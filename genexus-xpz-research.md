@@ -10,7 +10,7 @@ Pontos já confirmados:
 - esse XML usa a raiz `<ExportFile>`
 - os objetos GeneXus ficam em nós `<Object ...>`
 - cada objeto é composto por várias partes internas identificadas por `Part type`
-- já foi possível mapear GUIDs de tipos de objeto como `WebPanel`, `Procedure`, `API`, `Dashboard`, `DataProvider`, `SDT`, `Transaction`, `Module`, `Folder`, `File`, `Domain`, `SubTypeGroup`, `ThemeClass`, `ThemeColor`, `ColorPalette`, `Image`, `Index`, `Panel`, `UserControl`, `DesignSystem`, `Stencil`, `DataSelector`, `Document`, `Generator`, `Language`, `DeploymentUnit`, `Theme`, `DataStore`, `WorkWithForWeb` e `PatternSettings`
+- já foi possível mapear GUIDs de tipos de objeto como `Web Panel`, `Procedure`, `API`, `Dashboard`, `Data Provider`, `Structured Data Type (SDT)`, `Transaction`, `Module`, `Folder`, `File`, `Domain`, `Subtype Group`, `Theme Class`, `Theme Color`, `Color Palette`, `Image`, `Index`, `Panel`, `User Control`, `Design System`, `Stencil`, `Data Selector`, `Document`, `Generator`, `Language`, `Deployment Unit`, `Theme`, `DataStore`, `WorkWithForWeb` e `Pattern Settings`
 
 Objetivo deste documento:
 - servir como base genérica para analisar `XPZ`
@@ -31,7 +31,7 @@ Puntos ya confirmados:
 - ese XML usa la raíz `<ExportFile>`
 - los objetos GeneXus aparecen en nodos `<Object ...>`
 - cada objeto está compuesto por varias partes internas identificadas por `Part type`
-- ya fue posible mapear GUIDs de tipos de objeto como `WebPanel`, `Procedure`, `API`, `Dashboard`, `DataProvider`, `SDT`, `Transaction`, `Module`, `Folder`, `File`, `Domain`, `SubTypeGroup`, `ThemeClass`, `ThemeColor`, `ColorPalette`, `Image`, `Index`, `Panel`, `UserControl`, `DesignSystem`, `Stencil`, `DataSelector`, `Document`, `Generator`, `Language`, `DeploymentUnit`, `Theme`, `DataStore`, `WorkWithForWeb` y `PatternSettings`
+- ya fue posible mapear GUIDs de tipos de objeto como `Web Panel`, `Procedure`, `API`, `Dashboard`, `Data Provider`, `Structured Data Type (SDT)`, `Transaction`, `Module`, `Folder`, `File`, `Domain`, `Subtype Group`, `Theme Class`, `Theme Color`, `Color Palette`, `Image`, `Index`, `Panel`, `User Control`, `Design System`, `Stencil`, `Data Selector`, `Document`, `Generator`, `Language`, `Deployment Unit`, `Theme`, `DataStore`, `WorkWithForWeb` y `Pattern Settings`
 
 Objetivo del documento:
 - servir como base genérica para analizar `XPZ`
@@ -101,6 +101,8 @@ Meaning:
 
 The following mappings were confirmed from real objects found in the inspected XML.
 
+Canonical names below follow GeneXus public documentation when available. Entries that do not appear in the official public object table are kept as operational names inferred from exports and should not yet be treated as fully official object names.
+
 | Object type | GUID |
 |---|---|
 | `Folder` | `00000000-0000-0000-0000-000000000006` |
@@ -109,28 +111,29 @@ The following mappings were confirmed from real objects found in the inspected X
 | `Procedure` | `84a12160-f59b-4ad7-a683-ea4481ac23e9` |
 | `API` | `36e32e2d-023e-4188-95df-d13573bac2e0` |
 | `Dashboard` | `526aba9f-a725-4bc7-b1db-0b9f92ac9550` |
-| `DataProvider` | `2a9e9aba-d2de-4801-ae7f-5e3819222daf` |
-| `DataSelector` | `ffd44be7-3bb4-4d01-9e7e-d1c1a3c095af` |
+| `Data Provider` | `2a9e9aba-d2de-4801-ae7f-5e3819222daf` |
+| `Data Selector` | `ffd44be7-3bb4-4d01-9e7e-d1c1a3c095af` |
 | `DataStore` | `dcdcdcdc-dfe0-4a57-ae8f-c6e31b0dcbc0` |
-| `DeploymentUnit` | `bf08dfb1-361c-4e7e-ad54-391e56e60b49` |
+| `Deployment Unit` | `bf08dfb1-361c-4e7e-ad54-391e56e60b49` |
 | `Domain` | `00972a17-9975-449e-aab1-d26165d51393` |
 | `Document` | `faeb588c-dcce-4dad-9af3-cdd11b961a32` |
 | `File` | `1132ac08-290f-4fd1-bd18-64777b7329d1` |
 | `Image` | `9fb193d9-64a4-4d30-b129-ff7c76830f7e` |
 | `Index` | `857ca50e-7905-0000-0007-c5d9ff2975ec` |
 | `Language` | `88313f43-5eb2-0000-0028-e8d9f5bf9588` |
-| `PatternSettings` | `83476c1e-fa72-4229-9930-f51b954fca2d` |
+| `Pattern Settings` | `83476c1e-fa72-4229-9930-f51b954fca2d` |
 | `Stencil` | `624a8b31-36f0-4292-adba-2d270d1e3537` |
 | `Theme` | `c804fdbd-7c0b-440d-8527-4316c92649a6` |
-| `UserControl` | `562f4793-aabe-449f-8821-fc77e550698e` |
-| `DesignSystem` | `78b3fa0e-174c-4b2b-8716-718167a428b5` |
-| `SDT` | `447527b5-9210-4523-898b-5dccb17be60a` |
-| `SubTypeGroup` | `87313f43-5eb2-41d7-9b8c-e8d9f5bf9588` |
-| `ThemeClass` | `d4876646-98dd-419b-8c1c-896f83c48368` |
-| `ThemeColor` | `5592de59-d30a-499d-9100-a7006d3674f2` |
+| `User Control` | `562f4793-aabe-449f-8821-fc77e550698e` |
+| `Design System` | `78b3fa0e-174c-4b2b-8716-718167a428b5` |
+| `Structured Data Type (SDT)` | `447527b5-9210-4523-898b-5dccb17be60a` |
+| `Subtype Group` | `87313f43-5eb2-41d7-9b8c-e8d9f5bf9588` |
+| `Theme Class` | `d4876646-98dd-419b-8c1c-896f83c48368` |
+| `Theme Color` | `5592de59-d30a-499d-9100-a7006d3674f2` |
 | `Transaction` | `1db606f2-af09-4cf9-a3b5-b481519d28f6` |
 | `Panel` | `d82625fd-5892-40b0-99c9-5c8559c197fc` |
-| `WebPanel` | `c9584656-94b6-4ccd-890f-332d11fc2c25` |
+| `Color Palette` | `3affc0b3-494b-4d84-9ec1-3a6ab8349cda` |
+| `Web Panel` | `c9584656-94b6-4ccd-890f-332d11fc2c25` |
 | `WorkWithForWeb` | `78cecefe-be7d-4980-86ce-8d6e91fba04b` |
 | `External Object` | `c163e562-42c6-4158-ad83-5b21a14cf30e` |
 | `Packaged Module` | `c88fffcd-b6f8-0000-8fec-00b5497e2117` |
@@ -138,29 +141,29 @@ The following mappings were confirmed from real objects found in the inspected X
 ## Evidence Used For Type Mapping
 
 Examples observed in the inspected XML:
-- `wpLogin3` and `ViewCliente` use `type="c9584656-94b6-4ccd-890f-332d11fc2c25"` -> `WebPanel`
+- `wpLogin3` and `ViewCliente` use `type="c9584656-94b6-4ccd-890f-332d11fc2c25"` -> `Web Panel`
 - `sdLogin` uses `type="d82625fd-5892-40b0-99c9-5c8559c197fc"` -> `Panel`
 - `procViewRomaneio` uses `type="84a12160-f59b-4ad7-a683-ea4481ac23e9"` -> `Procedure`
 - `apiPDV_Integracao` uses `type="36e32e2d-023e-4188-95df-d13573bac2e0"`; per user confirmation in the KB, this object type is `API`
-- `Carmine` uses `type="3affc0b3-494b-4d84-9ec1-3a6ab8349cda"`; per user confirmation in the KB, this object type is `ColorPalette`
-- objects using `type="562f4793-aabe-449f-8821-fc77e550698e"`; per user confirmation in the KB, this object type is `UserControl`
-- objects using `type="78b3fa0e-174c-4b2b-8716-718167a428b5"`; per user confirmation in the KB, this object type is `DesignSystem`
+- `Carmine` uses `type="3affc0b3-494b-4d84-9ec1-3a6ab8349cda"`; per user confirmation in the KB, this object type is `Color Palette`
+- objects using `type="562f4793-aabe-449f-8821-fc77e550698e"`; per user confirmation in the KB, this object type is `User Control`
+- objects using `type="78b3fa0e-174c-4b2b-8716-718167a428b5"`; per user confirmation in the KB, this object type is `Design System`
 - objects using `type="624a8b31-36f0-4292-adba-2d270d1e3537"`; per user confirmation in the KB, this object type is `Stencil`
 - `GAM_ActivityDashboard` uses `type="526aba9f-a725-4bc7-b1db-0b9f92ac9550"` and contains `<Dashboard>` inside `<Data ...>`; no other extracted XML showed `<Dashboard>` -> `Dashboard`
-- objects using `type="2a9e9aba-d2de-4801-ae7f-5e3819222daf"` match the `Data Provider` set exported from the KB and show DP-style source, parameters, and `OutputSDT` definitions -> `DataProvider`
-- objects using `type="ffd44be7-3bb4-4d01-9e7e-d1c1a3c095af"`; per user confirmation in the KB, this object type is `DataSelector`
+- objects using `type="2a9e9aba-d2de-4801-ae7f-5e3819222daf"` match the `Data Provider` set exported from the KB and show DP-style source, parameters, and `OutputSDT` definitions -> `Data Provider`
+- objects using `type="ffd44be7-3bb4-4d01-9e7e-d1c1a3c095af"`; per user confirmation in the KB, this object type is `Data Selector`
 - objects using `type="faeb588c-dcce-4dad-9af3-cdd11b961a32"`; per user confirmation in the KB, this object type is `Document`
 - objects using `type="ecececec-dfe0-4a57-ae8f-c6e31b0dcbc0"`; per user confirmation in the KB, this object type is `Generator`
 - `AbrangenciaDaSelecaoDeCorte`, `Aliquota`, `CEST`, `EnderecoEmail`, and `PrecoComZ` use `type="00972a17-9975-449e-aab1-d26165d51393"` and consistently show `Domain`-style properties such as `ATTCUSTOMTYPE`, `Length`, `AttMaxLen`, `Decimals`, `ATT_PICTURE`, `IDEnumDefinedValues`, or `idBasedOn` -> `Domain`
 - objects using `type="1132ac08-290f-4fd1-bd18-64777b7329d1"` match the `File` export set from the KB and show `FileName`, `FileExtension`, embedded binary data, and extraction properties such as `JavaExtract` and `NetExtract` -> `File`
 - objects using `type="9fb193d9-64a4-4d30-b129-ff7c76830f7e"` consistently show image payload under `<Images>` and map directly to generated files under the web model's `Web/Resources` output directory -> `Image`
 - objects using `type="857ca50e-7905-0000-0007-c5d9ff2975ec"` consistently contain `<Index` and no objects outside that type showed the same pattern in the extracted KB object set -> `Index`
-- objects using `type="83476c1e-fa72-4229-9930-f51b954fca2d"` were `WorkWith` and `WorkWithDevices`, each storing `<Data Pattern="...">` configuration for pattern behavior -> `PatternSettings`
-- objects using `type="87313f43-5eb2-41d7-9b8c-e8d9f5bf9588"` consistently contain `<Subtype guid="...">` entries and no objects outside that type showed the same pattern in the extracted KB object set -> `SubTypeGroup`
-- objects using `type="d4876646-98dd-419b-8c1c-896f83c48368"` consistently show `ThemeElementInternalType = GxClass` and `ThemeElementThemeTypes = idWeb` or `idSD`, and their names are referenced as generated UI classes in the web output -> operationally classified as `ThemeClass`
-- objects using `type="5592de59-d30a-499d-9100-a7006d3674f2"` were confirmed by a dedicated export whose `<Dependencies>` entry declared `Name="Theme Color"` for that GUID -> `ThemeColor`
+- objects using `type="83476c1e-fa72-4229-9930-f51b954fca2d"` were `WorkWith` and `WorkWithDevices`, each storing `<Data Pattern="...">` configuration for pattern behavior -> `Pattern Settings`
+- objects using `type="87313f43-5eb2-41d7-9b8c-e8d9f5bf9588"` consistently contain `<Subtype guid="...">` entries and no objects outside that type showed the same pattern in the extracted KB object set -> `Subtype Group`
+- objects using `type="d4876646-98dd-419b-8c1c-896f83c48368"` consistently show `ThemeElementInternalType = GxClass` and `ThemeElementThemeTypes = idWeb` or `idSD`, and their names are referenced as generated UI classes in the web output -> operationally classified as `Theme Class`
+- objects using `type="5592de59-d30a-499d-9100-a7006d3674f2"` were confirmed by a dedicated export whose `<Dependencies>` entry declared `Name="Theme Color"` for that GUID -> `Theme Color`
 - objects using `type="78cecefe-be7d-4980-86ce-8d6e91fba04b"` all start with `WorkWithWeb` and no extracted object outside that type starts with `WorkWithWeb` -> `WorkWithForWeb`
-- `SdtNfe`, `sdtFatura`, `Messages` use `type="447527b5-9210-4523-898b-5dccb17be60a"` -> `SDT`
+- `SdtNfe`, `sdtFatura`, `Messages` use `type="447527b5-9210-4523-898b-5dccb17be60a"` -> `Structured Data Type (SDT)`
 - `Animal` transaction uses `type="1db606f2-af09-4cf9-a3b5-b481519d28f6"` -> `Transaction`
 - `GAMRepository` uses `type="c163e562-42c6-4158-ad83-5b21a14cf30e"` -> `External Object`
 
@@ -184,7 +187,7 @@ This means:
 
 ## Observed Part Types By Object Type
 
-### WebPanel
+### Web Panel
 
 Observed from object `wpLogin3`.
 
@@ -218,7 +221,7 @@ Validation evidence:
 - per user confirmation in the GeneXus KB, `apiPDV_Integracao` is an object of type `API`
 - the extracted object set for `type="36e32e2d-023e-4188-95df-d13573bac2e0"` currently contains that object
 
-### ColorPalette
+### Color Palette
 
 Observed from object `Carmine`.
 
@@ -226,7 +229,7 @@ Validation evidence:
 - per user confirmation in the GeneXus KB, `Carmine` is an object of type `Color Palette`
 - the extracted object set for `type="3affc0b3-494b-4d84-9ec1-3a6ab8349cda"` currently contains that object
 
-### DesignSystem
+### Design System
 
 Validation evidence:
 - per user confirmation in the GeneXus KB, the extracted object set for `type="78b3fa0e-174c-4b2b-8716-718167a428b5"` is of type `Design System`
@@ -236,7 +239,7 @@ Validation evidence:
 Validation evidence:
 - per user confirmation in the GeneXus KB, the extracted object set for `type="624a8b31-36f0-4292-adba-2d270d1e3537"` is of type `Stencil`
 
-### UserControl
+### User Control
 
 Validation evidence:
 - per user confirmation in the GeneXus KB, the extracted object set for `type="562f4793-aabe-449f-8821-fc77e550698e"` is of type `User Control`
@@ -254,7 +257,7 @@ Validation evidence:
 - this XML contained `<Dashboard>` inside `<Data ...>`
 - no other extracted XML contained `<Dashboard>`
 
-### DataProvider
+### Data Provider
 
 Observed from objects such as `dpCargaPedidos` and `GAM_GetTotalUsers`.
 
@@ -267,7 +270,7 @@ Validation evidence:
 - the extracted object set for `type="2a9e9aba-d2de-4801-ae7f-5e3819222daf"` matched the `Data Provider` list exported from the KB
 - sampled objects showed standard DP structure and semantics
 
-### DataSelector
+### Data Selector
 
 Validation evidence:
 - per user confirmation in the GeneXus KB, the extracted object set for `type="ffd44be7-3bb4-4d01-9e7e-d1c1a3c095af"` is of type `Data Selector`
@@ -344,7 +347,7 @@ Working note:
 - this GUID had previously been labeled `SDPanel` from observed examples
 - per user confirmation, the type should be treated as `Panel` in this working catalog
 
-### PatternSettings
+### Pattern Settings
 
 Observed from objects `WorkWith` and `WorkWithDevices`.
 
@@ -357,7 +360,7 @@ Validation evidence:
 - both objects stored pattern configuration rather than business object definitions
 - per user confirmation, the name shown in the GeneXus IDE for this object type is `Pattern Settings`
 
-### ThemeColor
+### Theme Color
 
 Observed from a dedicated export of only `Theme Color` objects from the KB.
 
@@ -368,7 +371,7 @@ Observed content style:
 Validation evidence:
 - a dedicated `XPZ` export containing only Theme Color objects produced exactly the same GUID `5592de59-d30a-499d-9100-a7006d3674f2`
 - the exported XML `<Dependencies>` block declared `Name="Theme Color"` for that GUID
-### ThemeClass
+### Theme Class
 
 Observed from objects such as `ActionAttribute`, `ActionButtons`, and `BigTitle`.
 
@@ -384,7 +387,7 @@ Validation evidence:
 - names such as `ActionButtons`, `ActionsContainer`, and `BigTitle` were found referenced in generated web output under the web model output directory
 
 Operational note:
-- `ThemeClass` is a practical working label based on current evidence
+- `Theme Class` is a practical working label based on current evidence
 - if future GeneXus documentation or broader evidence reveals a more official object-type name for this GUID, this mapping should be revised
 
 ### WorkWithForWeb
@@ -396,7 +399,7 @@ Validation evidence:
 - no extracted object outside that type started with `WorkWithWeb`
 - all extracted objects of this type also contained `<Data Pattern=`, consistent with pattern-generated web artifacts, though that marker was not exclusive to this type
 
-### SDT
+### Structured Data Type (SDT)
 
 Observed from object `SdtNfe`.
 
@@ -408,7 +411,7 @@ Related nested type identifiers observed:
 - `a76e9340-bdb9-445d-8f81-cfd4ddd0b0f3`: level metadata items inside SDT structure
 - `f76e9340-bdb9-445d-8f81-cfd4ddd0b0f3`: member/item entries inside SDT structure
 
-### SubTypeGroup
+### Subtype Group
 
 Observed from objects such as `AbateOrdemCompraGado`.
 
@@ -490,9 +493,9 @@ Long term:
 
 ## Suggested Next Investigation
 
-1. Extract a full minimal `WebPanel` object block and compare with another `WebPanel`
+1. Extract a full minimal `Web Panel` object block and compare with another `Web Panel`
 2. Extract a full minimal `Procedure` object block and compare with another `Procedure`
-3. Extract a simple `SDT`, a simple `Transaction`, and a `SubTypeGroup`
+3. Extract a simple `Structured Data Type (SDT)`, a simple `Transaction`, and a `Subtype Group`
 4. Build a `Part type` catalog with semantic labels
 5. Test whether editing a copied object block and repacking the `XPZ` is accepted by GeneXus
 
