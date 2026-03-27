@@ -7,7 +7,7 @@ operacional
 medio
 
 ## Depende de
-00-README-GLOBAL.md, 01-base-empirica-geral.md, 02-regras-operacionais-gerais.md, 03-risco-e-decisao-por-tipo.md, 04-webpanel-familias-e-templates.md, 05-transaction-familias-e-templates.md
+00-README-GLOBAL.md, 01-base-empirica-geral.md, 02-regras-operacionais-e-runtime.md, 03-risco-e-decisao-por-tipo.md, 04-webpanel-familias-e-templates.md, 05-transaction-familias-e-templates.md
 
 ## Usado por
 qualquer GPT que precise consumir esta base consolidada
@@ -27,7 +27,7 @@ operacional
 médio
 
 ## Depende de
-00-README-GLOBAL.md, 01-genexus-xpz-research.md, 20-guia-de-clonagem-segura.md, 21-indicios-de-obrigatoriedade.md, 22-tipos-prontos-para-geracao-conservadora.md, 23-mapa-de-risco-por-tipo.md, 24-resumo-operacional-para-gerador-xpz.md
+00-README-GLOBAL.md, 01-base-empirica-geral.md, 02-regras-operacionais-e-runtime.md, 03-risco-e-decisao-por-tipo.md, 22-tipos-prontos-para-geracao-conservadora.md, 03-risco-e-decisao-por-tipo.md, 02-regras-operacionais-e-runtime.md
 
 ## Usado por
 qualquer agente GPT que precise responder perguntas ou tomar decisão operacional usando esta base
@@ -39,11 +39,17 @@ Padronizar quando avançar, quando exigir template real e quando abortar.
 ## Ordem de consulta recomendada
 
 1. ler `00-README-GLOBAL.md`
-2. identificar o tipo alvo e checar `23-mapa-de-risco-por-tipo.md`
-3. ler `21-indicios-de-obrigatoriedade.md`
-4. ler `20-guia-de-clonagem-segura.md`
-5. ler `24-resumo-operacional-para-gerador-xpz.md`
-6. usar `10`, `11`, `12` e `30` para sustentar qualquer detalhe empírico específico
+2. identificar o tipo alvo e checar `03-risco-e-decisao-por-tipo.md`
+3. ler `02-regras-operacionais-e-runtime.md`
+4. para `WebPanel`, ler `04-webpanel-familias-e-templates.md`
+5. para `Transaction`, ler `05-transaction-familias-e-templates.md`
+6. usar `01-base-empirica-geral.md` e `09-historico-e-inventario-publico.md` para sustentar detalhe empírico e rastreabilidade
+
+## Regra de leitura para runtime
+
+- quando a pergunta envolver `Base Table`, `Extended Table`, navegacao, `For each`, `Load`, `Refresh`, `Refresh Grid` ou risco de performance, consultar primeiro `02-regras-operacionais-e-runtime.md`
+- quando a pergunta envolver apenas estrutura XML observada, priorizar `01-base-empirica-geral.md`
+- quando a pergunta misturar estrutura e comportamento provavel, responder separando explicitamente `Evidência direta`, `Regra documentada`, `Inferência forte` e `Hipótese`
 
 ## Quando responder com mais confiança
 
@@ -142,7 +148,7 @@ Padronizar quando avançar, quando exigir template real e quando abortar.
 
 ### WebPanel
 
-- identificar primeiro a familia estrutural usando `27-familias-estruturais-de-webpanel.md`
+- identificar primeiro a familia estrutural usando `04-webpanel-familias-e-templates.md`
 - selecionar um template bruto interno da mesma familia; nao usar o anexo sanitizado como fonte final
 - preservar `layout`, `events`, `variables`, `Part type`, controles e bindings do template-base
 - abortar se a familia nao estiver clara ou se o alvo exigir `grid`, `tab`, componente customizado ou contexto de `parent` ausente no bruto escolhido
@@ -159,8 +165,9 @@ Padronizar quando avançar, quando exigir template real e quando abortar.
 
 - Fonte valida: XML bruto de objeto e envelope XPZ bruto real
 - Fonte invalida: markdown desta base
-- Fonte invalida: exemplos sanitizados de `27-familias-estruturais-de-webpanel.md`
+- Fonte invalida: exemplos sanitizados de `04-webpanel-familias-e-templates.md`
 - Fonte invalida: reconstrucoes livres baseadas em tabelas, frequencias ou descricoes
 - Inferência forte: esta base documental decide, classifica e orienta; quem materializa e serializa e sempre o XML bruto comparavel
+
 
 

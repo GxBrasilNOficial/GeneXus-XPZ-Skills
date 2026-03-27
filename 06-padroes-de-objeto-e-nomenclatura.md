@@ -27,10 +27,10 @@ conceitual
 médio
 
 ## Depende de
-01-genexus-xpz-research.md, 30-inventario-bruto-kb.md
+01-base-empirica-geral.md, 30-inventario-bruto-kb.md
 
 ## Usado por
-20-guia-de-clonagem-segura.md, 26-guia-para-agente-gpt.md
+02-regras-operacionais-e-runtime.md, 26-guia-para-agente-gpt.md
 
 ## Objetivo
 Registrar padrões observáveis de nomeação, organização e referência entre objetos no acervo analisado.
@@ -90,6 +90,7 @@ Este documento registra apenas padrões observáveis no inventário bruto e nos 
 
 - `Inferência forte`: para documentação e análise, vale registrar esses padrões como recorrências da KB.
 - `Hipótese`: para criação de objetos novos, essas recorrências podem servir como convenção inicial, mas isso ainda precisaria de validação com a equipe ou com a IDE da KB.
+
 
 
 

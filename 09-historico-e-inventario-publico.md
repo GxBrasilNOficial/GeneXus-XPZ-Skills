@@ -122,7 +122,7 @@ alto
 nenhum; esta versao substitui o dump bruto nominal para publicacao
 
 ## Usado por
-01-genexus-xpz-research.md, 10-matriz-part-types-por-tipo.md, 11-campos-estaveis-vs-variaveis.md, 12-diffs-estruturais-por-tipo.md, 00-README-GLOBAL.md
+01-base-empirica-geral.md, 10-matriz-part-types-por-tipo.md, 11-campos-estaveis-vs-variaveis.md, 12-diffs-estruturais-por-tipo.md, 00-README-GLOBAL.md
 
 ## Objetivo
 Preservar os fatos agregados da varredura XML sem expor nomes reais de objeto, modulos, pais, caminhos ou descricoes de negocio da KB de origem.
@@ -193,7 +193,7 @@ Preservar todo o conteudo existente, definindo destino e criterio de incorporaca
 
 1. `00-README-GLOBAL.md`
 2. `01-base-empirica-geral.md`
-3. `02-regras-operacionais-gerais.md`
+3. `02-regras-operacionais-e-runtime.md`
 4. `03-risco-e-decisao-por-tipo.md`
 5. `04-webpanel-familias-e-templates.md`
 6. `05-transaction-familias-e-templates.md`
@@ -231,7 +231,7 @@ Preservar todo o conteudo existente, definindo destino e criterio de incorporaca
   - diagnostico de duplicidade/sobreposicao
   - observacoes sobre reorganizacao da base
 
-### 01-genexus-xpz-research.md
+### 01-base-empirica-geral.md
 
 - Destino principal: `01-base-empirica-geral.md`
 - Manter:
@@ -241,12 +241,12 @@ Preservar todo o conteudo existente, definindo destino e criterio de incorporaca
 
 ### 02-genexus-xpz-generation-rules.md
 
-- Destino principal: `02-regras-operacionais-gerais.md`
+- Destino principal: `02-regras-operacionais-e-runtime.md`
 - Manter:
   - regras gerais de geracao
   - postura conservadora de montagem
   - restricoes de fonte e materializacao
-- Integrar sem duplicar trechos que hoje ja estao mais fortes em `24-resumo-operacional-para-gerador-xpz.md`
+- Integrar sem duplicar trechos que hoje ja estao mais fortes em `02-regras-operacionais-e-runtime.md`
 
 ### 03-genexus-object-design-patterns.md
 
@@ -293,9 +293,9 @@ Preservar todo o conteudo existente, definindo destino e criterio de incorporaca
 - Consolidar como secao:
   - `Diffs estruturais`
 
-### 20-guia-de-clonagem-segura.md
+### 02-regras-operacionais-e-runtime.md
 
-- Destino principal: `02-regras-operacionais-gerais.md`
+- Destino principal: `02-regras-operacionais-e-runtime.md`
 - Manter:
   - criterios de escolha de template
   - o que preservar
@@ -303,7 +303,7 @@ Preservar todo o conteudo existente, definindo destino e criterio de incorporaca
 - Consolidar como secao:
   - `Clonagem conservadora`
 
-### 21-indicios-de-obrigatoriedade.md
+### 03-risco-e-decisao-por-tipo.md
 
 - Destino principal: `03-risco-e-decisao-por-tipo.md`
 - Manter:
@@ -322,7 +322,7 @@ Preservar todo o conteudo existente, definindo destino e criterio de incorporaca
 - Consolidar como secao:
   - `Prontidao por tipo`
 
-### 23-mapa-de-risco-por-tipo.md
+### 03-risco-e-decisao-por-tipo.md
 
 - Destino principal: `03-risco-e-decisao-por-tipo.md`
 - Manter:
@@ -331,9 +331,9 @@ Preservar todo o conteudo existente, definindo destino e criterio de incorporaca
 - Consolidar como secao:
   - `Mapa de risco`
 
-### 24-resumo-operacional-para-gerador-xpz.md
+### 02-regras-operacionais-e-runtime.md
 
-- Destino principal: `02-regras-operacionais-gerais.md`
+- Destino principal: `02-regras-operacionais-e-runtime.md`
 - Manter:
   - algoritmo de geracao
   - regras de materializacao
@@ -362,7 +362,7 @@ Preservar todo o conteudo existente, definindo destino e criterio de incorporaca
   - regras de materializacao, serializacao e fonte do ponto de vista do agente
 - Incorporar trechos introdutorios mais curtos tambem em `00-README-GLOBAL.md`
 
-### 27-familias-estruturais-de-webpanel.md
+### 04-webpanel-familias-e-templates.md
 
 - Destino principal: `04-webpanel-familias-e-templates.md`
 - Manter:
@@ -376,7 +376,7 @@ Preservar todo o conteudo existente, definindo destino e criterio de incorporaca
   - regras operacionais
   - anexos sanitizados
 
-### 28-familias-estruturais-de-transaction.md
+### 05-transaction-familias-e-templates.md
 
 - Destino principal: `05-transaction-familias-e-templates.md`
 - Manter:
@@ -417,30 +417,30 @@ Preservar todo o conteudo existente, definindo destino e criterio de incorporaca
 
 ### 01-base-empirica-geral.md
 
-- de `01-genexus-xpz-research.md`
+- de `01-base-empirica-geral.md`
 - de `10-matriz-part-types-por-tipo.md`
 - de `11-campos-estaveis-vs-variaveis.md`
 - de `12-diffs-estruturais-por-tipo.md`
 
-### 02-regras-operacionais-gerais.md
+### 02-regras-operacionais-e-runtime.md
 
 - de `02-genexus-xpz-generation-rules.md`
-- de `20-guia-de-clonagem-segura.md`
-- de `24-resumo-operacional-para-gerador-xpz.md`
+- de `02-regras-operacionais-e-runtime.md`
+- de `02-regras-operacionais-e-runtime.md`
 
 ### 03-risco-e-decisao-por-tipo.md
 
-- de `21-indicios-de-obrigatoriedade.md`
+- de `03-risco-e-decisao-por-tipo.md`
 - de `22-tipos-prontos-para-geracao-conservadora.md`
-- de `23-mapa-de-risco-por-tipo.md`
+- de `03-risco-e-decisao-por-tipo.md`
 
 ### 04-webpanel-familias-e-templates.md
 
-- de `27-familias-estruturais-de-webpanel.md`
+- de `04-webpanel-familias-e-templates.md`
 
 ### 05-transaction-familias-e-templates.md
 
-- de `28-familias-estruturais-de-transaction.md`
+- de `05-transaction-familias-e-templates.md`
 
 ### 06-padroes-de-objeto-e-nomenclatura.md
 
@@ -473,7 +473,7 @@ Preservar todo o conteudo existente, definindo destino e criterio de incorporaca
 
 1. consolidar `09-historico-e-inventario-publico.md`
 2. consolidar `01-base-empirica-geral.md`
-3. consolidar `02-regras-operacionais-gerais.md`
+3. consolidar `02-regras-operacionais-e-runtime.md`
 4. consolidar `03-risco-e-decisao-por-tipo.md`
 5. manter `04` e `05` como arquivos especializados
 6. consolidar `06`, `07` e `08`
@@ -509,18 +509,18 @@ Registrar o que foi lido, renomeado, consolidado e mantido em aberto durante a r
 
 ## Arquivos renomeados/consolidados para a raiz
 
-- `genexus-xpz-research.md` -> `01-genexus-xpz-research.md`
+- `genexus-xpz-research.md` -> `01-base-empirica-geral.md`
 - `genexus-xpz-generation-rules.md` -> `02-genexus-xpz-generation-rules.md`
 - `genexus-object-design-patterns.md` -> `03-genexus-object-design-patterns.md`
 - `genexus-open-points.md` -> `04-genexus-open-points.md`
 - `docs-kb-md/10-matriz-part-types-por-tipo.md` -> `10-matriz-part-types-por-tipo.md`
 - `docs-kb-md/11-campos-estaveis-vs-variaveis.md` -> `11-campos-estaveis-vs-variaveis.md`
 - `docs-kb-md/12-diffs-estruturais-por-tipo.md` -> `12-diffs-estruturais-por-tipo.md`
-- `docs-kb-md/13-guia-de-clonagem-segura.md` -> `20-guia-de-clonagem-segura.md`
-- `docs-kb-md/14-indicios-de-obrigatoriedade.md` -> `21-indicios-de-obrigatoriedade.md`
+- `docs-kb-md/13-guia-de-clonagem-segura.md` -> `02-regras-operacionais-e-runtime.md`
+- `docs-kb-md/14-indicios-de-obrigatoriedade.md` -> `03-risco-e-decisao-por-tipo.md`
 - `docs-kb-md/15-tipos-prontos-para-geracao-conservadora.md` -> `22-tipos-prontos-para-geracao-conservadora.md`
-- `docs-kb-md/16-mapa-de-risco-por-tipo.md` -> `23-mapa-de-risco-por-tipo.md`
-- `docs-kb-md/17-resumo-operacional-para-gerador-xpz.md` -> `24-resumo-operacional-para-gerador-xpz.md`
+- `docs-kb-md/16-mapa-de-risco-por-tipo.md` -> `03-risco-e-decisao-por-tipo.md`
+- `docs-kb-md/17-resumo-operacional-para-gerador-xpz.md` -> `02-regras-operacionais-e-runtime.md`
 - `docs-kb-md/18-checklist-para-novos-templates.md` -> `25-checklist-para-novos-templates.md`
 - `docs-kb-md/00-inventario-bruto.md` -> `30-inventario-bruto-kb.md`
 
@@ -557,5 +557,6 @@ Registrar o que foi lido, renomeado, consolidado e mantido em aberto durante a r
 - `Evidência direta`: a base passou a reconhecer 183 `Transaction` e 1196 `WebPanel` como massa amostral suficiente para execucao controlada.
 - `Inferência forte`: a mudanca pratica foi de bloqueio por prudencia para tentativa controlada com template interno da propria base.
 - `Hipótese`: os erros de importacao que aparecerem devem ser incorporados ao refinamento desta mesma documentacao.
+
 
 

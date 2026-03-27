@@ -10,18 +10,18 @@ medio
 09-historico-e-inventario-publico.md
 
 ## Usado por
-02-regras-operacionais-gerais.md, 03-risco-e-decisao-por-tipo.md, 08-guia-para-agente-gpt.md
+02-regras-operacionais-e-runtime.md, 03-risco-e-decisao-por-tipo.md, 08-guia-para-agente-gpt.md
 
 ## Objetivo
 Concentrar a base factual observada nos XMLs: pesquisa geral, matriz de Part types, campos do no Object e diffs estruturais por tipo.
 
 ## Fontes consolidadas
-- 01-genexus-xpz-research.md
+- 01-base-empirica-geral.md
 - 10-matriz-part-types-por-tipo.md
 - 11-campos-estaveis-vs-variaveis.md
 - 12-diffs-estruturais-por-tipo.md
 
-## Origem incorporada - 01-genexus-xpz-research.md
+## Origem incorporada - 01-base-empirica-geral.md
 
 ## Papel do documento
 conceitual
@@ -33,7 +33,7 @@ alto
 30-inventario-bruto-kb.md
 
 ## Usado por
-02-genexus-xpz-generation-rules.md, 10-matriz-part-types-por-tipo.md, 11-campos-estaveis-vs-variaveis.md, 12-diffs-estruturais-por-tipo.md, 20-guia-de-clonagem-segura.md
+02-genexus-xpz-generation-rules.md, 10-matriz-part-types-por-tipo.md, 11-campos-estaveis-vs-variaveis.md, 12-diffs-estruturais-por-tipo.md, 02-regras-operacionais-e-runtime.md
 
 ## Objetivo
 Consolidar a leitura estrutural do acervo XML extraído da KB.
@@ -167,10 +167,10 @@ empírico
 médio
 
 ## Depende de
-30-inventario-bruto-kb.md, 01-genexus-xpz-research.md
+30-inventario-bruto-kb.md, 01-base-empirica-geral.md
 
 ## Usado por
-20-guia-de-clonagem-segura.md, 21-indicios-de-obrigatoriedade.md, 23-mapa-de-risco-por-tipo.md, 24-resumo-operacional-para-gerador-xpz.md
+02-regras-operacionais-e-runtime.md, 03-risco-e-decisao-por-tipo.md, 03-risco-e-decisao-por-tipo.md, 02-regras-operacionais-e-runtime.md
 
 ## Objetivo
 Catalogar os `Part type` observados por tipo de objeto, com frequência e exemplos.
@@ -521,10 +521,10 @@ empírico
 médio
 
 ## Depende de
-30-inventario-bruto-kb.md, 01-genexus-xpz-research.md
+30-inventario-bruto-kb.md, 01-base-empirica-geral.md
 
 ## Usado por
-20-guia-de-clonagem-segura.md, 24-resumo-operacional-para-gerador-xpz.md, 26-guia-para-agente-gpt.md
+02-regras-operacionais-e-runtime.md, 02-regras-operacionais-e-runtime.md, 26-guia-para-agente-gpt.md
 
 ## Objetivo
 Comparar a estabilidade dos atributos do nó `Object` entre tipos extraídos.
@@ -1247,7 +1247,7 @@ médio
 30-inventario-bruto-kb.md, 10-matriz-part-types-por-tipo.md, 11-campos-estaveis-vs-variaveis.md
 
 ## Usado por
-20-guia-de-clonagem-segura.md, 21-indicios-de-obrigatoriedade.md, 23-mapa-de-risco-por-tipo.md, 24-resumo-operacional-para-gerador-xpz.md
+02-regras-operacionais-e-runtime.md, 03-risco-e-decisao-por-tipo.md, 03-risco-e-decisao-por-tipo.md, 02-regras-operacionais-e-runtime.md
 
 ## Objetivo
 Comparar amostras simples e complexas por tipo prioritário.
@@ -1396,6 +1396,7 @@ Destacar estabilidade estrutural relativa e pontos de maior risco para clonagem.
 - Evidência direta: Part type apenas nas amostras simples: nenhum.
 - Inferência forte: blocos recorrentes entre simples e complexos tendem a ser mais estáveis do que blocos exclusivos dos casos complexos.
 - Hipótese: editar primeiro blocos claramente textuais e recorrentes pode ter risco menor do que alterar blocos raros/opacos, mas isso ainda depende de validação posterior.
+
 
 
 

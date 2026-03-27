@@ -7,7 +7,7 @@ empirico e operacional
 medio
 
 ## Depende de
-01-base-empirica-geral.md, 02-regras-operacionais-gerais.md, 03-risco-e-decisao-por-tipo.md
+01-base-empirica-geral.md, 02-regras-operacionais-e-runtime.md, 03-risco-e-decisao-por-tipo.md
 
 ## Usado por
 08-guia-para-agente-gpt.md
@@ -27,10 +27,10 @@ empirico e operacional
 medio
 
 ## Depende de
-10-matriz-part-types-por-tipo.md, 11-campos-estaveis-vs-variaveis.md, 12-diffs-estruturais-por-tipo.md, 23-mapa-de-risco-por-tipo.md, 30-inventario-bruto-kb.md
+10-matriz-part-types-por-tipo.md, 11-campos-estaveis-vs-variaveis.md, 12-diffs-estruturais-por-tipo.md, 03-risco-e-decisao-por-tipo.md, 30-inventario-bruto-kb.md
 
 ## Usado por
-20-guia-de-clonagem-segura.md, 24-resumo-operacional-para-gerador-xpz.md, 26-guia-para-agente-gpt.md
+02-regras-operacionais-e-runtime.md, 02-regras-operacionais-e-runtime.md, 26-guia-para-agente-gpt.md
 
 ## Objetivo
 Identificar familias estruturais reais de `WebPanel` a partir do acervo XML da KB `KBBase18`.
@@ -1683,6 +1683,7 @@ Endevent
 - nome do objeto, captions e nomes semanticamente explicitos foram trocados por equivalentes genericos
 - referencia ao painel interno foi anonimizada sem alterar a estrutura do bloco de eventos
 - parent*, moduleGuid, Part type e a sequencia dos blocos foram preservados
+
 
 
 

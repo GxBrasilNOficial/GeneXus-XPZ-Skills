@@ -7,7 +7,7 @@ operacional e heuristico
 medio
 
 ## Depende de
-01-base-empirica-geral.md, 02-regras-operacionais-gerais.md
+01-base-empirica-geral.md, 02-regras-operacionais-e-runtime.md
 
 ## Usado por
 08-guia-para-agente-gpt.md
@@ -32,7 +32,7 @@ baixo
 10-matriz-part-types-por-tipo.md, 12-diffs-estruturais-por-tipo.md
 
 ## Usado por
-22-tipos-prontos-para-geracao-conservadora.md, 23-mapa-de-risco-por-tipo.md, 24-resumo-operacional-para-gerador-xpz.md, 26-guia-para-agente-gpt.md
+22-tipos-prontos-para-geracao-conservadora.md, 03-risco-e-decisao-por-tipo.md, 02-regras-operacionais-e-runtime.md, 26-guia-para-agente-gpt.md
 
 ## Objetivo
 Registrar indícios comparativos de obrigatoriedade, opcionalidade e vazio estrutural de `Part type`.
@@ -152,10 +152,10 @@ operacional
 baixo
 
 ## Depende de
-20-guia-de-clonagem-segura.md, 21-indicios-de-obrigatoriedade.md, 23-mapa-de-risco-por-tipo.md
+02-regras-operacionais-e-runtime.md, 03-risco-e-decisao-por-tipo.md, 03-risco-e-decisao-por-tipo.md
 
 ## Usado por
-24-resumo-operacional-para-gerador-xpz.md, 26-guia-para-agente-gpt.md, 04-genexus-open-points.md
+02-regras-operacionais-e-runtime.md, 26-guia-para-agente-gpt.md, 04-genexus-open-points.md
 
 ## Objetivo
 Classificar os tipos prioritários sob uma leitura estritamente conservadora de prontidão relativa.
@@ -204,10 +204,10 @@ operacional
 médio
 
 ## Depende de
-10-matriz-part-types-por-tipo.md, 11-campos-estaveis-vs-variaveis.md, 12-diffs-estruturais-por-tipo.md, 21-indicios-de-obrigatoriedade.md
+10-matriz-part-types-por-tipo.md, 11-campos-estaveis-vs-variaveis.md, 12-diffs-estruturais-por-tipo.md, 03-risco-e-decisao-por-tipo.md
 
 ## Usado por
-20-guia-de-clonagem-segura.md, 22-tipos-prontos-para-geracao-conservadora.md, 24-resumo-operacional-para-gerador-xpz.md, 26-guia-para-agente-gpt.md
+02-regras-operacionais-e-runtime.md, 22-tipos-prontos-para-geracao-conservadora.md, 02-regras-operacionais-e-runtime.md, 26-guia-para-agente-gpt.md
 
 ## Objetivo
 Sintetizar o risco estrutural relativo por tipo com base em dependência contextual, pattern e fragmentação interna.
@@ -235,5 +235,6 @@ Servir como primeira triagem operacional antes de qualquer tentativa de clonagem
 - Evidência direta: `Transaction`, `WebPanel` e `WorkWithForWeb` combinam alta dependencia contextual com estrutura relativamente rica ou pattern explicito.
 - Inferência forte: `Transaction` e `WebPanel` continuam em risco alto/muito alto, mas deixam de ser bloqueados por falta de base amostral.
 - Inferência forte: `PackagedModule`, `Theme` e parte de `SDT` seguem entre os candidatos menos agressivos do recorte, mas ainda nao devem ser tratados como baixos riscos absolutos.
+
 
 

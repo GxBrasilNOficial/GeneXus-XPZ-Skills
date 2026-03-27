@@ -52,39 +52,34 @@ Organizar conhecimento operacional e empírico sobre XMLs extraídos de `XPZ` Ge
 
 ### Conceitual
 
-- `01-genexus-xpz-research.md`
-- `02-genexus-xpz-generation-rules.md`
-- `03-genexus-object-design-patterns.md`
-- `04-genexus-open-points.md`
+- `00-README-GLOBAL.md`
+- `06-padroes-de-objeto-e-nomenclatura.md`
+- `09-historico-e-inventario-publico.md`
 
 ### Empírica
 
-- `30-inventario-bruto-kb.md`
-- `10-matriz-part-types-por-tipo.md`
-- `11-campos-estaveis-vs-variaveis.md`
-- `12-diffs-estruturais-por-tipo.md`
+- `01-base-empirica-geral.md`
+- `04-webpanel-familias-e-templates.md`
+- `05-transaction-familias-e-templates.md`
 
 ### Operacional
 
-- `20-guia-de-clonagem-segura.md`
-- `21-indicios-de-obrigatoriedade.md`
-- `22-tipos-prontos-para-geracao-conservadora.md`
-- `23-mapa-de-risco-por-tipo.md`
-- `24-resumo-operacional-para-gerador-xpz.md`
-- `25-checklist-para-novos-templates.md`
-- `26-guia-para-agente-gpt.md`
+- `02-regras-operacionais-e-runtime.md`
+- `03-risco-e-decisao-por-tipo.md`
+- `07-open-points-e-checklist.md`
+- `08-guia-para-agente-gpt.md`
 
 ## Ordem recomendada de leitura
 
 1. `00-README-GLOBAL.md`
-2. `01-genexus-xpz-research.md`
-3. `02-genexus-xpz-generation-rules.md`
-4. `23-mapa-de-risco-por-tipo.md`
-5. `21-indicios-de-obrigatoriedade.md`
-6. `20-guia-de-clonagem-segura.md`
-7. `24-resumo-operacional-para-gerador-xpz.md`
-8. `26-guia-para-agente-gpt.md`
-9. `04-genexus-open-points.md`
+2. `01-base-empirica-geral.md`
+3. `02-regras-operacionais-e-runtime.md`
+4. `03-risco-e-decisao-por-tipo.md`
+5. `04-webpanel-familias-e-templates.md`
+6. `05-transaction-familias-e-templates.md`
+7. `07-open-points-e-checklist.md`
+8. `08-guia-para-agente-gpt.md`
+9. `09-historico-e-inventario-publico.md`
 
 ## Regras absolutas para qualquer agente GPT
 
@@ -98,9 +93,9 @@ Organizar conhecimento operacional e empírico sobre XMLs extraídos de `XPZ` Ge
 ## Fluxo operacional resumido
 
 1. identificar o tipo do objeto
-2. consultar risco em `23-mapa-de-risco-por-tipo.md`
-3. consultar indícios de obrigatoriedade em `21-indicios-de-obrigatoriedade.md`
-4. escolher template em `20-guia-de-clonagem-segura.md`
+2. consultar risco em `03-risco-e-decisao-por-tipo.md`
+3. consultar indícios de obrigatoriedade em `03-risco-e-decisao-por-tipo.md`
+4. consultar regras operacionais e runtime em `02-regras-operacionais-e-runtime.md`
 5. aplicar clonagem conservadora apenas se o contexto estrutural combinar
 6. validar antes de qualquer empacotamento
 
@@ -127,7 +122,7 @@ operacional
 médio
 
 ## Depende de
-00-README-GLOBAL.md, 01-genexus-xpz-research.md, 20-guia-de-clonagem-segura.md, 21-indicios-de-obrigatoriedade.md, 22-tipos-prontos-para-geracao-conservadora.md, 23-mapa-de-risco-por-tipo.md, 24-resumo-operacional-para-gerador-xpz.md
+00-README-GLOBAL.md, 01-base-empirica-geral.md, 02-regras-operacionais-e-runtime.md, 03-risco-e-decisao-por-tipo.md, 22-tipos-prontos-para-geracao-conservadora.md, 03-risco-e-decisao-por-tipo.md, 02-regras-operacionais-e-runtime.md
 
 ## Usado por
 qualquer agente GPT que precise responder perguntas ou tomar decisão operacional usando esta base
@@ -139,10 +134,10 @@ Padronizar quando avançar, quando exigir template real e quando abortar.
 ## Ordem de consulta recomendada
 
 1. ler `00-README-GLOBAL.md`
-2. identificar o tipo alvo e checar `23-mapa-de-risco-por-tipo.md`
-3. ler `21-indicios-de-obrigatoriedade.md`
-4. ler `20-guia-de-clonagem-segura.md`
-5. ler `24-resumo-operacional-para-gerador-xpz.md`
+2. identificar o tipo alvo e checar `03-risco-e-decisao-por-tipo.md`
+3. ler `03-risco-e-decisao-por-tipo.md`
+4. ler `02-regras-operacionais-e-runtime.md`
+5. ler `02-regras-operacionais-e-runtime.md`
 6. usar `10`, `11`, `12` e `30` para sustentar qualquer detalhe empírico específico
 
 ## Quando responder com mais confiança
@@ -242,7 +237,7 @@ Padronizar quando avançar, quando exigir template real e quando abortar.
 
 ### WebPanel
 
-- identificar primeiro a familia estrutural usando `27-familias-estruturais-de-webpanel.md`
+- identificar primeiro a familia estrutural usando `04-webpanel-familias-e-templates.md`
 - selecionar um template bruto interno da mesma familia; nao usar o anexo sanitizado como fonte final
 - preservar `layout`, `events`, `variables`, `Part type`, controles e bindings do template-base
 - abortar se a familia nao estiver clara ou se o alvo exigir `grid`, `tab`, componente customizado ou contexto de `parent` ausente no bruto escolhido
@@ -259,8 +254,9 @@ Padronizar quando avançar, quando exigir template real e quando abortar.
 
 - Fonte valida: XML bruto de objeto e envelope XPZ bruto real
 - Fonte invalida: markdown desta base
-- Fonte invalida: exemplos sanitizados de `27-familias-estruturais-de-webpanel.md`
+- Fonte invalida: exemplos sanitizados de `04-webpanel-familias-e-templates.md`
 - Fonte invalida: reconstrucoes livres baseadas em tabelas, frequencias ou descricoes
 - Inferência forte: esta base documental decide, classifica e orienta; quem materializa e serializa e sempre o XML bruto comparavel
+
 
 

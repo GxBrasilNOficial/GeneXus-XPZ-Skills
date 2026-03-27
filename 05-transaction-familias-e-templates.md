@@ -7,7 +7,7 @@ empirico e operacional
 medio
 
 ## Depende de
-01-base-empirica-geral.md, 02-regras-operacionais-gerais.md, 03-risco-e-decisao-por-tipo.md
+01-base-empirica-geral.md, 02-regras-operacionais-e-runtime.md, 03-risco-e-decisao-por-tipo.md
 
 ## Usado por
 08-guia-para-agente-gpt.md
@@ -27,10 +27,10 @@ empirico e operacional
 medio
 
 ## Depende de
-01-genexus-xpz-research.md, 10-matriz-part-types-por-tipo.md, 11-campos-estaveis-vs-variaveis.md, 12-diffs-estruturais-por-tipo.md, 23-mapa-de-risco-por-tipo.md, 24-resumo-operacional-para-gerador-xpz.md
+01-base-empirica-geral.md, 10-matriz-part-types-por-tipo.md, 11-campos-estaveis-vs-variaveis.md, 12-diffs-estruturais-por-tipo.md, 03-risco-e-decisao-por-tipo.md, 02-regras-operacionais-e-runtime.md
 
 ## Usado por
-24-resumo-operacional-para-gerador-xpz.md, 26-guia-para-agente-gpt.md
+02-regras-operacionais-e-runtime.md, 26-guia-para-agente-gpt.md
 
 ## Objetivo
 Identificar familias estruturais reais de `Transaction` a partir do acervo XML analisado.
@@ -287,5 +287,6 @@ Permitir escolha repetivel de template interno real, reduzindo risco de vazament
 - Inferencia forte: a maior parte das novas `Transaction` deve ser tentada primeiro nas Familias 1, 2 ou 3.
 - Inferencia forte: Familias 5 e 6 devem ser tratadas como casos de alta cautela, com template interno muito proximo.
 - Hipotese: este catalogo reduz risco de vazamento estrutural do template-base, desde que a materializacao continue presa a XML bruto comparavel e nunca a markdown.
+
 
 

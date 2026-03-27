@@ -7,7 +7,7 @@ governanca e operacional
 medio
 
 ## Depende de
-01-base-empirica-geral.md, 02-regras-operacionais-gerais.md, 03-risco-e-decisao-por-tipo.md
+01-base-empirica-geral.md, 02-regras-operacionais-e-runtime.md, 03-risco-e-decisao-por-tipo.md
 
 ## Usado por
 08-guia-para-agente-gpt.md
@@ -28,7 +28,7 @@ conceitual
 médio
 
 ## Depende de
-00-inventario-da-base-documental.md, 01-genexus-xpz-research.md, 22-tipos-prontos-para-geracao-conservadora.md, 23-mapa-de-risco-por-tipo.md
+00-inventario-da-base-documental.md, 01-base-empirica-geral.md, 22-tipos-prontos-para-geracao-conservadora.md, 03-risco-e-decisao-por-tipo.md
 
 ## Usado por
 00-README-GLOBAL.md, 26-guia-para-agente-gpt.md, 99-resumo-da-consolidacao.md
@@ -78,7 +78,7 @@ operacional
 médio
 
 ## Depende de
-04-genexus-open-points.md, 22-tipos-prontos-para-geracao-conservadora.md, 23-mapa-de-risco-por-tipo.md
+04-genexus-open-points.md, 22-tipos-prontos-para-geracao-conservadora.md, 03-risco-e-decisao-por-tipo.md
 
 ## Usado por
 26-guia-para-agente-gpt.md, manutencao futura da base
@@ -127,5 +127,6 @@ Orientar futuras coletas de templates comparáveis.
 - Fonte valida para ampliar a base: XML bruto exportado ou extraido diretamente de XPZ real
 - Fonte invalida para ampliar a base: markdown, snippets copiados de documentacao, exemplos sanitizados e pseudo-XML produzido por agente
 - Inferência forte: `Transaction` e `WebPanel` nao precisam de novos exemplos para desbloqueio operacional, mas qualquer refinamento futuro deve entrar na base como XML bruto, nao como derivacao textual
+
 
 

@@ -1,4 +1,4 @@
-# 02 - Regras Operacionais Gerais
+# 02 - Regras Operacionais e Runtime
 
 ## Papel do documento
 operacional
@@ -13,12 +13,113 @@ medio
 04-webpanel-familias-e-templates.md, 05-transaction-familias-e-templates.md, 08-guia-para-agente-gpt.md
 
 ## Objetivo
-Consolidar regras de geracao, clonagem conservadora, materializacao, serializacao XPZ e validacoes minimas para execucao controlada.
+Consolidar regras de geracao, clonagem conservadora, materializacao, serializacao XPZ e uma camada explicita de ligacao entre estrutura XML observada e comportamento provavel de runtime GeneXus.
 
 ## Fontes consolidadas
 - 02-genexus-xpz-generation-rules.md
 - 20-guia-de-clonagem-segura.md
 - 24-resumo-operacional-para-gerador-xpz.md
+- documentacao oficial GeneXus usada de forma complementar e controlada
+
+## Premissas operacionais
+
+- `Evidência direta`: esta base continua sendo centrada em XML extraido de `XPZ`, nao em logs completos de especificacao, importacao, build ou execucao.
+- `Regra documentada`: conceitos como `Base Table`, `Extended Table`, navegacao de `For each`, `Load`, `Refresh` e `Refresh Grid` pertencem ao runtime/especificacao do GeneXus e nao podem ser inferidos apenas da forma do XML.
+- `Inferência forte`: certos sinais estruturais do XML permitem falar em risco runtime relativo, desde que a fala seja qualificada e nao prometa comportamento real sem teste.
+- `Hipótese`: quanto mais denso o objeto em `events`, `grid`, `Level`, `AttributeProperties`, `parent`, `pattern` e links contextuais, maior tende a ser a sensibilidade a navegacao, carga de dados e comportamento nao trivial em execucao.
+
+## Ligacao estrutural com runtime GeneXus
+
+- `Evidência direta`: no acervo desta KB, `Transaction` aparece em 183 objetos, todos com `parent`, todos com `Level`, e 177/183 com `AttributeProperties`.
+- `Evidência direta`: `WebPanel` aparece em 1196 objetos; 1195/1196 possuem `parent`; 437/1196 mostram sinal estrutural de eventos; 25/1196 exibem sinal textual de `grid`.
+- `Evidência direta`: `Procedure` aparece em 2281 objetos, todos com `parent`; `DataProvider` em 24, todos com `parent`; `API` em 1, com `parent`; `WorkWithForWeb` em 183, todos com `parent`, `Level` e marca de pattern no bloco `<Data Pattern=\"...\">`.
+- `Regra documentada`: em GeneXus, a determinacao de `Base Table` e a navegacao associada dependem dos atributos usados, do `For each`, da `Base Transaction clause`, da estrutura do objeto e dos eventos envolvidos.
+- `Inferência forte`: por isso, a estrutura XML permite detectar objetos mais ou menos propensos a joins implicitos, dependencia contextual e carga extra, mas nao substituir o relatorio de navegacao nem a especificacao real da IDE.
+
+## Regras documentadas de runtime
+
+### Base Table e Extended Table
+
+- `Regra documentada`: a `Base Transaction clause` declara a intencao de navegacao e pode ser usada em `For each` e em grupos de `Data Provider` para definir a tabela base com mais clareza e reduzir ambiguidade de especificacao.
+- `Regra documentada`: quando um `For each` declara uma `Base Transaction`, a tabela associada passa a ser a `Base Table`, e atributos usados no corpo, filtros e ordens precisam estar na `Extended Table` correspondente.
+- `Regra documentada`: GeneXus tambem pode determinar a `Base Table` implicitamente a partir dos atributos presentes, inclusive em grids e eventos `Load`.
+- `Inferência forte`: logo, objetos com muitos atributos de diferentes contextos, FKs paralelas ou multiplos niveis tendem a ser mais sensiveis a efeitos de `Extended Table`, filtros condicionais e custo de navegacao.
+
+### Navegacao, filtros e loops
+
+- `Regra documentada`: `For each` e grupos de `Data Provider` sao pontos centrais de navegacao; filtros, ordens e atributos fora da tabela base podem alterar joins, subselects e forma de acesso.
+- `Regra documentada`: quando ha `Load` sobre grid ou painel com base implicita, um `For each` escrito dentro do evento pode ficar aninhado em uma navegacao implicita ja existente.
+- `Inferência forte`: isso aumenta o risco relativo de padroes do tipo `N+1`, carga repetida por linha e custo dificil de perceber olhando apenas o XML final.
+- `Hipótese`: em objetos com muito codigo de evento e muitos controles ligados a dados, a ausencia de relatorio de navegacao detalhado torna prudente assumir performance potencialmente sensivel ate prova em contrario.
+
+### WebPanel, Refresh e Grid
+
+- `Regra documentada`: o `Refresh event` e o `Refresh Grid event` sao executados antes da carga/re-carga dos dados exibidos, e o `Load event` pode ser executado para cada linha quando ha grid com base de navegacao.
+- `Regra documentada`: em Web, os eventos de refresh usam ciclo Ajax; isso melhora a troca com o cliente, mas nao elimina custo server-side de navegacao e carga de dados.
+- `Inferência forte`: `WebPanel` com `events` + `grid` + acoes + `parent` contextual tende a merecer cautela runtime maior que uma casca minima sem eventos.
+- `Inferência forte`: `WebPanel` gerado por pattern/defaults ou acoplado a `MasterPage` e seguranca integrada tende a depender mais do contexto da KB do que um painel isolado e pequeno.
+
+### Procedure, Data Provider, Transaction e API
+
+- `Regra documentada`: `Procedure` e `Data Provider` podem disparar navegacoes a partir de `For each`, grupos e atributos usados; o runtime relevante depende mais do codigo e da base implicita do que do simples inventario de `Part`.
+- `Regra documentada`: `Transaction` descreve estrutura transacional e niveis; sua sensibilidade runtime cresce quando ha subniveis, relacoes pai-filho e maior densidade de atributos relacionais.
+- `Inferência forte`: `Transaction` com multiplos `Level` sugere maior probabilidade de joins implicitos, contexto pai-filho e custo de manutencao/performance superior ao de `Transaction` de um nivel.
+- `Inferência forte`: `API` com bloco `Service`, `RestMethod`, eventos `.Before/.After` e chamadas a `Procedure` sugere camada de orquestracao server-side; o XML nao prova custo, mas indica dependencia de codigo interno e contexto de seguranca/sessao.
+- `Hipótese`: `DataProvider` pequeno e direto, com poucos filtros e saida simples, tende a ser menos arriscado em runtime do que `Procedure` ou `WebPanel` com eventos cruzados e composicao de tela.
+
+## Ponte estrutura -> runtime por tipo e familia
+
+### Transaction
+
+- `Evidência direta`: 162/183 `Transaction` observadas possuem exatamente 1 `Level`; 12/183 possuem 2 `Level`; 9/183 possuem 3 ou mais `Level`.
+- `Inferência forte`: familias simples de 1 nivel tendem a ter risco runtime relativo menor para navegacao do que familias mestre-detalhe e multinivel.
+- `Inferência forte`: alta densidade de `AttributeProperties` e muitos atributos referenciais no mesmo nivel sugerem maior sensibilidade a `Extended Table`, filtros e relacoes implicitas.
+- `Hipótese`: quando a clonagem altera atributos-chave, `DescriptionAttribute` ou distribuicao entre niveis, o risco runtime cresce junto com o risco estrutural.
+
+### WebPanel
+
+- `Evidência direta`: o recorte estrutural mostra familias com casca minima, casca gerada por defaults/pattern, navegacional com eventos, formulario com acao, lista com grid e combinacoes mais densas.
+- `Inferência forte`: familias com `grid` e `events` sao mais sensiveis a carga, refresh e navegacao implicita do que familias de menu/home ou casca simples.
+- `Inferência forte`: familias geradas com marcas de `Defaults`, `IsGeneratedObject`, `parent` contextual e elementos de pattern tendem a depender mais do runtime/KB de origem.
+- `Hipótese`: quanto maior o numero de controles, links, actions e codigo de evento, maior a chance de existir comportamento nao trivial de autorizacao, refresh, carga condicional ou dependencia de master page.
+
+### Procedure, DataProvider, API e objetos dependentes de pattern
+
+- `Evidência direta`: `Procedure` e `DataProvider` frequentemente expõem blocos `Source`, `Parm` e `Variables`; `API` expõe `Service`, `RestMethod` e eventos `.Before/.After`; `WorkWithForWeb` carrega pattern e parent transacional em 183/183 casos.
+- `Inferência forte`: objetos com `pattern`, `parentType` forte e blocos de codigo gerado merecem leitura runtime mais cautelosa porque parte da navegacao e da expectativa funcional vem do contexto de geracao.
+- `Inferência forte`: `WorkWithForWeb` e derivados patternizados devem ser tratados como de risco operacional/runtime alto mesmo quando a estrutura parece recorrente.
+- `Hipótese`: `API` pequena pode ter runtime simples, mas a presenca de multiplos metodos e eventos de pre/pós-processamento sugere custo invisivel ao olhar apenas o contrato externo.
+
+## Regras de decisao operacional com impacto runtime
+
+- `Quando falar com mais confianca`:
+  - `Regra documentada`: quando a conclusao vier diretamente de conceito oficial de GeneXus, como `Base Table`, `Extended Table`, `Load`, `Refresh` ou `Refresh Grid`.
+  - `Evidência direta`: quando a estrutura XML mostrar claramente sinais repetidos, como `Level`, `Pattern`, `events`, `grid`, `parent` ou densidade de `AttributeProperties`.
+- `Quando falar com cautela`:
+  - `Inferência forte`: quando o XML sugere navegacao nao trivial, mas sem relatorio de navegacao ou sem codigo suficiente para confirmar custo e cardinalidade.
+  - `Hipótese`: quando a conclusao depender de supor joins, roundtrips ou custo de banco sem prova direta.
+- `Quando exigir template mais proximo`:
+  - `Inferência forte`: em `WebPanel` com `grid` + `events` + `parent` ou marcas de objeto gerado.
+  - `Inferência forte`: em `Transaction` com 2+ `Level` ou densidade alta de atributos relacionais.
+  - `Inferência forte`: em `WorkWithForWeb`, `Panel` gerado por pattern e `API` com eventos server-side relevantes.
+- `Quando abortar`:
+  - `Inferência forte`: quando a mudanca exigir alterar estrutura e, ao mesmo tempo, houver alto acoplamento com runtime implicito, pattern ou contexto pai-filho nao reproduzivel.
+  - `Hipótese`: quando o caso exigir garantir performance, importacao ou comportamento em producao sem validacao externa.
+
+## Limites do que a base ainda nao prova
+
+- `Evidência direta`: esta trilha nao contem relatorios completos de navegacao gerados pela IDE nem medições reais de performance.
+- `Regra documentada`: os conceitos oficiais ajudam a interpretar risco, mas nao substituem especificacao nem teste do objeto concreto na KB.
+- `Inferência forte`: a base agora consegue responder melhor sobre sensibilidade runtime relativa.
+- `Hipótese`: ela ainda nao permite afirmar, sem teste, que um clone vai importar, buildar, navegar bem ou performar de forma aceitavel.
+
+## Referencias oficiais complementares
+
+- `Regra documentada`: `Base Transaction clause` - [docs.genexus.com/en/wiki?25418,Base+Transaction+clause](https://docs.genexus.com/en/wiki?25418,Base+Transaction+clause)
+- `Regra documentada`: `Base Transaction in For each command` - [docs.genexus.com/en/wiki?23945,Base+Transaction+in+For+each+command](https://docs.genexus.com/en/wiki?23945,Base+Transaction+in+For+each+command)
+- `Regra documentada`: `Load event` - [wiki.genexus.com/commwiki/wiki?8188,Load+event](https://wiki.genexus.com/commwiki/wiki?8188,Load+event)
+- `Regra documentada`: `Refresh Grid event` - [wiki.genexus.com/commwiki/wiki?8187,Refresh+Grid+event](https://wiki.genexus.com/commwiki/wiki?8187,Refresh+Grid+event)
+- `Regra documentada`: `Web Form Refresh` - [wiki.genexus.com/commwiki/wiki?6566,Web+Form+Refresh](https://wiki.genexus.com/commwiki/wiki?6566,Web+Form+Refresh)
 
 ## Origem incorporada - 02-genexus-xpz-generation-rules.md
 
@@ -29,10 +130,10 @@ operacional
 médio
 
 ## Depende de
-01-genexus-xpz-research.md, 22-tipos-prontos-para-geracao-conservadora.md, 23-mapa-de-risco-por-tipo.md, 24-resumo-operacional-para-gerador-xpz.md
+01-base-empirica-geral.md, 22-tipos-prontos-para-geracao-conservadora.md, 03-risco-e-decisao-por-tipo.md, 02-regras-operacionais-e-runtime.md
 
 ## Usado por
-20-guia-de-clonagem-segura.md, 24-resumo-operacional-para-gerador-xpz.md, 26-guia-para-agente-gpt.md
+02-regras-operacionais-e-runtime.md, 02-regras-operacionais-e-runtime.md, 26-guia-para-agente-gpt.md
 
 ## Objetivo
 Registrar regras conservadoras para qualquer tentativa futura de geração de XPZ.
@@ -105,10 +206,10 @@ operacional
 médio
 
 ## Depende de
-10-matriz-part-types-por-tipo.md, 11-campos-estaveis-vs-variaveis.md, 12-diffs-estruturais-por-tipo.md, 23-mapa-de-risco-por-tipo.md
+10-matriz-part-types-por-tipo.md, 11-campos-estaveis-vs-variaveis.md, 12-diffs-estruturais-por-tipo.md, 03-risco-e-decisao-por-tipo.md
 
 ## Usado por
-24-resumo-operacional-para-gerador-xpz.md, 26-guia-para-agente-gpt.md
+02-regras-operacionais-e-runtime.md, 26-guia-para-agente-gpt.md
 
 ## Objetivo
 Traduzir a análise empírica em orientação prudente para clonagem conservadora de objetos.
@@ -240,7 +341,7 @@ operacional
 médio
 
 ## Depende de
-20-guia-de-clonagem-segura.md, 21-indicios-de-obrigatoriedade.md, 22-tipos-prontos-para-geracao-conservadora.md, 23-mapa-de-risco-por-tipo.md
+02-regras-operacionais-e-runtime.md, 03-risco-e-decisao-por-tipo.md, 22-tipos-prontos-para-geracao-conservadora.md, 03-risco-e-decisao-por-tipo.md
 
 ## Usado por
 02-genexus-xpz-generation-rules.md, 26-guia-para-agente-gpt.md
@@ -356,8 +457,9 @@ Funcionar como resumo decisório sem esconder os limites da evidência.
 
 - Fonte valida: XML bruto extraido do acervo ou de template XPZ bruto real comparavel
 - Fonte invalida: markdown desta base
-- Fonte invalida: exemplos sanitizados, inclusive os anexos de `27-familias-estruturais-de-webpanel.md`
+- Fonte invalida: exemplos sanitizados, inclusive os anexos de `04-webpanel-familias-e-templates.md`
 - Fonte invalida: reconstrucoes feitas so por resumo textual, tabela, frequencia ou memoria do agente
 - Inferência forte: markdown e exemplos sanitizados servem para decisao e escolha de template, nunca para materializacao final do XML ou serializacao final do XPZ
+
 
 
