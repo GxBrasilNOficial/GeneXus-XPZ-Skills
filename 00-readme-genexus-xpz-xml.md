@@ -255,15 +255,17 @@ Padronizar quando avançar, quando exigir molde estrutural comparável e quando 
 
 - o objeto clonado deve continuar como XML bem-formado com raiz unica `<Object>`
 - blocos `Source` e `InnerHtml` que vierem em `CDATA` devem permanecer em `CDATA`
-- o agente deve incluir o objeto em `<Objects>` somente por clonagem de um envelope XPZ bruto real; se nao houver envelope bruto, deve recusar a serializacao final
+- o agente pode incluir o objeto em `<Objects>` usando o envelope XPZ observado e documentado nesta base, desde que preserve a mesma hierarquia externa conhecida; se o caso exigir estrutura fora desse envelope observado, deve recusar a serializacao final
 - antes de empacotar, validar parse XML, presenca de todos os `Part type` recorrentes e coerencia entre objeto clonado e molde-base
 - o agente nao deve afirmar “sem erro de importacao”; deve afirmar apenas que seguiu a especificacao mais conservadora disponivel
 
 ## Regras de fonte
 
-- Fonte valida: XML bruto de objeto e envelope XPZ bruto real
+- Fonte valida: XML bruto de objeto
+- Fonte valida: envelope XPZ observado documentado nesta base
+- Fonte valida: molde sanitizado completo documentado nesta base, quando houver XML suficiente para o tipo alvo
 - Fonte invalida: markdown desta base
-- Fonte invalida: exemplos sanitizados incompletos de `04-webpanel-familias-e-templates.md`
+- Fonte invalida: exemplos sanitizados incompletos ou meramente ilustrativos
 - Fonte invalida: reconstrucoes livres baseadas em tabelas, frequencias ou descricoes
 - Inferência forte: esta base documental decide, classifica e orienta; quem materializa e serializa e sempre o XML bruto comparavel
 

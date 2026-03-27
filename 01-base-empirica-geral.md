@@ -1738,3 +1738,1169 @@ Destacar estabilidade estrutural relativa e pontos de maior risco para clonagem.
   </Properties>
 </Object>
 ```
+
+## Moldes sanitizados completos de Panel e API
+
+- Evidência direta: o acervo usado nesta base contem 7 objetos Panel e 1 objeto API.
+- Inferência forte: pela baixa cardinalidade, faz mais sentido documentar moldes completos representativos do que tentar abrir muitas familias finas.
+- Inferência forte: os anexos abaixo servem como referencia estrutural documentada para prototipos conservadores, sempre preservando Object/@type, inventario de Part e hierarquia interna.
+
+### Molde sanitizado de Panel 1 - `PanelExemploNaoAutorizado`
+
+- Perfil: Panel mobile enxuto, com PatternPart, layout simples e poucos eventos.
+- Uso operacional: boa referencia para Panel de mensagem/entrada curta com estrutura gerada por pattern.
+
+`xml
+<?xml version="1.0" encoding="utf-8"?>
+<Object parentGuid="d8c5213a-038e-4c3d-8cad-c4f38c6c10ff" user="SANITIZED" versionDate="0001-01-01T00:00:00.0000000" lastUpdate="2022-08-03T13:19:24.0000000Z" checksum="05f72ad114b0959c3b1154503e4e7ada" fullyQualifiedName="PanelExemploNaoAutorizado" moduleGuid="afa47377-41d5-4ae8-9755-6f53150aa361" guid="0492a00a-5a72-44bb-8fe5-6468b143a1db" name="PanelExemploNaoAutorizado" type="d82625fd-5892-40b0-99c9-5c8559c197fc" description="Nao Autorizado" parent="PastaExemploPanel" parentType="00000000-0000-0000-0000-000000000008">
+  <Part type="b4378a97-f9b2-4e05-b2f8-c610de258402">
+    <PatternPart type="a51ced48-7bee-0001-ab12-04e9e32123d1">
+      <Data Pattern="15cf49b5-fc38-4899-91b5-395d02d79889" Version="17.11.0"><![CDATA[<?xml version="1.0" encoding="utf-16"?>
+<instance>
+  <notifications />
+  <level id="9c3fa622-c8e3-419b-be3f-659de559bbd2" name="Level">
+    <detail variables="&lt;Variables&gt;&lt;Variable Id=&quot;9&quot; Name=&quot;Password&quot; Description=&quot;Password&quot;&gt;&lt;Properties&gt;&lt;Property&gt;&lt;Name&gt;Name&lt;/Name&gt;&lt;Value&gt;Password&lt;/Value&gt;&lt;/Property&gt;&lt;Property&gt;&lt;Name&gt;Description&lt;/Name&gt;&lt;Value&gt;Password&lt;/Value&gt;&lt;/Property&gt;&lt;Property&gt;&lt;Name&gt;OBJ_TYPE&lt;/Name&gt;&lt;Value&gt;id_OTYPE_VAR&lt;/Value&gt;&lt;/Property&gt;&lt;Property&gt;&lt;Name&gt;idBasedOn&lt;/Name&gt;&lt;Value&gt;Domain:AuthPassword, SANITIZEDSecurityCommon&lt;/Value&gt;&lt;/Property&gt;&lt;/Properties&gt;&lt;Documentation&gt;&amp;lt;WikiPage&amp;gt;&amp;lt;Modified&amp;gt;0001-01-01T00:00:00&amp;lt;/Modified&amp;gt;&amp;lt;Revision&amp;gt;0&amp;lt;/Revision&amp;gt;&amp;lt;/WikiPage&amp;gt;&lt;/Documentation&gt;&lt;/Variable&gt;&lt;Variable Id=&quot;10&quot; Name=&quot;UserName&quot;&gt;&lt;Properties&gt;&lt;Property&gt;&lt;Name&gt;Name&lt;/Name&gt;&lt;Value&gt;UserName&lt;/Value&gt;&lt;/Property&gt;&lt;Property&gt;&lt;Name&gt;OBJ_TYPE&lt;/Name&gt;&lt;Value&gt;id_OTYPE_VAR&lt;/Value&gt;&lt;/Property&gt;&lt;Property&gt;&lt;Name&gt;idBasedOn&lt;/Name&gt;&lt;Value&gt;Domain:AuthUserIdentification, SANITIZEDSecurityCommon&lt;/Value&gt;&lt;/Property&gt;&lt;/Properties&gt;&lt;Documentation&gt;&amp;lt;WikiPage&amp;gt;&amp;lt;Modified&amp;gt;0001-01-01T00:00:00&amp;lt;/Modified&amp;gt;&amp;lt;Revision&amp;gt;0&amp;lt;/Revision&amp;gt;&amp;lt;/WikiPage&amp;gt;&lt;/Documentation&gt;&lt;/Variable&gt;&lt;Variable Id=&quot;11&quot; Name=&quot;AuthRepository&quot;&gt;&lt;Properties&gt;&lt;Property&gt;&lt;Name&gt;Name&lt;/Name&gt;&lt;Value&gt;AuthRepository&lt;/Value&gt;&lt;/Property&gt;&lt;Property&gt;&lt;Name&gt;OBJ_TYPE&lt;/Name&gt;&lt;Value&gt;id_OTYPE_VAR&lt;/Value&gt;&lt;/Property&gt;&lt;Property&gt;&lt;Name&gt;ATTCUSTOMTYPE&lt;/Name&gt;&lt;Value&gt;exo:AuthRepository, SANITIZEDSecurity&lt;/Value&gt;&lt;/Property&gt;&lt;/Properties&gt;&lt;Documentation&gt;&amp;lt;WikiPage&amp;gt;&amp;lt;Modified&amp;gt;0001-01-01T00:00:00&amp;lt;/Modified&amp;gt;&amp;lt;Revision&amp;gt;0&amp;lt;/Revision&amp;gt;&amp;lt;/WikiPage&amp;gt;&lt;/Documentation&gt;&lt;/Variable&gt;&lt;StandardVariable Id=&quot;4&quot; Name=&quot;Pgmdesc&quot;&gt;&lt;Properties&gt;&lt;Property&gt;&lt;Name&gt;Name&lt;/Name&gt;&lt;Value&gt;Pgmdesc&lt;/Value&gt;&lt;/Property&gt;&lt;Property&gt;&lt;Name&gt;OBJ_TYPE&lt;/Name&gt;&lt;Value&gt;id_OTYPE_VAR&lt;/Value&gt;&lt;/Property&gt;&lt;Property&gt;&lt;Name&gt;IsStandardVariable&lt;/Name&gt;&lt;Value&gt;True&lt;/Value&gt;&lt;/Property&gt;&lt;Property&gt;&lt;Name&gt;ATTCUSTOMTYPE&lt;/Name&gt;&lt;Value&gt;bas:Character&lt;/Value&gt;&lt;/Property&gt;&lt;Property&gt;&lt;Name&gt;Length&lt;/Name&gt;&lt;Value&gt;256&lt;/Value&gt;&lt;/Property&gt;&lt;Property&gt;&lt;Name&gt;AttMaxLen&lt;/Name&gt;&lt;Value&gt;256&lt;/Value&gt;&lt;/Property&gt;&lt;/Properties&gt;&lt;Documentation&gt;&amp;lt;WikiPage&amp;gt;&amp;lt;Modified&amp;gt;0001-01-01T00:00:00&amp;lt;/Modified&amp;gt;&amp;lt;Revision&amp;gt;0&amp;lt;/Revision&amp;gt;&amp;lt;/WikiPage&amp;gt;&lt;/Documentation&gt;&lt;/StandardVariable&gt;&lt;StandardVariable Id=&quot;3&quot; Name=&quot;Pgmname&quot;&gt;&lt;Properties&gt;&lt;Property&gt;&lt;Name&gt;Name&lt;/Name&gt;&lt;Value&gt;Pgmname&lt;/Value&gt;&lt;/Property&gt;&lt;Property&gt;&lt;Name&gt;OBJ_TYPE&lt;/Name&gt;&lt;Value&gt;id_OTYPE_VAR&lt;/Value&gt;&lt;/Property&gt;&lt;Property&gt;&lt;Name&gt;IsStandardVariable&lt;/Name&gt;&lt;Value&gt;True&lt;/Value&gt;&lt;/Property&gt;&lt;Property&gt;&lt;Name&gt;ATTCUSTOMTYPE&lt;/Name&gt;&lt;Value&gt;bas:Character&lt;/Value&gt;&lt;/Property&gt;&lt;Property&gt;&lt;Name&gt;Length&lt;/Name&gt;&lt;Value&gt;128&lt;/Value&gt;&lt;/Property&gt;&lt;Property&gt;&lt;Name&gt;AttMaxLen&lt;/Name&gt;&lt;Value&gt;128&lt;/Value&gt;&lt;/Property&gt;&lt;/Properties&gt;&lt;Documentation&gt;&amp;lt;WikiPage&amp;gt;&amp;lt;Modified&amp;gt;0001-01-01T00:00:00&amp;lt;/Modified&amp;gt;&amp;lt;Revision&amp;gt;0&amp;lt;/Revision&amp;gt;&amp;lt;/WikiPage&amp;gt;&lt;/Documentation&gt;&lt;/StandardVariable&gt;&lt;StandardVariable Id=&quot;2&quot; Name=&quot;Time&quot;&gt;&lt;Properties&gt;&lt;Property&gt;&lt;Name&gt;Name&lt;/Name&gt;&lt;Value&gt;Time&lt;/Value&gt;&lt;/Property&gt;&lt;Property&gt;&lt;Name&gt;OBJ_TYPE&lt;/Name&gt;&lt;Value&gt;id_OTYPE_VAR&lt;/Value&gt;&lt;/Property&gt;&lt;Property&gt;&lt;Name&gt;IsStandardVariable&lt;/Name&gt;&lt;Value&gt;True&lt;/Value&gt;&lt;/Property&gt;&lt;Property&gt;&lt;Name&gt;ATTCUSTOMTYPE&lt;/Name&gt;&lt;Value&gt;bas:Character&lt;/Value&gt;&lt;/Property&gt;&lt;Property&gt;&lt;Name&gt;Length&lt;/Name&gt;&lt;Value&gt;8&lt;/Value&gt;&lt;/Property&gt;&lt;Property&gt;&lt;Name&gt;AttMaxLen&lt;/Name&gt;&lt;Value&gt;8&lt;/Value&gt;&lt;/Property&gt;&lt;/Properties&gt;&lt;Documentation&gt;&amp;lt;WikiPage&amp;gt;&amp;lt;Modified&amp;gt;0001-01-01T00:00:00&amp;lt;/Modified&amp;gt;&amp;lt;Revision&amp;gt;0&amp;lt;/Revision&amp;gt;&amp;lt;/WikiPage&amp;gt;&lt;/Documentation&gt;&lt;/StandardVariable&gt;&lt;StandardVariable Id=&quot;1&quot; Name=&quot;Today&quot;&gt;&lt;Properties&gt;&lt;Property&gt;&lt;Name&gt;Name&lt;/Name&gt;&lt;Value&gt;Today&lt;/Value&gt;&lt;/Property&gt;&lt;Property&gt;&lt;Name&gt;OBJ_TYPE&lt;/Name&gt;&lt;Value&gt;id_OTYPE_VAR&lt;/Value&gt;&lt;/Property&gt;&lt;Property&gt;&lt;Name&gt;IsStandardVariable&lt;/Name&gt;&lt;Value&gt;True&lt;/Value&gt;&lt;/Property&gt;&lt;Property&gt;&lt;Name&gt;ATTCUSTOMTYPE&lt;/Name&gt;&lt;Value&gt;bas:Date&lt;/Value&gt;&lt;/Property&gt;&lt;/Properties&gt;&lt;Documentation&gt;&amp;lt;WikiPage&amp;gt;&amp;lt;Modified&amp;gt;0001-01-01T00:00:00&amp;lt;/Modified&amp;gt;&amp;lt;Revision&amp;gt;0&amp;lt;/Revision&amp;gt;&amp;lt;/WikiPage&amp;gt;&lt;/Documentation&gt;&lt;/StandardVariable&gt;&lt;/Variables&gt;" events="Event Start&#xA;&#x9;&amp;AuthRepository = AuthRepository.Get()&#xA;&#x9;Do Case&#xA;&#x9;Case &amp;AuthRepository.UserIdentification = AuthRepositoryUserIdentifications.Name&#xA;&#x9;&#x9;&amp;UserName.Caption = AuthRepositoryUserIdentifications.EnumerationDescription(AuthRepositoryUserIdentifications.Name)&#xA;&#x9;Case &amp;AuthRepository.UserIdentification = AuthRepositoryUserIdentifications.EMail&#xA;&#x9;&#x9;&amp;UserName.Caption = AuthRepositoryUserIdentifications.EnumerationDescription(AuthRepositoryUserIdentifications.EMail)&#xA;&#x9;Case &amp;AuthRepository.UserIdentification = AuthRepositoryUserIdentifications.NameEmail&#xA;&#x9;&#x9;&amp;UserName.Caption = AuthRepositoryUserIdentifications.EnumerationDescription(AuthRepositoryUserIdentifications.NameEmail)&#xA;&#x9;EndCase&#xA;Endevent&#xA;&#xA;&#xA;Event 'BtnEntrar'&#xA;&#x9;Composite&#xA;&#x9;&#x9;SANITIZED.Common.UI.Progress.ShowWithTitle(&quot;Conectando...&quot;)&#xA;&#x9;&#x9;SANITIZED.SD.Actions.Entrar(&amp;UserName, &amp;Password)&#xA;&#x9;&#x9;SANITIZED.Common.UI.Progress.Hide()&#xA;&#x9;&#x9;Return&#xA;&#x9;EndComposite&#xA;EndEvent&#xA;&#xA;&#xA;Event 'Back'&#xA;&#x9;Return&#xA;Endevent&#xA;">
+      <layout id="78852907-2ff5-5ed0-aaf2-079ff7de3e65" Type="View">
+        <table id="b32d02f2-0dd3-4ff1-ab64-a3e660c6d75e" controlName="MainTable" columnsStyle="10dip;100%;10dip" responsiveSizes="[]">
+          <row id="9c151a94-80d2-46f8-96c6-9116c7daabd3" rowHeight="50dip">
+            <cell id="4ca3501c-1d5f-44c0-9a2f-d35dc46d120b" />
+            <cell id="a6049a5b-7a80-4dbf-be0e-823046c2135b" hAlign="Center" vAlign="Middle">
+              <textblock controlName="TBMsg" caption="Nao autorizado: acesso negado." enabled="False" />
+            </cell>
+            <cell id="4eb8110b-d034-4ff5-b1e6-52437c4e7d96" />
+          </row>
+          <row id="d752f865-4ff5-421f-86be-611fe83c74cb" rowHeight="15dip" />
+          <row id="fe634880-d9ac-4961-925d-b5af54956e19" rowHeight="pd">
+            <cell id="8852d807-ce19-43b1-b14b-9d87331132d6" />
+            <cell id="6b999592-fc89-46e3-8f85-e51d86bfb41f">
+              <data attribute="&amp;UserName" labelCaption="Name" inviteMessage="" />
+            </cell>
+          </row>
+          <row id="761dbdcc-a547-4dae-9d08-a1cfd3f46eaf" rowHeight="pd">
+            <cell id="43d045c0-a1e1-4ddb-ae47-10dbaf4bb4b3" />
+            <cell id="32839ce6-9945-47b0-a77f-06af61e9d68b">
+              <data attribute="&amp;Password" inviteMessage="" PATTERN_ELEMENT_CUSTOM_PROPERTIES="&lt;Properties&gt;&lt;Property&gt;&lt;Name&gt;idEnableShowPasswordHint&lt;/Name&gt;&lt;Value&gt;True&lt;/Value&gt;&lt;/Property&gt;&lt;/Properties&gt;" />
+            </cell>
+          </row>
+          <row id="f65f348a-0497-412e-8a47-c406ced202cc" rowHeight="15dip" />
+          <row id="cd2a293a-0b52-46a4-933a-74e67e355b2e" rowHeight="pd">
+            <cell id="9d22a783-969c-4a9a-8254-a92485853853" />
+            <cell id="af4ba31d-e944-4544-a51c-ac5f43a4c47d" hAlign="Center" vAlign="Middle">
+              <action controlName="BtnEntrar" onClickEvent="'BtnEntrar'" caption="ENTRAR" class="button-primary" />
+            </cell>
+          </row>
+        </table>
+      </layout>
+    </detail>
+  </level>
+</instance>]]></Data>
+      <Properties>
+        <Property>
+          <Name>IsDefault</Name>
+          <Value>False</Value>
+        </Property>
+      </Properties>
+    </PatternPart>
+    <Properties>
+      <Property>
+        <Name>IsDefault</Name>
+        <Value>False</Value>
+      </Property>
+    </Properties>
+  </Part>
+  <Part type="babf62c5-0111-49e9-a1c3-cc004d90900a">
+    <Properties />
+  </Part>
+  <Properties>
+    <Property>
+      <Name>Name</Name>
+      <Value>PanelExemploNaoAutorizado</Value>
+    </Property>
+    <Property>
+      <Name>Description</Name>
+      <Value>Nao Autorizado</Value>
+    </Property>
+    <Property>
+      <Name>IsDefault</Name>
+      <Value>False</Value>
+    </Property>
+    <Property>
+      <Name>AndroidBaseStyle</Name>
+      <Value>AndroidBaseStyleDark</Value>
+    </Property>
+    <Property>
+      <Name>CacheEnabled</Name>
+      <Value>False</Value>
+    </Property>
+    <Property>
+      <Name>IntegratedSecurityLevel</Name>
+      <Value>SecurityNone</Value>
+    </Property>
+    <Property>
+      <Name>IntegratedSecurityPermissionPrefix</Name>
+      <Value>PanelExemploNaoAutorizado</Value>
+    </Property>
+  </Properties>
+  <Categories>Panel_Samples-sd</Categories>
+</Object>
+
+` 
+
+### Molde sanitizado de Panel 2 - `PanelExemploAcesso`
+
+- Perfil: Panel mobile com PatternPart, acoes de autenticacao, ctionBar e fluxo de entrada mais rico.
+- Uso operacional: boa referencia para Panel com eventos, acoes e dependencias de pattern mais evidentes.
+
+`xml
+<?xml version="1.0" encoding="utf-8"?>
+<Object parentGuid="d8c5213a-038e-4c3d-8cad-c4f38c6c10ff" user="SANITIZED" versionDate="0001-01-01T00:00:00.0000000" lastUpdate="2022-08-04T13:50:26.0000000Z" checksum="7bff8a381959f9267b8a4be2f92c03d5" fullyQualifiedName="PanelExemploAcesso" moduleGuid="afa47377-41d5-4ae8-9755-6f53150aa361" guid="865ab616-d866-4c90-9110-d352975022b5" name="PanelExemploAcesso" type="d82625fd-5892-40b0-99c9-5c8559c197fc" description="Acesso" parent="PastaExemploPanel" parentType="00000000-0000-0000-0000-000000000008">
+  <Part type="b4378a97-f9b2-4e05-b2f8-c610de258402">
+    <PatternPart type="a51ced48-7bee-0001-ab12-04e9e32123d1">
+      <Data Pattern="15cf49b5-fc38-4899-91b5-395d02d79889" Version="17.11.0"><![CDATA[<?xml version="1.0" encoding="utf-16"?>
+<instance>
+  <notifications />
+  <level id="45969122-dc02-4641-8055-f127e24fef52" name="Level">
+    <detail variables="&lt;Variables&gt;&lt;Variable Id=&quot;13&quot; Name=&quot;AuthRepository&quot;&gt;&lt;Properties&gt;&lt;Property&gt;&lt;Name&gt;Name&lt;/Name&gt;&lt;Value&gt;AuthRepository&lt;/Value&gt;&lt;/Property&gt;&lt;Property&gt;&lt;Name&gt;OBJ_TYPE&lt;/Name&gt;&lt;Value&gt;id_OTYPE_VAR&lt;/Value&gt;&lt;/Property&gt;&lt;Property&gt;&lt;Name&gt;ATTCUSTOMTYPE&lt;/Name&gt;&lt;Value&gt;exo:AuthRepository, SANITIZEDSecurity&lt;/Value&gt;&lt;/Property&gt;&lt;/Properties&gt;&lt;Documentation&gt;&amp;lt;WikiPage&amp;gt;&amp;lt;Modified&amp;gt;0001-01-01T00:00:00&amp;lt;/Modified&amp;gt;&amp;lt;Revision&amp;gt;0&amp;lt;/Revision&amp;gt;&amp;lt;/WikiPage&amp;gt;&lt;/Documentation&gt;&lt;/Variable&gt;&lt;Variable Id=&quot;12&quot; Name=&quot;Password&quot; Description=&quot;Password&quot;&gt;&lt;Properties&gt;&lt;Property&gt;&lt;Name&gt;Name&lt;/Name&gt;&lt;Value&gt;Password&lt;/Value&gt;&lt;/Property&gt;&lt;Property&gt;&lt;Name&gt;Description&lt;/Name&gt;&lt;Value&gt;Password&lt;/Value&gt;&lt;/Property&gt;&lt;Property&gt;&lt;Name&gt;OBJ_TYPE&lt;/Name&gt;&lt;Value&gt;id_OTYPE_VAR&lt;/Value&gt;&lt;/Property&gt;&lt;Property&gt;&lt;Name&gt;idBasedOn&lt;/Name&gt;&lt;Value&gt;Domain:AuthPassword, SANITIZEDSecurityCommon&lt;/Value&gt;&lt;/Property&gt;&lt;/Properties&gt;&lt;Documentation&gt;&amp;lt;WikiPage&amp;gt;&amp;lt;Modified&amp;gt;0001-01-01T00:00:00&amp;lt;/Modified&amp;gt;&amp;lt;Revision&amp;gt;0&amp;lt;/Revision&amp;gt;&amp;lt;/WikiPage&amp;gt;&lt;/Documentation&gt;&lt;/Variable&gt;&lt;Variable Id=&quot;10&quot; Name=&quot;UserName&quot;&gt;&lt;Properties&gt;&lt;Property&gt;&lt;Name&gt;Name&lt;/Name&gt;&lt;Value&gt;UserName&lt;/Value&gt;&lt;/Property&gt;&lt;Property&gt;&lt;Name&gt;OBJ_TYPE&lt;/Name&gt;&lt;Value&gt;id_OTYPE_VAR&lt;/Value&gt;&lt;/Property&gt;&lt;Property&gt;&lt;Name&gt;idBasedOn&lt;/Name&gt;&lt;Value&gt;Domain:AuthUserIdentification, SANITIZEDSecurityCommon&lt;/Value&gt;&lt;/Property&gt;&lt;/Properties&gt;&lt;Documentation&gt;&amp;lt;WikiPage&amp;gt;&amp;lt;Modified&amp;gt;0001-01-01T00:00:00&amp;lt;/Modified&amp;gt;&amp;lt;Revision&amp;gt;0&amp;lt;/Revision&amp;gt;&amp;lt;/WikiPage&amp;gt;&lt;/Documentation&gt;&lt;/Variable&gt;&lt;StandardVariable Id=&quot;4&quot; Name=&quot;Pgmdesc&quot;&gt;&lt;Properties&gt;&lt;Property&gt;&lt;Name&gt;Name&lt;/Name&gt;&lt;Value&gt;Pgmdesc&lt;/Value&gt;&lt;/Property&gt;&lt;Property&gt;&lt;Name&gt;OBJ_TYPE&lt;/Name&gt;&lt;Value&gt;id_OTYPE_VAR&lt;/Value&gt;&lt;/Property&gt;&lt;Property&gt;&lt;Name&gt;IsStandardVariable&lt;/Name&gt;&lt;Value&gt;True&lt;/Value&gt;&lt;/Property&gt;&lt;Property&gt;&lt;Name&gt;ATTCUSTOMTYPE&lt;/Name&gt;&lt;Value&gt;bas:Character&lt;/Value&gt;&lt;/Property&gt;&lt;Property&gt;&lt;Name&gt;Length&lt;/Name&gt;&lt;Value&gt;256&lt;/Value&gt;&lt;/Property&gt;&lt;Property&gt;&lt;Name&gt;AttMaxLen&lt;/Name&gt;&lt;Value&gt;256&lt;/Value&gt;&lt;/Property&gt;&lt;/Properties&gt;&lt;Documentation&gt;&amp;lt;WikiPage&amp;gt;&amp;lt;Modified&amp;gt;0001-01-01T00:00:00&amp;lt;/Modified&amp;gt;&amp;lt;Revision&amp;gt;0&amp;lt;/Revision&amp;gt;&amp;lt;/WikiPage&amp;gt;&lt;/Documentation&gt;&lt;/StandardVariable&gt;&lt;StandardVariable Id=&quot;3&quot; Name=&quot;Pgmname&quot;&gt;&lt;Properties&gt;&lt;Property&gt;&lt;Name&gt;Name&lt;/Name&gt;&lt;Value&gt;Pgmname&lt;/Value&gt;&lt;/Property&gt;&lt;Property&gt;&lt;Name&gt;OBJ_TYPE&lt;/Name&gt;&lt;Value&gt;id_OTYPE_VAR&lt;/Value&gt;&lt;/Property&gt;&lt;Property&gt;&lt;Name&gt;IsStandardVariable&lt;/Name&gt;&lt;Value&gt;True&lt;/Value&gt;&lt;/Property&gt;&lt;Property&gt;&lt;Name&gt;ATTCUSTOMTYPE&lt;/Name&gt;&lt;Value&gt;bas:Character&lt;/Value&gt;&lt;/Property&gt;&lt;Property&gt;&lt;Name&gt;Length&lt;/Name&gt;&lt;Value&gt;128&lt;/Value&gt;&lt;/Property&gt;&lt;Property&gt;&lt;Name&gt;AttMaxLen&lt;/Name&gt;&lt;Value&gt;128&lt;/Value&gt;&lt;/Property&gt;&lt;/Properties&gt;&lt;Documentation&gt;&amp;lt;WikiPage&amp;gt;&amp;lt;Modified&amp;gt;0001-01-01T00:00:00&amp;lt;/Modified&amp;gt;&amp;lt;Revision&amp;gt;0&amp;lt;/Revision&amp;gt;&amp;lt;/WikiPage&amp;gt;&lt;/Documentation&gt;&lt;/StandardVariable&gt;&lt;StandardVariable Id=&quot;2&quot; Name=&quot;Time&quot;&gt;&lt;Properties&gt;&lt;Property&gt;&lt;Name&gt;Name&lt;/Name&gt;&lt;Value&gt;Time&lt;/Value&gt;&lt;/Property&gt;&lt;Property&gt;&lt;Name&gt;OBJ_TYPE&lt;/Name&gt;&lt;Value&gt;id_OTYPE_VAR&lt;/Value&gt;&lt;/Property&gt;&lt;Property&gt;&lt;Name&gt;IsStandardVariable&lt;/Name&gt;&lt;Value&gt;True&lt;/Value&gt;&lt;/Property&gt;&lt;Property&gt;&lt;Name&gt;ATTCUSTOMTYPE&lt;/Name&gt;&lt;Value&gt;bas:Character&lt;/Value&gt;&lt;/Property&gt;&lt;Property&gt;&lt;Name&gt;Length&lt;/Name&gt;&lt;Value&gt;8&lt;/Value&gt;&lt;/Property&gt;&lt;Property&gt;&lt;Name&gt;AttMaxLen&lt;/Name&gt;&lt;Value&gt;8&lt;/Value&gt;&lt;/Property&gt;&lt;/Properties&gt;&lt;Documentation&gt;&amp;lt;WikiPage&amp;gt;&amp;lt;Modified&amp;gt;0001-01-01T00:00:00&amp;lt;/Modified&amp;gt;&amp;lt;Revision&amp;gt;0&amp;lt;/Revision&amp;gt;&amp;lt;/WikiPage&amp;gt;&lt;/Documentation&gt;&lt;/StandardVariable&gt;&lt;StandardVariable Id=&quot;1&quot; Name=&quot;Today&quot;&gt;&lt;Properties&gt;&lt;Property&gt;&lt;Name&gt;Name&lt;/Name&gt;&lt;Value&gt;Today&lt;/Value&gt;&lt;/Property&gt;&lt;Property&gt;&lt;Name&gt;OBJ_TYPE&lt;/Name&gt;&lt;Value&gt;id_OTYPE_VAR&lt;/Value&gt;&lt;/Property&gt;&lt;Property&gt;&lt;Name&gt;IsStandardVariable&lt;/Name&gt;&lt;Value&gt;True&lt;/Value&gt;&lt;/Property&gt;&lt;Property&gt;&lt;Name&gt;ATTCUSTOMTYPE&lt;/Name&gt;&lt;Value&gt;bas:Date&lt;/Value&gt;&lt;/Property&gt;&lt;/Properties&gt;&lt;Documentation&gt;&amp;lt;WikiPage&amp;gt;&amp;lt;Modified&amp;gt;0001-01-01T00:00:00&amp;lt;/Modified&amp;gt;&amp;lt;Revision&amp;gt;0&amp;lt;/Revision&amp;gt;&amp;lt;/WikiPage&amp;gt;&lt;/Documentation&gt;&lt;/StandardVariable&gt;&lt;/Variables&gt;" events="Event Start&#xA;&#x9;&amp;AuthRepository = AuthRepository.Get()&#xA;&#x9;Do Case&#xA;&#x9;Case &amp;AuthRepository.UserIdentification = AuthRepositoryUserIdentifications.Name&#xA;&#x9;&#x9;&amp;UserName.Caption = AuthRepositoryUserIdentifications.EnumerationDescription(AuthRepositoryUserIdentifications.Name)&#xA;&#x9;Case &amp;AuthRepository.UserIdentification = AuthRepositoryUserIdentifications.EMail&#xA;&#x9;&#x9;&amp;UserName.Caption = AuthRepositoryUserIdentifications.EnumerationDescription(AuthRepositoryUserIdentifications.EMail)&#xA;&#x9;Case &amp;AuthRepository.UserIdentification = AuthRepositoryUserIdentifications.NameEmail&#xA;&#x9;&#x9;&amp;UserName.Caption = AuthRepositoryUserIdentifications.EnumerationDescription(AuthRepositoryUserIdentifications.NameEmail)&#xA;&#x9;EndCase&#xA;Endevent&#xA;&#xA;Event 'BtnAcesso'&#xA;&#x9;Composite&#xA;&#x9;&#x9;SANITIZED.Common.UI.Progress.ShowWithTitle(&quot;Conectando...&quot;)&#xA;&#x9;&#x9;SANITIZED.SD.Actions.Autenticar(&amp;UserName, &amp;Password)&#xA;&#x9;&#x9;SANITIZED.Common.UI.Progress.Hide()&#xA;&#x9;&#x9;Return&#xA;&#x9;EndComposite&#xA;EndEvent&#xA;&#xA;&#xA;//Event 'Facebook'&#xA;//&#x9;Composite&#xA;//&#x9;&#x9;&amp;AcessoExternalAdditionalParameters = new()&#xA;//      &amp;AcessoExternalAdditionalParameters.AuthenticationTypeName&#x9;= !&quot;facebook&quot;  //Use only when more than one Facebook authentication type is defined&#xA;//      SANITIZED.SD.Actions.AutenticarExternal(AuthAuthenticationTypes.Facebook, &amp;UserName, &amp;Password, &amp;AcessoExternalAdditionalParameters)&#xA;//      Return&#xA;//&#x9;EndComposite&#xA;//EndEvent&#xA;&#xA;//Event 'Google'&#xA;//&#x9;Composite&#xA;//&#x9;&#x9;&amp;AcessoExternalAdditionalParameters = new()&#xA;//      &amp;AcessoExternalAdditionalParameters.AuthenticationTypeName&#x9;= !&quot;google&quot;  //Use only when more than one Google authentication type is defined&#xA;//      SANITIZED.SD.Actions.AutenticarExternal(AuthAuthenticationTypes.Google, &amp;UserName, &amp;Password, &amp;AcessoExternalAdditionalParameters)&#xA;//&#x9;&#x9;Return&#xA;//&#x9;EndComposite&#xA;//EndEvent&#xA;&#xA;//Event 'Twitter'&#xA;//&#x9;Composite&#xA;//&#x9;&#x9;SANITIZED.SD.Actions.AutenticarExternal(AuthAuthenticationTypes.Twitter, &amp;UserName, &amp;Password)&#xA;//&#x9;&#x9;Return&#xA;//&#x9;EndComposite&#xA;//EndEvent&#xA;&#xA;//Event 'AuthRemote'&#xA;//&#x9;Composite&#xA;//&#x9;&#x9;&amp;AcessoExternalAdditionalParameters = new()&#xA;//&#x9;&#x9;&amp;AcessoExternalAdditionalParameters.Repository&#x9;&#x9;&#x9;&#x9;= &amp;RepositoryGUID&#x9;//Use only when more than one Repository is defined in the Identity Provider (multi-tenant)&#xA;//&#x9;&#x9;&amp;AcessoExternalAdditionalParameters.AuthenticationTypeName&#x9;= !&quot;idp_name&quot;  &#x9;&#x9;//Use only when more than one AuthRemote authentication type is defined&#xA;//      SANITIZED.SD.Actions.AutenticarExternal(AuthAuthenticationTypes.AuthRemote, &amp;UserName, &amp;Password, &amp;AcessoExternalAdditionalParameters)&#xA;//&#x9;&#x9;Return&#xA;//&#x9;EndComposite&#xA;//Endevent&#xA;&#xA;&#xA;&#xA;Event 'Register'&#xA;&#x9;Composite&#xA;&#x9;&#x9;PanelExemploRegistrar()&#xA;&#x9;&#x9;Return&#xA;&#x9;&#x9;If 1=0&#xA;&#x9;&#x9;&#x9;Do 'Dummy'&#xA;&#x9;&#x9;Endif&#xA;&#x9;EndComposite&#xA;EndEvent&#xA;&#xA;&#xA;Sub 'Dummy'&#xA;&#x9;//To include in build references&#xA;&#x9;PanelExemploAtualizar()&#xA;&#x9;PanelExemploAlterarSenha()&#xA;&#x9;PanelExemploNaoAutorizado()&#xA;Endsub&#xA;&#xA;&#xA;" rules="&#xD;&#xA;">
+      <layout id="3448c091-227a-50bb-a80a-dfbc08086458" Type="View">
+        <table id="ab58fa72-dc00-4426-b898-f29b04c920a8" controlName="MainTable" columnsStyle="10dip;100%;10dip" responsiveSizes="[]">
+          <row id="f906596b-4aad-4521-8da4-80aafbabdfbb" rowHeight="50dip" />
+          <row id="b020ea6f-2c5c-4a01-9474-913934e181b0" rowHeight="pd">
+            <cell id="365aba11-c77f-4c3d-a0a6-eacb08e3dc44" />
+            <cell id="2b8f0168-0df7-4de1-bbf8-ffb295d36429">
+              <data attribute="&amp;UserName" labelCaption="Name" readonly="False" inviteMessage="" />
+            </cell>
+            <cell id="da5e96b9-3aff-4aab-b89e-39d7be52ad7a" />
+          </row>
+          <row id="b99ef45d-712d-4945-85c3-7c017cf00d05" rowHeight="pd">
+            <cell id="7b01445f-554a-482d-9363-f71b40761bf4" />
+            <cell id="2a9b93b9-c15b-426a-b3e2-3372642b075d">
+              <data attribute="&amp;Password" labelCaption="Password" readonly="False" inviteMessage="" PATTERN_ELEMENT_CUSTOM_PROPERTIES="&lt;Properties&gt;&lt;Property&gt;&lt;Name&gt;idEnableShowPasswordHint&lt;/Name&gt;&lt;Value&gt;True&lt;/Value&gt;&lt;/Property&gt;&lt;/Properties&gt;" />
+            </cell>
+          </row>
+          <row id="91340143-cf76-4a5a-9536-2328d1d7c7e4" rowHeight="15dip" />
+          <row id="f36e98c0-93a9-4fc7-8b6f-99a81f196b01" rowHeight="pd">
+            <cell id="c4da8518-eb92-45c4-8c5f-6169048318a7" />
+            <cell id="de0e3236-6940-41b2-9b10-c01b64bb2dbf" hAlign="Center" vAlign="Middle">
+              <action controlName="BtnAcesso" onClickEvent="'BtnAcesso'" caption="Acesso" class="button-primary" />
+            </cell>
+          </row>
+        </table>
+        <actionBar>
+          <item priority="High">
+            <action controlName="BtnRegister" onClickEvent="'Register'" />
+          </item>
+        </actionBar>
+      </layout>
+    </detail>
+  </level>
+</instance>]]></Data>
+      <Properties>
+        <Property>
+          <Name>IsDefault</Name>
+          <Value>False</Value>
+        </Property>
+      </Properties>
+    </PatternPart>
+    <Properties>
+      <Property>
+        <Name>IsDefault</Name>
+        <Value>False</Value>
+      </Property>
+    </Properties>
+  </Part>
+  <Part type="babf62c5-0111-49e9-a1c3-cc004d90900a">
+    <Properties />
+  </Part>
+  <Properties>
+    <Property>
+      <Name>Name</Name>
+      <Value>PanelExemploAcesso</Value>
+    </Property>
+    <Property>
+      <Name>Description</Name>
+      <Value>Acesso</Value>
+    </Property>
+    <Property>
+      <Name>IsDefault</Name>
+      <Value>False</Value>
+    </Property>
+    <Property>
+      <Name>idConnectivitySupport</Name>
+      <Value>idOnline</Value>
+    </Property>
+    <Property>
+      <Name>AndroidBaseStyle</Name>
+      <Value>AndroidBaseStyleDark</Value>
+    </Property>
+    <Property>
+      <Name>CacheEnabled</Name>
+      <Value>False</Value>
+    </Property>
+    <Property>
+      <Name>IntegratedSecurityLevel</Name>
+      <Value>SecurityNone</Value>
+    </Property>
+    <Property>
+      <Name>IntegratedSecurityPermissionPrefix</Name>
+      <Value>PanelExemploAcesso</Value>
+    </Property>
+  </Properties>
+  <Categories>Panel_Samples-sd</Categories>
+</Object>
+
+` 
+
+### Molde sanitizado de API 1 - `APIExemploIntegracao`
+
+- Perfil: API com bloco Service, multiplos RestMethod, eventos .Before/.After e conjunto denso de variaveis.
+- Uso operacional: boa referencia para API com servicos REST coordenados por eventos e logica auxiliar interna.
+
+`xml
+<?xml version="1.0" encoding="utf-8"?>
+<Object parentGuid="74e9b5f3-f6b7-4421-b895-d960d6b1078b" user="SANITIZED\\USER" versionDate="0001-01-01T00:00:00.0000000" lastUpdate="2026-03-12T15:02:57.0000000Z" checksum="2ca44baa29aabb01a13db31a19ad40b3" fullyQualifiedName="APIExemploIntegracao" moduleGuid="afa47377-41d5-4ae8-9755-6f53150aa361" guid="854bf450-73b9-4472-bbcc-24ddcb983022" name="APIExemploIntegracao" type="36e32e2d-023e-4188-95df-d13573bac2e0" description="API Exemplo Integracao" parent="PastaExemploAPI" parentType="00000000-0000-0000-0000-000000000008">
+  <Part type="9f577ec2-27f4-4cf4-8ad5-f3f50c9d69b5">
+    <Source><![CDATA[Service
+{	
+	[RestMethod(POST)]
+	[Description("Obter a lista de itens conforme parametros.")]
+	ObterItens(
+		in:&ItemEmpresaId, 
+		in:&ItemCodigo, 
+		in:&UltimaAlteracaoInicio, 
+		in:&ComDFouPedidoOuVmEmpresaId, 
+		in:&ComDFouPedidoOuVmDesde, 
+		in:&SemDadosFiscaisAdicionais, 
+		in:&ItemMarcaId, 
+		in:&GrupoDeItemId, 
+		out:&ListaSdtItemDadosBasicos, 
+		out:&MensagensRetorno
+	)
+	=> procListaSdtItemDadosBasicosConformeParametros(
+		"", 
+		&ItemEmpresaId, 
+		&ItemTipoProd, 
+		&ItemCodigo, 
+		&UltimaAlteracaoInicio, 
+		&ComDFouPedidoOuVmEmpresaId, 
+		&ComDFouPedidoOuVmDesde, 
+		&SemDadosFiscaisAdicionais, 
+		&SemDadosOpcionaisPorEmpresa, 
+		&SemIdiomas, 
+		&GrupoEspecie, 
+		&ItemMarcaId, 
+		&ComMarca, 
+		&CorteTipo, 
+		&TipoLocalEstoque, 
+		&GrupoDeItemId, 
+		&ListaSdtItemDadosBasicos, 
+		&MensagensRetorno
+	);
+
+	[RestMethod(POST)]
+	[Description("Obter a lista de regras conforme parametros.")]
+	ObterRegras(
+		in:&RegraEmpresaId, 
+		in:&RegraId,
+		in:&DocumentoEmpresaId,
+		in:&TipoExemplo,
+		in:&UltimaAlteracaoInicio, 
+		out:&sdtRegraDadosBasicosSelecao, 
+		out:&MensagensRetorno
+	)
+	=> procSdtRegraDadosBasicosSelecaoConformeParametros(
+		&RegraEmpresaId, 
+		&RegraId,
+		&DocumentoEmpresaId,
+		&TipoExemplo,
+		&UltimaAlteracaoInicio, 
+		&sdtRegraDadosBasicosSelecao, 
+		&MensagensRetorno
+	);
+	
+	[RestMethod(POST)]
+	[Description("enviar um documento em Base64 para processamento.")]
+	EnviarDocumento(
+		in:&NomeDoArquivo, 
+		in:&ConteudoEmBase64,
+		in:&DocumentoEmpresaId,
+		out:&OperacaoSucesso, 
+		out:&MensagensRetorno
+	)
+	=> procImportaDocumentoDeBase64(
+		&NomeDoArquivo, 
+		&ConteudoEmBase64,
+		&DocumentoEmpresaId,
+		&OperacaoSucesso, 
+		&MensagensRetorno
+	);
+	
+}]]></Source>
+    <Properties>
+      <Property>
+        <Name>IsDefault</Name>
+        <Value>False</Value>
+      </Property>
+    </Properties>
+  </Part>
+  <Part type="c44bd5ff-f918-415b-98e6-aca44fed84fa">
+    <Source><![CDATA[Event ObterItens.Before
+	
+	&ItemTipoProd = TipoProd.Item
+	
+Endevent
+Event ObterItens.After
+	
+	do 'CompletaMensagensRetorno'	
+	
+Endevent	
+
+Event ObterRegras.Before
+	
+	&ContextoLoginId = procEmpresaContextoId(&DocumentoEmpresaId)		
+	if &ContextoLoginId.IsEmpty()
+			
+		&ContextoLoginId = &DocumentoEmpresaId
+			
+	endif	
+	
+	do 'CompletaLogin'
+	
+Endevent
+Event ObterRegras.After
+	
+	do 'CompletaMensagensRetorno'	
+	
+Endevent	
+
+
+Event EnviarDocumento.Before
+
+	&ContextoLoginId = procEmpresaContextoId(&DocumentoEmpresaId)		
+	if &ContextoLoginId.IsEmpty()
+			
+		&ContextoLoginId = &DocumentoEmpresaId
+			
+	endif	
+	
+	do 'CompletaLogin'
+
+Endevent
+Event EnviarDocumento.After
+	
+	if &OperacaoSucesso
+		
+		&MensagensRetorno =
+		procRemoveUmTipoDeMensagem(&MensagensRetorno, TiposMensagemExemplo.Warning, -1)
+		
+	endif
+
+	&MensagensRetorno =
+	procRemoveUmTipoDeMensagem(&MensagensRetorno, TiposMensagemExemplo.Info, 0)
+
+	do 'CompletaMensagensRetorno'
+	
+Endevent	
+	
+	
+//Sub 'CompletaMensagensRetorno'
+Sub 'CompletaMensagensRetorno'
+	
+	procAgregaMessages(&MensagensRetorno, &MensagensInicio)
+	
+Endsub	
+
+	
+//Sub 'CompletaLogin'
+Sub 'CompletaLogin'
+
+	&AbortarInicio = false
+	
+	&AuthSession = AuthSession.Get(&AuthErrors)
+	
+	&SessionValid = AuthSession.IsValid(&AuthSession, &AuthErrors)
+	
+	Do Case
+		Case &AuthErrors.Count > 0
+			
+			procAgregaMensagensDeErrosAuth(&MensagensInicio, &AuthErrors)
+			
+			//procAgregaNovaMensagem(&MensagensInicio, "", TiposMensagemExemplo.Error,
+			//"Erro: (Falha na autenticacao) " + &AuthErrors.ToJson())
+			//"Erro: Falha na autenticacao. Com " + &AuthErrors.Count.ToString().Trim() + " erros.")
+			
+			&RestCode = 403  // Forbidden (ou 401 se for "não autenticado")
+			&AbortarInicio = true
+			
+		Case not &SessionValid
+			
+			procAgregaNovaMensagem(&MensagensInicio,"", TiposMensagemExemplo.Error, 
+			'Erro: sessao de autenticacao invalida.')
+			
+			&RestCode = 403  // Forbidden (ou 401 se for "não autenticado")
+			&AbortarInicio = true
+			
+		Case &ContextoLoginId.IsEmpty()
+
+			procAgregaNovaMensagem(&MensagensInicio,"", TiposMensagemExemplo.Error, 
+			'Erro: contexto de login nao definido.')
+			
+			&RestCode = 403  // Forbidden (ou 401 se for "não autenticado")
+			&AbortarInicio = true
+		
+		Otherwise
+
+			&AuthUser    = &AuthSession.User
+			&UserName  = &AuthUser.GetName()
+			
+			&loginUsuarioId = procUsuarioPorLogin(&UserName.ToString().Trim())
+			
+			//if &loginUsuarioId.IsEmpty()
+			if &loginUsuarioId.IsEmpty()
+				
+				procAgregaNovaMensagem(&MensagensInicio,"", TiposMensagemExemplo.Error, 
+				'Erro: usuario nao identificado para o login ' + &UserName + ".")
+	
+				&RestCode = 403  // Forbidden (ou 401 se for "não autenticado")
+				&AbortarInicio = true
+				
+			else
+				
+				procCriaSessaoUsuario(&loginUsuarioId,"")
+				
+				//if procEmpresaLiberadaProUsuarioExemplo(&ContextoLoginId)
+				if procEmpresaLiberadaProUsuarioExemplo(&ContextoLoginId)
+					
+					procCriaSessaoEmpresa(&ContextoLoginId, "")
+					
+				else
+					
+					procAgregaNovaMensagem(&MensagensInicio,"", TiposMensagemExemplo.Error, 
+					'Erro: Usuário Id ' + &loginUsuarioId.ToString().Trim() + 
+					' sem permissao para a empresa id ' + &ContextoLoginId.ToString().Trim() +
+					".")
+		
+					&RestCode = 403  // Forbidden (ou 401 se for "não autenticado")
+					&AbortarInicio = true
+					
+				endif
+				
+			endif
+		
+	Endcase
+
+	//if &AbortarInicio
+	if &AbortarInicio
+		
+		do 'CompletaMensagensRetorno'
+		Return
+		
+	endif
+
+Endsub
+]]></Source>
+    <Properties>
+      <Property>
+        <Name>IsDefault</Name>
+        <Value>False</Value>
+      </Property>
+    </Properties>
+  </Part>
+  <Part type="e4c4ade7-53f0-4a56-bdfd-843735b66f47">
+    <Variable Name="AbortarInicio">
+      <Documentation />
+      <Properties>
+        <Property>
+          <Name>Name</Name>
+          <Value>AbortarInicio</Value>
+        </Property>
+        <Property>
+          <Name>ATTCUSTOMTYPE</Name>
+          <Value>bas:Boolean</Value>
+        </Property>
+      </Properties>
+    </Variable>
+    <Variable Name="ComDFouPedidoOuVmDesde">
+      <Documentation />
+      <Properties>
+        <Property>
+          <Name>Name</Name>
+          <Value>ComDFouPedidoOuVmDesde</Value>
+        </Property>
+        <Property>
+          <Name>idBasedOn</Name>
+          <Value>Domain:Data</Value>
+        </Property>
+      </Properties>
+    </Variable>
+    <Variable Name="ComDFouPedidoOuVmEmpresaId">
+      <Documentation />
+      <Properties>
+        <Property>
+          <Name>Name</Name>
+          <Value>ComDFouPedidoOuVmEmpresaId</Value>
+        </Property>
+        <Property>
+          <Name>Description</Name>
+          <Value>Empresa Id</Value>
+        </Property>
+        <Property>
+          <Name>idBasedOn</Name>
+          <Value>Attribute:EmpresaId</Value>
+        </Property>
+      </Properties>
+    </Variable>
+    <Variable Name="ComMarca">
+      <Documentation />
+      <Properties>
+        <Property>
+          <Name>Name</Name>
+          <Value>ComMarca</Value>
+        </Property>
+        <Property>
+          <Name>idBasedOn</Name>
+          <Value>Domain:SimOuNao</Value>
+        </Property>
+      </Properties>
+    </Variable>
+    <Variable Name="ConteudoEmBase64">
+      <Documentation />
+      <Properties>
+        <Property>
+          <Name>Name</Name>
+          <Value>ConteudoEmBase64</Value>
+        </Property>
+        <Property>
+          <Name>ATTCUSTOMTYPE</Name>
+          <Value>bas:LongVarChar</Value>
+        </Property>
+      </Properties>
+    </Variable>
+    <Variable Name="CorteTipo">
+      <Documentation />
+      <Properties>
+        <Property>
+          <Name>Name</Name>
+          <Value>CorteTipo</Value>
+        </Property>
+        <Property>
+          <Name>Description</Name>
+          <Value>Corte Tipo</Value>
+        </Property>
+        <Property>
+          <Name>idBasedOn</Name>
+          <Value>Attribute:CorteTipo</Value>
+        </Property>
+      </Properties>
+    </Variable>
+    <Variable Name="DocumentoEmpresaId">
+      <Documentation />
+      <Properties>
+        <Property>
+          <Name>Name</Name>
+          <Value>DocumentoEmpresaId</Value>
+        </Property>
+        <Property>
+          <Name>Description</Name>
+          <Value>Documento Fiscal Empresa Id</Value>
+        </Property>
+        <Property>
+          <Name>idBasedOn</Name>
+          <Value>Attribute:DocumentoEmpresaId</Value>
+        </Property>
+      </Properties>
+    </Variable>
+    <Variable Name="loginUsuarioId">
+      <Documentation />
+      <Properties>
+        <Property>
+          <Name>Name</Name>
+          <Value>loginUsuarioId</Value>
+        </Property>
+        <Property>
+          <Name>Description</Name>
+          <Value>Usuario Id</Value>
+        </Property>
+        <Property>
+          <Name>idIsAutoDefinedVariable</Name>
+          <Value>False</Value>
+        </Property>
+        <Property>
+          <Name>idBasedOn</Name>
+          <Value>Attribute:UsuarioId</Value>
+        </Property>
+      </Properties>
+    </Variable>
+    <Variable Name="emptyAuthSession">
+      <Documentation />
+      <Properties>
+        <Property>
+          <Name>Name</Name>
+          <Value>emptyAuthSession</Value>
+        </Property>
+        <Property>
+          <Name>ATTCUSTOMTYPE</Name>
+          <Value>exo:AuthSession, SanitizedSecurity</Value>
+        </Property>
+      </Properties>
+    </Variable>
+    <Variable Name="AuthError">
+      <Documentation />
+      <Properties>
+        <Property>
+          <Name>Name</Name>
+          <Value>AuthError</Value>
+        </Property>
+        <Property>
+          <Name>idIsAutoDefinedVariable</Name>
+          <Value>False</Value>
+        </Property>
+        <Property>
+          <Name>ATTCUSTOMTYPE</Name>
+          <Value>exo:AuthError, SanitizedSecurity</Value>
+        </Property>
+        <Property>
+          <Name>Length</Name>
+          <Value>4</Value>
+        </Property>
+        <Property>
+          <Name>Decimals</Name>
+          <Value>0</Value>
+        </Property>
+        <Property>
+          <Name>AttMaxLen</Name>
+          <Value>4</Value>
+        </Property>
+        <Property>
+          <Name>AttAvgLen</Name>
+          <Value>0</Value>
+        </Property>
+      </Properties>
+    </Variable>
+    <Variable Name="AuthErrors">
+      <Documentation />
+      <Properties>
+        <Property>
+          <Name>Name</Name>
+          <Value>AuthErrors</Value>
+        </Property>
+        <Property>
+          <Name>ATTCUSTOMTYPE</Name>
+          <Value>exo:AuthError, SanitizedSecurity</Value>
+        </Property>
+        <Property>
+          <Name>AttCollection</Name>
+          <Value>True</Value>
+        </Property>
+      </Properties>
+    </Variable>
+    <Variable Name="AuthLoginAdditionalParameters">
+      <Documentation />
+      <Properties>
+        <Property>
+          <Name>Name</Name>
+          <Value>AuthLoginAdditionalParameters</Value>
+        </Property>
+        <Property>
+          <Name>ATTCUSTOMTYPE</Name>
+          <Value>exo:AuthLoginAdditionalParameters, SanitizedSecurity</Value>
+        </Property>
+      </Properties>
+    </Variable>
+    <Variable Name="AuthSession">
+      <Documentation />
+      <Properties>
+        <Property>
+          <Name>Name</Name>
+          <Value>AuthSession</Value>
+        </Property>
+        <Property>
+          <Name>ATTCUSTOMTYPE</Name>
+          <Value>exo:AuthSession, SanitizedSecurity</Value>
+        </Property>
+      </Properties>
+    </Variable>
+    <Variable Name="AuthUser">
+      <Documentation />
+      <Properties>
+        <Property>
+          <Name>Name</Name>
+          <Value>AuthUser</Value>
+        </Property>
+        <Property>
+          <Name>ATTCUSTOMTYPE</Name>
+          <Value>exo:AuthUser, SanitizedSecurity</Value>
+        </Property>
+      </Properties>
+    </Variable>
+    <Variable Name="GrupoDeItemId">
+      <Documentation />
+      <Properties>
+        <Property>
+          <Name>Name</Name>
+          <Value>GrupoDeItemId</Value>
+        </Property>
+        <Property>
+          <Name>Description</Name>
+          <Value>Grupo De Item Id</Value>
+        </Property>
+        <Property>
+          <Name>idBasedOn</Name>
+          <Value>Attribute:GrupoDeItemId</Value>
+        </Property>
+      </Properties>
+    </Variable>
+    <Variable Name="GrupoEspecie">
+      <Documentation />
+      <Properties>
+        <Property>
+          <Name>Name</Name>
+          <Value>GrupoEspecie</Value>
+        </Property>
+        <Property>
+          <Name>idBasedOn</Name>
+          <Value>Domain:GrupoEspecie</Value>
+        </Property>
+      </Properties>
+    </Variable>
+    <Variable Name="MensagensInicio">
+      <Documentation />
+      <Properties>
+        <Property>
+          <Name>Name</Name>
+          <Value>MensagensInicio</Value>
+        </Property>
+        <Property>
+          <Name>ATTCUSTOMTYPE</Name>
+          <Value>sdt:Messages, Sanitized.Common</Value>
+        </Property>
+      </Properties>
+    </Variable>
+    <Variable Name="ListaSdtItemDadosBasicos">
+      <Documentation />
+      <Properties>
+        <Property>
+          <Name>Name</Name>
+          <Value>ListaSdtItemDadosBasicos</Value>
+        </Property>
+        <Property>
+          <Name>ATTCUSTOMTYPE</Name>
+          <Value>sdt:sdtItemDadosBasicos</Value>
+        </Property>
+        <Property>
+          <Name>AttCollection</Name>
+          <Value>True</Value>
+        </Property>
+        <Property>
+          <Name>idVarServiceExtName</Name>
+          <Value>ListaItemDadosBasicos</Value>
+        </Property>
+      </Properties>
+    </Variable>
+    <Variable Name="NomeArquivo">
+      <Documentation />
+      <Properties>
+        <Property>
+          <Name>Name</Name>
+          <Value>NomeArquivo</Value>
+        </Property>
+        <Property>
+          <Name>ATTCUSTOMTYPE</Name>
+          <Value>bas:VarChar</Value>
+        </Property>
+        <Property>
+          <Name>Length</Name>
+          <Value>512</Value>
+        </Property>
+        <Property>
+          <Name>AttMaxLen</Name>
+          <Value>512</Value>
+        </Property>
+      </Properties>
+    </Variable>
+    <Variable Name="NomeDoArquivo">
+      <Documentation />
+      <Properties>
+        <Property>
+          <Name>Name</Name>
+          <Value>NomeDoArquivo</Value>
+        </Property>
+        <Property>
+          <Name>idIsAutoDefinedVariable</Name>
+          <Value>False</Value>
+        </Property>
+        <Property>
+          <Name>ATTCUSTOMTYPE</Name>
+          <Value>bas:VarChar</Value>
+        </Property>
+        <Property>
+          <Name>Length</Name>
+          <Value>256</Value>
+        </Property>
+        <Property>
+          <Name>AttMaxLen</Name>
+          <Value>256</Value>
+        </Property>
+      </Properties>
+    </Variable>
+    <Variable Name="ContextoLoginId">
+      <Documentation />
+      <Properties>
+        <Property>
+          <Name>Name</Name>
+          <Value>ContextoLoginId</Value>
+        </Property>
+        <Property>
+          <Name>Description</Name>
+          <Value>Empresa Id</Value>
+        </Property>
+        <Property>
+          <Name>idBasedOn</Name>
+          <Value>Attribute:EmpresaId</Value>
+        </Property>
+      </Properties>
+    </Variable>
+    <Variable Name="ItemCodigo">
+      <Documentation />
+      <Properties>
+        <Property>
+          <Name>Name</Name>
+          <Value>ItemCodigo</Value>
+        </Property>
+        <Property>
+          <Name>Description</Name>
+          <Value>Item Código</Value>
+        </Property>
+        <Property>
+          <Name>idBasedOn</Name>
+          <Value>Attribute:ItemCodigo</Value>
+        </Property>
+      </Properties>
+    </Variable>
+    <Variable Name="ItemEmpresaId">
+      <Documentation />
+      <Properties>
+        <Property>
+          <Name>Name</Name>
+          <Value>ItemEmpresaId</Value>
+        </Property>
+        <Property>
+          <Name>Description</Name>
+          <Value>Item Empresa Id</Value>
+        </Property>
+        <Property>
+          <Name>idBasedOn</Name>
+          <Value>Attribute:ItemEmpresaId</Value>
+        </Property>
+      </Properties>
+    </Variable>
+    <Variable Name="ItemMarcaId">
+      <Documentation />
+      <Properties>
+        <Property>
+          <Name>Name</Name>
+          <Value>ItemMarcaId</Value>
+        </Property>
+        <Property>
+          <Name>Description</Name>
+          <Value>Item Marca Id</Value>
+        </Property>
+        <Property>
+          <Name>idBasedOn</Name>
+          <Value>Attribute:ItemMarcaId</Value>
+        </Property>
+      </Properties>
+    </Variable>
+    <Variable Name="ItemTipoProd">
+      <Documentation />
+      <Properties>
+        <Property>
+          <Name>Name</Name>
+          <Value>ItemTipoProd</Value>
+        </Property>
+        <Property>
+          <Name>Description</Name>
+          <Value>Item Tipo</Value>
+        </Property>
+        <Property>
+          <Name>idBasedOn</Name>
+          <Value>Attribute:ItemTipoProd</Value>
+        </Property>
+      </Properties>
+    </Variable>
+    <Variable Name="ProgressIndicator_Title">
+      <Documentation />
+      <Properties>
+        <Property>
+          <Name>Name</Name>
+          <Value>ProgressIndicator_Title</Value>
+        </Property>
+        <Property>
+          <Name>ATTCUSTOMTYPE</Name>
+          <Value>bas:VarChar</Value>
+        </Property>
+        <Property>
+          <Name>Length</Name>
+          <Value>256</Value>
+        </Property>
+        <Property>
+          <Name>AttMaxLen</Name>
+          <Value>256</Value>
+        </Property>
+      </Properties>
+    </Variable>
+    <Variable Name="MensagensRetorno">
+      <Documentation />
+      <Properties>
+        <Property>
+          <Name>Name</Name>
+          <Value>MensagensRetorno</Value>
+        </Property>
+        <Property>
+          <Name>ATTCUSTOMTYPE</Name>
+          <Value>sdt:Messages, Sanitized.Common</Value>
+        </Property>
+      </Properties>
+    </Variable>
+    <Variable Name="sdtRegraDadosBasicosSelecao">
+      <Documentation />
+      <Properties>
+        <Property>
+          <Name>Name</Name>
+          <Value>sdtRegraDadosBasicosSelecao</Value>
+        </Property>
+        <Property>
+          <Name>idIsAutoDefinedVariable</Name>
+          <Value>False</Value>
+        </Property>
+        <Property>
+          <Name>ATTCUSTOMTYPE</Name>
+          <Value>sdt:sdtRegraDadosBasicosSelecao</Value>
+        </Property>
+      </Properties>
+    </Variable>
+    <Variable Name="SemDadosFiscaisAdicionais">
+      <Documentation />
+      <Properties>
+        <Property>
+          <Name>Name</Name>
+          <Value>SemDadosFiscaisAdicionais</Value>
+        </Property>
+        <Property>
+          <Name>idBasedOn</Name>
+          <Value>Domain:Logico</Value>
+        </Property>
+      </Properties>
+    </Variable>
+    <Variable Name="SemDadosOpcionaisPorEmpresa">
+      <Documentation />
+      <Properties>
+        <Property>
+          <Name>Name</Name>
+          <Value>SemDadosOpcionaisPorEmpresa</Value>
+        </Property>
+        <Property>
+          <Name>idBasedOn</Name>
+          <Value>Domain:Logico</Value>
+        </Property>
+      </Properties>
+    </Variable>
+    <Variable Name="SemIdiomas">
+      <Documentation />
+      <Properties>
+        <Property>
+          <Name>Name</Name>
+          <Value>SemIdiomas</Value>
+        </Property>
+        <Property>
+          <Name>idBasedOn</Name>
+          <Value>Domain:Logico</Value>
+        </Property>
+      </Properties>
+    </Variable>
+    <Variable Name="SessionValid">
+      <Documentation />
+      <Properties>
+        <Property>
+          <Name>Name</Name>
+          <Value>SessionValid</Value>
+        </Property>
+        <Property>
+          <Name>ATTCUSTOMTYPE</Name>
+          <Value>bas:Boolean</Value>
+        </Property>
+      </Properties>
+    </Variable>
+    <Variable Name="OperacaoSucesso">
+      <Documentation />
+      <Properties>
+        <Property>
+          <Name>Name</Name>
+          <Value>OperacaoSucesso</Value>
+        </Property>
+        <Property>
+          <Name>ATTCUSTOMTYPE</Name>
+          <Value>bas:Boolean</Value>
+        </Property>
+      </Properties>
+    </Variable>
+    <Variable Name="tipodeconteudo">
+      <Documentation />
+      <Properties>
+        <Property>
+          <Name>Name</Name>
+          <Value>tipodeconteudo</Value>
+        </Property>
+        <Property>
+          <Name>ATTCUSTOMTYPE</Name>
+          <Value>bas:VarChar</Value>
+        </Property>
+      </Properties>
+    </Variable>
+    <Variable Name="TipoLocalEstoque">
+      <Documentation />
+      <Properties>
+        <Property>
+          <Name>Name</Name>
+          <Value>TipoLocalEstoque</Value>
+        </Property>
+        <Property>
+          <Name>idBasedOn</Name>
+          <Value>Domain:TipoLocalEstoque</Value>
+        </Property>
+      </Properties>
+    </Variable>
+    <Variable Name="RegraEmpresaId">
+      <Documentation />
+      <Properties>
+        <Property>
+          <Name>Name</Name>
+          <Value>RegraEmpresaId</Value>
+        </Property>
+        <Property>
+          <Name>Description</Name>
+          <Value>Regra Empresa Id</Value>
+        </Property>
+        <Property>
+          <Name>idIsAutoDefinedVariable</Name>
+          <Value>False</Value>
+        </Property>
+        <Property>
+          <Name>idBasedOn</Name>
+          <Value>Attribute:RegraEmpresaId</Value>
+        </Property>
+      </Properties>
+    </Variable>
+    <Variable Name="RegraId">
+      <Documentation />
+      <Properties>
+        <Property>
+          <Name>Name</Name>
+          <Value>RegraId</Value>
+        </Property>
+        <Property>
+          <Name>Description</Name>
+          <Value>Regra Id</Value>
+        </Property>
+        <Property>
+          <Name>idIsAutoDefinedVariable</Name>
+          <Value>False</Value>
+        </Property>
+        <Property>
+          <Name>idBasedOn</Name>
+          <Value>Attribute:RegraId</Value>
+        </Property>
+      </Properties>
+    </Variable>
+    <Variable Name="UltimaAlteracaoInicio">
+      <Documentation />
+      <Properties>
+        <Property>
+          <Name>Name</Name>
+          <Value>UltimaAlteracaoInicio</Value>
+        </Property>
+        <Property>
+          <Name>idBasedOn</Name>
+          <Value>Domain:Data</Value>
+        </Property>
+      </Properties>
+    </Variable>
+    <Variable Name="UserLogin">
+      <Documentation />
+      <Properties>
+        <Property>
+          <Name>Name</Name>
+          <Value>UserLogin</Value>
+        </Property>
+      </Properties>
+    </Variable>
+    <Variable Name="UserName">
+      <Documentation />
+      <Properties>
+        <Property>
+          <Name>Name</Name>
+          <Value>UserName</Value>
+        </Property>
+        <Property>
+          <Name>idBasedOn</Name>
+          <Value>Domain:AuthUserIdentification, SanitizedSecurityCommon</Value>
+        </Property>
+      </Properties>
+    </Variable>
+    <Variable Name="TipoExemplo">
+      <Documentation />
+      <Properties>
+        <Property>
+          <Name>Name</Name>
+          <Value>TipoExemplo</Value>
+        </Property>
+        <Property>
+          <Name>idIsAutoDefinedVariable</Name>
+          <Value>False</Value>
+        </Property>
+        <Property>
+          <Name>idBasedOn</Name>
+          <Value>Domain:TipoExemplo</Value>
+        </Property>
+      </Properties>
+    </Variable>
+    <Properties>
+      <Property>
+        <Name>IsDefault</Name>
+        <Value>False</Value>
+      </Property>
+    </Properties>
+  </Part>
+  <Part type="ad3ca970-19d0-44e1-a7b7-db05556e820c">
+    <Help>
+      <HelpItem>
+        <Language>88313f43-5eb2-0000-0028-e8d9f5bf9588-Portuguese</Language>
+        <Content />
+      </HelpItem>
+    </Help>
+    <Properties>
+      <Property>
+        <Name>IsDefault</Name>
+        <Value>False</Value>
+      </Property>
+    </Properties>
+  </Part>
+  <Part type="babf62c5-0111-49e9-a1c3-cc004d90900a">
+    <Properties />
+  </Part>
+  <Properties>
+    <Property>
+      <Name>Name</Name>
+      <Value>APIExemploIntegracao</Value>
+    </Property>
+    <Property>
+      <Name>GENERATE_OPEN_API</Name>
+      <Value>Yes</Value>
+    </Property>
+    <Property>
+      <Name>IsDefault</Name>
+      <Value>False</Value>
+    </Property>
+  </Properties>
+</Object>
+
+```

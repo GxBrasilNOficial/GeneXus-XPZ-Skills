@@ -659,7 +659,7 @@ Funcionar como resumo decisório sem esconder os limites da evidência.
 
 ## Quando exigir molde bruto comparável
 
-- Evidência direta: exigir molde bruto comparável muito proximo para `API`, `DataProvider`, `Panel`, `Procedure` e `WorkWithForWeb`.
+- Evidência direta: exigir molde bruto comparável muito proximo para `WorkWithForWeb` e para tipos ainda sem anexo XML completo equivalente nesta base.
 - Evidência direta: exigir molde bruto comparável tambem para `DesignSystem`, por causa da amostra muito pequena.
 - Inferência forte: para `SDT`, `Theme` e `PackagedModule`, um molde bruto comparável proximo continua sendo a opcao mais segura, mesmo quando a estrutura pareca menos agressiva.
 
@@ -733,7 +733,7 @@ Funcionar como resumo decisório sem esconder os limites da evidência.
 - Evidência direta: o XML do objeto deve continuar com raiz unica `<Object>` e permanecer bem-formado apos qualquer edicao
 - Evidência direta: cada `Part` deve manter seu atributo `type` e seu conteudo no mesmo bloco estrutural do molde-base
 - Inferência forte: quando o molde usado trouxer `<![CDATA[...]]>` em `Source` ou `InnerHtml`, o clone deve manter `CDATA`; nao converter esses blocos em texto escapado
-- Inferência forte: o objeto so deve ser incluido em `<Objects>` por clonagem de um contêiner XPZ bruto real da mesma linha de exportacao; nao inventar a estrutura externa de `<Objects>` a partir desta base documental
+- Inferência forte: o objeto pode ser incluido em `<Objects>` usando o envelope XPZ observado e documentado nesta base, desde que o prototipo preserve a mesma hierarquia externa conhecida; nao inventar estrutura fora do que o envelope observado ja demonstra
 - Inferência forte: antes de empacotar, validar parse XML do objeto clonado e validar que o envelope XPZ continua contendo o mesmo padrao estrutural do molde usado
 - Hipótese: checksum, datas e outros metadados externos so devem ser recalculados se houver processo real de exportacao que faca isso; na ausencia desse processo, preservar o padrao do molde usado
 
@@ -745,7 +745,7 @@ Funcionar como resumo decisório sem esconder os limites da evidência.
 - Fonte invalida: reconstrucoes feitas so por resumo textual, tabela, frequencia ou memoria do agente
 - Inferência forte: `04-webpanel-familias-e-templates.md` ja contem moldes sanitizados completos para familias de `WebPanel`
 - Inferência forte: `05-transaction-familias-e-templates.md` agora tambem contem moldes sanitizados completos para familias representativas de `Transaction` (`F1`, `F2`, `F5` e `F6`)
-- Inferência forte: `01-base-empirica-geral.md` agora tambem contem moldes sanitizados completos representativos de `Procedure` e `DataProvider`
+- Inferência forte: `01-base-empirica-geral.md` agora tambem contem moldes sanitizados completos representativos de `Procedure`, `DataProvider`, `Panel` e `API`
 - Hipótese: as familias `F3` e `F4` de `Transaction` ainda ficam mais seguras com molde bruto comparavel adicional, por terem densidade estrutural maior e ainda nao terem anexo completo proprio
 - Inferência forte: para o envelope externo do XPZ observado, a especificacao desta propria base ja e suficiente para evitar inventar `Objects.xml` isolado ou hierarquia externa sem prova local
 

@@ -58,7 +58,7 @@ Servir como local único para conflitos não resolvidos silenciosamente.
 - `Inferência forte`: a raiz deve ser tratada como fonte operacional principal; `docs-kb-md` deve permanecer apenas como histórico de staging para evitar leituras duplicadas.
 - `Evidência direta`: `04-webpanel-familias-e-templates.md` ja contem anexos XML sanitizados completos para `WebPanel`.
 - `Evidência direta`: `05-transaction-familias-e-templates.md` agora tambem contem anexos XML sanitizados completos para familias representativas de `Transaction`.
-- `Evidência direta`: `01-base-empirica-geral.md` agora tambem contem anexos XML sanitizados completos representativos de `Procedure` e `DataProvider`.
+- `Evidência direta`: `01-base-empirica-geral.md` agora tambem contem anexos XML sanitizados completos representativos de `Procedure`, `DataProvider`, `Panel` e `API`.
 - `Hipótese`: ainda vale completar `Transaction` com anexos equivalentes para as familias mais densas (`F3` e `F4`) se a meta for cobertura integral so pelos `.md`, sem recorrer ao acervo bruto.
 
 ## Próximas frentes recomendadas
@@ -100,12 +100,12 @@ Orientar futuras coletas de templates comparáveis.
 
 ## Itens sugeridos
 
-- Exportar pelo menos 1 template adicional de API com necessidade alta, preferindo um caso simples e outro com mais contexto.
-- Exportar pelo menos 1 template adicional de DataProvider com necessidade alta, preferindo um caso simples e outro com mais contexto.
+- Exportar pelo menos 1 template adicional de API com necessidade media, preferindo um caso simples e outro com mais contexto.
+- Exportar pelo menos 1 template adicional de DataProvider com necessidade media, preferindo um caso simples e outro com mais contexto.
 - Exportar pelo menos 1 template adicional de DesignSystem com necessidade media, preferindo um caso simples e outro com mais contexto.
 - Exportar pelo menos 1 template adicional de PackagedModule com necessidade baixa, preferindo um caso simples e outro com mais contexto.
-- Exportar pelo menos 1 template adicional de Panel com necessidade alta, preferindo um caso simples e outro com mais contexto.
-- Exportar pelo menos 1 template adicional de Procedure com necessidade alta, preferindo um caso simples e outro com mais contexto.
+- Exportar pelo menos 1 template adicional de Panel com necessidade media, preferindo um caso simples e outro com mais contexto.
+- Exportar pelo menos 1 template adicional de Procedure com necessidade media, preferindo um caso simples e outro com mais contexto.
 - Exportar pelo menos 1 template adicional de SDT com necessidade baixa, preferindo um caso simples e outro com mais contexto.
 - Exportar pelo menos 1 template adicional de Theme com necessidade media, preferindo um caso simples e outro com mais contexto.
 - Exportar pelo menos 1 template adicional de Transaction com necessidade alta, preferindo um caso simples e outro com mais contexto.
@@ -124,10 +124,10 @@ Orientar futuras coletas de templates comparáveis.
 
 ## Regras de serializacao XPZ
 
-- coletar junto do objeto bruto pelo menos um contêiner XPZ bruto real que mostre como o objeto entra em `<Objects>`
+- quando houver variante nova de export, coletar pelo menos um contêiner XPZ bruto real que mostre como o objeto entra em `<Objects>`
 - guardar o XML exatamente como exportado, sem reformatar `CDATA` para texto escapado
 - validar que cada template abre como XML bem-formado antes de entrar no acervo
-- rejeitar template coletado se o envelope externo tiver sido reconstruido manualmente
+- rejeitar template coletado se o envelope externo tiver sido reconstruido manualmente fora do padrao de envelope XPZ observado e documentado nesta base
 
 ## Regras de fonte
 
