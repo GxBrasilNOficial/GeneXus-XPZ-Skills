@@ -58,7 +58,7 @@ Servir como local único para conflitos não resolvidos silenciosamente.
 - `Inferência forte`: a raiz deve ser tratada como fonte operacional principal; `docs-kb-md` deve permanecer apenas como histórico de staging para evitar leituras duplicadas.
 - `Evidência direta`: `04-webpanel-familias-e-templates.md` ja contem anexos XML sanitizados completos para `WebPanel`.
 - `Evidência direta`: `05-transaction-familias-e-templates.md` agora tambem contem anexos XML sanitizados completos para familias representativas de `Transaction`.
-- `Evidência direta`: `01-base-empirica-geral.md` agora tambem contem anexos XML sanitizados completos representativos de `Procedure`, `DataProvider`, `Panel` e `API`.
+- `Evidência direta`: `01-base-empirica-geral.md` agora tambem contem anexos XML sanitizados completos representativos de `Procedure`, `DataProvider`, `Panel`, `API`, `WorkWithForWeb`, `SDT`, `Domain`, `Theme`, `PackagedModule`, `DesignSystem` e `ColorPalette`.
 - `Hipótese`: ainda vale completar `Transaction` com anexos equivalentes para as familias mais densas (`F3` e `F4`) se a meta for cobertura integral so pelos `.md`, sem recorrer ao acervo bruto.
 
 ## Próximas frentes recomendadas
@@ -103,14 +103,17 @@ Orientar futuras coletas de templates comparáveis.
 - Exportar pelo menos 1 template adicional de API com necessidade media, preferindo um caso simples e outro com mais contexto.
 - Exportar pelo menos 1 template adicional de DataProvider com necessidade media, preferindo um caso simples e outro com mais contexto.
 - Exportar pelo menos 1 template adicional de DesignSystem com necessidade media, preferindo um caso simples e outro com mais contexto.
+- Exportar pelo menos 1 template adicional de ColorPalette com necessidade baixa, preferindo uma paleta curta e outra com mais tons.
+- Exportar pelo menos 1 template adicional de Domain com necessidade baixa, preferindo um caso escalar e outro enumerado mais rico.
 - Exportar pelo menos 1 template adicional de PackagedModule com necessidade baixa, preferindo um caso simples e outro com mais contexto.
+- Exportar pelo menos 1 template adicional de Theme com necessidade baixa, preferindo um tema simples e outro com mais classes visuais.
 - Exportar pelo menos 1 template adicional de Panel com necessidade media, preferindo um caso simples e outro com mais contexto.
 - Exportar pelo menos 1 template adicional de Procedure com necessidade media, preferindo um caso simples e outro com mais contexto.
-- Exportar pelo menos 1 template adicional de SDT com necessidade baixa, preferindo um caso simples e outro com mais contexto.
+- Exportar pelo menos 1 template adicional de SDT com necessidade media, preferindo um caso simples e outro com mais contexto.
 - Exportar pelo menos 1 template adicional de Theme com necessidade media, preferindo um caso simples e outro com mais contexto.
 - Exportar pelo menos 1 template adicional de Transaction com necessidade alta, preferindo um caso simples e outro com mais contexto.
 - Exportar pelo menos 1 template adicional de WebPanel com necessidade alta, preferindo um caso simples e outro com mais contexto.
-- Exportar pelo menos 1 template adicional de WorkWithForWeb com necessidade alta, preferindo um caso simples e outro com mais contexto.
+- Exportar pelo menos 1 template adicional de WorkWithForWeb com necessidade media, preferindo um caso simples e outro com mais contexto.
 - Exportar casos em que o mesmo tipo exista com e sem parent.
 - Exportar casos em que o mesmo tipo exista com e sem pattern.
 - Exportar exemplos onde Part type raro apareca acompanhado de comportamento conhecido na IDE.
@@ -134,6 +137,10 @@ Orientar futuras coletas de templates comparáveis.
 - Fonte valida para ampliar a base: XML bruto exportado ou extraido diretamente de XPZ real
 - Fonte invalida para ampliar a base: markdown, snippets copiados de documentacao, exemplos sanitizados e pseudo-XML produzido por agente
 - Inferência forte: `Transaction` e `WebPanel` nao precisam de novos exemplos para desbloqueio operacional, mas qualquer refinamento futuro deve entrar na base como XML bruto, nao como derivacao textual
+- Hipótese: `WorkWithForWeb` ja tem anexos representativos suficientes para estudo e prototipo controlado, mas continua sendo um dos melhores candidatos a refinamento por causa da alta dependencia de pattern e parent transacional
+- Hipótese: `SDT` ja tem anexos representativos suficientes para prototipos pequenos e medios, mas vale refinar com exemplos adicionais quando houver dependencia forte de namespace, soaptype ou schema externo muito especifico
+- Hipótese: `Domain` ja tem anexos representativos suficientes para prototipos escalares e enumerados comuns, mas ainda pode valer ampliar a base se surgirem dominios com metadata mais exotica ou comportamento especial de enumeracao
+- Hipótese: `Theme`, `PackagedModule`, `DesignSystem` e `ColorPalette` ja tem anexos representativos suficientes para prototipos controlados, mas `DesignSystem` segue sendo o mais sensivel do grupo por acumular tokens, imports e regras visuais extensas
 
 
 

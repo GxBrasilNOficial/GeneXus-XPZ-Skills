@@ -659,9 +659,12 @@ Funcionar como resumo decisório sem esconder os limites da evidência.
 
 ## Quando exigir molde bruto comparável
 
-- Evidência direta: exigir molde bruto comparável muito proximo para `WorkWithForWeb` e para tipos ainda sem anexo XML completo equivalente nesta base.
+- Evidência direta: exigir molde bruto comparável muito proximo para tipos ainda sem anexo XML completo equivalente nesta base.
 - Evidência direta: exigir molde bruto comparável tambem para `DesignSystem`, por causa da amostra muito pequena.
-- Inferência forte: para `SDT`, `Theme` e `PackagedModule`, um molde bruto comparável proximo continua sendo a opcao mais segura, mesmo quando a estrutura pareca menos agressiva.
+- Inferência forte: para `Theme` e `PackagedModule`, um molde bruto comparável proximo continua sendo a opcao mais segura, mesmo quando a estrutura pareca menos agressiva.
+- Hipótese: `Domain` agora ja pode partir dos anexos sanitizados desta base tanto em casos escalares quanto enumerados, desde que o clone preserve `ATTCUSTOMTYPE`, limites e `IDEnumDefinedValues` quando existirem.
+- Hipótese: `Theme`, `PackagedModule`, `DesignSystem` e `ColorPalette` agora ja contam com moldes sanitizados completos representativos; mesmo assim, `DesignSystem` continua pedindo cuidado extra quando houver imports, tokens e regras visuais extensas.
+- Hipótese: `SDT` agora ja pode partir dos anexos sanitizados desta base em cenarios pequenos e medios, mas casos com metadata externa muito especifica ainda merecem comparacao com molde bruto mais proximo.
 
 ## Politica para Transaction
 
@@ -745,7 +748,8 @@ Funcionar como resumo decisório sem esconder os limites da evidência.
 - Fonte invalida: reconstrucoes feitas so por resumo textual, tabela, frequencia ou memoria do agente
 - Inferência forte: `04-webpanel-familias-e-templates.md` ja contem moldes sanitizados completos para familias de `WebPanel`
 - Inferência forte: `05-transaction-familias-e-templates.md` agora tambem contem moldes sanitizados completos para familias representativas de `Transaction` (`F1`, `F2`, `F5` e `F6`)
-- Inferência forte: `01-base-empirica-geral.md` agora tambem contem moldes sanitizados completos representativos de `Procedure`, `DataProvider`, `Panel` e `API`
+- Inferência forte: `01-base-empirica-geral.md` agora tambem contem moldes sanitizados completos representativos de `Procedure`, `DataProvider`, `Panel`, `API`, `WorkWithForWeb`, `SDT`, `Domain`, `Theme`, `PackagedModule`, `DesignSystem` e `ColorPalette`
+- Hipótese: mesmo com anexos representativos, `WorkWithForWeb` continua entre os tipos mais sensiveis a `pattern`, `parent` transacional e contexto gerado; por isso, casos muito distantes do molde documentado ainda podem pedir paralelo bruto mais proximo
 - Hipótese: as familias `F3` e `F4` de `Transaction` ainda ficam mais seguras com molde bruto comparavel adicional, por terem densidade estrutural maior e ainda nao terem anexo completo proprio
 - Inferência forte: para o envelope externo do XPZ observado, a especificacao desta propria base ja e suficiente para evitar inventar `Objects.xml` isolado ou hierarquia externa sem prova local
 
