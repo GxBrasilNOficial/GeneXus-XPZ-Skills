@@ -236,5 +236,10 @@ Servir como primeira triagem operacional antes de qualquer tentativa de clonagem
 - Inferência forte: `Transaction` e `WebPanel` continuam em risco alto/muito alto, mas deixam de ser bloqueados por falta de base amostral.
 - Inferência forte: `PackagedModule`, `Theme` e parte de `SDT` seguem entre os candidatos menos agressivos do recorte, mas ainda nao devem ser tratados como baixos riscos absolutos.
 
+## Nota leve de risco runtime relativo
+
+- `Inferência forte`: sem substituir o risco estrutural acima, o risco runtime relativo tende a ser `baixo a medio` em cascas simples e isoladas, `medio` em objetos com codigo mas baixa dependencia contextual, e `alto` quando se acumulam `grid`, `events`, multiplos `Level`, `parent` forte ou `pattern`.
+- `Hipótese`: essa leitura runtime relativa serve apenas como desempate operacional e deve ser confirmada no `02-regras-operacionais-e-runtime.md` antes de orientar clonagem ou resposta do agente.
+
 
 

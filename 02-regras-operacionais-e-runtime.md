@@ -121,6 +121,241 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
 - `Regra documentada`: `Refresh Grid event` - [wiki.genexus.com/commwiki/wiki?8187,Refresh+Grid+event](https://wiki.genexus.com/commwiki/wiki?8187,Refresh+Grid+event)
 - `Regra documentada`: `Web Form Refresh` - [wiki.genexus.com/commwiki/wiki?6566,Web+Form+Refresh](https://wiki.genexus.com/commwiki/wiki?6566,Web+Form+Refresh)
 
+## Heurísticas operacionais acionáveis
+
+### Heurística H01 - Transaction simples de 1 nivel
+
+#### Sinais observáveis
+- `Transaction` da familia simples de 1 nivel em `05-transaction-familias-e-templates.md`
+- 1 `Level`
+- sem subnivel
+- baixa ou moderada densidade de `AttributeProperties`
+
+#### Leitura técnica
+- `Evidência direta`: 162/183 `Transaction` observadas possuem exatamente 1 `Level`.
+- `Regra documentada`: navegacao transacional tende a ser menos sensivel quando o contexto estrutural e mais simples e local.
+- `Inferência forte`: esse e o melhor ponto de partida para clonagem controlada de `Transaction`.
+- `Hipótese`: a chance de erro runtime relativo e menor do que em familias com detalhe ou muitos atributos relacionais.
+
+#### Ação do agente
+- responder com cautela controlada, nao com otimismo
+- preservar `Level`, `DescriptionAttribute`, `parent*`, `moduleGuid` e todos os `Part`
+- nao prometer importacao, build ou comportamento de navegacao final
+- escalar o risco se surgir FK adicional, alteracao de contexto ou mudanca de `DescriptionAttribute`
+
+#### Exemplos de aplicação
+- nova `Transaction` simples de cadastro basico deve partir de template da familia simples de 1 nivel e nao de familia mestre-detalhe
+
+### Heurística H02 - Transaction com 2+ niveis
+
+#### Sinais observáveis
+- `Transaction` com 2 ou mais `Level`
+- relacao pai-filho explicita
+- estrutura mestre-detalhe ou multinivel
+
+#### Leitura técnica
+- `Evidência direta`: 21/183 `Transaction` observadas possuem 2 ou mais `Level`.
+- `Regra documentada`: multiplos niveis ampliam sensibilidade a contexto transacional e navegacao.
+- `Inferência forte`: o risco estrutural e runtime relativo sobe quando ha distribuicao de atributos entre niveis.
+- `Hipótese`: mudancas entre niveis podem afetar navegacao, joins implicitos e comportamento nao trivial na KB.
+
+#### Ação do agente
+- exigir template interno muito proximo
+- preservar hierarquia inteira e evitar mover atributos entre niveis
+- nao prometer simplicidade de manutencao ou boa performance
+- abortar se a mudanca exigir redesenho de niveis sem paralelo bruto
+
+#### Exemplos de aplicação
+- pedido com itens deve partir de familia mestre-detalhe equivalente, e nao de um template de 1 nivel
+
+### Heurística H03 - Transaction com alta densidade de AttributeProperties
+
+#### Sinais observáveis
+- muitos blocos `AttributeProperties`
+- varios atributos referenciais ou de controle no mesmo `Level`
+- XML significativamente mais denso que a familia enxuta
+
+#### Leitura técnica
+- `Evidência direta`: 177/183 `Transaction` observadas possuem `AttributeProperties`, com densidade variavel.
+- `Regra documentada`: atributos fora do contexto imediato podem aumentar sensibilidade a `Extended Table` e navegacao.
+- `Inferência forte`: densidade alta de `AttributeProperties` sugere mais pontos de dependencia estrutural e funcional.
+- `Hipótese`: a chance de vazamento de template e de erro por coerencia interna cresce junto com a densidade.
+
+#### Ação do agente
+- responder com cautela
+- preservar atributos, propriedades e referencias internas com diff estrutural rigoroso
+- nao tratar remocao de atributos como edicao trivial
+- exigir template mais proximo se houver muitos atributos relacionais ou flags internos
+
+#### Exemplos de aplicação
+- `Transaction` com dezenas de `AttributeProperties` nao deve ser usada como casca de edicao agressiva sem familia equivalente
+
+### Heurística H04 - WebPanel casca minima
+
+#### Sinais observáveis
+- familia de casca minima em `04-webpanel-familias-e-templates.md`
+- layout pequeno
+- sem `grid`
+- sem eventos relevantes
+
+#### Leitura técnica
+- `Evidência direta`: existem familias de `WebPanel` com casca minima e baixa variabilidade interna.
+- `Regra documentada`: ausencia de `grid` e de eventos reduz superficie de comportamento server-side observavel.
+- `Inferência forte`: esse e o caso menos arriscado dentro de `WebPanel`.
+- `Hipótese`: ainda pode haver dependencia externa de `parent`, `MasterPage` ou seguranca.
+
+#### Ação do agente
+- responder com confianca relativa, mas ainda conservadora
+- preservar `layout`, `Part type`, `parent*` e bindings existentes
+- nao prometer que o painel sera totalmente isolado do contexto
+- escalar o risco se surgirem actions, links, componentes customizados ou seguranca integrada
+
+#### Exemplos de aplicação
+- tela de menu/home simples pode partir de uma casca minima sem tentar herdar familia com grid e eventos
+
+### Heurística H05 - WebPanel gerado por pattern/defaults
+
+#### Sinais observáveis
+- marcas como `Defaults`, `IsGeneratedObject`, `WEB_COMP=Yes`
+- `parent` contextual
+- assinatura recorrente de objeto gerado
+
+#### Leitura técnica
+- `Evidência direta`: ha familias de `WebPanel` com sinais explicitos de defaults/pattern no acervo.
+- `Regra documentada`: objetos gerados tendem a depender mais do contexto de geracao e navegacao da KB.
+- `Inferência forte`: isso aumenta o risco operacional e runtime relativo.
+- `Hipótese`: parte do comportamento esperado pode estar fora do XML isolado, em pattern, master page ou objeto pai.
+
+#### Ação do agente
+- exigir template interno mais proximo
+- preservar marcas estruturais e contexto de `parent`
+- nao responder com linguagem otimista do tipo “casca simples”
+- abortar se o caso exigir descolar o objeto do contexto gerado sem paralelo bruto
+
+#### Exemplos de aplicação
+- `WebPanel` vindo de familia gerada por defaults nao deve ser reaproveitado como template generico para tela livre
+
+### Heurística H06 - WebPanel com events
+
+#### Sinais observáveis
+- bloco `Events` com codigo real
+- actions, chamadas de objetos ou regras condicionais
+- variaveis ligadas a fluxo de tela
+
+#### Leitura técnica
+- `Evidência direta`: 437/1196 `WebPanel` mostram sinal estrutural de eventos.
+- `Regra documentada`: eventos em Web podem acionar refresh, carga Ajax e logica server-side adicional.
+- `Inferência forte`: a presenca de eventos aumenta a chance de comportamento contextual nao trivial.
+- `Hipótese`: o custo real depende do codigo e da navegacao que nao aparecem integralmente so pela assinatura superficial.
+
+#### Ação do agente
+- responder com cautela
+- preservar eventos, nomes de controles referenciados e variaveis envolvidas
+- nao prometer que editar texto ou layout sera suficiente
+- escalar o risco se os eventos chamarem procedimentos, seguranca, validacoes ou navegacao indireta
+
+#### Exemplos de aplicação
+- painel com `Event Start` e eventos de botao deve ser tratado como painel comportamental, nao apenas visual
+
+### Heurística H07 - WebPanel com grid + events
+
+#### Sinais observáveis
+- familia com `grid`
+- bloco `Events`
+- possivel `Load`, `Refresh` ou filtros/acoes associados
+
+#### Leitura técnica
+- `Evidência direta`: ha `WebPanel` com assinatura estrutural de `grid` e eventos no acervo, embora sejam minoria relativa.
+- `Regra documentada`: grid com base de navegacao pode executar `Load` por linha; eventos e refresh aumentam sensibilidade de runtime.
+- `Inferência forte`: esta e uma das combinacoes mais sensiveis para custo, carga repetida e dependencia de contexto.
+- `Hipótese`: sem relatorio de navegacao, o risco de leitura incompleta do runtime continua alto.
+
+#### Ação do agente
+- exigir template interno muito proximo
+- preservar estrutura de grid, eventos, filtros, bindings e ordem dos blocos
+- nao tratar como casca simples nem autorizar simplificacao agressiva
+- abortar se a familia estrutural equivalente nao estiver clara
+
+#### Exemplos de aplicação
+- lista com grid filtravel e eventos de acao deve partir de familia de lista/grid equivalente e nao de menu simples
+
+### Heurística H08 - Procedure/DataProvider com sensibilidade de navegacao
+
+#### Sinais observáveis
+- codigo `Source` com consultas, filtros, ordens ou mapeamentos
+- `Parm` e `Variables` conectados a atributos
+- saida estruturada em `DataProvider` ou logica procedural em `Procedure`
+
+#### Leitura técnica
+- `Evidência direta`: `Procedure` e `DataProvider` expõem blocos de codigo, parametros e variaveis no acervo.
+- `Regra documentada`: navegacao nesses objetos depende de `For each`, grupos, atributos usados e base implicita/explicita.
+- `Inferência forte`: esses objetos podem parecer simples no XML externo, mas carregar sensibilidade alta de navegacao no codigo.
+- `Hipótese`: custo e qualidade de especificacao podem variar muito conforme filtros, ordens e atributos usados.
+
+#### Ação do agente
+- responder com cautela
+- preservar assinatura de parametros, blocos de codigo e relacao entre variaveis e atributos
+- nao falar de `For each` ou performance sem considerar `Base Table` e navegacao
+- exigir template mais proximo se o codigo tocar consulta de dados relevante
+
+#### Exemplos de aplicação
+- `DataProvider` com filtros e mapeamento de SDT deve ser clonado a partir de outro `DataProvider` com forma de consulta comparavel
+
+### Heurística H09 - Dependencia forte de parent/pattern
+
+#### Sinais observáveis
+- `parent`, `parentGuid`, `parentType` presentes
+- `Pattern=` ou marcas de objeto gerado
+- contexto estrutural amarrado a objeto pai
+
+#### Leitura técnica
+- `Evidência direta`: `WorkWithForWeb` aparece com `parent` e `pattern` em 183/183 casos; varios outros tipos dependem fortemente de `parent`.
+- `Regra documentada`: objetos dependentes de contexto gerado ou pai tendem a trazer comportamento e navegacao herdados da KB.
+- `Inferência forte`: esse e um forte sinal de cautela operacional e runtime.
+- `Hipótese`: remover ou trocar esse contexto pode quebrar comportamento esperado mesmo que o XML permaneça bem-formado.
+
+#### Ação do agente
+- exigir template muito proximo ou contexto completo
+- preservar todos os vinculos de `parent*`, `moduleGuid` e marcas de pattern
+- nao autorizar “generalizacao” do objeto
+- abortar se o objetivo for desacoplar o objeto do pai/pattern sem base real equivalente
+
+#### Exemplos de aplicação
+- `WorkWithForWeb` deve ser tratado como altamente dependente do objeto pai transacional e do pattern de origem
+
+### Heurística H10 - Quando exigir template mais proximo ou abortar
+
+#### Sinais observáveis
+- mistura de familias
+- blocos raros/opacos
+- evento + grid + contexto pai
+- multinivel transacional
+- pattern sem equivalente claro
+
+#### Leitura técnica
+- `Evidência direta`: a base ja documenta familias, riscos e dependencias contextuais para os tipos mais sensiveis.
+- `Regra documentada`: runtime e navegacao nao podem ser garantidos apenas por semelhanca superficial de XML.
+- `Inferência forte`: quando sinais de alta sensibilidade se acumulam, a postura correta deixa de ser “seguir” e passa a ser “exigir template” ou “abortar”.
+- `Hipótese`: insistir em clonagem nessas condicoes aumenta bastante a chance de erro estrutural ou runtime.
+
+#### Ação do agente
+- exigir template mais proximo quando ainda houver caminho estrutural comparavel
+- abortar quando nao houver familia equivalente ou quando a mudanca pedir invencao de estrutura
+- nao prometer importacao, build, navegacao correta ou performance
+- deixar explicito o motivo do aborto
+
+#### Exemplos de aplicação
+- `WebPanel` com grid, eventos, parent gerado e controles raros sem familia equivalente deve ser abortado em vez de improvisado
+
+## Anti-patterns operacionais
+
+- nunca inferir boa performance so pelo XML
+- nunca responder “vai buildar” ou “vai importar” sem evidencia externa
+- nunca tratar `grid + events` como casca simples
+- nunca responder sobre `For each` sem considerar `Base Table`, navegacao e contexto de atributos
+- nunca autorizar edicao agressiva em `Transaction` multinivel sem template equivalente
+- nunca usar entusiasmo estrutural para atropelar heuristica que mandou exigir template ou abortar
+
 ## Origem incorporada - 02-genexus-xpz-generation-rules.md
 
 ## Papel do documento

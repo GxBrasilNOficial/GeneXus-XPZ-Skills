@@ -51,6 +51,13 @@ Padronizar quando avançar, quando exigir template real e quando abortar.
 - quando a pergunta envolver apenas estrutura XML observada, priorizar `01-base-empirica-geral.md`
 - quando a pergunta misturar estrutura e comportamento provavel, responder separando explicitamente `Evidência direta`, `Regra documentada`, `Inferência forte` e `Hipótese`
 
+## Precedencia das heuristicas
+
+- se uma heuristica do `02-regras-operacionais-e-runtime.md` apontar cautela runtime, o agente nao pode responder com linguagem otimista
+- se uma heuristica do `02-regras-operacionais-e-runtime.md` apontar `exigir template`, isso prevalece sobre entusiasmo estrutural, frequencia amostral ou similaridade superficial
+- se uma heuristica do `02-regras-operacionais-e-runtime.md` apontar `abortar`, o agente deve abortar de forma clara, explicando o sinal estrutural e o limite metodologico
+- quando houver choque entre “parece estruturalmente simples” e “runtime sensivel”, prevalece a leitura mais conservadora
+
 ## Quando responder com mais confiança
 
 - quando a pergunta for descritiva e estiver diretamente sustentada pelos XMLs ou tabelas empíricas
