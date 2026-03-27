@@ -31,11 +31,12 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
 ## Envelope XPZ observado em export real
 
 - `Evidência direta`: no export real inspecionado nesta trilha, o arquivo `.xpz` continha um unico XML principal com raiz `<ExportFile>`.
-- `Evidência direta`: os blocos de primeiro nivel observados nesse XML foram `KMW`, `Source`, `KnowledgeBase`, `Objects`, `Attributes` e `Dependencies`, exatamente nessa ordem.
+- `Evidência direta`: no export full observado, os blocos de primeiro nivel foram `KMW`, `Source`, um bloco especial de KB, `Objects`, `Attributes` e `Dependencies`, nessa ordem.
 - `Evidência direta`: o bloco `KMW` observado continha `MajorVersion`, `MinorVersion` e `Build`.
 - `Evidência direta`: no export completo observado, o bloco top-level `<Objects>` continha `7219` nos `<Object>`.
 - `Evidência direta`: apos o fechamento do bloco top-level `<Objects>`, o envelope observado seguiu com `<Attributes>`, depois `<Dependencies>`, e por fim `</ExportFile>`.
 - `Inferência forte`: para esta base, a forma mais segura de pensar um XPZ e "envelope `<ExportFile>` com secoes top-level recorrentes", e nao "arquivo `Objects.xml` isolado" sem prova local.
+- `Evidência direta`: no lote amplo de `.xpz` reais, o formato normal mais frequente nao traz bloco especial de KB; esse bloco aparece apenas em exportacoes especiais/full e em variacoes antigas de mudanca de versao.
 - `Hipótese`: outros formatos de export GeneXus 18 podem existir; esta base so prova o envelope observado acima.
 
 ### Exemplo sanitizado do envelope observado
@@ -51,13 +52,13 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
   <Source kb="GUID_SANITIZED" username="SANITIZED\\USER" UNCPath="\\\\SANITIZED\\KBPATH">
     <Version guid="GUID_SANITIZED" name="KB_SANITIZED" />
   </Source>
-  <KnowledgeBase name="KB_SANITIZED" type="GUID_TIPO_KB" description="Descricao sanitizada" user="SANITIZED\\USER">
+  <BlocoEspecialDaKB name="KB_SANITIZED" type="GUID_TIPO_KB" description="Descricao sanitizada" user="SANITIZED\\USER">
     <Properties />
     <Version guid="GUID_SANITIZED" versionDate="0001-01-01T00:00:00.0000000" checksum="CHECKSUM_SANITIZED" server_checksum="">
       <Properties />
     </Version>
     <Environments />
-  </KnowledgeBase>
+  </BlocoEspecialDaKB>
   <Objects>
     <Object ... />
   </Objects>
@@ -404,6 +405,7 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
 - nunca responder sobre `For each` sem considerar `Base Table`, navegacao e contexto de atributos
 - nunca autorizar edicao agressiva em `Transaction` multinivel sem molde equivalente
 - nunca usar entusiasmo estrutural para atropelar heuristica que mandou exigir molde ou abortar
+- nunca gerar bloco especial de KB (`KnowledgeBase`, `Settings` ou elemento top-level com o nome da KB) em `.xpz` normal de objetos
 
 ## Origem incorporada - 02-genexus-xpz-generation-rules.md
 
@@ -663,7 +665,7 @@ Funcionar como resumo decisório sem esconder os limites da evidência.
 - Evidência direta: exigir molde bruto comparável tambem para `DesignSystem`, por causa da amostra muito pequena.
 - Inferência forte: para `Theme` e `PackagedModule`, um molde bruto comparável proximo continua sendo a opcao mais segura, mesmo quando a estrutura pareca menos agressiva.
 - Hipótese: `Domain` agora ja pode partir dos anexos sanitizados desta base tanto em casos escalares quanto enumerados, desde que o clone preserve `ATTCUSTOMTYPE`, limites e `IDEnumDefinedValues` quando existirem.
-- Hipótese: `Theme`, `PackagedModule`, `DesignSystem`, `ColorPalette`, `ThemeClass`, `ThemeColor`, `Image`, `Index`, `PatternSettings`, `DataStore`, `Dashboard`, `DeploymentUnit`, `Generator` e `Language` agora ja contam com moldes sanitizados completos representativos; mesmo assim, `DesignSystem` continua pedindo cuidado extra quando houver imports, tokens e regras visuais extensas, `ThemeClass` continua pedindo preservacao rigorosa da cadeia `parent` quando houver variantes derivadas, `ThemeColor` e `ColorPalette` continuam extremamente declarativos mas ainda devem preservar identidade nominal e organizacao tematica, `Image` continua pedindo preservacao cuidadosa do binario em `base64`, dos `ImageItem` e das referencias de tema, `Index` continua pedindo preservacao rigorosa da ordem dos `Members`, do `Type` e do `Source` de cada indice, `PatternSettings` continua pedindo cuidado com referencias internas de seguranca/contexto, `DataStore` segue bastante declarativo, `Dashboard` segue sensivel a referencias internas de objetos analiticos, `DeploymentUnit` segue dependente da lista completa de `Member`, `Generator` segue bastante declarativo mas ainda pede preservacao de flags como `IsUser`, `IsDefaultCategory`, `IsReorg` e `DefaultType`, e `Language` pede preservacao integral do bloco de `Translations`.
+- Hipótese: `Theme`, `PackagedModule`, `DesignSystem`, `ColorPalette`, `ThemeClass`, `ThemeColor`, `Image`, `Index`, `PatternSettings`, `DataStore`, `Dashboard`, `DeploymentUnit`, `Generator`, `Language`, `Folder`, `Stencil` e `File` agora ja contam com moldes sanitizados completos representativos; mesmo assim, `DesignSystem` continua pedindo cuidado extra quando houver imports, tokens e regras visuais extensas, `ThemeClass` continua pedindo preservacao rigorosa da cadeia `parent` quando houver variantes derivadas, `ThemeColor` e `ColorPalette` continuam extremamente declarativos mas ainda devem preservar identidade nominal e organizacao tematica, `Image` continua pedindo preservacao cuidadosa do binario em `base64`, dos `ImageItem` e das referencias de tema, `Index` continua pedindo preservacao rigorosa da ordem dos `Members`, do `Type` e do `Source` de cada indice, `PatternSettings` continua pedindo cuidado com referencias internas de seguranca/contexto, `DataStore` segue bastante declarativo, `Dashboard` segue sensivel a referencias internas de objetos analiticos, `DeploymentUnit` segue dependente da lista completa de `Member`, `Generator` segue bastante declarativo mas ainda pede preservacao de flags como `IsUser`, `IsDefaultCategory`, `IsReorg` e `DefaultType`, `Language` pede preservacao integral do bloco de `Translations`, `Folder` segue simples e declarativo, `Stencil` pede cuidado alto com `CDATA`, screenshots embutidos, controles e referencias visuais textuais, e `File` pede preservacao rigorosa do `base64Binary`, do nome extraido e dos caminhos de extracao.
 - Hipótese: `ExternalObject`, `UserControl`, `Module` e `SubTypeGroup` agora tambem contam com moldes sanitizados completos representativos; dentro desse grupo, `ExternalObject` e `UserControl` merecem cautela extra quando carregarem contratos externos, scripts ou eventos mais densos, enquanto `SubTypeGroup` segue mais declarativo, mas ainda sensivel a nomes residuais e mapeamentos de subtype/supertype.
 - Hipótese: `SDT` agora ja pode partir dos anexos sanitizados desta base em cenarios pequenos e medios, mas casos com metadata externa muito especifica ainda merecem comparacao com molde bruto mais proximo.
 
@@ -738,6 +740,8 @@ Funcionar como resumo decisório sem esconder os limites da evidência.
 - Evidência direta: cada `Part` deve manter seu atributo `type` e seu conteudo no mesmo bloco estrutural do molde-base
 - Inferência forte: quando o molde usado trouxer `<![CDATA[...]]>` em `Source` ou `InnerHtml`, o clone deve manter `CDATA`; nao converter esses blocos em texto escapado
 - Inferência forte: o objeto pode ser incluido em `<Objects>` usando o envelope XPZ observado e documentado nesta base, desde que o prototipo preserve a mesma hierarquia externa conhecida; nao inventar estrutura fora do que o envelope observado ja demonstra
+- Evidência direta: `KMW`, `Source` e `Dependencies` aparecem em todos os `.xpz` validos lidos nesta amostra ampla; `Objects` aparece no formato normal de export de objetos e pode ser substituido por `Attributes` em exportacoes parciais focadas em atributos
+- Inferência forte: para geracao de `.xpz` de objetos, o bloco especial de KB (`KnowledgeBase` ou elemento top-level com nome literal da KB) deve ser tratado como proibido
 - Inferência forte: antes de empacotar, validar parse XML do objeto clonado e validar que o envelope XPZ continua contendo o mesmo padrao estrutural do molde usado
 - Hipótese: checksum, datas e outros metadados externos so devem ser recalculados se houver processo real de exportacao que faca isso; na ausencia desse processo, preservar o padrao do molde usado
 
@@ -747,9 +751,10 @@ Funcionar como resumo decisório sem esconder os limites da evidência.
 - Fonte valida: molde sanitizado documentado nesta base, quando o anexo embutir XML completo suficiente para o tipo e a familia alvo
 - Fonte invalida: markdown meramente descritivo, sem XML completo
 - Fonte invalida: reconstrucoes feitas so por resumo textual, tabela, frequencia ou memoria do agente
+- Fonte invalida: tentativa de sintetizar `KnowledgeBase`, `Settings` ou bloco top-level com nome da KB em `.xpz` gerado para objetos comuns
 - Inferência forte: `04-webpanel-familias-e-templates.md` ja contem moldes sanitizados completos para familias de `WebPanel`
 - Inferência forte: `05-transaction-familias-e-templates.md` agora tambem contem moldes sanitizados completos para familias representativas de `Transaction` (`F1`, `F2`, `F5` e `F6`)
-- Inferência forte: `01-base-empirica-geral.md` agora tambem contem moldes sanitizados completos representativos de `Procedure`, `DataProvider`, `DataSelector`, `Panel`, `API`, `WorkWithForWeb`, `SDT`, `Domain`, `Theme`, `PackagedModule`, `DesignSystem`, `ColorPalette`, `ThemeClass`, `ThemeColor`, `Image`, `Index`, `Document`, `ExternalObject`, `UserControl`, `Module`, `SubTypeGroup`, `PatternSettings`, `DataStore`, `Dashboard`, `DeploymentUnit`, `Generator` e `Language`
+- Inferência forte: `01-base-empirica-geral.md` agora tambem contem moldes sanitizados completos representativos de `Procedure`, `DataProvider`, `DataSelector`, `Panel`, `API`, `WorkWithForWeb`, `SDT`, `Domain`, `Theme`, `PackagedModule`, `DesignSystem`, `ColorPalette`, `ThemeClass`, `ThemeColor`, `Image`, `Index`, `Document`, `ExternalObject`, `UserControl`, `Module`, `SubTypeGroup`, `PatternSettings`, `DataStore`, `Dashboard`, `DeploymentUnit`, `Generator`, `Language`, `Folder`, `Stencil` e `File`
 - Hipótese: mesmo com anexos representativos, `WorkWithForWeb` continua entre os tipos mais sensiveis a `pattern`, `parent` transacional e contexto gerado; por isso, casos muito distantes do molde documentado ainda podem pedir paralelo bruto mais proximo
 - Hipótese: as familias `F3` e `F4` de `Transaction` ainda ficam mais seguras com molde bruto comparavel adicional, por terem densidade estrutural maior e ainda nao terem anexo completo proprio
 - Inferência forte: para o envelope externo do XPZ observado, a especificacao desta propria base ja e suficiente para evitar inventar `Objects.xml` isolado ou hierarquia externa sem prova local
