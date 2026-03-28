@@ -262,6 +262,10 @@ Separar falha de envelope/shape de falha por dependencia semantica da KB.
 - `Inferência forte`: isso confirma que, para `API`, o recorte de risco correto e uma familia funcional grande; tentar trata-la como tipo quase isolado tende a subestimar a dependencia real.
 - `Evidência direta`: o export real `Table + Transaction + ColorPalette + DesignSystem + Theme + WebTheme + Category + ThemeClass + ThemeColor` veio com `947` objetos, incluindo `501` `ThemeClass`, `7` `Theme`, `24` `ThemeColor`, `2` `DesignSystem`, `1` `ColorPalette`, `228` `Table`, `183` `Transaction` e `1` `Folder`.
 - `Inferência forte`: para a pilha visual, o risco melhora quando a analise e feita por familia combinada (`Theme` + `ThemeClass` + `DesignSystem` + `ColorPalette` + `ThemeColor`), e nao por objeto visual totalmente isolado.
+- `Evidência direta`: o export `Attribute + Domain + Transaction + SubtypeGroup` veio com `1117` objetos, `7646` atributos top-level e `1576` identidades.
+- `Evidência direta`: o export `Attribute + Domain + Transaction + SubtypeGroup + Table + Index` veio com `1712` objetos, os mesmos `7646` atributos top-level e `1611` identidades.
+- `Inferência forte`: isso mostra que a familia `Attribute` + `Transaction` + `Domain` + `SubtypeGroup` tambem existe como recorte combinado relevante da IDE, com `Attributes` top-level preservados no mesmo `.xpz`.
+- `Inferência forte`: para `Attribute`, o risco residual continua semanticamente contextual, mas o formato multiobjeto observado com bloco `Attributes` deixa de ser lacuna relevante nesta trilha.
 
 ## Hierarquia de ataque das pendencias contextuais
 

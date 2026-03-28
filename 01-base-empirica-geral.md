@@ -279,6 +279,20 @@ Separar com mais precisao o que e falta de shape, o que e dependencia semantica 
 - `Inferência forte`: a pilha visual completa pode e deve ser estudada como familia combinada, e nao como tipos totalmente independentes.
 - `Inferência forte`: esse recorte reduz o risco de interpretar `Theme`, `ThemeClass`, `DesignSystem`, `ColorPalette` e `ThemeColor` fora do contexto visual em que a IDE os serializa de fato.
 
+### `Attribute + Domain + Transaction + SubtypeGroup`
+
+- `Evidência direta`: o export `FabricaBrasil18_Attribute_Domain_Transaction_SubtypeGroup.xpz` veio com `1117` objetos, `7646` atributos top-level e `1576` identidades em `ObjectsIdentityMapping`.
+- `Evidência direta`: o contêiner desse pacote usou `KMW`, `Source`, `Objects`, `Attributes`, `Dependencies` e `ObjectsIdentityMapping`.
+- `Evidência direta`: a presenca simultanea de `Objects` e `Attributes` top-level no mesmo `.xpz` confirma que a trilha normal da IDE tambem pode exportar familia mista de objetos e atributos reais, e nao apenas pacotes com `Objects` sem bloco `Attributes`.
+- `Inferência forte`: para engenharia reversa de `Attribute` top-level e de sua relacao com `Transaction`, `Domain` e `SubtypeGroup`, esse recorte e mais informativo do que os pacotes sem `Attributes`.
+
+### `Attribute + Domain + Transaction + SubtypeGroup + Table + Index`
+
+- `Evidência direta`: o export `FabricaBrasil18_Attribute_Domain_Transaction_SubtypeGroup_Table_Index.xpz` veio com `1712` objetos, os mesmos `7646` atributos top-level e `1611` identidades.
+- `Evidência direta`: esse pacote tambem usou o contêiner `KMW`, `Source`, `Objects`, `Attributes`, `Dependencies` e `ObjectsIdentityMapping`.
+- `Evidência direta`: a diferenca de `1117` para `1712` objetos entre os dois pacotes coincide com a entrada da camada fisica `Table`, enquanto o bloco de `Attributes` permaneceu estavel em `7646`.
+- `Inferência forte`: isso reforca que `Table/Index` entram como ampliacao da familia logica anterior, sem deslocar `Attribute` top-level para dentro de `Objects` nem eliminar o bloco `Attributes`.
+
 
 
 

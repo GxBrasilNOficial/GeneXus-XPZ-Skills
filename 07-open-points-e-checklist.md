@@ -193,6 +193,8 @@ Orientar futuras coletas de templates comparáveis.
 - `Evidência direta`: o export `Table + Domain + Transaction + SDT + API + Procedure + DataProvider` mostrou que a `API` relevante desta KB anda com uma subarvore funcional grande.
 - `Inferência forte`: a frente aberta de `API` e funcional, nao de envelope minimo.
 - `Evidência direta`: o export `Table + Transaction + ColorPalette + DesignSystem + Theme + WebTheme + Category + ThemeClass + ThemeColor` mostrou a pilha visual completa exportada como familia combinada.
+- `Evidência direta`: os exports `Attribute + Domain + Transaction + SubtypeGroup` e `Attribute + Domain + Transaction + SubtypeGroup + Table + Index` mostraram que a IDE tambem serializa familia combinada com `Attributes` top-level no mesmo `.xpz`.
+- `Inferência forte`: a frente aberta de `Attribute` deixa de incluir duvida relevante sobre contêiner multiobjeto; o foco remanescente continua sendo dependencia semantica de propriedades e contexto de KB.
 - `Inferência forte`: futuras analises devem priorizar combinacoes de familias relacionadas, e nao apenas tipos isolados.
 
 

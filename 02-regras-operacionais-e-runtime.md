@@ -145,6 +145,14 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
 - `Inferência forte`: para `API`, o melhor recorte operacional deixa de ser o objeto isolado e passa a ser uma familia funcional contendo pelo menos `Procedure`, `SDT`, `Domain`, e possivelmente `Transaction`, `Table` e `DataProvider`.
 - `Regra operacional`: nao regenerar `API` “igual” apos erro de `ATTCUSTOMTYPE`; primeiro materializar os SDTs reais e reexecutar. Se o erro remanescente migrar para `Procedure` ou atributo de negocio, tratar a camada semantica seguinte.
 
+### Politica para `Attribute` em export combinado
+
+- `Evidência direta`: o export `FabricaBrasil18_Attribute_Domain_Transaction_SubtypeGroup.xpz` veio com `1117` objetos, `7646` atributos top-level e `1576` identidades.
+- `Evidência direta`: o export `FabricaBrasil18_Attribute_Domain_Transaction_SubtypeGroup_Table_Index.xpz` veio com `1712` objetos, os mesmos `7646` atributos top-level e `1611` identidades.
+- `Evidência direta`: nesses dois recortes, a IDE serializou `Attributes` como bloco top-level proprio no mesmo `.xpz` que tambem carrega `Objects`.
+- `Inferência forte`: quando a familia funcional inclui `Attribute` real, `Transaction`, `Domain` e `SubtypeGroup`, o formato normal observado fica mais forte com `Objects` + `Attributes`, e nao apenas com `Objects`.
+- `Regra operacional`: ao analisar ou materializar pacote centrado em `Attribute` top-level, preservar a separacao entre `Objects` e `Attributes`; nao rebaixar `Attribute` real para pseudo-objeto dentro de `<Objects>`.
+
 ### Politica para `Theme`
 
 - `Evidência direta`: o `Theme 'SimpleIOS'` falhou isoladamente mesmo sendo objeto real, com ausencia de `Theme class 'TableDetail'`, `TableSection` e `TextBlockGroupCaption`.
