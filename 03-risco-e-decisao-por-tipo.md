@@ -258,6 +258,10 @@ Separar falha de envelope/shape de falha por dependencia semantica da KB.
 - `Evidência direta`: um pacote composto posterior reuniu `ThemeClass`, `Theme`, `Attribute`, `SDT`, `Transaction` e `Pattern Settings` no mesmo `.xpz` e importou com sucesso, incluindo geracao de pattern para `WorkWithWebBanco`.
 - `Inferência forte`: a base ja nao prova apenas sucessos isolados por tipo; ela tambem sustenta composicao entre tipos resolvidos quando as dependencias explicitas entram juntas no pacote.
 - `Inferência forte`: `API` permanece como pendencia principal, mas seu risco residual ja nao esta em `ATTCUSTOMTYPE`; ele foi deslocado para uma subarvore funcional de negocio, envolvendo `Procedure`, `Data Provider`, `Domain`, `Transaction` e atributos reais da KB.
+- `Evidência direta`: o export real `Table + Domain + Transaction + SDT + API + Procedure + DataProvider` veio com `3904` objetos, sendo `2282` `Procedure`, `594` `SDT`, `592` `Domain`, `228` `Table`, `183` `Transaction`, `24` `DataProvider` e `1` `API`.
+- `Inferência forte`: isso confirma que, para `API`, o recorte de risco correto e uma familia funcional grande; tentar trata-la como tipo quase isolado tende a subestimar a dependencia real.
+- `Evidência direta`: o export real `Table + Transaction + ColorPalette + DesignSystem + Theme + WebTheme + Category + ThemeClass + ThemeColor` veio com `947` objetos, incluindo `501` `ThemeClass`, `7` `Theme`, `24` `ThemeColor`, `2` `DesignSystem`, `1` `ColorPalette`, `228` `Table`, `183` `Transaction` e `1` `Folder`.
+- `Inferência forte`: para a pilha visual, o risco melhora quando a analise e feita por familia combinada (`Theme` + `ThemeClass` + `DesignSystem` + `ColorPalette` + `ThemeColor`), e nao por objeto visual totalmente isolado.
 
 ## Hierarquia de ataque das pendencias contextuais
 

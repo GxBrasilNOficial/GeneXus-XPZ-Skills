@@ -205,6 +205,10 @@ Orientar futuras coletas de templates comparáveis.
 - `Inferência forte`: a frente aberta deixa de ser `WorkWithForWeb` e passa a ser a serializacao/reassociacao correta da camada fisica `Table/Index` a partir da modelagem transacional.
 - `Evidência direta`: os exports `Table + Transaction + WorkWithForWeb + PatternSettings` e `Table + Transaction + DataSelector` explicitaram a ponte estrutural entre camada logica, camada fisica e camada de pattern, sem carregar `Attributes` top-level no pacote.
 - `Inferência forte`: futuras analises de engenharia reversa devem priorizar combinacoes de familias relacionadas, e nao apenas tipos isolados, quando o objetivo for entender como GeneXus reassocia pattern, camada fisica e modelagem transacional.
+- `Evidência direta`: o export `Table + Domain + Transaction + SDT + API + Procedure + DataProvider` mostrou que a `API` relevante desta KB nao anda com um pequeno conjunto auxiliar; ela ja sai da IDE junto com uma subarvore grande de `Procedure`, `SDT`, `Domain`, `Table`, `Transaction` e `DataProvider`.
+- `Inferência forte`: a frente aberta de `API` muda de natureza; o problema deixa de ser "qual XML minimo montar" e passa a ser "qual subconjunto funcional da KB precisa viajar junto".
+- `Evidência direta`: o export `Table + Transaction + ColorPalette + DesignSystem + Theme + WebTheme + Category + ThemeClass + ThemeColor` mostrou a pilha visual completa exportada como familia combinada, incluindo `Theme`, `ThemeClass`, `DesignSystem`, `ColorPalette`, `ThemeColor`, `Table`, `Transaction` e `Folder`.
+- `Inferência forte`: futuras coletas e leituras de engenharia reversa da camada visual devem privilegiar esse pacote combinado, porque ele preserva o contexto real em que a IDE costura tema, classes visuais, design system e paleta.
 
 
 

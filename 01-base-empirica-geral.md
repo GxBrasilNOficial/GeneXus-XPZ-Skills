@@ -256,6 +256,29 @@ Separar com mais precisao o que e falta de shape, o que e dependencia semantica 
 - `Evidência direta`: no mesmo export, `PatternSettings 'WorkWith'` materializa `ContextVariable`, `LoadProcedure`, `Security Check` e `NotAuthorized` no XML interno.
 - `Inferência forte`: a ponte operacional real do pattern web observado fica distribuida entre `Transaction` (aplicacao do pattern), `WorkWithForWeb` (instancia por objeto), `PatternSettings` (configuracao global do pattern) e `Table` (camada fisica com indices internos).
 
+## Complemento posterior - export combinado de `API` e da pilha visual
+
+### `Table + Domain + Transaction + SDT + API + Procedure + DataProvider`
+
+- `Evidência direta`: o export `FabricaBrasil18_Table_Domain_Transaction_SDT_API_Procedure_DataProvider.xpz` veio com `3904` objetos e `0` atributos top-level.
+- `Evidência direta`: a distribuicao observada foi `2282` `Procedure`, `594` `SDT`, `592` `Domain`, `228` `Table`, `183` `Transaction`, `24` `DataProvider` e `1` `API`.
+- `Evidência direta`: o `API` exportado nesse pacote e `apiPDV_Integracao`.
+- `Evidência direta`: o mesmo pacote prova que a trilha real de export da IDE para `API` relevante de negocio ja puxa junto uma massa grande de `Procedure`, `SDT`, `Domain`, `Table`, `Transaction` e `DataProvider`.
+- `Evidência direta`: no pacote, ha `Domain` enumerado como `TipoProd`, com valores como `Produto`, `Insumo`, `Servico` e `AnimalParaAbate`.
+- `Evidência direta`: no mesmo recorte, `SDT` como `sdtProdutoDadosBasicos` e `Procedure` como `procListaSdtProdutoDadosBasicosConformeParametros` aparecem no mesmo conjunto exportado.
+- `Inferência forte`: para `API`, o melhor recorte de engenharia reversa deixa de ser o objeto isolado e passa a ser essa combinacao funcional mais ampla.
+- `Inferência forte`: isso reforca a leitura anterior de que a pendencia remanescente de `API` nao e serializacao do envelope, e sim dependencia de subarvore funcional de negocio.
+
+### `Table + Transaction + ColorPalette + DesignSystem + Theme + WebTheme + Category + ThemeClass + ThemeColor`
+
+- `Evidência direta`: o export `FabricaBrasil18_Table_Transaction_ColorPalette_DesignSystem_Theme_WebTheme_Category_ThemeClass_ThemeColor.xpz` veio com `947` objetos e `0` atributos top-level.
+- `Evidência direta`: a distribuicao observada foi `501` `ThemeClass`, `228` `Table`, `183` `Transaction`, `24` `ThemeColor`, `7` `Theme`, `2` `DesignSystem`, `1` `Folder` e `1` `ColorPalette`.
+- `Evidência direta`: o pacote contem uma pasta organizacional `GAM_Samples-web`, reforcando que a familia visual tambem pode carregar o agrupador estrutural junto.
+- `Evidência direta`: o mesmo pacote mostrou `ThemeClass` como `ActionAttribute`, `ActionButtons` e `ActionButtonsHovered`, alem de varios `ThemeColor` e `Theme` reais.
+- `Evidência direta`: nesse export, `Theme`, `ThemeClass`, `DesignSystem`, `ColorPalette` e `ThemeColor` aparecem juntos no mesmo recorte exportado pela IDE.
+- `Inferência forte`: a pilha visual completa pode e deve ser estudada como familia combinada, e nao como tipos totalmente independentes.
+- `Inferência forte`: esse recorte reduz o risco de interpretar `Theme`, `ThemeClass`, `DesignSystem`, `ColorPalette` e `ThemeColor` fora do contexto visual em que a IDE os serializa de fato.
+
 
 
 
