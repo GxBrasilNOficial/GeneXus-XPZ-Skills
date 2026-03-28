@@ -202,6 +202,8 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 - ao extrair ou usar corpus de `Attribute`, aceitar apenas raiz `<Attribute ... name="...">` com `Part` e `Properties`
 - nao reutilizar nos curtos `<Attribute key="True|False" guid="...">Nome</Attribute>` como se fossem objeto `Attribute` completo
 - ao gerar `Attribute` isolado, partir apenas de molde real top-level comparavel
+- validar propriedades nominais que apontem para atributos reais da KB, como `ControlItemDescription`
+- se `ControlItemDescription`, `idBasedOn` ou referencia equivalente apontarem para atributo inexistente no destino, abortar em vez de tratar isso como problema de envelope
 
 ### WebPanel
 

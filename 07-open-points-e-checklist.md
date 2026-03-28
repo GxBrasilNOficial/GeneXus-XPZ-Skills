@@ -75,7 +75,8 @@ Servir como local único para conflitos não resolvidos silenciosamente.
 - `Evidência direta`: o primeiro teste de `Attribute` falhou no load com `Field: name` nulo.
 - `Evidência direta`: depois da bateria, o export full `FabricaBrasil18_Full_20260324a.xml` revelou `Attribute` top-level real com raiz `<Attribute ... name="...">`.
 - `Evidência direta`: o mesmo export tambem trouxe referencias inline `<Attribute key="...">Nome</Attribute>` dentro de `Transaction`; elas chegaram a contaminar a pasta de extraidos ate a limpeza posterior.
-- `Inferência forte`: a pendencia de `Attribute` deixou de ser “falta total de shape” e passou a ser “disciplina de filtragem e uso do shape top-level correto”.
+- `Evidência direta`: no teste combinado posterior, `Attribute` com shape top-level valido falhou em `ControlItemDescription`, por apontar para atributo desconhecido no destino.
+- `Inferência forte`: a pendencia de `Attribute` deixou de ser “falta total de shape” e passou a ser “uso de shape top-level correto + controle de propriedades que dependem de atributos reais da KB”.
 - `Evidência direta`: `Folder` continua pendente de fechamento semantico, porque o caso gerado foi reconhecido pela IDE como `Category`.
 - `Evidência direta`: `Theme` e `Pattern Settings` nao falharam por envelope puro; os resultados apontaram respectivamente inconsistencia de classes visuais e pattern nao registrado.
 - `Evidência direta`: `API`, `Transaction`, `Data Selector`, `Index`, `Deployment Unit`, `Theme Class`, `Design System` e `Work With for Web` mostraram dependencia contextual real da KB.
@@ -87,7 +88,7 @@ Servir como local único para conflitos não resolvidos silenciosamente.
 - `Inferência forte`: vale isolar pares de objetos simples e complexos do mesmo grupo para comparação estrutural.
 - `Inferência forte`: vale produzir uma camada de validação cruzando `parent*`, `moduleGuid`, chamadas em código e nomes de objeto.
 - `Inferência forte`: antes de corrigir os `.md` dos tipos problemáticos, vale usar a bateria atual para distinguir "erro de molde" de "erro de dependência de KB" em cada tipo.
-- `Inferência forte`: a proxima coleta em exemplos reais deve priorizar `Folder`, `Theme`, `Pattern Settings`, `API` e `Transaction`; `Attribute` ja teve o shape top-level encontrado, mas ainda merece refinamento documental para geracao segura.
+- `Inferência forte`: a proxima coleta em exemplos reais deve priorizar `Folder`, `Theme`, `Pattern Settings`, `API`, `Transaction` e propriedades semanticas de `Attribute` como `ControlItemDescription`.
 
 ## Decisao operacional - Transaction e WebPanel
 
