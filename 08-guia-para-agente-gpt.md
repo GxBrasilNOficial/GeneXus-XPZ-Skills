@@ -97,6 +97,7 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 - para `WebPanel`, usar familia estrutural inferida e molde interno muito proximo
 - para `Theme`, preservar tambem o conjunto minimo de classes visuais efetivamente referenciadas entre si
 - para `API`, copiar apenas `ATTCUSTOMTYPE` comprovado e somente quando o tipo correspondente existir no alvo
+- para `WorkWithForWeb`, usar o convenio estrutural real de atributo do pattern `adbb33c9-0906-4971-833c-998de27e0676-NomeDoAtributo`
 
 ### Exigir molde bruto comparável
 
@@ -107,6 +108,7 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 - `WebPanel` deve operar por familia estrutural e molde interno proximo
 - `Attribute` ja tem shape top-level provado, mas ainda deve exigir filtro cuidadoso para nao confundir definicao real com referencia inline de `Transaction`
 - `PatternSettings` deve exigir pattern registrado e contexto equivalente; o XML sozinho nao fecha o comportamento
+- `API` deve exigir, como regra preferencial, um recorte funcional comparavel contendo tambem `Procedure`, `SDT`, `Domain` e, quando o caso pedir, `Transaction`, `Table` e `DataProvider`
 
 ### Abortar
 
@@ -182,13 +184,14 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 
 - copiar somente um molde XML completo do mesmo tipo e com contexto comparavel
 - validar antes se cada `ATTCUSTOMTYPE` apontado no molde existe no alvo como `EXO`, `SDT` ou tipo base suportado
+- preferir ler e gerar `API` dentro de uma familia funcional combinada, e nao como objeto solto, quando o caso real ja vier acoplado a `Procedure`, `SDT`, `Domain`, `Transaction`, `Table` ou `DataProvider`
 - abortar se a API depender de procedures, `EXO` ou `SDT` inexistentes no destino
 
 ### Theme
 
 - preservar `PredefinedTypes`, `Styles`, classes visuais base e referencias internas entre classes
 - nao podar classes so porque parecem "sobrando"; classes como `TableDetail`, `TableSection` e `TextBlockGroupCaption` podem ser exigidas por outras referencias do proprio tema
-- mesmo um `Theme` real como `SimpleIOS` pode falhar no destino; tratar `Theme` como dependente do ambiente alvo, nao apenas do XML
+- tratar `Theme` preferencialmente em conjunto com `ThemeClass`; para analise mais completa da camada visual, considerar junto tambem `DesignSystem`, `ColorPalette` e `ThemeColor`
 - abortar se a edicao quebrar o grafo minimo de classes referenciadas
 
 ### PatternSettings
@@ -206,6 +209,13 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 - validar propriedades nominais que apontem para atributos reais da KB, como `ControlItemDescription`
 - se `ControlItemDescription`, `idBasedOn` ou referencia equivalente apontarem para atributo inexistente no destino, abortar em vez de tratar isso como problema de envelope
 - se houver opcao, preferir `Attribute` real semanticamente fechado, sem `ControlItemDescription`, porque esse perfil ja demonstrou importacao bem-sucedida
+
+### WorkWithForWeb
+
+- tratar o objeto como instancia de pattern por `Transaction`, nao como XML independente simples
+- usar referencias de atributo no formato estrutural real `adbb33c9-0906-4971-833c-998de27e0676-NomeDoAtributo`
+- nao substituir esse prefixo por GUID de `Attribute` top-level nem por GUID inline do `Level` da `Transaction`
+- se o objetivo incluir a camada fisica, lembrar que `Table` e `Index` seguem outra trilha: `Table` e top-level proprio e `Index` aparece embutido em `Table`
 
 ### WebPanel
 

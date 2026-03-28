@@ -1,7 +1,7 @@
-# 09 - Historico e Inventario Publico
+# 09 - Inventario e Rastreabilidade Publica
 
 ## Papel do documento
-indice e historico
+indice e rastreabilidade
 
 ## Nivel de confianca predominante
 alto
@@ -15,13 +15,10 @@ nenhum
 ## Objetivo
 Preservar rastreabilidade da consolidacao, inventario documental, inventario bruto publico sanitizado e o mapeamento usado para reduzir a base a ate 10 arquivos.
 
-## Registro adicional - bateria controlada de importacao em 2026-03-27
+## Nota sobre historico detalhado
 
-- `Evidência direta`: apos a consolidacao em ate 10 arquivos, a base foi exercitada por uma bateria controlada de `.xpz` de teste gerados a partir dos `.md` locais em conjunto com o skill `nexa`.
-- `Evidência direta`: nessa bateria, houve importacao bem-sucedida com tipo coerente para `Procedure`, `Domain`, `SDT`, `Data Provider`, `Subtype Group`, `Module`, `External Object`, `Data Store`, `Generator`, `Panel`, `Image`, `Theme Color`, `Document`, `File`, `Language`, `Color Palette`, `Dashboard`, `User Control` e `Stencil`.
-- `Evidência direta`: tambem houve casos que passaram da validacao estrutural, mas falharam por dependencia de contexto da KB, como `API`, `Transaction`, `Data Selector`, `Index`, `Deployment Unit`, `Theme Class`, `Design System` e `Work With for Web`.
-- `Evidência direta`: os pontos mais sensiveis restantes da base documental ficaram concentrados em `Attribute`, `Folder`, `Theme` e `Pattern Settings`.
-- `Inferência forte`: essa bateria marcou a transicao da base de uma fase predominantemente heuristica para uma fase com evidência real de importacao por tipo, sem eliminar a necessidade de exemplos reais para os casos contextuais.
+- `Evidência direta`: a raiz desta base passou a priorizar estado atual de trabalho, sem manter no corpo principal a arqueologia completa das rodadas de teste.
+- `Evidência direta`: o historico detalhado de validacoes, rodadas de importacao e reclassificacoes deve ficar separado em `historico/`, para nao competir com os `.md` operacionais da raiz.
 
 ## Fontes consolidadas
 - 00-inventario-da-base-documental.md

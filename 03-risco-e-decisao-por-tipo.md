@@ -178,7 +178,7 @@ Evitar que “melhor candidato” seja confundido com “tipo comprovadamente se
 | Theme | apto somente por clonagem muito controlada | 7 objetos; media de Part = 3; parent = 0; pattern = 0 | sem muita dependencia contextual aparente, mas a amostra ainda e pequena |
 | Transaction | apto por clonagem baseada em padrao estrutural inferido (decisao operacional) | 183 objetos; media de Part = 8; parent = 183; pattern = 0 | ha massa critica suficiente para trabalhar por familia estrutural interna, com erro tratado incrementalmente |
 | WebPanel | apto por clonagem baseada em familia estrutural (alta variabilidade; requer molde interno proximo) | 1196 objetos; media de Part = 7; parent = 1195; pattern = 0 | ha massa critica suficiente para escolher molde interno proximo, sem tratar WebPanel como estrutura unica |
-| WorkWithForWeb | ainda nao apto sem molde bruto comparável | 183 objetos; media de Part = 2; parent = 183; pattern = 183 | pattern e parent aparecem em 100% dos casos observados |
+| WorkWithForWeb | apto somente com contexto completo de pattern e `Transaction` comparável | 183 objetos; media de Part = 2; parent = 183; pattern = 183 | o risco continua alto, mas a trilha posterior mostrou importacao bem-sucedida quando o XML usa o convenio estrutural real do pattern |
 
 ## Leitura conservadora
 
@@ -230,23 +230,23 @@ Separar falha de envelope/shape de falha por dependencia semantica da KB.
 - `User Control`
 - `Stencil`
 
-## Tipos testados, mas dependentes de contexto real da KB
+## Tipos que exigem contexto real da KB ou familia funcional ampliada
 
-- `API`: na rodada inicial falhou por `ATTCUSTOMTYPE` de `EXO` e `SDT`; em teste isolado posterior, com os SDTs reais incluidos, essa camada foi resolvida e a falha remanescente migrou para `Procedure` ausente e contexto de negocio (`TipoProd`, `Produto`); em aprofundamento seguinte, ficou provado que a `API` puxa uma cadeia maior de `Procedure`, `Data Provider`, `Domain`, `Transaction` e atributos de negocio de `Produto` e `Tributacao`.
-- `Transaction`: na rodada inicial falhou por atributos inexistentes e por tipos de contexto nao resolvidos; em teste isolado posterior, `Banco` importou com sucesso quando acompanhado pelos atributos reais do `Level`, `Context` e `TransactionContext`.
-- `Data Selector`: falhou por atributos/funcoes nao validos no contexto da KB de destino.
-- `Index`: foi pulado porque a tabela nao tinha `Transaction` associada.
-- `Deployment Unit`: falhou por `Procedure` membro inexistente.
-- `Theme Class`: falhou por objeto pai inexistente.
-- `Design System`: falhou por dependencia de package/import inexistente.
-- `Work With for Web`: falhou por `Transaction` pai inexistente.
+- `API`: o risco atual esta concentrado numa subarvore funcional grande, envolvendo `Procedure`, `Data Provider`, `Domain`, `Transaction`, `Table`, `SDT` e atributos de negocio reais.
+- `Transaction`: o tipo esta destravado, mas depende de atributos reais do `Level` e dos SDTs de contexto corretos, como `Context` e `TransactionContext`.
+- `Data Selector`: o tipo pode importar em caso controlado, mas continua sensivel a atributos, filtros e funcoes realmente existentes na KB.
+- `Index`: a evidência consolidada mostra `Index` como estrutura embutida em `Table`, nao como familia top-level independente nesta trilha de export.
+- `Deployment Unit`: o tipo depende da lista completa de `Member` existir e ser coerente no destino.
+- `Theme Class`: o tipo depende da hierarquia visual correta e do contexto de tema/classe pai quando houver heranca ou derivacao.
+- `Design System`: o tipo pode importar em caso controlado, mas continua sensivel a imports, pacotes e contexto visual do ambiente.
+- `Work With for Web`: o tipo esta destravado quando usa o convenio estrutural real do pattern e `Transaction` comparavel, mas continua exigindo contexto completo de pattern.
 
-## Tipos testados com divergencia ou consistencia insuficiente
+## Tipos com leitura consolidada especial
 
-- `Folder`: o XML gerado foi importado como `Category`, nao como `Folder`.
-- `Pattern Settings`: o primeiro teste sintetico ficou em `was not changed`, mas o caso real `WorkWith` importou com sucesso; o risco remanescente passa a ser compatibilidade do pattern no ambiente.
-- `Attribute`: no primeiro teste falhou no load com `Value cannot be null. Parameter name: Field: name`; no teste combinado posterior, ja com shape top-level real, falhou por propriedade semantica `ControlItemDescription` apontando para atributo inexistente; em revisao seguinte, um atributo real simples (`DocumentoFiscalRemetenteDadosFiscaisAdicionaisId`) importou com sucesso.
-- `Theme`: falhou inicialmente por classes visuais referenciadas ausentes; depois, o `SimpleIOS` real repetiu a mesma falha isoladamente; por fim, o `Theme` importou com sucesso quando acompanhado por `ThemeClass` reais (`TableDetail`, `TableSection`, `TextBlockGroupCaption`).
+- `Folder`: tratar como tipo XML estruturalmente valido; `Category` e apenas o rotulo exibido pela IDE/importador.
+- `Pattern Settings`: o tipo esta destravado em caso real compativel; o risco residual passa a ser compatibilidade do pattern no ambiente.
+- `Attribute`: o shape top-level esta provado; o risco residual esta em propriedades semanticas como `ControlItemDescription`, `idBasedOn` e outras referencias nominais a atributos reais.
+- `Theme`: o tipo esta destravado quando acompanhado pelas `ThemeClass` exigidas pelo proprio grafo visual.
 
 ## Leitura operacional apos a bateria
 
@@ -281,7 +281,7 @@ Separar falha de envelope/shape de falha por dependencia semantica da KB.
 - `Inferência forte`: quando o `Attribute` escolhido evita referencias nominais problematicas, como `ControlItemDescription`, o tipo ja demonstrou importacao bem-sucedida nesta trilha.
 - Inferência forte: `Folder` fica por ultimo porque o shape minimo ja parece estavel e o problema restante e mais de reconhecimento semantico da IDE do que de XML ou contexto pesado da KB.
 - Inferência forte: em `Folder`, a hierarquia correta de decisao e `shape minimo correto -> contexto pai/modulo -> tipo exibido pela IDE`.
-- Inferência forte: qualquer tentativa de "corrigir" `Folder` mexendo no envelope antes de esclarecer a diferenca entre `Folder` e `Category` tende a atacar o problema errado.
+- Inferência forte: a diferenca `Folder` x `Category` ja ficou suficientemente esclarecida nesta trilha; novas tentativas devem tratar `Folder` como tipo XML estrutural e `Category` como rotulo de UI/importador, e nao como tipos rivais de envelope.
 
 
 ## Origem incorporada - 23-mapa-de-risco-por-tipo.md
@@ -317,7 +317,7 @@ Servir como primeira triagem operacional antes de qualquer tentativa de clonagem
 | Theme | medio | 0/7 | 0/7 | media-baixa | usar apenas para experimentos muito controlados e com diff manual |
 | Transaction | muito alto | 183/183 | 0/183 | media | permitir geracao por padrao estrutural inferido; preservar estrutura e tratar erros incrementalmente |
 | WebPanel | muito alto | 1195/1196 | 0/1196 | media-baixa | permitir geracao por familia estrutural; usar molde interno proximo; nao generalizar estrutura |
-| WorkWithForWeb | muito alto | 183/183 | 183/183 | baixa | nao tentar sem molde bruto comparável e contexto completo de pattern |
+| WorkWithForWeb | muito alto | 183/183 | 183/183 | media | tentar apenas com contexto completo de pattern, `Transaction` comparavel e convenio estrutural real de atributo |
 
 ## Notas de leitura
 
@@ -325,16 +325,13 @@ Servir como primeira triagem operacional antes de qualquer tentativa de clonagem
 - Inferência forte: `Transaction` e `WebPanel` continuam em risco alto/muito alto, mas deixam de ser bloqueados por falta de base amostral.
 - Inferência forte: `PackagedModule`, `Theme` e parte de `SDT` seguem entre os candidatos menos agressivos do recorte, mas ainda nao devem ser tratados como baixos riscos absolutos.
 
-## Complemento posterior - fechamento de `WorkWithForWeb` e reposicionamento de `Table/Index`
+## Estado atual consolidado - pattern web e camada fisica
 
-- `Evidência direta`: um pacote `.md`-only posterior reuniu `ThemeClass`, `Theme`, `DesignSystem`, `Attribute`, `Transaction`, `Data Selector`, `Work With for Web`, `Pattern Settings` e `Deployment Unit`; todos importaram com sucesso, exceto a camada `Index/Table`.
-- `Evidência direta`: nessa mesma trilha, `Work With for Web 'WorkWithWebTrnTesteMdF1'` passou a importar com sucesso quando o XML do pattern usou o convenio real de atributo `adbb33c9-0906-4971-833c-998de27e0676-NomeDoAtributo`.
-- `Evidência direta`: exports isolados posteriores da IDE mostraram `Table` como familia top-level propria (`857ca50e-7905-0000-0007-c5d9ff2975ec`) e `Index` como export isolado vazio.
-- `Evidência direta`: um quinto export posterior `Table + Index` confirmou o mesmo resultado estrutural do export isolado de `Table`, sem criar familia top-level adicional para `Index`.
-- `Inferência forte`: `WorkWithForWeb` deixa de ser pendencia estrutural aberta nesta trilha.
-- `Inferência forte`: a pendencia residual de camada fisica passa a se concentrar em como `Table` e `Index` se reassociam corretamente a partir da `Transaction`, e nao em como serializar `WorkWithForWeb`.
-- `Evidência direta`: exports combinados posteriores `Table + Transaction + WorkWithForWeb + PatternSettings` e `Table + Transaction + DataSelector` mostraram que essas familias convivem no mesmo `.xpz` sem exigir `Attributes` top-level no contêiner.
-- `Inferência forte`: para engenharia reversa do pattern web, a unidade mais informativa deixa de ser o tipo isolado e passa a ser a combinacao `Transaction + Table + WorkWithForWeb + PatternSettings`.
+- `Evidência direta`: `Work With for Web` importa com sucesso quando o XML do pattern usa o convenio estrutural real de atributo `adbb33c9-0906-4971-833c-998de27e0676-NomeDoAtributo`.
+- `Evidência direta`: `Table` aparece como familia top-level propria (`857ca50e-7905-0000-0007-c5d9ff2975ec`) e `Index` aparece embutido dentro de `Table` nesta trilha de export.
+- `Inferência forte`: a pendencia residual de camada fisica se concentra em como `Table` e `Index` se reassociam corretamente a partir da `Transaction`.
+- `Evidência direta`: os exports `Table + Transaction + WorkWithForWeb + PatternSettings` e `Table + Transaction + DataSelector` mostraram que essas familias convivem no mesmo `.xpz` sem exigir `Attributes` top-level no contêiner.
+- `Inferência forte`: para engenharia reversa do pattern web, a unidade mais informativa e a combinacao `Transaction + Table + WorkWithForWeb + PatternSettings`.
 
 ## Nota leve de risco runtime relativo
 

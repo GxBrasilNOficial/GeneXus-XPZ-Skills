@@ -126,6 +126,48 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
 - `Inferência forte`: `API` com bloco `Service`, `RestMethod`, eventos `.Before/.After` e chamadas a `Procedure` sugere camada de orquestracao server-side; o XML nao prova custo, mas indica dependencia de codigo interno e contexto de seguranca/sessao.
 - `Hipótese`: `DataProvider` pequeno e direto, com poucos filtros e saida simples, tende a ser menos arriscado em runtime do que `Procedure` ou `WebPanel` com eventos cruzados e composicao de tela.
 
+## Politicas especificas para tipos contextuais
+
+### Politica para `Transaction`
+
+- `Evidência direta`: o teste isolado com `Transaction 'Banco'`, seus `Attribute` top-level reais, `SDT 'Context'` e `SDT 'TransactionContext'` importou com sucesso.
+- `Evidência direta`: nesse mesmo teste houve geracao de pattern bem-sucedida para `WorkWithWebBanco`.
+- `Inferência forte`: quando o molde de `Transaction` usa `Context`, `TrnContext` ou `TrnContextAtt`, os SDTs de contexto correspondentes deixam de ser detalhe auxiliar e passam a ser dependencias de primeira classe do pacote.
+- `Regra operacional`: antes de materializar `Transaction`, validar nesta ordem: familia estrutural correta, atributos reais do `Level`, `SDT 'Context'`, `SDT 'TransactionContext'` e so depois regras/eventos mais especificos.
+- `Regra operacional`: erro em `ATTCUSTOMTYPE` de `sdt:Context`, `sdt:TransactionContext` ou `sdt:TransactionContext.Attribute` deve ser lido como falta de dependencia contextual, nao como falha do envelope XML.
+
+### Politica para `API`
+
+- `Evidência direta`: o teste isolado com `apiPDV_Integracao` e seus SDTs reais resolveu a camada de erro em `ATTCUSTOMTYPE`.
+- `Evidência direta`: depois disso, a `API` passou a falhar por `Procedure` ausente (`procListaSdtProdutoDadosBasicosConformeParametros`) e por contexto de negocio (`TipoProd`, `Produto`).
+- `Evidência direta`: o export real `Table + Domain + Transaction + SDT + API + Procedure + DataProvider` veio com `3904` objetos e mostrou que a `API` desta KB ja sai da IDE acompanhada por uma subarvore funcional grande.
+- `Inferência forte`: a hierarquia de validacao de `API` nesta trilha e: primeiro `ATTCUSTOMTYPE`/SDTs, depois `Procedure`, e por fim atributos, dominios ou contexto de negocio usados no codigo/eventos.
+- `Inferência forte`: para `API`, o melhor recorte operacional deixa de ser o objeto isolado e passa a ser uma familia funcional contendo pelo menos `Procedure`, `SDT`, `Domain`, e possivelmente `Transaction`, `Table` e `DataProvider`.
+- `Regra operacional`: nao regenerar `API` “igual” apos erro de `ATTCUSTOMTYPE`; primeiro materializar os SDTs reais e reexecutar. Se o erro remanescente migrar para `Procedure` ou atributo de negocio, tratar a camada semantica seguinte.
+
+### Politica para `Theme`
+
+- `Evidência direta`: o `Theme 'SimpleIOS'` falhou isoladamente mesmo sendo objeto real, com ausencia de `Theme class 'TableDetail'`, `TableSection` e `TextBlockGroupCaption`.
+- `Evidência direta`: quando essas tres `ThemeClass` reais foram importadas junto, o `Theme 'SimpleIOS'` importou com sucesso.
+- `Evidência direta`: o export real `Table + Transaction + ColorPalette + DesignSystem + Theme + WebTheme + Category + ThemeClass + ThemeColor` mostrou a pilha visual exportada como familia combinada.
+- `Inferência forte`: nesta trilha, `Theme` deve ser tratado como dependente de `ThemeClass` materializadas na KB, e nao apenas do XML do proprio tema.
+- `Inferência forte`: quando a meta for engenharia reversa da camada visual, `Theme`, `ThemeClass`, `DesignSystem`, `ColorPalette` e `ThemeColor` devem ser lidos como familia conjunta.
+- `Regra operacional`: antes de materializar `Theme`, levantar as `ThemeClass` referenciadas pelo grafo minimo do tema e inclui-las no pacote.
+- `Regra operacional`: falha “Theme class X does not exist” deve ser tratada como dependencia faltante de `ThemeClass`, nao como prova de erro no `Theme` principal.
+
+### Politica para `PatternSettings`
+
+- `Evidência direta`: o teste sintetico inicial resultou em `was not changed`, mas o teste posterior com `Pattern Settings 'WorkWith'` real importou com sucesso.
+- `Inferência forte`: `PatternSettings` deixa de ser pendencia estrutural aberta e passa a depender principalmente de pattern real compativel com o ambiente.
+- `Regra operacional`: sempre preferir `PatternSettings` reais do pattern alvo; se o log disser `pattern nao registrado`, tratar como incompatibilidade do ambiente, nao como erro do envelope.
+
+### Politica para `Folder`
+
+- `Evidência direta`: os exemplos reais de `Folder` usam shape minimo e estavel com `Object/@type=\"00000000-0000-0000-0000-000000000006\"`.
+- `Evidência direta`: a IDE importou o caso de teste como `Category`, e as capturas de `New Object` mostraram `Category` como agrupador visual da UI, nao como tipo XML de objeto.
+- `Inferência forte`: `Folder` fica encerrado como tipo estrutural simples; a divergencia residual e apenas de nomenclatura exibida pela IDE/importador.
+- `Regra operacional`: ao relatar resultado de `Folder`, separar sempre tipo estrutural XML (`Folder`) do rotulo de UI reconhecido no log (`Category`, quando for o caso).
+
 ## Ponte estrutura -> runtime por tipo e familia
 
 ### Transaction
@@ -147,6 +189,8 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
 - `Evidência direta`: `Procedure` e `DataProvider` frequentemente expõem blocos `Source`, `Parm` e `Variables`; `API` expõe `Service`, `RestMethod` e eventos `.Before/.After`; `WorkWithForWeb` carrega pattern e parent transacional em 183/183 casos.
 - `Inferência forte`: objetos com `pattern`, `parentType` forte e blocos de codigo gerado merecem leitura runtime mais cautelosa porque parte da navegacao e da expectativa funcional vem do contexto de geracao.
 - `Inferência forte`: `WorkWithForWeb` e derivados patternizados devem ser tratados como de risco operacional/runtime alto mesmo quando a estrutura parece recorrente.
+- `Evidência direta`: no experimento `.md`-only, `Work With for Web 'WorkWithWebTrnTesteMdF1'` importou com sucesso quando o pattern usou o convenio real de atributo `adbb33c9-0906-4971-833c-998de27e0676-NomeDoAtributo`.
+- `Inferência forte`: para `WorkWithForWeb`, a referencia de atributo do pattern deve ser tratada como convenio estrutural fixo do pattern, e nao como GUID do `Attribute` top-level ou do atributo inline do `Level`.
 - `Hipótese`: `API` pequena pode ter runtime simples, mas a presenca de multiplos metodos e eventos de pre/pós-processamento sugere custo invisivel ao olhar apenas o contrato externo.
 
 ## Regras de decisao operacional com impacto runtime
@@ -716,9 +760,12 @@ Funcionar como resumo decisório sem esconder os limites da evidência.
 
 - Evidência direta: a consulta ao acervo real confirmou que `Folder` usa um shape XML minimo e estavel, com `Object/@type="00000000-0000-0000-0000-000000000006"` e poucos metadados.
 - Evidência direta: na bateria de importacao, o caso de teste entrou, mas a IDE o exibiu como `Category`, nao como `Folder`.
+- Evidência direta: as capturas da janela `New Object` da IDE mostram que `Category` nomeia o agrupador visual da lista de tipos criaveis, e nao o tipo XML do objeto.
+- Evidência direta: nas mesmas capturas, um mesmo tipo pode aparecer sob mais de uma `Category` da UI, portanto `Category` nao se comporta como identidade estrutural unica de objeto.
 - Inferência forte: para `Folder`, a ordem correta de validacao e `shape minimo correto -> parent/module coerentes quando existirem -> leitura semantica da IDE`.
-- Inferência forte: aqui o risco principal nao e quebrar o XML, e sim confundir o nome do tipo exportado com a categoria semantica que a IDE resolve exibir.
-- Hipótese: novos testes devem tratar `Folder` como caso estruturalmente aceito, mas semanticamente ainda ambíguo na exibicao da IDE.
+- Inferência forte: aqui o risco principal nao e quebrar o XML, e sim confundir `Category` da UI com tipo estrutural de objeto.
+- Inferência forte: para esta trilha, `Folder` deve ser lido como tipo XML estruturalmente aceito, enquanto `Category` deve ser lido como rotulo de agrupamento/exibicao da IDE.
+- Hipótese: o importador pode estar reutilizando o mesmo vocabulário visual da IDE ao relatar `Category`, sem implicar mudanca real do tipo estrutural importado.
 
 ## Politica para WebPanel
 
@@ -803,8 +850,9 @@ Funcionar como resumo decisório sem esconder os limites da evidência.
 - preservar `Object/@type`, `guid`, `parent*`, `moduleGuid` e o inventario minimo de `Part` do molde-base
 - preferir o molde mais simples quando a necessidade for apenas organizacao logica de objetos
 - nao inflar `Folder` com propriedades extras sem paralelo claro no molde real
-- registrar separadamente o tipo pretendido no XML e o tipo efetivamente reconhecido pela IDE ao importar
-- se o objetivo depender da distincao semantica exata entre `Folder` e `Category`, tratar o caso como ambíguo e nao como falha de envelope
+- registrar separadamente o tipo estrutural do XML (`Folder`) e o rotulo exibido pela IDE/importador (`Category`, quando ocorrer)
+- nao reinterpretar `Category` da UI como prova de outro tipo XML concorrente sem evidencia estrutural adicional
+- se o objetivo depender da distincao funcional exata entre `Folder` e o rotulo `Category` na interface, tratar o caso como diferenca de nomenclatura da IDE ate prova contraria, e nao como falha de envelope
 
 ### WebPanel
 
