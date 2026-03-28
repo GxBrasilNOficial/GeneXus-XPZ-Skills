@@ -45,6 +45,12 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 5. para `Transaction`, ler `05-transaction-familias-e-templates.md`
 6. usar `01-base-empirica-geral.md` e `09-historico-e-inventario-publico.md` para sustentar detalhe empírico e rastreabilidade
 
+## Regra de precedencia sobre skills gerais
+
+- quando a tarefa for de `XML`/`XPZ` nesta base, os `.md` locais da pasta do projeto tem precedencia sobre heuristicas gerais de skill
+- isso nao revoga a postura conservadora do skill `nexa`; apenas define que a evidencia local consolidada nesta base e a fonte mais especifica desta trilha
+- se houver tensao entre fluxo GeneXus geral do skill e achado empirico local desta base, o agente deve seguir a base local para decisao de `XPZ`/`XML` e manter do skill apenas a disciplina metodologica
+
 ## Regra de leitura para runtime
 
 - quando a pergunta envolver `Base Table`, `Extended Table`, navegacao, `For each`, `Load`, `Refresh`, `Refresh Grid` ou risco de performance, consultar primeiro `02-regras-operacionais-e-runtime.md`
