@@ -8017,29 +8017,29 @@ MTUtMDctMDNUMTQ6Mzg6MzQrMDA6MDCOGKHvAAAAAElFTkSuQmCC
 ]]></Source>
       </Condition>
       <Condition>
-        <Source><![CDATA[MovimentoRegistroDocumentoFiscalDocumentoSaidaId.IsEmpty() or MovimentoRegistroDocumentoFiscalDocumentoSaidaId.IsNull() or MovimentoRegistroDocumentoFiscalTipoDocumentoSaida <> &sdtRegistroParametros.aIgnorarTipoDocumentoSaida when not &sdtRegistroParametros.aIgnorarTipoDocumentoSaida.IsEmpty()
+        <Source><![CDATA[MovimentoRegistroDocumentoOperacionalSaidaId.IsEmpty() or MovimentoRegistroDocumentoOperacionalSaidaId.IsNull() or MovimentoRegistroTipoDocumentoSaida <> &sdtRegistroParametros.aIgnorarTipoDocumentoSaida when not &sdtRegistroParametros.aIgnorarTipoDocumentoSaida.IsEmpty()
 ]]></Source>
       </Condition>
       <Condition>
-        <Source><![CDATA[MovimentoRegistroDocumentoFiscalTipoDocumentoSaida = &sdtRegistroParametros.TipoDocumentoSaida when not &sdtRegistroParametros.TipoDocumentoSaida.IsEmpty()
+        <Source><![CDATA[MovimentoRegistroTipoDocumentoSaida = &sdtRegistroParametros.TipoDocumentoSaida when not &sdtRegistroParametros.TipoDocumentoSaida.IsEmpty()
 ]]></Source>
       </Condition>
       <Condition>
-        <Source><![CDATA[MovimentoRegistroDocumentoFiscalDocumentoSaidaId = &sdtRegistroParametros.DocumentoSaidaId when &sdtRegistroParametros.DocumentoSaidaId > 0
+        <Source><![CDATA[MovimentoRegistroDocumentoOperacionalSaidaId = &sdtRegistroParametros.DocumentoSaidaId when &sdtRegistroParametros.DocumentoSaidaId > 0
 ]]></Source>
       </Condition>
       <Condition>
-        <Source><![CDATA[procAgenteIdDeUmEmbarqueSaidaId(MovimentoRegistroDocumentoFiscalDocumentoSaidaEmpresaId, MovimentoRegistroDocumentoFiscalDocumentoSaidaId) = &sdtRegistroParametros.AgenteId when not &sdtRegistroParametros.AgenteId.IsEmpty();
+        <Source><![CDATA[PRCExemploAgenteDocumentoSaidaA(MovimentoRegistroDocumentoOperacionalSaidaEmpresaId, MovimentoRegistroDocumentoOperacionalSaidaId) = &sdtRegistroParametros.AgenteId when not &sdtRegistroParametros.AgenteId.IsEmpty();
 ]]></Source>
       </Condition>
       <Condition>
-        <Source><![CDATA[(not MovimentoRegistroDocumentoFiscalId.IsEmpty() and not MovimentoRegistroDocumentoFiscalId.IsNull() and 
-	MovimentoRegistroDocumentoFiscalResponsavelId = &sdtRegistroParametros.DFResponsavelId
+        <Source><![CDATA[(not MovimentoRegistroDocumentoOperacionalId.IsEmpty() and not MovimentoRegistroDocumentoOperacionalId.IsNull() and 
+	MovimentoRegistroDocumentoOperacionalResponsavelId = &sdtRegistroParametros.DFResponsavelId
 ) or
-(	(MovimentoRegistroDocumentoFiscalId.IsEmpty() or MovimentoRegistroDocumentoFiscalId.IsNull()) and
-	not MovimentoRegistroDocumentoSaidaTipo.IsEmpty() and not MovimentoRegistroDocumentoSaidaTipo.IsNull() and
+(	(MovimentoRegistroDocumentoOperacionalId.IsEmpty() or MovimentoRegistroDocumentoOperacionalId.IsNull()) and
+	not MovimentoRegistroDocumentoOperacionalSaidaTipo.IsEmpty() and not MovimentoRegistroDocumentoOperacionalSaidaTipo.IsNull() and
 	not MovimentoRegistroPedidoId.IsEmpty() and not MovimentoRegistroPedidoId.IsNull() and
-	procResponsavelDoPedido(MovimentoRegistroDocumentoSaidaTipo, MovimentoRegistroPedidoEmpresaId, MovimentoRegistroPedidoId, MovimentoRegistroPedidoTipo) = &sdtRegistroParametros.DFResponsavelId
+	PRCExemploResponsavelPedidoA(MovimentoRegistroDocumentoOperacionalSaidaTipo, MovimentoRegistroPedidoEmpresaId, MovimentoRegistroPedidoId, MovimentoRegistroPedidoTipo) = &sdtRegistroParametros.DFResponsavelId
 )
 when not &sdtRegistroParametros.DFResponsavelId.IsEmpty();
 ]]></Source>
@@ -8053,7 +8053,7 @@ when not &sdtRegistroParametros.EntidadeResponsavelId.IsEmpty();
 ]]></Source>
       </Condition>
       <Condition>
-        <Source><![CDATA[MovimentoRegistroDocumentoFiscalId > 0 and MovimentoRegistroDocumentoFiscalResponsavelId in &sdtRegistroParametros.ResponsaveisDoSupervisor when not &sdtRegistroParametros.DFResponsavelSupervisorId.IsEmpty()
+        <Source><![CDATA[MovimentoRegistroDocumentoOperacionalId > 0 and MovimentoRegistroDocumentoOperacionalResponsavelId in &sdtRegistroParametros.ResponsaveisDoSupervisor when not &sdtRegistroParametros.DFResponsavelSupervisorId.IsEmpty()
 ]]></Source>
       </Condition>
       <Condition>
@@ -8113,7 +8113,7 @@ when not &sdtRegistroParametros.EntidadeResponsavelSupervisorId.IsEmpty();
 ]]></Source>
       </Condition>
       <Condition>
-        <Source><![CDATA[MovimentoRegistroDocumentoFiscalResponsavelId in &sdtRegistroParametros.ResponsaveisDoUsuario or
+        <Source><![CDATA[MovimentoRegistroDocumentoOperacionalResponsavelId in &sdtRegistroParametros.ResponsaveisDoUsuario or
 MovimentoRegistroEntidadeResponsavelId in &sdtRegistroParametros.ResponsaveisDoUsuario or
 (	MovimentoRegistroEntidadeSetorVendedorId in &sdtRegistroParametros.ResponsaveisDoUsuario and
 	(MovimentoRegistroEntidadeResponsavelId.IsEmpty() or MovimentoRegistroEntidadeResponsavelId.IsNull())
@@ -8130,7 +8130,7 @@ when not &sdtRegistroParametros.UsuarioTodosResponsaveisLiberados and not &sdtRe
 ]]></Source>
       </Condition>
       <Condition>
-        <Source><![CDATA[MovimentoRegistroDocumentoFiscalDocumentoSaidaEmpresaId > 0 and MovimentoRegistroDocumentoFiscalDocumentoSaidaId > 0 and MovimentoRegistroDocumentoFiscalTipoDocumentoSaida = TipoDocumentoSaida.Embarque			 
+        <Source><![CDATA[MovimentoRegistroDocumentoOperacionalSaidaEmpresaId > 0 and MovimentoRegistroDocumentoOperacionalSaidaId > 0 and MovimentoRegistroTipoDocumentoSaida = TipoDocumentoSaida.DocumentoOperacionalA			 
 when not &sdtRegistroParametros.AgentePrestouContas.IsEmpty() or not &sdtRegistroParametros.PrestacaoContasComObservacao.IsEmpty();
 ]]></Source>
       </Condition>
@@ -8181,7 +8181,7 @@ when &sdtRegistroParametros.ComDocumentoCobranca = SimOuNao.Nao;
 ]]></Source>
       </Condition>
       <Condition>
-        <Source><![CDATA[MovimentoRegistroDocumentoFiscalId.IsEmpty() or MovimentoRegistroDocumentoFiscalId.IsNull() or MovimentoRegistroDocumentoFiscalResponsavelId <> &sdtRegistroParametros.aIgnorarDFResponsavelId when not &sdtRegistroParametros.aIgnorarDFResponsavelId.IsEmpty();
+        <Source><![CDATA[MovimentoRegistroDocumentoOperacionalId.IsEmpty() or MovimentoRegistroDocumentoOperacionalId.IsNull() or MovimentoRegistroDocumentoOperacionalResponsavelId <> &sdtRegistroParametros.aIgnorarDFResponsavelId when not &sdtRegistroParametros.aIgnorarDFResponsavelId.IsEmpty();
 ]]></Source>
       </Condition>
       <Condition>
