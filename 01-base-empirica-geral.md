@@ -2152,7 +2152,7 @@ Destacar estabilidade estrutural relativa e pontos de maior risco para clonagem.
 		in:&RegraExemploEmpresaId, 
 		in:&RegraExemploId,
 		in:&DocumentoExemploEmpresaId,
-		in:&TipoExemplo,
+		in:&DomainExemploTipoOperacaoA,
 		in:&UltimaAlteracaoInicio, 
 		out:&SDTExemploRegraSelecaoA, 
 		out:&MensagensRetorno
@@ -2161,7 +2161,7 @@ Destacar estabilidade estrutural relativa e pontos de maior risco para clonagem.
 		&RegraExemploEmpresaId, 
 		&RegraExemploId,
 		&DocumentoExemploEmpresaId,
-		&TipoExemplo,
+		&DomainExemploTipoOperacaoA,
 		&UltimaAlteracaoInicio, 
 		&SDTExemploRegraSelecaoA, 
 		&MensagensRetorno
@@ -2170,17 +2170,17 @@ Destacar estabilidade estrutural relativa e pontos de maior risco para clonagem.
 	[RestMethod(POST)]
 	[Description("enviar um documento em Base64 para processamento.")]
 	EnviarDocumento(
-		in:&NomeDoArquivo, 
-		in:&ConteudoEmBase64,
+		in:&NomeArquivoExemploA, 
+		in:&ConteudoBase64ExemploA,
 		in:&DocumentoExemploEmpresaId,
-		out:&OperacaoSucesso, 
+		out:&OperacaoExemploSucessoA, 
 		out:&MensagensRetorno
 	)
 	=> PRCExemploImportaDocumentoBase64A(
-		&NomeDoArquivo, 
-		&ConteudoEmBase64,
+		&NomeArquivoExemploA, 
+		&ConteudoBase64ExemploA,
 		&DocumentoExemploEmpresaId,
-		&OperacaoSucesso, 
+		&OperacaoExemploSucessoA, 
 		&MensagensRetorno
 	);
 	
@@ -2237,7 +2237,7 @@ Event EnviarDocumento.Before
 Endevent
 Event EnviarDocumento.After
 	
-	if &OperacaoSucesso
+	if &OperacaoExemploSucessoA
 		
 		&MensagensRetorno =
 		procRemoveUmTipoDeMensagem(&MensagensRetorno, TiposMensagemExemplo.Warning, -1)
@@ -2412,12 +2412,12 @@ Endsub
         </Property>
       </Properties>
     </Variable>
-    <Variable Name="ConteudoEmBase64">
+    <Variable Name="ConteudoBase64ExemploA">
       <Documentation />
       <Properties>
         <Property>
           <Name>Name</Name>
-          <Value>ConteudoEmBase64</Value>
+          <Value>ConteudoBase64ExemploA</Value>
         </Property>
         <Property>
           <Name>ATTCUSTOMTYPE</Name>
@@ -2667,12 +2667,12 @@ Endsub
         </Property>
       </Properties>
     </Variable>
-    <Variable Name="NomeDoArquivo">
+    <Variable Name="NomeArquivoExemploA">
       <Documentation />
       <Properties>
         <Property>
           <Name>Name</Name>
-          <Value>NomeDoArquivo</Value>
+          <Value>NomeArquivoExemploA</Value>
         </Property>
         <Property>
           <Name>idIsAutoDefinedVariable</Name>
@@ -2880,12 +2880,12 @@ Endsub
         </Property>
       </Properties>
     </Variable>
-    <Variable Name="OperacaoSucesso">
+    <Variable Name="OperacaoExemploSucessoA">
       <Documentation />
       <Properties>
         <Property>
           <Name>Name</Name>
-          <Value>OperacaoSucesso</Value>
+          <Value>OperacaoExemploSucessoA</Value>
         </Property>
         <Property>
           <Name>ATTCUSTOMTYPE</Name>
@@ -2996,12 +2996,12 @@ Endsub
         </Property>
       </Properties>
     </Variable>
-    <Variable Name="TipoExemplo">
+    <Variable Name="DomainExemploTipoOperacaoA">
       <Documentation />
       <Properties>
         <Property>
           <Name>Name</Name>
-          <Value>TipoExemplo</Value>
+          <Value>DomainExemploTipoOperacaoA</Value>
         </Property>
         <Property>
           <Name>idIsAutoDefinedVariable</Name>
@@ -3009,7 +3009,7 @@ Endsub
         </Property>
         <Property>
           <Name>idBasedOn</Name>
-          <Value>Domain:TipoExemplo</Value>
+          <Value>Domain:DomainExemploTipoOperacaoA</Value>
         </Property>
       </Properties>
     </Variable>
