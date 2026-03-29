@@ -38,7 +38,12 @@ Evitar que convenções locais sejam tratadas como regra universal sem qualifica
 
 ## Escopo
 
-Este documento registra apenas padrões observáveis no inventário bruto e nos XMLs extraídos da KB `KBBase18`. Ele não prescreve convenções obrigatórias que não tenham apoio visível no acervo.
+Este documento registra padrões observáveis no inventário bruto e nos XMLs extraídos da KB principal analisada, complementados por um full export comparativo de uma KB independente usado apenas como contraprova de nomes genéricos do ecossistema GeneXus. Ele não prescreve convenções obrigatórias que não tenham apoio visível no acervo.
+
+## Evidência comparativa posterior
+
+- `Evidência direta`: um full export comparativo de KB independente confirmou a presença de nomes compartilhados do ecossistema GeneXus, como `Main Programs`, `ToBeDefined`, `UI`, `GAM_Frontend`, `GeneXusSecurity`, `GeneXusReporting` e `SidebarItemsDP`.
+- `Inferência forte`: quando um nome aparece tanto no acervo principal quanto nessa KB independente, cresce a confiança editorial de que ele pertence ao repertório genérico ou comunitário de GeneXus, e não apenas ao domínio de negócio da KB principal.
 
 ## Padrões de nomeação por grupo
 
@@ -52,6 +57,7 @@ Este documento registra apenas padrões observáveis no inventário bruto e nos 
 
 - `Evidência direta`: vários nomes começam com `dp`, como `DPExemploA`, `DPExemploB`, `DPExemploC` e `DPExemploD`.
 - `Evidência direta`: também há exceções com outros formatos, como `DPRegions`, `DPSampleInfinityScrollGrid`, `GAM_GetTotalUsers` e `SidebarItemsDP`.
+- `Evidência direta`: o full export comparativo também trouxe `SidebarItemsDP`, reforçando que esse nome não é exclusivo da KB principal analisada.
 - `Inferência forte`: o grupo `DataProvider` favorece nomes identificáveis por função, com forte presença de prefixo `dp`, mas aceita variações legadas e nomes de módulos terceiros.
 
 ### `SDT`
@@ -72,6 +78,7 @@ Este documento registra apenas padrões observáveis no inventário bruto e nos 
 ### `Transaction`, `Domain` e `Module`
 
 - `Evidência direta`: há nomes conceituais sem prefixo evidente, como `TRNExemploA`, `TRNExemploB`, `TRNExemploC`, `TRNExemploD`, `MODExemploA`, `MODExemploB` e `MODExemploC`.
+- `Evidência direta`: o full export comparativo também exibiu contêineres e módulos compartilhados como `Main Programs`, `ToBeDefined`, `UI`, `GAM_Frontend` e `GeneXusReporting`.
 - `Inferência forte`: nesses grupos, o padrão dominante parece ser nome de negócio ou nome técnico do conceito, não prefixação.
 
 ## Padrões de organização
