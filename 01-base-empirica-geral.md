@@ -200,27 +200,27 @@ Separar com mais precisao o que e falta de shape, o que e dependencia semantica 
 
 ### `API`
 
-- `Evidência direta`: o exemplo real `apiPDV_Integracao.xml` usa varios `ATTCUSTOMTYPE` validos, incluindo `exo:GAMSession, GeneXusSecurity`, `exo:GAMError, GeneXusSecurity`, `exo:GAMUser, GeneXusSecurity`, `sdt:Messages, GeneXus.Common`, `sdt:sdtProdutoDadosBasicos` e `sdt:sdtTributacaoDadosBasicosSelecao`.
+- `Evidência direta`: o exemplo real `APIExemploIntegracaoA.xml` usa varios `ATTCUSTOMTYPE` validos, incluindo `exo:GAMSession, GeneXusSecurity`, `exo:GAMError, GeneXusSecurity`, `exo:GAMUser, GeneXusSecurity`, `sdt:Messages, GeneXus.Common`, `sdt:SDTExemploProdutoBasicoA` e `sdt:SDTExemploTribSelecaoA`.
 - `Evidência direta`: o mesmo exemplo tambem depende de `Procedure` e eventos reais no codigo fonte.
 - `Inferência forte`: em `API`, o envelope XML e relativamente bem definido, mas os tipos customizados e procedimentos referenciados precisam existir de fato na KB de destino.
 - `Inferência forte`: nao e seguro inventar `ATTCUSTOMTYPE`; ele deve copiar um valor comprovado ou apontar para tipo efetivamente existente no alvo.
-- `Evidência direta`: num teste isolado posterior, os SDTs reais `sdtProdutoDadosBasicos`, `sdtProdutoDadosFiscaisAdicionaisDadosBasicos`, `sdtProdutoDadosOpcionaisDadosBasicos`, `sdtProdutoIdiomasDadosBasicos`, `sdtTributacaoDadosBasicos` e `sdtTributacaoDadosBasicosSelecao` importaram com sucesso antes da tentativa da `API`.
-- `Evidência direta`: nesse mesmo teste, `API 'apiPDV_Integracao'` deixou de falhar por `ATTCUSTOMTYPE` e passou a falhar por `Object Reference procListaSdtProdutoDadosBasicosConformeParametros not found`, `Invalid attribute 'TipoProd'` e `'Produto' invalid property`.
+- `Evidência direta`: num teste isolado posterior, os SDTs reais `SDTExemploProdutoBasicoA`, `SDTExemploProdutoBasicoB`, `SDTExemploProdutoBasicoC`, `SDTExemploProdutoBasicoD`, `SDTExemploTribA` e `SDTExemploTribSelecaoA` importaram com sucesso antes da tentativa da `API`.
+- `Evidência direta`: nesse mesmo teste, `API 'APIExemploIntegracaoA'` deixou de falhar por `ATTCUSTOMTYPE` e passou a falhar por `Object Reference PRCExemploListaA not found`, `Invalid attribute 'DomainExemploTipoA'` e `'TRNExemploProdutoA' invalid property`.
 - `Inferência forte`: o gargalo atual de `API` nesta trilha ja nao e mais tipagem `SDT`; ele ficou reduzido a `Procedure` e contexto de negocio realmente existentes na KB de destino.
-- `Evidência direta`: numa rodada posterior, `Domain 'TipoProd'` importou com sucesso e a `Procedure 'procListaSdtProdutoDadosBasicosConformeParametros'` foi localizada no acervo real.
-- `Evidência direta`: ao tentar incluir essa `Procedure`, ela falhou por depender de uma cadeia grande de transacoes e atributos de `Produto`, incluindo `Produto`, `ProdutoDadosFiscaisAdicionais`, `ProdutoDadosOpcionais`, `ProdutoIdiomas`, varios atributos `Produto...` e dominios auxiliares como `SimOuNao`, `GrupoEspecie` e `TipoLocalEstoque`.
-- `Evidência direta`: na mesma tentativa, a `API` avancou mais um passo e passou a falhar por outra `Procedure` faltante: `procSdtTributacaoDadosBasicosSelecaoConformeParametros`.
-- `Evidência direta`: essa segunda `Procedure` tambem existe no acervo real e, ao ser inspecionada, mostrou dependencia adicional de `Data Provider` (`dpSdtTributacaoDadosBasicosSelecaoConformeParametros`), `Domain 'TipoRomaneio'` e atributos de tributacao como `TributacaoEmpresaId`, `TributacaoId` e `DocumentoFiscalEmpresaId`.
+- `Evidência direta`: numa rodada posterior, `Domain 'DomainExemploTipoA'` importou com sucesso e a `Procedure 'PRCExemploListaA'` foi localizada no acervo real.
+- `Evidência direta`: ao tentar incluir essa `Procedure`, ela falhou por depender de uma cadeia grande de transacoes e atributos da entidade principal e de satelites relacionados, alem de dominios auxiliares como `SimOuNao`, `DomainExemploGrupoA` e `DomainExemploLocalA`.
+- `Evidência direta`: na mesma tentativa, a `API` avancou mais um passo e passou a falhar por outra `Procedure` faltante: `PRCExemploTribSelecaoA`.
+- `Evidência direta`: essa segunda `Procedure` tambem existe no acervo real e, ao ser inspecionada, mostrou dependencia adicional de `Data Provider` (`DPExemploTribSelecaoA`), `Domain 'DomainExemploRomaneioA'` e atributos tributarios adicionais da cadeia funcional.
 - `Inferência forte`: `API` entra definitivamente na zona de dependencia de negocio pesada; para este caso, fechar a importacao deixou de ser tarefa de empacotar poucos objetos auxiliares e passou a exigir uma subarvore funcional relevante da KB.
 
 ### `Transaction`
 
-- `Evidência direta`: exemplos reais como `DocumentoFiscalLacre.xml` trazem `<Level ...>` com muitos `<Attribute ... guid="...">NomeDoAtributo</Attribute>` e varios blocos `<AttributeProperties Attribute="...">`.
+- `Evidência direta`: exemplos reais como `TRNExemploComplexaA.xml` trazem `<Level ...>` com muitos `<Attribute ... guid="...">NomeDoAtributo</Attribute>` e varios blocos `<AttributeProperties Attribute="...">`.
 - `Evidência direta`: no mesmo tipo aparecem variaveis nomeadas `Context`, `TrnContext` e `TrnContextAtt`, com `ATTCUSTOMTYPE` como `sdt:Context`, `sdt:TransactionContext` e `sdt:TransactionContext.Attribute`.
 - `Inferência forte`: em `Transaction`, o shape estrutural pode ser inferido por familia, mas o objeto final continua dependente da existencia real dos atributos e SDTs de contexto na KB.
 - `Inferência forte`: a falha observada na bateria foi coerente com o acervo real; nao faltava apenas envelope, faltavam atributos reais e tipos de contexto validos.
-- `Evidência direta`: num teste isolado posterior, os `Attribute` reais de `Banco`, o `SDT 'Context'` e o `SDT 'TransactionContext'` importaram com sucesso antes da tentativa da `Transaction`.
-- `Evidência direta`: nesse mesmo teste, `Transaction 'Banco'` importou com sucesso e ainda disparou geracao de pattern bem-sucedida para `WorkWithWebBanco`.
+- `Evidência direta`: num teste isolado posterior, os `Attribute` reais de `TRNExemploMinBancoA`, o `SDT 'Context'` e o `SDT 'TransactionContext'` importaram com sucesso antes da tentativa da `Transaction`.
+- `Evidência direta`: nesse mesmo teste, `Transaction 'TRNExemploMinBancoA'` importou com sucesso e ainda disparou geracao de pattern bem-sucedida para `WWExemploMinBancoA`.
 - `Evidência direta`: em outro teste pratico controlado, uma `Transaction` minima so foi importada com sucesso apos a inclusao explicita dos `Attribute` top-level correspondentes no mesmo pacote.
 - `Evidência direta`: nesse caso, os nos `<Attribute>` dentro de `<Level>` nao bastaram para definir os atributos; eles funcionaram apenas como referencia contextual do `Level`.
 - `Inferência forte`: a distincao entre `Attribute` top-level e `Attribute` inline em `Level` e essencial no caso validado de montagem de pacote minimo valido de `Transaction`.
@@ -229,7 +229,7 @@ Separar com mais precisao o que e falta de shape, o que e dependencia semantica 
 ### `Attribute`
 
 - `Evidência direta`: o XML extraido de export full da KB, mantido em caminho privado sanitizado, contem objetos `Attribute` top-level com raiz `<Attribute ...>`, e nao `<Object ...>`.
-- `Evidência direta`: um atributo real completo, como `PessoaCreditoTipoDocumentoId`, traz atributos XML como `guid`, `name`, `fullyQualifiedName`, `description`, `moduleGuid`, `parentGuid`, alem de `Part` e `Properties`.
+- `Evidência direta`: um atributo real completo, como `AtributoExemploComplexoA`, traz atributos XML como `guid`, `name`, `fullyQualifiedName`, `description`, `moduleGuid`, `parentGuid`, alem de `Part` e `Properties`.
 - `Evidência direta`: no mesmo export tambem aparecem nos curtos `<Attribute key="True|False" guid="...">NomeDoAtributo</Attribute>` dentro de `<Level>` de `Transaction`.
 - `Evidência direta`: os nos curtos compartilham o mesmo `guid` do atributo real top-level correspondente; eles funcionam como referencia contextual do atributo no nivel da `Transaction`, nao como definicao top-level.
 - `Evidência direta`: na saneacao da pasta `C:\SANITIZED\ObjetosDaKbEmXml\Attribute`, permaneceram `7646` atributos reais top-level e foram removidas `8539` referencias inline `Attribute_*.xml`.
@@ -237,15 +237,15 @@ Separar com mais precisao o que e falta de shape, o que e dependencia semantica 
 - `Evidência direta`: arquivos como `FabricaBrasil18selectAttributes.Filters` se mostraram apenas configuracoes auxiliares de filtro/interface, nao export de objeto `Attribute`.
 - `Inferência forte`: `Attribute` top-level ja esta empiricamente provado nesta trilha, mas exige cuidado extra porque o mesmo nome de elemento XML tambem aparece como referencia inline em `Transaction`.
 - `Inferência forte`: para montar ou extrair corpus de `Attribute`, o filtro correto nao e “todo no chamado Attribute”, e sim apenas o no raiz completo com `name` e estrutura de `Part` e `Properties`.
-- `Evidência direta`: no teste combinado posterior, `Attribute 'AttrTesteMdPessoaCreditoTipoDocumentoId'` ja nao falhou por shape; falhou em propriedade semantica, com `ControlItemDescription='TipoDocumentoDescricao'` apontando para atributo desconhecido no destino.
+- `Evidência direta`: no teste combinado posterior, `Attribute 'AtributoExemploTesteA'` ja nao falhou por shape; falhou em propriedade semantica, com `ControlItemDescription='AtributoExemploDescricaoRelacionada'` apontando para atributo desconhecido no destino.
 - `Inferência forte`: `Attribute` saiu da zona “shape insuficiente” e entrou na mesma classe metodologica de dependencia contextual de KB em propriedades como `ControlItemDescription`, `idBasedOn` e outras referencias nominais a atributos reais.
-- `Evidência direta`: num consolidado revisado posterior, o `Attribute 'DocumentoFiscalRemetenteDadosFiscaisAdicionaisId'`, extraido do acervo real e sem `ControlItemDescription`, importou com sucesso.
+- `Evidência direta`: num consolidado revisado posterior, o `Attribute 'AtributoExemploFechadoA'`, extraido do acervo real e sem `ControlItemDescription`, importou com sucesso.
 - `Inferência forte`: `Attribute` passa a ser considerado estruturalmente destravado nesta trilha, desde que o caso escolhido seja top-level real e semanticamente fechado no ambiente de destino.
 
 ## Complemento posterior - IDE exportando `Table`, `Index` e `WorkWithForWeb`
 
 - `Evidência direta`: o export isolado `XPZExemploTabelaA.xpz` contem `228` objetos top-level no tipo `857ca50e-7905-0000-0007-c5d9ff2975ec`.
-- `Evidência direta`: esses objetos top-level de `Table` usam nomes iguais aos das `Transaction` correspondentes, como `AbateOrdem`, `Animal`, `Produto` e `Arquivo`.
+- `Evidência direta`: esses objetos top-level de `Table` usam nomes iguais aos das `Transaction` correspondentes, e nao uma convenção paralela exclusiva da camada fisica.
 - `Evidência direta`: dentro de cada `Table` exportada aparecem blocos `<Indexes>` com filhos `<Index ... type="9e750647-3679-0000-0100-2529de263960">`.
 - `Evidência direta`: o export isolado `XPZExemploIndiceVazioA.xpz` veio vazio, sem `Objects` nem `Attributes`.
 - `Inferência forte`: nesta trilha da IDE, `Table` existe como familia top-level propria, enquanto `Index` aparece subordinado a `Table`, e nao como conjunto top-level isolado.
@@ -258,10 +258,10 @@ Separar com mais precisao o que e falta de shape, o que e dependencia semantica 
 - `Evidência direta`: no export combinado com `WorkWithForWeb`, a `Transaction` mantem a propriedade `Apply:78cecefe-be7d-4980-86ce-8d6e91fba04b=True`.
 - `Evidência direta`: no mesmo export, `PatternSettings 'WorkWith'` materializa `ContextVariable`, `LoadProcedure`, `Security Check` e `NotAuthorized` no XML interno.
 - `Inferência forte`: a ponte operacional real do pattern web observado fica distribuida entre `Transaction` (aplicacao do pattern), `WorkWithForWeb` (instancia por objeto), `PatternSettings` (configuracao global do pattern) e `Table` (camada fisica com indices internos).
-- `Evidência direta`: o par de exports `XPZExemploTRNWWComparacaoSemWW.xpz` e `XPZExemploTRNWWComparacaoComWW.xpz` forneceu um recorte minimo comparavel da mesma `Transaction 'Pais'`.
-- `Evidência direta`: `PaisSemWWweb` veio com `7` objetos, `10` atributos top-level e `25` identidades; `PaisComWWweb` veio com `8` objetos, os mesmos `10` atributos e `49` identidades.
-- `Evidência direta`: a unica diferenca de objeto entre os dois recortes foi a entrada de `WorkWithWebPais`.
-- `Evidência direta`: apesar disso, a entrada de `WorkWithWebPais` quase dobrou o total de identidades de contexto em `ObjectsIdentityMapping`, incluindo referencias adicionais a `UF`, `PessoaEnderecos`, `wpAtualizaPorOutroServidor` e atributos relacionados.
+- `Evidência direta`: o par de exports `XPZExemploTRNWWComparacaoSemWW.xpz` e `XPZExemploTRNWWComparacaoComWW.xpz` forneceu um recorte minimo comparavel da mesma `Transaction 'TRNExemploMinPaisA'`.
+- `Evidência direta`: `XPZExemploTRNWWComparacaoSemWW` veio com `7` objetos, `10` atributos top-level e `25` identidades; `XPZExemploTRNWWComparacaoComWW` veio com `8` objetos, os mesmos `10` atributos e `49` identidades.
+- `Evidência direta`: a unica diferenca de objeto entre os dois recortes foi a entrada de `WWExemploMinPaisA`.
+- `Evidência direta`: apesar disso, a entrada de `WWExemploMinPaisA` quase dobrou o total de identidades de contexto em `ObjectsIdentityMapping`, incluindo referencias adicionais a `DomainExemploUfA`, `WPExemploRelacionamentoA`, `WPExemploAtualizacaoServidorA` e atributos relacionados.
 - `Inferência forte`: num caso minimo real, incluir `WorkWithForWeb` acrescenta pouco no bloco `<Objects>`, mas pode expandir bastante o grafo de contexto que o pacote precisa descrever em `ObjectsIdentityMapping`.
 
 ## Complemento posterior - export combinado de `API` e da pilha visual
@@ -270,10 +270,10 @@ Separar com mais precisao o que e falta de shape, o que e dependencia semantica 
 
 - `Evidência direta`: o export `XPZExemploCadeiaAPIA.xpz` veio com `3904` objetos e `0` atributos top-level.
 - `Evidência direta`: a distribuicao observada foi `2282` `Procedure`, `594` `SDT`, `592` `Domain`, `228` `Table`, `183` `Transaction`, `24` `DataProvider` e `1` `API`.
-- `Evidência direta`: o `API` exportado nesse pacote e `apiPDV_Integracao`.
+- `Evidência direta`: o `API` exportado nesse pacote e `APIExemploIntegracaoA`.
 - `Evidência direta`: o mesmo pacote prova que a trilha real de export da IDE para `API` relevante de negocio ja puxa junto uma massa grande de `Procedure`, `SDT`, `Domain`, `Table`, `Transaction` e `DataProvider`.
-- `Evidência direta`: no pacote, ha `Domain` enumerado como `TipoProd`, com valores como `Produto`, `Insumo`, `Servico` e `AnimalParaAbate`.
-- `Evidência direta`: no mesmo recorte, `SDT` como `sdtProdutoDadosBasicos` e `Procedure` como `procListaSdtProdutoDadosBasicosConformeParametros` aparecem no mesmo conjunto exportado.
+- `Evidência direta`: no pacote, ha `Domain` enumerado como `DomainExemploTipoA`, com valores de negocio distintos no mesmo conjunto exportado.
+- `Evidência direta`: no mesmo recorte, `SDT` como `SDTExemploProdutoBasicoA` e `Procedure` como `PRCExemploListaA` aparecem no mesmo conjunto exportado.
 - `Inferência forte`: para `API`, o melhor recorte de engenharia reversa deixa de ser o objeto isolado e passa a ser essa combinacao funcional mais ampla.
 - `Inferência forte`: isso reforca a leitura anterior de que a pendencia remanescente de `API` nao e serializacao do envelope, e sim dependencia de subarvore funcional de negocio.
 
