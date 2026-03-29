@@ -258,15 +258,15 @@ Separar falha de envelope/shape de falha por dependencia semantica da KB.
 - Inferência forte: os tipos em sucesso coerente passam a ter prioridade maior como fonte segura para agente/GPT nesta base.
 - Inferência forte: os tipos com falha contextual pedem complemento por exemplos reais ou regra documental mais especifica, e nao simples extrapolacao a partir do envelope minimo.
 - `Inferência forte`: `Transaction`, `Theme` e `PatternSettings` deixaram de ser pendencias estruturais abertas nesta trilha; agora ja possuem receita empirica de sucesso sob dependencias explicitas conhecidas.
-- `Evidência direta`: um pacote composto posterior reuniu `ThemeClass`, `Theme`, `Attribute`, `SDT`, `Transaction` e `Pattern Settings` no mesmo `.xpz` e importou com sucesso, incluindo geracao de pattern para `WorkWithWebBanco`.
+- `Evidência direta`: um pacote composto posterior reuniu `ThemeClass`, `Theme`, `Attribute`, `SDT`, `Transaction` e `Pattern Settings` no mesmo `.xpz` e importou com sucesso, incluindo geracao de pattern para `WWExemploMinBancoA`.
 - `Inferência forte`: a base ja nao prova apenas sucessos isolados por tipo; ela tambem sustenta composicao entre tipos resolvidos quando as dependencias explicitas entram juntas no pacote.
 - `Inferência forte`: `API` permanece como pendencia principal, mas seu risco residual ja nao esta em `ATTCUSTOMTYPE`; ele foi deslocado para uma subarvore funcional de negocio, envolvendo `Procedure`, `Data Provider`, `Domain`, `Transaction` e atributos reais da KB.
-- `Evidência direta`: o export real `Table + Domain + Transaction + SDT + API + Procedure + DataProvider` veio com `3904` objetos, sendo `2282` `Procedure`, `594` `SDT`, `592` `Domain`, `228` `Table`, `183` `Transaction`, `24` `DataProvider` e `1` `API`.
+- `Evidência direta`: o export real `XPZExemploCadeiaAPIA.xpz` veio com `3904` objetos, sendo `2282` `Procedure`, `594` `SDT`, `592` `Domain`, `228` `Table`, `183` `Transaction`, `24` `DataProvider` e `1` `API`.
 - `Inferência forte`: isso confirma que, para `API`, o recorte de risco correto e uma familia funcional grande; tentar trata-la como tipo quase isolado tende a subestimar a dependencia real.
-- `Evidência direta`: o export real `Table + Transaction + ColorPalette + DesignSystem + Theme + WebTheme + Category + ThemeClass + ThemeColor` veio com `947` objetos, incluindo `501` `ThemeClass`, `7` `Theme`, `24` `ThemeColor`, `2` `DesignSystem`, `1` `ColorPalette`, `228` `Table`, `183` `Transaction` e `1` `Folder`.
+- `Evidência direta`: o export real `XPZExemploTemaA.xpz` veio com `947` objetos, incluindo `501` `ThemeClass`, `7` `Theme`, `24` `ThemeColor`, `2` `DesignSystem`, `1` `ColorPalette`, `228` `Table`, `183` `Transaction` e `1` `Folder`.
 - `Inferência forte`: para a pilha visual, o risco melhora quando a analise e feita por familia combinada (`Theme` + `ThemeClass` + `DesignSystem` + `ColorPalette` + `ThemeColor`), e nao por objeto visual totalmente isolado.
-- `Evidência direta`: o export `Attribute + Domain + Transaction + SubtypeGroup` veio com `1117` objetos, `7646` atributos top-level e `1576` identidades.
-- `Evidência direta`: o export `Attribute + Domain + Transaction + SubtypeGroup + Table + Index` veio com `1712` objetos, os mesmos `7646` atributos top-level e `1611` identidades.
+- `Evidência direta`: o export `XPZExemploFamiliaMistaA.xpz` veio com `1117` objetos, `7646` atributos top-level e `1576` identidades.
+- `Evidência direta`: o export `XPZExemploFamiliaMistaB.xpz` veio com `1712` objetos, os mesmos `7646` atributos top-level e `1611` identidades.
 - `Inferência forte`: isso mostra que a familia `Attribute` + `Transaction` + `Domain` + `SubtypeGroup` tambem existe como recorte combinado relevante da IDE, com `Attributes` top-level preservados no mesmo `.xpz`.
 - `Inferência forte`: para `Attribute`, o risco residual continua semanticamente contextual, mas o formato multiobjeto observado com bloco `Attributes` deixa de ser lacuna relevante nesta trilha.
 
@@ -335,11 +335,11 @@ Servir como primeira triagem operacional antes de qualquer tentativa de clonagem
 ## Estado atual consolidado - pattern web e camada fisica
 
 - `Evidência direta`: `Work With for Web` importa com sucesso quando o XML do pattern usa o convenio estrutural real de atributo `adbb33c9-0906-4971-833c-998de27e0676-NomeDoAtributo`.
-- `Evidência direta`: no recorte comparavel `PaisSemWWweb` vs `PaisComWWweb`, a entrada de um unico `WorkWithWebPais` elevou `ObjectsIdentityMapping` de `25` para `49` identidades.
+- `Evidência direta`: no recorte comparavel `XPZExemploTRNWWComparacaoSemWW` vs `XPZExemploTRNWWComparacaoComWW`, a entrada de um unico `WWExemploMinPaisA` elevou `ObjectsIdentityMapping` de `25` para `49` identidades.
 - `Inferência forte`: isso reforca que o risco de `WorkWithForWeb` continua alto mesmo em casos pequenos, porque o objeto puxa contexto adicional alem do seu proprio XML.
 - `Evidência direta`: `Table` aparece como familia top-level propria (`857ca50e-7905-0000-0007-c5d9ff2975ec`) e `Index` aparece embutido dentro de `Table` nesta trilha de export.
 - `Inferência forte`: a pendencia residual de camada fisica se concentra em como `Table` e `Index` se reassociam corretamente a partir da `Transaction`.
-- `Evidência direta`: os exports `Table + Transaction + WorkWithForWeb + PatternSettings` e `Table + Transaction + DataSelector` mostraram que essas familias convivem no mesmo `.xpz` sem exigir `Attributes` top-level no contêiner.
+- `Evidência direta`: os exports `XPZExemploTabelaTRNWWPatternA.xpz` e `XPZExemploTabelaTRNDataSelectorA.xpz` mostraram que essas familias convivem no mesmo `.xpz` sem exigir `Attributes` top-level no contêiner.
 - `Inferência forte`: para engenharia reversa do pattern web, a unidade mais informativa e a combinacao `Transaction + Table + WorkWithForWeb + PatternSettings`.
 
 ## Nota leve de risco runtime relativo
