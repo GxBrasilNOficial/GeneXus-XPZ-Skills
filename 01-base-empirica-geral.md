@@ -1405,8 +1405,8 @@ Destacar estabilidade estrutural relativa e pontos de maior risco para clonagem.
 
 ## API
 
-- Evidência direta: amostra simples: alias sanitizado em API\\EXEMPLO-SANITIZADO.xmlapiPDV_Integracao.xml5 Part e 4 Part nao vazias.
-- Evidência direta: amostra complexa: alias sanitizado em API\\EXEMPLO-SANITIZADO.xmlapiPDV_Integracao.xml5 Part e tamanho de 25844 bytes.
+- Evidência direta: amostra simples: alias sanitizado `APIExemploMinA.xml` com 5 `Part` e 4 `Part` nao vazias.
+- Evidência direta: amostra complexa: alias sanitizado `APIExemploIntegracaoA.xml` com 5 `Part` e tamanho de 25844 bytes.
 - Evidência direta: Part type nas amostras simples: 9f577ec2-27f4-4cf4-8ad5-f3f50c9d69b5; ad3ca970-19d0-44e1-a7b7-db05556e820c; babf62c5-0111-49e9-a1c3-cc004d90900a; c44bd5ff-f918-415b-98e6-aca44fed84fa; e4c4ade7-53f0-4a56-bdfd-843735b66f47.
 - Evidência direta: Part type nas amostras complexas: 9f577ec2-27f4-4cf4-8ad5-f3f50c9d69b5; ad3ca970-19d0-44e1-a7b7-db05556e820c; babf62c5-0111-49e9-a1c3-cc004d90900a; c44bd5ff-f918-415b-98e6-aca44fed84fa; e4c4ade7-53f0-4a56-bdfd-843735b66f47.
 - Evidência direta: Part type apenas nas amostras complexas: nenhum.
@@ -1418,8 +1418,8 @@ Destacar estabilidade estrutural relativa e pontos de maior risco para clonagem.
 
 - Evidência direta: amostra simples: alias sanitizado `DPExemploLista.xml` com 5 `Part` e 3 `Part` nao vazias.
 - Evidência direta: amostra simples: alias sanitizado `DPExemploParm.xml` com 5 `Part` e 4 `Part` nao vazias.
-- Evidência direta: amostra complexa: alias sanitizado em DataProvider\\EXEMPLO-SANITIZADO.xmldpSdtTributacaoDadosBasicosSelecaoConformeParametros.xml5 Part e tamanho de 12558 bytes.
-- Evidência direta: amostra complexa: alias sanitizado em DataProvider\\EXEMPLO-SANITIZADO.xmldpFixoSidebarItems.xml5 Part e tamanho de 10713 bytes.
+- Evidência direta: amostra complexa: alias sanitizado `DPExemploTribSelecaoA.xml` com 5 `Part` e tamanho de 12558 bytes.
+- Evidência direta: amostra complexa: alias sanitizado `DPExemploSidebarA.xml` com 5 `Part` e tamanho de 10713 bytes.
 - Evidência direta: Part type nas amostras simples: 1d8aeb5a-6e98-45a7-92d2-d8de7384e432; 9b0a32a3-de6d-4be1-a4dd-1b85d3741534; ad3ca970-19d0-44e1-a7b7-db05556e820c; babf62c5-0111-49e9-a1c3-cc004d90900a; e4c4ade7-53f0-4a56-bdfd-843735b66f47.
 - Evidência direta: Part type nas amostras complexas: 1d8aeb5a-6e98-45a7-92d2-d8de7384e432; 9b0a32a3-de6d-4be1-a4dd-1b85d3741534; ad3ca970-19d0-44e1-a7b7-db05556e820c; babf62c5-0111-49e9-a1c3-cc004d90900a; e4c4ade7-53f0-4a56-bdfd-843735b66f47.
 - Evidência direta: Part type apenas nas amostras complexas: nenhum.
@@ -1442,10 +1442,10 @@ Destacar estabilidade estrutural relativa e pontos de maior risco para clonagem.
 
 ## PackagedModule
 
-- Evidência direta: amostra simples: alias sanitizado em PackagedModule\\EXEMPLO-SANITIZADO.xmlExtensions.xml2 Part e 2 Part nao vazias.
-- Evidência direta: amostra simples: alias sanitizado em PackagedModule\\EXEMPLO-SANITIZADO.xmlGeneXusSecurityCommon.xml2 Part e 2 Part nao vazias.
-- Evidência direta: amostra complexa: alias sanitizado em PackagedModule\\EXEMPLO-SANITIZADO.xmlUI.xml3 Part e tamanho de 998 bytes.
-- Evidência direta: amostra complexa: alias sanitizado em PackagedModule\\EXEMPLO-SANITIZADO.xmlServices.xml3 Part e tamanho de 990 bytes.
+- Evidência direta: amostra simples: alias sanitizado `PackagedModuleExemploExtensoesA.xml` com 2 `Part` e 2 `Part` nao vazias.
+- Evidência direta: amostra simples: alias sanitizado `PackagedModuleExemploSegurancaA.xml` com 2 `Part` e 2 `Part` nao vazias.
+- Evidência direta: amostra complexa: alias sanitizado `PackagedModuleExemploUIA.xml` com 3 `Part` e tamanho de 998 bytes.
+- Evidência direta: amostra complexa: alias sanitizado `PackagedModuleExemploServicesA.xml` com 3 `Part` e tamanho de 990 bytes.
 - Evidência direta: Part type nas amostras simples: babf62c5-0111-49e9-a1c3-cc004d90900a; ed1b7b1c-2aaf-46eb-9ec5-db348f6fa3fc.
 - Evidência direta: Part type nas amostras complexas: a5e6a251-2df0-44d8-adab-1da237574326; babf62c5-0111-49e9-a1c3-cc004d90900a; ed1b7b1c-2aaf-46eb-9ec5-db348f6fa3fc.
 - Evidência direta: Part type apenas nas amostras complexas: a5e6a251-2df0-44d8-adab-1da237574326.
@@ -1455,10 +1455,10 @@ Destacar estabilidade estrutural relativa e pontos de maior risco para clonagem.
 
 ## Panel
 
-- Evidência direta: amostra simples: alias sanitizado em Panel\\EXEMPLO-SANITIZADO.xmlGAMSDNotAuthorized.xml2 Part e 1 Part nao vazias.
-- Evidência direta: amostra simples: alias sanitizado em Panel\\EXEMPLO-SANITIZADO.xmlsdLogin.xml2 Part e 1 Part nao vazias.
-- Evidência direta: amostra complexa: alias sanitizado em Panel\\EXEMPLO-SANITIZADO.xmlGAMSDChangePassword.xml2 Part e tamanho de 16930 bytes.
-- Evidência direta: amostra complexa: alias sanitizado em Panel\\EXEMPLO-SANITIZADO.xmlGAMSDUpdateUser.xml2 Part e tamanho de 15516 bytes.
+- Evidência direta: amostra simples: alias sanitizado `PanelExemploNaoAutorizadoA.xml` com 2 `Part` e 1 `Part` nao vazia.
+- Evidência direta: amostra simples: alias sanitizado `PanelExemploLoginA.xml` com 2 `Part` e 1 `Part` nao vazia.
+- Evidência direta: amostra complexa: alias sanitizado `PanelExemploTrocaSenhaA.xml` com 2 `Part` e tamanho de 16930 bytes.
+- Evidência direta: amostra complexa: alias sanitizado `PanelExemploAtualizacaoUsuarioA.xml` com 2 `Part` e tamanho de 15516 bytes.
 - Evidência direta: Part type nas amostras simples: b4378a97-f9b2-4e05-b2f8-c610de258402; babf62c5-0111-49e9-a1c3-cc004d90900a.
 - Evidência direta: Part type nas amostras complexas: b4378a97-f9b2-4e05-b2f8-c610de258402; babf62c5-0111-49e9-a1c3-cc004d90900a.
 - Evidência direta: Part type apenas nas amostras complexas: nenhum.
@@ -1470,8 +1470,8 @@ Destacar estabilidade estrutural relativa e pontos de maior risco para clonagem.
 
 - Evidência direta: amostra simples: alias sanitizado `PRCExemploMinimo.xml` com 7 `Part` e 1 `Part` nao vazia.
 - Evidência direta: amostra simples: alias sanitizado `PRCExemploParm.xml` com 7 `Part` e 3 `Part` nao vazias.
-- Evidência direta: amostra complexa: alias sanitizado em Procedure\\EXEMPLO-SANITIZADO.xmlprocRelatorioVolumesNumRomaneioEPedido.xml7 Part e tamanho de 1114792 bytes.
-- Evidência direta: amostra complexa: alias sanitizado em Procedure\\EXEMPLO-SANITIZADO.xmlprocRelatorioDeProducaoDeVolumesComRendimento.xml7 Part e tamanho de 1060772 bytes.
+- Evidência direta: amostra complexa: alias sanitizado `PRCExemploRelatorioA.xml` com 7 `Part` e tamanho de 1114792 bytes.
+- Evidência direta: amostra complexa: alias sanitizado `PRCExemploRelatorioB.xml` com 7 `Part` e tamanho de 1060772 bytes.
 - Evidência direta: Part type nas amostras simples: 528d1c06-a9c2-420d-bd35-21dca83f12ff; 763f0d8b-d8ac-4db4-8dd4-de8979f2b5b9; 9b0a32a3-de6d-4be1-a4dd-1b85d3741534; ad3ca970-19d0-44e1-a7b7-db05556e820c; babf62c5-0111-49e9-a1c3-cc004d90900a; c414ed00-8cc4-4f44-8820-4baf93547173; e4c4ade7-53f0-4a56-bdfd-843735b66f47.
 - Evidência direta: Part type nas amostras complexas: 528d1c06-a9c2-420d-bd35-21dca83f12ff; 763f0d8b-d8ac-4db4-8dd4-de8979f2b5b9; 9b0a32a3-de6d-4be1-a4dd-1b85d3741534; ad3ca970-19d0-44e1-a7b7-db05556e820c; babf62c5-0111-49e9-a1c3-cc004d90900a; c414ed00-8cc4-4f44-8820-4baf93547173; e4c4ade7-53f0-4a56-bdfd-843735b66f47.
 - Evidência direta: Part type apenas nas amostras complexas: nenhum.
@@ -1481,10 +1481,10 @@ Destacar estabilidade estrutural relativa e pontos de maior risco para clonagem.
 
 ## SDT
 
-- Evidência direta: amostra simples: alias sanitizado em SDT\\EXEMPLO-SANITIZADO.xmlsdtWpState.xml2 Part e 1 Part nao vazias.
-- Evidência direta: amostra simples: alias sanitizado em SDT\\EXEMPLO-SANITIZADO.xmlsdtTerceiroComEstoque.xml2 Part e 1 Part nao vazias.
-- Evidência direta: amostra complexa: alias sanitizado em SDT\\EXEMPLO-SANITIZADO.xmlNFe_v4_00_TNFe.xml2 Part e tamanho de 1101872 bytes.
-- Evidência direta: amostra complexa: alias sanitizado em SDT\\EXEMPLO-SANITIZADO.xmlNFe_v4_00_infNFe.xml2 Part e tamanho de 1054406 bytes.
+- Evidência direta: amostra simples: alias sanitizado `SDTExemploEstadoTelaA.xml` com 2 `Part` e 1 `Part` nao vazia.
+- Evidência direta: amostra simples: alias sanitizado `SDTExemploEstoqueA.xml` com 2 `Part` e 1 `Part` nao vazia.
+- Evidência direta: amostra complexa: alias sanitizado `SDTExemploDocumentoA.xml` com 2 `Part` e tamanho de 1101872 bytes.
+- Evidência direta: amostra complexa: alias sanitizado `SDTExemploDocumentoB.xml` com 2 `Part` e tamanho de 1054406 bytes.
 - Evidência direta: Part type nas amostras simples: 5c2aa9da-8fc4-4b6b-ae02-8db4fa48976a; babf62c5-0111-49e9-a1c3-cc004d90900a.
 - Evidência direta: Part type nas amostras complexas: 5c2aa9da-8fc4-4b6b-ae02-8db4fa48976a; babf62c5-0111-49e9-a1c3-cc004d90900a.
 - Evidência direta: Part type apenas nas amostras complexas: nenhum.
@@ -1494,10 +1494,10 @@ Destacar estabilidade estrutural relativa e pontos de maior risco para clonagem.
 
 ## Theme
 
-- Evidência direta: amostra simples: alias sanitizado em Theme\\EXEMPLO-SANITIZADO.xmlSimpleBlackBerry.xml3 Part e 2 Part nao vazias.
-- Evidência direta: amostra simples: alias sanitizado em Theme\\EXEMPLO-SANITIZADO.xmlSimpleAndroid.xml3 Part e 2 Part nao vazias.
-- Evidência direta: amostra complexa: alias sanitizado em Theme\\EXEMPLO-SANITIZADO.xmlTemaExemploPrincipal.xml 3 Part e tamanho de 323724 bytes.
-- Evidência direta: amostra complexa: alias sanitizado em Theme\\EXEMPLO-SANITIZADO.xmlTemaExemploSeguranca.xml 3 Part e tamanho de 304258 bytes.
+- Evidência direta: amostra simples: alias sanitizado `ThemeExemploMobileB.xml` com 3 `Part` e 2 `Part` nao vazias.
+- Evidência direta: amostra simples: alias sanitizado `ThemeExemploMobileC.xml` com 3 `Part` e 2 `Part` nao vazias.
+- Evidência direta: amostra complexa: alias sanitizado `ThemeExemploPrincipalA.xml` com 3 `Part` e tamanho de 323724 bytes.
+- Evidência direta: amostra complexa: alias sanitizado `ThemeExemploSegurancaA.xml` com 3 `Part` e tamanho de 304258 bytes.
 - Evidência direta: Part type nas amostras simples: 43b86e51-163f-44af-ac5a-e101541b1a71; babf62c5-0111-49e9-a1c3-cc004d90900a; c31007a6-01d3-4788-95b3-425921d47758.
 - Evidência direta: Part type nas amostras complexas: 43b86e51-163f-44af-ac5a-e101541b1a71; babf62c5-0111-49e9-a1c3-cc004d90900a; c31007a6-01d3-4788-95b3-425921d47758.
 - Evidência direta: Part type apenas nas amostras complexas: nenhum.
