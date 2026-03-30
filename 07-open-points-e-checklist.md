@@ -76,10 +76,10 @@ Servir como local único para conflitos não resolvidos silenciosamente.
 - `Evidência direta`: `Folder` ficou esclarecido como tipo XML estruturalmente valido, enquanto `Category` e apenas o rotulo de UI/importador.
 - `Evidência direta`: `Theme`, `Pattern Settings`, `Transaction` e `Work With for Web` ja possuem receita empirica de sucesso sob dependencias explicitas conhecidas.
 - `Evidência direta`: `Design System`, `Deployment Unit` e `Data Selector` tambem ja tiveram casos controlados de sucesso nesta trilha.
-- `Evidência direta`: `API` e a camada fisica `Table/Index` concentram o principal restante da engenharia reversa mais sensivel.
+- `Evidência direta`: a camada fisica `Table/Index` concentra a principal frente tecnica ainda aberta nesta trilha, enquanto `API` ficou delimitada como caso unico manual/local da KB.
 - `Inferência forte`: a lacuna dominante agora nao e mais "como serializar o XPZ", e sim "quais referencias e dependencias minimas precisam existir na KB para cada tipo contextual".
 - `Inferência forte`: `Theme`, `PatternSettings`, `Transaction`, `Attribute`, `Folder`, `Design System`, `Deployment Unit`, `Data Selector` e `Work With for Web` deixam de ser pendencias estruturais abertas nesta trilha.
-- `Inferência forte`: a fronteira principal remanescente se concentra em `API` e na camada fisica `Table/Index`.
+- `Inferência forte`: a fronteira principal remanescente se concentra na camada fisica `Table/Index`; `API` fica encerrada por ora como estudo de caso unico, sem base para generalizacao adicional.
 
 ## Próximas frentes recomendadas
 
@@ -87,7 +87,7 @@ Servir como local único para conflitos não resolvidos silenciosamente.
 - `Inferência forte`: vale isolar pares de objetos simples e complexos do mesmo grupo para comparação estrutural.
 - `Inferência forte`: vale produzir uma camada de validação cruzando `parent*`, `moduleGuid`, chamadas em código e nomes de objeto.
 - `Inferência forte`: antes de corrigir os `.md` dos tipos problemáticos, vale usar a bateria atual para distinguir "erro de molde" de "erro de dependência de KB" em cada tipo.
-- `Inferência forte`: a proxima coleta em exemplos reais deve priorizar `API` e os tipos contextuais ainda nao revisitados com dependencias completas; para `Theme`, `PatternSettings` e `Transaction`, a coleta adicional passa a ser de generalizacao e nao de desbloqueio inicial.
+- `Inferência forte`: a proxima coleta em exemplos reais deve priorizar `Table/Index` e outros tipos contextuais ainda nao revisitados com dependencias completas; para `API`, so faz sentido nova coleta se surgirem novos casos reais ou automacao externa no ambiente. Para `Theme`, `PatternSettings` e `Transaction`, a coleta adicional passa a ser de generalizacao e nao de desbloqueio inicial.
 
 ## Decisao operacional - Transaction e WebPanel
 
@@ -122,7 +122,7 @@ Orientar futuras coletas de templates comparáveis.
 
 ## Itens sugeridos
 
-- Exportar pelo menos 1 template adicional de API com necessidade media, preferindo um caso simples e outro com mais contexto.
+- So voltar a coletar novos casos de `API` se surgirem novos objetos reais na KB ou alguma ferramenta externa passar a automatizar essa familia no ambiente.
 - Exportar pelo menos 1 template adicional de DataProvider com necessidade media, preferindo um caso simples e outro com mais contexto.
 - Exportar pelo menos 1 template adicional de DataStore com necessidade baixa, preferindo um datastore padrao e outro com metadados adicionais.
 - Exportar pelo menos 1 template adicional de Dashboard com necessidade media, preferindo um caso curto e outro com mais objetos analiticos e filtros.
@@ -191,7 +191,7 @@ Orientar futuras coletas de templates comparáveis.
 - `Inferência forte`: a frente aberta de camada fisica se concentra em `Table/Index`, nao mais em `WorkWithForWeb`.
 - `Evidência direta`: os exports `XPZExemploTabelaTRNWWPatternA.xpz` e `XPZExemploTabelaTRNDataSelectorA.xpz` explicitaram a ponte estrutural entre camada logica, camada fisica e camada de pattern.
 - `Evidência direta`: o export `XPZExemploCadeiaAPIA.xpz` mostrou que a `API` relevante desta KB anda com uma subarvore funcional grande.
-- `Inferência forte`: a frente aberta de `API` e funcional, nao de envelope minimo.
+- `Inferência forte`: o caso de `API` fica suficientemente entendido nesta trilha como dependencia funcional pesada de um unico caso manual/local, e nao como frente aberta de envelope minimo ou familia ampla.
 - `Evidência direta`: o export `XPZExemploTemaA.xpz` mostrou a pilha visual completa exportada como familia combinada.
 - `Evidência direta`: os exports `XPZExemploFamiliaMistaA.xpz` e `XPZExemploFamiliaMistaB.xpz` mostraram que a IDE tambem serializa familia combinada com `Attributes` top-level no mesmo `.xpz`.
 - `Inferência forte`: a frente aberta de `Attribute` deixa de incluir duvida relevante sobre contêiner multiobjeto; o foco remanescente continua sendo dependencia semantica de propriedades e contexto de KB.

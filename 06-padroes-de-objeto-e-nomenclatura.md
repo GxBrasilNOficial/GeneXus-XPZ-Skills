@@ -49,7 +49,7 @@ Este documento registra padrões observáveis no inventário bruto e nos XMLs ex
 
 ### `Procedure`
 
-- `Evidência direta`: há muitos objetos com prefixo `proc`, por exemplo `PRCExemploA`, `PRCExemploB` e `PRCExemploC`, referenciados em XMLs lidos como `API0001.xml` e `MODExemploAMenu.xml`.
+- `Evidência direta`: há muitos objetos com prefixo `proc`, por exemplo `PRCExemploA`, `PRCExemploB` e `PRCExemploC`, referenciados em XMLs lidos como `APIExemploIntegracaoA.xml` e `MODExemploAMenu.xml`.
 - `Evidência direta`: também existem procedimentos sem prefixo `proc`, como `ctodUTC` e `curvalSTRZERO`.
 - `Inferência forte`: o prefixo `proc` é recorrente, mas não exclusivo nem obrigatório no acervo.
 
@@ -90,7 +90,7 @@ Este documento registra padrões observáveis no inventário bruto e nos XMLs ex
 ## Padrões de referência entre objetos
 
 - `Evidência direta`: em `WebPanel\MODExemploAMenu.xml` o código referencia outros objetos nominais, como `wpEntradaMODExemploA`, `WWEntradaMODExemploA`, `WWPesagemMODExemploA` e `wpEscolhaPesagemMODExemploA`.
-- `Evidência direta`: em `API\API0001.xml` aparecem chamadas para procedures como `PRCExemploA`, `procSdtTributacaoDadosBasicosSelecaoConformeParametros` e `PRCExemploB`.
+- `Evidência direta`: no unico caso real de `API` observado nesta KB, representado aqui pelo alias sanitizado `APIExemploIntegracaoA.xml`, aparecem chamadas para procedures como `PRCExemploA`, `procSdtTributacaoDadosBasicosSelecaoConformeParametros` e `PRCExemploB`.
 - `Inferência forte`: nomes de objetos no acervo não são apenas rótulos; eles também aparecem como pontos de acoplamento explícito entre artefatos.
 
 ## Uso cauteloso destes padrões

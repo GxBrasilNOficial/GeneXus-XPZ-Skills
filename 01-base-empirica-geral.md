@@ -200,8 +200,12 @@ Separar com mais precisao o que e falta de shape, o que e dependencia semantica 
 
 ### `API`
 
+- `Evidência direta`: nesta trilha, a KB observada traz apenas `1` objeto `API` real.
+- `Evidência direta`: esse unico caso real corresponde a uma construcao manual/local da KB, e nao a uma familia ampla observada com multiplos exemplos comparaveis.
+- `Evidência direta`: nesta trilha documental, nao ha evidencia de ferramenta complementar de automacao de `API` atuando sobre esse caso.
 - `Evidência direta`: o exemplo real `APIExemploIntegracaoA.xml` usa varios `ATTCUSTOMTYPE` validos, incluindo `exo:GAMSession, GeneXusSecurity`, `exo:GAMError, GeneXusSecurity`, `exo:GAMUser, GeneXusSecurity`, `sdt:Messages, GeneXus.Common`, `sdt:SDTExemploProdutoBasicoA` e `sdt:SDTExemploTribSelecaoA`.
 - `Evidência direta`: o mesmo exemplo tambem depende de `Procedure` e eventos reais no codigo fonte.
+- `Inferência forte`: por haver apenas um caso real na KB, `API` deve ser lida aqui como estudo de caso operacional da KB analisada, e nao como familia GeneXus ja generalizavel nesta base.
 - `Inferência forte`: em `API`, o envelope XML e relativamente bem definido, mas os tipos customizados e procedimentos referenciados precisam existir de fato na KB de destino.
 - `Inferência forte`: nao e seguro inventar `ATTCUSTOMTYPE`; ele deve copiar um valor comprovado ou apontar para tipo efetivamente existente no alvo.
 - `Evidência direta`: num teste isolado posterior, os SDTs reais `SDTExemploProdutoBasicoA`, `SDTExemploProdutoBasicoB`, `SDTExemploProdutoBasicoC`, `SDTExemploProdutoBasicoD`, `SDTExemploTribA` e `SDTExemploTribSelecaoA` importaram com sucesso antes da tentativa da `API`.
@@ -311,6 +315,31 @@ Separar com mais precisao o que e falta de shape, o que e dependencia semantica 
 - `Evidência direta`: os nomes top-level de `Table` acompanham os nomes das `Transaction` correspondentes.
 - `Evidência direta`: em comparacao privada posterior de pares reais simples e densos da KB de origem, essa correspondencia nominal `Transaction` -> `Table` tambem se repetiu fora dos pacotes ja resumidos na base.
 - `Evidência direta`: na mesma comparacao privada, os `Index` seguiram aparecendo apenas no bloco interno `<Indexes>` do objeto fisico, e nao como objeto top-level separado.
+- `Evidência direta`: nessa mesma amostra privada, a lista de atributos-chave do primeiro `Level` da `Transaction` coincidiu com a lista do bloco `<Key>` da `Table`, tanto em chave simples quanto em chave composta.
+- `Evidência direta`: na amostra privada comparada, cada `Table` observada trouxe exatamente `1` indice `Unique` automatico para a chave e um conjunto variavel de indices `Duplicate`, misturando casos `Automatic` e `User`.
+- `Evidência direta`: nos mesmos pares privados comparados, todos os membros de indices `Automatic` observados ja estavam presentes no primeiro `Level` da `Transaction` correspondente.
+- `Evidência direta`: na KB analisada, prefixo `I` identifica indice automaticamente criado pelo GeneXus a partir de PK ou FK definidas pelo modelador.
+- `Evidência direta`: na mesma KB, prefixo `U` identifica indice criado manualmente pelo operador humano.
+- `Evidência direta`: quando um indice automatico `I...` recebe nome mais descritivo nesta KB, a mudanca e apenas editorial; os campos e sua ordem permanecem exatamente os mesmos do indice criado pelo GeneXus.
+- `Evidência direta`: o naming default do GeneXus para esses indices automaticos e pouco descritivo, normalmente centrado no nome da `Table` com numeracao incremental nos casos seguintes.
+- `Evidência direta`: nos indices automaticos de FK, os campos seguem a mesma ordem definida pelo modelador na relacao da `Transaction` e refletida na `Table`.
+- `Evidência direta`: na mesma amostra privada, os indices `Automatic` `Duplicate` apareceram principalmente em dois formatos recorrentes: atributo unico `...Id` e pares `...EmpresaId + ...Id|...Codigo`.
+- `Evidência direta`: nessa mesma investigacao privada, muitos atributos `...Id` e `...Codigo` presentes no primeiro `Level` nao reapareceram em indices `Automatic`, inclusive em objetos mais densos.
+- `Evidência direta`: os nomes amigaveis observados para varios indices `Duplicate` refletem convencao editorial/local da KB analisada, e nao devem ser tratados como padrao default do GeneXus.
+- `Evidência direta`: os nomes mais amigaveis, abreviacoes e formas descritivas observadas em varios indices desta KB surgem da renomeacao humana para facilitar manutencao, leitura de erro e leitura de log; nao devem ser lidos como naming automatico do GeneXus nem como resposta normal a limite de 63 caracteres.
+- `Evidência direta`: numa ampliacao posterior da amostra privada para todo o conjunto local de `Table`, os formatos mais recorrentes de indice `Automatic` `Duplicate` foram `...EmpresaId + ...Id|...Codigo`, depois atributos unicos de auditoria de usuario (`...InclusaoUsuarioId`, `...UltimaAtualizacaoUsuarioId`), depois `...EmpresaId` isolado, e so depois outros `...Id` unicos menos frequentes.
+- `Evidência direta`: nessa mesma ampliacao, `101/228` `Table` locais combinavam ao mesmo tempo algum par `...EmpresaId + ...Id|...Codigo` e algum indice automatico de auditoria de usuario; `41/228` nao mostraram nenhum desses dois sinais na leitura aplicada.
+- `Evidência direta`: dentro desse subconjunto sem os dois sinais fortes, apareceram pelo menos tres perfis adicionais: `Table` sem indice `Automatic` `Duplicate`, `Table` com um unico indice simples fora do nucleo principal (por exemplo `...UfId`, `...UsuarioId`, `...OrigemId`, `...Codigo`) e `Table` com um unico indice composto mais denso de cobertura/contexto.
+- `Inferência forte`: dentro dessa amostra, os indices `Automatic` aparecem como recombinacoes de atributos ja materializados na propria `Transaction`, e nao como introducao de atributos fisicos alheios ao primeiro `Level`.
+- `Inferência forte`: dentro dessa amostra, o padrao `...EmpresaId + ...Id|...Codigo` parece um dos sinais mais fortes de indice automatico adicional na camada fisica.
+- `Inferência forte`: ao mesmo tempo, esse padrao por nome nao e suficiente sozinho para prever indice automatico; ele funciona como pista estrutural, nao como regra deterministica.
+- `Inferência forte`: na KB analisada, a combinacao entre relacionamento principal (`...EmpresaId + ...Id|...Codigo`) e trilha de auditoria de usuario parece formar o nucleo mais recorrente dos indices `Automatic` adicionais.
+- `Inferência forte`: os indices automaticos de auditoria observados na amostra devem ser lidos como mais um caso de FK automatica renomeada de forma amigavel, e nao como familia especial criada por regra separada.
+- `Inferência forte`: a presenca de indice `User` (`U...`) deve ser lida como tuning manual e empirico por volume e ordenacao real, e nao como desdobramento estrutural obrigatorio da `Transaction`.
+- `Inferência forte`: na KB analisada, um indice `User` tende a surgir quando a ordenacao real de grid, relatorio ou procedure diverge dos indices automaticos disponiveis e a massa de registros ja justifica um indice dedicado.
+- `Inferência forte`: um caso recorrente de indice `User` e reaproveitar quase a mesma base de um indice automatico, mas ajustando direcao de ordenacao, especialmente com o ultimo campo em `Descending` para buscar o registro mais recente.
+- `Inferência forte`: a ausencia de indice `User` em varias `Table` deve ser lida como decisao valida e consciente do modelador, quando o volume esperado e pequeno e o custo de manutencao do indice nao compensa.
+- `Inferência forte`: fora desse nucleo, existe uma familia residual menor que parece ligada a cobertura contextual especifica do objeto, e nao a um unico padrao nominal dominante.
 - `Inferência forte`: para ler a camada fisica desta base, o eixo primario de correlacao deve ser `Transaction -> Table`, tratando os `Index` como estrutura interna da `Table`.
 - `Inferência forte`: para evolucao metodologica da base, o pacote mais informativo nao e `Index` isolado, e sim combinacoes como `Transaction + Table`, `Transaction + Table + WorkWithForWeb + PatternSettings` e `Attribute + Domain + Transaction + SubtypeGroup + Table`.
 
@@ -1420,8 +1449,8 @@ Destacar estabilidade estrutural relativa e pontos de maior risco para clonagem.
 
 ## API
 
-- Evidência direta: amostra simples: alias sanitizado `APIExemploMinA.xml` com 5 `Part` e 4 `Part` nao vazias.
-- Evidência direta: amostra complexa: alias sanitizado `APIExemploIntegracaoA.xml` com 5 `Part` e tamanho de 25844 bytes.
+- Evidência direta: caso real observado: alias sanitizado `APIExemploIntegracaoA.xml` com 5 `Part` e tamanho de 25844 bytes.
+- Evidência direta: o alias sanitizado `APIExemploMinA.xml` deve ser lido apenas como recorte editorial simplificado do mesmo perfil estrutural, e nao como segunda `API` real observada na KB.
 - Evidência direta: Part type nas amostras simples: 9f577ec2-27f4-4cf4-8ad5-f3f50c9d69b5; ad3ca970-19d0-44e1-a7b7-db05556e820c; babf62c5-0111-49e9-a1c3-cc004d90900a; c44bd5ff-f918-415b-98e6-aca44fed84fa; e4c4ade7-53f0-4a56-bdfd-843735b66f47.
 - Evidência direta: Part type nas amostras complexas: 9f577ec2-27f4-4cf4-8ad5-f3f50c9d69b5; ad3ca970-19d0-44e1-a7b7-db05556e820c; babf62c5-0111-49e9-a1c3-cc004d90900a; c44bd5ff-f918-415b-98e6-aca44fed84fa; e4c4ade7-53f0-4a56-bdfd-843735b66f47.
 - Evidência direta: Part type apenas nas amostras complexas: nenhum.
@@ -2115,7 +2144,7 @@ Destacar estabilidade estrutural relativa e pontos de maior risco para clonagem.
 ### Molde sanitizado de API 1 - `APIExemploIntegracao`
 
 - Perfil: API com bloco Service, multiplos RestMethod, eventos .Before/.After e conjunto denso de variaveis.
-- Uso operacional: boa referencia para API com servicos REST coordenados por eventos e logica auxiliar interna.
+- Uso operacional: boa referencia para o unico caso real de API observado nesta KB, construido de forma manual/local e com servicos REST coordenados por eventos e logica auxiliar interna.
 - Evidência direta: a validacao posterior no acervo real confirmou que `API` usa `ATTCUSTOMTYPE` concretos para `EXO` e `SDT`, como `exo:GAMSession, GeneXusSecurity` e `sdt:Messages, GeneXus.Common`.
 - Inferência forte: este molde so deve ser materializado quando os `Procedure`, `EXO` e `SDT` referenciados existirem de fato na KB de destino.
 - Inferência forte: trocar nomes e codigo sem revisar os `ATTCUSTOMTYPE` e as dependencias chamadas em `Source` tende a produzir falha semantica, nao falha de envelope.

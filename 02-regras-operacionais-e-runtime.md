@@ -150,9 +150,12 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
 
 ### Politica para `API`
 
+- `Evidência direta`: a base observa apenas `1` `API` real nesta KB.
+- `Evidência direta`: esse caso corresponde a uma construcao manual/local da KB, sem evidencia nesta trilha de ferramenta complementar de automacao de `API`.
 - `Evidência direta`: o teste isolado com `APIExemploIntegracaoA` e seus SDTs reais resolveu a camada de erro em `ATTCUSTOMTYPE`.
 - `Evidência direta`: depois disso, a `API` passou a falhar por `Procedure` ausente (`PRCExemploListaA`) e por contexto de negocio (`DomainExemploTipoA`, `TRNExemploProdutoA`).
 - `Evidência direta`: o export real `XPZExemploCadeiaAPIA.xpz` veio com `3904` objetos e mostrou que a `API` desta KB ja sai da IDE acompanhada por uma subarvore funcional grande.
+- `Inferência forte`: por haver apenas um caso real, a leitura operacional de `API` nesta base deve permanecer ancorada em estudo de caso da KB, e nao em suposta familia ampla de APIs GeneXus manuais ou automatizadas.
 - `Inferência forte`: a hierarquia de validacao de `API` nesta trilha e: primeiro `ATTCUSTOMTYPE`/SDTs, depois `Procedure`, e por fim atributos, dominios ou contexto de negocio usados no codigo/eventos.
 - `Inferência forte`: para `API`, o melhor recorte operacional deixa de ser o objeto isolado e passa a ser uma familia funcional contendo pelo menos `Procedure`, `SDT`, `Domain`, e possivelmente `Transaction`, `Table` e `DataProvider`.
 - `Regra operacional`: nao regenerar `API` “igual” apos erro de `ATTCUSTOMTYPE`; primeiro materializar os SDTs reais e reexecutar. Se o erro remanescente migrar para `Procedure` ou atributo de negocio, tratar a camada semantica seguinte.
@@ -193,10 +196,38 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
 - `Evidência direta`: o export isolado de `Index` veio vazio, enquanto `Table + Index` repetiu a mesma serializacao top-level de `Table`.
 - `Evidência direta`: pacotes combinados com `Transaction` mostraram `Table` convivendo no mesmo `.xpz` com `Transaction`, `WorkWithForWeb`, `PatternSettings` e `DataSelector`.
 - `Evidência direta`: comparacao privada posterior com pares reais da KB de origem confirmou repeticao da correspondencia nominal entre `Transaction` e `Table`, tanto em caso simples quanto em caso mais denso.
+- `Evidência direta`: na mesma comparacao privada, a chave do primeiro `Level` da `Transaction` coincidiu com o bloco `<Key>` da `Table`, inclusive em casos de chave composta.
+- `Evidência direta`: na mesma amostra, cada `Table` comparada apresentou `1` indice `Unique` automatico para a chave e um conjunto variavel de indices `Duplicate` `Automatic` e `User`.
+- `Evidência direta`: na mesma amostra privada, todos os membros de indices `Automatic` observados ja existiam como atributos do primeiro `Level` da `Transaction` correspondente.
+- `Evidência direta`: nesta KB, prefixo `I` identifica indice automaticamente criado pelo GeneXus a partir de PK ou FK definidas pelo modelador.
+- `Evidência direta`: nesta KB, prefixo `U` identifica indice criado manualmente pelo operador humano.
+- `Evidência direta`: quando um indice automatico `I...` recebe nome mais amigavel, a alteracao e apenas no nome; campos, ordem e natureza do indice permanecem os mesmos.
+- `Evidência direta`: o naming default do GeneXus para indices automaticos e pouco descritivo, normalmente derivado do nome da `Table` com numeracao incremental a partir do segundo indice.
+- `Evidência direta`: nos indices automaticos de FK, os campos seguem a mesma ordem estabelecida pelo modelador na `Transaction` e refletida na `Table`.
+- `Evidência direta`: na mesma amostra, os indices `Automatic` `Duplicate` apareceram principalmente como atributo unico `...Id` ou como par `...EmpresaId + ...Id|...Codigo`.
+- `Evidência direta`: na mesma investigacao privada, varios atributos `...Id` e `...Codigo` do primeiro `Level` nao reapareceram em indices `Automatic`, inclusive em objetos mais densos.
+- `Evidência direta`: os nomes amigaveis de varios indices `Duplicate` observados nesta KB devem ser lidos como convencao local da KB, e nao como naming default do GeneXus.
+- `Evidência direta`: abreviacoes e nomes descritivos observados em indices desta KB decorrem da renomeacao humana para manutencao, log e diagnostico; nao devem ser tratados como naming automatico do GeneXus nem como comportamento normal diante de limite de 63 caracteres.
+- `Evidência direta`: numa ampliacao posterior da amostra privada para o conjunto local de `Table`, o formato mais recorrente de indice `Automatic` `Duplicate` foi o par `...EmpresaId + ...Id|...Codigo`, seguido por indices unicos de auditoria de usuario e por `...EmpresaId` isolado.
+- `Evidência direta`: na mesma ampliacao, parte relevante das `Table` locais acumulou ao mesmo tempo indices automaticos de relacionamento principal e de auditoria de usuario, mas esse padrao nao cobriu todo o conjunto.
+- `Evidência direta`: no subconjunto que ficou fora desse nucleo principal, apareceram tanto `Table` sem indice `Automatic` `Duplicate` quanto casos com um unico indice simples (`...UfId`, `...UsuarioId`, `...OrigemId`, `...Codigo`) e casos com um unico indice composto de cobertura mais especifica.
 - `Inferência forte`: para engenharia reversa da camada fisica, a unidade minima util nao e `Index` solto, e sim `Table` comparavel, preferencialmente junto da `Transaction` correspondente.
+- `Inferência forte`: indices automaticos de auditoria devem ser lidos, nesta KB, como indices de FK automaticamente criados pelo GeneXus e depois eventualmente renomeados de forma amigavel.
+- `Inferência forte`: indice `User` deve ser lido como tuning manual empirico, criado quando a ordenacao real de grid, relatorio ou procedure nao e bem atendida pelos indices automaticos e o volume esperado justifica um indice dedicado.
+- `Inferência forte`: um caso recorrente de indice `User` e reaproveitar quase a mesma composicao de um indice automatico, mas com direcao `Descending` no ultimo campo para acelerar busca do registro mais recente.
 - `Regra operacional`: nao classificar `Index` como objeto top-level independente nesta trilha sem nova evidencia estrutural externa.
 - `Regra operacional`: ao materializar ou revisar `Table`, preservar o bloco de chave e o bloco `<Indexes>` integralmente, incluindo ordem dos `TableIndex`, `Index/@Type`, `Index/@Source` e ordem dos `Member`.
 - `Regra operacional`: quando a leitura exigir ponte com a camada logica, validar primeiro a correspondencia nominal e estrutural entre `Transaction` e `Table`; so depois analisar os `Index` embutidos.
+- `Regra operacional`: quando a pergunta for sobre chave fisica basica, usar como primeira leitura conservadora a chave do primeiro `Level` da `Transaction` e conferir se ela reaparece integralmente no bloco `<Key>` da `Table`.
+- `Regra operacional`: quando a pergunta for sobre origem de indice `Automatic`, conferir primeiro se os `Members` ja pertencem ao primeiro `Level` da `Transaction`, antes de supor regra extra de runtime ou metadata externa.
+- `Regra operacional`: quando a pergunta for sobre autoria do indice nesta KB, tratar prefixo `I` como automatico do GeneXus e prefixo `U` como criacao manual humana, salvo evidencia privada muito forte em contrario.
+- `Regra operacional`: se um indice `I...` tiver nome descritivo, assumir primeiro renomeacao editorial do nome, e nao alteracao de composicao, ordem ou tipo.
+- `Regra operacional`: na ausencia de evidencia mais forte, tratar como candidatos recorrentes a indice `Automatic` adicional os formatos `...Id` unico e `...EmpresaId + ...Id|...Codigo`, sempre confirmando no molde comparavel antes de concluir.
+- `Regra operacional`: nao inferir indice `Automatic` apenas porque o atributo termina em `Id` ou `Codigo`; o criterio mais seguro continua sendo a repeticao em `Table` comparavel do mesmo grupo estrutural.
+- `Regra operacional`: quando houver muitos candidatos possiveis no primeiro `Level`, priorizar primeiro a inspeção de pares `...EmpresaId + ...Id|...Codigo`, depois campos de auditoria de usuario, e so depois `...EmpresaId` ou outros `...Id` isolados.
+- `Regra operacional`: nao inferir que toda `Table` relevante precise de indice `User`; a ausencia de `U...` pode ser decisao consciente de custo/beneficio quando o volume esperado e pequeno.
+- `Regra operacional`: tratar decisao sobre indice `User` como tuning empirico de performance e ordenacao, e nao como regra estrutural previsivel apenas pelo XML.
+- `Regra operacional`: se a `Table` comparavel cair fora desse nucleo principal, considerar explicitamente a possibilidade de tres perfis residuais diferentes: ausencia de indice `Automatic` `Duplicate`, indice simples de cobertura contextual ou indice composto mais especifico.
 - `Regra operacional`: se o acervo privado ainda materializar esses objetos fisicos em pasta historica chamada `Index`, tratar isso como legado de extracao, e nao como prova de tipo top-level diferente.
 - `Regra operacional`: se o caso concreto depender de afirmar reassociacao fisica exata entre `Transaction`, `Table` e navegacao real da IDE, responder com cautela e separar explicitamente estrutura observada de comportamento runtime inferido.
 
@@ -773,7 +804,8 @@ Funcionar como resumo decisório sem esconder os limites da evidência.
 
 ## Politica para API
 
-- Evidência direta: o acervo desta trilha traz amostra pequena de `API`, mas a consulta ao caso real confirmou uso pesado de `ATTCUSTOMTYPE`, `EXO`, `SDT` e chamadas a `Procedure`.
+- Evidência direta: o acervo desta trilha traz apenas `1` `API` real, e a consulta a esse caso confirmou uso pesado de `ATTCUSTOMTYPE`, `EXO`, `SDT` e chamadas a `Procedure`.
+- Evidência direta: esse caso real deve ser lido como construcao manual/local da KB, sem evidencia nesta trilha de automacao complementar de terceiros.
 - Evidência direta: a bateria de importacao mostrou que `API` pode falhar sem erro de envelope, apenas por `ATTCUSTOMTYPE` nao conversivel ou tipo inexistente no destino.
 - Inferência forte: para `API`, a ordem correta de validacao e `molde estrutural -> ATTCUSTOMTYPE valido -> EXO e SDT existentes -> Procedure e eventos chamados`.
 - Inferência forte: em `API`, trocar nomes e codigo sem fechar primeiro a camada de tipos tende a produzir falha semantica imediata.

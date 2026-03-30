@@ -189,6 +189,7 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 ### API
 
 - copiar somente um molde XML completo do mesmo tipo e com contexto comparavel
+- tratar `API` nesta base como caso unico real observado na KB, e nao como familia ampla ja generalizavel
 - validar antes se cada `ATTCUSTOMTYPE` apontado no molde existe no alvo como `EXO`, `SDT` ou tipo base suportado
 - preferir ler e gerar `API` dentro de uma familia funcional combinada, e nao como objeto solto, quando o caso real ja vier acoplado a `Procedure`, `SDT`, `Domain`, `Transaction`, `Table` ou `DataProvider`
 - abortar se a API depender de procedures, `EXO` ou `SDT` inexistentes no destino
@@ -228,6 +229,11 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 - tratar `Table` como objeto top-level da camada fisica e `Index` como estrutura interna da `Table`
 - quando a pergunta envolver `Index`, consultar primeiro um molde comparavel de `Table`, nao um suposto corpus de `Index` isolado
 - preservar bloco de chave, `<Indexes>`, `Index/@Type`, `Index/@Source` e ordem dos `Member`
+- nesta KB, tratar prefixo `I` como indice automatico do GeneXus e prefixo `U` como indice manual criado por humano
+- se um indice `I...` tiver nome descritivo, assumir primeiro que houve apenas renomeacao editorial do nome, sem mudanca de campos ou ordem
+- ler indices automaticos de auditoria como casos de FK automatica renomeada, nao como familia especial separada
+- tratar indice `User` como tuning manual empirico para ordenacao/performance, especialmente quando a ordenacao real divergir dos indices automaticos disponiveis
+- nao supor que toda `Table` precise de indice `User`; a ausencia de `U...` pode ser a decisao correta quando o volume esperado nao compensa custo extra
 - preferir pacotes comparaveis com `Transaction` junto quando a pergunta depender da ponte logica -> fisica
 - abortar se o caso exigir inventar indice novo, chave fisica nova ou tratar `Index` como top-level sem evidencia externa adicional
 

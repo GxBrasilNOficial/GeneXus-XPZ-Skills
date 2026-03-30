@@ -168,7 +168,7 @@ Evitar que “melhor candidato” seja confundido com “tipo comprovadamente se
 
 | FolderType | Classification | Evidence | Reading |
 | --- | --- | --- | --- |
-| API | apto somente por clonagem muito controlada | 1 objeto; media de Part = 5; parent = 1; pattern = 0 | amostra pequena demais e dependencia contextual presente |
+| API | apto somente por clonagem muito controlada | 1 objeto real; media de Part = 5; parent = 1; pattern = 0 | caso unico manual/local da KB, com amostra pequena demais e dependencia contextual presente |
 | DataProvider | apto somente por clonagem muito controlada | 24 objetos; media de Part = 5; parent = 24; pattern = 0 | parent aparece em 100% dos casos observados |
 | DesignSystem | apto somente por clonagem muito controlada | 2 objetos; media de Part = 4; parent = 1; pattern = 0 | amostra pequena demais para liberar geracao conservadora |
 | PackagedModule | apto somente por clonagem muito controlada | 16 objetos; media de Part = 2.38; parent = 2; pattern = 0 | e o melhor candidato relativo do recorte, mas ainda sem teste externo |
@@ -264,7 +264,7 @@ Separar falha de envelope/shape de falha por dependencia semantica da KB.
 - Regra operacional: tratar ausencia de `Attribute` top-level necessario como bloqueio operacional do pacote minimo, e nao apenas como dependencia semantica secundaria.
 - `Evidência direta`: um pacote composto posterior reuniu `ThemeClass`, `Theme`, `Attribute`, `SDT`, `Transaction` e `Pattern Settings` no mesmo `.xpz` e importou com sucesso, incluindo geracao de pattern para `WWExemploMinBancoA`.
 - `Inferência forte`: a base ja nao prova apenas sucessos isolados por tipo; ela tambem sustenta composicao entre tipos resolvidos quando as dependencias explicitas entram juntas no pacote.
-- `Inferência forte`: `API` permanece como pendencia principal, mas seu risco residual ja nao esta em `ATTCUSTOMTYPE`; ele foi deslocado para uma subarvore funcional de negocio, envolvendo `Procedure`, `Data Provider`, `Domain`, `Transaction` e atributos reais da KB.
+- `Inferência forte`: `API` deixa de ser frente aberta de generalizacao nesta trilha e passa a ficar encerrada, por ora, como estudo de caso unico manual/local da KB; seu risco residual observado ja nao esta em `ATTCUSTOMTYPE`, e sim numa subarvore funcional de negocio envolvendo `Procedure`, `Data Provider`, `Domain`, `Transaction` e atributos reais da KB.
 - `Evidência direta`: o export real `XPZExemploCadeiaAPIA.xpz` veio com `3904` objetos, sendo `2282` `Procedure`, `594` `SDT`, `592` `Domain`, `228` `Table`, `183` `Transaction`, `24` `DataProvider` e `1` `API`.
 - `Inferência forte`: isso confirma que, para `API`, o recorte de risco correto e uma familia funcional grande; tentar trata-la como tipo quase isolado tende a subestimar a dependencia real.
 - `Evidência direta`: o export real `XPZExemploTemaA.xpz` veio com `947` objetos, incluindo `501` `ThemeClass`, `7` `Theme`, `24` `ThemeColor`, `2` `DesignSystem`, `1` `ColorPalette`, `228` `Table`, `183` `Transaction` e `1` `Folder`.
@@ -276,9 +276,9 @@ Separar falha de envelope/shape de falha por dependencia semantica da KB.
 
 ## Hierarquia de ataque das pendencias contextuais
 
-- Evidência direta: `Transaction` e `API` concentraram erros semanticos claros, apesar de o envelope ter passado da fase principal de parse/importacao.
-- Inferência forte: a ordem mais util de ataque e `Transaction -> API -> Theme -> Pattern Settings -> Folder`.
-- Inferência forte: `API` vem logo depois de `Transaction` porque compartilha o mesmo tipo de fragilidade principal: dependencia de tipos e referencias reais da KB.
+- Evidência direta: `Transaction` e o caso unico real de `API` concentraram erros semanticos claros, apesar de o envelope ter passado da fase principal de parse/importacao.
+- Inferência forte: a ordem mais util de ataque, entre pendencias contextuais ainda ativas, e `Transaction -> Theme -> Pattern Settings -> Folder`; `API` fica como estudo de caso fechado nesta fase e so deve reabrir se entrarem novos exemplos reais ou automacao externa.
+- Inferência forte: no unico caso real observado, `API` compartilha com `Transaction` a mesma fragilidade principal: dependencia de tipos e referencias reais da KB.
 - Inferência forte: em `API`, a hierarquia correta de decisao e `ATTCUSTOMTYPE` valido -> `EXO` e `SDT` existentes -> `Procedure` chamada -> `Data Provider`/`Domain` auxiliares -> atributos e contexto de negocio -> eventos/codigo.
 - Inferência forte: qualquer tentativa de corrigir `API` pelo fim, mexendo primeiro em codigo ou serializacao, tende a mascarar a causa real do erro.
 - Inferência forte: `Theme` vem em seguida porque seu problema principal ja esta isolado e nao depende tanto de semantica de negocio da KB, mas sim de preservar o grafo minimo de classes visuais.
