@@ -128,6 +128,11 @@ Organizar conhecimento operacional e empírico sobre XMLs extraídos de `XPZ` Ge
 - `Evidência direta`: as orientacoes detalhadas de consumo por agente GPT ficam centralizadas em `08-guia-para-agente-gpt.md`.
 - `Inferência forte`: este `00` deve funcionar como porta de entrada curta e estavel, evitando duplicar regras operacionais que ja estao mantidas e atualizadas no `08`.
 
+- `Evidência direta`: em teste real de `Import File Load`, um XML isolado de objeto com raiz `<Object>` falhou com erro `Invalid format, MajorVersion not found`.
+- `Evidência direta`: o mesmo conteudo, encapsulado em `import_file.xml` com `ExportFile`, `KMW`, `Source`, `Objects`, `Dependencies` e `ObjectsIdentityMapping`, carregou e importou com sucesso.
+- `Evidência direta`: em teste real de renomeacao de `Procedure`, a IDE preservou historico do mesmo objeto quando o pacote manteve o mesmo `Object/@guid` e alterou apenas `name`, `fullyQualifiedName`, `description` e conteudo.
+- `Regra operacional`: para qualquer alteracao de objeto existente, inclusive renomeacao, preservar o mesmo `guid`; `guid` novo faz a IDE tratar como objeto novo.
+
 ## Regras minimas adicionais
 
 - o agente deve manter `Source/@kb` e `Source/Version/@guid` em formato GUID valido; placeholders textuais ja causaram falha real de parse nesta trilha
@@ -143,8 +148,3 @@ Organizar conhecimento operacional e empírico sobre XMLs extraídos de `XPZ` Ge
 - Fonte invalida: exemplos sanitizados incompletos ou meramente ilustrativos
 - Fonte invalida: reconstrucoes livres baseadas em tabelas, frequencias ou descricoes
 - Inferência forte: esta base documental decide, classifica e orienta; a materializacao final deve usar XML bruto comparavel ou molde sanitizado completo documentado nesta propria base
-
-
-
-
-

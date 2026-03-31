@@ -30,11 +30,11 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
 
 ## Evidencia complementar de gerador local
 
-- `Evidência direta`: a pasta local `C:\\Dev\\Test\\from-anywhere-to-GeneXus` contem um gerador simplificado que monta XML de importacao GeneXus usando um envelope com `ExportFile`, `KMW`, `Source`, `Objects`, `Dependencies` e `ObjectsIdentityMapping`.
+- `Evidência direta`: a pasta local `C:\Dev\Test\from-anywhere-to-GeneXus` contem um gerador simplificado que monta XML de importacao GeneXus usando um envelope com `ExportFile`, `KMW`, `Source`, `Objects`, `Dependencies` e `ObjectsIdentityMapping`.
 - `Evidência direta`: nesse gerador local, o `README` e o script principal apontam para geracao de `import_file.xml` e importacao direta do XML, nao para empacotamento `.xpz` zipado real.
 - `Inferência forte`: essa fonte local serve como confirmacao secundaria de envelope minimo plausivel e do formato de `ObjectIdentity`, mas nao como autoridade principal para valores concretos de producao.
 - `Inferência forte`: o gerador local reforca a decisao de manter `KnowledgeBase` e `Settings` fora do formato normal de objetos.
-- `Hipótese`: valores hardcoded dessa fonte local, como `Build=0`, `username=\"root\"`, `SampleKB`, `BusinessLogic`, `parentGuid` fixo e `moduleGuid` fixo, podem levar o agente para caminho errado se forem tratados como regra geral.
+- `Hipótese`: valores hardcoded dessa fonte local, como `Build=0`, `username="root"`, `SampleKB`, `BusinessLogic`, `parentGuid` fixo e `moduleGuid` fixo, podem levar o agente para caminho errado se forem tratados como regra geral.
 - `Evidência direta`: um `.xpz` minimo de `Procedure`, montado nesta trilha com `KMW`, `Source`, `Objects`, `Dependencies` e `ObjectsIdentityMapping`, foi importado com sucesso no GeneXus quando `Source/@kb` e `Source/Version/@guid` estavam em formato GUID valido.
 
 ## Envelope XPZ observado em export real
@@ -85,6 +85,14 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
   </Dependencies>
 </ExportFile>
 ```
+
+- `Evidência direta`: em teste real de `Import File Load`, um arquivo contendo apenas `<Object>` falhou com `Invalid format, MajorVersion not found`.
+- `Evidência direta`: nesta trilha, `import_file.xml` foi validado como artefato operacional de importacao pela IDE, nao como sinonimo exato do `XPZ` completo observado em export real.
+- `Regra operacional`: para `Load/Import` pela IDE, nao assumir que XML individualizado de objeto seja suficiente; quando o objetivo for carga na KB, empacotar em `import_file.xml` com `ExportFile`, `KMW`, `Source`, `Objects`, `Dependencies` e `ObjectsIdentityMapping`.
+- `Regra operacional`: ao documentar ou raciocinar sobre formato, separar explicitamente `XPZ observado em export real` de `envelope de importacao pela IDE`; ambos compartilham a raiz `ExportFile`, mas nao devem ser tratados como o mesmo artefato sem qualificacao.
+- `Evidência direta`: em teste real de renomeacao de objeto, a importacao preservou historico apenas quando o pacote manteve o mesmo `Object/@guid` do objeto existente.
+- `Regra operacional`: renomeacao, mudanca de propriedades, `source`, `rules`, `variables` ou `folder` de um objeto existente devem preservar o mesmo `guid`; trocar o `guid` significa criar outro objeto.
+- `Regra operacional`: quando uma procedure ou rotina auxiliar expuser `FalhouProcessamento` e `HouveMudanca`, falha impeditiva de `commit` deve forcar `HouveMudanca = false`; mudanca so deve sair `true` quando a alteracao puder ser considerada consolidada com seguranca para o chamador.
 
 ## Vocabulario operacional de fonte e molde
 
@@ -1053,8 +1061,3 @@ Funcionar como resumo decisório sem esconder os limites da evidência.
 - Hipótese: mesmo com anexos representativos, `WorkWithForWeb` continua entre os tipos mais sensiveis a `pattern`, `parent` transacional e contexto gerado; por isso, casos muito distantes do molde documentado ainda podem pedir paralelo bruto mais proximo
 - Hipótese: as familias `F3` e `F4` de `Transaction` ainda ficam mais seguras com molde bruto comparavel adicional, por terem densidade estrutural maior e ainda nao terem anexo completo proprio
 - Inferência forte: para o envelope externo do XPZ observado, a especificacao desta propria base ja e suficiente para evitar inventar `Objects.xml` isolado ou hierarquia externa sem prova local
-
-
-
-
-
