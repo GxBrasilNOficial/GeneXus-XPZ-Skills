@@ -92,6 +92,8 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
 - `Evidência direta`: em teste real de `Import File Load`, um arquivo contendo apenas `<Object>` falhou com `Invalid format, MajorVersion not found`.
 - `Evidência direta`: nesta trilha, `import_file.xml` foi validado como artefato operacional de importacao pela IDE, nao como sinonimo exato do `XPZ` completo observado em export real.
 - `Regra operacional`: para `Load/Import` pela IDE, nao assumir que XML individualizado de objeto seja suficiente; quando o objetivo for carga na KB, empacotar em `import_file.xml` com `ExportFile`, `KMW`, `Source`, `Objects`, `Dependencies` e `ObjectsIdentityMapping`.
+- `Regra operacional`: quando a frente atual alterar apenas um subconjunto de objetos, preferir pacote minimo contendo so os objetos realmente mudados, para reduzir ruido, risco de regressao e retrabalho de validacao.
+- `Regra operacional`: ao embutir XML individualizado de objeto dentro de `<Objects>` no `import_file.xml`, remover a declaracao `<?xml ...?>` do objeto; essa declaracao deve existir apenas no topo do arquivo do pacote.
 - `Regra operacional`: ao documentar ou raciocinar sobre formato, separar explicitamente `XPZ observado em export real` de `envelope de importacao pela IDE`; ambos compartilham a raiz `ExportFile`, mas nao devem ser tratados como o mesmo artefato sem qualificacao.
 - `Evidência direta`: em teste real de renomeacao de objeto, a importacao preservou historico apenas quando o pacote manteve o mesmo `Object/@guid` do objeto existente.
 - `Regra operacional`: renomeacao, mudanca de propriedades, `source`, `rules`, `variables` ou `folder` de um objeto existente devem preservar o mesmo `guid`; trocar o `guid` significa criar outro objeto.
@@ -110,6 +112,7 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
 - `Evidência direta`: `Procedure` aparece em 2281 objetos, todos com `parent`; `DataProvider` em 24, todos com `parent`; `API` em 1, com `parent`; `WorkWithForWeb` em 183, todos com `parent`, `Level` e marca de pattern no bloco `<Data Pattern=\"...\">`.
 - `Regra documentada`: em GeneXus, a determinacao de `Base Table` e a navegacao associada dependem dos atributos usados, do `For each`, da `Base Transaction clause`, da estrutura do objeto e dos eventos envolvidos.
 - `Inferência forte`: por isso, a estrutura XML permite detectar objetos mais ou menos propensos a joins implicitos, dependencia contextual e carga extra, mas nao substituir o relatorio de navegacao nem a especificacao real da IDE.
+- `Regra operacional`: ao editar `WorkWithForWeb`, nao validar apenas o envelope externo do pacote; validar tambem o XML interno reconstruido do `CDATA` em `Data`, porque erros de fechamento em `variable`, `attributes`, `filter`, `tab` ou `view` podem surgir so no `Load/Import` pela IDE.
 
 ## Regras documentadas de runtime
 
