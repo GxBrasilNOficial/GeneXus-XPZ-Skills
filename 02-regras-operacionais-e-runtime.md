@@ -56,6 +56,7 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
 - `Evidência direta`: em importacao real de `Attribute`, a KB preservou o `lastUpdate` do XML como `Modified Date`, independentemente do `Import Date`.
 - `Regra operacional`: ao gerar ou alterar XML de objeto GeneXus, preencher `lastUpdate` com o instante real da gravacao, obtido do relogio local atualizado do ambiente que produz o XML.
 - `Regra operacional`: quando o XML serializar `lastUpdate` em UTC com sufixo `Z`, converter corretamente a partir do horario local real; nao reutilizar timestamp antigo, aproximado ou herdado de rodada anterior.
+- `Regra operacional`: em pacote de importacao, somente o objeto efetivamente alterado deve receber `lastUpdate` novo; objetos apenas reenviados para fechamento de dependencias devem manter o `lastUpdate` original do XML da KB.
 
 ### Exemplo sanitizado do envelope observado
 
@@ -93,6 +94,7 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
 - `Evidência direta`: nesta trilha, `import_file.xml` foi validado como artefato operacional de importacao pela IDE, nao como sinonimo exato do `XPZ` completo observado em export real.
 - `Regra operacional`: para `Load/Import` pela IDE, nao assumir que XML individualizado de objeto seja suficiente; quando o objetivo for carga na KB, empacotar em `import_file.xml` com `ExportFile`, `KMW`, `Source`, `Objects`, `Dependencies` e `ObjectsIdentityMapping`.
 - `Regra operacional`: quando a frente atual alterar apenas um subconjunto de objetos, preferir pacote minimo contendo so os objetos realmente mudados, para reduzir ruido, risco de regressao e retrabalho de validacao.
+- `Regra operacional`: se um objeto nao foi alterado, ele nao deve entrar no pacote apenas por conveniencia; so entra quando for necessario para fechar dependencias obrigatorias do objeto realmente modificado.
 - `Regra operacional`: ao embutir XML individualizado de objeto dentro de `<Objects>` no `import_file.xml`, remover a declaracao `<?xml ...?>` do objeto; essa declaracao deve existir apenas no topo do arquivo do pacote.
 - `Regra operacional`: ao documentar ou raciocinar sobre formato, separar explicitamente `XPZ observado em export real` de `envelope de importacao pela IDE`; ambos compartilham a raiz `ExportFile`, mas nao devem ser tratados como o mesmo artefato sem qualificacao.
 - `Evidência direta`: em teste real de renomeacao de objeto, a importacao preservou historico apenas quando o pacote manteve o mesmo `Object/@guid` do objeto existente.
