@@ -65,6 +65,8 @@ Servir como local único para conflitos não resolvidos silenciosamente.
 - `Evidência direta`: a pasta local `C:\\Dev\\Test\\from-anywhere-to-GeneXus` usa um envelope minimo com `ExportFile`, `KMW`, `Source`, `Objects`, `Dependencies` e `ObjectsIdentityMapping`, sem `KnowledgeBase` nem `Settings`.
 - `Inferência forte`: essa fonte local e util como evidencia complementar de envelope minimo, mas nao deve ensinar valores fixos de `Build`, `username`, `kb`, `parentGuid`, `moduleGuid` ou nomes como `SampleKB` e `BusinessLogic`.
 - `Inferência forte`: isso fecha a lacuna anterior sobre "como o XPZ é formado" para o formato de export observado nesta trilha.
+- `Evidência direta`: em frente posterior desta trilha, um pacote embutido com `4` `Transaction`, `4` `WorkWithForWeb` e `3` `Procedure` passou com sucesso por `Import File Load`, `Import`, `Updating table information` e `Pattern generation`.
+- `Inferência forte`: a lacuna de envelope para pacote misto `Transaction + WorkWithForWeb + Procedure` deixa de ser ponto aberto; a decisao operacional validada passa a ser usar export real comparavel da IDE como molde quando existir.
 - `Hipótese`: ainda pode haver variantes de export XPZ nao cobertas por esse unico envelope observado.
 - `Evidência direta`: a base consolidada passou a conviver com uma cópia histórica em `docs-kb-md`.
 - `Inferência forte`: a raiz deve ser tratada como fonte operacional principal; `docs-kb-md` deve permanecer apenas como histórico de staging para evitar leituras duplicadas.
@@ -197,6 +199,7 @@ Orientar futuras coletas de templates comparáveis.
 - `Inferência forte`: a frente aberta de `Attribute` deixa de incluir duvida relevante sobre contêiner multiobjeto; o foco remanescente continua sendo dependencia semantica de propriedades e contexto de KB.
 - `Evidência direta`: o par `XPZExemploTRNWWComparacaoSemWW` e `XPZExemploTRNWWComparacaoComWW` mostrou, em escala minima e comparavel, o custo estrutural de adicionar `WorkWithForWeb` a uma `Transaction`.
 - `Inferência forte`: esse tipo de par minimo comparavel e especialmente valioso para medir expansao de `ObjectsIdentityMapping` e dependencias de contexto sem o ruido dos pacotes grandes.
+- `Evidência direta`: a trilha tambem confirmou, em pacote misto embutido comparavel, que o erro `Value cannot be null. Parameter name: g` nao exigia inventar `ObjectsIdentityMapping`; o problema estava no uso do envelope leve errado para aquela composicao.
 - `Inferência forte`: futuras analises devem priorizar combinacoes de familias relacionadas, e nao apenas tipos isolados.
 
 

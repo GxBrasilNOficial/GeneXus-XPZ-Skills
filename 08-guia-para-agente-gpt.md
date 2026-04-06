@@ -63,6 +63,8 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 - nao presumir `Objects.xml` isolado nem manifesto externo separado se isso nao estiver documentado no `02`
 - usar o envelope sanitizado documentado na base como referencia estrutural antes de pedir XML externo adicional
 - depois da bateria de importacao e da consulta ao acervo real, separar explicitamente `problema de envelope`, `problema de shape minimo` e `problema de dependencia da KB`
+- se existir export real comparavel da IDE para a mesma composicao de objetos, esse export deve prevalecer sobre envelope leve hipotetico
+- em pacote misto com `Transaction`, `WorkWithForWeb` e `Procedure`, preferir pacote embutido comparavel antes de tentar envelope por `FilePath`
 
 ## Precedencia das heuristicas
 
@@ -256,6 +258,8 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 - em pacote misto com `Transaction`, `WorkWithForWeb` e atributos novos, `Transaction` e `WorkWithForWeb` ficam em `<Objects>` e os atributos top-level ficam em `<Attributes>`
 - se houver `WorkWithForWeb` no pacote misto, preservar tambem a referencia de `Pattern` no bloco `Dependencies`
 - ao gerar ou alterar XML de objeto GeneXus, obter o horario local no momento da gravacao e preencher `lastUpdate` com o instante real correspondente
+- se houver export real comparavel da IDE para a mesma composicao, preferir repetir o shape desse export em vez de improvisar `Dependencies` ou `ObjectsIdentityMapping`
+- para pacote misto com `Transaction`, `WorkWithForWeb` e `Procedure`, preferir objetos embutidos em `<Objects>` quando esse for o formato validado pelo molde real
 - quando o formato exigir UTC com `Z`, converter corretamente a partir do horario local real; nao reaproveitar timestamp antigo nem de rodada anterior
 - o agente deve tratar `ObjectsIdentityMapping` como mapeamento de contexto; nao repetir ali cada objeto exportado nem inventar pares `Object` -> `ObjectIdentity` 1:1
 - quando o objeto depender de `parentGuid` ou `moduleGuid` externos relevantes, o agente deve preferir manter no `ObjectsIdentityMapping` a identidade correspondente com o mesmo `Guid`

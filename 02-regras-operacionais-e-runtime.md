@@ -1,5 +1,4 @@
 # 02 - Regras Operacionais e Runtime
-
 ## Papel do documento
 operacional
 
@@ -55,8 +54,13 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
 - `Regra operacional`: item vindo de pacote mais antigo nao deve sobrepor em disco um XML individualizado com `lastUpdate` mais novo; nesse caso, o processamento deve marcar o item como ignorado por obsolescencia, nao como falha de leitura.
 - `Evidência direta`: em importacao real de `Attribute`, a KB preservou o `lastUpdate` do XML como `Modified Date`, independentemente do `Import Date`.
 - `Regra operacional`: ao gerar ou alterar XML de objeto GeneXus, preencher `lastUpdate` com o instante real da gravacao, obtido do relogio local atualizado do ambiente que produz o XML.
+- `Regra operacional`: toda regravacao de XML gerado localmente deve atualizar `lastUpdate` para o instante real da ultima escrita.
 - `Regra operacional`: quando o XML serializar `lastUpdate` em UTC com sufixo `Z`, converter corretamente a partir do horario local real; nao reutilizar timestamp antigo, aproximado ou herdado de rodada anterior.
 - `Regra operacional`: em pacote de importacao, somente o objeto efetivamente alterado deve receber `lastUpdate` novo; objetos apenas reenviados para fechamento de dependencias devem manter o `lastUpdate` original do XML da KB.
+- `Regra operacional`: em XMLs GeneXus parecidos, nao assumir que a mesma insercao vai casar em todos os objetos; confirmar o trecho exato em cada arquivo antes de aplicar a mesma edicao.
+- `Regra operacional`: depois de regravar XML local, validar no arquivo final tanto o `lastUpdate` quanto a presenca real dos nos inseridos no ponto esperado.
+- `Regra operacional`: em XMLs GeneXus com blocos repetidos ou muito parecidos, localizar e validar cada ocorrencia antes de aplicar a mesma edicao.
+- `Regra operacional`: depois de editar XML local, validar nao so se o XML abre, mas se os nos novos aparecem em todos os pontos funcionais esperados do objeto, especialmente em `Transaction` e `WorkWithWeb`.
 
 ### Exemplo sanitizado do envelope observado
 
@@ -90,6 +94,11 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
 </ExportFile>
 ```
 
+- Evidência direta: `Attributes` e um bloco adicional comum no formato normal, mas nao invariavel
+- Inferência forte: para geracao conservadora de objetos comuns, este envelope minimo continua sendo referencia util, mas nao deve ser promovido a formato universal para qualquer pacote misto
+- Evidência direta: esse envelope minimo ja sustentou uma importacao bem-sucedida de um `Procedure` de teste nesta trilha, desde que os GUIDs de `Source` fossem sintaticamente validos
+- Evidência direta: em frente posterior desta mesma trilha, um pacote misto com `Transaction`, `WorkWithForWeb` e `Procedure` so passou quando foi remontado como pacote embutido, tomando export real comparavel da IDE como molde.
+
 - `Evidência direta`: em teste real de `Import File Load`, um arquivo contendo apenas `<Object>` falhou com `Invalid format, MajorVersion not found`.
 - `Evidência direta`: nesta trilha, `import_file.xml` foi validado como artefato operacional de importacao pela IDE, nao como sinonimo exato do `XPZ` completo observado em export real.
 - `Regra operacional`: para `Load/Import` pela IDE, nao assumir que XML individualizado de objeto seja suficiente; quando o objetivo for carga na KB, empacotar em `import_file.xml` com `ExportFile`, `KMW`, `Source`, `Objects`, `Dependencies` e `ObjectsIdentityMapping`.
@@ -98,7 +107,42 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
 - `Regra operacional`: ao embutir XML individualizado de objeto dentro de `<Objects>` no `import_file.xml`, remover a declaracao `<?xml ...?>` do objeto; essa declaracao deve existir apenas no topo do arquivo do pacote.
 - `Regra operacional`: ao documentar ou raciocinar sobre formato, separar explicitamente `XPZ observado em export real` de `envelope de importacao pela IDE`; ambos compartilham a raiz `ExportFile`, mas nao devem ser tratados como o mesmo artefato sem qualificacao.
 - `Evidência direta`: em teste real de renomeacao de objeto, a importacao preservou historico apenas quando o pacote manteve o mesmo `Object/@guid` do objeto existente.
+- `Regra operacional`: se existir export real comparavel da IDE para a mesma composicao de objetos, esse export deve prevalecer como molde estrutural do pacote sobre qualquer envelope leve hipotetico.
+- `Regra operacional`: para pacote misto de `Transaction + WorkWithForWeb + Procedure`, o caminho validado nesta trilha foi pacote embutido com objetos completos em `<Objects>`, reaproveitando `Dependencies` e `ObjectsIdentityMapping` contextuais de export real comparavel.
 - `Regra operacional`: renomeacao, mudanca de propriedades, `source`, `rules`, `variables` ou `folder` de um objeto existente devem preservar o mesmo `guid`; trocar o `guid` significa criar outro objeto.
+
+## Aprendizados com pacotes de importacao na IDE
+
+- `Regra operacional`: pacote minimo deve ser a referencia padrao; se uma frente alterou apenas alguns objetos, nao reenviar XMLs nao tocados apenas para "completar" a rodada.
+- `Regra operacional`: `lastUpdate` novo deve existir so no objeto realmente alterado; objeto reenviado sem mudanca precisa conservar o `lastUpdate` original do XML da KB.
+- `Regra operacional`: ao embutir XMLs em `import_file.xml`, remover declaracao `<?xml ...?>` interna do objeto e manter a declaracao apenas no topo do pacote.
+- `Regra operacional`: quando o pacote envolver `WorkWithForWeb`, validar o `CDATA` interno do `Data` como XML completo, porque erros de fechamento de `selection`, `tab`, `view` ou `variable` costumam aparecer so no `Load`.
+- `Regra operacional`: se o `Selection` do `WorkWithWeb` usar ordenacao sensivel a volume, conferir se a `Table` tem indice exato para a mesma sequencia de campos e direcoes.
+- `Evidência direta`: em importacoes reais desta KB, a frente de `CompraRevenda` ficou com cobertura exata de ordenacao; outros casos fiscais da mesma trilha exigiram anotacao especifica para avaliacao de indice composto.
+- `Exemplo sanitizado`: `TRN + WorkWithWeb + Attributes + Procedures` pode importar com sucesso quando o pacote leva so o fecho minimo e preserva um `lastUpdate` real por objeto.
+- `Exemplo sanitizado`: tambem houve sucesso real, nesta trilha, com pacote embutido de `4` `Transaction`, `4` `WorkWithForWeb` e `3` `Procedure`, passando por `Import File Load`, `Import`, `Updating table information` e `Pattern generation`.
+- `Exemplo sanitizado`: um `WorkWithWeb` com filtros fiscais, acao de planilha e `IconeUpdate` deve ser validado por partes, comparando o XML gerado com o artefato equivalente da KB antes do `Load`.
+- `Referencia privada`: os casos completos, sem sanitizacao, ficam mapeados em `C:\\Dev\\Knowledge\\GeneXus-XPZ-PrivateMap`; a raiz publica deve manter apenas o aprendizado resumido e os exemplos anonimizados.
+
+### Modos de falha observados e correcoes
+
+- `Erro sanitizado`: declaracao `<?xml ...?>` duplicada dentro de `<Objects>` no `import_file.xml`.
+  `Correção`: manter a declaracao XML apenas no topo do pacote; o XML embutido no objeto deve entrar sem prologo.
+- `Erro sanitizado`: `Unexpected XML declaration` ou parse quebrado no meio do pacote.
+  `Correção`: localizar a declaracao interna repetida ou ruido de concatenacao antes do `Load`.
+- `Erro sanitizado`: `Data` de `WorkWithForWeb` terminando com fechamento invalido de `variable`, `selection` ou `tab`.
+  `Correção`: validar o XML interno do `CDATA` como documento completo, nao apenas o envelope externo.
+- `Erro sanitizado`: `Unknown function 'IsEmpty'` em `Procedure` importada.
+  `Correção`: comparar a `Procedure` com um molde valido da KB e ajustar o `Source` e o bloco de `Variables` para a assinatura real do objeto.
+- `Erro sanitizado`: `Cannot insert Folder ... already exists in this model`.
+  `Correção`: revisar `parentGuid` e `ObjectsIdentityMapping`; nao usar identidade de contêiner errada nem reaproveitar container inexistente no destino.
+- `Erro sanitizado`: `lastUpdate` novo aplicado a objeto apenas reenviado.
+  `Correção`: preservar `lastUpdate` do XML original para objetos nao modificados e atualizar apenas o que foi realmente alterado.
+- `Erro sanitizado`: pacote grande com objetos nao tocados atrasando importacao sem ganho funcional.
+  `Correção`: reter somente o fecho minimo da frente atual e excluir artefatos sem mudança efetiva.
+- `Erro sanitizado`: `Import File Load` falhando com `Value cannot be null. Parameter name: g` em pacote misto montado com envelope leve por `FilePath`.
+  `Correção`: parar de ajustar `ObjectsIdentityMapping` por hipotese e comparar primeiro com export real da IDE para a mesma composicao; no caso validado nesta trilha, a correcao foi remontar o pacote como embutido em `<Objects>`.
+- `Exemplo sanitizado ligado à privada`: os casos completos de `EntradaDeTerceiro`, `EntradaDoIndustrializador` e dos pacotes associados ficam referenciados na pasta privada `C:\\Dev\\Knowledge\\GeneXus-XPZ-PrivateMap`; nesta raiz publica ficam apenas os sintomas resumidos e as correcoes operacionais.
 
 ## Vocabulario operacional de fonte e molde
 
@@ -1057,8 +1101,9 @@ Funcionar como resumo decisório sem esconder os limites da evidência.
 ```
 
 - Evidência direta: `Attributes` e um bloco adicional comum no formato normal, mas nao invariavel
-- Inferência forte: para geracao conservadora de objetos comuns, este envelope minimo e mais seguro do que qualquer variante full/especial com `KnowledgeBase` ou `Settings`
+- Inferência forte: para geracao conservadora de objetos comuns, este envelope minimo continua sendo referencia util, mas nao deve ser promovido a formato universal para qualquer pacote misto
 - Evidência direta: esse envelope minimo ja sustentou uma importacao bem-sucedida de um `Procedure` de teste nesta trilha, desde que os GUIDs de `Source` fossem sintaticamente validos
+- Evidência direta: em frente posterior desta mesma trilha, um pacote misto com `Transaction`, `WorkWithForWeb` e `Procedure` so passou quando foi remontado como pacote embutido, tomando export real comparavel da IDE como molde.
 
 ## Regras de fonte
 
@@ -1073,4 +1118,3 @@ Funcionar como resumo decisório sem esconder os limites da evidência.
 - Hipótese: mesmo com anexos representativos, `WorkWithForWeb` continua entre os tipos mais sensiveis a `pattern`, `parent` transacional e contexto gerado; por isso, casos muito distantes do molde documentado ainda podem pedir paralelo bruto mais proximo
 - Hipótese: as familias `F3` e `F4` de `Transaction` ainda ficam mais seguras com molde bruto comparavel adicional, por terem densidade estrutural maior e ainda nao terem anexo completo proprio
 - Inferência forte: para o envelope externo do XPZ observado, a especificacao desta propria base ja e suficiente para evitar inventar `Objects.xml` isolado ou hierarquia externa sem prova local
-
