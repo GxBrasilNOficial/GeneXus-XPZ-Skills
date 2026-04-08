@@ -325,6 +325,7 @@ Servir como primeira triagem operacional antes de qualquer tentativa de clonagem
 | Panel | alto | 7/7 | 7/7 | baixa | exigir molde bruto comparável muito proximo do caso alvo |
 | Procedure | alto | 2281/2281 | 0/2281 | baixa | exigir molde bruto comparável muito proximo e preservar todos os blocos recorrentes |
 | SDT | medio | 591/594 | 0/594 | media-baixa | clonar so com template do mesmo subtipo estrutural e checagem de parent |
+| Table | baixo-contextual | 0/228 | 0/228 | alta | incluir sempre junto com a `Transaction` de mesmo nome; Part types fixos e confirmados em 228 objetos; risco residual e de reassociacao fisica no destino, nao estrutural |
 | Theme | medio | 0/7 | 0/7 | media-baixa | usar apenas para experimentos muito controlados e com diff manual |
 | Transaction | muito alto | 183/183 | 0/183 | media | permitir geracao por padrao estrutural inferido; preservar estrutura e tratar erros incrementalmente |
 | WebPanel | muito alto | 1195/1196 | 0/1196 | media-baixa | permitir geracao por familia estrutural; usar molde interno proximo; nao generalizar estrutura |
@@ -332,6 +333,8 @@ Servir como primeira triagem operacional antes de qualquer tentativa de clonagem
 
 ## Notas de leitura
 
+- `Evidência direta`: `Table` é o único tipo de volume relevante (228 objetos) onde `ParentModuleDependency = 0/228` não significa ausência de dependência contextual, mas ausência do atributo `parent` nomeado — `Table` usa apenas `parentGuid` e `moduleGuid`. A dependência real de `Table` está na `Transaction` de mesmo nome existir no destino.
+- `Evidência direta`: `Table` tem exatamente 2 `Part type` em 100% dos 228 objetos: `00000000-0000-0000-0002-000000000004` (chave) e `a5c0e770-560d-0001-0001-7fe71c260de3` (índices). Índices embutidos usam `type="9e750647-3679-0000-0100-2529de263960"` com `Part type` interno `62cfa789-c127-0001-0100-77676175e433`.
 - Evidência direta: `Transaction`, `WebPanel` e `WorkWithForWeb` combinam alta dependencia contextual com estrutura relativamente rica ou pattern explicito.
 - Inferência forte: `Transaction` e `WebPanel` continuam em risco alto/muito alto, mas deixam de ser bloqueados por falta de base amostral.
 - Inferência forte: `PackagedModule`, `Theme` e parte de `SDT` seguem entre os candidatos menos agressivos do recorte, mas ainda nao devem ser tratados como baixos riscos absolutos.

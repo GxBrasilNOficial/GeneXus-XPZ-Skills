@@ -249,6 +249,20 @@ Separar com mais precisao o que e falta de shape, o que e dependencia semantica 
 - `Evidência direta`: num consolidado revisado posterior, o `Attribute 'AtributoExemploFechadoA'`, extraido do acervo real e sem `ControlItemDescription`, importou com sucesso.
 - `Inferência forte`: `Attribute` passa a ser considerado estruturalmente destravado nesta trilha, desde que o caso escolhido seja top-level real e semanticamente fechado no ambiente de destino.
 
+### `Table`
+
+- `Evidência direta`: leitura direta de `228` objetos `Table` em `C:\SANITIZED\ObjetosDaKbEmXml\Table` confirma exatamente `2` `Part type` em `100%` dos casos — sem variação entre os exemplares.
+- `Evidência direta`: `Part type="00000000-0000-0000-0002-000000000004"` contém `<Key>` com lista de `<Item guid="...">NomeDoAtributo</Item>`, representando a chave primária da tabela.
+- `Evidência direta`: `Part type="a5c0e770-560d-0001-0001-7fe71c260de3"` contém `<Indexes>` com um ou mais `<TableIndex><Index ... type="9e750647-3679-0000-0100-2529de263960">`, representando os índices da tabela.
+- `Evidência direta`: nenhum terceiro `Part type` foi encontrado em nível de `Object` nos 228 exemplares.
+- `Evidência direta`: o nó `<Object>` de `Table` NÃO possui atributo `parent` por nome; possui apenas `parentGuid` e `moduleGuid`. Esse comportamento difere de `Transaction`, `Procedure` e outros tipos que carregam `parent` nominal — `Table` é a única família de tamanho relevante observada sem `parent` nomeado.
+- `Evidência direta`: cardinalidade da chave primária nos 228 objetos: 1 campo (34 tabelas, 15%), 2 campos (106, 46%), 3 campos (59, 26%), 4 campos (15, 7%), 5 campos (9, 4%), 6 campos (5, 2%). Chaves compostas representam 85% do corpus.
+- `Evidência direta`: número de índices por `Table`: mínimo 2, máximo 59, média 6,5 — observado nos 228 exemplares.
+- `Evidência direta`: todos os `1480` objetos `Index` embutidos usam `type="9e750647-3679-0000-0100-2529de263960"` e contêm exatamente `1` `Part type` interno: `62cfa789-c127-0001-0100-77676175e433` (lista de `<Members>`).
+- `Evidência direta`: dos 1480 índices, `1036` têm `Source="Automatic"` (gerados pelo GeneXus) e `444` têm `Source="User"` (definidos manualmente). Todo `Table` tem ao menos `1` índice `Type="Unique" Source="Automatic"` correspondente à chave primária.
+- `Inferência forte`: `Table` não carrega referência explícita à `Transaction` correspondente no XML; a associação é feita por convenção nominal — mesmo nome de objeto.
+- `Inferência forte`: o risco residual de `Table` está na reassociação correta com a `Transaction` no destino, não no envelope ou Part types — ambos são estruturalmente simples, fixos e sem variação entre famílias.
+
 ## Complemento posterior - IDE exportando `Table`, `Index` e `WorkWithForWeb`
 
 - `Evidência direta`: o export isolado `XPZExemploTabelaA.xpz` contem `228` objetos top-level no tipo `857ca50e-7905-0000-0007-c5d9ff2975ec`.
