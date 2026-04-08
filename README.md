@@ -2,7 +2,9 @@
 
 ## Português (BR)
 
-Este repositório reúne documentação consolidada sobre análise estrutural de objetos GeneXus a partir de XMLs extraídos de `XPZ`, com foco em:
+Este repositório existe para sustentar e operacionalizar skills para agentes dedicadas ao ecossistema `XPZ`/XML de GeneXus, em especial `xpz-reader`, `xpz-builder`, `xpz-sync` e `xpz-doc-builder`.
+
+A documentação consolidada e os scripts desta raiz funcionam como base metodológica e operacional dessas skills, com foco em:
 
 - leitura e interpretação de estrutura XML
 - famílias estruturais de objetos
@@ -25,6 +27,13 @@ Os documentos principais foram consolidados em 10 arquivos Markdown para facilit
 - `07-open-points-e-checklist.md`
 - `08-guia-para-agente-gpt.md`
 - `09-historico-e-inventario-publico.md`
+
+### Skills para agentes
+
+- `xpz-reader`: apoio à leitura e interpretação estrutural de `XPZ` e XMLs relacionados
+- `xpz-builder`: apoio à materialização controlada de artefatos e envelopes `XPZ`
+- `xpz-sync`: orquestração de sincronização e conferência do acervo XML a partir de parâmetros explícitos e scripts em `scripts/`
+- `xpz-doc-builder`: geração e recomposição de documentação Markdown a partir do acervo XML e de moldes sanitizados
 
 ### Leitura recomendada para humanos
 
@@ -49,9 +58,10 @@ Se você quer entender a base rapidamente:
 
 ### Automação operacional
 
-- o script [`scripts/Sync-GeneXusXpzToXml.ps1`](/C:/Dev/Knowledge/GeneXus-XPZ-ObjectModel/scripts/Sync-GeneXusXpzToXml.ps1) faz parte da infraestrutura operacional desta base e nao deve ser removido do repositório público
+- o script `scripts/Sync-GeneXusXpzToXml.ps1` faz parte da infraestrutura operacional desta base e nao deve ser removido do repositório público
 - esse script pode ser usado por projetos de produção que mantenham acervos versionados de XMLs extraidos de `XPZ`
-- a pasta `scripts/` existe como apoio operacional e utilitario compartilhavel, mas nao e fonte normativa da documentacao consolidada da raiz
+- a pasta `scripts/` existe como apoio operacional, analitico e editorial compartilhavel, mas nao e fonte normativa da documentacao consolidada da raiz
+- os scripts públicos desta raiz devem operar por parâmetros explícitos de entrada e saída, sem depender de caminhos absolutos privados
 - se o motor precisar evoluir, a mudança deve preservar compatibilidade com esse uso ou ser acompanhada de atualização explícita dos wrappers consumidores
 
 ---
@@ -149,6 +159,3 @@ If you want to understand the repository quickly:
 - the base already includes documented import tests in controlled cases, but that still does not remove risk
 - complete sanitized templates can serve as a starting point in specific scenarios documented in the base itself; textual summaries and incomplete examples are not valid as the final source for materialization
 - the content is meant to reduce trial and error, not to eliminate risk
-
-
-

@@ -28,17 +28,18 @@ Caminho opcional para salvar um relatório JSON com o resultado.
 .PARAMETER KeepReport
 Mantem o relatorio JSON mesmo quando a execucao termina sem erro.
 .EXAMPLE
-.\Sync-GeneXusXpzToXml.ps1 -InputPath C:\Exports\MeuPacote.xpz
+.\Sync-GeneXusXpzToXml.ps1 -InputPath C:\Exports\MeuPacote.xpz -DestinationRoot C:\Acervo\ObjetosDaKbEmXml
 
 .EXAMPLE
-.\Sync-GeneXusXpzToXml.ps1 -InputPath C:\Exports\MeuFull.xml -VerifyOnly -FullSnapshot
+.\Sync-GeneXusXpzToXml.ps1 -InputPath C:\Exports\MeuFull.xml -DestinationRoot C:\Acervo\ObjetosDaKbEmXml -VerifyOnly -FullSnapshot
 #>
 
 param(
     [Parameter(Mandatory = $true)]
     [string]$InputPath,
 
-    [string]$DestinationRoot = "C:\Dev\Prod\Gx_FabricaBrasil\ObjetosDaKbEmXml",
+    [Parameter(Mandatory = $true)]
+    [string]$DestinationRoot,
 
     [switch]$VerifyOnly,
 
@@ -48,7 +49,6 @@ param(
 
     [switch]$KeepReport
 )
-
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
