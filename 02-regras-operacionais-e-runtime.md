@@ -124,6 +124,15 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
 - `Exemplo sanitizado`: um `WorkWithWeb` com filtros fiscais, acao de planilha e `IconeUpdate` deve ser validado por partes, comparando o XML gerado com o artefato equivalente da KB antes do `Load`.
 - `Referencia privada`: os casos completos, sem sanitizacao, ficam mapeados em `C:\\Dev\\Knowledge\\GeneXus-XPZ-PrivateMap`; a raiz publica deve manter apenas o aprendizado resumido e os exemplos anonimizados.
 
+### Validacao separada em `WebPanel` e pacote delta
+
+- `Regra operacional`: em `WebPanel`, nao assumir que o `Conditions` visivel na IDE venha automaticamente de um `Part` fixo; antes de concluir shape, localizar no XML real onde aquele tipo de controle persiste o filtro.
+- `Evidência direta`: em `FreeStyleGrid`, ja houve caso em que o filtro navegou em runtime, mas a mesma forma nao foi aceita pelo parser estrutural da IDE.
+- `Regra operacional`: tratar `Load`, `Import` e `Specification` como validacoes separadas; sucesso em uma camada nao prova sucesso nas outras.
+- `Regra operacional`: ao ajustar `ControlWhere` no XML, preferir a sintaxe aceita pelo editor estrutural da IDE; navegacao em runtime, sozinha, nao basta como criterio de materializacao segura.
+- `Evidência direta`: declarar `controlName` explicito em `<data>` pode reduzir ambiguidade estrutural no XML, mas isso nao garante que o nome fique disponivel como identificador manipulavel no source do objeto.
+- `Regra operacional`: em pacote delta GeneXus, quando ja existir pacote equivalente validado na IDE, reaproveitar o envelope completo desse pacote como molde; nao simplificar cabecalho, `Dependencies` ou `ObjectsIdentityMapping` por inferencia.
+
 ### Modos de falha observados e correcoes
 
 - `Erro sanitizado`: declaracao `<?xml ...?>` duplicada dentro de `<Objects>` no `import_file.xml`.
