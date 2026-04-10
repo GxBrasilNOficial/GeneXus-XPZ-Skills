@@ -127,6 +127,11 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
 ### Validacao separada em `WebPanel` e pacote delta
 
 - `Regra operacional`: em `WebPanel`, nao assumir que o `Conditions` visivel na IDE venha automaticamente de um `Part` fixo; antes de concluir shape, localizar no XML real onde aquele tipo de controle persiste o filtro.
+- `Regra operacional`: quando a duvida for "onde a IDE realmente persiste esta propriedade?", decidir a partir de XML exportado pela propria IDE para objetos comparaveis da mesma KB; nao decidir por analogia com outro controle, outro `Part` ou outra familia de `WebPanel`.
+- `Regra operacional`: tratar `Conditions` materializado, `Defaults` de template (`ViewConditions.dkt`, `TabGridConditions.dkt`) e metadado serializado de layout como camadas distintas; a mera presenca textual da palavra `Conditions` nao prova filtro persistido.
+- `Regra operacional`: em `WebPanel`, `ControlWhere`, `ControlBaseTable`, `ControlOrder` e `ControlUnique` devem ser procurados primeiro no `Source` do `Part` de layout, normalmente dentro de `PATTERN_ELEMENT_CUSTOM_PROPERTIES`; so tratar outro `Part` como origem quando houver evidencia direta no XML real.
+- `Regra operacional`: `WebUserControlProperties` e `PATTERN_ELEMENT_CUSTOM_PROPERTIES` devem ser lidos como metadado serializado de controle no layout, e nao como propriedades planas do objeto.
+- `Regra operacional`: em `Prompt`, `Selection List`, `Dynamic Combo` e variantes com grid, confirmar por familia se o filtro operacional esta no `Part` de `Conditions`, no layout, ou nos dois lugares; nao promover padrao localizado a regra universal.
 - `Evidência direta`: em `FreeStyleGrid`, ja houve caso em que o filtro navegou em runtime, mas a mesma forma nao foi aceita pelo parser estrutural da IDE.
 - `Regra operacional`: tratar `Load`, `Import` e `Specification` como validacoes separadas; sucesso em uma camada nao prova sucesso nas outras.
 - `Regra operacional`: ao ajustar `ControlWhere` no XML, preferir a sintaxe aceita pelo editor estrutural da IDE; navegacao em runtime, sozinha, nao basta como criterio de materializacao segura.
@@ -137,6 +142,8 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
 
 - `Exemplo sanitizado`: em um `WebPanel` de prompt com `simplegrid`, o layout expunha o controle com `controlName`, mas o filtro pesquisavel ficou materializado em outro `Part`, como linhas de condicao no `Source`; isso prova que o ponto real de persistencia precisa ser confirmado no XML antes de atribuir o `Conditions` a um bloco fixo.
 - `Exemplo sanitizado`: em outro `WebPanel` com `grid class="FreeStyleGrid"`, o mesmo criterio de filtro apareceu tanto no `ControlWhere` do layout quanto em `Part` estrutural separado; esse tipo de duplicidade explica por que `Load`, `Import` e `Specification` precisam continuar sendo validados como camadas distintas.
+- `Exemplo sanitizado`: em `WPExemploGridEstruturalA`, um grid tradicional persistiu `ControlBaseTable`, `ControlOrder`, `ControlWhere` e `ControlUnique` no layout, dentro de `PATTERN_ELEMENT_CUSTOM_PROPERTIES`, sem depender de propriedade plana no objeto.
+- `Exemplo sanitizado`: em `WPExemploComboDinamicoA`, o `Dynamic Combo Box` persistiu `ControlWhere` no layout e configuracao complementar em `WebUserControlProperties`; isso mostra que filtro de combo dinamico nao deve ser confundido com `Conditions` materializado.
 - `Exemplo sanitizado`: em pacotes delta reais com um unico objeto, o envelope completo continuou incluindo `KMW`, `Source`, `Objects`, `Dependencies` e `ObjectsIdentityMapping`, mesmo quando os dois blocos finais estavam vazios; por isso, a forma segura e clonar o pacote equivalente validado, nao podar o fecho por "limpeza" manual.
 
 ### Modos de falha observados e correcoes

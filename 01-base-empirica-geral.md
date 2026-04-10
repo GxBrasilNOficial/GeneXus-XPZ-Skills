@@ -108,6 +108,29 @@ Servir como base conceitual para os documentos empíricos e operacionais.
 - `Evidência direta`: no mesmo arquivo há outro `Source` com blocos `Event`.
 - `Inferência forte`: em `WebPanel`, layout declarativo e código de eventos tendem a aparecer em partes distintas do XML.
 
+### Persistencia real de propriedades em `WebPanel`
+
+- `Evidência direta`: numa releitura operacional posterior de `1197` `WebPanel`, os `7` `Part type` recorrentes do tipo continuaram presentes em `100%` dos casos.
+- `Evidência direta`: o `Part type="d24a58ad-57ba-41b7-9e6e-eaca3543c778"` concentrou o layout declarativo e a quase totalidade das propriedades estruturais de controle observadas nesta frente.
+- `Evidência direta`: `PATTERN_ELEMENT_CUSTOM_PROPERTIES` apareceu em `411/1197` `WebPanel`, sempre no `Source` do `Part` de layout.
+- `Evidência direta`: `WebUserControlProperties` apareceu em `172/1197` `WebPanel`, sempre no `Source` do `Part` de layout.
+- `Evidência direta`: `ControlWhere` apareceu em `101/1197` casos; `100` deles vieram do `Part` de layout, serializados dentro de propriedades de controle, e `1` caso apareceu em `Part` de variáveis.
+- `Evidência direta`: `ControlBaseTable` apareceu em `23/1197`, `ControlOrder` em `86/1197` e `ControlUnique` em `13/1197`; nesses casos, a persistência observada ficou concentrada no `Source` do `Part` de layout, dentro de metadado serializado de controles.
+- `Evidência direta`: o `Part type="763f0d8b-d8ac-4db4-8dd4-de8979f2b5b9"` apareceu em `1197/1197` `WebPanel`, mas só `141` casos tinham `Source` nao vazio nesse `Part`.
+- `Evidência direta`: `Conditions` como filtro materializado apareceu nesses `141` casos via `Source` do `Part` `763f0d8b-d8ac-4db4-8dd4-de8979f2b5b9`, e nao como atributo do layout.
+- `Evidência direta`: a busca textual por `Conditions` supercontou casos de template, porque `183` objetos usavam `ViewConditions.dkt` e `179` usavam `TabGridConditions.dkt` apenas em metadado de `Defaults`.
+- `Evidência direta`: em `Prompt`/`Selection List`, a materializacao de filtro no `Part` de `Conditions` foi forte: `92/100` `prompt*` tinham `Source` nao vazio nesse `Part`, e os `30` casos com `Selection List` pertenciam a essa familia.
+- `Evidência direta`: em `FreeStyleGrid`, houve `10` casos; todos tinham `ControlWhere` no layout, `8/10` tinham `ControlOrder` e `9/10` tinham `WebUserControlProperties`.
+- `Evidência direta`: em grids tradicionais com tag `<grid`, houve `26` casos; `16` com `ControlWhere`, `9` com `ControlBaseTable`, `14` com `ControlOrder` e `5` com `ControlUnique`.
+- `Evidência direta`: em controles com `Dynamic Combo Box`, houve `58` casos; `56` deles coexistiam com `ControlWhere` no layout e `50` com `WebUserControlProperties`.
+- `Exemplo sanitizado`: `WPExemploSelectionPromptA` mostra `Selection List` com filtro materializado no `Part` de `Conditions`, enquanto `ControlOrder` e `WebUserControlProperties` permanecem no layout.
+- `Exemplo sanitizado`: `WPExemploGridEstruturalA` mostra grid tradicional com `ControlBaseTable`, `ControlOrder`, `ControlWhere` e `ControlUnique` serializados no layout.
+- `Exemplo sanitizado`: `WPExemploComboDinamicoA` mostra `Dynamic Combo Box` com `ControlWhere` persistido no layout e configuracao adicional em `WebUserControlProperties`.
+- `Exemplo sanitizado`: `WPExemploGridLivreA` mostra `FreeStyleGrid` com filtro persistido no layout via `ControlWhere`, junto com metadado adicional de controle no mesmo `Part`.
+- `Exemplo sanitizado`: `WPExemploConditionsTemplateA` mostra caso em que o termo `Conditions` aparece so por `Defaults` de template, sem filtro materializado no `Source` do `Part` de condicoes.
+- `Inferência forte`: para `WebPanel`, "a propriedade existe no XML" e "a propriedade persiste no mesmo lugar em todas as familias" sao afirmacoes diferentes; o ponto de persistencia varia por familia e por tipo de controle.
+- `Inferência forte`: para trilha `xpz-*`, a leitura segura e distinguir pelo menos `Conditions` materializado em `Part` proprio, metadado de layout serializado e defaults de template antes de decidir clonagem, comparacao ou documentacao.
+
 ### `Transaction`
 
 - `Evidência direta`: em `C:\SANITIZED\ObjetosDaKbEmXml\Transaction\TRNExemplo0001.xml` e `TRNExemplo0002.xml` aparecem nós `<Level ...>` e vários `<AttributeProperties Attribute="...">`.

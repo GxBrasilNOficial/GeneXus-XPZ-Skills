@@ -81,6 +81,7 @@ Os wrappers seguem esta convenção de parâmetros:
 5. Montar o comando com os parâmetros corretos
 6. Executar via Bash com `pwsh -File ...`
 7. Reportar: objetos criados, atualizados, ignorados, resíduos removidos e resumo Git
+8. Quando um objeto voltar da KB via `xpz` e for materializado no acervo oficial, tratar esse XML do acervo como a fonte mais confiável para alterações futuras; não reutilizar cópia intermediária/delta sem comparar com o acervo atualizado
 
 ---
 
@@ -90,4 +91,6 @@ Os wrappers seguem esta convenção de parâmetros:
 - NUNCA assumir caminhos absolutos privados — sempre derivar da raiz do repositório
 - NUNCA assumir os nomes dos wrappers sem consultar o `README.md` local
 - NUNCA mover arquivos entre pastas de trabalho e acervo — responsabilidade do fluxo oficial
+- NUNCA reutilizar automaticamente artefato de importação/delta como base de nova alteração se o mesmo objeto já tiver voltado da KB e sido materializado no acervo oficial
+- Antes de gerar novo delta de objeto já retornado da KB, comparar a cópia intermediária com o XML atual do acervo e rebasear no acervo se houver defasagem
 - Se o script não for encontrado na raiz resolvida, reportar o erro e perguntar ao usuário antes de tentar qualquer alternativa
