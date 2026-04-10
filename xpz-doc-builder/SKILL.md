@@ -13,6 +13,12 @@ Gera, recompõe e atualiza documentação Markdown a partir do acervo XML do rep
 
 Identificar a raiz do repositório pelo contexto, localizar os scripts documentais em `scripts\`, resolver caminhos de entrada e saída a partir do cenário atual e delegar a geração ou atualização aos scripts apropriados. Evitar edição manual de `.md` longos quando houver fluxo automatizável.
 
+## PATH RESOLUTION
+
+- Este `SKILL.md` fica dentro de uma subpasta de skill sob a raiz do repositório.
+- Toda referência `../arquivo.md` deve ser resolvida a partir da pasta deste `SKILL.md`, e não do diretório de trabalho corrente.
+- Na prática, `../` aponta para a base metodológica compartilhada na pasta-pai desta skill.
+
 ---
 
 ## TRIGGERS

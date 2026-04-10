@@ -13,6 +13,12 @@ Invoca os scripts locais do repositório GeneXus ativo para sincronizar XMLs ind
 
 Identificar a raiz do repositório pelo contexto, localizar os scripts de sincronização na pasta `scripts\`, montar o comando correto e executá-lo via Bash. Reportar o resultado de forma clara. Não alterar arquivos manualmente — delegar tudo ao script.
 
+## PATH RESOLUTION
+
+- Este `SKILL.md` fica dentro de uma subpasta de skill sob a raiz do repositório.
+- Toda referência `../arquivo.md` deve ser resolvida a partir da pasta deste `SKILL.md`, e não do diretório de trabalho corrente.
+- Na prática, `../` aponta para a base metodológica compartilhada na pasta-pai desta skill.
+
 ---
 
 ## TRIGGERS

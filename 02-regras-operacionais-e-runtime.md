@@ -195,6 +195,10 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
 
 - `Regra documentada`: o `Refresh event` e o `Refresh Grid event` sao executados antes da carga/re-carga dos dados exibidos, e o `Load event` pode ser executado para cada linha quando ha grid com base de navegacao.
 - `Regra documentada`: em Web, os eventos de refresh usam ciclo Ajax; isso melhora a troca com o cliente, mas nao elimina custo server-side de navegacao e carga de dados.
+- `Evidência direta`: em `WebPanel`, declarar `Event &Variavel.ControlValueChanged()` mesmo vazio registra roundtrip Ajax implicito para a variavel, em vez de funcionar como marcador inofensivo.
+- `Regra operacional`: remover `ControlValueChanged` vazio deve ser lido como ajuste de performance e previsibilidade, nao apenas como limpeza cosmetica de codigo.
+- `Regra operacional`: nao posicionar `SetFocus()` em `Event Refresh` quando o foco desejado depender de uma acao especifica; por ser escopo global de refresh Ajax, esse evento tende a reaplicar foco em momentos laterais e produzir salto inesperado.
+- `Regra operacional`: quando houver necessidade real de reposicionar foco em `WebPanel`, preferir `Event Start`, `Event Enter`, `Event Click` ou `Sub` chamado por evento explicitamente controlado.
 - `Inferência forte`: `WebPanel` com `events` + `grid` + acoes + `parent` contextual tende a merecer cautela runtime maior que uma casca minima sem eventos.
 - `Inferência forte`: `WebPanel` gerado por pattern/defaults ou acoplado a `MasterPage` e seguranca integrada tende a depender mais do contexto da KB do que um painel isolado e pequeno.
 

@@ -13,6 +13,12 @@ Interprets raw XML from GeneXus XPZ exports. Identifies object type, structural 
 
 Read and classify GeneXus XML objects from XPZ packages. Answer only what the evidence supports. Always declare confidence level.
 
+## PATH RESOLUTION
+
+- This `SKILL.md` lives inside a skill subfolder under the repository root.
+- Resolve every `../arquivo.md` reference relative to the directory of this `SKILL.md`, not relative to the current working directory.
+- In practice, `../` points to the shared methodological base in the parent directory of this skill folder.
+
 ---
 
 ## TRIGGERS

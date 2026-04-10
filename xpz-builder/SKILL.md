@@ -13,6 +13,12 @@ Generates GeneXus XML objects for XPZ packaging using conservative cloning from 
 
 Generate or clone GeneXus XPZ objects only from comparable structural templates. Abort when a suitable template does not exist. Never invent structure.
 
+## PATH RESOLUTION
+
+- This `SKILL.md` lives inside a skill subfolder under the repository root.
+- Resolve every `../arquivo.md` reference relative to the directory of this `SKILL.md`, not relative to the current working directory.
+- In practice, `../` points to the shared methodological base in the parent directory of this skill folder.
+
 ---
 
 ## TRIGGERS
