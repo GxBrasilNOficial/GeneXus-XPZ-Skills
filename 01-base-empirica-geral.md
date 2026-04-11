@@ -9688,6 +9688,56 @@ Endcase]]></Source>
 </Object>
 ```
 
+## Exemplos sanitizados minimos de compatibilidade de `Source`
+
+- `Objetivo`: registrar padroes minimos de `Source` que esta propria trilha ja sustenta metodologicamente sem depender de corpus grande da KB.
+- `Regra operacional`: estes exemplos servem como camada metodologica primaria para KB nova ou pouco povoada; o corpus local entra apenas como confirmacao ou desempate.
+- `Regra operacional`: ao introduzir operador, funcao, conversao ou padrao string/numerico novo em `Source`, preferir reescrita usando um destes padroes ou outro ja documentado nesta base.
+- `Regra operacional`: a ausencia de um operador, funcao ou conversao nesta secao nao prova proibicao absoluta, mas impede tratar o trecho como pronto sem outra base metodologica explicita da trilha.
+
+### Padrao minimo 1 - `parm(...)` simples de entrada e saida
+
+- `Uso operacional`: forma minima ja documentada na trilha para assinatura simples de `Procedure`.
+
+```geneXus
+parm(out:&DomainExemploTipoOperacaoA);
+parm(in:ContextoAId, in:ContextoBId);
+```
+
+### Padrao minimo 2 - conversao numerico para texto com ajuste explicito
+
+- `Uso operacional`: conversao numerico->texto e montagem de string ja documentadas nesta base por molde sanitizado de `DataProvider`.
+
+```geneXus
+Chave = RegistroId.ToString()
+Valor = "CtxA:" + RegistroEmpresaId.ToString().Trim() +
+" Chave: " + RegistroId.ToFormattedString() +
+"| Seq:" + SequenciaExemplo.ToString()
+```
+
+### Padrao minimo 3 - string e enumeracao em composicao textual
+
+- `Uso operacional`: composicao textual com `Trim()` e `EnumerationDescription()` ja aparece em molde sanitizado documentado nesta base.
+
+```geneXus
+" | B:" + procRightExemplo(PessoaBId.ToString()," ",10) +
+"-" + PessoaBNome.Trim() + " (" + TipoRegistro.EnumerationDescription() + ")"
+```
+
+### Padrao minimo 4 - condicao booleana com `IsNull()` e guarda com `when`
+
+- `Uso operacional`: padrao de filtro/condicao ja documentado nesta base para `Source` de condicao materializada.
+
+```geneXus
+RegistroMovimentoCancelado = false or RegistroMovimentoCancelado.IsNull() when not &SomenteCancelados
+MovimentoEmpresaId = &sdtRegistroParametros.EmpresaId when not &sdtRegistroParametros.EmpresaId.IsEmpty()
+```
+
+### Limite metodologico atual
+
+- `Evidência direta`: esta secao ancora apenas um conjunto minimo de padroes ja documentados na propria trilha.
+- `Regra operacional`: operador, funcao ou conversao que nao apareca em regra explicita, exemplo sanitizado ou molde documentado desta base continua sem lastro suficiente para consolidacao final apenas por plausibilidade.
+
 ## Moldes sanitizados completos de Stencil
 
 ### Molde sanitizado de Stencil 1 - `StencilCardResumoExemplo`

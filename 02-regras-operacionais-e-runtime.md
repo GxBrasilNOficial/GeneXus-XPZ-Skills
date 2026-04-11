@@ -173,6 +173,25 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
 - `Envelope XPZ observado`: estrutura externa `<ExportFile>` documentada acima, derivada de export real inspecionado nesta trilha.
 - `Resumo textual`: tabelas, frequencias, heuristicas e explicacoes. Serve para decidir; sozinho nao substitui um molde XML completo.
 
+## Politica para compatibilidade de `Source`
+
+- `Regra operacional`: `Source` GeneXus plausivel nao deve ser tratado como `Source` pronto apenas por parecer sintaticamente valido.
+- `Regra operacional`: a base primaria para aceitar novo `Source` nesta trilha e a propria documentacao metodologica, em duas formas: regra explicita e exemplo sanitizado ou molde documentado.
+- `Regra operacional`: o corpus real da KB, quando existir, entra como reforco, confirmacao ou desempate; ele nao substitui a base metodologica da trilha.
+- `Regra operacional`: isso vale tambem para KB nova ou pouco povoada; a camada metodologica da trilha deve bastar para orientar a geracao conservadora sem depender de corpus rico.
+- `Regra operacional`: antes de consolidar um `Source` novo ou alterado, materializar explicitamente os itens novos introduzidos pela mudanca em quatro grupos: `operadores`, `funcoes`, `conversoes` e `padroes string/numerico`.
+- `Regra operacional`: cada item novo desses grupos deve apontar pelo menos uma base metodologica desta trilha: regra explicita, exemplo sanitizado ou molde documentado.
+- `Regra operacional`: se um item novo estiver sustentado apenas por intuicao, memoria generica de GeneXus ou ocorrencia isolada do corpus local sem amparo metodologico da trilha, o `Source` nao deve ser consolidado.
+- `Regra operacional`: quando nao houver base metodologica suficiente para um item essencial do `Source`, o agente deve reescrever a solucao usando padrao ja documentado ou abortar a consolidacao.
+- `Regra operacional`: `XML` bem-formado, envelope correto, `Load` parcial ou `runtime` plausivel nao substituem validacao de compatibilidade do dialeto de `Source` aceito nesta trilha.
+
+### Decisao operacional para `Source`
+
+- `Prosseguir`: todos os itens novos do `Source` estao ancorados em regra explicita, exemplo sanitizado ou molde documentado desta trilha.
+- `Prosseguir com ressalva`: a trilha cobre o padrao principal e o corpus local apenas confirma ou desempata a escolha.
+- `Hipotese`: permitido apenas para analise; nao autoriza consolidar `Source` final nem empacotar.
+- `Abortar`: item essencial do `Source` sem base metodologica suficiente na trilha e sem reescrita para padrao documentado.
+
 ## Ligacao estrutural com runtime GeneXus
 
 - `Evidência direta`: no acervo desta KB, `Transaction` aparece em 183 objetos, todos com `parent`, todos com `Level`, e 177/183 com `AttributeProperties`.

@@ -109,6 +109,10 @@ Reference files and when to load them:
    - Before generating a new delta for an object that already returned from the KB, compare any intermediate import/delta copy against the official corpus XML and rebase on the official corpus if the working copy is stale
    - If a filter, business rule, or functional interpretation depends on a calculated or derived field, open the field formula/source and review the immediate chain of called procedures before defining the condition
    - Do NOT conclude the semantic meaning of a calculated or derived field from its name, label, or mere XML presence
+   - If the change introduces or rewrites `Source`, classify every new operator, function, conversion, and string/numeric pattern introduced by the change
+   - Each introduced `Source` construct must be anchored by layer-1 methodological evidence from this XPZ trail: explicit rule, sanitized example, or documented template
+   - Local KB corpus may confirm or disambiguate the choice, but does NOT replace layer-1 methodological evidence
+   - If an essential `Source` construct is still justified only by plausibility, generic GeneXus memory, or isolated local corpus evidence, rewrite it using documented patterns or **ABORT**
 6. Apply envelope rules from [02-regras-operacionais-e-runtime](../02-regras-operacionais-e-runtime.md):
    - Wrap in `<ExportFile>` with `<KMW>`, `<Source>`, `<Objects>`, `<Dependencies>`
    - Keep `Source/@kb` and `Source/Version/@guid` in valid GUID format
@@ -121,6 +125,9 @@ Reference files and when to load them:
    - Template and target share the same structural family
    - Container identity matches comparable corpus evidence for `fullyQualifiedName`, `name`, `parent`, `parentGuid`, `parentType`, and `moduleGuid`
    - When the case depends on IDE-oriented editing, prefer the syntax and structure accepted by the editor/importer, not only what appears to work at runtime
+   - Validate `Source` compatibility separately from XML well-formedness
+   - A plausible GeneXus `Source` is NOT ready unless every new operator, function, conversion, and string/numeric pattern is backed by methodological evidence from this trail
+   - Treat local corpus evidence as confirmation or tie-breaker, not as the sole basis for accepting a new `Source` construct
    - Treat structural XML validation, package-envelope validation, and semantic-contract validation as separate checks
    - Well-formed XML and an acceptable envelope do NOT prove that signatures, formulas, or business meaning are correct
    - If a shared procedure changed its `parm(...)`, review all direct call sites explicitly before concluding the delta
@@ -145,6 +152,9 @@ Reference files and when to load them:
 - [ ] Envelope complete: `<ExportFile>`, `<KMW>`, `<Source>`, `<Objects>`, `<Dependencies>`
 - [ ] `lastUpdate` is a real timestamp, not a placeholder
 - [ ] `Source/@kb` and `Source/Version/@guid` are valid GUIDs
+- [ ] Every new operator, function, conversion, and string/numeric pattern introduced in `Source` is backed by layer-1 methodological evidence
+- [ ] Local corpus evidence, when used for `Source`, was treated only as confirmation or tie-breaker
+- [ ] No essential `Source` construct was accepted only because it looked plausible
 - [ ] If a shared procedure changed its `parm(...)`, all relevant direct call sites were reviewed explicitly
 - [ ] Limitations block included in output
 
@@ -157,9 +167,11 @@ Reference files and when to load them:
 - NEVER treat `runtime`, `Import File Load`, `Import`, and `Specification` as interchangeable evidence
 - NEVER promote a `Folder` name into `fullyQualifiedName` by analogy or by string concatenation alone
 - NEVER propose a business filter over status, authorization, cancellation, invoicing, balance, availability, or similar functional meaning if the chosen field is still semantically justified only by its name or UI label
+- NEVER treat plausible GeneXus `Source` as ready when its new syntax is not anchored in the methodological base of this trail
 - NEVER generate from a text description or markdown summary alone — requires comparable raw XML template
 - NEVER generate special KB block (`KnowledgeBase`, `Settings`) for normal single-object XPZ
 - ABORT if risk is high/very high and no internal comparable template is available
 - ABORT if type has fewer than 5 specimens in the corpus and no sanitized template exists
 - ABORT if container identity is unresolved between `Folder` and `Module` for the target object
+- ABORT if an essential `Source` construct depends only on intuition, generic GeneXus memory, or isolated local corpus evidence
 - Absolute rules in [00-readme-genexus-xpz-xml.md](../00-readme-genexus-xpz-xml.md) and [08-guia-para-agente-gpt.md](../08-guia-para-agente-gpt.md) take precedence over all other heuristics

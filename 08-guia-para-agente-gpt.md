@@ -64,6 +64,13 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 - filtro de negocio sobre campo derivado exige validar a formula antes da proposta
 - se a formula chamar `Procedure`, a leitura deve seguir pelo menos a cadeia imediata necessaria para justificar o significado funcional do campo
 
+## Regra de leitura para compatibilidade de `Source`
+
+- `Source` que parece GeneXus valido nao prova compatibilidade operacional
+- operador, funcao, conversao ou padrao string/numerico novo so pode ser aceito como pronto quando a propria trilha XPZ o sustentar por regra explicita, exemplo sanitizado ou molde documentado
+- corpus local da KB ajuda a confirmar e desempatar, mas nao substitui a base metodologica
+- se um trecho essencial do `Source` continuar sustentado apenas por plausibilidade, o agente deve reescrever para padrao documentado ou abortar a consolidacao
+
 ## Regra de leitura para XPZ
 
 - quando a tarefa envolver montar ou serializar `XPZ`, consultar primeiro a secao `Envelope XPZ observado em export real` de `02-regras-operacionais-e-runtime.md`
@@ -141,6 +148,9 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 - “é seguro editar” sem qualificação de risco e nível de evidência
 - “o nome do campo deixa claro” quando o campo for calculado ou derivado
 - “o XML esta valido, entao a regra esta certa”
+- “parece GeneXus valido, entao deve importar”
+- “o corpus local tem algo parecido, entao basta”
+- “o Source esta plausivel”
 
 ## Tipos em maior cautela
 
@@ -183,6 +193,8 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 - Evidência direta: o agente nao deve materializar objeto final a partir de resumo textual sem XML completo
 - Evidência direta: identidade estrutural de objeto sob `Folder` ou `Module` deve ser decidida por exemplar comparavel da mesma KB, conferindo em conjunto `fullyQualifiedName`, `name`, `parent`, `parentGuid`, `parentType` e `moduleGuid`
 - Regra operacional: nome de `Folder` nao deve ser promovido para `fullyQualifiedName` por analogia; primeiro classificar o conteiner por `parentType`, depois seguir o padrao do exemplar comparavel
+- Evidência direta: compatibilidade de `Source` deve ser decidida primeiro pela propria trilha XPZ, usando regra explicita, exemplo sanitizado ou molde documentado, mesmo quando a KB ainda tiver corpus pequeno
+- Regra operacional: corpus local da KB pode confirmar ou desempatar um trecho de `Source`, mas nao substitui a base metodologica nem autoriza consolidar sintaxe apenas plausivel
 - Inferência forte: para `WebPanel`, os anexos completos de `04-webpanel-familias-e-templates.md` ja podem servir como molde sanitizado documentado
 - Inferência forte: para `Transaction`, `05-transaction-familias-e-templates.md` ja contem moldes sanitizados completos para as familias `F1`, `F2`, `F5` e `F6`
 - Inferência forte: para `Procedure`, `DataProvider`, `DataSelector`, `Panel`, `API`, `WorkWithForWeb`, `SDT`, `Domain`, `Theme`, `PackagedModule`, `DesignSystem`, `ColorPalette`, `ThemeClass`, `ThemeColor`, `Image`, `Table`, `Document`, `ExternalObject`, `UserControl`, `Module`, `SubTypeGroup`, `PatternSettings`, `DataStore`, `Dashboard`, `DeploymentUnit`, `Generator`, `Language`, `Folder`, `Stencil` e `File`, `01-base-empirica-geral.md` ja contem moldes sanitizados completos representativos
