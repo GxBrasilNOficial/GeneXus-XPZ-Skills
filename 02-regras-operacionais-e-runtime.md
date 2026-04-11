@@ -62,6 +62,14 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
 - `Regra operacional`: em XMLs GeneXus com blocos repetidos ou muito parecidos, localizar e validar cada ocorrencia antes de aplicar a mesma edicao.
 - `Regra operacional`: depois de editar XML local, validar nao so se o XML abre, mas se os nos novos aparecem em todos os pontos funcionais esperados do objeto, especialmente em `Transaction` e `WorkWithWeb`.
 
+### Conferencia auditavel de `lastUpdate`
+
+- `Regra operacional`: gravou ou regravou XML local de objeto, releia o arquivo salvo antes de seguir.
+- `Regra operacional`: a conferencia minima obrigatoria e: cabecalho final lido, `lastUpdate` confirmado e decisao registrada entre `objeto alterado` versus `objeto nao alterado`.
+- `Regra operacional`: objeto realmente alterado deve sair com `lastUpdate` novo do instante real da ultima escrita.
+- `Regra operacional`: objeto reenviado apenas por dependencia ou composicao de pacote deve preservar o `lastUpdate` oficial do XML da KB.
+- `Regra operacional`: empacotamento nao deve prosseguir enquanto o `lastUpdate` do arquivo final nao tiver sido conferido no proprio XML salvo.
+
 ### Exemplo sanitizado do envelope observado
 
 ```xml
@@ -123,6 +131,23 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
 - `Exemplo sanitizado`: tambem houve sucesso real, nesta trilha, com pacote embutido de `4` `Transaction`, `4` `WorkWithForWeb` e `3` `Procedure`, passando por `Import File Load`, `Import`, `Updating table information` e `Pattern generation`.
 - `Exemplo sanitizado`: um `WorkWithWeb` com filtros fiscais, acao de planilha e `IconeUpdate` deve ser validado por partes, comparando o XML gerado com o artefato equivalente da KB antes do `Load`.
 - `Referencia privada`: os casos completos, sem sanitizacao, ficam mapeados em `C:\\Dev\\Knowledge\\GeneXus-XPZ-PrivateMap`; a raiz publica deve manter apenas o aprendizado resumido e os exemplos anonimizados.
+
+## Leitura operacional de logs de importacao
+
+- `Regra operacional`: ler log de importacao por etapa, nao por linha isolada.
+- `Regra operacional`: classificar cada mensagem em uma destas categorias: `erro estrutural de XML/pacote`, `erro de identidade/serializacao do objeto`, `erro de sintaxe/semantica do Source`, `erro lateral da IDE`, `warning nao bloqueante`, `sucesso terminal`.
+- `Regra operacional`: a conclusao final deve usar a etapa terminal relevante do log e o conjunto das mensagens bloqueantes.
+- `Regra operacional`: falha lateral da IDE antes, durante ou depois do import nao deve ser promovida automaticamente a falha estrutural do pacote.
+- `Regra operacional`: se o pacote abriu, mas o `Source` falhou, classificar como falha de `Source`, nao de envelope.
+- `Regra operacional`: se alguns objetos entraram e outros nao, classificar o resultado como parcial e registrar o objeto ou etapa afetada.
+- `Regra operacional`: warning ou erro lateral coexistente com `Import` bem-sucedido deve gerar `sucesso com ressalva`, nao `falha total`.
+
+### Procedimento auditavel de leitura
+
+- `Regra operacional`: identificar primeiro a etapa de cada mensagem: `Import File Load`, `Import`, `Updating table information`, `Pattern generation`, `Specification`, `backup` ou equivalente.
+- `Regra operacional`: para cada mensagem, registrar `etapa`, `categoria`, `bloqueia objeto`, `bloqueia pacote` e `conclusao parcial`.
+- `Regra operacional`: concluir o estado final a partir da etapa terminal relevante do caso, e nao da linha mais alarmante do log.
+- `Regra operacional`: quando houver falha parcial, registrar separadamente o estado final do pacote e o estado final por objeto.
 
 ### Validacao separada em `WebPanel` e pacote delta
 

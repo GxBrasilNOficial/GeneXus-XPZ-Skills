@@ -118,6 +118,11 @@ Reference files and when to load them:
    - Keep `Source/@kb` and `Source/Version/@guid` in valid GUID format
    - Do NOT include special KB block unless explicitly documented as required
 7. Set `lastUpdate` to real local timestamp
+7.5. Audit `lastUpdate` after every local write:
+   - After writing or rewriting an object XML, reopen the saved file and confirm the root `lastUpdate`
+   - If the object was actually modified, `lastUpdate` must reflect the real instant of that last write
+   - If the object was not modified and is included only for dependency closure, preserve the official `lastUpdate` from the corpus XML
+   - Do NOT continue to packaging until the saved-file header has been checked
 8. Validate:
    - XML is well-formed
    - All recurring Part types present
@@ -132,6 +137,10 @@ Reference files and when to load them:
    - Well-formed XML and an acceptable envelope do NOT prove that signatures, formulas, or business meaning are correct
    - If a shared procedure changed its `parm(...)`, review all direct call sites explicitly before concluding the delta
    - This review must include wrappers, business procedures, WorkWith filters, and formulas that call the procedure when applicable
+   - When import logs are available, classify each message by stage and failure category before concluding anything
+   - Separate at minimum: XML/package structural error, object identity/serialization error, Source syntax/semantic error, IDE-side lateral error, non-blocking warning, and terminal import success
+   - Do NOT conclude from an isolated line; use the terminal relevant stage of the log plus the set of blocking messages
+   - If some objects failed and others succeeded, report the result as partial instead of collapsing it into full success or full package failure
 9. Deliver XML with limitations block:
    - Which template was used
    - Confidence level
@@ -151,11 +160,17 @@ Reference files and when to load them:
 - [ ] No invented Part type GUIDs
 - [ ] Envelope complete: `<ExportFile>`, `<KMW>`, `<Source>`, `<Objects>`, `<Dependencies>`
 - [ ] `lastUpdate` is a real timestamp, not a placeholder
+- [ ] Every modified object XML was reread after writing and its saved `lastUpdate` was confirmed
+- [ ] Every unchanged object reused only for dependency closure preserved the official `lastUpdate`
+- [ ] Embedded objects in `import_file.xml` were checked for correct `lastUpdate` handling before delivery
 - [ ] `Source/@kb` and `Source/Version/@guid` are valid GUIDs
 - [ ] Every new operator, function, conversion, and string/numeric pattern introduced in `Source` is backed by layer-1 methodological evidence
 - [ ] Local corpus evidence, when used for `Source`, was treated only as confirmation or tie-breaker
 - [ ] No essential `Source` construct was accepted only because it looked plausible
 - [ ] If a shared procedure changed its `parm(...)`, all relevant direct call sites were reviewed explicitly
+- [ ] When import logs were used, messages were classified by stage and category before diagnosis
+- [ ] The final conclusion was based on the terminal relevant stage, not on an isolated warning or side error
+- [ ] Partial success was reported explicitly when only some objects failed
 - [ ] Limitations block included in output
 
 ---
@@ -168,10 +183,14 @@ Reference files and when to load them:
 - NEVER promote a `Folder` name into `fullyQualifiedName` by analogy or by string concatenation alone
 - NEVER propose a business filter over status, authorization, cancellation, invoicing, balance, availability, or similar functional meaning if the chosen field is still semantically justified only by its name or UI label
 - NEVER treat plausible GeneXus `Source` as ready when its new syntax is not anchored in the methodological base of this trail
+- NEVER deliver XML or package with static, inherited, stale, or non-rechecked `lastUpdate`
+- NEVER treat an IDE-side lateral error as proof that the XML/package structure failed
+- NEVER treat a successful package load as proof that Source, Specification, or runtime are valid
 - NEVER generate from a text description or markdown summary alone — requires comparable raw XML template
 - NEVER generate special KB block (`KnowledgeBase`, `Settings`) for normal single-object XPZ
 - ABORT if risk is high/very high and no internal comparable template is available
 - ABORT if type has fewer than 5 specimens in the corpus and no sanitized template exists
 - ABORT if container identity is unresolved between `Folder` and `Module` for the target object
+- ABORT if a modified object was rewritten locally but the saved-file `lastUpdate` was not verified before packaging
 - ABORT if an essential `Source` construct depends only on intuition, generic GeneXus memory, or isolated local corpus evidence
 - Absolute rules in [00-readme-genexus-xpz-xml.md](../00-readme-genexus-xpz-xml.md) and [08-guia-para-agente-gpt.md](../08-guia-para-agente-gpt.md) take precedence over all other heuristics

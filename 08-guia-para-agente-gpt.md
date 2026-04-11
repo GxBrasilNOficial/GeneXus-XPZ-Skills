@@ -80,6 +80,14 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 - se existir export real comparavel da IDE para a mesma composicao de objetos, esse export deve prevalecer sobre envelope leve hipotetico
 - em pacote misto com `Transaction`, `WorkWithForWeb` e `Procedure`, preferir pacote embutido comparavel antes de tentar envelope por `FilePath`
 
+## Regra de leitura para logs de importacao
+
+- log de importacao deve ser lido por etapa e por categoria de falha
+- erro lateral da IDE nao prova falha de pacote
+- pacote aceito com falha posterior de `Source` ou `Specification` nao deve ser descrito como falha de envelope
+- se houver sucesso parcial, o agente deve dizer explicitamente que o resultado foi parcial
+- a conclusao final deve seguir a etapa terminal relevante do log, nao a linha mais alarmante
+
 ## Precedencia das heuristicas
 
 - se uma heuristica do `02-regras-operacionais-e-runtime.md` apontar cautela runtime, o agente nao pode responder com linguagem otimista
@@ -282,6 +290,10 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 - em pacote misto com `Transaction`, `WorkWithForWeb` e atributos novos, `Transaction` e `WorkWithForWeb` ficam em `<Objects>` e os atributos top-level ficam em `<Attributes>`
 - se houver `WorkWithForWeb` no pacote misto, preservar tambem a referencia de `Pattern` no bloco `Dependencies`
 - ao gerar ou alterar XML de objeto GeneXus, obter o horario local no momento da gravacao e preencher `lastUpdate` com o instante real correspondente
+- `lastUpdate` nao e detalhe cosmetico; ele deve ser conferido no arquivo salvo depois de cada gravacao local
+- se o objeto mudou, `lastUpdate` deve ser regravado com o instante real da ultima escrita
+- se o objeto nao mudou e entrou apenas para dependencia, preservar o `lastUpdate` oficial
+- nao concluir XML ou pacote enquanto o `lastUpdate` do arquivo final nao tiver sido relido e confirmado
 - se houver export real comparavel da IDE para a mesma composicao, preferir repetir o shape desse export em vez de improvisar `Dependencies` ou `ObjectsIdentityMapping`
 - para pacote misto com `Transaction`, `WorkWithForWeb` e `Procedure`, preferir objetos embutidos em `<Objects>` quando esse for o formato validado pelo molde real
 - quando o formato exigir UTC com `Z`, converter corretamente a partir do horario local real; nao reaproveitar timestamp antigo nem de rodada anterior
