@@ -18,15 +18,15 @@ Preservar a trilha das rodadas de teste, reclassificacoes e descobertas incremen
 - `Table` foi confirmado como familia top-level propria, enquanto `Index` apareceu apenas embutido dentro de `Table` nesta trilha da IDE.
 - `API` permaneceu como a pendencia funcional mais pesada, porque o recorte real mostrou dependencia de uma subarvore grande de `Procedure`, `SDT`, `Domain`, `Transaction`, `Table` e `DataProvider`.
 
-## Pacotes reais especialmente informativos
+## Pacotes especialmente informativos
 
-- `FabricaBrasil18_Table_Transaction_WorkWithForWeb_PatternSettings.xpz`
-- `FabricaBrasil18_Table_Transaction_DataSelector.xpz`
-- `FabricaBrasil18_Table_Domain_Transaction_SDT_API_Procedure_DataProvider.xpz`
-- `FabricaBrasil18_Table_Transaction_ColorPalette_DesignSystem_Theme_WebTheme_Category_ThemeClass_ThemeColor.xpz`
-- `FabricaBrasil18_Table.xpz`
-- `FabricaBrasil18_Index.xpz`
-- `FabricaBrasil18_Table_Index.xpz`
+- `XPZExemploTabelaTRNWWPatternA`
+- `XPZExemploTabelaTRNDataSelectorA`
+- `XPZExemploCadeiaAPIA`
+- `XPZExemploTemaA`
+- `XPZExemploTabelaA`
+- `XPZExemploIndiceVazioA`
+- `XPZExemploTabelaIndiceA`
 
 ## Resultado documental
 
