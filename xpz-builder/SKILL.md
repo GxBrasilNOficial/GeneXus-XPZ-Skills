@@ -48,6 +48,7 @@ Do NOT use this skill for:
 - Apply XPZ envelope rules from [02-regras-operacionais-e-runtime](../02-regras-operacionais-e-runtime.md)
 - Treat `runtime`, `Import File Load`, `Import`, and `Specification` as distinct validation layers; success in one does not authorize conclusions about the others
 - Generate valid `lastUpdate` timestamp (real local time, not placeholder)
+- Reread and apply local repository documentation (`AGENTS.md`, `README.md`, and equivalent project docs) before packaging whenever the target KB/repository defines specific functional review rules, contracts, or operational flow
 - Ensure all GUIDs are syntactically valid (no text placeholders like `"YOUR-GUID-HERE"`)
 - Validate XML structure before delivery
 - Declare confidence level and limitations explicitly at the end of every output
@@ -60,6 +61,7 @@ Do NOT use this skill for:
 - Lead with the decision (proceed / abort) and the reason
 - State which template was used and why it was selected
 - Always end output with a limitations block: what was followed, what requires external validation
+- In the closing, explicitly state that the saved XML was reread, the persisted `lastUpdate` was confirmed, and the applicable local repository rules were reread and satisfied before packaging
 - Use NEVER and ABORT as hard stops, not suggestions
 - NEVER use speculative or reassuring language about import/build success
 
@@ -123,7 +125,12 @@ Reference files and when to load them:
    - If the object was actually modified, `lastUpdate` must reflect the real instant of that last write
    - If the object was not modified and is included only for dependency closure, preserve the official `lastUpdate` from the corpus XML
    - Do NOT continue to packaging until the saved-file header has been checked
-8. Validate:
+8. Reread and apply local repository documentation before packaging:
+   - Reopen `AGENTS.md`, `README.md`, and any equivalent local KB/repository documentation that defines project-specific functional review chains, contracts, or operational flow
+   - Treat those local conventions as mandatory only for that repository, not as universal XPZ methodology
+   - If the local documentation requires a functional review chain for the current change type, verify that chain end-to-end in the local XML before packaging
+   - Do NOT continue to packaging while any applicable local rule remains pending, ambiguous, or inconsistent in the saved XML
+9. Validate:
    - XML is well-formed
    - All recurring Part types present
    - No text placeholder GUIDs remaining
@@ -141,9 +148,12 @@ Reference files and when to load them:
    - Separate at minimum: XML/package structural error, object identity/serialization error, Source syntax/semantic error, IDE-side lateral error, non-blocking warning, and terminal import success
    - Do NOT conclude from an isolated line; use the terminal relevant stage of the log plus the set of blocking messages
    - If some objects failed and others succeeded, report the result as partial instead of collapsing it into full success or full package failure
-9. Deliver XML with limitations block:
+   - Confirm before packaging that all applicable local repository rules were reread and satisfied in the saved XML
+10. Deliver XML with limitations block:
    - Which template was used
    - Confidence level
+   - That the saved XML was reread and the persisted `lastUpdate` was confirmed after the final local write
+   - Which applicable local repository rules were reread and satisfied before packaging
    - What requires external IDE validation (`Import File Load`, `Import`, `Specification`, runtime)
 
 ---
@@ -163,6 +173,8 @@ Reference files and when to load them:
 - [ ] Every modified object XML was reread after writing and its saved `lastUpdate` was confirmed
 - [ ] Every unchanged object reused only for dependency closure preserved the official `lastUpdate`
 - [ ] Embedded objects in `import_file.xml` were checked for correct `lastUpdate` handling before delivery
+- [ ] Applicable local repository documentation was reread before packaging
+- [ ] Applicable local functional review chains, contracts, and operational rules were verified end-to-end in the saved XML before packaging
 - [ ] `Source/@kb` and `Source/Version/@guid` are valid GUIDs
 - [ ] Every new operator, function, conversion, and string/numeric pattern introduced in `Source` is backed by layer-1 methodological evidence
 - [ ] Local corpus evidence, when used for `Source`, was treated only as confirmation or tie-breaker
@@ -171,6 +183,7 @@ Reference files and when to load them:
 - [ ] When import logs were used, messages were classified by stage and category before diagnosis
 - [ ] The final conclusion was based on the terminal relevant stage, not on an isolated warning or side error
 - [ ] Partial success was reported explicitly when only some objects failed
+- [ ] Final closing explicitly states that the saved XML was reread, the persisted `lastUpdate` was confirmed, and the applicable local rules were reread and satisfied
 - [ ] Limitations block included in output
 
 ---
@@ -186,11 +199,14 @@ Reference files and when to load them:
 - NEVER deliver XML or package with static, inherited, stale, or non-rechecked `lastUpdate`
 - NEVER treat an IDE-side lateral error as proof that the XML/package structure failed
 - NEVER treat a successful package load as proof that Source, Specification, or runtime are valid
+- NEVER universalize a repository-specific functional review rule, contract, or operational convention as if it were a global rule of the shared XPZ methodology
 - NEVER generate from a text description or markdown summary alone — requires comparable raw XML template
 - NEVER generate special KB block (`KnowledgeBase`, `Settings`) for normal single-object XPZ
 - ABORT if risk is high/very high and no internal comparable template is available
 - ABORT if type has fewer than 5 specimens in the corpus and no sanitized template exists
 - ABORT if container identity is unresolved between `Folder` and `Module` for the target object
 - ABORT if a modified object was rewritten locally but the saved-file `lastUpdate` was not verified before packaging
+- ABORT if applicable local repository documentation was not reread before packaging
+- ABORT if a local functional review chain, contract, or operational rule required by the target KB is still pending or inconsistent in the saved XML
 - ABORT if an essential `Source` construct depends only on intuition, generic GeneXus memory, or isolated local corpus evidence
 - Absolute rules in [00-readme-genexus-xpz-xml.md](../00-readme-genexus-xpz-xml.md) and [08-guia-para-agente-gpt.md](../08-guia-para-agente-gpt.md) take precedence over all other heuristics

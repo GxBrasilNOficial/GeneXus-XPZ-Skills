@@ -33,6 +33,7 @@ Os documentos principais foram consolidados em 10 arquivos Markdown para facilit
 - `xpz-reader`: apoio à leitura e interpretação estrutural de `XPZ` e XMLs relacionados
 - `xpz-builder`: apoio à materialização controlada de artefatos e envelopes `XPZ`
 - `xpz-sync`: orquestração de sincronização e conferência do acervo XML a partir de parâmetros explícitos e scripts em `scripts/`
+- `xpz-daemon`: instalação e gerenciamento de um monitor persistente que observa pastas de XPZ e dispara sincronização automaticamente ao detectar novos arquivos
 - `xpz-doc-builder`: geração e recomposição de documentação Markdown a partir do acervo XML e de moldes sanitizados
 
 ### Leitura recomendada para humanos
@@ -93,6 +94,14 @@ Los documentos principales fueron consolidados en 10 archivos Markdown para faci
 - `08-guia-para-agente-gpt.md`
 - `09-historico-e-inventario-publico.md`
 
+### Skills para agentes
+
+- `xpz-reader`: apoyo a la lectura e interpretación estructural de `XPZ` y XMLs relacionados
+- `xpz-builder`: apoyo a la materialización controlada de artefactos y envelopes `XPZ`
+- `xpz-sync`: orquestación de sincronización y verificación del acervo XML a partir de parámetros explícitos y scripts en `scripts/`
+- `xpz-daemon`: instalación y gestión de un monitor persistente que observa carpetas de XPZ y dispara sincronización automáticamente al detectar nuevos archivos
+- `xpz-doc-builder`: generación y recomposición de documentación Markdown a partir del acervo XML y de moldes sanitizados
+
 ### Lectura recomendada para humanos
 
 Si quieres entender la base rápidamente:
@@ -140,6 +149,14 @@ The main documentation has been consolidated into 10 Markdown files to make read
 - `07-open-points-e-checklist.md`
 - `08-guia-para-agente-gpt.md`
 - `09-historico-e-inventario-publico.md`
+
+### Skills for agents
+
+- `xpz-reader`: support for reading and structural interpretation of `XPZ` and related XMLs
+- `xpz-builder`: support for controlled materialization of `XPZ` artifacts and envelopes
+- `xpz-sync`: orchestration of synchronization and verification of the XML archive from explicit parameters and scripts in `scripts/`
+- `xpz-daemon`: installation and management of a persistent monitor that watches XPZ folders and automatically triggers synchronization when new files are detected
+- `xpz-doc-builder`: generation and recomposition of Markdown documentation from the XML archive and sanitized templates
 
 ### Recommended reading for humans
 
