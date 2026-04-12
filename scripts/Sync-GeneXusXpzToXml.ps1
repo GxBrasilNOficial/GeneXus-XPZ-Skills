@@ -47,7 +47,9 @@ param(
 
     [string]$ReportPath,
 
-    [switch]$KeepReport
+    [switch]$KeepReport,
+
+    [string]$KbMetadataPath = ""
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
@@ -473,6 +475,75 @@ function Get-FullSnapshotComparison {
     }
 }
 
+function Update-KbSourceMetadata {
+    param(
+        [xml]$XmlDocument,
+        [string]$SourceXpzPath,
+        [string]$MetadataPath
+    )
+
+    $kmwNode    = $XmlDocument.SelectSingleNode("/ExportFile/KMW")
+    $sourceNode = $XmlDocument.SelectSingleNode("/ExportFile/Source")
+    $versionNode = $XmlDocument.SelectSingleNode("/ExportFile/Source/Version")
+
+    if ($null -eq $kmwNode -or $null -eq $sourceNode) {
+        Write-Warning "KbMetadataPath: KMW ou Source nao encontrados no pacote; metadata nao atualizada."
+        return
+    }
+
+    $majorVersion = if ($null -ne $kmwNode.SelectSingleNode("MajorVersion")) { $kmwNode.SelectSingleNode("MajorVersion").InnerText } else { "" }
+    $minorVersion = if ($null -ne $kmwNode.SelectSingleNode("MinorVersion")) { $kmwNode.SelectSingleNode("MinorVersion").InnerText } else { "" }
+    $build        = if ($null -ne $kmwNode.SelectSingleNode("Build"))        { $kmwNode.SelectSingleNode("Build").InnerText }        else { "" }
+
+    $kbGuid      = $sourceNode.GetAttribute("kb")
+    $username    = $sourceNode.GetAttribute("username")
+    $uncPath     = $sourceNode.GetAttribute("UNCPath")
+    $versionGuid = if ($null -ne $versionNode) { $versionNode.GetAttribute("guid") } else { "" }
+    $versionName = if ($null -ne $versionNode) { $versionNode.GetAttribute("name") } else { "" }
+
+    $timestamp   = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.0000000Z")
+
+    $content = @"
+---
+name: KB Source Metadata
+description: Valores de KMW e Source extraidos do XPZ mais recente da IDE — usados para montar o envelope de import_file.xml
+updated: $timestamp
+source_xpz: $SourceXpzPath
+---
+
+## KMW
+
+| Campo        | Valor          |
+|---|---|
+| MajorVersion | $majorVersion  |
+| MinorVersion | $minorVersion  |
+| Build        | $build         |
+
+## Source
+
+| Campo    | Valor       |
+|---|---|
+| kb (GUID) | $kbGuid    |
+| username  | $username  |
+| UNCPath   | $uncPath   |
+
+## Source/Version
+
+| Campo | Valor        |
+|---|---|
+| guid  | $versionGuid |
+| name  | $versionName |
+
+## Uso
+
+Ao gerar um ``import_file.xml`` ou ``.xpz`` para importacao na KB, usar estes valores
+nos blocos ``<KMW>`` e ``<Source>`` do envelope ``<ExportFile>``.
+"@
+
+    [System.IO.File]::WriteAllText($MetadataPath, $content, (New-Object System.Text.UTF8Encoding($false)))
+    Write-Host "KbMetadataPath atualizado: $MetadataPath" -ForegroundColor Cyan
+}
+
 function Write-Report {
     param(
         [string]$Path,
@@ -490,6 +561,10 @@ try {
 
     if ($packageXml.DocumentElement.LocalName -ne "ExportFile") {
         throw "Expected root element 'ExportFile', found '$($packageXml.DocumentElement.LocalName)'."
+    }
+
+    if ($KbMetadataPath) {
+        Update-KbSourceMetadata -XmlDocument $packageXml -SourceXpzPath $InputPath -MetadataPath $KbMetadataPath
     }
 
     $typeMap = Get-DestinationTypeMap -Root $DestinationRoot

@@ -2,7 +2,7 @@
 
 ## Português (BR)
 
-Este repositório existe para sustentar e operacionalizar skills para agentes dedicadas ao ecossistema `XPZ`/XML de GeneXus, em especial `xpz-reader`, `xpz-builder`, `xpz-sync` e `xpz-doc-builder`.
+Este repositório existe para sustentar e operacionalizar skills para agentes dedicadas ao ecossistema `XPZ`/XML de GeneXus, em especial `xpz-reader`, `xpz-builder`, `xpz-sync`, `xpz-doc-builder` e `xpz-daemon`.
 
 A documentação consolidada e os scripts desta raiz funcionam como base metodológica e operacional dessas skills, com foco em:
 
@@ -70,7 +70,7 @@ Se você quer entender a base rapidamente:
 
 ## Español
 
-Este repositorio reúne documentación consolidada sobre análisis estructural de objetos GeneXus a partir de XMLs extraídos de `XPZ`, con foco en:
+Este repositorio reúne documentación consolidada sobre análisis estructural de objetos GeneXus a partir de XMLs extraídos de `XPZ`, con foco en skills para agentes dedicadas al ecosistema `XPZ`/XML de GeneXus, en especial `xpz-reader`, `xpz-builder`, `xpz-sync`, `xpz-doc-builder` y `xpz-daemon`.
 
 - lectura e interpretación de estructura XML
 - familias estructurales de objetos
@@ -126,7 +126,7 @@ Si quieres entender la base rápidamente:
 
 ## English
 
-This repository contains consolidated documentation about structural analysis of GeneXus objects based on XML extracted from `XPZ`, with emphasis on:
+This repository contains consolidated documentation about structural analysis of GeneXus objects based on XML extracted from `XPZ`, with emphasis on skills for agents dedicated to the `XPZ`/XML ecosystem of GeneXus, especially `xpz-reader`, `xpz-builder`, `xpz-sync`, `xpz-doc-builder`, and `xpz-daemon`.
 
 - reading and interpreting XML structure
 - structural object families

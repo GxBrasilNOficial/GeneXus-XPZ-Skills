@@ -32,6 +32,7 @@ Preservar rastreabilidade da consolidacao, inventario documental, inventario bru
 - `Regra editorial`: a pasta `scripts/` existe como apoio operacional e utilitario compartilhavel, mas nao funciona como fonte normativa da documentacao consolidada da raiz.
 - `Regra operacional`: esse arquivo nao deve ser apagado silenciosamente do repositório publico.
 - `Regra operacional`: se houver refatoracao, mudanca de local ou substituicao do motor, a alteracao deve ser documentada explicitamente e propagada aos consumidores externos antes de remover o arquivo anterior.
+- `Evidência direta`: o script recebeu adição do parâmetro `-KbMetadataPath` para gerar metadados da KB em formato Markdown, facilitando reuso em envelopes de importação.
 
 ## Fontes consolidadas
 - 00-inventario-da-base-documental.md

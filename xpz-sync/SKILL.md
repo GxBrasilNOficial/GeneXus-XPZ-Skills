@@ -63,6 +63,7 @@ Os wrappers seguem esta convenção de parâmetros:
 - `-FullSnapshot` *(switch)* — compara snapshot completo do acervo
 - `-ReportPath` *(opcional)* — salva relatório JSON
 - `-KeepReport` *(switch)* — mantém relatório mesmo sem erro
+- `-KbMetadataPath` *(opcional)* — salva metadados da KB em formato Markdown
 - `-NoGitSummary` *(switch)* — suprime resumo Git no final
 
 ### Wrapper de conferência full
