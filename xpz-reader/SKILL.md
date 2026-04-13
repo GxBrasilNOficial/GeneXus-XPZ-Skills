@@ -47,6 +47,8 @@ Do NOT use this skill for:
 - Assign risk level using [03-risco-e-decisao-por-tipo](../03-risco-e-decisao-por-tipo.md)
 - Identify structural anomalies: unexpected Part types, missing recurring parts, malformed envelope
 - Identify identity anomalies involving `fullyQualifiedName`, `name`, `parent`, `parentGuid`, `parentType`, and `moduleGuid`
+- Treat object lookup in repository-backed workflows as `type + name`, never `name` alone
+- Confirm the real folder where the XML exists before citing, comparing, or using a local object as evidence
 - Declare confidence level for every conclusion: `Direct evidence` / `Strong inference` / `Hypothesis`
 - Never affirm import or build compatibility — structural analysis only
 
@@ -86,10 +88,11 @@ Reference files and when to load them:
 3. Enumerate Part types present (`<Part type="...">`) → compare against observed frequencies for that type
 4. Identify missing or unexpected Part types relative to the known structural pattern
 5. Read container identity fields (`fullyQualifiedName`, `name`, `parent`, `parentGuid`, `parentType`, `moduleGuid`) and classify the container as `Folder`, `Module`, or unresolved from comparable corpus evidence
-6. If type is WebPanel → load [04-webpanel-familias-e-templates](../04-webpanel-familias-e-templates.md) and classify family
-7. If type is Transaction → load [05-transaction-familias-e-templates](../05-transaction-familias-e-templates.md) and classify family (F1–F6)
-8. Assign risk level from [03-risco-e-decisao-por-tipo](../03-risco-e-decisao-por-tipo.md)
-9. Report result:
+6. When the task depends on locating an object in a local GeneXus repository, confirm the object by `type + name` and verify the actual folder where the file exists before proceeding
+7. If type is WebPanel → load [04-webpanel-familias-e-templates](../04-webpanel-familias-e-templates.md) and classify family
+8. If type is Transaction → load [05-transaction-familias-e-templates](../05-transaction-familias-e-templates.md) and classify family (F1–F6)
+9. Assign risk level from [03-risco-e-decisao-por-tipo](../03-risco-e-decisao-por-tipo.md)
+10. Report result:
    - Object type and canonical name
    - Container classification (`Folder`, `Module`, or unresolved)
    - Structural family (if applicable)
@@ -121,4 +124,5 @@ Reference files and when to load them:
 - NEVER affirm import or build success — structural analysis only
 - ABORT analysis if XML is too malformed to identify `Object/@type`
 - When sample is small or type is rare, state it explicitly before concluding
+- When object lookup depends on a local repository, ABORT if the file was not confirmed in the folder implied by the validated object type
 - Absolute rules in [00-readme-genexus-xpz-xml.md](../00-readme-genexus-xpz-xml.md) take precedence over all heuristics

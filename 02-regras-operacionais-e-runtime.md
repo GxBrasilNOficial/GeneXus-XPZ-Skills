@@ -82,6 +82,10 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
 - `Regra operacional`: agente nunca deve criar subpastas por tipo automaticamente em `ObjetosGeradosParaImportacaoNaKbNoGenexus`.
 - `Regra operacional`: agente nunca deve mover XMLs para `ArquivoMorto` sem pedido explicito do usuario.
 - `Regra operacional`: quando houver conflito entre habito anterior do agente e documentacao local do repositorio, a documentacao local prevalece.
+- `Regra operacional`: ao referenciar qualquer objeto GeneXus do acervo local, identificar sempre `tipo + nome`; nunca operar apenas pelo nome isolado.
+- `Regra operacional`: o tipo do objeto determina a pasta esperada no acervo (`Procedure`, `Transaction`, `WebPanel`, `Attribute` e correlatas) e deve ser confirmado antes de qualquer leitura, comparacao, clonagem, ajuste ou empacotamento.
+- `Regra operacional`: o mesmo nome pode existir simultaneamente em tipos diferentes; antes de agir sobre um objeto, confirmar em qual pasta o arquivo realmente existe no acervo local.
+- `Regra operacional`: agente nao deve inferir tipo de objeto apenas por contexto funcional, nome parecido ou conversa anterior; a pasta real e a evidência direta minima para localizar o artefato correto.
 
 ## Contaminacao de workspace e isolamento de lote
 
