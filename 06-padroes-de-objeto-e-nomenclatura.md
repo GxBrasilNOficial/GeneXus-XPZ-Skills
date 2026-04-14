@@ -103,11 +103,18 @@ Este documento registra padrões observáveis no inventário bruto e nos XMLs ex
 - `Evidência direta`: no unico caso real de `API` observado nesta KB, representado aqui pelo alias sanitizado `APIExemploIntegracaoA.xml`, aparecem chamadas para procedures como `PRCExemploA`, `procSdtTributacaoDadosBasicosSelecaoConformeParametros` e `PRCExemploB`.
 - `Inferência forte`: nomes de objetos no acervo não são apenas rótulos; eles também aparecem como pontos de acoplamento explícito entre artefatos.
 
+## Regra operacional: qualificação por tipo ao referenciar objetos
+
+- `Regra operacional`: ao referenciar qualquer objeto GeneXus em análise, operação ou comunicação entre agentes, sempre qualificar com tipo e nome em conjunto — nunca apenas o nome.
+- `Regra operacional`: o tipo determina a pasta física do repositório (`Procedure\`, `Transaction\`, `WebPanel\`, `Attribute\`, etc.) e é obrigatório para localização inequívoca do arquivo no corpus.
+- `Regra operacional`: o mesmo nome pode existir simultaneamente em tipos distintos na mesma KB; coincidência de nome não prova unicidade nem identidade do objeto.
+- `Regra operacional`: antes de qualquer operação sobre um objeto (busca, leitura, edição, empacotamento, sincronização XPZ, referência em manifesto), confirmar explicitamente a pasta e o tipo onde o arquivo realmente existe no repositório.
+- `Regra operacional`: não inferir tipo, pasta ou identidade do objeto apenas pelo nome, pelo contexto da conversa ou por analogia com outros artefatos.
+
 ## Uso cauteloso destes padrões
 
 - `Inferência forte`: para documentação e análise, vale registrar esses padrões como recorrências da KB.
 - `Hipótese`: para criação de objetos novos, essas recorrências podem servir como convenção inicial, mas isso ainda precisaria de validação com a equipe ou com a IDE da KB.
-
 
 
 

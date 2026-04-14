@@ -108,6 +108,15 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 - se houver sucesso parcial, o agente deve dizer explicitamente que o resultado foi parcial
 - a conclusao final deve seguir a etapa terminal relevante do log, nao a linha mais alarmante
 
+## Regra de identificação de objetos por tipo
+
+- ao mencionar, localizar ou operar sobre qualquer objeto GeneXus, sempre informar tipo e nome em conjunto — nunca so o nome
+- o tipo determina a pasta física no repositório; referenciar apenas o nome implica risco de busca na pasta errada
+- o mesmo nome pode existir em tipos distintos ao mesmo tempo na mesma KB; coincidência de nome nao prova unicidade nem identidade do objeto
+- antes de qualquer operação sobre um objeto (leitura, edição, empacotamento, referência em manifesto, sincronização XPZ), confirmar explicitamente a pasta onde o arquivo existe no repositório
+- nao inferir tipo, pasta ou identidade do objeto apenas pelo contexto da conversa, por hábito ou por analogia
+- se o tipo não for conhecido com certeza, inspecionar o repositório antes de assumir qualquer pasta
+
 ## Precedencia das heuristicas
 
 - se uma heuristica do `02-regras-operacionais-e-runtime.md` apontar cautela runtime, o agente nao pode responder com linguagem otimista
