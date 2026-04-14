@@ -7,3 +7,5 @@
 !/xpz-builder/
 !/xpz-sync/
 !/xpz-doc-builder/
+!/xpz-daemon/
+!/xpz-kb-parallel-setup/
