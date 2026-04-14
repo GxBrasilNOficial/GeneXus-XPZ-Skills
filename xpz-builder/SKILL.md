@@ -79,6 +79,7 @@ If the main need is to prepare or validate the initial folder structure around t
 - Keep active XMLs for the current import batch in the root of `ObjetosGeradosParaImportacaoNaKbNoGenexus`, without subfolders
 - Use `PacotesGeradosParaImportacaoNaKbNoGenexus` as the destination area for locally generated packages
 - Detect workspace contamination before packaging and abort when more than one plausible batch is active
+- Treat the workspace as contaminated when the active root of `ObjetosGeradosParaImportacaoNaKbNoGenexus` contains XMLs from different fronts, different target objects, superseded deltas, or unrelated older files that could be mistaken for the current batch
 - Build or validate a manifest for the candidate batch before packaging, treating the manifest first as structured output in the conversation
 - When the user already signals manual IDE import/testing, treat `import_file.xml` as the primary deliverable and generate it promptly instead of postponing packaging
 - Prefer `import_file.xml` as the operational package artifact for manual IDE import unless `.xpz` is explicitly required by the user or by a documented local flow
@@ -147,9 +148,15 @@ Reference files and when to load them:
 5. Evaluate batch isolation before packaging:
    - If more than one plausible batch is present in the workspace → **ABORT**
    - Do NOT infer the correct batch only from recency when there is contamination risk
-   - If the current front needs a new isolated single-object delta and the root of `ObjetosGeradosParaImportacaoNaKbNoGenexus` contains unrelated older XMLs, treat the root as contaminated and **ABORT** until the single-object batch is isolated explicitly
-   - Preferred operational resolution for a new unitary delta: keep only the current object XML in the root of `ObjetosGeradosParaImportacaoNaKbNoGenexus` as the active batch, and move any unrelated older XMLs out of the active root before packaging
+   - If the current front needs a new isolated single-object delta and the root of `ObjetosGeradosParaImportacaoNaKbNoGenexus` contains remnant XMLs that do not belong to the current front, treat the root as contaminated and **ABORT** until the single-object batch is isolated explicitly
+   - Treat a root XML as a remnant contaminant when it is not part of the current front, is not part of the package being assembled now, was superseded by change of direction, or remains in the active root without operational justification for the current batch
+   - Preferred operational resolution for a new unitary delta: keep only the current object XML in the root of `ObjetosGeradosParaImportacaoNaKbNoGenexus` as the active batch
+   - Before generating new files, offer to move remnant contaminant XMLs to `ArquivoMorto`; do so only after explicit user approval
    - Do NOT silently reuse a contaminated root batch when the current front is unitary
+   - Distinguish explicitly between `artifact of the current front` and `pre-existing parallel change`:
+     - current-front artifact = XML intentionally produced, adjusted, or preserved for the current package decision
+     - pre-existing parallel change = unrelated XML/package/workspace modification that already existed and is not part of the current batch decision
+   - Do NOT absorb pre-existing parallel changes into the package of the current front only because they are present in the workspace
    - If an older package lost validity after a change of direction, either rename it with prefix `OBSOLETO_` or present a structured manifest in the conversation stating that package X was replaced by package Y; save that manifest as a local file only when local traceability is concretely needed
 6. Check for improper local changes in `ObjetosDaKbEmXml`:
    - If detected, treat this as an explicit process error
@@ -306,6 +313,7 @@ Reference files and when to load them:
 - [ ] When the task was packaging, active XMLs were listed from the root of `ObjetosGeradosParaImportacaoNaKbNoGenexus`
 - [ ] Candidate batch was isolated; no workspace contamination remained
 - [ ] When the front required a new unitary delta, the root of `ObjetosGeradosParaImportacaoNaKbNoGenexus` was isolated explicitly before packaging
+- [ ] Current-front artifacts were distinguished explicitly from pre-existing parallel changes before packaging
 - [ ] Root type of every active XML was classified before package serialization
 - [ ] No top-level `Attribute` was placed under `<Objects>`
 - [ ] For `Transaction`, every `Level/Attribute@guid` exists in `<Attributes>/Attribute@guid`
@@ -358,6 +366,7 @@ Reference files and when to load them:
 - NEVER create subfolders in `ObjetosGeradosParaImportacaoNaKbNoGenexus` for the active import batch
 - NEVER create automatic subfolders by type under `ObjetosGeradosParaImportacaoNaKbNoGenexus`
 - NEVER treat a contaminated root of `ObjetosGeradosParaImportacaoNaKbNoGenexus` as acceptable for a new isolated single-object delta
+- NEVER mix a pre-existing parallel change into the package of the current front only because both are present in the same workspace
 - NEVER move files to `ArquivoMorto` without explicit user request
 - NEVER place a top-level `Attribute` under `<Objects>`
 - NEVER serialize a required `Transaction` attribute as `Domain` under `<Objects>` when the package is supposed to create or supply that attribute

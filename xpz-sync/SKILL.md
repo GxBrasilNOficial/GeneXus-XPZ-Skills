@@ -13,6 +13,8 @@ Invoca os scripts locais do repositório GeneXus ativo para sincronizar XMLs ind
 
 Identificar a raiz do repositório pelo contexto, localizar os scripts de sincronização na pasta `scripts\`, montar o comando correto e executá-lo via Bash. Reportar o resultado de forma clara. Não alterar arquivos manualmente — delegar tudo ao script. Tratar `ObjetosDaKbEmXml` como snapshot oficial somente leitura para agentes e não antecipar manualmente nenhuma promoção para esse acervo. Distinguir sempre a pasta nativa da KB da pasta paralela da KB. Se houver edição detectada ou pretendida em `ObjetosDaKbEmXml` para delta ainda não reexportado oficialmente pela KB, tratar isso como erro explícito de processo.
 
+Quando o mesmo `XPZ` for reprocessado após atualização do arquivo exportado, tratar o novo resultado como um novo snapshot daquele insumo, não como repetição irrelevante do processamento anterior. A classificação `updated` versus `unchanged` pertence ao resultado daquele processamento específico.
+
 Os nomes das pastas sao apenas padroes sugeridos quando o usuario nao informar outros. O que manda e a funcao da pasta no fluxo.
 
 Se a pasta paralela da KB ainda nao estiver montada, validada ou mapeada, parar e usar `xpz-kb-parallel-setup` antes do `sync`.
@@ -116,6 +118,7 @@ Os wrappers seguem esta convenção de parâmetros:
 - `-ReportPath` *(opcional)* — salva relatório JSON
 - `-KeepReport` *(switch)* — mantém relatório mesmo sem erro
 - `-KbMetadataPath` *(opcional)* — salva metadados da KB em formato Markdown
+- se esse parâmetro estiver ativo no wrapper local, `kb-source-metadata.md` faz parte normal do fluxo e pode ser reescrito a cada processamento
 - `-NoGitSummary` *(switch)* — suprime resumo Git no final
 
 ### Wrapper de conferência full
@@ -157,11 +160,20 @@ Os wrappers seguem esta convenção de parâmetros:
 10. Quando o fluxo envolver `XPZ` parcial:
    - atualizar a mesma pasta com funcao de acervo materializado
    - nao desviar a materializacao para a pasta de geracao para importacao
+   - se o mesmo arquivo `XPZ` for reexportado/atualizado e reprocessado, tratar o novo processamento pelo conteúdo e pelo `lastUpdate` resultante, não pela memória do processamento anterior
 11. Montar o comando com os parâmetros corretos
 12. Executar via Bash com `pwsh -File ...`
 13. Se o processamento foi concluído com sucesso, permitir renomear o `.xpz` consumido para `processado_<nome-original>.xpz`
 14. Reportar: objetos criados, atualizados, ignorados, resíduos removidos e resumo Git
+   - explicar que `updated` significa que o wrapper materializou conteúdo mais novo/relevante para o acervo naquele processamento
+   - explicar que `unchanged` significa que o item já tinha no acervo oficial conteúdo compatível ou mais novo, tipicamente com `lastUpdate` igual ou superior ao XML vindo do `XPZ`
+   - se o mesmo `XPZ` tiver sido reprocessado após atualização do arquivo, deixar explícito que a comparação relevante é com o conteúdo do insumo reprocessado e com o estado atual do acervo, não com o relatório antigo
+   - se `kb-source-metadata.md` tiver sido reescrito pelo wrapper, tratar isso como artefato normal do fluxo, não como evidência automática de mudança funcional na frente
 15. Quando um objeto voltar da KB via `xpz` e for materializado no acervo oficial, tratar esse XML do acervo como a fonte mais confiável para alterações futuras; não reutilizar cópia intermediária/delta sem comparar com o acervo atualizado
+16. Ao preparar commit ou handoff após o `sync`, separar explicitamente:
+   - artefato da frente atual = resultado que o processamento atual confirmou como pertencente à frente em curso
+   - mudança paralela pré-existente = arquivo ou diferença já existente no workspace antes desta frente ou sem vínculo com o lote atual
+   - não agrupar no mesmo commit da frente atual mudanças paralelas pré-existentes sem decisão explícita
 
 ---
 
@@ -214,3 +226,6 @@ PastaParalelaDaKb/
 - NUNCA criar script novo se o repositorio ja tiver fluxo oficial previsto nas skills ou em `scripts/`
 - Antes de gerar novo delta de objeto já retornado da KB, comparar a cópia intermediária com o XML atual do acervo e rebasear no acervo se houver defasagem
 - Se o script não for encontrado na raiz resolvida, reportar o erro e perguntar ao usuário antes de tentar qualquer alternativa
+- NUNCA tratar reprocessamento do mesmo `XPZ` atualizado como se o resultado anterior ainda fosse autoritativo
+- NUNCA tratar regravação de `kb-source-metadata.md` pelo wrapper como mudança funcional automática da frente atual
+- NUNCA misturar no mesmo commit da frente atual mudanças paralelas pré-existentes só porque aparecem no mesmo workspace
