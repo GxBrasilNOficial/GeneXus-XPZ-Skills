@@ -55,7 +55,11 @@ Do NOT use this skill for:
 - Explicar que, apos processamento bem-sucedido, um `.xpz` em `XpzExportadosPelaIDE` pode ser renomeado para `processado_<nome-original>.xpz`
 - Tratar `ObjetosGeradosParaImportacaoNaKbNoGenexus` como area de trabalho para XMLs temporarios destinados a importacao manual na IDE
 - Tratar `PacotesGeradosParaImportacaoNaKbNoGenexus` como area de saida para `import_file.xml` e, quando aplicavel, `XPZ`
-- Exigir que os arquivos ativos em `ObjetosGeradosParaImportacaoNaKbNoGenexus` fiquem na raiz dessa pasta, sem subpastas
+- Exigir que cada frente ativa em `ObjetosGeradosParaImportacaoNaKbNoGenexus` use sua propria subpasta `NomeCurto_GUID_YYYYMMDD`
+- Explicar que `NomeCurto_GUID_YYYYMMDD` combina nome curto, GUID criado na abertura da frente e data de criacao da frente; `YYYYMMDD` representa a data de criacao da frente, nao a data do pacote
+- Explicar que a subpasta `NomeCurto_GUID_YYYYMMDD` e a unidade ativa da frente
+- Exigir reuso da mesma subpasta quando a frente ja existir e estiver sendo retomada
+- Exigir que `PacotesGeradosParaImportacaoNaKbNoGenexus` permaneça plano, sem subpastas por frente
 - Explicar que novos `XPZ` completos podem ser usados a qualquer momento para reatualizar `ObjetosDaKbEmXml`
 - Distinguir Carga Inicial, atualizacao incremental e empacotamento local
 - Explicar que materializar um `XPZ` completo da IDE inclui quebrar o `full.xml` em XMLs individuais por objeto
@@ -76,7 +80,7 @@ Do NOT use this skill for:
 - Se a intencao for gerar XML novo ou copia alterada para futura importacao na IDE:
   - usar a pasta com funcao de geracao para importacao
   - essa pasta recebe apenas XMLs novos ou copias alteradas geradas pelo agente
-  - os arquivos ativos do lote ficam na raiz dessa pasta, sem subpastas
+  - cada frente ativa deve usar sua propria subpasta `NomeCurto_GUID_YYYYMMDD`
 - Se a intencao for guardar `XPZ` exportado pela IDE:
   - usar a pasta com funcao de entrada de `XPZ`
   - essa pasta nao e acervo materializado nem area de geracao de XML
@@ -93,6 +97,10 @@ Do NOT use this skill for:
 - Nao usar GUID como nome principal de pasta ou arquivo do acervo materializado
 - Se houver colisao rara de nome, o GUID pode aparecer apenas como apoio de desambiguacao, nunca como eixo principal da organizacao
 - GUID, `parentGuid`, `parentType` e `moduleGuid` servem como metadados de apoio, nao como estrutura principal de saida
+- Para frente ativa em `ObjetosGeradosParaImportacaoNaKbNoGenexus`, usar a subpasta `NomeCurto_GUID_YYYYMMDD`
+- Para pacote final em `PacotesGeradosParaImportacaoNaKbNoGenexus`, usar o formato `NomeCurto_GUID_YYYYMMDD_nn.import_file.xml`
+- `nn` representa apenas a rodada curta do pacote naquela frente; nao representa versao semantica
+- no pacote final, o vinculo com a frente existe apenas pelo prefixo `NomeCurto_GUID_YYYYMMDD` somado ao `nn`
 
 ---
 
@@ -144,11 +152,11 @@ Do NOT use this skill for:
    - `XpzExportadosPelaIDE` = arquivos ja consumidos podem receber o prefixo `processado_` apos sucesso no fluxo oficial
    - `scripts` = wrappers `.ps1` e utilitarios operacionais
    - `scripts` = quando a pasta paralela da KB for inicializada do zero, os wrappers locais devem ser reconstruidos a partir do fluxo oficial e dos exemplos sanitizados desta skill
-   - `ObjetosGeradosParaImportacaoNaKbNoGenexus` = XMLs temporarios gerados pelo agente para importacao manual
+   - `ObjetosGeradosParaImportacaoNaKbNoGenexus` = XMLs temporarios gerados pelo agente para importacao manual, organizados por frente em subpastas `NomeCurto_GUID_YYYYMMDD`
    - `ObjetosGeradosParaImportacaoNaKbNoGenexus` = nao recebe materializacao do acervo vindo de `XPZ`
-   - `PacotesGeradosParaImportacaoNaKbNoGenexus` = pacote final de importacao pela IDE
+   - `PacotesGeradosParaImportacaoNaKbNoGenexus` = pacote final de importacao pela IDE, mantido plano sem subpastas por frente
 6. Se `ObjetosDaKbEmXml` ainda nao existir, tratar o acervo como ainda nao materializado
-7. Se `ObjetosGeradosParaImportacaoNaKbNoGenexus` contiver subpastas, tratar isso como desvio operacional e orientar correcao
+7. Se `ObjetosGeradosParaImportacaoNaKbNoGenexus` nao estiver organizado por frentes em subpastas `NomeCurto_GUID_YYYYMMDD`, tratar isso como desvio operacional e orientar correcao
 8. Se `XpzExportadosPelaIDE` estiver ausente e o fluxo depender de `XPZ`, pedir ao usuario o caminho pretendido ou criar a pasta padrao quando a politica do repositorio permitir
 9. Se a pasta `scripts` existir sem wrappers locais minimos, orientar a reconstruir:
    - wrapper de atualizacao diaria sobre o motor compartilhado
@@ -173,10 +181,11 @@ PastaParalelaDaKb/
     WebPanel/
       WPClienteConsulta.xml
   ObjetosGeradosParaImportacaoNaKbNoGenexus/
-    ClienteNovo.xml
-    PedidoAjustado.xml
+    AjusteVolumes_12345678-1234-1234-1234-123456789abc_20260414/
+      ClienteNovo.xml
+      PedidoAjustado.xml
   PacotesGeradosParaImportacaoNaKbNoGenexus/
-    CargaInicial_20260413_01.xml
+    AjusteVolumes_12345678-1234-1234-1234-123456789abc_20260414_01.import_file.xml
   scripts/
     Sync-GeneXusXpzToXml.ps1
 ```
@@ -189,7 +198,8 @@ PastaParalelaDaKb/
 - NUNCA gravar manualmente em `ObjetosDaKbEmXml`
 - NUNCA tratar `XpzExportadosPelaIDE` como area de saida de pacotes ou XMLs gerados
 - NUNCA aplicar o prefixo `processado_` antes de sucesso claro no processamento do `.xpz`
-- NUNCA criar subpastas em `ObjetosGeradosParaImportacaoNaKbNoGenexus` para o lote ativo de importacao
+- NUNCA manter o lote ativo diretamente na raiz de `ObjetosGeradosParaImportacaoNaKbNoGenexus`; usar a subpasta da frente `NomeCurto_GUID_YYYYMMDD`
+- NUNCA criar subpastas por frente em `PacotesGeradosParaImportacaoNaKbNoGenexus`; essa area deve permanecer plana
 - NUNCA materializar `XPZ` completo ou parcial da IDE dentro da pasta de geracao para importacao
 - NUNCA usar GUID como nome principal de pasta ou arquivo do acervo materializado
 - NUNCA usar `guid`, `parentGuid`, `parentType` ou `moduleGuid` como eixo principal de navegacao da pasta paralela da KB

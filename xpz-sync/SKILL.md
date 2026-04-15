@@ -57,7 +57,7 @@ Quando o usuário não informar nomes alternativos, adotar estas subpastas na ra
 - `ObjetosDaKbEmXml`: acervo oficial somente leitura para agentes
 - `XpzExportadosPelaIDE`: entrada dos `.xpz` exportados pela IDE
 - `scripts`: wrappers `.ps1` que tratam `XPZ`
-- `ObjetosGeradosParaImportacaoNaKbNoGenexus`: saída de XMLs temporários para importação manual
+- `ObjetosGeradosParaImportacaoNaKbNoGenexus`: saída de XMLs temporários para importação manual, organizada por frente em subpastas `NomeCurto_GUID_YYYYMMDD`; essa subpasta é a unidade ativa da frente
 - `PacotesGeradosParaImportacaoNaKbNoGenexus`: saída de pacotes `.xml` e, quando necessário, `.xpz`
 - após processamento bem-sucedido, o `.xpz` consumido pode ser renomeado para `processado_<nome-original>.xpz`
 - por padrão, novos fluxos devem ignorar arquivos com prefixo `processado_`
@@ -83,6 +83,7 @@ Quando o usuário não informar nomes alternativos, adotar estas subpastas na ra
 - Se a intencao for gerar XML novo ou copia alterada para importar na IDE:
   - usar a pasta com funcao de geracao para importacao
   - essa pasta recebe apenas XMLs novos ou copias alteradas geradas pelo agente
+  - cada frente deve usar sua propria subpasta `NomeCurto_GUID_YYYYMMDD`
 - Se a intencao for guardar `XPZ` exportado pela IDE:
   - usar a pasta com funcao de entrada de `XPZ`
   - essa pasta nao e acervo materializado nem area de geracao de XML
@@ -137,8 +138,8 @@ Os wrappers seguem esta convenção de parâmetros:
 5. Distinguir explicitamente as áreas operacionais locais:
    - `ObjetosDaKbEmXml` = snapshot oficial da KB, materializado em XMLs individuais por objeto e atualizado apenas pelo fluxo oficial do script
    - `XpzExportadosPelaIDE` = entrada dos `.xpz` exportados pela IDE
-   - `ObjetosGeradosParaImportacaoNaKbNoGenexus` = área de trabalho para XML local de importação manual
-   - `PacotesGeradosParaImportacaoNaKbNoGenexus` = área de pacotes gerados localmente
+   - `ObjetosGeradosParaImportacaoNaKbNoGenexus` = área de trabalho para XML local de importação manual, organizada por frente em subpastas `NomeCurto_GUID_YYYYMMDD`
+   - `PacotesGeradosParaImportacaoNaKbNoGenexus` = área de pacotes gerados localmente, mantida plana sem subpastas por frente
    - `scripts` = wrappers `.ps1` que tratam os `XPZ`
    - se o objeto ainda não voltou da KB por export oficial, o trabalho deve permanecer em `ObjetosGeradosParaImportacaoNaKbNoGenexus`
 6. Se o usuario informou nomes alternativos para as pastas, reportar na conversa o mapeamento entre nome real e funcao
@@ -193,10 +194,11 @@ PastaParalelaDaKb/
     WebPanel/
       WPClienteConsulta.xml
   ObjetosGeradosParaImportacaoNaKbNoGenexus/
-    ClienteNovo.xml
-    PedidoAjustado.xml
+    AjusteVolumes_12345678-1234-1234-1234-123456789abc_20260414/
+      ClienteNovo.xml
+      PedidoAjustado.xml
   PacotesGeradosParaImportacaoNaKbNoGenexus/
-    CargaInicial_20260413_01.xml
+    AjusteVolumes_12345678-1234-1234-1234-123456789abc_20260414_01.import_file.xml
   scripts/
     Sync-GeneXusXpzToXml.ps1
 ```
@@ -221,7 +223,8 @@ PastaParalelaDaKb/
 - NUNCA antecipar atualização manual de `ObjetosDaKbEmXml`
 - NUNCA prosseguir com sync normal quando `ObjetosDaKbEmXml` estiver dirty fora do fluxo oficial; primeiro preserve, restaure e trate como incidente de processo
 - NUNCA tratar edição detectada ou pretendida em `ObjetosDaKbEmXml` para delta ainda não reexportado oficialmente pela KB como detalhe operacional; isso é erro explícito de processo
-- NUNCA assumir subpastas em `ObjetosGeradosParaImportacaoNaKbNoGenexus` como lote ativo de importacao; o lote ativo deve estar na raiz da pasta
+- NUNCA assumir a raiz de `ObjetosGeradosParaImportacaoNaKbNoGenexus` como lote ativo de importacao; o lote ativo deve viver na subpasta da frente `NomeCurto_GUID_YYYYMMDD`
+- NUNCA criar subpastas por frente dentro de `PacotesGeradosParaImportacaoNaKbNoGenexus`; essa area de pacotes deve permanecer plana
 - NUNCA reutilizar automaticamente artefato de importação/delta como base de nova alteração se o mesmo objeto já tiver voltado da KB e sido materializado no acervo oficial
 - NUNCA criar script novo se o repositorio ja tiver fluxo oficial previsto nas skills ou em `scripts/`
 - Antes de gerar novo delta de objeto já retornado da KB, comparar a cópia intermediária com o XML atual do acervo e rebasear no acervo se houver defasagem

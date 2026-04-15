@@ -68,6 +68,10 @@ Se você quer entender a base rapidamente:
 - `XpzExportadosPelaIDE`: pasta onde o usuário grava tanto o `XPZ` completo da Carga Inicial quanto os `XPZ` incrementais do dia a dia
 - `ObjetosGeradosParaImportacaoNaKbNoGenexus`: área de trabalho para XMLs gerados, ajustados ou preservados para importação manual na IDE
 - `PacotesGeradosParaImportacaoNaKbNoGenexus`: área de saída para `import_file.xml` e demais pacotes gerados localmente
+- em `ObjetosGeradosParaImportacaoNaKbNoGenexus`, cada frente ativa deve usar sua propria subpasta no formato `NomeCurto_GUID_YYYYMMDD`
+- `NomeCurto_GUID_YYYYMMDD` identifica a frente pela combinacao de nome curto, GUID gerado na abertura da frente e data de criacao da frente; `YYYYMMDD` representa a data de criacao da frente, nao a data do pacote
+- em `PacotesGeradosParaImportacaoNaKbNoGenexus`, os pacotes devem permanecer na raiz, sem subpastas, usando o formato `NomeCurto_GUID_YYYYMMDD_nn.import_file.xml`
+- `nn` representa apenas a rodada curta de pacote daquela frente; nao representa versao semantica
 - a promoção para `ObjetosDaKbEmXml` ocorre apenas pelo fluxo oficial do script `.ps1` alimentado por `XPZ` exportado pela IDE
 - `ObjetosDaKbEmXml` nao deve ser atualizado por edição manual; ele e atualizado pelo fluxo do `.ps1` a partir dos `XPZ` disponibilizados na pasta paralela da KB
 - se o objeto ainda nao voltou da KB por export oficial, o trabalho deve acontecer em `ObjetosGeradosParaImportacaoNaKbNoGenexus`
@@ -88,8 +92,11 @@ Se você quer entender a base rapidamente:
 - a Carga Inicial pode usar um `XPZ` completo novo a qualquer momento para reatualizar `ObjetosDaKbEmXml`
 - a mesma estrutura também vale para `XPZ` parciais com objetos alterados desde a última atualização
 - `ObjetosGeradosParaImportacaoNaKbNoGenexus` guarda objetos temporários destinados à importação manual na IDE
-- os arquivos ativos em `ObjetosGeradosParaImportacaoNaKbNoGenexus` devem ficar na raiz dessa pasta, sem subpastas, quando fizerem parte do lote a ser incorporado ao pacote
+- cada frente ativa em `ObjetosGeradosParaImportacaoNaKbNoGenexus` deve ter sua propria subpasta `NomeCurto_GUID_YYYYMMDD`
+- essa subpasta da frente e a unidade ativa da frente de trabalho
+- ao retomar uma frente existente, reutilizar a mesma subpasta da frente em vez de criar outra
 - `PacotesGeradosParaImportacaoNaKbNoGenexus` guarda o pacote `.xml` e, quando necessário, também `.xpz`, que será importado pela IDE
+- `PacotesGeradosParaImportacaoNaKbNoGenexus` deve permanecer plano, sem subpastas por frente; o vinculo com a frente fica apenas no prefixo `NomeCurto_GUID_YYYYMMDD` somado ao `nn`
 - `AGENTS.md` e `README.md` podem existir na raiz ou em subpastas quando houver anotação operacional pertinente
 - se alguma dessas subpastas ainda não existir, a ordem recomendada de criação é:
   1. `scripts`
@@ -170,6 +177,10 @@ Si quieres entender la base rápidamente:
 - `ObjetosDaKbEmXml`: snapshot oficial de la KB; solo lectura para agentes
 - `ObjetosGeradosParaImportacaoNaKbNoGenexus`: área de trabajo para XMLs generados, ajustados o preservados para importación manual en la IDE
 - `PacotesGeradosParaImportacaoNaKbNoGenexus`: área de salida para `import_file.xml` y demás paquetes generados localmente
+- en `ObjetosGeradosParaImportacaoNaKbNoGenexus`, cada frente activa debe usar su propia subcarpeta con el formato `NomeCurto_GUID_YYYYMMDD`
+- `NomeCurto_GUID_YYYYMMDD` identifica la frente por la combinación de nombre corto, GUID generado al abrir la frente y fecha de creación de la frente
+- en `PacotesGeradosParaImportacaoNaKbNoGenexus`, los paquetes deben permanecer en la raíz, sin subcarpetas, usando el formato `NomeCurto_GUID_YYYYMMDD_nn.import_file.xml`
+- `nn` representa solo la ronda corta del paquete en esa frente; no representa versión semántica
 - la promoción hacia `ObjetosDaKbEmXml` ocurre solo por el flujo oficial del script `.ps1` alimentado por el `XPZ` exportado por la IDE
 - si el objeto todavía no volvió de la KB por export oficial, el trabajo debe ocurrir en `ObjetosGeradosParaImportacaoNaKbNoGenexus`
 - una edición detectada o pretendida en `ObjetosDaKbEmXml` para un delta aún no reexportado oficialmente por la KB debe tratarse como error explícito de proceso, no como detalle operativo
@@ -237,6 +248,10 @@ If you want to understand the repository quickly:
 - `ObjetosDaKbEmXml`: official KB snapshot; read-only for agents
 - `ObjetosGeradosParaImportacaoNaKbNoGenexus`: working area for XMLs generated, adjusted, or preserved for manual IDE import
 - `PacotesGeradosParaImportacaoNaKbNoGenexus`: output area for `import_file.xml` and other locally generated packages
+- in `ObjetosGeradosParaImportacaoNaKbNoGenexus`, each active front must use its own subfolder in the format `NomeCurto_GUID_YYYYMMDD`
+- `NomeCurto_GUID_YYYYMMDD` identifies the front by the combination of short name, GUID generated when the front is opened, and the front creation date
+- in `PacotesGeradosParaImportacaoNaKbNoGenexus`, packages must remain in the root, without subfolders, using the format `NomeCurto_GUID_YYYYMMDD_nn.import_file.xml`
+- `nn` represents only the short package round for that front; it is not semantic versioning
 - promotion into `ObjetosDaKbEmXml` happens only through the official `.ps1` script flow fed by the XPZ exported from the IDE
 - if the object has not yet returned from the KB by official export, the work must happen in `ObjetosGeradosParaImportacaoNaKbNoGenexus`
 - detected or intended editing in `ObjetosDaKbEmXml` for a delta that has not yet been officially re-exported by the KB must be treated as an explicit process error, not as an operational detail

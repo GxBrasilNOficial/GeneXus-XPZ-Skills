@@ -76,7 +76,9 @@ If the main need is to prepare or validate the initial folder structure around t
 - If `XpzExportadosPelaIDE` does not exist yet, ask where the user wants to store exported `.xpz` files
 - If `ObjetosDaKbEmXml` does not exist yet, stop and treat the KB as not yet materialized
 - Use `ObjetosGeradosParaImportacaoNaKbNoGenexus` as the working area for locally generated or preserved XML
-- Keep active XMLs for the current import batch in the root of `ObjetosGeradosParaImportacaoNaKbNoGenexus`, without subfolders
+- For each active front, create or reuse a dedicated subfolder under `ObjetosGeradosParaImportacaoNaKbNoGenexus` in the format `NomeCurto_GUID_YYYYMMDD`
+- Treat `YYYYMMDD` in that identifier as the creation date of the front, defined at the same moment the GUID is created; it is not the package date
+- Reuse the existing front subfolder when the work is a continuation of the same front; do NOT create a second front folder for the same active front without explicit reason
 - Use `PacotesGeradosParaImportacaoNaKbNoGenexus` as the destination area for locally generated packages
 - Detect workspace contamination before packaging and abort when more than one plausible batch is active
 - Treat the workspace as contaminated when the active root of `ObjetosGeradosParaImportacaoNaKbNoGenexus` contains XMLs from different fronts, different target objects, superseded deltas, or unrelated older files that could be mistaken for the current batch
@@ -84,7 +86,9 @@ If the main need is to prepare or validate the initial folder structure around t
 - When the user already signals manual IDE import/testing, treat `import_file.xml` as the primary deliverable and generate it promptly instead of postponing packaging
 - Prefer `import_file.xml` as the operational package artifact for manual IDE import unless `.xpz` is explicitly required by the user or by a documented local flow
 - Do NOT generate `.xpz` as an extra artifact by default when `import_file.xml` already satisfies the intended manual IDE import flow
-- Name locally generated packages for IDE import using the preferred pattern `FrenteCurta_YYYYMMDD_nn`
+- Name locally generated packages for IDE import using the preferred pattern `NomeCurto_GUID_YYYYMMDD_nn.import_file.xml`
+- In that package name, the front is identified only by the prefix `NomeCurto_GUID_YYYYMMDD`; `nn` is only the short package round for that front
+- Keep `PacotesGeradosParaImportacaoNaKbNoGenexus` flat, without subfolders by front
 - Classify each active XML root as `Object`, `Attribute`, or unsupported before serializing the package
 - For a new `Transaction` package, treat top-level `Attribute` items referenced by the `Level` as mandatory package members under `<Attributes>`, never as `Domain`/object payload under `<Objects>`
 - Validate UTF-8 without BOM hygiene on active XMLs before packaging
@@ -141,24 +145,32 @@ Reference files and when to load them:
 3. Reread local repository documentation and resolve the operational topology for this KB/repository:
    - `ObjetosDaKbEmXml` = official snapshot, read-only for agents
    - `XpzExportadosPelaIDE` = input area where the user stores `.xpz` exported by the IDE
-   - `ObjetosGeradosParaImportacaoNaKbNoGenexus` = working area for local XMLs to import manually
-   - `PacotesGeradosParaImportacaoNaKbNoGenexus` = output area for locally generated packages
+   - `ObjetosGeradosParaImportacaoNaKbNoGenexus` = working area for local XMLs to import manually, organized by front subfolder `NomeCurto_GUID_YYYYMMDD`
+   - each front subfolder is the active unit of that work front
+   - `PacotesGeradosParaImportacaoNaKbNoGenexus` = output area for locally generated packages, kept flat without subfolders by front
    - if the object has not yet returned from the KB by official export, the work must stay in `ObjetosGeradosParaImportacaoNaKbNoGenexus`
-4. When the task is packaging, list active XMLs in the root of `ObjetosGeradosParaImportacaoNaKbNoGenexus` and treat them as the candidate batch
-5. Evaluate batch isolation before packaging:
-   - If more than one plausible batch is present in the workspace → **ABORT**
+4. Before generating or packaging a front, resolve the front identifier:
+   - `NomeCurto`
+   - `GUID` generated when the front is opened
+   - `YYYYMMDD` = creation date of the front, defined together with the GUID; it is not the package date
+   - front folder = `ObjetosGeradosParaImportacaoNaKbNoGenexus\NomeCurto_GUID_YYYYMMDD\`
+   - if that front folder already exists for the current front, reuse it
+   - that front folder is the active unit of the work front
+5. When the task is packaging, list active XMLs only inside the current front folder and treat them as the candidate batch
+6. Evaluate batch isolation before packaging:
+   - If more than one plausible batch is present inside the current front folder → **ABORT**
    - Do NOT infer the correct batch only from recency when there is contamination risk
-   - If the current front needs a new isolated single-object delta and the root of `ObjetosGeradosParaImportacaoNaKbNoGenexus` contains remnant XMLs that do not belong to the current front, treat the root as contaminated and **ABORT** until the single-object batch is isolated explicitly
-   - Treat a root XML as a remnant contaminant when it is not part of the current front, is not part of the package being assembled now, was superseded by change of direction, or remains in the active root without operational justification for the current batch
-   - Preferred operational resolution for a new unitary delta: keep only the current object XML in the root of `ObjetosGeradosParaImportacaoNaKbNoGenexus` as the active batch
-   - Before generating new files, offer to move remnant contaminant XMLs to `ArquivoMorto`; do so only after explicit user approval
-   - Do NOT silently reuse a contaminated root batch when the current front is unitary
+   - If the current front needs a new isolated single-object delta and the current front folder contains remnant XMLs that do not belong to the current front decision, treat that front folder as contaminated and **ABORT** until the unitary batch is isolated explicitly
+   - Treat a front-folder XML as a remnant contaminant when it is not part of the current front decision, is not part of the package being assembled now, was superseded by change of direction, or remains inside the active front folder without operational justification for the current batch
+   - Preferred operational resolution for a new unitary delta: keep only the current object XML inside the current front folder as the active batch
+   - Before generating new files, offer to move remnant contaminant XMLs from the current front folder to `ArquivoMorto`; do so only after explicit user approval
+   - Do NOT silently reuse a contaminated front folder batch when the current front is unitary
    - Distinguish explicitly between `artifact of the current front` and `pre-existing parallel change`:
      - current-front artifact = XML intentionally produced, adjusted, or preserved for the current package decision
      - pre-existing parallel change = unrelated XML/package/workspace modification that already existed and is not part of the current batch decision
    - Do NOT absorb pre-existing parallel changes into the package of the current front only because they are present in the workspace
    - If an older package lost validity after a change of direction, either rename it with prefix `OBSOLETO_` or present a structured manifest in the conversation stating that package X was replaced by package Y; save that manifest as a local file only when local traceability is concretely needed
-6. Check for improper local changes in `ObjetosDaKbEmXml`:
+7. Check for improper local changes in `ObjetosDaKbEmXml`:
    - If detected, treat this as an explicit process error
    - Preserve those XMLs in `ObjetosGeradosParaImportacaoNaKbNoGenexus`, restore `ObjetosDaKbEmXml` to the official Git version, present a structured manifest of preserved items in the conversation, save it as a local file when incident traceability requires it, and **ABORT** packaging until the snapshot is sane
    - If the target object has not yet returned from the KB by official export, keep working only from `ObjetosGeradosParaImportacaoNaKbNoGenexus`
@@ -310,9 +322,10 @@ Reference files and when to load them:
 - [ ] Every unchanged object reused only for dependency closure preserved the official `lastUpdate`
 - [ ] Embedded objects in `import_file.xml` were checked for correct `lastUpdate` handling before delivery
 - [ ] `ObjetosDaKbEmXml` was treated as read-only official snapshot
-- [ ] When the task was packaging, active XMLs were listed from the root of `ObjetosGeradosParaImportacaoNaKbNoGenexus`
+- [ ] Current front folder `NomeCurto_GUID_YYYYMMDD` was created or reused explicitly
+- [ ] When the task was packaging, active XMLs were listed from the current front folder under `ObjetosGeradosParaImportacaoNaKbNoGenexus`
 - [ ] Candidate batch was isolated; no workspace contamination remained
-- [ ] When the front required a new unitary delta, the root of `ObjetosGeradosParaImportacaoNaKbNoGenexus` was isolated explicitly before packaging
+- [ ] When the front required a new unitary delta, the current front folder under `ObjetosGeradosParaImportacaoNaKbNoGenexus` was isolated explicitly before packaging
 - [ ] Current-front artifacts were distinguished explicitly from pre-existing parallel changes before packaging
 - [ ] Root type of every active XML was classified before package serialization
 - [ ] No top-level `Attribute` was placed under `<Objects>`
@@ -321,7 +334,7 @@ Reference files and when to load them:
 - [ ] For `Transaction`, every `DescriptionAttribute` present exists in the same `Level` and also in `<Attributes>`
 - [ ] For `Transaction`, no required `Attribute` was serialized as `Domain` or other object type under `<Objects>`
 - [ ] UTF-8 BOM hygiene was checked on every active XML
-- [ ] Generated package name followed the preferred `FrenteCurta_YYYYMMDD_nn` pattern when applicable
+- [ ] Generated package name followed the preferred `NomeCurto_GUID_YYYYMMDD_nn.import_file.xml` pattern when applicable
 - [ ] Batch manifest was produced or validated before packaging, by default in the conversation
 - [ ] Any superseded package was either renamed with prefix `OBSOLETO_` or recorded in a structured manifest in the conversation before continuing
 - [ ] Manifest file was created only when there was a concrete operational reason
@@ -363,9 +376,9 @@ Reference files and when to load them:
 - NEVER create, alter, move, rename, or overwrite files in `ObjetosDaKbEmXml`
 - NEVER treat an intended edit in `ObjetosDaKbEmXml` for a delta not yet returned by official KB export as acceptable; it is an explicit process error
 - NEVER treat locally generated XML as if it were the official KB snapshot
-- NEVER create subfolders in `ObjetosGeradosParaImportacaoNaKbNoGenexus` for the active import batch
-- NEVER create automatic subfolders by type under `ObjetosGeradosParaImportacaoNaKbNoGenexus`
-- NEVER treat a contaminated root of `ObjetosGeradosParaImportacaoNaKbNoGenexus` as acceptable for a new isolated single-object delta
+- NEVER keep the active front batch directly in the root of `ObjetosGeradosParaImportacaoNaKbNoGenexus`; use the front folder `NomeCurto_GUID_YYYYMMDD`
+- NEVER create automatic subfolders by type under the active front folder in `ObjetosGeradosParaImportacaoNaKbNoGenexus`
+- NEVER treat a contaminated active front folder as acceptable for a new isolated single-object delta
 - NEVER mix a pre-existing parallel change into the package of the current front only because both are present in the same workspace
 - NEVER move files to `ArquivoMorto` without explicit user request
 - NEVER place a top-level `Attribute` under `<Objects>`
@@ -373,6 +386,7 @@ Reference files and when to load them:
 - NEVER embed XML declaration text such as `<?xml version="1.0" ...?>` inside `<Objects>` payload of `import_file.xml`
 - NEVER postpone generation of `import_file.xml` after the user has already signaled manual IDE import/testing and the delta is materially ready
 - NEVER generate `.xpz` by default when manual IDE import is the target flow and `import_file.xml` is sufficient
+- NEVER create subfolders by front under `PacotesGeradosParaImportacaoNaKbNoGenexus`; that package area must remain flat
 - NEVER ignore `Cannot convert Domain to Attribute`, `Attribute 'X' in 'Transaction Y' does not exist`, or `DescriptionAttribute ... could not be found in level attributes`; these are blocking package-construction errors for this trail
 - NEVER treat `OBSOLETO_` as the default naming convention for normal package generation
 
