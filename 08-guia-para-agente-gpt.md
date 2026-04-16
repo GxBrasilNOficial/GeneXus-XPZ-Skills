@@ -83,7 +83,8 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 - se `ObjetosDaKbEmXml` ainda nao existir, tratar a KB como ainda nao materializada e parar antes de assumir snapshot
 - nesta trilha, `ObjetosDaKbEmXml` e snapshot oficial e somente leitura para agentes
 - nesta trilha, `ObjetosGeradosParaImportacaoNaKbNoGenexus` e a area de trabalho para XMLs a importar manualmente na IDE
-- nesta trilha, os arquivos ativos de `ObjetosGeradosParaImportacaoNaKbNoGenexus` devem ficar na raiz da pasta, sem subpastas, quando fizerem parte do lote de importacao
+- nesta trilha, cada frente ativa deve usar sua propria subpasta `NomeCurto_GUID_YYYYMMDD` dentro de `ObjetosGeradosParaImportacaoNaKbNoGenexus`
+- nesta trilha, os arquivos ativos do lote devem ficar dentro da subpasta ativa da frente, e nao soltos na raiz da area de trabalho
 - nesta trilha, `PacotesGeradosParaImportacaoNaKbNoGenexus` e a area de saida para pacotes gerados localmente
 - nesta trilha, a promocao para snapshot oficial ocorre apenas pelo script `.ps1` alimentado por `XPZ` exportado pela IDE
 - nao presumir `Objects.xml` isolado nem manifesto externo separado se isso nao estiver documentado no `02`
@@ -93,11 +94,14 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 - em pacote misto com `Transaction`, `WorkWithForWeb` e `Procedure`, preferir pacote embutido comparavel antes de tentar envelope por `FilePath`
 - se houver mais de um lote plausivel no workspace, o agente deve parar antes de empacotar e sinalizar contaminacao de workspace
 - o agente nao deve fechar pacote por inferencia, por recencia presumida ou por mistura implícita de frentes
+- o agente deve distinguir explicitamente `mesmo objeto` de `mesma frente`
+- reusar precedente estrutural de pacote nao autoriza herdar automaticamente a identidade nominal da frente anterior
+- quando a continuidade da frente nao estiver fechada por evidencia direta ou confirmacao explicita do usuario, o agente deve explicitar a ambiguidade antes de nomear pasta ou pacote
 - a ordem obrigatoria e: isolar lote, classificar raizes, validar `lastUpdate`, validar BOM, validar manifesto e so entao empacotar
 - manifesto nao implica automaticamente arquivo fisico; por padrao, ele deve ser apresentado na propria conversa
 - para `WorkWithWeb` com ruído comprovado de `Load Code` em `Selection` e/ou tabs de `View`, registrar isso como nao funcional no manifesto e nao generalizar para todo caso de `WorkWithWeb`
-- ao gerar pacote local para importacao na IDE, preferir nome no formato `FrenteCurta_YYYYMMDD_nn`
-- `nn` representa apenas a rodada curta daquela frente naquele dia; nao representa versao semantica profunda
+- ao gerar pacote local para importacao na IDE, preferir nome no formato `NomeCurto_GUID_YYYYMMDD_nn.import_file.xml`
+- nesse formato, `NomeCurto` identifica a frente, `GUID` e `YYYYMMDD` identificam a abertura da frente, e `nn` representa apenas a rodada curta daquela frente
 - `OBSOLETO_` nao e convencao principal de nome; usar so como contencao de risco quando dois pacotes da mesma frente puderem ser confundidos
 
 ## Regra de leitura para logs de importacao
@@ -239,7 +243,7 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 - Regra operacional: XML gerado localmente deve ser salvo em UTF-8 sem BOM; se houver BOM, remover e registrar a correcao
 - Regra operacional: antes de gerar `import_file.xml` ou `.xpz`, produzir ou validar manifesto do lote, por padrao na propria conversa, com frente ou descricao curta do lote, origem do lote, quantidade total de XMLs, quantidade de `Objects`, quantidade de `Attributes`, lista ou resumo dos arquivos incluidos, `lastUpdate` aplicado ou preservado, pacote gerado, pacote anterior substituido quando houver e observacoes de risco ou pendencia
 - Regra operacional: salvar manifesto em arquivo e comportamento excepcional e contextual; so fazer isso em incidente de processo envolvendo `ObjetosDaKbEmXml`, substituicao de pacote com rastreabilidade local util, pedido explicito do usuario ou necessidade real de retomada futura fora da conversa imediata
-- Regra operacional: ao nomear o pacote local, preferir `FrenteCurta_YYYYMMDD_nn`, evitando nome so com assunto, nome so com data/hora, descricao longa de conversa ou sobrescrita recorrente do mesmo nome
+- Regra operacional: ao nomear o pacote local, preferir `NomeCurto_GUID_YYYYMMDD_nn.import_file.xml`, evitando nome so com assunto, nome so com data/hora, descricao longa de conversa ou sobrescrita recorrente do mesmo nome
 - Evidência direta: identidade estrutural de objeto sob `Folder` ou `Module` deve ser decidida por exemplar comparavel da mesma KB, conferindo em conjunto `fullyQualifiedName`, `name`, `parent`, `parentGuid`, `parentType` e `moduleGuid`
 - Regra operacional: nome de `Folder` nao deve ser promovido para `fullyQualifiedName` por analogia; primeiro classificar o conteiner por `parentType`, depois seguir o padrao do exemplar comparavel
 - Evidência direta: compatibilidade de `Source` deve ser decidida primeiro pela propria trilha XPZ, usando regra explicita, exemplo sanitizado ou molde documentado, mesmo quando a KB ainda tiver corpus pequeno

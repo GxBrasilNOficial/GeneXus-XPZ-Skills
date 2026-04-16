@@ -55,8 +55,8 @@ If the main need is to prepare or validate the initial folder structure around t
 - Abort for confirmation instead of extrapolating from weak analogy when no strong enough local precedent justifies the package format
 - Treat `runtime`, `Import File Load`, `Import`, and `Specification` as distinct validation layers; success in one does not authorize conclusions about the others
 - Validate `Source` compatibility by methodology first: GeneXus semantic rules plus the XPZ trail and `nexa`; use KB corpus search only as fallback when the methodological base does not cover the case
-- Classify each package candidate by content delta, separating requested functional change from metadata, reserialization, or known noise before packaging
-- Require explicit confirmation when a candidate item is only metadata, reserialization, or noise and would otherwise be kept in the package
+- Classify each package candidate by content delta as `requested change`, `necessary auxiliary change`, or `extra unrequested change` before packaging
+- Require explicit signaling before packaging when a candidate item remains as `extra unrequested change`, including metadata, reserialization, or known noise that is not strictly required
 - Generate valid `lastUpdate` timestamp (real local time, not placeholder)
 - Treat `ObjetosDaKbEmXml` as official snapshot and read-only for agents
 - Treat any detected or intended edit in `ObjetosDaKbEmXml` for a delta that has not yet returned by official KB re-export as an explicit process error, not as a mere operational detail
@@ -78,7 +78,9 @@ If the main need is to prepare or validate the initial folder structure around t
 - Use `ObjetosGeradosParaImportacaoNaKbNoGenexus` as the working area for locally generated or preserved XML
 - For each active front, create or reuse a dedicated subfolder under `ObjetosGeradosParaImportacaoNaKbNoGenexus` in the format `NomeCurto_GUID_YYYYMMDD`
 - Treat `YYYYMMDD` in that identifier as the creation date of the front, defined at the same moment the GUID is created; it is not the package date
-- Reuse the existing front subfolder when the work is a continuation of the same front; do NOT create a second front folder for the same active front without explicit reason
+- Distinguish explicitly between `same object` and `same front`
+- Do NOT reuse front identity, short-name prefix, front GUID, front creation date, or package counter only because the target object is the same
+- Reuse the existing front subfolder only when the work is explicitly confirmed or directly evidenced as a continuation of that same front; do NOT create a second front folder for the same active front without explicit reason
 - Use `PacotesGeradosParaImportacaoNaKbNoGenexus` as the destination area for locally generated packages
 - Detect workspace contamination before packaging and abort when more than one plausible batch is active
 - Treat the workspace as contaminated when the active root of `ObjetosGeradosParaImportacaoNaKbNoGenexus` contains XMLs from different fronts, different target objects, superseded deltas, or unrelated older files that could be mistaken for the current batch
@@ -120,6 +122,9 @@ If the main need is to prepare or validate the initial folder structure around t
 - Lead with the decision (proceed / abort) and the reason
 - State which template was used and why it was selected
 - Always end output with a limitations block: what was followed, what requires external validation
+- In the closing, declare explicitly whether the front identity was confirmed, directly evidenced, or assumed under local rule
+- In the closing, declare explicitly whether the package reused an existing front or opened a new front
+- In the closing, declare explicitly why the final package name was chosen
 - In the closing, explicitly state that the saved XML was reread, the persisted `lastUpdate` was confirmed, and the applicable local repository rules were reread and satisfied before packaging
 - Use NEVER and ABORT as hard stops, not suggestions
 - NEVER use speculative or reassuring language about import/build success
@@ -153,13 +158,17 @@ Reference files and when to load them:
    - each front subfolder is the active unit of that work front
    - `PacotesGeradosParaImportacaoNaKbNoGenexus` = output area for locally generated packages, kept flat without subfolders by front
    - if the object has not yet returned from the KB by official export, the work must stay in `ObjetosGeradosParaImportacaoNaKbNoGenexus`
-4. Before generating or packaging a front, resolve the front identifier:
-   - `NomeCurto`
-   - `GUID` generated when the front is opened
-   - `YYYYMMDD` = creation date of the front, defined together with the GUID; it is not the package date
-   - front folder = `ObjetosGeradosParaImportacaoNaKbNoGenexus\NomeCurto_GUID_YYYYMMDD\`
-   - if that front folder already exists for the current front, reuse it
-   - that front folder is the active unit of the work front
+4. Before generating or packaging a front, resolve the front identifier explicitly:
+   - determine whether the case is `same front` or `new front`
+   - do NOT infer `same front` only because the object is the same
+   - if continuity was not explicitly stated and no direct repository evidence closes that ambiguity, block automatic inheritance of the previous front identity and follow the applicable local rule
+   - only after that, define:
+     - `NomeCurto`
+     - `GUID` generated when the front is opened
+     - `YYYYMMDD` = creation date of the front, defined together with the GUID; it is not the package date
+     - front folder = `ObjetosGeradosParaImportacaoNaKbNoGenexus\NomeCurto_GUID_YYYYMMDD\`
+     - if that front folder already exists for the current front, reuse it
+     - that front folder is the active unit of the work front
 5. When the task is packaging, list active XMLs only inside the current front folder and treat them as the candidate batch
 6. Evaluate batch isolation before packaging:
    - If more than one plausible batch is present inside the current front folder → **ABORT**
@@ -173,6 +182,8 @@ Reference files and when to load them:
      - current-front artifact = XML intentionally produced, adjusted, or preserved for the current package decision
      - pre-existing parallel change = unrelated XML/package/workspace modification that already existed and is not part of the current batch decision
    - Do NOT absorb pre-existing parallel changes into the package of the current front only because they are present in the workspace
+   - Classify current-batch content as `requested change`, `necessary auxiliary change`, or `extra unrequested change`
+   - Signal any `extra unrequested change` explicitly before packaging; do NOT silently absorb it into the package
    - If an older package lost validity after a change of direction, either rename it with prefix `OBSOLETO_` or present a structured manifest in the conversation stating that package X was replaced by package Y; save that manifest as a local file only when local traceability is concretely needed
 7. Check for improper local changes in `ObjetosDaKbEmXml`:
    - If detected, treat this as an explicit process error
@@ -241,9 +252,10 @@ Reference files and when to load them:
    - `TransactionOrObject`, when present in a comparable export, may be included as an auxiliary object in `<Objects>`, but it does NOT replace the mandatory top-level `<Attributes>` required by the `Transaction`
    - Validate UTF-8 without BOM on every active XML
    - If BOM is present, remove it and register the correction
-   - Prefer package names in the form `FrenteCurta_YYYYMMDD_nn`
-   - `FrenteCurta` must be short, human-readable, and semantically strong
-   - `nn` is only the short incremental round counter for that front on that date, not semantic versioning
+   - Prefer package names in the form `NomeCurto_GUID_YYYYMMDD_nn.import_file.xml`
+   - `NomeCurto` must be short, human-readable, and semantically strong
+   - `GUID` and `YYYYMMDD` identify the front opening, not the package generation instant
+   - `nn` is only the short incremental round counter for that front, not semantic versioning
    - Do NOT default to name-only, date-only/time-only, excessively long conversation descriptions, or always overwriting the same package name
    - Produce or validate a manifest in the conversation containing at minimum: batch front or short description, batch origin, total XML count, `Objects` count, `Attributes` count, included files list or summary, `lastUpdate` applied or preserved, generated package, superseded package when present, and risk/pending notes
    - Save that manifest as a file only when there is an incident involving `ObjetosDaKbEmXml`, package supersession that needs local traceability, explicit user request, or real need for future handoff outside the immediate conversation
@@ -265,6 +277,8 @@ Reference files and when to load them:
    - Validate `Source` compatibility separately from XML well-formedness
    - A plausible GeneXus `Source` is NOT ready unless every new operator, function, conversion, and string/numeric pattern is backed by methodological evidence from this trail
    - Treat local corpus evidence as confirmation or tie-breaker, not as the sole basis for accepting a new `Source` construct
+   - When the current delta edits `Source`, reread the saved snippet before packaging and confirm coherent indentation, visually consistent block closure, and absence of visually broken blocks
+   - If the current delta introduced or moved `if/endif`, `do case/endcase`, nested blocks, or comparable control-flow boundaries, treat this local readability review as mandatory operational hygiene
    - Treat structural XML validation, package-envelope validation, and semantic-contract validation as separate checks
    - Well-formed XML and an acceptable envelope do NOT prove that signatures, formulas, or business meaning are correct
    - Validate package-envelope serialization explicitly before concluding that the package is ready

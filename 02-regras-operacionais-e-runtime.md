@@ -93,11 +93,29 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
 - `Regra operacional`: nao exigir busca ampla no acervo inteiro da KB como padrao para validar um `Source`; se a base metodologica ja cobrir o padrao, ela prevalece.
 - `Regra operacional`: quando a cobertura vier apenas de melhor esforco, declarar explicitamente que a compatibilidade nao esta garantida e elevar o risco metodologico.
 
+## Identidade de frente e identidade de pacote
+
+- `Regra operacional`: distinguir explicitamente `mesmo objeto` de `mesma frente`.
+- `Regra operacional`: o agente nao deve reaproveitar `NomeCurto`, GUID da frente, data de abertura da frente ou contador `nn` apenas porque o objeto alvo e o mesmo.
+- `Regra operacional`: o agente so pode reutilizar a identidade de uma frente anterior quando o usuario declarar continuidade da mesma frente ou quando houver evidencia direta suficiente no repositorio para fechar essa continuidade sem ambiguidade relevante.
+- `Regra operacional`: reuso de precedente estrutural de pacote e decisao separada do reuso da identidade nominal da frente.
+- `Regra operacional`: envelope, `Dependencies`, `ObjectsIdentityMapping` e demais elementos estruturais podem herdar de precedente validado quando o caso for comparavel.
+- `Regra operacional`: identidade nominal da frente nao deve herdar automaticamente do pacote anterior por analogia, recencia, coincidencia de objeto ou habito operacional.
+- `Regra operacional`: quando a continuidade da frente nao estiver explicitamente confirmada nem diretamente evidenciada, o agente deve bloquear a heranca automatica da identidade anterior e tratar a decisao como pendente ou como abertura explicita de frente nova, conforme a documentacao local aplicavel.
+
 ## Delta estrito
 
-- `Regra operacional`: antes de empacotar, classificar cada objeto candidato como `mudanca funcional solicitada` ou `apenas metadado/reeserializacao/ruido`.
-- `Regra operacional`: se o objeto for apenas metadado, reserializacao ou ruido, exigir confirmacao explicita para mante-lo no pacote.
+- `Regra operacional`: antes de empacotar, classificar cada mudanca candidata como `mudanca pedida`, `mudanca auxiliar necessaria` ou `mudanca extra nao pedida`.
+- `Regra operacional`: se a mudanca for apenas metadado, reserializacao ou ruido, ela deve ser classificada como `mudanca extra nao pedida`, salvo quando houver justificativa objetiva de dependencia obrigatoria.
+- `Regra operacional`: mudanca extra nao pedida deve ser sinalizada explicitamente antes do empacotamento.
+- `Regra operacional`: o agente nao deve absorver mudanca extra nao pedida no pacote apenas porque ela apareceu no XML ativo, no diff local ou na reserializacao.
 - `Regra operacional`: o delta deve ser estrito pelo conteudo do pacote, nao por `git diff` abstrato.
+
+## Gate visual de `Source`
+
+- `Regra operacional`: quando houver edicao de `Source`, releia o trecho salvo antes do empacotamento.
+- `Regra operacional`: se a mudanca introduzir `if/endif`, `do case/endcase`, deslocamento de bloco, reindentacao relevante ou novo aninhamento, conferir explicitamente identacao, fechamento visual e legibilidade local.
+- `Regra operacional`: esse gate reduz erro humano em XML e `Source` grandes e nao substitui validacao semantica GeneXus.
 
 ## Ruido conhecido de `WorkWithWeb`
 
@@ -113,9 +131,9 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
 - `Regra operacional`: o agente nao deve fechar pacote por inferencia quando houver mais de um lote plausivel no workspace.
 - `Regra operacional`: a ordem obrigatoria antes de empacotar e: isolar lote, classificar raizes, validar `lastUpdate`, validar BOM, validar manifesto e so entao serializar o pacote.
 - `Regra operacional`: manifesto deve ser tratado primeiro como saida estruturada na propria conversa, e nao como arquivo fisico por padrao.
-- `Regra operacional`: nome de pacote local gerado para importacao na IDE deve priorizar clareza humana e separacao de frentes paralelas, preferindo o padrao `FrenteCurta_YYYYMMDD_nn`.
-- `Regra operacional`: nesse padrao, `FrenteCurta` e uma descricao curta, legivel e semanticamente forte da frente; `YYYYMMDD` e a data local da geracao; `nn` e apenas o contador curto e incremental da rodada daquela frente no mesmo dia.
-- `Regra operacional`: `nn` nao representa versao semantica profunda nem historico de release; ele representa somente o candidato curto daquela frente naquele dia.
+- `Regra operacional`: nome de pacote local gerado para importacao na IDE deve priorizar clareza humana e separacao de frentes paralelas, preferindo o padrao `NomeCurto_GUID_YYYYMMDD_nn.import_file.xml`.
+- `Regra operacional`: nesse padrao, `NomeCurto` e uma descricao curta, legivel e semanticamente forte da frente; `GUID` e o identificador aberto para aquela frente; `YYYYMMDD` e a data de abertura da frente; `nn` e apenas o contador curto e incremental da rodada daquela frente.
+- `Regra operacional`: `nn` nao representa versao semantica profunda nem historico de release; ele representa somente o candidato curto daquela frente.
 - `Regra operacional`: nao usar como padrao nome so com assunto, nome so com data ou hora, descricao excessivamente longa da conversa ou sobrescrita recorrente do mesmo nome de pacote.
 - `Regra operacional`: se um pacote anterior perder validade por mudanca de direcao da frente, ele deve ser marcado como provisório ou obsoleto e deixar de ser tratado como candidato principal.
 

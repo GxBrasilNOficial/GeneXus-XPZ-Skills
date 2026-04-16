@@ -91,6 +91,16 @@ Servir como local único para conflitos não resolvidos silenciosamente.
 - `Inferência forte`: antes de corrigir os `.md` dos tipos problemáticos, vale usar a bateria atual para distinguir "erro de molde" de "erro de dependência de KB" em cada tipo.
 - `Inferência forte`: a proxima coleta em exemplos reais deve priorizar `Table/Index` e outros tipos contextuais ainda nao revisitados com dependencias completas; para `API`, so faz sentido nova coleta se surgirem novos casos reais ou automacao externa no ambiente. Para `Theme`, `PatternSettings` e `Transaction`, a coleta adicional passa a ser de generalizacao e nao de desbloqueio inicial.
 
+## Mini-postmortem de incidente metodologico
+
+- `Regra operacional`: usar este mini-postmortem quando houver incidente de processo, erro de nomenclatura de frente ou pacote, erro de empacotamento, erro de snapshot/acervo, mudanca extra fora do plano ou melhoria candidata para skill/documento.
+- `Regra operacional`: esse registro e condicional e nao faz parte do fechamento obrigatorio de toda frente.
+- `Checklist`: registrar o incidente observado de forma objetiva.
+- `Checklist`: classificar a categoria principal do incidente.
+- `Checklist`: registrar impacto pratico na frente, no pacote ou na rastreabilidade.
+- `Checklist`: apontar a regra nova ou ajuste metodologico candidato.
+- `Checklist`: indicar qual skill, documento ou fluxo precisa evoluir.
+
 ## Decisao operacional - Transaction e WebPanel
 
 - `Evidência direta`: o acervo contem 183 `Transaction` e 1196 `WebPanel`.
@@ -224,7 +234,6 @@ Orientar futuras coletas de templates comparáveis.
 - `Causa`: assumir a `Base Table` pelo nome do objeto ou por leitura parcial do bloco, sem confirmar a determinacao explicita ou implicita.
 - `Consequência`: aceitar atributos que nao pertencem a `Base Table`/`Extended Table` coerente, gerando analise errada ou ajuste de `Source` fora da navegacao real.
 - `Regra de checagem`: antes de validar atributos do bloco, identificar a `Base Table` determinada do `For each` e verificar cada referencia contra essa base e seu contexto coerente de navegacao.
-
 
 
 
