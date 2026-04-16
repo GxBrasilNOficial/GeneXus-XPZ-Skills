@@ -102,6 +102,10 @@ If the main need is to prepare or validate the initial folder structure around t
 - When changing a `Procedure`, run a minimum semantic pre-packaging gate on the `Procedure` itself:
   - if `parm(...)` changed, every new parm variable must exist in the variables section of the object
   - if `parm(...)` changed, variable name, base type, and presence must remain coherent
+  - if the current `Source` delta introduces a new helper variable, that variable must exist in the variables section and its declared type must remain coherent with the way it is used
+  - if the current `Source` delta introduces a method call on a variable, accept it only when that method is compatible with the declared variable type and is anchored by the methodological base loaded for the case
+  - if the current `Source` delta introduces cleanup or reinitialization of a collection, SDT, or `Messages, GeneXus.Common`, accept only patterns anchored by the methodological base for that declared type
+  - for collection reinitialization introduced by the current `Source` delta and already covered by the methodological base, prefer `= new()`; do NOT accept unsupported cleanup forms such as `SetEmpty()` only by plausibility or analogy
   - if a period filter is introduced over a `DateTime` field, prefer direct comparison on the `DateTime` column: `>=` start and `<` next day after end
   - treat function on the database column, especially `ToDate()` over the column, as explicit navigation/performance risk
   - if a function on the column is kept, justify it explicitly
@@ -270,6 +274,10 @@ Reference files and when to load them:
      - every new parm variable exists in the variables section
      - variable name, base type, and presence remain coherent
      - variables referenced by the edited `Source` exist
+     - every new helper variable introduced by the current `Source` delta exists in the variables section and remains coherent with its declared type
+     - every new method call introduced by the current `Source` delta on a variable is compatible with the declared type of that variable and is anchored by the methodological base loaded for the case
+     - cleanup or reinitialization introduced by the current `Source` delta for a collection, SDT, or `Messages, GeneXus.Common` must use a pattern anchored by the methodological base loaded for that declared type
+     - for collection reinitialization introduced by the current `Source` delta and already covered by the methodological base, prefer `= new()`; do NOT accept unsupported forms such as `SetEmpty()` only by plausibility or analogy
    - If the local repository documentation explicitly requires direct-call review, then review all applicable direct call sites before concluding the delta
    - Treat chains such as `WorkWithWeb -> action -> parm(...) -> For each`, `WorkWith` to `procPlanilha`, wrappers, or equivalent flows as KB-specific review chains unless the local documentation makes them mandatory for this repository
    - Do NOT universalize a KB-specific architectural chain as if it were a global XPZ rule
@@ -351,6 +359,10 @@ Reference files and when to load them:
 - [ ] If `parm(...)` changed, every new parm variable exists in the variables section of the `Procedure`
 - [ ] If `parm(...)` changed, variable name, base type, and presence remained coherent
 - [ ] Variables referenced by the edited `Source` exist in the `Procedure`
+- [ ] Every new helper variable introduced by the current `Source` delta exists in the variables section and remains coherent with its declared type
+- [ ] Every new method call introduced by the current `Source` delta on a variable is compatible with the declared type of that variable and is anchored by the methodological base loaded for the case
+- [ ] Cleanup or reinitialization introduced by the current `Source` delta for a collection, SDT, or `Messages, GeneXus.Common` uses a pattern anchored by the methodological base loaded for that declared type
+- [ ] For collection reinitialization introduced by the current `Source` delta and already covered by the methodological base, `= new()` was preferred and unsupported forms such as `SetEmpty()` were not accepted only by plausibility or analogy
 - [ ] Filters over `DateTime` prefer direct comparison on the column and do not use function on the column without explicit justification
 - [ ] Simple initial/final period filters were expressed as two independent `where` clauses when applicable
 - [ ] When useful for readability, edited `Source` considered the local form already present in the object without turning that into a hard methodological requirement
