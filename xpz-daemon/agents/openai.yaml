@@ -1,0 +1,7 @@
+interface:
+  display_name: "XPZ Daemon"
+  short_description: "Manage a persistent XPZ monitor."
+  default_prompt: "Use $xpz-daemon to install or manage the persistent XPZ monitoring flow for GeneXus exports."
+
+policy:
+  allow_implicit_invocation: true

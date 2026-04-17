@@ -34,6 +34,12 @@ Preservar rastreabilidade da consolidacao, inventario documental, inventario bru
 - `Regra operacional`: se houver refatoracao, mudanca de local ou substituicao do motor, a alteracao deve ser documentada explicitamente e propagada aos consumidores externos antes de remover o arquivo anterior.
 - `Evidência direta`: o script recebeu adição do parâmetro `-KbMetadataPath` para gerar metadados da KB em formato Markdown, facilitando reuso em envelopes de importação.
 
+## Nota sobre a skill experimental de MSBuild
+
+- `Evidência direta`: a skill `xpz-msbuild-import-export` passou a existir na raiz como contrato materializado em `xpz-msbuild-import-export/SKILL.md`.
+- `Evidência direta`: essa skill permanece experimental e, nesta fase, ainda nao inclui implementacao dos futuros scripts `.ps1`.
+- `Regra editorial`: a existencia dessa skill nao promove a trilha `MSBuild` a fluxo oficial da base nem altera automaticamente o comportamento das skills `xpz-*` existentes.
+
 ## Fontes consolidadas
 - 00-inventario-da-base-documental.md
 - 30-inventario-bruto-kb.md
@@ -578,7 +584,6 @@ Registrar o que foi lido, renomeado, consolidado e mantido em aberto durante a r
 - `Evidência direta`: um teste controlado de importacao de `.xpz` minimo de `Procedure` foi bem-sucedido nesta trilha e confirmou o envelope normal sem `KnowledgeBase`.
 - `Evidência direta`: o mesmo teste mostrou que `Source/@kb` e `Source/Version/@guid` nao podem ficar como placeholders textuais; precisam ser GUIDs sintaticamente validos.
 - `Hipótese`: os erros adicionais de importacao que aparecerem devem continuar sendo incorporados ao refinamento desta mesma documentacao.
-
 
 
 

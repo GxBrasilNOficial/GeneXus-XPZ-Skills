@@ -1,0 +1,7 @@
+interface:
+  display_name: "XPZ KB Parallel Setup"
+  short_description: "Prepare the KB parallel-folder structure."
+  default_prompt: "Use $xpz-kb-parallel-setup to prepare or validate the GeneXus KB parallel-folder structure for XPZ work."
+
+policy:
+  allow_implicit_invocation: true

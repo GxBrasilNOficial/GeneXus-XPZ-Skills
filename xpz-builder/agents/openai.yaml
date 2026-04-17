@@ -1,0 +1,7 @@
+interface:
+  display_name: "XPZ Builder"
+  short_description: "Generate GeneXus XPZ/XML conservatively."
+  default_prompt: "Use $xpz-builder to generate or clone GeneXus XPZ/XML artifacts conservatively from comparable templates."
+
+policy:
+  allow_implicit_invocation: true

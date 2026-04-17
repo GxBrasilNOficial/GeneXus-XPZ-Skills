@@ -1,0 +1,7 @@
+interface:
+  display_name: "XPZ Sync"
+  short_description: "Run XPZ sync or verification scripts."
+  default_prompt: "Use $xpz-sync to run the local XPZ synchronization or verification flow for a GeneXus KB."
+
+policy:
+  allow_implicit_invocation: true

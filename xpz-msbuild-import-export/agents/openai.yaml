@@ -1,0 +1,7 @@
+interface:
+  display_name: "XPZ MSBuild Import Export"
+  short_description: "Experimental XPZ import/export via MSBuild."
+  default_prompt: "Use $xpz-msbuild-import-export to assess or run an experimental GeneXus XPZ import/export flow via MSBuild with explicit parameters and safety gates."
+
+policy:
+  allow_implicit_invocation: true

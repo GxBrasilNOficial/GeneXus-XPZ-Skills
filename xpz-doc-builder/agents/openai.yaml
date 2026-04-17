@@ -1,0 +1,7 @@
+interface:
+  display_name: "XPZ Doc Builder"
+  short_description: "Build Markdown docs from GeneXus XML."
+  default_prompt: "Use $xpz-doc-builder to generate or update Markdown documentation from GeneXus XPZ/XML sources."
+
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,7 @@
+interface:
+  display_name: "XPZ Reader"
+  short_description: "Classify GeneXus XPZ/XML structure and risk."
+  default_prompt: "Use $xpz-reader to analyze GeneXus XPZ/XML input and identify object type, family, structure, and risk."
+
+policy:
+  allow_implicit_invocation: true
