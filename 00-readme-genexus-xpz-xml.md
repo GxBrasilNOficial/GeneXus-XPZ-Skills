@@ -138,6 +138,7 @@ Organizar conhecimento operacional e empírico sobre XMLs extraídos de `XPZ` Ge
 - o agente deve manter `Source/@kb` e `Source/Version/@guid` em formato GUID valido; placeholders textuais ja causaram falha real de parse nesta trilha
 - antes de empacotar, validar parse XML, presenca de todos os `Part type` recorrentes e coerencia entre objeto clonado e molde-base
 - o agente nao deve afirmar “sem erro de importacao”; deve afirmar apenas que seguiu a especificacao mais conservadora disponivel
+- ao revisar `Source` grande com fechamento de bloco ou aninhamento relevante, releia o trecho salvo e preserve comentarios estruturais humanos que ajudam a leitura, sem tentar "limpar" apoio visual util
 
 ## Regras de fonte
 

@@ -115,6 +115,8 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
 
 - `Regra operacional`: quando houver edicao de `Source`, releia o trecho salvo antes do empacotamento.
 - `Regra operacional`: se a mudanca introduzir `if/endif`, `do case/endcase`, deslocamento de bloco, reindentacao relevante ou novo aninhamento, conferir explicitamente identacao, fechamento visual e legibilidade local.
+- `Regra operacional`: comentarios estruturais humanos ja existentes, como `//if`, devem ser preservados quando ajudam a leitura do bloco; nao tratar esse apoio como sujeira cosmetica.
+- `Regra operacional`: em `Source` grande, revisar o contorno visual do bloco afetado e algumas linhas antes e depois; isso e uma heuristica de escalada, nao uma regra metodologica central para toda edicao.
 - `Regra operacional`: esse gate reduz erro humano em XML e `Source` grandes e nao substitui validacao semantica GeneXus.
 
 ## Ruido conhecido de `WorkWithWeb`

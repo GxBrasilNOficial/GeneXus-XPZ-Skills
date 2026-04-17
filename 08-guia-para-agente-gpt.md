@@ -70,6 +70,7 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 - operador, funcao, conversao ou padrao string/numerico novo so pode ser aceito como pronto quando a propria trilha XPZ o sustentar por regra explicita, exemplo sanitizado ou molde documentado
 - corpus local da KB ajuda a confirmar e desempatar, mas nao substitui a base metodologica
 - se um trecho essencial do `Source` continuar sustentado apenas por plausibilidade, o agente deve reescrever para padrao documentado ou abortar a consolidacao
+- ao revisar `Source` grande, a leitura deve considerar o contorno visual do bloco afetado, e comentarios estruturais humanos ja existentes podem ser preservados quando ajudam a navegacao do trecho
 
 ## Regra de leitura para XPZ
 

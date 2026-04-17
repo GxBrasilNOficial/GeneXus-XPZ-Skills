@@ -1772,6 +1772,40 @@ Destacar estabilidade estrutural relativa e pontos de maior risco para clonagem.
 </Object>
 ```
 
+### Recorte sanitizado de Procedure grande - `PRCExemploRelatorioVolumesPendentes`
+
+- Perfil: `Procedure` densa com `if/endif`, `do case/endcase` e comentarios estruturais `//if` ja existentes no `Source`.
+- Uso operacional: recorte de apoio para o `Gate visual de Source`; preservar os comentarios estruturais humanos ajuda a leitura na IDE e evita piorar legibilidade herdada.
+- Evidencia direta: no objeto real examinado na KB, os comentarios `//if` aparecem como apoio de leitura em blocos com aninhamento e fechamento visual relevante.
+- Inferencia forte: quando uma edicao local mexe em fechamento de bloco, o foco da revisao deve incluir o trecho afetado e o contorno visual imediato, sem tentar "limpar" comentarios estruturais uteis.
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<Object parentGuid="3fd96d57-5faf-4631-a0d8-af1d7a4fcee1" user="SANITIZED\\USER" versionDate="0001-01-01T00:00:00.0000000" lastUpdate="2026-04-16T18:05:46.0000000Z" checksum="SANITIZEDCHECKSUM" fullyQualifiedName="PRCExemploRelatorioVolumesPendentes" moduleGuid="afa47377-41d5-4ae8-9755-6f53150aa361" guid="SANITIZED-GUID" name="PRCExemploRelatorioVolumesPendentes" type="84a12160-f59b-4ad7-a683-ea4481ac23e9" description="Procedure Exemplo Relatorio Volumes Pendentes" parent="Volume" parentType="00000000-0000-0000-0000-000000000008">
+  <Part type="528d1c06-a9c2-420d-bd35-21dca83f12ff">
+    <Source><![CDATA[//if &ComSubmit
+if &ComSubmit
+
+    procExemploCriaSessaoEmpresa(&EmpresaId, "")
+    procExemploCriaSessaoUsuario(&UsuarioId, "")
+
+endif
+
+&AgoraNaEmpresa = procExemploAgora(&EmpresaId)
+
+//if &Finalizando
+if not &Finalizando
+
+    //if &ComPrecoDeEntrada or &ComPrecoDeVenda
+    if &ComPrecoDeEntrada or &ComPrecoDeVenda
+        &Aviso = "Exemplo de bloco com comentario estrutural preservado"
+    endif
+
+endif]]></Source>
+  </Part>
+</Object>
+```
+
 ### Molde sanitizado de DataProvider 1 - `DPExemploLista`
 
 - Perfil: `DataProvider` simples com saida de colecao declarada no proprio `Source`.
