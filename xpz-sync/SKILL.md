@@ -172,11 +172,13 @@ Os wrappers seguem esta convenção de parâmetros:
     - se o mesmo `XPZ` tiver sido reprocessado após atualização do arquivo, deixar explícito que a comparação relevante é com o conteúdo do insumo reprocessado e com o estado atual do acervo, não com o relatório antigo
     - se `kb-source-metadata.md` tiver sido reescrito pelo wrapper, tratar isso como artefato normal do fluxo, não como evidência automática de mudança funcional na frente
     - se o pacote tiver `Source` parcial, separar claramente `sync de objetos aceito` de `refresh de metadado parcial` e preservar os valores estáveis já conhecidos
+    - se o `XPZ` oficial da KB trouxer objetos adicionais fora do foco imediato da frente, reportar isso como inesperado para a frente atual, mas tratar como possível mudança paralela legítima vinda da IDE/KB até evidência em contrário
 15. Quando um objeto voltar da KB via `xpz` e for materializado no acervo oficial, tratar esse XML do acervo como a fonte mais confiável para alterações futuras; não reutilizar cópia intermediária/delta sem comparar com o acervo atualizado
 16. Ao preparar commit ou handoff após o `sync`, separar explicitamente:
     - artefato da frente atual = resultado que o processamento atual confirmou como pertencente à frente em curso
-    - mudança paralela pré-existente = arquivo ou diferença já existente no workspace antes desta frente ou sem vínculo com o lote atual
-    - não agrupar no mesmo commit da frente atual mudanças paralelas pré-existentes sem decisão explícita
+    - mudanca paralela legitima vinda da KB/IDE = item devolvido oficialmente pela KB no `XPZ`, ainda que fora do foco imediato da frente
+    - mudanca lateral indevida = alteracao feita pelo agente fora do escopo da fase ou fora do fluxo oficial esperado
+    - nao agrupar no mesmo commit da frente atual mudancas paralelas sem decisao explicita, mas nao tratar automaticamente o retorno oficial adicional da KB como erro
 17. O resumo Git do item anterior e apenas informativo; nao autoriza `git add`, `commit` ou `push`
 18. Se o usuario nao pedir fechamento Git de forma explicita, o fluxo deve terminar no handoff tecnico e, no maximo, sugerir proximos passos sem executar publicacao
 
@@ -236,4 +238,5 @@ PastaParalelaDaKb/
 - NUNCA tratar reprocessamento do mesmo `XPZ` atualizado como se o resultado anterior ainda fosse autoritativo
 - NUNCA tratar regravação de `kb-source-metadata.md` pelo wrapper como mudança funcional automática da frente atual
 - NUNCA deixar `kb-source-metadata.md` perder valores estáveis conhecidos porque o `XPZ` veio com `Source` vazio ou incompleto
-- NUNCA misturar no mesmo commit da frente atual mudanças paralelas pré-existentes só porque aparecem no mesmo workspace
+- NUNCA classificar automaticamente como erro de processo, contaminacao indevida ou violacao da trilha o simples fato de um `XPZ` oficial vindo da KB trazer objetos adicionais alem do foco da frente
+- NUNCA misturar no mesmo commit da frente atual mudancas paralelas sem decisao explicita so porque aparecem no mesmo workspace

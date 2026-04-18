@@ -98,6 +98,8 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 - o agente deve distinguir explicitamente `mesmo objeto` de `mesma frente`
 - reusar precedente estrutural de pacote nao autoriza herdar automaticamente a identidade nominal da frente anterior
 - quando a continuidade da frente nao estiver fechada por evidencia direta ou confirmacao explicita do usuario, o agente deve explicitar a ambiguidade antes de nomear pasta ou pacote
+- se um `XPZ` oficial vindo da KB trouxer objetos adicionais alem do foco imediato da frente, o agente deve informar o inesperado sem presumir erro; isso pode ser mudanca paralela legitima feita diretamente na IDE do GeneXus
+- o agente deve distinguir explicitamente `artefato da frente atual`, `mudanca paralela legitima vinda da KB/IDE` e `mudanca lateral indevida do proprio agente fora do escopo`
 - frente validada tecnicamente nao implica publicacao Git; a conclusao tecnica e apenas `validado_tecnicamente` ate o usuario autorizar o fechamento
 - enquanto nao houver autorizacao explicita, o agente pode sugerir os proximos passos de Git e publicacao, mas nao pode executar `git add`, `commit` ou `push`
 - a ordem obrigatoria e: isolar lote, classificar raizes, validar `lastUpdate`, validar BOM, validar manifesto e so entao empacotar

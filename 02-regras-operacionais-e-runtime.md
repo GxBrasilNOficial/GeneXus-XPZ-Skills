@@ -175,6 +175,14 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
 - `Regra operacional`: nesse cenario, o fluxo seguro e preservar esses XMLs em `ObjetosGeradosParaImportacaoNaKbNoGenexus`, restaurar `ObjetosDaKbEmXml` para a versao oficial do Git e registrar manifesto dos itens preservados; esse manifesto pode ficar na conversa, mas deve virar arquivo quando a rastreabilidade local do incidente for necessaria.
 - `Regra operacional`: o agente nao deve empacotar diretamente a partir de `ObjetosDaKbEmXml` alterado.
 
+## Mudanca paralela legitima vinda da KB
+
+- `Regra operacional`: quando um `XPZ` oficial exportado da KB trouxer objetos adicionais alem do foco imediato da frente atual, isso pode representar mudanca paralela legitima feita diretamente na IDE do GeneXus.
+- `Regra operacional`: no `sync` de retorno oficial da KB, o padrao e materializar o que a KB devolveu oficialmente, mesmo quando houver itens que o agente nao estava esperando.
+- `Regra operacional`: o agente deve sinalizar os itens inesperados sem presumir, por si so, erro de processo, contaminacao indevida ou violacao da trilha.
+- `Regra operacional`: a distincao minima obrigatoria e entre `artefato da frente atual`, `mudanca paralela legitima vinda da KB/IDE` e `mudanca lateral indevida do proprio agente fora do escopo`.
+- `Regra operacional`: regras de contaminacao, incidente de processo e restauracao do snapshot oficial se aplicam a alteracao lateral indevida do agente ou a edicao manual indevida do acervo, nao ao simples fato de um `XPZ` oficial trazer retorno adicional da KB.
+
 ## Checklist obrigatorio antes do empacotamento
 
 - `Regra operacional`: antes de empacotar, classificar cada XML ativo como `alterado na rodada` ou `reenviado sem mudanca por dependencia obrigatoria`.
