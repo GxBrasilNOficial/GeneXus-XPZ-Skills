@@ -1,18 +1,18 @@
 <#
 .SYNOPSIS
-Executa preview de importação de XPZ via MSBuild sem alterar a KB.
+Executa importação real de XPZ via MSBuild com parâmetros explícitos.
 
 .DESCRIPTION
-Implementa a terceira etapa da trilha experimental: reaproveita o probe
-Test-GeneXusMsBuildSetup.ps1, abre a KB em modo headless controlado, posiciona
-versão e Environment quando informados, executa a task Import com
-PreviewMode="true" e fecha a KB. O script não executa importação real.
+Implementa a etapa de importação real da frente experimental: reaproveita
+o probe Test-GeneXusMsBuildSetup.ps1, abre a KB em modo headless controlado,
+posiciona versão e Environment quando informados, executa a task Import sem
+PreviewMode e fecha a KB. O script não executa exportação.
 
 .PARAMETER KbPath
-Caminho da KB a ser usada no preview.
+Caminho da KB a ser usada na importação.
 
 .PARAMETER XpzPath
-Caminho do arquivo XPZ a ser inspecionado em preview.
+Caminho do arquivo XPZ de entrada.
 
 .PARAMETER WorkingDirectory
 Diretório de trabalho para artefatos temporários desta execução.
@@ -27,13 +27,13 @@ Caminho explícito da instalação do GeneXus. Quando omitido, usa fallback do p
 Caminho explícito do MSBuild.exe. Quando omitido, usa fallback do probe.
 
 .PARAMETER VersionName
-Nome opcional da versão a posicionar antes do preview.
+Nome opcional da versão a posicionar antes da importação.
 
 .PARAMETER EnvironmentName
-Nome opcional do Environment a posicionar antes do preview.
+Nome opcional do Environment a posicionar antes da importação.
 
 .PARAMETER UpdateFilePath
-Caminho opcional para o UpdateFile gerado pelo preview.
+Caminho opcional para o UpdateFile gerado pela importação, quando suportado.
 
 .PARAMETER IncludeItems
 Lista opcional de objetos a incluir.
@@ -49,6 +49,9 @@ Valor explícito para ImportType. Default: AllObjects.
 
 .PARAMETER LanguageTranslations
 Valor explícito para LanguageTranslations. Default: Keep.
+
+.PARAMETER RedefineExternalPrograms
+Valor explícito para RedefineExternalPrograms. Default: false.
 
 .PARAMETER ImportKbInformation
 Valor explícito para ImportKBInformation. Default: false.
@@ -94,7 +97,10 @@ param(
     [string]$LanguageTranslations = 'Keep',
 
     [ValidateSet('true', 'false')]
-    [string]$ImportKbInformation,
+    [string]$RedefineExternalPrograms = 'false',
+
+    [ValidateSet('true', 'false')]
+    [string]$ImportKbInformation = 'false',
 
     [switch]$VerboseLog
 )
@@ -225,7 +231,7 @@ function New-ArtifactDirectory {
     $tempRoot = Join-Path $repositoryRoot 'Temp'
     $baseDirectory = Join-Path $tempRoot 'xpz-msbuild-import-export'
     [System.IO.Directory]::CreateDirectory($baseDirectory) | Out-Null
-    $artifactDirectory = Join-Path $baseDirectory ('gx-import-preview-' + [System.Guid]::NewGuid().ToString('N'))
+    $artifactDirectory = Join-Path $baseDirectory ('gx-import-real-' + [System.Guid]::NewGuid().ToString('N'))
     [System.IO.Directory]::CreateDirectory($artifactDirectory) | Out-Null
     return $artifactDirectory
 }
@@ -300,20 +306,6 @@ function Validate-OptionalOutputPath {
     }
 }
 
-function Split-ItemFilter {
-    param([string]$FilterText)
-
-    if ([string]::IsNullOrWhiteSpace($FilterText)) {
-        return @()
-    }
-
-    return @(
-        $FilterText -split ',|;|\r\n|\n' |
-        Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
-        ForEach-Object { $_.Trim() }
-    )
-}
-
 function Get-ImportTaskPropertyNames {
     param([string]$ResolvedGeneXusDir)
 
@@ -355,13 +347,14 @@ function New-MsBuildProjectContent {
     $xpzEscaped = Escape-Xml -Value $ResolvedXpzPath
     $versionEscaped = Escape-Xml -Value $VersionName
     $environmentEscaped = Escape-Xml -Value $EnvironmentName
-    $includeEscaped = Escape-Xml -Value (($ResolvedIncludeItems -join ';'))
-    $excludeEscaped = Escape-Xml -Value (($ResolvedExcludeItems -join ';'))
     $updateEscaped = Escape-Xml -Value $ResolvedUpdateFilePath
     $automaticBackupEscaped = Escape-Xml -Value $AutomaticBackup
     $importTypeEscaped = Escape-Xml -Value $ImportType
     $translationsEscaped = Escape-Xml -Value $LanguageTranslations
+    $redefineEscaped = Escape-Xml -Value $RedefineExternalPrograms
     $importKbInfoEscaped = Escape-Xml -Value $ImportKbInformation
+    $includeEscaped = Escape-Xml -Value (($ResolvedIncludeItems -join ';'))
+    $excludeEscaped = Escape-Xml -Value (($ResolvedExcludeItems -join ';'))
 
     $optionalAttributes = New-Object System.Collections.Generic.List[string]
     if (-not [string]::IsNullOrWhiteSpace($includeEscaped)) {
@@ -373,9 +366,10 @@ function New-MsBuildProjectContent {
     if (-not [string]::IsNullOrWhiteSpace($updateEscaped)) {
         $optionalAttributes.Add("      UpdateFile=""`$(UpdateFilePath)""")
     }
-    if (-not [string]::IsNullOrWhiteSpace($importKbInfoEscaped)) {
+    if ($ImportKbInformation -eq 'true') {
         $optionalAttributes.Add("      ImportKBInformation=""`$(ImportKBInformation)""")
     }
+
     $optionalAttributesText = ''
     if ($optionalAttributes.Count -gt 0) {
         $optionalAttributesText = [Environment]::NewLine + ($optionalAttributes -join [Environment]::NewLine)
@@ -390,13 +384,14 @@ function New-MsBuildProjectContent {
     <XPZPath>$xpzEscaped</XPZPath>
     <KBVersion>$versionEscaped</KBVersion>
     <KBEnvironment>$environmentEscaped</KBEnvironment>
-    <IncludeItems>$includeEscaped</IncludeItems>
-    <ExcludeItems>$excludeEscaped</ExcludeItems>
     <UpdateFilePath>$updateEscaped</UpdateFilePath>
     <AutomaticBackup>$automaticBackupEscaped</AutomaticBackup>
     <ImportType>$importTypeEscaped</ImportType>
     <LanguageTranslations>$translationsEscaped</LanguageTranslations>
+    <RedefineExternalPrograms>$redefineEscaped</RedefineExternalPrograms>
     <ImportKBInformation>$importKbInfoEscaped</ImportKBInformation>
+    <IncludeItems>$includeEscaped</IncludeItems>
+    <ExcludeItems>$excludeEscaped</ExcludeItems>
   </PropertyGroup>
 
   <Target Name="CloseOnError">
@@ -404,18 +399,30 @@ function New-MsBuildProjectContent {
   </Target>
 
   <Target Name="Run">
-    <OpenKnowledgeBase Directory="`$(KBPath)" />
+    <OpenKnowledgeBase Directory="`$(KBPath)" CaptureOutput="true">
+      <Output TaskParameter="TaskOutput" PropertyName="OpenOutput" />
+    </OpenKnowledgeBase>
     <SetActiveVersion Condition="'`$(KBVersion)' != ''" VersionName="`$(KBVersion)" />
     <SetActiveEnvironment Condition="'`$(KBEnvironment)' != ''" EnvironmentName="`$(KBEnvironment)" />
+    <GetActiveVersion CaptureOutput="true">
+      <Output TaskParameter="TaskOutput" PropertyName="ActiveVersionOutput" />
+    </GetActiveVersion>
+    <GetActiveEnvironment CaptureOutput="true">
+      <Output TaskParameter="TaskOutput" PropertyName="ActiveEnvironmentOutput" />
+    </GetActiveEnvironment>
     <Import
       File="`$(XPZPath)"
       AutomaticBackup="`$(AutomaticBackup)"
       ImportType="`$(ImportType)"
       LanguageTranslations="`$(LanguageTranslations)"
-      PreviewMode="true"$optionalAttributesText>
+      RedefineExternalPrograms="`$(RedefineExternalPrograms)"
+      PreviewMode="false"$optionalAttributesText>
       <Output TaskParameter="ImportedItems" ItemName="ImportedItem" />
     </Import>
     <Message Text="__IMPORTED_ITEM__=%(ImportedItem.Identity)" Importance="High" Condition="'@(ImportedItem)' != ''" />
+    <Message Text="__OPEN_OUTPUT__=`$(OpenOutput)" Importance="High" />
+    <Message Text="__ACTIVE_VERSION__=`$(ActiveVersionOutput)" Importance="High" />
+    <Message Text="__ACTIVE_ENVIRONMENT__=`$(ActiveEnvironmentOutput)" Importance="High" />
     <CloseKnowledgeBase />
     <OnError ExecuteTargets="CloseOnError" />
   </Target>
@@ -453,6 +460,34 @@ function Read-TextFileSafe {
     return [System.IO.File]::ReadAllText($PathValue)
 }
 
+function Get-MarkerValue {
+    param(
+        [string]$Text,
+        [string]$Marker
+    )
+
+    $match = [regex]::Match($Text, [regex]::Escape($Marker) + '(.*)')
+    if (-not $match.Success) {
+        return $null
+    }
+
+    return $match.Groups[1].Value.Trim()
+}
+
+function Get-RegexValue {
+    param(
+        [string]$Text,
+        [string]$Pattern
+    )
+
+    $match = [regex]::Match($Text, $Pattern, [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+    if (-not $match.Success) {
+        return $null
+    }
+
+    return $match.Groups[1].Value.Trim()
+}
+
 function Get-TextSummary {
     param([string]$Text)
 
@@ -460,7 +495,7 @@ function Get-TextSummary {
         return @()
     }
 
-    return @($Text -split "(`r`n|`n|`r)" | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -First 25)
+    return @($Text -split "(`r`n|`n|`r)" | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -First 20)
 }
 
 function Get-MatchingLines {
@@ -480,11 +515,9 @@ function Get-MatchingLines {
     )
 }
 
-function Get-PreviewExitCode {
+function Get-ImportExitCode {
     param(
         [int]$MsBuildExitCode,
-        [string]$StdOutText,
-        [string]$StdErrText,
         [string]$ResolvedUpdateFilePath
     )
 
@@ -506,20 +539,20 @@ $resolvedLogPath = Get-FullPathSafe -PathValue $LogPath
 
 try {
     if ($VerboseLog.IsPresent) {
-        Add-StrategyTrace -Message 'VerboseLog habilitado para detalhamento adicional do preview de importação.'
+        Add-StrategyTrace -Message 'VerboseLog habilitado para detalhamento adicional da importação real.'
     }
 
     $artifactDirectory = New-ArtifactDirectory
     $probeLogPath = Join-Path $artifactDirectory 'probe-stage.json'
     $probeStage = Invoke-ProbeStage -ProbeLogPath $probeLogPath
-    Add-StrategyTrace -Message ('Probe executado antes do preview de importação com exitCode {0}.' -f $probeStage.ExitCode)
+    Add-StrategyTrace -Message ('Probe executado antes da importação real com exitCode {0}.' -f $probeStage.ExitCode)
 
     if ($probeStage.ExitCode -ne 0) {
-        Add-BlockingReason -Reason 'Probe não apto para prosseguir bloqueou o preview de importação.'
+        Add-BlockingReason -Reason 'Probe não apto para prosseguir bloqueou a importação real.'
         $probeDiagnostic = $probeStage.Diagnostic
         $blocked = [ordered]@{
             status = 'não apto para prosseguir'
-            summary = 'Probe bloqueou o preview de importação.'
+            summary = 'Probe bloqueou a importação real.'
             exitCode = $probeStage.ExitCode
             stage = 'probe'
             resolvedPaths = [ordered]@{
@@ -558,7 +591,7 @@ try {
         $exitCode = if ($xpzValidation.ExitCode -ne 0) { $xpzValidation.ExitCode } else { $updateFileValidation.ExitCode }
         $blockedJsonObject = [ordered]@{
             status = 'não apto para prosseguir'
-            summary = 'Validação prévia bloqueou o preview de importação.'
+            summary = 'Validação prévia bloqueou a importação real.'
             exitCode = $exitCode
             stage = 'pre-validate'
             resolvedPaths = [ordered]@{
@@ -584,7 +617,9 @@ try {
         }
 
         $blockedJson = ConvertTo-JsonText -InputObject $blockedJsonObject
-        Write-JsonLog -TargetLogPath $resolvedLogPath -JsonPayload $blockedJson
+        if (-not (Test-IsUnderProgramFilesX86 -PathValue $resolvedLogPath)) {
+            Write-JsonLog -TargetLogPath $resolvedLogPath -JsonPayload $blockedJson
+        }
         Write-Output $blockedJson
         exit $exitCode
     }
@@ -598,48 +633,37 @@ try {
     $importTaskPropertyNames = Get-ImportTaskPropertyNames -ResolvedGeneXusDir $resolvedGeneXusDir
     Add-StrategyTrace -Message ('Import task properties carregadas da instalação atual: {0}' -f ($importTaskPropertyNames -join ', '))
 
-    if (-not [string]::IsNullOrWhiteSpace($resolvedUpdateFilePath) -and -not (Test-ImportTaskSupportsProperty -PropertyNames $importTaskPropertyNames -PropertyName 'UpdateFile')) {
+    foreach ($candidateProperty in @('File', 'AutomaticBackup', 'ImportType', 'LanguageTranslations', 'RedefineExternalPrograms', 'IncludeItems', 'ExcludeItems', 'PreviewMode')) {
+        if (-not (Test-ImportTaskSupportsProperty -PropertyNames $importTaskPropertyNames -PropertyName $candidateProperty)) {
+            Add-BlockingReason -Reason ("A instalação atual não expõe a propriedade pública {0} na task Import." -f $candidateProperty)
+        }
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($UpdateFilePath) -and -not (Test-ImportTaskSupportsProperty -PropertyNames $importTaskPropertyNames -PropertyName 'UpdateFile')) {
         Add-BlockingReason -Reason 'A instalação atual não expõe a propriedade pública UpdateFile na task Import.'
-        $unsupported = [ordered]@{
-            status = 'não apto para prosseguir'
-            summary = 'Preview bloqueado porque a instalação atual não suporta UpdateFile na task Import.'
-            exitCode = 32
-            stage = 'pre-validate'
-            resolvedPaths = [ordered]@{
-                GeneXusDir = $resolvedGeneXusDir
-                MsBuildPath = $resolvedMsBuildPath
-                KbPath = $resolvedKbPath
-                XpzPath = $resolvedXpzPath
-                WorkingDirectory = (Get-FullPathSafe -PathValue $WorkingDirectory)
-                LogPath = $resolvedLogPath
-                UpdateFilePath = $resolvedUpdateFilePath
-            }
-            artifacts = [ordered]@{
-                ProbeLogPath = $probeLogPath
-                MsBuildFilePath = $null
-                StdOutPath = $null
-                StdErrPath = $null
-                ExecutionLogPath = $resolvedLogPath
-            }
-            importedItems = @()
-            blockingReasons = @($script:BlockingReasons)
-            warnings = @($script:Warnings)
-            strategyTrace = @($probeStage.Diagnostic.strategyTrace + $script:StrategyTrace)
-        }
-
-        $unsupportedJson = ConvertTo-JsonText -InputObject $unsupported
-        Write-JsonLog -TargetLogPath $resolvedLogPath -JsonPayload $unsupportedJson
-        Write-Output $unsupportedJson
-        exit 32
     }
 
-    if (-not [string]::IsNullOrWhiteSpace($ImportKbInformation) -and -not (Test-ImportTaskSupportsProperty -PropertyNames $importTaskPropertyNames -PropertyName 'ImportKBInformation')) {
+    if ($ImportKbInformation -eq 'true' -and -not (Test-ImportTaskSupportsProperty -PropertyNames $importTaskPropertyNames -PropertyName 'ImportKBInformation')) {
         Add-BlockingReason -Reason 'A instalação atual não expõe a propriedade pública ImportKBInformation na task Import.'
+    }
+
+    if ($script:BlockingReasons.Count -gt 0) {
         $unsupported = [ordered]@{
             status = 'não apto para prosseguir'
-            summary = 'Preview bloqueado porque a instalação atual não suporta ImportKBInformation na task Import.'
+            summary = 'Importação bloqueada porque a task Import não expõe um ou mais parâmetros solicitados.'
             exitCode = 32
-            stage = 'pre-validate'
+            stage = 'task-support'
+            requestedContext = [ordered]@{
+                VersionName = $VersionName
+                EnvironmentName = $EnvironmentName
+                ImportType = $ImportType
+                LanguageTranslations = $LanguageTranslations
+                AutomaticBackup = $AutomaticBackup
+                RedefineExternalPrograms = $RedefineExternalPrograms
+                ImportKbInformation = $ImportKbInformation
+                IncludeItems = $IncludeItems
+                ExcludeItems = $ExcludeItems
+            }
             resolvedPaths = [ordered]@{
                 GeneXusDir = $resolvedGeneXusDir
                 MsBuildPath = $resolvedMsBuildPath
@@ -657,21 +681,30 @@ try {
                 ExecutionLogPath = $resolvedLogPath
             }
             importedItems = @()
-            blockingReasons = @($script:BlockingReasons)
+            blockingReasons = @($probeStage.Diagnostic.blockingReasons + $script:BlockingReasons)
             warnings = @($script:Warnings)
             strategyTrace = @($probeStage.Diagnostic.strategyTrace + $script:StrategyTrace)
         }
 
         $unsupportedJson = ConvertTo-JsonText -InputObject $unsupported
-        Write-JsonLog -TargetLogPath $resolvedLogPath -JsonPayload $unsupportedJson
+        if (-not (Test-IsUnderProgramFilesX86 -PathValue $resolvedLogPath)) {
+            Write-JsonLog -TargetLogPath $resolvedLogPath -JsonPayload $unsupportedJson
+        }
         Write-Output $unsupportedJson
         exit 32
     }
 
-    $includeItemsArray = Split-ItemFilter -FilterText $IncludeItems
-    $excludeItemsArray = Split-ItemFilter -FilterText $ExcludeItems
+    $includeItemsArray = @()
+    if (-not [string]::IsNullOrWhiteSpace($IncludeItems)) {
+        $includeItemsArray = @($IncludeItems -split ',|;|\r\n|\n' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | ForEach-Object { $_.Trim() })
+    }
 
-    $msBuildFilePath = Join-Path $artifactDirectory 'import-preview.msbuild'
+    $excludeItemsArray = @()
+    if (-not [string]::IsNullOrWhiteSpace($ExcludeItems)) {
+        $excludeItemsArray = @($ExcludeItems -split ',|;|\r\n|\n' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | ForEach-Object { $_.Trim() })
+    }
+
+    $msBuildFilePath = Join-Path $artifactDirectory 'import-real.msbuild'
     $stdOutPath = Join-Path $artifactDirectory 'msbuild.stdout.log'
     $stdErrPath = Join-Path $artifactDirectory 'msbuild.stderr.log'
     $projectContent = New-MsBuildProjectContent -ResolvedGeneXusDir $resolvedGeneXusDir -ResolvedKbPath $resolvedKbPath -ResolvedXpzPath $resolvedXpzPath -ResolvedUpdateFilePath $resolvedUpdateFilePath -ResolvedIncludeItems $includeItemsArray -ResolvedExcludeItems $excludeItemsArray
@@ -683,13 +716,13 @@ try {
     $stdErrText = Read-TextFileSafe -PathValue $stdErrPath
     $importedItems = @(Get-MatchingLines -Text $stdOutText -Prefix '__IMPORTED_ITEM__=')
 
-    $previewExitCode = Get-PreviewExitCode -MsBuildExitCode $msBuildExitCode -StdOutText $stdOutText -StdErrText $stdErrText -ResolvedUpdateFilePath $resolvedUpdateFilePath
-    if ($previewExitCode -eq 0) {
-        $status = 'preview apenas'
-        $summary = 'Preview de importação executado sem alterar a KB.'
+    $importExitCode = Get-ImportExitCode -MsBuildExitCode $msBuildExitCode -ResolvedUpdateFilePath $resolvedUpdateFilePath
+    if ($importExitCode -eq 0) {
+        $status = 'sucesso operacional'
+        $summary = 'Importação real executada sem erro operacional.'
     } else {
         $status = 'falha operacional'
-        $summary = 'Preview de importação falhou durante a execução.'
+        $summary = 'Importação real falhou durante a execução.'
         Add-BlockingReason -Reason ('Execução MSBuild terminou com exitCode {0}.' -f $msBuildExitCode)
     }
 
@@ -700,8 +733,24 @@ try {
     $diagnostic = [ordered]@{
         status = $status
         summary = $summary
-        exitCode = $previewExitCode
-        stage = 'import-preview'
+        exitCode = $importExitCode
+        stage = 'import-real'
+        requestedContext = [ordered]@{
+            VersionName = $VersionName
+            EnvironmentName = $EnvironmentName
+            ImportType = $ImportType
+            LanguageTranslations = $LanguageTranslations
+            AutomaticBackup = $AutomaticBackup
+            RedefineExternalPrograms = $RedefineExternalPrograms
+            ImportKbInformation = $ImportKbInformation
+            IncludeItems = $IncludeItems
+            ExcludeItems = $ExcludeItems
+        }
+        observedContext = [ordered]@{
+            ActiveVersion = (Get-RegexValue -Text $stdOutText -Pattern "The active version is '([^']+)'")
+            ActiveEnvironment = (Get-RegexValue -Text $stdOutText -Pattern "The active environment is '([^']+)'")
+            OpenOutput = (Get-MarkerValue -Text $stdOutText -Marker '__OPEN_OUTPUT__=')
+        }
         resolvedPaths = [ordered]@{
             GeneXusDir = $resolvedGeneXusDir
             MsBuildPath = $resolvedMsBuildPath
@@ -710,16 +759,6 @@ try {
             WorkingDirectory = (Get-FullPathSafe -PathValue $WorkingDirectory)
             LogPath = $resolvedLogPath
             UpdateFilePath = $resolvedUpdateFilePath
-        }
-        requestedContext = [ordered]@{
-            VersionName = $VersionName
-            EnvironmentName = $EnvironmentName
-            ImportType = $ImportType
-            LanguageTranslations = $LanguageTranslations
-            AutomaticBackup = $AutomaticBackup
-            ImportKbInformation = $ImportKbInformation
-            IncludeItems = $IncludeItems
-            ExcludeItems = $ExcludeItems
         }
         artifacts = [ordered]@{
             ProbeLogPath = $probeLogPath
@@ -731,22 +770,33 @@ try {
         importedItems = $importedItems
         stdoutSummary = Get-TextSummary -Text $stdOutText
         stderrSummary = Get-TextSummary -Text $stdErrText
-        blockingReasons = @($script:BlockingReasons)
-        warnings = @($script:Warnings)
+        blockingReasons = @($probeStage.Diagnostic.blockingReasons + $script:BlockingReasons)
+        warnings = @($probeStage.Diagnostic.warnings + $script:Warnings)
         strategyTrace = @($probeStage.Diagnostic.strategyTrace + $script:StrategyTrace)
     }
 
     $json = ConvertTo-JsonText -InputObject $diagnostic
     Write-JsonLog -TargetLogPath $resolvedLogPath -JsonPayload $json
     Write-Output $json
-    exit $previewExitCode
+    exit $importExitCode
 }
 catch {
     $failure = [ordered]@{
         status = 'falha operacional'
-        summary = 'Falha interna do script antes de concluir o preview de importação.'
+        summary = 'Falha interna do script antes de concluir a importação real.'
         exitCode = 90
-        stage = 'import-preview'
+        stage = 'import-real'
+        requestedContext = [ordered]@{
+            VersionName = $VersionName
+            EnvironmentName = $EnvironmentName
+            ImportType = $ImportType
+            LanguageTranslations = $LanguageTranslations
+            AutomaticBackup = $AutomaticBackup
+            RedefineExternalPrograms = $RedefineExternalPrograms
+            ImportKbInformation = $ImportKbInformation
+            IncludeItems = $IncludeItems
+            ExcludeItems = $ExcludeItems
+        }
         resolvedPaths = [ordered]@{
             GeneXusDir = (Get-FullPathSafe -PathValue $GeneXusDir)
             MsBuildPath = (Get-FullPathSafe -PathValue $MsBuildPath)
@@ -755,16 +805,6 @@ catch {
             WorkingDirectory = (Get-FullPathSafe -PathValue $WorkingDirectory)
             LogPath = $resolvedLogPath
             UpdateFilePath = (Get-FullPathSafe -PathValue $UpdateFilePath)
-        }
-        requestedContext = [ordered]@{
-            VersionName = $VersionName
-            EnvironmentName = $EnvironmentName
-            ImportType = $ImportType
-            LanguageTranslations = $LanguageTranslations
-            AutomaticBackup = $AutomaticBackup
-            ImportKbInformation = $ImportKbInformation
-            IncludeItems = $IncludeItems
-            ExcludeItems = $ExcludeItems
         }
         artifacts = [ordered]@{
             ProbeLogPath = $null
@@ -789,8 +829,8 @@ catch {
                 Write-JsonLog -TargetLogPath $resolvedLogPath -JsonPayload $failureJson
             }
         }
-    }
-    catch {
+    } catch {
+        # best effort apenas
     }
 
     Write-Output $failureJson

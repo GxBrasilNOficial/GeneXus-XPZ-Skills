@@ -12,6 +12,10 @@ Também já existe uma implementação inicial de `scripts/Open-GeneXusKbHeadles
 
 Também já existe uma implementação inicial de `scripts/Test-GeneXusXpzImportPreview.ps1`, restrita ao `PreviewMode` de importação com saída em `JSON`, sem alteração real da KB e já validada nesta conversa com `XPZ` real.
 
+Também já existe uma implementação inicial de `scripts/Invoke-GeneXusXpzExport.ps1`, restrita à exportação headless de `XPZ` com parâmetros explícitos, diagnóstico em `JSON` e validação da task carregada.
+
+Também já existe uma implementação inicial de `scripts/Invoke-GeneXusXpzImport.ps1`, restrita à importação real de `XPZ` com parâmetros explícitos, diagnóstico em `JSON` e validação da task carregada.
+
 Este plano ainda não define a implementação final da skill, não altera o comportamento das skills `xpz-*` existentes e não oficializa uma nova trilha operacional.
 
 ## Objetivo
@@ -51,6 +55,12 @@ Registrar as diretrizes iniciais para uma futura skill experimental dedicada à 
 - a futura skill não deve assumir que defaults internos do GeneXus são seguros para esta frente; parâmetros sensíveis devem ser tratados explicitamente
 - a instalação do host `MSBuild` sugere rastros laterais de log e trace, o que reforça a necessidade de controlar diretório de trabalho, captura de saída e destino dos logs
 - a futura skill deve tratar qualquer efeito colateral fora dos artefatos esperados como risco operacional relevante, mesmo quando a chamada principal reportar sucesso
+- em importacao real validada nesta frente, fechar a KB antes da nova rodada nao eliminou nem o `stderr` lateral com `mismatched input ']' expecting 'default'` nem o acesso negado a `C:\Program Files (x86)\GeneXus\GeneXus18\CssProperties.json`; esse ruido persistente nao deve ser confundido com falha operacional da chamada
+- os wrappers de preview e importacao real precisaram normalizar recortes multiplos de `IncludeItems` e `ExcludeItems` para que a task carregada aceitasse a lista de itens de forma confiavel
+- depois dessa correcao, recortes combinados passaram a funcionar e a reduzir o ruido lateral; o bloqueio remanescente mais relevante desta frente passou a ser de conteudo da KB/`XPZ`, com referencia nao resolvida em `Source` (`procStrZERO`) durante a importacao de `procCarregaSDTsDaNFe`
+- um teste controlado preenchendo o `Source` global do pacote headless com os valores do pacote full nao alterou esse bloqueio remanescente
+- um teste controlado trocando apenas `Pattern Settings` de `Padrões GeneXus` para `GeneXus Patterns` no pacote headless tambem nao alterou esse bloqueio remanescente
+- com isso, as duas diferencas remanescentes observadas entre o pacote full e o export headless deixaram de ser suspeitas fortes para o ruido principal desta frente
 
 ## Restrição Operacional De Leitura
 
@@ -522,6 +532,10 @@ Scripts propostos:
   - objetivo: exportar `XPZ` com parâmetros explícitos
 - `Invoke-GeneXusXpzImport.ps1`
   - objetivo: executar importação real apenas em fase já autorizada de teste controlado
+
+Estado atual da materialização adicional:
+
+- `Invoke-GeneXusXpzExport.ps1`: implementado para exportação headless de `XPZ` com parâmetros explícitos e diagnóstico em `JSON`
 
 Parâmetros transversais esperados:
 

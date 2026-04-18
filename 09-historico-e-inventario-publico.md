@@ -40,11 +40,24 @@ Preservar rastreabilidade da consolidacao, inventario documental, inventario bru
 - `Evidência direta`: essa skill permanece experimental e, nesta fase, ja inclui a implementacao inicial de `scripts/Test-GeneXusMsBuildSetup.ps1` como probe nao invasivo de ambiente.
 - `Evidência direta`: essa skill tambem ja inclui a implementacao inicial de `scripts/Open-GeneXusKbHeadless.ps1` para abertura e fechamento controlados da KB com captura de contexto.
 - `Evidência direta`: essa skill tambem ja inclui a implementacao inicial de `scripts/Test-GeneXusXpzImportPreview.ps1` para `PreviewMode` de importacao sem alteracao real da KB, validada nesta conversa com `XPZ` real.
+- `Evidência direta`: essa skill tambem ja inclui a implementacao inicial de `scripts/Invoke-GeneXusXpzExport.ps1` para exportacao headless de `XPZ` com parametros explicitos.
+- `Evidência direta`: essa skill tambem ja inclui a implementacao inicial de `scripts/Invoke-GeneXusXpzImport.ps1` para importacao real de `XPZ` com parametros explicitos.
 - `Evidência direta`: `Open-GeneXusKbHeadless.ps1` foi validado com `C:\KBs\Teste1`, `VersionName=Teste1` e `EnvironmentName=NETSQLServer`.
 - `Evidência direta`: `Test-GeneXusXpzImportPreview.ps1` foi validado com `C:\Dev\Knowledge\GeneXus-XPZ-Skills\Temp\Teste1_Full_20260417a.xpz`.
 - `Evidência direta`: o `PreviewMode` executado nessa validacao nao alterou a KB.
+- `Evidência direta`: `Invoke-GeneXusXpzImport.ps1` foi validado com o `XPZ` exportado nesta frente e concluiu com sucesso operacional, embora tenha produzido mensagens de stderr no log.
+- `Evidência direta`: uma nova rodada de importacao real com a KB fechada manteve o mesmo padrao de `stderr`, incluindo as mensagens de `mismatched input ']' expecting 'default'` e o acesso negado a `C:\Program Files (x86)\GeneXus\GeneXus18\CssProperties.json`, sem impedir `exitCode = 0`.
 - `Evidência direta`: na instalacao validada nesta conversa, `IncludeItems` e `ExcludeItems` funcionaram em `PreviewMode`, enquanto `UpdateFile` e `ImportKBInformation` ficaram bloqueados por ausencia de propriedade publica correspondente na task `Import` carregada.
-- `Evidência direta`: os scripts previstos para exportacao efetiva e importacao efetiva continuam nao materializados nesta fase.
+- `Evidência direta`: os wrappers de preview e importacao real passaram a normalizar recortes multiplos de `IncludeItems` e `ExcludeItems`, com serializacao em formato de lista aceito operacionalmente pela task carregada.
+- `Evidência direta`: depois dessa normalizacao, recortes combinados passaram a funcionar de forma confiavel e permitiram reduzir o ruido lateral sem alterar o `exitCode = 0` da importacao real.
+- `Evidência direta`: na bateria de recortes desta frente, o acesso negado a `C:\Program Files (x86)\GeneXus\GeneXus18\CssProperties.json` deixou de ficar restrito a `Module:GeneXusUnanimo` e `DesignSystem:Teste1` e reapareceu tambem em `Procedure:procExtraiTextoDoPdf`, `Procedure:procGeraPdfDoDANFCE` e `Procedure:procCarregaSDTsDaNFe`.
+- `Evidência direta`: no recorte mais reduzido desta bateria, a importacao real manteve `exitCode = 0`, mas o log passou a destacar `src0246` em `Procedure:procCarregaSDTsDaNFe`, com referencia a objeto nao definido `procStrZERO`.
+- `Evidência direta`: na inspecao do XML extraido do `XPZ` exportado com `ExportAll=true`, `procStrZERO` apareceu no bloco `Source`, mas nao apareceu como objeto exportado nem como referencia declarada do pacote.
+- `Evidência direta`: um teste controlado derivando o `XPZ` exportado via headless e preenchendo o `Source` global com os valores do pacote full nao alterou o padrao principal da importacao real; `CssProperties.json`, `mismatched input ']' expecting 'default'`, `src0246` e `procStrZERO` permaneceram no mesmo comportamento observado antes.
+- `Evidência direta`: um segundo teste controlado derivando o mesmo `XPZ` exportado via headless e trocando apenas as duas ocorrencias de `Pattern Settings` de `Padrões GeneXus` para `GeneXus Patterns` tambem nao alterou o padrao principal da importacao real.
+- `Inferência forte`: com esses dois testes, as duas diferencas remanescentes identificadas entre o pacote full e o export headless deixaram de ser suspeitas fortes para o ruido principal desta frente.
+- `Inferência forte`: para o estado atual desta frente, o bloqueio remanescente mais importante deixou de ser do wrapper e passou a apontar para conteudo da KB/`XPZ`, por referencia quebrada em `Source` durante a importacao.
+- `Evidência direta`: os scripts previstos para exportacao efetiva e importacao efetiva agora estao materializados nesta fase.
 - `Regra editorial`: a existencia dessa skill nao promove a trilha `MSBuild` a fluxo oficial da base nem altera automaticamente o comportamento das skills `xpz-*` existentes.
 
 ## Fontes consolidadas

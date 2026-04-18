@@ -60,8 +60,11 @@ Do NOT use esta skill para:
 - Registrar `stdout`, `stderr`, `exitCode`, caminho do `.msbuild` temporário e caminho do log
 - Privilegiar `PreviewMode` e, quando suportado pela task carregada, `UpdateFile` antes de importação real
 - Tratar `ImportKBInformation`, `UpdateFile` e defaults internos de importação/exportação como sensíveis e dependentes da assinatura efetiva da task `Import`
+- Normalizar recortes multiplos de `IncludeItems` e `ExcludeItems` como lista antes de serializar para a task carregada
 - Preservar `importedItems` como lista em qualquer diagnóstico JSON, mesmo quando houver apenas um item
 - Quando a task carregada não expuser `UpdateFile` nem `ImportKBInformation`, o wrapper de preview deve bloquear esses parâmetros cedo
+- Quando recortes sucessivos isolarem erro residual de `Source`, `Specification` ou referência não resolvida em objeto importado, tratar a continuação como frente de conteúdo da KB/`XPZ`, não como ajuste adicional presumido do wrapper
+- Quando um teste controlado com `Source` global preenchido e outro teste controlado com ajuste isolado de `Pattern Settings` nao mudarem o padrao principal do log, registrar explicitamente que essas diferencas deixaram de ser suspeitas fortes e estreitar a hipotese para conteudo da KB/`XPZ`
 - Exigir confirmação explícita antes de importação real
 - Recomendar reabertura da KB na IDE oficial após testes relevantes para observar warning, marca de versão ou outro efeito colateral
 
@@ -91,13 +94,15 @@ Arquivos de referência e quando carregar:
 
 ## EXPECTED INTERFACE
 
-Esta skill assume, como interface operacional, scripts pequenos e explicitamente parametrizados. `Test-GeneXusMsBuildSetup.ps1`, `Open-GeneXusKbHeadless.ps1` e `Test-GeneXusXpzImportPreview.ps1` já foram materializados nesta fase; os demais não devem ser tratados como já implementados sem confirmação explícita.
+Esta skill assume, como interface operacional, scripts pequenos e explicitamente parametrizados. `Test-GeneXusMsBuildSetup.ps1`, `Open-GeneXusKbHeadless.ps1`, `Test-GeneXusXpzImportPreview.ps1`, `Invoke-GeneXusXpzExport.ps1` e `Invoke-GeneXusXpzImport.ps1` já foram materializados nesta fase; os demais não devem ser tratados como já implementados sem confirmação explícita.
 
 Estado atual da materialização:
 
 - `Test-GeneXusMsBuildSetup.ps1`: implementado como probe (sondagem técnica inicial) não invasivo
 - `Open-GeneXusKbHeadless.ps1`: implementado para abertura e fechamento controlados da KB, com contexto ativo e sem import/export
 - `Test-GeneXusXpzImportPreview.ps1`: implementado para `PreviewMode` de importação e já validado nesta conversa com XPZ real
+- `Invoke-GeneXusXpzExport.ps1`: implementado para exportação headless de XPZ com parâmetros explícitos e diagnóstico JSON
+- `Invoke-GeneXusXpzImport.ps1`: implementado para importação real de XPZ com parâmetros explícitos e diagnóstico JSON
 - os demais scripts permanecem apenas como contrato
 
 Scripts nesta frente:
@@ -109,6 +114,7 @@ Scripts nesta frente:
 - `Test-GeneXusXpzImportPreview.ps1`
   - status atual: implementado para `PreviewMode` sem importação real, com `IncludeItems` e `ExcludeItems` validados nesta instalação
 - `Invoke-GeneXusXpzExport.ps1`
+  - status atual: implementado para exportação headless de XPZ com parâmetros explícitos e validação da task carregada
 - `Invoke-GeneXusXpzImport.ps1`
 
 Contrato inicial específico de `Test-GeneXusMsBuildSetup.ps1`:

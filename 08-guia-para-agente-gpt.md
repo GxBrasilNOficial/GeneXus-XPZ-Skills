@@ -110,6 +110,7 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 - quando a frente envolver `MSBuild` headless, consultar primeiro o plano e a skill experimental correspondente antes de presumir suporte de parametros da task `Import`
 - tratar `UpdateFile` e `ImportKBInformation` como capacidades dependentes da assinatura real da task carregada, nao apenas da documentacao offline
 - se a instalacao expuser `PreviewMode`, `IncludeItems` e `ExcludeItems`, priorizar esses caminhos para inspecao controlada antes de qualquer importacao real
+- quando `IncludeItems` ou `ExcludeItems` vierem com multiplos recortes, normalizar a entrada como lista e serializar em formato de lista aceito pela task carregada; nao presumir que uma string unica separada por virgulas sera aceita como um unico item
 - se o wrapper devolver diagnostico estruturado, manter `importedItems` sempre como lista, inclusive com item unico
 - em resposta ao usuario, separar explicitamente `sucesso operacional da chamada MSBuild`, `preview sem alteracao real da KB` e `confirmacao funcional pendente na IDE oficial`
 
@@ -120,6 +121,7 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 - pacote aceito com falha posterior de `Source` ou `Specification` nao deve ser descrito como falha de envelope
 - se houver sucesso parcial, o agente deve dizer explicitamente que o resultado foi parcial
 - a conclusao final deve seguir a etapa terminal relevante do log, nao a linha mais alarmante
+- quando recortes sucessivos reduzirem o ruido e o log passar a destacar referencia nao resolvida em objeto importado, tratar o caso como frente de conteudo da KB/`XPZ`, nao como defeito residual do wrapper, salvo evidencia contraria
 
 ## Regra de identificação de objetos por tipo
 

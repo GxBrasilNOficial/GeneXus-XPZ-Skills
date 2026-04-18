@@ -34,10 +34,12 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
 - `Regra operacional`: em automacao headless via `MSBuild`, o agente nao deve assumir que parametros documentados offline estao disponiveis na task efetivamente carregada; deve validar a assinatura real antes de emitir parametros sensiveis.
 - `Evidência direta`: `PreviewMode` foi validado operacionalmente com `XPZ` real nesta frente, sem alteracao real da KB.
 - `Evidência direta`: `IncludeItems` e `ExcludeItems` tiveram efeito operacional observavel em `PreviewMode` nesta instalacao.
+- `Regra operacional`: quando `IncludeItems` ou `ExcludeItems` receberem multiplos recortes, o wrapper deve normalizar a entrada como lista e serializar no formato aceito operacionalmente pela task carregada, em vez de repassar uma unica string composta.
 - `Regra operacional`: quando houver diagnostico estruturado de preview headless, `importedItems` deve permanecer lista mesmo quando so um item for retornado.
 - `Regra operacional`: quando a task `Genexus.MsBuild.Tasks.Import` nao expuser `UpdateFile` nem `ImportKBInformation`, o wrapper deve bloquear cedo esses parametros quando explicitamente pedidos.
 - `Regra operacional`: wrappers e scripts permanentes ficam em `scripts`; artefatos efemeros de execucao, logs auxiliares e diretorios temporarios de rodada devem preferir `Temp`.
 - `Regra operacional`: em trilha `MSBuild`, distinguir sempre `sucesso operacional da chamada`, `preview apenas` e `confirmacao funcional posterior na IDE`.
+- `Regra operacional`: depois que os recortes passarem a funcionar de forma confiavel, erro residual de `Source`, `Specification` ou referencia nao resolvida em objeto importado deve ser tratado como problema de conteudo da KB/`XPZ`, nao como problema de envelope ou do wrapper, salvo evidencia contraria.
 
 ## Evidencia complementar de gerador local
 
