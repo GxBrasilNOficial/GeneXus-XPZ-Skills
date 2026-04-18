@@ -194,6 +194,91 @@ function Get-DestinationTypeMap {
     return $map
 }
 
+function Get-KbSourceMetadataSnapshot {
+    param([string]$MetadataPath)
+
+    $snapshot = [ordered]@{
+        MajorVersion = ""
+        MinorVersion = ""
+        Build = ""
+        Kb = ""
+        Username = ""
+        UNCPath = ""
+        VersionGuid = ""
+        VersionName = ""
+    }
+
+    if (-not (Test-Path -LiteralPath $MetadataPath)) {
+        return [pscustomobject]$snapshot
+    }
+
+    $section = ""
+    foreach ($line in Get-Content -LiteralPath $MetadataPath) {
+        if ($line -match '^##\s+KMW\b') {
+            $section = "KMW"
+            continue
+        }
+
+        if ($line -match '^##\s+Source/Version\b') {
+            $section = "SourceVersion"
+            continue
+        }
+
+        if ($line -match '^##\s+Source\b') {
+            $section = "Source"
+            continue
+        }
+
+        if ($line -match '^##\s+') {
+            $section = ""
+            continue
+        }
+
+        switch ($section) {
+            "KMW" {
+                if ($line -match '^\|\s*MajorVersion\s*\|\s*(.*?)\s*\|\s*$') {
+                    $snapshot.MajorVersion = $Matches[1].Trim()
+                    continue
+                }
+                if ($line -match '^\|\s*MinorVersion\s*\|\s*(.*?)\s*\|\s*$') {
+                    $snapshot.MinorVersion = $Matches[1].Trim()
+                    continue
+                }
+                if ($line -match '^\|\s*Build\s*\|\s*(.*?)\s*\|\s*$') {
+                    $snapshot.Build = $Matches[1].Trim()
+                    continue
+                }
+            }
+            "Source" {
+                if ($line -match '^\|\s*kb \(GUID\)\s*\|\s*(.*?)\s*\|\s*$') {
+                    $snapshot.Kb = $Matches[1].Trim()
+                    continue
+                }
+                if ($line -match '^\|\s*username\s*\|\s*(.*?)\s*\|\s*$') {
+                    $snapshot.Username = $Matches[1].Trim()
+                    continue
+                }
+                if ($line -match '^\|\s*UNCPath\s*\|\s*(.*?)\s*\|\s*$') {
+                    $snapshot.UNCPath = $Matches[1].Trim()
+                    continue
+                }
+            }
+            "SourceVersion" {
+                if ($line -match '^\|\s*guid\s*\|\s*(.*?)\s*\|\s*$') {
+                    $snapshot.VersionGuid = $Matches[1].Trim()
+                    continue
+                }
+                if ($line -match '^\|\s*name\s*\|\s*(.*?)\s*\|\s*$') {
+                    $snapshot.VersionName = $Matches[1].Trim()
+                    continue
+                }
+            }
+        }
+    }
+
+    return [pscustomobject]$snapshot
+}
+
 function Convert-PackageToItems {
     param(
         [xml]$XmlDocument,
@@ -486,20 +571,63 @@ function Update-KbSourceMetadata {
     $sourceNode = $XmlDocument.SelectSingleNode("/ExportFile/Source")
     $versionNode = $XmlDocument.SelectSingleNode("/ExportFile/Source/Version")
 
-    if ($null -eq $kmwNode -or $null -eq $sourceNode) {
-        Write-Warning "KbMetadataPath: KMW ou Source nao encontrados no pacote; metadata nao atualizada."
-        return
+    $existingMetadata = Get-KbSourceMetadataSnapshot -MetadataPath $MetadataPath
+
+    $packageMajorVersion = if ($null -ne $kmwNode -and $null -ne $kmwNode.SelectSingleNode("MajorVersion")) { $kmwNode.SelectSingleNode("MajorVersion").InnerText } else { "" }
+    $packageMinorVersion = if ($null -ne $kmwNode -and $null -ne $kmwNode.SelectSingleNode("MinorVersion")) { $kmwNode.SelectSingleNode("MinorVersion").InnerText } else { "" }
+    $packageBuild        = if ($null -ne $kmwNode -and $null -ne $kmwNode.SelectSingleNode("Build"))        { $kmwNode.SelectSingleNode("Build").InnerText }        else { "" }
+
+    $packageKbGuid      = if ($null -ne $sourceNode) { $sourceNode.GetAttribute("kb") } else { "" }
+    $packageUsername    = if ($null -ne $sourceNode) { $sourceNode.GetAttribute("username") } else { "" }
+    $packageUncPath     = if ($null -ne $sourceNode) { $sourceNode.GetAttribute("UNCPath") } else { "" }
+    $packageVersionGuid = if ($null -ne $versionNode) { $versionNode.GetAttribute("guid") } else { "" }
+    $packageVersionName = if ($null -ne $versionNode) { $versionNode.GetAttribute("name") } else { "" }
+
+    $majorVersion = if ([string]::IsNullOrWhiteSpace($packageMajorVersion)) { $existingMetadata.MajorVersion } else { $packageMajorVersion }
+    $minorVersion = if ([string]::IsNullOrWhiteSpace($packageMinorVersion)) { $existingMetadata.MinorVersion } else { $packageMinorVersion }
+    $build        = if ([string]::IsNullOrWhiteSpace($packageBuild))        { $existingMetadata.Build }        else { $packageBuild }
+
+    $kbGuid      = if ([string]::IsNullOrWhiteSpace($packageKbGuid))      { $existingMetadata.Kb }          else { $packageKbGuid }
+    $username    = if ([string]::IsNullOrWhiteSpace($packageUsername))    { $existingMetadata.Username }    else { $packageUsername }
+    $uncPath     = if ([string]::IsNullOrWhiteSpace($packageUncPath))     { $existingMetadata.UNCPath }     else { $packageUncPath }
+    $versionGuid = if ([string]::IsNullOrWhiteSpace($packageVersionGuid)) { $existingMetadata.VersionGuid } else { $packageVersionGuid }
+    $versionName = if ([string]::IsNullOrWhiteSpace($packageVersionName)) { $existingMetadata.VersionName } else { $packageVersionName }
+
+    $hasCompleteSourceFromPackage = @(
+        $packageKbGuid,
+        $packageUsername,
+        $packageUncPath,
+        $packageVersionGuid,
+        $packageVersionName
+    ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+    $hasCompleteSourceFromPackage = ($hasCompleteSourceFromPackage.Count -eq 5)
+    $hasStableMetadataBaseline = @(
+        $existingMetadata.Kb,
+        $existingMetadata.Username,
+        $existingMetadata.UNCPath,
+        $existingMetadata.VersionGuid,
+        $existingMetadata.VersionName
+    ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+    $hasStableMetadataBaseline = ($hasStableMetadataBaseline.Count -gt 0)
+
+    $metadataStatus = if ($hasCompleteSourceFromPackage) {
+        "complete"
+    } elseif ($hasStableMetadataBaseline) {
+        "partial-preserved"
+    } else {
+        "partial-new"
     }
 
-    $majorVersion = if ($null -ne $kmwNode.SelectSingleNode("MajorVersion")) { $kmwNode.SelectSingleNode("MajorVersion").InnerText } else { "" }
-    $minorVersion = if ($null -ne $kmwNode.SelectSingleNode("MinorVersion")) { $kmwNode.SelectSingleNode("MinorVersion").InnerText } else { "" }
-    $build        = if ($null -ne $kmwNode.SelectSingleNode("Build"))        { $kmwNode.SelectSingleNode("Build").InnerText }        else { "" }
-
-    $kbGuid      = $sourceNode.GetAttribute("kb")
-    $username    = $sourceNode.GetAttribute("username")
-    $uncPath     = $sourceNode.GetAttribute("UNCPath")
-    $versionGuid = if ($null -ne $versionNode) { $versionNode.GetAttribute("guid") } else { "" }
-    $versionName = if ($null -ne $versionNode) { $versionNode.GetAttribute("name") } else { "" }
+    $warnings = New-Object System.Collections.Generic.List[string]
+    if ($null -eq $kmwNode -or $null -eq $sourceNode) {
+        $warnings.Add("KbMetadataPath: pacote aceito para sync de objetos, mas KMW ou Source vieram ausentes/incompletos; valores estaveis anteriores foram preservados e kb-source-metadata.md recebeu refresh parcial.") | Out-Null
+    } elseif (-not $hasCompleteSourceFromPackage) {
+        if ($hasStableMetadataBaseline) {
+            $warnings.Add("KbMetadataPath: pacote aceito para sync de objetos, mas Source incompleto; valores estaveis anteriores foram preservados e kb-source-metadata.md recebeu refresh parcial.") | Out-Null
+        } else {
+            $warnings.Add("KbMetadataPath: pacote aceito para sync de objetos, mas Source incompleto e sem baseline estavel previa; kb-source-metadata.md recebeu refresh parcial.") | Out-Null
+        }
+    }
 
     $timestamp   = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.0000000Z")
 
@@ -509,6 +637,7 @@ name: KB Source Metadata
 description: Valores de KMW e Source extraidos do XPZ mais recente da IDE — usados para montar o envelope de import_file.xml
 updated: $timestamp
 source_xpz: $SourceXpzPath
+source_refresh_status: $metadataStatus
 ---
 
 ## KMW
@@ -542,6 +671,16 @@ nos blocos ``<KMW>`` e ``<Source>`` do envelope ``<ExportFile>``.
 
     [System.IO.File]::WriteAllText($MetadataPath, $content, (New-Object System.Text.UTF8Encoding($false)))
     Write-Host "KbMetadataPath atualizado: $MetadataPath" -ForegroundColor Cyan
+
+    if ($warnings.Count -gt 0) {
+        Write-Warning ($warnings[0])
+    }
+
+    return [pscustomobject]@{
+        MetadataStatus = $metadataStatus
+        SourceComplete = $hasCompleteSourceFromPackage
+        Warnings = @($warnings)
+    }
 }
 
 function Write-Report {
@@ -555,6 +694,7 @@ function Write-Report {
 }
 
 $package = $null
+$warnings = New-Object System.Collections.Generic.List[string]
 try {
     $package = Resolve-PackageXmlPath -RawInputPath $InputPath
     [xml]$packageXml = Get-Content -LiteralPath $package.XmlPath -Raw
@@ -564,7 +704,12 @@ try {
     }
 
     if ($KbMetadataPath) {
-        Update-KbSourceMetadata -XmlDocument $packageXml -SourceXpzPath $InputPath -MetadataPath $KbMetadataPath
+        $metadataResult = Update-KbSourceMetadata -XmlDocument $packageXml -SourceXpzPath $InputPath -MetadataPath $KbMetadataPath
+        foreach ($warning in $metadataResult.Warnings) {
+            if (-not [string]::IsNullOrWhiteSpace($warning)) {
+                $warnings.Add($warning) | Out-Null
+            }
+        }
     }
 
     $typeMap = Get-DestinationTypeMap -Root $DestinationRoot
@@ -613,6 +758,9 @@ try {
         Mismatch = $verification.Mismatch
         FullSnapshot = $fullSnapshotResult
         Writes = $writeResults
+        Warnings = @($warnings)
+        KbMetadataStatus = if ($null -ne $metadataResult) { $metadataResult.MetadataStatus } else { "not-requested" }
+        KbMetadataSourceComplete = if ($null -ne $metadataResult) { [bool]$metadataResult.SourceComplete } else { $null }
     }
 
     if ($ReportPath) {

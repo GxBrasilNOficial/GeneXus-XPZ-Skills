@@ -41,6 +41,14 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
 - `Regra operacional`: em trilha `MSBuild`, distinguir sempre `sucesso operacional da chamada`, `preview apenas` e `confirmacao funcional posterior na IDE`.
 - `Regra operacional`: depois que os recortes passarem a funcionar de forma confiavel, erro residual de `Source`, `Specification` ou referencia nao resolvida em objeto importado deve ser tratado como problema de conteudo da KB/`XPZ`, nao como problema de envelope ou do wrapper, salvo evidencia contraria.
 
+## Metadado da KB no sync parcial
+
+- `Regra operacional`: um `XPZ` parcial pode ser valido para sync de objetos mesmo quando `Source` vier vazio, incompleto ou ausente.
+- `Regra operacional`: esse mesmo `XPZ` pode ser insuficiente para refresh completo de `kb-source-metadata.md`; nesses casos, o fluxo deve preservar os valores estaveis previamente conhecidos em vez de sobrescrever campos com vazio.
+- `Regra operacional`: campos vazios ou incompletos do pacote novo nao podem apagar `Source/@kb`, `Source/@username`, `Source/@UNCPath`, `Source/Version/@guid` ou `Source/Version/@name` quando houver baseline estavel anterior.
+- `Regra operacional`: se o pacote novo trouxer todos esses valores completos e validos, o refresh de metadado pode seguir normalmente.
+- `Regra operacional`: o caso deve produzir warning claro separando `sync de objetos aceito` de `refresh de metadado parcial`.
+
 ## Evidencia complementar de gerador local
 
 - `Evidência direta`: a pasta local `C:\Dev\Test\from-anywhere-to-GeneXus` contem um gerador simplificado que monta XML de importacao GeneXus usando um envelope com `ExportFile`, `KMW`, `Source`, `Objects`, `Dependencies` e `ObjectsIdentityMapping`.
