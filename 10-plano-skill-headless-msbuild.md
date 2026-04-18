@@ -61,17 +61,17 @@ Registrar as diretrizes iniciais para uma futura skill experimental dedicada à 
 - um teste controlado preenchendo o `Source` global do pacote headless com os valores do pacote full nao alterou esse bloqueio remanescente
 - um teste controlado trocando apenas `Pattern Settings` de `Padrões GeneXus` para `GeneXus Patterns` no pacote headless tambem nao alterou esse bloqueio remanescente
 - com isso, as duas diferencas remanescentes observadas entre o pacote full e o export headless deixaram de ser suspeitas fortes para o ruido principal desta frente
-- em uma segunda KB de teste (`GxTeste2`), a bateria de exportacao full headless, preview de importacao e importacao real do pacote exportado concluiu com sucesso operacional; o `stderr` residual ficou limitado ao mesmo padrao lateral de `mismatched input ']' expecting 'default'`, sem reaparecimento do bloqueio de conteudo observado na `Teste1`
-- isso reforca que a trilha central da skill funciona em mais de uma KB e que o caso `procCarregaSDTsDaNFe`/`procStrZERO` deve ser tratado como problema de conteudo da KB `Teste1`, nao como defeito central do fluxo headless via `MSBuild`
-- em uma terceira KB de teste (`GxTest3`), a mesma bateria tambem concluiu com sucesso operacional; a falha inicial de `XpzPath inválido` apareceu apenas quando `preview` e importacao foram disparados antes do termino do export, e desapareceu quando a execucao passou a respeitar a sequencia correta de artefatos
-- em uma quarta KB de teste (`TravelAgency`), a abertura headless confirmou `VersionName=TravelAgency` e `EnvironmentName=CloudNET`, e a bateria de exportacao full headless, preview de importacao e importacao real do pacote exportado tambem concluiu com sucesso operacional
-- nas rodadas bem-sucedidas de `GxTest3` e `TravelAgency`, o `stderr` residual da importacao real permaneceu restrito ao mesmo padrao lateral de `mismatched input ']' expecting 'default'`, sem bloqueio de conteudo equivalente ao da `Teste1`
-- em uma quinta KB de teste (`ShowcaseUnanimo`), a bateria tambem fechou com `exitCode = 0`, mas o preview registrou no `stdout` tentativa de contato com `GeneXus Server`, exigencia de credenciais e ausencia de licenca `GXtest` valida
-- na `ShowcaseUnanimo`, `importedItems` veio vazio tanto no preview quanto na importacao real; esse padrao deve ser tratado como validacao funcional incompleta, mesmo com sucesso operacional do wrapper
+- em uma segunda KB de teste sanitizada (`KB_Teste_B`), a bateria de exportacao full headless, preview de importacao e importacao real do pacote exportado concluiu com sucesso operacional; o `stderr` residual ficou limitado ao mesmo padrao lateral de `mismatched input ']' expecting 'default'`, sem reaparecimento do bloqueio de conteudo observado na `KB_Teste_A`
+- isso reforca que a trilha central da skill funciona em mais de uma KB e que o caso `procCarregaSDTsDaNFe`/`procStrZERO` deve ser tratado como problema de conteudo da `KB_Teste_A`, nao como defeito central do fluxo headless via `MSBuild`
+- em uma terceira KB de teste sanitizada (`KB_Teste_C`), a mesma bateria tambem concluiu com sucesso operacional; a falha inicial de `XpzPath inválido` apareceu apenas quando `preview` e importacao foram disparados antes do termino do export, e desapareceu quando a execucao passou a respeitar a sequencia correta de artefatos
+- em uma quarta KB de teste sanitizada (`KB_Teste_D`), a abertura headless confirmou contexto ativo coerente, e a bateria de exportacao full headless, preview de importacao e importacao real do pacote exportado tambem concluiu com sucesso operacional
+- nas rodadas bem-sucedidas de `KB_Teste_C` e `KB_Teste_D`, o `stderr` residual da importacao real permaneceu restrito ao mesmo padrao lateral de `mismatched input ']' expecting 'default'`, sem bloqueio de conteudo equivalente ao da `KB_Teste_A`
+- em uma quinta KB de teste sanitizada (`KB_Teste_E`), a bateria tambem fechou com `exitCode = 0`, mas o preview registrou no `stdout` tentativa de contato com `GeneXus Server`, exigencia de credenciais e ausencia de licenca `GXtest` valida
+- na `KB_Teste_E`, `importedItems` veio vazio tanto no preview quanto na importacao real; esse padrao deve ser tratado como validacao funcional incompleta, mesmo com sucesso operacional do wrapper
 - com isso, a frente ganhou uma nova regra empirica: `exitCode = 0` isolado nao basta para promover uma rodada como sucesso funcional quando a KB aciona dependencia externa de `GeneXus Server` ou restricao de licenca
-- em `EventDayTesteGx18`, `EventDayDoCursoMobile_Gx18` e `MyCinemaDoCursoGx18Advanced`, a bateria completa voltou a confirmar o perfil das KBs favoraveis: exportacao, preview e importacao real com sucesso operacional, `importedItems` preenchido e apenas o `stderr` lateral de `mismatched input ']' expecting 'default'`
-- em `FabricaBrasil18Test`, a abertura, o export e o preview tambem concluiram com sucesso operacional, mas com warning recorrente sobre item desconhecido `WebPanelDesigner` de extensao ausente `K2B Object Designer`
-- na `FabricaBrasil18Test`, a importacao real tambem concluiu, porem em escala muito superior: o wrapper inicial estourou timeout, o `MSBuild` seguiu trabalhando por longo periodo com progresso visivel, inclusive em geracao de padroes `WorkWith`, e o `stdout` final terminou com `Close Knowledge Base Task Sucesso`
+- em `KB_Teste_F`, `KB_Teste_G` e `KB_Teste_H`, a bateria completa voltou a confirmar o perfil das KBs favoraveis: exportacao, preview e importacao real com sucesso operacional, `importedItems` preenchido e apenas o `stderr` lateral de `mismatched input ']' expecting 'default'`
+- em `KB_Teste_Grande_A`, a abertura, o export e o preview tambem concluiram com sucesso operacional, mas com warning recorrente sobre item desconhecido `WebPanelDesigner` de extensao ausente `K2B Object Designer`
+- na `KB_Teste_Grande_A`, a importacao real tambem concluiu, porem em escala muito superior: o wrapper inicial estourou timeout, o `MSBuild` seguiu trabalhando por longo periodo com progresso visivel, inclusive em geracao de padroes `WorkWith`, e o `stdout` final terminou com `Close Knowledge Base Task Sucesso`
 - com isso, a frente ganhou outra regra empirica: em KBs muito grandes, timeout curto do wrapper nao deve ser interpretado automaticamente como falha da importacao; primeiro e preciso distinguir timeout do invocador de conclusao tardia do `MSBuild`
 - ainda assim, com evidência operacional repetida em nove KBs, a skill experimental ja demonstrou repetibilidade suficiente no mecanismo central de exportacao, preview e importacao via `MSBuild`; o foco remanescente desta frente passa a ser definicao de criterio de encerramento, limites de promocao e tratamento explicito de validacao incompleta ou execucao de longa duracao
 
@@ -864,9 +864,9 @@ O próximo marco passa a ser fechar o critério explícito de encerramento e pro
 
 Classificação mínima que a documentação da skill deve espelhar a partir daqui:
 
-- problema de conteúdo da KB/`XPZ`, como `Teste1`
-- validação funcional incompleta por dependência externa ou licença, como `ShowcaseUnanimo`
-- execução longa em KB grande, como `FabricaBrasil18Test`
+- problema de conteúdo da KB/`XPZ`, como `KB_Teste_A`
+- validação funcional incompleta por dependência externa ou licença, como `KB_Teste_E`
+- execução longa em KB grande, como `KB_Teste_Grande_A`
 - warning estrutural por extensão ausente, como `WebPanelDesigner`/`K2B Object Designer`
 
 Enquanto essa consolidação não estiver espelhada na skill e nos critérios de promoção, a frente continua experimental, porém com mecanismo central já validado.

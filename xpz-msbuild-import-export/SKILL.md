@@ -17,9 +17,9 @@ No estado atual, o mecanismo central desta skill já foi validado operacionalmen
 
 Exceções já mapeadas que a skill deve tratar explicitamente:
 
-- conteúdo inconsistente da KB/`XPZ`, como `Teste1`
-- validação funcional incompleta por `GeneXus Server` ou licença, como `ShowcaseUnanimo`
-- execução longa em KB grande, como `FabricaBrasil18Test`
+- conteúdo inconsistente da KB/`XPZ`, como `KB_Teste_A`
+- validação funcional incompleta por `GeneXus Server` ou licença, como `KB_Teste_E`
+- execução longa em KB grande, como `KB_Teste_Grande_A`
 - warning estrutural por extensão ausente, como `WebPanelDesigner`/`K2B Object Designer`
 
 Critério atual de `done experimental` desta skill:
