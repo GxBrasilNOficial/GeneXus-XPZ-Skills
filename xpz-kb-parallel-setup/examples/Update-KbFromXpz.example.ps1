@@ -28,6 +28,16 @@ Caminho opcional para salvar metadados da KB em Markdown.
 
 .PARAMETER NoGitSummary
 Suprime resumo local de alterações Git em `ObjetosDaKbEmXml`.
+
+.PARAMETER ExpectedItems
+Lista opcional de itens esperados no formato `Tipo:Nome`, repassada ao motor
+compartilhado para comparar foco esperado versus retorno oficial da KB.
+
+.EXAMPLE
+.\Update-KbFromXpz.ps1 -InputPath C:\Exports\MeuPacote.xpz -ExpectedItems 'Transaction:Cliente'
+
+.EXAMPLE
+.\Update-KbFromXpz.ps1 -InputPath C:\Exports\MeuPacote.xpz -ExpectedItems 'Transaction:Cliente', 'Procedure:GeraBoleto'
 #>
 
 param(
@@ -43,6 +53,8 @@ param(
     [switch]$KeepReport,
 
     [string]$KbMetadataPath,
+
+    [string[]]$ExpectedItems = @(),
 
     [switch]$NoGitSummary
 )
@@ -81,6 +93,10 @@ if ($KeepReport) {
 
 if ($KbMetadataPath) {
     $params.KbMetadataPath = $KbMetadataPath
+}
+
+if ($ExpectedItems.Count -gt 0) {
+    $params.ExpectedItems = @($ExpectedItems)
 }
 
 $result = & $enginePath @params

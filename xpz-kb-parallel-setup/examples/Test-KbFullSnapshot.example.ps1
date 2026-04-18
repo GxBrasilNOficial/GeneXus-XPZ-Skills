@@ -5,6 +5,16 @@ Wrapper local sanitizado para conferência completa de um export full da KB.
 .DESCRIPTION
 Reaproveita o wrapper diário em modo somente verificação, com comparação do
 snapshot completo mantido em `ObjetosDaKbEmXml`.
+
+.PARAMETER ExpectedItems
+Lista opcional de itens esperados no formato `Tipo:Nome`, repassada ao wrapper
+diário para comparar foco esperado versus retorno oficial da KB.
+
+.EXAMPLE
+.\Test-KbFullSnapshot.ps1 -InputPath C:\Exports\FullKb.xpz -ExpectedItems 'Transaction:Cliente'
+
+.EXAMPLE
+.\Test-KbFullSnapshot.ps1 -InputPath C:\Exports\FullKb.xpz -ExpectedItems 'Transaction:Cliente', 'Procedure:GeraBoleto'
 #>
 
 param(
@@ -12,6 +22,8 @@ param(
     [string]$InputPath,
 
     [string]$ReportPath,
+
+    [string[]]$ExpectedItems = @(),
 
     [switch]$KeepReport
 )
@@ -38,6 +50,10 @@ if ($ReportPath) {
 
 if ($KeepReport) {
     $params.KeepReport = $true
+}
+
+if ($ExpectedItems.Count -gt 0) {
+    $params.ExpectedItems = @($ExpectedItems)
 }
 
 & $wrapperPath @params
