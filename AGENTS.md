@@ -7,8 +7,14 @@
 
 ## Interpretação de prompts de terceiros
 
-- Quando o usuário indicar que o texto seguinte é um prompt com sugestões de outro agente, tratar esse texto como insumo de avaliação comparativa.
-- Nesse caso, responder primeiro com o que vale atender, o que precisa de ajuste e o que não vale atender, sem alterar arquivos antes de uma autorização explícita para mudanças.
+- Quando o usuário indicar que o texto seguinte é um prompt com sugestões de outro agente, tratar esse texto como insumo de avaliação.
+- Neste repositório, o foco é **melhorar as skills XPZ**, não usá-las — então o workflow é:
+  1. **Estude a documentação** das skills afetadas para entender sua metodologia
+  2. **Estude o prompt** do outro agente para entender a solicitação
+  3. **Avalie criticamente**: o que faz sentido, o que conflita, o que precisa ajuste
+  4. **Apresente um plano** ao usuário: claramente o que será alterado, por quê e onde
+  5. **Aguarde aprovação explícita** antes de fazer qualquer mudança
+- Não invoque as skills como ferramentas (via `Skill` tool) — elas são o objeto do seu trabalho, não suporte para ele.
 
 ## README trilíngue
 
@@ -20,6 +26,12 @@
 
 - Esta raiz é a base metodológica e operacional compartilhada das skills de `XPZ`/XML de GeneXus.
 - Regras locais desta raiz devem ser tratadas como regras do repositório; não promovê-las automaticamente a regra universal fora desta base sem evidência documental correspondente.
+
+## Trabalho nas skills XPZ
+
+- Esta raiz contém a documentação metodológica de múltiplas skills (xpz-reader, xpz-builder, xpz-sync, xpz-doc-builder) e outros artefatos compartilhados.
+- Ao trabalhar na melhoria de uma skill, estudar sua documentação de forma crítica e compreender seu propósito antes de propor mudanças.
+- Quando receber um prompt de outro agente solicitando mudança em uma skill, não invoque essa skill como ferramenta — consulte sua documentação, analise o impacto e apresente um plano.
 
 ## Edição segura de Markdown
 

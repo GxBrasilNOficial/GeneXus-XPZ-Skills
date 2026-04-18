@@ -188,7 +188,8 @@ function Escape-Xml {
 }
 
 function New-ArtifactDirectory {
-    $baseDirectory = Get-FullPathSafe -PathValue $WorkingDirectory
+    param([string]$BaseDirectory)
+
     $artifactDirectory = Join-Path $baseDirectory ('gx-open-kb-' + [System.Guid]::NewGuid().ToString('N'))
     [System.IO.Directory]::CreateDirectory($artifactDirectory) | Out-Null
     return $artifactDirectory
@@ -345,8 +346,12 @@ try {
         Add-StrategyTrace -Message 'VerboseLog habilitado para detalhamento adicional da abertura headless.'
     }
 
-    $artifactDirectory = New-ArtifactDirectory
-    $probeLogPath = Join-Path $artifactDirectory 'probe-stage.json'
+    $probeLogBaseDirectory = if ([string]::IsNullOrWhiteSpace($WorkingDirectory)) {
+        Split-Path -Parent $PSCommandPath
+    } else {
+        Get-FullPathSafe -PathValue $WorkingDirectory
+    }
+    $probeLogPath = Join-Path $probeLogBaseDirectory ('gx-open-probe-' + [System.Guid]::NewGuid().ToString('N') + '.json')
     $probeStage = Invoke-ProbeStage -ProbeLogPath $probeLogPath
 
     Add-StrategyTrace -Message ('Probe executado antes da abertura da KB com exitCode {0}.' -f $probeStage.ExitCode)
@@ -374,6 +379,7 @@ try {
                 WorkingDirectory = (Get-FullPathSafe -PathValue $WorkingDirectory)
                 LogPath = $resolvedLogPath
             }
+            pathActions = $probeDiagnostic.pathActions
             artifacts = [ordered]@{
                 ProbeLogPath = $probeLogPath
                 MsBuildFilePath = $null
@@ -397,6 +403,8 @@ try {
     $resolvedGeneXusDir = [string]$probeStage.Diagnostic.resolvedPaths.GeneXusDir
     $resolvedMsBuildPath = [string]$probeStage.Diagnostic.resolvedPaths.MsBuildPath
     $resolvedKbPath = [string]$probeStage.Diagnostic.resolvedPaths.KbPath
+    $resolvedWorkingDirectory = [string]$probeStage.Diagnostic.resolvedPaths.WorkingDirectory
+    $artifactDirectory = New-ArtifactDirectory -BaseDirectory $resolvedWorkingDirectory
 
     $msBuildFilePath = Join-Path $artifactDirectory 'open-kb.msbuild'
     $stdOutPath = Join-Path $artifactDirectory 'msbuild.stdout.log'
@@ -447,9 +455,10 @@ try {
             GeneXusDir = $resolvedGeneXusDir
             MsBuildPath = $resolvedMsBuildPath
             KbPath = $resolvedKbPath
-            WorkingDirectory = (Get-FullPathSafe -PathValue $WorkingDirectory)
+            WorkingDirectory = $resolvedWorkingDirectory
             LogPath = $resolvedLogPath
         }
+        pathActions = $probeStage.Diagnostic.pathActions
         artifacts = [ordered]@{
             ProbeLogPath = $probeLogPath
             MsBuildFilePath = $msBuildFilePath
@@ -490,6 +499,9 @@ catch {
             KbPath = (Get-FullPathSafe -PathValue $KbPath)
             WorkingDirectory = (Get-FullPathSafe -PathValue $WorkingDirectory)
             LogPath = $resolvedLogPath
+        }
+        pathActions = [ordered]@{
+            WorkingDirectory = 'blocked-internal-error'
         }
         artifacts = [ordered]@{
             ProbeLogPath = $null

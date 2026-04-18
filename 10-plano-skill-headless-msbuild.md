@@ -109,13 +109,15 @@ Objetivo do probe (sondagem técnica inicial):
 - confirmar que `MSBuild.exe` foi localizado por estratégia explícita de fallback
 - confirmar a existência de `Genexus.Tasks.targets`
 - confirmar que `WorkingDirectory` e `LogPath` apontam para fora de `C:\Program Files (x86)`
-- confirmar que os caminhos informados existem e são coerentes com a fase pedida
+- confirmar que `WorkingDirectory`, quando informado explicitamente em caminho seguro, possa ser auto-criado sem inferência adicional
+- confirmar que os demais caminhos informados existem e são coerentes com a fase pedida
 
 Saída mínima esperada do probe (sondagem técnica inicial):
 
 - classificação `apto para prosseguir` ou `não apto para prosseguir`
 - motivo explícito em caso de bloqueio
 - caminhos efetivamente resolvidos para `GeneXusDir`, `MsBuildPath`, `WorkingDirectory` e `LogPath`
+- distinção explícita entre `WorkingDirectory` validado já existente e `WorkingDirectory` ausente, seguro e auto-criado
 
 O probe (sondagem técnica inicial) não deve:
 
@@ -613,6 +615,7 @@ Escopo permitido:
 - validar presença de `Genexus.Tasks.targets`
 - validar existência de `KbPath`, quando ele for informado para fases posteriores
 - validar que `WorkingDirectory` e `LogPath` ficam fora de `C:\Program Files (x86)`
+- auto-criar exatamente o `WorkingDirectory` explicitamente informado quando ele for seguro e ainda não existir
 - devolver diagnóstico estruturado e abortar cedo quando houver ambiguidade
 
 Escopo proibido:
@@ -649,6 +652,7 @@ Parâmetros opcionais:
 Critério de obrigatoriedade nesta fase:
 
 - `WorkingDirectory` e `LogPath` são obrigatórios porque o probe precisa validar diretórios seguros e rastreabilidade mínima
+- `WorkingDirectory` continua explícito; o probe pode criar somente esse caminho, nunca inferir outro
 - `GeneXusDir` e `MsBuildPath` podem ser omitidos apenas porque esta fase já define fallback explícito
 - `KbPath` pode ser omitido quando o objetivo for apenas validar host e instalação antes de amarrar uma KB específica
 - `VerboseLog` é opcional e deve afetar detalhamento, não o resultado lógico do probe
@@ -751,13 +755,16 @@ Exemplo canônico inicial em `JSON`:
 ```json
 {
   "status": "apto para prosseguir",
-  "summary": "GeneXus, MSBuild e diretórios seguros validados.",
+  "summary": "GeneXus, MSBuild e diretórios seguros validados; WorkingDirectory explícito ausente foi auto-criado com segurança.",
   "resolvedPaths": {
     "GeneXusDir": "C:\\GeneXus\\GeneXus18",
     "MsBuildPath": "C:\\Program Files\\Microsoft Visual Studio\\2022\\BuildTools\\MSBuild\\Current\\Bin\\MSBuild.exe",
     "KbPath": "D:\\GX\\KbLaboratorio",
     "WorkingDirectory": "D:\\GX\\HeadlessProbe\\work",
     "LogPath": "D:\\GX\\HeadlessProbe\\logs\\probe.log"
+  },
+  "pathActions": {
+    "WorkingDirectory": "validated-and-created"
   },
   "checks": [
     {
@@ -783,7 +790,7 @@ Exemplo canônico inicial em `JSON`:
     {
       "name": "WorkingDirectory outside Program Files x86",
       "result": "ok",
-      "detail": "Diretório de trabalho fora da árvore somente leitura."
+      "detail": "Diretório ausente no caminho seguro informado; pasta auto-criada."
     },
     {
       "name": "LogPath outside Program Files x86",
@@ -792,10 +799,13 @@ Exemplo canônico inicial em `JSON`:
     }
   ],
   "blockingReasons": [],
-  "warnings": [],
+  "warnings": [
+    "WorkingDirectory ausente foi criado automaticamente no caminho explícito e seguro: D:\\GX\\HeadlessProbe\\work"
+  ],
   "strategyTrace": [
     "GeneXusDir usado conforme parâmetro explícito.",
     "MsBuildPath não informado; fallback aplicado em caminhos conhecidos do Visual Studio.",
+    "WorkingDirectory explícito não existia; o script criou exatamente o diretório informado após validar segurança.",
     "KbPath validado apenas por existência de diretório nesta fase."
   ]
 }
@@ -813,6 +823,9 @@ Exemplo canônico inicial em caso bloqueado:
     "KbPath": "D:\\GX\\KbLaboratorio",
     "WorkingDirectory": "D:\\GX\\HeadlessProbe\\work",
     "LogPath": "C:\\Program Files (x86)\\GeneXus\\GeneXus18\\probe.log"
+  },
+  "pathActions": {
+    "WorkingDirectory": "validated-existing"
   },
   "checks": [
     {

@@ -77,6 +77,7 @@ Do NOT use esta skill para:
 - Tratar `Test-GeneXusMsBuildSetup.ps1` como probe (sondagem técnica inicial) não invasivo, anterior a qualquer abertura de KB
 - Tratar `C:\Program Files (x86)` como estritamente somente leitura
 - Garantir que logs, temporários, `.msbuild` e artefatos sejam gerados fora de `C:\Program Files (x86)`
+- Permitir auto-criação apenas do `WorkingDirectory` explicitamente informado, depois de validado como seguro e fora das áreas proibidas
 - Preferir `Temp` como destino de artefatos efêmeros de execução e manter `scripts` como pasta de wrappers permanentes
 - Distinguir claramente:
   - sucesso operacional da chamada
@@ -147,6 +148,7 @@ Contrato inicial específico de `Test-GeneXusMsBuildSetup.ps1`:
 
 - obrigatórios: `-WorkingDirectory`, `-LogPath`
 - opcionais: `-GeneXusDir`, `-MsBuildPath`, `-KbPath`, `-VerboseLog`
+- regra de contrato: `-WorkingDirectory` continua explícito; quando o caminho seguro ainda não existir, o probe pode criar exatamente essa pasta e registrar isso no diagnóstico
 - códigos de saída contratuais:
   - `0` para `apto para prosseguir`
   - `10` a `16` para bloqueios operacionais esperados com diagnóstico estruturado
@@ -197,9 +199,11 @@ Parâmetros específicos de importação:
    - `WorkingDirectory`
    - `LogPath`
    - existência de `Genexus.Tasks.targets`
+   Se `WorkingDirectory` estiver em caminho seguro e ainda não existir, o probe pode auto-criar exatamente essa pasta.
 5. Resolver `GeneXusDir` e `MsBuildPath` por ordem explícita de precedência e fallback, registrando origem e descarte de candidatos quando aplicável
 6. Classificar o resultado do probe (sondagem técnica inicial) como `apto para prosseguir` ou `não apto para prosseguir`
    O diagnóstico deve incluir `status`, `summary`, `resolvedPaths`, `checks`, `blockingReasons`, `warnings` e `strategyTrace`.
+   O diagnóstico deve distinguir `WorkingDirectory` já existente de `WorkingDirectory` auto-criado no caminho explícito e seguro.
    Preferir `JSON` como formato canônico inicial.
 7. Só depois abrir a KB e confirmar versão ativa e `Environment` ativo quando aplicável
 8. Se o objetivo for inspeção, priorizar:
@@ -232,6 +236,7 @@ Parâmetros específicos de importação:
 - [ ] O probe (sondagem técnica inicial) devolveu diagnóstico estruturado completo
 - [ ] O probe (sondagem técnica inicial) respeitou o contrato de parâmetros obrigatórios, opcionais e `exitCode`
 - [ ] `KbPath`, `GeneXusDir`, `MsBuildPath`, `WorkingDirectory` e `LogPath` foram explicitados
+- [ ] O probe só auto-criou `WorkingDirectory` quando o caminho explícito era seguro e permaneceu bloqueando caminhos proibidos, inválidos ou ambíguos
 - [ ] `GeneXusDir` e `MsBuildPath` foram resolvidos por precedência e fallback rastreáveis
 - [ ] `Genexus.Tasks.targets` foi validado
 - [ ] `PreviewMode` foi priorizado quando a intenção era inspeção

@@ -10,8 +10,9 @@ em JSON. Este script não abre a KB, não gera .msbuild operacional e não
 executa importação ou exportação.
 
 .PARAMETER WorkingDirectory
-Diretório de trabalho a ser validado para etapas futuras. Deve existir e ficar
-fora de C:\Program Files (x86).
+ Diretório de trabalho explícito para etapas futuras. Deve ficar fora de
+ C:\Program Files (x86). Se o caminho informado for seguro e ainda não existir,
+ o probe pode criar automaticamente exatamente essa pasta.
 
 .PARAMETER LogPath
 Caminho completo do arquivo de log deste probe. O diretório pai deve existir e
@@ -53,32 +54,11 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $ProgramFilesX86 = [System.IO.Path]::GetFullPath('C:\Program Files (x86)')
+$sharedPathContractScript = Join-Path (Split-Path -Parent $PSCommandPath) 'GeneXusMsBuildPathContract.ps1'
+. $sharedPathContractScript
 
 function Get-Utf8NoBomEncoding {
     return [System.Text.UTF8Encoding]::new($false)
-}
-
-function Get-FullPathSafe {
-    param([string]$PathValue)
-
-    if ([string]::IsNullOrWhiteSpace($PathValue)) {
-        return $null
-    }
-
-    return [System.IO.Path]::GetFullPath($PathValue)
-}
-
-function Test-IsUnderProgramFilesX86 {
-    param([string]$PathValue)
-
-    if ([string]::IsNullOrWhiteSpace($PathValue)) {
-        return $false
-    }
-
-    $fullPath = Get-FullPathSafe -PathValue $PathValue
-    $candidate = $fullPath.TrimEnd('\')
-    $root = $ProgramFilesX86.TrimEnd('\')
-    return $candidate.StartsWith($root, [System.StringComparison]::OrdinalIgnoreCase)
 }
 
 function New-Check {
@@ -283,46 +263,6 @@ function Validate-TargetsFile {
     }
 }
 
-function Validate-ExistingDirectory {
-    param(
-        [string]$PathValue,
-        [string]$CheckName,
-        [int]$FailureCode,
-        [string]$InvalidReasonTemplate
-    )
-
-    $resolved = Get-FullPathSafe -PathValue $PathValue
-    if (-not (Test-Path -LiteralPath $resolved -PathType Container)) {
-        Add-BlockingReason -Reason ($InvalidReasonTemplate -f $resolved)
-        return [ordered]@{
-            path = $resolved
-            result = 'fail'
-            detail = 'Diretório não foi encontrado.'
-            code = $FailureCode
-            check = New-Check -Name $CheckName -Result 'fail' -Detail 'Diretório não foi encontrado.'
-        }
-    }
-
-    if (Test-IsUnderProgramFilesX86 -PathValue $resolved) {
-        Add-BlockingReason -Reason ($InvalidReasonTemplate -f $resolved)
-        return [ordered]@{
-            path = $resolved
-            result = 'fail'
-            detail = 'Diretório aponta para árvore estritamente somente leitura.'
-            code = $FailureCode
-            check = New-Check -Name $CheckName -Result 'fail' -Detail 'Diretório aponta para árvore estritamente somente leitura.'
-        }
-    }
-
-    return [ordered]@{
-        path = $resolved
-        result = 'ok'
-        detail = 'Diretório válido e fora da árvore somente leitura.'
-        code = 0
-        check = New-Check -Name $CheckName -Result 'ok' -Detail 'Diretório válido e fora da árvore somente leitura.'
-    }
-}
-
 function Validate-LogPath {
     $resolved = Get-FullPathSafe -PathValue $LogPath
     $parent = [System.IO.Path]::GetDirectoryName($resolved)
@@ -435,9 +375,19 @@ try {
     $geneXusResolution = Resolve-GeneXusDirectory
     $msBuildResolution = Resolve-MsBuildExecutable
     $targetsResolution = Validate-TargetsFile -ResolvedGeneXusDir $geneXusResolution.path
-    $workingValidation = Validate-ExistingDirectory -PathValue $WorkingDirectory -CheckName 'WorkingDirectory outside Program Files x86' -FailureCode 13 -InvalidReasonTemplate "WorkingDirectory inválido ou inseguro: '{0}'."
+    $workingValidation = Resolve-ExplicitWorkingDirectory -PathValue $WorkingDirectory -ProgramFilesX86 $ProgramFilesX86 -FailureCode 13
     $logValidation = Validate-LogPath
     $kbValidation = Validate-KbPath
+
+    if (-not [string]::IsNullOrWhiteSpace($workingValidation.blockingReason)) {
+        Add-BlockingReason -Reason $workingValidation.blockingReason
+    }
+    if (-not [string]::IsNullOrWhiteSpace($workingValidation.warning)) {
+        Add-WarningMessage -Message $workingValidation.warning
+    }
+    if (-not [string]::IsNullOrWhiteSpace($workingValidation.strategyTrace)) {
+        Add-StrategyTrace -Message $workingValidation.strategyTrace
+    }
 
     $checks = @(
         (New-Check -Name 'GeneXus installation' -Result $geneXusResolution.result -Detail $geneXusResolution.detail),
@@ -461,7 +411,11 @@ try {
     $status = if ($exitCode -eq 0) { 'apto para prosseguir' } else { 'não apto para prosseguir' }
 
     if ($exitCode -eq 0) {
-        $summary = 'GeneXus, MSBuild e diretórios seguros validados.'
+        if ($workingValidation.autoCreated) {
+            $summary = 'GeneXus, MSBuild e diretórios seguros validados; WorkingDirectory explícito ausente foi auto-criado com segurança.'
+        } else {
+            $summary = 'GeneXus, MSBuild e diretórios seguros validados.'
+        }
     } else {
         $summary = 'Probe bloqueado por uma ou mais validações de ambiente.'
     }
@@ -475,6 +429,9 @@ try {
             KbPath = $kbValidation.path
             WorkingDirectory = $workingValidation.path
             LogPath = $logValidation.path
+        }
+        pathActions = [ordered]@{
+            WorkingDirectory = $workingValidation.pathAction
         }
         checks = $checks
         blockingReasons = @($script:BlockingReasons)
@@ -501,6 +458,9 @@ catch {
             KbPath = (Get-FullPathSafe -PathValue $KbPath)
             WorkingDirectory = (Get-FullPathSafe -PathValue $WorkingDirectory)
             LogPath = $resolvedLogPathForFallback
+        }
+        pathActions = [ordered]@{
+            WorkingDirectory = 'blocked-internal-error'
         }
         checks = @()
         blockingReasons = @($_.Exception.Message)

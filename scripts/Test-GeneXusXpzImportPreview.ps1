@@ -527,10 +527,11 @@ try {
                 MsBuildPath = $probeDiagnostic.resolvedPaths.MsBuildPath
                 KbPath = $probeDiagnostic.resolvedPaths.KbPath
                 XpzPath = (Get-FullPathSafe -PathValue $XpzPath)
-                WorkingDirectory = (Get-FullPathSafe -PathValue $WorkingDirectory)
+                WorkingDirectory = $probeDiagnostic.resolvedPaths.WorkingDirectory
                 LogPath = $resolvedLogPath
                 UpdateFilePath = (Get-FullPathSafe -PathValue $UpdateFilePath)
             }
+            pathActions = $probeDiagnostic.pathActions
             artifacts = [ordered]@{
                 ProbeLogPath = $probeLogPath
                 MsBuildFilePath = $null
@@ -566,10 +567,11 @@ try {
                 MsBuildPath = $probeStage.Diagnostic.resolvedPaths.MsBuildPath
                 KbPath = $probeStage.Diagnostic.resolvedPaths.KbPath
                 XpzPath = $xpzValidation.Path
-                WorkingDirectory = (Get-FullPathSafe -PathValue $WorkingDirectory)
+                WorkingDirectory = $probeStage.Diagnostic.resolvedPaths.WorkingDirectory
                 LogPath = $resolvedLogPath
                 UpdateFilePath = $updateFileValidation.Path
             }
+            pathActions = $probeStage.Diagnostic.pathActions
             artifacts = [ordered]@{
                 ProbeLogPath = $probeLogPath
                 MsBuildFilePath = $null
@@ -610,10 +612,11 @@ try {
                 MsBuildPath = $resolvedMsBuildPath
                 KbPath = $resolvedKbPath
                 XpzPath = $resolvedXpzPath
-                WorkingDirectory = (Get-FullPathSafe -PathValue $WorkingDirectory)
+                WorkingDirectory = $probeStage.Diagnostic.resolvedPaths.WorkingDirectory
                 LogPath = $resolvedLogPath
                 UpdateFilePath = $resolvedUpdateFilePath
             }
+            pathActions = $probeStage.Diagnostic.pathActions
             artifacts = [ordered]@{
                 ProbeLogPath = $probeLogPath
                 MsBuildFilePath = $null
@@ -645,10 +648,11 @@ try {
                 MsBuildPath = $resolvedMsBuildPath
                 KbPath = $resolvedKbPath
                 XpzPath = $resolvedXpzPath
-                WorkingDirectory = (Get-FullPathSafe -PathValue $WorkingDirectory)
+                WorkingDirectory = $probeStage.Diagnostic.resolvedPaths.WorkingDirectory
                 LogPath = $resolvedLogPath
                 UpdateFilePath = $resolvedUpdateFilePath
             }
+            pathActions = $probeStage.Diagnostic.pathActions
             artifacts = [ordered]@{
                 ProbeLogPath = $probeLogPath
                 MsBuildFilePath = $null
@@ -707,10 +711,11 @@ try {
             MsBuildPath = $resolvedMsBuildPath
             KbPath = $resolvedKbPath
             XpzPath = $resolvedXpzPath
-            WorkingDirectory = (Get-FullPathSafe -PathValue $WorkingDirectory)
+            WorkingDirectory = $probeStage.Diagnostic.resolvedPaths.WorkingDirectory
             LogPath = $resolvedLogPath
             UpdateFilePath = $resolvedUpdateFilePath
         }
+        pathActions = $probeStage.Diagnostic.pathActions
         requestedContext = [ordered]@{
             VersionName = $VersionName
             EnvironmentName = $EnvironmentName
@@ -755,6 +760,9 @@ catch {
             WorkingDirectory = (Get-FullPathSafe -PathValue $WorkingDirectory)
             LogPath = $resolvedLogPath
             UpdateFilePath = (Get-FullPathSafe -PathValue $UpdateFilePath)
+        }
+        pathActions = [ordered]@{
+            WorkingDirectory = 'blocked-internal-error'
         }
         requestedContext = [ordered]@{
             VersionName = $VersionName
