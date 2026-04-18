@@ -61,6 +61,12 @@ Registrar as diretrizes iniciais para uma futura skill experimental dedicada à 
 - um teste controlado preenchendo o `Source` global do pacote headless com os valores do pacote full nao alterou esse bloqueio remanescente
 - um teste controlado trocando apenas `Pattern Settings` de `Padrões GeneXus` para `GeneXus Patterns` no pacote headless tambem nao alterou esse bloqueio remanescente
 - com isso, as duas diferencas remanescentes observadas entre o pacote full e o export headless deixaram de ser suspeitas fortes para o ruido principal desta frente
+- em uma segunda KB de teste (`GxTeste2`), a bateria de exportacao full headless, preview de importacao e importacao real do pacote exportado concluiu com sucesso operacional; o `stderr` residual ficou limitado ao mesmo padrao lateral de `mismatched input ']' expecting 'default'`, sem reaparecimento do bloqueio de conteudo observado na `Teste1`
+- isso reforca que a trilha central da skill funciona em mais de uma KB e que o caso `procCarregaSDTsDaNFe`/`procStrZERO` deve ser tratado como problema de conteudo da KB `Teste1`, nao como defeito central do fluxo headless via `MSBuild`
+- em uma terceira KB de teste (`GxTest3`), a mesma bateria tambem concluiu com sucesso operacional; a falha inicial de `XpzPath inválido` apareceu apenas quando `preview` e importacao foram disparados antes do termino do export, e desapareceu quando a execucao passou a respeitar a sequencia correta de artefatos
+- em uma quarta KB de teste (`TravelAgency`), a abertura headless confirmou `VersionName=TravelAgency` e `EnvironmentName=CloudNET`, e a bateria de exportacao full headless, preview de importacao e importacao real do pacote exportado tambem concluiu com sucesso operacional
+- nas rodadas bem-sucedidas de `GxTest3` e `TravelAgency`, o `stderr` residual da importacao real permaneceu restrito ao mesmo padrao lateral de `mismatched input ']' expecting 'default'`, sem bloqueio de conteudo equivalente ao da `Teste1`
+- com evidência operacional repetida em quatro KBs, a skill experimental ja demonstrou repetibilidade suficiente no mecanismo central de exportacao, preview e importacao via `MSBuild`; o foco remanescente desta frente passa a ser definicao de criterio de encerramento e limites de promocao, nao descoberta basal do wrapper
 
 ## Restrição Operacional De Leitura
 
