@@ -17,6 +17,13 @@ Quando o mesmo `XPZ` for reprocessado após atualização do arquivo exportado, 
 
 Os nomes das pastas sao apenas padroes sugeridos quando o usuario nao informar outros. O que manda e a funcao da pasta no fluxo.
 
+Quando a base compartilhada ganhar um parametro operacional relevante, isso
+significa apenas que a capacidade existe no motor compartilhado. A exposicao em
+wrappers locais continua sendo decisao local e pode estar defasada. Nesses
+casos, o agente deve reconhecer a defasagem como oportunidade de adaptacao
+local, propor a mudanca ao usuario e aguardar aprovacao explicita; nao deve
+alterar wrappers locais por conta propria.
+
 Se a pasta paralela da KB ainda nao estiver montada, validada ou mapeada, parar e usar `xpz-kb-parallel-setup` antes do `sync`.
 
 ## PATH RESOLUTION
@@ -119,6 +126,10 @@ Os wrappers seguem esta convenção de parâmetros:
 - `-ReportPath` *(opcional)* — salva relatório JSON
 - `-KeepReport` *(switch)* — mantém relatório mesmo sem erro
 - `-ExpectedItems` *(opcional)* — lista de itens esperados da frente atual no formato `Tipo:Nome`, usada apenas para classificação comparativa entre foco esperado e retorno oficial da KB
+- a disponibilidade desse parametro no motor compartilhado nao autoriza presumir
+  que wrappers locais da pasta paralela da KB ja o exponham; se o wrapper local
+  ainda nao o aceitar, tratar isso como oportunidade de atualizacao local,
+  mencionar ao usuario e aguardar aprovacao explicita antes de qualquer ajuste
 - `-KbMetadataPath` *(opcional)* — salva metadados da KB em formato Markdown
 - se esse parâmetro estiver ativo no wrapper local, `kb-source-metadata.md` faz parte normal do fluxo e pode ser reescrito a cada processamento
 - se o `XPZ` vier com `Source` vazio, incompleto ou ausente, o wrapper deve preservar valores estáveis conhecidos e emitir warning de refresh parcial; isso não invalida o sync de objetos

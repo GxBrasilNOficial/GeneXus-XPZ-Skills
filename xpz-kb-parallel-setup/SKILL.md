@@ -115,12 +115,11 @@ Do NOT use this skill for:
   - apontar para o motor compartilhado
   - repassar parametros
   - opcionalmente produzir resumo Git, relatorio e metadados da KB
-- Quando o wrapper diário aceitar `-ExpectedItems`, ele deve repassar essa lista
-  ao motor compartilhado sem alterar o comportamento padrao quando o parametro
-  nao for informado
-- Quando o wrapper de conferencia full reaproveitar o wrapper diario, ele deve
-  aceitar o mesmo `-ExpectedItems` e encaminhar o parametro sem reimplementar
-  a comparacao localmente
+- Quando o motor compartilhado ganhar parametros operacionais relevantes, isso
+  nao significa automaticamente que os wrappers locais ja os exponham
+- Se o wrapper local estiver defasado em relacao ao motor compartilhado, tratar
+  isso como oportunidade de atualizacao local, mencionar ao usuario e aguardar
+  aprovacao explicita; nao corrigir automaticamente
 - O wrapper local nao deve reimplementar o motor compartilhado se o fluxo oficial ja existir
 - Para reconstruir wrappers locais, usar como referencia os exemplos sanitizados desta skill antes de improvisar um fluxo novo:
   - [Update-KbFromXpz.example.ps1](C:/Dev/Knowledge/GeneXus-XPZ-Skills/xpz-kb-parallel-setup/examples/Update-KbFromXpz.example.ps1)
