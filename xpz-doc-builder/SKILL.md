@@ -102,8 +102,10 @@ Se o repositório ainda mantiver wrappers especializados, eles devem ser tratado
 5. Confirmar ou derivar caminhos de entrada e saída
 6. Executar o script com parâmetros explícitos
 7. Se a documentação citar XML vindo de `ObjetosGeradosParaImportacaoNaKbNoGenexus`, rotular isso como artefato de trabalho e não como snapshot oficial
-8. Reler o início do arquivo gerado ou alterado, a seção modificada e a transição seguinte
-9. Reportar o que foi criado, atualizado ou substituído
+8. Quando a documentação gerar ou preservar links de linha para XML GeneXus, rotular o papel do trecho citado: `Source efetivo`, `Rules/parm`, `metadado XML`, `chamada no chamador` ou `assinatura no chamado`
+9. Se a documentação afirmar que objeto A chama objeto B, validar que o link de linha aponta para o `Source` efetivo de A ou para metadado explícito de chamada em A; linha de `parm(...)` em B deve ser descrita apenas como assinatura do chamado
+10. Reler o início do arquivo gerado ou alterado, a seção modificada e a transição seguinte
+11. Reportar o que foi criado, atualizado ou substituído
 
 ---
 
@@ -115,4 +117,5 @@ Se o repositório ainda mantiver wrappers especializados, eles devem ser tratado
 - NUNCA reescrever uma seção sem identificar corretamente o título-alvo
 - NUNCA esconder que o conteúdo foi gerado a partir de XMLs sanitizados ou acervo real quando isso for relevante
 - NUNCA tratar `ObjetosGeradosParaImportacaoNaKbNoGenexus` como se fosse snapshot oficial da KB sem rotulagem explícita
+- NUNCA documentar uma linha de `parm(...)` do objeto chamado como se fosse o ponto de chamada no objeto chamador
 - Se o script esperado não existir, reportar o problema antes de improvisar uma edição manual ampla

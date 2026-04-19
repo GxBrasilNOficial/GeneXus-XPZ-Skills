@@ -50,12 +50,18 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 - quando a tarefa for de `XML`/`XPZ` nesta base, os `.md` locais da pasta do projeto tem precedencia sobre heuristicas gerais de skill
 - isso nao revoga a postura conservadora do skill `nexa`; apenas define que a evidencia local consolidada nesta base e a fonte mais especifica desta trilha
 - se houver tensao entre fluxo GeneXus geral do skill e achado empirico local desta base, o agente deve seguir a base local para decisao de `XPZ`/`XML` e manter do skill apenas a disciplina metodologica
+- quando a base compartilhar uma capacidade operacional nova, isso nao autoriza presumir que wrappers locais da pasta paralela da KB ja a exponham; a exposicao local e decisao separada
+- se o wrapper local ainda nao expuser um parametro operacional relevante ja disponivel na base compartilhada, o agente deve tratar isso como oportunidade de atualizacao local, mencionar ao usuario e aguardar aprovacao explicita; nao deve executar a mudanca local automaticamente
 
 ## Regra de leitura para runtime
 
 - quando a pergunta envolver `Base Table`, `Extended Table`, navegacao, `For each`, `Load`, `Refresh`, `Refresh Grid` ou risco de performance, consultar primeiro `02-regras-operacionais-e-runtime.md`
 - quando a pergunta envolver apenas estrutura XML observada, priorizar `01-base-empirica-geral.md`
 - quando a pergunta misturar estrutura e comportamento provavel, responder separando explicitamente `Evidência direta`, `Regra documentada`, `Inferência forte` e `Hipótese`
+- quando a pergunta envolver `sync` ou wrappers locais da pasta paralela da KB, distinguir explicitamente:
+  - capacidade ja disponivel na base compartilhada
+  - exposicao dessa capacidade no wrapper local
+  - decisao local do usuario/equipe sobre atualizar ou nao o wrapper
 
 ## Regra de leitura para campos derivados
 
@@ -71,6 +77,9 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 - corpus local da KB ajuda a confirmar e desempatar, mas nao substitui a base metodologica
 - se um trecho essencial do `Source` continuar sustentado apenas por plausibilidade, o agente deve reescrever para padrao documentado ou abortar a consolidacao
 - ao revisar `Source` grande, a leitura deve considerar o contorno visual do bloco afetado, e comentarios estruturais humanos ja existentes podem ser preservados quando ajudam a navegacao do trecho
+- ao citar uma linha de XML GeneXus, classificar o trecho como `Source efetivo`, `Rules/parm`, `metadado XML`, `chamada no chamador` ou `assinatura no chamado`
+- para afirmar que uma `Procedure` A chama uma `Procedure` B, a evidencia deve estar no `Source` efetivo de A, na linha da chamada a B; o `parm(...)` de B prova assinatura do chamado, nao ponto de chamada
+- em cadeia de chamadas, separar sempre arquivo/linha do chamador e arquivo/linha da assinatura do chamado
 
 ## Regra de leitura para XPZ
 

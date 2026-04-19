@@ -104,6 +104,8 @@ If the main need is to prepare or validate the initial folder structure around t
 - When changing a `Procedure`, run a minimum semantic pre-packaging gate on the `Procedure` itself:
   - if `parm(...)` changed, every new parm variable must exist in the variables section of the object
   - if `parm(...)` changed, variable name, base type, and presence must remain coherent
+  - if `parm(...)` changed or a direct call is reviewed, distinguish the callee signature line from each caller call-site line
+  - do NOT treat the callee `parm(...)` line as evidence that a caller invokes that `Procedure`
   - if the current `Source` delta introduces a new helper variable, that variable must exist in the variables section and its declared type must remain coherent with the way it is used
   - if the current `Source` delta introduces a method call on a variable, accept it only when that method is compatible with the declared variable type and is anchored by the methodological base loaded for the case
   - if the current `Source` delta introduces cleanup or reinitialization of a collection, SDT, or `Messages, GeneXus.Common`, accept only patterns anchored by the methodological base for that declared type
@@ -287,12 +289,15 @@ Reference files and when to load them:
    - Minimum semantic gate for `Procedure`:
      - every new parm variable exists in the variables section
      - variable name, base type, and presence remain coherent
+     - the saved line for the callee `parm(...)` is classified as signature, not caller evidence
+     - every reviewed direct caller has its own call-site evidence in that caller's effective `Source` or explicit call metadata
      - variables referenced by the edited `Source` exist
      - every new helper variable introduced by the current `Source` delta exists in the variables section and remains coherent with its declared type
      - every new method call introduced by the current `Source` delta on a variable is compatible with the declared type of that variable and is anchored by the methodological base loaded for the case
      - cleanup or reinitialization introduced by the current `Source` delta for a collection, SDT, or `Messages, GeneXus.Common` must use a pattern anchored by the methodological base loaded for that declared type
      - for collection reinitialization introduced by the current `Source` delta and already covered by the methodological base, prefer `= new()`; do NOT accept unsupported forms such as `SetEmpty()` only by plausibility or analogy
    - If the local repository documentation explicitly requires direct-call review, then review all applicable direct call sites before concluding the delta
+   - When direct-call review cites XML line numbers, cite caller and callee separately: caller line = `call site`; callee `parm(...)` line = `signature`
    - Treat chains such as `WorkWithWeb -> action -> parm(...) -> For each`, `WorkWith` to `procPlanilha`, wrappers, or equivalent flows as KB-specific review chains unless the local documentation makes them mandatory for this repository
    - Do NOT universalize a KB-specific architectural chain as if it were a global XPZ rule
    - For filters over `DateTime`, prefer direct comparison on the column: `>=` period start and `<` next day after period end

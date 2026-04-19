@@ -32,6 +32,8 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
 - `Evidência direta`: na instalacao validada nesta frente, a task `Genexus.MsBuild.Tasks.Import` expos publicamente `PreviewMode`, `IncludeItems` e `ExcludeItems`.
 - `Evidência direta`: na mesma instalacao, a task `Import` nao expos `UpdateFile` nem `ImportKBInformation` como propriedades publicas configuraveis.
 - `Regra operacional`: em automacao headless via `MSBuild`, o agente nao deve assumir que parametros documentados offline estao disponiveis na task efetivamente carregada; deve validar a assinatura real antes de emitir parametros sensiveis.
+- `Regra operacional`: quando a base compartilhada ganhar um parametro operacional relevante, isso nao autoriza presumir que wrappers locais ou adaptadores da pasta paralela da KB ja o exponham; a exposicao local e decisao separada e pode estar defasada
+- `Regra operacional`: ao encontrar essa defasagem local, o agente deve tratar o caso como oportunidade de adaptacao local, sinalizar a sugestao ao usuario e aguardar aprovacao explicita; a ausencia de exposicao local nao e erro por si so
 - `Evidência direta`: `PreviewMode` foi validado operacionalmente com `XPZ` real nesta frente, sem alteracao real da KB.
 - `Evidência direta`: `IncludeItems` e `ExcludeItems` tiveram efeito operacional observavel em `PreviewMode` nesta instalacao.
 - `Regra operacional`: quando `IncludeItems` ou `ExcludeItems` receberem multiplos recortes, o wrapper deve normalizar a entrada como lista e serializar no formato aceito operacionalmente pela task carregada, em vez de repassar uma unica string composta.
@@ -39,6 +41,9 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
 - `Regra operacional`: quando a task `Genexus.MsBuild.Tasks.Import` nao expuser `UpdateFile` nem `ImportKBInformation`, o wrapper deve bloquear cedo esses parametros quando explicitamente pedidos.
 - `Regra operacional`: wrappers e scripts permanentes ficam em `scripts`; artefatos efemeros de execucao, logs auxiliares e diretorios temporarios de rodada devem preferir `Temp`.
 - `Regra operacional`: em trilha `MSBuild`, distinguir sempre `sucesso operacional da chamada`, `preview apenas` e `confirmacao funcional posterior na IDE`.
+- `Evidência direta`: a IDE do GeneXus permite selecionar objetos modificados depois de uma data/hora antes de exportar, mas o `XPZ` resultante nao preserva a condicao do filtro; ele contem apenas os objetos selecionados e seus `lastUpdate`.
+- `Evidência direta`: na instalacao validada, a task `Export` expos publicamente `ExportAtTimestamp`, mas chamadas headless com esse parametro falharam dentro da task, enquanto exportacoes equivalentes por `Objects` explicito concluiram com sucesso e geraram o mesmo conjunto de objetos observado no `XPZ` parcial da IDE.
+- `Regra operacional`: ate haver evidencia contraria, a exportacao headless via `MSBuild` nao deve ser tratada como capaz de filtrar objetos por data de modificacao; para exportacao parcial, o caminho validado e fornecer explicitamente a lista de objetos em `Objects`/`ObjectList`.
 - `Regra operacional`: depois que os recortes passarem a funcionar de forma confiavel, erro residual de `Source`, `Specification` ou referencia nao resolvida em objeto importado deve ser tratado como problema de conteudo da KB/`XPZ`, nao como problema de envelope ou do wrapper, salvo evidencia contraria.
 
 ## Metadado da KB no sync parcial
@@ -114,6 +119,14 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
 - `Regra operacional`: validar compatibilidade de funcao, assinatura e tipo primeiro pela metodologia desta trilha e pela semantica GeneXus consolidada em `nexa`; a KB local entra como reforco apenas quando os exemplos metodologicos nao cobrirem o caso.
 - `Regra operacional`: nao exigir busca ampla no acervo inteiro da KB como padrao para validar um `Source`; se a base metodologica ja cobrir o padrao, ela prevalece.
 - `Regra operacional`: quando a cobertura vier apenas de melhor esforco, declarar explicitamente que a compatibilidade nao esta garantida e elevar o risco metodologico.
+
+## Citacao de linhas em XML GeneXus
+
+- `Regra operacional`: ao citar linha de XML GeneXus como evidencia, classificar explicitamente o papel do trecho citado: `Source efetivo`, `Rules/parm`, `metadado XML`, `chamada no chamador` ou `assinatura no chamado`.
+- `Regra operacional`: em `Procedure`, uma linha no `Part` de `Rules/parm` do objeto chamado prova apenas a assinatura ou regra de parametros desse proprio objeto; ela nao prova que outro objeto chamou essa `Procedure`.
+- `Regra operacional`: para afirmar que objeto A chama objeto B, a evidencia deve estar no `Source` efetivo de A, na linha em que B aparece como chamada, ou em metadado de chamada explicitamente materializado no objeto A.
+- `Regra operacional`: se a linha citada pertence ao XML de B e mostra `parm(...)`, descreve-la como `assinatura no chamado`, nunca como ponto de chamada a partir de A.
+- `Regra operacional`: quando a analise envolver cadeia de chamadas, registrar separadamente arquivo/linha do chamador e arquivo/linha da assinatura do chamado, sem colapsar as duas evidencias em um unico link.
 
 ## Identidade de frente e identidade de pacote
 
