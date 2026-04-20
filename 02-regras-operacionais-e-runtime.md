@@ -89,6 +89,15 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
 - `Regra operacional`: em XMLs GeneXus com blocos repetidos ou muito parecidos, localizar e validar cada ocorrencia antes de aplicar a mesma edicao.
 - `Regra operacional`: depois de editar XML local, validar nao so se o XML abre, mas se os nos novos aparecem em todos os pontos funcionais esperados do objeto, especialmente em `Transaction` e `WorkWithWeb`.
 
+### Gravacao segura de XML grande
+
+- `Regra operacional`: XML GeneXus grande, especialmente `Procedure` com `Source` extenso ou blocos `CDATA`, nao deve ser tratado como valido apenas porque o comando de escrita terminou sem erro fatal.
+- `Regra operacional`: depois de gerar XML grande, reler cabecalho, cauda do arquivo e bloco funcional afetado antes de qualquer empacotamento.
+- `Regra operacional`: a validacao minima e: XML bem-formado, raiz esperada fechada (`</Object>` ou `</ExportFile>`), `lastUpdate` conferido quando aplicavel, `CDATA` encerrado e ausencia de linha final truncada.
+- `Regra operacional`: se a geracao usar heredoc, here-string ou mecanismo equivalente e o stderr indicar delimitador encerrado por EOF, como `here-document ... delimited by end-of-file`, o artefato deve ser tratado como corrompido e descartado para regeneracao controlada.
+- `Regra operacional`: para XML grande, preferir serializacao estruturada, script dedicado ou gravacao em arquivo temporario seguida de validacao e troca atomica; escrita em blocos so e aceitavel quando a validacao final do arquivo completo for obrigatoria.
+- `Regra operacional`: quando houver tamanho, quantidade de linhas ou fechamento estrutural esperado por molde comparavel, usar esses sinais como alerta de truncamento; divergencia relevante bloqueia empacotamento ate reinspecao.
+
 ### Conferencia auditavel de `lastUpdate`
 
 - `Regra operacional`: gravou ou regravou XML local de objeto, releia o arquivo salvo antes de seguir.
@@ -272,6 +281,9 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
 - `Regra operacional`: `lastUpdate` novo deve existir so no objeto realmente alterado; objeto reenviado sem mudanca precisa conservar o `lastUpdate` original do XML da KB.
 - `Regra operacional`: ao embutir XMLs em `import_file.xml`, remover declaracao `<?xml ...?>` interna do objeto e manter a declaracao apenas no topo do pacote.
 - `Regra operacional`: quando o pacote envolver `WorkWithForWeb`, validar o `CDATA` interno do `Data` como XML completo, porque erros de fechamento de `selection`, `tab`, `view` ou `variable` costumam aparecer so no `Load`.
+- `Regra operacional`: ao alterar `WorkWithForWeb`, desencorajar substituicoes textuais amplas em tags repetidas, especialmente `<actions>`; localizar estruturalmente a `Selection` alvo dentro do XML interno antes de inserir, remover ou alterar uma action.
+- `Regra operacional`: em `WorkWithForWeb`, uma action nova so deve ser considerada materializada quando estiver no `Selection` correto, com identificador/nome esperado, e aparecer exatamente uma vez naquele escopo.
+- `Regra operacional`: se houver mais de um `<actions>` plausivel, ou se a mesma action aparecer em escopos diferentes sem justificativa documental, bloquear o pacote ate reinspecao estrutural do XML interno.
 - `Regra operacional`: se o `Selection` do `WorkWithWeb` usar ordenacao sensivel a volume, conferir se a `Table` tem indice exato para a mesma sequencia de campos e direcoes.
 - `Evidência direta`: em importacoes reais desta KB, a frente de `CompraRevenda` ficou com cobertura exata de ordenacao; outros casos fiscais da mesma trilha exigiram anotacao especifica para avaliacao de indice composto.
 - `Exemplo sanitizado`: `TRN + WorkWithWeb + Attributes + Procedures` pode importar com sucesso quando o pacote leva so o fecho minimo e preserva um `lastUpdate` real por objeto.
@@ -288,6 +300,8 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
 - `Regra operacional`: se o pacote abriu, mas o `Source` falhou, classificar como falha de `Source`, nao de envelope.
 - `Regra operacional`: se alguns objetos entraram e outros nao, classificar o resultado como parcial e registrar o objeto ou etapa afetada.
 - `Regra operacional`: warning ou erro lateral coexistente com `Import` bem-sucedido deve gerar `sucesso com ressalva`, nao `falha total`.
+- `Regra operacional`: ao gerar pacote corretivo depois de falha parcial, relatar explicitamente: pacote original, objetos importados com sucesso, objetos falhos, causa provavel por objeto ou etapa, e novo pacote corretivo.
+- `Regra operacional`: pacote corretivo deve conter apenas o delta necessario para corrigir os objetos falhos ou dependencias estritamente necessarias; nao reenviar automaticamente todos os objetos do pacote original.
 
 ### Procedimento auditavel de leitura
 
@@ -391,6 +405,10 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
 - `Regra documentada`: quando ha `Load` sobre grid ou painel com base implicita, um `For each` escrito dentro do evento pode ficar aninhado em uma navegacao implicita ja existente.
 - `Inferência forte`: isso aumenta o risco relativo de padroes do tipo `N+1`, carga repetida por linha e custo dificil de perceber olhando apenas o XML final.
 - `Hipótese`: em objetos com muito codigo de evento e muitos controles ligados a dados, a ausencia de relatorio de navegacao detalhado torna prudente assumir performance potencialmente sensivel ate prova em contrario.
+- `Regra operacional`: ao alterar filtro de identidade, unicidade, contagem, existencia, selecao candidata ou ambiguidade em um `for each`, procurar no mesmo `Source` outros blocos proximos ou semanticamente relacionados sobre a mesma tabela/base.
+- `Regra operacional`: tratar pares como `count/then-copy`, `exists/then-load`, `validate/then-apply` e `select-candidate/then-materialize` como unidade logica quando um bloco define o conjunto candidato e outro materializa, copia, carrega ou aplica o registro selecionado.
+- `Regra operacional`: classificar esses blocos irmaos, por exemplo como `candidate/count query`, `existence/validation query`, `materialization/copy query` ou `load/apply query`, e validar que os criterios de identidade do registro permanecem coerentes.
+- `Regra operacional`: se a mudanca afetar a identidade do registro candidato, ajustar ou reconciliar todos os blocos irmaos relacionados; alterar apenas um bloco exige justificativa explicita antes de empacotar.
 
 ### WebPanel, Refresh e Grid
 
@@ -1144,6 +1162,9 @@ Funcionar como resumo decisório sem esconder os limites da evidência.
 - Regra operacional: validar sempre em conjunto `fullyQualifiedName`, `name`, `parent`, `parentGuid`, `parentType` e `moduleGuid`; nao validar esses campos isoladamente.
 - Regra operacional: `fullyQualifiedName` nao deve ser derivado por concatenacao textual de `parent + "." + name`.
 - Regra operacional: se a trilha nao conseguir decidir, por exemplar comparavel, se o contêiner real e `Folder` ou `Module`, a geracao deve abortar antes da serializacao.
+- Regra operacional: em clonagem ou criacao a partir de XML existente, validar identidade interna ampliada antes de empacotar: `Object/@name`, `fullyQualifiedName`, `guid`, propriedade `Name`, `Description`, `Source`, `Rules/parm`, chamadas internas, dependencias e `ObjectsIdentityMapping`.
+- Regra operacional: toda ocorrencia residual do nome, descricao, GUID ou chamada do objeto molde deve ser classificada como `intencional`, `dependencia necessaria` ou `erro de clonagem`; ocorrencia nao classificada bloqueia o pacote.
+- Regra operacional: para objeto novo, `guid` novo nao basta; nomes internos, propriedades nominais, assinatura, chamadas e dependencias tambem precisam deixar de apontar indevidamente para o objeto de origem.
 
 ## Politica para WebPanel
 

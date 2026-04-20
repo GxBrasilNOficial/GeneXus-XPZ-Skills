@@ -77,6 +77,8 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 - corpus local da KB ajuda a confirmar e desempatar, mas nao substitui a base metodologica
 - se um trecho essencial do `Source` continuar sustentado apenas por plausibilidade, o agente deve reescrever para padrao documentado ou abortar a consolidacao
 - ao revisar `Source` grande, a leitura deve considerar o contorno visual do bloco afetado, e comentarios estruturais humanos ja existentes podem ser preservados quando ajudam a navegacao do trecho
+- em `Procedure Source`, pares como `count/then-copy`, `exists/then-load`, `validate/then-apply` e `select-candidate/then-materialize` devem ser revisados como unidade logica quando compartilham a mesma tabela/base e identidade candidata
+- se a mudanca altera filtros de identidade, unicidade ou ambiguidade em um `for each`, buscar queries irmas no mesmo `Source` e reconciliar os criterios ou justificar explicitamente a divergencia
 - ao citar uma linha de XML GeneXus, classificar o trecho como `Source efetivo`, `Rules/parm`, `metadado XML`, `chamada no chamador` ou `assinatura no chamado`
 - para afirmar que uma `Procedure` A chama uma `Procedure` B, a evidencia deve estar no `Source` efetivo de A, na linha da chamada a B; o `parm(...)` de B prova assinatura do chamado, nao ponto de chamada
 - em cadeia de chamadas, separar sempre arquivo/linha do chamador e arquivo/linha da assinatura do chamado
@@ -134,6 +136,7 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 - erro lateral da IDE nao prova falha de pacote
 - pacote aceito com falha posterior de `Source` ou `Specification` nao deve ser descrito como falha de envelope
 - se houver sucesso parcial, o agente deve dizer explicitamente que o resultado foi parcial
+- quando houver pacote corretivo apos falha parcial, relatar pacote original, objetos importados, objetos falhos e pacote corretivo minimo contendo apenas o delta necessario
 - a conclusao final deve seguir a etapa terminal relevante do log, nao a linha mais alarmante
 - quando recortes sucessivos reduzirem o ruido e o log passar a destacar referencia nao resolvida em objeto importado, tratar o caso como frente de conteudo da KB/`XPZ`, nao como defeito residual do wrapper, salvo evidencia contraria
 
@@ -339,6 +342,8 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 - usar referencias de atributo no formato estrutural real `adbb33c9-0906-4971-833c-998de27e0676-NomeDoAtributo`
 - nao substituir esse prefixo por GUID de `Attribute` top-level nem por GUID inline do `Level` da `Transaction`
 - se a frente introduzir atributos novos usados em `selection`, filtros, abas ou navegacao, tratar o pacote como caso misto `Transaction + WorkWithForWeb + Attribute`
+- ao inserir ou alterar action, localizar estruturalmente a `Selection` alvo no XML interno antes de editar `<actions>`; nao usar substituicao textual ampla em tags repetidas
+- validar que a action nova ficou exatamente uma vez no `Selection` correto; duplicidade ou action em escopo ambiguo bloqueia o pacote ate reinspecao
 - se o objetivo incluir a camada fisica, lembrar que `Table` e `Index` seguem outra trilha: `Table` e top-level proprio e `Index` aparece embutido em `Table`
 
 ### Table e Index
@@ -375,6 +380,8 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 - se o objeto mudou, `lastUpdate` deve ser regravado com o instante real da ultima escrita
 - se o objeto nao mudou e entrou apenas para dependencia, preservar o `lastUpdate` oficial
 - nao concluir XML ou pacote enquanto o `lastUpdate` do arquivo final nao tiver sido relido e confirmado
+- nao concluir XML GeneXus grande apenas porque a escrita terminou; reler cabecalho, cauda e trecho funcional afetado, validar XML bem-formado, fechamento da raiz e `CDATA` antes de empacotar
+- se heredoc, here-string ou mecanismo equivalente terminar por EOF antes do delimitador esperado, tratar o arquivo como truncado/corrompido e regenerar por metodo controlado
 - se houver export real comparavel da IDE para a mesma composicao, preferir repetir o shape desse export em vez de improvisar `Dependencies` ou `ObjectsIdentityMapping`
 - para pacote misto com `Transaction`, `WorkWithForWeb` e `Procedure`, preferir objetos embutidos em `<Objects>` quando esse for o formato validado pelo molde real
 - quando o formato exigir UTC com `Z`, converter corretamente a partir do horario local real; nao reaproveitar timestamp antigo nem de rodada anterior
@@ -382,6 +389,8 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 - quando o objeto depender de `parentGuid` ou `moduleGuid` externos relevantes, o agente deve preferir manter no `ObjectsIdentityMapping` a identidade correspondente com o mesmo `Guid`
 - o agente deve preservar sempre preenchidos, no formato normal, `Source/Version/@name`, `Object/@name` e `ObjectIdentity/@Name`
 - o agente deve garantir tambem que `Source/@kb` e `Source/Version/@guid` sejam GUIDs sintaticamente validos; placeholders textuais ja falharam em parse real nesta trilha
+- ao clonar/criar objeto a partir de XML existente, procurar residuos do objeto molde em `Object/@name`, `fullyQualifiedName`, `guid`, propriedade `Name`, `Description`, `Source`, `Rules/parm`, chamadas internas, dependencias e `ObjectsIdentityMapping`
+- cada residuo do objeto molde deve ser classificado como intencional, dependencia necessaria ou erro de clonagem; ocorrencia sem classificacao bloqueia o pacote
 - o agente nao deve gerar `KnowledgeBase`, `Settings` nem elemento top-level com nome da KB ao montar `.xpz` normal de objetos
 - se a serializacao depender de bloco especial de KB, o agente deve tratar isso como export especial e recusar a montagem normal de objetos
 - o agente pode usar a pasta local `from-anywhere-to-GeneXus` apenas como confirmacao secundaria de envelope minimo; nao deve copiar dela valores hardcoded como `Build=0`, `SampleKB`, `BusinessLogic`, `root`, `parentGuid` fixo ou `moduleGuid` fixo

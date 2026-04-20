@@ -182,6 +182,9 @@ Os wrappers seguem esta convenção de parâmetros:
 14. Reportar: objetos criados, atualizados, ignorados, resíduos removidos e resumo Git
     - explicar que `updated` significa que o wrapper materializou conteúdo mais novo/relevante para o acervo naquele processamento
     - explicar que `unchanged` significa que o item já tinha no acervo oficial conteúdo compatível ou mais novo, tipicamente com `lastUpdate` igual ou superior ao XML vindo do `XPZ`
+    - explicar que `updated`/`unchanged` pertencem ao processamento do `XPZ` contra o arquivo materializado atual, nao ao estado Git do repositorio
+    - explicar que um item pode aparecer como `unchanged` no sync porque o arquivo local ja esta igual ao conteudo vindo do `XPZ`, mesmo que esse mesmo arquivo ainda tenha diff pendente no Git contra o ultimo commit
+    - quando houver resumo Git, apresentar essa camada separadamente como comparacao do worktree contra o commit atual, sem reclassificar o resultado do sync
     - se o mesmo `XPZ` tiver sido reprocessado após atualização do arquivo, deixar explícito que a comparação relevante é com o conteúdo do insumo reprocessado e com o estado atual do acervo, não com o relatório antigo
     - se `kb-source-metadata.md` tiver sido reescrito pelo wrapper, tratar isso como artefato normal do fluxo, não como evidência automática de mudança funcional na frente
     - se o pacote tiver `Source` parcial, separar claramente `sync de objetos aceito` de `refresh de metadado parcial` e preservar os valores estáveis já conhecidos

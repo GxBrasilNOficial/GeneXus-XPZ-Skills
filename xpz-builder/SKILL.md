@@ -208,6 +208,9 @@ Reference files and when to load them:
    - Keep all recurring Part types present, even if content is empty
    - Do NOT invent Part types not present in the template
    - Validate identity as a 6-field set before serializing: `fullyQualifiedName`, `name`, `parent`, `parentGuid`, `parentType`, `moduleGuid`
+   - For cloned or newly created objects based on an existing XML, validate expanded internal identity before packaging: `Object/@name`, `fullyQualifiedName`, `guid`, `Name` property, `Description`, `Source`, `Rules/parm`, internal calls, dependencies, and `ObjectsIdentityMapping`
+   - Search for residual template object name, description, GUID, and calls; classify each residual occurrence as intentional, necessary dependency, or clone error
+   - If any residual template identity remains unclassified, **ABORT** before packaging
    - Do NOT derive `fullyQualifiedName` by concatenating `parent + "." + name`
    - If `parentType` is `Folder`, treat the folder name as container only; it must appear in `parent`/`parentGuid`, not be promoted automatically into `fullyQualifiedName`
    - If `parentType` is `Module`, allow module qualification in `fullyQualifiedName` only when comparable corpus objects of the same KB confirm that pattern
@@ -279,6 +282,11 @@ Reference files and when to load them:
    - Validate `Source` compatibility separately from XML well-formedness
    - A plausible GeneXus `Source` is NOT ready unless every new operator, function, conversion, and string/numeric pattern is backed by methodological evidence from this trail
    - Treat local corpus evidence as confirmation or tie-breaker, not as the sole basis for accepting a new `Source` construct
+   - For large GeneXus XML, especially `Procedure` with long `Source` or `CDATA`, do not rely on heredoc/here-string as the primary generation mechanism when a structured script or serializer is available
+   - If heredoc, here-string, or an equivalent shell writer is used, inspect stderr and reject any artifact whose writer ended by EOF before the expected delimiter
+   - Before packaging generated large XML, reread the file header, tail, and affected functional block; confirm the expected root closing tag, complete `CDATA`, and no truncated final line
+   - For `WorkWithForWeb`, do not use broad text substitution over repeated tags such as `<actions>`; locate the target `Selection` structurally inside the internal XML before editing actions
+   - For `WorkWithForWeb`, confirm any new action appears exactly once in the intended `Selection`; duplicates or ambiguous action scope block packaging
    - When the current delta edits `Source`, reread the saved snippet before packaging and confirm coherent indentation, visually consistent block closure, and absence of visually broken blocks
    - If the current delta introduced or moved `if/endif`, `do case/endcase`, nested blocks, or comparable control-flow boundaries, treat this local readability review as mandatory operational hygiene
    - Treat structural XML validation, package-envelope validation, and semantic-contract validation as separate checks
@@ -296,6 +304,9 @@ Reference files and when to load them:
      - every new method call introduced by the current `Source` delta on a variable is compatible with the declared type of that variable and is anchored by the methodological base loaded for the case
      - cleanup or reinitialization introduced by the current `Source` delta for a collection, SDT, or `Messages, GeneXus.Common` must use a pattern anchored by the methodological base loaded for that declared type
      - for collection reinitialization introduced by the current `Source` delta and already covered by the methodological base, prefer `= new()`; do NOT accept unsupported forms such as `SetEmpty()` only by plausibility or analogy
+     - when the current `Source` delta changes identity, uniqueness, ambiguity, count, existence, candidate selection, or materialization filters in a `for each`, search for paired cursor blocks in the same `Source`
+     - classify related paired blocks such as `count/then-copy`, `exists/then-load`, `validate/then-apply`, and `select-candidate/then-materialize`
+     - if paired blocks share the same logical candidate record, reconcile their identity criteria or justify explicitly why only one block changed
    - If the local repository documentation explicitly requires direct-call review, then review all applicable direct call sites before concluding the delta
    - When direct-call review cites XML line numbers, cite caller and callee separately: caller line = `call site`; callee `parm(...)` line = `signature`
    - Treat chains such as `WorkWithWeb -> action -> parm(...) -> For each`, `WorkWith` to `procPlanilha`, wrappers, or equivalent flows as KB-specific review chains unless the local documentation makes them mandatory for this repository
@@ -319,6 +330,8 @@ Reference files and when to load them:
    - Separate at minimum: XML/package structural error, object identity/serialization error, Source syntax/semantic error, IDE-side lateral error, non-blocking warning, and terminal import success
    - Do NOT conclude from an isolated line; use the terminal relevant stage of the log plus the set of blocking messages
    - If some objects failed and others succeeded, report the result as partial instead of collapsing it into full success or full package failure
+   - When creating a corrective package after partial import failure, report the original package, successfully imported objects, failed objects, probable failure category, and corrective package path/name
+   - Corrective packages must contain only the necessary delta for failed objects and strictly required dependencies; do NOT resend all original package objects by default
    - Confirm before packaging that all applicable local repository rules were reread and satisfied in the saved XML
 15. Deliver XML with limitations block:
    - Which template was used
@@ -337,6 +350,8 @@ Reference files and when to load them:
 - [ ] `Object/@guid` valid and appropriate (preserved or newly generated)
 - [ ] `parent*` and `moduleGuid` preserved from template or context
 - [ ] `fullyQualifiedName`, `name`, `parent`, `parentGuid`, `parentType`, and `moduleGuid` were checked together against comparable corpus XML
+- [ ] For cloned/new objects, expanded internal identity was checked: `Object/@name`, `fullyQualifiedName`, `guid`, `Name` property, `Description`, `Source`, `Rules/parm`, internal calls, dependencies, and `ObjectsIdentityMapping`
+- [ ] Residual template object names, descriptions, GUIDs, and calls were classified as intentional, necessary dependency, or clone error
 - [ ] All recurring Part types present (even if empty)
 - [ ] No invented Part type GUIDs
 - [ ] Envelope complete: `<ExportFile>`, `<KMW>`, `<Source>`, `<Objects>`, `<Dependencies>`
@@ -350,6 +365,7 @@ Reference files and when to load them:
 - [ ] Embedded objects in `import_file.xml` were checked for correct `lastUpdate` handling before delivery
 - [ ] `ObjetosDaKbEmXml` was treated as read-only official snapshot
 - [ ] Current front folder `NomeCurto_GUID_YYYYMMDD` was created or reused explicitly
+- [ ] Active front folder format was validated before packaging; if local rules require `NomeCurto_GUID_YYYYMMDD`, nonconforming folders were reported and realigned before package generation
 - [ ] When the task was packaging, active XMLs were listed from the current front folder under `ObjetosGeradosParaImportacaoNaKbNoGenexus`
 - [ ] Candidate batch was isolated; no workspace contamination remained
 - [ ] When the front required a new unitary delta, the current front folder under `ObjetosGeradosParaImportacaoNaKbNoGenexus` was isolated explicitly before packaging
@@ -374,6 +390,10 @@ Reference files and when to load them:
 - [ ] Every new operator, function, conversion, and string/numeric pattern introduced in `Source` is backed by layer-1 methodological evidence
 - [ ] Local corpus evidence, when used for `Source`, was treated only as confirmation or tie-breaker
 - [ ] No essential `Source` construct was accepted only because it looked plausible
+- [ ] For generated large XML, header, tail, expected root closing tag, complete `CDATA`, and absence of truncated final line were verified before packaging
+- [ ] Any heredoc/here-string writer stderr was checked, and no artifact ended by EOF before the expected delimiter
+- [ ] For `WorkWithForWeb` action changes, the target `Selection` was located structurally and the action appears exactly once in that scope
+- [ ] Procedure `Source` deltas that changed candidate/identity filters searched for paired cursor blocks and reconciled or justified `count/then-copy`, `exists/then-load`, `validate/then-apply`, or `select-candidate/then-materialize` criteria
 - [ ] If local repository documentation required direct-call review after `parm(...)` change, all applicable direct call sites were reviewed explicitly
 - [ ] If `parm(...)` changed, every new parm variable exists in the variables section of the `Procedure`
 - [ ] If `parm(...)` changed, variable name, base type, and presence remained coherent
@@ -390,6 +410,7 @@ Reference files and when to load them:
 - [ ] When import logs were used, messages were classified by stage and category before diagnosis
 - [ ] The final conclusion was based on the terminal relevant stage, not on an isolated warning or side error
 - [ ] Partial success was reported explicitly when only some objects failed
+- [ ] Any corrective package after partial failure reports original package, successful objects, failed objects, and contains only the necessary delta
 - [ ] Final closing explicitly states that the saved XML was reread, the persisted `lastUpdate` was confirmed, and the applicable local rules were reread and satisfied
 - [ ] Limitations block included in output
 
