@@ -36,7 +36,9 @@ Na mesma data, a Fase 2 recebeu mais dois incrementos controlados: actions de `W
 
 Ainda na mesma data, a Fase 2 recebeu um quinto incremento controlado: vinculacao explicita de `WorkWithForWeb` para `Transaction` por tag interna `<transaction transaction="guid-Nome">`.
 
-Continuam fora destes incrementos: semantica completa de `Transaction`, `WorkWithForWeb` alem de actions `gxobject` e vinculacoes explicitas de `Transaction`, `for each`, `.Load(...)`, resolucao semantica de `CustomType` para `SDT` ou `Domain`, e inferencias por layout ou comentarios.
+Depois disso, a Fase 2 recebeu um sexto incremento controlado: links explicitos de `WorkWithForWeb` para `WebPanel` por tag interna `<link webpanel="Nome">`.
+
+Continuam fora destes incrementos: semantica completa de `Transaction`, `WorkWithForWeb` alem de actions `gxobject`, vinculacoes explicitas de `Transaction` e links explicitos de `WebPanel`, `for each`, `.Load(...)`, resolucao semantica de `CustomType` para `SDT` ou `Domain`, e inferencias por layout ou comentarios.
 
 ## Principios da frente
 
@@ -184,7 +186,7 @@ Caso conhecido obrigatorio para a bateria:
 
 So iniciar depois da Fase 1 validada.
 
-Estado em 2026-04-21: fase aberta e ja ampliada de forma controlada para `DataProvider` como origem e destino direto, actions de `WorkWithForWeb` por `gxobject`, vinculacoes explicitas `WorkWithForWeb` -> `Transaction`, e propriedades `ATTCUSTOMTYPE` como alvo literal `CustomType`.
+Estado em 2026-04-21: fase aberta e ja ampliada de forma controlada para `DataProvider` como origem e destino direto, actions de `WorkWithForWeb` por `gxobject`, vinculacoes explicitas `WorkWithForWeb` -> `Transaction`, links explicitos `WorkWithForWeb` -> `WebPanel`, e propriedades `ATTCUSTOMTYPE` como alvo literal `CustomType`.
 
 Possiveis ampliacoes:
 
@@ -321,6 +323,31 @@ Gate minimo:
 - manter os casos anteriores da Fase 2 passando
 - adicionar casos reais positivos para `WorkWithForWeb` referenciando `Transaction`
 - adicionar caso negativo para `Transaction` inexistente
+
+### Sexto incremento - links explicitos de `WorkWithForWeb` para `WebPanel`
+
+Escopo aceito:
+
+- origem: `WorkWithForWeb`
+- destino: `WebPanel`
+- regra: `workwith_link_webpanel`
+- evidencia: `WorkWith link`
+- confianca: `direct`
+
+Fora do sexto incremento:
+
+- inferir relacao por atributo, caption, prompt, autolink ou nome de coluna
+- interpretar parametros do link
+- ampliar semantica de `WorkWithForWeb` alem da tag explicita `<link webpanel="...">`
+- tratar links nao resolvidos como relacoes
+
+Gate minimo:
+
+- manter os 15 casos reais da Fase 1 passando
+- manter os casos anteriores da Fase 2 passando
+- adicionar casos reais positivos para `WorkWithForWeb` linkando `WebPanel`
+- adicionar caso que prove canonizacao de nome do `WebPanel`
+- adicionar caso negativo para `WebPanel` inexistente
 
 ## Fase 3 - suporte a agentes de programacao
 

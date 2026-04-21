@@ -19,7 +19,7 @@ medio
 `C:\Dev\Prod\Gx_FabricaBrasil\ObjetosDaKbEmXml`
 
 ## Objetivo
-Registrar as primeiras ampliacoes controladas da Fase 2 do KB Intelligence, adicionando `DataProvider` como origem e destino em `Source` efetivo, actions de `WorkWithForWeb` com `gxobject` resolvido, vinculacoes explicitas de `WorkWithForWeb` para `Transaction` e propriedades `ATTCUSTOMTYPE` como alvo literal `CustomType`.
+Registrar as primeiras ampliacoes controladas da Fase 2 do KB Intelligence, adicionando `DataProvider` como origem e destino em `Source` efetivo, actions de `WorkWithForWeb` com `gxobject` resolvido, vinculacoes explicitas de `WorkWithForWeb` para `Transaction`, links explicitos de `WorkWithForWeb` para `WebPanel` e propriedades `ATTCUSTOMTYPE` como alvo literal `CustomType`.
 
 ## Escopo
 
@@ -31,14 +31,15 @@ Incluido nesta rodada:
 - origem: `WorkWithForWeb` por action com `gxobject`
 - destinos de action: `Procedure` e `WebPanel`
 - destino explicito de `WorkWithForWeb`: `Transaction`
+- links explicitos de `WorkWithForWeb`: `WebPanel`
 - alvo literal: `CustomType:<valor>` por `ATTCUSTOMTYPE`
-- regras: `procedure_direct_call`, `procedure_dot_call`, `webpanel_dot_link`, `dataprovider_direct_call`, `workwith_action_gxobject`, `workwith_transaction_binding` e `attcustomtype_property`
-- evidencias: `Source efetivo`, `WorkWith action`, `WorkWith transaction` e `Property ATTCUSTOMTYPE`
+- regras: `procedure_direct_call`, `procedure_dot_call`, `webpanel_dot_link`, `dataprovider_direct_call`, `workwith_action_gxobject`, `workwith_transaction_binding`, `workwith_link_webpanel` e `attcustomtype_property`
+- evidencias: `Source efetivo`, `WorkWith action`, `WorkWith transaction`, `WorkWith link` e `Property ATTCUSTOMTYPE`
 
 Continuam fora:
 
 - semantica completa de `Transaction`
-- `WorkWithForWeb` alem de actions `gxobject` e vinculacoes explicitas de `Transaction`
+- `WorkWithForWeb` alem de actions `gxobject`, vinculacoes explicitas de `Transaction` e links explicitos de `WebPanel`
 - `for each`
 - `.Load(...)`
 - resolucao semantica de `CustomType` para `SDT`, `Domain` ou outro tipo GeneXus
@@ -99,9 +100,9 @@ Geracao do indice canonico da pasta paralela:
 - `WorkWithForWeb` lidos: 183
 - `Transaction` lidas: 183
 - objetos gravados no SQLite: 3890
-- relacoes gravadas: 33076
+- relacoes gravadas: 33325
 - casos de regressao da Fase 1: 15 `passed`
-- casos de validacao da Fase 2: 24 `passed`
+- casos de validacao da Fase 2: 28 `passed`
 
 ## Casos de validacao da Fase 2
 
@@ -124,6 +125,9 @@ A bateria propria da Fase 2 cobriu:
 - `CustomType` inexistente sem relacao criada
 - vinculacao explicita de `WorkWithForWeb` para `Transaction`
 - `Transaction` inexistente sem relacao criada
+- links explicitos de `WorkWithForWeb` para `WebPanel`
+- canonizacao de nome de `WebPanel` em link explicito
+- `WebPanel` inexistente sem relacao criada
 
 ## Consultas reais executadas
 
@@ -185,8 +189,12 @@ A bateria propria da Fase 2 cobriu:
 
 - evidencia direta em `WorkWithForWeb/WorkWithWebAbateOrdem.xml`, por `workwith_transaction_binding`
 
+`show-evidence` para `WorkWithForWeb:WorkWithWebAbateOrdem` -> `WebPanel:ViewPessoa`:
+
+- evidencia direta em `WorkWithForWeb/WorkWithWebAbateOrdem.xml`, por `workwith_link_webpanel`
+
 ## Conclusao
 
-Os cinco primeiros incrementos da Fase 2 foram implementados e validados: `DataProvider` como origem, `DataProvider` como destino de chamada direta, actions de `WorkWithForWeb` por `gxobject`, vinculacoes explicitas de `WorkWithForWeb` para `Transaction`, e `ATTCUSTOMTYPE` como `CustomType` literal.
+Os seis primeiros incrementos da Fase 2 foram implementados e validados: `DataProvider` como origem, `DataProvider` como destino de chamada direta, actions de `WorkWithForWeb` por `gxobject`, vinculacoes explicitas de `WorkWithForWeb` para `Transaction`, links explicitos de `WorkWithForWeb` para `WebPanel`, e `ATTCUSTOMTYPE` como `CustomType` literal.
 
-Continuam fora: semantica completa de `Transaction`, `WorkWithForWeb` alem de actions `gxobject` e vinculacoes explicitas de `Transaction`, `for each`, `.Load(...)` e resolucao semantica de `CustomType` para `SDT` ou `Domain`.
+Continuam fora: semantica completa de `Transaction`, `WorkWithForWeb` alem de actions `gxobject`, vinculacoes explicitas de `Transaction` e links explicitos de `WebPanel`, `for each`, `.Load(...)` e resolucao semantica de `CustomType` para `SDT` ou `Domain`.

@@ -27,6 +27,8 @@ O quarto alvo da Fase 2 e propriedade `ATTCUSTOMTYPE` como alvo literal `CustomT
 
 O quinto alvo da Fase 2 e vinculacao explicita de `WorkWithForWeb` para `Transaction`.
 
+O sexto alvo da Fase 2 e link explicito de `WorkWithForWeb` para `WebPanel`.
+
 Destinos do primeiro incremento continuam limitados a:
 
 - `Procedure`
@@ -47,6 +49,10 @@ Origem do quarto incremento:
 - objetos ja coletados pelo indice
 
 Origem do quinto incremento:
+
+- `WorkWithForWeb`
+
+Origem do sexto incremento:
 
 - `WorkWithForWeb`
 
@@ -74,12 +80,16 @@ O quinto incremento adiciona:
 
 - `workwith_transaction_binding`
 
-Toda relacao deve vir de evidencia direta nomeada, com arquivo, linha, snippet, regra e confianca. Em `Source` efetivo, a evidencia deve continuar classificada como `Source efetivo`; em actions de `WorkWithForWeb`, como `WorkWith action`; em vinculacoes de `WorkWithForWeb` para `Transaction`, como `WorkWith transaction`; em `ATTCUSTOMTYPE`, como `Property ATTCUSTOMTYPE`.
+O sexto incremento adiciona:
+
+- `workwith_link_webpanel`
+
+Toda relacao deve vir de evidencia direta nomeada, com arquivo, linha, snippet, regra e confianca. Em `Source` efetivo, a evidencia deve continuar classificada como `Source efetivo`; em actions de `WorkWithForWeb`, como `WorkWith action`; em vinculacoes de `WorkWithForWeb` para `Transaction`, como `WorkWith transaction`; em links explicitos de `WorkWithForWeb` para `WebPanel`, como `WorkWith link`; em `ATTCUSTOMTYPE`, como `Property ATTCUSTOMTYPE`.
 
 ## Fora do incremento
 
 - semantica completa de `Transaction`
-- `WorkWithForWeb` alem de actions `gxobject` resolvidas e vinculacoes explicitas de `Transaction`
+- `WorkWithForWeb` alem de actions `gxobject` resolvidas, vinculacoes explicitas de `Transaction` e links explicitos de `WebPanel`
 - `for each`
 - `.Load(...)`
 - resolucao semantica de `CustomType` para `SDT`, `Domain` ou outro tipo GeneXus
@@ -104,6 +114,9 @@ Antes de considerar este incremento pronto:
 - a bateria deve incluir caso negativo de `CustomType` inexistente
 - a bateria deve incluir casos positivos de vinculacao explicita `WorkWithForWeb` -> `Transaction`
 - a bateria deve incluir caso negativo de `Transaction` inexistente
+- a bateria deve incluir casos positivos de link explicito `WorkWithForWeb` -> `WebPanel`
+- a bateria deve incluir caso de canonizacao de nome de `WebPanel`
+- a bateria deve incluir caso negativo de `WebPanel` inexistente
 - a validacao deve ser executada contra `FabricaBrasil` com `-FailOnValidationFailure`
 
 ## Decisoes adiaveis

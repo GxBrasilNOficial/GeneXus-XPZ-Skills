@@ -192,6 +192,38 @@
       "expected_rule": "workwith_transaction_binding",
       "should_exist": false,
       "expectation": "WorkWithForWeb transaction binding must not create a relation for an unresolved Transaction"
+    },
+    {
+      "id": "phase2-case-25-workwith-link-webpanel-view-pessoa",
+      "source": "WorkWithForWeb:WorkWithWebAbateOrdem",
+      "target": "WebPanel:ViewPessoa",
+      "expected_rule": "workwith_link_webpanel",
+      "should_exist": true,
+      "expectation": "WorkWithForWeb explicit link webpanel attribute must create a direct relation to WebPanel"
+    },
+    {
+      "id": "phase2-case-26-workwith-link-webpanel-view-compra-gado",
+      "source": "WorkWithForWeb:WorkWithWebAbateOrdem",
+      "target": "WebPanel:ViewCompraGado",
+      "expected_rule": "workwith_link_webpanel",
+      "should_exist": true,
+      "expectation": "Second WorkWithForWeb explicit link webpanel attribute must create a direct relation to WebPanel"
+    },
+    {
+      "id": "phase2-case-27-workwith-link-webpanel-canonical-case",
+      "source": "WorkWithForWeb:WorkWithWebAbateOrdem",
+      "target": "WebPanel:ViewAnimal",
+      "expected_rule": "workwith_link_webpanel",
+      "should_exist": true,
+      "expectation": "WorkWithForWeb explicit link must resolve WebPanel name preserving canonical case"
+    },
+    {
+      "id": "phase2-case-28-workwith-link-webpanel-unknown-does-not-create-relation",
+      "source": "WorkWithForWeb:WorkWithWebAbateOrdem",
+      "target": "WebPanel:ObjetoInexistenteParaNaoIndexar",
+      "expected_rule": "workwith_link_webpanel",
+      "should_exist": false,
+      "expectation": "WorkWithForWeb explicit link must not create a relation for unresolved WebPanel"
     }
   ]
 }

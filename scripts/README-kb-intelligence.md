@@ -12,11 +12,12 @@ Estes scripts implementam a Fase 1 do KB Intelligence e os incrementos aprovados
 - origem por action: `WorkWithForWeb`
 - destino por action: `Procedure` ou `WebPanel`
 - vinculacao explicita: `WorkWithForWeb` para `Transaction`
+- link explicito: `WorkWithForWeb` para `WebPanel`
 - alvo literal por propriedade: `CustomType:<valor>` a partir de `ATTCUSTOMTYPE`
-- relacoes: chamadas diretas em `Source efetivo`, actions `gxobject` resolvidas, vinculacoes explicitas de `Transaction` em `WorkWithForWeb` e propriedades `ATTCUSTOMTYPE`
+- relacoes: chamadas diretas em `Source efetivo`, actions `gxobject` resolvidas, vinculacoes explicitas de `Transaction`, links explicitos de `WebPanel` em `WorkWithForWeb` e propriedades `ATTCUSTOMTYPE`
 - artefato principal: SQLite derivado
 
-O incremento atual da Fase 2 cobre `DataProvider` como origem e como destino de chamada direta, actions de `WorkWithForWeb` com `gxobject` resolvido para `Procedure` ou `WebPanel`, vinculacao explicita de `WorkWithForWeb` para `Transaction`, e `ATTCUSTOMTYPE` como `CustomType` literal. Ele nao cobre semantica completa de `Transaction`, `WorkWithForWeb` alem de actions `gxobject` e vinculacoes explicitas de `Transaction`, `for each`, `.Load(...)` nem resolucao semantica de `CustomType` para `SDT` ou `Domain`.
+O incremento atual da Fase 2 cobre `DataProvider` como origem e como destino de chamada direta, actions de `WorkWithForWeb` com `gxobject` resolvido para `Procedure` ou `WebPanel`, vinculacao explicita de `WorkWithForWeb` para `Transaction`, links explicitos de `WorkWithForWeb` para `WebPanel`, e `ATTCUSTOMTYPE` como `CustomType` literal. Ele nao cobre semantica completa de `Transaction`, `WorkWithForWeb` alem de actions `gxobject`, vinculacoes explicitas de `Transaction` e links explicitos de `WebPanel`, `for each`, `.Load(...)` nem resolucao semantica de `CustomType` para `SDT` ou `Domain`.
 
 Eles nao substituem o acervo XML em `ObjetosDaKbEmXml` e nao provam comportamento runtime.
 

@@ -5,6 +5,7 @@ Build a minimal GeneXus KB intelligence SQLite index.
 Phase 2 current scope:
 - Source relations among Procedure, WebPanel and DataProvider
 - WorkWithForWeb action gxobject links to Procedure and WebPanel
+- WorkWithForWeb explicit link tags to WebPanel
 - WorkWithForWeb explicit transaction binding
 - literal ATTCUSTOMTYPE CustomType values
 """
@@ -38,6 +39,7 @@ ATTCUSTOMTYPE_PROPERTY_RE = re.compile(
     re.IGNORECASE | re.DOTALL,
 )
 WORKWITH_TRANSACTION_RE = re.compile(r"<transaction\b[^>]*\btransaction=\"(?P<value>[^\"]+)\"", re.IGNORECASE)
+WORKWITH_WEBPANEL_LINK_RE = re.compile(r"<link\b[^>]*\bwebpanel=\"(?P<name>[^\"]+)\"", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -389,6 +391,39 @@ def extract_workwith_transaction_evidence(
     return list(unique.values())
 
 
+def extract_workwith_webpanel_link_evidence(
+    workwith_objects: Iterable[ObjectInfo],
+    webpanel_names: set[str],
+) -> list[Evidence]:
+    evidences: list[Evidence] = []
+    webpanel_lookup = case_insensitive_lookup(webpanel_names, "WebPanel")
+
+    for source in workwith_objects:
+        xml_text = read_text(source.path)
+        for match in WORKWITH_WEBPANEL_LINK_RE.finditer(xml_text):
+            raw_target_name = html.unescape(match.group("name"))
+            target_name = webpanel_lookup.get(raw_target_name.lower())
+            if not target_name:
+                continue
+            add_evidence(
+                evidences,
+                source=source,
+                target_type="WebPanel",
+                target_name=target_name,
+                relation_kind="workwith_links_webpanel",
+                line=line_number_at(xml_text, match.start()),
+                column=1,
+                snippet=match.group(0),
+                extractor_rule="workwith_link_webpanel",
+                evidence_role="WorkWith link",
+            )
+
+    unique: dict[tuple[str, str, str, int], Evidence] = {}
+    for evidence in evidences:
+        unique[(evidence.source_name, evidence.target_name, evidence.extractor_rule, evidence.line)] = evidence
+    return list(unique.values())
+
+
 def normalize_custom_type(value: str) -> str:
     return " ".join(html.unescape(value).strip().split())
 
@@ -643,11 +678,16 @@ def main() -> int:
         workwiths.values(),
         transaction_names=set(transactions),
     )
+    workwith_webpanel_link_evidences = extract_workwith_webpanel_link_evidence(
+        workwiths.values(),
+        webpanel_names=set(webpanels),
+    )
     custom_type_evidences = extract_attcustomtype_evidence(objects)
     evidences = [
         *source_evidences,
         *workwith_evidences,
         *workwith_transaction_evidences,
+        *workwith_webpanel_link_evidences,
         *custom_type_evidences,
     ]
     write_index(args.output_path.resolve(), source_root, objects, evidences)
