@@ -68,6 +68,17 @@ Parametros minimos esperados:
 
 O script nao deve depender de caminho absoluto privado como valor fixo.
 
+## Implementacao inicial
+
+A primeira implementacao operacional da Fase 1 fica em:
+
+- `scripts/New-KbIntelligenceIndex.ps1`
+- `scripts/New-KbIntelligenceIndex.py`
+- `scripts/Query-KbIntelligenceIndex.ps1`
+- `scripts/Query-KbIntelligenceIndex.py`
+
+Os wrappers PowerShell preservam o padrao operacional atual do repositorio. Os motores Python usam `sqlite3` da biblioteca padrao para gravar e consultar o banco tecnico.
+
 ## Artefato principal
 
 O artefato principal da Fase 1 deve ser um banco SQLite.
@@ -354,8 +365,6 @@ Se a saida do indice for usada para gerar Markdown, essa sera uma etapa posterio
 
 ## Decisoes ainda abertas
 
-- linguagem final dos scripts compartilhados
-- nome do primeiro script
 - local padrao para o SQLite gerado em cada pasta paralela de KB
 - estrategia exata para linha e coluna em `CDATA`
 - formato do relatorio pequeno de validacao
