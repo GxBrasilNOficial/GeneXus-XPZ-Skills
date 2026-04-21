@@ -5,14 +5,17 @@ guia operacional
 
 ## Escopo atual
 
-Estes scripts implementam a Fase 1 do KB Intelligence e o primeiro incremento da Fase 2:
+Estes scripts implementam a Fase 1 do KB Intelligence e os incrementos aprovados da Fase 2:
 
-- origem: `Procedure`, `WebPanel` e `DataProvider`
-- destino: `Procedure` e `WebPanel`
-- relacoes: chamadas diretas em `Source efetivo`
+- origens por `Source` efetivo: `Procedure`, `WebPanel` e `DataProvider`
+- destinos por `Source` efetivo: `Procedure`, `WebPanel` e `DataProvider`
+- origem por action: `WorkWithForWeb`
+- destino por action: `Procedure` ou `WebPanel`
+- alvo literal por propriedade: `CustomType:<valor>` a partir de `ATTCUSTOMTYPE`
+- relacoes: chamadas diretas em `Source efetivo`, actions `gxobject` resolvidas e propriedades `ATTCUSTOMTYPE`
 - artefato principal: SQLite derivado
 
-O incremento atual da Fase 2 cobre apenas `DataProvider` como origem. Ele nao cobre `Transaction`, `WorkWithForWeb`, `for each`, `.Load(...)` nem `DataProvider` como destino.
+O incremento atual da Fase 2 cobre `DataProvider` como origem e como destino de chamada direta, actions de `WorkWithForWeb` com `gxobject` resolvido para `Procedure` ou `WebPanel`, e `ATTCUSTOMTYPE` como `CustomType` literal. Ele nao cobre semantica completa de `Transaction`, `WorkWithForWeb` alem de actions `gxobject`, `for each`, `.Load(...)` nem resolucao semantica de `CustomType` para `SDT` ou `Domain`.
 
 Eles nao substituem o acervo XML em `ObjetosDaKbEmXml` e nao provam comportamento runtime.
 
@@ -29,7 +32,7 @@ Eles nao substituem o acervo XML em `ObjetosDaKbEmXml` e nao provam comportament
 
 Para outra KB, troque `-SourceRoot`, `-OutputPath` e, se aplicavel, `-ValidationCasesPath`.
 
-Para validar o primeiro incremento da Fase 2 em `FabricaBrasil`, use:
+Para validar os incrementos aprovados da Fase 2 em `FabricaBrasil`, use:
 
 ```powershell
 .\scripts\New-KbIntelligenceIndex.ps1 `

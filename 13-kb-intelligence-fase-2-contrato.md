@@ -13,16 +13,36 @@ baixo a medio
 agentes que forem ampliar o indice tecnico reutilizavel sem perder o recorte validado da Fase 1
 
 ## Objetivo
-Definir o primeiro incremento da Fase 2 do KB Intelligence, mantendo a ampliacao pequena, auditavel e validada em casos reais.
+Definir os incrementos iniciais da Fase 2 do KB Intelligence, mantendo a ampliacao pequena, auditavel e validada em casos reais.
 
-## Primeiro alvo aprovado
+## Alvos aprovados
 
 O primeiro alvo da Fase 2 e `DataProvider` como nova origem de relacoes.
 
-Destinos continuam limitados a:
+O segundo alvo da Fase 2 e `DataProvider` como destino de chamada direta.
+
+O terceiro alvo da Fase 2 e action de `WorkWithForWeb` com atributo `gxobject` resolvido para `Procedure` ou `WebPanel`.
+
+O quarto alvo da Fase 2 e propriedade `ATTCUSTOMTYPE` como alvo literal `CustomType:<valor>`.
+
+Destinos do primeiro incremento continuam limitados a:
 
 - `Procedure`
 - `WebPanel`
+
+Origem do segundo incremento:
+
+- `Procedure`
+- `WebPanel`
+- `DataProvider`
+
+Origem do terceiro incremento:
+
+- `WorkWithForWeb`
+
+Origem do quarto incremento:
+
+- objetos ja coletados pelo indice
 
 ## Padroes aceitos
 
@@ -32,16 +52,27 @@ O incremento reaproveita as regras ja validadas na Fase 1:
 - `procedure_dot_call`
 - `webpanel_dot_link`
 
-Toda relacao deve vir de `Source efetivo`, com evidencia de arquivo, linha, snippet, regra e confianca.
+O segundo incremento adiciona:
+
+- `dataprovider_direct_call`
+
+O terceiro incremento adiciona:
+
+- `workwith_action_gxobject`
+
+O quarto incremento adiciona:
+
+- `attcustomtype_property`
+
+Toda relacao deve vir de evidencia direta nomeada, com arquivo, linha, snippet, regra e confianca. Em `Source` efetivo, a evidencia deve continuar classificada como `Source efetivo`; em actions de `WorkWithForWeb`, como `WorkWith action`; em `ATTCUSTOMTYPE`, como `Property ATTCUSTOMTYPE`.
 
 ## Fora do incremento
 
-- `Transaction`
-- `WorkWithForWeb`
-- `DataProvider` como destino
+- semantica completa de `Transaction`
+- `WorkWithForWeb` alem de actions `gxobject` resolvidas
 - `for each`
 - `.Load(...)`
-- actions estruturadas de `WorkWithForWeb`
+- resolucao semantica de `CustomType` para `SDT`, `Domain` ou outro tipo GeneXus
 - chamadas dinamicas
 - inferencia por layout visual
 - comentario como chamada efetiva
@@ -55,15 +86,22 @@ Antes de considerar este incremento pronto:
 - a bateria deve incluir casos positivos de chamada de `Procedure`
 - a bateria deve incluir casos positivos de `.Link(...)` para `WebPanel`
 - a bateria deve incluir casos negativos de comentarios em `DataProvider`
+- a bateria deve incluir casos positivos de chamada direta para `DataProvider`
+- a bateria deve incluir caso negativo de comentario com chamada de `DataProvider`
+- a bateria deve incluir casos positivos de action de `WorkWithForWeb` para `Procedure` e `WebPanel`
+- a bateria deve incluir caso negativo para action sem alvo resolvido no recorte aprovado
+- a bateria deve incluir casos positivos de `ATTCUSTOMTYPE` em `Transaction` e `Procedure`
+- a bateria deve incluir caso negativo de `CustomType` inexistente
 - a validacao deve ser executada contra `FabricaBrasil` com `-FailOnValidationFailure`
 
 ## Decisoes adiaveis
 
-As decisoes abaixo nao bloqueiam o primeiro incremento:
+As decisoes abaixo nao bloqueiam os incrementos ja aprovados:
 
 - nome final da skill futura
 - politica de snapshots pequenos versionados
 - estrategia definitiva para linha exata em XML com `CDATA`
-- segundo alvo da Fase 2
+- proximo alvo da Fase 2
+- resolucao semantica futura de `CustomType:<valor>` para `SDT`, `Domain` ou outro tipo GeneXus
 
-O segundo alvo da Fase 2 so deve ser escolhido depois que `DataProvider` estiver validado e registrado.
+O proximo alvo da Fase 2 so deve ser escolhido depois que os incrementos ja aprovados estiverem validados e registrados.

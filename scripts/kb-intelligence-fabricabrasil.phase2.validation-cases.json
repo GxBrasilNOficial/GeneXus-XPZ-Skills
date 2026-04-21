@@ -64,6 +64,110 @@
       "expected_rule": "webpanel_dot_link",
       "should_exist": false,
       "expectation": "comment-only WebPanel .Link() in DataProvider must not create a direct relation"
+    },
+    {
+      "id": "phase2-case-9-procedure-dataprovider-direct-call",
+      "source": "Procedure:procMenuItens",
+      "target": "DataProvider:dpFixoSidebarItems",
+      "expected_rule": "dataprovider_direct_call",
+      "should_exist": true,
+      "expectation": "Procedure direct DataProvider call must create a direct relation"
+    },
+    {
+      "id": "phase2-case-10-procedure-dataprovider-direct-call-second",
+      "source": "Procedure:procMenuItens",
+      "target": "DataProvider:dpRecentLinksSidebarItems",
+      "expected_rule": "dataprovider_direct_call",
+      "should_exist": true,
+      "expectation": "Second direct DataProvider call from the same Procedure must create a direct relation"
+    },
+    {
+      "id": "phase2-case-11-webpanel-dataprovider-direct-call",
+      "source": "WebPanel:GAMExampleMasterPage",
+      "target": "DataProvider:dpGamMenuSidebarItems",
+      "expected_rule": "dataprovider_direct_call",
+      "should_exist": true,
+      "expectation": "WebPanel direct DataProvider call must create a direct relation"
+    },
+    {
+      "id": "phase2-case-12-webpanel-dataprovider-direct-call-with-params",
+      "source": "WebPanel:wcEmbarqueSaidaPedidosPrevistos",
+      "target": "DataProvider:dpVolumeMovimentoPedidos",
+      "expected_rule": "dataprovider_direct_call",
+      "should_exist": true,
+      "expectation": "WebPanel direct DataProvider call with parameters must create a direct relation"
+    },
+    {
+      "id": "phase2-case-13-webpanel-dataprovider-comment-does-not-create-relation",
+      "source": "WebPanel:wpInicializaUFsBrasil",
+      "target": "DataProvider:dpCarregaUFsBrasil",
+      "expected_rule": "dataprovider_direct_call",
+      "should_exist": false,
+      "expectation": "comment-only DataProvider call in WebPanel must not create a direct relation"
+    },
+    {
+      "id": "phase2-case-14-workwith-action-procedure",
+      "source": "WorkWithForWeb:WorkWithWebAbateOrdem",
+      "target": "Procedure:procLimpaGridState",
+      "expected_rule": "workwith_action_gxobject",
+      "should_exist": true,
+      "expectation": "WorkWithForWeb action gxobject pointing to Procedure must create a direct relation"
+    },
+    {
+      "id": "phase2-case-15-workwith-action-webpanel",
+      "source": "WorkWithForWeb:WorkWithWebAbateOrdem",
+      "target": "WebPanel:wpPesagemAbate",
+      "expected_rule": "workwith_action_gxobject",
+      "should_exist": true,
+      "expectation": "WorkWithForWeb action gxobject pointing to WebPanel must create a direct relation"
+    },
+    {
+      "id": "phase2-case-16-workwith-action-ww-webpanel",
+      "source": "WorkWithForWeb:WorkWithWebAbateOrdem",
+      "target": "WebPanel:WWEmbarqueSaida",
+      "expected_rule": "workwith_action_gxobject",
+      "should_exist": true,
+      "expectation": "WorkWithForWeb action gxobject pointing to WW WebPanel must create a direct relation"
+    },
+    {
+      "id": "phase2-case-17-workwith-action-unknown-does-not-create-relation",
+      "source": "WorkWithForWeb:WorkWithWebAbateOrdem",
+      "target": "Procedure:ObjetoInexistenteParaNaoIndexar",
+      "expected_rule": "workwith_action_gxobject",
+      "should_exist": false,
+      "expectation": "WorkWithForWeb action must not create a direct relation for an unresolved target"
+    },
+    {
+      "id": "phase2-case-18-transaction-attcustomtype-sdt-context",
+      "source": "Transaction:AbateOrdem",
+      "target": "CustomType:sdt:Context",
+      "expected_rule": "attcustomtype_property",
+      "should_exist": true,
+      "expectation": "Transaction ATTCUSTOMTYPE property must create a literal CustomType relation"
+    },
+    {
+      "id": "phase2-case-19-transaction-attcustomtype-bas-boolean",
+      "source": "Transaction:AbateOrdem",
+      "target": "CustomType:bas:Boolean",
+      "expected_rule": "attcustomtype_property",
+      "should_exist": true,
+      "expectation": "Transaction ATTCUSTOMTYPE built-in type must create a literal CustomType relation"
+    },
+    {
+      "id": "phase2-case-20-procedure-attcustomtype-sdt-context",
+      "source": "Procedure:ExportWWOperacaoAjustada",
+      "target": "CustomType:sdt:Context",
+      "expected_rule": "attcustomtype_property",
+      "should_exist": true,
+      "expectation": "Procedure ATTCUSTOMTYPE property must create a literal CustomType relation"
+    },
+    {
+      "id": "phase2-case-21-attcustomtype-unknown-does-not-create-relation",
+      "source": "Transaction:AbateOrdem",
+      "target": "CustomType:sdt:TipoInexistenteParaNaoIndexar",
+      "expected_rule": "attcustomtype_property",
+      "should_exist": false,
+      "expectation": "Absent ATTCUSTOMTYPE value must not create a relation"
     }
   ]
 }

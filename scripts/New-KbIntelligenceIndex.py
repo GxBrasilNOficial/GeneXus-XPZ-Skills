@@ -29,6 +29,13 @@ PROCEDURE_DIRECT_RE = re.compile(r"\b(?P<name>proc[A-Za-z_][A-Za-z0-9_]*)\s*\(",
 PROCEDURE_DOT_CALL_RE = re.compile(r"\b(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*\.\s*Call\s*\(", re.IGNORECASE)
 WEBPANEL_DOT_LINK_RE = re.compile(r"\b(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*\.\s*Link\s*\(", re.IGNORECASE)
 INDEXED_SOURCE_TYPES = ("Procedure", "WebPanel", "DataProvider")
+ACTION_RE = re.compile(r"<action\b(?P<attrs>[^>]*)>", re.IGNORECASE | re.DOTALL)
+ATTR_RE = re.compile(r'(?P<name>[A-Za-z_][A-Za-z0-9_]*)="(?P<value>[^"]*)"')
+GXOBJECT_RE = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}-(?P<name>.+)$")
+ATTCUSTOMTYPE_PROPERTY_RE = re.compile(
+    r"<Property>\s*<Name>ATTCUSTOMTYPE</Name>\s*<Value>(?P<value>.*?)</Value>\s*</Property>",
+    re.IGNORECASE | re.DOTALL,
+)
 
 
 @dataclass(frozen=True)
@@ -138,6 +145,7 @@ def add_evidence(
     column: int,
     snippet: str,
     extractor_rule: str,
+    evidence_role: str = "Source efetivo",
 ) -> None:
     evidences.append(
         Evidence(
@@ -150,7 +158,7 @@ def add_evidence(
             line=line,
             column=column,
             snippet=compact_snippet(snippet),
-            evidence_role="Source efetivo",
+            evidence_role=evidence_role,
             extractor_rule=extractor_rule,
             confidence="direct",
         )
@@ -175,15 +183,25 @@ def case_insensitive_lookup(names: set[str], object_type: str) -> dict[str, str]
     return {key: values[0] for key, values in grouped.items()}
 
 
+def direct_call_pattern(names: set[str]) -> re.Pattern[str] | None:
+    if not names:
+        return None
+    alternatives = "|".join(re.escape(name) for name in sorted(names, key=len, reverse=True))
+    return re.compile(rf"\b(?P<name>{alternatives})\s*\(", re.IGNORECASE)
+
+
 def extract_evidence(
     source_root: Path,
     source_objects: Iterable[ObjectInfo],
     procedure_names: set[str],
     webpanel_names: set[str],
+    data_provider_names: set[str],
 ) -> list[Evidence]:
     evidences: list[Evidence] = []
     procedure_lookup = case_insensitive_lookup(procedure_names, "Procedure")
     webpanel_lookup = case_insensitive_lookup(webpanel_names, "WebPanel")
+    data_provider_lookup = case_insensitive_lookup(data_provider_names, "DataProvider")
+    data_provider_direct_re = direct_call_pattern(data_provider_names)
 
     for source in source_objects:
         xml_text = read_text(source.path)
@@ -242,6 +260,23 @@ def extract_evidence(
                             extractor_rule="webpanel_dot_link",
                         )
 
+                if data_provider_direct_re:
+                    for match in data_provider_direct_re.finditer(cleaned):
+                        matched_name = match.group("name")
+                        target_name = data_provider_lookup.get(matched_name.lower())
+                        if target_name:
+                            add_evidence(
+                                evidences,
+                                source=source,
+                                target_type="DataProvider",
+                                target_name=target_name,
+                                relation_kind="calls_dataprovider",
+                                line=line_no,
+                                column=match.start("name") + 1,
+                                snippet=cleaned,
+                                extractor_rule="dataprovider_direct_call",
+                            )
+
     unique: dict[tuple[str, str, str, str, int, str], Evidence] = {}
     for evidence in evidences:
         key = (
@@ -254,6 +289,94 @@ def extract_evidence(
         )
         unique[key] = evidence
     return list(unique.values())
+
+
+def parse_attributes(raw_attrs: str) -> dict[str, str]:
+    return {match.group("name"): html.unescape(match.group("value")) for match in ATTR_RE.finditer(raw_attrs)}
+
+
+def gxobject_name(value: str) -> str | None:
+    match = GXOBJECT_RE.match(value)
+    if not match:
+        return None
+    return match.group("name")
+
+
+def extract_workwith_action_evidence(
+    workwith_objects: Iterable[ObjectInfo],
+    procedure_names: set[str],
+    webpanel_names: set[str],
+) -> list[Evidence]:
+    evidences: list[Evidence] = []
+    procedure_lookup = case_insensitive_lookup(procedure_names, "Procedure")
+    webpanel_lookup = case_insensitive_lookup(webpanel_names, "WebPanel")
+
+    for source in workwith_objects:
+        xml_text = read_text(source.path)
+        for match in ACTION_RE.finditer(xml_text):
+            attrs = parse_attributes(match.group("attrs"))
+            raw_gxobject = attrs.get("gxobject")
+            if not raw_gxobject:
+                continue
+            raw_target_name = gxobject_name(raw_gxobject)
+            if not raw_target_name:
+                continue
+
+            target_type = None
+            target_name = procedure_lookup.get(raw_target_name.lower())
+            relation_kind = "workwith_action_calls_procedure"
+            if target_name:
+                target_type = "Procedure"
+            else:
+                target_name = webpanel_lookup.get(raw_target_name.lower())
+                relation_kind = "workwith_action_calls_webpanel"
+                if target_name:
+                    target_type = "WebPanel"
+
+            if not target_type or not target_name:
+                continue
+
+            add_evidence(
+                evidences,
+                source=source,
+                target_type=target_type,
+                target_name=target_name,
+                relation_kind=relation_kind,
+                line=line_number_at(xml_text, match.start()),
+                column=1,
+                snippet=match.group(0),
+                extractor_rule="workwith_action_gxobject",
+                evidence_role="WorkWith action",
+            )
+
+    return evidences
+
+
+def normalize_custom_type(value: str) -> str:
+    return " ".join(html.unescape(value).strip().split())
+
+
+def extract_attcustomtype_evidence(source_objects: Iterable[ObjectInfo]) -> list[Evidence]:
+    evidences: list[Evidence] = []
+    for source in source_objects:
+        xml_text = read_text(source.path)
+        for match in ATTCUSTOMTYPE_PROPERTY_RE.finditer(xml_text):
+            target_name = normalize_custom_type(match.group("value"))
+            if not target_name:
+                continue
+            add_evidence(
+                evidences,
+                source=source,
+                target_type="CustomType",
+                target_name=target_name,
+                relation_kind="uses_custom_type",
+                line=line_number_at(xml_text, match.start("value")),
+                column=1,
+                snippet=match.group(0),
+                extractor_rule="attcustomtype_property",
+                evidence_role="Property ATTCUSTOMTYPE",
+            )
+    return evidences
 
 
 def create_schema(conn: sqlite3.Connection) -> None:
@@ -328,7 +451,7 @@ def write_index(
                 ("generated_at", generated_at),
                 ("source_root", str(source_root)),
                 ("phase", "2"),
-                ("scope", "Procedure,WebPanel,DataProvider"),
+                ("scope", "Procedure,WebPanel,DataProvider,WorkWithForWeb,Transaction"),
             ],
         )
 
@@ -450,15 +573,37 @@ def main() -> int:
     procedures = collect_objects(source_root, "Procedure")
     webpanels = collect_objects(source_root, "WebPanel")
     data_providers = collect_objects(source_root, "DataProvider")
-    objects_by_type = {"Procedure": procedures, "WebPanel": webpanels, "DataProvider": data_providers}
-    objects = [*procedures.values(), *webpanels.values(), *data_providers.values()]
+    workwiths = collect_objects(source_root, "WorkWithForWeb")
+    transactions = collect_objects(source_root, "Transaction")
+    objects_by_type = {
+        "Procedure": procedures,
+        "WebPanel": webpanels,
+        "DataProvider": data_providers,
+        "WorkWithForWeb": workwiths,
+        "Transaction": transactions,
+    }
+    objects = [
+        *procedures.values(),
+        *webpanels.values(),
+        *data_providers.values(),
+        *workwiths.values(),
+        *transactions.values(),
+    ]
 
-    evidences = extract_evidence(
+    source_evidences = extract_evidence(
         source_root,
         [obj for obj in objects if obj.object_type in INDEXED_SOURCE_TYPES],
         procedure_names=set(procedures),
         webpanel_names=set(webpanels),
+        data_provider_names=set(data_providers),
     )
+    workwith_evidences = extract_workwith_action_evidence(
+        workwiths.values(),
+        procedure_names=set(procedures),
+        webpanel_names=set(webpanels),
+    )
+    custom_type_evidences = extract_attcustomtype_evidence(objects)
+    evidences = [*source_evidences, *workwith_evidences, *custom_type_evidences]
     write_index(args.output_path.resolve(), source_root, objects, evidences)
 
     validation_cases_path = args.validation_cases_path.resolve() if args.validation_cases_path else None

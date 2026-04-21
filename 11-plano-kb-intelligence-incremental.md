@@ -30,7 +30,11 @@ Em 2026-04-21, a Fase 1 foi concluida e validada na KB real `FabricaBrasil`, com
 
 A Fase 2 foi aberta em 2026-04-21, com primeiro incremento limitado a `DataProvider` como nova origem de relacoes em `Source` efetivo.
 
-Continuam fora deste incremento: `Transaction`, `WorkWithForWeb`, `for each`, `.Load(...)`, actions estruturadas de `WorkWithForWeb` e inferencias por layout ou comentarios.
+Na mesma data, a Fase 2 recebeu um segundo incremento pequeno: `DataProvider` como destino de chamada direta em `Source` efetivo.
+
+Na mesma data, a Fase 2 recebeu mais dois incrementos controlados: actions de `WorkWithForWeb` com atributo `gxobject` resolvido para `Procedure` ou `WebPanel`, e propriedades `ATTCUSTOMTYPE` indexadas como alvo literal `CustomType:<valor>`.
+
+Continuam fora destes incrementos: semantica completa de `Transaction`, `WorkWithForWeb` alem de actions `gxobject`, `for each`, `.Load(...)`, resolucao semantica de `CustomType` para `SDT` ou `Domain`, e inferencias por layout ou comentarios.
 
 ## Principios da frente
 
@@ -178,7 +182,7 @@ Caso conhecido obrigatorio para a bateria:
 
 So iniciar depois da Fase 1 validada.
 
-Estado em 2026-04-21: fase aberta, com primeiro alvo aprovado como `DataProvider` enquanto origem. Destinos continuam limitados a `Procedure` e `WebPanel`, usando as mesmas regras seguras de `Source` efetivo da Fase 1.
+Estado em 2026-04-21: fase aberta e ja ampliada de forma controlada para `DataProvider` como origem e destino direto, actions de `WorkWithForWeb` por `gxobject`, e propriedades `ATTCUSTOMTYPE` como alvo literal `CustomType`.
 
 Possiveis ampliacoes:
 
@@ -220,6 +224,77 @@ Gate minimo:
 - manter os 15 casos reais da Fase 1 passando
 - adicionar casos reais positivos e negativos para `DataProvider`
 - validar que comentario em `DataProvider` nao cria relacao direta
+
+### Segundo incremento - `DataProvider` como destino
+
+Escopo aceito:
+
+- origens: `Procedure`, `WebPanel` e `DataProvider`
+- destino: `DataProvider`
+- regra: `dataprovider_direct_call`
+- evidencia: `Source efetivo`
+- confianca: `direct`
+
+Fora do segundo incremento:
+
+- interpretar `for each` como relacao de entidade
+- interpretar `.Load(...)`
+- inferir dependencia por SDT de saida
+- ampliar `Transaction` ou `WorkWithForWeb`
+
+Gate minimo:
+
+- manter os 15 casos reais da Fase 1 passando
+- manter os casos do primeiro incremento de `DataProvider` passando
+- adicionar casos reais positivos de chamadas de `DataProvider` por `Procedure` e `WebPanel`
+- validar que comentario com chamada de `DataProvider` nao cria relacao direta
+
+### Terceiro incremento - actions de `WorkWithForWeb`
+
+Escopo aceito:
+
+- origem: `WorkWithForWeb`
+- destinos: `Procedure` e `WebPanel`
+- regra: `workwith_action_gxobject`
+- evidencia: `WorkWith action`
+- confianca: `direct`
+
+Fora do terceiro incremento:
+
+- interpretar `Selection` ou grids como dependencia semantica
+- inferir relacao por caption, tooltip, imagem ou nome da action
+- tratar `gxobject` que nao resolva para `Procedure` ou `WebPanel`
+- ampliar `Transaction` por associacao com o `WorkWithForWeb`
+
+Gate minimo:
+
+- manter os 15 casos reais da Fase 1 passando
+- manter os casos anteriores da Fase 2 passando
+- adicionar casos reais positivos para action chamando `Procedure` e `WebPanel`
+- adicionar caso negativo que prove que alvo inexistente nao cria relacao
+
+### Quarto incremento - `ATTCUSTOMTYPE` como `CustomType` literal
+
+Escopo aceito:
+
+- origens: objetos ja coletados pelo indice
+- destino: `CustomType`
+- regra: `attcustomtype_property`
+- evidencia: `Property ATTCUSTOMTYPE`
+- confianca: `direct`
+
+Fora do quarto incremento:
+
+- resolver `CustomType` para objeto `SDT`, `Domain` ou outro tipo GeneXus
+- inferir uso efetivo em runtime
+- interpretar estrutura interna do tipo referenciado
+
+Gate minimo:
+
+- manter os 15 casos reais da Fase 1 passando
+- manter os casos anteriores da Fase 2 passando
+- adicionar casos reais positivos em `Transaction` e `Procedure`
+- adicionar caso negativo para `CustomType` inexistente
 
 ## Fase 3 - suporte a agentes de programacao
 
@@ -292,7 +367,8 @@ Ele deve ser preservado apenas como registro historico e substituido por este pl
 
 ## Proximas decisoes abertas
 
-- decidir o segundo alvo da Fase 2 somente depois de validar e registrar o incremento de `DataProvider`
+- decidir o proximo alvo da Fase 2 depois de fechar os incrementos ja validados
+- decidir futuramente se `CustomType:<valor>` deve ser resolvido semanticamente para `SDT`, `Domain` ou outro tipo GeneXus
 - se abrir Fase 3, definir o contrato do `impact-basic` e o guia operacional para agentes consultarem o indice antes de alterar objetos
 - definir nome final da frente tecnica ou skill futura
 - confirmar politica de snapshots pequenos para validacao em Git
