@@ -18,7 +18,13 @@ def fetch_all(conn: sqlite3.Connection, sql: str, params: tuple[object, ...]) ->
     return [row_to_dict(cursor, row) for row in cursor.fetchall()]
 
 
-def who_uses(conn: sqlite3.Connection, object_type: str, object_name: str) -> dict[str, object]:
+def limit_rows(rows: list[dict[str, object]], limit: int | None) -> list[dict[str, object]]:
+    if limit is None or limit <= 0:
+        return rows
+    return rows[:limit]
+
+
+def who_uses(conn: sqlite3.Connection, object_type: str, object_name: str, limit: int | None) -> dict[str, object]:
     rows = fetch_all(
         conn,
         """
@@ -44,10 +50,17 @@ def who_uses(conn: sqlite3.Connection, object_type: str, object_name: str) -> di
         """,
         (object_type, object_name),
     )
-    return {"query": "who-uses", "object": {"type": object_type, "name": object_name}, "results": rows}
+    total = len(rows)
+    return {
+        "query": "who-uses",
+        "object": {"type": object_type, "name": object_name},
+        "total": total,
+        "shown": len(limit_rows(rows, limit)),
+        "results": limit_rows(rows, limit),
+    }
 
 
-def what_uses(conn: sqlite3.Connection, object_type: str, object_name: str) -> dict[str, object]:
+def what_uses(conn: sqlite3.Connection, object_type: str, object_name: str, limit: int | None) -> dict[str, object]:
     rows = fetch_all(
         conn,
         """
@@ -73,7 +86,14 @@ def what_uses(conn: sqlite3.Connection, object_type: str, object_name: str) -> d
         """,
         (object_type, object_name),
     )
-    return {"query": "what-uses", "object": {"type": object_type, "name": object_name}, "results": rows}
+    total = len(rows)
+    return {
+        "query": "what-uses",
+        "object": {"type": object_type, "name": object_name},
+        "total": total,
+        "shown": len(limit_rows(rows, limit)),
+        "results": limit_rows(rows, limit),
+    }
 
 
 def show_evidence(
@@ -83,6 +103,7 @@ def show_evidence(
     source_name: str | None,
     target_type: str | None,
     target_name: str | None,
+    limit: int | None,
 ) -> dict[str, object]:
     if relation_id is not None:
         rows = fetch_all(
@@ -138,7 +159,43 @@ def show_evidence(
             """,
             (source_type, source_name, target_type, target_name),
         )
-    return {"query": "show-evidence", "results": rows}
+    total = len(rows)
+    return {"query": "show-evidence", "total": total, "shown": len(limit_rows(rows, limit)), "results": limit_rows(rows, limit)}
+
+
+def format_text(result: dict[str, object]) -> str:
+    lines: list[str] = []
+    query = result.get("query")
+    obj = result.get("object")
+    if isinstance(obj, dict):
+        lines.append(f"{query}: {obj.get('type')}:{obj.get('name')}")
+    else:
+        lines.append(str(query))
+
+    total = result.get("total", 0)
+    shown = result.get("shown", 0)
+    lines.append(f"results: {shown}/{total}")
+
+    rows = result.get("results", [])
+    if not isinstance(rows, list) or not rows:
+        lines.append("(no results)")
+        return "\n".join(lines)
+
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        source = f"{row.get('source_type')}:{row.get('source_name')}"
+        target = f"{row.get('target_type')}:{row.get('target_name')}"
+        lines.append(
+            f"- #{row.get('relation_id')} {source} -> {target} "
+            f"[{row.get('relation_kind')}, {row.get('confidence')}]"
+        )
+        lines.append(
+            f"  {row.get('source_file')}:{row.get('line')} "
+            f"{row.get('evidence_role')} via {row.get('extractor_rule')}"
+        )
+        lines.append(f"  {row.get('snippet')}")
+    return "\n".join(lines)
 
 
 def parse_args() -> argparse.Namespace:
@@ -152,6 +209,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--source-name")
     parser.add_argument("--target-type")
     parser.add_argument("--target-name")
+    parser.add_argument("--limit", type=int)
+    parser.add_argument("--format", choices=["json", "text"], default="json")
     return parser.parse_args()
 
 
@@ -165,11 +224,11 @@ def main() -> int:
         if args.query == "who-uses":
             if not args.object_type or not args.object_name:
                 raise SystemExit("who-uses requires --object-type and --object-name.")
-            result = who_uses(conn, args.object_type, args.object_name)
+            result = who_uses(conn, args.object_type, args.object_name, args.limit)
         elif args.query == "what-uses":
             if not args.object_type or not args.object_name:
                 raise SystemExit("what-uses requires --object-type and --object-name.")
-            result = what_uses(conn, args.object_type, args.object_name)
+            result = what_uses(conn, args.object_type, args.object_name, args.limit)
         else:
             result = show_evidence(
                 conn,
@@ -178,11 +237,15 @@ def main() -> int:
                 args.source_name,
                 args.target_type,
                 args.target_name,
+                args.limit,
             )
     finally:
         conn.close()
 
-    print(json.dumps(result, indent=2, ensure_ascii=False))
+    if args.format == "text":
+        print(format_text(result))
+    else:
+        print(json.dumps(result, indent=2, ensure_ascii=False))
     return 0
 
 

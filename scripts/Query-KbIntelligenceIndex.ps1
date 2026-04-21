@@ -18,7 +18,10 @@ param(
     [string]$SourceType,
     [string]$SourceName,
     [string]$TargetType,
-    [string]$TargetName
+    [string]$TargetName,
+    [int]$Limit,
+    [ValidateSet("json", "text")]
+    [string]$Format = "json"
 )
 
 $ErrorActionPreference = "Stop"
@@ -51,6 +54,8 @@ if ($SourceType) { $arguments += @("--source-type", $SourceType) }
 if ($SourceName) { $arguments += @("--source-name", $SourceName) }
 if ($TargetType) { $arguments += @("--target-type", $TargetType) }
 if ($TargetName) { $arguments += @("--target-name", $TargetName) }
+if ($Limit) { $arguments += @("--limit", $Limit) }
+if ($Format) { $arguments += @("--format", $Format) }
 
 & $python.Source @arguments
 exit $LASTEXITCODE

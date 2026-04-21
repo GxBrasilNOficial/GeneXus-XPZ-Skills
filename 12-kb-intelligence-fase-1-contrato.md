@@ -236,6 +236,8 @@ Entrada:
 
 - `ObjectType`
 - `ObjectName`
+- `Limit` opcional
+- `Format` opcional: `json` ou `text`
 
 Saida minima:
 
@@ -253,6 +255,8 @@ Entrada:
 
 - `ObjectType`
 - `ObjectName`
+- `Limit` opcional
+- `Format` opcional: `json` ou `text`
 
 Saida minima:
 
@@ -269,6 +273,8 @@ Saida minima:
 Entrada:
 
 - identificador da relacao ou par origem/destino
+- `Limit` opcional
+- `Format` opcional: `json` ou `text`
 
 Saida minima:
 
