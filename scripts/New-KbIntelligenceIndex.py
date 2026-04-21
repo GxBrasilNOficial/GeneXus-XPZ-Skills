@@ -44,6 +44,10 @@ ATTCUSTOMTYPE_PROPERTY_RE = re.compile(
     r"<Property>\s*<Name>ATTCUSTOMTYPE</Name>\s*<Value>(?P<value>.*?)</Value>\s*</Property>",
     re.IGNORECASE | re.DOTALL,
 )
+IDBASEDON_PROPERTY_RE = re.compile(
+    r"<Property>\s*<Name>idBasedOn</Name>\s*<Value>(?P<value>.*?)</Value>\s*</Property>",
+    re.IGNORECASE | re.DOTALL,
+)
 WORKWITH_TRANSACTION_RE = re.compile(r"<transaction\b[^>]*\btransaction=\"(?P<value>[^\"]+)\"", re.IGNORECASE)
 WORKWITH_WEBPANEL_LINK_RE = re.compile(r"<link\b[^>]*\bwebpanel=\"(?P<name>[^\"]+)\"", re.IGNORECASE)
 WORKWITH_PROMPT_RE = re.compile(r"\bprompt=\"(?P<value>[^\"]+)\"", re.IGNORECASE)
@@ -639,6 +643,37 @@ def extract_attcustomtype_resolved_evidence(
     return evidences
 
 
+def extract_attribute_idbasedon_domain_evidence(
+    source_objects: Iterable[ObjectInfo],
+    domain_names: set[str],
+) -> list[Evidence]:
+    evidences: list[Evidence] = []
+    domain_lookup = case_insensitive_lookup(domain_names, "Domain")
+    for source in source_objects:
+        xml_text = read_text(source.path)
+        for match in IDBASEDON_PROPERTY_RE.finditer(xml_text):
+            value = normalize_custom_type(match.group("value"))
+            if not value.lower().startswith("domain:"):
+                continue
+            raw_domain_name = value.split(":", 1)[1].strip()
+            target_name = domain_lookup.get(raw_domain_name.lower())
+            if not target_name:
+                continue
+            add_evidence(
+                evidences,
+                source=source,
+                target_type="Domain",
+                target_name=target_name,
+                relation_kind="based_on_domain",
+                line=line_number_at(xml_text, match.start("value")),
+                column=1,
+                snippet=match.group(0),
+                extractor_rule="attribute_idbasedon_domain",
+                evidence_role="Property idBasedOn",
+            )
+    return evidences
+
+
 def create_schema(conn: sqlite3.Connection) -> None:
     conn.executescript(
         """
@@ -836,6 +871,7 @@ def main() -> int:
     data_providers = objects_by_type.get("DataProvider", {})
     workwiths = objects_by_type.get("WorkWithForWeb", {})
     transactions = objects_by_type.get("Transaction", {})
+    attributes = objects_by_type.get("Attribute", {})
     objects = [obj for by_name in objects_by_type.values() for obj in by_name.values()]
 
     source_evidences = extract_evidence(
@@ -883,6 +919,10 @@ def main() -> int:
         sdt_names=set(objects_by_type.get("SDT", {})),
         domain_names=set(objects_by_type.get("Domain", {})),
     )
+    attribute_idbasedon_domain_evidences = extract_attribute_idbasedon_domain_evidence(
+        attributes.values(),
+        domain_names=set(objects_by_type.get("Domain", {})),
+    )
     evidences = [
         *source_evidences,
         *workwith_evidences,
@@ -893,6 +933,7 @@ def main() -> int:
         *workwith_prompt_evidences,
         *custom_type_evidences,
         *resolved_custom_type_evidences,
+        *attribute_idbasedon_domain_evidences,
     ]
     write_index(args.output_path.resolve(), source_root, objects, evidences)
 

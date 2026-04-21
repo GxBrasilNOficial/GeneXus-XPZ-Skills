@@ -5,7 +5,7 @@ guia operacional
 
 ## Escopo atual
 
-Estes scripts implementam a Fase 1 do KB Intelligence, os incrementos aprovados da Fase 2, a consulta operacional da Fase 3, o inventario ampliado da Fase 4 e o primeiro incremento da Fase 5.
+Estes scripts implementam a Fase 1 do KB Intelligence, os incrementos aprovados da Fase 2, a consulta operacional da Fase 3, o inventario ampliado da Fase 4 e os incrementos aprovados da Fase 5.
 
 A Fase 3 foi aberta por contrato em `..\14-kb-intelligence-fase-3-contrato.md` para formalizar o uso operacional por agentes e o comando `impact-basic`.
 
@@ -28,7 +28,8 @@ Escopo de extracao de relacoes atual:
 - atributo de condicao: `WorkWithForWeb` para `Procedure`
 - alvo literal por propriedade: `CustomType:<valor>` a partir de `ATTCUSTOMTYPE`
 - alvo resolvido por propriedade: `SDT` ou `Domain` a partir de `ATTCUSTOMTYPE`, quando o objeto existir no inventario e a regra aprovada resolver o prefixo com seguranca
-- relacoes: chamadas diretas em `Source efetivo`, actions `gxobject` resolvidas, vinculacoes explicitas de `Transaction`, links e prompts explicitos de `WebPanel` em `WorkWithForWeb`, condicoes por tag e atributo de `WorkWithForWeb` chamando `Procedure`, e propriedades `ATTCUSTOMTYPE`
+- dominio base de atributo: `Attribute` para `Domain` a partir de `idBasedOn`, quando o dominio existir no inventario local
+- relacoes: chamadas diretas em `Source efetivo`, actions `gxobject` resolvidas, vinculacoes explicitas de `Transaction`, links e prompts explicitos de `WebPanel` em `WorkWithForWeb`, condicoes por tag e atributo de `WorkWithForWeb` chamando `Procedure`, propriedades `ATTCUSTOMTYPE` e `idBasedOn` de `Attribute`
 - artefato principal: SQLite derivado
 
 A Fase 2 consolidada cobre `DataProvider` como origem e como destino de chamada direta, actions de `WorkWithForWeb` com `gxobject` resolvido para `Procedure` ou `WebPanel`, vinculacao explicita de `WorkWithForWeb` para `Transaction`, links e prompts explicitos de `WorkWithForWeb` para `WebPanel`, condicoes por tag e atributo de `WorkWithForWeb` chamando `Procedure`, e `ATTCUSTOMTYPE` como `CustomType` literal. Ela nao cobre semantica completa de `Transaction`, semantica de `WorkWithForWeb` alem dos recortes ja cobertos, `for each`, `.Load(...)` nem resolucao semantica de `CustomType` para `SDT` ou `Domain`.

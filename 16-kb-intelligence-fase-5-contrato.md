@@ -64,9 +64,39 @@ Exemplos conceituais:
 - resolver prefixos sem regra documentada
 - remover a relacao literal `CustomType:<valor>` sem decisao explicita
 
+## Incremento 2 aprovado - resolver `Attribute` -> `Domain` por `idBasedOn`
+
+### Escopo aceito
+
+- origem: objetos `Attribute`
+- evidencia:
+  - `Property idBasedOn`
+- destino resolvido:
+  - `Domain`, somente quando o valor tiver prefixo `Domain:` e o objeto existir no inventario local
+- regra proposta:
+  - `attribute_idbasedon_domain`
+- confianca:
+  - `direct`
+
+### Comportamento esperado
+
+Quando um `Attribute` declarar `idBasedOn` para um `Domain` existente no inventario, o indice deve criar uma relacao direta do atributo para o dominio.
+
+Exemplos conceituais:
+
+- `Attribute:AbateOrdemData` com `idBasedOn` `Domain:Data` pode resolver para `Domain:Data`
+- `Domain:Geolocation, GeneXus` nao deve resolver se nao houver objeto correspondente no inventario local
+
+### Fora do incremento 2
+
+- criar dominio inexistente
+- resolver dominios externos ou built-in do GeneXus sem objeto local
+- inferir semantica de atributo por nome
+- inferir uso em `Transaction`, `Table` ou `Source`
+- resolver valores sem prefixo `Domain:`
+
 ## Incrementos futuros possiveis
 
-- `Attribute` -> `Domain`
 - `Transaction` -> `Attribute`
 - `Transaction` -> `Table`
 - `Table` -> `Attribute`
