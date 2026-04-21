@@ -232,6 +232,21 @@ Se forem detectados durante desenvolvimento, devem ir para relatorio como candid
 
 A implementacao futura deve expor pelo menos estas consultas:
 
+### `search-objects`
+
+Entrada:
+
+- `ObjectName`: nome, trecho de nome ou padrao com `*`
+- `ObjectType` opcional
+- `Limit` opcional
+- `Format` opcional: `json` ou `text`
+
+Saida minima:
+
+- tipo e nome do objeto
+- arquivo XML relativo
+- `last_update`
+
 ### `object-info`
 
 Entrada:

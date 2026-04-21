@@ -68,6 +68,38 @@ def object_info(conn: sqlite3.Connection, object_type: str, object_name: str) ->
     }
 
 
+def search_objects(conn: sqlite3.Connection, object_name: str, object_type: str | None, limit: int | None) -> dict[str, object]:
+    pattern = object_name.replace("*", "%")
+    if "%" not in pattern:
+        pattern = f"%{pattern}%"
+
+    params: list[object] = [pattern]
+    type_clause = ""
+    if object_type:
+        type_clause = "AND type = ?"
+        params.append(object_type)
+
+    rows = fetch_all(
+        conn,
+        f"""
+        SELECT type, name, file_path, last_update
+        FROM objects
+        WHERE name LIKE ? {type_clause}
+        ORDER BY type, name
+        """,
+        tuple(params),
+    )
+    total = len(rows)
+    return {
+        "query": "search-objects",
+        "pattern": object_name,
+        "object_type": object_type,
+        "total": total,
+        "shown": len(limit_rows(rows, limit)),
+        "results": limit_rows(rows, limit),
+    }
+
+
 def who_uses(conn: sqlite3.Connection, object_type: str, object_name: str, limit: int | None) -> dict[str, object]:
     rows = fetch_all(
         conn,
@@ -217,7 +249,10 @@ def format_text(result: dict[str, object]) -> str:
             return "\n".join(lines)
         lines.append(f"{query}: {obj.get('type')}:{obj.get('name')}")
     else:
-        lines.append(str(query))
+        if query == "search-objects":
+            lines.append(f"{query}: {result.get('pattern')}")
+        else:
+            lines.append(str(query))
 
     if query == "object-info" and isinstance(obj, dict):
         lines.append(f"file: {obj.get('file_path')}")
@@ -238,6 +273,10 @@ def format_text(result: dict[str, object]) -> str:
     for row in rows:
         if not isinstance(row, dict):
             continue
+        if query == "search-objects":
+            lines.append(f"- {row.get('type')}:{row.get('name')}")
+            lines.append(f"  {row.get('file_path')} last_update={row.get('last_update')}")
+            continue
         source = f"{row.get('source_type')}:{row.get('source_name')}"
         target = f"{row.get('target_type')}:{row.get('target_name')}"
         lines.append(
@@ -255,7 +294,7 @@ def format_text(result: dict[str, object]) -> str:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Query a KB Intelligence SQLite index.")
     parser.add_argument("--index-path", required=True, type=Path)
-    parser.add_argument("--query", required=True, choices=["object-info", "who-uses", "what-uses", "show-evidence"])
+    parser.add_argument("--query", required=True, choices=["object-info", "search-objects", "who-uses", "what-uses", "show-evidence"])
     parser.add_argument("--object-type")
     parser.add_argument("--object-name")
     parser.add_argument("--relation-id", type=int)
@@ -279,6 +318,10 @@ def main() -> int:
             if not args.object_type or not args.object_name:
                 raise SystemExit("object-info requires --object-type and --object-name.")
             result = object_info(conn, args.object_type, args.object_name)
+        elif args.query == "search-objects":
+            if not args.object_name:
+                raise SystemExit("search-objects requires --object-name.")
+            result = search_objects(conn, args.object_name, args.object_type, args.limit)
         elif args.query == "who-uses":
             if not args.object_type or not args.object_name:
                 raise SystemExit("who-uses requires --object-type and --object-name.")
