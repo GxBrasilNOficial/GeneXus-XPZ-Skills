@@ -5,9 +5,11 @@ guia operacional
 
 ## Escopo atual
 
-Estes scripts implementam a Fase 1 do KB Intelligence, os incrementos aprovados da Fase 2, a consulta operacional da Fase 3 e o inventario ampliado da Fase 4.
+Estes scripts implementam a Fase 1 do KB Intelligence, os incrementos aprovados da Fase 2, a consulta operacional da Fase 3, o inventario ampliado da Fase 4 e o primeiro incremento da Fase 5.
 
 A Fase 3 foi aberta por contrato em `..\14-kb-intelligence-fase-3-contrato.md` para formalizar o uso operacional por agentes e o comando `impact-basic`.
+
+A Fase 5 foi aberta por contrato em `..\16-kb-intelligence-fase-5-contrato.md` para ampliar relacoes semanticas por incrementos pequenos.
 
 Escopo de inventario atual:
 
@@ -25,6 +27,7 @@ Escopo de extracao de relacoes atual:
 - condicao explicita: `WorkWithForWeb` para `Procedure`
 - atributo de condicao: `WorkWithForWeb` para `Procedure`
 - alvo literal por propriedade: `CustomType:<valor>` a partir de `ATTCUSTOMTYPE`
+- alvo resolvido por propriedade: `SDT` ou `Domain` a partir de `ATTCUSTOMTYPE`, quando o objeto existir no inventario e a regra aprovada resolver o prefixo com seguranca
 - relacoes: chamadas diretas em `Source efetivo`, actions `gxobject` resolvidas, vinculacoes explicitas de `Transaction`, links e prompts explicitos de `WebPanel` em `WorkWithForWeb`, condicoes por tag e atributo de `WorkWithForWeb` chamando `Procedure`, e propriedades `ATTCUSTOMTYPE`
 - artefato principal: SQLite derivado
 
@@ -162,6 +165,21 @@ Depois de regenerar o indice, valide a presenca de tipos ampliados com:
 ```
 
 Os casos da Fase 4 conferem inventario de objetos e comportamento conservador de `impact-basic` para tipos sem relacoes extraidas.
+
+## Validar relacoes semanticas da Fase 5
+
+Depois de regenerar o indice, valide a resolucao semantica aprovada com:
+
+```powershell
+.\scripts\New-KbIntelligenceIndex.ps1 `
+  -SourceRoot "C:\Dev\Prod\Gx_FabricaBrasil\ObjetosDaKbEmXml" `
+  -OutputPath "C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\kb-intelligence.sqlite" `
+  -ValidationReportPath "C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\kb-intelligence-validation.json" `
+  -ValidationCasesPath ".\scripts\kb-intelligence-fabricabrasil.phase5.validation-cases.json" `
+  -FailOnValidationFailure
+```
+
+Os casos da Fase 5 conferem relacoes semanticas novas. Eles devem ser executados junto com as baterias anteriores quando houver rodada oficial.
 
 ## Saidas
 

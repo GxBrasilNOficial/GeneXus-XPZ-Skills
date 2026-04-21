@@ -587,6 +587,58 @@ def extract_attcustomtype_evidence(source_objects: Iterable[ObjectInfo]) -> list
     return evidences
 
 
+def resolve_custom_type_target(
+    custom_type: str,
+    sdt_lookup: dict[str, str],
+    domain_lookup: dict[str, str],
+) -> tuple[str, str] | None:
+    if ":" not in custom_type:
+        return None
+    prefix, raw_name = custom_type.split(":", 1)
+    if prefix.lower() == "sdt":
+        target_name = sdt_lookup.get(raw_name.lower())
+        if target_name:
+            return "SDT", target_name
+    if prefix.lower() in {"dom", "domain"}:
+        target_name = domain_lookup.get(raw_name.lower())
+        if target_name:
+            return "Domain", target_name
+    return None
+
+
+def extract_attcustomtype_resolved_evidence(
+    source_objects: Iterable[ObjectInfo],
+    sdt_names: set[str],
+    domain_names: set[str],
+) -> list[Evidence]:
+    evidences: list[Evidence] = []
+    sdt_lookup = case_insensitive_lookup(sdt_names, "SDT")
+    domain_lookup = case_insensitive_lookup(domain_names, "Domain")
+    for source in source_objects:
+        xml_text = read_text(source.path)
+        for match in ATTCUSTOMTYPE_PROPERTY_RE.finditer(xml_text):
+            custom_type = normalize_custom_type(match.group("value"))
+            if not custom_type:
+                continue
+            resolved = resolve_custom_type_target(custom_type, sdt_lookup, domain_lookup)
+            if not resolved:
+                continue
+            target_type, target_name = resolved
+            add_evidence(
+                evidences,
+                source=source,
+                target_type=target_type,
+                target_name=target_name,
+                relation_kind="uses_resolved_custom_type",
+                line=line_number_at(xml_text, match.start("value")),
+                column=1,
+                snippet=match.group(0),
+                extractor_rule="attcustomtype_resolved_object",
+                evidence_role="Property ATTCUSTOMTYPE",
+            )
+    return evidences
+
+
 def create_schema(conn: sqlite3.Connection) -> None:
     conn.executescript(
         """
@@ -826,6 +878,11 @@ def main() -> int:
         *transactions.values(),
     ]
     custom_type_evidences = extract_attcustomtype_evidence(relation_scope_objects)
+    resolved_custom_type_evidences = extract_attcustomtype_resolved_evidence(
+        relation_scope_objects,
+        sdt_names=set(objects_by_type.get("SDT", {})),
+        domain_names=set(objects_by_type.get("Domain", {})),
+    )
     evidences = [
         *source_evidences,
         *workwith_evidences,
@@ -835,6 +892,7 @@ def main() -> int:
         *workwith_webpanel_link_evidences,
         *workwith_prompt_evidences,
         *custom_type_evidences,
+        *resolved_custom_type_evidences,
     ]
     write_index(args.output_path.resolve(), source_root, objects, evidences)
 

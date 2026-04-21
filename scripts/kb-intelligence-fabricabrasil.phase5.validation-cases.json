@@ -1,0 +1,45 @@
+{
+  "description": "Validation cases for KB Intelligence Phase 5 CustomType semantic resolution using the FabricaBrasil parallel KB.",
+  "cases": [
+    {
+      "id": "phase5-case-1-transaction-attcustomtype-resolves-sdt-context",
+      "source": "Transaction:AbateOrdem",
+      "target": "SDT:Context",
+      "expected_rule": "attcustomtype_resolved_object",
+      "should_exist": true,
+      "expectation": "ATTCUSTOMTYPE sdt:Context in Transaction must resolve to SDT:Context"
+    },
+    {
+      "id": "phase5-case-2-procedure-attcustomtype-resolves-sdt-context",
+      "source": "Procedure:ExportWWOperacaoAjustada",
+      "target": "SDT:Context",
+      "expected_rule": "attcustomtype_resolved_object",
+      "should_exist": true,
+      "expectation": "ATTCUSTOMTYPE sdt:Context in Procedure must resolve to SDT:Context"
+    },
+    {
+      "id": "phase5-case-3-literal-customtype-is-preserved",
+      "source": "Transaction:AbateOrdem",
+      "target": "CustomType:sdt:Context",
+      "expected_rule": "attcustomtype_property",
+      "should_exist": true,
+      "expectation": "Resolved ATTCUSTOMTYPE relation must not replace the literal CustomType relation"
+    },
+    {
+      "id": "phase5-case-4-builtin-bas-boolean-does-not-resolve-domain",
+      "source": "Transaction:AbateOrdem",
+      "target": "Domain:Boolean",
+      "expected_rule": "attcustomtype_resolved_object",
+      "should_exist": false,
+      "expectation": "Built-in bas:Boolean must not be forced to Domain:Boolean"
+    },
+    {
+      "id": "phase5-case-5-unknown-sdt-does-not-resolve",
+      "source": "Transaction:AbateOrdem",
+      "target": "SDT:TipoInexistenteParaNaoIndexar",
+      "expected_rule": "attcustomtype_resolved_object",
+      "should_exist": false,
+      "expectation": "Unknown CustomType target must not create a resolved relation"
+    }
+  ]
+}

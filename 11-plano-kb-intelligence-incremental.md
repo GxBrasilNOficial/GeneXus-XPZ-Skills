@@ -459,7 +459,9 @@ Objetivo:
 
 ## Fase 5 - relacoes semanticas ampliadas
 
-So iniciar depois da Fase 4 validada.
+Aberta por contrato em `16-kb-intelligence-fase-5-contrato.md`, depois do encerramento validado da Fase 4.
+
+Estado em 2026-04-21: primeiro incremento implementado para resolver `CustomType:<valor>` para `SDT` ou `Domain` quando houver objeto inventariado correspondente.
 
 Entregas possiveis:
 
