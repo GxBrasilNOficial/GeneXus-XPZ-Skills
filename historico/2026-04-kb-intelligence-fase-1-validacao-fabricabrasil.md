@@ -162,6 +162,22 @@ Decisao decorrente:
 - experimentos antigos como `Mapeamento` devem ir para `ArquivoMorto\Mapeamento` quando o usuario autorizar a movimentacao
 - o `AGENTS.md` da pasta paralela deve orientar agentes a ignorar `ArquivoMorto` ou tratar seu conteudo como nao confiavel
 
+## Arquivamento do experimento anterior
+
+Em 2026-04-21, apos autorizacao do usuario, o experimento anterior foi movido na pasta paralela real:
+
+```text
+C:\Dev\Prod\Gx_FabricaBrasil\Mapeamento
+```
+
+para:
+
+```text
+C:\Dev\Prod\Gx_FabricaBrasil\ArquivoMorto\Mapeamento
+```
+
+Tambem foram ajustados `README.md` e `AGENTS.md` da pasta paralela para registrar que `ArquivoMorto` deve ser ignorado por agentes ou tratado como nao confiavel, salvo pedido explicito de analise historica.
+
 ## Limites desta validacao
 
 - nao cobre `Transaction`

@@ -246,6 +246,8 @@ Ele nao deve ser evoluido como base arquitetural definitiva nem competir com `Kb
 
 Quando a nova frente nao precisar mais dele para comparacao, a pasta `Mapeamento` da KB real pode ser movida para `ArquivoMorto\Mapeamento` por decisao explicita do usuario no repositorio da KB, nao nesta raiz metodologica.
 
+Na KB `FabricaBrasil`, essa movimentacao foi executada em 2026-04-21, junto com a regra local em `README.md` e `AGENTS.md` da pasta paralela.
+
 O `AGENTS.md` da raiz da pasta paralela deve orientar agentes a ignorar `ArquivoMorto`, ou tratar seu conteudo como nao confiavel, salvo pedido explicito do usuario para analise historica.
 
 ## Tratamento da sugestao externa v1
