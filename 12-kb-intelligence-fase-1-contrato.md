@@ -91,6 +91,33 @@ O artefato principal da Fase 1 deve ser um banco SQLite.
 
 O SQLite deve ser tratado como derivado e regeneravel. Por padrao, ele nao deve ser versionado em Git.
 
+## Local padrao na pasta paralela
+
+Em cada pasta paralela de KB, o local padrao para artefatos operacionais do KB Intelligence deve ser:
+
+```text
+<PastaParalelaDaKB>\KbIntelligence\
+  kb-intelligence.sqlite
+  kb-intelligence-validation.json
+  README.md
+```
+
+Exemplo real:
+
+```text
+C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\kb-intelligence.sqlite
+```
+
+A pasta `KbIntelligence` e uma area operacional estavel para agentes. Ela nao e fonte normativa: o SQLite e os relatorios gerados continuam sendo derivados de `ObjetosDaKbEmXml`.
+
+Se a pasta paralela estiver em Git, o banco `.sqlite` e relatorios derivados grandes devem ser ignorados, salvo decisao explicita em contrario. Arquivos pequenos de contrato, README local, configuracao e casos de validacao podem ser versionados quando ajudarem a repetir a rodada.
+
+## Arquivo morto em pasta paralela
+
+Quando houver experimentos anteriores, como `Mapeamento`, eles devem ser movidos para uma subpasta `ArquivoMorto` da propria pasta paralela somente por decisao explicita do usuario.
+
+O `AGENTS.md` da raiz da pasta paralela deve deixar claro que conteudo em `ArquivoMorto` deve ser ignorado por agentes ou tratado como nao confiavel, a menos que o usuario peca explicitamente uma analise historica.
+
 ## Schema minimo
 
 ### Tabela `objects`
@@ -411,7 +438,6 @@ Se a saida do indice for usada para gerar Markdown, essa sera uma etapa posterio
 
 ## Decisoes ainda abertas
 
-- local padrao para o SQLite gerado em cada pasta paralela de KB
 - estrategia exata para linha e coluna em `CDATA`
 - formato do relatorio pequeno de validacao
 - politica de criacao de uma skill futura especifica para KB Intelligence

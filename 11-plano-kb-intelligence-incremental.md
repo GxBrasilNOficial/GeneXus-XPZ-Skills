@@ -53,6 +53,8 @@ XMLs individuais em `ObjetosDaKbEmXml`, organizados por tipo de objeto, vindos d
 
 Banco SQLite gerado a partir dos XMLs. Deve ser tratado como artefato derivado e reconstruivel.
 
+O local operacional padrao em uma pasta paralela de KB deve ser `KbIntelligence\kb-intelligence.sqlite`. A pasta `KbIntelligence` e estavel para descoberta por agentes, mas seus artefatos gerados continuam derivados de `ObjetosDaKbEmXml`.
+
 ### Exportes auxiliares
 
 JSONL ou JSON pequenos podem existir para debug, amostras, testes e auditoria pontual. Eles nao devem ser a base operacional principal.
@@ -240,9 +242,11 @@ O experimento em `C:\Dev\Prod\Gx_FabricaBrasil\Mapeamento` deve ser tratado como
 - fonte de casos reais para bateria inicial
 - evidencia de que a dor operacional existe
 
-Ele nao deve ser evoluido como base arquitetural definitiva.
+Ele nao deve ser evoluido como base arquitetural definitiva nem competir com `KbIntelligence` como fonte operacional.
 
-Quando a nova frente nao precisar mais dele para comparacao, a pasta `Mapeamento` da KB real pode ser movida para arquivo morto por decisao explicita do usuario no repositorio da KB, nao nesta raiz metodologica.
+Quando a nova frente nao precisar mais dele para comparacao, a pasta `Mapeamento` da KB real pode ser movida para `ArquivoMorto\Mapeamento` por decisao explicita do usuario no repositorio da KB, nao nesta raiz metodologica.
+
+O `AGENTS.md` da raiz da pasta paralela deve orientar agentes a ignorar `ArquivoMorto`, ou tratar seu conteudo como nao confiavel, salvo pedido explicito do usuario para analise historica.
 
 ## Tratamento da sugestao externa v1
 
@@ -256,6 +260,5 @@ Ele deve ser preservado apenas como registro historico e substituido por este pl
 - linguagem principal dos scripts compartilhados
 - local dos scripts genericos nesta raiz
 - local dos adaptadores por KB real
-- formato exato do schema SQLite
 - estrategia de calculo de linha exata em XML com `CDATA`
 - politica de snapshots pequenos para validacao em Git

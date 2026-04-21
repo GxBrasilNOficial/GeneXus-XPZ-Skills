@@ -145,6 +145,23 @@ Resultado esperado e observado:
 
 Isso valida o uso de `-FailOnValidationFailure` como gate operacional de rodada oficial.
 
+## Teste de uso real por outro agente
+
+Foi executado um teste conversacional em outra conversa, pedindo que o agente consultasse o indice antes de abrir XMLs para entender `WebPanel:wpRelatoriosDeMovimentosDeVolumes`.
+
+Resultado observado:
+
+- o agente seguiu parcialmente o fluxo esperado de procurar um indice antes de abrir XML
+- como ainda nao havia local canonico operacional em `KbIntelligence`, ele encontrou e usou artefatos antigos em `Mapeamento`
+- o agente misturou achados do experimento antigo com validacao direta por XML
+- a resposta confirmou a utilidade operacional do fluxo, mas tambem confirmou o risco de descoberta errada quando `Mapeamento` permanece visivel na raiz da pasta paralela
+
+Decisao decorrente:
+
+- o local padrao do SQLite passa a ser `KbIntelligence\kb-intelligence.sqlite` dentro da pasta paralela da KB
+- experimentos antigos como `Mapeamento` devem ir para `ArquivoMorto\Mapeamento` quando o usuario autorizar a movimentacao
+- o `AGENTS.md` da pasta paralela deve orientar agentes a ignorar `ArquivoMorto` ou tratar seu conteudo como nao confiavel
+
 ## Limites desta validacao
 
 - nao cobre `Transaction`
@@ -157,6 +174,6 @@ Isso valida o uso de `-FailOnValidationFailure` como gate operacional de rodada 
 
 ## Conclusao
 
-A Fase 1 tem uma primeira implementacao operacional validada para o recorte `Procedure` e `WebPanel`, com SQLite derivado, evidencia rastreavel, consulta por agente e gate de validacao.
+A Fase 1 tem uma implementacao operacional validada para o recorte `Procedure` e `WebPanel`, com SQLite derivado, evidencia rastreavel, consulta por agente e gate de validacao.
 
-O proximo passo tecnico deve ser ampliar testes e ergonomia de consulta antes de expandir novos tipos de objeto.
+Antes de expandir novos tipos de objeto, a frente deve fechar o local canonico `KbIntelligence`, a regra de `ArquivoMorto` e a instrucao correspondente no `AGENTS.md` da pasta paralela.
