@@ -79,6 +79,7 @@ A primeira implementacao operacional da Fase 1 fica em:
 - `scripts/Query-KbIntelligenceIndex.ps1`
 - `scripts/Query-KbIntelligenceIndex.py`
 - `scripts/kb-intelligence-fabricabrasil.phase1.validation-cases.json`
+- `scripts/README-kb-intelligence.md`
 
 Os wrappers PowerShell preservam o padrao operacional atual do repositorio. Os motores Python usam `sqlite3` da biblioteca padrao para gravar e consultar o banco tecnico.
 

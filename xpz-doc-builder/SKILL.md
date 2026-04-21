@@ -31,11 +31,13 @@ Use esta skill para:
 - Usuário quer recompor uma seção Markdown com moldes sanitizados completos
 - Usuário quer atualizar documentação a partir de exemplos reais de uma KB
 - Usuário quer manter a base documental que alimenta humanos e outras skills
+- Usuário quer gerar documentação a partir de fonte técnica validada do KB Intelligence, preservando a distinção entre evidência direta e inferência
 
 Do NOT use this skill for:
 - Sincronizar XMLs a partir de um XPZ exportado pela IDE (use `xpz-sync`)
 - Analisar um XML isolado sem intenção de atualizar a documentação (use `xpz-reader`)
 - Gerar ou clonar objetos XPZ para empacotamento (use `xpz-builder`)
+- Tratar o SQLite do KB Intelligence como fonte normativa no lugar dos XMLs oficiais
 
 ---
 
@@ -46,6 +48,8 @@ Do NOT use this skill for:
 | `inventory` | Gerar inventário bruto do acervo XML |
 | `advanced-docs` | Produzir documentação analítica, matrizes e catálogos estruturais |
 | `update-section` | Recriar ou atualizar uma seção Markdown com exemplos XML completos |
+
+O KB Intelligence pode alimentar documentação em fase posterior, mas o índice SQLite é artefato derivado. Ao usá-lo, rotule a origem como índice técnico derivado e preserve links para XML oficial e evidência quando possível.
 
 ---
 
@@ -104,8 +108,9 @@ Se o repositório ainda mantiver wrappers especializados, eles devem ser tratado
 7. Se a documentação citar XML vindo de `ObjetosGeradosParaImportacaoNaKbNoGenexus`, rotular isso como artefato de trabalho e não como snapshot oficial
 8. Quando a documentação gerar ou preservar links de linha para XML GeneXus, rotular o papel do trecho citado: `Source efetivo`, `Rules/parm`, `metadado XML`, `chamada no chamador` ou `assinatura no chamado`
 9. Se a documentação afirmar que objeto A chama objeto B, validar que o link de linha aponta para o `Source` efetivo de A ou para metadado explícito de chamada em A; linha de `parm(...)` em B deve ser descrita apenas como assinatura do chamado
-10. Reler o início do arquivo gerado ou alterado, a seção modificada e a transição seguinte
-11. Reportar o que foi criado, atualizado ou substituído
+10. Se usar saída do KB Intelligence, declarar que a fonte imediata é índice técnico derivado e que a fonte normativa continua sendo o XML oficial em `ObjetosDaKbEmXml`
+11. Reler o início do arquivo gerado ou alterado, a seção modificada e a transição seguinte
+12. Reportar o que foi criado, atualizado ou substituído
 
 ---
 
@@ -118,4 +123,5 @@ Se o repositório ainda mantiver wrappers especializados, eles devem ser tratado
 - NUNCA esconder que o conteúdo foi gerado a partir de XMLs sanitizados ou acervo real quando isso for relevante
 - NUNCA tratar `ObjetosGeradosParaImportacaoNaKbNoGenexus` como se fosse snapshot oficial da KB sem rotulagem explícita
 - NUNCA documentar uma linha de `parm(...)` do objeto chamado como se fosse o ponto de chamada no objeto chamador
+- NUNCA tratar o SQLite do KB Intelligence como prova funcional ou runtime; ele é índice técnico derivado de evidências extraídas
 - Se o script esperado não existir, reportar o problema antes de improvisar uma edição manual ampla
