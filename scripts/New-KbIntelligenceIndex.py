@@ -163,6 +163,17 @@ def compact_snippet(text: str, limit: int = 220) -> str:
     return snippet[: limit - 3].rstrip() + "..."
 
 
+def case_insensitive_lookup(names: set[str], object_type: str) -> dict[str, str]:
+    grouped: dict[str, list[str]] = {}
+    for name in names:
+        grouped.setdefault(name.lower(), []).append(name)
+    collisions = {key: sorted(values) for key, values in grouped.items() if len(values) > 1}
+    if collisions:
+        details = "; ".join(f"{key}: {', '.join(values)}" for key, values in sorted(collisions.items()))
+        raise ValueError(f"Ambiguous {object_type} names differing only by case: {details}")
+    return {key: values[0] for key, values in grouped.items()}
+
+
 def extract_evidence(
     source_root: Path,
     source_objects: Iterable[ObjectInfo],
@@ -170,8 +181,8 @@ def extract_evidence(
     webpanel_names: set[str],
 ) -> list[Evidence]:
     evidences: list[Evidence] = []
-    procedure_lookup = {name.lower(): name for name in procedure_names}
-    webpanel_lookup = {name.lower(): name for name in webpanel_names}
+    procedure_lookup = case_insensitive_lookup(procedure_names, "Procedure")
+    webpanel_lookup = case_insensitive_lookup(webpanel_names, "WebPanel")
 
     for source in source_objects:
         xml_text = read_text(source.path)

@@ -109,6 +109,7 @@ Restricoes esperadas:
 - `type` + `name` deve identificar o objeto dentro do acervo indexado
 - `file_path` deve ser relativo ao `SourceRoot` quando possivel
 - `file_hash` deve permitir detectar mudanca de conteudo entre execucoes
+- nomes que colidam apenas por maiusculas/minusculas devem bloquear a resolucao case-insensitive ate decisao explicita
 
 ### Tabela `relations`
 
