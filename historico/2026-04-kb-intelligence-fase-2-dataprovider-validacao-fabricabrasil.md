@@ -19,7 +19,7 @@ medio
 `C:\Dev\Prod\Gx_FabricaBrasil\ObjetosDaKbEmXml`
 
 ## Objetivo
-Registrar as primeiras ampliacoes controladas da Fase 2 do KB Intelligence, adicionando `DataProvider` como origem e destino em `Source` efetivo, actions de `WorkWithForWeb` com `gxobject` resolvido, vinculacoes explicitas de `WorkWithForWeb` para `Transaction`, links e prompts explicitos de `WorkWithForWeb` para `WebPanel`, condicoes de `WorkWithForWeb` chamando `Procedure`, e propriedades `ATTCUSTOMTYPE` como alvo literal `CustomType`.
+Registrar a consolidacao da Fase 2 do KB Intelligence, adicionando `DataProvider` como origem e destino em `Source` efetivo, actions de `WorkWithForWeb` com `gxobject` resolvido, vinculacoes explicitas de `WorkWithForWeb` para `Transaction`, links e prompts explicitos de `WorkWithForWeb` para `WebPanel`, condicoes por tag e atributo de `WorkWithForWeb` chamando `Procedure`, e propriedades `ATTCUSTOMTYPE` como alvo literal `CustomType`.
 
 ## Escopo
 
@@ -34,14 +34,15 @@ Incluido nesta rodada:
 - links explicitos de `WorkWithForWeb`: `WebPanel`
 - prompts explicitos de `WorkWithForWeb`: `WebPanel`
 - condicoes de `WorkWithForWeb`: `Procedure`
+- atributos de condicao de `WorkWithForWeb`: `Procedure`
 - alvo literal: `CustomType:<valor>` por `ATTCUSTOMTYPE`
-- regras: `procedure_direct_call`, `procedure_dot_call`, `webpanel_dot_link`, `dataprovider_direct_call`, `workwith_action_gxobject`, `workwith_transaction_binding`, `workwith_link_webpanel`, `workwith_prompt_webpanel`, `workwith_condition_procedure` e `attcustomtype_property`
-- evidencias: `Source efetivo`, `WorkWith action`, `WorkWith transaction`, `WorkWith link`, `WorkWith prompt`, `WorkWith condition` e `Property ATTCUSTOMTYPE`
+- regras: `procedure_direct_call`, `procedure_dot_call`, `webpanel_dot_link`, `dataprovider_direct_call`, `workwith_action_gxobject`, `workwith_transaction_binding`, `workwith_link_webpanel`, `workwith_prompt_webpanel`, `workwith_condition_procedure`, `workwith_condition_attribute_procedure` e `attcustomtype_property`
+- evidencias: `Source efetivo`, `WorkWith action`, `WorkWith transaction`, `WorkWith link`, `WorkWith prompt`, `WorkWith condition`, `WorkWith condition attribute` e `Property ATTCUSTOMTYPE`
 
 Continuam fora:
 
 - semantica completa de `Transaction`
-- `WorkWithForWeb` alem de actions `gxobject`, vinculacoes explicitas de `Transaction`, links explicitos de `WebPanel`, prompts explicitos de `WebPanel` e condicoes com chamada direta de `Procedure`
+- semantica de `WorkWithForWeb` alem dos recortes ja cobertos
 - `for each`
 - `.Load(...)`
 - resolucao semantica de `CustomType` para `SDT`, `Domain` ou outro tipo GeneXus
@@ -102,9 +103,9 @@ Geracao do indice canonico da pasta paralela:
 - `WorkWithForWeb` lidos: 183
 - `Transaction` lidas: 183
 - objetos gravados no SQLite: 3890
-- relacoes gravadas: 34054
+- relacoes gravadas: 34276
 - casos de regressao da Fase 1: 15 `passed`
-- casos de validacao da Fase 2: 36 `passed`
+- casos de validacao da Fase 2: 40 `passed`
 
 ## Casos de validacao da Fase 2
 
@@ -134,6 +135,8 @@ A bateria propria da Fase 2 cobriu:
 - prompt para `WebPanel` inexistente sem relacao criada
 - condicoes de `WorkWithForWeb` chamando `Procedure`
 - condicao para `Procedure` inexistente sem relacao criada
+- atributos de condicao de `WorkWithForWeb` chamando `Procedure`
+- chamada apos comentario `//` em atributo de condicao sem relacao criada
 
 ## Consultas reais executadas
 
@@ -165,7 +168,7 @@ A bateria propria da Fase 2 cobriu:
 `object-info` para `WorkWithForWeb:WorkWithWebAbateOrdem`:
 
 - objeto localizado em `WorkWithForWeb/WorkWithWebAbateOrdem.xml`
-- 75 relacoes de saida
+- 87 relacoes de saida
 
 `what-uses` para `WorkWithForWeb:WorkWithWebAbateOrdem`:
 
@@ -211,8 +214,20 @@ A bateria propria da Fase 2 cobriu:
 
 - evidencia direta em `WorkWithForWeb/WorkWithWebAbateOrdem.xml`, linha 182, por `workwith_condition_procedure`
 
+`show-evidence` para `WorkWithForWeb:WorkWithWebAbateOrdem` -> `Procedure:procEmpresaGeraNotasDeRetornoPelaOrdemDeAbate`:
+
+- 4 evidencias diretas em `WorkWithForWeb/WorkWithWebAbateOrdem.xml`, por `workwith_condition_attribute_procedure`
+
+`show-evidence` para `WorkWithForWeb:WorkWithWebAnimalPadrao` -> `Procedure:procUsuarioDaSessaoDaEquipeDaFrigobyte`:
+
+- 3 evidencias diretas em `WorkWithForWeb/WorkWithWebAnimalPadrao.xml`, por `workwith_condition_attribute_procedure`
+
+`show-evidence` para `WorkWithForWeb:WorkWithWebAbateOrdem` -> `Procedure:procReferenciadoRomaneioVolumesTotalPesoLiquido`:
+
+- sem resultados, confirmando que chamada apos comentario `//` no atributo de condicao nao foi indexada
+
 ## Conclusao
 
-Os oito primeiros incrementos da Fase 2 foram implementados e validados: `DataProvider` como origem, `DataProvider` como destino de chamada direta, actions de `WorkWithForWeb` por `gxobject`, vinculacoes explicitas de `WorkWithForWeb` para `Transaction`, links e prompts explicitos de `WorkWithForWeb` para `WebPanel`, condicoes de `WorkWithForWeb` chamando `Procedure`, e `ATTCUSTOMTYPE` como `CustomType` literal.
+A Fase 2 foi consolidada com nove incrementos implementados e validados: `DataProvider` como origem, `DataProvider` como destino de chamada direta, actions de `WorkWithForWeb` por `gxobject`, vinculacoes explicitas de `WorkWithForWeb` para `Transaction`, links e prompts explicitos de `WorkWithForWeb` para `WebPanel`, condicoes por tag e atributo de `WorkWithForWeb` chamando `Procedure`, e `ATTCUSTOMTYPE` como `CustomType` literal.
 
-Continuam fora: semantica completa de `Transaction`, `WorkWithForWeb` alem de actions `gxobject`, vinculacoes explicitas de `Transaction`, links e prompts explicitos de `WebPanel`, condicoes com chamada direta de `Procedure`, `for each`, `.Load(...)` e resolucao semantica de `CustomType` para `SDT` ou `Domain`.
+Continuam fora: semantica completa de `Transaction`, semantica de `WorkWithForWeb` alem dos recortes ja cobertos, `for each`, `.Load(...)` e resolucao semantica de `CustomType` para `SDT` ou `Domain`.

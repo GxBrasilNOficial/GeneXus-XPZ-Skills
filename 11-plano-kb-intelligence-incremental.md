@@ -28,7 +28,7 @@ Este plano substitui a sugestao externa `Plano_GeneXus_KB_Intelligence_v1.md` co
 
 Em 2026-04-21, a Fase 1 foi concluida e validada na KB real `FabricaBrasil`, com local canonico operacional em `C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\kb-intelligence.sqlite`.
 
-A Fase 2 foi aberta em 2026-04-21, com primeiro incremento limitado a `DataProvider` como nova origem de relacoes em `Source` efetivo.
+A Fase 2 foi aberta e consolidada em 2026-04-21, com primeiro incremento limitado a `DataProvider` como nova origem de relacoes em `Source` efetivo.
 
 Na mesma data, a Fase 2 recebeu um segundo incremento pequeno: `DataProvider` como destino de chamada direta em `Source` efetivo.
 
@@ -42,7 +42,11 @@ Na sequencia, a Fase 2 recebeu um setimo incremento controlado: prompts explicit
 
 Na sequencia, a Fase 2 recebeu um oitavo incremento controlado: expressoes de condicao de `WorkWithForWeb` chamando `Procedure` por `<condition value="...procNome(...)...">`.
 
-Continuam fora destes incrementos: semantica completa de `Transaction`, `WorkWithForWeb` alem de actions `gxobject`, vinculacoes explicitas de `Transaction`, links explicitos de `WebPanel`, prompts explicitos de `WebPanel` e condicoes com chamada direta de `Procedure`, `for each`, `.Load(...)`, resolucao semantica de `CustomType` para `SDT` ou `Domain`, e inferencias por layout ou comentarios.
+Na sequencia, a Fase 2 recebeu um nono incremento controlado: atributos de condicao de `WorkWithForWeb`, como `condition="..."` e `DeleteCondition="..."`, chamando `Procedure`.
+
+A Fase 2 fica consolidada com estes nove incrementos validados.
+
+Continuam fora da Fase 2: semantica completa de `Transaction`, semantica de `WorkWithForWeb` alem dos recortes ja cobertos, `for each`, `.Load(...)`, resolucao semantica de `CustomType` para `SDT` ou `Domain`, e inferencias por layout ou comentarios.
 
 ## Principios da frente
 
@@ -190,7 +194,7 @@ Caso conhecido obrigatorio para a bateria:
 
 So iniciar depois da Fase 1 validada.
 
-Estado em 2026-04-21: fase aberta e ja ampliada de forma controlada para `DataProvider` como origem e destino direto, actions de `WorkWithForWeb` por `gxobject`, vinculacoes explicitas `WorkWithForWeb` -> `Transaction`, links explicitos `WorkWithForWeb` -> `WebPanel`, prompts explicitos `WorkWithForWeb` -> `WebPanel`, condicoes de `WorkWithForWeb` -> `Procedure`, e propriedades `ATTCUSTOMTYPE` como alvo literal `CustomType`.
+Estado em 2026-04-21: fase consolidada com ampliacao controlada para `DataProvider` como origem e destino direto, actions de `WorkWithForWeb` por `gxobject`, vinculacoes explicitas `WorkWithForWeb` -> `Transaction`, links explicitos `WorkWithForWeb` -> `WebPanel`, prompts explicitos `WorkWithForWeb` -> `WebPanel`, condicoes por tag e atributo de `WorkWithForWeb` -> `Procedure`, e propriedades `ATTCUSTOMTYPE` como alvo literal `CustomType`.
 
 Possiveis ampliacoes:
 
@@ -399,6 +403,30 @@ Gate minimo:
 - adicionar casos reais positivos para `WorkWithForWeb` chamando `Procedure` em `<condition value="...">`
 - adicionar caso negativo para `Procedure` inexistente
 
+### Nono incremento - atributos de condicao de `WorkWithForWeb` chamando `Procedure`
+
+Escopo aceito:
+
+- origem: `WorkWithForWeb`
+- destino: `Procedure`
+- regra: `workwith_condition_attribute_procedure`
+- evidencia: `WorkWith condition attribute`
+- confianca: `direct`
+
+Fora do nono incremento:
+
+- interpretar semantica de filtros, atributos ou operadores da condicao
+- inferir relacao por nome de atributo usado na condicao
+- tratar trecho apos comentario `//` como chamada efetiva
+- tratar chamadas dinamicas ou procedures nao resolvidas como relacoes
+
+Gate minimo:
+
+- manter os 15 casos reais da Fase 1 passando
+- manter os casos anteriores da Fase 2 passando
+- adicionar casos reais positivos para `condition="..."` e `DeleteCondition="..."`
+- adicionar caso negativo para chamada apos comentario `//`
+
 ## Fase 3 - suporte a agentes de programacao
 
 So iniciar depois de existir banco tecnico confiavel.
@@ -470,7 +498,6 @@ Ele deve ser preservado apenas como registro historico e substituido por este pl
 
 ## Proximas decisoes abertas
 
-- decidir o proximo alvo da Fase 2 depois de fechar os incrementos ja validados
 - decidir futuramente se `CustomType:<valor>` deve ser resolvido semanticamente para `SDT`, `Domain` ou outro tipo GeneXus
 - se abrir Fase 3, definir o contrato do `impact-basic` e o guia operacional para agentes consultarem o indice antes de alterar objetos
 - definir nome final da frente tecnica ou skill futura

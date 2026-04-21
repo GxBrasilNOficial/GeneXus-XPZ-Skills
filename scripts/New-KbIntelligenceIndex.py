@@ -6,6 +6,7 @@ Phase 2 current scope:
 - Source relations among Procedure, WebPanel and DataProvider
 - WorkWithForWeb action gxobject links to Procedure and WebPanel
 - WorkWithForWeb condition expressions to Procedure
+- WorkWithForWeb condition attributes to Procedure
 - WorkWithForWeb explicit link tags to WebPanel
 - WorkWithForWeb explicit prompt attributes to WebPanel
 - WorkWithForWeb explicit transaction binding
@@ -35,6 +36,7 @@ WEBPANEL_DOT_LINK_RE = re.compile(r"\b(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*\.\s*Li
 INDEXED_SOURCE_TYPES = ("Procedure", "WebPanel", "DataProvider")
 ACTION_RE = re.compile(r"<action\b(?P<attrs>[^>]*)>", re.IGNORECASE | re.DOTALL)
 CONDITION_RE = re.compile(r"<condition\b(?P<attrs>[^>]*)>", re.IGNORECASE | re.DOTALL)
+TAG_RE = re.compile(r"<(?P<tag>[A-Za-z][A-Za-z0-9]*)\b(?P<attrs>[^>]*)>", re.IGNORECASE | re.DOTALL)
 ATTR_RE = re.compile(r'(?P<name>[A-Za-z_][A-Za-z0-9_]*)="(?P<value>[^"]*)"')
 GXOBJECT_RE = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}-(?P<name>.+)$")
 ATTCUSTOMTYPE_PROPERTY_RE = re.compile(
@@ -310,6 +312,10 @@ def gxobject_name(value: str) -> str | None:
     return match.group("name")
 
 
+def effective_condition_expression(value: str) -> str:
+    return value.split("//", 1)[0]
+
+
 def extract_workwith_action_evidence(
     workwith_objects: Iterable[ObjectInfo],
     procedure_names: set[str],
@@ -375,7 +381,8 @@ def extract_workwith_condition_evidence(
             if not condition_value:
                 continue
 
-            for procedure_match in PROCEDURE_DIRECT_RE.finditer(condition_value):
+            expression = effective_condition_expression(condition_value)
+            for procedure_match in PROCEDURE_DIRECT_RE.finditer(expression):
                 target_name = procedure_lookup.get(procedure_match.group("name").lower())
                 if not target_name:
                     continue
@@ -391,6 +398,45 @@ def extract_workwith_condition_evidence(
                     extractor_rule="workwith_condition_procedure",
                     evidence_role="WorkWith condition",
                 )
+
+    unique: dict[tuple[str, str, str, int], Evidence] = {}
+    for evidence in evidences:
+        unique[(evidence.source_name, evidence.target_name, evidence.extractor_rule, evidence.line)] = evidence
+    return list(unique.values())
+
+
+def extract_workwith_condition_attribute_evidence(
+    workwith_objects: Iterable[ObjectInfo],
+    procedure_names: set[str],
+) -> list[Evidence]:
+    evidences: list[Evidence] = []
+    procedure_lookup = case_insensitive_lookup(procedure_names, "Procedure")
+
+    for source in workwith_objects:
+        xml_text = read_text(source.path)
+        for tag_match in TAG_RE.finditer(xml_text):
+            attrs = parse_attributes(tag_match.group("attrs"))
+            for attr_name, attr_value in attrs.items():
+                if not attr_name.lower().endswith("condition"):
+                    continue
+
+                expression = effective_condition_expression(attr_value)
+                for procedure_match in PROCEDURE_DIRECT_RE.finditer(expression):
+                    target_name = procedure_lookup.get(procedure_match.group("name").lower())
+                    if not target_name:
+                        continue
+                    add_evidence(
+                        evidences,
+                        source=source,
+                        target_type="Procedure",
+                        target_name=target_name,
+                        relation_kind="workwith_condition_attribute_calls_procedure",
+                        line=line_number_at(xml_text, tag_match.start()),
+                        column=1,
+                        snippet=tag_match.group(0),
+                        extractor_rule="workwith_condition_attribute_procedure",
+                        evidence_role="WorkWith condition attribute",
+                    )
 
     unique: dict[tuple[str, str, str, int], Evidence] = {}
     for evidence in evidences:
@@ -755,6 +801,10 @@ def main() -> int:
         workwiths.values(),
         procedure_names=set(procedures),
     )
+    workwith_condition_attribute_evidences = extract_workwith_condition_attribute_evidence(
+        workwiths.values(),
+        procedure_names=set(procedures),
+    )
     workwith_transaction_evidences = extract_workwith_transaction_evidence(
         workwiths.values(),
         transaction_names=set(transactions),
@@ -772,6 +822,7 @@ def main() -> int:
         *source_evidences,
         *workwith_evidences,
         *workwith_condition_evidences,
+        *workwith_condition_attribute_evidences,
         *workwith_transaction_evidences,
         *workwith_webpanel_link_evidences,
         *workwith_prompt_evidences,

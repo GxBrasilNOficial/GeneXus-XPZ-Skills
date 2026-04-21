@@ -288,6 +288,38 @@
       "expected_rule": "workwith_condition_procedure",
       "should_exist": false,
       "expectation": "WorkWithForWeb condition expression must not create a relation for unresolved Procedure"
+    },
+    {
+      "id": "phase2-case-37-workwith-condition-attribute-procedure-return-note",
+      "source": "WorkWithForWeb:WorkWithWebAbateOrdem",
+      "target": "Procedure:procEmpresaGeraNotasDeRetornoPelaOrdemDeAbate",
+      "expected_rule": "workwith_condition_attribute_procedure",
+      "should_exist": true,
+      "expectation": "WorkWithForWeb condition attribute with direct Procedure call must create a direct relation"
+    },
+    {
+      "id": "phase2-case-38-workwith-condition-attribute-nested-procedure",
+      "source": "WorkWithForWeb:WorkWithWebAbateOrdem",
+      "target": "Procedure:procLeEmpresaSessao",
+      "expected_rule": "workwith_condition_attribute_procedure",
+      "should_exist": true,
+      "expectation": "Nested Procedure call inside WorkWithForWeb condition attribute must create a direct relation"
+    },
+    {
+      "id": "phase2-case-39-workwith-deletecondition-attribute-procedure",
+      "source": "WorkWithForWeb:WorkWithWebAnimalPadrao",
+      "target": "Procedure:procUsuarioDaSessaoDaEquipeDaFrigobyte",
+      "expected_rule": "workwith_condition_attribute_procedure",
+      "should_exist": true,
+      "expectation": "DeleteCondition attribute with direct Procedure call must create a direct relation"
+    },
+    {
+      "id": "phase2-case-40-workwith-condition-attribute-comment-does-not-create-relation",
+      "source": "WorkWithForWeb:WorkWithWebAbateOrdem",
+      "target": "Procedure:procReferenciadoRomaneioVolumesTotalPesoLiquido",
+      "expected_rule": "workwith_condition_attribute_procedure",
+      "should_exist": false,
+      "expectation": "Procedure reference after inline comment marker in condition attribute must not create a direct relation"
     }
   ]
 }

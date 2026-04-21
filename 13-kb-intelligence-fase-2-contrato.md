@@ -1,4 +1,4 @@
-# 13 - KB Intelligence Fase 2 - Contrato Inicial
+# 13 - KB Intelligence Fase 2 - Contrato Consolidado
 
 ## Papel do documento
 contrato operacional
@@ -13,7 +13,7 @@ baixo a medio
 agentes que forem ampliar o indice tecnico reutilizavel sem perder o recorte validado da Fase 1
 
 ## Objetivo
-Definir os incrementos iniciais da Fase 2 do KB Intelligence, mantendo a ampliacao pequena, auditavel e validada em casos reais.
+Definir o contrato consolidado da Fase 2 do KB Intelligence, mantendo a ampliacao pequena, auditavel e validada em casos reais.
 
 ## Alvos aprovados
 
@@ -32,6 +32,8 @@ O sexto alvo da Fase 2 e link explicito de `WorkWithForWeb` para `WebPanel`.
 O setimo alvo da Fase 2 e prompt explicito de `WorkWithForWeb` para `WebPanel`.
 
 O oitavo alvo da Fase 2 e condicao de `WorkWithForWeb` com chamada direta para `Procedure`.
+
+O nono alvo da Fase 2 e atributo de condicao de `WorkWithForWeb` com chamada direta para `Procedure`.
 
 Destinos do primeiro incremento continuam limitados a:
 
@@ -65,6 +67,10 @@ Origem do setimo incremento:
 - `WorkWithForWeb`
 
 Origem do oitavo incremento:
+
+- `WorkWithForWeb`
+
+Origem do nono incremento:
 
 - `WorkWithForWeb`
 
@@ -104,12 +110,16 @@ O oitavo incremento adiciona:
 
 - `workwith_condition_procedure`
 
-Toda relacao deve vir de evidencia direta nomeada, com arquivo, linha, snippet, regra e confianca. Em `Source` efetivo, a evidencia deve continuar classificada como `Source efetivo`; em actions de `WorkWithForWeb`, como `WorkWith action`; em vinculacoes de `WorkWithForWeb` para `Transaction`, como `WorkWith transaction`; em links explicitos de `WorkWithForWeb` para `WebPanel`, como `WorkWith link`; em prompts explicitos de `WorkWithForWeb` para `WebPanel`, como `WorkWith prompt`; em condicoes de `WorkWithForWeb` com chamada de `Procedure`, como `WorkWith condition`; em `ATTCUSTOMTYPE`, como `Property ATTCUSTOMTYPE`.
+O nono incremento adiciona:
+
+- `workwith_condition_attribute_procedure`
+
+Toda relacao deve vir de evidencia direta nomeada, com arquivo, linha, snippet, regra e confianca. Em `Source` efetivo, a evidencia deve continuar classificada como `Source efetivo`; em actions de `WorkWithForWeb`, como `WorkWith action`; em vinculacoes de `WorkWithForWeb` para `Transaction`, como `WorkWith transaction`; em links explicitos de `WorkWithForWeb` para `WebPanel`, como `WorkWith link`; em prompts explicitos de `WorkWithForWeb` para `WebPanel`, como `WorkWith prompt`; em condicoes de `WorkWithForWeb` com chamada de `Procedure`, como `WorkWith condition`; em atributos de condicao de `WorkWithForWeb` com chamada de `Procedure`, como `WorkWith condition attribute`; em `ATTCUSTOMTYPE`, como `Property ATTCUSTOMTYPE`.
 
 ## Fora do incremento
 
 - semantica completa de `Transaction`
-- `WorkWithForWeb` alem de actions `gxobject` resolvidas, vinculacoes explicitas de `Transaction`, links explicitos de `WebPanel`, prompts explicitos de `WebPanel` e condicoes com chamada direta de `Procedure`
+- semantica de `WorkWithForWeb` alem dos recortes ja cobertos
 - `for each`
 - `.Load(...)`
 - resolucao semantica de `CustomType` para `SDT`, `Domain` ou outro tipo GeneXus
@@ -141,6 +151,8 @@ Antes de considerar este incremento pronto:
 - a bateria deve incluir caso negativo de prompt para `WebPanel` inexistente
 - a bateria deve incluir casos positivos de condicao `WorkWithForWeb` chamando `Procedure`
 - a bateria deve incluir caso negativo de condicao para `Procedure` inexistente
+- a bateria deve incluir casos positivos de atributo de condicao `WorkWithForWeb` chamando `Procedure`
+- a bateria deve incluir caso negativo de chamada apos comentario `//` em atributo de condicao
 - a validacao deve ser executada contra `FabricaBrasil` com `-FailOnValidationFailure`
 
 ## Decisoes adiaveis
@@ -150,7 +162,6 @@ As decisoes abaixo nao bloqueiam os incrementos ja aprovados:
 - nome final da skill futura
 - politica de snapshots pequenos versionados
 - estrategia definitiva para linha exata em XML com `CDATA`
-- proximo alvo da Fase 2
 - resolucao semantica futura de `CustomType:<valor>` para `SDT`, `Domain` ou outro tipo GeneXus
 
-O proximo alvo da Fase 2 so deve ser escolhido depois que os incrementos ja aprovados estiverem validados e registrados.
+Novas ampliacoes estruturais devem ser tratadas como fase futura ou frente separada, nao como requisito pendente desta Fase 2 consolidada.
