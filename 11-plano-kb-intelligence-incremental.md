@@ -496,9 +496,10 @@ O `AGENTS.md` da raiz da pasta paralela deve orientar agentes a ignorar `Arquivo
 
 Ele deve ser preservado apenas como registro historico e substituido por este plano como orientacao vigente.
 
-## Proximas decisoes abertas
+## Divida tecnica e decisoes adiaveis
 
 - decidir futuramente se `CustomType:<valor>` deve ser resolvido semanticamente para `SDT`, `Domain` ou outro tipo GeneXus
+- decidir futuramente se `for each` e `.Load(...)` devem entrar em fase propria, com classificacao separada e cautela runtime
 - se abrir Fase 3, definir o contrato do `impact-basic` e o guia operacional para agentes consultarem o indice antes de alterar objetos
 - definir nome final da frente tecnica ou skill futura
 - confirmar politica de snapshots pequenos para validacao em Git
