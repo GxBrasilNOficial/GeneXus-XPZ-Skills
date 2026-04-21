@@ -2,7 +2,8 @@
 """
 Build a minimal GeneXus KB intelligence SQLite index.
 
-Phase 2 current scope:
+Current scope:
+- object inventory for every immediate SourceRoot type folder with XML files
 - Source relations among Procedure, WebPanel and DataProvider
 - WorkWithForWeb action gxobject links to Procedure and WebPanel
 - WorkWithForWeb condition expressions to Procedure
@@ -112,6 +113,18 @@ def collect_objects(source_root: Path, object_type: str) -> dict[str, ObjectInfo
             file_hash=sha256_text(text),
         )
     return objects
+
+
+def collect_all_objects(source_root: Path) -> dict[str, dict[str, ObjectInfo]]:
+    objects_by_type: dict[str, dict[str, ObjectInfo]] = {}
+    for folder in sorted(source_root.iterdir(), key=lambda item: item.name.lower()):
+        if not folder.is_dir():
+            continue
+        object_type = folder.name
+        objects = collect_objects(source_root, object_type)
+        if objects:
+            objects_by_type[object_type] = objects
+    return objects_by_type
 
 
 def unwrap_source_body(raw_body: str) -> str:
@@ -765,25 +778,13 @@ def main() -> int:
     if not source_root.exists():
         raise SystemExit(f"SourceRoot not found: {source_root}")
 
-    procedures = collect_objects(source_root, "Procedure")
-    webpanels = collect_objects(source_root, "WebPanel")
-    data_providers = collect_objects(source_root, "DataProvider")
-    workwiths = collect_objects(source_root, "WorkWithForWeb")
-    transactions = collect_objects(source_root, "Transaction")
-    objects_by_type = {
-        "Procedure": procedures,
-        "WebPanel": webpanels,
-        "DataProvider": data_providers,
-        "WorkWithForWeb": workwiths,
-        "Transaction": transactions,
-    }
-    objects = [
-        *procedures.values(),
-        *webpanels.values(),
-        *data_providers.values(),
-        *workwiths.values(),
-        *transactions.values(),
-    ]
+    objects_by_type = collect_all_objects(source_root)
+    procedures = objects_by_type.get("Procedure", {})
+    webpanels = objects_by_type.get("WebPanel", {})
+    data_providers = objects_by_type.get("DataProvider", {})
+    workwiths = objects_by_type.get("WorkWithForWeb", {})
+    transactions = objects_by_type.get("Transaction", {})
+    objects = [obj for by_name in objects_by_type.values() for obj in by_name.values()]
 
     source_evidences = extract_evidence(
         source_root,
@@ -817,7 +818,14 @@ def main() -> int:
         workwiths.values(),
         webpanel_names=set(webpanels),
     )
-    custom_type_evidences = extract_attcustomtype_evidence(objects)
+    relation_scope_objects = [
+        *procedures.values(),
+        *webpanels.values(),
+        *data_providers.values(),
+        *workwiths.values(),
+        *transactions.values(),
+    ]
+    custom_type_evidences = extract_attcustomtype_evidence(relation_scope_objects)
     evidences = [
         *source_evidences,
         *workwith_evidences,

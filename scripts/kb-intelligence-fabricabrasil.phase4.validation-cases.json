@@ -1,0 +1,53 @@
+{
+  "description": "Validation cases for KB Intelligence Phase 4 expanded object inventory using the FabricaBrasil parallel KB.",
+  "cases": [
+    {
+      "id": "phase4-case-1-attribute-inventory",
+      "query": "object-info",
+      "object": "Attribute:AbateOrdemAnimaisContagem",
+      "should_exist": true,
+      "expected_file_contains": "Attribute/AbateOrdemAnimaisContagem.xml",
+      "expectation": "Expanded inventory must include Attribute objects"
+    },
+    {
+      "id": "phase4-case-2-domain-inventory",
+      "query": "object-info",
+      "object": "Domain:AbrangenciaDaSelecaoDeCorte",
+      "should_exist": true,
+      "expected_file_contains": "Domain/AbrangenciaDaSelecaoDeCorte.xml",
+      "expectation": "Expanded inventory must include Domain objects"
+    },
+    {
+      "id": "phase4-case-3-sdt-inventory",
+      "query": "object-info",
+      "object": "SDT:Context",
+      "should_exist": true,
+      "expected_file_contains": "SDT/Context.xml",
+      "expectation": "Expanded inventory must include SDT objects"
+    },
+    {
+      "id": "phase4-case-4-table-inventory",
+      "query": "object-info",
+      "object": "Table:AbateOrdem",
+      "should_exist": true,
+      "expected_file_contains": "Table/AbateOrdem.xml",
+      "expectation": "Expanded inventory must include Table objects"
+    },
+    {
+      "id": "phase4-case-5-impact-basic-expanded-type",
+      "query": "impact-basic",
+      "object": "Domain:AbrangenciaDaSelecaoDeCorte",
+      "should_exist": true,
+      "min_incoming_relations": 0,
+      "min_outgoing_relations": 0,
+      "expectation": "impact-basic must find expanded inventory objects without inventing relations"
+    },
+    {
+      "id": "phase4-case-6-missing-expanded-type-object",
+      "query": "object-info",
+      "object": "Domain:ObjetoInexistenteParaTesteFase4",
+      "should_exist": false,
+      "expectation": "object-info for a missing expanded type object must fail clearly"
+    }
+  ]
+}

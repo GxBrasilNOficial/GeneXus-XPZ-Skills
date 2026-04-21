@@ -445,9 +445,35 @@ Entregas:
 
 Esta fase deve priorizar respostas curtas, baratas e rastreaveis.
 
-## Fase 4 - suporte funcional por agentes
+## Fase 4 - inventario ampliado de tipos
 
-So iniciar depois da base tecnica sustentar consultas confiaveis.
+Aberta por contrato em `15-kb-intelligence-fase-4-contrato.md`, depois do encerramento validado da Fase 3.
+
+Estado em 2026-04-21: implementada e encerrada, com registro em `historico/2026-04-kb-intelligence-fase-4-encerramento.md`.
+
+Objetivo:
+
+- ampliar a tabela `objects` para todos os tipos materializados em `ObjetosDaKbEmXml`
+- manter `search-objects`, `object-info` e `impact-basic` funcionando para tipos sem relacoes extraidas
+- nao ampliar relacoes semanticas nesta fase
+
+## Fase 5 - relacoes semanticas ampliadas
+
+So iniciar depois da Fase 4 validada.
+
+Entregas possiveis:
+
+- resolver `CustomType:<valor>` para `SDT`, `Domain` ou outro tipo GeneXus
+- extrair relacoes entre `Transaction`, `Attribute`, `Domain`, `Table`, `SDT` ou outros tipos
+- decidir se `for each` e `.Load(...)` entram com classificacao propria e cautela runtime
+
+Cada relacao nova deve entrar por contrato incremental, com exemplos reais positivos, exemplos reais negativos, regra de extracao, evidencia e teste de regressao.
+
+## Fase 6 - suporte funcional por agentes
+
+So iniciar depois da base tecnica sustentar consultas confiaveis e depois de decidir se a Fase 5 e pre-requisito para o recorte funcional desejado.
+
+A antiga previsao de Fase 4 foi renumerada para Fase 6 antes de abertura formal, para preservar a sequencia: inventario, relacoes semanticas, suporte funcional.
 
 Entregas possiveis:
 
@@ -456,6 +482,8 @@ Entregas possiveis:
 - explicacao de regras e fluxos com indicacao de evidencias
 
 Esta fase nao deve depender de humanos lendo documentacao estatica extensa.
+
+Recomendacao: abrir a Fase 6 em conversa nova, para evitar mistura entre expansao tecnica do indice e desenho de suporte funcional por agentes.
 
 ## Versionamento recomendado
 
@@ -502,8 +530,6 @@ Ele deve ser preservado apenas como registro historico e substituido por este pl
 
 ## Divida tecnica e decisoes adiaveis
 
-- decidir futuramente se `CustomType:<valor>` deve ser resolvido semanticamente para `SDT`, `Domain` ou outro tipo GeneXus
-- decidir futuramente se `for each` e `.Load(...)` devem entrar em fase propria, com classificacao separada e cautela runtime
 - definir nome final da frente tecnica ou skill futura
 - confirmar politica de snapshots pequenos para validacao em Git
 - manter como decisao tecnica futura a estrategia de calculo de linha exata em XML com `CDATA`

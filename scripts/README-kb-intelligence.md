@@ -5,11 +5,15 @@ guia operacional
 
 ## Escopo atual
 
-Estes scripts implementam a Fase 1 do KB Intelligence e os incrementos aprovados da Fase 2.
+Estes scripts implementam a Fase 1 do KB Intelligence, os incrementos aprovados da Fase 2, a consulta operacional da Fase 3 e o inventario ampliado da Fase 4.
 
 A Fase 3 foi aberta por contrato em `..\14-kb-intelligence-fase-3-contrato.md` para formalizar o uso operacional por agentes e o comando `impact-basic`.
 
-Escopo de extracao atual:
+Escopo de inventario atual:
+
+- todos os tipos com XML em subpastas imediatas de `ObjetosDaKbEmXml`
+
+Escopo de extracao de relacoes atual:
 
 - origens por `Source` efetivo: `Procedure`, `WebPanel` e `DataProvider`
 - destinos por `Source` efetivo: `Procedure`, `WebPanel` e `DataProvider`
@@ -144,6 +148,20 @@ Depois de gerar ou localizar um indice SQLite, valide o comportamento operaciona
 ```
 
 Os casos de validacao da Fase 3 conferem comportamento de consulta. Eles nao regeneram o indice nem substituem a bateria de extracao da Fase 2.
+
+## Validar inventario ampliado da Fase 4
+
+Depois de regenerar o indice, valide a presenca de tipos ampliados com:
+
+```powershell
+.\scripts\Test-KbIntelligenceQueries.ps1 `
+  -IndexPath "C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\kb-intelligence.sqlite" `
+  -ValidationCasesPath ".\scripts\kb-intelligence-fabricabrasil.phase4.validation-cases.json" `
+  -ValidationReportPath "C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\kb-intelligence-phase4-validation.json" `
+  -FailOnValidationFailure
+```
+
+Os casos da Fase 4 conferem inventario de objetos e comportamento conservador de `impact-basic` para tipos sem relacoes extraidas.
 
 ## Saidas
 

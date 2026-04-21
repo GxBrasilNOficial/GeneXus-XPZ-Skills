@@ -65,6 +65,31 @@ def validate_impact_basic(query_engine: Any, conn: sqlite3.Connection, raw_case:
     return case_result
 
 
+def validate_object_info(query_engine: Any, conn: sqlite3.Connection, raw_case: dict[str, Any]) -> dict[str, Any]:
+    object_type, object_name = split_typed_name(raw_case["object"])
+    result = query_engine.object_info(conn, object_type, object_name)
+    should_exist = bool(raw_case.get("should_exist", True))
+
+    failures: list[str] = []
+    if bool(result.get("found")) != should_exist:
+        failures.append(f"found={result.get('found')} expected {should_exist}")
+
+    if should_exist:
+        obj = result.get("object", {})
+        if not isinstance(obj, dict):
+            failures.append("missing object payload")
+        else:
+            expected_file_contains = raw_case.get("expected_file_contains")
+            if expected_file_contains and expected_file_contains not in str(obj.get("file_path", "")):
+                failures.append(f"file_path={obj.get('file_path')} does not contain {expected_file_contains}")
+
+    case_result = dict(raw_case)
+    case_result["status"] = "failed" if failures else "passed"
+    if failures:
+        case_result["failures"] = failures
+    return case_result
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Validate KB Intelligence query behavior.")
     parser.add_argument("--index-path", required=True, type=Path)
@@ -90,12 +115,14 @@ def main() -> int:
     try:
         for raw_case in raw_cases.get("cases", []):
             query = raw_case.get("query")
-            if query != "impact-basic":
+            if query == "impact-basic":
+                case_result = validate_impact_basic(query_engine, conn, raw_case)
+            elif query == "object-info":
+                case_result = validate_object_info(query_engine, conn, raw_case)
+            else:
                 case_result = dict(raw_case)
                 case_result["status"] = "failed"
                 case_result["failures"] = [f"Unsupported query validation: {query}"]
-            else:
-                case_result = validate_impact_basic(query_engine, conn, raw_case)
             cases.append(case_result)
     finally:
         conn.close()
