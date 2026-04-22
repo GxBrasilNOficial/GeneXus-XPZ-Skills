@@ -95,9 +95,39 @@ Exemplos conceituais:
 - inferir uso em `Transaction`, `Table` ou `Source`
 - resolver valores sem prefixo `Domain:`
 
+## Incremento 3 aprovado - resolver `Transaction` -> `Attribute` por `Level`
+
+### Escopo aceito
+
+- origem: objetos `Transaction`
+- evidencia:
+  - elementos estruturais `<Level>/<Attribute>`
+- destino resolvido:
+  - `Attribute`, somente quando o atributo existir no inventario local
+- regra proposta:
+  - `transaction_level_attribute`
+- confianca:
+  - `direct`
+
+### Comportamento esperado
+
+Quando uma `Transaction` declarar atributos em seus niveis estruturais, o indice deve criar relacoes diretas da transacao para esses atributos.
+
+Exemplos conceituais:
+
+- `Transaction:AbateOrdem` pode resolver para `Attribute:AbateOrdemEmpresaId`
+- `Transaction:AbateOrdem` pode resolver para `Attribute:AbateOrdemData`
+
+### Fora do incremento 3
+
+- usar `AttributeProperties` como fonte de relacao
+- inferir atributo por variaveis, `idBasedOn` interno ou nome no `Source`
+- inferir `Transaction` -> `Table`
+- inferir participacao em indice, chave estrangeira ou regra runtime
+- criar relacao para atributo ausente do inventario local
+
 ## Incrementos futuros possiveis
 
-- `Transaction` -> `Attribute`
 - `Transaction` -> `Table`
 - `Table` -> `Attribute`
 - `SDT` -> membros ou tipos internos

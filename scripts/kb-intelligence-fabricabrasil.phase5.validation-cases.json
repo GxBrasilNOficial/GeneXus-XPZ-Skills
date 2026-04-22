@@ -72,6 +72,38 @@
       "expected_rule": "attribute_idbasedon_domain",
       "should_exist": false,
       "expectation": "Attribute without idBasedOn must not create an Attribute to Domain relation"
+    },
+    {
+      "id": "phase5-case-10-transaction-level-key-attribute",
+      "source": "Transaction:AbateOrdem",
+      "target": "Attribute:AbateOrdemEmpresaId",
+      "expected_rule": "transaction_level_attribute",
+      "should_exist": true,
+      "expectation": "Transaction Level Attribute element for a key attribute must create a Transaction to Attribute relation"
+    },
+    {
+      "id": "phase5-case-11-transaction-level-non-key-attribute",
+      "source": "Transaction:AbateOrdem",
+      "target": "Attribute:AbateOrdemData",
+      "expected_rule": "transaction_level_attribute",
+      "should_exist": true,
+      "expectation": "Transaction Level Attribute element for a non-key attribute must create a Transaction to Attribute relation"
+    },
+    {
+      "id": "phase5-case-12-transaction-does-not-link-unlisted-attribute",
+      "source": "Transaction:AbateOrdem",
+      "target": "Attribute:VolumeMovimentoId",
+      "expected_rule": "transaction_level_attribute",
+      "should_exist": false,
+      "expectation": "Existing Attribute absent from the Transaction Level must not create a Transaction to Attribute relation"
+    },
+    {
+      "id": "phase5-case-13-transaction-does-not-link-missing-attribute",
+      "source": "Transaction:AbateOrdem",
+      "target": "Attribute:ObjetoInexistenteParaNaoIndexar",
+      "expected_rule": "transaction_level_attribute",
+      "should_exist": false,
+      "expectation": "Transaction Level extraction must not create a relation to an unresolved Attribute"
     }
   ]
 }
