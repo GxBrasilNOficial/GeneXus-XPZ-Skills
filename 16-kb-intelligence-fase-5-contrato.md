@@ -157,9 +157,39 @@ Exemplos conceituais:
 - criar relacao para atributo ausente do inventario local
 - tratar `<Members>/<Member>` como `table_key_attribute`
 
+## Incremento 5 aprovado - resolver `Transaction` -> `Table` por `Level`
+
+### Escopo aceito
+
+- origem: objetos `Transaction`
+- evidencia:
+  - atributo `Type` de elementos estruturais `<Level>`
+- destino resolvido:
+  - `Table`, somente quando o valor de `Type` existir como tabela no inventario local
+- regra proposta:
+  - `transaction_level_table`
+- confianca:
+  - `direct`
+
+### Comportamento esperado
+
+Quando uma `Transaction` declarar um `Level` cujo `Type` corresponda a uma `Table` existente, o indice deve criar relacao direta da transacao para a tabela.
+
+Exemplos conceituais:
+
+- `Transaction:AbateOrdem` com `Level Type="AbateOrdem"` pode resolver para `Table:AbateOrdem`
+- `Transaction:AnimalParaAbate` nao deve resolver para `Table:AnimalParaAbate` se a tabela nao existir no inventario local
+
+### Fora do incremento 5
+
+- inferir tabela por nome da transacao
+- criar relacao para subnivel sem tabela local correspondente
+- inferir chave estrangeira, indice, navegacao ou comportamento runtime
+- inferir composicao fisica completa de tabela
+- criar relacao para tabela ausente do inventario local
+
 ## Incrementos futuros possiveis
 
-- `Transaction` -> `Table`
 - `Table` -> `Attribute` por membros de indice, com regra separada de chave primaria
 - `SDT` -> membros ou tipos internos
 - relacoes por `for each`, com classificacao separada e cautela runtime

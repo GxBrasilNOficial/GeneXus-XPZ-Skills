@@ -136,6 +136,38 @@
       "expected_rule": "table_key_attribute",
       "should_exist": false,
       "expectation": "Table Key extraction must not create a relation to an unresolved Attribute"
+    },
+    {
+      "id": "phase5-case-18-transaction-level-type-resolves-table-abate-ordem",
+      "source": "Transaction:AbateOrdem",
+      "target": "Table:AbateOrdem",
+      "expected_rule": "transaction_level_table",
+      "should_exist": true,
+      "expectation": "Transaction Level Type must create a Transaction to Table relation when the Table object exists"
+    },
+    {
+      "id": "phase5-case-19-transaction-level-type-resolves-table-animal",
+      "source": "Transaction:Animal",
+      "target": "Table:Animal",
+      "expected_rule": "transaction_level_table",
+      "should_exist": true,
+      "expectation": "Transaction Level Type extraction must work across different Transaction objects"
+    },
+    {
+      "id": "phase5-case-20-transaction-level-type-missing-table-does-not-resolve",
+      "source": "Transaction:AnimalParaAbate",
+      "target": "Table:AnimalParaAbate",
+      "expected_rule": "transaction_level_table",
+      "should_exist": false,
+      "expectation": "Transaction Level Type must not create a relation when the Table object is absent from the local inventory"
+    },
+    {
+      "id": "phase5-case-21-transaction-does-not-link-unlisted-table",
+      "source": "Transaction:AbateOrdem",
+      "target": "Table:Animal",
+      "expected_rule": "transaction_level_table",
+      "should_exist": false,
+      "expectation": "Existing Table not declared as a Level Type in the Transaction must not create a relation"
     }
   ]
 }

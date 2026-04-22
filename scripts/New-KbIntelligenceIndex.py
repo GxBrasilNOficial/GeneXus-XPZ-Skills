@@ -48,7 +48,7 @@ IDBASEDON_PROPERTY_RE = re.compile(
     r"<Property>\s*<Name>idBasedOn</Name>\s*<Value>(?P<value>.*?)</Value>\s*</Property>",
     re.IGNORECASE | re.DOTALL,
 )
-LEVEL_RE = re.compile(r"<Level\b[^>]*>(?P<body>.*?)</Level>", re.IGNORECASE | re.DOTALL)
+LEVEL_RE = re.compile(r"<Level\b(?P<attrs>[^>]*)>(?P<body>.*?)</Level>", re.IGNORECASE | re.DOTALL)
 LEVEL_ATTRIBUTE_RE = re.compile(
     r"<Attribute\b(?P<attrs>[^>]*)>(?P<name>.*?)</Attribute>",
     re.IGNORECASE | re.DOTALL,
@@ -717,6 +717,37 @@ def extract_transaction_level_attribute_evidence(
     return evidences
 
 
+def extract_transaction_level_table_evidence(
+    source_objects: Iterable[ObjectInfo],
+    table_names: set[str],
+) -> list[Evidence]:
+    evidences: list[Evidence] = []
+    table_lookup = case_insensitive_lookup(table_names, "Table")
+    for source in source_objects:
+        xml_text = read_text(source.path)
+        for match in LEVEL_RE.finditer(xml_text):
+            attrs = parse_attributes(match.group("attrs"))
+            raw_table_name = attrs.get("Type", "").strip()
+            if not raw_table_name:
+                continue
+            target_name = table_lookup.get(raw_table_name.lower())
+            if not target_name:
+                continue
+            add_evidence(
+                evidences,
+                source=source,
+                target_type="Table",
+                target_name=target_name,
+                relation_kind="has_level_table",
+                line=line_number_at(xml_text, match.start()),
+                column=1,
+                snippet=match.group(0).split(">", 1)[0] + ">",
+                extractor_rule="transaction_level_table",
+                evidence_role="Level Type",
+            )
+    return evidences
+
+
 def extract_table_key_attribute_evidence(
     source_objects: Iterable[ObjectInfo],
     attribute_names: set[str],
@@ -1004,6 +1035,10 @@ def main() -> int:
         transactions.values(),
         attribute_names=set(attributes),
     )
+    transaction_level_table_evidences = extract_transaction_level_table_evidence(
+        transactions.values(),
+        table_names=set(tables),
+    )
     table_key_attribute_evidences = extract_table_key_attribute_evidence(
         tables.values(),
         attribute_names=set(attributes),
@@ -1020,6 +1055,7 @@ def main() -> int:
         *resolved_custom_type_evidences,
         *attribute_idbasedon_domain_evidences,
         *transaction_level_attribute_evidences,
+        *transaction_level_table_evidences,
         *table_key_attribute_evidences,
     ]
     write_index(args.output_path.resolve(), source_root, objects, evidences)
