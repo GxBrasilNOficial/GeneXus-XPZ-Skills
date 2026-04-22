@@ -28,6 +28,8 @@ A consulta nao deve interpretar regra de negocio, nao deve inferir comportamento
 
 Implementada em 2026-04-22 nos scripts de consulta do KB Intelligence, sem alterar schema do SQLite e sem ampliar extracao.
 
+Depois da primeira estabilizacao curta, recebeu filtro conservador para ocultar literais `CustomType` redundantes quando houver relacao resolvida equivalente na mesma direcao, arquivo e linha. `impact-basic` e `show-evidence` continuam completos.
+
 ## Problema que a consulta resolve
 
 Na Fase 6, o agente frequentemente repete a mesma sequencia:

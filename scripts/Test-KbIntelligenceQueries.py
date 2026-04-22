@@ -102,6 +102,14 @@ def validate_functional_trace_basic(query_engine: Any, conn: sqlite3.Connection,
         for expected in raw_case.get("expected_reading_plan_files", []):
             if expected not in plan_files:
                 failures.append(f"missing expected reading plan file {expected}")
+        if "expected_suppressed_redundant_custom_type_relations" in raw_case:
+            expected_suppressed = int(raw_case["expected_suppressed_redundant_custom_type_relations"])
+            actual_suppressed = int(result.get("suppressed_redundant_custom_type_relations", 0))
+            if actual_suppressed != expected_suppressed:
+                failures.append(
+                    "suppressed_redundant_custom_type_relations="
+                    f"{actual_suppressed} expected {expected_suppressed}"
+                )
         for expected in ("Evidencia direta", "Leitura adicional do XML", "Inferencia forte", "Hipotese"):
             if not isinstance(response_contract, list) or expected not in response_contract:
                 failures.append(f"missing response contract section {expected}")

@@ -228,6 +228,33 @@ def functional_trace_basic(conn: sqlite3.Connection, object_type: str, object_na
             trace_row["direction"] = direction
             trace_rows.append(trace_row)
 
+    def custom_type_payload(target_name: object) -> str | None:
+        value = str(target_name)
+        if ":" not in value:
+            return None
+        return value.split(":", 1)[1].split(",", 1)[0].strip().lower()
+
+    resolved_keys: set[tuple[object, object, object, str]] = set()
+    for row in trace_rows:
+        if row.get("target_type") == "CustomType":
+            continue
+        if "resolved" not in str(row.get("extractor_rule")):
+            continue
+        key = (row.get("direction"), row.get("source_file"), row.get("line"), str(row.get("target_name")).lower())
+        resolved_keys.add(key)
+
+    filtered_trace_rows: list[dict[str, object]] = []
+    suppressed_custom_type_count = 0
+    for row in trace_rows:
+        if row.get("target_type") == "CustomType":
+            payload = custom_type_payload(row.get("target_name"))
+            key = (row.get("direction"), row.get("source_file"), row.get("line"), payload or "")
+            if payload and key in resolved_keys:
+                suppressed_custom_type_count += 1
+                continue
+        filtered_trace_rows.append(row)
+    trace_rows = filtered_trace_rows
+
     def trace_sort_key(row: dict[str, object]) -> tuple[int, int, str, str, int]:
         target_type = str(row.get("target_type", ""))
         relation_kind = str(row.get("relation_kind", ""))
@@ -274,6 +301,7 @@ def functional_trace_basic(conn: sqlite3.Connection, object_type: str, object_na
         "incoming_relations": impact.get("incoming_relations", 0),
         "outgoing_relations": impact.get("outgoing_relations", 0),
         "technical_trace_shown": len(trace_rows),
+        "suppressed_redundant_custom_type_relations": suppressed_custom_type_count,
         "technical_trace": trace_rows,
         "xml_reading_plan": list(reading_plan_by_file.values()),
         "response_contract": [

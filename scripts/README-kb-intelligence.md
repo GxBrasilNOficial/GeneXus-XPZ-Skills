@@ -211,6 +211,7 @@ O comando `functional-trace-basic` monta uma trilha inicial para perguntas funci
 - localiza o objeto principal
 - combina dependentes e dependencias diretas
 - prioriza objetos resolvidos e locais antes de literais `CustomType`
+- oculta literais `CustomType` redundantes quando houver relacao resolvida equivalente na mesma linha
 - indica XMLs oficiais que o agente deve abrir
 - devolve o contrato de resposta da Fase 6
 

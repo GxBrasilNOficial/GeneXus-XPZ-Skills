@@ -51,6 +51,7 @@
       "expected_rules": [
         "attcustomtype_resolved_object"
       ],
+      "expected_suppressed_redundant_custom_type_relations": 2,
       "expected_reading_plan_files": [
         "API/apiPDV_Integracao.xml"
       ]

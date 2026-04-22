@@ -81,7 +81,9 @@ Antes de adicionar novos parametros, avaliar um ajuste pequeno:
 
 ## Proximo gate
 
-Se o objetivo for melhorar a qualidade da triagem curta, implementar filtro conservador de literais redundantes em `functional-trace-basic` e validar de novo:
+Executado depois deste registro: foi implementado filtro conservador de literais redundantes em `functional-trace-basic`.
+
+Validar de novo:
 
 - Fase 3 para regressao
 - Fase 6 para comportamento do novo comando
