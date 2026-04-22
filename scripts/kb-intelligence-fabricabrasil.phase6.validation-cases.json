@@ -1,0 +1,59 @@
+{
+  "cases": [
+    {
+      "id": "phase6-case-1-workwith-functional-trace",
+      "query": "functional-trace-basic",
+      "object": "WorkWithForWeb:WorkWithWebAbateOrdem",
+      "limit": 80,
+      "should_exist": true,
+      "expected_trace_targets": [
+        "Transaction:AbateOrdem",
+        "Procedure:procLeEmpresaSessao"
+      ],
+      "expected_rules": [
+        "workwith_transaction_binding",
+        "workwith_condition_procedure"
+      ],
+      "expected_reading_plan_files": [
+        "WorkWithForWeb/WorkWithWebAbateOrdem.xml"
+      ]
+    },
+    {
+      "id": "phase6-case-2-procedure-bc-functional-trace",
+      "query": "functional-trace-basic",
+      "object": "Procedure:procAjustaCompraGadoIdDeAnimais",
+      "limit": 80,
+      "should_exist": true,
+      "expected_trace_sources": [
+        "WorkWithForWeb:WorkWithWebAbateOrdem"
+      ],
+      "expected_trace_targets": [
+        "Transaction:Animal"
+      ],
+      "expected_rules": [
+        "source_bc_load_transaction",
+        "source_bc_save_transaction"
+      ],
+      "expected_reading_plan_files": [
+        "Procedure/procAjustaCompraGadoIdDeAnimais.xml",
+        "WorkWithForWeb/WorkWithWebAbateOrdem.xml"
+      ]
+    },
+    {
+      "id": "phase6-case-3-api-sdt-functional-trace",
+      "query": "functional-trace-basic",
+      "object": "API:apiPDV_Integracao",
+      "limit": 80,
+      "should_exist": true,
+      "expected_trace_targets": [
+        "SDT:sdtProdutoDadosBasicos"
+      ],
+      "expected_rules": [
+        "attcustomtype_resolved_object"
+      ],
+      "expected_reading_plan_files": [
+        "API/apiPDV_Integracao.xml"
+      ]
+    }
+  ]
+}

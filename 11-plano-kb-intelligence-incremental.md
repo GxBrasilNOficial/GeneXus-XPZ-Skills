@@ -507,6 +507,12 @@ Esta fase nao deve depender de humanos lendo documentacao estatica extensa.
 
 Estado em 2026-04-22: contrato de abertura preparado para formalizar a trilha de suporte funcional assistido por agentes, preservando a precedencia do XML oficial sobre o indice tecnico.
 
+Na mesma data, foi executado o primeiro piloto operacional da Fase 6 em `20-kb-intelligence-fase-6-piloto-investigacao-funcional.md`, usando `FabricaBrasil` como laboratorio real. O piloto confirmou o uso do indice como trilha de triagem e do XML oficial como fonte normativa, alem de registrar que o indice canonico operacional parecia defasado em relacao aos incrementos finais da Fase 5 e nao deveria ser sobrescrito sem decisao explicita. Depois de decisao explicita do usuario, o indice canonico de `FabricaBrasil` foi regenerado pela rotina oficial e validado com a bateria consolidada da Fase 5.
+
+Na sequencia, a Fase 6 recebeu um checklist operacional para agentes em `21-kb-intelligence-fase-6-checklist-operacional-agente.md`, consolidando a ordem minima de triagem, abertura do XML oficial e classificacao da resposta funcional.
+
+Depois disso, foi preparado e implementado o contrato da consulta auxiliar `functional-trace-basic` em `22-kb-intelligence-fase-6-contrato-functional-trace-basic.md`, para reduzir repeticao operacional de triagem sem produzir conclusao funcional automatica.
+
 ## Versionamento recomendado
 
 Versionar:

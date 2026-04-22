@@ -198,6 +198,94 @@ def impact_basic(conn: sqlite3.Connection, object_type: str, object_name: str, l
     }
 
 
+def functional_trace_basic(conn: sqlite3.Connection, object_type: str, object_name: str, limit: int | None) -> dict[str, object]:
+    impact = impact_basic(conn, object_type, object_name, None)
+    if impact.get("found") is False:
+        return {
+            "query": "functional-trace-basic",
+            "object": {"type": object_type, "name": object_name},
+            "found": False,
+            "technical_trace": [],
+            "xml_reading_plan": [],
+            "response_contract": [
+                "Evidencia direta",
+                "Leitura adicional do XML",
+                "Inferencia forte",
+                "Hipotese",
+            ],
+            "notice": "Triagem funcional basica baseada em indice tecnico derivado. Nao representa prova funcional completa nem substitui leitura do XML oficial.",
+        }
+
+    trace_rows: list[dict[str, object]] = []
+    for direction, section in (("incoming", "dependents"), ("outgoing", "dependencies")):
+        rows = impact.get(section, [])
+        if not isinstance(rows, list):
+            continue
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            trace_row = dict(row)
+            trace_row["direction"] = direction
+            trace_rows.append(trace_row)
+
+    def trace_sort_key(row: dict[str, object]) -> tuple[int, int, str, str, int]:
+        target_type = str(row.get("target_type", ""))
+        relation_kind = str(row.get("relation_kind", ""))
+        direction_rank = 0 if row.get("direction") == "incoming" else 1
+        # For functional triage, resolved/local objects are usually better first
+        # than literal CustomType edges, while still preserving every relation.
+        target_rank = 1 if target_type == "CustomType" else 0
+        resolved_rank = 0 if "resolved" in relation_kind else 1
+        line = row.get("line")
+        return (direction_rank, target_rank, resolved_rank, target_type, int(line) if isinstance(line, int) else 0)
+
+    trace_rows = limit_rows(sorted(trace_rows, key=trace_sort_key), limit)
+
+    reading_plan_by_file: dict[str, dict[str, object]] = {}
+    obj = impact.get("object")
+    if isinstance(obj, dict) and obj.get("file_path"):
+        reading_plan_by_file[str(obj["file_path"])] = {
+            "file_path": obj["file_path"],
+            "reason": "Abrir o XML oficial do objeto principal antes de concluir funcionalmente.",
+            "trigger": f"{object_type}:{object_name}",
+            "index_limit": "O indice confirma existencia e relacoes tecnicas diretas; nao prova semantica funcional completa.",
+        }
+
+    for row in trace_rows:
+        source_file = row.get("source_file")
+        if not source_file:
+            continue
+        source = f"{row.get('source_type')}:{row.get('source_name')}"
+        target = f"{row.get('target_type')}:{row.get('target_name')}"
+        reading_plan_by_file.setdefault(
+            str(source_file),
+            {
+                "file_path": source_file,
+                "reason": "Abrir o XML oficial para revisar o trecho ancorado pela evidencia tecnica.",
+                "trigger": f"{source} -> {target}",
+                "index_limit": "A evidencia indica relacao tecnica direta; a conclusao funcional depende da leitura do XML oficial.",
+            },
+        )
+
+    return {
+        "query": "functional-trace-basic",
+        "object": impact["object"],
+        "found": True,
+        "incoming_relations": impact.get("incoming_relations", 0),
+        "outgoing_relations": impact.get("outgoing_relations", 0),
+        "technical_trace_shown": len(trace_rows),
+        "technical_trace": trace_rows,
+        "xml_reading_plan": list(reading_plan_by_file.values()),
+        "response_contract": [
+            "Evidencia direta",
+            "Leitura adicional do XML",
+            "Inferencia forte",
+            "Hipotese",
+        ],
+        "notice": "Triagem funcional basica baseada em indice tecnico derivado. Nao representa prova funcional completa nem substitui leitura do XML oficial.",
+    }
+
+
 def show_evidence(
     conn: sqlite3.Connection,
     relation_id: int | None,
@@ -272,7 +360,7 @@ def format_text(result: dict[str, object]) -> str:
     if isinstance(obj, dict):
         if result.get("found") is False:
             lines.append(f"{query}: {obj.get('type')}:{obj.get('name')} not found")
-            if query == "impact-basic":
+            if query in ("impact-basic", "functional-trace-basic"):
                 lines.append(str(result.get("notice")))
             return "\n".join(lines)
         lines.append(f"{query}: {obj.get('type')}:{obj.get('name')}")
@@ -319,6 +407,43 @@ def format_text(result: dict[str, object]) -> str:
                 lines.append(f"    {row.get('snippet')}")
         return "\n".join(lines)
 
+    if query == "functional-trace-basic" and isinstance(obj, dict):
+        lines.append(f"file: {obj.get('file_path')}")
+        lines.append(f"last_update: {obj.get('last_update')}")
+        lines.append(f"incoming_relations: {result.get('incoming_relations', 0)}")
+        lines.append(f"outgoing_relations: {result.get('outgoing_relations', 0)}")
+        lines.append(str(result.get("notice")))
+
+        trace_rows = result.get("technical_trace", [])
+        lines.append(f"technical_trace: {result.get('technical_trace_shown', 0)}")
+        if isinstance(trace_rows, list):
+            for row in trace_rows:
+                if not isinstance(row, dict):
+                    continue
+                source = f"{row.get('source_type')}:{row.get('source_name')}"
+                target = f"{row.get('target_type')}:{row.get('target_name')}"
+                lines.append(
+                    f"  - {row.get('direction')} #{row.get('relation_id')} {source} -> {target} "
+                    f"[{row.get('relation_kind')}, {row.get('confidence')}]"
+                )
+                lines.append(
+                    f"    {row.get('source_file')}:{row.get('line')} "
+                    f"{row.get('evidence_role')} via {row.get('extractor_rule')}"
+                )
+                lines.append(f"    {row.get('snippet')}")
+
+        reading_plan = result.get("xml_reading_plan", [])
+        lines.append("xml_reading_plan:")
+        if isinstance(reading_plan, list):
+            for item in reading_plan:
+                if not isinstance(item, dict):
+                    continue
+                lines.append(f"  - {item.get('file_path')}")
+                lines.append(f"    reason: {item.get('reason')}")
+                lines.append(f"    trigger: {item.get('trigger')}")
+        lines.append("response_contract: Evidencia direta | Leitura adicional do XML | Inferencia forte | Hipotese")
+        return "\n".join(lines)
+
     total = result.get("total", 0)
     shown = result.get("shown", 0)
     lines.append(f"results: {shown}/{total}")
@@ -355,7 +480,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--query",
         required=True,
-        choices=["object-info", "search-objects", "who-uses", "what-uses", "show-evidence", "impact-basic"],
+        choices=[
+            "object-info",
+            "search-objects",
+            "who-uses",
+            "what-uses",
+            "show-evidence",
+            "impact-basic",
+            "functional-trace-basic",
+        ],
     )
     parser.add_argument("--object-type")
     parser.add_argument("--object-name")
@@ -396,6 +529,10 @@ def main() -> int:
             if not args.object_type or not args.object_name:
                 raise SystemExit("impact-basic requires --object-type and --object-name.")
             result = impact_basic(conn, args.object_type, args.object_name, args.limit)
+        elif args.query == "functional-trace-basic":
+            if not args.object_type or not args.object_name:
+                raise SystemExit("functional-trace-basic requires --object-type and --object-name.")
+            result = functional_trace_basic(conn, args.object_type, args.object_name, args.limit)
         else:
             result = show_evidence(
                 conn,

@@ -11,6 +11,8 @@ A Fase 3 foi aberta por contrato em `..\14-kb-intelligence-fase-3-contrato.md` p
 
 A Fase 5 foi aberta por contrato em `..\16-kb-intelligence-fase-5-contrato.md` para ampliar relacoes semanticas por incrementos pequenos.
 
+A Fase 6 foi aberta por contrato em `..\17-kb-intelligence-fase-6-contrato.md` para suporte funcional assistido por agentes. O comando `functional-trace-basic` empacota a triagem inicial, mas nao produz conclusao funcional automatica.
+
 Escopo de inventario atual:
 
 - todos os tipos com XML em subpastas imediatas de `ObjetosDaKbEmXml`
@@ -202,6 +204,28 @@ Para auditar uma relacao especifica retornada por `impact-basic`, use `show-evid
 
 Essa consulta representa impacto tecnico direto baseado no indice. Ela nao prova impacto runtime completo.
 
+## Triagem funcional basica
+
+O comando `functional-trace-basic` monta uma trilha inicial para perguntas funcionais curtas:
+
+- localiza o objeto principal
+- combina dependentes e dependencias diretas
+- prioriza objetos resolvidos e locais antes de literais `CustomType`
+- indica XMLs oficiais que o agente deve abrir
+- devolve o contrato de resposta da Fase 6
+
+Ele nao abre XML automaticamente, nao interpreta regra de negocio e nao substitui a leitura do XML oficial.
+
+```powershell
+.\scripts\Query-KbIntelligenceIndex.ps1 `
+  -IndexPath "C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\kb-intelligence.sqlite" `
+  -Query functional-trace-basic `
+  -ObjectType Procedure `
+  -ObjectName procAjustaCompraGadoIdDeAnimais `
+  -Limit 20 `
+  -Format text
+```
+
 ## Validar consultas da Fase 3
 
 Depois de gerar ou localizar um indice SQLite, valide o comportamento operacional de `impact-basic` com:
@@ -245,6 +269,20 @@ Depois de regenerar o indice, valide a resolucao semantica aprovada com:
 
 Os casos da Fase 5 conferem relacoes semanticas novas. Eles devem ser executados junto com as baterias anteriores quando houver rodada oficial.
 
+## Validar consulta da Fase 6
+
+Depois de localizar ou regenerar o indice canonico, valide `functional-trace-basic` com:
+
+```powershell
+.\scripts\Test-KbIntelligenceQueries.ps1 `
+  -IndexPath "C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\kb-intelligence.sqlite" `
+  -ValidationCasesPath ".\scripts\kb-intelligence-fabricabrasil.phase6.validation-cases.json" `
+  -ValidationReportPath "C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\kb-intelligence-phase6-validation.json" `
+  -FailOnValidationFailure
+```
+
+Os casos da Fase 6 conferem apenas a montagem da trilha funcional basica. Eles nao provam comportamento runtime nem substituem leitura do XML oficial.
+
 ## Saidas
 
 - `json`: formato padrao para consumo por agentes e automacoes
@@ -259,5 +297,6 @@ Os casos da Fase 5 conferem relacoes semanticas novas. Eles devem ser executados
 - manter o XML oficial como fonte normativa
 - antes de alterar objeto GeneXus coberto pelo indice, executar `impact-basic`
 - tratar `impact-basic` como impacto tecnico direto, nao como prova funcional completa
+- para perguntas funcionais curtas, `functional-trace-basic` pode reduzir a coleta inicial, mas a resposta final ainda deve separar `Evidencia direta`, `Leitura adicional do XML`, `Inferencia forte` e `Hipotese`
 - usar a linha e o `snippet` apenas como evidencia tecnica, nao como prova funcional completa
 - quando a mudanca exigir semantica GeneXus, abrir o XML e revisar o `Source` efetivo

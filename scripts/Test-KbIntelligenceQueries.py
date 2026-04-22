@@ -65,6 +65,56 @@ def validate_impact_basic(query_engine: Any, conn: sqlite3.Connection, raw_case:
     return case_result
 
 
+def validate_functional_trace_basic(query_engine: Any, conn: sqlite3.Connection, raw_case: dict[str, Any]) -> dict[str, Any]:
+    object_type, object_name = split_typed_name(raw_case["object"])
+    result = query_engine.functional_trace_basic(conn, object_type, object_name, raw_case.get("limit"))
+    should_exist = bool(raw_case.get("should_exist", True))
+
+    failures: list[str] = []
+    if bool(result.get("found")) != should_exist:
+        failures.append(f"found={result.get('found')} expected {should_exist}")
+
+    if should_exist:
+        trace_rows = result.get("technical_trace", [])
+        if not isinstance(trace_rows, list):
+            failures.append("technical_trace is not a list")
+            trace_rows = []
+        reading_plan = result.get("xml_reading_plan", [])
+        if not isinstance(reading_plan, list):
+            failures.append("xml_reading_plan is not a list")
+            reading_plan = []
+
+        trace_targets = {typed_name(row, "target") for row in trace_rows if isinstance(row, dict)}
+        trace_sources = {typed_name(row, "source") for row in trace_rows if isinstance(row, dict)}
+        trace_rules = {str(row.get("extractor_rule")) for row in trace_rows if isinstance(row, dict)}
+        plan_files = {str(row.get("file_path")) for row in reading_plan if isinstance(row, dict)}
+        response_contract = result.get("response_contract", [])
+
+        for expected in raw_case.get("expected_trace_targets", []):
+            if expected not in trace_targets:
+                failures.append(f"missing expected trace target {expected}")
+        for expected in raw_case.get("expected_trace_sources", []):
+            if expected not in trace_sources:
+                failures.append(f"missing expected trace source {expected}")
+        for expected in raw_case.get("expected_rules", []):
+            if expected not in trace_rules:
+                failures.append(f"missing expected rule {expected}")
+        for expected in raw_case.get("expected_reading_plan_files", []):
+            if expected not in plan_files:
+                failures.append(f"missing expected reading plan file {expected}")
+        for expected in ("Evidencia direta", "Leitura adicional do XML", "Inferencia forte", "Hipotese"):
+            if not isinstance(response_contract, list) or expected not in response_contract:
+                failures.append(f"missing response contract section {expected}")
+        if "Nao representa prova funcional completa" not in str(result.get("notice", "")):
+            failures.append("notice does not declare functional proof limit")
+
+    case_result = dict(raw_case)
+    case_result["status"] = "failed" if failures else "passed"
+    if failures:
+        case_result["failures"] = failures
+    return case_result
+
+
 def validate_object_info(query_engine: Any, conn: sqlite3.Connection, raw_case: dict[str, Any]) -> dict[str, Any]:
     object_type, object_name = split_typed_name(raw_case["object"])
     result = query_engine.object_info(conn, object_type, object_name)
@@ -117,6 +167,8 @@ def main() -> int:
             query = raw_case.get("query")
             if query == "impact-basic":
                 case_result = validate_impact_basic(query_engine, conn, raw_case)
+            elif query == "functional-trace-basic":
+                case_result = validate_functional_trace_basic(query_engine, conn, raw_case)
             elif query == "object-info":
                 case_result = validate_object_info(query_engine, conn, raw_case)
             else:
