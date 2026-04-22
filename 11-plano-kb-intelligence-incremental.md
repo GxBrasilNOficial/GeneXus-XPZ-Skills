@@ -513,6 +513,8 @@ Na sequencia, a Fase 6 recebeu um checklist operacional para agentes em `21-kb-i
 
 Depois disso, foi preparado e implementado o contrato da consulta auxiliar `functional-trace-basic` em `22-kb-intelligence-fase-6-contrato-functional-trace-basic.md`, para reduzir repeticao operacional de triagem sem produzir conclusao funcional automatica.
 
+A consulta recebeu exemplos operacionais proprios em `23-kb-intelligence-fase-6-exemplos-functional-trace-basic.md`, cobrindo os mesmos tres casos reais da bateria da Fase 6.
+
 ## Versionamento recomendado
 
 Versionar:
