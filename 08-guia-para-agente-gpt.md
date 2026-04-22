@@ -72,6 +72,7 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 
 ## Regra de uso do KB Intelligence
 
+- quando o objetivo principal for triagem por indice derivado para decidir por onde comecar na KB, preferir a skill `xpz-index-triage`
 - quando uma pasta paralela de KB expuser `KbIntelligence\kb-intelligence.sqlite`, o agente deve usar o indice para triagem tecnica antes de alterar objetos GeneXus cobertos pelo contrato da Fase 3
 - a triagem operacional deve consultar `object-info`, `who-uses`, `what-uses` e `show-evidence`, ou `impact-basic` quando esse comando estiver disponivel
 - `impact-basic` e a triagem equivalente representam impacto tecnico direto baseado no indice; nao provam impacto runtime completo
