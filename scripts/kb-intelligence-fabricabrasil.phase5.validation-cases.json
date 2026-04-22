@@ -288,6 +288,62 @@
       "expected_rule": "source_for_each_qualified_table_prefix",
       "should_exist": false,
       "expectation": "Qualified Source target must not create a Table relation to the member name after the dot"
+    },
+    {
+      "id": "phase5-case-37-procedure-bc-load-resolves-transaction",
+      "source": "Procedure:procAjustaCompraGadoIdDeAnimais",
+      "target": "Transaction:Animal",
+      "expected_rule": "source_bc_load_transaction",
+      "should_exist": true,
+      "expectation": "Procedure Source &animal.Load(...) must create a relation to Transaction:Animal when variable ATTCUSTOMTYPE is bc:Animal"
+    },
+    {
+      "id": "phase5-case-38-webpanel-bc-load-resolves-transaction",
+      "source": "WebPanel:WCAbateOrdemAnimal",
+      "target": "Transaction:AbateOrdem",
+      "expected_rule": "source_bc_load_transaction",
+      "should_exist": true,
+      "expectation": "WebPanel Source &AbateOrdem.Load(...) must create a relation to Transaction:AbateOrdem when variable ATTCUSTOMTYPE is bc:AbateOrdem"
+    },
+    {
+      "id": "phase5-case-39-bc-load-resolves-transaction-without-table",
+      "source": "Procedure:procCargaMudaDataDePedidos",
+      "target": "Transaction:RetornoPedido",
+      "expected_rule": "source_bc_load_transaction",
+      "should_exist": true,
+      "expectation": "BC Load must resolve to Transaction when the BC Transaction exists even if no local Table relation exists"
+    },
+    {
+      "id": "phase5-case-40-bc-load-does-not-infer-gam-external-type",
+      "source": "Procedure:GAM_CheckUserActivationMethod",
+      "target": "Transaction:User",
+      "expected_rule": "source_bc_load_transaction",
+      "should_exist": false,
+      "expectation": "Load receiver without resolvable local bc: Transaction variable type must not create a relation by receiver name"
+    },
+    {
+      "id": "phase5-case-41-procedure-bc-save-resolves-transaction",
+      "source": "Procedure:procAjustaCompraGadoIdDeAnimais",
+      "target": "Transaction:Animal",
+      "expected_rule": "source_bc_save_transaction",
+      "should_exist": true,
+      "expectation": "Procedure Source &animal.Save() must create a relation to Transaction:Animal when variable ATTCUSTOMTYPE is bc:Animal"
+    },
+    {
+      "id": "phase5-case-42-webpanel-bc-save-resolves-transaction",
+      "source": "WebPanel:wpEmbarqueSaida",
+      "target": "Transaction:VendaPedido",
+      "expected_rule": "source_bc_save_transaction",
+      "should_exist": true,
+      "expectation": "WebPanel Source &VendaPedido.Save() must create a relation to Transaction:VendaPedido when variable ATTCUSTOMTYPE is bc:VendaPedido"
+    },
+    {
+      "id": "phase5-case-43-bc-save-does-not-infer-external-document",
+      "source": "Procedure:ExportWWOperacaoAjustada",
+      "target": "Transaction:ExcelDocument",
+      "expected_rule": "source_bc_save_transaction",
+      "should_exist": false,
+      "expectation": "Save receiver without resolvable local bc: Transaction variable type must not create a relation by receiver name"
     }
   ]
 }

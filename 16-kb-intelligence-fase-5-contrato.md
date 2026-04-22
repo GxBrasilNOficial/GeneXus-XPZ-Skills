@@ -190,7 +190,7 @@ Exemplos conceituais:
 
 ## Incrementos futuros possiveis
 
-- relacoes por `.Load(...)`, com classificacao separada e cautela runtime
+No momento, manter novos itens como propostas explicitas antes de implementacao.
 
 Cada um desses itens deve ter contrato incremental proprio antes de implementacao.
 
@@ -323,6 +323,76 @@ Exemplos conceituais:
 - inferir tabela fisica do subnivel qualificado
 - inferir join, navegacao completa, indice usado ou plano SQL
 - resolver prefixo que nao exista como `Table` local
+
+## Incremento 10 aprovado - resolver `.Load(...)` de Business Component para `Transaction`
+
+### Escopo aceito
+
+- origem: objetos `Procedure`, `WebPanel` e `DataProvider`
+- evidencia:
+  - linha de `Source` efetivo contendo `&Variavel.Load(...)`
+  - declaracao da variavel com `ATTCUSTOMTYPE` resolvido como `bc:<Transaction>`
+- destino resolvido:
+  - `Transaction`, somente quando a transacao existir no inventario local
+- regra proposta:
+  - `source_bc_load_transaction`
+- confianca:
+  - `direct`
+
+### Comportamento esperado
+
+Quando uma linha de `Source` efetivo chamar `.Load(...)` em uma variavel cujo `ATTCUSTOMTYPE` seja `bc:<Nome>` e `<Nome>` exista como `Transaction`, o indice deve criar relacao direta da origem para a `Transaction`.
+
+Essa relacao representa evidencia estrutural de carga de Business Component no `Source`. Ela nao resolve tabela fisica, nao promete sucesso da carga, nao interpreta parametros de chave e nao prova comportamento runtime completo.
+
+Exemplos conceituais:
+
+- `Procedure:procAjustaCompraGadoIdDeAnimais` com `&animal.Load(...)` e variavel `bc:Animal` pode resolver para `Transaction:Animal`
+- `WebPanel:WCAbateOrdemAnimal` com `&AbateOrdem.Load(...)` e variavel `bc:AbateOrdem` pode resolver para `Transaction:AbateOrdem`
+- `Procedure:procCargaMudaDataDePedidos` com `&RetornoPedido.Load(...)` e variavel `bc:RetornoPedido` pode resolver para `Transaction:RetornoPedido` mesmo sem `Table:RetornoPedido`
+
+### Fora do incremento 10
+
+- inferir tipo do receptor pelo nome da variavel
+- criar relacao quando a variavel nao tiver `ATTCUSTOMTYPE` `bc:*` resolvido localmente
+- resolver `.Load(...)` de `SDT`, `ExternalObject`, GAM externo ou outro tipo nao `Transaction`
+- resolver tabela fisica, chave, sucesso da carga, save posterior ou comportamento runtime
+- interpretar `Grid.Load(...)` ou chamadas sem receptor de variavel GeneXus
+
+## Incremento 11 aprovado - resolver `.Save()` de Business Component para `Transaction`
+
+### Escopo aceito
+
+- origem: objetos `Procedure`, `WebPanel` e `DataProvider`
+- evidencia:
+  - linha de `Source` efetivo contendo `&Variavel.Save()`
+  - declaracao da variavel com `ATTCUSTOMTYPE` resolvido como `bc:<Transaction>`
+- destino resolvido:
+  - `Transaction`, somente quando a transacao existir no inventario local
+- regra proposta:
+  - `source_bc_save_transaction`
+- confianca:
+  - `direct`
+
+### Comportamento esperado
+
+Quando uma linha de `Source` efetivo chamar `.Save()` em uma variavel cujo `ATTCUSTOMTYPE` seja `bc:<Nome>` e `<Nome>` exista como `Transaction`, o indice deve criar relacao direta da origem para a `Transaction`.
+
+Essa relacao representa evidencia estrutural de persistencia via Business Component no `Source`. Ela nao prova sucesso da gravacao, commit, rollback, validacoes disparadas, mensagens de erro ou comportamento runtime completo.
+
+Exemplos conceituais:
+
+- `Procedure:procAjustaCompraGadoIdDeAnimais` com `&animal.Save()` e variavel `bc:Animal` pode resolver para `Transaction:Animal`
+- `WebPanel:wpEmbarqueSaida` com `&VendaPedido.Save()` e variavel `bc:VendaPedido` pode resolver para `Transaction:VendaPedido`
+- `Procedure:ExportWWOperacaoAjustada` com `&ExcelDocument.Save()` nao deve criar relacao para `Transaction:ExcelDocument`
+
+### Fora do incremento 11
+
+- inferir tipo do receptor pelo nome da variavel
+- criar relacao quando a variavel nao tiver `ATTCUSTOMTYPE` `bc:*` resolvido localmente
+- resolver `.Save()` de `ExternalObject`, documentos, GAM externo ou outro tipo nao `Transaction`
+- inferir `.Load(...)`, `.Delete()`, `.Success()`, `.Fail()`, commit, rollback ou mensagens
+- provar sucesso da gravacao ou comportamento runtime
 
 ## Fora do escopo geral da Fase 5
 

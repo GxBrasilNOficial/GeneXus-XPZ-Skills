@@ -14,6 +14,8 @@ Current scope:
 - literal ATTCUSTOMTYPE CustomType values
 - explicit Source for each table references in Procedure and WebPanel
 - qualified Source for each table-prefix references in Procedure and WebPanel
+- Source Business Component Load calls with receiver resolved by variable ATTCUSTOMTYPE
+- Source Business Component Save calls with receiver resolved by variable ATTCUSTOMTYPE
 """
 
 from __future__ import annotations
@@ -44,11 +46,15 @@ FOR_EACH_QUALIFIED_TABLE_RE = re.compile(
     r"\bfor\s+each\s+(?P<prefix>[A-Za-z_][A-Za-z0-9_]*)\s*\.\s*(?P<member>[A-Za-z_][A-Za-z0-9_]*)\b",
     re.IGNORECASE,
 )
+BC_LOAD_RE = re.compile(r"(?P<receiver>&[A-Za-z_][A-Za-z0-9_]*)\s*\.\s*Load\s*\(", re.IGNORECASE)
+BC_SAVE_RE = re.compile(r"(?P<receiver>&[A-Za-z_][A-Za-z0-9_]*)\s*\.\s*Save\s*\(", re.IGNORECASE)
 INDEXED_SOURCE_TYPES = ("Procedure", "WebPanel", "DataProvider")
 FOR_EACH_SOURCE_TYPES = ("Procedure", "WebPanel")
+BC_LOAD_SOURCE_TYPES = ("Procedure", "WebPanel", "DataProvider")
 ACTION_RE = re.compile(r"<action\b(?P<attrs>[^>]*)>", re.IGNORECASE | re.DOTALL)
 CONDITION_RE = re.compile(r"<condition\b(?P<attrs>[^>]*)>", re.IGNORECASE | re.DOTALL)
 TAG_RE = re.compile(r"<(?P<tag>[A-Za-z][A-Za-z0-9]*)\b(?P<attrs>[^>]*)>", re.IGNORECASE | re.DOTALL)
+VARIABLE_RE = re.compile(r"<Variable\b(?P<attrs>[^>]*)>(?P<body>.*?)</Variable>", re.IGNORECASE | re.DOTALL)
 ATTR_RE = re.compile(r'(?P<name>[A-Za-z_][A-Za-z0-9_]*)="(?P<value>[^"]*)"')
 GXOBJECT_RE = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}-(?P<name>.+)$")
 ATTCUSTOMTYPE_PROPERTY_RE = re.compile(
@@ -453,6 +459,129 @@ def gxobject_name(value: str) -> str | None:
 
 def effective_condition_expression(value: str) -> str:
     return value.split("//", 1)[0]
+
+
+def bc_variable_targets(xml_text: str, transaction_lookup: dict[str, str]) -> dict[str, str]:
+    targets: dict[str, str] = {}
+    for match in VARIABLE_RE.finditer(xml_text):
+        attrs = parse_attributes(match.group("attrs"))
+        variable_name = attrs.get("Name")
+        if not variable_name:
+            continue
+        custom_type_match = ATTCUSTOMTYPE_PROPERTY_RE.search(match.group("body"))
+        if not custom_type_match:
+            continue
+        custom_type = normalize_custom_type(custom_type_match.group("value"))
+        if not custom_type.lower().startswith("bc:"):
+            continue
+        raw_transaction_name = custom_type.split(":", 1)[1].strip()
+        target_name = transaction_lookup.get(raw_transaction_name.lower())
+        if not target_name:
+            continue
+        targets[variable_name.lower()] = target_name
+    return targets
+
+
+def extract_source_bc_load_transaction_evidence(
+    source_objects: Iterable[ObjectInfo],
+    transaction_names: set[str],
+) -> list[Evidence]:
+    evidences: list[Evidence] = []
+    transaction_lookup = case_insensitive_lookup(transaction_names, "Transaction")
+
+    for source in source_objects:
+        xml_text = read_text(source.path)
+        variable_targets = bc_variable_targets(xml_text, transaction_lookup)
+        if not variable_targets:
+            continue
+        for block in source_blocks(xml_text):
+            for offset, line in enumerate(block.text.splitlines()):
+                cleaned = active_line(line)
+                if not cleaned.strip():
+                    continue
+                line_no = block.start_line + offset
+
+                for match in BC_LOAD_RE.finditer(cleaned):
+                    receiver_name = match.group("receiver")[1:]
+                    target_name = variable_targets.get(receiver_name.lower())
+                    if not target_name:
+                        continue
+                    add_evidence(
+                        evidences,
+                        source=source,
+                        target_type="Transaction",
+                        target_name=target_name,
+                        relation_kind="loads_business_component",
+                        line=line_no,
+                        column=match.start("receiver") + 1,
+                        snippet=cleaned,
+                        extractor_rule="source_bc_load_transaction",
+                        evidence_role="Source BC Load",
+                    )
+
+    unique: dict[tuple[str, str, str, str, int, str], Evidence] = {}
+    for evidence in evidences:
+        key = (
+            evidence.source_type,
+            evidence.source_name,
+            evidence.target_type,
+            evidence.target_name,
+            evidence.line,
+            evidence.extractor_rule,
+        )
+        unique[key] = evidence
+    return list(unique.values())
+
+
+def extract_source_bc_save_transaction_evidence(
+    source_objects: Iterable[ObjectInfo],
+    transaction_names: set[str],
+) -> list[Evidence]:
+    evidences: list[Evidence] = []
+    transaction_lookup = case_insensitive_lookup(transaction_names, "Transaction")
+
+    for source in source_objects:
+        xml_text = read_text(source.path)
+        variable_targets = bc_variable_targets(xml_text, transaction_lookup)
+        if not variable_targets:
+            continue
+        for block in source_blocks(xml_text):
+            for offset, line in enumerate(block.text.splitlines()):
+                cleaned = active_line(line)
+                if not cleaned.strip():
+                    continue
+                line_no = block.start_line + offset
+
+                for match in BC_SAVE_RE.finditer(cleaned):
+                    receiver_name = match.group("receiver")[1:]
+                    target_name = variable_targets.get(receiver_name.lower())
+                    if not target_name:
+                        continue
+                    add_evidence(
+                        evidences,
+                        source=source,
+                        target_type="Transaction",
+                        target_name=target_name,
+                        relation_kind="saves_business_component",
+                        line=line_no,
+                        column=match.start("receiver") + 1,
+                        snippet=cleaned,
+                        extractor_rule="source_bc_save_transaction",
+                        evidence_role="Source BC Save",
+                    )
+
+    unique: dict[tuple[str, str, str, str, int, str], Evidence] = {}
+    for evidence in evidences:
+        key = (
+            evidence.source_type,
+            evidence.source_name,
+            evidence.target_type,
+            evidence.target_name,
+            evidence.line,
+            evidence.extractor_rule,
+        )
+        unique[key] = evidence
+    return list(unique.values())
 
 
 def extract_workwith_action_evidence(
@@ -1185,6 +1314,14 @@ def main() -> int:
         [obj for obj in objects if obj.object_type in FOR_EACH_SOURCE_TYPES],
         table_names=set(tables),
     )
+    source_bc_load_transaction_evidences = extract_source_bc_load_transaction_evidence(
+        [obj for obj in objects if obj.object_type in BC_LOAD_SOURCE_TYPES],
+        transaction_names=set(transactions),
+    )
+    source_bc_save_transaction_evidences = extract_source_bc_save_transaction_evidence(
+        [obj for obj in objects if obj.object_type in BC_LOAD_SOURCE_TYPES],
+        transaction_names=set(transactions),
+    )
     workwith_evidences = extract_workwith_action_evidence(
         workwiths.values(),
         procedure_names=set(procedures),
@@ -1251,6 +1388,8 @@ def main() -> int:
         *source_evidences,
         *source_for_each_explicit_table_evidences,
         *source_for_each_qualified_table_prefix_evidences,
+        *source_bc_load_transaction_evidences,
+        *source_bc_save_transaction_evidences,
         *workwith_evidences,
         *workwith_condition_evidences,
         *workwith_condition_attribute_evidences,
