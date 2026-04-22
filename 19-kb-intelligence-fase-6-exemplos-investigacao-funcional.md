@@ -353,6 +353,86 @@ Mostrar como a Fase 6 deve usar o indice para orientar a leitura e como a respos
 
 - o indice nao prova sozinho se esse `SDT` concentra todo o criterio do seletor ou se parte relevante da regra esta espalhada em chamadas auxiliares
 
+## Exemplo 12 - distinguir `via edicao web` de `via BC` no ajuste de `Animal`
+
+### Pergunta
+
+"No fluxo de `WorkWithForWeb:WorkWithWebAbateOrdem`, a acao `ZeraCompraGadoIdDeAnimais` atua sobre `Transaction:Animal` via edicao web ou via BC?"
+
+### Trilha minima
+
+- consultar `functional-trace-basic` para `Procedure:procAjustaCompraGadoIdDeAnimais`
+- confirmar no indice a relacao de entrada `WorkWithForWeb:WorkWithWebAbateOrdem` -> `Procedure:procAjustaCompraGadoIdDeAnimais`
+- confirmar no indice as relacoes `Procedure:procAjustaCompraGadoIdDeAnimais` -> `Transaction:Animal` por `Load` e `Save`
+- abrir os XMLs oficiais de `WorkWithForWeb/WorkWithWebAbateOrdem.xml`, `Procedure/procAjustaCompraGadoIdDeAnimais.xml` e `Transaction/Animal.xml`
+
+### Evidencia direta
+
+- existe relacao direta `WorkWithForWeb:WorkWithWebAbateOrdem` -> `Procedure:procAjustaCompraGadoIdDeAnimais`
+- a evidencia registrada fica em `WorkWithForWeb/WorkWithWebAbateOrdem.xml`, linha `843`
+- a regra registrada e `workwith_action_gxobject`
+- o trecho registrado e a action `ZeraCompraGadoIdDeAnimais`
+- existem relacoes diretas `Procedure:procAjustaCompraGadoIdDeAnimais` -> `Transaction:Animal`
+- as evidencias registradas ficam em `Procedure/procAjustaCompraGadoIdDeAnimais.xml`, linhas `66`, `83`, `122` e `138`
+- as regras registradas sao `source_bc_load_transaction` e `source_bc_save_transaction`
+
+### Leitura adicional do XML
+
+- no XML oficial de `WorkWithForWeb:WorkWithWebAbateOrdem`, a action `ZeraCompraGadoIdDeAnimais` chama a procedure `procAjustaCompraGadoIdDeAnimais` com parametros como `AbateOrdemData`, `AbateOrdemEmpresaId` e `AbateOrdemId`
+- no XML oficial da procedure, o `parm(...)` confirma esse contrato de entrada e o `Source` filtra `Animal` por `AnimalAbateOrdemId = &AbateOrdemId`
+- ainda na procedure, os trechos `&animal.Load(AnimalEmpresaId, AnimalId)`, `&animal.AnimalCompraGadoId.SetEmpty()` ou `&animal.AnimalCompraGadoId = &CompraGadoId`, seguidos de `&animal.Save()`, confirmam manipulacao da `Transaction:Animal` via Business Component
+- no XML oficial de `Transaction:Animal`, ha blocos separados marcados com `[web]` e `[bc]`, reforcando a terminologia local: regras e eventos de tela ficam em `via edicao web`, enquanto manipulacao por `Load/Save` do BC fica em `via BC`
+
+### Inferencia forte
+
+- neste caso, o disparo do fluxo ocorre `via edicao web`, porque parte de uma action do `WorkWithForWeb`
+- a alteracao efetiva dos registros de `Animal` ocorre `via BC`, porque a procedure chamada carrega e salva a transacao com `&animal.Load(...)` e `&animal.Save()`
+- portanto, a forma mais precisa de descrever o caso e: a tela inicia o fluxo `via edicao web`, mas a atualizacao de `Animal` e executada `via BC`
+
+### Hipotese
+
+- esse recorte nao prova sozinho se toda atualizacao de `Animal` a partir de `WorkWithWebAbateOrdem` passa por essa mesma procedure
+- tambem nao prova que a action sempre zera `AnimalCompraGadoId`; em parte do `Source`, a mesma procedure tambem pode preencher `AnimalCompraGadoId = &CompraGadoId`, conforme os parametros recebidos
+
+## Exemplo 13 - suspeita curta de reprocessamento em `AbateOrdem`
+
+### Pergunta
+
+"Ha indicio tecnico forte de que `WorkWithForWeb:WorkWithWebAbateOrdem` oferece um fluxo de reprocessamento de `Transaction:AbateOrdem`?"
+
+### Trilha minima
+
+- consultar `functional-trace-basic` para `Procedure:procReprocessaAbateOrdem`
+- confirmar no indice a relacao de entrada `WorkWithForWeb:WorkWithWebAbateOrdem` -> `Procedure:procReprocessaAbateOrdem`
+- confirmar no indice as relacoes `Procedure:procReprocessaAbateOrdem` -> `Transaction:AbateOrdem` por `Load` e `Save`
+- abrir os XMLs oficiais de `WorkWithForWeb/WorkWithWebAbateOrdem.xml` e `Procedure/procReprocessaAbateOrdem.xml`
+
+### Evidencia direta
+
+- existem relacoes diretas `WorkWithForWeb:WorkWithWebAbateOrdem` -> `Procedure:procReprocessaAbateOrdem`
+- as evidencias registradas ficam em `WorkWithForWeb/WorkWithWebAbateOrdem.xml`, linhas `324` e `834`
+- a regra registrada e `workwith_action_gxobject`
+- existem relacoes diretas `Procedure:procReprocessaAbateOrdem` -> `Transaction:AbateOrdem`
+- as evidencias registradas ficam em `Procedure/procReprocessaAbateOrdem.xml`, linhas `28` e `30`
+- as regras registradas sao `source_bc_load_transaction` e `source_bc_save_transaction`
+
+### Leitura adicional do XML
+
+- no XML oficial de `WorkWithForWeb:WorkWithWebAbateOrdem`, as actions `ReprocessaAbateOrdens` e `ReprocessaAbateOrdem` chamam a procedure `procReprocessaAbateOrdem`
+- no XML oficial da procedure, o `parm(...)` recebe `EmpresaId`, intervalo de datas, `TerceiroId` e `AbateOrdemId`
+- ainda na procedure, o `for each` filtra `AbateOrdem` por empresa, data, terceiro e id quando os parametros estao preenchidos
+- dentro desse recorte, os trechos `&abateordem.Load(AbateOrdemEmpresaId, AbateOrdemId)` e `&abateordem.Save()` confirmam manipulacao `via BC` da `Transaction:AbateOrdem`
+
+### Inferencia forte
+
+- ha indicio tecnico forte de que a tela oferece um fluxo de reprocessamento de `AbateOrdem`, porque o `WorkWithForWeb` expoe actions nomeadas para reprocessar e a procedure correspondente reler e salvar a transacao por BC
+- o indice e o XML juntos sustentam bem a suspeita de fluxo, mesmo sem afirmar o efeito funcional completo do reprocessamento
+
+### Hipotese
+
+- esse recorte nao prova sozinho o que exatamente e recalculado ou refeito durante o reprocessamento
+- para fechar a regra funcional completa, ainda seria necessario seguir a leitura da `Transaction:AbateOrdem` e de qualquer logica disparada indiretamente no `Save()`
+
 ## Padrao comum dos exemplos
 
 - o indice decide a ordem de leitura

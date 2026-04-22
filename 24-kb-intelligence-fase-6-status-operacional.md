@@ -10,14 +10,16 @@ medio
 17-kb-intelligence-fase-6-contrato.md, 18-kb-intelligence-fase-6-roteiro-investigacao-funcional.md, 20-kb-intelligence-fase-6-piloto-investigacao-funcional.md, 21-kb-intelligence-fase-6-checklist-operacional-agente.md, 22-kb-intelligence-fase-6-contrato-functional-trace-basic.md, 23-kb-intelligence-fase-6-exemplos-functional-trace-basic.md, scripts/README-kb-intelligence.md
 
 ## Usado por
-agentes que forem retomar a Fase 6 depois da primeira entrega operacional
+agentes que precisem consultar o status da primeira entrega operacional da Fase 6 antes do encerramento consolidado
 
 ## Objetivo
-Registrar o estado operacional da Fase 6 depois da implementacao e publicacao de `functional-trace-basic`.
+Registrar o estado operacional da primeira entrega da Fase 6 depois da implementacao e publicacao de `functional-trace-basic`.
 
 ## Estado consolidado
 
 Em 2026-04-22, a Fase 6 deixou de ser apenas documental e passou a ter uma consulta auxiliar operacional.
+
+Este documento registra esse marco intermediario. O encerramento operacional consolidado da fase ficou registrado depois em `28-kb-intelligence-fase-6-encerramento.md`.
 
 Artefatos consolidados:
 
@@ -86,23 +88,16 @@ A Fase 6 continua com estes limites:
 - `functional-trace-basic` nao substitui `impact-basic` nem `show-evidence`
 - `functional-trace-basic` nao deve ser descrito como prova funcional
 
-## Proximo gate recomendado
+## Desfecho posterior
 
-Antes de ampliar a Fase 6, escolher uma destas frentes:
+Depois deste status intermediario, a Fase 6 recebeu:
 
-1. **Estabilizacao curta**
-   - rodar Fase 6 em mais 2 ou 3 perguntas funcionais reais
-   - ajustar apenas exemplos e checklist
-   - nao ampliar codigo
+- estabilizacao curta em `25-kb-intelligence-fase-6-estabilizacao-curta.md`
+- verificacao pos-filtro em `26-kb-intelligence-fase-6-verificacao-pos-filtro.md`
+- primeira resposta funcional controlada em `27-kb-intelligence-fase-6-primeira-resposta-funcional.md`
+- encerramento operacional consolidado em `28-kb-intelligence-fase-6-encerramento.md`
 
-2. **Consulta filtrada**
-   - avaliar parametros como `TargetType`, `RelationKind`, `IncludeIncoming` e `IncludeOutgoing`
-   - so implementar se houver ruido operacional recorrente
-
-3. **Relatorio de resposta assistida**
-   - gerar um esqueleto de resposta com secoes vazias
-   - manter conclusao funcional fora do script
-   - exigir que o agente preencha apos leitura do XML oficial
+Com isso, este documento deve ser lido como fotografia da primeira entrega operacional, nao como estado final aberto da fase.
 
 ## Criterio para nao avancar
 

@@ -491,7 +491,7 @@ Cada relacao nova deve entrar por contrato incremental, com exemplos reais posit
 
 ## Fase 6 - suporte funcional por agentes
 
-Aberta por contrato em `17-kb-intelligence-fase-6-contrato.md`, com foco inicial em metodo de triagem funcional assistida, ainda sem automacao funcional nova.
+Aberta por contrato em `17-kb-intelligence-fase-6-contrato.md`, com foco inicial em metodo de triagem funcional assistida.
 
 So iniciar depois da base tecnica sustentar consultas confiaveis e depois de decidir se ainda ha expansao tecnica relevante pendente na Fase 5.
 
@@ -505,7 +505,7 @@ Entregas possiveis:
 
 Esta fase nao deve depender de humanos lendo documentacao estatica extensa.
 
-Estado em 2026-04-22: contrato de abertura preparado para formalizar a trilha de suporte funcional assistido por agentes, preservando a precedencia do XML oficial sobre o indice tecnico.
+Estado em 2026-04-22: implementada e encerrada operacionalmente no recorte curto, com preservacao explicita da precedencia do XML oficial sobre o indice tecnico.
 
 Na mesma data, foi executado o primeiro piloto operacional da Fase 6 em `20-kb-intelligence-fase-6-piloto-investigacao-funcional.md`, usando `FabricaBrasil` como laboratorio real. O piloto confirmou o uso do indice como trilha de triagem e do XML oficial como fonte normativa, alem de registrar que o indice canonico operacional parecia defasado em relacao aos incrementos finais da Fase 5 e nao deveria ser sobrescrito sem decisao explicita. Depois de decisao explicita do usuario, o indice canonico de `FabricaBrasil` foi regenerado pela rotina oficial e validado com a bateria consolidada da Fase 5.
 
@@ -515,13 +515,19 @@ Depois disso, foi preparado e implementado o contrato da consulta auxiliar `func
 
 A consulta recebeu exemplos operacionais proprios em `23-kb-intelligence-fase-6-exemplos-functional-trace-basic.md`, cobrindo os mesmos tres casos reais da bateria da Fase 6.
 
-O status operacional consolidado da primeira entrega da Fase 6 ficou registrado em `24-kb-intelligence-fase-6-status-operacional.md`, com limites preservados e proximos gates recomendados.
+O status operacional consolidado da primeira entrega da Fase 6 ficou registrado em `24-kb-intelligence-fase-6-status-operacional.md`, como fotografia do marco intermediario antes do encerramento consolidado.
 
 A primeira estabilizacao curta de `functional-trace-basic` ficou registrada em `25-kb-intelligence-fase-6-estabilizacao-curta.md`. O achado principal foi que literais `CustomType` ainda aparecem na trilha mesmo quando ha relacao resolvida equivalente, o que preserva rastreabilidade mas pode gerar ruido em respostas funcionais curtas.
 
 Depois do ajuste conservador, a verificacao pos-filtro ficou registrada em `26-kb-intelligence-fase-6-verificacao-pos-filtro.md`. O resultado confirmou que a consulta oculta apenas literais `CustomType` redundantes quando ha relacao resolvida equivalente, mantendo relacoes resolvidas, literais externos ou primitivos, chamadas e tabelas.
 
 O primeiro exemplo de resposta funcional controlada ficou registrado em `27-kb-intelligence-fase-6-primeira-resposta-funcional.md`, usando `API:apiPDV_Integracao` para exercitar a separacao entre evidencia direta, leitura adicional do XML, inferencia forte e hipotese.
+
+Na sequencia, a Fase 6 recebeu mais dois exemplos curtos no documento `19-kb-intelligence-fase-6-exemplos-investigacao-funcional.md`: um para fixar a terminologia local entre `via edicao web` e `via BC`, e outro para registrar uma suspeita curta de fluxo de reprocessamento em `AbateOrdem` sem inflar certeza funcional.
+
+O encerramento operacional da fase ficou registrado em `28-kb-intelligence-fase-6-encerramento.md`.
+
+Recomendacao atual apos o encerramento: nao abrir Fase 7 ainda. Se uma frente futura for necessaria, ela deve nascer de lacuna operacional concreta e pequena, nao de expansao especulativa.
 
 ## Versionamento recomendado
 
