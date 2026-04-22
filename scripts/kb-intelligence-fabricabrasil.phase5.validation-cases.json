@@ -232,6 +232,62 @@
       "expected_rule": "sdt_item_attcustomtype_resolved_sdt",
       "should_exist": false,
       "expectation": "Existing SDT not declared as an SDT Item ATTCUSTOMTYPE target must not create a relation"
+    },
+    {
+      "id": "phase5-case-30-procedure-for-each-explicit-table-animal",
+      "source": "Procedure:procAnimaisContagemDeUmPeriodo",
+      "target": "Table:Animal",
+      "expected_rule": "source_for_each_explicit_table",
+      "should_exist": true,
+      "expectation": "Procedure Source with explicit for each Animal must create a Procedure to Table relation when Table:Animal exists"
+    },
+    {
+      "id": "phase5-case-31-webpanel-for-each-explicit-table-volume",
+      "source": "WebPanel:wcVolumeMovimentosComReferenciaAoRomaneio",
+      "target": "Table:VolumeMovimento",
+      "expected_rule": "source_for_each_explicit_table",
+      "should_exist": true,
+      "expectation": "WebPanel Source with explicit for each VolumeMovimento must create a WebPanel to Table relation when Table:VolumeMovimento exists"
+    },
+    {
+      "id": "phase5-case-32-for-each-transaction-without-local-table-does-not-resolve",
+      "source": "Procedure:procImportaPedidosDaCarga",
+      "target": "Table:RetornoPedido",
+      "expected_rule": "source_for_each_explicit_table",
+      "should_exist": false,
+      "expectation": "Explicit for each RetornoPedido must not create a Table relation when Table:RetornoPedido is absent from the local inventory"
+    },
+    {
+      "id": "phase5-case-33-qualified-for-each-target-stays-out-of-scope",
+      "source": "Procedure:procAnimalValorPelaCompra",
+      "target": "Table:CompraGadoItens",
+      "expected_rule": "source_for_each_explicit_table",
+      "should_exist": false,
+      "expectation": "Qualified targets such as for each CompraGadoItens.Faixas must stay out of this explicit table increment"
+    },
+    {
+      "id": "phase5-case-34-qualified-for-each-prefix-resolves-table",
+      "source": "Procedure:procAnimalValorPelaCompra",
+      "target": "Table:CompraGadoItens",
+      "expected_rule": "source_for_each_qualified_table_prefix",
+      "should_exist": true,
+      "expectation": "Qualified Source target for each CompraGadoItens.Faixas must create a relation to the table prefix when Table:CompraGadoItens exists"
+    },
+    {
+      "id": "phase5-case-35-qualified-for-each-prefix-resolves-second-table",
+      "source": "Procedure:procCondicaoPagamentoPrazoMedio",
+      "target": "Table:CondicaoPagamento",
+      "expected_rule": "source_for_each_qualified_table_prefix",
+      "should_exist": true,
+      "expectation": "Qualified Source target for each CondicaoPagamento.Parcelas must create a relation to the table prefix when Table:CondicaoPagamento exists"
+    },
+    {
+      "id": "phase5-case-36-qualified-for-each-member-is-not-table-target",
+      "source": "Procedure:procAnimalValorPelaCompra",
+      "target": "Table:Faixas",
+      "expected_rule": "source_for_each_qualified_table_prefix",
+      "should_exist": false,
+      "expectation": "Qualified Source target must not create a Table relation to the member name after the dot"
     }
   ]
 }

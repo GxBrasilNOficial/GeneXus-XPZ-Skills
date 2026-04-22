@@ -190,7 +190,6 @@ Exemplos conceituais:
 
 ## Incrementos futuros possiveis
 
-- relacoes por `for each`, com classificacao separada e cautela runtime
 - relacoes por `.Load(...)`, com classificacao separada e cautela runtime
 
 Cada um desses itens deve ter contrato incremental proprio antes de implementacao.
@@ -257,6 +256,73 @@ Exemplos conceituais:
 - resolver `Domain` a partir de item de `SDT` sem evidencia real aprovada
 - inferir uso runtime, serializacao ou contrato de API
 - expandir estrutura interna completa do `SDT`
+
+## Incremento 8 aprovado - resolver `Procedure`/`WebPanel` -> `Table` por `for each` explicito
+
+### Escopo aceito
+
+- origem: objetos `Procedure` e `WebPanel`
+- evidencia:
+  - linha de `Source` efetivo contendo `for each <Nome>` explicito
+- destino resolvido:
+  - `Table`, somente quando `<Nome>` existir como tabela no inventario local
+- regra proposta:
+  - `source_for_each_explicit_table`
+- confianca:
+  - `direct`
+
+### Comportamento esperado
+
+Quando uma linha de `Source` efetivo declarar `for each <Nome>` e `<Nome>` existir como `Table`, o indice deve criar relacao direta da origem para a tabela. Essa relacao representa evidencia estrutural de navegacao declarada no `Source`; ela nao promete comportamento runtime completo, plano SQL, joins, indice usado ou tabela base inferida pelo especificador GeneXus.
+
+Exemplos conceituais:
+
+- `Procedure:procAnimaisContagemDeUmPeriodo` com `for each Animal` pode resolver para `Table:Animal`
+- `WebPanel:wcVolumeMovimentosComReferenciaAoRomaneio` com `for each VolumeMovimento` pode resolver para `Table:VolumeMovimento`
+- `Procedure:procImportaPedidosDaCarga` com `for each RetornoPedido` nao deve resolver para `Table:RetornoPedido` se a tabela nao existir no inventario local
+
+### Fora do incremento 8
+
+- `for each` sem alvo explicito
+- alvo qualificado ou subnivelado como `for each CompraGadoItens.Faixas`
+- resolver tabela por atributos em `where`
+- inferir tabela base escolhida pelo especificador GeneXus
+- inferir join, navegacao completa, indice usado ou plano SQL
+- resolver nomes que parecam `Transaction` mas nao tenham `Table` local, como `RetornoPedido`, `RetornoPedidoItens` e `AnimalParaAbate`
+
+## Incremento 9 aprovado - resolver prefixo de `for each` qualificado
+
+### Escopo aceito
+
+- origem: objetos `Procedure` e `WebPanel`
+- evidencia:
+  - linha de `Source` efetivo contendo `for each <Nome>.<Membro>`
+- destino resolvido:
+  - `Table`, somente quando `<Nome>` existir como tabela no inventario local
+- regra proposta:
+  - `source_for_each_qualified_table_prefix`
+- confianca:
+  - `direct`
+
+### Comportamento esperado
+
+Quando uma linha de `Source` efetivo declarar `for each <Nome>.<Membro>` e `<Nome>` existir como `Table`, o indice deve criar relacao direta da origem para a tabela do prefixo. O alvo qualificado completo permanece no `snippet` da evidencia.
+
+Essa relacao representa evidencia estrutural de navegacao qualificada declarada no `Source`. Ela nao transforma `<Membro>` em tabela propria, nao resolve subnivel como objeto independente e nao promete comportamento runtime completo.
+
+Exemplos conceituais:
+
+- `Procedure:procAnimalValorPelaCompra` com `for each CompraGadoItens.Faixas` pode resolver para `Table:CompraGadoItens`
+- `Procedure:procCondicaoPagamentoPrazoMedio` com `for each CondicaoPagamento.Parcelas` pode resolver para `Table:CondicaoPagamento`
+- `for each CompraGadoItens.Faixas` nao deve criar relacao para `Table:Faixas`
+
+### Fora do incremento 9
+
+- criar objeto proprio para `<Membro>`
+- resolver `<Membro>` como tabela, atributo, subnivel ou indice
+- inferir tabela fisica do subnivel qualificado
+- inferir join, navegacao completa, indice usado ou plano SQL
+- resolver prefixo que nao exista como `Table` local
 
 ## Fora do escopo geral da Fase 5
 

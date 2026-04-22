@@ -12,6 +12,8 @@ Current scope:
 - WorkWithForWeb explicit prompt attributes to WebPanel
 - WorkWithForWeb explicit transaction binding
 - literal ATTCUSTOMTYPE CustomType values
+- explicit Source for each table references in Procedure and WebPanel
+- qualified Source for each table-prefix references in Procedure and WebPanel
 """
 
 from __future__ import annotations
@@ -34,7 +36,16 @@ LAST_UPDATE_RE = re.compile(r'\blastUpdate="([^"]+)"')
 PROCEDURE_DIRECT_RE = re.compile(r"\b(?P<name>proc[A-Za-z_][A-Za-z0-9_]*)\s*\(", re.IGNORECASE)
 PROCEDURE_DOT_CALL_RE = re.compile(r"\b(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*\.\s*Call\s*\(", re.IGNORECASE)
 WEBPANEL_DOT_LINK_RE = re.compile(r"\b(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*\.\s*Link\s*\(", re.IGNORECASE)
+FOR_EACH_EXPLICIT_TABLE_RE = re.compile(
+    r"\bfor\s+each\s+(?P<name>[A-Za-z_][A-Za-z0-9_]*)\b(?!\s*\.)",
+    re.IGNORECASE,
+)
+FOR_EACH_QUALIFIED_TABLE_RE = re.compile(
+    r"\bfor\s+each\s+(?P<prefix>[A-Za-z_][A-Za-z0-9_]*)\s*\.\s*(?P<member>[A-Za-z_][A-Za-z0-9_]*)\b",
+    re.IGNORECASE,
+)
 INDEXED_SOURCE_TYPES = ("Procedure", "WebPanel", "DataProvider")
+FOR_EACH_SOURCE_TYPES = ("Procedure", "WebPanel")
 ACTION_RE = re.compile(r"<action\b(?P<attrs>[^>]*)>", re.IGNORECASE | re.DOTALL)
 CONDITION_RE = re.compile(r"<condition\b(?P<attrs>[^>]*)>", re.IGNORECASE | re.DOTALL)
 TAG_RE = re.compile(r"<(?P<tag>[A-Za-z][A-Za-z0-9]*)\b(?P<attrs>[^>]*)>", re.IGNORECASE | re.DOTALL)
@@ -318,6 +329,102 @@ def extract_evidence(
                                 snippet=cleaned,
                                 extractor_rule="dataprovider_direct_call",
                             )
+
+    unique: dict[tuple[str, str, str, str, int, str], Evidence] = {}
+    for evidence in evidences:
+        key = (
+            evidence.source_type,
+            evidence.source_name,
+            evidence.target_type,
+            evidence.target_name,
+            evidence.line,
+            evidence.extractor_rule,
+        )
+        unique[key] = evidence
+    return list(unique.values())
+
+
+def extract_source_for_each_explicit_table_evidence(
+    source_objects: Iterable[ObjectInfo],
+    table_names: set[str],
+) -> list[Evidence]:
+    evidences: list[Evidence] = []
+    table_lookup = case_insensitive_lookup(table_names, "Table")
+
+    for source in source_objects:
+        xml_text = read_text(source.path)
+        for block in source_blocks(xml_text):
+            for offset, line in enumerate(block.text.splitlines()):
+                cleaned = active_line(line)
+                if not cleaned.strip():
+                    continue
+                line_no = block.start_line + offset
+
+                for match in FOR_EACH_EXPLICIT_TABLE_RE.finditer(cleaned):
+                    matched_name = match.group("name")
+                    target_name = table_lookup.get(matched_name.lower())
+                    if not target_name:
+                        continue
+                    add_evidence(
+                        evidences,
+                        source=source,
+                        target_type="Table",
+                        target_name=target_name,
+                        relation_kind="navigates_explicit_table",
+                        line=line_no,
+                        column=match.start("name") + 1,
+                        snippet=cleaned,
+                        extractor_rule="source_for_each_explicit_table",
+                        evidence_role="Source explicit for each table",
+                    )
+
+    unique: dict[tuple[str, str, str, str, int, str], Evidence] = {}
+    for evidence in evidences:
+        key = (
+            evidence.source_type,
+            evidence.source_name,
+            evidence.target_type,
+            evidence.target_name,
+            evidence.line,
+            evidence.extractor_rule,
+        )
+        unique[key] = evidence
+    return list(unique.values())
+
+
+def extract_source_for_each_qualified_table_prefix_evidence(
+    source_objects: Iterable[ObjectInfo],
+    table_names: set[str],
+) -> list[Evidence]:
+    evidences: list[Evidence] = []
+    table_lookup = case_insensitive_lookup(table_names, "Table")
+
+    for source in source_objects:
+        xml_text = read_text(source.path)
+        for block in source_blocks(xml_text):
+            for offset, line in enumerate(block.text.splitlines()):
+                cleaned = active_line(line)
+                if not cleaned.strip():
+                    continue
+                line_no = block.start_line + offset
+
+                for match in FOR_EACH_QUALIFIED_TABLE_RE.finditer(cleaned):
+                    matched_prefix = match.group("prefix")
+                    target_name = table_lookup.get(matched_prefix.lower())
+                    if not target_name:
+                        continue
+                    add_evidence(
+                        evidences,
+                        source=source,
+                        target_type="Table",
+                        target_name=target_name,
+                        relation_kind="navigates_qualified_table_prefix",
+                        line=line_no,
+                        column=match.start("prefix") + 1,
+                        snippet=cleaned,
+                        extractor_rule="source_for_each_qualified_table_prefix",
+                        evidence_role="Source qualified for each table prefix",
+                    )
 
     unique: dict[tuple[str, str, str, str, int, str], Evidence] = {}
     for evidence in evidences:
@@ -1070,6 +1177,14 @@ def main() -> int:
         webpanel_names=set(webpanels),
         data_provider_names=set(data_providers),
     )
+    source_for_each_explicit_table_evidences = extract_source_for_each_explicit_table_evidence(
+        [obj for obj in objects if obj.object_type in FOR_EACH_SOURCE_TYPES],
+        table_names=set(tables),
+    )
+    source_for_each_qualified_table_prefix_evidences = extract_source_for_each_qualified_table_prefix_evidence(
+        [obj for obj in objects if obj.object_type in FOR_EACH_SOURCE_TYPES],
+        table_names=set(tables),
+    )
     workwith_evidences = extract_workwith_action_evidence(
         workwiths.values(),
         procedure_names=set(procedures),
@@ -1134,6 +1249,8 @@ def main() -> int:
     )
     evidences = [
         *source_evidences,
+        *source_for_each_explicit_table_evidences,
+        *source_for_each_qualified_table_prefix_evidences,
         *workwith_evidences,
         *workwith_condition_evidences,
         *workwith_condition_attribute_evidences,

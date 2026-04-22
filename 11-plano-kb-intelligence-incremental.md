@@ -461,13 +461,13 @@ Objetivo:
 
 Aberta por contrato em `16-kb-intelligence-fase-5-contrato.md`, depois do encerramento validado da Fase 4.
 
-Estado em 2026-04-21: incrementos implementados para resolver `CustomType:<valor>` para `SDT` ou `Domain` quando houver objeto inventariado correspondente, `Attribute` para `Domain` por `idBasedOn` quando o dominio existir no inventario local, `Transaction` para `Attribute` por `<Level>/<Attribute>`, `Table` para `Attribute` por `<Key>/<Item>`, `Transaction` para `Table` por `Type` em `<Level>`, `Table` para `Attribute` por membros de indice, e `SDT` para `SDT` por `ATTCUSTOMTYPE` em item interno.
+Estado em 2026-04-22: incrementos implementados para resolver `CustomType:<valor>` para `SDT` ou `Domain` quando houver objeto inventariado correspondente, `Attribute` para `Domain` por `idBasedOn` quando o dominio existir no inventario local, `Transaction` para `Attribute` por `<Level>/<Attribute>`, `Table` para `Attribute` por `<Key>/<Item>`, `Transaction` para `Table` por `Type` em `<Level>`, `Table` para `Attribute` por membros de indice, `SDT` para `SDT` por `ATTCUSTOMTYPE` em item interno, `Procedure`/`WebPanel` para `Table` por `for each <Nome>` explicito em `Source` efetivo, e `Procedure`/`WebPanel` para `Table` pelo prefixo de `for each <Nome>.<Membro>` qualificado.
 
 Entregas possiveis:
 
 - resolver `CustomType:<valor>` para `SDT`, `Domain` ou outro tipo GeneXus
 - extrair relacoes entre `Transaction`, `Attribute`, `Domain`, `Table`, `SDT` ou outros tipos
-- decidir se `for each` e `.Load(...)` entram com classificacao propria e cautela runtime
+- decidir se `.Load(...)` entra com classificacao propria e cautela runtime
 
 Cada relacao nova deve entrar por contrato incremental, com exemplos reais positivos, exemplos reais negativos, regra de extracao, evidencia e teste de regressao.
 
