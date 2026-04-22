@@ -241,6 +241,8 @@ Depois de gerar ou localizar um indice SQLite, valide o comportamento operaciona
 
 Os casos de validacao da Fase 3 conferem comportamento de consulta. Eles nao regeneram o indice nem substituem a bateria de extracao da Fase 2.
 
+Escolha o executor pelo formato do caso, nao pelo numero da fase. Casos com campo `query` pertencem a validacao de consultas; casos com `source`, `target` e `expected_rule` pertencem a validacao de extracao/geracao.
+
 ## Cuidado com validacoes SQLite no Windows
 
 Depois de gerar um SQLite temporario novo, prefira executar validacoes em sequencia contra esse arquivo. Evite rodar validacoes paralelas contra o mesmo banco recem-gerado.
@@ -278,6 +280,8 @@ Depois de regenerar o indice, valide a resolucao semantica aprovada com:
 
 Os casos da Fase 5 conferem relacoes semanticas novas. Eles devem ser executados junto com as baterias anteriores quando houver rodada oficial.
 
+Esses casos usam `source`, `target` e `expected_rule`, entao devem rodar no gerador/indexador. Se forem enviados por engano para `Test-KbIntelligenceQueries.ps1`, o resultado deve ser tratado primeiro como executor incompatível, nao como regressao real da regra.
+
 ## Validar consulta da Fase 6
 
 Depois de localizar ou regenerar o indice canonico, valide `functional-trace-basic` com:
@@ -291,6 +295,8 @@ Depois de localizar ou regenerar o indice canonico, valide `functional-trace-bas
 ```
 
 Os casos da Fase 6 conferem apenas a montagem da trilha funcional basica. Eles nao provam comportamento runtime nem substituem leitura do XML oficial.
+
+Como os casos da Fase 6 validam consultas e trazem `query`, eles pertencem ao executor `Test-KbIntelligenceQueries.ps1`, nao ao fluxo de regeneracao via `New-KbIntelligenceIndex.ps1`.
 
 ## Saidas
 

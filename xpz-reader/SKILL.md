@@ -50,6 +50,8 @@ Do NOT use this skill for:
 - Treat object lookup in repository-backed workflows as `type + name`, never `name` alone
 - Confirm the real folder where the XML exists before citing, comparing, or using a local object as evidence
 - When citing a line from GeneXus XML, classify the cited fragment as `effective Source`, `Rules/parm`, `XML metadata`, `call in caller`, or `signature in callee`
+- When reading GeneXus variable declarations or variable metadata, classify `ATTCUSTOMTYPE` `bc:<Transaction>` together with `AttCollection=True/False`; never treat BC simple and BC collection as equivalent contracts
+- When reading BC method calls in `Source`, classify the method family as `operation`, `status/message`, `serialization/copy`, or `collection`, and keep that classification separate from runtime semantics not directly proved by the XML
 - Declare confidence level for every conclusion: `Direct evidence` / `Strong inference` / `Hypothesis`
 - Never affirm import or build compatibility — structural analysis only
 - When the task depends on a local KB parallel folder structure, require that structure to be clarified or validated first via `xpz-kb-parallel-setup`
@@ -98,11 +100,17 @@ Reference files and when to load them:
    - XML metadata or structural wrapper
    - direct call site inside the caller object
    - callee signature inside the called object
-9. If the conclusion is "object A calls object B", require evidence in A's effective `Source` or in explicit call metadata belonging to A; a `parm(...)` line in B is only callee signature evidence
-10. If type is WebPanel → load [04-webpanel-familias-e-templates](../04-webpanel-familias-e-templates.md) and classify family
-11. If type is Transaction → load [05-transaction-familias-e-templates](../05-transaction-familias-e-templates.md) and classify family (F1–F6)
-12. Assign risk level from [03-risco-e-decisao-por-tipo](../03-risco-e-decisao-por-tipo.md)
-13. Report result:
+9. If variable metadata or declaration indicates `ATTCUSTOMTYPE` `bc:<Transaction>`, classify the variable as BC simple or BC collection using `AttCollection=True/False` before interpreting method calls
+10. If the task cites BC methods in `Source`, classify each cited method by family:
+   - `operation`: `.Load(...)`, `.Save()`, `.Delete()`, `.Check()`, `.Insert()`, `.Update()`
+   - `status/message`: `.Success()`, `.Fail()`, `.GetMessages()`
+   - `serialization/copy`: `.ToJson()`, `.FromJson()`, `.ToXml()`, `.FromXml()`, `.Clone()`
+   - `collection`: `.Add()`, `.Item()`, `.Sort()`, and `.Insert()` when the variable was confirmed as collection
+11. If the conclusion is "object A calls object B", require evidence in A's effective `Source` or in explicit call metadata belonging to A; a `parm(...)` line in B is only callee signature evidence
+12. If type is WebPanel → load [04-webpanel-familias-e-templates](../04-webpanel-familias-e-templates.md) and classify family
+13. If type is Transaction → load [05-transaction-familias-e-templates](../05-transaction-familias-e-templates.md) and classify family (F1–F6)
+14. Assign risk level from [03-risco-e-decisao-por-tipo](../03-risco-e-decisao-por-tipo.md)
+15. Report result:
    - Object type and canonical name
    - Container classification (`Folder`, `Module`, or unresolved)
    - Structural family (if applicable)
@@ -119,6 +127,8 @@ Reference files and when to load them:
 - [ ] `Object/@type` identified and mapped to known category
 - [ ] Part types enumerated and compared against corpus frequencies
 - [ ] Any cited XML line has an explicit evidence role (`effective Source`, `Rules/parm`, `XML metadata`, `call in caller`, or `signature in callee`)
+- [ ] BC variables cited from XML metadata or `Source` were classified as simple or collection using `ATTCUSTOMTYPE` together with `AttCollection`
+- [ ] BC methods cited from `Source` were classified by family (`operation`, `status/message`, `serialization/copy`, or `collection`)
 - [ ] Container identity classified from `parentType` and comparable corpus evidence
 - [ ] Risk level stated with source reference
 - [ ] Family classified when type supports it (WebPanel, Transaction)
@@ -138,4 +148,7 @@ Reference files and when to load them:
 - When object lookup depends on a local repository, ABORT if the file was not confirmed in the folder implied by the validated object type
 - When repository-backed analysis depends on the KB parallel folder structure, ABORT if that structure was not clarified or validated first
 - NEVER present a `parm(...)` line from the called object's XML as the caller's call site
+- NEVER treat `ATTCUSTOMTYPE` `bc:<Transaction>` alone as enough to collapse BC simple and BC collection into the same contract
+- NEVER turn BC `status/message` methods such as `.Success()`, `.Fail()`, or `.GetMessages()` into a new functional operation without direct evidence beyond the cited line
+- NEVER infer runtime semantics for BC collection methods from name similarity alone; require the simple-vs-collection classification first
 - Absolute rules in [00-readme-genexus-xpz-xml.md](../00-readme-genexus-xpz-xml.md) take precedence over all heuristics

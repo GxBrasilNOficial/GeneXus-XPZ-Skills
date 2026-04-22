@@ -105,13 +105,16 @@ Se o repositório ainda mantiver wrappers especializados, eles devem ser tratado
 4. Localizar `scripts\` e confirmar a existência do script adequado
 5. Confirmar ou derivar caminhos de entrada e saída
 6. Executar o script com parâmetros explícitos
-7. Se a documentação citar XML vindo de `ObjetosGeradosParaImportacaoNaKbNoGenexus`, rotular isso como artefato de trabalho e não como snapshot oficial
-8. Quando a documentação gerar ou preservar links de linha para XML GeneXus, rotular o papel do trecho citado: `Source efetivo`, `Rules/parm`, `metadado XML`, `chamada no chamador` ou `assinatura no chamado`
-9. Se a documentação afirmar que objeto A chama objeto B, validar que o link de linha aponta para o `Source` efetivo de A ou para metadado explícito de chamada em A; linha de `parm(...)` em B deve ser descrita apenas como assinatura do chamado
-10. Se usar saída do KB Intelligence, declarar que a fonte imediata é índice técnico derivado e que a fonte normativa continua sendo o XML oficial em `ObjetosDaKbEmXml`; quando houver evidência citada, preservar referência ao XML oficial, papel do trecho citado e nível de confiança
-11. Quando a documentação tiver natureza funcional, separar explicitamente `Evidencia direta`, `Leitura adicional do XML`, `Inferencia forte` e `Hipotese`
-12. Reler o início do arquivo gerado ou alterado, a seção modificada e a transição seguinte
-13. Reportar o que foi criado, atualizado ou substituído
+7. Se usar casos de validação derivados do KB Intelligence, identificar primeiro o formato do caso antes de escolher o executor:
+   - casos com `source`, `target` e `expected_rule` → validar no gerador/indexador com `New-KbIntelligenceIndex.ps1 -ValidationCasesPath`
+   - casos com `query` → validar no executor de consultas com `Test-KbIntelligenceQueries.ps1 -ValidationCasesPath`
+8. Se a documentação citar XML vindo de `ObjetosGeradosParaImportacaoNaKbNoGenexus`, rotular isso como artefato de trabalho e não como snapshot oficial
+9. Quando a documentação gerar ou preservar links de linha para XML GeneXus, rotular o papel do trecho citado: `Source efetivo`, `Rules/parm`, `metadado XML`, `chamada no chamador` ou `assinatura no chamado`
+10. Se a documentação afirmar que objeto A chama objeto B, validar que o link de linha aponta para o `Source` efetivo de A ou para metadado explícito de chamada em A; linha de `parm(...)` em B deve ser descrita apenas como assinatura do chamado
+11. Se usar saída do KB Intelligence, declarar que a fonte imediata é índice técnico derivado e que a fonte normativa continua sendo o XML oficial em `ObjetosDaKbEmXml`; quando houver evidência citada, preservar referência ao XML oficial, papel do trecho citado e nível de confiança
+12. Quando a documentação tiver natureza funcional, separar explicitamente `Evidencia direta`, `Leitura adicional do XML`, `Inferencia forte` e `Hipotese`
+13. Reler o início do arquivo gerado ou alterado, a seção modificada e a transição seguinte
+14. Reportar o que foi criado, atualizado ou substituído
 
 ---
 
@@ -125,4 +128,5 @@ Se o repositório ainda mantiver wrappers especializados, eles devem ser tratado
 - NUNCA tratar `ObjetosGeradosParaImportacaoNaKbNoGenexus` como se fosse snapshot oficial da KB sem rotulagem explícita
 - NUNCA documentar uma linha de `parm(...)` do objeto chamado como se fosse o ponto de chamada no objeto chamador
 - NUNCA tratar o SQLite do KB Intelligence como prova funcional ou runtime; ele é índice técnico derivado de evidências extraídas
+- NUNCA escolher o executor de validação do KB Intelligence só pelo nome da fase; o formato do caso (`expected_rule` versus `query`) é que define o executor compatível
 - Se o script esperado não existir, reportar o problema antes de improvisar uma edição manual ampla
