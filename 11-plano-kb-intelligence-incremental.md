@@ -517,6 +517,8 @@ A consulta recebeu exemplos operacionais proprios em `23-kb-intelligence-fase-6-
 
 O status operacional consolidado da primeira entrega da Fase 6 ficou registrado em `24-kb-intelligence-fase-6-status-operacional.md`, com limites preservados e proximos gates recomendados.
 
+A primeira estabilizacao curta de `functional-trace-basic` ficou registrada em `25-kb-intelligence-fase-6-estabilizacao-curta.md`. O achado principal foi que literais `CustomType` ainda aparecem na trilha mesmo quando ha relacao resolvida equivalente, o que preserva rastreabilidade mas pode gerar ruido em respostas funcionais curtas.
+
 ## Versionamento recomendado
 
 Versionar:
