@@ -461,19 +461,35 @@ Objetivo:
 
 Aberta por contrato em `16-kb-intelligence-fase-5-contrato.md`, depois do encerramento validado da Fase 4.
 
-Estado em 2026-04-22: incrementos implementados para resolver `CustomType:<valor>` para `SDT` ou `Domain` quando houver objeto inventariado correspondente, `Attribute` para `Domain` por `idBasedOn` quando o dominio existir no inventario local, `Transaction` para `Attribute` por `<Level>/<Attribute>`, `Table` para `Attribute` por `<Key>/<Item>`, `Transaction` para `Table` por `Type` em `<Level>`, `Table` para `Attribute` por membros de indice, `SDT` para `SDT` por `ATTCUSTOMTYPE` em item interno, `Procedure`/`WebPanel` para `Table` por `for each <Nome>` explicito em `Source` efetivo, `Procedure`/`WebPanel` para `Table` pelo prefixo de `for each <Nome>.<Membro>` qualificado, e `Procedure`/`WebPanel`/`DataProvider` para `Transaction` por `.Load(...)`, `.Save()`, `.Delete()`, `.Check()`, `.Insert()` e `.Update()` de variavel BC com `ATTCUSTOMTYPE` `bc:*` resolvido, mantendo colecoes fora do incremento de `.Insert()`/`.Update()`.
+Estado em 2026-04-22: a subtrilha principal da Fase 5 ficou consolidada ate o incremento 18.
+
+O escopo validado ate aqui cobre:
+
+- resolucao de `CustomType:<valor>` para `SDT`, `Domain` e `ExternalObject` quando houver objeto inventariado correspondente e regra aprovada para o prefixo
+- `Attribute` para `Domain` por `idBasedOn` quando o dominio existir no inventario local
+- `Transaction` para `Attribute` por `<Level>/<Attribute>`
+- `Table` para `Attribute` por `<Key>/<Item>`
+- `Transaction` para `Table` por `Type` em `<Level>`
+- `Table` para `Attribute` por membros de indice
+- `SDT` para `SDT` por `ATTCUSTOMTYPE` em item interno
+- ampliacao de origem de `ATTCUSTOMTYPE` resolvido para `API`, `DataSelector`, `Domain` e `SDT` top-level
+- `Procedure`/`WebPanel` para `Table` por `for each <Nome>` explicito em `Source` efetivo
+- `Procedure`/`WebPanel` para `Table` pelo prefixo de `for each <Nome>.<Membro>` qualificado
+- `Procedure`/`WebPanel`/`DataProvider` para `Transaction` por `.Load(...)`, `.Save()`, `.Delete()`, `.Check()`, `.Insert()` e `.Update()` de variavel BC com `ATTCUSTOMTYPE` `bc:*` resolvido, mantendo colecoes fora do incremento de `.Insert()`/`.Update()`
+
+Tambem ficou medido e registrado que `Success()`, `Fail()` e `GetMessages()` em variavel `bc:*` nao acrescentam pares novos `origem -> Transaction` fora da cobertura forte ja existente, e por isso nao justificam um incremento 19 no mesmo eixo.
 
 Entregas possiveis:
 
-- resolver `CustomType:<valor>` para `SDT`, `Domain` ou outro tipo GeneXus
-- extrair relacoes entre `Transaction`, `Attribute`, `Domain`, `Table`, `SDT` ou outros tipos
-- decidir se outros padroes de navegacao ou carga entram com classificacao propria e cautela runtime
+- abrir familia nova de relacao com evidencia estrutural nova e ganho liquido de cobertura
+- abrir contrato proprio para evidencia mais fraca somente se houver valor operacional claro
+- encerrar tecnicamente a Fase 5 antes de abrir a Fase 6, caso nao apareca nova familia defensavel
 
 Cada relacao nova deve entrar por contrato incremental, com exemplos reais positivos, exemplos reais negativos, regra de extracao, evidencia e teste de regressao.
 
 ## Fase 6 - suporte funcional por agentes
 
-So iniciar depois da base tecnica sustentar consultas confiaveis e depois de decidir se a Fase 5 e pre-requisito para o recorte funcional desejado.
+So iniciar depois da base tecnica sustentar consultas confiaveis e depois de decidir se ainda ha expansao tecnica relevante pendente na Fase 5.
 
 A antiga previsao de Fase 4 foi renumerada para Fase 6 antes de abertura formal, para preservar a sequencia: inventario, relacoes semanticas, suporte funcional.
 
@@ -485,7 +501,7 @@ Entregas possiveis:
 
 Esta fase nao deve depender de humanos lendo documentacao estatica extensa.
 
-Recomendacao: abrir a Fase 6 em conversa nova, para evitar mistura entre expansao tecnica do indice e desenho de suporte funcional por agentes.
+Estado recomendado apos 2026-04-22: preparar a abertura da Fase 6 em conversa nova, para evitar mistura entre fechamento metodologico da Fase 5 e desenho de suporte funcional por agentes.
 
 ## Versionamento recomendado
 
