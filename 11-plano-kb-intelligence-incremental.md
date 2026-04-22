@@ -461,7 +461,7 @@ Objetivo:
 
 Aberta por contrato em `16-kb-intelligence-fase-5-contrato.md`, depois do encerramento validado da Fase 4.
 
-Estado em 2026-04-21: incrementos implementados para resolver `CustomType:<valor>` para `SDT` ou `Domain` quando houver objeto inventariado correspondente, `Attribute` para `Domain` por `idBasedOn` quando o dominio existir no inventario local, `Transaction` para `Attribute` por `<Level>/<Attribute>`, `Table` para `Attribute` por `<Key>/<Item>`, e `Transaction` para `Table` por `Type` em `<Level>`.
+Estado em 2026-04-21: incrementos implementados para resolver `CustomType:<valor>` para `SDT` ou `Domain` quando houver objeto inventariado correspondente, `Attribute` para `Domain` por `idBasedOn` quando o dominio existir no inventario local, `Transaction` para `Attribute` por `<Level>/<Attribute>`, `Table` para `Attribute` por `<Key>/<Item>`, `Transaction` para `Table` por `Type` em `<Level>`, e `Table` para `Attribute` por membros de indice.
 
 Entregas possiveis:
 

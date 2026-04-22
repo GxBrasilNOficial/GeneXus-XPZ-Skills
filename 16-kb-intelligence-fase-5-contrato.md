@@ -190,12 +190,42 @@ Exemplos conceituais:
 
 ## Incrementos futuros possiveis
 
-- `Table` -> `Attribute` por membros de indice, com regra separada de chave primaria
 - `SDT` -> membros ou tipos internos
 - relacoes por `for each`, com classificacao separada e cautela runtime
 - relacoes por `.Load(...)`, com classificacao separada e cautela runtime
 
 Cada um desses itens deve ter contrato incremental proprio antes de implementacao.
+
+## Incremento 6 aprovado - resolver `Table` -> `Attribute` por membros de indice
+
+### Escopo aceito
+
+- origem: objetos `Table`
+- evidencia:
+  - elementos `<Member>` dentro de `Indexes`/`Index`
+- destino resolvido:
+  - `Attribute`, somente quando o membro existir como atributo no inventario local
+- regra proposta:
+  - `table_index_member_attribute`
+- confianca:
+  - `direct`
+
+### Comportamento esperado
+
+Quando uma `Table` declarar um membro de indice cujo texto corresponda a um `Attribute` existente, o indice deve criar relacao direta da tabela para o atributo. A regra deve permanecer separada de `table_key_attribute`, pois chave primaria e participacao em indice sao evidencias estruturais diferentes.
+
+Exemplos conceituais:
+
+- `Table:AbateOrdem` com membro de indice `AbateOrdemData` pode resolver para `Attribute:AbateOrdemData`
+- `Table:AbateOrdem` com membro de indice `AbateOrdemId` tambem pode resolver por esta regra, alem da relacao de chave primaria ja existente por `table_key_attribute`
+- `Table:AbateOrdem` nao deve resolver para `Attribute:VolumeMovimentoId` se o atributo nao estiver declarado como membro de indice da tabela
+
+### Fora do incremento 6
+
+- criar objeto `Index` proprio
+- inferir chave estrangeira, navegacao, cardinalidade ou plano SQL
+- substituir ou remover a regra `table_key_attribute`
+- prometer semantica funcional alem de participacao estrutural em indice
 
 ## Fora do escopo geral da Fase 5
 

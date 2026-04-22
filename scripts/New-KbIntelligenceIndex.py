@@ -58,6 +58,10 @@ KEY_ITEM_RE = re.compile(
     r"<Item\b(?P<attrs>[^>]*)>(?P<name>.*?)</Item>",
     re.IGNORECASE | re.DOTALL,
 )
+INDEX_MEMBER_RE = re.compile(
+    r"<Member\b(?P<attrs>[^>]*)>(?P<name>.*?)</Member>",
+    re.IGNORECASE | re.DOTALL,
+)
 WORKWITH_TRANSACTION_RE = re.compile(r"<transaction\b[^>]*\btransaction=\"(?P<value>[^\"]+)\"", re.IGNORECASE)
 WORKWITH_WEBPANEL_LINK_RE = re.compile(r"<link\b[^>]*\bwebpanel=\"(?P<name>[^\"]+)\"", re.IGNORECASE)
 WORKWITH_PROMPT_RE = re.compile(r"\bprompt=\"(?P<value>[^\"]+)\"", re.IGNORECASE)
@@ -781,6 +785,41 @@ def extract_table_key_attribute_evidence(
     return evidences
 
 
+def extract_table_index_member_attribute_evidence(
+    source_objects: Iterable[ObjectInfo],
+    attribute_names: set[str],
+) -> list[Evidence]:
+    evidences: list[Evidence] = []
+    seen: set[tuple[str, str]] = set()
+    attribute_lookup = case_insensitive_lookup(attribute_names, "Attribute")
+    for source in source_objects:
+        xml_text = read_text(source.path)
+        for match in INDEX_MEMBER_RE.finditer(xml_text):
+            raw_attribute_name = html.unescape(match.group("name")).strip()
+            if not raw_attribute_name:
+                continue
+            target_name = attribute_lookup.get(raw_attribute_name.lower())
+            if not target_name:
+                continue
+            pair_key = (source.name.lower(), target_name.lower())
+            if pair_key in seen:
+                continue
+            seen.add(pair_key)
+            add_evidence(
+                evidences,
+                source=source,
+                target_type="Attribute",
+                target_name=target_name,
+                relation_kind="has_index_member_attribute",
+                line=line_number_at(xml_text, match.start()),
+                column=1,
+                snippet=match.group(0),
+                extractor_rule="table_index_member_attribute",
+                evidence_role="Index Member",
+            )
+    return evidences
+
+
 def create_schema(conn: sqlite3.Connection) -> None:
     conn.executescript(
         """
@@ -1043,6 +1082,10 @@ def main() -> int:
         tables.values(),
         attribute_names=set(attributes),
     )
+    table_index_member_attribute_evidences = extract_table_index_member_attribute_evidence(
+        tables.values(),
+        attribute_names=set(attributes),
+    )
     evidences = [
         *source_evidences,
         *workwith_evidences,
@@ -1057,6 +1100,7 @@ def main() -> int:
         *transaction_level_attribute_evidences,
         *transaction_level_table_evidences,
         *table_key_attribute_evidences,
+        *table_index_member_attribute_evidences,
     ]
     write_index(args.output_path.resolve(), source_root, objects, evidences)
 

@@ -168,6 +168,38 @@
       "expected_rule": "transaction_level_table",
       "should_exist": false,
       "expectation": "Existing Table not declared as a Level Type in the Transaction must not create a relation"
+    },
+    {
+      "id": "phase5-case-22-table-index-member-attribute-abate-ordem-data",
+      "source": "Table:AbateOrdem",
+      "target": "Attribute:AbateOrdemData",
+      "expected_rule": "table_index_member_attribute",
+      "should_exist": true,
+      "expectation": "Table Index Member element must create a Table to Attribute relation for indexed attributes"
+    },
+    {
+      "id": "phase5-case-23-table-index-member-attribute-abate-ordem-lote",
+      "source": "Table:AbateOrdem",
+      "target": "Attribute:AbateOrdemLoteDoDia",
+      "expected_rule": "table_index_member_attribute",
+      "should_exist": true,
+      "expectation": "Table Index Member extraction must cover user-defined composite index members"
+    },
+    {
+      "id": "phase5-case-24-table-key-member-is-also-index-member",
+      "source": "Table:AbateOrdem",
+      "target": "Attribute:AbateOrdemId",
+      "expected_rule": "table_index_member_attribute",
+      "should_exist": true,
+      "expectation": "Primary key attributes may also appear as index members under the separate index member rule"
+    },
+    {
+      "id": "phase5-case-25-table-does-not-link-unlisted-index-member",
+      "source": "Table:AbateOrdem",
+      "target": "Attribute:VolumeMovimentoId",
+      "expected_rule": "table_index_member_attribute",
+      "should_exist": false,
+      "expectation": "Existing Attribute absent from the Table indexes must not create a table_index_member_attribute relation"
     }
   ]
 }
