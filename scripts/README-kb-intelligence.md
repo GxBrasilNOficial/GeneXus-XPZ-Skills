@@ -84,6 +84,11 @@ Ordem sugerida de triagem:
 1. contar ocorrencias brutas
 2. agrupar por valor ou prefixo relevante
 3. abrir amostra curta de casos reais positivos e negativos
+4. medir quantos casos realmente resolvem contra o inventario local
+
+Se um agrupamento ou regex retornar zero de forma inesperada, nao concluir ausencia de sinal de imediato. Primeiro abra uma ocorrencia real no XML da KB para conferir o formato efetivo da propriedade e so depois ajuste o extrator.
+
+Depois de separar por prefixo, nao tratar prefixo promissor como relacao resolvida. Antes de propor incremento, medir quantos casos daquele prefixo realmente apontam para objeto existente no inventario local. Prefixos textual ou semanticamente proximos, como `exo:` e `ext:`, podem ter comportamentos metodologicos diferentes e nao devem ser fundidos por intuicao.
 
 Contar ocorrencias textuais de `ATTCUSTOMTYPE` no acervo:
 

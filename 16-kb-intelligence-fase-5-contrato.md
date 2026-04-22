@@ -17,6 +17,8 @@ Definir a Fase 5 do KB Intelligence como ampliacao incremental de relacoes seman
 
 A Fase 5 deve evoluir a camada de relacoes sem misturar inventario, inferencia runtime e suporte funcional. Cada nova familia de relacao deve entrar por incremento pequeno, com regra nomeada, evidencia rastreavel, casos positivos, casos negativos e teste de regressao.
 
+Para abrir incremento novo, nao basta contagem bruta de ocorrencias ou plausibilidade por nome. A proposta deve trazer casos reais positivos e negativos extraidos do acervo, em amostra curta e auditavel, suficientes para sustentar o contrato antes de qualquer alteracao de codigo.
+
 ## Principio da Fase 5
 
 Inventario ampliado nao implica relacao semantica. Um objeto estar presente na tabela `objects` permite resolver existencia, nome canonico e arquivo, mas nao autoriza inferir dependencia funcional.
@@ -654,6 +656,7 @@ Depois do incremento 18, a triagem adicional indicou:
 
 - leitura agregada de `ATTCUSTOMTYPE` sem separar prefixos produz ruido excessivo para decisao incremental; a triagem correta deve agrupar primeiro por prefixo real observado no acervo
 - prefixos com semanticas diferentes, como `bas:`, `sdt:`, `bc:`, `exo:` e `ext:`, nao devem compartilhar a mesma hipotese de incremento apenas por coexistirem na mesma propriedade
+- depois de separar por prefixo, ainda e obrigatorio medir resolucao real contra o inventario local; prefixo com sinal textual promissor nao equivale automaticamente a alvo resolvido
 - `Attribute`, `PackagedModule` e `Stencil` ainda possuem ocorrencias brutas de `ATTCUSTOMTYPE`, mas sem novos alvos resolviveis com a mesma regra conservadora hoje usada para `SDT`, `Domain` e `ExternalObject`
 - `ext:*` continua relevante como valor literal de propriedade, mas nao como alvo resolvido para objeto local do inventario
 - `Success()`, `Fail()` e `GetMessages()` em variavel `bc:*` nao abriram novos pares `origem -> Transaction` fora dos pares ja cobertos por `.Load(...)`, `.Save()`, `.Delete()`, `.Check()`, `.Insert()` e `.Update()`
@@ -668,6 +671,7 @@ Conclusao operacional:
 
 - nao aprovar incremento 19 apenas para `Success()`, `Fail()` ou `GetMessages()`
 - nao aprovar novo incremento de `ATTCUSTOMTYPE` apenas por massa bruta agregada; antes disso, separar a amostra por prefixo e confirmar qual prefixo ainda preserva sinal estrutural forte
+- nao tratar prefixos proximos, como `exo:` e `ext:`, como candidatos equivalentes sem medir separadamente a resolucao efetiva de cada um no inventario local
 - nao ampliar `ATTCUSTOMTYPE` resolvido para novos tipos de origem sem evidencia estrutural nova e casos reais adicionais
 - tratar a subtrilha atual como consolidada, e nao como aberta para extensao mecanica
 

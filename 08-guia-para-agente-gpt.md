@@ -86,6 +86,8 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 - a ordem recomendada e: contagem bruta, agrupamento por sinal relevante, amostra curta de casos reais positivos e negativos
 - nao propor novo incremento apenas por ocorrencia textual bruta; confirmar antes se o padrao observado tem resolucao estrutural segura no acervo
 - quando a consulta falhar por sintaxe ou ficar ruidosa demais para leitura direta, simplificar a abordagem e refazer em etapas menores
+- quando a hipotese depender de fechar regra nova, contrato novo ou ampliacao metodologica, extrair antes casos reais positivos e negativos do acervo; contagem sozinha nao basta para sustentar decisao
+- quando busca, agrupamento ou regex retornarem zero de forma inesperada, validar primeiro uma ocorrencia real do XML no acervo antes de concluir ausencia de sinal ou trocar a hipotese
 
 ## Regra de leitura para compatibilidade de `Source`
 
