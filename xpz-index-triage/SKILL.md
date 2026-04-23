@@ -128,8 +128,12 @@ Reference files and when to load them:
 | [02-regras-operacionais-e-runtime.md](../02-regras-operacionais-e-runtime.md) | Depois do gate estrutural inicial, quando for necessario interpretar frescor, metadados, limite operacional ou relacao entre artefato derivado e fonte normativa |
 | [08-guia-para-agente-gpt.md](../08-guia-para-agente-gpt.md) | Depois do gate estrutural inicial, quando for necessario orientar uso do KB Intelligence, escalada para XML oficial ou decisao operacional |
 | [17-kb-intelligence-fase-6-contrato.md](../17-kb-intelligence-fase-6-contrato.md) | Quando a pergunta envolver resposta funcional curta |
+| [18-kb-intelligence-fase-6-roteiro-investigacao-funcional.md](../18-kb-intelligence-fase-6-roteiro-investigacao-funcional.md) | Quando a pergunta for funcional e o agente precisar do roteiro passo a passo de investigacao |
+| [19-kb-intelligence-fase-6-exemplos-investigacao-funcional.md](../19-kb-intelligence-fase-6-exemplos-investigacao-funcional.md) | Quando forem necessarios exemplos reais do roteiro funcional, incluindo a terminologia `via edicao web` e `via BC` |
 | [21-kb-intelligence-fase-6-checklist-operacional-agente.md](../21-kb-intelligence-fase-6-checklist-operacional-agente.md) | Quando a pergunta envolver roteiro operacional do agente |
 | [22-kb-intelligence-fase-6-contrato-functional-trace-basic.md](../22-kb-intelligence-fase-6-contrato-functional-trace-basic.md) | Quando a consulta candidata for `functional-trace-basic` |
+| [23-kb-intelligence-fase-6-exemplos-functional-trace-basic.md](../23-kb-intelligence-fase-6-exemplos-functional-trace-basic.md) | Quando a consulta candidata for `functional-trace-basic` e exemplos operacionais forem necessarios |
+| [27-kb-intelligence-fase-6-primeira-resposta-funcional.md](../27-kb-intelligence-fase-6-primeira-resposta-funcional.md) | Quando for necessario um modelo canonico de resposta funcional completa |
 | [scripts/README-kb-intelligence.md](../scripts/README-kb-intelligence.md) | Depois do gate estrutural inicial, quando a skill precisar escolher consulta, interpretar cobertura, executar comando do indice ou distinguir validadores |
 
 Para economizar contexto, nao carregue referencias longas da tabela acima antes do gate estrutural inicial (`KbIntelligence`, SQLite e wrapper local). Se o gate bloquear em uma dessas tres checagens, responda com a primeira falha e ofereca `xpz-kb-parallel-setup` sem abrir referencias adicionais.
