@@ -447,7 +447,7 @@ Esta fase deve priorizar respostas curtas, baratas e rastreaveis.
 
 ## Fase 4 - inventario ampliado de tipos
 
-Aberta por contrato em `15-kb-intelligence-fase-4-contrato.md`, depois do encerramento validado da Fase 3.
+Aberta por contrato em `historico/kb-intelligence/15-kb-intelligence-fase-4-contrato.md`, depois do encerramento validado da Fase 3.
 
 Estado em 2026-04-21: implementada e encerrada, com registro em `historico/kb-intelligence/2026-04-kb-intelligence-fase-4-encerramento.md`.
 
@@ -515,9 +515,9 @@ Depois disso, foi preparado e implementado o contrato da consulta auxiliar `func
 
 A consulta recebeu exemplos operacionais proprios em `23-kb-intelligence-fase-6-exemplos-functional-trace-basic.md`, cobrindo os mesmos tres casos reais da bateria da Fase 6.
 
-O status operacional consolidado da primeira entrega da Fase 6 ficou registrado em `24-kb-intelligence-fase-6-status-operacional.md`, como fotografia do marco intermediario antes do encerramento consolidado.
+O status operacional consolidado da primeira entrega da Fase 6 ficou registrado em `historico/kb-intelligence/24-kb-intelligence-fase-6-status-operacional.md`, como fotografia do marco intermediario antes do encerramento consolidado.
 
-A primeira estabilizacao curta de `functional-trace-basic` ficou registrada em `25-kb-intelligence-fase-6-estabilizacao-curta.md`. O achado principal foi que literais `CustomType` ainda aparecem na trilha mesmo quando ha relacao resolvida equivalente, o que preserva rastreabilidade mas pode gerar ruido em respostas funcionais curtas.
+A primeira estabilizacao curta de `functional-trace-basic` ficou registrada em `historico/kb-intelligence/25-kb-intelligence-fase-6-estabilizacao-curta.md`. O achado principal foi que literais `CustomType` ainda aparecem na trilha mesmo quando ha relacao resolvida equivalente, o que preserva rastreabilidade mas pode gerar ruido em respostas funcionais curtas.
 
 Depois do ajuste conservador, a verificacao pos-filtro ficou registrada em `26-kb-intelligence-fase-6-verificacao-pos-filtro.md`. O resultado confirmou que a consulta oculta apenas literais `CustomType` redundantes quando ha relacao resolvida equivalente, mantendo relacoes resolvidas, literais externos ou primitivos, chamadas e tabelas.
 
@@ -525,7 +525,7 @@ O primeiro exemplo de resposta funcional controlada ficou registrado em `27-kb-i
 
 Na sequencia, a Fase 6 recebeu mais dois exemplos curtos no documento `19-kb-intelligence-fase-6-exemplos-investigacao-funcional.md`: um para fixar a terminologia local entre `via edicao web` e `via BC`, e outro para registrar uma suspeita curta de fluxo de reprocessamento em `AbateOrdem` sem inflar certeza funcional.
 
-O encerramento operacional da fase ficou registrado em `28-kb-intelligence-fase-6-encerramento.md`.
+O encerramento operacional da fase ficou registrado em `historico/kb-intelligence/28-kb-intelligence-fase-6-encerramento.md`.
 
 Recomendacao atual apos o encerramento: nao abrir Fase 7 ainda. Se uma frente futura for necessaria, ela deve nascer de lacuna operacional concreta e pequena, nao de expansao especulativa.
 

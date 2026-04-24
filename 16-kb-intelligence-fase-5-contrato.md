@@ -7,7 +7,7 @@ contrato operacional
 baixo a medio
 
 ## Depende de
-11-plano-kb-intelligence-incremental.md, 15-kb-intelligence-fase-4-contrato.md, scripts/README-kb-intelligence.md
+11-plano-kb-intelligence-incremental.md, historico/kb-intelligence/15-kb-intelligence-fase-4-contrato.md, scripts/README-kb-intelligence.md
 
 ## Usado por
 agentes que forem ampliar relacoes semanticas do KB Intelligence depois do inventario completo de tipos

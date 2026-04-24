@@ -7,7 +7,7 @@ contrato operacional
 medio
 
 ## Depende de
-11-plano-kb-intelligence-incremental.md, 12-kb-intelligence-fase-1-contrato.md, 13-kb-intelligence-fase-2-contrato.md, scripts/README-kb-intelligence.md
+11-plano-kb-intelligence-incremental.md, historico/kb-intelligence/12-kb-intelligence-fase-1-contrato.md, historico/kb-intelligence/13-kb-intelligence-fase-2-contrato.md, scripts/README-kb-intelligence.md
 
 ## Usado por
 agentes que forem usar ou evoluir consultas operacionais do KB Intelligence antes de alterar objetos GeneXus

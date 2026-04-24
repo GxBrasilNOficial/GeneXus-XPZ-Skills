@@ -7,7 +7,7 @@ registro de verificacao operacional
 baixo a medio
 
 ## Depende de
-22-kb-intelligence-fase-6-contrato-functional-trace-basic.md, 25-kb-intelligence-fase-6-estabilizacao-curta.md
+22-kb-intelligence-fase-6-contrato-functional-trace-basic.md, historico/kb-intelligence/25-kb-intelligence-fase-6-estabilizacao-curta.md
 
 ## Usado por
 agentes que forem decidir se a consulta `functional-trace-basic` ja esta estavel o bastante para uso assistido na Fase 6
