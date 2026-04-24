@@ -209,8 +209,8 @@ Os wrappers seguem esta convenção de parâmetros:
     - quando houver resumo Git, apresentar essa camada separadamente como comparacao do worktree contra o commit atual, sem reclassificar o resultado do sync
     - se o mesmo `XPZ` tiver sido reprocessado após atualização do arquivo, deixar explícito que a comparação relevante é com o conteúdo do insumo reprocessado e com o estado atual do acervo, não com o relatório antigo
     - se `kb-source-metadata.md` tiver sido reescrito pelo wrapper, tratar isso como artefato normal do fluxo, não como evidência automática de mudança funcional na frente
-    - nao afirmar conteudo especifico de `kb-source-metadata.md`, como versao do GeneXus, build, GUID da KB, usuario ou caminho `Source`, sem citar a saida real do wrapper ou o proprio arquivo lido nominalmente
-    - quando esses metadados nao tiverem sido exibidos na saida real ou lidos do arquivo, limitar o resumo ao que o wrapper efetivamente retornou
+    - so afirmar conteudo especifico de `kb-source-metadata.md`, como versao do GeneXus, build, GUID da KB, usuario ou caminho `Source`, quando esse metadado tiver aparecido explicitamente na saida real do wrapper ou quando o proprio `kb-source-metadata.md` tiver sido aberto e lido nominalmente na rodada atual
+    - quando nenhuma dessas duas fontes aceitaveis tiver mostrado o metadado, limitar o resumo ao que o wrapper efetivamente retornou
     - se o pacote tiver `Source` parcial, separar claramente `sync de objetos aceito` de `refresh de metadado parcial` e preservar os valores estáveis já conhecidos
     - se o `XPZ` oficial da KB trouxer objetos adicionais fora do foco imediato da frente, reportar isso como inesperado para a frente atual, mas tratar como possível mudança paralela legítima vinda da IDE/KB até evidência em contrário
     - se `-ExpectedItems` tiver sido informado, classificar explicitamente `itens esperados que voltaram`, `itens esperados que nao voltaram` e `retorno oficial adicional da KB`

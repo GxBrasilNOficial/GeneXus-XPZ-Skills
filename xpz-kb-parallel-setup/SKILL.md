@@ -99,7 +99,7 @@ Do NOT use this skill for:
   - `A)` o usuario exporta o `.xpz` full pela IDE do GeneXus para `XpzExportadosPelaIDE` e o agente materializa os XMLs depois
   - `B)` o agente tenta gerar o `.xpz` full a partir da pasta nativa da KB, grava esse `.xpz` em `XpzExportadosPelaIDE` e depois materializa os XMLs
 - Ao oferecer `A)` e `B)`, dizer explicitamente que `A)` e o caminho preferencial e normalmente mais rapido, enquanto `B)` tende a demorar mais por depender da trilha via `MSBuild`
-- Ao orientar o caminho `A)`, preferir descricao funcional estavel como `export full da KB pela IDE` em vez de depender de rotulos exatos de menu, tela ou botao do GeneXus como se fossem universais; exemplos de navegacao podem aparecer apenas como ajuda opcional
+- Ao orientar o caminho `A)`, preferir descricao funcional estavel como `export full da KB pela IDE` em vez de depender de rotulos exatos de menu, tela ou botao do GeneXus como se fossem universais; se citar caminho de menu, apresentá-lo depois da instrucao principal e marcado explicitamente como exemplo opcional de navegacao, nunca como passo normativo principal
 - Se o usuario escolher `B)`, encaminhar a geracao do `.xpz` full pela skill `xpz-msbuild-import-export` em vez de improvisar exportacao fora dessa trilha
 
 ---

@@ -153,7 +153,7 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 - ao concluir o setup inicial da pasta paralela da KB, deixar explicito que a estrutura esta pronta, mas `ObjetosDaKbEmXml` ainda nao foi materializada
 - ao concluir o setup inicial, oferecer dois proximos passos: `A)` o usuario exporta o `.xpz` full pela IDE para `XpzExportadosPelaIDE`; `B)` o agente tenta gerar o `.xpz` full a partir da pasta nativa da KB, grava o arquivo em `XpzExportadosPelaIDE` e depois materializa os XMLs
 - ao oferecer `A)` e `B)`, declarar que `A)` e o caminho preferencial e normalmente mais rapido, enquanto `B)` tende a demorar mais por depender da trilha via `MSBuild`
-- ao orientar o caminho `A)`, preferir descricao funcional estavel como `export full da KB pela IDE` em vez de depender de rotulos exatos de menu, tela ou botao do GeneXus como se fossem universais; exemplos de navegacao da IDE podem aparecer apenas como ajuda opcional
+- ao orientar o caminho `A)`, preferir descricao funcional estavel como `export full da KB pela IDE` em vez de depender de rotulos exatos de menu, tela ou botao do GeneXus como se fossem universais; se citar caminho de menu, apresentá-lo depois da instrucao principal e marcado explicitamente como exemplo opcional de navegacao, nunca como passo normativo principal
 - se o usuario escolher `B)`, usar a skill `xpz-msbuild-import-export` e nao improvisar exportacao fora dessa trilha
 - quando a skill de `MSBuild` for publicada por symlink, junction ou outro reparse point, resolver referencias `../` pela pasta real da skill, nao pelo caminho launcher publicado
 - ao concluir a exportacao headless do caminho `B)`, declarar explicitamente o marco `XPZ gerado` antes de prosseguir para materializacao em `ObjetosDaKbEmXml`
@@ -161,7 +161,7 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 - na materializacao normal do `XPZ` em `ObjetosDaKbEmXml`, inclusive na primeira carga por `XPZ` full, nao presumir `-FullSnapshot` como padrao implicito; usar esse modo apenas quando o objetivo explicito for conferencia full adicional ou quando a documentacao local exigir isso nominalmente
 - quando o resumo do sync expuser `MaterializationInterpretation`, preferir esse campo para explicar o resultado da materializacao; nao reinventar a leitura a partir de `Created`, `Updated` e `Unchanged`
 - nao afirmar `primeira carga`, `primeira materializacao` ou equivalente quando `Created = 0` e `Unchanged > 0`; sem evidencia previa adicional, isso indica apenas confirmacao de snapshot ja existente contra o insumo atual
-- nao afirmar metadado especifico de `kb-source-metadata.md`, como versao do GeneXus, build, GUID da KB, usuario ou caminho `Source`, sem citar a saida real do wrapper ou o proprio arquivo lido nominalmente
+- so afirmar metadado especifico de `kb-source-metadata.md`, como versao do GeneXus, build, GUID da KB, usuario ou caminho `Source`, quando esse metadado tiver aparecido explicitamente na saida real do wrapper ou quando o proprio `kb-source-metadata.md` tiver sido aberto e lido nominalmente na rodada atual
 - nao presumir `Objects.xml` isolado nem manifesto externo separado se isso nao estiver documentado no `02`
 - usar o envelope sanitizado documentado na base como referencia estrutural antes de pedir XML externo adicional
 - depois da bateria de importacao e da consulta ao acervo real, separar explicitamente `problema de envelope`, `problema de shape minimo` e `problema de dependencia da KB`
