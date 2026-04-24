@@ -23,7 +23,9 @@ A documentação consolidada e os scripts desta raiz funcionam como base metodol
 
 ### O que você vai encontrar aqui
 
-Os documentos principais foram consolidados em 10 arquivos Markdown para facilitar leitura, manutenção e uso controlado.
+Os 10 arquivos abaixo formam a base compartilhada principal desta raiz, consolidada para facilitar leitura, manutenção e uso controlado.
+
+Além dessa base principal, a raiz também pode conter documentação operacional complementar de frentes ativas, quando ela ainda precisar permanecer visível fora de `historico/`.
 
 - `00-readme-genexus-xpz-xml.md`
 - `01-base-empirica-geral.md`
@@ -151,7 +153,9 @@ Este repositorio reúne documentación consolidada sobre análisis estructural d
 
 ### Qué encontrarás aquí
 
-Los documentos principales fueron consolidados en 10 archivos Markdown para facilitar lectura, mantenimiento y uso controlado.
+Los 10 archivos de abajo forman la base compartida principal de esta raíz, consolidada para facilitar lectura, mantenimiento y uso controlado.
+
+Además de esa base principal, la raíz también puede contener documentación operativa complementaria de frentes activas, cuando todavía necesite permanecer visible fuera de `historico/`.
 
 - `00-readme-genexus-xpz-xml.md`
 - `01-base-empirica-geral.md`
@@ -279,7 +283,9 @@ This repository contains consolidated documentation about structural analysis of
 
 ### What you will find here
 
-The main documentation has been consolidated into 10 Markdown files to make reading, maintenance, and controlled use easier.
+The 10 files below form the main shared base in this root, consolidated to make reading, maintenance, and controlled use easier.
+
+In addition to that main base, the root may also contain complementary operational documentation for active workstreams when it still needs to remain visible outside `historico/`.
 
 - `00-readme-genexus-xpz-xml.md`
 - `01-base-empirica-geral.md`
