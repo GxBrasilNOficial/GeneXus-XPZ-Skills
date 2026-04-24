@@ -734,6 +734,7 @@ function Update-KbSourceMetadata {
         $packageVersionGuid,
         $packageVersionName
     ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+    $hasCompleteSourceFromPackage = @($hasCompleteSourceFromPackage)
     $hasCompleteSourceFromPackage = ($hasCompleteSourceFromPackage.Count -eq 5)
     $hasStableMetadataBaseline = @(
         $existingMetadata.Kb,
@@ -742,6 +743,7 @@ function Update-KbSourceMetadata {
         $existingMetadata.VersionGuid,
         $existingMetadata.VersionName
     ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+    $hasStableMetadataBaseline = @($hasStableMetadataBaseline)
     $hasStableMetadataBaseline = ($hasStableMetadataBaseline.Count -gt 0)
 
     $metadataStatus = if ($hasCompleteSourceFromPackage) {
