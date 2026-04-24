@@ -150,6 +150,7 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 - ao concluir o setup inicial da pasta paralela da KB, deixar explicito que a estrutura esta pronta, mas `ObjetosDaKbEmXml` ainda nao foi materializada
 - ao concluir o setup inicial, oferecer dois proximos passos: `A)` o usuario exporta o `.xpz` full pela IDE para `XpzExportadosPelaIDE`; `B)` o agente tenta gerar o `.xpz` full a partir da pasta nativa da KB, grava o arquivo em `XpzExportadosPelaIDE` e depois materializa os XMLs
 - ao oferecer `A)` e `B)`, declarar que `A)` e o caminho preferencial e normalmente mais rapido, enquanto `B)` tende a demorar mais por depender da trilha via `MSBuild`
+- ao orientar o caminho `A)`, preferir descricao funcional estavel como `export full da KB pela IDE` em vez de depender de rotulos exatos de menu, tela ou botao do GeneXus como se fossem universais; exemplos de navegacao da IDE podem aparecer apenas como ajuda opcional
 - se o usuario escolher `B)`, usar a skill `xpz-msbuild-import-export` e nao improvisar exportacao fora dessa trilha
 - quando a skill de `MSBuild` for publicada por symlink, junction ou outro reparse point, resolver referencias `../` pela pasta real da skill, nao pelo caminho launcher publicado
 - ao concluir a exportacao headless do caminho `B)`, declarar explicitamente o marco `XPZ gerado` antes de prosseguir para materializacao em `ObjetosDaKbEmXml`
