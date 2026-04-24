@@ -45,6 +45,7 @@ Orquestre operações de `XPZ` via `MSBuild` com parâmetros explícitos, coleta
 
 - Este `SKILL.md` fica em uma subpasta de skill sob a raiz do repositório.
 - Resolva referências `../arquivo.md` relativas à pasta desta skill, não ao diretório corrente.
+- Se a skill estiver publicada por symlink, junction ou outro reparse point, resolva primeiro a pasta real da skill e só então interprete referências relativas como `../arquivo.md`.
 - Na prática, `../` aponta para a base metodológica compartilhada da raiz.
 
 ---
@@ -85,6 +86,7 @@ Do NOT use esta skill para:
 - Exigir que o probe (sondagem técnica inicial) devolva diagnóstico estruturado com `status`, `summary`, `resolvedPaths`, `checks`, `blockingReasons`, `warnings` e `strategyTrace`
 - Preferir `JSON` como formato canônico inicial desse diagnóstico
 - Registrar `stdout`, `stderr`, `exitCode`, caminho do `.msbuild` temporário e caminho do log
+- Validar a assinatura efetiva do wrapper e da task antes de assumir formato de parâmetro sensível de exportação ou importação
 - Privilegiar `PreviewMode` e, quando suportado pela task carregada, `UpdateFile` antes de importação real
 - Tratar `ImportKBInformation`, `UpdateFile` e defaults internos de importação/exportação como sensíveis e dependentes da assinatura efetiva da task `Import`
 - Normalizar recortes multiplos de `IncludeItems` e `ExcludeItems` como lista antes de serializar para a task carregada
@@ -104,6 +106,9 @@ Do NOT use esta skill para:
 - Declare quando o resultado é apenas operacional e ainda depende de confirmação funcional
 - Quando houver ambiguidade de contexto, interrompa a execução e peça definição explícita
 - Não use linguagem otimista para sugerir segurança que ainda não foi validada empiricamente
+- Quando a exportação headless gerar um `.xpz` para alimentar a pasta paralela da KB, declarar explicitamente o marco `XPZ gerado`
+- Se a geração do `.xpz` fizer parte do caminho `B` do setup inicial, diferenciar explicitamente a fase `exportação headless concluída` da fase posterior `materialização em ObjetosDaKbEmXml`
+- Se o pedido do usuário for apenas gerar o `.xpz`, parar no artefato gerado; só prosseguir para materialização quando o pedido for seguir com o setup ou com a materialização
 
 ---
 
@@ -210,6 +215,7 @@ Parâmetros específicos de importação:
    - `PreviewMode`
    - `UpdateFile`, quando suportado pela task carregada
 9. Se o objetivo for exportação, executar com parâmetros explícitos e conferir o artefato gerado
+   Antes de emitir parâmetro sensível de exportação, validar a assinatura efetiva do wrapper e da task carregada para evitar sintaxe presumida incorreta.
 10. Se o objetivo for importação real, exigir autorização explícita e ambiente controlado
 11. Capturar e relatar:
    - `exitCode`
@@ -225,6 +231,12 @@ Parâmetros específicos de importação:
    - `preview apenas`
    - `operação concluída, porém pendente de confirmação funcional`
 13. Recomendar o próximo passo seguro, incluindo reabertura da KB na IDE quando o teste exigir observação posterior
+14. Se a exportação gerou um `.xpz` full para a pasta paralela da KB, declarar explicitamente:
+   - caminho do artefato gerado
+   - status operacional da exportação
+   - warnings estruturais relevantes
+   - se a execução para no `.xpz` gerado ou se seguirá para materialização
+15. Se o pedido do usuário for seguir com o setup depois da exportação full, anunciar a mudança de fase para materialização em `ObjetosDaKbEmXml` antes de sair da trilha `MSBuild`
 
 ---
 
