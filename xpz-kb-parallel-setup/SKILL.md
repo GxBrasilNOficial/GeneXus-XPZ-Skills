@@ -59,6 +59,7 @@ Do NOT use this skill for:
 - Registrar em `AGENTS.md` da pasta paralela o caminho confirmado da pasta nativa da KB
 - Registrar em `AGENTS.md` da pasta paralela que a pasta nativa da KB e terreno proibido para gravacao por agentes, com leitura permitida apenas quando o fluxo operacional explicito realmente exigir
 - Quando houver `README.md` local para humanos na pasta paralela, espelhar ali a identificacao da pasta nativa da KB e a regra de somente leitura em linguagem clara
+- Em setup inicial padrao sem nomes alternativos, sem conflito estrutural e com pasta nativa da KB ja informada, evitar exploracao ampla do motor compartilhado e dos exemplos antes de criar a estrutura base; explorar mais so se surgir bloqueio concreto
 - Explicar a funcao de cada subpasta
 - Tratar `ObjetosDaKbEmXml` como snapshot oficial somente leitura para agentes
 - Tratar `XpzExportadosPelaIDE` como pasta de entrada onde o usuario grava os `.xpz` exportados pela IDE
@@ -85,7 +86,10 @@ Do NOT use this skill for:
 - Explicar que `KbIntelligence` nao substitui `ObjetosDaKbEmXml`; ele e uma camada derivada para triagem e deve ser regeneravel a partir do snapshot oficial
 - Explicar que, se `last_index_build_run_at` estiver ausente ou anterior a `last_xpz_materialization_run_at`, o agente nao deve pesquisar o acervo em massa nem gerar objetos para importacao; deve tratar isso como excecao operacional e oferecer a regeneracao/validacao do indice antes de seguir
 - Prever wrappers locais `.ps1` na pasta `scripts` quando a pasta paralela da KB precisar reconstruir o fluxo operacional local sobre o motor compartilhado
+- Tratar `.gitignore` na raiz e `.gitkeep` nas subpastas estruturais vazias como parte esperada do setup inicial padrao quando a pasta paralela estiver versionada em Git
 - Reutilizar o fluxo oficial previsto nas skills e no motor compartilhado antes de considerar qualquer script novo
+- Gerar `kb-source-metadata.md` inicial em formato compativel com o motor compartilhado, preservando desde o setup o campo nominal `last_xpz_materialization_run_at`
+- Nao salvar memoria operacional fora da propria pasta paralela da KB sem autorizacao explicita do usuario; `AGENTS.md`, `README.md` e arquivos operacionais locais sao a camada preferencial de memoria do setup
 - Ao concluir o setup inicial, declarar explicitamente que a pasta paralela esta pronta, mas `ObjetosDaKbEmXml` ainda nao foi materializada
 - Ao concluir o setup inicial, oferecer dois proximos passos:
   - `A)` o usuario exporta o `.xpz` full pela IDE do GeneXus para `XpzExportadosPelaIDE` e o agente materializa os XMLs depois
@@ -217,6 +221,7 @@ O objetivo do bloqueio e tornar visivel que uma pasta paralela ainda precisa rec
 - Liderar com a diferenca entre pasta da KB e pasta paralela da KB
 - Quando houver risco de ambiguidade, usar sempre a expressao completa `pasta paralela da KB`
 - Se a estrutura nao existir, dizer explicitamente o que falta
+- Em setup inicial padrao bem delimitado, preferir fechamento curto e objetivo em vez de narrar exploracao desnecessaria
 - Se o gate de compatibilidade falhar, explicar a falha como defasagem operacional da pasta paralela e oferecer atualizacao antes de responder a pergunta de negocio
 - Nao tratar a estrutura da pasta nativa da KB como se fosse a mesma coisa que o repositorio paralelo
 - Ao fechar um setup inicial bem-sucedido, diferenciar explicitamente `estrutura pronta` de `snapshot oficial ainda nao materializado`
@@ -232,7 +237,8 @@ O objetivo do bloqueio e tornar visivel que uma pasta paralela ainda precisa rec
 4. Se o usuario informar nomes alternativos, registrar o mapeamento entre nome real e funcao da pasta em `AGENTS.md` da pasta paralela da KB e, quando ajudar humanos, tambem em `README.md`
 5. Registrar em `AGENTS.md` da pasta paralela o caminho confirmado da pasta nativa da KB e a regra de que essa pasta e somente leitura para agentes, com gravacao proibida
 6. Quando houver `README.md` local na pasta paralela, registrar ali tambem a identificacao da pasta nativa da KB e a regra de somente leitura em linguagem clara
-7. Validar a existencia da estrutura nesta ordem:
+7. Se o caso for setup inicial padrao e a pasta paralela estiver praticamente vazia, criar primeiro a estrutura base e so aprofundar exploracao se surgir bloqueio concreto
+8. Validar a existencia da estrutura nesta ordem:
    - `scripts`
    - `Temp`
    - `XpzExportadosPelaIDE`
@@ -240,7 +246,10 @@ O objetivo do bloqueio e tornar visivel que uma pasta paralela ainda precisa rec
    - `KbIntelligence`
    - `ObjetosGeradosParaImportacaoNaKbNoGenexus`
    - `PacotesGeradosParaImportacaoNaKbNoGenexus`
-8. Explicar o papel de cada pasta:
+9. Quando a pasta paralela estiver versionada em Git, criar `.gitignore` na raiz e `.gitkeep` nas subpastas estruturais vazias como parte do bootstrap padrao
+10. Criar `kb-source-metadata.md` inicial com o campo nominal `last_xpz_materialization_run_at`, sem inventar formato paralelo desconectado do motor compartilhado
+11. Nao salvar memoria externa do agente fora da pasta paralela da KB sem autorizacao explicita do usuario
+12. Explicar o papel de cada pasta:
    - `ObjetosDaKbEmXml` = snapshot oficial extraido via fluxo oficial do `.ps1`
    - `ObjetosDaKbEmXml` = materializacao do `XPZ` completo ou parcial da IDE, quebrando `full.xml` em XMLs individuais por objeto
    - `ObjetosDaKbEmXml` = organizacao por subpastas de tipo amigavel e nomes amigaveis de objeto
@@ -253,10 +262,10 @@ O objetivo do bloqueio e tornar visivel que uma pasta paralela ainda precisa rec
    - `ObjetosGeradosParaImportacaoNaKbNoGenexus` = XMLs temporarios gerados pelo agente para importacao manual, organizados por frente em subpastas `NomeCurto_GUID_YYYYMMDD`
    - `ObjetosGeradosParaImportacaoNaKbNoGenexus` = nao recebe materializacao do acervo vindo de `XPZ`
    - `PacotesGeradosParaImportacaoNaKbNoGenexus` = pacote final de importacao pela IDE, mantido plano sem subpastas por frente
-9. Se `ObjetosDaKbEmXml` ainda nao existir, tratar o acervo como ainda nao materializado
-10. Se `ObjetosGeradosParaImportacaoNaKbNoGenexus` nao estiver organizado por frentes em subpastas `NomeCurto_GUID_YYYYMMDD`, tratar isso como desvio operacional e orientar correcao
-11. Se `XpzExportadosPelaIDE` estiver ausente e o fluxo depender de `XPZ`, pedir ao usuario o caminho pretendido ou criar a pasta padrao quando a politica do repositorio permitir
-12. Se a pasta `scripts` existir sem wrappers locais minimos, orientar a reconstruir:
+13. Se `ObjetosDaKbEmXml` ainda nao existir, tratar o acervo como ainda nao materializado
+14. Se `ObjetosGeradosParaImportacaoNaKbNoGenexus` nao estiver organizado por frentes em subpastas `NomeCurto_GUID_YYYYMMDD`, tratar isso como desvio operacional e orientar correcao
+15. Se `XpzExportadosPelaIDE` estiver ausente e o fluxo depender de `XPZ`, pedir ao usuario o caminho pretendido ou criar a pasta padrao quando a politica do repositorio permitir
+16. Se a pasta `scripts` existir sem wrappers locais minimos, orientar a reconstruir:
    - wrapper de atualizacao diaria sobre o motor compartilhado
    - wrapper de conferencia full reaproveitando o wrapper diario
    - wrapper de consulta do indice derivado, se a KB local adotar `KbIntelligence`

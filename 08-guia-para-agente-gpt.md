@@ -129,10 +129,14 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 - quando a tarefa envolver montar ou serializar `XPZ`, consultar primeiro a secao `Envelope XPZ observado em export real` de `02-regras-operacionais-e-runtime.md`
 - distinguir sempre a pasta nativa da KB da pasta paralela da KB; nesta trilha, os `XPZ`, os XMLs materializados e os artefatos de importacao vivem na pasta paralela da KB, nao dentro da pasta nativa da KB
 - tratar a pasta nativa da KB como area proibida para gravacao por agentes; leitura e permitida apenas quando o fluxo operacional explicito realmente exigir
+- em setup inicial padrao de pasta paralela da KB, com pasta nativa ja informada, sem nomes alternativos e sem conflito estrutural visivel, evitar exploracao ampla do motor compartilhado e dos exemplos antes de criar a estrutura base; aprofundar exploracao so se surgir bloqueio concreto
 - quando a tarefa envolver gerar, ajustar, preservar ou empacotar XMLs, distinguir explicitamente as tres areas operacionais do repositorio: `ObjetosDaKbEmXml`, `ObjetosGeradosParaImportacaoNaKbNoGenexus` e `PacotesGeradosParaImportacaoNaKbNoGenexus`
 - na carga inicial, considerar tambem `XpzExportadosPelaIDE` como pasta de entrada padrão, `scripts` como pasta de wrappers, `Temp` como destino preferencial de artefatos efemeros de execucao, `KbIntelligence` como pasta do indice derivado, e as demais pastas como estrutura funcional padrão quando o usuario nao informar nomes alternativos
 - se alguma dessas pastas ainda nao existir, criar nesta ordem: `scripts`, `Temp`, `XpzExportadosPelaIDE`, `ObjetosDaKbEmXml`, `KbIntelligence`, `ObjetosGeradosParaImportacaoNaKbNoGenexus`, `PacotesGeradosParaImportacaoNaKbNoGenexus`
+- quando a pasta paralela estiver versionada em Git e o setup inicial estiver criando a estrutura do zero, tratar `.gitignore` na raiz e `.gitkeep` nas subpastas estruturais vazias como parte esperada do bootstrap
 - se o setup inicial da pasta paralela da KB estiver sendo preparado e o caminho da pasta nativa da KB nao vier no prompt, pedir esse caminho ao usuario antes de concluir o setup
+- no setup inicial, gerar `kb-source-metadata.md` inicial em formato compativel com o motor compartilhado, preservando o campo nominal `last_xpz_materialization_run_at`
+- no setup inicial, nao salvar memoria operacional fora da propria pasta paralela da KB sem autorizacao explicita do usuario; `AGENTS.md`, `README.md` e arquivos operacionais locais sao a camada preferencial de memoria
 - se `XpzExportadosPelaIDE` ainda nao existir, perguntar onde o usuario quer salvar os `.xpz`
 - se `ObjetosDaKbEmXml` ainda nao existir, tratar a KB como ainda nao materializada e parar antes de assumir snapshot
 - se `KbIntelligence` ainda nao existir, tratar isso como ausencia da camada derivada de triagem, nao como ausencia do snapshot oficial; preparar a pasta e os wrappers locais antes de depender de `xpz-index-triage`

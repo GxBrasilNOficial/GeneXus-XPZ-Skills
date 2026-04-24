@@ -126,8 +126,10 @@ Se você quer entender a base rapidamente:
   5. `KbIntelligence`
   6. `ObjetosGeradosParaImportacaoNaKbNoGenexus`
   7. `PacotesGeradosParaImportacaoNaKbNoGenexus`
+- quando a pasta paralela estiver versionada em Git e o setup inicial partir de estrutura vazia, `.gitignore` na raiz e `.gitkeep` nas subpastas vazias fazem parte do bootstrap esperado
 - quando `XpzExportadosPelaIDE` ainda não existir, o agente deve perguntar onde o usuário pretende salvar os `.xpz` antes de prosseguir com o processamento
 - no setup inicial da pasta paralela da KB, se o caminho da pasta nativa da KB nao vier informado, o agente deve pedir esse caminho ao usuario antes de concluir o setup
+- no setup inicial da pasta paralela da KB, `kb-source-metadata.md` deve nascer em formato compativel com o motor compartilhado e preservar o campo nominal `last_xpz_materialization_run_at`
 - quando `ObjetosDaKbEmXml` ainda não existir, o agente deve tratar isso como KB ainda não materializada e parar antes de assumir qualquer snapshot
 - ao concluir o setup inicial da pasta paralela da KB, o agente deve deixar explicito que a estrutura esta pronta, mas `ObjetosDaKbEmXml` ainda nao foi materializada
 - ao concluir o setup inicial, o agente deve oferecer `A)` exportacao do `.xpz` full pela IDE para `XpzExportadosPelaIDE` ou `B)` geracao do `.xpz` full a partir da pasta nativa da KB via trilha `MSBuild`, seguida de materializacao dos XMLs
@@ -141,6 +143,7 @@ Se você quer entender a base rapidamente:
 - os scripts públicos desta raiz devem operar por parâmetros explícitos de entrada e saída, sem depender de caminhos absolutos privados
 - os `.example.ps1` publicados nas skills funcionam como exemplos metodologicos importantes para bootstrap tecnico e reconstrucao assistida de wrappers locais finais
 - esses `.example.ps1` nao substituem o wrapper local real da pasta paralela da KB e nao devem virar fallback automatico de execucao no fluxo normal
+- memoria operacional de setup e compatibilidade deve permanecer primeiro na propria pasta paralela da KB, em `AGENTS.md`, `README.md` e arquivos operacionais locais; memoria externa do agente fora do repositorio nao deve ser tratada como requisito nem ser gravada sem autorizacao explicita do usuario
 - se o motor precisar evoluir, a mudança deve preservar compatibilidade com esse uso ou ser acompanhada de atualização explícita dos wrappers consumidores
 
 ---
@@ -261,8 +264,10 @@ Si quieres entender la base rápidamente:
   5. `KbIntelligence`
   6. `ObjetosGeradosParaImportacaoNaKbNoGenexus`
   7. `PacotesGeradosParaImportacaoNaKbNoGenexus`
+- cuando la carpeta paralela esté versionada en Git y el setup inicial parta de estructura vacía, `.gitignore` en la raíz y `.gitkeep` en las subcarpetas vacías forman parte del bootstrap esperado
 - cuando `XpzExportadosPelaIDE` todavía no exista, el agente debe preguntar dónde el usuario pretende guardar los `.xpz` antes de continuar con el procesamiento
 - en el setup inicial de la carpeta paralela de la KB, si el camino de la carpeta nativa de la KB no viene informado, el agente debe pedir ese camino al usuario antes de concluir el setup
+- en el setup inicial de la carpeta paralela de la KB, `kb-source-metadata.md` debe nacer en formato compatible con el motor compartido y preservar el campo nominal `last_xpz_materialization_run_at`
 - cuando `ObjetosDaKbEmXml` todavía no exista, el agente debe tratar esto como KB aún no materializada y detenerse antes de asumir cualquier snapshot
 - al concluir el setup inicial de la carpeta paralela de la KB, el agente debe dejar explícito que la estructura está lista, pero `ObjetosDaKbEmXml` todavía no fue materializada
 - al concluir el setup inicial, el agente debe ofrecer `A)` exportación del `.xpz` full por la IDE hacia `XpzExportadosPelaIDE` o `B)` generación del `.xpz` full a partir de la carpeta nativa de la KB por la trilha `MSBuild`, seguida de materialización de los XMLs
@@ -276,6 +281,7 @@ Si quieres entender la base rápidamente:
 - los scripts públicos de esta raíz deben operar por parámetros explícitos de entrada y salida, sin depender de rutas absolutas privadas
 - los `.example.ps1` publicados en las skills funcionan como ejemplos metodológicos importantes para bootstrap técnico y reconstrucción asistida de wrappers locales finales
 - esos `.example.ps1` no sustituyen el wrapper local real de la carpeta paralela de la KB y no deben convertirse en fallback automático de ejecución en el flujo normal
+- la memoria operativa de setup y compatibilidad debe permanecer primero en la propia carpeta paralela de la KB, en `AGENTS.md`, `README.md` y archivos operativos locales; la memoria externa del agente fuera del repositorio no debe tratarse como requisito ni escribirse sin autorización explícita del usuario
 - si el motor necesita evolucionar, el cambio debe preservar compatibilidad con ese uso o venir acompañado de actualización explícita de los wrappers consumidores
 
 ---
@@ -396,8 +402,10 @@ If you want to understand the repository quickly:
   5. `KbIntelligence`
   6. `ObjetosGeradosParaImportacaoNaKbNoGenexus`
   7. `PacotesGeradosParaImportacaoNaKbNoGenexus`
+- when the parallel folder is versioned in Git and the initial setup starts from an empty structure, `.gitignore` at the root and `.gitkeep` in empty subfolders are part of the expected bootstrap
 - when `XpzExportadosPelaIDE` does not exist yet, the agent must ask where the user intends to save the `.xpz` files before continuing with processing
 - in the initial setup of the KB parallel folder, if the native KB folder path is not provided, the agent must ask the user for that path before concluding setup
+- in the initial setup of the KB parallel folder, `kb-source-metadata.md` must start in a format compatible with the shared engine and preserve the nominal `last_xpz_materialization_run_at` field
 - when `ObjetosDaKbEmXml` does not exist yet, the agent must treat this as a KB not yet materialized and stop before assuming any snapshot
 - when concluding the initial setup of the KB parallel folder, the agent must make it explicit that the structure is ready, but `ObjetosDaKbEmXml` has not yet been materialized
 - when concluding the initial setup, the agent must offer `A)` full `.xpz` export by the IDE into `XpzExportadosPelaIDE` or `B)` full `.xpz` generation from the native KB folder through the `MSBuild` track, followed by XML materialization
@@ -411,4 +419,5 @@ If you want to understand the repository quickly:
 - the public scripts in this root must operate through explicit input and output parameters, without depending on private absolute paths
 - the `.example.ps1` files published inside the skills act as important methodological examples for technical bootstrap and assisted reconstruction of final local wrappers
 - those `.example.ps1` files do not replace the real local wrapper of the KB parallel folder and must not become an automatic execution fallback in the normal flow
+- setup and compatibility operational memory should remain first inside the KB parallel folder itself, in `AGENTS.md`, `README.md`, and local operational files; external agent memory outside the repository must not be treated as a requirement or written without explicit user authorization
 - if the engine needs to evolve, the change must preserve compatibility with that use or be accompanied by explicit updates to the consuming wrappers
