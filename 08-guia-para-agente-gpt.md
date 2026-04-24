@@ -150,6 +150,8 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 - quando a skill de `MSBuild` for publicada por symlink, junction ou outro reparse point, resolver referencias `../` pela pasta real da skill, nao pelo caminho launcher publicado
 - ao concluir a exportacao headless do caminho `B)`, declarar explicitamente o marco `XPZ gerado` antes de prosseguir para materializacao em `ObjetosDaKbEmXml`
 - se o pedido do usuario for apenas gerar o `.xpz`, parar no artefato gerado; so prosseguir para materializacao quando o pedido for seguir com o setup ou com a materializacao
+- quando o resumo do sync expuser `MaterializationInterpretation`, preferir esse campo para explicar o resultado da materializacao; nao reinventar a leitura a partir de `Created`, `Updated` e `Unchanged`
+- nao afirmar `primeira carga`, `primeira materializacao` ou equivalente quando `Created = 0` e `Unchanged > 0`; sem evidencia previa adicional, isso indica apenas confirmacao de snapshot ja existente contra o insumo atual
 - nao presumir `Objects.xml` isolado nem manifesto externo separado se isso nao estiver documentado no `02`
 - usar o envelope sanitizado documentado na base como referencia estrutural antes de pedir XML externo adicional
 - depois da bateria de importacao e da consulta ao acervo real, separar explicitamente `problema de envelope`, `problema de shape minimo` e `problema de dependencia da KB`

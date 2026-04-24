@@ -661,6 +661,18 @@ function Test-PackageMaterialization {
     }
 }
 
+function Get-OfficialXmlCount {
+    param(
+        [string]$Root
+    )
+
+    if (-not (Test-Path -LiteralPath $Root -PathType Container)) {
+        return 0
+    }
+
+    return @(Get-ChildItem -Path $Root -Recurse -File -Filter *.xml).Count
+}
+
 function Get-FullSnapshotComparison {
     param(
         [object[]]$Items,
@@ -855,6 +867,7 @@ try {
 
     $objectsBlockCount = @($items | Where-Object { $_.PackageSection -eq "Objects" }).Count
     $attributesBlockCount = @($items | Where-Object { $_.PackageSection -eq "Attributes" }).Count
+    $preExistingOfficialXmlCount = Get-OfficialXmlCount -Root $DestinationRoot
 
     $writeResults = @()
     if (-not $VerifyOnly) {
@@ -869,6 +882,26 @@ try {
         $fullSnapshotResult = Get-FullSnapshotComparison -Items $items -Root $DestinationRoot
     }
 
+    $createdCount = @($writeResults | Where-Object { $_.Status -eq "created" }).Count
+    $updatedCount = @($writeResults | Where-Object { $_.Status -eq "updated" }).Count
+    $unchangedCount = @($writeResults | Where-Object { $_.Status -eq "unchanged" }).Count
+    $skippedOlderLastUpdateCount = @($writeResults | Where-Object { $_.Status -eq "skipped-older-lastUpdate" }).Count
+    $normalizedFileNamesCount = @($writeResults | Where-Object { $_.WasNormalized }).Count
+
+    $materializationInterpretation = if ($VerifyOnly) {
+        "verify-only"
+    } elseif ($items.Count -eq 0) {
+        "no-exportable-items"
+    } elseif ($preExistingOfficialXmlCount -eq 0 -and $createdCount -gt 0) {
+        "first-materialization"
+    } elseif ($preExistingOfficialXmlCount -gt 0 -and ($createdCount -gt 0 -or $updatedCount -gt 0)) {
+        "existing-snapshot-updated"
+    } elseif ($preExistingOfficialXmlCount -gt 0 -and $createdCount -eq 0 -and $updatedCount -eq 0 -and $unchangedCount -gt 0) {
+        "existing-snapshot-confirmed-unchanged"
+    } else {
+        "materialization-result-requires-context"
+    }
+
     $summary = [pscustomobject]@{
         InputPath = (Resolve-Path -LiteralPath $InputPath).Path
         PackageXmlPath = $package.XmlPath
@@ -879,11 +912,13 @@ try {
         TotalExportedItems = $items.Count
         PackageHasExportedItems = ($items.Count -gt 0)
         PackageInterpretation = if ($items.Count -gt 0) { "exported-items-found" } else { "no-exportable-items" }
-        Created = @($writeResults | Where-Object { $_.Status -eq "created" }).Count
-        Updated = @($writeResults | Where-Object { $_.Status -eq "updated" }).Count
-        Unchanged = @($writeResults | Where-Object { $_.Status -eq "unchanged" }).Count
-        SkippedOlderLastUpdate = @($writeResults | Where-Object { $_.Status -eq "skipped-older-lastUpdate" }).Count
-        NormalizedFileNames = @($writeResults | Where-Object { $_.WasNormalized }).Count
+        PreExistingOfficialXmlCount = $preExistingOfficialXmlCount
+        MaterializationInterpretation = $materializationInterpretation
+        Created = $createdCount
+        Updated = $updatedCount
+        Unchanged = $unchangedCount
+        SkippedOlderLastUpdate = $skippedOlderLastUpdateCount
+        NormalizedFileNames = $normalizedFileNamesCount
         MissingAfterVerification = $verification.Missing.Count
         MismatchesAfterVerification = $verification.Mismatch.Count
         FullSnapshotMissing = if ($null -ne $fullSnapshotResult) { $fullSnapshotResult.MissingKeys.Count } else { $null }
