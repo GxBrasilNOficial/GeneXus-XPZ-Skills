@@ -13,7 +13,7 @@ alto
 toda a base consolidada
 
 ## Objetivo
-Ser o ponto de entrada principal da base consolidada em ate 10 arquivos, com ordem de leitura, limites metodologicos e regras absolutas para uso por outro agente GPT.
+Ser o ponto de entrada principal da base consolidada, com ordem de leitura, limites metodologicos e regras absolutas para uso por outro agente GPT.
 
 ## Fontes consolidadas
 - 00-indice-da-base-genexus-xpz-xml.md
@@ -60,6 +60,14 @@ Organizar conhecimento operacional e empírico sobre XMLs extraídos de `XPZ` Ge
 ### Empírica
 
 - `01-base-empirica-geral.md`
+- `01a-catalogo-e-padroes-empiricos.md`
+- `01b-matriz-part-types-por-tipo.md`
+- `01c-campos-estaveis-vs-variaveis.md`
+- `01d-diffs-estruturais-por-tipo.md`
+- `01e-moldes-sanitizados-core.md`
+- `01f-moldes-sanitizados-dados-e-design.md`
+- `01g-moldes-sanitizados-componentes-e-fisico.md`
+- `01h-moldes-sanitizados-metadados-e-artefatos.md`
 - `04-webpanel-familias-e-templates.md`
 - `05-transaction-familias-e-templates.md`
 - `05b-procedure-relatorio-familias-e-templates.md`
@@ -75,14 +83,15 @@ Organizar conhecimento operacional e empírico sobre XMLs extraídos de `XPZ` Ge
 
 1. `00-indice-da-base-genexus-xpz-xml.md`
 2. `01-base-empirica-geral.md`
-3. `02-regras-operacionais-e-runtime.md`
-4. `03-risco-e-decisao-por-tipo.md`
-5. `04-webpanel-familias-e-templates.md`
-6. `05-transaction-familias-e-templates.md`
-7. `05b-procedure-relatorio-familias-e-templates.md`
-8. `07-open-points-e-checklist.md`
-9. `08-guia-para-agente-gpt.md`
-10. `09-inventario-e-rastreabilidade-publica.md`
+3. abrir o filho mais aderente da serie `01` (`01a` a `01h`)
+4. `02-regras-operacionais-e-runtime.md`
+5. `03-risco-e-decisao-por-tipo.md`
+6. `04-webpanel-familias-e-templates.md`
+7. `05-transaction-familias-e-templates.md`
+8. `05b-procedure-relatorio-familias-e-templates.md`
+9. `07-open-points-e-checklist.md`
+10. `08-guia-para-agente-gpt.md`
+11. `09-inventario-e-rastreabilidade-publica.md`
 
 ## Regras absolutas para qualquer agente GPT
 

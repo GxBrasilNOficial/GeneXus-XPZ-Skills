@@ -72,7 +72,7 @@ Servir como local único para conflitos não resolvidos silenciosamente.
 - `Inferência forte`: a raiz deve ser tratada como fonte operacional principal; `docs-kb-md` deve permanecer apenas como histórico de staging para evitar leituras duplicadas.
 - `Evidência direta`: `04-webpanel-familias-e-templates.md` ja contem anexos XML sanitizados completos para `WebPanel`.
 - `Evidência direta`: `05-transaction-familias-e-templates.md` agora tambem contem anexos XML sanitizados completos para familias representativas de `Transaction`.
-- `Evidência direta`: `01-base-empirica-geral.md` agora tambem contem anexos XML sanitizados completos representativos de `Procedure`, `DataProvider`, `DataSelector`, `Panel`, `API`, `WorkWithForWeb`, `SDT`, `Domain`, `Theme`, `PackagedModule`, `DesignSystem`, `ColorPalette`, `ThemeClass`, `ThemeColor`, `Image`, `Index`, `Document`, `ExternalObject`, `UserControl`, `Module`, `SubTypeGroup`, `PatternSettings`, `DataStore`, `Dashboard`, `DeploymentUnit`, `Generator`, `Language`, `Folder`, `Stencil` e `File`.
+- `Evidência direta`: a serie `01` agora distribui anexos XML sanitizados completos representativos de `Procedure`, `DataProvider`, `DataSelector`, `Panel`, `API`, `WorkWithForWeb`, `SDT`, `Domain`, `Theme`, `PackagedModule`, `DesignSystem`, `ColorPalette`, `ThemeClass`, `ThemeColor`, `Image`, `Index`, `Document`, `ExternalObject`, `UserControl`, `Module`, `SubTypeGroup`, `PatternSettings`, `DataStore`, `Dashboard`, `DeploymentUnit`, `Generator`, `Language`, `Folder`, `Stencil` e `File` em `01e` ate `01h`.
 - `Hipótese`: ainda vale completar `Transaction` com anexos equivalentes para as familias mais densas (`F3` e `F4`) se a meta for cobertura integral so pelos `.md`, sem recorrer ao acervo bruto.
 - `Evidência direta`: `Attribute` tem shape top-level comprovado nesta trilha e ja demonstrou importacao bem-sucedida em caso semanticamente fechado.
 - `Evidência direta`: `Folder` ficou esclarecido como tipo XML estruturalmente valido, enquanto `Category` e apenas o rotulo de UI/importador.
@@ -234,6 +234,5 @@ Orientar futuras coletas de templates comparáveis.
 - `Causa`: assumir a `Base Table` pelo nome do objeto ou por leitura parcial do bloco, sem confirmar a determinacao explicita ou implicita.
 - `Consequência`: aceitar atributos que nao pertencem a `Base Table`/`Extended Table` coerente, gerando analise errada ou ajuste de `Source` fora da navegacao real.
 - `Regra de checagem`: antes de validar atributos do bloco, identificar a `Base Table` determinada do `For each` e verificar cada referencia contra essa base e seu contexto coerente de navegacao.
-
 
 

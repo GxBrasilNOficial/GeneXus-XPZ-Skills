@@ -40,8 +40,8 @@ Do NOT use this skill for:
 
 ## RESPONSIBILITIES
 
-- Identify `Object/@type` and map to known object category using [01-base-empirica-geral](../01-base-empirica-geral.md)
-- Map Part types present in input against observed frequencies and known patterns
+- Identify `Object/@type` and map to known object category using [01-base-empirica-geral](../01-base-empirica-geral.md) as the index plus [01a-catalogo-e-padroes-empiricos](../01a-catalogo-e-padroes-empiricos.md) for the actual catalog
+- Map Part types present in input against observed frequencies and known patterns, using [01b-matriz-part-types-por-tipo](../01b-matriz-part-types-por-tipo.md) when needed
 - Classify object family when applicable: WebPanel families in [04-webpanel-familias-e-templates](../04-webpanel-familias-e-templates.md), Transaction families in [05-transaction-familias-e-templates](../05-transaction-familias-e-templates.md)
 - For report `Procedure`, classify whether the case fits the documented simple coverage from [05b-procedure-relatorio-familias-e-templates](../05b-procedure-relatorio-familias-e-templates.md) before recommending escalation to real XML
 - Classify container identity from `parentType` and check whether the object is under `Folder` or `Module`
@@ -78,7 +78,11 @@ Reference files and when to load them:
 | Reference | Load when |
 |-----------|-----------|
 | [00-indice-da-base-genexus-xpz-xml.md](../00-indice-da-base-genexus-xpz-xml.md) | Always — absolute rules and envelope spec |
-| [01-base-empirica-geral.md](../01-base-empirica-geral.md) | Identifying object type, Part type frequencies, structural catalog |
+| [01-base-empirica-geral.md](../01-base-empirica-geral.md) | Entry point and routing across the empirical `01` series |
+| [01a-catalogo-e-padroes-empiricos.md](../01a-catalogo-e-padroes-empiricos.md) | Identifying object type and reading the structural catalog |
+| [01b-matriz-part-types-por-tipo.md](../01b-matriz-part-types-por-tipo.md) | Checking recurring `Part type` inventory by object type |
+| [01c-campos-estaveis-vs-variaveis.md](../01c-campos-estaveis-vs-variaveis.md) | Checking which fields tend to remain stable or vary |
+| [01d-diffs-estruturais-por-tipo.md](../01d-diffs-estruturais-por-tipo.md) | Comparing structural density and per-type differences |
 | [03-risco-e-decisao-por-tipo.md](../03-risco-e-decisao-por-tipo.md) | Risk classification for any object type |
 | [04-webpanel-familias-e-templates.md](../04-webpanel-familias-e-templates.md) | Input contains WebPanel XML |
 | [05-transaction-familias-e-templates.md](../05-transaction-familias-e-templates.md) | Input contains Transaction XML |
@@ -92,8 +96,8 @@ Reference files and when to load them:
 
 1. Receive XML input or fragment from user
 2. If the task depends on locating files in a local KB parallel folder structure and that structure is still undefined, ambiguous, or unvalidated → **ABORT** and use `xpz-kb-parallel-setup` first
-3. Locate `Object/@type` attribute → cross-reference against [01-base-empirica-geral](../01-base-empirica-geral.md) type catalog
-4. Enumerate Part types present (`<Part type="...">`) → compare against observed frequencies for that type
+3. Locate `Object/@type` attribute → use [01-base-empirica-geral](../01-base-empirica-geral.md) to route and cross-reference against [01a-catalogo-e-padroes-empiricos](../01a-catalogo-e-padroes-empiricos.md)
+4. Enumerate Part types present (`<Part type="...">`) → compare against observed frequencies in [01b-matriz-part-types-por-tipo](../01b-matriz-part-types-por-tipo.md) for that type
 5. Identify missing or unexpected Part types relative to the known structural pattern
 6. Read container identity fields (`fullyQualifiedName`, `name`, `parent`, `parentGuid`, `parentType`, `moduleGuid`) and classify the container as `Folder`, `Module`, or unresolved from comparable corpus evidence
 7. When the task depends on locating an object in a local GeneXus repository, confirm the object by `type + name` and verify the actual folder where the file exists before proceeding

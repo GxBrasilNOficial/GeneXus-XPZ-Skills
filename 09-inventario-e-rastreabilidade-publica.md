@@ -13,7 +13,7 @@ nenhum
 00-indice-da-base-genexus-xpz-xml.md, 01-base-empirica-geral.md
 
 ## Objetivo
-Preservar rastreabilidade da consolidacao, inventario documental, inventario bruto publico sanitizado e o mapeamento usado para reduzir a base a ate 10 arquivos.
+Preservar rastreabilidade da consolidacao, inventario documental, inventario bruto publico sanitizado e o mapeamento usado para reorganizar a base consolidada.
 
 ## Nota sobre historico detalhado
 
@@ -248,10 +248,10 @@ alto
 00-readme-genexus-xpz-xml.md, 00-inventario-da-base-documental.md, 99-resumo-da-consolidacao.md
 
 ## Usado por
-futura consolidacao da base em ate 10 arquivos
+futura consolidacao da base em serie documental mais enxuta e roteavel
 
 ## Objetivo
-Mapear a base atual para a estrutura consolidada proposta em ate 10 arquivos.
+Mapear a base atual para a estrutura consolidada proposta, incluindo a serie `01` desdobrada.
 Preservar todo o conteudo existente, definindo destino e criterio de incorporacao antes de qualquer fusao.
 
 ## Estrutura alvo
@@ -300,6 +300,7 @@ Preservar todo o conteudo existente, definindo destino e criterio de incorporaca
 
 - Destino principal: `01-base-empirica-geral.md`
 - Manter:
+  - indice mestre da serie `01`
   - premissas empiricas gerais sobre XML/XPZ
   - observacoes gerais de estrutura
   - limites do que foi de fato observado
@@ -332,31 +333,28 @@ Preservar todo o conteudo existente, definindo destino e criterio de incorporaca
 
 ### 10-matriz-part-types-por-tipo.md
 
-- Destino principal: `01-base-empirica-geral.md`
+- Destino principal: `01b-matriz-part-types-por-tipo.md`
 - Manter:
   - tabela de `PartType`
   - frequencias por tipo
   - classificacao preliminar
-- Consolidar como secao:
-  - `Part types por tipo`
+- Consolidar como arquivo filho da serie `01`
 
 ### 11-campos-estaveis-vs-variaveis.md
 
-- Destino principal: `01-base-empirica-geral.md`
+- Destino principal: `01c-campos-estaveis-vs-variaveis.md`
 - Manter:
   - atributos recorrentes do no `<Object>`
   - campos estaveis, variaveis e contextuais
-- Consolidar como secao:
-  - `Campos do no Object`
+- Consolidar como arquivo filho da serie `01`
 
 ### 12-diffs-estruturais-por-tipo.md
 
-- Destino principal: `01-base-empirica-geral.md`
+- Destino principal: `01d-diffs-estruturais-por-tipo.md`
 - Manter:
   - comparacoes simples vs complexas
   - diferencas por tipo
-- Consolidar como secao:
-  - `Diffs estruturais`
+- Consolidar como arquivo filho da serie `01`
 
 ### 02-regras-operacionais-e-runtime.md
 
@@ -486,6 +484,7 @@ Preservar todo o conteudo existente, definindo destino e criterio de incorporaca
 - de `10-matriz-part-types-por-tipo.md`
 - de `11-campos-estaveis-vs-variaveis.md`
 - de `12-diffs-estruturais-por-tipo.md`
+- reorganizado depois como serie `01` com indice mestre em `01-base-empirica-geral.md` e arquivos filhos `01a` a `01h`
 
 ### 02-regras-operacionais-e-runtime.md
 

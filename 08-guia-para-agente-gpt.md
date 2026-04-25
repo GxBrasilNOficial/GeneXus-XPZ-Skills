@@ -44,7 +44,8 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 4. para `WebPanel`, ler `04-webpanel-familias-e-templates.md`
 5. para `Transaction`, ler `05-transaction-familias-e-templates.md`
 6. para `Procedure` de relatorio (nome com prefixo de relatorio no acervo), ler `05b-procedure-relatorio-familias-e-templates.md`
-7. usar `01-base-empirica-geral.md` e `09-inventario-e-rastreabilidade-publica.md` para sustentar detalhe empírico e rastreabilidade
+7. usar `01-base-empirica-geral.md` como indice mestre da serie `01` e abrir o filho empirico mais aderente (`01a` a `01h`)
+8. usar `09-inventario-e-rastreabilidade-publica.md` para sustentar rastreabilidade
 
 ### Fluxo curto para `Procedure` de relatorio simples
 
@@ -68,7 +69,7 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 ## Regra de leitura para runtime
 
 - quando a pergunta envolver `Base Table`, `Extended Table`, navegacao, `For each`, `Load`, `Refresh`, `Refresh Grid` ou risco de performance, consultar primeiro `02-regras-operacionais-e-runtime.md`
-- quando a pergunta envolver apenas estrutura XML observada, priorizar `01-base-empirica-geral.md`
+- quando a pergunta envolver apenas estrutura XML observada, priorizar `01-base-empirica-geral.md` como indice e descer ao arquivo empirico mais aderente da serie `01`
 - quando a pergunta misturar estrutura e comportamento provavel, responder separando explicitamente `Evidência direta`, `Regra documentada`, `Inferência forte` e `Hipótese`
 - quando a pergunta envolver `sync` ou wrappers locais da pasta paralela da KB, distinguir explicitamente:
   - capacidade ja disponivel na base compartilhada
@@ -378,7 +379,7 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 - Regra operacional: corpus local da KB pode confirmar ou desempatar um trecho de `Source`, mas nao substitui a base metodologica nem autoriza consolidar sintaxe apenas plausivel
 - Inferência forte: para `WebPanel`, os anexos completos de `04-webpanel-familias-e-templates.md` ja podem servir como molde sanitizado documentado
 - Inferência forte: para `Transaction`, `05-transaction-familias-e-templates.md` ja contem moldes sanitizados completos para as familias `F1`, `F2`, `F5` e `F6`
-- Inferência forte: para `Procedure`, `DataProvider`, `DataSelector`, `Panel`, `API`, `WorkWithForWeb`, `SDT`, `Domain`, `Theme`, `PackagedModule`, `DesignSystem`, `ColorPalette`, `ThemeClass`, `ThemeColor`, `Image`, `Table`, `Document`, `ExternalObject`, `UserControl`, `Module`, `SubTypeGroup`, `PatternSettings`, `DataStore`, `Dashboard`, `DeploymentUnit`, `Generator`, `Language`, `Folder`, `Stencil` e `File`, `01-base-empirica-geral.md` ja contem moldes sanitizados completos representativos
+- Inferência forte: para `Procedure`, `DataProvider`, `DataSelector`, `Panel`, `API`, `WorkWithForWeb`, `SDT`, `Domain`, `Theme`, `PackagedModule`, `DesignSystem`, `ColorPalette`, `ThemeClass`, `ThemeColor`, `Image`, `Table`, `Document`, `ExternalObject`, `UserControl`, `Module`, `SubTypeGroup`, `PatternSettings`, `DataStore`, `Dashboard`, `DeploymentUnit`, `Generator`, `Language`, `Folder`, `Stencil` e `File`, a serie `01` agora distribui moldes sanitizados completos representativos em `01e` ate `01h`
 - Inferência forte: para `Procedure` de relatorio simples, `05b-procedure-relatorio-familias-e-templates.md` passa a ser a referencia primaria de molde sanitizado canonico para familias `F2` e `F3`
 - Regra operacional: em `Procedure` de relatorio simples, nao exigir XML real da KB como primeiro passo quando o molde sanitizado canonico desta trilha ja cobrir o shape necessario
 - Regra operacional: depois de uma tentativa inicial e no maximo um corretivo estrutural curto, bloquear nova iteracao por analogia e escalar para XML real comparavel
