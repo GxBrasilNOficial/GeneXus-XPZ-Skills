@@ -286,8 +286,8 @@ Nao usar `setup concluido`, `estrutura pronta` ou expressao equivalente sem dize
 
 8.a Inspecionar `scripts/` e categorizar cada script previsto pela base metodologica em uma de tres classes:
     - AUSENTE: script previsto que ainda nao existe localmente
-    - EQUIVALENTE: script que existe e cuja logica e equivalente ao exemplo correspondente; diferencas apenas de nome KB (ex: `FabricaBrasil` no lugar do nome generico) sao toleradas e nao constituem divergencia
-    - CUSTOMIZADO: script que existe com diferencas de logica, parametros adicionais, fluxo alterado ou qualquer mudanca alem da substituicao de nome KB
+    - EQUIVALENTE: script que existe e cuja logica e equivalente ao exemplo correspondente; diferencas apenas de nome KB (ex: `FabricaBrasil` no lugar do nome generico) sao toleradas e nao constituem divergencia; para ser EQUIVALENTE, nenhum parametro pode ter default hardcoded apontando para arquivo que nao existe no disco
+    - CUSTOMIZADO: script que existe com diferencas de logica, parametros adicionais, fluxo alterado ou qualquer mudanca alem da substituicao de nome KB; tambem e CUSTOMIZADO qualquer script com parametro cujo default hardcoded aponta para arquivo inexistente, mesmo que a logica seja identica ao exemplo — o default quebrado e divergencia de configuracao efetiva, nao mera diferenca de nome
 
 8.b Para cada script AUSENTE: preparar criacao a partir do exemplo correspondente; apresentar ao usuario o script que sera criado e aguardar aprovacao explicita antes de gravar
 
@@ -425,3 +425,4 @@ PastaParalelaDaKb/
 - NUNCA classificar uma pasta como `bootstrap_incompleto` por ausencia de um script novo quando os scripts existentes ja funcionam e a pasta tem historico de uso real; a ausencia de script novo e caso de `modo_atualizacao`, nao de bootstrap incompleto
 - NUNCA assumir `modo_criacao` em pasta com historico real, qualquer que seja o pedido do usuario
 - NUNCA oferecer recriacao do zero como opcao em pasta com historico real; `modo_atualizacao` e o unico caminho disponivel
+- NUNCA, quando o wrapper de regeneracao do indice falhar com "file not found" em um `$ValidationCasesPath` default, tratar isso como ausencia de casos de validacao nem propor workarounds como passar `-ValidationCasesPath ""` ou apontar para casos de outra KB; tratar como default hardcoded quebrado no wrapper (classificacao `CUSTOMIZADO`), evidenciar a divergencia ao usuario e oferecer correcao via esta skill (remover ou corrigir o default para que o parametro fique opcional sem valor fixo)
