@@ -45,7 +45,7 @@ Ao comparar esses pares com a cobertura forte ja existente por `.Load(...)`, `.S
 
 ## Interpretacao
 
-Esses tres sinais continuam semanticamente mais fracos do que as chamadas diretas de operacao em BC e, no acervo atual da KB `FabricaBrasil`, nao acrescentam novas arestas tecnicas ao grafo.
+Esses tres sinais continuam semanticamente mais fracos do que as chamadas diretas de operacao em BC e, no acervo atual da KB `KBExemplo`, nao acrescentam novas arestas tecnicas ao grafo.
 
 Na pratica:
 

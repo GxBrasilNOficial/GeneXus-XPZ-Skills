@@ -7,7 +7,7 @@ exemplos operacionais
 baixo a medio
 
 ## Depende de
-17-kb-intelligence-fase-6-contrato.md, 18-kb-intelligence-fase-6-roteiro-investigacao-funcional.md, historico/kb-intelligence/2026-04-kb-intelligence-fase-1-validacao-fabricabrasil.md, historico/kb-intelligence/2026-04-kb-intelligence-fase-2-dataprovider-validacao-fabricabrasil.md
+17-kb-intelligence-fase-6-contrato.md, 18-kb-intelligence-fase-6-roteiro-investigacao-funcional.md, historico/kb-intelligence/2026-04-kb-intelligence-fase-1-validacao-kbexemplo.md, historico/kb-intelligence/2026-04-kb-intelligence-fase-2-dataprovider-validacao-kbexemplo.md
 
 ## Usado por
 agentes que precisem ver exemplos curtos de resposta funcional assistida com base em evidencias reais ja validadas

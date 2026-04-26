@@ -1,4 +1,4 @@
-# Encerramento KB Intelligence Fase 4 - FabricaBrasil
+# Encerramento KB Intelligence Fase 4 - KBExemplo
 
 ## Papel do documento
 registro de encerramento
@@ -20,7 +20,7 @@ O escopo consolidado cobre:
 
 ## Validacao final
 
-- KB laboratorio: `FabricaBrasil`
+- KB laboratorio: `KBExemplo`
 - indice usado para validacao: SQLite derivado regenerado em `Temp`
 - tipos inventariados: 33
 - objetos gravados no indice regenerado: 14928

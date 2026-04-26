@@ -31,16 +31,16 @@ Contexto operacional:
   - Inferencia forte
   - Hipotese
 - Nao alterar o indice canonico sem pedido explicito:
-  C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\kb-intelligence.sqlite
+  C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite
 - Usar indices temporarios em:
-  C:\Dev\Prod\Gx_FabricaBrasil\Temp\
-- Antes de agir na primeira vez em C:\Dev\Prod\Gx_FabricaBrasil, avisar a troca de contexto e ler README.md e AGENTS.md de la.
-- C:\Dev\Prod\Gx_FabricaBrasil pode ter logs/ pre-existente; nao tocar sem pedido explicito.
+  C:\KB\KBExemplo\Temp\
+- Antes de agir na primeira vez em C:\KB\KBExemplo, avisar a troca de contexto e ler README.md e AGENTS.md de la.
+- C:\KB\KBExemplo pode ter logs/ pre-existente; nao tocar sem pedido explicito.
 
 Estado versionado:
-- O indice canonico de FabricaBrasil foi regenerado por decisao explicita do usuario e validado pela rotina oficial.
+- O indice canonico de KBExemplo foi regenerado por decisao explicita do usuario e validado pela rotina oficial.
 - functional-trace-basic foi implementado em scripts/Query-KbIntelligenceIndex.py e scripts/Query-KbIntelligenceIndex.ps1.
-- A bateria minima da Fase 6 esta em scripts/kb-intelligence-fabricabrasil.phase6.validation-cases.json.
+- A bateria minima da Fase 6 esta em scripts/kb-intelligence-kbexemplo.phase6.validation-cases.json.
 - O filtro conservador de literais CustomType redundantes ja foi implementado.
 - A primeira resposta funcional controlada foi registrada em 27-kb-intelligence-fase-6-primeira-resposta-funcional.md usando API:apiPDV_Integracao.
 

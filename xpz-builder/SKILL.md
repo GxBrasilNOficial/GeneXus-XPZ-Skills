@@ -55,7 +55,7 @@ If the main need is to prepare or validate the initial folder structure around t
 - Abort for confirmation instead of extrapolating from weak analogy when no strong enough local precedent justifies the package format
 - Treat `runtime`, `Import File Load`, `Import`, and `Specification` as distinct validation layers; success in one does not authorize conclusions about the others
 - Validate `Source` compatibility by methodology first: GeneXus semantic rules plus the XPZ trail and `nexa`; use KB corpus search only as fallback when the methodological base does not cover the case
-- For simple report `Procedure`, prefer the documented sanitized canonical template first; escalate to KB corpus only when the methodological base does not cover the case, when structural import failures repeat, or when KB-local dialect/localism appears
+- For simple report `Procedure`, prefer the documented sanitized canonical template first; use it as a materialization source only when the selected block in [05b-procedure-relatorio-familias-e-templates](../05b-procedure-relatorio-familias-e-templates.md) is marked as `molde pronto`; escalate to KB corpus only when the methodological base does not cover the case, when the initial attempt plus one short structural corrective attempt fail, or when KB-local dialect/localism appears
 - Classify each package candidate by content delta as `requested change`, `necessary auxiliary change`, or `extra unrequested change` before packaging
 - Require explicit signaling before packaging when a candidate item remains as `extra unrequested change`, including metadata, reserialization, or known noise that is not strictly required
 - Generate valid `lastUpdate` timestamp (real local time, not placeholder)
@@ -198,20 +198,21 @@ Reference files and when to load them:
    - If detected, treat this as an explicit process error
    - Preserve those XMLs in `ObjetosGeradosParaImportacaoNaKbNoGenexus`, restore `ObjetosDaKbEmXml` to the official Git version, present a structured manifest of preserved items in the conversation, save it as a local file when incident traceability requires it, and **ABORT** packaging until the snapshot is sane
    - If the target object has not yet returned from the KB by official export, keep working only from `ObjetosGeradosParaImportacaoNaKbNoGenexus`
-7. Load [03-risco-e-decisao-por-tipo](../03-risco-e-decisao-por-tipo.md) → assign risk level
-8. Evaluate abort conditions:
+8. Load [03-risco-e-decisao-por-tipo](../03-risco-e-decisao-por-tipo.md) → assign risk level
+9. Evaluate abort conditions:
    - Risk is high/very high AND no comparable internal template exists → **ABORT**
    - Type is not in the empirical corpus → **ABORT**
    - User requests affirmation of import/build success → **REFUSE**, state limitation
-9. Locate template:
+10. Locate template:
    - Transaction → use family F1–F6 from [05-transaction-familias-e-templates](../05-transaction-familias-e-templates.md)
    - WebPanel → use closest family from [04-webpanel-familias-e-templates](../04-webpanel-familias-e-templates.md)
-   - Simple report `Procedure` → use the canonical sanitized family from [05b-procedure-relatorio-familias-e-templates](../05b-procedure-relatorio-familias-e-templates.md) first when the case fits simple F2/F3 coverage
+   - Simple report `Procedure` → use the canonical sanitized family from [05b-procedure-relatorio-familias-e-templates](../05b-procedure-relatorio-familias-e-templates.md) first when the case fits simple F2/F3 coverage and the selected block is marked as `molde pronto`
    - Other types → use sanitized representative from [08-guia-para-agente-gpt](../08-guia-para-agente-gpt.md) materialization rules
-   - For simple report `Procedure`, escalate to comparable real XML only when the request falls outside the documented simple family, when one or two structural import failures already happened, or when KB-local dialect/localism appears
+   - For simple report `Procedure`, escalate to comparable real XML only when the request falls outside the documented simple family, when the initial attempt plus one short structural corrective attempt already failed, or when KB-local dialect/localism appears
+   - For simple report `Procedure`, every output or handoff must label the basis used as exactly one of: `molde sanitizado`, `XML real da KB atual`, `XML real de outra KB`, or `hipotese`
    - If the object has already returned from the KB via official XPZ processing, prefer the current XML in the official corpus over any older delta/import working copy when selecting the base for a new change
    - Before cloning identity fields, classify the container from comparable corpus XML: `Folder` (`parentType="00000000-0000-0000-0000-000000000008"`) versus `Module` (`parentType="c88fffcd-b6f8-0000-8fec-00b5497e2117"`)
-9. Apply conservative cloning:
+11. Apply conservative cloning:
    - Preserve `Object/@guid` (new GUID only for new objects, never reuse existing object's GUID)
    - Preserve `parent`, `parentGuid`, `parentType`, `moduleGuid`
    - Keep all recurring Part types present, even if content is empty
@@ -235,7 +236,7 @@ Reference files and when to load them:
    - For report `Procedure`, classify each edited fragment before serialization as `Source`, `Rules`, or layout and reject any cross-layer mixture
    - For report `Procedure`, verify coherence between layout `PrintBlock` names and each `print printBlock...` reference in `Source`
    - For report `Procedure`, if an import error points to invalid control, report block, or layout shape, inspect layout first before altering envelope
-10. Apply envelope rules from [02-regras-operacionais-e-runtime](../02-regras-operacionais-e-runtime.md):
+12. Apply envelope rules from [02-regras-operacionais-e-runtime](../02-regras-operacionais-e-runtime.md):
    - For delta of an existing object, prefer the package format with validated local precedent in the same KB trail before any generic preference
    - Distinguish explicitly between embedded-object package under `<Objects>` and package using `<FilePath>` to external XML
    - Consider local precedent strong only when object type, operation nature, and batch materialization style are compatible with the current case
@@ -245,18 +246,18 @@ Reference files and when to load them:
    - Wrap in `<ExportFile>` with `<KMW>`, `<Source>`, `<Objects>`, `<Dependencies>`
    - Keep `Source/@kb` and `Source/Version/@guid` in valid GUID format
    - Do NOT include special KB block unless explicitly documented as required
-11. Set or preserve `lastUpdate` according to the batch-role classification:
+13. Set or preserve `lastUpdate` according to the batch-role classification:
    - Classify each active XML as `modified in this round` or `reused unchanged for mandatory dependency closure`
    - If any textual change was persisted in the final XML, classify the item as `modified in this round`
    - Modified object → set `lastUpdate` to the real local timestamp of the final write
    - Unchanged dependency object → preserve the official `lastUpdate` from the official corpus XML
    - If classification and materialized `lastUpdate` diverge → **ABORT**
-11.5. Audit `lastUpdate` after every local write:
+14. Audit `lastUpdate` after every local write:
    - After writing or rewriting an object XML, reopen the saved file and confirm the root `lastUpdate`
    - If the object was actually modified, `lastUpdate` must reflect the real instant of that last write
    - If the object was not modified and is included only for mandatory dependency closure, preserve the official `lastUpdate` from the corpus XML
    - Do NOT continue to packaging until the saved-file header has been checked
-12. Before packaging, classify active XML roots and validate packaging hygiene:
+15. Before packaging, classify active XML roots and validate packaging hygiene:
    - `Object` top-level → serialize under `<Objects>`
    - `Attribute` top-level → serialize under `<Attributes>`
    - Unsupported root type → **ABORT** or require explicit treatment
@@ -279,12 +280,12 @@ Reference files and when to load them:
    - Validate the final envelope materialized inside `import_file.xml`, not only the source XML files
    - If an object is embedded under `<Objects>`, it must appear as XML element content only; embedded XML declaration such as `<?xml version="1.0" ...?>` inside `<Objects>` is a blocking envelope error
    - If the current flow is manual IDE import and `import_file.xml` is still missing, do NOT treat the packaging task as complete
-13. Reread and apply local repository documentation before packaging:
+16. Reread and apply local repository documentation before packaging:
    - Reopen `AGENTS.md`, `README.md`, and any equivalent local KB/repository documentation that defines project-specific functional review chains, contracts, or operational flow
    - Treat those local conventions as mandatory only for that repository, not as universal XPZ methodology
    - If the local documentation requires a functional review chain for the current change type, verify that chain end-to-end in the local XML before packaging
    - Do NOT continue to packaging while any applicable local rule remains pending, ambiguous, or inconsistent in the saved XML
-14. Validate:
+17. Validate:
    - XML is well-formed
    - All recurring Part types present
    - No text placeholder GUIDs remaining
@@ -345,7 +346,7 @@ Reference files and when to load them:
    - When creating a corrective package after partial import failure, report the original package, successfully imported objects, failed objects, probable failure category, and corrective package path/name
    - Corrective packages must contain only the necessary delta for failed objects and strictly required dependencies; do NOT resend all original package objects by default
    - Confirm before packaging that all applicable local repository rules were reread and satisfied in the saved XML
-15. Deliver XML with limitations block:
+18. Deliver XML with limitations block:
    - Which template was used
    - Confidence level
    - That the saved XML was reread and the persisted `lastUpdate` was confirmed after the final local write
@@ -453,6 +454,28 @@ Reference files and when to load them:
 - NEVER create subfolders by front under `PacotesGeradosParaImportacaoNaKbNoGenexus`; that package area must remain flat
 - NEVER ignore `Cannot convert Domain to Attribute`, `Attribute 'X' in 'Transaction Y' does not exist`, or `DescriptionAttribute ... could not be found in level attributes`; these are blocking package-construction errors for this trail
 - NEVER treat `OBSOLETO_` as the default naming convention for normal package generation
+- NEVER default to package names that are only subject, only date/time, excessively long conversation prose, or permanent overwrite of the same file name
+- NEVER treat an IDE-side lateral error as proof that the XML/package structure failed
+- NEVER treat a successful package load as proof that Source, Specification, or runtime are valid
+- NEVER universalize a repository-specific functional review rule, contract, or operational convention as if it were a global rule of the shared XPZ methodology
+- NEVER pick envelope format for an existing-object delta by generic preference when there is validated local precedent in the same KB trail
+- NEVER justify envelope choice only by broad similarity of front, family, or object name
+- NEVER treat `WorkWith`, `WorkWithWeb`, `procPlanilha`, wrappers, or action chains as universal architectural obligations of XPZ methodology
+- NEVER apply function over a `DateTime` database column in a period filter without treating it as an explicit navigation/performance risk and justifying the exception
+- NEVER generate from a text description or markdown summary alone — requires comparable raw XML template
+- NEVER generate special KB block (`KnowledgeBase`, `Settings`) for normal single-object XPZ
+- ABORT if risk is high/very high and no internal comparable template is available
+- ABORT if type has fewer than 5 specimens in the corpus and no sanitized template exists
+- ABORT if container identity is unresolved between `Folder` and `Module` for the target object
+- ABORT if more than one plausible batch is active in the workspace
+- ABORT if improper local changes are detected in `ObjetosDaKbEmXml` and the snapshot has not been sanitized yet
+- ABORT if classification of an item as modified vs unchanged dependency does not match the materialized `lastUpdate`
+- ABORT if an active XML has an unsupported top-level root type for the current package flow
+- ABORT if a modified object was rewritten locally but the saved-file `lastUpdate` was not verified before packaging
+- ABORT if applicable local repository documentation was not reread before packaging
+- ABORT if a local functional review chain, contract, or operational rule required by the target KB is still pending or inconsistent in the saved XML
+- ABORT if an essential `Source` construct depends only on intuition, generic GeneXus memory, or isolated local corpus evidence
+- Absolute rules in [00-indice-da-base-genexus-xpz-xml.md](../00-indice-da-base-genexus-xpz-xml.md) and [08-guia-para-agente-gpt.md](../08-guia-para-agente-gpt.md) take precedence over all other heuristics
 
 ---
 
@@ -479,25 +502,3 @@ Reference files and when to load them:
 - `DescriptionAttribute ... could not be found in level attributes`
   - Meaning in this trail: `DescriptionAttribute` points to an attribute that is not present in the same `Level` and/or is absent from `<Attributes>`
   - Expected correction: point `DescriptionAttribute` to a real attribute of the same `Level` and include that attribute in `<Attributes>` when the package must create or supply it
-- NEVER default to package names that are only subject, only date/time, excessively long conversation prose, or permanent overwrite of the same file name
-- NEVER treat an IDE-side lateral error as proof that the XML/package structure failed
-- NEVER treat a successful package load as proof that Source, Specification, or runtime are valid
-- NEVER universalize a repository-specific functional review rule, contract, or operational convention as if it were a global rule of the shared XPZ methodology
-- NEVER pick envelope format for an existing-object delta by generic preference when there is validated local precedent in the same KB trail
-- NEVER justify envelope choice only by broad similarity of front, family, or object name
-- NEVER treat `WorkWith`, `WorkWithWeb`, `procPlanilha`, wrappers, or action chains as universal architectural obligations of XPZ methodology
-- NEVER apply function over a `DateTime` database column in a period filter without treating it as an explicit navigation/performance risk and justifying the exception
-- NEVER generate from a text description or markdown summary alone — requires comparable raw XML template
-- NEVER generate special KB block (`KnowledgeBase`, `Settings`) for normal single-object XPZ
-- ABORT if risk is high/very high and no internal comparable template is available
-- ABORT if type has fewer than 5 specimens in the corpus and no sanitized template exists
-- ABORT if container identity is unresolved between `Folder` and `Module` for the target object
-- ABORT if more than one plausible batch is active in the workspace
-- ABORT if improper local changes are detected in `ObjetosDaKbEmXml` and the snapshot has not been sanitized yet
-- ABORT if classification of an item as modified vs unchanged dependency does not match the materialized `lastUpdate`
-- ABORT if an active XML has an unsupported top-level root type for the current package flow
-- ABORT if a modified object was rewritten locally but the saved-file `lastUpdate` was not verified before packaging
-- ABORT if applicable local repository documentation was not reread before packaging
-- ABORT if a local functional review chain, contract, or operational rule required by the target KB is still pending or inconsistent in the saved XML
-- ABORT if an essential `Source` construct depends only on intuition, generic GeneXus memory, or isolated local corpus evidence
-- Absolute rules in [00-indice-da-base-genexus-xpz-xml.md](../00-indice-da-base-genexus-xpz-xml.md) and [08-guia-para-agente-gpt.md](../08-guia-para-agente-gpt.md) take precedence over all other heuristics

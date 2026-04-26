@@ -13,15 +13,15 @@ baixo a medio
 agentes que precisem validar o uso pratico da Fase 6 em perguntas funcionais curtas, sem transformar o indice tecnico em fonte normativa
 
 ## Objetivo
-Executar um piloto pequeno da Fase 6 usando a KB real `FabricaBrasil`, demonstrando como o indice tecnico reduz a trilha de leitura e como o XML oficial fecha ou limita a resposta funcional.
+Executar um piloto pequeno da Fase 6 usando a KB real `KBExemplo`, demonstrando como o indice tecnico reduz a trilha de leitura e como o XML oficial fecha ou limita a resposta funcional.
 
 ## Ambiente do piloto
 
-- KB paralela: `C:\Dev\Prod\Gx_FabricaBrasil`
-- Fonte normativa lida: `C:\Dev\Prod\Gx_FabricaBrasil\ObjetosDaKbEmXml`
-- Indice canonico consultado sem alteracao: `C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\kb-intelligence.sqlite`
-- Indice temporario usado para o piloto atualizado: `C:\Dev\Prod\Gx_FabricaBrasil\Temp\kb-intelligence-fase6-piloto.sqlite`
-- Relatorio temporario de validacao: `C:\Dev\Prod\Gx_FabricaBrasil\Temp\kb-intelligence-fase6-piloto-validation.json`
+- KB paralela: `C:\KB\KBExemplo`
+- Fonte normativa lida: `C:\KB\KBExemplo\ObjetosDaKbEmXml`
+- Indice canonico consultado sem alteracao: `C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite`
+- Indice temporario usado para o piloto atualizado: `C:\KB\KBExemplo\Temp\kb-intelligence-fase6-piloto.sqlite`
+- Relatorio temporario de validacao: `C:\KB\KBExemplo\Temp\kb-intelligence-fase6-piloto-validation.json`
 
 Na execucao inicial do piloto, o indice canonico operacional nao foi sobrescrito. A geracao temporaria foi necessaria porque a consulta ao canonico localizou bem relacoes de `WorkWithForWeb`, mas nao retornou relacoes dos incrementos finais da Fase 5, como BC `.Load(...)` resolvido para `Transaction` e `API` para `SDT` resolvido por `ATTCUSTOMTYPE`.
 
@@ -33,10 +33,10 @@ Depois do piloto, por decisao explicita do usuario, o indice canonico foi regene
 
 ```powershell
 .\scripts\New-KbIntelligenceIndex.ps1 `
-  -SourceRoot "C:\Dev\Prod\Gx_FabricaBrasil\ObjetosDaKbEmXml" `
-  -OutputPath "C:\Dev\Prod\Gx_FabricaBrasil\Temp\kb-intelligence-fase6-piloto.sqlite" `
-  -ValidationReportPath "C:\Dev\Prod\Gx_FabricaBrasil\Temp\kb-intelligence-fase6-piloto-validation.json" `
-  -ValidationCasesPath ".\scripts\kb-intelligence-fabricabrasil.phase5.validation-cases.json" `
+  -SourceRoot "C:\KB\KBExemplo\ObjetosDaKbEmXml" `
+  -OutputPath "C:\KB\KBExemplo\Temp\kb-intelligence-fase6-piloto.sqlite" `
+  -ValidationReportPath "C:\KB\KBExemplo\Temp\kb-intelligence-fase6-piloto-validation.json" `
+  -ValidationCasesPath ".\scripts\kb-intelligence-kbexemplo.phase5.validation-cases.json" `
   -FailOnValidationFailure
 ```
 
@@ -171,10 +171,10 @@ Por decisao explicita do usuario, a rotina oficial de geracao do indice canonico
 
 ```powershell
 .\scripts\New-KbIntelligenceIndex.ps1 `
-  -SourceRoot "C:\Dev\Prod\Gx_FabricaBrasil\ObjetosDaKbEmXml" `
-  -OutputPath "C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\kb-intelligence.sqlite" `
-  -ValidationReportPath "C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\kb-intelligence-validation.json" `
-  -ValidationCasesPath ".\scripts\kb-intelligence-fabricabrasil.phase5.validation-cases.json" `
+  -SourceRoot "C:\KB\KBExemplo\ObjetosDaKbEmXml" `
+  -OutputPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite" `
+  -ValidationReportPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence-validation.json" `
+  -ValidationCasesPath ".\scripts\kb-intelligence-kbexemplo.phase5.validation-cases.json" `
   -FailOnValidationFailure
 ```
 
@@ -183,8 +183,8 @@ Resultado registrado:
 - objetos escritos: `14928`
 - relacoes escritas: `60494`
 - validacao da Fase 5: `64` casos aprovados
-- arquivo canonico atualizado: `C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\kb-intelligence.sqlite`
-- relatorio atualizado: `C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\kb-intelligence-validation.json`
+- arquivo canonico atualizado: `C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite`
+- relatorio atualizado: `C:\KB\KBExemplo\KbIntelligence\kb-intelligence-validation.json`
 
 Consultas pontuais confirmaram no canonico:
 

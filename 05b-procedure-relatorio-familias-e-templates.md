@@ -182,26 +182,19 @@ Concentrar familias estruturais de `Procedure` de relatorio observadas no acervo
 - Evidencia direta: a familia `F3` ja representa a menor listagem linear com iteracao simples.
 - Inferencia forte: esses dois perfis cobrem o caso comum pedido pelo outro agente para relatorio simples.
 
-### Cobertura minima que o molde canonico deve expor
+### Separacao obrigatoria entre explicacao e molde pronto
 
-- variante simples em retrato
-- variante simples em paisagem
-- shape minimo completo do `Part` `c414ed00-8cc4-4f44-8820-4baf93547173`
-- `Bands`, `PrintBlock` e relacao com `print printBlock...`
-- `RPT_INTERNAL_NAME` coerente entre `Source` e layout
-- exemplo minimo de `Output_file`
-- exemplo minimo de `parm(...)` em `Rules`
-- exemplo minimo de `ReportLabel`
-- exemplo minimo de `ReportAttribute`
-- variante com atributos diretos
-- variante com variaveis
+- Bloco descritivo: tabelas de familia, sintese textual, frequencias e alertas de risco ajudam a classificar o caso, mas nao bastam para materializacao.
+- Molde pronto para uso controlado: XML sanitizado completo por `Part`, com shape comprovado e suficiente para clonagem conservadora dentro da trilha.
+- Regra operacional: nesta secao, tudo que estiver marcado como `molde pronto` passa a ser fonte valida para materializacao controlada de `Procedure` de relatorio simples.
+- Regra operacional: nada fora dos blocos `molde pronto` deve ser promovido a XML final por analogia livre.
 
 ### Shape minimo por camada
 
 - `Source`: declarar fluxo de impressao, blocos `Header`/`Footer` quando existirem, comandos `print printBlock...`, `for each` quando a familia exigir, e chamada `Output_file` quando o caso pedir saida em arquivo.
 - `Rules`: declarar `parm(...)` e apenas regras sintaticamente proprias dessa camada.
 - layout `Part c414ed00-8cc4-4f44-8820-4baf93547173`: materializar `Bands`, `PrintBlock`, `ReportLabel`, `ReportAttribute` e metadado estrutural do relatorio.
-- Regra operacional: o layout nao deve ser inventado como GXML livre, lista arbitraria de controles ou shape textual plausivel; ele precisa seguir shape comprovado de `Bands` e `PrintBlock`.
+- Regra operacional: o layout nao deve ser inventado como `GXML` livre, lista arbitraria de controles ou shape textual plausivel; ele precisa seguir shape comprovado de `Bands` e `PrintBlock`.
 - Regra operacional: `RPT_INTERNAL_NAME`, nomes de `PrintBlock` e referencias usadas em `print printBlock...` devem permanecer coerentes entre as tres camadas.
 
 ### Gramatica explicita por `Part`
@@ -213,47 +206,503 @@ Concentrar familias estruturais de `Procedure` de relatorio observadas no acervo
 - Regra operacional: `;` rejeitado em `Source` de relatorio deve ser tratado como problema de dialeto/sintaxe do `Source`, nao como defeito do layout.
 - Regra operacional: fica proibido misturar `GXML` inventado, controles nao comprovados e shapes nao observados no corpus como tentativa de "completar" relatorio.
 
-### Esqueleto minimo documentado
+### Casca canonica de `Part` para `Procedure` de relatorio
 
-```text
-Source:
-  Header
-    print PB_HEADER
-  EndHeader
+- Evidencia direta: os representantes reais comparaveis observados nesta trilha repetem a mesma ordem minima de `Part`: `528d1c06...` (`Source`), `c414ed00...` (layout), `9b0a32a3...` (`Rules`), `763f0d8b...` (fonte auxiliar vazia), `e4c4ade7...` (variaveis), `ad3ca970...` (help) e `babf62c5...` (propriedades finais).
+- Regra operacional: os moldes abaixo foram desenhados para clonagem conservadora sobre essa casca, nao para geracao arbitraria de um objeto do zero sem identidade, modulo e parent coerentes.
 
-  For each
-    print PB_DETAIL
-  EndFor
-
-  Footer
-    print PB_FOOTER
-  EndFooter
-
-Rules:
-  parm(in:&DataInicial, in:&DataFinal);
-
-Layout:
-  Bands
-    PrintBlock PB_HEADER -> ReportLabel
-    PrintBlock PB_DETAIL -> ReportAttribute / ReportLabel
-    PrintBlock PB_FOOTER -> ReportLabel
+```xml
+<Part type="528d1c06-a9c2-420d-bd35-21dca83f12ff">...</Part>
+<Part type="c414ed00-8cc4-4f44-8820-4baf93547173">...</Part>
+<Part type="9b0a32a3-de6d-4be1-a4dd-1b85d3741534">...</Part>
+<Part type="763f0d8b-d8ac-4db4-8dd4-de8979f2b5b9"><Source><![CDATA[]]></Source></Part>
+<Part type="e4c4ade7-53f0-4a56-bdfd-843735b66f47">...</Part>
+<Part type="ad3ca970-19d0-44e1-a7b7-db05556e820c"><Help>...</Help></Part>
+<Part type="babf62c5-0111-49e9-a1c3-cc004d90900a"><Properties /></Part>
 ```
 
-- Regra operacional: o bloco acima e apenas mapa de camadas; a materializacao final continua exigindo XML completo comprovado pelo molde sanitizado correspondente.
-
-### Variantes minimas que a base deve sustentar
+### Variantes minimas que a base passa a sustentar
 
 - `F2-retrato`: sem `For each`, com `Header` e/ou `Footer`, orientacao retrato, `Output_file` opcional.
 - `F2-paisagem`: sem `For each`, com `Header` e/ou `Footer`, orientacao paisagem, mesmo shape estrutural minimo.
 - `F3-atributos-diretos`: `For each` simples, `ReportAttribute` apontando para atributos diretos do cursor principal.
 - `F3-variaveis`: `For each` simples ou pre-processamento curto, `ReportAttribute` apontando para variaveis previamente carregadas.
 
+### Molde pronto 1 - `F2-retrato`
+
+- Base empirica comparavel: `procRelatorioModeloBasicoInicial.xml` + `procRelatorioModeloRetrato.xml`.
+- Uso esperado: pagina simples sem iteracao, com cabecalho/rodape e bloco de mensagem ou resumo.
+
+```xml
+<Part type="528d1c06-a9c2-420d-bd35-21dca83f12ff">
+  <Source><![CDATA[Header
+    print printBlockCabecalho
+End
+
+Footer
+    print printBlockRodape
+End
+
+print printBlockMensagem
+]]></Source>
+  <Properties>
+    <Property>
+      <Name>IsDefault</Name>
+      <Value>False</Value>
+    </Property>
+  </Properties>
+</Part>
+<Part type="c414ed00-8cc4-4f44-8820-4baf93547173">
+  <Layout>
+    <Bands>
+      <PrintBlock>
+        <Controls>
+          <ReportLabel>
+            <Properties>
+              <Property><Name>RPT_INTERNAL_NAME</Name><Value>gxReportLabelTitulo</Value></Property>
+              <Property><Name>RPT_VISIBLE</Name><Value>True</Value></Property>
+              <Property><Name>RPT_TEXT</Name><Value>Titulo do relatorio</Value></Property>
+              <Property><Name>RPT_X</Name><Value>20</Value></Property>
+              <Property><Name>RPT_Y</Name><Value>0</Value></Property>
+            </Properties>
+          </ReportLabel>
+        </Controls>
+        <Properties>
+          <Property><Name>RPT_INTERNAL_NAME</Name><Value>printBlockCabecalho</Value></Property>
+          <Property><Name>RPT_ID</Name><Value>1</Value></Property>
+          <Property><Name>RPT_HEIGHT</Name><Value>90</Value></Property>
+        </Properties>
+      </PrintBlock>
+      <PrintBlock>
+        <Controls>
+          <ReportAttribute>
+            <Properties>
+              <Property><Name>RPT_INTERNAL_NAME</Name><Value>Mensagem</Value></Property>
+              <Property><Name>RPT_VISIBLE</Name><Value>True</Value></Property>
+              <Property><Name>AttID</Name><Value>&amp;Mensagem</Value></Property>
+              <Property><Name>RPT_X</Name><Value>20</Value></Property>
+              <Property><Name>RPT_Y</Name><Value>0</Value></Property>
+              <Property><Name>RPT_WIDTH</Name><Value>760</Value></Property>
+            </Properties>
+          </ReportAttribute>
+        </Controls>
+        <Properties>
+          <Property><Name>RPT_INTERNAL_NAME</Name><Value>printBlockMensagem</Value></Property>
+          <Property><Name>RPT_ID</Name><Value>2</Value></Property>
+          <Property><Name>RPT_HEIGHT</Name><Value>25</Value></Property>
+        </Properties>
+      </PrintBlock>
+      <PrintBlock>
+        <Controls>
+          <ReportLabel>
+            <Properties>
+              <Property><Name>RPT_INTERNAL_NAME</Name><Value>gxReportLabelPagina</Value></Property>
+              <Property><Name>RPT_VISIBLE</Name><Value>True</Value></Property>
+              <Property><Name>RPT_TEXT</Name><Value>{{Pages}}</Value></Property>
+              <Property><Name>RPT_X</Name><Value>740</Value></Property>
+              <Property><Name>RPT_Y</Name><Value>5</Value></Property>
+            </Properties>
+          </ReportLabel>
+        </Controls>
+        <Properties>
+          <Property><Name>RPT_INTERNAL_NAME</Name><Value>printBlockRodape</Value></Property>
+          <Property><Name>RPT_ID</Name><Value>3</Value></Property>
+          <Property><Name>RPT_HEIGHT</Name><Value>20</Value></Property>
+        </Properties>
+      </PrintBlock>
+    </Bands>
+    <Properties>
+      <Property><Name>RPT_PAPER_SIZE</Name><Value>A4</Value></Property>
+      <Property><Name>RPT_RIGHT_MARGIN</Name><Value>20</Value></Property>
+    </Properties>
+  </Layout>
+  <Properties>
+    <Property><Name>IsDefault</Name><Value>False</Value></Property>
+  </Properties>
+</Part>
+<Part type="9b0a32a3-de6d-4be1-a4dd-1b85d3741534">
+  <Source><![CDATA[parm(in:&EmpresaId, in:&DataInicial);
+
+&arquivodesaidanome = 'RelatorioSimples_' + &EmpresaId.ToString();
+
+Output_file(&arquivodesaidanome, 'PDF');
+]]></Source>
+  <Properties>
+    <Property><Name>IsDefault</Name><Value>False</Value></Property>
+  </Properties>
+</Part>
+<Part type="e4c4ade7-53f0-4a56-bdfd-843735b66f47">
+  <Variable Name="arquivodesaidanome">
+    <Documentation />
+    <Properties>
+      <Property><Name>Name</Name><Value>arquivodesaidanome</Value></Property>
+      <Property><Name>ATTCUSTOMTYPE</Name><Value>bas:VarChar</Value></Property>
+      <Property><Name>Length</Name><Value>255</Value></Property>
+      <Property><Name>AttMaxLen</Name><Value>255</Value></Property>
+    </Properties>
+  </Variable>
+  <Variable Name="EmpresaId">
+    <Documentation />
+    <Properties>
+      <Property><Name>Name</Name><Value>EmpresaId</Value></Property>
+      <Property><Name>idBasedOn</Name><Value>Attribute:EmpresaId</Value></Property>
+    </Properties>
+  </Variable>
+  <Variable Name="DataInicial">
+    <Documentation />
+    <Properties>
+      <Property><Name>Name</Name><Value>DataInicial</Value></Property>
+      <Property><Name>ATTCUSTOMTYPE</Name><Value>bas:Date</Value></Property>
+    </Properties>
+  </Variable>
+  <Variable Name="Mensagem">
+    <Documentation />
+    <Properties>
+      <Property><Name>Name</Name><Value>Mensagem</Value></Property>
+      <Property><Name>ATTCUSTOMTYPE</Name><Value>bas:VarChar</Value></Property>
+      <Property><Name>Length</Name><Value>255</Value></Property>
+      <Property><Name>AttMaxLen</Name><Value>255</Value></Property>
+    </Properties>
+  </Variable>
+</Part>
+```
+
+### Molde pronto 2 - `F2-paisagem`
+
+- Base empirica comparavel: `procRelatorioModeloPaisagem.xml`.
+- Uso esperado: mesma familia simples de `F2`, mas com papel e largura de layout orientados para paisagem.
+- Regra operacional: a diferenca principal em relacao ao retrato esta nas propriedades do layout e nas larguras/coordenadas dos controles.
+
+```xml
+<Part type="c414ed00-8cc4-4f44-8820-4baf93547173">
+  <Layout>
+    <Bands>
+      <PrintBlock>
+        <Controls>
+          <ReportLabel>
+            <Properties>
+              <Property><Name>RPT_INTERNAL_NAME</Name><Value>gxReportLabelTitulo</Value></Property>
+              <Property><Name>RPT_VISIBLE</Name><Value>True</Value></Property>
+              <Property><Name>RPT_TEXT</Name><Value>Titulo do relatorio</Value></Property>
+              <Property><Name>RPT_X</Name><Value>20</Value></Property>
+              <Property><Name>RPT_Y</Name><Value>0</Value></Property>
+            </Properties>
+          </ReportLabel>
+        </Controls>
+        <Properties>
+          <Property><Name>RPT_INTERNAL_NAME</Name><Value>printBlockCabecalho</Value></Property>
+          <Property><Name>RPT_ID</Name><Value>1</Value></Property>
+          <Property><Name>RPT_HEIGHT</Name><Value>90</Value></Property>
+        </Properties>
+      </PrintBlock>
+      <PrintBlock>
+        <Controls>
+          <ReportAttribute>
+            <Properties>
+              <Property><Name>RPT_INTERNAL_NAME</Name><Value>Mensagem</Value></Property>
+              <Property><Name>RPT_VISIBLE</Name><Value>True</Value></Property>
+              <Property><Name>AttID</Name><Value>&amp;Mensagem</Value></Property>
+              <Property><Name>RPT_X</Name><Value>20</Value></Property>
+              <Property><Name>RPT_Y</Name><Value>0</Value></Property>
+              <Property><Name>RPT_WIDTH</Name><Value>1160</Value></Property>
+            </Properties>
+          </ReportAttribute>
+        </Controls>
+        <Properties>
+          <Property><Name>RPT_INTERNAL_NAME</Name><Value>printBlockMensagem</Value></Property>
+          <Property><Name>RPT_ID</Name><Value>2</Value></Property>
+          <Property><Name>RPT_HEIGHT</Name><Value>25</Value></Property>
+        </Properties>
+      </PrintBlock>
+      <PrintBlock>
+        <Controls>
+          <ReportLabel>
+            <Properties>
+              <Property><Name>RPT_INTERNAL_NAME</Name><Value>gxReportLabelPagina</Value></Property>
+              <Property><Name>RPT_VISIBLE</Name><Value>True</Value></Property>
+              <Property><Name>RPT_TEXT</Name><Value>{{Pages}}</Value></Property>
+              <Property><Name>RPT_X</Name><Value>1140</Value></Property>
+              <Property><Name>RPT_Y</Name><Value>5</Value></Property>
+            </Properties>
+          </ReportLabel>
+        </Controls>
+        <Properties>
+          <Property><Name>RPT_INTERNAL_NAME</Name><Value>printBlockRodape</Value></Property>
+          <Property><Name>RPT_ID</Name><Value>3</Value></Property>
+          <Property><Name>RPT_HEIGHT</Name><Value>20</Value></Property>
+        </Properties>
+      </PrintBlock>
+    </Bands>
+    <Properties>
+      <Property><Name>RPT_PAPER_SIZE</Name><Value>Custom</Value></Property>
+      <Property><Name>RPT_PAPER_ORIENTATION</Name><Value>Landscape</Value></Property>
+      <Property><Name>RPT_PAPER_WIDTH</Name><Value>1229</Value></Property>
+      <Property><Name>RPT_PAPER_HEIGHT</Name><Value>827</Value></Property>
+      <Property><Name>RPT_RIGHT_MARGIN</Name><Value>0</Value></Property>
+    </Properties>
+  </Layout>
+  <Properties>
+    <Property><Name>IsDefault</Name><Value>False</Value></Property>
+  </Properties>
+</Part>
+```
+
+### Molde pronto 3 - `F3-atributos-diretos`
+
+- Base empirica comparavel: `procRelatorioVolumesRomaneioPorCorte.xml`.
+- Uso esperado: listagem linear curta, `For each` simples e `ReportAttribute` ligados ao cursor principal.
+
+```xml
+<Part type="528d1c06-a9c2-420d-bd35-21dca83f12ff">
+  <Source><![CDATA[Header
+    print printBlockCabecalho
+End
+
+For each
+    where EmpresaId = &EmpresaId
+    order ClienteNome
+    print printBlockDetalhe
+Endfor
+
+Footer
+    print printBlockRodape
+End
+]]></Source>
+  <Properties>
+    <Property><Name>IsDefault</Name><Value>False</Value></Property>
+  </Properties>
+</Part>
+<Part type="c414ed00-8cc4-4f44-8820-4baf93547173">
+  <Layout>
+    <Bands>
+      <PrintBlock>
+        <Controls>
+          <ReportLabel>
+            <Properties>
+              <Property><Name>RPT_INTERNAL_NAME</Name><Value>gxReportLabelCabecalho</Value></Property>
+              <Property><Name>RPT_VISIBLE</Name><Value>True</Value></Property>
+              <Property><Name>RPT_TEXT</Name><Value>Clientes por empresa</Value></Property>
+            </Properties>
+          </ReportLabel>
+        </Controls>
+        <Properties>
+          <Property><Name>RPT_INTERNAL_NAME</Name><Value>printBlockCabecalho</Value></Property>
+          <Property><Name>RPT_ID</Name><Value>1</Value></Property>
+          <Property><Name>RPT_HEIGHT</Name><Value>35</Value></Property>
+        </Properties>
+      </PrintBlock>
+      <PrintBlock>
+        <Controls>
+          <ReportAttribute>
+            <Properties>
+              <Property><Name>RPT_INTERNAL_NAME</Name><Value>ClienteNome</Value></Property>
+              <Property><Name>RPT_VISIBLE</Name><Value>True</Value></Property>
+              <Property><Name>AttID</Name><Value>ClienteNome</Value></Property>
+              <Property><Name>RPT_X</Name><Value>20</Value></Property>
+              <Property><Name>RPT_Y</Name><Value>0</Value></Property>
+              <Property><Name>RPT_WIDTH</Name><Value>420</Value></Property>
+            </Properties>
+          </ReportAttribute>
+          <ReportAttribute>
+            <Properties>
+              <Property><Name>RPT_INTERNAL_NAME</Name><Value>ClienteSaldo</Value></Property>
+              <Property><Name>RPT_VISIBLE</Name><Value>True</Value></Property>
+              <Property><Name>AttID</Name><Value>ClienteSaldo</Value></Property>
+              <Property><Name>RPT_X</Name><Value>460</Value></Property>
+              <Property><Name>RPT_Y</Name><Value>0</Value></Property>
+              <Property><Name>RPT_WIDTH</Name><Value>120</Value></Property>
+            </Properties>
+          </ReportAttribute>
+        </Controls>
+        <Properties>
+          <Property><Name>RPT_INTERNAL_NAME</Name><Value>printBlockDetalhe</Value></Property>
+          <Property><Name>RPT_ID</Name><Value>2</Value></Property>
+          <Property><Name>RPT_HEIGHT</Name><Value>18</Value></Property>
+        </Properties>
+      </PrintBlock>
+      <PrintBlock>
+        <Controls>
+          <ReportLabel>
+            <Properties>
+              <Property><Name>RPT_INTERNAL_NAME</Name><Value>gxReportLabelRodape</Value></Property>
+              <Property><Name>RPT_VISIBLE</Name><Value>True</Value></Property>
+              <Property><Name>RPT_TEXT</Name><Value>{{Pages}}</Value></Property>
+            </Properties>
+          </ReportLabel>
+        </Controls>
+        <Properties>
+          <Property><Name>RPT_INTERNAL_NAME</Name><Value>printBlockRodape</Value></Property>
+          <Property><Name>RPT_ID</Name><Value>3</Value></Property>
+          <Property><Name>RPT_HEIGHT</Name><Value>18</Value></Property>
+        </Properties>
+      </PrintBlock>
+    </Bands>
+    <Properties>
+      <Property><Name>RPT_PAPER_SIZE</Name><Value>A4</Value></Property>
+      <Property><Name>RPT_RIGHT_MARGIN</Name><Value>20</Value></Property>
+    </Properties>
+  </Layout>
+  <Properties>
+    <Property><Name>IsDefault</Name><Value>False</Value></Property>
+  </Properties>
+</Part>
+<Part type="9b0a32a3-de6d-4be1-a4dd-1b85d3741534">
+  <Source><![CDATA[parm(in:&EmpresaId);
+
+&arquivodesaidanome = 'RelatorioDireto_' + &EmpresaId.ToString();
+
+Output_file(&arquivodesaidanome, 'PDF');
+]]></Source>
+  <Properties>
+    <Property><Name>IsDefault</Name><Value>False</Value></Property>
+  </Properties>
+</Part>
+```
+
+### Molde pronto 4 - `F3-variaveis`
+
+- Base empirica comparavel: `procRelatorioVolumesRomaneioPorCorte.xml` no padrao de pre-processamento curto antes do `print`.
+- Uso esperado: a linha impressa depende de variaveis carregadas dentro do fluxo, e nao diretamente do `AttID` do cursor.
+
+```xml
+<Part type="528d1c06-a9c2-420d-bd35-21dca83f12ff">
+  <Source><![CDATA[Header
+    print printBlockCabecalho
+End
+
+For each
+    where EmpresaId = &EmpresaId
+    &NomeCliente = ClienteNome
+    &TotalLiquido = PedidoValorLiquido
+    print printBlockDetalhe
+Endfor
+
+Footer
+    print printBlockRodape
+End
+]]></Source>
+  <Properties>
+    <Property><Name>IsDefault</Name><Value>False</Value></Property>
+  </Properties>
+</Part>
+<Part type="c414ed00-8cc4-4f44-8820-4baf93547173">
+  <Layout>
+    <Bands>
+      <PrintBlock>
+        <Controls>
+          <ReportLabel>
+            <Properties>
+              <Property><Name>RPT_INTERNAL_NAME</Name><Value>gxReportLabelCabecalho</Value></Property>
+              <Property><Name>RPT_VISIBLE</Name><Value>True</Value></Property>
+              <Property><Name>RPT_TEXT</Name><Value>Resumo por variaveis</Value></Property>
+            </Properties>
+          </ReportLabel>
+        </Controls>
+        <Properties>
+          <Property><Name>RPT_INTERNAL_NAME</Name><Value>printBlockCabecalho</Value></Property>
+          <Property><Name>RPT_ID</Name><Value>1</Value></Property>
+          <Property><Name>RPT_HEIGHT</Name><Value>35</Value></Property>
+        </Properties>
+      </PrintBlock>
+      <PrintBlock>
+        <Controls>
+          <ReportAttribute>
+            <Properties>
+              <Property><Name>RPT_INTERNAL_NAME</Name><Value>NomeCliente</Value></Property>
+              <Property><Name>RPT_VISIBLE</Name><Value>True</Value></Property>
+              <Property><Name>AttID</Name><Value>&amp;NomeCliente</Value></Property>
+              <Property><Name>RPT_X</Name><Value>20</Value></Property>
+              <Property><Name>RPT_Y</Name><Value>0</Value></Property>
+              <Property><Name>RPT_WIDTH</Name><Value>420</Value></Property>
+            </Properties>
+          </ReportAttribute>
+          <ReportAttribute>
+            <Properties>
+              <Property><Name>RPT_INTERNAL_NAME</Name><Value>TotalLiquido</Value></Property>
+              <Property><Name>RPT_VISIBLE</Name><Value>True</Value></Property>
+              <Property><Name>AttID</Name><Value>&amp;TotalLiquido</Value></Property>
+              <Property><Name>RPT_X</Name><Value>460</Value></Property>
+              <Property><Name>RPT_Y</Name><Value>0</Value></Property>
+              <Property><Name>RPT_WIDTH</Name><Value>120</Value></Property>
+            </Properties>
+          </ReportAttribute>
+        </Controls>
+        <Properties>
+          <Property><Name>RPT_INTERNAL_NAME</Name><Value>printBlockDetalhe</Value></Property>
+          <Property><Name>RPT_ID</Name><Value>2</Value></Property>
+          <Property><Name>RPT_HEIGHT</Name><Value>18</Value></Property>
+        </Properties>
+      </PrintBlock>
+      <PrintBlock>
+        <Controls>
+          <ReportLabel>
+            <Properties>
+              <Property><Name>RPT_INTERNAL_NAME</Name><Value>gxReportLabelRodape</Value></Property>
+              <Property><Name>RPT_VISIBLE</Name><Value>True</Value></Property>
+              <Property><Name>RPT_TEXT</Name><Value>{{Pages}}</Value></Property>
+            </Properties>
+          </ReportLabel>
+        </Controls>
+        <Properties>
+          <Property><Name>RPT_INTERNAL_NAME</Name><Value>printBlockRodape</Value></Property>
+          <Property><Name>RPT_ID</Name><Value>3</Value></Property>
+          <Property><Name>RPT_HEIGHT</Name><Value>18</Value></Property>
+        </Properties>
+      </PrintBlock>
+    </Bands>
+    <Properties>
+      <Property><Name>RPT_PAPER_SIZE</Name><Value>A4</Value></Property>
+      <Property><Name>RPT_RIGHT_MARGIN</Name><Value>20</Value></Property>
+    </Properties>
+  </Layout>
+  <Properties>
+    <Property><Name>IsDefault</Name><Value>False</Value></Property>
+  </Properties>
+</Part>
+<Part type="9b0a32a3-de6d-4be1-a4dd-1b85d3741534">
+  <Source><![CDATA[parm(in:&EmpresaId);
+
+&arquivodesaidanome = 'RelatorioVariaveis_' + &EmpresaId.ToString();
+
+Output_file(&arquivodesaidanome, 'PDF');
+]]></Source>
+  <Properties>
+    <Property><Name>IsDefault</Name><Value>False</Value></Property>
+  </Properties>
+</Part>
+<Part type="e4c4ade7-53f0-4a56-bdfd-843735b66f47">
+  <Variable Name="NomeCliente">
+    <Documentation />
+    <Properties>
+      <Property><Name>Name</Name><Value>NomeCliente</Value></Property>
+      <Property><Name>ATTCUSTOMTYPE</Name><Value>bas:VarChar</Value></Property>
+      <Property><Name>Length</Name><Value>120</Value></Property>
+    </Properties>
+  </Variable>
+  <Variable Name="TotalLiquido">
+    <Documentation />
+    <Properties>
+      <Property><Name>Name</Name><Value>TotalLiquido</Value></Property>
+      <Property><Name>ATTCUSTOMTYPE</Name><Value>bas:Numeric</Value></Property>
+      <Property><Name>Decimals</Name><Value>2</Value></Property>
+    </Properties>
+  </Variable>
+</Part>
+```
+
+### Regra operacional de uso dos moldes acima
+
+- Regra operacional: `F2-retrato` e `F2-paisagem` ja contam como molde sanitizado canonico forte para pagina simples sem iteracao.
+- Regra operacional: `F3-atributos-diretos` e `F3-variaveis` ja contam como molde sanitizado canonico forte para listagem linear simples com um unico `For each` de impressao.
+- Regra operacional: se o caso exigir agrupamento real, subtotal estrutural, multiplos `For each` de impressao, shape de controle nao coberto ou dialeto proprio da KB, esses moldes deixam de ser fonte suficiente.
+- Regra operacional: toda frente que criar, fortalecer ou recombinar estes `moldes prontos` deve avaliar se a rastreabilidade privada correspondente precisa ser atualizada no `GeneXus-XPZ-PrivateMap`.
+
 ### Fallback estruturado
 
 - Passo 1: tentar o molde sanitizado canonico mais proximo da familia simples.
 - Passo 2: se o pedido sair do perfil simples coberto, marcar a diferenca estrutural e escalar para XML real comparavel.
-- Passo 3: se a importacao falhar com erro estrutural de shape, layout ou sintaxe de camada, revisar a camada suspeita uma vez e tentar pacote corretivo minimo.
-- Passo 4: depois de uma ou duas falhas estruturais, parar de inventar e buscar XML real comparavel, registrando a escalada explicitamente.
+- Passo 3: se a importacao falhar com erro estrutural de shape, layout ou sintaxe de camada, revisar apenas a camada suspeita uma vez e tentar pacote corretivo minimo.
+- Passo 4: se ainda falhar depois desse unico corretivo curto, parar de inventar e buscar XML real comparavel, registrando a escalada explicitamente.
 - Passo 5: se aparecer sinal de dialeto/localismo da KB, abandonar o molde canonico como fonte suficiente e escalar para XML real comparavel da KB alvo.
 
 ### Sinais tipicos de dialeto/localismo
@@ -276,6 +725,8 @@ Layout:
 ### Regra editorial de uso
 
 - Regra editorial: nunca usar resumo textual deste documento como unica fonte para materializacao de XML.
+- Regra editorial: os blocos marcados como `molde pronto` nesta secao ja sao fonte valida para materializacao controlada de `Procedure` de relatorio simples.
+- Regra editorial: aliases publicos, tabelas de familia e descricao textual continuam sendo fonte de classificacao, nao fonte materializavel por si so.
 - Regra editorial: para familias simples cobertas nesta base, o agente pode materializar a partir de molde sanitizado canonico completo sem exigir leitura inicial do XML real da KB.
 - Regra editorial: quando o caso sair da cobertura simples documentada, o proximo passo obrigatorio e XML real comparavel, nao improvisacao adicional.
 
@@ -286,4 +737,4 @@ Layout:
 - Inferencia forte: clonar um F2 como base para um F4 sem ajustar o `Source` e o inventario de `PrintBlock` resultara em estrutura incompleta que nao imprimira corretamente.
 - Inferencia forte: copiar um F5 para gerar um F3 carrega blocos e iteracoes desnecessarios que podem causar erros de compilacao por referencias ausentes.
 - Hipotese: a maioria dos relatorios de producao desta KB pertence a F3 ou F4, o que torna esses moldes os mais frequentemente necessarios em novas frentes.
-- Regra operacional: nao insistir em terceira tentativa estrutural por analogia; depois de uma ou duas falhas estruturais, escalar para XML real comparavel.
+- Regra operacional: nao insistir em nova tentativa estrutural por analogia depois da tentativa inicial mais um unico corretivo estrutural curto; a partir dai, escalar para XML real comparavel.

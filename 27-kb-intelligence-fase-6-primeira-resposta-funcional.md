@@ -28,7 +28,7 @@ Consulta executada:
 
 ```powershell
 .\scripts\Query-KbIntelligenceIndex.ps1 `
-  -IndexPath "C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\kb-intelligence.sqlite" `
+  -IndexPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite" `
   -Query functional-trace-basic `
   -ObjectType API `
   -ObjectName apiPDV_Integracao `
@@ -54,7 +54,7 @@ Limite da triagem:
 
 ### Evidencia direta
 
-No XML oficial `C:\Dev\Prod\Gx_FabricaBrasil\ObjetosDaKbEmXml\API\apiPDV_Integracao.xml`, o `Service` declara tres metodos `POST`:
+No XML oficial `C:\KB\KBExemplo\ObjetosDaKbEmXml\API\apiPDV_Integracao.xml`, o `Service` declara tres metodos `POST`:
 
 - `ObterProdutos`, descrito como obtencao de lista de produtos conforme parametros
 - `ObterTributacoes`, descrito como obtencao de lista de tributacoes conforme parametros
@@ -91,9 +91,9 @@ O sub-bloco `CompletaLogin`:
 
 Foram abertos tambem os XMLs oficiais das procedures chamadas diretamente:
 
-- `C:\Dev\Prod\Gx_FabricaBrasil\ObjetosDaKbEmXml\Procedure\procListaSdtProdutoDadosBasicosConformeParametros.xml`
-- `C:\Dev\Prod\Gx_FabricaBrasil\ObjetosDaKbEmXml\Procedure\procSdtTributacaoDadosBasicosSelecaoConformeParametros.xml`
-- `C:\Dev\Prod\Gx_FabricaBrasil\ObjetosDaKbEmXml\Procedure\procImportaDFeDeBase64.xml`
+- `C:\KB\KBExemplo\ObjetosDaKbEmXml\Procedure\procListaSdtProdutoDadosBasicosConformeParametros.xml`
+- `C:\KB\KBExemplo\ObjetosDaKbEmXml\Procedure\procSdtTributacaoDadosBasicosSelecaoConformeParametros.xml`
+- `C:\KB\KBExemplo\ObjetosDaKbEmXml\Procedure\procImportaDFeDeBase64.xml`
 
 Nessa leitura adicional:
 
@@ -104,8 +104,8 @@ Nessa leitura adicional:
 
 Tambem foram confirmados os XMLs dos SDTs:
 
-- `C:\Dev\Prod\Gx_FabricaBrasil\ObjetosDaKbEmXml\SDT\sdtProdutoDadosBasicos.xml`
-- `C:\Dev\Prod\Gx_FabricaBrasil\ObjetosDaKbEmXml\SDT\sdtTributacaoDadosBasicosSelecao.xml`
+- `C:\KB\KBExemplo\ObjetosDaKbEmXml\SDT\sdtProdutoDadosBasicos.xml`
+- `C:\KB\KBExemplo\ObjetosDaKbEmXml\SDT\sdtTributacaoDadosBasicosSelecao.xml`
 
 ### Inferencia forte
 

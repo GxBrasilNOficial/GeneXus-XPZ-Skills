@@ -650,7 +650,7 @@ Exemplos conceituais:
 
 ## Posicao consolidada apos o incremento 18
 
-O eixo incremental de `ATTCUSTOMTYPE` ficou metodologicamente maduro ate o limite de sinal forte encontrado no acervo atual da KB `FabricaBrasil`.
+O eixo incremental de `ATTCUSTOMTYPE` ficou metodologicamente maduro ate o limite de sinal forte encontrado no acervo atual da KB `KBExemplo`.
 
 Depois do incremento 18, a triagem adicional indicou:
 

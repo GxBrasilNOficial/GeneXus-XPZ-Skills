@@ -228,7 +228,7 @@ Servir como base factual publica para verificacao posterior.
 - nomes reais de objeto foram removidos desta versao
 - caminhos reais da KB foram substituidos por caminho sanitizado
 - a utilidade operacional permanece nos documentos `10`, `11`, `12`, `27` e `28`, que preservam contagens, GUIDs e familias estruturais
-- para materializacao real de XML ou XPZ, a fonte continua sendo XML bruto privado comparavel, nunca esta versao publica
+- para materializacao real de XML ou XPZ, a fonte continua sendo XML bruto privado comparavel, exceto nos casos em que a propria base publica ja publicar bloco `molde pronto` suficiente para materializacao controlada
 
 ## Observacao
 
@@ -638,4 +638,6 @@ Estes aliases foram criados em 2026-04-25 a partir da analise estrutural de 77 X
 
 - Rastreabilidade privada: os nomes reais dos representantes estao registrados em `GeneXus-XPZ-PrivateMap/maps/object-alias-map.csv`.
 - Uso previsto: esses aliases servem como referencia estrutural para `xpz-reader`, `xpz-builder` e `xpz-doc-builder` ao trabalhar com `Procedure` de relatorio.
-- Regra editorial: nunca usar o alias como unica fonte para materializacao; o XML real do representante deve ser lido a partir de `ObjetosDaKbEmXml` antes de qualquer clonagem.
+- Regra editorial: nunca usar o alias como unica fonte para materializacao.
+- Regra editorial: quando `05b-procedure-relatorio-familias-e-templates.md` oferecer `molde pronto` suficiente para a familia simples coberta, o alias pode servir apenas como referencia de classificacao para chegar a esse molde sanitizado.
+- Regra editorial: fora dessa cobertura simples, ou depois de tentativa inicial mais um unico corretivo curto sem sucesso, o proximo passo obrigatorio volta a ser XML real comparavel.

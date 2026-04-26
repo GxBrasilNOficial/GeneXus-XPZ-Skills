@@ -1,4 +1,4 @@
-# KB Intelligence Fase 5 - Incremento 8 - FabricaBrasil
+# KB Intelligence Fase 5 - Incremento 8 - KBExemplo
 
 ## Papel do documento
 registro de incremento
@@ -33,7 +33,7 @@ A relacao representa evidencia estrutural de navegacao declarada no `Source`. El
 
 ## Validacao final
 
-- KB laboratorio: `FabricaBrasil`
+- KB laboratorio: `KBExemplo`
 - indice usado para validacao: SQLite derivado regenerado em `Temp`
 - objetos escritos: 14928
 - relacoes escritas: 52104

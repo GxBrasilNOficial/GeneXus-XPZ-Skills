@@ -44,6 +44,12 @@
 - Ao alterar nomenclatura, fluxo ou regra operacional, verificar impacto pelo menos em `README.md`, `02-regras-operacionais-e-runtime.md`, `08-guia-para-agente-gpt.md` e nas skills afetadas.
 - Não deixar convenções conflitantes entre a base compartilhada e as skills quando a mudança fizer parte da mesma frente.
 
+## Rastreabilidade privada de moldes sanitizados
+
+- Quando uma frente criar, fortalecer, recombinar ou ampliar cobertura de molde sanitizado publicável, o agente deve avaliar explicitamente se existe anotação correspondente a registrar no `GeneXus-XPZ-PrivateMap`.
+- Essa avaliação faz parte do fechamento metodológico da frente, mesmo quando nenhuma edição for feita imediatamente no repositório privado.
+- Se houver necessidade de atualização no `GeneXus-XPZ-PrivateMap`, tratar isso como outro contexto operacional e sinalizar claramente ao usuário antes de editar fora desta base pública.
+
 ## Idioma
 
 - Responder ao usuário em português, salvo pedido explícito em outro idioma.

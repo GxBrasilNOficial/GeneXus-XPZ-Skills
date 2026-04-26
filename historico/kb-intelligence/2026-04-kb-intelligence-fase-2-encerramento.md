@@ -1,4 +1,4 @@
-# Encerramento KB Intelligence Fase 2 - FabricaBrasil
+# Encerramento KB Intelligence Fase 2 - KBExemplo
 
 ## Papel do documento
 registro de encerramento
@@ -21,7 +21,7 @@ O escopo consolidado cobre:
 
 ## Validacao final
 
-- KB laboratorio: `FabricaBrasil`
+- KB laboratorio: `KBExemplo`
 - objetos gravados no indice: 3890
 - relacoes gravadas no indice: 34276
 - casos de validacao da Fase 2: 40 `passed`

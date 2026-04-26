@@ -153,7 +153,7 @@ Antes de considerar este incremento pronto:
 - a bateria deve incluir caso negativo de condicao para `Procedure` inexistente
 - a bateria deve incluir casos positivos de atributo de condicao `WorkWithForWeb` chamando `Procedure`
 - a bateria deve incluir caso negativo de chamada apos comentario `//` em atributo de condicao
-- a validacao deve ser executada contra `FabricaBrasil` com `-FailOnValidationFailure`
+- a validacao deve ser executada contra `KBExemplo` com `-FailOnValidationFailure`
 
 ## Decisoes adiaveis
 

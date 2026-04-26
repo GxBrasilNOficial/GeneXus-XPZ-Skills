@@ -16,7 +16,7 @@ medio
 agentes que precisem saber se a Fase 6 ja pode ser tratada como encerrada operacionalmente e quais limites permanecem obrigatorios
 
 ## Objetivo
-Registrar o encerramento operacional da Fase 6 do KB Intelligence no recorte curto validado em `FabricaBrasil`.
+Registrar o encerramento operacional da Fase 6 do KB Intelligence no recorte curto validado em `KBExemplo`.
 
 ## Escopo encerrado
 
@@ -34,10 +34,10 @@ O escopo consolidado cobre:
 
 ## Validacao final
 
-- KB laboratorio: `FabricaBrasil`
+- KB laboratorio: `KBExemplo`
 - indice usado para triagem e validacao curta: SQLite derivado em `Temp`
-- indice temporario usado nas consultas desta rodada de consolidacao: `C:\Dev\Prod\Gx_FabricaBrasil\Temp\kb-intelligence-fase6-piloto.sqlite`
-- indice canonico preservado como fonte operacional separada em `C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\kb-intelligence.sqlite`
+- indice temporario usado nas consultas desta rodada de consolidacao: `C:\KB\KBExemplo\Temp\kb-intelligence-fase6-piloto.sqlite`
+- indice canonico preservado como fonte operacional separada em `C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite`
 - casos de validacao automatizada da Fase 6 preservados: 3 casos da bateria minima
 - exemplo funcional controlado consolidado: `API:apiPDV_Integracao`
 - exemplo funcional consolidado para terminologia local: `WorkWithForWeb:WorkWithWebAbateOrdem` + `Procedure:procAjustaCompraGadoIdDeAnimais` + `Transaction:Animal`

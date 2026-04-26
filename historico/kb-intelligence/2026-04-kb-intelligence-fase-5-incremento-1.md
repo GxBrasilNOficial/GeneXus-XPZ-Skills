@@ -1,4 +1,4 @@
-# KB Intelligence Fase 5 - Incremento 1 - FabricaBrasil
+# KB Intelligence Fase 5 - Incremento 1 - KBExemplo
 
 ## Papel do documento
 registro de incremento
@@ -20,7 +20,7 @@ O escopo consolidado cobre:
 
 ## Validacao final
 
-- KB laboratorio: `FabricaBrasil`
+- KB laboratorio: `KBExemplo`
 - indice usado para validacao: SQLite derivado regenerado em `Temp`
 - casos da Fase 2 preservados: 40 `passed`
 - casos da Fase 3 preservados: 4 `passed`

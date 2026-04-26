@@ -36,7 +36,7 @@ Usuário solicita ativar ou desativar o monitoramento permanente. A skill:
 - Resolver a pasta a monitorar pelo contexto ou perguntar ao usuário
 - Identificar o nome da KB (pelo nome da pasta-pai ou perguntar ao usuário)
 - Criar o script `.ps1` do watcher (ou reutilizar se já existe)
-- Registrar no Task Scheduler com nome único por KB (ex: `XpzDaemon_FabricaBrasil`)
+- Registrar no Task Scheduler com nome único por KB (ex: `XpzDaemon_KBExemplo`)
 - Validar que não existe daemon com esse nome já instalado
 - Inicia o monitoramento imediatamente após instalação
 - Oferece comandos para parar/iniciar/remover o daemon

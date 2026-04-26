@@ -26,7 +26,7 @@ Este plano substitui a sugestao externa `Plano_GeneXus_KB_Intelligence_v1.md` co
 
 ## Estado atual da frente
 
-Em 2026-04-21, a Fase 1 foi concluida e validada na KB real `FabricaBrasil`, com local canonico operacional em `C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\kb-intelligence.sqlite`.
+Em 2026-04-21, a Fase 1 foi concluida e validada na KB real `KBExemplo`, com local canonico operacional em `C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite`.
 
 A Fase 2 foi aberta e consolidada em 2026-04-21, com primeiro incremento limitado a `DataProvider` como nova origem de relacoes em `Source` efetivo.
 
@@ -58,7 +58,7 @@ Continuam fora da Fase 2: semantica completa de `Transaction`, semantica de `Wor
 - o indice tecnico e artefato derivado; ele nao substitui o acervo XML
 - toda relacao indexada deve guardar evidencia rastreavel
 - quando houver inferencia, ela deve ser classificada separadamente de evidencia direta
-- a solucao deve ser generica para qualquer pasta paralela de KB, com a KB `FabricaBrasil` apenas como laboratorio real
+- a solucao deve ser generica para qualquer pasta paralela de KB, com a KB `KBExemplo` apenas como laboratorio real
 - resultados de prototipos anteriores podem servir como anti-exemplos e casos de teste, mas nao como arquitetura definitiva
 
 ## Nao objetivos iniciais
@@ -507,7 +507,7 @@ Esta fase nao deve depender de humanos lendo documentacao estatica extensa.
 
 Estado em 2026-04-22: implementada e encerrada operacionalmente no recorte curto, com preservacao explicita da precedencia do XML oficial sobre o indice tecnico.
 
-Na mesma data, foi executado o primeiro piloto operacional da Fase 6 em `historico/kb-intelligence/20-kb-intelligence-fase-6-piloto-investigacao-funcional.md`, usando `FabricaBrasil` como laboratorio real. O piloto confirmou o uso do indice como trilha de triagem e do XML oficial como fonte normativa, alem de registrar que o indice canonico operacional parecia defasado em relacao aos incrementos finais da Fase 5 e nao deveria ser sobrescrito sem decisao explicita. Depois de decisao explicita do usuario, o indice canonico de `FabricaBrasil` foi regenerado pela rotina oficial e validado com a bateria consolidada da Fase 5.
+Na mesma data, foi executado o primeiro piloto operacional da Fase 6 em `historico/kb-intelligence/20-kb-intelligence-fase-6-piloto-investigacao-funcional.md`, usando `KBExemplo` como laboratorio real. O piloto confirmou o uso do indice como trilha de triagem e do XML oficial como fonte normativa, alem de registrar que o indice canonico operacional parecia defasado em relacao aos incrementos finais da Fase 5 e nao deveria ser sobrescrito sem decisao explicita. Depois de decisao explicita do usuario, o indice canonico de `KBExemplo` foi regenerado pela rotina oficial e validado com a bateria consolidada da Fase 5.
 
 Na sequencia, a Fase 6 recebeu um checklist operacional para agentes em `21-kb-intelligence-fase-6-checklist-operacional-agente.md`, consolidando a ordem minima de triagem, abertura do XML oficial e classificacao da resposta funcional.
 
@@ -551,7 +551,7 @@ Excecoes devem ser decididas explicitamente por frente.
 
 ## Tratamento do experimento `Mapeamento`
 
-O experimento em `C:\Dev\Prod\Gx_FabricaBrasil\Mapeamento` deve ser tratado como:
+O experimento em `C:\KB\KBExemplo\Mapeamento` deve ser tratado como:
 
 - prototipo descartavel
 - fonte de anti-exemplos
@@ -562,7 +562,7 @@ Ele nao deve ser evoluido como base arquitetural definitiva nem competir com `Kb
 
 Quando a nova frente nao precisar mais dele para comparacao, a pasta `Mapeamento` da KB real pode ser movida para `ArquivoMorto\Mapeamento` por decisao explicita do usuario no repositorio da KB, nao nesta raiz metodologica.
 
-Na KB `FabricaBrasil`, essa movimentacao foi executada em 2026-04-21, junto com a regra local em `README.md` e `AGENTS.md` da pasta paralela.
+Na KB `KBExemplo`, essa movimentacao foi executada em 2026-04-21, junto com a regra local em `README.md` e `AGENTS.md` da pasta paralela.
 
 O `AGENTS.md` da raiz da pasta paralela deve orientar agentes a ignorar `ArquivoMorto`, ou tratar seu conteudo como nao confiavel, salvo pedido explicito do usuario para analise historica.
 

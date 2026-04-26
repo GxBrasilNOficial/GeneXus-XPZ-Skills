@@ -80,7 +80,7 @@ Do NOT use this skill for:
 - Executar a triagem inicial apropriada
 - Nao executar consulta substantiva do indice antes de `GATE_OK`; `search-objects`, `object-info`, `who-uses`, `what-uses`, `show-evidence`, `impact-basic` e `functional-trace-basic` so podem rodar depois que o gate terminar liberado
 - Depois de `GATE_OK`, ir direto para a consulta substantiva minima necessaria; nao abrir `scripts/README-kb-intelligence.md`, nao listar `scripts` e nao reinspecionar o wrapper local se a pergunta ja puder ser atendida com consulta simples como `search-objects` ou `object-info`
-- Em pergunta simples de existencia/localizacao nominal, considerar a propria skill suficiente para escolher a consulta minima; nao abrir o wrapper so para "confirmar assinatura" antes de chamar `search-objects` ou `object-info`
+- Em pergunta simples de existencia/localizacao nominal, considerar a propria skill suficiente para escolher a consulta minima; usar os parametros documentados em **QUERY PARAMETER REFERENCE**; nao abrir o wrapper so para "confirmar assinatura" antes de chamar `search-objects` ou `object-info`
 - Devolver leitura tecnica curta, auditavel e limitada ao recorte do indice
 - Orientar o chamador a reduzir a abertura de XML ao conjunto minimo necessario
 - Indicar quais XMLs oficiais devem ser lidos depois, quando a triagem nao bastar sozinha
@@ -106,6 +106,7 @@ Do NOT use this skill for:
 - Quando o gate bloquear depois de `index-metadata`, nao dizer que "nao devo consultar o indice"; dizer que a consulta de metadados do gate foi feita, mas a triagem substantiva pelo indice esta bloqueada
 - Dizer explicitamente quando a resposta ainda depende de leitura do XML oficial
 - Quando o gate estiver bloqueado, dizer explicitamente que nao sera aberto XML oficial de objeto nem feita varredura em `ObjetosDaKbEmXml` para responder a pergunta de negocio
+- Quando o comando do gate for negado, cancelado ou interrompido pelo usuario, dizer explicitamente que (a) nenhuma busca alternativa sera feita ate o gate ser liberado e (b) o caminho operacional e revisar a regra de permissao em `settings.json` e/ou rodar `xpz-kb-parallel-setup`; nao prometer "tentar de outro jeito"
 - Abrir XML oficial de objeto somente depois de o gate ter sido liberado; com gate bloqueado, nao usar leitura pontual de XML para responder pergunta de negocio
 - Quando o indice devolver caminho nominal do XML oficial, manter esse caminho completo e consistente na resposta; nao encurtar depois para apenas o nome do arquivo
 - Separar o que veio do indice do que e inferencia do agente
@@ -144,18 +145,29 @@ Mesmo com o gate liberado, continue economico: para pergunta simples de existenc
 
 ---
 
+## QUERY PARAMETER REFERENCE (consultas minimas)
+
+Para `search-objects` e `object-info` — as consultas mais frequentes em perguntas simples de existencia/localizacao — o wrapper `Query-*KbIntelligence.ps1` aceita os seguintes parametros (alem de `-IndexPath` e `-Format`, comuns a todas as consultas):
+
+- **search-objects**: `-ObjectName` (obrigatorio, aceita substring parcial com wildcard `*`, ex: `"*planilha*"`), `-Limit` (opcional)
+- **object-info**: `-ObjectType` (obrigatorio, tipo exato, ex: `Procedure`), `-ObjectName` (obrigatorio, nome exato do objeto)
+
+A documentacao completa de todas as consultas e seus parametros esta em [scripts/README-kb-intelligence.md](../scripts/README-kb-intelligence.md).
+
+---
+
 ## GATE MINIMO RECOMENDADO
 
 Chamar `Test-*KbGate.ps1` pelo nome provisionado na pasta `scripts` da pasta paralela da KB. O script encapsula toda a logica do gate: verifica sequencialmente pasta `KbIntelligence`, `kb-intelligence.sqlite`, wrapper local de consulta, metadado de build via `-Query index-metadata`, `kb-source-metadata.md` e comparacao de timestamps. Retorna `GATE_OK` em stdout quando o indice esta apto, ou lanca excecao com `BLOCK: <motivo>` quando nao esta.
 
-Copie o bloco abaixo literalmente, sem acrescentar linhas, saidas auxiliares, parsing ou comandos posteriores. Substitua `<caminho-absoluto-do-script>` pelo caminho absoluto literal do script lido da documentacao local da pasta paralela (ex: `C:\Dev\Prod\Gx_FabricaBrasil\scripts\Test-FabricaBrasilKbGate.ps1`). Nao usar variavel nem `Join-Path` para montar o caminho na chamada final: o caminho literal e obrigatorio para que o sistema de permissoes consiga validar estaticamente o comando e dispensar prompts manuais.
+Substitua `<caminho-absoluto-do-script>` pelo caminho absoluto literal do script lido da documentacao local da pasta paralela (ex: `C:\Dev\Prod\Gx_FabricaBrasil\scripts\Test-FabricaBrasilKbGate.ps1`). Nao usar variavel nem `Join-Path`: o caminho literal e obrigatorio para que o sistema de permissoes consiga validar estaticamente o comando e dispensar prompts manuais. Nao acrescentar linhas, saidas auxiliares, parsing ou comandos ao bloco; toda a logica de gate esta encapsulada no script.
+
+Executar este bloco usando o tool `PowerShell` (nao `Bash`). A sintaxe `& "..."` e PowerShell pura; o Bash nao consegue parsea-la e o sistema de permissoes acaba sem padrao estavel para registrar (sem opcao de "Sempre permitir"). Alem disso, a regra de permissao usa prefixo `PowerShell(...)` e nao casa quando o comando entra via tool `Bash`.
+
+O comentario `#gate` no fim do bloco e proposital: e apenas comentario PowerShell (zero efeito em execucao), mas garante que o comando termine com conteudo apos o caminho. Isso permite usar o padrao de permissao `PowerShell(& "<caminho-absoluto-do-script>" *)` (espaco + curinga), que e o mesmo padrao dos demais scripts ja registrados no `settings.json`. Foi observado em Claude Desktop Windows que match exato sem curinga (`PowerShell(& "<caminho>")`) nao dispensa o prompt mesmo quando registrado, comportamento aparentemente bugado de descasamento entre matcher e registrador; o `#gate` evita esse caminho problematico.
 
 ```powershell
-$ErrorActionPreference = 'Stop'
-if (-not (Test-Path -LiteralPath '<caminho-absoluto-do-script>' -PathType Leaf)) {
-    throw 'BLOCK: script Test-*KbGate.ps1 ausente em scripts\'
-}
-& '<caminho-absoluto-do-script>'
+& "<caminho-absoluto-do-script>" #gate
 ```
 
 Se o script retornar `GATE_OK`, encerrar o comando do gate; qualquer proxima acao deve ser decidida e executada em comando separado, conforme a consulta substantiva necessaria.
@@ -171,6 +183,7 @@ Se qualquer `BLOCK:` ocorrer, encerrar a pergunta de negocio e oferecer `xpz-kb-
 3. Executar o gate em ordem sequencial e parar no primeiro bloqueio; nao investigar camadas internas ate a camada externa estar valida
 4. Verificar se existe `Test-*KbGate.ps1` em `scripts\`; se ausente, bloquear como defasagem da pasta paralela e oferecer atualizacao via `xpz-kb-parallel-setup`
 5. Executar `Test-*KbGate.ps1`; o script verifica sequencialmente pasta `KbIntelligence`, `kb-intelligence.sqlite`, wrapper local de consulta com `-Query index-metadata`, `kb-source-metadata.md` e comparacao de timestamps; qualquer `BLOCK:` encerra a pergunta de negocio
+   - se a execucao do comando do gate for negada, cancelada ou interrompida pelo usuario, tratar como gate nao liberado: encerrar a pergunta de negocio, relatar a situacao ao usuario, oferecer revisao da regra de permissao em `settings.json` e/ou `xpz-kb-parallel-setup`; NUNCA contornar o gate com varredura, leitura pontual ou consulta indireta
 6. Se qualquer etapa do gate falhar, bloquear pesquisa ampla, triagem substantiva, consulta substantiva ao acervo oficial de objetos, leitura de XML oficial de objeto e geracao de objetos para importacao, relatar a primeira excecao operacional encontrada e oferecer atualizacao via `xpz-kb-parallel-setup` antes de seguir
 7. Com gate bloqueado, encerrar a pergunta de negocio antes de resolver o objeto pedido para caminho de XML; nao montar, testar existencia, listar ou abrir caminhos deduzidos como `ObjetosDaKbEmXml\<Tipo>\<Nome>.xml`
 8. Classificar a pergunta do usuario em uma destas naturezas:
@@ -181,7 +194,7 @@ Se qualquer `BLOCK:` ocorrer, encerrar a pergunta de negocio e oferecer `xpz-kb-
    - triagem funcional curta
 9. Escolher a consulta do indice mais adequada
 10. So depois de `GATE_OK`, executar a consulta substantiva minima necessaria sem leitura lateral de `scripts`, `scripts/README-kb-intelligence.md` ou reinspecao do wrapper quando a pergunta ja couber em `search-objects` ou `object-info`
-    - para pergunta simples de existencia/localizacao nominal, usar diretamente `search-objects` ou `object-info` conforme a pergunta, sem abrir o wrapper para confirmar parametros
+    - para pergunta simples de existencia/localizacao nominal, usar diretamente `search-objects` ou `object-info` conforme a pergunta, usando os parametros documentados em **QUERY PARAMETER REFERENCE**; nao abrir o wrapper para confirmar assinatura
 11. Resumir o resultado da triagem de forma curta e auditavel
 12. Decidir se a triagem ja basta para responder no nivel tecnico pedido
 13. Se nao bastar, indicar ao chamador apenas o conjunto minimo de XMLs oficiais a abrir
@@ -204,6 +217,8 @@ Se qualquer `BLOCK:` ocorrer, encerrar a pergunta de negocio e oferecer `xpz-kb-
 - NUNCA concluir funcionalidade sozinho apenas pelo indice
 - NUNCA abrir XML em massa por padrao
 - NUNCA consultar o acervo oficial de objetos para responder pergunta de negocio, nem por varredura ampla nem por caminho pontual deduzido, quando o gate de compatibilidade/frescor estiver bloqueado
+- NUNCA tratar recusa de permissao, cancelamento ou interrupcao do comando `Test-*KbGate.ps1` como autorizacao para fallback; trata-se de gate nao liberado e exige a mesma postura de bloqueio que `BLOCK:` da propria saida do script
+- NUNCA usar `Grep`, `Select-String`, `Get-ChildItem`, `find`, varredura de pasta ou leitura pontual em `ObjetosDaKbEmXml` para responder pergunta de negocio quando o gate nao retornou `GATE_OK` por qualquer motivo, incluindo recusa de permissao, comando cancelado, interrupcao ou timeout
 - NUNCA fazer pesquisa ampla no acervo nem gerar objetos para importacao quando o indice estiver defasado em relacao a ultima materializacao XPZ/XML
 - NUNCA gastar diagnostico em camadas internas do gate quando uma camada externa ja falhou; parar no primeiro bloqueio e oferecer atualizacao
 - NUNCA testar, listar ou abrir caminho filho de uma camada do gate antes de confirmar a camada pai; por exemplo, nao testar `KbIntelligence\kb-intelligence.sqlite` antes de `KbIntelligence`
@@ -215,7 +230,7 @@ Se qualquer `BLOCK:` ocorrer, encerrar a pergunta de negocio e oferecer `xpz-kb-
 - NUNCA descrever bloqueio pos-`index-metadata` como proibicao total de consultar o indice; `index-metadata` e consulta de gate, o bloqueio impede triagem substantiva
 - NUNCA acrescentar parsing, saidas auxiliares, impressao de timestamps ou comandos ao bloco de chamada do gate; toda logica esta encapsulada em `Test-*KbGate.ps1`
 - NUNCA, depois de `GATE_OK`, abrir `scripts/README-kb-intelligence.md`, listar `scripts` ou reinspecionar o wrapper local quando a pergunta puder ser resolvida diretamente por `search-objects` ou `object-info`
-- NUNCA, em pergunta simples de existencia/localizacao nominal, abrir o wrapper local apenas para confirmar assinatura antes de chamar `search-objects` ou `object-info`
+- NUNCA, em pergunta simples de existencia/localizacao nominal, abrir o wrapper local apenas para confirmar assinatura antes de chamar `search-objects` ou `object-info`; os parametros estao documentados em **QUERY PARAMETER REFERENCE**
 - NUNCA encurtar ou reescrever de forma inconsistente o caminho nominal do XML oficial retornado pelo indice
 - NUNCA reutilizar timestamp anterior em update ou resposta ao usuario; obter horario local imediatamente antes de cada mensagem
 - NUNCA compensar falha de `index-metadata` ou ausencia de `last_xpz_materialization_run_at` lendo manualmente JSON de validacao, SQLite direto, `kb-source-metadata.md` isolado, datas de arquivo, `updated`, `generated_at`, `source_xpz` ou XML oficial para responder a pergunta de negocio

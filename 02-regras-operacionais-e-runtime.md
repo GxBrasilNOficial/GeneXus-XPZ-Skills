@@ -153,14 +153,14 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
 ### Gramatica operacional para `Procedure` de relatorio
 
 - `Regra operacional`: em `Procedure` de relatorio simples, o fluxo primario deve partir de molde sanitizado documentado da trilha antes de escalar para XML real comparavel.
-- `Regra operacional`: a cobertura primaria barata desta trilha vale para relatorio simples das familias `F2` e `F3`, desde que o shape completo esteja documentado em molde sanitizado suficiente.
+- `Regra operacional`: a cobertura primaria barata desta trilha vale para relatorio simples das familias `F2` e `F3`, desde que o shape completo esteja documentado em molde sanitizado suficiente e marcado como `molde pronto` na trilha.
 - `Regra operacional`: em `Procedure` de relatorio, separar sempre tres camadas antes de corrigir ou gerar: `Source`, `Rules` e layout.
 - `Regra operacional`: `Source` e a camada de fluxo procedural; nela entram `Header`, `Footer`, `For each`, `print printBlock...`, `Output_file` e logica de preparacao de variaveis.
 - `Regra operacional`: `Rules` e a camada de assinatura/regra; nela entram `parm(...)` e regras proprias dessa camada, nao `print`, `For each`, `Header`, `Footer` nem shape de layout.
 - `Regra operacional`: o layout do `Part` `c414ed00-8cc4-4f44-8820-4baf93547173` e a camada estrutural de `Bands`, `PrintBlock`, `ReportLabel` e `ReportAttribute`; nao deve receber pseudo-`Source` procedural.
 - `Regra operacional`: `RPT_INTERNAL_NAME`, identificadores de `PrintBlock` e referencias usadas em `print printBlock...` devem permanecer coerentes entre `Source` e layout.
 - `Regra operacional`: em relatorio simples, a falta de XML real da KB nao bloqueia o primeiro prototipo quando a trilha ja oferecer molde sanitizado canonico suficiente.
-- `Regra operacional`: escalar para XML real comparavel apenas quando o pedido fugir da cobertura simples, quando houver falha estrutural repetida, ou quando surgir sinal de dialeto/localismo da KB.
+- `Regra operacional`: escalar para XML real comparavel apenas quando o pedido fugir da cobertura simples, quando a tentativa inicial mais um unico corretivo estrutural curto falharem, ou quando surgir sinal de dialeto/localismo da KB.
 - `Regra operacional`: em `Procedure` de relatorio, `;` faltando em `Rules` deve ser tratado como erro da camada `Rules`; `;` rejeitado em `Source` deve ser tratado como erro de dialeto/sintaxe de `Source`.
 - `Regra operacional`: nao inventar `GXML`, controles, propriedades ou shape alternativo para o `Part c414...` sem ancoragem em molde documentado ou XML real comparavel.
 
@@ -168,6 +168,7 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
 
 - `Regra operacional`: quando a trilha ja cobrir o caso comum por molde sanitizado forte, o corpus real da KB nao deve ser exigido como primeiro passo.
 - `Regra operacional`: depois de uma tentativa inicial e no maximo um corretivo estrutural curto, o agente deve parar de iterar por analogia e escalar para XML real comparavel.
+- `Regra operacional`: enquanto o caso continuar coberto pelo molde forte da trilha sem necessidade de escalada, rotular a base usada como `molde sanitizado`.
 - `Regra operacional`: ao escalar, registrar explicitamente se a base usada passa a ser `XML real da KB atual` ou `XML real de outra KB`.
 - `Regra operacional`: se a resposta ainda estiver sustentada apenas por tentativa plausivel sem molde documentado nem XML real comparavel, classificar como `hipotese` e bloquear consolidacao.
 
@@ -355,7 +356,7 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
 - erro citando `parm`, `rule`, `end of the rule` ou assinatura: suspeitar primeiro de `Rules`.
 - erro citando `For each`, `Header`, `Footer`, `Output_file` ou comando procedural: suspeitar primeiro de `Source`.
 - `Regra operacional`: classificar esses casos como `erro de sintaxe/semantica do Source` ou `erro estrutural de XML/pacote` conforme a camada realmente afetada; nao colapsar tudo como defeito de envelope.
-- `Regra operacional`: depois de uma ou duas falhas estruturais nesse playbook, bloquear terceira tentativa por analogia e exigir XML real comparavel.
+- `Regra operacional`: depois da tentativa inicial mais um unico corretivo estrutural curto nesse playbook, bloquear nova iteracao por analogia e exigir XML real comparavel.
 
 ### Procedimento auditavel de leitura
 
@@ -1419,7 +1420,7 @@ Funcionar como resumo decisório sem esconder os limites da evidência.
 ## Regras de fonte
 
 - Fonte valida: XML bruto extraido do acervo ou de export XPZ real comparavel
-- Fonte valida: molde sanitizado documentado nesta base, quando o anexo embutir XML completo suficiente para o tipo e a familia alvo
+- Fonte valida: molde sanitizado documentado nesta base, quando o anexo embutir XML completo suficiente para o tipo e a familia alvo e estiver marcado como `molde pronto`
 - Fonte invalida: markdown meramente descritivo, sem XML completo
 - Fonte invalida: reconstrucoes feitas so por resumo textual, tabela, frequencia ou memoria do agente
 - Fonte invalida: tentativa de sintetizar `KnowledgeBase`, `Settings` ou bloco top-level com nome da KB em `.xpz` gerado para objetos comuns

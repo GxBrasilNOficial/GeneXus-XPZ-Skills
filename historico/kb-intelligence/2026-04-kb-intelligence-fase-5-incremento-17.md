@@ -1,4 +1,4 @@
-# KB Intelligence Fase 5 - Incremento 17 - FabricaBrasil
+# KB Intelligence Fase 5 - Incremento 17 - KBExemplo
 
 ## Papel do documento
 registro de incremento
@@ -32,7 +32,7 @@ A relacao representa evidencia estrutural de tipo declarado em propriedade `ATTC
 
 ## Validacao final
 
-- KB laboratorio: `FabricaBrasil`
+- KB laboratorio: `KBExemplo`
 - indice usado para validacao: SQLite derivado regenerado em `Temp`
 - objetos escritos: 14928
 - relacoes escritas: 53974

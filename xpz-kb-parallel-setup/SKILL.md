@@ -178,14 +178,14 @@ Do NOT use this skill for:
   aprovacao explicita; nao corrigir automaticamente
 - O wrapper local nao deve reimplementar o motor compartilhado se o fluxo oficial ja existir
 - Para reconstruir wrappers locais, usar como referencia os exemplos sanitizados desta skill antes de improvisar um fluxo novo:
-  - [Update-KbFromXpz.example.ps1](C:/Dev/Knowledge/GeneXus-XPZ-Skills/xpz-kb-parallel-setup/examples/Update-KbFromXpz.example.ps1)
-  - [Test-KbFullSnapshot.example.ps1](C:/Dev/Knowledge/GeneXus-XPZ-Skills/xpz-kb-parallel-setup/examples/Test-KbFullSnapshot.example.ps1)
-  - [Query-KbIntelligence.example.ps1](C:/Dev/Knowledge/GeneXus-XPZ-Skills/xpz-kb-parallel-setup/examples/Query-KbIntelligence.example.ps1)
-  - [Update-KbIntelligenceIndex.example.ps1](C:/Dev/Knowledge/GeneXus-XPZ-Skills/xpz-kb-parallel-setup/examples/Update-KbIntelligenceIndex.example.ps1)
-  - [Notify-TaskComplete.example.ps1](C:/Dev/Knowledge/GeneXus-XPZ-Skills/xpz-kb-parallel-setup/examples/Notify-TaskComplete.example.ps1)
-  - [Test-KbGate.example.ps1](C:/Dev/Knowledge/GeneXus-XPZ-Skills/xpz-kb-parallel-setup/examples/Test-KbGate.example.ps1)
-  - [Get-KbMetadata.example.ps1](C:/Dev/Knowledge/GeneXus-XPZ-Skills/xpz-kb-parallel-setup/examples/Get-KbMetadata.example.ps1)
-  - [Test-KbStructure.example.ps1](C:/Dev/Knowledge/GeneXus-XPZ-Skills/xpz-kb-parallel-setup/examples/Test-KbStructure.example.ps1)
+  - [Update-KbFromXpz.example.ps1](examples/Update-KbFromXpz.example.ps1)
+  - [Test-KbFullSnapshot.example.ps1](examples/Test-KbFullSnapshot.example.ps1)
+  - [Query-KbIntelligence.example.ps1](examples/Query-KbIntelligence.example.ps1)
+  - [Update-KbIntelligenceIndex.example.ps1](examples/Update-KbIntelligenceIndex.example.ps1)
+  - [Notify-TaskComplete.example.ps1](examples/Notify-TaskComplete.example.ps1)
+  - [Test-KbGate.example.ps1](examples/Test-KbGate.example.ps1)
+  - [Get-KbMetadata.example.ps1](examples/Get-KbMetadata.example.ps1)
+  - [Test-KbStructure.example.ps1](examples/Test-KbStructure.example.ps1)
 - Esses `.example.ps1` sao exemplos metodologicos importantes para bootstrap tecnico e reconstrucao assistida dos wrappers locais finais.
 - Quando os wrappers locais precisarem nascer do zero no setup inicial, preferir adaptar os exemplos sanitizados completos desta skill como base do bootstrap tecnico, em vez de improvisar wrappers curtos ou parciais que ainda exijam correcao na etapa seguinte.
 - Esses `.example.ps1` nao substituem o wrapper local real da pasta paralela da KB e nao devem virar fallback automatico de execucao no fluxo normal.

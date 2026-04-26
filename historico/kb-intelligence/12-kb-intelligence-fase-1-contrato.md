@@ -78,12 +78,12 @@ A primeira implementacao operacional da Fase 1 fica em:
 - `scripts/New-KbIntelligenceIndex.py`
 - `scripts/Query-KbIntelligenceIndex.ps1`
 - `scripts/Query-KbIntelligenceIndex.py`
-- `scripts/kb-intelligence-fabricabrasil.phase1.validation-cases.json`
+- `scripts/kb-intelligence-kbexemplo.phase1.validation-cases.json`
 - `scripts/README-kb-intelligence.md`
 
 Os wrappers PowerShell preservam o padrao operacional atual do repositorio. Os motores Python usam `sqlite3` da biblioteca padrao para gravar e consultar o banco tecnico.
 
-Os casos de validacao ficam fora do motor generico. O arquivo de casos de `FabricaBrasil` existe como laboratorio explicito da Fase 1, nao como requisito universal para outras KBs.
+Os casos de validacao ficam fora do motor generico. O arquivo de casos de `KBExemplo` existe como laboratorio explicito da Fase 1, nao como requisito universal para outras KBs.
 
 ## Artefato principal
 
@@ -105,7 +105,7 @@ Em cada pasta paralela de KB, o local padrao para artefatos operacionais do KB I
 Exemplo real:
 
 ```text
-C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\kb-intelligence.sqlite
+C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite
 ```
 
 A pasta `KbIntelligence` e uma area operacional estavel para agentes. Ela nao e fonte normativa: o SQLite e os relatorios gerados continuam sendo derivados de `ObjetosDaKbEmXml`.

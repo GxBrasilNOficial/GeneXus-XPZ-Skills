@@ -1,4 +1,4 @@
-# KB Intelligence Fase 5 - Incremento 12 - FabricaBrasil
+# KB Intelligence Fase 5 - Incremento 12 - KBExemplo
 
 ## Papel do documento
 registro de incremento
@@ -32,7 +32,7 @@ A relacao representa evidencia estrutural de exclusao via Business Component dec
 
 ## Validacao final
 
-- KB laboratorio: `FabricaBrasil`
+- KB laboratorio: `KBExemplo`
 - indice usado para validacao: SQLite derivado regenerado em `Temp`
 - objetos escritos: 14928
 - relacoes escritas: 53202 na validacao isolada do incremento 12; 53328 na validacao acumulada com o incremento 13

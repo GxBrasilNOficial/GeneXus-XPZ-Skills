@@ -110,7 +110,7 @@ A Fase 3 so deve ser considerada pronta quando:
 - `impact-basic` estiver implementado nos wrappers e no motor de consulta
 - `impact-basic` funcionar em `json` e `text`
 - os comandos existentes continuarem funcionando
-- existir validacao pequena com casos reais em `FabricaBrasil`
+- existir validacao pequena com casos reais em `KBExemplo`
 - a validacao preservar os 40 casos da Fase 2 quando o indice for regenerado
 - o guia operacional estiver documentado em `scripts/README-kb-intelligence.md`
 - o contrato deixar claro que nao houve ampliacao de extracao

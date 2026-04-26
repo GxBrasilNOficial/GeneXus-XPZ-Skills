@@ -129,7 +129,7 @@ Usar para o que ainda depende de leitura adicional, teste externo, build, execuc
 
 ```powershell
 .\scripts\Query-KbIntelligenceIndex.ps1 `
-  -IndexPath "C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\kb-intelligence.sqlite" `
+  -IndexPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite" `
   -Query object-info `
   -ObjectType Procedure `
   -ObjectName NomeDoObjeto `
@@ -140,7 +140,7 @@ Usar para o que ainda depende de leitura adicional, teste externo, build, execuc
 
 ```powershell
 .\scripts\Query-KbIntelligenceIndex.ps1 `
-  -IndexPath "C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\kb-intelligence.sqlite" `
+  -IndexPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite" `
   -Query impact-basic `
   -ObjectType Procedure `
   -ObjectName NomeDoObjeto `
@@ -152,7 +152,7 @@ Usar para o que ainda depende de leitura adicional, teste externo, build, execuc
 
 ```powershell
 .\scripts\Query-KbIntelligenceIndex.ps1 `
-  -IndexPath "C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\kb-intelligence.sqlite" `
+  -IndexPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite" `
   -Query show-evidence `
   -SourceType Procedure `
   -SourceName NomeOrigem `

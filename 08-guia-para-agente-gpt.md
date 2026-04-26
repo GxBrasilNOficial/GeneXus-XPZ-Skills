@@ -52,8 +52,8 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 1. classificar primeiro se o caso cabe em familia simples `F2` ou `F3`
 2. se couber, partir de `05b-procedure-relatorio-familias-e-templates.md` como molde sanitizado canonico primario
 3. separar explicitamente `Source`, `Rules` e layout antes de editar ou diagnosticar
-4. tentar no maximo uma rodada corretiva estrutural curta se a primeira montagem falhar
-5. escalar para XML real comparavel apenas se o caso fugir da cobertura simples, se houver uma ou duas falhas estruturais, ou se aparecer sinal de dialeto/localismo da KB
+4. tentar no maximo um corretivo estrutural curto se a primeira montagem falhar
+5. escalar para XML real comparavel apenas se o caso fugir da cobertura simples, se a tentativa inicial mais esse unico corretivo curto falharem, ou se aparecer sinal de dialeto/localismo da KB
 6. registrar no handoff qual base esta sustentando a resposta: `molde sanitizado`, `XML real da KB atual`, `XML real de outra KB` ou `hipotese`
 
 ## Regra de precedencia sobre skills gerais
@@ -380,7 +380,7 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 - Inferência forte: para `WebPanel`, os anexos completos de `04-webpanel-familias-e-templates.md` ja podem servir como molde sanitizado documentado
 - Inferência forte: para `Transaction`, `05-transaction-familias-e-templates.md` ja contem moldes sanitizados completos para as familias `F1`, `F2`, `F5` e `F6`
 - Inferência forte: para `Procedure`, `DataProvider`, `DataSelector`, `Panel`, `API`, `WorkWithForWeb`, `SDT`, `Domain`, `Theme`, `PackagedModule`, `DesignSystem`, `ColorPalette`, `ThemeClass`, `ThemeColor`, `Image`, `Table`, `Document`, `ExternalObject`, `UserControl`, `Module`, `SubTypeGroup`, `PatternSettings`, `DataStore`, `Dashboard`, `DeploymentUnit`, `Generator`, `Language`, `Folder`, `Stencil` e `File`, a serie `01` agora distribui moldes sanitizados completos representativos em `01e` ate `01h`
-- Inferência forte: para `Procedure` de relatorio simples, `05b-procedure-relatorio-familias-e-templates.md` passa a ser a referencia primaria de molde sanitizado canonico para familias `F2` e `F3`
+- Inferência forte: para `Procedure` de relatorio simples, `05b-procedure-relatorio-familias-e-templates.md` passa a ser a referencia primaria de molde sanitizado canonico para familias `F2` e `F3`, mas somente nos blocos marcados como `molde pronto`
 - Regra operacional: em `Procedure` de relatorio simples, nao exigir XML real da KB como primeiro passo quando o molde sanitizado canonico desta trilha ja cobrir o shape necessario
 - Regra operacional: depois de uma tentativa inicial e no maximo um corretivo estrutural curto, bloquear nova iteracao por analogia e escalar para XML real comparavel
 - Hipótese: para `Transaction` das familias `F3` e `F4`, continua prudente buscar molde bruto comparavel adicional se a densidade estrutural real do alvo ultrapassar o que os anexos atuais sustentam
@@ -507,8 +507,8 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 - Fonte valida: XML bruto de objeto
 - Fonte valida: envelope XPZ observado documentado em `02-regras-operacionais-e-runtime.md`
 - Fonte valida: exemplos sanitizados completos de `04-webpanel-familias-e-templates.md`, quando usados como molde de `WebPanel`
-- Fonte valida: molde sanitizado canonico completo de `05b-procedure-relatorio-familias-e-templates.md`, quando o caso for `Procedure` de relatorio simples dentro da cobertura `F2` ou `F3`
-- Fonte invalida: markdown apenas descritivo desta base
+- Fonte valida: molde sanitizado canonico completo de `05b-procedure-relatorio-familias-e-templates.md`, quando o caso for `Procedure` de relatorio simples dentro da cobertura `F2` ou `F3` e o bloco usado estiver marcado como `molde pronto`
+- Fonte invalida: markdown apenas descritivo desta base, inclusive alias, tabelas e sinteses sem bloco `molde pronto`
 - Fonte invalida: reconstrucoes livres baseadas em tabelas, frequencias ou descricoes
 - Inferência forte: esta base documental ja explica o envelope XPZ observado e ja contem moldes sanitizados completos para `WebPanel`
 - Inferência forte: esta base documental ja contem moldes sanitizados completos tambem para `Transaction` em familias representativas

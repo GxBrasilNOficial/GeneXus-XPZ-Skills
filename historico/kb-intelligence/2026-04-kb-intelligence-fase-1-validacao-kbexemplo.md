@@ -1,4 +1,4 @@
-# Validacao KB Intelligence Fase 1 - FabricaBrasil
+# Validacao KB Intelligence Fase 1 - KBExemplo
 
 ## Papel do documento
 historico de validacao
@@ -13,10 +13,10 @@ medio
 `C:\Dev\Knowledge\GeneXus-XPZ-Skills`
 
 ## Pasta paralela usada como laboratorio
-`C:\Dev\Prod\Gx_FabricaBrasil`
+`C:\KB\KBExemplo`
 
 ## Fonte XML
-`C:\Dev\Prod\Gx_FabricaBrasil\ObjetosDaKbEmXml`
+`C:\KB\KBExemplo\ObjetosDaKbEmXml`
 
 ## Objetivo
 Registrar as rodadas de validacao operacional da Fase 1 do KB Intelligence contra uma pasta paralela real, usando apenas `Procedure` e `WebPanel` como escopo inicial.
@@ -27,10 +27,10 @@ Geracao do indice com casos de validacao:
 
 ```powershell
 .\scripts\New-KbIntelligenceIndex.ps1 `
-  -SourceRoot "C:\Dev\Prod\Gx_FabricaBrasil\ObjetosDaKbEmXml" `
+  -SourceRoot "C:\KB\KBExemplo\ObjetosDaKbEmXml" `
   -OutputPath ".\Temp\kb-intelligence-phase1.sqlite" `
   -ValidationReportPath ".\Temp\kb-intelligence-phase1-validation.json" `
-  -ValidationCasesPath ".\scripts\kb-intelligence-fabricabrasil.phase1.validation-cases.json" `
+  -ValidationCasesPath ".\scripts\kb-intelligence-kbexemplo.phase1.validation-cases.json" `
   -FailOnValidationFailure
 ```
 
@@ -50,7 +50,7 @@ Teste negativo controlado de falha de validacao:
 
 ```powershell
 .\scripts\New-KbIntelligenceIndex.ps1 `
-  -SourceRoot "C:\Dev\Prod\Gx_FabricaBrasil\ObjetosDaKbEmXml" `
+  -SourceRoot "C:\KB\KBExemplo\ObjetosDaKbEmXml" `
   -OutputPath ".\Temp\kb-intelligence-forced-failure.sqlite" `
   -ValidationReportPath ".\Temp\kb-intelligence-forced-failure-validation.json" `
   -ValidationCasesPath ".\Temp\kb-intelligence-forced-failure-cases.json" `
@@ -88,7 +88,7 @@ Evidencia consultada:
 - regra: `procedure_dot_call`
 - trecho: `procPlanilhaVolumeMovimento.Call(...)`
 
-Este caso evita repetir o falso negativo observado no experimento anterior em `C:\Dev\Prod\Gx_FabricaBrasil\Mapeamento`.
+Este caso evita repetir o falso negativo observado no experimento anterior em `C:\KB\KBExemplo\Mapeamento`.
 
 ### Caso 2 - Procedure chamando Procedure por chamada direta
 
@@ -167,13 +167,13 @@ Decisao decorrente:
 Em 2026-04-21, apos autorizacao do usuario, o experimento anterior foi movido na pasta paralela real:
 
 ```text
-C:\Dev\Prod\Gx_FabricaBrasil\Mapeamento
+C:\KB\KBExemplo\Mapeamento
 ```
 
 para:
 
 ```text
-C:\Dev\Prod\Gx_FabricaBrasil\ArquivoMorto\Mapeamento
+C:\KB\KBExemplo\ArquivoMorto\Mapeamento
 ```
 
 Tambem foram ajustados `README.md` e `AGENTS.md` da pasta paralela para registrar que `ArquivoMorto` deve ser ignorado por agentes ou tratado como nao confiavel, salvo pedido explicito de analise historica.
@@ -183,16 +183,16 @@ Tambem foram ajustados `README.md` e `AGENTS.md` da pasta paralela para registra
 Em 2026-04-21, foi gerado e validado o indice canonico da Fase 1 na pasta paralela real:
 
 ```text
-C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\kb-intelligence.sqlite
+C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite
 ```
 
 Tambem foi gerado o relatorio derivado:
 
 ```text
-C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\kb-intelligence-validation.json
+C:\KB\KBExemplo\KbIntelligence\kb-intelligence-validation.json
 ```
 
-A geracao usou `ObjetosDaKbEmXml` como fonte normativa e os 15 casos reais de `scripts\kb-intelligence-fabricabrasil.phase1.validation-cases.json`, com `-FailOnValidationFailure`.
+A geracao usou `ObjetosDaKbEmXml` como fonte normativa e os 15 casos reais de `scripts\kb-intelligence-kbexemplo.phase1.validation-cases.json`, com `-FailOnValidationFailure`.
 
 Resultado da rodada canonica:
 
@@ -209,7 +209,7 @@ Consultas reais executadas contra o indice canonico:
 - `who-uses` para `Procedure:procPlanilhaVolumeMovimento`: 2 usos diretos retornados
 - `show-evidence` para `WebPanel:wpRelatoriosDeMovimentosDeVolumes` -> `Procedure:procPlanilhaVolumeMovimento`: evidencia direta na linha 131 por `procedure_dot_call`
 
-Foi criado `C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\README.md` para orientar agentes a tratar o SQLite como derivado e regeneravel, mantendo `ObjetosDaKbEmXml` como fonte normativa.
+Foi criado `C:\KB\KBExemplo\KbIntelligence\README.md` para orientar agentes a tratar o SQLite como derivado e regeneravel, mantendo `ObjetosDaKbEmXml` como fonte normativa.
 
 A Fase 2 nao foi iniciada nesta rodada.
 

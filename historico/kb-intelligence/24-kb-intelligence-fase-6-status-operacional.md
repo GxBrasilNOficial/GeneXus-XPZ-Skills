@@ -26,11 +26,11 @@ Artefatos consolidados:
 - `17-kb-intelligence-fase-6-contrato.md`: contrato da fase
 - `18-kb-intelligence-fase-6-roteiro-investigacao-funcional.md`: roteiro manual de investigacao
 - `19-kb-intelligence-fase-6-exemplos-investigacao-funcional.md`: exemplos funcionais baseados em trilha de evidencia
-- `20-kb-intelligence-fase-6-piloto-investigacao-funcional.md`: piloto com `FabricaBrasil`
+- `20-kb-intelligence-fase-6-piloto-investigacao-funcional.md`: piloto com `KBExemplo`
 - `21-kb-intelligence-fase-6-checklist-operacional-agente.md`: checklist recorrente para agentes
 - `22-kb-intelligence-fase-6-contrato-functional-trace-basic.md`: contrato e estado da consulta auxiliar
 - `23-kb-intelligence-fase-6-exemplos-functional-trace-basic.md`: exemplos do comando implementado
-- `scripts/kb-intelligence-fabricabrasil.phase6.validation-cases.json`: bateria minima da Fase 6
+- `scripts/kb-intelligence-kbexemplo.phase6.validation-cases.json`: bateria minima da Fase 6
 
 ## Funcionalidade operacional
 
@@ -56,8 +56,8 @@ Ele:
 Validacoes executadas na implementacao:
 
 - compilacao Python de `Query-KbIntelligenceIndex.py` e `Test-KbIntelligenceQueries.py`
-- regressao da Fase 3 com `kb-intelligence-fabricabrasil.phase3.validation-cases.json`
-- validacao da Fase 6 com `kb-intelligence-fabricabrasil.phase6.validation-cases.json`
+- regressao da Fase 3 com `kb-intelligence-kbexemplo.phase3.validation-cases.json`
+- validacao da Fase 6 com `kb-intelligence-kbexemplo.phase6.validation-cases.json`
 
 Casos cobertos na bateria da Fase 6:
 
@@ -67,9 +67,9 @@ Casos cobertos na bateria da Fase 6:
 
 ## Indice canonico
 
-O indice canonico de `FabricaBrasil` foi regenerado por decisao explicita do usuario, usando a rotina oficial:
+O indice canonico de `KBExemplo` foi regenerado por decisao explicita do usuario, usando a rotina oficial:
 
-- `C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\kb-intelligence.sqlite`
+- `C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite`
 
 Resultado registrado:
 

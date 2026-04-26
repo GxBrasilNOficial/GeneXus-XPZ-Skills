@@ -1,4 +1,4 @@
-# Validacao KB Intelligence Fase 2 - DataProvider, WorkWithForWeb e ATTCUSTOMTYPE - FabricaBrasil
+# Validacao KB Intelligence Fase 2 - DataProvider, WorkWithForWeb e ATTCUSTOMTYPE - KBExemplo
 
 ## Papel do documento
 historico de validacao
@@ -13,10 +13,10 @@ medio
 `C:\Dev\Knowledge\GeneXus-XPZ-Skills`
 
 ## Pasta paralela usada como laboratorio
-`C:\Dev\Prod\Gx_FabricaBrasil`
+`C:\KB\KBExemplo`
 
 ## Fonte XML
-`C:\Dev\Prod\Gx_FabricaBrasil\ObjetosDaKbEmXml`
+`C:\KB\KBExemplo\ObjetosDaKbEmXml`
 
 ## Objetivo
 Registrar a consolidacao da Fase 2 do KB Intelligence, adicionando `DataProvider` como origem e destino em `Source` efetivo, actions de `WorkWithForWeb` com `gxobject` resolvido, vinculacoes explicitas de `WorkWithForWeb` para `Transaction`, links e prompts explicitos de `WorkWithForWeb` para `WebPanel`, condicoes por tag e atributo de `WorkWithForWeb` chamando `Procedure`, e propriedades `ATTCUSTOMTYPE` como alvo literal `CustomType`.
@@ -55,10 +55,10 @@ Regressao dos 15 casos da Fase 1:
 
 ```powershell
 .\scripts\New-KbIntelligenceIndex.ps1 `
-  -SourceRoot "C:\Dev\Prod\Gx_FabricaBrasil\ObjetosDaKbEmXml" `
+  -SourceRoot "C:\KB\KBExemplo\ObjetosDaKbEmXml" `
   -OutputPath ".\Temp\kb-intelligence-phase2-regression.sqlite" `
   -ValidationReportPath ".\Temp\kb-intelligence-phase2-regression-validation.json" `
-  -ValidationCasesPath ".\scripts\kb-intelligence-fabricabrasil.phase1.validation-cases.json" `
+  -ValidationCasesPath ".\scripts\kb-intelligence-kbexemplo.phase1.validation-cases.json" `
   -FailOnValidationFailure
 ```
 
@@ -66,10 +66,10 @@ Validacao dos casos de Fase 2:
 
 ```powershell
 .\scripts\New-KbIntelligenceIndex.ps1 `
-  -SourceRoot "C:\Dev\Prod\Gx_FabricaBrasil\ObjetosDaKbEmXml" `
+  -SourceRoot "C:\KB\KBExemplo\ObjetosDaKbEmXml" `
   -OutputPath ".\Temp\kb-intelligence-phase2.sqlite" `
   -ValidationReportPath ".\Temp\kb-intelligence-phase2-validation.json" `
-  -ValidationCasesPath ".\scripts\kb-intelligence-fabricabrasil.phase2.validation-cases.json" `
+  -ValidationCasesPath ".\scripts\kb-intelligence-kbexemplo.phase2.validation-cases.json" `
   -FailOnValidationFailure
 ```
 
@@ -77,10 +77,10 @@ Regressao ampliada depois dos incrementos de `WorkWithForWeb` e `ATTCUSTOMTYPE`:
 
 ```powershell
 .\scripts\New-KbIntelligenceIndex.ps1 `
-  -SourceRoot "C:\Dev\Prod\Gx_FabricaBrasil\ObjetosDaKbEmXml" `
+  -SourceRoot "C:\KB\KBExemplo\ObjetosDaKbEmXml" `
   -OutputPath ".\Temp\kb-intelligence-phase2-workwith-attcustomtype-regression.sqlite" `
   -ValidationReportPath ".\Temp\kb-intelligence-phase2-workwith-attcustomtype-regression-validation.json" `
-  -ValidationCasesPath ".\scripts\kb-intelligence-fabricabrasil.phase1.validation-cases.json" `
+  -ValidationCasesPath ".\scripts\kb-intelligence-kbexemplo.phase1.validation-cases.json" `
   -FailOnValidationFailure
 ```
 
@@ -88,10 +88,10 @@ Geracao do indice canonico da pasta paralela:
 
 ```powershell
 .\scripts\New-KbIntelligenceIndex.ps1 `
-  -SourceRoot "C:\Dev\Prod\Gx_FabricaBrasil\ObjetosDaKbEmXml" `
-  -OutputPath "C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\kb-intelligence.sqlite" `
-  -ValidationReportPath "C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\kb-intelligence-validation.json" `
-  -ValidationCasesPath ".\scripts\kb-intelligence-fabricabrasil.phase2.validation-cases.json" `
+  -SourceRoot "C:\KB\KBExemplo\ObjetosDaKbEmXml" `
+  -OutputPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite" `
+  -ValidationReportPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence-validation.json" `
+  -ValidationCasesPath ".\scripts\kb-intelligence-kbexemplo.phase2.validation-cases.json" `
   -FailOnValidationFailure
 ```
 

@@ -57,23 +57,23 @@ Eles nao substituem o acervo XML em `ObjetosDaKbEmXml` e nao provam comportament
 
 ```powershell
 .\scripts\New-KbIntelligenceIndex.ps1 `
-  -SourceRoot "C:\Dev\Prod\Gx_FabricaBrasil\ObjetosDaKbEmXml" `
-  -OutputPath "C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\kb-intelligence.sqlite" `
-  -ValidationReportPath "C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\kb-intelligence-validation.json" `
-  -ValidationCasesPath ".\scripts\kb-intelligence-fabricabrasil.phase1.validation-cases.json" `
+  -SourceRoot "C:\KB\KBExemplo\ObjetosDaKbEmXml" `
+  -OutputPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite" `
+  -ValidationReportPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence-validation.json" `
+  -ValidationCasesPath ".\scripts\kb-intelligence-kbexemplo.phase1.validation-cases.json" `
   -FailOnValidationFailure
 ```
 
 Para outra KB, troque `-SourceRoot`, `-OutputPath` e, se aplicavel, `-ValidationCasesPath`.
 
-Para validar os incrementos aprovados da Fase 2 em `FabricaBrasil`, use:
+Para validar os incrementos aprovados da Fase 2 em `KBExemplo`, use:
 
 ```powershell
 .\scripts\New-KbIntelligenceIndex.ps1 `
-  -SourceRoot "C:\Dev\Prod\Gx_FabricaBrasil\ObjetosDaKbEmXml" `
-  -OutputPath "C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\kb-intelligence.sqlite" `
-  -ValidationReportPath "C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\kb-intelligence-validation.json" `
-  -ValidationCasesPath ".\scripts\kb-intelligence-fabricabrasil.phase2.validation-cases.json" `
+  -SourceRoot "C:\KB\KBExemplo\ObjetosDaKbEmXml" `
+  -OutputPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite" `
+  -ValidationReportPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence-validation.json" `
+  -ValidationCasesPath ".\scripts\kb-intelligence-kbexemplo.phase2.validation-cases.json" `
   -FailOnValidationFailure
 ```
 
@@ -100,7 +100,7 @@ Para ler os metadados do indice pelo wrapper:
 
 ```powershell
 .\scripts\Query-KbIntelligenceIndex.ps1 `
-  -IndexPath "C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\kb-intelligence.sqlite" `
+  -IndexPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite" `
   -Query index-metadata `
   -Format text
 ```
@@ -127,7 +127,7 @@ Depois de separar por prefixo, nao tratar prefixo promissor como relacao resolvi
 Contar ocorrencias textuais de `ATTCUSTOMTYPE` no acervo:
 
 ```powershell
-Get-ChildItem -Path "C:\Dev\Prod\Gx_FabricaBrasil\ObjetosDaKbEmXml" -Recurse -File |
+Get-ChildItem -Path "C:\KB\KBExemplo\ObjetosDaKbEmXml" -Recurse -File |
   Select-String -Pattern 'ATTCUSTOMTYPE' |
   Measure-Object
 ```
@@ -135,7 +135,7 @@ Get-ChildItem -Path "C:\Dev\Prod\Gx_FabricaBrasil\ObjetosDaKbEmXml" -Recurse -Fi
 Agrupar valores de `ATTCUSTOMTYPE` por prefixo observavel:
 
 ```powershell
-Get-ChildItem -Path "C:\Dev\Prod\Gx_FabricaBrasil\ObjetosDaKbEmXml" -Recurse -File |
+Get-ChildItem -Path "C:\KB\KBExemplo\ObjetosDaKbEmXml" -Recurse -File |
   Select-String -Pattern 'ATTCUSTOMTYPE="([^"]+)"' -AllMatches |
   ForEach-Object { $_.Matches } |
   ForEach-Object { ($_.Groups[1].Value -split ':', 2)[0].ToLower() } |
@@ -146,7 +146,7 @@ Get-ChildItem -Path "C:\Dev\Prod\Gx_FabricaBrasil\ObjetosDaKbEmXml" -Recurse -Fi
 Abrir amostra curta de valores reais antes de decidir contrato:
 
 ```powershell
-Get-ChildItem -Path "C:\Dev\Prod\Gx_FabricaBrasil\ObjetosDaKbEmXml" -Recurse -File |
+Get-ChildItem -Path "C:\KB\KBExemplo\ObjetosDaKbEmXml" -Recurse -File |
   Select-String -Pattern 'ATTCUSTOMTYPE="([^"]+)"' -AllMatches |
   ForEach-Object { $_.Matches } |
   ForEach-Object { $_.Groups[1].Value } |
@@ -163,7 +163,7 @@ Evitar:
 
 ```powershell
 .\scripts\Query-KbIntelligenceIndex.ps1 `
-  -IndexPath "C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\kb-intelligence.sqlite" `
+  -IndexPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite" `
   -Query search-objects `
   -ObjectName "*PlanilhaVolume*" `
   -Limit 10 `
@@ -174,7 +174,7 @@ Evitar:
 
 ```powershell
 .\scripts\Query-KbIntelligenceIndex.ps1 `
-  -IndexPath "C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\kb-intelligence.sqlite" `
+  -IndexPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite" `
   -Query object-info `
   -ObjectType Procedure `
   -ObjectName procPlanilhaVolumeMovimento `
@@ -185,7 +185,7 @@ Evitar:
 
 ```powershell
 .\scripts\Query-KbIntelligenceIndex.ps1 `
-  -IndexPath "C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\kb-intelligence.sqlite" `
+  -IndexPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite" `
   -Query who-uses `
   -ObjectType Procedure `
   -ObjectName procPlanilhaVolumeMovimento `
@@ -197,7 +197,7 @@ Evitar:
 
 ```powershell
 .\scripts\Query-KbIntelligenceIndex.ps1 `
-  -IndexPath "C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\kb-intelligence.sqlite" `
+  -IndexPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite" `
   -Query what-uses `
   -ObjectType WebPanel `
   -ObjectName wpRelatoriosDeMovimentosDeVolumes `
@@ -209,7 +209,7 @@ Evitar:
 
 ```powershell
 .\scripts\Query-KbIntelligenceIndex.ps1 `
-  -IndexPath "C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\kb-intelligence.sqlite" `
+  -IndexPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite" `
   -Query show-evidence `
   -SourceType WebPanel `
   -SourceName wpRelatoriosDeMovimentosDeVolumes `
@@ -224,7 +224,7 @@ O comando `impact-basic` resume dependentes diretos e dependencias diretas do ob
 
 ```powershell
 .\scripts\Query-KbIntelligenceIndex.ps1 `
-  -IndexPath "C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\kb-intelligence.sqlite" `
+  -IndexPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite" `
   -Query impact-basic `
   -ObjectType Procedure `
   -ObjectName procPlanilhaVolumeMovimento `
@@ -251,7 +251,7 @@ Ele nao abre XML automaticamente, nao interpreta regra de negocio e nao substitu
 
 ```powershell
 .\scripts\Query-KbIntelligenceIndex.ps1 `
-  -IndexPath "C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\kb-intelligence.sqlite" `
+  -IndexPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite" `
   -Query functional-trace-basic `
   -ObjectType Procedure `
   -ObjectName procAjustaCompraGadoIdDeAnimais `
@@ -265,9 +265,9 @@ Depois de gerar ou localizar um indice SQLite, valide o comportamento operaciona
 
 ```powershell
 .\scripts\Test-KbIntelligenceQueries.ps1 `
-  -IndexPath "C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\kb-intelligence.sqlite" `
-  -ValidationCasesPath ".\scripts\kb-intelligence-fabricabrasil.phase3.validation-cases.json" `
-  -ValidationReportPath "C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\kb-intelligence-phase3-validation.json" `
+  -IndexPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite" `
+  -ValidationCasesPath ".\scripts\kb-intelligence-kbexemplo.phase3.validation-cases.json" `
+  -ValidationReportPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence-phase3-validation.json" `
   -FailOnValidationFailure
 ```
 
@@ -289,9 +289,9 @@ Depois de regenerar o indice, valide a presenca de tipos ampliados com:
 
 ```powershell
 .\scripts\Test-KbIntelligenceQueries.ps1 `
-  -IndexPath "C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\kb-intelligence.sqlite" `
-  -ValidationCasesPath ".\scripts\kb-intelligence-fabricabrasil.phase4.validation-cases.json" `
-  -ValidationReportPath "C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\kb-intelligence-phase4-validation.json" `
+  -IndexPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite" `
+  -ValidationCasesPath ".\scripts\kb-intelligence-kbexemplo.phase4.validation-cases.json" `
+  -ValidationReportPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence-phase4-validation.json" `
   -FailOnValidationFailure
 ```
 
@@ -303,10 +303,10 @@ Depois de regenerar o indice, valide a resolucao semantica aprovada com:
 
 ```powershell
 .\scripts\New-KbIntelligenceIndex.ps1 `
-  -SourceRoot "C:\Dev\Prod\Gx_FabricaBrasil\ObjetosDaKbEmXml" `
-  -OutputPath "C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\kb-intelligence.sqlite" `
-  -ValidationReportPath "C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\kb-intelligence-validation.json" `
-  -ValidationCasesPath ".\scripts\kb-intelligence-fabricabrasil.phase5.validation-cases.json" `
+  -SourceRoot "C:\KB\KBExemplo\ObjetosDaKbEmXml" `
+  -OutputPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite" `
+  -ValidationReportPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence-validation.json" `
+  -ValidationCasesPath ".\scripts\kb-intelligence-kbexemplo.phase5.validation-cases.json" `
   -FailOnValidationFailure
 ```
 
@@ -320,9 +320,9 @@ Depois de localizar ou regenerar o indice canonico, valide `functional-trace-bas
 
 ```powershell
 .\scripts\Test-KbIntelligenceQueries.ps1 `
-  -IndexPath "C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\kb-intelligence.sqlite" `
-  -ValidationCasesPath ".\scripts\kb-intelligence-fabricabrasil.phase6.validation-cases.json" `
-  -ValidationReportPath "C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\kb-intelligence-phase6-validation.json" `
+  -IndexPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite" `
+  -ValidationCasesPath ".\scripts\kb-intelligence-kbexemplo.phase6.validation-cases.json" `
+  -ValidationReportPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence-phase6-validation.json" `
   -FailOnValidationFailure
 ```
 

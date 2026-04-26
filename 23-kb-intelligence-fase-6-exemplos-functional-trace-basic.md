@@ -38,7 +38,7 @@ Qual trilha inicial devo abrir para investigar regras ligadas a ordem de abate?
 
 ```powershell
 .\scripts\Query-KbIntelligenceIndex.ps1 `
-  -IndexPath "C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\kb-intelligence.sqlite" `
+  -IndexPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite" `
   -Query functional-trace-basic `
   -ObjectType WorkWithForWeb `
   -ObjectName WorkWithWebAbateOrdem `
@@ -72,7 +72,7 @@ Ha indício tecnico de manipulacao direta de `Transaction:Animal`?
 
 ```powershell
 .\scripts\Query-KbIntelligenceIndex.ps1 `
-  -IndexPath "C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\kb-intelligence.sqlite" `
+  -IndexPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite" `
   -Query functional-trace-basic `
   -ObjectType Procedure `
   -ObjectName procAjustaCompraGadoIdDeAnimais `
@@ -108,7 +108,7 @@ Qual tipo local devo abrir primeiro para entender parte do contrato tecnico da A
 
 ```powershell
 .\scripts\Query-KbIntelligenceIndex.ps1 `
-  -IndexPath "C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\kb-intelligence.sqlite" `
+  -IndexPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite" `
   -Query functional-trace-basic `
   -ObjectType API `
   -ObjectName apiPDV_Integracao `
@@ -137,9 +137,9 @@ Os exemplos acima sao cobertos por:
 
 ```powershell
 .\scripts\Test-KbIntelligenceQueries.ps1 `
-  -IndexPath "C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\kb-intelligence.sqlite" `
-  -ValidationCasesPath ".\scripts\kb-intelligence-fabricabrasil.phase6.validation-cases.json" `
-  -ValidationReportPath "C:\Dev\Prod\Gx_FabricaBrasil\KbIntelligence\kb-intelligence-phase6-validation.json" `
+  -IndexPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite" `
+  -ValidationCasesPath ".\scripts\kb-intelligence-kbexemplo.phase6.validation-cases.json" `
+  -ValidationReportPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence-phase6-validation.json" `
   -FailOnValidationFailure
 ```
 
