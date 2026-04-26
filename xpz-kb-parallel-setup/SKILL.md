@@ -13,6 +13,8 @@ Define e valida a estrutura inicial da pasta paralela da KB usada ao redor de um
 
 Usar esta skill quando o trabalho exigir preparar, explicar, validar, atualizar ou corrigir a estrutura da pasta paralela da KB. O agente deve separar claramente a pasta nativa da KB da pasta paralela e aplicar os nomes padrao quando o usuario nao informar alternativas.
 
+Quando o usuario usar linguagem ambigua como "refazer", "reiniciar", "recriar" ou equivalente em pasta que ja tem historico real, nao assumir `modo_criacao` automaticamente. Clarificar explicitamente se o usuario quer recriar do zero — destruindo dados existentes — ou apenas incorporar scripts novos preservando o historico. Apresentar as duas opcoes com consequencias claras antes de qualquer acao.
+
 ## PATH RESOLUTION
 
 - Este `SKILL.md` fica dentro de uma subpasta de skill sob a raiz do repositório.
@@ -278,6 +280,10 @@ Nao usar `setup concluido`, `estrutura pronta` ou expressao equivalente sem dize
 8. Detectar o contexto operacional da pasta paralela antes de qualquer escrita:
    - `modo_criacao`: pasta inexistente, vazia, sem `ObjetosDaKbEmXml` materializado e sem `kb-source-metadata.md` com timestamps reais → criar primeiro a estrutura base e so aprofundar exploracao se surgir bloqueio concreto; prosseguir para o passo 9
    - `modo_atualizacao`: pasta com historico real — qualquer combinacao de `ObjetosDaKbEmXml` materializado, `kb-source-metadata.md` com timestamps reais ou `kb-intelligence.sqlite` com dados → executar o BLOCO DE ATUALIZACAO a seguir antes de prosseguir para o passo 9
+   - Se o usuario usou linguagem ambigua como "refazer", "reiniciar", "recriar" ou equivalente e a pasta tem sinais de historico real: parar, nao assumir modo, e clarificar com o usuario apresentando as duas opcoes e suas consequencias:
+     - Opcao 1 — atualizar (modo_atualizacao): incorporar scripts novos, preservar tudo que ja existe
+     - Opcao 2 — recriar do zero (modo_criacao): estrutura e dados existentes sao descartados
+   - Aguardar escolha explicita antes de prosseguir
 --- BLOCO DE ATUALIZACAO (executar somente em modo_atualizacao) ---
 
 8.a Inspecionar `scripts/` e categorizar cada script previsto pela base metodologica em uma de tres classes:
@@ -419,3 +425,4 @@ PastaParalelaDaKb/
 - NUNCA sobrescrever script existente em `scripts/` sem antes comparar com o exemplo correspondente, evidenciar objetivamente a divergencia ao usuario e obter aprovacao explicita para substituicao
 - NUNCA gravar em `kb-source-metadata.md` se o arquivo ja existir com timestamps reais; apos a primeira materializacao oficial esse arquivo e somente leitura para o agente
 - NUNCA classificar uma pasta como `bootstrap_incompleto` por ausencia de um script novo quando os scripts existentes ja funcionam e a pasta tem historico de uso real; a ausencia de script novo e caso de `modo_atualizacao`, nao de bootstrap incompleto
+- NUNCA assumir `modo_criacao` em pasta com historico real apenas porque o usuario usou "refazer", "reiniciar", "recriar" ou expressao similar sem declarar explicitamente que quer destruir e recriar do zero; clarificar a intencao antes de qualquer acao
