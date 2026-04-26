@@ -1,6 +1,6 @@
 # Ideias Pendentes
 
-## LlamaIndex + vector store como alternativa ao indice SQLite atual
+## LlamaIndex / LangChain + vector store como alternativa ao indice SQLite atual
 
 **Origem:** sugestao recebida em 2026-04-25 para exploracao futura.
 
@@ -10,13 +10,22 @@ Hoje o usuario GeneXus que trabalha com a pasta paralela via agente e obrigado a
 
 O efeito pratico: o usuario que nao lembra o nome do objeto nao consegue explorar a KB de forma fluida; precisa saber o que procura antes de perguntar.
 
-### O que LlamaIndex + vector store resolveriam
+### Framework de orquestracao: LlamaIndex ou LangChain
+
+Ambos resolvem o mesmo problema e suportam os mesmos vector stores (ChromaDB, Redis Stack). A escolha e de preferencia de ecossistema:
+
+- **LlamaIndex**: especializado em indexacao e recuperacao de dados; API mais direta para RAG puro; escolha natural quando o unico objetivo e "indexar e buscar".
+- **LangChain**: framework mais abrangente (agentes, chains, memoria, ferramentas, RAG); comunidade maior; util se o mesmo framework ja for usado em outras partes do projeto.
+
+Para o caso especifico de indexar XMLs GeneXus e buscar por intencao funcional, ambos chegam no mesmo resultado.
+
+### O que a camada vetorial resolveria
 
 **Busca por intencao funcional**
 Com embeddings vetoriais, uma pergunta como "qual procedure atualiza o saldo de estoque mensal?" localizaria o objeto correto mesmo sem o nome exato. O usuario descreveria o que precisa em linguagem natural e o agente encontraria os candidatos relevantes — invertendo a dependencia atual de nomenclatura precisa.
 
 **Contexto recortado (chunking)**
-Cada XML de objeto GeneXus pode ser extenso. Em vez de enviar o XML inteiro ao agente, o LlamaIndex fatiaria em blocos logicos (`Source`, `Rules`, `Events`). A resposta usaria apenas os trechos realmente relevantes, reduzindo tokens e ruido.
+Cada XML de objeto GeneXus pode ser extenso. Em vez de enviar o XML inteiro ao agente, o framework fatiaria em blocos logicos (`Source`, `Rules`, `Events`). A resposta usaria apenas os trechos realmente relevantes, reduzindo tokens e ruido.
 
 **Custo de busca constante**
 O vector store organiza vetores matematicamente. O custo de busca nao degrada com o crescimento do acervo.
@@ -33,5 +42,5 @@ Redis com modulo de busca vetorial (RediSearch / HNSW). Open source e gratuito. 
 
 - Qual o custo de geracao dos embeddings para o acervo? Precisa de API externa ou modelo local funciona com qualidade suficiente?
 - O ganho de descoberta por intencao compensa a complexidade de manter dois indices (SQLite estrutural + vetorial)?
-- Adotar LlamaIndex + vector store exigiria reescrever os wrappers locais (`Query-*KbIntelligence.ps1`, gate, etc.) em todas as pastas paralelas?
+- Adotar LlamaIndex/LangChain + vector store exigiria reescrever os wrappers locais (`Query-*KbIntelligence.ps1`, gate, etc.) em todas as pastas paralelas?
 - O chunking por bloco logico do XML (`Source`, `Rules`, `Events`) e viavel dado o formato dos XMLs GeneXus?
