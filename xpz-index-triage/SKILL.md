@@ -148,15 +148,14 @@ Mesmo com o gate liberado, continue economico: para pergunta simples de existenc
 
 Chamar `Test-*KbGate.ps1` pelo nome provisionado na pasta `scripts` da pasta paralela da KB. O script encapsula toda a logica do gate: verifica sequencialmente pasta `KbIntelligence`, `kb-intelligence.sqlite`, wrapper local de consulta, metadado de build via `-Query index-metadata`, `kb-source-metadata.md` e comparacao de timestamps. Retorna `GATE_OK` em stdout quando o indice esta apto, ou lanca excecao com `BLOCK: <motivo>` quando nao esta.
 
-Copie o bloco abaixo literalmente, sem acrescentar linhas, saidas auxiliares, parsing ou comandos posteriores. Ajuste apenas o nome do script quando a documentacao local da pasta paralela indicar outro nome.
+Copie o bloco abaixo literalmente, sem acrescentar linhas, saidas auxiliares, parsing ou comandos posteriores. Substitua `<caminho-absoluto-do-script>` pelo caminho absoluto literal do script lido da documentacao local da pasta paralela (ex: `C:\Dev\Prod\Gx_FabricaBrasil\scripts\Test-FabricaBrasilKbGate.ps1`). Nao usar variavel nem `Join-Path` para montar o caminho na chamada final: o caminho literal e obrigatorio para que o sistema de permissoes consiga validar estaticamente o comando e dispensar prompts manuais.
 
 ```powershell
 $ErrorActionPreference = 'Stop'
-$gateScript = Join-Path (Get-Location).Path 'scripts\Test-KBExemploKbGate.ps1'
-if (-not (Test-Path -LiteralPath $gateScript -PathType Leaf)) {
+if (-not (Test-Path -LiteralPath '<caminho-absoluto-do-script>' -PathType Leaf)) {
     throw 'BLOCK: script Test-*KbGate.ps1 ausente em scripts\'
 }
-& $gateScript
+& '<caminho-absoluto-do-script>'
 ```
 
 Se o script retornar `GATE_OK`, encerrar o comando do gate; qualquer proxima acao deve ser decidida e executada em comando separado, conforme a consulta substantiva necessaria.
