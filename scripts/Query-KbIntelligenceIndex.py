@@ -62,7 +62,7 @@ def object_info(conn: sqlite3.Connection, object_type: str, object_name: str) ->
         """
         SELECT object_id, type, name, file_path, last_update, file_hash
         FROM objects
-        WHERE type = ? AND name = ?
+        WHERE type = ? AND LOWER(name) = LOWER(?)
         """,
         (object_type, object_name),
     )
@@ -80,7 +80,7 @@ def object_info(conn: sqlite3.Connection, object_type: str, object_name: str) ->
     )
     incoming = fetch_one(
         conn,
-        "SELECT COUNT(*) AS count FROM relations WHERE target_type = ? AND target_name = ?",
+        "SELECT COUNT(*) AS count FROM relations WHERE target_type = ? AND LOWER(target_name) = LOWER(?)",
         (object_type, object_name),
     )
     return {
@@ -145,7 +145,7 @@ def who_uses(conn: sqlite3.Connection, object_type: str, object_name: str, limit
         FROM relations r
         JOIN objects o ON o.object_id = r.source_object_id
         JOIN evidence e ON e.evidence_id = r.evidence_id
-        WHERE r.target_type = ? AND r.target_name = ?
+        WHERE r.target_type = ? AND LOWER(r.target_name) = LOWER(?)
         ORDER BY o.type, o.name, e.line
         """,
         (object_type, object_name),
@@ -181,7 +181,7 @@ def what_uses(conn: sqlite3.Connection, object_type: str, object_name: str, limi
         FROM relations r
         JOIN objects o ON o.object_id = r.source_object_id
         JOIN evidence e ON e.evidence_id = r.evidence_id
-        WHERE o.type = ? AND o.name = ?
+        WHERE o.type = ? AND LOWER(o.name) = LOWER(?)
         ORDER BY r.target_type, r.target_name, e.line
         """,
         (object_type, object_name),
@@ -396,7 +396,7 @@ def show_evidence(
             FROM relations r
             JOIN objects o ON o.object_id = r.source_object_id
             JOIN evidence e ON e.evidence_id = r.evidence_id
-            WHERE o.type = ? AND o.name = ? AND r.target_type = ? AND r.target_name = ?
+            WHERE o.type = ? AND LOWER(o.name) = LOWER(?) AND r.target_type = ? AND LOWER(r.target_name) = LOWER(?)
             ORDER BY e.line
             """,
             (source_type, source_name, target_type, target_name),
