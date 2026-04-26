@@ -71,7 +71,7 @@ foreach ($script in @(
     'Update-KbFromXpz.ps1',
     'Test-KbFullSnapshot.ps1',
     'Query-KbIntelligence.ps1',
-    'Update-KbIntelligenceIndex.ps1',
+    'Rebuild-KbIntelligenceIndex.ps1',
     'Test-KbGate.ps1',
     'Get-KbMetadata.ps1',
     'Test-KbStructure.ps1'

@@ -4,7 +4,7 @@
     Builds the KB Intelligence SQLite index.
 
 .DESCRIPTION
-    Wrapper for New-KbIntelligenceIndex.py. Keeps paths explicit and avoids
+    Wrapper for Build-KbIntelligenceIndex.py. Keeps paths explicit and avoids
     hardcoded KB-specific locations.
 
 .PARAMETER SourceRoot
@@ -40,7 +40,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 $scriptDir = Split-Path -Parent $PSCommandPath
-$enginePath = Join-Path $scriptDir "New-KbIntelligenceIndex.py"
+$enginePath = Join-Path $scriptDir "Build-KbIntelligenceIndex.py"
 
 if (-not (Test-Path -LiteralPath $enginePath)) {
     throw "Engine script not found: $enginePath"

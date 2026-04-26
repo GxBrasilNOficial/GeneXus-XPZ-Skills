@@ -31,7 +31,7 @@ paralela da KB.
 .PARAMETER IndexUpdateScriptPath
 Caminho opcional do wrapper local que regenera o indice derivado apos
 materializacao bem-sucedida. Quando omitido, usa
-`Update-KbIntelligenceIndex.ps1` na mesma pasta deste wrapper.
+`Rebuild-KbIntelligenceIndex.ps1` na mesma pasta deste wrapper.
 
 .PARAMETER IndexValidationCasesPath
 Caminho opcional para casos de validacao usados no refresh compulsorio do
@@ -269,7 +269,7 @@ if (-not $KbMetadataPath) {
 }
 
 if (-not $IndexUpdateScriptPath) {
-    $IndexUpdateScriptPath = Join-Path $PSScriptRoot "Update-KbIntelligenceIndex.ps1"
+    $IndexUpdateScriptPath = Join-Path $PSScriptRoot "Rebuild-KbIntelligenceIndex.ps1"
     if (-not (Test-Path -LiteralPath $IndexUpdateScriptPath)) {
         throw "Local index refresh wrapper not found: $IndexUpdateScriptPath. Generate or update the local final wrapper before normal XPZ/XML sync."
     }

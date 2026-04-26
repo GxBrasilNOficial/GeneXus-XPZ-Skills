@@ -181,7 +181,7 @@ Do NOT use this skill for:
   - [Update-KbFromXpz.example.ps1](examples/Update-KbFromXpz.example.ps1)
   - [Test-KbFullSnapshot.example.ps1](examples/Test-KbFullSnapshot.example.ps1)
   - [Query-KbIntelligence.example.ps1](examples/Query-KbIntelligence.example.ps1)
-  - [Update-KbIntelligenceIndex.example.ps1](examples/Update-KbIntelligenceIndex.example.ps1)
+  - [Rebuild-KbIntelligenceIndex.example.ps1](examples/Rebuild-KbIntelligenceIndex.example.ps1)
   - [Notify-TaskComplete.example.ps1](examples/Notify-TaskComplete.example.ps1)
   - [Test-KbGate.example.ps1](examples/Test-KbGate.example.ps1)
   - [Get-KbMetadata.example.ps1](examples/Get-KbMetadata.example.ps1)
@@ -206,11 +206,11 @@ Do NOT use this skill for:
 
 ## GATE DE COMPATIBILIDADE OPERACIONAL
 
-Antes de trabalho substantivo em uma pasta paralela da KB que declare uso de `KbIntelligence`, validar tres camadas:
+Antes de trabalho substantivo em uma pasta paralela da KB que declare uso de `KbIntelligence`, validar tres camadas na ordem exata executada pelo `Test-*KbGate.ps1`:
 
-- Estrutura: pastas funcionais esperadas, `README.md`, `AGENTS.md`, `kb-source-metadata.md`, `ObjetosDaKbEmXml` e `KbIntelligence`.
-- Wrappers: scripts locais mínimos em `scripts`, incluindo consulta do indice com suporte a `index-metadata`, regeneracao/validacao do indice e materializacao XPZ/XML com refresh compulsorio do indice.
-- Frescor: `last_index_build_run_at` obtido pelo wrapper local de consulta deve ser igual ou posterior a `last_xpz_materialization_run_at`, lido nominalmente em `kb-source-metadata.md`.
+1. Estrutura (primeira camada, executada via `Test-*KbStructure.ps1`): pastas funcionais esperadas, `README.md`, `AGENTS.md`, `kb-source-metadata.md`, `ObjetosDaKbEmXml`, `KbIntelligence` e scripts minimos com os nomes corretos. Se `Test-KbStructure` retornar qualquer coisa diferente de `STRUCTURE_OK`, o gate bloqueia imediatamente — nao avancar para camadas internas.
+2. Wrappers: scripts locais funcionais em `scripts`, incluindo consulta do indice com suporte a `index-metadata`, regeneracao/validacao do indice com `-FailOnValidationFailure` e materializacao XPZ/XML com refresh compulsorio do indice.
+3. Frescor: `last_index_build_run_at` obtido pelo wrapper local de consulta deve ser igual ou posterior a `last_xpz_materialization_run_at`, lido nominalmente em `kb-source-metadata.md`.
 
 Executar o gate em ordem sequencial e parar no primeiro bloqueio. Nao investigar camadas internas enquanto a camada externa estiver invalida; no maximo, mencionar que outras verificacoes podem ser necessarias depois da primeira correcao.
 
@@ -301,7 +301,17 @@ Nao usar `setup concluido`, `estrutura pronta` ou expressao equivalente sem dize
 
 8.e Para `.claude\settings.json` existente: ler entradas presentes e inserir apenas os padroes que ainda nao constarem; nao remover nem sobrescrever entradas ja existentes
 
-8.f Ao concluir o bloco de atualizacao, declarar o estado `wrappers_atualizados` e listar explicitamente: scripts adicionados, scripts mantidos (EQUIVALENTES), scripts substituidos com aprovacao e scripts pulados
+8.f Para cada script local cujo papel corresponde a um exemplo canonico da base metodologica: verificar se o prefixo verbal do nome local coincide com o do exemplo atual. Se o exemplo canonico mudou de prefixo em relacao a versao anterior da base (ex: o exemplo passou de `Update-KbIntelligenceIndex` para `Rebuild-KbIntelligenceIndex`), o nome local deve ser alinhado ao padrao atual. Esse caso especifico deve ser tratado mesmo quando o conteudo do script ja foi corrigido e esta funcional:
+    - O agente deve detectar a divergencia de prefixo verbal e evidencia-la ao usuario de forma objetiva (ex: local `Update-FabricaBrasilKbIntelligenceIndex.ps1` vs exemplo canonico `Rebuild-KbIntelligenceIndex.example.ps1`)
+    - Oferecer renome do script local para refletir o prefixo canonico (ex: `Rebuild-FabricaBrasilKbIntelligenceIndex.ps1`)
+    - Apos renomear, atualizar referencias ao nome antigo nos demais scripts locais:
+      - `Update-KbFromXpz.ps1` (ou equivalente local) → ajustar o default de `IndexUpdateScriptPath` e qualquer mencao ao nome antigo
+      - `Test-KbStructure.ps1` (ou equivalente local) → ajustar a lista de scripts esperados para usar o nome novo
+      - `Test-KbGate.ps1` → se referenciar o nome antigo, ajustar
+    - Atualizar entradas correspondentes em `.claude\settings.json` (remover entrada antiga, adicionar entrada nova)
+    - Aguardar aprovacao explicita do usuario antes de renomear ou alterar qualquer script por este motivo
+
+8.g Ao concluir o bloco de atualizacao, declarar o estado `wrappers_atualizados` e listar explicitamente: scripts adicionados, scripts mantidos (EQUIVALENTES), scripts substituidos com aprovacao e scripts pulados. Atualizar o campo de estado operacional no `AGENTS.md` local da pasta paralela para refletir o que realmente foi concluido (ex: `wrappers_atualizados`, `bootstrap_incompleto`). Nao manter declaracao de estado anterior desatualizada — se o `AGENTS.md` dizia `materializado_e_indice_validado` mas o gate script nao existia e acabou de ser criado, o estado deve ser atualizado para `wrappers_atualizados`. Um `AGENTS.md` com estado desatualizado serve como argumento falso para agentes burlarem o gate.
 
 --- FIM DO BLOCO DE ATUALIZACAO ---
 
@@ -374,7 +384,7 @@ PastaParalelaDaKb/
     Update-KbFromXpz.ps1
     Test-KbFullSnapshot.ps1
     Query-KbIntelligence.ps1
-    Update-KbIntelligenceIndex.ps1
+    Rebuild-KbIntelligenceIndex.ps1
     Test-KbGate.ps1
     Get-KbMetadata.ps1
     Test-KbStructure.ps1
@@ -426,3 +436,5 @@ PastaParalelaDaKb/
 - NUNCA assumir `modo_criacao` em pasta com historico real, qualquer que seja o pedido do usuario
 - NUNCA oferecer recriacao do zero como opcao em pasta com historico real; `modo_atualizacao` e o unico caminho disponivel
 - NUNCA, quando o wrapper de regeneracao do indice falhar com "file not found" em um `$ValidationCasesPath` default, tratar isso como ausencia de casos de validacao nem propor workarounds como passar `-ValidationCasesPath ""` ou apontar para casos de outra KB; tratar como default hardcoded quebrado no wrapper (classificacao `CUSTOMIZADO`), evidenciar a divergencia ao usuario e oferecer correcao via esta skill (remover ou corrigir o default para que o parametro fique opcional sem valor fixo)
+- NUNCA ignorar divergencia de prefixo verbal entre o nome do script local e o exemplo canonico correspondente quando o exemplo mudou de nome em relacao a versao anterior da base (ex: `Update-` → `Rebuild-`). Corrigir o conteudo sem alinhar o nome mascara a divergencia do `Test-KbStructure` e deixa a pasta paralela com nome defasado invisivel para o gate
+- NUNCA tratar declaracao de estado em `AGENTS.md` local (ex: `materializado_e_indice_validado`) como verdade absoluta quando a inspecao objetiva da pasta paralela mostrar scripts ausentes, wrappers defasados ou gate quebrado. O `AGENTS.md` e memoria auxiliar e pode estar desatualizado; a evidencia estrutural (presenca/ausencia de scripts, resultado do gate) prevalece sobre declaracao de estado. Ao concluir qualquer atualizacao, atualizar o estado no `AGENTS.md` para refletir a realidade.

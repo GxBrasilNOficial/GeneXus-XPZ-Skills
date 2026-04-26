@@ -56,7 +56,7 @@ Eles nao substituem o acervo XML em `ObjetosDaKbEmXml` e nao provam comportament
 ## Gerar indice
 
 ```powershell
-.\scripts\New-KbIntelligenceIndex.ps1 `
+.\scripts\Build-KbIntelligenceIndex.ps1 `
   -SourceRoot "C:\KB\KBExemplo\ObjetosDaKbEmXml" `
   -OutputPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite" `
   -ValidationReportPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence-validation.json" `
@@ -69,7 +69,7 @@ Para outra KB, troque `-SourceRoot`, `-OutputPath` e, se aplicavel, `-Validation
 Para validar os incrementos aprovados da Fase 2 em `KBExemplo`, use:
 
 ```powershell
-.\scripts\New-KbIntelligenceIndex.ps1 `
+.\scripts\Build-KbIntelligenceIndex.ps1 `
   -SourceRoot "C:\KB\KBExemplo\ObjetosDaKbEmXml" `
   -OutputPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite" `
   -ValidationReportPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence-validation.json" `
@@ -108,6 +108,19 @@ Para ler os metadados do indice pelo wrapper:
 Se `index-metadata` falhar, retornar vazio ou nao expor `last_index_build_run_at`, trate o indice como legado/incompativel ou sem metadado valido. Nao siga para triagem substantiva, pesquisa ampla, caminho pontual deduzido em `ObjetosDaKbEmXml`, leitura de XML oficial de objeto ou geracao de objetos; ofereca regeneracao/validacao do indice ao usuario.
 
 Quando a validacao de frescor for parte relevante da resposta ou handoff, registre a decisao de forma curta. Em caso apto, informe `last_index_build_run_at >= last_xpz_materialization_run_at`; em caso bloqueado, informe o campo/capacidade ausente ou qual timestamp ficou defasado.
+
+## Schema e versionamento
+
+O indice armazena `schema_version` na tabela `metadata`. O valor atual e `"1"`.
+
+O design e deliberado: o indice e artefato derivado e sempre regeneravel. Por isso nao existe caminho de migracao de schema — qualquer mudanca estrutural no motor exige rebuild completo.
+
+Consequencias operacionais:
+
+- todo indice gerado antes da introducao de `schema_version` e tratado automaticamente como incompativel e bloqueia qualquer consulta com mensagem explicita de rebuild
+- quando o motor evoluir para schema `"2"`, todo indice `"1"` bloqueia da mesma forma — comportamento esperado, nao bug
+- o erro de schema version e detectado pelo proprio `Query-KbIntelligenceIndex.py` antes de qualquer query, incluindo `index-metadata`; portanto o gate `Test-*KbGate.ps1` tambem falha com `BLOCK:` em indices incompativeis
+- a resposta correta a qualquer bloqueio por schema e rebuild via `Build-KbIntelligenceIndex.ps1`, nunca contorno por leitura direta do SQLite ou dos XMLs
 
 ## Triagem exploratoria no PowerShell
 
@@ -302,7 +315,7 @@ Os casos da Fase 4 conferem inventario de objetos e comportamento conservador de
 Depois de regenerar o indice, valide a resolucao semantica aprovada com:
 
 ```powershell
-.\scripts\New-KbIntelligenceIndex.ps1 `
+.\scripts\Build-KbIntelligenceIndex.ps1 `
   -SourceRoot "C:\KB\KBExemplo\ObjetosDaKbEmXml" `
   -OutputPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite" `
   -ValidationReportPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence-validation.json" `
@@ -328,7 +341,7 @@ Depois de localizar ou regenerar o indice canonico, valide `functional-trace-bas
 
 Os casos da Fase 6 conferem apenas a montagem da trilha funcional basica. Eles nao provam comportamento runtime nem substituem leitura do XML oficial.
 
-Como os casos da Fase 6 validam consultas e trazem `query`, eles pertencem ao executor `Test-KbIntelligenceQueries.ps1`, nao ao fluxo de regeneracao via `New-KbIntelligenceIndex.ps1`.
+Como os casos da Fase 6 validam consultas e trazem `query`, eles pertencem ao executor `Test-KbIntelligenceQueries.ps1`, nao ao fluxo de regeneracao via `Build-KbIntelligenceIndex.ps1`.
 
 ## Saidas
 

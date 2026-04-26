@@ -1,21 +1,25 @@
 #requires -version 5.1
 <#
 .SYNOPSIS
-Wrapper local sanitizado para executar o gate de frescor do indice derivado da KB.
+Wrapper local sanitizado para executar o gate de compatibilidade da pasta paralela.
 
 .DESCRIPTION
-Verifica sequencialmente: pasta KbIntelligence, kb-intelligence.sqlite, wrapper
-local de consulta, metadado de build do indice via index-metadata,
-kb-source-metadata.md e campo last_xpz_materialization_run_at. Compara timestamps
-e retorna GATE_OK em stdout quando o indice esta apto, ou lanca excecao com
-BLOCK: <motivo> quando nao esta.
+Verifica sequencialmente: estrutura da pasta paralela via Test-*KbStructure.ps1,
+pasta KbIntelligence, kb-intelligence.sqlite, wrapper local de consulta,
+metadado de build do indice via index-metadata, kb-source-metadata.md e campo
+last_xpz_materialization_run_at. Compara timestamps e retorna GATE_OK em stdout
+quando o indice esta apto, ou lanca excecao com BLOCK: <motivo> quando nao esta.
 
-Deve ser o unico ponto de execucao do gate de frescor da pasta paralela da KB.
-Dependencia: Query-KbIntelligence.ps1 na mesma pasta.
+Deve ser o unico ponto de execucao do gate da pasta paralela da KB.
+Dependencias: Query-KbIntelligence.ps1 e Test-KbStructure.ps1 na mesma pasta.
 
 .PARAMETER QueryWrapperPath
 Caminho opcional para o wrapper local de consulta do indice.
 Quando omitido, usa Query-KbIntelligence.ps1 na mesma pasta deste script.
+
+.PARAMETER StructureWrapperPath
+Caminho opcional para o wrapper local de verificacao de estrutura.
+Quando omitido, usa Test-KbStructure.ps1 na mesma pasta deste script.
 
 .EXAMPLE
 .\Test-KbGate.ps1
@@ -25,7 +29,8 @@ Quando omitido, usa Query-KbIntelligence.ps1 na mesma pasta deste script.
 #>
 
 param(
-    [string]$QueryWrapperPath
+    [string]$QueryWrapperPath,
+    [string]$StructureWrapperPath
 )
 
 Set-StrictMode -Version Latest
@@ -38,6 +43,19 @@ $sourceMetadata = Join-Path $repoRoot 'kb-source-metadata.md'
 
 if (-not $QueryWrapperPath) {
     $QueryWrapperPath = Join-Path $PSScriptRoot 'Query-KbIntelligence.ps1'
+}
+
+if (-not $StructureWrapperPath) {
+    $StructureWrapperPath = Join-Path $PSScriptRoot 'Test-KbStructure.ps1'
+}
+
+if (-not (Test-Path -LiteralPath $StructureWrapperPath -PathType Leaf)) {
+    throw 'BLOCK: wrapper local de estrutura ausente'
+}
+$structureOutput = & $StructureWrapperPath
+$structureText = ($structureOutput | Out-String)
+if ($LASTEXITCODE -ne 0 -or $structureText -notmatch 'STRUCTURE_OK') {
+    throw "BLOCK: estrutura da pasta paralela falhou: $($structureText.Trim())"
 }
 
 if (-not (Test-Path -LiteralPath $indexDir -PathType Container)) {

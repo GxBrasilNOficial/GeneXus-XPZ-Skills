@@ -108,7 +108,7 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 - se a mudanca exigir semantica GeneXus, o agente deve abrir o XML oficial e revisar o trecho relevante antes de concluir
 - quando a pergunta for funcional e a trilha estiver na Fase 6, o agente deve usar o indice apenas para orientar a ordem de leitura, separando explicitamente `Evidencia direta`, `Leitura adicional do XML`, `Inferencia forte` e `Hipotese`
 - ao validar artefatos do KB Intelligence, escolher o executor pelo formato do caso, nao pelo nome da fase:
-  - casos com `source`, `target` e `expected_rule` pertencem a validacao de extracao/geracao e devem rodar com `New-KbIntelligenceIndex.ps1 -ValidationCasesPath`
+  - casos com `source`, `target` e `expected_rule` pertencem a validacao de extracao/geracao e devem rodar com `Build-KbIntelligenceIndex.ps1 -ValidationCasesPath`
   - casos com `query` pertencem a validacao de consulta e devem rodar com `Test-KbIntelligenceQueries.ps1 -ValidationCasesPath`
 - se um caso de relacao com `expected_rule` for enviado ao validador de consultas, tratar o erro como uso de executor incompatível antes de concluir regressao real
 

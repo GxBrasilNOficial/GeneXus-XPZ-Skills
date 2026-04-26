@@ -1,11 +1,12 @@
 #requires -version 5.1
 <#
 .SYNOPSIS
-Wrapper local sanitizado para regenerar o indice derivado da KB.
+Wrapper local sanitizado para rebuild completo do indice derivado da KB.
 
 .DESCRIPTION
-Usa os caminhos padrao da pasta paralela da KB e delega a geracao e validacao
-ao motor compartilhado desta base metodologica.
+Destroi e recria o SQLite do zero a partir de ObjetosDaKbEmXml, delegando a
+construcao e validacao ao motor compartilhado desta base metodologica.
+Nao existe modo incremental — a cada execucao e um rebuild completo.
 
 .PARAMETER SourceRoot
 Raiz opcional do snapshot XML oficial da KB.
@@ -27,10 +28,10 @@ Raiz local da base compartilhada `GeneXus-XPZ-Skills`. Use este parametro quando
 o wrapper sanitizado for adaptado para um ambiente com outro caminho local.
 
 .EXAMPLE
-.\Update-KbIntelligenceIndex.ps1 -FailOnValidationFailure
+.\Rebuild-KbIntelligenceIndex.ps1 -FailOnValidationFailure
 
 .EXAMPLE
-.\Update-KbIntelligenceIndex.ps1 -ValidationCasesPath "C:\CAMINHO\PARA\casos-validacao.json" -FailOnValidationFailure
+.\Rebuild-KbIntelligenceIndex.ps1 -ValidationCasesPath "C:\CAMINHO\PARA\casos-validacao.json" -FailOnValidationFailure
 #>
 
 param(
@@ -51,7 +52,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$enginePath = Join-Path $SharedSkillsRoot "scripts\New-KbIntelligenceIndex.ps1"
+$enginePath = Join-Path $SharedSkillsRoot "scripts\Build-KbIntelligenceIndex.ps1"
 
 if (-not $SourceRoot) {
     $SourceRoot = Join-Path $repoRoot "ObjetosDaKbEmXml"

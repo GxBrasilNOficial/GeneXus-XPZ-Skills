@@ -4,6 +4,7 @@ Build a minimal GeneXus KB intelligence SQLite index.
 
 Current scope:
 - object inventory for every immediate SourceRoot type folder with XML files
+- object identity via guid extracted from XML
 - Source relations among Procedure, WebPanel and DataProvider
 - WorkWithForWeb action gxobject links to Procedure and WebPanel
 - WorkWithForWeb condition expressions to Procedure
@@ -38,6 +39,7 @@ from typing import Iterable
 SOURCE_RE = re.compile(r"<Source(?:\s[^>]*)?>(?P<body>.*?)</Source>", re.IGNORECASE | re.DOTALL)
 CDATA_RE = re.compile(r"^\s*<!\[CDATA\[(?P<body>.*)\]\]>\s*$", re.DOTALL)
 LAST_UPDATE_RE = re.compile(r'\blastUpdate="([^"]+)"')
+GUID_RE = re.compile(r'\bguid="([^"]+)"')
 PROCEDURE_DIRECT_RE = re.compile(r"\b(?P<name>proc[A-Za-z_][A-Za-z0-9_]*)\s*\(", re.IGNORECASE)
 PROCEDURE_DOT_CALL_RE = re.compile(r"\b(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*\.\s*Call\s*\(", re.IGNORECASE)
 WEBPANEL_DOT_LINK_RE = re.compile(r"\b(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*\.\s*Link\s*\(", re.IGNORECASE)
@@ -108,6 +110,7 @@ class SourceBlock:
 class ObjectInfo:
     object_type: str
     name: str
+    guid: str | None
     path: Path
     rel_path: str
     last_update: str | None
@@ -151,11 +154,13 @@ def collect_objects(source_root: Path, object_type: str) -> dict[str, ObjectInfo
     for path in sorted(folder.glob("*.xml")):
         text = read_text(path)
         last_update_match = LAST_UPDATE_RE.search(text)
+        guid_match = GUID_RE.search(text)
         rel_path = path.relative_to(source_root).as_posix()
         name = path.stem
         objects[name] = ObjectInfo(
             object_type=object_type,
             name=name,
+            guid=guid_match.group(1) if guid_match else None,
             path=path,
             rel_path=rel_path,
             last_update=last_update_match.group(1) if last_update_match else None,
@@ -1320,6 +1325,7 @@ def create_schema(conn: sqlite3.Connection) -> None:
             object_id INTEGER PRIMARY KEY AUTOINCREMENT,
             type TEXT NOT NULL,
             name TEXT NOT NULL,
+            guid TEXT,
             file_path TEXT NOT NULL,
             last_update TEXT,
             file_hash TEXT NOT NULL,
@@ -1374,17 +1380,18 @@ def write_index(
             [
                 ("last_index_build_run_at", index_build_run_at),
                 ("source_root", str(source_root)),
-                ("scope", "Procedure,WebPanel,DataProvider,WorkWithForWeb,Transaction"),
+                ("schema_version", "1"),
+                ("scope", ",".join(sorted(set(obj.object_type for obj in objects)))),
             ],
         )
 
         for obj in objects:
             conn.execute(
                 """
-                INSERT INTO objects(type, name, file_path, last_update, file_hash)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO objects(type, name, guid, file_path, last_update, file_hash)
+                VALUES (?, ?, ?, ?, ?, ?)
                 """,
-                (obj.object_type, obj.name, obj.rel_path, obj.last_update, obj.file_hash),
+                (obj.object_type, obj.name, obj.guid, obj.rel_path, obj.last_update, obj.file_hash),
             )
 
         object_ids = {

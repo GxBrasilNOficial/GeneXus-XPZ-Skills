@@ -9,6 +9,35 @@ import sqlite3
 from pathlib import Path
 
 
+EXPECTED_SCHEMA_VERSION = "1"
+
+
+def validate_schema_version(conn: sqlite3.Connection) -> None:
+    row = conn.execute(
+        "SELECT value FROM metadata WHERE key = 'schema_version'"
+    ).fetchone()
+    if row is None:
+        raise SystemExit(
+            "Index schema version not found in metadata. "
+            "This index was built by an older engine that predates schema versioning. "
+            "Rebuild the index with Build-KbIntelligenceIndex before querying."
+        )
+    index_version = row[0]
+    if index_version != EXPECTED_SCHEMA_VERSION:
+        raise SystemExit(
+            f"Index schema version mismatch: index has {index_version}, "
+            f"engine expects {EXPECTED_SCHEMA_VERSION}. "
+            "Rebuild the index before querying."
+        )
+    cursor = conn.execute("PRAGMA table_info(objects)")
+    columns = {row[1] for row in cursor.fetchall()}
+    if "guid" not in columns:
+        raise SystemExit(
+            "Index schema is missing required column 'guid' in objects table. "
+            "Rebuild the index with the current engine before querying."
+        )
+
+
 def row_to_dict(cursor: sqlite3.Cursor, row: sqlite3.Row) -> dict[str, object]:
     return {description[0]: row[index] for index, description in enumerate(cursor.description)}
 
@@ -60,7 +89,7 @@ def object_info(conn: sqlite3.Connection, object_type: str, object_name: str) ->
     obj = fetch_one(
         conn,
         """
-        SELECT object_id, type, name, file_path, last_update, file_hash
+        SELECT object_id, type, name, guid, file_path, last_update, file_hash
         FROM objects
         WHERE type = ? AND LOWER(name) = LOWER(?)
         """,
@@ -106,7 +135,7 @@ def search_objects(conn: sqlite3.Connection, object_name: str, object_type: str 
     rows = fetch_all(
         conn,
         f"""
-        SELECT type, name, file_path, last_update
+        SELECT type, name, guid, file_path, last_update
         FROM objects
         WHERE name LIKE ? {type_clause}
         ORDER BY type, name
@@ -434,6 +463,7 @@ def format_text(result: dict[str, object]) -> str:
             lines.append(str(query))
 
     if query == "object-info" and isinstance(obj, dict):
+        lines.append(f"guid: {obj.get('guid')}")
         lines.append(f"file: {obj.get('file_path')}")
         lines.append(f"last_update: {obj.get('last_update')}")
         lines.append(f"incoming_relations: {result.get('incoming_relations', 0)}")
@@ -441,6 +471,7 @@ def format_text(result: dict[str, object]) -> str:
         return "\n".join(lines)
 
     if query == "impact-basic" and isinstance(obj, dict):
+        lines.append(f"guid: {obj.get('guid')}")
         lines.append(f"file: {obj.get('file_path')}")
         lines.append(f"last_update: {obj.get('last_update')}")
         lines.append(f"incoming_relations: {result.get('incoming_relations', 0)}")
@@ -471,6 +502,7 @@ def format_text(result: dict[str, object]) -> str:
         return "\n".join(lines)
 
     if query == "functional-trace-basic" and isinstance(obj, dict):
+        lines.append(f"guid: {obj.get('guid')}")
         lines.append(f"file: {obj.get('file_path')}")
         lines.append(f"last_update: {obj.get('last_update')}")
         lines.append(f"incoming_relations: {result.get('incoming_relations', 0)}")
@@ -521,7 +553,7 @@ def format_text(result: dict[str, object]) -> str:
             continue
         if query == "search-objects":
             lines.append(f"- {row.get('type')}:{row.get('name')}")
-            lines.append(f"  {row.get('file_path')} last_update={row.get('last_update')}")
+            lines.append(f"  guid={row.get('guid')} {row.get('file_path')} last_update={row.get('last_update')}")
             continue
         source = f"{row.get('source_type')}:{row.get('source_name')}"
         target = f"{row.get('target_type')}:{row.get('target_name')}"
@@ -573,6 +605,7 @@ def main() -> int:
 
     conn = sqlite3.connect(args.index_path)
     try:
+        validate_schema_version(conn)
         if args.query == "index-metadata":
             result = index_metadata(conn)
         elif args.query == "object-info":

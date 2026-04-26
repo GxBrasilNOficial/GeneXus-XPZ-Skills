@@ -701,7 +701,7 @@ Cada incremento da Fase 5 so deve ser considerado pronto quando:
 
 ## Artefatos esperados por incremento
 
-- atualizacao de `scripts/New-KbIntelligenceIndex.py`
+- atualizacao de `scripts/Build-KbIntelligenceIndex.py`
 - casos de validacao pequenos do incremento
 - atualizacao de `scripts/README-kb-intelligence.md`
 - registro historico de encerramento do incremento ou da fase
