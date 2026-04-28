@@ -96,6 +96,9 @@ If the main need is to prepare or validate the initial folder structure around t
 - Do NOT generate `.xpz` as an extra artifact by default when `import_file.xml` already satisfies the intended manual IDE import flow
 - Name locally generated packages for IDE import using the preferred pattern `NomeCurto_GUID_YYYYMMDD_nn.import_file.xml`
 - In that package name, the front is identified only by the prefix `NomeCurto_GUID_YYYYMMDD`; `nn` is only the short package round for that front
+- Before writing `NomeCurto_GUID_YYYYMMDD_nn.import_file.xml`, check whether a package with the same front prefix `NomeCurto_GUID_YYYYMMDD` and the same `nn` already exists in `PacotesGeradosParaImportacaoNaKbNoGenexus`
+- If the same front prefix and the same `nn` already exist, abort the write; do NOT silently overwrite that round
+- When there is an `nn` collision, return an explicit error with the next free `nn` suggested for that front, but do NOT auto-increment or write automatically with the suggested value
 - Keep `PacotesGeradosParaImportacaoNaKbNoGenexus` flat, without subfolders by front
 - Classify each active XML root as `Object`, `Attribute`, or unsupported before serializing the package
 - For a new `Transaction` package, treat top-level `Attribute` items referenced by the `Level` as mandatory package members under `<Attributes>`, never as `Domain`/object payload under `<Objects>`
@@ -284,6 +287,9 @@ Reference files and when to load them:
    - `NomeCurto` must be short, human-readable, and semantically strong
    - `GUID` and `YYYYMMDD` identify the front opening, not the package generation instant
    - `nn` is only the short incremental round counter for that front, not semantic versioning
+   - Before writing the package, check whether the same front prefix `NomeCurto_GUID_YYYYMMDD` already has the same `nn` in `PacotesGeradosParaImportacaoNaKbNoGenexus`
+   - If the same front prefix already has that `nn`, **ABORT** instead of overwriting the existing file
+   - In that collision case, report the next free `nn` suggestion, but do NOT auto-increment or silently save under the suggested value
    - Do NOT default to name-only, date-only/time-only, excessively long conversation descriptions, or always overwriting the same package name
    - Produce or validate a manifest in the conversation containing at minimum: batch front or short description, batch origin, total XML count, `Objects` count, `Attributes` count, included files list or summary, `lastUpdate` applied or preserved, generated package, superseded package when present, and risk/pending notes
    - Save that manifest as a file only when there is an incident involving `ObjetosDaKbEmXml`, package supersession that needs local traceability, explicit user request, or real need for future handoff outside the immediate conversation
@@ -447,6 +453,8 @@ Ao clonar tela customizada WorkWithPlus:
 - [ ] For `Transaction`, no required `Attribute` was serialized as `Domain` or other object type under `<Objects>`
 - [ ] UTF-8 BOM hygiene was checked on every active XML
 - [ ] Generated package name followed the preferred `NomeCurto_GUID_YYYYMMDD_nn.import_file.xml` pattern when applicable
+- [ ] Package write was blocked if the same front prefix already had the same `nn`
+- [ ] Any `nn` collision returned an explicit next-free-round suggestion without auto-incrementing or silent overwrite
 - [ ] Batch manifest was produced or validated before packaging, by default in the conversation
 - [ ] Any superseded package was either renamed with prefix `OBSOLETO_` or recorded in a structured manifest in the conversation before continuing
 - [ ] Manifest file was created only when there was a concrete operational reason

@@ -231,6 +231,9 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
 - `Regra operacional`: nome de pacote local gerado para importacao na IDE deve priorizar clareza humana e separacao de frentes paralelas, preferindo o padrao `NomeCurto_GUID_YYYYMMDD_nn.import_file.xml`.
 - `Regra operacional`: nesse padrao, `NomeCurto` e uma descricao curta, legivel e semanticamente forte da frente; `GUID` e o identificador aberto para aquela frente; `YYYYMMDD` e a data de abertura da frente; `nn` e apenas o contador curto e incremental da rodada daquela frente.
 - `Regra operacional`: `nn` nao representa versao semantica profunda nem historico de release; ele representa somente o candidato curto daquela frente.
+- `Regra operacional`: antes de gravar `NomeCurto_GUID_YYYYMMDD_nn.import_file.xml` em `PacotesGeradosParaImportacaoNaKbNoGenexus`, verificar se ja existe arquivo com o mesmo prefixo de frente `NomeCurto_GUID_YYYYMMDD` e o mesmo `nn`.
+- `Regra operacional`: se ja existir pacote com o mesmo prefixo de frente e o mesmo `nn`, abortar a gravacao; nao sobrescrever silenciosamente a rodada.
+- `Regra operacional`: quando houver colisao de `nn`, retornar erro explicito com sugestao do proximo `nn` livre para aquela frente, mas sem autoincrementar nem gravar automaticamente com o valor sugerido.
 - `Regra operacional`: nao usar como padrao nome so com assunto, nome so com data ou hora, descricao excessivamente longa da conversa ou sobrescrita recorrente do mesmo nome de pacote.
 - `Regra operacional`: se um pacote anterior perder validade por mudanca de direcao da frente, ele deve ser marcado como provisório ou obsoleto e deixar de ser tratado como candidato principal.
 

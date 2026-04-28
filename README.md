@@ -115,6 +115,9 @@ Se você quer entender a base rapidamente:
 - `NomeCurto_GUID_YYYYMMDD` identifica a frente pela combinacao de nome curto, GUID gerado na abertura da frente e data de criacao da frente; `YYYYMMDD` representa a data de criacao da frente, nao a data do pacote
 - em `PacotesGeradosParaImportacaoNaKbNoGenexus`, os pacotes devem permanecer na raiz, sem subpastas, usando o formato `NomeCurto_GUID_YYYYMMDD_nn.import_file.xml`
 - `nn` representa apenas a rodada curta de pacote daquela frente; nao representa versao semantica
+- antes de gravar `NomeCurto_GUID_YYYYMMDD_nn.import_file.xml`, verificar se ja existe pacote com o mesmo prefixo de frente `NomeCurto_GUID_YYYYMMDD` e o mesmo `nn`
+- se ja existir pacote com o mesmo prefixo de frente e o mesmo `nn`, abortar a gravacao; nao sobrescrever silenciosamente a rodada
+- em caso de colisao, retornar erro explicito com sugestao do proximo `nn` livre para aquela frente, sem autoincrementar nem gravar automaticamente com o valor sugerido
 - a promoção para `ObjetosDaKbEmXml` ocorre apenas pelo fluxo oficial do script `.ps1` alimentado por `XPZ` exportado pela IDE
 - `ObjetosDaKbEmXml` nao deve ser atualizado por edição manual; ele e atualizado pelo fluxo do `.ps1` a partir dos `XPZ` disponibilizados na pasta paralela da KB
 - se o objeto ainda nao voltou da KB por export oficial, o trabalho deve acontecer em `ObjetosGeradosParaImportacaoNaKbNoGenexus`
@@ -287,6 +290,9 @@ Si quieres entender la base rápidamente:
 - `NomeCurto_GUID_YYYYMMDD` identifica la frente por la combinación de nombre corto, GUID generado al abrir la frente y fecha de creación de la frente
 - en `PacotesGeradosParaImportacaoNaKbNoGenexus`, los paquetes deben permanecer en la raíz, sin subcarpetas, usando el formato `NomeCurto_GUID_YYYYMMDD_nn.import_file.xml`
 - `nn` representa solo la ronda corta del paquete en esa frente; no representa versión semántica
+- antes de grabar `NomeCurto_GUID_YYYYMMDD_nn.import_file.xml`, verificar si ya existe un paquete con el mismo prefijo de frente `NomeCurto_GUID_YYYYMMDD` y el mismo `nn`
+- si ya existe un paquete con el mismo prefijo de frente y el mismo `nn`, abortar la grabación; no sobrescribir silenciosamente la ronda
+- en caso de colisión, devolver un error explícito con sugerencia del próximo `nn` libre para esa frente, sin autoincrementar ni grabar automáticamente con el valor sugerido
 - la promoción hacia `ObjetosDaKbEmXml` ocurre solo por el flujo oficial del script `.ps1` alimentado por el `XPZ` exportado por la IDE
 - `ObjetosDaKbEmXml` no debe actualizarse por edición manual; se actualiza por el flujo del `.ps1` a partir de los `XPZ` disponibilizados en la carpeta paralela de la KB
 - si el objeto todavía no volvió de la KB por export oficial, el trabajo debe ocurrir en `ObjetosGeradosParaImportacaoNaKbNoGenexus`
@@ -459,6 +465,9 @@ If you want to understand the repository quickly:
 - `NomeCurto_GUID_YYYYMMDD` identifies the front by the combination of short name, GUID generated when the front is opened, and the front creation date
 - in `PacotesGeradosParaImportacaoNaKbNoGenexus`, packages must remain in the root, without subfolders, using the format `NomeCurto_GUID_YYYYMMDD_nn.import_file.xml`
 - `nn` represents only the short package round for that front; it is not semantic versioning
+- before writing `NomeCurto_GUID_YYYYMMDD_nn.import_file.xml`, check whether a package with the same front prefix `NomeCurto_GUID_YYYYMMDD` and the same `nn` already exists
+- if a package with the same front prefix and the same `nn` already exists, abort the write; do not silently overwrite that round
+- in case of collision, return an explicit error with the next free `nn` suggested for that front, without auto-incrementing or writing automatically with the suggested value
 - promotion into `ObjetosDaKbEmXml` happens only through the official `.ps1` script flow fed by the XPZ exported from the IDE
 - `ObjetosDaKbEmXml` must not be updated by manual editing; it is updated by the `.ps1` flow from the XPZ files made available in the KB parallel folder
 - if the object has not yet returned from the KB by official export, the work must happen in `ObjetosGeradosParaImportacaoNaKbNoGenexus`
