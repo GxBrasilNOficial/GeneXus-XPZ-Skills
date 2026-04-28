@@ -144,7 +144,7 @@ if (Test-Path -LiteralPath $acervoPath -PathType Container) {
             $results.Add([pscustomobject]@{
                 Component = "ObjetosDaKbEmXml\$dirName"
                 Status    = 'NAMING_DIVERGENTE'
-                Path      = "tipo real: $canonicalType — renomear para '$canonicalType' via xpz-kb-parallel-setup"
+                Path      = "tipo real: $canonicalType; renomear para '$canonicalType' via xpz-kb-parallel-setup"
             })
             $namingDivergencias.Add("  $dirName -> $canonicalType")
         }
