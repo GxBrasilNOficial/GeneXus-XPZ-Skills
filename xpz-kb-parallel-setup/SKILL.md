@@ -32,6 +32,7 @@ Use esta skill para:
 - Preparar a pasta paralela da KB para uso de indice derivado em `KbIntelligence`
 - Atualizar wrappers de pasta paralela com historico de uso para incorporar novos scripts previstos pela base metodologica compartilhada
 - Detectar que o `AGENTS.md` da pasta paralela esta desatualizado em relacao ao padrao canonico atual — por exemplo, ausencia de secao `## Triagem Por Indice`, lista de wrappers incompleta ou outras secoes ausentes identificadas por comparacao com `examples/AGENTS.md.example`
+- Verificar se o naming dos diretorios de container em `ObjetosDaKbEmXml` corresponde ao GUID real de cada objeto — especialmente `Folder/`, `Module/` e `PackagedModule/` — e propor correcao quando houver inversao ou divergencia
 - Explicar a diferenca entre pasta da KB e pasta paralela da KB
 - Confirmar nomes padrao das subpastas quando o usuario nao informou alternativas
 
@@ -85,6 +86,7 @@ Do NOT use this skill for:
 - Exigir reuso da mesma subpasta quando a frente ja existir e estiver sendo retomada
 - Exigir que `PacotesGeradosParaImportacaoNaKbNoGenexus` permaneça plano, sem subpastas por frente
 - Explicar que novos `XPZ` completos podem ser usados a qualquer momento para reatualizar `ObjetosDaKbEmXml`
+- Quando acionado para revisar naming de `ObjetosDaKbEmXml` em pasta paralela existente, ler pelo menos um XML de cada diretorio de container (`Folder/`, `Module/`, `PackagedModule/`) e verificar o `Object/@type` real antes de qualquer conclusao sobre inversao ou conformidade
 - Distinguir Carga Inicial, atualizacao incremental e empacotamento local
 - Explicar que materializar um `XPZ` completo da IDE inclui quebrar o `full.xml` em XMLs individuais por objeto
 - Explicar que o acervo materializado deve ser organizado em subpastas por tipo amigavel de objeto GeneXus
@@ -351,6 +353,34 @@ Nao usar `setup concluido`, `estrutura pronta` ou expressao equivalente sem dize
 
 --- FIM DO BLOCO DE ATUALIZACAO ---
 
+--- BLOCO DE VERIFICACAO DE NAMING (executar quando solicitado ou ao suspeitar de inversao em ObjetosDaKbEmXml) ---
+
+8.i Identificar quais diretorios de container existem em `ObjetosDaKbEmXml`: tipicamente `Folder/`, `Module/` e `PackagedModule/`
+
+8.j Para cada diretorio de container presente, ler pelo menos um XML e extrair `Object/@type`:
+    - `Folder/` deve conter objetos com `Object/@type="00000000-0000-0000-0000-000000000008"` (Pasta/Módulo do usuario — "Module/Folder" na IDE)
+    - `Module/` deve conter objetos com `Object/@type="00000000-0000-0000-0000-000000000006"` (Pasta de sistema — Main Programs, ToBeDefined)
+    - `PackagedModule/` deve conter objetos com `Object/@type="c88fffcd-b6f8-0000-8fec-00b5497e2117"` (Modulo instalado)
+    - O GUID encontrado no XML e sempre a fonte autoritativa; o nome do diretorio e apenas uma convencao
+
+8.k Se o GUID encontrado nao corresponder ao esperado para aquele diretorio (ex: `Folder/` contendo `000...0006` ou `Module/` contendo `000...0008`), declarar a inversao explicitamente ao usuario: qual diretorio esta com qual GUID, qual deveria ser o nome correto segundo a convencao canonica, e qual foi a causa provavel da inversao quando conhecida
+
+8.l Antes de propor qualquer renome, verificar:
+    - Se o `AGENTS.md` local referencia os nomes de diretorio em risco de ser renomeados
+    - Se existe indice `KbIntelligence` que pode ter registrado os nomes atuais e precisara ser regenerado apos o renome
+
+8.m Propor a sequencia de renome segura e aguardar aprovacao explicita do usuario antes de qualquer escrita no disco:
+    1. Diretorio A → `_tmp_<nome>/` (nome temporario para evitar colisao)
+    2. Diretorio B → nome que era de A
+    3. `_tmp_<nome>/` → nome que era de B
+    - Nunca tentar renomear A diretamente para B quando B ja existe
+
+8.n Apos renome aprovado e executado:
+    - Atualizar referencias ao nome antigo no `AGENTS.md` local se houver
+    - Informar ao usuario que o indice `KbIntelligence`, se existente, deve ser regenerado antes de qualquer triagem — os registros internos do SQLite podem conter os nomes antigos
+
+--- FIM DO BLOCO DE VERIFICACAO DE NAMING ---
+
 9. Validar a existencia da estrutura nesta ordem:
    - `scripts`
    - `Temp`
@@ -451,6 +481,8 @@ PastaParalelaDaKb/
 
 ## CONSTRAINTS
 
+- NUNCA assumir que o nome do diretorio em `ObjetosDaKbEmXml` corresponde ao tipo GeneXus correto sem verificar `Object/@type` em pelo menos um XML daquele diretorio; o nome do diretorio e convencao local e pode estar invertido
+- NUNCA renomear diretorios de container em `ObjetosDaKbEmXml` sem aprovacao explicita do usuario e sem seguir a sequencia segura com nome temporario (A→tmp, B→A, tmp→B)
 - NUNCA confundir a pasta nativa da KB com a pasta paralela da KB
 - NUNCA gravar na pasta nativa da KB; essa pasta e somente leitura para agentes, salvo leitura operacional controlada quando realmente necessaria
 - NUNCA gravar manualmente em `ObjetosDaKbEmXml`
