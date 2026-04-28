@@ -102,6 +102,8 @@ Permitir escolha automatizavel de template interno real, reduzindo dependencia d
 - Inferencia forte: nomes textuais e alguns valores de propriedades recorrentes parecem mais editaveis do que o esqueleto interno.
 - Inferencia forte: devem ser preservados `parent`, `parentGuid`, marcadores de geracao e inventario completo de `Part`.
 - Hipotese: alterar esta familia longe do contexto `WorkWith` pode introduzir risco estrutural alto.
+- Evidencia direta (WWP): objetos WW panels gerados pelo padrao WorkWithPlus seguem a convencao `WW` + nome da Transaction (ex.: `WWCliente`); o campo `MasterPage` aponta tipicamente para `WWMasterPage`.
+- Inferencia forte (WWP): `WWPBaseObjects` e infraestrutura de suporte compartilhada do ecossistema WWP -- nao deve ser clonado nem modificado diretamente; sua presenca no `parent` ou nas dependencias e sinal de que o objeto e parte da familia gerada e de alto acoplamento.
 
 ### Uso pratico e clonagem
 
