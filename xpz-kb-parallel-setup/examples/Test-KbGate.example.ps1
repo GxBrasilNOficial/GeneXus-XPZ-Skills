@@ -52,8 +52,10 @@ if (-not $StructureWrapperPath) {
 if (-not (Test-Path -LiteralPath $StructureWrapperPath -PathType Leaf)) {
     throw 'BLOCK: wrapper local de estrutura ausente'
 }
-$structureOutput = & $StructureWrapperPath
-$structureText = ($structureOutput | Out-String)
+$structureOutput = & $StructureWrapperPath *>&1
+$structureText = ($structureOutput | Where-Object { $_ -is [string] } | Out-String)
+$structureWarnings = @($structureOutput | Where-Object { $_ -is [System.Management.Automation.WarningRecord] })
+foreach ($w in $structureWarnings) { Write-Warning $w.Message }
 if ((-not $?) -or $structureText -notmatch 'STRUCTURE_OK') {
     throw "BLOCK: estrutura da pasta paralela falhou: $($structureText.Trim())"
 }
