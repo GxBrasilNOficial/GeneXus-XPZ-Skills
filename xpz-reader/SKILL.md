@@ -98,9 +98,9 @@ Reference files and when to load them:
 
 1. Receive XML input or fragment from user
 2. If the task depends on locating files in a local KB parallel folder structure and that structure is still undefined, ambiguous, or unvalidated → **ABORT** and use `xpz-kb-parallel-setup` first
-3. Locate `Object/@type` attribute → use [01-base-empirica-geral](../01-base-empirica-geral.md) to route and cross-reference against [01a-catalogo-e-padroes-empiricos](../01a-catalogo-e-padroes-empiricos.md)
-4. Enumerate Part types present (`<Part type="...">`) → compare against observed frequencies in [01b-matriz-part-types-por-tipo](../01b-matriz-part-types-por-tipo.md) for that type
-5. Identify missing or unexpected Part types relative to the known structural pattern
+3. Locate `Object/@type` attribute → use [01-base-empirica-geral](../01-base-empirica-geral.md) to route and cross-reference against [01a-catalogo-e-padroes-empiricos](../01a-catalogo-e-padroes-empiricos.md); if the root element is `<Attribute>` (not `<Object>`), the type is `Attribute` — it uses a distinct envelope and has no `Object/@type`
+4. Check [01b-matriz-part-types-por-tipo](../01b-matriz-part-types-por-tipo.md) for the identified type: if 01b confirms the type uses no Parts (e.g. `ThemeClass`, `ThemeColor`, `Generator`, `DataStore`, `Module/Folder`), skip Part enumeration — absence of `<Part>` is expected for these types, not an anomaly; otherwise enumerate Part types present and compare against observed frequencies
+5. Identify missing or unexpected Part types relative to the known structural pattern — this step is not applicable for types confirmed in 01b as using no Parts
 6. Read container identity fields (`fullyQualifiedName`, `name`, `parent`, `parentGuid`, `parentType`, `moduleGuid`) and classify the container from `parentType` GUID — never from the directory name in `ObjetosDaKbEmXml`, which varies across KBs:
    - `00000000-0000-0000-0000-000000000008` → Module/Folder (user-created container)
    - `c88fffcd-b6f8-0000-8fec-00b5497e2117` → PackagedModule
@@ -132,7 +132,7 @@ Reference files and when to load them:
    - Container classification (`Folder`, `Module`, or unresolved)
    - Structural family (if applicable)
    - Risk level
-   - Part types: present / expected / missing
+   - Part types: present / expected / missing — or N/A if the type is confirmed in [01b] as using no Parts
    - For report `Procedure`, anomaly layer and escalation recommendation (`sanitized canonical template still fits` vs `escalate to comparable real XML`)
    - For report `Procedure`, basis used labeled as exactly one of: `molde sanitizado`, `XML real da KB atual`, `XML real de outra KB`, or `hipotese`
    - Identity fields: `fullyQualifiedName`, `name`, `parent`, `parentGuid`, `parentType`, `moduleGuid`
@@ -144,7 +144,7 @@ Reference files and when to load them:
 ## QUALITY CHECKLIST
 
 - [ ] `Object/@type` identified and mapped to known category
-- [ ] Part types enumerated and compared against corpus frequencies
+- [ ] Part types enumerated and compared against corpus frequencies — or confirmed N/A for types that use no Parts per [01b]
 - [ ] Any cited XML line has an explicit evidence role (`effective Source`, `Rules/parm`, `XML metadata`, `call in caller`, or `signature in callee`)
 - [ ] BC variables cited from XML metadata or `Source` were classified as simple or collection using `ATTCUSTOMTYPE` together with `AttCollection`
 - [ ] BC methods cited from `Source` were classified by family (`operation`, `status/message`, `serialization/copy`, or `collection`)
@@ -160,6 +160,7 @@ Reference files and when to load them:
 
 ## CONSTRAINTS
 
+- NEVER flag absence of `<Part>` as a structural anomaly for types confirmed in [01b-matriz-part-types-por-tipo](../01b-matriz-part-types-por-tipo.md) as using no Parts (`ThemeClass`, `ThemeColor`, `Generator`, `DataStore`, `Module/Folder`)
 - NEVER invent a Part type GUID not observed in the empirical corpus
 - NEVER promote a Hypothesis to Strong Inference without new direct evidence
 - NEVER affirm import or build success — structural analysis only
