@@ -152,7 +152,7 @@ operacional
 baixo
 
 ## Depende de
-02-regras-operacionais-e-runtime.md, 03-risco-e-decisao-por-tipo.md, 03-risco-e-decisao-por-tipo.md
+02-regras-operacionais-e-runtime.md, 03-risco-e-decisao-por-tipo.md
 
 ## Usado por
 02-regras-operacionais-e-runtime.md, 26-guia-para-agente-gpt.md, 04-genexus-open-points.md
@@ -161,6 +161,7 @@ baixo
 Classificar os tipos prioritários sob uma leitura estritamente conservadora de prontidão relativa.
 Evitar que “melhor candidato” seja confundido com “tipo comprovadamente seguro”.
 
+- `Regra editorial`: as contagens desta secao refletem o snapshot original de incorporacao deste documento; o inventario atual e mais recente esta em `09-inventario-e-rastreabilidade-publica.md`. As analises de prontidao relativa abaixo foram feitas com o snapshot original e nao devem ser recalculadas com os totais atuais sem revisao metodologica correspondente.
 - Evidência direta: a classificacao abaixo considera quantidade de objetos, media de Part, dependencia de parent/module e presenca de pattern no acervo extraído.
 - Inferência forte: "pronto" aqui significa apenas "melhor candidato relativo para experimentacao controlada por clonagem", nao tipo comprovadamente importavel.
 - Evidência direta: a trilha ja contem bateria controlada de importacao real a partir de `.xpz` montados com base nos `.md` locais e no skill `nexa`.

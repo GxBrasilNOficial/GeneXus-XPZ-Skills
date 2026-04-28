@@ -194,8 +194,8 @@ Preservar os fatos agregados da varredura XML sem expor nomes reais de objeto, m
 Servir como base factual publica para verificacao posterior.
 
 - Fonte sanitizada: `C:\SANITIZED\ObjetosDaKbEmXml`
-- Escopo analisado: `7219` arquivos XML
-- Total de registros de objetos lidos: `7219`
+- Escopo analisado: `7416` arquivos XML
+- Total de registros de objetos lidos: `7416`
 - Total de arquivos problematicos: `0`
 - Tipos de objeto observados: `API`, `ColorPalette`, `Dashboard`, `DataProvider`, `DesignSystem`, `Domain`, `Index`, `Module`, `PackagedModule`, `Panel`, `Procedure`, `SDT`, `SubTypeGroup`, `Theme`, `ThemeClass`, `Transaction`, `UserControl`, `WebPanel`, `WorkWithForWeb`
 

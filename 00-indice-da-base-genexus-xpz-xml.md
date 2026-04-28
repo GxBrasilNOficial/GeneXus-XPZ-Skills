@@ -16,7 +16,6 @@ toda a base consolidada
 Ser o ponto de entrada principal da base consolidada, com ordem de leitura, limites metodologicos e regras absolutas para uso por outro agente GPT.
 
 ## Fontes consolidadas
-- 00-indice-da-base-genexus-xpz-xml.md
 - 26-guia-para-agente-gpt.md
 
 ## Origem incorporada - 00-indice-da-base-genexus-xpz-xml.md
@@ -92,6 +91,8 @@ Organizar conhecimento operacional e empírico sobre XMLs extraídos de `XPZ` Ge
 9. `07-open-points-e-checklist.md`
 10. `08-guia-para-agente-gpt.md`
 11. `09-inventario-e-rastreabilidade-publica.md`
+
+`06-padroes-de-objeto-e-nomenclatura.md`: leitura suplementar — indicado quando a duvida envolver nomenclatura de objetos, prefixos de tipo ou comportamento de `Folder` vs `Module` no `fullyQualifiedName`.
 
 ## Regras absolutas para qualquer agente GPT
 

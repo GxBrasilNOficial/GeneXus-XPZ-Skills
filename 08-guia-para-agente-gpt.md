@@ -39,13 +39,15 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 ## Ordem de consulta recomendada
 
 1. ler `00-indice-da-base-genexus-xpz-xml.md`
-2. identificar o tipo alvo e checar `03-risco-e-decisao-por-tipo.md`
-3. ler `02-regras-operacionais-e-runtime.md`
-4. para `WebPanel`, ler `04-webpanel-familias-e-templates.md`
-5. para `Transaction`, ler `05-transaction-familias-e-templates.md`
-6. para `Procedure` de relatorio (nome com prefixo de relatorio no acervo), ler `05b-procedure-relatorio-familias-e-templates.md`
-7. usar `01-base-empirica-geral.md` como indice mestre da serie `01` e abrir o filho empirico mais aderente (`01a` a `01h`)
+2. ler `02-regras-operacionais-e-runtime.md`
+3. identificar o tipo alvo e checar `03-risco-e-decisao-por-tipo.md`
+4. usar `01-base-empirica-geral.md` como indice mestre da serie `01` e abrir o filho empirico mais aderente (`01a` a `01h`)
+5. para `WebPanel`, ler `04-webpanel-familias-e-templates.md`
+6. para `Transaction`, ler `05-transaction-familias-e-templates.md`
+7. para `Procedure` de relatorio (nome com prefixo de relatorio no acervo), ler `05b-procedure-relatorio-familias-e-templates.md`
 8. usar `09-inventario-e-rastreabilidade-publica.md` para sustentar rastreabilidade
+
+`06-padroes-de-objeto-e-nomenclatura.md`: leitura suplementar — indicado quando a duvida envolver nomenclatura de objetos, prefixos de tipo ou comportamento de `Folder` vs `Module` no `fullyQualifiedName`.
 
 ### Fluxo curto para `Procedure` de relatorio simples
 

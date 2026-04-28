@@ -82,6 +82,9 @@ Se você quer entender a base rapidamente:
 5. para casos práticos, use `04-webpanel-familias-e-templates.md`, `05-transaction-familias-e-templates.md` e `05b-procedure-relatorio-familias-e-templates.md`
 6. se quiser entender limites e próximas frentes, leia `07-open-points-e-checklist.md`
 7. para consumo por outro agente GPT, termine em `08-guia-para-agente-gpt.md`
+8. para conferir rastreabilidade do inventário, consulte `09-inventario-e-rastreabilidade-publica.md`
+
+`06-padroes-de-objeto-e-nomenclatura.md`: leitura suplementar — indicado quando a dúvida envolver nomenclatura de objetos, prefixos de tipo ou comportamento de `Folder` vs `Module` no `fullyQualifiedName`.
 
 ### Avisos importantes
 
@@ -251,6 +254,9 @@ Si quieres entender la base rápidamente:
 5. para casos prácticos, usa `04-webpanel-familias-e-templates.md`, `05-transaction-familias-e-templates.md` y `05b-procedure-relatorio-familias-e-templates.md`
 6. si quieres ver límites y siguientes frentes, lee `07-open-points-e-checklist.md`
 7. para consumo por otro agente GPT, termina en `08-guia-para-agente-gpt.md`
+8. para verificar trazabilidad del inventario, consulta `09-inventario-e-rastreabilidade-publica.md`
+
+`06-padroes-de-objeto-e-nomenclatura.md`: lectura suplementaria — indicado cuando la duda involucre nomenclatura de objetos, prefijos de tipo o comportamiento de `Folder` vs `Module` en `fullyQualifiedName`.
 
 ### Avisos importantes
 
@@ -420,6 +426,9 @@ If you want to understand the repository quickly:
 5. for practical cases, use `04-webpanel-familias-e-templates.md`, `05-transaction-familias-e-templates.md`, and `05b-procedure-relatorio-familias-e-templates.md`
 6. if you want limits and next investigation fronts, read `07-open-points-e-checklist.md`
 7. for another GPT agent consuming the base, finish with `08-guia-para-agente-gpt.md`
+8. to verify inventory traceability, consult `09-inventario-e-rastreabilidade-publica.md`
+
+`06-padroes-de-objeto-e-nomenclatura.md`: supplemental reading — recommended when the question involves object naming, type prefixes, or `Folder` vs `Module` behavior in `fullyQualifiedName`.
 
 ### Important notes
 
