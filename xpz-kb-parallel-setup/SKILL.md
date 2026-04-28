@@ -349,7 +349,7 @@ Nao usar `setup concluido`, `estrutura pronta` ou expressao equivalente sem dize
       - Gate: nao compensar gate bloqueado com leitura manual de SQLite, JSON ou XML
       - Fonte normativa: `ObjetosDaKbEmXml` como confirmacao so depois do gate liberado
 
-8.g2 Se existirem em `ObjetosDaKbEmXml` quaisquer diretorios com XMLs, executar o BLOCO DE VERIFICACAO DE NAMING antes de declarar o estado de conclusao; se o diretorio estiver vazio ou nao existir, pular o bloco
+8.g2 OBRIGATÓRIO ANTES DE 8.h: executar o BLOCO DE VERIFICACAO DE NAMING (passos 8.i a 8.n) para todos os diretorios presentes em `ObjetosDaKbEmXml` que contenham XMLs; so pular se `ObjetosDaKbEmXml` nao existir ou estiver completamente vazio
 
 8.h Ao concluir o bloco de atualizacao, declarar o estado `wrappers_atualizados` e listar explicitamente: scripts adicionados, scripts mantidos (EQUIVALENTES), scripts substituidos com aprovacao e scripts pulados. Atualizar o campo de estado operacional no `AGENTS.md` local da pasta paralela para refletir o que realmente foi concluido (ex: `wrappers_atualizados`, `bootstrap_incompleto`). Nao manter declaracao de estado anterior desatualizada — se o `AGENTS.md` dizia `materializado_e_indice_validado` mas o gate script nao existia e acabou de ser criado, o estado deve ser atualizado para `wrappers_atualizados`. Um `AGENTS.md` com estado desatualizado serve como argumento falso para agentes burlarem o gate. Verificar tambem se a secao `## Wrappers locais` do `AGENTS.md` local lista todos os scripts atualmente presentes em `scripts/` com nomes e funcoes corretos; se estiver desatualizada — por listar scripts com nomes antigos ou omitir scripts recem-adicionados — propor atualizacao ao usuario antes de declarar o setup como concluido. Por fim, comparar a estrutura geral do `AGENTS.md` local contra o modelo canonico em `examples/AGENTS.md.example` desta skill; se houver secoes canonicas ausentes alem das ja verificadas nos passos anteriores (`## Triagem Por Indice` em 8.g e `## Wrappers locais` acima), propor adicao ao usuario antes de declarar o setup como concluido.
 
@@ -485,6 +485,7 @@ PastaParalelaDaKb/
 
 - NUNCA assumir que o nome de qualquer diretorio em `ObjetosDaKbEmXml` corresponde ao tipo GeneXus correto sem verificar o GUID em pelo menos um XML daquele diretorio; o nome do diretorio e convencao local e pode divergir do tipo real
 - NUNCA renomear diretorios em `ObjetosDaKbEmXml` sem aprovacao explicita do usuario e sem seguir a sequencia segura com nome temporario (A→tmp, B→A, tmp→B)
+- NUNCA declarar estado de conclusao em `modo_atualizacao` (passo 8.h) sem ter executado o BLOCO DE VERIFICACAO DE NAMING (passos 8.i a 8.n) quando `ObjetosDaKbEmXml` contiver diretorios com XMLs; a auditoria de naming e obrigatoria e nao pode ser omitida mesmo quando todos os scripts forem EQUIVALENTE e nenhuma outra correcao for necessaria
 - NUNCA confundir a pasta nativa da KB com a pasta paralela da KB
 - NUNCA gravar na pasta nativa da KB; essa pasta e somente leitura para agentes, salvo leitura operacional controlada quando realmente necessaria
 - NUNCA gravar manualmente em `ObjetosDaKbEmXml`
