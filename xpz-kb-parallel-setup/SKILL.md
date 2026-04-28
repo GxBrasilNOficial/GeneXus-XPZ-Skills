@@ -273,6 +273,7 @@ Nao usar `setup concluido`, `estrutura pronta` ou expressao equivalente sem dize
 - No fechamento do setup inicial, apresentar `A)` e `B)` como opcoes de proximo passo e informar o tradeoff de tempo entre elas
 - Se a existencia da pasta nativa da KB foi verificada, declarar no fechamento se ela existe/acessou corretamente ou se ficou como ressalva operacional
 - Ao fechar um `modo_atualizacao`, a resposta deve conter obrigatoriamente: classificacao de cada script (EQUIVALENTE / AUSENTE / CUSTOMIZADO), resultado da verificacao de naming de cada diretorio presente em `ObjetosDaKbEmXml` (conforme ou divergente — mesmo que nenhuma divergencia seja encontrada), estado operacional declarado e resultado do gate quando executado
+- Se o gate ou `Test-KbStructure` reportar qualquer linha `NAMING_DIVERGENTE` no output, incluir na resposta ao usuario — independente da pergunta original — o aviso explicito de quais diretorios estao com nome divergente e a oferta de correcao via `xpz-kb-parallel-setup`; nao suprimir esse aviso mesmo quando a pergunta de negocio ja foi respondida
 
 ---
 
