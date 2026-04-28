@@ -80,6 +80,51 @@ IDBASEDON_PROPERTY_RE = re.compile(
     r"<Property>\s*<Name>idBasedOn</Name>\s*<Value>(?P<value>.*?)</Value>\s*</Property>",
     re.IGNORECASE | re.DOTALL,
 )
+OBJECT_TYPE_GUID_RE = re.compile(r'<Object\b[^>]*\btype="([^"]+)"')
+ATTRIBUTE_ROOT_RE = re.compile(r"<Attribute\b")
+
+# Canonical type name by Object/@type GUID.
+# Source of truth: 01a-catalogo-e-padroes-empiricos.md.
+# Container canonical names follow the FabricaBrasil directory convention:
+#   000...0008 (user-created Module/Folder) -> "Folder"
+#   000...0006 (system Folder)              -> "Module"
+# If an XML produces a GUID not present here, the index build aborts and
+# reports the unknown GUID so the catalog can be updated before retrying.
+GX_TYPE_BY_GUID: dict[str, str] = {
+    "36e32e2d-023e-4188-95df-d13573bac2e0": "API",
+    "3affc0b3-494b-4d84-9ec1-3a6ab8349cda": "ColorPalette",
+    "526aba9f-a725-4bc7-b1db-0b9f92ac9550": "Dashboard",
+    "2a9e9aba-d2de-4801-ae7f-5e3819222daf": "DataProvider",
+    "ffd44be7-3bb4-4d01-9e7e-d1c1a3c095af": "DataSelector",
+    "dcdcdcdc-dfe0-4a57-ae8f-c6e31b0dcbc0": "DataStore",
+    "bf08dfb1-361c-4e7e-ad54-391e56e60b49": "DeploymentUnit",
+    "78b3fa0e-174c-4b2b-8716-718167a428b5": "DesignSystem",
+    "faeb588c-dcce-4dad-9af3-cdd11b961a32": "Document",
+    "00972a17-9975-449e-aab1-d26165d51393": "Domain",
+    "c163e562-42c6-4158-ad83-5b21a14cf30e": "ExternalObject",
+    "1132ac08-290f-4fd1-bd18-64777b7329d1": "File",
+    "ecececec-dfe0-4a57-ae8f-c6e31b0dcbc0": "Generator",
+    "9fb193d9-64a4-4d30-b129-ff7c76830f7e": "Image",
+    "88313f43-5eb2-0000-0028-e8d9f5bf9588": "Language",
+    "d82625fd-5892-40b0-99c9-5c8559c197fc": "Panel",
+    "83476c1e-fa72-4229-9930-f51b954fca2d": "PatternSettings",
+    "84a12160-f59b-4ad7-a683-ea4481ac23e9": "Procedure",
+    "447527b5-9210-4523-898b-5dccb17be60a": "SDT",
+    "624a8b31-36f0-4292-adba-2d270d1e3537": "Stencil",
+    "87313f43-5eb2-41d7-9b8c-e8d9f5bf9588": "SubTypeGroup",
+    "857ca50e-7905-0000-0007-c5d9ff2975ec": "Table",
+    "c804fdbd-7c0b-440d-8527-4316c92649a6": "Theme",
+    "d4876646-98dd-419b-8c1c-896f83c48368": "ThemeClass",
+    "5592de59-d30a-499d-9100-a7006d3674f2": "ThemeColor",
+    "1db606f2-af09-4cf9-a3b5-b481519d28f6": "Transaction",
+    "562f4793-aabe-449f-8821-fc77e550698e": "UserControl",
+    "c9584656-94b6-4ccd-890f-332d11fc2c25": "WebPanel",
+    "78cecefe-be7d-4980-86ce-8d6e91fba04b": "WorkWithForWeb",
+    # Containers
+    "00000000-0000-0000-0000-000000000008": "Folder",
+    "00000000-0000-0000-0000-000000000006": "Module",
+    "c88fffcd-b6f8-0000-8fec-00b5497e2117": "PackagedModule",
+}
 LEVEL_RE = re.compile(r"<Level\b(?P<attrs>[^>]*)>(?P<body>.*?)</Level>", re.IGNORECASE | re.DOTALL)
 LEVEL_ATTRIBUTE_RE = re.compile(
     r"<Attribute\b(?P<attrs>[^>]*)>(?P<name>.*?)</Attribute>",
@@ -145,20 +190,37 @@ def line_number_at(text: str, index: int) -> int:
     return text.count("\n", 0, index) + 1
 
 
-def collect_objects(source_root: Path, object_type: str) -> dict[str, ObjectInfo]:
-    folder = source_root / object_type
-    objects: dict[str, ObjectInfo] = {}
-    if not folder.exists():
-        return objects
+def resolve_canonical_type(text: str) -> tuple[str | None, str | None]:
+    """Return (canonical_type, guid). canonical_type is None when the GUID is unknown."""
+    if ATTRIBUTE_ROOT_RE.search(text[:1024]):
+        return "Attribute", None
+    m = OBJECT_TYPE_GUID_RE.search(text)
+    if not m:
+        return None, None
+    guid = m.group(1)
+    return GX_TYPE_BY_GUID.get(guid), guid
 
+
+def collect_objects(
+    folder: Path,
+    source_root: Path,
+    unknown_guids: list[tuple[str, str]],
+) -> dict[str, dict[str, ObjectInfo]]:
+    objects_by_type: dict[str, dict[str, ObjectInfo]] = {}
     for path in sorted(folder.glob("*.xml")):
         text = read_text(path)
+        canonical_type, guid = resolve_canonical_type(text)
+        if canonical_type is None:
+            unknown_guids.append((guid or "(no type attribute)", path.relative_to(source_root).as_posix()))
+            continue
         last_update_match = LAST_UPDATE_RE.search(text)
         guid_match = GUID_RE.search(text)
         rel_path = path.relative_to(source_root).as_posix()
         name = path.stem
-        objects[name] = ObjectInfo(
-            object_type=object_type,
+        if canonical_type not in objects_by_type:
+            objects_by_type[canonical_type] = {}
+        objects_by_type[canonical_type][name] = ObjectInfo(
+            object_type=canonical_type,
             name=name,
             guid=guid_match.group(1) if guid_match else None,
             path=path,
@@ -166,18 +228,34 @@ def collect_objects(source_root: Path, object_type: str) -> dict[str, ObjectInfo
             last_update=last_update_match.group(1) if last_update_match else None,
             file_hash=sha256_text(text),
         )
-    return objects
+    return objects_by_type
 
 
 def collect_all_objects(source_root: Path) -> dict[str, dict[str, ObjectInfo]]:
     objects_by_type: dict[str, dict[str, ObjectInfo]] = {}
+    unknown_guids: list[tuple[str, str]] = []
     for folder in sorted(source_root.iterdir(), key=lambda item: item.name.lower()):
         if not folder.is_dir():
             continue
-        object_type = folder.name
-        objects = collect_objects(source_root, object_type)
-        if objects:
-            objects_by_type[object_type] = objects
+        folder_objects = collect_objects(folder, source_root, unknown_guids)
+        for type_name, objs in folder_objects.items():
+            if type_name not in objects_by_type:
+                objects_by_type[type_name] = {}
+            objects_by_type[type_name].update(objs)
+    if unknown_guids:
+        lines = [
+            "",
+            "ERRO: GUIDs de tipo desconhecidos encontrados no acervo.",
+            "O índice não pode ser construído enquanto todos os tipos não forem identificados.",
+            "Informe o agente ou o administrador do acervo para atualizar GX_TYPE_BY_GUID",
+            "em Build-KbIntelligenceIndex.py com os seguintes GUIDs:",
+            "",
+        ]
+        for guid, rel in sorted(set(unknown_guids)):
+            lines.append(f"  GUID: {guid}")
+            lines.append(f"  Arquivo: {rel}")
+            lines.append("")
+        raise SystemExit("\n".join(lines))
     return objects_by_type
 
 
