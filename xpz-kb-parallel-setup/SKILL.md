@@ -270,6 +270,7 @@ Nao usar `setup concluido`, `estrutura pronta` ou expressao equivalente sem dize
 - Ao fechar um setup inicial bem-sucedido, diferenciar explicitamente `estrutura pronta` de `snapshot oficial ainda nao materializado`
 - No fechamento do setup inicial, apresentar `A)` e `B)` como opcoes de proximo passo e informar o tradeoff de tempo entre elas
 - Se a existencia da pasta nativa da KB foi verificada, declarar no fechamento se ela existe/acessou corretamente ou se ficou como ressalva operacional
+- Ao fechar um `modo_atualizacao`, a resposta deve conter obrigatoriamente: classificacao de cada script (EQUIVALENTE / AUSENTE / CUSTOMIZADO), resultado da verificacao de naming de cada diretorio presente em `ObjetosDaKbEmXml` (conforme ou divergente — mesmo que nenhuma divergencia seja encontrada), estado operacional declarado e resultado do gate quando executado
 
 ---
 
