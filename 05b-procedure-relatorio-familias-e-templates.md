@@ -243,6 +243,9 @@ Footer
     print printBlockRodape
 End
 
+&arquivodesaidanome = 'RelatorioSimples_' + &EmpresaId.ToString();
+Output_file(&arquivodesaidanome, 'PDF');
+
 print printBlockMensagem
 ]]></Source>
   <Properties>
@@ -321,12 +324,7 @@ print printBlockMensagem
   </Properties>
 </Part>
 <Part type="9b0a32a3-de6d-4be1-a4dd-1b85d3741534">
-  <Source><![CDATA[parm(in:&EmpresaId, in:&DataInicial);
-
-&arquivodesaidanome = 'RelatorioSimples_' + &EmpresaId.ToString();
-
-Output_file(&arquivodesaidanome, 'PDF');
-]]></Source>
+  <Source><![CDATA[parm(in:&EmpresaId, in:&DataInicial);]]></Source>
   <Properties>
     <Property><Name>IsDefault</Name><Value>False</Value></Property>
   </Properties>
@@ -458,6 +456,9 @@ Output_file(&arquivodesaidanome, 'PDF');
     print printBlockCabecalho
 End
 
+&arquivodesaidanome = 'RelatorioDireto_' + &EmpresaId.ToString();
+Output_file(&arquivodesaidanome, 'PDF');
+
 For each
     where EmpresaId = &EmpresaId
     order ClienteNome
@@ -547,12 +548,7 @@ End
   </Properties>
 </Part>
 <Part type="9b0a32a3-de6d-4be1-a4dd-1b85d3741534">
-  <Source><![CDATA[parm(in:&EmpresaId);
-
-&arquivodesaidanome = 'RelatorioDireto_' + &EmpresaId.ToString();
-
-Output_file(&arquivodesaidanome, 'PDF');
-]]></Source>
+  <Source><![CDATA[parm(in:&EmpresaId);]]></Source>
   <Properties>
     <Property><Name>IsDefault</Name><Value>False</Value></Property>
   </Properties>
@@ -569,6 +565,9 @@ Output_file(&arquivodesaidanome, 'PDF');
   <Source><![CDATA[Header
     print printBlockCabecalho
 End
+
+&arquivodesaidanome = 'RelatorioVariaveis_' + &EmpresaId.ToString();
+Output_file(&arquivodesaidanome, 'PDF');
 
 For each
     where EmpresaId = &EmpresaId
@@ -660,12 +659,7 @@ End
   </Properties>
 </Part>
 <Part type="9b0a32a3-de6d-4be1-a4dd-1b85d3741534">
-  <Source><![CDATA[parm(in:&EmpresaId);
-
-&arquivodesaidanome = 'RelatorioVariaveis_' + &EmpresaId.ToString();
-
-Output_file(&arquivodesaidanome, 'PDF');
-]]></Source>
+  <Source><![CDATA[parm(in:&EmpresaId);]]></Source>
   <Properties>
     <Property><Name>IsDefault</Name><Value>False</Value></Property>
   </Properties>

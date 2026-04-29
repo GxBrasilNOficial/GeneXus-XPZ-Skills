@@ -106,9 +106,10 @@ If the main need is to prepare or validate the initial folder structure around t
 - Do NOT generate `.xpz` as an extra artifact by default when `import_file.xml` already satisfies the intended manual IDE import flow
 - Name locally generated packages for IDE import using the preferred pattern `NomeCurto_GUID_YYYYMMDD_nn.import_file.xml`
 - In that package name, the front is identified only by the prefix `NomeCurto_GUID_YYYYMMDD`; `nn` is only the short package round for that front
-- Before writing `NomeCurto_GUID_YYYYMMDD_nn.import_file.xml`, check whether a package with the same front prefix `NomeCurto_GUID_YYYYMMDD` and the same `nn` already exists in `PacotesGeradosParaImportacaoNaKbNoGenexus`
-- If the same front prefix and the same `nn` already exist, abort the write; do NOT silently overwrite that round
-- When there is an `nn` collision, return an explicit error with the next free `nn` suggested for that front, but do NOT auto-increment or write automatically with the suggested value
+- Before writing `NomeCurto_GUID_YYYYMMDD_nn.import_file.xml`, run a deterministic collision gate in `.ps1`; do NOT leave this decision to ad hoc reasoning
+- Prefer a local wrapper such as `Test-*KbPackageCollision.ps1`, delegating to the shared engine `scripts\Test-XpzPackageCollision.ps1`
+- If the collision gate returns `BLOCK: ...`, abort the write; do NOT silently overwrite that round
+- When there is an `nn` collision, the suggested next free `nn` must come from the collision gate output itself; do NOT auto-increment or write automatically with the suggested value
 - Keep `PacotesGeradosParaImportacaoNaKbNoGenexus` flat, without subfolders by front
 - Classify each active XML root as `Object`, `Attribute`, or unsupported before serializing the package
 - For a new `Transaction` package, treat top-level `Attribute` items referenced by the `Level` as mandatory package members under `<Attributes>`, never as `Domain`/object payload under `<Objects>`
@@ -181,6 +182,7 @@ Reference files and when to load them:
 | [03-risco-e-decisao-por-tipo.md](../03-risco-e-decisao-por-tipo.md) | Always — risk level and abort conditions |
 | [04-webpanel-familias-e-templates.md](../04-webpanel-familias-e-templates.md) | Target is a WebPanel object |
 | [05-transaction-familias-e-templates.md](../05-transaction-familias-e-templates.md) | Target is a Transaction object |
+| [05b-procedure-relatorio-familias-e-templates.md](../05b-procedure-relatorio-familias-e-templates.md) | Target is a simple report `Procedure`, especially F2/F3 covered by `molde pronto` |
 | [07-open-points-e-checklist.md](../07-open-points-e-checklist.md) | Edge cases, provisional decisions, or checklist for new templates |
 | [08-guia-para-agente-gpt.md](../08-guia-para-agente-gpt.md) | Decision formula, precedence rules, materialization rules, refuse conditions |
 | `xpz-index-triage` skill | When a KbIntelligence index is available and locating comparable corpus XMLs or confirming object existence is needed before opening XML files |
@@ -210,7 +212,14 @@ Reference files and when to load them:
      - if that front folder already exists for the current front, reuse it
      - that front folder is the active unit of the work front
 5. When the task is packaging, list active XMLs only inside the current front folder and treat them as the candidate batch
-6. Evaluate batch isolation before packaging:
+6. Before any package write, execute the deterministic collision gate for the intended `FrontPrefix + nn` in `PacotesGeradosParaImportacaoNaKbNoGenexus`:
+   - Prefer the local wrapper `Test-*KbPackageCollision.ps1` when the KB/repository publishes it
+   - The wrapper should delegate to the shared engine `scripts\Test-XpzPackageCollision.ps1`
+   - Expected outputs:
+     - `COLLISION_OK`
+     - `BLOCK: _nn ja existe para o front X, proximo livre: _mm`
+   - If the gate blocks, **ABORT** packaging before any `Set-Content`, rename, move, or overwrite of the package artifact
+7. Evaluate batch isolation before packaging:
    - If more than one plausible batch is present inside the current front folder → **ABORT**
    - Do NOT infer the correct batch only from recency when there is contamination risk
    - If the current front needs a new isolated single-object delta and the current front folder contains remnant XMLs that do not belong to the current front decision, treat that front folder as contaminated and **ABORT** until the unitary batch is isolated explicitly
@@ -225,16 +234,16 @@ Reference files and when to load them:
    - Classify current-batch content as `requested change`, `necessary auxiliary change`, or `extra unrequested change`
    - Signal any `extra unrequested change` explicitly before packaging; do NOT silently absorb it into the package
    - If an older package lost validity after a change of direction, either rename it with prefix `OBSOLETO_` or present a structured manifest in the conversation stating that package X was replaced by package Y; save that manifest as a local file only when local traceability is concretely needed
-7. Check for improper local changes in `ObjetosDaKbEmXml`:
+8. Check for improper local changes in `ObjetosDaKbEmXml`:
    - If detected, treat this as an explicit process error
    - Preserve those XMLs in `ObjetosGeradosParaImportacaoNaKbNoGenexus`, restore `ObjetosDaKbEmXml` to the official Git version, present a structured manifest of preserved items in the conversation, save it as a local file when incident traceability requires it, and **ABORT** packaging until the snapshot is sane
    - If the target object has not yet returned from the KB by official export, keep working only from `ObjetosGeradosParaImportacaoNaKbNoGenexus`
-8. Load [03-risco-e-decisao-por-tipo](../03-risco-e-decisao-por-tipo.md) → assign risk level
-9. Evaluate abort conditions:
+9. Load [03-risco-e-decisao-por-tipo](../03-risco-e-decisao-por-tipo.md) → assign risk level
+10. Evaluate abort conditions:
    - Risk is high/very high AND no comparable internal template exists → **ABORT**
    - Type is not in the empirical corpus → **ABORT**
    - User requests affirmation of import/build success → **REFUSE**, state limitation
-10. Locate template:
+11. Locate template:
    - Transaction → use family F1–F6 from [05-transaction-familias-e-templates](../05-transaction-familias-e-templates.md)
    - WebPanel → use closest family from [04-webpanel-familias-e-templates](../04-webpanel-familias-e-templates.md)
    - For `WebPanel`, declare the primary edit block before touching the XML and use only the adjacent blocks required by explicit functional dependency
@@ -293,11 +302,14 @@ Reference files and when to load them:
    - Recommended local check command when the XML file is already materialized: `& ..\scripts\Test-GeneXusSourceSanity.ps1 -InputPath .\Objeto.xml -AsJson`
    - Interpret the JSON result conservatively:
      - `xmlWellFormed=false` -> **ABORT** before any packaging discussion
-     - `sourceSanityStatus=fail` -> **ABORT** packaging and correct structural balance first
-     - `sourceSanityStatus=warn` with `probablyImportable=true` -> keep packaging blocked until each warning is either rewritten to a documented conservative form or explicitly justified as residual risk
-     - `sourceSanityStatus=pass` with `xmlWellFormed=true` -> proceed only to the next packaging gate; do NOT describe this as proof of import/build success
+   - `sourceSanityStatus=fail` -> **ABORT** packaging and correct structural balance first
+   - `sourceSanityStatus=warn` with `probablyImportable=true` -> keep packaging blocked until each warning is either rewritten to a documented conservative form or explicitly justified as residual risk
+   - `sourceSanityStatus=pass` with `xmlWellFormed=true` -> proceed only to the next packaging gate; do NOT describe this as proof of import/build success
+   - If GeneXus `Source` is serialized inside `CDATA`, scan the saved block before packaging and **ABORT** if the literal code still contains XML entity spellings such as `&amp;`, `&quot;`, `&gt;`, or `&lt;` that should have remained raw code characters
    - For report `Procedure`, classify each edited fragment before serialization as `Source`, `Rules`, or layout and reject any cross-layer mixture
+   - For simple report `Procedure`, load [05b-procedure-relatorio-familias-e-templates.md](../05b-procedure-relatorio-familias-e-templates.md) as a mandatory reference before generating from `molde pronto`; do NOT treat that read as optional
    - For report `Procedure`, verify coherence between layout `PrintBlock` names and each `print printBlock...` reference in `Source`
+   - For report `Procedure`, if `Source` prints `printBlockX`, require a matching layout `PrintBlock` with coherent `RPT_INTERNAL_NAME`; if the pair is missing, **ABORT** before packaging
    - For report `Procedure`, if an import error points to invalid control, report block, or layout shape, inspect layout first before altering envelope
 12. Apply envelope rules from [02-regras-operacionais-e-runtime](../02-regras-operacionais-e-runtime.md):
    - For delta of an existing object, prefer the package format with validated local precedent in the same KB trail before any generic preference

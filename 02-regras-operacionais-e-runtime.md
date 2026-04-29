@@ -122,6 +122,7 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
 
 - `Regra operacional`: antes de gerar `import_file.xml` ou outro pacote importavel, diferenciar explicitamente `XML bem-formado` de `objeto provavelmente importavel`.
 - `Regra operacional`: `XML bem-formado` cobre parse XML, raiz fechada, `CDATA` encerrado, `lastUpdate` conferido quando aplicavel e ausencia de truncamento evidente.
+- `Regra operacional`: quando um bloco `CDATA` carregar `Source` GeneXus literal, entidades XML escapadas como `&amp;`, `&quot;`, `&gt;` e `&lt;` dentro do codigo salvo devem ser tratadas como erro de materializacao; antes do empacotamento, reler o bloco e bloquear o artefato se esses spellings aparecerem onde o codigo deveria permanecer literal.
 - `Regra operacional`: `objeto provavelmente importavel` exige tambem um gate minimo de sanidade do `Source` GeneXus para objetos cujo comportamento principal vive no `Source`, especialmente `Procedure`, `DataProvider` e casos comparaveis.
 - `Regra operacional`: o gate minimo de sanidade do `Source` deve conferir pelo menos o balanceamento estrutural basico dos pares realmente tocados pela mudanca, como `Sub/EndSub`, `For each/EndFor`, `Do Case/EndCase` e `If/EndIf`.
 - `Regra operacional`: quando a mudanca inserir ou mover bloco em `Source` grande, revisar o trecho alterado junto com algumas linhas antes e depois, incluindo os fechamentos ao redor.
@@ -199,6 +200,7 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
 - `Regra operacional`: `Rules` e a camada de assinatura/regra; nela entram `parm(...)` e regras proprias dessa camada, nao `print`, `For each`, `Header`, `Footer` nem shape de layout.
 - `Regra operacional`: o layout do `Part` `c414ed00-8cc4-4f44-8820-4baf93547173` e a camada estrutural de `Bands`, `PrintBlock`, `ReportLabel` e `ReportAttribute`; nao deve receber pseudo-`Source` procedural.
 - `Regra operacional`: `RPT_INTERNAL_NAME`, identificadores de `PrintBlock` e referencias usadas em `print printBlock...` devem permanecer coerentes entre `Source` e layout.
+- `Regra operacional`: antes de empacotar `Procedure` de relatorio, tratar a coerencia `Source <-> layout` como gate bloqueante: se houver `print printBlock...` no `Source`, o layout deve materializar `Bands` com `PrintBlock` correspondente e `RPT_INTERNAL_NAME` coerente; ausencia dessa correspondencia bloqueia o pacote.
 - `Regra operacional`: em relatorio simples, a falta de XML real da KB nao bloqueia o primeiro prototipo quando a trilha ja oferecer molde sanitizado canonico suficiente.
 - `Regra operacional`: escalar para XML real comparavel apenas quando o pedido fugir da cobertura simples, quando a tentativa inicial mais um unico corretivo estrutural curto falharem, ou quando surgir sinal de dialeto/localismo da KB.
 - `Regra operacional`: em `Procedure` de relatorio, `;` faltando em `Rules` deve ser tratado como erro da camada `Rules`; `;` rejeitado em `Source` deve ser tratado como erro de dialeto/sintaxe de `Source`.
