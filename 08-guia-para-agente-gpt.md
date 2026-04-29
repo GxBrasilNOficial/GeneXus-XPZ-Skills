@@ -162,6 +162,14 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 - se o erro mencionar controle invalido, `printBlock` ou shape de relatorio, revisar layout antes de inferir defeito de envelope
 - se a solucao continuar sustentada so por plausibilidade depois de uma rodada corretiva, parar e escalar para XML real comparavel
 
+### Protocolo geral de revisao por blocos
+
+- em tipos heterogeneos cobertos por esta base, declarar o `bloco primario` antes da analise fina
+- `bloco adjacente` e apenas o bloco adicional aberto por dependencia funcional explicita com o `bloco primario`
+- nomear toda `transicao justificada` no raciocinio e no handoff
+- usar como `criterio de parada` o ponto em que a hipotese ja estiver sustentada; nao reabrir o objeto inteiro por reflexo
+- declarar o `escopo da conclusao` no menor nivel funcional que a evidencia sustenta; quando houver mais de um contexto de execucao relevante, explicitar tambem esse contexto
+
 ### Regra adicional para revisao de `Procedure`
 
 - em `Procedure`, revisar por blocos funcionais; nao presumir `Source` como bloco inicial universal

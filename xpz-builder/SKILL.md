@@ -52,6 +52,9 @@ If the main need is to prepare or validate the initial folder structure around t
 - For `WebPanel`, classify the current delta by functional block before editing: `layout`, `events`, `variables`, `serialized functional metadata`, `identity and container`, or `dependencies`
 - For `Transaction`, classify the current delta by functional block before editing: `Transaction structure`, `Attributes and attribute properties`, `Rules`, `Events`, `Execution context`, or `Identity and container`
 - For `Procedure`, classify the current delta by functional block before editing: `Source`, `Rules/parm`, `Variables`, `Calls and dependencies`, `Identity and container`, and `Report layout` when applicable
+- Treat any extra block opened after the first one as an `adjacent block` and open it only when there is explicit functional dependency with the primary edit block
+- Name every justified block transition in the review or packaging rationale, instead of silently widening the edit scope
+- State the intended conclusion or effect scope at the smallest functional level supported by the delta, including execution context when that distinction matters
 - Clone conservatively: preserve `Object/@guid`, `parent*`, `moduleGuid`, all recurring Part types
 - Apply XPZ envelope rules from [02-regras-operacionais-e-runtime](../02-regras-operacionais-e-runtime.md)
 - Choose package format for deltas of existing objects by validated local precedent first, distinguishing explicitly between embedded-object packages under `<Objects>` and packages that use `<FilePath>` to point to external XML

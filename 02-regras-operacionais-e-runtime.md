@@ -185,6 +185,14 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
 - `Regra operacional`: em `Procedure` de relatorio, `;` faltando em `Rules` deve ser tratado como erro da camada `Rules`; `;` rejeitado em `Source` deve ser tratado como erro de dialeto/sintaxe de `Source`.
 - `Regra operacional`: nao inventar `GXML`, controles, propriedades ou shape alternativo para o `Part c414...` sem ancoragem em molde documentado ou XML real comparavel.
 
+### Protocolo geral de revisao por blocos
+
+- `Regra operacional`: em tipos heterogeneos cobertos por esta base, a revisao fina deve declarar antes qual e o `bloco primario` do sintoma atual.
+- `Regra operacional`: `bloco adjacente` e apenas o bloco adicional aberto por dependencia funcional explicita com o `bloco primario`; ele nao deve ser aberto por curiosidade, inseguranca ou "garantia".
+- `Regra operacional`: toda `transicao justificada` entre blocos deve ser nomeada no raciocinio e no handoff, por exemplo `Rules/parm -> Variables` ou `events -> variables`.
+- `Regra operacional`: o `criterio de parada` da revisao por blocos e simples: parar a expansao quando a hipotese ja estiver sustentada; nao reabrir o objeto inteiro por reflexo.
+- `Regra operacional`: o `escopo da conclusao` deve ser declarado no menor nivel funcional que a evidencia sustenta; quando o tipo tiver mais de um contexto de execucao relevante, explicitar tambem esse contexto.
+
 ### Revisao por blocos em `Procedure`
 
 - `Regra operacional`: em `Procedure`, nao presumir `Source` como bloco inicial universal; a revisao fina deve declarar antes qual e o bloco primario do sintoma atual.

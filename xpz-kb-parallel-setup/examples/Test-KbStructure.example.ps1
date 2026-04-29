@@ -82,6 +82,31 @@ foreach ($script in @(
 Test-Component -Label 'KbIntelligence\kb-intelligence.sqlite' `
     -Path (Join-Path $KbRoot 'KbIntelligence\kb-intelligence.sqlite') -Type Leaf
 
+# Auditoria de parse dos scripts esperados
+foreach ($scriptName in @(
+    'Update-KbFromXpz.ps1',
+    'Test-KbFullSnapshot.ps1',
+    'Query-KbIntelligence.ps1',
+    'Rebuild-KbIntelligenceIndex.ps1',
+    'Test-KbGate.ps1',
+    'Get-KbMetadata.ps1',
+    'Test-KbStructure.ps1'
+)) {
+    $scriptPath = Join-Path $scriptsDir $scriptName
+    if (-not (Test-Path -LiteralPath $scriptPath -PathType Leaf)) { continue }
+    $parseTokens = $null
+    $parseErrors = $null
+    [System.Management.Automation.Language.Parser]::ParseFile($scriptPath, [ref]$parseTokens, [ref]$parseErrors) | Out-Null
+    if ($parseErrors.Count -gt 0) {
+        $errorSummary = ($parseErrors | ForEach-Object { "linha $($_.Extent.StartLineNumber): $($_.Message)" }) -join '; '
+        $results.Add([pscustomobject]@{
+            Component = "scripts\$scriptName"
+            Status    = 'PARSE_ERROR'
+            Path      = $errorSummary
+        })
+    }
+}
+
 # Auditoria de naming em ObjetosDaKbEmXml
 $acervoPath = Join-Path $KbRoot 'ObjetosDaKbEmXml'
 $namingDivergencias = [System.Collections.Generic.List[string]]::new()
@@ -159,9 +184,16 @@ if ($namingDivergencias.Count -gt 0) {
     Write-Warning "Corrija os nomes via xpz-kb-parallel-setup (modo_atualizacao)."
 }
 
-$blocked = @($results | Where-Object { $_.Status -eq 'AUSENTE' })
+$blocked = @($results | Where-Object { $_.Status -in @('AUSENTE', 'PARSE_ERROR') })
 if ($blocked.Count -gt 0) {
-    Write-Warning ("$($blocked.Count) componente(s) ausente(s). Execute xpz-kb-parallel-setup para corrigir.")
+    $ausenteCount = @($results | Where-Object { $_.Status -eq 'AUSENTE' }).Count
+    $parseCount   = @($results | Where-Object { $_.Status -eq 'PARSE_ERROR' }).Count
+    if ($ausenteCount -gt 0) {
+        Write-Warning ("$ausenteCount componente(s) ausente(s). Execute xpz-kb-parallel-setup para corrigir.")
+    }
+    if ($parseCount -gt 0) {
+        Write-Warning ("$parseCount script(s) com erro de parse detectado pelo parser do PowerShell. Corrija antes de continuar.")
+    }
     exit 1
 }
 
