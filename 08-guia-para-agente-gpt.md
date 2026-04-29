@@ -258,6 +258,21 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 - usar `identidade e contêiner` como bloco inicial para `parent`, `module`, `fullyQualifiedName`, risco de clonagem e classificacao estrutural
 - usar `dependencias` como bloco inicial quando o sintoma nascer de `MasterPage`, pattern, user control, objeto chamado ou vinculo externo ausente
 
+### Regra adicional para revisao de `WorkWithForWeb`
+
+- em `WorkWithForWeb`, revisar por blocos funcionais; nao ler o objeto como XML pequeno autossuficiente quando a pergunta for de comportamento, filtro, navegacao, action ou diagnostico fino
+- os blocos canonicos sao `Transaction binding`, `Pattern structure and navigation`, `Actions, links and prompts`, `Attribute references and data contract` e `Identity and container`
+- antes da analise fina, declarar qual e o bloco primario do sintoma atual
+- abrir bloco adjacente apenas quando houver dependencia funcional explicita com o bloco primario
+- nomear a transicao de bloco no raciocinio e no handoff, por exemplo: `Actions, links and prompts -> Pattern structure and navigation` para validar em qual `Selection` a action realmente mora
+- parar a expansao quando a hipotese ja estiver sustentada; nao reabrir o `WorkWithForWeb` inteiro por reflexo
+- usar `Transaction binding` como bloco inicial para `parent`, `parentGuid`, `parentType`, `Transaction` associada, acoplamento estrutural e suspeita de WW ligado ao pai errado
+- usar `Pattern structure and navigation` como bloco inicial para `selection`, abas, `view`, filtros, navegacao e shape funcional interno do pattern
+- usar `Actions, links and prompts` como bloco inicial para action, botao, item de menu, `gxobject`, link, prompt e abertura explicita de outro objeto
+- usar `Attribute references and data contract` como bloco inicial para atributo exibido, filtro por atributo, coluna, aba dependente de atributo, referencia quebrada e convenio estrutural `adbb33c9-0906-4971-833c-998de27e0676-NomeDoAtributo`
+- usar `Identity and container` como bloco inicial para `name`, `fullyQualifiedName`, `guid`, `moduleGuid`, contêiner, origem estrutural e risco de confundir a instancia alvo
+- tratar `WebPanel` gerado ao redor e `WorkWithPlus` apenas como dependencias externas explicitas; eles nao sao bloco funcional interno canonico de `WorkWithForWeb`
+
 ## Regra de leitura para XPZ
 
 - antes de usar `xpz-sync`, `xpz-builder` ou `xpz-doc-builder` em fluxo dependente de repositorio, confirmar que a pasta paralela da KB esta montada e validada; se nao estiver, usar `xpz-kb-parallel-setup` primeiro
@@ -267,6 +282,7 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 - em setup inicial padrao de pasta paralela da KB, com pasta nativa ja informada, sem nomes alternativos e sem conflito estrutural visivel, evitar exploracao ampla do motor compartilhado e dos exemplos antes de criar a estrutura base; aprofundar exploracao so se surgir bloqueio concreto
 - quando a inspecao local da pasta contradisser contexto indireto do ambiente, da sessao ou de hooks, confiar primeiro na inspecao local e seguir com verificacao curta e objetiva; nao gastar o handoff especulando longamente sobre o conflito
 - quando a tarefa envolver gerar, ajustar, preservar ou empacotar XMLs, distinguir explicitamente as tres areas operacionais do repositorio: `ObjetosDaKbEmXml`, `ObjetosGeradosParaImportacaoNaKbNoGenexus` e `PacotesGeradosParaImportacaoNaKbNoGenexus`
+- em auditoria de pasta paralela de KB, declarar separadamente `sync/materializacao`, `indice/gate` e `empacotamento local`; nao concluir "tudo certo" so porque gate e estrutura passaram quando o fluxo de empacotamento local ainda nao foi auditado
 - na carga inicial, considerar tambem `XpzExportadosPelaIDE` como pasta de entrada padrão, `scripts` como pasta de wrappers, `Temp` como destino preferencial de artefatos efemeros de execucao, `KbIntelligence` como pasta do indice derivado, e as demais pastas como estrutura funcional padrão quando o usuario nao informar nomes alternativos
 - se alguma dessas pastas ainda nao existir, criar nesta ordem: `scripts`, `Temp`, `XpzExportadosPelaIDE`, `ObjetosDaKbEmXml`, `KbIntelligence`, `ObjetosGeradosParaImportacaoNaKbNoGenexus`, `PacotesGeradosParaImportacaoNaKbNoGenexus`
 - quando a pasta paralela ja estiver versionada em Git e o setup inicial estiver criando a estrutura do zero, tratar `.gitignore` na raiz e `.gitkeep` nas subpastas estruturais vazias como parte esperada do bootstrap
@@ -307,6 +323,7 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
   - `materializacao em ObjetosDaKbEmXml`: XMLs oficiais foram criados/atualizados pelo fluxo oficial a partir do `XPZ`
   - `refresh/validacao do indice`: `KbIntelligence` foi regenerado/validado e tem `last_index_build_run_at >= last_xpz_materialization_run_at`
   - `conferencia full`: verificacao posterior do acervo, que nao substitui nem deve sobrescrever o relatorio da materializacao principal
+- em auditoria de setup de pasta paralela que adota `KbIntelligence`, validar o contrato de `Get-*KbMetadata.ps1` pelo gate local `Test-*KbMetadataWrapper.ps1` quando ele existir; se o gate bloquear, nao classificar o wrapper de metadata como equivalente por inspecao textual
 - `XPZ` full define o insumo exportado; `FullSnapshot` define modo adicional de verificacao do acervo
 - na materializacao normal do `XPZ` em `ObjetosDaKbEmXml`, inclusive na primeira carga por `XPZ` full vindo da IDE ou por export headless via `MSBuild`, nao presumir `-FullSnapshot` como padrao implicito nem como atalho ergonomico
 - usar `-FullSnapshot` apenas quando houver pedido explicito do usuario por conferencia full, quando o wrapper especifico de conferencia full for o caminho escolhido ou quando a documentacao local exigir isso nominalmente
@@ -336,8 +353,9 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 - ao gerar pacote local para importacao na IDE, preferir nome no formato `NomeCurto_GUID_YYYYMMDD_nn.import_file.xml`
 - nesse formato, `NomeCurto` identifica a frente, `GUID` e `YYYYMMDD` identificam a abertura da frente, e `nn` representa apenas a rodada curta daquela frente
 - antes de gravar `NomeCurto_GUID_YYYYMMDD_nn.import_file.xml`, verificar se ja existe pacote com o mesmo prefixo `NomeCurto_GUID_YYYYMMDD` e o mesmo `nn` em `PacotesGeradosParaImportacaoNaKbNoGenexus`
-- se o mesmo prefixo e o mesmo `nn` ja existirem, abortar a gravacao; nao sobrescrever silenciosamente a rodada
-- quando houver colisao de `nn`, retornar erro explicito com sugestao do proximo `nn` livre para aquela frente, sem autoincrementar nem gravar automaticamente com o valor sugerido
+- quando a regra for deterministica e houver gate `.ps1` correspondente, executar o gate em vez de decidir por heuristica textual; para colisao de pacote, preferir `Test-*KbPackageCollision.ps1` ou o engine compartilhado `scripts\Test-XpzPackageCollision.ps1`
+- se o mesmo prefixo e o mesmo `nn` ja existirem, o gate deve abortar a gravacao; nao sobrescrever silenciosamente a rodada
+- quando houver colisao de `nn`, retornar o erro explicito e a sugestao do proximo `nn` livre emitidos pelo proprio gate, sem autoincrementar nem gravar automaticamente com o valor sugerido
 - `OBSOLETO_` nao e convencao principal de nome; usar so como contencao de risco quando dois pacotes da mesma frente puderem ser confundidos
 
 ## Regra de leitura para XPZ via MSBuild
@@ -639,7 +657,3 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 - Regra operacional: quando `Procedure` de relatorio simples estiver coberta por molde canonico da trilha, rotular a resposta como baseada em `molde sanitizado`; quando houver escalada, rotular explicitamente `XML real da KB atual`, `XML real de outra KB` ou `hipotese`
 - Hipótese: no caso de `WorkWithForWeb`, os anexos ajudam a prototipar, mas ainda nao eliminam a necessidade de cautela extra quando o caso concreto depender fortemente de `pattern` gerado e contexto do objeto pai
 - Hipótese: nem todos os tipos da base chegaram nesse mesmo nivel de cobertura; para varios deles ainda prevalece a orientacao por familia + molde bruto comparavel
-
-
-
-

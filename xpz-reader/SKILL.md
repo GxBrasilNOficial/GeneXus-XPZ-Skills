@@ -45,6 +45,7 @@ Do NOT use this skill for:
 - Map Part types present in input against observed frequencies and known patterns, using [01b-matriz-part-types-por-tipo](../01b-matriz-part-types-por-tipo.md) when needed
 - Classify object family when applicable: WebPanel families in [04-webpanel-familias-e-templates](../04-webpanel-familias-e-templates.md), Transaction families in [05-transaction-familias-e-templates](../05-transaction-familias-e-templates.md)
 - For `WebPanel`, classify the review by functional block before fine analysis: `layout`, `events`, `variables`, `serialized functional metadata`, `identity and container`, or `dependencies`
+- For `WorkWithForWeb`, classify the review by functional block before fine analysis: `Transaction binding`, `Pattern structure and navigation`, `Actions, links and prompts`, `Attribute references and data contract`, or `Identity and container`
 - For `Transaction`, classify the review by functional block before fine analysis: `Transaction structure`, `Attributes and attribute properties`, `Rules`, `Events`, `Execution context`, or `Identity and container`
 - For `Procedure`, classify the review by functional block before fine analysis: `Source`, `Rules/parm`, `Variables`, `Calls and dependencies`, `Identity and container`, and `Report layout` when applicable
 - For `DataProvider`, classify the review by functional block before fine analysis: `Output structure`, `Source`, `Navigation context`, `Calls and dependencies`, or `Identity and container`
@@ -138,45 +139,53 @@ Reference files and when to load them:
    - `identity and container` for `fullyQualifiedName`, `parent`, `parentGuid`, `parentType`, and `moduleGuid`
    - `dependencies` for `MasterPage`, pattern links, user controls, and relevant external object references
 13. For `WebPanel`, open adjacent blocks only when there is explicit functional dependency with the primary block, and name that transition in the analysis
-14. If type is Transaction → load [05-transaction-familias-e-templates](../05-transaction-familias-e-templates.md), classify family (F1–F6), and classify the primary review block before fine analysis:
+14. If type is `WorkWithForWeb` → classify the primary review block before fine analysis:
+   - `Transaction binding` for `parent`, `parentGuid`, `parentType`, associated `Transaction`, structural coupling, and suspicion that the WW is attached to the wrong parent
+   - `Pattern structure and navigation` for `selection`, tabs, `view`, filters, navigation, and functional organization inside the serialized pattern
+   - `Actions, links and prompts` for actions, buttons, menu items, `gxobject`, links, prompts, and explicit openings of external objects from the WW
+   - `Attribute references and data contract` for displayed attributes, attribute-based filters, columns, tabs depending on attributes, broken references, and the structural convention `adbb33c9-0906-4971-833c-998de27e0676-NomeDoAtributo`
+   - `Identity and container` for `fullyQualifiedName`, `name`, `guid`, `moduleGuid`, container, and risk of confusing the target instance with another similar one
+15. For `WorkWithForWeb`, open adjacent blocks only when there is explicit functional dependency with the primary block, name that transition in the analysis, and treat surrounding generated `WebPanel` or `WorkWithPlus` artifacts only as explicit external dependencies, never as canonical internal blocks of `WorkWithForWeb`
+16. If type is Transaction → load [05-transaction-familias-e-templates](../05-transaction-familias-e-templates.md), classify family (F1–F6), and classify the primary review block before fine analysis:
    - `Transaction structure` for `Level`, key, `DescriptionAttribute`, structural shape, and transactional composition
    - `Attributes and attribute properties` for attributes, `AttributeProperties`, subtype linkage, and data-contract questions
    - `Rules` for declarative rules, obligation, and normative transaction behavior
    - `Events` for interface-driven behavior and flow via web editing
    - `Execution context` when the main ambiguity is the distinction between web editing and BC usage
    - `Identity and container` for `fullyQualifiedName`, `parent`, `parentGuid`, `parentType`, and `moduleGuid`
-15. For `Transaction`, open adjacent blocks only when there is explicit functional dependency with the primary block, name that transition in the analysis, and state whether the conclusion applies via web editing, via BC, or remains unresolved across contexts
-16. If type is `DataProvider` → classify the primary review block before fine analysis:
+17. For `Transaction`, open adjacent blocks only when there is explicit functional dependency with the primary block, name that transition in the analysis, and state whether the conclusion applies via web editing, via BC, or remains unresolved across contexts
+18. If type is `DataProvider` → classify the primary review block before fine analysis:
    - `Output structure` for collection vs simple, nested groups, node names, cardinality, and coherence of the promised return shape
    - `Source` for conditions, assignments, assembly logic, calculations, population of output nodes, and internal flow
    - `Navigation context` for implicit or declared base, `For each`, filters, base table, and navigation ambiguity
    - `Calls and dependencies` for `SDT`, `Procedure`, `BC`, `Transaction`, and immediate external dependencies needed to justify the conclusion
    - `Identity and container` for `fullyQualifiedName`, `parent`, `parentGuid`, `parentType`, and `moduleGuid`
-17. For `DataProvider`, open adjacent blocks only when there is explicit functional dependency with the primary block, and name that transition in the analysis
-18. If type is `API` → classify the primary review block before fine analysis:
+19. For `DataProvider`, open adjacent blocks only when there is explicit functional dependency with the primary block, and name that transition in the analysis
+20. If type is `API` → classify the primary review block before fine analysis:
    - `Service contract` for exposed method, endpoint, external signature, and published operation shape
    - `Events and orchestration` for `.Before/.After`, internal flow, validation, transformation, and orchestration behavior
    - `Calls and dependencies` for `Procedure`, `SDT`, `Domain`, `Transaction`, `EXO`, `DataProvider`, and immediate external dependencies needed to justify the conclusion
    - `Data contract` for input/output shape, type coherence, response structure, and mapping between contract and processed data
    - `Identity and container` for `fullyQualifiedName`, `parent`, `parentGuid`, `parentType`, and `moduleGuid`
-19. For `API`, open adjacent blocks only when there is explicit functional dependency with the primary block, and name that transition in the analysis
-20. If type is `Procedure` → classify the primary review block before fine analysis:
+21. For `API`, open adjacent blocks only when there is explicit functional dependency with the primary block, and name that transition in the analysis
+22. If type is `Procedure` → classify the primary review block before fine analysis:
    - `Source` for filters, flow, conditions, assignments, navigation, and calls made in the body
    - `Rules/parm` for signature, parameters, declarative contract, and rule-focused errors
    - `Variables` for existence, type, helper declarations, and collection-vs-simple coherence
    - `Calls and dependencies` for callee review, dependency chain, and proof of caller call-site
    - `Identity and container` for `fullyQualifiedName`, `parent`, `parentGuid`, `parentType`, and `moduleGuid`
    - `Report layout` only when the `Procedure` is a report and the symptoms involve `Bands`, `PrintBlock`, `ReportLabel`, `ReportAttribute`, or layout shape
-21. For `Procedure`, open adjacent blocks only when there is explicit functional dependency with the primary block, and name that transition in the analysis
-22. If type is report `Procedure` → load [05b-procedure-relatorio-familias-e-templates](../05b-procedure-relatorio-familias-e-templates.md), classify family, and separate observed evidence into `Source`, `Rules`, and layout
-23. For report `Procedure`, if the symptoms point to `invalid control`, `printBlock`, `ReportLabel`, or `ReportAttribute`, classify the primary suspicion as layout; if they point to `parm(...)` or missing `;`, classify the primary suspicion as `Rules`; if they point to `Header`, `Footer`, `For each`, or `Output_file`, classify the primary suspicion as `Source`
-24. For report `Procedure`, if the case still fits simple F2/F3 coverage with no repeated structural failure signal, report that sanitized canonical coverage is still available and label the basis as `molde sanitizado`; otherwise recommend escalation to comparable real XML explicitly
-25. Assign risk level from [03-risco-e-decisao-por-tipo](../03-risco-e-decisao-por-tipo.md)
-26. Report result:
+23. For `Procedure`, open adjacent blocks only when there is explicit functional dependency with the primary block, and name that transition in the analysis
+24. If type is report `Procedure` → load [05b-procedure-relatorio-familias-e-templates](../05b-procedure-relatorio-familias-e-templates.md), classify family, and separate observed evidence into `Source`, `Rules`, and layout
+25. For report `Procedure`, if the symptoms point to `invalid control`, `printBlock`, `ReportLabel`, or `ReportAttribute`, classify the primary suspicion as layout; if they point to `parm(...)` or missing `;`, classify the primary suspicion as `Rules`; if they point to `Header`, `Footer`, `For each`, or `Output_file`, classify the primary suspicion as `Source`
+26. For report `Procedure`, if the case still fits simple F2/F3 coverage with no repeated structural failure signal, report that sanitized canonical coverage is still available and label the basis as `molde sanitizado`; otherwise recommend escalation to comparable real XML explicitly
+27. Assign risk level from [03-risco-e-decisao-por-tipo](../03-risco-e-decisao-por-tipo.md)
+28. Report result:
    - Object type and canonical name
    - Container classification (`Folder`, `Module`, or unresolved)
    - Structural family (if applicable)
    - For `WebPanel`, primary review block and any justified block transition used in the analysis
+   - For `WorkWithForWeb`, primary review block and any justified block transition used in the analysis
    - For `Transaction`, primary review block and any justified block transition used in the analysis, plus explicit scope via web editing, via BC, or unresolved
    - For `DataProvider`, primary review block and any justified block transition used in the analysis
    - For `API`, primary review block and any justified block transition used in the analysis
@@ -202,6 +211,7 @@ Reference files and when to load them:
 - [ ] Risk level stated with source reference
 - [ ] Family classified when type supports it (WebPanel, Transaction)
 - [ ] For `WebPanel`, the primary review block was declared before fine analysis and any block transition was justified explicitly
+- [ ] For `WorkWithForWeb`, the primary review block was declared before fine analysis and any block transition was justified explicitly
 - [ ] For `Transaction`, the primary review block was declared before fine analysis, any block transition was justified explicitly, and web editing vs BC scope was stated when relevant
 - [ ] For `DataProvider`, the primary review block was declared before fine analysis and any block transition was justified explicitly
 - [ ] For `API`, the primary review block was declared before fine analysis and any block transition was justified explicitly
@@ -228,6 +238,7 @@ Reference files and when to load them:
 - NEVER turn BC `status/message` methods such as `.Success()`, `.Fail()`, or `.GetMessages()` into a new functional operation without direct evidence beyond the cited line
 - NEVER infer runtime semantics for BC collection methods from name similarity alone; require the simple-vs-collection classification first
 - For `WebPanel`, NEVER jump from one functional block to another without explicit dependency rationale
+- For `WorkWithForWeb`, NEVER jump from one functional block to another without explicit dependency rationale, and NEVER treat surrounding generated `WebPanel` or `WorkWithPlus` artifacts as canonical internal blocks of the WW itself
 - For `Transaction`, NEVER collapse web editing and BC behavior into the same conclusion without explicit evidence
 - For `DataProvider`, NEVER treat output shape as proved only by dependency inventory, or navigation context as proved only by the return shape
 - For `API`, NEVER treat dependency inventory as enough to prove service contract, or service contract text as enough to prove the full orchestration chain

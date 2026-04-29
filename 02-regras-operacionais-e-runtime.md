@@ -335,8 +335,9 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
 - `Regra operacional`: nesse padrao, `NomeCurto` e uma descricao curta, legivel e semanticamente forte da frente; `GUID` e o identificador aberto para aquela frente; `YYYYMMDD` e a data de abertura da frente; `nn` e apenas o contador curto e incremental da rodada daquela frente.
 - `Regra operacional`: `nn` nao representa versao semantica profunda nem historico de release; ele representa somente o candidato curto daquela frente.
 - `Regra operacional`: antes de gravar `NomeCurto_GUID_YYYYMMDD_nn.import_file.xml` em `PacotesGeradosParaImportacaoNaKbNoGenexus`, verificar se ja existe arquivo com o mesmo prefixo de frente `NomeCurto_GUID_YYYYMMDD` e o mesmo `nn`.
-- `Regra operacional`: se ja existir pacote com o mesmo prefixo de frente e o mesmo `nn`, abortar a gravacao; nao sobrescrever silenciosamente a rodada.
-- `Regra operacional`: quando houver colisao de `nn`, retornar erro explicito com sugestao do proximo `nn` livre para aquela frente, mas sem autoincrementar nem gravar automaticamente com o valor sugerido.
+- `Regra operacional`: quando a decisao for deterministica, o enforcement primario deve viver em `.ps1`; para colisao de pacote, preferir um gate dedicado como `Test-XpzPackageCollision.ps1` ou wrapper local equivalente, em vez de recalcular a regra no texto da resposta.
+- `Regra operacional`: se ja existir pacote com o mesmo prefixo de frente e o mesmo `nn`, o gate deve abortar a gravacao; nao sobrescrever silenciosamente a rodada.
+- `Regra operacional`: quando houver colisao de `nn`, o erro explicito e a sugestao do proximo `nn` livre devem sair do proprio gate `.ps1`, sem autoincrementar nem gravar automaticamente com o valor sugerido.
 - `Regra operacional`: nao usar como padrao nome so com assunto, nome so com data ou hora, descricao excessivamente longa da conversa ou sobrescrita recorrente do mesmo nome de pacote.
 - `Regra operacional`: se um pacote anterior perder validade por mudanca de direcao da frente, ele deve ser marcado como provisório ou obsoleto e deixar de ser tratado como candidato principal.
 
@@ -492,6 +493,26 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
 - `Regra operacional`: em clonagem conservadora de `WebPanel` que deveria preservar a superficie de bindings, comparar antes do empacotamento os bindings serializados relevantes entre original e clone; no minimo, `fieldSpecifier` deve bater em contagem e nomes, e divergencia sem classificacao explicita bloqueia o pacote.
 - `Evidência direta`: declarar `controlName` explicito em `<data>` pode reduzir ambiguidade estrutural no XML, mas isso nao garante que o nome fique disponivel como identificador manipulavel no source do objeto.
 - `Regra operacional`: em pacote delta GeneXus, quando ja existir pacote equivalente validado na IDE, reaproveitar o envelope completo desse pacote como molde; nao simplificar cabecalho, `Dependencies` ou `ObjectsIdentityMapping` por inferencia.
+
+### Revisao por blocos em `WorkWithForWeb`
+
+- `Regra operacional`: em `WorkWithForWeb`, nao tratar o objeto como XML pequeno autossuficiente; a revisao fina deve separar explicitamente vinculo transacional, comportamento serializado do pattern e identidade estrutural da instancia.
+- `Regra operacional`: os blocos canonicos de revisao em `WorkWithForWeb` sao `Transaction binding`, `Pattern structure and navigation`, `Actions, links and prompts`, `Attribute references and data contract` e `Identity and container`.
+- `Regra operacional`: `Transaction binding` cobre `parent`, `parentGuid`, `parentType` e o vinculo explicito com a `Transaction` pai.
+- `Regra operacional`: `Pattern structure and navigation` cobre o XML interno do `Data` no que define `selection`, `tab`, `view`, filtros, navegacao e organizacao funcional do pattern.
+- `Regra operacional`: `Actions, links and prompts` cobre actions estruturadas, `gxobject`, links explicitos, prompts e disparos associados dentro do pattern serializado.
+- `Regra operacional`: `Attribute references and data contract` cobre referencias a atributos, filtros, colunas, abas e o convenio estrutural `adbb33c9-0906-4971-833c-998de27e0676-NomeDoAtributo`.
+- `Regra operacional`: `Identity and container` cobre `name`, `fullyQualifiedName`, `guid`, `moduleGuid`, contêiner e classificacao estrutural do objeto.
+- `Regra operacional`: antes de aprofundar a leitura, declarar qual e o bloco primario do sintoma atual; se o agente ainda nao souber qual e o bloco primario, ele ainda nao esta pronto para revisao fina.
+- `Regra operacional`: abrir bloco adjacente apenas por dependencia funcional explicita; transicao sem motivo declarado reintroduz leitura difusa do `WorkWithForWeb`.
+- `Regra operacional`: em `WorkWithForWeb`, as transicoes mais comuns e justificadas sao `Transaction binding -> Attribute references and data contract`, `Transaction binding -> Pattern structure and navigation`, `Pattern structure and navigation -> Attribute references and data contract`, `Pattern structure and navigation -> Actions, links and prompts`, `Actions, links and prompts -> Pattern structure and navigation`, `Actions, links and prompts -> Attribute references and data contract`, `Attribute references and data contract -> Transaction binding`, `Identity and container -> Transaction binding` e `Identity and container -> Pattern structure and navigation`.
+- `Regra operacional`: usar `Transaction binding` como bloco inicial quando a duvida nascer de `parent*`, acoplamento estrutural, `Transaction` associada ou suspeita de `WorkWithForWeb` ligado ao pai errado.
+- `Regra operacional`: usar `Pattern structure and navigation` como bloco inicial quando o sintoma falar de `selection`, abas, `view`, filtro, navegacao, organizacao funcional da listagem ou shape interno do pattern.
+- `Regra operacional`: usar `Actions, links and prompts` como bloco inicial quando a pergunta falar de action, botao, item de menu, `gxobject`, link, prompt, abertura de outro objeto ou disparo explicito a partir do `WorkWithForWeb`.
+- `Regra operacional`: usar `Attribute references and data contract` como bloco inicial quando o sintoma falar de atributo exibido, filtro por atributo, coluna, aba dependente de atributo, referencia quebrada ou contrato de dados presumido pelo pattern.
+- `Regra operacional`: usar `Identity and container` como bloco inicial quando a duvida falar de `name`, `fullyQualifiedName`, `guid`, `moduleGuid`, contêiner, origem do objeto ou risco de confundir a instancia alvo com outra parecida.
+- `Regra operacional`: em `WorkWithForWeb`, `WebPanel` gerado ao redor e familias `WorkWithPlus` so entram na revisao como dependencia externa explicita; nao usa-los como bloco funcional interno padrao deste tipo.
+- `Regra operacional`: parar a expansao quando a hipotese ja estiver sustentada; nao reabrir o `WorkWithForWeb` inteiro por reflexo.
 
 #### Exemplos sanitizados minimos
 
