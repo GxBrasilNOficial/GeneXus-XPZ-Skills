@@ -80,6 +80,19 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
   - exposicao dessa capacidade no wrapper local
   - decisao local do usuario/equipe sobre atualizar ou nao o wrapper
 
+## Regra de leitura para baseline oficial conhecido
+
+- quando a pergunta envolver review, sanity, regressao, defeito herdado ou qualidade de delta em objeto legado, separar explicitamente `sanity absoluto do artefato atual` de `comparacao contra baseline oficial`
+- responder primeiro o `sanity absoluto` e so depois, se houver baseline oficial confiavel, responder a comparacao
+- usar como baseline apenas fonte oficial e rastreavel da trilha, como snapshot oficial em `ObjetosDaKbEmXml` ou export oficial comparavel da IDE; nao usar copia provisoria, delta local ou XML contaminado como baseline
+- rotular a comparacao com exatamente um destes estados: `same as official baseline`, `worse than official baseline`, `better than official baseline` ou `no official baseline compared`
+- nunca tratar `same as official baseline` como sinonimo de `bom`; isso prova apenas ausencia de piora relevante naquela dimensao comparada
+- se o artefato atual falhar em `sanity absoluto`, manter a reprovacao mesmo quando a comparacao indicar `same as official baseline` ou `better than official baseline`
+- quando o problema ja existia no baseline oficial e o delta nao piorou, descrever como risco ou defeito herdado, nao como regressao introduzida agora
+- antes de concluir `worse than official baseline`, filtrar primeiro ruido conhecido e nao funcional ja documentado pela trilha
+- se nao houver baseline oficial confiavel ou se ele nao tiver sido realmente aberto, usar `no official baseline compared` em vez de inferir comparacao por memoria, plausibilidade ou recencia
+- em revisao por blocos, comparar primeiro o `bloco primario` tocado pelo delta e so expandir para bloco adjacente quando a dependencia funcional exigir
+
 ## Regra de leitura para campos derivados
 
 - nome de atributo calculado ou derivado nao prova semantica funcional
@@ -626,7 +639,6 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 - Regra operacional: quando `Procedure` de relatorio simples estiver coberta por molde canonico da trilha, rotular a resposta como baseada em `molde sanitizado`; quando houver escalada, rotular explicitamente `XML real da KB atual`, `XML real de outra KB` ou `hipotese`
 - Hipótese: no caso de `WorkWithForWeb`, os anexos ajudam a prototipar, mas ainda nao eliminam a necessidade de cautela extra quando o caso concreto depender fortemente de `pattern` gerado e contexto do objeto pai
 - Hipótese: nem todos os tipos da base chegaram nesse mesmo nivel de cobertura; para varios deles ainda prevalece a orientacao por familia + molde bruto comparavel
-
 
 
 

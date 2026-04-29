@@ -136,6 +136,24 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
 - `Regra operacional`: alerta consultivo isolado nao bloqueia automaticamente, mas deve ser registrado como risco e resolvido quando o trecho ainda estiver sustentado apenas por plausibilidade.
 - `Regra operacional`: cheque automatizado leve de `Source`, quando existir no repositório, deve ser tratado como apoio de triagem e nao como prova completa de importabilidade.
 
+### Baseline oficial conhecido em revisao e sanity
+
+- `Regra operacional`: em objeto legado, separar explicitamente duas decisoes independentes: `sanity absoluto do artefato atual` e `comparacao contra baseline oficial`.
+- `Regra operacional`: `sanity absoluto` responde se o artefato atual esta aceitavel por si so, independentemente do historico.
+- `Regra operacional`: `comparacao contra baseline oficial` responde apenas se o delta atual preservou, piorou, melhorou ou nao foi comparado contra o estado oficial anterior da KB.
+- `Regra operacional`: o baseline valido para essa comparacao deve ser oficial e rastreavel, como snapshot oficial em `ObjetosDaKbEmXml`, export oficial comparavel da IDE ou outro artefato explicitamente qualificado como baseline oficial pela trilha.
+- `Regra operacional`: copia intermediaria de trabalho, XML contaminado, pacote provisório, export informal ou delta local ainda nao devolvido oficialmente pela KB nao valem como baseline oficial.
+- `Regra operacional`: a classificacao comparativa canonica deve usar exatamente um destes estados: `same as official baseline`, `worse than official baseline`, `better than official baseline` ou `no official baseline compared`.
+- `Regra operacional`: `same as official baseline` nao significa `bom`; significa apenas que o delta nao introduziu diferenca relevante naquela dimensao comparada.
+- `Regra operacional`: `worse than official baseline` indica regressao introduzida pelo delta atual naquela dimensao comparada, salvo reclassificacao posterior por ruido conhecido explicitamente documentado.
+- `Regra operacional`: `better than official baseline` indica melhoria em relacao ao baseline oficial, mas nao dispensa verificar se essa melhoria fazia parte do pedido ou se virou `mudanca extra nao pedida`.
+- `Regra operacional`: `no official baseline compared` deve ser usado quando nao houver baseline oficial confiavel, quando o baseline nao tiver sido efetivamente aberto, ou quando a comparacao segura ainda nao puder ser concluida.
+- `Regra operacional`: falha em `sanity absoluto` bloqueia consolidacao e empacotamento mesmo que o resultado comparativo seja `same as official baseline` ou `better than official baseline`.
+- `Regra operacional`: comparacao contra baseline nao absolve defeito herdado; se o artefato atual falhar em sanidade, o resultado deve continuar reprovado, ainda que o problema ja existisse no baseline oficial.
+- `Regra operacional`: quando o achado comparativo indicar problema herdado sem piora do delta, registrar isso como ressalva ou risco herdado, e nao como regressao introduzida pelo delta.
+- `Regra operacional`: antes de concluir `worse than official baseline`, filtrar ruido ja conhecido e explicitamente documentado pela trilha, para nao promover diferenca nao funcional a regressao real.
+- `Regra operacional`: quando a revisao estiver organizada por blocos, a comparacao contra baseline deve priorizar primeiro o `bloco primario` tocado pelo delta e abrir bloco adjacente apenas se a dependencia funcional exigir.
+
 ### Conferencia auditavel de `lastUpdate`
 
 - `Regra operacional`: gravou ou regravou XML local de objeto, releia o arquivo salvo antes de seguir.

@@ -92,6 +92,7 @@ Se você quer entender a base rapidamente:
 - ela não promete sucesso de importação ou build sem validação externa
 - a base já incorpora testes documentados de importação em casos controlados, mas isso não elimina risco
 - antes de gerar `import_file.xml` ou pacote importável, a trilha deve separar explicitamente `XML bem-formado` de `Source GeneXus estruturalmente conservador/provavelmente importável`; parse XML sozinho não basta
+- em revisão e sanity de objeto legado, a trilha deve separar explicitamente `sanity absoluto do artefato atual` de `comparacao contra baseline oficial`; `igual ao baseline` nao significa `bom`, e `pior que o baseline` indica regressao do delta
 - moldes sanitizados completos podem servir como ponto de partida em cenários específicos documentados na própria base; resumos textuais e exemplos incompletos não servem como fonte final de materialização
 - o conteúdo foi organizado para reduzir tentativa e erro, não para eliminar risco
 - existe uma pasta privada separada, `GeneXus-XPZ-PrivateMap`, usada apenas para rastreabilidade editorial privada entre aliases públicos e artefatos reais; a fonte publicada continua sendo esta raiz
@@ -271,6 +272,7 @@ Si quieres entender la base rápidamente:
 - no promete éxito de importación o build sin validación externa
 - la base ya incorpora pruebas documentadas de importación en casos controlados, pero eso no elimina el riesgo
 - antes de generar `import_file.xml` o paquete importable, la trilha debe separar explícitamente `XML bien formado` de `Source GeneXus estructuralmente conservador/probablemente importable`; el parseo XML por sí solo no alcanza
+- en revisión y sanity de objeto legado, la trilha debe separar explícitamente `sanity absoluto del artefacto actual` de `comparacion contra baseline oficial`; `igual al baseline` no significa `bueno`, y `peor que el baseline` indica regresion del delta
 - moldes sanitizados completos pueden servir como punto de partida en escenarios específicos documentados en la propia base; resúmenes textuales y ejemplos incompletos no sirven como fuente final de materialización
 - el contenido fue organizado para reducir prueba y error, no para eliminar riesgo
 - existe una carpeta privada separada, `GeneXus-XPZ-PrivateMap`, usada solo para trazabilidad editorial privada entre aliases públicos y artefactos reales; la fuente publicada sigue siendo esta raíz
@@ -450,6 +452,7 @@ If you want to understand the repository quickly:
 - it does not guarantee successful import or build without external validation
 - the base already includes documented import tests in controlled cases, but that still does not remove risk
 - before generating `import_file.xml` or another importable package, the trail must explicitly separate `well-formed XML` from `structurally conservative/probably importable GeneXus Source`; XML parsing alone is not enough
+- in legacy object review and sanity, the trail must explicitly separate `absolute sanity of the current artifact` from `comparison against the official baseline`; `same as baseline` does not mean `good`, and `worse than baseline` indicates delta regression
 - complete sanitized templates can serve as a starting point in specific scenarios documented in the base itself; textual summaries and incomplete examples are not valid as the final source for materialization
 - the content is meant to reduce trial and error, not to eliminate risk
 - there is a separate private folder, `GeneXus-XPZ-PrivateMap`, used only for private editorial traceability between public aliases and real artifacts; the published source remains this root

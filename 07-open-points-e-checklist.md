@@ -53,6 +53,7 @@ Servir como local único para conflitos não resolvidos silenciosamente.
 - `Hipótese`: a correspondência entre nomes compactos de diretório e nomes oficiais mostrados na IDE ainda deve ser validada diretamente na KB quando isso for necessário.
 - `Hipótese`: a diferença exata entre `Module` e `PackagedModule` no plano funcional ainda não pode ser fechada só com os XMLs extraídos.
 - `Hipótese`: ainda falta validar se os padrões observados nesta KB se repetem sem mudança relevante em outros exports GeneXus 18.
+- `Hipótese`: a base ainda nao fechou automacao confiavel para distinguir, em review de objeto legado, `defeito herdado`, `regressao introduzida`, `melhoria sobre baseline oficial` e `sem baseline oficial comparado` sem reinspecao humana por bloco.
 - `Evidência direta`: ja houve importacao bem-sucedida, nesta trilha, de um `.xpz` minimo de `Procedure` gerado a partir da propria base documental.
 - `Evidência direta`: nesse teste, placeholders textuais em `Source/@kb` e `Source/Version/@guid` causaram erro de parse; GUIDs sintaticamente validos destravaram a importacao.
 - `Evidência direta`: ainda nao ha evidência nesta trilha documental de build e execucao a partir de XMLs gerados.
@@ -89,6 +90,7 @@ Servir como local único para conflitos não resolvidos silenciosamente.
 - `Inferência forte`: vale isolar pares de objetos simples e complexos do mesmo grupo para comparação estrutural.
 - `Inferência forte`: vale produzir uma camada de validação cruzando `parent*`, `moduleGuid`, chamadas em código e nomes de objeto.
 - `Inferência forte`: antes de corrigir os `.md` dos tipos problemáticos, vale usar a bateria atual para distinguir "erro de molde" de "erro de dependência de KB" em cada tipo.
+- `Inferência forte`: vale abrir uma frente de automacao comparativa por baseline oficial, com diff normalizado por bloco funcional e filtragem de ruido conhecido, para reduzir falso positivo de regressao em objeto legado.
 - `Inferência forte`: a proxima coleta em exemplos reais deve priorizar `Table/Index` e outros tipos contextuais ainda nao revisitados com dependencias completas; para `API`, so faz sentido nova coleta se surgirem novos casos reais ou automacao externa no ambiente. Para `Theme`, `PatternSettings` e `Transaction`, a coleta adicional passa a ser de generalizacao e nao de desbloqueio inicial.
 
 ## Mini-postmortem de incidente metodologico
@@ -234,4 +236,3 @@ Orientar futuras coletas de templates comparáveis.
 - `Causa`: assumir a `Base Table` pelo nome do objeto ou por leitura parcial do bloco, sem confirmar a determinacao explicita ou implicita.
 - `Consequência`: aceitar atributos que nao pertencem a `Base Table`/`Extended Table` coerente, gerando analise errada ou ajuste de `Source` fora da navegacao real.
 - `Regra de checagem`: antes de validar atributos do bloco, identificar a `Base Table` determinada do `For each` e verificar cada referencia contra essa base e seu contexto coerente de navegacao.
-
