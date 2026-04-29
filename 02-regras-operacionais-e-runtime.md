@@ -267,7 +267,7 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
 - `Regra operacional`: o agente nao deve absorver mudanca extra nao pedida no pacote apenas porque ela apareceu no XML ativo, no diff local ou na reserializacao.
 - `Regra operacional`: o delta deve ser estrito pelo conteudo do pacote, nao por `git diff` abstrato.
 
-## Revisao por blocos em `Transaction`
+### Revisao por blocos em `Transaction`
 
 - `Regra operacional`: em `Transaction`, nao tratar a transacao inteira como bloco unico de leitura; a revisao fina deve declarar antes qual e o bloco primario do sintoma atual.
 - `Regra operacional`: os blocos canonicos de revisao em `Transaction` sao `Transaction structure`, `Attributes and attribute properties`, `Rules`, `Events`, `Execution context` e `Identity and container`.
@@ -452,7 +452,7 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
 - `Regra operacional`: concluir o estado final a partir da etapa terminal relevante do caso, e nao da linha mais alarmante do log.
 - `Regra operacional`: quando houver falha parcial, registrar separadamente o estado final do pacote e o estado final por objeto.
 
-### Validacao separada em `WebPanel` e pacote delta
+### Revisao por blocos em `WebPanel` e validacao de pacote delta
 
 - `Regra operacional`: tratar `WebPanel` como objeto de revisao por blocos funcionais, nao como massa unica de XML, sempre que a duvida envolver comportamento, filtro, evento, dependencia ou diagnostico fino.
 - `Regra operacional`: os blocos canonicos de revisao em `WebPanel` sao `layout`, `events`, `variables`, `metadado funcional serializado`, `identidade e contêiner` e `dependencias`.
