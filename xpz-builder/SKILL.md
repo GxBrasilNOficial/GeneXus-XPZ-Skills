@@ -50,6 +50,7 @@ If the main need is to prepare or validate the initial folder structure around t
 - Apply risk assessment from [03-risco-e-decisao-por-tipo](../03-risco-e-decisao-por-tipo.md) before proceeding
 - Abort if no comparable structural template exists and risk is high or very high
 - For `WebPanel`, classify the current delta by functional block before editing: `layout`, `events`, `variables`, `serialized functional metadata`, `identity and container`, or `dependencies`
+- For `Procedure`, classify the current delta by functional block before editing: `Source`, `Rules/parm`, `Variables`, `Calls and dependencies`, `Identity and container`, and `Report layout` when applicable
 - Clone conservatively: preserve `Object/@guid`, `parent*`, `moduleGuid`, all recurring Part types
 - Apply XPZ envelope rules from [02-regras-operacionais-e-runtime](../02-regras-operacionais-e-runtime.md)
 - Choose package format for deltas of existing objects by validated local precedent first, distinguishing explicitly between embedded-object packages under `<Objects>` and packages that use `<FilePath>` to point to external XML
@@ -114,6 +115,10 @@ If the main need is to prepare or validate the initial folder structure around t
 - Declare confidence level and limitations explicitly at the end of every output
 - Keep `WorkWithWeb` noise that is already proven in this trail as non-functional in the manifest, especially `Load Code` in `Selection` and the affected `View` tabs; do not generalize this to unrelated `WorkWithWeb` cases
 - When changing a `Procedure`, run a minimum semantic pre-packaging gate on the `Procedure` itself:
+  - declare the primary edit block before touching the XML
+  - use only the adjacent blocks required by explicit functional dependency
+  - name each justified block transition during review, for example `Rules/parm -> Variables` or `Source -> Calls and dependencies`
+  - if the current reasoning no longer needs a new block, stop expanding; do NOT reopen the whole object by reflex
   - distinguish `well-formed XML` from `minimum Source sanity gate passed`
   - if the object depends on `Source`, do not package while the `Source` gate is still unresolved
   - review structural pair balance touched by the delta, such as `Sub/EndSub`, `For each/EndFor`, `Do Case/EndCase`, and `If/EndIf`
@@ -500,6 +505,7 @@ Ao clonar tela customizada WorkWithPlus:
 - [ ] Variables referenced by the edited `Source` exist in the `Procedure`
 - [ ] Every new helper variable introduced by the current `Source` delta exists in the variables section and remains coherent with its declared type
 - [ ] For `WebPanel`, the primary edit block was declared before editing and any block transition was justified explicitly
+- [ ] For `Procedure`, the primary edit block was declared before editing and any block transition was justified explicitly
 - [ ] Every new method call introduced by the current `Source` delta on a variable is compatible with the declared type of that variable and is anchored by the methodological base loaded for the case
 - [ ] Cleanup or reinitialization introduced by the current `Source` delta for a collection, SDT, or `Messages, GeneXus.Common` uses a pattern anchored by the methodological base loaded for that declared type
 - [ ] For collection reinitialization introduced by the current `Source` delta and already covered by the methodological base, `= new()` was preferred and unsupported forms such as `SetEmpty()` were not accepted only by plausibility or analogy

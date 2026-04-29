@@ -185,6 +185,20 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
 - `Regra operacional`: em `Procedure` de relatorio, `;` faltando em `Rules` deve ser tratado como erro da camada `Rules`; `;` rejeitado em `Source` deve ser tratado como erro de dialeto/sintaxe de `Source`.
 - `Regra operacional`: nao inventar `GXML`, controles, propriedades ou shape alternativo para o `Part c414...` sem ancoragem em molde documentado ou XML real comparavel.
 
+### Revisao por blocos em `Procedure`
+
+- `Regra operacional`: em `Procedure`, nao presumir `Source` como bloco inicial universal; a revisao fina deve declarar antes qual e o bloco primario do sintoma atual.
+- `Regra operacional`: os blocos canonicos de revisao em `Procedure` sao `Source`, `Rules/parm`, `Variables`, `Calls and dependencies`, `Identity and container` e, quando aplicavel, `Report layout`.
+- `Regra operacional`: `Source` cobre fluxo procedural, filtros, atribuicoes, navegacao, condicoes e chamadas feitas no corpo.
+- `Regra operacional`: `Rules/parm` cobre assinatura declarativa e contrato de parametros; nao deve ser tratado como prova de call site.
+- `Regra operacional`: `Variables` cobre existencia, tipo, coerencia de nome e classificacao de colecao vs simples quando isso for relevante ao caso.
+- `Regra operacional`: `Calls and dependencies` cobre procedures chamadas, objetos auxiliares e a cadeia funcional imediata necessaria para justificar a conclusao.
+- `Regra operacional`: `Identity and container` cobre `name`, `fullyQualifiedName`, `parent`, `parentGuid`, `parentType` e `moduleGuid`.
+- `Regra operacional`: `Report layout` so existe como bloco proprio quando a `Procedure` for de relatorio e houver `Bands`, `PrintBlock`, `ReportLabel` ou `ReportAttribute` em jogo.
+- `Regra operacional`: abrir bloco adjacente apenas por dependencia funcional explicita; transicao sem motivo declarado reintroduz leitura difusa do objeto.
+- `Regra operacional`: em `Procedure`, as transicoes mais comuns e justificadas sao `Rules/parm -> Variables`, `Rules/parm -> Source`, `Source -> Variables`, `Source -> Calls and dependencies` e `Report layout -> Source`.
+- `Regra operacional`: parar a expansao quando a hipotese ja estiver sustentada; nao reabrir a `Procedure` inteira por reflexo.
+
 ### Escalada para corpus real
 
 - `Regra operacional`: quando a trilha ja cobrir o caso comum por molde sanitizado forte, o corpus real da KB nao deve ser exigido como primeiro passo.

@@ -44,3 +44,34 @@ Redis com modulo de busca vetorial (RediSearch / HNSW). Open source e gratuito. 
 - O ganho de descoberta por intencao compensa a complexidade de manter dois indices (SQLite estrutural + vetorial)?
 - Adotar LlamaIndex/LangChain + vector store exigiria reescrever os wrappers locais (`Query-*KbIntelligence.ps1`, gate, etc.) em todas as pastas paralelas?
 - O chunking por bloco logico do XML (`Source`, `Rules`, `Events`) e viavel dado o formato dos XMLs GeneXus?
+
+## Baseline conhecido no sanity e na revisao de objeto legado
+
+**Origem:** ideia discutida em 2026-04-29 e adiada para frente separada.
+
+### Problema concreto que motiva a ideia
+
+Hoje a trilha distingue bem `xmlWellFormed`, `sourceSanityStatus` e os gates minimos de `Source`, mas ainda nao expressa de forma curta e operacional a comparacao entre um delta novo e o XML oficial ja aceito do mesmo objeto.
+
+Em objeto legado grande, isso gera ruido de decisao:
+
+- warning antigo do baseline oficial pode ser lido como defeito novo do delta
+- piora nova pode passar despercebida sob o argumento de que "o objeto ja era ruim"
+- o agente pode misturar sanidade absoluta do XML com comparacao relativa contra o estado oficial anterior
+
+### Ideia de melhoria
+
+Adicionar, em frente separada, uma camada comparativa explicita e distinta do sanity absoluto, com saidas como:
+
+- `same as official baseline`
+- `worse than official baseline`
+- `better than official baseline`
+- `no official baseline compared`
+
+Essa camada nao substituiria `xmlWellFormed`, `sourceSanityStatus` nem os gates metodologicos atuais. Ela serviria para comparar o delta com o baseline oficial quando houver XML oficial comparavel do mesmo objeto.
+
+### Perguntas a responder antes de decidir
+
+- O que exatamente conta como `official baseline` em cada fluxo: XML oficial atual em `ObjetosDaKbEmXml`, ultimo delta aceito, ou outro marco explicitamente documentado?
+- A comparacao deve nascer primeiro como regra metodologica de handoff/revisao, ou ja como evolucao automatizada do `Test-GeneXusSourceSanity.ps1`?
+- Como impedir que baseline ruim vire permissao implicita para aceitar piora nova?

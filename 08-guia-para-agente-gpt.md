@@ -162,6 +162,21 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 - se o erro mencionar controle invalido, `printBlock` ou shape de relatorio, revisar layout antes de inferir defeito de envelope
 - se a solucao continuar sustentada so por plausibilidade depois de uma rodada corretiva, parar e escalar para XML real comparavel
 
+### Regra adicional para revisao de `Procedure`
+
+- em `Procedure`, revisar por blocos funcionais; nao presumir `Source` como bloco inicial universal
+- os blocos canonicos sao `Source`, `Rules/parm`, `Variables`, `Calls and dependencies`, `Identity and container` e, quando aplicavel, `Report layout`
+- antes da analise fina, declarar qual e o bloco primario do sintoma atual
+- abrir bloco adjacente apenas quando houver dependencia funcional explicita com o bloco primario
+- nomear a transicao de bloco no raciocinio e no handoff, por exemplo: `Rules/parm -> Variables` para validar contrato de parametros
+- parar a expansao quando a hipotese ja estiver sustentada; nao reabrir a `Procedure` inteira por reflexo
+- usar `Source` como bloco inicial para filtros, fluxo procedural, navegacao, atribuicoes, condicoes e chamadas feitas no corpo
+- usar `Rules/parm` como bloco inicial para assinatura, parametros, direcao do contrato e erro claramente ligado a regra
+- usar `Variables` como bloco inicial para existencia, tipo, helper novo, coerencia de nome e colecao vs simples
+- usar `Calls and dependencies` como bloco inicial para cadeia de chamadas, objeto chamado, dependencia externa e prova de call site
+- usar `Identity and container` como bloco inicial para `parent`, `module`, `fullyQualifiedName`, origem estrutural e risco de clonagem
+- usar `Report layout` como bloco inicial apenas em `Procedure` de relatorio quando o sintoma falar de `PrintBlock`, `ReportLabel`, `ReportAttribute`, `Bands` ou shape de layout
+
 ### Regra adicional para revisao de `WebPanel`
 
 - em `WebPanel`, revisar por blocos funcionais; nao abrir o XML inteiro como massa unica quando a pergunta for de comportamento, filtro, evento ou diagnostico fino
