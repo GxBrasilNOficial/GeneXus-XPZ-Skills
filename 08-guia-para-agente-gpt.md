@@ -68,6 +68,7 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 - se o wrapper local ainda nao expuser um parametro operacional relevante ja disponivel na base compartilhada, o agente deve tratar isso como oportunidade de atualizacao local, mencionar ao usuario e aguardar aprovacao explicita; nao deve executar a mudanca local automaticamente
 - exemplos sanitizados `.example.ps1` publicados pelas skills podem servir como referencia metodologica para reconstruir wrappers locais finais, mas nao substituem o wrapper local real nem autorizam fallback automatico de execucao no fluxo normal
 - quando wrappers locais precisarem nascer do zero no setup inicial da pasta paralela da KB, preferir adaptar os exemplos sanitizados completos da base como bootstrap tecnico, em vez de improvisar wrappers curtos ou parciais
+- quando a sessao ja publicar o caminho de uma skill ou de seus exemplos, usar esse caminho publicado como referencia autoritativa; nao inferir caminho alternativo por heuristica
 
 ## Regra de leitura para runtime
 
@@ -94,6 +95,7 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 - quando o wrapper local expuser `index-metadata`, usar essa consulta para obter `last_index_build_run_at`; se ela falhar, retornar vazio ou nao trouxer timestamp, tratar o indice como sem metadado valido e oferecer regeneracao/validacao antes de seguir
 - se `kb-source-metadata.md` estiver ausente ou nao expuser literalmente `last_xpz_materialization_run_at`, tratar a pasta paralela como defasada/incompatível e oferecer atualizacao via `xpz-kb-parallel-setup`; nao inferir esse horario por data do arquivo, `updated`, `generated_at`, `source_xpz` ou outro campo aproximado
 - se `last_index_build_run_at` for igual ou posterior a `last_xpz_materialization_run_at`, o indice esta apto para triagem inicial
+- se `AGENTS.md` ou `README.md` locais declararem timestamps, estado operacional ou observacoes de frescor, comparar esses campos com `kb-source-metadata.md`, com `index-metadata` e com o gate efetivo; se houver drift, tratar isso como memoria local desatualizada da pasta paralela e nao como detalhe irrelevante
 - quando a validacao de frescor/compatibilidade tiver sido relevante para liberar ou bloquear a resposta, declarar brevemente no handoff se o gate foi liberado (`last_index_build_run_at >= last_xpz_materialization_run_at`) ou qual campo/capacidade bloqueou
 - todo processamento bem-sucedido de `XPZ` exportado pela IDE que materialize XMLs oficiais em `ObjetosDaKbEmXml` deve chamar a regeneracao/validacao do indice derivado logo depois
 - antes de sugerir ou executar `sync` normal em pasta que adota `KbIntelligence`, o agente deve ter evidencia clara, na documentacao local ou no proprio wrapper local, de que o wrapper de materializacao encadeia esse refresh compulsorio do indice
@@ -160,6 +162,22 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 - se o erro mencionar controle invalido, `printBlock` ou shape de relatorio, revisar layout antes de inferir defeito de envelope
 - se a solucao continuar sustentada so por plausibilidade depois de uma rodada corretiva, parar e escalar para XML real comparavel
 
+### Regra adicional para revisao de `WebPanel`
+
+- em `WebPanel`, revisar por blocos funcionais; nao abrir o XML inteiro como massa unica quando a pergunta for de comportamento, filtro, evento ou diagnostico fino
+- os blocos canonicos sao `layout`, `events`, `variables`, `metadado funcional serializado`, `identidade e contêiner` e `dependencias`
+- antes da analise fina, declarar qual e o bloco primario do sintoma atual
+- abrir bloco adjacente apenas quando houver dependencia funcional explicita com o bloco primario
+- nomear a transicao de bloco no raciocinio e no handoff, por exemplo: `events -> variables` para validar contrato local
+- parar a expansao quando a hipotese ja estiver sustentada; nao reabrir o objeto inteiro por reflexo
+- tratar `metadado funcional serializado` como camada propria; ele pode viver perto do layout, mas nao deve ser lido como decoracao visual
+- usar `events` como bloco inicial para acoes do usuario, refresh, start, load, chamadas e validacao procedural
+- usar `layout` como bloco inicial para composicao visual, estrutura de grid/tab/controle e bindings visiveis
+- usar `variables` como bloco inicial para tipo, declaracao, coerencia de uso e colecao vs simples
+- usar `metadado funcional serializado` como bloco inicial para `Conditions`, `ControlWhere`, `ControlBaseTable`, `ControlOrder`, `ControlUnique`, `PATTERN_ELEMENT_CUSTOM_PROPERTIES`, `WebUserControlProperties` e marcas de pattern
+- usar `identidade e contêiner` como bloco inicial para `parent`, `module`, `fullyQualifiedName`, risco de clonagem e classificacao estrutural
+- usar `dependencias` como bloco inicial quando o sintoma nascer de `MasterPage`, pattern, user control, objeto chamado ou vinculo externo ausente
+
 ## Regra de leitura para XPZ
 
 - antes de usar `xpz-sync`, `xpz-builder` ou `xpz-doc-builder` em fluxo dependente de repositorio, confirmar que a pasta paralela da KB esta montada e validada; se nao estiver, usar `xpz-kb-parallel-setup` primeiro
@@ -180,6 +198,7 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 - no setup inicial, nao salvar memoria operacional fora da propria pasta paralela da KB sem autorizacao explicita do usuario; `AGENTS.md`, `README.md` e arquivos operacionais locais sao a camada preferencial de memoria
 - no setup inicial da pasta paralela da KB, nao declarar `setup concluido`, `estrutura pronta` ou equivalente final antes de a camada minima de wrappers locais esperados em `scripts` existir para o fluxo oficial adotado
 - se a estrutura de pastas e documentos estiver pronta, mas a camada minima de wrappers locais ainda nao existir, o status correto e `estrutura parcial` ou `bootstrap incompleto`, nao `setup concluido`
+- `Test-*KbSourceSanity.ps1` e wrapper recomendado quando a pasta tambem adotar fluxo local de geracao e empacotamento; sua ausencia isolada nao impede, por si so, reconhecer a camada minima do fluxo oficial de materializacao ou de `KbIntelligence`
 - se o setup inicial registrar memoria local provisoria como `ObjetosDaKbEmXml ainda nao materializada`, `aguardando primeiro XPZ` ou equivalente, esse estado precisa ser atualizado ou neutralizado depois da primeira materializacao oficial bem-sucedida
 - se `XpzExportadosPelaIDE` ainda nao existir, perguntar onde o usuario quer salvar os `.xpz`
 - se `ObjetosDaKbEmXml` ainda nao existir, tratar a KB como ainda nao materializada e parar antes de assumir snapshot
@@ -193,6 +212,7 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 - por padrao, `ObjetosGeradosParaImportacaoNaKbNoGenexus` e `PacotesGeradosParaImportacaoNaKbNoGenexus` nao precisam ser versionadas em Git; se houver duvida sobre rastrear ou ignorar seu conteudo, tratar isso como decisao de politica do repositorio e pedir aprovacao explicita
 - nesta trilha, a promocao para snapshot oficial ocorre apenas pelo script `.ps1` alimentado por `XPZ` exportado pela IDE
 - ao concluir o setup inicial da pasta paralela da KB, deixar explicito que a estrutura esta pronta, mas `ObjetosDaKbEmXml` ainda nao foi materializada
+- se `Test-*KbSourceSanity.ps1` for criado ou atualizado durante a frente, valida-lo diretamente antes do fechamento; `STRUCTURE_OK` e `GATE_OK` nao bastam como prova desse wrapper, porque o checklist estrutural canonico nao o trata como minimo universal
 - ao concluir o setup inicial, oferecer dois proximos passos: `A)` o usuario exporta o `.xpz` full pela IDE para `XpzExportadosPelaIDE`; `B)` o agente tenta gerar o `.xpz` full a partir da pasta nativa da KB, grava o arquivo em `XpzExportadosPelaIDE` e depois materializa os XMLs
 - ao oferecer `A)` e `B)`, declarar que `A)` e o caminho preferencial e normalmente mais rapido, enquanto `B)` tende a demorar mais por depender da trilha via `MSBuild`
 - ao orientar o caminho `A)`, preferir descricao funcional estavel como `export full da KB pela IDE` em vez de depender de rotulos exatos de menu, tela ou botao do GeneXus como se fossem universais; se citar caminho de menu, apresentá-lo depois da instrucao principal e marcado explicitamente como exemplo opcional de navegacao, nunca como passo normativo principal

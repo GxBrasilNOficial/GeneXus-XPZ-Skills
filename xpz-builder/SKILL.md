@@ -49,6 +49,7 @@ If the main need is to prepare or validate the initial folder structure around t
 - Identify the target object type and locate the most comparable structural template
 - Apply risk assessment from [03-risco-e-decisao-por-tipo](../03-risco-e-decisao-por-tipo.md) before proceeding
 - Abort if no comparable structural template exists and risk is high or very high
+- For `WebPanel`, classify the current delta by functional block before editing: `layout`, `events`, `variables`, `serialized functional metadata`, `identity and container`, or `dependencies`
 - Clone conservatively: preserve `Object/@guid`, `parent*`, `moduleGuid`, all recurring Part types
 - Apply XPZ envelope rules from [02-regras-operacionais-e-runtime](../02-regras-operacionais-e-runtime.md)
 - Choose package format for deltas of existing objects by validated local precedent first, distinguishing explicitly between embedded-object packages under `<Objects>` and packages that use `<FilePath>` to point to external XML
@@ -224,6 +225,7 @@ Reference files and when to load them:
 10. Locate template:
    - Transaction → use family F1–F6 from [05-transaction-familias-e-templates](../05-transaction-familias-e-templates.md)
    - WebPanel → use closest family from [04-webpanel-familias-e-templates](../04-webpanel-familias-e-templates.md)
+   - For `WebPanel`, declare the primary edit block before touching the XML and use only the adjacent blocks required by explicit functional dependency
    - Simple report `Procedure` → use the canonical sanitized family from [05b-procedure-relatorio-familias-e-templates](../05b-procedure-relatorio-familias-e-templates.md) first when the case fits simple F2/F3 coverage and the selected block is marked as `molde pronto`
    - Other types → use sanitized representative from [08-guia-para-agente-gpt](../08-guia-para-agente-gpt.md) materialization rules
    - For simple report `Procedure`, escalate to comparable real XML only when the request falls outside the documented simple family, when the initial attempt plus one short structural corrective attempt already failed, or when KB-local dialect/localism appears
@@ -247,7 +249,10 @@ Reference files and when to load them:
    - If `parentType` is `00000000-0000-0000-0000-000000000008` (Module/Folder), treat the container name as container only; it must appear in `parent`/`parentGuid`, not be promoted automatically into `fullyQualifiedName`
    - If `parentType` is `c88fffcd-b6f8-0000-8fec-00b5497e2117` (PackagedModule), allow module qualification in `fullyQualifiedName` only when comparable corpus objects of the same KB confirm that pattern
    - For `WebPanel`, verify where each relevant property is actually persisted before editing: `Conditions` may live in its own `Part`, while `ControlWhere`, `ControlBaseTable`, `ControlOrder`, `ControlUnique`, `PATTERN_ELEMENT_CUSTOM_PROPERTIES`, and `WebUserControlProperties` often live inside serialized layout metadata; follow the operational rules in [02-regras-operacionais-e-runtime](../02-regras-operacionais-e-runtime.md)
+   - For `WebPanel`, treat serialized functional metadata as its own functional layer; do NOT collapse it into visual layout when planning or reviewing the delta
    - For `WebPanel`, do NOT treat template defaults mentioning `Conditions` as proof that a real filter is materialized in the object
+   - For `WebPanel`, name each justified block transition during review, for example `events -> variables` or `layout -> serialized functional metadata`
+   - For `WebPanel`, if the current reasoning no longer needs a new block, stop expanding; do NOT reopen the whole object by reflex
    - Before generating a new delta for an object that already returned from the KB, compare any intermediate import/delta copy against the official corpus XML and rebase on the official corpus if the working copy is stale
    - If a filter, business rule, or functional interpretation depends on a calculated or derived field, open the field formula/source and review the immediate chain of called procedures before defining the condition
    - Do NOT conclude the semantic meaning of a calculated or derived field from its name, label, or mere XML presence
@@ -494,6 +499,7 @@ Ao clonar tela customizada WorkWithPlus:
 - [ ] If `parm(...)` changed, variable name, base type, and presence remained coherent
 - [ ] Variables referenced by the edited `Source` exist in the `Procedure`
 - [ ] Every new helper variable introduced by the current `Source` delta exists in the variables section and remains coherent with its declared type
+- [ ] For `WebPanel`, the primary edit block was declared before editing and any block transition was justified explicitly
 - [ ] Every new method call introduced by the current `Source` delta on a variable is compatible with the declared type of that variable and is anchored by the methodological base loaded for the case
 - [ ] Cleanup or reinitialization introduced by the current `Source` delta for a collection, SDT, or `Messages, GeneXus.Common` uses a pattern anchored by the methodological base loaded for that declared type
 - [ ] For collection reinitialization introduced by the current `Source` delta and already covered by the methodological base, `= new()` was preferred and unsupported forms such as `SetEmpty()` were not accepted only by plausibility or analogy
