@@ -112,6 +112,7 @@ Se você quer entender a base rapidamente:
 - `XpzExportadosPelaIDE`: pasta onde o usuário grava tanto o `XPZ` completo da Carga Inicial quanto os `XPZ` incrementais do dia a dia
 - `ObjetosGeradosParaImportacaoNaKbNoGenexus`: área de trabalho para XMLs gerados, ajustados ou preservados para importação manual na IDE
 - `PacotesGeradosParaImportacaoNaKbNoGenexus`: área de saída para `import_file.xml` e demais pacotes gerados localmente
+- em auditoria operacional da pasta paralela, declarar separadamente `sync/materializacao`, `indice/gate` e `empacotamento local`; `GATE_OK` e estrutura OK nao bastam, sozinhos, para concluir genericamente que "esta tudo certo" quando o fluxo de empacotamento local ainda nao foi auditado
 - `Temp`: destino preferencial de artefatos efêmeros de execução, como diretórios temporários de wrappers, logs auxiliares e saídas intermediárias que não sejam fonte normativa da base
 - `ArquivoMorto`: subpasta opcional de `ObjetosGeradosParaImportacaoNaKbNoGenexus` para preservar XMLs contaminados que nao devem ser importados mas precisam de rastreabilidade; nao apagar sem autorizacao explicita do usuario
 - em `ObjetosGeradosParaImportacaoNaKbNoGenexus`, cada frente ativa deve usar sua propria subpasta no formato `NomeCurto_GUID_YYYYMMDD`
@@ -119,8 +120,9 @@ Se você quer entender a base rapidamente:
 - em `PacotesGeradosParaImportacaoNaKbNoGenexus`, os pacotes devem permanecer na raiz, sem subpastas, usando o formato `NomeCurto_GUID_YYYYMMDD_nn.import_file.xml`
 - `nn` representa apenas a rodada curta de pacote daquela frente; nao representa versao semantica
 - antes de gravar `NomeCurto_GUID_YYYYMMDD_nn.import_file.xml`, verificar se ja existe pacote com o mesmo prefixo de frente `NomeCurto_GUID_YYYYMMDD` e o mesmo `nn`
-- se ja existir pacote com o mesmo prefixo de frente e o mesmo `nn`, abortar a gravacao; nao sobrescrever silenciosamente a rodada
-- em caso de colisao, retornar erro explicito com sugestao do proximo `nn` livre para aquela frente, sem autoincrementar nem gravar automaticamente com o valor sugerido
+- quando a regra for deterministica, o enforcement primario deve viver em `.ps1`; para colisao de pacote, preferir gate dedicado como `Test-XpzPackageCollision.ps1` ou wrapper local equivalente
+- se ja existir pacote com o mesmo prefixo de frente e o mesmo `nn`, o gate deve abortar a gravacao; nao sobrescrever silenciosamente a rodada
+- em caso de colisao, o erro explicito e a sugestao do proximo `nn` livre devem sair do proprio gate, sem autoincrementar nem gravar automaticamente com o valor sugerido
 - a promoção para `ObjetosDaKbEmXml` ocorre apenas pelo fluxo oficial do script `.ps1` alimentado por `XPZ` exportado pela IDE
 - `ObjetosDaKbEmXml` nao deve ser atualizado por edição manual; ele e atualizado pelo fluxo do `.ps1` a partir dos `XPZ` disponibilizados na pasta paralela da KB
 - se o objeto ainda nao voltou da KB por export oficial, o trabalho deve acontecer em `ObjetosGeradosParaImportacaoNaKbNoGenexus`
@@ -292,6 +294,7 @@ Si quieres entender la base rápidamente:
 - `XpzExportadosPelaIDE`: carpeta donde el usuario graba tanto el `XPZ` completo de la Carga Inicial como los `XPZ` incrementales del día a día
 - `ObjetosGeradosParaImportacaoNaKbNoGenexus`: área de trabajo para XMLs generados, ajustados o preservados para importación manual en la IDE
 - `PacotesGeradosParaImportacaoNaKbNoGenexus`: área de salida para `import_file.xml` y demás paquetes generados localmente
+- en auditoría operativa de la carpeta paralela, declarar por separado `sync/materialización`, `índice/gate` y `empaquetado local`; `GATE_OK` y estructura OK no bastan, por sí solos, para concluir genéricamente que "todo está bien" cuando el flujo de empaquetado local todavía no fue auditado
 - `Temp`: destino preferente de artefactos efímeros de ejecución, como directorios temporales de wrappers, logs auxiliares y salidas intermedias que no sean fuente normativa de la base
 - `ArquivoMorto`: subcarpeta opcional de `ObjetosGeradosParaImportacaoNaKbNoGenexus` para preservar XML contaminados que no deben importarse pero necesitan trazabilidad; no borrar sin autorización explícita del usuario
 - en `ObjetosGeradosParaImportacaoNaKbNoGenexus`, cada frente activa debe usar su propia subcarpeta con el formato `NomeCurto_GUID_YYYYMMDD`
@@ -300,7 +303,8 @@ Si quieres entender la base rápidamente:
 - `nn` representa solo la ronda corta del paquete en esa frente; no representa versión semántica
 - antes de grabar `NomeCurto_GUID_YYYYMMDD_nn.import_file.xml`, verificar si ya existe un paquete con el mismo prefijo de frente `NomeCurto_GUID_YYYYMMDD` y el mismo `nn`
 - si ya existe un paquete con el mismo prefijo de frente y el mismo `nn`, abortar la grabación; no sobrescribir silenciosamente la ronda
-- en caso de colisión, devolver un error explícito con sugerencia del próximo `nn` libre para esa frente, sin autoincrementar ni grabar automáticamente con el valor sugerido
+- cuando la regla sea determinística, el enforcement primario debe vivir en `.ps1`; para colisión de paquete, preferir un gate dedicado como `Test-XpzPackageCollision.ps1` o un wrapper local equivalente
+- en caso de colisión, el error explícito y la sugerencia del próximo `nn` libre deben salir del propio gate, sin autoincrementar ni grabar automáticamente con el valor sugerido
 - la promoción hacia `ObjetosDaKbEmXml` ocurre solo por el flujo oficial del script `.ps1` alimentado por el `XPZ` exportado por la IDE
 - `ObjetosDaKbEmXml` no debe actualizarse por edición manual; se actualiza por el flujo del `.ps1` a partir de los `XPZ` disponibilizados en la carpeta paralela de la KB
 - si el objeto todavía no volvió de la KB por export oficial, el trabajo debe ocurrir en `ObjetosGeradosParaImportacaoNaKbNoGenexus`
@@ -472,6 +476,7 @@ If you want to understand the repository quickly:
 - `XpzExportadosPelaIDE`: folder where the user stores both the full Initial Load `XPZ` and the day-to-day incremental `XPZ` files
 - `ObjetosGeradosParaImportacaoNaKbNoGenexus`: working area for XMLs generated, adjusted, or preserved for manual IDE import
 - `PacotesGeradosParaImportacaoNaKbNoGenexus`: output area for `import_file.xml` and other locally generated packages
+- in operational audits of the KB parallel folder, declare `sync/materialization`, `index/gate`, and `local packaging` separately; `GATE_OK` and structure OK are not enough, by themselves, to conclude generically that "everything is fine" when the local packaging flow has not yet been audited
 - `Temp`: preferred destination for ephemeral execution artifacts, such as wrapper temporary directories, auxiliary logs, and intermediate outputs that are not normative source material for the base
 - `ArquivoMorto`: optional subfolder of `ObjetosGeradosParaImportacaoNaKbNoGenexus` used to preserve contaminated XMLs that must not be imported but require traceability; do not delete without explicit user authorization
 - in `ObjetosGeradosParaImportacaoNaKbNoGenexus`, each active front must use its own subfolder in the format `NomeCurto_GUID_YYYYMMDD`
@@ -480,7 +485,8 @@ If you want to understand the repository quickly:
 - `nn` represents only the short package round for that front; it is not semantic versioning
 - before writing `NomeCurto_GUID_YYYYMMDD_nn.import_file.xml`, check whether a package with the same front prefix `NomeCurto_GUID_YYYYMMDD` and the same `nn` already exists
 - if a package with the same front prefix and the same `nn` already exists, abort the write; do not silently overwrite that round
-- in case of collision, return an explicit error with the next free `nn` suggested for that front, without auto-incrementing or writing automatically with the suggested value
+- when the rule is deterministic, the primary enforcement should live in `.ps1`; for package collision, prefer a dedicated gate such as `Test-XpzPackageCollision.ps1` or an equivalent local wrapper
+- on collision, the explicit error and the suggested next free `nn` must come from the gate itself, without auto-incrementing or automatically writing with the suggested value
 - promotion into `ObjetosDaKbEmXml` happens only through the official `.ps1` script flow fed by the XPZ exported from the IDE
 - `ObjetosDaKbEmXml` must not be updated by manual editing; it is updated by the `.ps1` flow from the XPZ files made available in the KB parallel folder
 - if the object has not yet returned from the KB by official export, the work must happen in `ObjetosGeradosParaImportacaoNaKbNoGenexus`

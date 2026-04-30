@@ -72,6 +72,9 @@ Wrappers esperados:
 - `Get-<NomeKb>KbMetadata.ps1`: le campos-chave de `kb-source-metadata.md` sem
   regex inline nos chamadores; expoe ao menos `last_xpz_materialization_run_at`,
   `kb_name` e `source_guid`.
+- `Test-<NomeKb>KbMetadataWrapper.ps1`: valida o contrato funcional do
+  `Get-<NomeKb>KbMetadata.ps1` contra `kb-source-metadata.md`; retorna
+  `METADATA_WRAPPER_OK`, `PENDENTE_DE_DADOS` ou `BLOCK: ...`.
 - `Test-<NomeKb>KbStructure.ps1`: relatorio de presenca/ausencia de pastas,
   scripts e artefatos esperados; retorna `STRUCTURE_OK` ou lista componentes
   ausentes. Na auditoria de naming, `Attribute` pode ser identificado pela raiz

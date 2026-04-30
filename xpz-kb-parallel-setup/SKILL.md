@@ -92,6 +92,7 @@ Do NOT use this skill for:
 - Explicar que novos `XPZ` completos podem ser usados a qualquer momento para reatualizar `ObjetosDaKbEmXml`
 - Quando acionado para revisar naming de `ObjetosDaKbEmXml` em pasta paralela existente, ler pelo menos um XML de cada diretorio de container (`Folder/`, `Module/`, `PackagedModule/`) e verificar o `Object/@type` real antes de qualquer conclusao sobre inversao ou conformidade
 - Distinguir Carga Inicial, atualizacao incremental e empacotamento local
+- Em pasta com `PacotesGeradosParaImportacaoNaKbNoGenexus`, auditar separadamente a aderencia do fluxo de empacotamento local; `sync`/indice OK nao autorizam concluir sozinho que "esta tudo certo"
 - Explicar que materializar um `XPZ` completo da IDE inclui quebrar o `full.xml` em XMLs individuais por objeto
 - Explicar que o acervo materializado deve ser organizado em subpastas por tipo amigavel de objeto GeneXus
 - Explicar que os XMLs materializados devem usar nomes amigaveis dos objetos, nao GUID como nome principal
@@ -171,6 +172,7 @@ Do NOT use this skill for:
   - regeneracao e validacao do indice a partir de `ObjetosDaKbEmXml`
   - execucao do gate de frescor (`Test-*KbGate.ps1`): chama o wrapper de consulta local com `-Query index-metadata`, le `kb-source-metadata.md`, compara timestamps e retorna `GATE_OK` ou lanca `BLOCK: <motivo>`; depende de `Query-*KbIntelligence.ps1` na mesma pasta; deve ser o unico ponto de execucao do gate de frescor
   - leitura de campos chave de `kb-source-metadata.md` (`Get-*KbMetadata.ps1`): elimina o padrao recorrente de `Select-String + regex` inline nos chamadores; expoe ao menos `last_xpz_materialization_run_at`, `kb_name` e `source_guid`
+  - validacao do contrato funcional de metadata (`Test-*KbMetadataWrapper.ps1`): chama o motor compartilhado `Test-XpzKbMetadataWrapper.ps1`, compara o que `Get-*KbMetadata.ps1` expoe contra `kb-source-metadata.md` e retorna `METADATA_WRAPPER_OK`, `PENDENTE_DE_DADOS` ou `BLOCK: ...`
   - verificacao de estrutura da pasta paralela (`Test-*KbStructure.ps1`): relatorio de presenca/ausencia de pastas, scripts e artefatos esperados; retorna `STRUCTURE_OK` ou lista componentes ausentes; usado no setup e em diagnostico antes de qualquer operacao
 - Quando a pasta paralela da KB operar com `ObjetosGeradosParaImportacaoNaKbNoGenexus` e `PacotesGeradosParaImportacaoNaKbNoGenexus`, recomendar tambem wrapper local fino para gate de `Source`, por exemplo `Test-*KbSourceSanity.ps1`:
   - recebe um XML especifico ou a subpasta ativa da frente
@@ -178,7 +180,14 @@ Do NOT use this skill for:
   - retorna saida estruturada suficiente para distinguir `xmlWellFormed`, `sourceSanityStatus` e `probablyImportable`
   - bloqueia empacotamento local quando encontrar `sourceSanityStatus=fail`
   - em `warn`, devolve a lista de warnings e exige revisao conservadora antes do pacote
+- Quando a pasta paralela da KB operar com empacotamento local em `PacotesGeradosParaImportacaoNaKbNoGenexus`, recomendar tambem wrapper local fino para gate de colisao de pacote, por exemplo `Test-*KbPackageCollision.ps1`:
+  - recebe `FrontPrefix`, `NN` e opcionalmente `OutputDir`
+  - delega para `scripts\Test-XpzPackageCollision.ps1` da base compartilhada
+  - retorna `COLLISION_OK` quando a rodada pretendida ainda nao existe
+  - retorna `BLOCK: ...` quando a rodada `nn` ja existir para o mesmo prefixo de frente, com sugestao do proximo `nn` livre
+  - deve ser o unico ponto local para decidir se o pacote pode ser gravado ou se a frente deve bloquear por colisao
 - A ausencia isolada de `Test-*KbSourceSanity.ps1` nao impede, por si so, classificar a pasta como tendo camada minima de wrappers para materializacao oficial ou para `KbIntelligence`; ele passa a ser esperado quando a KB adota fluxo local de geracao e empacotamento que dependa desse gate.
+- A ausencia isolada de `Test-*KbPackageCollision.ps1` tambem nao impede, por si so, classificar a pasta como tendo camada minima de wrappers para materializacao oficial ou para `KbIntelligence`; ele passa a ser esperado quando a KB adota fluxo local de empacotamento com `import_file.xml` local.
 - Um helper local de notificacao pode existir como apoio operacional, mas nao substitui os wrappers principais
 - O wrapper local deve ser fino:
   - resolver caminhos da pasta paralela da KB
@@ -200,9 +209,11 @@ Do NOT use this skill for:
   - [Query-KbIntelligence.example.ps1](examples/Query-KbIntelligence.example.ps1)
   - [Rebuild-KbIntelligenceIndex.example.ps1](examples/Rebuild-KbIntelligenceIndex.example.ps1)
   - [Test-KbSourceSanity.example.ps1](examples/Test-KbSourceSanity.example.ps1)
+  - [Test-KbPackageCollision.example.ps1](examples/Test-KbPackageCollision.example.ps1)
   - [Notify-TaskComplete.example.ps1](examples/Notify-TaskComplete.example.ps1)
   - [Test-KbGate.example.ps1](examples/Test-KbGate.example.ps1)
   - [Get-KbMetadata.example.ps1](examples/Get-KbMetadata.example.ps1)
+  - [Test-KbMetadataWrapper.example.ps1](examples/Test-KbMetadataWrapper.example.ps1)
   - [Test-KbStructure.example.ps1](examples/Test-KbStructure.example.ps1)
 - Esses `.example.ps1` sao exemplos metodologicos importantes para bootstrap tecnico e reconstrucao assistida dos wrappers locais finais.
 - Quando os wrappers locais precisarem nascer do zero no setup inicial, preferir adaptar os exemplos sanitizados completos desta skill como base do bootstrap tecnico, em vez de improvisar wrappers curtos ou parciais que ainda exijam correcao na etapa seguinte.
@@ -266,8 +277,10 @@ Ao fechar um setup ou handoff de pasta paralela da KB, usar um estado operaciona
 - `pronto_para_primeira_materializacao`: estrutura, documentos e wrappers locais minimos foram criados ou validados, sem placeholders sanitizados pendentes em configuracao efetiva dos wrappers, mas `ObjetosDaKbEmXml` ainda nao recebeu materializacao oficial.
 - `materializado_e_indice_validado`: houve materializacao oficial bem-sucedida e, quando `KbIntelligence` for adotado, o indice derivado foi regenerado/validado com `last_index_build_run_at >= last_xpz_materialization_run_at`.
 - `wrappers_atualizados`: pasta ja em producao recebeu scripts ausentes previstos pela base metodologica; scripts com personalizacao foram preservados ou substituidos com aprovacao explicita do usuario; `ObjetosDaKbEmXml`, `kb-source-metadata.md` e `kb-intelligence.sqlite` intactos.
+- `auditoria_de_empacotamento_pendente`: `sync`, indice e estrutura podem estar OK, mas a pasta adota ou pode adotar empacotamento local e a aderencia dos wrappers/gates desse fluxo ainda nao foi confirmada objetivamente.
 
 Nao usar `setup concluido`, `estrutura pronta` ou expressao equivalente sem dizer qual desses marcos ja foi efetivamente cumprido. Criar pastas vazias ou gravar memoria local inicial nao basta para declarar a pasta pronta para `sync` normal, pesquisa ampla ou geracao de objetos.
+No handoff final, usar literalmente um dos estados canonicos listados acima. Nao inventar rotulos hibridos, reforcos livres ou variantes como `wrappers_atualizados completo`, `quase wrappers_atualizados`, `indice ok com pendencia`, `estrutura pronta com ressalva` ou equivalente.
 
 ---
 
@@ -284,6 +297,13 @@ Nao usar `setup concluido`, `estrutura pronta` ou expressao equivalente sem dize
 - No fechamento do setup inicial, apresentar `A)` e `B)` como opcoes de proximo passo e informar o tradeoff de tempo entre elas
 - Se a existencia da pasta nativa da KB foi verificada, declarar no fechamento se ela existe/acessou corretamente ou se ficou como ressalva operacional
 - Ao fechar um `modo_atualizacao`, a resposta deve conter obrigatoriamente: classificacao de cada script (EQUIVALENTE / AUSENTE / CUSTOMIZADO), resultado da verificacao de naming de cada diretorio presente em `ObjetosDaKbEmXml` (conforme ou divergente — mesmo que nenhuma divergencia seja encontrada), estado operacional declarado e resultado do gate quando executado
+- Ao fechar um `modo_atualizacao`, declarar separadamente no handoff: `sync/materializacao`, `indice/gate` e `empacotamento local`; nao colapsar tudo em "tudo certo" sem mostrar a situacao de cada dimensao adotada
+- Ao fechar um `modo_atualizacao`, usar literalmente o rotulo `indice/gate` para a dimensao do gate estrutural e de frescor; nao substituir por variantes como `indice/frescor`, `frescor`, `indice` isolado ou equivalentes
+- No handoff final, capturar o timestamp real imediatamente antes de responder e usá-lo na propria resposta; nao usar placeholder, horario inventado, valor reaproveitado de mensagem anterior nem timestamp inferido do contexto
+- Se a pasta tiver `PacotesGeradosParaImportacaoNaKbNoGenexus`, a resposta final de `modo_atualizacao` deve dizer explicitamente se o fluxo de empacotamento local foi classificado como `OK`, `NAO_ADOTADO` ou `PENDENTE`
+- Se a pasta tiver `PacotesGeradosParaImportacaoNaKbNoGenexus`, o handoff final nao pode resumir os wrappers como "scripts presentes", "parse OK" ou formula equivalente sem destacar a classificacao explicita de `Test-*KbSourceSanity.ps1` e `Test-*KbPackageCollision.ps1`
+- No handoff final, o `estado operacional` deve ser exatamente um dos estados canonicos desta skill; nao anexar qualificadores livres ao nome do estado nem usar frase que pareca novo estado
+- Quando existir `Test-*KbMetadataWrapper.ps1`, o handoff final nao pode citar `kb_name`, `source_guid` ou classificar `Get-*KbMetadata.ps1` sem referenciar a evidencia produzida por esse gate; inspecao textual isolada nao basta
 - Se o gate ou `Test-KbStructure` reportar qualquer linha `NAMING_DIVERGENTE` no output, incluir na resposta ao usuario — independente da pergunta original — o aviso explicito de quais diretorios estao com nome divergente e a oferta de correcao via `xpz-kb-parallel-setup`; nao suprimir esse aviso mesmo quando a pergunta de negocio ja foi respondida
 - Se `AGENTS.md` local ou `README.md` local declararem timestamps, estado operacional ou observacoes de frescor que conflitem com `kb-source-metadata.md`, `-Query index-metadata` ou com o gate efetivo, tratar isso como memoria local desatualizada; nao declarar a pasta "tudo certo" sem antes apontar a divergencia e oferecer atualizacao dessa memoria
 
@@ -353,6 +373,14 @@ Pre-condicao obrigatoria: confirmar que o passo 7b foi executado nesta sessao an
     - EQUIVALENTE: script que passou em 8.a.i e cuja logica e equivalente ao exemplo correspondente; diferencas apenas de nome KB (ex: `FabricaBrasil` no lugar do nome generico) sao toleradas e nao constituem divergencia; para ser EQUIVALENTE, nenhum parametro pode ter default hardcoded apontando para arquivo que nao existe no disco e o caminho de engine inferido no corpo do script — tipicamente `Join-Path $SharedSkillsRoot 'scripts\<nome>.ps1'` — deve apontar para arquivo que existe no motor compartilhado; engine path apontando para arquivo inexistente classifica o script como CUSTOMIZADO; adicionalmente, para o papel especifico de `Test-*KbStructure.ps1`, o script deve emitir `STRUCTURE_OK` via `Write-Output`, nao via `Write-Host` — a diferenca e funcional porque o gate filtra `$_ -is [string]` no output redirecionado via `*>&1` e `Write-Host` emite `InformationRecord` (nao `string`), quebrando o gate silenciosamente
     - CUSTOMIZADO: script que existe com diferencas de logica, parametros adicionais, fluxo alterado ou qualquer mudanca alem da substituicao de nome KB; tambem e CUSTOMIZADO qualquer script com parametro cujo default hardcoded aponta para arquivo inexistente, mesmo que a logica seja identica ao exemplo — o default quebrado e divergencia de configuracao efetiva, nao mera diferenca de nome
 
+8.a.iii Para o papel especifico de `Get-*KbMetadata.ps1`, a equivalencia exige contrato funcional minimo verificavel:
+    - Quando houver wrapper local `Test-*KbMetadataWrapper.ps1`, executar esse gate obrigatoriamente antes de classificar `Get-*KbMetadata.ps1` ou mencionar `kb_name`/`source_guid` no handoff; usar a saida como evidencia deterministica primaria
+    - O gate deve retornar `METADATA_WRAPPER_OK` quando `Get-*KbMetadata.ps1` expoe `last_xpz_materialization_run_at`, `kb_name` e `source_guid` existentes em `kb-source-metadata.md`
+    - Se o gate retornar `BLOCK: ...`, classificar `Get-*KbMetadata.ps1` como `CUSTOMIZADO` e evidenciar a falha funcional apontada pelo gate
+    - Se o gate retornar `PENDENTE_DE_DADOS` para um campo realmente ausente no metadata local, registrar o campo como `PENDENTE_DE_DADOS`; nesse caso a ausencia do valor nao torna o wrapper `CUSTOMIZADO` por si so
+    - Se `Test-*KbMetadataWrapper.ps1` estiver ausente em pasta que adota `KbIntelligence`, tratar isso como wrapper previsto `AUSENTE` em `modo_atualizacao` e oferecer criacao a partir de `Test-KbMetadataWrapper.example.ps1`
+    - Nao concluir `Get-*KbMetadata.ps1 = EQUIVALENTE` e, no mesmo handoff, registrar que `kb_name` ou `source_guid` existem no metadata mas saem como `(ausente)`; isso e contradicao de auditoria
+
 8.b Para cada script AUSENTE: preparar criacao a partir do exemplo correspondente; apresentar ao usuario o script que sera criado e aguardar aprovacao explicita antes de gravar
 
 8.c Para cada script CUSTOMIZADO: evidenciar objetivamente a divergencia (quais secoes diferem, quais parametros foram adicionados, qual logica foi alterada) e apresentar ao usuario quatro opcoes claras; aguardar decisao explicita antes de qualquer escrita:
@@ -420,10 +448,39 @@ Pre-condicao obrigatoria: confirmar que o passo 7b foi executado nesta sessao an
     - Excecao operacional: se o XML local ja permitir identificar o tipo canonico pela propria estrutura — por exemplo, raiz `<Attribute>` — isso basta; nao exigir `Object/@type` nem consulta adicional externa para fechar a auditoria
     - Se houver divergencia real, relatar a divergencia e propor a acao segura; se nao houver divergencia, seguir para 8.h e declarar o estado sem exploracao extra
 
-8.h Ao concluir o bloco de atualizacao, declarar o estado `wrappers_atualizados` e apresentar a tabela de scripts com as colunas: Script | Classe (EQUIVALENTE / AUSENTE / CUSTOMIZADO) | Acao. Parse ja esta coberto pelo gate: `GATE_OK` prova que todos os scripts passaram o parser do PowerShell sem erros — nao e necessario repetir o resultado na tabela. Listar explicitamente: scripts adicionados, scripts mantidos (EQUIVALENTES), scripts substituidos com aprovacao e scripts pulados. Atualizar o campo de estado operacional no `AGENTS.md` local da pasta paralela para refletir o que realmente foi concluido (ex: `wrappers_atualizados`, `bootstrap_incompleto`). Nao manter declaracao de estado anterior desatualizada — se o `AGENTS.md` dizia `materializado_e_indice_validado` mas o gate script nao existia e acabou de ser criado, o estado deve ser atualizado para `wrappers_atualizados`. Um `AGENTS.md` com estado desatualizado serve como argumento falso para agentes burlarem o gate. Verificar tambem se a secao `## Wrappers locais` do `AGENTS.md` local lista todos os scripts atualmente presentes em `scripts/` com nomes e funcoes corretos; se estiver desatualizada — por listar scripts com nomes antigos ou omitir scripts recem-adicionados — propor atualizacao ao usuario antes de declarar o setup como concluido. Por fim, comparar a estrutura geral do `AGENTS.md` local contra o modelo canonico em `examples/AGENTS.md.example` desta skill; se houver secoes canonicas ausentes alem das ja verificadas nos passos anteriores (`## Triagem Por Indice` em 8.g e `## Wrappers locais` acima), propor adicao ao usuario antes de declarar o setup como concluido.
+8.g3 Auditoria de aderencia do fluxo de empacotamento local (executar antes de 8.h quando existir `PacotesGeradosParaImportacaoNaKbNoGenexus`):
+
+8.g3.i Determinar se ha evidencia objetiva de empacotamento local adotado ou esperado na pasta paralela:
+    - considerar como evidencia suficiente qualquer uma das seguintes:
+      - existencia da pasta `PacotesGeradosParaImportacaoNaKbNoGenexus`
+      - existencia de wrapper local `Test-*KbSourceSanity.ps1`
+      - existencia de wrapper local `Test-*KbPackageCollision.ps1`
+      - documentacao local (`AGENTS.md`, `README.md`) mencionando `import_file.xml`, pacote local ou importacao manual na IDE
+
+8.g3.ii Se nao houver nenhuma dessas evidencias, declarar `empacotamento local = NAO_ADOTADO` e seguir
+
+8.g3.iii Se houver evidencia objetiva, auditar explicitamente os wrappers locais ligados a empacotamento:
+    - `Test-*KbSourceSanity.ps1`
+    - `Test-*KbPackageCollision.ps1`
+    Para cada um, classificar como `EQUIVALENTE`, `AUSENTE` ou `CUSTOMIZADO` sob o mesmo criterio de 8.a.ii
+
+8.g3.iv Se a pasta adota ou pode adotar empacotamento local e `Test-*KbPackageCollision.ps1` estiver `AUSENTE` ou `CUSTOMIZADO`, nao concluir `wrappers_atualizados` como estado global suficiente; declarar `empacotamento local = PENDENTE` e usar estado operacional compativel com essa pendencia, preferindo `auditoria_de_empacotamento_pendente` quando `sync`, indice e estrutura estiverem OK
+
+8.g3.v Se a pasta adota ou pode adotar empacotamento local e os wrappers `Test-*KbSourceSanity.ps1` e `Test-*KbPackageCollision.ps1` estiverem `EQUIVALENTE` ou conscientemente `NAO_ADOTADO` por regra local explicitada ao usuario, declarar `empacotamento local = OK`
+
+8.g3.vi No handoff final de `modo_atualizacao`, quando 8.g3 foi executado, listar separadamente a classificacao de `Test-*KbSourceSanity.ps1` e `Test-*KbPackageCollision.ps1`; nao substituir esse detalhe por resumo agregado como "9 scripts presentes", "scripts parseados" ou equivalente
+
+8.g3.vii Criterio de parada curta por pendencia isolada de empacotamento:
+    - Se `Test-*KbStructure.ps1` retornou `STRUCTURE_OK`, `Test-*KbGate.ps1` retornou `GATE_OK`, a verificacao de naming ja fechou sem divergencia e a unica lacuna objetiva remanescente do fluxo de empacotamento local for `Test-*KbPackageCollision.ps1 = AUSENTE`, autorizar fechamento curto do diagnostico
+    - Nessa situacao, nao prolongar a sessao com reinspecao extensa dos wrappers ja estabilizados, comparacoes repetitivas contra exemplos canonicos ou leitura manual extra de scripts que ja estao operacionais pelo contexto local
+    - Basta declarar explicitamente: `sync/materializacao = OK`, `indice/gate = OK`, `empacotamento local = PENDENTE`, `Test-*KbSourceSanity.ps1 = <classe apurada>`, `Test-*KbPackageCollision.ps1 = AUSENTE` e oferecer a criacao do wrapper faltante
+    - Essa saida curta nao autoriza mascarar `CUSTOMIZADO`, `AUSENTE` adicional ou memoria local desatualizada; se surgir qualquer outra lacuna objetiva alem do wrapper de colisao ausente, retomar o fluxo normal de auditoria
+
+8.h Ao concluir o bloco de atualizacao, declarar o estado operacional compativel com a evidencia realmente fechada e apresentar a tabela de scripts com as colunas: Script | Classe (EQUIVALENTE / AUSENTE / CUSTOMIZADO) | Acao. Parse ja esta coberto pelo gate: `GATE_OK` prova que todos os scripts passaram o parser do PowerShell sem erros — nao e necessario repetir o resultado na tabela. Listar explicitamente: scripts adicionados, scripts mantidos (EQUIVALENTES), scripts substituidos com aprovacao e scripts pulados. Quando houver `PacotesGeradosParaImportacaoNaKbNoGenexus`, a tabela ou o resumo deve incluir explicitamente `Test-*KbSourceSanity.ps1` e `Test-*KbPackageCollision.ps1`, mesmo que a conclusao seja "mantido" ou "ausente". Quando 8.g3.vii se aplicar, a saida pode ser curta e objetiva, sem reinspecao exaustiva dos wrappers ja estabilizados; ainda assim, deve preservar a classificacao explicita dos wrappers de empacotamento local e o estado canonico final. Atualizar o campo de estado operacional no `AGENTS.md` local da pasta paralela para refletir o que realmente foi concluido (ex: `wrappers_atualizados`, `auditoria_de_empacotamento_pendente`, `bootstrap_incompleto`). Nao manter declaracao de estado anterior desatualizada — se o `AGENTS.md` dizia `materializado_e_indice_validado` mas o gate script nao existia e acabou de ser criado, o estado deve ser atualizado para `wrappers_atualizados`. Um `AGENTS.md` com estado desatualizado serve como argumento falso para agentes burlarem o gate. Verificar tambem se a secao `## Wrappers locais` do `AGENTS.md` local lista todos os scripts atualmente presentes em `scripts/` com nomes e funcoes corretos; se estiver desatualizada — por listar scripts com nomes antigos ou omitir scripts recem-adicionados — propor atualizacao ao usuario antes de declarar o setup como concluido. Por fim, comparar a estrutura geral do `AGENTS.md` local contra o modelo canonico em `examples/AGENTS.md.example` desta skill; se houver secoes canonicas ausentes alem das ja verificadas nos passos anteriores (`## Triagem Por Indice` em 8.g e `## Wrappers locais` acima), propor adicao ao usuario antes de declarar o setup como concluido.
     - Quando `README.md` local tambem declarar estado operacional humano, timestamps de materializacao/indice ou observacao de frescor, comparar esses campos com `AGENTS.md`, `kb-source-metadata.md` e `-Query index-metadata`
     - Se `README.md` e `AGENTS.md` estiverem divergentes entre si ou em relacao aos valores efetivos, evidenciar a divergencia ao usuario e propor refresh da memoria local em ambos antes de encerrar o setup como "ok"
     - `GATE_OK` nao neutraliza essa obrigacao: gate liberado prova compatibilidade operacional atual, mas nao prova que a memoria local humana esta sincronizada
+    - `GATE_OK` e `STRUCTURE_OK` nao bastam, sozinhos, para concluir "tudo certo" quando a aderencia do fluxo de empacotamento local ainda nao tiver sido auditada
 
 --- FIM DO BLOCO DE ATUALIZACAO ---
 
@@ -498,9 +555,10 @@ Pre-condicao obrigatoria: confirmar que o passo 7b foi executado nesta sessao an
    - wrapper de regeneracao e validacao do indice derivado, se a KB local adotar `KbIntelligence`
    - `Test-*KbGate.ps1`, se a KB local adotar `KbIntelligence`
    - `Get-*KbMetadata.ps1`, se a KB local adotar `KbIntelligence`
+   - `Test-*KbMetadataWrapper.ps1`, se a KB local adotar `KbIntelligence`
    - `Test-*KbStructure.ps1`, se a KB local adotar `KbIntelligence`
    - helper local opcional de notificacao, se houver necessidade operacional
-20. Se os scripts `Test-*KbGate.ps1`, `Get-*KbMetadata.ps1` e `Test-*KbStructure.ps1` forem criados ou confirmados durante o setup ou atualizacao, registrar os padroes de allowlist correspondentes em `.claude\settings.json` da pasta paralela da KB:
+20. Se os scripts `Test-*KbGate.ps1`, `Get-*KbMetadata.ps1`, `Test-*KbMetadataWrapper.ps1` e `Test-*KbStructure.ps1` forem criados ou confirmados durante o setup ou atualizacao, registrar os padroes de allowlist correspondentes em `.claude\settings.json` da pasta paralela da KB:
    - Para cada script, adicionar uma entrada no array `permissions.allow` no formato `PowerShell(& "<caminho-absoluto-do-script>" *)`
    - Usar o nome real do script no caminho (ex: `Test-FabricaBrasilKbGate.ps1`), nao o nome sanitizado do exemplo
    - Se `.claude\settings.json` ainda nao existir, criar com estrutura minima
@@ -538,6 +596,7 @@ PastaParalelaDaKb/
     Rebuild-KbIntelligenceIndex.ps1
     Test-KbGate.ps1
     Get-KbMetadata.ps1
+    Test-KbMetadataWrapper.ps1
     Test-KbStructure.ps1
   Temp/
   XpzExportadosPelaIDE/
@@ -569,6 +628,7 @@ PastaParalelaDaKb/
 - NUNCA assumir que o nome de qualquer diretorio em `ObjetosDaKbEmXml` corresponde ao tipo GeneXus correto sem verificar o GUID em pelo menos um XML daquele diretorio; o nome do diretorio e convencao local e pode divergir do tipo real
 - NUNCA renomear diretorios em `ObjetosDaKbEmXml` sem aprovacao explicita do usuario e sem seguir a sequencia segura com nome temporario (A→tmp, B→A, tmp→B)
 - NUNCA declarar estado de conclusao em `modo_atualizacao` (passo 8.h) sem ter executado a verificacao de naming inline (passos 8.g2.i a 8.g2.vi) quando `ObjetosDaKbEmXml` contiver diretorios com XMLs; a auditoria de naming e obrigatoria e nao pode ser omitida mesmo quando todos os scripts forem EQUIVALENTE e nenhuma outra correcao for necessaria
+- NUNCA declarar "tudo certo", `wrappers_atualizados` ou equivalente global em `modo_atualizacao` quando existir `PacotesGeradosParaImportacaoNaKbNoGenexus` e a aderencia do fluxo de empacotamento local ainda nao tiver sido auditada explicitamente, incluindo `Test-*KbPackageCollision.ps1`
 - NUNCA confundir a pasta nativa da KB com a pasta paralela da KB
 - NUNCA gravar na pasta nativa da KB; essa pasta e somente leitura para agentes, salvo leitura operacional controlada quando realmente necessaria
 - NUNCA gravar manualmente em `ObjetosDaKbEmXml`
@@ -593,3 +653,5 @@ PastaParalelaDaKb/
 - NUNCA ignorar divergencia de prefixo verbal entre o nome do script local e o exemplo canonico correspondente quando o exemplo mudou de nome em relacao a versao anterior da base (ex: `Update-` → `Rebuild-`). Corrigir o conteudo sem alinhar o nome mascara a divergencia do `Test-KbStructure` e deixa a pasta paralela com nome defasado invisivel para o gate
 - NUNCA tratar declaracao de estado em `AGENTS.md` local (ex: `materializado_e_indice_validado`) como verdade absoluta quando a inspecao objetiva da pasta paralela mostrar scripts ausentes, wrappers defasados ou gate quebrado. O `AGENTS.md` e memoria auxiliar e pode estar desatualizado; a evidencia estrutural (presenca/ausencia de scripts, resultado do gate) prevalece sobre declaracao de estado. Ao concluir qualquer atualizacao, atualizar o estado no `AGENTS.md` para refletir a realidade.
 - NUNCA deixar uma pasta paralela que adota `KbIntelligence` sem a secao `## Triagem Por Indice` no `AGENTS.md` local. A ausencia dessa secao faz com que a regra generica "tarefa GeneXus → nexa" capture perguntas de existencia/localizacao/impacto, desviando o agente do `xpz-index-triage` e furando o gate. Tanto em `modo_criacao` quanto em `modo_atualizacao`, verificar e garantir essa secao.
+- NUNCA usar no handoff final timestamp placeholder, fixo, reaproveitado de outra mensagem ou obviamente nao obtido do relogio local no momento da resposta; isso invalida a conformidade formal do diagnostico.
+- NUNCA classificar `Get-*KbMetadata.ps1` como `EQUIVALENTE` se `kb-source-metadata.md` contem `kb_name` ou `source_guid` em formato documentado e o wrapper retorna esses campos como ausentes; isso e falha funcional do wrapper, nao ressalva informativa.

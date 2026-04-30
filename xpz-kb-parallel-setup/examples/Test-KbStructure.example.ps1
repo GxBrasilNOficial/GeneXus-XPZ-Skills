@@ -74,6 +74,7 @@ foreach ($script in @(
     'Rebuild-KbIntelligenceIndex.ps1',
     'Test-KbGate.ps1',
     'Get-KbMetadata.ps1',
+    'Test-KbMetadataWrapper.ps1',
     'Test-KbStructure.ps1'
 )) {
     Test-Component -Label "scripts\$script" -Path (Join-Path $scriptsDir $script) -Type Leaf
@@ -90,6 +91,7 @@ foreach ($scriptName in @(
     'Rebuild-KbIntelligenceIndex.ps1',
     'Test-KbGate.ps1',
     'Get-KbMetadata.ps1',
+    'Test-KbMetadataWrapper.ps1',
     'Test-KbStructure.ps1'
 )) {
     $scriptPath = Join-Path $scriptsDir $scriptName
