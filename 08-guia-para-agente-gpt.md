@@ -241,6 +241,21 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 - usar `Data contract` como bloco inicial para shape de entrada/saida, coerencia de tipos, estrutura de resposta e mapeamento entre contrato e dados
 - usar `Identity and container` como bloco inicial para `parent`, `module`, `fullyQualifiedName`, origem estrutural e risco de clonagem
 
+### Regra adicional para revisao de `Panel`
+
+- em `Panel`, revisar por blocos funcionais; nao tratar XML curto como sinal automatico de revisao simples quando a pergunta for de estrutura, comportamento, pattern, parent ou diagnostico fino
+- os blocos canonicos sao `Panel structure and layout`, `Serialized behavior and configuration`, `Pattern and parent coupling`, `External dependencies` e `Identity and container`
+- antes da analise fina, declarar qual e o bloco primario do sintoma atual
+- abrir bloco adjacente apenas quando houver dependencia funcional explicita com o bloco primario
+- nomear a transicao de bloco no raciocinio e no handoff, por exemplo: `Panel structure and layout -> Pattern and parent coupling` para separar a tela aparente do contexto estrutural que a sustenta
+- parar a expansao quando a hipotese ja estiver sustentada; nao reabrir o `Panel` inteiro por reflexo
+- usar `Panel structure and layout` como bloco inicial para composicao visual, controles, shape da tela e estrutura funcional aparente
+- usar `Serialized behavior and configuration` como bloco inicial para comportamento serializado, configuracao persistida e metadado funcional nao redutivel a decoracao visual
+- usar `Pattern and parent coupling` como bloco inicial para `parent`, `parentGuid`, `parentType`, `moduleGuid`, pattern de origem e acoplamento estrutural do painel
+- usar `External dependencies` como bloco inicial para objeto externo chamado, vinculo necessario e dependencia funcional fora do proprio painel
+- usar `Identity and container` como bloco inicial para `name`, `fullyQualifiedName`, `guid`, contêiner, origem estrutural e risco de ter aberto o painel errado
+- manter separado o que e superficie funcional do painel e o que e dependencia estrutural do contexto de origem; nao colapsar essas camadas cedo demais
+
 ### Regra adicional para revisao de `Transaction`
 
 - em `Transaction`, revisar por blocos funcionais; nao tratar a transacao inteira como bloco unico de leitura

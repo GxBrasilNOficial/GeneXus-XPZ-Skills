@@ -308,6 +308,26 @@ Consolidar regras de geracao, clonagem conservadora, materializacao, serializaca
 - `Regra operacional`: o agente nao deve absorver mudanca extra nao pedida no pacote apenas porque ela apareceu no XML ativo, no diff local ou na reserializacao.
 - `Regra operacional`: o delta deve ser estrito pelo conteudo do pacote, nao por `git diff` abstrato.
 
+### Revisao por blocos em `Panel`
+
+- `Regra operacional`: em `Panel`, nao presumir que pouco volume de XML signifique baixa sensibilidade metodologica; a revisao fina deve separar explicitamente superficie funcional, comportamento serializado e acoplamento estrutural com `parent` e pattern.
+- `Regra operacional`: os blocos canonicos de revisao em `Panel` sao `Panel structure and layout`, `Serialized behavior and configuration`, `Pattern and parent coupling`, `External dependencies` e `Identity and container`.
+- `Regra operacional`: `Panel structure and layout` cobre a composicao funcional e visual do painel, controles, organizacao declarativa e shape estrutural da tela.
+- `Regra operacional`: `Serialized behavior and configuration` cobre comportamento e configuracao serializados no XML, inclusive metadados funcionais que nao sao mera decoracao visual.
+- `Regra operacional`: `Pattern and parent coupling` cobre `parent`, `parentGuid`, `parentType`, `moduleGuid` e o acoplamento do painel ao contexto estrutural e de pattern de origem.
+- `Regra operacional`: `External dependencies` cobre objetos externos chamados, referenciados ou necessarios para sustentar a leitura funcional do painel.
+- `Regra operacional`: `Identity and container` cobre `name`, `fullyQualifiedName`, `guid`, contêiner e classificacao estrutural do objeto.
+- `Regra operacional`: antes de aprofundar a leitura, declarar qual e o bloco primario do sintoma atual; se o agente ainda nao souber qual e o bloco primario, ele ainda nao esta pronto para revisao fina.
+- `Regra operacional`: abrir bloco adjacente apenas por dependencia funcional explicita; transicao sem motivo declarado reintroduz leitura difusa do `Panel`.
+- `Regra operacional`: em `Panel`, as transicoes mais comuns e justificadas sao `Panel structure and layout -> Serialized behavior and configuration`, `Serialized behavior and configuration -> Panel structure and layout`, `Panel structure and layout -> Pattern and parent coupling`, `Pattern and parent coupling -> Panel structure and layout`, `Serialized behavior and configuration -> Pattern and parent coupling`, `Pattern and parent coupling -> External dependencies`, `External dependencies -> Serialized behavior and configuration`, `Identity and container -> Pattern and parent coupling` e `Identity and container -> Panel structure and layout`.
+- `Regra operacional`: usar `Panel structure and layout` como bloco inicial quando a duvida nascer de composicao visual, controles, organizacao declarativa, shape da tela ou estrutura funcional aparente do painel.
+- `Regra operacional`: usar `Serialized behavior and configuration` como bloco inicial quando o sintoma falar de comportamento serializado, configuracao persistida, metadado funcional ou algo que nao se explica so pela superficie visual.
+- `Regra operacional`: usar `Pattern and parent coupling` como bloco inicial quando a duvida falar de `parent`, `parentGuid`, `parentType`, `moduleGuid`, pattern de origem, acoplamento estrutural ou suspeita de painel fora do contexto correto.
+- `Regra operacional`: usar `External dependencies` como bloco inicial quando a pergunta falar de objeto externo chamado, vinculo ausente, referencia necessaria ou dependencia funcional fora do proprio painel.
+- `Regra operacional`: usar `Identity and container` como bloco inicial quando a duvida falar de `name`, `fullyQualifiedName`, `guid`, contêiner, classificacao estrutural ou risco de ter aberto o painel errado.
+- `Regra operacional`: em `Panel`, nao tratar `Panel structure and layout` como prova suficiente de autonomia do objeto; sempre manter a possibilidade de que o risco real esteja no acoplamento estrutural ao redor dele.
+- `Regra operacional`: parar a expansao quando a hipotese ja estiver sustentada; nao reabrir o `Panel` inteiro por reflexo.
+
 ### Revisao por blocos em `Transaction`
 
 - `Regra operacional`: em `Transaction`, nao tratar a transacao inteira como bloco unico de leitura; a revisao fina deve declarar antes qual e o bloco primario do sintoma atual.
