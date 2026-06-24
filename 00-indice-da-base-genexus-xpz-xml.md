@@ -67,7 +67,6 @@ Organizar conhecimento operacional e empírico sobre XMLs extraídos de `XPZ` Ge
 - `01f-moldes-sanitizados-dados-e-design.md`
 - `01g-moldes-sanitizados-componentes-e-fisico.md`
 - `01h-moldes-sanitizados-metadados-e-artefatos.md`
-- `01k-registro-elementos-legados.md`
 - `04-webpanel-familias-e-templates.md`
 - `04b-ucw-gxcontroltype-reference.md`
 - `05-transaction-familias-e-templates.md`
@@ -75,6 +74,7 @@ Organizar conhecimento operacional e empírico sobre XMLs extraídos de `XPZ` Ge
 
 ### Operacional
 
+- `01k-registro-elementos-legados.md`
 - `02-regras-operacionais-e-runtime.md`
 - `03-risco-e-decisao-por-tipo.md`
 - `07-open-points-e-checklist.md`
