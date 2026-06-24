@@ -39,7 +39,7 @@ from pathlib import Path
 from typing import Iterable
 
 # Incrementar quando a cobertura ou regras do indexador mudarem de forma material (nao em refator inerte).
-EXTRACTOR_SIGNATURE_VERSION = "6"
+EXTRACTOR_SIGNATURE_VERSION = "7"
 
 
 def compute_extractor_signature_hash() -> str:
@@ -165,6 +165,35 @@ def activate_object_type_catalog(
 GX_OBJECT_TYPE_CATALOG = load_gx_object_type_catalog()
 GX_TYPE_CATALOG_BY_NAME: dict[str, dict[str, object]] = GX_OBJECT_TYPE_CATALOG["types"]
 GX_TYPE_BY_GUID: dict[str, str] = build_type_guid_index(GX_TYPE_CATALOG_BY_NAME)
+
+
+def load_legacy_export_registry() -> dict:
+    """Carrega gx-legacy-export-element-registry.json (camada de governanca de export legado GX9).
+
+    Dinamico: le o registro ao lado do script. Ausente -> registro vazio (comportamento inalterado).
+    """
+    registry_path = Path(__file__).resolve().parent / "gx-legacy-export-element-registry.json"
+    if not registry_path.exists():
+        return {"elements": {}}
+    return json.loads(registry_path.read_text(encoding="utf-8"))
+
+
+def build_legacy_orphan_folders(registry: dict) -> set[str]:
+    """Conjunto de materializedFolderName dos elementos legados de classe 'orphan' (ex.: Report, Menubar)."""
+    folders: set[str] = set()
+    elements = registry.get("elements", {})
+    if not isinstance(elements, dict):
+        return folders
+    for element in elements.values():
+        if isinstance(element, dict) and element.get("class") == "orphan":
+            folder = element.get("materializedFolderName")
+            if folder:
+                folders.add(str(folder))
+    return folders
+
+
+GX_LEGACY_EXPORT_REGISTRY: dict = load_legacy_export_registry()
+LEGACY_ORPHAN_FOLDERS: set[str] = build_legacy_orphan_folders(GX_LEGACY_EXPORT_REGISTRY)
 LEVEL_RE = re.compile(r"<Level\b(?P<attrs>[^>]*)>(?P<body>.*?)</Level>", re.IGNORECASE | re.DOTALL)
 LEVEL_ATTRIBUTE_RE = re.compile(
     r"<Attribute\b(?P<attrs>[^>]*)>(?P<name>.*?)</Attribute>",
@@ -215,6 +244,7 @@ class InventoryScanSummary:
     snapshot_objects_by_directory: dict[str, int]
     folder_type_mismatches: list[InventorySemanticIssue]
     unknown_type_folders: list[str]
+    legacy_orphan_directories_skipped: list[dict[str, object]]
 
 
 @dataclass(frozen=True)
@@ -315,11 +345,20 @@ def collect_all_objects(source_root: Path) -> tuple[dict[str, dict[str, ObjectIn
     folder_type_mismatches: list[InventorySemanticIssue] = []
     snapshot_objects_by_directory: dict[str, int] = {}
     unknown_type_folders: list[str] = []
+    legacy_orphan_directories_skipped: list[dict[str, object]] = []
     for folder in sorted(source_root.iterdir(), key=lambda item: item.name.lower()):
         if not folder.is_dir():
             continue
         xml_count = sum(1 for _ in folder.glob("*.xml"))
         if xml_count == 0:
+            continue
+        # Pastas de elementos legados orfaos (registro gx-legacy-export-element-registry.json):
+        # reconhecidas como known-legacy e puladas na MESMA passada — ficam fora do snapshot, de
+        # unknown_type_folders e da coleta. Evita o raise SystemExit por unknown_guids (type=gxlegacy/*
+        # nao casa GUID) e o BLOCK por directory_inventory_mismatch (pasta fora do snapshot nao diverge).
+        # O skip fica auditavel em legacy_orphan_directories_skipped (nao silenciar XML orfaos presentes).
+        if folder.name in LEGACY_ORPHAN_FOLDERS:
+            legacy_orphan_directories_skipped.append({"directory": folder.name, "xml_count": xml_count})
             continue
         snapshot_objects_by_directory[folder.name] = xml_count
         if folder.name not in GX_TYPE_CATALOG_BY_NAME:
@@ -349,6 +388,9 @@ def collect_all_objects(source_root: Path) -> tuple[dict[str, dict[str, ObjectIn
         snapshot_objects_by_directory=snapshot_objects_by_directory,
         folder_type_mismatches=folder_type_mismatches,
         unknown_type_folders=sorted(set(unknown_type_folders)),
+        legacy_orphan_directories_skipped=sorted(
+            legacy_orphan_directories_skipped, key=lambda item: str(item["directory"])
+        ),
     )
 
 
@@ -409,6 +451,7 @@ def validate_inventory_semantics(
         "catalog_version": GX_OBJECT_TYPE_CATALOG["version"],
         "snapshot_objects_by_directory": dict(sorted(scan_summary.snapshot_objects_by_directory.items())),
         "indexed_objects_by_type": dict(sorted(indexed_objects_by_type.items())),
+        "legacy_orphan_directories_skipped": scan_summary.legacy_orphan_directories_skipped,
         "mismatch_count": len(mismatches),
         "mismatches": mismatches,
     }

@@ -106,6 +106,12 @@ if (-not (Test-Path -LiteralPath $supportScript -PathType Leaf)) {
 }
 . $supportScript
 
+$fileBaseNameNormalizationSupportScript = Join-Path $PSScriptRoot 'GeneXusFileBaseNameNormalizationSupport.ps1'
+if (-not (Test-Path -LiteralPath $fileBaseNameNormalizationSupportScript -PathType Leaf)) {
+    throw "Required support script not found: $fileBaseNameNormalizationSupportScript"
+}
+. $fileBaseNameNormalizationSupportScript
+
 function New-TempDirectory {
     $tempBase = [System.IO.Path]::GetTempPath()
     $tempName = "gx-xpz-" + [System.Guid]::NewGuid().ToString("N")
@@ -153,23 +159,6 @@ function Resolve-PackageXmlPath {
     }
 
     throw "Unsupported InputPath '$resolved'. Use a folder, .xml, or .xpz."
-}
-
-function Normalize-FileBaseName {
-    param([string]$LogicalName)
-
-    $invalidChars = [System.IO.Path]::GetInvalidFileNameChars()
-    $builder = New-Object System.Text.StringBuilder
-
-    foreach ($char in $LogicalName.ToCharArray()) {
-        if ($invalidChars -contains $char) {
-            [void]$builder.Append('_')
-        } else {
-            [void]$builder.Append($char)
-        }
-    }
-
-    return $builder.ToString().TrimEnd('.')
 }
 
 function Convert-ExpectedItemsToComparison {

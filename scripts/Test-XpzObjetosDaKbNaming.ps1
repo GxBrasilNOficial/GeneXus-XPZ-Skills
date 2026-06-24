@@ -44,6 +44,32 @@ if (-not (Test-Path -LiteralPath $supportScript -PathType Leaf)) {
 }
 . $supportScript
 
+function Get-GeneXusLegacyOrphanTokenMap {
+    # Mapa typeToken (lower) -> { TypeToken, FolderName } dos elementos legados orfaos do registro
+    # gx-legacy-export-element-registry.json (camada de governanca de export legado GX9). Carregado
+    # dinamicamente; ausente -> mapa vazio (comportamento inalterado).
+    $registryPath = Join-Path $PSScriptRoot 'gx-legacy-export-element-registry.json'
+    $map = @{}
+    if (-not (Test-Path -LiteralPath $registryPath -PathType Leaf)) {
+        return $map
+    }
+    $registry = Get-Content -LiteralPath $registryPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ($null -eq $registry.PSObject.Properties['elements']) {
+        return $map
+    }
+    foreach ($prop in $registry.elements.PSObject.Properties) {
+        $element = $prop.Value
+        if ($null -ne $element.PSObject.Properties['class'] -and $element.class -eq 'orphan') {
+            $token = [string]$element.typeToken
+            $folder = [string]$element.materializedFolderName
+            if (-not [string]::IsNullOrWhiteSpace($token) -and -not [string]::IsNullOrWhiteSpace($folder)) {
+                $map[$token.ToLowerInvariant()] = [pscustomobject]@{ TypeToken = $token; FolderName = $folder }
+            }
+        }
+    }
+    return $map
+}
+
 function Write-StructuredError {
     param([string]$Message)
 
@@ -62,7 +88,8 @@ function Write-StructuredError {
 function Try-ClassifyXml {
     param(
         [string]$Path,
-        [hashtable]$GuidMap
+        [hashtable]$GuidMap,
+        [hashtable]$LegacyOrphanMap
     )
 
     $document = [xml](Get-Content -LiteralPath $Path -Raw)
@@ -106,6 +133,32 @@ function Try-ClassifyXml {
         }
     }
 
+    if ($typeGuid -match '^gxlegacy/') {
+        # Elemento legado orfao materializado por typeToken (gxlegacy/<Elemento>): o @type nunca
+        # casa GUID do catalogo moderno; classifica pelo registro, nao como TIPO_DESCONHECIDO.
+        $tokenKey = $typeGuid.ToLowerInvariant()
+        if ($null -ne $LegacyOrphanMap -and $LegacyOrphanMap.ContainsKey($tokenKey)) {
+            $orphan = $LegacyOrphanMap[$tokenKey]
+            return [pscustomobject]@{
+                Root                 = $rootName
+                TypeGuid             = $typeGuid
+                TipoReal             = $orphan.TypeToken
+                NomeCanonicoEsperado = $orphan.FolderName
+                StatusNaming         = $null
+                SourceFile           = $Path
+            }
+        }
+        # typeToken gxlegacy nao registrado -> desconhecido (defensivo).
+        return [pscustomobject]@{
+            Root                 = $rootName
+            TypeGuid             = $typeGuid
+            TipoReal             = 'TIPO_DESCONHECIDO'
+            NomeCanonicoEsperado = $null
+            StatusNaming         = 'TIPO_DESCONHECIDO'
+            SourceFile           = $Path
+        }
+    }
+
     $guidKey = $typeGuid.ToLowerInvariant()
     if (-not $GuidMap.ContainsKey($guidKey)) {
         return [pscustomobject]@{
@@ -142,6 +195,7 @@ try {
     foreach ($entry in $typeMap.GetEnumerator()) {
         $guidMap[$entry.Key] = $entry.Value
     }
+    $legacyOrphanMap = Get-GeneXusLegacyOrphanTokenMap
     $rows = [System.Collections.Generic.List[pscustomobject]]::new()
 
     foreach ($dir in Get-ChildItem -LiteralPath $objetosPath -Directory | Sort-Object Name) {
@@ -164,7 +218,7 @@ try {
         $lastError = $null
         foreach ($xmlFile in $xmlFiles) {
             try {
-                $classified = Try-ClassifyXml -Path $xmlFile.FullName -GuidMap $guidMap
+                $classified = Try-ClassifyXml -Path $xmlFile.FullName -GuidMap $guidMap -LegacyOrphanMap $legacyOrphanMap
                 break
             } catch {
                 $lastError = $_.Exception.Message
