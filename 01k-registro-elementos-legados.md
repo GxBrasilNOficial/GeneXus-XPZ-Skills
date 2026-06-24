@@ -4,7 +4,7 @@
 operacional e de governança
 
 ## Nível de confiança predominante
-alto (classificação e mapeamento peer-validados; tag/casing exatos de cada elemento confirmados pelo motor ao parsear GX9 real)
+alto (classificação e mapeamento peer-validados; tag/casing exatos de cada elemento são os melhores conhecidos hoje, a confirmar pelo motor de export legado — frente futura, inexistente — ao parsear GX9 real)
 
 ## Depende de
 01a-catalogo-e-padroes-empiricos.md
