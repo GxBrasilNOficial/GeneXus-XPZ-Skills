@@ -839,6 +839,7 @@ para um modelo **externo** via `Invoke-OpenCode.ps1` com o agente default, o pai
   **qualquer arquivo** (config com baseURL/chaves, `.env`) — eixo de **leitura** ainda aberto (e o adapter
   opencode **não** tem `-Cd` para conter o cwd). Ver `999-ideias-pendentes.md` (frente "agente reviewer
   sem execução/escrita").
+- **Regra operacional (revisor opencode = read-only obrigatório).** Ao usar opencode como **revisor** (revisão por pares / pré-push reforçada), **nunca** despachar com o agente default `build`/`plan`: o revisor **não pode escrever**. Despachar com `-Agent <custom>` cujo arquivo declare `permission: edit: deny` (e `bash: deny` quando a revisão não exigir execução); enquanto esse agente não estiver provisionado (ver `999-ideias-pendentes.md`), **preferir um revisor read-only de outra família** (Codex em sandbox `read-only`; Claude Code com tools restritos) a conceder escrita ao opencode. **Incidente concreto (2026-06-24, pré-push reforçada):** um revisor opencode (`kimi-k2.7-code`, agente default) **editou** um `.md` do repo (corrigiu um typo) em vez de só reportar — o eixo `edit` **se materializou**; o orquestrador inspecionou o diff antes de adotar, mas a edição pelo revisor **não devia ser possível**.
 
 ## LIMITE CONHECIDO — CODEX É AGÊNTICO (HERDA O AGENTS.md, PODE EXECUTAR)
 
