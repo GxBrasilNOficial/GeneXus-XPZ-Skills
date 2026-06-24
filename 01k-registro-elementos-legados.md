@@ -27,7 +27,7 @@ Cada elemento legado pertence a uma de duas classes:
 - **`equivalent`** — o elemento legado tem um **tipo moderno real** no catálogo (`catalogType`). Materializa-se exatamente como o tipo moderno correspondente; **reusa o `folderName` do catálogo** (não define pasta própria). O campo `modernSuccessor` não se aplica: não há sucessão, há identidade de tipo.
 - **`orphan`** — o elemento legado **não tem** equivalente moderno direto. Materializa-se em pasta própria (`materializedFolderName`) sob um token de tipo sintético `typeToken` no formato `gxlegacy/<Elemento>`, que o distingue inequivocamente de qualquer tipo do catálogo moderno.
 
-A reconciliação por GUID (`reconcilableByGuid`) é **invariante de classe**, não campo do registro: elementos legados não carregam GUID de tipo, logo **não participam** de rename por GUID no sync (o reconciliador GUID-aware ignora-os). Isso vale para ambas as classes e não precisa ser repetido por elemento.
+A reconciliação por GUID (`reconcilableByGuid`) é **invariante de classe**, não campo do registro. Atenção a **dois GUIDs distintos**: o **GUID de tipo** (`Object/@type`) — que falta aos elementos legados e por isso eles ficam fora do catálogo moderno — **não** é o usado pelo rename GUID-aware do `Sync-GeneXusXpzToXml.ps1`, que reconcilia por **`guid` do nó raiz do objeto** (identidade da instância). Na representação atual do export legado, os itens não carregam `guid` de objeto estável (vazio), logo **não participam** do rename por GUID; se/como participarão no futuro depende da identidade estável que o **motor de export legado** (frente futura) extrair e materializar. Isso vale para ambas as classes e não precisa ser repetido por elemento.
 
 ### Campos por classe
 
