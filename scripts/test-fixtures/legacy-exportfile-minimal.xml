@@ -1,0 +1,36 @@
+<?xml version='1.0' encoding='iso-8859-1'?>
+<ExportFile>
+  <Model>
+    <Name>LegacySample</Name>
+  </Model>
+  <KMW>
+    <MajorVersion>2</MajorVersion>
+    <MinorVersion>2</MinorVersion>
+    <Path>C:\KBs\LegacySample</Path>
+    <MaxGxBuildSaved>2494</MaxGxBuildSaved>
+  </KMW>
+  <GXObject>
+    <Transaction>
+      <Info>
+        <Name>Cliente</Name>
+        <Description>Cliente</Description>
+      </Info>
+      <LastUpdate>2026-06-23 10:00:00GMT</LastUpdate>
+      <Structure>
+        <Source><![CDATA[ClienteId*
+ClienteNome
+]]></Source>
+      </Structure>
+    </Transaction>
+  </GXObject>
+  <Attributes>
+    <GXAtt>
+      <Attribute>
+        <Name>ClienteId</Name>
+        <Title>Cliente Id</Title>
+        <Length>4</Length>
+        <LastUpdate>2026-06-23 10:00:00GMT</LastUpdate>
+      </Attribute>
+    </GXAtt>
+  </Attributes>
+</ExportFile>

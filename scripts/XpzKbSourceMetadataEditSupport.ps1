@@ -308,7 +308,15 @@ function Update-XpzKbSourceMetadataFromSync {
 
     $packageMajorVersion = if ($null -ne $kmwNode -and $null -ne $kmwNode.SelectSingleNode('MajorVersion')) { $kmwNode.SelectSingleNode('MajorVersion').InnerText } else { '' }
     $packageMinorVersion = if ($null -ne $kmwNode -and $null -ne $kmwNode.SelectSingleNode('MinorVersion')) { $kmwNode.SelectSingleNode('MinorVersion').InnerText } else { '' }
-    $packageBuild = if ($null -ne $kmwNode -and $null -ne $kmwNode.SelectSingleNode('Build')) { $kmwNode.SelectSingleNode('Build').InnerText } else { '' }
+    $packageBuild = ''
+    if ($null -ne $kmwNode) {
+        if ($null -ne $kmwNode.SelectSingleNode('Build') -and -not [string]::IsNullOrWhiteSpace($kmwNode.SelectSingleNode('Build').InnerText)) {
+            $packageBuild = $kmwNode.SelectSingleNode('Build').InnerText.Trim()
+        }
+        elseif ($null -ne $kmwNode.SelectSingleNode('MaxGxBuildSaved') -and -not [string]::IsNullOrWhiteSpace($kmwNode.SelectSingleNode('MaxGxBuildSaved').InnerText)) {
+            $packageBuild = $kmwNode.SelectSingleNode('MaxGxBuildSaved').InnerText.Trim()
+        }
+    }
 
     $packageKbGuid = if ($null -ne $sourceNode) { $sourceNode.GetAttribute('kb') } else { '' }
     $packageUsername = if ($null -ne $sourceNode) { $sourceNode.GetAttribute('username') } else { '' }
@@ -355,7 +363,14 @@ function Update-XpzKbSourceMetadataFromSync {
 
     $warnings = [System.Collections.Generic.List[string]]::new()
     if ($null -eq $kmwNode -or $null -eq $sourceNode) {
-        $warnings.Add('KbMetadataPath: pacote aceito para sync de objetos, mas KMW ou Source vieram ausentes/incompletos; valores estaveis anteriores foram preservados e kb-source-metadata.md recebeu refresh parcial.') | Out-Null
+        $legacyExportHint = ''
+        if ($null -ne $kmwNode -and $null -eq $sourceNode) {
+            $legacyPath = $kmwNode.SelectSingleNode('Path')
+            if ($null -ne $legacyPath -and -not [string]::IsNullOrWhiteSpace($legacyPath.InnerText)) {
+                $legacyExportHint = ' Export legado: KMW/Path presente sem bloco Source moderno.'
+            }
+        }
+        $warnings.Add("KbMetadataPath: pacote aceito para sync de objetos, mas KMW ou Source vieram ausentes/incompletos; valores estaveis anteriores foram preservados e kb-source-metadata.md recebeu refresh parcial.$legacyExportHint") | Out-Null
     } elseif (-not $hasCompleteSourceFromPackage) {
         if ($hasStableMetadataBaseline) {
             $warnings.Add('KbMetadataPath: pacote aceito para sync de objetos, mas Source incompleto; valores estaveis anteriores foram preservados e kb-source-metadata.md recebeu refresh parcial.') | Out-Null

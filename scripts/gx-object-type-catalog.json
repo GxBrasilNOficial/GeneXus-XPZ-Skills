@@ -181,6 +181,15 @@
       "containerType": true,
       "notes": "Container de sistema (Part; extrator nao modela dependencia de modulo). queryableByKbIntelligence=false."
     },
+    "MenuBar": {
+      "objectTypeGuid": "7c4e8f21-9a00-4000-8000-000000000002",
+      "rootKind": "Object",
+      "folderName": "MenuBar",
+      "inventoryEligible": true,
+      "queryableByKbIntelligence": false,
+      "containerType": false,
+      "notes": "Menu principal (GXObject/Menubar em export legado GX9). GUID sintetico/provisorio reservado para adaptacao de export legado; nao observado como Object/@type moderno. Substituir quando houver evidencia oficial ou empirica do tipo real. queryableByKbIntelligence=false: extrator atual nao interpreta payload legado."
+    },
     "PackagedModule": {
       "objectTypeGuid": "c88fffcd-b6f8-0000-8fec-00b5497e2117",
       "rootKind": "Object",
@@ -234,6 +243,15 @@
       "queryableByKbIntelligence": true,
       "containerType": false,
       "notes": "Query object GeneXus (QueryElement, filtros, parametros, chart/card settings)."
+    },
+    "Report": {
+      "objectTypeGuid": "7c4e8f21-9a00-4000-8000-000000000001",
+      "rootKind": "Object",
+      "folderName": "Report",
+      "inventoryEligible": true,
+      "queryableByKbIntelligence": false,
+      "containerType": false,
+      "notes": "Relatorio em export legado (GXObject/Report, GX9). GUID sintetico/provisorio reservado para adaptacao de export legado; nao observado como Object/@type moderno. Substituir quando houver evidencia oficial ou empirica do tipo real. queryableByKbIntelligence=false: extrator atual nao interpreta payload legado."
     },
     "SDT": {
       "objectTypeGuid": "447527b5-9210-4523-898b-5dccb17be60a",

@@ -134,6 +134,21 @@ Quando o usuário não informar nomes alternativos, adotar estas subpastas na ra
 
 ---
 
+## EXPORTS LEGADOS (KB ANTIGA)
+
+- `Evidência direta`: versões antigas do GeneXus (ex.: GX9) podem exportar `ExportFile` com `GXObject`/`GXAtt` em vez de `Objects/Object` e `Attributes/Attribute`.
+- O motor `Sync-GeneXusXpzToXml.ps1` detecta esse perfil e delega a `scripts/GeneXusLegacyExportFileSupport.ps1`.
+- Interpretações de sucesso: `legacy-export-adapted` (itens materializados) — distinto de `no-exportable-items` (pacote moderno vazio) e de erro de leitura.
+- Cada XML gravado usa envelope moderno (`Object`/`Attribute` + `lastUpdate`) com `dataSource="gx-legacy-export"` e payload original em `GxLegacyPayload`.
+- O acervo legado materializado não carrega `guid` de identidade estável; em `-FullSnapshot`, esses itens não participam da reconciliação por GUID (`RenamedByGuid`/`RenameResidualsDetected`). Renames futuros desse material legado devem ser tratados por nome/contexto humano, não como rename GUID-aware.
+- Mapeamento de elementos legados → tipo canônico: `scripts/gx-legacy-export-element-map.json`; tipos sem entrada geram warning consultivo, não bloqueio automático do sync.
+- `Get-GeneXusImportPackageObjectInventory.ps1` inventaria o mesmo perfil (`legacyFormatDetected=true`).
+- `KbIntelligence`: inventário e gate estrutural costumam funcionar; `who-uses`, `impact-basic` e trilhas semânticas sobre o payload interno permanecem limitadas até extrator dedicado.
+- Não confundir com conversão MSBuild `ConvertXpz` (GeneXus 18+): adaptação aqui é para pasta paralela e triagem, não round-trip importável sem revisão humana.
+- Quando houver GeneXus moderno disponível, export atualizado pela IDE continua sendo o caminho preferencial.
+
+---
+
 ## LOCALIZAÇÃO DO REPOSITÓRIO
 
 1. Usar o diretório de trabalho atual como ponto de partida

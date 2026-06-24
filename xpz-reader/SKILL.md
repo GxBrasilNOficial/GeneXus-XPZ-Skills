@@ -453,6 +453,7 @@ Reference files and when to load them:
 - NEVER invent a Part type GUID not observed in the empirical corpus
 - NEVER promote a Hypothesis to Strong Inference without new direct evidence
 - NEVER affirm import or build success — structural analysis only
+- When `dataSource="gx-legacy-export"` or a `GxLegacyPayload` node is present, treat the modern envelope as adaptation for inventory; analyze structure inside the payload and do not assume modern `Part type` layout without evidence
 - ABORT analysis if XML is too malformed to identify `Object/@type`
 - When sample is small or type is rare, state it explicitly before concluding
 - When object lookup depends on a local repository, ABORT if the file was not confirmed in the folder implied by the validated object type

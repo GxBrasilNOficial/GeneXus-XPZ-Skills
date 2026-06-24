@@ -106,6 +106,12 @@ if (-not (Test-Path -LiteralPath $supportScript -PathType Leaf)) {
 }
 . $supportScript
 
+$legacyExportSupportScript = Join-Path $PSScriptRoot 'GeneXusLegacyExportFileSupport.ps1'
+if (-not (Test-Path -LiteralPath $legacyExportSupportScript -PathType Leaf)) {
+    throw "Required support script not found: $legacyExportSupportScript"
+}
+. $legacyExportSupportScript
+
 function New-TempDirectory {
     $tempBase = [System.IO.Path]::GetTempPath()
     $tempName = "gx-xpz-" + [System.Guid]::NewGuid().ToString("N")
@@ -749,19 +755,36 @@ try {
 
     $catalogResolution = Resolve-GeneXusObjectTypeCatalogPaths -BaseCatalogPath $CatalogPath -CatalogOverridePath $CatalogOverridePath -ParallelKbRoot $ParallelKbRoot
     $catalogGuidMap = Get-GeneXusCatalogGuidToFolderMap -MergedCatalog $catalogResolution.MergedCatalog
-    $unknownTypes = @(Get-GeneXusUnknownObjectTypesFromExportFile -XmlDocument $packageXml -GuidToFolderMap $catalogGuidMap)
-    if ($unknownTypes.Count -gt 0) {
-        if ($DiscoveryReportPath) {
-            Write-GeneXusUnknownTypeDiscoveryReport -Path $DiscoveryReportPath -UnknownTypes $unknownTypes -CatalogResolution $catalogResolution -InputPath $InputPath
+    $legacyFormatDetected = Test-GeneXusLegacyExportFilePackage -XmlDocument $packageXml
+    if (-not $legacyFormatDetected) {
+        $unknownTypes = @(Get-GeneXusUnknownObjectTypesFromExportFile -XmlDocument $packageXml -GuidToFolderMap $catalogGuidMap)
+        if ($unknownTypes.Count -gt 0) {
+            if ($DiscoveryReportPath) {
+                Write-GeneXusUnknownTypeDiscoveryReport -Path $DiscoveryReportPath -UnknownTypes $unknownTypes -CatalogResolution $catalogResolution -InputPath $InputPath
+            }
+            $errorMessage = Format-GeneXusUnknownObjectTypesErrorMessage -UnknownTypes $unknownTypes -OverrideActive $catalogResolution.OverrideActive
+            throw $errorMessage
         }
-        $errorMessage = Format-GeneXusUnknownObjectTypesErrorMessage -UnknownTypes $unknownTypes -OverrideActive $catalogResolution.OverrideActive
-        throw $errorMessage
     }
 
-    $items = Convert-PackageToItems -XmlDocument $packageXml -CatalogGuidToFolderMap $catalogGuidMap
+    $legacyUnmappedElements = @()
+    if ($legacyFormatDetected) {
+        $legacyResult = Get-GeneXusLegacyExportFileSyncItems `
+            -XmlDocument $packageXml `
+            -MergedCatalog $catalogResolution.MergedCatalog `
+            -NormalizeFileBaseName { param($LogicalName) Normalize-FileBaseName -LogicalName $LogicalName }
+        $items = $legacyResult.Items
+        $legacyUnmappedElements = @($legacyResult.UnmappedElements)
+        if ($legacyUnmappedElements.Count -gt 0) {
+            $warnings.Add(("export legado: elementos GXObject ignorados por falta de mapeamento no gx-legacy-export-element-map.json: {0}" -f ($legacyUnmappedElements -join ', '))) | Out-Null
+        }
+    }
+    else {
+        $items = Convert-PackageToItems -XmlDocument $packageXml -CatalogGuidToFolderMap $catalogGuidMap
+    }
     $expectedComparison = Convert-ExpectedItemsToComparison -ExpectedItems $ExpectedItems -ActualItems $items
 
-    $objectsBlockCount = @($items | Where-Object { $_.PackageSection -eq "Objects" }).Count
+    $objectsBlockCount = @($items | Where-Object { $_.PackageSection -eq "Objects" -or $_.PackageSection -eq "GXObject" }).Count
     $attributesBlockCount = @($items | Where-Object { $_.PackageSection -eq "Attributes" }).Count
     $preExistingOfficialXmlCount = Get-OfficialXmlCount -Root $DestinationRoot
 
@@ -818,6 +841,8 @@ try {
         "verify-only"
     } elseif ($items.Count -eq 0) {
         "no-exportable-items"
+    } elseif ($legacyFormatDetected -and $items.Count -gt 0) {
+        "legacy-export-adapted"
     } elseif ($preExistingOfficialXmlCount -eq 0 -and $createdCount -gt 0) {
         "first-materialization"
     } elseif ($preExistingOfficialXmlCount -gt 0 -and ($createdCount -gt 0 -or $updatedCount -gt 0)) {
@@ -839,7 +864,11 @@ try {
         AttributesBlockCount = $attributesBlockCount
         TotalExportedItems = $items.Count
         PackageHasExportedItems = ($items.Count -gt 0)
-        PackageInterpretation = if ($items.Count -gt 0) { "exported-items-found" } else { "no-exportable-items" }
+        PackageInterpretation = if ($items.Count -gt 0) {
+            if ($legacyFormatDetected) { "legacy-export-adapted" } else { "exported-items-found" }
+        } else { "no-exportable-items" }
+        LegacyFormatDetected = [bool]$legacyFormatDetected
+        LegacyUnmappedElements = $legacyUnmappedElements
         PreExistingOfficialXmlCount = $preExistingOfficialXmlCount
         MaterializationInterpretation = $materializationInterpretation
         Created = $createdCount

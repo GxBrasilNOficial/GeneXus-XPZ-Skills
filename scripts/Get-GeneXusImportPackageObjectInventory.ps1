@@ -92,6 +92,12 @@ if (-not (Test-Path -LiteralPath $platformCatalogSupport -PathType Leaf)) {
 }
 . $platformCatalogSupport
 
+$legacyExportSupportScript = Join-Path $PSScriptRoot 'GeneXusLegacyExportFileSupport.ps1'
+if (-not (Test-Path -LiteralPath $legacyExportSupportScript -PathType Leaf)) {
+    throw "BLOCK: support script not found: $legacyExportSupportScript"
+}
+. $legacyExportSupportScript
+
 function Get-IdentityKey {
     param(
         [string]$TypeName,
@@ -372,29 +378,50 @@ if ($null -eq $root -or $root.LocalName -ne 'ExportFile') {
 }
 
 $inventory = [System.Collections.Generic.List[pscustomObject]]::new()
-$objectsNode = $root.SelectSingleNode('./Objects')
-if ($null -ne $objectsNode) {
-    $index = 0
-    foreach ($child in @($objectsNode.ChildNodes | Where-Object { $_ -is [System.Xml.XmlElement] })) {
-        $index += 1
-        $inventory.Add((New-InventoryItem -Node $child -GuidMap $guidMap -SourceBlock 'Objects' -Index $index)) | Out-Null
-    }
-}
+$legacyFormatDetected = Test-GeneXusLegacyExportFilePackage -XmlDocument $package.Document
+$legacyUnmappedElements = @()
 
-$attributesNode = $root.SelectSingleNode('./Attributes')
-if ($null -ne $attributesNode) {
-    $index = 0
-    foreach ($child in @($attributesNode.ChildNodes | Where-Object { $_ -is [System.Xml.XmlElement] })) {
-        $index += 1
-        $inventory.Add((New-InventoryItem -Node $child -GuidMap $guidMap -SourceBlock 'Attributes' -Index $index)) | Out-Null
+if ($legacyFormatDetected) {
+    $legacyInventory = Get-GeneXusLegacyExportFileInventoryItems -XmlDocument $package.Document -MergedCatalog $catalogResolution.MergedCatalog
+    foreach ($legacyItem in $legacyInventory.Items) {
+        $inventory.Add($legacyItem) | Out-Null
+    }
+    $legacyUnmappedElements = @($legacyInventory.UnmappedElements)
+}
+else {
+    $objectsNode = $root.SelectSingleNode('./Objects')
+    if ($null -ne $objectsNode) {
+        $index = 0
+        foreach ($child in @($objectsNode.ChildNodes | Where-Object { $_ -is [System.Xml.XmlElement] })) {
+            $index += 1
+            $inventory.Add((New-InventoryItem -Node $child -GuidMap $guidMap -SourceBlock 'Objects' -Index $index)) | Out-Null
+        }
+    }
+
+    $attributesNode = $root.SelectSingleNode('./Attributes')
+    if ($null -ne $attributesNode) {
+        $index = 0
+        foreach ($child in @($attributesNode.ChildNodes | Where-Object { $_ -is [System.Xml.XmlElement] })) {
+            if ($child.LocalName -eq 'GXAtt') {
+                continue
+            }
+            $index += 1
+            $inventory.Add((New-InventoryItem -Node $child -GuidMap $guidMap -SourceBlock 'Attributes' -Index $index)) | Out-Null
+        }
     }
 }
 
 $inventoryArray = @($inventory)
-$objectItems = @($inventoryArray | Where-Object { $_.sourceBlock -eq 'Objects' })
+$objectItems = @($inventoryArray | Where-Object { $_.sourceBlock -eq 'Objects' -or $_.sourceBlock -eq 'GXObject' })
 $attributeItems = @($inventoryArray | Where-Object { $_.sourceBlock -eq 'Attributes' })
 
 $warnings = [System.Collections.Generic.List[string]]::new()
+if ($legacyFormatDetected) {
+    $warnings.Add('export-legado: envelope GXObject/GXAtt detectado; inventario via GeneXusLegacyExportFileSupport.') | Out-Null
+    if ($legacyUnmappedElements.Count -gt 0) {
+        $warnings.Add(("export-legado: elementos GXObject ignorados por falta de mapeamento: {0}" -f ($legacyUnmappedElements -join ', '))) | Out-Null
+    }
+}
 $unknownTypeItems = @($inventoryArray | Where-Object { $_.typeStatus -eq 'unknown' })
 foreach ($item in $unknownTypeItems) {
     $parentHint = if (-not [string]::IsNullOrWhiteSpace($item.parent)) { " parent='$($item.parent)'" } else { '' }
@@ -402,7 +429,10 @@ foreach ($item in $unknownTypeItems) {
     $warnings.Add(("tipo nao mapeado no item {0}[{1}] name='{2}' typeGuid='{3}'{4}{5}" -f $item.sourceBlock, $item.index, $item.name, $item.typeGuid, $parentHint, $parentTypeHint)) | Out-Null
 }
 
-$unknownTypesDiscovery = @(Get-GeneXusUnknownObjectTypesFromExportFile -XmlDocument $package.Document -GuidToFolderMap $catalogFolderMap)
+$unknownTypesDiscovery = @()
+if (-not $legacyFormatDetected) {
+    $unknownTypesDiscovery = @(Get-GeneXusUnknownObjectTypesFromExportFile -XmlDocument $package.Document -GuidToFolderMap $catalogFolderMap)
+}
 
 $objectsByType = Get-ObjectsByTypeMap -InventoryItems $inventoryArray
 $systemObjectsPresent = @(Get-SystemObjectsPresent -InventoryItems $inventoryArray -PlatformKindSets $platformKindSets)
@@ -537,6 +567,8 @@ $result = [ordered]@{
     inputKind            = $package.InputKind
     innerXmlEntry        = $package.InnerXmlName
     rootElement          = $root.LocalName
+    legacyFormatDetected = [bool]$legacyFormatDetected
+    legacyUnmappedElements = $legacyUnmappedElements
     selectiveExport      = $selectiveExport
     totalItemCount       = $inventoryArray.Count
     objectCount          = $objectItems.Count

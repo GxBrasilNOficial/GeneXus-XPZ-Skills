@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "notes": "Mapeia elementos filhos de GXObject em exports legados (pre-envelope Objects/Object) para tipos canonicos do gx-object-type-catalog.json. Caso empirico inicial: GeneXus 9; ampliado com Theme, Folder, Group (SubTypeGroup) e Menubar (MenuBar) a partir de GXW_alunoturma_re.xpz.",
+  "elementToCanonicalType": {
+    "Transaction": "Transaction",
+    "StructureDataType": "SDT",
+    "Language": "Language",
+    "Table": "Table",
+    "Report": "Report",
+    "Theme": "Theme",
+    "Folder": "Folder",
+    "Group": "SubTypeGroup",
+    "Menubar": "MenuBar",
+    "WebPanel": "WebPanel"
+  },
+  "ignoredLegacyElements": []
+}
