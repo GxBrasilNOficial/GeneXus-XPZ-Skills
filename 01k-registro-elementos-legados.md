@@ -4,7 +4,7 @@
 operacional e de governança
 
 ## Nível de confiança predominante
-alto (classificação e mapeamento peer-validados; tag/casing exatos de cada elemento são os melhores conhecidos hoje, a confirmar pelo motor de export legado — frente futura, inexistente — ao parsear GX9 real)
+alto para os 11 elementos observados em um export GeneXus 9 real (amostra `FinGX90`): classificação, mapeamento, tag e casing confirmados por inspeção direta. `Theme` é o único elemento classificado mas **não observado** nesta amostra (mantido por decisão de cobertura — ver «Resíduos conhecidos»); sua tag/casing exata será confirmada quando o motor de export legado (frente futura, inexistente) parsear um GX9 que o contenha.
 
 ## Depende de
 01a-catalogo-e-padroes-empiricos.md
@@ -48,9 +48,9 @@ A reconciliação por GUID (`reconcilableByGuid`) é **invariante de classe**, n
 | `modernSuccessor` | **Metadado de migração**, não identidade: o tipo moderno que absorveu ou sucedeu o conceito. **Nunca** vira o `type` do artefato materializado (o artefato órfão é representado por seu `typeToken`, não pelo sucessor). `null` quando não há sucessor. |
 | `successorRelation` | Relação com o sucessor. Enum cobre **só o corpus conhecido**: `absorbed` (o conceito foi absorvido pelo sucessor) e `none` (sem sucessor; exige `modernSuccessor: null`). Novos valores só com critério explícito e caso real. |
 
-## Inventário dos 10 elementos
+## Inventário dos 12 elementos
 
-Tabela peer-validada (Codex, Kimi-K2.6, deepseek-v4-pro, glm-5.2). `equivalent` (8):
+Tabela peer-validada e **confirmada por export GeneXus 9 real** (amostra `FinGX90`, KB "Financeiro": 11 dos 12 elementos observados; só `Theme` não observado). `equivalent` (10):
 
 | Elemento GX9 | `catalogType` (moderno) |
 | --- | --- |
@@ -58,12 +58,16 @@ Tabela peer-validada (Codex, Kimi-K2.6, deepseek-v4-pro, glm-5.2). `equivalent` 
 | `StructureDataType` | `SDT` |
 | `Language` | `Language` |
 | `Table` | `Table` |
-| `Theme` | `Theme` |
+| `Procedure` | `Procedure` |
+| `DataView` | `DataView` |
+| `WorkPanel` | `WorkPanel` |
 | `Folder` | `Folder` |
-| `WebPanel` | `WebPanel` |
 | `Group` | `SubTypeGroup` |
+| `Theme` | `Theme` (não observado na amostra — ver «Resíduos conhecidos») |
 
-Nota sobre `Group`: na nomenclatura GeneXus o **Subtype Group** é chamado "Group" (a wiki descreve-o como *"A Group can be viewed as a 'virtual' transaction"*); por isso o elemento legado `Group` mapeia para o tipo moderno `SubTypeGroup`. O elemento legado `Folder` (pasta organizacional) é separado e mapeia para o tipo `Folder`.
+Nota sobre `Group`: na nomenclatura GeneXus o **Subtype Group** é chamado "Group" (a wiki descreve-o como *"A Group can be viewed as a 'virtual' transaction"*); por isso o elemento legado `Group` mapeia para o tipo moderno `SubTypeGroup`. O elemento legado `Folder` (pasta organizacional) é separado e mapeia para o tipo `Folder`. Ambos confirmados na amostra (`Group` traz `<Subtype><Name>/<Supertype>`; `Folder` é pasta organizacional).
+
+Nota sobre `WorkPanel`: o elemento legado `WorkPanel` mapeia para o tipo moderno **`WorkPanel`** (objeto do gerador desktop/Windows, *deprecated* desde GeneXus 15, com GUID próprio no catálogo) — **não** para `WebPanel` (página web, runtime distinto). A entrada anterior `WebPanel` do registro era erro de tag/tipo da versão validada sem amostra; `FinGX90` confirma a tag real `WorkPanel` (169 ocorrências).
 
 `orphan` (2):
 
@@ -79,8 +83,8 @@ Nota sobre `Group`: na nomenclatura GeneXus o **Subtype Group** é chamado "Grou
 
 ## Resíduos conhecidos (não bloqueiam a representação)
 
-- O **casing exato** de `Menubar` e a **tag exata** de cada elemento são os melhores conhecidos; o motor de export confirma ao parsear um `ExportFile` GeneXus 9 real. Ajuste de casing/tag é correção do registro, não mudança de classe nem de mapeamento.
-- Amostra real de referência (`GXW_alunoturma_re.xpz`, do autor do PR de export legado) não está nesta máquina; a classificação acima foi derivada por evidência de documentação GeneXus + revisão por pares.
+- 11 dos 12 elementos do registro foram **confirmados por inspeção direta de um export GeneXus 9 real** (amostra `FinGX90`, KB "Financeiro", export GeneXus 9.0): tag, casing (`Menubar` em minúsculo após a primeira letra; `WorkPanel`, `DataView`, `StructureDataType`, `Procedure`, etc.) e estrutura batem com a classificação. Ajuste de tag/casing, caso algum dia divergir em outra KB GX9, é correção do registro, não mudança de classe nem de mapeamento.
+- **`Theme` é o único elemento não observado** na amostra `FinGX90` (KB de perfil desktop/Windows — 169 `WorkPanel`, sem páginas web → sem Themes). É mantido no registro por **decisão de cobertura**, não por evidência da amostra: o objeto Theme existe no GeneXus desde o 8.0 (codinome Olimar, 2003) e o GeneXus 9.0 (Yi, 2005) o suportava — fato de **documentação oficial GeneXus**, não verificado contra esta amostra nem contra o repositório. A tag/casing exata de `<Theme>` em export GX9 segue **presumida** até o motor de export legado (frente futura) parsear um GX9 que a contenha.
 
 ## Invariantes validados por self-test
 

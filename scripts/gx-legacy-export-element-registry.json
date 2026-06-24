@@ -8,8 +8,10 @@
     "Table": { "class": "equivalent", "catalogType": "Table" },
     "Theme": { "class": "equivalent", "catalogType": "Theme" },
     "Folder": { "class": "equivalent", "catalogType": "Folder" },
-    "WebPanel": { "class": "equivalent", "catalogType": "WebPanel" },
+    "WorkPanel": { "class": "equivalent", "catalogType": "WorkPanel" },
     "Group": { "class": "equivalent", "catalogType": "SubTypeGroup" },
+    "Procedure": { "class": "equivalent", "catalogType": "Procedure" },
+    "DataView": { "class": "equivalent", "catalogType": "DataView" },
     "Report": {
       "class": "orphan",
       "materializedFolderName": "Report",
