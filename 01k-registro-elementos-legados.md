@@ -10,7 +10,7 @@ alto (classificação e mapeamento peer-validados; tag/casing exatos de cada ele
 01a-catalogo-e-padroes-empiricos.md
 
 ## Usado por
-scripts/Test-GeneXusLegacyRegistrySchemaSelfTest.ps1, scripts/Test-GeneXusLegacyRegistryDisjointSelfTest.ps1 (validam o registro). O motor de export legado — frente futura, ainda inexistente — consumirá `scripts/gx-legacy-export-element-registry.json`; nenhum script o consome hoje.
+scripts/Test-GeneXusLegacyRegistrySchemaSelfTest.ps1, scripts/Test-GeneXusLegacyRegistryDisjointSelfTest.ps1 (validam o registro). `scripts/Build-KbIntelligenceIndex.py` (indexador registry-aware: reconhece e pula pastas órfãs `gxlegacy/*`, com skip content-aware) e `scripts/Test-XpzObjetosDaKbNaming.ps1` (audit de naming: classifica órfão por `materializedFolderName`) já consomem `scripts/gx-legacy-export-element-registry.json`. O **motor de export/materialização** legado (parse GX9, integração no sync) — frente futura, ainda inexistente — também o consumirá.
 
 ## Objetivo
 

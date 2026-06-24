@@ -339,6 +339,24 @@ def collect_objects(
     return objects_by_type
 
 
+def folder_is_all_legacy_orphan(folder: Path) -> bool:
+    """True sse a pasta tem XML(s) e TODO XML e orfao legado (Object/@type casando gxlegacy/*).
+
+    Skip content-aware: uma pasta cujo nome coincide com materializedFolderName de orfao mas que
+    contem objeto moderno (GUID real) NAO e pulada — segue para o caminho normal, que a flagra
+    (folder_type_mismatch/unknown). Evita mascarar diretorio mal-nomeado em silencio.
+    """
+    xmls = sorted(folder.glob("*.xml"))
+    if not xmls:
+        return False
+    for path in xmls:
+        text = read_text(path)
+        match = OBJECT_TYPE_GUID_RE.search(text)
+        if match is None or not match.group(1).lower().startswith("gxlegacy/"):
+            return False
+    return True
+
+
 def collect_all_objects(source_root: Path) -> tuple[dict[str, dict[str, ObjectInfo]], InventoryScanSummary]:
     objects_by_type: dict[str, dict[str, ObjectInfo]] = {}
     unknown_guids: list[tuple[str, str]] = []
@@ -356,8 +374,10 @@ def collect_all_objects(source_root: Path) -> tuple[dict[str, dict[str, ObjectIn
         # reconhecidas como known-legacy e puladas na MESMA passada — ficam fora do snapshot, de
         # unknown_type_folders e da coleta. Evita o raise SystemExit por unknown_guids (type=gxlegacy/*
         # nao casa GUID) e o BLOCK por directory_inventory_mismatch (pasta fora do snapshot nao diverge).
+        # O skip e CONTENT-AWARE (folder_is_all_legacy_orphan): so pula se TODO XML for orfao gxlegacy/*;
+        # pasta mal-nomeada com conteudo moderno NAO e pulada — segue ao caminho normal, que a flagra.
         # O skip fica auditavel em legacy_orphan_directories_skipped (nao silenciar XML orfaos presentes).
-        if folder.name in LEGACY_ORPHAN_FOLDERS:
+        if folder.name in LEGACY_ORPHAN_FOLDERS and folder_is_all_legacy_orphan(folder):
             legacy_orphan_directories_skipped.append({"directory": folder.name, "xml_count": xml_count})
             continue
         snapshot_objects_by_directory[folder.name] = xml_count

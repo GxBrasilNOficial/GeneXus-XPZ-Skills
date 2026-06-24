@@ -97,5 +97,43 @@ Assert-True ($snapNames -contains 'WebPanel') 'A pasta de tipo moderno WebPanel 
 $indexedNames = @($inv.indexed_objects_by_type.PSObject.Properties.Name)
 Assert-True ($indexedNames -contains 'WebPanel') 'WebPanel deveria estar indexado em indexed_objects_by_type'
 
+# --- Cenario B: skip content-aware (pasta mal-nomeada NAO mascarada) ---
+# Uma pasta chamada 'Report' (nome de orfao do registro) MAS com conteudo MODERNO (WebPanel, GUID real)
+# NAO deve ser pulada em silencio: o skip e content-aware (folder_is_all_legacy_orphan), entao ela segue
+# ao caminho normal e e flagrada (status BLOCK), em vez de virar legacy_orphan_directories_skipped.
+$tempRootB = Join-Path ([System.IO.Path]::GetTempPath()) ('kb-intel-legacy-orphan-misnamed-{0}' -f ([guid]::NewGuid().ToString('N')))
+$parallelRootB = Join-Path $tempRootB 'KbParalela'
+$objetosPathB = Join-Path $parallelRootB 'ObjetosDaKbEmXml'
+$misnamedReportDir = Join-Path $objetosPathB 'Report'
+$kbIntelDirB = Join-Path $parallelRootB 'KbIntelligence'
+[void](New-Item -ItemType Directory -Path $misnamedReportDir, $kbIntelDirB -Force)
+
+$misnamedXml = @'
+<Object type="c9584656-94b6-4ccd-890f-332d11fc2c25" name="wpMisnamed" guid="55555555-0000-0000-0000-000000000001">
+  <Properties>
+    <Property><Name>Name</Name><Value>wpMisnamed</Value></Property>
+  </Properties>
+</Object>
+'@
+[System.IO.File]::WriteAllText((Join-Path $misnamedReportDir 'wpMisnamed.xml'), $misnamedXml, $enc)
+
+$sqlitePathB = Join-Path $kbIntelDirB 'kb-intelligence.sqlite'
+$validationPathB = Join-Path $kbIntelDirB 'kb-intelligence-validation.json'
+
+# Sem -FailOnValidationFailure: queremos ler o report mesmo com BLOCK.
+& $indexScript `
+    -SourceRoot $objetosPathB `
+    -OutputPath $sqlitePathB `
+    -ValidationReportPath $validationPathB `
+    -ParallelKbRoot $parallelRootB | Out-Null
+
+$reportB = Get-Content -LiteralPath $validationPathB -Raw -Encoding UTF8 | ConvertFrom-Json
+$invB = $reportB.inventory_semantics
+
+$skippedB = @($invB.legacy_orphan_directories_skipped)
+$reportSkipB = @($skippedB | Where-Object { $_.directory -eq 'Report' })
+Assert-True ($reportSkipB.Count -eq 0) "Pasta 'Report' com conteudo MODERNO NAO deveria ser pulada como orfao (skip mascararia diretorio mal-nomeado)"
+Assert-True ($invB.status -eq 'BLOCK') "Pasta 'Report' mal-nomeada (conteudo moderno) deveria gerar status BLOCK, foi $($invB.status)"
+
 Write-Output 'OK: Test-KbIntelligenceLegacyOrphanSkipSelfTest.ps1'
 exit 0
