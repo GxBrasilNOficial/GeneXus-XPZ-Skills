@@ -135,5 +135,35 @@ $reportSkipB = @($skippedB | Where-Object { $_.directory -eq 'Report' })
 Assert-True ($reportSkipB.Count -eq 0) "Pasta 'Report' com conteudo MODERNO NAO deveria ser pulada como orfao (skip mascararia diretorio mal-nomeado)"
 Assert-True ($invB.status -eq 'BLOCK') "Pasta 'Report' mal-nomeada (conteudo moderno) deveria gerar status BLOCK, foi $($invB.status)"
 
+# --- Cenario C: token gxlegacy errado/nao-registrado (governanca pelo registro) ---
+# Pasta 'Report' com type="gxlegacy/Foo" (token gxlegacy que NAO e o registrado para Report). O skip e
+# governado pelo registro: gxlegacy/Foo != gxlegacy/Report -> NAO pula -> segue ao caminho normal ->
+# token desconhecido -> o build FALHA (nao mascara em silencio como orfao).
+$tempRootC = Join-Path ([System.IO.Path]::GetTempPath()) ('kb-intel-legacy-orphan-wrongtoken-{0}' -f ([guid]::NewGuid().ToString('N')))
+$parallelRootC = Join-Path $tempRootC 'KbParalela'
+$objetosPathC = Join-Path $parallelRootC 'ObjetosDaKbEmXml'
+$wrongTokenReportDir = Join-Path $objetosPathC 'Report'
+$kbIntelDirC = Join-Path $parallelRootC 'KbIntelligence'
+[void](New-Item -ItemType Directory -Path $wrongTokenReportDir, $kbIntelDirC -Force)
+
+$wrongTokenXml = @'
+<Object type="gxlegacy/Foo" name="rptWrong" lastUpdate="0001-01-01T00:00:00.0000000Z" dataSource="gx-legacy-export">
+  <GxLegacyPayload><Foo><Info><Name>rptWrong</Name></Info></Foo></GxLegacyPayload>
+</Object>
+'@
+[System.IO.File]::WriteAllText((Join-Path $wrongTokenReportDir 'rptWrong.xml'), $wrongTokenXml, $enc)
+
+$sqlitePathC = Join-Path $kbIntelDirC 'kb-intelligence.sqlite'
+$validationPathC = Join-Path $kbIntelDirC 'kb-intelligence-validation.json'
+
+$cFailed = $false
+try {
+    & $indexScript -SourceRoot $objetosPathC -OutputPath $sqlitePathC -ValidationReportPath $validationPathC -ParallelKbRoot $parallelRootC 2>$null | Out-Null
+    if ($LASTEXITCODE -ne 0) { $cFailed = $true }
+} catch {
+    $cFailed = $true
+}
+Assert-True $cFailed "Pasta 'Report' com token gxlegacy errado (gxlegacy/Foo) deveria FALHAR o build (nao mascarar como orfao), mas o build teve sucesso"
+
 Write-Output 'OK: Test-KbIntelligenceLegacyOrphanSkipSelfTest.ps1'
 exit 0

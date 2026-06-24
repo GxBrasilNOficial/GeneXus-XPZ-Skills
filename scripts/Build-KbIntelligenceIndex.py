@@ -192,8 +192,24 @@ def build_legacy_orphan_folders(registry: dict) -> set[str]:
     return folders
 
 
+def build_legacy_orphan_folder_to_token(registry: dict) -> dict[str, str]:
+    """Mapa materializedFolderName -> typeToken (lower) dos elementos legados de classe 'orphan'."""
+    mapping: dict[str, str] = {}
+    elements = registry.get("elements", {})
+    if not isinstance(elements, dict):
+        return mapping
+    for element in elements.values():
+        if isinstance(element, dict) and element.get("class") == "orphan":
+            folder = element.get("materializedFolderName")
+            token = element.get("typeToken")
+            if folder and token:
+                mapping[str(folder)] = str(token).lower()
+    return mapping
+
+
 GX_LEGACY_EXPORT_REGISTRY: dict = load_legacy_export_registry()
 LEGACY_ORPHAN_FOLDERS: set[str] = build_legacy_orphan_folders(GX_LEGACY_EXPORT_REGISTRY)
+LEGACY_ORPHAN_FOLDER_TO_TOKEN: dict[str, str] = build_legacy_orphan_folder_to_token(GX_LEGACY_EXPORT_REGISTRY)
 LEVEL_RE = re.compile(r"<Level\b(?P<attrs>[^>]*)>(?P<body>.*?)</Level>", re.IGNORECASE | re.DOTALL)
 LEVEL_ATTRIBUTE_RE = re.compile(
     r"<Attribute\b(?P<attrs>[^>]*)>(?P<name>.*?)</Attribute>",
@@ -340,19 +356,25 @@ def collect_objects(
 
 
 def folder_is_all_legacy_orphan(folder: Path) -> bool:
-    """True sse a pasta tem XML(s) e TODO XML e orfao legado (Object/@type casando gxlegacy/*).
+    """True sse a pasta tem XML(s) e TODO XML tem Object/@type == o typeToken REGISTRADO para esta
+    pasta orfa (materializedFolderName -> typeToken no registro).
 
-    Skip content-aware: uma pasta cujo nome coincide com materializedFolderName de orfao mas que
-    contem objeto moderno (GUID real) NAO e pulada — segue para o caminho normal, que a flagra
-    (folder_type_mismatch/unknown). Evita mascarar diretorio mal-nomeado em silencio.
+    Skip content-aware GOVERNADO PELO REGISTRO: a pasta 'Report' so e pulada se TODO XML for
+    exatamente o token registrado (gxlegacy/Report). Conteudo moderno (GUID real) OU token gxlegacy
+    errado/nao-registrado para a pasta (ex.: gxlegacy/Foo numa pasta Report) NAO e pulado — segue ao
+    caminho normal, que o flagra (folder_type_mismatch / unknown_guids). Evita mascarar diretorio
+    mal-nomeado ou orfao com token divergente em silencio.
     """
+    expected_token = LEGACY_ORPHAN_FOLDER_TO_TOKEN.get(folder.name)
+    if expected_token is None:
+        return False
     xmls = sorted(folder.glob("*.xml"))
     if not xmls:
         return False
     for path in xmls:
         text = read_text(path)
         match = OBJECT_TYPE_GUID_RE.search(text)
-        if match is None or not match.group(1).lower().startswith("gxlegacy/"):
+        if match is None or match.group(1).lower() != expected_token:
             return False
     return True
 
