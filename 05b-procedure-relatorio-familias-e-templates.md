@@ -36,7 +36,7 @@ Concentrar familias estruturais de `Procedure` de relatório observadas no acerv
 - Evidencia direta: o agrupamento abaixo usa contagem de `PrintBlock` no `Part` de layout, presenca de `Header`/`Footer` no `Part` de fonte e contagem de `For each` no `Source`.
 - Evidencia direta: os tamanhos de arquivo variam de 7.161 bytes ate 1.115.994 bytes no acervo observado.
 - Inferencia forte: para `Procedure` de relatório, a familia estrutural e mais discriminante do que o nome do objeto.
-- Regra editorial: este documento trata do `Procedure` de relatório **moderno** (`Object/@type` `84a12160-...`). O objeto `Report` do **GeneXus 9 legado** (elemento por nome, sem GUID de tipo) foi **absorvido** pela Procedure e e rastreado a parte como `orphan` no registro `scripts/gx-legacy-export-element-registry.json` (`modernSuccessor: Procedure`, doc-dono `01k-registro-elementos-legados.md`) — não confundir com as familias de Procedure-relatório descritas aqui.
+- Regra editorial: este documento trata do `Procedure` de relatório **moderno** (`Object/@type` `84a12160-...`). O objeto `Report` do **GeneXus 9 legado** (elemento por nome, sem GUID de tipo) foi **absorvido** pela Procedure e é rastreado à parte como `orphan` no registro `scripts/gx-legacy-export-element-registry.json` (`modernSuccessor: Procedure`, doc-dono `01k-registro-elementos-legados.md`) — não confundir com as familias de Procedure-relatório descritas aqui.
 
 ---
 
