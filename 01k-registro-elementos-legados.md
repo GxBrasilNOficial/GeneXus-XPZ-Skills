@@ -10,7 +10,7 @@ alto (classificação e mapeamento peer-validados; tag/casing exatos de cada ele
 01a-catalogo-e-padroes-empiricos.md
 
 ## Usado por
-xpz-sync/SKILL.md (motor de export legado, frente futura), scripts/gx-legacy-export-element-registry.json
+scripts/Test-GeneXusLegacyRegistrySchemaSelfTest.ps1, scripts/Test-GeneXusLegacyRegistryDisjointSelfTest.ps1 (validam o registro). O motor de export legado — frente futura, ainda inexistente — consumirá `scripts/gx-legacy-export-element-registry.json`; nenhum script o consome hoje.
 
 ## Objetivo
 
