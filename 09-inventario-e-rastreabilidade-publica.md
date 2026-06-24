@@ -642,7 +642,7 @@ Preservar todo o conteúdo existente, definindo destino e critério de incorpora
 - de `10-matriz-part-types-por-tipo.md`
 - de `11-campos-estaveis-vs-variaveis.md`
 - de `12-diffs-estruturais-por-tipo.md`
-- reorganizado depois como serie `01` com índice mestre em `01-base-empirica-geral.md` e arquivos filhos `01a` em diante
+- reorganizado depois como serie `01` com índice mestre em `01-base-empirica-geral.md` e arquivos filhos `01a` a `01h`
 
 ### 02-regras-operacionais-e-runtime.md
 

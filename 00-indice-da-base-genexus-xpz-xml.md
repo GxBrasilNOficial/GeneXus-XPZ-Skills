@@ -89,7 +89,7 @@ Organizar conhecimento operacional e empírico sobre XMLs extraídos de `XPZ` Ge
 
 1. `00-indice-da-base-genexus-xpz-xml.md`
 2. `01-base-empirica-geral.md`
-3. abrir o filho mais aderente da serie `01` (`01a` em diante)
+3. abrir o filho mais aderente da serie `01` (`01a` a `01h`, filhos empíricos)
 4. `02-regras-operacionais-e-runtime.md`
 5. `03-risco-e-decisao-por-tipo.md`
 6. `04-webpanel-familias-e-templates.md`

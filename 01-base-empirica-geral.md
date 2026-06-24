@@ -35,6 +35,8 @@ Servir como porta de entrada curta para a serie `01`, agora desdobrada em arquiv
 | `01g-moldes-sanitizados-componentes-e-fisico.md` | moldes de `ExternalObject`, `UserControl`, `Module`, `SubTypeGroup`, `ThemeClass`, `Image` e `Table` | componentes, camada física e estrutura visual/material |
 | `01h-moldes-sanitizados-metadados-e-artefatos.md` | moldes de `ThemeColor`, `Document`, `DataSelector`, `Generator`, `PatternSettings`, `DataStore`, `Dashboard`, `DeploymentUnit`, `Language`, `Folder`, exemplos de identidade/`Source`, `Stencil` e `File` | metadados, artefatos auxiliares e exemplos de identidade estrutural |
 
+> `01j` (padrões de CDATA WorkWithWeb) e `01k` (registro de elementos legados) compartilham o prefixo `01` mas são docs **operacionais/de governança**, fora deste mapa empírico; estão no índice completo `00-indice-da-base-genexus-xpz-xml.md`.
+
 ## Ordem recomendada de consulta
 
 1. ler este índice

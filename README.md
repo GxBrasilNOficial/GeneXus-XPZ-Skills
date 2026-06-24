@@ -79,7 +79,7 @@ Guia operacional e metodologico da trilha KB Intelligence. Contratos de fases en
 Se você quer entender a base rapidamente:
 
 1. comece por `00-indice-da-base-genexus-xpz-xml.md`
-2. siga para `01-base-empirica-geral.md` e desça ao filho da série `01` mais aderente ao caso (`01a` em diante)
+2. siga para `01-base-empirica-geral.md` e desça ao filho da série `01` mais aderente ao caso (`01a` a `01h`, filhos empíricos)
 3. depois leia `02-regras-operacionais-e-runtime.md`
 4. em seguida leia `03-risco-e-decisao-por-tipo.md`
 5. para casos práticos, use `04-webpanel-familias-e-templates.md`, `05-transaction-familias-e-templates.md` e `05b-procedure-relatorio-familias-e-templates.md`
@@ -319,7 +319,7 @@ Guía operacional y metodológica de la trilha KB Intelligence. Los contratos de
 Si quieres entender la base rápidamente:
 
 1. empieza por `00-indice-da-base-genexus-xpz-xml.md`
-2. continúa con `01-base-empirica-geral.md` y baja al hijo de la serie `01` más adherente al caso (`01a` en adelante)
+2. continúa con `01-base-empirica-geral.md` y baja al hijo de la serie `01` más adherente al caso (`01a` a `01h`, hijos empíricos)
 3. luego lee `02-regras-operacionais-e-runtime.md`
 4. después lee `03-risco-e-decisao-por-tipo.md`
 5. para casos prácticos, usa `04-webpanel-familias-e-templates.md`, `05-transaction-familias-e-templates.md` y `05b-procedure-relatorio-familias-e-templates.md`
@@ -559,7 +559,7 @@ Operational and methodological guide for the KB Intelligence workstream. Closed 
 If you want to understand the repository quickly:
 
 1. start with `00-indice-da-base-genexus-xpz-xml.md`
-2. continue with `01-base-empirica-geral.md` and then open the most relevant child in the `01` series (`01a` onward)
+2. continue with `01-base-empirica-geral.md` and then open the most relevant child in the `01` series (`01a` through `01h`, empirical children)
 3. then read `02-regras-operacionais-e-runtime.md`
 4. next read `03-risco-e-decisao-por-tipo.md`
 5. for practical cases, use `04-webpanel-familias-e-templates.md`, `05-transaction-familias-e-templates.md`, and `05b-procedure-relatorio-familias-e-templates.md`
