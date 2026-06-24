@@ -41,7 +41,7 @@ Padronizar quando avançar, quando exigir molde bruto comparável e quando abort
 1. ler `00-indice-da-base-genexus-xpz-xml.md`
 2. ler `02-regras-operacionais-e-runtime.md`
 3. identificar o tipo alvo e checar `03-risco-e-decisao-por-tipo.md`
-4. usar `01-base-empirica-geral.md` como índice mestre da serie `01` e abrir o filho empirico mais aderente (`01a` a `01h`)
+4. usar `01-base-empirica-geral.md` como índice mestre da serie `01` e abrir o filho empirico mais aderente (`01a` em diante)
 5. para `WebPanel`, ler `04-webpanel-familias-e-templates.md`
 6. para `Transaction`, ler `05-transaction-familias-e-templates.md`
 7. para `Procedure` de relatório (nome com prefixo de relatório no acervo), ler `05b-procedure-relatorio-familias-e-templates.md`
