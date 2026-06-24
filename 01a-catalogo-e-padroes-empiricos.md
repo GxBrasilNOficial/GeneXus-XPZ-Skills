@@ -55,6 +55,7 @@ Servir como base conceitual para os documentos empíricos e operacionais.
 Tipos que geram arquivo XML próprio no acervo. Containers de organização estão na seção seguinte.
 
 - `Regra editorial`: a fonte técnica canônica executável desta lista fica em `scripts/gx-object-type-catalog.json`.
+- `Regra editorial`: este catálogo cobre **só** tipos modernos identificados por GUID em `Object/@type`. Elementos de export **legado GeneXus 9** (`ExportFile` com `<GXObject><Elemento>` por **nome**, sem GUID de tipo) ficam **fora** deste catálogo, no registro próprio `scripts/gx-legacy-export-element-registry.json` (doc-dono `01k-registro-elementos-legados.md`) — não inventar GUID nem reusar o GUID do tipo moderno sucessor para representar um elemento legado.
 - `Regra editorial`: este documento continua como referência explicativa e histórica, não como ponto único de leitura por scripts.
 - `Regra editorial`: na coluna Descrição, `queryableByKbIntelligence=false` indica que o motor atual do índice **não** deve ser usado em `who-uses`, `what-uses`, `impact-basic` nem `functional-trace-basic` (lista canônica no JSON). Tipos sem essa marca na tabela permanecem `true` no catálogo — inclusive com grafo assimétrico (`API`, `DataSelector`, `WorkWithForWeb`, `ExternalObject`; ver `scripts/README-kb-intelligence.md`).
 

@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "description": "Registro (nao catalogo) dos elementos de export legado GeneXus 9 (ExportFile com <GXObject><Elemento> identificado por NOME de elemento, sem GUID de tipo). Camada de representacao/governanca: classifica cada elemento legado como 'equivalent' (tem tipo moderno real no catalogo) ou 'orphan' (sem equivalente moderno, materializado em pasta propria com typeToken gxlegacy/<Elemento>). O motor de export/materializacao e separado e confirma tag/casing exatos ao parsear GX9 real. Doc-dono: 01k-registro-elementos-legados.md.",
+  "elements": {
+    "Transaction": { "class": "equivalent", "catalogType": "Transaction" },
+    "StructureDataType": { "class": "equivalent", "catalogType": "SDT" },
+    "Language": { "class": "equivalent", "catalogType": "Language" },
+    "Table": { "class": "equivalent", "catalogType": "Table" },
+    "Theme": { "class": "equivalent", "catalogType": "Theme" },
+    "Folder": { "class": "equivalent", "catalogType": "Folder" },
+    "WebPanel": { "class": "equivalent", "catalogType": "WebPanel" },
+    "Group": { "class": "equivalent", "catalogType": "SubTypeGroup" },
+    "Report": {
+      "class": "orphan",
+      "materializedFolderName": "Report",
+      "typeToken": "gxlegacy/Report",
+      "modernSuccessor": "Procedure",
+      "successorRelation": "absorbed"
+    },
+    "Menubar": {
+      "class": "orphan",
+      "materializedFolderName": "Menubar",
+      "typeToken": "gxlegacy/Menubar",
+      "modernSuccessor": null,
+      "successorRelation": "none"
+    }
+  }
+}

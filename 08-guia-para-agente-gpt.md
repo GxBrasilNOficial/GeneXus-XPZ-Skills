@@ -128,6 +128,8 @@ Regras da escada:
 
 ## Tipo desconhecido no catálogo XPZ (agente)
 
+Este fluxo cobre **tipo moderno** ausente do catálogo (identificado por GUID em `Object/@type`). Elemento de **export legado GeneXus 9** (`<GXObject><Elemento>` por nome, sem GUID de tipo) **não** entra aqui: é governado pelo registro `scripts/gx-legacy-export-element-registry.json` (doc-dono `01k-registro-elementos-legados.md`); não criar override de catálogo nem inventar GUID para ele.
+
 Quando sync ou pre-varredura bloquearem por GUID de `Object/@type` ausente do catálogo efetivo:
 
 1. Parar materialização; não tratar como defeito do XPZ da KB.
