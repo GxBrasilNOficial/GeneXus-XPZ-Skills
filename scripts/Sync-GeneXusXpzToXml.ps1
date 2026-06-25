@@ -112,6 +112,12 @@ if (-not (Test-Path -LiteralPath $fileBaseNameNormalizationSupportScript -PathTy
 }
 . $fileBaseNameNormalizationSupportScript
 
+$legacyExportSupportScript = Join-Path $PSScriptRoot 'GeneXusLegacyExportFileSupport.ps1'
+if (-not (Test-Path -LiteralPath $legacyExportSupportScript -PathType Leaf)) {
+    throw "Required support script not found: $legacyExportSupportScript"
+}
+. $legacyExportSupportScript
+
 function New-TempDirectory {
     $tempBase = [System.IO.Path]::GetTempPath()
     $tempName = "gx-xpz-" + [System.Guid]::NewGuid().ToString("N")
@@ -715,39 +721,86 @@ $metadataResult = $null
 $warnings = New-Object System.Collections.Generic.List[string]
 try {
     $package = Resolve-PackageXmlPath -RawInputPath $InputPath
-    [xml]$packageXml = Get-Content -LiteralPath $package.XmlPath -Raw
+    # Leitura encoding-aware: XmlDocument.Load respeita o atributo encoding do prologo. Export
+    # legado GeneXus 9 e iso-8859-1; Get-Content -Raw assumiria UTF-8 e corromperia acentos
+    # Latin-1. Vale para moderno (UTF-8) e legado (iso-8859-1) por igual.
+    $packageXml = New-Object System.Xml.XmlDocument
+    $packageXml.PreserveWhitespace = $true
+    $packageXml.Load($package.XmlPath)
 
-    if ($packageXml.DocumentElement.LocalName -ne "ExportFile") {
-        throw "Expected root element 'ExportFile', found '$($packageXml.DocumentElement.LocalName)'."
+    if ($null -eq $packageXml.DocumentElement -or $packageXml.DocumentElement.LocalName -ne "ExportFile") {
+        $foundRoot = if ($null -eq $packageXml.DocumentElement) { '<null>' } else { $packageXml.DocumentElement.LocalName }
+        throw "Expected root element 'ExportFile', found '$foundRoot'."
     }
 
-    if ($KbMetadataPath) {
-        $metadataResult = Update-XpzKbSourceMetadataFromSync -XmlDocument $packageXml -SourceXpzPath $InputPath -MetadataPath $KbMetadataPath
-        [Console]::Error.WriteLine("KbMetadataPath atualizado: $KbMetadataPath ($($metadataResult.WriteMode))")
-        if ($metadataResult.Warnings.Count -gt 0) {
-            # stderr (nao Write-Warning): o stream de warning tambem vaza para o stdout
-            # capturado de um processo filho, contaminando o contrato JSON.
-            [Console]::Error.WriteLine("AVISO: " + $metadataResult.Warnings[0])
-        }
-        foreach ($warning in $metadataResult.Warnings) {
-            if (-not [string]::IsNullOrWhiteSpace($warning)) {
-                $warnings.Add($warning) | Out-Null
+    # Classificacao de perfil ANTES de qualquer gravacao de metadata. Pacote MISTO (elementos
+    # legados <GXObject> e modernos <Objects>/<Attributes> no mesmo ExportFile) e fail-closed
+    # SEM tocar kb-source-metadata.md (spec congelada Fase 2 v2.8.5, secao 4.1, ramo 5).
+    $LegacyFormatDetected = $false
+    if (Test-GeneXusMixedExportFilePackage -XmlDocument $packageXml) {
+        throw "BLOCK: pacote de export MISTO (elementos legados <GXObject> e modernos <Objects>/<Attributes> no mesmo ExportFile); fora de escopo do motor de export legado. Exporte os formatos separadamente. Nenhum metadata foi gravado."
+    }
+
+    if (Test-GeneXusLegacyExportFilePackage -XmlDocument $packageXml) {
+        # ===== RAMO LEGADO (export GeneXus 9) =====
+        # Ordem (v2.8.5 secao 4.1): resolver catalogo -> construir/validar itens (fail-closed
+        # de tag fora do registro / >1 elemento-filho / colisao AQUI, antes da metadata) ->
+        # metadata (-IsLegacyExport) -> materializacao/rename/verificacao compartilhados.
+        $LegacyFormatDetected = $true
+        $catalogResolution = Resolve-GeneXusObjectTypeCatalogPaths -BaseCatalogPath $CatalogPath -CatalogOverridePath $CatalogOverridePath -ParallelKbRoot $ParallelKbRoot
+        $legacyRegistry = Get-GeneXusLegacyExportElementRegistry
+        $legacySyncResult = Get-GeneXusLegacyExportFileSyncItems -XmlDocument $packageXml -MergedCatalog $catalogResolution.MergedCatalog -Registry $legacyRegistry
+        $items = @($legacySyncResult.Items)
+
+        if ($KbMetadataPath) {
+            # GRAVACAO DE METADATA (legado): pos-catalogo/itens. Mutuamente exclusiva com a
+            # gravacao do ramo moderno abaixo (apos a classificacao de perfil) — nunca ambas
+            # numa mesma execucao, pois os ramos legado/moderno sao disjuntos por perfil [R6-b].
+            $metadataResult = Update-XpzKbSourceMetadataFromSync -XmlDocument $packageXml -SourceXpzPath $InputPath -MetadataPath $KbMetadataPath -IsLegacyExport $true
+            [Console]::Error.WriteLine("KbMetadataPath atualizado: $KbMetadataPath ($($metadataResult.WriteMode))")
+            if ($metadataResult.Warnings.Count -gt 0) {
+                [Console]::Error.WriteLine("AVISO: " + $metadataResult.Warnings[0])
+            }
+            foreach ($warning in $metadataResult.Warnings) {
+                if (-not [string]::IsNullOrWhiteSpace($warning)) {
+                    $warnings.Add($warning) | Out-Null
+                }
             }
         }
     }
-
-    $catalogResolution = Resolve-GeneXusObjectTypeCatalogPaths -BaseCatalogPath $CatalogPath -CatalogOverridePath $CatalogOverridePath -ParallelKbRoot $ParallelKbRoot
-    $catalogGuidMap = Get-GeneXusCatalogGuidToFolderMap -MergedCatalog $catalogResolution.MergedCatalog
-    $unknownTypes = @(Get-GeneXusUnknownObjectTypesFromExportFile -XmlDocument $packageXml -GuidToFolderMap $catalogGuidMap)
-    if ($unknownTypes.Count -gt 0) {
-        if ($DiscoveryReportPath) {
-            Write-GeneXusUnknownTypeDiscoveryReport -Path $DiscoveryReportPath -UnknownTypes $unknownTypes -CatalogResolution $catalogResolution -InputPath $InputPath
+    else {
+        # ===== RAMO MODERNO (inalterado) =====
+        if ($KbMetadataPath) {
+            # GRAVACAO DE METADATA (moderno): antes da pre-varredura/Convert-PackageToItems.
+            # Mutuamente exclusiva com a gravacao do ramo legado acima [R6-b].
+            $metadataResult = Update-XpzKbSourceMetadataFromSync -XmlDocument $packageXml -SourceXpzPath $InputPath -MetadataPath $KbMetadataPath
+            [Console]::Error.WriteLine("KbMetadataPath atualizado: $KbMetadataPath ($($metadataResult.WriteMode))")
+            if ($metadataResult.Warnings.Count -gt 0) {
+                # stderr (nao Write-Warning): o stream de warning tambem vaza para o stdout
+                # capturado de um processo filho, contaminando o contrato JSON.
+                [Console]::Error.WriteLine("AVISO: " + $metadataResult.Warnings[0])
+            }
+            foreach ($warning in $metadataResult.Warnings) {
+                if (-not [string]::IsNullOrWhiteSpace($warning)) {
+                    $warnings.Add($warning) | Out-Null
+                }
+            }
         }
-        $errorMessage = Format-GeneXusUnknownObjectTypesErrorMessage -UnknownTypes $unknownTypes -OverrideActive $catalogResolution.OverrideActive
-        throw $errorMessage
+
+        $catalogResolution = Resolve-GeneXusObjectTypeCatalogPaths -BaseCatalogPath $CatalogPath -CatalogOverridePath $CatalogOverridePath -ParallelKbRoot $ParallelKbRoot
+        $catalogGuidMap = Get-GeneXusCatalogGuidToFolderMap -MergedCatalog $catalogResolution.MergedCatalog
+        $unknownTypes = @(Get-GeneXusUnknownObjectTypesFromExportFile -XmlDocument $packageXml -GuidToFolderMap $catalogGuidMap)
+        if ($unknownTypes.Count -gt 0) {
+            if ($DiscoveryReportPath) {
+                Write-GeneXusUnknownTypeDiscoveryReport -Path $DiscoveryReportPath -UnknownTypes $unknownTypes -CatalogResolution $catalogResolution -InputPath $InputPath
+            }
+            $errorMessage = Format-GeneXusUnknownObjectTypesErrorMessage -UnknownTypes $unknownTypes -OverrideActive $catalogResolution.OverrideActive
+            throw $errorMessage
+        }
+
+        $items = Convert-PackageToItems -XmlDocument $packageXml -CatalogGuidToFolderMap $catalogGuidMap
     }
 
-    $items = Convert-PackageToItems -XmlDocument $packageXml -CatalogGuidToFolderMap $catalogGuidMap
     $expectedComparison = Convert-ExpectedItemsToComparison -ExpectedItems $ExpectedItems -ActualItems $items
 
     $objectsBlockCount = @($items | Where-Object { $_.PackageSection -eq "Objects" }).Count
@@ -803,7 +856,9 @@ try {
         $additionalOfficialNames = $null
     }
 
-    $materializationInterpretation = if ($VerifyOnly) {
+    $materializationInterpretation = if ($LegacyFormatDetected) {
+        "legacy-export-adapted"
+    } elseif ($VerifyOnly) {
         "verify-only"
     } elseif ($items.Count -eq 0) {
         "no-exportable-items"
@@ -824,11 +879,12 @@ try {
         PackageXmlPath = $package.XmlPath
         VerifyOnly = [bool]$VerifyOnly
         FullSnapshot = [bool]$FullSnapshot
+        LegacyFormatDetected = [bool]$LegacyFormatDetected
         ObjectsBlockCount = $objectsBlockCount
         AttributesBlockCount = $attributesBlockCount
         TotalExportedItems = $items.Count
         PackageHasExportedItems = ($items.Count -gt 0)
-        PackageInterpretation = if ($items.Count -gt 0) { "exported-items-found" } else { "no-exportable-items" }
+        PackageInterpretation = if ($LegacyFormatDetected) { "legacy-export-adapted" } elseif ($items.Count -gt 0) { "exported-items-found" } else { "no-exportable-items" }
         PreExistingOfficialXmlCount = $preExistingOfficialXmlCount
         MaterializationInterpretation = $materializationInterpretation
         Created = $createdCount
