@@ -4,13 +4,13 @@
 operacional e de governança
 
 ## Nível de confiança predominante
-alto para os 11 elementos observados em um export GeneXus 9 real (amostra `FinGX90`): classificação, mapeamento, tag e casing confirmados por inspeção direta. `Theme` é o único elemento classificado mas **não observado** nesta amostra (mantido por decisão de cobertura — ver «Resíduos conhecidos»); sua tag/casing exata será confirmada quando o motor de export legado (frente futura, inexistente) parsear um GX9 que o contenha.
+alto para os 11 elementos observados em um export GeneXus 9 real (amostra `FinGX90`): classificação, mapeamento, tag e casing confirmados por inspeção direta. `Theme` é o único elemento classificado mas **não observado** nesta amostra (mantido por decisão de cobertura — ver «Resíduos conhecidos»); sua tag/casing exata será confirmada quando o motor de export legado parsear via sync um GX9 que o contenha (o parser já existe; a integração no sync está em andamento).
 
 ## Depende de
 01a-catalogo-e-padroes-empiricos.md
 
 ## Usado por
-scripts/Test-GeneXusLegacyRegistrySchemaSelfTest.ps1, scripts/Test-GeneXusLegacyRegistryDisjointSelfTest.ps1 (validam o registro). `scripts/Build-KbIntelligenceIndex.py` (indexador registry-aware: reconhece e pula pastas órfãs `gxlegacy/*`, com skip content-aware) e `scripts/Test-XpzObjetosDaKbNaming.ps1` (audit de naming: classifica órfão por `materializedFolderName`) já consomem `scripts/gx-legacy-export-element-registry.json`. O **motor de export/materialização** legado (parse GX9, integração no sync) — frente futura, ainda inexistente — também o consumirá.
+scripts/Test-GeneXusLegacyRegistrySchemaSelfTest.ps1, scripts/Test-GeneXusLegacyRegistryDisjointSelfTest.ps1 (validam o registro). `scripts/Build-KbIntelligenceIndex.py` (indexador registry-aware: reconhece e pula pastas órfãs `gxlegacy/*`, com skip content-aware) e `scripts/Test-XpzObjetosDaKbNaming.ps1` (audit de naming: classifica órfão por `materializedFolderName`) já consomem `scripts/gx-legacy-export-element-registry.json`. O **parser/conversor** legado `scripts/GeneXusLegacyExportFileSupport.ps1` (com self-test isolado `scripts/Test-GeneXusLegacyExportFileSupportSelfTest.ps1`) também já consome o registro. A **integração no fluxo de sync/inventário** (materialização no acervo) é a **frente em andamento**.
 
 ## Objetivo
 
