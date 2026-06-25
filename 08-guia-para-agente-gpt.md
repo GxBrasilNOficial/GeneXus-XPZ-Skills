@@ -128,7 +128,7 @@ Regras da escada:
 
 ## Tipo desconhecido no catálogo XPZ (agente)
 
-Este fluxo cobre **tipo moderno** ausente do catálogo (identificado por GUID em `Object/@type`). Elemento de **export legado GeneXus 9** (`<GXObject><Elemento>` por nome, sem GUID de tipo) **não** entra aqui: é governado pelo registro `scripts/gx-legacy-export-element-registry.json` (doc-dono `01k-registro-elementos-legados.md`); não criar override de catálogo nem inventar GUID para ele.
+Este fluxo cobre **tipo moderno** ausente do catálogo (identificado por GUID em `Object/@type`). Elemento de **export legado GeneXus 9** (`<GXObject><Elemento>` por nome, sem GUID de tipo) **não** entra aqui: é governado pelo registro `scripts/gx-legacy-export-element-registry.json` (doc-dono `01k-registro-elementos-legados.md`); não criar override de catálogo nem inventar GUID para ele. O motor de export legado **já existe e está integrado**: o `Sync-GeneXusXpzToXml.ps1` detecta o perfil legado automaticamente e materializa (`LegacyFormatDetected=true`, `MaterializationInterpretation=legacy-export-adapted`); pacote **misto** (legado + moderno no mesmo `ExportFile`) é **fail-closed** (`throw` sem gravar `kb-source-metadata.md`), e tag fora do registro também é fail-closed (estender o registro, não improvisar). No Inventory legado, `unknownTypeCount=0`/`unknownTypesDiscovery=[]` — **não** confundir com "zero dependências"; ver `xpz-sync/SKILL.md` (seção EXPORTS LEGADOS) e `02`.
 
 Quando sync ou pre-varredura bloquearem por GUID de `Object/@type` ausente do catálogo efetivo:
 

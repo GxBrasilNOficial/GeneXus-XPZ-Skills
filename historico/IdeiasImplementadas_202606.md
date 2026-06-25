@@ -793,3 +793,31 @@ Teste do ollama-cloud durante a reforçada do pacote `.ContainsKey`+429 (2026-06
 - Código (já existente): `scripts/Invoke-OpenCode.ps1` (`-MaxAttempts`), `scripts/Invoke-LlmDelegatePanelDispatch.ps1` (`MaxAttempts=2` no despacho), `scripts/OpenCodeStreamSupport.ps1` (`Get-OpenCodeCompletionVerdict`), `scripts/Test-OpenCodeRetrySelfTest.ps1`, `CHANGELOG.md` (entrada do retry).
 - `999-ideias-pendentes.md` — entrada → ponteiro «RESOLVIDA E MIGRADA»; frentes de segurança derivadas seguem **abertas**.
 - Revisão por pares: livro-razão efêmero em `Temp/xpz-llm-panel-dispatch/` (gitignored).
+
+## Motor de export/materialização legado GeneXus 9 (consumidor do registro `gx-legacy-export-element-registry.json`)
+
+**Importância original:** média (gap real com workaround — KBs GeneXus 9 não sincronizavam pelo fluxo XPZ→XML).
+**Status:** implementada em 2026-06-25 (parser/conversor + integração nos ramos Sync/Inventory + metadata `-IsLegacyExport` + self-tests ponta-a-ponta verdes). Pré-push reforçada e push são passos de processo (humanos), não resíduo de ideia. Resíduo derivado **novo** (deferido por design) registrado à parte no `999`: colisão cross-fluxo moderno↔legado.
+
+### Origem
+
+"O resto do PR de export legado" (autor Felipe Neves): a camada de representação/governança (registro `gx-legacy-export-element-registry.json` + doc-dono `01k`) já existia; faltava o **motor** que a consome — parse do `ExportFile` GeneXus 9 (`<GXObject><Elemento>` por nome, sem GUID de tipo), materialização em `ObjetosDaKbEmXml` e integração no sync/inventário. Gatilho de caso real atendido em 2026-06-24 (amostra `FinGX90`, KB "Financeiro", gitignored em `Temp/`), que corrigiu o registro empiricamente (10 equivalent + 2 orphan).
+
+### Implementação
+
+- **Parser/conversor próprio** `scripts/GeneXusLegacyExportFileSupport.ps1` (motor isolado, commit local `d4706ff`): converte `/ExportFile/GXObject/<Elemento>` e `/ExportFile/Attributes/GXAtt/Attribute` em envelopes modernos `Object`/`Attribute` (`dataSource="gx-legacy-export"`, payload em `GxLegacyPayload`, `guid=""`), consumindo o registro (equivalent→GUID real do catálogo; orphan→`type="gxlegacy/<Elemento>"`); sentinela `0001-01-01` para `lastUpdate` ausente; fail-closed para misto/tag-fora-do-registro/>1-filho/colisão.
+- **Integração (PASSO 4)** nos ramos legados de `scripts/Sync-GeneXusXpzToXml.ps1` (leitura encoding-aware `XmlDocument.Load`; ordem perfil→misto-throw-sem-metadata→catálogo→itens-fail-closed→metadata→materializar; ramo moderno inalterado; `LegacyFormatDetected`/`legacy-export-adapted` no JSON) e `scripts/Get-GeneXusImportPackageObjectInventory.ps1` (leitura `.xpz` `Load($entry.Open())`; itens `known-legacy`; `unknownTypeCount=0`/`unknownTypesDiscovery=[]`; delta órfão registry-aware).
+- **Metadata** `scripts/XpzKbSourceMetadataEditSupport.ps1`: `-IsLegacyExport` usa `KMW/MaxGxBuildSaved` como Build e emite hint legado no lugar do warning genérico.
+- **Self-tests:** `Test-GeneXusLegacyExportFileSupportSelfTest.ps1` (motor isolado), `Test-XpzSyncLegacyExportFullSnapshotSelfTest.ps1` (reproduz/resolve o crash StrictMode `property 'Guid'` sob `-FullSnapshot`), `Test-XpzKbSourceMetadataLegacySelfTest.ps1` (ramo legado + não-regressão moderna). Parse gate 288/0.
+- **Doc/paridade:** `01k`, `02`, `08`, `09`, `README` (3 idiomas), `CHANGELOG` (3 idiomas), `xpz-sync/SKILL.md` (seção EXPORTS LEGADOS), `xpz-reader/SKILL.md` (envelope `gx-legacy-export`/`GxLegacyPayload`), `scripts/README-kb-intelligence.md`, `xpz-kb-parallel-setup/SKILL.md`.
+
+### Decisão final
+
+Plano **convergido/congelado por revisão por pares** Fase 2 (6 rodadas, manuscritos v2.6→v2.8.5; 5 revisores / 3 famílias: anthropic nativo, openai/Codex gpt-5.5, ollama-cloud kimi-k2.7-code/glm-5.2/deepseek-v4-pro). Decisão de não versionar a fixture iso-8859-1 (Opção B): gerada on-the-fly em Temp pelo `GeneXusLegacyExportFileFixtureSupport.ps1`. `Theme` segue presumido (não observado na amostra desktop) — coberto por fail-closed de tag desconhecida. Limitação conhecida deferida por design (manuscrito §9): `Write-ItemToDestination` ignora `dataSource`, então um objeto materializado por moderno e depois por legado pode sobrescrever silenciosamente — rara; documentada no `01k` e registrada como entrada própria no `999`.
+
+### Rastreabilidade
+
+- Código: `scripts/GeneXusLegacyExportFileSupport.ps1`, `scripts/GeneXusLegacyExportFileFixtureSupport.ps1`, `scripts/Sync-GeneXusXpzToXml.ps1`, `scripts/Get-GeneXusImportPackageObjectInventory.ps1`, `scripts/XpzKbSourceMetadataEditSupport.ps1` + 3 self-tests.
+- Commit base do motor isolado: `d4706ff` (`Co-Authored-By: Felipe Neves`). Commits do PASSO 4 (integração + doc): ver o commit de fechamento desta frente.
+- Revisão por pares Fase 2: manuscrito congelado em `Temp/revpares-pr1motor/manuscrito-v2.8.5-fase2-CONGELADO.md` (gitignored).
+- `999-ideias-pendentes.md` — entrada do motor retirada (esta migração); substituída pela entrada nova da limitação §9.

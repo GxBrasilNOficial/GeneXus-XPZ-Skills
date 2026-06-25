@@ -356,6 +356,38 @@ XPZ/XML, não apenas a última mudança material detectada nos XMLs.
 
 ---
 
+## EXPORTS LEGADOS (GeneXus 9)
+
+O `Sync-GeneXusXpzToXml.ps1` reconhece e materializa **exports legados GeneXus 9**
+sem configuração extra. Um export legado é um `ExportFile` cujos objetos aparecem como
+`<GXObject><Elemento>` por **nome** (ex.: `<Procedure>`, `<Report>`), **sem** `Object/@type`
+(GUID de tipo) — diferente do export moderno GeneXus 18. Detecção automática por perfil:
+
+- **legado-puro** = existe `/ExportFile/GXObject` **e** `Objects/Object`=0 **e** `Attributes/Attribute`=0;
+- **misto** (elementos legados e modernos no mesmo `ExportFile`) = **fail-closed**: o sync
+  lança erro `BLOCK` **sem** gravar `kb-source-metadata.md` e sem materializar nada. Exporte
+  os formatos separadamente.
+
+No ramo legado o motor (`scripts/GeneXusLegacyExportFileSupport.ps1`) consome o registro
+`scripts/gx-legacy-export-element-registry.json` (doc-dono `01k-registro-elementos-legados.md`):
+
+- `equivalent` → materializa no `folderName` do tipo moderno, com `type=<GUID real do catálogo>`;
+- `orphan` (`Report`/`Menubar`) → materializa em `materializedFolderName` próprio, com `type="gxlegacy/<Elemento>"`;
+- cada item vira envelope `Object`/`Attribute` com `dataSource="gx-legacy-export"`, payload
+  original preservado em `<GxLegacyPayload>` e `guid=""` (não participa do rename por GUID);
+- `lastUpdate` ausente/inválido → sentinela determinística `0001-01-01T00:00:00.0000000Z`
+  (conservadora: na materialização incremental, sentinela × data real → `skipped-older-lastUpdate`);
+- **tag fora do registro** → `throw` com instrução de estender o registro (não materializa parcial).
+
+Sinais no JSON de resultado: `LegacyFormatDetected=true` e
+`MaterializationInterpretation`/`PackageInterpretation`=`legacy-export-adapted`. Quando
+`-KbMetadataPath` é informado, a metadata recebe `-IsLegacyExport`: o `Build` vem de
+`KMW/MaxGxBuildSaved` (o export legado não traz `KMW/Build` nem bloco `<Source>`), com um
+hint dedicado no lugar do warning genérico de `Source` ausente. A leitura é encoding-aware
+(export GX9 é iso-8859-1, lido por `XmlDocument.Load`). Ver `01k`, `02` e `xpz-reader/SKILL.md`.
+
+---
+
 ## CONSTRAINTS
 
 - NUNCA editar XMLs manualmente — todo o trabalho é delegado ao script
@@ -394,6 +426,8 @@ XPZ/XML, não apenas a última mudança material detectada nos XMLs.
 - NUNCA reformatar ou normalizar `ObjetosDaKbEmXml` durante sync para remover whitespace herdado de export oficial; se o ruído tiver sido introduzido por XML/pacote local gerado pelo agente, a correção deve acontecer na etapa de geração em `ObjetosGeradosParaImportacaoNaKbNoGenexus` antes da importação, não como limpeza posterior do snapshot oficial
 - NUNCA classificar automaticamente como erro de processo, contaminação indevida ou violação da trilha o simples fato de um `XPZ` oficial vindo da KB trazer objetos adicionais além do foco da frente
 - NUNCA materializar `XPZ` com tipo desconhecido no catálogo efetivo (compartilhado + override aprovado)
+- NUNCA materializar um `ExportFile` **misto** (elementos legados `<GXObject>` e modernos `<Objects>`/`<Attributes>` no mesmo pacote); é fail-closed (`throw` sem gravar `kb-source-metadata.md`) — exportar os formatos separadamente
+- NUNCA materializar elemento legado cuja tag esteja **fora** de `gx-legacy-export-element-registry.json`; o motor lança `throw` pedindo para estender o registro (doc-dono `01k`), nunca improvisar pasta/tipo
 - NUNCA registrar override local ou consultar `nexa`/wiki sem consentimento explícito do usuário
 - NUNCA omitir lembrete de override pendente upstream quando `Test-XpzCatalogOverrideSessionReminder.ps1` exigir
 - NUNCA editar `GeneXus-XPZ-Skills` a partir da pasta paralela para “fechar” tipo novo sem troca de contexto

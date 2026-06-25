@@ -87,6 +87,7 @@ Do NOT use this skill for:
 - When the task depends on a local KB parallel folder structure, require that structure to be clarified or validated first via `xpz-kb-parallel-setup`
 - When the object analyzed is a WWP PatternInstance (`WorkWithPlus*`): flag as structural anomaly any duplicate nodes in `<attribute>`, `<gridAttribute>`, or `<parameter>`; `parentGuid` inconsistent with the object name; and references to attributes apparently absent from the current model — if the user intends to package or clone the object, encaminhar para `xpz-builder`
 - When the analysis is motivated by a GeneXus warning about an unknown provider, unknown item, designer, or extension metadata: classify the cited item before searching the XPZ/XML — (a) common exportable GeneXus object; (b) internal part or metadata; (c) designer or extension provider; (d) unknown type. If the XPZ/XML search returns no result and the item is not type (a), state only the limited conclusion: "not found in XPZ/XML" — never "does not exist in the KB". Refer to the conceptual boundary rule in `02-regras-operacionais-e-runtime.md` section "Limite do XPZ/XML frente a providers e extensões GeneXus".
+- When the input is a **legacy GeneXus 9 export envelope** — a root `<Object>`/`<Attribute>` carrying `dataSource="gx-legacy-export"` and a `<GxLegacyPayload>` wrapper, with `guid=""` and (for orphans like `Report`/`Menubar`) `type="gxlegacy/<Element>"` — recognize it as materialized by the legacy sync engine (`Sync-GeneXusXpzToXml.ps1`): the real GX9 object content lives **inside** `<GxLegacyPayload>` as `<GXObject><Element>` by name (no type GUID). Route classification through [01k-registro-elementos-legados.md](../01k-registro-elementos-legados.md) (`equivalent` reusing a modern type vs `orphan` under a `gxlegacy/<Element>` `typeToken`), not the modern type catalog; never treat `type="gxlegacy/<Element>"` as an unknown/invalid modern GUID, and never treat `guid=""` as a malformed envelope (legacy items carry no stable object GUID by design).
 
 ---
 
@@ -110,6 +111,7 @@ Reference files and when to load them:
 | [00-indice-da-base-genexus-xpz-xml.md](../00-indice-da-base-genexus-xpz-xml.md) | Always — absolute rules and envelope spec |
 | [01-base-empirica-geral.md](../01-base-empirica-geral.md) | Entry point and routing across the empirical `01` series |
 | [01a-catalogo-e-padroes-empiricos.md](../01a-catalogo-e-padroes-empiricos.md) | Identifying object type and reading the structural catalog |
+| [01k-registro-elementos-legados.md](../01k-registro-elementos-legados.md) | Input is a legacy GeneXus 9 export envelope (`dataSource="gx-legacy-export"`, `<GxLegacyPayload>`, `type="gxlegacy/<Element>"`) |
 | [01b-matriz-part-types-por-tipo.md](../01b-matriz-part-types-por-tipo.md) | Checking recurring `Part type` inventory by object type |
 | [01c-campos-estaveis-vs-variaveis.md](../01c-campos-estaveis-vs-variaveis.md) | Checking which fields tend to remain stable or vary |
 | [01d-diffs-estruturais-por-tipo.md](../01d-diffs-estruturais-por-tipo.md) | Comparing structural density and per-type differences |
