@@ -4,7 +4,8 @@
     Self-test do motor de export legado GeneXus 9 (GeneXusLegacyExportFileSupport.ps1), isolado.
 
 .DESCRIPTION
-    Exercita o parser/conversor sobre a fixture iso-8859-1 (scripts/test-fixtures/) e casos
+    Exercita o parser/conversor sobre a fixture iso-8859-1 (gerada on-the-fly em Temp por
+    GeneXusLegacyExportFileFixtureSupport.ps1; nao versionada — Opcao B) e casos
     inline: deteccao de perfil; leitura encoding-aware via .xml e .xpz (acento Latin-1
     preservado, nao transliterado); equivalent->GUID real / orphan->gxlegacy/<Tag>; sentinela;
     guid=''/dataSource/GxLegacyPayload; atributos; XPath-nao-vaza (nos aninhados em payload nao
