@@ -30,6 +30,12 @@ $script:SyncOwnedFrontmatterFieldNames = @(
     'source_refresh_status'
 )
 
+# Hint exato emitido no ramo de export legado GeneXus 9 (substitui o warning generico
+# de KMW/Source ausente). Literal estavel: o self-test de metadata legado casa esta string
+# e valida a ausencia do generico. Export legado nao tem bloco <Source> e usa
+# KMW/MaxGxBuildSaved como Build.
+$script:LegacyExportMetadataHintMessage = 'KbMetadataPath: export legado GeneXus 9 detectado (sem bloco <Source>); Build preenchido por KMW/MaxGxBuildSaved e identidade Source preservada do baseline anterior quando existente; kb-source-metadata.md recebeu refresh parcial.'
+
 function Get-KbSourceMetadataSnapshot {
     param([string]$MetadataPath)
 
@@ -297,7 +303,8 @@ function Update-XpzKbSourceMetadataFromSync {
     param(
         [xml]$XmlDocument,
         [string]$SourceXpzPath,
-        [string]$MetadataPath
+        [string]$MetadataPath,
+        [bool]$IsLegacyExport = $false
     )
 
     $kmwNode = $XmlDocument.SelectSingleNode('/ExportFile/KMW')
@@ -354,7 +361,17 @@ function Update-XpzKbSourceMetadataFromSync {
     }
 
     $warnings = [System.Collections.Generic.List[string]]::new()
-    if ($null -eq $kmwNode -or $null -eq $sourceNode) {
+    if ($IsLegacyExport -and [string]::IsNullOrWhiteSpace($packageBuild)) {
+        # Ramo legado GeneXus 9 (gated por -IsLegacyExport): sem KMW/Build; o Build vem de
+        # KMW/MaxGxBuildSaved. O hint legado SUBSTITUI o warning generico de KMW/Source
+        # ausente — o generico NAO dispara aqui (export legado nao tem bloco <Source>).
+        $maxGxBuildNode = if ($null -ne $kmwNode) { $kmwNode.SelectSingleNode('MaxGxBuildSaved') } else { $null }
+        if ($null -ne $maxGxBuildNode -and -not [string]::IsNullOrWhiteSpace($maxGxBuildNode.InnerText)) {
+            $packageBuild = $maxGxBuildNode.InnerText.Trim()
+            $build = $packageBuild
+        }
+        $warnings.Add($script:LegacyExportMetadataHintMessage) | Out-Null
+    } elseif ($null -eq $kmwNode -or $null -eq $sourceNode) {
         $warnings.Add('KbMetadataPath: pacote aceito para sync de objetos, mas KMW ou Source vieram ausentes/incompletos; valores estaveis anteriores foram preservados e kb-source-metadata.md recebeu refresh parcial.') | Out-Null
     } elseif (-not $hasCompleteSourceFromPackage) {
         if ($hasStableMetadataBaseline) {
