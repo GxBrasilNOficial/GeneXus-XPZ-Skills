@@ -92,6 +92,12 @@ if (-not (Test-Path -LiteralPath $platformCatalogSupport -PathType Leaf)) {
 }
 . $platformCatalogSupport
 
+$legacyExportSupport = Join-Path $PSScriptRoot 'GeneXusLegacyExportFileSupport.ps1'
+if (-not (Test-Path -LiteralPath $legacyExportSupport -PathType Leaf)) {
+    throw "BLOCK: support script not found: $legacyExportSupport"
+}
+. $legacyExportSupport
+
 function Get-IdentityKey {
     param(
         [string]$TypeName,
@@ -165,19 +171,19 @@ function Get-ExportFileXmlDocument {
         $zip = [System.IO.Compression.ZipFile]::OpenRead($resolvedPath)
         try {
             foreach ($entry in @($zip.Entries | Where-Object { $_.FullName -match '\.xml$' } | Sort-Object FullName)) {
-                $reader = [System.IO.StreamReader]::new($entry.Open(), [System.Text.Encoding]::UTF8, $true)
-                try {
-                    $entryText = $reader.ReadToEnd()
-                } finally {
-                    $reader.Dispose()
-                }
-
+                # Leitura encoding-aware: Load(stream) respeita o atributo encoding do prologo
+                # (export legado GeneXus 9 e iso-8859-1). O par StreamReader(UTF-8)+ReadToEnd+
+                # LoadXml anterior assumia UTF-8 e corrompia acentos Latin-1. Loop multi-candidato
+                # + try/catch continue + selecao ExportFile + fail-closed >1 preservados.
                 $candidateDoc = New-Object System.Xml.XmlDocument
+                $entryStream = $entry.Open()
                 try {
                     $candidateDoc.PreserveWhitespace = $true
-                    $candidateDoc.LoadXml($entryText)
+                    $candidateDoc.Load($entryStream)
                 } catch {
                     continue
+                } finally {
+                    $entryStream.Dispose()
                 }
 
                 if ($candidateDoc.DocumentElement.LocalName -eq 'ExportFile') {
@@ -372,21 +378,45 @@ if ($null -eq $root -or $root.LocalName -ne 'ExportFile') {
 }
 
 $inventory = [System.Collections.Generic.List[pscustomObject]]::new()
-$objectsNode = $root.SelectSingleNode('./Objects')
-if ($null -ne $objectsNode) {
-    $index = 0
-    foreach ($child in @($objectsNode.ChildNodes | Where-Object { $_ -is [System.Xml.XmlElement] })) {
-        $index += 1
-        $inventory.Add((New-InventoryItem -Node $child -GuidMap $guidMap -SourceBlock 'Objects' -Index $index)) | Out-Null
-    }
+$legacyFormatDetected = $false
+$legacyRegistry = $null
+
+# Classificacao de perfil ANTES de iterar e ANTES do discovery de tipos desconhecidos.
+# Pacote MISTO (legado <GXObject> + moderno <Objects>/<Attributes> no mesmo ExportFile) e
+# fail-closed (spec congelada Fase 2 v2.8.5, secao 4.2).
+if (Test-GeneXusMixedExportFilePackage -XmlDocument $package.Document) {
+    throw "BLOCK: pacote de export MISTO (elementos legados <GXObject> e modernos <Objects>/<Attributes> no mesmo ExportFile); fora de escopo do motor de export legado. Inventarie os formatos separadamente."
 }
 
-$attributesNode = $root.SelectSingleNode('./Attributes')
-if ($null -ne $attributesNode) {
-    $index = 0
-    foreach ($child in @($attributesNode.ChildNodes | Where-Object { $_ -is [System.Xml.XmlElement] })) {
-        $index += 1
-        $inventory.Add((New-InventoryItem -Node $child -GuidMap $guidMap -SourceBlock 'Attributes' -Index $index)) | Out-Null
+if (Test-GeneXusLegacyExportFilePackage -XmlDocument $package.Document) {
+    # ===== RAMO LEGADO (export GeneXus 9): itens known-legacy via support compartilhado =====
+    # rootKind sintetico Object/Attribute, typeStatus='known-legacy', guid=null, typeName
+    # nao-nulo, legacyElement=<tag> (contrato secao 4.3). ./GXObject e ./Attributes/GXAtt.
+    $legacyFormatDetected = $true
+    $legacyRegistry = Get-GeneXusLegacyExportElementRegistry
+    $legacyInventory = Get-GeneXusLegacyExportFileInventoryItems -XmlDocument $package.Document -MergedCatalog $catalogResolution.MergedCatalog -Registry $legacyRegistry
+    foreach ($legacyItem in $legacyInventory.Items) {
+        $inventory.Add($legacyItem) | Out-Null
+    }
+}
+else {
+    # ===== RAMO MODERNO (inalterado) =====
+    $objectsNode = $root.SelectSingleNode('./Objects')
+    if ($null -ne $objectsNode) {
+        $index = 0
+        foreach ($child in @($objectsNode.ChildNodes | Where-Object { $_ -is [System.Xml.XmlElement] })) {
+            $index += 1
+            $inventory.Add((New-InventoryItem -Node $child -GuidMap $guidMap -SourceBlock 'Objects' -Index $index)) | Out-Null
+        }
+    }
+
+    $attributesNode = $root.SelectSingleNode('./Attributes')
+    if ($null -ne $attributesNode) {
+        $index = 0
+        foreach ($child in @($attributesNode.ChildNodes | Where-Object { $_ -is [System.Xml.XmlElement] })) {
+            $index += 1
+            $inventory.Add((New-InventoryItem -Node $child -GuidMap $guidMap -SourceBlock 'Attributes' -Index $index)) | Out-Null
+        }
     }
 }
 
@@ -402,7 +432,15 @@ foreach ($item in $unknownTypeItems) {
     $warnings.Add(("tipo nao mapeado no item {0}[{1}] name='{2}' typeGuid='{3}'{4}{5}" -f $item.sourceBlock, $item.index, $item.name, $item.typeGuid, $parentHint, $parentTypeHint)) | Out-Null
 }
 
-$unknownTypesDiscovery = @(Get-GeneXusUnknownObjectTypesFromExportFile -XmlDocument $package.Document -GuidToFolderMap $catalogFolderMap)
+# No ramo legado o fail-closed de tag desconhecida vive no parser (Get-GeneXusLegacyExportFile*),
+# nao no discovery moderno por GUID: unknownTypeCount=0 (typeStatus='known-legacy') e
+# unknownTypesDiscovery=vazio [R6-g, spec v2.8.5 secao 7]. Forma statement (nao if-expressao):
+# sob StrictMode, '$x = if (...) { @() }' colapsaria @() para $null e quebraria .Count adiante.
+if ($legacyFormatDetected) {
+    $unknownTypesDiscovery = @()
+} else {
+    $unknownTypesDiscovery = @(Get-GeneXusUnknownObjectTypesFromExportFile -XmlDocument $package.Document -GuidToFolderMap $catalogFolderMap)
+}
 
 $objectsByType = Get-ObjectsByTypeMap -InventoryItems $inventoryArray
 $systemObjectsPresent = @(Get-SystemObjectsPresent -InventoryItems $inventoryArray -PlatformKindSets $platformKindSets)
@@ -422,6 +460,16 @@ if (-not [string]::IsNullOrWhiteSpace($DeclaredDeltaPath)) {
     $declaredItems = @(Read-DeclaredDeltaFromPath -Path $DeclaredDeltaPath)
 } elseif (-not [string]::IsNullOrWhiteSpace($DeclaredDeltaItems)) {
     $declaredItems = @(Read-DeclaredDeltaFromItems -Text $DeclaredDeltaItems)
+}
+
+# Delta orfao registry-aware [R6-f]: no perfil legado, normaliza a chave declarada de cada
+# orphan (<Tag>:Nome ou gxlegacy/<Tag>:Nome) para o token canonico gxlegacy/<Tag>:Nome ANTES
+# de montar $declaredKeys/set-match, casando com identityKey dos itens known-legacy. Equivalentes
+# e chaves nao-orphan passam inalteradas. Alias exportTaskLabel (moderno) permanece intocado.
+if ($legacyFormatDetected -and $declaredItems.Count -gt 0) {
+    foreach ($declared in $declaredItems) {
+        $declared.key = Convert-LegacyDeclaredDeltaKeyToCanonical -DeclaredKey $declared.key -Registry $legacyRegistry
+    }
 }
 
 if ($declaredItems.Count -gt 0) {
@@ -537,6 +585,7 @@ $result = [ordered]@{
     inputKind            = $package.InputKind
     innerXmlEntry        = $package.InnerXmlName
     rootElement          = $root.LocalName
+    legacyFormatDetected = $legacyFormatDetected
     selectiveExport      = $selectiveExport
     totalItemCount       = $inventoryArray.Count
     objectCount          = $objectItems.Count
