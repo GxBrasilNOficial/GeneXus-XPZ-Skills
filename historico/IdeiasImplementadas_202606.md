@@ -2,6 +2,31 @@
 
 Registro de ideias que sairam de `999-ideias-pendentes.md` por terem sido implementadas ou incorporadas ao contrato metodologico vigente.
 
+## Colisão cross-fluxo moderno↔legado na materialização do acervo (export legado GeneXus 9)
+
+**Importância original:** baixa (caso raro, limite conhecido declarado; sem perda silenciosa no fluxo normal de uma única KB).
+**Status:** implementada em 2026-06-25 — detecção fail-soft + bloqueio opt-in (escopo (b)).
+
+### Origem
+
+`scripts/Sync-GeneXusXpzToXml.ps1` materializa cada item em `<FolderType>/<NormalizedName>.xml` e o `Write-ItemToDestination` ignorava o `dataSource`: se o **mesmo** objeto fosse materializado primeiro por um export **moderno** e depois por um **legado GeneXus 9** (ou vice-versa) na mesma pasta/nome, o segundo sobrescrevia o primeiro silenciosamente por `lastUpdate`, ainda que os envelopes diferissem (`dataSource="gx-legacy-export"` + `GxLegacyPayload` + `guid=""` no legado vs envelope moderno). Distinto do fail-closed de pacote **misto** (dentro de um único `ExportFile`); esta colisão é **entre execuções de sync**. Deferido na Fase 2 (manuscrito §9: documentar, não tratar); tratado agora.
+
+### Implementação
+
+- **`scripts/Sync-GeneXusXpzToXml.ps1`** — nova função `Get-GeneXusCrossFlowDataSourceCollisions` (compara o `dataSource` do nó entrante com o do arquivo já materializado, parse encoding-aware `XmlDocument.Load`; **Decisão E.2** — na ausência do atributo, o filho direto `<GxLegacyPayload>` é sinal de legado, `guid=""` só corrobora; parse-falho → warning fail-safe, **Decisão G**); helper `Resolve-ItemDestinationPath` (path único reusado por `Write-ItemToDestination`); orquestrador `Invoke-GeneXusCrossFlowDetection` (agrega warnings; sob `-Block` + colisão emite `CROSSFLOW_BLOCKED_ERRORID:` no stderr e um terminating error `ErrorId=CrossFlowDataSourceCollisionBlocked`). Campos aditivos `Summary.CrossFlowCollisions` (stdout) + `Writes[].CrossFlowCollision` (`-ReportPath`); mitigação stderr universal JSONL (`CROSSFLOW_COLLISION:`/`CROSSFLOW_WARNING:`). Switch `-BlockCrossFlowDataSource` (opt-in). **`SchemaVersion` mantém `1`** (aditivo; varredura de consumidores: o único molde que lê o JSON, `Update-KbFromXpz.example.ps1`, acessa por nome). Ramo **moderno** reordenado (`catálogo → unknown → Convert → detecção → metadata`): os fail-closed de tipo desconhecido e intra-pacote passam a **pré-metadata**; o rename `-FullSnapshot` segue **pós-metadata** (assimetria declarada).
+- **`scripts/Test-XpzSyncCrossFlowCollisionSelfTest.ps1`** (novo) — token `GENEXUS_XPZ_SYNC_CROSSFLOW_SELFTEST_OK`; processo filho; cobre fail-soft, `-Block` com atomicidade de metadata, `-VerifyOnly`, E.2, não-parseável e o booleano por-item. Self-tests existentes do Sync (KbMetadata/GuidRename/LegacyFullSnapshot) seguem verdes (sem regressão).
+- **Paridade:** `02`, `08`, `09`, `xpz-sync/SKILL.md`, `01k`, `CHANGELOG.md`.
+
+### Decisão final
+
+Plano **congelado por revisão por pares** (v1→v16, 5 vozes / 3 famílias: anthropic nativo, openai/Codex gpt-5.5, ollama-cloud deepseek-v4-pro/glm-5.2/kimi-k2.7-code). A v15 atingiu **4/5 CONVERGE**; os gaps remanescentes eram puramente redacionais/de implementação (revisores "coder" geram redação inesgotável sobre o papel), e o design foi **congelado por decisão humana** (`resubmissionDeclinedByHuman`, motivo "prova transferida para implementação/self-test"). Limitações residuais declaradas: legado depositado à mão sem nenhum sinal (Decisão E) e XML não-parseável tratado como moderno sob `-Block` (Decisão G). Derivada do fechamento do **Motor de export legado GeneXus 9**.
+
+### Rastreabilidade
+
+- Arquivos: `scripts/Sync-GeneXusXpzToXml.ps1`, `scripts/Test-XpzSyncCrossFlowCollisionSelfTest.ps1`, `02`, `08`, `09`, `01k`, `xpz-sync/SKILL.md`, `CHANGELOG.md`, `999-ideias-pendentes.md` (entrada removida → esta).
+- Revisão por pares: livro-razão em `Temp/` (`xpz-crossflow-v1.txt`…`v16.txt`, gitignored).
+- Commit: a registrar no commit desta frente.
+
 ## Forma canônica de invocação dos adapters documentada (resíduo (b1) do item URGENTE)
 
 **Importância original:** alta (atrito operacional recorrente; resíduo (b1) do item URGENTE «Reduzir as variações de chamada dos adapters de delegação»).

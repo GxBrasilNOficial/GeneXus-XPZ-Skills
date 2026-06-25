@@ -49,6 +49,13 @@ Raiz da pasta paralela; quando informada, resolve override em scripts/gx-object-
 .PARAMETER DiscoveryReportPath
 Quando o pacote contiver GUID de tipo desconhecido, grava relatório JSON de triagem antes de falhar.
 
+.PARAMETER BlockCrossFlowDataSource
+Bloqueio opt-in: quando um item entrante colide no acervo com um arquivo de origem
+(`dataSource`) divergente — caso central moderno↔legado (export GeneXus 9) —, aborta o sync
+ANTES de gravar metadata ou XML, em vez do comportamento padrão fail-soft (que só sinaliza a
+colisão em `Summary.CrossFlowCollisions` e no stderr e segue). Separado do fail-closed de pacote
+misto. NÃO impede a sobrescrita de XML existente não-parseável (tratado como moderno).
+
 .EXAMPLE
 .\Sync-GeneXusXpzToXml.ps1 -InputPath C:\Exports\MeuPacote.xpz -DestinationRoot C:\Acervo\ObjetosDaKbEmXml
 
@@ -82,7 +89,9 @@ param(
 
     [string]$ParallelKbRoot = "",
 
-    [string]$DiscoveryReportPath = ""
+    [string]$DiscoveryReportPath = "",
+
+    [switch]$BlockCrossFlowDataSource
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
@@ -439,10 +448,23 @@ function Get-LastUpdateInfoFromFile {
     return Get-LastUpdateInfoFromXmlDocument -XmlDocument $xmlDocument -SourceLabel $FilePath
 }
 
+function Resolve-ItemDestinationPath {
+    # SO compoe o caminho de destino do item (FolderType/NormalizedName.xml); NAO cria diretorio
+    # nem faz I/O. Fonte unica reusada por Write-ItemToDestination e
+    # Get-GeneXusCrossFlowDataSourceCollisions (evita drift na regra de path).
+    param(
+        [string]$Root,
+        [string]$FolderType,
+        [string]$NormalizedName
+    )
+    return Join-Path (Join-Path $Root $FolderType) ($NormalizedName + ".xml")
+}
+
 function Write-ItemToDestination {
     param(
         [object]$Item,
-        [string]$Root
+        [string]$Root,
+        [bool]$CrossFlowCollision = $false
     )
 
     $folderPath = Join-Path $Root $Item.FolderType
@@ -450,7 +472,7 @@ function Write-ItemToDestination {
         New-Item -ItemType Directory -Path $folderPath | Out-Null
     }
 
-    $filePath = Join-Path $folderPath ($Item.NormalizedName + ".xml")
+    $filePath = Resolve-ItemDestinationPath -Root $Root -FolderType $Item.FolderType -NormalizedName $Item.NormalizedName
     $xmlText = Convert-NodeToXmlString -Node $Item.Node
     $incomingLastUpdate = Get-LastUpdateInfoFromNode -Node $Item.Node
     $status = "created"
@@ -482,7 +504,106 @@ function Write-ItemToDestination {
         WasNormalized = ($Item.LogicalName -ne $Item.NormalizedName)
         IncomingLastUpdate = $incomingLastUpdate.RawValue
         ExistingLastUpdate = if ($null -ne $existingLastUpdate) { $existingLastUpdate.RawValue } else { $null }
+        CrossFlowCollision = [bool]$CrossFlowCollision
     }
+}
+
+function Get-GeneXusCrossFlowDataSourceCollisions {
+    <#
+        Deteccao de DIVERGENCIA DE ORIGEM (dataSource) cross-fluxo no acervo (caso central
+        moderno<->legado GeneXus 9). Compara o dataSource do no incoming com o do arquivo JA
+        materializado no destino. A FUNCAO NUNCA lanca; retorna { Collisions, Warnings } e o
+        chamador decide bloquear (Decisao K) ou seguir (fail-soft). Roda pre-rename, antes da
+        metadata. Ver doc-dono 01k e xpz-sync/SKILL.md.
+    #>
+    param(
+        [object[]]$Items,
+        [string]$Root
+    )
+
+    $collisions = New-Object System.Collections.Generic.List[object]
+    $warnings = New-Object System.Collections.Generic.List[string]
+
+    foreach ($item in $Items) {
+        $filePath = Resolve-ItemDestinationPath -Root $Root -FolderType $item.FolderType -NormalizedName $item.NormalizedName
+        if (-not (Test-Path -LiteralPath $filePath)) { continue }  # inexistente => sem colisao (sem parse)
+
+        # Incoming: o no ja esta em $item.Node (XmlElement em ambos os ramos); ausencia => "".
+        $incomingDataSource = [string]$item.Node.GetAttribute('dataSource')
+
+        # Existente: parse encoding-aware (XmlDocument.Load, como a pre-leitura do pacote), NAO o
+        # [xml]Get-Content -Raw de Get-LogicalNameFromExtractedFile. Parse-falho => warning fail-safe.
+        $existingDataSource = $null
+        try {
+            $existingDoc = New-Object System.Xml.XmlDocument
+            $existingDoc.PreserveWhitespace = $true
+            $existingDoc.Load($filePath)
+            $existingRoot = $existingDoc.DocumentElement
+            if ($null -eq $existingRoot) { throw "sem no raiz" }
+            $existingDataSource = [string]$existingRoot.GetAttribute('dataSource')
+            # Decisao E.2: atributo presente vence; so na AUSENCIA consulta o sinal secundario
+            # <GxLegacyPayload> (filho direto, exclusivo do legado; LocalName tolerante a namespace).
+            if ([string]::IsNullOrEmpty($existingDataSource)) {
+                foreach ($child in $existingRoot.ChildNodes) {
+                    if ($child.NodeType -eq [System.Xml.XmlNodeType]::Element -and $child.LocalName -eq 'GxLegacyPayload') {
+                        $existingDataSource = 'gx-legacy-export'
+                        break
+                    }
+                }
+            }
+        } catch {
+            # parse-falho: nao produz ExistingDataSource confiavel => sem colisao, sem bloqueio.
+            $w = (@{ FilePath = $filePath; ExceptionType = $_.Exception.GetType().Name } | ConvertTo-Json -Compress)
+            [Console]::Error.WriteLine("CROSSFLOW_WARNING: $w")
+            $warnings.Add("dataSource indeterminavel em '$filePath' (parse falhou: $($_.Exception.GetType().Name)); item tratado sem colisao cross-fluxo.") | Out-Null
+            continue
+        }
+
+        # COLISAO quando os dataSource DIVERGEM (Decisao E: comparacao ordinal, sem normalizacao).
+        if (-not [string]::Equals($incomingDataSource, $existingDataSource, [System.StringComparison]::Ordinal)) {
+            $collision = [pscustomobject]@{
+                FolderType = $item.FolderType
+                NormalizedName = $item.NormalizedName
+                LogicalName = $item.LogicalName
+                ExistingDataSource = $existingDataSource
+                IncomingDataSource = $incomingDataSource
+                FilePath = $filePath
+            }
+            $collisions.Add($collision) | Out-Null
+            # Mitigacao stderr UNIVERSAL (JSONL): emitida sempre no ponto da deteccao, para a colisao
+            # nunca se perder mesmo nos caminhos que abortam antes do Summary do stdout.
+            $line = ($collision | ConvertTo-Json -Compress)
+            [Console]::Error.WriteLine("CROSSFLOW_COLLISION: $line")
+        }
+    }
+
+    return [pscustomobject]@{
+        Collisions = $collisions.ToArray()
+        Warnings = $warnings.ToArray()
+    }
+}
+
+function Invoke-GeneXusCrossFlowDetection {
+    # Orquestra a deteccao no fluxo do sync: roda Get-GeneXusCrossFlowDataSourceCollisions, agrega
+    # os warnings em $Warnings e, sob -Block + colisao, EMITE o terminating error (Decisao K) apos
+    # sinalizar o ErrorId por stderr (para o processo filho do self-test confirmar sem dot-source).
+    # Retorna o array de colisoes (vazio quando nao ha) para o Summary/Writes[]. Pre-metadata.
+    param(
+        [object[]]$Items,
+        [string]$Root,
+        [object]$Warnings,
+        [switch]$Block
+    )
+    $result = Get-GeneXusCrossFlowDataSourceCollisions -Items $Items -Root $Root
+    foreach ($w in $result.Warnings) {
+        if (-not [string]::IsNullOrWhiteSpace($w)) { $Warnings.Add($w) | Out-Null }
+    }
+    $collisions = @($result.Collisions)
+    if ($Block -and $collisions.Count -gt 0) {
+        [Console]::Error.WriteLine("CROSSFLOW_BLOCKED_ERRORID: CrossFlowDataSourceCollisionBlocked")
+        Write-Error -Message ("BLOCK: colisao cross-fluxo de dataSource detectada ({0} item(ns)); -BlockCrossFlowDataSource ativo. Nenhuma metadata nem XML foi gravado." -f $collisions.Count) -ErrorId 'CrossFlowDataSourceCollisionBlocked' -Category InvalidOperation -ErrorAction Stop
+    }
+    return ,$collisions
 }
 
 function Get-LogicalNameFromExtractedFile {
@@ -737,6 +858,7 @@ try {
     # legados <GXObject> e modernos <Objects>/<Attributes> no mesmo ExportFile) e fail-closed
     # SEM tocar kb-source-metadata.md (spec congelada Fase 2 v2.8.5, secao 4.1, ramo 5).
     $LegacyFormatDetected = $false
+    $crossFlowCollisions = @()
     if (Test-GeneXusMixedExportFilePackage -XmlDocument $packageXml) {
         throw "BLOCK: pacote de export MISTO (elementos legados <GXObject> e modernos <Objects>/<Attributes> no mesmo ExportFile); fora de escopo do motor de export legado. Exporte os formatos separadamente. Nenhum metadata foi gravado."
     }
@@ -751,6 +873,9 @@ try {
         $legacyRegistry = Get-GeneXusLegacyExportElementRegistry
         $legacySyncResult = Get-GeneXusLegacyExportFileSyncItems -XmlDocument $packageXml -MergedCatalog $catalogResolution.MergedCatalog -Registry $legacyRegistry
         $items = @($legacySyncResult.Items)
+
+        # Deteccao cross-fluxo: pos-$items, ANTES da metadata e do rename (snapshot pre-rename).
+        $crossFlowCollisions = Invoke-GeneXusCrossFlowDetection -Items $items -Root $DestinationRoot -Warnings $warnings -Block:$BlockCrossFlowDataSource
 
         if ($KbMetadataPath) {
             # GRAVACAO DE METADATA (legado): pos-catalogo/itens. Mutuamente exclusiva com a
@@ -769,9 +894,31 @@ try {
         }
     }
     else {
-        # ===== RAMO MODERNO (inalterado) =====
+        # ===== RAMO MODERNO =====
+        # REORDENADO (frente cross-fluxo): catalogo -> unknown-throw -> Convert($items) ->
+        # DETECCAO cross-fluxo -> metadata. Antes a metadata era gravada ANTES de $items existir;
+        # agora os fail-closed de tipo desconhecido e de colisao intra-pacote (Convert-PackageToItems)
+        # passam a disparar ANTES da gravacao de kb-source-metadata.md (mudanca de comportamento
+        # intencional; ver CHANGELOG/xpz-sync). Update-XpzKbSourceMetadataFromSync nao recebe $items,
+        # entao mover $items para antes dela e seguro.
+        $catalogResolution = Resolve-GeneXusObjectTypeCatalogPaths -BaseCatalogPath $CatalogPath -CatalogOverridePath $CatalogOverridePath -ParallelKbRoot $ParallelKbRoot
+        $catalogGuidMap = Get-GeneXusCatalogGuidToFolderMap -MergedCatalog $catalogResolution.MergedCatalog
+        $unknownTypes = @(Get-GeneXusUnknownObjectTypesFromExportFile -XmlDocument $packageXml -GuidToFolderMap $catalogGuidMap)
+        if ($unknownTypes.Count -gt 0) {
+            if ($DiscoveryReportPath) {
+                Write-GeneXusUnknownTypeDiscoveryReport -Path $DiscoveryReportPath -UnknownTypes $unknownTypes -CatalogResolution $catalogResolution -InputPath $InputPath
+            }
+            $errorMessage = Format-GeneXusUnknownObjectTypesErrorMessage -UnknownTypes $unknownTypes -OverrideActive $catalogResolution.OverrideActive
+            throw $errorMessage
+        }
+
+        $items = Convert-PackageToItems -XmlDocument $packageXml -CatalogGuidToFolderMap $catalogGuidMap
+
+        # Deteccao cross-fluxo: pos-$items, ANTES da metadata e do rename (snapshot pre-rename).
+        $crossFlowCollisions = Invoke-GeneXusCrossFlowDetection -Items $items -Root $DestinationRoot -Warnings $warnings -Block:$BlockCrossFlowDataSource
+
         if ($KbMetadataPath) {
-            # GRAVACAO DE METADATA (moderno): antes da pre-varredura/Convert-PackageToItems.
+            # GRAVACAO DE METADATA (moderno): agora pos-catalogo/unknown/Convert/deteccao.
             # Mutuamente exclusiva com a gravacao do ramo legado acima [R6-b].
             $metadataResult = Update-XpzKbSourceMetadataFromSync -XmlDocument $packageXml -SourceXpzPath $InputPath -MetadataPath $KbMetadataPath
             [Console]::Error.WriteLine("KbMetadataPath atualizado: $KbMetadataPath ($($metadataResult.WriteMode))")
@@ -786,19 +933,6 @@ try {
                 }
             }
         }
-
-        $catalogResolution = Resolve-GeneXusObjectTypeCatalogPaths -BaseCatalogPath $CatalogPath -CatalogOverridePath $CatalogOverridePath -ParallelKbRoot $ParallelKbRoot
-        $catalogGuidMap = Get-GeneXusCatalogGuidToFolderMap -MergedCatalog $catalogResolution.MergedCatalog
-        $unknownTypes = @(Get-GeneXusUnknownObjectTypesFromExportFile -XmlDocument $packageXml -GuidToFolderMap $catalogGuidMap)
-        if ($unknownTypes.Count -gt 0) {
-            if ($DiscoveryReportPath) {
-                Write-GeneXusUnknownTypeDiscoveryReport -Path $DiscoveryReportPath -UnknownTypes $unknownTypes -CatalogResolution $catalogResolution -InputPath $InputPath
-            }
-            $errorMessage = Format-GeneXusUnknownObjectTypesErrorMessage -UnknownTypes $unknownTypes -OverrideActive $catalogResolution.OverrideActive
-            throw $errorMessage
-        }
-
-        $items = Convert-PackageToItems -XmlDocument $packageXml -CatalogGuidToFolderMap $catalogGuidMap
     }
 
     $expectedComparison = Convert-ExpectedItemsToComparison -ExpectedItems $ExpectedItems -ActualItems $items
@@ -812,10 +946,18 @@ try {
         $renameResults = Resolve-GuidAwareRenames -Items $items -Root $DestinationRoot -Warnings $warnings -Apply (-not [bool]$VerifyOnly)
     }
 
+    # Chaves FolderType|NormalizedName das colisoes cross-fluxo (pre-rename); coincidem com o
+    # destino final do par cross-fluxo (Decisao I), entao indexam o booleano por-item do Writes[].
+    $crossFlowKeys = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+    foreach ($c in $crossFlowCollisions) {
+        [void]$crossFlowKeys.Add("$($c.FolderType)|$($c.NormalizedName)")
+    }
+
     $writeResults = @()
     if (-not $VerifyOnly) {
         foreach ($item in $items) {
-            $writeResults += Write-ItemToDestination -Item $item -Root $DestinationRoot
+            $itemCrossFlow = $crossFlowKeys.Contains("$($item.FolderType)|$($item.NormalizedName)")
+            $writeResults += Write-ItemToDestination -Item $item -Root $DestinationRoot -CrossFlowCollision $itemCrossFlow
         }
     }
 
@@ -911,6 +1053,7 @@ try {
         ExpectedReturnedNames = $expectedReturnedNames
         ExpectedMissingNames = $expectedMissingNames
         AdditionalOfficialNames = $additionalOfficialNames
+        CrossFlowCollisions = @($crossFlowCollisions)
     }
 
     $overrideReminder = $null
