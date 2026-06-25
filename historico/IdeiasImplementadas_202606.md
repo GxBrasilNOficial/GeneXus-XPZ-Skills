@@ -808,7 +808,7 @@ Teste do ollama-cloud durante a reforçada do pacote `.ContainsKey`+429 (2026-06
 - **Parser/conversor próprio** `scripts/GeneXusLegacyExportFileSupport.ps1` (motor isolado, commit local `d4706ff`): converte `/ExportFile/GXObject/<Elemento>` e `/ExportFile/Attributes/GXAtt/Attribute` em envelopes modernos `Object`/`Attribute` (`dataSource="gx-legacy-export"`, payload em `GxLegacyPayload`, `guid=""`), consumindo o registro (equivalent→GUID real do catálogo; orphan→`type="gxlegacy/<Elemento>"`); sentinela `0001-01-01` para `lastUpdate` ausente; fail-closed para misto/tag-fora-do-registro/>1-filho/colisão.
 - **Integração (PASSO 4)** nos ramos legados de `scripts/Sync-GeneXusXpzToXml.ps1` (leitura encoding-aware `XmlDocument.Load`; ordem perfil→misto-throw-sem-metadata→catálogo→itens-fail-closed→metadata→materializar; ramo moderno inalterado; `LegacyFormatDetected`/`legacy-export-adapted` no JSON) e `scripts/Get-GeneXusImportPackageObjectInventory.ps1` (leitura `.xpz` `Load($entry.Open())`; itens `known-legacy`; `unknownTypeCount=0`/`unknownTypesDiscovery=[]`; delta órfão registry-aware).
 - **Metadata** `scripts/XpzKbSourceMetadataEditSupport.ps1`: `-IsLegacyExport` usa `KMW/MaxGxBuildSaved` como Build e emite hint legado no lugar do warning genérico.
-- **Self-tests:** `Test-GeneXusLegacyExportFileSupportSelfTest.ps1` (motor isolado), `Test-XpzSyncLegacyExportFullSnapshotSelfTest.ps1` (reproduz/resolve o crash StrictMode `property 'Guid'` sob `-FullSnapshot`), `Test-XpzKbSourceMetadataLegacySelfTest.ps1` (ramo legado + não-regressão moderna). Parse gate 288/0.
+- **Self-tests:** `Test-GeneXusLegacyExportFileSupportSelfTest.ps1` (motor isolado), `Test-XpzSyncLegacyExportFullSnapshotSelfTest.ps1` (reproduz/resolve o crash StrictMode `property 'Guid'` sob `-FullSnapshot`), `Test-XpzKbSourceMetadataLegacySelfTest.ps1` (ramo legado + não-regressão moderna) e `Test-XpzInventoryLegacyExportSelfTest.ps1` (ramo legado do Inventory por processo filho; follow-up da pré-push reforçada). Parse gate 289/0.
 - **Doc/paridade:** `01k`, `02`, `08`, `09`, `README` (3 idiomas), `CHANGELOG` (3 idiomas), `xpz-sync/SKILL.md` (seção EXPORTS LEGADOS), `xpz-reader/SKILL.md` (envelope `gx-legacy-export`/`GxLegacyPayload`), `scripts/README-kb-intelligence.md`, `xpz-kb-parallel-setup/SKILL.md`.
 
 ### Decisão final
@@ -817,7 +817,7 @@ Plano **convergido/congelado por revisão por pares** Fase 2 (6 rodadas, manuscr
 
 ### Rastreabilidade
 
-- Código: `scripts/GeneXusLegacyExportFileSupport.ps1`, `scripts/GeneXusLegacyExportFileFixtureSupport.ps1`, `scripts/Sync-GeneXusXpzToXml.ps1`, `scripts/Get-GeneXusImportPackageObjectInventory.ps1`, `scripts/XpzKbSourceMetadataEditSupport.ps1` + 3 self-tests.
+- Código: `scripts/GeneXusLegacyExportFileSupport.ps1`, `scripts/GeneXusLegacyExportFileFixtureSupport.ps1`, `scripts/Sync-GeneXusXpzToXml.ps1`, `scripts/Get-GeneXusImportPackageObjectInventory.ps1`, `scripts/XpzKbSourceMetadataEditSupport.ps1` + 4 self-tests.
 - Commit base do motor isolado: `d4706ff` (`Co-Authored-By: Felipe Neves`). Commits do PASSO 4 (integração + doc): ver o commit de fechamento desta frente.
 - Revisão por pares Fase 2: manuscrito congelado em `Temp/revpares-pr1motor/manuscrito-v2.8.5-fase2-CONGELADO.md` (gitignored).
 - `999-ideias-pendentes.md` — entrada do motor retirada (esta migração); substituída pela entrada nova da limitação §9.
