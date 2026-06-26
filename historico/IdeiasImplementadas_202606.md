@@ -822,7 +822,7 @@ Teste do ollama-cloud durante a reforçada do pacote `.ContainsKey`+429 (2026-06
 ## Motor de export/materialização legado GeneXus 9 (consumidor do registro `gx-legacy-export-element-registry.json`)
 
 **Importância original:** média (gap real com workaround — KBs GeneXus 9 não sincronizavam pelo fluxo XPZ→XML).
-**Status:** implementada em 2026-06-25 (parser/conversor + integração nos ramos Sync/Inventory + metadata `-IsLegacyExport` + self-tests ponta-a-ponta verdes). Pré-push reforçada e push são passos de processo (humanos), não resíduo de ideia. Resíduo derivado **novo** (deferido por design) registrado à parte no `999`: colisão cross-fluxo moderno↔legado.
+**Status:** implementada em 2026-06-25 (parser/conversor + integração nos ramos Sync/Inventory + metadata `-IsLegacyExport` + self-tests ponta-a-ponta verdes). Pré-push reforçada e push são passos de processo (humanos), não resíduo de ideia. Resíduo derivado **novo** (deferido por design à época) registrado à parte no `999`: colisão cross-fluxo moderno↔legado — **implementada depois** em 2026-06-25/26 (ver a entrada própria no topo deste arquivo; a entrada do `999` foi então removida).
 
 ### Origem
 
