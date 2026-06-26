@@ -54,7 +54,10 @@ Bloqueio opt-in: quando um item entrante colide no acervo com um arquivo de orig
 (`dataSource`) divergente — caso central moderno↔legado (export GeneXus 9) —, aborta o sync
 ANTES de gravar metadata ou XML, em vez do comportamento padrão fail-soft (que só sinaliza a
 colisão em `Summary.CrossFlowCollisions` e no stderr e segue). Separado do fail-closed de pacote
-misto. NÃO impede a sobrescrita de XML existente não-parseável (tratado como moderno).
+misto. Quanto a um XML existente **não-parseável**: a detecção não gera colisão nem bloqueia (nem
+sob este switch), só um warning — mas isso **não garante a sobrescrita**: o sync pode falhar
+adiante ao processar um arquivo existente corrompido (estágios de parse preexistentes, fora do
+escopo desta frente).
 
 .EXAMPLE
 .\Sync-GeneXusXpzToXml.ps1 -InputPath C:\Exports\MeuPacote.xpz -DestinationRoot C:\Acervo\ObjetosDaKbEmXml
