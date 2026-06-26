@@ -25,7 +25,7 @@ Plano **congelado por revisão por pares** (v1→v16, 5 vozes / 3 famílias: ant
 
 - Arquivos: `scripts/Sync-GeneXusXpzToXml.ps1`, `scripts/Test-XpzSyncCrossFlowCollisionSelfTest.ps1`, `02`, `08`, `09`, `01k`, `xpz-sync/SKILL.md`, `CHANGELOG.md`, `999-ideias-pendentes.md` (entrada removida → esta).
 - Revisão por pares: livro-razão em `Temp/` (`xpz-crossflow-v1.txt`…`v16.txt`, gitignored).
-- Commit: a registrar no commit desta frente.
+- Commit: `1d3f126` (implementação da frente); ajustes da revisão pré-push reforçada nos commits seguintes.
 
 ## Forma canônica de invocação dos adapters documentada (resíduo (b1) do item URGENTE)
 
