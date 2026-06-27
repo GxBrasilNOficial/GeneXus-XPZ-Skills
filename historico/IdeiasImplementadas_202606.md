@@ -50,7 +50,7 @@ Validada por **revisão por pares** (manuscrito v1→v4, 3 famílias: `openai`/C
 
 - Arquivos: `xpz-sync/SKILL.md`, `999-ideias-pendentes.md` (entrada removida → esta).
 - Revisão por pares: livro-razão em `Temp/revisao-por-pares/20260626-224728-blockcrossflow/` (manuscrito v1→v4 + prompts, gitignored).
-- Commit: `07acfa2` (acréscimos na `SKILL.md`); esta migração 999→histórico no commit seguinte.
+- Commit: `07acfa2` (acréscimos na `SKILL.md`) + `dd2f866` (esta migração 999→histórico).
 
 ## Forma canônica de invocação dos adapters documentada (resíduo (b1) do item URGENTE)
 
