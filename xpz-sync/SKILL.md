@@ -190,6 +190,9 @@ Os wrappers seguem esta convenção de parâmetros:
 - evidência clara desse encadeamento significa declaração local explícita no `README.md`/`AGENTS.md` ou chamada observável no próprio wrapper local; não presumir essa capacidade apenas porque a base compartilhada a exige
 - se o wrapper local de regeneração do índice estiver ausente ou defasado, ou se o wrapper de materialização não encadear esse refresh, tratar como bloqueio operacional do sync normal e oferecer ao usuário atualização via `xpz-kb-parallel-setup` antes de seguir
 - não apresentar `sync` seguido de regeneração manual separada do índice como fluxo normal em pasta que adota `KbIntelligence`
+- `-BlockCrossFlowDataSource` *(switch, opt-in)* — aborta o sync (`ErrorId=CrossFlowDataSourceCollisionBlocked`, precedido de `CROSSFLOW_BLOCKED_ERRORID:` no stderr) **antes** de gravar metadata ou XML quando há colisão cross-fluxo de origem (`dataSource`): moderno (sem `dataSource`) ↔ legado (`gx-legacy-export`)
+- sem o switch, o **fail-soft não introduz gate adicional na materialização**: a detecção roda antes da gravação e apenas **registra** a colisão (campo `CrossFlowCollisions`; stderr/relatório), e o fluxo segue normalmente pela regra de `lastUpdate` (sobrescreve se o entrante não for mais antigo), podendo materializar moderno↔legado sem bloquear; ver detalhe na seção de interpretação de resultado
+- como todo parâmetro do motor compartilhado, o wrapper local da pasta paralela pode ainda não repassá-lo; tratar a ausência como oportunidade de atualização local (mesma postura de `-ExpectedItems`), não como bloqueio
 - `-NoGitSummary` *(switch)* — suprime resumo Git no final
 
 ### Wrapper de conferência full
@@ -378,6 +381,10 @@ No ramo legado o motor (`scripts/GeneXusLegacyExportFileSupport.ps1`) consome o 
 - `orphan` (`Report`/`Menubar`) → materializa em `materializedFolderName` próprio, com `type="gxlegacy/<Elemento>"`;
 - cada item vira envelope `Object`/`Attribute` com `dataSource="gx-legacy-export"`, payload
   original preservado em `<GxLegacyPayload>` e `guid=""` (não participa do rename por GUID);
+- **colisão cross-fluxo:** se o mesmo `FolderType|NormalizedName` já existir no acervo como
+  **moderno** (sem `dataSource`), a detecção cross-fluxo dispara ao materializar o legado —
+  fail-soft por padrão (`CrossFlowCollisions`), ou bloqueio com `-BlockCrossFlowDataSource`
+  (ver "Wrapper de atualização diária" e a seção de interpretação de resultado);
 - `lastUpdate` ausente/inválido → sentinela determinística `0001-01-01T00:00:00.0000000Z`
   (conservadora: na materialização incremental, sentinela × data real → `skipped-older-lastUpdate`);
 - **tag fora do registro** → `throw` com instrução de estender o registro (não materializa parcial).
