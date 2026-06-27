@@ -1,13 +1,13 @@
 # Daemon do hook `PreToolUse` (auto-allow) do Claude Code — design
 
-> **STATUS: RASCUNHO v2 (não congelado).** Esta v2 incorpora a revisão por pares
-> `daemon-design-v1` (5 vozes efetivamente consultadas, 3 famílias — `anthropic`/Claude Opus
-> subagente nativo, `openai`/Codex gpt-5.5, `nvidia`/glm-5.1+kimi-k2.6+minimax-m2.7; os 3
-> `ollama-cloud` preferidos caíram por cota e foram substituídos pelos NVIDIA). Veredito do painel:
-> **unânime "revisar — direção certa, não congelar"**. Os invariantes (§2) foram aprovados sem
-> ressalva; o bloqueio é **empírico e de protocolo**. Esta v2 fecha as decisões de protocolo,
-> identidade, staleness e corrida que a v1 deixava em aberto, e move a prova numérica para um
-> **passo 0 de medição** (§9). **Ainda não congelada:** depende do passo 0 e de re-submissão ao painel.
+> **STATUS: RASCUNHO v3 (não congelado).** Esta v3 incorpora **duas rodadas** de revisão por pares
+> (`daemon-design-v1` sobre a v1 e a re-submissão da v2), cada uma com 5 vozes / 3 famílias
+> (`anthropic`/Claude Opus subagente nativo, `openai`/Codex gpt-5.5, `nvidia`/glm-5.1+kimi-k2.6+
+> minimax-m2.7; os `ollama-cloud` preferidos caíram por cota e foram substituídos pelos NVIDIA). A
+> rodada 2 moveu o veredito de "unânime revisar" para **4 aprova-com-ressalvas + 1 revisar**: os 7
+> gaps da rodada 1 foram aceitos como fechados; o bloqueio restante era estreito e convergente. Esta
+> v3 crava esses convergentes. **Ainda não congelada:** o que sobra são **números** (passo 0 de
+> medição) + a prova nos self-tests.
 >
 > **ESCOPO — Claude Code apenas** (herdado da spec congelada `claude-code-pretooluse-auto-allow-design.md`):
 > depende do hook `PreToolUse` + `permissionDecision`, recurso que não existe em Codex/Cursor/OpenCode.
@@ -36,10 +36,12 @@ dentro do daemon **não** elimina esse segundo python — ele é chamado por `& 
 Sem resolver isso (ver §4.1), o daemon resolve **metade** do problema. E há **dois caminhos quentes
 distintos** a medir separadamente, não um só:
 
-- **caminho `defer`-comum** (1º token não é verbo read-only): hoje é sub-ms in-process no pwsh-hook;
-  **com daemon fica mais lento** (paga startup do cliente + IPC para um `defer`). Não pode regredir.
+- **caminho `defer`-comum** (1º token não é verbo read-only): hoje é sub-ms in-process **dentro** do
+  pwsh-hook — mas o **custo real ao usuário** inclui o startup do pwsh (~520 ms). **Com daemon** paga
+  startup do cliente + IPC para um `defer`. **Baseline correto** = o **hook atual completo** (pwsh do
+  zero), não o sub-ms in-process (que é só o limite inferior teórico). Critério de regressão em §9.
 - **caminho `allow`-candidato** (verbo read-only): hoje paga pwsh + python(shlex); com daemon paga
-  cliente + IPC + (possivelmente) python(shlex) no daemon.
+  cliente + IPC + (conforme §4.1) o `shlex` no cliente **ou** no daemon.
 
 ## 2. Invariantes herdados (não-negociáveis) — aprovados pelo painel
 
@@ -50,14 +52,15 @@ Tudo da spec congelada continua valendo e o daemon **não pode** afrouxar nada:
    inesperada, versão divergente, staleness suspeita ou ambiguidade. Indisponível **nunca** vira `allow`.
 3. **Fonte única da lógica de decisão = `ClaudeCodePreToolUseSafeAllowSupport.ps1`.** O daemon
    **reusa** `Get-PtuDecision` por dot-source; **proibido** reimplementar o classificador noutra
-   linguagem (divergência = falso-allow silencioso).
+   linguagem (divergência = falso-allow silencioso). **(reforço v3)** "Fonte única" inclui a
+   **semântica de tokenização** (o `shlex` que produz os segmentos), não só o veredito — ver §4.1.
 4. **O daemon nunca executa o comando do usuário.** Recebe o JSON do hook, **classifica**, devolve
    `allow`/`defer`. Não há caminho de execução do `command`.
 5. **Gate de segurança = self-test adversarial**, agora também através do daemon **e do cliente** (§8).
-6. **(NOVO) O cliente só tokeniza e transporta — nunca decide `allow`.** Mesmo que o `shlex` migre
-   para o cliente (§4.1), todo **veredito** fica no daemon (`Get-PtuDecision`). O cliente, isolado,
-   é **incapaz** de emitir `allow` — invariante provado por self-test, análogo ao já provado para
-   `Get-PtuBashFastPath` (`...Support.ps1:132-133`). Isso preserva (3) mesmo com a fronteira deslocada.
+6. **O cliente só tokeniza e transporta — nunca decide `allow`.** Mesmo que o `shlex` migre para o
+   cliente (§4.1), todo **veredito** fica no daemon (`Get-PtuDecision`). O cliente, isolado, é
+   **incapaz** de emitir `allow` — invariante provado por self-test, análogo ao já provado para
+   `Get-PtuBashFastPath` (`...Support.ps1:132-133`).
 
 ## 3. Arquitetura proposta
 
@@ -66,195 +69,231 @@ Claude Code  --(stdin: hook JSON)-->  [CLIENTE leve]  --(IPC: ver §4.2)-->  [DA
                                             |                                         |
                                             |<---  resposta = enum {allow|defer}  ----| (Get-PtuDecision)
                                             v
-                                   stdout: {"hookSpecificOutput": ...}   (montado PELO cliente)
+                                   stdout: hookSpecificOutput (montado PELO cliente, JSON exato em §3.1)
 ```
 
-- **Daemon:** `pwsh` persistente que dot-source o `...Support.ps1` **uma vez**, abre o canal IPC e
-  entra em loop: lê uma requisição enquadrada, valida, chama `Get-PtuDecision`, devolve **o enum**.
-  Custo de startup pago **uma vez**. **Estado `ready` explícito** (§5): antes de `ready`, não aceita
-  conexão (ou responde só `defer`).
+- **Daemon:** `pwsh` persistente que dot-source o `...Support.ps1` **uma vez**, abre o canal IPC
+  **só após `ready`** (§5) e entra em loop: lê uma requisição enquadrada, valida, chama
+  `Get-PtuDecision`, devolve **o enum**. Custo de startup pago **uma vez**.
 - **Cliente (o comando do hook):** programa de **inicialização rápida** que conecta, repassa o JSON
   do stdin (ou os segmentos já tokenizados, §4.1), lê **o enum** e **monta ele mesmo** o
-  `hookSpecificOutput`. Em qualquer falha (canal ausente/ocupado/subindo, timeout, lixo, versão
-  divergente) → imprime **`defer`** e sai 0 (fail-closed). **Nunca** monta `allow` por conta própria.
+  `hookSpecificOutput` (§3.1). Em qualquer falha (canal ausente/ocupado/subindo, timeout, lixo,
+  versão divergente) → imprime **`defer`** e sai 0 (fail-closed). **Nunca** monta `allow` sozinho.
 - **Resposta como enum estreito** (correção do painel): o daemon devolve **apenas** `allow`|`defer`
-  (+ campos diagnósticos que o cliente ignora), **não** JSON arbitrário. O cliente é quem constrói o
-  payload final do hook. Reduz superfície de injeção e impede que resposta malformada vire saída
-  inesperada ao Claude Code.
+  (+ campos diagnósticos que o cliente ignora), **não** JSON arbitrário. Reduz superfície de injeção.
 
-## 4. A decisão central — runtime do cliente, IPC e o 2º python
+### 3.1 JSON exato que o cliente emite (contrato, da spec congelada)
 
-### 4.1 Onde roda o `shlex` (resolve o 2º python)
+O cliente reproduz **byte-a-byte** o formato do decisor atual (`Get-PtuHookOutput` em
+`Invoke-ClaudeCodePreToolUseSafeAllow.ps1`), trocando só `permissionDecision`:
 
-Duas saídas, a decidir **por medição** no passo 0 (§9):
+```json
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow","permissionDecisionReason":"ptu-daemon vX"}}
+```
 
-- **(a) Cliente tokeniza:** o cliente Python roda o `shlex` (reaproveitando o processo Python que já
-  nasceu) e manda ao daemon os **segmentos já tokenizados**; o daemon só roda as `Test-Ptu*SegmentAllowed`
-  (in-process puras, sem python). **Elimina o 2º python.** Custo: desloca a fronteira — coberto pelo
-  invariante §2.6 (cliente nunca decide `allow`) + self-test de paridade **cliente↔daemon** (§8).
-- **(b) Daemon mantém python persistente:** um processo/runspace Python vivo no daemon para o `shlex`.
-  Mantém a fronteira atual (cliente burro), mas adiciona um 2º processo de longa vida para gerenciar.
+Para `defer`, idêntico com `"permissionDecision":"defer"`. **Nunca** `deny`. O self-test (§8) compara
+o payload do cliente com o do decisor in-process para o mesmo input.
 
-**Preferência provisória:** (a), por ser mais simples no agregado e matar o 2º python — **se** o
-self-test de paridade cliente↔daemon provar zero divergência. Confirmar no passo 0.
+## 4. A decisão central — tokenização, IPC e runtime do cliente
+
+### 4.1 Onde roda o `shlex` (o 2º python) — e a prova de equivalência
+
+Duas saídas, **igualmente válidas até o passo 0** (sem preferência provisória — o painel apontou
+viés de confirmação em pré-escolher (a)):
+
+- **(a) Cliente tokeniza:** o cliente roda o `shlex` e manda ao daemon os **segmentos já tokenizados**;
+  o daemon só roda as `Test-Ptu*SegmentAllowed` (in-process puras, sem python). **Elimina o 2º python.**
+  **Condição de aceite (cravada):** a tokenização do cliente deve ser **identidade de artefato** — o
+  **mesmo** `Get-ClaudeCodeBashSafeSegments.py` (mesmo arquivo/hash), **não** uma reimplementação
+  "equivalente". `shlex.split` (Python) ≠ o split do PowerShell em aspas/escapes; uma 2ª implementação
+  diverge silenciosamente → segmentos errados → `allow` indevido (viola §2.3). **Não basta paridade
+  por corpus** (seria circular: testa o caminho novo contra si mesmo).
+- **(b) Daemon mantém o `shlex`:** o daemon segura um **processo Python persistente** para o `shlex`
+  (ex.: `Start-Process python -RedirectStandardInput`, mantido vivo pelo loop do daemon; o startup do
+  python é pago **uma vez**, não por requisição). Mantém a fronteira atual (cliente burro). Custo: um
+  2º processo de longa vida a gerenciar (memória + ciclo de vida).
+
+**Regra de decisão (cravada):** **(a)** só é aceita se o self-test de equivalência (§8) passar com
+**identidade de artefato + modo de decomposição auditável** (abaixo). **Se a equivalência não
+fechar no passo 0, (b) é OBRIGATÓRIA, não opcional.**
+
+**Modo de decomposição auditável (pré-requisito de (a)):** `Get-PtuDecision` ganha um modo que
+**expõe os segmentos** que ele produziria internamente a partir da **string crua**. O self-test então
+compara, sobre o **mesmo corpus adversarial**: `in-process(string crua) → segmentos` **vs**
+`cliente(string crua) → segmentos`. Divergência de **segmentos** (não só de veredito) = falha. Sem
+esse modo, a paridade é circular e não prova nada.
 
 ### 4.2 Transporte IPC: named pipe vs TCP loopback
 
-| Opção | Prós | Contras (apontados pelo painel) |
+| Opção | Prós | Contras |
 |---|---|---|
-| **Named pipe** | ACL nativa por-usuário; sem porta/firewall | `open(r'\\.\pipe\...')` da stdlib Python **não** basta para `PIPE_ACCESS_DUPLEX`/message-mode → exige `pywin32`/`ctypes` (nova dependência, **derruba o "zero build/zero dep"**); ACL "default" de pipe criado por pwsh é **incerta** |
-| **TCP loopback** | stdlib `socket` puro (zero dep), **drasticamente mais simples** em Python | `127.0.0.1` ≠ "só este hook": **exige token de sessão** (nonce em arquivo com ACL só-usuário, apresentado no handshake); superfície de firewall (rara em default) |
+| **Named pipe** | **ACL nativa por-usuário** (modelo de confiança forte); sem porta de escuta | `open(r'\\.\pipe\...')` da stdlib Python **não** basta para `PIPE_ACCESS_DUPLEX`/message-mode → exige `pywin32`/`ctypes` (**derruba o "zero dep"**) ou um cliente **NativeAOT** (que fala pipe nativamente) |
+| **TCP loopback** | stdlib `socket` puro (zero dep), simples em Python | `127.0.0.1` ≠ "só este hook" → **token de sessão** obrigatório (auth caseira, mais frágil que ACL nativa); **porta de escuta dispara DLP/endpoint-protection corporativo** (apontado pelo painel) — pode ser **inviável** para devs em ambiente corporativo |
 
-**Decisão de design:** medir os dois no passo 0. Se o named pipe exigir `pywin32`, a comparação
-Python-vs-NativeAOT **se inverte** (o exe fala pipe nativamente, sem dep runtime). **Default
-provisório:** TCP loopback stdlib **com token de sessão** — mais portável e sem dep extra —, com
-named pipe (via exe NativeAOT) como alternativa se a medição favorecer. Qualquer que seja, a **ACL é
-parte do contrato, não "default"**: pipe → ACL explícita pelo SID do usuário; TCP → token + ACL do
-arquivo de descoberta.
+**Dissidência registrada do painel:** glm-5.1 preferiu TCP stdlib (zero-dep); Codex e Claude
+preferiram named pipe (ACL nativa > token-em-arquivo). A própria objeção corporativa (DLP) de glm-5.1
+**reforça** named pipe. **Posição da v3:** tratar **named pipe (via cliente NativeAOT) e TCP+token
+(via cliente Python)** como **co-primários** a medir no passo 0, **não** "pipe alternativo". A ACL é
+**parte do contrato, não default**: pipe → ACL explícita pelo SID; TCP → token + ACL do arquivo de
+descoberta (§7).
 
 ### 4.3 Runtime do cliente
 
-| Opção | Startup típico (Win) | Dependência | Veredito |
+| Opção | Startup típico (Win) | Dependência | Casa com |
 |---|---|---|---|
-| **Python** (cliente mínimo, stdlib `socket`) | ~30–60 ms nu; +`import json`/socket; +`pywin32` se pipe | já é dep (`shlex`); zero build **se** stdlib bastar | **candidato v1, gated na medição** |
-| **.NET exe (NativeAOT)** | ~10–30 ms; named pipe nativo | passo de build + binário | **co-candidato real** se pipe exigir `pywin32` ou se p95 do Python estourar |
+| **Python** (stdlib `socket`) | ~30–60 ms + `import json` + conexão | já é dep (`shlex`); zero build **se** stdlib bastar | **TCP+token** |
+| **.NET exe (NativeAOT)** | ~10–30 ms; named pipe nativo | passo de build + binário | **named pipe** |
 | **`pwsh` cliente** | ~500 ms | nenhuma | **proibido** (é o problema) |
 
-**Critério objetivo de escolha (do painel):** Python **falha** e cai-se para NativeAOT se o **p95
-end-to-end real** (não isolado) exceder ~80 ms ou o **p99** exceder 100 ms, na máquina alvo, com
-Defender ativo e carga moderada. O startup "30–60 ms" da v1 era otimista: não contava `import json`,
-custo de conexão real, nem o overhead do shell que dispara o hook.
+### 4.4 Tabela de decisão binária (passo 0 → escolha, sem "decidir depois")
 
-## 5. Ciclo de vida do daemon — corrida e estado `ready`
+Medir os dois co-primários no passo 0 e aplicar, **nesta ordem**:
 
-- **Subida única guardada por mutex.** Antes de spawnar, o cliente adquire um **named mutex** por
-  usuário (`Local\ClaudeCodePreToolUseSafeAllowDaemon-<userSID>`). Só quem adquire o mutex spawna o
-  daemon; os demais **apenas devolvem `defer`**. Evita N daemons quando N hooks acham o canal ausente
-  ao mesmo tempo (o Claude Code dispara ferramentas em paralelo).
-- **Estado `ready` explícito.** O daemon só passa a aceitar conexões (ou só responde algo diferente
-  de `defer`) **depois** de: dot-source OK, self-check de versão/hash OK, canal criado e escutando.
-  Antes disso → conexão recusada ou `defer`. Mata a janela "daemon meio-inicializado responde default".
-- **Cliente distingue as falhas, mas todas viram `defer`.** "canal ausente" (→ tenta adquirir mutex
-  e spawnar, **uma vez**) ≠ "canal existe mas ocupado/subindo" (`ERROR_PIPE_BUSY`/connection refused
-  → **só `defer`**, **não** spawna outro daemon). **Toda** falha de conexão resulta em `defer`.
-- **Backoff curto opt-in.** Para reduzir avalanche de `defer` nos primeiros ~800 ms de uma sessão
-  (enquanto o daemon sobe), o cliente pode tentar reconectar com backoff **dentro do orçamento de
-  tempo** (ex.: 2 tentativas em ≤ 30 ms total). Estourou o micro-orçamento → `defer`. Documentar o
-  **máximo de `defer`s por arranque** esperado.
-- **Persistência entre reboots:** fora do escopo da v1. A subida lazy cobre "daemon caiu". Auto-start
-  no login (Task Scheduler/Startup) é **evolução** e deve **reusar os padrões da skill `xpz-daemon`**
-  (dependência documentada), não inventar outro mecanismo.
-- **Watchdog (dívida registrada):** detecção de daemon **travado/órfão** (PID file + heartbeat) não
-  entra na v1, mas fica listado — o timeout do cliente já garante `defer`, mas o processo órfão precisa
-  de quem o detecte/mate na evolução.
+1. Se **`pwsh -NoProfile` isolado já cabe** no orçamento (improvável, dado os 520 ms) → **sem daemon**;
+   volta ao modelo in-process com pwsh enxuto. (Gate teórico; ver §9-0a — é baseline, não saída esperada.)
+2. Senão, comparar **NativeAOT+pipe** vs **Python+TCP** pelo **p95 end-to-end real** (§9-0b):
+   - ambos **dentro** do orçamento (p95 ≤ 80 ms / p99 ≤ 100 ms) **e** TCP **viável no ambiente alvo**
+     (sem bloqueio de DLP) → **empate técnico → vence named pipe + NativeAOT** (ACL nativa > token).
+   - só um dentro do orçamento → vence esse.
+   - TCP **inviável por DLP** no público alvo → **NativeAOT+pipe** mesmo se o Python couber.
+3. A escolha de §4.1 (a/b) é **independente** e decidida pela equivalência (§4.1), não pelo transporte.
 
-## 6. Frescor da lógica (staleness) — regra única decisiva
+Atualizar este doc com os números medidos antes de congelar.
 
-O daemon segura a versão de `...Support.ps1` de quando subiu. Servir lógica velha como boa = falso-allow.
-Decisão do painel (não mais "uma ou outra"):
+## 5. Ciclo de vida do daemon — mutex, `ready` e corrida
 
-- **Primário: hash SHA256** do `...Support.ps1` por requisição (sub-ms; cacheável por `(path,size,mtime)`
-  para não reler quando nada mudou). **Não** usar mtime como primário — `git checkout`/`stash` não
-  preservam mtime de forma confiável (grava conteúdo, não timestamp), e a granularidade NTFS engana.
-- **Secundário: handshake de versão** (`$script:PtuSafeAllowVersion`): o cliente envia a versão
-  esperada; divergência → `defer`. Segunda barreira (pega incompatibilidade de contrato), nunca a
-  primária (o número é manual e não bumpa sozinho durante desenvolvimento).
-- **Regra única: "dúvida → `defer` + restart".** Hash divergente ou reload que falha (arquivo
-  meio-escrito sob `Set-StrictMode`) → o daemon entra em **`defer-only`** e se reinicia; **nunca**
-  continua servindo a lógica anterior nem tenta "ajustar no voo". O re-dot-source é **envolto em
-  try/catch que mantém o loop vivo** e marca `stale-unsafe` até um reload bem-sucedido.
-- **Custo worst-case:** em disco local SSD o hash é ~0.1–0.3 ms; em UNC/antivírus pode subir — por
-  isso o cache por `(path,size,mtime)` e a anotação de que o `...Support.ps1` deve estar em disco local.
+- **Canal só existe após `ready`.** O daemon **não** cria o pipe / **não** faz `listen` (TCP) antes
+  de: dot-source OK, self-check de hash/versão OK. Assim, **antes de `ready` a única semântica é
+  "canal ausente"** — não há "canal existe mas não responde". Mata a janela do daemon meio-inicializado.
+- **Subida única guardada por mutex, segurado até `ready`.** Antes de spawnar, o cliente adquire um
+  **named mutex** cuja identidade segue §7 (SID + repo + roots). **Só** quem adquire o mutex spawna; o
+  spawner **segura o mutex até observar `ready`** (ou até **timeout de subida ≤ 2 s**, então libera —
+  daemon que morre na subida não pode prender o mutex eternamente). Clientes que **não** adquirem o
+  mutex devolvem **`defer` imediatamente, sem tentar conectar nem spawnar** outro daemon.
+- **Cliente distingue, mas tudo vira `defer`.** "canal ausente" (→ tenta mutex/spawn, **uma vez**) vs
+  "canal existe mas recusa/ocupado" (→ só `defer`). Toda falha → `defer`.
+- **Backoff hard-coded (não "opt-in").** Para reduzir avalanche no arranque, o cliente tenta
+  reconectar **2 vezes em ≤ 30 ms total** (hard-coded na v1; configurável é evolução). Estourou o
+  micro-orçamento → `defer`. O **máximo de `defer`s por arranque** é medido no passo 0 (§9-0d).
+- **Persistência entre reboots:** fora da v1. Auto-start no login é **evolução** e deve **reusar os
+  padrões da skill `xpz-daemon`** (dependência documentada), não inventar outro mecanismo.
+- **Watchdog (dívida):** detecção de daemon travado/órfão (PID + heartbeat) é evolução; o timeout do
+  cliente já garante `defer`.
 
-## 7. Concorrência e segurança
+## 6. Frescor da lógica (staleness) — regra única + backoff
+
+Servir lógica velha como boa = falso-allow. Decisão cravada:
+
+- **Primário: hash SHA256** do `...Support.ps1` (e do helper `shlex` se §4.1(a)) por requisição.
+  **Não** mtime como primário (`git checkout`/`stash` não preservam mtime; granularidade NTFS engana).
+- **Cache `(path,size,mtime)` com recomputo, não skip:** o cache **não pula** o hash — ele evita
+  reler o arquivo quando `(size,mtime)` batem, mas o caso perigoso (git restaurando **tamanho igual**
+  com conteúdo diferente entre commits) é coberto porque, na dúvida de mtime, recomputa-se o hash.
+  Anotado: cache seguro **só** em disco local; `...Support.ps1` deve estar em disco local.
+- **Hash com timeout (ex.: 20 ms):** estourou (AV segurando o arquivo) → `defer` **na requisição
+  corrente** e marca `stale-uncertain`; **não** dispara restart na 1ª falha.
+- **Secundário: handshake de versão** (`$script:PtuSafeAllowVersion`) — segunda barreira (o número é
+  manual e não bumpa sozinho; pega incompatibilidade de contrato, não edição).
+- **Regra única "dúvida → `defer` + restart", COM backoff e cap:** hash divergente → `defer-only` +
+  re-dot-source. O re-dot-source é **envolto em try/catch que mantém o loop vivo**. Se o reload
+  **falhar** (arquivo meio-escrito/sintaxe quebrada), **backoff exponencial** (1 s, 2 s, 4 s … cap
+  30 s); **após N=3 falhas consecutivas**, o daemon **suspende os retries** e fica em `defer-only`
+  **até sinal externo** (touch no arquivo / restart manual) — **nunca** busy-loop devorando CPU.
+
+## 7. Concorrência, identidade e segurança
 
 - **Concorrência:** v1 é **single-threaded síncrona** (uma conexão por vez); cada decisão é sub-ms.
-  **Limiar explícito:** se a medição de contenção (2+ chamadas simultâneas) levar o **p95 acima de
-  100 ms** por espera na fila, a saída é **pipe/porta por sessão**
-  (`...-<userSID>-<sessionId>`), **não** múltiplas instâncias de daemon (evita sincronização entre
-  processos). Medir antes de complicar.
-- **ACL/identidade (parte do contrato, não "default"):**
-  - **Pipe:** criado com ACL **explícita** pelo SID do usuário corrente (`ReadWrite`); se PowerShell
-    puro não garantir, usar helper C# inline. Nome inclui o **SID** (não `$env:USERNAME`, que muda em
-    renomeação de conta).
-  - **TCP:** token de sessão (nonce aleatório) em arquivo com ACL só-usuário, exigido no handshake;
-    sem token válido → conexão rejeitada → `defer` no cliente.
-  - **Identidade por checkout/repo:** o nome do canal inclui um hash do **caminho canônico do repo**,
-    não só o usuário — senão um daemon de **outro checkout/branch** poderia responder por engano.
-- **Protocolo do wire (especificado):** framing **length-prefixed** (4 bytes big-endian + payload
-  UTF-8), **não** line-delimited (um `\n` interno mal escapado quebraria o enquadramento). Encoding
-  UTF-8 fixo nas duas pontas. **Tamanho máximo** de mensagem (rejeita acima → `defer`). O daemon
-  valida que o JSON parseia e que `tool_name`/`tool_input.command`/`cwd` existem com os tipos certos;
-  qualquer anomalia → `defer`. Resposta = **enum** `allow|defer`. Corpus adversarial (§8) inclui
-  `\n`/`\r`/`\0`/delimitador embutido no `command` e JSON truncado, exigindo `defer`.
-- **Shutdown — plano de controle separado do plano de dados:** o encerramento **não** trafega como
-  "um JSON de hook com campo especial" (seria vetor de DoS: input que parece shutdown derruba o
-  daemon). É um canal/verbo de controle **autenticado** (mesmo token/ACL), distinto do caminho de
-  classificação. Qualquer processo do mesmo usuário derrubar o daemon → degrada para prompts, não é
-  catastrófico, mas exige a barreira de auth.
-- **Timeout agressivo do cliente (materializa o fail-closed):** connect ≤ 50 ms, read ≤ 50 ms
-  (coerente com o orçamento de 100 ms). Estouro → imprime `defer` e sai 0. **Sem timeout o hook
-  pendura**, o que é **pior que um prompt** (trava a tool call inteira) e quebraria silenciosamente a
-  promessa "pior caso = prompt como hoje". Self-test com daemon que dorme de propósito (§8).
-- **Log/diagnóstico (dívida registrada):** um log mínimo (decisão + timestamp, sem o `command`
-  completo por privacidade) é essencial para depurar um processo persistente; entra como item de v1
-  leve ou evolução próxima.
+  **Limiar explícito (e2e total, não só fila):** se a medição de contenção (passo 0) levar o **p95
+  end-to-end acima de 100 ms** por espera, a saída é **canal por sessão**
+  (identidade + `<sessionId>`), **não** múltiplas instâncias de daemon.
+- **Identidade (TODOS os artefatos de coordenação — cravado):** mutex, canal (pipe/porta), token e
+  arquivo de descoberta incluem o hash de **(SID do usuário + caminho canônico do repo + conjunto
+  `PTU_SAFE_ALLOW_ROOTS` resolvido)**. "Caminho canônico" = `Resolve-Path` seguindo symlinks/junctions
+  (não o `$PWD` cru). Nome por **SID**, não `$env:USERNAME` (muda em renomeação). Isso impede que um
+  daemon de **outro checkout/branch** ou com **roots divergentes** responda por engano (a 1ª barreira
+  de `Get-PtuDecision` é `Test-PtuCwdInScope`, `...Support.ps1:190` — daemon com roots errados a furaria).
+- **ACL como requisito verificável (não mecanismo fixo):** o **self-test inspeciona a ACL efetiva** do
+  canal; o mecanismo pode variar (PowerShell puro ou helper C# inline para pipe; ACL do arquivo de
+  token para TCP), mas o **resultado** (só o usuário corrente) é testado.
+- **Token de sessão TCP — ciclo de vida cravado:** recriado pelo daemon a cada subida, escrito
+  **atomicamente** (move-from-tmp) em arquivo com ACL só-usuário, em diretório com ACL só-usuário. Se
+  o cliente não acha o token → `defer` (não cria outro daemon; isso é do mutex). Conexão sem token
+  válido → daemon responde "token rejeitado" → cliente trata como `defer`.
+- **Protocolo do wire (cravado):** framing **length-prefixed** (4 bytes big-endian + payload UTF-8),
+  **não** line-delimited. **`protocolVersion` no framing** (separado de `$script:PtuSafeAllowVersion`,
+  que é da lógica). **Tamanho máximo = 64 KB** (cobre qualquer comando razoável; acima → `defer`). O
+  daemon valida JSON + tipos de `tool_name`/`tool_input.command`/`cwd`; anomalia → `defer`. Handshake
+  de versão **por-requisição** (TCP persistente pode atravessar um reload). Resposta = enum `allow|defer`.
+- **Shutdown — plano de controle separado por opcode:** **magic byte** no início do frame
+  (`0x01`=dados/classificação, `0x02`=controle/shutdown). Shutdown exige a mesma auth (token/ACL).
+  **Não** é "JSON de hook com campo especial" (seria DoS por input que parece shutdown).
+- **Timeout do cliente = deadline monotônico único (~80 ms)** do qual se derivam connect/read (não
+  50+50 fixos, que sozinhos já comem 100 ms). Estouro → `defer` e sai 0. **Sem timeout o hook pendura**
+  (pior que prompt). Self-test com daemon que dorme (§8).
+- **Log mínimo NA v1 (promovido de dívida):** decisão + estado do daemon (`ready`/`defer-only`/
+  `stale-uncertain`) + timestamp + código de erro, **sem o `command` completo** (privacidade), com
+  limite de tamanho. Sem ele, um daemon degradado é indistinguível de "tudo virou prompt".
 
 ## 8. Prova (self-test) — o gate continua sendo a segurança
 
-- **Paridade daemon↔in-process:** `Test-ClaudeCodePreToolUseSafeAllowDaemonSelfTest.ps1` roda o
-  **mesmo corpus adversarial** **através do daemon** e exige decisão **idêntica** à de `Get-PtuDecision`
-  direto. Divergência = falha.
-- **Paridade cliente↔daemon e invariante do cliente:** se o `shlex` migrar para o cliente (§4.1),
-  novo caso provando que o cliente, isolado, **nunca** emite `allow` (só `defer` ou "tokeniza e
-  transporta") — análogo ao invariante de `Get-PtuBashFastPath`. E paridade: cliente+daemon juntos =
-  mesma decisão do in-process.
-- **Fail-closed com daemon fora/subindo/lento:** com o daemon parado, o cliente produz `defer` para
-  todo o corpus (inclusive os que seriam `allow` quente). Com daemon que **dorme** além do timeout →
-  cliente devolve `defer` **dentro do orçamento**, sem pendurar.
-- **Staleness:** caso que **edita o `...Support.ps1` com o daemon vivo** e prova que a decisão muda
-  (ou vira `defer`+restart), não permanece a antiga.
-- **Protocolo:** casos adversariais de framing (§7) exigindo `defer`.
-- **Carga paralela (desejável, não bloqueante v1):** stress com N requisições simultâneas; pré-requisito
-  é o `...Support.ps1` **não** carregar estado mutável global (`$script:`) que vaze entre requisições.
-- **Sentinela** no padrão dos demais (`OK: Test-...DaemonSelfTest.ps1`). O self-test é o **gate**; o
-  observe mede cobertura/latência, não segurança.
+- **Equivalência de tokenização (gate de §4.1(a)):** modo de decomposição auditável; compara
+  `in-process(string crua) → segmentos` vs `cliente(string crua) → segmentos` no corpus adversarial.
+  Divergência de segmentos = falha. + identidade de artefato (mesmo `.py`/hash). Falhou → (b) obrigatória.
+- **Paridade daemon↔in-process** e **cliente↔daemon:** mesma decisão final + mesmo payload (§3.1).
+- **Invariante do cliente:** o cliente, isolado, **nunca** emite `allow` (só `defer`/tokens).
+- **Fail-closed:** daemon parado/subindo → `defer` para todo o corpus; daemon que **dorme** além do
+  deadline → cliente devolve `defer` **dentro do orçamento**, sem pendurar.
+- **Staleness ao vivo:** edita o `...Support.ps1` com o daemon vivo → decisão muda ou vira
+  `defer`+restart; reload quebrado → `defer-only` com backoff, sem busy-loop.
+- **ACL efetiva:** inspeciona a ACL do canal (só o usuário).
+- **Protocolo:** framing adversarial (`\n`/`\0`/delimitador embutido, JSON truncado, > 64 KB) → `defer`.
+- **Carga paralela — BLOQUEANTE na v1 (subido de "desejável"):** mínimo de dois testes: N clientes
+  simultâneos **na subida lazy** (conta `defer`s, exige no máximo um daemon) e N clientes simultâneos
+  **com daemon `ready`** (p95 sob contenção). Pré-requisito: `...Support.ps1` sem estado mutável global.
+- **Sentinela** `OK: Test-...DaemonSelfTest.ps1`. O self-test é o **gate**; o observe mede cobertura/latência.
 
-## 9. Sequência de implementação proposta (após aprovação)
+## 9. Sequência de implementação — passo 0 é PROTÓTIPO DESCARTÁVEL
 
-**Passo 0 — MEDIÇÃO (gate empírico; nada se implementa antes disto fechar):**
-0a. **Medir `pwsh -NoProfile -NoLogo -NonInteractive` isolado** na máquina alvo. Se o startup enxuto
-   do pwsh já chegar perto do orçamento, **o daemon pode virar evolução, não pré-requisito** — pode
-   tornar a frente inteira desnecessária. Medida mais barata, feita primeiro.
-0b. **Cliente Python mínimo real** (com o código de conexão IPC de verdade — pipe via `pywin32`/`ctypes`
-   E TCP via stdlib `socket`), medindo **p95/p99 end-to-end** (Claude Code → hook → cliente → IPC →
-   daemon → volta), com Defender ativo e carga, ≥100 invocações, **separando** o caminho `defer`-comum
-   do `allow`-candidato. Confirmar que o `defer`-comum **não regride** vs o sub-ms in-process de hoje.
-0c. **Decidir** §4.1 (shlex no cliente vs daemon), §4.2 (pipe vs TCP) e §4.3 (Python vs NativeAOT)
-   **com os números**, não por argumento. Atualizar este doc com as medições coladas.
-1. Daemon `pwsh` + canal IPC + estado `ready` + mutex de subida única, reusando `Get-PtuDecision`.
-2. Cliente (Python ou exe, conforme 0c): conecta, transporta/tokeniza, monta `hookSpecificOutput`,
-   fail-closed + timeout agressivo.
-3. Staleness (§6) + protocolo enquadrado (§7).
-4. Self-tests: paridade daemon↔in-process, cliente↔daemon, fail-closed, staleness, protocolo (§8).
-5. Fase 3 (observe medindo p95 dos **dois** caminhos com daemon) → só então Fase 4 (enforce), e Fase 5
-   (fio via `xpz-skills-setup`, subindo o daemon por máquina; manter fora da v1 até o lazy provar-se).
+**Passo 0 — MEDIÇÃO (protótipo instrumentado e descartável; sem fio no hook real; nada vira código
+final automaticamente; nada se implementa como v1 antes de fechar):**
+- **0a. Baseline obrigatória (NÃO gate de existência):** medir `pwsh -NoProfile -NoLogo -NonInteractive`
+  isolado e o hook atual completo. Os 520 ms já são conhecidos → 0a quase certamente confirma o daemon;
+  serve de **baseline** (não de saída prematura). Só no caso improvável de caber sem daemon, voltar ao
+  modelo in-process com pwsh enxuto e **dissolver** o resto desta frente.
+- **0b. Caminho real e2e** dos dois co-primários (NativeAOT+pipe e Python+TCP, com o código de conexão
+  **real**), medindo **p95/p99 end-to-end**, com Defender ativo e carga, ≥100 invocações, **separando**
+  `defer`-comum de `allow`-candidato, **+ check de viabilidade corporativa do TCP** (a porta de escuta
+  passa pelo DLP do ambiente alvo?).
+- **0c. Equivalência de tokenização** (§4.1/§8) para decidir (a) vs (b).
+- **0d. Caminho frio sob paralelismo:** com o daemon parado, rajada de K tools simultâneas (arranque de
+  sessão) → conta `defer`s até `ready`; teto aceitável e **um** único daemon.
+- **0e. Critério de veredito (cravado):** o daemon **só é liberado** se (i) o `allow`-candidato cabe no
+  orçamento **e** (ii) o `defer`-comum com daemon **não regride** além de **≤ 5 ms** sobre o hook atual
+  completo (o `defer`-comum é a maioria das invocações — não pode piorar o caso comum para proteger o
+  minoritário). Aplicar a tabela §4.4 com os números.
+1–5. Só após 0 fechar: daemon + `ready`/mutex (§5); cliente (a/b e runtime conforme §4.4); staleness
+   (§6) + protocolo (§7) + log; self-tests (§8, incl. paralelo bloqueante); Fase 3 (observe) → Fase 4
+   (enforce) → Fase 5 (fio via `xpz-skills-setup`, subindo o daemon por máquina, fora da v1).
 
-## 10. Questões abertas remanescentes (pós-painel)
+## 10. Questões abertas remanescentes (pós-rodada 2)
 
-A maioria das questões da v1 foi fechada acima. Restam, todas **dependentes do passo 0**:
+Todas dependem **dos números** do passo 0 — não há mais decisão de papel pendente:
 
-- **§4.1** shlex no cliente (a) vs daemon python persistente (b) — decidir pela paridade + medição.
-- **§4.2/4.3** pipe+`pywin32`/exe vs TCP+token/Python — a medição pode inverter a recomendação.
-- **§7** limiar de contenção que dispara "canal por sessão" — só com número de carga real.
-- Itens de **dívida registrada** (watchdog, log, auto-start reusando `xpz-daemon`) — evolução, não v1.
+- **§4.1** (a) vs (b): decidida pela equivalência de tokenização (0c).
+- **§4.2/4.3/4.4** named pipe+NativeAOT vs TCP+Python: decidida por 0b + tabela §4.4 (empate → pipe).
+- **§7** limiar de contenção que dispara "canal por sessão": decidido por 0b/0d.
 
 ## 11. Proveniência (revisão por pares)
 
-- **Rodada `daemon-design-v1`** (2026-06-27): manuscrito = v1 deste doc, blindado de papel; payload
-  público. Painel: Claude Opus (subagente nativo, `anthropic`), Codex `gpt-5.5` (`openai`),
-  `nvidia/z-ai/glm-5.1`, `nvidia/moonshotai/kimi-k2.6`, `nvidia/minimaxai/minimax-m2.7`. Os preferidos
-  `ollama-cloud/*` (deepseek-v4-pro, kimi-k2.7-code, glm-5.2) voltaram `unavailable` (cota semanal/429)
-  e foram substituídos pelos NVIDIA. **5 vozes / 3 famílias; piso de diversidade superado.** Veredito
-  unânime: "revisar — direção certa, não congelar". Esta v2 endereça os gaps convergentes; **pende
-  re-submissão ao painel** (vN+1) antes de congelar.
+- **Rodada 1 `daemon-design-v1`** (2026-06-27): manuscrito = v1; veredito unânime "revisar — direção
+  certa, não congelar"; 7 gaps convergentes.
+- **Rodada 2** (2026-06-27): manuscrito = v2 (commit `a8c1bc1`); mesmo painel (Claude Opus nativo
+  `anthropic`; Codex `gpt-5.5` `openai`; `nvidia/z-ai/glm-5.1`, `nvidia/moonshotai/kimi-k2.6`,
+  `nvidia/minimaxai/minimax-m2.7`; preferidos `ollama-cloud/*` `unavailable` por cota, substituídos
+  pelos NVIDIA). **5 vozes / 3 famílias.** Veredito: **4 aprova-com-ressalvas + 1 revisar** — os 7 gaps
+  aceitos como fechados; bloqueio restante = §4.1(a) (identidade de artefato + decomposição auditável),
+  tabela de decisão de transporte, identidade completa (repo+roots), critério de regressão do
+  `defer`-comum, staleness com backoff, ciclo mutex↔ready, protocolo versionado, log na v1. Dissidência
+  de transporte (TCP zero-dep vs pipe ACL) registrada em §4.2.
+- **Esta v3** crava todos esses convergentes. **Pende re-submissão (vN+1)** antes de congelar; o que
+  resta é empírico (passo 0).
