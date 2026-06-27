@@ -1,6 +1,6 @@
 # Daemon do hook `PreToolUse` (auto-allow) do Claude Code — design
 
-> **STATUS: RASCUNHO v4 (candidato a congelamento).** Esta v4 incorpora **três rodadas** de revisão
+> **STATUS: CONGELADO (v4) — congelado em 2026-06-27 por Antonio José (antonio@frigobyte.com).** Esta v4 incorpora **quatro rodadas** de revisão
 > por pares (5 vozes / 3 famílias cada: `anthropic`/Claude Opus subagente nativo, `openai`/Codex
 > gpt-5.5, `nvidia`/glm-5.1+kimi-k2.6+minimax-m2.7; os `ollama-cloud` preferidos caíram por cota e
 > foram substituídos pelos NVIDIA). Trajetória: rodada 1 (v1) unânime "revisar" → rodada 2 (v2)
@@ -9,8 +9,10 @@
 > **orçamento absoluto** além de não regredir (§9-0e); (2) distinção **congelamento do design ≠
 > liberação pós-medição** + gate de saída do passo 0 (§4.4/§9-0f); (3) **recuperação do `defer-only`**
 > por watchdog interno + telemetria (§6); (4) enquadramento **honesto** do transporte — named
-> pipe+NativeAOT é o **default preferido**, TCP+Python é **fallback** (§4.2/4.4). **Pende a 4ª rodada
-> (vN+1)**; o que resta após ela é empírico (passo 0) + prova nos self-tests.
+> pipe+NativeAOT é o **default preferido**, TCP+Python é **fallback** (§4.2/4.4). A **rodada 4 (v4) + a
+> re-consulta da versão final** confirmaram o congelamento **por unanimidade** (5 vozes / 3 famílias,
+> zero gap de papel). **Design CONGELADO** — a prova restante é empírica: passo 0 de medição +
+> self-tests, em frente separada.
 >
 > **ESCOPO — Claude Code apenas** (herdado da spec congelada `claude-code-pretooluse-auto-allow-design.md`):
 > depende do hook `PreToolUse` + `permissionDecision`, recurso que não existe em Codex/Cursor/OpenCode.
@@ -336,5 +338,16 @@ Todas dependem **dos números** do passo 0 — não há mais decisão de papel p
   congelamento≠liberação + gate de saída do passo 0, recuperação do `defer-only`, e enquadramento
   honesto do transporte. Minoria (kimi) sobre o transporte: registrada e acatada (default preferido +
   fallback).
-- **Esta v4** crava esses 4 ajustes. **Pende a 4ª rodada (vN+1)**; após ela, o que resta é empírico
-  (passo 0) + prova nos self-tests.
+- **Rodada 4** (2026-06-27): manuscrito = v4 (commit `60094ea`); mesmo painel. **5 vozes / 3 famílias.**
+  Veredito: **4 *congelar* (Claude, Codex, glm-5.1, minimax) + 1 aprova-com-ressalvas (kimi)**, esta
+  última condicionada a 3 polish de contrato (gate 0f vinculante, caminho do log, resíduo lexical) e
+  **sem exigir nova rodada**. Polish aplicado no commit `b575b74`.
+- **Re-consulta da versão final** (2026-06-27, sobre `b575b74`): por decisão humana de escopo,
+  consultaram-se primeiro os 2 revisores que levantaram os 3 itens (kimi: ressalvas A/B fechadas;
+  Claude: lexical limpo) e, em seguida, o **painel inteiro** confirmou a versão exata final — **5/5
+  "pode congelar", 3 famílias, zero gap de papel**. (1ª tentativa do Codex inválida por contradição no
+  manuscrito → `noResponse`; re-disparo confirmou.)
+- **CONGELAMENTO (2026-06-27):** design **congelado** na v4 (`b575b74`) por Antonio José
+  (antonio@frigobyte.com), após confirmação unânime do painel. Closeout auditado:
+  `resubmissionDeclinedByHuman` — a prova restante (números) é transferida para o **passo 0 de
+  medição** + self-tests, frente separada. Nenhum código de daemon implementado.
