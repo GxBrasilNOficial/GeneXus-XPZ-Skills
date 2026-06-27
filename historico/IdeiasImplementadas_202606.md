@@ -27,6 +27,31 @@ Plano **congelado por revisão por pares** (v1→v16, 5 vozes / 3 famílias: ant
 - Revisão por pares: livro-razão em `Temp/` (`xpz-crossflow-v1.txt`…`v16.txt`, gitignored).
 - Commit: `1d3f126` (implementação da frente); ajustes da revisão pré-push reforçada nos commits seguintes.
 
+## Descoberta documental do switch `-BlockCrossFlowDataSource` e da colisão cross-fluxo no `xpz-sync/SKILL.md`
+
+**Importância original:** baixa (descoberta/conveniência; não-gap).
+**Status:** implementada em 2026-06-27 — dois acréscimos documentais no `xpz-sync/SKILL.md`, sem mudança de código.
+
+### Origem
+
+Entrada do `999-ideias-pendentes.md` levantada pelo revisor `ollama-cloud/kimi-k2.7-code` na revisão pré-push reforçada da frente-mãe «Colisão cross-fluxo moderno↔legado» (acima). O switch `-BlockCrossFlowDataSource` e os campos `CrossFlowCollisions`/`Writes[].CrossFlowCollision` já estavam no **workflow** (interpretação de resultado) do `xpz-sync/SKILL.md` e nas bases, mas duas seções de descoberta do próprio `SKILL.md` não tinham sido tocadas — reduzindo a descoberta do recurso por um agente que consultasse só elas.
+
+### Implementação
+
+- **`xpz-sync/SKILL.md` (a)** — na lista "Wrapper de atualização diária" (antes de `-NoGitSummary`): linha do `-BlockCrossFlowDataSource` *(switch, opt-in)* + duas notas — fail-soft **não introduz gate adicional** (a colisão é só registrada; a materialização segue a regra de `lastUpdate`), e switch do **motor compartilhado** eventualmente não repassado pelo wrapper local (mesma postura de `-ExpectedItems`).
+- **`xpz-sync/SKILL.md` (b)** — na seção "EXPORTS LEGADOS (GeneXus 9)": bullet de **colisão cross-fluxo** quando o mesmo `FolderType|NormalizedName` já existe no acervo como **moderno**, com cross-reference ao "Wrapper de atualização diária" e à interpretação de resultado.
+- **Sem mudança de código.** Bases (`02`/`08`/`01k`/`09`/`CHANGELOG`) já cobriam o switch/campos — sem ajuste adicional (confirmado na revisão pré-push e pelo painel).
+
+### Decisão final
+
+Validada por **revisão por pares** (manuscrito v1→v4, 3 famílias: `openai`/Codex gpt-5.5, `anthropic`/Claude Opus 4.8 nativo, `nvidia` glm-5.1/kimi-k2.6/minimax-m2.7). Codex revisou v1→v2 (núcleo); o dissidente kimi-k2.6 percorreu v2→v3→v4 e **concordou na v4**; minimax-m2.7 confirmou a v4. Design **declarado estável por decisão humana** (`resubmissionDeclinedByHuman`, motivo "delta v2→v4 puramente redacional; núcleo aprovado por 3 famílias na v2; full-panel sobre v4 dispensado"). Não é convergência plena no sentido forte da régua.
+
+### Rastreabilidade
+
+- Arquivos: `xpz-sync/SKILL.md`, `999-ideias-pendentes.md` (entrada removida → esta).
+- Revisão por pares: livro-razão em `Temp/revisao-por-pares/20260626-224728-blockcrossflow/` (manuscrito v1→v4 + prompts, gitignored).
+- Commit: `07acfa2` (acréscimos na `SKILL.md`); esta migração 999→histórico no commit seguinte.
+
 ## Forma canônica de invocação dos adapters documentada (resíduo (b1) do item URGENTE)
 
 **Importância original:** alta (atrito operacional recorrente; resíduo (b1) do item URGENTE «Reduzir as variações de chamada dos adapters de delegação»).
