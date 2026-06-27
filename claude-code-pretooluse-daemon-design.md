@@ -1,13 +1,16 @@
 # Daemon do hook `PreToolUse` (auto-allow) do Claude Code — design
 
-> **STATUS: RASCUNHO v3 (não congelado).** Esta v3 incorpora **duas rodadas** de revisão por pares
-> (`daemon-design-v1` sobre a v1 e a re-submissão da v2), cada uma com 5 vozes / 3 famílias
-> (`anthropic`/Claude Opus subagente nativo, `openai`/Codex gpt-5.5, `nvidia`/glm-5.1+kimi-k2.6+
-> minimax-m2.7; os `ollama-cloud` preferidos caíram por cota e foram substituídos pelos NVIDIA). A
-> rodada 2 moveu o veredito de "unânime revisar" para **4 aprova-com-ressalvas + 1 revisar**: os 7
-> gaps da rodada 1 foram aceitos como fechados; o bloqueio restante era estreito e convergente. Esta
-> v3 crava esses convergentes. **Ainda não congelada:** o que sobra são **números** (passo 0 de
-> medição) + a prova nos self-tests.
+> **STATUS: RASCUNHO v4 (candidato a congelamento).** Esta v4 incorpora **três rodadas** de revisão
+> por pares (5 vozes / 3 famílias cada: `anthropic`/Claude Opus subagente nativo, `openai`/Codex
+> gpt-5.5, `nvidia`/glm-5.1+kimi-k2.6+minimax-m2.7; os `ollama-cloud` preferidos caíram por cota e
+> foram substituídos pelos NVIDIA). Trajetória: rodada 1 (v1) unânime "revisar" → rodada 2 (v2)
+> 4 aprova-com-ressalvas + 1 revisar → **rodada 3 (v3) 3 *congelar* + 2 aprova-com-ressalvas** (ambas
+> condicionadas a 4 ajustes pequenos). Esta v4 crava esses 4 ajustes: (1) `defer`-comum respeita o
+> **orçamento absoluto** além de não regredir (§9-0e); (2) distinção **congelamento do design ≠
+> liberação pós-medição** + gate de saída do passo 0 (§4.4/§9-0f); (3) **recuperação do `defer-only`**
+> por watchdog interno + telemetria (§6); (4) enquadramento **honesto** do transporte — named
+> pipe+NativeAOT é o **default preferido**, TCP+Python é **fallback** (§4.2/4.4). **Pende a 4ª rodada
+> (vN+1)**; o que resta após ela é empírico (passo 0) + prova nos self-tests.
 >
 > **ESCOPO — Claude Code apenas** (herdado da spec congelada `claude-code-pretooluse-auto-allow-design.md`):
 > depende do hook `PreToolUse` + `permissionDecision`, recurso que não existe em Codex/Cursor/OpenCode.
@@ -132,10 +135,13 @@ esse modo, a paridade é circular e não prova nada.
 
 **Dissidência registrada do painel:** glm-5.1 preferiu TCP stdlib (zero-dep); Codex e Claude
 preferiram named pipe (ACL nativa > token-em-arquivo). A própria objeção corporativa (DLP) de glm-5.1
-**reforça** named pipe. **Posição da v3:** tratar **named pipe (via cliente NativeAOT) e TCP+token
-(via cliente Python)** como **co-primários** a medir no passo 0, **não** "pipe alternativo". A ACL é
-**parte do contrato, não default**: pipe → ACL explícita pelo SID; TCP → token + ACL do arquivo de
-descoberta (§7).
+**reforça** named pipe. **Posição da v4 (enquadramento honesto — correção da rodada 3):** o painel
+apontou que chamar os dois de "co-primários" e ao mesmo tempo dar vitória ao pipe "no empate" era uma
+**pré-escolha disfarçada de empírica**. Então, sem rodeio: **named pipe + cliente NativeAOT é o
+default PREFERIDO** (por ACL nativa); **TCP+token + cliente Python é FALLBACK**, usado só quando o
+primário for **inviável** (build NativeAOT impossível/incompatível na máquina alvo) ou seu p95
+estourar. O passo 0 **valida o primário e mede o fallback** — **não** "desempata". A ACL é **parte do
+contrato, não default**: pipe → ACL explícita pelo SID; TCP → token + ACL do arquivo de descoberta (§7).
 
 ### 4.3 Runtime do cliente
 
@@ -151,14 +157,19 @@ Medir os dois co-primários no passo 0 e aplicar, **nesta ordem**:
 
 1. Se **`pwsh -NoProfile` isolado já cabe** no orçamento (improvável, dado os 520 ms) → **sem daemon**;
    volta ao modelo in-process com pwsh enxuto. (Gate teórico; ver §9-0a — é baseline, não saída esperada.)
-2. Senão, comparar **NativeAOT+pipe** vs **Python+TCP** pelo **p95 end-to-end real** (§9-0b):
-   - ambos **dentro** do orçamento (p95 ≤ 80 ms / p99 ≤ 100 ms) **e** TCP **viável no ambiente alvo**
-     (sem bloqueio de DLP) → **empate técnico → vence named pipe + NativeAOT** (ACL nativa > token).
-   - só um dentro do orçamento → vence esse.
-   - TCP **inviável por DLP** no público alvo → **NativeAOT+pipe** mesmo se o Python couber.
+2. Senão, **validar o primário (NativeAOT+pipe)** pelo **p95 end-to-end real** (§9-0b): se atinge o
+   orçamento (p95 ≤ 80 ms / p99 ≤ 100 ms) e o build NativeAOT é viável na máquina alvo → **adota-se o
+   pipe — fim**. Mede-se o **fallback Python+TCP** só para o caso de o primário ser **inviável** ou
+   estourar:
+   - primário inviável/estoura **e** TCP cabe **e** TCP **viável** (sem bloqueio de DLP) → adota **TCP+Python**.
+   - TCP **inviável por DLP** → permanece **NativeAOT+pipe**; se nem ele couber, reabre §4.3.
+   Ou seja: o passo 0 **confirma** o primário e só recorre ao fallback por **inviabilidade medida** —
+   **não** é um "empate" com vencedor pré-fixado.
 3. A escolha de §4.1 (a/b) é **independente** e decidida pela equivalência (§4.1), não pelo transporte.
 
-Atualizar este doc com os números medidos antes de congelar.
+**Dois estados distintos (correção da rodada 3):** *congelamento do design* (este documento, ao fim da
+4ª rodada — encerra a iteração de papel) **≠** *liberação da implementação* (v1/observe/enforce). Os
+números medidos atualizam este doc **antes da liberação**, **não** antes do congelamento do design.
 
 ## 5. Ciclo de vida do daemon — mutex, `ready` e corrida
 
@@ -197,8 +208,16 @@ Servir lógica velha como boa = falso-allow. Decisão cravada:
 - **Regra única "dúvida → `defer` + restart", COM backoff e cap:** hash divergente → `defer-only` +
   re-dot-source. O re-dot-source é **envolto em try/catch que mantém o loop vivo**. Se o reload
   **falhar** (arquivo meio-escrito/sintaxe quebrada), **backoff exponencial** (1 s, 2 s, 4 s … cap
-  30 s); **após N=3 falhas consecutivas**, o daemon **suspende os retries** e fica em `defer-only`
-  **até sinal externo** (touch no arquivo / restart manual) — **nunca** busy-loop devorando CPU.
+  30 s); **após N=3 falhas consecutivas**, o daemon **suspende os retries ativos** e fica em
+  `defer-only` — **nunca** busy-loop devorando CPU.
+- **Recuperação do `defer-only` (cravado — correção da rodada 3):** a saída do `defer-only` **não**
+  depende de `touch`/restart manual (senão o daemon fica órfão por tempo indeterminado). Um
+  **watchdog interno** re-tenta o hash/reload num intervalo **lento** (ex.: a cada 30 s, **fora** do
+  caminho quente) enquanto estiver `defer-only`; reload bem-sucedido → volta a `ready`. **Telemetria
+  obrigatória:** toda entrada/saída de `defer-only` e `stale-uncertain` vai ao **log mínimo da v1**
+  (§7) com rate-limit — sem isso, um daemon degradado vira "tudo virou prompt" invisível ao usuário.
+  (O watchdog de processo **travado/órfão** — PID+heartbeat — segue evolução; este é só o re-hash
+  periódico para sair de `defer-only`.)
 
 ## 7. Concorrência, identidade e segurança
 
@@ -267,10 +286,18 @@ final automaticamente; nada se implementa como v1 antes de fechar):**
 - **0c. Equivalência de tokenização** (§4.1/§8) para decidir (a) vs (b).
 - **0d. Caminho frio sob paralelismo:** com o daemon parado, rajada de K tools simultâneas (arranque de
   sessão) → conta `defer`s até `ready`; teto aceitável e **um** único daemon.
-- **0e. Critério de veredito (cravado):** o daemon **só é liberado** se (i) o `allow`-candidato cabe no
-  orçamento **e** (ii) o `defer`-comum com daemon **não regride** além de **≤ 5 ms** sobre o hook atual
-  completo (o `defer`-comum é a maioria das invocações — não pode piorar o caso comum para proteger o
-  minoritário). Aplicar a tabela §4.4 com os números.
+- **0e. Critério de veredito (cravado — reforçado na rodada 3):** o daemon **só é liberado** se as
+  **três** condições valerem juntas: (i) o `allow`-candidato cabe no **orçamento absoluto**
+  (p95 ≤ 80 ms / p99 ≤ 100 ms); (ii) o `defer`-comum com daemon **também** cabe no **mesmo orçamento
+  absoluto** (p95/p99); **e** (iii) o `defer`-comum **não regride** além de **≤ 5 ms** sobre o hook
+  atual completo. A (ii) é o reforço da rodada 3: impede aprovar um `defer`-comum que "não regride" vs
+  os ~520 ms mas ainda viola o orçamento quente (ex.: 200 ms); a (iii) protege a maioria das
+  invocações de qualquer piora perceptível. Aplicar a tabela §4.4 com os números.
+- **0f. Gate de saída do passo 0 (cravado — correção da rodada 3):** o passo 0 conclui com um
+  **relatório empírico** versionado (no histórico do repo: números brutos, metodologia, ambiente,
+  commit) **e uma decisão explícita e datada do autor** entre (a) dissolver a frente, (b) adotar
+  NativeAOT+pipe, ou (c) adotar TCP+Python. Essa decisão é **revisada por outro par** antes de virar
+  v1. Sem esse gate, o passo 0 degenera em laço de "só mais uma medição".
 1–5. Só após 0 fechar: daemon + `ready`/mutex (§5); cliente (a/b e runtime conforme §4.4); staleness
    (§6) + protocolo (§7) + log; self-tests (§8, incl. paralelo bloqueante); Fase 3 (observe) → Fase 4
    (enforce) → Fase 5 (fio via `xpz-skills-setup`, subindo o daemon por máquina, fora da v1).
@@ -280,7 +307,8 @@ final automaticamente; nada se implementa como v1 antes de fechar):**
 Todas dependem **dos números** do passo 0 — não há mais decisão de papel pendente:
 
 - **§4.1** (a) vs (b): decidida pela equivalência de tokenização (0c).
-- **§4.2/4.3/4.4** named pipe+NativeAOT vs TCP+Python: decidida por 0b + tabela §4.4 (empate → pipe).
+- **§4.2/4.3/4.4** named pipe+NativeAOT (**default preferido**) vs TCP+Python (**fallback**): validada
+  por 0b + tabela §4.4 (o passo 0 confirma o primário; recorre ao fallback só por inviabilidade medida).
 - **§7** limiar de contenção que dispara "canal por sessão": decidido por 0b/0d.
 
 ## 11. Proveniência (revisão por pares)
@@ -295,5 +323,13 @@ Todas dependem **dos números** do passo 0 — não há mais decisão de papel p
   tabela de decisão de transporte, identidade completa (repo+roots), critério de regressão do
   `defer`-comum, staleness com backoff, ciclo mutex↔ready, protocolo versionado, log na v1. Dissidência
   de transporte (TCP zero-dep vs pipe ACL) registrada em §4.2.
-- **Esta v3** crava todos esses convergentes. **Pende re-submissão (vN+1)** antes de congelar; o que
-  resta é empírico (passo 0).
+- **Rodada 3** (2026-06-27): manuscrito = v3 (commit `7d464a8`); mesmo painel (Claude Opus nativo;
+  Codex `gpt-5.5`; NVIDIA glm-5.1/kimi-k2.6/minimax-m2.7; `ollama-cloud` segue `unavailable` por cota).
+  **5 vozes / 3 famílias.** Veredito: **3 *congelar* (Claude, glm-5.1, minimax) + 2 aprova-com-ressalvas
+  (Codex, kimi)** — os 7 gaps da rodada 1 e os convergentes da rodada 2 aceitos como fechados; as 2
+  ressalvas condicionaram o "congelar" a 4 ajustes: orçamento absoluto do `defer`-comum, distinção
+  congelamento≠liberação + gate de saída do passo 0, recuperação do `defer-only`, e enquadramento
+  honesto do transporte. Minoria (kimi) sobre o transporte: registrada e acatada (default preferido +
+  fallback).
+- **Esta v4** crava esses 4 ajustes. **Pende a 4ª rodada (vN+1)**; após ela, o que resta é empírico
+  (passo 0) + prova nos self-tests.
