@@ -153,7 +153,7 @@ contrato, não default**: pipe → ACL explícita pelo SID; TCP → token + ACL 
 
 ### 4.4 Tabela de decisão binária (passo 0 → escolha, sem "decidir depois")
 
-Medir os dois co-primários no passo 0 e aplicar, **nesta ordem**:
+Medir o primário (NativeAOT+pipe) e o fallback (Python+TCP) no passo 0 e aplicar, **nesta ordem**:
 
 1. Se **`pwsh -NoProfile` isolado já cabe** no orçamento (improvável, dado os 520 ms) → **sem daemon**;
    volta ao modelo in-process com pwsh enxuto. (Gate teórico; ver §9-0a — é baseline, não saída esperada.)
@@ -251,7 +251,10 @@ Servir lógica velha como boa = falso-allow. Decisão cravada:
   (pior que prompt). Self-test com daemon que dorme (§8).
 - **Log mínimo NA v1 (promovido de dívida):** decisão + estado do daemon (`ready`/`defer-only`/
   `stale-uncertain`) + timestamp + código de erro, **sem o `command` completo** (privacidade), com
-  limite de tamanho. Sem ele, um daemon degradado é indistinguível de "tudo virou prompt".
+  limite de tamanho e rotação. Gravado em **local conhecido e inspecionável** —
+  `%LOCALAPPDATA%\xpz-pretooluse\ClaudeCodePreToolUseSafeAllowDaemon.log` — e a v1 **documenta como
+  verificar o estado** do daemon (senão a telemetria de `defer-only`/`stale-uncertain` é "observável
+  em teoria, invisível na prática"). Sem ele, um daemon degradado é indistinguível de "tudo virou prompt".
 
 ## 8. Prova (self-test) — o gate continua sendo a segurança
 
@@ -279,8 +282,8 @@ final automaticamente; nada se implementa como v1 antes de fechar):**
   isolado e o hook atual completo. Os 520 ms já são conhecidos → 0a quase certamente confirma o daemon;
   serve de **baseline** (não de saída prematura). Só no caso improvável de caber sem daemon, voltar ao
   modelo in-process com pwsh enxuto e **dissolver** o resto desta frente.
-- **0b. Caminho real e2e** dos dois co-primários (NativeAOT+pipe e Python+TCP, com o código de conexão
-  **real**), medindo **p95/p99 end-to-end**, com Defender ativo e carga, ≥100 invocações, **separando**
+- **0b. Caminho real e2e** do primário (NativeAOT+pipe) e do fallback (Python+TCP), com o código de
+  conexão **real**, medindo **p95/p99 end-to-end**, com Defender ativo e carga, ≥100 invocações, **separando**
   `defer`-comum de `allow`-candidato, **+ check de viabilidade corporativa do TCP** (a porta de escuta
   passa pelo DLP do ambiente alvo?).
 - **0c. Equivalência de tokenização** (§4.1/§8) para decidir (a) vs (b).
@@ -296,8 +299,10 @@ final automaticamente; nada se implementa como v1 antes de fechar):**
 - **0f. Gate de saída do passo 0 (cravado — correção da rodada 3):** o passo 0 conclui com um
   **relatório empírico** versionado (no histórico do repo: números brutos, metodologia, ambiente,
   commit) **e uma decisão explícita e datada do autor** entre (a) dissolver a frente, (b) adotar
-  NativeAOT+pipe, ou (c) adotar TCP+Python. Essa decisão é **revisada por outro par** antes de virar
-  v1. Sem esse gate, o passo 0 degenera em laço de "só mais uma medição".
+  NativeAOT+pipe, ou (c) adotar TCP+Python. Essa decisão é **revisada por outro par**, e essa revisão
+  é **obrigatória e vinculante** (não consultiva): se o par discordar, o **default é conservador** —
+  adotar o fallback ou dissolver a frente, **nunca** liberar o primário sob divergência. Sem esse
+  gate, o passo 0 degenera em laço de "só mais uma medição".
 1–5. Só após 0 fechar: daemon + `ready`/mutex (§5); cliente (a/b e runtime conforme §4.4); staleness
    (§6) + protocolo (§7) + log; self-tests (§8, incl. paralelo bloqueante); Fase 3 (observe) → Fase 4
    (enforce) → Fase 5 (fio via `xpz-skills-setup`, subindo o daemon por máquina, fora da v1).
