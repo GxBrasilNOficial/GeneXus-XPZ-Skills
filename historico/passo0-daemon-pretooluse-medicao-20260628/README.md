@@ -15,8 +15,10 @@ medição descartáveis** preservados só para **auditoria e reprodução** — 
 ## Resultado em uma linha
 
 O daemon resolve o gargalo: a mediana cai de **~520 ms → ~28 ms** por comando (~10×), com **overhead
-do daemon ~1 ms**. A cauda **p95 ~180 ms** é o **piso de criação de processo do cliente neste host e
-neste modelo "hook-nasce-cliente"** (provado pelo floor `return 0;`), irredutível — por isso o
+do daemon ~1 ms**. A cauda **p95 ~180 ms** é o **piso do cliente/processo AOT neste host e neste modelo
+"hook-nasce-cliente"** (provado pelo floor `return 0;`) — agrega criação de processo, runtime, antivírus,
+prioridade, agendamento e teardown, **fora do controle da implementação enquanto o modelo exigir um cliente
+novo por invocação** — por isso o
 orçamento absoluto **p95 ≤ 80 ms do §9-0e é inatingível** e o relatório propõe **re-enquadrá-lo**
 (overhead ≤ 5 ms + p50 ≤ 40 + p90 ≤ 60; p95/p99 como telemetria por host). Primário **NativeAOT+pipe**
 (p50 ~28 ms) ≫ fallback **TCP+Python** (p50 ~65 ms).
@@ -24,9 +26,12 @@ orçamento absoluto **p95 ≤ 80 ms do §9-0e é inatingível** e o relatório p
 ## Decisão datada do §9-0f
 
 **Adotar (b) NativeAOT+pipe + python persistente**, decidida por Antonio José em **2026-06-28**.
-O **re-enquadramento do §9-0e é mudança de design congelado** e vai a **rodada própria de revisão**
-antes de re-congelar. A revisão de par vinculante da decisão é o aval unânime das 3 famílias do painel
-à opção (b) (abaixo). Próximo: rodada do re-enquadramento → construção da v1 (§5/6/7/8) → fio (Fase 5).
+O **re-enquadramento do §9-0e é mudança de design congelado** e passou por **rodada própria de revisão**
+antes de re-congelar (concluída em 2026-06-28; ver `../../claude-code-pretooluse-daemon-design.md` §11). O
+aval unânime das 3 famílias do painel do passo 0 valida o **passo 0** (a medição) e **alimenta** a decisão
+(b); a **revisão de par vinculante do §9-0f sob o critério re-enquadrado** é essa rodada própria do
+re-enquadramento, não o aval do passo 0 (régua *stale a cada versão*, `../../15-revisao-por-pares.md`).
+Próximo: construção da v1 (§5/6/7/8) → fio (Fase 5).
 
 ## Recibo da revisão por pares (5 rodadas, 3 famílias — convergiu)
 

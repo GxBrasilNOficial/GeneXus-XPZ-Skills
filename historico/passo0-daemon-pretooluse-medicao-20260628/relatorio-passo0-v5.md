@@ -61,7 +61,7 @@ protocolo de reprodução portátil em §8).
 | cenário | p50 | p75 | p90 | p95 | p99 | %>80ms |
 |---|---|---|---|---|---|---|
 | `floor` (no-op AOT, `return 0;`) | 27,1 | 28,2 | 31,4 | 180,1 | 212,0 | 6,4% |
-| `e2e-defer` (pipe) | 28,0 | 29,1 | 32,3 | 182,7 | 200,3 | 6,8% |
+| `e2e-defer` (pipe) | 28,0 | 29,1 | 32,3 | 182,7 | 200,3 | 6,9% |
 | `e2e-allow` (pipe) | 28,3 | 29,5 | 32,3 | 183,3 | 197,7 | 6,7% |
 
 **Overhead do daemon (subtração pareada, e2e − floor na mesma iteração) — transparência da cauda
@@ -72,14 +72,16 @@ protocolo de reprodução portátil em §8).
   p75 **1 ms** · p90 **1 ms** · p95 **2 / 3 ms** · p99 **−12 / −15 ms** (e2e abaixo do floor — ruído). Ou seja,
   **em nenhum percentil até o p95 o daemon adiciona mais que ~3 ms** sobre o piso de spawn.
 - **Na cauda o pareamento por-iteração se desfaz** (p95 pareado ~154 ms): floor e e2e ficam lentos em iterações
-  **DIFERENTES** (jitter de spawn **não-correlacionado**) — **~16% negativos** (`defer` 16,1% / `allow` 15,6%),
-  min −480 / max +626. Não é overhead do daemon: das 64 iterações de floor lento, só **11** têm o e2e lento
-  junto. **Reforça A4** (jitter independente por processo). Por isso o cross-check percentil-a-percentil acima
-  é a métrica honesta do overhead, não o p95 do pareado.
+  **DIFERENTES** (jitter de spawn **não-correlacionado**) — **~21% negativos no conjunto inteiro** (`defer`
+  21,8% / `allow` 21,2%; no **subconjunto modo-rápido** são ~16%, `defer` 16,1% / `allow` 15,6% — recompute
+  autoritativo do CSV, n=1000, na rodada de re-enquadramento do §9-0e), min −480 / max +626. Não é overhead do
+  daemon: das 64 iterações de floor lento, só **9 (`defer`) / 6 (`allow`)** têm o e2e lento junto. **Reforça A4**
+  (jitter independente por processo). Por isso o cross-check percentil-a-percentil acima é a métrica honesta do
+  overhead, não o p95 do pareado.
 - **Telemetria obrigatória por host:** p95/p99 e %>80 ms (floor 6,4% · e2e 6,7-6,9% = **+0,3-0,5 pp**) reportados.
 
 **Série temporal (histograma, n=1000 por cenário):** bimodal com **vão limpo** (balde 50–100 ms ≈ vazio):
-modo rápido <50 ms (~93%) + modo lento >100 ms (~6,5%). Fração lenta **idêntica** nos 3 (6,4/6,8/6,7%) → a
+modo rápido <50 ms (~93%) + modo lento >100 ms (~6,5%). Fração lenta **idêntica** nos 3 (6,4/6,9/6,7%) → a
 cauda é do **floor (spawn)**. Lentas **predominantemente isoladas** (maior bloco consecutivo = 3).
 
 ### 4.3 #6 — fallback TCP+Python, **quieto, 500 iter**
@@ -177,7 +179,7 @@ rodada **rejeitar**, a saída honesta é **reprovar o passo 0 / dissolver**.
 - Nenhuma decisão de arquitetura/A4/A5/confronto revertida — só precisão numérica do orçamento.
 
 **v3 → v4 (2 correções factuais de uma linha, da auditoria do CSV pela voz Claude no painel v3 — que convergiu):**
-- **§4.2 "% negativos" corrigido:** era "~21%", o CSV real dá **~16%** (`defer` 16,1% / `allow` 15,6%) — reconferido pelo autor. Nenhuma conclusão muda (segue jitter não-correlacionado).
+- **§4.2 "% negativos" corrigido:** era "~21%", o CSV real dá **~16%** (`defer` 16,1% / `allow` 15,6%) — reconferido pelo autor. Nenhuma conclusão muda (segue jitter não-correlacionado). **[CORREÇÃO 2026-06-28 (rodada de re-enquadramento do §9-0e): esta "correção" v3→v4 estava EQUIVOCADA — o ~16% é o subconjunto modo-rápido; o conjunto inteiro é **~21% (`defer` 21,8% / `allow` 21,2%)**, reconferido por recompute autoritativo do CSV (n=1000), confirmado por 3 famílias do painel (openai/anthropic/nvidia). O §4.2 acima foi corrigido; a interseção também passou de "11" para "9/6". A direção certa é ~21% no conjunto, com ~16% rotulado como subconjunto.]**
 - **§4.2 rótulo da mediana pareada corrigido:** "0,96 / 1,26" era a **média** mal-rotulada; a **mediana** (nearest-rank, do CSV) é **1,0 / 1,0** e a média é 0,96 / 1,06. Rótulo↔número alinhados.
 - Nenhum outro item: o painel v3 convergiu ("pode congelar") nestes 2 pontos como únicos resíduos.
 

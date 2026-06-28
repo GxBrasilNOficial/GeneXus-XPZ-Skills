@@ -14,6 +14,11 @@
 > zero gap de papel). **Design CONGELADO** — a prova restante é empírica: passo 0 de medição +
 > self-tests, em frente separada.
 >
+> **(Nota pós-passo-0, 2026-06-28: o item (1) acima — orçamento absoluto do §9-0e — foi RE-ENQUADRADO por
+> rodada própria de revisão por pares (3 famílias, convergiu); o p95/p99 absoluto é fisicamente inatingível
+> (piso de spawn) e foi substituído pelo overhead-sobre-o-piso ≤ 5 ms. Ver §9-0e e a rodada de
+> re-enquadramento em §11.)**
+>
 > **ESCOPO — Claude Code apenas** (herdado da spec congelada `claude-code-pretooluse-auto-allow-design.md`):
 > depende do hook `PreToolUse` + `permissionDecision`, recurso que não existe em Codex/Cursor/OpenCode.
 > O fio em `~/.claude/settings.json` é **máquina-local**; os scripts viajam com o repositório.
@@ -28,6 +33,10 @@ A latência medida (2026-06-22) é **~520 ms/comando**, dominada pelo **startup 
 chamada** — não pela lógica. O fast-path (`Get-PtuBashFastPath`) já é **in-process e sub-ms**, mas
 isso não ajuda: o custo é **fazer o `pwsh` nascer**. O orçamento da frente é **p95 do caminho quente
 ≤ 100 ms**. Enquanto o hook for um `pwsh -File ...` que sobe do zero, o orçamento é estourado em ~5×.
+**(Nota pós-passo-0: este orçamento absoluto foi re-enquadrado em §9-0e — a medição provou que a cauda p95
+é o piso do cliente/processo AOT neste host e neste modelo "hook-nasce-cliente", fora do controle da
+implementação enquanto o modelo exigir um cliente novo por invocação; o gate de liberação passou a ser o
+overhead do daemon sobre esse piso ≤ 5 ms.)**
 
 **Consequência de design:** o daemon (processo persistente que já tem a lógica carregada) resolve o
 lado **servidor**. Mas o hook continua sendo **disparado pelo Claude Code como um comando novo a cada
@@ -159,11 +168,15 @@ Medir o primário (NativeAOT+pipe) e o fallback (Python+TCP) no passo 0 e aplica
 
 1. Se **`pwsh -NoProfile` isolado já cabe** no orçamento (improvável, dado os 520 ms) → **sem daemon**;
    volta ao modelo in-process com pwsh enxuto. (Gate teórico; ver §9-0a — é baseline, não saída esperada.)
-2. Senão, **validar o primário (NativeAOT+pipe)** pelo **p95 end-to-end real** (§9-0b): se atinge o
-   orçamento (p95 ≤ 80 ms / p99 ≤ 100 ms) e o build NativeAOT é viável na máquina alvo → **adota-se o
-   pipe — fim**. Mede-se o **fallback Python+TCP** só para o caso de o primário ser **inviável** ou
-   estourar:
-   - primário inviável/estoura **e** TCP cabe **e** TCP **viável** (sem bloqueio de DLP) → adota **TCP+Python**.
+2. Senão, **validar o primário (NativeAOT+pipe)** pelo **critério §9-0e re-enquadrado** (§9-0b): se o
+   **overhead do daemon sobre o piso de spawn ≤ 5 ms** (gate **pretensamente host-independente** —
+   controlável pela implementação e normalizado contra o floor; portabilidade a confirmar noutro host —,
+   pelas duas métricas obrigatórias do §9-0e) e o build NativeAOT é viável na máquina alvo → **adota-se o
+   pipe — fim**. (O p95/p99 absoluto da redação original é governado pelo piso de spawn — vira telemetria
+   por host, ver §9-0e.) Mede-se o **fallback Python+TCP** só para o caso de o primário ser **inviável** ou
+   **regredir o overhead** (a redação original dizia "estourar [o orçamento absoluto]"; com o re-enquadramento
+   o gatilho do fallback passa a ser **regredir o overhead-sobre-o-piso**, não estourar um teto absoluto):
+   - primário inviável/**regride o overhead** **e** TCP cabe **e** TCP **viável** (sem bloqueio de DLP) → adota **TCP+Python**.
    - TCP **inviável por DLP** → permanece **NativeAOT+pipe**; se nem ele couber, reabre §4.3.
    Ou seja: o passo 0 **confirma** o primário e só recorre ao fallback por **inviabilidade medida** —
    **não** é um "empate" com vencedor pré-fixado.
@@ -224,9 +237,14 @@ Servir lógica velha como boa = falso-allow. Decisão cravada:
 ## 7. Concorrência, identidade e segurança
 
 - **Concorrência:** v1 é **single-threaded síncrona** (uma conexão por vez); cada decisão é sub-ms.
-  **Limiar explícito (e2e total, não só fila):** se a medição de contenção (passo 0) levar o **p95
-  end-to-end acima de 100 ms** por espera, a saída é **canal por sessão**
-  (identidade + `<sessionId>`), **não** múltiplas instâncias de daemon.
+  **Limiar explícito (delta de contenção, não o piso de spawn):** se a medição de contenção mostrar que a
+  **espera em fila** — o acréscimo do e2e sob contenção sobre o e2e sem contenção, **medido no mesmo harness,
+  mesmo percentil e mesma classe de cenário, comparando `ready` sem contenção vs `ready` sob contenção** —
+  empurra o caminho quente de forma perceptível, a saída é **canal por sessão**
+  (identidade + `<sessionId>`), **não** múltiplas instâncias de daemon. (O p95 e2e **absoluto** é governado
+  pelo piso de spawn — §9-0e —, não pela fila; o gatilho é o **delta de contenção**. Este limiar **não**
+  altera o *deadline* monotônico de ~80 ms do cliente, abaixo, que é orçamento de espera de resposta, não
+  percentil e2e.)
 - **Identidade (TODOS os artefatos de coordenação — cravado):** mutex, canal (pipe/porta), token e
   arquivo de descoberta incluem o hash de **(SID do usuário + caminho canônico do repo + conjunto
   `PTU_SAFE_ALLOW_ROOTS` resolvido)**. "Caminho canônico" = `Resolve-Path` seguindo symlinks/junctions
@@ -291,13 +309,44 @@ final automaticamente; nada se implementa como v1 antes de fechar):**
 - **0c. Equivalência de tokenização** (§4.1/§8) para decidir (a) vs (b).
 - **0d. Caminho frio sob paralelismo:** com o daemon parado, rajada de K tools simultâneas (arranque de
   sessão) → conta `defer`s até `ready`; teto aceitável e **um** único daemon.
-- **0e. Critério de veredito (cravado — reforçado na rodada 3):** o daemon **só é liberado** se as
-  **três** condições valerem juntas: (i) o `allow`-candidato cabe no **orçamento absoluto**
-  (p95 ≤ 80 ms / p99 ≤ 100 ms); (ii) o `defer`-comum com daemon **também** cabe no **mesmo orçamento
-  absoluto** (p95/p99); **e** (iii) o `defer`-comum **não regride** além de **≤ 5 ms** sobre o hook
-  atual completo. A (ii) é o reforço da rodada 3: impede aprovar um `defer`-comum que "não regride" vs
-  os ~520 ms mas ainda viola o orçamento quente (ex.: 200 ms); a (iii) protege a maioria das
-  invocações de qualquer piora perceptível. Aplicar a tabela §4.4 com os números.
+- **0e. Critério de veredito (RE-ENQUADRADO pós-passo-0 — substitui o orçamento absoluto da v4; base
+  empírica em `historico/passo0-daemon-pretooluse-medicao-20260628/relatorio-passo0-v5.md` + recompute do
+  `robust1k-series.csv`; revisado por rodada própria de revisão por pares, ver §11):** a medição do passo 0
+  provou que a cauda **p95 ~180 ms é o piso do cliente/processo AOT neste host e neste modelo
+  "hook-nasce-cliente"** (o floor `return 0;` dá p95 ~180 ms, idêntico ao e2e) — piso que agrega runtime,
+  antivírus, prioridade, agendamento e teardown, **fora do controle da implementação do daemon enquanto o
+  modelo continuar exigindo um cliente novo por invocação**; o overhead do daemon sobre esse piso é **~1 ms**.
+  Logo o **p95 ≤ 80 / p99 ≤ 100 ms absoluto é fisicamente inatingível** sob este modelo e é **substituído**
+  pelos critérios abaixo. O daemon **só é liberado** se valerem juntas:
+  - **(i) GATE de liberação — overhead do daemon sobre o piso de spawn ≤ 5 ms, pretensamente
+    host-independente (controlável pela implementação e normalizado contra o floor; portabilidade a confirmar
+    pelo protocolo portátil noutro host, §8 do relatório do passo 0)**, para o `defer`-comum **e** o
+    `allow`-candidato. **Duas métricas, ambas obrigatórias, ambas com teto ≤ 5 ms (a mais estrita vence se
+    divergirem):** (1) **diferença percentil-a-percentil** `e2e_pX − floor_pX` **≤ 5 ms até o p95** (medido:
+    p50–p90 ≤ 1 ms; p95 defer 2,6 / allow 3,3 ms — todos dentro) — métrica robusta sobre duas distribuições
+    marginais ordenadas; **não** é overhead pareado verdadeiro e pode subestimá-lo se as caudas divergirem
+    (p99 negativo = "e2e abaixo do floor", ruído); (2) **overhead pareado** (subtração na mesma iteração) com
+    **p90 ≤ 5 ms** (medido: defer 3,9 / allow 4,4 ms) — overhead verdadeiro, confiável só **até ~p90**: acima
+    disso o pareamento **se descorrelaciona** (p95 pareado ~154 ms = jitter de spawn não-correlacionado,
+    **não** overhead — das **64 iterações de floor lento (>80 ms)**, só **9 (`defer`) / 6 (`allow`)** têm o
+    e2e lento junto, e **~21% das iterações** [defer 21,8 / allow 21,2%] têm overhead pareado negativo;
+    recompute do CSV, n=1000) e o overhead **deixa de ser medível por pareamento** → por isso a telemetria
+    por host, abaixo. **Não** se usa o p95 pareado como critério.
+  - **(ii) Guardrail de cauda por-host (normalizado contra o floor, NÃO parte da tese de host-independência):**
+    o **`%>80 ms` do e2e não excede o do floor em mais de ~1 pp** (medido: floor 6,4% vs e2e 6,7–6,9% =
+    +0,3–0,5 pp) — é o que o daemon **acrescenta**; o valor absoluto é governado pelo piso.
+  - **(iii)** o `defer`-comum **não regride** além de **≤ 5 ms** sobre o hook pwsh atual completo (**base
+    inalterada**, ~520 ms) — preservado da v4; trivialmente satisfeito.
+  - **Alvo/telemetria por host (NÃO gate de liberação): p50 ≤ 40 ms, p90 ≤ 60 ms** (calibrados **neste host**;
+    medido ~28 / ~32). São **host-dependentes** como p95/p99 (todos contêm o piso de spawn como termo aditivo);
+    tratá-los como gate repetiria, em host mais lento, o erro conceitual que motivou este re-enquadramento.
+    Úteis para detectar regressão **neste host**; não bloqueiam liberação noutro.
+  - **Telemetria por host (NÃO gate de aprovação): p95/p99** — governados pelo piso de spawn (~180 ms p95
+    **neste host**), fora do controle de qualquer implementação; reportados, não usados como liberação.
+  - **Ressalva de processo:** este re-enquadramento foi **mudança de design congelado, NÃO pré-aprovada**,
+    submetida a **rodada própria de revisão por pares** antes do re-congelamento (ver §11). Se o painel tivesse
+    rejeitado, o §9-0e absoluto **permaneceria** e a saída honesta seria **(a) dissolver** (§9-0f) — **nunca**
+    liberar o primário sob o critério antigo violado. Aplicar a tabela §4.4 com os números.
 - **0f. Gate de saída do passo 0 (cravado — correção da rodada 3):** o passo 0 conclui com um
   **relatório empírico** versionado (no histórico do repo: números brutos, metodologia, ambiente,
   commit) **e uma decisão explícita e datada do autor** entre (a) dissolver a frente, (b) adotar
@@ -351,3 +400,26 @@ Todas dependem **dos números** do passo 0 — não há mais decisão de papel p
   (antonio@frigobyte.com), após confirmação unânime do painel. Closeout auditado:
   `resubmissionDeclinedByHuman` — a prova restante (números) é transferida para o **passo 0 de
   medição** + self-tests, frente separada. Nenhum código de daemon implementado.
+- **Rodada de re-enquadramento do §9-0e (2026-06-28):** manuscrito v1→…→v6 (6 rodadas), painel de **3
+  famílias efetivamente consultadas** (siliconflow, openai, anthropic; **nvidia** entrou na r6 ao re-disparar
+  vozes; piso `panelReady`). Motivada pelo passo 0: a cauda p95 ~180 ms é o piso do cliente/processo AOT
+  neste host (**fora do controle da implementação enquanto o modelo exigir um cliente novo por invocação**),
+  tornando o orçamento absoluto p95 ≤ 80 / p99 ≤ 100 do §9-0e **fisicamente inatingível**. O re-enquadramento
+  **substitui** o orçamento absoluto pelo **overhead-sobre-o-piso ≤ 5 ms** (gate) e **dissolve a sub-condição
+  (ii)** do §9-0e original — o `defer`-comum **deixa** de estar sujeito ao orçamento absoluto p95/p99;
+  sobrevive a (iii) não-regressão ≤ 5 ms; p50/p90/p95/p99 viram alvo/telemetria por-host.
+  - **Trajetória:** R1 (mérito aprovado + questão aberta p50/p90=telemetria resolvida por unanimidade) → R2
+    (refinos de redação) → **R3: 5/5 concordam, zero gaps bloqueantes**, (b) NativeAOT+pipe endossado por
+    todos → R4 (Codex achou gap de número, confirmado por recompute) → R5 (correção dos números de cauda;
+    contradição entre recomputes adjudicada) → **R6 (v6): convergência — 3 famílias (openai/Codex,
+    anthropic/Opus, nvidia/GLM-5.1) CONCORDA com recompute próprio independente; siliconflow/MiniMax concorda
+    no conceito; DeepSeek-V4-Pro `timeout` em ambos os provedores.**
+  - **Adjudicação empírica (recompute autoritativo do `robust1k-series.csv`, n=1000):** negativos do conjunto
+    **21,8% (defer) / 21,2% (allow)**; interseção floor-lenta ∩ e2e-lenta **9 / 6**; floor-lentas **64/1000**;
+    perc-a-perc p95 defer 2,6 / allow 3,3 ms; p90 pareado 3,9 / 4,4 ms. A dissidência da r5 (DeepSeek, "~16%
+    no conjunto") foi **refutada por recompute** (o ~16% é o subconjunto modo-rápido) e registrada
+    `skippedByHumanDecision`.
+  - **Revisores preferidos (`preferred-reviewers.json`):** `anthropic/claude-opus-4-8` e `openai/gpt-5.5`
+    `responded`; tríade `ollama-cloud` `unavailable` (cota semanal) → substituída por SiliconFlow/NVIDIA por
+    decisão humana. Closeout: `closeoutReady=true`, `vNextState=resubmitted`. Convergência declarada pelo
+    autor; **§9-0e re-congelado** com o critério re-enquadrado. Nenhum código de daemon implementado.
