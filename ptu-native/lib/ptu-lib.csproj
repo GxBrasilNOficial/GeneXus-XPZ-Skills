@@ -20,4 +20,7 @@
     <Compile Include="..\PtuCanon.cs" />
   </ItemGroup>
 
+  <!-- Ultimo elemento antes de </Project>, depois das props (spec v12 §5i): gera e inclui BuildPin.g.cs. -->
+  <Import Project="..\BuildPin.targets" />
+
 </Project>

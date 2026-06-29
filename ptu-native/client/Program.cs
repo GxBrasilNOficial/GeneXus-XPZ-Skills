@@ -8,6 +8,8 @@ using Ptu;
 
 if (args.Length == 0)
 {
+    // Modo handshake/diagnostico: emite o buildContractPin embutido (de BuildPin.g.cs, gerado em build).
+    Console.Out.Write(BuildPin.Value);
     return 0;
 }
 

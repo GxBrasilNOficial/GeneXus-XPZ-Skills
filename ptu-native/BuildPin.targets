@@ -1,0 +1,37 @@
+<Project>
+
+  <!-- Passo B do daemon PreToolUse (auto-allow) do Claude Code (spec congelada v12).
+       Importado pelos DOIS .csproj (ptu-client e ptu-lib) como ULTIMO elemento antes de
+       </Project>, depois das definicoes das 3 props canonicas. Dispara o gerador versionado
+       scripts/Generate-ClaudeCodePtuBuildPin.ps1 (via pwsh) ANTES do CoreCompile, gera
+       BuildPin.g.cs em obj/ e o inclui em @(Compile). O proprio .targets entra no material do
+       pin (passado como -TargetsPath), porque controla args/ordem/saida do gerador.
+
+       Sem Inputs/Outputs no target: roda a CADA build (5l) para que mudanca em qualquer material
+       (inclusive este .targets ou o .ps1, sem mudar o .cs) recompute o pin; o gerador e
+       idempotente (so reescreve o .g.cs quando muda), entao nao dispara rebuild em cascata.
+       O Exec (ContinueOnError=false por padrao) FALHA o build se o gerador sair non-zero. -->
+
+  <PropertyGroup>
+    <_PtuGenScript>$(MSBuildThisFileDirectory)..\scripts\Generate-ClaudeCodePtuBuildPin.ps1</_PtuGenScript>
+    <_PtuCsSource>$(MSBuildThisFileDirectory)PtuCanon.cs</_PtuCsSource>
+    <_PtuTargetsSelf>$(MSBuildThisFileFullPath)</_PtuTargetsSelf>
+  </PropertyGroup>
+
+  <Target Name="GeneratePtuBuildPin" BeforeTargets="CoreCompile">
+    <!-- _PtuPinOut e avaliado DENTRO do Target (execucao), nao na PropertyGroup global (avaliacao
+         estatica): naquele momento $(IntermediateOutputPath) ainda nao foi definido pelo SDK e o
+         .g.cs iria para a RAIZ do projeto (versionavel, fora de obj/, e potencialmente duplicado
+         pelo glob default). No Target ja esta definido -> sempre obj/. Absoluto via
+         $(MSBuildProjectDirectory) para nao depender do cwd do build (CI/install). -->
+    <PropertyGroup>
+      <_PtuPinOut>$(MSBuildProjectDirectory)\$(IntermediateOutputPath)BuildPin.g.cs</_PtuPinOut>
+    </PropertyGroup>
+    <MakeDir Directories="$(IntermediateOutputPath)" Condition="!Exists('$(IntermediateOutputPath)')" />
+    <Exec Command="pwsh -NoProfile -NonInteractive -File &quot;$(_PtuGenScript)&quot; -CsPath &quot;$(_PtuCsSource)&quot; -GeneratorPath &quot;$(_PtuGenScript)&quot; -TargetsPath &quot;$(_PtuTargetsSelf)&quot; -InvariantGlobalization &quot;$(InvariantGlobalization)&quot; -TargetFramework &quot;$(TargetFramework)&quot; -LangVersion &quot;$(LangVersion)&quot; -OutPath &quot;$(_PtuPinOut)&quot;" />
+    <ItemGroup>
+      <Compile Include="$(_PtuPinOut)" />
+    </ItemGroup>
+  </Target>
+
+</Project>
