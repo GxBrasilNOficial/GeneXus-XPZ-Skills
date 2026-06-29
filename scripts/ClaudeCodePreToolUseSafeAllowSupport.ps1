@@ -147,27 +147,71 @@ function Get-PtuBashFastPath {
     return 'defer'
 }
 
-function Get-PtuBashDecision {
-    param([string] $Command, [string] $PythonExe, [string] $HelperPath)
-    if ([string]::IsNullOrWhiteSpace($Command)) { return 'defer' }
-    if ((Get-PtuBashFastPath -Command $Command) -eq 'defer') { return 'defer' }  # caminho comum: sem python
-    if ([string]::IsNullOrWhiteSpace($PythonExe) -or -not (Test-Path -LiteralPath $PythonExe)) { return 'defer' }
-    if ([string]::IsNullOrWhiteSpace($HelperPath) -or -not (Test-Path -LiteralPath $HelperPath)) { return 'defer' }
-    try {
-        $json = $Command | & $PythonExe $HelperPath 2>$null
-    }
-    catch { return 'defer' }
-    if ($LASTEXITCODE -ne 0) { return 'defer' }
-    if ([string]::IsNullOrWhiteSpace($json)) { return 'defer' }
-    try { $parsed = $json | ConvertFrom-Json } catch { return 'defer' }
-    if (-not $parsed -or $parsed.status -ne 'ok') { return 'defer' }
-    $segs = @($parsed.segments)
-    if ($segs.Count -lt 1) { return 'defer' }
-    foreach ($seg in $segs) {
+function Get-PtuSegmentsVerdict {
+    # Veredito PURO a partir do objeto parsed do tokenizador ({status, segments}). Fonte unica
+    # do veredito de segmentos (in-process E daemon). Contrato ESTRITO sob StrictMode: segments =
+    # array NAO-VAZIO de arrays NAO-VAZIOS de strings. Rejeita string escalar como segmento (em PS
+    # string e' IEnumerable<char> e passaria por engano). Qualquer violacao -> 'defer' (fail-closed).
+    # NAO e' 2o ponto de despacho: escopo/ferramenta/shape ficam em Get-PtuDecision.
+    param($Parsed)
+    if ($null -eq $Parsed) { return 'defer' }
+    if (-not ($Parsed.PSObject.Properties.Name -contains 'status')) { return 'defer' }
+    if ($Parsed.status -ne 'ok') { return 'defer' }
+    if (-not ($Parsed.PSObject.Properties.Name -contains 'segments')) { return 'defer' }
+    $segments = $Parsed.segments
+    if ($null -eq $segments -or $segments -is [string]) { return 'defer' }
+    if (-not ($segments -is [System.Collections.IEnumerable])) { return 'defer' }
+    $segList = @($segments)
+    if ($segList.Count -lt 1) { return 'defer' }
+    foreach ($seg in $segList) {
+        if ($null -eq $seg -or $seg -is [string]) { return 'defer' }  # segmento NAO e' string escalar
+        if (-not ($seg -is [System.Collections.IEnumerable])) { return 'defer' }
         $tokens = @($seg)
+        if ($tokens.Count -lt 1) { return 'defer' }
+        foreach ($tok in $tokens) { if ($tok -isnot [string]) { return 'defer' } }
         if (-not (Test-PtuBashSegmentAllowed $tokens)) { return 'defer' }
     }
     return 'allow'
+}
+
+function Invoke-PtuOneShotTokenizer {
+    # Tokenizador IN-PROCESS (default): spawn one-shot do python helper (Get-ClaudeCodeBashSafeSegments.py).
+    # Retorna o objeto parsed {status, segments} ou $null em qualquer falha (o chamador trata como defer).
+    param([string] $Command, [string] $PythonExe, [string] $HelperPath)
+    if ([string]::IsNullOrWhiteSpace($PythonExe) -or -not (Test-Path -LiteralPath $PythonExe)) { return $null }
+    if ([string]::IsNullOrWhiteSpace($HelperPath) -or -not (Test-Path -LiteralPath $HelperPath)) { return $null }
+    try { $json = $Command | & $PythonExe $HelperPath 2>$null } catch { return $null }
+    if ($LASTEXITCODE -ne 0) { return $null }
+    if ([string]::IsNullOrWhiteSpace($json)) { return $null }
+    try { return ($json | ConvertFrom-Json) } catch { return $null }
+}
+
+function Get-PtuBashDecision {
+    # Fast-path -> tokenizacao -> Get-PtuSegmentsVerdict. A tokenizacao e' INJETAVEL (-Tokenizer):
+    # sem -Tokenizer = one-shot in-process (comportamento atual, assinatura preservada); com -Tokenizer
+    # (caminho DAEMON) = round-trip ao python persistente que roda a MESMA classify (fonte unica).
+    # -Decompose devolve os SEGMENTOS (objeto parsed) em vez do veredito, para o gate de transporte.
+    param(
+        [string] $Command,
+        [string] $PythonExe,
+        [string] $HelperPath,
+        [scriptblock] $Tokenizer,
+        [switch] $Decompose
+    )
+    if ([string]::IsNullOrWhiteSpace($Command)) { if ($Decompose) { return $null } return 'defer' }
+    if ($Decompose) {
+        # Modo de decomposicao: expoe os SEGMENTOS crus do tokenizador (sem fast-path nem veredito).
+        if ($Tokenizer) { try { return (& $Tokenizer $Command) } catch { return $null } }
+        return (Invoke-PtuOneShotTokenizer -Command $Command -PythonExe $PythonExe -HelperPath $HelperPath)
+    }
+    if ((Get-PtuBashFastPath -Command $Command) -eq 'defer') { return 'defer' }  # caminho comum: sem python
+    if ($Tokenizer) {
+        try { $parsed = & $Tokenizer $Command } catch { $parsed = $null }
+    }
+    else {
+        $parsed = Invoke-PtuOneShotTokenizer -Command $Command -PythonExe $PythonExe -HelperPath $HelperPath
+    }
+    return (Get-PtuSegmentsVerdict $parsed)
 }
 
 function Get-PtuPowerShellDecision {
@@ -178,18 +222,22 @@ function Get-PtuPowerShellDecision {
 }
 
 function Get-PtuDecision {
+    # Despacho TOP-LEVEL e fonte unica da decisao: escopo (Test-PtuCwdInScope), ferramenta (switch),
+    # shape invalido -> defer. -Tokenizer OPCIONAL e' repassado ao caminho Bash: ausente = one-shot
+    # in-process (comportamento atual); presente = round-trip ao python persistente do daemon.
     param(
         [string] $ToolName,
         [string] $Command,
         [string] $Cwd,
         [string[]] $Roots,
         [string] $PythonExe,
-        [string] $HelperPath
+        [string] $HelperPath,
+        [scriptblock] $Tokenizer
     )
     try {
         if (-not (Test-PtuCwdInScope -Cwd $Cwd -Roots $Roots)) { return 'defer' }
         switch -CaseSensitive ($ToolName) {
-            'Bash'       { return (Get-PtuBashDecision -Command $Command -PythonExe $PythonExe -HelperPath $HelperPath) }
+            'Bash'       { return (Get-PtuBashDecision -Command $Command -PythonExe $PythonExe -HelperPath $HelperPath -Tokenizer $Tokenizer) }
             'PowerShell' { return (Get-PtuPowerShellDecision -Command $Command) }
             default      { return 'defer' }
         }

@@ -14,6 +14,8 @@
 import sys
 import json
 import shlex
+import unicodedata
+import hashlib
 
 # Separadores de segmento de pipeline aceitos (estrutura permitida).
 SEPARATORS = {"|", "||", "&&", ";"}
@@ -26,27 +28,40 @@ PUNCT = set("();<>|&")
 DANGER_IN_TOKEN = set("$`{}")
 
 
+# Marcador de versao: SHA256 do PROPRIO source deste modulo, computado em runtime na
+# importacao. O daemon (Passo C) usa isto para PROVAR que o python persistente importou a
+# versao NOVA do .py apos um respawn (e nao um modulo/.pyc velho ainda em memoria).
+def _module_source_sha256():
+    try:
+        with open(__file__, "rb") as _f:
+            return hashlib.sha256(_f.read()).hexdigest()
+    except OSError:
+        return None
+
+
+CLASSIFY_SOURCE_SHA256 = _module_source_sha256()
+
+
 def emit(obj):
     sys.stdout.write(json.dumps(obj))
 
 
-def main():
-    cmd = sys.stdin.read()
+# classify: logica pura e IMPORTAVEL (Passo A da v1). Recebe o comando cru e RETORNA o
+# dict de resultado (mesma semantica de antes, so que retornando em vez de emitir). O
+# ShlexLoop.py persistente IMPORTA esta funcao -> fonte unica da tokenizacao (sem duplicar).
+def classify(cmd):
     if not cmd or not cmd.strip():
-        emit({"status": "defer", "reason": "empty"})
-        return
+        return {"status": "defer", "reason": "empty"}
     # Multi-linha: newline pode separar comandos; nao tratamos -> defer.
     if "\n" in cmd.strip():
-        emit({"status": "defer", "reason": "multiline"})
-        return
+        return {"status": "defer", "reason": "multiline"}
     try:
         lex = shlex.shlex(cmd, posix=True, punctuation_chars=True)
         lex.whitespace_split = True
         tokens = list(lex)
     except ValueError:
         # Aspas desbalanceadas / lexing invalido -> defer.
-        emit({"status": "defer", "reason": "lex-error"})
-        return
+        return {"status": "defer", "reason": "lex-error"}
 
     segments = []
     current = []
@@ -57,19 +72,24 @@ def main():
             continue
         if tok and all(c in PUNCT for c in tok):
             # Pontuacao que nao e separador: redirecao, subshell, background, etc.
-            emit({"status": "defer", "reason": "punct"})
-            return
+            return {"status": "defer", "reason": "punct"}
         if any(c in DANGER_IN_TOKEN for c in tok):
-            emit({"status": "defer", "reason": "danger-char"})
-            return
+            return {"status": "defer", "reason": "danger-char"}
+        # Unicode de CONTROLE/FORMATO (categorias Cc/Cf: zero-width U+200B/U+FEFF, bidi
+        # U+202E, etc.) em qualquer token -> defer (fail-closed; nao tentamos provar seguro).
+        if any(unicodedata.category(c) in ("Cc", "Cf") for c in tok):
+            return {"status": "defer", "reason": "unicode-control"}
         current.append(tok)
     segments.append(current)
 
     segments = [s for s in segments if s]
     if not segments:
-        emit({"status": "defer", "reason": "no-segments"})
-        return
-    emit({"status": "ok", "segments": segments})
+        return {"status": "defer", "reason": "no-segments"}
+    return {"status": "ok", "segments": segments}
+
+
+def main():
+    emit(classify(sys.stdin.read()))
 
 
 if __name__ == "__main__":
