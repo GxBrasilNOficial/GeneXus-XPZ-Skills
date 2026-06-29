@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- DLL gerenciada non-AOT, carregada por Add-Type -Path no daemon (sem SDK/Roslyn em runtime).
+       Compila o MESMO PtuCanon.cs que o cliente NativeAOT (ptu-client), SEM #if. As props do
+       buildContractPin (InvariantGlobalization, TargetFramework, LangVersion) sao IDENTICAS as do
+       EXE; OutputType/PublishAot/TrimMode ficam FORA do pin. AssemblyName=PtuCanon -> PtuCanon.dll. -->
+
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>12.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <Optimize>true</Optimize>
+    <AssemblyName>PtuCanon</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\PtuCanon.cs" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Cliente NativeAOT (EXE). Compila o MESMO PtuCanon.cs que a DLL gerenciada (ptu-lib).
+       As props que afetam canonicalizePath e entram no buildContractPin (InvariantGlobalization,
+       TargetFramework, LangVersion) sao IDENTICAS as da DLL. PublishAot/OutputType/TrimMode
+       diferem por natureza entre AOT e DLL e por isso ficam FORA do pin (plano, Passo B). -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>12.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <PublishAot>true</PublishAot>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <Optimize>true</Optimize>
+    <AssemblyName>ptu-client</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\PtuCanon.cs" />
+  </ItemGroup>
+
+</Project>

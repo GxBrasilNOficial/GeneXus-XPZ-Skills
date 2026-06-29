@@ -13,3 +13,7 @@ scripts/**/__pycache__/
 scripts/**/*.pyc
 !/xpz-*/
 !/xpz-*/**
+!/ptu-native/
+!/ptu-native/**
+ptu-native/**/bin/
+ptu-native/**/obj/
