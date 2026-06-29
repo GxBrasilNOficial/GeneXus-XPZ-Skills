@@ -6,6 +6,12 @@
 using System;
 using Ptu;
 
+// Saida deterministica em UTF-8 (sem BOM) para o spike do Passo B: a comparacao byte-a-byte do
+// EXE-AOT vs DLL sobre o corpus nao-ASCII (I turco U+0130, ss U+00DF) NAO pode passar pela code page
+// do console (CP850/ANSI), que nao representa esses caracteres e corromperia a saida. NAO afeta o
+// buildContractPin (que hasheia PtuCanon.cs + gerador + targets + 3 props, nao este Program.cs).
+System.Console.OutputEncoding = new System.Text.UTF8Encoding(false);
+
 if (args.Length == 0)
 {
     // Modo handshake/diagnostico: emite o buildContractPin embutido (de BuildPin.g.cs, gerado em build).
