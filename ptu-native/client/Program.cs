@@ -1,27 +1,36 @@
 // ptu-client - entry-point NativeAOT do cliente do hook PreToolUse (auto-allow) do Claude Code.
-// PASSO B (spike): modo CLI que canonicaliza cada caminho recebido por argumento e imprime UMA
-// linha por caminho (ou "<null>" em falha). Serve ao gate de viabilidade do Passo B, que exige
-// invocar canonicalizePath pelo EXE-AOT sobre o corpus. O protocolo named-pipe dispara-e-sai
-// (le o JSON do hook no stdin, handshake, request/resposta) e' o Passo D -- NAO esta aqui.
+// PASSO D (em construcao). Modo real do hook (args VAZIO): le o JSON do hook no stdin, computa a
+// identidade, dispara-e-sai contra o named pipe do daemon e devolve o hookSpecificOutput allow/defer.
+// Modos diagnostico (read-only; NAO leem stdin, NAO conectam, NAO decidem, JAMAIS emitem allow), usados
+// pelos self-tests de paridade (Passos D/E): --emit-pin e --emit-identity.
+//
+// ESTADO D1: identidade C# (ClientIdentity/NativeMethods) ligada nos modos diagnostico. O hook real
+// (hot/cold-path, saida §3.1, log de falha de subida) e' o D3 -- aqui ainda devolve um defer placeholder.
 using System;
+using System.IO;
 using Ptu;
+using Ptu.Client;
 
-// Saida deterministica em UTF-8 (sem BOM) para o spike do Passo B: a comparacao byte-a-byte do
-// EXE-AOT vs DLL sobre o corpus nao-ASCII (I turco U+0130, ss U+00DF) NAO pode passar pela code page
-// do console (CP850/ANSI), que nao representa esses caracteres e corromperia a saida. NAO afeta o
-// buildContractPin (que hasheia PtuCanon.cs + gerador + targets + 3 props, nao este Program.cs).
-System.Console.OutputEncoding = new System.Text.UTF8Encoding(false);
-
-if (args.Length == 0)
+if (args.Length >= 1)
 {
-    // Modo handshake/diagnostico: emite o buildContractPin embutido (de BuildPin.g.cs, gerado em build).
-    Console.Out.Write(BuildPin.Value);
-    return 0;
+    switch (args[0])
+    {
+        case "--emit-pin":
+            // buildContractPin embutido (BuildPin.g.cs, gerado no build) -- handshake/diagnostico.
+            Console.Out.Write(BuildPin.Value);
+            return 0;
+        case "--emit-identity":
+        {
+            // startDir OPCIONAL (so diagnostico/self-test): permite apontar um deploy sem relocar o EXE.
+            // O hook real (D3) usa SEMPRE o diretorio do EXE. Roots vem da env/default (GetRoots).
+            string startDir = args.Length >= 2 ? args[1] : Path.GetDirectoryName(Environment.ProcessPath);
+            PtuIdentity id = ClientIdentity.Compute(startDir, null);
+            Console.Out.Write(id == null ? "IDENTITY-INVALID" : id.IdentityHash);
+            return 0;
+        }
+    }
 }
 
-foreach (var a in args)
-{
-    string c = Canon.CanonicalizePath(a);
-    Console.Out.WriteLine(c ?? "<null>");
-}
+// Hook real (args vazio): D3. Placeholder fail-closed ate la.
+Console.Out.Write("{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"defer\",\"permissionDecisionReason\":\"ptu-client interim D1\"}}");
 return 0;
