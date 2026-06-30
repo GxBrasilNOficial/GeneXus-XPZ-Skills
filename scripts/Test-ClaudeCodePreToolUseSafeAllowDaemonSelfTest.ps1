@@ -356,6 +356,13 @@ function Get-PtuMutexDacl {
         try { return [System.Threading.ThreadingAclExtensions]::GetAccessControl($m) } finally { $m.Dispose() }
     } catch { return $null }
 }
+function Get-PtuLiveDaemonCount {
+    # Conta processos daemon VIVOS de um deploy especifico (path GUID unico). O filtro -Command exclui
+    # comandos de inspecao espurios (defesa contra auto-match).
+    param([string] $DeployDir)
+    return @(Get-CimInstance Win32_Process -Filter "Name='pwsh.exe'" -ErrorAction SilentlyContinue |
+        Where-Object { $_.CommandLine -and $_.CommandLine.Contains($DeployDir) -and $_.CommandLine.Contains('Daemon.ps1') -and (-not $_.CommandLine.Contains('-Command')) }).Count
+}
 
 $deploys           = [System.Collections.Generic.List[string]]::new()
 $clientLogsToClean = [System.Collections.Generic.List[string]]::new()
@@ -736,6 +743,99 @@ try {
     Assert-True (-not (Test-PtuCwdInScope -Cwd $depA -Roots @())) "E4: roots vazio -> CwdInScope deveria ser false"
     Assert-True (-not (Test-PtuCwdInScope -Cwd $depA -Roots @('', '   '))) "E4: roots so-whitespace -> CwdInScope deveria ser false"
     Assert-True ((Get-PtuDecision -ToolName 'Bash' -Command 'git status' -Cwd $depA -Roots @()) -ceq 'defer') "E4: Get-PtuDecision com roots vazio nao deu defer"
+
+    # ==============================================================================================
+    # SECAO F parte 1 (E-f) — Concorrencia + no-drain (painel) + cap + roots/logs/encoding
+    # ==============================================================================================
+    # F1) Burst SIMULTANEO de K clientes (deploy SEM daemon): so o vencedor do guard mutex spawna o daemon
+    # (loserSpawns~0); apos estabilizar, EXATAMENTE 1 daemon sobrevive por IdentityHash (singleton).
+    $depF1 = New-PtuDeploy; $deploys.Add($depF1)
+    $idF1  = Get-PtuDeployIdentity -DeployDir $depF1
+    $exeF1 = Get-PtuExePath -DeployDir $depF1
+    $clientLogsToClean.Add($idF1.Names.ClientLogPath)
+    Register-PtuDaemon -Proc $null -Pipe $idF1.Names.PipeName
+    $jsonF1 = @{ tool_name = 'Bash'; tool_input = @{ command = 'git status' }; cwd = $depF1 } | ConvertTo-Json -Compress
+    $burstJobs = @()
+    for ($i = 0; $i -lt 6; $i++) { $burstJobs += Start-ThreadJob -ScriptBlock $cliSb -ArgumentList $exeF1, $jsonF1, $depF1 }
+    foreach ($j in $burstJobs) { [void](Wait-Job -Job $j -Timeout 25000); Remove-Job -Job $j -Force -ErrorAction SilentlyContinue }
+    $readyF1 = Wait-PtuPipeExists -PipeName $idF1.Names.PipeName -TimeoutMs 25000
+    Assert-True $readyF1 "F1: daemon nao subiu apos burst simultaneo"
+    Start-Sleep -Milliseconds 1500   # deixa eventuais losers-daemon (nao deveria haver) sairem via singleton
+    $liveF1 = Get-PtuLiveDaemonCount -DeployDir $depF1
+    Assert-True ($liveF1 -eq 1) "F1: esperado 1 daemon sobrevivente por IdentityHash, veio $liveF1 (loserSpawns; medicao fina = Passo F)"
+
+    # F2) AbandonedMutex: matar o daemon SEM shutdown -> o singleton fica ABANDONADO -> outro daemon sobe,
+    # adquire (AbandonedMutexException tratada) e serve. Identidades distintas (depF1, depAM) coexistem.
+    $depAM = New-PtuDeploy; $deploys.Add($depAM)
+    $idAM  = Get-PtuDeployIdentity -DeployDir $depAM
+    $clientLogsToClean.Add($idAM.Names.ClientLogPath)
+    $procAM1 = Start-PtuTestDaemon -DeployDir $depAM
+    $rAM1 = Connect-PtuPipe -PipeName $idAM.Names.PipeName -TimeoutMs 20000; if ($rAM1) { $rAM1.Dispose() }
+    Assert-True ($null -ne $rAM1) "F2: 1o daemon (AbandonedMutex) nao subiu"
+    try { $procAM1.Kill() } catch {}; [void]$procAM1.WaitForExit(5000)
+    Start-Sleep -Milliseconds 700
+    $procAM2 = Start-PtuTestDaemon -DeployDir $depAM
+    Register-PtuDaemon -Proc $procAM2 -Pipe $idAM.Names.PipeName
+    $rAM2 = Connect-PtuPipe -PipeName $idAM.Names.PipeName -TimeoutMs 20000; if ($rAM2) { $rAM2.Dispose() }
+    Assert-True ($null -ne $rAM2) "F2: 2o daemon nao subiu apos AbandonedMutex (nao adquiriu o singleton)"
+    $servedAM = 'defer'; for ($k = 0; $k -lt 10 -and $servedAM -cne 'allow'; $k++) { $servedAM = Send-PtuReq -PipeName $idAM.Names.PipeName -Tool 'Bash' -Cmd 'git status' -Cwd $depAM -ReqId "f2-$k"; if ($servedAM -cne 'allow') { Start-Sleep -Milliseconds 150 } }
+    Assert-True ($servedAM -ceq 'allow') "F2: 2o daemon (pos-AbandonedMutex) nao serve"
+    Assert-True ((Get-PtuLiveDaemonCount -DeployDir $depF1) -ge 1) "F2: daemon de identidade distinta (depF1) nao coexiste"
+
+    # F3) CASO DO PAINEL: cliente conecta, envia frame com payloadLen<real (bytes orfaos) e NAO drena a
+    # resposta, segurando a conexao. Com o Write fail-closed (C outBuffer + A timeout), o daemon NAO trava
+    # -> continua servindo outra conexao concorrente. (No baseline buffer-0 isto pendurava o daemon.)
+    $holdSb = {
+        param($PipeName, $Wire, $HoldMs)
+        $c = [System.IO.Pipes.NamedPipeClientStream]::new('.', $PipeName, [System.IO.Pipes.PipeDirection]::InOut)
+        try { $c.Connect(4000); [void]$c.WriteAsync($Wire, 0, $Wire.Length); Start-Sleep -Milliseconds $HoldMs } catch {} finally { $c.Dispose() }
+    }
+    $holdPayload = [System.Text.Encoding]::UTF8.GetBytes('{"abcdefghijklmnopqrs"}')   # 23 bytes
+    $holdWire = New-PtuFrameBytes -Magic 1 -ProtoVer 1 -Payload $holdPayload -DeclaredLen 5   # declara 5 (<23): orfaos
+    $holdJob = Start-ThreadJob -ScriptBlock $holdSb -ArgumentList $pipeA, $holdWire, 5000
+    Start-Sleep -Milliseconds 900
+    $duringND = 'defer'; for ($k = 0; $k -lt 12 -and $duringND -cne 'allow'; $k++) { $duringND = Send-PtuReq -PipeName $pipeA -Tool 'Bash' -Cmd 'git status' -Cwd $depA -ReqId "nd-$k"; if ($duringND -cne 'allow') { Start-Sleep -Milliseconds 120 } }
+    [void](Wait-Job -Job $holdJob -Timeout 12000); Remove-Job -Job $holdJob -Force -ErrorAction SilentlyContinue
+    Assert-True ($duringND -ceq 'allow') "F3: daemon nao serve durante cliente que NAO drena (C+A falhou contra o hang?)"
+
+    # F-cap) Cap da canonicalizacao do cwd (in-process, mesma classe do StepC): sob N>cap chamadas que
+    # DORMEM (I/O nao-cancelavel simulada), InFlight <= cap e os excedentes retornam CapExceeded; o loop
+    # do daemon real (depA) segue servindo (prova abaixo).
+    $cap = 3
+    $capRes = @()
+    for ($i = 0; $i -lt 6; $i++) { $capRes += [Ptu.CwdWorker]::CanonicalizeSlowForTest(4000, 40, $cap) }
+    Assert-True ([Ptu.CwdWorker]::InFlight() -le $cap) "F-cap: InFlight ($([Ptu.CwdWorker]::InFlight())) > cap ($cap)"
+    Assert-True (@($capRes | Where-Object { $_ -ceq [Ptu.CwdWorker]::CapExceeded }).Count -ge ($capRes.Count - $cap)) "F-cap: excedentes do cap nao retornaram CapExceeded"
+    Assert-True ((Send-PtuReq -PipeName $pipeA -Tool 'Bash' -Cmd 'git status' -Cwd $depA -ReqId 'fcap') -ceq 'allow') "F-cap: daemon real nao serve (loop afetado pelo cap in-process?)"
+
+    # F-roots) PTU_SAFE_ALLOW_ROOTS diferente -> IdentityHash diferente -> pipe diferente (separacao por canal).
+    $otherRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("ptu-roots2-" + [System.Guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $otherRoot -Force | Out-Null; $deploys.Add($otherRoot)
+    $idRootsA = Get-PtuIdentity -StartDirectory $depA -DllPath (Join-Path $depA 'PtuCanon.dll') -Roots @($depA)
+    $idRootsB = Get-PtuIdentity -StartDirectory $depA -DllPath (Join-Path $depA 'PtuCanon.dll') -Roots @($depA, $otherRoot)
+    Assert-True (($null -ne $idRootsA) -and ($null -ne $idRootsB)) "F-roots: identidade nula"
+    if (($null -ne $idRootsA) -and ($null -ne $idRootsB)) {
+        Assert-True ($idRootsA.Names.PipeName -cne $idRootsB.Names.PipeName) "F-roots: roots diferentes deram o MESMO pipe"
+    }
+
+    # F-enc) arg nao-ASCII legitimo (nao Cc/Cf) -> mesmo veredito que o ASCII equivalente (cat e' allow).
+    $rEncAscii = 'defer'; for ($k = 0; $k -lt 10 -and $rEncAscii -cne 'allow'; $k++) { $rEncAscii = Send-PtuReq -PipeName $pipeA -Tool 'Bash' -Cmd 'cat arquivo' -Cwd $depA -ReqId "fe-a-$k"; if ($rEncAscii -cne 'allow') { Start-Sleep -Milliseconds 120 } }
+    $rEncNon = 'defer'; for ($k = 0; $k -lt 10 -and $rEncNon -cne 'allow'; $k++) { $rEncNon = Send-PtuReq -PipeName $pipeA -Tool 'Bash' -Cmd "cat arquiv$([char]0x00F8)" -Cwd $depA -ReqId "fe-n-$k"; if ($rEncNon -cne 'allow') { Start-Sleep -Milliseconds 120 } }
+    Assert-True ($rEncAscii -ceq $rEncNon) "F-enc: arg ASCII ('$rEncAscii') e nao-ASCII ('$rEncNon') deram veredito diferente"
+
+    # F-priv) Privacidade: o log do daemon E o log do cliente NAO contem o command (so requestId/decisao/
+    # estado/timestamp/codigo). Reforco do D-ACL.
+    $daemonLogTxt = Get-Content -Raw -LiteralPath $idA.Names.DaemonLogPath
+    Assert-True (-not ($daemonLogTxt -match 'git status')) "F-priv: daemon log VAZOU command (git status)"
+    Assert-True (-not ($daemonLogTxt -match 'rm -rf')) "F-priv: daemon log VAZOU command (rm -rf)"
+    if (Test-Path -LiteralPath $idA3.Names.ClientLogPath) {
+        $clientLogTxt = Get-Content -Raw -LiteralPath $idA3.Names.ClientLogPath
+        Assert-True (-not ($clientLogTxt -match 'git status')) "F-priv: client log VAZOU command"
+    }
+
+    # F-transp) Comparacao de SEGMENTOS = TRANSPORTE: provada pelo gate do Passo A
+    # (Test-ClaudeCodePreToolUseSafeAllowDaemonShlexLoopParity.py: paridade ShlexLoop persistente vs
+    # one-shot byte-a-byte). Referenciada aqui, NAO duplicada (design §8).
 }
 finally {
     foreach ($d in $daemons) { Stop-PtuTestDaemon -Proc $d.Proc -PipeName $d.Pipe }
