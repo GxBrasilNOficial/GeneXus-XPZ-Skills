@@ -701,6 +701,41 @@ try {
     if (($null -ne $idCoA) -and ($null -ne $idCoB)) {
         Assert-True ($idCoA.Names.PipeName -cne $idCoB.Names.PipeName) "D-ID wide: checkouts distintos sob root largo deram o MESMO pipe"
     }
+
+    # ==============================================================================================
+    # SECAO E (E-e) — Escopo (junction dentro/escapa; cwd indisponivel; fora; roots vazio; canon por-req)
+    # ==============================================================================================
+    # depA tem roots = @($depA). A canonicalizacao do cwd e' POR-REQUISICAO (G2(a)): junction DENTRO de
+    # depA apontando p/ dentro -> in-scope; junction que ESCAPA -> defer (sem canon, o StartsWith do path
+    # CRU daria falso-allow). Limpeza das junctions com Directory.Delete (remove o link, NAO o target).
+    $realSub = Join-Path $depA 'realsub'; New-Item -ItemType Directory -Path $realSub -Force | Out-Null
+    $outE = Join-Path ([System.IO.Path]::GetTempPath()) ("ptu-eself-outE-" + [System.Guid]::NewGuid().ToString('N')); New-Item -ItemType Directory -Path $outE -Force | Out-Null
+    $jin = Join-Path $depA 'jin'; $jout = Join-Path $depA 'jout'
+    $junctions = [System.Collections.Generic.List[string]]::new()
+    try {
+        New-Item -ItemType Junction -Path $jin -Target $realSub | Out-Null; $junctions.Add($jin)
+        New-Item -ItemType Junction -Path $jout -Target $outE | Out-Null; $junctions.Add($jout)
+        # E1) junction DENTRO -> allow (tolera warmup); junction que ESCAPA -> defer.
+        $rIn = 'defer'; for ($k = 0; $k -lt 10 -and $rIn -cne 'allow'; $k++) { $rIn = Send-PtuReq -PipeName $pipeA -Tool 'Bash' -Cmd 'git status' -Cwd $jin -ReqId "e1in-$k"; if ($rIn -cne 'allow') { Start-Sleep -Milliseconds 120 } }
+        Assert-True ($rIn -ceq 'allow') "E1: junction DENTRO do escopo nao deu allow (veio '$rIn')"
+        Assert-True ((Send-PtuReq -PipeName $pipeA -Tool 'Bash' -Cmd 'git status' -Cwd $jout -ReqId 'e1out') -ceq 'defer') "E1: junction que ESCAPA do escopo nao deu defer"
+        # E2) cwd INDISPONIVEL (path inexistente DENTRO de depA) -> Failed na canon -> defer, SEM travar o loop.
+        $missing = Join-Path $depA ('naoexiste-' + [System.Guid]::NewGuid().ToString('N') + '\sub')
+        Assert-True ((Send-PtuReq -PipeName $pipeA -Tool 'Bash' -Cmd 'git status' -Cwd $missing -ReqId 'e2') -ceq 'defer') "E2: cwd inexistente nao deu defer"
+        $rAfter = 'defer'; for ($k = 0; $k -lt 8 -and $rAfter -cne 'allow'; $k++) { $rAfter = Send-PtuReq -PipeName $pipeA -Tool 'Bash' -Cmd 'git status' -Cwd $depA -ReqId "e2after-$k"; if ($rAfter -cne 'allow') { Start-Sleep -Milliseconds 120 } }
+        Assert-True ($rAfter -ceq 'allow') "E2: daemon nao voltou a servir apos cwd indisponivel (loop travou?)"
+        # E3) cwd FORA do escopo + comando allow-candidato -> defer (a 1a barreira de escopo nao afrouxa).
+        Assert-True ((Send-PtuReq -PipeName $pipeA -Tool 'Bash' -Cmd 'git status' -Cwd $outE -ReqId 'e3') -ceq 'defer') "E3: cwd fora do escopo + allow-candidato nao deu defer"
+    }
+    finally {
+        foreach ($j in $junctions) { try { [System.IO.Directory]::Delete($j, $false) } catch {} }
+        Remove-Item -LiteralPath $outE -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    # E4) ROOTS vazio / so-whitespace -> defer (fonte unica, in-process). No daemon, roots invalidos ->
+    # identidade nula -> o daemon nem sobe (fail-closed na subida); aqui prova-se a 1a barreira de escopo.
+    Assert-True (-not (Test-PtuCwdInScope -Cwd $depA -Roots @())) "E4: roots vazio -> CwdInScope deveria ser false"
+    Assert-True (-not (Test-PtuCwdInScope -Cwd $depA -Roots @('', '   '))) "E4: roots so-whitespace -> CwdInScope deveria ser false"
+    Assert-True ((Get-PtuDecision -ToolName 'Bash' -Command 'git status' -Cwd $depA -Roots @()) -ceq 'defer') "E4: Get-PtuDecision com roots vazio nao deu defer"
 }
 finally {
     foreach ($d in $daemons) { Stop-PtuTestDaemon -Proc $d.Proc -PipeName $d.Pipe }
