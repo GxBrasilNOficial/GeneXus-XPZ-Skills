@@ -27,6 +27,13 @@
     <Compile Include="..\PtuCanon.cs" />
   </ItemGroup>
 
+  <!-- MutexAcl/MutexSecurity (guard mutex com ACL so-usuario) vivem em System.Threading.AccessControl,
+       fora dos refs default do net8.0 (ao contrario de FileSecurity). PackageReference NAO entra no pin
+       (so PtuCanon.cs + gerador + targets + 3 props). -->
+  <ItemGroup>
+    <PackageReference Include="System.Threading.AccessControl" Version="8.0.0" />
+  </ItemGroup>
+
   <!-- Ultimo elemento antes de </Project>, depois das props (spec v12 §5i): gera e inclui BuildPin.g.cs. -->
   <Import Project="..\BuildPin.targets" />
 

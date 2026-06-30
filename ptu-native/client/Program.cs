@@ -1,11 +1,17 @@
 // ptu-client - entry-point NativeAOT do cliente do hook PreToolUse (auto-allow) do Claude Code.
-// PASSO D (em construcao). Modo real do hook (args VAZIO): le o JSON do hook no stdin, computa a
-// identidade, dispara-e-sai contra o named pipe do daemon e devolve o hookSpecificOutput allow/defer.
-// Modos diagnostico (read-only; NAO leem stdin, NAO conectam, NAO decidem, JAMAIS emitem allow), usados
-// pelos self-tests de paridade (Passos D/E): --emit-pin e --emit-identity.
+// PASSO D (§5(b) dispara-e-sai). Solucao especifica do Claude Code; nao se aplica a Codex/Cursor/OpenCode.
 //
-// ESTADO D1: identidade C# (ClientIdentity/NativeMethods) ligada nos modos diagnostico. O hook real
-// (hot/cold-path, saida §3.1, log de falha de subida) e' o D3 -- aqui ainda devolve um defer placeholder.
+// Modo real do hook (args VAZIO): le o JSON do hook no stdin (cap <= 64 KB + deadline), computa a
+// identidade (paridade B3), e DISPARA-E-SAI contra o named pipe do daemon:
+//   - canal disponivel (WaitNamedPipe)        -> connect, frame, resposta ESTRITA ("allow"/"defer"), emite §3.1;
+//   - canal AUSENTE (ERROR_FILE_NOT_FOUND)    -> TryAcquire NAO-bloqueante do mutex de guarda:
+//        adquiriu -> sobe o daemon DETACHED, segura guardWindowMs, escreve defer, libera; nao adquiriu -> defer;
+//   - existe-porem-ocupado / outra falha      -> defer (canal existe; nao sobe outro daemon).
+// INVARIANTE: isolado, NUNCA emite "allow"; allow so vem de um FRAME VALIDO do daemon com payload "allow".
+// Qualquer erro/timeout/identidade invalida/handshake divergente -> "defer", exit 0. NUNCA "deny".
+//
+// Modos diagnostico (read-only; NAO leem stdin, NAO conectam, NAO decidem, JAMAIS emitem allow), usados
+// pelos self-tests de paridade (Passos D/E): --emit-pin e --emit-identity [startDir].
 using System;
 using System.IO;
 using Ptu;
@@ -16,21 +22,22 @@ if (args.Length >= 1)
     switch (args[0])
     {
         case "--emit-pin":
-            // buildContractPin embutido (BuildPin.g.cs, gerado no build) -- handshake/diagnostico.
             Console.Out.Write(BuildPin.Value);
             return 0;
         case "--emit-identity":
         {
-            // startDir OPCIONAL (so diagnostico/self-test): permite apontar um deploy sem relocar o EXE.
-            // O hook real (D3) usa SEMPRE o diretorio do EXE. Roots vem da env/default (GetRoots).
+            // startDir OPCIONAL (so diagnostico/self-test): aponta um deploy sem relocar o EXE. O hook
+            // real usa SEMPRE o diretorio do EXE. Roots vem da env/default (GetRoots).
             string startDir = args.Length >= 2 ? args[1] : Path.GetDirectoryName(Environment.ProcessPath);
-            PtuIdentity id = ClientIdentity.Compute(startDir, null);
-            Console.Out.Write(id == null ? "IDENTITY-INVALID" : id.IdentityHash);
+            PtuIdentity diag = ClientIdentity.Compute(startDir, null);
+            Console.Out.Write(diag == null ? "IDENTITY-INVALID" : diag.IdentityHash);
             return 0;
         }
+        default:
+            // Argumento desconhecido: fail-closed (o hook real nunca passa args).
+            HookClient.WriteHookOutput("defer", HookClient.ReasonLocal);
+            return 0;
     }
 }
 
-// Hook real (args vazio): D3. Placeholder fail-closed ate la.
-Console.Out.Write("{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"defer\",\"permissionDecisionReason\":\"ptu-client interim D1\"}}");
-return 0;
+return HookClient.Run();
