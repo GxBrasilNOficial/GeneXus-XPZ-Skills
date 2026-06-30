@@ -155,9 +155,12 @@ function Get-PtuSegmentsVerdict {
     # NAO e' 2o ponto de despacho: escopo/ferramenta/shape ficam em Get-PtuDecision.
     param($Parsed)
     if ($null -eq $Parsed) { return 'defer' }
-    if (-not ($Parsed.PSObject.Properties.Name -contains 'status')) { return 'defer' }
+    # Indexer ['x'] em vez de (.Properties.Name -contains 'x'): a member-enumeration de .Name sobre um
+    # PSCustomObject VAZIO (ex.: '{}' | ConvertFrom-Json) LANCA sob StrictMode -> a funcao deferiria mas
+    # quebrava. O indexer devolve $null (ausente) / o membro (presente) sem lancar -> fail-closed genuino.
+    if ($null -eq $Parsed.PSObject.Properties['status']) { return 'defer' }
     if ($Parsed.status -ne 'ok') { return 'defer' }
-    if (-not ($Parsed.PSObject.Properties.Name -contains 'segments')) { return 'defer' }
+    if ($null -eq $Parsed.PSObject.Properties['segments']) { return 'defer' }
     $segments = $Parsed.segments
     if ($null -eq $segments -or $segments -is [string]) { return 'defer' }
     if (-not ($segments -is [System.Collections.IEnumerable])) { return 'defer' }

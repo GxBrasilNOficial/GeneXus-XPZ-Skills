@@ -52,7 +52,7 @@ $script:Artifacts           = $null
 # ---------------------------------------------------------------------------------------------------
 function Get-PtuProp {
     param($Obj, [string] $Name)
-    if ($null -ne $Obj -and ($Obj.PSObject.Properties.Name -contains $Name)) { return $Obj.$Name }
+    if ($null -ne $Obj -and ($null -ne $Obj.PSObject.Properties[$Name])) { return $Obj.$Name }  # indexer: StrictMode-safe p/ objeto vazio (vs .Properties.Name -contains, que lanca)
     return $null
 }
 
