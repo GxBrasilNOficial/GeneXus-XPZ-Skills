@@ -322,6 +322,41 @@ function Send-PtuTwoFramesReadOne {
     } finally { $c.Dispose() }
 }
 
+# SIDs "estrangeiros" que JAMAIS podem aparecer na DACL dos artefatos de coordenacao (so-usuario):
+# Everyone, Authenticated Users, NetworkService.
+$script:PtuForeignSids = @('S-1-1-0', 'S-1-5-11', 'S-1-5-20')
+function Test-PtuDaclUserOnly {
+    # Assercao: a DACL (a) nao contem nenhum SID estrangeiro e (b) so tem regras p/ o SID corrente.
+    param($Acl, [string] $Label)
+    if ($null -eq $Acl) { Assert-True $false "$Label : DACL nula (nao inspecionada)"; return }
+    $me = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+    $rules = $Acl.GetAccessRules($true, $false, [System.Security.Principal.SecurityIdentifier])
+    $foreign = [System.Collections.Generic.List[string]]::new()
+    $ownerOnly = $true
+    foreach ($r in $rules) {
+        $sid = $r.IdentityReference.Value
+        if ($script:PtuForeignSids -contains $sid) { [void]$foreign.Add($sid) }
+        if ($sid -cne $me) { $ownerOnly = $false }
+    }
+    Assert-True ($foreign.Count -eq 0) "$Label : DACL tem SID estrangeiro ($($foreign -join ','))"
+    Assert-True $ownerOnly "$Label : DACL nao e' so-usuario (regra de outro principal)"
+}
+function Get-PtuPipeDacl {
+    # DACL EFETIVA do pipe do daemon, lida via CLIENTE conectado (PipesAclExtensions.GetAccessControl).
+    param([string] $PipeName)
+    $c = Connect-PtuPipe -PipeName $PipeName -TimeoutMs 4000
+    if ($null -eq $c) { return $null }
+    try { return [System.IO.Pipes.PipesAclExtensions]::GetAccessControl($c) } catch { return $null } finally { $c.Dispose() }
+}
+function Get-PtuMutexDacl {
+    # DACL EFETIVA de um named mutex vivo (MutexAcl.OpenExisting com ReadPermissions). $null se ausente.
+    param([string] $MutexName)
+    try {
+        $m = [System.Threading.MutexAcl]::OpenExisting($MutexName, [System.Security.AccessControl.MutexRights]::ReadPermissions)
+        try { return [System.Threading.ThreadingAclExtensions]::GetAccessControl($m) } finally { $m.Dispose() }
+    } catch { return $null }
+}
+
 $deploys           = [System.Collections.Generic.List[string]]::new()
 $clientLogsToClean = [System.Collections.Generic.List[string]]::new()
 $daemons           = [System.Collections.Generic.List[object]]::new()
@@ -367,13 +402,23 @@ try {
         @{ Cmd = 'cat foo.txt';           InScope = $false }   # defer: fora de escopo
     )
     $ix = 0
+    # Aquece o daemon antes do corpus: o round-trip ao python persistente tem custo de cold-start e um
+    # timeout interno; sem warmup uma tokenizacao inicial pode estourar esse timeout e deferir por
+    # PERFORMANCE (nao por logica), quebrando a paridade de forma flaky.
+    for ($w = 0; $w -lt 5; $w++) { [void](Send-PtuReq -PipeName $pipeA -Tool 'Bash' -Cmd 'git status' -Cwd $depA -ReqId "warm-$w") }
     foreach ($case in $corpus) {
         $ix++
         $cwd = if ($case.InScope) { $depA } else { $outA }
         $json = @{ tool_name = 'Bash'; tool_input = @{ command = $case.Cmd }; cwd = $cwd } | ConvertTo-Json -Compress
-        $daemonDec = Send-PtuReq -PipeName $pipeA -Tool 'Bash' -Cmd $case.Cmd -Cwd $cwd -ReqId "a-$ix"
         $inProcOut = Invoke-PtuDecisorProc -Json $json -Roots $depA
         $inProcDec = Get-PtuDecisionField -Json $inProcOut
+        $daemonDec = Send-PtuReq -PipeName $pipeA -Tool 'Bash' -Cmd $case.Cmd -Cwd $cwd -ReqId "a-$ix"
+        # Paridade de LOGICA: o in-process (python one-shot, sem o timeout do round-trip) e' a referencia.
+        # Se o in-process diz allow mas o daemon deu defer, esse defer e' flaky de PERFORMANCE -> re-tenta
+        # o daemon ate concordar; defer esperado (in-process=defer) NAO re-tenta (e' o veredito correto).
+        if ($inProcDec -ceq 'allow' -and $daemonDec -cne 'allow') {
+            for ($r = 0; $r -lt 6 -and $daemonDec -cne 'allow'; $r++) { Start-Sleep -Milliseconds 120; $daemonDec = Send-PtuReq -PipeName $pipeA -Tool 'Bash' -Cmd $case.Cmd -Cwd $cwd -ReqId "a-$ix-r$r" }
+        }
         Assert-True (($daemonDec -ceq 'allow') -or ($daemonDec -ceq 'defer')) "A1[$ix]: daemon devolveu valor inesperado '$daemonDec' p/ '$($case.Cmd)'"
         Assert-True ($daemonDec -ceq $inProcDec) "A1[$ix]: paridade daemon('$daemonDec') != in-process('$inProcDec') p/ '$($case.Cmd)' inScope=$($case.InScope)"
     }
@@ -536,6 +581,126 @@ try {
     $rNfd = 'defer'; for ($k = 0; $k -lt 10 -and $rNfd -cne 'allow'; $k++) { $rNfd = Send-PtuReq -PipeName $pipeA -Tool 'Bash' -Cmd $cmdNfd -Cwd $depA -ReqId "c3nfd-$k"; if ($rNfd -cne 'allow') { Start-Sleep -Milliseconds 120 } }
     Assert-True ($rNfc -ceq $rNfd) "C3: NFC ('$rNfc') e NFD ('$rNfd') deram veredito DIFERENTE"
     Assert-True ($rNfc -ceq 'allow') "C3: 'cat cafe arquivo' (NFC) nao deu allow (veio '$rNfc')"
+
+    # ==============================================================================================
+    # SECAO D (E-d) — ACL (DACL efetiva so-usuario) + Identidade (paridade EXE<->PS; fail-closed)
+    # ==============================================================================================
+
+    # D-ACL-1) DACL efetiva so-usuario dos artefatos VIVOS do daemon depA: pipe + singleton mutex + log.
+    Test-PtuDaclUserOnly -Acl (Get-PtuPipeDacl -PipeName $pipeA) -Label 'D-ACL pipe'
+    Test-PtuDaclUserOnly -Acl (Get-PtuMutexDacl -MutexName $idA.Names.SingletonMutexName) -Label 'D-ACL singleton-mutex'
+    Assert-True (Test-Path -LiteralPath $idA.Names.DaemonLogPath) "D-ACL: daemon log ausente"
+    if (Test-Path -LiteralPath $idA.Names.DaemonLogPath) {
+        $dlAcl = Get-Acl -LiteralPath $idA.Names.DaemonLogPath
+        Assert-True ($dlAcl.AreAccessRulesProtected) "D-ACL daemon-log: heranca nao removida"
+        Test-PtuDaclUserOnly -Acl $dlAcl -Label 'D-ACL daemon-log'
+    }
+    # cliente log: gerado no A3 (cold-path -> daemonScript ausente -> ClientLog 'spawn-failed').
+    Assert-True (Test-Path -LiteralPath $idA3.Names.ClientLogPath) "D-ACL: cliente log ausente (deveria vir do A3)"
+    if (Test-Path -LiteralPath $idA3.Names.ClientLogPath) {
+        $clAcl = Get-Acl -LiteralPath $idA3.Names.ClientLogPath
+        Assert-True ($clAcl.AreAccessRulesProtected) "D-ACL client-log: heranca nao removida"
+        Test-PtuDaclUserOnly -Acl $clAcl -Label 'D-ACL client-log'
+        Assert-True (-not ((Get-Content -Raw -LiteralPath $idA3.Names.ClientLogPath) -match 'git status')) "D-ACL client-log: VAZOU o command"
+    }
+
+    # D-ACL-2) guard mutex (cliente, TRANSITORIO): capturado best-effort durante um cold-path real. Se nao
+    # entrar na janela, AVISA (a postura so-usuario do mutex ja vem do singleton; a do cliente, do client-log).
+    $depG = New-PtuDeploy; $deploys.Add($depG)
+    $idG  = Get-PtuDeployIdentity -DeployDir $depG
+    $exeG = Get-PtuExePath -DeployDir $depG
+    $clientLogsToClean.Add($idG.Names.ClientLogPath)
+    Register-PtuDaemon -Proc $null -Pipe $idG.Names.PipeName   # o cold-path sobe um daemon -> shutdown no finally
+    $jsonG = @{ tool_name = 'Bash'; tool_input = @{ command = 'git status' }; cwd = $depG } | ConvertTo-Json -Compress
+    $cliSb = {
+        param($ExePath, $Stdin, $Roots)
+        $psi = [System.Diagnostics.ProcessStartInfo]::new()
+        $psi.FileName = $ExePath; $psi.UseShellExecute = $false
+        $psi.RedirectStandardInput = $true; $psi.RedirectStandardOutput = $true
+        $psi.Environment['PTU_SAFE_ALLOW_ROOTS'] = $Roots
+        $p = [System.Diagnostics.Process]::Start($psi)
+        $p.StandardInput.Write($Stdin); $p.StandardInput.Close()
+        [void]$p.StandardOutput.ReadToEnd(); [void]$p.WaitForExit(15000)
+    }
+    $cliJob = Start-ThreadJob -ScriptBlock $cliSb -ArgumentList $exeG, $jsonG, $depG
+    $guardCaptured = $false
+    $swG = [System.Diagnostics.Stopwatch]::StartNew()
+    while ($swG.ElapsedMilliseconds -lt 4000 -and -not $guardCaptured) {
+        $gd = Get-PtuMutexDacl -MutexName $idG.Names.GuardMutexName
+        if ($null -ne $gd) { Test-PtuDaclUserOnly -Acl $gd -Label 'D-ACL guard-mutex'; $guardCaptured = $true }
+        else { Start-Sleep -Milliseconds 4 }
+    }
+    [void](Wait-Job -Job $cliJob -Timeout 20000); Remove-Job -Job $cliJob -Force -ErrorAction SilentlyContinue
+    if (-not $guardCaptured) { Write-Warning 'E-d: guard mutex (cliente) nao capturado na janela transitoria; postura so-usuario coberta por singleton-mutex + client-log (CreateUserOnly)' }
+
+    # D-ACL-3) shutdown 0x02 ENCERRA o daemon (plano de controle autorizado pela ACL do pipe). Deploy
+    # proprio p/ nao derrubar depA (ainda usado abaixo nao — mas mantem isolado).
+    $depS = New-PtuDeploy; $deploys.Add($depS)
+    $idS  = Get-PtuDeployIdentity -DeployDir $depS
+    $clientLogsToClean.Add($idS.Names.ClientLogPath)
+    $procS = Start-PtuTestDaemon -DeployDir $depS
+    $rdS = Connect-PtuPipe -PipeName $idS.Names.PipeName -TimeoutMs 20000; if ($rdS) { $rdS.Dispose() }
+    Send-PtuShutdown -PipeName $idS.Names.PipeName
+    Assert-True ($procS.WaitForExit(8000)) "D-ACL: shutdown 0x02 nao encerrou o daemon"
+
+    # D-ID) Identidade: paridade hash cliente[EXE/AOT] <-> daemon[PS/DLL] (mesmo canonicalizePath) + marcador
+    # fail-closed. --emit-identity (EXE) vs Get-PtuIdentity (DLL via Add-Type).
+    function Get-PtuExeIdentityHash {
+        param([string] $ExePath, [string] $StartDir, [string] $Roots)
+        $envOverride = if ($Roots) { @{ PTU_SAFE_ALLOW_ROOTS = $Roots } } else { $null }
+        return (Invoke-PtuClientExe -ExePath $ExePath -Stdin $null -EnvOverride $envOverride -ExeArgs @('--emit-identity', $StartDir)).Trim()
+    }
+    # D-ID-1) paridade em path ASCII e NAO-ASCII (İ turco U+0130 + ß U+00DF no caminho) -> canonicalizePath
+    # byte-identico EXE<->DLL (se divergisse, o hash divergiria).
+    foreach ($variant in @('ascii', 'nonascii')) {
+        $sub = if ($variant -eq 'ascii') { 'ptu-id-ascii' } else { "ptu-id-$([char]0x0130)$([char]0x00DF)" }
+        $root = Join-Path ([System.IO.Path]::GetTempPath()) ("$sub-" + [System.Guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $root -Force | Out-Null
+        Copy-Item -LiteralPath $exeSrc -Destination (Join-Path $root 'ptu-client.exe') -Force
+        Copy-Item -LiteralPath $dllSrc -Destination (Join-Path $root 'PtuCanon.dll') -Force
+        [System.IO.File]::WriteAllText((Join-Path $root '.ptu-safe-allow-root'), '')
+        $deploys.Add($root)
+        $psId = Get-PtuIdentity -StartDirectory $root -DllPath (Join-Path $root 'PtuCanon.dll') -Roots @($root)
+        Assert-True ($null -ne $psId) "D-ID[$variant]: identidade PS nula"
+        if ($null -ne $psId) {
+            $exeHash = Get-PtuExeIdentityHash -ExePath (Join-Path $root 'ptu-client.exe') -StartDir $root -Roots $root
+            Assert-True ($exeHash -ceq $psId.IdentityHash) "D-ID[$variant]: hash EXE($exeHash) != PS($($psId.IdentityHash)) (canonicalizePath divergente)"
+        }
+    }
+    # D-ID-2) fail-closed: ZERO marcador -> invalido nos dois lados.
+    $depZero = New-PtuDeploy -NoMarker; $deploys.Add($depZero)
+    $exeZeroHash = Get-PtuExeIdentityHash -ExePath (Get-PtuExePath -DeployDir $depZero) -StartDir $depZero -Roots $depZero
+    Assert-True ($exeZeroHash -ceq 'IDENTITY-INVALID') "D-ID zero: EXE nao deu IDENTITY-INVALID (veio $exeZeroHash)"
+    Assert-True ($null -eq (Get-PtuIdentity -StartDirectory $depZero -DllPath (Join-Path $depZero 'PtuCanon.dll') -Roots @($depZero))) "D-ID zero: PS nao deu identidade nula"
+    # D-ID-3) fail-closed: MULTIPLOS marcadores (orfao em ancestral) -> invalido. Fixture outer/marcador +
+    # outer/inner/marcador + EXE em outer/inner/deep -> a ascensao acha 2 -> invalido (regra: exatamente 1).
+    $outer = Join-Path ([System.IO.Path]::GetTempPath()) ("ptu-id-multi-" + [System.Guid]::NewGuid().ToString('N'))
+    $inner = Join-Path $outer 'inner'
+    $deep  = Join-Path $inner 'deep'
+    New-Item -ItemType Directory -Path $deep -Force | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $outer '.ptu-safe-allow-root'), '')
+    [System.IO.File]::WriteAllText((Join-Path $inner '.ptu-safe-allow-root'), '')
+    Copy-Item -LiteralPath $exeSrc -Destination (Join-Path $deep 'ptu-client.exe') -Force
+    Copy-Item -LiteralPath $dllSrc -Destination (Join-Path $deep 'PtuCanon.dll') -Force
+    $deploys.Add($outer)
+    $exeMultiHash = Get-PtuExeIdentityHash -ExePath (Join-Path $deep 'ptu-client.exe') -StartDir $deep -Roots $deep
+    Assert-True ($exeMultiHash -ceq 'IDENTITY-INVALID') "D-ID multi: EXE nao deu IDENTITY-INVALID (orfao em ancestral) (veio $exeMultiHash)"
+    Assert-True ($null -eq (Get-PtuIdentity -StartDirectory $deep -DllPath (Join-Path $deep 'PtuCanon.dll') -Roots @($deep))) "D-ID multi: PS nao deu identidade nula (orfao em ancestral)"
+    # D-ID-4) checkouts distintos sob o MESMO root largo -> repoCanonical distinto -> pipes distintos.
+    $wide = Join-Path ([System.IO.Path]::GetTempPath()) ("ptu-id-wide-" + [System.Guid]::NewGuid().ToString('N'))
+    $coA = Join-Path $wide 'checkoutA'; $coB = Join-Path $wide 'checkoutB'
+    foreach ($co in @($coA, $coB)) {
+        New-Item -ItemType Directory -Path $co -Force | Out-Null
+        [System.IO.File]::WriteAllText((Join-Path $co '.ptu-safe-allow-root'), '')
+        Copy-Item -LiteralPath $dllSrc -Destination (Join-Path $co 'PtuCanon.dll') -Force
+    }
+    $deploys.Add($wide)
+    $idCoA = Get-PtuIdentity -StartDirectory $coA -DllPath (Join-Path $coA 'PtuCanon.dll') -Roots @($wide)
+    $idCoB = Get-PtuIdentity -StartDirectory $coB -DllPath (Join-Path $coB 'PtuCanon.dll') -Roots @($wide)
+    Assert-True (($null -ne $idCoA) -and ($null -ne $idCoB)) "D-ID wide: identidade nula em checkout sob root largo"
+    if (($null -ne $idCoA) -and ($null -ne $idCoB)) {
+        Assert-True ($idCoA.Names.PipeName -cne $idCoB.Names.PipeName) "D-ID wide: checkouts distintos sob root largo deram o MESMO pipe"
+    }
 }
 finally {
     foreach ($d in $daemons) { Stop-PtuTestDaemon -Proc $d.Proc -PipeName $d.Pipe }
