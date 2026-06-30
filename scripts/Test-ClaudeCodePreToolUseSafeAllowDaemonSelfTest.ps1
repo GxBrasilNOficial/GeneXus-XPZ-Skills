@@ -497,6 +497,45 @@ try {
     Assert-True ((Get-PtuBashDecision -Command 'git status' -Tokenizer $tokDefer) -ceq 'defer') "B5: BashDecision(tok=defer) != defer"
     Assert-True ((Get-PtuBashDecision -Command 'git status' -Tokenizer $tokEmpty) -ceq 'defer') "B5: BashDecision(tok={}) != defer"
     Assert-True ((Get-PtuBashDecision -Command 'git status' -Tokenizer $tokNull) -ceq 'defer') "B5: BashDecision(tok=null) != defer"
+
+    # ==============================================================================================
+    # SECAO C (E-c) — Segments (contrato de formato) + Unicode (Cc/Cf; NFC vs NFD)
+    # ==============================================================================================
+    # C1) Get-PtuSegmentsVerdict: contrato ESTRITO de formato de segments, construido por ConvertFrom-Json
+    # (exatamente como o daemon recebe do python). Array-NAO-vazio de arrays-NAO-vazios de strings; resto
+    # -> defer (fail-closed).
+    Assert-True ((Get-PtuSegmentsVerdict ('{"status":"ok","segments":[]}' | ConvertFrom-Json)) -ceq 'defer') "C1: segments [] != defer"
+    Assert-True ((Get-PtuSegmentsVerdict ('{"status":"ok","segments":[[]]}' | ConvertFrom-Json)) -ceq 'defer') "C1: segments [[]] (segmento vazio) != defer"
+    Assert-True ((Get-PtuSegmentsVerdict ('{"status":"ok","segments":["git"]}' | ConvertFrom-Json)) -ceq 'defer') "C1: segmento string escalar (['git']) != defer"
+    Assert-True ((Get-PtuSegmentsVerdict ('{"status":"ok","segments":[["git","log"],["head"]]}' | ConvertFrom-Json)) -ceq 'allow') "C1: [[git,log],[head]] != allow"
+    Assert-True ((Get-PtuSegmentsVerdict ('{"status":"ok","segments":[["git",null]]}' | ConvertFrom-Json)) -ceq 'defer') "C1: token null != defer"
+    Assert-True ((Get-PtuSegmentsVerdict ('{"status":"ok","segments":[["git",{}]]}' | ConvertFrom-Json)) -ceq 'defer') "C1: token objeto != defer"
+    Assert-True ((Get-PtuSegmentsVerdict ('{"status":"ok","segments":[[""]]}' | ConvertFrom-Json)) -ceq 'defer') "C1: token string vazia != defer"
+
+    # C2) Unicode de CONTROLE/FORMATO (Cc/Cf) em QUALQUER token -> defer, via DAEMON REAL (depA, quente):
+    # no verbo cai no fast-path; na flag/arg cai na rejeicao da classify (unicodedata Cc/Cf). U+200B
+    # (zero-width space), U+FEFF (BOM/zwnbsp), U+202E (RLO bidi).
+    $uniChars = @(
+        @{ N = 'U+200B'; C = ([string][char]0x200B) },
+        @{ N = 'U+FEFF'; C = ([string][char]0xFEFF) },
+        @{ N = 'U+202E'; C = ([string][char]0x202E) }
+    )
+    foreach ($u in $uniChars) {
+        $ch = $u.C
+        Assert-True ((Send-PtuReq -PipeName $pipeA -Tool 'Bash' -Cmd ("git{0} status" -f $ch) -Cwd $depA -ReqId "c2v") -ceq 'defer') "C2: unicode $($u.N) no VERBO != defer"
+        Assert-True ((Send-PtuReq -PipeName $pipeA -Tool 'Bash' -Cmd ("git log --onel{0}ine" -f $ch) -Cwd $depA -ReqId "c2f") -ceq 'defer') "C2: unicode $($u.N) na FLAG != defer"
+        Assert-True ((Send-PtuReq -PipeName $pipeA -Tool 'Bash' -Cmd ("git log {0}arg" -f $ch) -Cwd $depA -ReqId "c2a") -ceq 'defer') "C2: unicode $($u.N) no ARG != defer"
+    }
+
+    # C3) NFC vs NFD: a mesma string acentuada nas duas formas deve dar o MESMO veredito. 'cat' e' allow
+    # incondicional e o combining U+0301 (NFD) e' categoria Mn (NAO Cc/Cf) -> nao rejeitado -> allow nas
+    # duas formas. Tolera warmup (allow eventual).
+    $cmdNfc = "cat caf$([char]0x00E9) arquivo"          # café (NFC, U+00E9)
+    $cmdNfd = "cat cafe$([char]0x0301) arquivo"         # café (NFD, e + combining acute)
+    $rNfc = 'defer'; for ($k = 0; $k -lt 10 -and $rNfc -cne 'allow'; $k++) { $rNfc = Send-PtuReq -PipeName $pipeA -Tool 'Bash' -Cmd $cmdNfc -Cwd $depA -ReqId "c3nfc-$k"; if ($rNfc -cne 'allow') { Start-Sleep -Milliseconds 120 } }
+    $rNfd = 'defer'; for ($k = 0; $k -lt 10 -and $rNfd -cne 'allow'; $k++) { $rNfd = Send-PtuReq -PipeName $pipeA -Tool 'Bash' -Cmd $cmdNfd -Cwd $depA -ReqId "c3nfd-$k"; if ($rNfd -cne 'allow') { Start-Sleep -Milliseconds 120 } }
+    Assert-True ($rNfc -ceq $rNfd) "C3: NFC ('$rNfc') e NFD ('$rNfd') deram veredito DIFERENTE"
+    Assert-True ($rNfc -ceq 'allow') "C3: 'cat cafe arquivo' (NFC) nao deu allow (veio '$rNfc')"
 }
 finally {
     foreach ($d in $daemons) { Stop-PtuTestDaemon -Proc $d.Proc -PipeName $d.Pipe }
