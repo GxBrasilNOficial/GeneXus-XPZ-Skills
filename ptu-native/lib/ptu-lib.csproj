@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <Compile Include="..\PtuCanon.cs" />
+    <Compile Include="..\CwdWorker.cs" />
   </ItemGroup>
 
   <!-- Ultimo elemento antes de </Project>, depois das props (spec v12 §5i): gera e inclui BuildPin.g.cs. -->
