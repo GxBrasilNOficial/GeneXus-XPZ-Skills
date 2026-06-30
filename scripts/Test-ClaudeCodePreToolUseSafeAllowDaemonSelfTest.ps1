@@ -144,11 +144,17 @@ function ConvertTo-Ptu31Normalized {
     return [regex]::Replace($s, '("permissionDecisionReason":")(.*?)(")', '${1}NORM${3}')
 }
 function Wait-PtuPipeExists {
+    # Enumera por STRINGS ([IO.Directory]::GetFiles devolve "\\.\pipe\<nome>") em vez de
+    # (Get-ChildItem).Name: a member-enumeration de .Name sobre os objetos de pipe do sistema LANCA sob
+    # StrictMode quando um pipe transiente aparece sem a propriedade Name (flaky, depende do instante).
     param([string] $PipeName, [int] $TimeoutMs)
     $sw = [System.Diagnostics.Stopwatch]::StartNew()
     while ($sw.ElapsedMilliseconds -lt $TimeoutMs) {
-        $names = @((Get-ChildItem -Path '\\.\pipe\' -ErrorAction SilentlyContinue).Name)
-        if ($names -ccontains $PipeName) { return $true }
+        try {
+            foreach ($e in [System.IO.Directory]::GetFiles('\\.\pipe\')) {
+                if ($e.Substring($e.LastIndexOf('\') + 1) -ceq $PipeName) { return $true }
+            }
+        } catch {}
         Start-Sleep -Milliseconds 25
     }
     return $false
@@ -240,11 +246,15 @@ function Send-PtuRaw {
         $hdr[1] = [byte](($ProtoVer -shr 8) -band 0xFF); $hdr[2] = [byte]($ProtoVer -band 0xFF)
         $hdr[3] = [byte](($DeclaredLen -shr 24) -band 0xFF); $hdr[4] = [byte](($DeclaredLen -shr 16) -band 0xFF)
         $hdr[5] = [byte](($DeclaredLen -shr 8) -band 0xFF); $hdr[6] = [byte]($DeclaredLen -band 0xFF)
-        $c.Write($hdr, 0, 7)
-        if ($null -ne $Payload -and $Payload.Length -gt 0) { $c.Write($Payload, 0, $Payload.Length) }
-        $c.Flush()
-        if ($Magic -eq 2) { return '<shutdown>' }
+        # WriteAsync (nao Write sincrono): o pipe do daemon tem INBUFFER 0, entao enviar mais bytes do que
+        # o daemon consome (frame adversarial com bytes orfaos) BLOQUEARIA um Write sincrono. Numa Task
+        # nativa o write orfao fica pendente sem travar o teste (abandonado no Dispose); o que importa e' a
+        # RESPOSTA do daemon (nunca 'allow' p/ lixo). Frame unico (header+payload concatenado).
+        $wire = if ($null -ne $Payload -and $Payload.Length -gt 0) { [byte[]]($hdr + $Payload) } else { $hdr }
+        $wt = $c.WriteAsync($wire, 0, $wire.Length)
+        if ($Magic -eq 2) { try { [void]$wt.Wait(2000) } catch {}; return '<shutdown>' }
         $r = Read-PtuResp -Stream $c -TimeoutMs $RespTimeoutMs
+        try { [void]$wt.Wait(500) } catch {}
         if ($null -eq $r) { return '<none>' }
         return $r
     } finally { $c.Dispose() }
@@ -280,6 +290,36 @@ function Stop-PtuTestDaemon {
     if ($null -ne $Proc) {
         if (-not $Proc.WaitForExit(6000)) { try { $Proc.Kill() } catch {} }
     }
+}
+
+function New-PtuFrameBytes {
+    # Monta os bytes de UM frame do wire (header 7B + payload). DeclaredLen<0 => usa Payload.Length.
+    param([byte] $Magic, [int] $ProtoVer, [byte[]] $Payload, [int] $DeclaredLen = -1)
+    $len = if ($DeclaredLen -ge 0) { $DeclaredLen } else { $Payload.Length }
+    $hdr = [byte[]]::new(7)
+    $hdr[0] = $Magic
+    $hdr[1] = [byte](($ProtoVer -shr 8) -band 0xFF); $hdr[2] = [byte]($ProtoVer -band 0xFF)
+    $hdr[3] = [byte](($len -shr 24) -band 0xFF); $hdr[4] = [byte](($len -shr 16) -band 0xFF)
+    $hdr[5] = [byte](($len -shr 8) -band 0xFF); $hdr[6] = [byte]($len -band 0xFF)
+    return ,([byte[]]($hdr + $Payload))
+}
+function Send-PtuTwoFramesReadOne {
+    # Escreve DOIS frames numa MESMA conexao e tenta ler DUAS respostas: o daemon (single-threaded, 1
+    # frame por conexao) deve responder so ao 1o (First) e nao emitir 2a resposta (Second = $null).
+    param([string] $PipeName, [byte[]] $Frame1, [byte[]] $Frame2)
+    $c = Connect-PtuPipe -PipeName $PipeName -TimeoutMs 4000
+    if ($null -eq $c) { return [pscustomobject]@{ First = '<no-pipe>'; Second = $null } }
+    try {
+        # f1+f2 num unico WriteAsync (inbuffer-0: f2 fica orfao quando o daemon le so f1 e fecha; numa
+        # Task nativa nao trava o teste). O daemon le 1 frame por conexao -> responde f1 e dispoe; f2 e'
+        # descartado (sem 2a resposta).
+        $wire = [byte[]]($Frame1 + $Frame2)
+        $wt = $c.WriteAsync($wire, 0, $wire.Length)
+        $r1 = Read-PtuResp -Stream $c -TimeoutMs 4000
+        $r2 = Read-PtuResp -Stream $c -TimeoutMs 800
+        try { [void]$wt.Wait(300) } catch {}
+        return [pscustomobject]@{ First = $r1; Second = $r2 }
+    } finally { $c.Dispose() }
 }
 
 $deploys           = [System.Collections.Generic.List[string]]::new()
@@ -376,6 +416,87 @@ try {
     }
 
     Remove-Item -LiteralPath $outA -Recurse -Force -ErrorAction SilentlyContinue
+
+    # ==============================================================================================
+    # SECAO B (E-b) — Resposta/protocolo adversarial (daemon falso hostil; framing; handshake; pin)
+    # ==============================================================================================
+
+    # B1) DAEMON FALSO HOSTIL: o cliente conecta num servidor de pipe PS falso (deploy SEM daemon) que
+    # devolve respostas malformadas; o cliente (parsing ESTRITO) tem de tratar TODAS como defer.
+    $depB  = New-PtuDeploy -NoDaemon; $deploys.Add($depB)
+    $exeB  = Get-PtuExePath -DeployDir $depB
+    $idB   = Get-PtuDeployIdentity -DeployDir $depB
+    $pipeB = $idB.Names.PipeName
+    $clientLogsToClean.Add($idB.Names.ClientLogPath)
+    $jsonB = @{ tool_name = 'Bash'; tool_input = @{ command = 'git status' }; cwd = $depB } | ConvertTo-Json -Compress
+
+    Test-PtuStrictResponse -Name 'B1-nul'        -PipeName $pipeB -ExePath $exeB -Deploy $depB -Stdin $jsonB -Magic 1 -Proto 1 -DeclaredLen 6  -Payload ([byte[]]@(97,108,108,111,119,0)) -Expected 'defer'
+    Test-PtuStrictResponse -Name 'B1-crlf'       -PipeName $pipeB -ExePath $exeB -Deploy $depB -Stdin $jsonB -Magic 1 -Proto 1 -DeclaredLen 7  -Payload (Bytes "allow`r`n") -Expected 'defer'
+    Test-PtuStrictResponse -Name 'B1-trailspace' -PipeName $pipeB -ExePath $exeB -Deploy $depB -Stdin $jsonB -Magic 1 -Proto 1 -DeclaredLen 6  -Payload (Bytes 'allow ') -Expected 'defer'
+    Test-PtuStrictResponse -Name 'B1-leadspace'  -PipeName $pipeB -ExePath $exeB -Deploy $depB -Stdin $jsonB -Magic 1 -Proto 1 -DeclaredLen 6  -Payload (Bytes ' allow') -Expected 'defer'
+    Test-PtuStrictResponse -Name 'B1-upper'      -PipeName $pipeB -ExePath $exeB -Deploy $depB -Stdin $jsonB -Magic 1 -Proto 1 -DeclaredLen 5  -Payload (Bytes 'ALLOW') -Expected 'defer'
+    Test-PtuStrictResponse -Name 'B1-json'       -PipeName $pipeB -ExePath $exeB -Deploy $depB -Stdin $jsonB -Magic 1 -Proto 1 -DeclaredLen 20 -Payload (Bytes '{"decision":"allow"}') -Expected 'defer'
+    Test-PtuStrictResponse -Name 'B1-allowdefer' -PipeName $pipeB -ExePath $exeB -Deploy $depB -Stdin $jsonB -Magic 1 -Proto 1 -DeclaredLen 10 -Payload (Bytes 'allowdefer') -Expected 'defer'
+    Test-PtuStrictResponse -Name 'B1-truncated'  -PipeName $pipeB -ExePath $exeB -Deploy $depB -Stdin $jsonB -Magic 1 -Proto 1 -DeclaredLen 50 -Payload (Bytes 'al') -Expected 'defer'
+    Test-PtuStrictResponse -Name 'B1-magicbad'   -PipeName $pipeB -ExePath $exeB -Deploy $depB -Stdin $jsonB -Magic 9 -Proto 1 -DeclaredLen 5  -Payload (Bytes 'allow') -Expected 'defer'
+    Test-PtuStrictResponse -Name 'B1-protobad'   -PipeName $pipeB -ExePath $exeB -Deploy $depB -Stdin $jsonB -Magic 1 -Proto 2 -DeclaredLen 5  -Payload (Bytes 'allow') -Expected 'defer'
+    Test-PtuStrictResponse -Name 'B1-lenoverflow'-PipeName $pipeB -ExePath $exeB -Deploy $depB -Stdin $jsonB -Magic 1 -Proto 1 -DeclaredLen 70000 -Payload (Bytes 'allow') -Expected 'defer'
+    # B3) 0x02 (shutdown) em RESPOSTA a 0x01 (dados): resposta nao e' frame de dados valido -> defer.
+    Test-PtuStrictResponse -Name 'B3-magic2resp' -PipeName $pipeB -ExePath $exeB -Deploy $depB -Stdin $jsonB -Magic 2 -Proto 1 -DeclaredLen 5  -Payload (Bytes 'allow') -Expected 'defer'
+
+    # B2) ENTRADA/PROTOCOLO ADVERSARIAL contra o DAEMON REAL (depA, ainda vivo): todo lixo -> defer,
+    # SEM excecao, e o daemon SEGUE servindo depois da saraivada.
+    $okBytes = [System.Text.Encoding]::UTF8.GetBytes((@{ tool_name = 'Bash'; tool_input = @{ command = 'git status' }; cwd = $depA; ptuSafeAllowVersion = $ver; buildContractPin = $pin; requestId = 'b2' } | ConvertTo-Json -Compress))
+    Assert-True ((Send-PtuRaw -PipeName $pipeA -Magic 1 -ProtoVer 1 -DeclaredLen 70000 -Payload ([byte[]]@())) -ceq 'defer') "B2: payload>64KB != defer"
+    # payloadLen>real (declara 50, envia 1): o daemon consome o 1 byte, espera o resto e estoura o timeout de leitura -> defer.
+    Assert-True ((Send-PtuRaw -PipeName $pipeA -Magic 1 -ProtoVer 1 -DeclaredLen 50 -Payload ([byte[]]@(0x7B))) -ceq 'defer') "B2: payloadLen>real (read-timeout) != defer"
+    Assert-True ((Send-PtuRaw -PipeName $pipeA -Magic 1 -ProtoVer 1 -DeclaredLen 0 -Payload ([byte[]]@())) -ceq 'defer') "B2: payloadLen=0 != defer"
+    # boundaries de len: 0x7FFFFFFF (int.MaxValue) e 0xFFFFFFFF (4B 0xFF; o daemon usa [long] -> 4294967295,
+    # NAO vira signed -1). Ambos > MAX_FRAME -> o daemon rejeita ANTES de ler payload, por isso so o header
+    # e' enviado (payload vazio): testa a barreira de len sem deixar bytes orfaos.
+    Assert-True ((Send-PtuRaw -PipeName $pipeA -Magic 1 -ProtoVer 1 -DeclaredLen 2147483647 -Payload ([byte[]]@())) -ceq 'defer') "B2: payloadLen=0x7FFFFFFF != defer"
+    $rawFFFF = Send-PtuRaw -PipeName $pipeA -Magic 1 -ProtoVer 1 -DeclaredLen ([int]::Parse('-1')) -Payload ([byte[]]@())
+    Assert-True ($rawFFFF -ceq 'defer') "B2: payloadLen=0xFFFFFFFF (signed -1) != defer (veio '$rawFFFF')"
+    Assert-True ((Send-PtuRaw -PipeName $pipeA -Magic 9 -ProtoVer 1 -DeclaredLen $okBytes.Length -Payload $okBytes) -ceq 'defer') "B2: magic fora de {1,2} != defer"
+    Assert-True ((Send-PtuRaw -PipeName $pipeA -Magic 1 -ProtoVer 2 -DeclaredLen $okBytes.Length -Payload $okBytes) -ceq 'defer') "B2: protocolVersion errado != defer"
+    $emptyJson = [System.Text.Encoding]::UTF8.GetBytes('{}')
+    Assert-True ((Send-PtuRaw -PipeName $pipeA -Magic 1 -ProtoVer 1 -DeclaredLen $emptyJson.Length -Payload $emptyJson) -ceq 'defer') "B2: JSON {} != defer"
+    # tool_name AUSENTE (ver/pin corretos, in-scope) -> switch default -> defer.
+    $noTool = [System.Text.Encoding]::UTF8.GetBytes((@{ tool_input = @{ command = 'git status' }; cwd = $depA; ptuSafeAllowVersion = $ver; buildContractPin = $pin; requestId = 'b2nt' } | ConvertTo-Json -Compress))
+    Assert-True ((Send-PtuRaw -PipeName $pipeA -Magic 1 -ProtoVer 1 -DeclaredLen $noTool.Length -Payload $noTool) -ceq 'defer') "B2: tool_name ausente != defer"
+    # tool_name TIPO ERRADO (numero) -> '123' nao casa Bash/PowerShell -> default -> defer.
+    $badTool = [System.Text.Encoding]::UTF8.GetBytes((@{ tool_name = 123; tool_input = @{ command = 'git status' }; cwd = $depA; ptuSafeAllowVersion = $ver; buildContractPin = $pin; requestId = 'b2bt' } | ConvertTo-Json -Compress))
+    Assert-True ((Send-PtuRaw -PipeName $pipeA -Magic 1 -ProtoVer 1 -DeclaredLen $badTool.Length -Payload $badTool) -ceq 'defer') "B2: tool_name tipo errado != defer"
+    # multiplos frames numa conexao: le SO o 1o; sem 2a resposta.
+    $f1 = New-PtuFrameBytes -Magic 1 -ProtoVer 1 -Payload ([System.Text.Encoding]::UTF8.GetBytes((@{ tool_name = 'Bash'; tool_input = @{ command = 'rm -rf /' }; cwd = $depA; ptuSafeAllowVersion = $ver; buildContractPin = $pin; requestId = 'b2m1' } | ConvertTo-Json -Compress)))
+    $f2 = New-PtuFrameBytes -Magic 1 -ProtoVer 1 -Payload ([System.Text.Encoding]::UTF8.GetBytes((@{ tool_name = 'Bash'; tool_input = @{ command = 'git status' }; cwd = $depA; ptuSafeAllowVersion = $ver; buildContractPin = $pin; requestId = 'b2m2' } | ConvertTo-Json -Compress)))
+    $multi = Send-PtuTwoFramesReadOne -PipeName $pipeA -Frame1 $f1 -Frame2 $f2
+    Assert-True ($multi.First -ceq 'defer') "B2: multi-frame: 1a resposta != defer (rm -rf) (veio '$($multi.First)')"
+    Assert-True ($null -eq $multi.Second) "B2: multi-frame: daemon emitiu 2a resposta na mesma conexao (devia ler 1)"
+
+    # B4) HANDSHAKE divergente -> defer. version errada; pin divergente (DOIS valores: a comparacao
+    # reqPin -cne dllPin e' simetrica, entao 'EXE novo+DLL velha' e 'velha+nova' reduzem ao MESMO
+    # caminho; a assimetria fisica EXE/DLL nao e' reproduzivel sem rebuild — mesma barreira de pin).
+    Assert-True ((Send-PtuReq -PipeName $pipeA -Tool 'Bash' -Cmd 'git status' -Cwd $depA -ReqId 'b4v' -Ver '9.9.9') -ceq 'defer') "B4: version divergente != defer"
+    Assert-True ((Send-PtuReq -PipeName $pipeA -Tool 'Bash' -Cmd 'git status' -Cwd $depA -ReqId 'b4p1' -Pin ('0' * 64)) -ceq 'defer') "B4: pin divergente (zeros) != defer"
+    Assert-True ((Send-PtuReq -PipeName $pipeA -Tool 'Bash' -Cmd 'git status' -Cwd $depA -ReqId 'b4p2' -Pin ('f' * 64)) -ceq 'defer') "B4: pin divergente (efes) != defer"
+    Assert-True ((Send-PtuReq -PipeName $pipeA -Tool 'Bash' -Cmd 'git status' -Cwd $depA -ReqId 'b4p3' -Pin 'PIN-ERRADO') -ceq 'defer') "B4: pin malformado != defer"
+    # daemon SEGUE servindo apos toda a saraivada adversarial (warmup ja passou na Secao A).
+    $served = 'defer'
+    for ($k = 0; $k -lt 8 -and $served -cne 'allow'; $k++) { $served = Send-PtuReq -PipeName $pipeA -Tool 'Bash' -Cmd 'git status' -Cwd $depA -ReqId "b4ok-$k"; if ($served -cne 'allow') { Start-Sleep -Milliseconds 120 } }
+    Assert-True ($served -ceq 'allow') "B2/B4: daemon nao volta a servir (allow) apos a saraivada adversarial"
+
+    # B5) StrictMode da FONTE UNICA (Get-PtuSegmentsVerdict / Get-PtuBashDecision): tokenizador que
+    # devolve {status:defer}, {} (sem status) ou $null -> defer, sem excecao (contrato §4.1/StrictMode).
+    Assert-True ((Get-PtuSegmentsVerdict $null) -ceq 'defer') "B5: SegmentsVerdict(null) != defer"
+    Assert-True ((Get-PtuSegmentsVerdict ([pscustomobject]@{ status = 'defer'; reason = 'loop-error' })) -ceq 'defer') "B5: SegmentsVerdict(status=defer) != defer"
+    Assert-True ((Get-PtuSegmentsVerdict ('{}' | ConvertFrom-Json)) -ceq 'defer') "B5: SegmentsVerdict({}) != defer"
+    $tokDefer = { param([string] $c) [pscustomobject]@{ status = 'defer'; reason = 'loop-error' } }
+    $tokEmpty = { param([string] $c) ('{}' | ConvertFrom-Json) }
+    $tokNull  = { param([string] $c) $null }
+    Assert-True ((Get-PtuBashDecision -Command 'git status' -Tokenizer $tokDefer) -ceq 'defer') "B5: BashDecision(tok=defer) != defer"
+    Assert-True ((Get-PtuBashDecision -Command 'git status' -Tokenizer $tokEmpty) -ceq 'defer') "B5: BashDecision(tok={}) != defer"
+    Assert-True ((Get-PtuBashDecision -Command 'git status' -Tokenizer $tokNull) -ceq 'defer') "B5: BashDecision(tok=null) != defer"
 }
 finally {
     foreach ($d in $daemons) { Stop-PtuTestDaemon -Proc $d.Proc -PipeName $d.Pipe }
