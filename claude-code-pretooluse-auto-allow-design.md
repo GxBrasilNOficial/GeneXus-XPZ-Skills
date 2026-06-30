@@ -113,6 +113,13 @@ read-only) custa sub-ms; o `python` só roda no caminho candidato. A medição d
   de input PS); `xpz-skills-setup` grava o path por máquina e valida existência + self-test antes de
   instalar o fio (fail-closed); documentar como desligar rápido e reportar falso-allow.
 
+> **ATUALIZADO (reconciliação pós-Passo F, 2026-06-30 — fonte canônica: «Passo G» do
+> `claude-code-pretooluse-implementacao-v1-plan.md`):** a descrição da **Fase 3 como modo `-Observe`
+> in-process** acima é **anterior ao daemon**. Com o daemon, o observe da Fase 3 roda pelo **FIO REAL**
+> (hook → cliente NativeAOT → daemon decide → mede latência; cliente sempre devolve `defer`), pois só ele
+> caracteriza a **latência de concorrência** — condição pendente para liberar o enforce. O `-Observe`
+> in-process fica restrito a medir **cobertura** offline, não é o observe do fio.
+
 ## 6. Limitação conhecida assumida (decisão consciente da v1)
 
 Como `allow` bypassa a allowlist, o hook vira também **guardião do "ler o quê"**: verbos read-only

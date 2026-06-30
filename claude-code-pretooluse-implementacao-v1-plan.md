@@ -104,8 +104,10 @@ divergente/staleness/ambiguidade; **fonte única** da decisão E da tokenizaçã
 - A DLL é carregada 1× na subida; os ROOTS são canonicalizados 1× na subida (congelados). O `cwd` é
   canonicalizado **POR-REQUISIÇÃO** (vem no payload de cada hook — §5) pela DLL, ANTES da comparação com os
   roots canônicos. junction/symlink p/ fora não passa; symlink p/ dentro deixa de dar `defer` espúrio.
-  Baseline do §9-0e-iii = hook string-puro ORIGINAL inalterado. DLL ausente → `defer`. In-process só no
-  OBSERVE (Fase 3); no enforce o hook invoca o CLIENTE NativeAOT, não o `Invoke-...ps1`.
+  Baseline do §9-0e-iii = hook string-puro ORIGINAL inalterado. DLL ausente → `defer`. O hook invoca
+  **SEMPRE** o CLIENTE NativeAOT — tanto no observe (Fase 3) quanto no enforce (Fase 4); ver a reconciliação
+  pós-Passo F na seção «Passo G». O `Invoke-...ps1 -Observe` in-process **NÃO** é o observe do fio: mede só
+  cobertura e não sobe o daemon (logo não caracteriza a latência de concorrência).
 - **Threading (reconcilia o §7 "v1 single-threaded síncrona"):** o loop principal segue SINGLE-THREADED para
   DECISÕES. A canonicalização do `cwd` (I/O que pode BLOQUEAR em UNC ruim, pois `CreateFile`/`GetFinalPathNameByHandle`
   não cancelam pelo token) é offloaded a um WORKER curto com **CAP EXPLÍCITO** (pool limitado): ao atingir o
@@ -248,6 +250,20 @@ do design §5/§9 a essa skill), NUNCA standalone. O install: valida que o EXE e
 marcada** (a DLL ao lado do `Daemon.ps1` para `$PSScriptRoot` resolvê-la); **cria um único marcador
 `.ptu-safe-allow-root` na raiz do repo, limpando marcadores órfãos** de instalações antigas; rebuilda o cliente
 AOT E a DLL (gerando `BuildPin.g.cs` do `.cs` corrente). Máquina-local, Windows x64.
+
+> **Recorte da v1 (reconciliação 2026-06-30, confirmada pelo autor):** o install que grava o fio via
+> `xpz-skills-setup` está **dentro** da v1/Passo G (máquina local: deploy + observe → enforce, condicionado);
+> o "fora da v1" do design §9 refere-se a **persistência entre reboots, auto-start no login e distribuição
+> multi-máquina** (§5, reusando os padrões da skill `xpz-daemon`), não ao ato de gravar o fio.
+
+> **Observe da Fase 3 = FIO REAL (reconciliação pós-Passo F, 2026-06-30, confirmada pelo autor):** a fase de
+> medição (observe) roda pelo **caminho completo** — o hook executa o cliente NativeAOT, que fala com o daemon,
+> o daemon **decide** `allow`/`defer` e mede-se a latência —, mas o cliente **sempre devolve `defer`** ao Claude
+> Code (passivo: mede tudo, não altera nada). É o ÚNICO caminho que caracteriza a **latência de concorrência**
+> (a fila do daemon single-threaded), que é a condição pendente para liberar o enforce (§9-0e). **Supera** as
+> menções anteriores que descreviam o observe como in-process (`Invoke-...ps1 -Observe`): no Passo A-escopo
+> acima e no `claude-code-pretooluse-auto-allow-design.md` §5 (Fase 1–2, anterior ao daemon). O `-Observe`
+> in-process fica restrito a medir **cobertura** offline — não é o observe do fio.
 
 ## 4. Notas de codificação (da passada de confirmação; não alteram o design)
 
