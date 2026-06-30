@@ -264,9 +264,15 @@ try {
         if ($decD -cne 'defer') { $deferMismatch++ }
         if ($decA -cne 'allow') { $allowMismatch++ }
         $floor.Add($rF.Ms); $defer.Add($rD.Ms); $allow.Add($rA.Ms)
-        $rows.Add(('{0},floor,{1},-'     -f $i, [math]::Round($rF.Ms, 3)))
-        $rows.Add(('{0},defer,{1},{2}'   -f $i, [math]::Round($rD.Ms, 3), $decD))
-        $rows.Add(('{0},allow,{1},{2}'   -f $i, [math]::Round($rA.Ms, 3), $decA))
+        # ms com ponto decimal INVARIANTE (o operador -f usa a cultura do host: em pt-BR a virgula
+        # decimal viraria um separador de coluna a mais e quebraria o CSV -> Import-Csv leria errado).
+        $inv = [System.Globalization.CultureInfo]::InvariantCulture
+        $msF = ([math]::Round($rF.Ms, 3)).ToString($inv)
+        $msD = ([math]::Round($rD.Ms, 3)).ToString($inv)
+        $msA = ([math]::Round($rA.Ms, 3)).ToString($inv)
+        $rows.Add(('{0},floor,{1},-'   -f $i, $msF))
+        $rows.Add(('{0},defer,{1},{2}' -f $i, $msD, $decD))
+        $rows.Add(('{0},allow,{1},{2}' -f $i, $msA, $decA))
         if ((($i + 1) % 200) -eq 0) { Write-Host ("  ...{0}/{1}" -f ($i + 1), $Iterations) -ForegroundColor DarkGray }
     }
     $elapsed = ([DateTime]::UtcNow - $tStart).TotalSeconds
