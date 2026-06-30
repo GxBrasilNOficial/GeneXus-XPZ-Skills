@@ -25,6 +25,7 @@ namespace Ptu.Client
         internal string GuardMutexName;
         internal string LogDirectory;
         internal string ClientLogPath;
+        internal string ObserveLogPath;
     }
 
     internal static class ClientIdentity
@@ -132,7 +133,8 @@ namespace Ptu.Client
                 PipeName       = "ptu-safe-allow-" + hash,                  // NamedPipeClientStream usa o nome simples
                 GuardMutexName = "Local\\ptu-safe-allow-guard-" + hash,
                 LogDirectory   = logDir,
-                ClientLogPath  = Path.Combine(logDir, "ptu-client-" + hash + ".log")
+                ClientLogPath  = Path.Combine(logDir, "ptu-client-" + hash + ".log"),
+                ObserveLogPath = Path.Combine(logDir, "ptu-observe-" + hash + ".log")
             };
         }
 

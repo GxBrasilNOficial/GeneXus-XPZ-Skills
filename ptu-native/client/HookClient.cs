@@ -33,50 +33,81 @@ namespace Ptu.Client
         private const string Version = "1.0.0";
 
         // Reasons (o §8 normaliza SO o valor de permissionDecisionReason; conteudo nao afeta a paridade).
-        internal const string ReasonDaemon = "ptu-daemon v" + Version;
-        internal const string ReasonLocal  = "ptu-client v" + Version + " fail-closed";
+        internal const string ReasonDaemon  = "ptu-daemon v" + Version;
+        internal const string ReasonLocal   = "ptu-client v" + Version + " fail-closed";
+        internal const string ReasonObserve = "ptu-observe v" + Version + " passive";
 
         private const string DaemonScriptName = "ClaudeCodePreToolUseSafeAllowDaemon.ps1";
         private const string DllName          = "PtuCanon.dll";
 
         private sealed class HookFields { internal string ToolName; internal string Command; internal string Cwd; }
 
-        internal static int Run()
+        // Resultado do Dispatch: decisao + telemetria do modo observe (Fase 3). No enforce so .Decision e' usado.
+        private sealed class DispatchResult
+        {
+            internal string Decision;    // allow | defer
+            internal double LatencyMs;   // ida-e-volta e2e client-side (inclui a espera na fila do daemon)
+            internal string Outcome;     // decided | busy | cold | deadline | error | stdin | parse | identity
+            internal string Path;        // hot | cold | -
+        }
+
+        internal static int Run() { return Run(false); }
+
+        // observe=true (Fase 3): mede o fio real e SEMPRE devolve defer (passivo). observe=false: enforce,
+        // comportamento byte-identico ao anterior (a saida depende SO de r.Decision).
+        internal static int Run(bool observe)
         {
             // requestId cunhado pelo cliente (o hook nao traz um); usado no payload e nos logs.
             string requestId = Guid.NewGuid().ToString("N");
             try
             {
                 string hookJson = ReadStdinCapped();
-                if (hookJson == null) { WriteHookOutput("defer", ReasonLocal); return 0; }
+                if (hookJson == null) { return Finish(observe, requestId, null, Pre("stdin")); }
 
                 HookFields f = ParseHook(hookJson);
-                if (f == null) { WriteHookOutput("defer", ReasonLocal); return 0; }
+                if (f == null) { return Finish(observe, requestId, null, Pre("parse")); }
 
                 string exeDir = Path.GetDirectoryName(Environment.ProcessPath);
                 PtuIdentity id = ClientIdentity.Compute(exeDir, null);
                 if (id == null)
                 {
                     ClientLog.Write(IdentityInvalidLogPath(), requestId, "identity-invalid");
-                    WriteHookOutput("defer", ReasonLocal);
-                    return 0;
+                    return Finish(observe, requestId, null, Pre("identity"));
                 }
 
-                string decision = Dispatch(f, id, exeDir, requestId);
-                WriteHookOutput(decision, decision == "allow" ? ReasonDaemon : ReasonLocal);
-                return 0;
+                DispatchResult r = Dispatch(f, id, exeDir, requestId);
+                return Finish(observe, requestId, id, r);
             }
             catch
             {
-                WriteHookOutput("defer", ReasonLocal);
+                return Finish(observe, requestId, null, Pre("error"));
+            }
+        }
+
+        // Falha pre-Dispatch: defer, sem latencia/path reais (mantem a contagem do observe completa).
+        private static DispatchResult Pre(string outcome)
+        {
+            return new DispatchResult { Decision = "defer", LatencyMs = 0, Outcome = outcome, Path = "-" };
+        }
+
+        // Emite a saida §3.1. No enforce: a decisao do daemon (allow/defer). No observe: grava a linha de
+        // medicao e FORCA defer (passivo: mede tudo, decide nada). id==null no observe -> sem log, so defer.
+        private static int Finish(bool observe, string requestId, PtuIdentity id, DispatchResult r)
+        {
+            if (observe)
+            {
+                if (id != null) { ObserveLog.Write(id.ObserveLogPath, requestId, r.Decision, r.Outcome, r.LatencyMs, r.Path); }
+                WriteHookOutput("defer", ReasonObserve);
                 return 0;
             }
+            WriteHookOutput(r.Decision, r.Decision == "allow" ? ReasonDaemon : ReasonLocal);
+            return 0;
         }
 
         // ------------------------------------------------------------------------------------------------
         // Dispatch: quente XOR frio. allow SO do hot-path com frame valido "allow".
         // ------------------------------------------------------------------------------------------------
-        private static string Dispatch(HookFields f, PtuIdentity id, string exeDir, string requestId)
+        private static DispatchResult Dispatch(HookFields f, PtuIdentity id, string exeDir, string requestId)
         {
             string pipePath = @"\\.\pipe\" + id.PipeName;
             var sw = Stopwatch.StartNew();
@@ -88,28 +119,34 @@ namespace Ptu.Client
             int err = Marshal.GetLastWin32Error();
             if (err == NativeMethods.ERROR_FILE_NOT_FOUND)
             {
-                return ColdPath(id, exeDir, requestId);   // canal ausente -> guard/spawn
+                string d = ColdPath(id, exeDir, requestId);   // canal ausente -> guard/spawn
+                return new DispatchResult { Decision = d, LatencyMs = Ms(sw), Outcome = "cold", Path = "cold" };
             }
-            return "defer";   // existe-porem-ocupado (timeout) ou outra falha -> nao sobe outro daemon
+            // existe-porem-ocupado (WaitNamedPipe esgotou o prazo sem instancia livre) -> nao sobe outro
+            // daemon. Principal sinal de CONCORRENCIA: a fila do daemon single-threaded (maxInstances=1).
+            return new DispatchResult { Decision = "defer", LatencyMs = Ms(sw), Outcome = "busy", Path = "hot" };
         }
 
-        private static string HotPath(HookFields f, PtuIdentity id, string requestId, Stopwatch sw)
+        private static DispatchResult HotPath(HookFields f, PtuIdentity id, string requestId, Stopwatch sw)
         {
             try
             {
                 using var client = new NamedPipeClientStream(".", id.PipeName, PipeDirection.InOut);
                 int connTimeout = Remaining(sw);
-                if (connTimeout <= 0) { return "defer"; }
+                if (connTimeout <= 0) { return new DispatchResult { Decision = "defer", LatencyMs = Ms(sw), Outcome = "deadline", Path = "hot" }; }
                 client.Connect(connTimeout);   // lanca em timeout/sem-instancia -> catch -> defer
 
                 byte[] payload = BuildRequestPayload(f, requestId);
-                if (payload.Length > MaxFrameBytes) { return "defer"; }
+                if (payload.Length > MaxFrameBytes) { return new DispatchResult { Decision = "defer", LatencyMs = Ms(sw), Outcome = "error", Path = "hot" }; }
                 WriteFrame(client, MagicData, payload);
 
                 string resp = ReadResponseStrict(client, sw);
-                return (resp != null && resp == "allow") ? "allow" : "defer";
+                // O daemon so emite "allow"/"defer"; resp null = timeout/eof (estourou o prazo de 80 ms).
+                if (resp == "allow") { return new DispatchResult { Decision = "allow", LatencyMs = Ms(sw), Outcome = "decided", Path = "hot" }; }
+                if (resp == "defer") { return new DispatchResult { Decision = "defer", LatencyMs = Ms(sw), Outcome = "decided", Path = "hot" }; }
+                return new DispatchResult { Decision = "defer", LatencyMs = Ms(sw), Outcome = "deadline", Path = "hot" };
             }
-            catch { return "defer"; }
+            catch { return new DispatchResult { Decision = "defer", LatencyMs = Ms(sw), Outcome = "error", Path = "hot" }; }
         }
 
         private static string ColdPath(PtuIdentity id, string exeDir, string requestId)
@@ -182,6 +219,8 @@ namespace Ptu.Client
             int r = ResponseDeadlineMs - (int)sw.ElapsedMilliseconds;
             return r;
         }
+
+        private static double Ms(Stopwatch sw) { return sw.Elapsed.TotalMilliseconds; }
 
         private static void WriteFrame(Stream s, byte magic, byte[] payload)
         {

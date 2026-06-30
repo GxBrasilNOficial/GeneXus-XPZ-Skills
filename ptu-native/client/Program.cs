@@ -33,6 +33,10 @@ if (args.Length >= 1)
             Console.Out.Write(diag == null ? "IDENTITY-INVALID" : diag.IdentityHash);
             return 0;
         }
+        case "--observe":
+            // Modo MEDICAO (Fase 3): exercita o fio real (sobe/consulta o daemon) e mede a latencia, mas
+            // SEMPRE devolve defer ao Claude Code (passivo). NAO e' diagnostico: le stdin e conecta.
+            return HookClient.Run(true);
         default:
             // Argumento desconhecido: fail-closed (o hook real nunca passa args).
             HookClient.WriteHookOutput("defer", HookClient.ReasonLocal);
