@@ -264,7 +264,7 @@ function Write-PtuDaemonLog {
     param([string] $RequestId, [string] $Decision, [string] $State = $script:State, [string] $Extra = '')
     try {
         $ts = [System.DateTime]::UtcNow.ToString('o')
-        $line = ('{0}`t{1}`t{2}`t{3}`t{4}' -f $ts, $RequestId, $Decision, $State, $Extra)
+        $line = ("{0}`t{1}`t{2}`t{3}`t{4}" -f $ts, $RequestId, $Decision, $State, $Extra)   # aspas DUPLAS: `t = TAB real (em aspas simples sairia literal)
         [System.IO.File]::AppendAllText($script:DaemonLogPath, $line + "`n", ([System.Text.UTF8Encoding]::new($false)))
     } catch {}
 }
