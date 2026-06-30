@@ -16,6 +16,11 @@
     <InvariantGlobalization>true</InvariantGlobalization>
     <Optimize>true</Optimize>
     <AssemblyName>ptu-client</AssemblyName>
+    <!-- Binario intencionalmente win-x64-only (design "Windows-x64-only"): o TFM e' net8.0 portavel
+         (NAO net8.0-windows) porque TargetFramework entra no buildContractPin e mudar isso divergiria
+         o pin da DLL (ptu-lib, net8.0). Logo os tipos ACL/SID disparam CA1416 (plataforma): esperado
+         e silenciado. O csproj NAO entra no pin (so PtuCanon.cs + gerador + targets + 3 props). -->
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
