@@ -833,6 +833,102 @@ try {
         Assert-True (-not ($clientLogTxt -match 'git status')) "F-priv: client log VAZOU command"
     }
 
+    # ==============================================================================================
+    # SECAO F parte 2 (E-f) — Staleness bloqueante (editar COPIAS no deploy, nunca o repo) + recuperacao
+    # ==============================================================================================
+    function New-PtuStaleDaemon {
+        # Deploy completo + daemon + baseline 'git status' allow (warmup tolerante). Cada bloco de
+        # staleness usa o SEU deploy (edita copias). Retorna { Dir; Id; Pipe; Proc; Baseline }.
+        $dir = New-PtuDeploy; $script:deploys.Add($dir)
+        $sid = Get-PtuDeployIdentity -DeployDir $dir
+        $script:clientLogsToClean.Add($sid.Names.ClientLogPath)
+        $proc = Start-PtuTestDaemon -DeployDir $dir
+        $script:daemons.Add([pscustomobject]@{ Proc = $proc; Pipe = $sid.Names.PipeName })
+        $rd = Connect-PtuPipe -PipeName $sid.Names.PipeName -TimeoutMs 20000; if ($rd) { $rd.Dispose() }
+        $base = 'defer'
+        for ($k = 0; $k -lt 10 -and $base -cne 'allow'; $k++) { $base = Send-PtuReq -PipeName $sid.Names.PipeName -Tool 'Bash' -Cmd 'git status' -Cwd $dir -ReqId "base-$k"; if ($base -cne 'allow') { Start-Sleep -Milliseconds 150 } }
+        return [pscustomobject]@{ Dir = $dir; Id = $sid; Pipe = $sid.Names.PipeName; Proc = $proc; Baseline = $base }
+    }
+    function Set-PtuFileMtimeFuture { param([string] $Path) (Get-Item -LiteralPath $Path).LastWriteTimeUtc = [System.DateTime]::UtcNow.AddSeconds(2) }
+    function Invoke-PtuRetryReq {
+        # Re-tenta uma req ate o veredito ESPERADO (tolera transicao/respawn/warmup). Retorna o ultimo.
+        param([string] $Pipe, [string] $Cmd, [string] $Cwd, [string] $Ver = $ver, [string] $Expect, [int] $Tries = 12)
+        $r = ''
+        for ($k = 0; $k -lt $Tries -and $r -cne $Expect; $k++) { $r = Send-PtuReq -PipeName $Pipe -Tool 'Bash' -Cmd $Cmd -Cwd $Cwd -ReqId "rt-$k" -Ver $Ver; if ($r -cne $Expect) { Start-Sleep -Milliseconds 200 } }
+        return $r
+    }
+
+    # F-stale-Support: re-dot-source. Editar a COPIA do Support (versao 1.0.0 -> 1.0.1) -> req com versao
+    # velha passa a deferir; versao nova volta a allow (mesma classe do StepC D).
+    $stSup = New-PtuStaleDaemon
+    Assert-True ($stSup.Baseline -ceq 'allow') "F-stale-Support: baseline != allow"
+    $supCopy = Join-Path $stSup.Dir 'ClaudeCodePreToolUseSafeAllowSupport.ps1'
+    [System.IO.File]::WriteAllText($supCopy, ([System.IO.File]::ReadAllText($supCopy).Replace("`$script:PtuSafeAllowVersion = '1.0.0'", "`$script:PtuSafeAllowVersion = '1.0.1'")), ([System.Text.UTF8Encoding]::new($false)))
+    Set-PtuFileMtimeFuture -Path $supCopy
+    [void](Send-PtuReq -PipeName $stSup.Pipe -Tool 'Bash' -Cmd 'git status' -Cwd $stSup.Dir -ReqId 'sup-trigger')   # dispara staleness/reload
+    Assert-True ((Invoke-PtuRetryReq -Pipe $stSup.Pipe -Cmd 'git status' -Cwd $stSup.Dir -Ver '1.0.1' -Expect 'allow') -ceq 'allow') "F-stale-Support: apos reload, versao nova nao volta a allow"
+    Assert-True ((Send-PtuReq -PipeName $stSup.Pipe -Tool 'Bash' -Cmd 'git status' -Cwd $stSup.Dir -ReqId 'sup-old' -Ver '1.0.0') -ceq 'defer') "F-stale-Support: versao velha (1.0.0) nao defere apos reload p/ 1.0.1"
+
+    # F-stale-classify: editar SO o classify (.py) com mudanca ADVERSARIAL (sempre defer) -> respawn do
+    # python (transicao segura: valida o sourceSha256 NOVO antes de trocar) -> git status (era allow) passa
+    # a DEFERIR. A decisao mudar PROVA que o modulo importado e' o novo (o respawn so troca se o hash bate).
+    $stCl = New-PtuStaleDaemon
+    Assert-True ($stCl.Baseline -ceq 'allow') "F-stale-classify: baseline != allow"
+    $clCopy = Join-Path $stCl.Dir 'Get-ClaudeCodeBashSafeSegments.py'
+    [System.IO.File]::WriteAllText($clCopy, ([System.IO.File]::ReadAllText($clCopy).Replace("def classify(cmd):`n", "def classify(cmd):`n    return {`"status`": `"defer`", `"reason`": `"adversarial-staleness-test`"}`n")), ([System.Text.UTF8Encoding]::new($false)))
+    Set-PtuFileMtimeFuture -Path $clCopy
+    Assert-True ((Invoke-PtuRetryReq -Pipe $stCl.Pipe -Cmd 'git status' -Cwd $stCl.Dir -Expect 'defer') -ceq 'defer') "F-stale-classify: classify adversarial nao deferiu apos respawn (modulo novo nao importado?)"
+
+    # F-stale-ShlexLoop: editar o ShlexLoop (.py) com mudanca BENIGNA (comentario) -> muda o hash ->
+    # respawn (transicao segura) -> git status CONTINUA allow (comportamento inalterado, respawn nao quebra).
+    $stSL = New-PtuStaleDaemon
+    Assert-True ($stSL.Baseline -ceq 'allow') "F-stale-ShlexLoop: baseline != allow"
+    $slCopy = Join-Path $stSL.Dir 'ClaudeCodePreToolUseSafeAllowDaemonShlexLoop.py'
+    [System.IO.File]::AppendAllText($slCopy, "`n# staleness-benign-test`n", ([System.Text.UTF8Encoding]::new($false)))
+    Set-PtuFileMtimeFuture -Path $slCopy
+    Assert-True ((Invoke-PtuRetryReq -Pipe $stSL.Pipe -Cmd 'git status' -Cwd $stSL.Dir -Expect 'allow') -ceq 'allow') "F-stale-ShlexLoop: respawn benigno nao manteve allow"
+
+    # F-stale-Daemon: editar o Daemon.ps1 (.ps1) -> policy deferonly PERMANENTE -> defer ate restart.
+    $stDa = New-PtuStaleDaemon
+    Assert-True ($stDa.Baseline -ceq 'allow') "F-stale-Daemon: baseline != allow"
+    $daCopy = Join-Path $stDa.Dir 'ClaudeCodePreToolUseSafeAllowDaemon.ps1'
+    [System.IO.File]::AppendAllText($daCopy, "`n# staleness-deferonly-test`n", ([System.Text.UTF8Encoding]::new($false)))
+    Set-PtuFileMtimeFuture -Path $daCopy
+    Assert-True ((Invoke-PtuRetryReq -Pipe $stDa.Pipe -Cmd 'git status' -Cwd $stDa.Dir -Expect 'defer') -ceq 'defer') "F-stale-Daemon: alteracao do Daemon.ps1 nao levou a defer-only"
+    Assert-True ((Send-PtuReq -PipeName $stDa.Pipe -Tool 'Bash' -Cmd 'git status' -Cwd $stDa.Dir -ReqId 'da2') -ceq 'defer') "F-stale-Daemon: defer-only do Daemon.ps1 nao e' permanente"
+
+    # F-stale-DLL: substituir a DLL on-disk (rename do velho + novo arquivo alterado) -> hash on-disk muda
+    # -> defer-only (mesma classe do StepC E; a DLL CARREGADA nao pode ser modificada in-place).
+    $stDll = New-PtuStaleDaemon
+    Assert-True ($stDll.Baseline -ceq 'allow') "F-stale-DLL: baseline != allow"
+    $dllCopy = Join-Path $stDll.Dir 'PtuCanon.dll'
+    [System.IO.File]::Move($dllCopy, "$dllCopy.old")
+    $origDll = [System.IO.File]::ReadAllBytes($dllSrc)
+    $tampered = [byte[]]::new($origDll.Length + 1); [System.Array]::Copy($origDll, $tampered, $origDll.Length); $tampered[$origDll.Length] = 0
+    [System.IO.File]::WriteAllBytes($dllCopy, $tampered)
+    Set-PtuFileMtimeFuture -Path $dllCopy
+    Assert-True ((Invoke-PtuRetryReq -Pipe $stDll.Pipe -Cmd 'git status' -Cwd $stDll.Dir -Expect 'defer') -ceq 'defer') "F-stale-DLL: DLL alterada on-disk nao levou a defer-only"
+    Assert-True ((Send-PtuReq -PipeName $stDll.Pipe -Tool 'Bash' -Cmd 'git status' -Cwd $stDll.Dir -ReqId 'dll2') -ceq 'defer') "F-stale-DLL: defer-only da DLL nao e' permanente"
+
+    # F-deferonly-recover: Support com SINTAXE QUEBRADA -> cada req dispara reload falho -> apos 3 falhas,
+    # defer-only RECUPERAVEL. Corrigir o Support -> o watchdog (~30s ocioso) re-tenta o reload -> recupera.
+    $stRec = New-PtuStaleDaemon
+    Assert-True ($stRec.Baseline -ceq 'allow') "F-deferonly: baseline != allow"
+    $recCopy = Join-Path $stRec.Dir 'ClaudeCodePreToolUseSafeAllowSupport.ps1'
+    $recOrig = [System.IO.File]::ReadAllText($recCopy)
+    [System.IO.File]::WriteAllText($recCopy, ($recOrig + "`nfunction Ptu-Broken {`n  if (`n"), ([System.Text.UTF8Encoding]::new($false)))   # sintaxe quebrada (paren/chave aberta)
+    Set-PtuFileMtimeFuture -Path $recCopy
+    $deferred = 'allow'
+    for ($k = 0; $k -lt 6 -and $deferred -cne 'defer'; $k++) { $deferred = Send-PtuReq -PipeName $stRec.Pipe -Tool 'Bash' -Cmd 'git status' -Cwd $stRec.Dir -ReqId "rec-brk-$k"; if ($deferred -cne 'defer') { Start-Sleep -Milliseconds 150 } }
+    Assert-True ($deferred -ceq 'defer') "F-deferonly: reload quebrado nao levou a defer"
+    # corrige o Support; o watchdog (ocioso ~30s) sinaliza o reload pendente, que roda no topo do loop
+    # apos a 1a conexao seguinte -> a recuperacao e' observavel a partir da 2a req pos-watchdog.
+    [System.IO.File]::WriteAllText($recCopy, $recOrig, ([System.Text.UTF8Encoding]::new($false)))
+    Set-PtuFileMtimeFuture -Path $recCopy
+    Start-Sleep -Seconds 33   # deixa o daemon OCIOSO p/ o watchdog (~30s) disparar o reload pendente
+    [void](Send-PtuReq -PipeName $stRec.Pipe -Tool 'Bash' -Cmd 'git status' -Cwd $stRec.Dir -ReqId 'rec-kick')   # 1a conexao pos-watchdog
+    Assert-True ((Invoke-PtuRetryReq -Pipe $stRec.Pipe -Cmd 'git status' -Cwd $stRec.Dir -Expect 'allow') -ceq 'allow') "F-deferonly: nao recuperou de defer-only apos corrigir o Support (watchdog)"
+
     # F-transp) Comparacao de SEGMENTOS = TRANSPORTE: provada pelo gate do Passo A
     # (Test-ClaudeCodePreToolUseSafeAllowDaemonShlexLoopParity.py: paridade ShlexLoop persistente vs
     # one-shot byte-a-byte). Referenciada aqui, NAO duplicada (design §8).
