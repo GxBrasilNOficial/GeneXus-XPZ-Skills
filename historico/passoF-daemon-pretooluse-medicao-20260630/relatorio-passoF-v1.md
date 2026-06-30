@@ -139,6 +139,29 @@ perfeitamente instantâneo, um 2º cliente reacquire o guard liberado antes do p
 perde o singleton e sai). Escalonado: **3 loserSpawns**, **dentro** do teto `ceil(coldMax/guardWindow)+2 =
 ceil(825/50)+2 = 19`. RSS e vida agregada modestos.
 
+### 4.7 Concorrência (ADENDO P0, pedido pela revisão por pares) — `Measure-PassoF-Concurrency.ps1`
+Daemon QUENTE single-threaded; rajada de N clientes quase-simultâneos; **medição QUALITATIVA** (a
+distribuição de decisão é robusta à carga; a latência absoluta é confundida por carga de máquina, ver §9 —
+só indicativa). Prioridade NORMAL.
+
+| N (rajada) | allow% | defer% | **other** | p50 (indic.) | p95 (indic.) |
+|---|---|---|---|---|---|
+| 1 | ~100 | ~0 | **0** | ~50 | — |
+| 5 | 90,0 | 10,0 | **0** | 458 | 1043 |
+| 10 | 76,7 | 23,3 | **0** | 288 | 1707 |
+| 20 | 75,0 | 25,0 | **0** | 671 | 5416 |
+
+- **Fail-closed se mantém sob TODA rajada (`other=0`):** nenhum cliente jamais emite saída ≠ allow/defer; o
+  que não é atendido **defere** (cai no prompt). Propriedade de correção, **independente de carga**.
+- **Degradação graciosa para defer:** defer sobe (~10→25%) e allow cai (90→75%) com a concorrência — o
+  benefício degrada **com segurança**.
+- **Latência infla sob rajada** (p95 ~1 s @N=5 → ~5 s @N=20) — confundida por carga; confirma que os ~50 ms
+  são regime sequencial/quente. **A latência sob carga em uso real fica para a Fase 3 (observe) do Passo G.**
+- **Achado:** sob rajada alta e sustentada (N≈20), o cold-path dispara tempestade de spawns de
+  daemon-perdedor (janela de recriação do pipe → "pipe ausente" → tentativa de subir outro daemon → perde o
+  singleton e sai). Fail-closed, mas pressiona recursos; parcialmente artefato de rajada sintética, raiz real
+  — candidato a backpressure/otimização, a vigiar na Fase 3.
+
 ## 5. Validação da métrica
 
 Idêntica ao passo 0 §5 (fonte: docs do Claude Code; o stdout é lido até o EOF coincidente com o exit). A
@@ -207,6 +230,16 @@ permanece aberta.
 (evitar dupla desserialização JSON, enxugar a matriz de staleness no caminho quente, ou mover o laço quente
 para fora do PowerShell) é uma frente própria, com seu próprio design + revisão por pares se for aberta.
 
+**ADENDO PÓS-PAINEL (2026-06-30):** a decisão acima foi **submetida a revisão por pares vinculante** (5 vozes/3
+famílias; registro em `revisao-por-pares-passoF-v1.md`). Veredito unânime **"revisa com gaps"**: a tese
+**procede no mérito**, mas (1) a *forma* "(i) gate→alvo porque reprovou" foi corrigida — o (i) é re-rotulado
+como **alvo de eficiência que sempre foi** (não um gate de segurança/correção), com **meta ≤ 10 ms até o
+Passo H** e **salvaguarda** contra uma 3ª reclassificação sem painel; (2) a **condição de liberação** passa a
+ser (ii)+(iii)+**concorrência fail-closed**; (3) **concorrência é P0** — caracterizada na §4.7 (fail-closed
+`other=0`; degradação para defer; latência sob carga para a Fase 3). A reconciliação final está na
+`NOTA PÓS-PASSO-F + PAINEL` do §9-0e do design. **Enforce (Passo G) condicionado** à Fase 3 (observe) fechar a
+latência sob carga em uso real.
+
 ## 9. Ameaças à validade (reconhecidas)
 
 - **Uma única máquina.** O overhead (i), pretensamente host-independente, foi medido só aqui. O harness é
@@ -223,10 +256,13 @@ para fora do PowerShell) é uma frente própria, com seu próprio design + revis
 
 ## 10. Auditabilidade — hashes SHA256 dos artefatos (16 primeiros hex)
 
-- `Measure-PassoF.ps1` — `56724e3758411396` (17027 b)
+- `Measure-PassoF.ps1` — `92ea2f65019ffb15` (17402 b) — ms do CSV agora em ponto decimal invariante
 - `Measure-PassoF-Cold.ps1` — `388bfadbfd271ff7` (10561 b)
 - `Measure-PassoF-Breakdown.ps1` — `91038f405c3834c9` (7981 b)
-- `passoF-series.csv` — `c296dc68dc67b585` (67475 b) — série temporal completa, 1000×3 amostras
+- `Measure-PassoF-Concurrency.ps1` — `80fbc6833f8221f1` (9692 b) — adendo P0 de concorrência (§4.7)
+- `passoF-series.csv` — `ade4e090b1652354` (64474 b) — série temporal completa, 1000×3; reparsada para
+  ponto decimal (Import-Csv lê as 4 colunas; percentis idênticos aos do §4.1, validados no reparse)
+- `revisao-por-pares-passoF-v1.md` — `fda27c12ebf2d4a8` (11368 b) — manuscrito + 5 pareceres + recibo
 - `aot-floor/Program.cs` — `8eb8da778efaf708` (279 b) — literalmente `return 0;`
 - `aot-floor/floor.csproj` — `be956b5d467fbad2` (749 b)
 - `aot-floor/publish.bat` — `e503785a1418d655` (492 b)

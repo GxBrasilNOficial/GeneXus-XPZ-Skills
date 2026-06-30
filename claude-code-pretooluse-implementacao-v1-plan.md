@@ -233,6 +233,13 @@ pareado; separar defer-comum de allow-candidato; guardrail `%>80 ms`; p95/p99 co
 sob burst K=20, com `guardWindowMs` fixado; custo da canonicalização do `cwd` ISOLADO; latência fria reportada
 = floor + `guardWindow`. §9-0e-iii baseline = hook string-puro ORIGINAL. Modo observe.
 
+> **NOTA PÓS-EXECUÇÃO (2026-06-30):** o Passo F foi executado; o fio real deu overhead **~20–34 ms** (não ~1 ms
+> do protótipo), então o **"Gate = overhead ≤ 5 ms" acima foi RECONCILIADO** — ver a `NOTA PÓS-PASSO-F + PAINEL`
+> no §9-0e de `claude-code-pretooluse-daemon-design.md` (revisão por pares vinculante): o (i) vira **alvo de
+> eficiência** (meta ≤ 10 ms até o Passo H), e a **condição de liberação** passa a ser (ii)+(iii)+concorrência
+> fail-closed. Decisão datada: fio **aprovado no mérito**; enforce (Passo G) condicionado à Fase 3 (observe).
+> Relatório + revisão por pares + medições em `historico/passoF-daemon-pretooluse-medicao-20260630/`.
+
 ### Passo G — Fio (install via `xpz-skills-setup`)
 Fase 3 (observe) → 4 (enforce) → 5: o fio em `~/.claude/settings.json` é gravado por
 `Install-ClaudeCodePreToolUseSafeAllow.ps1`, **sempre invocado pela `xpz-skills-setup`** (mantém a atribuição
