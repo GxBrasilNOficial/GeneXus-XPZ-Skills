@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Floor de spawn AOT (Passo F). Props AOT espelham ptu-client.csproj (PublishAot, win-x64,
+       net8.0, InvariantGlobalization, Optimize) para o piso refletir o MESMO modelo de processo
+       do cliente real. Sem PtuCanon.cs/BuildPin: o floor nao decide nada, so spawna e sai. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <PublishAot>true</PublishAot>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <Optimize>true</Optimize>
+    <AssemblyName>ptu-client-floor</AssemblyName>
+  </PropertyGroup>
+</Project>
