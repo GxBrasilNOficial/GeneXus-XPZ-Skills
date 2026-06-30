@@ -41,6 +41,7 @@ $script:State               = 'ready'   # 'ready' | 'defer-only'
 $script:DeferReason         = ''
 $script:DeferOnlyPermanent  = $false
 $script:ReloadFailCount     = 0
+$script:PendingSupportReload = $false   # sinalizado pela staleness; re-dot-source roda no ESCOPO DE SCRIPT (loop)
 $script:PyProc              = $null
 $script:PyTokenizer         = $null
 $script:CanonRoots          = @()
@@ -212,18 +213,6 @@ function Set-PtuDeferOnly {
     Write-PtuDaemonLog -RequestId '-' -Decision 'defer-only' -Extra $Reason
 }
 
-function Invoke-PtuReloadSupport {
-    try {
-        . $script:SupportPath
-        $script:ReloadFailCount = 0
-        return $true
-    } catch {
-        $script:ReloadFailCount++
-        if ($script:ReloadFailCount -ge 3) { Set-PtuDeferOnly -Reason 'support-reload-failed-x3' -Permanent $false }
-        return $false
-    }
-}
-
 function Invoke-PtuStalenessCheck {
     # $true = ok-para-servir; $false = deferir ESTA requisicao. Cache (size,mtime) evita re-hash.
     if ($script:State -eq 'defer-only') { return $false }
@@ -237,7 +226,7 @@ function Invoke-PtuStalenessCheck {
         if ($h -ceq $a.Hash) { $a.Size = $fi.Length; $a.Mtime = $fi.LastWriteTimeUtc.Ticks; continue }  # so mtime mudou
         switch ($a.Policy) {
             'deferonly'   { Set-PtuDeferOnly -Reason "changed:$key" -Permanent $true; return $false }
-            'redotsource' { if (Invoke-PtuReloadSupport) { Update-PtuArtifactBaseline $key; continue } else { return $false } }
+            'redotsource' { $script:PendingSupportReload = $true; return $false }   # reload no escopo de script (loop)
             'respawn'     { if (Invoke-PtuRespawnPython) { continue } else { return $false } }
             default       { Set-PtuDeferOnly -Reason "unknown-policy:$key" -Permanent $true; return $false }
         }
@@ -246,13 +235,11 @@ function Invoke-PtuStalenessCheck {
 }
 
 function Invoke-PtuWatchdog {
-    # Re-tenta sair de defer-only RECUPERAVEL (~30s, fora do caminho quente). Permanente (daemon/dll) nao recupera.
+    # Re-tenta sair de defer-only RECUPERAVEL (~30s, fora do caminho quente). So SINALIZA o reload de
+    # Support; o re-dot-source efetivo (e a saida de defer-only) rodam no ESCOPO DE SCRIPT (topo do
+    # loop), pois dot-source dentro de funcao cairia em escopo filho. Permanente (daemon/dll) nao recupera.
     if ($script:State -ne 'defer-only' -or $script:DeferOnlyPermanent) { return }
-    if (Invoke-PtuReloadSupport) {
-        $script:State = 'ready'; $script:DeferReason = ''
-        try { Update-PtuArtifactBaseline 'support' } catch {}
-        Write-PtuDaemonLog -RequestId '-' -Decision 'ready' -Extra 'recovered'
-    }
+    $script:PendingSupportReload = $true
 }
 
 # ---------------------------------------------------------------------------------------------------
@@ -326,11 +313,12 @@ function Get-PtuDaemonDecision {
         $cwd       = [string](Get-PtuProp $hook 'cwd')
         $reqVer    = [string](Get-PtuProp $hook 'ptuSafeAllowVersion')
         $reqPin    = [string](Get-PtuProp $hook 'buildContractPin')
-        # 2a barreira (§6, por-requisicao) + pin (3a barreira de handshake)
+        # staleness PRIMEIRO (frescor antes de qualquer decisao; garante que o reload de Support seja
+        # sinalizado mesmo quando a versao/pin divergem) -> depois 2a barreira (§6, por-requisicao,
+        # versao) + pin (3a barreira de handshake).
+        if (-not (Invoke-PtuStalenessCheck)) { return 'defer' }
         if ($reqVer -cne $script:PtuSafeAllowVersion) { return 'defer' }
         if ($reqPin -cne [Ptu.BuildPin]::Value) { return 'defer' }
-        # staleness
-        if (-not (Invoke-PtuStalenessCheck)) { return 'defer' }
         # G2(a): canonicaliza o cwd POR-REQUISICAO (worker com cap/timeout) antes do escopo
         if ([string]::IsNullOrWhiteSpace($cwd)) { return 'defer' }
         $canonCwd = [Ptu.CwdWorker]::Canonicalize($cwd, $script:CwdCanonTimeoutMs, $script:CwdCanonCap)
@@ -408,6 +396,22 @@ try {
 
     # Loop SINGLE-THREADED: SO AGORA o pipe existe (ready = pipe conectavel; sem ready file).
     while (-not $script:Shutdown) {
+        # Re-dot-source de Support PENDENTE roda AQUI (escopo de script) para realmente substituir as
+        # funcoes e $script:PtuSafeAllowVersion (dot-source dentro de funcao cairia em escopo filho e nao
+        # atualizaria as funcoes). Single-threaded garante que isto aplica antes do proximo request.
+        if ($script:PendingSupportReload) {
+            $script:PendingSupportReload = $false
+            try {
+                . $script:SupportPath
+                $script:ReloadFailCount = 0
+                Update-PtuArtifactBaseline 'support'
+                if ($script:State -eq 'defer-only' -and -not $script:DeferOnlyPermanent) { $script:State = 'ready'; $script:DeferReason = '' }
+                Write-PtuDaemonLog -RequestId '-' -Decision $script:State -Extra 'support-reloaded'
+            } catch {
+                $script:ReloadFailCount++
+                if ($script:ReloadFailCount -ge 3) { Set-PtuDeferOnly -Reason 'support-reload-failed-x3' -Permanent $false }
+            }
+        }
         $server = New-PtuPipeServer -PipeName $names.PipeName
         if ($null -eq $server) { Set-PtuDeferOnly -Reason 'pipe-create-failed' -Permanent $false; Start-Sleep -Milliseconds 50; continue }
         try {
