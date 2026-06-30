@@ -100,7 +100,16 @@ function Read-PtuFrame {
 }
 
 function Write-PtuFrame {
-    param($Stream, [byte] $Magic, [byte[]] $Bytes)
+    # A (§7 "timeout no servidor -> fecha+defer"): escrita da resposta com DEADLINE, nao Write sincrono
+    # sem timeout. Motivacao (provada empiricamente + revisao por pares 5 familias): com buffer de saida
+    # ZERO, o Write sincrono BLOQUEIA ate o cliente DRENAR; um cliente que conecta, manda um frame e nao
+    # le a resposta (ex.: payloadLen<real e segura a conexao) PENDURAVA o daemon para sempre (singleton
+    # preso, demais conexoes recusadas) -- fail-closed, mas DoS de disponibilidade trivial. Combinada com
+    # outBuffer>0 (C, em New-PtuPipeServer): a resposta pequena vai pro buffer do SO e o WriteAsync
+    # completa na hora (deadline nunca dispara no caminho real); se a resposta exceder o buffer E o
+    # cliente nao drenar, o deadline impede o hang -> 'throw', o loop captura e o finally descarta a
+    # conexao, e o daemon SEGUE servindo. Frame unico (header+payload) num WriteAsync so.
+    param($Stream, [byte] $Magic, [byte[]] $Bytes, [int] $TimeoutMs = 1000)
     $len = $Bytes.Length
     $hdr = [byte[]]::new(7)
     $hdr[0] = $Magic
@@ -110,8 +119,11 @@ function Write-PtuFrame {
     $hdr[4] = [byte](($len -shr 16) -band 0xFF)
     $hdr[5] = [byte](($len -shr 8)  -band 0xFF)
     $hdr[6] = [byte]($len -band 0xFF)
-    $Stream.Write($hdr, 0, 7)
-    $Stream.Write($Bytes, 0, $len)
+    $frame = [byte[]]::new(7 + $len)
+    [System.Array]::Copy($hdr, 0, $frame, 0, 7)
+    if ($len -gt 0) { [System.Array]::Copy($Bytes, 0, $frame, 7, $len) }
+    $wt = $Stream.WriteAsync($frame, 0, $frame.Length)
+    if (-not $wt.Wait($TimeoutMs)) { throw 'write-timeout' }   # cliente nao drenou + buffer cheio -> nao pendura
     $Stream.Flush()
 }
 
@@ -291,7 +303,7 @@ function New-PtuPipeServer {
             return [System.IO.Pipes.NamedPipeServerStreamAcl]::Create(
                 $PipeName, [System.IO.Pipes.PipeDirection]::InOut, 1,
                 [System.IO.Pipes.PipeTransmissionMode]::Byte, [System.IO.Pipes.PipeOptions]::Asynchronous,
-                0, 0, $sec)
+                0, 4096, $sec)   # C: outBuffer=4096 (>= frame de resposta ~12B): o Write da resposta vai pro buffer do SO e NAO bloqueia mesmo se o cliente nao drenar
         } catch { Start-Sleep -Milliseconds (10 * ($attempt + 1)) }
     }
     return $null
@@ -440,7 +452,7 @@ try {
             } catch { $decision = 'defer' }
 
             if (-not $script:Shutdown) {
-                try { Write-PtuFrame -Stream $server -Magic $script:MAGIC_DATA -Bytes ([System.Text.Encoding]::UTF8.GetBytes($decision)) } catch {}
+                try { Write-PtuFrame -Stream $server -Magic $script:MAGIC_DATA -Bytes ([System.Text.Encoding]::UTF8.GetBytes($decision)) -TimeoutMs $RequestTimeoutMs } catch {}
                 Write-PtuDaemonLog -RequestId $requestId -Decision $decision
             } else {
                 Write-PtuDaemonLog -RequestId '-' -Decision 'shutdown'
