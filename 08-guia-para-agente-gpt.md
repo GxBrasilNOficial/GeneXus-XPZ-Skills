@@ -1096,6 +1096,9 @@ Pre-varredura obrigatória antes de sync full ou primeira materialização longa
 - validar antes se cada `ATTCUSTOMTYPE` apontado no molde existe no alvo como `EXO`, `SDT` ou tipo base suportado
 - preferir ler e gerar `API` dentro de uma familia funcional combinada, e não como objeto solto, quando o caso real já vier acoplado a `Procedure`, `SDT`, `Domain`, `Transaction`, `Table` ou `DataProvider`
 - abortar se a API depender de procedures, `EXO` ou `SDT` inexistentes no destino
+- `Calibração (from-spec + GAM, 2026-07-01)`: além do caso único de cadeia grande, existe o perfil `API` autocontido from-spec — tríade `API` -> `Procedure` -> `SDT` escrita em XML, importável por importação real (não por preview). Ver `03-risco-e-decisao-por-tipo.md` (`API (cadeia)` vs `API (from-spec)`) e `xpz-builder/responsibilities-by-type/api.md` + `api-gam-runtime.md`
+- validar `API` from-spec por importação real, nunca por preview (o preview reporta sucesso para `API` inválida); empacotar a `API` junto com seu `Procedure` de implementação, ou fazer staging do `Procedure` antes
+- `[SecurityLevel]` só aceita `None`/`Authentication`/`Authorization` (nunca `Authorize`); `SecurityHigh` em C# não prova enforcement — o enforcement GAM é pré-condição de runtime (ver `api-gam-runtime.md`), não risco de envelope; não declarar uma `API` "segura" sem o smoke 2 fases (401/403/200)
 
 ### Theme
 

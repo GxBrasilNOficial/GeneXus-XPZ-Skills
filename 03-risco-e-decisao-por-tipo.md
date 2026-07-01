@@ -50,6 +50,7 @@ Preservar explicitamente o caráter heurístico dessas leituras.
 - Evidência direta: Part type com indicio de vazio/estrutural: babf62c5-0111-49e9-a1c3-cc004d90900a.
 - Inferência forte: blocos em todos os objetos do tipo merecem preservacao prioritaria na clonagem.
 - Hipótese: blocos quase sempre vazios podem continuar sendo necessários mesmo sem carregar conteúdo útil.
+- `Calibração (from-spec, 2026-07-01)`: os indícios de Part type acima vêm do único objeto real clonado (perfil cadeia-grande). O perfil **autocontido from-spec** (tríade `API`->`Procedure`->`SDT`) segue caminho distinto — construção direta em XML validada por importação real, não clonagem — e não depende desses part-types herdados de amostra. Ver `xpz-builder/responsibilities-by-type/api.md`.
 
 ## DataProvider
 
@@ -169,10 +170,12 @@ Evitar que “melhor candidato” seja confundido com “tipo comprovadamente se
 - Inferência forte: "pronto" aqui significa apenas "melhor candidato relativo para experimentacao controlada por clonagem", não tipo comprovadamente importavel.
 - Evidência direta: a trilha já contem bateria controlada de importação real a partir de `.xpz` montados com base nos `.md` locais e no skill `nexa`.
 - Inferência forte: isso não transforma nenhum tipo em "definitivamente seguro", mas já separa tipos com envelope comprovado dos tipos que ainda dependem de contexto real da KB.
+- `Nota de recalibração (2026-07-01)`: as linhas `API (cadeia)` e `API (from-spec)` refletem recalibração empírica posterior (Fase 0, KMW 4.0.187794 + GAM 3.15.78), fora do escopo do snapshot original de contagens — **não** recalculam as médias amostrais de `Part`/`parent`/`pattern` protegidas pela nota acima. Para `API`, a coluna `FolderType` traz **perfis operacionais qualificados**; o tipo GeneXus continua sendo `API`.
 
 | FolderType | Classification | Evidence | Reading |
 | --- | --- | --- | --- |
-| API | apto somente por clonagem muito controlada | 1 objeto real; media de Part = 5; parent = 1; pattern = 0 | caso único manual/local da KB, com amostra pequena demais e dependencia contextual presente |
+| API (cadeia) | apto somente por clonagem muito controlada | 1 API real no snapshot (media de Part = 5; parent = 1; pattern = 0); export real `XPZExemploCadeiaAPIA.xpz` = 3904 objetos (subárvore funcional) | clonar arrasta subárvore de negócio (`Procedure`, `DataProvider`, `Domain`, `Transaction`, `Table`, `SDT`); risco alto |
+| API (from-spec) | apto por construção from-spec validada por importação real | tríade `API`->`Procedure`->`SDT`; a importação real valida gramática/refs (KMW 4.0.187794 + GAM 3.15.78) | única referência `ATTCUSTOMTYPE` externa ao objeto `API` = `sdt:` próprios; risco estrutural menor que o perfil cadeia, mas condicionado a Procedure/SDT no lote ou na KB e à importação real; segurança GAM é pré-condição de runtime à parte (ver `xpz-builder/responsibilities-by-type/api-gam-runtime.md`) |
 | DataProvider | apto somente por clonagem muito controlada | 24 objetos; media de Part = 5; parent = 24; pattern = 0 | parent aparece em 100% dos casos observados |
 | DesignSystem | apto somente por clonagem muito controlada | 2 objetos; media de Part = 4; parent = 1; pattern = 0 | amostra pequena demais para liberar geração conservadora |
 | PackagedModule | apto somente por clonagem muito controlada | 16 objetos; media de Part = 2.38; parent = 2; pattern = 0 | e o melhor candidato relativo do recorte, mas ainda sem teste externo |
@@ -271,6 +274,7 @@ Separar falha de envelope/shape de falha por dependencia semantica da KB.
 - `Inferência forte`: `API` deixa de ser frente aberta de generalizacao nesta trilha e passa a ficar encerrada, por ora, como estudo de caso único manual/local da KB; seu risco residual observado já não está em `ATTCUSTOMTYPE`, e sim numa subarvore funcional de negocio envolvendo `Procedure`, `Data Provider`, `Domain`, `Transaction` e atributos reais da KB.
 - `Evidência direta`: o export real `XPZExemploCadeiaAPIA.xpz` veio com `3904` objetos, sendo `2282` `Procedure`, `594` `SDT`, `592` `Domain`, `228` `Table`, `183` `Transaction`, `24` `DataProvider` e `1` `API`.
 - `Inferência forte`: isso confirma que, para `API`, o recorte de risco correto e uma familia funcional grande; tentar trata-la como tipo quase isolado tende a subestimar a dependencia real.
+- `Calibração (from-spec, 2026-07-01)`: o encerramento de `API` como "estudo de caso único" (bullets acima) vale para o perfil **cadeia-grande** (clonagem da subárvore) e segue válido para clonagem; NÃO se aplica ao perfil from-spec. A Fase 0 empírica reabriu `API` por outro caminho: a **tríade autocontida** (`API`->`Procedure`->`SDT`) é montável from-spec e validada por **importação real** (que resolve `API => Proc` intra-lote ou contra a KB; preview NÃO valida). Nesse perfil o risco estrutural é menor que o do perfil cadeia, mas condicionado a Procedure/SDT no lote ou na KB e à importação real; o risco que resta é de **runtime/segurança GAM**, tratado como pré-condição em `xpz-builder/responsibilities-by-type/api-gam-runtime.md`, não como risco de envelope.
 - `Evidência direta`: o export real `XPZExemploTemaA.xpz` veio com `947` objetos, incluindo `501` `ThemeClass`, `7` `Theme`, `24` `ThemeColor`, `2` `DesignSystem`, `1` `ColorPalette`, `228` `Table`, `183` `Transaction` e `1` `Folder`.
 - `Inferência forte`: para a pilha visual, o risco melhora quando a análise e feita por familia combinada (`Theme` + `ThemeClass` + `DesignSystem` + `ColorPalette` + `ThemeColor`), e não por objeto visual totalmente isolado.
 - `Evidência direta`: o export `XPZExemploFamiliaMistaA.xpz` veio com `1117` objetos, `7646` atributos top-level e `1576` identidades.
@@ -282,6 +286,7 @@ Separar falha de envelope/shape de falha por dependencia semantica da KB.
 
 - Evidência direta: `Transaction` e o caso único real de `API` concentraram erros semanticos claros, apesar de o envelope ter passado da fase principal de parse/importacao.
 - Inferência forte: a ordem mais útil de ataque, entre pendencias contextuais ainda ativas, e `Transaction -> Theme -> Pattern Settings -> Folder`; `API` fica como estudo de caso fechado nesta fase e só deve reabrir se entrarem novos exemplos reais ou automacao externa.
+- `Calibração (from-spec, 2026-07-01)`: o "estudo de caso fechado... só deve reabrir se entrarem novos exemplos reais ou automação externa" do bullet acima refere-se ao perfil **cadeia-grande**; a Fase 0 empírica é justamente o novo exemplo real que reabriu o perfil **from-spec** (ver a calibração from-spec na seção de inferência acima e as linhas `API (from-spec)` das Tabelas 1 e 2).
 - Inferência forte: no único caso real observado, `API` compartilha com `Transaction` a mesma fragilidade principal: dependencia de tipos e referencias reais da KB.
 - Inferência forte: em `API`, a hierarquia correta de decisão e `ATTCUSTOMTYPE` valido -> `EXO` e `SDT` existentes -> `Procedure` chamada -> `Data Provider`/`Domain` auxiliares -> atributos e contexto de negocio -> eventos/codigo.
 - Inferência forte: qualquer tentativa de corrigir `API` pelo fim, mexendo primeiro em código ou serializacao, tende a mascarar a causa real do erro.
@@ -323,7 +328,9 @@ Servir como primeira triagem operacional antes de qualquer tentativa de clonagem
 | FolderType | StructuralRisk | ParentModuleDependency | PatternDependency | CurrentConfidence | PracticalRecommendation |
 | --- | --- | --- | --- | --- | --- |
 | Nota editorial | snapshot original | Procedure = 2281; SDT = 594 | ver `09` para totais agregados atuais | não recalcular esta tabela sem revisao metodologica | manter leitura relativa desta seção |
-| API | alto | 1/1 | 0/1 | baixa | exigir molde bruto comparável muito próximo do caso alvo |
+| Nota de recalibração (2026-07-01) | `medio-contextual` da linha from-spec qualifica (não rebaixa) o nível base; recalibração operacional, não novo nível do snapshot | a linha from-spec NÃO é `0/n` amostral nem ausência de parent: os objetos da tríade têm `parent="PastaExemploApi"` (pasta, GUIDs neutralizados no molde `01e`); "autocontido" = sem dep. funcional/`ATTCUSTOMTYPE` externa (única = `sdt:` próprios), não ausência de parent | — | evidência posterior à Fase 0 (KMW 4.0.187794 + GAM 3.15.78); não recalcula contagens do snapshot | `API (cadeia)`/`API (from-spec)` = perfis operacionais qualificados; o tipo GeneXus continua `API` |
+| API (cadeia) | alto | 1/1 | 0/1 | baixa | exigir molde bruto comparável muito próximo; clonar arrasta a subárvore funcional inteira |
+| API (from-spec) | medio-contextual | parent nomeado presente (pasta `PastaExemploApi`, neutralizada no molde) — ver nota | 0 | media (importação real 2026-07-01) | montar from-spec da tríade `API`->`Procedure`->`SDT`; validar por importação real (nunca preview); segurança GAM = pré-condição de runtime à parte (ver `api-gam-runtime.md`) |
 | DataProvider | alto | 24/24 | 0/24 | baixa | exigir molde bruto comparável muito próximo do caso alvo |
 | DesignSystem | alto | 1/2 | 0/2 | baixa | exigir molde bruto comparável e evitar extrapolacao com amostra pequena |
 | PackagedModule | medio | 2/16 | 0/16 | media-baixa | clonar só com diff estrutural e revisao manual forte |
