@@ -265,15 +265,18 @@ AOT E a DLL (gerando `BuildPin.g.cs` do `.cs` corrente). Máquina-local, Windows
 > acima e no `claude-code-pretooluse-auto-allow-design.md` §5 (Fase 1–2, anterior ao daemon). O `-Observe`
 > in-process fica restrito a medir **cobertura** offline — não é o observe do fio.
 
-> **CORREÇÃO PENDENTE — `defer`→`ask` na saída §3.1 (BLOQUEIA o G2.2/wire; verificação empírica
-> 2026-06-30, autorizada pelo autor, dispensa painel):** uma sonda com hook temporário no Claude Code
-> **interativo** provou que `permissionDecision: "defer"` **QUEBRA** (erro interno / tool result perdido;
-> **não** pede prompt **nem** roda) — `defer` é **headless-only** (`-p`/Agent SDK, per doc). Em interativo
-> o valor de "abster-se → prompt normal" é **`ask`** (`allow` = roda; `ask` = prompt; `defer` = erro). O
-> produto emite `defer` em toda a "boca" (cliente `HookClient.WriteHookOutput` + decisor `Get-PtuHookOutput`).
-> Correção **mínima**: traduzir `defer`→`ask` **só na emissão** (`defer` segue token interno do
-> protocolo/decisão/gate §8); ajustar os self-tests que conferem a saída §3.1 (StepD paridade, Observe,
-> gate §8); design §3.1 já anotado. **Fazer ANTES do G2.2** — não adianta gravar um hook que emite `defer`.
+> **CORREÇÃO PENDENTE — abster-se = NÃO emitir `permissionDecision` (BLOQUEIA o G2.2/wire; verificação
+> empírica 2026-06-30, autorizada pelo autor, dispensa painel):** sondas no Claude Code **interativo**
+> provaram que (a) `permissionDecision: "defer"` **QUEBRA** (erro interno; headless-only) e (b)
+> `permissionDecision: "ask"` **força prompt mesmo sobre comando que a allowlist do usuário JÁ auto-aprovaria**
+> (`ls` na allowlist rodou **sem** prompt com o hook sem opinar; o mesmo com `ask` **disparou prompt**) —
+> então mapear abster→`ask` seria **REGRESSÃO** (no observe passivo pediria prompt em TODA ferramenta). O
+> correto para "abster-se → fluxo normal" é **exit 0 SEM emitir `permissionDecision`** (hooks-guide: "the
+> normal permission flow still applies" → a allowlist decide). A "boca" §3.1: `allow` →
+> `permissionDecision:"allow"`; abster (o `defer` **interno**) → **saída vazia** (exit 0); nunca `ask`,
+> nunca `deny`. `defer` segue **token interno** do protocolo/decisão/gate §8. Toca a "boca"
+> (`HookClient.WriteHookOutput` + `Get-PtuHookOutput`) + os self-tests que conferem a saída §3.1 (esperam
+> saída **VAZIA** na abstenção) + design §3.1 (anotado). **Fazer ANTES do G2.2.**
 
 ## 4. Notas de codificação (da passada de confirmação; não alteram o design)
 

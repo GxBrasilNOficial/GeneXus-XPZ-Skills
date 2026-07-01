@@ -108,15 +108,21 @@ O cliente reproduz **byte-a-byte** o formato do decisor atual (`Get-PtuHookOutpu
 Para `defer`, idêntico com `"permissionDecision":"defer"`. **Nunca** `deny`. O self-test (§8) compara
 o payload do cliente com o do decisor in-process para o mesmo input.
 
-> **CORREÇÃO PENDENTE (verificação empírica, 2026-06-30 — autorizada pelo autor, dispensa painel): a
-> saída emite `ask`, NÃO `defer`.** O valor `defer` de `permissionDecision` é **headless-only** (`-p` /
-> Agent SDK; "exits the process with the tool call preserved" — `code.claude.com/docs/en/hooks-guide`).
-> Em modo **interativo** (o alvo real: Claude Code desktop) uma sonda com hook temporário provou que
-> `defer` **QUEBRA** (erro interno / tool result perdido; **não** pede prompt **nem** roda), enquanto
-> `ask` = prompt normal e `allow` = roda sem prompt. Logo o cliente deve emitir **`ask`** onde a lógica
-> decide `defer`; `defer` permanece **token interno** do protocolo/decisão/gate §8; `allow` inalterado;
-> nunca `deny`. Toca a "boca" (`HookClient.WriteHookOutput` + `Get-PtuHookOutput`) + os self-tests que
-> conferem a saída §3.1 + este §3.1. **PENDENTE de implementar — bloqueia o wire (Passo G2.2).**
+> **CORREÇÃO PENDENTE (verificação empírica, 2026-06-30 — autorizada pelo autor, dispensa painel):
+> abster-se = NÃO emitir `permissionDecision` (saída vazia), NUNCA `defer` NEM `ask`.** Duas sondas no
+> Claude Code **interativo** (hook temporário, backup/restore do settings.json): (a) `permissionDecision
+> "defer"` **QUEBRA** (erro interno / tool result perdido) — `defer` é **headless-only** (`-p`/Agent SDK;
+> hooks-guide l.586); (b) `permissionDecision "ask"` **força prompt mesmo sobre comando que a allowlist do
+> usuário JÁ auto-aprovaria** (medido: `ls` na allowlist rodou **sem** prompt com o hook sem opinar; o
+> mesmo `ls` com o hook emitindo `ask` **disparou prompt**) — logo mapear abster→`ask` seria **REGRESSÃO**
+> (e no observe passivo pediria prompt em TODA ferramenta, deixando de ser passivo). O mecanismo oficial de
+> "não opino → segue o fluxo normal" é **exit 0 SEM `permissionDecision`** (hooks-guide l.556: "the normal
+> permission flow still applies" → a allowlist decide). Logo a "boca" §3.1: decisão `allow` → emitir
+> `permissionDecision:"allow"`; decisão de abster (o `defer` **INTERNO**) → **NÃO emitir `permissionDecision`**
+> (stdout vazio, exit 0); nunca `ask`, nunca `deny`. `defer` permanece **token interno** do
+> protocolo/decisão/gate §8. Toca a "boca" (`HookClient.WriteHookOutput` + `Get-PtuHookOutput`) + os
+> self-tests que conferem a saída §3.1 (passam a esperar saída **VAZIA** na abstenção) + este §3.1.
+> **PENDENTE de implementar — bloqueia o wire (Passo G2.2).**
 
 ## 4. A decisão central — tokenização, IPC e runtime do cliente
 
