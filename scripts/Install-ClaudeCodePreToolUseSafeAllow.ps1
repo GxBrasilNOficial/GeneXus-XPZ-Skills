@@ -2,7 +2,8 @@
 <#
 .SYNOPSIS
 Instalador (DEPLOY) do daemon+cliente PreToolUse (auto-allow) do Claude Code. PASSO G / G2.1.
-SEMPRE invocado pela skill xpz-skills-setup (NUNCA standalone em producao). Solucao especifica do
+Contrato de producao: invocado pela skill xpz-skills-setup (integracao efetiva = Passo G3, PENDENTE),
+NUNCA standalone em producao; hoje rodavel standalone em dev/manual. Solucao especifica do
 Claude Code; nao se aplica a Codex/Cursor/OpenCode. Maquina-local, Windows x64.
 
 .DESCRIPTION
