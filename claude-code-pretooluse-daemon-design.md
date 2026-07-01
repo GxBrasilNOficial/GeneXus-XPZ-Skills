@@ -108,6 +108,16 @@ O cliente reproduz **byte-a-byte** o formato do decisor atual (`Get-PtuHookOutpu
 Para `defer`, idêntico com `"permissionDecision":"defer"`. **Nunca** `deny`. O self-test (§8) compara
 o payload do cliente com o do decisor in-process para o mesmo input.
 
+> **CORREÇÃO PENDENTE (verificação empírica, 2026-06-30 — autorizada pelo autor, dispensa painel): a
+> saída emite `ask`, NÃO `defer`.** O valor `defer` de `permissionDecision` é **headless-only** (`-p` /
+> Agent SDK; "exits the process with the tool call preserved" — `code.claude.com/docs/en/hooks-guide`).
+> Em modo **interativo** (o alvo real: Claude Code desktop) uma sonda com hook temporário provou que
+> `defer` **QUEBRA** (erro interno / tool result perdido; **não** pede prompt **nem** roda), enquanto
+> `ask` = prompt normal e `allow` = roda sem prompt. Logo o cliente deve emitir **`ask`** onde a lógica
+> decide `defer`; `defer` permanece **token interno** do protocolo/decisão/gate §8; `allow` inalterado;
+> nunca `deny`. Toca a "boca" (`HookClient.WriteHookOutput` + `Get-PtuHookOutput`) + os self-tests que
+> conferem a saída §3.1 + este §3.1. **PENDENTE de implementar — bloqueia o wire (Passo G2.2).**
+
 ## 4. A decisão central — tokenização, IPC e runtime do cliente
 
 ### 4.1 Onde roda o `shlex` (o 2º python) — e a prova de equivalência

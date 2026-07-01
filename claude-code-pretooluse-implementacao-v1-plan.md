@@ -265,6 +265,16 @@ AOT E a DLL (gerando `BuildPin.g.cs` do `.cs` corrente). Máquina-local, Windows
 > acima e no `claude-code-pretooluse-auto-allow-design.md` §5 (Fase 1–2, anterior ao daemon). O `-Observe`
 > in-process fica restrito a medir **cobertura** offline — não é o observe do fio.
 
+> **CORREÇÃO PENDENTE — `defer`→`ask` na saída §3.1 (BLOQUEIA o G2.2/wire; verificação empírica
+> 2026-06-30, autorizada pelo autor, dispensa painel):** uma sonda com hook temporário no Claude Code
+> **interativo** provou que `permissionDecision: "defer"` **QUEBRA** (erro interno / tool result perdido;
+> **não** pede prompt **nem** roda) — `defer` é **headless-only** (`-p`/Agent SDK, per doc). Em interativo
+> o valor de "abster-se → prompt normal" é **`ask`** (`allow` = roda; `ask` = prompt; `defer` = erro). O
+> produto emite `defer` em toda a "boca" (cliente `HookClient.WriteHookOutput` + decisor `Get-PtuHookOutput`).
+> Correção **mínima**: traduzir `defer`→`ask` **só na emissão** (`defer` segue token interno do
+> protocolo/decisão/gate §8); ajustar os self-tests que conferem a saída §3.1 (StepD paridade, Observe,
+> gate §8); design §3.1 já anotado. **Fazer ANTES do G2.2** — não adianta gravar um hook que emite `defer`.
+
 ## 4. Notas de codificação (da passada de confirmação; não alteram o design)
 
 Levantadas pelo painel na confirmação da v2.22, para atenção durante os Passos A–G:
