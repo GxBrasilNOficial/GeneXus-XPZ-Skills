@@ -5,8 +5,8 @@ Self-test do PASSO D (cliente NativeAOT do hook PreToolUse auto-allow do Claude 
 ptu-native/client (ptu-client.exe). Sentinela de sucesso: "OK:" na ultima linha.
 
 .DESCRIPTION
-PRECURSOR, NAO o gate. O GATE de seguranca completo (§8) e' o Passo E, sob o nome canonico
-RESERVADO Test-ClaudeCodePreToolUseSafeAllowDaemonSelfTest.ps1 (ainda nao criado). Este arquivo
+PRECURSOR, NAO o gate. O GATE de seguranca completo (§8) e' o Passo E, no arquivo canonico
+Test-ClaudeCodePreToolUseSafeAllowDaemonSelfTest.ps1 (JA CRIADO; ver esse arquivo). Este arquivo
 cobre so a FATIA do Passo D:
   A) paridade de identidade cliente[C#] <-> daemon[PS] (env-presente, env-ausente->default, invalida) + pin;
   B) parsing ESTRITO da resposta (servidor de pipe PS FALSO: caso feliz allow/defer + saraivada hostil);

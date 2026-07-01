@@ -5,8 +5,8 @@ Self-test do PASSO C (daemon PreToolUse auto-allow do Claude Code):
 scripts/ClaudeCodePreToolUseSafeAllowDaemon.ps1. Sentinela de sucesso: "OK:" na ultima linha.
 
 .DESCRIPTION
-PRECURSOR, NAO o gate. O GATE de seguranca completo (§8) e' o Passo E, sob o nome canonico
-RESERVADO Test-ClaudeCodePreToolUseSafeAllowDaemonSelfTest.ps1 (ainda nao criado). Este arquivo
+PRECURSOR, NAO o gate. O GATE de seguranca completo (§8) e' o Passo E, no arquivo canonico
+Test-ClaudeCodePreToolUseSafeAllowDaemonSelfTest.ps1 (JA CRIADO; ver esse arquivo). Este arquivo
 cobre so a FATIA do Passo C, sem o cliente NativeAOT (Passo D) e sem a bateria adversarial inteira
 do §8: subida/singleton/protocolo/staleness/cap, com um cliente de named pipe em PowerShell.
 
