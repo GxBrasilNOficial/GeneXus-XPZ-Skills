@@ -8,6 +8,8 @@
 !/.github/workflows/*.yml
 !/historico/
 !/historico/**
+historico/**/bin/
+historico/**/obj/
 !/scripts/
 scripts/**/__pycache__/
 scripts/**/*.pyc
