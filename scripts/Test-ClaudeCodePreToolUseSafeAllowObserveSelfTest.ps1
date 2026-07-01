@@ -6,13 +6,13 @@ Claude Code. PASSO G. Sentinela de sucesso: "OK:" na ultima linha.
 
 .DESCRIPTION
 Prova que o modo observe (ptu-client.exe --observe) e' PASSIVO: exercita o fio real (hot/cold) e GRAVA
-a telemetria, mas SEMPRE devolve defer ao Claude Code -- nunca allow, mesmo quando o outro lado responde
-allow. Casos:
-  1) passividade: servidor responde allow -> saida defer + reason observe;
+a telemetria, mas SEMPRE abstem (nao emite permissionDecision; saida vazia) -- nunca allow, mesmo quando
+o outro lado responde allow. Casos:
+  1) passividade: servidor responde allow -> saida VAZIA (abstem); o que teria decidido fica so no log;
   2) fidelidade do log: wouldDecision/outcome/path/latencyMs/requestId;
   3) privacidade (§7): o command NAO aparece no log de medicao;
-  4) caminho defer: servidor responde defer -> saida defer, log wouldDecision=defer;
-  5) caminho frio: canal ausente, sem script de daemon -> saida defer, log outcome=cold/path=cold (sem subir daemon).
+  4) caminho defer: servidor responde defer -> saida VAZIA (abstem), log wouldDecision=defer;
+  5) caminho frio: canal ausente, sem script de daemon -> saida VAZIA (abstem), log outcome=cold/path=cold (sem subir daemon).
 Reusa o padrao do StepD (deploy temporario plano + servidor de pipe FALSO + Invoke-PtuClientExe). Exige o
 EXE publicado (NativeAOT) e a DLL buildada. Tudo em temp/LOCALAPPDATA, limpo no fim; nao toca versionados.
 #>
