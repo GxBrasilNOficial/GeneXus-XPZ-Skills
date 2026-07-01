@@ -1,8 +1,10 @@
 # Invoke-ClaudeCodePreToolUseSafeAllow.ps1 - decisor do hook PreToolUse do CLAUDE CODE (auto-allow).
 # Solucao especifica do Claude Code (hook PreToolUse + permissionDecision); nao se aplica a
-# Codex/Cursor/OpenCode. Le o JSON do hook no stdin (ou -InputJson para teste) e emite em JSON:
-#   {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow|defer",...}}
-# NUNCA emite 'deny'. Fail-closed: qualquer erro -> 'defer'.
+# Codex/Cursor/OpenCode. Le o JSON do hook no stdin (ou -InputJson para teste). SO a decisao 'allow'
+# emite permissionDecision; abster (o 'defer' interno) NAO emite nada (stdout vazio, exit 0) e o fluxo
+# normal de permissao do Claude Code segue (a allowlist decide). Formato do allow:
+#   {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow",...}}
+# NUNCA 'deny' nem 'ask'. Fail-closed: qualquer erro -> abster (nada emitido). Ver design §3.1.
 # Ver claude-code-pretooluse-auto-allow-design.md.
 [CmdletBinding()]
 param(

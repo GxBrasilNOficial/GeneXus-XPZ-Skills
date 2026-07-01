@@ -6,8 +6,10 @@ SEMPRE invocado pela skill xpz-skills-setup (NUNCA standalone em producao). Solu
 Claude Code; nao se aplica a Codex/Cursor/OpenCode. Maquina-local, Windows x64.
 
 .DESCRIPTION
-Deposita o produto de runtime numa subpasta unica da raiz marcada, pronto para ser ligado depois
-(G2.2 grava o fio no ~/.claude/settings.json -- ESTE script NAO toca o settings.json):
+Instalador com dois modos. Sem -Wire (DEPLOY, default): deposita o produto de runtime numa subpasta unica
+da raiz marcada e NAO toca o settings.json. Com -Wire observe|enforce|off (WIRE, G2.2): grava/remove o hook
+PreToolUse no ~/.claude/settings.json apontando p/ o EXE deployado (merge cirurgico + backup; ver
+Invoke-PtuWire). O DEPLOY:
 
  1. Computa o buildContractPin esperado do .cs CORRENTE rodando o gerador versionado
     (Generate-ClaudeCodePtuBuildPin.ps1) num OutPath temporario -- sem buildar.

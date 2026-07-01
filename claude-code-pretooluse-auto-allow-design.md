@@ -116,7 +116,8 @@ read-only) custa sub-ms; o `python` só roda no caminho candidato. A medição d
 > **ATUALIZADO (reconciliação pós-Passo F, 2026-06-30 — fonte canônica: «Passo G» do
 > `claude-code-pretooluse-implementacao-v1-plan.md`):** a descrição da **Fase 3 como modo `-Observe`
 > in-process** acima é **anterior ao daemon**. Com o daemon, o observe da Fase 3 roda pelo **FIO REAL**
-> (hook → cliente NativeAOT → daemon decide → mede latência; cliente sempre devolve `defer`), pois só ele
+> (hook → cliente NativeAOT → daemon decide → mede latência; cliente sempre **abstém** — NÃO emite
+> `permissionDecision`, stdout vazio, ver a correção §3.1 do daemon-design, 2026-07-01), pois só ele
 > caracteriza a **latência de concorrência** — condição pendente para liberar o enforce. O `-Observe`
 > in-process fica restrito a medir **cobertura** offline, não é o observe do fio.
 
