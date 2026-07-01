@@ -5,10 +5,10 @@
 // identidade (paridade B3), e DISPARA-E-SAI contra o named pipe do daemon:
 //   - canal disponivel (WaitNamedPipe)        -> connect, frame, resposta ESTRITA ("allow"/"defer"), emite §3.1;
 //   - canal AUSENTE (ERROR_FILE_NOT_FOUND)    -> TryAcquire NAO-bloqueante do mutex de guarda:
-//        adquiriu -> sobe o daemon DETACHED, segura guardWindowMs, escreve defer, libera; nao adquiriu -> defer;
+//        adquiriu -> sobe o daemon DETACHED, segura guardWindowMs, abstem (nada emitido), libera; nao adquiriu -> abstem;
 //   - existe-porem-ocupado / outra falha      -> defer (canal existe; nao sobe outro daemon).
 // INVARIANTE: isolado, NUNCA emite "allow"; allow so vem de um FRAME VALIDO do daemon com payload "allow".
-// Qualquer erro/timeout/identidade invalida/handshake divergente -> "defer", exit 0. NUNCA "deny".
+// Qualquer erro/timeout/identidade invalida/handshake divergente -> abster (nada emitido), exit 0. NUNCA "deny".
 //
 // Modos diagnostico (read-only; NAO leem stdin, NAO conectam, NAO decidem, JAMAIS emitem allow), usados
 // pelos self-tests de paridade (Passos D/E): --emit-pin e --emit-identity [startDir].
@@ -35,7 +35,7 @@ if (args.Length >= 1)
         }
         case "--observe":
             // Modo MEDICAO (Fase 3): exercita o fio real (sobe/consulta o daemon) e mede a latencia, mas
-            // SEMPRE devolve defer ao Claude Code (passivo). NAO e' diagnostico: le stdin e conecta.
+            // SEMPRE abstem (nao emite permissionDecision) ao Claude Code (passivo). NAO e' diagnostico: le stdin e conecta.
             return HookClient.Run(true);
         default:
             // Argumento desconhecido: fail-closed = abster (o hook real nunca passa args). Abster => NAO

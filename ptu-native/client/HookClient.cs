@@ -56,7 +56,7 @@ namespace Ptu.Client
 
         internal static int Run() { return Run(false); }
 
-        // observe=true (Fase 3): mede o fio real e SEMPRE devolve defer (passivo). observe=false: enforce,
+        // observe=true (Fase 3): mede o fio real e SEMPRE abstem (passivo, saida vazia). observe=false: enforce,
         // comportamento byte-identico ao anterior (a saida depende SO de r.Decision).
         internal static int Run(bool observe)
         {
