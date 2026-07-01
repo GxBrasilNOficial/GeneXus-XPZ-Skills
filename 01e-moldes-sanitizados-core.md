@@ -1553,6 +1553,144 @@ Endsub
 
 ```
 
+### Molde sanitizado de API 2 - tríade mínima autocontida (`ApiExemploMinima` + `procExemploApiList` + `SdtExemploApiResponse`)
+
+- Perfil: molde **mínimo autocontido** para criar um objeto `API` from-spec com segurança GAM, complementando o caso denso `APIExemploIntegracao` acima. É a **tríade fechada** `API` → `Procedure` de implementação → `SDT` de response.
+- Fronteira de dependência ("autocontido"): a **única** `ATTCUSTOMTYPE` externa é `sdt:SdtExemploApiResponse` (o próprio SDT da tríade). **Não** usa `exo:GAMSession, GeneXusSecurity` (isso é o 4º modo — auth manual via evento; o enforcement GAM real é pela annotation `[SecurityLevel]`) nem `sdt:Messages, GeneXus.Common` (o response carrega `Found/Code/Message` inline).
+- Segurança: usa `[SecurityLevel(Authorization)]` (grafia **provada** no parser; `Authorize` é rejeitado). Runtime GAM é pré-condição — ver `xpz-builder/responsibilities-by-type/api-gam-runtime.md`.
+- Evidência: forma provada por **import real** (não preview) em GeneXus 18 / KMW 4.0.187794 + GAM 3.15.78. Ordem de import: empacotar a API junto com o Procedure (como abaixo) ou fazer staging do Procedure antes — o import real valida a referência `API => Proc`.
+- Corpo do Procedure deliberadamente autocontido (monta um item literal, sem `For each` em Transaction real) para o molde não arrastar dependência de negócio; ao materializar, substituir pela lógica real.
+- Sanitização aplicada: `user=SANITIZED\USER`, `checksum` vazio, `guid`/`parentGuid`/`moduleGuid` neutralizados; `type`/`parentType` e os part-type GUIDs são canônicos (identidade de tipo, iguais entre KBs) e **preservados**.
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<Object parentGuid="55555555-5555-4555-8555-555555555555" user="SANITIZED\\USER" versionDate="0001-01-01T00:00:00.0000000" lastUpdate="2026-01-01T00:00:00.0000000Z" checksum="" fullyQualifiedName="SdtExemploApiResponse" moduleGuid="44444444-4444-4444-8444-444444444444" guid="11111111-1111-4111-8111-111111111111" name="SdtExemploApiResponse" type="447527b5-9210-4523-898b-5dccb17be60a" description="Sdt Exemplo Api Response" parent="PastaExemploApi" parentType="00000000-0000-0000-0000-000000000008">
+  <Part type="5c2aa9da-8fc4-4b6b-ae02-8db4fa48976a">
+    <Level Name="SdtExemploApiResponse">
+      <LevelInfo guid="11111111-1111-4111-8111-111111111112" name="SdtExemploApiResponse" type="a76e9340-bdb9-445d-8f81-cfd4ddd0b0f3" description="Sdt Exemplo Api Response" user="SANITIZED\\USER">
+        <Properties><Property><Name>Name</Name><Value>SdtExemploApiResponse</Value></Property><Property><Name>AttCollection</Name><Value>False</Value></Property></Properties>
+      </LevelInfo>
+      <Item guid="11111111-1111-4111-8111-111111111113" name="Id" type="f76e9340-bdb9-445d-8f81-cfd4ddd0b0f3" description="Id" user="SANITIZED\\USER">
+        <Properties><Property><Name>Name</Name><Value>Id</Value></Property><Property><Name>ATTCUSTOMTYPE</Name><Value>bas:Numeric</Value></Property><Property><Name>Length</Name><Value>7</Value></Property><Property><Name>Decimals</Name><Value>0</Value></Property><Property><Name>AttMaxLen</Name><Value>7</Value></Property></Properties>
+      </Item>
+      <Item guid="11111111-1111-4111-8111-111111111114" name="Nome" type="f76e9340-bdb9-445d-8f81-cfd4ddd0b0f3" description="Nome" user="SANITIZED\\USER">
+        <Properties><Property><Name>Name</Name><Value>Nome</Value></Property><Property><Name>ATTCUSTOMTYPE</Name><Value>bas:VarChar</Value></Property><Property><Name>Length</Name><Value>60</Value></Property><Property><Name>Decimals</Name><Value>0</Value></Property><Property><Name>AttMaxLen</Name><Value>60</Value></Property></Properties>
+      </Item>
+      <Item guid="11111111-1111-4111-8111-111111111115" name="Found" type="f76e9340-bdb9-445d-8f81-cfd4ddd0b0f3" description="Found" user="SANITIZED\\USER">
+        <Properties><Property><Name>Name</Name><Value>Found</Value></Property><Property><Name>ATTCUSTOMTYPE</Name><Value>bas:Boolean</Value></Property></Properties>
+      </Item>
+      <Item guid="11111111-1111-4111-8111-111111111116" name="Code" type="f76e9340-bdb9-445d-8f81-cfd4ddd0b0f3" description="Code" user="SANITIZED\\USER">
+        <Properties><Property><Name>Name</Name><Value>Code</Value></Property><Property><Name>ATTCUSTOMTYPE</Name><Value>bas:VarChar</Value></Property><Property><Name>Length</Name><Value>20</Value></Property><Property><Name>Decimals</Name><Value>0</Value></Property><Property><Name>AttMaxLen</Name><Value>20</Value></Property></Properties>
+      </Item>
+      <Item guid="11111111-1111-4111-8111-111111111117" name="Message" type="f76e9340-bdb9-445d-8f81-cfd4ddd0b0f3" description="Message" user="SANITIZED\\USER">
+        <Properties><Property><Name>Name</Name><Value>Message</Value></Property><Property><Name>ATTCUSTOMTYPE</Name><Value>bas:VarChar</Value></Property><Property><Name>Length</Name><Value>200</Value></Property><Property><Name>Decimals</Name><Value>0</Value></Property><Property><Name>AttMaxLen</Name><Value>200</Value></Property></Properties>
+      </Item>
+    </Level>
+    <Properties><Property><Name>IsDefault</Name><Value>False</Value></Property></Properties>
+  </Part>
+  <Part type="babf62c5-0111-49e9-a1c3-cc004d90900a">
+    <Properties />
+  </Part>
+  <Properties><Property><Name>Name</Name><Value>SdtExemploApiResponse</Value></Property><Property><Name>Description</Name><Value>Sdt Exemplo Api Response</Value></Property><Property><Name>IsDefault</Name><Value>False</Value></Property></Properties>
+</Object>
+```
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<Object parentGuid="55555555-5555-4555-8555-555555555555" user="SANITIZED\\USER" versionDate="0001-01-01T00:00:00.0000000" lastUpdate="2026-01-01T00:00:00.0000000Z" checksum="" fullyQualifiedName="procExemploApiList" moduleGuid="44444444-4444-4444-8444-444444444444" guid="22222222-2222-4222-8222-222222222222" name="procExemploApiList" type="84a12160-f59b-4ad7-a683-ea4481ac23e9" description="proc Exemplo Api List" parent="PastaExemploApi" parentType="00000000-0000-0000-0000-000000000008">
+  <Part type="528d1c06-a9c2-420d-bd35-21dca83f12ff">
+    <Source><![CDATA[&SdtExemploApiResponseCollection.Clear()
+
+&SdtExemploApiResponse = new()
+&SdtExemploApiResponse.Id = 1
+&SdtExemploApiResponse.Nome = !"Exemplo"
+&SdtExemploApiResponse.Found = true
+&SdtExemploApiResponse.Code = !"OK"
+&SdtExemploApiResponse.Message = !"Registro de exemplo."
+&SdtExemploApiResponseCollection.Add(&SdtExemploApiResponse)
+]]></Source>
+    <Properties><Property><Name>IsDefault</Name><Value>False</Value></Property></Properties>
+  </Part>
+  <Part type="c414ed00-8cc4-4f44-8820-4baf93547173">
+    <Properties />
+  </Part>
+  <Part type="9b0a32a3-de6d-4be1-a4dd-1b85d3741534">
+    <Source><![CDATA[parm(out:&SdtExemploApiResponseCollection);
+]]></Source>
+    <Properties><Property><Name>IsDefault</Name><Value>False</Value></Property></Properties>
+  </Part>
+  <Part type="763f0d8b-d8ac-4db4-8dd4-de8979f2b5b9">
+    <Properties />
+  </Part>
+  <Part type="e4c4ade7-53f0-4a56-bdfd-843735b66f47">
+    <Variable Name="SdtExemploApiResponse">
+      <Documentation />
+      <Properties><Property><Name>Name</Name><Value>SdtExemploApiResponse</Value></Property><Property><Name>ATTCUSTOMTYPE</Name><Value>sdt:SdtExemploApiResponse</Value></Property></Properties>
+    </Variable>
+    <Variable Name="SdtExemploApiResponseCollection">
+      <Documentation />
+      <Properties><Property><Name>Name</Name><Value>SdtExemploApiResponseCollection</Value></Property><Property><Name>ATTCUSTOMTYPE</Name><Value>sdt:SdtExemploApiResponse</Value></Property><Property><Name>AttCollection</Name><Value>True</Value></Property></Properties>
+    </Variable>
+    <Properties><Property><Name>IsDefault</Name><Value>False</Value></Property></Properties>
+  </Part>
+  <Part type="ad3ca970-19d0-44e1-a7b7-db05556e820c">
+    <Help>
+      <HelpItem>
+        <Language>88313f43-5eb2-0000-0028-e8d9f5bf9588-Portuguese</Language>
+        <Content />
+      </HelpItem>
+    </Help>
+    <Properties><Property><Name>IsDefault</Name><Value>False</Value></Property></Properties>
+  </Part>
+  <Part type="babf62c5-0111-49e9-a1c3-cc004d90900a">
+    <Properties />
+  </Part>
+  <Properties><Property><Name>Name</Name><Value>procExemploApiList</Value></Property><Property><Name>Description</Name><Value>proc Exemplo Api List</Value></Property><Property><Name>IsDefault</Name><Value>False</Value></Property></Properties>
+</Object>
+```
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<Object parentGuid="55555555-5555-4555-8555-555555555555" user="SANITIZED\\USER" versionDate="0001-01-01T00:00:00.0000000" lastUpdate="2026-01-01T00:00:00.0000000Z" checksum="" fullyQualifiedName="ApiExemploMinima" moduleGuid="44444444-4444-4444-8444-444444444444" guid="33333333-3333-4333-8333-333333333333" name="ApiExemploMinima" type="36e32e2d-023e-4188-95df-d13573bac2e0" description="Api Exemplo Minima" parent="PastaExemploApi" parentType="00000000-0000-0000-0000-000000000008">
+  <Part type="9f577ec2-27f4-4cf4-8ad5-f3f50c9d69b5">
+    <Source><![CDATA[Service
+{
+	[SecurityLevel(Authorization)]
+	[RestMethod(GET)]
+	[RestPath("/itens")]
+	List(out:&SdtExemploApiResponseCollection)
+	=> procExemploApiList(&SdtExemploApiResponseCollection);
+}
+]]></Source>
+    <Properties><Property><Name>IsDefault</Name><Value>False</Value></Property></Properties>
+  </Part>
+  <Part type="c44bd5ff-f918-415b-98e6-aca44fed84fa">
+    <Source><![CDATA[]]></Source>
+    <Properties><Property><Name>IsDefault</Name><Value>False</Value></Property></Properties>
+  </Part>
+  <Part type="e4c4ade7-53f0-4a56-bdfd-843735b66f47">
+    <Variable Name="SdtExemploApiResponseCollection">
+      <Documentation />
+      <Properties><Property><Name>Name</Name><Value>SdtExemploApiResponseCollection</Value></Property><Property><Name>ATTCUSTOMTYPE</Name><Value>sdt:SdtExemploApiResponse</Value></Property><Property><Name>AttCollection</Name><Value>True</Value></Property></Properties>
+    </Variable>
+    <Properties><Property><Name>IsDefault</Name><Value>False</Value></Property></Properties>
+  </Part>
+  <Part type="ad3ca970-19d0-44e1-a7b7-db05556e820c">
+    <Help>
+      <HelpItem>
+        <Language>88313f43-5eb2-0000-0028-e8d9f5bf9588-Portuguese</Language>
+        <Content />
+      </HelpItem>
+    </Help>
+    <Properties><Property><Name>IsDefault</Name><Value>False</Value></Property></Properties>
+  </Part>
+  <Part type="babf62c5-0111-49e9-a1c3-cc004d90900a">
+    <Properties />
+  </Part>
+  <Properties><Property><Name>Name</Name><Value>ApiExemploMinima</Value></Property><Property><Name>Description</Name><Value>Api Exemplo Minima</Value></Property><Property><Name>GENERATE_OPEN_API</Name><Value>Yes</Value></Property><Property><Name>IsDefault</Name><Value>False</Value></Property></Properties>
+</Object>
+```
+
 ## Moldes sanitizados completos de WorkWithForWeb
 
 - Evidência direta: o acervo usado nesta base contem 183 objetos WorkWithForWeb.
