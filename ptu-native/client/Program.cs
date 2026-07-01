@@ -38,8 +38,9 @@ if (args.Length >= 1)
             // SEMPRE devolve defer ao Claude Code (passivo). NAO e' diagnostico: le stdin e conecta.
             return HookClient.Run(true);
         default:
-            // Argumento desconhecido: fail-closed (o hook real nunca passa args).
-            HookClient.WriteHookOutput("defer", HookClient.ReasonLocal);
+            // Argumento desconhecido: fail-closed = abster (o hook real nunca passa args). Abster => NAO
+            // emite permissionDecision (EmitStep31 com 'defer' interno nao escreve nada; §3.1). Exit 0.
+            HookClient.EmitStep31("defer", HookClient.ReasonLocal);
             return 0;
     }
 }

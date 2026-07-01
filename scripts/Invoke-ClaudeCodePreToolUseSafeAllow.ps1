@@ -80,4 +80,10 @@ catch {
     $reason = "ptu v$script:PtuSafeAllowVersion fail-closed"
 }
 
-Get-PtuHookOutput -Decision $decision -Reason $reason
+# "Boca" §3.1: SO 'allow' emite permissionDecision. Abster ('defer' interno, inclui fail-closed e o modo
+# -Observe) => NAO emite nada (stdout vazio) e o fluxo normal de permissao do Claude Code segue -- a
+# allowlist do usuario decide. NUNCA 'ask'/'deny'; 'defer' na saida QUEBRA o modo interativo (headless-only).
+# Verificado empiricamente 2026-06-30. Ver claude-code-pretooluse-daemon-design.md §3.1.
+if ($decision -eq 'allow') {
+    Get-PtuHookOutput -Decision 'allow' -Reason $reason
+}

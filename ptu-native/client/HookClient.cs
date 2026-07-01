@@ -33,6 +33,9 @@ namespace Ptu.Client
         private const string Version = "1.0.0";
 
         // Reasons (o §8 normaliza SO o valor de permissionDecisionReason; conteudo nao afeta a paridade).
+        // Apos a correcao "abster = emitir nada" (verificado 2026-06-30), SO o caminho 'allow' emite reason;
+        // ReasonLocal/ReasonObserve NAO vao mais a boca §3.1 (abster nao emite permissionDecision) -- ficam
+        // p/ telemetria/log futuro. Ver EmitStep31 e design §3.1.
         internal const string ReasonDaemon  = "ptu-daemon v" + Version;
         internal const string ReasonLocal   = "ptu-client v" + Version + " fail-closed";
         internal const string ReasonObserve = "ptu-observe v" + Version + " passive";
@@ -90,17 +93,19 @@ namespace Ptu.Client
             return new DispatchResult { Decision = "defer", LatencyMs = 0, Outcome = outcome, Path = "-" };
         }
 
-        // Emite a saida §3.1. No enforce: a decisao do daemon (allow/defer). No observe: grava a linha de
-        // medicao e FORCA defer (passivo: mede tudo, decide nada). id==null no observe -> sem log, so defer.
+        // Emite a saida §3.1. No enforce: SO 'allow' vira permissionDecision; abster (defer interno) -> nada.
+        // No observe: grava a linha de medicao e SEMPRE abstem (passivo: mede tudo, decide nada -> boca vazia).
+        // id==null no observe -> sem log, so abster.
         private static int Finish(bool observe, string requestId, PtuIdentity id, DispatchResult r)
         {
             if (observe)
             {
                 if (id != null) { ObserveLog.Write(id.ObserveLogPath, requestId, r.Decision, r.Outcome, r.LatencyMs, r.Path); }
-                WriteHookOutput("defer", ReasonObserve);
+                // Observe passivo: SEMPRE abster -> NAO emite permissionDecision. A decisao que TERIA sido
+                // tomada segue no log de medicao, nunca na saida §3.1.
                 return 0;
             }
-            WriteHookOutput(r.Decision, r.Decision == "allow" ? ReasonDaemon : ReasonLocal);
+            EmitStep31(r.Decision, ReasonDaemon);
             return 0;
         }
 
@@ -316,9 +321,22 @@ namespace Ptu.Client
         }
 
         // ------------------------------------------------------------------------------------------------
-        // Saida §3.1: byte-a-byte com Get-PtuHookOutput (ConvertTo-Json -Compress). So permissionDecision
-        // varia entre allow/defer; ordem hookEventName->permissionDecision->permissionDecisionReason, sem
-        // espacos. NUNCA "deny". Bytes UTF-8 crus no stdout (sem code page).
+        // "Boca" §3.1 ao Claude Code: SO a decisao 'allow' emite permissionDecision. Abster (o 'defer'
+        // INTERNO do protocolo/decisao) => NAO emite nada (stdout vazio, exit 0), e o fluxo normal de
+        // permissao segue -- a allowlist do usuario decide. NUNCA 'ask' (forcaria prompt sobre comando ja
+        // auto-aprovado = REGRESSAO) NEM 'deny'. 'defer' na saida QUEBRA o modo interativo (headless-only,
+        // hooks-guide l.586). Verificado empiricamente 2026-06-30 (2 sondas no Claude Code interativo). §3.1.
+        // ------------------------------------------------------------------------------------------------
+        internal static void EmitStep31(string decision, string reason)
+        {
+            if (decision == "allow") { WriteHookOutput("allow", reason); }
+            // abster: nada no stdout.
+        }
+
+        // ------------------------------------------------------------------------------------------------
+        // Emissor CRU do JSON §3.1 (byte-a-byte com Get-PtuHookOutput / ConvertTo-Json -Compress): ordem
+        // hookEventName->permissionDecision->permissionDecisionReason, sem espacos. Chamado SO por EmitStep31
+        // no caminho 'allow'. Bytes UTF-8 crus no stdout (sem code page).
         // ------------------------------------------------------------------------------------------------
         internal static void WriteHookOutput(string decision, string reason)
         {

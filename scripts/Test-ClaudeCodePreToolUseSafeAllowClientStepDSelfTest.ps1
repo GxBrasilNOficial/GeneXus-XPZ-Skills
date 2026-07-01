@@ -99,7 +99,10 @@ function Invoke-PtuClientExe {
     return $out
 }
 function Get-PtuDecisionField {
+    # SAIDA §3.1: 'allow' -> 'allow'; ABSTER = saida VAZIA (nenhum permissionDecision) -> sentinela
+    # '(abstain)'. Um 'defer'/'ask' LITERAL na boca (regressao) cai no parse e devolve o valor -> pego.
     param([string] $Json)
+    if ([string]::IsNullOrWhiteSpace($Json)) { return '(abstain)' }
     try { $o = $Json | ConvertFrom-Json; return [string]$o.hookSpecificOutput.permissionDecision } catch { return '<unparseable>' }
 }
 function ConvertTo-PtuNormalized {
@@ -228,19 +231,19 @@ try {
 
     # validos
     Test-PtuStrictResponse -Name 'B-allow'  -PipeName $pipeB -ExePath $exeB -Deploy $depB -Stdin $jsonB -Magic 1 -Proto 1 -DeclaredLen 5 -Payload (Bytes 'allow') -Expected 'allow'
-    Test-PtuStrictResponse -Name 'B-defer'  -PipeName $pipeB -ExePath $exeB -Deploy $depB -Stdin $jsonB -Magic 1 -Proto 1 -DeclaredLen 5 -Payload (Bytes 'defer') -Expected 'defer'
+    Test-PtuStrictResponse -Name 'B-defer'  -PipeName $pipeB -ExePath $exeB -Deploy $depB -Stdin $jsonB -Magic 1 -Proto 1 -DeclaredLen 5 -Payload (Bytes 'defer') -Expected '(abstain)'
     # hostis -> sempre defer
-    Test-PtuStrictResponse -Name 'B-trailspace'  -PipeName $pipeB -ExePath $exeB -Deploy $depB -Stdin $jsonB -Magic 1 -Proto 1 -DeclaredLen 6 -Payload (Bytes 'allow ') -Expected 'defer'
-    Test-PtuStrictResponse -Name 'B-leadspace'   -PipeName $pipeB -ExePath $exeB -Deploy $depB -Stdin $jsonB -Magic 1 -Proto 1 -DeclaredLen 6 -Payload (Bytes ' allow') -Expected 'defer'
-    Test-PtuStrictResponse -Name 'B-upper'       -PipeName $pipeB -ExePath $exeB -Deploy $depB -Stdin $jsonB -Magic 1 -Proto 1 -DeclaredLen 5 -Payload (Bytes 'ALLOW') -Expected 'defer'
-    Test-PtuStrictResponse -Name 'B-nul'         -PipeName $pipeB -ExePath $exeB -Deploy $depB -Stdin $jsonB -Magic 1 -Proto 1 -DeclaredLen 6 -Payload ([byte[]]@(97,108,108,111,119,0)) -Expected 'defer'
-    Test-PtuStrictResponse -Name 'B-allowdefer'  -PipeName $pipeB -ExePath $exeB -Deploy $depB -Stdin $jsonB -Magic 1 -Proto 1 -DeclaredLen 10 -Payload (Bytes 'allowdefer') -Expected 'defer'
-    Test-PtuStrictResponse -Name 'B-json'        -PipeName $pipeB -ExePath $exeB -Deploy $depB -Stdin $jsonB -Magic 1 -Proto 1 -DeclaredLen 20 -Payload (Bytes '{"decision":"allow"}') -Expected 'defer'
-    Test-PtuStrictResponse -Name 'B-magic2'      -PipeName $pipeB -ExePath $exeB -Deploy $depB -Stdin $jsonB -Magic 2 -Proto 1 -DeclaredLen 5 -Payload (Bytes 'allow') -Expected 'defer'
-    Test-PtuStrictResponse -Name 'B-magic9'      -PipeName $pipeB -ExePath $exeB -Deploy $depB -Stdin $jsonB -Magic 9 -Proto 1 -DeclaredLen 5 -Payload (Bytes 'allow') -Expected 'defer'
-    Test-PtuStrictResponse -Name 'B-proto2'      -PipeName $pipeB -ExePath $exeB -Deploy $depB -Stdin $jsonB -Magic 1 -Proto 2 -DeclaredLen 5 -Payload (Bytes 'allow') -Expected 'defer'
-    Test-PtuStrictResponse -Name 'B-lenoverflow' -PipeName $pipeB -ExePath $exeB -Deploy $depB -Stdin $jsonB -Magic 1 -Proto 1 -DeclaredLen 70000 -Payload (Bytes 'allow') -Expected 'defer'
-    Test-PtuStrictResponse -Name 'B-truncated'   -PipeName $pipeB -ExePath $exeB -Deploy $depB -Stdin $jsonB -Magic 1 -Proto 1 -DeclaredLen 50 -Payload (Bytes 'al') -Expected 'defer'
+    Test-PtuStrictResponse -Name 'B-trailspace'  -PipeName $pipeB -ExePath $exeB -Deploy $depB -Stdin $jsonB -Magic 1 -Proto 1 -DeclaredLen 6 -Payload (Bytes 'allow ') -Expected '(abstain)'
+    Test-PtuStrictResponse -Name 'B-leadspace'   -PipeName $pipeB -ExePath $exeB -Deploy $depB -Stdin $jsonB -Magic 1 -Proto 1 -DeclaredLen 6 -Payload (Bytes ' allow') -Expected '(abstain)'
+    Test-PtuStrictResponse -Name 'B-upper'       -PipeName $pipeB -ExePath $exeB -Deploy $depB -Stdin $jsonB -Magic 1 -Proto 1 -DeclaredLen 5 -Payload (Bytes 'ALLOW') -Expected '(abstain)'
+    Test-PtuStrictResponse -Name 'B-nul'         -PipeName $pipeB -ExePath $exeB -Deploy $depB -Stdin $jsonB -Magic 1 -Proto 1 -DeclaredLen 6 -Payload ([byte[]]@(97,108,108,111,119,0)) -Expected '(abstain)'
+    Test-PtuStrictResponse -Name 'B-allowdefer'  -PipeName $pipeB -ExePath $exeB -Deploy $depB -Stdin $jsonB -Magic 1 -Proto 1 -DeclaredLen 10 -Payload (Bytes 'allowdefer') -Expected '(abstain)'
+    Test-PtuStrictResponse -Name 'B-json'        -PipeName $pipeB -ExePath $exeB -Deploy $depB -Stdin $jsonB -Magic 1 -Proto 1 -DeclaredLen 20 -Payload (Bytes '{"decision":"allow"}') -Expected '(abstain)'
+    Test-PtuStrictResponse -Name 'B-magic2'      -PipeName $pipeB -ExePath $exeB -Deploy $depB -Stdin $jsonB -Magic 2 -Proto 1 -DeclaredLen 5 -Payload (Bytes 'allow') -Expected '(abstain)'
+    Test-PtuStrictResponse -Name 'B-magic9'      -PipeName $pipeB -ExePath $exeB -Deploy $depB -Stdin $jsonB -Magic 9 -Proto 1 -DeclaredLen 5 -Payload (Bytes 'allow') -Expected '(abstain)'
+    Test-PtuStrictResponse -Name 'B-proto2'      -PipeName $pipeB -ExePath $exeB -Deploy $depB -Stdin $jsonB -Magic 1 -Proto 2 -DeclaredLen 5 -Payload (Bytes 'allow') -Expected '(abstain)'
+    Test-PtuStrictResponse -Name 'B-lenoverflow' -PipeName $pipeB -ExePath $exeB -Deploy $depB -Stdin $jsonB -Magic 1 -Proto 1 -DeclaredLen 70000 -Payload (Bytes 'allow') -Expected '(abstain)'
+    Test-PtuStrictResponse -Name 'B-truncated'   -PipeName $pipeB -ExePath $exeB -Deploy $depB -Stdin $jsonB -Magic 1 -Proto 1 -DeclaredLen 50 -Payload (Bytes 'al') -Expected '(abstain)'
 
     # ==============================================================================================
     # C) Paridade do JSON §3.1 cliente <-> decisor in-process (allow e defer)
@@ -284,11 +287,11 @@ try {
         Assert-True ($exeAllowOut.StartsWith($prefix, [System.StringComparison]::Ordinal)) "C: prefixo §3.1 do cliente (allow) divergente (out=$exeAllowOut)"
         Assert-True ((ConvertTo-PtuNormalized $exeAllowOut) -ceq (ConvertTo-PtuNormalized $decAllowOut)) "C: §3.1 normalizado allow cliente != decisor"
     }
-    Assert-True ($null -ne $exeDeferOut -and (Get-PtuDecisionField $exeDeferOut) -ceq 'defer') "C: cliente nao deu defer (out=$exeDeferOut)"
-    Assert-True ((Get-PtuDecisionField $decDeferOut) -ceq 'defer') "C: decisor in-process nao deu defer (out=$decDeferOut)"
-    if ($null -ne $exeDeferOut) {
-        Assert-True ((ConvertTo-PtuNormalized $exeDeferOut) -ceq (ConvertTo-PtuNormalized $decDeferOut)) "C: §3.1 normalizado defer cliente != decisor"
-    }
+    # abster (defer interno): a boca §3.1 fica VAZIA nos dois lados (nenhum permissionDecision).
+    Assert-True ((Get-PtuDecisionField $exeDeferOut) -ceq '(abstain)') "C: cliente nao absteve (out=[$exeDeferOut])"
+    Assert-True ((Get-PtuDecisionField $decDeferOut) -ceq '(abstain)') "C: decisor in-process nao absteve (out=[$decDeferOut])"
+    # Paridade da abstencao = ambos VAZIOS (byte-a-byte trivial: nada emitido).
+    Assert-True ([string]::IsNullOrWhiteSpace($exeDeferOut) -and [string]::IsNullOrWhiteSpace($decDeferOut)) "C: abster deveria dar saida VAZIA nos dois (cli=[$exeDeferOut] dec=[$decDeferOut])"
 
     # ==============================================================================================
     # D) Invariante: cliente ISOLADO (deploy SEM daemon) NUNCA emite allow, nem in-scope
@@ -300,7 +303,7 @@ try {
     $jsonD = @{ tool_name = 'Bash'; tool_input = @{ command = 'git status' }; cwd = $depD } | ConvertTo-Json -Compress
     for ($i = 0; $i -lt 3; $i++) {
         $o = Invoke-PtuClientExe -ExePath $exeD -Stdin $jsonD -EnvOverride @{ PTU_SAFE_ALLOW_ROOTS = $depD }
-        Assert-True ((Get-PtuDecisionField $o) -ceq 'defer') "D: cliente isolado emitiu nao-defer (iter $i, out=$o)"
+        Assert-True ((Get-PtuDecisionField $o) -ceq '(abstain)') "D: cliente isolado nao absteve (emitiu algo) (iter $i, out=[$o])"
     }
 
     # ==============================================================================================
@@ -311,7 +314,7 @@ try {
     $exeE = Get-PtuExePath -DeployDir $depE
     $jsonE = @{ tool_name = 'Bash'; tool_input = @{ command = 'git status' }; cwd = 'C:/qualquer' } | ConvertTo-Json -Compress
     $oE = Invoke-PtuClientExe -ExePath $exeE -Stdin $jsonE -EnvOverride @{ PTU_SAFE_ALLOW_ROOTS = $depE }
-    Assert-True ((Get-PtuDecisionField $oE) -ceq 'defer') "E: identidade invalida nao deu defer (out=$oE)"
+    Assert-True ((Get-PtuDecisionField $oE) -ceq '(abstain)') "E: identidade invalida nao absteve (out=[$oE])"
     Assert-True (Test-Path -LiteralPath $identityInvalidLog) "E: log identity-invalid nao foi gravado"
     if (Test-Path -LiteralPath $identityInvalidLog) {
         $logTxt = (Get-Content -Raw -LiteralPath $identityInvalidLog)
@@ -340,7 +343,7 @@ try {
 
     try {
         $oCold = Invoke-PtuClientExe -ExePath $exeF -Stdin $jsonF -EnvOverride @{ PTU_SAFE_ALLOW_ROOTS = $depF }
-        Assert-True ((Get-PtuDecisionField $oCold) -ceq 'defer') "F: frio (canal ausente) nao deu defer (out=$oCold)"
+        Assert-True ((Get-PtuDecisionField $oCold) -ceq '(abstain)') "F: frio (canal ausente) nao absteve (out=[$oCold])"
 
         $ready = Wait-PtuPipeExists -PipeName $pipeF -TimeoutMs 25000
         Assert-True $ready "F: daemon real nao subiu (pipe nao ficou disponivel)"
@@ -358,7 +361,7 @@ try {
 
             # Daemon agora QUENTE: out-of-scope deve deferir por ESCOPO (nao por warmup).
             $oHotOut = Invoke-PtuClientExe -ExePath $exeF -Stdin $jsonFout -EnvOverride @{ PTU_SAFE_ALLOW_ROOTS = $depF }
-            Assert-True ((Get-PtuDecisionField $oHotOut) -ceq 'defer') "F: quente out-of-scope nao deu defer (out=$oHotOut)"
+            Assert-True ((Get-PtuDecisionField $oHotOut) -ceq '(abstain)') "F: quente out-of-scope nao absteve (out=[$oHotOut])"
         }
     } finally {
         Send-PtuShutdown -PipeName $pipeF

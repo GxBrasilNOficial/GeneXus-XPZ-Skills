@@ -172,9 +172,9 @@ try {
     $cmd1 = 'git status # ' + $sentinela
     $out1 = Invoke-PtuObserveAgainstFake -Payload 'allow' -Command $cmd1 -DeployDir $dep1 -ExePath $exe1 -PipeName $id1.Names.PipeName
 
-    # Caso 1: passividade -> defer + reason observe (mesmo o fake dizendo allow)
-    Assert-True ((Get-PtuDecisionField -Json $out1) -ceq 'defer') "1: observe deveria devolver defer (out=$out1)"
-    Assert-True ((Get-PtuReasonField -Json $out1) -match 'observe') "1: reason deveria conter 'observe' (out=$out1)"
+    # Caso 1: passividade -> ABSTER (boca §3.1 VAZIA), mesmo o fake dizendo allow. O que "teria" decidido
+    # (allow) fica so no log de medicao (caso 2), nunca na saida ao Claude Code.
+    Assert-True ([string]::IsNullOrWhiteSpace($out1)) "1: observe deveria abster (saida VAZIA) (out=[$out1])"
 
     # Caso 2: log fiel (6 colunas TSV; wouldDecision/outcome/path/latencyMs/requestId)
     $lines1 = @(Read-PtuObserveLines -Path $log1)
@@ -207,7 +207,7 @@ try {
     $log4 = Get-PtuObserveLogPath -Hash $id4.IdentityHash; $obsLogs.Add($log4)
     Clear-PtuFile -Path $log4
     $out4 = Invoke-PtuObserveAgainstFake -Payload 'defer' -Command 'git status' -DeployDir $dep4 -ExePath $exe4 -PipeName $id4.Names.PipeName
-    Assert-True ((Get-PtuDecisionField -Json $out4) -ceq 'defer') "4: observe deveria devolver defer (out=$out4)"
+    Assert-True ([string]::IsNullOrWhiteSpace($out4)) "4: observe deveria abster (saida VAZIA) (out=[$out4])"
     $lines4 = @(Read-PtuObserveLines -Path $log4)
     Assert-True ($lines4.Count -ge 1) "4: log de medicao vazio/ausente ($log4)"
     if ($lines4.Count -ge 1) {
@@ -225,7 +225,7 @@ try {
     Clear-PtuFile -Path $log5
     $json5 = @{ tool_name = 'Bash'; tool_input = @{ command = 'git status' }; cwd = $dep5 } | ConvertTo-Json -Compress
     $out5 = Invoke-PtuClientExe -ExePath $exe5 -Stdin $json5 -EnvOverride @{ PTU_SAFE_ALLOW_ROOTS = $dep5 } -ExeArgs @('--observe')
-    Assert-True ((Get-PtuDecisionField -Json $out5) -ceq 'defer') "5: observe frio deveria devolver defer (out=$out5)"
+    Assert-True ([string]::IsNullOrWhiteSpace($out5)) "5: observe frio deveria abster (saida VAZIA) (out=[$out5])"
     $lines5 = @(Read-PtuObserveLines -Path $log5)
     Assert-True ($lines5.Count -ge 1) "5: log de medicao vazio/ausente ($log5)"
     if ($lines5.Count -ge 1) {
