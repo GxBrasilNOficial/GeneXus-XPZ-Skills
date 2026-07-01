@@ -202,6 +202,10 @@ function Invoke-PtuWire {
     # Merge cirurgico TEXTUAL (por linhas ancoradas) do hook PreToolUse no settings.json. Preserva o resto
     # do arquivo byte-a-byte (permissions.allow, SessionStart, etc.). Fail-closed: valida o JSON de entrada
     # e o de saida; se o resultado nao parseia, NAO grava. Backup timestamped antes de qualquer gravacao.
+    # LIMITACAO CONHECIDA (verificada 2026-07-01): reconhece SO o formato multi-linha canonico do objeto
+    # hooks e do bloco PreToolUse (o mesmo que este script grava, e o que o Claude Code usa). Um PreToolUse
+    # pre-existente em formato compacto/inline -> aborta fail-closed por "formato inesperado" (NUNCA corrompe
+    # o arquivo); robustez a formatos arbitrarios e' frente futura (ver 999).
     param([string] $Mode, [string] $DeployDir, [string] $SettingsPath)
     if (-not (Test-Path -LiteralPath $SettingsPath)) { throw "settings.json nao encontrado: $SettingsPath" }
     $exe = Join-Path $DeployDir 'ptu-client.exe'
