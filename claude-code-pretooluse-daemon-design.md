@@ -105,8 +105,10 @@ O cliente reproduz **byte-a-byte** o formato do decisor atual (`Get-PtuHookOutpu
 {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow","permissionDecisionReason":"ptu-daemon vX"}}
 ```
 
-Para `defer`, idêntico com `"permissionDecision":"defer"`. **Nunca** `deny`. O self-test (§8) compara
-o payload do cliente com o do decisor in-process para o mesmo input.
+Para **abster-se** (o `defer` **interno** da decisão), o cliente **NÃO emite `permissionDecision`** —
+stdout vazio, exit 0 (ver a **CORREÇÃO APLICADA** logo abaixo, verificada no fio real 2026-07-01).
+**Nunca** `deny` nem `ask`. O self-test (§8) compara o payload do cliente com o do decisor in-process para
+o mesmo input (allow → JSON idêntico; abster → ambos vazios).
 
 > **CORREÇÃO APLICADA 2026-07-01 (verificação empírica das sondas em 2026-06-30 — autorizada pelo autor, dispensa painel):
 > abster-se = NÃO emitir `permissionDecision` (saída vazia), NUNCA `defer` NEM `ask`.** Duas sondas no
