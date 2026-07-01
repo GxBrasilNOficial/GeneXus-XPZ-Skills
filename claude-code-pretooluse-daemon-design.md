@@ -108,7 +108,7 @@ O cliente reproduz **byte-a-byte** o formato do decisor atual (`Get-PtuHookOutpu
 Para `defer`, idêntico com `"permissionDecision":"defer"`. **Nunca** `deny`. O self-test (§8) compara
 o payload do cliente com o do decisor in-process para o mesmo input.
 
-> **CORREÇÃO PENDENTE (verificação empírica, 2026-06-30 — autorizada pelo autor, dispensa painel):
+> **CORREÇÃO APLICADA 2026-07-01 (verificação empírica das sondas em 2026-06-30 — autorizada pelo autor, dispensa painel):
 > abster-se = NÃO emitir `permissionDecision` (saída vazia), NUNCA `defer` NEM `ask`.** Duas sondas no
 > Claude Code **interativo** (hook temporário, backup/restore do settings.json): (a) `permissionDecision
 > "defer"` **QUEBRA** (erro interno / tool result perdido) — `defer` é **headless-only** (`-p`/Agent SDK;
@@ -122,7 +122,14 @@ o payload do cliente com o do decisor in-process para o mesmo input.
 > (stdout vazio, exit 0); nunca `ask`, nunca `deny`. `defer` permanece **token interno** do
 > protocolo/decisão/gate §8. Toca a "boca" (`HookClient.WriteHookOutput` + `Get-PtuHookOutput`) + os
 > self-tests que conferem a saída §3.1 (passam a esperar saída **VAZIA** na abstenção) + este §3.1.
-> **PENDENTE de implementar — bloqueia o wire (Passo G2.2).**
+> **APLICADO 2026-07-01:** `EmitStep31` no cliente (`HookClient.cs`) emite `permissionDecision` só no
+> `allow`; abster → nada. Mesma regra no decisor in-process (`Invoke-ClaudeCodePreToolUseSafeAllow.ps1`,
+> condicional em `Get-PtuHookOutput`) e nos self-tests que conferem a saída §3.1 (sentinela `(abstain)` p/
+> saída vazia; o wire do daemon mantém `defer`). 4 self-tests verdes (ClientStepD, Observe, SafeAllow
+> in-process, gate §8). **Confirmado no fio real:** hook `PreToolUse[Bash] --observe` no Claude Code
+> interativo — `echo` rodou sem prompt (a allowlist decidiu) e o log de medição registrou a linha, provando
+> que `abster` = saída vazia é aceita como *no decision*. Wire (Passo G2.2) entregue via
+> `Install -Wire observe|enforce|off` e ativo em observe (Fase 3).
 
 ## 4. A decisão central — tokenização, IPC e runtime do cliente
 

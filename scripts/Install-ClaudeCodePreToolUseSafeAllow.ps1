@@ -24,7 +24,16 @@ Tudo FAIL-CLOSED: qualquer etapa que falhe -> excecao -> nada e' depositado.
 [CmdletBinding()]
 param(
     [switch] $Force,     # rebuilda mesmo com o pin batendo
-    [switch] $SkipGate   # pula o gate §8 (apenas iteracao de dev)
+    [switch] $SkipGate,  # pula o gate §8 (apenas iteracao de dev)
+    # WIRE (G2.2): grava/remove o hook PreToolUse no ~/.claude/settings.json apontando p/ o EXE deployado.
+    # Com -Wire, o script SO faz a operacao de wire (nao deploya/rebuilda/roda gate). Modos:
+    #   observe -> hook com args ["--observe"] (passivo: mede o fio, SEMPRE abstem);
+    #   enforce -> hook com args [] (modo real: allow/abster de verdade);
+    #   off     -> remove o hook do produto (reversao; o backup timestamped tambem reverte).
+    [ValidateSet('observe', 'enforce', 'off')]
+    [string] $Wire,
+    # So com -Wire. Default ~/.claude/settings.json. Serve p/ testar o merge numa COPIA sem tocar o real.
+    [string] $SettingsPath
 )
 
 Set-StrictMode -Version Latest
@@ -159,6 +168,117 @@ function Clear-PtuBuildResiduals {
     }
     Start-Sleep -Seconds 2
     Write-Host "ptu-install: residuais de build limpos ($killed processo(s) do rebuild)."
+}
+
+function Get-PtuHookBlockText {
+    # Linhas do bloco canonico do hook PreToolUse do produto, indentado p/ o settings.json (2 espacos por
+    # nivel; a chave hooks fica no nivel 1, entao PreToolUse comeca com 4 espacos). O 'command' leva o path
+    # do EXE com backslashes escapados p/ JSON. Termina com '],' pois o bloco e' inserido ANTES da 1a chave
+    # existente do objeto hooks. EOL aplicado pelo chamador (join).
+    param([string] $ExePath, [string] $Mode)
+    $escaped = $ExePath.Replace('\', '\\')
+    $argsJson = if ($Mode -eq 'observe') { '["--observe"]' } else { '[]' }
+    return @(
+        '    "PreToolUse": ['
+        '      {'
+        '        "matcher": "Bash",'
+        '        "hooks": ['
+        '          {'
+        '            "type": "command",'
+        '            "command": "' + $escaped + '",'
+        '            "args": ' + $argsJson + ','
+        '            "timeout": 10'
+        '          }'
+        '        ]'
+        '      }'
+        '    ],'
+    )
+}
+
+function Invoke-PtuWire {
+    # Merge cirurgico TEXTUAL (por linhas ancoradas) do hook PreToolUse no settings.json. Preserva o resto
+    # do arquivo byte-a-byte (permissions.allow, SessionStart, etc.). Fail-closed: valida o JSON de entrada
+    # e o de saida; se o resultado nao parseia, NAO grava. Backup timestamped antes de qualquer gravacao.
+    param([string] $Mode, [string] $DeployDir, [string] $SettingsPath)
+    if (-not (Test-Path -LiteralPath $SettingsPath)) { throw "settings.json nao encontrado: $SettingsPath" }
+    $exe = Join-Path $DeployDir 'ptu-client.exe'
+    if ($Mode -ne 'off' -and -not (Test-Path -LiteralPath $exe)) {
+        throw "EXE deployado ausente: $exe -- rode o deploy (Install sem -Wire) antes do wire."
+    }
+
+    $raw = [System.IO.File]::ReadAllText($SettingsPath)
+    try { $null = $raw | ConvertFrom-Json } catch { throw "settings.json de entrada invalido (nao parseia): $($_.Exception.Message)" }
+
+    $eol = if ($raw.Contains("`r`n")) { "`r`n" } else { "`n" }
+    $lines = @($raw -split "`r?`n")
+
+    # Localiza a chave hooks (nivel 1) e um PreToolUse existente (+ seu fechamento no nivel da chave: 4
+    # espacos + ']' com virgula opcional). O produto controla a formatacao do bloco que grava.
+    $hooksIdx = -1; $preIdx = -1; $preEndIdx = -1
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        if ($hooksIdx -lt 0 -and $lines[$i] -match '^\s{2}"hooks"\s*:\s*\{') { $hooksIdx = $i }
+        if ($preIdx -lt 0 -and $lines[$i] -match '^\s{4}"PreToolUse"\s*:\s*\[') { $preIdx = $i }
+    }
+    if ($preIdx -ge 0) {
+        for ($j = $preIdx + 1; $j -lt $lines.Count; $j++) {
+            if ($lines[$j] -match '^\s{4}\],?\s*$') { $preEndIdx = $j; break }
+        }
+        if ($preEndIdx -lt 0) { throw "PreToolUse encontrado mas o fechamento (4 espacos + ']') nao -- formato inesperado; abortado." }
+        $existing = ($lines[$preIdx..$preEndIdx] -join "`n")
+        if ($existing -notmatch 'ptu-client\.exe') {
+            throw "ja existe um hook PreToolUse que NAO e' deste produto (sem ptu-client.exe) -- abortado p/ nao mexer em hook de terceiro."
+        }
+    }
+
+    # Remove o bloco existente do produto (se houver), preservando o resto.
+    if ($preIdx -ge 0) {
+        $out = [System.Collections.Generic.List[string]]::new()
+        for ($i = 0; $i -lt $lines.Count; $i++) { if ($i -lt $preIdx -or $i -gt $preEndIdx) { [void]$out.Add($lines[$i]) } }
+        $lines = @($out.ToArray())
+        # o hooksIdx pode ter mudado se o PreToolUse estava antes; re-localiza.
+        $hooksIdx = -1
+        for ($i = 0; $i -lt $lines.Count; $i++) { if ($lines[$i] -match '^\s{2}"hooks"\s*:\s*\{') { $hooksIdx = $i; break } }
+    }
+
+    if ($Mode -eq 'off') {
+        if ($preIdx -lt 0) { Write-Host 'ptu-install: -Wire off -> nenhum hook PreToolUse do produto presente (idempotente).' }
+    }
+    else {
+        if ($hooksIdx -lt 0) { throw "objeto 'hooks' nao encontrado no settings.json -- formato inesperado; abortado (esperado um bloco `"hooks`": { ... })." }
+        $block = Get-PtuHookBlockText -ExePath $exe -Mode $Mode
+        $merged = [System.Collections.Generic.List[string]]::new()
+        for ($i = 0; $i -lt $lines.Count; $i++) {
+            [void]$merged.Add($lines[$i])
+            if ($i -eq $hooksIdx) { foreach ($b in $block) { [void]$merged.Add($b) } }
+        }
+        $lines = @($merged.ToArray())
+    }
+
+    $newText = ($lines -join $eol)
+    try { $null = $newText | ConvertFrom-Json } catch { throw "resultado do wire NAO parseia como JSON -- nada gravado. Erro: $($_.Exception.Message)" }
+
+    # backup UNICO e recuperavel: timestamp (ordenavel/legivel p/ reverter) + sufixo GUID curto (unicidade
+    # garantida sem loop de sondagem, mesmo com multiplos wires no mesmo segundo). Copy nao-overwrite ainda
+    # e' a guarda final (colisao praticamente impossivel -> falha em vez de sobrescrever).
+    $stamp = (Get-Date).ToString('yyyyMMdd-HHmmss')
+    $suffix = [System.Guid]::NewGuid().ToString('N').Substring(0, 8)
+    $backup = "$SettingsPath.ptu-backup-$stamp-$suffix"
+    [System.IO.File]::Copy($SettingsPath, $backup, $false)
+    [System.IO.File]::WriteAllText($SettingsPath, $newText, (New-Object System.Text.UTF8Encoding($false)))
+
+    Write-Host "ptu-install: wire=$Mode aplicado em $SettingsPath"
+    Write-Host "  backup    : $backup"
+    if ($Mode -ne 'off') { Write-Host "  hook      : PreToolUse[matcher=Bash] -> $exe $(if ($Mode -eq 'observe') { '--observe' } else { '(enforce)' })" }
+}
+
+# ---------------------------------------------------------------------------------------------------
+# WIRE (G2.2): com -Wire, SO mexe no settings.json (nao deploya). Deploy tem de ter sido feito antes.
+# ---------------------------------------------------------------------------------------------------
+if ($PSBoundParameters.ContainsKey('Wire')) {
+    $sp = if ([string]::IsNullOrWhiteSpace($SettingsPath)) { Join-Path $env:USERPROFILE '.claude\settings.json' } else { $SettingsPath }
+    Invoke-PtuWire -Mode $Wire -DeployDir $deployDir -SettingsPath $sp
+    Write-Host "OK: Install-ClaudeCodePreToolUseSafeAllow.ps1 (wire=$Wire)"
+    exit 0
 }
 
 # ---------------------------------------------------------------------------------------------------
