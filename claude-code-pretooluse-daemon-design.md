@@ -92,7 +92,7 @@ Claude Code  --(stdin: hook JSON)-->  [CLIENTE leve]  --(IPC: ver §4.2)-->  [DA
 - **Cliente (o comando do hook):** programa de **inicialização rápida** que conecta, repassa o JSON
   do stdin (ou os segmentos já tokenizados, §4.1), lê **o enum** e **monta ele mesmo** o
   `hookSpecificOutput` (§3.1). Em qualquer falha (canal ausente/ocupado/subindo, timeout, lixo,
-  versão divergente) → imprime **`defer`** e sai 0 (fail-closed). **Nunca** monta `allow` sozinho.
+  versão divergente) → **abstém** (não emite `permissionDecision`, stdout vazio) e sai 0 (fail-closed). **Nunca** monta `allow` sozinho.
 - **Resposta como enum estreito** (correção do painel): o daemon devolve **apenas** `allow`|`defer`
   (+ campos diagnósticos que o cliente ignora), **não** JSON arbitrário. Reduz superfície de injeção.
 
@@ -132,6 +132,12 @@ o mesmo input (allow → JSON idêntico; abster → ambos vazios).
 > interativo — `echo` rodou sem prompt (a allowlist decidiu) e o log de medição registrou a linha, provando
 > que `abster` = saída vazia é aceita como *no decision*. Wire (Passo G2.2) entregue via
 > `Install -Wire observe|enforce|off` e ativo em observe (Fase 3).
+>
+> **Convenção de leitura (vale para este documento e o plano):** onde o texto disser o cliente
+> **imprimir / devolver / emitir / escrever `defer`** como *saída ao Claude Code*, leia-se **abster = não
+> emitir `permissionDecision`** (stdout vazio, exit 0). `defer` permanece o **token INTERNO** da decisão e do
+> protocolo/wire (ex.: «o daemon decide `allow`|`defer`», «resposta = enum `allow|defer`», `defer-only`) —
+> esse uso é correto e não muda.
 
 ## 4. A decisão central — tokenização, IPC e runtime do cliente
 
@@ -220,7 +226,7 @@ números medidos atualizam este doc **antes da liberação**, **não** antes do 
   **named mutex** cuja identidade segue §7 (SID + repo + roots). **Só** quem adquire o mutex spawna; o
   spawner **segura o mutex até observar `ready`** (ou até **timeout de subida ≤ 2 s**, então libera —
   daemon que morre na subida não pode prender o mutex eternamente). Clientes que **não** adquirem o
-  mutex devolvem **`defer` imediatamente, sem tentar conectar nem spawnar** outro daemon.
+  mutex **abstêm imediatamente, sem tentar conectar nem spawnar** outro daemon.
 - **Cliente distingue, mas tudo vira `defer`.** "canal ausente" (→ tenta mutex/spawn, **uma vez**) vs
   "canal existe mas recusa/ocupado" (→ só `defer`). Toda falha → `defer`.
 - **Backoff hard-coded (não "opt-in").** Para reduzir avalanche no arranque, o cliente tenta
@@ -292,7 +298,7 @@ Servir lógica velha como boa = falso-allow. Decisão cravada:
   (`0x01`=dados/classificação, `0x02`=controle/shutdown). Shutdown exige a mesma auth (token/ACL).
   **Não** é "JSON de hook com campo especial" (seria DoS por input que parece shutdown).
 - **Timeout do cliente = deadline monotônico único (~80 ms)** do qual se derivam connect/read (não
-  50+50 fixos, que sozinhos já comem 100 ms). Estouro → `defer` e sai 0. **Sem timeout o hook pendura**
+  50+50 fixos, que sozinhos já comem 100 ms). Estouro → **abstém** (nada emitido) e sai 0. **Sem timeout o hook pendura**
   (pior que prompt). Self-test com daemon que dorme (§8).
 - **Log mínimo NA v1 (promovido de dívida):** decisão + estado do daemon (`ready`/`defer-only`/
   `stale-uncertain`) + timestamp + código de erro, **sem o `command` completo** (privacidade), com
@@ -307,9 +313,9 @@ Servir lógica velha como boa = falso-allow. Decisão cravada:
   `in-process(string crua) → segmentos` vs `cliente(string crua) → segmentos` no corpus adversarial.
   Divergência de segmentos = falha. + identidade de artefato (mesmo `.py`/hash). Falhou → (b) obrigatória.
 - **Paridade daemon↔in-process** e **cliente↔daemon:** mesma decisão final + mesmo payload (§3.1).
-- **Invariante do cliente:** o cliente, isolado, **nunca** emite `allow` (só `defer`/tokens).
-- **Fail-closed:** daemon parado/subindo → `defer` para todo o corpus; daemon que **dorme** além do
-  deadline → cliente devolve `defer` **dentro do orçamento**, sem pendurar.
+- **Invariante do cliente:** o cliente, isolado, **nunca** emite `allow` (na boca só **abstém** — saída vazia; no wire, só dispara a requisição ao daemon).
+- **Fail-closed:** daemon parado/subindo → **abstém** para todo o corpus; daemon que **dorme** além do
+  deadline → cliente **abstém** **dentro do orçamento**, sem pendurar.
 - **Staleness ao vivo:** edita o `...Support.ps1` com o daemon vivo → decisão muda ou vira
   `defer`+restart; reload quebrado → `defer-only` com backoff, sem busy-loop.
 - **ACL efetiva:** inspeciona a ACL do canal (só o usuário).

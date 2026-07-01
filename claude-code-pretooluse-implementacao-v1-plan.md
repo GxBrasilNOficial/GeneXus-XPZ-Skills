@@ -164,8 +164,8 @@ divergente/staleness/ambiguidade; **fonte única** da decisão E da tokenizaçã
   `defer`. stdin do hook com cap ≤ 64 KB + deadline. Parsing ESTRITO da resposta (só `allow`/`defer` exatos em
   frame válido).
 - **Dispara-e-sai:** conectável → request/enum/monta payload/sai. "Canal ausente" → `TryAcquire` NÃO-bloqueante
-  do mutex de GUARDA: adquire → dispara o daemon DETACHED, segura `guardWindowMs`, escreve `defer`, sai; não
-  adquire → `defer` e sai. NUNCA segura até ready.
+  do mutex de GUARDA: adquire → dispara o daemon DETACHED, segura `guardWindowMs`, **abstém** (nada emitido), sai; não
+  adquire → **abstém** e sai. NUNCA segura até ready.
 - **Log de falha de subida pelo cliente (complementar ao do daemon):** como o daemon pode NUNCA nascer, o
   cliente grava um marcador mínimo em `...SafeAllowClient.log` (ACL só-usuário, rate-limited, SEM `command`):
   timestamp + `requestId` + código (`spawn-failed`, `daemon-not-ready`, `identity-invalid`, `dll-missing`).
@@ -180,7 +180,7 @@ divergente/staleness/ambiguidade; **fonte única** da decisão E da tokenizaçã
 - **Integridade do EXE:** handshake (`protocolVersion`/`ptuSafeAllowVersion`/`buildContractPin`) barra cliente
   velho/divergente; self-test §8 gateia o binário; Passo G rebuilda. Swap malicioso de mesma versão = fora do
   threat model (escrita local = já comprometido) → dívida documentada.
-- NUNCA emite `allow` sozinho; falha → `defer` exit 0. Toolchain ausente → PARA com diagnóstico; build AOT
+- NUNCA emite `allow` sozinho; falha → **abstém** (nada emitido), exit 0. Toolchain ausente → PARA com diagnóstico; build AOT
   falho = instalação FALHA; NUNCA ativa TCP automaticamente.
 
 ### Passo C-fallback — TCP+Python (só por decisão humana, se o toolchain AOT faltar)
@@ -258,8 +258,8 @@ AOT E a DLL (gerando `BuildPin.g.cs` do `.cs` corrente). Máquina-local, Windows
 
 > **Observe da Fase 3 = FIO REAL (reconciliação pós-Passo F, 2026-06-30, confirmada pelo autor):** a fase de
 > medição (observe) roda pelo **caminho completo** — o hook executa o cliente NativeAOT, que fala com o daemon,
-> o daemon **decide** `allow`/`defer` e mede-se a latência —, mas o cliente **sempre devolve `defer`** ao Claude
-> Code (passivo: mede tudo, não altera nada). É o ÚNICO caminho que caracteriza a **latência de concorrência**
+> o daemon **decide** `allow`/`defer` e mede-se a latência —, mas o cliente **sempre abstém** (não emite
+> `permissionDecision`) ao Claude Code (passivo: mede tudo, não altera nada). É o ÚNICO caminho que caracteriza a **latência de concorrência**
 > (a fila do daemon single-threaded), que é a condição pendente para liberar o enforce (§9-0e). **Supera** as
 > menções anteriores que descreviam o observe como in-process (`Invoke-...ps1 -Observe`): no Passo A-escopo
 > acima e no `claude-code-pretooluse-auto-allow-design.md` §5 (Fase 1–2, anterior ao daemon). O `-Observe`
@@ -280,7 +280,9 @@ AOT E a DLL (gerando `BuildPin.g.cs` do `.cs` corrente). Máquina-local, Windows
 > condicional no decisor in-process; sentinela `(abstain)` nos self-tests de saída (wire mantém `defer`); 4
 > self-tests verdes (incl. gate §8); confirmado no fio real (hook observe: `echo` sem prompt = a allowlist
 > decide; log de medição registrou a linha). G2.2 entregue: `Install -Wire observe|enforce|off`, ativo em
-> observe (Fase 3).**
+> observe (Fase 3).** Vale aqui a **convenção de leitura de `defer`** cravada no design §3.1: onde o texto
+> disser o cliente **imprimir/devolver/emitir/escrever `defer`** como *saída ao Claude Code*, leia-se
+> **abster = não emitir `permissionDecision`**; `defer` segue token INTERNO da decisão/wire.
 
 ## 4. Notas de codificação (da passada de confirmação; não alteram o design)
 
