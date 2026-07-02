@@ -4,7 +4,7 @@ Data: 2026-07-01. Sessão anterior: Fase 0 empírica + início das fases documen
 
 ## Onde está o contexto canônico
 
-- **Plano congelado + resultados empíricos:** entrada «Criar/alterar objeto GeneXus do tipo `API` (from-spec, com segurança GAM) nas skills XPZ» em `999-ideias-pendentes.md`, incluindo o bloco final **«Resultados da Fase 0 empírica — EXECUTADA 2026-07-01»**. Ler de lá primeiro.
+- **Plano congelado + resultados empíricos:** entrada «Criar/alterar objeto GeneXus do tipo `API` (from-spec, com segurança GAM) nas skills XPZ» — **migrada na conclusão da frente (2026-07-01) para `historico/IdeiasImplementadas_202607.md`**, incluindo o bloco **«Resultados da Fase 0 empírica»**. Ler de lá primeiro. (O `999-ideias-pendentes.md` ficou só com a mini-entrada do gate scriptado da Face 3 — evolução futura.)
 - **Memória:** `project_api_from_spec_gam_plan`.
 - KB de teste: `C:\Dev\Test\Gx_wsEducacaoSpTeste` (paralela; qualquer trabalho ali exige invocar `xpz-kb-parallel-setup` antes). App deployado/rodando em `http://localhost/wsEducacaoSpTesteNETFrameworkSQLServer` (web real: `C:\KBs\wsEducacaoSpTeste\NETFrameworkSQLServer004\web`; env ativo da KB é `NETPostgreSQL`). Versões: **KMW 4.0.187794 + GAM 3.15.78**.
 
@@ -22,7 +22,7 @@ Data: 2026-07-01. Sessão anterior: Fase 0 empírica + início das fases documen
 - **A1** `xpz-builder/responsibilities-by-type/api.md` — elevado: SecurityLevel/GAM, `[SecurityPermission]`↔`*_Services_*`, dep-order/import real, preview≠validação, OpenAPI≠segurança, checklist, refs.
 - **B1** `xpz-builder/responsibilities-by-type/api-gam-runtime.md` — NOVO satélite: Face 2 (pré-condição runtime GAM), smoke 2 fases + reversibilidade, erros OAuth (542/116/232/79), body-envelope, PUT→404, multi-env, sub-estado.
 - **A2** `01e-moldes-sanitizados-core.md` — «Molde sanitizado de API 2 - tríade mínima autocontida» (SDT+Proc+API sanitizados) inserido após o `APIExemploIntegracao` (linha ~1556).
-- `999-ideias-pendentes.md` — bloco «Resultados da Fase 0 empírica».
+- `999-ideias-pendentes.md` — bloco «Resultados da Fase 0 empírica» (na conclusão da frente, migrado para `historico/IdeiasImplementadas_202607.md`).
 
 ## O que FALTA (fazer na nova sessão)
 
