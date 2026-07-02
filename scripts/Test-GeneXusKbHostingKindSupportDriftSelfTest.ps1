@@ -133,6 +133,12 @@ if ($java.freshnessSkipStatus -ne 'skipped-hosting-unsupported') {
 if ([string]::IsNullOrWhiteSpace($java.unsupportedReason)) {
     throw "ASSERT_FAILED: java-tomcat deveria ter unsupportedReason nao-vazio"
 }
+# Fonte-unica TAMBEM no texto: o unsupportedReason interpola o freshnessSkipStatus; travar que o
+# valor renderizado esteja de fato presente. Uma renomeacao de `$script:...SkipStatus` ou erro na
+# subexpressao deixaria "Checagem pulada ()" e o check de nao-vazio acima passaria em silencio.
+if ($java.unsupportedReason -notmatch [regex]::Escape($java.freshnessSkipStatus)) {
+    throw "ASSERT_FAILED: java.unsupportedReason deveria conter o freshnessSkipStatus renderizado ('$($java.freshnessSkipStatus)'), atual=[$($java.unsupportedReason)]"
+}
 
 # ── 5. tentative-java (campos provisorios exatamente como o design manda) ────────
 if ($java.sentinel -ne 'tentative-java') {
@@ -271,6 +277,9 @@ if ($liveProof.Count -ne 1) {
 }
 # NENHUM kind do fallback estatico pode aparecer com a API respondendo (aderencia literal ao
 # comentario; pega tambem uma hipotetica fusao vivo+fallback, nao so o ramo 'sempre fallback').
+# NOTA (sync): esta lista espelha manualmente o fallback estatico embutido no ArgumentCompleter
+# (GeneXusKbHostingKindSupport.ps1). A guarda 'failsoft == normal' acima ja trava fallback vs registro;
+# este $fallbackKinds e apenas o conjunto proibido no caminho vivo.
 $fallbackKinds = @('dotnet-core-self-host', 'dotnet-framework-iis', 'java-tomcat')
 $fallbackLeak = @($liveProof | Where-Object { $_ -in $fallbackKinds })
 if ($fallbackLeak.Count -gt 0) {

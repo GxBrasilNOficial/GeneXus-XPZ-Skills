@@ -114,11 +114,14 @@ $dotnetExclusionPrefixes = @('GeneXus.', 'System.', 'Microsoft.')
 $dotnetWebDirExtensions  = @('.cs', '.js', '.aspx', '.dll')
 $dotnetRuntimeExtensions = @('.cs', '.js', '.aspx', '.rsp')
 
-# ALIASING PROPOSITAL (ver design, Fase 3 item (x)): estes arrays $dotnet* sao a MESMA referencia
-# nos dois records .NET (a copia [pscustomobject] e rasa; os campos de lista continuam compartilhados),
-# e $dotnetExclusionPrefixes ainda aparece aninhado em publicationTargets[0].exclusionPrefixes. Inerte
-# na Fase 1 (nada muta). A Fase 3, ao popular/mutar listas por familia (itens (iv)/(vi)/(vii)), DEVE
-# clonar antes de mutar para nao vazar entre records.
+# ALIASING PROPOSITAL (ver design, Fase 3 item (x)): os arrays $dotnet* compartilhados sao a MESMA
+# referencia nos dois records .NET (a copia [pscustomobject] e rasa; os campos de lista continuam
+# compartilhados): $dotnetExclusionPrefixes, $dotnetWebDirExtensions, $dotnetRuntimeExtensions e o
+# proprio $dotnetPublicationTargets. Este ultimo vaza em DOIS niveis: o array em si (compartilhado
+# entre os records) e $dotnetExclusionPrefixes aninhado em publicationTargets[0].exclusionPrefixes.
+# Inerte na Fase 1 (nada muta). A Fase 3, ao popular/mutar listas por familia (itens (iv)/(vi)/(vii)),
+# DEVE clonar antes de mutar para nao vazar entre records (clonar so o aninhado nao basta se
+# $dotnetPublicationTargets for mutado por familia).
 
 # publicationTargets .NET ja na forma-alvo da Fase 3 (subPath 'bin'), porem OPACO as Fases 1/2:
 # nenhum consumidor de Fase 1/2 itera este campo (clausula no-bridge). evidenceStrategy e string
