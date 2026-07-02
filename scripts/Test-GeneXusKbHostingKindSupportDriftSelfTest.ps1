@@ -248,6 +248,26 @@ if (($failsoft -join ',') -ne ($normal -join ',')) {
     throw "ASSERT_FAILED: lista fail-soft do completer divergente do registro. viva=[$($normal -join ',')] fallback=[$($failsoft -join ',')]"
 }
 
+# Prova de que o caminho VIVO usa a API (nao coincide com o fallback por acaso): sombreia a API
+# para retornar um kind SENTINELA (ausente da lista estatica); o completer deve refleti-lo e NAO
+# devolver os kinds do fallback. Sem isto, uma regressao que fizesse o completer cair SEMPRE no
+# fallback passaria enquanto a lista fixa coincidisse com o registro (Codex hardening).
+$liveProof = $null
+try {
+    function Get-GeneXusKbHostingKindSupportRecord { [pscustomobject]@{ hostingKind = 'sentinel-kind-vivo' } }
+    $liveProof = @(& $sb $null 'DeploymentHostingKind' '' $null $null | ForEach-Object { $_.CompletionText })
+}
+finally {
+    Remove-Item -Path 'Function:\Get-GeneXusKbHostingKindSupportRecord' -ErrorAction SilentlyContinue
+    . $registryFile  # restaura a API real
+}
+if ('sentinel-kind-vivo' -notin $liveProof) {
+    throw "ASSERT_FAILED: completer nao usou a API no caminho vivo (kind sentinela ausente): [$($liveProof -join ',')]"
+}
+if ('dotnet-core-self-host' -in $liveProof) {
+    throw "ASSERT_FAILED: completer caiu no fallback estatico mesmo com a API respondendo: [$($liveProof -join ',')]"
+}
+
 # ── 8. Contrato de skip: string com fonte unica (nenhum emissor a redigita) ──────
 $skipLiteral = 'skipped-hosting-unsupported'
 $skipOffenders = New-Object System.Collections.Generic.List[string]
