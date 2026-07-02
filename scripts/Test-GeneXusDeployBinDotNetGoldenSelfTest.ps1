@@ -1,23 +1,27 @@
 #requires -Version 7.4
 <#
 .SYNOPSIS
-    Golden de regressao .NET do diagnostico de deploy-bin (fachada Test-GeneXusDeployBinFreshness.ps1).
+    Golden de regressao .NET + skip por familia do diagnostico de deploy-bin (fachada Test-GeneXusDeployBinFreshness.ps1).
 
 .DESCRIPTION
-    Fase 1 da paridade de gerador Java/Tomcat. A Fase 1 NAO toca o motor de deploy-bin
-    (Get-GeneXusKbDeployBinPaths / Test-GeneXusKbDeployBinFreshnessCore seguem ESCALARES).
-    Este golden congela, com timestamps e paths normalizados (<TS>/<ROOT>), a saida JSON
-    canonica da fachada em dois casos:
+    Congela, com timestamps e paths normalizados (<TS>/<ROOT>), a saida JSON canonica da fachada em
+    TRES casos, apos a Fase 2 da paridade Java/Tomcat fiar o registro na fachada:
 
-      - ACEITO   : dotnet-framework-iis com DLL de objeto fresca em web\bin -> status 'fresh'.
-      - REJEITADO: hosting kind fora do par .NET ('java-tomcat') -> a fachada .NET-only ainda
-                   emite 'deployment_hosting_kind invalido' (status 'skipped'). Isto documenta que
-                   a Fase 1 NAO fia o registro na fachada: java-tomcat e reconhecido pelo REGISTRO
-                   (recognized-no-engine), mas a fachada segue rejeitando ate a Fase 2. Estados
-                   simultaneos e corretos; a Fase 2 mudara deliberadamente o caso rejeitado.
+      - ACEITO    : dotnet-framework-iis com DLL de objeto fresca em web\bin -> status 'fresh'.
+      - SKIP      : java-tomcat -> reconhecido pelo registro como recognized-no-engine; a fachada
+                    ROTEIA para o skip via registro -> status 'skipped-hosting-unsupported' + summary
+                    derivado de unsupportedReason. (Na Fase 1 este caso era rejeitado como 'invalido';
+                    a Fase 2 mudou-o DELIBERADAMENTE para skip — ver java-tomcat-paridade-gerador-design.md.)
+      - REJEITADO : 'foobar' — hosting kind GENUINAMENTE invalido (fora do registro) -> a fachada rejeita
+                    com a mensagem canonica (status 'skipped', deployBinCheck null). Preserva a cobertura
+                    de rejeicao de valor invalido que a decisao (a') exige — cobertura que o caso java-tomcat
+                    deixou de exercer ao virar skip.
 
-    Rode com -UpdateBaseline para reimprimir os baselines normalizados (ao evoluir a fachada
-    nas Fases 2/3, revalidar a mudanca e recapturar conscientemente).
+    O motor de deploy-bin (Get-GeneXusKbDeployBinPaths / Test-GeneXusKbDeployBinFreshnessCore) permanece
+    ESCALAR (a mudanca de aridade e da Fase 3); a Fase 2 so fia o registro na fachada/policy.
+
+    Rode com -UpdateBaseline para reimprimir os baselines normalizados (ao evoluir a fachada na Fase 3,
+    revalidar a mudanca e recapturar conscientemente).
 
     Falha => 'ASSERT_FAILED: ...'; sucesso => 'GENEXUS_DEPLOY_BIN_DOTNET_GOLDEN_SELFTEST_OK'.
 #>
@@ -91,12 +95,22 @@ try {
         -AsJson
     $acceptedActual = ConvertTo-GoldenNormalizedText -Text (($acceptedRaw | Out-String).TrimEnd()) -Root $tempRoot
 
-    # ── Caso REJEITADO (hosting kind fora do par .NET) ───────────────────────────
-    $rejectedRaw = & $facade `
+    # ── Caso SKIP (java-tomcat reconhecido-sem-motor -> skip via registro) ────────
+    $skipRaw = & $facade `
         -KbPath $kbNativePath `
         -EnvironmentName $envName `
         -KbMetadataPath $metadataPath `
         -DeploymentHostingKind 'java-tomcat' `
+        -BuildStartedAt ($buildStartedAt.ToString('o')) `
+        -AsJson
+    $skipActual = ConvertTo-GoldenNormalizedText -Text (($skipRaw | Out-String).TrimEnd()) -Root $tempRoot
+
+    # ── Caso REJEITADO (hosting kind GENUINAMENTE invalido, fora do registro) ─────
+    $rejectedRaw = & $facade `
+        -KbPath $kbNativePath `
+        -EnvironmentName $envName `
+        -KbMetadataPath $metadataPath `
+        -DeploymentHostingKind 'foobar' `
         -BuildStartedAt ($buildStartedAt.ToString('o')) `
         -AsJson
     $rejectedActual = ConvertTo-GoldenNormalizedText -Text (($rejectedRaw | Out-String).TrimEnd()) -Root $tempRoot
@@ -104,6 +118,8 @@ try {
     if ($UpdateBaseline) {
         '===== ACCEPTED BASELINE ====='
         $acceptedActual
+        '===== SKIP BASELINE ====='
+        $skipActual
         '===== REJECTED BASELINE ====='
         $rejectedActual
         return
@@ -150,20 +166,34 @@ try {
 }
 '@ -replace "`r`n", "`n"
 
-    $rejectedGolden = @'
+    $skipGolden = @'
 {
-  "status": "skipped",
+  "status": "skipped-hosting-unsupported",
   "validationEnvironmentName": ".Net Environment",
   "deploymentHostingKind": "java-tomcat",
   "metadataPath": "<ROOT>\\parallel\\kb-source-metadata.md",
   "buildStartedAt": "<TS>",
   "buildStartedAtSource": "parameter",
   "deployBinCheck": null,
-  "summary": "deployment_hosting_kind invalido: java-tomcat"
+  "summary": "Gerador Java/Tomcat reconhecido, mas o motor de verificacao de deploy-bin ainda e .NET (Eixo A). Checagem pulada (skipped-hosting-unsupported) ate a Fase 3 dar motor por familia."
+}
+'@ -replace "`r`n", "`n"
+
+    $rejectedGolden = @'
+{
+  "status": "skipped",
+  "validationEnvironmentName": ".Net Environment",
+  "deploymentHostingKind": "foobar",
+  "metadataPath": "<ROOT>\\parallel\\kb-source-metadata.md",
+  "buildStartedAt": "<TS>",
+  "buildStartedAtSource": "parameter",
+  "deployBinCheck": null,
+  "summary": "deployment_hosting_kind invalido: 'foobar'. Valores reconhecidos: dotnet-core-self-host, dotnet-framework-iis, java-tomcat."
 }
 '@ -replace "`r`n", "`n"
 
     $acceptedActualN = $acceptedActual -replace "`r`n", "`n"
+    $skipActualN     = $skipActual -replace "`r`n", "`n"
     $rejectedActualN = $rejectedActual -replace "`r`n", "`n"
 
     if ($acceptedActualN -ne $acceptedGolden) {
@@ -173,12 +203,19 @@ try {
         Write-Host $acceptedGolden
         throw 'ASSERT_FAILED: caso ACEITO divergiu do golden .NET (regressao no motor/fachada de deploy-bin?).'
     }
+    if ($skipActualN -ne $skipGolden) {
+        Write-Host '----- SKIP (atual normalizado) -----'
+        Write-Host $skipActualN
+        Write-Host '----- SKIP (baseline) -----'
+        Write-Host $skipGolden
+        throw 'ASSERT_FAILED: caso SKIP (java-tomcat) divergiu do golden. Se a mudanca da fachada e DELIBERADA (registro/motor por familia), recapturar o baseline com -UpdateBaseline apos revalidar.'
+    }
     if ($rejectedActualN -ne $rejectedGolden) {
         Write-Host '----- REJEITADO (atual normalizado) -----'
         Write-Host $rejectedActualN
         Write-Host '----- REJEITADO (baseline) -----'
         Write-Host $rejectedGolden
-        throw 'ASSERT_FAILED: caso REJEITADO divergiu do golden .NET. Na Fase 1: a fachada fiou o registro indevidamente? Na Fase 2+: se a mudanca da fachada e DELIBERADA (registro fiado), recapturar o baseline com -UpdateBaseline apos revalidar.'
+        throw 'ASSERT_FAILED: caso REJEITADO (foobar) divergiu do golden. Se a mensagem canonica de valor invalido mudou deliberadamente, recapturar o baseline com -UpdateBaseline apos revalidar.'
     }
 
     'GENEXUS_DEPLOY_BIN_DOTNET_GOLDEN_SELFTEST_OK'

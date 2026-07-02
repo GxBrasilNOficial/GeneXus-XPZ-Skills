@@ -176,6 +176,13 @@ Do NOT use esta skill para:
 - Para diagnostico de `.cs` gerado, resolver o caminho com `Resolve-GeneXusGeneratedCsPath.ps1`,
   que le `kb_environment_web_dirs` no mesmo metadata; metadata sem esse campo volta para
   `xpz-kb-parallel-setup`.
+- **Paridade Java/Tomcat (Fase 2):** quando `deployment_hosting_kind` for `java-tomcat` (família não-.NET,
+  `recognized-no-engine` no registro `GeneXusKbHostingKindSupport.ps1`), o gate de deploy bin e o resolvedor
+  de `.cs` **pulam** de forma explícita (`skipped-hosting-unsupported`/`CS_PATH_SKIPPED_HOSTING_UNSUPPORTED`,
+  `exit 0`) em vez de derivar `web\bin`/`CSharpModel\web` .NET — o motor por família é a Fase 3. **Skip ≠
+  deploy validado.** `Test-GeneXusRuntimeFreshness.ps1` aceita `-DeploymentHostingKind` opcional para a mesma
+  guarda de família (ausente → comportamento .NET de hoje). Valor de `deployment_hosting_kind` fora do
+  registro é rejeitado com mensagem canônica (não vira skip).
 - Quando o build falhar com erros C# compatíveis com arquivo gerado truncado, como
   `CS1010` (newline em constante) e `CS1513` (`}` esperada) repetidos no mesmo `.cs`,
   verificar primeiro se o artefato gerado termina abruptamente, sem string/funcao

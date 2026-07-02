@@ -57,11 +57,21 @@ param(
 
     [string]$GeneratorOutputPath,
 
+    # Fase 2 (paridade Java/Tomcat): OPCIONAL. Quando informado e a familia do hosting kind for nao-.NET
+    # (recognized-no-engine), pula de forma clara em vez de derivar CSharpModel\web e cair em runtime-unknown
+    # silencioso. Ausente/vazio => comportamento IDENTICO ao de hoje (D3, zero regressao). Passado por quem ja
+    # resolveu o metadata; este script permanece metadata-free (nao resolve metadata por conta propria).
+    [string]$DeploymentHostingKind,
+
     [switch]$AsJson
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+
+# Fase 2: registro-fonte-unica dos hosting kinds (guarda de familia do Eixo C). Dot-source novo — este
+# script era self-contained.
+. (Join-Path $PSScriptRoot 'GeneXusKbHostingKindSupport.ps1')
 
 # ── Parse ImportedAt ───────────────────────────────────────────────────────────
 
@@ -91,6 +101,46 @@ $result = [ordered]@{
         }
     }
     summary    = ''
+}
+
+# ── Fase 2 — guarda de familia (Eixo C) ─────────────────────────────────────────
+# Opt-in por -DeploymentHostingKind (D3). Inserida APOS o init de $result e ANTES da secao nav_objs, para
+# nao rodar o diagnostico .NET (nav_objs + derivacao CSharpModel\web) no caso de skip. Guard de vazio T1 +
+# tríade por T2 ($rec.runsFreshnessEngine). Script LINEAR (sem return): ramos 1/2 emitem a saida e saem com
+# exit explicito. Le so runsFreshnessEngine/freshnessSkipStatus/unsupportedReason — nunca o campo de
+# forma-alvo da Fase 3 (clausula no-bridge).
+if (-not [string]::IsNullOrWhiteSpace($DeploymentHostingKind)) {
+    $hostingRec = Get-GeneXusKbHostingKindSupportRecord -HostingKind $DeploymentHostingKind
+    if ($null -eq $hostingRec) {
+        # ramo 1 — presente-e-fora-do-registro: erro de parametro/metadata (exit NAO-ZERO), nao skip de familia.
+        $invalidMsg = Get-GeneXusKbHostingKindSupportInvalidValueMessage -HostingKind $DeploymentHostingKind
+        if ($AsJson) {
+            [ordered]@{
+                status     = 'runtime-hosting-kind-invalido'
+                objectName = $ObjectName
+                reason     = $invalidMsg
+            } | ConvertTo-Json -Depth 6
+        } else {
+            Write-Host "BLOCK: $invalidMsg"
+        }
+        exit 1
+    }
+    if (-not $hostingRec.runsFreshnessEngine) {
+        # ramo 2 — recognized-no-engine / blocked-out-of-scope: skip claro, sem derivar CSharpModel\web nem .cs.
+        # status/summary DERIVADOS do registro (nunca redigitados). Os checks ficam nos defaults (found=false).
+        $result.status  = $hostingRec.freshnessSkipStatus
+        $result.summary = $hostingRec.unsupportedReason
+        if ($AsJson) {
+            $result | ConvertTo-Json -Depth 6
+        } else {
+            Write-Host "Status    : $($result.status)"
+            Write-Host "Objeto    : $($result.objectName)"
+            Write-Host "Import em : $($result.importedAt)"
+            Write-Host "Resumo    : $($result.summary)"
+        }
+        exit 0
+    }
+    # ramo 3 — runsFreshnessEngine (dotnet): segue o diagnostico .cs de hoje (abaixo).
 }
 
 # ── 1. nav_objs.xml ────────────────────────────────────────────────────────────

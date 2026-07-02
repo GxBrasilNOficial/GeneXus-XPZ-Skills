@@ -30,7 +30,11 @@
     Identificador MSBuild do environment de validacao/deploy (ex.: NETPostgreSQL).
 
 .PARAMETER DeploymentHostingKind
-    Tipo de hospedagem do environment de deploy: dotnet-core-self-host ou dotnet-framework-iis.
+    Tipo de hospedagem do environment de deploy. Valores reconhecidos vem do registro-fonte-unica
+    GeneXusKbHostingKindSupport.ps1 (dotnet-core-self-host, dotnet-framework-iis, java-tomcat), validados
+    em runtime contra o registro (nao mais por [ValidateSet], que recebia constantes de compilacao). Grava o
+    valor RAW (preserva caixa). Tab-completion interativo requer registrar o ArgumentCompleter em
+    perfil/modulo; o registro no corpo deste script so vale quando dot-sourced (ver Fase 4).
 
 .PARAMETER KbEnvironmentNames
     Lista explicita de environments GeneXus (nomes exatos como na IDE / SetActiveEnvironment).
@@ -90,7 +94,8 @@ param(
     [string]$DeploymentEnvironmentName,
 
     [Parameter(Mandatory = $true)]
-    [ValidateSet('dotnet-core-self-host', 'dotnet-framework-iis')]
+    # Fase 2: [ValidateSet] removido — recebia constantes de compilacao e nao lia o registro em runtime
+    # (nao aceitaria java-tomcat nem futuros kinds). Validacao por registro (fonte-unica) e feita no corpo.
     [string]$DeploymentHostingKind,
 
     [Parameter(Mandatory = $true)]
@@ -128,6 +133,11 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 . (Join-Path $PSScriptRoot 'GeneXusKbDeploymentEnvironmentSupport.ps1')
+# Fase 2 (paridade Java/Tomcat): registro-fonte-unica dos hosting kinds (validacao por API publica).
+. (Join-Path $PSScriptRoot 'GeneXusKbHostingKindSupport.ps1')
+# Completer fail-soft opt-in (D4). Inerte em invocacao one-shot (a sessao morre no fim); util quando o
+# script e dot-sourced. Tab-completion interativo no momento da digitacao requer registro em perfil/modulo.
+Register-GeneXusKbHostingKindArgumentCompleter -CommandName 'Set-XpzKbSourceMetadataDeployment.ps1' -ParameterName 'DeploymentHostingKind'
 
 if ($InventoryFromKbNativePath.IsPresent) {
     throw @'
@@ -162,6 +172,12 @@ if ($deploymentName.Length -eq 0) {
 $hostingKind = $DeploymentHostingKind.Trim()
 if ($hostingKind.Length -eq 0) {
     throw 'BLOCK: DeploymentHostingKind vazio.'
+}
+
+# Fase 2: validacao por registro (fonte-unica), case-insensitive (o lookup usa [ordered]@{}.Contains).
+# Grava o valor RAW ($hostingKind, ja trimmed) — preserva caixa, nao normaliza para $rec.hostingKind.
+if ($null -eq (Get-GeneXusKbHostingKindSupportRecord -HostingKind $hostingKind)) {
+    throw ('BLOCK: ' + (Get-GeneXusKbHostingKindSupportInvalidValueMessage -HostingKind $hostingKind))
 }
 
 $environmentNames = New-Object System.Collections.Generic.List[string]

@@ -149,6 +149,20 @@ Regras de uso:
 - `Hipótese`: valores hardcoded dessa fonte local, como `Build=0`, `username="root"`, `SampleKB`, `BusinessLogic`, `parentGuid` fixo e `moduleGuid` fixo, podem levar o agente para caminho errado se forem tratados como regra geral.
 - `Evidência direta`: um `.xpz` mínimo de `Procedure`, montado nesta trilha com `KMW`, `Source`, `Objects`, `Dependencies` e `ObjectsIdentityMapping`, foi importado com sucesso no GeneXus quando `Source/@kb` e `Source/Version/@guid` estavam em formato GUID valido.
 
+## Status de deploy/diagnóstico por `deployment_hosting_kind` (paridade Java/Tomcat)
+
+- `Decisão congelada`: os `deployment_hosting_kind` reconhecidos vêm do registro-fonte-única `GeneXusKbHostingKindSupport.ps1` (acesso só via `Get-GeneXusKbHostingKindSupportRecord`). Cada kind tem um `freshnessSupportState` que governa o roteamento dos gates/diagnósticos de deploy-bin (Eixo A), runtime-freshness (Eixo C) e `.cs` gerado (Eixo B). Valor **fora** do registro é rejeitado com mensagem canônica (`Get-GeneXusKbHostingKindSupportInvalidValueMessage`), **não** vira skip.
+
+| `freshnessSupportState` | Exemplo de kind | Roteamento | `status` de saída |
+|---|---|---|---|
+| `supported` | `dotnet-core-self-host`, `dotnet-framework-iis` | roda o motor .NET (como hoje) | `fresh` / `stale` / `unknown` (deploy-bin, Eixo A) · `runtime-*` (Eixo C) · `CS_PATH_RESOLVED` (Eixo B) |
+| `recognized-no-engine` | `java-tomcat` | **skip** congelado (motor por família é a Fase 3) | `skipped-hosting-unsupported` (exit 0) |
+| `blocked-out-of-scope` | (nenhum kind hoje) | **skip** | `skipped-hosting-unsupported` (exit 0) |
+
+- `Regra`: **UMA** string `skipped-hosting-unsupported` cobre **DOIS** estados (`recognized-no-engine` e `blocked-out-of-scope`). A desambiguação é por `freshnessSupportState`/`unsupportedReason` do registro, **não** pela string de saída. O discriminador nos consumidores é o booleano `runsFreshnessEngine` (não a enumeração de nomes de estado — evita ramo morto para estados sem record).
+- `Regra`: **skip ≠ deploy validado.** Uma KB `java-tomcat` termina com MSBuild `exit 0` e `deployBinFreshness`=`skipped-hosting-unsupported` — isso significa "não verificado por falta de motor por família", **não** "publicação confirmada". Não declarar validação de deploy OK sobre um skip.
+- `Superfícies observáveis` (Fase 2, quando o kind é não-.NET): (1) fachada `Test-GeneXusDeployBinFreshness.ps1` → `status` de topo `skipped-hosting-unsupported`; (2) classificação pós-build (`Invoke-GeneXusKbDeployBinPostBuildClassification`) → `deployBinFreshness`=`skipped-hosting-unsupported`, sem reclassificar/gate; (3) `Resolve-GeneXusGeneratedCsPath.ps1` → `status`=`CS_PATH_SKIPPED_HOSTING_UNSUPPORTED` (`exit 0`, sem `csPath`); (4) `Test-GeneXusRuntimeFreshness.ps1` com `-DeploymentHostingKind` → `status`=`skipped-hosting-unsupported` (fora do padrão `runtime-*`). Tab-completion interativo de `-DeploymentHostingKind` requer registrar o `ArgumentCompleter` (fail-soft, opt-in) em perfil/módulo — o registro no corpo de um script one-shot só vale quando dot-sourced.
+
 ## Envelope XPZ observado em export real
 
 - `Evidência direta`: no export real inspecionado nesta trilha, o arquivo `.xpz` continha um único XML principal com raiz `<ExportFile>`.

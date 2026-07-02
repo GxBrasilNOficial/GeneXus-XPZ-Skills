@@ -21,7 +21,8 @@ Campos retornados e sua origem em kb-source-metadata.md:
                                     serao semanticamente incorretas mesmo com parse valido)
   deployment_environment_name     : frontmatter — identificador MSBuild do environment de
                                     validacao/deploy (ex.: NETPostgreSQL); gravado por setup
-  deployment_hosting_kind         : frontmatter — dotnet-core-self-host ou dotnet-framework-iis
+  deployment_hosting_kind         : frontmatter — valor do registro GeneXusKbHostingKindSupport.ps1
+                                    (dotnet-core-self-host, dotnet-framework-iis ou java-tomcat)
   kb_environment_count            : frontmatter — contagem de environments (inventario no setup)
   kb_environment_names            : frontmatter — lista separada por virgula (inventario no setup)
   kb_environment_output_dirs      : frontmatter — pares Environment=DiretorioOutput separados por ;

@@ -10,6 +10,11 @@
 
 Set-StrictMode -Version Latest
 
+# Fase 2 (paridade Java/Tomcat): registro-fonte-unica dos hosting kinds, usado na validacao de VALOR de
+# deployment_hosting_kind no diagnostico de consistencia (Test-GeneXusKbDeploymentMetadataConsistency).
+# O registro e standalone (nao dot-source este arquivo) — sem ciclo.
+. (Join-Path $PSScriptRoot 'GeneXusKbHostingKindSupport.ps1')
+
 function Get-GeneXusKbSourceMetadataDirectField {
     param(
         [string[]]$Lines,
@@ -525,6 +530,12 @@ function Test-GeneXusKbDeploymentMetadataPlausibility {
 
     if ([string]::IsNullOrWhiteSpace($fields.deployment_hosting_kind)) {
         $failures.Add('deployment_hosting_kind ausente enquanto outros campos de deploy estao preenchidos.') | Out-Null
+    }
+    elseif ($null -eq (Get-GeneXusKbHostingKindSupportRecord -HostingKind $fields.deployment_hosting_kind)) {
+        # Fase 2: valor PRESENTE mas fora do registro (ex.: metadata editado a mao — bypassa a validacao de
+        # escrita de Set-XpzKbSourceMetadataDeployment). Auditoria de valor, nao so presenca; mensagem canonica
+        # do registro (fonte-unica). O elseif garante que so consulta quando presente (guard de vazio T1).
+        $failures.Add((Get-GeneXusKbHostingKindSupportInvalidValueMessage -HostingKind $fields.deployment_hosting_kind)) | Out-Null
     }
 
     if ($null -eq $fields.kb_environment_count) {

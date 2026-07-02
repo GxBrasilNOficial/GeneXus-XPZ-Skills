@@ -34,6 +34,11 @@ $ErrorActionPreference = 'Stop'
 $scriptDir    = Split-Path -Parent $PSCommandPath
 $registryFile = Join-Path $scriptDir 'GeneXusKbHostingKindSupport.ps1'
 $selfFile     = $PSCommandPath
+# Fase 2: o golden .NET (Test-GeneXusDeployBinDotNetGoldenSelfTest.ps1) embute, no baseline SKIP do
+# caso java-tomcat, o literal 'skipped-hosting-unsupported' via summary=unsupportedReason (baseline
+# congelado, NAO redigitacao de emissor). E excluido SO da varredura §8 (skip fonte-unica) — nao da
+# §6 (nao cita o token interno do registro) nem da §9 (nao cita publicationTargets).
+$goldenFile   = Join-Path $scriptDir 'Test-GeneXusDeployBinDotNetGoldenSelfTest.ps1'
 
 if (-not (Test-Path -LiteralPath $registryFile -PathType Leaf)) {
     throw "ASSERT_FAILED: registro ausente em $registryFile"
@@ -290,7 +295,9 @@ if ($fallbackLeak.Count -gt 0) {
 $skipLiteral = 'skipped-hosting-unsupported'
 $skipOffenders = New-Object System.Collections.Generic.List[string]
 foreach ($file in Get-ChildItem -LiteralPath $scriptDir -Filter '*.ps1' -File) {
-    if ($file.FullName -eq $registryFile -or $file.FullName -eq $selfFile) {
+    # Exclusao cirurgica: registro (fonte), este self-test, e o golden (baseline congelado que
+    # contem o literal legitimamente — ver nota no topo). Cada exclusao e um furo no guard; manter minima.
+    if ($file.FullName -eq $registryFile -or $file.FullName -eq $selfFile -or $file.FullName -eq $goldenFile) {
         continue
     }
     $content = [System.IO.File]::ReadAllText($file.FullName)

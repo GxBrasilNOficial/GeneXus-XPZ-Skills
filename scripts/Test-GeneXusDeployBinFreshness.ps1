@@ -59,6 +59,9 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 . (Join-Path $PSScriptRoot 'GeneXusKbDeployBinSupport.ps1')
+# Fase 2 (paridade Java/Tomcat): registro-fonte-unica dos hosting kinds (dot-source explicito,
+# alem do transitivo via GeneXusKbDeployBinSupport.ps1 — idempotente).
+. (Join-Path $PSScriptRoot 'GeneXusKbHostingKindSupport.ps1')
 
 $kbPathResolved = [System.IO.Path]::GetFullPath($KbPath)
 if (-not (Test-Path -LiteralPath $kbPathResolved -PathType Container)) {
@@ -133,14 +136,27 @@ $result = [ordered]@{
     summary                   = ''
 }
 
+# Fase 2: lookup do registro uma vez (guard de vazio T1: so consulta quando presente; vazio cai no
+# ramo 'ausente' abaixo). Discriminador por $rec.runsFreshnessEngine (T2) na cadeia.
+$rec = $null
+if (-not [string]::IsNullOrWhiteSpace($hostingKind)) {
+    $rec = Get-GeneXusKbHostingKindSupportRecord -HostingKind $hostingKind
+}
+
 if ([string]::IsNullOrWhiteSpace($validationEnvironment)) {
     $result.summary = 'Environment de deploy nao informado e deployment_environment_name ausente no metadata.'
 }
 elseif ([string]::IsNullOrWhiteSpace($hostingKind)) {
     $result.summary = 'deployment_hosting_kind ausente; gravar via xpz-kb-parallel-setup.'
 }
-elseif ($hostingKind -notin @('dotnet-core-self-host', 'dotnet-framework-iis')) {
-    $result.summary = "deployment_hosting_kind invalido: $hostingKind"
+elseif ($null -eq $rec) {
+    # presente-e-fora-do-registro: rejeicao com a mensagem canonica (fonte-unica das chaves).
+    $result.summary = Get-GeneXusKbHostingKindSupportInvalidValueMessage -HostingKind $hostingKind
+}
+elseif (-not $rec.runsFreshnessEngine) {
+    # recognized-no-engine / blocked-out-of-scope: skip DERIVADO do registro (nunca redigitado).
+    $result.status = $rec.freshnessSkipStatus
+    $result.summary = $rec.unsupportedReason
 }
 else {
     $freshness = Test-GeneXusKbDeployBinFreshnessCore `

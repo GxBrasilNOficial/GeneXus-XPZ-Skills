@@ -39,7 +39,9 @@ param(
     [string]$DeploymentEnvironmentName,
 
     [Parameter(Mandatory = $true)]
-    [ValidateSet('dotnet-core-self-host', 'dotnet-framework-iis')]
+    # Fase 2 (paridade Java/Tomcat): [ValidateSet] removido. O motor compartilhado valida o valor contra o
+    # registro-fonte-unica (GeneXusKbHostingKindSupport.ps1) em runtime — aceita dotnet-core-self-host,
+    # dotnet-framework-iis e java-tomcat. Manter o [ValidateSet] .NET-only aqui barraria java-tomcat antes do motor.
     [string]$DeploymentHostingKind,
 
     [Parameter(Mandatory = $true)]

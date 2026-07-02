@@ -14,6 +14,9 @@
 Set-StrictMode -Version Latest
 
 . (Join-Path $PSScriptRoot 'GeneXusKbDeploymentEnvironmentSupport.ps1')
+# Fase 2 (paridade Java/Tomcat): fonte-unica dos hosting kinds. Acesso so via a API publica
+# Get-GeneXusKbHostingKindSupportRecord / Get-GeneXusKbHostingKindSupportInvalidValueMessage.
+. (Join-Path $PSScriptRoot 'GeneXusKbHostingKindSupport.ps1')
 
 $script:GeneXusKbDeployBinGateExitCode = 49
 $script:GeneXusKbDeployBinStaleStatus = 'compilou-mas-dll-destino-desatualizada'
@@ -52,6 +55,11 @@ function Resolve-GeneXusKbDeployBinCheckPolicy {
         mode               = 'skipped'
         skipReason         = $null
         deploymentHostingKind = $DeploymentHostingKind
+        # Fase 2: campos do skip por familia (recognized-no-engine / blocked-out-of-scope).
+        # Inicializados $null na BASE (nao so no ramo Java) para que a leitura a jusante em
+        # Invoke-...Classification nao lance sob StrictMode nos skips nao-Java (SkipDeployBinCheck etc.).
+        hostingSkipStatus  = $null
+        unsupportedReason  = $null
     }
 
     if ($SkipDeployBinCheck.IsPresent) {
@@ -85,11 +93,27 @@ function Resolve-GeneXusKbDeployBinCheckPolicy {
         return [pscustomobject]$policy
     }
 
-    if ($hostingKind -notin @('dotnet-core-self-host', 'dotnet-framework-iis')) {
-        $policy.skipReason = ("deployment_hosting_kind invalido: '{0}'." -f $hostingKind)
+    # Fase 2: validacao por registro (fonte-unica), nao por lista .NET-only redigitada. Discriminador
+    # por $rec.runsFreshnessEngine (T2) — cobre qualquer estado nao-supported (recognized-no-engine e
+    # um futuro blocked-out-of-scope) sem enumerar nomes de estado nem criar ramo morto.
+    $rec = Get-GeneXusKbHostingKindSupportRecord -HostingKind $hostingKind
+    if ($null -eq $rec) {
+        # Presente e fora do registro: invalido genuino (fail-closed = rejeicao, nao skip).
+        $policy.skipReason = Get-GeneXusKbHostingKindSupportInvalidValueMessage -HostingKind $hostingKind
         return [pscustomobject]$policy
     }
 
+    if (-not $rec.runsFreshnessEngine) {
+        # recognized-no-engine / blocked-out-of-scope: skip congelado. A string de status e a razao
+        # sao DERIVADAS do registro (nunca redigitadas); o exit 0 + status e materializado a jusante
+        # em Invoke-GeneXusKbDeployBinPostBuildClassification.
+        $policy.hostingSkipStatus = $rec.freshnessSkipStatus
+        $policy.unsupportedReason = $rec.unsupportedReason
+        $policy.skipReason = $rec.unsupportedReason
+        return [pscustomobject]$policy
+    }
+
+    # supported: roda o motor .NET exatamente como hoje.
     $policy.shouldRun = $true
     $policy.gateEnabled = ($StrictDeployBinCheck.IsPresent -or $PostImportDeployValidation.IsPresent)
     $policy.mode = if ($policy.gateEnabled) { 'gate' } else { 'diagnostic' }
@@ -452,6 +476,14 @@ function Invoke-GeneXusKbDeployBinPostBuildClassification {
     if (-not $policy.shouldRun) {
         if ($policy.skipReason) {
             $output.deployBinCheck.skipReason = $policy.skipReason
+        }
+        # Fase 2: hosting kind reconhecido-sem-motor (recognized-no-engine / blocked-out-of-scope) →
+        # materializa o contrato de skip DERIVANDO a string do registro (via $policy). exit 0 sem gate:
+        # nao reclassifica, nao seta newExitCode (o ramo ja retorna cedo). Demais skips mantem 'skipped'.
+        if ($policy.hostingSkipStatus) {
+            $output.deployBinFreshness = $policy.hostingSkipStatus
+            $output.deployBinCheck.hostingSkipStatus = $policy.hostingSkipStatus
+            $output.deployBinCheck.unsupportedReason = $policy.unsupportedReason
         }
         return [pscustomobject]$output
     }
