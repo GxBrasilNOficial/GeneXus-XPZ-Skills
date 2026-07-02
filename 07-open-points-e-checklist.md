@@ -140,6 +140,7 @@ Orientar futuras coletas de templates comparáveis.
 ## Itens sugeridos
 
 - Só voltar a coletar novos casos de `API` se surgirem novos objetos reais na KB ou alguma ferramenta externa passar a automatizar essa familia no ambiente.
+- `Calibração (from-spec, 2026-07-01)`: o "só voltar a coletar novos casos de `API` se surgirem novos objetos reais" acima refere-se ao perfil **cadeia-grande**; a Fase 0 já trouxe o novo caso — o perfil **from-spec autocontido** (tríade `API`->`Procedure`->`SDT`, validada por importação real), montável **sem** depender de objeto real na KB. Ver `03-risco-e-decisao-por-tipo.md` (`API (cadeia)` vs `API (from-spec)`) e `xpz-builder/responsibilities-by-type/api.md`.
 - Exportar pelo menos 1 template adicional de DataProvider com necessidade media, preferindo um caso simples e outro com mais contexto.
 - Exportar pelo menos 1 template adicional de DataStore com necessidade baixa, preferindo um datastore padrão e outro com metadados adicionais.
 - Exportar pelo menos 1 template adicional de Dashboard com necessidade media, preferindo um caso curto e outro com mais objetos analiticos e filtros.
@@ -209,6 +210,7 @@ Orientar futuras coletas de templates comparáveis.
 - `Evidência direta`: os exports `XPZExemploTabelaTRNWWPatternA.xpz` e `XPZExemploTabelaTRNDataSelectorA.xpz` explicitaram a ponte estrutural entre camada lógica, camada física e camada de pattern.
 - `Evidência direta`: o export `XPZExemploCadeiaAPIA.xpz` mostrou que a `API` relevante desta KB anda com uma subarvore funcional grande.
 - `Inferência forte`: o caso de `API` fica suficientemente entendido nesta trilha como dependencia funcional pesada de um único caso manual/local, e não como frente aberta de envelope mínimo ou familia ampla.
+- `Calibração (from-spec, 2026-07-01)`: o "`API`... dependência funcional pesada de um único caso... e não como frente aberta de envelope mínimo" acima é do perfil **cadeia-grande** (o export `XPZExemploCadeiaAPIA`). A Fase 0 reabriu `API` pelo perfil **from-spec autocontido** (tríade `API`->`Procedure`->`SDT`), esse sim frente de envelope mínimo viável, validada por importação real. Ver `03-risco-e-decisao-por-tipo.md` e `xpz-builder/responsibilities-by-type/api.md`.
 - `Evidência direta`: o export `XPZExemploTemaA.xpz` mostrou a pilha visual completa exportada como familia combinada.
 - `Evidência direta`: os exports `XPZExemploFamiliaMistaA.xpz` e `XPZExemploFamiliaMistaB.xpz` mostraram que a IDE também serializa familia combinada com `Attributes` top-level no mesmo `.xpz`.
 - `Inferência forte`: a frente aberta de `Attribute` deixa de incluir duvida relevante sobre contêiner multiobjeto; o foco remanescente continua sendo dependencia semantica de propriedades e contexto de KB.
