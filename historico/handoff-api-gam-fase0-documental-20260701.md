@@ -26,7 +26,7 @@ Data: 2026-07-01. Sessão anterior: Fase 0 empírica + início das fases documen
 
 ## O que FALTA (fazer na nova sessão)
 
-**ATUALIZAÇÃO 2026-07-01 (sessão seguinte): A3, A4 e B COMPLETOS, commitados em `main` (`d758f6c` + follow-up de paridade da pré-push), NÃO pushados.** Pré-push reforçada (13/14) executada (2 famílias: openai/Codex + anthropic nativo); corrigidos 4 gaps de paridade (CHANGELOG trilíngue, exceção API no `xpz-msbuild-import-export`, micro-notas stale em `01a`/`02`/`07`, bookkeeping). Falta só: **push (autorização do usuário)**. Resíduos na KB de teste seguem (ver `## Resíduos / pendências do usuário`).
+**ATUALIZAÇÃO 2026-07-01 (sessão seguinte): A3, A4 e B COMPLETOS e PUSHADOS em `f29f590` (2026-07-01); frente encerrada e migrada para `historico/IdeiasImplementadas_202607.md`.** Pré-push reforçada (13/14) completa — painel inteiro (5 vozes / 3 famílias: openai/Codex, anthropic nativo, ollama-cloud deepseek/kimi/glm) convergiu em zero gaps sobre a versão final `f29f590`; ~10 gaps de paridade corrigidos ao longo do caminho. Resíduos na KB de teste seguem (ver `## Resíduos / pendências do usuário`).
 
 - **A3 — FEITO** (`03-risco-e-decisao-por-tipo.md`): distinguido `API (cadeia)` de `API (from-spec)` em texto e nas 2 tabelas de risco (linhas ~175 e ~326), com micro-notas de recalibração (bullet na Tabela 1 / linha-nota in-grid na Tabela 2), `StructuralRisk = medio-contextual`, célula `ParentModuleDependency` = `parent nomeado presente (pasta PastaExemploApi, neutralizada no molde)` — **correção de revisão por pares**: a v5 dizia erroneamente `0 sem parent nomeado`, mas o molde `01e` tem `parent="PastaExemploApi"`; só o Codex, lendo o `01e`, pegou (4 revisores passaram). Revisão por pares: 6 versões, 3 famílias (anthropic nativo, openai/gpt-5.5, ollama-cloud deepseek/kimi/glm); recibo/closeout `closeoutReady=true`.
 - **A4 — FEITO**: `02-regras-operacionais-e-runtime.md` (Politica para API + dimensão GAM/runtime: from-spec, import real≠preview, falso-positivo de enforcement), `08-guia-para-agente-gpt.md` (`### API`), `10-base-operacional-msbuild-headless.md` (achado empírico: preview reporta sucesso p/ API inválida, só import real valida). **README: sem edição** — é índice de alto nível, não carrega conteúdo por tipo nem afirmação stale sobre API; forçar parágrafo API/GAM trilíngue seria ruído (decisão registrada; usuário pode redirecionar).
@@ -35,7 +35,7 @@ Data: 2026-07-01. Sessão anterior: Fase 0 empírica + início das fases documen
 ## Resíduos / pendências do usuário
 
 - KB de teste: `zzApiBatchTest` + `procFase0BatchDep` foram importados (deletar pela IDE). Papel `ProdutoApiConsumidor` foi **revogado** do usuário `api_produto_teste` (restaurar se quiser a ProdutoApi utilizável). Divergência à parte: `kb_environment_web_dirs` registra `NETFrameworkSQLServer/web`, real é `NETFrameworkSQLServer004/web`.
-- Git: esta rodada foi **commitada, NÃO pushada**. Há outras frentes não pushadas na branch (não são desta). Antes de push, rotina pré-push reforçada (doc 13/14) + paridade.
+- Git: frente **commitada e PUSHADA** em `f29f590` (2026-07-01); `origin/main` já contém os 7 commits da frente. (A menção anterior a "outras frentes não pushadas" era incorreta — a frente do pretooluse já estava em `origin/main=1e4b8a6` antes desta sessão.)
 
 ## Como retomar operações empíricas (se A3/A4 precisarem re-testar)
 
