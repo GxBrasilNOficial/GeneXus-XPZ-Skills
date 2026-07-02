@@ -83,6 +83,7 @@ Servir como local único para conflitos não resolvidos silenciosamente.
 - `Inferência forte`: a lacuna dominante agora não é mais "como serializar o XPZ", e sim "quais referencias e dependencias minimas precisam existir na KB para cada tipo contextual".
 - `Inferência forte`: `Theme`, `PatternSettings`, `Transaction`, `Attribute`, `Folder`, `Design System`, `Deployment Unit`, `Data Selector` e `Work With for Web` deixam de ser pendencias estruturais abertas nesta trilha.
 - `Inferência forte`: a fronteira principal remanescente se concentra na camada física `Table/Index`; `API` fica encerrada por ora como estudo de caso único, sem base para generalizacao adicional.
+- `Calibração (from-spec, 2026-07-01)`: o "encerrada como estudo de caso único, sem base para generalização" acima refere-se ao perfil **cadeia-grande**. A Fase 0 (frente `API` from-spec + GAM) abriu um perfil **from-spec autocontido** (tríade `API`->`Procedure`->`SDT`, validada por importação real), esse generalizável; ver `03-risco-e-decisao-por-tipo.md` (`API (cadeia)` vs `API (from-spec)`) e `xpz-builder/responsibilities-by-type/api.md`.
 
 ## Próximas frentes recomendadas
 

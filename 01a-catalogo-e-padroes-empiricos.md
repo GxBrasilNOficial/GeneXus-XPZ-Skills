@@ -254,6 +254,7 @@ Separar com mais precisao o que e falta de shape, o que e dependencia semantica 
 - `Evidência direta`: o mesmo exemplo também depende de `Procedure` e eventos reais no código fonte.
 - `Inferência forte`: por haver apenas um caso real na KB, `API` deve ser lida aqui como estudo de caso operacional da KB analisada, e não como familia GeneXus já generalizavel nesta base.
 - `Inferência forte`: em `API`, o envelope XML e relativamente bem definido, mas os tipos customizados e procedimentos referenciados precisam existir de fato na KB de destino.
+- `Calibração (from-spec, 2026-07-01)`: a leitura "caso único / não generalizável" acima vale para o perfil **cadeia-grande** (a subárvore funcional de negócio). A Fase 0 provou um perfil **from-spec autocontido** (tríade `API`->`Procedure`->`SDT`, validada por importação real, única `ATTCUSTOMTYPE` externa = `sdt:` próprios), esse sim generalizável. Ver `03-risco-e-decisao-por-tipo.md` (`API (cadeia)` vs `API (from-spec)`) e `xpz-builder/responsibilities-by-type/api.md`.
 - `Inferência forte`: não é seguro inventar `ATTCUSTOMTYPE`; ele deve copiar um valor comprovado ou apontar para tipo efetivamente existente no alvo.
 - `Evidência direta`: num teste isolado posterior, os SDTs reais `SDTExemploProdutoBasicoA`, `SDTExemploProdutoBasicoB`, `SDTExemploProdutoBasicoC`, `SDTExemploProdutoBasicoD`, `SDTExemploTribA` e `SDTExemploTribSelecaoA` importaram com sucesso antes da tentativa da `API`.
 - `Evidência direta`: nesse mesmo teste, `API 'APIExemploIntegracaoA'` deixou de falhar por `ATTCUSTOMTYPE` e passou a falhar por `Object Reference PRCExemploListaA not found`, `Invalid attribute 'DomainExemploTipoA'` e `'TRNExemploProdutoA' invalid property`.
@@ -344,6 +345,7 @@ Separar com mais precisao o que e falta de shape, o que e dependencia semantica 
 - `Evidência direta`: no mesmo recorte, `SDT` como `SDTExemploProdutoBasicoA` e `Procedure` como `PRCExemploListaA` aparecem no mesmo conjunto exportado.
 - `Inferência forte`: para `API`, o melhor recorte de engenharia reversa deixa de ser o objeto isolado e passa a ser essa combinacao funcional mais ampla.
 - `Inferência forte`: isso reforca a leitura anterior de que a pendencia remanescente de `API` não é serializacao do envelope, e sim dependencia de subarvore funcional de negocio.
+- `Calibração (from-spec, 2026-07-01)`: essa "dependência de subárvore funcional" é do perfil **cadeia-grande**; o perfil **from-spec autocontido** (tríade `API`->`Procedure`->`SDT`, única `ATTCUSTOMTYPE` externa = `sdt:` próprios) não puxa essa subárvore. Ver `03-risco-e-decisao-por-tipo.md` e `xpz-builder/responsibilities-by-type/api.md`.
 
 ### `Table + Transaction + ColorPalette + DesignSystem + Theme + WebTheme + Category + ThemeClass + ThemeColor`
 

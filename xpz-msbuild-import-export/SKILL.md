@@ -41,6 +41,8 @@ Uso mais amplo desta skill ainda depende de:
 
 Orquestre operações de `XPZ` via `MSBuild` com parâmetros explícitos, coleta rastreável de evidências e aborto seguro antes de operações sensíveis. Priorize descoberta de ambiente, `PreviewMode`, `UpdateFile` quando suportado pela task carregada, `IncludeItems`/`ExcludeItems` para recortes controlados e validação posterior. Nunca trate importação real como padrão.
 
+> **Exceção — validação de `API` (from-spec):** o `PreviewMode` prioriza inspeção, mas **não valida** uma `API` — reporta `importTaskSuccess:true` mesmo para `API` inválida (valor de `[SecurityLevel]` inválido, `Procedure` de implementação ausente). Só a **importação real** roda a validação de gramática/referências da `API` (inclusive a resolução `API => Procedure`). Quando o objetivo for **validar** uma `API` from-spec, usar importação real (empacotando a `API` com seu `Procedure`, ou fazendo staging do `Procedure` antes) — a autorização de import real e os gates de envelope continuam valendo. Ver `10-base-operacional-msbuild-headless.md` e `xpz-builder/responsibilities-by-type/api.md`.
+
 ## PATH RESOLUTION
 
 - Este `SKILL.md` fica em uma subpasta de skill sob a raiz do repositório.
@@ -602,6 +604,7 @@ Após a limpeza, reaplicar WWP na Transaction final para regenerar base consiste
 - [ ] `observedContext.pathEnrichment` registrou o enriquecimento preventivo do `PATH` (`applied`, `subdirsAdded`, `subdirsSkipped`)
 - [ ] `Genexus.Tasks.targets` foi validado
 - [ ] `PreviewMode` foi priorizado quando a intenção era inspeção
+- [ ] Quando a intenção era **validar** uma `API` from-spec, usou-se **importação real** (não preview) — o preview reporta sucesso para `API` inválida
 - [ ] Quando o objetivo era importação (preview ou real): `Test-GeneXusImportFileEnvelope.ps1` foi executado antes de qualquer chamada ao MSBuild
 - [ ] O gate de envelope retornou `apto para prosseguir` ou `apto com ressalvas` com confirmação explícita do usuário
 - [ ] O gate de envelope não foi ignorado por presunção de que o arquivo já havia sido validado anteriormente

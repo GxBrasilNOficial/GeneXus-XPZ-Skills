@@ -1459,6 +1459,7 @@ Não confundir `src0056` em `Transaction` `Rules` com o playbook de `Procedure` 
 - `Inferência forte`: a hierarquia de validação de `API` nesta trilha é: primeiro `ATTCUSTOMTYPE`/SDTs, depois `Procedure`, e por fim atributos, dominios ou contexto de negocio usados no codigo/eventos.
 - `Inferência forte`: para `API`, o melhor recorte operacional deixa de ser o objeto isolado e passa a ser uma familia funcional contendo pelo menos `Procedure`, `SDT`, `Domain`, e possivelmente `Transaction`, `Table` e `DataProvider`.
 - `Regra operacional`: não regenerar `API` “igual” após erro de `ATTCUSTOMTYPE`; primeiro materializar os SDTs reais e reexecutar. Se o erro remanescente migrar para `Procedure` ou atributo de negocio, tratar a camada semantica seguinte.
+- `Calibração (from-spec, 2026-07-01)`: esta seção descreve o perfil **cadeia-grande** (caso único da KB, subárvore funcional). A dimensão **from-spec + GAM/runtime** (tríade autocontida `API`->`Procedure`->`SDT`, importação real ≠ preview, enforcement GAM como pré-condição de runtime) está na seção `## Politica para API` adiante e no `03-risco-e-decisao-por-tipo.md` (`API (cadeia)` vs `API (from-spec)`).
 
 ### Politica para `Attribute` em export combinado
 
