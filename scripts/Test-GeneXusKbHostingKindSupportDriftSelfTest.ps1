@@ -70,6 +70,13 @@ foreach ($kind in $expectedKinds) {
 if ($null -ne (Get-GeneXusKbHostingKindSupportRecord -HostingKind 'kind-inexistente')) {
     throw "ASSERT_FAILED: kind desconhecido deveria retornar `$null"
 }
+# -HostingKind vazio/espaco e lookup singular (parametro informado) -> `$null, NAO a enumeracao.
+if ($null -ne (Get-GeneXusKbHostingKindSupportRecord -HostingKind '')) {
+    throw "ASSERT_FAILED: -HostingKind '' (vazio) deveria retornar `$null, nao todos os registros"
+}
+if ($null -ne (Get-GeneXusKbHostingKindSupportRecord -HostingKind '   ')) {
+    throw "ASSERT_FAILED: -HostingKind '   ' (espacos) deveria retornar `$null, nao todos os registros"
+}
 
 # ── 2. dispatch por familia ─────────────────────────────────────────────────────
 $expectedFamily = @{
@@ -96,7 +103,7 @@ if ($core.freshnessSupportState -ne 'supported' -or -not $core.runsFreshnessEngi
 if ($core.sentinel -ne 'GxNetCoreStartup.dll') {
     throw "ASSERT_FAILED: sentinel do core divergente: [$($core.sentinel)]"
 }
-if ($core.freshnessSkipStatus -ne $null) {
+if ($null -ne $core.freshnessSkipStatus) {
     throw "ASSERT_FAILED: core supported nao deveria ter freshnessSkipStatus, atual=[$($core.freshnessSkipStatus)]"
 }
 if (@($core.tentativeFields).Count -ne 0) {
@@ -138,10 +145,58 @@ if ($java.outputModelSubPath -ne 'tentative-java') {
 if ($null -ne $java.runtimeExclusionPrefixes) {
     throw "ASSERT_FAILED: java.runtimeExclusionPrefixes deveria ser `$null (nao @()), atual=[$(@($java.runtimeExclusionPrefixes) -join ',')]"
 }
-foreach ($f in @('sentinel', 'outputModelSubPath', 'runtimeExclusionPrefixes')) {
-    if ($f -notin @($java.tentativeFields)) {
-        throw "ASSERT_FAILED: campo '$f' deveria constar em java.tentativeFields=[$(@($java.tentativeFields) -join ',')]"
+# Conjunto EXATO de tentativeFields (trava a decisao de quais campos Java sao provisorios;
+# um editor futuro nao pode adicionar/remover sem o teste reclamar).
+$expectedTentative = @(
+    'outputModelSubPath'
+    'sentinel'
+    'webDirFreshnessExtensions'
+    'runtimeFreshnessExtensions'
+    'runtimeExclusionPrefixes'
+    'publicationTargets'
+)
+$actualTentative = @($java.tentativeFields | Sort-Object)
+$expectedSorted = @($expectedTentative | Sort-Object)
+if (($actualTentative -join ',') -ne ($expectedSorted -join ',')) {
+    throw "ASSERT_FAILED: java.tentativeFields divergente. esperado=[$($expectedSorted -join ',')] atual=[$($actualTentative -join ',')]"
+}
+# deployTargetKind e recomendacao v1 CONGELADA (nao empirica) -> NAO deve constar em tentativeFields.
+if ('deployTargetKind' -in @($java.tentativeFields)) {
+    throw "ASSERT_FAILED: deployTargetKind e decisao v1 congelada, nao deve estar em java.tentativeFields"
+}
+# Campos de lista provisorios Java = `$null (NAO @()) -> "desconhecido", nunca "vazio conhecido".
+foreach ($listField in @('webDirFreshnessExtensions', 'runtimeFreshnessExtensions', 'runtimeExclusionPrefixes', 'publicationTargets')) {
+    if ($null -ne $java.$listField) {
+        throw "ASSERT_FAILED: java.$listField deveria ser `$null (campo de lista provisorio, nao @()), atual=[$(@($java.$listField) -join ',')]"
     }
+}
+
+# ── 5b. Mensagem canonica de valor invalido (fonte-unica das chaves + ramo vazio) ─
+# Trava o comportamento (nao so a existencia) de Get-...InvalidValueMessage antes de a
+# Fase 2 consumi-la: a mensagem deve enumerar TODAS as chaves do registro (fonte unica) e
+# ecoar o valor recebido; o ramo vazio deve render '(vazio)'.
+$invalidMsg = Get-GeneXusKbHostingKindSupportInvalidValueMessage -HostingKind 'kind-bogus'
+foreach ($kind in $expectedKinds) {
+    if ($invalidMsg -notmatch [regex]::Escape($kind)) {
+        throw "ASSERT_FAILED: mensagem de valor invalido deveria listar o kind '$kind' (fonte-unica das chaves), atual=[$invalidMsg]"
+    }
+}
+if ($invalidMsg -notmatch [regex]::Escape('kind-bogus')) {
+    throw "ASSERT_FAILED: mensagem de valor invalido deveria ecoar o valor recebido, atual=[$invalidMsg]"
+}
+$emptyValueMsg = Get-GeneXusKbHostingKindSupportInvalidValueMessage -HostingKind ''
+if ($emptyValueMsg -notmatch [regex]::Escape('(vazio)')) {
+    throw "ASSERT_FAILED: mensagem de valor invalido para vazio deveria conter '(vazio)', atual=[$emptyValueMsg]"
+}
+# Exatidao (nao so presenca): a lista 'Valores reconhecidos: ...' deve ser EXATAMENTE as chaves
+# do registro — um valor extra/stale na mensagem nao pode passar.
+if ($invalidMsg -notmatch 'Valores reconhecidos:\s*(.+?)\.\s*$') {
+    throw "ASSERT_FAILED: mensagem de valor invalido nao casou o formato 'Valores reconhecidos: <lista>.', atual=[$invalidMsg]"
+}
+$listedKinds = @($matches[1] -split ',\s*' | ForEach-Object { $_.Trim() } | Sort-Object)
+$expectedKindsSorted = @($expectedKinds | Sort-Object)
+if (($listedKinds -join '|') -ne ($expectedKindsSorted -join '|')) {
+    throw "ASSERT_FAILED: mensagem lista [$($listedKinds -join ', ')] != chaves exatas do registro [$($expectedKindsSorted -join ', ')]"
 }
 
 # ── 6. uso da API publica: hashtable interna nao vaza para consumidores ──────────
@@ -177,10 +232,16 @@ if (($prefixJava -join ',') -ne 'java-tomcat') {
 }
 
 # Fail-soft: sombrear a API para lancar; o completer deve cair na lista estatica, sem excecao.
-function Get-GeneXusKbHostingKindSupportRecord { throw 'drift-selftest: registro indisponivel' }
-$failsoft = @(& $sb $null 'DeploymentHostingKind' '' $null $null | ForEach-Object { $_.CompletionText } | Sort-Object)
-Remove-Item -Path 'Function:\Get-GeneXusKbHostingKindSupportRecord' -ErrorAction SilentlyContinue
-. $registryFile  # restaura a API real para checagens seguintes
+# try/finally garante a restauracao da API real mesmo se o completer lancar (robustez do teste).
+$failsoft = $null
+try {
+    function Get-GeneXusKbHostingKindSupportRecord { throw 'drift-selftest: registro indisponivel' }
+    $failsoft = @(& $sb $null 'DeploymentHostingKind' '' $null $null | ForEach-Object { $_.CompletionText } | Sort-Object)
+}
+finally {
+    Remove-Item -Path 'Function:\Get-GeneXusKbHostingKindSupportRecord' -ErrorAction SilentlyContinue
+    . $registryFile  # restaura a API real para checagens seguintes
+}
 
 # Guarda de drift: a lista estatica de fallback deve espelhar as chaves do registro.
 if (($failsoft -join ',') -ne ($normal -join ',')) {

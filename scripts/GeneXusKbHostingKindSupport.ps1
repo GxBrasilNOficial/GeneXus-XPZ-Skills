@@ -57,6 +57,11 @@ $script:GeneXusKbHostingKindFreshnessSkipStatusByState = [ordered]@{
 # ── Construtor interno do registro (NAO faz parte da API publica) ────────────────
 
 function New-GeneXusKbHostingKindSupportRecord {
+    # Convencao de tipagem (deliberada): campos SEMPRE preenchidos (strings nao-nulas) sao
+    # tipados [string]; campos que podem ser $null (sentinel, listas, prosa opcional) ficam
+    # SEM tipo DE PROPOSITO. Tipar [string]$Sentinel = $null coage $null -> '' sob StrictMode e
+    # quebraria a invariante framework-iis (sentinel=$null) e os campos de lista provisorios
+    # ($null, nao @()). Contrato dos nao-tipados: passar string|array|$null conforme o comentario.
     param(
         [string]$HostingKind,
         [string]$Family,
@@ -68,7 +73,7 @@ function New-GeneXusKbHostingKindSupportRecord {
         $WebDirFreshnessExtensions,   # string[]|$null
         $RuntimeFreshnessExtensions,  # string[]|$null
         $RuntimeExclusionPrefixes,    # string[]|$null ($null, NAO @(), quando desconhecido)
-        $PublicationTargets,          # object[] (opaco as Fases 1/2)
+        $PublicationTargets,          # object[]|$null (opaco as Fases 1/2; $null quando desconhecido)
         $UnsupportedReason,           # string|$null
         $ErrorMessage,                # string|$null
         [string[]]$TentativeFields
@@ -162,8 +167,10 @@ $script:GeneXusKbHostingKindSupportRegistry['dotnet-framework-iis'] =
 # java-tomcat: reconhecido-sem-motor. Familia e estado sao definitivos; os campos de motor
 # sao provisorios (tentativeFields) ate a Fase 0/3 aterrar a evidencia. Marcador 'tentative-java'
 # nos campos string; $null (NAO @()) nos campos de lista para significar "desconhecido", nunca
-# "sem exclusoes/sem alvos". deployTargetKind='in-kb-web' e a recomendacao v1 (in-place), sujeita
-# ao Plano B se a Fase 0 revelar topologia externa (.war/webapp fora de web).
+# "sem exclusoes/sem alvos". deployTargetKind='in-kb-web' e a recomendacao v1 (in-place): decisao
+# CONGELADA (NAO valor empirico), sujeita apenas ao Plano B se a Fase 0 revelar topologia externa
+# (.war/webapp fora de web) -> por isso NAO entra em tentativeFields (que lista so campos de valor
+# Java empiricamente desconhecido).
 $javaTomcatRecord = @{
     HostingKind                = 'java-tomcat'
     Family                     = 'java'
@@ -175,11 +182,10 @@ $javaTomcatRecord = @{
     WebDirFreshnessExtensions  = $null
     RuntimeFreshnessExtensions = $null
     RuntimeExclusionPrefixes   = $null
-    PublicationTargets         = @()
+    PublicationTargets         = $null
     UnsupportedReason          = 'Gerador Java/Tomcat reconhecido, mas o motor de verificacao de deploy-bin ainda e .NET (Eixo A). Checagem pulada (skipped-hosting-unsupported) ate a Fase 3 dar motor por familia.'
     ErrorMessage               = $null
     TentativeFields            = @(
-        'deployTargetKind'
         'outputModelSubPath'
         'sentinel'
         'webDirFreshnessExtensions'
@@ -199,9 +205,9 @@ function Get-GeneXusKbHostingKindSupportRecord {
         Acessor unico do registro de hosting kinds.
     .DESCRIPTION
         Com -HostingKind: retorna o registro (pscustomobject) do kind, ou $null se
-        desconhecido. Sem -HostingKind: retorna todos os registros (array), na ordem
-        de declaracao. Unica porta de leitura do registro; nenhum consumidor toca o
-        $script: table diretamente.
+        desconhecido OU vazio/espaco. Sem -HostingKind (parametro nao informado): retorna
+        todos os registros (array), na ordem de declaracao. Unica porta de leitura do
+        registro; nenhum consumidor toca o $script: table diretamente.
     #>
     [CmdletBinding()]
     param(
@@ -209,7 +215,11 @@ function Get-GeneXusKbHostingKindSupportRecord {
         [string]$HostingKind
     )
 
-    if ($PSBoundParameters.ContainsKey('HostingKind') -and -not [string]::IsNullOrWhiteSpace($HostingKind)) {
+    if ($PSBoundParameters.ContainsKey('HostingKind')) {
+        # -HostingKind informado: lookup singular. Vazio/espaco -> $null (nao cai na enumeracao).
+        if ([string]::IsNullOrWhiteSpace($HostingKind)) {
+            return $null
+        }
         $key = $HostingKind.Trim()
         if ($script:GeneXusKbHostingKindSupportRegistry.Contains($key)) {
             return [pscustomobject]$script:GeneXusKbHostingKindSupportRegistry[$key]
@@ -238,7 +248,9 @@ function Get-GeneXusKbHostingKindSupportInvalidValueMessage {
         [string]$HostingKind
     )
 
-    $supported = @($script:GeneXusKbHostingKindSupportRegistry.Keys) -join ', '
+    # Enumera pela propria API publica (porta unica), nao pela hashtable interna: a mensagem
+    # e sourced pelo mesmo caminho de leitura que todo o resto (dogfood do single-door).
+    $supported = @((Get-GeneXusKbHostingKindSupportRecord).hostingKind) -join ', '
     $shown = if ([string]::IsNullOrWhiteSpace($HostingKind)) { '(vazio)' } else { $HostingKind }
     return ("deployment_hosting_kind invalido: '{0}'. Valores reconhecidos: {1}." -f $shown, $supported)
 }
@@ -253,7 +265,9 @@ function Get-GeneXusKbHostingKindArgumentCompleterScriptBlock {
         Enumera os kinds via a API publica. Se a enumeracao falhar (registro indisponivel
         no momento do completamento), cai para uma lista estatica minima embutida — nunca
         lanca durante o TAB. O self-test trava a equivalencia lista-viva == lista-fallback
-        (guarda de drift).
+        (guarda de drift). O scriptblock resolve Get-...Record por NOME em runtime (resolucao
+        dinamica), nao por captura de closure — e isso que permite ao self-test sombrear a
+        funcao para exercitar o ramo fail-soft.
     #>
     return {
         param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
