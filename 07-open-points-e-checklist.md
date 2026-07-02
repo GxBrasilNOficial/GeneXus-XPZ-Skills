@@ -80,6 +80,7 @@ Servir como local único para conflitos não resolvidos silenciosamente.
 - `Evidência direta`: `Theme`, `Pattern Settings`, `Transaction` e `Work With for Web` já possuem receita empirica de sucesso sob dependencias explicitas conhecidas.
 - `Evidência direta`: `Design System`, `Deployment Unit` e `Data Selector` também já tiveram casos controlados de sucesso nesta trilha.
 - `Evidência direta`: a camada física `Table/Index` concentra a principal frente técnica ainda aberta nesta trilha, enquanto `API` ficou delimitada como caso único manual/local da KB.
+- `Calibração (from-spec, 2026-07-01)`: o "`API` ficou delimitada como caso único manual/local da KB" acima refere-se ao perfil **cadeia-grande**; a Fase 0 abriu o perfil **from-spec autocontido** (tríade `API`->`Procedure`->`SDT`, validada por importação real), esse generalizável. Ver `03-risco-e-decisao-por-tipo.md` (`API (cadeia)` vs `API (from-spec)`) e `xpz-builder/responsibilities-by-type/api.md`.
 - `Inferência forte`: a lacuna dominante agora não é mais "como serializar o XPZ", e sim "quais referencias e dependencias minimas precisam existir na KB para cada tipo contextual".
 - `Inferência forte`: `Theme`, `PatternSettings`, `Transaction`, `Attribute`, `Folder`, `Design System`, `Deployment Unit`, `Data Selector` e `Work With for Web` deixam de ser pendencias estruturais abertas nesta trilha.
 - `Inferência forte`: a fronteira principal remanescente se concentra na camada física `Table/Index`; `API` fica encerrada por ora como estudo de caso único, sem base para generalizacao adicional.
@@ -93,6 +94,7 @@ Servir como local único para conflitos não resolvidos silenciosamente.
 - `Inferência forte`: antes de corrigir os `.md` dos tipos problemáticos, vale usar a bateria atual para distinguir "erro de molde" de "erro de dependência de KB" em cada tipo.
 - `Inferência forte`: vale abrir uma frente de automacao comparativa por baseline oficial, com diff normalizado por bloco funcional e filtragem de ruido conhecido, para reduzir falso positivo de regressao em objeto legado.
 - `Inferência forte`: a próxima coleta em exemplos reais deve priorizar `Table/Index` e outros tipos contextuais ainda não revisitados com dependencias completas; para `API`, só faz sentido nova coleta se surgirem novos casos reais ou automacao externa no ambiente. Para `Theme`, `PatternSettings` e `Transaction`, a coleta adicional passa a ser de generalizacao e não de desbloqueio inicial.
+- `Calibração (from-spec, 2026-07-01)`: o "para `API`, só faz sentido nova coleta se surgirem novos casos reais ou automação externa" acima **já foi atendido** — a Fase 0 é o novo caso real (perfil from-spec autocontido, validado por importação real). A coleta adicional de `API` passa a ser de novos perfis/variantes, não de desbloqueio inicial. Ver `03-risco-e-decisao-por-tipo.md` (`API (cadeia)` vs `API (from-spec)`) e `xpz-builder/responsibilities-by-type/api.md`.
 
 ## Mini-postmortem de incidente metodologico
 
