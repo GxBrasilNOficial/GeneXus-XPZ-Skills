@@ -264,6 +264,11 @@ finally {
 if ('sentinel-kind-vivo' -notin $liveProof) {
     throw "ASSERT_FAILED: completer nao usou a API no caminho vivo (kind sentinela ausente): [$($liveProof -join ',')]"
 }
+# O caminho vivo deve refletir EXATAMENTE a API (1 kind sentinela) — trava tambem uma regressao
+# que devolvesse o sentinela MAIS algum valor nao-fallback (fusao parcial nao coberta pela negativa).
+if ($liveProof.Count -ne 1) {
+    throw "ASSERT_FAILED: caminho vivo deve refletir exatamente a API (1 kind), retornou $($liveProof.Count): [$($liveProof -join ',')]"
+}
 # NENHUM kind do fallback estatico pode aparecer com a API respondendo (aderencia literal ao
 # comentario; pega tambem uma hipotetica fusao vivo+fallback, nao so o ramo 'sempre fallback').
 $fallbackKinds = @('dotnet-core-self-host', 'dotnet-framework-iis', 'java-tomcat')

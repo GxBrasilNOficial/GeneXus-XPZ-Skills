@@ -178,7 +178,7 @@ try {
         Write-Host $rejectedActualN
         Write-Host '----- REJEITADO (baseline) -----'
         Write-Host $rejectedGolden
-        throw 'ASSERT_FAILED: caso REJEITADO divergiu do golden .NET (a Fase 1 fiou o registro na fachada indevidamente?).'
+        throw 'ASSERT_FAILED: caso REJEITADO divergiu do golden .NET. Na Fase 1: a fachada fiou o registro indevidamente? Na Fase 2+: se a mudanca da fachada e DELIBERADA (registro fiado), recapturar o baseline com -UpdateBaseline apos revalidar.'
     }
 
     'GENEXUS_DEPLOY_BIN_DOTNET_GOLDEN_SELFTEST_OK'

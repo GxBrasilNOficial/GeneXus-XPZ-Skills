@@ -114,6 +114,12 @@ $dotnetExclusionPrefixes = @('GeneXus.', 'System.', 'Microsoft.')
 $dotnetWebDirExtensions  = @('.cs', '.js', '.aspx', '.dll')
 $dotnetRuntimeExtensions = @('.cs', '.js', '.aspx', '.rsp')
 
+# ALIASING PROPOSITAL (ver design, Fase 3 item (x)): estes arrays $dotnet* sao a MESMA referencia
+# nos dois records .NET (a copia [pscustomobject] e rasa; os campos de lista continuam compartilhados),
+# e $dotnetExclusionPrefixes ainda aparece aninhado em publicationTargets[0].exclusionPrefixes. Inerte
+# na Fase 1 (nada muta). A Fase 3, ao popular/mutar listas por familia (itens (iv)/(vi)/(vii)), DEVE
+# clonar antes de mutar para nao vazar entre records.
+
 # publicationTargets .NET ja na forma-alvo da Fase 3 (subPath 'bin'), porem OPACO as Fases 1/2:
 # nenhum consumidor de Fase 1/2 itera este campo (clausula no-bridge). evidenceStrategy e string
 # livre na Fase 1 (vira enum fechado so na Fase 3).
@@ -183,7 +189,7 @@ $javaTomcatRecord = @{
     RuntimeFreshnessExtensions = $null
     RuntimeExclusionPrefixes   = $null
     PublicationTargets         = $null
-    UnsupportedReason          = 'Gerador Java/Tomcat reconhecido, mas o motor de verificacao de deploy-bin ainda e .NET (Eixo A). Checagem pulada (skipped-hosting-unsupported) ate a Fase 3 dar motor por familia.'
+    UnsupportedReason          = "Gerador Java/Tomcat reconhecido, mas o motor de verificacao de deploy-bin ainda e .NET (Eixo A). Checagem pulada ($($script:GeneXusKbHostingKindSkipStatus)) ate a Fase 3 dar motor por familia."
     ErrorMessage               = $null
     TentativeFields            = @(
         'outputModelSubPath'
