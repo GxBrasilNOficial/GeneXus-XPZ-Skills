@@ -264,8 +264,12 @@ finally {
 if ('sentinel-kind-vivo' -notin $liveProof) {
     throw "ASSERT_FAILED: completer nao usou a API no caminho vivo (kind sentinela ausente): [$($liveProof -join ',')]"
 }
-if ('dotnet-core-self-host' -in $liveProof) {
-    throw "ASSERT_FAILED: completer caiu no fallback estatico mesmo com a API respondendo: [$($liveProof -join ',')]"
+# NENHUM kind do fallback estatico pode aparecer com a API respondendo (aderencia literal ao
+# comentario; pega tambem uma hipotetica fusao vivo+fallback, nao so o ramo 'sempre fallback').
+$fallbackKinds = @('dotnet-core-self-host', 'dotnet-framework-iis', 'java-tomcat')
+$fallbackLeak = @($liveProof | Where-Object { $_ -in $fallbackKinds })
+if ($fallbackLeak.Count -gt 0) {
+    throw "ASSERT_FAILED: completer devolveu kind(s) do fallback estatico com a API respondendo: [$($fallbackLeak -join ',')]"
 }
 
 # ── 8. Contrato de skip: string com fonte unica (nenhum emissor a redigita) ──────
