@@ -276,8 +276,8 @@ Scripts nesta frente:
   - status atual: implementado
   - objetivo: diagnosticar se o runtime GeneXus reflete a versão mais recente de um objeto após import+build; somente leitura, não abre KB, não invoca MSBuild
   - parâmetros obrigatórios: `-KbPath`, `-ObjectName`, `-ImportedAt`
-  - parâmetros opcionais: `-ObjectType` (reservado para uso futuro), `-GeneratorOutputPath` (se omitido, deriva como `<KbPath>\CSharpModel\web`), `-AsJson`
-  - saída esperada: `runtime-fresh` (nogenreq + artefatos posteriores ao import), `runtime-stale` (genreq ou artefatos anteriores), `runtime-unknown` (objeto não encontrado em `nav_objs.xml` ou artefatos não localizados)
+  - parâmetros opcionais: `-ObjectType` (reservado para uso futuro), `-GeneratorOutputPath` (se omitido, deriva como `<KbPath>\CSharpModel\web`), `-DeploymentHostingKind` (Fase 2 — guarda de família do Eixo C; opcional), `-AsJson`
+  - saída esperada: `runtime-fresh` (nogenreq + artefatos posteriores ao import), `runtime-stale` (genreq ou artefatos anteriores), `runtime-unknown` (objeto não encontrado em `nav_objs.xml` ou artefatos não localizados), `skipped-hosting-unsupported` (Fase 2 — quando `-DeploymentHostingKind` é `java-tomcat`/família não-.NET: pula sem derivar `CSharpModel\web`, exit 0; valor fora do registro → `runtime-hosting-kind-invalido`, exit não-zero)
 - `Get-GeneXusKbProperty.ps1`
   - status atual: implementado
   - objetivo: leitura de propriedade em qualquer nível da KB sem alterar nenhum dado
@@ -539,7 +539,7 @@ pwsh -NoProfile -File scripts/Invoke-GeneXusXpzImport.ps1 `
    Quando o sub-estado for `importação real efetiva provada`, build tiver sido executado após reabertura da KB e o usuário reportar que o comportamento ainda não mudou, oferecer a `checagem de frescor de runtime` como trilha de diagnóstico nomeada antes de sugerir nova edição:
    - Resolver antes o caminho do `.cs` gerado com `scripts\Resolve-GeneXusGeneratedCsPath.ps1 -KbPath <caminho> -ParallelKbRoot <pasta-paralela> -ObjectName <nome> -EnvironmentName <environment-quando-necessario> -AsJson`, usando `kb_environment_web_dirs` de `kb-source-metadata.md`
    - Se o metadata não cobrir o environment, bloquear e encaminhar para `xpz-kb-parallel-setup`; não usar glob recursivo nem inferir `CSharpModel\web` como substituto em KB multi-environment
-   - Em seguida executar `scripts\Test-GeneXusRuntimeFreshness.ps1 -KbPath <caminho> -ObjectName <nome> -ImportedAt <timestamp-do-import> -GeneratorOutputPath <webDirectory-resolvido> -AsJson` para verificar automaticamente os dois indicadores; a saída JSON indica `runtime-fresh`, `runtime-stale` ou `runtime-unknown`
+   - Em seguida executar `scripts\Test-GeneXusRuntimeFreshness.ps1 -KbPath <caminho> -ObjectName <nome> -ImportedAt <timestamp-do-import> -GeneratorOutputPath <webDirectory-resolvido> -AsJson` para verificar automaticamente os dois indicadores; a saída JSON indica `runtime-fresh`, `runtime-stale` ou `runtime-unknown` (Fase 2: em KB `java-tomcat`, passar `-DeploymentHostingKind java-tomcat` → `skipped-hosting-unsupported`/exit 0, pois o diagnóstico `.cs`/.NET não se aplica)
    - Verificar `nav_objs.xml` (raiz da KB nativa): confirmar se o objeto aparece com `ObjStatus=nogenreq`; `ObjStatus=genreq` indica que a geração está pendente após o import
    - NVG excluído da checagem somente leitura: é gerado ao abrir a KB na IDE e não é um arquivo estático acessível sem abertura
    - Comparar timestamps dos artefatos gerados (`.cs`, `.aspx`, ou equivalente da instalação) com o timestamp do import
