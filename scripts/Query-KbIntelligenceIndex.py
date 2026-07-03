@@ -18,7 +18,7 @@ if str(_SCRIPT_DIR) not in sys.path:
 from GeneXusObjectTypeCatalogCore import resolve_effective_object_type_catalog_for_query  # noqa: E402
 
 
-EXPECTED_SCHEMA_VERSION = "3"
+EXPECTED_SCHEMA_VERSION = "4"
 LEVEL_RE = re.compile(r"<Level\b(?P<attrs>[^>]*)>(?P<body>.*?)</Level>", re.IGNORECASE | re.DOTALL)
 LEVEL_ATTRIBUTE_RE = re.compile(
     r"<Attribute\b(?P<attrs>[^>]*)>(?P<name>.*?)</Attribute>",
@@ -205,7 +205,7 @@ def fetch_object(conn: sqlite3.Connection, object_type: str, object_name: str) -
     return fetch_one(
         conn,
         """
-        SELECT object_id, type, name, guid, file_path, last_update, file_hash
+        SELECT object_id, type, name, guid, file_path, last_update, file_hash, is_generated_object, pattern_object_id, instance_key
         FROM objects
         WHERE type = ? AND LOWER(name) = LOWER(?)
         """,
@@ -217,6 +217,23 @@ def limit_rows(rows: list[dict[str, object]], limit: int | None) -> list[dict[st
     if limit is None or limit <= 0:
         return rows
     return rows[:limit]
+
+
+def generated_filter_clause(generated_filter: str | None) -> str:
+    """Clausula SQL literal para o filtro autoral x gerado (sem params; valores literais 0/1)."""
+    if generated_filter == "generated":
+        return "AND is_generated_object = 1"
+    if generated_filter == "authored":
+        return "AND is_generated_object = 0"
+    return ""
+
+
+def generated_filter_from_args(args: argparse.Namespace) -> str | None:
+    if getattr(args, "generated", False):
+        return "generated"
+    if getattr(args, "authored", False):
+        return "authored"
+    return None
 
 
 def index_metadata(conn: sqlite3.Connection) -> dict[str, object]:
@@ -404,7 +421,7 @@ def transaction_writable_attributes(conn: sqlite3.Connection, transaction_name: 
     }
 
 
-def search_objects(conn: sqlite3.Connection, object_name: str, object_type: str | None, limit: int | None) -> dict[str, object]:
+def search_objects(conn: sqlite3.Connection, object_name: str, object_type: str | None, limit: int | None, generated_filter: str | None = None) -> dict[str, object]:
     pattern = object_name.replace("*", "%")
     if "%" not in pattern:
         pattern = f"%{pattern}%"
@@ -414,13 +431,14 @@ def search_objects(conn: sqlite3.Connection, object_name: str, object_type: str 
     if object_type:
         type_clause = "AND type = ?"
         params.append(object_type)
+    generated_clause = generated_filter_clause(generated_filter)
 
     rows = fetch_all(
         conn,
         f"""
-        SELECT type, name, guid, file_path, last_update
+        SELECT type, name, guid, file_path, last_update, is_generated_object, pattern_object_id, instance_key
         FROM objects
-        WHERE name LIKE ? {type_clause}
+        WHERE name LIKE ? {type_clause} {generated_clause}
         ORDER BY type, name
         """,
         tuple(params),
@@ -430,6 +448,7 @@ def search_objects(conn: sqlite3.Connection, object_name: str, object_type: str 
         "query": "search-objects",
         "pattern": object_name,
         "object_type": object_type,
+        "generated_filter": generated_filter,
         "total": total,
         "shown": len(limit_rows(rows, limit)),
         "results": limit_rows(rows, limit),
@@ -650,13 +669,14 @@ def functional_trace_basic(conn: sqlite3.Connection, object_type: str, object_na
     }
 
 
-def list_by_type(conn: sqlite3.Connection, object_type: str, limit: int | None) -> dict[str, object]:
+def list_by_type(conn: sqlite3.Connection, object_type: str, limit: int | None, generated_filter: str | None = None) -> dict[str, object]:
+    generated_clause = generated_filter_clause(generated_filter)
     rows = fetch_all(
         conn,
-        """
-        SELECT type, name, guid, file_path, last_update
+        f"""
+        SELECT type, name, guid, file_path, last_update, is_generated_object, pattern_object_id, instance_key
         FROM objects
-        WHERE type = ?
+        WHERE type = ? {generated_clause}
         ORDER BY name
         """,
         (object_type,),
@@ -665,6 +685,7 @@ def list_by_type(conn: sqlite3.Connection, object_type: str, limit: int | None) 
     return {
         "query": "list-by-type",
         "object_type": object_type,
+        "generated_filter": generated_filter,
         "total": total,
         "shown": len(limit_rows(rows, limit)),
         "results": limit_rows(rows, limit),
@@ -989,6 +1010,9 @@ def format_text(result: dict[str, object]) -> str:
         lines.append(f"guid: {obj.get('guid')}")
         lines.append(f"file: {obj.get('file_path')}")
         lines.append(f"last_update: {obj.get('last_update')}")
+        lines.append(f"generated: {obj.get('is_generated_object')}")
+        lines.append(f"pattern_object_id: {obj.get('pattern_object_id')}")
+        lines.append(f"instance_key: {obj.get('instance_key')}")
         lines.append(f"incoming_relations: {result.get('incoming_relations', 0)}")
         lines.append(f"outgoing_relations: {result.get('outgoing_relations', 0)}")
         return "\n".join(lines)
@@ -1114,7 +1138,7 @@ def format_text(result: dict[str, object]) -> str:
             continue
         if query in ("search-objects", "list-by-type"):
             lines.append(f"- {row.get('type')}:{row.get('name')}")
-            lines.append(f"  guid={row.get('guid')} {row.get('file_path')} last_update={row.get('last_update')}")
+            lines.append(f"  guid={row.get('guid')} {row.get('file_path')} last_update={row.get('last_update')} generated={row.get('is_generated_object')}")
             continue
         source = f"{row.get('source_type')}:{row.get('source_name')}"
         target = f"{row.get('target_type')}:{row.get('target_name')}"
@@ -1161,6 +1185,17 @@ def parse_args() -> argparse.Namespace:
         "--include-imported",
         action="store_true",
         help="css-classes: inclui classes de PackagedModule (libs importadas) na visao sem lookup nominal.",
+    )
+    generated_group = parser.add_mutually_exclusive_group()
+    generated_group.add_argument(
+        "--generated",
+        action="store_true",
+        help="search-objects/list-by-type: apenas objetos gerados por Pattern (is_generated_object=1).",
+    )
+    generated_group.add_argument(
+        "--authored",
+        action="store_true",
+        help="search-objects/list-by-type: apenas objetos autorais (is_generated_object=0).",
     )
     parser.add_argument("--relation-id", type=int)
     parser.add_argument("--source-type")
@@ -1224,11 +1259,11 @@ def main() -> int:
         elif args.query == "search-objects":
             if not args.object_name:
                 raise SystemExit("search-objects requires --object-name.")
-            result = search_objects(conn, args.object_name, args.object_type, args.limit)
+            result = search_objects(conn, args.object_name, args.object_type, args.limit, generated_filter_from_args(args))
         elif args.query == "list-by-type":
             if not args.object_type:
                 raise SystemExit("list-by-type requires --object-type.")
-            result = list_by_type(conn, args.object_type, args.limit)
+            result = list_by_type(conn, args.object_type, args.limit, generated_filter_from_args(args))
         elif args.query == "transaction-attributes":
             if not args.object_name:
                 raise SystemExit("transaction-attributes requires --object-name.")

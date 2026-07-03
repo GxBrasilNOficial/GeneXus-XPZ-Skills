@@ -90,3 +90,5 @@ The following NEVER/ABORT invariants about WWP remain in the main `SKILL.md` CON
 - NEVER re-apply a pattern over a Transaction without reviewing the diff of existing customizations
 - NEVER rename an entity with WWP active without checking for attribute collisions that would break the PatternInstance XML
 - NEVER mix base structural changes and surgical corrections in the same large package when patterns are active — keep package phases separate
+
+> **Deterministic generated-vs-authored signal (KbIntelligence).** To confirm deterministically whether an object is a pattern-generated derivative — instead of relying only on the name patterns above (`*General`, `*Selection`, `*WW`, `*WWDS`, …) — the KbIntelligence index materializes `is_generated_object`/`pattern_object_id`/`instance_key` on the `objects` table (query `object-info`; filter `--generated`/`--authored` on `search-objects`/`list-by-type`). See `xpz-index-triage/SKILL.md` and `scripts/README-kb-intelligence.md`. Name patterns stay a useful quick hint, but the marker is the proof — after a fresh index rebuild.

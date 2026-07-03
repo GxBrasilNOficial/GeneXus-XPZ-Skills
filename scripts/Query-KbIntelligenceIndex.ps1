@@ -22,6 +22,8 @@ param(
     [string]$Model,
     [string]$Origin,
     [switch]$IncludeImported,
+    [switch]$Generated,
+    [switch]$Authored,
     [int]$Limit,
     [ValidateSet("json", "text")]
     [string]$Format = "json",
@@ -64,6 +66,8 @@ if ($TargetName) { $arguments += @("--target-name", $TargetName) }
 if ($Model) { $arguments += @("--model", $Model) }
 if ($Origin) { $arguments += @("--origin", $Origin) }
 if ($IncludeImported) { $arguments += @("--include-imported") }
+if ($Generated) { $arguments += @("--generated") }
+if ($Authored) { $arguments += @("--authored") }
 if ($Limit) { $arguments += @("--limit", $Limit) }
 if ($Format) { $arguments += @("--format", $Format) }
 if ($ParallelKbRoot) { $arguments += @("--parallel-kb-root", $ParallelKbRoot) }

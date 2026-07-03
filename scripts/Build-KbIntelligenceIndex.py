@@ -33,13 +33,14 @@ import html
 import json
 import re
 import sqlite3
+import xml.etree.ElementTree as ElementTree
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable
 
 # Incrementar quando a cobertura ou regras do indexador mudarem de forma material (nao em refator inerte).
-EXTRACTOR_SIGNATURE_VERSION = "7"
+EXTRACTOR_SIGNATURE_VERSION = "8"
 
 
 def compute_extractor_signature_hash() -> str:
@@ -245,6 +246,9 @@ class ObjectInfo:
     rel_path: str
     last_update: str | None
     file_hash: str
+    is_generated_object: int
+    pattern_object_id: str | None
+    instance_key: str | None
 
 
 @dataclass(frozen=True)
@@ -299,6 +303,71 @@ def sha256_text(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8", errors="replace")).hexdigest()
 
 
+# Marcadores de objeto gerado por Pattern (WorkWith For Web): extraidos APENAS do bloco
+# <Properties> de nivel-objeto (filho direto do <Object> raiz), NUNCA de <Object> aninhado
+# em <Part>/<ExportFile> (ex.: PackagedModule que empacota uma lib importada e materializa
+# seus objetos internos, cada um com o proprio IsGeneratedObject). Ver design convergido.
+OBJECT_MARKER_PROPERTY_RE = re.compile(
+    r"<Property>\s*<Name>(?P<name>.*?)</Name>\s*<Value>(?P<value>.*?)</Value>\s*</Property>",
+    re.IGNORECASE | re.DOTALL,
+)
+PROPERTIES_BLOCK_RE = re.compile(r"<Properties\b[^>]*>(?P<body>.*?)</Properties>", re.IGNORECASE | re.DOTALL)
+XML_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
+XML_CDATA_RE = re.compile(r"<!\[CDATA\[.*?\]\]>", re.DOTALL)
+
+
+def markers_from_property_dict(props: dict[str, str]) -> tuple[int, str | None, str | None]:
+    is_generated = 1 if props.get("IsGeneratedObject", "").strip().lower() == "true" else 0
+    pattern_object_id = props.get("PatternObjectId")
+    pattern_object_id = pattern_object_id.strip() if pattern_object_id else None
+    instance_key = props.get("InstanceKey")
+    instance_key = instance_key.strip() if instance_key else None
+    return is_generated, pattern_object_id, instance_key
+
+
+def object_level_property_dict_via_parse(text: str) -> dict[str, str]:
+    """Filhos <Property> do <Properties> filho DIRETO do <Object> raiz (ignora aninhados)."""
+    root = ElementTree.fromstring(text.encode("utf-8"))
+    props: dict[str, str] = {}
+    properties_el = root.find("Properties")
+    if properties_el is not None:
+        for prop in properties_el.findall("Property"):
+            name_el = prop.find("Name")
+            value_el = prop.find("Value")
+            if name_el is not None and name_el.text:
+                value = value_el.text if (value_el is not None and value_el.text is not None) else ""
+                props[name_el.text.strip()] = value
+    return props
+
+
+def object_level_property_dict_via_regex(text: str) -> dict[str, str]:
+    """Fallback best-effort para XML malformado (o parse primario cobre 100% do XML bem-formado).
+
+    Usa o ULTIMO bloco <Properties> (o de nivel-objeto vem depois dos <Part>), ignorando
+    comentarios/CDATA. Limitacao documentada: shape malformado patologico pode divergir.
+    """
+    stripped = XML_CDATA_RE.sub("", XML_COMMENT_RE.sub("", text))
+    blocks = PROPERTIES_BLOCK_RE.findall(stripped)
+    props: dict[str, str] = {}
+    if blocks:
+        for match in OBJECT_MARKER_PROPERTY_RE.finditer(blocks[-1]):
+            props[html.unescape(match.group("name")).strip()] = html.unescape(match.group("value"))
+    return props
+
+
+def extract_object_level_markers(text: str) -> tuple[int, str | None, str | None]:
+    """(is_generated_object, pattern_object_id, instance_key) do <Properties> do OBJETO RAIZ.
+
+    Primario: parse XML por bytes (portavel entre versoes; str com declaracao de encoding
+    quebra em versoes antigas). Fallback: regex do ultimo bloco, so em XML malformado.
+    """
+    try:
+        props = object_level_property_dict_via_parse(text)
+    except (ElementTree.ParseError, ValueError):
+        props = object_level_property_dict_via_regex(text)
+    return markers_from_property_dict(props)
+
+
 def line_number_at(text: str, index: int) -> int:
     return text.count("\n", 0, index) + 1
 
@@ -343,6 +412,7 @@ def collect_objects(
         name = path.stem
         if canonical_type not in objects_by_type:
             objects_by_type[canonical_type] = {}
+        is_generated_object, pattern_object_id, instance_key = extract_object_level_markers(text)
         objects_by_type[canonical_type][name] = ObjectInfo(
             object_type=canonical_type,
             name=name,
@@ -351,6 +421,9 @@ def collect_objects(
             rel_path=rel_path,
             last_update=last_update_match.group(1) if last_update_match else None,
             file_hash=sha256_text(text),
+            is_generated_object=is_generated_object,
+            pattern_object_id=pattern_object_id,
+            instance_key=instance_key,
         )
     return objects_by_type
 
@@ -2065,6 +2138,9 @@ def create_schema(conn: sqlite3.Connection) -> None:
             file_path TEXT NOT NULL,
             last_update TEXT,
             file_hash TEXT NOT NULL,
+            is_generated_object INTEGER NOT NULL DEFAULT 0,
+            pattern_object_id TEXT,
+            instance_key TEXT,
             UNIQUE(type, name)
         );
 
@@ -2091,6 +2167,7 @@ def create_schema(conn: sqlite3.Connection) -> None:
         );
 
         CREATE INDEX idx_objects_type_name ON objects(type, name);
+        CREATE INDEX idx_objects_is_generated ON objects(is_generated_object);
         CREATE INDEX idx_relations_target ON relations(target_type, target_name);
         CREATE INDEX idx_relations_source ON relations(source_object_id);
 
@@ -2236,7 +2313,7 @@ def write_index(
             [
                 ("last_index_build_run_at", index_build_run_at),
                 ("source_root", str(source_root)),
-                ("schema_version", "3"),
+                ("schema_version", "4"),
                 ("writability_rule_version", WRITABILITY_RULE_VERSION),
                 ("extractor_signature_version", EXTRACTOR_SIGNATURE_VERSION),
                 ("extractor_signature_hash", extractor_signature_hash),
@@ -2244,16 +2321,27 @@ def write_index(
                 ("inventory_catalog_version", str(inventory_semantics["catalog_version"])),
                 ("inventory_validation_status", str(inventory_semantics["status"])),
                 ("inventory_mismatch_count", str(inventory_semantics["mismatch_count"])),
+                ("generated_objects_count", str(sum(1 for obj in objects if obj.is_generated_object))),
             ],
         )
 
         for obj in objects:
             conn.execute(
                 """
-                INSERT INTO objects(type, name, guid, file_path, last_update, file_hash)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO objects(type, name, guid, file_path, last_update, file_hash, is_generated_object, pattern_object_id, instance_key)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (obj.object_type, obj.name, obj.guid, obj.rel_path, obj.last_update, obj.file_hash),
+                (
+                    obj.object_type,
+                    obj.name,
+                    obj.guid,
+                    obj.rel_path,
+                    obj.last_update,
+                    obj.file_hash,
+                    obj.is_generated_object,
+                    obj.pattern_object_id,
+                    obj.instance_key,
+                ),
             )
 
         object_ids = {

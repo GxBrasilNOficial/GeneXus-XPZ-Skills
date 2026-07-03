@@ -158,16 +158,31 @@ O gate `Test-*KbIndexGate.ps1` (molde em `xpz-kb-parallel-setup/examples/Test-Kb
 
 ## Schema e versionamento
 
-O índice armazena `schema_version` na tabela `metadata`. O valor atual e `"3"` (inclui a tabela `transaction_attribute_writability` com `writability_rule_version` e a tabela `css_class` do catalogo de classes CSS).
+O índice armazena `schema_version` na tabela `metadata`. O valor atual e `"4"` (inclui a tabela `transaction_attribute_writability` com `writability_rule_version`, a tabela `css_class` do catalogo de classes CSS e as colunas `is_generated_object`/`pattern_object_id`/`instance_key` na tabela `objects`).
 
 O design e deliberado: o índice e artefato derivado e sempre regeneravel. Por isso não existe caminho de migracao de schema — qualquer mudanca estrutural no motor exige rebuild completo.
 
 Consequencias operacionais:
 
 - todo índice gerado antes da introducao de `schema_version` e tratado automaticamente como incompativel e bloqueia qualquer consulta com mensagem explicita de rebuild
-- a cada evolucao de schema (`"1"` → `"2"` → `"3"`), todo índice em versão anterior bloqueia da mesma forma — comportamento esperado, não bug
+- a cada evolucao de schema (`"1"` → `"2"` → `"3"` → `"4"`), todo índice em versão anterior bloqueia da mesma forma — comportamento esperado, não bug
 - o erro de schema version e detectado pelo próprio `Query-KbIntelligenceIndex.py` antes de qualquer query, incluindo `index-metadata`; portanto o gate `Test-*KbIndexGate.ps1` também falha com `BLOCK:` em índices incompativeis
 - a resposta correta a qualquer bloqueio por schema e rebuild via `Build-KbIntelligenceIndex.ps1`, nunca contorno por leitura direta do SQLite ou dos XMLs
+
+## Objetos gerados por Pattern (autoral x gerado)
+
+A tabela `objects` traz três colunas para separar objetos GERADOS por Pattern (WorkWith For Web) de AUTORAIS **de forma determinística**, sem heurística de nome (`ww*`/`*WC`/`*General`/`*Selection`):
+
+- `is_generated_object` (`INTEGER NOT NULL DEFAULT 0`): `1` quando o objeto tem a propriedade de nível-objeto `IsGeneratedObject=True`; `0` caso contrário (autoral ou derivado).
+- `pattern_object_id` (`TEXT`, nulável): o papel no Pattern (ex.: `TabGrid`, `TabTabular`, `View`, `Selection` em WebPanel; `ExportSelection`, `ExportTabGrid` em Procedure).
+- `instance_key` (`TEXT`, nulável): a instância dona — `<type-GUID do WorkWithForWeb>-<nome da instância WorkWith>`. Pode ser nulo mesmo com `is_generated_object=1` (ex.: alguns Procedures gerados).
+
+A extração é **escopada ao `<Properties>` do objeto RAIZ** (parse XML por bytes; fallback regex do último bloco `<Properties>` só em XML malformado), nunca de `<Object>` aninhado em tipo-contêiner (`PackagedModule`, que empacota uma lib com objetos internos marcados). Os três campos aparecem no JSON de `object-info`/`search-objects`/`list-by-type`; no `--format text`, `object-info` mostra os três e `search-objects`/`list-by-type` mostram apenas `generated=0/1` (saída de lista compacta). A metadata do índice traz `generated_objects_count`.
+
+Filtro determinístico (`--generated` / `--authored`, mutuamente exclusivos, em `search-objects` e `list-by-type`; switches `-Generated`/`-Authored` no wrapper `.ps1`):
+
+- `Query-KbIntelligenceIndex.ps1 -IndexPath <sqlite> -Query list-by-type -ObjectType WebPanel -Generated` — só gerados
+- `Query-KbIntelligenceIndex.ps1 -IndexPath <sqlite> -Query list-by-type -ObjectType WebPanel -Authored` — só autorais
 
 ## Triagem exploratoria no PowerShell
 
@@ -471,6 +486,12 @@ Self-test local (não depende de KBExemplo) para chamada de método em variável
 
 ```powershell
 .\scripts\Test-KbIntelligenceExternalObjectMethodExtractionSelfTest.ps1
+```
+
+Self-test local (não depende de KBExemplo) para o sinal determinístico gerado-por-Pattern (`IsGeneratedObject`/`PatternObjectId`/`InstanceKey`) na tabela `objects`, com guarda contra marcadores de `<Object>` aninhado em `PackagedModule` e o caminho de fallback regex para XML malformado:
+
+```powershell
+.\scripts\Test-KbIntelligenceGeneratedObjectExtractionSelfTest.ps1
 ```
 
 Casos positivos de `Property Formula` em KBs de producao ficam catalogados em `kb-intelligence-kbexemplo.validation-extraction-semantic.json` (ids `phase5-case-65..68`) e em baterias dedicadas por KB: `kb-intelligence-fabricabrasil.validation-extraction-attribute-formula.json`, `kb-intelligence-wseducacaospteste.validation-extraction-attribute-formula.json`. Validar cada bateria no rebuild da pasta paralela correspondente; o arquivo semantic completo continua orientado ao KBExemplo e inclui esses casos apenas como catalogo compartilhado.

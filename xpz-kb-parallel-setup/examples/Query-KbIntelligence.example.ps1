@@ -41,7 +41,7 @@ Caminho opcional do override de catalogo (prevalece sobre a deteccao por Paralle
 
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet("object-info", "attribute-info", "search-objects", "list-by-type", "transaction-attributes", "transaction-writable-attributes", "who-uses", "what-uses", "show-evidence", "impact-basic", "functional-trace-basic", "index-metadata")]
+    [ValidateSet("object-info", "attribute-info", "search-objects", "list-by-type", "transaction-attributes", "transaction-writable-attributes", "who-uses", "what-uses", "show-evidence", "impact-basic", "functional-trace-basic", "index-metadata", "css-classes", "css-class-usage")]
     [string]$Query,
 
     [string]$IndexPath,
@@ -53,6 +53,11 @@ param(
     [string]$SourceName,
     [string]$TargetType,
     [string]$TargetName,
+    [string]$Model,
+    [string]$Origin,
+    [switch]$IncludeImported,
+    [switch]$Generated,
+    [switch]$Authored,
     [int]$Limit,
 
     [ValidateSet("json", "text")]
@@ -105,6 +110,11 @@ if ($SourceType) { $params.SourceType = $SourceType }
 if ($SourceName) { $params.SourceName = $SourceName }
 if ($TargetType) { $params.TargetType = $TargetType }
 if ($TargetName) { $params.TargetName = $TargetName }
+if ($Model) { $params.Model = $Model }
+if ($Origin) { $params.Origin = $Origin }
+if ($IncludeImported) { $params.IncludeImported = $true }
+if ($Generated) { $params.Generated = $true }
+if ($Authored) { $params.Authored = $true }
 if ($Limit) { $params.Limit = $Limit }
 
 & $enginePath @params

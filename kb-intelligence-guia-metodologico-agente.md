@@ -68,6 +68,17 @@ Use este ramo somente quando a pergunta for **triagem técnica** sobre atributos
    - `transaction-writable-attributes`: classificação completa materializada; **não** substitui empacote nem blocos `New` em `Procedure` (`Test-GeneXusNewWritableTargets.ps1`)
 4. se a pergunta evoluir para geração de atribuicao em `Rules`, `Events`, `New` ou empacotamento, **parar a triagem** e encaminhar para `xpz-builder` com `Test-GeneXusTransactionWritability.ps1` ou `Test-GeneXusNewWritableTargets.ps1` (fachadas sobre `GeneXusTransactionWritabilityCore.py`)
 
+### Ramo: objetos gerados por Pattern × autorais (triagem via índice)
+
+Use este ramo somente quando a pergunta for **triagem** sobre separar objetos GERADOS por Pattern (WorkWith For Web) de AUTORAIS — tipicamente **auditoria** (ex.: de segurança) — não quando o objetivo for **gerar ou empacotar** XML/XPZ.
+
+1. escolher a consulta mínima conforme `xpz-index-triage` (**QUERY PARAMETER REFERENCE**):
+   - `object-info` — um objeto; retorna `is_generated_object` (0/1), `pattern_object_id` e `instance_key`
+   - `search-objects` ou `list-by-type` com `--generated` / `--authored` (mutuamente exclusivos) — um conjunto por tipo, filtrado deterministicamente
+2. registrar o comando, o objeto e o valor de `is_generated_object`/`pattern_object_id`/`instance_key` como **evidencia direta**
+3. declarar explicitamente que é **sinal determinístico** materializado no índice (propriedade `IsGeneratedObject` de nível-objeto), **não** heurística de nome (`ww*`/`*WC`/`*General`/`*Selection`); o marcador é a prova **após rebuild fresco** do índice
+4. se a pergunta evoluir para **empacotar ou corrigir** um derivado gerado, **parar a triagem** e encaminhar para `xpz-builder` (que aponta o mesmo sinal em `wwp-packaging.md`: não empacotar correção contra derivado gerado; trabalhar na fonte declarativa)
+
 Para sintaxe, parâmetros e validação operacional das consultas, preferir `scripts/README-kb-intelligence.md`; este guia não duplica esse catalogo.
 
 ---
