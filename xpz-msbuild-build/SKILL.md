@@ -268,7 +268,7 @@ Motor compartilhado de **diagnóstico** no `.cs` gerado (camada web), complement
 - `-Attribute` (obrigatório) — nome com ou sem prefixo `A<n>`; o motor normaliza para a forma canônica no arquivo
 - `-AsJson` (opcional) — saída estruturada (`methods[]`, `totals`, `tripletPattern.cascadeOrder`, `hasAssignAttriInMethod`)
 
-Antes de montar `-CsPath`, preferir `scripts/Resolve-GeneXusGeneratedCsPath.ps1` com `-KbPath`, `-ParallelKbRoot`/`-KbMetadataPath`, `-EnvironmentName` quando necessário e `-ObjectName`. O resolvedor usa `kb_environment_web_dirs` em `kb-source-metadata.md`; se o campo estiver ausente, bloquear e encaminhar para `xpz-kb-parallel-setup`, sem glob recursivo na KB nativa nem inferencia por `CSharpModel`.
+Antes de montar `-CsPath`, preferir `scripts/Resolve-GeneXusGeneratedCsPath.ps1` com `-KbPath`, `-ParallelKbRoot`/`-KbMetadataPath`, `-EnvironmentName` quando necessário e `-ObjectName`. O resolvedor usa `kb_environment_web_dirs` em `kb-source-metadata.md`; se o campo estiver ausente, bloquear e encaminhar para `xpz-kb-parallel-setup`, sem glob recursivo na KB nativa nem inferencia por `CSharpModel`. **Exceção (Fase 2, guarda de família do Eixo B):** KB `java-tomcat`/família não-.NET pula com `CS_PATH_SKIPPED_HOSTING_UNSUPPORTED`/exit 0 **antes** desse bloqueio — não exige `web_dirs` (o artefato Java não é `.cs`).
 
 **Mapa dos métodos `.cs` gerados onde a atribuição pode aparecer:** use `methods[].name` como nome literal gerado e cruze com o mapa canônico longo em [xpz-builder/responsibilities-by-type/transaction.md](../xpz-builder/responsibilities-by-type/transaction.md#generated-cs-map-where-a-transaction-assignment-rule-lives-in-xpz-quarantine).
 

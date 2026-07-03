@@ -719,7 +719,7 @@ Scripts propostos:
   - objetivo: resolver o caminho direto do `.cs` gerado para diagnostico pontual, sem glob recursivo na KB nativa
   - parâmetros obrigatórios: `-KbPath`, `-ObjectName`, e `-ParallelKbRoot` ou `-KbMetadataPath`
   - parâmetros opcionais: `-ObjectType`, `-EnvironmentName`, `-AsJson`
-  - regra: consome `kb_environment_web_dirs` de `kb-source-metadata.md`; se o mapeamento estiver ausente, bloqueia e encaminha para `xpz-kb-parallel-setup`
+  - regra: consome `kb_environment_web_dirs` de `kb-source-metadata.md`; se o mapeamento estiver ausente, bloqueia e encaminha para `xpz-kb-parallel-setup` (exceção Fase 2: KB `java-tomcat`/família não-.NET pula com `CS_PATH_SKIPPED_HOSTING_UNSUPPORTED`/exit 0 antes desse bloqueio — guarda de família do Eixo B; não exige `web_dirs`)
 
 Estado atual da materialização adicional:
 
