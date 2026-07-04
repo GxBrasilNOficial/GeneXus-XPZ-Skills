@@ -55,3 +55,28 @@ Pacote empírico rodado após revisão por pares (5 vozes/3 famílias: anthropic
 - Commits materiais: `7dc1bd3` (Fase 0 + A1/A2/B1), `133886b` (reconcilia status 0b), `d758f6c` (A3/A4/B), `9df971f` (paridade pós-pré-push).
 - Revisão por pares: A3 = 6 versões / 3 famílias (anthropic nativo, openai/gpt-5.5, ollama-cloud deepseek-v4-pro/kimi-k2.7-code/glm-5.2); design congelado por decisão humana em 2026-06-28; pré-push reforçada com 2+3 famílias.
 - Fase 0 empírica: KMW 4.0.187794 + GAM 3.15.78, KB de teste `Gx_wsEducacaoSpTeste`.
+
+## Least-privilege do revisor opencode — «sem execução/escrita» (D-min)
+
+Reúne as duas entradas do `999` que eram **problema** e **conserto** da mesma classe de risco: «Painel de revisão por pares concede execução de código a modelo externo em headless» e «Agente reviewer do opencode sem execução/escrita». Ambas **implementadas** e removidas do `999`.
+
+- **Importância** — **ALTA / segurança-least-privilege**. Risco ativo, já **materializado** (2026-06-24: revisor opencode `kimi-k2.7-code`, agente default, **editou** um `.md` do repo em vez de só reportar). Em `opencode run` headless o agente default `build`/`plan` **auto-aprova** `bash`/`edit`/rede; em payload `public` o gate de confidencialidade libera automaticamente, então o risco de execução/escrita **não passava por nó humano**.
+- **Escopo D-min (fechado):** fecha execução/escrita (`bash`/`edit`) e as **ferramentas** de rede (`webfetch`/`websearch`/`task`); confina a **leitura** ao workspace do cwd. **Não** fecha o canal do próprio parecer ao provider (residual aceito em `public`).
+
+**Solução (design congelado `opencode-reviewer-ro-least-privilege-design.md`, 8 rodadas / 4 famílias):**
+
+- **D1+D2 (adapter):** `Invoke-OpenCode.ps1`/`Start-OpenCodeJob.ps1` ganham **default `-Agent reviewer-ro`** escopado ao caminho revisor + **guard fail-closed** (pré-check estático + `opencode agent list` allow-set resolvido EXATAMENTE `{read,grep,glob,list}` + versão testada; BLOCK com motivo `static`/`version`/`allowset`/`agentlist`-transitório). `-Agent <x>` explícito = opt-out consciente (confirma só que resolve). Pós-check síncrono varre o warning de fallback; assíncrono é diagnóstico no `Watch-OpenCodeJob.ps1`. O painel segue bloqueando a chave `agent` → o revisor sempre cai no `reviewer-ro`. **Breaking change** do default (CHANGELOG).
+- **D3 (provisionamento):** `.opencode/agent/reviewer-ro.md` (project-local versionado, forma `permission` `"*": deny` + allowlist) + `scripts/Install-OpenCodeReviewerRoAgent.ps1` (global, edição JSONC localizada preservando comentários, migra o interino `tools:`→`permission`) + `scripts/OpenCodeReviewerRoGuard.ps1` (guard compartilhado) + `scripts/Test-OpenCodeReviewerRoSelfTest.ps1` (`OPENCODE_REVIEWER_RO_SELFTEST_OK`) + fixtures versionados.
+
+**Correção de premissas (medido em opencode 1.4.4 — o self-test é o gate dos claims):**
+
+- **`permission: deny` ≡ `tools: false`** — a nota antiga do `999` («`tools: false` desabilita a ferramenta, **mais forte** que `permission: deny`») está **REFUTADA pela medição**: os dois resolvem idêntico e removem a tool em headless. A forma canônica é `permission` (curinga `"*": deny` funciona por last-match-wins; `webfetch`/`websearch`/`task: deny` removem as tools).
+- **Eixo de leitura NÃO é machine-wide** — a nota antiga («`read` lê qualquer arquivo da máquina») está **invertida pela medição**: o opencode tem a dimensão nativa `external_directory` (base `ask`, auto-rejeitada em headless) que gateia leituras **fora** do cwd; o reviewer-ro fixa `external_directory: deny` explícito → leitura **confinada ao cwd herdado**, garantida e independente do modo.
+
+**ADIADO (entrada nova no `999`, eixo de leitura):** liberar opencode em `kb-sensitive`/pasta paralela (segue `unavailable`) + **mecanizar cwd-seguro** (hoje o confinamento é ao cwd HERDADO, mas escolher um cwd sem segredos não-versionados é responsabilidade operacional de quem dispara).
+
+### Rastreabilidade
+
+- Design congelado: `opencode-reviewer-ro-least-privilege-design.md` (8 rodadas de revisão por pares, 4 famílias — anthropic/openai/ollama-cloud/nvidia; arquitetura nunca reaberta; freeze por decisão humana com a prova transferida aos self-tests).
+- Arquivos materiais: `.opencode/agent/reviewer-ro.md`, `.gitignore` (exceção em cascata), `scripts/OpenCodeReviewerRoGuard.ps1`, `scripts/Install-OpenCodeReviewerRoAgent.ps1`, `scripts/Test-OpenCodeReviewerRoSelfTest.ps1`, `scripts/Invoke-OpenCode.ps1`, `scripts/Start-OpenCodeJob.ps1`, `scripts/Watch-OpenCodeJob.ps1`, `xpz-llm-delegate/fixtures/opencode-reviewer-ro/*`, `xpz-llm-delegate/SKILL.md`, `15-revisao-por-pares.md`, `xpz-skills-setup/SKILL.md`, `08-guia-para-agente-gpt.md`, `09-inventario-e-rastreabilidade-publica.md`, `CHANGELOG.md`, `999-ideias-pendentes.md` (2 entradas removidas → esta; entrada nova do eixo de leitura mantida).
+- Self-test/versão: `OPENCODE_REVIEWER_RO_SELFTEST_OK`; fixtures/claims medidos em opencode 1.4.4.

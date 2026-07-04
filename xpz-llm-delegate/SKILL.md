@@ -531,8 +531,8 @@ re-despacho single-flight do ollama que falhou │    gateAsk,gateDeny}
 
 - **Modelo efetivo:** opencode = `invokeArgs.model` ou o `targetModelKey` de **entrada** (o resolvedor opencode exige `-Model`; o gate recebe o mesmo valor); codex = `invokeArgs.model` ou, se ausente, gate **sem** `-Model` → último segmento do `targetModelKey` retornado; claude-code/copilot/gemini = `invokeArgs.model` **obrigatório** (ausente → `state=error` fail-closed). `targetModelKey` nulo onde exigido (opencode/codex) → `state=error`.
 - **`responded` é MECÂNICO** (texto não-vazio), **não** «parecer válido»: o harness não inspeciona o conteúdo. A reclassificação `responded`→`noResponse` (revisor off-task **ou on-task raquítico**) é **post-hoc do orquestrador** antes do closeout (`15-revisao-por-pares.md`, `## Recibo e livro-razão`) — um off-task **ou parecer raquítico** não soma para o piso.
-- **Contenção = trava fail-closed PER-BACKEND (Posição B, decisão de segurança):** as chaves de contenção do backend que as aceita — claude-code `{permissionMode,tools,maxTurns}`, opencode `{agent}`, gemini `{approvalMode != plan}` — são **recusadas** (`securityBlockedArgs`) e **não** repassadas ao adapter; o despacho segue com os **defaults seguros** do adapter. O harness **nunca** expõe nem relaxa contenção. `approvalMode=plan` (gemini, o default) → `droppedArgs` silencioso; codex/copilot não têm parâmetro de contenção (chave estranha → `droppedArgs`).
-- **opencode só-`public` no v1:** opencode em `kb-sensitive` → `unavailable` (sem gate/despacho); o confinamento do agente custom fica para a frente 999 «agente reviewer sem execução/escrita». O adapter opencode **não** tem `-Cd` (por isso nunca o recebe); os demais (codex/claude-code/gemini/copilot) recebem `-Cd` por precedência (explícito → `ParallelKbRoot` em `kb-sensitive` → cwd em `public`) com **fail-closed** quando `kb-sensitive` e faltam ambos.
+- **Contenção = trava fail-closed PER-BACKEND (Posição B, decisão de segurança):** as chaves de contenção do backend que as aceita — claude-code `{permissionMode,tools,maxTurns}`, opencode `{agent}`, gemini `{approvalMode != plan}` — são **recusadas** (`securityBlockedArgs`) e **não** repassadas ao adapter; o despacho segue com os **defaults seguros** do adapter. **O default seguro do opencode é agora o agente `reviewer-ro` least-privilege** (default escopado + guard fail-closed no adapter — ver «OPENCODE — REVISOR LEAST-PRIVILEGE»); como o painel bloqueia `{agent}`, o revisor opencode **sempre** cai no `reviewer-ro`. O harness **nunca** expõe nem relaxa contenção. `approvalMode=plan` (gemini, o default) → `droppedArgs` silencioso; codex/copilot não têm parâmetro de contenção (chave estranha → `droppedArgs`).
+- **opencode só-`public` no v1:** opencode em `kb-sensitive` → `unavailable` (sem gate/despacho). O confinamento do agente custom **está ATIVO** (default `reviewer-ro` sem execução/escrita, leitura confinada ao cwd via `external_directory: deny`); liberar opencode em `kb-sensitive`/pasta paralela + mecanizar cwd-seguro ficou **ADIADO** (`999-ideias-pendentes.md`, eixo de leitura). O adapter opencode **não** tem `-Cd` (por isso nunca o recebe; a leitura fica confinada ao cwd HERDADO); os demais (codex/claude-code/gemini/copilot) recebem `-Cd` por precedência (explícito → `ParallelKbRoot` em `kb-sensitive` → cwd em `public`) com **fail-closed** quando `kb-sensitive` e faltam ambos.
 - **single-flight DIFERIDO (decisão II-b):** uma falha concorrente de `ollama-cloud/*` vira `error` + ledger cru + `concurrencySaturationWarning` por stderr; a recuperação automática depende do **contrato de saída tipado dos adapters** (frente 999) — o orquestrador pode redisparar isolado manualmente.
 - **Disciplina de stdout:** o harness é processo filho; `panel-summary.json` é a **única** linha de stdout (`[Console]::Out`); todo texto humano sai por `[Console]::Error` (lição do `Sync-GeneXusXpzToXml`: `Write-Host`/`Write-Warning`/`Write-Information` **vazam** para o stdout capturado). O **chamador captura stdout e stderr separadamente**; redirecionar stderr→stdout corromperia o JSON.
 - **NÃO refatorar os 6 adapters** por esta frente: o status tipado dos adapters é frente própria no 999.
@@ -815,31 +815,51 @@ gravado **apenas no log próprio** do opencode (`~/.local/share/opencode/log/<ts
 - **Follow-up:** estender a detecção aos jobs opencode (`Start-`/`Watch-OpenCodeJob`) e aos demais
   backends — `999-ideias-pendentes.md`.
 
-## LIMITE CONHECIDO — OPENCODE: AGENTE DEFAULT AUTO-APROVA FERRAMENTAS LOCAIS EM HEADLESS
+## OPENCODE — REVISOR LEAST-PRIVILEGE "SEM EXECUÇÃO/ESCRITA" (ATIVO)
 
-Observação **empírica** (opencode 2026-06; não-contratual): em `opencode run` headless (sem TTY), as
-permissões de ferramenta do agente default `build` — **e do `--agent plan`** — são **auto-aprovadas**:
-o modelo executou `bash` (e a rotina pré-push real) **sem gate interativo**. Consequência: ao despachar
-para um modelo **externo** via `Invoke-OpenCode.ps1` com o agente default, o painel concede a esse modelo
-**execução de comandos arbitrários na máquina** durante a tarefa.
+**Contexto histórico** (opencode 2026-06): em `opencode run` headless (sem TTY), as permissões de
+ferramenta do agente default `build` — **e do `--agent plan`** — eram **auto-aprovadas**: o modelo
+executava `bash`/`edit` **sem gate interativo**. Ao despachar um revisor opencode com o agente
+default, o painel concedia **execução de comandos arbitrários e escrita** na máquina. **Incidente
+concreto (2026-06-24, pré-push reforçada):** um revisor opencode (`kimi-k2.7-code`, agente default)
+**editou** um `.md` do repo (corrigiu um typo) em vez de só reportar — o eixo `edit` **se
+materializou**.
 
-- **Dois eixos de risco:** (i) **execução arbitrária local** — vale para **qualquer** modelo (inclusive
-  local), porque o opencode auto-aprova as tools em headless; (ii) **exfiltração** — agravante específico
-  do modelo **externo**.
-- **O gate de confidencialidade não cobre este eixo.** `Resolve-LlmDelegateAuthorization.ps1` governa
-  **se o dado sai** (destino/sensibilidade), **não** a capacidade do modelo de executar/ler localmente —
-  eixos distintos. **Caso central deste repositório:** payload `public` cai em **`allow` automático**
-  (validação de plano/design na raiz das skills é o caso nobre da diversidade externa), então o risco de
-  execução local **não passa por nó humano**. Vale também para `ask` **autorizado** (consentir o envio
-  também concede execução).
-- **Mecanismo de contenção é DIFERENTE** do Codex/Claude/Gemini (que usam `--approval-mode plan`/
-  `PermissionMode=plan`): no opencode a contenção é por **config `permission` em arquivo de agente custom**
-  (`permission: bash: deny`/`edit: deny`). **`-Agent <nome>` por si só não mitiga** — só mitiga se o agente
-  custom negar as ferramentas. **Limite residual:** mesmo negando `bash`/`edit`, a tool `read` (default) lê
-  **qualquer arquivo** (config com baseURL/chaves, `.env`) — eixo de **leitura** ainda aberto (e o adapter
-  opencode **não** tem `-Cd` para conter o cwd). Ver `999-ideias-pendentes.md` (frente "agente reviewer
-  sem execução/escrita").
-- **Regra operacional (revisor opencode = read-only obrigatório).** Ao usar opencode como **revisor** (revisão por pares / pré-push reforçada), **nunca** despachar com o agente default `build`/`plan`: o revisor **não pode escrever**. Despachar com `-Agent <custom>` cujo arquivo declare `permission: edit: deny` (e `bash: deny` quando a revisão não exigir execução); enquanto esse agente não estiver provisionado (ver `999-ideias-pendentes.md`), **preferir um revisor read-only de outra família** (Codex em sandbox `read-only`; Claude Code com tools restritos) a conceder escrita ao opencode. **Incidente concreto (2026-06-24, pré-push reforçada):** um revisor opencode (`kimi-k2.7-code`, agente default) **editou** um `.md` do repo (corrigiu um typo) em vez de só reportar — o eixo `edit` **se materializou**; o orquestrador inspecionou o diff antes de adotar, mas a edição pelo revisor **não devia ser possível**.
+**Correção ATIVA** (design congelado [`opencode-reviewer-ro-least-privilege-design.md`](../opencode-reviewer-ro-least-privilege-design.md),
+escopo D-min). Os adapters `Invoke-OpenCode.ps1`/`Start-OpenCodeJob.ps1` aplicam a postura de
+segurança no **próprio adapter**, de forma inseparável (nunca "default sem guard"):
+
+- **Default `-Agent reviewer-ro` escopado ao caminho revisor.** Sem `-Agent` explícito, o agente
+  efetivo é `reviewer-ro` (forma `permission` com default-deny curinga `"*": deny` + allowlist
+  `{read, grep, glob, list}`; `edit`/`bash`/`webfetch`/`websearch`/`task` negados). O painel bloqueia
+  a chave `agent` → o revisor **sempre** cai no `reviewer-ro`. `-Agent <x>` **explícito** = opt-out
+  consciente (uso agêntico fora do painel; o chamador assume a postura de segurança), mas o
+  pré-check confirma que `<x>` **resolve** (evita o fallback silencioso ao `build` full-access).
+- **Guard fail-closed (pré-check ANTES do run/spawn).** Estático (frontmatter do reviewer-ro) +
+  `opencode agent list` confirmando o **allow-set resolvido EXATAMENTE `{read, grep, glob, list}`**
+  (trava divergência por ausência E por excesso — ex.: `bash` reaparecendo por regra tardia da
+  global) + versão do opencode testada. Qualquer falha ⇒ **BLOCK** com o motivo no recibo
+  (`static`/`version`/`allowset`/`agentlist`-transitório-SQLite `PRAGMA wal_checkpoint`). Pós-check
+  (defesa-em-profundidade, não a barreira): varre o stderr pelo warning de fallback silencioso.
+  Provisionamento: `.opencode/agent/reviewer-ro.md` (project-local versionado) +
+  `scripts/Install-OpenCodeReviewerRoAgent.ps1` (global, dono desta skill). Gate de processo/CI:
+  `scripts/Test-OpenCodeReviewerRoSelfTest.ps1` (`OPENCODE_REVIEWER_RO_SELFTEST_OK`).
+- **Eixo de LEITURA — premissa INVERTIDA (medido em opencode 1.4.4).** A doc anterior afirmava que a
+  tool `read` lê **qualquer arquivo** da máquina; a **medição refuta**: o opencode tem a dimensão
+  nativa `external_directory` (base `ask`, auto-rejeitada em `opencode run` headless) que gateia
+  leituras **fora** do workspace do cwd. O reviewer-ro fixa `external_directory: deny` explícito → a
+  leitura fica **confinada ao cwd herdado**, garantida e independente do modo. O D-min fecha
+  execução/escrita e as **ferramentas** de rede (`webfetch`/`websearch`); **não** fecha o canal do
+  próprio parecer ao provider (residual aceito em `public`, inerente a qualquer revisor externo).
+- **cwd-seguro é OPERACIONAL (nota de operador).** O D-min **não** mecaniza "o cwd é seguro": o
+  confinamento é ao cwd HERDADO (o adapter opencode não recebe `-Cd`), mas **quem dispara** é
+  responsável por escolher um cwd sem segredos não-versionados. Se o cwd contiver `.env` local,
+  logs ou cache com segredos, o revisor pode lê-los; iscas de self-test não substituem revisar
+  segredos reais no diretório. Mecanizar cwd-seguro + liberar opencode em `kb-sensitive`/pasta
+  paralela ficou **ADIADO** (`999-ideias-pendentes.md`, entrada do eixo de leitura).
+- **O gate de confidencialidade continua ortogonal.** `Resolve-LlmDelegateAuthorization.ps1` governa
+  **se o dado sai** (destino/sensibilidade), **não** a capacidade de executar/ler local — é o guard
+  do reviewer-ro que fecha execução/escrita e confina a leitura.
 
 ## LIMITE CONHECIDO — CODEX É AGÊNTICO (HERDA O AGENTS.md, PODE EXECUTAR)
 

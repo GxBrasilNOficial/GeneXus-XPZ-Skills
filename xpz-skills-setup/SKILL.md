@@ -56,6 +56,16 @@ de um novo usuário.
   (incluindo instalação do MCP Cursor via
   `scripts/Install-CursorGlobalInstructionsMcp.ps1`), apenas **após confirmação
   explícita** do usuário e **sem edição silenciosa**
+- **Fora de escopo — agentes custom do OpenCode:** o agente `reviewer-ro`
+  least-privilege do OpenCode (revisor «sem execução/escrita») é provisionado pelo
+  seu **instalador próprio** `scripts/Install-OpenCodeReviewerRoAgent.ps1` (dono:
+  `xpz-llm-delegate`; alvo `~/.config/opencode/opencode.jsonc`, além do project-local
+  versionado `.opencode/agent/reviewer-ro.md`). Esta skill **não** gerencia agentes
+  custom do OpenCode — o `agentsPath` que ela resolve é do **MCP do Cursor**, não
+  cobre o bloco `agent` do `opencode.jsonc`. Numa auditoria de setup **completo**,
+  apenas **citar** esse instalador como dependência (verificação read-only da
+  presença do `reviewer-ro` no `opencode.jsonc`/project-local), sem instalá-lo nem
+  editá-lo aqui.
 - Verificar existência de diretórios com `Test-Path` individual por ferramenta — nunca
   agrupar em hashtable ou bloco de verificação coletiva
 - Quando o usuário pedir auditoria ou setup **completo** (ex.: após `git pull`,
