@@ -79,6 +79,8 @@ try { [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false) } catc
 
 # Funções compartilhadas de parsing do stream do opencode (dot-source)
 . (Join-Path $PSScriptRoot 'OpenCodeStreamSupport.ps1')
+# Guard least-privilege do reviewer-ro (default escopado + pre/pos-check fail-closed)
+. (Join-Path $PSScriptRoot 'OpenCodeReviewerRoGuard.ps1')
 
 # Prompt: inline (-Message) ou de arquivo (-MessagePath). Le como UTF-8.
 if ($PSCmdlet.ParameterSetName -eq 'FromFile') {
@@ -100,6 +102,28 @@ if ($OpenCodeExe) {
         Where-Object FullName -like '*windows-x64\bin\opencode.exe' |
         Select-Object -First 1 -ExpandProperty FullName
     if (-not $exe) { throw "BLOCK: opencode.exe nao encontrado sob $env:APPDATA\npm" }
+}
+
+# 1b) D1/D2: postura de seguranca no ADAPTER (design congelado). Default -Agent reviewer-ro
+#     ESCOPADO ao caminho revisor: sem -Agent explicito, o agente efetivo e reviewer-ro e o
+#     enforce read-only fail-closed (pre-check) se aplica. Com -Agent <x> EXPLICITO, o chamador
+#     faz opt-out consciente (uso agentico fora do painel; assume a postura de seguranca), mas o
+#     pre-check ainda confirma que <x> RESOLVE, para nao recair no fallback silencioso ao 'build'
+#     (`--agent <ausente>` nao falha). D1 e D2 sao inseparaveis: nunca "default sem guard".
+$agentExplicit = $PSBoundParameters.ContainsKey('Agent') -and -not [string]::IsNullOrWhiteSpace($Agent)
+if (-not $agentExplicit) { $Agent = 'reviewer-ro' }
+$isReviewerPath = ($Agent -eq 'reviewer-ro')
+$cwd = (Get-Location).Path
+if ($isReviewerPath) {
+    $pc = Test-OpenCodeReviewerRoPrecheck -Exe $exe -WorkingDirectory $cwd
+    if (-not $pc.pass) {
+        throw "BLOCK: guard reviewer-ro fail-closed (motivo=$($pc.reason)): $($pc.detail)"
+    }
+} else {
+    $res = Test-OpenCodeAgentResolves -Exe $exe -Name $Agent
+    if (-not $res.ok) {
+        throw "BLOCK: -Agent '$Agent' nao resolve (evita fallback silencioso ao 'build' full-access): $($res.detail)"
+    }
 }
 
 # 2) Prompt via STDIN (arquivo), fora do argv. O opencode le o stdin quando o argumento
@@ -144,6 +168,16 @@ try {
         }
         if ($p.ExitCode -ne 0) {
             throw "BLOCK: opencode saiu com codigo $($p.ExitCode).`nstderr:`n$(Get-Content -LiteralPath $err -Raw -ErrorAction SilentlyContinue)"
+        }
+
+        # Pos-check (DEFESA-EM-PROFUNDIDADE, nao a barreira): no caminho revisor, le o CONTEUDO de
+        # $err (descartado no finally) ANTES do Remove-Item e varre o warning de fallback silencioso.
+        # Se aparecer, o --agent nao resolveu no runtime apesar do pre-check -> descartar a saida.
+        if ($isReviewerPath) {
+            $errText = Get-Content -LiteralPath $err -Raw -Encoding utf8 -ErrorAction SilentlyContinue
+            if (Test-OpenCodeReviewerRoFallbackWarning -Text $errText) {
+                throw "BLOCK: pos-check reviewer-ro: warning de fallback ao 'build' detectado no stderr (o --agent nao resolveu no runtime apesar do pre-check). Saida descartada por seguranca."
+            }
         }
 
         $lines = Get-Content -LiteralPath $out -Encoding utf8

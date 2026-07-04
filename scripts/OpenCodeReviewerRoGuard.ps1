@@ -188,10 +188,21 @@ function Test-OpenCodeReviewerRoStatic {
         $GlobalJsoncPath = Join-Path $env:USERPROFILE '.config\opencode\opencode.jsonc'
     }
 
-    $projectLocal = Join-Path $WorkingDirectory '.opencode\agent\reviewer-ro.md'
+    # Descoberta project-local: sobe a arvore de diretorios a partir do cwd procurando
+    # .opencode/agent/reviewer-ro.md (mesma semantica do opencode, que descobre o project-local
+    # subindo ate a raiz). Assim o static nao e fragil a subdiretorios do cwd.
+    $projectLocal = $null
+    $dir = $WorkingDirectory
+    while (-not [string]::IsNullOrEmpty($dir)) {
+        $candidate = Join-Path $dir '.opencode\agent\reviewer-ro.md'
+        if (Test-Path -LiteralPath $candidate -PathType Leaf) { $projectLocal = $candidate; break }
+        $parent = Split-Path -Parent $dir
+        if ($parent -eq $dir) { break }
+        $dir = $parent
+    }
     $def = $null
     $source = $null
-    if (Test-Path -LiteralPath $projectLocal -PathType Leaf) {
+    if ($projectLocal) {
         $def = Get-OpenCodeReviewerRoPermissionFromMarkdown -Path $projectLocal
         $source = $projectLocal
     }
@@ -201,13 +212,13 @@ function Test-OpenCodeReviewerRoStatic {
     }
     if ($null -eq $def) {
         return @{ ok = $false; reason = 'static'; source = $source
-            detail = "definicao do reviewer-ro ausente (nem project-local $projectLocal nem global $GlobalJsoncPath). Rode scripts/Install-OpenCodeReviewerRoAgent.ps1 e/ou versione .opencode/agent/reviewer-ro.md." }
+            detail = "definicao do reviewer-ro ausente (nem project-local .opencode/agent/reviewer-ro.md subindo de '$WorkingDirectory' nem global $GlobalJsoncPath). Rode scripts/Install-OpenCodeReviewerRoAgent.ps1 e/ou versione .opencode/agent/reviewer-ro.md." }
     }
 
     $perm = $def.permission
     if ($null -eq $perm -or $perm.Count -eq 0) {
         return @{ ok = $false; reason = 'static'; source = $source
-            detail = "reviewer-ro sem bloco `permission` (forma antiga `tools:`? migre com o instalador). Fonte: $source." }
+            detail = "reviewer-ro sem bloco 'permission' (forma antiga 'tools:'? migre com o instalador). Fonte: $source." }
     }
 
     $problems = [System.Collections.Generic.List[string]]::new()
@@ -392,6 +403,36 @@ function Test-OpenCodeReviewerRoPrecheck {
 
     return @{ pass = $true; reason = $null
         detail = "reviewer-ro OK: allow-set {$($got -join ',')}, external_directory[*]='$($al.externalDirStar)'." }
+}
+
+function Test-OpenCodeAgentResolves {
+    <#
+        Opt-out check (D1, fold-in G2): quando o chamador passa -Agent <x> EXPLICITO (uso agentico
+        fora do painel), o enforce read-only NAO se aplica, mas confirma-se que <x> RESOLVE (aparece
+        em `opencode agent list`) — senao o opencode cairia SILENCIOSAMENTE no `build` full-access
+        (`--agent <ausente>` nao falha). Devolve @{ ok = $bool; detail }.
+    #>
+    param(
+        [Parameter(Mandatory)] [string] $Exe,
+        [Parameter(Mandatory)] [string] $Name
+    )
+    $stdout = $null
+    try {
+        $prev = if (Test-Path Variable:LASTEXITCODE) { $LASTEXITCODE } else { 0 }
+        $stdout = & $Exe agent list 2>$null
+        $code = $LASTEXITCODE
+        $global:LASTEXITCODE = $prev
+    } catch {
+        return @{ ok = $false; detail = "excecao ao rodar 'opencode agent list': $($_.Exception.Message)" }
+    }
+    if ($code -ne 0) {
+        return @{ ok = $false; detail = "'opencode agent list' saiu com codigo $code (INTERMITENTE — retentar)." }
+    }
+    $rules = Get-OpenCodeReviewerRoBlockFromAgentList -Lines @($stdout) -Name $Name
+    if ($null -eq $rules) {
+        return @{ ok = $false; detail = "agente '$Name' nao resolve em 'opencode agent list' — cairia no fallback silencioso ao 'build' full-access." }
+    }
+    return @{ ok = $true; detail = "agente '$Name' resolve." }
 }
 
 function Test-OpenCodeReviewerRoFallbackWarning {

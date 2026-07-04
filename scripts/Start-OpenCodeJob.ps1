@@ -59,6 +59,9 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
+# Guard least-privilege do reviewer-ro (default escopado + pre-check fail-closed no spawn)
+. (Join-Path $PSScriptRoot 'OpenCodeReviewerRoGuard.ps1')
+
 # Prompt: inline (-Message) ou de arquivo (-MessagePath). Le como UTF-8.
 if ($PSCmdlet.ParameterSetName -eq 'FromFile') {
     if (-not (Test-Path -LiteralPath $MessagePath -PathType Leaf)) {
@@ -79,6 +82,24 @@ if ($OpenCodeExe) {
         Where-Object FullName -like '*windows-x64\bin\opencode.exe' |
         Select-Object -First 1 -ExpandProperty FullName
     if (-not $exe) { throw "BLOCK: opencode.exe nao encontrado sob $env:APPDATA\npm" }
+}
+
+# 1b) D1/D2: default -Agent reviewer-ro ESCOPADO + pre-check fail-closed ANTES do Start-Process (o
+#     spawn e a barreira; o assincrono nao tem finally-remove, entao o pos-check e diagnostico no
+#     Watch-OpenCodeJob.ps1). Opt-out consciente com -Agent <x> explicito (confirma que resolve).
+$agentExplicit = $PSBoundParameters.ContainsKey('Agent') -and -not [string]::IsNullOrWhiteSpace($Agent)
+if (-not $agentExplicit) { $Agent = 'reviewer-ro' }
+$cwd = (Get-Location).Path
+if ($Agent -eq 'reviewer-ro') {
+    $pc = Test-OpenCodeReviewerRoPrecheck -Exe $exe -WorkingDirectory $cwd
+    if (-not $pc.pass) {
+        throw "BLOCK: guard reviewer-ro fail-closed (motivo=$($pc.reason)): $($pc.detail)"
+    }
+} else {
+    $res = Test-OpenCodeAgentResolves -Exe $exe -Name $Agent
+    if (-not $res.ok) {
+        throw "BLOCK: -Agent '$Agent' nao resolve (evita fallback silencioso ao 'build' full-access): $($res.detail)"
+    }
 }
 
 # 2) Pasta de jobs

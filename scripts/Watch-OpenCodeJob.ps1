@@ -37,6 +37,9 @@ $ErrorActionPreference = 'Stop'
 
 # Funções compartilhadas de parsing do stream do opencode (dot-source)
 . (Join-Path $PSScriptRoot 'OpenCodeStreamSupport.ps1')
+# Guard do reviewer-ro (pos-check assincrono = DIAGNOSTICO, nao bloqueia — a barreira e o
+# pre-check no spawn de Start-OpenCodeJob.ps1)
+. (Join-Path $PSScriptRoot 'OpenCodeReviewerRoGuard.ps1')
 
 $base       = Join-Path $TempDir $JobId
 $streamPath = "$base.stream.jsonl"
@@ -212,6 +215,10 @@ try {
     if (Test-Path -LiteralPath $errPath -PathType Leaf) {
         $errText = (Get-Content -LiteralPath $errPath -Raw -ErrorAction SilentlyContinue)
     }
+    # Pos-check DIAGNOSTICO (nao bloqueia): warning de fallback silencioso ao 'build' no stderr
+    # persistido. A barreira e o pre-check no spawn (Start-OpenCodeJob.ps1); aqui so sinaliza para
+    # o operador que o --agent nao resolveu no runtime (a saida pode ter sido gerada pelo 'build').
+    $fallbackToBuild = Test-OpenCodeReviewerRoFallbackWarning -Text $errText
     # Achado D: classificar a conclusao por reason (precedencia compartilhada com o sincrono via
     # OpenCodeStreamSupport). lastError tem prioridade; depois truncado/sem-conclusao/sem-texto.
     $verdict = Get-OpenCodeCompletionVerdict -HasStepFinish $script:sawStepFinish -Reason $script:lastFinishReason -FinalText $final
@@ -230,9 +237,14 @@ try {
         tokens       = $script:lastTokens
         finishReason = $script:lastFinishReason
         stderr       = $errText
+        fallbackToBuild = $fallbackToBuild
         finishedAt   = (Get-Date).ToString('o')
     }
     $result | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $resultPath -Encoding utf8
+
+    if ($fallbackToBuild) {
+        Write-Host "DIAGNOSTICO: warning de fallback ao 'build' no stderr — o --agent pode NAO ter resolvido no runtime (saida possivelmente do 'build' full-access). Verifique o provisionamento do reviewer-ro." -ForegroundColor Red
+    }
 
     Write-Host "-------------------------------------------------------------" -ForegroundColor White
     Write-Host "RESPOSTA FINAL:" -ForegroundColor Green

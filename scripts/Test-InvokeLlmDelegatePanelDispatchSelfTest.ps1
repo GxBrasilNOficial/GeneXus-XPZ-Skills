@@ -48,7 +48,13 @@ $mutexName = 'panel-fake-mtx-' + [guid]::NewGuid().ToString('N')
 # Env compartilhado com o processo filho (e com os fake-exe via Start-Process herdado)
 $env:PANEL_FAKE_LOG = $concLog
 $env:PANEL_FAKE_MUTEX = $mutexName
+# Guard D1/D2: versao testada dos fixtures (o fake-opencode a devolve em --version p/ o pre-check)
+$repoRoot = Split-Path -Parent $scriptsDir
+$env:PANEL_FAKE_OC_VERSION = ((Get-Content -LiteralPath (Join-Path $repoRoot 'xpz-llm-delegate\fixtures\opencode-reviewer-ro\VERSION.txt') -Raw -Encoding utf8).Trim())
 
+# cwd deterministica na raiz do repo: o pre-check do opencode (default reviewer-ro) descobre o
+# project-local .opencode/agent/reviewer-ro.md subindo do cwd herdado (harness in-process E filho).
+Push-Location $repoRoot
 try {
     # ---------------------------------------------------------------------------------------
     # Fixtures: fakes + configs sintéticas
@@ -59,6 +65,27 @@ try {
     # demais -> emite texto (responded), com acentos pt-BR.
     $fakeOcReader = Join-Path $tmp 'fake-oc-reader.ps1'
     @'
+$a = @($args)
+# Guard D1/D2: o painel usa o default reviewer-ro (bloqueia a chave agent), entao o adapter roda o
+# pre-check (--version + agent list). Responder ANTES de ler stdin/model, sem consumir stdin.
+if ($a -contains '--version') { $env:PANEL_FAKE_OC_VERSION; exit 0 }
+if ($a.Count -ge 2 -and $a[0] -eq 'agent' -and $a[1] -eq 'list') {
+    'reviewer-ro (all)'
+    '['
+    '{"permission":"*","action":"deny","pattern":"*"},'
+    '{"permission":"read","action":"allow","pattern":"*"},'
+    '{"permission":"grep","action":"allow","pattern":"*"},'
+    '{"permission":"glob","action":"allow","pattern":"*"},'
+    '{"permission":"list","action":"allow","pattern":"*"},'
+    '{"permission":"edit","action":"deny","pattern":"*"},'
+    '{"permission":"bash","action":"deny","pattern":"*"},'
+    '{"permission":"webfetch","action":"deny","pattern":"*"},'
+    '{"permission":"websearch","action":"deny","pattern":"*"},'
+    '{"permission":"task","action":"deny","pattern":"*"},'
+    '{"permission":"external_directory","action":"deny","pattern":"*"}'
+    ']'
+    exit 0
+}
 $model = ''
 for ($i = 0; $i -lt $args.Count; $i++) { if ($args[$i] -eq '--model') { $model = [string]$args[$i + 1]; break } }
 $null = [Console]::In.ReadToEnd()
@@ -555,7 +582,9 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
     Write-Output 'OK: Test-InvokeLlmDelegatePanelDispatchSelfTest.ps1'
 }
 finally {
+    Pop-Location -ErrorAction SilentlyContinue
     Remove-Item Env:\PANEL_FAKE_LOG -ErrorAction SilentlyContinue
     Remove-Item Env:\PANEL_FAKE_MUTEX -ErrorAction SilentlyContinue
+    Remove-Item Env:\PANEL_FAKE_OC_VERSION -ErrorAction SilentlyContinue
     if (Test-Path -LiteralPath $tmp) { Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue }
 }

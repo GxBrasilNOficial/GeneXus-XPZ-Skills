@@ -227,6 +227,57 @@ agente ruim (nao default-deny)
     Assert-True (Test-Path -LiteralPath $g3) "(g3) arquivo novo criado"
     $g3parsed = ConvertFrom-Jsonc -Raw (Get-Content -LiteralPath $g3 -Raw -Encoding utf8)
     Assert-True ([string]$g3parsed.agent.'reviewer-ro'.permission.'read' -eq 'allow') "(g3) arquivo novo com reviewer-ro valido"
+
+    # ── (a)+(b-adapter) INTEGRACAO com os adapters (D1+D2) ──────────────────────
+    # Push-Location na raiz do repo: o pre-check descobre o project-local subindo do cwd herdado.
+    $invoke = Join-Path $scriptsDir 'Invoke-OpenCode.ps1'
+    $start = Join-Path $scriptsDir 'Start-OpenCodeJob.ps1'
+    $prompt = Join-Path $tempRoot 'prompt.txt'
+    Set-Content -LiteralPath $prompt -Value 'oi' -Encoding utf8 -NoNewline
+    $runStream = Join-Path $tempRoot 'run-stream.jsonl'
+    @(
+        '{"type":"text","part":{"messageID":"m1","text":"OK-ADAPTER"}}'
+        '{"type":"step_finish","part":{"reason":"stop"}}'
+    ) | Set-Content -LiteralPath $runStream -Encoding utf8
+
+    $env:FAKE_OC_VERSION = $testedVersion
+    $env:FAKE_OC_AGENTLIST = $sampleAgentList
+    $env:FAKE_OC_AGENTLIST_EXIT = ''
+    $env:FAKE_OC_RUN_STREAM = $runStream
+    $env:FAKE_OC_RUN_STDERR = ''
+
+    Push-Location $repoRoot
+    try {
+        # (a-sync) sem -Agent => default reviewer-ro no argv; pre-check passa; run devolve a saida
+        $argvSync = Join-Path $tempRoot 'argv-sync.txt'
+        $env:FAKE_OC_ARGV_FILE = $argvSync
+        $ans = & $invoke -OpenCodeExe $fakeCmd -MessagePath $prompt -Model 'fake/model' -TimeoutSec 30
+        Assert-True (([string]$ans) -match 'OK-ADAPTER') "(a-sync) run devolveu a saida do fake (pre-check passou)"
+        $argvSyncText = if (Test-Path -LiteralPath $argvSync) { Get-Content -LiteralPath $argvSync -Raw } else { '' }
+        Assert-True ($argvSyncText -match '--agent reviewer-ro') "(a-sync) default -Agent reviewer-ro no argv do run (got: $argvSyncText)"
+
+        # (b-adapter) allow-set divergente => BLOCK ANTES do run (argv do run NAO e escrito)
+        $argvBlock = Join-Path $tempRoot 'argv-block.txt'
+        $env:FAKE_OC_ARGV_FILE = $argvBlock
+        $env:FAKE_OC_AGENTLIST = $excessPath
+        $threw = $false; $msg = ''
+        try { & $invoke -OpenCodeExe $fakeCmd -MessagePath $prompt -Model 'fake/model' -TimeoutSec 30 | Out-Null }
+        catch { $threw = $true; $msg = $_.Exception.Message }
+        Assert-True ($threw -and $msg -match 'guard reviewer-ro fail-closed') "(b-adapter) allow-set divergente => BLOCK do adapter (got: $msg)"
+        Assert-True (-not (Test-Path -LiteralPath $argvBlock)) "(b-adapter) BLOCK ANTES do run: argv do run nao foi escrito"
+        $env:FAKE_OC_AGENTLIST = $sampleAgentList
+
+        # (a-async) Start-OpenCodeJob sem -Agent => default reviewer-ro no argv (spawn e a barreira)
+        $argvAsync = Join-Path $tempRoot 'argv-async.txt'
+        $env:FAKE_OC_ARGV_FILE = $argvAsync
+        $jobDir = Join-Path $tempRoot 'jobs'
+        $null = & $start -OpenCodeExe $fakeCmd -MessagePath $prompt -Model 'fake/model' -NoWatcher -TempDir $jobDir
+        $waited = 0
+        while (-not (Test-Path -LiteralPath $argvAsync) -and $waited -lt 15) { Start-Sleep -Milliseconds 300; $waited++ }
+        $argvAsyncText = if (Test-Path -LiteralPath $argvAsync) { Get-Content -LiteralPath $argvAsync -Raw } else { '' }
+        Assert-True ($argvAsyncText -match '--agent reviewer-ro') "(a-async) default -Agent reviewer-ro no argv do spawn (got: $argvAsyncText)"
+    }
+    finally { Pop-Location -ErrorAction SilentlyContinue }
 }
 finally {
     foreach ($e in $fakeEnv) { Remove-Item "Env:$e" -ErrorAction SilentlyContinue }

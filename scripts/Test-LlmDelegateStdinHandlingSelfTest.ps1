@@ -135,6 +135,21 @@ exit 7
     # do opencode (text + step_finish reason=stop) que OpenCodeStreamSupport sabe parsear.
     $fakeReader = Join-Path $tempRoot 'fake-reader.ps1'
     @'
+$a = @($args)
+# Guard D1/D2: opt-out -Agent reviewer-fake -> o adapter chama `agent list` para confirmar que
+# resolve; responder sem ler stdin (nao interfere na prova de >32KB via stdin do branch run).
+if ($a.Count -ge 2 -and $a[0] -eq 'agent' -and $a[1] -eq 'list') {
+    'reviewer-fake (all)'
+    '['
+    '{"permission":"*","action":"deny","pattern":"*"},'
+    '{"permission":"read","action":"allow","pattern":"*"},'
+    '{"permission":"grep","action":"allow","pattern":"*"},'
+    '{"permission":"glob","action":"allow","pattern":"*"},'
+    '{"permission":"list","action":"allow","pattern":"*"},'
+    '{"permission":"external_directory","action":"deny","pattern":"*"}'
+    ']'
+    exit 0
+}
 $s = [Console]::In.ReadToEnd()
 $n = $s.Length
 '{"type":"text","part":{"messageID":"m1","text":"FAKELEN=' + $n + '"}}'
@@ -144,7 +159,7 @@ $n = $s.Length
     $fakeCmd = Join-Path $tempRoot 'fake-opencode.cmd'
     @'
 @echo off
-pwsh -NoProfile -ExecutionPolicy Bypass -File "%~dp0fake-reader.ps1"
+pwsh -NoProfile -ExecutionPolicy Bypass -File "%~dp0fake-reader.ps1" %*
 '@ | Set-Content -LiteralPath $fakeCmd -Encoding ascii
 
     # Prompt > 32KB (limite de linha de comando do Windows ~32767). Por argv estouraria;
@@ -155,7 +170,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File "%~dp0fake-reader.ps1"
     Set-Content -LiteralPath $bigFile -Value $bigPrompt -Encoding utf8 -NoNewline
 
     $invoke = Join-Path $scriptsDir 'Invoke-OpenCode.ps1'
-    $answer = & $invoke -OpenCodeExe $fakeCmd -MessagePath $bigFile -Model 'fake/model' -TimeoutSec 60
+    $answer = & $invoke -OpenCodeExe $fakeCmd -Agent 'reviewer-fake' -MessagePath $bigFile -Model 'fake/model' -TimeoutSec 60
     $answer = [string]$answer
 
     Assert-True ($answer -match 'FAKELEN=(\d+)') `

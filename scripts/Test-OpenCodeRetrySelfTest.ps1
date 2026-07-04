@@ -43,6 +43,21 @@ try {
     # leitor: incrementa o contador, consome o stdin (EOF), emite o stream do status da tentativa.
     $fakeReader = Join-Path $tempRoot 'fake-reader.ps1'
     @'
+$a = @($args)
+# Guard D1/D2: o adapter chama `agent list` (opt-out -Agent reviewer-fake -> so confirma que
+# resolve). Responder ANTES da logica de contador (nao consome tentativa) e sem ler stdin.
+if ($a.Count -ge 2 -and $a[0] -eq 'agent' -and $a[1] -eq 'list') {
+    'reviewer-fake (all)'
+    '['
+    '{"permission":"*","action":"deny","pattern":"*"},'
+    '{"permission":"read","action":"allow","pattern":"*"},'
+    '{"permission":"grep","action":"allow","pattern":"*"},'
+    '{"permission":"glob","action":"allow","pattern":"*"},'
+    '{"permission":"list","action":"allow","pattern":"*"},'
+    '{"permission":"external_directory","action":"deny","pattern":"*"}'
+    ']'
+    exit 0
+}
 $counterFile = $env:FAKE_COUNTER
 $n = 0
 if ($counterFile -and (Test-Path -LiteralPath $counterFile)) { $n = [int](Get-Content -LiteralPath $counterFile -Raw) }
@@ -64,7 +79,7 @@ switch ($status) {
     $fakeCmd = Join-Path $tempRoot 'fake-opencode.cmd'
     @'
 @echo off
-pwsh -NoProfile -ExecutionPolicy Bypass -File "%~dp0fake-reader.ps1"
+pwsh -NoProfile -ExecutionPolicy Bypass -File "%~dp0fake-reader.ps1" %*
 exit /b %errorlevel%
 '@ | Set-Content -LiteralPath $fakeCmd -Encoding ascii
 
@@ -79,7 +94,7 @@ exit /b %errorlevel%
     # ---- (i) 'truncated,ok' com -MaxAttempts 2 ----
     $c = Join-Path $tempRoot 'c1.txt'; Reset-Counter $c
     $env:FAKE_COUNTER = $c; $env:FAKE_PLAN = 'truncated,ok'
-    $ans = & $invoke -OpenCodeExe $fakeCmd -MessagePath $promptFile -Model 'fake/model' -TimeoutSec 60 -MaxAttempts 2
+    $ans = & $invoke -OpenCodeExe $fakeCmd -Agent 'reviewer-fake' -MessagePath $promptFile -Model 'fake/model' -TimeoutSec 60 -MaxAttempts 2
     Assert-True (([string]$ans) -match 'OK-RETRY') "(i) -MaxAttempts 2 deveria converter truncado->ok; veio: '$ans'."
     Assert-True ((Get-Counter $c) -eq 2) "(i) deveria ter 2 tentativas; contador=$(Get-Counter $c)."
 
@@ -87,7 +102,7 @@ exit /b %errorlevel%
     $c = Join-Path $tempRoot 'c2.txt'; Reset-Counter $c
     $env:FAKE_COUNTER = $c; $env:FAKE_PLAN = 'truncated'
     $threw = $false; $msg = ''
-    try { & $invoke -OpenCodeExe $fakeCmd -MessagePath $promptFile -Model 'fake/model' -TimeoutSec 60 -MaxAttempts 1 } catch { $threw = $true; $msg = $_.Exception.Message }
+    try { & $invoke -OpenCodeExe $fakeCmd -Agent 'reviewer-fake' -MessagePath $promptFile -Model 'fake/model' -TimeoutSec 60 -MaxAttempts 1 } catch { $threw = $true; $msg = $_.Exception.Message }
     Assert-True $threw "(ii) -MaxAttempts 1 com truncado deveria lancar."
     Assert-True ($msg -match 'truncad') "(ii) a mensagem deveria indicar truncado; veio: '$msg'."
     Assert-True (-not ($msg -match 'apos .* tentativas')) "(ii) -MaxAttempts 1 nao deve anotar '(apos N tentativas)'; veio: '$msg'."
@@ -97,7 +112,7 @@ exit /b %errorlevel%
     $c = Join-Path $tempRoot 'c3a.txt'; Reset-Counter $c
     $env:FAKE_COUNTER = $c; $env:FAKE_PLAN = 'exit,ok'
     $threw = $false; $msg = ''
-    try { & $invoke -OpenCodeExe $fakeCmd -MessagePath $promptFile -Model 'fake/model' -TimeoutSec 60 -MaxAttempts 2 } catch { $threw = $true; $msg = $_.Exception.Message }
+    try { & $invoke -OpenCodeExe $fakeCmd -Agent 'reviewer-fake' -MessagePath $promptFile -Model 'fake/model' -TimeoutSec 60 -MaxAttempts 2 } catch { $threw = $true; $msg = $_.Exception.Message }
     Assert-True $threw "(iii-a) exit!=0 deveria lancar."
     Assert-True ($msg -match 'codigo 3') "(iii-a) mensagem deveria citar o exit code; veio: '$msg'."
     Assert-True ((Get-Counter $c) -eq 1) "(iii-a) exit!=0 NAO deve re-tentar; contador=$(Get-Counter $c)."
@@ -106,7 +121,7 @@ exit /b %errorlevel%
     $c = Join-Path $tempRoot 'c3b.txt'; Reset-Counter $c
     $env:FAKE_COUNTER = $c; $env:FAKE_PLAN = 'streamerror,ok'
     $threw = $false; $msg = ''
-    try { & $invoke -OpenCodeExe $fakeCmd -MessagePath $promptFile -Model 'fake/model' -TimeoutSec 60 -MaxAttempts 2 } catch { $threw = $true; $msg = $_.Exception.Message }
+    try { & $invoke -OpenCodeExe $fakeCmd -Agent 'reviewer-fake' -MessagePath $promptFile -Model 'fake/model' -TimeoutSec 60 -MaxAttempts 2 } catch { $threw = $true; $msg = $_.Exception.Message }
     Assert-True $threw "(iii-b) erro de stream deveria lancar."
     Assert-True ($msg -match 'erro no stream') "(iii-b) mensagem deveria citar erro no stream; veio: '$msg'."
     Assert-True ((Get-Counter $c) -eq 1) "(iii-b) erro de stream NAO deve re-tentar; contador=$(Get-Counter $c)."
@@ -115,7 +130,7 @@ exit /b %errorlevel%
     $c = Join-Path $tempRoot 'c4.txt'; Reset-Counter $c
     $env:FAKE_COUNTER = $c; $env:FAKE_PLAN = 'truncated,truncated'
     $threw = $false; $msg = ''
-    try { & $invoke -OpenCodeExe $fakeCmd -MessagePath $promptFile -Model 'fake/model' -TimeoutSec 60 -MaxAttempts 2 } catch { $threw = $true; $msg = $_.Exception.Message }
+    try { & $invoke -OpenCodeExe $fakeCmd -Agent 'reviewer-fake' -MessagePath $promptFile -Model 'fake/model' -TimeoutSec 60 -MaxAttempts 2 } catch { $threw = $true; $msg = $_.Exception.Message }
     Assert-True $threw "(iv) todas truncam deveria lancar."
     Assert-True ($msg -match 'apos 2 tentativas') "(iv) deveria anotar '(apos 2 tentativas...)'; veio: '$msg'."
     Assert-True ($msg -match 'ultimo status=truncated') "(iv) deveria citar 'ultimo status=truncated'; veio: '$msg'."
@@ -130,7 +145,7 @@ exit /b %errorlevel%
     $env:FAKE_COUNTER = $c; $env:FAKE_PLAN = 'truncated,ok'
     $env:XDG_DATA_HOME = $xdg429
     $threw = $false; $msg = ''
-    try { & $invoke -OpenCodeExe $fakeCmd -MessagePath $promptFile -Model 'fake/model' -TimeoutSec 60 -MaxAttempts 2 } catch { $threw = $true; $msg = $_.Exception.Message }
+    try { & $invoke -OpenCodeExe $fakeCmd -Agent 'reviewer-fake' -MessagePath $promptFile -Model 'fake/model' -TimeoutSec 60 -MaxAttempts 2 } catch { $threw = $true; $msg = $_.Exception.Message }
     $env:XDG_DATA_HOME = $cleanXdg
     Assert-True $threw "(v) 429 na janela deveria bloquear o retry (lancar)."
     Assert-True ($msg -match '429') "(v) mensagem deveria citar 429; veio: '$msg'."
