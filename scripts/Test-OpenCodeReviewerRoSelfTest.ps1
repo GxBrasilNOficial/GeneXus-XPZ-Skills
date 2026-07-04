@@ -41,9 +41,10 @@ $sampleAgentList = Join-Path $fixtureDir 'agentlist-reviewer-ro.sample.txt'
 $fallbackFixture = Join-Path $fixtureDir 'fallback-warning.txt'
 $equivFixture = Join-Path $fixtureDir 'equiv-permission-vs-tools.sample.txt'
 $mergeFixture = Join-Path $fixtureDir 'merge-global-only-reviewer-ro.sample.txt'
+$readOutsideFixture = Join-Path $fixtureDir 'read-outside-cwd-blocked.sample.txt'
 $agentMd = Join-Path $repoRoot '.opencode\agent\reviewer-ro.md'
 
-foreach ($p in @($guard, $installer, $sampleAgentList, $fallbackFixture, $equivFixture, $mergeFixture, $agentMd)) {
+foreach ($p in @($guard, $installer, $sampleAgentList, $fallbackFixture, $equivFixture, $mergeFixture, $readOutsideFixture, $agentMd)) {
     if (-not (Test-Path -LiteralPath $p)) { throw "BLOCK: artefato ausente: $p" }
 }
 
@@ -156,6 +157,12 @@ exit /b %errorlevel%
     $env:FAKE_OC_AGENTLIST = $extAllowPath
     $pce = Test-OpenCodeReviewerRoPrecheck -Exe $fakeCmd -WorkingDirectory $repoRoot
     Assert-True ((-not $pce.pass) -and $pce.reason -eq 'allowset' -and $pce.detail -match 'external_directory') "(d) external_directory[*]=allow => BLOCK (nao confinado)"
+
+    # ── (d-behavioral) fixture golden da captura real "leitura fora do cwd bloqueada" (design D4) ──
+    # O self-test deterministico nao re-executa o modelo; aqui so verifica que a captura documenta o
+    # desfecho (sem-leak) e nao contem sentinela literal. A asserção mecanica CI e o caso (d) acima.
+    $roText = Get-Content -LiteralPath $readOutsideFixture -Raw -Encoding utf8
+    Assert-True (($roText -match 'SEM LEAK') -and ($roText -match 'external_directory') -and (-not ($roText -match 'ZQX789'))) "(d-behavioral) fixture documenta leitura-fora-do-cwd bloqueada (sem-leak, sem sentinela literal)"
 
     # ── (b-versao) versao instalada != testada => BLOCK version ──
     $env:FAKE_OC_AGENTLIST = $sampleAgentList

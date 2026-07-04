@@ -71,7 +71,10 @@ de um novo usuário.
   confirmação, no padrão «audita → oferece resolver» desta skill, para a instalação
   global do `reviewer-ro` passar a ser trabalho da `xpz-skills-setup`) são **frente
   própria** — ver `999-ideias-pendentes.md`. Nesta frente **nada** é instalado nem
-  auditado em código aqui.
+  auditado em código aqui. **Gate de ativação (rastreabilidade, não enforcement):** o
+  `reviewer-ro` só é considerado ativo quando `scripts/Test-OpenCodeReviewerRoSelfTest.ps1`
+  passa na versão-alvo (token `OPENCODE_REVIEWER_RO_SELFTEST_OK`); quando a auditoria
+  em código existir, conferir esse gate faz parte dela.
 - Verificar existência de diretórios com `Test-Path` individual por ferramenta — nunca
   agrupar em hashtable ou bloco de verificação coletiva
 - Quando o usuário pedir auditoria ou setup **completo** (ex.: após `git pull`,

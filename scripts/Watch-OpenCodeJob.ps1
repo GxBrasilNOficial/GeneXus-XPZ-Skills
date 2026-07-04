@@ -219,6 +219,7 @@ try {
     # persistido. A barreira e o pre-check no spawn (Start-OpenCodeJob.ps1); aqui so sinaliza para
     # o operador que o --agent nao resolveu no runtime (a saida pode ter sido gerada pelo 'build').
     $fallbackToBuild = Test-OpenCodeReviewerRoFallbackWarning -Text $errText
+    $fallbackDetail = if ($fallbackToBuild) { "warning de fallback ao 'build' no stderr — o --agent nao resolveu no runtime; a resposta pode ter sido gerada pelo agente 'build' full-access. Verifique o provisionamento do reviewer-ro (diagnostico; nao bloqueia)." } else { $null }
     # Achado D: classificar a conclusao por reason (precedencia compartilhada com o sincrono via
     # OpenCodeStreamSupport). lastError tem prioridade; depois truncado/sem-conclusao/sem-texto.
     $verdict = Get-OpenCodeCompletionVerdict -HasStepFinish $script:sawStepFinish -Reason $script:lastFinishReason -FinalText $final
@@ -238,6 +239,7 @@ try {
         finishReason = $script:lastFinishReason
         stderr       = $errText
         fallbackToBuild = $fallbackToBuild
+        fallbackDetail = $fallbackDetail
         finishedAt   = (Get-Date).ToString('o')
     }
     $result | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $resultPath -Encoding utf8

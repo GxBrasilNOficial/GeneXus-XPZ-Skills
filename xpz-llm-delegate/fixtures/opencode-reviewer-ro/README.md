@@ -34,6 +34,10 @@ podem não valer; re-capturar os fixtures e revisitar D2/D3 antes de reativar.
   (project-local, forma `permission`, `mode: all`, allow-set `{read,grep,glob,list}`): a presença do
   project-local muda `mode` `primary`→`all` e `*` `allow`→`deny` **por inteiro**, provando que o
   project-local **substitui o agente**, não mescla campo a campo.
+- `read-outside-cwd-blocked.sample.txt` — **captura behavioral** (design D4 «leitura fora do cwd
+  bloqueada headless»): reviewer-ro (com glm-5.2) pedido para ler um arquivo FORA do cwd → **sem
+  leak** do sentinela; a resolução `external_directory[*]=deny` é a rede mecânica. Golden/documental
+  (o self-test determinístico não re-executa o modelo real; a asserção CI vive no caso (d)).
 
 ## Resolução efetiva medida (1.4.4) — `agent list`, last-match-wins
 
