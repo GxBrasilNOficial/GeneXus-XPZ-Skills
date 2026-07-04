@@ -156,6 +156,14 @@ Skills consumidoras: `xpz-builder`, `xpz-msbuild-import-export`. Motor: `scripts
 
 **Origem:** recorte **adiado** da frente least-privilege do revisor opencode (D-min), congelada por revisão por pares (8 rodadas / 4 famílias) e **implementada** em 2026-07-04. Ver o histórico.
 
+## `xpz-skills-setup` oferecer instalar o agente `reviewer-ro` do OpenCode (resolução ativa do gap)
+
+- **Importância** — média (fecha a lacuna operacional do provisionamento **global** do revisor opencode; hoje o `reviewer-ro` só está garantido **project-local** na raiz do repo, e de outros cwd o guard cai em fail-closed `static` até o `opencode.jsonc` global ser migrado).
+- **Maturidade** — ideia (decisão do usuário 2026-07-04: **opção B** — a `xpz-skills-setup` deve ser a dona operacional da instalação, não só auditar). O **script** `scripts/Install-OpenCodeReviewerRoAgent.ps1` já existe (dono `xpz-llm-delegate`; edição JSONC localizada, migra o interino `tools:`→`permission`; testado por `Test-OpenCodeReviewerRoSelfTest.ps1`). Falta a **fiação na `xpz-skills-setup`**: no fluxo «audita → oferece resolver», detectar ausência/deriva do `reviewer-ro` no `~/.config/opencode/opencode.jsonc` e **oferecer invocá-lo após confirmação explícita** (padrão do passo 9 do `WORKFLOW`, análogo ao `Install-CursorGlobalInstructionsMcp.ps1`), sem edição silenciosa.
+- **Recorte:** a frente D-min (implementada) deixou na `xpz-skills-setup` **só** a auditoria read-only (cita o instalador como dependência). Esta entrada é a **extensão para resolução ativa** — provavelmente + um check de presença/deriva e um passo de oferta no `WORKFLOW`, com paridade em `09` se nascer contrato novo.
+
+**Origem:** decisão do usuário (2026-07-04) ao fechar a frente least-privilege do revisor opencode — «deixar o trabalho [de instalação global] para a `xpz-skills-setup`» (opção B).
+
 ## Resposta `stop` porém quase-vazia escapa do veredito e do retry (gate de qualidade/aderência ausente)
 
 - **Importância** — baixa-média (ruído **silencioso** no painel: uma voz pode "responder" sem opinar e ainda contar como revisor válido, enfraquecendo a diversidade sem alarme).

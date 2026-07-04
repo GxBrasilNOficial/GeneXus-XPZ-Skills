@@ -56,16 +56,20 @@ de um novo usuário.
   (incluindo instalação do MCP Cursor via
   `scripts/Install-CursorGlobalInstructionsMcp.ps1`), apenas **após confirmação
   explícita** do usuário e **sem edição silenciosa**
-- **Fora de escopo — agentes custom do OpenCode:** o agente `reviewer-ro`
-  least-privilege do OpenCode (revisor «sem execução/escrita») é provisionado pelo
-  seu **instalador próprio** `scripts/Install-OpenCodeReviewerRoAgent.ps1` (dono:
+- **Agente custom `reviewer-ro` do OpenCode (auditoria agora; resolução ativa =
+  frente própria):** o agente `reviewer-ro` least-privilege do OpenCode (revisor
+  «sem execução/escrita») tem **instalador próprio**
+  `scripts/Install-OpenCodeReviewerRoAgent.ps1` (dono do **script**:
   `xpz-llm-delegate`; alvo `~/.config/opencode/opencode.jsonc`, além do project-local
-  versionado `.opencode/agent/reviewer-ro.md`). Esta skill **não** gerencia agentes
-  custom do OpenCode — o `agentsPath` que ela resolve é do **MCP do Cursor**, não
-  cobre o bloco `agent` do `opencode.jsonc`. Numa auditoria de setup **completo**,
-  apenas **citar** esse instalador como dependência (verificação read-only da
-  presença do `reviewer-ro` no `opencode.jsonc`/project-local), sem instalá-lo nem
-  editá-lo aqui.
+  versionado `.opencode/agent/reviewer-ro.md`). Hoje o `agentsPath` que esta skill
+  resolve é do **MCP do Cursor** e **não** cobre o bloco `agent` do `opencode.jsonc`;
+  por isso, **nesta frente** a `xpz-skills-setup` só **audita** (verificação
+  read-only da presença do `reviewer-ro` no `opencode.jsonc`/project-local, citando
+  o instalador como dependência de setup), **sem instalá-lo aqui**. **Oferecer
+  resolver o gap** (invocar o instalador após confirmação, no padrão «audita →
+  oferece resolver» desta skill, para que a instalação global do `reviewer-ro`
+  passe a ser trabalho da `xpz-skills-setup`) é **frente própria** — ver
+  `999-ideias-pendentes.md`.
 - Verificar existência de diretórios com `Test-Path` individual por ferramenta — nunca
   agrupar em hashtable ou bloco de verificação coletiva
 - Quando o usuário pedir auditoria ou setup **completo** (ex.: após `git pull`,
