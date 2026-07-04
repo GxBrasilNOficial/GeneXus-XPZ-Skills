@@ -437,7 +437,7 @@ Após implementar + rebuild:
 
 ## Implementar `Invoke-LlmDelegatePanelDispatch.ps1` (frente A) — CONCLUÍDA E PUSHADA (origin/main `2e88905`)
 
-**Migrada para `historico/IdeiasImplementadas_202606.md`** (2026-06-22). Harness MECÂNICO de disparo+coleta do painel de revisão por pares (o «harness de disparo» previsto em `15-revisao-por-pares.md:108`), conforme o design convergido v11; implementação convergida por revisão por pares (v1→v2). Resíduos relacionados seguem abertos no 999: «contrato de saída estruturado dos adapters» (consumidor do single-flight automático) e «agente reviewer sem execução/escrita» (confinamento do opencode).
+**Migrada para `historico/IdeiasImplementadas_202606.md`** (2026-06-22). Harness MECÂNICO de disparo+coleta do painel de revisão por pares (o «harness de disparo» previsto em `15-revisao-por-pares.md:108`), conforme o design convergido v11; implementação convergida por revisão por pares (v1→v2). Resíduos relacionados: «contrato de saída estruturado dos adapters» (consumidor do single-flight automático) **segue aberto** no 999; o eixo **execução/escrita** do confinamento do revisor opencode foi **implementado** (frente D-min, 2026-07-04 — ver `historico/IdeiasImplementadas_202607.md`), restando aberto apenas o **eixo de leitura/cwd-seguro** (ADIADO) e a fiação da `xpz-skills-setup` para oferecer a instalação global do `reviewer-ro`.
 
 ## Normalizar a caixa do -VNextState no eco do closeout
 
