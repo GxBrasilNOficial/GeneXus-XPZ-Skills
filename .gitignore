@@ -19,3 +19,13 @@ scripts/**/*.pyc
 !/ptu-native/**
 ptu-native/**/bin/
 ptu-native/**/obj/
+# Agente opencode versionado (reviewer-ro): habilita SO o arquivo do agente,
+# nao o runtime state do opencode. Cascata: re-inclui a pasta para o git descer,
+# re-ignora o conteudo de cada nivel, e re-inclui apenas o arquivo do agente.
+# (So `!/.opencode/`+`!/.opencode/agent/` nao basta: sem os `/.opencode/*` o
+# runtime state — state.json, cache — ficaria trackable, ao contrario da intencao.)
+!/.opencode/
+/.opencode/*
+!/.opencode/agent/
+/.opencode/agent/*
+!/.opencode/agent/reviewer-ro.md
