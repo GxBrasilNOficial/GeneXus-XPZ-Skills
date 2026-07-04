@@ -97,13 +97,15 @@ function Find-JsoncMatchingBrace {
 
 function Find-JsoncKeyValueSpan {
     <# Localiza a chave "Key" (fora de string) cujo valor e um objeto {...} e devolve
-       @{ keyStart; valueOpen; valueClose } (indices) ou $null. Busca a partir de -From. #>
-    param([Parameter(Mandatory)] [string] $Text, [Parameter(Mandatory)] [string] $Key, [int] $From = 0)
+       @{ keyStart; valueOpen; valueClose } (indices) ou $null. Busca a partir de -From; se -To >= 0,
+       a chave so conta se comecar ANTES de -To (limite exclusivo — para escopar a um bloco pai). #>
+    param([Parameter(Mandatory)] [string] $Text, [Parameter(Mandatory)] [string] $Key, [int] $From = 0, [int] $To = -1)
     $needle = '"' + $Key + '"'
     $idx = $From
     while ($true) {
         $k = $Text.IndexOf($needle, $idx)
         if ($k -lt 0) { return $null }
+        if ($To -ge 0 -and $k -ge $To) { return $null }
         # confirmar que nao esta dentro de uma string (heuristica: contar aspas nao-escapadas antes)
         $j = $k + $needle.Length
         while ($j -lt $Text.Length -and [char]::IsWhiteSpace($Text[$j])) { $j++ }
@@ -202,36 +204,38 @@ if (-not $existed -or [string]::IsNullOrWhiteSpace($raw)) {
     $new += $nl
     $action = 'criar'
 } else {
-    $rr = Find-JsoncKeyValueSpan -Text $raw -Key 'reviewer-ro'
-    if ($null -ne $rr) {
-        # Substitui o VALOR do reviewer-ro (migracao tools:->permission tambem cai aqui).
-        # Detecta a indentacao da linha da chave (agnostico a `\n`/`\r\n`).
-        $p = $rr.keyStart - 1
-        while ($p -ge 0 -and $raw[$p] -ne "`n" -and $raw[$p] -ne "`r") { $p-- }
-        $p++
-        $indent = ''
-        while ($p -lt $rr.keyStart -and ($raw[$p] -eq ' ' -or $raw[$p] -eq "`t")) { $indent += $raw[$p]; $p++ }
-        $frag = Build-ReviewerRoFragment -Description $desc -Mode $mode -Permission $def.permission -Indent $indent
-        $new = $raw.Substring(0, $rr.valueOpen) + $frag + $raw.Substring($rr.valueClose + 1)
-    } else {
-        # Sem reviewer-ro: inserir no bloco agent (se existir) ou criar o bloco agent.
-        $ag = Find-JsoncKeyValueSpan -Text $raw -Key 'agent'
-        if ($null -ne $ag) {
+    # Escopa a chave `reviewer-ro` ao bloco `agent` — NAO busca globalmente (uma chave homonima
+    # fora de `agent`, ex.: em `metadata.reviewer-ro`, nao pode ser confundida com agent.reviewer-ro,
+    # senao o instalador editaria o bloco errado e falharia a validacao pos-edicao).
+    $ag = Find-JsoncKeyValueSpan -Text $raw -Key 'agent'
+    if ($null -ne $ag) {
+        $rr = Find-JsoncKeyValueSpan -Text $raw -Key 'reviewer-ro' -From $ag.valueOpen -To $ag.valueClose
+        if ($null -ne $rr) {
+            # Substitui o VALOR do reviewer-ro DENTRO do agent (migracao tools:->permission cai aqui).
+            # Detecta a indentacao da linha da chave (agnostico a `\n`/`\r\n`).
+            $p = $rr.keyStart - 1
+            while ($p -ge 0 -and $raw[$p] -ne "`n" -and $raw[$p] -ne "`r") { $p-- }
+            $p++
+            $indent = ''
+            while ($p -lt $rr.keyStart -and ($raw[$p] -eq ' ' -or $raw[$p] -eq "`t")) { $indent += $raw[$p]; $p++ }
+            $frag = Build-ReviewerRoFragment -Description $desc -Mode $mode -Permission $def.permission -Indent $indent
+            $new = $raw.Substring(0, $rr.valueOpen) + $frag + $raw.Substring($rr.valueClose + 1)
+        } else {
+            # agent existe mas sem reviewer-ro: insere como primeira propriedade do agent
             $frag = Build-ReviewerRoFragment -Description $desc -Mode $mode -Permission $def.permission -Indent '    '
-            # insere logo apos o '{' do agent, como primeira propriedade
             $afterOpen = $ag.valueOpen + 1
             $insertion = "$nl    `"reviewer-ro`": $frag,"
             $new = $raw.Substring(0, $afterOpen) + $insertion + $raw.Substring($afterOpen)
             $action = 'inserir (bloco agent existente)'
-        } else {
-            # sem bloco agent: insere apos o '{' raiz
-            $rootOpen = $raw.IndexOf('{')
-            if ($rootOpen -lt 0) { throw "BLOCK: opencode.jsonc sem objeto raiz." }
-            $frag = Build-ReviewerRoFragment -Description $desc -Mode $mode -Permission $def.permission -Indent '    '
-            $insertion = "$nl  `"agent`": {$nl    `"reviewer-ro`": $frag$nl  },"
-            $new = $raw.Substring(0, $rootOpen + 1) + $insertion + $raw.Substring($rootOpen + 1)
-            $action = 'inserir (novo bloco agent)'
         }
+    } else {
+        # sem bloco agent: insere apos o '{' raiz
+        $rootOpen = $raw.IndexOf('{')
+        if ($rootOpen -lt 0) { throw "BLOCK: opencode.jsonc sem objeto raiz." }
+        $frag = Build-ReviewerRoFragment -Description $desc -Mode $mode -Permission $def.permission -Indent '    '
+        $insertion = "$nl  `"agent`": {$nl    `"reviewer-ro`": $frag$nl  },"
+        $new = $raw.Substring(0, $rootOpen + 1) + $insertion + $raw.Substring($rootOpen + 1)
+        $action = 'inserir (novo bloco agent)'
     }
 }
 

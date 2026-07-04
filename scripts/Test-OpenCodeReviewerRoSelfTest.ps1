@@ -228,6 +228,25 @@ agente ruim (nao default-deny)
     $g3parsed = ConvertFrom-Jsonc -Raw (Get-Content -LiteralPath $g3 -Raw -Encoding utf8)
     Assert-True ([string]$g3parsed.agent.'reviewer-ro'.permission.'read' -eq 'allow') "(g3) arquivo novo com reviewer-ro valido"
 
+    # (g4) chave `reviewer-ro` HOMONIMA fora de `agent` (em metadata) + agent sem reviewer-ro:
+    # o instalador deve escopar ao bloco agent (inserir agent.reviewer-ro) SEM tocar o homonimo.
+    $g4 = Join-Path $tempRoot 'g4-homonimo.jsonc'
+    @'
+{
+  "$schema": "https://opencode.ai/config.json",
+  "metadata": { "reviewer-ro": { "note": "homonimo fora de agent — nao tocar" } },
+  "agent": {
+    "helper": { "mode": "all" }
+  }
+}
+'@ | Set-Content -LiteralPath $g4 -Encoding utf8
+    & $installer -JsoncPath $g4 -AgentMarkdownPath $agentMd | Out-Null
+    $g4raw = Get-Content -LiteralPath $g4 -Raw -Encoding utf8
+    $g4parsed = ConvertFrom-Jsonc -Raw $g4raw
+    Assert-True ([string]$g4parsed.agent.'reviewer-ro'.permission.'*' -eq 'deny') "(g4) reviewer-ro inserido DENTRO de agent (nao no homonimo)"
+    Assert-True ([string]$g4parsed.metadata.'reviewer-ro'.note -eq 'homonimo fora de agent — nao tocar') "(g4) metadata.reviewer-ro homonimo preservado intacto"
+    Assert-True ($null -ne $g4parsed.agent.PSObject.Properties['helper']) "(g4) agent.helper preservado"
+
     # ── (a)+(b-adapter) INTEGRACAO com os adapters (D1+D2) ──────────────────────
     # Push-Location na raiz do repo: o pre-check descobre o project-local subindo do cwd herdado.
     $invoke = Join-Path $scriptsDir 'Invoke-OpenCode.ps1'
