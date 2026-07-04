@@ -48,6 +48,7 @@ param(
 
     [string]$ObjectType,
     [string]$ObjectName,
+    [string]$InstanceKey,
     [int]$RelationId,
     [string]$SourceType,
     [string]$SourceName,
@@ -105,6 +106,7 @@ if ($CatalogOverridePath) {
 
 if ($ObjectType) { $params.ObjectType = $ObjectType }
 if ($ObjectName) { $params.ObjectName = $ObjectName }
+if ($InstanceKey) { $params.InstanceKey = $InstanceKey }
 if ($RelationId) { $params.RelationId = $RelationId }
 if ($SourceType) { $params.SourceType = $SourceType }
 if ($SourceName) { $params.SourceName = $SourceName }

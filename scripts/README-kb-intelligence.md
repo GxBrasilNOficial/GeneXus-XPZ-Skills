@@ -176,13 +176,31 @@ A tabela `objects` traz três colunas para separar objetos GERADOS por Pattern (
 - `is_generated_object` (`INTEGER NOT NULL DEFAULT 0`): `1` quando o objeto tem a propriedade de nível-objeto `IsGeneratedObject=True`; `0` caso contrário (autoral ou derivado).
 - `pattern_object_id` (`TEXT`, nulável): o papel no Pattern (ex.: `TabGrid`, `TabTabular`, `View`, `Selection` em WebPanel; `ExportSelection`, `ExportTabGrid` em Procedure).
 - `instance_key` (`TEXT`, nulável): a instância dona — `<type-GUID do WorkWithForWeb>-<nome da instância WorkWith>`. Pode ser nulo mesmo com `is_generated_object=1` (ex.: alguns Procedures gerados).
+- `instance_name` (campo **derivado**, não é coluna): o nome da instância extraído de `instance_key` pelo motor de query, em `object-info`/`search-objects`/`list-by-type` (não em `attribute-info`, nem em `transaction-attributes`/`transaction-writable-attributes`). Sempre presente na saída, `null` quando não derivável (`instance_key` nulo ou não-canônico). Derivação ancorada no GUID canônico (`8-4-4-4-12`) + primeiro hífen; nunca `split` cego (hífens internos do nome são preservados). O mapeamento `pattern_object_id → forma-do-nome` (`Selection`=`WW<nome>`, `TabTabular`=`<nome>General`, etc.) é **convenção GeneXus, não contrato do repositório**.
 
-A extração é **escopada ao `<Properties>` do objeto RAIZ** (parse XML por bytes; fallback regex do último bloco `<Properties>` só em XML malformado), nunca de `<Object>` aninhado em tipo-contêiner (`PackagedModule`, que empacota uma lib com objetos internos marcados). Os três campos aparecem no JSON de `object-info`/`search-objects`/`list-by-type`; no `--format text`, `object-info` mostra os três e `search-objects`/`list-by-type` mostram apenas `generated=0/1` (saída de lista compacta). A metadata do índice traz `generated_objects_count`.
+A extração é **escopada ao `<Properties>` do objeto RAIZ** (parse XML por bytes; fallback regex do último bloco `<Properties>` só em XML malformado), nunca de `<Object>` aninhado em tipo-contêiner (`PackagedModule`, que empacota uma lib com objetos internos marcados). Os três campos aparecem no JSON de `object-info`/`search-objects`/`list-by-type`; no `--format text`, `object-info` mostra os três mais `instance_name`; `search-objects`/`list-by-type` mostram `generated=0/1` e, quando derivável, `instance_name=<nome>` (saída de lista compacta). A metadata do índice traz `generated_objects_count`.
 
 Filtro determinístico (`--generated` / `--authored`, mutuamente exclusivos, em `search-objects` e `list-by-type`; switches `-Generated`/`-Authored` no wrapper `.ps1`):
 
 - `Query-KbIntelligenceIndex.ps1 -IndexPath <sqlite> -Query list-by-type -ObjectType WebPanel -Generated` — só gerados
 - `Query-KbIntelligenceIndex.ps1 -IndexPath <sqlite> -Query list-by-type -ObjectType WebPanel -Authored` — só autorais
+
+### Reverse lookup por instância (`-InstanceKey`)
+
+`search-objects` aceita `-InstanceKey` (`--instance-key`) para listar os objetos gerados por uma instância WorkWithForWeb. O motor **auto-detecta** a forma do argumento (regra de contrato):
+
+- **nome plano** da instância (ex.: `WorkWithWebVolume`) → correspondência **exata, ignorando caixa** (`casefold`) contra o `instance_name` derivado;
+- **chave completa** `<GUID canônico 8-4-4-4-12>-<nome>` → correspondência **exata, ignorando caixa** (`LOWER` do SQLite) contra `instance_key`;
+- `<GUID>-` sem nome → **erro** (chave incompleta); GUID puro sem hífen → cai em nome (nenhum objeto casa).
+
+A correspondência é sempre **exata, nunca parcial** (`WorkWithWebFoo` não casa `WorkWithWebFooBar`). Combina com `-ObjectType`, `-Generated`/`-Authored` e `-Limit`; com `-ObjectName`, os dois filtros combinam em **AND**. `search-objects` passa a exigir **pelo menos um** entre `-ObjectName` e `-InstanceKey`. `-InstanceKey` **só** vale em `search-objects` (em outra consulta → erro `--instance-key is only valid with search-objects.`).
+
+- `Query-KbIntelligenceIndex.ps1 -IndexPath <sqlite> -Query search-objects -InstanceKey WorkWithWebVolume` — objetos gerados pela instância (por nome)
+- `Query-KbIntelligenceIndex.ps1 -IndexPath <sqlite> -Query search-objects -InstanceKey <GUID>-WorkWithWebVolume` — idem (por chave completa)
+
+**Nota de caixa (ASCII):** a comparação sem caixa da **chave completa** usa `LOWER()` do SQLite (ASCII); a do **nome** usa `casefold()` do Python (Unicode). A diferença só importa para nome de instância não-ASCII — a convenção GeneXus é ASCII.
+
+**Nota de desempenho:** no modo nome sem `-ObjectName`/`-ObjectType`, a consulta varre a tabela e deriva o nome de cada linha; o `-Limit` recorta **após** o filtro (não reduz a varredura).
 
 ## Triagem exploratoria no PowerShell
 

@@ -29,6 +29,9 @@ PROPERTY_RE = re.compile(
     r"<Property>\s*<Name>(?P<name>.*?)</Name>\s*<Value>(?P<value>.*?)</Value>\s*</Property>",
     re.IGNORECASE | re.DOTALL,
 )
+INSTANCE_KEY_GUID_PREFIX_RE = re.compile(
+    r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}-"
+)
 
 SEMANTIC_QUERIES = frozenset(
     {"who-uses", "what-uses", "impact-basic", "functional-trace-basic"}
@@ -236,6 +239,40 @@ def generated_filter_from_args(args: argparse.Namespace) -> str | None:
     return None
 
 
+def derive_instance_name(instance_key: object) -> str | None:
+    """Nome da instancia WorkWithForWeb derivado do instance_key.
+
+    Convencao GeneXus: <GUID canonico 8-4-4-4-12>-<nome>. Ancora no GUID + primeiro
+    hifen; nunca faz split cego (o GUID tem hifens internos). Hifens dentro do nome
+    sao preservados. NULL / nao-canonico / nome vazio -> None (nao derivavel).
+    """
+    if instance_key is None:
+        return None
+    text = str(instance_key)
+    match = INSTANCE_KEY_GUID_PREFIX_RE.match(text)
+    if not match:
+        return None
+    name = text[match.end():]
+    return name or None
+
+
+def classify_instance_filter(value: str) -> dict[str, str]:
+    """Classifica o argumento --instance-key em modo full-key ou instance-name.
+
+    full-key sse o valor comeca com GUID canonico + hifen E ha nome depois; caso
+    contrario, instance-name. Uma chave <GUID>- sem nome nao e chave valida -> erro.
+    A auto-deteccao e contrato documentado (ver README-kb-intelligence.md).
+    """
+    match = INSTANCE_KEY_GUID_PREFIX_RE.match(value)
+    if match:
+        if match.end() >= len(value):
+            raise SystemExit(
+                "--instance-key: chave completa exige <GUID>-<nome>; nome ausente apos o GUID."
+            )
+        return {"mode": "full-key", "value": value}
+    return {"mode": "instance-name", "value": value}
+
+
 def index_metadata(conn: sqlite3.Connection) -> dict[str, object]:
     rows = fetch_all(
         conn,
@@ -269,6 +306,7 @@ def object_info(conn: sqlite3.Connection, object_type: str, object_name: str) ->
             "found": False,
         }
 
+    obj["instance_name"] = derive_instance_name(obj.get("instance_key"))
     outgoing = fetch_one(
         conn,
         "SELECT COUNT(*) AS count FROM relations WHERE source_object_id = ?",
@@ -421,34 +459,55 @@ def transaction_writable_attributes(conn: sqlite3.Connection, transaction_name: 
     }
 
 
-def search_objects(conn: sqlite3.Connection, object_name: str, object_type: str | None, limit: int | None, generated_filter: str | None = None) -> dict[str, object]:
-    pattern = object_name.replace("*", "%")
-    if "%" not in pattern:
-        pattern = f"%{pattern}%"
-
-    params: list[object] = [pattern]
-    type_clause = ""
+def search_objects(conn: sqlite3.Connection, object_name: str | None, object_type: str | None, limit: int | None, generated_filter: str | None = None, instance_filter: dict[str, str] | None = None) -> dict[str, object]:
+    # WHERE dinamico: object_name pode ser None quando so -InstanceKey e usado.
+    where: list[str] = []
+    params: list[object] = []
+    if object_name:
+        pattern = object_name.replace("*", "%")
+        if "%" not in pattern:
+            pattern = f"%{pattern}%"
+        where.append("name LIKE ?")
+        params.append(pattern)
     if object_type:
-        type_clause = "AND type = ?"
+        where.append("type = ?")
         params.append(object_type)
-    generated_clause = generated_filter_clause(generated_filter)
+    if instance_filter and instance_filter["mode"] == "full-key":
+        # chave completa: comparacao exata ignorando caixa (LOWER SQLite, ASCII).
+        where.append("LOWER(instance_key) = LOWER(?)")
+        params.append(instance_filter["value"])
+    if generated_filter == "generated":
+        where.append("is_generated_object = 1")
+    elif generated_filter == "authored":
+        where.append("is_generated_object = 0")
+    where_sql = ("WHERE " + " AND ".join(where)) if where else ""
 
     rows = fetch_all(
         conn,
         f"""
         SELECT type, name, guid, file_path, last_update, is_generated_object, pattern_object_id, instance_key
         FROM objects
-        WHERE name LIKE ? {type_clause} {generated_clause}
+        {where_sql}
         ORDER BY type, name
         """,
         tuple(params),
     )
+    if instance_filter and instance_filter["mode"] == "instance-name":
+        # nome plano: correspondencia exata ignorando caixa contra o nome derivado.
+        target = instance_filter["value"].casefold()
+        rows = [
+            r for r in rows
+            if (dn := derive_instance_name(r.get("instance_key"))) is not None and dn.casefold() == target
+        ]
+    for r in rows:
+        r["instance_name"] = derive_instance_name(r.get("instance_key"))
     total = len(rows)
     return {
         "query": "search-objects",
         "pattern": object_name,
         "object_type": object_type,
         "generated_filter": generated_filter,
+        "instance_filter": instance_filter,
         "total": total,
         "shown": len(limit_rows(rows, limit)),
         "results": limit_rows(rows, limit),
@@ -681,6 +740,8 @@ def list_by_type(conn: sqlite3.Connection, object_type: str, limit: int | None, 
         """,
         (object_type,),
     )
+    for r in rows:
+        r["instance_name"] = derive_instance_name(r.get("instance_key"))
     total = len(rows)
     return {
         "query": "list-by-type",
@@ -1000,7 +1061,15 @@ def format_text(result: dict[str, object]) -> str:
         lines.append(f"{query}: {obj.get('type')}:{obj.get('name')}")
     else:
         if query == "search-objects":
-            lines.append(f"{query}: {result.get('pattern')}")
+            inst = result.get("instance_filter")
+            inst_val = inst.get("value") if isinstance(inst, dict) else None
+            pat = result.get("pattern")
+            if pat and inst_val:
+                lines.append(f"{query}: {pat} (instance: {inst_val})")
+            elif inst_val:
+                lines.append(f"{query}: (instance: {inst_val})")
+            else:
+                lines.append(f"{query}: {pat}")
         elif query == "list-by-type":
             lines.append(f"{query}: {result.get('object_type')}")
         else:
@@ -1013,6 +1082,7 @@ def format_text(result: dict[str, object]) -> str:
         lines.append(f"generated: {obj.get('is_generated_object')}")
         lines.append(f"pattern_object_id: {obj.get('pattern_object_id')}")
         lines.append(f"instance_key: {obj.get('instance_key')}")
+        lines.append(f"instance_name: {obj.get('instance_name')}")
         lines.append(f"incoming_relations: {result.get('incoming_relations', 0)}")
         lines.append(f"outgoing_relations: {result.get('outgoing_relations', 0)}")
         return "\n".join(lines)
@@ -1138,7 +1208,10 @@ def format_text(result: dict[str, object]) -> str:
             continue
         if query in ("search-objects", "list-by-type"):
             lines.append(f"- {row.get('type')}:{row.get('name')}")
-            lines.append(f"  guid={row.get('guid')} {row.get('file_path')} last_update={row.get('last_update')} generated={row.get('is_generated_object')}")
+            line2 = f"  guid={row.get('guid')} {row.get('file_path')} last_update={row.get('last_update')} generated={row.get('is_generated_object')}"
+            if row.get("instance_name"):
+                line2 += f" instance_name={row.get('instance_name')}"
+            lines.append(line2)
             continue
         source = f"{row.get('source_type')}:{row.get('source_name')}"
         target = f"{row.get('target_type')}:{row.get('target_name')}"
@@ -1197,6 +1270,10 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="search-objects/list-by-type: apenas objetos autorais (is_generated_object=0).",
     )
+    parser.add_argument(
+        "--instance-key",
+        help="search-objects: filtra pela instancia WorkWithForWeb (nome plano ou chave completa <GUID>-<nome>).",
+    )
     parser.add_argument("--relation-id", type=int)
     parser.add_argument("--source-type")
     parser.add_argument("--source-name")
@@ -1219,6 +1296,9 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
+
+    if args.instance_key is not None and args.query != "search-objects":
+        raise SystemExit("--instance-key is only valid with search-objects.")
 
     if args.query in SEMANTIC_QUERIES and args.object_type:
         catalog_types = load_catalog_types_by_name(
@@ -1257,9 +1337,10 @@ def main() -> int:
                 raise SystemExit("attribute-info requires --object-name.")
             result = attribute_info(conn, args.object_name)
         elif args.query == "search-objects":
-            if not args.object_name:
-                raise SystemExit("search-objects requires --object-name.")
-            result = search_objects(conn, args.object_name, args.object_type, args.limit, generated_filter_from_args(args))
+            if not args.object_name and not args.instance_key:
+                raise SystemExit("search-objects requires --object-name or --instance-key.")
+            instance_filter = classify_instance_filter(args.instance_key) if args.instance_key else None
+            result = search_objects(conn, args.object_name, args.object_type, args.limit, generated_filter_from_args(args), instance_filter)
         elif args.query == "list-by-type":
             if not args.object_type:
                 raise SystemExit("list-by-type requires --object-type.")

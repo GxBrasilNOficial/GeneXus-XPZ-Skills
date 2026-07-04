@@ -93,6 +93,22 @@ $pkgContainerXml = @'
 '@
 [System.IO.File]::WriteAllText((Join-Path $packagedModuleDir 'pkgContainer.xml'), $pkgContainerXml, $enc)
 
+# --- WebPanel gerado 2: MESMA instancia canonica de wpGenerated (agrupamento por instancia) ---
+$wpGenerated2Xml = @'
+<Object type="c9584656-94b6-4ccd-890f-332d11fc2c25" name="wpGenerated2" guid="11110000-0000-0000-0000-000000000007">
+  <Properties><Property><Name>Name</Name><Value>wpGenerated2</Value></Property><Property><Name>IsGeneratedObject</Name><Value>True</Value></Property><Property><Name>InstanceKey</Name><Value>78cecefe-be7d-4980-86ce-8d6e91fba04b-WorkWithWebFoo</Value></Property><Property><Name>PatternObjectId</Name><Value>TabTabular</Value></Property></Properties>
+</Object>
+'@
+[System.IO.File]::WriteAllText((Join-Path $webPanelDir 'wpGenerated2.xml'), $wpGenerated2Xml, $enc)
+
+# --- WebPanel gerado com InstanceKey NAO-CANONICO (raiz): instance_name deve derivar para nulo ---
+$wpOrfaXml = @'
+<Object type="c9584656-94b6-4ccd-890f-332d11fc2c25" name="wpOrfa" guid="11110000-0000-0000-0000-000000000008">
+  <Properties><Property><Name>Name</Name><Value>wpOrfa</Value></Property><Property><Name>IsGeneratedObject</Name><Value>True</Value></Property><Property><Name>InstanceKey</Name><Value>zzzz-WorkWithWebOrfa</Value></Property><Property><Name>PatternObjectId</Name><Value>Selection</Value></Property></Properties>
+</Object>
+'@
+[System.IO.File]::WriteAllText((Join-Path $webPanelDir 'wpOrfa.xml'), $wpOrfaXml, $enc)
+
 $sqlitePath = Join-Path $kbIntelDir 'kb-intelligence.sqlite'
 $indexScript = Join-Path $scriptDir 'Build-KbIntelligenceIndex.ps1'
 
@@ -186,7 +202,95 @@ Assert-True ($textJoined -match 'instance_key: 78cecefe') 'texto object-info dev
 # --- metadata: contador e schema_version ---
 $meta = Invoke-Query -QueryArgs @('--query', 'index-metadata')
 Assert-True ($meta.metadata.schema_version -eq '4') "schema_version deveria ser 4, foi $($meta.metadata.schema_version)"
-Assert-True ($meta.metadata.generated_objects_count -eq '3') "generated_objects_count deveria ser 3 (wpGenerated, wpMalformed, procDivergent), foi $($meta.metadata.generated_objects_count)"
+Assert-True ($meta.metadata.generated_objects_count -eq '5') "generated_objects_count deveria ser 5 (wpGenerated, wpMalformed, procDivergent, wpGenerated2, wpOrfa), foi $($meta.metadata.generated_objects_count)"
+
+# ============================================================================
+# Reverse lookup por instancia: instance_name derivado + filtro -InstanceKey
+# ============================================================================
+
+$fooKey = '78cecefe-be7d-4980-86ce-8d6e91fba04b-WorkWithWebFoo'
+$fooKeyUpper = '78CECEFE-BE7D-4980-86CE-8D6E91FBA04B-WorkWithWebFoo'
+$fooKeyLower = '78cecefe-be7d-4980-86ce-8d6e91fba04b-workwithwebfoo'
+
+# instance_name derivado no object-info (canonico -> nome; autoral/nao-canonico -> nulo)
+$gen1 = Get-ObjectInfo -Type 'WebPanel' -Name 'wpGenerated'
+Assert-True ($gen1.object.instance_name -eq 'WorkWithWebFoo') 'wpGenerated deveria ter instance_name=WorkWithWebFoo'
+$auth1 = Get-ObjectInfo -Type 'WebPanel' -Name 'wpAuthored'
+Assert-True ($null -eq $auth1.object.instance_name) 'wpAuthored deveria ter instance_name nulo'
+$orfa1 = Get-ObjectInfo -Type 'WebPanel' -Name 'wpOrfa'
+Assert-True ($null -eq $orfa1.object.instance_name) 'wpOrfa (nao-canonico) deveria ter instance_name nulo'
+
+function Get-SearchNames {
+    param([string[]]$ExtraArgs)
+    $r = Invoke-Query -QueryArgs (@('--query', 'search-objects') + $ExtraArgs)
+    # ',@(...)' preserva o array no retorno (evita unwrap p/ $null quando vazio, sob StrictMode).
+    return , @($r.results | ForEach-Object { $_.name })
+}
+
+# reverse lookup por NOME da instancia -> os 2 objetos da instancia (nao autorais nem outras)
+$byName = Get-SearchNames -ExtraArgs @('--instance-key', 'WorkWithWebFoo')
+Assert-True ($byName.Count -eq 2) "reverse lookup por nome deveria ter 2 resultados, teve $($byName.Count)"
+Assert-True (($byName -contains 'wpGenerated') -and ($byName -contains 'wpGenerated2')) 'reverse lookup por nome deveria conter wpGenerated e wpGenerated2'
+Assert-True (-not ($byName -contains 'wpOrfa')) 'reverse lookup por nome NAO deveria conter wpOrfa (instancia diferente)'
+
+# reverse lookup por CHAVE COMPLETA canonica -> mesmos 2
+$byKey = Get-SearchNames -ExtraArgs @('--instance-key', $fooKey)
+Assert-True ($byKey.Count -eq 2) 'reverse lookup por chave completa deveria ter 2 resultados'
+
+# chave completa com GUID MAIUSCULO -> mesmos 2 (ignora caixa)
+$byKeyUpper = Get-SearchNames -ExtraArgs @('--instance-key', $fooKeyUpper)
+Assert-True ($byKeyUpper.Count -eq 2) 'chave completa com GUID maiusculo deveria ter 2 resultados (ignora caixa)'
+
+# chave completa MINUSCULA (GUID + nome minusculos) -> mesmos 2 (ignora caixa por chave)
+$byKeyLower = Get-SearchNames -ExtraArgs @('--instance-key', $fooKeyLower)
+Assert-True ($byKeyLower.Count -eq 2) 'chave completa minuscula deveria ter 2 resultados (ignora caixa por chave)'
+
+# nome MINUSCULO -> mesmos 2 (ignora caixa por nome)
+$byNameLower = Get-SearchNames -ExtraArgs @('--instance-key', 'workwithwebfoo')
+Assert-True ($byNameLower.Count -eq 2) 'nome minusculo deveria dar os 2 (ignora caixa por nome)'
+
+# prefixo parcial do nome -> zero (correspondencia exata, nunca parcial)
+$byPartial = Get-SearchNames -ExtraArgs @('--instance-key', 'WorkWithWebFo')
+Assert-True ($byPartial.Count -eq 0) 'prefixo parcial do nome deveria dar zero (exato, nao parcial)'
+
+# composicao com --authored / --generated / --object-type
+$byNameAuth = Get-SearchNames -ExtraArgs @('--instance-key', 'WorkWithWebFoo', '--authored')
+Assert-True ($byNameAuth.Count -eq 0) 'instancia + --authored deveria dar zero'
+$byNameGen = Get-SearchNames -ExtraArgs @('--instance-key', 'WorkWithWebFoo', '--generated')
+Assert-True ($byNameGen.Count -eq 2) 'instancia + --generated deveria dar os 2'
+$byNameType = Get-SearchNames -ExtraArgs @('--instance-key', 'WorkWithWebFoo', '--object-type', 'WebPanel')
+Assert-True ($byNameType.Count -eq 2) 'instancia + --object-type WebPanel deveria dar os 2'
+
+# JSON: instance_filter.mode e instance_name nos resultados
+$byNameFull = Invoke-Query -QueryArgs @('--query', 'search-objects', '--instance-key', 'WorkWithWebFoo')
+Assert-True ($byNameFull.instance_filter.mode -eq 'instance-name') 'instance_filter.mode deveria ser instance-name'
+Assert-True (@($byNameFull.results | Where-Object { $_.instance_name -eq 'WorkWithWebFoo' }).Count -eq 2) 'resultados por nome deveriam trazer instance_name=WorkWithWebFoo'
+$byKeyFull = Invoke-Query -QueryArgs @('--query', 'search-objects', '--instance-key', $fooKey)
+Assert-True ($byKeyFull.instance_filter.mode -eq 'full-key') 'instance_filter.mode deveria ser full-key'
+
+# nao-regressao: busca por nome de objeto (sem -InstanceKey) traz instance_name (nulo p/ autoral)
+$byObjName = Invoke-Query -QueryArgs @('--query', 'search-objects', '--object-name', 'wpAuthored')
+$authRow = @($byObjName.results | Where-Object { $_.name -eq 'wpAuthored' })[0]
+Assert-True ($authRow.PSObject.Properties.Name -contains 'instance_name') 'resultado autoral deveria ter o campo instance_name'
+Assert-True ($null -eq $authRow.instance_name) 'wpAuthored deveria ter instance_name nulo na busca por nome de objeto'
+
+# via WRAPPER .ps1 (processo filho): -InstanceKey repassado
+$wrapInst = & $queryWrapper -IndexPath $sqlitePath -Query 'search-objects' -InstanceKey 'WorkWithWebFoo' -Format json
+if ($LASTEXITCODE -ne 0) { throw "wrapper .ps1 -InstanceKey falhou; exit $LASTEXITCODE" }
+$wrapInstNames = @(($wrapInst | ConvertFrom-Json).results | ForEach-Object { $_.name })
+Assert-True ($wrapInstNames.Count -eq 2) 'wrapper -InstanceKey WorkWithWebFoo deveria dar os 2'
+
+# Erros esperados: obrigatoriedade, escopo, chave sem nome
+function Assert-QueryFails {
+    param([string[]]$QueryArgs, [string]$Message)
+    $null = & python $queryScript --index-path $sqlitePath @QueryArgs --format json 2>&1
+    if ($LASTEXITCODE -eq 0) { throw "ASSERT FALHOU (deveria falhar): $Message" }
+}
+
+Assert-QueryFails -QueryArgs @('--query', 'search-objects') -Message 'search-objects sem object-name e sem instance-key deveria falhar'
+Assert-QueryFails -QueryArgs @('--query', 'list-by-type', '--object-type', 'WebPanel', '--instance-key', 'WorkWithWebFoo') -Message 'list-by-type com --instance-key deveria falhar (fora de escopo)'
+Assert-QueryFails -QueryArgs @('--query', 'search-objects', '--instance-key', '78cecefe-be7d-4980-86ce-8d6e91fba04b-') -Message 'chave <GUID>- sem nome deveria falhar'
+Assert-QueryFails -QueryArgs @('--query', 'who-uses', '--object-type', 'WebPanel', '--object-name', 'wpGenerated', '--instance-key', 'WorkWithWebFoo') -Message 'who-uses (semantica) com --instance-key deveria falhar (fora de escopo)'
 
 Write-Output 'OK: Test-KbIntelligenceGeneratedObjectExtractionSelfTest.ps1'
 exit 0

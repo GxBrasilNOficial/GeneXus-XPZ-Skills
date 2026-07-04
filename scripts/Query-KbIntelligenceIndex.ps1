@@ -14,6 +14,7 @@ param(
 
     [string]$ObjectType,
     [string]$ObjectName,
+    [string]$InstanceKey,
     [int]$RelationId,
     [string]$SourceType,
     [string]$SourceName,
@@ -58,6 +59,7 @@ $arguments = @(
 
 if ($ObjectType) { $arguments += @("--object-type", $ObjectType) }
 if ($ObjectName) { $arguments += @("--object-name", $ObjectName) }
+if ($InstanceKey) { $arguments += @("--instance-key", $InstanceKey) }
 if ($RelationId) { $arguments += @("--relation-id", $RelationId) }
 if ($SourceType) { $arguments += @("--source-type", $SourceType) }
 if ($SourceName) { $arguments += @("--source-name", $SourceName) }
