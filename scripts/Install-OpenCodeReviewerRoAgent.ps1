@@ -124,7 +124,15 @@ function Find-JsoncKeyValueSpan {
 
 function Build-ReviewerRoFragment {
     <# Monta o VALOR JSON (objeto) do reviewer-ro a partir da definicao derivada, indentado para
-       insercao. -Indent = indentacao (espacos) da linha da chave "reviewer-ro". #>
+       insercao. -Indent = indentacao (espacos) da linha da chave "reviewer-ro".
+
+       ESCOPO DA PRESERVACAO (nota de contrato): o valor do reviewer-ro e RECONSTRUIDO por inteiro a
+       partir da fonte canonica (markdown project-local: description + mode + permission). Portanto
+       chaves EXTRAS *dentro* de um `agent.reviewer-ro` preexistente (ex.: `temperature`, `model`,
+       `prompt` custom) NAO sao preservadas na migracao/atualizacao — o reviewer-ro e definido
+       integralmente pela frente, nao e um agente que o usuario customiza campo a campo. O claim
+       "preserva comentarios/formatacao/demais chaves" refere-se as demais chaves do opencode.jsonc
+       *fora* do bloco agent.reviewer-ro (schema, instructions, outros agentes) — essas sim intactas. #>
     param(
         [Parameter(Mandatory)] [string] $Description,
         [Parameter(Mandatory)] [string] $Mode,

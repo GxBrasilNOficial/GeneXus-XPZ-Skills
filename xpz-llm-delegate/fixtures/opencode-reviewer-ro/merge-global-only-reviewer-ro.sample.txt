@@ -1,0 +1,23 @@
+reviewer-ro (primary)
+  [
+  {
+    "permission": "*",
+    "action": "allow",
+    "pattern": "*"
+  },
+  {
+    "permission": "read",
+    "action": "allow",
+    "pattern": "*"
+  },
+  {
+    "permission": "edit",
+    "action": "deny",
+    "pattern": "*"
+  },
+  {
+    "permission": "bash",
+    "action": "deny",
+    "pattern": "*"
+  }
+]

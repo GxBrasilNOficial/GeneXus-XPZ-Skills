@@ -39,9 +39,11 @@ $repoRoot = (Resolve-Path -LiteralPath (Join-Path $scriptsDir '..')).Path
 $fixtureDir = Join-Path $repoRoot 'xpz-llm-delegate\fixtures\opencode-reviewer-ro'
 $sampleAgentList = Join-Path $fixtureDir 'agentlist-reviewer-ro.sample.txt'
 $fallbackFixture = Join-Path $fixtureDir 'fallback-warning.txt'
+$equivFixture = Join-Path $fixtureDir 'equiv-permission-vs-tools.sample.txt'
+$mergeFixture = Join-Path $fixtureDir 'merge-global-only-reviewer-ro.sample.txt'
 $agentMd = Join-Path $repoRoot '.opencode\agent\reviewer-ro.md'
 
-foreach ($p in @($guard, $installer, $sampleAgentList, $fallbackFixture, $agentMd)) {
+foreach ($p in @($guard, $installer, $sampleAgentList, $fallbackFixture, $equivFixture, $mergeFixture, $agentMd)) {
     if (-not (Test-Path -LiteralPath $p)) { throw "BLOCK: artefato ausente: $p" }
 }
 
@@ -176,6 +178,51 @@ agente ruim (nao default-deny)
     $pcs = Test-OpenCodeReviewerRoPrecheck -Exe $fakeCmd -WorkingDirectory $badWd
     Assert-True ((-not $pcs.pass) -and $pcs.reason -eq 'static') "(b) frontmatter divergente => BLOCK reason=static (got: $($pcs.reason))"
 
+    # ── (b-mode-ausente) frontmatter sem `mode: all` => BLOCK static (mode e obrigatorio) ──
+    $noModeWd = Join-Path $tempRoot 'nomode-wd'
+    New-Item -ItemType Directory -Path (Join-Path $noModeWd '.opencode\agent') -Force | Out-Null
+    @'
+---
+permission:
+  "*": deny
+  read: allow
+  grep: allow
+  glob: allow
+  list: allow
+  edit: deny
+  bash: deny
+  webfetch: deny
+  websearch: deny
+  task: deny
+  external_directory: deny
+---
+sem mode
+'@ | Set-Content -LiteralPath (Join-Path $noModeWd '.opencode\agent\reviewer-ro.md') -Encoding utf8
+    $pcm = Test-OpenCodeReviewerRoPrecheck -Exe $fakeCmd -WorkingDirectory $noModeWd
+    Assert-True ((-not $pcm.pass) -and $pcm.reason -eq 'static' -and $pcm.detail -match 'mode') "(b) mode ausente => BLOCK reason=static (obrigatorio) (got: $($pcm.reason))"
+
+    # ── (b-agente-ausente) agent list VALIDO (exit 0) porem SEM o bloco reviewer-ro => BLOCK ──
+    # distinto do SQLite-transitorio: aqui o `agent list` funcionou, mas o agente nao resolve
+    # (provisionamento nao carregado); a detail cita "nao encontrado", nao "codigo N".
+    $absentPath = Join-Path $tempRoot 'agentlist-agente-ausente.txt'
+    Set-Content -LiteralPath $absentPath -Value ("build (primary)`n[`n{`"permission`":`"*`",`"action`":`"allow`",`"pattern`":`"*`"}`n]") -Encoding utf8
+    $env:FAKE_OC_AGENTLIST = $absentPath
+    $pcaa = Test-OpenCodeReviewerRoPrecheck -Exe $fakeCmd -WorkingDirectory $repoRoot
+    Assert-True ((-not $pcaa.pass) -and $pcaa.reason -eq 'agentlist' -and $pcaa.detail -match 'nao encontrado') "(b) agente ausente (agent list valido sem reviewer-ro) => BLOCK reason=agentlist detail 'nao encontrado' (got: $($pcaa.reason))"
+    $env:FAKE_OC_AGENTLIST = $sampleAgentList
+
+    # ── (B4) equivalencia permission:deny == tools:false (fixture medido em 1.4.4) ──
+    $equivLines = @(Get-Content -LiteralPath $equivFixture -Encoding utf8)
+    $permBlock = Resolve-OpenCodeReviewerRoAllowSet -Rules (Get-OpenCodeReviewerRoBlockFromAgentList -Lines $equivLines -Name 'probe-perm')
+    $toolsBlock = Resolve-OpenCodeReviewerRoAllowSet -Rules (Get-OpenCodeReviewerRoBlockFromAgentList -Lines $equivLines -Name 'probe-tools')
+    Assert-True ([string]$permBlock.effective['webfetch'] -eq 'deny' -and [string]$toolsBlock.effective['webfetch'] -eq 'deny') "(B4) permission:deny E tools:false resolvem webfetch=deny (equivalencia)"
+
+    # ── (B5) merge global<->project = substituicao, nao campo a campo (fixture medido) ──
+    $mergeGlobal = Resolve-OpenCodeReviewerRoAllowSet -Rules (Get-OpenCodeReviewerRoBlockFromAgentList -Lines @(Get-Content -LiteralPath $mergeFixture -Encoding utf8) -Name 'reviewer-ro')
+    $mergeProject = Resolve-OpenCodeReviewerRoAllowSet -Rules (Get-OpenCodeReviewerRoBlockFromAgentList -Lines @(Get-Content -LiteralPath $sampleAgentList -Encoding utf8) -Name 'reviewer-ro')
+    Assert-True (@($mergeGlobal.allowSet) -contains '*') "(B5) so-global (tools:) resolve '*'=allow (allow-set wide)"
+    Assert-True (@($mergeProject.allowSet) -notcontains '*' -and (@($mergeProject.allowSet | Sort-Object) -join ',') -eq 'glob,grep,list,read') "(B5) com project-local resolve '*'=deny + allow-set {read,grep,glob,list} => SUBSTITUICAO integral (nao merge campo a campo)"
+
     # ── (e) pos-check: warning de fallback detectado; texto limpo nao ──
     $fbText = Get-Content -LiteralPath $fallbackFixture -Raw -Encoding utf8
     Assert-True (Test-OpenCodeReviewerRoFallbackWarning -Text $fbText) "(e) pos-check detecta warning de fallback do fixture"
@@ -295,6 +342,19 @@ agente ruim (nao default-deny)
         while (-not (Test-Path -LiteralPath $argvAsync) -and $waited -lt 15) { Start-Sleep -Milliseconds 300; $waited++ }
         $argvAsyncText = if (Test-Path -LiteralPath $argvAsync) { Get-Content -LiteralPath $argvAsync -Raw } else { '' }
         Assert-True ($argvAsyncText -match '--agent reviewer-ro') "(a-async) default -Agent reviewer-ro no argv do spawn (got: $argvAsyncText)"
+
+        # (b-adapter-async) Start-OpenCodeJob com allow-set divergente => BLOCK ANTES do Start-Process
+        # (o pre-check no spawn e a barreira do assincrono; o job NAO deve spawnar).
+        $argvAsyncBlock = Join-Path $tempRoot 'argv-async-block.txt'
+        $env:FAKE_OC_ARGV_FILE = $argvAsyncBlock
+        $env:FAKE_OC_AGENTLIST = $excessPath
+        $threwA = $false; $msgA = ''
+        try { & $start -OpenCodeExe $fakeCmd -MessagePath $prompt -Model 'fake/model' -NoWatcher -TempDir (Join-Path $tempRoot 'jobs-block') | Out-Null }
+        catch { $threwA = $true; $msgA = $_.Exception.Message }
+        Start-Sleep -Milliseconds 500
+        Assert-True ($threwA -and $msgA -match 'guard reviewer-ro fail-closed') "(b-adapter-async) allow-set divergente => BLOCK do Start-OpenCodeJob (got: $msgA)"
+        Assert-True (-not (Test-Path -LiteralPath $argvAsyncBlock)) "(b-adapter-async) BLOCK ANTES do spawn: argv do job nao foi escrito (nao spawnou)"
+        $env:FAKE_OC_AGENTLIST = $sampleAgentList
     }
     finally { Pop-Location -ErrorAction SilentlyContinue }
 }

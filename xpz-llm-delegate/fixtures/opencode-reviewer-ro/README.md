@@ -23,6 +23,17 @@ podem não valer; re-capturar os fixtures e revisitar D2/D3 antes de reativar.
   `reviewer-ro` na forma `permission`. Os caminhos reais de `external_directory` (dirs de skills da
   máquina) foram substituídos por `<SANITIZED_SKILL_DIR>`; as regras de ferramenta são as reais.
   Base do parser e do fake-exe do self-test.
+- `equiv-permission-vs-tools.sample.txt` — **equivalência `permission: deny` ≡ `tools: false`**
+  (medida em 1.4.4): dois agentes-probe que negam a MESMA tool (`webfetch`), um pela forma
+  `permission: { webfetch: deny }`, outro pela forma `tools: { webfetch: false }`, resolvem
+  **idêntico** no `agent list` — ambos `webfetch → deny`. Ancora a refutação da nota antiga de
+  `999:168` («`tools: false` mais forte que `permission: deny`»).
+- `merge-global-only-reviewer-ro.sample.txt` — **merge global↔project (substituição, não campo a
+  campo)**: resolução do `reviewer-ro` quando **só** o global interino (forma `tools:`, `mode:
+  primary`) aplica (cwd sem `.opencode/`). Contrasta com `agentlist-reviewer-ro.sample.txt`
+  (project-local, forma `permission`, `mode: all`, allow-set `{read,grep,glob,list}`): a presença do
+  project-local muda `mode` `primary`→`all` e `*` `allow`→`deny` **por inteiro**, provando que o
+  project-local **substitui o agente**, não mescla campo a campo.
 
 ## Resolução efetiva medida (1.4.4) — `agent list`, last-match-wins
 

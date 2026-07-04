@@ -1,0 +1,36 @@
+probe-perm (all)
+  [
+  {
+    "permission": "*",
+    "action": "allow",
+    "pattern": "*"
+  },
+  {
+    "permission": "read",
+    "action": "allow",
+    "pattern": "*"
+  },
+  {
+    "permission": "webfetch",
+    "action": "deny",
+    "pattern": "*"
+  }
+]
+probe-tools (all)
+  [
+  {
+    "permission": "*",
+    "action": "allow",
+    "pattern": "*"
+  },
+  {
+    "permission": "read",
+    "action": "allow",
+    "pattern": "*"
+  },
+  {
+    "permission": "webfetch",
+    "action": "deny",
+    "pattern": "*"
+  }
+]

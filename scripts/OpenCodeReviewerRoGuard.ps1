@@ -222,7 +222,9 @@ function Test-OpenCodeReviewerRoStatic {
     }
 
     $problems = [System.Collections.Generic.List[string]]::new()
-    if (($def.mode) -and ($def.mode -ne 'all')) { $problems.Add("mode='$($def.mode)' (esperado 'all')") }
+    # `mode: all` e OBRIGATORIO (design D3: garante selecao por --agent em headless). Ausente
+    # tambem e divergencia — nao basta "se presente, ser all".
+    if ($def.mode -ne 'all') { $problems.Add("mode='$($def.mode)' (esperado 'all'; obrigatorio)") }
 
     $star = if ($perm.Contains('*')) { $perm['*'] } else { $null }
     if ($star -ne 'deny') { $problems.Add("'*'='$star' (esperado 'deny')") }
