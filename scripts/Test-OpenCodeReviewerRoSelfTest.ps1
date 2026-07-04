@@ -355,6 +355,29 @@ sem mode
         Assert-True ($threwA -and $msgA -match 'guard reviewer-ro fail-closed') "(b-adapter-async) allow-set divergente => BLOCK do Start-OpenCodeJob (got: $msgA)"
         Assert-True (-not (Test-Path -LiteralPath $argvAsyncBlock)) "(b-adapter-async) BLOCK ANTES do spawn: argv do job nao foi escrito (nao spawnou)"
         $env:FAKE_OC_AGENTLIST = $sampleAgentList
+
+        # (opt-out) -Agent <x> explicito (x != reviewer-ro): opt-out consciente. So confirma que <x>
+        # RESOLVE (Test-OpenCodeAgentResolves), sem enforce read-only. Caso resolve => despacha.
+        $argvOpt = Join-Path $tempRoot 'argv-optout.txt'
+        $env:FAKE_OC_ARGV_FILE = $argvOpt
+        $optList = Join-Path $tempRoot 'agentlist-optout.txt'
+        Set-Content -LiteralPath $optList -Value ("reviewer-fake (all)`n[`n{`"permission`":`"*`",`"action`":`"allow`",`"pattern`":`"*`"}`n]") -Encoding utf8
+        $env:FAKE_OC_AGENTLIST = $optList
+        $ansOpt = & $invoke -OpenCodeExe $fakeCmd -Agent 'reviewer-fake' -MessagePath $prompt -Model 'fake/model' -TimeoutSec 30
+        Assert-True (([string]$ansOpt) -match 'OK-ADAPTER') "(opt-out) -Agent <x> que resolve => despacha (sem enforce reviewer-ro)"
+        $argvOptText = if (Test-Path -LiteralPath $argvOpt) { Get-Content -LiteralPath $argvOpt -Raw } else { '' }
+        Assert-True ($argvOptText -match '--agent reviewer-fake') "(opt-out) argv usa o agente explicito (nao reviewer-ro) (got: $argvOptText)"
+
+        # (opt-out) -Agent <x> que NAO resolve (ausente do agent list) => BLOCK antes do run
+        $argvOptBlk = Join-Path $tempRoot 'argv-optout-block.txt'
+        $env:FAKE_OC_ARGV_FILE = $argvOptBlk
+        $env:FAKE_OC_AGENTLIST = $sampleAgentList   # so tem reviewer-ro, nao 'agente-nao-existe'
+        $threwO = $false; $msgO = ''
+        try { & $invoke -OpenCodeExe $fakeCmd -Agent 'agente-nao-existe' -MessagePath $prompt -Model 'fake/model' -TimeoutSec 30 | Out-Null }
+        catch { $threwO = $true; $msgO = $_.Exception.Message }
+        Assert-True ($threwO -and $msgO -match 'nao resolve') "(opt-out) -Agent <x> que NAO resolve => BLOCK (evita fallback ao build) (got: $msgO)"
+        Assert-True (-not (Test-Path -LiteralPath $argvOptBlk)) "(opt-out) BLOCK antes do run: argv nao foi escrito"
+        $env:FAKE_OC_AGENTLIST = $sampleAgentList
     }
     finally { Pop-Location -ErrorAction SilentlyContinue }
 }
