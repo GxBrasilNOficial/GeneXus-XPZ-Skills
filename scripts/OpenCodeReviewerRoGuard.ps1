@@ -308,31 +308,62 @@ function Resolve-OpenCodeReviewerRoAllowSet {
     return @{ allowSet = $allow; externalDirStar = $extStar; effective = $eff }
 }
 
-function Get-OpenCodeReviewerRoAllowSetFromExe {
+function Get-OpenCodeAgentListLines {
     <#
-        Roda `opencode agent list` com o -Exe informado (na cwd atual, herdada — mesma que o run) e
-        devolve @{ ok; allowSet; externalDirStar; error }. ok=$false em qualquer falha (exit!=0,
-        excecao, agente ausente) — o chamador trata como transitorio (SQLite) e BLOCK.
+        Roda `opencode agent list` com RETRY CURTO (design D2 `:73`: "retry curto, senao BLOCK") para
+        tolerar a falha transitoria de SQLite (`PRAGMA wal_checkpoint`) medida em campo. Retenta so
+        em falha TRANSITORIA (exit!=0 ou excecao), com um sleep breve entre tentativas; exit 0 (mesmo
+        que o bloco procurado nao apareca) NAO e transitorio e nao retenta. Devolve
+        @{ ok; lines; error }. -Retries = tentativas EXTRAS (default 2 => ate 3 execucoes);
+        -RetryDelayMs = pausa entre tentativas (0 nos self-tests).
     #>
     param(
         [Parameter(Mandatory)] [string] $Exe,
-        [string] $Name = 'reviewer-ro'
+        [int] $Retries = 2,
+        [int] $RetryDelayMs = 250
+    )
+    $attempts = [Math]::Max(1, $Retries + 1)
+    $lastErr = $null
+    for ($i = 1; $i -le $attempts; $i++) {
+        $failed = $false
+        $stdout = $null
+        try {
+            $prev = if (Test-Path Variable:LASTEXITCODE) { $LASTEXITCODE } else { 0 }
+            $stdout = & $Exe agent list 2>$null
+            $code = $LASTEXITCODE
+            $global:LASTEXITCODE = $prev
+            if ($code -ne 0) {
+                $failed = $true
+                $lastErr = "'opencode agent list' saiu com codigo $code (INTERMITENTE — SQLite PRAGMA wal_checkpoint transitorio; tentativa $i/$attempts)."
+            }
+        } catch {
+            $failed = $true
+            $lastErr = "excecao ao rodar 'opencode agent list' (tentativa $i/$attempts): $($_.Exception.Message)"
+        }
+        if (-not $failed) { return @{ ok = $true; lines = @($stdout); error = $null } }
+        if ($i -lt $attempts -and $RetryDelayMs -gt 0) { Start-Sleep -Milliseconds $RetryDelayMs }
+    }
+    return @{ ok = $false; lines = @(); error = $lastErr }
+}
+
+function Get-OpenCodeReviewerRoAllowSetFromExe {
+    <#
+        Roda `opencode agent list` (com retry curto) e devolve @{ ok; allowSet; externalDirStar;
+        error }. ok=$false em qualquer falha (exit!=0 apos retries, excecao, agente ausente) — o
+        chamador trata como BLOCK (transitorio-SQLite vs agente-ausente distinguidos na `error`).
+    #>
+    param(
+        [Parameter(Mandatory)] [string] $Exe,
+        [string] $Name = 'reviewer-ro',
+        [int] $Retries = 2,
+        [int] $RetryDelayMs = 250
     )
 
-    $stdout = $null
-    try {
-        $prev = if (Test-Path Variable:LASTEXITCODE) { $LASTEXITCODE } else { 0 }
-        $stdout = & $Exe agent list 2>$null
-        $code = $LASTEXITCODE
-        $global:LASTEXITCODE = $prev
-    } catch {
-        return @{ ok = $false; error = "excecao ao rodar 'opencode agent list': $($_.Exception.Message)" }
+    $al = Get-OpenCodeAgentListLines -Exe $Exe -Retries $Retries -RetryDelayMs $RetryDelayMs
+    if (-not $al.ok) {
+        return @{ ok = $false; error = $al.error }
     }
-    if ($code -ne 0) {
-        return @{ ok = $false; error = "'opencode agent list' saiu com codigo $code (INTERMITENTE — pode ser SQLite PRAGMA wal_checkpoint transitorio; retentar)." }
-    }
-    $lines = @($stdout)
-    $rules = Get-OpenCodeReviewerRoBlockFromAgentList -Lines $lines -Name $Name
+    $rules = Get-OpenCodeReviewerRoBlockFromAgentList -Lines $al.lines -Name $Name
     if ($null -eq $rules) {
         return @{ ok = $false; error = "agente '$Name' nao encontrado / bloco ilegivel na saida de 'opencode agent list'." }
     }
@@ -364,7 +395,9 @@ function Test-OpenCodeReviewerRoPrecheck {
         [Parameter(Mandatory)] [string] $Exe,
         [string] $AgentName = 'reviewer-ro',
         [string] $WorkingDirectory = (Get-Location).Path,
-        [string] $ExpectedVersion = (Get-OpenCodeReviewerRoTestedVersion)
+        [string] $ExpectedVersion = (Get-OpenCodeReviewerRoTestedVersion),
+        [int] $Retries = 2,
+        [int] $RetryDelayMs = 250
     )
 
     # 1) estatico
@@ -387,7 +420,7 @@ function Test-OpenCodeReviewerRoPrecheck {
     }
 
     # 3) agent list -> allow-set exato + external_directory nao-allow
-    $al = Get-OpenCodeReviewerRoAllowSetFromExe -Exe $Exe -Name $AgentName
+    $al = Get-OpenCodeReviewerRoAllowSetFromExe -Exe $Exe -Name $AgentName -Retries $Retries -RetryDelayMs $RetryDelayMs
     if (-not $al.ok) {
         return @{ pass = $false; reason = 'agentlist'; detail = $al.error }
     }
@@ -416,21 +449,15 @@ function Test-OpenCodeAgentResolves {
     #>
     param(
         [Parameter(Mandatory)] [string] $Exe,
-        [Parameter(Mandatory)] [string] $Name
+        [Parameter(Mandatory)] [string] $Name,
+        [int] $Retries = 2,
+        [int] $RetryDelayMs = 250
     )
-    $stdout = $null
-    try {
-        $prev = if (Test-Path Variable:LASTEXITCODE) { $LASTEXITCODE } else { 0 }
-        $stdout = & $Exe agent list 2>$null
-        $code = $LASTEXITCODE
-        $global:LASTEXITCODE = $prev
-    } catch {
-        return @{ ok = $false; detail = "excecao ao rodar 'opencode agent list': $($_.Exception.Message)" }
+    $al = Get-OpenCodeAgentListLines -Exe $Exe -Retries $Retries -RetryDelayMs $RetryDelayMs
+    if (-not $al.ok) {
+        return @{ ok = $false; detail = $al.error }
     }
-    if ($code -ne 0) {
-        return @{ ok = $false; detail = "'opencode agent list' saiu com codigo $code (INTERMITENTE — retentar)." }
-    }
-    $rules = Get-OpenCodeReviewerRoBlockFromAgentList -Lines @($stdout) -Name $Name
+    $rules = Get-OpenCodeReviewerRoBlockFromAgentList -Lines $al.lines -Name $Name
     if ($null -eq $rules) {
         return @{ ok = $false; detail = "agente '$Name' nao resolve em 'opencode agent list' — cairia no fallback silencioso ao 'build' full-access." }
     }

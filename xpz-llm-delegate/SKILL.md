@@ -840,9 +840,11 @@ segurança no **próprio adapter**, de forma inseparável (nunca "default sem gu
 - **Guard fail-closed (pré-check ANTES do run/spawn).** Estático (frontmatter do reviewer-ro) +
   `opencode agent list` confirmando o **allow-set resolvido EXATAMENTE `{read, grep, glob, list}`**
   (trava divergência por ausência E por excesso — ex.: `bash` reaparecendo por regra tardia da
-  global) + versão do opencode testada. Qualquer falha ⇒ **BLOCK** com o motivo no recibo
-  (`static`/`version`/`allowset`/`agentlist`-transitório-SQLite `PRAGMA wal_checkpoint`). Pós-check
-  (defesa-em-profundidade, não a barreira): varre o stderr pelo warning de fallback silencioso.
+  global) + versão do opencode testada. O `agent list` faz **retry curto** (até 3 tentativas com
+  pausa breve) para tolerar a falha transitória de SQLite antes de desistir. Qualquer falha ⇒
+  **BLOCK** com o motivo no recibo (`static`/`version`/`allowset`/`agentlist`-transitório-SQLite
+  `PRAGMA wal_checkpoint`). Pós-check (defesa-em-profundidade, não a barreira): varre o stderr pelo
+  warning de fallback silencioso.
   Provisionamento: `.opencode/agent/reviewer-ro.md` (project-local versionado) +
   `scripts/Install-OpenCodeReviewerRoAgent.ps1` (global, dono desta skill). Gate de processo/CI:
   `scripts/Test-OpenCodeReviewerRoSelfTest.ps1` (`OPENCODE_REVIEWER_RO_SELFTEST_OK`).

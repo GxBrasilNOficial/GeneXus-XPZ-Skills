@@ -63,7 +63,7 @@ $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('gx-oc-rro-selftest-' +
 [System.IO.Directory]::CreateDirectory($tempRoot) | Out-Null
 
 # variaveis de ambiente do fake-exe (limpas no finally)
-$fakeEnv = @('FAKE_OC_VERSION', 'FAKE_OC_AGENTLIST', 'FAKE_OC_AGENTLIST_EXIT', 'FAKE_OC_RUN_STREAM', 'FAKE_OC_RUN_STDERR', 'FAKE_OC_ARGV_FILE')
+$fakeEnv = @('FAKE_OC_VERSION', 'FAKE_OC_AGENTLIST', 'FAKE_OC_AGENTLIST_EXIT', 'FAKE_OC_RUN_STREAM', 'FAKE_OC_RUN_STDERR', 'FAKE_OC_ARGV_FILE', 'FAKE_OC_AGENTLIST_FAIL_UNTIL', 'FAKE_OC_AGENTLIST_FAILCOUNTER')
 
 try {
     # ── fake-exe: leitor pwsh + wrapper .cmd ───────────────────────────────────
@@ -72,6 +72,14 @@ try {
 $a = @($args)
 if ($a.Count -ge 1 -and $a[0] -eq '--version') { Write-Output $env:FAKE_OC_VERSION; exit 0 }
 if ($a.Count -ge 2 -and $a[0] -eq 'agent' -and $a[1] -eq 'list') {
+    # falha transitoria simulada: exit 1 nas primeiras FAIL_UNTIL tentativas (conta em arquivo)
+    if ($env:FAKE_OC_AGENTLIST_FAIL_UNTIL -and $env:FAKE_OC_AGENTLIST_FAILCOUNTER) {
+        $n = 0
+        if (Test-Path -LiteralPath $env:FAKE_OC_AGENTLIST_FAILCOUNTER) { $n = [int](Get-Content -LiteralPath $env:FAKE_OC_AGENTLIST_FAILCOUNTER -Raw) }
+        $n++
+        Set-Content -LiteralPath $env:FAKE_OC_AGENTLIST_FAILCOUNTER -Value $n -Encoding ascii -NoNewline
+        if ($n -le [int]$env:FAKE_OC_AGENTLIST_FAIL_UNTIL) { exit 1 }
+    }
     if ($env:FAKE_OC_AGENTLIST_EXIT -and [int]$env:FAKE_OC_AGENTLIST_EXIT -ne 0) { exit ([int]$env:FAKE_OC_AGENTLIST_EXIT) }
     Get-Content -LiteralPath $env:FAKE_OC_AGENTLIST -Encoding utf8
     exit 0
@@ -156,11 +164,34 @@ exit /b %errorlevel%
     Assert-True ((-not $pcv.pass) -and $pcv.reason -eq 'version') "(b) versao nao-testada => BLOCK reason=version (got: $($pcv.reason))"
     $env:FAKE_OC_VERSION = $testedVersion
 
-    # ── (b-agentlist) agent list falha (exit!=0 transitorio SQLite) => BLOCK agentlist ──
+    # ── (b-agentlist) agent list falha SEMPRE (exit!=0) => BLOCK agentlist apos retries ──
     $env:FAKE_OC_AGENTLIST_EXIT = '1'
-    $pcg = Test-OpenCodeReviewerRoPrecheck -Exe $fakeCmd -WorkingDirectory $repoRoot
-    Assert-True ((-not $pcg.pass) -and $pcg.reason -eq 'agentlist') "(b) agent list exit!=0 => BLOCK reason=agentlist (transitorio) (got: $($pcg.reason))"
+    $pcg = Test-OpenCodeReviewerRoPrecheck -Exe $fakeCmd -WorkingDirectory $repoRoot -RetryDelayMs 0
+    Assert-True ((-not $pcg.pass) -and $pcg.reason -eq 'agentlist') "(b) agent list exit!=0 (sempre) => BLOCK reason=agentlist apos retries (got: $($pcg.reason))"
     $env:FAKE_OC_AGENTLIST_EXIT = ''
+
+    # ── (retry) agent list falha TRANSITORIA (1a tentativa) + sucesso (2a) => PASSA (design :73) ──
+    $failCounter = Join-Path $tempRoot 'agentlist-failcounter.txt'
+    Set-Content -LiteralPath $failCounter -Value '0' -Encoding ascii -NoNewline
+    $env:FAKE_OC_AGENTLIST_FAILCOUNTER = $failCounter
+    $env:FAKE_OC_AGENTLIST_FAIL_UNTIL = '1'   # falha so na 1a tentativa, sucesso na 2a
+    $pcr = Test-OpenCodeReviewerRoPrecheck -Exe $fakeCmd -WorkingDirectory $repoRoot -RetryDelayMs 0
+    Assert-True ($pcr.pass) "(retry) agent list transitorio (falha 1a, ok 2a) => retry curto RECUPERA => PASSA (detail: $($pcr.detail))"
+    Assert-True ([int](Get-Content -LiteralPath $failCounter -Raw) -ge 2) "(retry) o retry re-executou o agent list (contador >= 2)"
+    $env:FAKE_OC_AGENTLIST_FAIL_UNTIL = ''
+    $env:FAKE_OC_AGENTLIST_FAILCOUNTER = ''
+
+    # ── (b-version-inobtivel) opencode --version vazio => BLOCK version (distinto de divergente) ──
+    $env:FAKE_OC_VERSION = ''
+    $pcvu = Test-OpenCodeReviewerRoPrecheck -Exe $fakeCmd -WorkingDirectory $repoRoot -RetryDelayMs 0
+    Assert-True ((-not $pcvu.pass) -and $pcvu.reason -eq 'version' -and $pcvu.detail -match 'nao foi possivel obter') "(b) versao inobtivel (--version vazio) => BLOCK reason=version 'nao foi possivel obter' (got: $($pcvu.reason))"
+    $env:FAKE_OC_VERSION = $testedVersion
+
+    # ── (b-ausencia-total) nem project-local nem global => BLOCK static 'ausente' ──
+    $emptyWd = Join-Path $tempRoot 'empty-wd'
+    New-Item -ItemType Directory -Path $emptyWd -Force | Out-Null
+    $stAbs = Test-OpenCodeReviewerRoStatic -WorkingDirectory $emptyWd -GlobalJsoncPath (Join-Path $tempRoot 'nao-existe-global.jsonc')
+    Assert-True ((-not $stAbs.ok) -and $stAbs.reason -eq 'static' -and $stAbs.detail -match 'ausente') "(b) definicao completamente ausente => static 'ausente' (got: $($stAbs.reason))"
 
     # ── (b-static) frontmatter divergente => BLOCK static (antes de tocar o exe) ──
     $badWd = Join-Path $tempRoot 'bad-wd'
