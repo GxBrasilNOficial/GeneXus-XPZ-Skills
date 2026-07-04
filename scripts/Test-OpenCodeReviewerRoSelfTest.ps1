@@ -20,9 +20,10 @@
       (g) instalador global preserva comentarios/formatacao/demais chaves do opencode.jsonc
           (migracao tools:->permission; insercao; arquivo novo).
 
-    Os casos (a) default `-Agent reviewer-ro` no argv (sincrono E assincrono) e o BLOCK do adapter
-    ANTES do Start-Process sao exercidos pelo self-test do adapter apos D1+D2 (esta suite valida a
-    camada guard/instalador — a barreira de resolucao — de forma isolada e CI-safe).
+    (a) default `-Agent reviewer-ro` no argv (sincrono E assincrono), o BLOCK do adapter ANTES do
+    run/Start-Process, o opt-out (`-Agent <x>`) e o pos-check sincrono end-to-end tambem sao
+    exercidos NESTA suite (secao «INTEGRACAO com os adapters»), via fake-exe injetado por
+    `-OpenCodeExe`. A suite cobre tanto a camada guard/instalador quanto a integracao com os adapters.
 
     Sentinela de sucesso: OPENCODE_REVIEWER_RO_SELFTEST_OK
 #>
@@ -359,6 +360,15 @@ sem mode
         Assert-True (([string]$ans) -match 'OK-ADAPTER') "(a-sync) run devolveu a saida do fake (pre-check passou)"
         $argvSyncText = if (Test-Path -LiteralPath $argvSync) { Get-Content -LiteralPath $argvSync -Raw } else { '' }
         Assert-True ($argvSyncText -match '--agent reviewer-ro') "(a-sync) default -Agent reviewer-ro no argv do run (got: $argvSyncText)"
+
+        # (e-adapter) pos-check SINCRONO end-to-end: exit 0 mas o stderr tem o warning de fallback =>
+        # o adapter (caminho revisor) le $err cru e lanca BLOCK: pos-check, descartando a saida.
+        $env:FAKE_OC_RUN_STDERR = (Get-Content -LiteralPath $fallbackFixture -Raw -Encoding utf8).Trim()
+        $threwPc = $false; $msgPc = ''
+        try { & $invoke -OpenCodeExe $fakeCmd -MessagePath $prompt -Model 'fake/model' -TimeoutSec 30 | Out-Null }
+        catch { $threwPc = $true; $msgPc = $_.Exception.Message }
+        Assert-True ($threwPc -and $msgPc -match 'pos-check reviewer-ro') "(e-adapter) warning de fallback no stderr => adapter lanca BLOCK pos-check (got: $msgPc)"
+        $env:FAKE_OC_RUN_STDERR = ''
 
         # (b-adapter) allow-set divergente => BLOCK ANTES do run (argv do run NAO e escrito)
         $argvBlock = Join-Path $tempRoot 'argv-block.txt'
