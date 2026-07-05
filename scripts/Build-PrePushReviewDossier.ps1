@@ -39,6 +39,11 @@
     fetched | not-fetched | fetch-failed. O builder nao roda fetch. not-fetched /
     fetch-failed => remoteFreshness=stale (diagnostico local). Default: not-fetched.
 
+.PARAMETER MechanicalScriptPath
+    Seam de teste (uso interno). Caminho do script mecanico; default = o
+    Invoke-PrePushMechanicalChecks.ps1 ao lado deste. O self-test injeta um mecanico
+    falso (saida nao-JSON) para exercitar o modo degradado. Nao usar em producao.
+
 .PARAMETER AsJson
     Emite metadados estruturados (para o orquestrador decidir despacho) + o texto
     integral do dossie no campo dossierText. Sem -AsJson, emite so o texto do dossie em
@@ -53,6 +58,10 @@ param(
 
     [ValidateSet('fetched', 'not-fetched', 'fetch-failed')]
     [string]$FetchStatus = 'not-fetched',
+
+    # Seam de teste: caminho do script mecanico. Default = Invoke-PrePushMechanicalChecks.ps1
+    # ao lado deste. O self-test injeta um mecanico falso para exercitar o modo degradado.
+    [string]$MechanicalScriptPath,
 
     [switch]$AsJson
 )
@@ -200,7 +209,11 @@ $sectionA = @(
 ) -join "`n"
 
 # --- SECAO B - diagnostico mecanico (NAO verdade): container inteiro do -AsJson ---
-$mechanicalScript = Join-Path $PSScriptRoot 'Invoke-PrePushMechanicalChecks.ps1'
+$mechanicalScript = if ([string]::IsNullOrWhiteSpace($MechanicalScriptPath)) {
+    Join-Path $PSScriptRoot 'Invoke-PrePushMechanicalChecks.ps1'
+} else {
+    $MechanicalScriptPath
+}
 if (-not (Test-Path -LiteralPath $mechanicalScript -PathType Leaf)) {
     throw "Script mecanico nao encontrado: $mechanicalScript"
 }
@@ -236,23 +249,24 @@ if (-not [string]::IsNullOrWhiteSpace($mechanicalJsonText)) {
 $mechanicalStatus = if ($mechanicalExitCode -eq 0 -and $mechanicalParseOk) { 'passed' } else { 'failed' }
 
 # 4b: mecanico e fonte de verdade de commitsBehind/pushReadiness; builder REFERENCIA.
-# Fallback git-direto so quando o JSON mecanico nao e parseavel (metadados uteis mesmo assim).
+# Modo degradado (a'): se o JSON mecanico nao parseia (mecanico lancou), o builder reafirma
+# SO o FATO BRUTO commitsBehind por git; pushReadiness/intervalDiffDiagnosticOnly sao POLITICA
+# do motor e ficam INDETERMINADOS ('unknown'/$null), coerentes com mechanicalStatus=failed --
+# nao sao derivados por um caminho paralelo (evita veredito de push fabricado sob falha).
 $commitsBehind = $null
 $pushReadiness = 'unknown'
-$intervalDiffDiagnosticOnly = $false
+$intervalDiffDiagnosticOnly = $null
 $mechanicalFailures = @()
 if ($mechanicalParseOk) {
     try { $commitsBehind = [int]$mechanicalObject.git.commitsBehind } catch { $commitsBehind = $null }
     try { $pushReadiness = [string]$mechanicalObject.pushReadiness } catch { $pushReadiness = 'unknown' }
-    try { $intervalDiffDiagnosticOnly = [bool]$mechanicalObject.intervalDiffDiagnosticOnly } catch { $intervalDiffDiagnosticOnly = $false }
+    try { $intervalDiffDiagnosticOnly = [bool]$mechanicalObject.intervalDiffDiagnosticOnly } catch { $intervalDiffDiagnosticOnly = $null }
     try { $mechanicalFailures = @($mechanicalObject.mechanicalFailures) } catch { $mechanicalFailures = @() }
 }
 if ($null -eq $commitsBehind) {
     $behindResult = Invoke-DossierGit -RepositoryRoot $resolvedRoot -Arguments @('rev-list', '--count', "HEAD..$BaseRef")
     if ($behindResult.ExitCode -eq 0 -and $behindResult.Lines.Count -gt 0) {
         $commitsBehind = [int]$behindResult.Lines[0]
-        $pushReadiness = if ($commitsBehind -gt 0) { 'blocked' } else { 'ok' }
-        $intervalDiffDiagnosticOnly = ($commitsBehind -gt 0)
     }
 }
 

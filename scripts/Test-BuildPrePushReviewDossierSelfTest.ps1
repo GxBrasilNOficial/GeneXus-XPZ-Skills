@@ -251,6 +251,33 @@ try {
 }
 finally { Remove-TempDir -Path $tmp }
 
+# ---------------------------------------------------------------------------
+# Caso (o): mecanico imparseavel (modo degradado, a') => builder reafirma SO o fato
+# bruto commitsBehind; pushReadiness/intervalDiffDiagnosticOnly ficam indeterminados
+# (a politica push-ready do motor NAO e reencenada pelo builder sob falha).
+# ---------------------------------------------------------------------------
+$tmp = New-TempDir
+$fakeMech = Join-Path ([System.IO.Path]::GetTempPath()) ('fake-mech-' + [Guid]::NewGuid().ToString('N') + '.ps1')
+try {
+    $baseSha = Initialize-DossierRepo -Root $tmp
+    # HEAD atras de origin/main por 1 (commitsBehind>0), como no caso (d)
+    $featureSha = (& git -C $tmp rev-parse HEAD).Trim()
+    & git -C $tmp update-ref refs/remotes/origin/main $featureSha *> $null
+    & git -C $tmp reset --hard $baseSha *> $null
+    # Mecanico falso: saida NAO-JSON + exit 1 => builder parseOk=false (modo degradado)
+    Set-Content -LiteralPath $fakeMech -Value "param([string]`$RootPath,[string]`$BaseRef,[switch]`$AsJson)`nWrite-Output 'BOOM: saida nao-JSON do mecanico'`nexit 1" -Encoding utf8 -NoNewline
+    $json = Invoke-Builder -BuilderArgs @('-RootPath', $tmp, '-MechanicalScriptPath', $fakeMech, '-AsJson') | ConvertFrom-Json
+    Assert-True -CaseName 'o: dossierReady=true (mecanico imparseavel)' -Condition ($json.dossierReady -eq $true)
+    Assert-True -CaseName 'o: mechanicalStatus=failed' -Condition ($json.mechanicalStatus -eq 'failed') -Detail ("status={0}" -f $json.mechanicalStatus)
+    Assert-True -CaseName 'o: commitsBehind bruto preservado (>0)' -Condition ($json.commitsBehind -gt 0) -Detail ("commitsBehind={0}" -f $json.commitsBehind)
+    Assert-True -CaseName 'o: pushReadiness=unknown (politica NAO reencenada)' -Condition ($json.pushReadiness -eq 'unknown') -Detail ("pushReadiness={0}" -f $json.pushReadiness)
+    Assert-True -CaseName 'o: intervalDiffDiagnosticOnly indeterminado (null)' -Condition ($null -eq $json.intervalDiffDiagnosticOnly) -Detail ("intervalDiffDiagnosticOnly={0}" -f $json.intervalDiffDiagnosticOnly)
+}
+finally {
+    Remove-TempDir -Path $tmp
+    if (Test-Path -LiteralPath $fakeMech) { Remove-Item -LiteralPath $fakeMech -Force -ErrorAction SilentlyContinue }
+}
+
 Write-Output '---'
 if ($failures -eq 0) {
     Write-Output ("SELFTEST_OK: {0}/{0} asserts passaram" -f $cases)
