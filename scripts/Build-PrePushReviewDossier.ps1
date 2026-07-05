@@ -4,10 +4,11 @@
     Monta o dossie pre-push para revisor semantic-only (git BRUTO + diagnostico mecanico).
 
 .DESCRIPTION
-    Artefato do ORQUESTRADOR (quem tem git). Monta um arquivo unico entregue inline
-    via stdin ao revisor semantic-only (opencode reviewer-ro, Claude Code, etc.), que
-    nao roda o passo mecanico do 13 (nega bash/shell). O dossie tem duas secoes
-    rotuladas:
+    Artefato do ORQUESTRADOR (quem tem git). Monta um dossie unico e o EMITE em stdout;
+    a entrega inline no prompt ao revisor semantic-only e decisao do ORQUESTRADOR (stdin
+    nos stdin-dossier-capable como opencode/Claude Code; argv nos argv-limited Copilot/
+    Gemini, se couber — ver 13/14). O revisor semantic-only nao roda o passo mecanico do
+    13 (nega bash/shell). O dossie tem duas secoes rotuladas:
 
       - SECAO A - git BRUTO (fato): rev-parse HEAD, log origin/main..HEAD,
         diff origin/main..HEAD, status --porcelain.
@@ -40,8 +41,8 @@
 
 .PARAMETER AsJson
     Emite metadados estruturados (para o orquestrador decidir despacho) + o texto
-    integral do dossie no campo dossierText. Sem -AsJson, emite so o texto do dossie
-    (o artefato entregue via stdin).
+    integral do dossie no campo dossierText. Sem -AsJson, emite so o texto do dossie em
+    stdout (o orquestrador o entrega inline no prompt; transporte por adapter — ver 13/14).
 #>
 
 [CmdletBinding()]
