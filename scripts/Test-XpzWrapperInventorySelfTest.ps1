@@ -21,6 +21,8 @@ $ErrorActionPreference = 'Stop'
 
 $scriptDir = Split-Path -Parent $PSCommandPath
 $inventoryScriptPath = Join-Path $scriptDir 'Test-XpzWrapperInventory.ps1'
+# Dot-source do helper para os casos de UNIDADE do diff de superficie (Get-XpzWrapperSurfaceFinding).
+. (Join-Path $scriptDir 'XpzWrapperEngineParamSupport.ps1')
 
 function Assert-Contains {
     param(
@@ -54,6 +56,45 @@ function Assert-NotContains {
     if ($Text -match $Pattern) {
         throw "ASSERT_FAILED: $Message | output=$Text"
     }
+}
+
+# --- Auxiliares dos casos de UNIDADE do diff de superficie ---
+$script:surfaceFixtureCounter = 0
+$script:surfaceUtf8 = New-Object System.Text.UTF8Encoding($false)
+
+function New-SurfaceFixture {
+    param([string]$Dir, [string]$Content)
+    $script:surfaceFixtureCounter++
+    $p = Join-Path $Dir ('sfx-{0}.ps1' -f $script:surfaceFixtureCounter)
+    [System.IO.File]::WriteAllText($p, $Content, $script:surfaceUtf8)
+    return $p
+}
+
+function Get-SurfaceReasonList {
+    param([object[]]$Items)
+    if (-not $Items) { return '' }
+    return ((@($Items | ForEach-Object { [string]$_.Reason }) | Sort-Object) -join '|')
+}
+
+function Assert-Surface {
+    # Compara os reasons (ordenados) de Blocking/Advisory de Get-XpzWrapperSurfaceFinding contra o esperado.
+    param(
+        [string]$Molde,
+        [string]$Local,
+        [string]$Dir,
+        [string[]]$Block = @(),
+        [string[]]$Adv = @(),
+        [string]$Message
+    )
+    $moldePath = New-SurfaceFixture -Dir $Dir -Content $Molde
+    $localPath = New-SurfaceFixture -Dir $Dir -Content $Local
+    $finding = Get-XpzWrapperSurfaceFinding -MoldePath $moldePath -LocalPath $localPath
+    $gotB = Get-SurfaceReasonList $finding.Blocking
+    $gotA = Get-SurfaceReasonList $finding.Advisory
+    $wantB = ((@($Block) | Sort-Object) -join '|')
+    $wantA = ((@($Adv) | Sort-Object) -join '|')
+    if ($gotB -ne $wantB) { throw "ASSERT_FAILED: $Message (blocking) esperado=[$wantB] obtido=[$gotB]" }
+    if ($gotA -ne $wantA) { throw "ASSERT_FAILED: $Message (advisory) esperado=[$wantA] obtido=[$gotA]" }
 }
 
 $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('xpz-wrapper-inventory-selftest-{0}' -f ([guid]::NewGuid().ToString('N')))
@@ -363,6 +404,144 @@ $enginePath = Join-Path $SharedSkillsRoot 'scripts\Test-GeneXusSourceSanity.ps1'
         ForEach-Object { $_.ToString() }) -join ' '
 
     Assert-Contains -Text $output -Pattern 'Test-DemoKbSourceSanity\.ps1\(reason=forwards_unknown_engine_param: -BogusXyz -> Test-GeneXusSourceSanity\.ps1\)' -Message 'parametro inexistente repassado a motor advanced deve ser sinalizado pelo inventario dentro de INVENTORY_CUSTOMIZED'
+
+    # ============================================================================
+    # Diff de superficie de wrapper (surface_mismatch / INVENTORY_SURFACE_ADVISORY)
+    # UNIDADE: Get-XpzWrapperSurfaceFinding com fixtures surface-fieis (so a superficie importa).
+    # ============================================================================
+    $surfaceDir = Join-Path $tempRoot 'surface'
+    [void](New-Item -ItemType Directory -Path $surfaceDir -Force)
+    $D = $surfaceDir
+
+    # BLOQUEIA: perda de contrato obrigatorio
+    Assert-Surface -Dir $D -Molde 'param([Parameter(Mandatory)][string]$Query, [string]$Opt)' -Local 'param([string]$Opt)' -Block @('mandatory_param_missing') -Message 'U01 obrigatorio ausente -> surface_mismatch'
+    Assert-Surface -Dir $D -Molde 'param([Parameter(Mandatory)][string]$Q)' -Local 'param([string]$Q)' -Block @('mandatory_downgraded') -Message 'U10 obrigatorio rebaixado -> surface_mismatch'
+    Assert-Surface -Dir $D -Molde 'param([Parameter(Mandatory)][string]$Q)' -Local 'param([string]$Other)' -Block @('mandatory_param_missing') -Message 'U14 [Parameter(Mandatory)] sem =$true e obrigatorio'
+    Assert-Surface -Dir $D -Molde 'param([System.Management.Automation.ParameterAttribute(Mandatory=$true)][string]$Q)' -Local 'param([string]$Other)' -Block @('mandatory_param_missing') -Message 'U16 [Parameter] por FQN e lido'
+    Assert-Surface -Dir $D -Molde 'param([Parameter(ParameterSetName="A")][Parameter(ParameterSetName="B",Mandatory=$true)][string]$Q)' -Local 'param([string]$Q)' -Block @('mandatory_downgraded') -Message 'U12 multiplos [Parameter] com Mandatory num set -> obrigatorio'
+
+    # BLOQUEIA / AVISA / QUIETO conforme a superficie do MOLDE quando o LOCAL nao tem param() de topo (v14)
+    $localFn = "function Foo { param([Parameter(Mandatory)][string]`$X) }`nWrite-Output 'x'"
+    Assert-Surface -Dir $D -Molde 'param([Parameter(Mandatory)][string]$Q)' -Local $localFn -Block @('no_param_block') -Message 'U13a sem param() topo + molde obrigatorio -> surface_mismatch no_param_block (nao herda da funcao interna)'
+    Assert-Surface -Dir $D -Molde 'param([string]$Q)' -Local $localFn -Adv @('no_param_block') -Message 'U13b sem param() topo + molde so-opcional -> advisory no_param_block'
+    Assert-Surface -Dir $D -Molde "[CmdletBinding()]`nparam()" -Local $localFn -Message 'U13c sem param() topo + molde zero-superficie -> quieto'
+
+    # AVISA: reducao opcional / ValidateSet / promocao / extra obrigatorio
+    Assert-Surface -Dir $D -Molde 'param([string]$A, [string]$B)' -Local 'param([string]$A)' -Adv @('optional_param_missing') -Message 'U03 opcional ausente -> advisory'
+    Assert-Surface -Dir $D -Molde "param([ValidateSet('a','b','c')][string]`$Q)" -Local "param([ValidateSet('a','b')][string]`$Q)" -Adv @('validateset_reduced') -Message 'U04a ValidateSet reduzido (subconjunto) -> advisory'
+    Assert-Surface -Dir $D -Molde "param([ValidateSet('a','b')][string]`$Q)" -Local "param([ValidateSet('a','c')][string]`$Q)" -Adv @('validateset_reduced') -Message 'U04b ValidateSet valor trocado (diferenca de conjunto) -> advisory'
+    Assert-Surface -Dir $D -Molde "param([System.Management.Automation.ValidateSetAttribute('a','b')][string]`$Q)" -Local "param([ValidateSet('a')][string]`$Q)" -Adv @('validateset_reduced') -Message 'U15 ValidateSet por FQN e lido'
+    Assert-Surface -Dir $D -Molde 'param([string]$Q)' -Local 'param([Parameter(Mandatory)][string]$Q)' -Adv @('optional_promoted_to_mandatory') -Message 'U11 opcional -> obrigatorio -> advisory'
+    Assert-Surface -Dir $D -Molde 'param([string]$A)' -Local 'param([string]$A, [Parameter(Mandatory)][string]$Extra)' -Adv @('extra_mandatory_added') -Message 'U08 param extra obrigatorio -> advisory'
+    Assert-Surface -Dir $D -Molde "[CmdletBinding()]`nparam()" -Local 'param([Parameter(Mandatory)][string]$Z)' -Adv @('extra_mandatory_added') -Message 'U09 molde zero-superficie + local obrigatorio -> advisory extra_mandatory_added'
+
+    # QUIETO: excedente / a frente / delegacao legitima / nao-comparavel
+    Assert-Surface -Dir $D -Molde 'param([string]$Root = "X")' -Local 'param([string]$Root = "Y")' -Message 'U02 fiel (so default diferente) -> quieto'
+    Assert-Surface -Dir $D -Molde 'param([string]$A)' -Local 'param([string]$A, [string]$Extra)' -Message 'U07 param extra opcional -> quieto'
+    Assert-Surface -Dir $D -Molde "param([ValidateSet('a','b')][string]`$Q)" -Local 'param([string]$Q)' -Message 'U05a ValidateSet removido no local -> quieto (delegacao)'
+    Assert-Surface -Dir $D -Molde "param([ValidateSet('a','b')][string]`$Q)" -Local "param([ValidateSet('a','b','c')][string]`$Q)" -Message 'U05b ValidateSet local superset -> quieto'
+    Assert-Surface -Dir $D -Molde "param([ValidateSet()][string]`$Q)" -Local "param([ValidateSet('a')][string]`$Q)" -Message 'U05c ValidateSet vazio no molde -> nao-comparavel -> quieto'
+    Assert-Surface -Dir $D -Molde 'param([ValidateSet(1,2,3)][int]$Q)' -Local 'param([ValidateSet(1,2)][int]$Q)' -Message 'U05d ValidateSet non-string -> nao-comparavel -> quieto'
+    Assert-Surface -Dir $D -Molde "param([ValidateSet('a',`$z)][string]`$Q)" -Local "param([ValidateSet('a')][string]`$Q)" -Message 'U05e ValidateSet misto (literal+var) -> nao-comparavel -> quieto'
+    Assert-Surface -Dir $D -Molde "param([ValidateSet('a','b')][ValidateSet('b','c')][string]`$Q)" -Local "param([ValidateSet('a')][string]`$Q)" -Message 'U06 param com 2 [ValidateSet] (AND/intersecao) -> nao-comparavel -> quieto'
+    Assert-Surface -Dir $D -Molde "param([ValidateSet('a','b',IgnoreCase=`$true)][string]`$Q)" -Local "param([ValidateSet('a','b')][string]`$Q)" -Message 'U17 ValidateSet arg nomeado ignorado -> compara so posicionais -> quieto'
+
+    # Coexistencia: BLOQUEIO + AVISO no mesmo wrapper (achado por-wrapper, nao global)
+    Assert-Surface -Dir $D -Molde "param([Parameter(Mandatory)][string]`$Query, [string]`$Opt, [ValidateSet('a','b','c')][string]`$Kind)" -Local "param([ValidateSet('a')][string]`$Kind)" -Block @('mandatory_param_missing') -Adv @('optional_param_missing', 'validateset_reduced') -Message 'U18 coexistencia bloqueio + avisos no mesmo wrapper'
+
+    # Cantos OUT-OF-SCOPE (kimi): travar o comportamento CONHECIDO para pegar regressao
+    Assert-Surface -Dir $D -Molde "param([Parameter(Mandatory)][string]`$Path)" -Local "param([Parameter(Mandatory)][Alias('Path')][string]`$Local)" -Block @('mandatory_param_missing') -Adv @('extra_mandatory_added') -Message 'OOS-a [Alias] renomeado -> bloqueio+aviso espurios (limitacao conhecida, sem suporte a alias)'
+    Assert-Surface -Dir $D -Molde "param([ValidateSet('a','b')][string]`$Q)" -Local "param([ValidateSet('A','B',IgnoreCase=`$false)][string]`$Q)" -Message 'OOS-b IgnoreCase=$false divergente comparado como OrdinalIgnoreCase (limitacao conhecida) -> quieto'
+    Assert-Surface -Dir $D -Molde 'param([string]$Q)' -Local "filter Bar { `$_ }" -Adv @('no_param_block') -Message 'OOS-c wrapper em forma de filter -> no_param_block (advisory por molde so-opcional)'
+
+    # ============================================================================
+    # END-TO-END pelo inventario: rotulos emitidos, coexistencia e advisory-so nao vira INVENTORY_OK
+    # ============================================================================
+    # E2E-1: bloqueio (rebaixado) + advisory (opcional ausente) no mesmo wrapper Query
+    @'
+#requires -Version 7.4
+param(
+    [Parameter(Mandatory = $true)]
+    [string]$Query,
+    [string]$Opt
+)
+'@ | Set-Content -LiteralPath (Join-Path $examplesPath 'Query-KbIntelligence.example.ps1') -Encoding utf8NoBOM
+    $queryStandardPath = Join-Path $scriptsPath 'Query-DemoKbIntelligence.ps1'
+    @'
+#requires -Version 7.4
+param(
+    [string]$Query
+)
+'@ | Set-Content -LiteralPath $queryStandardPath -Encoding utf8NoBOM
+
+    $output = (& $inventoryScriptPath -KbParallelRoot $kbRoot -SkillsExamplesPath $examplesPath 2>&1 |
+        ForEach-Object { $_.ToString() }) -join ' '
+
+    Assert-Contains -Text $output -Pattern 'INVENTORY_CUSTOMIZED\b' -Message 'E2E-1 perda de obrigatorio deve entrar em INVENTORY_CUSTOMIZED'
+    Assert-Contains -Text $output -Pattern 'Query-DemoKbIntelligence\.ps1\(reason=surface_mismatch: mandatory_downgraded -Query\)' -Message 'E2E-1 mandatory rebaixado emitido como surface_mismatch'
+    Assert-Contains -Text $output -Pattern 'INVENTORY_SURFACE_ADVISORY:.*Query-DemoKbIntelligence\.ps1\(reason=optional_param_missing: -Opt\)' -Message 'E2E-1 opcional ausente emitido como INVENTORY_SURFACE_ADVISORY'
+    Assert-NotContains -Text $output -Pattern '\bINVENTORY_OK\b' -Message 'E2E-1 wrapper com surface_mismatch nao pode retornar OK'
+
+    # E2E-2: advisory-so (ValidateSet reduzido) -> INVENTORY_SURFACE_ADVISORY sem surface_mismatch, e sem INVENTORY_OK
+    @'
+#requires -Version 7.4
+param(
+    [ValidateSet('a', 'b', 'c')]
+    [string]$Query
+)
+'@ | Set-Content -LiteralPath (Join-Path $examplesPath 'Query-KbIntelligence.example.ps1') -Encoding utf8NoBOM
+    @'
+#requires -Version 7.4
+param(
+    [ValidateSet('a')]
+    [string]$Query
+)
+'@ | Set-Content -LiteralPath $queryStandardPath -Encoding utf8NoBOM
+
+    $output = (& $inventoryScriptPath -KbParallelRoot $kbRoot -SkillsExamplesPath $examplesPath 2>&1 |
+        ForEach-Object { $_.ToString() }) -join ' '
+
+    Assert-Contains -Text $output -Pattern 'INVENTORY_SURFACE_ADVISORY:.*Query-DemoKbIntelligence\.ps1\(reason=validateset_reduced: -Query \[b, c\]\)' -Message 'E2E-2 ValidateSet reduzido emitido como advisory com os valores faltantes'
+    Assert-NotContains -Text $output -Pattern 'Query-DemoKbIntelligence\.ps1\(reason=surface_mismatch' -Message 'E2E-2 reducao de ValidateSet nao pode bloquear (nao e surface_mismatch)'
+    Assert-NotContains -Text $output -Pattern '\bINVENTORY_OK\b' -Message 'E2E-2 advisory-so ainda nao e INVENTORY_OK (emite status part)'
+
+    # E2E-3: overlap de check por-token (requires_version_mismatch) + surface_mismatch no mesmo wrapper
+    @'
+#requires -Version 7.4
+param(
+    [Parameter(Mandatory = $true)]
+    [string]$Query
+)
+'@ | Set-Content -LiteralPath (Join-Path $examplesPath 'Query-KbIntelligence.example.ps1') -Encoding utf8NoBOM
+    @'
+#requires -version 5.1
+param(
+    [string]$Other
+)
+'@ | Set-Content -LiteralPath $queryStandardPath -Encoding utf8NoBOM
+
+    $output = (& $inventoryScriptPath -KbParallelRoot $kbRoot -SkillsExamplesPath $examplesPath 2>&1 |
+        ForEach-Object { $_.ToString() }) -join ' '
+
+    Assert-Contains -Text $output -Pattern 'Query-DemoKbIntelligence\.ps1\(reason=requires_version_mismatch' -Message 'E2E-3 check por-token (requires) segue reportado'
+    Assert-Contains -Text $output -Pattern 'Query-DemoKbIntelligence\.ps1\(reason=surface_mismatch: mandatory_param_missing -Query\)' -Message 'E2E-3 surface_mismatch coexiste com o check por-token (redundancia aceita)'
+
+    # ============================================================================
+    # GUARDA anti-regressao: o regex de pendencia do agregador (Test-XpzSetupAudit.ps1) casa
+    # INVENTORY_CUSTOMIZED mas NAO os rotulos de aviso/diagnostico. Localizado POR CONTEUDO
+    # (nao por numero de linha) para sobreviver a drift.
+    # ============================================================================
+    $auditPath = Join-Path $scriptDir 'Test-XpzSetupAudit.ps1'
+    $auditLines = [System.IO.File]::ReadAllLines($auditPath)
+    $regexLine = @($auditLines | Where-Object { $_ -match 'hasInventoryMethodologyPendencies\s*=' }) | Select-Object -First 1
+    if (-not $regexLine) { throw 'ASSERT_FAILED: nao encontrei a linha de $hasInventoryMethodologyPendencies em Test-XpzSetupAudit.ps1' }
+    $regexMatch = [regex]::Match($regexLine, "-match\s+'(?<pat>[^']*)'")
+    if (-not $regexMatch.Success) { throw "ASSERT_FAILED: nao consegui extrair o regex literal da linha de pendencia | linha=$regexLine" }
+    $blockRegex = $regexMatch.Groups['pat'].Value
+
+    Assert-Contains -Text 'INVENTORY_CUSTOMIZED: X(reason=surface_mismatch: mandatory_param_missing -Query)' -Pattern $blockRegex -Message 'regex de pendencia DEVE casar INVENTORY_CUSTOMIZED (surface_mismatch bloqueia via CUSTOMIZED)'
+    Assert-NotContains -Text 'INVENTORY_SURFACE_ADVISORY: X(reason=validateset_reduced: -Query [a, b])' -Pattern $blockRegex -Message 'REGRESSAO: regex de pendencia NAO pode casar INVENTORY_SURFACE_ADVISORY'
+    Assert-NotContains -Text 'INVENTORY_ENGINE_DIAGNOSTIC: X(reason=engine_unresolved_or_unparseable: Y)' -Pattern $blockRegex -Message 'REGRESSAO: regex de pendencia NAO pode casar INVENTORY_ENGINE_DIAGNOSTIC'
 
     Write-Output 'WRAPPER_INVENTORY_SELFTEST_OK'
 } finally {

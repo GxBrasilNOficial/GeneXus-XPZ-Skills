@@ -1,8 +1,11 @@
 #requires -Version 7.4
 <#
 .SYNOPSIS
-  Suporte (dot-source) para o check generico forwards_unknown_engine_param do inventario
-  de wrappers locais (Test-XpzWrapperInventory.ps1).
+  Suporte (dot-source) para dois checks do inventario de wrappers locais
+  (Test-XpzWrapperInventory.ps1): (1) forwards_unknown_engine_param — repasse a motor
+  compartilhado advanced de parametro nao-declarado (direcao wrapper->motor); (2) diff de
+  superficie wrapper-local vs molde — surface_mismatch (bloqueio) e INVENTORY_SURFACE_ADVISORY
+  (aviso), ver bloco proprio no fim do arquivo (direcao wrapper->molde).
 
 .DESCRIPTION
   Verifica, por AST + Get-Command (sem executar o motor, sem KB), que todo parametro que
@@ -415,4 +418,218 @@ function Get-XpzWrapperEngineParamFinding {
         EngineDiagnostics = @($diagnostics)
         AuditedSiteCount  = $audited
     }
+}
+
+# ============================================================================
+# Diff de superficie de wrapper (check surface_mismatch / INVENTORY_SURFACE_ADVISORY)
+#
+# Compara a superficie {nomes de parametro; Mandatory; conjunto de valores de cada
+# [ValidateSet]} do wrapper LOCAL contra o MOLDE canonico (.example.ps1). VALOR DEFAULT
+# NAO faz parte da superficie (o molde usa placeholders como SharedSkillsRoot). Severidade
+# consciente de direcao: o falso-positivo mora no lado "a mais / a frente" (o repo remove
+# [ValidateSet] de proposito para delegar ao motor; ha index-gate runtime), entao esse lado
+# NAO e punido. BLOQUEIA so PERDA de contrato obrigatorio; AVISA reducoes opcionais/ValidateSet;
+# QUIETO no excedente/delegacao legitima. Complementa (nao duplica) o check por direcao inversa
+# forwards_unknown_engine_param acima: la o wrapper repassa demais; aqui o wrapper acompanha de
+# menos o molde.
+# ============================================================================
+
+function Test-XpzAttributeAstIsType {
+    <# True se $Attr e um AttributeAst cujo TypeName casa (accelerator OU FQN) um dos $Names. #>
+    param([System.Management.Automation.Language.Ast]$Attr, [string[]]$Names)
+    if (-not ($Attr -is [System.Management.Automation.Language.AttributeAst])) { return $false }
+    $fn = [string]$Attr.TypeName.FullName
+    foreach ($n in $Names) { if ($fn -ieq $n) { return $true } }
+    return $false
+}
+
+function Test-XpzParamAstMandatory {
+    <#
+      Um parametro e obrigatorio SSE QUALQUER [Parameter] o marca Mandatory=$true (uniao entre
+      parameter-sets). Atributo [Parameter] ausente OU sem Mandatory=opcional; Mandatory sem valor
+      (ExpressionOmitted)=obrigatorio; =$true=obrigatorio; =$false=opcional por esse attr; QUALQUER
+      expressao nao-literal-bool (=$var, =[bool]"x")=conservador OBRIGATORIO (nao avaliar). Casa
+      [Parameter] por accelerator E FQN.
+    #>
+    param([System.Management.Automation.Language.ParameterAst]$ParameterAst)
+    foreach ($attr in $ParameterAst.Attributes) {
+        if (-not (Test-XpzAttributeAstIsType -Attr $attr -Names @('Parameter', 'ParameterAttribute', 'System.Management.Automation.ParameterAttribute'))) { continue }
+        foreach ($na in $attr.NamedArguments) {
+            if ($na.ArgumentName -ine 'Mandatory') { continue }
+            if ($na.ExpressionOmitted) { return $true }
+            $arg = $na.Argument
+            if ($arg -is [System.Management.Automation.Language.VariableExpressionAst]) {
+                $vp = $arg.VariablePath.UserPath
+                if ($vp -ieq 'true') { return $true }
+                elseif ($vp -ieq 'false') { continue }
+                else { return $true }
+            } else {
+                return $true
+            }
+        }
+    }
+    return $false
+}
+
+function Get-XpzParamAstValidateSet {
+    <#
+      Devolve [pscustomobject]@{ Comparable; Values }. Comparavel (Values=HashSet OrdinalIgnoreCase)
+      SSE existe EXATAMENTE 1 [ValidateSet] e TODOS os posicionais sao literais STRING. Nao-comparavel
+      (Values=$null) quando: zero ou >1 [ValidateSet] (multiplos = AND/INTERSECAO, nao uniao); vazio;
+      qualquer posicional nao-literal (misto/gerador/variavel) ou literal nao-string (ex.: 1,2,3).
+      Argumentos NOMEADOS (IgnoreCase=/ErrorMessage=) sao ignorados. Cobre posicional direto e
+      ArrayLiteralAst. Casa [ValidateSet] por accelerator E FQN.
+    #>
+    param([System.Management.Automation.Language.ParameterAst]$ParameterAst)
+    $vsAttrs = @($ParameterAst.Attributes | Where-Object {
+            Test-XpzAttributeAstIsType -Attr $_ -Names @('ValidateSet', 'ValidateSetAttribute', 'System.Management.Automation.ValidateSetAttribute')
+        })
+    if ($vsAttrs.Count -ne 1) { return [pscustomobject]@{ Comparable = $false; Values = $null } }
+
+    $attr = $vsAttrs[0]
+    $positionals = [System.Collections.Generic.List[object]]::new()
+    foreach ($pa in $attr.PositionalArguments) {
+        if ($pa -is [System.Management.Automation.Language.ArrayLiteralAst]) {
+            foreach ($el in $pa.Elements) { $positionals.Add($el) }
+        } else {
+            $positionals.Add($pa)
+        }
+    }
+    if ($positionals.Count -eq 0) { return [pscustomobject]@{ Comparable = $false; Values = $null } }
+
+    $values = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    foreach ($pa in $positionals) {
+        if (-not ($pa -is [System.Management.Automation.Language.StringConstantExpressionAst])) {
+            return [pscustomobject]@{ Comparable = $false; Values = $null }
+        }
+        [void]$values.Add(([string]$pa.Value).Trim())
+    }
+    return [pscustomobject]@{ Comparable = $true; Values = $values }
+}
+
+function Get-XpzScriptParamSurface {
+    <#
+      Extrai a superficie de parametros do ParamBlock de TOPO do ScriptBlock raiz
+      ($ast.ParamBlock), NUNCA FindAll(ParamBlockAst) recursivo — recursivo colheria os param()
+      de funcoes/filtros internos (ex.: Update-KbFromXpz.example.ps1 tem param() de topo E ~5
+      funcoes internas com param() Mandatory). Script sem param() de topo (so funcao/filtro) tem
+      ParamBlock NULO -> HasParamBlock=$false, sem fallback para param() interno. CUIDADO:
+      [CmdletBinding()] sem param() gera ParamBlock nulo (parse-error); [CmdletBinding()] COM
+      param() vazio gera ParamBlock nao-nulo Count 0 (molde zero-superficie).
+
+      Devolve [pscustomobject]@{ Parseable; HasParamBlock; Params(Dictionary OrdinalIgnoreCase);
+      ParamCount; MandatoryCount }. Extrai de AST, nao de Get-Command (que injeta CommonParameters
+      em advanced).
+    #>
+    param([Parameter(Mandatory)][string]$ScriptPath)
+
+    $perrs = $null
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile($ScriptPath, [ref]$null, [ref]$perrs)
+    $parseable = ($null -ne $ast) -and (@($perrs).Count -eq 0)
+
+    $paramBlock = if ($null -ne $ast) { $ast.ParamBlock } else { $null }
+    $hasParamBlock = ($null -ne $paramBlock)
+
+    $params = [System.Collections.Generic.Dictionary[string, object]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    $mandatoryCount = 0
+    if ($hasParamBlock) {
+        foreach ($p in $paramBlock.Parameters) {
+            $name = [string]$p.Name.VariablePath.UserPath
+            if ($params.ContainsKey($name)) { continue }
+            $mandatory = Test-XpzParamAstMandatory -ParameterAst $p
+            $vs = Get-XpzParamAstValidateSet -ParameterAst $p
+            $params[$name] = [pscustomobject]@{
+                Name                  = $name
+                Mandatory             = $mandatory
+                ValidateSetComparable = $vs.Comparable
+                ValidateSetValues     = $vs.Values
+            }
+            if ($mandatory) { $mandatoryCount++ }
+        }
+    }
+
+    return [pscustomobject]@{
+        Parseable      = $parseable
+        HasParamBlock  = $hasParamBlock
+        Params         = $params
+        ParamCount     = $params.Count
+        MandatoryCount = $mandatoryCount
+    }
+}
+
+function Get-XpzWrapperSurfaceFinding {
+    <#
+      Compara a superficie do wrapper LOCAL contra o MOLDE canonico. Devolve
+      [pscustomobject]@{ Blocking; Advisory } onde cada item e @{ Reason; Detail }.
+        Blocking (-> INVENTORY_CUSTOMIZED reason=surface_mismatch): mandatory_param_missing,
+          mandatory_downgraded, no_param_block (quando o molde tem obrigatorio).
+        Advisory (-> INVENTORY_SURFACE_ADVISORY, fora do regex de pendencia do agregador):
+          optional_param_missing, validateset_reduced (DIFERENCA DE CONJUNTO molde-local),
+          optional_promoted_to_mandatory, extra_mandatory_added, no_param_block (molde >=1 param
+          todos opcionais).
+      QUIETO: param extra opcional; ValidateSet local superset/removido/nao-comparavel; molde
+      zero-superficie sem obrigatorio; qualquer lado nao-parseavel (conservador — wrapper quebrado
+      e pego por outro gate).
+    #>
+    param(
+        [Parameter(Mandatory)][string]$MoldePath,
+        [Parameter(Mandatory)][string]$LocalPath
+    )
+    $blocking = [System.Collections.Generic.List[object]]::new()
+    $advisory = [System.Collections.Generic.List[object]]::new()
+
+    $molde = Get-XpzScriptParamSurface -ScriptPath $MoldePath
+    $local = Get-XpzScriptParamSurface -ScriptPath $LocalPath
+
+    if (-not $molde.Parseable -or -not $local.Parseable) {
+        return [pscustomobject]@{ Blocking = @(); Advisory = @() }
+    }
+
+    # LOCAL sem param() de topo -> no_param_block; severidade pela superficie do MOLDE.
+    if (-not $local.HasParamBlock) {
+        if ($molde.MandatoryCount -gt 0) {
+            $blocking.Add(@{ Reason = 'no_param_block'; Detail = '' })
+        } elseif ($molde.ParamCount -gt 0) {
+            $advisory.Add(@{ Reason = 'no_param_block'; Detail = '' })
+        }
+        return [pscustomobject]@{ Blocking = @($blocking); Advisory = @($advisory) }
+    }
+
+    foreach ($mName in @($molde.Params.Keys)) {
+        $mp = $molde.Params[$mName]
+        if (-not $local.Params.ContainsKey($mName)) {
+            if ($mp.Mandatory) {
+                $blocking.Add(@{ Reason = 'mandatory_param_missing'; Detail = ('-{0}' -f $mp.Name) })
+            } else {
+                $advisory.Add(@{ Reason = 'optional_param_missing'; Detail = ('-{0}' -f $mp.Name) })
+            }
+            continue
+        }
+        $lp = $local.Params[$mName]
+        if ($mp.Mandatory -and -not $lp.Mandatory) {
+            $blocking.Add(@{ Reason = 'mandatory_downgraded'; Detail = ('-{0}' -f $mp.Name) })
+        } elseif (-not $mp.Mandatory -and $lp.Mandatory) {
+            $advisory.Add(@{ Reason = 'optional_promoted_to_mandatory'; Detail = ('-{0}' -f $mp.Name) })
+        }
+        if ($mp.ValidateSetComparable -and $lp.ValidateSetComparable) {
+            $missing = [System.Collections.Generic.List[string]]::new()
+            foreach ($v in $mp.ValidateSetValues) {
+                if (-not $lp.ValidateSetValues.Contains($v)) { $missing.Add($v) }
+            }
+            if ($missing.Count -gt 0) {
+                $sorted = @($missing | Sort-Object)
+                $advisory.Add(@{ Reason = 'validateset_reduced'; Detail = ('-{0} [{1}]' -f $mp.Name, ($sorted -join ', ')) })
+            }
+        }
+    }
+
+    foreach ($lName in @($local.Params.Keys)) {
+        if ($molde.Params.ContainsKey($lName)) { continue }
+        $lp = $local.Params[$lName]
+        if ($lp.Mandatory) {
+            $advisory.Add(@{ Reason = 'extra_mandatory_added'; Detail = ('-{0}' -f $lp.Name) })
+        }
+    }
+
+    return [pscustomobject]@{ Blocking = @($blocking); Advisory = @($advisory) }
 }

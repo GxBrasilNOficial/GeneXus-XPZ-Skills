@@ -388,6 +388,12 @@ if (Test-Path -LiteralPath $inventoryScriptPath -PathType Leaf) {
     $inventoryStatus = 'INVENTORY_UNKNOWN: motor Test-XpzWrapperInventory.ps1 ausente'
 }
 
+# Regex de pendencia metodologica do inventario: SO estes 4 tokens bloqueiam o estado de setup.
+# Deliberadamente FORA daqui (por construcao, nao por acaso): INVENTORY_ENGINE_DIAGNOSTIC (infra do
+# repo de skills) e INVENTORY_SURFACE_ADVISORY (reducao opcional/ValidateSet do diff de superficie) —
+# ambos sao avisos consultivos que NAO bloqueiam. A perda de contrato obrigatorio do diff de
+# superficie ja chega aqui via INVENTORY_CUSTOMIZED (reason=surface_mismatch). NAO adicionar os
+# rotulos de aviso a este regex (guarda-regressao: Test-XpzWrapperInventorySelfTest.ps1).
 $hasInventoryMethodologyPendencies = $inventoryStatus -match '\b(INVENTORY_GAPS|INVENTORY_SHORT_NAMING|INVENTORY_CUSTOMIZED|INVENTORY_LEGACY_ORPHANS)\b'
 $hasMetadataWrapperPendencies = $metadataWrapperStatus -ne 'OK'
 $hasDeploymentMetadataPendencies = $deploymentMetadataStatus -in @('BLOCK', 'PENDENTE')

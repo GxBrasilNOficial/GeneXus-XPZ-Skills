@@ -19,10 +19,19 @@
                                             forwards_unknown_engine_param quando o wrapper repassa a um
                                             motor compartilhado advanced um parametro nao-declarado;
                                             shared_engine_unresolved quando o caminho de motor inferido
-                                            nao existe na base canonica)
+                                            nao existe na base canonica; surface_mismatch quando o
+                                            wrapper local PERDE contrato obrigatorio do molde
+                                            (mandatory ausente/rebaixado, no_param_block com molde
+                                            obrigatorio) — diff de superficie param()/ValidateSet)
       INVENTORY_ENGINE_DIAGNOSTIC: <lista> - diagnostico brando (motor canonico ausente/parse-broken,
                                             engine_unresolved_or_unparseable); NAO bloqueia o estado de
                                             setup (rotulo fora dos tokens de pendencia do agregador)
+      INVENTORY_SURFACE_ADVISORY: <lista>  - aviso de superficie: wrapper local defasado do molde por
+                                            REDUCAO opcional (optional_param_missing,
+                                            validateset_reduced, optional_promoted_to_mandatory,
+                                            extra_mandatory_added, no_param_block com molde so-opcional);
+                                            NAO bloqueia (rotulo fora dos tokens de pendencia do
+                                            agregador); perda de obrigatorio sai em INVENTORY_CUSTOMIZED
       INVENTORY_RECOMMENDED_MISSING: <lista> - wrappers recomendados ausentes por sinais objetivos
       INVENTORY_LEGACY_ORPHANS: <lista>    - scripts legados lado a lado com canonicos atuais
       INVENTORY_UNKNOWN: <motivo>         - não foi possível determinar o estado
@@ -39,6 +48,7 @@
     "INVENTORY_SHORT_NAMING: <nomes esperados>",
     "INVENTORY_CUSTOMIZED: <nomes e motivos>",
     "INVENTORY_ENGINE_DIAGNOSTIC: <nomes e motivos>",
+    "INVENTORY_SURFACE_ADVISORY: <nomes e motivos>",
     "INVENTORY_LEGACY_ORPHANS: <canonico(legacy=antigo)>",
     "INVENTORY_RECOMMENDED_MISSING: <nomes recomendados>", ou
     "INVENTORY_UNKNOWN: <motivo>"
@@ -216,6 +226,7 @@ $customized  = [System.Collections.Generic.List[string]]::new()
 $recommendedMissing = [System.Collections.Generic.List[string]]::new()
 $legacyOrphans = [System.Collections.Generic.List[string]]::new()
 $engineDiagnostics = [System.Collections.Generic.List[string]]::new()
+$surfaceAdvisory = [System.Collections.Generic.List[string]]::new()
 $optionalBaseNames = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
 [void]$optionalBaseNames.Add('New-KbImportPackage')
 [void]$optionalBaseNames.Add('New-KbFront')
@@ -323,6 +334,23 @@ foreach ($exampleFile in Get-ChildItem -LiteralPath $SkillsExamplesPath -Filter 
         foreach ($diag in $engineParamFinding.EngineDiagnostics) {
             $engineDiagnostics.Add(('{0}(reason={1}: {2})' -f $standardLocalName, $diag.Reason, $diag.Detail))
         }
+
+        # Diff de superficie wrapper-local vs molde canonico (helper Get-XpzWrapperSurfaceFinding,
+        # direcao wrapper->molde, complementar ao forwards_unknown_engine_param acima). PERDA de
+        # contrato obrigatorio (mandatory ausente/rebaixado; no_param_block com molde obrigatorio)
+        # -> INVENTORY_CUSTOMIZED reason=surface_mismatch (capturado pelo agregador). Reducoes
+        # opcionais/ValidateSet -> INVENTORY_SURFACE_ADVISORY (rotulo proprio, FORA do regex de
+        # pendencia do agregador -> nao bloqueia). Excedente/delegacao legitima -> quieto. Coexiste
+        # com os checks por-token acima (redundancia aceita, nao deduplicar).
+        $surfaceFinding = Get-XpzWrapperSurfaceFinding -MoldePath $examplePath -LocalPath $standardPath
+        foreach ($b in $surfaceFinding.Blocking) {
+            $blockDetail = if ($b.Detail) { '{0} {1}' -f $b.Reason, $b.Detail } else { [string]$b.Reason }
+            $customized.Add(('{0}(reason=surface_mismatch: {1})' -f $standardLocalName, $blockDetail))
+        }
+        foreach ($a in $surfaceFinding.Advisory) {
+            $advBody = if ($a.Detail) { '{0}: {1}' -f $a.Reason, $a.Detail } else { [string]$a.Reason }
+            $surfaceAdvisory.Add(('{0}(reason={1})' -f $standardLocalName, $advBody))
+        }
     } elseif ($shortExists) {
         $shortNaming.Add($standardLocalName)
     } elseif ($optionalBaseNames.Contains($baseName)) {
@@ -377,6 +405,13 @@ if ($engineDiagnostics.Count -gt 0) {
     # Canal brando: rotulo deliberadamente FORA dos 4 tokens do regex de pendencia do
     # agregador (Test-XpzSetupAudit.ps1) -> nao bloqueia o estado de pasta paralela.
     $statusParts.Add("INVENTORY_ENGINE_DIAGNOSTIC: $($engineDiagnostics -join ', ')")
+}
+if ($surfaceAdvisory.Count -gt 0) {
+    # Canal de aviso de superficie: rotulo deliberadamente FORA dos 4 tokens do regex de
+    # pendencia do agregador (Test-XpzSetupAudit.ps1) -> nao bloqueia o estado de pasta paralela.
+    # So reducao opcional/ValidateSet/no_param_block-opcional; a perda de contrato obrigatorio ja
+    # saiu em INVENTORY_CUSTOMIZED (reason=surface_mismatch) acima.
+    $statusParts.Add("INVENTORY_SURFACE_ADVISORY: $($surfaceAdvisory -join ', ')")
 }
 
 if ($statusParts.Count -eq 0) {
