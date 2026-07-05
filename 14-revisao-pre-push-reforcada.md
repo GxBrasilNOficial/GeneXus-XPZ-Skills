@@ -25,7 +25,7 @@ A **régua de convergência** — independência, diversidade de modelo, pára-n
 
 Os papéis — montagem e opinião pelo agente (sob acionamento humano) vs **decisão** (triagem, convergência e, aqui, **push**) pelo humano — e o guardrail (o agente não decide/age no lugar do humano, nem finge que um único revisor é o painel) são **genéricos e normativos no [`15-revisao-por-pares.md`](15-revisao-por-pares.md)**. No pré-push, a forma concreta:
 
-- **(a) Montagem do painel** — disparar os revisores diversos (modelos via [`xpz-llm-delegate`](xpz-llm-delegate/SKILL.md) + subagentes), cada um com o prompt mínimo verbatim `execute a rotina pre push, sem push`, e **colher os vereditos**; sob acionamento humano (o pedido "execute a reforçada" é esse acionamento).
+- **(a) Montagem do painel** — disparar os revisores diversos (modelos via [`xpz-llm-delegate`](xpz-llm-delegate/SKILL.md) + subagentes), cada um com o prompt mínimo **por capacidade** (ver o bullet «Prompt mínimo por CAPACIDADE» acima): o **git-capable** recebe o verbatim `execute a rotina pre push, sem push`; o **semantic-only** recebe o **dossiê** + fase semântica ([`13`](13-revisao-pre-push.md) «Modo assistido por dossiê»). **Colher os vereditos**; sob acionamento humano (o pedido "execute a reforçada" é esse acionamento).
 - **(b) Decisão é humana** — quem decide se o gap é real, declara a convergência e **autoriza o push** é o humano; o agente **deve opinar e recomendar antes**, mas **não** auto-tria, não declara convergência sozinho nem dá push.
 - **(c) Ser um revisor** — rodar a rotina do [`13`](13-revisao-pre-push.md). Qualquer revisor, humano ou agente.
 
