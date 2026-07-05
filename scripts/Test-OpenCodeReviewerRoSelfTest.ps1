@@ -195,6 +195,11 @@ exit /b %errorlevel%
     Assert-True ((-not $pcvu.pass) -and $pcvu.reason -eq 'version' -and $pcvu.detail -match 'nao foi possivel obter') "(b) versao inobtivel (--version vazio) => BLOCK reason=version 'nao foi possivel obter' (got: $($pcvu.reason))"
     $env:FAKE_OC_VERSION = $testedVersion
 
+    # ── (b-version-esperada-ausente) VERSION.txt ausente (ExpectedVersion vazio) => BLOCK version ──
+    # FAIL-CLOSED: sem versao esperada nao se pode validar a clausula; NUNCA pular o check.
+    $pcve = Test-OpenCodeReviewerRoPrecheck -Exe $fakeCmd -WorkingDirectory $repoRoot -ExpectedVersion '' -RetryDelayMs 0
+    Assert-True ((-not $pcve.pass) -and $pcve.reason -eq 'version' -and $pcve.detail -match 'clausula de validade') "(b) versao esperada ausente (VERSION.txt sumiu) => BLOCK reason=version fail-closed (got: $($pcve.reason))"
+
     # ── (b-ausencia-total) nem project-local nem global => BLOCK static 'ausente' ──
     $emptyWd = Join-Path $tempRoot 'empty-wd'
     New-Item -ItemType Directory -Path $emptyWd -Force | Out-Null

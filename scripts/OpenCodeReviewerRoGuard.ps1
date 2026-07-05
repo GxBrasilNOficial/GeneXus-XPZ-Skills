@@ -406,17 +406,22 @@ function Test-OpenCodeReviewerRoPrecheck {
         return @{ pass = $false; reason = 'static'; detail = $static.detail }
     }
 
-    # 2) versao (cláusula de validade dos claims empiricos)
-    if ($ExpectedVersion) {
-        $installed = Get-OpenCodeVersionFromExe -Exe $Exe
-        if ([string]::IsNullOrWhiteSpace($installed)) {
-            return @{ pass = $false; reason = 'version'
-                detail = "nao foi possivel obter 'opencode --version' (fail-closed)." }
-        }
-        if ($installed -ne $ExpectedVersion) {
-            return @{ pass = $false; reason = 'version'
-                detail = "opencode $installed != versao testada dos fixtures ($ExpectedVersion). Os claims de resolucao podem nao valer; revisitar D2/D3 e re-capturar fixtures antes de ativar." }
-        }
+    # 2) versao (cláusula de validade dos claims empiricos). FAIL-CLOSED TOTAL: se a versao esperada
+    #    nao pode ser determinada (VERSION.txt do fixture ausente/vazio/inacessivel), NAO despachar —
+    #    nao ha como validar a clausula de validade. String vazia e falsy em PS; um `if ($ExpectedVersion)`
+    #    puro PULARIA o check silenciosamente (fail-OPEN) — proibido pelo design D2.
+    if ([string]::IsNullOrWhiteSpace($ExpectedVersion)) {
+        return @{ pass = $false; reason = 'version'
+            detail = "versao esperada ausente (VERSION.txt do fixture nao encontrado/vazio) — nao e possivel validar a clausula de validade; fail-closed." }
+    }
+    $installed = Get-OpenCodeVersionFromExe -Exe $Exe
+    if ([string]::IsNullOrWhiteSpace($installed)) {
+        return @{ pass = $false; reason = 'version'
+            detail = "nao foi possivel obter 'opencode --version' (fail-closed)." }
+    }
+    if ($installed -ne $ExpectedVersion) {
+        return @{ pass = $false; reason = 'version'
+            detail = "opencode $installed != versao testada dos fixtures ($ExpectedVersion). Os claims de resolucao podem nao valer; revisitar D2/D3 e re-capturar fixtures antes de ativar." }
     }
 
     # 3) agent list -> allow-set exato + external_directory nao-allow
