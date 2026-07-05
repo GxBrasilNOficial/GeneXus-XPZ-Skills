@@ -525,7 +525,7 @@ function Get-XpzScriptParamSurface {
 
     $perrs = $null
     $ast = [System.Management.Automation.Language.Parser]::ParseFile($ScriptPath, [ref]$null, [ref]$perrs)
-    $parseable = ($null -ne $ast) -and (@($perrs).Count -eq 0)
+    $parseable = ($null -ne $ast) -and ($null -eq $perrs -or @($perrs).Count -eq 0)
 
     $paramBlock = if ($null -ne $ast) { $ast.ParamBlock } else { $null }
     $hasParamBlock = ($null -ne $paramBlock)

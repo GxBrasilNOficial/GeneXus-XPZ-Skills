@@ -18,8 +18,10 @@ $ErrorActionPreference = 'Stop'
 
 $scriptDir = Split-Path -Parent $PSCommandPath
 . (Join-Path $scriptDir 'XpzWrapperEngineParamSupport.ps1')
+# Fonte unica de encoding UTF-8 sem BOM (norma de reuso; ver 09-inventario, Utf8NoBomEncodingSupport.ps1).
+. (Join-Path $scriptDir 'Utf8NoBomEncodingSupport.ps1')
 
-$utf8 = New-Object System.Text.UTF8Encoding($false)
+$utf8 = Get-Utf8NoBomEncoding
 $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('xpz-engineparam-selftest-{0}' -f ([guid]::NewGuid().ToString('N')))
 $wrapDir = Join-Path $tempRoot 'wrappers'
 $synthEngines = Join-Path $tempRoot 'synthscripts'

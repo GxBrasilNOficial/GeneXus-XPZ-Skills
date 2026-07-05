@@ -11,6 +11,10 @@
     legados orfaos, e os motivos de INVENTORY_CUSTOMIZED: missing_AsJson_passthrough
     (K8/K9), consumes_legacy_text_stdout (Update-*KbFromXpz) e forwards_unknown_engine_param
     (repasse a motor compartilhado advanced de parametro nao-declarado; caso end-to-end).
+    Valida ainda o diff de superficie wrapper-vs-molde (surface_mismatch -> INVENTORY_CUSTOMIZED;
+    reducoes opcionais/ValidateSet -> INVENTORY_SURFACE_ADVISORY) em casos de unidade + end-to-end,
+    mais a guarda-regressao que localiza por conteudo o regex de pendencia do agregador
+    (Test-XpzSetupAudit.ps1) e falha se ele casar os rotulos de aviso.
 #>
 
 [CmdletBinding()]
@@ -23,6 +27,8 @@ $scriptDir = Split-Path -Parent $PSCommandPath
 $inventoryScriptPath = Join-Path $scriptDir 'Test-XpzWrapperInventory.ps1'
 # Dot-source do helper para os casos de UNIDADE do diff de superficie (Get-XpzWrapperSurfaceFinding).
 . (Join-Path $scriptDir 'XpzWrapperEngineParamSupport.ps1')
+# Fonte unica de encoding UTF-8 sem BOM (norma de reuso; ver 09-inventario, Utf8NoBomEncodingSupport.ps1).
+. (Join-Path $scriptDir 'Utf8NoBomEncodingSupport.ps1')
 
 function Assert-Contains {
     param(
@@ -60,7 +66,7 @@ function Assert-NotContains {
 
 # --- Auxiliares dos casos de UNIDADE do diff de superficie ---
 $script:surfaceFixtureCounter = 0
-$script:surfaceUtf8 = New-Object System.Text.UTF8Encoding($false)
+$script:surfaceUtf8 = Get-Utf8NoBomEncoding
 
 function New-SurfaceFixture {
     param([string]$Dir, [string]$Content)
