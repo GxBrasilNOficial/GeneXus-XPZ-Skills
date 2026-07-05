@@ -182,7 +182,11 @@ try {
 finally { Remove-TempDir -Path $tmp }
 
 # ---------------------------------------------------------------------------
-# Caso (c): parse quebrado => mechanicalStatus=failed, dossierReady=true
+# Caso (c): JSON VALIDO + exit != 0 (parse-gate do mecanico falho) => mechanicalStatus
+# =failed, dossierReady=true, e os campos vem DO JSON (parseOk=true). Contrasta com o
+# caso (o) (JSON imparseavel => modo degradado => pushReadiness/intervalDiffDiagnosticOnly
+# indeterminados). O .ps1 quebrado faz o parse-gate reprovar: o mecanico sai 1 mas emite
+# JSON valido; commitsBehind=0 (HEAD a frente por 1, atras por 0) => pushReadiness='ok'.
 # ---------------------------------------------------------------------------
 $tmp = New-TempDir
 try {
@@ -190,6 +194,9 @@ try {
     $json = Invoke-Builder -BuilderArgs @('-RootPath', $tmp, '-AsJson') | ConvertFrom-Json
     Assert-True -CaseName 'c: dossierReady=true (mesmo com parse quebrado)' -Condition ($json.dossierReady -eq $true)
     Assert-True -CaseName 'c: mechanicalStatus=failed' -Condition ($json.mechanicalStatus -eq 'failed') -Detail ("mechanicalStatus={0} exit={1}" -f $json.mechanicalStatus, $json.mechanicalExitCode)
+    Assert-True -CaseName 'c: mechanicalExitCode != 0 com JSON valido' -Condition ($json.mechanicalExitCode -ne 0) -Detail ("exit={0}" -f $json.mechanicalExitCode)
+    Assert-True -CaseName 'c: pushReadiness vem do JSON (ok, NAO degradado unknown)' -Condition ($json.pushReadiness -eq 'ok') -Detail ("pushReadiness={0}" -f $json.pushReadiness)
+    Assert-True -CaseName 'c: intervalDiffDiagnosticOnly do JSON (false bool, NAO null)' -Condition ($json.intervalDiffDiagnosticOnly -eq $false) -Detail ("intervalDiffDiagnosticOnly={0}" -f $json.intervalDiffDiagnosticOnly)
 }
 finally { Remove-TempDir -Path $tmp }
 
@@ -281,6 +288,7 @@ finally {
 Write-Output '---'
 if ($failures -eq 0) {
     Write-Output ("SELFTEST_OK: {0}/{0} asserts passaram" -f $cases)
+    Write-Output 'BUILD_PREPUSH_REVIEW_DOSSIER_SELFTEST_OK'
     exit 0
 } else {
     Write-Output ("SELFTEST_FAIL: {0} de {1} asserts falharam" -f $failures, $cases)
