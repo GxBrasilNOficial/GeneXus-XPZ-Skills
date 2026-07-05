@@ -44,7 +44,7 @@ Quando `commitsBehind > 0`, o intervalo `BaseRef..HEAD` deixa de representar lim
 
 No tier **reforçado** ([`14`](14-revisao-pre-push-reforcada.md)), nem todo revisor consegue **executar** este passo mecânico: os adapters de LLM rodam os backends em modo restrito, e há uma classe **semantic-only** que **não tem shell** (não roda git nem `pwsh`) — o opencode `reviewer-ro` (nega `bash`) e, por configuração de adapter, Claude Code, Copilot e Gemini. A classe **git-capable** (roda git) é o Codex-delegate (sandbox read-only) e o subagente nativo (Bash). Duas capacidades, provadas empiricamente por probe, não inferidas.
 
-Para o revisor **semantic-only**, o orquestrador — que tem git — roda o passo mecânico **uma vez** e monta um **dossiê** com [`scripts/Build-PrePushReviewDossier.ps1`](scripts/Build-PrePushReviewDossier.ps1), entregue **inline via stdin**:
+Para o revisor **semantic-only**, o orquestrador — que tem git — roda o passo mecânico **uma vez** e monta um **dossiê** com [`scripts/Build-PrePushReviewDossier.ps1`](scripts/Build-PrePushReviewDossier.ps1), entregue **inline no prompt** (o transporte por adapter — stdin vs argv — está no «Eixo do transporte» abaixo):
 
 - **Seção A — git BRUTO (fato):** `rev-parse HEAD`, `log origin/main..HEAD`, `diff origin/main..HEAD`, `status --porcelain`.
 - **Seção B — diagnóstico mecânico (NÃO verdade):** o container inteiro do `Invoke-PrePushMechanicalChecks.ps1 -AsJson`, sob cabeçalho literal único rotulado «candidatas a verificar, NÃO verdade». O mecânico é a **fonte de verdade** de `commitsBehind`/`pushReadiness`; o builder **referencia** (lê do `-AsJson`), não mantém um segundo rastreador. Se o mecânico falhar ou lançar, o dossiê continua **pronto** com `mechanicalStatus=failed`.
