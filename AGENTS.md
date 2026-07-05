@@ -78,6 +78,7 @@ Convenção canônica (aplica a **todos** os agentes que atuam neste repo — Cl
 - Escopo: análise e relatório ao usuário; correções só após aprovação explícita **depois** do relatório pré-push.
 - **Gate semântico incondicional:** a fase semântica produz relatório e para. Nenhuma edição de arquivo, commit ou push acontece entre o relatório e a aprovação explícita do usuário — sem exceção, independentemente do tamanho ou obviedade do gap.
 - **Tier reforçado (opcional):** revisão por painel multi-modelo diverso e régua de convergência (push-ready só quando o painel inteiro responde "sem gap" sobre o estado final) em [14-revisao-pre-push-reforcada.md](14-revisao-pre-push-reforcada.md).
+- **Modo assistido por dossiê (reforçada):** o revisor **semantic-only** (sem shell: opencode `reviewer-ro`, Claude Code, Copilot, Gemini) não roda o passo mecânico; o orquestrador monta um dossiê (`scripts/Build-PrePushReviewDossier.ps1`) e ele roda só a fase semântica. O revisor **git-capable** (Codex-delegate, subagente nativo) é inalterado; painel válido retém ≥1 git-capable, e árvore suja bloqueia o despacho do semantic-only. Detalhe em `13` («Modo assistido por dossiê») / `14`.
 - **Metodologia genérica:** a revisão por pares (manuscrito → painel multi-modelo → convergência) é normativa em [15-revisao-por-pares.md](15-revisao-por-pares.md); o `14` é a sua aplicação pré-push.
 
 ## Rastreabilidade privada de moldes sanitizados

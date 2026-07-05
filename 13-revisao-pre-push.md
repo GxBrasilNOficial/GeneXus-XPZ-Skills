@@ -40,6 +40,24 @@ Quando a intenção for comparar contra o **remoto real atual**, garantir `origi
 
 Quando `commitsBehind > 0`, o intervalo `BaseRef..HEAD` deixa de representar limpidamente «só o que falta enviar» — compara árvores divergentes; lista de arquivos e `git diff --check` nesse intervalo são **apenas diagnósticos**. O orquestrador emite `pushReadiness=blocked` (sem falhar parse/whitespace). A pré-push **não** deve ser considerada liberada para push até integrar o remoto: se ainda não houve fetch, `git fetch origin`; se `commitsBehind` persistir, integrar com o usuário (ex.: `git pull --rebase origin main` ou merge) — não fazer push automático.
 
+### Modo assistido por dossiê (revisor semantic-only)
+
+No tier **reforçado** ([`14`](14-revisao-pre-push-reforcada.md)), nem todo revisor consegue **executar** este passo mecânico: os adapters de LLM rodam os backends em modo restrito, e há uma classe **semantic-only** que **não tem shell** (não roda git nem `pwsh`) — o opencode `reviewer-ro` (nega `bash`) e, por configuração de adapter, Claude Code, Copilot e Gemini. A classe **git-capable** (roda git) é o Codex-delegate (sandbox read-only) e o subagente nativo (Bash). Duas capacidades, provadas empiricamente por probe, não inferidas.
+
+Para o revisor **semantic-only**, o orquestrador — que tem git — roda o passo mecânico **uma vez** e monta um **dossiê** com [`scripts/Build-PrePushReviewDossier.ps1`](scripts/Build-PrePushReviewDossier.ps1), entregue **inline via stdin**:
+
+- **Seção A — git BRUTO (fato):** `rev-parse HEAD`, `log origin/main..HEAD`, `diff origin/main..HEAD`, `status --porcelain`.
+- **Seção B — diagnóstico mecânico (NÃO verdade):** o container inteiro do `Invoke-PrePushMechanicalChecks.ps1 -AsJson`, sob cabeçalho literal único rotulado «candidatas a verificar, NÃO verdade». O mecânico é a **fonte de verdade** de `commitsBehind`/`pushReadiness`; o builder **referencia** (lê do `-AsJson`), não mantém um segundo rastreador. Se o mecânico falhar ou lançar, o dossiê continua **pronto** com `mechanicalStatus=failed`.
+- **Sentinelas** ao fim (`HEAD:` + `END_DOSSIER sha256=`), **anti-truncamento**: o revisor as ecoa; o hash cobre o **corpo** (bytes UTF-8 sem BOM, EOL=LF, excluindo as sentinelas). Eco ausente **mas parecer on-task** = `responded`+`noEchoSentinel` no recibo (não `noResponse`). É anti-truncamento, **não** anti-dossiê-errado — contra isso vale o invariante git-capable (`14`).
+
+**Eixo do transporte.** Adapters `stdin-dossier-capable` (opencode, Claude Code) recebem o dossiê por stdin, sem teto prático. Adapters `argv-limited` (Copilot, Gemini) passam o prompt por argv, com guard fail-closed (~30000 chars): dossiê acima do teto ⇒ o orquestrador **omite** o revisor (`unavailable`+`dossier-too-large`), sem truncar nem degradar em silêncio.
+
+O revisor semantic-only roda **só a fase semântica** read-only sobre o dossiê; **não** roda o passo mecânico (não pode). O revisor git-capable é **inalterado**: roda a rotina inteira e reproduz a Seção A por conta própria. Um painel reforçado válido retém **≥1 git-capable** que reproduz a Seção A (ver [`14`](14-revisao-pre-push-reforcada.md)).
+
+**Gate de árvore limpa (pré-condição adicional do modo dossiê).** O semantic-only lê a árvore **viva** por `read`/`grep`/`glob`, e a Seção A cobre só o commitado — conteúdo não-commitado contaminaria a leitura dele **sem que ele possa distinguir** committed de working-tree (não tem git). Por isso, com `workingTreeDirty=true`, o orquestrador **não despacha** os revisores semantic-only: para, reporta a **lista de paths sujos** (`git status --porcelain`) e pede **commit ou stash**. Só gateia o semantic-only — o git-capable **pode distinguir** committed de working-tree e segue normal. É pré-condição **adicional** do modo dossiê, coerente com o item «Working tree» dos limites acima (que trata do passo mecânico apenas **avisar**): aqui a leitura da árvore viva pelo próprio revisor exige a garantia.
+
+A **política de painel** (invariante git-capable, piso de diversidade, serial por custo, dossiê regenerado a cada novo HEAD) é normativa no [`14`](14-revisao-pre-push-reforcada.md).
+
 ## Fase semântica — por frente alterada
 
 ### 1. Inventário da frente
@@ -181,6 +199,7 @@ Ver `10-base-operacional-msbuild-headless.md` e gate `Test-PrePushMsBuildProbeDo
 | Script | Papel |
 | --- | --- |
 | `scripts/Invoke-PrePushMechanicalChecks.ps1` | Orquestrador mecânico (git, parse, avisos) |
+| `scripts/Build-PrePushReviewDossier.ps1` | Monta o dossiê (Seção A git bruto + Seção B `-AsJson`) para o revisor **semantic-only** da reforçada (ver «Modo assistido por dossiê»); dono normativo do modo = este `13`, política de painel = `14` |
 | `scripts/Test-PyScriptsParse.ps1` | Parse AST de `scripts/*.py` sem gerar bytecode |
 | `scripts/Test-PrePushTraceabilityCoverage.ps1` | Rastreabilidade editorial + paridade motor/doc; trava `PUBLIC_TRACEABILITY_VERBOSE_LINE` do índice de ponteiros do `09` (consultivo) |
 | `scripts/Test-PrePushMsBuildProbeDocParity.ps1` | Paridade MSBuild probe (quando aplicável) |

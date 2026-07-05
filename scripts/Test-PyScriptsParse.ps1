@@ -100,7 +100,10 @@ print(json.dumps(findings, ensure_ascii=False))
 sys.exit(1 if findings else 0)
 '@
 
-    $parserOutput = & $pythonPath -c $parserCode @($files.FullName) 2>&1
+    # Sob StrictMode, $files.FullName lanca quando $files e array vazio (scripts/ sem
+    # nenhum .py). Materializar os caminhos por ForEach-Object e seguro com zero itens.
+    $filePaths = @($files | ForEach-Object { $_.FullName })
+    $parserOutput = & $pythonPath -c $parserCode @filePaths 2>&1
     $parserExitCode = $LASTEXITCODE
     $parserText = ($parserOutput | ForEach-Object { $_.ToString() }) -join [Environment]::NewLine
 

@@ -891,9 +891,18 @@ payload para Anthropic (`anthropic/claude-opus-4-8`) e, portanto, é externo. Co
 - Para **consulta curta restrita**, usar os defaults do adapter: `-PermissionMode plan`,
   `-Tools Read,Glob,Grep`, persistência de sessão desabilitada e `-Cd` apontando ao menor
   diretório necessário. `-MaxTurns` só entra quando a CLI local suportar `--max-turns`.
-- Para **revisor pré-push**, a rotina pode precisar de `git` e scripts locais; não reaproveitar
-  cegamente o perfil restrito de consulta curta. Definir explicitamente ferramentas/permissões
-  suficientes para leitura e comandos de validação, sem usar `bypassPermissions`.
+- Para **revisor pré-push**, a rotina pode precisar de `git` e scripts locais. Definir
+  explicitamente ferramentas/permissões suficientes para leitura e comandos de validação
+  (sem `bypassPermissions`) **só vale FORA do painel** — via `Invoke-ClaudeCode.ps1` **direto**.
+  **In-panel é INALCANÇÁVEL:** `Invoke-LlmDelegatePanelDispatch.ps1` recusa override de
+  `tools`/`maxturns`/`permissionmode` do Claude Code (`ContentionKeys`), então no painel o Claude
+  Code roda como **semantic-only** (`plan`, `Read,Glob,Grep`, `MaxTurns=1`) e **não** obtém git. Para
+  dar git a um revisor pré-push, use um **git-capable** (Codex-delegate ou subagente nativo) ou o
+  **modo assistido por dossiê** — o orquestrador roda o mecânico e entrega o dossiê ao semantic-only
+  (ver [`13-revisao-pre-push.md`](../13-revisao-pre-push.md) «Modo assistido por dossiê» e
+  [`14-revisao-pre-push-reforcada.md`](../14-revisao-pre-push-reforcada.md)). Limite adicional: mesmo
+  como semantic-only, o Claude Code in-panel é **fraco** (`MaxTurns=1`) — preferir o opencode
+  `reviewer-ro` como voz semantic-only.
 - Os adapters `Invoke-ClaudeCode.ps1` e `Start-ClaudeCodeJob.ps1` bloqueiam
   `PermissionMode=bypassPermissions`; esse modo não faz parte da delegação XPZ.
 
