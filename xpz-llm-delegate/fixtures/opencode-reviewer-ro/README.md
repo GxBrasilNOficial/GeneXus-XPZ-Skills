@@ -26,8 +26,9 @@ podem não valer; re-capturar os fixtures e revisitar D2/D3 antes de reativar.
 - `equiv-permission-vs-tools.sample.txt` — **equivalência `permission: deny` ≡ `tools: false`**
   (medida em 1.4.4): dois agentes-probe que negam a MESMA tool (`webfetch`), um pela forma
   `permission: { webfetch: deny }`, outro pela forma `tools: { webfetch: false }`, resolvem
-  **idêntico** no `agent list` — ambos `webfetch → deny`. Ancora a refutação da nota antiga de
-  `999:168` («`tools: false` mais forte que `permission: deny`»).
+  **idêntico** no `agent list` — ambos `webfetch → deny`. Ancora a refutação da nota antiga
+  migrada para `historico/IdeiasImplementadas_202607.md` («`tools: false` mais forte que
+  `permission: deny`»).
 - `merge-global-only-reviewer-ro.sample.txt` — **merge global↔project (substituição, não campo a
   campo)**: resolução do `reviewer-ro` quando **só** o global interino (forma `tools:`, `mode:
   primary`) aplica (cwd sem `.opencode/`). Contrasta com `agentlist-reviewer-ro.sample.txt`
