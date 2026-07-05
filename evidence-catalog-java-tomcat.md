@@ -1,6 +1,6 @@
 # Evidence catalog — GeneXus Java/Tomcat (Fase 0, aterramento empírico)
 
-> **Status:** Fase 0 concluída **com um gap declarado** (Q5b — o re-teste controlado de 2026-07-04 ficou inconclusivo por sonda no-op; ver Q5). **VEREDITO: Plano B acionado** — a topologia real do deploy Java/Tomcat é **externa** à árvore de output, invalidando a hipótese *in-place* que o design congelou para o motor da Fase 3 (ver [`java-tomcat-paridade-gerador-design.md`](java-tomcat-paridade-gerador-design.md), seção "Congelamento vale para a hipótese in-place"). O resto do design **não** reabre.
+> **Status:** Fase 0 **concluída** (Q5b **confirmado** pelo re-teste controlado decisivo de 2026-07-04, rota manual pela IDE; ver Q5). **VEREDITO: Plano B acionado** — a topologia real do deploy Java/Tomcat é **externa** à árvore de output, invalidando a hipótese *in-place* que o design congelou para o motor da Fase 3 (ver [`java-tomcat-paridade-gerador-design.md`](java-tomcat-paridade-gerador-design.md), seção "Congelamento vale para a hipótese in-place"). O resto do design **não** reabre.
 >
 > **Data da coleta:** 2026-07-04. **Registro-resumo:** [`999-ideias-pendentes.md`](999-ideias-pendentes.md).
 
@@ -63,22 +63,33 @@ Esse `SERVLET_DIR` é o análogo Java do `kb_environment_web_dirs`: um futuro ga
 
 **Os `.class` da aplicação** em `webapps\<app>\WEB-INF\classes\com\<pacote-da-kb>\*.class` (aqui `com\ebtech\`) — **não** os `.jar` de `WEB-INF\lib`.
 
-Evidência **indireta** (por timestamps escalonados, não por teste controlado): objetos diferentes têm mtime diferente conforme foram tocados em builds incrementais distintos — ex.: `ebt_gamuserentry*.class` e `bb_importarextratoconta*.class` em 2026-06-29 19:02:39, enquanto `bbextrato*.class` e `bb_carregarconfiguracaoconta*.class` em 2026-07-02 19:06:29. Isso indica **regravação por objeto alterado** (incremental), consistente com o modelo .NET de "DLL de objeto regrava". O re-teste controlado de 2026-07-04 **não** confirmou nem refutou esse mecanismo (a sonda foi um no-op semântico; ver Q5) — mas os mtimes escalonados acima **provam** que builds reescreveram `.class` de objeto no `WEB-INF\classes` externo em momentos distintos, ou seja, **o sinal de frescor existe**.
+Evidência **indireta** (por timestamps escalonados, não por teste controlado): objetos diferentes têm mtime diferente conforme foram tocados em builds incrementais distintos — ex.: `ebt_gamuserentry*.class` e `bb_importarextratoconta*.class` em 2026-06-29 19:02:39, enquanto `bbextrato*.class` e `bb_carregarconfiguracaoconta*.class` em 2026-07-02 19:06:29. Isso indica **regravação por objeto alterado** (incremental), consistente com o modelo .NET de "DLL de objeto regrava". O re-teste controlado **decisivo** de 2026-07-04 (rota manual pela IDE) **confirmou** o mecanismo (ver Q5): uma mudança real de objeto recompilou o **`<obj>_impl.class`** e atualizou o `.class` publicado no `WEB-INF\classes` externo, com o publicado batendo com o local.
 
 ### Q5 — Incremental sem mudança vs com mudança
 
-**Re-teste controlado rodado em 2026-07-04 (KB EBTECH, env `Prototipo_18U14`) — resultado PARCIAL/INCONCLUSIVO.** Três builds incrementais com snapshots de mtime das duas árvores (`web\build\classes\java\main` local e `WEB-INF\classes` publicado):
+**Fechado por re-teste controlado decisivo em 2026-07-04 (KB EBTECH, env `Prototipo_18U14`, rota manual pela IDE, sem import).**
 
-- **Q5a (build SEM mudança → nenhuma reescrita de `.class`):** confirmado — delta zero nas duas árvores. Calibra "sem mudança = unknown, **não** stale". (Corroboração fraca pelos confounders abaixo, mas na direção esperada.)
-- **Q5b/Q4 (build COM mudança de 1 objeto → reescrita do `.class` do objeto):** **NÃO respondido.** A mudança aplicada foi um **no-op semântico** (`&isConnectionOK = &isConnectionOK` no evento Start do `WebPanel:EBT_Login`) e também deu **delta zero**. Isso **não** prova ausência de sinal — é artefato da sonda.
+**Tentativas anteriores (contexto):** a 1ª (2026-07-04) foi **inconclusiva por sonda no-op** — a mudança `&isConnectionOK = &isConnectionOK` no Start do `WebPanel:EBT_Login` foi eliminada pelo gerador (DCE) → `.java` gerado idêntico → nada tocado (**delta zero por artefato da sonda**, não ausência de sinal). Uma 2ª tentativa ficou barrada por uma **reorg de banco pré-existente** da KB (ruído estrutural, não do frescor). Lição transportável: em Java, quem é content-aware é a **geração GeneXus** — um no-op que gera código idêntico não propaga nada.
 
-**Por que o "delta zero" NÃO é a verdade do frescor Java (confounders, em ordem de força):**
+**Tentativa decisiva — CONFIRMADA.** Com a KB restaurada e limpa (BuildAll sem mudança rodou **sem reorg**, exitCode 0, BuildAllDone true — reconfirma Q5a), inseriu-se pela **IDE** `msg("FASE0-PROBE-20260704")` no Start do `EBT_Login` (mudança real, resistente a DCE). BuildAll com mudança rodou **sem reorg** (Specification + Default (Java) Generation + compilação Java). Resultado por hash+mtime nas três localizações:
 
-1. **Sonda no-op.** Autoatribuição de variável é eliminada pelo gerador (mecanismo (b)/DCE, documentado na `xpz-msbuild-build`): o `.java` gerado sai **byte-idêntico**. E — achado central — o build Java é **Gradle**, incremental **por conteúdo/hash**, não por timestamp como o MSBuild/.NET: `.java` idêntico ⇒ não recompila ⇒ `.class` não muda de mtime. A sonda nunca forçou um delta de código gerado.
-2. **`exitCode 90` (falha de pós-processamento do wrapper) + a lista de fases não menciona COMPILE nem DEPLOY** (para em "Default (Java) Generation" / "Reorganização" / "Close KB"). Não há prova de que o ciclo generate→compile→deploy-para-Tomcat fechou; se rodou generate-only ou abortou antes do compile, nada tocaria `.class` — independentemente da edição.
-3. **Reorg em todas as três execuções** (Database Impact Analysis + Reorganização) indica estado estrutural pendente na KB — ruído que desvia do caminho incremental limpo de objeto.
+| Local | Artefato | Hash ANTES→DEPOIS | mtime avançou |
+|---|---|---|---|
+| A (`.java` local) | `ebt_login.java` (stub) | **inalterado** | sim |
+| A (`.java` local) | `ebt_login_impl.java` (lógica) | **literal apareceu** | sim |
+| B (`.class` local) | `ebt_login_impl.class` | **mudou** (`072F8A20…`→`A624A810…`) | sim |
+| B (`.class` local) | `ebt_login.class` (stub) | inalterado | sim |
+| C (`.class` publicado) | `ebt_login_impl.class` | **mudou; = ao local B** | sim |
+| C (`.class` publicado) | `ebt_login.class` (stub) | inalterado | sim |
 
-**Prova cruzada de que o sinal existe:** os mtimes escalonados do **primeiro** relatório (`.class` de objetos distintos em 2026-06-29 vs 2026-07-02, ver Q4) mostram que builds reescreveram `.class` de objeto no `WEB-INF\classes` publicado em momentos diferentes. Logo "o deploy nunca atualiza `WEB-INF\classes`" é contraditado pelos próprios dados. O gap Q4/Q5b **permanece aberto**, pendente de um re-teste com mudança que **provadamente** altere o código gerado — ver "Itens abertos".
+- **Q5a (build sem mudança → sem stale):** confirmado — os `.class` do objeto ficaram com hash/mtime intactos (2026-06-29) após o BuildAll sem mudança.
+- **Q5b (build com mudança → objeto regrava):** **confirmado** — a mudança real propagou **geração → recompile Gradle do `_impl.class` → deploy no `WEB-INF\classes` externo**, com o publicado (C) batendo com o local (B). Um gate de deploy-bin Java keyed no `.class` de objeto sob o `WEB-INF\classes` externo **detectaria** a publicação. Confirma também a **prova cruzada** (mtimes escalonados do 1º relatório): o sinal de frescor **existe** e regrava por objeto.
+
+**Nuances confirmadas (relevantes para a Fase 3):**
+
+- **Split stub/impl:** o objeto gera `<obj>.class`/`<obj>.java` (stub, estável) **+** `<obj>_impl.class`/`_impl.java` (a lógica). O código do evento vive no **`_impl`**; é o `_impl.class` que muda de conteúdo. O artefato portador de frescor é o **`_impl.class`**.
+- **mtime avança em TODOS os artefatos do objeto** num build **com** mudança (até nos de conteúdo estável, `<obj>.class`/`.java`), enquanto no build **sem** mudança **nada** é tocado (Q5a). Logo um gate **por mtime** (`.class` de objeto ≥ início do build) é **viável e correto**.
+- **Não-determinismo na reversão:** ao remover o `msg` e rebuildar, o `_impl.class` **não** voltou ao hash inicial (recompilação não byte-a-byte determinística). Consequência: o gate deve detectar frescor **por mtime vs início-do-build**, **não** por hash-vs-golden.
 
 ### Q6 — Sentinela (análogo a `GxNetCoreStartup.dll`)
 
@@ -116,7 +127,8 @@ O aterramento confirma que a Fase 3 **é replanejada** (não apenas parametrizad
 5. **`sentinel` = `GeneXus.jar`** (no `WEB-INF\lib` externo), com `web.xml`/`gxweb-*.jar` auxiliares.
 6. **Sem `.war`** no fluxo cotidiano — o gate afere o **webapp exploded**, não um pacote `.war` (o `.war` seria um fluxo de deploy separado a modelar à parte, se algum dia entrar no escopo).
 7. **`outputModelSubPath` provavelmente precisa desdobrar** em Java: raiz do fonte gerado (`web\src\main\java`, local) ≠ raiz do artefato de deploy (`WEB-INF\classes`, externo).
-8. **Build Java = Gradle (incremental por conteúdo/hash), não por timestamp** como o MSBuild/.NET (achado do re-teste de 2026-07-04, ver Q5). O Gradle só reescreve o que muda de **conteúdo** — um objeto reeditado com código gerado idêntico (ex.: no-op eliminado por DCE) **não** bumpa o mtime do `.class`. Um gate de frescor Java keyed em mtime herda essa semântica: precisa ser desenhado ciente de que "mtime não avançou" pode significar "conteúdo idêntico, não recompilado" e não necessariamente "build não rodou". Divergência de fundo frente ao modelo .NET a tratar na Fase 3.
+8. **Geração GeneXus é content-aware; build Java = Gradle** (confirmado no re-teste decisivo de 2026-07-04, ver Q5). Uma mudança que gera código **idêntico** (no-op eliminado por DCE) não propaga nada; uma mudança **real** regenera o `_impl.java`, o Gradle recompila o `_impl.class` e o deploy o publica — e o **mtime avança em todos os artefatos do objeto** (build sem mudança não toca nada). Um gate de frescor Java **por mtime** (`.class` de objeto ≥ início do build) é **viável e correto**; deve comparar **mtime vs início-do-build**, **não** hash-vs-golden (a recompilação não é byte-determinística — ver Q5).
+9. **Frescor por objeto = `<obj>_impl.class`, não `<obj>.class`** (achado do re-teste decisivo). Em Java o objeto se divide em stub (`<obj>.class`/`.java`, estável) + lógica (`<obj>_impl.class`/`_impl.java`, onde o código do evento vive e o conteúdo muda). O motor de frescor da Fase 3 considera o **conjunto** de `.class` do objeto (todos ganham mtime novo no build com mudança), com o `_impl.class` como portador do delta de conteúdo.
 
 Nada disso reabre as decisões (a)–(e) nem a cláusula no-bridge; é o replanejamento da Fase 3 já autorizado pela cláusula de Plano B.
 
@@ -124,7 +136,6 @@ Nada disso reabre as decisões (a)–(e) nem a cláusula no-bridge; é o replane
 
 ## Itens abertos
 
-- **Gap Q4/Q5b (ainda ABERTO após o re-teste de 2026-07-04):** Q5a (sem mudança → sem reescrita) ficou corroborado, mas Q5b (mudança de 1 objeto → reescrita do seu `.class`) **não** foi respondido — a sonda foi um no-op semântico (delta zero por artefato, não por ausência de sinal; ver Q5). **Re-teste decisivo necessário**, removendo os confounders: (i) mudança que **provadamente** altere o código gerado (ex.: trocar um literal de texto exibido na tela, não uma autoatribuição); (ii) usar **BuildAll** (specify+generate+**compile**), confirmando que a fase de compile+deploy rodou e que exit não foi só `90` de pós-processamento; (iii) snapshotar **também** o `.java` gerado (`web\src\main\java\com\<kb>\<obj>.java`), não só os `.class`, para separar "gerou diferente" de "recompilou". Requer build na máquina da colega, com ok dela e edição reversível. Prompt do re-teste decisivo preparado nesta frente.
 - **Dois sabores Java (Jakarta vs javax):** a evidência é do sabor `JAKARTA_EE`/`jakarta.*`. O sabor `JAVA_EE`/`javax.*` (ex.: env Java da `wsEducacaoSpTeste`, Tomcat 8/9, JDK 8) tem nomes de jar de runtime distintos. A família `java-tomcat` deve ser namespace-agnóstica ou cobrir os dois. Não força mudança de design agora; é aviso para a Fase 3.
 - **`.war` (fluxo de deploy explícito):** não observado; se um dia o escopo incluir deploy empacotado, exige aterramento próprio.
 
