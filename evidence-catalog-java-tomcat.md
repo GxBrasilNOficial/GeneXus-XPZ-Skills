@@ -116,6 +116,18 @@ Padrões de nome de jar GeneXus/runtime observados (referência; distilação da
 
 ---
 
+## Triagem de alvo de deploy (parte C — cláusula de momento)
+
+Snapshot **no instante da decisão**, da KB de **dev `wsEducacaoSpTeste`** (não da KB de aterramento `EBTECH`), por evidência do `kb-source-metadata.md` + `model.ini`:
+
+- Alvo de deploy atual: `deployment_environment_name = NETFrameworkSQLServer`, `deployment_hosting_kind = dotnet-framework-iis` — há env **.NET ativo** como alvo de deploy.
+- O env Java (`JavaPostgreSQL208`) é **separado**, nunca o alvo de deploy.
+- **Classificação: `e-mantém`** — o .NET continua o alvo; Java fica em environment separado. Declarar `deployment_hosting_kind=java-tomcat` nesta KB **desabilitaria o gate .NET** (regressão, pois o deploy real é .NET). Para esta KB, Java permanece environment de estudo; a metadata **não** deve ser virada para `java-tomcat`.
+
+Ressalva: a evidência de topologia/frescor acima veio da KB `EBTECH` (a máquina de dev não tem licença Java); a triagem de alvo de deploy é da `wsEducacaoSpTeste` e vale para o instante em que foi lida — a cláusula de momento admite que uma decisão futura de migrar o alvo .NET→Java reabra a classificação.
+
+---
+
 ## Implicações para o contrato do registro e a Fase 3 (Plano B)
 
 O aterramento confirma que a Fase 3 **é replanejada** (não apenas parametrizada). Impactos concretos no contrato de `GeneXusKbHostingKindSupport.ps1`:
