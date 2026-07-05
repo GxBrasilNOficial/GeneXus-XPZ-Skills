@@ -6,7 +6,7 @@
 
 ## Fonte da evidência
 
-- Coleta feita por um agente numa **máquina de terceiro** (a máquina de dev **não tem licença Java**; build local impossível). Modo **read-only** (nenhum build rodado — daí o gap Q4/Q5).
+- Coleta feita por um agente numa **máquina de terceiro** (a máquina de dev **não tem licença Java**; build local impossível). Modo **read-only** na coleta inicial; os re-testes de frescor (Q5, rota manual pela IDE) **rodaram builds** na máquina da colega — Q4/Q5 fechados.
 - **KB observada:** `EBTECH`. **GeneXus:** 18 Upgrade 14. **Environment Java:** `Prototipo_18U14`. **KB nativa:** `C:\Applications\GeneXus\18U14_IA\EBTECH`.
 - **Sabor Java observado:** `JAKARTA_EE` / `TOMCAT_10_1` / JDK 21 / namespace `jakarta.*` / build **Gradle** / DataStore PostgreSQL.
 - **Ressalva de generalização:** é **uma** KB Java, no sabor **Jakarta**. O env Java da `wsEducacaoSpTeste` (não buildável aqui) é do **outro sabor** — `JAVA_EE` / `TOMCAT_8_9` / JDK 8 / namespace `javax.*`. Os nomes de jar de runtime diferem entre os dois sabores (`jakarta.*` vs `javax.*`). A família `java-tomcat` precisa ser **namespace-agnóstica** ou cobrir os dois sabores — ver "Itens abertos".
