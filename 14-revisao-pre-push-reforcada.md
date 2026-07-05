@@ -39,6 +39,8 @@ Os papéis — montagem e opinião pelo agente (sob acionamento humano) vs **dec
 
 **HEAD estável durante a rodada.** O dossiê é regenerado a **cada novo HEAD**: `git rev-parse HEAD` vivo ≠ HEAD do dossiê ⇒ **regenera**, junto à checagem de árvore limpa, imediatamente antes de cada despacho. Vige a premissa de HEAD estável durante a rodada (serial + re-checagem detectam mudança na próxima invocação). O git-capable **não** é instrumentado (verbatim inalterado); o eco de HEAD é só dos semantic-only.
 
+**Nota de operador — opencode em cwd de worktree (Windows).** O Claude Code desktop roda em **git worktree**, e `opencode run` **falha** nesse cwd (stdout vazio / `uv_spawn ENAMETOOLONG` por causa do gitlink `.git`). Para despachar revisor **opencode** a partir de um worktree, materialize o HEAD num **dir plano** (`git archive HEAD` → dir sem `.git`) e rode o adapter de lá (o dossiê vai por stdin, independe do cwd). Detalhe e workaround em [`xpz-llm-delegate/SKILL.md`](xpz-llm-delegate/SKILL.md), «LIMITE CONHECIDO — opencode run FALHA EM CWD DE GIT WORKTREE». Os demais backends têm `-Cd` e não sofrem disto.
+
 **Proibição (o guardrail):** um agente **não** pode (1) **decidir e agir** no lugar do humano — auto-triar e aplicar correção, declarar convergência, dar push — nem (2) **fingir** que um solo (só o passo c) é a reforçada. A **decisão** de triagem/convergência/push é nó humano; sem ele, ou se colapsa a salvaguarda, ou se degenera na rotina do `13`. O erro **não** é montar o painel **nem opinar** (isso o agente deve); o erro é o agente **decidir/agir** no lugar do humano.
 
 ## Relação com os outros documentos

@@ -113,6 +113,10 @@ if ($OpenCodeExe) {
 $agentExplicit = $PSBoundParameters.ContainsKey('Agent') -and -not [string]::IsNullOrWhiteSpace($Agent)
 if (-not $agentExplicit) { $Agent = 'reviewer-ro' }
 $isReviewerPath = ($Agent -eq 'reviewer-ro')
+# cwd HERDADO (o opencode nao tem -Cd; a leitura do reviewer-ro confina-se a ele). ATENCAO:
+# no Windows, `opencode run` FALHA (stdout vazio / uv_spawn ENAMETOOLONG) quando este cwd e um
+# git WORKTREE (.git gitlink). Rode de um dir plano sem .git (ex.: git archive HEAD -> dir).
+# Ver SKILL.md, secao "LIMITE CONHECIDO - opencode run FALHA EM CWD DE GIT WORKTREE (WINDOWS)".
 $cwd = (Get-Location).Path
 if ($isReviewerPath) {
     $pc = Test-OpenCodeReviewerRoPrecheck -Exe $exe -WorkingDirectory $cwd

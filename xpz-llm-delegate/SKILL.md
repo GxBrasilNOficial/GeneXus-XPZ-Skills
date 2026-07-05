@@ -922,6 +922,37 @@ consulta curta, podem carregar contexto próprio e são serviços externos: Copi
 - Nenhum dos dois substitui o backend one-shot futuro (`llm`/`mods`/equivalente) para o caso
   em que é essencial enviar só o prompt sem camada agêntica.
 
+## LIMITE CONHECIDO — `opencode run` FALHA EM CWD DE GIT WORKTREE (WINDOWS)
+
+**Sintoma:** `opencode run` (qualquer modelo/provider/agente, inclusive o default `reviewer-ro`)
+produz **stdout vazio** e/ou crasha com `uv_spawn ENAMETOOLONG` quando o **diretório de trabalho
+atual é um git worktree** — aquele onde `.git` é um **gitlink (arquivo)** apontando para
+`.../.git/worktrees/<nome>`, não um diretório. O adapter [`Invoke-OpenCode.ps1`](../scripts/Invoke-OpenCode.ps1)
+reporta então `no-completion` (sem `step_finish`/`reason` no stream) ou o crash. Medido em
+Windows, opencode 1.4.4. `opencode models` funciona (não spawna subprocesso); só `run` falha.
+
+**Causa provável:** o opencode (Bun/libuv) spawna `git` via `uv_spawn`; num worktree, a resolução
+do gitlink monta um caminho/linha-de-comando que estoura o limite do SO → `ENAMETOOLONG`.
+Descartado empiricamente como causa: cota, tamanho do prompt/dossiê, o próprio adapter (o binário
+direto falha igual) e estado travado (reiniciar a máquina **não** resolve; trocar o cwd resolve).
+
+**Impacto na revisão por pares / pré-push reforçada:** o Claude Code desktop **sempre** roda em
+worktree, e o harness fixa o cwd no worktree. Logo, despachar revisores **opencode** do cwd do
+worktree **falha em silêncio**. Os demais backends (Codex/Claude Code/Copilot/Gemini) têm `-Cd`
+próprio e não dependem disto; o opencode **não** tem `-Cd` (a contenção é pelo cwd herdado).
+
+**Workaround (materializar dir plano):** rodar o opencode de um cwd **fora de worktree**. Para
+revisar o estado de um worktree sem o gitlink, materialize-o num diretório plano curto e rode de
+lá (o dossiê vai por **stdin**, então independe do cwd; o cwd só precisa conter os arquivos para o
+`read`/`grep`/`glob` do `reviewer-ro`):
+
+```powershell
+# 1) materializa o HEAD do worktree num dir plano (sem .git)
+git -C <worktree> archive --format=tar HEAD | tar -xf - -C C:\Users\<user>\AppData\Local\Temp\xr
+# 2) roda o opencode desse cwd (Set-Location dentro do pwsh; o adapter usa (Get-Location).Path)
+pwsh -NoProfile -Command "Set-Location 'C:\Users\<user>\AppData\Local\Temp\xr'; & '<repo>\scripts\Invoke-OpenCode.ps1' -MessagePath '<dossie>.txt' -Model opencode-go/glm-5.2 -TimeoutSec 600"
+```
+
 ## BACKENDS
 
 Ativos: **opencode** (#1), **Codex** (#2), **Claude Code** (#3), **GitHub Copilot CLI** (#4)
