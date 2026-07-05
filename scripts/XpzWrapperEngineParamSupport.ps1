@@ -8,8 +8,14 @@
   (aviso), ver bloco proprio no fim do arquivo (direcao wrapper->molde).
 
 .DESCRIPTION
-  Verifica, por AST + Get-Command (sem executar o motor, sem KB), que todo parametro que
-  um wrapper local REPASSA a um motor compartilhado ADVANCED de fato EXISTE no motor (nome
+  Este arquivo hospeda DOIS checks do inventario. Esta secao .DESCRIPTION e os LIMITES
+  CONHECIDOS abaixo cobrem o check (1) forwards_unknown_engine_param (direcao wrapper->motor);
+  o check (2) diff de superficie wrapper->molde (`surface_mismatch`/`INVENTORY_SURFACE_ADVISORY`,
+  helpers Get-XpzScriptParamSurface/Get-XpzWrapperSurfaceFinding) tem documentacao propria no
+  bloco de comentario no fim do arquivo.
+
+  Check (1): verifica, por AST + Get-Command (sem executar o motor, sem KB), que todo parametro
+  que um wrapper local REPASSA a um motor compartilhado ADVANCED de fato EXISTE no motor (nome
   canonico ou alias). Em motor advanced, repassar um parametro nao-declarado e erro de
   binding em runtime, invisivel ao parse/STRUCTURE_OK/GATE_OK e ao naming-contract.
 

@@ -1,7 +1,9 @@
 #requires -Version 7.4
 <#
 .SYNOPSIS
-  Self-test do helper XpzWrapperEngineParamSupport.ps1 (check forwards_unknown_engine_param).
+  Self-test do helper XpzWrapperEngineParamSupport.ps1 — check forwards_unknown_engine_param.
+  (O segundo check hospedado pelo helper, o diff de superficie wrapper->molde
+  `surface_mismatch`/`INVENTORY_SURFACE_ADVISORY`, e coberto por Test-XpzWrapperInventorySelfTest.ps1.)
 
 .DESCRIPTION
   Cria wrappers de fixture (apenas PARSEADOS, nunca executados) e os confronta com:
