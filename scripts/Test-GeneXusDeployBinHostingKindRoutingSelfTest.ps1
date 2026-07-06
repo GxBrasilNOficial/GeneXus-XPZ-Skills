@@ -42,7 +42,7 @@ if ($null -eq $javaRec) {
     throw "ASSERT_FAILED: registro nao reconhece 'java-tomcat' (pre-condicao)."
 }
 if (-not $javaRec.runsDeployBinEngine) {
-    throw "ASSERT_FAILED: 'java-tomcat' deveria rodar o motor do Eixo A (runsDeployBinEngine=false) apos a Fase 3."
+    throw "ASSERT_FAILED: 'java-tomcat' deveria rodar o motor do Eixo A apos a Fase 3 (esperado runsDeployBinEngine=true, atual=false)."
 }
 
 $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("xpz-deploy-bin-routing-selftest-" + [guid]::NewGuid().ToString('N'))
