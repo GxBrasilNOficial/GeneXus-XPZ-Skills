@@ -1,14 +1,23 @@
 #requires -Version 7.4
 <#
 .SYNOPSIS
-    Checagem pos-build de frescor de web\bin do environment de deploy (Ponto 2).
+    Checagem pos-build de frescor da publicacao do environment de deploy (Ponto 2), por familia
+    de deployment_hosting_kind (.NET e Java/Tomcat).
 
 .DESCRIPTION
-    Le deployment_hosting_kind e kb_environment_web_dirs do metadata; gate por publicacao em web\bin:
-      object *.dll (exceto runtime GeneXus/System/Microsoft) ou *.config
-      dotnet-core-self-host: GxNetCoreStartup.dll só complementar (warning se velho)
+    Le deployment_hosting_kind e kb_environment_web_dirs (e, para Java, kb_environment_servlet_dirs/
+    _app_package) do metadata. Test-GeneXusKbDeployBinFreshnessCore e DISPATCHER por familia (Fase 3):
+      .NET (...CoreDotNet): gate por publicacao em web\bin — object *.dll (exceto runtime GeneXus/
+        System/Microsoft) ou *.config; dotnet-core-self-host: GxNetCoreStartup.dll só complementar
+        (warning se velho).
+      Java/Tomcat (...CoreJava): co-gate por CONJUNTO DE ARTEFATOS do objeto (max mtime dos <obj>*.java
+        locais vs <obj>*.class no WEB-INF\classes EXTERNO do Tomcat), janela de skew bidirecional;
+        4 quadrantes (fresh/stale/no-evidence/unexpected-publication) + unknown (config-error).
+        Ancora superior operativa = Now (Fase 3; BuildEndedAt/DeployStepCompletedAt = Fase 5).
 
-    Severidade hibrida (decisoes fechadas): status novo quando stale; exit 49 só com gate.
+    Propriedade de seguranca: nunca 'fresh' sem publicacao atestada neste build (todo caminho de
+    incerteza falha conservativo). Severidade hibrida (decisoes fechadas): status novo quando stale;
+    exit 49 só com gate. Recognized-no-engine (Eixos B/C Java) roteia para skip.
 #>
 
 Set-StrictMode -Version Latest
