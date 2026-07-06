@@ -1,11 +1,15 @@
 #requires -Version 7.4
 <#
 .SYNOPSIS
-    Diagnostico somente leitura de frescor de web\bin do environment de deploy.
+    Diagnostico somente leitura de frescor da publicacao do environment de deploy (Eixo A), por familia
+    de deployment_hosting_kind (.NET: web\bin; java-tomcat: co-gate Java no WEB-INF\classes externo).
 
 .DESCRIPTION
-    Complementa Test-GeneXusRuntimeFreshness.ps1 (CSharpModel compartilhado) verificando
-    artefatos no web\bin mapeado por kb_environment_web_dirs conforme deployment_hosting_kind no metadata.
+    Complementa Test-GeneXusRuntimeFreshness.ps1 (CSharpModel compartilhado). Fia o registro de hosting
+    kinds e discrimina pelo predicado do Eixo A (runsDeployBinEngine): .NET verifica artefatos no web\bin
+    mapeado por kb_environment_web_dirs; java-tomcat (Eixo A supported) roteia ao dispatcher por familia
+    (Test-GeneXusKbDeployBinFreshnessCore -> co-gate Java no WEB-INF\classes externo). Valor fora do
+    registro -> mensagem canonica.
 
 .PARAMETER KbPath
     Caminho da KB GeneXus nativa.
