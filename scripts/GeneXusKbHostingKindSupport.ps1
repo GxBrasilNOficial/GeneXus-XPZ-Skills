@@ -43,15 +43,16 @@ Set-StrictMode -Version Latest
 # Marcador de valor provisorio: campos cujo valor definitivo Java e empirico (Fase 0/3).
 $script:GeneXusKbHostingKindTentativeJavaMarker = 'tentative-java'
 
-# Contrato de saida do skip (design): exit 0 + status='skipped-hosting-unsupported' + unsupportedReason.
-# Fonte unica desta string; os emissores nomeados do skip (Fase 2: Resolve-GeneXusKbDeployBinCheckPolicy
-# em GeneXusKbDeployBinSupport.ps1, a fachada Test-GeneXusDeployBinFreshness.ps1, as guardas de familia
-# dos Eixos C/B) devem derivar dela, nunca redigitar o literal.
+# Contrato de saida do skip (design): exit 0 + status='skipped-hosting-unsupported' + <eixo>UnsupportedReason.
+# Fonte unica desta string; os emissores nomeados do skip (Resolve-GeneXusKbDeployBinCheckPolicy em
+# GeneXusKbDeployBinSupport.ps1, a fachada Test-GeneXusDeployBinFreshness.ps1, as guardas de familia dos
+# Eixos C/B) devem derivar dela, nunca redigitar o literal.
 $script:GeneXusKbHostingKindSkipStatus = 'skipped-hosting-unsupported'
 
-# Mapa fonte-unica freshnessSupportState -> status de skip ($null quando o motor roda).
-# recognized-no-engine e blocked-out-of-scope compartilham a MESMA string de skip; a
-# desambiguacao e por freshnessSupportState/unsupportedReason, nao pela string (Fase 4 doc).
+# Mapa fonte-unica: valor de support-state (de QUALQUER eixo) -> status de skip ($null quando o motor roda).
+# recognized-no-engine e blocked-out-of-scope compartilham a MESMA string de skip; a desambiguacao e pelo
+# support-state/UnsupportedReason DO EIXO (deployBinSupportState/sourceSupportState/runtimeSupportState),
+# nao pela string.
 $script:GeneXusKbHostingKindFreshnessSkipStatusByState = [ordered]@{
     'supported'            = $null
     'recognized-no-engine' = $script:GeneXusKbHostingKindSkipStatus

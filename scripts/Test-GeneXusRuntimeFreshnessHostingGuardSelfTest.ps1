@@ -72,7 +72,7 @@ try {
         throw "ASSERT_FAILED: ramo 2 status esperado=[$expectedSkipStatus] atual=[$($r2.status)]"
     }
     if ([string]::IsNullOrWhiteSpace($r2.summary)) {
-        throw "ASSERT_FAILED: ramo 2 deveria ter summary (unsupportedReason) nao-vazio."
+        throw "ASSERT_FAILED: ramo 2 deveria ter summary (runtimeUnsupportedReason, Eixo C) nao-vazio."
     }
 
     # ── ramo 2 case-insensitive: JAVA-TOMCAT -> mesmo skip ───────────────────────────────────────────
