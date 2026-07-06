@@ -82,7 +82,7 @@ Use esta skill para:
 - configurar o modo de build antes de `BuildAll` via `SetConfiguration` (valores: `Release`, `Debug`, `Performance Test`)
 - classificar resultado de build em categorias operacionais explícitas
 - apoiar decisão do usuário sobre o próximo passo após import
-- resolver sub-estado `importação real efetiva provada, geração de runtime pendente` declarado por `xpz-msbuild-import-export` — quando import está provado mas artefatos de runtime ainda refletem versão anterior, executar build é o passo que atualiza os artefatos gerados no **environment usado no build**; `specify e generate concluídos` ou `compilou limpo` confirmam sucesso operacional **nesse** environment — em KB multi-environment **não** equivalem sozinhos a “a aplicação em IIS/self-host refletiu o import” sem `-EnvironmentName`/`deployment_environment_name` alinhados ao deploy; após build de validação deploy, passar `-PostImportDeployValidation` para gate de publicação em `web\bin` (max de DLL de objeto excluindo runtime GeneXus/System/Microsoft, ou `*.config` — exit **49** se stale); em Core, `GxNetCoreStartup.dll` velho em incremental gera warning, não gate; `Test-GeneXusRuntimeFreshness.ps1` verifica `CSharpModel\web` (compartilhado) — complementar, não substituto; `Test-GeneXusDeployBinFreshness.ps1` diagnostica só `web\bin` do environment de deploy (aceita `-BuildResultJsonPath` para tomar a linha de corte de `timing.msbuildStart` do build, dispensando `-BuildStartedAt` manual)
+- resolver sub-estado `importação real efetiva provada, geração de runtime pendente` declarado por `xpz-msbuild-import-export` — quando import está provado mas artefatos de runtime ainda refletem versão anterior, executar build é o passo que atualiza os artefatos gerados no **environment usado no build**; `specify e generate concluídos` ou `compilou limpo` confirmam sucesso operacional **nesse** environment — em KB multi-environment **não** equivalem sozinhos a “a aplicação em IIS/self-host refletiu o import” sem `-EnvironmentName`/`deployment_environment_name` alinhados ao deploy; após build de validação deploy, passar `-PostImportDeployValidation` para gate de publicação em `web\bin` (max de DLL de objeto excluindo runtime GeneXus/System/Microsoft, ou `*.config` — exit **49** se stale; para `java-tomcat` o gate roda o **co-gate Java** por conjunto de artefatos no `WEB-INF\classes` **externo** do Tomcat — ver seção «Paridade Java/Tomcat» abaixo); em Core, `GxNetCoreStartup.dll` velho em incremental gera warning, não gate; `Test-GeneXusRuntimeFreshness.ps1` verifica `CSharpModel\web` (compartilhado) — complementar, não substituto; `Test-GeneXusDeployBinFreshness.ps1` diagnostica só `web\bin` do environment de deploy (aceita `-BuildResultJsonPath` para tomar a linha de corte de `timing.msbuildStart` do build, dispensando `-BuildStartedAt` manual)
 
 Do NOT use esta skill para:
 - executar reorg sem autorização explícita do usuário
@@ -176,13 +176,21 @@ Do NOT use esta skill para:
 - Para diagnostico de `.cs` gerado, resolver o caminho com `Resolve-GeneXusGeneratedCsPath.ps1`,
   que le `kb_environment_web_dirs` no mesmo metadata; metadata sem esse campo volta para
   `xpz-kb-parallel-setup`.
-- **Paridade Java/Tomcat (Fase 2):** quando `deployment_hosting_kind` for `java-tomcat` (família não-.NET,
-  `recognized-no-engine` no registro `GeneXusKbHostingKindSupport.ps1`), o gate de deploy bin e o resolvedor
-  de `.cs` **pulam** de forma explícita (`skipped-hosting-unsupported`/`CS_PATH_SKIPPED_HOSTING_UNSUPPORTED`,
-  `exit 0`) em vez de derivar `web\bin`/`CSharpModel\web` .NET — o motor por família é a Fase 3. **Skip ≠
-  deploy validado.** `Test-GeneXusRuntimeFreshness.ps1` aceita `-DeploymentHostingKind` opcional para a mesma
-  guarda de família (ausente → comportamento .NET de hoje). Valor de `deployment_hosting_kind` fora do
-  registro é rejeitado com mensagem canônica (não vira skip).
+- **Paridade Java/Tomcat (Fase 3, split PER-EIXO):** o suporte é por eixo no registro
+  `GeneXusKbHostingKindSupport.ps1`; cada consumidor discrimina pelo predicado **do seu eixo**
+  (`runsDeployBinEngine`/`runsSourceEngine`/`runsRuntimeEngine`), não pelo alias legado `runsFreshnessEngine`.
+  Para `java-tomcat`: **Eixo A (deploy bin) = `supported`** — o gate **roda um co-gate Java por família**
+  (`Test-GeneXusKbDeployBinFreshnessCoreJava`): confere publicação atestada por **conjunto de artefatos do
+  objeto** (mtime `<obj>*.java` local vs `<obj>*.class` no `WEB-INF\classes` **externo** do Tomcat, resolvido
+  por `kb_environment_servlet_dirs`/`_app_package`), classifica `fresh`/`stale`/`no-evidence`/
+  `unexpected-publication`/`unknown` com janela de skew bidirecional (**nunca `fresh` sem publicação
+  atestada**; `no-evidence` não falha o gate; `stale`/`unexpected-publication`/`unknown` falham sob gate,
+  exit 49). Os **Eixos B (`.cs`/`.java`) e C (runtime) seguem `recognized-no-engine`** (Pós-v1): o resolvedor
+  de `.cs` e o `Test-GeneXusRuntimeFreshness.ps1` **pulam** (`CS_PATH_SKIPPED_HOSTING_UNSUPPORTED`/
+  `skipped-hosting-unsupported`, `exit 0`) em vez de derivar `CSharpModel\web` .NET. **Skip ≠ deploy validado**
+  (vale para os skips B/C e para `no-evidence`/`unknown` do Eixo A). `Test-GeneXusRuntimeFreshness.ps1` aceita
+  `-DeploymentHostingKind` opcional (ausente → comportamento .NET de hoje). Valor de `deployment_hosting_kind`
+  fora do registro é rejeitado com mensagem canônica (não vira skip).
 - Quando o build falhar com erros C# compatíveis com arquivo gerado truncado, como
   `CS1010` (newline em constante) e `CS1513` (`}` esperada) repetidos no mesmo `.cs`,
   verificar primeiro se o artefato gerado termina abruptamente, sem string/funcao
@@ -1067,7 +1075,7 @@ $scriptPath = "C:\Dev\Knowledge\GeneXus-XPZ-Skills\scripts\Start-GeneXusKbBuildD
 - [ ] Com `kb_environment_count` > 1, `-ParallelKbRoot`/`-KbMetadataPath` foi passado e o environment de deploy foi resolvido
 - [ ] `ActiveEnvironment` no JSON foi comparado ao environment de validação resolvido antes de declarar validação deploy OK
 - [ ] Quando a frente exigiu objetivo B (opt-in): deploy validado (A) **e** Build na IDE nos environments secundários que a frente cobre — ou headless repetido documentado como exceção
-- [ ] Validação deploy pós-import usou `-PostImportDeployValidation` (ou `-StrictDeployBinCheck`) com `deployment_hosting_kind` e paths resolvidos por `kb_environment_web_dirs` no metadata; `deployBinFreshness`/`deployBinCheck`/`publicationFreshSinceBuild` foram lidos — **não** declarar deploy OK com `compilou-mas-dll-destino-desatualizada` ou exit **49**, **nem** com `deployBinFreshness=skipped-hosting-unsupported` (Fase 2: skip por família sem motor, ex.: `java-tomcat` — exit 0, mas **skip ≠ deploy validado**, não é evidência de publicação); warning de sentinela Core (`GxNetCoreStartup.dll` velho) não substitui gate
+- [ ] Validação deploy pós-import usou `-PostImportDeployValidation` (ou `-StrictDeployBinCheck`) com `deployment_hosting_kind` e paths resolvidos por `kb_environment_web_dirs` no metadata; `deployBinFreshness`/`deployBinCheck`/`publicationFreshSinceBuild` foram lidos — **não** declarar deploy OK com `compilou-mas-dll-destino-desatualizada` ou exit **49**; **para `java-tomcat` (Fase 3, co-gate)**, tampouco declarar deploy OK com `deployBinFreshness` em `no-evidence`/`unexpected-publication`/`unknown` (não são publicação atestada); o skip `skipped-hosting-unsupported` no deploy-bin vale só para um hosting kind com Eixo A `recognized-no-engine` (nenhum hoje); warning de sentinela Core (`GxNetCoreStartup.dll` velho) não substitui gate
 - [ ] Build limpo rebaixado a `operação concluída, pendente de confirmação funcional` por motivo benigno (evento pós-build como sino de fim de build, ruído em stderr) **não** suprimiu `-PostImportDeployValidation`: o gate decide por sucesso operacional (`exitCode` 0 + marcador de conclusão do build), não pela string de status; só falha real (Categoria B, reorg, timeout, KB inacessível, que derrubam `exitCode`) pula o gate
 
 ---
@@ -1120,5 +1128,5 @@ $scriptPath = "C:\Dev\Knowledge\GeneXus-XPZ-Skills\scripts\Start-GeneXusKbBuildD
 - ABORT se `KbPath`, versão, `Environment` de validação/deploy ou destino de logs estiverem ambíguos
 - NEVER executar `BuildAll`/`SpecifyGenerate` de validação pós-import em KB com `kb_environment_count` > 1 sem `-EnvironmentName` resolvido (parâmetro ou `deployment_environment_name` no metadata) — o wrapper bloqueia (exit 46)
 - NEVER tratar `compilou limpo` como prova de que o IIS/self-host refletiu o import quando `ActiveEnvironment` divergir de `deploymentEnvironmentContext.validationEnvironmentResolved`
-- NEVER declarar validação deploy OK quando `status` for `compilou-mas-dll-destino-desatualizada`, `deployBinFreshness=stale`, `publicationFreshSinceBuild=false` ou `exitCode=49` — investigar `deployBinCheck.interpretation`, `objectDllMaxWriteTime`/`configMaxWriteTime` e paths resolvidos por `kb_environment_web_dirs`; **não** usar `GxNetCoreStartup.dll` sozinha como prova de publicação. **Tampouco** declarar deploy OK quando `deployBinFreshness=skipped-hosting-unsupported` (Fase 2: skip por família sem motor de verificação, ex.: `java-tomcat` — exit 0, porém **skip ≠ deploy validado**; a verificação real por família é a Fase 3)
+- NEVER declarar validação deploy OK quando `status` for `compilou-mas-dll-destino-desatualizada`, `deployBinFreshness=stale`, `publicationFreshSinceBuild=false` ou `exitCode=49` — investigar `deployBinCheck.interpretation`, `objectDllMaxWriteTime`/`configMaxWriteTime` e paths resolvidos por `kb_environment_web_dirs`; **não** usar `GxNetCoreStartup.dll` sozinha como prova de publicação. **Tampouco** declarar deploy OK, **para `java-tomcat` (Fase 3, co-gate Java)**, quando `deployBinFreshness` for `no-evidence`/`unexpected-publication`/`unknown` — não são publicação atestada (`stale`/`unexpected-publication`/`unknown` falham sob gate; `no-evidence` = build sem mudança, não é evidência de deploy). O skip `skipped-hosting-unsupported` no deploy-bin só ocorreria para um hosting kind com Eixo A `recognized-no-engine` (nenhum hoje)
 - ABORT se não houver ambiente controlado compatível com a fase solicitada
