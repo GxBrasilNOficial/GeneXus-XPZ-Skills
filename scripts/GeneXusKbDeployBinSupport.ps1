@@ -901,10 +901,10 @@ function Invoke-GeneXusKbDeployBinPostBuildClassification {
         if ($policy.gateEnabled) {
             $output.statusReclassified = $true
             $output.newStatus = $script:GeneXusKbDeployBinStaleStatus
-            $output.newSummary = ("{0} concluiu sem erro de MSBuild, mas a checagem de web\bin do environment de deploy foi inconclusiva ({1}). Nao declarar validacao deploy OK." -f $OperationLabel, $freshness.interpretation)
+            $output.newSummary = ("{0} concluiu sem erro de MSBuild, mas a checagem de publicacao do environment de deploy foi inconclusiva ({1}). Nao declarar validacao deploy OK." -f $OperationLabel, $freshness.interpretation)
             $output.newExitCode = $script:GeneXusKbDeployBinGateExitCode
             $output.blockingReasons = @(
-                'deploy-bin-cheque-inconclusivo: deployment_hosting_kind ou artefatos em web\bin ausentes/ilegiveis.'
+                'deploy-bin-cheque-inconclusivo: deployment_hosting_kind ou artefatos de publicacao (web\bin no .NET, WEB-INF\classes no Java) ausentes/ilegiveis.'
             )
         }
         return [pscustomobject]$output
@@ -922,13 +922,13 @@ function Invoke-GeneXusKbDeployBinPostBuildClassification {
     # stale, unexpected-publication (Java) e demais nao-fresh/nao-unknown/nao-no-evidence: falha (gate).
     $output.statusReclassified = $true
     $output.newStatus = $script:GeneXusKbDeployBinStaleStatus
-    $output.newSummary = ("{0} concluiu sem erro de MSBuild, mas web\bin do environment de deploy ({1}) nao reflete o build. {2}" -f $OperationLabel, $ValidationEnvironmentName, $freshness.interpretation)
+    $output.newSummary = ("{0} concluiu sem erro de MSBuild, mas a publicacao do environment de deploy ({1}) nao reflete o build. {2}" -f $OperationLabel, $ValidationEnvironmentName, $freshness.interpretation)
     $output.warnings = @($freshness.interpretation)
 
     if ($policy.gateEnabled) {
         $output.newExitCode = $script:GeneXusKbDeployBinGateExitCode
         $output.blockingReasons = @(
-            ("deploy-bin-desatualizado: sem evidencia de publicacao em web\bin do environment '{0}' apos o build (hosting={1})." -f $ValidationEnvironmentName, $policy.deploymentHostingKind)
+            ("deploy-bin-desatualizado: sem evidencia de publicacao no destino do environment '{0}' apos o build (hosting={1}; web\bin no .NET, WEB-INF\classes no Java)." -f $ValidationEnvironmentName, $policy.deploymentHostingKind)
         )
     }
     else {

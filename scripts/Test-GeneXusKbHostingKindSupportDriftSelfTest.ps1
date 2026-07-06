@@ -4,23 +4,25 @@
     Self-test de drift do registro de hosting kinds (GeneXusKbHostingKindSupport.ps1).
 
 .DESCRIPTION
-    Fase 1 da paridade de gerador Java/Tomcat. Trava as invariantes do contrato congelado
-    (decisao (a) do design) por verificacao real (dot-source), nao por regex sobre o codigo:
+    Fase 3 da paridade de gerador Java/Tomcat (split PER-EIXO; no-bridge INVERTIDA). Trava as
+    invariantes do contrato congelado por verificacao real (dot-source), nao por regex sobre o codigo:
 
       - dot-source real     : carrega o registro e exercita a API publica de verdade.
       - dispatch por familia: cada kind roteia para a familia correta (dotnet|java).
       - uso da API publica  : nenhum script consome a hashtable interna direto (varredura por arquivo).
+      - estados per-eixo     : java Eixo A 'supported'; Eixos B/C 'recognized-no-engine' (asserts por eixo).
+      - migracao-compat      : aliases legados (runsFreshnessEngine/...) == campos do Eixo A (guarda).
       - contrato de skip     : recognized-no-engine -> status 'skipped-hosting-unsupported' + unsupportedReason;
                                a string de skip tem fonte unica (nenhum emissor a redigita — varredura por arquivo).
-      - clausula no-bridge  : nenhum codigo de Fase 1/2 referencia publicationTargets (checagem estatica; por arquivo).
+      - no-bridge INVERTIDA : publicationTargets so e citado pelos arquivos-motor ALLOWLISTADOS (registro +
+                               self-tests do co-gate); todo outro *.ps1 = zero (fail-closed) + guarda de drift da allowlist.
 
-    Emissores nomeados do contrato de skip (derivam a string, nunca a redigitam). Hoje ainda
-    .NET-only; a fiacao ao registro e da Fase 2 — esta lista guia a auditoria daquela fase:
-      * Resolve-GeneXusKbDeployBinCheckPolicy  (GeneXusKbDeployBinSupport.ps1:88)
-      * fachada de diagnostico                  (Test-GeneXusDeployBinFreshness.ps1:142)
-      * [ValidateSet] -> validacao manual        (Set-XpzKbSourceMetadataDeployment.ps1:93)
-      * validacao de presenca                    (GeneXusKbDeploymentEnvironmentSupport.ps1:526)
-      * guardas de familia dos Eixos C/B         (Test-GeneXusRuntimeFreshness.ps1 / diagnostico .cs)
+    Consumidores fiados ao registro (Fase 2/3; discriminam pelo predicado do SEU eixo, nao pelo alias legado):
+      * Resolve-GeneXusKbDeployBinCheckPolicy  (GeneXusKbDeployBinSupport.ps1; Eixo A: runsDeployBinEngine)
+      * fachada de diagnostico                  (Test-GeneXusDeployBinFreshness.ps1; Eixo A)
+      * validacao de hosting_kind na escrita     (Set-XpzKbSourceMetadataDeployment.ps1; validacao manual)
+      * validacao de presenca/valor              (GeneXusKbDeploymentEnvironmentSupport.ps1)
+      * guardas de familia dos Eixos C/B         (Test-GeneXusRuntimeFreshness.ps1 / Resolve-GeneXusGeneratedCsPath.ps1)
 
     Falha => 'ASSERT_FAILED: ...'; sucesso => 'GENEXUS_HOSTING_KIND_DRIFT_SELFTEST_OK'.
 #>

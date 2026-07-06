@@ -4,29 +4,33 @@
     Registro-fonte unico dos hosting kinds de deploy reconhecidos pelas skills XPZ.
 
 .DESCRIPTION
-    Fase 1 da paridade de gerador Java/Tomcat (design congelado em
-    java-tomcat-paridade-gerador-design.md). Materializa o contrato do registro: uma
-    entrada por deployment_hosting_kind, com os campos que governam o gate de deploy-bin
-    (Eixo A), o diagnostico de runtime (Eixo C) e o roteamento por familia.
+    Fase 3 da paridade de gerador Java/Tomcat (design congelado em
+    java-tomcat-paridade-gerador-design.md + replano java-tomcat-fase3-replano.md).
+    Materializa o contrato do registro: uma entrada por deployment_hosting_kind, com
+    suporte PER-EIXO — deployBinSupportState/runsDeployBinEngine (Eixo A, deploy-bin),
+    sourceSupportState/runsSourceEngine (Eixo B, .cs/.java) e runtimeSupportState/
+    runsRuntimeEngine (Eixo C, runtime) — mais o roteamento por familia. Aliases legados
+    (runsFreshnessEngine/freshnessSupportState/freshnessSkipStatus/unsupportedReason)
+    persistem 1 ciclo de release (deprecados, derivados do Eixo A) para consumidores
+    externos (wrappers de pasta paralela).
 
     Acesso EXCLUSIVO via a API publica Get-GeneXusKbHostingKindSupportRecord. Nenhum
     consumidor le a hashtable interna ($script:GeneXusKbHostingKindSupportRegistry)
     diretamente; o self-test de drift (Test-GeneXusKbHostingKindSupportDriftSelfTest.ps1)
     trava essa invariante por varredura estatica.
 
-    Clausula no-bridge (invariante do congelamento): o campo publicationTargets[] e a
-    forma-alvo da Fase 3 e e OPACO as Fases 1/2. Nenhum codigo de Fase 1/2 itera
-    publicationTargets para acionar o motor de deploy-bin; a ponte registro<->motor e
-    exclusiva da Fase 3. O motor (Get-GeneXusKbDeployBinPaths /
-    Test-GeneXusKbDeployBinFreshnessCore) permanece ESCALAR na Fase 1 (a mudanca de
-    aridade escalar->lista e da Fase 3). O self-test trava a clausula como checagem
-    estatica trivial.
+    Clausula no-bridge INVERTIDA (Fase 3): o campo publicationTargets[] e a forma-alvo do
+    motor de deploy-bin e agora e citado LEGITIMAMENTE pelos arquivos-motor (registro +
+    self-tests do co-gate) via allowlist; todo outro *.ps1 = zero ocorrencias (fail-closed,
+    travado pelo self-test + guarda de drift da propria allowlist). O motor deixou de ser
+    escalar: Get-GeneXusKbDeployBinPaths devolve LISTA de alvos (v1: 1 por KB) e
+    Test-GeneXusKbDeployBinFreshnessCore e DISPATCHER por familia (dotnet|java).
 
-    Java/Tomcat entra como freshnessSupportState='recognized-no-engine': reconhecido pelo
-    registro, sem motor de verificacao (skip congelado). Campos cujo valor Java e empirico
-    (criterio de aceite da Fase 0) carregam o marcador 'tentative-java' (campos string) ou
-    permanecem $null (campos de lista, NAO @()) e estao listados em tentativeFields; a Fase 3
-    os preenche a partir do evidence-catalog-java-tomcat e remove o marcador.
+    java-tomcat: Eixo A 'supported' (co-gate por conjunto de artefatos, alvo externo
+    WEB-INF\classes; deployTargetKind='external-webapp'); Eixos B/C 'recognized-no-engine'
+    (Pos-v1, skip). Campos cujo valor Java e empirico (criterio de aceite) carregam o
+    marcador 'tentative-java' (campos string) ou permanecem $null (campos de lista, NAO @())
+    e estao listados em tentativeFields; a Fase 5 os afere na KB Java real.
 
     Dot-sourcing este arquivo NAO tem efeito colateral alem de definir as funcoes e montar
     o $script: table. O ArgumentCompleter e opt-in via Register-GeneXusKbHostingKindArgumentCompleter.
