@@ -62,43 +62,87 @@ function New-GeneXusKbHostingKindSupportRecord {
     # SEM tipo DE PROPOSITO. Tipar [string]$Sentinel = $null coage $null -> '' sob StrictMode e
     # quebraria a invariante framework-iis (sentinel=$null) e os campos de lista provisorios
     # ($null, nao @()). Contrato dos nao-tipados: passar string|array|$null conforme o comentario.
+    #
+    # Fase 3 (sub-passo viii): o estado unico de suporte foi QUEBRADO em tres estados PER-EIXO
+    # (Eixo A = deploy-bin freshness; Eixo B = fonte gerado .cs/.java; Eixo C = runtime-freshness).
+    # Cada eixo tem seu proprio supportState, skipStatus, runs<Eixo>Engine e razao de skip. Java/Tomcat
+    # passa a ter Eixo A = supported (motor por familia) mantendo B/C = recognized-no-engine (Pos-v1).
     param(
         [string]$HostingKind,
         [string]$Family,
         [string]$HumanLabel,
-        [string]$FreshnessSupportState,
+        [string]$DeployBinSupportState,   # Eixo A
+        [string]$RuntimeSupportState,     # Eixo C
+        [string]$SourceSupportState,      # Eixo B
         [string]$DeployTargetKind,
         [string]$OutputModelSubPath,
+        [int]$DeployBinTimeSlackSeconds = 5,  # (v-ter)/(vi): slack do co-gate; default 5 provisorio (Fase 5)
         $Sentinel,                    # string|$null (framework-iis: $null E supported)
         $WebDirFreshnessExtensions,   # string[]|$null
         $RuntimeFreshnessExtensions,  # string[]|$null
         $RuntimeExclusionPrefixes,    # string[]|$null ($null, NAO @(), quando desconhecido)
         $PublicationTargets,          # object[]|$null (opaco as Fases 1/2; $null quando desconhecido)
-        $UnsupportedReason,           # string|$null
+        $SupportedServletFlavors,     # string[]|$null (vi-bis): SO a enumeracao de sabores da familia
+        $DeployBinUnsupportedReason,  # string|$null (Eixo A)
+        $RuntimeUnsupportedReason,    # string|$null (Eixo C)
+        $SourceUnsupportedReason,     # string|$null (Eixo B)
         $ErrorMessage,                # string|$null
         [string[]]$TentativeFields
     )
 
-    if (-not $script:GeneXusKbHostingKindFreshnessSkipStatusByState.Contains($FreshnessSupportState)) {
-        throw "freshnessSupportState desconhecido ao montar o registro: '$FreshnessSupportState'"
+    foreach ($pair in @(
+            @{ eixo = 'deployBin(A)'; state = $DeployBinSupportState },
+            @{ eixo = 'runtime(C)';   state = $RuntimeSupportState },
+            @{ eixo = 'source(B)';    state = $SourceSupportState })) {
+        if (-not $script:GeneXusKbHostingKindFreshnessSkipStatusByState.Contains($pair.state)) {
+            throw "supportState desconhecido ao montar o registro (eixo=$($pair.eixo)): '$($pair.state)'"
+        }
     }
-    $skipStatus = $script:GeneXusKbHostingKindFreshnessSkipStatusByState[$FreshnessSupportState]
+
+    $deployBinSkipStatus = $script:GeneXusKbHostingKindFreshnessSkipStatusByState[$DeployBinSupportState]
+    $runtimeSkipStatus   = $script:GeneXusKbHostingKindFreshnessSkipStatusByState[$RuntimeSupportState]
+    $sourceSkipStatus    = $script:GeneXusKbHostingKindFreshnessSkipStatusByState[$SourceSupportState]
+    $runsDeployBinEngine = ($DeployBinSupportState -eq 'supported')
 
     return [ordered]@{
         hostingKind                = $HostingKind
         family                     = $Family
         humanLabel                 = $HumanLabel
-        freshnessSupportState      = $FreshnessSupportState
-        freshnessSkipStatus        = $skipStatus
-        runsFreshnessEngine        = ($FreshnessSupportState -eq 'supported')
+
+        # ── Estado PER-EIXO (Fase 3, sub-passo viii) ─────────────────────────────
+        deployBinSupportState      = $DeployBinSupportState
+        runtimeSupportState        = $RuntimeSupportState
+        sourceSupportState         = $SourceSupportState
+        runsDeployBinEngine        = $runsDeployBinEngine
+        runsRuntimeEngine          = ($RuntimeSupportState -eq 'supported')
+        runsSourceEngine           = ($SourceSupportState -eq 'supported')
+        deployBinSkipStatus        = $deployBinSkipStatus
+        runtimeSkipStatus          = $runtimeSkipStatus
+        sourceSkipStatus           = $sourceSkipStatus
+        deployBinUnsupportedReason = $DeployBinUnsupportedReason
+        runtimeUnsupportedReason   = $RuntimeUnsupportedReason
+        sourceUnsupportedReason    = $SourceUnsupportedReason
+
+        # ── Migracao-compat (Fase 3, A3): aliases DEPRECADOS do Eixo A ────────────
+        # Mantidos por UM ciclo de release para consumidores EXTERNOS (wrappers em pastas
+        # paralelas de KB, fora do alcance da varredura semantica do doc 13). Todos os
+        # consumidores INTERNOS ja migraram aos campos per-eixo acima. Derivados do Eixo A
+        # (deploy-bin) — o unico eixo que o campo unico legado governava de fato. REMOVER no
+        # proximo ciclo (a guarda de drift interna cobre os internos; o alias cobre os externos).
+        freshnessSupportState      = $DeployBinSupportState
+        freshnessSkipStatus        = $deployBinSkipStatus
+        runsFreshnessEngine        = $runsDeployBinEngine
+        unsupportedReason          = $DeployBinUnsupportedReason
+
         deployTargetKind           = $DeployTargetKind
         outputModelSubPath         = $OutputModelSubPath
+        deployBinTimeSlackSeconds  = $DeployBinTimeSlackSeconds
         sentinel                   = $Sentinel
         webDirFreshnessExtensions  = $WebDirFreshnessExtensions
         runtimeFreshnessExtensions = $RuntimeFreshnessExtensions
         runtimeExclusionPrefixes   = $RuntimeExclusionPrefixes
         publicationTargets         = $PublicationTargets
-        unsupportedReason          = $UnsupportedReason
+        supportedServletFlavors    = $SupportedServletFlavors
         errorMessage               = $ErrorMessage
         tentativeFields            = @($TentativeFields)
     }
@@ -134,11 +178,14 @@ $dotnetPublicationTargets = @(
     }
 )
 
+# .NET: os TRES eixos tem motor (A deploy-bin, B .cs, C runtime) -> supported em todos.
 $dotnetCoreRecord = @{
     HostingKind                = 'dotnet-core-self-host'
     Family                     = 'dotnet'
     HumanLabel                 = '.NET Core (self-host)'
-    FreshnessSupportState      = 'supported'
+    DeployBinSupportState      = 'supported'
+    RuntimeSupportState        = 'supported'
+    SourceSupportState         = 'supported'
     DeployTargetKind           = 'in-kb-web'
     OutputModelSubPath         = 'CSharpModel\web'
     Sentinel                   = 'GxNetCoreStartup.dll'
@@ -146,19 +193,24 @@ $dotnetCoreRecord = @{
     RuntimeFreshnessExtensions = $dotnetRuntimeExtensions
     RuntimeExclusionPrefixes   = $dotnetExclusionPrefixes
     PublicationTargets         = $dotnetPublicationTargets
-    UnsupportedReason          = $null
+    SupportedServletFlavors    = $null
+    DeployBinUnsupportedReason = $null
+    RuntimeUnsupportedReason   = $null
+    SourceUnsupportedReason    = $null
     ErrorMessage               = $null
     TentativeFields            = @()
 }
 $script:GeneXusKbHostingKindSupportRegistry['dotnet-core-self-host'] =
     New-GeneXusKbHostingKindSupportRecord @dotnetCoreRecord
 
-# framework-iis: invariante do design — sentinel=$null E freshnessSupportState='supported'.
+# framework-iis: invariante do design — sentinel=$null E deployBinSupportState='supported'.
 $dotnetFrameworkRecord = @{
     HostingKind                = 'dotnet-framework-iis'
     Family                     = 'dotnet'
     HumanLabel                 = '.NET Framework (IIS)'
-    FreshnessSupportState      = 'supported'
+    DeployBinSupportState      = 'supported'
+    RuntimeSupportState        = 'supported'
+    SourceSupportState         = 'supported'
     DeployTargetKind           = 'in-kb-web'
     OutputModelSubPath         = 'CSharpModel\web'
     Sentinel                   = $null
@@ -166,7 +218,10 @@ $dotnetFrameworkRecord = @{
     RuntimeFreshnessExtensions = $dotnetRuntimeExtensions
     RuntimeExclusionPrefixes   = $dotnetExclusionPrefixes
     PublicationTargets         = $dotnetPublicationTargets
-    UnsupportedReason          = $null
+    SupportedServletFlavors    = $null
+    DeployBinUnsupportedReason = $null
+    RuntimeUnsupportedReason   = $null
+    SourceUnsupportedReason    = $null
     ErrorMessage               = $null
     TentativeFields            = @()
 }
@@ -184,7 +239,13 @@ $javaTomcatRecord = @{
     HostingKind                = 'java-tomcat'
     Family                     = 'java'
     HumanLabel                 = 'Java / Tomcat'
-    FreshnessSupportState      = 'recognized-no-engine'
+    # Fase 3, Commit 1 (split per-eixo aditivo): os TRES eixos ainda recognized-no-engine — comportamento
+    # IDENTICO ao anterior. O Commit 3 vira deployBinSupportState -> 'supported' (motor Java do Eixo A) e
+    # aterra os campos de motor; B/C permanecem recognized-no-engine (Pos-v1). Razoes de skip PER-EIXO
+    # (cada eixo diz a SUA razao; a razao unica antiga falava so do Eixo A e ficaria enganosa em B/C).
+    DeployBinSupportState      = 'recognized-no-engine'
+    RuntimeSupportState        = 'recognized-no-engine'
+    SourceSupportState         = 'recognized-no-engine'
     DeployTargetKind           = 'in-kb-web'
     OutputModelSubPath         = $script:GeneXusKbHostingKindTentativeJavaMarker
     Sentinel                   = $script:GeneXusKbHostingKindTentativeJavaMarker
@@ -192,7 +253,10 @@ $javaTomcatRecord = @{
     RuntimeFreshnessExtensions = $null
     RuntimeExclusionPrefixes   = $null
     PublicationTargets         = $null
-    UnsupportedReason          = "Gerador Java/Tomcat reconhecido, mas o motor de verificacao de deploy-bin ainda e .NET (Eixo A). Checagem pulada ($($script:GeneXusKbHostingKindSkipStatus)) ate a Fase 3 dar motor por familia."
+    SupportedServletFlavors    = $null
+    DeployBinUnsupportedReason = "Gerador Java/Tomcat reconhecido, mas o motor de verificacao de deploy-bin ainda e .NET (Eixo A). Checagem pulada ($($script:GeneXusKbHostingKindSkipStatus)) ate a Fase 3 dar motor por familia."
+    RuntimeUnsupportedReason   = "Diagnostico de runtime-freshness (Eixo C) para Java/Tomcat e Pos-v1: guarda de familia ativa, motor Java nao. Checagem pulada ($($script:GeneXusKbHostingKindSkipStatus))."
+    SourceUnsupportedReason    = "Diagnostico de fonte gerado .java (Eixo B) para Java/Tomcat e Pos-v1: guarda de familia ativa, motor Java nao. Checagem pulada ($($script:GeneXusKbHostingKindSkipStatus))."
     ErrorMessage               = $null
     TentativeFields            = @(
         'outputModelSubPath'

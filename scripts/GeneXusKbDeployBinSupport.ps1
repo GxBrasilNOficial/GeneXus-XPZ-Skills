@@ -93,9 +93,10 @@ function Resolve-GeneXusKbDeployBinCheckPolicy {
         return [pscustomobject]$policy
     }
 
-    # Fase 2: validacao por registro (fonte-unica), nao por lista .NET-only redigitada. Discriminador
-    # por $rec.runsFreshnessEngine (T2) — cobre qualquer estado nao-supported (recognized-no-engine e
-    # um futuro blocked-out-of-scope) sem enumerar nomes de estado nem criar ramo morto.
+    # Fase 3 (split per-eixo): validacao por registro (fonte-unica), nao por lista .NET-only redigitada.
+    # Este e o Eixo A (deploy-bin) — discrimina pelo campo DO SEU EIXO ($rec.runsDeployBinEngine), nao pelo
+    # alias legado runsFreshnessEngine. Cobre qualquer estado nao-supported (recognized-no-engine e um futuro
+    # blocked-out-of-scope) sem enumerar nomes de estado nem criar ramo morto.
     $rec = Get-GeneXusKbHostingKindSupportRecord -HostingKind $hostingKind
     if ($null -eq $rec) {
         # Presente e fora do registro: invalido genuino (fail-closed = rejeicao, nao skip).
@@ -103,17 +104,17 @@ function Resolve-GeneXusKbDeployBinCheckPolicy {
         return [pscustomobject]$policy
     }
 
-    if (-not $rec.runsFreshnessEngine) {
-        # recognized-no-engine / blocked-out-of-scope: skip congelado. A string de status e a razao
-        # sao DERIVADAS do registro (nunca redigitadas); o exit 0 + status e materializado a jusante
-        # em Invoke-GeneXusKbDeployBinPostBuildClassification.
-        $policy.hostingSkipStatus = $rec.freshnessSkipStatus
-        $policy.unsupportedReason = $rec.unsupportedReason
-        $policy.skipReason = $rec.unsupportedReason
+    if (-not $rec.runsDeployBinEngine) {
+        # recognized-no-engine / blocked-out-of-scope no Eixo A: skip congelado. A string de status e a
+        # razao sao DERIVADAS do registro (campos do Eixo A; nunca redigitadas); o exit 0 + status e
+        # materializado a jusante em Invoke-GeneXusKbDeployBinPostBuildClassification.
+        $policy.hostingSkipStatus = $rec.deployBinSkipStatus
+        $policy.unsupportedReason = $rec.deployBinUnsupportedReason
+        $policy.skipReason = $rec.deployBinUnsupportedReason
         return [pscustomobject]$policy
     }
 
-    # supported: roda o motor .NET exatamente como hoje.
+    # deployBinSupportState=supported: roda o motor de deploy-bin (dispatcher por familia na Fase 3).
     $policy.shouldRun = $true
     $policy.gateEnabled = ($StrictDeployBinCheck.IsPresent -or $PostImportDeployValidation.IsPresent)
     $policy.mode = if ($policy.gateEnabled) { 'gate' } else { 'diagnostic' }

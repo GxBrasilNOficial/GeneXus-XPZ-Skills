@@ -106,9 +106,11 @@ $result = [ordered]@{
 # ── Fase 2 — guarda de familia (Eixo C) ─────────────────────────────────────────
 # Opt-in por -DeploymentHostingKind (D3). Inserida APOS o init de $result e ANTES da secao nav_objs, para
 # nao rodar o diagnostico .NET (nav_objs + derivacao CSharpModel\web) no caso de skip. Guard de vazio T1 +
-# tríade por T2 ($rec.runsFreshnessEngine). Script LINEAR (sem return): ramos 1/2 emitem a saida e saem com
-# exit explicito. Le so runsFreshnessEngine/freshnessSkipStatus/unsupportedReason — nunca o campo de
-# forma-alvo da Fase 3 (clausula no-bridge).
+# tríade por T2. Fase 3 (split per-eixo): este e o Eixo C (runtime-freshness) — discrimina pelo campo DO
+# SEU EIXO ($rec.runsRuntimeEngine), nao pelo alias legado runsFreshnessEngine (que segue o Eixo A e, para
+# Java pos-Fase 3, seria 'true' e rodaria o motor .rsp indevidamente). Script LINEAR (sem return): ramos 1/2
+# emitem a saida e saem com exit explicito. Le so runsRuntimeEngine/runtimeSkipStatus/runtimeUnsupportedReason
+# — nunca o campo de forma-alvo da Fase 3 (clausula no-bridge).
 if (-not [string]::IsNullOrWhiteSpace($DeploymentHostingKind)) {
     $hostingRec = Get-GeneXusKbHostingKindSupportRecord -HostingKind $DeploymentHostingKind
     if ($null -eq $hostingRec) {
@@ -125,11 +127,12 @@ if (-not [string]::IsNullOrWhiteSpace($DeploymentHostingKind)) {
         }
         exit 1
     }
-    if (-not $hostingRec.runsFreshnessEngine) {
-        # ramo 2 — recognized-no-engine / blocked-out-of-scope: skip claro, sem derivar CSharpModel\web nem .cs.
-        # status/summary DERIVADOS do registro (nunca redigitados). Os checks ficam nos defaults (found=false).
-        $result.status  = $hostingRec.freshnessSkipStatus
-        $result.summary = $hostingRec.unsupportedReason
+    if (-not $hostingRec.runsRuntimeEngine) {
+        # ramo 2 — recognized-no-engine / blocked-out-of-scope no Eixo C: skip claro, sem derivar
+        # CSharpModel\web nem .cs. status/summary DERIVADOS do registro (campos do Eixo C; nunca
+        # redigitados). Os checks ficam nos defaults (found=false).
+        $result.status  = $hostingRec.runtimeSkipStatus
+        $result.summary = $hostingRec.runtimeUnsupportedReason
         if ($AsJson) {
             $result | ConvertTo-Json -Depth 6
         } else {
@@ -140,7 +143,7 @@ if (-not [string]::IsNullOrWhiteSpace($DeploymentHostingKind)) {
         }
         exit 0
     }
-    # ramo 3 — runsFreshnessEngine (dotnet): segue o diagnostico .cs de hoje (abaixo).
+    # ramo 3 — runsRuntimeEngine (dotnet): segue o diagnostico .cs de hoje (abaixo).
 }
 
 # ── 1. nav_objs.xml ────────────────────────────────────────────────────────────

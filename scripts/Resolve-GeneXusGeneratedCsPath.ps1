@@ -178,9 +178,11 @@ if ($known.Count -gt 0 -and -not $known.Contains($resolvedEnvironment)) {
 # $resolvedEnvironment aos resultados) e ANTES do bloco kb_environment_web_dirs abaixo: o skip Java NAO
 # depende de web_dirs (nao roda motor; o design admite topologia Java externa .war/webapp sem web_dirs
 # no molde .NET). Guard de vazio T1: so consulta o registro quando deployment_hosting_kind esta PRESENTE;
-# vazio/ausente segue o fluxo .cs de hoje (KB .NET/legada sem bloco de deploy NAO regride). Tríade por T2
-# ($rec.runsFreshnessEngine); le so family/runsFreshnessEngine/freshnessSkipStatus/unsupportedReason — nunca
-# o campo de forma-alvo da Fase 3 (clausula no-bridge).
+# vazio/ausente segue o fluxo .cs de hoje (KB .NET/legada sem bloco de deploy NAO regride). Fase 3 (split
+# per-eixo): este e o Eixo B (fonte gerado .cs/.java) — discrimina pelo campo DO SEU EIXO
+# ($rec.runsSourceEngine), nao pelo alias legado runsFreshnessEngine (que segue o Eixo A e, para Java
+# pos-Fase 3, seria 'true' e montaria o .cs indevidamente). Le so family/runsSourceEngine/sourceUnsupportedReason
+# — nunca o campo de forma-alvo da Fase 3 (clausula no-bridge).
 $hostingKindRaw = $fields.deployment_hosting_kind
 if (-not [string]::IsNullOrWhiteSpace($hostingKindRaw)) {
     $hostingRec = Get-GeneXusKbHostingKindSupportRecord -HostingKind $hostingKindRaw
@@ -193,10 +195,11 @@ if (-not [string]::IsNullOrWhiteSpace($hostingKindRaw)) {
         if ($AsJson) { $blocked | ConvertTo-Json -Depth 6 } else { Write-Output "BLOCK: $($blocked.reason)"; Write-Output $blocked.nextStep }
         exit 1
     }
-    if (-not $hostingRec.runsFreshnessEngine) {
-        # ramo 2 — recognized-no-engine / blocked-out-of-scope: skip exit 0, sem depender de web_dirs; nao monta .cs.
+    if (-not $hostingRec.runsSourceEngine) {
+        # ramo 2 — recognized-no-engine / blocked-out-of-scope no Eixo B: skip exit 0, sem depender de
+        # web_dirs; nao monta .cs. Razao DERIVADA do campo do Eixo B (sourceUnsupportedReason).
         $skipped = New-SkippedJavaResult `
-            -Reason $hostingRec.unsupportedReason `
+            -Reason $hostingRec.sourceUnsupportedReason `
             -MetadataPath $metadataPathResolved `
             -ResolvedEnvironment $resolvedEnvironment `
             -DeploymentHostingKind $hostingRec.hostingKind `
@@ -204,7 +207,7 @@ if (-not [string]::IsNullOrWhiteSpace($hostingKindRaw)) {
         if ($AsJson) { $skipped | ConvertTo-Json -Depth 6 } else { Write-Output "CS_PATH_SKIPPED_HOSTING_UNSUPPORTED"; Write-Output $skipped.reason }
         exit 0
     }
-    # ramo 3 — runsFreshnessEngine (dotnet): segue o fluxo .cs de hoje (abaixo).
+    # ramo 3 — runsSourceEngine (dotnet): segue o fluxo .cs de hoje (abaixo).
 }
 
 if ($fields.kb_environment_web_dirs.Count -eq 0) {

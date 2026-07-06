@@ -100,49 +100,86 @@ if (($familias -join ',') -ne 'dotnet,java') {
     throw "ASSERT_FAILED: conjunto de familias esperado 'dotnet,java', atual='$($familias -join ',')'"
 }
 
-# ── 3. Invariantes .NET (motor supported) ───────────────────────────────────────
+# ── 3. Invariantes .NET (os TRES eixos com motor supported) ──────────────────────
+# Fase 3 (split per-eixo): .NET tem motor nos 3 eixos (A deploy-bin, B fonte .cs, C runtime).
 $core = Get-GeneXusKbHostingKindSupportRecord -HostingKind 'dotnet-core-self-host'
-if ($core.freshnessSupportState -ne 'supported' -or -not $core.runsFreshnessEngine) {
-    throw "ASSERT_FAILED: dotnet-core-self-host deveria ser supported/roda-motor"
+foreach ($eixo in @('deployBin', 'runtime', 'source')) {
+    $stateField = "${eixo}SupportState"
+    $runsField  = "runs$(($eixo.Substring(0,1).ToUpper() + $eixo.Substring(1)))Engine"
+    $skipField  = "${eixo}SkipStatus"
+    if ($core.$stateField -ne 'supported' -or -not $core.$runsField) {
+        throw "ASSERT_FAILED: dotnet-core-self-host Eixo '$eixo' deveria ser supported/roda-motor (state=[$($core.$stateField)] runs=[$($core.$runsField)])"
+    }
+    if ($null -ne $core.$skipField) {
+        throw "ASSERT_FAILED: core supported nao deveria ter $skipField, atual=[$($core.$skipField)]"
+    }
 }
 if ($core.sentinel -ne 'GxNetCoreStartup.dll') {
     throw "ASSERT_FAILED: sentinel do core divergente: [$($core.sentinel)]"
-}
-if ($null -ne $core.freshnessSkipStatus) {
-    throw "ASSERT_FAILED: core supported nao deveria ter freshnessSkipStatus, atual=[$($core.freshnessSkipStatus)]"
 }
 if (@($core.tentativeFields).Count -ne 0) {
     throw "ASSERT_FAILED: core nao deveria ter tentativeFields, atual=[$(@($core.tentativeFields) -join ',')]"
 }
 
-# Invariante critico do design: framework-iis tem sentinel=$null E e supported.
+# Invariante critico do design: framework-iis tem sentinel=$null E os 3 eixos supported.
 $fw = Get-GeneXusKbHostingKindSupportRecord -HostingKind 'dotnet-framework-iis'
-if ($fw.freshnessSupportState -ne 'supported' -or -not $fw.runsFreshnessEngine) {
-    throw "ASSERT_FAILED: dotnet-framework-iis deveria ser supported/roda-motor"
+foreach ($eixo in @('deployBin', 'runtime', 'source')) {
+    $stateField = "${eixo}SupportState"
+    $runsField  = "runs$(($eixo.Substring(0,1).ToUpper() + $eixo.Substring(1)))Engine"
+    if ($fw.$stateField -ne 'supported' -or -not $fw.$runsField) {
+        throw "ASSERT_FAILED: dotnet-framework-iis Eixo '$eixo' deveria ser supported/roda-motor (state=[$($fw.$stateField)] runs=[$($fw.$runsField)])"
+    }
 }
 if ($null -ne $fw.sentinel) {
     throw "ASSERT_FAILED: framework-iis deveria ter sentinel=`$null (invariante do design), atual=[$($fw.sentinel)]"
 }
 
-# ── 4. Contrato de skip + reconhecimento Java ───────────────────────────────────
+# ── 4. Contrato de skip PER-EIXO + reconhecimento Java ───────────────────────────
+# Fase 3, Commit 1 (split aditivo): java-tomcat ainda recognized-no-engine nos TRES eixos
+# (comportamento identico). O Commit 3 vira o Eixo A -> supported; este assert acompanhara.
 $java = Get-GeneXusKbHostingKindSupportRecord -HostingKind 'java-tomcat'
-if ($java.freshnessSupportState -ne 'recognized-no-engine') {
-    throw "ASSERT_FAILED: java-tomcat deveria ser recognized-no-engine, atual=$($java.freshnessSupportState)"
+$javaEixos = @(
+    @{ eixo = 'deployBin'; runs = 'runsDeployBinEngine'; state = 'deployBinSupportState'; skip = 'deployBinSkipStatus'; reason = 'deployBinUnsupportedReason' }
+    @{ eixo = 'runtime';   runs = 'runsRuntimeEngine';   state = 'runtimeSupportState';   skip = 'runtimeSkipStatus';   reason = 'runtimeUnsupportedReason' }
+    @{ eixo = 'source';    runs = 'runsSourceEngine';    state = 'sourceSupportState';    skip = 'sourceSkipStatus';    reason = 'sourceUnsupportedReason' }
+)
+foreach ($e in $javaEixos) {
+    if ($java.($e.state) -ne 'recognized-no-engine') {
+        throw "ASSERT_FAILED: java-tomcat Eixo '$($e.eixo)' deveria ser recognized-no-engine, atual=[$($java.($e.state))]"
+    }
+    if ($java.($e.runs)) {
+        throw "ASSERT_FAILED: java-tomcat NAO deve rodar o motor do Eixo '$($e.eixo)' ($($e.runs)=true)"
+    }
+    if ($java.($e.skip) -ne 'skipped-hosting-unsupported') {
+        throw "ASSERT_FAILED: java-tomcat Eixo '$($e.eixo)' deveria mapear para 'skipped-hosting-unsupported', atual=[$($java.($e.skip))]"
+    }
+    if ([string]::IsNullOrWhiteSpace($java.($e.reason))) {
+        throw "ASSERT_FAILED: java-tomcat Eixo '$($e.eixo)' deveria ter razao de skip nao-vazia ($($e.reason))"
+    }
+    # Fonte-unica TAMBEM no texto: cada razao per-eixo interpola o skip status; travar que o valor
+    # renderizado esteja presente (uma renomeacao de `$script:...SkipStatus` deixaria "pulada ()").
+    if ($java.($e.reason) -notmatch [regex]::Escape($java.($e.skip))) {
+        throw "ASSERT_FAILED: java Eixo '$($e.eixo)': $($e.reason) deveria conter o skip status renderizado ('$($java.($e.skip))'), atual=[$($java.($e.reason))]"
+    }
 }
-if ($java.runsFreshnessEngine) {
-    throw "ASSERT_FAILED: java-tomcat NAO deve rodar o motor (runsFreshnessEngine=true)"
-}
-if ($java.freshnessSkipStatus -ne 'skipped-hosting-unsupported') {
-    throw "ASSERT_FAILED: java-tomcat deveria mapear para 'skipped-hosting-unsupported', atual=[$($java.freshnessSkipStatus)]"
-}
-if ([string]::IsNullOrWhiteSpace($java.unsupportedReason)) {
-    throw "ASSERT_FAILED: java-tomcat deveria ter unsupportedReason nao-vazio"
-}
-# Fonte-unica TAMBEM no texto: o unsupportedReason interpola o freshnessSkipStatus; travar que o
-# valor renderizado esteja de fato presente. Uma renomeacao de `$script:...SkipStatus` ou erro na
-# subexpressao deixaria "Checagem pulada ()" e o check de nao-vazio acima passaria em silencio.
-if ($java.unsupportedReason -notmatch [regex]::Escape($java.freshnessSkipStatus)) {
-    throw "ASSERT_FAILED: java.unsupportedReason deveria conter o freshnessSkipStatus renderizado ('$($java.freshnessSkipStatus)'), atual=[$($java.unsupportedReason)]"
+
+# ── 4b. Migracao-compat (Fase 3, A3): aliases legados == campos do Eixo A ─────────
+# Os aliases deprecados (freshnessSupportState/freshnessSkipStatus/runsFreshnessEngine/unsupportedReason)
+# DEVEM persistir por um ciclo, derivados do Eixo A (deploy-bin), para consumidores externos. Travar a
+# derivacao para todos os records: se alguem remover o alias antes do ciclo, ou o desalinhar do Eixo A, falha.
+foreach ($rec in $all) {
+    if ($rec.freshnessSupportState -ne $rec.deployBinSupportState) {
+        throw "ASSERT_FAILED: alias freshnessSupportState de '$($rec.hostingKind)' deveria == deployBinSupportState. alias=[$($rec.freshnessSupportState)] eixoA=[$($rec.deployBinSupportState)]"
+    }
+    if ($rec.freshnessSkipStatus -ne $rec.deployBinSkipStatus) {
+        throw "ASSERT_FAILED: alias freshnessSkipStatus de '$($rec.hostingKind)' deveria == deployBinSkipStatus"
+    }
+    if ($rec.runsFreshnessEngine -ne $rec.runsDeployBinEngine) {
+        throw "ASSERT_FAILED: alias runsFreshnessEngine de '$($rec.hostingKind)' deveria == runsDeployBinEngine"
+    }
+    if ($rec.unsupportedReason -ne $rec.deployBinUnsupportedReason) {
+        throw "ASSERT_FAILED: alias unsupportedReason de '$($rec.hostingKind)' deveria == deployBinUnsupportedReason"
+    }
 }
 
 # ── 5. tentative-java (campos provisorios exatamente como o design manda) ────────
