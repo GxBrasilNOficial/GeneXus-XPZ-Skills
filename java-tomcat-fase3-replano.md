@@ -45,6 +45,8 @@ Na KB de dev `wsEducacaoSpTeste`, o alvo de deploy é **.NET**; o env Java é se
 
 ## 2. Motor .NET atual (a refatorar) — fatos por leitura direta do código
 
+> **Snapshot do código no momento do congelamento v10 (estado PRÉ-implementação).** As referências abaixo (`runsFreshnessEngine`-cêntricas, `§9` "exclui só `registryFile`/`selfFile`", números de linha) descrevem o motor .NET **antes** desta frente. A implementação (commits `80b1394`/`d732d1b`/`e245afc`/`3c39da0`) migrou para o modelo per-eixo e para a allowlist invertida da §9 — não confundir com o estado corrente do código.
+
 `GeneXusKbDeployBinSupport.ps1`:
 - `Get-GeneXusKbDeployBinPaths` (`:291-332`) — resolve `envWebPath` de `kb_environment_web_dirs`; devolve **objeto escalar**. **Consumidor único** de `...Paths`: `Test-GeneXusKbDeployBinFreshnessCore` (`:343`).
 - `Test-GeneXusKbDeployBinFreshnessCore` (`:334-434`) — `$paths.environmentBinPath` escalar; `threshold = BuildStartedAt - slack(5s)`; camada diagnóstica varre `environmentWebPath` (exclui subdir `bin`, `:371`) → `environmentWebFresh`; evidência via `Get-GeneXusKbDeployBinPublicationEvidence`; sentinela só `dotnet-core-self-host` (`:395`); `framework-iis` sem sentinela. **Devolve shape** consumido pela fachada (`:162`) e por `Invoke-...Classification` (`:499-511`).
