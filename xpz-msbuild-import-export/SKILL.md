@@ -231,7 +231,7 @@ Scripts nesta frente:
   - saída esperada: JSON único com `status`/`roundtripStatus`, `summary`, `exitCode`, `importJson`, `buildJson`, `importReadyForBuild`, `buildSkippedReason`, `importProcess`, `buildProcess`, `resolvedPaths`, `artifacts`, `blockingReasons`, `warnings` e `strategyTrace`
   - regra de segurança: se `Invoke-GeneXusXpzImport.ps1` falhar, bloquear, produzir Categoria B, não gravar JSON interpretável ou retornar `status` de falha/bloqueio, `Invoke-GeneXusKbBuildAll.ps1` não é chamado; reportar `buildJson=null` e explicar em `buildSkippedReason`
   - gates de build propagados: `-AllowWideRebuild`/`-ConfirmWideRebuild`, `-AllowCostlyBuildOptions`/`-ConfirmCostlyBuildOptions` e `-AllowReorg`/`-ConfirmReorg` são apenas repassados ao `Invoke-GeneXusKbBuildAll.ps1`; a autorização humana e as frases exatas continuam sendo responsabilidade do chamador conforme `xpz-msbuild-build`
-  - flags de validação de deploy bin propagadas: `-PostImportDeployValidation`, `-StrictDeployBinCheck` e `-SkipDeployBinCheck` também são apenas repassadas ao `Invoke-GeneXusKbBuildAll.ps1` (checagem de publicação no `web\bin` resolvido por `kb_environment_web_dirs`; gate com exit **49** quando ativo) — categoria **distinta** dos gates de autorização acima: são opções de validação, **não** têm frase exata nem par `-Confirm*` e não exigem autorização humana; contrato do gate em `xpz-msbuild-build`
+  - flags de validação de deploy bin propagadas: `-PostImportDeployValidation`, `-StrictDeployBinCheck` e `-SkipDeployBinCheck` também são apenas repassadas ao `Invoke-GeneXusKbBuildAll.ps1` (checagem de publicação no destino do environment — `web\bin` no .NET; para `java-tomcat`, co-gate Java no `WEB-INF\classes` externo — gate com exit **49** quando ativo) — categoria **distinta** dos gates de autorização acima: são opções de validação, **não** têm frase exata nem par `-Confirm*` e não exigem autorização humana; contrato do gate em `xpz-msbuild-build`
 - `Read-MsBuildImportSignals.ps1`
   - status atual: implementado
   - objetivo: ler logs brutos de preview/import sem despejar CDATA ou stdout inteiro na conversa
@@ -276,7 +276,7 @@ Scripts nesta frente:
   - status atual: implementado
   - objetivo: diagnosticar se o runtime GeneXus reflete a versão mais recente de um objeto após import+build; somente leitura, não abre KB, não invoca MSBuild
   - parâmetros obrigatórios: `-KbPath`, `-ObjectName`, `-ImportedAt`
-  - parâmetros opcionais: `-ObjectType` (reservado para uso futuro), `-GeneratorOutputPath` (se omitido, deriva como `<KbPath>\CSharpModel\web`), `-DeploymentHostingKind` (Fase 2 — guarda de família do Eixo C; opcional), `-AsJson`
+  - parâmetros opcionais: `-ObjectType` (reservado para uso futuro), `-GeneratorOutputPath` (se omitido, deriva como `<KbPath>\CSharpModel\web`), `-DeploymentHostingKind` (guarda de família do Eixo C; opcional — `java-tomcat` Eixo C `runtimeSupportState=recognized-no-engine`, Pós-v1), `-AsJson`
   - saída esperada: `runtime-fresh` (nogenreq + artefatos posteriores ao import), `runtime-stale` (genreq ou artefatos anteriores), `runtime-unknown` (objeto não encontrado em `nav_objs.xml` ou artefatos não localizados), `skipped-hosting-unsupported` (Fase 2 — quando `-DeploymentHostingKind` é `java-tomcat`/família não-.NET: pula sem derivar `CSharpModel\web`, exit 0; valor fora do registro → `runtime-hosting-kind-invalido`, exit não-zero)
 - `Get-GeneXusKbProperty.ps1`
   - status atual: implementado

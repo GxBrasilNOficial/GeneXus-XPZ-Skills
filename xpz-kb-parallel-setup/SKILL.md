@@ -441,7 +441,7 @@ Referencia rápida para decidir o peso operacional da ausencia de cada wrapper. 
   - delega para `scripts\Resolve-GeneXusGeneratedCsPath.ps1` da base compartilhada
   - le `kb-source-metadata.md` e usa `kb_environment_web_dirs` para montar `<webDir>\<objectName-lowercase>.cs` sem varredura recursiva da KB nativa
   - se `kb_environment_web_dirs` estiver ausente ou sem o environment solicitado, retorna `BLOCK` e orienta executar `xpz-kb-parallel-setup` para reconciliar o metadata; não aceitar chute de diretório nem scan de `C:\GxModels`
-  - exceção (Fase 2, guarda de família do Eixo B): KB com `deployment_hosting_kind` de família não-.NET (`java-tomcat`, `recognized-no-engine`) retorna **`CS_PATH_SKIPPED_HOSTING_UNSUPPORTED`** (exit 0, sem `csPath`) **antes** do bloqueio de `web_dirs` — o skip não exige `web_dirs` (o artefato Java não é `.cs`)
+  - exceção (guarda de família do Eixo B): KB com `deployment_hosting_kind` de família não-.NET (`java-tomcat`, Eixo B `sourceSupportState=recognized-no-engine`, Pós-v1 — o Eixo A roda o co-gate Java) retorna **`CS_PATH_SKIPPED_HOSTING_UNSUPPORTED`** (exit 0, sem `csPath`) **antes** do bloqueio de `web_dirs` — o skip não exige `web_dirs` (o artefato Java não é `.cs`)
   - e somente leitura: não grava, não abre a KB e não invoca MSBuild
 - Quando o fluxo iterativo de import+build produzir o sub-estado `importação real efetiva provada, geração de runtime pendente` ou o usuário reportar que o comportamento ainda não mudou após import e build, a checagem de frescor de runtime pode ser executada diretamente pelo script da base compartilhada `scripts\Test-GeneXusRuntimeFreshness.ps1` — não requer wrapper local:
   - `-KbPath` (obrigatório): caminho da KB GeneXus nativa (onde reside `nav_objs.xml`)
