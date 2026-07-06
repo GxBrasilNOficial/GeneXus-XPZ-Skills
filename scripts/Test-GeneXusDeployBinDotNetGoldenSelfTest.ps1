@@ -1,11 +1,11 @@
 #requires -Version 7.4
 <#
 .SYNOPSIS
-    Golden de regressao .NET + skip por familia do diagnostico de deploy-bin (fachada Test-GeneXusDeployBinFreshness.ps1).
+    Golden de regressao .NET + roteamento por familia (.NET web\bin / co-gate Java) do diagnostico de deploy-bin (fachada Test-GeneXusDeployBinFreshness.ps1).
 
 .DESCRIPTION
     Congela, com timestamps e paths normalizados (<TS>/<ROOT>), a saida JSON canonica da fachada em
-    TRES casos, apos a Fase 2 da paridade Java/Tomcat fiar o registro na fachada:
+    TRES casos, com o dispatcher por familia da Fase 3 da paridade Java/Tomcat na fachada:
 
       - ACEITO    : dotnet-framework-iis com DLL de objeto fresca em web\bin -> status 'fresh'.
       - JAVA CFGERR: java-tomcat -> Eixo A SUPPORTED a partir da Fase 3 (Commit 3): a fachada ROTEIA para o
@@ -97,14 +97,14 @@ try {
     $acceptedActual = ConvertTo-GoldenNormalizedText -Text (($acceptedRaw | Out-String).TrimEnd()) -Root $tempRoot
 
     # ── Caso JAVA (java-tomcat Eixo A supported -> co-gate; sem servlet_dirs -> unknown config-error) ──
-    $skipRaw = & $facade `
+    $javaRaw = & $facade `
         -KbPath $kbNativePath `
         -EnvironmentName $envName `
         -KbMetadataPath $metadataPath `
         -DeploymentHostingKind 'java-tomcat' `
         -BuildStartedAt ($buildStartedAt.ToString('o')) `
         -AsJson
-    $skipActual = ConvertTo-GoldenNormalizedText -Text (($skipRaw | Out-String).TrimEnd()) -Root $tempRoot
+    $javaActual = ConvertTo-GoldenNormalizedText -Text (($javaRaw | Out-String).TrimEnd()) -Root $tempRoot
 
     # ── Caso REJEITADO (hosting kind GENUINAMENTE invalido, fora do registro) ─────
     $rejectedRaw = & $facade `
@@ -119,8 +119,8 @@ try {
     if ($UpdateBaseline) {
         '===== ACCEPTED BASELINE ====='
         $acceptedActual
-        '===== SKIP BASELINE ====='
-        $skipActual
+        '===== JAVA (config-error unknown) BASELINE ====='
+        $javaActual
         '===== REJECTED BASELINE ====='
         $rejectedActual
         return
@@ -167,7 +167,7 @@ try {
 }
 '@ -replace "`r`n", "`n"
 
-    $skipGolden = @'
+    $javaGolden = @'
 {
   "status": "unknown",
   "validationEnvironmentName": ".Net Environment",
@@ -211,7 +211,7 @@ try {
 '@ -replace "`r`n", "`n"
 
     $acceptedActualN = $acceptedActual -replace "`r`n", "`n"
-    $skipActualN     = $skipActual -replace "`r`n", "`n"
+    $javaActualN     = $javaActual -replace "`r`n", "`n"
     $rejectedActualN = $rejectedActual -replace "`r`n", "`n"
 
     if ($acceptedActualN -ne $acceptedGolden) {
@@ -221,12 +221,12 @@ try {
         Write-Host $acceptedGolden
         throw 'ASSERT_FAILED: caso ACEITO divergiu do golden .NET (regressao no motor/fachada de deploy-bin?).'
     }
-    if ($skipActualN -ne $skipGolden) {
-        Write-Host '----- SKIP (atual normalizado) -----'
-        Write-Host $skipActualN
-        Write-Host '----- SKIP (baseline) -----'
-        Write-Host $skipGolden
-        throw 'ASSERT_FAILED: caso SKIP (java-tomcat) divergiu do golden. Se a mudanca da fachada e DELIBERADA (registro/motor por familia), recapturar o baseline com -UpdateBaseline apos revalidar.'
+    if ($javaActualN -ne $javaGolden) {
+        Write-Host '----- JAVA (atual normalizado) -----'
+        Write-Host $javaActualN
+        Write-Host '----- JAVA (baseline) -----'
+        Write-Host $javaGolden
+        throw 'ASSERT_FAILED: caso JAVA (java-tomcat, config-error unknown) divergiu do golden. Se a mudanca da fachada e DELIBERADA (registro/motor por familia), recapturar o baseline com -UpdateBaseline apos revalidar.'
     }
     if ($rejectedActualN -ne $rejectedGolden) {
         Write-Host '----- REJEITADO (atual normalizado) -----'
