@@ -290,6 +290,9 @@ function Add-GeneXusKbDeployBinPublicationFieldsToBinCheck {
 }
 
 function Get-GeneXusKbDeployBinPaths {
+    # Fase 3 (ii) — aridade escalar -> LISTA de alvos de deploy. v1: 1 alvo por KB (decisao (e)).
+    # Este resolvedor e do alvo .NET in-kb-web (web\bin); o alvo Java external-webapp tem resolvedor
+    # proprio no Commit 3 (design iii: ...CoreJava nao reusa este). Consumidor unico: ...CoreDotNet.
     param(
         [string]$KbPath,
         [string]$EnvironmentName,
@@ -322,17 +325,27 @@ function Get-GeneXusKbDeployBinPaths {
 
     $envBinPath = if ($null -ne $envWebPath) { Join-Path $envWebPath 'bin' } else { $null }
 
-    return [pscustomobject][ordered]@{
-        environmentWebPath = $envWebPath
-        environmentBinPath = $envBinPath
-        sentinelPath       = if ($null -ne $envBinPath) { Join-Path $envBinPath 'GxNetCoreStartup.dll' } else { $null }
-        pathResolutionStatus = $pathStatus
-        pathResolutionSource = $pathSource
-        pathResolutionReason = $pathReason
-    }
+    # Lista de 1 alvo (in-kb-web). Tags family/targetKind explicitas; campos .NET preservados para o
+    # consumidor ...CoreDotNet montar a saida `paths` identica (golden byte-a-byte).
+    return @(
+        [pscustomobject][ordered]@{
+            family               = 'dotnet'
+            targetKind           = 'in-kb-web'
+            environmentWebPath   = $envWebPath
+            environmentBinPath   = $envBinPath
+            sentinelPath         = if ($null -ne $envBinPath) { Join-Path $envBinPath 'GxNetCoreStartup.dll' } else { $null }
+            pathResolutionStatus = $pathStatus
+            pathResolutionSource = $pathSource
+            pathResolutionReason = $pathReason
+        }
+    )
 }
 
 function Test-GeneXusKbDeployBinFreshnessCore {
+    # Fase 3 (iii) — DISPATCHER por familia. Extraido o corpo .NET para ...CoreDotNet (comportamento
+    # preservado, ancora de regressao) e adicionado ...CoreJava (co-gate; stub no Commit 2, real no
+    # Commit 3). Roteia por $rec.family; kind ausente/invalido nao chega aqui (rejeitado a montante pela
+    # policy/fachada). Default conservador = .NET.
     param(
         [string]$KbPath,
         [string]$EnvironmentName,
@@ -341,7 +354,71 @@ function Test-GeneXusKbDeployBinFreshnessCore {
         [string]$MetadataPath
     )
 
-    $paths = Get-GeneXusKbDeployBinPaths -KbPath $KbPath -EnvironmentName $EnvironmentName -MetadataPath $MetadataPath
+    $rec = $null
+    if (-not [string]::IsNullOrWhiteSpace($DeploymentHostingKind)) {
+        $rec = Get-GeneXusKbHostingKindSupportRecord -HostingKind $DeploymentHostingKind
+    }
+    $family = if ($null -ne $rec) { $rec.family } else { 'dotnet' }
+
+    if ($family -eq 'java') {
+        return Test-GeneXusKbDeployBinFreshnessCoreJava `
+            -KbPath $KbPath -EnvironmentName $EnvironmentName -DeploymentHostingKind $DeploymentHostingKind `
+            -BuildStartedAt $BuildStartedAt -MetadataPath $MetadataPath
+    }
+
+    return Test-GeneXusKbDeployBinFreshnessCoreDotNet `
+        -KbPath $KbPath -EnvironmentName $EnvironmentName -DeploymentHostingKind $DeploymentHostingKind `
+        -BuildStartedAt $BuildStartedAt -MetadataPath $MetadataPath
+}
+
+function Test-GeneXusKbDeployBinFreshnessCoreJava {
+    # Fase 3, Commit 2: STUB fail-safe. O co-gate Java real (4 quadrantes por conjunto de artefatos,
+    # skew bidirecional, validacao de topologia externa, resolucao de com\<kb>) entra no Commit 3, junto
+    # com a virada de deployBinSupportState -> supported. Ate la o motor Java e INALCANCAVEL (java-tomcat
+    # = recognized-no-engine no Eixo A -> policy/fachada pulam antes daqui). Este stub apenas garante a
+    # propriedade de seguranca central (NUNCA emitir 'fresh' sem publicacao atestada) caso algum caminho
+    # inesperado o alcance: retorna 'unknown' (config-error, fail-safe).
+    param(
+        [string]$KbPath,
+        [string]$EnvironmentName,
+        [string]$DeploymentHostingKind,
+        [DateTimeOffset]$BuildStartedAt,
+        [string]$MetadataPath
+    )
+
+    $slack = Get-GeneXusKbDeployBinTimeSlack
+    $threshold = $BuildStartedAt.Subtract($slack)
+
+    return [pscustomobject][ordered]@{
+        status                    = 'unknown'
+        deploymentHostingKind     = $DeploymentHostingKind
+        validationEnvironmentName = $EnvironmentName
+        buildStartedAt            = $BuildStartedAt.ToString('o')
+        thresholdAt               = $threshold.ToString('o')
+        paths                     = [ordered]@{
+            environmentWebPath   = $null
+            environmentBinPath   = $null
+            pathResolutionStatus = 'blocked'
+            pathResolutionSource = 'java-cogate-nao-implementado'
+            pathResolutionReason = 'Motor de deploy-bin Java (co-gate) sera implementado no Commit 3 da Fase 3.'
+        }
+        binCheck                  = [ordered]@{}
+        diagnosticLayer           = [ordered]@{}
+        interpretation            = 'Motor Java de deploy-bin nao implementado (Commit 2 stub); fail-safe unknown.'
+    }
+}
+
+function Test-GeneXusKbDeployBinFreshnessCoreDotNet {
+    param(
+        [string]$KbPath,
+        [string]$EnvironmentName,
+        [string]$DeploymentHostingKind,
+        [DateTimeOffset]$BuildStartedAt,
+        [string]$MetadataPath
+    )
+
+    $targets = Get-GeneXusKbDeployBinPaths -KbPath $KbPath -EnvironmentName $EnvironmentName -MetadataPath $MetadataPath
+    $paths = $targets[0]  # v1: 1 alvo por KB (in-kb-web)
     $slack = Get-GeneXusKbDeployBinTimeSlack
     $threshold = $BuildStartedAt.Subtract($slack)
 
