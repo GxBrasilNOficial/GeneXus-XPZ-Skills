@@ -12,11 +12,11 @@
               Prova zero regressao quando o parametro e ausente.
       ramo 1 (-DeploymentHostingKind fora do registro) -> erro de parametro: exit 1, status
               'runtime-hosting-kind-invalido', reason ecoa o valor.
-      ramo 2 (-DeploymentHostingKind java-tomcat) -> skip claro: exit 0, status = freshnessSkipStatus do
+      ramo 2 (-DeploymentHostingKind java-tomcat) -> skip claro: exit 0, status = runtimeSkipStatus (Eixo C) do
               registro; NAO deriva CSharpModel\web (a KB de fixture nem tem esse diretorio).
       ramo 2 case-insensitive ('JAVA-TOMCAT') -> mesmo skip (lookup [ordered]@{}.Contains).
 
-    FONTE-UNICA: o status de skip esperado e DERIVADO de (Get-...Record 'java-tomcat').freshnessSkipStatus;
+    FONTE-UNICA: o status de skip esperado e DERIVADO de (Get-...Record 'java-tomcat').runtimeSkipStatus (Eixo C);
     este arquivo nao redigita o literal (fica fora da §8 do drift) e nao referencia o campo de forma-alvo da Fase 3 (§9).
 
     Falha => 'ASSERT_FAILED: ...'; sucesso => 'GENEXUS_RUNTIME_FRESHNESS_HOSTING_GUARD_SELFTEST_OK'.
