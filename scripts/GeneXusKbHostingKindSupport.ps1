@@ -85,7 +85,7 @@ function New-GeneXusKbHostingKindSupportRecord {
         $WebDirFreshnessExtensions,   # string[]|$null
         $RuntimeFreshnessExtensions,  # string[]|$null
         $RuntimeExclusionPrefixes,    # string[]|$null ($null, NAO @(), quando desconhecido)
-        $PublicationTargets,          # object[]|$null (opaco as Fases 1/2; $null quando desconhecido)
+        $PublicationTargets,          # object[]|$null (forma-alvo do motor de deploy-bin; citado via allowlist no-bridge invertida; $null quando desconhecido)
         $SupportedServletFlavors,     # string[]|$null (vi-bis): SO a enumeracao de sabores da familia
         $DeployBinUnsupportedReason,  # string|$null (Eixo A)
         $RuntimeUnsupportedReason,    # string|$null (Eixo C)
@@ -167,13 +167,13 @@ $dotnetRuntimeExtensions = @('.cs', '.js', '.aspx', '.rsp')
 # compartilhados): $dotnetExclusionPrefixes, $dotnetWebDirExtensions, $dotnetRuntimeExtensions e o
 # proprio $dotnetPublicationTargets. Este ultimo vaza em DOIS niveis: o array em si (compartilhado
 # entre os records) e $dotnetExclusionPrefixes aninhado em publicationTargets[0].exclusionPrefixes.
-# Inerte na Fase 1 (nada muta). A Fase 3, ao popular/mutar listas por familia (itens (iv)/(vi)/(vii)),
-# DEVE clonar antes de mutar para nao vazar entre records (clonar so o aninhado nao basta se
-# $dotnetPublicationTargets for mutado por familia).
+# Listas por familia sao clonadas antes de mutar para nao vazar entre records (clonar so o aninhado
+# nao basta se $dotnetPublicationTargets for mutado por familia); o self-test do co-gate (cenario de
+# aliasing) trava que as arrays Java != .NET (referencias distintas).
 
-# publicationTargets .NET ja na forma-alvo da Fase 3 (subPath 'bin'), porem OPACO as Fases 1/2:
-# nenhum consumidor de Fase 1/2 itera este campo (clausula no-bridge). evidenceStrategy e string
-# livre na Fase 1 (vira enum fechado so na Fase 3).
+# publicationTargets .NET na forma-alvo (subPath 'bin'). Clausula no-bridge INVERTIDA (Fase 3): o campo
+# e citado LEGITIMAMENTE pelos arquivos-motor via allowlist (o co-gate itera a forma-alvo); todo outro
+# *.ps1 = zero ocorrencias (fail-closed, travado pelo self-test de drift + guarda de drift da allowlist).
 $dotnetPublicationTargets = @(
     [ordered]@{
         subPath           = 'bin'
