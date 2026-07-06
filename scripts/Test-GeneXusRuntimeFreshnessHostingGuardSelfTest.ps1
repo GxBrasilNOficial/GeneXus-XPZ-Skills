@@ -32,9 +32,12 @@ $scriptDir = Split-Path -Parent $PSCommandPath
 $freshnessScript = Join-Path $scriptDir 'Test-GeneXusRuntimeFreshness.ps1'
 . (Join-Path $scriptDir 'GeneXusKbHostingKindSupport.ps1')
 
-$expectedSkipStatus = (Get-GeneXusKbHostingKindSupportRecord -HostingKind 'java-tomcat').freshnessSkipStatus
+# Fase 3 (split per-eixo): esta e a guarda do Eixo C (runtime) — o status de skip esperado vem do campo
+# DO SEU EIXO (runtimeSkipStatus), NAO do alias legado freshnessSkipStatus (que segue o Eixo A e, apos a
+# Fase 3, e $null para Java porque o Eixo A passou a rodar o motor).
+$expectedSkipStatus = (Get-GeneXusKbHostingKindSupportRecord -HostingKind 'java-tomcat').runtimeSkipStatus
 if ([string]::IsNullOrWhiteSpace($expectedSkipStatus)) {
-    throw "ASSERT_FAILED: freshnessSkipStatus de 'java-tomcat' vazio (pre-condicao da Fase 1)."
+    throw "ASSERT_FAILED: runtimeSkipStatus de 'java-tomcat' vazio (Eixo C deveria seguir recognized-no-engine)."
 }
 
 $importedAt = '2026-06-01T00:00:00-03:00'

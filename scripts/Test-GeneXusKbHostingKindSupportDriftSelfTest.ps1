@@ -34,11 +34,9 @@ $ErrorActionPreference = 'Stop'
 $scriptDir    = Split-Path -Parent $PSCommandPath
 $registryFile = Join-Path $scriptDir 'GeneXusKbHostingKindSupport.ps1'
 $selfFile     = $PSCommandPath
-# Fase 2: o golden .NET (Test-GeneXusDeployBinDotNetGoldenSelfTest.ps1) embute, no baseline SKIP do
-# caso java-tomcat, o literal 'skipped-hosting-unsupported' via summary=unsupportedReason (baseline
-# congelado, NAO redigitacao de emissor). E excluido SO da varredura §8 (skip fonte-unica) — nao da
-# §6 (nao cita o token interno do registro) nem da §9 (nao cita publicationTargets).
-$goldenFile   = Join-Path $scriptDir 'Test-GeneXusDeployBinDotNetGoldenSelfTest.ps1'
+# Fase 3: o golden .NET (Test-GeneXusDeployBinDotNetGoldenSelfTest.ps1) NAO embute mais o literal de skip
+# — o caso java-tomcat virou config-error 'unknown' (Eixo A supported), nao mais skip. Logo o golden NAO
+# precisa de exclusao na §8: o guard passa a cobri-lo como qualquer outro arquivo (furo a menos).
 
 if (-not (Test-Path -LiteralPath $registryFile -PathType Leaf)) {
     throw "ASSERT_FAILED: registro ausente em $registryFile"
@@ -134,16 +132,28 @@ if ($null -ne $fw.sentinel) {
     throw "ASSERT_FAILED: framework-iis deveria ter sentinel=`$null (invariante do design), atual=[$($fw.sentinel)]"
 }
 
-# ── 4. Contrato de skip PER-EIXO + reconhecimento Java ───────────────────────────
-# Fase 3, Commit 1 (split aditivo): java-tomcat ainda recognized-no-engine nos TRES eixos
-# (comportamento identico). O Commit 3 vira o Eixo A -> supported; este assert acompanhara.
+# ── 4. Contrato de skip PER-EIXO + reconhecimento Java (Fase 3, Commit 3) ─────────
+# Eixo A (deploy-bin) VIRA supported (motor Java = co-gate por familia); Eixos B/C (source/runtime)
+# seguem recognized-no-engine (Pos-v1), cada um com sua razao de skip PER-EIXO.
 $java = Get-GeneXusKbHostingKindSupportRecord -HostingKind 'java-tomcat'
-$javaEixos = @(
-    @{ eixo = 'deployBin'; runs = 'runsDeployBinEngine'; state = 'deployBinSupportState'; skip = 'deployBinSkipStatus'; reason = 'deployBinUnsupportedReason' }
-    @{ eixo = 'runtime';   runs = 'runsRuntimeEngine';   state = 'runtimeSupportState';   skip = 'runtimeSkipStatus';   reason = 'runtimeUnsupportedReason' }
-    @{ eixo = 'source';    runs = 'runsSourceEngine';    state = 'sourceSupportState';    skip = 'sourceSkipStatus';    reason = 'sourceUnsupportedReason' }
+
+# Eixo A: supported, roda o motor, SEM skip status/razao.
+if ($java.deployBinSupportState -ne 'supported' -or -not $java.runsDeployBinEngine) {
+    throw "ASSERT_FAILED: java-tomcat Eixo A (deploy-bin) deveria ser supported/roda-motor (state=[$($java.deployBinSupportState)] runs=[$($java.runsDeployBinEngine)])"
+}
+if ($null -ne $java.deployBinSkipStatus) {
+    throw "ASSERT_FAILED: java-tomcat Eixo A supported nao deveria ter deployBinSkipStatus, atual=[$($java.deployBinSkipStatus)]"
+}
+if ($null -ne $java.deployBinUnsupportedReason) {
+    throw "ASSERT_FAILED: java-tomcat Eixo A supported nao deveria ter deployBinUnsupportedReason, atual=[$($java.deployBinUnsupportedReason)]"
+}
+
+# Eixos B (source) e C (runtime): recognized-no-engine, skip claro com razao PER-EIXO.
+$javaSkipEixos = @(
+    @{ eixo = 'runtime'; runs = 'runsRuntimeEngine'; state = 'runtimeSupportState'; skip = 'runtimeSkipStatus'; reason = 'runtimeUnsupportedReason' }
+    @{ eixo = 'source';  runs = 'runsSourceEngine';  state = 'sourceSupportState';  skip = 'sourceSkipStatus';  reason = 'sourceUnsupportedReason' }
 )
-foreach ($e in $javaEixos) {
+foreach ($e in $javaSkipEixos) {
     if ($java.($e.state) -ne 'recognized-no-engine') {
         throw "ASSERT_FAILED: java-tomcat Eixo '$($e.eixo)' deveria ser recognized-no-engine, atual=[$($java.($e.state))]"
     }
@@ -156,8 +166,6 @@ foreach ($e in $javaEixos) {
     if ([string]::IsNullOrWhiteSpace($java.($e.reason))) {
         throw "ASSERT_FAILED: java-tomcat Eixo '$($e.eixo)' deveria ter razao de skip nao-vazia ($($e.reason))"
     }
-    # Fonte-unica TAMBEM no texto: cada razao per-eixo interpola o skip status; travar que o valor
-    # renderizado esteja presente (uma renomeacao de `$script:...SkipStatus` deixaria "pulada ()").
     if ($java.($e.reason) -notmatch [regex]::Escape($java.($e.skip))) {
         throw "ASSERT_FAILED: java Eixo '$($e.eixo)': $($e.reason) deveria conter o skip status renderizado ('$($java.($e.skip))'), atual=[$($java.($e.reason))]"
     }
@@ -182,40 +190,54 @@ foreach ($rec in $all) {
     }
 }
 
-# ── 5. tentative-java (campos provisorios exatamente como o design manda) ────────
-if ($java.sentinel -ne 'tentative-java') {
-    throw "ASSERT_FAILED: java.sentinel deveria ser 'tentative-java', atual=[$($java.sentinel)]"
+# ── 5. Campos Java aterrados (Eixo A) vs provisorios (Eixo B/C) — Fase 3 Commit 3 ─
+# Eixo A aterrado: sentinela real (WEB-INF\lib\GeneXus.jar), publicationTargets external-servlet-dir,
+# sabores enumerados, deployTargetKind external-webapp (Plano B).
+if ($java.sentinel -ne 'WEB-INF\lib\GeneXus.jar') {
+    throw "ASSERT_FAILED: java.sentinel deveria ser 'WEB-INF\lib\GeneXus.jar' (aterrado), atual=[$($java.sentinel)]"
 }
+if ($null -eq $java.publicationTargets -or @($java.publicationTargets).Count -ne 1) {
+    throw "ASSERT_FAILED: java.publicationTargets deveria ter 1 alvo aterrado, atual=[$(@($java.publicationTargets).Count)]"
+}
+if ($java.publicationTargets[0].targetResolution -ne 'external-servlet-dir') {
+    throw "ASSERT_FAILED: java.publicationTargets[0].targetResolution deveria ser 'external-servlet-dir', atual=[$($java.publicationTargets[0].targetResolution)]"
+}
+if (($java.supportedServletFlavors -join ',') -ne 'jakarta,javax') {
+    throw "ASSERT_FAILED: java.supportedServletFlavors deveria ser 'jakarta,javax', atual=[$($java.supportedServletFlavors -join ',')]"
+}
+if ($java.deployTargetKind -ne 'external-webapp') {
+    throw "ASSERT_FAILED: java.deployTargetKind deveria ser 'external-webapp' (Plano B), atual=[$($java.deployTargetKind)]"
+}
+
+# Eixo B/C provisorios (Pos-v1): outputModelSubPath marcador; extensoes/exclusoes $null (NAO @()).
 if ($java.outputModelSubPath -ne 'tentative-java') {
-    throw "ASSERT_FAILED: java.outputModelSubPath deveria ser 'tentative-java', atual=[$($java.outputModelSubPath)]"
+    throw "ASSERT_FAILED: java.outputModelSubPath deveria ser 'tentative-java' (Eixo B/C Pos-v1), atual=[$($java.outputModelSubPath)]"
 }
-# runtimeExclusionPrefixes DEVE ser $null (NAO @()) — "desconhecido", nunca "sem exclusoes".
 if ($null -ne $java.runtimeExclusionPrefixes) {
-    throw "ASSERT_FAILED: java.runtimeExclusionPrefixes deveria ser `$null (nao @()), atual=[$(@($java.runtimeExclusionPrefixes) -join ',')]"
+    throw "ASSERT_FAILED: java.runtimeExclusionPrefixes deveria ser `$null (Eixo C Pos-v1, nao @()), atual=[$(@($java.runtimeExclusionPrefixes) -join ',')]"
 }
-# Conjunto EXATO de tentativeFields (trava a decisao de quais campos Java sao provisorios;
-# um editor futuro nao pode adicionar/remover sem o teste reclamar).
+# Conjunto EXATO de tentativeFields APOS aterramento do Eixo A (sentinel/publicationTargets saem).
 $expectedTentative = @(
     'outputModelSubPath'
-    'sentinel'
     'webDirFreshnessExtensions'
     'runtimeFreshnessExtensions'
     'runtimeExclusionPrefixes'
-    'publicationTargets'
 )
 $actualTentative = @($java.tentativeFields | Sort-Object)
 $expectedSorted = @($expectedTentative | Sort-Object)
 if (($actualTentative -join ',') -ne ($expectedSorted -join ',')) {
     throw "ASSERT_FAILED: java.tentativeFields divergente. esperado=[$($expectedSorted -join ',')] atual=[$($actualTentative -join ',')]"
 }
-# deployTargetKind e recomendacao v1 CONGELADA (nao empirica) -> NAO deve constar em tentativeFields.
-if ('deployTargetKind' -in @($java.tentativeFields)) {
-    throw "ASSERT_FAILED: deployTargetKind e decisao v1 congelada, nao deve estar em java.tentativeFields"
+# sentinel/publicationTargets/deployTargetKind aterrados/congelados -> NAO devem constar em tentativeFields.
+foreach ($grounded in @('sentinel', 'publicationTargets', 'deployTargetKind')) {
+    if ($grounded -in @($java.tentativeFields)) {
+        throw "ASSERT_FAILED: '$grounded' foi aterrado/congelado e nao deve estar em java.tentativeFields"
+    }
 }
-# Campos de lista provisorios Java = `$null (NAO @()) -> "desconhecido", nunca "vazio conhecido".
-foreach ($listField in @('webDirFreshnessExtensions', 'runtimeFreshnessExtensions', 'runtimeExclusionPrefixes', 'publicationTargets')) {
+# Campos de lista provisorios Java (Eixo B/C) = `$null (NAO @()) -> "desconhecido", nunca "vazio conhecido".
+foreach ($listField in @('webDirFreshnessExtensions', 'runtimeFreshnessExtensions', 'runtimeExclusionPrefixes')) {
     if ($null -ne $java.$listField) {
-        throw "ASSERT_FAILED: java.$listField deveria ser `$null (campo de lista provisorio, nao @()), atual=[$(@($java.$listField) -join ',')]"
+        throw "ASSERT_FAILED: java.$listField deveria ser `$null (Eixo B/C provisorio, nao @()), atual=[$(@($java.$listField) -join ',')]"
     }
 }
 
@@ -332,9 +354,9 @@ if ($fallbackLeak.Count -gt 0) {
 $skipLiteral = 'skipped-hosting-unsupported'
 $skipOffenders = New-Object System.Collections.Generic.List[string]
 foreach ($file in Get-ChildItem -LiteralPath $scriptDir -Filter '*.ps1' -File) {
-    # Exclusao cirurgica: registro (fonte), este self-test, e o golden (baseline congelado que
-    # contem o literal legitimamente — ver nota no topo). Cada exclusao e um furo no guard; manter minima.
-    if ($file.FullName -eq $registryFile -or $file.FullName -eq $selfFile -or $file.FullName -eq $goldenFile) {
+    # Exclusao cirurgica: registro (fonte) e este self-test. Cada exclusao e um furo no guard; manter
+    # minima. (O golden .NET deixou de embutir o literal na Fase 3 — nao precisa mais ser excluido.)
+    if ($file.FullName -eq $registryFile -or $file.FullName -eq $selfFile) {
         continue
     }
     $content = [System.IO.File]::ReadAllText($file.FullName)
@@ -349,23 +371,48 @@ if ($skipOffenders.Count -gt 0) {
     throw "ASSERT_FAILED: $($skipOffenders.Count) arquivo(s) redigitam a string de skip fora do registro (Fase 1 espera zero): $($skipOffenders -join ', ')."
 }
 
-# ── 9. Clausula no-bridge: publicationTargets opaco as Fases 1/2 ─────────────────
+# ── 9. no-bridge INVERTIDA (Fase 3, ix): ALLOWLIST de arquivos-motor + guarda de drift ──
+# A ponte registro<->motor (iterar publicationTargets) e LEGITIMA na Fase 3. Inverte-se a denylist: em
+# vez de "todo mundo menos registro+self", declara-se a ALLOWLIST dos arquivos-motor que PODEM citar o
+# token; todo OUTRO *.ps1 deve ter ZERO ocorrencias (fail-closed — um arquivo de Fase 1/2 novo que cite o
+# token vira falso-ofensor no CI, visivel no PR, nunca fail-open). Criterio = ocorrencia TEXTUAL
+# (comentario/string contam; o AST fica p/ 999 se algum dia um arquivo de Fase 1/2 precisar citar).
 $bridgeToken = 'publicationTargets'
+$engineAllowlist = @(
+    'GeneXusKbHostingKindSupport.ps1'                     # registro: fonte do contrato (declara publicationTargets)
+    'Test-GeneXusKbHostingKindSupportDriftSelfTest.ps1'   # este self-test: cita o token na propria allowlist/asserts
+    'Test-GeneXusDeployBinJavaCoGateSelfTest.ps1'         # self-test do co-gate Java: valida o contrato do alvo (iv)
+)
+$allowSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+foreach ($n in $engineAllowlist) { [void]$allowSet.Add($n) }
+
 $bridgeOffenders = New-Object System.Collections.Generic.List[string]
+$actualCiters = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
 foreach ($file in Get-ChildItem -LiteralPath $scriptDir -Filter '*.ps1' -File) {
-    if ($file.FullName -eq $registryFile -or $file.FullName -eq $selfFile) {
-        continue
-    }
     $content = [System.IO.File]::ReadAllText($file.FullName)
     if ($content -match [regex]::Escape($bridgeToken)) {
-        $bridgeOffenders.Add($file.Name)
+        [void]$actualCiters.Add($file.Name)
+        if (-not $allowSet.Contains($file.Name)) {
+            $bridgeOffenders.Add($file.Name)
+        }
     }
 }
 if ($bridgeOffenders.Count -gt 0) {
     foreach ($name in $bridgeOffenders) {
-        Write-Host "ASSERT_FAILED[no-bridge]: $name referencia '$bridgeToken' — a ponte registro<->motor e exclusiva da Fase 3."
+        Write-Host "ASSERT_FAILED[no-bridge]: $name cita '$bridgeToken' e NAO esta na allowlist de arquivos-motor — se for motor legitimo da Fase 3, adicione-o conscientemente; senao remova a referencia."
     }
-    throw "ASSERT_FAILED: $($bridgeOffenders.Count) arquivo(s) violam a clausula no-bridge (Fase 1/2 nao itera publicationTargets): $($bridgeOffenders -join ', ')."
+    throw "ASSERT_FAILED: $($bridgeOffenders.Count) arquivo(s) fora da allowlist citam publicationTargets: $($bridgeOffenders -join ', ')."
+}
+
+# Guarda de drift da PROPRIA allowlist (R4): allowlist == arquivos-motor ATIVOS (citers reais). Uma
+# entrada obsoleta (arquivo renomeado/removido, ou que deixou de citar o token) fica orfa e deve falhar,
+# senao a allowlist "permite" um arquivo inexistente e desatualiza em silencio.
+$staleAllow = New-Object System.Collections.Generic.List[string]
+foreach ($n in $engineAllowlist) {
+    if (-not $actualCiters.Contains($n)) { $staleAllow.Add($n) }
+}
+if ($staleAllow.Count -gt 0) {
+    throw "ASSERT_FAILED: allowlist §9 desatualizada — entrada(s) que nao existe(m) ou nao cita(m) mais '$bridgeToken': $($staleAllow -join ', '). Sincronizar a allowlist com os arquivos-motor ativos."
 }
 
 'GENEXUS_HOSTING_KIND_DRIFT_SELFTEST_OK'

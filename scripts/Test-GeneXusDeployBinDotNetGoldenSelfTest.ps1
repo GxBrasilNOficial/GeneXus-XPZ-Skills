@@ -8,17 +8,18 @@
     TRES casos, apos a Fase 2 da paridade Java/Tomcat fiar o registro na fachada:
 
       - ACEITO    : dotnet-framework-iis com DLL de objeto fresca em web\bin -> status 'fresh'.
-      - SKIP      : java-tomcat -> reconhecido pelo registro como recognized-no-engine; a fachada
-                    ROTEIA para o skip via registro -> status 'skipped-hosting-unsupported' + summary
-                    derivado de unsupportedReason. (Na Fase 1 este caso era rejeitado como 'invalido';
-                    a Fase 2 mudou-o DELIBERADAMENTE para skip — ver java-tomcat-paridade-gerador-design.md.)
+      - JAVA CFGERR: java-tomcat -> Eixo A SUPPORTED a partir da Fase 3 (Commit 3): a fachada ROTEIA para o
+                    co-gate Java (Test-GeneXusKbDeployBinFreshnessCoreJava). Sem kb_environment_servlet_dirs
+                    no fixture, o alvo externo nao resolve -> status 'unknown' (config-error, fail-safe;
+                    NUNCA 'fresh'). (Na Fase 1 rejeitado como invalido; na Fase 2 virou skip; na Fase 3 passa
+                    a RODAR o motor e falha conservativo sem config — ver java-tomcat-fase3-replano.md.)
       - REJEITADO : 'foobar' — hosting kind GENUINAMENTE invalido (fora do registro) -> a fachada rejeita
                     com a mensagem canonica (status 'skipped', deployBinCheck null). Preserva a cobertura
-                    de rejeicao de valor invalido que a decisao (a') exige — cobertura que o caso java-tomcat
-                    deixou de exercer ao virar skip.
+                    de rejeicao de valor invalido que a decisao (a') exige.
 
-    O motor de deploy-bin (Get-GeneXusKbDeployBinPaths / Test-GeneXusKbDeployBinFreshnessCore) permanece
-    ESCALAR (a mudanca de aridade e da Fase 3); a Fase 2 so fia o registro na fachada/policy.
+    O caso ACEITO prova a regressao .NET byte-a-byte (Get-GeneXusKbDeployBinPaths -> lista de 1 alvo, corpo
+    extraido para ...CoreDotNet SEM mudanca de comportamento). O caso JAVA prova o roteamento por familia +
+    a propriedade de seguranca (config-error -> unknown, jamais fresh).
 
     Rode com -UpdateBaseline para reimprimir os baselines normalizados (ao evoluir a fachada na Fase 3,
     revalidar a mudanca e recapturar conscientemente).
@@ -95,7 +96,7 @@ try {
         -AsJson
     $acceptedActual = ConvertTo-GoldenNormalizedText -Text (($acceptedRaw | Out-String).TrimEnd()) -Root $tempRoot
 
-    # ── Caso SKIP (java-tomcat reconhecido-sem-motor -> skip via registro) ────────
+    # ── Caso JAVA (java-tomcat Eixo A supported -> co-gate; sem servlet_dirs -> unknown config-error) ──
     $skipRaw = & $facade `
         -KbPath $kbNativePath `
         -EnvironmentName $envName `
@@ -168,14 +169,31 @@ try {
 
     $skipGolden = @'
 {
-  "status": "skipped-hosting-unsupported",
+  "status": "unknown",
   "validationEnvironmentName": ".Net Environment",
   "deploymentHostingKind": "java-tomcat",
   "metadataPath": "<ROOT>\\parallel\\kb-source-metadata.md",
   "buildStartedAt": "<TS>",
   "buildStartedAtSource": "parameter",
-  "deployBinCheck": null,
-  "summary": "Gerador Java/Tomcat reconhecido, mas o motor de verificacao de deploy-bin ainda e .NET (Eixo A). Checagem pulada (skipped-hosting-unsupported) ate a Fase 3 dar motor por familia."
+  "deployBinCheck": {
+    "paths": {
+      "classesRoot": null,
+      "webappRoot": null,
+      "localSourceRoot": null,
+      "appPackage": null,
+      "servletFlavor": null,
+      "servletFlavorAudit": "not-audited",
+      "sentinelPath": null,
+      "pathResolutionStatus": "blocked",
+      "pathResolutionSource": "kb-source-metadata.kb_environment_servlet_dirs",
+      "pathResolutionReason": "kb_environment_servlet_dirs ausente/vazio para environment '.Net Environment' (gravar SERVLET_DIR via xpz-kb-parallel-setup)."
+    },
+    "binCheck": {},
+    "diagnosticLayer": {},
+    "interpretation": "kb_environment_servlet_dirs ausente/vazio para environment '.Net Environment' (gravar SERVLET_DIR via xpz-kb-parallel-setup).",
+    "thresholdAt": "<TS>"
+  },
+  "summary": "kb_environment_servlet_dirs ausente/vazio para environment '.Net Environment' (gravar SERVLET_DIR via xpz-kb-parallel-setup)."
 }
 '@ -replace "`r`n", "`n"
 

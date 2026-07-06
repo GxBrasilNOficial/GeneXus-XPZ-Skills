@@ -228,43 +228,56 @@ $dotnetFrameworkRecord = @{
 $script:GeneXusKbHostingKindSupportRegistry['dotnet-framework-iis'] =
     New-GeneXusKbHostingKindSupportRecord @dotnetFrameworkRecord
 
-# java-tomcat: reconhecido-sem-motor. Familia e estado sao definitivos; os campos de motor
-# sao provisorios (tentativeFields) ate a Fase 0/3 aterrar a evidencia. Marcador 'tentative-java'
-# nos campos string; $null (NAO @()) nos campos de lista para significar "desconhecido", nunca
-# "sem exclusoes/sem alvos". deployTargetKind='in-kb-web' e a recomendacao v1 (in-place): decisao
-# CONGELADA (NAO valor empirico), sujeita apenas ao Plano B se a Fase 0 revelar topologia externa
-# (.war/webapp fora de web) -> por isso NAO entra em tentativeFields (que lista so campos de valor
-# Java empiricamente desconhecido).
+# java-tomcat: Eixo A (deploy-bin) SUPPORTED a partir da Fase 3 (motor Java = co-gate por familia).
+# Eixos B/C seguem recognized-no-engine (Pos-v1). Campos do Eixo A aterrados do evidence-catalog
+# (sentinela WEB-INF\lib\GeneXus.jar; publicationTargets external-servlet-dir; sabores jakarta/javax).
+# Campos de Eixo B/C (outputModelSubPath, extensoes .cs/.rsp) seguem tentativos ($null/marcador).
+# deployTargetKind='external-webapp' — Plano B aferido na Fase 0 (topologia externa, webapp no Tomcat).
+
+# publicationTargets Java construidos DO ZERO (literais proprios) — cuidado de aliasing (x): NUNCA
+# mutar/copiar os $dotnet*. Forma-alvo da Fase 3 (iv): alvo external-servlet-dir; a resolucao de
+# com\<kb> vem de metadata dedicado (kb_environment_app_package) em runtime, nunca literal aqui.
+$javaPublicationTargets = @(
+    [ordered]@{
+        targetResolution             = 'external-servlet-dir'
+        subPath                      = $null
+        externalTargetKey            = 'kb_environment_servlet_dirs'
+        appPackageKey                = 'kb_environment_app_package'
+        evidenceStrategy             = 'app-object-artifact-mtime'
+        exclusionPrefixes            = $null
+        exclusionPackages            = [ordered]@{
+            allowRootMetadataKey = 'kb_environment_app_package'
+            denySanity           = @('com\genexus', 'qviewer', 'dummy')
+        }
+        sentinelRelativeToWebappRoot = 'WEB-INF\lib\GeneXus.jar'
+    }
+)
+
 $javaTomcatRecord = @{
     HostingKind                = 'java-tomcat'
     Family                     = 'java'
     HumanLabel                 = 'Java / Tomcat'
-    # Fase 3, Commit 1 (split per-eixo aditivo): os TRES eixos ainda recognized-no-engine — comportamento
-    # IDENTICO ao anterior. O Commit 3 vira deployBinSupportState -> 'supported' (motor Java do Eixo A) e
-    # aterra os campos de motor; B/C permanecem recognized-no-engine (Pos-v1). Razoes de skip PER-EIXO
-    # (cada eixo diz a SUA razao; a razao unica antiga falava so do Eixo A e ficaria enganosa em B/C).
-    DeployBinSupportState      = 'recognized-no-engine'
+    DeployBinSupportState      = 'supported'
     RuntimeSupportState        = 'recognized-no-engine'
     SourceSupportState         = 'recognized-no-engine'
-    DeployTargetKind           = 'in-kb-web'
+    DeployTargetKind           = 'external-webapp'
     OutputModelSubPath         = $script:GeneXusKbHostingKindTentativeJavaMarker
-    Sentinel                   = $script:GeneXusKbHostingKindTentativeJavaMarker
+    Sentinel                   = 'WEB-INF\lib\GeneXus.jar'
     WebDirFreshnessExtensions  = $null
     RuntimeFreshnessExtensions = $null
     RuntimeExclusionPrefixes   = $null
-    PublicationTargets         = $null
-    SupportedServletFlavors    = $null
-    DeployBinUnsupportedReason = "Gerador Java/Tomcat reconhecido, mas o motor de verificacao de deploy-bin ainda e .NET (Eixo A). Checagem pulada ($($script:GeneXusKbHostingKindSkipStatus)) ate a Fase 3 dar motor por familia."
+    PublicationTargets         = $javaPublicationTargets
+    SupportedServletFlavors    = @('jakarta', 'javax')
+    DeployBinUnsupportedReason = $null
     RuntimeUnsupportedReason   = "Diagnostico de runtime-freshness (Eixo C) para Java/Tomcat e Pos-v1: guarda de familia ativa, motor Java nao. Checagem pulada ($($script:GeneXusKbHostingKindSkipStatus))."
     SourceUnsupportedReason    = "Diagnostico de fonte gerado .java (Eixo B) para Java/Tomcat e Pos-v1: guarda de familia ativa, motor Java nao. Checagem pulada ($($script:GeneXusKbHostingKindSkipStatus))."
     ErrorMessage               = $null
+    # Eixo A aterrado (sentinel/publicationTargets saem de tentativos); Eixo B/C seguem tentativos (Pos-v1).
     TentativeFields            = @(
         'outputModelSubPath'
-        'sentinel'
         'webDirFreshnessExtensions'
         'runtimeFreshnessExtensions'
         'runtimeExclusionPrefixes'
-        'publicationTargets'
     )
 }
 $script:GeneXusKbHostingKindSupportRegistry['java-tomcat'] =

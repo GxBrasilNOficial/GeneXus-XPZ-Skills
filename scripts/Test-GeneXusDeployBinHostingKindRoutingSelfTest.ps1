@@ -1,27 +1,24 @@
 #requires -Version 7.4
 <#
 .SYNOPSIS
-    Self-test de roteamento por hosting kind no gate de deploy-bin (Fase 2 da paridade Java/Tomcat).
+    Self-test de roteamento por hosting kind no gate de deploy-bin (Fase 3 da paridade Java/Tomcat).
 
 .DESCRIPTION
-    Trava a fiacao do registro (GeneXusKbHostingKindSupport.ps1) nos dois consumidores do Eixo A que
-    a Fase 2 fia: Resolve-GeneXusKbDeployBinCheckPolicy (A2) e Invoke-GeneXusKbDeployBinPostBuildClassification (A3).
-    Complementa o golden .NET (fachada) exercitando o PIPELINE policy+classificacao, que os 4 self-tests
-    de deploy-bin existentes nao cobrem para os ramos Java/invalido.
+    Trava a fiacao do registro (GeneXusKbHostingKindSupport.ps1) nos dois consumidores do Eixo A:
+    Resolve-GeneXusKbDeployBinCheckPolicy (A2) e Invoke-GeneXusKbDeployBinPostBuildClassification (A3).
+    A partir da Fase 3 (Commit 3) o java-tomcat tem Eixo A SUPPORTED (motor Java = co-gate): NAO pula
+    mais; RODA o motor e, sem kb_environment_servlet_dirs no fixture, cai em config-error 'unknown'
+    (fail-safe — nunca 'fresh'). Complementa o golden .NET exercitando o PIPELINE policy+classificacao.
 
     Casos:
-      1. java-tomcat  -> reconhecido-sem-motor: shouldRun=false; a classificacao materializa o contrato
-                         de skip DERIVANDO a string do registro (nunca redigitada aqui).
-      2. foobar       -> presente-e-fora-do-registro: shouldRun=false, skipReason = mensagem canonica
-                         (que ecoa o valor recebido).
-      3. JAVA-TOMCAT  -> case-insensitive: mesmo record que 'java-tomcat' (lookup [ordered]@{}.Contains).
+      1. java-tomcat  -> Eixo A supported: shouldRun=TRUE; sem servlet_dirs -> freshness 'unknown'
+                         (config-error); sob gate (PostImportDeployValidation) reclassifica + exit 49.
+      2. foobar       -> presente-e-fora-do-registro: shouldRun=false, skipReason = mensagem canonica.
+      3. JAVA-TOMCAT  -> case-insensitive: mesmo roteamento do caso 1 (shouldRun=TRUE).
       4. SkipDeployBinCheck (skip NAO-Java) -> Invoke-...Classification le $policy.hostingSkipStatus no ramo
-                         de skip SEM lancar sob StrictMode (prova o init $null na BASE do $policy — regressao
-                         StrictMode que quebraria os skips nao-Java sem o init).
+                         de skip SEM lancar sob StrictMode (prova o init $null na BASE do $policy).
 
-    FONTE-UNICA: o valor esperado do skip e DERIVADO de (Get-GeneXusKbHostingKindSupportRecord ...).freshnessSkipStatus.
-    Este arquivo NAO redigita o literal do status de skip (fica fora da varredura §8 do drift self-test) e NAO
-    referencia a hashtable interna do registro nem o campo de forma-alvo da Fase 3.
+    FONTE-UNICA: nenhuma redigitacao do literal de skip (fica fora da varredura §8 do drift self-test).
 
     Falha => 'ASSERT_FAILED: ...'; sucesso => 'GENEXUS_DEPLOY_BIN_HOSTING_KIND_ROUTING_SELFTEST_OK'.
 #>
@@ -39,17 +36,13 @@ function Get-Utf8NoBomEncoding {
     return [System.Text.UTF8Encoding]::new($false)
 }
 
-# Valor esperado do skip, DERIVADO do registro (nunca redigitado neste arquivo).
+# Pre-condicao Fase 3: java-tomcat RODA o motor do Eixo A (deploy-bin), pelo campo do seu eixo.
 $javaRec = Get-GeneXusKbHostingKindSupportRecord -HostingKind 'java-tomcat'
 if ($null -eq $javaRec) {
-    throw "ASSERT_FAILED: registro nao reconhece 'java-tomcat' (pre-condicao da Fase 1)."
+    throw "ASSERT_FAILED: registro nao reconhece 'java-tomcat' (pre-condicao)."
 }
-$expectedSkipStatus = $javaRec.freshnessSkipStatus
-if ([string]::IsNullOrWhiteSpace($expectedSkipStatus)) {
-    throw "ASSERT_FAILED: freshnessSkipStatus de 'java-tomcat' vazio; registro incoerente."
-}
-if ($javaRec.runsFreshnessEngine) {
-    throw "ASSERT_FAILED: 'java-tomcat' nao deveria rodar o motor (runsFreshnessEngine=true)."
+if (-not $javaRec.runsDeployBinEngine) {
+    throw "ASSERT_FAILED: 'java-tomcat' deveria rodar o motor do Eixo A (runsDeployBinEngine=false) apos a Fase 3."
 }
 
 $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("xpz-deploy-bin-routing-selftest-" + [guid]::NewGuid().ToString('N'))
@@ -76,21 +69,21 @@ try {
 
     $buildStartedAt = [DateTimeOffset]::Now.AddMinutes(-2)
 
-    # ── Caso 1: java-tomcat → policy skip + classificacao materializa o skip derivado ────────────────
+    # ── Caso 1: java-tomcat → Eixo A supported: RODA o motor; sem servlet_dirs -> unknown (config-error) ──
     $policyJava = Resolve-GeneXusKbDeployBinCheckPolicy `
         -PostImportDeployValidation `
         -MetadataPath $metadataPath `
         -DeploymentHostingKind 'java-tomcat' `
         -ValidationEnvironmentName $envName `
         -BuildOperationallySucceeded $true
-    if ($policyJava.shouldRun) {
-        throw "ASSERT_FAILED: caso 1 (java-tomcat) nao deveria rodar o motor (shouldRun=$($policyJava.shouldRun))."
+    if (-not $policyJava.shouldRun) {
+        throw "ASSERT_FAILED: caso 1 (java-tomcat) deveria RODAR o motor do Eixo A (shouldRun=$($policyJava.shouldRun))."
     }
-    if ($policyJava.hostingSkipStatus -ne $expectedSkipStatus) {
-        throw "ASSERT_FAILED: caso 1 policy.hostingSkipStatus esperado=[$expectedSkipStatus] atual=[$($policyJava.hostingSkipStatus)]."
+    if ($null -ne $policyJava.hostingSkipStatus) {
+        throw "ASSERT_FAILED: caso 1 (java-tomcat supported) nao e skip; hostingSkipStatus deveria ser `$null, atual=[$($policyJava.hostingSkipStatus)]."
     }
-    if ([string]::IsNullOrWhiteSpace($policyJava.unsupportedReason)) {
-        throw "ASSERT_FAILED: caso 1 policy.unsupportedReason deveria ser nao-vazio."
+    if (-not $policyJava.gateEnabled) {
+        throw "ASSERT_FAILED: caso 1 com -PostImportDeployValidation deveria ter gateEnabled=true."
     }
 
     $classJava = Invoke-GeneXusKbDeployBinPostBuildClassification `
@@ -102,20 +95,14 @@ try {
         -BuildOperationallySucceeded $true `
         -PostImportDeployValidation `
         -OperationLabel 'SelfTest'
-    if ($classJava.deployBinFreshness -ne $expectedSkipStatus) {
-        throw "ASSERT_FAILED: caso 1 classificacao.deployBinFreshness esperado=[$expectedSkipStatus] atual=[$($classJava.deployBinFreshness)]."
+    if ($classJava.deployBinFreshness -ne 'unknown') {
+        throw "ASSERT_FAILED: caso 1 sem servlet_dirs deveria dar freshness 'unknown' (config-error), atual=[$($classJava.deployBinFreshness)]."
     }
-    if ($classJava.statusReclassified) {
-        throw "ASSERT_FAILED: caso 1 skip Java nao deveria reclassificar status (statusReclassified=$($classJava.statusReclassified))."
+    if (-not $classJava.statusReclassified) {
+        throw "ASSERT_FAILED: caso 1 'unknown' sob gate deveria reclassificar (statusReclassified=false)."
     }
-    if ($null -ne $classJava.newExitCode) {
-        throw "ASSERT_FAILED: caso 1 skip Java nao deveria setar newExitCode, atual=[$($classJava.newExitCode)]."
-    }
-    if (-not $classJava.deployBinCheck.Contains('hostingSkipStatus')) {
-        throw "ASSERT_FAILED: caso 1 deployBinCheck deveria conter 'hostingSkipStatus'."
-    }
-    if ($classJava.deployBinCheck['hostingSkipStatus'] -ne $expectedSkipStatus) {
-        throw "ASSERT_FAILED: caso 1 deployBinCheck.hostingSkipStatus esperado=[$expectedSkipStatus] atual=[$($classJava.deployBinCheck['hostingSkipStatus'])]."
+    if ($classJava.newExitCode -ne 49) {
+        throw "ASSERT_FAILED: caso 1 'unknown' sob gate deveria setar newExitCode=49, atual=[$($classJava.newExitCode)]."
     }
 
     # ── Caso 2: foobar → rejeicao canonica (presente-e-fora-do-registro) ─────────────────────────────
@@ -139,18 +126,18 @@ try {
         throw "ASSERT_FAILED: caso 2 skipReason deveria ser a mensagem canonica do registro. esperado=[$expectedInvalidMsg] atual=[$($policyBogus.skipReason)]."
     }
 
-    # ── Caso 3: JAVA-TOMCAT (case-insensitive) → mesmo skip do caso 1 ─────────────────────────────────
+    # ── Caso 3: JAVA-TOMCAT (case-insensitive) → mesmo roteamento do caso 1 (roda o motor) ────────────
     $policyUpper = Resolve-GeneXusKbDeployBinCheckPolicy `
         -PostImportDeployValidation `
         -MetadataPath $metadataPath `
         -DeploymentHostingKind 'JAVA-TOMCAT' `
         -ValidationEnvironmentName $envName `
         -BuildOperationallySucceeded $true
-    if ($policyUpper.shouldRun) {
-        throw "ASSERT_FAILED: caso 3 (JAVA-TOMCAT) deveria ser reconhecido case-insensitive e nao rodar o motor."
+    if (-not $policyUpper.shouldRun) {
+        throw "ASSERT_FAILED: caso 3 (JAVA-TOMCAT) deveria ser reconhecido case-insensitive e RODAR o motor (shouldRun=false)."
     }
-    if ($policyUpper.hostingSkipStatus -ne $expectedSkipStatus) {
-        throw "ASSERT_FAILED: caso 3 (JAVA-TOMCAT) lookup case-insensitive falhou. esperado hostingSkipStatus=[$expectedSkipStatus] atual=[$($policyUpper.hostingSkipStatus)]."
+    if ($null -ne $policyUpper.hostingSkipStatus) {
+        throw "ASSERT_FAILED: caso 3 (JAVA-TOMCAT) nao e skip; hostingSkipStatus deveria ser `$null, atual=[$($policyUpper.hostingSkipStatus)]."
     }
 
     # ── Caso 4: SkipDeployBinCheck (skip NAO-Java) → classificacao sem lancar (regressao StrictMode) ─

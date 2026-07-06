@@ -126,6 +126,10 @@ function Read-GeneXusKbDeploymentMetadataFields {
         kb_environment_names          = @()
         kb_environment_output_dirs    = [ordered]@{}
         kb_environment_web_dirs       = [ordered]@{}
+        # Fase 3 (paridade Java/Tomcat): metadata dedicado do alvo Java externo (por env).
+        kb_environment_servlet_dirs   = [ordered]@{}   # env -> SERVLET_DIR (...\WEB-INF\classes)
+        kb_environment_app_package    = [ordered]@{}   # env -> pacote da app (ex.: com\ebtech)
+        kb_environment_servlet_flavor = [ordered]@{}   # env -> jakarta|javax
         kb_environment_post_build_event_hashes = [ordered]@{}
     }
 
@@ -178,6 +182,28 @@ function Read-GeneXusKbDeploymentMetadataFields {
     )
     if ($webDirsRaw) {
         $result.kb_environment_web_dirs = Split-GeneXusKbEnvironmentMap -MapRaw $webDirsRaw
+    }
+
+    # Fase 3: mapas por-env do alvo Java externo (mesmo formato env=valor;env=valor).
+    $servletDirsRaw = Normalize-GeneXusKbMetadataScalar (
+        Get-GeneXusKbSourceMetadataDirectField -Lines $lines -FieldName 'kb_environment_servlet_dirs'
+    )
+    if ($servletDirsRaw) {
+        $result.kb_environment_servlet_dirs = Split-GeneXusKbEnvironmentMap -MapRaw $servletDirsRaw
+    }
+
+    $appPackageRaw = Normalize-GeneXusKbMetadataScalar (
+        Get-GeneXusKbSourceMetadataDirectField -Lines $lines -FieldName 'kb_environment_app_package'
+    )
+    if ($appPackageRaw) {
+        $result.kb_environment_app_package = Split-GeneXusKbEnvironmentMap -MapRaw $appPackageRaw
+    }
+
+    $servletFlavorRaw = Normalize-GeneXusKbMetadataScalar (
+        Get-GeneXusKbSourceMetadataDirectField -Lines $lines -FieldName 'kb_environment_servlet_flavor'
+    )
+    if ($servletFlavorRaw) {
+        $result.kb_environment_servlet_flavor = Split-GeneXusKbEnvironmentMap -MapRaw $servletFlavorRaw
     }
 
     $postBuildHashesRaw = Normalize-GeneXusKbMetadataScalar (
