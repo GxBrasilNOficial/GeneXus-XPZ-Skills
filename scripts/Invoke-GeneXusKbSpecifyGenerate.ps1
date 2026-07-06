@@ -48,15 +48,16 @@ Raiz da pasta paralela da KB para resolver kb-source-metadata.md sem inventario 
 Caminho explicito para kb-source-metadata.md; prevalece sobre -ParallelKbRoot.
 
 .PARAMETER PostImportDeployValidation
-Quando presente, ativa gate de validação deploy pos-import: checagem do web\bin resolvido por
-kb_environment_web_dirs em kb-source-metadata.md (exit 49 se desatualizado). Metadata sem esse
-mapeamento bloqueia a resolucao (status unknown); reconciliar via xpz-kb-parallel-setup.
+Quando presente, ativa gate de validação deploy pos-import por familia de deployment_hosting_kind:
+.NET checa o web\bin resolvido por kb_environment_web_dirs; java-tomcat roda o co-gate Java no
+WEB-INF\classes externo (kb_environment_servlet_dirs/_app_package) — exit 49 se desatualizado.
+Metadata sem o mapeamento bloqueia a resolucao (status unknown); reconciliar via xpz-kb-parallel-setup.
 
 .PARAMETER SkipDeployBinCheck
-Pula a checagem do web\bin do environment de deploy (resolvido por kb_environment_web_dirs).
+Pula a checagem de publicacao do environment de deploy (.NET: web\bin; java-tomcat: WEB-INF\classes).
 
 .PARAMETER StrictDeployBinCheck
-Forca gate do web\bin (resolvido por kb_environment_web_dirs) mesmo fora do fluxo pos-import.
+Forca o gate de publicacao (.NET: web\bin; java-tomcat: co-gate WEB-INF\classes) mesmo fora do fluxo pos-import.
 
 .PARAMETER ForceRebuild
 Quando true, força a regeneração de TODOS os objetos da KB, independentemente de mudança.
