@@ -182,7 +182,7 @@ if ($known.Count -gt 0 -and -not $known.Contains($resolvedEnvironment)) {
 # per-eixo): este e o Eixo B (fonte gerado .cs/.java) — discrimina pelo campo DO SEU EIXO
 # ($rec.runsSourceEngine), nao pelo alias legado runsFreshnessEngine (que segue o Eixo A e, para Java
 # pos-Fase 3, seria 'true' e montaria o .cs indevidamente). Le so family/runsSourceEngine/sourceUnsupportedReason
-# — nunca o campo de forma-alvo da Fase 3 (clausula no-bridge).
+# — nunca o campo de forma-alvo publicationTargets (clausula no-bridge INVERTIDA: este guard nao-motor fica fora da allowlist de arquivos-motor).
 $hostingKindRaw = $fields.deployment_hosting_kind
 if (-not [string]::IsNullOrWhiteSpace($hostingKindRaw)) {
     $hostingRec = Get-GeneXusKbHostingKindSupportRecord -HostingKind $hostingKindRaw

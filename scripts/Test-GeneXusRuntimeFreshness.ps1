@@ -110,7 +110,7 @@ $result = [ordered]@{
 # SEU EIXO ($rec.runsRuntimeEngine), nao pelo alias legado runsFreshnessEngine (que segue o Eixo A e, para
 # Java pos-Fase 3, seria 'true' e rodaria o motor .rsp indevidamente). Script LINEAR (sem return): ramos 1/2
 # emitem a saida e saem com exit explicito. Le so runsRuntimeEngine/runtimeSkipStatus/runtimeUnsupportedReason
-# — nunca o campo de forma-alvo da Fase 3 (clausula no-bridge).
+# — nunca o campo de forma-alvo publicationTargets (clausula no-bridge INVERTIDA: este guard nao-motor fica fora da allowlist de arquivos-motor).
 if (-not [string]::IsNullOrWhiteSpace($DeploymentHostingKind)) {
     $hostingRec = Get-GeneXusKbHostingKindSupportRecord -HostingKind $DeploymentHostingKind
     if ($null -eq $hostingRec) {
