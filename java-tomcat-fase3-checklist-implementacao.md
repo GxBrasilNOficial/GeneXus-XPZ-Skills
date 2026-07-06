@@ -1,0 +1,27 @@
+# Fase 3 Java/Tomcat — checklist de implementação + Fase 5 (companheiro do replano v10 congelado)
+
+> Compilado no closeout da revisão por pares (2026-07-05, painel 5 famílias, `vNextState=resubmissionDeclinedByHuman`, motivo "prova transferida para implementação/self-test"). São itens **não-bloqueantes** que os revisores levantaram — não gaps de papel. A spec congelada é `java-tomcat-fase3-replano.md`. Persistido no repo em 2026-07-05 (antes vivia só em scratchpad efêmero).
+
+## A. Checklist de implementação (PR da Fase 3)
+
+1. **Varredura real de consumidores (gate de impl, 2 níveis)** — todos os consumidores de `Get-GeneXusKbDeployBinPaths` (nível 1: `...FreshnessCore`; nível 2: shape de `...FreshnessCore` → fachada `:162`, classification `:499-511`) **e** os 8 sítios de `runsFreshnessEngine` (código + doc); cobrir acesso por membro (`$rec.runsFreshnessEngine`), splat/reflection, `.example.ps1`, `.md`. (~27 matches confirmados por glm/kimi/deepseek: 18 `.ps1` + 9 `.md`.) [glm A6, kimi, deepseek]
+2. **Campos per-eixo tangíveis no registro** — criar `deployBinSupportState`/`runtimeSupportState`/`sourceSupportState`; cada leitor migra ao campo do SEU eixo (policy/fachada→A; guarda C→C; guarda B→B). Decidir `runsFreshnessEngine`: **remover + migrar asserts** OU alias derivado (ver A3). [Opus A4/viii]
+3. **Migração-compat do breaking change (obrigatório)** — o split vira `java-tomcat` de skip→motor, mudando `status`/`exitCode` para KBs Java. **Havendo consumo externo (wrappers em pastas paralelas, fora do alcance da varredura do doc 13), o alias `runsFreshnessEngine` derivado de `deployBinSupportState` DEVE persistir por um ciclo de release, com deprecation warning.** Check de drift do doc 13 no mesmo PR cobre consumidores **internos**; o alias cobre os **externos**. Reescrever no mesmo PR: `02-regras-operacionais-e-runtime.md:163`, `09-inventario-e-rastreabilidade-publica.md:~208-213`, `xpz-kb-parallel-setup/SKILL.md:252` (NÃO reescrever `CHANGELOG.md` histórico). [kimi #2, deepseek R3, Opus]
+4. **Self-test da validação cruzada de `publicationTargets`** — assert num self-test nomeado: `external-servlet-dir` ⇒ `subPath=$null` e `externalTargetKey`/`appPackageKey`/`sentinelRelativeToWebappRoot` não-nulos; `env-subpath` ⇒ inverso. Testar uma **instância** de alvo Java resolvido, não só o molde/record. [deepseek rec3, glm O4, kimi #1]
+5. **§9 allowlist invertida + guarda de drift da própria allowlist** — inverter denylist→allowlist de arquivos-motor; assert "todo outro `*.ps1` = zero ocorrências". **Definir operacionalmente "arquivos-motor ativos"** no self-test (enumeração explícita OU padrão de nome `...Core/...Freshness/...Paths` + gêmeos Java); critério = **ocorrência textual**, não uso semântico (comentário conta). Guarda `assert allowlist == {arquivos-motor ativos}`. [glm O5, kimi]
+6. **Fixtures temporais dos self-tests** — `LastWriteTime` forjado (mesmo método dos self-tests .NET). **Rodar em NTFS/ReFS** (FAT/exFAT = 2s mascara skew; se inevitável, slack de teste ≥2s). O self-test de skew deve usar slack ≥ valor medido na Fase 5, **não** o default 5 (que mascararia o skew em teste). [deepseek rec1/R2, kimi #5]
+7. **Self-tests de borda do strip condicional (a/b/c/d)** — incluir assert explícito "não generalizar o conjunto fechado `{_impl,__default,__gam}` sem aterramento". [kimi #4, Opus, glm O3]
+8. **Diagnóstico** — (a) `unexpected-publication`: mensagem acionável ("nenhum objeto gerado neste build, mas há artefatos publicados recentes; pode ser normal após Rebuild All; gate falha por origem não atestável"); **considerar renomear** internamente para `unattested-publication`. (b) `Pf\Lf`: redação informativa (não-falha) + **limitar o dump** (ex.: 20 primeiros + "e mais N"). (c) strip condicional: nota quando `foo_impl` for tratado como objeto próprio por ausência de stub-base. [kimi #3/#4/#6]
+9. **Regressão .NET por golden estrutural** — saída canonicalizada (`ToString('o')` culture-invariante, ordem de chaves `[ordered]@{}` estável); extração `...CoreDotNet` sem mudança de comportamento. [Codex, glm A9]
+
+## B. Fase 5 (empírico — frente própria, precisa da KB Java da colega)
+
+1. **`Rebuild All`/clean-build forçado** produz `Lf=∅, Pf≠∅`? Se frequente, avaliar estado adicional "última publicação bem-sucedida". [glm A1]
+2. **Latência fim-Gradle→fim-deploy** → default empírico de `deployBinTimeSlackSeconds` (hoje 5, provisório). [glm A7, deepseek R2]
+3. **Ator da cópia** ao `WEB-INF\classes` (MSBuild? gradlew? auto-deploy?) → define se `DeployStepCompletedAt` é observável no `timing` do MSBuild. [glm R1]
+4. **Sabor `javax`** → o sentinela `GeneXus.jar` existe? A exclusão por pacote `com\<kb>` e o sentinela seguem namespace-agnósticos? [evidence-catalog item aberto]
+5. **Validar o conjunto fechado de sufixos** `{_impl, __default, __gam}` contra tipos variados de objeto — **Work With, Business Component, SDT, Procedure, Data Provider** — atento a sufixos não catalogados (`__ww`, `__bc`); registrar **sample size + n mínima por tipo**. [deepseek rec2, glm O1/O2]
+
+## C. Fechamento de processo
+- Nova revisão por pares da **implementação** (não do plano) na conclusão da Fase 3 — `13`/`14` pré-push reforçada.
+- Fases 3/5 seguem **gated pela KB Java** da colega (a máquina de dev não tem licença Java).
