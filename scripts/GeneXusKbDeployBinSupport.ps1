@@ -848,8 +848,9 @@ function Invoke-GeneXusKbDeployBinPostBuildClassification {
         if ($policy.skipReason) {
             $output.deployBinCheck.skipReason = $policy.skipReason
         }
-        # Fase 2: hosting kind reconhecido-sem-motor (recognized-no-engine / blocked-out-of-scope) →
-        # materializa o contrato de skip DERIVANDO a string do registro (via $policy). exit 0 sem gate:
+        # Eixo A recognized-no-engine / blocked-out-of-scope: skip de deploy-bin POR EIXO, nao por kind
+        # (pos-Fase 3 nenhum kind reconhecido cai aqui — java-tomcat Eixo A e 'supported' e roda o co-gate).
+        # Materializa o contrato de skip DERIVANDO a string do registro (via $policy). exit 0 sem gate:
         # nao reclassifica, nao seta newExitCode (o ramo ja retorna cedo). Demais skips mantem 'skipped'.
         if ($policy.hostingSkipStatus) {
             $output.deployBinFreshness = $policy.hostingSkipStatus
