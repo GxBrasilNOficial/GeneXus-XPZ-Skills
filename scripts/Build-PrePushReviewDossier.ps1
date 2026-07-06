@@ -171,7 +171,15 @@ if ($baseRefCheck.ExitCode -ne 0) {
 }
 
 # --- SECAO A - git BRUTO (fato) ---
+# HEAD nao-nascido (repo sem commits) ou irresoluvel: rev-parse HEAD falha (ou nao
+# devolve um hash de 40 hex). Sem HEAD nao ha fatos brutos => dossierReady=false, em vez
+# de deixar $headResult.Lines[0] lancar sob StrictMode. (4c: sem Secao A, dossie nao pronto.)
 $headResult = Invoke-DossierGit -RepositoryRoot $resolvedRoot -Arguments @('rev-parse', 'HEAD')
+if ($headResult.ExitCode -ne 0 -or $headResult.Lines.Count -eq 0 -or $headResult.Lines[0].Trim() -notmatch '^[0-9a-f]{40}$') {
+    $result = New-NotReadyResult -Reason 'head-unresolved' -ResolvedRoot $resolvedRoot
+    if ($AsJson) { [pscustomobject]$result | ConvertTo-Json -Depth 6 } else { Write-Output '' }
+    exit 0
+}
 $head = $headResult.Lines[0].Trim()
 
 $range = "$BaseRef..HEAD"

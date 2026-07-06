@@ -285,6 +285,29 @@ finally {
     if (Test-Path -LiteralPath $fakeMech) { Remove-Item -LiteralPath $fakeMech -Force -ErrorAction SilentlyContinue }
 }
 
+# ---------------------------------------------------------------------------
+# Caso (p): origin/main existe mas HEAD NAO-NASCIDO (symref pendente) => o builder
+# nao lanca sob StrictMode; devolve dossierReady=false, notReadyReason='head-unresolved'.
+# Setup: commit (cria refs/heads/main + origin/main) e depois deleta refs/heads/main,
+# deixando HEAD apontando para uma ref inexistente (rev-parse HEAD falha).
+# ---------------------------------------------------------------------------
+$tmp = New-TempDir
+try {
+    & git -C $tmp init -b main *> $null
+    & git -C $tmp config user.email 'selftest@example.com' *> $null
+    & git -C $tmp config user.name 'Self Test' *> $null
+    Set-RepoFile -Root $tmp -RelativePath 'README.md' -Content '# base'
+    & git -C $tmp add -A *> $null
+    & git -C $tmp commit -m 'base' *> $null
+    $baseSha = (& git -C $tmp rev-parse HEAD).Trim()
+    & git -C $tmp update-ref refs/remotes/origin/main $baseSha *> $null
+    & git -C $tmp update-ref -d refs/heads/main *> $null   # HEAD -> refs/heads/main inexistente
+    $json = Invoke-Builder -BuilderArgs @('-RootPath', $tmp, '-AsJson') | ConvertFrom-Json
+    Assert-True -CaseName 'p: HEAD nao-nascido => dossierReady=false (nao lanca)' -Condition ($json.dossierReady -eq $false) -Detail ("reason={0}" -f $json.notReadyReason)
+    Assert-True -CaseName 'p: notReadyReason=head-unresolved' -Condition ($json.notReadyReason -eq 'head-unresolved') -Detail ("reason={0}" -f $json.notReadyReason)
+}
+finally { Remove-TempDir -Path $tmp }
+
 Write-Output '---'
 if ($failures -eq 0) {
     Write-Output ("SELFTEST_OK: {0}/{0} asserts passaram" -f $cases)
