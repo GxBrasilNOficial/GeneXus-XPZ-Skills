@@ -269,6 +269,35 @@ try {
     $dt = $dotnetRec.publicationTargets[0]
     if ($dt.subPath -ne 'bin') { throw "ASSERT_FAILED: [13] dotnet subPath deveria ser 'bin' (env-subpath), atual=[$($dt.subPath)]" }
 
+    # ── 14. Ramo Now (PRODUCAO): BuildEndedAt=$null exercita o else{[DateTimeOffset]::Now} ───────
+    # A fachada publica NAO cabeia BuildEndedAt, entao a producao SEMPRE roda este ramo. Os cenarios
+    # 1-13 acima passam -BuildEndedAt explicito (ramo nao-producao). Este fecha o gap de cobertura.
+    #
+    # 14.1 — safety-lock: .class no FUTURO real (Now+1h) NAO pode virar 'fresh' com Now (falso-fresh).
+    $s = Build-JavaScenario -Root (Get-ScenarioRoot $tempRoot) `
+        -JavaFiles @(@{ rel = 'foo.java'; time = $tFresh }) `
+        -ClassFiles @(@{ rel = 'foo.class'; time = [DateTimeOffset]::Now.AddHours(1) })
+    $rNow = Invoke-Cogate $s -BuildEnded $null
+    if ($rNow.status -eq 'fresh') { throw "ASSERT_FAILED: [14.1 Now-safety] .class do futuro NAO pode virar 'fresh' com ancora Now (falso-fresh de seguranca!)" }
+    if ($rNow.status -ne 'stale') { throw "ASSERT_FAILED: [14.1 Now-safety] esperado 'stale' (.class acima da janela), atual=[$($rNow.status)]" }
+
+    # 14.2 — sanity de thresholdSupAt no ramo Now: existe, >= thresholdAt, e ~ Now (nao uma ancora fixa do passado).
+    $tSup = [DateTimeOffset]::Parse($rNow.thresholdSupAt)
+    $tInf = [DateTimeOffset]::Parse($rNow.thresholdAt)
+    if ($tSup -lt $tInf) { throw "ASSERT_FAILED: [14.2 Now-sanity] thresholdSupAt < thresholdAt (janela invertida): sup=[$($tSup.ToString('o'))] inf=[$($tInf.ToString('o'))]" }
+    $ageSup = ([DateTimeOffset]::Now - $tSup).TotalSeconds
+    if ($ageSup -lt -60 -or $ageSup -gt 60) { throw "ASSERT_FAILED: [14.2 Now-sanity] thresholdSupAt a $([math]::Round($ageSup,1))s de Now (fora de [-60,60]s -> ramo Now nao foi tomado?)" }
+
+    # 14.3 — caminho feliz do ramo Now: .class recente (Now-3s), build recente -> 'fresh'.
+    $nowRef = [DateTimeOffset]::Now
+    $s = Build-JavaScenario -Root (Get-ScenarioRoot $tempRoot) `
+        -JavaFiles @(@{ rel = 'bar.java'; time = $nowRef.AddSeconds(-5) }) `
+        -ClassFiles @(@{ rel = 'bar.class'; time = $nowRef.AddSeconds(-3) })
+    $rNowFresh = Test-GeneXusKbDeployBinFreshnessCoreJava `
+        -KbPath $s.kbPath -EnvironmentName $s.envName -DeploymentHostingKind 'java-tomcat' `
+        -BuildStartedAt ($nowRef.AddMinutes(-1)) -MetadataPath $s.metadataPath -BuildEndedAt $null
+    if ($rNowFresh.status -ne 'fresh') { throw "ASSERT_FAILED: [14.3 Now-fresh] .class recente deveria ser 'fresh' via ancora Now, atual=[$($rNowFresh.status)] ($($rNowFresh.interpretation))" }
+
     'GENEXUS_DEPLOY_BIN_JAVA_COGATE_SELFTEST_OK'
 }
 finally {

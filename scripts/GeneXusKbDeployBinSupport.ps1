@@ -558,9 +558,13 @@ function Test-GeneXusKbDeployBinFreshnessCoreJava {
     $slack = [TimeSpan]::FromSeconds($slackSeconds)
 
     $thresholdInf = $BuildStartedAt.Subtract($slack)
-    # Ancora superior (v-ter): preferida = fim da publicacao (BuildEndedAt/DeployStepCompletedAt); fallback
-    # conservador = instante do check (Now). Ancora cedo demais -> .class legitimo fica ACIMA da janela ->
-    # stale/no-evidence, NUNCA falso-fresh (a incerteza so gera ruido, jamais viola a seguranca).
+    # Ancora superior (v-ter): preferida-por-design = fim da publicacao (DeployStepCompletedAt = Fase 5;
+    # BuildEndedAt = fallback explicito). NOTA (Fase 3): a fachada publica Invoke-...PostBuildClassification
+    # NAO cabeia BuildEndedAt, entao na PRODUCAO a ancora e SEMPRE Now (BuildEndedAt so e exercitado por
+    # self-test). Ancora tarde demais (Now) so alarga a janela superior -> pode gerar falso-stale, NUNCA
+    # falso-fresh; a exclusao do .class do futuro (skew) permanece. Limite operacional: com topologia
+    # externa, Now (relogio KB) e os mtimes dos .class (relogio do servidor de deploy) podem divergir por
+    # skew de NTP -> falso-stale sistemico; so DeployStepCompletedAt (Fase 5) elimina.
     $upperAnchor = if ($null -ne $BuildEndedAt -and $BuildEndedAt -is [System.DateTimeOffset]) { $BuildEndedAt } else { [System.DateTimeOffset]::Now }
     $thresholdSup = $upperAnchor.Add($slack)
 
@@ -866,6 +870,17 @@ function Invoke-GeneXusKbDeployBinPostBuildClassification {
         binCheck                  = $freshness.binCheck
         diagnosticLayer           = $freshness.diagnosticLayer
         interpretation            = $freshness.interpretation
+    }
+
+    # Observabilidade (Fase 3): expor a ancora superior efetiva (thresholdSupAt) quando o core a
+    # materializa (co-gate Java). Guard StrictMode-safe OBRIGATORIO: o CoreDotNet NAO produz
+    # thresholdSupAt (janela so-inferior), e ler $freshness.thresholdSupAt do caminho .NET lancaria
+    # "property does not exist" sob Set-StrictMode -Version Latest. $freshness.PSObject.Properties[...]
+    # nao lanca (devolve $null se ausente). A ancora superior OPERATIVA na Fase 3 e sempre
+    # [DateTimeOffset]::Now (a fachada nao cabeia BuildEndedAt; DeployStepCompletedAt = Fase 5); o
+    # valor e volatil e sensivel a skew de relogio KB-vs-servidor de deploy externo (ver 02/CHANGELOG).
+    if ($freshness.PSObject.Properties['thresholdSupAt']) {
+        $output.deployBinCheck.thresholdSupAt = $freshness.thresholdSupAt
     }
 
     if ($freshness.status -eq 'fresh') {
