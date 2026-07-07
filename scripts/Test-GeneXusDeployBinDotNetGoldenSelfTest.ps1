@@ -12,7 +12,8 @@
                     co-gate Java (Test-GeneXusKbDeployBinFreshnessCoreJava). Sem kb_environment_servlet_dirs
                     no fixture, o alvo externo nao resolve -> status 'unknown' (config-error, fail-safe;
                     NUNCA 'fresh'). (Na Fase 1 rejeitado como invalido; na Fase 2 virou skip; na Fase 3 passa
-                    a RODAR o motor e falha conservativo sem config — ver java-tomcat-fase3-replano.md.)
+                    a RODAR o motor e falha conservativo sem config — ver java-tomcat-fase3-replano.md.
+                    Fase 5: SERVLET_DIR/model.ini e evidencia util, mas precisa validar env/gradle/sentinelas.)
       - REJEITADO : 'foobar' — hosting kind GENUINAMENTE invalido (fora do registro) -> a fachada rejeita
                     com a mensagem canonica (status 'skipped', deployBinCheck null). Preserva a cobertura
                     de rejeicao de valor invalido que a decisao (a') exige.
@@ -186,14 +187,14 @@ try {
       "sentinelPath": null,
       "pathResolutionStatus": "blocked",
       "pathResolutionSource": "kb-source-metadata.kb_environment_servlet_dirs",
-      "pathResolutionReason": "kb_environment_servlet_dirs ausente/vazio para environment '.Net Environment' (gravar SERVLET_DIR via xpz-kb-parallel-setup)."
+      "pathResolutionReason": "kb_environment_servlet_dirs ausente/vazio para environment '.Net Environment' (resolver/validar alvo Java via xpz-kb-parallel-setup; nao copiar SERVLET_DIR sem confrontar environment, gradle.properties e sentinelas)."
     },
     "binCheck": {},
     "diagnosticLayer": {},
-    "interpretation": "kb_environment_servlet_dirs ausente/vazio para environment '.Net Environment' (gravar SERVLET_DIR via xpz-kb-parallel-setup).",
+    "interpretation": "kb_environment_servlet_dirs ausente/vazio para environment '.Net Environment' (resolver/validar alvo Java via xpz-kb-parallel-setup; nao copiar SERVLET_DIR sem confrontar environment, gradle.properties e sentinelas).",
     "thresholdAt": "<TS>"
   },
-  "summary": "kb_environment_servlet_dirs ausente/vazio para environment '.Net Environment' (gravar SERVLET_DIR via xpz-kb-parallel-setup)."
+  "summary": "kb_environment_servlet_dirs ausente/vazio para environment '.Net Environment' (resolver/validar alvo Java via xpz-kb-parallel-setup; nao copiar SERVLET_DIR sem confrontar environment, gradle.properties e sentinelas)."
 }
 '@ -replace "`r`n", "`n"
 

@@ -13,7 +13,8 @@
       Java/Tomcat (...CoreJava): co-gate por CONJUNTO DE ARTEFATOS do objeto (max mtime dos <obj>*.java
         locais vs <obj>*.class no WEB-INF\classes EXTERNO do Tomcat), janela de skew bidirecional;
         4 quadrantes (fresh/stale/no-evidence/unexpected-publication) + unknown (config-error).
-        Ancora superior operativa = Now (Fase 3; BuildEndedAt/DeployStepCompletedAt = Fase 5).
+        Ancora superior operativa = Now; Fase 5 confirmou que o marco util e fim da copia/publicacao
+        Gradle (copyTomcat*), nao fim de compileJava.
 
     Propriedade de seguranca: nunca 'fresh' sem publicacao atestada neste build (todo caminho de
     incerteza falha conservativo). Severidade hibrida (decisoes fechadas): status novo quando stale;
@@ -38,8 +39,8 @@ function Get-GeneXusKbDeployBinTimeSlack {
 # Conjunto FECHADO de sufixos-artefato (amostra EBTECH; evidence-catalog). Um objeto GeneXus gera
 # <obj> (stub) + <obj>_impl (logica) + auxiliares (__default/__gam). O co-gate agrupa por OBJETO
 # (max mtime sobre todos os artefatos). Sufixo FORA deste conjunto -> tratado como objeto proprio
-# (fail-safe: gate mais estrito, nunca funde reduzindo Pf). Ampliar exige aterramento (Fase 5),
-# NAO inferencia aberta. Ordem irrelevante (terminacoes distintas; so uma casa por base).
+# (fail-safe: gate mais estrito, nunca funde reduzindo Pf). Ampliar exige novo aterramento
+# empirico, NAO inferencia aberta. Ordem irrelevante (terminacoes distintas; so uma casa por base).
 $script:GeneXusKbDeployBinJavaArtifactSuffixes = @('__default', '__gam', '_impl')
 # Sub-caminho do fonte .java LOCAL sob o web dir do env (Gradle): web\src\main\java.
 $script:GeneXusKbDeployBinJavaSourceSubPath = 'src\main\java'
@@ -423,7 +424,7 @@ function Get-GeneXusKbDeployBinJavaTarget {
 
     if ($fields.kb_environment_servlet_dirs.Count -eq 0 -or -not $fields.kb_environment_servlet_dirs.Contains($EnvironmentName) -or
         [string]::IsNullOrWhiteSpace($fields.kb_environment_servlet_dirs[$EnvironmentName])) {
-        $target.pathResolutionReason = ("kb_environment_servlet_dirs ausente/vazio para environment '{0}' (gravar SERVLET_DIR via xpz-kb-parallel-setup)." -f $EnvironmentName)
+        $target.pathResolutionReason = ("kb_environment_servlet_dirs ausente/vazio para environment '{0}' (resolver/validar alvo Java via xpz-kb-parallel-setup; nao copiar SERVLET_DIR sem confrontar environment, gradle.properties e sentinelas)." -f $EnvironmentName)
         return [pscustomobject]$target
     }
     $classesRoot = $fields.kb_environment_servlet_dirs[$EnvironmentName]
@@ -567,13 +568,13 @@ function Test-GeneXusKbDeployBinFreshnessCoreJava {
     $slack = [TimeSpan]::FromSeconds($slackSeconds)
 
     $thresholdInf = $BuildStartedAt.Subtract($slack)
-    # Ancora superior (v-ter): preferida-por-design = fim da publicacao (DeployStepCompletedAt = Fase 5;
-    # BuildEndedAt = fallback explicito). NOTA (Fase 3): a fachada publica Invoke-...PostBuildClassification
+    # Ancora superior (v-ter): preferida-por-design = fim da publicacao/copia (Fase 5 confirmou
+    # copyTomcat* como marco util; BuildEndedAt = fallback explicito). NOTA (Fase 3): a fachada publica Invoke-...PostBuildClassification
     # NAO cabeia BuildEndedAt, entao na PRODUCAO a ancora e SEMPRE Now (BuildEndedAt so e exercitado por
     # self-test). Ancora tarde demais (Now) so alarga a janela superior -> pode gerar falso-stale, NUNCA
     # falso-fresh; a exclusao do .class do futuro (skew) permanece. Limite operacional: com topologia
     # externa, Now (relogio KB) e os mtimes dos .class (relogio do servidor de deploy) podem divergir por
-    # skew de NTP -> falso-stale sistemico; so DeployStepCompletedAt (Fase 5) elimina.
+    # skew de NTP -> falso-stale sistemico; so um marco real de fim de copia/publicacao elimina.
     $upperAnchor = if ($null -ne $BuildEndedAt -and $BuildEndedAt -is [System.DateTimeOffset]) { $BuildEndedAt } else { [System.DateTimeOffset]::Now }
     $thresholdSup = $upperAnchor.Add($slack)
 
@@ -886,8 +887,8 @@ function Invoke-GeneXusKbDeployBinPostBuildClassification {
     # materializa (co-gate Java). Guard StrictMode-safe OBRIGATORIO: o CoreDotNet NAO produz
     # thresholdSupAt (janela so-inferior), e ler $freshness.thresholdSupAt do caminho .NET lancaria
     # "property does not exist" sob Set-StrictMode -Version Latest. $freshness.PSObject.Properties[...]
-    # nao lanca (devolve $null se ausente). A ancora superior OPERATIVA na Fase 3 e sempre
-    # [DateTimeOffset]::Now (a fachada nao cabeia BuildEndedAt; DeployStepCompletedAt = Fase 5); o
+    # nao lanca (devolve $null se ausente). A ancora superior OPERATIVA na fachada ainda e
+    # [DateTimeOffset]::Now (nao cabeia BuildEndedAt nem marco real de fim de copia/publicacao); o
     # valor e volatil e sensivel a skew de relogio KB-vs-servidor de deploy externo (ver 02/CHANGELOG).
     if ($freshness.PSObject.Properties['thresholdSupAt']) {
         $output.deployBinCheck.thresholdSupAt = $freshness.thresholdSupAt
