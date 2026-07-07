@@ -24,4 +24,4 @@
 
 ## C. Fechamento de processo
 - Nova revisão por pares da **implementação** (não do plano) na conclusão da Fase 3 — `13`/`14` pré-push reforçada.
-- Fases 3/5 seguem **gated pela KB Java** da colega (a máquina de dev não tem licença Java).
+- A Fase 3 foi implementada e a Fase 5 empírica foi registrada para os ambientes disponíveis na KB Java da colega. Como a máquina de dev não tem licença Java, qualquer nova medição empírica (incluindo Java EE clássico puro Tomcat 8/9 + JDK 8, se surgir ambiente) continua dependente da KB Java externa.
