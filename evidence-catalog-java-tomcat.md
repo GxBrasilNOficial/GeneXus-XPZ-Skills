@@ -2,7 +2,7 @@
 
 > **Status:** Fase 0 **concluída** (Q5b **confirmado** pelo re-teste controlado decisivo de 2026-07-04, rota manual pela IDE; ver Q5). **VEREDITO: Plano B acionado** — a topologia real do deploy Java/Tomcat é **externa** à árvore de output, invalidando a hipótese *in-place* que o design congelou para o motor da Fase 3 (ver [`java-tomcat-paridade-gerador-design.md`](java-tomcat-paridade-gerador-design.md), seção "Congelamento vale para a hipótese in-place"). O resto do design **não** reabre.
 >
-> **Fase 5 parcial (2026-07-07):** nova medição na KB `EBTECH` (GX18U14, Jakarta/Tomcat 11/JDK 21) confirmou o ator da publicação (`gradlew`/Gradle chamado pelo Build All, tarefas `copyTomcat*`) e trouxe uma amostra de latência e sufixos; não fechou `javax` nem o caso exato `Rebuild All -> Lf=∅, Pf≠∅`. Ver seção "Fase 5 parcial".
+> **Fase 5 (2026-07-07):** medições na KB `EBTECH` confirmaram o ator da publicação (`gradlew`/Gradle chamado pelo Build All, tarefas `copyTomcat*`) e fecharam, para Jakarta, `Rebuild All -> Lf=∅, Pf≠∅` em rodada limpa dedicada (`Lf=0`, `Pf=624`). A opção GeneXus `JAVA_EE`/`javaEE` também foi medida no environment `JavaEE`, mas no stack real disponível (Tomcat 11/JDK 21/Servlet 6, com sinais `javax` e também jars `jakarta.*`), não em Java EE clássico puro Tomcat 8/9 + JDK 8. Ver seções "Fase 5 parcial", "Fase 5 rodada 2" e "Fase 5 JavaEE/javax".
 >
 > **Data da coleta:** 2026-07-04. **Registro-resumo:** [`999-ideias-pendentes.md`](999-ideias-pendentes.md).
 
@@ -11,7 +11,7 @@
 - Coleta feita por um agente numa **máquina de terceiro** (a máquina de dev **não tem licença Java**; build local impossível). Modo **read-only** na coleta inicial; os re-testes de frescor (Q5, rota manual pela IDE) **rodaram builds** na máquina da colega — Q4/Q5 fechados.
 - **KB observada:** `EBTECH`. **GeneXus:** 18 Upgrade 14. **Environment Java:** `Prototipo_18U14`. **KB nativa:** `C:\Applications\GeneXus\18U14_IA\EBTECH`.
 - **Sabor Java observado:** `JAKARTA_EE` / `TOMCAT_10_1` / JDK 21 / namespace `jakarta.*` / build **Gradle** / DataStore PostgreSQL.
-- **Ressalva de generalização:** é **uma** KB Java, no sabor **Jakarta**. O env Java da `wsEducacaoSpTeste` (não buildável aqui) é do **outro sabor** — `JAVA_EE` / `TOMCAT_8_9` / JDK 8 / namespace `javax.*`. Os nomes de jar de runtime diferem entre os dois sabores (`jakarta.*` vs `javax.*`). A família `java-tomcat` precisa ser **namespace-agnóstica** ou cobrir os dois sabores — ver "Itens abertos".
+- **Ressalva de generalização:** a Fase 0 original era **uma** KB Java, no sabor **Jakarta**. Na Fase 5, a mesma KB `EBTECH` também teve um environment `JavaEE` medido com `JAVA_PLATFORM_SUPPORT=JAVA_EE`/Gradle `JAVA_PLATFORM=javaEE`, mas no stack Tomcat 11/JDK 21/Servlet 6, com presença simultânea de artefatos `javax` e `jakarta.*`. O stack clássico puro Tomcat 8/9 + JDK 8 segue não medido — ver "Itens abertos".
 
 ---
 
@@ -183,11 +183,86 @@ Coleta empírica recebida de agente na máquina da colega, sobre a KB `EBTECH`, 
 
 ---
 
+## Fase 5 rodada 2 (2026-07-07)
+
+Segunda coleta empírica recebida de agente na máquina da colega, com evidências brutas preservadas em `C:\Applications\PastasPararelasGenexus\GX_18U14_EBTECH\Temp\phase5-java-tomcat-round2-20260707-obs`.
+
+**Rebuild All/clean build dedicado.** A rodada válida executou `C:\Applications\GeneXus\18U14\EBTECH\Prototipo_18U14\web\gradlew.bat clean build --console=plain --info` e fechou empiricamente, para EBTECH/Jakarta, o caso `Lf=∅, Pf≠∅`:
+
+| Rodada | `buildStartedAt` UTC | Resultado | `Lf` | `Pf` | `Pf\Lf` | `Lf\Pf` |
+|---|---|---|---:|---:|---:|---:|
+| clean build corrigido | `2026-07-07T19:16:29.6298569Z` | `exit=0`, `BUILD SUCCESSFUL` | 0 | 624 | 624 | 0 |
+| build sem mudança | `2026-07-07T19:21:20.9414677Z` | `exit=0`, `BUILD SUCCESSFUL` | 0 | 624 | 624 | 0 |
+| build instrumentado | `2026-07-07T19:22:41.0707928Z` | `exit=0`, `BUILD SUCCESSFUL` | 0 | 624 | 624 | 0 |
+
+**Latência.** Uma amostra instrumentada mostrou que `deployBinTimeSlackSeconds=5` cobre a janela interna da cópia, mas não cobre a distância entre fim de compilação Java e último `.class` publicado:
+
+| Rodada | `compileJavaEndAt` | `copyTomcatClassesStartAt` | `copyTomcatClassesEndAt` | `lastPublishedClassMTime` | `compile->last` | `copyStart->last` | `first->last` |
+|---|---|---|---|---|---:|---:|---:|
+| build instrumentado | `2026-07-07T19:23:14.076336500Z` | `2026-07-07T19:23:36.297752600Z` | `2026-07-07T19:23:38.323366300Z` | `2026-07-07T19:23:38.1217719Z` | 24.045s | 1.824s | 1.792s |
+
+Conclusão operacional: a âncora empírica correta para a janela superior é o fim da publicação/cópia (`copyTomcatClasses`/`copyTomcat*`, ou um futuro `DeployStepCompletedAt` equivalente), não o fim de `compileJava`. Se algum fluxo usar `compileJavaEndAt` como marco, margem conservadora observada precisa exceder 30s.
+
+**Destino efetivo de publicação.** A divergência da primeira coleta foi explicada por seleção de bloco/environment. O bloco atual do `model.ini` continha `SERVLET_DIR=C:\Program Files\Apache Software Foundation\Tomcat 11\webapps\EBTECHPrototipo_18U14\WEB-INF\classes`, enquanto o bloco `Version6/Data054` continha `EBTECHVersion6Prototipo_18U14`. O caminho efetivo também apareceu em `C:\Applications\GeneXus\18U14\EBTECH\Prototipo_18U14\web\gradle.properties`:
+
+```text
+WEBAPP_NAME=EBTECHPrototipo_18U14
+TOMCAT_WEBAPP_PATH=C:\\Program Files\\Apache Software Foundation\\Tomcat 11\\webapps\\EBTECHPrototipo_18U14
+TOMCAT_STATIC_PATH=C:\\Program Files\\Apache Software Foundation\\Tomcat 11\\webapps\\EBTECHPrototipo_18U14\\static
+JAVA_PLATFORM=jakartaEE
+SERVLET_VERSION=6
+ISREBUILD=true
+```
+
+Sentinelas: `EBTECHVersion6Prototipo_18U14` não tinha `WEB-INF\classes` nem `WEB-INF\lib\GeneXus.jar`; `EBTECHPrototipo_18U14` tinha ambos. Regra para setup: `model.ini` é evidência útil só quando o environment/bloco correto foi resolvido e validado; quando houver Gradle, `gradle.properties` (`TOMCAT_WEBAPP_PATH`) é evidência efetiva do alvo publicado e deve concordar com a metadata sugerida ou prevalecer como alerta/auditoria.
+
+**`javax`.** Não medido. Foi encontrado um environment com `JAVA_PLATFORM_SUPPORT=JAVA_EE`/`TOMCAT_VERSION=TOMCAT_8_9`, mas sem Tomcat 8/9 e JDK 8 acessíveis; os webapps lidos estavam sob Tomcat 11 e continham jars Jakarta. Não há inferência de `javax` clássico a partir dessa amostra.
+
+**Sufixos e stems derivados.** Fechado de forma conservadora: manter o strip do co-gate limitado a `{_impl,__default,__gam}`. `_bc`, `ww*`, `Sdt*`, `StructSdt*` e `StructSdtCol*` permanecem stems próprios. Exemplo decisivo: `mb_bbtoken_bc__default` e `mb_bbtoken_bc__gam` agrupam em `mb_bbtoken_bc`; colar `_bc` em `mb_bbtoken` criaria vínculo por convenção de nome, não por evidência de stub-base.
+
+---
+
+## Fase 5 JavaEE/javax (2026-07-07)
+
+Medição empírica do novo environment `JavaEE` criado pelo usuário na KB `EBTECH`, com evidências brutas preservadas em `C:\Applications\PastasPararelasGenexus\GX_18U14_EBTECH\Temp\javax-measurement-20260707T205111Z`.
+
+**O que foi medido.** Environment GeneXus `JavaEE`, seção `[MODEL 056]`/`[PREFERENCES 056]`, `TargetFullPath=C:\Applications\GeneXus\18U14\EBTECH\JavaEE`, `GeneratorType=JavaWeb`, `JAVA_PLATFORM_SUPPORT=JAVA_EE`, `TOMCAT_VERSION=TOMCAT_10_1`, `TOMCAT_PATH=C:\Program Files\Apache Software Foundation\Tomcat 11`, `SERVLET_DIR=C:\Program Files\Apache Software Foundation\Tomcat 11\webapps\EBTECHJavaEE\WEB-INF\classes`, `JDK_DIR_JAVA=C:\Program Files\Java\jdk-21`. Em `C:\Applications\GeneXus\18U14\EBTECH\JavaEE\web\gradle.properties`: `WEBAPP_NAME=EBTECHJavaEE`, `JAVA_PLATFORM=javaEE`, `SERVLET_VERSION=6`, `JAVA_PACKAGE_NAME_FOLDER=com\\ebtech`, `org.gradle.java.home=C:\\Program Files\\Java\\jdk-21`.
+
+**O que não foi medido.** Este environment não representa o stack clássico antigo Tomcat 8/9 + JDK 8 nem classpath puramente `javax`. O webapp publicado tinha sinais reais de Java EE/`javax`, mas também jars `jakarta.*`.
+
+**Sinais `javax`/Java EE observados.**
+
+- `WEB-INF\web.xml` publicado com namespace `http://java.sun.com/xml/ns/javaee`, schema `web-app_3_0.xsd` e parâmetro `javax.ws.rs.Application`.
+- Jars `javax`/wrapper: `gxwrapperjavax-4.10.2.jar`, `javax.servlet-api-3.1.0.jar`, `javax.ws.rs-api-2.1.jar`, `javax.activation-api-1.2.0.jar`.
+- Jars `jakarta` também presentes: `jakarta.ws.rs-api-2.1.6.jar`, `jakarta.activation-api-2.1.3.jar`, `jakarta.annotation-api-1.3.5.jar`, `jakarta.mail-api-2.1.3.jar`, `jakarta.xml.bind-api-3.0.1.jar`.
+- Sentinelas/topologia: `WEB-INF\classes`, `WEB-INF\web.xml`, `WEB-INF\lib\GeneXus.jar` e pacote da app sob `WEB-INF\classes\com\ebtech` existentes.
+
+**Build controlado.** Foi executado `Build All` com `ForceRebuild=true`, autorizado pelo usuário. Resultado operacional observado: `MSBuild exit code=0`, `wrapperExitCode=0`, `BuildAllDone=true`, `__BUILDALL_DONE__=true`, `BUILD SUCCESSFUL`, `0` erros classificados. Ressalvas: `142` warnings GeneXus, `msbuild.stderr.log` não vazio, mensagens de acesso negado em arquivos da instalação GeneXus e falha interna de pós-processamento do wrapper (`$operationalSubStateBuild` não definido). Portanto, build e publicação concluíram, mas não são "limpos sem ressalvas".
+
+**Medição Lf/Pf.** Cutoff `2026-07-07T21:05:33.7684485Z`; local source `C:\Applications\GeneXus\18U14\EBTECH\JavaEE\web\src\main\java\com\ebtech`; publicado `C:\Program Files\Apache Software Foundation\Tomcat 11\webapps\EBTECHJavaEE\WEB-INF\classes\com\ebtech`.
+
+| Métrica | Valor |
+|---|---:|
+| `.java` frescos sob package root | 852 |
+| `.class` publicados frescos | 1168 |
+| `Lf` object stems | 618 |
+| `Pf` object stems | 618 |
+| `Pf - Lf` | 0 |
+| `Lf - Pf` | 0 |
+
+Sufixos observados: em `.java`, `<base>` 618 e `_impl` 234; em `.class`, `<base>` 618, `_impl` 234, `__default` 225 e `__gam` 91. A normalização permaneceu a mesma: strip apenas de `_impl`, `__default`, `__gam`; `_bc`, `ww*`, `Sdt*`, `StructSdt*` e `StructSdtCol*` permanecem stems próprios.
+
+**Latência.** Primeira classe publicada `2026-07-07T21:22:49.3772797Z`, última `2026-07-07T21:22:52.9739171Z`, `BUILD SUCCESSFUL` `2026-07-07T21:22:53.0000000Z`. Janela de escrita das classes publicadas: `3.597s`; última classe publicada até `BUILD SUCCESSFUL`: `0.026s`. O log só continha timestamp único para `:copyTomcatClasses`, sem marcador de fim.
+
+**Veredito.** O co-gate Lf/Pf foi validado também no environment GeneXus `JAVA_EE`/`javaEE` medido (`Lf=618`, `Pf=618`, diferenças zero). Isso valida a opção GeneXus disponível com sinais `javax` reais, mas não prova compatibilidade universal com Java EE clássico puro em Tomcat 8/9 + JDK 8.
+
+---
+
 ## Itens abertos
 
-- **Dois sabores Java (Jakarta vs javax):** a evidência segue restrita ao sabor `JAKARTA_EE`/`jakarta.*`. O sabor `JAVA_EE`/`javax.*` (ex.: env Java da `wsEducacaoSpTeste`, Tomcat 8/9, JDK 8) tem nomes de jar de runtime distintos. A família `java-tomcat` deve ser namespace-agnóstica ou cobrir os dois. A coleta de Fase 5 de 2026-07-07 também foi Jakarta; `javax` permanece aberto.
-- **`Rebuild All -> Lf=∅, Pf≠∅`:** a coleta de Fase 5 de 2026-07-07 trouxe evidência contra (`Lf=379`, `Pf=624`), mas não fechou a pergunta como rodada dedicada porque reutilizou rodada existente e o wrapper reportou falha operacional por log bloqueado.
-- **Auto-população de metadata Java pelo setup:** o `SERVLET_DIR` do `model.ini` divergiu da publicação real observada na Fase 5 parcial; futura automação deve validar topologia/sentinela e exigir auditoria quando o caminho configurado não existir ou não coincidir com o deploy efetivo.
+- **Java EE clássico puro:** foi medido um environment GeneXus `JAVA_EE`/`javaEE` com sinais `javax` reais, mas no stack Tomcat 11/JDK 21/Servlet 6 e com jars `jakarta.*` também presentes. Não foi medido um stack clássico puro Tomcat 8/9 + JDK 8 com classpath exclusivamente/majoritariamente `javax`.
+- **Amostragem de latência:** a rodada instrumentada fechou a direção (`copyTomcatClasses` cabe em 5s; `compileJavaEndAt` não), mas não produz percentis. Se o default de slack for recalibrado estatisticamente, coletar mais rodadas com timestamps por tarefa.
+- **Auto-população de metadata Java pelo setup:** futura automação deve resolver o environment ativo, validar topologia/sentinela/pacote da app e, quando houver Gradle, confrontar `model.ini` com `gradle.properties` (`TOMCAT_WEBAPP_PATH`). Divergência deve virar auditoria, não escrita cega.
 - **`.war` (fluxo de deploy explícito):** não observado; se um dia o escopo incluir deploy empacotado, exige aterramento próprio.
 
 ---
