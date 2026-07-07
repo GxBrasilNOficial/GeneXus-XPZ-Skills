@@ -16,11 +16,11 @@
 
 ## B. Fase 5 (empírico — frente própria, precisa da KB Java da colega)
 
-1. **`Rebuild All`/clean-build forçado** produz `Lf=∅, Pf≠∅`? Se frequente, avaliar estado adicional "última publicação bem-sucedida". [glm A1]
-2. **Latência fim-Gradle→fim-deploy** → default empírico de `deployBinTimeSlackSeconds` (hoje 5, provisório). [glm A7, deepseek R2]
-3. **Ator da cópia** ao `WEB-INF\classes` (MSBuild? gradlew? auto-deploy?) → define se `DeployStepCompletedAt` é observável no `timing` do MSBuild. [glm R1]
-4. **Sabor `javax`** → o sentinela `GeneXus.jar` existe? A exclusão por pacote `com\<kb>` e o sentinela seguem namespace-agnósticos? [evidence-catalog item aberto]
-5. **Validar o conjunto fechado de sufixos** `{_impl, __default, __gam}` contra tipos variados de objeto — **Work With, Business Component, SDT, Procedure, Data Provider** — atento a sufixos não catalogados (`__ww`, `__bc`); registrar **sample size + n mínima por tipo**. [deepseek rec2, glm O1/O2]
+1. **`Rebuild All`/clean-build forçado** produz `Lf=∅, Pf≠∅`? Se frequente, avaliar estado adicional "última publicação bem-sucedida". [glm A1] **Fase 5 parcial 2026-07-07:** negado na amostra (`Lf=379`, `Pf=624`), mas não fechado como rodada dedicada porque a coleta reutilizou rodada existente e o wrapper teve falha operacional por log bloqueado.
+2. **Latência fim-Gradle→fim-deploy** → default empírico de `deployBinTimeSlackSeconds` (hoje 5, provisório). [glm A7, deepseek R2] **Fase 5 parcial 2026-07-07:** amostra única; ~61s de fim de `compileJava` ao último `.class` publicado, ~1,6s dentro da janela de mtimes publicados.
+3. **Ator da cópia** ao `WEB-INF\classes` (MSBuild? gradlew? auto-deploy?) → define se `DeployStepCompletedAt` é observável no `timing` do MSBuild. [glm R1] **Fase 5 parcial 2026-07-07:** confirmado como Gradle chamado pelo Build All GeneXus/MSBuild, via tarefas `copyTomcat*`.
+4. **Sabor `javax`** → o sentinela `GeneXus.jar` existe? A exclusão por pacote `com\<kb>` e o sentinela seguem namespace-agnósticos? [evidence-catalog item aberto] **Fase 5 parcial 2026-07-07:** não medido; a KB era Jakarta/Tomcat 11/JDK 21.
+5. **Validar o conjunto fechado de sufixos** `{_impl, __default, __gam}` contra tipos variados de objeto — **Work With, Business Component, SDT, Procedure, Data Provider** — atento a sufixos não catalogados (`__ww`, `__bc`); registrar **sample size + n mínima por tipo**. [deepseek rec2, glm O1/O2] **Fase 5 parcial 2026-07-07:** para stem/stub-base de arquivo, conjunto observado = `<base>`, `_impl`, `__default`, `__gam`; para objeto GeneXus de origem há stems derivados (`_bc`, `ww*`, `RESTInterfaceIN/OUT`, `services_rest`, `Sdt*`, `StructSdt*`).
 
 ## C. Fechamento de processo
 - Nova revisão por pares da **implementação** (não do plano) na conclusão da Fase 3 — `13`/`14` pré-push reforçada.

@@ -2,6 +2,8 @@
 
 > **Status:** Fase 0 **concluída** (Q5b **confirmado** pelo re-teste controlado decisivo de 2026-07-04, rota manual pela IDE; ver Q5). **VEREDITO: Plano B acionado** — a topologia real do deploy Java/Tomcat é **externa** à árvore de output, invalidando a hipótese *in-place* que o design congelou para o motor da Fase 3 (ver [`java-tomcat-paridade-gerador-design.md`](java-tomcat-paridade-gerador-design.md), seção "Congelamento vale para a hipótese in-place"). O resto do design **não** reabre.
 >
+> **Fase 5 parcial (2026-07-07):** nova medição na KB `EBTECH` (GX18U14, Jakarta/Tomcat 11/JDK 21) confirmou o ator da publicação (`gradlew`/Gradle chamado pelo Build All, tarefas `copyTomcat*`) e trouxe uma amostra de latência e sufixos; não fechou `javax` nem o caso exato `Rebuild All -> Lf=∅, Pf≠∅`. Ver seção "Fase 5 parcial".
+>
 > **Data da coleta:** 2026-07-04. **Registro-resumo:** [`999-ideias-pendentes.md`](999-ideias-pendentes.md).
 
 ## Fonte da evidência
@@ -146,9 +148,46 @@ Nada disso reabre as decisões (a)–(e) nem a cláusula no-bridge; é o replane
 
 ---
 
+## Fase 5 parcial (2026-07-07)
+
+Coleta empírica recebida de agente na máquina da colega, sobre a KB `EBTECH`, `GeneXus 18.0.14.187820+9bf4f24502457696deb48c507d5729eccba7c817`, environment `Prototipo_18U14`, sabor `JAKARTA_EE`, Tomcat `11.0.11`, JDK `21.0.8`.
+
+**Ambiente observado.**
+
+- KB paralela: `C:\Applications\PastasPararelasGenexus\GX_18U14_EBTECH`
+- KB nativa: `C:\Applications\GeneXus\18U14\EBTECH`
+- `model.ini`: `C:\Applications\GeneXus\18U14\EBTECH\model.ini`
+- `TargetFullPath`: `C:\Applications\GeneXus\18U14\EBTECH\Data054`
+- Raiz Java usada na medição: `C:\Applications\GeneXus\18U14\EBTECH\Prototipo_18U14\web\src\main\java`
+- Raiz local de classes: `C:\Applications\GeneXus\18U14\EBTECH\Prototipo_18U14\web\build\classes\java\main`
+- Pacote da app: `com\ebtech`
+- `SERVLET_DIR` no `model.ini`: `C:\Program Files\Apache Software Foundation\Tomcat 11\webapps\EBTECHVersion6Prototipo_18U14\WEB-INF\classes`
+- Publicação real observada: `C:\Program Files\Apache Software Foundation\Tomcat 11\webapps\EBTECHPrototipo_18U14\WEB-INF\classes`
+
+**Achado de metadata.** Nesta coleta, o `SERVLET_DIR` configurado no `model.ini` não existia, enquanto a publicação real estava em outro webapp (`EBTECHPrototipo_18U14`). Portanto, a futura auto-população de `kb_environment_servlet_dirs` pelo `xpz-kb-parallel-setup` não deve copiar cegamente o `SERVLET_DIR`: deve validar existência, topologia `WEB-INF\classes`, sentinela irmã `WEB-INF\lib\GeneXus.jar` e tratar divergência como auditoria/decisão humana.
+
+**Perguntas da Fase 5.**
+
+1. **`Rebuild All`/clean-build forçado produz `Lf=∅, Pf≠∅`?** Negado nesta amostra: a rodada observada teve `Lf=379`, `Pf=624`, `Pf\Lf=245`, `Lf\Pf=0`. Como a própria coleta registra que não executou um novo Rebuild All com frase exata após o pedido e o wrapper terminou com falha operacional por log bloqueado, isso é evidência contra a hipótese, mas não fechamento absoluto.
+2. **Latência fim-Gradle -> fim-deploy.** Parcial, amostra única: `compileJava` terminou por volta de `2026-07-07T12:21:12Z`; classes publicadas ficaram entre `2026-07-07T12:22:11.5408214Z` e `2026-07-07T12:22:13.1288486Z`; `BUILD SUCCESSFUL` em `2026-07-07T12:22:18Z`. Observação: cerca de 61s entre fim de `compileJava` e último `.class` publicado; cerca de 1,6s dentro da janela de mtimes das classes publicadas.
+3. **Ator da cópia ao `WEB-INF\classes`.** Confirmado: quem publica no Tomcat é o Gradle chamado pelo Build All GeneXus/MSBuild, por tarefas `cleanTomcat`, `copyTomcatLib`, `copyTomcatPackageResources`, `copyTomcatResources`, `copyTomcatStatic`, `copyTomcatClasses`, `copyTomcatWebInf`, `copyTomcat`.
+4. **Sabor `javax`.** Não medido: a KB/ambiente desta coleta é Jakarta/Tomcat 11/JDK 21 (`JAKARTA_EE`), não `JAVA_EE`/`javax`.
+5. **Sufixos por tipo.** Para stem/stub-base de arquivo, o conjunto observado foi `<base>`, `_impl`, `__default`, `__gam`: `local-java` 624/234/0/0, `local-class` 624/234/225/91, `published-class` 624/234/225/91. Para agrupar sob objeto GeneXus de origem, há stems derivados (`_bc`, `ww*`, `RESTInterfaceIN/OUT`, `services_rest`, `Sdt*`, `StructSdt*`, `StructSdtCol*`); não houve `__ww`, houve `ww` como continuação do nome-base e `_bc`.
+
+**Limitações.**
+
+- A rodada teve sucesso Gradle/deploy observado (`BUILD SUCCESSFUL in 2m 14s`), mas o wrapper reportou `falha operacional`, `exitCode=90`, por leitura de `msbuild.stdout.log` bloqueada por outro processo.
+- Há uma única amostra de latência, insuficiente para definir p50/pior caso confiável.
+- `javax` segue não medido.
+- A pergunta `Rebuild All -> Lf=∅, Pf≠∅` segue pendente de rodada dedicada, se a frente exigir fechamento absoluto.
+
+---
+
 ## Itens abertos
 
-- **Dois sabores Java (Jakarta vs javax):** a evidência é do sabor `JAKARTA_EE`/`jakarta.*`. O sabor `JAVA_EE`/`javax.*` (ex.: env Java da `wsEducacaoSpTeste`, Tomcat 8/9, JDK 8) tem nomes de jar de runtime distintos. A família `java-tomcat` deve ser namespace-agnóstica ou cobrir os dois. Não força mudança de design agora; é aviso para a Fase 3.
+- **Dois sabores Java (Jakarta vs javax):** a evidência segue restrita ao sabor `JAKARTA_EE`/`jakarta.*`. O sabor `JAVA_EE`/`javax.*` (ex.: env Java da `wsEducacaoSpTeste`, Tomcat 8/9, JDK 8) tem nomes de jar de runtime distintos. A família `java-tomcat` deve ser namespace-agnóstica ou cobrir os dois. A coleta de Fase 5 de 2026-07-07 também foi Jakarta; `javax` permanece aberto.
+- **`Rebuild All -> Lf=∅, Pf≠∅`:** a coleta de Fase 5 de 2026-07-07 trouxe evidência contra (`Lf=379`, `Pf=624`), mas não fechou a pergunta como rodada dedicada porque reutilizou rodada existente e o wrapper reportou falha operacional por log bloqueado.
+- **Auto-população de metadata Java pelo setup:** o `SERVLET_DIR` do `model.ini` divergiu da publicação real observada na Fase 5 parcial; futura automação deve validar topologia/sentinela e exigir auditoria quando o caminho configurado não existir ou não coincidir com o deploy efetivo.
 - **`.war` (fluxo de deploy explícito):** não observado; se um dia o escopo incluir deploy empacotado, exige aterramento próprio.
 
 ---
