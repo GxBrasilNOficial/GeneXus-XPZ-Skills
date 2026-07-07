@@ -28,9 +28,10 @@
 
     java-tomcat: Eixo A 'supported' (co-gate por conjunto de artefatos, alvo externo
     WEB-INF\classes; deployTargetKind='external-webapp'); Eixos B/C 'recognized-no-engine'
-    (Pos-v1, skip). Campos cujo valor Java e empirico (criterio de aceite) carregam o
-    marcador 'tentative-java' (campos string) ou permanecem $null (campos de lista, NAO @())
-    e estao listados em tentativeFields; a Fase 5 os afere na KB Java real.
+    (Pos-v1, skip). A Fase 5 aferiu o Eixo A para os ambientes disponiveis da KB Java externa.
+    Campos residuais de Eixos B/C e extensoes ainda nao aterradas carregam o marcador
+    'tentative-java' (campos string) ou permanecem $null (campos de lista, NAO @()) e
+    seguem listados em tentativeFields.
 
     Dot-sourcing este arquivo NAO tem efeito colateral alem de definir as funcoes e montar
     o $script: table. O ArgumentCompleter e opt-in via Register-GeneXusKbHostingKindArgumentCompleter.
@@ -40,7 +41,7 @@ Set-StrictMode -Version Latest
 
 # ── Constantes de contrato ──────────────────────────────────────────────────────
 
-# Marcador de valor provisorio: campos cujo valor definitivo Java e empirico (Fase 0/3).
+# Marcador de valor residual: campos Java ainda pos-v1/nao aterrados apos Fase 5.
 $script:GeneXusKbHostingKindTentativeJavaMarker = 'tentative-java'
 
 # Contrato de saida do skip (design): exit 0 + status='skipped-hosting-unsupported' + <eixo>UnsupportedReason.
@@ -65,7 +66,7 @@ function New-GeneXusKbHostingKindSupportRecord {
     # Convencao de tipagem (deliberada): campos SEMPRE preenchidos (strings nao-nulas) sao
     # tipados [string]; campos que podem ser $null (sentinel, listas, prosa opcional) ficam
     # SEM tipo DE PROPOSITO. Tipar [string]$Sentinel = $null coage $null -> '' sob StrictMode e
-    # quebraria a invariante framework-iis (sentinel=$null) e os campos de lista provisorios
+    # quebraria a invariante framework-iis (sentinel=$null) e os campos de lista residuais
     # ($null, nao @()). Contrato dos nao-tipados: passar string|array|$null conforme o comentario.
     #
     # Fase 3 (sub-passo viii): o estado unico de suporte foi QUEBRADO em tres estados PER-EIXO
@@ -81,7 +82,7 @@ function New-GeneXusKbHostingKindSupportRecord {
         [string]$SourceSupportState,      # Eixo B
         [string]$DeployTargetKind,
         [string]$OutputModelSubPath,
-        [int]$DeployBinTimeSlackSeconds = 5,  # (v-ter)/(vi): slack do co-gate; default 5 provisorio (Fase 5)
+        [int]$DeployBinTimeSlackSeconds = 5,  # (v-ter)/(vi): Fase 5 confirmou 5s para a janela de copia; nao para compileJava
         $Sentinel,                    # string|$null (framework-iis: $null E supported)
         $WebDirFreshnessExtensions,   # string[]|$null
         $RuntimeFreshnessExtensions,  # string[]|$null
