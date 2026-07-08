@@ -201,8 +201,9 @@ Do NOT use esta skill para:
   puro Tomcat 8/9 + JDK 8 segue não medido. Para metadata Java, `SERVLET_DIR`/`model.ini` é evidência útil,
   mas não autoridade cega: resolver o environment/bloco correto e, quando houver Gradle, confrontar
   `gradle.properties` (`TOMCAT_WEBAPP_PATH`/`TOMCAT_STATIC_PATH`), topologia `WEB-INF\classes`, sentinela
-  `WEB-INF\lib\GeneXus.jar` e pacote da app antes de gravar `kb_environment_servlet_dirs`/`_app_package`/
-  `_servlet_flavor`.
+  `WEB-INF\lib\GeneXus.jar` e compatibilidade do pacote da app antes de gravar
+  `kb_environment_servlet_dirs`/`_app_package`/`_servlet_flavor`; no motor, `_app_package` é allowlist da
+  evidência e a ausência de artefatos sob o pacote aparece pela classificação do co-gate.
 - Quando o build falhar com erros C# compatíveis com arquivo gerado truncado, como
   `CS1010` (newline em constante) e `CS1513` (`}` esperada) repetidos no mesmo `.cs`,
   verificar primeiro se o artefato gerado termina abruptamente, sem string/funcao
