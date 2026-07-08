@@ -7,7 +7,8 @@
 .DESCRIPTION
     Para cada XML de objeto na pasta da frente que tem homonimo no acervo com lastUpdate
     mais recente, copia o arquivo do acervo sobre o da frente e bumpa o lastUpdate para
-    garantir que o novo arquivo fique estritamente mais novo que o acervo.
+    garantir que o novo arquivo fique estritamente mais novo que o acervo. Excecao:
+    quando o mesmo guid tem Object/@type divergente, a copia automatica e bloqueada.
 
     Resolve o anti-padrao "editar acervo esperando que o pacote pegue": em vez de editar
     o acervo, o agente copia a versão mais recente do acervo para a frente e depois edita
@@ -98,6 +99,12 @@ if (-not (Test-Path -LiteralPath $utf8NoBomEncodingSupportPath -PathType Leaf)) 
     throw "UTF-8 no-BOM encoding support script not found: $utf8NoBomEncodingSupportPath"
 }
 . $utf8NoBomEncodingSupportPath
+
+$objectTypeDriftSupportPath = Join-Path (Split-Path -Parent $PSCommandPath) 'GeneXusObjectTypeDriftSupport.ps1'
+if (-not (Test-Path -LiteralPath $objectTypeDriftSupportPath -PathType Leaf)) {
+    throw "Object type drift support script not found: $objectTypeDriftSupportPath"
+}
+. $objectTypeDriftSupportPath
 
 if ($null -ne $ObjectList -and $ObjectList.Count -gt 0) {
     $objectListNames = @($ObjectList | ForEach-Object {
@@ -424,6 +431,28 @@ if ($frontMetas.Count -eq 0 -and $frontXmls.Count -eq 0) {
 
         if ($null -eq $aMeta) {
             # Objeto novo, sem homonimo no acervo
+            continue
+        }
+
+        $frontGuidNormalized = Normalize-GeneXusObjectTypeDriftValue -Value $fMeta.Guid
+        $acervoGuidNormalized = Normalize-GeneXusObjectTypeDriftValue -Value $aMeta.Guid
+        $frontTypeNormalized = Normalize-GeneXusObjectTypeDriftValue -Value $fMeta.TypeGuid
+        $acervoTypeNormalized = Normalize-GeneXusObjectTypeDriftValue -Value $aMeta.TypeGuid
+        if (
+            -not [string]::IsNullOrWhiteSpace($frontGuidNormalized) -and
+            $frontGuidNormalized -eq $acervoGuidNormalized -and
+            -not [string]::IsNullOrWhiteSpace($frontTypeNormalized) -and
+            -not [string]::IsNullOrWhiteSpace($acervoTypeNormalized) -and
+            $frontTypeNormalized -ne $acervoTypeNormalized
+        ) {
+            $findings += New-Finding -Severity 'fail' -Code 'front-object-type-drift-skip' `
+                -Message "Objeto '$($fMeta.Name)' tem mesmo guid na frente e no acervo, mas Object/@type diverge (frente='$($fMeta.TypeGuid)', acervo='$($aMeta.TypeGuid)'). Copia automatica bloqueada; decisao humana requerida." `
+                -ObjectName $fMeta.Name -ObjectGuid $fMeta.Guid `
+                -ObjectFile $fRel -AcervoFile ([System.IO.Path]::GetRelativePath($AcervoFolder, $aMeta.Path)) `
+                -Action 'skip' `
+                -FrontLastUpdateBefore $(if ($null -ne $fMeta.LastUpdate) { Format-GeneXusLastUpdate $fMeta.LastUpdate } else { '' }) `
+                -AcervoLastUpdate $(if ($null -ne $aMeta.LastUpdate) { Format-GeneXusLastUpdate $aMeta.LastUpdate } else { '' }) `
+                -FrontLastUpdateAfter ''
             continue
         }
 

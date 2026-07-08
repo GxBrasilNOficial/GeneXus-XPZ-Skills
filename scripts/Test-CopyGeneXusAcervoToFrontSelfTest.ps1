@@ -17,10 +17,11 @@ function New-FixtureObjectXml {
     param(
         [Parameter(Mandatory = $true)][string]$Name,
         [Parameter(Mandatory = $true)][string]$Guid,
-        [Parameter(Mandatory = $true)][string]$LastUpdate
+        [Parameter(Mandatory = $true)][string]$LastUpdate,
+        [string]$TypeGuid = '84a12160-f59b-4ad7-a683-ea4481ac23e9'
     )
     return @"
-<Object type="84a12160-f59b-4ad7-a683-ea4481ac23e9" name="$Name" guid="$Guid" fullyQualifiedName="$Name" lastUpdate="$LastUpdate">
+<Object type="$TypeGuid" name="$Name" guid="$Guid" fullyQualifiedName="$Name" lastUpdate="$LastUpdate">
   <Properties>
     <Property>
       <Name>Name</Name>
@@ -41,10 +42,13 @@ $frontSeed = Join-Path $tempRoot 'FrontSeed'
 $frontSeedObjectList = Join-Path $tempRoot 'FrontSeedObjectList'
 $frontSeedGuid = Join-Path $tempRoot 'FrontSeedGuid'
 $frontMissing = Join-Path $tempRoot 'FrontMissing'
-[void](New-Item -ItemType Directory -Path $procedureDir, $frontEmpty, $frontSeed, $frontSeedObjectList, $frontSeedGuid, $frontMissing -Force)
+$frontTypeDrift = Join-Path $tempRoot 'FrontTypeDrift'
+[void](New-Item -ItemType Directory -Path $procedureDir, $frontEmpty, $frontSeed, $frontSeedObjectList, $frontSeedGuid, $frontMissing, $frontTypeDrift -Force)
 
 $objName = 'procSeedTeste'
 $objGuid = '11111111-1111-1111-1111-111111111111'
+$procedureTypeGuid = '84a12160-f59b-4ad7-a683-ea4481ac23e9'
+$webPanelTypeGuid = '7a7686a8-90de-4598-9406-014bcbcf3d82'
 $objXml = New-FixtureObjectXml -Name $objName -Guid $objGuid -LastUpdate '2026-01-01T00:00:00.0000000Z'
 [System.IO.File]::WriteAllText((Join-Path $procedureDir "$objName.xml"), $objXml, (Get-Utf8NoBomEncoding))
 
@@ -112,6 +116,26 @@ if ($missingResult.status -ne 'fail') {
 $missingFinding = @($missingResult.findings | Where-Object { $_.code -eq 'seed-target-not-found' })
 if ($missingFinding.Count -ne 1) {
     throw "Seed de alvo inexistente deveria gerar seed-target-not-found; obtido $($missingFinding.Count)"
+}
+
+$typeDriftName = 'procTypeDrift'
+$typeDriftGuid = '33333333-3333-3333-3333-333333333333'
+$typeDriftAcervoXml = New-FixtureObjectXml -Name $typeDriftName -Guid $typeDriftGuid -LastUpdate '2026-02-01T00:00:00.0000000Z' -TypeGuid $procedureTypeGuid
+$typeDriftFrontXml = New-FixtureObjectXml -Name $typeDriftName -Guid $typeDriftGuid -LastUpdate '2026-01-01T00:00:00.0000000Z' -TypeGuid $webPanelTypeGuid
+[System.IO.File]::WriteAllText((Join-Path $procedureDir "$typeDriftName.xml"), $typeDriftAcervoXml, (Get-Utf8NoBomEncoding))
+$typeDriftFrontPath = Join-Path $frontTypeDrift "$typeDriftName.xml"
+[System.IO.File]::WriteAllText($typeDriftFrontPath, $typeDriftFrontXml, (Get-Utf8NoBomEncoding))
+$typeDriftResult = & $scriptPath -FrontFolder $frontTypeDrift -AcervoFolder $acervo | ConvertFrom-Json
+if ($typeDriftResult.status -ne 'fail') {
+    throw "Drift de Object/@type deveria bloquear autocopia com status fail; obtido $($typeDriftResult.status)"
+}
+$typeDriftFinding = @($typeDriftResult.findings | Where-Object { $_.code -eq 'front-object-type-drift-skip' })
+if ($typeDriftFinding.Count -ne 1) {
+    throw "Drift de Object/@type deveria gerar front-object-type-drift-skip; obtido $($typeDriftFinding.Count)"
+}
+$typeDriftFrontText = Get-Content -LiteralPath $typeDriftFrontPath -Raw -Encoding UTF8
+if ($typeDriftFrontText -notmatch [regex]::Escape("type=`"$webPanelTypeGuid`"")) {
+    throw 'Drift de Object/@type nao deveria copiar o XML do acervo sobre a frente.'
 }
 
 Write-Output 'OK: Test-CopyGeneXusAcervoToFrontSelfTest.ps1'
