@@ -19,7 +19,8 @@
                  na frente = objeto novo)
       warn    — revisao obrigatória antes de empacotar (frente com mesmo lastUpdate
                  do acervo, ou lastUpdate não parseavel)
-      fail    — frente com lastUpdate mais antigo que acervo
+      fail    — frente com lastUpdate mais antigo que acervo, ou mesmo guid com
+                 Object/@type divergente (front-object-type-drift)
 
 .PARAMETER FrontFolder
     Caminho da pasta da frente (ObjetosGeradosParaImportacaoNaKbNoGenexus/<NomeCurto_GUID_YYYYMMDD>).
