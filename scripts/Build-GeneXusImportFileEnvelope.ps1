@@ -91,6 +91,12 @@ if (-not (Test-Path -LiteralPath $utf8NoBomEncodingSupportPath -PathType Leaf)) 
 }
 . $utf8NoBomEncodingSupportPath
 
+$objectTypeDriftSupportPath = Join-Path (Split-Path -Parent $PSCommandPath) 'GeneXusObjectTypeDriftSupport.ps1'
+if (-not (Test-Path -LiteralPath $objectTypeDriftSupportPath -PathType Leaf)) {
+    throw "Object type drift support script not found: $objectTypeDriftSupportPath"
+}
+. $objectTypeDriftSupportPath
+
 function Resolve-NextRejectedPath {
     param(
         [Parameter(Mandatory = $true)][string]$BasePath
@@ -195,6 +201,140 @@ function Test-ObjectIdentityMatch {
     }
 
     return $false
+}
+
+function Test-FrontObjectTypeDrift {
+    param(
+        [Parameter(Mandatory = $true)][System.Xml.XmlDocument[]]$Docs,
+        [Parameter(Mandatory = $true)][string]$BaselineRootPath,
+        [Parameter(Mandatory = $true)]$GuidIndex
+    )
+
+    $checks = [System.Collections.Generic.List[object]]::new()
+    $blockingReasons = [System.Collections.Generic.List[string]]::new()
+    $blockingDetails = [System.Collections.Generic.List[object]]::new()
+    $warnings = [System.Collections.Generic.List[string]]::new()
+
+    foreach ($doc in $Docs) {
+        $root = $doc.DocumentElement
+        if ($null -eq $root -or $root.LocalName -ne 'Object') {
+            continue
+        }
+
+        $name = $root.GetAttribute('name')
+        $fqn = $root.GetAttribute('fullyQualifiedName')
+        $guid = $root.GetAttribute('guid')
+        $label = if (-not [string]::IsNullOrWhiteSpace($fqn)) { $fqn } elseif (-not [string]::IsNullOrWhiteSpace($name)) { $name } else { $guid }
+        $frontGuidNormalized = Normalize-GeneXusObjectTypeDriftValue -Value $guid
+        if ([string]::IsNullOrWhiteSpace($frontGuidNormalized)) {
+            $checks.Add([pscustomobject]@{
+                objectName = $name
+                fullyQualifiedName = $fqn
+                guid = $guid
+                status = 'not-applicable'
+                code = 'front-guid-missing'
+                matchBasis = ''
+            }) | Out-Null
+            continue
+        }
+
+        $candidatePaths = @(Get-GeneXusObjectTypeGuidIndexMatches -Index $GuidIndex -Guid $guid)
+        $candidateRelativePaths = @($candidatePaths | ForEach-Object { [System.IO.Path]::GetRelativePath($BaselineRootPath, $_) })
+        if ($candidatePaths.Count -eq 0) {
+            $checks.Add([pscustomobject]@{
+                objectName = $name
+                fullyQualifiedName = $fqn
+                guid = $guid
+                status = 'pass'
+                code = 'baseline-guid-missing'
+                matchBasis = ''
+            }) | Out-Null
+            continue
+        }
+
+        if ($candidatePaths.Count -gt 1) {
+            $checks.Add([pscustomobject]@{
+                objectName = $name
+                fullyQualifiedName = $fqn
+                guid = $guid
+                status = 'info'
+                code = 'front-object-type-drift-ambiguous-baseline'
+                matchBasis = 'guid-ambiguous'
+                candidateBaselinePaths = $candidateRelativePaths
+            }) | Out-Null
+            continue
+        }
+
+        try {
+            $baselineDoc = Assert-XmlWellFormed -Path $candidatePaths[0] -Role "BaselineObjectXml"
+        } catch {
+            $warnings.Add("front-object-type-baseline-unreadable: '$label' baseline '$($candidatePaths[0])' nao pode ser lida.") | Out-Null
+            continue
+        }
+
+        $baselineRoot = $baselineDoc.DocumentElement
+        if ($null -eq $baselineRoot -or $baselineRoot.LocalName -ne 'Object') {
+            continue
+        }
+
+        $baselineGuidNormalized = Normalize-GeneXusObjectTypeDriftValue -Value $baselineRoot.GetAttribute('guid')
+        if ($frontGuidNormalized -ne $baselineGuidNormalized) {
+            continue
+        }
+
+        $frontType = $root.GetAttribute('type')
+        $baselineType = $baselineRoot.GetAttribute('type')
+        $frontTypeNormalized = Normalize-GeneXusObjectTypeDriftValue -Value $frontType
+        $baselineTypeNormalized = Normalize-GeneXusObjectTypeDriftValue -Value $baselineType
+        $status = 'pass'
+        $code = 'object-type-match'
+
+        if (
+            -not [string]::IsNullOrWhiteSpace($frontTypeNormalized) -and
+            -not [string]::IsNullOrWhiteSpace($baselineTypeNormalized) -and
+            $frontTypeNormalized -ne $baselineTypeNormalized
+        ) {
+            $status = 'fail'
+            $code = 'front-object-type-drift'
+            if (-not $blockingReasons.Contains('front-object-type-drift')) {
+                $blockingReasons.Add('front-object-type-drift') | Out-Null
+            }
+            $detail = [ordered]@{
+                code = 'front-object-type-drift'
+                objectName = $name
+                fullyQualifiedName = $fqn
+                frontGuid = $guid
+                frontObjectType = $frontType
+                baselineObjectType = $baselineType
+                frontObjectTypeNormalized = $frontTypeNormalized
+                baselineObjectTypeNormalized = $baselineTypeNormalized
+                matchBasis = 'guid'
+                baselinePath = $candidateRelativePaths[0]
+            }
+            $blockingDetails.Add([pscustomobject]$detail) | Out-Null
+        }
+
+        $checks.Add([pscustomobject]@{
+            objectName = $name
+            fullyQualifiedName = $fqn
+            guid = $guid
+            status = $status
+            code = $code
+            frontObjectType = $frontType
+            baselineObjectType = $baselineType
+            frontObjectTypeNormalized = $frontTypeNormalized
+            baselineObjectTypeNormalized = $baselineTypeNormalized
+            matchBasis = 'guid'
+            baselinePath = $candidateRelativePaths[0]
+        }) | Out-Null
+    }
+
+    return [pscustomobject]@{
+        checks = $checks.ToArray()
+        blockingReasons = $blockingReasons.ToArray()
+        blockingDetails = $blockingDetails.ToArray()
+        warnings = $warnings.ToArray()
+    }
 }
 
 function Find-BaselineObjectXml {
@@ -481,9 +621,21 @@ foreach ($path in $ObjectXmlPaths) {
     $objectDocs += (Assert-XmlWellFormed -Path $path -Role "ObjectXml")
 }
 
+$objectTypeGuidIndex = New-GeneXusObjectTypeGuidIndex -RootPath $AcervoPath
 $lastUpdateFreshness = Test-LastUpdateFreshness -Docs $objectDocs -BaselineRootPath $AcervoPath
-if (@($lastUpdateFreshness.blockingReasons).Count -gt 0) {
-    throw "BLOCK: lastUpdate invalido antes do empacotamento. $(@($lastUpdateFreshness.blockingReasons) -join ' | ')"
+$frontObjectTypeDrift = Test-FrontObjectTypeDrift -Docs $objectDocs -BaselineRootPath $AcervoPath -GuidIndex $objectTypeGuidIndex
+$preWriteBlockingReasons = @(@($lastUpdateFreshness.blockingReasons) + @($frontObjectTypeDrift.blockingReasons))
+if ($preWriteBlockingReasons.Count -gt 0) {
+    Write-BuildEnvelopeJsonAndExit -InputObject ([ordered]@{
+        status = 'bloqueado'
+        exitCode = 20
+        stage = 'front-acervo-coherence'
+        blockingReasons = $preWriteBlockingReasons
+        blockingDetails = @($frontObjectTypeDrift.blockingDetails)
+        lastUpdateFreshness = $lastUpdateFreshness
+        frontObjectTypeDrift = $frontObjectTypeDrift
+        warnings = @(@($lastUpdateFreshness.warnings) + @($frontObjectTypeDrift.warnings))
+    }) -ExitCode 20
 }
 
 $attributeDocs = @()
@@ -581,6 +733,7 @@ $buildResult = [ordered]@{
     topLevelAttrCount = $attributeDocs.Count
     topLevelAttrSource = $topLevelAttrSource
     lastUpdateFreshness = $lastUpdateFreshness
+    frontObjectTypeDrift = $frontObjectTypeDrift
     gateStatus        = $null
     gateInvoked       = (-not $SkipGate.IsPresent)
     blockingReasons   = @()

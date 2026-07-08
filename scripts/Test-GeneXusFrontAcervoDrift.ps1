@@ -8,6 +8,8 @@
     Para cada <Object> na pasta da frente, busca o XML correspondente no acervo
     (ObjetosDaKbEmXml) por GUID ou por nome, e compara:
       - lastUpdate: se o acervo e mais recente que a frente, emite finding.
+      - Object/@type: se frente e acervo compartilham o mesmo guid e têm tipos
+        GeneXus divergentes, emite front-object-type-drift fatal.
       - presenca no acervo: se o objeto da frente não existe no acervo, classifica
         como objeto novo presumido. O gate não enumera objetos do acervo ausentes
         da frente, porque a frente e o escopo operacional do empacotamento.
@@ -45,6 +47,12 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+
+$objectTypeDriftSupportPath = Join-Path (Split-Path -Parent $PSCommandPath) 'GeneXusObjectTypeDriftSupport.ps1'
+if (-not (Test-Path -LiteralPath $objectTypeDriftSupportPath -PathType Leaf)) {
+    throw "Object type drift support script not found: $objectTypeDriftSupportPath"
+}
+. $objectTypeDriftSupportPath
 
 function Format-GeneXusLastUpdate {
     param([Parameter(Mandatory = $true)][DateTime]$Value)
@@ -85,9 +93,15 @@ function New-Finding {
         [string]$ObjectFile,
         [string]$AcervoFile,
         [string]$FrontLastUpdate,
-        [string]$AcervoLastUpdate
+        [string]$AcervoLastUpdate,
+        [string]$FrontObjectType,
+        [string]$AcervoObjectType,
+        [string]$FrontObjectTypeNormalized,
+        [string]$AcervoObjectTypeNormalized,
+        [string]$MatchBasis,
+        [string[]]$CandidateBaselinePaths
     )
-    return [pscustomobject]@{
+    $finding = [ordered]@{
         severity         = $Severity
         code             = $Code
         message          = $Message
@@ -98,6 +112,25 @@ function New-Finding {
         frontLastUpdate  = $FrontLastUpdate
         acervoLastUpdate = $AcervoLastUpdate
     }
+    if (-not [string]::IsNullOrWhiteSpace($FrontObjectType)) {
+        $finding.frontObjectType = $FrontObjectType
+    }
+    if (-not [string]::IsNullOrWhiteSpace($AcervoObjectType)) {
+        $finding.acervoObjectType = $AcervoObjectType
+    }
+    if (-not [string]::IsNullOrWhiteSpace($FrontObjectTypeNormalized)) {
+        $finding.frontObjectTypeNormalized = $FrontObjectTypeNormalized
+    }
+    if (-not [string]::IsNullOrWhiteSpace($AcervoObjectTypeNormalized)) {
+        $finding.acervoObjectTypeNormalized = $AcervoObjectTypeNormalized
+    }
+    if (-not [string]::IsNullOrWhiteSpace($MatchBasis)) {
+        $finding.matchBasis = $MatchBasis
+    }
+    if ($CandidateBaselinePaths -and $CandidateBaselinePaths.Count -gt 0) {
+        $finding.candidateBaselinePaths = @($CandidateBaselinePaths)
+    }
+    return [pscustomobject]$finding
 }
 
 function Get-ObjectMetadata {
@@ -210,6 +243,7 @@ if (-not (Test-Path -LiteralPath $AcervoFolder -PathType Container)) {
 }
 $FrontFolder  = (Resolve-Path -LiteralPath $FrontFolder).Path
 $AcervoFolder = (Resolve-Path -LiteralPath $AcervoFolder).Path
+$objectTypeGuidIndex = New-GeneXusObjectTypeGuidIndex -RootPath $AcervoFolder
 
 # 1. Enumerar XMLs na pasta da frente
 $findings = @()
@@ -230,7 +264,52 @@ if ($objectsScanned -eq 0 -and $frontXmls.Count -eq 0) {
     # 2. Para cada objeto da frente, buscar homonimo no acervo e comparar
     foreach ($fMeta in $frontMetas) {
         $fRel = [System.IO.Path]::GetRelativePath($FrontFolder, $fMeta.Path)
-        $aMeta = Find-AcervoObjectXml -RootPath $AcervoFolder -FrontMeta $fMeta
+        $guidBaselinePaths = @(Get-GeneXusObjectTypeGuidIndexMatches -Index $objectTypeGuidIndex -Guid $fMeta.Guid)
+        $guidBaselineRelPaths = @($guidBaselinePaths | ForEach-Object { [System.IO.Path]::GetRelativePath($AcervoFolder, $_) })
+        $matchBasis = ''
+        $typeDriftFatalForObject = $false
+        $aMeta = $null
+
+        if ($guidBaselinePaths.Count -eq 1) {
+            $aMeta = Get-ObjectMetadata $guidBaselinePaths[0]
+            if ($null -ne $aMeta) {
+                $frontTypeNorm = Normalize-GeneXusObjectTypeDriftValue -Value $fMeta.TypeGuid
+                $acervoTypeNorm = Normalize-GeneXusObjectTypeDriftValue -Value $aMeta.TypeGuid
+                $frontGuidNorm = Normalize-GeneXusObjectTypeDriftValue -Value $fMeta.Guid
+                $acervoGuidNorm = Normalize-GeneXusObjectTypeDriftValue -Value $aMeta.Guid
+                if (-not [string]::IsNullOrWhiteSpace($frontGuidNorm) -and $frontGuidNorm -eq $acervoGuidNorm) {
+                    $matchBasis = 'guid'
+                    if (
+                        -not [string]::IsNullOrWhiteSpace($frontTypeNorm) -and
+                        -not [string]::IsNullOrWhiteSpace($acervoTypeNorm) -and
+                        $frontTypeNorm -ne $acervoTypeNorm
+                    ) {
+                        $typeDriftFatalForObject = $true
+                        $findings += New-Finding -Severity 'fail' -Code 'front-object-type-drift' `
+                            -Message "Objeto '$($fMeta.Name)' tem o mesmo guid na frente e no acervo, mas Object/@type diverge (frente='$($fMeta.TypeGuid)', acervo='$($aMeta.TypeGuid)'). Decisao humana requerida antes de empacotar." `
+                            -ObjectName $fMeta.Name -ObjectGuid $fMeta.Guid `
+                            -ObjectFile $fRel -AcervoFile ([System.IO.Path]::GetRelativePath($AcervoFolder, $aMeta.Path)) `
+                            -FrontLastUpdate '' -AcervoLastUpdate '' `
+                            -FrontObjectType $fMeta.TypeGuid -AcervoObjectType $aMeta.TypeGuid `
+                            -FrontObjectTypeNormalized $frontTypeNorm -AcervoObjectTypeNormalized $acervoTypeNorm `
+                            -MatchBasis $matchBasis -CandidateBaselinePaths $guidBaselineRelPaths
+                    }
+                }
+            }
+        } elseif ($guidBaselinePaths.Count -gt 1) {
+            $findings += New-Finding -Severity 'info' -Code 'front-object-type-drift-ambiguous-baseline' `
+                -Message "Objeto '$($fMeta.Name)' tem guid presente em mais de um XML do acervo; drift de Object/@type nao foi decidido automaticamente." `
+                -ObjectName $fMeta.Name -ObjectGuid $fMeta.Guid `
+                -ObjectFile $fRel -AcervoFile '' `
+                -FrontLastUpdate '' -AcervoLastUpdate '' `
+                -FrontObjectType $fMeta.TypeGuid -AcervoObjectType '' `
+                -FrontObjectTypeNormalized (Normalize-GeneXusObjectTypeDriftValue -Value $fMeta.TypeGuid) -AcervoObjectTypeNormalized '' `
+                -MatchBasis 'guid-ambiguous' -CandidateBaselinePaths $guidBaselineRelPaths
+        }
+
+        if ($null -eq $aMeta) {
+            $aMeta = Find-AcervoObjectXml -RootPath $AcervoFolder -FrontMeta $fMeta
+        }
 
         if ($null -eq $aMeta) {
             $findings += New-Finding -Severity 'info' -Code 'front-only-new-object' `
@@ -269,11 +348,14 @@ if ($objectsScanned -eq 0 -and $frontXmls.Count -eq 0) {
                 -ObjectFile $fRel -AcervoFile $aRel `
                 -FrontLastUpdate $fLastStr -AcervoLastUpdate $aLastStr
         } else {
-            $findings += New-Finding -Severity 'info' -Code 'front-newer-than-acervo' `
-                -Message "Objeto '$($fMeta.Name)' na frente tem lastUpdate ($fLastStr) mais recente que o acervo ($aLastStr). Consistente com edicao na frente." `
-                -ObjectName $fMeta.Name -ObjectGuid $fMeta.Guid `
-                -ObjectFile $fRel -AcervoFile $aRel `
-                -FrontLastUpdate $fLastStr -AcervoLastUpdate $aLastStr
+            if (-not $typeDriftFatalForObject) {
+                $findings += New-Finding -Severity 'info' -Code 'front-newer-than-acervo' `
+                    -Message "Objeto '$($fMeta.Name)' na frente tem lastUpdate ($fLastStr) mais recente que o acervo ($aLastStr). Consistente com edicao na frente." `
+                    -ObjectName $fMeta.Name -ObjectGuid $fMeta.Guid `
+                    -ObjectFile $fRel -AcervoFile $aRel `
+                    -FrontLastUpdate $fLastStr -AcervoLastUpdate $aLastStr `
+                    -MatchBasis $matchBasis
+            }
         }
     }
 
