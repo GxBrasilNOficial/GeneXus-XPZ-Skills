@@ -41,10 +41,11 @@
     automaticamente. O gate de drift frente-vs-acervo roda sempre antes do
     empacotamento; sem acervo explicito nem canonico, o empacotamento e
     bloqueado (fail-closed). Se o gate detectar que um XML da frente está mais
-    antigo que o homonimo no acervo (front-older-than-acervo), o empacotamento e
+    antigo que o homonimo no acervo (front-older-than-acervo) ou Object/@type
+    divergente para o mesmo guid (front-object-type-drift), o empacotamento e
     abortado. Findings warn (front-equals-acervo ou lastupdate-unparseable)
     também bloqueiam esta chamada automática ate confirmacao/resolucao fora do
-    wrapper.
+    wrapper; front-object-type-drift exige decisao humana, sem autocopia/bump.
 
 #>
 

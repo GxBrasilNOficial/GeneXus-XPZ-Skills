@@ -12,7 +12,8 @@
     Resolve o anti-padrao "editar acervo esperando que o pacote pegue": em vez de editar
     o acervo, o agente copia a versão mais recente do acervo para a frente e depois edita
     a copia. O gate 9-FD (Test-GeneXusFrontAcervoDrift.ps1) detecta o drift; este script
-    resolve o drift copiando e bumpando.
+    resolve apenas drift temporal copiando e bumpando; drift de Object/@type
+    por mesmo guid exige decisao humana antes de qualquer autocopia.
 
     Comportamento por finding do gate 9-FD:
       - front-older-than-acervo: copia do acervo e bumpa lastUpdate (ação primaria)
@@ -21,6 +22,7 @@
       - front-only-new-object: ignorado (objeto novo, sem homonimo no acervo)
       - front-newer-than-acervo: ignorado (frente já e mais recente)
       - lastupdate-unparseable: ignorado (requer resolucao manual)
+      - front-object-type-drift: ignorado (requer decisao humana; nao autocopiar)
 
     Quando -ObjectList, -ObjectNames ou -ObjectGuids e fornecido, só os objetos listados
     são considerados para copia. Quando omitido, todos os objetos com drift são copiados.

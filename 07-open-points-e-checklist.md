@@ -267,7 +267,7 @@ Declarar explicitamente: `fullyQualifiedName` (ou identificador estavel), valor 
 
 ### Automacao
 
-A verificacao mecanica foi incorporada ao ponto de montagem `scripts/Build-GeneXusImportFileEnvelope.ps1`: `-AcervoPath <ObjetosDaKbEmXml>` e obrigatório e o gate de `lastUpdate` roda sempre, com declaracao opcional de modificados por `-ModifiedObjectNames` ou `-ModifiedObjectGuids`. O helper `scripts/Get-GeneXusXpzLastUpdate.ps1` aceita `-BaselineXmlPath` e calcula o timestamp canonico com margem padrão de 60 segundos. `Test-GeneXusImportFileEnvelope.ps1` continua validando o envelope estatico; sozinho, ele não tem contexto suficiente para inferir acervo e classificação de modificado vs preservado.
+A verificacao mecanica foi incorporada ao ponto de montagem `scripts/Build-GeneXusImportFileEnvelope.ps1`: `-AcervoPath <ObjetosDaKbEmXml>` e obrigatório e a coerencia frente-vs-acervo roda sempre antes da gravacao, cobrindo `lastUpdate` e `Object/@type` divergente por mesmo `guid`, com declaracao opcional de modificados por `-ModifiedObjectNames` ou `-ModifiedObjectGuids` para a parte temporal. O helper `scripts/Get-GeneXusXpzLastUpdate.ps1` aceita `-BaselineXmlPath` e calcula o timestamp canonico com margem padrão de 60 segundos. `Test-GeneXusImportFileEnvelope.ps1` continua validando o envelope estatico; sozinho, ele não tem contexto suficiente para inferir acervo e classificação de modificado vs preservado.
 
 ---
 
