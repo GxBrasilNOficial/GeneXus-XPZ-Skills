@@ -516,9 +516,13 @@ function Test-GeneXusKbDeploymentMetadataPlausibility {
         warnings                   = @()
         kb_environment_names       = @()
         kb_environment_count       = $null
+        deployment_hosting_kind    = $null
         deployment_environment_name = $null
         kb_environment_output_dirs = [ordered]@{}
         kb_environment_web_dirs    = [ordered]@{}
+        kb_environment_servlet_dirs = [ordered]@{}
+        kb_environment_app_package = [ordered]@{}
+        kb_environment_servlet_flavor = [ordered]@{}
     }
 
     if ([string]::IsNullOrWhiteSpace($MetadataPath) -or -not (Test-Path -LiteralPath $MetadataPath -PathType Leaf)) {
@@ -537,10 +541,14 @@ function Test-GeneXusKbDeploymentMetadataPlausibility {
 
     $result.deploymentFieldsPresent = $hasAnyDeploymentField
     $result.deployment_environment_name = $fields.deployment_environment_name
+    $result.deployment_hosting_kind = $fields.deployment_hosting_kind
     $result.kb_environment_count = $fields.kb_environment_count
     $result.kb_environment_names = @($fields.kb_environment_names)
     $result.kb_environment_output_dirs = $fields.kb_environment_output_dirs
     $result.kb_environment_web_dirs = $fields.kb_environment_web_dirs
+    $result.kb_environment_servlet_dirs = $fields.kb_environment_servlet_dirs
+    $result.kb_environment_app_package = $fields.kb_environment_app_package
+    $result.kb_environment_servlet_flavor = $fields.kb_environment_servlet_flavor
 
     if (-not $hasAnyDeploymentField) {
         $result.status = 'PENDENTE'
@@ -633,6 +641,77 @@ function Test-GeneXusKbDeploymentMetadataPlausibility {
             foreach ($name in $fields.kb_environment_names) {
                 if (-not $map.Contains($name)) {
                     $failures.Add(("{0} nao contem mapeamento para environment '{1}'." -f $mapName, $name)) | Out-Null
+                }
+            }
+        }
+    }
+
+    if ($fields.deployment_hosting_kind -ieq 'java-tomcat') {
+        $requiredJavaMaps = [ordered]@{
+            kb_environment_servlet_dirs = $fields.kb_environment_servlet_dirs
+            kb_environment_app_package = $fields.kb_environment_app_package
+        }
+
+        $knownEnvironmentNames = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+        foreach ($name in $fields.kb_environment_names) {
+            [void]$knownEnvironmentNames.Add($name)
+        }
+
+        foreach ($mapName in $requiredJavaMaps.Keys) {
+            $map = $requiredJavaMaps[$mapName]
+            if ($map.Count -eq 0) {
+                $warnings.Add(("{0} ausente para deployment_hosting_kind=java-tomcat; resolver candidatos via assistente opt-in do xpz-kb-parallel-setup e gravar somente apos confirmacao." -f $mapName)) | Out-Null
+                continue
+            }
+
+            foreach ($key in $map.Keys) {
+                if ([string]::IsNullOrWhiteSpace($map[$key])) {
+                    $failures.Add(("{0} contem valor vazio ou entrada malformada para '{1}'." -f $mapName, $key)) | Out-Null
+                    continue
+                }
+
+                if (-not $knownEnvironmentNames.Contains($key)) {
+                    $failures.Add(("{0} contem environment '{1}' que nao consta em kb_environment_names." -f $mapName, $key)) | Out-Null
+                }
+            }
+
+            foreach ($name in $fields.kb_environment_names) {
+                if (-not $map.Contains($name)) {
+                    $failures.Add(("{0} nao contem mapeamento para environment '{1}'." -f $mapName, $name)) | Out-Null
+                }
+            }
+        }
+
+        foreach ($key in $fields.kb_environment_servlet_dirs.Keys) {
+            $value = $fields.kb_environment_servlet_dirs[$key]
+            if (-not [string]::IsNullOrWhiteSpace($value)) {
+                $normalized = $value.TrimEnd('\', '/')
+                $leaf = Split-Path -Leaf $normalized
+                $parent = Split-Path -Parent $normalized
+                $parentLeaf = if ($parent) { Split-Path -Leaf $parent } else { '' }
+                if (($leaf -ine 'classes') -or ($parentLeaf -ine 'WEB-INF')) {
+                    $failures.Add(("kb_environment_servlet_dirs para '{0}' nao termina em WEB-INF\classes: {1}" -f $key, $value)) | Out-Null
+                }
+            }
+        }
+
+        if ($fields.kb_environment_servlet_flavor.Count -eq 0) {
+            $warnings.Add('kb_environment_servlet_flavor ausente para deployment_hosting_kind=java-tomcat; campo e informativo, mas deve ser preenchido como jakarta ou javax quando a stack for confirmada.') | Out-Null
+        } else {
+            foreach ($key in $fields.kb_environment_servlet_flavor.Keys) {
+                $value = $fields.kb_environment_servlet_flavor[$key]
+                if ([string]::IsNullOrWhiteSpace($value)) {
+                    $failures.Add(("kb_environment_servlet_flavor contem valor vazio ou entrada malformada para '{0}'." -f $key)) | Out-Null
+                    continue
+                }
+
+                if (-not $knownEnvironmentNames.Contains($key)) {
+                    $failures.Add(("kb_environment_servlet_flavor contem environment '{0}' que nao consta em kb_environment_names." -f $key)) | Out-Null
+                }
+
+                $normalizedFlavor = $value.Trim().ToLowerInvariant()
+                if ($normalizedFlavor -notin @('jakarta', 'javax')) {
+                    $failures.Add(("kb_environment_servlet_flavor para '{0}' deve ser jakarta ou javax; valor atual: {1}" -f $key, $value)) | Out-Null
                 }
             }
         }

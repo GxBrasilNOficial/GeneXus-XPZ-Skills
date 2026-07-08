@@ -15,6 +15,7 @@
     "scripts/Test-XpzPowerShellRuntime.ps1",
     "scripts/Test-XpzKbMetadataWrapper.ps1",
     "scripts/GeneXusKbDeploymentEnvironmentSupport.ps1",
+    "scripts/Resolve-XpzJavaTomcatMetadataSuggestion.ps1",
     "scripts/Test-XpzKbDeploymentMetadata.ps1",
     "scripts/Test-XpzObjetosDaKbNaming.ps1",
     "scripts/Set-XpzKbSourceMetadataDeployment.ps1"

@@ -11,7 +11,8 @@ pelo usuário; não fazer scan de pastas da KB nativa.
 Por padrão valida cada nome via SetActiveEnvironment headless (MSBuild).
 
 NOTA DE INVOCACAO: os parametros de lista (-KbEnvironmentNames, -KbEnvironmentOutputDirs,
--KbEnvironmentWebDirs) exigem invocacao nativa PowerShell com @(...), como no .EXAMPLE abaixo.
+-KbEnvironmentWebDirs e campos Java/Tomcat) exigem invocacao nativa PowerShell com @(...),
+como no .EXAMPLE abaixo.
 NAO invocar por `pwsh -File ... -KbEnvironmentNames a,b`: nesse modo a virgula NAO vira array,
 o valor chega como um unico elemento com a virgula embutida e o motor barra com
 "BLOCK: KbEnvironmentOutputDirs contem environment '...' que nao consta em -KbEnvironmentNames".
@@ -52,6 +53,12 @@ param(
 
     [string[]]$KbEnvironmentWebDirs,
 
+    [string[]]$KbEnvironmentServletDirs,
+
+    [string[]]$KbEnvironmentAppPackage,
+
+    [string[]]$KbEnvironmentServletFlavor,
+
     [string]$KbNativePath,
 
     [string]$InventoryWorkingDirectory,
@@ -91,6 +98,9 @@ $invokeArgs = @{
 if ($KbParallelRoot) { $invokeArgs['KbParallelRoot'] = $KbParallelRoot }
 if ($MetadataPath) { $invokeArgs['MetadataPath'] = $MetadataPath }
 if ($KbEnvironmentWebDirs) { $invokeArgs['KbEnvironmentWebDirs'] = $KbEnvironmentWebDirs }
+if ($KbEnvironmentServletDirs) { $invokeArgs['KbEnvironmentServletDirs'] = $KbEnvironmentServletDirs }
+if ($KbEnvironmentAppPackage) { $invokeArgs['KbEnvironmentAppPackage'] = $KbEnvironmentAppPackage }
+if ($KbEnvironmentServletFlavor) { $invokeArgs['KbEnvironmentServletFlavor'] = $KbEnvironmentServletFlavor }
 if ($KbNativePath) { $invokeArgs['KbNativePath'] = $KbNativePath }
 if ($InventoryWorkingDirectory) { $invokeArgs['InventoryWorkingDirectory'] = $InventoryWorkingDirectory }
 if ($InventoryLogPath) { $invokeArgs['InventoryLogPath'] = $InventoryLogPath }

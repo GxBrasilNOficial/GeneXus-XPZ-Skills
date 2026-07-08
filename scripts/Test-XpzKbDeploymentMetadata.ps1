@@ -8,6 +8,8 @@
     por pastas web\ (CSharpModel, Data*), inconsistencias de contagem e mapeamento
     de output/web ausente ou divergente. A lista correta vem do usuário via
     -KbEnvironmentNames e -KbEnvironmentOutputDirs; este gate não valida existência no GeneXus (MSBuild).
+    Para java-tomcat, exige metadata Java dedicado ou retorna PENDENTE/BLOCK conforme ausencia
+    ou inconsistencia dos campos.
 
 .PARAMETER MetadataPath
     Caminho para kb-source-metadata.md.
@@ -47,6 +49,11 @@ switch ($result.status) {
         Write-Output ("kb_environment_names: {0}" -f ($result.kb_environment_names -join ', '))
         Write-Output ("kb_environment_output_dirs: {0}" -f (Join-GeneXusKbEnvironmentMap -Map $result.kb_environment_output_dirs))
         Write-Output ("kb_environment_web_dirs: {0}" -f (Join-GeneXusKbEnvironmentMap -Map $result.kb_environment_web_dirs))
+        if ($result.deployment_hosting_kind -ieq 'java-tomcat') {
+            Write-Output ("kb_environment_servlet_dirs: {0}" -f (Join-GeneXusKbEnvironmentMap -Map $result.kb_environment_servlet_dirs))
+            Write-Output ("kb_environment_app_package: {0}" -f (Join-GeneXusKbEnvironmentMap -Map $result.kb_environment_app_package))
+            Write-Output ("kb_environment_servlet_flavor: {0}" -f (Join-GeneXusKbEnvironmentMap -Map $result.kb_environment_servlet_flavor))
+        }
     }
     'PENDENTE' {
         foreach ($warning in $result.warnings) {

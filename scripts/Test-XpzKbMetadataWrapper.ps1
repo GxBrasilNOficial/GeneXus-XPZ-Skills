@@ -95,7 +95,7 @@ function Get-WrapperFields {
 
     $result = @{}
     foreach ($line in $OutputLines) {
-        $match = [regex]::Match($line, '^\s*(?<key>last_xpz_materialization_run_at|kb_name|source_guid|deployment_environment_name|deployment_hosting_kind|kb_environment_count|kb_environment_names|kb_environment_output_dirs|kb_environment_web_dirs)\s*[:=]\s*(?<value>.*)\s*$')
+        $match = [regex]::Match($line, '^\s*(?<key>last_xpz_materialization_run_at|kb_name|source_guid|deployment_environment_name|deployment_hosting_kind|kb_environment_count|kb_environment_names|kb_environment_output_dirs|kb_environment_web_dirs|kb_environment_servlet_dirs|kb_environment_app_package|kb_environment_servlet_flavor)\s*[:=]\s*(?<value>.*)\s*$')
         if ($match.Success) {
             $result[$match.Groups['key'].Value] = $match.Groups['value'].Value.Trim()
         }
@@ -124,6 +124,9 @@ $expected = [ordered]@{
     kb_environment_names = Normalize-MetadataValue (Get-DirectFieldValue -Lines $metadataLines -FieldName 'kb_environment_names')
     kb_environment_output_dirs = Normalize-MetadataValue (Get-DirectFieldValue -Lines $metadataLines -FieldName 'kb_environment_output_dirs')
     kb_environment_web_dirs = Normalize-MetadataValue (Get-DirectFieldValue -Lines $metadataLines -FieldName 'kb_environment_web_dirs')
+    kb_environment_servlet_dirs = Normalize-MetadataValue (Get-DirectFieldValue -Lines $metadataLines -FieldName 'kb_environment_servlet_dirs')
+    kb_environment_app_package = Normalize-MetadataValue (Get-DirectFieldValue -Lines $metadataLines -FieldName 'kb_environment_app_package')
+    kb_environment_servlet_flavor = Normalize-MetadataValue (Get-DirectFieldValue -Lines $metadataLines -FieldName 'kb_environment_servlet_flavor')
 }
 
 if (-not $expected.kb_name) {
@@ -173,7 +176,17 @@ $actual = Get-WrapperFields -OutputLines $outputLines
 $failures = New-Object System.Collections.Generic.List[string]
 
 $requiredWrapperFields = @('last_xpz_materialization_run_at', 'kb_name', 'source_guid')
-$optionalWrapperFields = @('deployment_environment_name', 'deployment_hosting_kind', 'kb_environment_count', 'kb_environment_names', 'kb_environment_output_dirs', 'kb_environment_web_dirs')
+$optionalWrapperFields = @(
+    'deployment_environment_name',
+    'deployment_hosting_kind',
+    'kb_environment_count',
+    'kb_environment_names',
+    'kb_environment_output_dirs',
+    'kb_environment_web_dirs',
+    'kb_environment_servlet_dirs',
+    'kb_environment_app_package',
+    'kb_environment_servlet_flavor'
+)
 
 foreach ($field in ($requiredWrapperFields + $optionalWrapperFields)) {
     $expectedValue = $expected[$field]

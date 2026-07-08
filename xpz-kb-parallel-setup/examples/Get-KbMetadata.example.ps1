@@ -27,6 +27,10 @@ Campos retornados e sua origem em kb-source-metadata.md:
   kb_environment_names            : frontmatter — lista separada por virgula (inventario no setup)
   kb_environment_output_dirs      : frontmatter — pares Environment=DiretorioOutput separados por ;
   kb_environment_web_dirs         : frontmatter — pares Environment=CaminhoWeb separados por ;
+  kb_environment_servlet_dirs     : frontmatter — pares Environment=SERVLET_DIR separados por ;
+                                    usado em Java/Tomcat e preenchido somente apos confirmacao
+  kb_environment_app_package      : frontmatter — pares Environment=PacoteApp separados por ;
+  kb_environment_servlet_flavor   : frontmatter — pares Environment=jakarta|javax separados por ;
 
 Campos ausentes são indicados com "(ausente)" em vez de falha silenciosa.
 
@@ -130,6 +134,9 @@ $kbEnvironmentCount = Get-DirectFieldValue -Lines $lines -FieldName 'kb_environm
 $kbEnvironmentNames = Get-DirectFieldValue -Lines $lines -FieldName 'kb_environment_names'
 $kbEnvironmentOutputDirs = Get-DirectFieldValue -Lines $lines -FieldName 'kb_environment_output_dirs'
 $kbEnvironmentWebDirs = Get-DirectFieldValue -Lines $lines -FieldName 'kb_environment_web_dirs'
+$kbEnvironmentServletDirs = Get-DirectFieldValue -Lines $lines -FieldName 'kb_environment_servlet_dirs'
+$kbEnvironmentAppPackage = Get-DirectFieldValue -Lines $lines -FieldName 'kb_environment_app_package'
+$kbEnvironmentServletFlavor = Get-DirectFieldValue -Lines $lines -FieldName 'kb_environment_servlet_flavor'
 
 $values = [ordered]@{
     last_xpz_materialization_run_at = $lastMaterialization
@@ -141,6 +148,9 @@ $values = [ordered]@{
     kb_environment_names = $kbEnvironmentNames
     kb_environment_output_dirs = $kbEnvironmentOutputDirs
     kb_environment_web_dirs = $kbEnvironmentWebDirs
+    kb_environment_servlet_dirs = $kbEnvironmentServletDirs
+    kb_environment_app_package = $kbEnvironmentAppPackage
+    kb_environment_servlet_flavor = $kbEnvironmentServletFlavor
 }
 
 foreach ($field in $values.Keys) {

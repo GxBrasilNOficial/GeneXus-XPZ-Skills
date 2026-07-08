@@ -47,6 +47,18 @@
     Mapeamento opcional Environment=CaminhoWeb para cada environment declarado. Quando omitido,
     e derivado de -KbNativePath + DiretorioOutput + web.
 
+.PARAMETER KbEnvironmentServletDirs
+    Mapeamento opcional e explicito Environment=SERVLET_DIR para Java/Tomcat. Nao e derivado
+    automaticamente; use apenas apos validar topologia WEB-INF\classes e sentinelas do webapp.
+
+.PARAMETER KbEnvironmentAppPackage
+    Mapeamento opcional e explicito Environment=PacoteApp para Java/Tomcat (ex.: com\minhaapp).
+    Nao varrer com\ inteiro para inferir este valor.
+
+.PARAMETER KbEnvironmentServletFlavor
+    Mapeamento opcional e explicito Environment=jakarta|javax para Java/Tomcat. Valor informativo,
+    validado apenas contra o conjunto fechado jakarta/javax quando informado.
+
 .PARAMETER KbNativePath
     Caminho da KB nativa GeneXus. Obrigatório para validação MSBuild, salvo
     -SkipEnvironmentNamesMsBuildValidation, e também obrigatório para derivar
@@ -105,6 +117,12 @@ param(
     [string[]]$KbEnvironmentOutputDirs,
 
     [string[]]$KbEnvironmentWebDirs,
+
+    [string[]]$KbEnvironmentServletDirs,
+
+    [string[]]$KbEnvironmentAppPackage,
+
+    [string[]]$KbEnvironmentServletFlavor,
 
     [string]$KbNativePath,
 
@@ -259,6 +277,100 @@ foreach ($name in $environmentNames) {
     }
 }
 
+function Resolve-ExplicitEnvironmentMap {
+    param(
+        [AllowNull()][string[]]$RawValues,
+        [string]$ParameterName,
+        [System.Collections.Generic.HashSet[string]]$KnownEnvironmentNames,
+        [System.Collections.Generic.List[string]]$DeclaredEnvironmentNames,
+        [switch]$RequireAllDeclared,
+        [AllowNull()][scriptblock]$ValidateValue
+    )
+
+    $map = [ordered]@{}
+    if ($null -eq $RawValues -or $RawValues.Count -eq 0) {
+        return $map
+    }
+
+    $map = Split-GeneXusKbEnvironmentMap -MapRaw ($RawValues -join '; ')
+    if ($map.Count -eq 0) {
+        throw ("BLOCK: -{0} vazio ou invalido. Informe Environment=Valor para cada environment aplicavel." -f $ParameterName)
+    }
+
+    foreach ($key in $map.Keys) {
+        if (-not $KnownEnvironmentNames.Contains($key)) {
+            throw ("BLOCK: {0} contem environment '{1}' que nao consta em -KbEnvironmentNames." -f $ParameterName, $key)
+        }
+
+        $value = $map[$key]
+        if ([string]::IsNullOrWhiteSpace($value)) {
+            throw ("BLOCK: {0} contem valor vazio para '{1}'." -f $ParameterName, $key)
+        }
+
+        if ($null -ne $ValidateValue) {
+            & $ValidateValue $key $value
+        }
+    }
+
+    if ($RequireAllDeclared.IsPresent) {
+        foreach ($name in $DeclaredEnvironmentNames) {
+            if (-not $map.Contains($name)) {
+                throw ("BLOCK: {0} nao contem mapeamento para environment '{1}'." -f $ParameterName, $name)
+            }
+        }
+    }
+
+    return $map
+}
+
+$servletDirsMap = Resolve-ExplicitEnvironmentMap `
+    -RawValues $KbEnvironmentServletDirs `
+    -ParameterName 'KbEnvironmentServletDirs' `
+    -KnownEnvironmentNames $knownEnvironmentNames `
+    -DeclaredEnvironmentNames $environmentNames `
+    -RequireAllDeclared `
+    -ValidateValue {
+        param($EnvironmentName, $Value)
+        $normalized = $Value.TrimEnd('\', '/')
+        $leaf = Split-Path -Leaf $normalized
+        $parent = Split-Path -Parent $normalized
+        $parentLeaf = if ($parent) { Split-Path -Leaf $parent } else { '' }
+        if (($leaf -ine 'classes') -or ($parentLeaf -ine 'WEB-INF')) {
+            throw ("BLOCK: KbEnvironmentServletDirs para '{0}' deve terminar em WEB-INF\classes; valor informado: {1}" -f $EnvironmentName, $Value)
+        }
+    }
+
+$appPackageMap = Resolve-ExplicitEnvironmentMap `
+    -RawValues $KbEnvironmentAppPackage `
+    -ParameterName 'KbEnvironmentAppPackage' `
+    -KnownEnvironmentNames $knownEnvironmentNames `
+    -DeclaredEnvironmentNames $environmentNames `
+    -RequireAllDeclared
+
+$servletFlavorMap = Resolve-ExplicitEnvironmentMap `
+    -RawValues $KbEnvironmentServletFlavor `
+    -ParameterName 'KbEnvironmentServletFlavor' `
+    -KnownEnvironmentNames $knownEnvironmentNames `
+    -DeclaredEnvironmentNames $environmentNames `
+    -RequireAllDeclared `
+    -ValidateValue {
+        param($EnvironmentName, $Value)
+        $normalized = $Value.Trim().ToLowerInvariant()
+        if ($normalized -notin @('jakarta', 'javax')) {
+            throw ("BLOCK: KbEnvironmentServletFlavor para '{0}' deve ser jakarta ou javax; valor informado: {1}" -f $EnvironmentName, $Value)
+        }
+    }
+
+if ($servletDirsMap.Count -gt 0 -or $appPackageMap.Count -gt 0 -or $servletFlavorMap.Count -gt 0) {
+    if ($hostingKind -ine 'java-tomcat') {
+        throw 'BLOCK: campos Java/Tomcat de metadata so podem ser gravados quando DeploymentHostingKind=java-tomcat.'
+    }
+
+    if ($servletDirsMap.Count -eq 0 -or $appPackageMap.Count -eq 0) {
+        throw 'BLOCK: metadata Java/Tomcat parcial. Informe KbEnvironmentServletDirs e KbEnvironmentAppPackage juntos, apos validacao opt-in do alvo.'
+    }
+}
+
 $msBuildValidationSkipped = $false
 $msBuildValidationPerformed = $false
 $msBuildRejectedNames = @()
@@ -314,6 +426,9 @@ $count = $environmentNames.Count
 $namesJoined = ($environmentNames | Sort-Object) -join ', '
 $outputDirsJoined = Join-GeneXusKbEnvironmentMap -Map $outputDirsMap
 $webDirsJoined = Join-GeneXusKbEnvironmentMap -Map $webDirsMap
+$servletDirsJoined = Join-GeneXusKbEnvironmentMap -Map $servletDirsMap
+$appPackageJoined = Join-GeneXusKbEnvironmentMap -Map $appPackageMap
+$servletFlavorJoined = Join-GeneXusKbEnvironmentMap -Map $servletFlavorMap
 
 . (Join-Path $PSScriptRoot 'XpzTextFileEolSupport.ps1')
 
@@ -324,6 +439,15 @@ $fieldsToWrite = [ordered]@{
     kb_environment_names        = $namesJoined
     kb_environment_output_dirs  = $outputDirsJoined
     kb_environment_web_dirs     = $webDirsJoined
+}
+if ($servletDirsMap.Count -gt 0) {
+    $fieldsToWrite['kb_environment_servlet_dirs'] = $servletDirsJoined
+}
+if ($appPackageMap.Count -gt 0) {
+    $fieldsToWrite['kb_environment_app_package'] = $appPackageJoined
+}
+if ($servletFlavorMap.Count -gt 0) {
+    $fieldsToWrite['kb_environment_servlet_flavor'] = $servletFlavorJoined
 }
 
 $fileContext = Get-TextFileLineContext -Path $MetadataPath
@@ -389,6 +513,9 @@ $result = [ordered]@{
     kb_environment_names                = @($environmentNames | Sort-Object)
     kb_environment_output_dirs          = $outputDirsMap
     kb_environment_web_dirs             = $webDirsMap
+    kb_environment_servlet_dirs         = $servletDirsMap
+    kb_environment_app_package          = $appPackageMap
+    kb_environment_servlet_flavor       = $servletFlavorMap
     environmentNamesSource              = 'user_declared'
     msBuildValidationPerformed          = $msBuildValidationPerformed
     msBuildValidationSkipped            = $msBuildValidationSkipped
