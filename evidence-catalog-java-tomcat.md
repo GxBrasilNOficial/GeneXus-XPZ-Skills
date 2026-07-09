@@ -4,6 +4,8 @@
 >
 > **Fase 5 (2026-07-07):** medições na KB `EBTECH` confirmaram o ator da publicação (`gradlew`/Gradle chamado pelo Build All, tarefas `copyTomcat*`) e fecharam, para Jakarta, `Rebuild All -> Lf=∅, Pf≠∅` em rodada limpa dedicada (`Lf=0`, `Pf=624`). A opção GeneXus `JAVA_EE`/`javaEE` também foi medida no environment `JavaEE`, mas no stack real disponível (Tomcat 11/JDK 21/Servlet 6, com sinais `javax` e também jars `jakarta.*`), não em Java EE clássico puro Tomcat 8/9 + JDK 8. Ver seções "Fase 5 parcial", "Fase 5 rodada 2" e "Fase 5 JavaEE/javax".
 >
+> **Eixos B/C (2026-07-09):** coleta read-only na mesma KB `EBTECH` confirmou a raiz de fonte Java por environment (`<TargetFullPath>\web\src\main\java`), o uso prático de `JAVA_PACKAGE_NAME_FOLDER` e o mapeamento de módulos GeneXus para subpackages (`GestaoMail.Email` -> `com\ebtech\gestaomail`). Para o Eixo C, `nav_objs.xml` existe na raiz da KB nativa e trouxe `ObjStatus=genreq`/`nogenspc`, com `ObjNavig` apontando para XMLs de navegação/specification. Experimento controlado posterior em KB descartável/de teste (`WebPanel:TestWP`, env `Prototipo_18U14`) mostrou que `ObjStatus=genreq` não é critério isolado de freshness; o caminho operacional é cruzar `ObjNavig`, XML de navegação/specification e artefatos locais `.java`/`.class`/`.js`.
+>
 > **Data da coleta:** 2026-07-04. **Registro-resumo:** [`999-ideias-pendentes.md`](999-ideias-pendentes.md).
 
 ## Fonte da evidência
@@ -258,9 +260,119 @@ Sufixos observados: em `.java`, `<base>` 618 e `_impl` 234; em `.class`, `<base>
 
 ---
 
+## Eixos B/C — fonte Java e runtime-freshness EBTECH (2026-07-09)
+
+Coletas empíricas recebidas de agente na máquina da colega sobre a KB `EBTECH`, sem edição no repositório de skills e sem alteração na KB nativa. A pasta paralela `C:\Applications\PastasPararelasGenexus\GX_18U14_EBTECH` estava com gate de índice OK (`inventory_validation_status=OK`, `extractor_signature_version=8`). O Tomcat observado era compartilhado com outras aplicações, e a KB nativa `C:\Applications\GeneXus\18U14\EBTECH` não estava autorizada para gravação por agentes; por isso não houve alteração de objeto, build, clean/rebuild, restart de Tomcat nem teste de transição controlada.
+
+**Environments medidos.** Foram lidos os environments Java `Prototipo_18U14` (`JAKARTA_EE`, `JAVA_PLATFORM=jakartaEE`), `JavaEE` (`JAVA_EE`, `JAVA_PLATFORM=javaEE`) e, na triagem de runtime-freshness, também `Producao_18U14` como environment local com `web\src\main\java`. Todos continuam no stack real Tomcat 11/JDK 21; Java EE clássico puro Tomcat 8/9 + JDK 8 segue não medido.
+
+### Eixo B — fonte `.java` gerado
+
+**Raiz e package.** A raiz real de fonte Java é `<TargetFullPath>\web\src\main\java`:
+
+- `Prototipo_18U14`: `C:\Applications\GeneXus\18U14\EBTECH\Prototipo_18U14\web\src\main\java`
+- `JavaEE`: `C:\Applications\GeneXus\18U14\EBTECH\JavaEE\web\src\main\java`
+
+Em ambos, o package raiz da aplicação é `com\ebtech`, coerente com `JAVA_PACKAGE_NAME_FOLDER=com\\ebtech` em `gradle.properties`. Subpackages imediatos observados sob `com\ebtech`: `gam`, `general`, `gestaomail`, `grpc`, `workwithplus`, `wwpbaseobjects`.
+
+**Módulos GeneXus viram subpackages.** O objeto `GestaoMail.Email` aparece em `com\ebtech\gestaomail`, não diretamente em `com\ebtech`. Portanto, um resolvedor de Eixo B não pode presumir apenas `<packageRoot>\<objectNameLower>.java`; precisa considerar nome GeneXus qualificado/módulo e subpackage.
+
+**Contagens em `com\ebtech` direto, sem recursão em subpackages:**
+
+| Environment | `.java` diretos | nomes não-lowercase | `_impl` | `_bc` | `RESTInterface*` | `Sdt*` | `StructSdt*` | `StructSdtCol*` |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| `Prototipo_18U14` | 512 | 130 | 129 | 4 | 52 | 24 | 24 | 24 |
+| `JavaEE` | 506 | 124 | 129 | 4 | 52 | 22 | 22 | 22 |
+
+Nomes não-lowercase observados incluem auxiliares/runtime (`GXApplication.java`, `GXcfg.java`, `GxFullTextSearchReindexer.java`, `GxObjectCollection.java`, `GxWebStd.java`) e derivados (`*_RESTInterfaceIN/OUT.java`). Para os objetos GeneXus autorais amostrados, os nomes de arquivo foram lowercase do objeto normalizado.
+
+**Amostras por objeto.**
+
+| Objeto | Tipo | Achado de fonte |
+|---|---|---|
+| `BBExtratoImportar` | Procedure | `bbextratoimportar.java` existe em `Prototipo_18U14` e `JavaEE`; não foi encontrado `bbextratoimportar_impl.java`. Logo, Procedure não deve ser presumida como sempre tendo `_impl.java`. |
+| `MB_BBToken` | Transaction | `mb_bbtoken.java`, `mb_bbtoken_impl.java` e `mb_bbtoken_bc.java` existem. `_bc` permanece stem derivado completo, não sufixo de stub-base. |
+| `EBT_Login` | WebPanel | `ebt_login.java` e `ebt_login_impl.java` existem nos dois environments. |
+
+**Evidência negativa.** `web\src\main\resources` não existia em `Prototipo_18U14` nem em `JavaEE`. Para `GestaoMail.Email`, busca textual direta por `email*` em `com\ebtech` é perigosa porque retorna uma família de objetos (`emailoutbox`, `emailrecipient`, `emailtemplate`, `emailtracking`); o resolvedor futuro deve usar mapeamento de nome qualificado/subpackage, não só prefixo textual no package raiz.
+
+**Conclusão de Eixo B.** O resolvedor Java deve partir de `TargetFullPath\web\src\main\java`, usar `JAVA_PACKAGE_NAME_FOLDER` quando disponível, suportar subpackages derivados de módulos GeneXus e não presumir `_impl.java` para todo tipo/objeto. Stems derivados (`_bc`, `RESTInterface*`, `Sdt*`, `StructSdt*`, `StructSdtCol*`, `ww*`) devem ser tratados como nomes completos derivados; o strip conservador de co-gate do Eixo A continua limitado a `{_impl,__default,__gam}`.
+
+### Eixo C — runtime-freshness Java
+
+**Estado observado.** `nav_objs.xml` existe em `C:\Applications\GeneXus\18U14\EBTECH\nav_objs.xml`, com `LastWriteTime` `2026-07-07 18:11:47`. A captura read-only de 2026-07-09 encontrou:
+
+| `ObjStatus` | Qtde |
+|---|---:|
+| `genreq` | 395 |
+| `nogenspc` | 40 |
+| `nogenreq` | 0 |
+
+Tipos identificados por `ObjCls`/GUID:
+
+| `ObjCls` | Tipo GeneXus | Qtde |
+|---:|---|---:|
+| `0` | `Transaction` | 39 |
+| `1` | `Procedure` | 207 |
+| `13` | `WebPanel` | 180 |
+| `33` | `DataProvider` | 9 |
+
+Resultado agregado contra fontes Java locais:
+
+| Status / Tipo / Java local | Qtde |
+|---|---:|
+| `genreq`, `Transaction`, com Java | 39 |
+| `genreq`, `Procedure`, com Java | 169 |
+| `genreq`, `WebPanel`, com Java | 180 |
+| `genreq`, `DataProvider`, com Java | 7 |
+| `nogenspc`, `Procedure`, sem Java | 38 |
+| `nogenspc`, `DataProvider`, sem Java | 2 |
+
+Não foi encontrado objeto `genreq` sem fonte Java local em pelo menos um environment, nem objeto `nogenspc` com fonte Java local. Portanto, nesta KB, `genreq` **não** significa "fonte Java ausente"; a semântica observada é mais compatível com "requer geração/specification pendente ou estado de navegação" e precisa ser interpretada junto com `ObjNavig` e timestamps de artefatos locais.
+
+**Amostras de `nav_objs.xml`.**
+
+| Objeto | Tipo | `ObjStatus` | `ObjNavig` | Evidência Java local |
+|---|---|---|---|---|
+| `WorkWithPlus.DynamicForms.WWP_DF_EmptyWC` | WebPanel | `genreq` | existe, LWT `2026-07-07 18:06:51` | `wwp_df_emptywc.java` e `wwp_df_emptywc_impl.java` nos 3 envs |
+| `WWPBaseObjects.EditBookmark` | WebPanel | `genreq` | existe, LWT `2026-07-07 18:06:57` | `editbookmark.java` e `editbookmark_impl.java` nos 3 envs |
+| `GAM_ConvertErrorsToMessages` | Procedure | `genreq` | existe, LWT `2026-07-07 18:07:19` | `gam_converterrorstomessages.java` nos 3 envs |
+| `General.UI.SidebarItemsDP` | DataProvider | `genreq` | existe, LWT `2026-07-07 18:07:15` | `sidebaritemsdp.java` nos 3 envs |
+| `MS_Company` | Transaction | `genreq` | existe, LWT `2026-07-07 18:08:48` | `ms_company.java` e `ms_company_impl.java` nos 3 envs |
+| `GAM_BuildAppURL` | Procedure | `nogenspc` | existe, LWT `2026-07-07 18:07:19` | nenhum `.java` local |
+| `WWPBaseObjects.SetWWPContext` | Procedure | `nogenspc` | existe, LWT `2026-07-07 18:07:22` | nenhum `.java` local |
+| `MS_Company_DP` | DataProvider | `nogenspc` | existe, LWT `2026-07-07 18:07:16` | nenhum `.java`; existe `web\private\Interfaces\MS_Company_DP.xml` |
+| `WorkWithPlus.DynamicForms.WWP_DS_SaveData` | Procedure | `nogenspc` | existe, LWT `2026-07-07 18:07:55` | nenhum `.java` local |
+
+**Artefatos locais úteis observados para Eixo C.** Sem usar Tomcat externo como critério principal, a coleta identificou como candidatos: `nav_objs.xml`, `GXSPC056\GEN12\NVG\...\*.xml` via `ObjNavig`, `<Environment>\web\src\main\java\...\*.java`, `<Environment>\web\build\classes\java\main\...\*.class`, `<Environment>\web\js\...\*.js` (especialmente WebPanel/Transaction) e `<Environment>\web\private\Interfaces\*.xml` (observado em DataProvider). `WEB-INF\classes` apareceu em alguns casos locais, por exemplo GAM, mas permanece contexto de Eixo A/deploy-bin quando se trata do Tomcat externo.
+
+**Diferença JavaEE/Jakarta em fonte local.**
+
+| Environment | Arquivos `.java` com `javax.` | Arquivos `.java` com `jakarta.` |
+|---|---:|---:|
+| `JavaEE` | 369 | 0 |
+| `Producao_18U14` | 0 | 334 |
+| `Prototipo_18U14` | 0 | 372 |
+
+**Experimento controlado em KB descartável/de teste.** Em rodada posterior no mesmo dia, a KB `C:\Applications\GeneXus\18U14\EBTECH` foi confirmada pelo usuário como descartável/de teste para este experimento, com restrição explícita de não usar `Producao_18U14`. O objeto escolhido foi `WebPanel:TestWP` (`ObjCls=13`, `ObjId=173`), no environment `Prototipo_18U14` (`GeneXus 18.0.14.56748`, `GeneratorType=JavaWeb`, `JAKARTA_EE`, `TOMCAT_10_1`, JDK 21). A alteração foi feita por tarefa oficial MSBuild (`SetObjectProperty`, propriedade `Description`), sem edição manual de `nav_objs.xml`, XMLs de navegação, artefatos Java ou banco `GX_KB_*`.
+
+| Etapa | `nav_objs.xml` | Entrada `TestWP` | Artefatos locais específicos |
+|---|---|---|---|
+| T0 antes da alteração | LWT `2026-07-07T18:11:47.6886209-03:00`, hash `710021C3...` | `ObjStatus=genreq`, `ObjNavig=GXSPC056\GEN12\NVG\TestWP.xml` | `.java`, `.class` e `web\js\testwp.js` já existiam; sem `private\Interfaces\testwp*` |
+| T1 depois de salvar `Description`, antes do build | inalterado | `ObjStatus=genreq`, `ObjNavig` inalterado | `.java`, `.class`, `.js` e XML apontado por `ObjNavig` inalterados |
+| T2 depois de `BuildOneObject` | LWT `2026-07-09T16:06:36.3236469-03:00`, hash `EE86637C...`, tamanho reduziu para `521` | `ObjStatus=genreq`, `ObjNavig=GXSPC002\GEN12\NVG\TestWP.xml` | XML de navegação, `testwp.java`, `testwp_impl.java`, `testwp.js`, `testwp.class` e `testwp_impl.class` foram regravados/tocados |
+| T3 segundo build sem nova alteração | inalterado desde T2 | `ObjStatus=genreq`, `ObjNavig` inalterado | artefatos específicos de `TestWP` inalterados; log registrou `Nenhum objeto para especificar` e `compileJava UP-TO-DATE`, apesar de etapas comuns de generation/deploy |
+
+O XML apontado por `ObjNavig` mudou de `GXSPC056\GEN12\NVG\TestWP.xml` para `GXSPC002\GEN12\NVG\TestWP.xml` depois do build no environment `Prototipo_18U14`; o arquivo novo foi criado/regravado com LWT `2026-07-09T16:06:20.8525685-03:00`. O build com alteração tocou os `.java`, compilou os `.class` e regravou `web\js\testwp.js`. O build sem alteração não tocou os artefatos específicos do objeto, embora tarefas comuns do Gradle/Tomcat tenham rodado.
+
+**Conclusão de Eixo C.** `nav_objs.xml` é candidato real para o diagnóstico Java equivalente ao runtime-freshness .NET, mas `ObjStatus` é apenas informativo: `ObjStatus=genreq` permaneceu antes da alteração, depois do build bem-sucedido e depois de build sem alteração. Logo, `ObjStatus=genreq` **não** deve ser usado isoladamente como critério de fonte Java ausente, classe ausente, specification pendente ou freshness local. O núcleo operacional do futuro motor deve cruzar: `ObjNavig` apontando para o `GXSPC` do environment esperado, existência/frescor do XML de navegação/specification, `.java` específicos em `<TargetFullPath>\web\src\main\java`, `.class` específicos em `<TargetFullPath>\web\build\classes\java\main`, e `.js`/`private\Interfaces` quando aplicável. Tomcat externo e tarefas `copyTomcat*` permanecem contexto de deploy/Eixo A, não prova primária de freshness do objeto.
+
+---
+
 ## Itens abertos
 
 - **Java EE clássico puro:** foi medido um environment GeneXus `JAVA_EE`/`javaEE` com sinais `javax` reais, mas no stack Tomcat 11/JDK 21/Servlet 6 e com jars `jakarta.*` também presentes. Não foi medido um stack clássico puro Tomcat 8/9 + JDK 8 com classpath exclusivamente/majoritariamente `javax`.
+- **Eixo C Java — repetição por fluxo visual/evento:** a transição controlada foi medida em KB descartável/de teste com alteração de `Description` via MSBuild oficial e build do objeto. Isso derruba `ObjStatus` como critério isolado e valida o cruzamento `ObjNavig` + artefatos locais. Ainda falta, como reforço, repetir com alteração visual/literal/evento pela IDE para aproximar o fluxo humano e confirmar se o mesmo padrão se mantém.
 - **Amostragem de latência:** a rodada instrumentada fechou a direção (`copyTomcatClasses` cabe em 5s; `compileJavaEndAt` não), mas não produz percentis. Se o default de slack for recalibrado estatisticamente, coletar mais rodadas com timestamps por tarefa.
 - **Auto-população de metadata Java pelo setup:** futura automação deve resolver o environment ativo, validar topologia/sentinela/pacote da app e, quando houver Gradle, confrontar `model.ini` com `gradle.properties` (`TOMCAT_WEBAPP_PATH`). Divergência deve virar auditoria, não escrita cega.
 - **`.war` (fluxo de deploy explícito):** não observado; se um dia o escopo incluir deploy empacotado, exige aterramento próprio.
