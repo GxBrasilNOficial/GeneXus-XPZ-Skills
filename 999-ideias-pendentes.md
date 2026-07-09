@@ -23,6 +23,7 @@ Fica pendente:
 - Fase 2: assinatura de tipo funcional para `Attribute`, `Domain`, `SDT/Item` e `Variable`.
 - Fase 3: drift interno/intra-pacote e `parm(...)` versus variáveis/assinaturas.
 - Endurecer chamada direta a `New-XpzImportPackage.py`, se varredura de consumidores diretos indicar que a quebra de compatibilidade é aceitável.
+- Avaliar alinhamento futuro do finding `front-object-type-drift-skip` em `Copy-GeneXusAcervoToFront.ps1`: hoje ele bloqueia autocópia corretamente, mas conserva payload próprio de fluxo temporal/seed (`acervoFile`, sem `acervoPath`/`candidateAcervoPaths`/`message`). DeepSeek/Atlas apontou isto na pré-push reforçada de 2026-07-09 como melhoria candidata não bloqueante, fora do escopo da Fase 1.
 - Sanidade do acervo para XML ilegível, corrompido, sem raiz efetiva `Object` quando esperado, ou sem `guid` extraível.
 - Decidir shape/tipo de elementos em `frontObjectTypeDrift.warnings` se algum warning nominal de type drift for proposto.
 - Validação formal de formato GUID além de `Trim()` + não vazio.
