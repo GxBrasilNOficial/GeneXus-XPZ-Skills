@@ -48,6 +48,16 @@ function Assert-True {
     }
 }
 
+function Assert-PropertyAbsent {
+    param(
+        [Parameter(Mandatory = $true)]$Object,
+        [Parameter(Mandatory = $true)][string]$PropertyName,
+        [Parameter(Mandatory = $true)][string]$Message
+    )
+
+    Assert-True ($null -eq $Object.PSObject.Properties[$PropertyName]) $Message
+}
+
 function Assert-BuilderBlocksPath {
     param(
         [Parameter(Mandatory = $true)][scriptblock]$Invocation,
@@ -175,6 +185,16 @@ try {
     Assert-True ($control.status -eq 'apto para prosseguir') "status de controle inesperado: $($control.status)"
     Assert-True ($control.objectCount -eq 1) "objectCount de controle esperado 1; obtido $($control.objectCount)"
     Assert-True ($control.topLevelAttrCount -eq 1) "topLevelAttrCount de controle esperado 1; obtido $($control.topLevelAttrCount)"
+    Assert-True ((@($control.frontObjectTypeDrift.warnings)).Count -eq 0) 'frontObjectTypeDrift.warnings deveria existir como array vazio.'
+    Assert-True ((@($control.frontObjectTypeDrift.blockingReasons)).Count -eq 0) 'frontObjectTypeDrift.blockingReasons deveria existir como array vazio.'
+    Assert-True ((@($control.frontObjectTypeDrift.blockingDetails)).Count -eq 0) 'frontObjectTypeDrift.blockingDetails deveria existir como array vazio.'
+    $matchCheck = @($control.frontObjectTypeDrift.checks | Where-Object { $_.code -eq 'object-type-match' } | Select-Object -First 1)
+    Assert-True ($matchCheck.Count -eq 1) 'controle deveria emitir object-type-match.'
+    Assert-True ($matchCheck[0].status -eq 'pass') 'object-type-match deveria ter status pass.'
+    Assert-True ($matchCheck[0].objectGuid -eq $objectGuid) "object-type-match deveria emitir objectGuid normalizado; obtido $($matchCheck[0].objectGuid)."
+    Assert-True ($matchCheck[0].acervoPath -eq 'Cliente.xml') "object-type-match deveria emitir acervoPath relativo; obtido $($matchCheck[0].acervoPath)."
+    Assert-PropertyAbsent -Object $matchCheck[0] -PropertyName 'guid' -Message 'object-type-match nao deve emitir guid como chave publica.'
+    Assert-PropertyAbsent -Object $matchCheck[0] -PropertyName 'baselinePath' -Message 'object-type-match nao deve emitir baselinePath.'
     Assert-True (Test-Path -LiteralPath $controlOutputPath -PathType Leaf) 'pacote de controle deveria ter sido gravado'
 
     $typeDriftOutputPath = Join-Path $outDir 'Front_00000000000000000000000000000000_20260604_04.import_file.xml'
@@ -197,6 +217,12 @@ try {
     Assert-True (@($typeDrift.frontObjectTypeDrift.blockingReasons) -contains 'front-object-type-drift') 'frontObjectTypeDrift deveria preservar o bloqueio.'
     Assert-True ($typeDrift.frontObjectTypeDrift.blockingDetails[0].code -eq 'front-object-type-drift') 'blockingDetails deveria preservar codigo front-object-type-drift.'
     Assert-True ($typeDrift.frontObjectTypeDrift.blockingDetails[0].matchBasis -eq 'guid') 'blockingDetails deveria preservar matchBasis guid.'
+    Assert-True ($typeDrift.frontObjectTypeDrift.blockingDetails[0].objectGuid -eq $objectGuid) 'blockingDetails deveria preservar objectGuid normalizado.'
+    Assert-True (-not [string]::IsNullOrWhiteSpace([string]$typeDrift.frontObjectTypeDrift.blockingDetails[0].message)) 'blockingDetails deveria preservar message.'
+    Assert-True ($typeDrift.frontObjectTypeDrift.blockingDetails[0].acervoPath -eq 'Cliente.xml') "blockingDetails deveria preservar acervoPath relativo; obtido $($typeDrift.frontObjectTypeDrift.blockingDetails[0].acervoPath)."
+    foreach ($legacyName in @('frontGuid', 'guid', 'baselinePath', 'candidateBaselinePaths', 'baselineObjectType', 'baselineObjectTypeNormalized', 'acervoFile')) {
+        Assert-PropertyAbsent -Object $typeDrift.frontObjectTypeDrift.blockingDetails[0] -PropertyName $legacyName -Message "blockingDetails de type drift nao deve emitir $legacyName."
+    }
     Assert-True (-not (Test-Path -LiteralPath $typeDriftOutputPath -PathType Leaf)) 'pacote nao deveria ser gravado quando ha drift de tipo.'
 
     Write-Output 'BUILD_GENEXUS_IMPORT_FILE_ENVELOPE_SELFTEST_OK'

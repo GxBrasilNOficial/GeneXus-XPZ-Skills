@@ -206,7 +206,7 @@ function Test-ObjectIdentityMatch {
 function Test-FrontObjectTypeDrift {
     param(
         [Parameter(Mandatory = $true)][System.Xml.XmlDocument[]]$Docs,
-        [Parameter(Mandatory = $true)][string]$BaselineRootPath,
+        [Parameter(Mandatory = $true)][string]$AcervoRootPath,
         [Parameter(Mandatory = $true)]$GuidIndex
     )
 
@@ -225,60 +225,42 @@ function Test-FrontObjectTypeDrift {
         $fqn = $root.GetAttribute('fullyQualifiedName')
         $guid = $root.GetAttribute('guid')
         $label = if (-not [string]::IsNullOrWhiteSpace($fqn)) { $fqn } elseif (-not [string]::IsNullOrWhiteSpace($name)) { $name } else { $guid }
-        $frontGuidNormalized = Normalize-GeneXusObjectTypeDriftValue -Value $guid
-        if ([string]::IsNullOrWhiteSpace($frontGuidNormalized)) {
-            $checks.Add([pscustomobject]@{
-                objectName = $name
-                fullyQualifiedName = $fqn
-                guid = $guid
-                status = 'not-applicable'
-                code = 'front-guid-missing'
-                matchBasis = ''
-            }) | Out-Null
-            continue
-        }
+        $objectGuidNormalized = Normalize-GeneXusObjectTypeDriftValue -Value $guid
+        if ([string]::IsNullOrWhiteSpace($objectGuidNormalized)) { continue }
 
         $candidatePaths = @(Get-GeneXusObjectTypeGuidIndexMatches -Index $GuidIndex -Guid $guid)
-        $candidateRelativePaths = @($candidatePaths | ForEach-Object { [System.IO.Path]::GetRelativePath($BaselineRootPath, $_) })
-        if ($candidatePaths.Count -eq 0) {
-            $checks.Add([pscustomobject]@{
-                objectName = $name
-                fullyQualifiedName = $fqn
-                guid = $guid
-                status = 'pass'
-                code = 'baseline-guid-missing'
-                matchBasis = ''
-            }) | Out-Null
-            continue
-        }
+        if ($candidatePaths.Count -eq 0) { continue }
 
         if ($candidatePaths.Count -gt 1) {
-            $checks.Add([pscustomobject]@{
-                objectName = $name
-                fullyQualifiedName = $fqn
-                guid = $guid
+            $message = "Objeto '$label' tem guid presente em mais de um XML do acervo; drift de Object/@type nao foi decidido automaticamente."
+            $common = New-GeneXusObjectTypeDriftCommonFields `
+                -ObjectGuid $guid `
+                -ObjectName $name `
+                -FullyQualifiedName $fqn `
+                -FrontObjectType $root.GetAttribute('type') `
+                -MatchBasis 'guid-ambiguous' `
+                -CandidateAcervoPaths @($candidatePaths | ForEach-Object { $_.AcervoPath }) `
+                -Message $message `
+                -Code 'front-object-type-drift-ambiguous-acervo'
+            $check = [ordered]@{
+                code = 'front-object-type-drift-ambiguous-acervo'
                 status = 'info'
-                code = 'front-object-type-drift-ambiguous-baseline'
-                matchBasis = 'guid-ambiguous'
-                candidateBaselinePaths = $candidateRelativePaths
-            }) | Out-Null
+            }
+            foreach ($entry in $common.GetEnumerator()) { $check[$entry.Key] = $entry.Value }
+            $checks.Add([pscustomobject]$check) | Out-Null
             continue
         }
 
-        try {
-            $baselineDoc = Assert-XmlWellFormed -Path $candidatePaths[0] -Role "BaselineObjectXml"
-        } catch {
-            $warnings.Add("front-object-type-baseline-unreadable: '$label' baseline '$($candidatePaths[0])' nao pode ser lida.") | Out-Null
-            continue
-        }
+        $candidate = $candidatePaths[0]
+        $baselineDoc = Assert-XmlWellFormed -Path $candidate.FullPath -Role "AcervoObjectXml"
 
         $baselineRoot = $baselineDoc.DocumentElement
         if ($null -eq $baselineRoot -or $baselineRoot.LocalName -ne 'Object') {
             continue
         }
 
-        $baselineGuidNormalized = Normalize-GeneXusObjectTypeDriftValue -Value $baselineRoot.GetAttribute('guid')
-        if ($frontGuidNormalized -ne $baselineGuidNormalized) {
+        $acervoGuidNormalized = Normalize-GeneXusObjectTypeDriftValue -Value $baselineRoot.GetAttribute('guid')
+        if ($objectGuidNormalized -ne $acervoGuidNormalized) {
             continue
         }
 
@@ -286,47 +268,50 @@ function Test-FrontObjectTypeDrift {
         $baselineType = $baselineRoot.GetAttribute('type')
         $frontTypeNormalized = Normalize-GeneXusObjectTypeDriftValue -Value $frontType
         $baselineTypeNormalized = Normalize-GeneXusObjectTypeDriftValue -Value $baselineType
-        $status = 'pass'
-        $code = 'object-type-match'
+        if ([string]::IsNullOrWhiteSpace($frontTypeNormalized) -or [string]::IsNullOrWhiteSpace($baselineTypeNormalized)) {
+            continue
+        }
 
         if (
-            -not [string]::IsNullOrWhiteSpace($frontTypeNormalized) -and
-            -not [string]::IsNullOrWhiteSpace($baselineTypeNormalized) -and
             $frontTypeNormalized -ne $baselineTypeNormalized
         ) {
-            $status = 'fail'
-            $code = 'front-object-type-drift'
             if (-not $blockingReasons.Contains('front-object-type-drift')) {
                 $blockingReasons.Add('front-object-type-drift') | Out-Null
             }
+            $message = "Objeto '$label' tem o mesmo guid na frente e no acervo, mas Object/@type diverge (frente='$frontType', acervo='$baselineType'). Decisao humana requerida antes de empacotar."
+            $common = New-GeneXusObjectTypeDriftCommonFields `
+                -ObjectGuid $guid `
+                -ObjectName $name `
+                -FullyQualifiedName $fqn `
+                -FrontObjectType $frontType `
+                -AcervoObjectType $baselineType `
+                -MatchBasis 'guid' `
+                -AcervoPath $candidate.AcervoPath `
+                -Message $message `
+                -Code 'front-object-type-drift'
             $detail = [ordered]@{
                 code = 'front-object-type-drift'
-                objectName = $name
-                fullyQualifiedName = $fqn
-                frontGuid = $guid
-                frontObjectType = $frontType
-                baselineObjectType = $baselineType
-                frontObjectTypeNormalized = $frontTypeNormalized
-                baselineObjectTypeNormalized = $baselineTypeNormalized
-                matchBasis = 'guid'
-                baselinePath = $candidateRelativePaths[0]
             }
+            foreach ($entry in $common.GetEnumerator()) { $detail[$entry.Key] = $entry.Value }
             $blockingDetails.Add([pscustomobject]$detail) | Out-Null
+            continue
         }
 
-        $checks.Add([pscustomobject]@{
-            objectName = $name
-            fullyQualifiedName = $fqn
-            guid = $guid
-            status = $status
-            code = $code
-            frontObjectType = $frontType
-            baselineObjectType = $baselineType
-            frontObjectTypeNormalized = $frontTypeNormalized
-            baselineObjectTypeNormalized = $baselineTypeNormalized
-            matchBasis = 'guid'
-            baselinePath = $candidateRelativePaths[0]
-        }) | Out-Null
+        $common = New-GeneXusObjectTypeDriftCommonFields `
+            -ObjectGuid $guid `
+            -ObjectName $name `
+            -FullyQualifiedName $fqn `
+            -FrontObjectType $frontType `
+            -AcervoObjectType $baselineType `
+            -MatchBasis 'guid' `
+            -AcervoPath $candidate.AcervoPath `
+            -Code 'object-type-match'
+        $check = [ordered]@{
+            code = 'object-type-match'
+            status = 'pass'
+        }
+        foreach ($entry in $common.GetEnumerator()) { $check[$entry.Key] = $entry.Value }
+        $checks.Add([pscustomobject]$check) | Out-Null
     }
 
     return [pscustomobject]@{
@@ -623,8 +608,15 @@ foreach ($path in $ObjectXmlPaths) {
 
 $objectTypeGuidIndex = New-GeneXusObjectTypeGuidIndex -RootPath $AcervoPath
 $lastUpdateFreshness = Test-LastUpdateFreshness -Docs $objectDocs -BaselineRootPath $AcervoPath
-$frontObjectTypeDrift = Test-FrontObjectTypeDrift -Docs $objectDocs -BaselineRootPath $AcervoPath -GuidIndex $objectTypeGuidIndex
-$preWriteBlockingReasons = @(@($lastUpdateFreshness.blockingReasons) + @($frontObjectTypeDrift.blockingReasons))
+$frontObjectTypeDrift = Test-FrontObjectTypeDrift -Docs $objectDocs -AcervoRootPath $AcervoPath -GuidIndex $objectTypeGuidIndex
+$preWriteBlockingReasonsList = [System.Collections.Generic.List[string]]::new()
+foreach ($reason in @(@($lastUpdateFreshness.blockingReasons) + @($frontObjectTypeDrift.blockingReasons))) {
+    if ([string]::IsNullOrWhiteSpace([string]$reason)) { continue }
+    if (-not $preWriteBlockingReasonsList.Contains([string]$reason)) {
+        $preWriteBlockingReasonsList.Add([string]$reason) | Out-Null
+    }
+}
+$preWriteBlockingReasons = @($preWriteBlockingReasonsList.ToArray())
 if ($preWriteBlockingReasons.Count -gt 0) {
     Write-BuildEnvelopeJsonAndExit -InputObject ([ordered]@{
         status = 'bloqueado'
@@ -784,4 +776,4 @@ if (-not [string]::IsNullOrWhiteSpace([string]$buildResult.outputPath)) {
     $buildResult.inventoryError = $inventoryBlock.inventoryError
 }
 
-$buildResult | ConvertTo-Json -Depth 6
+$buildResult | ConvertTo-Json -Depth 10

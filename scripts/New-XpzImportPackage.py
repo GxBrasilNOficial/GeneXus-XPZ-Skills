@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Create a GeneXus import_file.xml package from a parallel-KB work front."""
+"""Internal engine for GeneXus import_file.xml packaging.
+
+For operational use, call New-XpzImportPackage.ps1. The PowerShell wrapper runs
+the required front validations, including the 9-FD front-acervo drift gate;
+direct Python execution is not an equivalent safe entry point.
+"""
 
 from __future__ import annotations
 

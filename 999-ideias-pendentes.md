@@ -11,6 +11,23 @@ Cada entrada usa dois campos curtos logo abaixo do titulo:
 
 Entradas legadas sem avaliação carregam `FALTA AVALIAR` em ambos os campos até que sejam revistas em sessão dedicada.
 
+## Drift de tipagem entre delta empacotado e snapshot oficial — fases residuais
+
+- **Importância** — alta para o falso-negativo original; Fase 1 implementada para `Object/@type` por `guid`, mas a assinatura funcional ampla ainda tem gaps.
+- **Maturidade** — pesquisa feita (Fase 1 executada; fases residuais dependem de desenho próprio e novos self-tests).
+
+Fase 1 implementada: proteção determinística contra delta de frente que tenha o mesmo `guid` do acervo oficial, ambos com `Object/@type` não vazio após `Trim()`, mas tipos normalizados divergentes. O contrato público novo usa `objectGuid` normalizado, `acervoPath`/`candidateAcervoPaths`, `acervoObjectType*` e `message`; acervo com GUID duplicado gera `front-object-type-drift-ambiguous-acervo` informativo.
+
+Fica pendente:
+
+- Fase 2: assinatura de tipo funcional para `Attribute`, `Domain`, `SDT/Item` e `Variable`.
+- Fase 3: drift interno/intra-pacote e `parm(...)` versus variáveis/assinaturas.
+- Endurecer chamada direta a `New-XpzImportPackage.py`, se varredura de consumidores diretos indicar que a quebra de compatibilidade é aceitável.
+- Sanidade do acervo para XML ilegível, corrompido, sem raiz efetiva `Object` quando esperado, ou sem `guid` extraível.
+- Decidir shape/tipo de elementos em `frontObjectTypeDrift.warnings` se algum warning nominal de type drift for proposto.
+- Validação formal de formato GUID além de `Trim()` + não vazio.
+- Reavaliar as entradas irmãs da pendência original, especialmente "Acervo conhecido no sanity..." e "Gate de dependências GeneXus...".
+
 ## Verificação empírica de claim factual na revisão (comportamento de runtime testado, não raciocinado)
 
 - **Importância** — média (não é bug de produto; é lacuna de método que já deixou passar um erro factual em conteúdo pushado). Evita que um claim sobre comportamento de linguagem/API/ferramenta seja "convergido" por consenso de painel sem ninguém executar.

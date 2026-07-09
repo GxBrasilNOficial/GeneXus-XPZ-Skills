@@ -434,13 +434,13 @@ if ($frontMetas.Count -eq 0 -and $frontXmls.Count -eq 0) {
             continue
         }
 
-        $frontGuidNormalized = Normalize-GeneXusObjectTypeDriftValue -Value $fMeta.Guid
+        $objectGuidNormalized = Normalize-GeneXusObjectTypeDriftValue -Value $fMeta.Guid
         $acervoGuidNormalized = Normalize-GeneXusObjectTypeDriftValue -Value $aMeta.Guid
         $frontTypeNormalized = Normalize-GeneXusObjectTypeDriftValue -Value $fMeta.TypeGuid
         $acervoTypeNormalized = Normalize-GeneXusObjectTypeDriftValue -Value $aMeta.TypeGuid
         if (
-            -not [string]::IsNullOrWhiteSpace($frontGuidNormalized) -and
-            $frontGuidNormalized -eq $acervoGuidNormalized -and
+            -not [string]::IsNullOrWhiteSpace($objectGuidNormalized) -and
+            $objectGuidNormalized -eq $acervoGuidNormalized -and
             -not [string]::IsNullOrWhiteSpace($frontTypeNormalized) -and
             -not [string]::IsNullOrWhiteSpace($acervoTypeNormalized) -and
             $frontTypeNormalized -ne $acervoTypeNormalized
@@ -593,4 +593,4 @@ $result = [pscustomobject]@{
     findings        = $findings
 }
 
-$result | ConvertTo-Json -Depth 6
+$result | ConvertTo-Json -Depth 10

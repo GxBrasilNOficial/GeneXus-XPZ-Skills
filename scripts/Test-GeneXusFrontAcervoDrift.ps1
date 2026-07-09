@@ -93,6 +93,7 @@ function New-Finding {
         [string]$ObjectGuid,
         [string]$ObjectFile,
         [string]$AcervoFile,
+        [string]$AcervoPath,
         [string]$FrontLastUpdate,
         [string]$AcervoLastUpdate,
         [string]$FrontObjectType,
@@ -100,7 +101,7 @@ function New-Finding {
         [string]$FrontObjectTypeNormalized,
         [string]$AcervoObjectTypeNormalized,
         [string]$MatchBasis,
-        [string[]]$CandidateBaselinePaths
+        [string[]]$CandidateAcervoPaths
     )
     $finding = [ordered]@{
         severity         = $Severity
@@ -109,9 +110,11 @@ function New-Finding {
         objectName       = $ObjectName
         objectGuid       = $ObjectGuid
         objectFile       = $ObjectFile
-        acervoFile       = $AcervoFile
         frontLastUpdate  = $FrontLastUpdate
         acervoLastUpdate = $AcervoLastUpdate
+    }
+    if ($Code -notin @('front-object-type-drift', 'front-object-type-drift-ambiguous-acervo')) {
+        $finding.acervoFile = $AcervoFile
     }
     if (-not [string]::IsNullOrWhiteSpace($FrontObjectType)) {
         $finding.frontObjectType = $FrontObjectType
@@ -128,8 +131,11 @@ function New-Finding {
     if (-not [string]::IsNullOrWhiteSpace($MatchBasis)) {
         $finding.matchBasis = $MatchBasis
     }
-    if ($CandidateBaselinePaths -and $CandidateBaselinePaths.Count -gt 0) {
-        $finding.candidateBaselinePaths = @($CandidateBaselinePaths)
+    if (-not [string]::IsNullOrWhiteSpace($AcervoPath)) {
+        $finding.acervoPath = $AcervoPath.Replace('\', '/')
+    }
+    if ($CandidateAcervoPaths -and $CandidateAcervoPaths.Count -gt 0) {
+        $finding.candidateAcervoPaths = @($CandidateAcervoPaths | ForEach-Object { ([string]$_).Replace('\', '/') })
     }
     return [pscustomobject]$finding
 }
@@ -265,20 +271,21 @@ if ($objectsScanned -eq 0 -and $frontXmls.Count -eq 0) {
     # 2. Para cada objeto da frente, buscar homonimo no acervo e comparar
     foreach ($fMeta in $frontMetas) {
         $fRel = [System.IO.Path]::GetRelativePath($FrontFolder, $fMeta.Path)
-        $guidBaselinePaths = @(Get-GeneXusObjectTypeGuidIndexMatches -Index $objectTypeGuidIndex -Guid $fMeta.Guid)
-        $guidBaselineRelPaths = @($guidBaselinePaths | ForEach-Object { [System.IO.Path]::GetRelativePath($AcervoFolder, $_) })
+        $guidAcervoMatches = @(Get-GeneXusObjectTypeGuidIndexMatches -Index $objectTypeGuidIndex -Guid $fMeta.Guid)
+        $guidAcervoPaths = @($guidAcervoMatches | ForEach-Object { $_.FullPath })
+        $guidAcervoRelPaths = @($guidAcervoMatches | ForEach-Object { $_.AcervoPath })
         $matchBasis = ''
         $typeDriftFatalForObject = $false
         $aMeta = $null
 
-        if ($guidBaselinePaths.Count -eq 1) {
-            $aMeta = Get-ObjectMetadata $guidBaselinePaths[0]
+        if ($guidAcervoMatches.Count -eq 1) {
+            $aMeta = Get-ObjectMetadata $guidAcervoMatches[0].FullPath
             if ($null -ne $aMeta) {
                 $frontTypeNorm = Normalize-GeneXusObjectTypeDriftValue -Value $fMeta.TypeGuid
                 $acervoTypeNorm = Normalize-GeneXusObjectTypeDriftValue -Value $aMeta.TypeGuid
-                $frontGuidNorm = Normalize-GeneXusObjectTypeDriftValue -Value $fMeta.Guid
+                $objectGuidNorm = Normalize-GeneXusObjectTypeDriftValue -Value $fMeta.Guid
                 $acervoGuidNorm = Normalize-GeneXusObjectTypeDriftValue -Value $aMeta.Guid
-                if (-not [string]::IsNullOrWhiteSpace($frontGuidNorm) -and $frontGuidNorm -eq $acervoGuidNorm) {
+                if (-not [string]::IsNullOrWhiteSpace($objectGuidNorm) -and $objectGuidNorm -eq $acervoGuidNorm) {
                     $matchBasis = 'guid'
                     if (
                         -not [string]::IsNullOrWhiteSpace($frontTypeNorm) -and
@@ -286,26 +293,47 @@ if ($objectsScanned -eq 0 -and $frontXmls.Count -eq 0) {
                         $frontTypeNorm -ne $acervoTypeNorm
                     ) {
                         $typeDriftFatalForObject = $true
+                        $typeMessage = "Objeto '$($fMeta.Name)' tem o mesmo guid na frente e no acervo, mas Object/@type diverge (frente='$($fMeta.TypeGuid)', acervo='$($aMeta.TypeGuid)'). Decisao humana requerida antes de empacotar."
+                        $common = New-GeneXusObjectTypeDriftCommonFields `
+                            -ObjectGuid $fMeta.Guid `
+                            -ObjectName $fMeta.Name `
+                            -FullyQualifiedName $fMeta.Fqn `
+                            -FrontObjectType $fMeta.TypeGuid `
+                            -AcervoObjectType $aMeta.TypeGuid `
+                            -MatchBasis $matchBasis `
+                            -AcervoPath $guidAcervoMatches[0].AcervoPath `
+                            -Message $typeMessage `
+                            -Code 'front-object-type-drift'
                         $findings += New-Finding -Severity 'fail' -Code 'front-object-type-drift' `
-                            -Message "Objeto '$($fMeta.Name)' tem o mesmo guid na frente e no acervo, mas Object/@type diverge (frente='$($fMeta.TypeGuid)', acervo='$($aMeta.TypeGuid)'). Decisao humana requerida antes de empacotar." `
-                            -ObjectName $fMeta.Name -ObjectGuid $fMeta.Guid `
-                            -ObjectFile $fRel -AcervoFile ([System.IO.Path]::GetRelativePath($AcervoFolder, $aMeta.Path)) `
+                            -Message $common['message'] `
+                            -ObjectName $fMeta.Name -ObjectGuid $common['objectGuid'] `
+                            -ObjectFile $fRel -AcervoFile '' -AcervoPath $common['acervoPath'] `
                             -FrontLastUpdate '' -AcervoLastUpdate '' `
-                            -FrontObjectType $fMeta.TypeGuid -AcervoObjectType $aMeta.TypeGuid `
-                            -FrontObjectTypeNormalized $frontTypeNorm -AcervoObjectTypeNormalized $acervoTypeNorm `
-                            -MatchBasis $matchBasis -CandidateBaselinePaths $guidBaselineRelPaths
+                            -FrontObjectType $common['frontObjectType'] -AcervoObjectType $common['acervoObjectType'] `
+                            -FrontObjectTypeNormalized $common['frontObjectTypeNormalized'] -AcervoObjectTypeNormalized $common['acervoObjectTypeNormalized'] `
+                            -MatchBasis $common['matchBasis']
                     }
                 }
             }
-        } elseif ($guidBaselinePaths.Count -gt 1) {
-            $findings += New-Finding -Severity 'info' -Code 'front-object-type-drift-ambiguous-baseline' `
-                -Message "Objeto '$($fMeta.Name)' tem guid presente em mais de um XML do acervo; drift de Object/@type nao foi decidido automaticamente." `
-                -ObjectName $fMeta.Name -ObjectGuid $fMeta.Guid `
+        } elseif ($guidAcervoMatches.Count -gt 1) {
+            $ambiguousMessage = "Objeto '$($fMeta.Name)' tem guid presente em mais de um XML do acervo; drift de Object/@type nao foi decidido automaticamente."
+            $common = New-GeneXusObjectTypeDriftCommonFields `
+                -ObjectGuid $fMeta.Guid `
+                -ObjectName $fMeta.Name `
+                -FullyQualifiedName $fMeta.Fqn `
+                -FrontObjectType $fMeta.TypeGuid `
+                -MatchBasis 'guid-ambiguous' `
+                -CandidateAcervoPaths $guidAcervoRelPaths `
+                -Message $ambiguousMessage `
+                -Code 'front-object-type-drift-ambiguous-acervo'
+            $findings += New-Finding -Severity 'info' -Code 'front-object-type-drift-ambiguous-acervo' `
+                -Message $common['message'] `
+                -ObjectName $fMeta.Name -ObjectGuid $common['objectGuid'] `
                 -ObjectFile $fRel -AcervoFile '' `
                 -FrontLastUpdate '' -AcervoLastUpdate '' `
-                -FrontObjectType $fMeta.TypeGuid -AcervoObjectType '' `
-                -FrontObjectTypeNormalized (Normalize-GeneXusObjectTypeDriftValue -Value $fMeta.TypeGuid) -AcervoObjectTypeNormalized '' `
-                -MatchBasis 'guid-ambiguous' -CandidateBaselinePaths $guidBaselineRelPaths
+                -FrontObjectType $common['frontObjectType'] -AcervoObjectType '' `
+                -FrontObjectTypeNormalized $common['frontObjectTypeNormalized'] -AcervoObjectTypeNormalized '' `
+                -MatchBasis $common['matchBasis'] -CandidateAcervoPaths $common['candidateAcervoPaths']
         }
 
         if ($null -eq $aMeta) {
@@ -378,7 +406,7 @@ $result = [pscustomobject]@{
 }
 
 if ($AsJson) {
-    $result | ConvertTo-Json -Depth 6
+    $result | ConvertTo-Json -Depth 10
 } else {
     Write-Output "status: $status"
     Write-Output "frontFolder: $FrontFolder"

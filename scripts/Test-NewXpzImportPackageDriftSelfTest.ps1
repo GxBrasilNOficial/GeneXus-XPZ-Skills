@@ -167,6 +167,20 @@ if ($typeFinding4.Count -ne 1) {
 if ($typeFinding4[0].matchBasis -ne 'guid') {
     throw "Caso 4: matchBasis deveria ser guid; obtido '$($typeFinding4[0].matchBasis)'."
 }
+if ($typeFinding4[0].objectGuid -ne $objGuid) {
+    throw "Caso 4: objectGuid normalizado inesperado: '$($typeFinding4[0].objectGuid)'."
+}
+if ([string]::IsNullOrWhiteSpace([string]$typeFinding4[0].message)) {
+    throw 'Caso 4: driftFindings deveria preservar message.'
+}
+if ($typeFinding4[0].acervoPath -ne 'Procedure/procDriftTeste.xml') {
+    throw "Caso 4: acervoPath relativo inesperado: '$($typeFinding4[0].acervoPath)'."
+}
+foreach ($legacyName in @('frontGuid', 'baselinePath', 'candidateBaselinePaths', 'baselineObjectType', 'baselineObjectTypeNormalized', 'acervoFile')) {
+    if ($null -ne $typeFinding4[0].PSObject.Properties[$legacyName]) {
+        throw "Caso 4: driftFindings nao deveria emitir campo legado '$legacyName'."
+    }
+}
 if ($typeFinding4[0].frontObjectTypeNormalized -ne $webPanelTypeGuid) {
     throw "Caso 4: frontObjectTypeNormalized inesperado: '$($typeFinding4[0].frontObjectTypeNormalized)'."
 }

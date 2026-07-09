@@ -30,6 +30,16 @@ function Assert-True {
     }
 }
 
+function Assert-PropertyAbsent {
+    param(
+        [Parameter(Mandatory = $true)]$Object,
+        [Parameter(Mandatory = $true)][string]$PropertyName,
+        [Parameter(Mandatory = $true)][string]$Message
+    )
+
+    Assert-True ($null -eq $Object.PSObject.Properties[$PropertyName]) $Message
+}
+
 function Write-Utf8NoBomText {
     param(
         [Parameter(Mandatory = $true)][string]$Path,
@@ -93,8 +103,15 @@ try {
     Assert-True ($r1Codes -notcontains 'front-newer-than-acervo') 'Caso 1: front-newer-than-acervo deveria ser suprimido quando ha drift fatal de tipo.'
     $typeFinding = @($r1.findings | Where-Object { $_.code -eq 'front-object-type-drift' } | Select-Object -First 1)[0]
     Assert-True ($typeFinding.matchBasis -eq 'guid') "Caso 1: matchBasis esperado guid; obtido $($typeFinding.matchBasis)"
+    Assert-True ($typeFinding.objectGuid -eq $guid) "Caso 1: objectGuid normalizado esperado $guid; obtido $($typeFinding.objectGuid)"
+    Assert-True (-not [string]::IsNullOrWhiteSpace([string]$typeFinding.message)) 'Caso 1: finding fatal deveria preservar message.'
+    Assert-True ($typeFinding.acervoPath -eq 'Procedure/ObjDrift.xml') "Caso 1: acervoPath relativo inesperado: $($typeFinding.acervoPath)"
     Assert-True ($typeFinding.frontObjectTypeNormalized -eq $webPanelTypeGuid) 'Caso 1: tipo normalizado da frente nao preservado.'
     Assert-True ($typeFinding.acervoObjectTypeNormalized -eq $procedureTypeGuid) 'Caso 1: tipo normalizado do acervo nao preservado.'
+    Assert-PropertyAbsent -Object $typeFinding -PropertyName 'acervoFile' -Message 'Caso 1: finding novo de type drift nao deve emitir acervoFile.'
+    foreach ($legacyName in @('frontGuid', 'baselinePath', 'candidateBaselinePaths', 'baselineObjectType', 'baselineObjectTypeNormalized')) {
+        Assert-PropertyAbsent -Object $typeFinding -PropertyName $legacyName -Message "Caso 1: finding novo de type drift nao deve emitir $legacyName."
+    }
 
     $front2 = Join-Path $tempRoot 'case2-front'
     $acervo2 = Join-Path $tempRoot 'case2-acervo'
@@ -112,8 +129,19 @@ try {
     Write-FixtureObject -Folder (Join-Path $acervo3 'ProcedureB') -Name 'ObjAmbiguoCopia' -Guid $guid -TypeGuid $procedureTypeGuid -LastUpdate $oldStamp
     $r3 = & $gateScript -FrontFolder $front3 -AcervoFolder $acervo3 -AsJson | ConvertFrom-Json
     $r3Codes = @($r3.findings | ForEach-Object { $_.code })
-    Assert-True ($r3Codes -contains 'front-object-type-drift-ambiguous-baseline') 'Caso 3: ambiguidade por GUID deveria gerar diagnostico nao fatal.'
+    Assert-True ($r3Codes -contains 'front-object-type-drift-ambiguous-acervo') 'Caso 3: ambiguidade por GUID deveria gerar diagnostico nao fatal.'
     Assert-True ($r3Codes -notcontains 'front-object-type-drift') 'Caso 3: ambiguidade nao deveria afirmar drift fatal.'
+    $ambiguousFinding = @($r3.findings | Where-Object { $_.code -eq 'front-object-type-drift-ambiguous-acervo' } | Select-Object -First 1)[0]
+    Assert-True ($ambiguousFinding.severity -eq 'info') "Caso 3: ambiguidade deveria ser info; obtido $($ambiguousFinding.severity)."
+    Assert-True ($ambiguousFinding.objectGuid -eq $guid) "Caso 3: objectGuid normalizado esperado $guid; obtido $($ambiguousFinding.objectGuid)"
+    Assert-True ($ambiguousFinding.matchBasis -eq 'guid-ambiguous') "Caso 3: matchBasis esperado guid-ambiguous; obtido $($ambiguousFinding.matchBasis)."
+    Assert-True ((@($ambiguousFinding.candidateAcervoPaths)).Count -eq 2) 'Caso 3: candidateAcervoPaths deveria ter dois candidatos.'
+    Assert-True (-not [string]::IsNullOrWhiteSpace([string]$ambiguousFinding.message)) 'Caso 3: ambiguidade deveria preservar message.'
+    Assert-PropertyAbsent -Object $ambiguousFinding -PropertyName 'acervoObjectType' -Message 'Caso 3: ambiguidade nao deve escolher acervoObjectType arbitrario.'
+    Assert-PropertyAbsent -Object $ambiguousFinding -PropertyName 'acervoObjectTypeNormalized' -Message 'Caso 3: ambiguidade nao deve escolher acervoObjectTypeNormalized arbitrario.'
+    foreach ($legacyName in @('frontGuid', 'baselinePath', 'candidateBaselinePaths', 'baselineObjectType', 'baselineObjectTypeNormalized')) {
+        Assert-PropertyAbsent -Object $ambiguousFinding -PropertyName $legacyName -Message "Caso 3: ambiguidade nao deve emitir $legacyName."
+    }
 
     $front4 = Join-Path $tempRoot 'case4-front'
     $acervo4 = Join-Path $tempRoot 'case4-acervo'
