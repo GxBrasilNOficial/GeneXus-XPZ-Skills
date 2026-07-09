@@ -21,10 +21,12 @@ O QUE FALTA (nada bloqueia o que já está no ar — o Eixo A é fail-safe e us�
    guarda-de-família (pulam/skip para KB Java); a paridade TOTAL com .NET exige esses dois motores
    (gêmeos de `Resolve-GeneXusGeneratedCsPath`/`Find-CsAttributeAssignments`). NÃO precisa de KB Java para
    projetar; precisa dela para validar. Ver a fase "Pós-v1" no design congelado.
-2. Auto-população do metadata Java (`kb_environment_servlet_dirs`/`_app_package`/`_servlet_flavor`) pelo
-   `xpz-kb-parallel-setup` a partir do `model.ini`/`gradle.properties`. Hoje é escrita manual AUDIT_REQUIRED.
-   A Fase 5 achou que `SERVLET_DIR` do `model.ini` pode divergir da publicação real → o setup NÃO pode copiar
-   cegamente; deve validar topologia/sentinela e confrontar com `gradle.properties` (`TOMCAT_WEBAPP_PATH`).
+2. Eventual automação além do assistente read-only de metadata Java, se algum dia for aprovada sem perder a
+   confirmação explícita. Hoje `Resolve-XpzJavaTomcatMetadataSuggestion.ps1` sugere
+   `kb_environment_servlet_dirs`/`_app_package`/`_servlet_flavor` a partir de `model.ini`/`gradle.properties`,
+   valida topologia/sentinelas/pacote e deixa a gravação opt-in para `Set-XpzKbSourceMetadataDeployment.ps1`.
+   A Fase 5 achou que `SERVLET_DIR` do `model.ini` pode divergir da publicação real → continua proibido copiar
+   cegamente; qualquer automação futura deve preservar validação e decisão humana em divergência.
 3. Dois resíduos empíricos (dependem de KB Java):
    a. Sabor Java EE CLÁSSICO PURO (Tomcat 8/9 + JDK 8) NÃO foi medido (não havia ambiente; o que se mediu
       foi um env `JAVA_EE`/`javax` porém rodando em Tomcat 11/JDK 21/Servlet 6).
@@ -41,8 +43,9 @@ DUAS NATUREZAS DE TRABALHO (para não confundir o que precisa da colega):
 - EMPÍRICO → precisa da KB Java da colega (a máquina de dev NÃO tem licença Java). Faz-se por TROCA DE DADOS:
   você gera um prompt copiável para o agente que roda na máquina dela, ele mede, você processa o resultado
   aqui. PROIBIDO inventar resultado empírico. Cabe aqui: resíduo 3a (e re-medições que faltarem).
-- DESIGN/CÓDIGO (sem KB Java) → Pós-v1 (motores B/C), auto-população do metadata (item 2), e a decisão do
-  item 3b. Segue o processo normal do repo (design → revisão por pares se abrir arquitetura → self-tests).
+- DESIGN/CÓDIGO (sem KB Java) → Pós-v1 (motores B/C), eventual automação além do assistente read-only de
+  metadata (item 2), e a decisão do item 3b. Segue o processo normal do repo (design → revisão por pares se
+  abrir arquitetura → self-tests).
 
 LEIA PRIMEIRO, nesta ordem (fontes-verdade versionadas; NÃO reprocessar o que já foi feito):
 1. AGENTS.md local (convenções do repo: rotina pré-push, git na main, gates de segurança, idioma).
