@@ -6,7 +6,7 @@
 >
 > **Eixos B/C (2026-07-09):** coleta read-only na mesma KB `EBTECH` confirmou a raiz de fonte Java por environment (`<TargetFullPath>\web\src\main\java`), o uso prático de `JAVA_PACKAGE_NAME_FOLDER` e o mapeamento de módulos GeneXus para subpackages (`GestaoMail.Email` -> `com\ebtech\gestaomail`). Para o Eixo C, `nav_objs.xml` existe na raiz da KB nativa e trouxe `ObjStatus=genreq`/`nogenspc`, com `ObjNavig` apontando para XMLs de navegação/specification. Experimento controlado posterior em KB descartável/de teste (`WebPanel:TestWP`, env `Prototipo_18U14`) mostrou que `ObjStatus=genreq` não é critério isolado de freshness; o caminho operacional é cruzar `ObjNavig`, XML de navegação/specification e artefatos locais `.java`/`.class`/`.js`.
 >
-> **Data da coleta:** 2026-07-04. **Registro-resumo:** [`999-ideias-pendentes.md`](999-ideias-pendentes.md).
+> **Coletas:** inicial 2026-07-04; Fase 5 2026-07-07; Eixos B/C 2026-07-09. **Registro-resumo:** [`999-ideias-pendentes.md`](999-ideias-pendentes.md).
 
 ## Fonte da evidência
 

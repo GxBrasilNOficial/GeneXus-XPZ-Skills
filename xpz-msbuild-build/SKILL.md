@@ -189,7 +189,8 @@ Do NOT use esta skill para:
   de `.cs` e o `Test-GeneXusRuntimeFreshness.ps1` **pulam** (`CS_PATH_SKIPPED_HOSTING_UNSUPPORTED`/
   `skipped-hosting-unsupported`, `exit 0`) em vez de derivar `CSharpModel\web` .NET. **Skip ≠ deploy validado**
   (vale para os skips B/C e para `no-evidence`/`unknown` do Eixo A). `Test-GeneXusRuntimeFreshness.ps1` aceita
-  `-DeploymentHostingKind` opcional (ausente → comportamento .NET de hoje). Valor de `deployment_hosting_kind`
+  `-DeploymentHostingKind` por compatibilidade com chamadas legadas (ausente → comportamento .NET de hoje), mas KB
+  Java/Tomcat conhecida deve passar `-DeploymentHostingKind java-tomcat` para acionar o skip do Eixo C. Valor de `deployment_hosting_kind`
   fora do registro é rejeitado com mensagem canônica (não vira skip).
 - **Paridade Java/Tomcat (Fase 5, evidência empírica):** para EBTECH/Jakarta, clean build dedicado confirmou
   `Rebuild All -> Lf=∅, Pf≠∅` (`Lf=0`, `Pf=624`), portanto `unexpected-publication` continua sendo política
