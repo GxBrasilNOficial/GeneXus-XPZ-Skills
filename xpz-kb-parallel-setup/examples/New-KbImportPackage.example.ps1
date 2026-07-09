@@ -17,7 +17,10 @@ O gate de drift frente-vs-acervo (Test-GeneXusFrontAcervoDrift.ps1) executa
 sempre antes do empacotamento (fail-closed). -AcervoPath e opcional; quando
 omitido, o acervo canonico <RepoRoot>/ObjetosDaKbEmXml e resolvido
 automaticamente. Sem acervo resolvivel, o empacotamento e bloqueado. O gate
-detecta XMLs na frente com lastUpdate mais antigo que o homonimo no acervo.
+detecta XMLs na frente com lastUpdate mais antigo que o homonimo no acervo e
+bloqueia Object/@type divergente quando frente e acervo compartilham o mesmo
+guid. Acervo ambiguo por guid gera diagnostico informativo
+front-object-type-drift-ambiguous-acervo, sem escolher tipo automaticamente.
 
 .PARAMETER FrontName
 Nome da subpasta da frente no formato `NomeCurto_GUID_YYYYMMDD`.
@@ -38,7 +41,9 @@ omitido, o acervo canonico <RepoRoot>/ObjetosDaKbEmXml e resolvido
 automaticamente. O gate de drift frente-vs-acervo executa sempre antes do
 empacotamento (fail-closed); sem acervo resolvivel, o empacotamento e bloqueado.
 Se o gate detectar que um XML da frente está mais antigo que o homonimo no
-acervo, o empacotamento e abortado.
+acervo ou que o mesmo guid tem Object/@type divergente entre frente e acervo,
+o empacotamento e abortado. Ambiguidade por guid no acervo e diagnostico
+informativo, reportado como front-object-type-drift-ambiguous-acervo.
 
 .PARAMETER SharedSkillsRoot
 Raiz local da base compartilhada `GeneXus-XPZ-Skills`.
