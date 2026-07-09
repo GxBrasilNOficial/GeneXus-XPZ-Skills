@@ -8,7 +8,9 @@ Rode `git fetch origin` no início e reconfirme o estado do remoto antes de afir
 (o `origin/main` avança por OUTRAS frentes não-relacionadas; não fixe hash — o trabalho java-tomcat até a
 Fase 5 já está em `origin/main`). Trabalhar direto na main.
 
-ESTADO: Fases 0, 1, 2, 3, 4-docs e 5 FEITAS e PUSHADAS.
+ESTADO: Fases 0, 1, 2, 3, 4-docs e 5 FEITAS e PUSHADAS. Fechamento formal da v1 prática
+(metadata/setup + deploy-bin Java/Tomcat) concluído em 2026-07-08: a frente está usável/fail-safe no
+repositório, sem texto stale conhecido, e as pendências abaixo são Pós-v1 ou follow-ups separados.
 - Fase 0 = aterramento empírico (topologia externa; frescor por mtime do `.class` no `WEB-INF\classes`).
 - Fases 1/2 = registro-fonte-única + guardas de família dos 3 eixos.
 - Fase 3 = MOTOR do Eixo A (deploy-bin) = co-gate Java por família (4 quadrantes, skew bidirecional,
@@ -16,7 +18,7 @@ ESTADO: Fases 0, 1, 2, 3, 4-docs e 5 FEITAS e PUSHADAS.
 - Fase 4 = documentação em paridade (02/08/09/10/README trilíngue/SKILLs).
 - Fase 5 = validação empírica DOCS-ONLY (o motor foi validado, sem mudança de código).
 
-O QUE FALTA (nada bloqueia o que já está no ar — o Eixo A é fail-safe e usável):
+O QUE FICA PARA FRENTES FUTURAS (nada bloqueia a v1 prática já encerrada — o Eixo A é fail-safe e usável):
 1. Pós-v1 — MOTORES dos Eixos B (fonte gerado `.java`) e C (runtime-freshness `.java`). Hoje B/C só têm
    guarda-de-família (pulam/skip para KB Java); a paridade TOTAL com .NET exige esses dois motores
    (gêmeos de `Resolve-GeneXusGeneratedCsPath`/`Find-CsAttributeAssignments`). NÃO precisa de KB Java para
