@@ -203,7 +203,7 @@ Estado atual da materialização:
 - `GeneXusMsBuildWatcherSupport.ps1`: implementado como helper comum do contrato de watcher dos wrappers MSBuild; centraliza `-StartWatcher`, `-MonitorLogPath`, `watcherContext`, `timing.phases` e leitura do log do monitor
 - `Watch-GeneXusMsBuildLog.ps1`: implementado como monitor incremental de execução headless; usar em preview/import/export grandes para acompanhar o MSBuild sem depender do chat; em importação real de pacote amplo ou com muitos `WorkWithForWeb`, usar watcher como padrão operacional recomendado
 - `Resolve-GeneXusGeneratedCsPath.ps1`: implementado como resolvedor somente leitura do `.cs` gerado a partir de `kb_environment_web_dirs` em `kb-source-metadata.md`; usar antes de `Test-GeneXusRuntimeFreshness.ps1` quando a checagem exigir `-GeneratorOutputPath`; exceção Fase 2 (guarda de família do Eixo B): KB `java-tomcat`/família não-.NET pula com `CS_PATH_SKIPPED_HOSTING_UNSUPPORTED`/exit 0, sem exigir `web_dirs` (o artefato Java não é `.cs`)
-- `Test-GeneXusRuntimeFreshness.ps1`: implementado como diagnóstico somente leitura de frescor de runtime; usar quando o sub-estado for `importação real efetiva provada, geração de runtime pendente` para confirmar se artefatos de runtime já refletem a versão importada
+- `Test-GeneXusRuntimeFreshness.ps1`: implementado como diagnóstico somente leitura de frescor de runtime no motor .NET; usar quando o sub-estado for `importação real efetiva provada, geração de runtime pendente` para confirmar se artefatos de runtime já refletem a versão importada. Em KB `java-tomcat`, passar `-DeploymentHostingKind java-tomcat`: o Eixo C pula com `skipped-hosting-unsupported`/exit 0, e `ObjStatus` não deve ser usado isoladamente como critério de freshness Java
 
 Scripts nesta frente:
 
@@ -276,7 +276,7 @@ Scripts nesta frente:
   - status atual: implementado
   - objetivo: diagnosticar se o runtime GeneXus reflete a versão mais recente de um objeto após import+build; somente leitura, não abre KB, não invoca MSBuild
   - parâmetros obrigatórios: `-KbPath`, `-ObjectName`, `-ImportedAt`
-  - parâmetros opcionais: `-ObjectType` (reservado para uso futuro), `-GeneratorOutputPath` (se omitido, deriva como `<KbPath>\CSharpModel\web`), `-DeploymentHostingKind` (guarda de família do Eixo C; opcional — `java-tomcat` Eixo C `runtimeSupportState=recognized-no-engine`, Pós-v1), `-AsJson`
+  - parâmetros opcionais: `-ObjectType` (reservado para uso futuro), `-GeneratorOutputPath` (se omitido, deriva como `<KbPath>\CSharpModel\web`), `-DeploymentHostingKind` (guarda de família do Eixo C; compatível com chamadas legadas, mas obrigatório operacionalmente quando a KB for de família não-.NET conhecida, especialmente `java-tomcat`, para obter `skipped-hosting-unsupported` em vez de rodar a heurística .NET), `-AsJson`
   - saída esperada: `runtime-fresh` (nogenreq + artefatos posteriores ao import, no motor .NET), `runtime-stale` (genreq ou artefatos anteriores, no motor .NET), `runtime-unknown` (objeto não encontrado em `nav_objs.xml` ou artefatos não localizados), `skipped-hosting-unsupported` (Fase 2 — quando `-DeploymentHostingKind` é `java-tomcat`/família não-.NET: pula sem derivar `CSharpModel\web`, exit 0; valor fora do registro → `runtime-hosting-kind-invalido`, exit não-zero; `ObjStatus` não é critério isolado de freshness Java)
 - `Get-GeneXusKbProperty.ps1`
   - status atual: implementado

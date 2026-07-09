@@ -714,7 +714,7 @@ Scripts propostos:
 - `Test-GeneXusRuntimeFreshness.ps1`
   - objetivo: diagnosticar se o runtime GeneXus reflete a versão mais recente de um objeto após import+build; somente leitura, não abre KB, não invoca MSBuild
   - parâmetros obrigatórios: `-KbPath`, `-ObjectName`, `-ImportedAt`
-  - parâmetros opcionais: `-ObjectType` (reservado para uso futuro), `-GeneratorOutputPath` (se omitido, deriva como `<KbPath>\CSharpModel\web`), `-AsJson`
+  - parâmetros opcionais: `-ObjectType` (reservado para uso futuro), `-GeneratorOutputPath` (se omitido, deriva como `<KbPath>\CSharpModel\web`), `-DeploymentHostingKind` (compatível com chamadas legadas, mas obrigatório operacionalmente quando a KB for de família não-.NET conhecida, especialmente `java-tomcat`, para acionar o skip do Eixo C), `-AsJson`
 - `Resolve-GeneXusGeneratedCsPath.ps1`
   - objetivo: resolver o caminho direto do `.cs` gerado para diagnostico pontual, sem glob recursivo na KB nativa
   - parâmetros obrigatórios: `-KbPath`, `-ObjectName`, e `-ParallelKbRoot` ou `-KbMetadataPath`

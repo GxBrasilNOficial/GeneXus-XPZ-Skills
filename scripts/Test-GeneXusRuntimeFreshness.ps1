@@ -1,16 +1,22 @@
 #requires -Version 7.4
 <#
 .SYNOPSIS
-    Diagnostica se o runtime GeneXus reflete a versão mais recente de um objeto importado.
+    Diagnostica se o runtime GeneXus .NET reflete a versão mais recente de um objeto importado.
 
 .DESCRIPTION
-    Verifica dois indicadores em modo somente leitura, sem abrir a IDE e sem invocar MSBuild:
+    Verifica dois indicadores do motor .NET em modo somente leitura, sem abrir a IDE e sem invocar MSBuild:
 
     1. nav_objs.xml na raiz da KB: status de geração do objeto
-       - genreq  = GeneXus marcou o objeto como pendente de geração (runtime defasado)
+       - genreq  = GeneXus marcou o objeto como pendente de geração no diagnóstico .NET (runtime defasado)
        - nogenreq = GeneXus considera o objeto já gerado (checar artefatos para confirmar)
 
-    2. Artefatos gerados (CSharpModel\web): timestamp dos arquivos gerados vs ImportedAt
+    2. Artefatos gerados .NET (CSharpModel\web): timestamp dos arquivos gerados vs ImportedAt
+
+    Em KB Java/Tomcat conhecida, passe -DeploymentHostingKind java-tomcat: o Eixo C ainda é
+    recognized-no-engine/Pós-v1 e o script pula com skipped-hosting-unsupported, sem derivar
+    CSharpModel\web. Nesse caso, ObjStatus não é critério isolado de freshness Java; a evidência
+    operacional exige cruzar ObjNavig, XMLs de navegação/specification e artefatos .java/.class/.js
+    em frente futura.
 
     O diagnostico e somente leitura: não grava, não abre KB, não invoca MSBuild.
 
@@ -30,6 +36,10 @@
     Pasta de output do gerador. Se omitido, deriva como <KbPath>\CSharpModel\web.
     Para diagnostico de .cs por environment, prefira resolver este caminho antes
     com Resolve-GeneXusGeneratedCsPath.ps1 a partir de kb-source-metadata.md.
+
+.PARAMETER DeploymentHostingKind
+    Guarda de família do Eixo C. Para KB de família não-.NET conhecida, especialmente
+    java-tomcat, deve ser informado para acionar o skip explícito em vez do diagnóstico .NET.
 
 .PARAMETER AsJson
     Emite saida como JSON estruturado em vez de texto humano.
@@ -57,10 +67,11 @@ param(
 
     [string]$GeneratorOutputPath,
 
-    # Fase 2 (paridade Java/Tomcat): OPCIONAL. Quando informado e a familia do hosting kind for nao-.NET
-    # (recognized-no-engine), pula de forma clara em vez de derivar CSharpModel\web e cair em runtime-unknown
-    # silencioso. Ausente/vazio => comportamento IDENTICO ao de hoje (D3, zero regressao). Passado por quem ja
-    # resolveu o metadata; este script permanece metadata-free (nao resolve metadata por conta propria).
+    # Fase 2 (paridade Java/Tomcat): opcional no contrato para manter compatibilidade .NET legada.
+    # Quando a familia do hosting kind e conhecida como nao-.NET, quem ja resolveu o metadata deve
+    # passar o valor explicito (especialmente java-tomcat) para pular de forma clara em vez de derivar
+    # CSharpModel\web e cair em runtime-unknown silencioso. Ausente/vazio => comportamento IDENTICO
+    # ao de hoje (D3, zero regressao). Este script permanece metadata-free (nao resolve metadata por conta propria).
     [string]$DeploymentHostingKind,
 
     [switch]$AsJson
