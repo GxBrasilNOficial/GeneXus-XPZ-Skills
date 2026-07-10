@@ -477,6 +477,53 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
     Assert-True ($null -ne $rv.errorPath) 'timeout: deveria gravar .error.txt'
 
     # =======================================================================================
+    # 8d) FALLBACK: ativacao auditavel, skip por sucesso e divergencia pre-dispatch
+    # =======================================================================================
+    $r = Invoke-Harness -Reviewers @(@{
+            backend = 'opencode'; targetModelKey = 'openai/primary-ok'; invokeArgs = @{}
+            fallbackChain = @(
+                @{ backend = 'opencode'; targetModelKey = 'openai/fallback-skip'; invokeArgs = @{ backend = 'opencode'; model = 'openai/fallback-skip' } }
+            )
+        }) -Sensitivity 'public' -Extra @{ OpenCodeConfigPath = $ocCfg }
+    Assert-True (@($r.json.reviewers).Count -eq 2) 'fallback skip: deveria registrar primario + fallback.'
+    $rv0 = Get-Reviewer $r.json 0
+    $rv1 = Get-Reviewer $r.json 1
+    Assert-True ($rv0.state -eq 'responded') 'fallback skip: primario deveria responder.'
+    Assert-True ($rv1.state -eq 'skippedAfterSuccess') "fallback skip: fallback deveria ficar skippedAfterSuccess; got $($rv1.state)"
+    Assert-True ($rv1.countsForDiversity -eq $false) 'fallback skip: skippedAfterSuccess nao conta diversidade.'
+    Assert-True ($rv1.fallbackOf -eq 'openai/primary-ok') 'fallback skip: fallbackOf deveria apontar para primario.'
+
+    $r = Invoke-Harness -Reviewers @(@{
+            backend = 'opencode'; targetModelKey = 'openai/empty-primary'; invokeArgs = @{}
+            fallbackChain = @(
+                @{ backend = 'opencode'; targetModelKey = 'openai/fallback-ok'; invokeArgs = @{ backend = 'opencode'; model = 'openai/fallback-ok' } }
+            )
+        }) -Sensitivity 'public' -Extra @{ OpenCodeConfigPath = $ocCfg }
+    Assert-True (@($r.json.reviewers).Count -eq 2) 'fallback ativado: deveria registrar primario + fallback.'
+    $rv0 = Get-Reviewer $r.json 0
+    $rv1 = Get-Reviewer $r.json 1
+    Assert-True ($rv0.state -eq 'error') 'fallback ativado: primario empty deveria virar error.'
+    Assert-True ($rv1.state -eq 'responded') "fallback ativado: fallback deveria responder; got $($rv1.state)"
+    Assert-True ($rv1.attemptRole -eq 'fallback') 'fallback ativado: attemptRole=fallback.'
+    Assert-True ($rv1.activationReason -eq 'error') 'fallback ativado: activationReason deveria ser error.'
+    Assert-True ($rv1.countsForDiversity -eq $true) 'fallback respondido deve contar diversidade.'
+
+    Set-Content -LiteralPath $concLog -Value '' -NoNewline -Encoding utf8
+    $r = Invoke-Harness -Reviewers @(@{
+            backend = 'opencode'; targetModelKey = 'openai/bad-primary'; invokeArgs = @{ backend = 'opencode'; model = 'openai/bad-primary' }
+            fallbackChain = @(
+                @{ backend = 'opencode'; targetModelKey = 'openai/fb-0'; invokeArgs = @{ backend = 'opencode'; model = 'openai/fb-0' } },
+                @{ backend = 'codex'; targetModelKey = 'openai/fb-1'; invokeArgs = @{ backend = 'opencode'; model = 'gpt-5.5' } }
+            )
+        }) -Sensitivity 'public' -Extra @{ OpenCodeConfigPath = $ocCfg }
+    $rv0 = Get-Reviewer $r.json 0
+    Assert-True ($rv0.state -eq 'error') 'fallback divergente: deveria falhar em pre-dispatch.'
+    Assert-True ([string]$rv0.reason -match 'invokeArgs.backend') 'fallback divergente: reason deveria citar invokeArgs.backend.'
+    $logAfterBad = @(Get-Content -LiteralPath $concLog -ErrorAction SilentlyContinue | Where-Object { $_ })
+    $badCalls = @($logAfterBad | Where-Object { $_ -match 'bad-primary|fb-0|fb-1' })
+    Assert-True ($badCalls.Count -eq 0) "fallback divergente: fake executor nao deveria ser chamado para a entrada invalida; chamadas=[$($badCalls -join ' | ')]"
+
+    # =======================================================================================
     # 8c) DESPACHO REAL de claude-code / copilot / gemini (prova -Model + -Cd + exe-param por backend)
     # =======================================================================================
     $r = Invoke-Harness -Reviewers @(

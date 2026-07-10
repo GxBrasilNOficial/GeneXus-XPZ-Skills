@@ -192,6 +192,37 @@ Assert-True ($r21.closeoutReady -eq $true) 'Caso 21: declinio com bordas de whit
 Assert-True ($r21.resubmissionDeclinedBy -eq 'Antonio') 'Caso 21: objeto deveria ecoar o valor com Trim.'
 Assert-True ([string]$r21.receiptAddendum -match 'declinadoPor=Antonio;') 'Caso 21: recibo deveria ecoar o valor com Trim.'
 
+# (22) Estados de fallback finais sao aceitos quando skips nao contam diversidade.
+$statesFallbackOk = @'
+[
+  {"backend":"opencode","targetModelKey":"ollama-cloud/deepseek-v4-pro","family":"ollama-cloud","state":"responded","attemptRole":"primary","countsForDiversity":true},
+  {"backend":"opencode","targetModelKey":"nvidia/deepseek-ai/deepseek-v4-pro","family":"nvidia","state":"skippedAfterSuccess","attemptRole":"fallback","fallbackOf":"ollama-cloud/deepseek-v4-pro","countsForDiversity":false},
+  {"backend":"opencode","targetModelKey":"nvidia/z-ai/glm-5.1","family":"nvidia","state":"notAttempted","attemptRole":"fallback","fallbackOf":"ollama-cloud/glm-5.2","countsForDiversity":false},
+  {"backend":"opencode","targetModelKey":"nvidia/minimaxai/minimax-m3","family":"nvidia","state":"skippedByPolicy","attemptRole":"fallback","fallbackOf":"ollama-cloud/minimax-m3","countsForDiversity":false}
+]
+'@
+$r22 = Invoke-Closeout $true $false 'not_applicable' '[]' $statesFallbackOk
+Assert-True ($r22.closeoutReady -eq $true) 'Caso 22: estados finais de fallback deveriam liberar.'
+Assert-True (@($r22.preferredReviewerStates).Count -eq 4) 'Caso 22: deveria ecoar primario + fallbacks.'
+
+# (23) Skip contando diversidade bloqueia.
+$statesSkipBad = '[{"backend":"opencode","targetModelKey":"nvidia/x","family":"nvidia","state":"skippedAfterSuccess","attemptRole":"fallback","fallbackOf":"ollama-cloud/x","countsForDiversity":true}]'
+$r23 = Invoke-Closeout $true $false 'not_applicable' '[]' $statesSkipBad
+Assert-True ($r23.closeoutReady -eq $false) 'Caso 23: skip com countsForDiversity=true deveria bloquear.'
+Assert-True (@($r23.blockingReasons) -contains 'preferred-reviewer-state-skip-counts-diversity:nvidia/x:skippedAfterSuccess') 'Caso 23: razao de diversidade inflada ausente.'
+
+# (24) notAttempted como estado primario silencioso bloqueia.
+$statesPrimaryNotAttempted = '[{"backend":"opencode","targetModelKey":"ollama-cloud/x","family":"ollama-cloud","state":"notAttempted","attemptRole":"primary","countsForDiversity":false}]'
+$r24 = Invoke-Closeout $true $false 'not_applicable' '[]' $statesPrimaryNotAttempted
+Assert-True ($r24.closeoutReady -eq $false) 'Caso 24: primario notAttempted silencioso deveria bloquear.'
+Assert-True (@($r24.blockingReasons) -contains 'preferred-reviewer-primary-notattempted-silent:ollama-cloud/x') 'Caso 24: razao primario notAttempted ausente.'
+
+# (25) Diversidade insuficiente apos fallback bloqueia o recibo de revisao por pares.
+$r25 = (& $target -HadPreferredReviewers 'false' -ManualReviewerSelection 'false' -PreferredReviewersOfferState not_applicable -DiversityState insufficientDiversityAfterFallback | ConvertFrom-Json)
+Assert-True ($r25.closeoutReady -eq $false) 'Caso 25: insufficientDiversityAfterFallback deveria bloquear closeout.'
+Assert-True (@($r25.blockingReasons) -contains 'insufficient-diversity-after-fallback') 'Caso 25: razao insufficient-diversity-after-fallback ausente.'
+Assert-True ([string]$r25.requiredUserPrompt -match 'diversidade insuficiente') 'Caso 25: prompt deveria mencionar diversidade insuficiente.'
+
 <#
 Casos antigos mantidos por cobertura historica:
   - sem preferencias previas + escolha manual + oferta omitida -> bloqueia;

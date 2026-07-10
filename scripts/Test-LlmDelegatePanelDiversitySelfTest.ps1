@@ -62,4 +62,10 @@ Assert-True ($r6.state -eq 'insufficientDiversity') "Caso 6: deny nao deveria co
 Assert-True ($null -eq ($r1.PSObject.Properties['verdict'])) 'Caso 7: a saida NAO deve ter campo verdict (e consultiva, nao autorizacao).'
 Assert-True (-not [string]::IsNullOrWhiteSpace([string]$r1.note)) 'Caso 7: note (invariante consultivo) ausente.'
 
+# (8) Pos-fallback: skip nao conta diversidade; uma familia respondida apos fallback ainda e insuficiente.
+$r8 = Invoke-Diversity '[{"targetModelKey":"openai/gpt-5.5","state":"responded","attemptRole":"fallback","fallbackOf":"ollama-cloud/deepseek","countsForDiversity":true},{"targetModelKey":"ollama-cloud/deepseek","state":"skippedAfterSuccess","attemptRole":"fallback","fallbackOf":"ollama-cloud/primary","countsForDiversity":false}]'
+Assert-True ($r8.state -eq 'insufficientDiversityAfterFallback') "Caso 8: esperado insufficientDiversityAfterFallback; veio '$($r8.state)'."
+Assert-True ($r8.panelReady -eq $false) 'Caso 8: panelReady deveria ser false.'
+Assert-True (@($r8.distinctFamiliesAllow).Count -eq 1) 'Caso 8: skips com countsForDiversity=false nao devem inflar familias.'
+
 Write-Output 'OK: Test-LlmDelegatePanelDiversitySelfTest.ps1'

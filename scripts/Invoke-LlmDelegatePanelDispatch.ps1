@@ -130,6 +130,67 @@ function Get-Slug {
     return ([regex]::Replace($Value, '[^A-Za-z0-9._-]', '-'))
 }
 
+function Test-InvokeArgsBackendDivergence {
+    param($Reviewer, [string]$Label)
+    $backend = [string](Get-Prop $Reviewer 'backend')
+    $invokeArgs = Get-Prop $Reviewer 'invokeArgs'
+    $invBackend = [string](Get-Prop $invokeArgs 'backend')
+    if (-not [string]::IsNullOrWhiteSpace($invBackend) -and $invBackend -ne $backend) {
+        return "invokeArgs.backend ('$invBackend') diverge de backend ('$backend') em $Label"
+    }
+    return $null
+}
+
+function Get-FallbackItems {
+    param($Reviewer)
+    $fallbackItems = Get-Prop $Reviewer 'fallbackChain'
+    if ($null -eq $fallbackItems) { return @() }
+    return @($fallbackItems)
+}
+
+function Add-SkippedFallbackRecords {
+    param(
+        [System.Collections.Generic.List[object]]$Records,
+        [object[]]$FallbackItems,
+        [string]$FallbackOf,
+        [string]$State,
+        [string]$Reason,
+        [int]$BaseRank
+    )
+    for ($skipIdx = 0; $skipIdx -lt @($FallbackItems).Count; $skipIdx++) {
+        $fb = @($FallbackItems)[$skipIdx]
+        $idx = $Records.Count
+        $fbTarget = [string](Get-Prop $fb 'targetModelKey')
+        $fbBackend = [string](Get-Prop $fb 'backend')
+        $Records.Add([ordered]@{
+                index              = $idx
+                backend            = $fbBackend
+                family             = if ($fbTarget) { @($fbTarget -split '/', 2)[0] } else { $null }
+                targetModelKey     = $fbTarget
+                effectiveModel     = [string](Get-Prop (Get-Prop $fb 'invokeArgs') 'model')
+                gateVerdict        = $null
+                state              = $State
+                verdictPath        = $null
+                errorPath          = $null
+                statePath          = $null
+                startedAt          = $null
+                endedAt            = $null
+                durationMs         = $null
+                attempts           = 0
+                reason             = $Reason
+                droppedArgs        = @()
+                securityBlockedArgs = @()
+                attemptRole        = 'fallback'
+                fallbackOf         = $FallbackOf
+                fallbackIndex      = $skipIdx
+                activationReason   = $null
+                countsForDiversity = $false
+                rank               = $BaseRank
+                fallbackChain      = @()
+            })
+    }
+}
+
 # 0) Precondicoes de chamador (erro de uso -> nao produz summary)
 if (-not (Test-Path -LiteralPath $ManuscriptPath -PathType Leaf)) {
     throw "BLOCK: -ManuscriptPath nao encontrado: $ManuscriptPath"
@@ -182,6 +243,7 @@ for ($i = 0; $i -lt $reviewers.Count; $i++) {
     $r = $reviewers[$i]
     $backend = [string](Get-Prop $r 'backend')
     $invokeArgs = Get-Prop $r 'invokeArgs'
+    $fallbackItems = @(Get-FallbackItems -Reviewer $r)
 
     $inputKey = [string](Get-Prop $r 'targetModelKey')
     if ([string]::IsNullOrWhiteSpace($inputKey)) { $inputKey = $null }
@@ -207,6 +269,30 @@ for ($i = 0; $i -lt $reviewers.Count; $i++) {
         reason             = $null
         droppedArgs        = @()
         securityBlockedArgs = @()
+        attemptRole        = 'primary'
+        fallbackOf         = $null
+        fallbackIndex      = $null
+        activationReason   = $null
+        countsForDiversity = $false
+        rank               = if ($null -ne (Get-Prop $r 'rank')) { [int](Get-Prop $r 'rank') } else { $i + 1 }
+        fallbackChain      = @($fallbackItems)
+    }
+
+    $backendDivergence = Test-InvokeArgsBackendDivergence -Reviewer $r -Label "revisor[$i]"
+    if ($backendDivergence) {
+        $rec.state = 'error'
+        $rec.reason = "BLOCK: $backendDivergence"
+        $records.Add($rec); continue
+    }
+    $fallbackDivergence = $null
+    for ($fbIdx = 0; $fbIdx -lt $fallbackItems.Count; $fbIdx++) {
+        $fallbackDivergence = Test-InvokeArgsBackendDivergence -Reviewer $fallbackItems[$fbIdx] -Label "fallbackChain[$fbIdx] de $inputKey"
+        if ($fallbackDivergence) { break }
+    }
+    if ($fallbackDivergence) {
+        $rec.state = 'error'
+        $rec.reason = "BLOCK: $fallbackDivergence"
+        $records.Add($rec); continue
     }
 
     # Backend invalido -> erro defensivo
@@ -512,6 +598,147 @@ foreach ($res in $collected) {
 }
 
 # --------------------------------------------------------------------------------------------
+# FALLBACK ORDENADO (segunda passagem): o primario falhou por estado ativavel, entao cada
+# fallback passa pelo mesmo gate/adapter via invocacao recursiva sem herdar autorizacao.
+# Estados de nao tentativa nunca contam diversidade.
+# --------------------------------------------------------------------------------------------
+$activateFallbackOn = @('quota', 'timeout', 'error', 'unavailable', 'noResponse')
+$skipPolicyStates = @('gateAsk', 'gateDeny')
+$originalRecords = @($records)
+foreach ($rec in $originalRecords) {
+    $fallbackItems = @($rec.fallbackChain)
+    if ($fallbackItems.Count -eq 0) { continue }
+    if ($rec.state -eq 'responded') {
+        Add-SkippedFallbackRecords -Records $records -FallbackItems $fallbackItems -FallbackOf ([string]$rec.targetModelKey) `
+            -State 'skippedAfterSuccess' -Reason 'fallback nao tentado porque o primario respondeu' -BaseRank ([int]$rec.rank)
+        continue
+    }
+    if ([string]$rec.state -eq 'error' -and [string]$rec.reason -like 'BLOCK:*') {
+        Add-SkippedFallbackRecords -Records $records -FallbackItems $fallbackItems -FallbackOf ([string]$rec.targetModelKey) `
+            -State 'skippedByPolicy' -Reason "fallback nao tentado por erro de validacao pre-despacho: $($rec.reason)" -BaseRank ([int]$rec.rank)
+        continue
+    }
+    if ($skipPolicyStates -contains [string]$rec.state) {
+        Add-SkippedFallbackRecords -Records $records -FallbackItems $fallbackItems -FallbackOf ([string]$rec.targetModelKey) `
+            -State 'skippedByPolicy' -Reason "fallback nao tentado porque o primario terminou em $($rec.state)" -BaseRank ([int]$rec.rank)
+        continue
+    }
+    if ($activateFallbackOn -notcontains [string]$rec.state) {
+        Add-SkippedFallbackRecords -Records $records -FallbackItems $fallbackItems -FallbackOf ([string]$rec.targetModelKey) `
+            -State 'notAttempted' -Reason "fallback nao alcançado; estado primario=$($rec.state)" -BaseRank ([int]$rec.rank)
+        continue
+    }
+
+    $fallbackSucceeded = $false
+    for ($fbIdx = 0; $fbIdx -lt $fallbackItems.Count; $fbIdx++) {
+        $fb = $fallbackItems[$fbIdx]
+        if ($fallbackSucceeded) {
+            Add-SkippedFallbackRecords -Records $records -FallbackItems @($fb) -FallbackOf ([string]$rec.targetModelKey) `
+                -State 'skippedAfterSuccess' -Reason 'fallback nao tentado porque tentativa anterior da cadeia respondeu' -BaseRank ([int]$rec.rank)
+            continue
+        }
+
+        $fbJsonPath = Join-Path $ledgerDir ("fallback-$($rec.index)-$fbIdx.reviewers.json")
+        $fbClean = [pscustomobject]@{
+            backend        = [string](Get-Prop $fb 'backend')
+            targetModelKey = [string](Get-Prop $fb 'targetModelKey')
+            invokeArgs     = (Get-Prop $fb 'invokeArgs')
+            family         = (Get-Prop $fb 'family')
+            rank           = [int]$rec.rank
+        }
+        @($fbClean) | ConvertTo-Json -Depth 10 -AsArray | Set-Content -LiteralPath $fbJsonPath -Encoding utf8
+        $fbArgs = @{
+            ManuscriptPath     = $manuscriptFull
+            ReviewersJson      = $fbJsonPath
+            PayloadSensitivity = $PayloadSensitivity
+            RoundId            = "$RoundId-fb-$($rec.index)-$fbIdx"
+            TempDir            = $tempRoot
+            OllamaConcurrency  = $OllamaConcurrency
+        }
+        if ($Cd) { $fbArgs['Cd'] = $Cd }
+        if ($ParallelKbRoot) { $fbArgs['ParallelKbRoot'] = $ParallelKbRoot }
+        if ($PolicyPath) { $fbArgs['PolicyPath'] = $PolicyPath }
+        if ($OpenCodeConfigPath) { $fbArgs['OpenCodeConfigPath'] = $OpenCodeConfigPath }
+        if ($CodexConfigPath) { $fbArgs['CodexConfigPath'] = $CodexConfigPath }
+        if ($BackendExeMap) { $fbArgs['BackendExeMap'] = $BackendExeMap }
+
+        $fbRecord = $null
+        try {
+            $fbOutPath = Join-Path $ledgerDir ("fallback-$($rec.index)-$fbIdx.stdout.json")
+            $fbErrPath = Join-Path $ledgerDir ("fallback-$($rec.index)-$fbIdx.stderr.txt")
+            $argList = @(
+                '-NoProfile', '-File', $PSCommandPath,
+                '-ManuscriptPath', $fbArgs.ManuscriptPath,
+                '-ReviewersJson', $fbArgs.ReviewersJson,
+                '-PayloadSensitivity', $fbArgs.PayloadSensitivity,
+                '-RoundId', $fbArgs.RoundId,
+                '-TempDir', $fbArgs.TempDir,
+                '-OllamaConcurrency', ([string]$fbArgs.OllamaConcurrency)
+            )
+            foreach ($optionalKey in @('Cd', 'ParallelKbRoot', 'PolicyPath', 'OpenCodeConfigPath', 'CodexConfigPath', 'BackendExeMap')) {
+                if ($fbArgs.ContainsKey($optionalKey)) { $argList += @("-$optionalKey", [string]$fbArgs[$optionalKey]) }
+            }
+            $p = Start-Process -FilePath 'pwsh' -ArgumentList $argList -NoNewWindow -PassThru `
+                -RedirectStandardOutput $fbOutPath -RedirectStandardError $fbErrPath
+            [void]$p.WaitForExit(180000)
+            $fbStdout = ''
+            if (Test-Path -LiteralPath $fbOutPath -PathType Leaf) {
+                $fbStdout = Get-Content -LiteralPath $fbOutPath -Raw -Encoding utf8
+            }
+            if ($p.ExitCode -ne 0 -or [string]::IsNullOrWhiteSpace($fbStdout)) {
+                throw "fallback dispatcher exit=$($p.ExitCode)"
+            }
+            $fbSummary = ($fbStdout.Trim() -split "`r?`n" | Select-Object -Last 1) | ConvertFrom-Json
+            $fbRecord = @($fbSummary.reviewers)[0]
+        } catch {
+            $fbRecord = [pscustomobject]@{
+                backend        = [string](Get-Prop $fb 'backend')
+                targetModelKey = [string](Get-Prop $fb 'targetModelKey')
+                family         = (Get-Prop $fb 'family')
+                state          = 'error'
+                reason         = "fallback dispatcher falhou: $($_.Exception.Message)"
+                attempts       = 0
+            }
+        }
+        $newIdx = $records.Count
+        $fbState = [string](Get-Prop $fbRecord 'state')
+        $counts = ($fbState -eq 'responded')
+        $records.Add([ordered]@{
+                index              = $newIdx
+                backend            = [string](Get-Prop $fbRecord 'backend')
+                family             = [string](Get-Prop $fbRecord 'family')
+                targetModelKey     = [string](Get-Prop $fbRecord 'targetModelKey')
+                effectiveModel     = [string](Get-Prop $fbRecord 'effectiveModel')
+                gateVerdict        = [string](Get-Prop $fbRecord 'gateVerdict')
+                state              = $fbState
+                verdictPath        = [string](Get-Prop $fbRecord 'verdictPath')
+                errorPath          = [string](Get-Prop $fbRecord 'errorPath')
+                statePath          = [string](Get-Prop $fbRecord 'statePath')
+                startedAt          = [string](Get-Prop $fbRecord 'startedAt')
+                endedAt            = [string](Get-Prop $fbRecord 'endedAt')
+                durationMs         = Get-Prop $fbRecord 'durationMs'
+                attempts           = [int](Get-Prop $fbRecord 'attempts')
+                reason             = [string](Get-Prop $fbRecord 'reason')
+                droppedArgs        = @(Get-Prop $fbRecord 'droppedArgs')
+                securityBlockedArgs = @(Get-Prop $fbRecord 'securityBlockedArgs')
+                attemptRole        = 'fallback'
+                fallbackOf         = [string]$rec.targetModelKey
+                fallbackIndex      = $fbIdx
+                activationReason   = [string]$rec.state
+                countsForDiversity = $counts
+                rank               = [int]$rec.rank
+                fallbackChain      = @()
+            })
+        if ($fbState -eq 'responded') { $fallbackSucceeded = $true }
+    }
+}
+
+foreach ($rec in $records) {
+    if ($rec.state -eq 'responded') { $rec.countsForDiversity = $true }
+    if ($rec.state -in @('skippedByPolicy', 'skippedAfterSuccess', 'notAttempted')) { $rec.countsForDiversity = $false }
+}
+
+# --------------------------------------------------------------------------------------------
 # LEDGER + SUMMARY
 # --------------------------------------------------------------------------------------------
 $reviewerFiles = [System.Collections.Generic.List[object]]::new()
@@ -530,20 +757,26 @@ foreach ($rec in $records) {
 
     switch ($rec.state) {
         'responded' {
-            $path = Join-Path $ledgerDir "$baseName.verdict.txt"
-            Set-Content -LiteralPath $path -Value ([string]$text) -Encoding utf8
-            $rec.verdictPath = $path
+            if ([string]::IsNullOrWhiteSpace([string]$rec.verdictPath)) {
+                $path = Join-Path $ledgerDir "$baseName.verdict.txt"
+                Set-Content -LiteralPath $path -Value ([string]$text) -Encoding utf8
+                $rec.verdictPath = $path
+            }
         }
         { $_ -in @('error', 'timeout') } {
-            $path = Join-Path $ledgerDir "$baseName.error.txt"
-            $content = if ($errText) { $errText } else { [string]$rec.reason }
-            Set-Content -LiteralPath $path -Value ([string]$content) -Encoding utf8
-            $rec.errorPath = $path
+            if ([string]::IsNullOrWhiteSpace([string]$rec.errorPath)) {
+                $path = Join-Path $ledgerDir "$baseName.error.txt"
+                $content = if ($errText) { $errText } else { [string]$rec.reason }
+                Set-Content -LiteralPath $path -Value ([string]$content) -Encoding utf8
+                $rec.errorPath = $path
+            }
         }
-        { $_ -in @('gateAsk', 'gateDeny', 'unavailable') } {
-            $path = Join-Path $ledgerDir "$baseName.state.txt"
-            Set-Content -LiteralPath $path -Value ([string]$rec.reason) -Encoding utf8
-            $rec.statePath = $path
+        { $_ -in @('gateAsk', 'gateDeny', 'unavailable', 'skippedByPolicy', 'skippedAfterSuccess', 'notAttempted') } {
+            if ([string]::IsNullOrWhiteSpace([string]$rec.statePath)) {
+                $path = Join-Path $ledgerDir "$baseName.state.txt"
+                Set-Content -LiteralPath $path -Value ([string]$rec.reason) -Encoding utf8
+                $rec.statePath = $path
+            }
         }
     }
     $reviewerFiles.Add([pscustomobject]@{

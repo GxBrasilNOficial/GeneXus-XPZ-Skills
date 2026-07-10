@@ -34,9 +34,11 @@
     parecer util de todos, mas tambem nao pode virar pool opcional silencioso. O fechamento
     exige estado auditavel para cada revisor preferido da rodada. Estados incompletos
     (`gateAllow`, `dispatched`, `enqueued`) bloqueiam o recibo final; estados finais como
-    `responded`, `noResponse`, `timeout`, `error`, `gateAsk`, `gateDeny`, `unavailable`,
-    `skippedByHumanDecision` e `stoppedOnGap` liberam, desde que o piso de diversidade ja tenha
-    sido tratado pelo motor proprio.
+    `responded`, `noResponse`, `timeout`, `error`, `quota`, `gateAsk`, `gateDeny`, `unavailable`,
+    `skippedByHumanDecision`, `stoppedOnGap`, `skippedAfterSuccess`, `skippedByPolicy` e
+    `notAttempted` liberam como estados finais auditaveis, desde que o piso de diversidade ja
+    tenha sido tratado pelo motor proprio. Estados de nao tentativa devem vir com
+    `countsForDiversity=false`.
 
     Eixo de estado da vN+1 (Achado A): apos o painel, o agente AUTORA uma versao consolidada
     (vN+1) que ainda NAO foi revisada. -VNextState declara onde a vN+1 esta:
@@ -179,11 +181,15 @@ $validFinalStates = @(
     'noResponse',
     'timeout',
     'error',
+    'quota',
     'gateAsk',
     'gateDeny',
     'unavailable',
     'skippedByHumanDecision',
-    'stoppedOnGap'
+    'stoppedOnGap',
+    'skippedAfterSuccess',
+    'skippedByPolicy',
+    'notAttempted'
 )
 $incompleteStates = @('gateAllow', 'dispatched', 'enqueued')
 $allKnownStates = @($validFinalStates + $incompleteStates)
@@ -194,6 +200,9 @@ foreach ($st in $preferredReviewerStates) {
     $state = [string](Get-Prop $st 'state')
     $backend = [string](Get-Prop $st 'backend')
     $family = [string](Get-Prop $st 'family')
+    $attemptRole = [string](Get-Prop $st 'attemptRole')
+    $fallbackOf = [string](Get-Prop $st 'fallbackOf')
+    $countsForDiversityRaw = Get-Prop $st 'countsForDiversity'
 
     if ([string]::IsNullOrWhiteSpace($target)) {
         $blockingReasons.Add('preferred-reviewer-state-missing-target')
@@ -210,12 +219,23 @@ foreach ($st in $preferredReviewerStates) {
     if ($incompleteStates -contains $state) {
         $blockingReasons.Add("preferred-reviewer-state-incomplete:${target}:${state}")
     }
+    if ($state -in @('skippedByPolicy', 'skippedAfterSuccess', 'notAttempted')) {
+        if ($countsForDiversityRaw -ne $false) {
+            $blockingReasons.Add("preferred-reviewer-state-skip-counts-diversity:${target}:${state}")
+        }
+    }
+    if ($state -eq 'notAttempted' -and ([string]::IsNullOrWhiteSpace($attemptRole) -or $attemptRole -eq 'primary')) {
+        $blockingReasons.Add("preferred-reviewer-primary-notattempted-silent:${target}")
+    }
 
     $preferredStateRows.Add([pscustomobject]@{
-            targetModelKey = $target
-            backend        = $backend
-            family         = $family
-            state          = $state
+            targetModelKey      = $target
+            backend             = $backend
+            family              = $family
+            state               = $state
+            attemptRole         = $attemptRole
+            fallbackOf          = $fallbackOf
+            countsForDiversity  = $countsForDiversityRaw
         })
 }
 
@@ -248,6 +268,10 @@ if ($VNextState -eq 'resubmissionDeclinedByHuman') {
     }
 }
 
+if ($DiversityState -eq 'insufficientDiversityAfterFallback') {
+    $blockingReasons.Add('insufficient-diversity-after-fallback')
+}
+
 $labels = @($selectedReviewers | ForEach-Object { Get-ReviewerLabel $_ } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
 $selectedText = if ($labels.Count -gt 0) { ($labels -join ', ') } else { 'os revisores escolhidos nesta rodada' }
 
@@ -259,6 +283,8 @@ if ($blockingReasons -contains 'vnext-pending-resubmission') {
     $requiredPrompt = "Antes de encerrar a revisão por pares: há uma vN+1 autorada e ainda não re-submetida ($roundLabel). Pela opção 1 (D2), ofereça a 2ª rodada ao painel e, após re-submeter, re-rode este closeout com -VNextState resubmitted; se o humano cientemente declinar a re-submissão, re-rode com -VNextState resubmissionDeclinedByHuman + -ResubmissionDeclinedBy, -ResubmissionDeclineReason e -RoundId."
 } elseif ($blockingReasons -contains 'vnext-resubmission-decline-unaudited') {
     $requiredPrompt = "Antes de encerrar a revisão por pares: o declínio de re-submissão da vN+1 ($roundLabel) exige registro auditável — informe -ResubmissionDeclinedBy (quem decidiu), -ResubmissionDeclineReason (por quê) e -RoundId (qual rodada)."
+} elseif ($blockingReasons -contains 'insufficient-diversity-after-fallback') {
+    $requiredPrompt = 'Antes de encerrar a revisão por pares: a composição final após fallback ficou com diversidade insuficiente. Não use o rótulo revisão por pares; registre como parecer solo, segunda opinião ou rodada não concluída.'
 } elseif ($requiresOffer -and ($blockingReasons -contains 'preferred-reviewers-offer-missing' -or $blockingReasons -contains 'preferred-reviewers-offer-state-invalid-for-manual-selection')) {
     $requiredPrompt = "Antes de encerrar a revisão por pares: você quer salvar $selectedText como revisores preferidos desta máquina em ${preferredPath}? Se responder sim, vou usar Set-LlmDelegatePreferredReviewers.ps1; se preferir não salvar ou adiar, sigo sem bloquear esta rodada."
 } elseif ($blockingReasons.Count -gt 0) {

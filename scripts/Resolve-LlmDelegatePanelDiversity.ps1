@@ -37,6 +37,8 @@
 .PARAMETER CandidatesJson
     JSON (array) dos candidatos com veredito do gate: [{ "targetModelKey": "openai/gpt-5.5",
     "verdict": "allow|ask|deny", "backend": "codex" }]. `backend` e opcional (so repassado).
+    Para avaliacao pos-despacho, aceita tambem `state=responded` e `countsForDiversity=false`
+    em tentativas de fallback/skip; skips nao contam familias.
 .PARAMETER Floor
     Piso de familias distintas. Default 2. Nao baixar para 1 (reintroduz o bug).
 .PARAMETER AuthorFamily
@@ -81,7 +83,11 @@ $dispatchable = [System.Collections.Generic.List[object]]::new()
 
 # 1) Familias ja despachaveis (allow).
 foreach ($it in $items) {
+    $countsRaw = Get-Prop $it 'countsForDiversity'
+    if ($countsRaw -eq $false) { continue }
     $verdict = [string](Get-Prop $it 'verdict')
+    $stateValue = [string](Get-Prop $it 'state')
+    if ([string]::IsNullOrWhiteSpace($verdict) -and $stateValue -eq 'responded') { $verdict = 'allow' }
     $target = [string](Get-Prop $it 'targetModelKey')
     $fam = Get-Family $target
     if ([string]::IsNullOrWhiteSpace($fam)) { continue }
@@ -94,7 +100,11 @@ foreach ($it in $items) {
 
 # 2) `ask` que adicionam familia ainda nao coberta por `allow` (candidatos a autorizar em lote).
 foreach ($it in $items) {
+    $countsRaw = Get-Prop $it 'countsForDiversity'
+    if ($countsRaw -eq $false) { continue }
     $verdict = [string](Get-Prop $it 'verdict')
+    $stateValue = [string](Get-Prop $it 'state')
+    if ([string]::IsNullOrWhiteSpace($verdict) -and $stateValue -eq 'responded') { $verdict = 'allow' }
     if ($verdict -ne 'ask') { continue }
     $target = [string](Get-Prop $it 'targetModelKey')
     $fam = Get-Family $target
@@ -108,8 +118,11 @@ foreach ($it in $items) {
 $allowCount = $allowFamilies.Count
 $potentialCount = $potentialFamilies.Count
 
+$hasFallbackEvidence = @($items | Where-Object { -not [string]::IsNullOrWhiteSpace([string](Get-Prop $_ 'fallbackOf')) -or [string](Get-Prop $_ 'attemptRole') -eq 'fallback' }).Count -gt 0
+
 $state = if ($allowCount -ge $Floor) { 'panelReady' }
 elseif ($potentialCount -ge $Floor) { 'needsBatchAuthorization' }
+elseif ($hasFallbackEvidence) { 'insufficientDiversityAfterFallback' }
 else { 'insufficientDiversity' }
 
 $authorInPanel = $false
