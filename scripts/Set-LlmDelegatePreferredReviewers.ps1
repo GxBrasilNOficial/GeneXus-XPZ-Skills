@@ -60,7 +60,8 @@ function Get-Prop {
 $hardVetoPatterns = @('mistral-large-3', 'nemotron-3-ultra')
 $allowedBackends = @('opencode', 'codex', 'claude-code', 'copilot', 'gemini')
 $allowedInvokeArgs = @('backend', 'model', 'profile', 'localProvider', 'oss', 'timeoutSec')
-$supportedFallbackActivateOn = @('quota', 'timeout', 'error', 'unavailable', 'noResponse')
+$supportedFallbackActivateOn = @('quota', 'timeout', 'error', 'unavailable')
+$legacyFallbackActivateOn = @('quota', 'timeout', 'error', 'unavailable', 'noResponse')
 
 function Assert-ValidRankSet {
     param([object[]]$Reviewers)
@@ -85,12 +86,20 @@ function ConvertTo-SupportedFallbackPolicy {
     $mode = [string](Get-Prop $Policy 'mode')
     if ($mode -ne 'ordered-chain') { throw "BLOCK: fallbackPolicy.mode suportado e somente 'ordered-chain'; veio '$mode'" }
     $activateOn = @(Get-Prop $Policy 'defaultActivateOn' | ForEach-Object { [string]$_ })
-    if ($activateOn.Count -ne $supportedFallbackActivateOn.Count) {
+    $legacyNoResponsePolicy = ($activateOn.Count -eq $legacyFallbackActivateOn.Count)
+    if ($legacyNoResponsePolicy) {
+        for ($i = 0; $i -lt $legacyFallbackActivateOn.Count; $i++) {
+            if ($activateOn[$i] -ne $legacyFallbackActivateOn[$i]) { $legacyNoResponsePolicy = $false; break }
+        }
+    }
+    if (-not $legacyNoResponsePolicy -and $activateOn.Count -ne $supportedFallbackActivateOn.Count) {
         throw "BLOCK: fallbackPolicy.defaultActivateOn deve casar o contrato suportado: $($supportedFallbackActivateOn -join ', ')"
     }
-    for ($i = 0; $i -lt $supportedFallbackActivateOn.Count; $i++) {
-        if ($activateOn[$i] -ne $supportedFallbackActivateOn[$i]) {
-            throw "BLOCK: fallbackPolicy.defaultActivateOn deve preservar a ordem suportada: $($supportedFallbackActivateOn -join ', ')"
+    if (-not $legacyNoResponsePolicy) {
+        for ($i = 0; $i -lt $supportedFallbackActivateOn.Count; $i++) {
+            if ($activateOn[$i] -ne $supportedFallbackActivateOn[$i]) {
+                throw "BLOCK: fallbackPolicy.defaultActivateOn deve preservar a ordem suportada: $($supportedFallbackActivateOn -join ', ')"
+            }
         }
     }
     $gateAsk = [string](Get-Prop $Policy 'gateAskBehavior')

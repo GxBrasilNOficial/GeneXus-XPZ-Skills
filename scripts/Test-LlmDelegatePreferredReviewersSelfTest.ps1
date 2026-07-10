@@ -213,6 +213,26 @@ try {
     try { & $setScript -ReviewersJson $dupRank -OutputPath (Join-Path $tempRoot 'dup-rank.json') | Out-Null } catch { $blocked = ([string]$_.Exception.Message -like '*rank duplicado*') }
     Assert-True $blocked 'rank duplicado deveria bloquear no Set.'
 
+    $legacyPolicy = @'
+{
+  "fallbackPolicy": {
+    "mode": "ordered-chain",
+    "defaultActivateOn": ["quota", "timeout", "error", "unavailable", "noResponse"],
+    "gateAskBehavior": "ask-human",
+    "gateDenyBehavior": "stop-or-suggest-manual-alternative"
+  },
+  "reviewers": [
+    { "backend": "codex", "targetModelKey": "openai/gpt-5.5", "invokeArgs": { "backend": "codex", "model": "gpt-5.5" } }
+  ]
+}
+'@
+    $legacyPath = Join-Path $tempRoot 'legacy-policy.json'
+    & $setScript -ReviewersJson $legacyPolicy -OutputPath $legacyPath | Out-Null
+    $legacyWritten = Get-Content -LiteralPath $legacyPath -Raw -Encoding utf8 | ConvertFrom-Json
+    Assert-True (@($legacyWritten.fallbackPolicy.defaultActivateOn).Count -eq 4) 'fallbackPolicy legado com noResponse deveria ser normalizado para 4 estados no Set.'
+    $legacyResolved = & $resolveScript -PreferredPath $legacyPath -CapabilitiesPath $capPath | ConvertFrom-Json
+    Assert-True (@($legacyResolved.fallbackPolicy.defaultActivateOn).Count -eq 4) 'fallbackPolicy legado normalizado deveria resolver com 4 estados.'
+
     $badPolicy = @'
 {
   "fallbackPolicy": { "mode": "custom", "defaultActivateOn": ["error"], "gateAskBehavior": "skip", "gateDenyBehavior": "skip" },

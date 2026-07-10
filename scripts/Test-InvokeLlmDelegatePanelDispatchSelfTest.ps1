@@ -12,7 +12,7 @@
     sem single-flight (fake NÃO re-invocado + concurrencySaturationWarning); classificação
     mecânica (responded mesmo off-task); -Cd (precedência + fail-closed); contrato (stdout 1 linha
     JSON Kind/SchemaVersion PascalCase, acentos íntegros, stderr separado, state subset,
-    targetModelKey vazio->null, ledger por estado, unavailableCount, ReviewersJson inline/arquivo/
+    targetModelKey vazio->null, ledger por estado, unavailableCount, quotaCount, ReviewersJson inline/arquivo/
     inválido, RoundId ausente->guid, slug Windows-safe).
 
     O harness é invocado como PROCESSO FILHO (pwsh -File) com stdout/stderr redirecionados a
@@ -103,8 +103,8 @@ if ($model -match 'sleep') { Start-Sleep -Milliseconds 1200 }
 if ($model -match 'timeout') { Start-Sleep -Milliseconds 5000 }
 Append-Log("$fam`tEXIT`t$([DateTime]::UtcNow.Ticks)`t$model")
 if ($model -match 'cota') {
-    # evento de erro de stream com 429/limite de uso -> Invoke-OpenCode lanca BLOCK; harness -> unavailable
-    '{"type":"error","error":{"data":{"message":"limite de uso do provider (HTTP 429) weekly usage limit"}}}'
+    # evento de erro de stream com 402/quota/saldo -> Invoke-OpenCode lanca BLOCK; harness -> quota
+    '{"type":"error","error":{"data":{"message":"Payment Required: insufficient coding plan balance (HTTP 402) sem quota livre"}}}'
 } elseif ($model -match 'empty') {
     '{"type":"step_finish","part":{"reason":"stop"}}'
 } else {
@@ -458,14 +458,14 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
     Assert-True ($vtext -match 'revisão') 'acentos: o texto do verdict deveria preservar acentuação pt-BR (revisão)'
 
     # =======================================================================================
-    # 8b) CLASSIFICAÇÃO EM DESPACHO: cota → unavailable; timeout → timeout
+    # 8b) CLASSIFICAÇÃO EM DESPACHO: cota → quota; timeout → timeout
     # =======================================================================================
-    # cota: fake-opencode emite erro de stream com 429/limite de uso -> adapter lança BLOCK -> unavailable
+    # cota: fake-opencode emite erro de stream com 402/quota/saldo -> adapter lança BLOCK -> quota
     $r = Invoke-Harness -Reviewers @(@{ backend = 'opencode'; targetModelKey = 'ollama-cloud/cota-1'; invokeArgs = @{} }) `
         -Sensitivity 'public' -Extra @{ OpenCodeConfigPath = $ocCfg }
     $rv = Get-Reviewer $r.json 0
-    Assert-True ($rv.state -eq 'unavailable') "cota: 429/limite de uso em despacho deveria virar unavailable; got $($rv.state)"
-    Assert-True ([int]$r.json.unavailableCount -ge 1) 'cota: unavailableCount >= 1'
+    Assert-True ($rv.state -eq 'quota') "cota: 402/quota/saldo em despacho deveria virar quota; got $($rv.state)"
+    Assert-True ([int]$r.json.quotaCount -ge 1) 'cota: quotaCount >= 1'
     Assert-True ($null -ne $rv.errorPath -or $null -ne $rv.statePath) 'cota: deveria gravar ledger'
 
     # timeout: fake dorme além do -TimeoutSec (via invokeArgs.timeoutSec) -> adapter "excedeu...encerrado" -> timeout
@@ -607,7 +607,7 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
     Assert-True ($r.json.Kind -eq 'xpz-llm-panel-dispatch-result') 'contrato: Kind PascalCase'
     Assert-True ([int]$r.json.SchemaVersion -eq 1) 'contrato: SchemaVersion=1 PascalCase'
     # state subset
-    $validStates = @('responded', 'error', 'unavailable', 'timeout', 'gateAsk', 'gateDeny')
+    $validStates = @('responded', 'error', 'quota', 'unavailable', 'timeout', 'gateAsk', 'gateDeny')
     foreach ($rev in $r.json.reviewers) { Assert-True ($validStates -contains $rev.state) "contrato: state '$($rev.state)' deveria estar no subset valido" }
     # targetModelKey vazio -> null (claude-code sem model)
     $rvClaude = Get-Reviewer $r.json 1

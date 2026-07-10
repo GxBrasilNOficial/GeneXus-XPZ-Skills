@@ -24,9 +24,9 @@
     Despacho CONCORRENTE: ForEach-Object -Parallel -ThrottleLimit 8 + SemaphoreSlim($OllamaConcurrency)
     via $using: SO para family 'ollama-cloud' (validado empirico PS 7.6.2). Captura antes do Dispose.
 
-    Classificacao do resultado (ESTRUTURAL, sem parsear prosa): texto nao-vazio -> responded;
-    sentinela de cota (BLOCK + 429/limite de uso) -> unavailable; timeout (BLOCK excedeu ... encerrado)
-    -> timeout; vazio/resto -> error. Sem single-flight (diferido).
+    Classificacao do resultado (ESTRUTURAL, sem parsear prosa de parecer): texto nao-vazio -> responded;
+    sentinela de cota/saldo/limite -> quota; timeout (BLOCK excedeu ... encerrado) -> timeout;
+    vazio/resto -> error. Sem single-flight (diferido).
 
     DISCIPLINA DE STDOUT: este harness e processo filho. panel-summary.json e a UNICA linha de stdout.
     Todo texto humano sai por [Console]::Error (Write-Host/Write-Warning/Write-Information VAZAM para o
@@ -128,6 +128,14 @@ function Get-Slug {
     param([string]$Value)
     if ([string]::IsNullOrWhiteSpace($Value)) { return 'na' }
     return ([regex]::Replace($Value, '[^A-Za-z0-9._-]', '-'))
+}
+
+$quotaFailurePattern = '(?i)(^|[^0-9])402([^0-9]|$)|Payment Required|insufficient coding plan balance|quota|rate limit|weekly usage limit|limite de uso|sem quota|saldo insuficiente'
+
+function Test-QuotaFailureMessage {
+    param([AllowNull()] [string] $Message)
+    if ([string]::IsNullOrWhiteSpace($Message)) { return $false }
+    return ($Message -match $script:quotaFailurePattern)
 }
 
 function Test-InvokeArgsBackendDivergence {
@@ -505,6 +513,7 @@ try {
             $useSem = ($item.family -eq 'ollama-cloud')
             $acquired = $false
             $result = $null
+            $quotaPattern = $using:quotaFailurePattern
             # try EXTERNO envolve TODO o corpo: nada (nem Wait, nem Get-Date, nem o build do objeto)
             # escapa do runspace (conforme v11 "o bloco nunca lanca para fora").
             try {
@@ -528,8 +537,8 @@ try {
                 $state = $null; $textOut = $null; $errText = $null
                 if ($null -ne $errRec) {
                     $msg = [string]$errRec.Exception.Message
-                    if ($msg -match 'BLOCK:' -and ($msg -match '429' -or $msg -match 'weekly usage limit' -or $msg -match 'limite de uso')) {
-                        $state = 'unavailable'
+                    if ($msg -match 'BLOCK:' -and $msg -match $quotaPattern) {
+                        $state = 'quota'
                     } elseif ($msg -match 'excedeu' -and $msg -match 'foi encerrado') {
                         $state = 'timeout'
                     } else {
@@ -602,7 +611,7 @@ foreach ($res in $collected) {
 # fallback passa pelo mesmo gate/adapter via invocacao recursiva sem herdar autorizacao.
 # Estados de nao tentativa nunca contam diversidade.
 # --------------------------------------------------------------------------------------------
-$activateFallbackOn = @('quota', 'timeout', 'error', 'unavailable', 'noResponse')
+$activateFallbackOn = @('quota', 'timeout', 'error', 'unavailable')
 $skipPolicyStates = @('gateAsk', 'gateDeny')
 $originalRecords = @($records)
 foreach ($rec in $originalRecords) {
@@ -700,6 +709,7 @@ foreach ($rec in $originalRecords) {
         } catch {
             $fallbackState = 'error'
             if ([string]$_.Exception.Message -match 'timeout|excedeu') { $fallbackState = 'timeout' }
+            elseif (Test-QuotaFailureMessage -Message ([string]$_.Exception.Message)) { $fallbackState = 'quota' }
             $fbRecord = [pscustomobject]@{
                 backend        = [string](Get-Prop $fb 'backend')
                 targetModelKey = [string](Get-Prop $fb 'targetModelKey')
@@ -780,7 +790,7 @@ foreach ($rec in $records) {
                 $rec.errorPath = $path
             }
         }
-        { $_ -in @('gateAsk', 'gateDeny', 'unavailable', 'skippedByPolicy', 'skippedAfterSuccess', 'notAttempted') } {
+            { $_ -in @('gateAsk', 'gateDeny', 'quota', 'unavailable', 'skippedByPolicy', 'skippedAfterSuccess', 'notAttempted') } {
             if ([string]::IsNullOrWhiteSpace([string]$rec.statePath)) {
                 $path = Join-Path $ledgerDir "$baseName.state.txt"
                 Set-Content -LiteralPath $path -Value ([string]$rec.reason) -Encoding utf8
@@ -797,11 +807,11 @@ foreach ($rec in $records) {
     if ($rec.Contains('__errorText')) { $rec.Remove('__errorText') }
 }
 
-# concurrencySaturationWarning: 2+ ollama-cloud/* em error neste lote (sem redisparo - single-flight diferido)
+# concurrencySaturationWarning: 2+ ollama-cloud/* em error neste lote (sem redisparo automatico - single-flight diferido)
 $ollamaErrors = @($records | Where-Object { $_.family -eq 'ollama-cloud' -and $_.state -eq 'error' }).Count
 $concurrencySaturationWarning = $null
 if ($ollamaErrors -ge 2) {
-    $concurrencySaturationWarning = "concurrencySaturationWarning: $ollamaErrors revisores ollama-cloud/* terminaram em error neste lote; possivel saturacao de concorrencia. Sem redisparo automatico (single-flight diferido) — o orquestrador pode redisparar isolado."
+    $concurrencySaturationWarning = "concurrencySaturationWarning: $ollamaErrors revisores ollama-cloud/* terminaram em error neste lote; possivel saturacao de concorrencia. Sem redisparo automatico (single-flight diferido) — o orquestrador so pode redisparar isolado com decisao humana explicita."
 }
 
 # Contagens
@@ -809,6 +819,7 @@ $dispatched = @($records | Where-Object { [int]$_.attempts -ge 1 }).Count
 $respondedCount = @($records | Where-Object { $_.state -eq 'responded' }).Count
 $errorCount = @($records | Where-Object { $_.state -eq 'error' }).Count
 $timeoutCount = @($records | Where-Object { $_.state -eq 'timeout' }).Count
+$quotaCount = @($records | Where-Object { $_.state -eq 'quota' }).Count
 $unavailableCount = @($records | Where-Object { $_.state -eq 'unavailable' }).Count
 $gateAskCount = @($records | Where-Object { $_.state -eq 'gateAsk' }).Count
 $gateDenyCount = @($records | Where-Object { $_.state -eq 'gateDeny' }).Count
@@ -832,6 +843,7 @@ $summary = [ordered]@{
     respondedCount               = $respondedCount
     errorCount                   = $errorCount
     timeoutCount                 = $timeoutCount
+    quotaCount                   = $quotaCount
     unavailableCount             = $unavailableCount
     gateAsk                      = $gateAskCount
     gateDeny                     = $gateDenyCount
