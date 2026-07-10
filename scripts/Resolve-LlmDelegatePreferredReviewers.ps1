@@ -86,6 +86,40 @@ function Test-HardVetoTarget {
     return $false
 }
 
+$supportedFallbackActivateOn = @('quota', 'timeout', 'error', 'unavailable', 'noResponse')
+
+function Assert-ValidRankSet {
+    param([object[]]$Reviewers)
+    $seenRanks = [System.Collections.Generic.HashSet[int]]::new()
+    foreach ($reviewer in @($Reviewers)) {
+        $rank = [int](Get-Prop $reviewer 'rank')
+        if ($rank -lt 1) { throw "BLOCK: rank invalido ($rank); use inteiros positivos a partir de 1" }
+        if (-not $seenRanks.Add($rank)) { throw "BLOCK: rank duplicado ($rank) em preferred-reviewers.json" }
+    }
+}
+
+function Assert-SupportedFallbackPolicy {
+    param($Policy)
+    if ($null -eq $Policy) { return }
+    $mode = [string](Get-Prop $Policy 'mode')
+    if ($mode -ne 'ordered-chain') { throw "BLOCK: fallbackPolicy.mode suportado e somente 'ordered-chain'; veio '$mode'" }
+    $activateOn = @(Get-Prop $Policy 'defaultActivateOn' | ForEach-Object { [string]$_ })
+    if ($activateOn.Count -ne $supportedFallbackActivateOn.Count) {
+        throw "BLOCK: fallbackPolicy.defaultActivateOn deve casar o contrato suportado: $($supportedFallbackActivateOn -join ', ')"
+    }
+    for ($i = 0; $i -lt $supportedFallbackActivateOn.Count; $i++) {
+        if ($activateOn[$i] -ne $supportedFallbackActivateOn[$i]) {
+            throw "BLOCK: fallbackPolicy.defaultActivateOn deve preservar a ordem suportada: $($supportedFallbackActivateOn -join ', ')"
+        }
+    }
+    $gateAsk = [string](Get-Prop $Policy 'gateAskBehavior')
+    if ($gateAsk -ne 'ask-human') { throw "BLOCK: fallbackPolicy.gateAskBehavior suportado e somente 'ask-human'; veio '$gateAsk'" }
+    $gateDeny = [string](Get-Prop $Policy 'gateDenyBehavior')
+    if ($gateDeny -ne 'stop-or-suggest-manual-alternative') {
+        throw "BLOCK: fallbackPolicy.gateDenyBehavior suportado e somente 'stop-or-suggest-manual-alternative'; veio '$gateDeny'"
+    }
+}
+
 function Assert-ReviewerValid {
     param($Reviewer, [string]$OwnerLabel)
     $backend = [string](Get-Prop $Reviewer 'backend')
@@ -190,6 +224,8 @@ try { $pref = Get-Content -LiteralPath $PreferredPath -Raw | ConvertFrom-Json } 
 $schemaVersion = Get-Prop $pref 'schemaVersion'
 if ($null -eq $schemaVersion) { $schemaVersion = 1 }
 $reviewers = @(Get-Prop $pref 'reviewers')
+$fallbackPolicy = Get-Prop $pref 'fallbackPolicy'
+Assert-SupportedFallbackPolicy -Policy $fallbackPolicy
 $manifestMap = Get-ManifestModelMap -Path $CapabilitiesPath
 
 $out = [System.Collections.Generic.List[object]]::new()
@@ -198,12 +234,14 @@ foreach ($r in $reviewers) {
     $rankCounter++
     $out.Add((ConvertTo-ResolvedReviewer -Reviewer $r -ManifestMap $manifestMap -DefaultRank $rankCounter))
 }
+$outSorted = @($out | Sort-Object -Property @{ Expression = { [int](Get-Prop $_ 'rank') } }, @{ Expression = { [string](Get-Prop $_ 'targetModelKey') } })
+Assert-ValidRankSet -Reviewers $outSorted
 
 [pscustomobject]@{
     hasPreferences = $true
     schemaVersion  = [int]$schemaVersion
     updatedAt      = [string](Get-Prop $pref 'updatedAt')
-    fallbackPolicy = (Get-Prop $pref 'fallbackPolicy')
-    reviewers      = @($out)
+    fallbackPolicy = $fallbackPolicy
+    reviewers      = @($outSorted)
     note           = $note
 } | ConvertTo-Json -Depth 12

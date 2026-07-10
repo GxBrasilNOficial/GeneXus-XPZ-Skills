@@ -508,6 +508,17 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
     Assert-True ($rv1.activationReason -eq 'error') 'fallback ativado: activationReason deveria ser error.'
     Assert-True ($rv1.countsForDiversity -eq $true) 'fallback respondido deve contar diversidade.'
 
+    $r = Invoke-Harness -Reviewers @(@{
+            backend = 'opencode'; targetModelKey = 'openai/empty-primary-timeout-fallback'; invokeArgs = @{}
+            fallbackChain = @(
+                @{ backend = 'opencode'; targetModelKey = 'openai/timeout-fallback'; invokeArgs = @{ backend = 'opencode'; model = 'openai/timeout-fallback'; timeoutSec = 2 } }
+            )
+        }) -Sensitivity 'public' -Extra @{ OpenCodeConfigPath = $ocCfg }
+    Assert-True (@($r.json.reviewers).Count -eq 2) 'fallback timeout: deveria registrar primario + fallback.'
+    $rv1 = Get-Reviewer $r.json 1
+    Assert-True ($rv1.state -eq 'timeout') "fallback timeout: fallback deveria registrar timeout; got $($rv1.state)"
+    Assert-True ($rv1.countsForDiversity -eq $false) 'fallback timeout nao deve contar diversidade.'
+
     Set-Content -LiteralPath $concLog -Value '' -NoNewline -Encoding utf8
     $r = Invoke-Harness -Reviewers @(@{
             backend = 'opencode'; targetModelKey = 'openai/bad-primary'; invokeArgs = @{ backend = 'opencode'; model = 'openai/bad-primary' }

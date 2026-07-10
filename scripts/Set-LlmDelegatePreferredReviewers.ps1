@@ -60,6 +60,52 @@ function Get-Prop {
 $hardVetoPatterns = @('mistral-large-3', 'nemotron-3-ultra')
 $allowedBackends = @('opencode', 'codex', 'claude-code', 'copilot', 'gemini')
 $allowedInvokeArgs = @('backend', 'model', 'profile', 'localProvider', 'oss', 'timeoutSec')
+$supportedFallbackActivateOn = @('quota', 'timeout', 'error', 'unavailable', 'noResponse')
+
+function Assert-ValidRankSet {
+    param([object[]]$Reviewers)
+    $seenRanks = [System.Collections.Generic.HashSet[int]]::new()
+    foreach ($reviewer in @($Reviewers)) {
+        $rank = [int](Get-Prop $reviewer 'rank')
+        if ($rank -lt 1) { throw "BLOCK: rank invalido ($rank); use inteiros positivos a partir de 1" }
+        if (-not $seenRanks.Add($rank)) { throw "BLOCK: rank duplicado ($rank) em revisores preferidos" }
+    }
+}
+
+function ConvertTo-SupportedFallbackPolicy {
+    param($Policy)
+    if ($null -eq $Policy) {
+        return [pscustomobject]@{
+            mode              = 'ordered-chain'
+            defaultActivateOn = @($supportedFallbackActivateOn)
+            gateAskBehavior   = 'ask-human'
+            gateDenyBehavior  = 'stop-or-suggest-manual-alternative'
+        }
+    }
+    $mode = [string](Get-Prop $Policy 'mode')
+    if ($mode -ne 'ordered-chain') { throw "BLOCK: fallbackPolicy.mode suportado e somente 'ordered-chain'; veio '$mode'" }
+    $activateOn = @(Get-Prop $Policy 'defaultActivateOn' | ForEach-Object { [string]$_ })
+    if ($activateOn.Count -ne $supportedFallbackActivateOn.Count) {
+        throw "BLOCK: fallbackPolicy.defaultActivateOn deve casar o contrato suportado: $($supportedFallbackActivateOn -join ', ')"
+    }
+    for ($i = 0; $i -lt $supportedFallbackActivateOn.Count; $i++) {
+        if ($activateOn[$i] -ne $supportedFallbackActivateOn[$i]) {
+            throw "BLOCK: fallbackPolicy.defaultActivateOn deve preservar a ordem suportada: $($supportedFallbackActivateOn -join ', ')"
+        }
+    }
+    $gateAsk = [string](Get-Prop $Policy 'gateAskBehavior')
+    if ($gateAsk -ne 'ask-human') { throw "BLOCK: fallbackPolicy.gateAskBehavior suportado e somente 'ask-human'; veio '$gateAsk'" }
+    $gateDeny = [string](Get-Prop $Policy 'gateDenyBehavior')
+    if ($gateDeny -ne 'stop-or-suggest-manual-alternative') {
+        throw "BLOCK: fallbackPolicy.gateDenyBehavior suportado e somente 'stop-or-suggest-manual-alternative'; veio '$gateDeny'"
+    }
+    return [pscustomobject]@{
+        mode              = 'ordered-chain'
+        defaultActivateOn = @($supportedFallbackActivateOn)
+        gateAskBehavior   = 'ask-human'
+        gateDenyBehavior  = 'stop-or-suggest-manual-alternative'
+    }
+}
 
 $parsed = $null
 try { $parsed = $ReviewersJson | ConvertFrom-Json } catch {
@@ -182,20 +228,16 @@ foreach ($it in $items) {
     if ($converted.ContainsKey('veto') -and $converted['veto']) { $discardedVeto.Add([string]$converted['target']); continue }
     $kept.Add($converted['reviewer'])
 }
+$keptSorted = @($kept | Sort-Object -Property @{ Expression = { [int](Get-Prop $_ 'rank') } }, @{ Expression = { [string](Get-Prop $_ 'targetModelKey') } })
+Assert-ValidRankSet -Reviewers $keptSorted
+$fallbackPolicy = ConvertTo-SupportedFallbackPolicy -Policy $fallbackPolicyIn
 
 $doc = [pscustomobject]@{
     schemaVersion  = 2
     updatedAt      = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
     migratedFrom   = if ($null -eq $inputSchema) { 1 } else { $inputSchema }
-    fallbackPolicy = if ($null -ne $fallbackPolicyIn) { $fallbackPolicyIn } else {
-        [pscustomobject]@{
-            mode              = 'ordered-chain'
-            defaultActivateOn = @('quota', 'timeout', 'error', 'unavailable', 'noResponse')
-            gateAskBehavior   = 'ask-human'
-            gateDenyBehavior  = 'stop-or-suggest-manual-alternative'
-        }
-    }
-    reviewers      = @($kept)
+    fallbackPolicy = $fallbackPolicy
+    reviewers      = @($keptSorted)
 }
 $docJson = $doc | ConvertTo-Json -Depth 12
 

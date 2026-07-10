@@ -20,6 +20,8 @@ $ErrorActionPreference = 'Stop'
 #  (G) Divergencia invokeArgs.backend no primario e em item N>0 de fallbackChain bloqueia
 #      antes de qualquer dispatcher.
 #  (H) Ciclo/duplicidade em fallbackChain bloqueia.
+#  (I) Rank e politica: titulares saem ordenados por rank; rank invalido/duplicado e
+#      fallbackPolicy fora do contrato suportado bloqueiam.
 
 $scriptsDir = $PSScriptRoot
 $setScript = Join-Path $scriptsDir 'Set-LlmDelegatePreferredReviewers.ps1'
@@ -181,6 +183,47 @@ try {
     $blocked = $false
     try { & $setScript -ReviewersJson $cycleFallback -OutputPath (Join-Path $tempRoot 'cycle.json') | Out-Null } catch { $blocked = ([string]$_.Exception.Message -like '*ciclo/duplicidade*') }
     Assert-True $blocked 'Ciclo/duplicidade em fallbackChain deveria bloquear.'
+
+    # (I) rank ordena a saida e valores invalidos/duplicados bloqueiam.
+    $outOfOrder = @'
+[
+  { "backend": "codex", "targetModelKey": "openai/gpt-5.5", "rank": 20, "invokeArgs": { "backend": "codex", "model": "gpt-5.5" } },
+  { "backend": "opencode", "targetModelKey": "ollama-cloud/deepseek-v4-pro", "rank": 10, "invokeArgs": { "backend": "opencode", "model": "ollama-cloud/deepseek-v4-pro" } }
+]
+'@
+    $rankPath = Join-Path $tempRoot 'ranked.json'
+    & $setScript -ReviewersJson $outOfOrder -OutputPath $rankPath | Out-Null
+    $ranked = Get-Content -LiteralPath $rankPath -Raw -Encoding utf8 | ConvertFrom-Json
+    Assert-True ($ranked.reviewers[0].rank -eq 10) "Titular de rank 10 deveria sair antes; veio rank $($ranked.reviewers[0].rank)."
+    $rankedResolved = & $resolveScript -PreferredPath $rankPath -CapabilitiesPath $capPath | ConvertFrom-Json
+    Assert-True ($rankedResolved.reviewers[0].rank -eq 10) "Resolve deveria preservar a ordenacao por rank; veio rank $($rankedResolved.reviewers[0].rank)."
+
+    $badRank = '[{ "backend": "codex", "targetModelKey": "openai/gpt-5.5", "rank": 0, "invokeArgs": { "backend": "codex", "model": "gpt-5.5" } }]'
+    $blocked = $false
+    try { & $setScript -ReviewersJson $badRank -OutputPath (Join-Path $tempRoot 'bad-rank.json') | Out-Null } catch { $blocked = ([string]$_.Exception.Message -like '*rank invalido*') }
+    Assert-True $blocked 'rank 0 deveria bloquear no Set.'
+
+    $dupRank = @'
+[
+  { "backend": "codex", "targetModelKey": "openai/gpt-5.5", "rank": 1, "invokeArgs": { "backend": "codex", "model": "gpt-5.5" } },
+  { "backend": "opencode", "targetModelKey": "ollama-cloud/deepseek-v4-pro", "rank": 1, "invokeArgs": { "backend": "opencode", "model": "ollama-cloud/deepseek-v4-pro" } }
+]
+'@
+    $blocked = $false
+    try { & $setScript -ReviewersJson $dupRank -OutputPath (Join-Path $tempRoot 'dup-rank.json') | Out-Null } catch { $blocked = ([string]$_.Exception.Message -like '*rank duplicado*') }
+    Assert-True $blocked 'rank duplicado deveria bloquear no Set.'
+
+    $badPolicy = @'
+{
+  "fallbackPolicy": { "mode": "custom", "defaultActivateOn": ["error"], "gateAskBehavior": "skip", "gateDenyBehavior": "skip" },
+  "reviewers": [
+    { "backend": "codex", "targetModelKey": "openai/gpt-5.5", "invokeArgs": { "backend": "codex", "model": "gpt-5.5" } }
+  ]
+}
+'@
+    $blocked = $false
+    try { & $setScript -ReviewersJson $badPolicy -OutputPath (Join-Path $tempRoot 'bad-policy.json') | Out-Null } catch { $blocked = ([string]$_.Exception.Message -like '*fallbackPolicy.mode*') }
+    Assert-True $blocked 'fallbackPolicy fora do contrato suportado deveria bloquear no Set.'
 
     Write-Output 'OK: Test-LlmDelegatePreferredReviewersSelfTest.ps1'
 }

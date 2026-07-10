@@ -680,7 +680,14 @@ foreach ($rec in $originalRecords) {
             }
             $p = Start-Process -FilePath 'pwsh' -ArgumentList $argList -NoNewWindow -PassThru `
                 -RedirectStandardOutput $fbOutPath -RedirectStandardError $fbErrPath
-            [void]$p.WaitForExit(180000)
+            $exited = $p.WaitForExit(180000)
+            if (-not $exited) {
+                try {
+                    $p.Kill($true)
+                    $p.WaitForExit()
+                } catch { }
+                throw 'fallback dispatcher timeout excedeu 180000ms; processo encerrado'
+            }
             $fbStdout = ''
             if (Test-Path -LiteralPath $fbOutPath -PathType Leaf) {
                 $fbStdout = Get-Content -LiteralPath $fbOutPath -Raw -Encoding utf8
@@ -691,11 +698,13 @@ foreach ($rec in $originalRecords) {
             $fbSummary = ($fbStdout.Trim() -split "`r?`n" | Select-Object -Last 1) | ConvertFrom-Json
             $fbRecord = @($fbSummary.reviewers)[0]
         } catch {
+            $fallbackState = 'error'
+            if ([string]$_.Exception.Message -match 'timeout|excedeu') { $fallbackState = 'timeout' }
             $fbRecord = [pscustomobject]@{
                 backend        = [string](Get-Prop $fb 'backend')
                 targetModelKey = [string](Get-Prop $fb 'targetModelKey')
                 family         = (Get-Prop $fb 'family')
-                state          = 'error'
+                state          = $fallbackState
                 reason         = "fallback dispatcher falhou: $($_.Exception.Message)"
                 attempts       = 0
             }
