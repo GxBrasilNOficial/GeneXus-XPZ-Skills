@@ -436,14 +436,19 @@ function Resolve-GeneXusKbValidationEnvironment {
 function Test-GeneXusKbActiveEnvironmentMatchesValidation {
     param(
         [AllowNull()][string]$ActiveEnvironment,
-        [hashtable]$DeploymentEnvironmentContext
+        [object]$DeploymentEnvironmentContext
     )
 
     if ($null -eq $DeploymentEnvironmentContext) {
         return $true
     }
 
-    $resolved = $DeploymentEnvironmentContext['validationEnvironmentResolved']
+    if ($DeploymentEnvironmentContext -is [System.Collections.IDictionary]) {
+        $resolved = $DeploymentEnvironmentContext['validationEnvironmentResolved']
+    } else {
+        $property = $DeploymentEnvironmentContext.PSObject.Properties['validationEnvironmentResolved']
+        $resolved = if ($null -ne $property) { $property.Value } else { $null }
+    }
     if ([string]::IsNullOrWhiteSpace($resolved)) {
         return $true
     }

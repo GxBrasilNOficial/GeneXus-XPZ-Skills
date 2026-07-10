@@ -52,6 +52,28 @@ if ($d.inert.Count -ne 1) { throw "ASSERT_FAILED: caso D deveria ter 1 inerte, a
 $e = Get-GeneXusPostBuildEventClassification -PostBuildEventLines @($sino) -RegisteredHashes @()
 if ($e.shouldDowngrade) { throw 'ASSERT_FAILED: caso E sino-only sem registro nao deveria rebaixar' }
 
+# Caso F: cronometro/data/sucesso de pos-build -> diagnostico benigno sem registro.
+$timer = @(
+    'Powershell New-TimeSpan -Start (Get-Content Inicio.txt) -End (Get-Date)',
+    'Days              : 0',
+    'Hours             : 0',
+    'Minutes           : 0',
+    'Seconds           : 49',
+    'Milliseconds      : 33',
+    'Ticks             : 490339218',
+    'TotalDays         : 0,000567522243055555',
+    'TotalHours        : 0,0136205338333333',
+    'TotalMinutes      : 0,81723203',
+    'TotalSeconds      : 49,0339218',
+    'TotalMilliseconds : 49033,9218',
+    'Powershell (Get-Date).ToString()',
+    '10/07/2026 16:35:06',
+    '> Build All Task Sucesso'
+)
+$f = Get-GeneXusPostBuildEventClassification -PostBuildEventLines $timer -RegisteredHashes @()
+if ($f.shouldDowngrade) { throw 'ASSERT_FAILED: caso F cronometro pos-build nao deveria rebaixar' }
+if ($f.benignFallback.Count -ne $timer.Count) { throw "ASSERT_FAILED: caso F deveria ter todos em benignFallback, atual=$($f.benignFallback.Count)" }
+
 # Hash estavel a variacao inocua de espacos/caixa.
 $sinoSpaced = '  start ""   powershell -NoProfile -WindowStyle Hidden -Command "(New-Object System.Media.SoundPlayer ''C:\TEMP\SINO.WAV'').PlaySync()"  '
 if ((Get-GeneXusPostBuildEventNormalizedHash -Line $sinoSpaced) -ne $sinoHash) {

@@ -147,6 +147,26 @@ function Test-GeneXusPostBuildEventBenignBySound {
     return $false
 }
 
+function Test-GeneXusPostBuildEventBenignByTimingDiagnostic {
+    param([AllowNull()][string]$Line)
+
+    # Algumas KBs usam eventos pos-build apenas para imprimir duracao/data no Output.
+    # Essas linhas nao disparam processo externo relevante nem alteram artefatos; sao
+    # tratadas como benignas quando aparecem sem registro explicito do environment.
+    if ([string]::IsNullOrWhiteSpace($Line)) {
+        return $false
+    }
+
+    $value = $Line.Trim()
+    if ($value -match '(?i)^Powershell\s+New-TimeSpan\s+-Start\s+\(Get-Content\s+Inicio\.txt\)\s+-End\s+\(Get-Date\)$') { return $true }
+    if ($value -match '(?i)^Powershell\s+\(Get-Date\)\.ToString\(\)$') { return $true }
+    if ($value -match '^(Days|Hours|Minutes|Seconds|Milliseconds|Ticks|TotalDays|TotalHours|TotalMinutes|TotalSeconds|TotalMilliseconds)\s*:') { return $true }
+    if ($value -match '^\d{1,2}/\d{1,2}/\d{4}\s+\d{1,2}:\d{2}:\d{2}$') { return $true }
+    if ($value -match '^>\s*Build\s+All\s+Task\s+Sucesso$') { return $true }
+
+    return $false
+}
+
 function Get-GeneXusPostBuildEventClassification {
     param(
         [AllowNull()][string[]]$PostBuildEventLines,
@@ -183,7 +203,8 @@ function Get-GeneXusPostBuildEventClassification {
                 [void]$unexpected.Add($line)
             }
         } else {
-            if (Test-GeneXusPostBuildEventBenignBySound -Line $line) {
+            if ((Test-GeneXusPostBuildEventBenignBySound -Line $line) -or
+                (Test-GeneXusPostBuildEventBenignByTimingDiagnostic -Line $line)) {
                 [void]$benignFallback.Add($line)
             } else {
                 [void]$unknownFallback.Add($line)

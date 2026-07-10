@@ -590,6 +590,31 @@ function Split-NonEmptyLines {
     return ,$result
 }
 
+function Get-ObjectValueByName {
+    param(
+        [object]$InputObject,
+        [string]$Name
+    )
+
+    if ($null -eq $InputObject -or [string]::IsNullOrWhiteSpace($Name)) {
+        return $null
+    }
+
+    if ($InputObject -is [System.Collections.IDictionary]) {
+        if ($InputObject.Contains($Name)) {
+            return $InputObject[$Name]
+        }
+        return $null
+    }
+
+    $property = $InputObject.PSObject.Properties[$Name]
+    if ($null -ne $property) {
+        return $property.Value
+    }
+
+    return $null
+}
+
 function Resolve-BuildStatus {
     param(
         [int]$MsBuildExitCode,
@@ -1726,6 +1751,8 @@ try {
 
     $postProcessingFailed = $false
     $postProcessingError  = $null
+    $msBuildCategoryBBlocked = $false
+    $operationalSubStateBuild = $null
 
     $kbOpenMarker     = Get-MarkerValue -Text $stdOutText -Marker '__KB_OPEN__='
     $buildAllDoneMarker = Get-MarkerValue -Text $stdOutText -Marker '__BUILDALL_DONE__='
@@ -1735,7 +1762,7 @@ try {
     # Detecta reorg pelo conteúdo do stdout/stderr (padrão GeneXus: "reorganization", "reorganizacao")
     $combinedOutput = $stdOutText + $stdErrText
     $reorgDetected  = [bool]($combinedOutput -match '(?i)reorgan')
-    $script:BuildSignals.ReorgDetected = $reorgDetected
+    $script:BuildSignals['ReorgDetected'] = $reorgDetected
 
     # Detecta falha de SetActiveVersion (versão informada não existe na KB)
     $setVersionFailed = [bool]($stdOutText -match 'Set Active Version falhou')
@@ -1786,13 +1813,16 @@ try {
     $knownStdOutNoiseBuild = @()
 
     try {
-    # GeneXus 18 grava exatamente 3 linhas "context [anonymous] N:N attribute component
-    # isn't defined" no stderr durante SpecifyAll (executado internamente pelo BuildAll).
+    # GeneXus 18 grava linhas "context [anonymous] N:N attribute component isn't defined"
+    # e, em algumas KBs Java/Tomcat, "context [/g_service_worker] N:N attribute obj isn't defined"
+    # no stderr durante BuildAll/SpecifyAll. O GeneXus nao conta isso como erro quando stdout
+    # conclui com sucesso; filtrar antes de classificar.
     # O GeneXus não conta isso como erro: stdout reporta "0 avisos, 0 erros".
     # Evidencia empirica: FabricaBrasil18 e wsEducacaoSpTeste em 2026-05-10, sempre 3x,
     # mesma posicao, independente do conteúdo da KB. Filtrar antes de classificar.
-    $stdErrFilteredNoise = @([regex]::Matches($stdErrText, '(?m)context \[anonymous\] \d+:\d+ attribute component isn''t defined') | ForEach-Object { $_.Value }) -join "`n"
-    $stdErrFiltered      = ($stdErrText -replace '(?m)^context \[anonymous\] \d+:\d+ attribute component isn''t defined\r?\n?', '').Trim()
+    $stdErrBenignNoisePattern = '(?m)^context \[(anonymous|/g_service_worker)\] \d+:\d+ attribute (component|obj) isn''t defined\r?$'
+    $stdErrFilteredNoise = @([regex]::Matches($stdErrText, $stdErrBenignNoisePattern) | ForEach-Object { $_.Value }) -join "`n"
+    $stdErrFiltered      = ($stdErrText -replace ($stdErrBenignNoisePattern + '\r?\n?'), '').Trim()
 
     # Ruido estrutural GAM/NetCore: GeneXusMsBuildGamPlatformsSupport.ps1 (ver SKILL.md).
     $stdOutLines      = if ([string]::IsNullOrEmpty($stdOutText)) { @() } else { $stdOutText -split "`r?`n" }
@@ -1815,7 +1845,7 @@ try {
     # excecao. Generico e KB-agnostico: a linha bruta (ex.: o .bat de deploy) chega
     # ao bucket sem detector dedicado. @() = computou sem eventos; null (default) =
     # a falha estourou antes daqui.
-    $script:BuildSignals.PostBuildEvents = @($postBuildEventLines)
+    $script:BuildSignals['PostBuildEvents'] = @($postBuildEventLines)
 
     $buildWarningLines   = @([regex]::Matches($stdOutFiltered, '(?m)[^\r\n]*\(\d+,\d+\)\s*:\s*warning\s*:[^\r\n]*') |
                              ForEach-Object { $_.Value.Trim() })
@@ -1840,11 +1870,11 @@ try {
         # Classifica os eventos contra o conjunto registrado do environment ativo em
         # kb-source-metadata.md (kb_environment_post_build_event_hashes). Evento registrado =
         # esperado (informativo); não registrado = inesperado (rebaixa). Sem registro para o
-        # environment, cai na rede de seguranca por padrão de som. Só rebaixa se houver evento
-        # inesperado/nao reconhecido — sino e deploy registrados não rebaixam mais.
+        # environment, cai na rede de seguranca por padroes benignos conhecidos. Só rebaixa se houver evento
+        # inesperado/nao reconhecido — sino, diagnostico de tempo e deploy registrados não rebaixam mais.
         $metadataPathForPostBuild = $null
         if ($null -ne $script:DeploymentEnvironmentContext) {
-            $metadataPathForPostBuild = $script:DeploymentEnvironmentContext['kbSourceMetadataPath']
+            $metadataPathForPostBuild = Get-ObjectValueByName -InputObject $script:DeploymentEnvironmentContext -Name 'kbSourceMetadataPath'
         }
         $registeredPostBuildHashes = Get-GeneXusRegisteredPostBuildEventHashesForEnvironment `
             -MetadataPath $metadataPathForPostBuild -EnvironmentName $activeEnvironmentOutput
@@ -1855,7 +1885,7 @@ try {
             Add-WarningMessage -Message "Evento pos-build registrado reconhecido (nao afeta a classificacao): '$evt'"
         }
         foreach ($evt in $pbClassification.benignFallback) {
-            Add-WarningMessage -Message "Evento pos-build benigno reconhecido sem registro (player de som): '$evt'. Registre via xpz-kb-parallel-setup (Register-GeneXusKbPostBuildEvents.ps1) para reconhecimento explicito."
+            Add-WarningMessage -Message "Evento pos-build benigno reconhecido sem registro: '$evt'. Registre via xpz-kb-parallel-setup (Register-GeneXusKbPostBuildEvents.ps1) para reconhecimento explicito."
         }
         foreach ($evt in $pbClassification.unexpected) {
             Add-WarningMessage -Message "Evento pos-build NAO registrado detectado: '$evt'. Se for legitimo, registre via xpz-kb-parallel-setup (Register-GeneXusKbPostBuildEvents.ps1); status rebaixado por cautela."
@@ -1896,12 +1926,12 @@ try {
         try {
             $buildSignalsJson = (& $signalsScript -StdOutPath $stdOutPath -StdErrPath $stdErrPath -Stage 'build-all' -AsJson) | Out-String
             if (-not [string]::IsNullOrWhiteSpace($buildSignalsJson)) {
-                $buildSignals = $buildSignalsJson | ConvertFrom-Json
-                if ($null -ne $buildSignals.PSObject.Properties['errors']) {
-                    $buildErrors = @($buildSignals.errors)
+                $parsedBuildSignals = $buildSignalsJson | ConvertFrom-Json
+                if ($null -ne $parsedBuildSignals.PSObject.Properties['errors']) {
+                    $buildErrors = @($parsedBuildSignals.errors)
                 }
-                if ($null -ne $buildSignals.PSObject.Properties['knownStdOutNoise']) {
-                    $knownStdOutNoiseBuild = @($buildSignals.knownStdOutNoise)
+                if ($null -ne $parsedBuildSignals.PSObject.Properties['knownStdOutNoise']) {
+                    $knownStdOutNoiseBuild = @($parsedBuildSignals.knownStdOutNoise)
                 }
             }
         }
@@ -1913,15 +1943,13 @@ try {
     # Carrega a contagem canonica de erros adiante para os caminhos de excecao. Se a
     # analise abortou antes daqui, ErrorCount permanece null (parcial honesto). Se
     # chegou aqui, este 0/N e o mesmo valor que o caminho feliz reportaria.
-    $script:BuildSignals.ErrorCount = @($buildErrors).Count
+    $script:BuildSignals['ErrorCount'] = @($buildErrors).Count
     # ErrorCount e o ultimo sinal da sequencia (reorg, eventos pos-build e erros ja
     # foram calculados antes daqui); alcancar esta linha marca o bucket como integral.
     # Ao adicionar um sinal calculado DEPOIS deste ponto, mover esta marcacao para
     # depois dele.
-    $script:BuildSignals.Complete = $true
+    $script:BuildSignals['Complete'] = $true
 
-    $msBuildCategoryBBlocked = $false
-    $operationalSubStateBuild = $null
     if ($msBuildExitCode -eq 0 -and $buildStatus.ExitCode -eq 0) {
         $categoryBExit = Resolve-GeneXusMsBuildCategoryBExitCode `
             -BaseExitCode $buildStatus.ExitCode `
@@ -1985,7 +2013,7 @@ try {
     if ($null -ne $buildStatus -and $msBuildExitCode -eq 0) {
         $validationEnvForDeployBin = $EnvironmentName
         if ($null -ne $script:DeploymentEnvironmentContext) {
-            $ctxResolvedDeploy = $script:DeploymentEnvironmentContext['validationEnvironmentResolved']
+            $ctxResolvedDeploy = Get-ObjectValueByName -InputObject $script:DeploymentEnvironmentContext -Name 'validationEnvironmentResolved'
             if (-not [string]::IsNullOrWhiteSpace($ctxResolvedDeploy)) {
                 $validationEnvForDeployBin = $ctxResolvedDeploy
             }
@@ -2006,7 +2034,7 @@ try {
 
         $metadataPathDeploy = $null
         if ($null -ne $script:DeploymentEnvironmentContext) {
-            $metadataPathDeploy = $script:DeploymentEnvironmentContext['kbSourceMetadataPath']
+            $metadataPathDeploy = Get-ObjectValueByName -InputObject $script:DeploymentEnvironmentContext -Name 'kbSourceMetadataPath'
         }
 
         # Decide o gate de deploy bin pelo fato (exit 0 + BuildAll concluido), não pela string
@@ -2049,7 +2077,7 @@ try {
 
     if ($null -ne $script:DeploymentEnvironmentContext) {
         if (-not (Test-GeneXusKbActiveEnvironmentMatchesValidation -ActiveEnvironment $activeEnvironmentOutput -DeploymentEnvironmentContext $script:DeploymentEnvironmentContext)) {
-            $expectedEnv = $script:DeploymentEnvironmentContext['validationEnvironmentResolved']
+            $expectedEnv = Get-ObjectValueByName -InputObject $script:DeploymentEnvironmentContext -Name 'validationEnvironmentResolved'
             Add-WarningMessage -Message ("ActiveEnvironment observado ('{0}') diverge do environment de validacao resolvido ('{1}'). Nao tratar compilou limpo como validacao deploy nesse environment." -f $activeEnvironmentOutput, $expectedEnv)
         }
     }

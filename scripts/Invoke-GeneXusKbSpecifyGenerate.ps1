@@ -1379,7 +1379,7 @@ try {
             Add-WarningMessage -Message "Evento pos-build registrado reconhecido (nao afeta a classificacao): '$evt'"
         }
         foreach ($evt in $pbClassification.benignFallback) {
-            Add-WarningMessage -Message "Evento pos-build benigno reconhecido sem registro (player de som): '$evt'. Registre via xpz-kb-parallel-setup (Register-GeneXusKbPostBuildEvents.ps1) para reconhecimento explicito."
+            Add-WarningMessage -Message "Evento pos-build benigno reconhecido sem registro: '$evt'. Registre via xpz-kb-parallel-setup (Register-GeneXusKbPostBuildEvents.ps1) para reconhecimento explicito."
         }
         foreach ($evt in $pbClassification.unexpected) {
             Add-WarningMessage -Message "Evento pos-build NAO registrado detectado: '$evt'. Se for legitimo, registre via xpz-kb-parallel-setup (Register-GeneXusKbPostBuildEvents.ps1); status rebaixado por cautela."
