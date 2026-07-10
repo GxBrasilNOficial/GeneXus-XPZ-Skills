@@ -70,8 +70,10 @@
     JSON opcional com os revisores escolhidos. Usado para ecoar a selecao no prompt.
 .PARAMETER PreferredReviewerStatesJson
     JSON opcional com o estado final de cada revisor preferido da rodada:
-    [{ "targetModelKey": "...", "backend": "...", "state": "responded|noResponse|timeout|error|gateAsk|gateDeny|unavailable|skippedByHumanDecision|stoppedOnGap|gateAllow|dispatched|enqueued", "family": "..." }].
+    [{ "targetModelKey": "...", "backend": "...", "state": "responded|noResponse|timeout|error|quota|gateAsk|gateDeny|unavailable|skippedByHumanDecision|stoppedOnGap|skippedAfterSuccess|skippedByPolicy|notAttempted|gateAllow|dispatched|enqueued", "family": "...", "attemptRole": "primary|fallback", "fallbackOf": "...", "countsForDiversity": true|false }].
     Quando HadPreferredReviewers=true, deve conter todos os preferidos resolvidos.
+    Estados de nao tentativa (`skippedAfterSuccess`, `skippedByPolicy`, `notAttempted`) devem carregar
+    `countsForDiversity=false`; `notAttempted` como estado primario silencioso bloqueia o fechamento.
 .PARAMETER DiversityState
     Estado opcional ja calculado por Resolve-LlmDelegatePanelDiversity.ps1. Este script nao
     recalcula diversidade; apenas ecoa o valor no recibo.
