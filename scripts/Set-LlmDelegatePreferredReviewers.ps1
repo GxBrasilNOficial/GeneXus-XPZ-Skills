@@ -128,7 +128,9 @@ $fallbackPolicyIn = Get-Prop $parsed 'fallbackPolicy'
 $kept = [System.Collections.Generic.List[object]]::new()
 $discardedVeto = [System.Collections.Generic.List[object]]::new()
 $skipped = [System.Collections.Generic.List[object]]::new()
-$rankCounter = 0
+$explicitRanks = [System.Collections.Generic.HashSet[int]]::new()
+$implicitRanks = [System.Collections.Generic.HashSet[int]]::new()
+$nextImplicitRank = 1
 
 function Test-HardVetoTarget {
     param([string]$TargetModelKey)
@@ -231,8 +233,35 @@ function ConvertTo-ReviewerV2 {
 }
 
 foreach ($it in $items) {
-    $rankCounter++
-    $converted = ConvertTo-ReviewerV2 -Item $it -DefaultRank $rankCounter
+    $backendForRank = [string](Get-Prop $it 'backend')
+    $targetForRank = [string](Get-Prop $it 'targetModelKey')
+    if ([string]::IsNullOrWhiteSpace($targetForRank)) {
+        $targetForRank = [string](Get-Prop $it 'model')
+    }
+    $rankValueForReservation = Get-Prop $it 'rank'
+    if ($null -ne $rankValueForReservation -and
+        -not [string]::IsNullOrWhiteSpace($backendForRank) -and
+        -not [string]::IsNullOrWhiteSpace($targetForRank) -and
+        $allowedBackends -contains $backendForRank -and
+        -not (Test-HardVetoTarget -TargetModelKey $targetForRank)) {
+        [void]$explicitRanks.Add([int]$rankValueForReservation)
+    }
+}
+foreach ($explicitRank in $explicitRanks) {
+    if ($explicitRank -ge $nextImplicitRank) { $nextImplicitRank = $explicitRank + 1 }
+}
+
+foreach ($it in $items) {
+    $defaultRank = 0
+    if ($null -eq (Get-Prop $it 'rank')) {
+        while ($explicitRanks.Contains($nextImplicitRank) -or $implicitRanks.Contains($nextImplicitRank)) {
+            $nextImplicitRank++
+        }
+        $defaultRank = $nextImplicitRank
+        [void]$implicitRanks.Add($defaultRank)
+        $nextImplicitRank++
+    }
+    $converted = ConvertTo-ReviewerV2 -Item $it -DefaultRank $defaultRank
     if ($converted.ContainsKey('skipped') -and $converted['skipped']) { $skipped.Add([string]$converted['target']); continue }
     if ($converted.ContainsKey('veto') -and $converted['veto']) { $discardedVeto.Add([string]$converted['target']); continue }
     $kept.Add($converted['reviewer'])

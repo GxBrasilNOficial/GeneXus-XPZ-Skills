@@ -20,8 +20,8 @@ $ErrorActionPreference = 'Stop'
 #  (G) Divergencia invokeArgs.backend no primario e em item N>0 de fallbackChain bloqueia
 #      antes de qualquer dispatcher.
 #  (H) Ciclo/duplicidade em fallbackChain bloqueia.
-#  (I) Rank e politica: titulares saem ordenados por rank; rank invalido/duplicado e
-#      fallbackPolicy fora do contrato suportado bloqueiam.
+#  (I) Rank e politica: titulares saem ordenados por rank; rank implicito nao colide com
+#      rank explicito; rank invalido/duplicado e fallbackPolicy fora do contrato suportado bloqueiam.
 
 $scriptsDir = $PSScriptRoot
 $setScript = Join-Path $scriptsDir 'Set-LlmDelegatePreferredReviewers.ps1'
@@ -197,6 +197,18 @@ try {
     Assert-True ($ranked.reviewers[0].rank -eq 10) "Titular de rank 10 deveria sair antes; veio rank $($ranked.reviewers[0].rank)."
     $rankedResolved = & $resolveScript -PreferredPath $rankPath -CapabilitiesPath $capPath | ConvertFrom-Json
     Assert-True ($rankedResolved.reviewers[0].rank -eq 10) "Resolve deveria preservar a ordenacao por rank; veio rank $($rankedResolved.reviewers[0].rank)."
+
+    $mixedImplicitRank = @'
+[
+  { "backend": "codex", "targetModelKey": "openai/gpt-5.5", "rank": 2, "invokeArgs": { "backend": "codex", "model": "gpt-5.5" } },
+  { "backend": "opencode", "targetModelKey": "ollama-cloud/deepseek-v4-pro", "invokeArgs": { "backend": "opencode", "model": "ollama-cloud/deepseek-v4-pro" } }
+]
+'@
+    $mixedRankPath = Join-Path $tempRoot 'mixed-implicit-rank.json'
+    & $setScript -ReviewersJson $mixedImplicitRank -OutputPath $mixedRankPath | Out-Null
+    $mixedRanked = Get-Content -LiteralPath $mixedRankPath -Raw -Encoding utf8 | ConvertFrom-Json
+    $implicitReviewer = $mixedRanked.reviewers | Where-Object { $_.targetModelKey -eq 'ollama-cloud/deepseek-v4-pro' }
+    Assert-True ($implicitReviewer.rank -eq 3) "Rank implicito deveria evitar colisao com rank explicito 2; veio rank $($implicitReviewer.rank)."
 
     $badRank = '[{ "backend": "codex", "targetModelKey": "openai/gpt-5.5", "rank": 0, "invokeArgs": { "backend": "codex", "model": "gpt-5.5" } }]'
     $blocked = $false

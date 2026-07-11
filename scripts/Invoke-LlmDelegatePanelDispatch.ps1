@@ -138,6 +138,23 @@ function Test-QuotaFailureMessage {
     return ($Message -match $script:quotaFailurePattern)
 }
 
+function Get-FallbackDispatcherTimeoutMs {
+    param($InvokeArgs)
+    $defaultTimeoutMs = 180000
+    $overheadMs = 30000
+    $timeoutSecValue = Get-Prop $InvokeArgs 'timeoutSec'
+    if ($null -eq $timeoutSecValue) { return $defaultTimeoutMs }
+
+    $timeoutSec = 0
+    if (-not [int]::TryParse([string]$timeoutSecValue, [ref]$timeoutSec)) { return $defaultTimeoutMs }
+    if ($timeoutSec -lt 1) { return $defaultTimeoutMs }
+
+    $derivedTimeoutMs = ([int64]$timeoutSec * 1000) + $overheadMs
+    if ($derivedTimeoutMs -lt $defaultTimeoutMs) { return $defaultTimeoutMs }
+    if ($derivedTimeoutMs -gt [int]::MaxValue) { return [int]::MaxValue }
+    return [int]$derivedTimeoutMs
+}
+
 function Test-InvokeArgsBackendDivergence {
     param($Reviewer, [string]$Label)
     $backend = [string](Get-Prop $Reviewer 'backend')
@@ -689,13 +706,14 @@ foreach ($rec in $originalRecords) {
             }
             $p = Start-Process -FilePath 'pwsh' -ArgumentList $argList -NoNewWindow -PassThru `
                 -RedirectStandardOutput $fbOutPath -RedirectStandardError $fbErrPath
-            $exited = $p.WaitForExit(180000)
+            $fallbackDispatcherTimeoutMs = Get-FallbackDispatcherTimeoutMs -InvokeArgs $fbClean.invokeArgs
+            $exited = $p.WaitForExit($fallbackDispatcherTimeoutMs)
             if (-not $exited) {
                 try {
                     $p.Kill($true)
                     $p.WaitForExit()
                 } catch { }
-                throw 'fallback dispatcher timeout excedeu 180000ms; processo encerrado'
+                throw "fallback dispatcher timeout excedeu ${fallbackDispatcherTimeoutMs}ms; processo encerrado"
             }
             $fbStdout = ''
             if (Test-Path -LiteralPath $fbOutPath -PathType Leaf) {

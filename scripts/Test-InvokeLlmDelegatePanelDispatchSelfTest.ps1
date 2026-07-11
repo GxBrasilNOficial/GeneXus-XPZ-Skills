@@ -519,6 +519,10 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
     Assert-True ($rv1.state -eq 'timeout') "fallback timeout: fallback deveria registrar timeout; got $($rv1.state)"
     Assert-True ($rv1.countsForDiversity -eq $false) 'fallback timeout nao deve contar diversidade.'
 
+    $harnessText = Get-Content -LiteralPath $harness -Raw -Encoding utf8
+    Assert-True ($harnessText -match 'Get-FallbackDispatcherTimeoutMs') 'fallback dispatcher: timeout do processo filho deve derivar do invokeArgs.timeoutSec.'
+    Assert-True ($harnessText -notmatch 'WaitForExit\(180000\)') 'fallback dispatcher: nao pode haver timeout fixo de 180000ms no processo filho.'
+
     Set-Content -LiteralPath $concLog -Value '' -NoNewline -Encoding utf8
     $r = Invoke-Harness -Reviewers @(@{
             backend = 'opencode'; targetModelKey = 'openai/bad-primary'; invokeArgs = @{ backend = 'opencode'; model = 'openai/bad-primary' }
