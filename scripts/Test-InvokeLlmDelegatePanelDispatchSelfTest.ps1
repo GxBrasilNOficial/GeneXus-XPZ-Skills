@@ -522,6 +522,9 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
     $harnessText = Get-Content -LiteralPath $harness -Raw -Encoding utf8
     Assert-True ($harnessText -match 'Get-FallbackDispatcherTimeoutMs') 'fallback dispatcher: timeout do processo filho deve derivar do invokeArgs.timeoutSec.'
     Assert-True ($harnessText -notmatch 'WaitForExit\(180000\)') 'fallback dispatcher: nao pode haver timeout fixo de 180000ms no processo filho.'
+    Assert-True ($harnessText -match 'Get-CurrentPowerShellExecutable') 'fallback dispatcher: processo filho deve usar o executavel PowerShell atual/validado, nao depender de pwsh cru no PATH.'
+    Assert-True ($harnessText -notmatch "Start-Process\s+-FilePath\s+'pwsh'") 'fallback dispatcher: nao pode resolver pwsh cru pelo PATH.'
+    Assert-True ($harnessText -notmatch "return\s+'pwsh'") 'fallback dispatcher: nao pode ter fallback silencioso para pwsh cru no PATH.'
 
     Set-Content -LiteralPath $concLog -Value '' -NoNewline -Encoding utf8
     $r = Invoke-Harness -Reviewers @(@{

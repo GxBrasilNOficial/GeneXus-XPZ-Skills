@@ -155,6 +155,22 @@ function Get-FallbackDispatcherTimeoutMs {
     return [int]$derivedTimeoutMs
 }
 
+function Get-CurrentPowerShellExecutable {
+    $currentExe = ''
+    try { $currentExe = [string]([System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName) } catch { }
+    if (-not [string]::IsNullOrWhiteSpace($currentExe) -and (Test-Path -LiteralPath $currentExe -PathType Leaf)) {
+        return $currentExe
+    }
+
+    $psHomeExeName = if ($IsWindows) { 'pwsh.exe' } else { 'pwsh' }
+    $psHomeExe = Join-Path $PSHOME $psHomeExeName
+    if (Test-Path -LiteralPath $psHomeExe -PathType Leaf) {
+        return $psHomeExe
+    }
+
+    throw "BLOCK: executavel PowerShell atual nao resolvido para fallback recursivo"
+}
+
 function Test-InvokeArgsBackendDivergence {
     param($Reviewer, [string]$Label)
     $backend = [string](Get-Prop $Reviewer 'backend')
@@ -704,7 +720,7 @@ foreach ($rec in $originalRecords) {
             foreach ($optionalKey in @('Cd', 'ParallelKbRoot', 'PolicyPath', 'OpenCodeConfigPath', 'CodexConfigPath', 'BackendExeMap')) {
                 if ($fbArgs.ContainsKey($optionalKey)) { $argList += @("-$optionalKey", [string]$fbArgs[$optionalKey]) }
             }
-            $p = Start-Process -FilePath 'pwsh' -ArgumentList $argList -NoNewWindow -PassThru `
+            $p = Start-Process -FilePath (Get-CurrentPowerShellExecutable) -ArgumentList $argList -NoNewWindow -PassThru `
                 -RedirectStandardOutput $fbOutPath -RedirectStandardError $fbErrPath
             $fallbackDispatcherTimeoutMs = Get-FallbackDispatcherTimeoutMs -InvokeArgs $fbClean.invokeArgs
             $exited = $p.WaitForExit($fallbackDispatcherTimeoutMs)
