@@ -369,6 +369,8 @@ if ($blockingReasons -contains 'vnext-pending-resubmission') {
     $requiredPrompt = 'Antes de encerrar a revisão por pares: a composição final após fallback ficou com diversidade insuficiente. Não use o rótulo revisão por pares; registre como parecer solo, segunda opinião ou rodada não concluída.'
 } elseif ($requiresOffer -and ($blockingReasons -contains 'preferred-reviewers-offer-missing' -or $blockingReasons -contains 'preferred-reviewers-offer-state-invalid-for-manual-selection')) {
     $requiredPrompt = "Antes de encerrar a revisão por pares: você quer salvar $selectedText como revisores preferidos desta máquina em ${preferredPath}? Se responder sim, vou usar Set-LlmDelegatePreferredReviewers.ps1; se preferir não salvar ou adiar, sigo sem bloquear esta rodada."
+} elseif ($blockingReasons -contains 'preferred-reviewer-expected-states-missing') {
+    $requiredPrompt = 'Antes de encerrar a revisão por pares: informe -SelectedReviewersJson com a lista esperada da rodada (titulares e fallbackChain[]) e re-rote este closeout junto de -PreferredReviewerStatesJson. Sem a lista esperada, o script não consegue provar completude dos estados auditáveis.'
 } elseif ($blockingReasons.Count -gt 0) {
     $requiredPrompt = 'Antes de encerrar a revisão por pares: registre no recibo o estado final de cada revisor preferido da rodada, sem omitir preferidos não consultados. Se algum ficou fora, informe o motivo auditável.'
 }

@@ -246,6 +246,7 @@ $r26 = Invoke-Closeout $true $false 'not_applicable' '[]' '[{"backend":"codex","
 Assert-True ($r26.closeoutReady -eq $false) 'Caso 26: HadPreferred=true com SelectedReviewersJson vazio deveria bloquear.'
 Assert-True (@($r26.blockingReasons) -contains 'preferred-reviewer-expected-states-missing') 'Caso 26: razao preferred-reviewer-expected-states-missing ausente.'
 Assert-True (@($r26.blockingReasons) -contains 'preferred-reviewer-state-unexpected:openai/gpt-5.5') 'Caso 26: estado sem esperado correspondente deveria bloquear.'
+Assert-True ([string]$r26.requiredUserPrompt -match 'SelectedReviewersJson') 'Caso 26: prompt deveria orientar a informar SelectedReviewersJson.'
 
 # (27) Estado parcial nao pode liberar: todo titular esperado precisa aparecer.
 $selectedTwo = '[{"backend":"codex","targetModelKey":"openai/gpt-5.5"},{"backend":"opencode","targetModelKey":"nvidia/z-ai/glm-5.2"}]'
