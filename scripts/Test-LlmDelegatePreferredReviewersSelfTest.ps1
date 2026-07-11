@@ -76,6 +76,7 @@ try {
     $prefText = [System.IO.File]::ReadAllText($prefPath)
     $pref = $prefText | ConvertFrom-Json
     Assert-True ($pref.schemaVersion -eq 2) 'schemaVersion deveria ser 2.'
+    Assert-True ($pref.migratedFrom -eq 1) "migratedFrom deveria ser 1 quando a entrada nao declara schemaVersion; veio '$($pref.migratedFrom)'."
     Assert-True (-not [string]::IsNullOrWhiteSpace([string]$pref.updatedAt)) 'updatedAt ausente.'
     Assert-True ($pref.fallbackPolicy.mode -eq 'ordered-chain') 'fallbackPolicy.mode deveria ser ordered-chain.'
 
@@ -115,6 +116,7 @@ try {
     $res = & $resolveScript -PreferredPath $prefPath -CapabilitiesPath $capPath | ConvertFrom-Json
     Assert-True ($res.hasPreferences -eq $true) 'Resolve deveria reportar hasPreferences=true.'
     Assert-True ($res.schemaVersion -eq 2) 'Resolve deveria reportar schemaVersion=2.'
+    Assert-True ($res.migratedFrom -eq 1) "Resolve deveria ecoar migratedFrom=1; veio '$($res.migratedFrom)'."
     Assert-True (-not [string]::IsNullOrWhiteSpace([string]$res.note)) 'note (invariante preferencia != autorizacao) ausente.'
     $rcx = $res.reviewers | Where-Object { $_.targetModelKey -eq 'openai/gpt-5.5' }
     Assert-True ($rcx.availableInManifest -eq $true) 'codex (openai/gpt-5.5) deveria estar availableInManifest=true.'
@@ -209,6 +211,20 @@ try {
     $mixedRanked = Get-Content -LiteralPath $mixedRankPath -Raw -Encoding utf8 | ConvertFrom-Json
     $implicitReviewer = $mixedRanked.reviewers | Where-Object { $_.targetModelKey -eq 'ollama-cloud/deepseek-v4-pro' }
     Assert-True ($implicitReviewer.rank -eq 3) "Rank implicito deveria evitar colisao com rank explicito 2; veio rank $($implicitReviewer.rank)."
+
+    $nativeV2 = @'
+{
+  "schemaVersion": 2,
+  "reviewers": [
+    { "backend": "codex", "targetModelKey": "openai/gpt-5.5", "invokeArgs": { "backend": "codex", "model": "gpt-5.5" } }
+  ]
+}
+'@
+    $nativeV2Preview = & $setScript -ReviewersJson $nativeV2 -Preview | ConvertFrom-Json
+    Assert-True ($nativeV2Preview.document.migratedFrom -eq 2) "migratedFrom deveria ser 2 quando a entrada declara schemaVersion=2; veio '$($nativeV2Preview.document.migratedFrom)'."
+
+    $setScriptText = Get-Content -LiteralPath $setScript -Raw -Encoding utf8
+    Assert-True ($setScriptText -match 'Remove-Item -LiteralPath \$tmpPath') 'Escrita atomica deveria limpar o arquivo temporario se Move-Item falhar.'
 
     $badRank = '[{ "backend": "codex", "targetModelKey": "openai/gpt-5.5", "rank": 0, "invokeArgs": { "backend": "codex", "model": "gpt-5.5" } }]'
     $blocked = $false

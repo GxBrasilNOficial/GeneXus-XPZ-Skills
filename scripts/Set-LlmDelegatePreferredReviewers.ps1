@@ -287,8 +287,15 @@ if (-not $Preview) {
         Copy-Item -LiteralPath $OutputPath -Destination $backupPath -Force
     }
     $tmpPath = "$OutputPath.tmp-$([guid]::NewGuid().ToString('N'))"
-    Set-Content -LiteralPath $tmpPath -Value $docJson -Encoding utf8
-    Move-Item -LiteralPath $tmpPath -Destination $OutputPath -Force
+    try {
+        Set-Content -LiteralPath $tmpPath -Value $docJson -Encoding utf8
+        Move-Item -LiteralPath $tmpPath -Destination $OutputPath -Force
+    } catch {
+        if (Test-Path -LiteralPath $tmpPath -PathType Leaf) {
+            Remove-Item -LiteralPath $tmpPath -Force -ErrorAction SilentlyContinue
+        }
+        throw
+    }
 }
 
 [pscustomobject]@{

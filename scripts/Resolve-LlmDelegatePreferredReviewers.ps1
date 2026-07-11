@@ -256,6 +256,7 @@ Assert-ValidRankSet -Reviewers $outSorted
     hasPreferences = $true
     schemaVersion  = [int]$schemaVersion
     updatedAt      = [string](Get-Prop $pref 'updatedAt')
+    migratedFrom   = Get-Prop $pref 'migratedFrom'
     fallbackPolicy = $fallbackPolicy
     reviewers      = @($outSorted)
     note           = $note
