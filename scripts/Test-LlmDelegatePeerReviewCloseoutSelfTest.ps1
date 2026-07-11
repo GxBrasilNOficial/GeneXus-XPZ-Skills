@@ -82,7 +82,15 @@ $statesOk = @'
   {"backend":"opencode","targetModelKey":"ollama-cloud/glm-5.2","family":"ollama-cloud","state":"stoppedOnGap"}
 ]
 '@
-$r6 = Invoke-Closeout $true $false 'not_applicable' '[]' $statesOk
+$selectedOk = @'
+[
+  {"backend":"claude-code","targetModelKey":"anthropic/claude-opus-4-8"},
+  {"backend":"codex","targetModelKey":"openai/gpt-5.5"},
+  {"backend":"opencode","targetModelKey":"ollama-cloud/deepseek-v4-pro"},
+  {"backend":"opencode","targetModelKey":"ollama-cloud/glm-5.2"}
+]
+'@
+$r6 = Invoke-Closeout $true $false 'not_applicable' $selectedOk $statesOk
 Assert-True ($r6.closeoutReady -eq $true) 'Caso 6: preferencias existentes com estados finais deveriam liberar.'
 Assert-True ($r6.requiresPreferredOffer -eq $false) 'Caso 6: requiresPreferredOffer deveria ser false.'
 Assert-True (@($r6.preferredReviewerStates).Count -eq 4) 'Caso 6: deveria ecoar 4 estados de revisores preferidos.'
@@ -90,7 +98,7 @@ Assert-True ([string]$r6.receiptAddendum -match 'registrados=4') 'Caso 6: recibo
 
 # (7) Estado incompleto em revisor preferido -> bloqueia.
 $statesIncomplete = '[{"backend":"opencode","targetModelKey":"ollama-cloud/kimi-k2.7-code","family":"ollama-cloud","state":"gateAllow"}]'
-$r7 = Invoke-Closeout $true $false 'not_applicable' '[]' $statesIncomplete
+$r7 = Invoke-Closeout $true $false 'not_applicable' '[{"backend":"opencode","targetModelKey":"ollama-cloud/kimi-k2.7-code"}]' $statesIncomplete
 Assert-True ($r7.closeoutReady -eq $false) 'Caso 7: estado incompleto gateAllow deveria bloquear.'
 Assert-True (@($r7.blockingReasons) -contains 'preferred-reviewer-state-incomplete:ollama-cloud/kimi-k2.7-code:gateAllow') 'Caso 7: razao de estado incompleto ausente.'
 
@@ -197,23 +205,32 @@ $statesFallbackOk = @'
 [
   {"backend":"opencode","targetModelKey":"ollama-cloud/deepseek-v4-pro","family":"ollama-cloud","state":"responded","attemptRole":"primary","countsForDiversity":true},
   {"backend":"opencode","targetModelKey":"nvidia/deepseek-ai/deepseek-v4-pro","family":"nvidia","state":"skippedAfterSuccess","attemptRole":"fallback","fallbackOf":"ollama-cloud/deepseek-v4-pro","countsForDiversity":false},
+  {"backend":"opencode","targetModelKey":"ollama-cloud/glm-5.2","family":"ollama-cloud","state":"timeout","attemptRole":"primary","countsForDiversity":false},
   {"backend":"opencode","targetModelKey":"nvidia/z-ai/glm-5.1","family":"nvidia","state":"notAttempted","attemptRole":"fallback","fallbackOf":"ollama-cloud/glm-5.2","countsForDiversity":false},
+  {"backend":"opencode","targetModelKey":"ollama-cloud/minimax-m3","family":"ollama-cloud","state":"gateDeny","attemptRole":"primary","countsForDiversity":false},
   {"backend":"opencode","targetModelKey":"nvidia/minimaxai/minimax-m3","family":"nvidia","state":"skippedByPolicy","attemptRole":"fallback","fallbackOf":"ollama-cloud/minimax-m3","countsForDiversity":false}
 ]
 '@
-$r22 = Invoke-Closeout $true $false 'not_applicable' '[]' $statesFallbackOk
+$selectedFallbackOk = @'
+[
+  {"backend":"opencode","targetModelKey":"ollama-cloud/deepseek-v4-pro","fallbackChain":[{"backend":"opencode","targetModelKey":"nvidia/deepseek-ai/deepseek-v4-pro"}]},
+  {"backend":"opencode","targetModelKey":"ollama-cloud/glm-5.2","fallbackChain":[{"backend":"opencode","targetModelKey":"nvidia/z-ai/glm-5.1"}]},
+  {"backend":"opencode","targetModelKey":"ollama-cloud/minimax-m3","fallbackChain":[{"backend":"opencode","targetModelKey":"nvidia/minimaxai/minimax-m3"}]}
+]
+'@
+$r22 = Invoke-Closeout $true $false 'not_applicable' $selectedFallbackOk $statesFallbackOk
 Assert-True ($r22.closeoutReady -eq $true) 'Caso 22: estados finais de fallback deveriam liberar.'
-Assert-True (@($r22.preferredReviewerStates).Count -eq 4) 'Caso 22: deveria ecoar primario + fallbacks.'
+Assert-True (@($r22.preferredReviewerStates).Count -eq 6) 'Caso 22: deveria ecoar primarios + fallbacks.'
 
 # (23) Skip contando diversidade bloqueia.
 $statesSkipBad = '[{"backend":"opencode","targetModelKey":"nvidia/x","family":"nvidia","state":"skippedAfterSuccess","attemptRole":"fallback","fallbackOf":"ollama-cloud/x","countsForDiversity":true}]'
-$r23 = Invoke-Closeout $true $false 'not_applicable' '[]' $statesSkipBad
+$r23 = Invoke-Closeout $true $false 'not_applicable' '[{"backend":"opencode","targetModelKey":"ollama-cloud/x","fallbackChain":[{"backend":"opencode","targetModelKey":"nvidia/x"}]}]' $statesSkipBad
 Assert-True ($r23.closeoutReady -eq $false) 'Caso 23: skip com countsForDiversity=true deveria bloquear.'
 Assert-True (@($r23.blockingReasons) -contains 'preferred-reviewer-state-skip-counts-diversity:nvidia/x:skippedAfterSuccess') 'Caso 23: razao de diversidade inflada ausente.'
 
 # (24) notAttempted como estado primario silencioso bloqueia.
 $statesPrimaryNotAttempted = '[{"backend":"opencode","targetModelKey":"ollama-cloud/x","family":"ollama-cloud","state":"notAttempted","attemptRole":"primary","countsForDiversity":false}]'
-$r24 = Invoke-Closeout $true $false 'not_applicable' '[]' $statesPrimaryNotAttempted
+$r24 = Invoke-Closeout $true $false 'not_applicable' '[{"backend":"opencode","targetModelKey":"ollama-cloud/x"}]' $statesPrimaryNotAttempted
 Assert-True ($r24.closeoutReady -eq $false) 'Caso 24: primario notAttempted silencioso deveria bloquear.'
 Assert-True (@($r24.blockingReasons) -contains 'preferred-reviewer-primary-notattempted-silent:ollama-cloud/x') 'Caso 24: razao primario notAttempted ausente.'
 
@@ -222,6 +239,44 @@ $r25 = (& $target -HadPreferredReviewers 'false' -ManualReviewerSelection 'false
 Assert-True ($r25.closeoutReady -eq $false) 'Caso 25: insufficientDiversityAfterFallback deveria bloquear closeout.'
 Assert-True (@($r25.blockingReasons) -contains 'insufficient-diversity-after-fallback') 'Caso 25: razao insufficient-diversity-after-fallback ausente.'
 Assert-True ([string]$r25.requiredUserPrompt -match 'diversidade insuficiente') 'Caso 25: prompt deveria mencionar diversidade insuficiente.'
+
+# (26) Com preferred-reviewers existente, SelectedReviewersJson nao pode vir vazio: sem lista
+#      esperada nao ha como provar completude dos estados.
+$r26 = Invoke-Closeout $true $false 'not_applicable' '[]' '[{"backend":"codex","targetModelKey":"openai/gpt-5.5","state":"responded","countsForDiversity":true}]'
+Assert-True ($r26.closeoutReady -eq $false) 'Caso 26: HadPreferred=true com SelectedReviewersJson vazio deveria bloquear.'
+Assert-True (@($r26.blockingReasons) -contains 'preferred-reviewer-expected-states-missing') 'Caso 26: razao preferred-reviewer-expected-states-missing ausente.'
+Assert-True (@($r26.blockingReasons) -contains 'preferred-reviewer-state-unexpected:openai/gpt-5.5') 'Caso 26: estado sem esperado correspondente deveria bloquear.'
+
+# (27) Estado parcial nao pode liberar: todo titular esperado precisa aparecer.
+$selectedTwo = '[{"backend":"codex","targetModelKey":"openai/gpt-5.5"},{"backend":"opencode","targetModelKey":"nvidia/z-ai/glm-5.2"}]'
+$stateOne = '[{"backend":"codex","targetModelKey":"openai/gpt-5.5","state":"responded","countsForDiversity":true}]'
+$r27 = Invoke-Closeout $true $false 'not_applicable' $selectedTwo $stateOne
+Assert-True ($r27.closeoutReady -eq $false) 'Caso 27: estado parcial deveria bloquear.'
+Assert-True (@($r27.blockingReasons) -contains 'preferred-reviewer-state-missing:nvidia/z-ai/glm-5.2') 'Caso 27: titular esperado omitido deveria ser apontado.'
+
+# (28) Fallback esperado tambem precisa ter estado auditavel quando consta na lista preferida.
+$selectedWithFallback = '[{"backend":"codex","targetModelKey":"openai/gpt-5.5","fallbackChain":[{"backend":"opencode","targetModelKey":"nvidia/z-ai/glm-5.2"}]}]'
+$r28 = Invoke-Closeout $true $false 'not_applicable' $selectedWithFallback $stateOne
+Assert-True ($r28.closeoutReady -eq $false) 'Caso 28: fallback esperado omitido deveria bloquear.'
+Assert-True (@($r28.blockingReasons) -contains 'preferred-reviewer-state-missing:nvidia/z-ai/glm-5.2') 'Caso 28: fallback esperado omitido deveria ser apontado.'
+
+# (29) Estado duplicado nao pode mascarar ausencia de outro preferido esperado.
+$stateDuplicate = @'
+[
+  {"backend":"codex","targetModelKey":"openai/gpt-5.5","state":"responded","countsForDiversity":true},
+  {"backend":"codex","targetModelKey":"openai/gpt-5.5","state":"responded","countsForDiversity":true}
+]
+'@
+$r29 = Invoke-Closeout $true $false 'not_applicable' $selectedTwo $stateDuplicate
+Assert-True ($r29.closeoutReady -eq $false) 'Caso 29: duplicata de estado deveria bloquear.'
+Assert-True (@($r29.blockingReasons) -contains 'preferred-reviewer-state-duplicate:openai/gpt-5.5') 'Caso 29: duplicata deveria ser apontada.'
+Assert-True (@($r29.blockingReasons) -contains 'preferred-reviewer-state-missing:nvidia/z-ai/glm-5.2') 'Caso 29: duplicata nao pode mascarar ausencia do outro esperado.'
+
+# (30) Selecao manual tambem vira contrato de completude quando SelectedReviewersJson e
+#      informado: nao pode fechar com estado parcial depois da oferta de curadoria.
+$r30 = Invoke-Closeout $false $true 'offered' $selectedTwo $stateOne
+Assert-True ($r30.closeoutReady -eq $false) 'Caso 30: selecao manual com estado parcial deveria bloquear.'
+Assert-True (@($r30.blockingReasons) -contains 'preferred-reviewer-state-missing:nvidia/z-ai/glm-5.2') 'Caso 30: revisor manual esperado omitido deveria ser apontado.'
 
 <#
 Casos antigos mantidos por cobertura historica:

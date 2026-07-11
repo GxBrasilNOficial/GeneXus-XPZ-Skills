@@ -67,11 +67,15 @@
     OBRIGATORIO quando -VNextState resubmissionDeclinedByHuman (escopa o declinio a rodada;
     ausente nesse caso bloqueia o fechamento).
 .PARAMETER SelectedReviewersJson
-    JSON opcional com os revisores escolhidos. Usado para ecoar a selecao no prompt.
+    JSON com os revisores esperados da rodada. Quando HadPreferredReviewers=true, e obrigatorio
+    para provar completude; quando ManualReviewerSelection=true e a lista e informada, tambem
+    vira contrato de completude. Titulares e fallbackChain[] sao expandidos e comparados contra
+    PreferredReviewerStatesJson.
 .PARAMETER PreferredReviewerStatesJson
-    JSON opcional com o estado final de cada revisor preferido da rodada:
+    JSON opcional com o estado final de cada revisor esperado/auditado da rodada:
     [{ "targetModelKey": "...", "backend": "...", "state": "responded|noResponse|timeout|error|quota|gateAsk|gateDeny|unavailable|skippedByHumanDecision|stoppedOnGap|skippedAfterSuccess|skippedByPolicy|notAttempted|gateAllow|dispatched|enqueued", "family": "...", "attemptRole": "primary|fallback", "fallbackOf": "...", "countsForDiversity": true|false }].
-    Quando HadPreferredReviewers=true, deve conter todos os preferidos resolvidos.
+    Quando HadPreferredReviewers=true ou quando ManualReviewerSelection=true com SelectedReviewersJson
+    informado, deve conter todos os revisores esperados.
     Estados de nao tentativa (`skippedAfterSuccess`, `skippedByPolicy`, `notAttempted`) devem carregar
     `countsForDiversity=false`; `notAttempted` como estado primario silencioso bloqueia o fechamento.
 .PARAMETER DiversityState
@@ -147,6 +151,49 @@ function Get-ReviewerLabel {
     return "$backend -> $target"
 }
 
+function Get-ReviewerTarget {
+    param($Reviewer)
+    $target = [string](Get-Prop $Reviewer 'targetModelKey')
+    if ([string]::IsNullOrWhiteSpace($target)) { $target = [string](Get-Prop $Reviewer 'model') }
+    return $target
+}
+
+function Get-ReviewerStateKey {
+    param([string]$Backend, [string]$TargetModelKey, [string]$AttemptRole, [string]$FallbackOf)
+    $role = if ($AttemptRole -eq 'fallback' -or -not [string]::IsNullOrWhiteSpace($FallbackOf)) { 'fallback' } else { 'primary' }
+    $fallbackOwner = if ($role -eq 'fallback') { $FallbackOf } else { '' }
+    return "$Backend|$TargetModelKey|$role|$fallbackOwner"
+}
+
+function Add-ExpectedReviewerState {
+    param(
+        [System.Collections.Generic.List[object]]$Rows,
+        [System.Collections.Generic.HashSet[string]]$Keys,
+        [System.Collections.Generic.List[string]]$BlockingReasons,
+        $Reviewer,
+        [string]$AttemptRole,
+        [string]$FallbackOf
+    )
+    $backend = [string](Get-Prop $Reviewer 'backend')
+    $target = Get-ReviewerTarget $Reviewer
+    if ([string]::IsNullOrWhiteSpace($target)) {
+        $BlockingReasons.Add('preferred-reviewer-expected-missing-target')
+        return
+    }
+    $key = Get-ReviewerStateKey -Backend $backend -TargetModelKey $target -AttemptRole $AttemptRole -FallbackOf $FallbackOf
+    if (-not $Keys.Add($key)) {
+        $BlockingReasons.Add("preferred-reviewer-expected-duplicate:$target")
+        return
+    }
+    $Rows.Add([pscustomobject]@{
+            targetModelKey = $target
+            backend        = $backend
+            attemptRole    = $AttemptRole
+            fallbackOf     = $FallbackOf
+            key            = $key
+        })
+}
+
 $selectedReviewers = @()
 try {
     $parsed = $SelectedReviewersJson | ConvertFrom-Json
@@ -195,7 +242,25 @@ $validFinalStates = @(
 )
 $incompleteStates = @('gateAllow', 'dispatched', 'enqueued')
 $allKnownStates = @($validFinalStates + $incompleteStates)
+$expectedStateRows = [System.Collections.Generic.List[object]]::new()
+$expectedStateKeys = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+$requiresStateCompleteness = ($hadPreferred -or ($manualSelection -and @($selectedReviewers).Count -gt 0))
+if ($requiresStateCompleteness) {
+    foreach ($selected in $selectedReviewers) {
+        $selectedTarget = Get-ReviewerTarget $selected
+        Add-ExpectedReviewerState -Rows $expectedStateRows -Keys $expectedStateKeys -BlockingReasons $blockingReasons -Reviewer $selected -AttemptRole 'primary' -FallbackOf ''
+        $fallbackItems = Get-Prop $selected 'fallbackChain'
+        if ($null -eq $fallbackItems) { $fallbackItems = @() }
+        foreach ($fb in @($fallbackItems)) {
+            Add-ExpectedReviewerState -Rows $expectedStateRows -Keys $expectedStateKeys -BlockingReasons $blockingReasons -Reviewer $fb -AttemptRole 'fallback' -FallbackOf $selectedTarget
+        }
+    }
+    if ($expectedStateRows.Count -eq 0) {
+        $blockingReasons.Add('preferred-reviewer-expected-states-missing')
+    }
+}
 $preferredStateRows = [System.Collections.Generic.List[object]]::new()
+$receivedStateKeys = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
 
 foreach ($st in $preferredReviewerStates) {
     $target = [string](Get-Prop $st 'targetModelKey')
@@ -229,6 +294,14 @@ foreach ($st in $preferredReviewerStates) {
     if ($state -eq 'notAttempted' -and ([string]::IsNullOrWhiteSpace($attemptRole) -or $attemptRole -eq 'primary')) {
         $blockingReasons.Add("preferred-reviewer-primary-notattempted-silent:${target}")
     }
+    if ($requiresStateCompleteness) {
+        $stateKey = Get-ReviewerStateKey -Backend $backend -TargetModelKey $target -AttemptRole $attemptRole -FallbackOf $fallbackOf
+        if (-not $receivedStateKeys.Add($stateKey)) {
+            $blockingReasons.Add("preferred-reviewer-state-duplicate:$target")
+        } elseif (-not $expectedStateKeys.Contains($stateKey)) {
+            $blockingReasons.Add("preferred-reviewer-state-unexpected:$target")
+        }
+    }
 
     $preferredStateRows.Add([pscustomobject]@{
             targetModelKey      = $target
@@ -243,6 +316,13 @@ foreach ($st in $preferredReviewerStates) {
 
 if ($hadPreferred -and $preferredStateRows.Count -eq 0) {
     $blockingReasons.Add('preferred-reviewer-states-missing')
+}
+if ($requiresStateCompleteness) {
+    foreach ($expected in $expectedStateRows) {
+        if (-not $receivedStateKeys.Contains([string]$expected.key)) {
+            $blockingReasons.Add("preferred-reviewer-state-missing:$($expected.targetModelKey)")
+        }
+    }
 }
 
 # Eixo de estado da vN+1 (Achado A2). Este closeout e STATELESS: VNextState chega como
@@ -328,6 +408,7 @@ $receiptAddendum = "$curationReceipt $stateReceipt $vNextReceipt"
     resubmissionDeclinedBy       = $vNextDeclinedBy
     resubmissionDeclineReason    = $vNextDeclineReason
     selectedReviewers            = @($labels)
+    expectedPreferredReviewerStates = @($expectedStateRows)
     preferredReviewerStates      = @($preferredStateRows)
     requiredUserPrompt           = $requiredPrompt
     receiptAddendum              = $receiptAddendum
