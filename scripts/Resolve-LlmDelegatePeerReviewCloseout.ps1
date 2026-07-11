@@ -75,7 +75,9 @@
     JSON opcional com o estado final de cada revisor esperado/auditado da rodada:
     [{ "targetModelKey": "...", "backend": "...", "state": "responded|noResponse|timeout|error|quota|gateAsk|gateDeny|unavailable|skippedByHumanDecision|stoppedOnGap|skippedAfterSuccess|skippedByPolicy|notAttempted|gateAllow|dispatched|enqueued", "family": "...", "attemptRole": "primary|fallback", "fallbackOf": "...", "countsForDiversity": true|false }].
     Quando HadPreferredReviewers=true ou quando ManualReviewerSelection=true com SelectedReviewersJson
-    informado, deve conter todos os revisores esperados.
+    informado, deve conter todos os revisores esperados. Nessa comparacao, backend, targetModelKey,
+    attemptRole e fallbackOf compoem a identidade do revisor esperado; omiti-los pode gerar estado
+    ausente ou inesperado no fechamento.
     Estados de nao tentativa (`skippedAfterSuccess`, `skippedByPolicy`, `notAttempted`) devem carregar
     `countsForDiversity=false`; `notAttempted` como estado primario silencioso bloqueia o fechamento.
 .PARAMETER DiversityState

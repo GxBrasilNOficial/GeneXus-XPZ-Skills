@@ -14,23 +14,26 @@
     confidencialidade (Resolve-LlmDelegateAuthorization.ps1) NAO consome este arquivo;
     ele reavalia destino e sensibilidade deterministicamente a cada uso. Nao acoplar.
 
-    SANITIZACAO POR DESENHO: o manifesto grava SOMENTE metadados nao sensiveis -
-    canonicalModel, backend, locality, reasonCode (codigo curto, sem host/baseURL) e
-    sourceKind. NUNCA grava token, chave de API, baseURL/host, header, caminho de config,
+    SANITIZACAO POR DESENHO: o manifesto grava SOMENTE metadados nao sensiveis, como
+    backend, targetModelKey, canonicalModel, provider, family, sourceKind, sourceConfidence,
+    availableInManifest, locality, reasonCode (codigo curto, sem host/baseURL), hardVeto e
+    diagnostics. NUNCA grava token, chave de API, baseURL/host, header, caminho de config,
     prompt nem politica por-KB. O self-test prova essa ausencia.
 
-    ENUMERACAO: so opencode (provider/modelo em opencode.json) e Codex (config.toml) tem
-    fonte de enumeracao de modelos. Claude Code, Copilot e Gemini nao tem enumeracao
-    nativa - registrados como instalados com models=[] e enumeration=none-native; o modelo
+    ENUMERACAO: opencode le provider/modelo em opencode.json/jsonc; Codex usa config.toml
+    e resolvedor; Claude Code combina settings configurado e cache historico/fraco
+    (enumeration=settings-or-historical). Copilot e Gemini seguem registrados como
+    instalados sem enumeracao nativa forte (models=[] e enumeration=none-native); o modelo
     default deles vive na doc da skill/no 14, nao aqui.
 
     ESTAVEL vs VOLATIL: o que o manifesto grava (instalado? local/externo?) e estavel e
     cacheavel. A SAUDE do backend ("responde agora?") e volatil e fica em lastHealthCheck
     (null por padrao) - reverificada de leve no momento da revisao, nao nesta sondagem.
 
-    Reuso: chama Resolve-OpenCodeModelLocality.ps1 / Resolve-CodexModelLocality.ps1 em
-    processo para a localidade de cada modelo (a chave de destino canonica). A enumeracao
-    em si (listar os modelos) e logica nova, pois os resolvers classificam UM modelo dado.
+    Reuso: chama Resolve-OpenCodeModelLocality.ps1, Resolve-CodexModelLocality.ps1 e
+    Resolve-ClaudeCodeModelLocality.ps1 em processo para a localidade de cada modelo (a chave
+    de destino canonica). A enumeracao em si (listar os modelos) e logica propria deste script,
+    pois os resolvers classificam UM modelo dado.
 .PARAMETER OutputPath
     Caminho do manifesto machine-level. Default: %LOCALAPPDATA%\xpz-llm-delegate\capabilities.json.
 .PARAMETER SnapshotPath

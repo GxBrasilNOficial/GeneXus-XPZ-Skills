@@ -32,6 +32,8 @@
                                  apresentar askToAuthorize ao usuario para autorizacao EM LOTE
       insufficientDiversity   -> nem allow+ask alcancam >=2 familias: nao ha painel possivel;
                                  fallbackLabel = "segunda opiniao (N)" (N = despachaveis allow)
+      insufficientDiversityAfterFallback -> pos-despacho: houve fallback/skip auditavel, mas as
+                                 familias efetivamente respondidas ficaram abaixo do piso
 
     Saida: objeto JSON de maquina no stdout.
 .PARAMETER CandidatesJson

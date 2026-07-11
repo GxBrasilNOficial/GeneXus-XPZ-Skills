@@ -466,7 +466,9 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
     $rv = Get-Reviewer $r.json 0
     Assert-True ($rv.state -eq 'quota') "cota: 402/quota/saldo em despacho deveria virar quota; got $($rv.state)"
     Assert-True ([int]$r.json.quotaCount -ge 1) 'cota: quotaCount >= 1'
-    Assert-True ($null -ne $rv.errorPath -or $null -ne $rv.statePath) 'cota: deveria gravar ledger'
+    Assert-True ($null -ne $rv.statePath) 'cota: deveria gravar .state.txt no ledger'
+    $quotaLedger = Get-Content -LiteralPath $rv.statePath -Raw -Encoding utf8
+    Assert-True ($quotaLedger -match 'Payment Required' -and $quotaLedger -match 'insufficient coding plan balance' -and $quotaLedger -match '402' -and $quotaLedger -match 'sem quota') 'cota: .state.txt deveria preservar a evidencia bruta de quota/saldo/402'
 
     # timeout: fake dorme além do -TimeoutSec (via invokeArgs.timeoutSec) -> adapter "excedeu...encerrado" -> timeout
     $r = Invoke-Harness -Reviewers @(@{ backend = 'opencode'; targetModelKey = 'openai/timeout-1'; invokeArgs = @{ timeoutSec = 2 } }) `

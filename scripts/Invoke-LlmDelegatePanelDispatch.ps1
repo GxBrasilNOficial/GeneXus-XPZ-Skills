@@ -35,8 +35,10 @@
 .PARAMETER ManuscriptPath
     Caminho do manuscrito enviado a cada revisor (UTF-8). Repassado como -MessagePath ao adapter.
 .PARAMETER ReviewersJson
-    Array JSON [{backend, targetModelKey, invokeArgs, family?}] inline OU caminho de arquivo. O
-    orquestrador ja decidiu o conjunto (subagente nativo injetado FORA). family por ordem: explicita
+    Array JSON [{backend, targetModelKey, invokeArgs, family?, rank?, fallbackChain?}] inline OU caminho de arquivo. O
+    orquestrador ja decidiu o conjunto (subagente nativo injetado FORA). fallbackChain[] e lista ordenada
+    de revisores completos; o harness registra attemptRole/fallbackOf/countsForDiversity no resultado.
+    family por ordem: explicita
     -> targetModelKey canonico do gate (split '/'[0]) -> $null (despachavel, mas nao conta no piso).
     Modelo efetivo: opencode = invokeArgs.model ou o targetModelKey de ENTRADA (o resolvedor opencode
     exige -Model; o gate recebe o mesmo valor); codex = invokeArgs.model ou, se ausente, gate SEM -Model
@@ -637,6 +639,9 @@ foreach ($res in $collected) {
     $rec.attempts = $res.attempts
     $rec['__text'] = $res.text
     $rec['__errorText'] = $res.errorText
+    if ([string]::IsNullOrWhiteSpace([string]$rec.reason) -and -not [string]::IsNullOrWhiteSpace([string]$res.errorText)) {
+        $rec.reason = [string]$res.errorText
+    }
 }
 
 # --------------------------------------------------------------------------------------------
@@ -655,7 +660,7 @@ foreach ($rec in $originalRecords) {
             -State 'skippedAfterSuccess' -Reason 'fallback nao tentado porque o primario respondeu' -BaseRank ([int]$rec.rank)
         continue
     }
-    if ([string]$rec.state -eq 'error' -and [string]$rec.reason -like 'BLOCK:*') {
+    if ([string]$rec.state -eq 'error' -and [int]$rec.attempts -eq 0 -and [string]$rec.reason -like 'BLOCK:*') {
         Add-SkippedFallbackRecords -Records $records -FallbackItems $fallbackItems -FallbackOf ([string]$rec.targetModelKey) `
             -State 'skippedByPolicy' -Reason "fallback nao tentado por erro de validacao pre-despacho: $($rec.reason)" -BaseRank ([int]$rec.rank)
         continue
@@ -827,7 +832,8 @@ foreach ($rec in $records) {
             { $_ -in @('gateAsk', 'gateDeny', 'quota', 'unavailable', 'skippedByPolicy', 'skippedAfterSuccess', 'notAttempted') } {
             if ([string]::IsNullOrWhiteSpace([string]$rec.statePath)) {
                 $path = Join-Path $ledgerDir "$baseName.state.txt"
-                Set-Content -LiteralPath $path -Value ([string]$rec.reason) -Encoding utf8
+                $content = if ($errText) { $errText } else { [string]$rec.reason }
+                Set-Content -LiteralPath $path -Value ([string]$content) -Encoding utf8
                 $rec.statePath = $path
             }
         }
