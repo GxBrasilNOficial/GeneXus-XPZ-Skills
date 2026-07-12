@@ -10,12 +10,17 @@
     O contrato v2 separa resultado aceito de resultado rejeitado. Fallback de agente opencode para
     o agente default, truncamento, ausencia de conclusao, ausencia de texto, erro de stream, exit
     opencode diferente de zero ou exit opencode desconhecido viram rejeicao controlada (exit 20)
-    quando o watcher consegue promover o contrato. Falha interna do proprio watcher antes da
-    promocao atomica sai com codigo diferente de 0/20 e nao promove <GUID>.result.json.
+    quando o watcher consegue promover o contrato. O exit real do opencode vem de
+    <GUID>.exitcode.txt; -ProcessId delimita a vida do processo observado (runner pwsh criado por
+    Start-OpenCodeJob.ps1, ou processo equivalente em invocacoes manuais). Falha interna do
+    proprio watcher antes da promocao atomica sai com codigo 99, emite WATCHER_INTERNAL_ERROR no
+    stderr e nao promove <GUID>.result.json.
 .PARAMETER JobId
     GUID do job (nome-base dos arquivos em -TempDir).
 .PARAMETER ProcessId
-    PID do processo opencode cuja vida delimita o monitoramento.
+    PID do processo observado cuja vida delimita o monitoramento. No fluxo padrao de
+    Start-OpenCodeJob.ps1, e o PID do runner pwsh; o exit do opencode deve vir de
+    <GUID>.exitcode.txt.
 .PARAMETER TempDir
     Pasta dos arquivos de job. Default: <temp do usuário>\opencode-jobs.
 .PARAMETER IntervalSeconds
@@ -242,20 +247,6 @@ try {
             $opencodeExitObserved = $true
         }
     }
-    if (-not $opencodeExitObserved -and $observedProcess) {
-        try {
-            $observedProcess.WaitForExit()
-            $rawExit = $observedProcess.ExitCode
-            if ($null -ne $rawExit) {
-                $opencodeExitCode = [int]$rawExit
-                $opencodeExitObserved = $true
-            }
-        } catch {
-            $opencodeExitCode = $null
-            $opencodeExitObserved = $false
-        }
-    }
-
     $errText = ''
     if (Test-Path -LiteralPath $errPath -PathType Leaf) {
         $errText = Get-Content -LiteralPath $errPath -Raw -Encoding utf8 -ErrorAction SilentlyContinue

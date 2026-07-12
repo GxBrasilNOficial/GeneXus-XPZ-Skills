@@ -363,18 +363,40 @@ function Get-OpenCodeAcceptedResult {
 
     function HasProp($o, [string]$n) { return ($null -ne $o -and $null -ne $o.PSObject.Properties[$n]) }
     function Val($o, [string]$n) { if (HasProp $o $n) { return $o.PSObject.Properties[$n].Value }; return $null }
+    function Convert-OpenCodeResultInt($o, [string]$n) {
+        if (-not (HasProp $o $n)) { return [pscustomobject]@{ ok = $false; value = 0 } }
+        $v = Val $o $n
+        if ($null -eq $v) { return [pscustomobject]@{ ok = $false; value = 0 } }
+        $parsed = 0
+        if (-not [int]::TryParse([string]$v, [ref]$parsed)) {
+            return [pscustomobject]@{ ok = $false; value = 0 }
+        }
+        return [pscustomobject]@{ ok = $true; value = $parsed }
+    }
     $failResult = {
         param([string]$r, [string]$e)
         return [pscustomobject]@{ accepted = $false; reason = $r; result = $obj; acceptedFinalText = ''; error = $e }
     }
 
-    foreach ($p in @('schemaVersion','resultAccepted','status','hasStepFinish','completionVerdict','acceptedFinalText','finalText','watcherExitCode','opencodeExitCode','fallbackToBuild','fallbackDetail','finalTextDisposition','rejectionReason','error')) {
+    foreach ($p in @('schemaVersion','resultAccepted','status','hasStepFinish','completionVerdict','finishReason','acceptedFinalText','finalText','watcherExitCode','opencodeExitCode','fallbackToBuild','fallbackDetail','finalTextDisposition','rejectionReason','error')) {
         if (-not (HasProp $obj $p)) { return (& $failResult 'missing-field' "Missing field: $p") }
     }
-    if ([int](Val $obj 'schemaVersion') -ne 2) { return (& $failResult 'unsupported-schemaVersion' 'schemaVersion must be exactly 2.') }
+    $schemaVersionParsed = Convert-OpenCodeResultInt $obj 'schemaVersion'
+    if (-not $schemaVersionParsed.ok) { return (& $failResult 'invalid-schemaVersion' 'schemaVersion must be an integer.') }
+    $schemaVersion = $schemaVersionParsed.value
+    if ($schemaVersion -ne 2) { return (& $failResult 'unsupported-schemaVersion' 'schemaVersion must be exactly 2.') }
     if ((Val $obj 'resultAccepted') -isnot [bool]) { return (& $failResult 'invalid-resultAccepted' 'resultAccepted must be boolean.') }
     if ((Val $obj 'hasStepFinish') -isnot [bool]) { return (& $failResult 'invalid-hasStepFinish' 'hasStepFinish must be boolean.') }
     if ((Val $obj 'fallbackToBuild') -isnot [bool]) { return (& $failResult 'invalid-fallbackToBuild' 'fallbackToBuild must be boolean.') }
+    $watcherExitCodeParsed = Convert-OpenCodeResultInt $obj 'watcherExitCode'
+    if (-not $watcherExitCodeParsed.ok) { return (& $failResult 'invalid-watcherExitCode' 'watcherExitCode must be an integer.') }
+    $watcherExitCode = $watcherExitCodeParsed.value
+    $opencodeExitCode = $null
+    if ($null -ne (Val $obj 'opencodeExitCode')) {
+        $opencodeExitCodeParsed = Convert-OpenCodeResultInt $obj 'opencodeExitCode'
+        if (-not $opencodeExitCodeParsed.ok) { return (& $failResult 'invalid-opencodeExitCode' 'opencodeExitCode must be integer or null.') }
+        $opencodeExitCode = $opencodeExitCodeParsed.value
+    }
 
     $validStatus = @('completed','truncado','sem-conclusao','sem-texto','error')
     $validVerdict = @('ok','truncated','no-completion','empty','error')
@@ -393,13 +415,14 @@ function Get-OpenCodeAcceptedResult {
             [bool](Val $obj 'hasStepFinish') -and
             [string](Val $obj 'completionVerdict') -eq 'ok' -and
             [string](Val $obj 'finishReason') -eq 'stop' -and
-            [int](Val $obj 'watcherExitCode') -eq 0 -and
-            $null -ne (Val $obj 'opencodeExitCode') -and [int](Val $obj 'opencodeExitCode') -eq 0 -and
+            $watcherExitCode -eq 0 -and
+            $null -ne $opencodeExitCode -and $opencodeExitCode -eq 0 -and
             -not [bool](Val $obj 'fallbackToBuild') -and
             $null -eq (Val $obj 'fallbackDetail') -and
             [string](Val $obj 'finalTextDisposition') -eq 'accepted' -and
             [string](Val $obj 'rejectionReason') -eq '' -and
             $null -eq (Val $obj 'error') -and
+            [string](Val $obj 'acceptedFinalText') -eq [string](Val $obj 'finalText') -and
             -not [string]::IsNullOrWhiteSpace([string](Val $obj 'acceptedFinalText'))
         )
         if (-not $ok) { return (& $failResult 'accepted-shape-invalid' 'Accepted result does not satisfy v2 acceptance shape.') }
@@ -408,6 +431,7 @@ function Get-OpenCodeAcceptedResult {
 
     if ([string](Val $obj 'acceptedFinalText') -ne '') { return (& $failResult 'rejected-with-accepted-text' 'Rejected result must have empty acceptedFinalText.') }
     if ([string]::IsNullOrWhiteSpace([string](Val $obj 'error'))) { return (& $failResult 'rejected-without-error' 'Rejected result must have non-empty error.') }
+    if ([string](Val $obj 'finalTextDisposition') -eq 'accepted') { return (& $failResult 'rejected-disposition-invalid' 'Rejected result must not have accepted disposition.') }
     $rr = [string](Val $obj 'rejectionReason')
     if ($validReason -notcontains $rr) { return (& $failResult 'invalid-rejectionReason' 'Invalid rejectionReason.') }
     if ([string](Val $obj 'completionVerdict') -eq 'ok' -and [string](Val $obj 'finalTextDisposition') -in @('rejected-truncated','rejected-no-completion','rejected-empty')) {
@@ -426,6 +450,6 @@ function Get-OpenCodeAcceptedResult {
             return (& $failResult 'fallbackDetail-shape-invalid' 'fallbackDetail has invalid v2 shape.')
         }
     }
-    if ([int](Val $obj 'watcherExitCode') -ne 20) { return (& $failResult 'rejected-watcherExitCode-invalid' 'Rejected v2 result must have watcherExitCode 20.') }
+    if ($watcherExitCode -ne 20) { return (& $failResult 'rejected-watcherExitCode-invalid' 'Rejected v2 result must have watcherExitCode 20.') }
     return [pscustomobject]@{ accepted = $false; reason = $rr; result = $obj; acceptedFinalText = ''; error = [string](Val $obj 'error') }
 }

@@ -7,7 +7,8 @@
     <TempDir> e dispara `opencode run` desanexado, com o prompt entregue por STDIN (arquivo) e o
     stream JSON crescendo em <GUID>.stream.jsonl. Entregar o prompt por stdin (fora do argv)
     resolve o limite ~32KB de linha de comando do Windows e usa redirecao EXPLICITA a arquivo
-    (Start-Process -RedirectStandard*). Retorna imediatamente jobId+pid (não bloqueia o chamador).
+    (Start-Process -RedirectStandard*). Retorna imediatamente jobId+pid do runner pwsh (não bloqueia
+    o chamador).
     Por padrão abre Watch-OpenCodeJob.ps1 numa janela visivel para acompanhar ao vivo; use
     -NoWatcher para suprimir. Espelha o padrao stdin-based de Start-CodexJob.ps1.
 

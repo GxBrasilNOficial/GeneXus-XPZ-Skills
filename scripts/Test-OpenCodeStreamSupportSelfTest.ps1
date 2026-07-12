@@ -252,6 +252,14 @@ $fabricated = [pscustomobject]@{
     finalTextDisposition = 'accepted'; rejectionReason = ''; error = $null
 }
 Assert-Eq 'fabricado: ok sem step_finish rejeitado' (Get-OpenCodeAcceptedResult -Result $fabricated).accepted $false
+$fabricatedTextMismatch = $wrOk.PSObject.Copy()
+$fabricatedTextMismatch.acceptedFinalText = 'texto divergente'
+Assert-Eq 'fabricado: acceptedFinalText diverge de finalText rejeitado' (Get-OpenCodeAcceptedResult -Result $fabricatedTextMismatch).accepted $false
+$corruptNumeric = $wrOk.PSObject.Copy()
+$corruptNumeric.watcherExitCode = 'zero'
+$corruptResult = Get-OpenCodeAcceptedResult -Result $corruptNumeric
+Assert-Eq 'corrompido: watcherExitCode nao numerico rejeitado sem excecao' $corruptResult.accepted $false
+Assert-Eq 'corrompido: reason numerico' $corruptResult.reason 'invalid-watcherExitCode'
 $v1 = [pscustomobject]@{ status = 'completed'; finalText = 'texto' }
 Assert-Eq 'v1 implicito: rejeitado' (Get-OpenCodeAcceptedResult -Result $v1).accepted $false
 $v3 = $wrOk.PSObject.Copy()
@@ -283,7 +291,9 @@ function Invoke-WatcherE2E {
         [int]$ExpectedWatcherExitCode,
         [string]$ExpectedDisposition,
         [string]$ExpectedReason,
-        [bool]$ExpectFinalLabel
+        [bool]$ExpectFinalLabel,
+        [bool]$WriteExitCodeFile = $true,
+        [bool]$ExpectOpencodeExitCodeNull = $false
     )
     $jobDir = Join-Path ([System.IO.Path]::GetTempPath()) ('gx-oc-watch-e2e-' + [guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Path $jobDir -Force | Out-Null
@@ -306,11 +316,13 @@ function Invoke-WatcherE2E {
         } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $requestPath -Encoding utf8
 
         $sleeperScript = Join-Path $jobDir "$Name-sleeper.ps1"
-        @(
-            'Start-Sleep -Milliseconds 3000'
-            "Set-Content -LiteralPath '$($exitCodePath.Replace("'", "''"))' -Value '$OpencodeProcessExitCode' -Encoding ascii -NoNewline"
-            "exit $OpencodeProcessExitCode"
-        ) | Set-Content -LiteralPath $sleeperScript -Encoding utf8
+        $sleeperLines = [System.Collections.Generic.List[string]]::new()
+        $sleeperLines.Add('Start-Sleep -Milliseconds 3000')
+        if ($WriteExitCodeFile) {
+            $sleeperLines.Add("Set-Content -LiteralPath '$($exitCodePath.Replace("'", "''"))' -Value '$OpencodeProcessExitCode' -Encoding ascii -NoNewline")
+        }
+        $sleeperLines.Add("exit $OpencodeProcessExitCode")
+        $sleeperLines | Set-Content -LiteralPath $sleeperScript -Encoding utf8
         $sleeper = Start-Process pwsh -ArgumentList @('-NoProfile','-File',$sleeperScript) -WindowStyle Hidden -PassThru
         $watcher = Join-Path $PSScriptRoot 'Watch-OpenCodeJob.ps1'
         $watch = Start-Process pwsh -ArgumentList @(
@@ -326,7 +338,11 @@ function Invoke-WatcherE2E {
         $json = Get-Content -LiteralPath $resultPath -Raw -Encoding utf8 | ConvertFrom-Json
         Assert-Eq "$Name e2e: process exit" $watch.ExitCode $ExpectedWatcherExitCode
         Assert-Eq "$Name e2e: json watcherExitCode" $json.watcherExitCode $ExpectedWatcherExitCode
-        Assert-Eq "$Name e2e: opencodeExitCode" $json.opencodeExitCode $OpencodeProcessExitCode
+        if ($ExpectOpencodeExitCodeNull) {
+            Assert-Eq "$Name e2e: opencodeExitCode null" ($null -eq $json.opencodeExitCode) $true
+        } else {
+            Assert-Eq "$Name e2e: opencodeExitCode" $json.opencodeExitCode $OpencodeProcessExitCode
+        }
         Assert-Eq "$Name e2e: accepted" $json.resultAccepted $ExpectAccepted
         Assert-Eq "$Name e2e: disposition" $json.finalTextDisposition $ExpectedDisposition
         Assert-Eq "$Name e2e: reason" $json.rejectionReason $ExpectedReason
@@ -357,6 +373,8 @@ Invoke-WatcherE2E -Name 'watch-fallback' -StreamLines $watchLinesOk -StderrText 
     -ExpectAccepted $false -ExpectedWatcherExitCode 20 -ExpectedDisposition 'rejected-fallback' -ExpectedReason 'opencode-agent-fallback-to-build' -ExpectFinalLabel $false
 Invoke-WatcherE2E -Name 'watch-exit-nonzero' -StreamLines $watchLinesOk -OpencodeProcessExitCode 7 `
     -ExpectAccepted $false -ExpectedWatcherExitCode 20 -ExpectedDisposition 'rejected-error' -ExpectedReason 'opencode-exit-nonzero' -ExpectFinalLabel $false
+Invoke-WatcherE2E -Name 'watch-exit-unknown' -StreamLines $watchLinesOk -OpencodeProcessExitCode 0 -WriteExitCodeFile $false `
+    -ExpectAccepted $false -ExpectedWatcherExitCode 20 -ExpectedDisposition 'rejected-error' -ExpectedReason 'opencode-exit-unknown' -ExpectFinalLabel $false -ExpectOpencodeExitCodeNull $true
 
 if ($fail -gt 0) { throw "BLOCK: $fail caso(s) falharam em Test-OpenCodeStreamSupportSelfTest.ps1" }
 Write-Host 'OK: Test-OpenCodeStreamSupportSelfTest.ps1' -ForegroundColor Cyan
