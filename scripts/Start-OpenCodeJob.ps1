@@ -23,7 +23,8 @@
         <GUID>.stream.jsonl   saida do opencode, cresce incrementalmente
         <GUID>.stderr.txt     erros do processo
         <GUID>.stdin.txt      o prompt enviado via stdin
-        <GUID>.result.json    resposta final + custo (gravado pelo watcher no fim)
+        <GUID>.exitcode.txt   exit code observado do processo opencode, gravado pelo runner
+        <GUID>.result.json    resultado aceito/rejeitado + custo (gravado pelo watcher no fim)
 .PARAMETER Message
     Prompt a enviar (posicional). Exclusivo com -MessagePath.
 .PARAMETER MessagePath
@@ -124,6 +125,9 @@ $streamPath = "$base.stream.jsonl"
 $errPath    = "$base.stderr.txt"
 $stdinPath  = "$base.stdin.txt"
 $resultPath = "$base.result.json"
+$exitCodePath = "$base.exitcode.txt"
+$argsPath = "$base.args.json"
+$runnerPath = "$base.runner.ps1"
 
 # 4) request.json
 $agentLabel = if ($Agent) { $Agent } else { $null }
@@ -138,6 +142,8 @@ $request = [ordered]@{
     stderrPath = $errPath
     stdinPath  = $stdinPath
     resultPath = $resultPath
+    exitCodePath = $exitCodePath
+    argsPath = $argsPath
     exe        = $exe
 }
 $request | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $reqPath -Encoding utf8
@@ -146,15 +152,43 @@ $request | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $reqPath -Encoding
 #    posicional de 'run' e omitido; o fim do arquivo da EOF (anti-hang headless preservado).
 Set-Content -LiteralPath $stdinPath -Value $Message -Encoding utf8 -NoNewline
 
-# 6) Dispara o opencode desanexado (janela oculta, não espera): prompt por stdin, stream a arquivo.
-#    Sem runner intermediario — Start-Process chama o opencode.exe direto com redirecao explicita,
-#    como Start-CodexJob.ps1.
+# 6) Dispara o opencode desanexado (janela oculta): prompt por stdin, stream a arquivo.
+#    Um runner minimo grava <GUID>.exitcode.txt para o watcher, pois um processo separado que
+#    recebe apenas PID nao consegue recuperar ExitCode de forma confiavel no Windows.
 $ocArgs = @('run', '--format', 'json')
 if (-not [string]::IsNullOrWhiteSpace($Model)) { $ocArgs += @('--model', $Model) }
 if (-not [string]::IsNullOrWhiteSpace($Agent)) { $ocArgs += @('--agent', $Agent) }
+$ocArgs | ConvertTo-Json -Depth 3 | Set-Content -LiteralPath $argsPath -Encoding utf8
 
-$proc = Start-Process -FilePath $exe -ArgumentList $ocArgs -WindowStyle Hidden -PassThru `
-    -RedirectStandardInput $stdinPath -RedirectStandardOutput $streamPath -RedirectStandardError $errPath
+$runner = @'
+param(
+    [Parameter(Mandatory)] [string] $Exe,
+    [Parameter(Mandatory)] [string] $ArgsPath,
+    [Parameter(Mandatory)] [string] $StdinPath,
+    [Parameter(Mandatory)] [string] $StdoutPath,
+    [Parameter(Mandatory)] [string] $StderrPath,
+    [Parameter(Mandatory)] [string] $ExitCodePath
+)
+$ErrorActionPreference = 'Stop'
+$OpenCodeArgs = @(Get-Content -LiteralPath $ArgsPath -Raw -Encoding utf8 | ConvertFrom-Json | ForEach-Object { [string]$_ })
+$p = Start-Process -FilePath $Exe -ArgumentList $OpenCodeArgs -WindowStyle Hidden -PassThru `
+    -RedirectStandardInput $StdinPath -RedirectStandardOutput $StdoutPath -RedirectStandardError $StderrPath
+$p.WaitForExit()
+Set-Content -LiteralPath $ExitCodePath -Value ([string]$p.ExitCode) -Encoding ascii -NoNewline
+exit ([int]$p.ExitCode)
+'@
+Set-Content -LiteralPath $runnerPath -Value $runner -Encoding utf8
+
+$runnerArgs = @(
+    '-NoProfile', '-File', $runnerPath,
+    '-Exe', $exe,
+    '-ArgsPath', $argsPath,
+    '-StdinPath', $stdinPath,
+    '-StdoutPath', $streamPath,
+    '-StderrPath', $errPath,
+    '-ExitCodePath', $exitCodePath
+)
+$proc = Start-Process -FilePath pwsh -ArgumentList $runnerArgs -WindowStyle Hidden -PassThru
 $procId = $proc.Id
 
 # 7) Abre o watcher numa janela visivel (a menos que -NoWatcher)

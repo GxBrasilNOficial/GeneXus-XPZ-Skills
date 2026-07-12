@@ -23,9 +23,9 @@
       - 'agentlist'= `opencode agent list` falhou/timeout/erro (INTERMITENTE — SQLite
                      `PRAGMA wal_checkpoint`; transitorio -> retentar).
 
-    Pos-check (defesa-em-profundidade, NAO a barreira): Test-OpenCodeReviewerRoFallbackWarning
-    varre stderr pelo warning de fallback silencioso (`agent "..." not found. Falling back to
-    default agent`), que o opencode emite quando `--agent <ausente>` cai no `build` full-access.
+    Pos-check (defesa-em-profundidade, NAO a barreira do spawn): Test-OpenCodeReviewerRoFallbackWarning
+    varre stderr pelo warning generico de fallback silencioso (`agent "..." not found. Falling back to
+    default agent`), que o opencode emite quando `--agent <ausente>` cai no agente default.
 
     Claims empiricos medidos em opencode 1.4.4 (fixtures versionados em
     xpz-llm-delegate/fixtures/opencode-reviewer-ro/). Se um claim nao reproduzir na versao
@@ -471,11 +471,17 @@ function Test-OpenCodeAgentResolves {
 
 function Test-OpenCodeReviewerRoFallbackWarning {
     <#
-        Pos-check (defesa-em-profundidade): $true se o texto contiver o warning de fallback
-        silencioso do opencode (`agent "..." not found. Falling back to default agent`), sinal de
-        que o `--agent` caiu no `build` full-access. Tolera codigos ANSI e o nome entre aspas.
+        Pos-check (defesa-em-profundidade): $true se o texto contiver o warning generico de
+        fallback silencioso do opencode (`agent "..." not found. Falling back to default agent`),
+        sinal de que o `--agent` caiu no agente default. O padrao logico e exposto por
+        Get-OpenCodeReviewerRoFallbackWarningPattern.
     #>
     param([string] $Text)
     if ([string]::IsNullOrEmpty($Text)) { return $false }
-    return ($Text -match 'not found\. Falling back to default agent')
+    return ($Text -match (Get-OpenCodeReviewerRoFallbackWarningPattern))
+}
+
+function Get-OpenCodeReviewerRoFallbackWarningPattern {
+    <# Padrao logico unico do warning de fallback silencioso emitido pelo opencode. #>
+    return 'not found\. Falling back to default agent'
 }

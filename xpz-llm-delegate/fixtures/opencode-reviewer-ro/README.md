@@ -17,8 +17,10 @@ podem não valer; re-capturar os fixtures e revisitar D2/D3 antes de reativar.
 
 - `VERSION.txt` — versão do opencode contra a qual os claims foram medidos.
 - `fallback-warning.txt` — warning verbatim que o opencode emite em `run --agent <ausente>` (cai
-  silenciosamente no `build` full-access). O pós-check varre o stderr por
-  `not found. Falling back to default agent`.
+  silenciosamente no agente default, hoje `build` full-access). O pós-check varre o stderr pelo
+  padrão lógico exposto por `Get-OpenCodeReviewerRoFallbackWarningPattern`; no contrato v2 do
+  watcher esse mesmo valor alimenta `fallbackDetail.stderrPattern` sem copiar o literal em outros
+  produtores/consumidores.
 - `agentlist-reviewer-ro.sample.txt` — bloco canônico (sanitizado) do `opencode agent list` para o
   `reviewer-ro` na forma `permission`. Os caminhos reais de `external_directory` (dirs de skills da
   máquina) foram substituídos por `<SANITIZED_SKILL_DIR>`; as regras de ferramenta são as reais.

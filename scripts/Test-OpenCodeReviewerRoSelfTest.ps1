@@ -269,7 +269,12 @@ sem mode
 
     # ── (e) pos-check: warning de fallback detectado; texto limpo nao ──
     $fbText = Get-Content -LiteralPath $fallbackFixture -Raw -Encoding utf8
+    $pattern1 = Get-OpenCodeReviewerRoFallbackWarningPattern
+    $pattern2 = Get-OpenCodeReviewerRoFallbackWarningPattern
+    Assert-True (-not [string]::IsNullOrWhiteSpace($pattern1) -and $pattern1 -eq $pattern2) "(e) accessor Get-OpenCodeReviewerRoFallbackWarningPattern retorna padrao estavel nao vazio"
+    Assert-True ($fbText -match $pattern1) "(e) fixture real casa com o padrao logico unico do fallback"
     Assert-True (Test-OpenCodeReviewerRoFallbackWarning -Text $fbText) "(e) pos-check detecta warning de fallback do fixture"
+    Assert-True (Test-OpenCodeReviewerRoFallbackWarning -Text ("ruido antes`n" + $fbText + "`nruido depois")) "(e) pos-check detecta warning com ruido antes/depois"
     Assert-True (-not (Test-OpenCodeReviewerRoFallbackWarning -Text "stderr limpo sem warning")) "(e) pos-check nao dispara em stderr limpo"
 
     # ── (g) instalador preserva comentarios/formatacao/demais chaves ──

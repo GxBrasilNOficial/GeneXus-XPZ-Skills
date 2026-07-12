@@ -80,10 +80,11 @@ campo, cair para estático + hash do arquivo, aceitando o ponto cego de merge-gl
 
 **Pós-check (DEFESA-EM-PROFUNDIDADE, não a barreira).** Síncrono (`Invoke-OpenCode.ps1`): lê o
 CONTEÚDO de `$err` (arquivo temp descartado no `finally` em `:200`) **antes** do `Remove-Item`, e
-varre pelo warning de fallback. Assíncrono (`Start-OpenCodeJob.ps1` não tem `finally`-remove — usa
-limpeza por idade, `:89-96`): o check de fallback é **diagnóstico** no `Watch-OpenCodeJob.ps1`
-(`:211-214`, que já lê o stderr persistido). O pós-check assíncrono é diagnóstico, **não**
-bloqueador (o pré-check no spawn é a barreira).
+varre pelo warning de fallback. Assíncrono: `Start-OpenCodeJob.ps1` mantém artefatos do job por
+idade e `Watch-OpenCodeJob.ps1` lê o stderr persistido. Depois do contrato v2 do watcher, fallback
+assíncrono para `build`/default não é mais apenas diagnóstico aceitável: ele invalida o aceite
+técnico (`resultAccepted=false`, `watcherExitCode=20`) e só permanece como diagnóstico em
+`fallbackDetail`.
 
 **Limite operacional:** o fail-closed torna o opencode-revisor **indisponível** sob contenção
 transitória de SQLite. Registrar `unavailable` (+ motivo) no recibo e aplicar a régua normal de
@@ -217,7 +218,8 @@ README trilíngue: refletir em ES/EN se a regra operacional mudar.
 1. **D3** — `.gitignore` (exceção); `.opencode/agent/reviewer-ro.md`; fixtures; instalador;
    self-test. Suíte verde.
 2. **D1+D2** — `Invoke-OpenCode.ps1` (default escopado + pré/pós-check); `Start-OpenCodeJob.ps1`
-   (default + pré-check no spawn); `Watch-OpenCodeJob.ps1` (fallback diagnóstico).
+   (default + pré-check no spawn); `Watch-OpenCodeJob.ps1` (contrato aceito/rejeitado; fallback
+   invalida aceite).
 3. **Doc** — paridade acima.
 4. **Fechamento** — pré-push reforçada (revisão por pares do código real) → push (com ok humano).
 

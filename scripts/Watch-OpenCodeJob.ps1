@@ -3,13 +3,15 @@
 .SYNOPSIS
     Monitor incremental de um job assincrono do opencode (disparado por Start-OpenCodeJob.ps1).
 .DESCRIPTION
-    Backend opencode da skill xpz-llm-delegate. Segue o processo informado (-ProcessId) e le
-    o <GUID>.stream.jsonl incrementalmente, traduzindo os eventos JSON do opencode em linhas
-    legiveis: chamadas de ferramenta, custo/tokens parciais e texto recebido. Detecta silencio
-    prolongado e encerra quando o processo termina, gravando <GUID>.result.json com a resposta
-    final e o custo total.
+    Backend opencode da skill xpz-llm-delegate. Segue o processo informado (-ProcessId), le
+    o <GUID>.stream.jsonl incrementalmente, traduz eventos neutros para acompanhamento humano e,
+    no fim, grava <GUID>.result.json com contrato local schemaVersion=2.
 
-    Espelha o padrão de Watch-GeneXusMsBuildLog.ps1 do repo GeneXus-XPZ-Skills.
+    O contrato v2 separa resultado aceito de resultado rejeitado. Fallback de agente opencode para
+    o agente default, truncamento, ausencia de conclusao, ausencia de texto, erro de stream, exit
+    opencode diferente de zero ou exit opencode desconhecido viram rejeicao controlada (exit 20)
+    quando o watcher consegue promover o contrato. Falha interna do proprio watcher antes da
+    promocao atomica sai com codigo diferente de 0/20 e nao promove <GUID>.result.json.
 .PARAMETER JobId
     GUID do job (nome-base dos arquivos em -TempDir).
 .PARAMETER ProcessId
@@ -35,10 +37,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-# Funções compartilhadas de parsing do stream do opencode (dot-source)
 . (Join-Path $PSScriptRoot 'OpenCodeStreamSupport.ps1')
-# Guard do reviewer-ro (pos-check assincrono = DIAGNOSTICO, nao bloqueia — a barreira e o
-# pre-check no spawn de Start-OpenCodeJob.ps1)
 . (Join-Path $PSScriptRoot 'OpenCodeReviewerRoGuard.ps1')
 
 $base       = Join-Path $TempDir $JobId
@@ -46,16 +45,9 @@ $streamPath = "$base.stream.jsonl"
 $reqPath    = "$base.request.json"
 $errPath    = "$base.stderr.txt"
 $resultPath = "$base.result.json"
+$exitCodePath = "$base.exitcode.txt"
 
-# Acumuladores de resultado
-$script:textParts        = [System.Collections.Generic.List[object]]::new()
-$script:lastError        = $null
-$script:totalCost        = [double]0
-$script:lastTokens       = 0
-$script:sawStepFinish    = $false
-$script:lastFinishReason = ''
-
-# ── Helpers ───────────────────────────────────────────────────────────────────
+$script:events = [System.Collections.Generic.List[object]]::new()
 
 function Get-Prop {
     param($Obj, [string]$Name)
@@ -74,6 +66,9 @@ function Read-NewLines {
     param([ref]$Offset)
     $lines = [System.Collections.Generic.List[string]]::new()
     if (-not (Test-Path -LiteralPath $streamPath -PathType Leaf)) { return $lines }
+
+    $fs = $null
+    $reader = $null
     try {
         $fs = [System.IO.FileStream]::new(
             $streamPath,
@@ -86,9 +81,11 @@ function Read-NewLines {
         $l = $reader.ReadLine()
         while ($null -ne $l) { $lines.Add($l); $l = $reader.ReadLine() }
         $Offset.Value = $fs.Position
-        $reader.Dispose(); $fs.Dispose()
     } catch {
         Write-Line "AVISO: falha ao ler stream: $($_.Exception.Message)" 'DarkYellow'
+    } finally {
+        if ($reader) { $reader.Dispose() }
+        elseif ($fs) { $fs.Dispose() }
     }
     return $lines
 }
@@ -111,79 +108,105 @@ function Show-Event {
         'text' {
             $t = Get-Prop $part 'text'
             if ($t) {
-                $mid = [string](Get-Prop $part 'messageID')
-                $script:textParts.Add([pscustomobject]@{ mid = $mid; text = [string]$t })
-                $preview = [string]$t
-                if ($preview.Length -gt 100) { $preview = $preview.Substring(0, 100) + '...' }
-                Write-Line ("TEXTO: {0}" -f $preview) 'Green'
+                Write-Line ("TEXTO recebido ({0} chars)" -f ([string]$t).Length) 'Green'
             }
         }
         'step_finish' {
             $cost = Get-Prop $part 'cost'
-            if ($null -ne $cost) { $script:totalCost += [double]$cost }
             $tok = Get-Prop $part 'tokens'
             $tot = Get-Prop $tok 'total'
-            if ($null -ne $tot) { $script:lastTokens = [int]$tot }
-            # Achado D: capturar o sinal de conclusao do ULTIMO step_finish. Sempre sobrescrever
-            # (inclusive com vazio): se o ultimo step_finish vier SEM reason, o estado correto e ''
-            # (no-completion), nunca herdar o reason de um step_finish anterior. [string]$null = ''
-            # (sem excecao sob StrictMode). Espelha "ultimo step_finish governa" de Get-OpenCodeCompletionSignal.
-            $script:sawStepFinish = $true
-            $script:lastFinishReason = [string](Get-Prop $part 'reason')
-            Write-Line ("passo concluido | custo parcial USD {0:N5} | tokens {1} | reason {2}" -f $script:totalCost, $script:lastTokens, $script:lastFinishReason) 'DarkCyan'
+            $reason = [string](Get-Prop $part 'reason')
+            $costText = if ($null -ne $cost) { [double]$cost } else { 0 }
+            $tokText = if ($null -ne $tot) { [int]$tot } else { 0 }
+            Write-Line ("passo concluido | custo parcial USD {0:N5} | tokens {1} | reason {2}" -f $costText, $tokText, $reason) 'DarkCyan'
         }
         'error' {
             $emsg = Get-Prop (Get-Prop (Get-Prop $Json 'error') 'data') 'message'
-            if ([string]::IsNullOrWhiteSpace($emsg)) { $emsg = ($Json | ConvertTo-Json -Compress) }
-            $script:lastError = [string]$emsg
+            if ([string]::IsNullOrWhiteSpace($emsg)) { $emsg = 'erro no stream opencode' }
             Write-Line ("ERRO no agente: {0}" -f $emsg) 'Red'
         }
         default { }
     }
 }
 
-# ── Header ────────────────────────────────────────────────────────────────────
+function Write-OpenCodeResultAtomic {
+    param(
+        [Parameter(Mandatory)] $Result,
+        [Parameter(Mandatory)] [string] $Path
+    )
+    $json = $Result | ConvertTo-Json -Depth 8
+    $tmp = "$Path.tmp"
+    Set-Content -LiteralPath $tmp -Value $json -Encoding utf8
+    Move-Item -LiteralPath $tmp -Destination $Path -Force
+}
 
-Write-Host "=== Watch-OpenCodeJob =======================================" -ForegroundColor White
-if (Test-Path -LiteralPath $reqPath -PathType Leaf) {
+function Write-HumanResult {
+    param(
+        [Parameter(Mandatory)] $Result,
+        [Parameter(Mandatory)] [string] $Path
+    )
     try {
-        $req = Get-Content -LiteralPath $reqPath -Raw | ConvertFrom-Json
-        Write-Line ("Job   : {0}" -f (Get-Prop $req 'jobId'))  'White'
-        Write-Line ("Modelo: {0}" -f (Get-Prop $req 'model'))  'White'
-        $pr = [string](Get-Prop $req 'prompt')
-        if ($pr.Length -gt 80) { $pr = $pr.Substring(0, 80) + '...' }
-        Write-Line ("Prompt: {0}" -f $pr) 'White'
-    } catch { }
-}
-Write-Line ("PID   : {0}" -f $ProcessId) 'White'
-Write-Host "-------------------------------------------------------------" -ForegroundColor White
-
-# ── Aguardar stream aparecer (ate 30s) ────────────────────────────────────────
-
-$waited = 0
-while (-not (Test-Path -LiteralPath $streamPath -PathType Leaf) -and $waited -lt 30) {
-    Write-Line "Aguardando stream do opencode..." 'DarkGray'
-    Start-Sleep -Seconds 2; $waited += 2
+        Write-Host "-------------------------------------------------------------" -ForegroundColor White
+        if ($Result.resultAccepted) {
+            Write-Host "RESPOSTA FINAL:" -ForegroundColor Green
+            Write-Host $Result.acceptedFinalText
+        } elseif ($Result.fallbackToBuild) {
+            Write-Host "RESULTADO NAO ACEITO: fallback opencode para agente default/build detectado; resposta invalidada." -ForegroundColor Red
+        } else {
+            Write-Host ("RESULTADO NAO ACEITO: status={0}; rejectionReason={1}" -f $Result.status, $Result.rejectionReason) -ForegroundColor Red
+        }
+        Write-Host ("Custo total USD {0:N5} | tokens {1}" -f $Result.totalCost, $Result.tokens) -ForegroundColor DarkCyan
+        Write-Host ("result.json: {0}" -f $Path) -ForegroundColor DarkGray
+    } catch {
+        try { [Console]::Error.WriteLine("AVISO: falha ao apresentar resultado humano: $($_.Exception.Message)") } catch { }
+    }
 }
 
-# ── Loop principal ────────────────────────────────────────────────────────────
-
-$offset         = [long]0
-$lastActivity   = [DateTime]::Now
-$silenceAlerted = $false
-
+$exitCode = 99
 try {
+    Write-Host "=== Watch-OpenCodeJob =======================================" -ForegroundColor White
+    if (Test-Path -LiteralPath $reqPath -PathType Leaf) {
+        try {
+            $req = Get-Content -LiteralPath $reqPath -Raw -Encoding utf8 | ConvertFrom-Json
+            Write-Line ("Job   : {0}" -f (Get-Prop $req 'jobId'))  'White'
+            Write-Line ("Modelo: {0}" -f (Get-Prop $req 'model'))  'White'
+            $promptLen = ([string](Get-Prop $req 'prompt')).Length
+            Write-Line ("Prompt recebido ({0} chars)" -f $promptLen) 'White'
+        } catch { }
+    }
+    Write-Line ("PID   : {0}" -f $ProcessId) 'White'
+    Write-Host "-------------------------------------------------------------" -ForegroundColor White
+
+    $observedProcess = $null
+    try { $observedProcess = [System.Diagnostics.Process]::GetProcessById($ProcessId) } catch { $observedProcess = $null }
+    $opencodeExitObserved = $false
+    $opencodeExitCode = $null
+
+    $waited = 0
+    while (-not (Test-Path -LiteralPath $streamPath -PathType Leaf) -and $waited -lt 30) {
+        Write-Line "Aguardando stream do opencode..." 'DarkGray'
+        Start-Sleep -Seconds 2
+        $waited += 2
+    }
+
+    $offset = [long]0
+    $lastActivity = [DateTime]::Now
+    $silenceAlerted = $false
+
     :loop while ($true) {
-        $alive = $null -ne (Get-Process -Id $ProcessId -ErrorAction SilentlyContinue)
-        $new   = @(Read-NewLines ([ref]$offset))
+        $alive = if ($observedProcess) { -not $observedProcess.HasExited } else { $null -ne (Get-Process -Id $ProcessId -ErrorAction SilentlyContinue) }
+        $new = @(Read-NewLines ([ref]$offset))
 
         if ($new.Count -gt 0) {
-            $lastActivity   = [DateTime]::Now
+            $lastActivity = [DateTime]::Now
             $silenceAlerted = $false
             foreach ($line in $new) {
                 if ([string]::IsNullOrWhiteSpace($line)) { continue }
-                try { $j = $line | ConvertFrom-Json } catch { continue }
-                Show-Event $j
+                try {
+                    $j = $line | ConvertFrom-Json
+                    $script:events.Add($j)
+                    Show-Event $j
+                } catch { continue }
             }
         } else {
             $silenceSec = [int]([DateTime]::Now - $lastActivity).TotalSeconds
@@ -199,58 +222,58 @@ try {
             $tail = @(Read-NewLines ([ref]$offset))
             foreach ($line in $tail) {
                 if ([string]::IsNullOrWhiteSpace($line)) { continue }
-                try { $j = $line | ConvertFrom-Json } catch { continue }
-                Show-Event $j
+                try {
+                    $j = $line | ConvertFrom-Json
+                    $script:events.Add($j)
+                    Show-Event $j
+                } catch { continue }
             }
             break loop
         }
 
         Start-Sleep -Seconds $IntervalSeconds
     }
-} finally {
-    # Resposta final = concatenacao das partes da última mensagem (via OpenCodeStreamSupport)
-    $final = Get-OpenCodeFinalText -TextParts $script:textParts
+
+    if (Test-Path -LiteralPath $exitCodePath -PathType Leaf) {
+        $rawExitCode = (Get-Content -LiteralPath $exitCodePath -Raw -Encoding utf8 -ErrorAction SilentlyContinue).Trim()
+        $parsedExit = 0
+        if ([int]::TryParse($rawExitCode, [ref]$parsedExit)) {
+            $opencodeExitCode = $parsedExit
+            $opencodeExitObserved = $true
+        }
+    }
+    if (-not $opencodeExitObserved -and $observedProcess) {
+        try {
+            $observedProcess.WaitForExit()
+            $rawExit = $observedProcess.ExitCode
+            if ($null -ne $rawExit) {
+                $opencodeExitCode = [int]$rawExit
+                $opencodeExitObserved = $true
+            }
+        } catch {
+            $opencodeExitCode = $null
+            $opencodeExitObserved = $false
+        }
+    }
 
     $errText = ''
     if (Test-Path -LiteralPath $errPath -PathType Leaf) {
-        $errText = (Get-Content -LiteralPath $errPath -Raw -ErrorAction SilentlyContinue)
+        $errText = Get-Content -LiteralPath $errPath -Raw -Encoding utf8 -ErrorAction SilentlyContinue
     }
-    # Pos-check DIAGNOSTICO (nao bloqueia): warning de fallback silencioso ao 'build' no stderr
-    # persistido. A barreira e o pre-check no spawn (Start-OpenCodeJob.ps1); aqui so sinaliza para
-    # o operador que o --agent nao resolveu no runtime (a saida pode ter sido gerada pelo 'build').
+    $requestedAgent = Get-OpenCodeRequestedAgent -RequestPath $reqPath
     $fallbackToBuild = Test-OpenCodeReviewerRoFallbackWarning -Text $errText
-    $fallbackDetail = if ($fallbackToBuild) { "warning de fallback ao 'build' no stderr — o --agent nao resolveu no runtime; a resposta pode ter sido gerada pelo agente 'build' full-access. Verifique o provisionamento do reviewer-ro (diagnostico; nao bloqueia)." } else { $null }
-    # Achado D: classificar a conclusao por reason (precedencia compartilhada com o sincrono via
-    # OpenCodeStreamSupport). lastError tem prioridade; depois truncado/sem-conclusao/sem-texto.
-    $verdict = Get-OpenCodeCompletionVerdict -HasStepFinish $script:sawStepFinish -Reason $script:lastFinishReason -FinalText $final
-    $status = if ($script:lastError) { 'error' }
-    elseif ($verdict.status -eq 'truncated') { 'truncado' }
-    elseif ($verdict.status -eq 'no-completion') { 'sem-conclusao' }
-    elseif ($verdict.status -eq 'empty') { 'sem-texto' }
-    else { 'completed' }
+    $fallbackPattern = Get-OpenCodeReviewerRoFallbackWarningPattern
+    $signal = Get-OpenCodeCompletionSignal -Events @($script:events)
+    $result = Get-OpenCodeWatchResult -JobId $JobId -CompletionSignal $signal -StderrText $errText `
+        -FallbackToBuild:$fallbackToBuild -FallbackStderrPattern $fallbackPattern -RequestedAgent $requestedAgent `
+        -OpencodeExitCode $opencodeExitCode -OpencodeExitObserved:$opencodeExitObserved -FinishedAt (Get-Date)
 
-    $result = [ordered]@{
-        jobId        = $JobId
-        status       = $status
-        finalText    = $final
-        error        = $script:lastError
-        totalCost    = $script:totalCost
-        tokens       = $script:lastTokens
-        finishReason = $script:lastFinishReason
-        stderr       = $errText
-        fallbackToBuild = $fallbackToBuild
-        fallbackDetail = $fallbackDetail
-        finishedAt   = (Get-Date).ToString('o')
-    }
-    $result | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $resultPath -Encoding utf8
-
-    if ($fallbackToBuild) {
-        Write-Host "DIAGNOSTICO: warning de fallback ao 'build' no stderr — o --agent pode NAO ter resolvido no runtime (saida possivelmente do 'build' full-access). Verifique o provisionamento do reviewer-ro." -ForegroundColor Red
-    }
-
-    Write-Host "-------------------------------------------------------------" -ForegroundColor White
-    Write-Host "RESPOSTA FINAL:" -ForegroundColor Green
-    Write-Host $final
-    Write-Host ("Custo total USD {0:N5} | tokens {1}" -f $script:totalCost, $script:lastTokens) -ForegroundColor DarkCyan
-    Write-Host ("result.json: {0}" -f $resultPath) -ForegroundColor DarkGray
+    Write-OpenCodeResultAtomic -Result $result -Path $resultPath
+    $exitCode = [int]$result.watcherExitCode
+    Write-HumanResult -Result $result -Path $resultPath
+} catch {
+    try { [Console]::Error.WriteLine("WATCHER_INTERNAL_ERROR: $($_.Exception.Message)") } catch { }
+    $exitCode = 99
 }
+
+exit $exitCode
