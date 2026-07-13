@@ -173,6 +173,11 @@ Repassado a Watch-GeneXusMsBuildLog.ps1. Padrão: 120. Intervalo válido: 30-360
 
 .PARAMETER VerboseLog
 Amplia o detalhamento gravado no log sem alterar o resultado lógico.
+
+.PARAMETER SelfTestForceOuterRecovery
+Uso exclusivo do self-test controlado. Depois de o MSBuild terminar e os seus logs
+brutos estarem disponíveis, força uma exceção local imediatamente antes da escrita
+do diagnóstico normal para exercitar o recovery externo. Não usar operacionalmente.
 #>
 
 param(
@@ -245,7 +250,10 @@ param(
 
     [switch]$SkipDeployBinCheck,
 
-    [switch]$StrictDeployBinCheck
+    [switch]$StrictDeployBinCheck,
+
+    [Parameter(DontShow = $true)]
+    [switch]$SelfTestForceOuterRecovery
 )
 
 Set-StrictMode -Version Latest
@@ -2202,6 +2210,10 @@ try {
             $msBuildFailedText = if ($null -eq $msBuildExitCode) { 'null' } elseif ($msBuildExitCode -ne 0) { 'true' } else { 'false' }
             $json = '{"status":"' + $buildStatus.Status + '","exitCode":' + $buildStatus.ExitCode + ',"msBuildExitCode":' + $msBuildExitCodeText + ',"executionEvidence":{"msBuildExitCode":' + $msBuildExitCodeText + ',"msBuildFailed":' + $msBuildFailedText + ',"wrapperExitCode":' + $buildStatus.ExitCode + '},"postProcessingFailed":true,"note":"Fallback minimo: serializacao do fallback tambem falhou. Consultar msbuild.stdout.log."}'
         }
+    }
+
+    if ($SelfTestForceOuterRecovery.IsPresent) {
+        throw 'SELFTEST: falha artificial antes da escrita do diagnostico normal.'
     }
 
     Write-JsonLog -TargetLogPath $resolvedLogPath -JsonPayload $json
