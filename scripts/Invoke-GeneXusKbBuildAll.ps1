@@ -2210,9 +2210,7 @@ try {
 }
 catch {
     $outerCatchError = $_.Exception.Message
-    if ([string]::IsNullOrWhiteSpace($postProcessingError)) {
-        $postProcessingError = $outerCatchError
-    }
+    $postProcessingError = $outerCatchError
     if ($null -ne $msBuildExitCode) {
         $recoveryBuildAllDone = $false
         $recoveryKbOpen = $false

@@ -73,7 +73,8 @@ foreach ($scriptUnderTest in $scripts) {
     Assert-True -Condition ($source -match ("\$" + [regex]::Escape($subState) + ' = \$null')) -Message "Default seguro ausente para $subState."
     Assert-True -Condition ($source -match '\$msBuildCategoryBBlocked = \$false') -Message 'Default seguro ausente para msBuildCategoryBBlocked.'
     Assert-True -Condition ($source -match '\$outerCatchError = \$_\.Exception\.Message') -Message 'Outer catch deve capturar o erro original imediatamente.'
-    Assert-True -Condition ($source -match 'postProcessingError\s*= \$postProcessingError') -Message 'Recovery deve reutilizar postProcessingError capturado.'
+    Assert-True -Condition ($source -match '\$postProcessingError = \$outerCatchError') -Message 'Recovery deve registrar a exceção terminal do catch externo.'
+    Assert-True -Condition ($source -notmatch 'if \(\[string\]::IsNullOrWhiteSpace\(\$postProcessingError\)\) \{\s*\$postProcessingError = \$outerCatchError') -Message 'Recovery não pode manter um erro anterior no lugar da exceção terminal.'
     Assert-True -Condition ($source -match 'if \(\$null -ne \$msBuildExitCode\) \{') -Message 'Recovery externo deve preservar qualquer resultado conhecido do MSBuild, inclusive não-zero.'
     Assert-True -Condition ($source -notmatch 'if \(\(\$null -ne \$msBuildExitCode\) -and \(\$msBuildExitCode -eq 0\)\) \{') -Message 'Recovery externo não pode ignorar resultado MSBuild não-zero.'
     Assert-True -Condition ($source -match '\$recoveryBuildStatus = \$buildStatus') -Message 'Recovery deve partir da classificação já calculada.'
