@@ -232,6 +232,18 @@ Assert-Eq 'exit-unknown: status completed' $wrUnknownExit.status 'completed'
 Assert-Eq 'exit-unknown: reason' $wrUnknownExit.rejectionReason 'opencode-exit-unknown'
 Assert-Eq 'exit-unknown: helper rejected' (Get-OpenCodeAcceptedResult -Result $wrUnknownExit).accepted $false
 
+# 19a) O rejectionReason opencode-error exige status/disposicao coerentes.
+$wrError = $wrExit.PSObject.Copy()
+$wrError.rejectionReason = 'opencode-error'
+$wrError.status = 'error'
+$wrError.completionVerdict = 'error'
+$badErrorStatus = $wrError.PSObject.Copy()
+$badErrorStatus.status = 'completed'
+Assert-Eq 'corrompido: opencode-error com status errado rejeitado' (Get-OpenCodeAcceptedResult -Result $badErrorStatus).reason 'rejected-status-incoherent'
+$badErrorDisposition = $wrError.PSObject.Copy()
+$badErrorDisposition.finalTextDisposition = 'rejected-truncated'
+Assert-Eq 'corrompido: opencode-error com disposition errada rejeitado' (Get-OpenCodeAcceptedResult -Result $badErrorDisposition).reason 'rejected-disposition-incoherent'
+
 # 20) Rejeicoes de conclusao usam status publico PT-BR e helper nao aceita texto bruto.
 $wrTrunc = New-WatchResultFromLines -Lines $linesLen
 Assert-Eq 'truncated: status publico' $wrTrunc.status 'truncado'
