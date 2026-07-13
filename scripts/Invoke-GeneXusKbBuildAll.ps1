@@ -682,6 +682,15 @@ $confirmReorgMode       = $null
 $confirmWideRebuildMode = $null
 $confirmCostlyBuildOptionsMode = $null
 $allowCostlyBuildOptionsConfirmed = $false
+$msBuildExitCode = $null
+$timedOut = $false
+$stdOutText = ''
+$stdErrText = ''
+$postProcessingFailed = $false
+$postProcessingError = $null
+$buildStatus = $null
+$msBuildCategoryBBlocked = $false
+$operationalSubStateBuild = $null
 
 $resolvedLogPath = Get-FullPathSafe -PathValue $LogPath
 
@@ -1716,10 +1725,6 @@ try {
     }
 
     $script:TimingLog['msbuildStart'] = Get-GeneXusMsBuildNowIso
-    $msBuildExitCode = $null
-    $timedOut        = $false
-    $stdOutText      = ''
-    $stdErrText      = ''
     $msBuildResult   = Invoke-MsBuildFile -ResolvedMsBuildPath $resolvedMsBuildPath -MsBuildFilePath $msBuildFilePath -StdOutPath $stdOutPath -StdErrPath $stdErrPath
     $script:TimingLog['msbuildEnd'] = Get-GeneXusMsBuildNowIso
     $msBuildExitCode = $msBuildResult.ExitCode
@@ -1727,12 +1732,6 @@ try {
 
     $stdOutText = Read-TextFileSafe -PathValue $stdOutPath
     $stdErrText = Read-TextFileSafe -PathValue $stdErrPath
-
-    $postProcessingFailed = $false
-    $postProcessingError  = $null
-    $buildStatus = $null
-    $msBuildCategoryBBlocked = $false
-    $operationalSubStateBuild = $null
 
     $kbOpenMarker     = Get-MarkerValue -Text $stdOutText -Marker '__KB_OPEN__='
     $buildAllDoneMarker = Get-MarkerValue -Text $stdOutText -Marker '__BUILDALL_DONE__='

@@ -592,6 +592,18 @@ $confirmWideRebuildMode    = $null
 $allowWideRebuildConfirmed = $false
 $confirmCostlyBuildOptionsMode = $null
 $allowCostlyBuildOptionsConfirmed = $false
+$msBuildExitCode = $null
+$stdOutText = ''
+$stdErrText = ''
+$postProcessingFailed = $false
+$postProcessingError = $null
+$buildStatus = $null
+$msBuildCategoryBBlocked = $false
+$operationalSubStateSpecify = $null
+$activeVersionOutput = $null
+$activeEnvironmentOutput = $null
+$specifyDone = $false
+$generateDone = $false
 
 $resolvedLogPath = Get-FullPathSafe -PathValue $LogPath
 
@@ -1282,23 +1294,10 @@ try {
     }
 
     $script:TimingLog['msbuildStart'] = Get-GeneXusMsBuildNowIso
-    $msBuildExitCode = $null
-    $stdOutText      = ''
-    $stdErrText      = ''
     $msBuildExitCode = Invoke-MsBuildFile -ResolvedMsBuildPath $resolvedMsBuildPath -MsBuildFilePath $msBuildFilePath -StdOutPath $stdOutPath -StdErrPath $stdErrPath
     $script:TimingLog['msbuildEnd'] = Get-GeneXusMsBuildNowIso
     $stdOutText = Read-TextFileSafe -PathValue $stdOutPath
     $stdErrText = Read-TextFileSafe -PathValue $stdErrPath
-
-    $postProcessingFailed = $false
-    $postProcessingError  = $null
-    $buildStatus = $null
-    $msBuildCategoryBBlocked = $false
-    $operationalSubStateSpecify = $null
-    $activeVersionOutput = $null
-    $activeEnvironmentOutput = $null
-    $specifyDone = $false
-    $generateDone = $false
 
     $stdErrFilteredNoise = ''
     $stdErrFiltered      = ''

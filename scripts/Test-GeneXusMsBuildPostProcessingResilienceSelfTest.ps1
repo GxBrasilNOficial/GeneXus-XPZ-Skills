@@ -61,6 +61,15 @@ foreach ($scriptUnderTest in $scripts) {
     [void][System.Management.Automation.Language.Parser]::ParseFile($path, [ref]$null, [ref]$errors)
     Assert-True -Condition ($errors.Count -eq 0) -Message "Parse PowerShell falhou em $path"
 
+    $timingStartIndex = $source.IndexOf("`$script:TimingLog['scriptStart']")
+    Assert-True -Condition ($timingStartIndex -ge 0) -Message 'Marco de inicio do try externo ausente.'
+    $outerTryIndex = $source.IndexOf('try {', $timingStartIndex)
+    Assert-True -Condition ($outerTryIndex -ge 0) -Message 'Try externo ausente apos o marco de inicio.'
+    $postProcessingErrorDefaultIndex = $source.IndexOf('$postProcessingError = $null')
+    Assert-True -Condition ($postProcessingErrorDefaultIndex -ge 0 -and $postProcessingErrorDefaultIndex -lt $outerTryIndex) -Message 'postProcessingError deve ser inicializado antes do try externo para o recovery funcionar sob StrictMode.'
+    $msBuildExitCodeDefaultIndex = $source.IndexOf('$msBuildExitCode = $null')
+    Assert-True -Condition ($msBuildExitCodeDefaultIndex -ge 0 -and $msBuildExitCodeDefaultIndex -lt $outerTryIndex) -Message 'msBuildExitCode deve ser inicializado antes do try externo para o recovery funcionar sob StrictMode.'
+
     Assert-True -Condition ($source -match ("\$" + [regex]::Escape($subState) + ' = \$null')) -Message "Default seguro ausente para $subState."
     Assert-True -Condition ($source -match '\$msBuildCategoryBBlocked = \$false') -Message 'Default seguro ausente para msBuildCategoryBBlocked.'
     Assert-True -Condition ($source -match '\$outerCatchError = \$_\.Exception\.Message') -Message 'Outer catch deve capturar o erro original imediatamente.'
