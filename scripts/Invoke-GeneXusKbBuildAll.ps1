@@ -1902,12 +1902,12 @@ try {
         try {
             $buildSignalsJson = (& $signalsScript -StdOutPath $stdOutPath -StdErrPath $stdErrPath -Stage 'build-all' -AsJson) | Out-String
             if (-not [string]::IsNullOrWhiteSpace($buildSignalsJson)) {
-                $buildSignals = $buildSignalsJson | ConvertFrom-Json
-                if ($null -ne $buildSignals.PSObject.Properties['errors']) {
-                    $buildErrors = @($buildSignals.errors)
+                $parsedBuildSignals = $buildSignalsJson | ConvertFrom-Json
+                if ($null -ne $parsedBuildSignals.PSObject.Properties['errors']) {
+                    $buildErrors = @($parsedBuildSignals.errors)
                 }
-                if ($null -ne $buildSignals.PSObject.Properties['knownStdOutNoise']) {
-                    $knownStdOutNoiseBuild = @($buildSignals.knownStdOutNoise)
+                if ($null -ne $parsedBuildSignals.PSObject.Properties['knownStdOutNoise']) {
+                    $knownStdOutNoiseBuild = @($parsedBuildSignals.knownStdOutNoise)
                 }
             }
         }
