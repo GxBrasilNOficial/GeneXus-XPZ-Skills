@@ -2213,11 +2213,10 @@ catch {
     if ([string]::IsNullOrWhiteSpace($postProcessingError)) {
         $postProcessingError = $outerCatchError
     }
-    if (($null -ne $msBuildExitCode) -and ($msBuildExitCode -eq 0)) {
-        $recoveryStatus = 'compilou limpo com falha no pos-processamento'
-        $recoverySummary = 'BuildAll concluiu sem erro de MSBuild, mas o wrapper falhou ao montar o diagnostico. Consulte msbuild.stdout.log nos artefatos.'
+    if ($null -ne $msBuildExitCode) {
         $recoveryBuildAllDone = $false
         $recoveryKbOpen = $false
+        $recoveryStdOut = ''
         $recoveryStdErr = $stdErrText
         $recoveryStdErrFilteredNoise = @()
         $recoveryStdErrContent = @()
@@ -2245,14 +2244,46 @@ catch {
             # best effort apenas
         }
 
+        $recoveryBuildStatus = $buildStatus
+        if ($null -eq $recoveryBuildStatus) {
+            $recoveryReorgDetected = [bool](($recoveryStdOut + $recoveryStdErr) -match '(?i)reorgan')
+            $recoveryBuildStatus = Resolve-BuildStatus `
+                -MsBuildExitCode $msBuildExitCode `
+                -KbOpen $recoveryKbOpen `
+                -BuildAllDone $recoveryBuildAllDone `
+                -ReorgDetected $recoveryReorgDetected `
+                -TimedOut $timedOut `
+                -AllowReorgConfirmed $allowReorgConfirmed
+        }
+
+        if (($recoveryBuildStatus.Status -eq 'compilou limpo') -and (-not $recoveryKbOpen -or -not $recoveryBuildAllDone)) {
+            $recoveryBuildStatus = Resolve-BuildStatus `
+                -MsBuildExitCode $msBuildExitCode `
+                -KbOpen $recoveryKbOpen `
+                -BuildAllDone $recoveryBuildAllDone `
+                -ReorgDetected $false `
+                -TimedOut $timedOut `
+                -AllowReorgConfirmed $allowReorgConfirmed
+        }
+
+        $recoveryExitCode = [int]$recoveryBuildStatus.ExitCode
+        $recoveryStatus = [string]$recoveryBuildStatus.Status
+        $recoverySummary = [string]$recoveryBuildStatus.Summary
+        if (($recoveryExitCode -eq 0) -and ($recoveryStatus -eq 'compilou limpo') -and $recoveryKbOpen -and $recoveryBuildAllDone) {
+            $recoveryStatus = 'compilou limpo com falha no pos-processamento'
+            $recoverySummary = 'BuildAll concluiu sem erro de MSBuild e com marcador de conclusão, mas o wrapper falhou ao montar o diagnóstico. Consulte msbuild.stdout.log nos artefatos.'
+        } else {
+            $recoverySummary = $recoverySummary + ' O diagnóstico completo falhou após o MSBuild; a classificação e a evidência disponível foram preservadas.'
+        }
+
         $recovery = [ordered]@{
             status               = $recoveryStatus
             summary              = $recoverySummary
-            exitCode             = 0
+            exitCode             = $recoveryExitCode
             executionEvidence    = [ordered]@{
                 msBuildExitCode = $msBuildExitCode
-                msBuildFailed   = $false
-                wrapperExitCode = 0
+                msBuildFailed   = ($msBuildExitCode -ne 0)
+                wrapperExitCode = $recoveryExitCode
                 StdOutPath      = $stdOutPath
                 StdErrPath      = $stdErrPath
             }
@@ -2296,7 +2327,7 @@ catch {
                 # best effort apenas
             }
             Write-Output $recoveryJson
-            exit 0
+            exit $recoveryExitCode
         }
         catch {
             # cair no failure padrão abaixo

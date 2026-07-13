@@ -74,8 +74,22 @@ foreach ($scriptUnderTest in $scripts) {
     Assert-True -Condition ($source -match '\$msBuildCategoryBBlocked = \$false') -Message 'Default seguro ausente para msBuildCategoryBBlocked.'
     Assert-True -Condition ($source -match '\$outerCatchError = \$_\.Exception\.Message') -Message 'Outer catch deve capturar o erro original imediatamente.'
     Assert-True -Condition ($source -match 'postProcessingError\s*= \$postProcessingError') -Message 'Recovery deve reutilizar postProcessingError capturado.'
+    Assert-True -Condition ($source -match 'if \(\$null -ne \$msBuildExitCode\) \{') -Message 'Recovery externo deve preservar qualquer resultado conhecido do MSBuild, inclusive não-zero.'
+    Assert-True -Condition ($source -notmatch 'if \(\(\$null -ne \$msBuildExitCode\) -and \(\$msBuildExitCode -eq 0\)\) \{') -Message 'Recovery externo não pode ignorar resultado MSBuild não-zero.'
+    Assert-True -Condition ($source -match '\$recoveryBuildStatus = \$buildStatus') -Message 'Recovery deve partir da classificação já calculada.'
+    Assert-True -Condition ($source -match '\$recoveryExitCode = \[int\]\$recoveryBuildStatus\.ExitCode') -Message 'Recovery deve preservar o exitCode da classificação.'
+    Assert-True -Condition ($source -match 'wrapperExitCode = \$recoveryExitCode') -Message 'executionEvidence deve repetir o exitCode preservado.'
+    Assert-True -Condition ($source -match 'exit \$recoveryExitCode') -Message 'Processo deve sair com o exitCode preservado pelo recovery.'
     Assert-True -Condition ($source -match [regex]::Escape('^context \[anonymous\] \d+:\d+ attribute component')) -Message 'Filtro stderr full-line ausente.'
     Assert-True -Condition ($source -match 'stderrFilteredNoise\s*= \@\(\$recoveryStdErrFilteredNoise') -Message 'Recovery deve expor stderrFilteredNoise.'
+
+    if ($subState -eq 'operationalSubStateBuild') {
+        Assert-True -Condition ($source -match '\$recoveryStatus -eq ''compilou limpo''') -Message 'BuildAll deve exigir status limpo anterior para promover recovery limpo.'
+        Assert-True -Condition ($source -match '\$recoveryKbOpen -and \$recoveryBuildAllDone') -Message 'BuildAll deve exigir KB aberta e marcador BuildAll antes de promover recovery limpo.'
+    } else {
+        Assert-True -Condition ($source -match '\$recoveryStatus -eq ''specify e generate concluídos''') -Message 'SpecifyGenerate deve exigir status limpo anterior para promover recovery limpo.'
+        Assert-True -Condition ($source -match '\$recoverySpecifyDone -and \$recoveryGenerateDone') -Message 'SpecifyGenerate deve exigir os dois marcadores antes de promover recovery limpo.'
+    }
 }
 
 Write-Output 'GENEXUS_MSBUILD_POST_PROCESSING_RESILIENCE_SELFTEST_OK'

@@ -1728,11 +1728,10 @@ catch {
     if ([string]::IsNullOrWhiteSpace($postProcessingError)) {
         $postProcessingError = $outerCatchError
     }
-    if (($null -ne $msBuildExitCode) -and ($msBuildExitCode -eq 0)) {
-        $recoveryStatus = 'specify e generate concluídos com falha no pos-processamento'
-        $recoverySummary = 'SpecifyAll/GenerateOnly concluiu sem erro de MSBuild, mas o wrapper falhou ao montar o diagnostico. Consulte msbuild.stdout.log nos artefatos.'
+    if ($null -ne $msBuildExitCode) {
         $recoverySpecifyDone = $false
         $recoveryGenerateDone = $false
+        $recoveryStdOut = ''
         $recoveryStdErr = $stdErrText
         $recoveryStdErrFilteredNoise = @()
         $recoveryStdErrContent = @()
@@ -1760,14 +1759,43 @@ catch {
             # best effort apenas
         }
 
+        $recoveryBuildStatus = $buildStatus
+        if ($null -eq $recoveryBuildStatus) {
+            $recoveryBuildStatus = Resolve-BuildStatus `
+                -MsBuildExitCode $msBuildExitCode `
+                -SpecifyDone $recoverySpecifyDone `
+                -GenerateDone $recoveryGenerateDone `
+                -StdOutText $recoveryStdOut `
+                -StdErrText ($recoveryStdErrContent -join "`n")
+        }
+
+        if (($recoveryBuildStatus.Status -eq 'specify e generate concluídos') -and (-not $recoverySpecifyDone -or -not $recoveryGenerateDone)) {
+            $recoveryBuildStatus = Resolve-BuildStatus `
+                -MsBuildExitCode $msBuildExitCode `
+                -SpecifyDone $recoverySpecifyDone `
+                -GenerateDone $recoveryGenerateDone `
+                -StdOutText $recoveryStdOut `
+                -StdErrText ($recoveryStdErrContent -join "`n")
+        }
+
+        $recoveryExitCode = [int]$recoveryBuildStatus.ExitCode
+        $recoveryStatus = [string]$recoveryBuildStatus.Status
+        $recoverySummary = [string]$recoveryBuildStatus.Summary
+        if (($recoveryExitCode -eq 0) -and ($recoveryStatus -eq 'specify e generate concluídos') -and $recoverySpecifyDone -and $recoveryGenerateDone) {
+            $recoveryStatus = 'specify e generate concluídos com falha no pos-processamento'
+            $recoverySummary = 'SpecifyAll/GenerateOnly concluiu sem erro de MSBuild e com marcadores de conclusão, mas o wrapper falhou ao montar o diagnóstico. Consulte msbuild.stdout.log nos artefatos.'
+        } else {
+            $recoverySummary = $recoverySummary + ' O diagnóstico completo falhou após o MSBuild; a classificação e a evidência disponível foram preservadas.'
+        }
+
         $recovery = [ordered]@{
             status               = $recoveryStatus
             summary              = $recoverySummary
-            exitCode             = 0
+            exitCode             = $recoveryExitCode
             executionEvidence    = [ordered]@{
                 msBuildExitCode = $msBuildExitCode
-                msBuildFailed   = $false
-                wrapperExitCode = 0
+                msBuildFailed   = ($msBuildExitCode -ne 0)
+                wrapperExitCode = $recoveryExitCode
                 StdOutPath      = $stdOutPath
                 StdErrPath      = $stdErrPath
             }
@@ -1810,7 +1838,7 @@ catch {
                 # best effort apenas
             }
             Write-Output $recoveryJson
-            exit 0
+            exit $recoveryExitCode
         }
         catch {
             # cair no failure padrão abaixo
