@@ -450,6 +450,66 @@ function Get-OpenCodeAcceptedResult {
             return (& $failResult 'fallbackDetail-shape-invalid' 'fallbackDetail has invalid v2 shape.')
         }
     }
+    $status = [string](Val $obj 'status')
+    $completionVerdict = [string](Val $obj 'completionVerdict')
+    $finalTextDisposition = [string](Val $obj 'finalTextDisposition')
+    $hasStepFinish = [bool](Val $obj 'hasStepFinish')
+    $finishReason = [string](Val $obj 'finishReason')
+    switch ($rr) {
+        'opencode-agent-fallback-to-build' {
+            if (-not [bool](Val $obj 'fallbackToBuild') -or $null -eq (Val $obj 'fallbackDetail')) {
+                return (& $failResult 'rejected-shape-incoherent' 'Fallback rejectionReason requires fallbackToBuild/fallbackDetail.')
+            }
+        }
+        'opencode-exit-nonzero' {
+            if ($finalTextDisposition -ne 'rejected-error') {
+                return (& $failResult 'rejected-disposition-incoherent' 'opencode-exit-nonzero requires rejected-error disposition.')
+            }
+            if ($null -eq $opencodeExitCode -or $opencodeExitCode -eq 0) {
+                return (& $failResult 'rejected-exit-code-incoherent' 'opencode-exit-nonzero requires non-zero opencodeExitCode.')
+            }
+        }
+        'opencode-exit-unknown' {
+            if ($finalTextDisposition -ne 'rejected-error') {
+                return (& $failResult 'rejected-disposition-incoherent' 'opencode-exit-unknown requires rejected-error disposition.')
+            }
+            if ($null -ne $opencodeExitCode) {
+                return (& $failResult 'rejected-exit-code-incoherent' 'opencode-exit-unknown requires null opencodeExitCode.')
+            }
+        }
+        'opencode-error' {
+            if ($finalTextDisposition -ne 'rejected-error') {
+                return (& $failResult 'rejected-disposition-incoherent' 'opencode-error requires rejected-error disposition.')
+            }
+            if ($status -ne 'error') {
+                return (& $failResult 'rejected-status-incoherent' 'opencode-error requires error status.')
+            }
+        }
+        'truncated' {
+            if ($finalTextDisposition -ne 'rejected-truncated') {
+                return (& $failResult 'rejected-disposition-incoherent' 'truncated requires rejected-truncated disposition.')
+            }
+            if ($completionVerdict -ne 'truncated' -or $status -ne 'truncado' -or -not $hasStepFinish -or [string]::IsNullOrWhiteSpace($finishReason) -or $finishReason -eq 'stop') {
+                return (& $failResult 'rejected-verdict-incoherent' 'truncated rejection has incoherent completion signal.')
+            }
+        }
+        'no-completion' {
+            if ($finalTextDisposition -ne 'rejected-no-completion') {
+                return (& $failResult 'rejected-disposition-incoherent' 'no-completion requires rejected-no-completion disposition.')
+            }
+            if ($completionVerdict -ne 'no-completion' -or $status -ne 'sem-conclusao' -or -not [string]::IsNullOrEmpty($finishReason)) {
+                return (& $failResult 'rejected-verdict-incoherent' 'no-completion rejection has incoherent completion signal.')
+            }
+        }
+        'empty' {
+            if ($finalTextDisposition -ne 'rejected-empty') {
+                return (& $failResult 'rejected-disposition-incoherent' 'empty requires rejected-empty disposition.')
+            }
+            if ($completionVerdict -ne 'empty' -or $status -ne 'sem-texto' -or -not $hasStepFinish -or $finishReason -ne 'stop') {
+                return (& $failResult 'rejected-verdict-incoherent' 'empty rejection has incoherent completion signal.')
+            }
+        }
+    }
     if ($watcherExitCode -ne 20) { return (& $failResult 'rejected-watcherExitCode-invalid' 'Rejected v2 result must have watcherExitCode 20.') }
     return [pscustomobject]@{ accepted = $false; reason = $rr; result = $obj; acceptedFinalText = ''; error = [string](Val $obj 'error') }
 }

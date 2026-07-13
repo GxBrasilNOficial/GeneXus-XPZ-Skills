@@ -209,6 +209,7 @@ Assert-Eq 'watch-v2 ok: opencodeExitCode' $wrOk.opencodeExitCode 0
 $wrFallback = New-WatchResultFromLines -Lines $linesStop -FallbackToBuild $true -RequestedAgent 'reviewer-fake'
 $acceptedFallback = Get-OpenCodeAcceptedResult -Result $wrFallback
 Assert-Eq 'fallback: accepted false' $acceptedFallback.accepted $false
+Assert-Eq 'fallback: helper reason preservado' $acceptedFallback.reason 'opencode-agent-fallback-to-build'
 Assert-Eq 'fallback: watcherExitCode 20' $wrFallback.watcherExitCode 20
 Assert-Eq 'fallback: disposition' $wrFallback.finalTextDisposition 'rejected-fallback'
 Assert-Eq 'fallback: reason' $wrFallback.rejectionReason 'opencode-agent-fallback-to-build'
@@ -265,6 +266,47 @@ Assert-Eq 'v1 implicito: rejeitado' (Get-OpenCodeAcceptedResult -Result $v1).acc
 $v3 = $wrOk.PSObject.Copy()
 $v3.schemaVersion = 3
 Assert-Eq 'schemaVersion >2: rejeitado' (Get-OpenCodeAcceptedResult -Result $v3).accepted $false
+
+$badExitNonzero = $wrExit.PSObject.Copy()
+$badExitNonzero.opencodeExitCode = 0
+$badExitNonzeroResult = Get-OpenCodeAcceptedResult -Result $badExitNonzero
+Assert-Eq 'corrompido: exit-nonzero com opencodeExitCode zero rejeitado' $badExitNonzeroResult.accepted $false
+Assert-Eq 'corrompido: exit-nonzero reason incoerente' $badExitNonzeroResult.reason 'rejected-exit-code-incoherent'
+$badExitUnknown = $wrUnknownExit.PSObject.Copy()
+$badExitUnknown.opencodeExitCode = 1
+$badExitUnknownResult = Get-OpenCodeAcceptedResult -Result $badExitUnknown
+Assert-Eq 'corrompido: exit-unknown com opencodeExitCode presente rejeitado' $badExitUnknownResult.accepted $false
+Assert-Eq 'corrompido: exit-unknown reason incoerente' $badExitUnknownResult.reason 'rejected-exit-code-incoherent'
+$badTruncatedVerdict = $wrTrunc.PSObject.Copy()
+$badTruncatedVerdict.completionVerdict = 'ok'
+$badTruncatedVerdictResult = Get-OpenCodeAcceptedResult -Result $badTruncatedVerdict
+Assert-Eq 'corrompido: truncated com verdict ok rejeitado' $badTruncatedVerdictResult.accepted $false
+Assert-Eq 'corrompido: truncated verdict reason incoerente' $badTruncatedVerdictResult.reason 'contradictory-completionVerdict'
+$badTruncatedDisposition = $wrTrunc.PSObject.Copy()
+$badTruncatedDisposition.finalTextDisposition = 'rejected-error'
+$badTruncatedDispositionResult = Get-OpenCodeAcceptedResult -Result $badTruncatedDisposition
+Assert-Eq 'corrompido: truncated com disposition errada rejeitado' $badTruncatedDispositionResult.accepted $false
+Assert-Eq 'corrompido: truncated disposition reason incoerente' $badTruncatedDispositionResult.reason 'rejected-disposition-incoherent'
+$badNoCompletionDisposition = $wrNoFin.PSObject.Copy()
+$badNoCompletionDisposition.finalTextDisposition = 'rejected-error'
+$badNoCompletionDispositionResult = Get-OpenCodeAcceptedResult -Result $badNoCompletionDisposition
+Assert-Eq 'corrompido: no-completion com disposition errada rejeitado' $badNoCompletionDispositionResult.accepted $false
+Assert-Eq 'corrompido: no-completion disposition reason incoerente' $badNoCompletionDispositionResult.reason 'rejected-disposition-incoherent'
+$badEmptyDisposition = $wrEmpty.PSObject.Copy()
+$badEmptyDisposition.finalTextDisposition = 'rejected-error'
+$badEmptyDispositionResult = Get-OpenCodeAcceptedResult -Result $badEmptyDisposition
+Assert-Eq 'corrompido: empty com disposition errada rejeitado' $badEmptyDispositionResult.accepted $false
+Assert-Eq 'corrompido: empty disposition reason incoerente' $badEmptyDispositionResult.reason 'rejected-disposition-incoherent'
+$badFallbackDisposition = $wrFallback.PSObject.Copy()
+$badFallbackDisposition.finalTextDisposition = 'rejected-error'
+$badFallbackDispositionResult = Get-OpenCodeAcceptedResult -Result $badFallbackDisposition
+Assert-Eq 'corrompido: fallback com disposition errada rejeitado' $badFallbackDispositionResult.accepted $false
+Assert-Eq 'corrompido: fallback shape invalido' $badFallbackDispositionResult.reason 'fallback-shape-invalid'
+$badFallbackFlag = $wrFallback.PSObject.Copy()
+$badFallbackFlag.fallbackToBuild = $false
+$badFallbackFlagResult = Get-OpenCodeAcceptedResult -Result $badFallbackFlag
+Assert-Eq 'corrompido: fallbackDetail sem fallbackToBuild rejeitado' $badFallbackFlagResult.accepted $false
+Assert-Eq 'corrompido: fallback flag reason incoerente' $badFallbackFlagResult.reason 'rejected-shape-incoherent'
 
 # 22) Leitura por caminho aceita apenas <GUID>.result.json final, nunca .tmp.
 $tmpDir = Join-Path ([System.IO.Path]::GetTempPath()) ('gx-oc-watch-v2-' + [guid]::NewGuid().ToString('N'))
