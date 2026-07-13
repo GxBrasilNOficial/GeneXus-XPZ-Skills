@@ -11,6 +11,17 @@ Cada entrada usa dois campos curtos logo abaixo do titulo:
 
 Entradas legadas sem avaliação carregam `FALTA AVALIAR` em ambos os campos até que sejam revistas em sessão dedicada.
 
+## Avaliar contrato v2/finalizador compartilhado para wrappers MSBuild GeneXus
+
+- **Importância** — média (risco real de regressão e duplicação em pós-processamento de wrappers, mas a Fase 0 cobre a dor atual sem precisar desta arquitetura).
+- **Maturidade** — ideia (motivação e riscos mapeados; desenho deve ser refeito como frente própria depois da Fase 0, sem herdar automaticamente a pilha de planos temporários).
+
+Ideia futura: avaliar se os wrappers MSBuild GeneXus (`Invoke-GeneXusKbBuildAll.ps1`, `Invoke-GeneXusKbSpecifyGenerate.ps1` e consumidores relacionados) devem ganhar contrato de resultado v2/finalizador compartilhado para reduzir duplicação, centralizar serialização JSON stdout/`LogPath`, preservar `watcherContext`/timing e endurecer falhas de pós-processamento.
+
+Não faz parte da correção atual/Fase 0. A Fase 0 deve sanar o incidente estreito observado: build operacional limpo com ruído conhecido em stderr não pode virar JSON degradado por variável não inicializada.
+
+Detalhes e critérios para retomada: [`msbuild-result-contract-v2-finalizador-compartilhado.md`](msbuild-result-contract-v2-finalizador-compartilhado.md).
+
 ## Drift de tipagem entre delta empacotado e snapshot oficial — fases residuais
 
 - **Importância** — alta para o falso-negativo original; Fase 1 implementada para `Object/@type` por `guid`, mas a assinatura funcional ampla ainda tem gaps.
