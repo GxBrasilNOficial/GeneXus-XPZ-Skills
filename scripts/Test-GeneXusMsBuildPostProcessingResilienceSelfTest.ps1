@@ -1,0 +1,72 @@
+#requires -Version 7.4
+
+[CmdletBinding()]
+param()
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+function Assert-True {
+    param([bool]$Condition, [string]$Message)
+    if (-not $Condition) {
+        throw $Message
+    }
+}
+
+function Split-KnownGeneXusStderrNoise {
+    param([AllowNull()][string]$Text)
+
+    $pattern = '^context \[anonymous\] \d+:\d+ attribute component isn''t defined$'
+    $lines = if ([string]::IsNullOrEmpty($Text)) { @() } else { @($Text -split "`r?`n") }
+    return [ordered]@{
+        noise = @($lines | Where-Object { $_ -match $pattern })
+        content = @($lines | Where-Object { $_ -notmatch $pattern } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    }
+}
+
+$noise = "context [anonymous] 1:12 attribute component isn't defined"
+foreach ($count in 1, 2, 3, 4) {
+    foreach ($separator in "`n", "`r`n") {
+        $noiseLines = @()
+        foreach ($index in 1..$count) {
+            $noiseLines += $noise
+        }
+        $result = Split-KnownGeneXusStderrNoise -Text ($noiseLines -join $separator)
+        Assert-True -Condition ($result.noise.Count -eq $count) -Message "Esperava $count linhas de ruido filtradas."
+        Assert-True -Condition ($result.content.Count -eq 0) -Message 'Ruido conhecido isolado nao pode permanecer em stderrContent.'
+    }
+}
+
+$withoutFinalNewline = Split-KnownGeneXusStderrNoise -Text ($noise + "`n" + $noise)
+Assert-True -Condition ($withoutFinalNewline.noise.Count -eq 2) -Message 'Ausencia de newline final nao pode alterar a filtragem.'
+
+$mixed = Split-KnownGeneXusStderrNoise -Text ($noise + "`r`nERRO REAL: detalhe preservado`r`n" + $noise)
+Assert-True -Condition ($mixed.noise.Count -eq 2) -Message 'Stderr misto deveria separar as duas linhas conhecidas.'
+Assert-True -Condition ($mixed.content.Count -eq 1 -and $mixed.content[0] -eq 'ERRO REAL: detalhe preservado') -Message 'Linha adicional real deve permanecer no stderrContent.'
+
+$containsOnly = Split-KnownGeneXusStderrNoise -Text ('prefixo ' + $noise)
+Assert-True -Condition ($containsOnly.noise.Count -eq 0 -and $containsOnly.content.Count -eq 1) -Message 'Filtro full-line nao pode remover mensagem maior que apenas contenha a frase.'
+
+$scripts = @(
+    [ordered]@{ Path = (Join-Path $PSScriptRoot 'Invoke-GeneXusKbBuildAll.ps1'); SubState = 'operationalSubStateBuild' },
+    [ordered]@{ Path = (Join-Path $PSScriptRoot 'Invoke-GeneXusKbSpecifyGenerate.ps1'); SubState = 'operationalSubStateSpecify' }
+)
+
+foreach ($scriptUnderTest in $scripts) {
+    $path = $scriptUnderTest['Path']
+    $subState = $scriptUnderTest['SubState']
+    Assert-True -Condition (Test-Path -LiteralPath $path -PathType Leaf) -Message "Wrapper ausente: $path"
+    $source = Get-Content -LiteralPath $path -Raw
+    $errors = $null
+    [void][System.Management.Automation.Language.Parser]::ParseFile($path, [ref]$null, [ref]$errors)
+    Assert-True -Condition ($errors.Count -eq 0) -Message "Parse PowerShell falhou em $path"
+
+    Assert-True -Condition ($source -match ("\$" + [regex]::Escape($subState) + ' = \$null')) -Message "Default seguro ausente para $subState."
+    Assert-True -Condition ($source -match '\$msBuildCategoryBBlocked = \$false') -Message 'Default seguro ausente para msBuildCategoryBBlocked.'
+    Assert-True -Condition ($source -match '\$outerCatchError = \$_\.Exception\.Message') -Message 'Outer catch deve capturar o erro original imediatamente.'
+    Assert-True -Condition ($source -match 'postProcessingError\s*= \$postProcessingError') -Message 'Recovery deve reutilizar postProcessingError capturado.'
+    Assert-True -Condition ($source -match [regex]::Escape('^context \[anonymous\] \d+:\d+ attribute component')) -Message 'Filtro stderr full-line ausente.'
+    Assert-True -Condition ($source -match 'stderrFilteredNoise\s*= \@\(\$recoveryStdErrFilteredNoise') -Message 'Recovery deve expor stderrFilteredNoise.'
+}
+
+Write-Output 'GENEXUS_MSBUILD_POST_PROCESSING_RESILIENCE_SELFTEST_OK'

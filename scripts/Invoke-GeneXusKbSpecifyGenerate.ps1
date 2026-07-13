@@ -1282,6 +1282,9 @@ try {
     }
 
     $script:TimingLog['msbuildStart'] = Get-GeneXusMsBuildNowIso
+    $msBuildExitCode = $null
+    $stdOutText      = ''
+    $stdErrText      = ''
     $msBuildExitCode = Invoke-MsBuildFile -ResolvedMsBuildPath $resolvedMsBuildPath -MsBuildFilePath $msBuildFilePath -StdOutPath $stdOutPath -StdErrPath $stdErrPath
     $script:TimingLog['msbuildEnd'] = Get-GeneXusMsBuildNowIso
     $stdOutText = Read-TextFileSafe -PathValue $stdOutPath
@@ -1289,6 +1292,13 @@ try {
 
     $postProcessingFailed = $false
     $postProcessingError  = $null
+    $buildStatus = $null
+    $msBuildCategoryBBlocked = $false
+    $operationalSubStateSpecify = $null
+    $activeVersionOutput = $null
+    $activeEnvironmentOutput = $null
+    $specifyDone = $false
+    $generateDone = $false
 
     $stdErrFilteredNoise = ''
     $stdErrFiltered      = ''
@@ -1306,11 +1316,13 @@ try {
     $knownStdOutNoiseSpecify = @()
 
     try {
-    # GeneXus 18 grava exatamente 3 linhas "context [anonymous] N:N attribute component
-    # isn't defined" no stderr durante SpecifyAll — ruído sistêmico do modo headless;
-    # a IDE absorve sem registrar. Filtrar antes de classificar.
-    $stdErrFilteredNoise = @([regex]::Matches($stdErrText, '(?m)context \[anonymous\] \d+:\d+ attribute component isn''t defined') | ForEach-Object { $_.Value }) -join "`n"
-    $stdErrFiltered      = ($stdErrText -replace '(?m)^context \[anonymous\] \d+:\d+ attribute component isn''t defined\r?\n?', '').Trim()
+    # Full-line intencional: nao filtra mensagens maiores que apenas contenham a frase.
+    $knownStdErrNoisePattern = '^context \[anonymous\] \d+:\d+ attribute component isn''t defined$'
+    $stdErrLines = if ([string]::IsNullOrEmpty($stdErrText)) { @() } else { @($stdErrText -split "`r?`n") }
+    $stdErrNoiseLines = @($stdErrLines | Where-Object { $_ -match $knownStdErrNoisePattern })
+    $stdErrContentLines = @($stdErrLines | Where-Object { $_ -notmatch $knownStdErrNoisePattern })
+    $stdErrFilteredNoise = $stdErrNoiseLines -join "`n"
+    $stdErrFiltered      = $stdErrContentLines -join "`n"
 
     # Ruido estrutural GAM/NetCore: GeneXusMsBuildGamPlatformsSupport.ps1 (ver SKILL.md).
     $stdOutLines      = if ([string]::IsNullOrEmpty($stdOutText)) { @() } else { $stdOutText -split "`r?`n" }
@@ -1437,8 +1449,6 @@ try {
         }
     }
 
-    $msBuildCategoryBBlocked = $false
-    $operationalSubStateSpecify = $null
     if ($msBuildExitCode -eq 0 -and $buildStatus.ExitCode -eq 0) {
         $categoryBExit = Resolve-GeneXusMsBuildCategoryBExitCode `
             -BaseExitCode $buildStatus.ExitCode `
@@ -1715,17 +1725,37 @@ try {
     exit $buildStatus.ExitCode
 }
 catch {
+    $outerCatchError = $_.Exception.Message
+    if ([string]::IsNullOrWhiteSpace($postProcessingError)) {
+        $postProcessingError = $outerCatchError
+    }
     if (($null -ne $msBuildExitCode) -and ($msBuildExitCode -eq 0)) {
         $recoveryStatus = 'specify e generate concluídos com falha no pos-processamento'
         $recoverySummary = 'SpecifyAll/GenerateOnly concluiu sem erro de MSBuild, mas o wrapper falhou ao montar o diagnostico. Consulte msbuild.stdout.log nos artefatos.'
         $recoverySpecifyDone = $false
         $recoveryGenerateDone = $false
+        $recoveryStdErr = $stdErrText
+        $recoveryStdErrFilteredNoise = @()
+        $recoveryStdErrContent = @()
         try {
             if (-not [string]::IsNullOrWhiteSpace($stdOutPath) -and (Test-Path -LiteralPath $stdOutPath -PathType Leaf)) {
                 $recoveryStdOut = Read-TextFileSafe -PathValue $stdOutPath
                 $recoverySpecifyDone = ((Get-MarkerValue -Text $recoveryStdOut -Marker '__SPECIFY_DONE__=') -eq 'true')
                 $recoveryGenerateDone = ((Get-MarkerValue -Text $recoveryStdOut -Marker '__GENERATE_DONE__=') -eq 'true')
             }
+        }
+        catch {
+            # best effort apenas
+        }
+
+        try {
+            if ([string]::IsNullOrEmpty($recoveryStdErr) -and -not [string]::IsNullOrWhiteSpace($stdErrPath) -and (Test-Path -LiteralPath $stdErrPath -PathType Leaf)) {
+                $recoveryStdErr = Read-TextFileSafe -PathValue $stdErrPath
+            }
+            $recoveryStdErrLines = if ([string]::IsNullOrEmpty($recoveryStdErr)) { @() } else { @($recoveryStdErr -split "`r?`n") }
+            $recoveryStdErrNoisePattern = '^context \[anonymous\] \d+:\d+ attribute component isn''t defined$'
+            $recoveryStdErrFilteredNoise = @($recoveryStdErrLines | Where-Object { $_ -match $recoveryStdErrNoisePattern })
+            $recoveryStdErrContent = @($recoveryStdErrLines | Where-Object { $_ -notmatch $recoveryStdErrNoisePattern })
         }
         catch {
             # best effort apenas
@@ -1743,7 +1773,7 @@ catch {
                 StdErrPath      = $stdErrPath
             }
             postProcessingFailed = $true
-            postProcessingError  = $_.Exception.Message
+            postProcessingError  = $postProcessingError
             stage                = 'specify-generate'
             observedContext      = [ordered]@{
                 SpecifyDone       = $recoverySpecifyDone
@@ -1763,6 +1793,11 @@ catch {
             }
             watcherContext       = $script:WatcherContext
             timing               = (Get-GeneXusMsBuildTimingSection -TimingLog $script:TimingLog -MonitorLogPath $MonitorLogPath)
+            stderrContent        = @($recoveryStdErrContent | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+            stderrFilteredNoise  = @($recoveryStdErrFilteredNoise | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+            blockingReasons      = @($script:BlockingReasons)
+            warnings             = @($script:Warnings)
+            strategyTrace        = @($script:StrategyTrace)
             note                 = 'Diagnostico completo indisponivel apos falha interna; consultar msbuild.stdout.log para evidencia primaria.'
         }
         try {

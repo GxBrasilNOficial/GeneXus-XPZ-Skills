@@ -1716,6 +1716,10 @@ try {
     }
 
     $script:TimingLog['msbuildStart'] = Get-GeneXusMsBuildNowIso
+    $msBuildExitCode = $null
+    $timedOut        = $false
+    $stdOutText      = ''
+    $stdErrText      = ''
     $msBuildResult   = Invoke-MsBuildFile -ResolvedMsBuildPath $resolvedMsBuildPath -MsBuildFilePath $msBuildFilePath -StdOutPath $stdOutPath -StdErrPath $stdErrPath
     $script:TimingLog['msbuildEnd'] = Get-GeneXusMsBuildNowIso
     $msBuildExitCode = $msBuildResult.ExitCode
@@ -1726,6 +1730,9 @@ try {
 
     $postProcessingFailed = $false
     $postProcessingError  = $null
+    $buildStatus = $null
+    $msBuildCategoryBBlocked = $false
+    $operationalSubStateBuild = $null
 
     $kbOpenMarker     = Get-MarkerValue -Text $stdOutText -Marker '__KB_OPEN__='
     $buildAllDoneMarker = Get-MarkerValue -Text $stdOutText -Marker '__BUILDALL_DONE__='
@@ -1786,13 +1793,13 @@ try {
     $knownStdOutNoiseBuild = @()
 
     try {
-    # GeneXus 18 grava exatamente 3 linhas "context [anonymous] N:N attribute component
-    # isn't defined" no stderr durante SpecifyAll (executado internamente pelo BuildAll).
-    # O GeneXus não conta isso como erro: stdout reporta "0 avisos, 0 erros".
-    # Evidencia empirica: FabricaBrasil18 e wsEducacaoSpTeste em 2026-05-10, sempre 3x,
-    # mesma posicao, independente do conteúdo da KB. Filtrar antes de classificar.
-    $stdErrFilteredNoise = @([regex]::Matches($stdErrText, '(?m)context \[anonymous\] \d+:\d+ attribute component isn''t defined') | ForEach-Object { $_.Value }) -join "`n"
-    $stdErrFiltered      = ($stdErrText -replace '(?m)^context \[anonymous\] \d+:\d+ attribute component isn''t defined\r?\n?', '').Trim()
+    # Full-line intencional: nao filtra mensagens maiores que apenas contenham a frase.
+    $knownStdErrNoisePattern = '^context \[anonymous\] \d+:\d+ attribute component isn''t defined$'
+    $stdErrLines = if ([string]::IsNullOrEmpty($stdErrText)) { @() } else { @($stdErrText -split "`r?`n") }
+    $stdErrNoiseLines = @($stdErrLines | Where-Object { $_ -match $knownStdErrNoisePattern })
+    $stdErrContentLines = @($stdErrLines | Where-Object { $_ -notmatch $knownStdErrNoisePattern })
+    $stdErrFilteredNoise = $stdErrNoiseLines -join "`n"
+    $stdErrFiltered      = $stdErrContentLines -join "`n"
 
     # Ruido estrutural GAM/NetCore: GeneXusMsBuildGamPlatformsSupport.ps1 (ver SKILL.md).
     $stdOutLines      = if ([string]::IsNullOrEmpty($stdOutText)) { @() } else { $stdOutText -split "`r?`n" }
@@ -1920,8 +1927,6 @@ try {
     # depois dele.
     $script:BuildSignals.Complete = $true
 
-    $msBuildCategoryBBlocked = $false
-    $operationalSubStateBuild = $null
     if ($msBuildExitCode -eq 0 -and $buildStatus.ExitCode -eq 0) {
         $categoryBExit = Resolve-GeneXusMsBuildCategoryBExitCode `
             -BaseExitCode $buildStatus.ExitCode `
@@ -2205,17 +2210,37 @@ try {
     exit $buildStatus.ExitCode
 }
 catch {
+    $outerCatchError = $_.Exception.Message
+    if ([string]::IsNullOrWhiteSpace($postProcessingError)) {
+        $postProcessingError = $outerCatchError
+    }
     if (($null -ne $msBuildExitCode) -and ($msBuildExitCode -eq 0)) {
         $recoveryStatus = 'compilou limpo com falha no pos-processamento'
         $recoverySummary = 'BuildAll concluiu sem erro de MSBuild, mas o wrapper falhou ao montar o diagnostico. Consulte msbuild.stdout.log nos artefatos.'
         $recoveryBuildAllDone = $false
         $recoveryKbOpen = $false
+        $recoveryStdErr = $stdErrText
+        $recoveryStdErrFilteredNoise = @()
+        $recoveryStdErrContent = @()
         try {
             if (-not [string]::IsNullOrWhiteSpace($stdOutPath) -and (Test-Path -LiteralPath $stdOutPath -PathType Leaf)) {
                 $recoveryStdOut = Read-TextFileSafe -PathValue $stdOutPath
                 $recoveryBuildAllDone = ((Get-MarkerValue -Text $recoveryStdOut -Marker '__BUILDALL_DONE__=') -eq 'true')
                 $recoveryKbOpen = ((Get-MarkerValue -Text $recoveryStdOut -Marker '__KB_OPEN__=') -eq 'true')
             }
+        }
+        catch {
+            # best effort apenas
+        }
+
+        try {
+            if ([string]::IsNullOrEmpty($recoveryStdErr) -and -not [string]::IsNullOrWhiteSpace($stdErrPath) -and (Test-Path -LiteralPath $stdErrPath -PathType Leaf)) {
+                $recoveryStdErr = Read-TextFileSafe -PathValue $stdErrPath
+            }
+            $recoveryStdErrLines = if ([string]::IsNullOrEmpty($recoveryStdErr)) { @() } else { @($recoveryStdErr -split "`r?`n") }
+            $recoveryStdErrNoisePattern = '^context \[anonymous\] \d+:\d+ attribute component isn''t defined$'
+            $recoveryStdErrFilteredNoise = @($recoveryStdErrLines | Where-Object { $_ -match $recoveryStdErrNoisePattern })
+            $recoveryStdErrContent = @($recoveryStdErrLines | Where-Object { $_ -notmatch $recoveryStdErrNoisePattern })
         }
         catch {
             # best effort apenas
@@ -2233,7 +2258,7 @@ catch {
                 StdErrPath      = $stdErrPath
             }
             postProcessingFailed = $true
-            postProcessingError  = $_.Exception.Message
+            postProcessingError  = $postProcessingError
             stage                = 'build-all'
             observedContext      = [ordered]@{
                 KbOpen       = $recoveryKbOpen
@@ -2254,6 +2279,11 @@ catch {
             }
             watcherContext       = $script:WatcherContext
             timing               = (Get-GeneXusMsBuildTimingSection -TimingLog $script:TimingLog -MonitorLogPath $MonitorLogPath)
+            stderrContent        = @($recoveryStdErrContent | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+            stderrFilteredNoise  = @($recoveryStdErrFilteredNoise | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+            blockingReasons      = @($script:BlockingReasons)
+            warnings             = @($script:Warnings)
+            strategyTrace        = @($script:StrategyTrace)
             note                 = 'Diagnostico completo indisponivel apos falha interna; consultar msbuild.stdout.log para evidencia primaria. buildSignals.Complete=true: reorg/erros/eventos pos-build sao integrais e confiaveis (nao reabrir o log para eles). Complete=false: bucket parcial — campo null nao e zero/vazio, reabrir o log para os campos null.'
         }
         try {
