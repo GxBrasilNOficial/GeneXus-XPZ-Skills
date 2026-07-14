@@ -238,7 +238,9 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
             [string] $Sensitivity = 'public',
             [hashtable] $Extra = @{},
             [switch] $NoRoundId,
-            [switch] $NoExeMap
+            [switch] $NoExeMap,
+            [switch] $UseManuscriptText,
+            [AllowEmptyString()] [string] $ManuscriptText = ''
         )
         $rid = [guid]::NewGuid().ToString('N')
         $revFile = Join-Path $tmp "rev-$rid.json"
@@ -248,11 +250,15 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
 
         $argList = @(
             '-NoProfile', '-File', $harness,
-            '-ManuscriptPath', $manuscript,
             '-ReviewersJson', $revFile,
             '-PayloadSensitivity', $Sensitivity,
             '-TempDir', $ledgerRoot
         )
+        if ($UseManuscriptText) {
+            $argList += @('-ManuscriptText', $ManuscriptText)
+        } else {
+            $argList += @('-ManuscriptPath', $manuscript)
+        }
         if (-not $NoRoundId) { $argList += @('-RoundId', $rid) }
         if (-not $NoExeMap) { $argList += @('-BackendExeMap', $exeMapFile) }
         foreach ($k in $Extra.Keys) { $argList += @("-$k", [string]$Extra[$k]) }
@@ -630,6 +636,25 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
     $r = Invoke-Harness -Reviewers @(@{ backend = 'opencode'; targetModelKey = 'openai/x'; invokeArgs = @{} }) `
         -Sensitivity 'public' -Extra @{ OpenCodeConfigPath = $ocCfg } -NoRoundId
     Assert-True ($r.json.roundId -match '^[0-9a-f]{32}$') "RoundId ausente: deveria gerar guid 'N'; got '$($r.json.roundId)'"
+
+    # ManuscriptText -> preparador transacional antes do despacho
+    $r = Invoke-Harness -Reviewers @(@{ backend = 'opencode'; targetModelKey = 'openai/texto-inline'; invokeArgs = @{} }) `
+        -Sensitivity 'public' -Extra @{ OpenCodeConfigPath = $ocCfg } -UseManuscriptText `
+        -ManuscriptText 'manuscrito-inline'
+    Assert-True ($r.exit -eq 0) 'ManuscriptText: exit 0 esperado'
+    Assert-True ((Get-Reviewer $r.json 0).state -eq 'responded') 'ManuscriptText: revisor deveria responder'
+    $prepManifest = Join-Path $ledgerRoot $r.roundId 'preparation-manifest.json'
+    Assert-True (Test-Path -LiteralPath $prepManifest -PathType Leaf) 'ManuscriptText: preparation-manifest.json deveria existir'
+
+    # Falha de preparacao -> summary proprio do dispatcher, sem iniciar rodada/despacho
+    $r = Invoke-Harness -Reviewers @(@{ backend = 'opencode'; targetModelKey = 'openai/texto-invalido'; invokeArgs = 'nao-objeto' }) `
+        -Sensitivity 'public' -Extra @{ OpenCodeConfigPath = $ocCfg } -UseManuscriptText -ManuscriptText 'manuscrito-inline'
+    Assert-True ($r.exit -eq 1) 'ManuscriptText invalido: exit 1 esperado'
+    Assert-True ($r.json.Kind -eq 'xpz-llm-panel-dispatch-result') 'ManuscriptText invalido: Kind do dispatcher esperado'
+    Assert-True ($r.json.roundStarted -eq $false) 'ManuscriptText invalido: roundStarted=false'
+    Assert-True ($r.json.dispatchStarted -eq $false) 'ManuscriptText invalido: dispatchStarted=false'
+    Assert-True ([int]$r.json.reviewersDispatched -eq 0) 'ManuscriptText invalido: zero despachos'
+    Assert-True ($r.json.preparationError.failureCode -eq 'reviewer-invalid-invokeArgs') 'ManuscriptText invalido: failureCode reviewer-invalid-invokeArgs'
 
     # ReviewersJson INLINE (não-arquivo) + INVÁLIDO — testados em processo IN-PROCESS lendo o ledger
     $ridInline = [guid]::NewGuid().ToString('N')

@@ -11,6 +11,11 @@
     responded->noResponse (off-task), single-flight nem confinamento do opencode. Tudo isso e do
     ORQUESTRADOR (fora deste script). Ver 15-revisao-por-pares.md e xpz-llm-delegate/SKILL.md.
 
+    Aceita exatamente uma origem de manuscrito: -ManuscriptPath (legado) OU -ManuscriptText.
+    No modo -ManuscriptText, prepara artefatos transacionais com New-LlmDelegatePeerReviewArtifacts.ps1
+    antes de qualquer gate/despacho; falha de preparacao emite summary proprio com rodada/despacho
+    nao iniciados e zero revisores despachados.
+
     Por revisor (sequencial, pre-despacho):
       - opencode em kb-sensitive -> state=unavailable (sem gate, sem despacho; confinamento diferido);
       - modelo efetivo + fail-closeds (ver -ReviewersJson);
@@ -33,7 +38,10 @@
     stdout capturado num processo filho; so [Console]::Error fica fora). O chamador DEVE capturar stdout
     e stderr SEPARADAMENTE; redirecionar stderr->stdout corromperia o JSON.
 .PARAMETER ManuscriptPath
-    Caminho do manuscrito enviado a cada revisor (UTF-8). Repassado como -MessagePath ao adapter.
+    Caminho do manuscrito enviado a cada revisor (UTF-8). Exclusivo com -ManuscriptText.
+.PARAMETER ManuscriptText
+    Texto do manuscrito. Exclusivo com -ManuscriptPath; gera manuscript.md/reviewers.json/manifest
+    em <TempDir>\<RoundId> antes de iniciar o despacho.
 .PARAMETER ReviewersJson
     Array JSON [{backend, targetModelKey, invokeArgs, family?, rank?, fallbackChain?}] inline OU caminho de arquivo. O
     orquestrador ja decidiu o conjunto (subagente nativo injetado FORA). fallbackChain[] e lista ordenada
@@ -73,7 +81,8 @@
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)] [string] $ManuscriptPath,
+    [string] $ManuscriptPath,
+    [AllowEmptyString()] [string] $ManuscriptText,
     [Parameter(Mandatory)] [string] $ReviewersJson,
     [Parameter(Mandatory)] [ValidateSet('public', 'kb-sensitive')] [string] $PayloadSensitivity,
     [string] $RoundId,
@@ -234,12 +243,6 @@ function Add-SkippedFallbackRecords {
     }
 }
 
-# 0) Precondicoes de chamador (erro de uso -> nao produz summary)
-if (-not (Test-Path -LiteralPath $ManuscriptPath -PathType Leaf)) {
-    throw "BLOCK: -ManuscriptPath nao encontrado: $ManuscriptPath"
-}
-$manuscriptFull = (Resolve-Path -LiteralPath $ManuscriptPath).Path
-
 $scriptsDir = $PSScriptRoot
 $gateScript = Join-Path $scriptsDir 'Resolve-LlmDelegateAuthorization.ps1'
 if (-not (Test-Path -LiteralPath $gateScript -PathType Leaf)) {
@@ -252,8 +255,129 @@ $tempRoot = $TempDir
 if ([string]::IsNullOrWhiteSpace($tempRoot)) {
     $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) 'xpz-llm-panel-dispatch'
 }
-$ledgerDir = Join-Path $tempRoot $RoundId
-New-Item -ItemType Directory -Path $ledgerDir -Force | Out-Null
+
+# 0) Precondicoes de chamador: exatamente um entre -ManuscriptPath e -ManuscriptText
+$useManuscriptText = ($PSBoundParameters.ContainsKey('ManuscriptText'))
+$useManuscriptPath = ($PSBoundParameters.ContainsKey('ManuscriptPath'))
+if ($useManuscriptText -eq $useManuscriptPath) {
+    throw "BLOCK: informe exatamente um entre -ManuscriptText e -ManuscriptPath."
+}
+if ($useManuscriptPath) {
+    if (-not (Test-Path -LiteralPath $ManuscriptPath -PathType Leaf)) {
+        throw "BLOCK: -ManuscriptPath nao encontrado: $ManuscriptPath"
+    }
+    $manuscriptFull = (Resolve-Path -LiteralPath $ManuscriptPath).Path
+    $ledgerDir = Join-Path $tempRoot $RoundId
+    New-Item -ItemType Directory -Path $ledgerDir -Force | Out-Null
+} else {
+    # -ManuscriptText: preparar artefatos transacionalmente
+    $preparerScript = Join-Path $scriptsDir 'New-LlmDelegatePeerReviewArtifacts.ps1'
+    if (-not (Test-Path -LiteralPath $preparerScript -PathType Leaf)) {
+        throw "BLOCK: preparador de artefatos nao encontrado: $preparerScript"
+    }
+    $prepReviewers = if (Test-Path -LiteralPath $ReviewersJson -PathType Leaf) {
+        Get-Content -LiteralPath $ReviewersJson -Raw -Encoding utf8
+    } else {
+        $ReviewersJson
+    }
+    [System.IO.Directory]::CreateDirectory($tempRoot) | Out-Null
+    $prepGuid = [guid]::NewGuid().ToString('N')
+    $prepInputPath = Join-Path $tempRoot ".dispatch-prep-$prepGuid.manuscript.md"
+    $prepReviewersPath = Join-Path $tempRoot ".dispatch-prep-$prepGuid.reviewers.json"
+    $prepStdoutPath = Join-Path $tempRoot ".dispatch-prep-$prepGuid.stdout"
+    $prepStderrPath = Join-Path $tempRoot ".dispatch-prep-$prepGuid.stderr"
+    $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+    [System.IO.File]::WriteAllText($prepInputPath, $ManuscriptText, $utf8NoBom)
+    [System.IO.File]::WriteAllText($prepReviewersPath, $prepReviewers, $utf8NoBom)
+
+    $prepExitCode = $null
+    $prepJson = $null
+    $prepFailureMessage = $null
+    try {
+        $prepArgList = @(
+            '-NoProfile',
+            '-File', $preparerScript,
+            '-ManuscriptPath', $prepInputPath,
+            '-ReviewersJson', $prepReviewersPath,
+            '-RoundId', $RoundId,
+            '-TempDir', $tempRoot
+        )
+        $prepProcess = Start-Process -FilePath (Get-CurrentPowerShellExecutable) -ArgumentList $prepArgList -NoNewWindow -PassThru -RedirectStandardOutput $prepStdoutPath -RedirectStandardError $prepStderrPath
+        if (-not $prepProcess.WaitForExit(120000)) {
+            try { $prepProcess.Kill() } catch { }
+            $prepExitCode = 124
+            $prepFailureMessage = 'Preparador de artefatos excedeu 120s e foi encerrado.'
+        } else {
+            $prepExitCode = [int]$prepProcess.ExitCode
+        }
+
+        $prepStdout = Get-Content -LiteralPath $prepStdoutPath -Raw -Encoding utf8 -ErrorAction SilentlyContinue
+        if ($null -eq $prepStdout) { $prepStdout = '' }
+        if (-not [string]::IsNullOrWhiteSpace($prepStdout)) {
+            $prepJsonLine = @($prepStdout.Trim() -split "`r?`n") | Select-Object -Last 1
+            try { $prepJson = $prepJsonLine | ConvertFrom-Json } catch { $prepFailureMessage = "Preparador retornou JSON invalido: $($_.Exception.Message)" }
+        } elseif ($null -eq $prepFailureMessage) {
+            $prepFailureMessage = 'Preparador nao emitiu JSON no stdout.'
+        }
+    } finally {
+        foreach ($p in @($prepInputPath, $prepReviewersPath, $prepStdoutPath, $prepStderrPath)) {
+            try { Remove-Item -LiteralPath $p -Force -ErrorAction SilentlyContinue } catch { }
+        }
+    }
+
+    $prepSuccess = $false
+    if ($null -ne $prepJson -and $prepJson.PSObject.Properties['success']) {
+        $prepSuccess = [bool]$prepJson.success
+    }
+    if ($prepExitCode -ne 0 -or -not $prepSuccess) {
+        $failureStage = 'artifactPreparation'
+        $failureCode = 'artifact-preparation-failed'
+        $message = $prepFailureMessage
+        if ($null -ne $prepJson) {
+            if ($prepJson.PSObject.Properties['failureStage']) { $failureStage = [string]$prepJson.failureStage }
+            if ($prepJson.PSObject.Properties['failureCode']) { $failureCode = [string]$prepJson.failureCode }
+            if ($prepJson.PSObject.Properties['message']) { $message = [string]$prepJson.message }
+        }
+        if ([string]::IsNullOrWhiteSpace($message)) { $message = 'Preparacao de artefatos falhou.' }
+        $blockResult = [ordered]@{
+            Kind                         = 'xpz-llm-panel-dispatch-result'
+            SchemaVersion                = 1
+            success                      = $false
+            roundStarted                 = $false
+            dispatchStarted              = $false
+            reviewersDispatched          = 0
+            roundId                      = $RoundId
+            payloadSensitivity           = $PayloadSensitivity
+            parallelKbRoot               = $null
+            policyPath                   = $null
+            manuscriptPath               = $null
+            ollamaConcurrency            = $OllamaConcurrency
+            reviewers                    = @()
+            dispatched                   = 0
+            respondedCount               = 0
+            errorCount                   = 0
+            timeoutCount                 = 0
+            quotaCount                   = 0
+            unavailableCount             = 0
+            gateAsk                      = 0
+            gateDeny                     = 0
+            ollamaQuotaWarning           = $null
+            concurrencySaturationWarning = $null
+            preparationError             = [ordered]@{
+                failureStage = $failureStage
+                failureCode  = $failureCode
+                message      = $message
+            }
+        }
+        $blockJson = $blockResult | ConvertTo-Json -Compress -Depth 8
+        [Console]::Error.WriteLine("BLOCK: preparacao de artefatos falhou: $failureCode - $message")
+        [Console]::Out.WriteLine($blockJson)
+        exit 1
+    }
+    $manuscriptFull = [string]$prepJson.artifactPaths.manuscript
+    $ReviewersJson = [string]$prepJson.artifactPaths.reviewers
+    $ledgerDir = Join-Path $tempRoot $RoundId
+}
 
 # Mapa de fake-exe (so teste): inline OU arquivo
 $exeMap = $null
