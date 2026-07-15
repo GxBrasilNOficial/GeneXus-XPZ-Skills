@@ -651,6 +651,17 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
     $prepManifest = Join-Path $ledgerRoot $r.roundId 'preparation-manifest.json'
     Assert-True (Test-Path -LiteralPath $prepManifest -PathType Leaf) 'ManuscriptText: preparation-manifest.json deveria existir'
 
+    # ManuscriptText grande -> bloqueio estruturado antes de preparar/despachar
+    $r = Invoke-Harness -Reviewers @(@{ backend = 'opencode'; targetModelKey = 'openai/texto-grande'; invokeArgs = @{} }) `
+        -Sensitivity 'public' -Extra @{ OpenCodeConfigPath = $ocCfg } -UseManuscriptText `
+        -ManuscriptText ('x' * 30001)
+    Assert-True ($r.exit -eq 1) 'ManuscriptText grande: exit 1 esperado'
+    Assert-True ($r.json.Kind -eq 'xpz-llm-panel-dispatch-result') 'ManuscriptText grande: Kind do dispatcher esperado'
+    Assert-True ($r.json.roundStarted -eq $false) 'ManuscriptText grande: roundStarted=false'
+    Assert-True ($r.json.dispatchStarted -eq $false) 'ManuscriptText grande: dispatchStarted=false'
+    Assert-True ([int]$r.json.reviewersDispatched -eq 0) 'ManuscriptText grande: zero despachos'
+    Assert-True ($r.json.preparationError.failureCode -eq 'manuscript-text-too-large') 'ManuscriptText grande: failureCode manuscript-text-too-large'
+
     # Falha de preparacao -> summary proprio do dispatcher, sem iniciar rodada/despacho
     $r = Invoke-Harness -Reviewers @(@{ backend = 'opencode'; targetModelKey = 'openai/texto-invalido'; invokeArgs = 'nao-objeto' }) `
         -Sensitivity 'public' -Extra @{ OpenCodeConfigPath = $ocCfg } -UseManuscriptText -ManuscriptText 'manuscrito-inline'

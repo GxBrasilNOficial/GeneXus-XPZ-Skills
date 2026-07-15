@@ -41,7 +41,8 @@
     Caminho do manuscrito enviado a cada revisor (UTF-8). Exclusivo com -ManuscriptText.
 .PARAMETER ManuscriptText
     Texto do manuscrito. Exclusivo com -ManuscriptPath; gera manuscript.md/reviewers.json/manifest
-    em <TempDir>\<RoundId> antes de iniciar o despacho.
+    em <TempDir>\<RoundId> antes de iniciar o despacho. Use apenas para payload curto; para
+    payload grande, use -ManuscriptPath para evitar o limite de linha de comando do Windows.
 .PARAMETER ReviewersJson
     Array JSON [{backend, targetModelKey, invokeArgs, family?, rank?, fallbackChain?}] inline OU caminho de arquivo. O
     orquestrador ja decidiu o conjunto (subagente nativo injetado FORA). fallbackChain[] e lista ordenada
@@ -102,6 +103,7 @@ $ErrorActionPreference = 'Stop'
 
 # Disciplina de stdout: UTF-8 sem BOM; o JSON-resumo e a UNICA linha de stdout.
 try { [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false) } catch { }
+$MaxInlineManuscriptChars = 30000
 
 # Adapter por backend; parametro de exe-override (so teste) por backend.
 $AdapterScript = @{
@@ -261,6 +263,41 @@ $useManuscriptText = ($PSBoundParameters.ContainsKey('ManuscriptText'))
 $useManuscriptPath = ($PSBoundParameters.ContainsKey('ManuscriptPath'))
 if ($useManuscriptText -eq $useManuscriptPath) {
     throw "BLOCK: informe exatamente um entre -ManuscriptText e -ManuscriptPath."
+}
+if ($useManuscriptText -and $ManuscriptText.Length -gt $MaxInlineManuscriptChars) {
+    $blockResult = [ordered]@{
+        Kind                         = 'xpz-llm-panel-dispatch-result'
+        SchemaVersion                = 1
+        success                      = $false
+        roundStarted                 = $false
+        dispatchStarted              = $false
+        reviewersDispatched          = 0
+        roundId                      = $RoundId
+        payloadSensitivity           = $PayloadSensitivity
+        parallelKbRoot               = $null
+        policyPath                   = $null
+        manuscriptPath               = $null
+        ollamaConcurrency            = $OllamaConcurrency
+        reviewers                    = @()
+        dispatched                   = 0
+        respondedCount               = 0
+        errorCount                   = 0
+        timeoutCount                 = 0
+        quotaCount                   = 0
+        unavailableCount             = 0
+        gateAsk                      = 0
+        gateDeny                     = 0
+        ollamaQuotaWarning           = $null
+        concurrencySaturationWarning = $null
+        preparationError             = [ordered]@{
+            failureStage = 'parameter-validation'
+            failureCode  = 'manuscript-text-too-large'
+            message      = "-ManuscriptText excede $MaxInlineManuscriptChars caracteres; use -ManuscriptPath para payload grande."
+        }
+    }
+    [Console]::Error.WriteLine("BLOCK: manuscript-text-too-large: -ManuscriptText excede $MaxInlineManuscriptChars caracteres; use -ManuscriptPath.")
+    [Console]::Out.WriteLine(($blockResult | ConvertTo-Json -Compress -Depth 8))
+    exit 1
 }
 if ($useManuscriptPath) {
     if (-not (Test-Path -LiteralPath $ManuscriptPath -PathType Leaf)) {

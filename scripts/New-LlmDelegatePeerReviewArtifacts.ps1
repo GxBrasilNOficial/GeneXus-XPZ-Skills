@@ -20,7 +20,8 @@
     Disciplina de stdout: exatamente uma linha JSON (Kind/SchemaVersion PascalCase).
     Texto humano sai por [Console]::Error.
 .PARAMETER ManuscriptText
-    Texto do manuscrito (UTF-8). Exclusivo com -ManuscriptPath.
+    Texto do manuscrito (UTF-8). Exclusivo com -ManuscriptPath. Para payload grande,
+    use -ManuscriptPath para evitar o limite de linha de comando do Windows.
 .PARAMETER ManuscriptPath
     Caminho do manuscrito (UTF-8). Exclusivo com -ManuscriptText.
 .PARAMETER ReviewersJson
@@ -41,8 +42,8 @@
 #>
 [CmdletBinding()]
 param(
-    [Parameter(ParameterSetName = 'Inline')] [string] $ManuscriptText,
-    [Parameter(ParameterSetName = 'File')] [string] $ManuscriptPath,
+    [AllowEmptyString()] [string] $ManuscriptText,
+    [string] $ManuscriptPath,
     [Parameter(Mandatory)] [string] $ReviewersJson,
     [string] $RoundId,
     [string] $TempDir,
@@ -56,12 +57,21 @@ try { [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false) } catc
 
 $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
 $utf8StrictNoBom = [System.Text.UTF8Encoding]::new($false, $true)
+$MaxInlineManuscriptChars = 30000
 
 # ---------------------------------------------------------------------------------------
 # 1) Validacao de parametros mutuamente exclusivos
 # ---------------------------------------------------------------------------------------
-$useInline = $PSCmdlet.ParameterSetName -eq 'Inline'
-if (-not ($PSBoundParameters.ContainsKey('ManuscriptText') -xor $PSBoundParameters.ContainsKey('ManuscriptPath'))) {
+$useInline = $PSBoundParameters.ContainsKey('ManuscriptText')
+$useFile = $PSBoundParameters.ContainsKey('ManuscriptPath')
+if (-not ($useInline -xor $useFile)) {
+    $missingSource = (-not $useInline -and -not $useFile)
+    $failureCode = if ($missingSource) { 'manuscript-source-missing' } else { 'manuscript-source-ambiguous' }
+    $message = if ($missingSource) {
+        'Informe um entre -ManuscriptText e -ManuscriptPath.'
+    } else {
+        'Informe exatamente um entre -ManuscriptText e -ManuscriptPath.'
+    }
     $result = [ordered]@{
         Kind              = 'xpz-llm-peer-review-artifacts-result'
         SchemaVersion     = 1
@@ -71,11 +81,29 @@ if (-not ($PSBoundParameters.ContainsKey('ManuscriptText') -xor $PSBoundParamete
         reviewersDispatched = 0
         roundId           = $null
         failureStage      = 'parameter-validation'
-        failureCode       = 'manuscript-source-ambiguous'
-        message           = 'Informe exatamente um entre -ManuscriptText e -ManuscriptPath.'
+        failureCode       = $failureCode
+        message           = $message
         cleanup           = 'nada a limpar'
     }
-    [Console]::Error.WriteLine('BLOCK: manuscript-source-ambiguous: informe exatamente um entre -ManuscriptText e -ManuscriptPath.')
+    [Console]::Error.WriteLine("BLOCK: ${failureCode}: $message")
+    [Console]::Out.WriteLine(($result | ConvertTo-Json -Compress -Depth 6))
+    exit 1
+}
+if ($useInline -and $ManuscriptText.Length -gt $MaxInlineManuscriptChars) {
+    $result = [ordered]@{
+        Kind              = 'xpz-llm-peer-review-artifacts-result'
+        SchemaVersion     = 1
+        success           = $false
+        roundStarted      = $false
+        dispatchStarted   = $false
+        reviewersDispatched = 0
+        roundId           = $null
+        failureStage      = 'parameter-validation'
+        failureCode       = 'manuscript-text-too-large'
+        message           = "-ManuscriptText excede $MaxInlineManuscriptChars caracteres; use -ManuscriptPath para payload grande."
+        cleanup           = 'nada a limpar'
+    }
+    [Console]::Error.WriteLine("BLOCK: manuscript-text-too-large: -ManuscriptText excede $MaxInlineManuscriptChars caracteres; use -ManuscriptPath.")
     [Console]::Out.WriteLine(($result | ConvertTo-Json -Compress -Depth 6))
     exit 1
 }

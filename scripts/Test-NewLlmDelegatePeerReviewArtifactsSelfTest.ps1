@@ -4,7 +4,8 @@
     Self-test do preparador transacional New-LlmDelegatePeerReviewArtifacts.ps1 (skill xpz-llm-delegate).
 .DESCRIPTION
     Deterministico, sem backends reais nem rede. Cobre: sucesso com -ManuscriptText inline e -ManuscriptPath;
-    saida JSON uma linha; artefatos, manifesto, hashes, UTF-8 sem BOM, acentos pt-BR; manuscrito vazio/whitespace;
+    saida JSON uma linha; artefatos, manifesto, hashes, UTF-8 sem BOM, acentos pt-BR; origem de manuscrito
+    ausente/ambigua; -ManuscriptText grande; manuscrito vazio/whitespace;
     JSON malformado; reviewers sem backend/invokeArgs; raiz array preservada com um unico revisor;
     UTF-8 invalido em arquivos de entrada; RoundId inseguro; colisao de diretorio final;
     falha injetada afterManuscript/beforePublish sem diretorio final e staging limpo;
@@ -275,6 +276,44 @@ Assert-True ($rBadRev.exit -eq 1) 'utf8-reviewers: exit 1'
 # (ja validado no stdout do caso de sucesso)
 $stdoutTrim = $r.stdout.TrimEnd("`r", "`n")
 Assert-True (@($stdoutTrim -split "`n").Count -eq 1) 'stdout: exatamente 1 linha'
+
+# =======================================================================================
+# 2a) ORIGEM DE MANUSCRITO AUSENTE / AMBIGUA E INLINE GRANDE -> JSON ESTRUTURADO
+# =======================================================================================
+$r = Invoke-Preparer -ArgsHashtable @{
+    ReviewersJson = $reviewersValid
+    TempDir       = $ledgerRoot
+}
+Assert-True ($null -ne $r.json) 'sem-origem: deveria emitir JSON no stdout'
+Assert-True ($r.json.success -eq $false) 'sem-origem: success=false'
+Assert-True ($r.json.failureCode -eq 'manuscript-source-missing') "sem-origem: manuscript-source-missing; got $($r.json.failureCode)"
+Assert-True ($r.exit -eq 1) 'sem-origem: exit 1'
+Assert-True (@($r.stdout.TrimEnd("`r", "`n") -split "`n").Count -eq 1) 'sem-origem: stdout exatamente 1 linha'
+
+$bothMsFile = Join-Path $tmp 'manuscrito-both.md'
+[System.IO.File]::WriteAllText($bothMsFile, $manuscriptPt, [System.Text.UTF8Encoding]::new($false))
+$r = Invoke-Preparer -ArgsHashtable @{
+    ManuscriptText = $manuscriptPt
+    ManuscriptPath = $bothMsFile
+    ReviewersJson  = $reviewersValid
+    TempDir        = $ledgerRoot
+}
+Assert-True ($null -ne $r.json) 'origem-ambigua: deveria emitir JSON no stdout'
+Assert-True ($r.json.success -eq $false) 'origem-ambigua: success=false'
+Assert-True ($r.json.failureCode -eq 'manuscript-source-ambiguous') "origem-ambigua: manuscript-source-ambiguous; got $($r.json.failureCode)"
+Assert-True ($r.exit -eq 1) 'origem-ambigua: exit 1'
+Assert-True (@($r.stdout.TrimEnd("`r", "`n") -split "`n").Count -eq 1) 'origem-ambigua: stdout exatamente 1 linha'
+
+$r = Invoke-Preparer -ArgsHashtable @{
+    ManuscriptText = ('x' * 30001)
+    ReviewersJson  = $reviewersValid
+    TempDir        = $ledgerRoot
+}
+Assert-True ($null -ne $r.json) 'inline-grande: deveria emitir JSON no stdout'
+Assert-True ($r.json.success -eq $false) 'inline-grande: success=false'
+Assert-True ($r.json.failureCode -eq 'manuscript-text-too-large') "inline-grande: manuscript-text-too-large; got $($r.json.failureCode)"
+Assert-True ($r.exit -eq 1) 'inline-grande: exit 1'
+Assert-True (@($r.stdout.TrimEnd("`r", "`n") -split "`n").Count -eq 1) 'inline-grande: stdout exatamente 1 linha'
 
 # =======================================================================================
 # 3) MANUSCRITO VAZIO / WHITESPACE -> FALHA
