@@ -137,8 +137,11 @@ self-test; passo de **migração** do interino global (forma antiga `tools:` →
 dependência de setup (o `agentsPath` dele é do MCP do Cursor — `999:167` — não cobre agentes
 opencode).
 
-**Global-only e project-local comprovados LIMPOS:** o global provisionado e o project-local resolvem
-o mesmo contrato least-privilege (`*` final `deny` + allow-set `{read,grep,glob,list}`).
+**Global-only e project-local resolvem o contrato least-privilege:** o global provisionado e o
+project-local resolvem `*` final `deny` + allow-set `{read,grep,glob,list}`. A captura sanitizada
+1.17.20 ficou byte-equivalente entre os dois caminhos; isso cobre o contrato efetivo fora da raiz
+do repo, mas não deve ser lido como prova independente de semântica de merge/substituição campo a
+campo.
 
 **Pré-requisito de cwd:** opencode **não** recebe `-Cd` (`Invoke-LlmDelegatePanelDispatch.ps1:362-363`
 `$cdCapable` exclui opencode; `:373` `(Get-Location).Path` é código morto para opencode). Herda a
@@ -153,10 +156,12 @@ do parecer ao provider (residual aceito).
 opencode tem a dimensão nativa **`external_directory`** (base `action: ask`) que gateia leituras
 **fora** do workspace do cwd; em `opencode run` headless o `ask` é **auto-rejeitado** → ler fora do
 cwd é **bloqueado** (provado: agentes com e sem curinga ambos bloqueados ao ler arquivo fora do cwd,
-pela mesma regra base). `external_directory: deny` explícito (D3) torna o confinamento **garantido**
-e independente do modo. **Este achado INVERTE a premissa** de `SKILL.md:838-840` (que hoje diz que
-`read` lê "qualquer arquivo") — tratar a reescrita da doc como **correção de premissa**, versionada
-por fixture, condicionada ao self-test na versão instalada.
+pela mesma regra base). `external_directory: deny` explícito (D3) torna o bloqueio padrão
+`external_directory[*]` independente do modo. Em 1.17.20 há exceções `allow` para diretórios
+internos do opencode, como o tool-output; elas não autorizam tratar o cwd como "seguro" nem como
+proibição absoluta de todo path externo específico. **Este achado INVERTE a premissa** de
+`SKILL.md:838-840` (que hoje diz que `read` lê "qualquer arquivo") — tratar a reescrita da doc como
+**correção de premissa**, versionada por fixture, condicionada ao self-test na versão instalada.
 
 **Qual é o cwd:** herdado do orquestrador (`Invoke-OpenCode.ps1:135`, sem `-WorkingDirectory`);
 opencode nunca recebe `-Cd`. Confinamento por **herança**, não por controle explícito.
@@ -167,8 +172,10 @@ self-test). **Não** mecaniza "o cwd é seguro" — não há BLOCK por cwd em `p
 raiz do repo de skills (onde, medido, não há segredo REAL versionado — só iscas de self-test).
 **Nota de operador** (em `SKILL.md`/`15`): "cwd-seguro é responsabilidade de quem dispara; se o cwd
 contiver segredos não-versionados (`.env` local, logs, cache), o revisor pode lê-los; iscas de
-self-test não substituem revisar segredos reais no diretório." Mecanizar cwd-seguro pertence ao
-read-containment **adiado**.
+self-test não substituem revisar segredos reais no diretório." Em 1.17.20 o OpenCode traz proteção
+nativa `read "*.env" -> ask`, mas o bloco posterior `read "*" -> allow` do `reviewer-ro` tende a
+anulá-la por `last-match-wins`; resolver esse recorte é urgente no `999`. Mecanizar cwd-seguro
+pertence ao read-containment **adiado**.
 
 Renomear "read-only" → **"sem execução/escrita"** (a leitura não está totalmente contida).
 

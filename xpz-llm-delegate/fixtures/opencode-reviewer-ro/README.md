@@ -35,9 +35,11 @@ não foram promovidos para a versão instalada; `blocked` indica problema estrut
   migrada para `historico/IdeiasImplementadas_202607.md` («`tools: false` mais forte que
   `permission: deny`»).
 - `merge-global-only-reviewer-ro.sample.txt` — resolução do `reviewer-ro` quando **só** o global
-  provisionado aplica (cwd sem `.opencode/`). Em 1.17.20 o global já resolve no mesmo contrato
-  least-privilege do project-local: `*` final `deny` + allow-set `{read,grep,glob,list}`. Este
-  fixture preserva a cobertura do caminho fora da raiz do repo, sem depender do project-local.
+  provisionado aplica (cwd sem `.opencode/`). Em 1.17.20 a captura sanitizada resolve o mesmo
+  contrato least-privilege do project-local: `*` final `deny` + allow-set `{read,grep,glob,list}`.
+  Como o bloco efetivo hoje fica byte-equivalente ao fixture project-local, este fixture cobre o
+  contrato efetivo fora da raiz do repo; ele não prova, sozinho, semântica de merge/substituição
+  campo a campo.
 - `read-outside-cwd-blocked.sample.txt` — **captura behavioral** (design D4 «leitura fora do cwd
   bloqueada headless»): reviewer-ro (com glm-5.2) pedido para ler um arquivo FORA do cwd → **sem
   leak** do sentinela; a resolução `external_directory[*]=deny` é a rede mecânica. Golden/documental
@@ -45,8 +47,8 @@ não foram promovidos para a versão instalada; `blocked` indica problema estrut
 
 ## Resolução efetiva medida (1.17.20) — `agent list`, last-match-wins
 
-Excluindo `external_directory` (regras por-padrão) e os gates internos (`doom_loop`, `question`,
-`plan_enter`, `plan_exit`):
+Excluindo `external_directory` e os gates internos (`doom_loop`, `question`, `plan_enter`,
+`plan_exit`):
 
 | permission | ação efetiva |
 |------------|--------------|
@@ -65,8 +67,15 @@ Excluindo `external_directory` (regras por-padrão) e os gates internos (`doom_l
 divergência por ausência E por excesso, ex.: `bash` reaparecendo por regra tardia da global).
 
 `external_directory` padrão `*` resolve **deny** (a base do opencode é `ask`, auto-rejeitada em
-`opencode run` headless; o `external_directory: deny` explícito do reviewer-ro torna o confinamento
-de leitura ao cwd garantido e independente do modo).
+`opencode run` headless; o `external_directory: deny` explícito do reviewer-ro torna o bloqueio
+padrão de leitura fora do cwd independente do modo). Os fixtures 1.17.20 também trazem exceções
+`allow` para diretórios internos do opencode, como `<SANITIZED_OPENCODE_TOOL_OUTPUT_DIR>`; o guard
+atual verifica o padrão `*`, não uma proibição absoluta de todo path externo específico.
+
+Risco residual urgente: os fixtures 1.17.20 mostram regras nativas `read "*.env" -> ask` e
+`read "*.env.*" -> ask` antes do bloco final do `reviewer-ro`, que volta a permitir `read "*"`.
+Pela regra `last-match-wins`, isso tende a deixar `.env` legível dentro do cwd; o recorte está
+registrado em `999-ideias-pendentes.md` como alta prioridade.
 
 ## Como re-capturar (refresh após upgrade do opencode)
 
