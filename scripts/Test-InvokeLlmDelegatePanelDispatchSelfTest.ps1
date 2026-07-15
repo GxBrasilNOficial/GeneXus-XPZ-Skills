@@ -153,6 +153,10 @@ if ($args -contains '--help') {
     '--model --print --output-format --no-session-persistence --permission-mode --tools --max-turns'
     exit 0
 }
+if ($model -eq 'claude-untrusted-workspace') {
+    [Console]::Error.WriteLine('Claude Code refused to run because this workspace is not trusted. Mark this workspace as trusted to continue.')
+    exit 1
+}
 $null = [Console]::In.ReadToEnd()
 'CLAUDE cwd=' + (Get-Location).Path + ' model=' + $model + ' revisao'
 exit 0
@@ -582,6 +586,13 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
     $tGm = Get-Content -LiteralPath $rvGm.verdictPath -Raw -Encoding utf8
     Assert-True ($tGm -match 'model=gemini-3-flash-preview') 'gemini despacho: -Model deveria chegar ao adapter'
     Assert-True ($tGm -match [regex]::Escape($tmpFwd)) 'gemini despacho: -Cd deveria virar o WorkingDirectory (cwd)'
+
+    # Claude Code workspace nao confiavel -> unavailable, para permitir fallback em painel.
+    $r = Invoke-Harness -Reviewers @(@{ backend = 'claude-code'; invokeArgs = @{ model = 'claude-untrusted-workspace' } }) `
+        -Sensitivity 'public' -Extra @{ Cd = $tmp }
+    $rvClUntrusted = Get-Reviewer $r.json 0
+    Assert-True ($rvClUntrusted.state -eq 'unavailable') "claude-code workspace-not-trusted: esperado unavailable; got $($rvClUntrusted.state)"
+    Assert-True ([string]$rvClUntrusted.reason -match 'workspace-not-trusted') 'claude-code workspace-not-trusted: reason deveria citar codigo canonico'
 
     # =======================================================================================
     # 9) -Cd: precedência (explícito / cwd / ParallelKbRoot) + fail-closed

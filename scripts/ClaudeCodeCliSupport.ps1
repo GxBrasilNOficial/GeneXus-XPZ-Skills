@@ -22,14 +22,29 @@ function Get-ClaudeCodeErrorMessage {
     $combined = @($StderrText, $StdoutText) -join "`n"
     if ([string]::IsNullOrWhiteSpace($combined)) { return $null }
 
+    if (Test-ClaudeCodeWorkspaceNotTrusted -Text $combined) {
+        return 'Claude Code workspace-not-trusted: este workspace ainda nao foi marcado como confiavel no ambiente do Claude Code. Abra o workspace no Claude Code e confirme a confianca, ou use outro backend/fallback.'
+    }
+
     $lines = @($combined -split "`r?`n")
     $interesting = @($lines | Where-Object {
-        $_ -match '(?i)\b(error|failed|unauthorized|forbidden|not\s+available|requires|login|auth)\b'
+        $_ -match '(?i)\b(error|failed|unauthorized|forbidden|not\s+available|requires|login|auth|trust|trusted|workspace)\b'
     })
     if ($interesting.Count -gt 0) {
         return (($interesting | Select-Object -First 8) -join "`n").Trim()
     }
     return $null
+}
+
+function Test-ClaudeCodeWorkspaceNotTrusted {
+    param([AllowNull()] [string] $Text)
+    if ([string]::IsNullOrWhiteSpace($Text)) { return $false }
+    return (
+        $Text -match '(?i)workspace.{0,80}(not|nao|não).{0,80}(trusted|confiavel|confiável)' -or
+        $Text -match '(?i)(not|nao|não).{0,80}(trusted|confiavel|confiável).{0,80}workspace' -or
+        $Text -match '(?i)mark(ed)? this workspace as trusted' -or
+        $Text -match '(?i)marc(ar|ado).{0,80}workspace.{0,80}confi'
+    )
 }
 
 function Test-ClaudeCodeHelpSupportsContract {
@@ -99,6 +114,9 @@ function Resolve-ClaudeCodeJobStatus {
     }
     $errMsg = Get-ClaudeCodeErrorMessage -StdoutText '' -StderrText $Stderr
     if ($errMsg) {
+        if (Test-ClaudeCodeWorkspaceNotTrusted -Text $errMsg) {
+            return [pscustomobject]@{ status = 'unavailable'; error = $errMsg }
+        }
         return [pscustomobject]@{ status = 'error'; error = $errMsg }
     }
     return [pscustomobject]@{ status = 'sem-texto'; error = 'Claude Code encerrou sem resposta final.' }

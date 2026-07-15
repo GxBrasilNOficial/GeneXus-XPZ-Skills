@@ -910,6 +910,11 @@ payload para Anthropic (`anthropic/claude-opus-4-8`) e, portanto, é externo. Co
 - Para **consulta curta restrita**, usar os defaults do adapter: `-PermissionMode plan`,
   `-Tools Read,Glob,Grep`, persistência de sessão desabilitada e `-Cd` apontando ao menor
   diretório necessário. `-MaxTurns` só entra quando a CLI local suportar `--max-turns`.
+- Se o Claude Code recusar a execução porque o workspace ainda não foi marcado como confiável,
+  isso é bloqueio operacional do backend, não parecer do revisor. O adapter emite
+  `workspace-not-trusted`; no painel o estado deve ser `unavailable`, acionando fallback quando
+  houver. Não marcar confiança automaticamente: o humano deve abrir o workspace no Claude Code e
+  confirmar a confiança, ou escolher outro backend.
 - Para **revisor pré-push**, a rotina pode precisar de `git` e scripts locais. Definir
   explicitamente ferramentas/permissões suficientes para leitura e comandos de validação
   (sem `bypassPermissions`) **só vale FORA do painel** — via `Invoke-ClaudeCode.ps1` **direto**.

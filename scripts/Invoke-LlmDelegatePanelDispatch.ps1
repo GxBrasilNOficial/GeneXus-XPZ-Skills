@@ -144,11 +144,18 @@ function Get-Slug {
 }
 
 $quotaFailurePattern = '(?i)(^|[^0-9])402([^0-9]|$)|Payment Required|insufficient coding plan balance|quota|rate limit|weekly usage limit|limite de uso|sem quota|saldo insuficiente'
+$unavailableFailurePattern = '(?i)workspace-not-trusted'
 
 function Test-QuotaFailureMessage {
     param([AllowNull()] [string] $Message)
     if ([string]::IsNullOrWhiteSpace($Message)) { return $false }
     return ($Message -match $script:quotaFailurePattern)
+}
+
+function Test-UnavailableFailureMessage {
+    param([AllowNull()] [string] $Message)
+    if ([string]::IsNullOrWhiteSpace($Message)) { return $false }
+    return ($Message -match $script:unavailableFailurePattern)
 }
 
 function Get-FallbackDispatcherTimeoutMs {
@@ -748,6 +755,7 @@ try {
             $acquired = $false
             $result = $null
             $quotaPattern = $using:quotaFailurePattern
+            $unavailablePattern = $using:unavailableFailurePattern
             # try EXTERNO envolve TODO o corpo: nada (nem Wait, nem Get-Date, nem o build do objeto)
             # escapa do runspace (conforme v11 "o bloco nunca lanca para fora").
             try {
@@ -773,6 +781,8 @@ try {
                     $msg = [string]$errRec.Exception.Message
                     if ($msg -match 'BLOCK:' -and $msg -match $quotaPattern) {
                         $state = 'quota'
+                    } elseif ($msg -match 'BLOCK:' -and $msg -match $unavailablePattern) {
+                        $state = 'unavailable'
                     } elseif ($msg -match 'excedeu' -and $msg -match 'foi encerrado') {
                         $state = 'timeout'
                     } else {
@@ -948,6 +958,7 @@ foreach ($rec in $originalRecords) {
             $fallbackState = 'error'
             if ([string]$_.Exception.Message -match 'timeout|excedeu') { $fallbackState = 'timeout' }
             elseif (Test-QuotaFailureMessage -Message ([string]$_.Exception.Message)) { $fallbackState = 'quota' }
+            elseif (Test-UnavailableFailureMessage -Message ([string]$_.Exception.Message)) { $fallbackState = 'unavailable' }
             $fbRecord = [pscustomobject]@{
                 backend        = [string](Get-Prop $fb 'backend')
                 targetModelKey = [string](Get-Prop $fb 'targetModelKey')
