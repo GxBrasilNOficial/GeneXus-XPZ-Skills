@@ -5,7 +5,8 @@
 .DESCRIPTION
     Deterministico, sem backends reais nem rede. Cobre: sucesso com -ManuscriptText inline e -ManuscriptPath;
     saida JSON uma linha; artefatos, manifesto, hashes, UTF-8 sem BOM, acentos pt-BR; manuscrito vazio/whitespace;
-    JSON malformado; reviewers sem backend/invokeArgs; RoundId inseguro; colisao de diretorio final;
+    JSON malformado; reviewers sem backend/invokeArgs; raiz array preservada com um unico revisor;
+    UTF-8 invalido em arquivos de entrada; RoundId inseguro; colisao de diretorio final;
     falha injetada afterManuscript/beforePublish sem diretorio final e staging limpo;
     prova que o preparador NAO chama dispatcher nem adapters.
 
@@ -72,6 +73,9 @@ function Invoke-Preparer {
         $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
         [System.IO.File]::WriteAllText($revTemp, $ArgsHashtable['ReviewersJson'], $utf8NoBom)
         $argList += @('-ReviewersJson', $revTemp)
+    }
+    if ($ArgsHashtable.ContainsKey('ReviewersJsonPath')) {
+        $argList += @('-ReviewersJson', $ArgsHashtable['ReviewersJsonPath'])
     }
     if ($ArgsHashtable.ContainsKey('TempDir')) {
         $argList += @('-TempDir', $ArgsHashtable['TempDir'])
@@ -151,7 +155,8 @@ if ($revBytes.Length -ge 3) {
     Assert-True (-not ($revBytes[0] -eq 0xEF -and $revBytes[1] -eq 0xBB -and $revBytes[2] -eq 0xBF)) 'reviewers.json: sem BOM UTF-8'
 }
 $revContent = Get-Content -LiteralPath $revPath -Raw -Encoding utf8
-$revParsed = $revContent | ConvertFrom-Json
+$revParsed = $revContent | ConvertFrom-Json -NoEnumerate
+Assert-True ($revParsed -is [System.Array]) 'reviewers.json: raiz array preservada'
 Assert-True (@($revParsed).Count -eq 2) 'reviewers.json: 2 revisores'
 Assert-True ($revParsed[0].backend -eq 'opencode') 'reviewers.json: backend=opencode'
 
@@ -188,7 +193,25 @@ Assert-True ($r.json.artifactPaths.reviewers -eq $revPath) 'stdout artifactPaths
 Assert-True ($r.json.artifactPaths.manifest -eq $maniPath) 'stdout artifactPaths.manifest correto'
 
 # =======================================================================================
-# 1g) SUCESSO COM -ManuscriptPath (arquivo)
+# 1g) REVIEWERS COM UM UNICO ITEM CONTINUA ARRAY
+# =======================================================================================
+$reviewersSingle = '[{"backend":"opencode","invokeArgs":{}}]'
+$rSingle = Invoke-Preparer -ArgsHashtable @{
+    ManuscriptText = $manuscriptPt
+    ReviewersJson  = $reviewersSingle
+    TempDir        = $ledgerRoot
+}
+Assert-True ($rSingle.json.success -eq $true) 'single-reviewer: success=true'
+$singleRevPath = Join-Path (Join-Path $ledgerRoot $rSingle.roundId) 'reviewers.json'
+$singleRevContent = Get-Content -LiteralPath $singleRevPath -Raw -Encoding utf8
+Assert-True ($singleRevContent.TrimStart().StartsWith('[')) 'single-reviewer: reviewers.json deve iniciar com array'
+$singleRevParsed = $singleRevContent | ConvertFrom-Json -NoEnumerate
+Assert-True ($singleRevParsed -is [System.Array]) 'single-reviewer: raiz array preservada'
+Assert-True (@($singleRevParsed).Count -eq 1) 'single-reviewer: array com 1 item'
+Assert-True ($singleRevParsed[0].backend -eq 'opencode') 'single-reviewer: backend preservado'
+
+# =======================================================================================
+# 1h) SUCESSO COM -ManuscriptPath (arquivo)
 # =======================================================================================
 $msFile = Join-Path $tmp 'manuscrito-utf8.md'
 $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
@@ -206,6 +229,31 @@ $msContent2 = Get-Content -LiteralPath $msPath2 -Raw -Encoding utf8
 Assert-True ($msContent2 -eq $manuscriptPt) 'ManuscriptPath: conteudo preservado'
 $mani2 = Get-Content -LiteralPath (Join-Path $artifactDir2 'preparation-manifest.json') -Raw -Encoding utf8 | ConvertFrom-Json
 Assert-True ($mani2.manuscriptSource -eq 'file') 'ManuscriptPath: manuscriptSource=file'
+
+# =======================================================================================
+# 1i) UTF-8 INVALIDO EM ARQUIVOS DE ENTRADA -> FALHA
+# =======================================================================================
+$badUtf8Manuscript = Join-Path $tmp 'manuscrito-invalid-utf8.md'
+[System.IO.File]::WriteAllBytes($badUtf8Manuscript, [byte[]](0x61, 0xFF, 0x62))
+$rBadMs = Invoke-Preparer -ArgsHashtable @{
+    ManuscriptPath = $badUtf8Manuscript
+    ReviewersJson  = $reviewersValid
+    TempDir        = $ledgerRoot
+}
+Assert-True ($rBadMs.json.success -eq $false) 'utf8-manuscript: success=false'
+Assert-True ($rBadMs.json.failureCode -eq 'manuscript-utf8-invalid') "utf8-manuscript: manuscript-utf8-invalid; got $($rBadMs.json.failureCode)"
+Assert-True ($rBadMs.exit -eq 1) 'utf8-manuscript: exit 1'
+
+$badUtf8Reviewers = Join-Path $tmp 'reviewers-invalid-utf8.json'
+[System.IO.File]::WriteAllBytes($badUtf8Reviewers, [byte[]](0x5B, 0x7B, 0xFF, 0x7D, 0x5D))
+$rBadRev = Invoke-Preparer -ArgsHashtable @{
+    ManuscriptText     = $manuscriptPt
+    ReviewersJsonPath  = $badUtf8Reviewers
+    TempDir            = $ledgerRoot
+}
+Assert-True ($rBadRev.json.success -eq $false) 'utf8-reviewers: success=false'
+Assert-True ($rBadRev.json.failureCode -eq 'reviewers-utf8-invalid') "utf8-reviewers: reviewers-utf8-invalid; got $($rBadRev.json.failureCode)"
+Assert-True ($rBadRev.exit -eq 1) 'utf8-reviewers: exit 1'
 
 # =======================================================================================
 # 2) SAIDA JSON = EXATAMENTE 1 LINHA

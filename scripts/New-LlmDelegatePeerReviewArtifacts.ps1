@@ -55,6 +55,7 @@ $ErrorActionPreference = 'Stop'
 try { [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false) } catch { }
 
 $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+$utf8StrictNoBom = [System.Text.UTF8Encoding]::new($false, $true)
 
 # ---------------------------------------------------------------------------------------
 # 1) Validacao de parametros mutuamente exclusivos
@@ -106,7 +107,26 @@ if ($useInline) {
         [Console]::Out.WriteLine(($result | ConvertTo-Json -Compress -Depth 6))
         exit 1
     }
-    $manuscriptContent = Get-Content -LiteralPath $ManuscriptPath -Raw -Encoding utf8
+    try {
+        $manuscriptContent = [System.IO.File]::ReadAllText($ManuscriptPath, $utf8StrictNoBom)
+    } catch {
+        $result = [ordered]@{
+            Kind              = 'xpz-llm-peer-review-artifacts-result'
+            SchemaVersion     = 1
+            success           = $false
+            roundStarted      = $false
+            dispatchStarted   = $false
+            reviewersDispatched = 0
+            roundId           = $null
+            failureStage      = 'manuscript-validation'
+            failureCode       = 'manuscript-utf8-invalid'
+            message           = "Manuscrito nao e UTF-8 valido: $($_.Exception.Message)"
+            cleanup           = 'nada a limpar'
+        }
+        [Console]::Error.WriteLine("BLOCK: manuscript-utf8-invalid: $($_.Exception.Message)")
+        [Console]::Out.WriteLine(($result | ConvertTo-Json -Compress -Depth 6))
+        exit 1
+    }
     $manuscriptSource = 'file'
 }
 
@@ -214,7 +234,26 @@ if (Test-Path -LiteralPath $finalDir -PathType Container) {
 # ---------------------------------------------------------------------------------------
 $reviewersRaw = $null
 if (Test-Path -LiteralPath $ReviewersJson -PathType Leaf) {
-    $reviewersRaw = Get-Content -LiteralPath $ReviewersJson -Raw -Encoding utf8
+    try {
+        $reviewersRaw = [System.IO.File]::ReadAllText($ReviewersJson, $utf8StrictNoBom)
+    } catch {
+        $result = [ordered]@{
+            Kind              = 'xpz-llm-peer-review-artifacts-result'
+            SchemaVersion     = 1
+            success           = $false
+            roundStarted      = $false
+            dispatchStarted   = $false
+            reviewersDispatched = 0
+            roundId           = $RoundId
+            failureStage      = 'reviewers-validation'
+            failureCode       = 'reviewers-utf8-invalid'
+            message           = "ReviewersJson nao e UTF-8 valido: $($_.Exception.Message)"
+            cleanup           = 'nada a limpar'
+        }
+        [Console]::Error.WriteLine("BLOCK: reviewers-utf8-invalid: $($_.Exception.Message)")
+        [Console]::Out.WriteLine(($result | ConvertTo-Json -Compress -Depth 6))
+        exit 1
+    }
 } else {
     $reviewersRaw = $ReviewersJson
 }
@@ -371,7 +410,7 @@ try {
         }
 
         # Releitura estrita UTF-8
-        $reRead = [System.IO.File]::ReadAllText($manuscriptPath, $utf8NoBom)
+        $reRead = [System.IO.File]::ReadAllText($manuscriptPath, $utf8StrictNoBom)
         if ($reRead -ne $manuscriptContent) {
             throw "Divergencia na releitura de manuscript.md (round-trip)"
         }
@@ -383,14 +422,14 @@ try {
         # 7b) Escrever reviewers.json (UTF-8 sem BOM, pretty para legibilidade)
         # -------------------------------------------------------------------------------
         $reviewersJsonOut = Join-Path $stagingDir 'reviewers.json'
-        $reviewersPretty = ($reviewers | ConvertTo-Json -Depth 8)
+        $reviewersPretty = ($reviewers | ConvertTo-Json -Depth 8 -AsArray)
         [System.IO.File]::WriteAllText($reviewersJsonOut, $reviewersPretty, $utf8NoBom)
 
         $reviewersBytes = [System.IO.File]::ReadAllBytes($reviewersJsonOut)
         if ($reviewersBytes.Length -ge 3 -and $reviewersBytes[0] -eq 0xEF -and $reviewersBytes[1] -eq 0xBB -and $reviewersBytes[2] -eq 0xBF) {
             throw "BOM UTF-8 detectado apos escrita de reviewers.json"
         }
-        $reviewersReRead = [System.IO.File]::ReadAllText($reviewersJsonOut, $utf8NoBom)
+        $reviewersReRead = [System.IO.File]::ReadAllText($reviewersJsonOut, $utf8StrictNoBom)
         if ($reviewersReRead -ne $reviewersPretty) {
             throw "Divergencia na releitura de reviewers.json (round-trip)"
         }
