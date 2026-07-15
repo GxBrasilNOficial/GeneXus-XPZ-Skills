@@ -240,6 +240,8 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
             [switch] $NoRoundId,
             [switch] $NoExeMap,
             [switch] $UseManuscriptText,
+            [switch] $OmitManuscriptSource,
+            [switch] $BothManuscriptSources,
             [AllowEmptyString()] [string] $ManuscriptText = ''
         )
         $rid = [guid]::NewGuid().ToString('N')
@@ -254,7 +256,11 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
             '-PayloadSensitivity', $Sensitivity,
             '-TempDir', $ledgerRoot
         )
-        if ($UseManuscriptText) {
+        if ($OmitManuscriptSource) {
+            # Intencional: exercita validacao estruturada de origem ausente.
+        } elseif ($BothManuscriptSources) {
+            $argList += @('-ManuscriptPath', $manuscript, '-ManuscriptText', $ManuscriptText)
+        } elseif ($UseManuscriptText) {
             $argList += @('-ManuscriptText', $ManuscriptText)
         } else {
             $argList += @('-ManuscriptPath', $manuscript)
@@ -661,6 +667,25 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
     Assert-True ($r.json.dispatchStarted -eq $false) 'ManuscriptText grande: dispatchStarted=false'
     Assert-True ([int]$r.json.reviewersDispatched -eq 0) 'ManuscriptText grande: zero despachos'
     Assert-True ($r.json.preparationError.failureCode -eq 'manuscript-text-too-large') 'ManuscriptText grande: failureCode manuscript-text-too-large'
+
+    # Origem ausente/ambigua -> bloqueio estruturado antes de preparar/despachar
+    $r = Invoke-Harness -Reviewers @(@{ backend = 'opencode'; targetModelKey = 'openai/origem-ausente'; invokeArgs = @{} }) `
+        -Sensitivity 'public' -Extra @{ OpenCodeConfigPath = $ocCfg } -OmitManuscriptSource
+    Assert-True ($r.exit -eq 1) 'Origem ausente: exit 1 esperado'
+    Assert-True ($r.json.Kind -eq 'xpz-llm-panel-dispatch-result') 'Origem ausente: Kind do dispatcher esperado'
+    Assert-True ($r.json.roundStarted -eq $false) 'Origem ausente: roundStarted=false'
+    Assert-True ($r.json.dispatchStarted -eq $false) 'Origem ausente: dispatchStarted=false'
+    Assert-True ([int]$r.json.reviewersDispatched -eq 0) 'Origem ausente: zero despachos'
+    Assert-True ($r.json.preparationError.failureCode -eq 'manuscript-source-missing') 'Origem ausente: failureCode manuscript-source-missing'
+
+    $r = Invoke-Harness -Reviewers @(@{ backend = 'opencode'; targetModelKey = 'openai/origem-ambigua'; invokeArgs = @{} }) `
+        -Sensitivity 'public' -Extra @{ OpenCodeConfigPath = $ocCfg } -BothManuscriptSources -ManuscriptText 'manuscrito-inline'
+    Assert-True ($r.exit -eq 1) 'Origem ambigua: exit 1 esperado'
+    Assert-True ($r.json.Kind -eq 'xpz-llm-panel-dispatch-result') 'Origem ambigua: Kind do dispatcher esperado'
+    Assert-True ($r.json.roundStarted -eq $false) 'Origem ambigua: roundStarted=false'
+    Assert-True ($r.json.dispatchStarted -eq $false) 'Origem ambigua: dispatchStarted=false'
+    Assert-True ([int]$r.json.reviewersDispatched -eq 0) 'Origem ambigua: zero despachos'
+    Assert-True ($r.json.preparationError.failureCode -eq 'manuscript-source-ambiguous') 'Origem ambigua: failureCode manuscript-source-ambiguous'
 
     # Falha de preparacao -> summary proprio do dispatcher, sem iniciar rodada/despacho
     $r = Invoke-Harness -Reviewers @(@{ backend = 'opencode'; targetModelKey = 'openai/texto-invalido'; invokeArgs = 'nao-objeto' }) `

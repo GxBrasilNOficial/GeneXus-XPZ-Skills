@@ -262,7 +262,45 @@ if ([string]::IsNullOrWhiteSpace($tempRoot)) {
 $useManuscriptText = ($PSBoundParameters.ContainsKey('ManuscriptText'))
 $useManuscriptPath = ($PSBoundParameters.ContainsKey('ManuscriptPath'))
 if ($useManuscriptText -eq $useManuscriptPath) {
-    throw "BLOCK: informe exatamente um entre -ManuscriptText e -ManuscriptPath."
+    $failureCode = if ($useManuscriptText) { 'manuscript-source-ambiguous' } else { 'manuscript-source-missing' }
+    $message = if ($useManuscriptText) {
+        'Informe apenas um entre -ManuscriptText e -ManuscriptPath.'
+    } else {
+        'Informe exatamente um entre -ManuscriptText e -ManuscriptPath.'
+    }
+    $blockResult = [ordered]@{
+        Kind                         = 'xpz-llm-panel-dispatch-result'
+        SchemaVersion                = 1
+        success                      = $false
+        roundStarted                 = $false
+        dispatchStarted              = $false
+        reviewersDispatched          = 0
+        roundId                      = $RoundId
+        payloadSensitivity           = $PayloadSensitivity
+        parallelKbRoot               = $null
+        policyPath                   = $null
+        manuscriptPath               = $null
+        ollamaConcurrency            = $OllamaConcurrency
+        reviewers                    = @()
+        dispatched                   = 0
+        respondedCount               = 0
+        errorCount                   = 0
+        timeoutCount                 = 0
+        quotaCount                   = 0
+        unavailableCount             = 0
+        gateAsk                      = 0
+        gateDeny                     = 0
+        ollamaQuotaWarning           = $null
+        concurrencySaturationWarning = $null
+        preparationError             = [ordered]@{
+            failureStage = 'parameter-validation'
+            failureCode  = $failureCode
+            message      = $message
+        }
+    }
+    [Console]::Error.WriteLine("BLOCK: ${failureCode}: $message")
+    [Console]::Out.WriteLine(($blockResult | ConvertTo-Json -Compress -Depth 8))
+    exit 1
 }
 if ($useManuscriptText -and $ManuscriptText.Length -gt $MaxInlineManuscriptChars) {
     $blockResult = [ordered]@{
