@@ -36,7 +36,7 @@
 .PARAMETER Agent
     Nome do agente do opencode. Opcional.
 .PARAMETER OpenCodeExe
-    Forca um caminho de opencode.exe (contorna a descoberta automatica).
+    Forca um caminho de opencode.exe (contorna a descoberta automatica por PATH/npm).
 .PARAMETER NoWatcher
     Não abrir a janela do watcher (apenas dispara o job).
 .PARAMETER TempDir
@@ -62,6 +62,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
 # Guard least-privilege do reviewer-ro (default escopado + pre-check fail-closed no spawn)
+. (Join-Path $PSScriptRoot 'OpenCodeCliSupport.ps1')
 . (Join-Path $PSScriptRoot 'OpenCodeReviewerRoGuard.ps1')
 
 # Prompt: inline (-Message) ou de arquivo (-MessagePath). Le como UTF-8.
@@ -72,19 +73,8 @@ if ($PSCmdlet.ParameterSetName -eq 'FromFile') {
     $Message = Get-Content -LiteralPath $MessagePath -Raw -Encoding utf8
 }
 
-# 1) Resolve o opencode.exe: override explicito (-OpenCodeExe) ou descoberta sob %APPDATA%\npm
-if ($OpenCodeExe) {
-    if (-not (Test-Path -LiteralPath $OpenCodeExe -PathType Leaf)) {
-        throw "BLOCK: -OpenCodeExe nao encontrado: $OpenCodeExe"
-    }
-    $exe = $OpenCodeExe
-} else {
-    $exe = Get-ChildItem -Path "$env:APPDATA\npm\node_modules\opencode-ai" `
-        -Recurse -Filter 'opencode.exe' -ErrorAction SilentlyContinue |
-        Where-Object FullName -like '*windows-x64\bin\opencode.exe' |
-        Select-Object -First 1 -ExpandProperty FullName
-    if (-not $exe) { throw "BLOCK: opencode.exe nao encontrado sob $env:APPDATA\npm" }
-}
+# 1) Resolve o opencode.exe: override explicito, PATH (WinGet/Scoop/binario direto) ou npm legado.
+$exe = Resolve-OpenCodeExe -Override $OpenCodeExe
 
 # 1b) D1/D2: default -Agent reviewer-ro ESCOPADO + pre-check fail-closed ANTES do Start-Process (o
 #     spawn e a barreira; o assincrono nao tem finally-remove, entao o pos-check e diagnostico no

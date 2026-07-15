@@ -11,7 +11,10 @@ Consumidos por `scripts/OpenCodeReviewerRoGuard.ps1` (pré-check runtime) e por
 
 `VERSION.txt` = **1.4.4**. O pré-check compara `opencode --version` contra este valor
 (cláusula de validade). Versão diferente ⇒ BLOCK com motivo `version` — os claims de resolução
-podem não valer; re-capturar os fixtures e revisitar D2/D3 antes de reativar.
+podem não valer. Antes de concluir falha operacional, rode
+`scripts/Test-OpenCodeReviewerRoInstalledCompatibility.ps1 -AsJson` a partir da raiz do repo:
+`needsFixtureRecapture` significa que a estrutura local está OK, mas os fixtures empíricos ainda
+não foram promovidos para a versão instalada; `blocked` indica problema estrutural a corrigir.
 
 ## Arquivos
 
@@ -78,4 +81,7 @@ opencode agent list        # extrair o bloco `reviewer-ro (all)`
 
 Atualizar `VERSION.txt`, `agentlist-reviewer-ro.sample.txt` (sanitizando os paths de
 `external_directory`) e re-rodar `scripts/Test-OpenCodeReviewerRoSelfTest.ps1` até verde antes de
-reativar o default `-Agent reviewer-ro`.
+reativar o default `-Agent reviewer-ro`. O diagnóstico estrutural
+`scripts/Test-OpenCodeReviewerRoInstalledCompatibility.ps1 -AsJson` ajuda a confirmar o estado
+instalado, mas não substitui a recaptura behavioral (`read-outside-cwd-blocked.sample.txt`) quando a
+versão do opencode muda.

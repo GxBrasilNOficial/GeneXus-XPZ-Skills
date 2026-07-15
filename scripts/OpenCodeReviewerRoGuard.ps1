@@ -421,7 +421,7 @@ function Test-OpenCodeReviewerRoPrecheck {
     }
     if ($installed -ne $ExpectedVersion) {
         return @{ pass = $false; reason = 'version'
-            detail = "opencode $installed != versao testada dos fixtures ($ExpectedVersion). Os claims de resolucao podem nao valer; revisitar D2/D3 e re-capturar fixtures antes de ativar." }
+            detail = "opencode $installed != versao testada dos fixtures ($ExpectedVersion). Os claims de resolucao podem nao valer; antes de desistir, rode scripts/Test-OpenCodeReviewerRoInstalledCompatibility.ps1 -AsJson para diagnostico estrutural. Se a estrutura estiver OK, re-capture os fixtures empiricos do reviewer-ro para esta versao antes de ativar." }
     }
 
     # 3) agent list -> allow-set exato + external_directory nao-allow
