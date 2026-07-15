@@ -642,6 +642,11 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
         -Sensitivity 'public' -Extra @{ OpenCodeConfigPath = $ocCfg } -UseManuscriptText `
         -ManuscriptText 'manuscrito-inline'
     Assert-True ($r.exit -eq 0) 'ManuscriptText: exit 0 esperado'
+    Assert-True ($r.json.success -eq $true) 'ManuscriptText: success=true'
+    Assert-True ($r.json.roundStarted -eq $true) 'ManuscriptText: roundStarted=true'
+    Assert-True ($r.json.dispatchStarted -eq $true) 'ManuscriptText: dispatchStarted=true'
+    Assert-True ([int]$r.json.reviewersDispatched -eq 1) 'ManuscriptText: reviewersDispatched=1'
+    Assert-True ($null -eq $r.json.preparationError) 'ManuscriptText: preparationError=null'
     Assert-True ((Get-Reviewer $r.json 0).state -eq 'responded') 'ManuscriptText: revisor deveria responder'
     $prepManifest = Join-Path $ledgerRoot $r.roundId 'preparation-manifest.json'
     Assert-True (Test-Path -LiteralPath $prepManifest -PathType Leaf) 'ManuscriptText: preparation-manifest.json deveria existir'

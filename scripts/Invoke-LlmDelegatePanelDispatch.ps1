@@ -996,6 +996,10 @@ $policyPathOut = $null; if (-not [string]::IsNullOrWhiteSpace($PolicyPath)) { $p
 $summary = [ordered]@{
     Kind                         = 'xpz-llm-panel-dispatch-result'
     SchemaVersion                = 1
+    success                      = $true
+    roundStarted                 = $true
+    dispatchStarted              = $true
+    reviewersDispatched          = $dispatched
     roundId                      = $RoundId
     payloadSensitivity           = $PayloadSensitivity
     parallelKbRoot               = $parallelKbRootOut
@@ -1013,6 +1017,7 @@ $summary = [ordered]@{
     gateDeny                     = $gateDenyCount
     ollamaQuotaWarning           = $ollamaQuotaWarning
     concurrencySaturationWarning = $concurrencySaturationWarning
+    preparationError             = $null
 }
 
 $summaryPath = Join-Path $ledgerDir 'panel-summary.json'
