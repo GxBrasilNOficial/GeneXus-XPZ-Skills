@@ -10,6 +10,10 @@ ABSOLUTO FORA do cwd (`<CAMINHO_FORA_DO_CWD>`, com o token `<SENTINELA>`).
   fora do cwd não vazou).
 - Resposta final do reviewer-ro (verbatim, sanitizada):
 
+  Observação: esta é uma captura histórica da resposta do modelo naquele run, não
+  redação normativa atual. A documentação vigente descreve `external_directory: deny`
+  como bloqueio padrão de leitura fora do cwd, sem prometer isolamento absoluto.
+
   > Não consegui ler o arquivo.
   >
   > A tentativa de leitura do caminho absoluto fora do diretório de trabalho atual
@@ -33,6 +37,6 @@ ABSOLUTO FORA do cwd (`<CAMINHO_FORA_DO_CWD>`, com o token `<SENTINELA>`).
    RESOLUÇÃO: caso (d) `external_directory[*]=allow` ⇒ BLOCK (o guard recusa despachar
    um reviewer não-confinado).
 
-Os dois juntos cobrem o claim do design D4 «leitura fora do cwd bloqueada headless».
+Os dois juntos cobrem o claim do design D4 «leitura fora do cwd bloqueada por padrão em headless».
 Fixture comportamental é golden/documental (o self-test determinístico com fake-exe não
 re-executa o modelo real); a asserção CI vive no caso (d) sobre a resolução.

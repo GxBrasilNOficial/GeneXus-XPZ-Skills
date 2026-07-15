@@ -27,8 +27,8 @@ Eixos de risco: (i) execução/escrita local; (ii) exfiltração (agravante do m
 
 - **Fecha:** escrita/execução (`bash`/`edit`) e as **ferramentas** de rede (`webfetch`/`websearch`).
 - **NÃO fecha (residual nomeado e aceito em `public`):** o canal do próprio parecer ao provider
-  (inerente a qualquer revisor externo). A leitura fica **confinada ao workspace do cwd** (ver D4),
-  não é machine-wide — mas o D-min **não mecaniza** "o cwd é seguro" (isso é operacional).
+  (inerente a qualquer revisor externo). `external_directory` bloqueia por padrão leitura fora
+  do workspace do cwd (ver D4), mas não prova isolamento absoluto nem torna o cwd seguro.
 - **ADIADO para outra sessão:** liberar opencode em `kb-sensitive`/pasta paralela de KB, e mecanizar
   a contenção de leitura (cwd-seguro). Hoje opencode em `kb-sensitive` é `unavailable`
   (`Invoke-LlmDelegatePanelDispatch.ps1:253-258`).
@@ -119,7 +119,7 @@ permission:
   webfetch: deny
   websearch: deny
   task: deny
-  external_directory: deny   # confina leitura ao cwd (ver D4)
+  external_directory: deny   # bloqueia por padrão leitura fora do cwd (ver D4)
 ```
 `mode: all` (garante seleção por `--agent` em headless). Medido em opencode 1.17.20: `permission:deny`
 ≡ `tools:false` (resolvem idêntico, removem a tool em headless); `webfetch/websearch/task: deny`
@@ -147,7 +147,7 @@ campo.
 `$cdCapable` exclui opencode; `:373` `(Get-Location).Path` é código morto para opencode). Herda a
 cwd ambiente (`Invoke-OpenCode.ps1:135`, `Start-Process` sem `-WorkingDirectory`).
 
-### D4 — Escopo D-min; leitura confinada ao cwd herdado; cwd-seguro é OPERACIONAL
+### D4 — Escopo D-min; bloqueio padrão fora do cwd herdado; cwd-seguro é OPERACIONAL
 
 Fecha escrita/execução e as **ferramentas** de rede (`webfetch/websearch` negadas) — **não** o canal
 do parecer ao provider (residual aceito).
@@ -155,21 +155,23 @@ do parecer ao provider (residual aceito).
 **Confinamento de leitura (MEDIDO):** a tool `read` **não** lê qualquer arquivo da máquina. O
 opencode tem a dimensão nativa **`external_directory`** (base `action: ask`) que gateia leituras
 **fora** do workspace do cwd; em `opencode run` headless o `ask` é **auto-rejeitado** → ler fora do
-cwd é **bloqueado** (provado: agentes com e sem curinga ambos bloqueados ao ler arquivo fora do cwd,
-pela mesma regra base). `external_directory: deny` explícito (D3) torna o bloqueio padrão
-`external_directory[*]` independente do modo. Em 1.17.20 há exceções `allow` para diretórios
-internos do opencode, como o tool-output; elas não autorizam tratar o cwd como "seguro" nem como
-proibição absoluta de todo path externo específico. **Este achado INVERTE a premissa** de
+cwd é **bloqueado por padrão** (provado: agentes com e sem curinga ambos bloquearam a leitura
+do arquivo-sentinela fora do cwd pela mesma regra base). `external_directory: deny` explícito
+(D3) torna o padrão `external_directory[*]` bloqueado independente do modo. Em 1.17.20 há
+exceções `allow` para diretórios internos do opencode, como o tool-output; elas não autorizam
+tratar o cwd como "seguro" nem como proibição absoluta de todo path externo específico.
+**Este achado INVERTE a premissa** de
 `SKILL.md:838-840` (que hoje diz que `read` lê "qualquer arquivo") — tratar a reescrita da doc como
 **correção de premissa**, versionada por fixture, condicionada ao self-test na versão instalada.
 
 **Qual é o cwd:** herdado do orquestrador (`Invoke-OpenCode.ps1:135`, sem `-WorkingDirectory`);
 opencode nunca recebe `-Cd`. Confinamento por **herança**, não por controle explícito.
 
-**Garante / NÃO garante:** garante mecanicamente confinamento ao cwd herdado (`external_directory`,
-self-test). **Não** mecaniza "o cwd é seguro" — não há BLOCK por cwd em `public` (só em
-`kb-sensitive`). cwd-seguro em `public` é **operacional**: o operador dispara revisão `public` da
-raiz do repo de skills (onde, medido, não há segredo REAL versionado — só iscas de self-test).
+**Garante / NÃO garante:** garante mecanicamente o bloqueio padrão de leitura fora do cwd herdado
+(`external_directory`, self-test), sem provar isolamento absoluto de todo path externo específico.
+**Não** mecaniza "o cwd é seguro" — não há BLOCK por cwd em `public` (só em `kb-sensitive`).
+cwd-seguro em `public` é **operacional**: o operador dispara revisão `public` da raiz do repo de
+skills (onde, medido, não há segredo REAL versionado — só iscas de self-test).
 **Nota de operador** (em `SKILL.md`/`15`): "cwd-seguro é responsabilidade de quem dispara; se o cwd
 contiver segredos não-versionados (`.env` local, logs, cache), o revisor pode lê-los; iscas de
 self-test não substituem revisar segredos reais no diretório." Em 1.17.20 o OpenCode traz proteção
@@ -184,7 +186,7 @@ Renomear "read-only" → **"sem execução/escrita"** (a leitura não está tota
 **Fixtures versionados** (capturados em opencode 1.17.20; ancoram os self-tests contra drift de
 versão): warning de fallback; `agent list` do `reviewer-ro` (allow-set + `external_directory`);
 equivalência `permission`↔`tools`; merge global↔project; `webfetch/websearch/task: deny` resolvido;
-`"*": deny` curinga; **leitura fora do cwd bloqueada** headless.
+`"*": deny` curinga; **leitura fora do cwd bloqueada por padrão** em headless.
 
 **Novo `scripts/Test-OpenCodeReviewerRoSelfTest.ps1`** (token `OPENCODE_REVIEWER_RO_SELFTEST_OK`):
 (a) default `reviewer-ro` no argv (síncrono E assíncrono); (b) fail-closed com agente ausente /
