@@ -863,7 +863,7 @@ segurança no **próprio adapter**, de forma inseparável (nunca "default sem gu
   `scripts/Install-OpenCodeReviewerRoAgent.ps1` (global, dono desta skill). Gate de processo/CI:
   `scripts/Test-OpenCodeReviewerRoSelfTest.ps1` (`OPENCODE_REVIEWER_RO_SELFTEST_OK`) e
   `scripts/Test-OpenCodeCliSupportSelfTest.ps1` para a descoberta do CLI.
-- **Eixo de LEITURA — premissa INVERTIDA (medido em opencode 1.4.4).** A doc anterior afirmava que a
+- **Eixo de LEITURA — premissa INVERTIDA (medido em opencode 1.17.20).** A doc anterior afirmava que a
   tool `read` lê **qualquer arquivo** da máquina; a **medição refuta**: o opencode tem a dimensão
   nativa `external_directory` (base `ask`, auto-rejeitada em `opencode run` headless) que gateia
   leituras **fora** do workspace do cwd. O reviewer-ro fixa `external_directory: deny` explícito → a

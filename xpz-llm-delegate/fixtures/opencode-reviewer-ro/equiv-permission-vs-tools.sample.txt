@@ -1,36 +1,521 @@
 probe-perm (all)
   [
-  {
-    "permission": "*",
-    "action": "allow",
-    "pattern": "*"
-  },
-  {
-    "permission": "read",
-    "action": "allow",
-    "pattern": "*"
-  },
-  {
-    "permission": "webfetch",
-    "action": "deny",
-    "pattern": "*"
-  }
-]
+    {
+      "permission": "*",
+      "action": "allow",
+      "pattern": "*"
+    },
+    {
+      "permission": "doom_loop",
+      "action": "ask",
+      "pattern": "*"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "*",
+      "action": "ask"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_OPENCODE_TOOL_OUTPUT_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_OPENCODE_TEMP_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "question",
+      "action": "deny",
+      "pattern": "*"
+    },
+    {
+      "permission": "plan_enter",
+      "action": "deny",
+      "pattern": "*"
+    },
+    {
+      "permission": "plan_exit",
+      "action": "deny",
+      "pattern": "*"
+    },
+    {
+      "permission": "read",
+      "pattern": "*",
+      "action": "allow"
+    },
+    {
+      "permission": "read",
+      "pattern": "*.env",
+      "action": "ask"
+    },
+    {
+      "permission": "read",
+      "pattern": "*.env.*",
+      "action": "ask"
+    },
+    {
+      "permission": "read",
+      "pattern": "*.env.example",
+      "action": "allow"
+    },
+    {
+      "permission": "*",
+      "action": "allow",
+      "pattern": "*"
+    },
+    {
+      "permission": "read",
+      "action": "allow",
+      "pattern": "*"
+    },
+    {
+      "permission": "webfetch",
+      "action": "deny",
+      "pattern": "*"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_OPENCODE_TOOL_OUTPUT_DIR>\\*",
+      "action": "allow"
+    }
+  ]
 probe-tools (all)
   [
-  {
-    "permission": "*",
-    "action": "allow",
-    "pattern": "*"
-  },
-  {
-    "permission": "read",
-    "action": "allow",
-    "pattern": "*"
-  },
-  {
-    "permission": "webfetch",
-    "action": "deny",
-    "pattern": "*"
-  }
-]
+    {
+      "permission": "*",
+      "action": "allow",
+      "pattern": "*"
+    },
+    {
+      "permission": "doom_loop",
+      "action": "ask",
+      "pattern": "*"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "*",
+      "action": "ask"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_OPENCODE_TOOL_OUTPUT_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_OPENCODE_TEMP_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_SKILL_DIR>\\*",
+      "action": "allow"
+    },
+    {
+      "permission": "question",
+      "action": "deny",
+      "pattern": "*"
+    },
+    {
+      "permission": "plan_enter",
+      "action": "deny",
+      "pattern": "*"
+    },
+    {
+      "permission": "plan_exit",
+      "action": "deny",
+      "pattern": "*"
+    },
+    {
+      "permission": "read",
+      "pattern": "*",
+      "action": "allow"
+    },
+    {
+      "permission": "read",
+      "pattern": "*.env",
+      "action": "ask"
+    },
+    {
+      "permission": "read",
+      "pattern": "*.env.*",
+      "action": "ask"
+    },
+    {
+      "permission": "read",
+      "pattern": "*.env.example",
+      "action": "allow"
+    },
+    {
+      "permission": "read",
+      "action": "allow",
+      "pattern": "*"
+    },
+    {
+      "permission": "webfetch",
+      "action": "deny",
+      "pattern": "*"
+    },
+    {
+      "permission": "external_directory",
+      "pattern": "<SANITIZED_OPENCODE_TOOL_OUTPUT_DIR>\\*",
+      "action": "allow"
+    }
+  ]

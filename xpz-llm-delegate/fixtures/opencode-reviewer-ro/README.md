@@ -9,7 +9,7 @@ Consumidos por `scripts/OpenCodeReviewerRoGuard.ps1` (pré-check runtime) e por
 
 ## Versão medida
 
-`VERSION.txt` = **1.4.4**. O pré-check compara `opencode --version` contra este valor
+`VERSION.txt` = **1.17.20**. O pré-check compara `opencode --version` contra este valor
 (cláusula de validade). Versão diferente ⇒ BLOCK com motivo `version` — os claims de resolução
 podem não valer. Antes de concluir falha operacional, rode
 `scripts/Test-OpenCodeReviewerRoInstalledCompatibility.ps1 -AsJson` a partir da raiz do repo:
@@ -29,23 +29,21 @@ não foram promovidos para a versão instalada; `blocked` indica problema estrut
   máquina) foram substituídos por `<SANITIZED_SKILL_DIR>`; as regras de ferramenta são as reais.
   Base do parser e do fake-exe do self-test.
 - `equiv-permission-vs-tools.sample.txt` — **equivalência `permission: deny` ≡ `tools: false`**
-  (medida em 1.4.4): dois agentes-probe que negam a MESMA tool (`webfetch`), um pela forma
+  (medida em 1.17.20): dois agentes-probe que negam a MESMA tool (`webfetch`), um pela forma
   `permission: { webfetch: deny }`, outro pela forma `tools: { webfetch: false }`, resolvem
   **idêntico** no `agent list` — ambos `webfetch → deny`. Ancora a refutação da nota antiga
   migrada para `historico/IdeiasImplementadas_202607.md` («`tools: false` mais forte que
   `permission: deny`»).
-- `merge-global-only-reviewer-ro.sample.txt` — **merge global↔project (substituição, não campo a
-  campo)**: resolução do `reviewer-ro` quando **só** o global interino (forma `tools:`, `mode:
-  primary`) aplica (cwd sem `.opencode/`). Contrasta com `agentlist-reviewer-ro.sample.txt`
-  (project-local, forma `permission`, `mode: all`, allow-set `{read,grep,glob,list}`): a presença do
-  project-local muda `mode` `primary`→`all` e `*` `allow`→`deny` **por inteiro**, provando que o
-  project-local **substitui o agente**, não mescla campo a campo.
+- `merge-global-only-reviewer-ro.sample.txt` — resolução do `reviewer-ro` quando **só** o global
+  provisionado aplica (cwd sem `.opencode/`). Em 1.17.20 o global já resolve no mesmo contrato
+  least-privilege do project-local: `*` final `deny` + allow-set `{read,grep,glob,list}`. Este
+  fixture preserva a cobertura do caminho fora da raiz do repo, sem depender do project-local.
 - `read-outside-cwd-blocked.sample.txt` — **captura behavioral** (design D4 «leitura fora do cwd
   bloqueada headless»): reviewer-ro (com glm-5.2) pedido para ler um arquivo FORA do cwd → **sem
   leak** do sentinela; a resolução `external_directory[*]=deny` é a rede mecânica. Golden/documental
   (o self-test determinístico não re-executa o modelo real; a asserção CI vive no caso (d)).
 
-## Resolução efetiva medida (1.4.4) — `agent list`, last-match-wins
+## Resolução efetiva medida (1.17.20) — `agent list`, last-match-wins
 
 Excluindo `external_directory` (regras por-padrão) e os gates internos (`doom_loop`, `question`,
 `plan_enter`, `plan_exit`):

@@ -121,7 +121,7 @@ permission:
   task: deny
   external_directory: deny   # confina leitura ao cwd (ver D4)
 ```
-`mode: all` (garante seleção por `--agent` em headless). Medido em opencode 1.4.4: `permission:deny`
+`mode: all` (garante seleção por `--agent` em headless). Medido em opencode 1.17.20: `permission:deny`
 ≡ `tools:false` (resolvem idêntico, removem a tool em headless); `webfetch/websearch/task: deny`
 removem as tools; `"*": deny` curinga funciona. A nota de `999:168` ("`tools:false` mais forte que
 `permission:deny`") é **refutada pela medição** — corrigir **condicionada** ao self-test confirmar.
@@ -137,8 +137,8 @@ self-test; passo de **migração** do interino global (forma antiga `tools:` →
 dependência de setup (o `agentsPath` dele é do MCP do Cursor — `999:167` — não cobre agentes
 opencode).
 
-**Merge global↔project comprovado LIMPO:** o project-local substitui o agente inteiro (não mistura
-campo a campo).
+**Global-only e project-local comprovados LIMPOS:** o global provisionado e o project-local resolvem
+o mesmo contrato least-privilege (`*` final `deny` + allow-set `{read,grep,glob,list}`).
 
 **Pré-requisito de cwd:** opencode **não** recebe `-Cd` (`Invoke-LlmDelegatePanelDispatch.ps1:362-363`
 `$cdCapable` exclui opencode; `:373` `(Get-Location).Path` é código morto para opencode). Herda a
@@ -174,7 +174,7 @@ Renomear "read-only" → **"sem execução/escrita"** (a leitura não está tota
 
 ## Self-tests, fixtures e GATE DE ATIVAÇÃO
 
-**Fixtures versionados** (capturados em opencode 1.4.4; ancoram os self-tests contra drift de
+**Fixtures versionados** (capturados em opencode 1.17.20; ancoram os self-tests contra drift de
 versão): warning de fallback; `agent list` do `reviewer-ro` (allow-set + `external_directory`);
 equivalência `permission`↔`tools`; merge global↔project; `webfetch/websearch/task: deny` resolvido;
 `"*": deny` curinga; **leitura fora do cwd bloqueada** headless.
@@ -190,7 +190,7 @@ preserva comentários/formatação/demais chaves do `opencode.jsonc`. **Não** h
 `public` fora da raiz ⇒ BLOCK" (o D-min não mecaniza cwd-seguro).
 
 **Detecção de versão:** o adapter detecta a versão instalada (`opencode --version`) e a cláusula de
-validade compara contra a versão dos fixtures — não fixar `1.4.4` como produção sem checar.
+validade compara contra a versão dos fixtures — não fixar uma versão como produção sem checar.
 
 **Natureza HONESTA do gate (fold-in G1):** o **runtime** é protegido pelo **pré-check do D2**
 (código, fail-closed) — esse é o mecanismo. O "bloqueio de ativação" pelos self-tests é um **GATE DE
@@ -228,5 +228,5 @@ README trilíngue: refletir em ES/EN se a regra operacional mudar.
 Congelado após 8 rodadas de revisão por pares (v1→v8) — anthropic (subagente nativo), openai
 (Codex gpt-5.5), ollama-cloud (glm-5.2/kimi-k2.7-code/deepseek-v4-pro), nvidia
 (glm-5.2/kimi-k2.6/deepseek-v4-pro/minimax-m3). Arquitetura nunca reaberta; freeze por decisão
-humana com a prova transferida para os self-tests. Claims empíricos medidos em opencode 1.4.4
+humana com a prova transferida para os self-tests. Claims empíricos promovidos para opencode 1.17.20
 (fixtures versionados).
