@@ -57,13 +57,10 @@ function Invoke-Preparer {
         $argList += @('-RoundId', $rid)
     }
 
-    # -ManuscriptText e -ReviewersJson sofrem de quebra de argumento em espacos/newlines/quotes
-    # com Start-Process. Converter para -ManuscriptPath/-ReviewersJson via arquivos temporarios.
+    # ProcessStartInfo.ArgumentList preserva argumentos com espacos/newlines/quotes.
+    # ReviewersJson continua por arquivo para manter o harness de teste legivel e focado.
     if ($ArgsHashtable.ContainsKey('ManuscriptText')) {
-        $msTemp = Join-Path $tmp "ms-$ridSafe.txt"
-        $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
-        [System.IO.File]::WriteAllText($msTemp, $ArgsHashtable['ManuscriptText'], $utf8NoBom)
-        $argList += @('-ManuscriptPath', $msTemp)
+        $argList += @('-ManuscriptText', $ArgsHashtable['ManuscriptText'])
     }
     if ($ArgsHashtable.ContainsKey('ManuscriptPath')) {
         $argList += @('-ManuscriptPath', $ArgsHashtable['ManuscriptPath'])
@@ -84,11 +81,28 @@ function Invoke-Preparer {
         $argList += @('-FailAt', $ArgsHashtable['FailAt'])
     }
 
-    $p = Start-Process -FilePath 'pwsh' -ArgumentList $argList -NoNewWindow -PassThru `
-        -RedirectStandardOutput $oFile -RedirectStandardError $eFile
+    $psi = [System.Diagnostics.ProcessStartInfo]::new()
+    $psi.FileName = 'pwsh'
+    foreach ($arg in $argList) {
+        [void]$psi.ArgumentList.Add([string]$arg)
+    }
+    $psi.UseShellExecute = $false
+    $psi.CreateNoWindow = $true
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+
+    $p = [System.Diagnostics.Process]::new()
+    $p.StartInfo = $psi
+    [void]$p.Start()
+    $stdoutTask = $p.StandardOutput.ReadToEndAsync()
+    $stderrTask = $p.StandardError.ReadToEndAsync()
     [void]$p.WaitForExit(60000)
-    $stdout = Get-Content -LiteralPath $oFile -Raw -Encoding utf8 -ErrorAction SilentlyContinue
-    $stderr = Get-Content -LiteralPath $eFile -Raw -Encoding utf8 -ErrorAction SilentlyContinue
+    $stdoutTask.Wait()
+    $stderrTask.Wait()
+    $stdout = $stdoutTask.Result
+    $stderr = $stderrTask.Result
+    [System.IO.File]::WriteAllText($oFile, $stdout, [System.Text.UTF8Encoding]::new($false))
+    [System.IO.File]::WriteAllText($eFile, $stderr, [System.Text.UTF8Encoding]::new($false))
     if ($null -eq $stdout) { $stdout = '' }
     if ($null -eq $stderr) { $stderr = '' }
     $json = $null
@@ -168,7 +182,7 @@ Assert-True ($mani.Kind -eq 'xpz-llm-peer-review-artifacts-manifest') 'manifest:
 Assert-True ([int]$mani.SchemaVersion -eq 1) 'manifest: SchemaVersion=1'
 Assert-True ($mani.roundId -eq $r.roundId) 'manifest: roundId casa'
 Assert-True ($mani.encoding -eq 'utf-8-no-bom') 'manifest: encoding=utf-8-no-bom'
-Assert-True ($mani.manuscriptSource -eq 'file') 'manifest: manuscriptSource=file (via temp file no Start-Process)'
+Assert-True ($mani.manuscriptSource -eq 'inline') 'manifest: manuscriptSource=inline'
 Assert-True ([int]$mani.reviewerCount -eq 2) 'manifest: reviewerCount=2'
 Assert-True (-not [string]::IsNullOrWhiteSpace([string]$mani.artifacts.manuscript.sha256)) 'manifest: manuscript sha256 preenchido'
 Assert-True (-not [string]::IsNullOrWhiteSpace([string]$mani.artifacts.reviewers.sha256)) 'manifest: reviewers sha256 preenchido'
