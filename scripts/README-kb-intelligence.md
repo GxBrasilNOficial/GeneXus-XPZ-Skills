@@ -52,14 +52,14 @@ Escopo de extracao de relacoes atual:
 - vinculacao explicita: `WorkWithForWeb` para `Transaction`
 - link explicito: `WorkWithForWeb` para `WebPanel`
 - prompt explicito: `WorkWithForWeb` para `WebPanel`
-- condição explicita: `WorkWithForWeb` para `Procedure`, incluindo chamada estatica omitida por nome real do inventario, `Nome.Call(...)`, `udp(Nome, ...)` e `Nome.Udp(...)`
+- condição explicita: `WorkWithForWeb` para `Procedure`, incluindo chamada estatica omitida por nome real do inventario, `Nome.Call(...)`, `Call(Nome, ...)`, `udp(Nome, ...)` e `Nome.Udp(...)`
 - atributo de condição: `WorkWithForWeb` para `Procedure`, com as mesmas formas resolviveis por inventario da condição explicita
 - alvo literal por propriedade: `CustomType:<valor>` a partir de `ATTCUSTOMTYPE`
 - alvo resolvido por propriedade: `SDT`, `Domain` ou `ExternalObject` a partir de `ATTCUSTOMTYPE`, quando o objeto existir no inventario e a regra aprovada resolver o prefixo com seguranca
 - origem atual de `ATTCUSTOMTYPE` indexado: `Procedure`, `WebPanel`, `DataProvider`, `API`, `DataSelector`, `Domain`, `SDT`, `WorkWithForWeb` e `Transaction`
 - chamada efetiva de método em ExternalObject: `Procedure`, `WebPanel`, `DataProvider`, `Transaction`, `API` e `DataSelector` para `ExternalObject` a partir de `&Variavel.Metodo(...)` em `Source` efetivo, quando a variável tiver `ATTCUSTOMTYPE` `exo:<ExternalObject>` resolvido no inventario local
 - dominio base de atributo: `Attribute` para `Domain` a partir de `idBasedOn`, quando o dominio existir no inventario local
-- chamada em atributo calculado: `Attribute` para `Procedure`, `WebPanel` ou `DataProvider` a partir de `Property Formula`, quando o alvo existir no inventario local e a forma for resolvivel estaticamente (`Nome(...)`, `Nome.Call(...)`, `udp(Nome, ...)`, `Nome.Udp(...)`, `Nome.Link(...)`, `Nome.Create(...)`, chamada direta a `DataProvider`)
+- chamada em atributo calculado: `Attribute` para `Procedure`, `WebPanel` ou `DataProvider` a partir de `Property Formula`, quando o alvo existir no inventario local e a forma for resolvivel estaticamente (`Nome(...)`, `Nome.Call(...)`, `Call(Nome, ...)`, `udp(Nome, ...)`, `Nome.Udp(...)`, `Nome.Link(...)`, `Nome.Create(...)`, chamada direta a `DataProvider`)
 - atributo estrutural de transacao: `Transaction` para `Attribute` a partir de `<Level>/<Attribute>`, quando o atributo existir no inventario local
 - tabela estrutural de transacao: `Transaction` para `Table` a partir de `Type` em `<Level>`, quando a tabela existir no inventario local
 - atributo chave de tabela: `Table` para `Attribute` a partir de `<Key>/<Item>`, quando o atributo existir no inventario local

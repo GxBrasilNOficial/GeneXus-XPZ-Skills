@@ -679,6 +679,7 @@ def append_call_evidences_from_expression(
     extractor_rule_procedure_direct: str,
     extractor_rule_procedure_dot: str,
     extractor_rule_webpanel_link: str,
+    extractor_rule_procedure_call_command: str | None,
     extractor_rule_webpanel_create: str,
     extractor_rule_dataprovider_direct: str,
     extractor_rule_procedure_udp_func: str | None = None,
@@ -719,6 +720,24 @@ def append_call_evidences_from_expression(
                 extractor_rule=extractor_rule_procedure_direct,
                 evidence_role=evidence_role,
             )
+
+    if extractor_rule_procedure_call_command:
+        for match in PROCEDURE_CALL_COMMAND_RE.finditer(expression):
+            matched_name = match.group("name")
+            target_name = procedure_lookup.get(matched_name.lower())
+            if target_name:
+                add_evidence(
+                    evidences,
+                    source=source,
+                    target_type="Procedure",
+                    target_name=target_name,
+                    relation_kind=relation_kind_procedure,
+                    line=line_no,
+                    column=match.start("name") + 1,
+                    snippet=expression,
+                    extractor_rule=extractor_rule_procedure_call_command,
+                    evidence_role=evidence_role,
+                )
 
     if extractor_rule_procedure_udp_func:
         for match in PROCEDURE_UDP_FUNC_RE.finditer(expression):
@@ -1525,6 +1544,7 @@ def append_workwith_condition_extra_procedure_calls(
 ) -> None:
     for regex, suffix in (
         (PROCEDURE_DOT_CALL_RE, "dot_call"),
+        (PROCEDURE_CALL_COMMAND_RE, "call_command"),
         (PROCEDURE_UDP_FUNC_RE, "udp_func"),
         (PROCEDURE_DOT_UDP_RE, "dot_udp"),
     ):
@@ -1957,6 +1977,7 @@ def extract_attribute_formula_call_evidence(
                 extractor_rule_procedure_direct="attribute_formula_procedure_direct_call",
                 extractor_rule_procedure_dot="attribute_formula_procedure_dot_call",
                 extractor_rule_webpanel_link="attribute_formula_webpanel_dot_link",
+                extractor_rule_procedure_call_command="attribute_formula_procedure_call_command",
                 extractor_rule_webpanel_create="attribute_formula_webpanel_dot_create",
                 extractor_rule_dataprovider_direct="attribute_formula_dataprovider_direct_call",
                 extractor_rule_procedure_udp_func="attribute_formula_procedure_udp_func",

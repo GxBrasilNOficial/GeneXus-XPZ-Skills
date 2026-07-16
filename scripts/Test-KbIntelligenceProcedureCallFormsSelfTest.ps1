@@ -72,7 +72,7 @@ OrderNote = udp(PValueNoPrefixFake, OrderId) if OrderNote.IsEmpty() on aftervali
 $attrFormulaXml = @"
 <Attribute name="AttrComputedCallFormsFake" guid="44444444-4444-4444-4444-444444444401">
   <Properties>
-    <Property><Name>Formula</Name><Value>PStaticNoPrefixFake(0) + udp(PValueNoPrefixFake, 0) + PMethodNoPrefixFake.Udp("C")</Value></Property>
+    <Property><Name>Formula</Name><Value>PStaticNoPrefixFake(0) + Call(PCommandNoPrefixFake, 0) + udp(PValueNoPrefixFake, 0) + PMethodNoPrefixFake.Udp("C")</Value></Property>
   </Properties>
 </Attribute>
 "@
@@ -81,9 +81,11 @@ $attrFormulaXml = @"
 $workWithXml = @"
 <Object type="$workWithForWebGuid" name="WWCallFormsFake" guid="55555555-5555-5555-5555-555555555501">
   <Condition value="PStaticNoPrefixFake()"/>
+  <Condition value="Call(PCommandNoPrefixFake, &amp;Mode)"/>
   <Condition value="PCommandNoPrefixFake.Call()"/>
   <Condition value="udp(PValueNoPrefixFake, OrderId)"/>
   <Condition value="PMethodNoPrefixFake.Udp(&amp;Mode)"/>
+  <Grid CommandCondition="Call(PCommandNoPrefixFake, &amp;Mode)"/>
   <Grid FilterCondition="PStaticNoPrefixFake()" RowCondition="PCommandNoPrefixFake.Call()" ColCondition="PMethodNoPrefixFake.Udp(&amp;Mode)"/>
 </Object>
 "@
@@ -97,10 +99,13 @@ $cases = @(
     @{ id = 'commented-static-call'; source = 'Procedure:PUsesCallFormsFake'; target = 'Procedure:PUnusedNoPrefixFake'; expected_rule = 'procedure_direct_call'; should_exist = $false },
     @{ id = 'transaction-rule-static-no-prefix'; source = 'Transaction:TOrderCallFormsFake'; target = 'Procedure:PStaticNoPrefixFake'; expected_rule = 'procedure_direct_call'; should_exist = $true },
     @{ id = 'attribute-formula-static-no-prefix'; source = 'Attribute:AttrComputedCallFormsFake'; target = 'Procedure:PStaticNoPrefixFake'; expected_rule = 'attribute_formula_procedure_direct_call'; should_exist = $true },
+    @{ id = 'attribute-formula-call-command'; source = 'Attribute:AttrComputedCallFormsFake'; target = 'Procedure:PCommandNoPrefixFake'; expected_rule = 'attribute_formula_procedure_call_command'; should_exist = $true },
     @{ id = 'attribute-formula-udp-function'; source = 'Attribute:AttrComputedCallFormsFake'; target = 'Procedure:PValueNoPrefixFake'; expected_rule = 'attribute_formula_procedure_udp_func'; should_exist = $true },
     @{ id = 'attribute-formula-dot-udp'; source = 'Attribute:AttrComputedCallFormsFake'; target = 'Procedure:PMethodNoPrefixFake'; expected_rule = 'attribute_formula_procedure_dot_udp'; should_exist = $true },
     @{ id = 'workwith-condition-static-no-prefix'; source = 'WorkWithForWeb:WWCallFormsFake'; target = 'Procedure:PStaticNoPrefixFake'; expected_rule = 'workwith_condition_procedure'; should_exist = $true },
+    @{ id = 'workwith-condition-call-command'; source = 'WorkWithForWeb:WWCallFormsFake'; target = 'Procedure:PCommandNoPrefixFake'; expected_rule = 'workwith_condition_procedure_call_command'; should_exist = $true },
     @{ id = 'workwith-condition-dot-call'; source = 'WorkWithForWeb:WWCallFormsFake'; target = 'Procedure:PCommandNoPrefixFake'; expected_rule = 'workwith_condition_procedure_dot_call'; should_exist = $true },
+    @{ id = 'workwith-condition-attribute-call-command'; source = 'WorkWithForWeb:WWCallFormsFake'; target = 'Procedure:PCommandNoPrefixFake'; expected_rule = 'workwith_condition_attribute_procedure_call_command'; should_exist = $true },
     @{ id = 'workwith-condition-attribute-dot-udp'; source = 'WorkWithForWeb:WWCallFormsFake'; target = 'Procedure:PMethodNoPrefixFake'; expected_rule = 'workwith_condition_attribute_procedure_dot_udp'; should_exist = $true }
 )
 $validationCasesPath = Join-Path $kbIntelDir 'procedure-call-forms-validation.json'
