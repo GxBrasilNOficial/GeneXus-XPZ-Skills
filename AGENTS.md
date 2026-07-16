@@ -5,6 +5,12 @@
 - Ler primeiro o `README.md` local antes de agir.
 - Reler a documentação local quando o contexto da conversa ficar longo, ambíguo ou perder aderência às convenções da raiz.
 
+## Edição local pelo Codex
+
+- Nesta raiz, para uma alteração de arquivo já aprovada pelo usuário, usar `scripts/Apply-ApprovedPatch.ps1` em vez de `apply_patch`.
+- O chamador deve fornecer um patch unificado, uma lista explícita `-AllowedPath`, executar primeiro com `-DryRun` e só então aplicar. O script valida os caminhos, executa `git apply --check` e não faz commit, push ou checkout.
+- Após a aplicação, reler o trecho alterado, conferir encoding/EOL e executar o parse ou teste pertinente. Não usar esse mecanismo para ampliar o escopo aprovado.
+
 ## Revisão por pares como termo operacional
 
 - Quando o usuário pedir `revisão por pares`, `peer review`, `painel multi-modelo` ou `validar plano multi-modelo`, tratar isso como termo operacional reservado desta raiz, não como sinônimo de parecer crítico solo.
