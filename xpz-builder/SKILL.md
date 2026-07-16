@@ -279,6 +279,7 @@ Reference files and when to load them:
      - `bc-isbc-false-batch` / `bc-isbc-property-absent-batch`: correct the Transaction XML in the batch to set `idISBUSINESSCOMPONENT=True` before packaging
      - `bc-isbc-false-corpus` / `bc-isbc-property-absent-corpus`: the Transaction exists in the official corpus but is not a Business Component; the `bc:` dependency cannot be satisfied without correcting and reimporting the Transaction first
      - `bc-missing-everywhere`: the Transaction is absent from both the batch and the official corpus; add it to the batch or confirm its existence in the target KB before packaging
+     - `bc-sublevel-not-found-batch` / `bc-sublevel-not-found-corpus`: the Transaction exists as BC, but the sublevel referenced by `bc:<Transaction>.<Sublevel>` is not present in its Levels; correct the BC reference or the Transaction structure before packaging
    - Do not package while any `fail` finding remains unresolved
 9-WW. WorkWithWeb Apply-mark preflight gate — run before any packaging when the batch contains a `WorkWithForWeb` object:
    - Run `& ..\scripts\Test-GeneXusWorkWithWebApply.ps1 -FrontFolder <pasta-da-frente> -CorpusFolder <ObjetosDaKbEmXml> -AsJson`
