@@ -594,6 +594,22 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
     Assert-True ($rvClUntrusted.state -eq 'unavailable') "claude-code workspace-not-trusted: esperado unavailable; got $($rvClUntrusted.state)"
     Assert-True ([string]$rvClUntrusted.reason -match 'workspace-not-trusted') 'claude-code workspace-not-trusted: reason deveria citar codigo canonico'
 
+    # workspace-not-trusted do titular deve ativar fallback como qualquer unavailable tecnico.
+    $r = Invoke-Harness -Reviewers @(@{
+            backend = 'claude-code'; targetModelKey = 'anthropic/claude-opus-4-8'; invokeArgs = @{ model = 'claude-untrusted-workspace' }
+            fallbackChain = @(
+                @{ backend = 'opencode'; targetModelKey = 'openai/fallback-after-unavailable'; invokeArgs = @{ backend = 'opencode'; model = 'openai/fallback-after-unavailable' } }
+            )
+        }) -Sensitivity 'public' -Extra @{ Cd = $tmp; OpenCodeConfigPath = $ocCfg }
+    Assert-True (@($r.json.reviewers).Count -eq 2) 'fallback workspace-not-trusted: deveria registrar titular + fallback.'
+    $rvClUntrusted = Get-Reviewer $r.json 0
+    $rvFallbackUntrusted = Get-Reviewer $r.json 1
+    Assert-True ($rvClUntrusted.state -eq 'unavailable') "fallback workspace-not-trusted: titular deveria ficar unavailable; got $($rvClUntrusted.state)"
+    Assert-True ($rvFallbackUntrusted.state -eq 'responded') "fallback workspace-not-trusted: fallback deveria responder; got $($rvFallbackUntrusted.state)"
+    Assert-True ($rvFallbackUntrusted.attemptRole -eq 'fallback') 'fallback workspace-not-trusted: attemptRole=fallback.'
+    Assert-True ($rvFallbackUntrusted.activationReason -eq 'unavailable') 'fallback workspace-not-trusted: activationReason deveria ser unavailable.'
+    Assert-True ($rvFallbackUntrusted.countsForDiversity -eq $true) 'fallback workspace-not-trusted respondido deve contar diversidade.'
+
     # =======================================================================================
     # 9) -Cd: precedência (explícito / cwd / ParallelKbRoot) + fail-closed
     # =======================================================================================
