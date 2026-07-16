@@ -6,6 +6,7 @@ Current scope:
 - object inventory for every immediate SourceRoot type folder with XML files
 - object identity via guid extracted from XML
 - Source relations among Procedure, WebPanel, DataProvider, Transaction, API and DataSelector
+  (including static calls resolved from the local inventory and legacy call/udp forms)
 - WorkWithForWeb action gxobject links to Procedure and WebPanel
 - WorkWithForWeb condition expressions to Procedure
 - WorkWithForWeb condition attributes to Procedure
@@ -40,7 +41,7 @@ from pathlib import Path
 from typing import Iterable
 
 # Incrementar quando a cobertura ou regras do indexador mudarem de forma material (nao em refator inerte).
-EXTRACTOR_SIGNATURE_VERSION = "8"
+EXTRACTOR_SIGNATURE_VERSION = "9"
 
 
 def compute_extractor_signature_hash() -> str:
@@ -52,8 +53,10 @@ SOURCE_RE = re.compile(r"<Source(?:\s[^>]*)?>(?P<body>.*?)</Source>", re.IGNOREC
 CDATA_RE = re.compile(r"^\s*<!\[CDATA\[(?P<body>.*)\]\]>\s*$", re.DOTALL)
 LAST_UPDATE_RE = re.compile(r'\blastUpdate="([^"]+)"')
 GUID_RE = re.compile(r'\bguid="([^"]+)"')
-PROCEDURE_DIRECT_RE = re.compile(r"\b(?P<name>proc[A-Za-z_][A-Za-z0-9_]*)\s*\(", re.IGNORECASE)
 PROCEDURE_DOT_CALL_RE = re.compile(r"\b(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*\.\s*Call\s*\(", re.IGNORECASE)
+PROCEDURE_CALL_COMMAND_RE = re.compile(r"(?<![&.\w])call\s*\(\s*(?P<name>[A-Za-z_][A-Za-z0-9_]*)(?!\s*:)", re.IGNORECASE)
+PROCEDURE_UDP_FUNC_RE = re.compile(r"(?<![&.\w])udp\s*\(\s*(?P<name>[A-Za-z_][A-Za-z0-9_]*)(?!\s*:)", re.IGNORECASE)
+PROCEDURE_DOT_UDP_RE = re.compile(r"(?<![&.])\b(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*\.\s*udp\s*\(", re.IGNORECASE)
 WEBPANEL_DOT_LINK_RE = re.compile(r"\b(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*\.\s*Link\s*\(", re.IGNORECASE)
 WEBPANEL_DOT_CREATE_RE = re.compile(r"(?<![&.])\b(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*\.\s*Create\s*\(", re.IGNORECASE)
 FOR_EACH_EXPLICIT_TABLE_RE = re.compile(
@@ -653,7 +656,7 @@ def direct_call_pattern(names: set[str]) -> re.Pattern[str] | None:
     if not names:
         return None
     alternatives = "|".join(re.escape(name) for name in sorted(names, key=len, reverse=True))
-    return re.compile(rf"\b(?P<name>{alternatives})\s*\(", re.IGNORECASE)
+    return re.compile(rf"(?<![&.])\b(?P<name>{alternatives})\s*\(", re.IGNORECASE)
 
 
 def append_call_evidences_from_expression(
@@ -668,6 +671,7 @@ def append_call_evidences_from_expression(
     webpanel_lookup: dict[str, str],
     data_provider_lookup: dict[str, str],
     data_provider_direct_re: re.Pattern[str] | None,
+    procedure_direct_re: re.Pattern[str] | None,
     relation_kind_procedure: str,
     relation_kind_webpanel_link: str,
     relation_kind_webpanel_create: str,
@@ -677,6 +681,8 @@ def append_call_evidences_from_expression(
     extractor_rule_webpanel_link: str,
     extractor_rule_webpanel_create: str,
     extractor_rule_dataprovider_direct: str,
+    extractor_rule_procedure_udp_func: str | None = None,
+    extractor_rule_procedure_dot_udp: str | None = None,
 ) -> None:
     line_no = line_number_at(xml_text, expression_start)
     for match in PROCEDURE_DOT_CALL_RE.finditer(expression):
@@ -696,7 +702,8 @@ def append_call_evidences_from_expression(
                 evidence_role=evidence_role,
             )
 
-    for match in PROCEDURE_DIRECT_RE.finditer(expression):
+    direct_matches = procedure_direct_re.finditer(expression) if procedure_direct_re else ()
+    for match in direct_matches:
         matched_name = match.group("name")
         target_name = procedure_lookup.get(matched_name.lower())
         if target_name:
@@ -712,6 +719,42 @@ def append_call_evidences_from_expression(
                 extractor_rule=extractor_rule_procedure_direct,
                 evidence_role=evidence_role,
             )
+
+    if extractor_rule_procedure_udp_func:
+        for match in PROCEDURE_UDP_FUNC_RE.finditer(expression):
+            matched_name = match.group("name")
+            target_name = procedure_lookup.get(matched_name.lower())
+            if target_name:
+                add_evidence(
+                    evidences,
+                    source=source,
+                    target_type="Procedure",
+                    target_name=target_name,
+                    relation_kind=relation_kind_procedure,
+                    line=line_no,
+                    column=match.start("name") + 1,
+                    snippet=expression,
+                    extractor_rule=extractor_rule_procedure_udp_func,
+                    evidence_role=evidence_role,
+                )
+
+    if extractor_rule_procedure_dot_udp:
+        for match in PROCEDURE_DOT_UDP_RE.finditer(expression):
+            matched_name = match.group("name")
+            target_name = procedure_lookup.get(matched_name.lower())
+            if target_name:
+                add_evidence(
+                    evidences,
+                    source=source,
+                    target_type="Procedure",
+                    target_name=target_name,
+                    relation_kind=relation_kind_procedure,
+                    line=line_no,
+                    column=match.start("name") + 1,
+                    snippet=expression,
+                    extractor_rule=extractor_rule_procedure_dot_udp,
+                    evidence_role=evidence_role,
+                )
 
     for match in WEBPANEL_DOT_LINK_RE.finditer(expression):
         matched_name = match.group("name")
@@ -777,6 +820,7 @@ def extract_evidence(
     procedure_lookup = case_insensitive_lookup(procedure_names, "Procedure")
     webpanel_lookup = case_insensitive_lookup(webpanel_names, "WebPanel")
     data_provider_lookup = case_insensitive_lookup(data_provider_names, "DataProvider")
+    procedure_direct_re = direct_call_pattern(procedure_names)
     data_provider_direct_re = direct_call_pattern(data_provider_names)
 
     for source in source_objects:
@@ -804,7 +848,8 @@ def extract_evidence(
                             extractor_rule="procedure_dot_call",
                         )
 
-                for match in PROCEDURE_DIRECT_RE.finditer(cleaned):
+                direct_matches = procedure_direct_re.finditer(cleaned) if procedure_direct_re else ()
+                for match in direct_matches:
                     matched_name = match.group("name")
                     target_name = procedure_lookup.get(matched_name.lower())
                     if target_name:
@@ -818,6 +863,54 @@ def extract_evidence(
                             column=match.start("name") + 1,
                             snippet=cleaned,
                             extractor_rule="procedure_direct_call",
+                        )
+
+                for match in PROCEDURE_CALL_COMMAND_RE.finditer(cleaned):
+                    matched_name = match.group("name")
+                    target_name = procedure_lookup.get(matched_name.lower())
+                    if target_name:
+                        add_evidence(
+                            evidences,
+                            source=source,
+                            target_type="Procedure",
+                            target_name=target_name,
+                            relation_kind="calls_procedure",
+                            line=line_no,
+                            column=match.start("name") + 1,
+                            snippet=cleaned,
+                            extractor_rule="procedure_call_command",
+                        )
+
+                for match in PROCEDURE_UDP_FUNC_RE.finditer(cleaned):
+                    matched_name = match.group("name")
+                    target_name = procedure_lookup.get(matched_name.lower())
+                    if target_name:
+                        add_evidence(
+                            evidences,
+                            source=source,
+                            target_type="Procedure",
+                            target_name=target_name,
+                            relation_kind="calls_procedure",
+                            line=line_no,
+                            column=match.start("name") + 1,
+                            snippet=cleaned,
+                            extractor_rule="procedure_udp_func",
+                        )
+
+                for match in PROCEDURE_DOT_UDP_RE.finditer(cleaned):
+                    matched_name = match.group("name")
+                    target_name = procedure_lookup.get(matched_name.lower())
+                    if target_name:
+                        add_evidence(
+                            evidences,
+                            source=source,
+                            target_type="Procedure",
+                            target_name=target_name,
+                            relation_kind="calls_procedure",
+                            line=line_no,
+                            column=match.start("name") + 1,
+                            snippet=cleaned,
+                            extractor_rule="procedure_dot_udp",
                         )
 
                 for match in WEBPANEL_DOT_LINK_RE.finditer(cleaned):
@@ -1418,12 +1511,48 @@ def extract_workwith_action_evidence(
     return evidences
 
 
+def append_workwith_condition_extra_procedure_calls(
+    evidences: list[Evidence],
+    *,
+    source: ObjectInfo,
+    expression: str,
+    procedure_lookup: dict[str, str],
+    relation_kind: str,
+    extractor_rule_prefix: str,
+    snippet: str,
+    line: int,
+    evidence_role: str,
+) -> None:
+    for regex, suffix in (
+        (PROCEDURE_DOT_CALL_RE, "dot_call"),
+        (PROCEDURE_UDP_FUNC_RE, "udp_func"),
+        (PROCEDURE_DOT_UDP_RE, "dot_udp"),
+    ):
+        for match in regex.finditer(expression):
+            target_name = procedure_lookup.get(match.group("name").lower())
+            if not target_name:
+                continue
+            add_evidence(
+                evidences,
+                source=source,
+                target_type="Procedure",
+                target_name=target_name,
+                relation_kind=relation_kind,
+                line=line,
+                column=1,
+                snippet=snippet,
+                extractor_rule=f"{extractor_rule_prefix}_{suffix}",
+                evidence_role=evidence_role,
+            )
+
+
 def extract_workwith_condition_evidence(
     workwith_objects: Iterable[ObjectInfo],
     procedure_names: set[str],
 ) -> list[Evidence]:
     evidences: list[Evidence] = []
     procedure_lookup = case_insensitive_lookup(procedure_names, "Procedure")
+    procedure_direct_re = direct_call_pattern(procedure_names)
 
     for source in workwith_objects:
         xml_text = read_text(source.path)
@@ -1434,7 +1563,8 @@ def extract_workwith_condition_evidence(
                 continue
 
             expression = effective_condition_expression(condition_value)
-            for procedure_match in PROCEDURE_DIRECT_RE.finditer(expression):
+            direct_matches = procedure_direct_re.finditer(expression) if procedure_direct_re else ()
+            for procedure_match in direct_matches:
                 target_name = procedure_lookup.get(procedure_match.group("name").lower())
                 if not target_name:
                     continue
@@ -1451,6 +1581,18 @@ def extract_workwith_condition_evidence(
                     evidence_role="WorkWith condition",
                 )
 
+            append_workwith_condition_extra_procedure_calls(
+                evidences,
+                source=source,
+                expression=expression,
+                procedure_lookup=procedure_lookup,
+                relation_kind="workwith_condition_calls_procedure",
+                extractor_rule_prefix="workwith_condition_procedure",
+                snippet=condition_match.group(0),
+                line=line_number_at(xml_text, condition_match.start()),
+                evidence_role="WorkWith condition",
+            )
+
     unique: dict[tuple[str, str, str, int], Evidence] = {}
     for evidence in evidences:
         unique[(evidence.source_name, evidence.target_name, evidence.extractor_rule, evidence.line)] = evidence
@@ -1463,6 +1605,7 @@ def extract_workwith_condition_attribute_evidence(
 ) -> list[Evidence]:
     evidences: list[Evidence] = []
     procedure_lookup = case_insensitive_lookup(procedure_names, "Procedure")
+    procedure_direct_re = direct_call_pattern(procedure_names)
 
     for source in workwith_objects:
         xml_text = read_text(source.path)
@@ -1473,7 +1616,8 @@ def extract_workwith_condition_attribute_evidence(
                     continue
 
                 expression = effective_condition_expression(attr_value)
-                for procedure_match in PROCEDURE_DIRECT_RE.finditer(expression):
+                direct_matches = procedure_direct_re.finditer(expression) if procedure_direct_re else ()
+                for procedure_match in direct_matches:
                     target_name = procedure_lookup.get(procedure_match.group("name").lower())
                     if not target_name:
                         continue
@@ -1489,6 +1633,18 @@ def extract_workwith_condition_attribute_evidence(
                         extractor_rule="workwith_condition_attribute_procedure",
                         evidence_role="WorkWith condition attribute",
                     )
+
+                append_workwith_condition_extra_procedure_calls(
+                    evidences,
+                    source=source,
+                    expression=expression,
+                    procedure_lookup=procedure_lookup,
+                    relation_kind="workwith_condition_attribute_calls_procedure",
+                    extractor_rule_prefix="workwith_condition_attribute_procedure",
+                    snippet=tag_match.group(0),
+                    line=line_number_at(xml_text, tag_match.start()),
+                    evidence_role="WorkWith condition attribute",
+                )
 
     unique: dict[tuple[str, str, str, int], Evidence] = {}
     for evidence in evidences:
@@ -1773,6 +1929,7 @@ def extract_attribute_formula_call_evidence(
     procedure_lookup = case_insensitive_lookup(procedure_names, "Procedure")
     webpanel_lookup = case_insensitive_lookup(webpanel_names, "WebPanel")
     data_provider_lookup = case_insensitive_lookup(data_provider_names, "DataProvider")
+    procedure_direct_re = direct_call_pattern(procedure_names)
     data_provider_direct_re = direct_call_pattern(data_provider_names)
     for source in source_objects:
         xml_text = read_text(source.path)
@@ -1792,6 +1949,7 @@ def extract_attribute_formula_call_evidence(
                 webpanel_lookup=webpanel_lookup,
                 data_provider_lookup=data_provider_lookup,
                 data_provider_direct_re=data_provider_direct_re,
+                procedure_direct_re=procedure_direct_re,
                 relation_kind_procedure="formula_calls_procedure",
                 relation_kind_webpanel_link="formula_calls_webpanel",
                 relation_kind_webpanel_create="formula_creates_webcomponent",
@@ -1801,6 +1959,8 @@ def extract_attribute_formula_call_evidence(
                 extractor_rule_webpanel_link="attribute_formula_webpanel_dot_link",
                 extractor_rule_webpanel_create="attribute_formula_webpanel_dot_create",
                 extractor_rule_dataprovider_direct="attribute_formula_dataprovider_direct_call",
+                extractor_rule_procedure_udp_func="attribute_formula_procedure_udp_func",
+                extractor_rule_procedure_dot_udp="attribute_formula_procedure_dot_udp",
             )
     return evidences
 
