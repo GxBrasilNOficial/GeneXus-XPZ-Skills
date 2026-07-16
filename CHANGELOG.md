@@ -8,6 +8,8 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 ### Unreleased
 
+- **Chamadas de Procedure no índice KbIntelligence:** `scripts/Build-KbIntelligenceIndex.py` agora resolve formas estáticas de chamada de `Procedure` pelo inventário real da KB, sem depender de prefixos de nomenclatura locais como `proc*`. A cobertura inclui `Nome(...)`, `Nome.Call(...)`, `Call(Nome, ...)`, `udp(Nome, ...)` e `Nome.Udp(...)` em `Source` efetivo, `Property Formula` de `Attribute` e condições de `WorkWithForWeb`; chamadas dinâmicas (`Call(&Nome)`, `Call(ATT:Att)` ou nome de programa entre aspas) continuam fora do grafo nominal. `EXTRACTOR_SIGNATURE_VERSION` 8→9; rebuild esperado nas pastas paralelas. Novo self-test: `scripts/Test-KbIntelligenceProcedureCallFormsSelfTest.ps1`.
+
 - **Aplicador de patch aprovado:** adicionado `scripts/Apply-ApprovedPatch.ps1`, que exige caminhos permitidos explícitos, valida tanto `diff --git` quanto os cabeçalhos efetivos `---`/`+++`, executa `git apply --check` antes da escrita e não faz commit, push ou checkout. O self-test cobre simulação, aplicação autorizada e bloqueios de caminho, cabeçalho ausente e divergência entre cabeçalhos.
 
 - **Gate 9-BC para subníveis de Business Component:** `Test-GeneXusBCDependency.ps1` agora reconhece subníveis declarados em `<Level>` tanto por `name` quanto por `type`, mantendo os mesmos status e códigos de finding. O novo `Test-GeneXusBCDependencySelfTest.ps1` cobre dependência BC válida, múltiplas dependências, subnível por `name`, subnível por `type`, subnível ausente, Transaction ausente, `idISBUSINESSCOMPONENT` falso/ausente e risco de ordenação no mesmo batch.
@@ -137,6 +139,8 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 ### Unreleased
 
+- **Llamadas de Procedure en el índice KbIntelligence:** `scripts/Build-KbIntelligenceIndex.py` ahora resuelve formas estáticas de llamada de `Procedure` por el inventario real de la KB, sin depender de prefijos de nomenclatura locales como `proc*`. La cobertura incluye `Nome(...)`, `Nome.Call(...)`, `Call(Nome, ...)`, `udp(Nome, ...)` y `Nome.Udp(...)` en `Source` efectivo, `Property Formula` de `Attribute` y condiciones de `WorkWithForWeb`; las llamadas dinámicas (`Call(&Nome)`, `Call(ATT:Att)` o nombre de programa entre comillas) siguen fuera del grafo nominal. `EXTRACTOR_SIGNATURE_VERSION` 8→9; se espera rebuild en las carpetas paralelas. Nuevo self-test: `scripts/Test-KbIntelligenceProcedureCallFormsSelfTest.ps1`.
+
 - **Aplicador de parches aprobados:** se agregó `scripts/Apply-ApprovedPatch.ps1`, que exige rutas permitidas explícitas, valida tanto `diff --git` como los encabezados efectivos `---`/`+++`, ejecuta `git apply --check` antes de escribir y no hace commit, push ni checkout. El self-test cubre simulación, aplicación autorizada y bloqueos por ruta, encabezado ausente y divergencia entre encabezados.
 
 - **Gate 9-BC para subniveles de Business Component:** `Test-GeneXusBCDependency.ps1` ahora reconoce subniveles declarados en `<Level>` tanto por `name` como por `type`, manteniendo los mismos estados y códigos de hallazgo. El nuevo `Test-GeneXusBCDependencySelfTest.ps1` cubre dependencia BC válida, múltiples dependencias, subnivel por `name`, subnivel por `type`, subnivel ausente, Transaction ausente, `idISBUSINESSCOMPONENT` falso/ausente y riesgo de ordenación en el mismo batch.
@@ -258,6 +262,8 @@ All relevant changes to this repository will be recorded here from this adoption
 The format keeps an `Unreleased` section for changes not yet published in a formal version. This repository does not yet use public semantic versioning; when that changes, future sections should record the corresponding tag.
 
 ### Unreleased
+
+- **Procedure calls in the KbIntelligence index:** `scripts/Build-KbIntelligenceIndex.py` now resolves static `Procedure` call forms from the KB's real inventory, without depending on local naming prefixes such as `proc*`. Coverage includes `Nome(...)`, `Nome.Call(...)`, `Call(Nome, ...)`, `udp(Nome, ...)`, and `Nome.Udp(...)` in effective `Source`, `Attribute` `Property Formula`, and `WorkWithForWeb` conditions; dynamic calls (`Call(&Nome)`, `Call(ATT:Att)`, or quoted program names) remain outside the nominal graph. `EXTRACTOR_SIGNATURE_VERSION` 8→9; rebuild expected in parallel folders. New self-test: `scripts/Test-KbIntelligenceProcedureCallFormsSelfTest.ps1`.
 
 - **Approved patch applier:** added `scripts/Apply-ApprovedPatch.ps1`, which requires explicit allowed paths, validates both `diff --git` and effective `---`/`+++` headers, runs `git apply --check` before writing, and never commits, pushes, or checks out. Its self-test covers dry runs, allowed application, and blocks for paths, missing headers, and mismatched headers.
 
