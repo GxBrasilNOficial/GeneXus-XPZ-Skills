@@ -23,7 +23,7 @@ function Get-ClaudeCodeErrorMessage {
     if ([string]::IsNullOrWhiteSpace($combined)) { return $null }
 
     if (Test-ClaudeCodeWorkspaceNotTrusted -Text $StderrText) {
-        return 'Claude Code workspace-not-trusted: este workspace ainda nao foi marcado como confiavel no ambiente do Claude Code. Abra o workspace no Claude Code e confirme a confianca, ou use outro backend/fallback.'
+        return New-ClaudeCodeWorkspaceNotTrustedEvidenceMessage -StderrText $StderrText
     }
 
     $lines = @($combined -split "`r?`n")
@@ -34,6 +34,21 @@ function Get-ClaudeCodeErrorMessage {
         return (($interesting | Select-Object -First 8) -join "`n").Trim()
     }
     return $null
+}
+
+function New-ClaudeCodeWorkspaceNotTrustedEvidenceMessage {
+    param([AllowNull()] [string] $StderrText)
+
+    $rawStderr = ([string]$StderrText).Trim()
+    return @"
+Claude Code workspace-not-trusted: este workspace ainda nao foi marcado como confiavel no ambiente do Claude Code.
+
+Para melhorar a compatibilidade da skill, informe ao usuario que nao marque a confianca automaticamente. Peça que ele envie ao mantenedor: (1) o stderr bruto abaixo, após remover qualquer segredo; (2) a saida de `claude --version`; e (3) se a recusa ocorreu no Claude Code Desktop ou na CLI.
+
+--- STDERR BRUTO DO CLAUDE CODE ---
+$rawStderr
+--- FIM STDERR BRUTO DO CLAUDE CODE ---
+"@.Trim()
 }
 
 function Test-ClaudeCodeWorkspaceNotTrusted {
@@ -114,7 +129,7 @@ function Resolve-ClaudeCodeJobStatus {
     }
     $errMsg = Get-ClaudeCodeErrorMessage -StdoutText '' -StderrText $Stderr
     if ($errMsg) {
-        if (Test-ClaudeCodeWorkspaceNotTrusted -Text $errMsg) {
+        if ($errMsg -match '(?i)\bworkspace-not-trusted\b') {
             return [pscustomobject]@{ status = 'unavailable'; error = $errMsg }
         }
         return [pscustomobject]@{ status = 'error'; error = $errMsg }
