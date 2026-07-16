@@ -6,9 +6,10 @@ Current scope:
 - object inventory for every immediate SourceRoot type folder with XML files
 - object identity via guid extracted from XML
 - Source relations among Procedure, WebPanel, DataProvider, Transaction, API and DataSelector
+- Source legacy procedure call idioms: call(Proc, ...), udp(Proc, ...) and Proc.udp(...)
 - WorkWithForWeb action gxobject links to Procedure and WebPanel
-- WorkWithForWeb condition expressions to Procedure
-- WorkWithForWeb condition attributes to Procedure
+- WorkWithForWeb condition expressions to Procedure (including the legacy Proc.Call(), udp(Proc, ...) and Proc.udp(...) idioms)
+- WorkWithForWeb condition attributes to Procedure (including the legacy Proc.Call(), udp(Proc, ...) and Proc.udp(...) idioms)
 - WorkWithForWeb explicit link tags to WebPanel
 - WorkWithForWeb explicit prompt attributes to WebPanel
 - WorkWithForWeb explicit transaction binding
@@ -23,6 +24,7 @@ Current scope:
 - Source simple Business Component Insert and Update calls with receiver resolved by variable ATTCUSTOMTYPE
 - Source ExternalObject method calls with receiver resolved by variable ATTCUSTOMTYPE
 - Attribute Formula property references to Procedure, WebPanel and DataProvider when resolvable in the local inventory
+  (including the legacy udp(Proc, ...) and Proc.udp(...) value idioms)
 """
 
 from __future__ import annotations
@@ -40,7 +42,7 @@ from pathlib import Path
 from typing import Iterable
 
 # Incrementar quando a cobertura ou regras do indexador mudarem de forma material (nao em refator inerte).
-EXTRACTOR_SIGNATURE_VERSION = "8"
+EXTRACTOR_SIGNATURE_VERSION = "9"
 
 
 def compute_extractor_signature_hash() -> str:
@@ -54,6 +56,13 @@ LAST_UPDATE_RE = re.compile(r'\blastUpdate="([^"]+)"')
 GUID_RE = re.compile(r'\bguid="([^"]+)"')
 PROCEDURE_DIRECT_RE = re.compile(r"\b(?P<name>proc[A-Za-z_][A-Za-z0-9_]*)\s*\(", re.IGNORECASE)
 PROCEDURE_DOT_CALL_RE = re.compile(r"\b(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*\.\s*Call\s*\(", re.IGNORECASE)
+# Idiomas de chamada legado GeneXus: call(Proc, ...), &x = udp(Proc, ...), Proc.udp(...).
+# Em call()/udp() o nome do procedimento e o primeiro argumento; na forma com ponto o nome e o receiver.
+# Os lookbehind evitam casar a forma .Call( (ja coberta acima), prefixos de palavra (ex.: recall() e
+# &var.udp() nunca sao procedimento) — a resolucao final ainda passa pelo procedure_lookup.
+PROCEDURE_CALL_COMMAND_RE = re.compile(r"(?<![&.\w])call\s*\(\s*(?P<name>[A-Za-z_][A-Za-z0-9_]*)", re.IGNORECASE)
+PROCEDURE_UDP_FUNC_RE = re.compile(r"(?<![&.\w])udp\s*\(\s*(?P<name>[A-Za-z_][A-Za-z0-9_]*)", re.IGNORECASE)
+PROCEDURE_DOT_UDP_RE = re.compile(r"(?<![&.])\b(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*\.\s*udp\s*\(", re.IGNORECASE)
 WEBPANEL_DOT_LINK_RE = re.compile(r"\b(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*\.\s*Link\s*\(", re.IGNORECASE)
 WEBPANEL_DOT_CREATE_RE = re.compile(r"(?<![&.])\b(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*\.\s*Create\s*\(", re.IGNORECASE)
 FOR_EACH_EXPLICIT_TABLE_RE = re.compile(
@@ -677,6 +686,8 @@ def append_call_evidences_from_expression(
     extractor_rule_webpanel_link: str,
     extractor_rule_webpanel_create: str,
     extractor_rule_dataprovider_direct: str,
+    extractor_rule_procedure_udp_func: str | None = None,
+    extractor_rule_procedure_dot_udp: str | None = None,
 ) -> None:
     line_no = line_number_at(xml_text, expression_start)
     for match in PROCEDURE_DOT_CALL_RE.finditer(expression):
@@ -712,6 +723,44 @@ def append_call_evidences_from_expression(
                 extractor_rule=extractor_rule_procedure_direct,
                 evidence_role=evidence_role,
             )
+
+    # Idiomas legado validos em expressao (retornam valor): udp(Proc, ...) e Proc.udp(...).
+    # call(...) e comando (nao aparece em expressao), por isso nao entra aqui.
+    if extractor_rule_procedure_udp_func:
+        for match in PROCEDURE_UDP_FUNC_RE.finditer(expression):
+            matched_name = match.group("name")
+            target_name = procedure_lookup.get(matched_name.lower())
+            if target_name:
+                add_evidence(
+                    evidences,
+                    source=source,
+                    target_type="Procedure",
+                    target_name=target_name,
+                    relation_kind=relation_kind_procedure,
+                    line=line_no,
+                    column=match.start("name") + 1,
+                    snippet=expression,
+                    extractor_rule=extractor_rule_procedure_udp_func,
+                    evidence_role=evidence_role,
+                )
+
+    if extractor_rule_procedure_dot_udp:
+        for match in PROCEDURE_DOT_UDP_RE.finditer(expression):
+            matched_name = match.group("name")
+            target_name = procedure_lookup.get(matched_name.lower())
+            if target_name:
+                add_evidence(
+                    evidences,
+                    source=source,
+                    target_type="Procedure",
+                    target_name=target_name,
+                    relation_kind=relation_kind_procedure,
+                    line=line_no,
+                    column=match.start("name") + 1,
+                    snippet=expression,
+                    extractor_rule=extractor_rule_procedure_dot_udp,
+                    evidence_role=evidence_role,
+                )
 
     for match in WEBPANEL_DOT_LINK_RE.finditer(expression):
         matched_name = match.group("name")
@@ -818,6 +867,54 @@ def extract_evidence(
                             column=match.start("name") + 1,
                             snippet=cleaned,
                             extractor_rule="procedure_direct_call",
+                        )
+
+                for match in PROCEDURE_CALL_COMMAND_RE.finditer(cleaned):
+                    matched_name = match.group("name")
+                    target_name = procedure_lookup.get(matched_name.lower())
+                    if target_name:
+                        add_evidence(
+                            evidences,
+                            source=source,
+                            target_type="Procedure",
+                            target_name=target_name,
+                            relation_kind="calls_procedure",
+                            line=line_no,
+                            column=match.start("name") + 1,
+                            snippet=cleaned,
+                            extractor_rule="procedure_call_command",
+                        )
+
+                for match in PROCEDURE_UDP_FUNC_RE.finditer(cleaned):
+                    matched_name = match.group("name")
+                    target_name = procedure_lookup.get(matched_name.lower())
+                    if target_name:
+                        add_evidence(
+                            evidences,
+                            source=source,
+                            target_type="Procedure",
+                            target_name=target_name,
+                            relation_kind="calls_procedure",
+                            line=line_no,
+                            column=match.start("name") + 1,
+                            snippet=cleaned,
+                            extractor_rule="procedure_udp_func",
+                        )
+
+                for match in PROCEDURE_DOT_UDP_RE.finditer(cleaned):
+                    matched_name = match.group("name")
+                    target_name = procedure_lookup.get(matched_name.lower())
+                    if target_name:
+                        add_evidence(
+                            evidences,
+                            source=source,
+                            target_type="Procedure",
+                            target_name=target_name,
+                            relation_kind="calls_procedure",
+                            line=line_no,
+                            column=match.start("name") + 1,
+                            snippet=cleaned,
+                            extractor_rule="procedure_dot_udp",
                         )
 
                 for match in WEBPANEL_DOT_LINK_RE.finditer(cleaned):
@@ -1418,6 +1515,45 @@ def extract_workwith_action_evidence(
     return evidences
 
 
+def append_workwith_condition_extra_call_idioms(
+    evidences: list[Evidence],
+    *,
+    source: ObjectInfo,
+    expression: str,
+    procedure_lookup: dict[str, str],
+    relation_kind: str,
+    extractor_rule_prefix: str,
+    snippet: str,
+    line: int,
+    evidence_role: str,
+) -> None:
+    """Idiomas de chamada de procedure em expressao de condicao WorkWith alem do direct proc…(.
+
+    Cobre Proc.Call(...), udp(Proc, ...) e Proc.udp(...); call(...) e comando e nao aparece
+    em condicao. A resolucao final passa pelo procedure_lookup (sem falso positivo)."""
+    for regex, suffix in (
+        (PROCEDURE_DOT_CALL_RE, "dot_call"),
+        (PROCEDURE_UDP_FUNC_RE, "udp_func"),
+        (PROCEDURE_DOT_UDP_RE, "dot_udp"),
+    ):
+        for match in regex.finditer(expression):
+            target_name = procedure_lookup.get(match.group("name").lower())
+            if not target_name:
+                continue
+            add_evidence(
+                evidences,
+                source=source,
+                target_type="Procedure",
+                target_name=target_name,
+                relation_kind=relation_kind,
+                line=line,
+                column=1,
+                snippet=snippet,
+                extractor_rule=f"{extractor_rule_prefix}_{suffix}",
+                evidence_role=evidence_role,
+            )
+
+
 def extract_workwith_condition_evidence(
     workwith_objects: Iterable[ObjectInfo],
     procedure_names: set[str],
@@ -1450,6 +1586,18 @@ def extract_workwith_condition_evidence(
                     extractor_rule="workwith_condition_procedure",
                     evidence_role="WorkWith condition",
                 )
+
+            append_workwith_condition_extra_call_idioms(
+                evidences,
+                source=source,
+                expression=expression,
+                procedure_lookup=procedure_lookup,
+                relation_kind="workwith_condition_calls_procedure",
+                extractor_rule_prefix="workwith_condition_procedure",
+                snippet=condition_match.group(0),
+                line=line_number_at(xml_text, condition_match.start()),
+                evidence_role="WorkWith condition",
+            )
 
     unique: dict[tuple[str, str, str, int], Evidence] = {}
     for evidence in evidences:
@@ -1489,6 +1637,18 @@ def extract_workwith_condition_attribute_evidence(
                         extractor_rule="workwith_condition_attribute_procedure",
                         evidence_role="WorkWith condition attribute",
                     )
+
+                append_workwith_condition_extra_call_idioms(
+                    evidences,
+                    source=source,
+                    expression=expression,
+                    procedure_lookup=procedure_lookup,
+                    relation_kind="workwith_condition_attribute_calls_procedure",
+                    extractor_rule_prefix="workwith_condition_attribute_procedure",
+                    snippet=tag_match.group(0),
+                    line=line_number_at(xml_text, tag_match.start()),
+                    evidence_role="WorkWith condition attribute",
+                )
 
     unique: dict[tuple[str, str, str, int], Evidence] = {}
     for evidence in evidences:
@@ -1801,6 +1961,8 @@ def extract_attribute_formula_call_evidence(
                 extractor_rule_webpanel_link="attribute_formula_webpanel_dot_link",
                 extractor_rule_webpanel_create="attribute_formula_webpanel_dot_create",
                 extractor_rule_dataprovider_direct="attribute_formula_dataprovider_direct_call",
+                extractor_rule_procedure_udp_func="attribute_formula_procedure_udp_func",
+                extractor_rule_procedure_dot_udp="attribute_formula_procedure_dot_udp",
             )
     return evidences
 
