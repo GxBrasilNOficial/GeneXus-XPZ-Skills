@@ -41,6 +41,7 @@ Assert-Equal 'extrai erro simples' $err 'Error: model not available'
 $trustErr = 'Claude Code refused to run because this workspace is not trusted. Mark this workspace as trusted to continue.'
 Assert-Equal 'detecta workspace nao confiavel' (Test-ClaudeCodeWorkspaceNotTrusted -Text $trustErr) $true
 Assert-Equal 'erro workspace not trusted vira mensagem canonica' ((Get-ClaudeCodeErrorMessage -StdoutText '' -StderrText $trustErr) -match 'workspace-not-trusted') $true
+Assert-Equal 'workspace informativo nao vira erro generico' (Get-ClaudeCodeErrorMessage -StdoutText '' -StderrText 'Workspace cache atualizado.') $null
 
 $s1 = Resolve-ClaudeCodeJobStatus -FinalText 'ok' -StreamError '' -Stderr 'Error: ruidoso'
 Assert-Equal 'status resposta final manda' $s1.status 'completed'

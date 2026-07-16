@@ -28,7 +28,7 @@ function Get-ClaudeCodeErrorMessage {
 
     $lines = @($combined -split "`r?`n")
     $interesting = @($lines | Where-Object {
-        $_ -match '(?i)\b(error|failed|unauthorized|forbidden|not\s+available|requires|login|auth|trust|trusted|workspace)\b'
+        $_ -match '(?i)\b(error|failed|unauthorized|forbidden|not\s+available|requires|login|auth)\b'
     })
     if ($interesting.Count -gt 0) {
         return (($interesting | Select-Object -First 8) -join "`n").Trim()
