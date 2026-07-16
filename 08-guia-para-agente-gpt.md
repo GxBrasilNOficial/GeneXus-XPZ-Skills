@@ -260,6 +260,7 @@ English: when using `Start-OpenCodeJob.ps1`, the initial JSON contains job ident
 - `xmlWellFormed=false` bloqueia qualquer conversa de empacotamento ate correcao do XML
 - `sourceSanityStatus=fail` bloqueia empacotamento ate corrigir balanceamento estrutural e fechamentos
 - o `fail` tambem inclui o finding type-aware `procedural-in-conditions`: um `Procedure` com a parte `Conditions` não-vazia e barrado porque `Procedure` não tem filtro de `Conditions` (predicados vivem em `For Each ... Where`) e codigo ali causa `src0055` no import; `WebPanel`/`Prompt`/`Selection List`, onde `Conditions` e filtro legitimo, e `Data Selector`, que tem `Conditions` propria, ficam fora
+- para o unico par declarativo hoje reconhecido, `Transaction` + `Rules`, o gate suprime somente os falsos findings procedurais `unexpected-close`, `mismatched-close` e `unclosed-block` que podem surgir de clauses `if` multiline ou blocos `[web]`; os warnings permanecem e `Events`, `Procedure`, demais pares e `Conditions` seguem no balanceamento procedural
 - `sourceSanityStatus=warn` com `probablyImportable=true` ainda exige revisao dos warnings; não tratar como liberacao automática
 - `sourceSanityStatus=pass` com `xmlWellFormed=true` libera apenas o próximo gate metodologico; não prova importação, especificacao nem build
 - ao revisar `Source` grande, a leitura deve considerar o contorno visual do bloco afetado, e comentarios estruturais humanos já existentes podem ser preservados quando ajudam a navegacao do trecho
