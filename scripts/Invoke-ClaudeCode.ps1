@@ -108,9 +108,6 @@ try {
 
     $errMsg = Get-ClaudeCodeErrorMessage -StdoutText $stdoutText -StderrText $stderrText
     if ($errMsg) {
-        if (Test-ClaudeCodeWorkspaceNotTrusted -Text $errMsg) {
-            throw "BLOCK: Claude Code workspace-not-trusted: $errMsg"
-        }
         throw "BLOCK: Claude Code retornou erro: $errMsg"
     }
     if ($p.ExitCode -ne 0) {

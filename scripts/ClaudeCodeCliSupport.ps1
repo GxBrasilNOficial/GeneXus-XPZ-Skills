@@ -22,7 +22,7 @@ function Get-ClaudeCodeErrorMessage {
     $combined = @($StderrText, $StdoutText) -join "`n"
     if ([string]::IsNullOrWhiteSpace($combined)) { return $null }
 
-    if (Test-ClaudeCodeWorkspaceNotTrusted -Text $combined) {
+    if (Test-ClaudeCodeWorkspaceNotTrusted -Text $StderrText) {
         return 'Claude Code workspace-not-trusted: este workspace ainda nao foi marcado como confiavel no ambiente do Claude Code. Abra o workspace no Claude Code e confirme a confianca, ou use outro backend/fallback.'
     }
 
@@ -40,8 +40,8 @@ function Test-ClaudeCodeWorkspaceNotTrusted {
     param([AllowNull()] [string] $Text)
     if ([string]::IsNullOrWhiteSpace($Text)) { return $false }
     return (
-        $Text -match '(?i)workspace.{0,80}(not|nao|não).{0,80}(trusted|confiavel|confiável)' -or
-        $Text -match '(?i)(not|nao|não).{0,80}(trusted|confiavel|confiável).{0,80}workspace' -or
+        $Text -match '(?i)workspace.{0,80}\b(not|nao|não)\b.{0,80}(trusted|confiavel|confiável)' -or
+        $Text -match '(?i)\b(not|nao|não)\b.{0,80}(trusted|confiavel|confiável).{0,80}workspace' -or
         $Text -match '(?i)mark(ed)? this workspace as trusted' -or
         $Text -match '(?i)marc(ar|ado).{0,80}workspace.{0,80}confi'
     )
