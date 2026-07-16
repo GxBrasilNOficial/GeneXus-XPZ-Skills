@@ -208,6 +208,13 @@ Critério para retomar: caso real em que a ausência do cache Codex prejudique a
 
 **Origem:** frente da detecção de 429 no `Invoke-OpenCode` (2026-06-21), nascida de uma pré-push reforçada em que 3 modelos `ollama-cloud` (kimi/minimax/glm) "estouraram timeout" sem causa visível — era a **cota semanal** esgotada da conta ollama-cloud. Deixado como follow-up para não bundlar na frente do `.ContainsKey`.
 
+## Capturar a recusa real de workspace não confiável do Claude Code
+
+- **Importância** — baixa-média (o detector atual permite classificar a indisponibilidade e acionar fallback, mas ainda é heurístico e pode divergir da mensagem real da CLI).
+- **Maturidade** — ideia pronta para validar quando houver nova ocorrência: preservar, após remover segredos, o `stderr` bruto, `claude --version` e o contexto Desktop/CLI; então ancorar o detector nessa evidência e incluir fixture de regressão. Não confirmar a confiança do workspace automaticamente.
+
+**Origem:** revisão pré-push reforçada de 2026-07-15, após relato sem `stderr` bruto de que Claude Code recusou executar em workspace não confiável. A implementação atual classifica `workspace-not-trusted` como `unavailable` e orienta a coleta segura; falta a captura empírica para substituir ou calibrar a heurística.
+
 ## Variante de prompt read-only para vozes "coder" do painel de revisão por pares (evitar truncamento por tool-calls) — RESOLVIDA E MIGRADA
 
 > Investigação concluída e migrada para `historico/IdeiasImplementadas_202606.md` em 2026-06-23. Truncamento das vozes coder = **não-determinismo de cauda raro** (não cota/429, não orçamento-de-passos, não propriedade fixa "coder=trunca"); corroborado por experimento controlado (12 runs, 4 modelos × 3) que reproduziu 1 truncamento real (`reason=tool-calls`, 28 `tool_use`, sem 429). Correção **implementada**: `-MaxAttempts` (retry-once) em `Invoke-OpenCode.ps1`, já no despacho do painel (`Invoke-LlmDelegatePanelDispatch.ps1`). A "variante read-only por prompt" foi **descartada como solução de truncamento** (`--agent plan` auto-aprova bash); a substância de menor-privilégio foi **implementada** (frente D-min do reviewer-ro, 2026-07-04 — ver `historico/IdeiasImplementadas_202607.md`), restando apenas o eixo de leitura como entrada **ADIADA** abaixo. Gap derivado novo (resposta `stop` quase-vazia escapa do veredito/retry) registrado em entrada própria abaixo.
