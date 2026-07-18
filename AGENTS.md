@@ -7,9 +7,9 @@
 
 ## Edição local pelo Codex
 
-- Nesta raiz, para uma alteração de arquivo já aprovada pelo usuário, usar `scripts/Apply-ApprovedPatch.ps1` em vez de `apply_patch`.
-- O chamador deve fornecer um patch unificado, uma lista explícita `-AllowedPath`, executar primeiro com `-DryRun` e só então aplicar. O script valida os caminhos, executa `git apply --check` e não faz commit, push ou checkout.
-- Após a aplicação, reler o trecho alterado, conferir encoding/EOL e executar o parse ou teste pertinente. Não usar esse mecanismo para ampliar o escopo aprovado.
+- Nesta raiz, para uma alteração já aprovada, seguir `xpz-codex-apply-patch-alternative/SKILL.md` e usar `scripts/Apply-ApprovedPatch.ps1`; não usar a ferramenta Codex `apply_patch`.
+- O patch unificado textual deve ser transmitido como Base64 contíguo por stdin para `-DryRun`, com `-RepositoryRoot` e a lista completa e exata de `-AllowedPath`. Só então chamar `-StagedPatchId` + `-ExpectedPatchSha256` para aplicar.
+- Após a aplicação, reler o trecho alterado, conferir encoding/EOL e executar o parse ou teste pertinente. O motor não faz commit, push, checkout, reset ou rollback automático; não usar esse mecanismo para ampliar o escopo aprovado.
 
 ## Revisão por pares como termo operacional
 

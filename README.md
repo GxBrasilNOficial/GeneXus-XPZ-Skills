@@ -10,7 +10,7 @@
 
 ## Português (BR)
 
-Este repositório existe para sustentar e operacionalizar skills para agentes dedicadas ao ecossistema `XPZ`/XML de GeneXus, em especial `xpz-reader`, `xpz-builder`, `xpz-sync`, `xpz-doc-builder`, `xpz-daemon`, `xpz-kb-parallel-setup`, `xpz-kb-parallel-pre-push`, `xpz-msbuild-import-export`, `xpz-msbuild-build`, `xpz-index-triage`, `xpz-llm-delegate` e `xpz-skills-setup`.
+Este repositório existe para sustentar e operacionalizar skills para agentes dedicadas ao ecossistema `XPZ`/XML de GeneXus, em especial `xpz-reader`, `xpz-builder`, `xpz-sync`, `xpz-doc-builder`, `xpz-daemon`, `xpz-kb-parallel-setup`, `xpz-kb-parallel-pre-push`, `xpz-msbuild-import-export`, `xpz-msbuild-build`, `xpz-index-triage`, `xpz-llm-delegate`, `xpz-skills-setup` e `xpz-codex-apply-patch-alternative`.
 
 A documentação consolidada e os scripts desta raiz funcionam como base metodológica e operacional dessas skills, com foco em:
 
@@ -73,6 +73,7 @@ Guia operacional e metodologico da trilha KB Intelligence. Contratos de fases en
 - `xpz-index-triage`: triagem inicial por índice derivado para orientar a leitura mínima dos XMLs oficiais da KB
 - `xpz-llm-delegate`: delegação de tarefas menores ou segunda opinião a um LLM secundário via opencode (modelos no formato `provider/modelo`, incluindo provedores cloud conhecidos como `ollama-cloud/*` e `opencode-go/*`), Codex (`codex exec`), Claude Code (`claude -p`, Opus 4.8), GitHub Copilot CLI (`copilot -p`) ou Gemini CLI (`gemini -p`), com classificação local/externo determinística e gate de confidencialidade por KB (chave de destino, nunca o adapter); acionamento sempre humano (inclui condução de revisão por pares multi-modelo, ver `15-revisao-por-pares.md`)
 - `xpz-skills-setup`: auditoria e manutenção do registro global das skills XPZ nas ferramentas de agente instaladas na máquina; inclui o bootstrap de uma pasta baixada como ZIP do GitHub — instalar o Git quando ausente e ligá-la ao repositório oficial; também valida e registra a skill externa gerenciada `nexa`, clonando seu repositório oficial (`genexuslabs/genexus-skills`) quando ausente
+- `xpz-codex-apply-patch-alternative`: aplicação textual de patch Git aprovado no Codex por motor PowerShell auditável, sem usar `apply_patch`; o registro global é frente posterior
 
 ### Leitura recomendada para humanos
 
@@ -253,7 +254,7 @@ Se você quer entender a base rapidamente:
 
 ## Español
 
-Este repositorio reúne documentación consolidada sobre análisis estructural de objetos GeneXus a partir de XMLs extraídos de `XPZ`, con foco en skills para agentes dedicadas al ecosistema `XPZ`/XML de GeneXus, en especial `xpz-reader`, `xpz-builder`, `xpz-sync`, `xpz-doc-builder`, `xpz-daemon`, `xpz-kb-parallel-setup`, `xpz-kb-parallel-pre-push`, `xpz-msbuild-import-export`, `xpz-msbuild-build`, `xpz-index-triage`, `xpz-llm-delegate` y `xpz-skills-setup`.
+Este repositorio reúne documentación consolidada sobre análisis estructural de objetos GeneXus a partir de XMLs extraídos de `XPZ`, con foco en skills para agentes dedicadas al ecosistema `XPZ`/XML de GeneXus, en especial `xpz-reader`, `xpz-builder`, `xpz-sync`, `xpz-doc-builder`, `xpz-daemon`, `xpz-kb-parallel-setup`, `xpz-kb-parallel-pre-push`, `xpz-msbuild-import-export`, `xpz-msbuild-build`, `xpz-index-triage`, `xpz-llm-delegate`, `xpz-skills-setup` y `xpz-codex-apply-patch-alternative`.
 
 - lectura e interpretación de estructura XML
 - familias estructurales de objetos
@@ -314,6 +315,7 @@ Guía operacional y metodológica de la trilha KB Intelligence. Los contratos de
 - `xpz-index-triage`: triaje inicial por índice derivado para orientar la lectura mínima de los XML oficiales de la KB
 - `xpz-llm-delegate`: delegación de tareas menores o segunda opinión a un LLM secundario vía opencode (modelos en formato `provider/modelo`, incluidos proveedores cloud conocidos como `ollama-cloud/*` y `opencode-go/*`), Codex (`codex exec`), Claude Code (`claude -p`, Opus 4.8), GitHub Copilot CLI (`copilot -p`) o Gemini CLI (`gemini -p`), con clasificación local/externo determinística y gate de confidencialidad por KB (clave de destino, nunca el adapter); activación siempre humana (incluye conducción de revisión por pares multimodelo, ver `15-revisao-por-pares.md`)
 - `xpz-skills-setup`: auditoría y mantenimiento del registro global de las skills XPZ en las herramientas de agente instaladas en la máquina; incluye el bootstrap de una carpeta descargada como ZIP de GitHub — instalar Git cuando falte y vincularla al repositorio oficial; también valida y registra la skill externa gestionada `nexa`, clonando su repositorio oficial (`genexuslabs/genexus-skills`) cuando falte
+- `xpz-codex-apply-patch-alternative`: aplicación textual de un parche Git aprobado en Codex mediante un motor PowerShell auditable, sin usar `apply_patch`; el registro global queda para una fase posterior
 
 ### Lectura recomendada para humanos
 
@@ -494,7 +496,7 @@ Si quieres entender la base rápidamente:
 
 ## English
 
-This repository contains consolidated documentation about structural analysis of GeneXus objects based on XML extracted from `XPZ`, with emphasis on skills for agents dedicated to the `XPZ`/XML ecosystem of GeneXus, especially `xpz-reader`, `xpz-builder`, `xpz-sync`, `xpz-doc-builder`, `xpz-daemon`, `xpz-kb-parallel-setup`, `xpz-kb-parallel-pre-push`, `xpz-msbuild-import-export`, `xpz-msbuild-build`, `xpz-index-triage`, `xpz-llm-delegate`, and `xpz-skills-setup`.
+This repository contains consolidated documentation about structural analysis of GeneXus objects based on XML extracted from `XPZ`, with emphasis on skills for agents dedicated to the `XPZ`/XML ecosystem of GeneXus, especially `xpz-reader`, `xpz-builder`, `xpz-sync`, `xpz-doc-builder`, `xpz-daemon`, `xpz-kb-parallel-setup`, `xpz-kb-parallel-pre-push`, `xpz-msbuild-import-export`, `xpz-msbuild-build`, `xpz-index-triage`, `xpz-llm-delegate`, `xpz-skills-setup`, and `xpz-codex-apply-patch-alternative`.
 
 - reading and interpreting XML structure
 - structural object families
@@ -555,6 +557,7 @@ Operational and methodological guide for the KB Intelligence workstream. Closed 
 - `xpz-index-triage`: initial triage through a derived index to guide the minimum reading of the KB official XMLs
 - `xpz-llm-delegate`: delegation of smaller tasks or second opinion to a secondary LLM via opencode (models in `provider/model` format, including known cloud providers such as `ollama-cloud/*` and `opencode-go/*`), Codex (`codex exec`), Claude Code (`claude -p`, Opus 4.8), GitHub Copilot CLI (`copilot -p`), or Gemini CLI (`gemini -p`), with deterministic local/external classification and per-KB confidentiality gate (destination key, never the adapter); always human-triggered (includes running multi-model peer review, see `15-revisao-por-pares.md`)
 - `xpz-skills-setup`: auditing and maintaining the global registration of XPZ skills in the installed agent tools on the machine; includes bootstrapping a folder downloaded as a ZIP from GitHub — installing Git when missing and linking it to the official repository; it also validates and registers the managed external skill `nexa`, cloning its official repository (`genexuslabs/genexus-skills`) when missing
+- `xpz-codex-apply-patch-alternative`: applies approved textual Git patches in Codex through an auditable PowerShell engine, without `apply_patch`; global registration remains a later task
 
 ### Recommended reading for humans
 

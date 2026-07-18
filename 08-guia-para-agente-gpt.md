@@ -1253,3 +1253,7 @@ Regra operacional: ao revisar ou registrar achados de investigação — própri
 agente — verificar explicitamente se cada afirmação tem fonte direta rastreável (linha lida,
 query executada, coluna nominada) ou se é inferência por consolidação de contexto. Em caso
 de dúvida, qualificar como `Inferência forte` ou `Hipótese` antes de registrar como fato.
+
+## Edição textual aprovada no Codex
+
+Quando a alteração já estiver aprovada, siga xpz-codex-apply-patch-alternative/SKILL.md: transmita o patch textual como Base64 contíguo para o -DryRun de scripts/Apply-ApprovedPatch.ps1, confirme stagedPatchId/patchSha256 no JSON e aplique com ambos. O motor não substitui a validação posterior nem autorização humana; ele não faz commit, push, checkout, reset ou rollback.

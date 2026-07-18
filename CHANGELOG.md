@@ -8,6 +8,8 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 ### Unreleased
 
+- **Motor de patch aprovado para Codex:** `scripts/Apply-ApprovedPatch.ps1` prepara um patch textual Base64, vincula SHA-256 e caminhos exatos antes da aplicação e nunca faz commit, push, checkout, reset ou rollback. Nova skill local: `xpz-codex-apply-patch-alternative`.
+
 - **Chamadas de Procedure no índice KbIntelligence:** `scripts/Build-KbIntelligenceIndex.py` agora resolve formas estáticas de chamada de `Procedure` pelo inventário real da KB, sem depender de prefixos de nomenclatura locais como `proc*`. A cobertura inclui `Nome(...)`, `Nome.Call(...)`, `Call(Nome, ...)`, `udp(Nome, ...)` e `Nome.Udp(...)` em `Source` efetivo, `Property Formula` de `Attribute` e condições de `WorkWithForWeb`; chamadas dinâmicas (`Call(&Nome)`, `Call(ATT:Att)` ou nome de programa entre aspas) continuam fora do grafo nominal. `EXTRACTOR_SIGNATURE_VERSION` 8→9; rebuild esperado nas pastas paralelas. Novo self-test: `scripts/Test-KbIntelligenceProcedureCallFormsSelfTest.ps1`.
 
 - **Aplicador de patch aprovado:** adicionado `scripts/Apply-ApprovedPatch.ps1`, que exige caminhos permitidos explícitos, valida tanto `diff --git` quanto os cabeçalhos efetivos `---`/`+++`, executa `git apply --check` antes da escrita e não faz commit, push ou checkout. O self-test cobre simulação, aplicação autorizada e bloqueios de caminho, cabeçalho ausente e divergência entre cabeçalhos.
@@ -139,6 +141,8 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 ### Unreleased
 
+- **Motor de parche aprobado para Codex:** `scripts/Apply-ApprovedPatch.ps1` prepara un parche textual Base64, vincula su SHA-256 y rutas exactas antes de aplicarlo y nunca hace commit, push, checkout, reset ni rollback. Nueva skill local: `xpz-codex-apply-patch-alternative`.
+
 - **Llamadas de Procedure en el índice KbIntelligence:** `scripts/Build-KbIntelligenceIndex.py` ahora resuelve formas estáticas de llamada de `Procedure` por el inventario real de la KB, sin depender de prefijos de nomenclatura locales como `proc*`. La cobertura incluye `Nome(...)`, `Nome.Call(...)`, `Call(Nome, ...)`, `udp(Nome, ...)` y `Nome.Udp(...)` en `Source` efectivo, `Property Formula` de `Attribute` y condiciones de `WorkWithForWeb`; las llamadas dinámicas (`Call(&Nome)`, `Call(ATT:Att)` o nombre de programa entre comillas) siguen fuera del grafo nominal. `EXTRACTOR_SIGNATURE_VERSION` 8→9; se espera rebuild en las carpetas paralelas. Nuevo self-test: `scripts/Test-KbIntelligenceProcedureCallFormsSelfTest.ps1`.
 
 - **Aplicador de parches aprobados:** se agregó `scripts/Apply-ApprovedPatch.ps1`, que exige rutas permitidas explícitas, valida tanto `diff --git` como los encabezados efectivos `---`/`+++`, ejecuta `git apply --check` antes de escribir y no hace commit, push ni checkout. El self-test cubre simulación, aplicación autorizada y bloqueos por ruta, encabezado ausente y divergencia entre encabezados.
@@ -262,6 +266,8 @@ All relevant changes to this repository will be recorded here from this adoption
 The format keeps an `Unreleased` section for changes not yet published in a formal version. This repository does not yet use public semantic versioning; when that changes, future sections should record the corresponding tag.
 
 ### Unreleased
+
+- **Approved patch engine for Codex:** `scripts/Apply-ApprovedPatch.ps1` now stages a Base64 textual patch, binds its SHA-256 and exact paths before applying, and never commits, pushes, checks out, resets, or rolls back. New local skill: `xpz-codex-apply-patch-alternative`.
 
 - **Procedure calls in the KbIntelligence index:** `scripts/Build-KbIntelligenceIndex.py` now resolves static `Procedure` call forms from the KB's real inventory, without depending on local naming prefixes such as `proc*`. Coverage includes `Nome(...)`, `Nome.Call(...)`, `Call(Nome, ...)`, `udp(Nome, ...)`, and `Nome.Udp(...)` in effective `Source`, `Attribute` `Property Formula`, and `WorkWithForWeb` conditions; dynamic calls (`Call(&Nome)`, `Call(ATT:Att)`, or quoted program names) remain outside the nominal graph. `EXTRACTOR_SIGNATURE_VERSION` 8→9; rebuild expected in parallel folders. New self-test: `scripts/Test-KbIntelligenceProcedureCallFormsSelfTest.ps1`.
 

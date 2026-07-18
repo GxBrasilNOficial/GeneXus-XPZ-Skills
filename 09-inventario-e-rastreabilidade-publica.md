@@ -829,3 +829,7 @@ Estes aliases foram criados em 2026-04-25 a partir da análise estrutural de 77 
 - Regra editorial: nunca usar o alias como única fonte para materialização.
 - Regra editorial: quando `05b-procedure-relatorio-familias-e-templates.md` oferecer `molde pronto` suficiente para a familia simples coberta, o alias pode servir apenas como referencia de classificação para chegar a esse molde sanitizado.
 - Regra editorial: fora dessa cobertura simples, ou depois de tentativa inicial mais um único corretivo curto sem sucesso, o próximo passo obrigatório volta a ser XML real comparavel.
+
+## Aplicador de patch aprovado no Codex
+
+- scripts/Apply-ApprovedPatch.ps1 (motor) — recebe patch textual por Base64, faz staging por stagedPatchId/SHA-256 e aplica somente após revalidar contexto, paths, pré-imagens e atributos Git; não faz commit, push, checkout, reset ou rollback. Dono: xpz-codex-apply-patch-alternative/SKILL.md. Validação: Test-ApplyApprovedPatchSelfTest.ps1. Token: APPLY_APPROVED_PATCH_SELFTEST_OK.
