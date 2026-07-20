@@ -8,7 +8,7 @@
 ## Edição local pelo Codex
 
 - Nesta raiz, para uma alteração já aprovada, seguir `xpz-codex-apply-patch-alternative/SKILL.md` e usar `scripts/Apply-ApprovedPatch.ps1`; não usar a ferramenta Codex `apply_patch`.
-- O patch unificado textual deve ser transmitido como Base64 contíguo por stdin para `-DryRun`, com `-RepositoryRoot` e a lista completa e exata de `-AllowedPath`. Só então chamar `-StagedPatchId` + `-ExpectedPatchSha256` para aplicar.
+- Na rota canônica, `pwsh -File` recebe argv literal, inclusive via `ProcessStartInfo.ArgumentList`; por isso, transmita o patch unificado textual como Base64 contíguo por stdin para `-DryRun`, com `-RepositoryRoot` e um único `-AllowedPath` por ciclo. O motor continua exigindo que esse caminho corresponda ao conjunto completo e exato do patch. Só então chamar `-StagedPatchId` + `-ExpectedPatchSha256` para aplicar.
 - Após a aplicação, reler o trecho alterado, conferir encoding/EOL e executar o parse ou teste pertinente. O motor não faz commit, push, checkout, reset ou rollback automático; não usar esse mecanismo para ampliar o escopo aprovado.
 
 ## Revisão por pares como termo operacional
