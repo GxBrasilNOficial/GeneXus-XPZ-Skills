@@ -36,6 +36,30 @@ function Invoke-Git {
     [pscustomobject]@{ exitCode = $LASTEXITCODE; output = @($output | ForEach-Object { $_.ToString() }) }
 }
 
+if ($null -eq ('XpzApprovedPatchNative' -as [type])) {
+    Add-Type -TypeDefinition @'
+using System.Runtime.InteropServices;
+using System.Text;
+public static class XpzApprovedPatchNative {
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    public static extern uint GetLongPathName(string shortPath, StringBuilder longPath, int capacity);
+}
+'@
+}
+
+function Resolve-CanonicalPath {
+    param([string]$Path)
+    $capacity = 260
+    for ($attempt = 0; $attempt -lt 2; $attempt++) {
+        $buffer = [Text.StringBuilder]::new($capacity)
+        $length = [XpzApprovedPatchNative]::GetLongPathName($Path, $buffer, $buffer.Capacity)
+        if ($length -eq 0) { return [IO.Path]::GetFullPath($Path) }
+        if ($length -lt $buffer.Capacity) { return [IO.Path]::GetFullPath($buffer.ToString()) }
+        $capacity = [int]$length + 1
+    }
+    Stop-Result 'INTERNAL_ERROR' "Could not canonicalize path: $Path"
+}
+
 function Get-Sha256 {
     param([byte[]]$Bytes)
     ([System.Security.Cryptography.SHA256]::HashData($Bytes) | ForEach-Object { $_.ToString('x2') }) -join ''
@@ -59,10 +83,22 @@ function Get-RepositoryContext {
     $head = Invoke-Git $candidate @('rev-parse', '--verify', 'HEAD')
     $branch = Invoke-Git $candidate @('symbolic-ref', '--quiet', '--short', 'HEAD')
     $gitDir = Invoke-Git $candidate @('rev-parse', '--absolute-git-dir')
-    if ($top.exitCode -ne 0 -or $bare.exitCode -ne 0 -or $head.exitCode -ne 0 -or $branch.exitCode -ne 0 -or $gitDir.exitCode -ne 0) { Stop-Result 'GIT_PREFLIGHT_FAILED' 'Repository must be a non-detached Git work tree.' }
-    $rootFull = [IO.Path]::GetFullPath($candidate).TrimEnd('\','/')
+    if ($top.exitCode -ne 0 -or $bare.exitCode -ne 0 -or $head.exitCode -ne 0 -or $branch.exitCode -ne 0 -or $gitDir.exitCode -ne 0) {
+        $diagnostic = [ordered]@{
+            top = [ordered]@{ exitCode = $top.exitCode; output = @($top.output) }
+            bare = [ordered]@{ exitCode = $bare.exitCode; output = @($bare.output) }
+            head = [ordered]@{ exitCode = $head.exitCode; output = @($head.output) }
+            branch = [ordered]@{ exitCode = $branch.exitCode; output = @($branch.output) }
+            gitDir = [ordered]@{ exitCode = $gitDir.exitCode; output = @($gitDir.output) }
+        }
+        Stop-Result 'GIT_PREFLIGHT_FAILED' 'Repository must be a non-detached Git work tree.' @{ diagnostic = $diagnostic }
+    }
+    $rootFull = (Resolve-CanonicalPath $candidate).TrimEnd('\','/')
     $topFull = [IO.Path]::GetFullPath($top.output[0]).TrimEnd('\','/')
-    if (-not $rootFull.Equals($topFull, [StringComparison]::OrdinalIgnoreCase) -or $bare.output[0] -ne 'false' -or $branch.output[0] -ne 'main') { Stop-Result 'GIT_PREFLIGHT_FAILED' 'RepositoryRoot must be a non-bare main work tree root.' }
+    if (-not $rootFull.Equals($topFull, [StringComparison]::OrdinalIgnoreCase) -or $bare.output[0] -ne 'false' -or $branch.output[0] -ne 'main') {
+        $diagnostic = [ordered]@{ candidate = $candidate; repositoryRoot = $rootFull; topLevel = $topFull; bare = $bare.output[0]; branch = $branch.output[0] }
+        Stop-Result 'GIT_PREFLIGHT_FAILED' 'RepositoryRoot must be a non-bare main work tree root.' @{ diagnostic = $diagnostic }
+    }
     [pscustomobject]@{ root = $rootFull; head = $head.output[0]; gitDir = $gitDir.output[0]; branch = $branch.output[0] }
 }
 
