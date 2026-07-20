@@ -156,7 +156,7 @@ try {
     $allowed = @($allowedSet | Sort-Object)
     if ($DryRun) {
         $base64 = [Console]::In.ReadToEnd()
-        if ([string]::IsNullOrWhiteSpace($base64) -or $base64 -match '\s' -or $base64 -notmatch '^[A-Za-z0-9+/]*={0,2}$' -or ($base64.Length % 4) -ne 0) { Stop-Result 'INVALID_INPUT' 'stdin must be contiguous padded Base64 ASCII.' }
+        if ([string]::IsNullOrWhiteSpace($base64) -or $base64 -match '\s' -or $base64 -notmatch '^[A-Za-z0-9+/]*={0,2}$' -or ($base64.Length % 4) -ne 0) { Stop-Result 'INVALID_INPUT' 'stdin must be contiguous padded Base64 ASCII; use StandardInput.Write(...) then StandardInput.Close(), without newline or other whitespace.' }
         try { $patchBytes = [Convert]::FromBase64String($base64) } catch { Stop-Result 'INVALID_INPUT' 'stdin is not valid Base64.' }
         $paths = Get-PatchPaths $patchBytes
         if (($paths -join "`0") -ne ($allowed -join "`0")) { Stop-Result 'PATH_NOT_ALLOWED' 'AllowedPath must exactly match all patch paths.' }

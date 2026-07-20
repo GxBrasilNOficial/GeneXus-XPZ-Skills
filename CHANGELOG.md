@@ -8,6 +8,8 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 ### Unreleased
 
+- **Rota canônica do patch aprovado para Codex:** a skill `xpz-codex-apply-patch-alternative` agora explica a transmissão Base64 sem newline pela rota ProcessStartInfo, os limites dessa rota para múltiplos caminhos, o formato textual aceito e a cobertura de regressão para Base64, caminhos compostos e CRLF. O contrato do motor `Apply-ApprovedPatch.ps1` permanece inalterado.
+
 - **Motor de patch aprovado para Codex:** `scripts/Apply-ApprovedPatch.ps1` prepara um patch textual Base64, vincula SHA-256 e caminhos exatos antes da aplicação e nunca faz commit, push, checkout, reset ou rollback. Nova skill local: `xpz-codex-apply-patch-alternative`.
 
 - **Chamadas de Procedure no índice KbIntelligence:** `scripts/Build-KbIntelligenceIndex.py` agora resolve formas estáticas de chamada de `Procedure` pelo inventário real da KB, sem depender de prefixos de nomenclatura locais como `proc*`. A cobertura inclui `Nome(...)`, `Nome.Call(...)`, `Call(Nome, ...)`, `udp(Nome, ...)` e `Nome.Udp(...)` em `Source` efetivo, `Property Formula` de `Attribute` e condições de `WorkWithForWeb`; chamadas dinâmicas (`Call(&Nome)`, `Call(ATT:Att)` ou nome de programa entre aspas) continuam fora do grafo nominal. `EXTRACTOR_SIGNATURE_VERSION` 8→9; rebuild esperado nas pastas paralelas. Novo self-test: `scripts/Test-KbIntelligenceProcedureCallFormsSelfTest.ps1`.
@@ -139,6 +141,8 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 ### Unreleased
 
+- **Ruta canónica del parche aprobado para Codex:** la skill `xpz-codex-apply-patch-alternative` ahora explica la transmisión Base64 sin newline mediante la ruta ProcessStartInfo, los límites de esa ruta para múltiples rutas, el formato textual aceptado y la cobertura de regresión para Base64, rutas compuestas y CRLF. El contrato del motor `Apply-ApprovedPatch.ps1` permanece sin cambios.
+
 - **Motor de parche aprobado para Codex:** `scripts/Apply-ApprovedPatch.ps1` prepara un parche textual Base64, vincula su SHA-256 y rutas exactas antes de aplicarlo y nunca hace commit, push, checkout, reset ni rollback. Nueva skill local: `xpz-codex-apply-patch-alternative`.
 
 - **Llamadas de Procedure en el índice KbIntelligence:** `scripts/Build-KbIntelligenceIndex.py` ahora resuelve formas estáticas de llamada de `Procedure` por el inventario real de la KB, sin depender de prefijos de nomenclatura locales como `proc*`. La cobertura incluye `Nome(...)`, `Nome.Call(...)`, `Call(Nome, ...)`, `udp(Nome, ...)` y `Nome.Udp(...)` en `Source` efectivo, `Property Formula` de `Attribute` y condiciones de `WorkWithForWeb`; las llamadas dinámicas (`Call(&Nome)`, `Call(ATT:Att)` o nombre de programa entre comillas) siguen fuera del grafo nominal. `EXTRACTOR_SIGNATURE_VERSION` 8→9; se espera rebuild en las carpetas paralelas. Nuevo self-test: `scripts/Test-KbIntelligenceProcedureCallFormsSelfTest.ps1`.
@@ -262,6 +266,8 @@ All relevant changes to this repository will be recorded here from this adoption
 The format keeps an `Unreleased` section for changes not yet published in a formal version. This repository does not yet use public semantic versioning; when that changes, future sections should record the corresponding tag.
 
 ### Unreleased
+
+- **Canonical approved-patch route for Codex:** the `xpz-codex-apply-patch-alternative` skill now explains newline-free Base64 delivery through the ProcessStartInfo route, that route's limits for multiple paths, the accepted textual format, and regression coverage for Base64, composite paths, and CRLF. The `Apply-ApprovedPatch.ps1` engine contract remains unchanged.
 
 - **Approved patch engine for Codex:** `scripts/Apply-ApprovedPatch.ps1` now stages a Base64 textual patch, binds its SHA-256 and exact paths before applying, and never commits, pushes, checks out, resets, or rolls back. New local skill: `xpz-codex-apply-patch-alternative`.
 
