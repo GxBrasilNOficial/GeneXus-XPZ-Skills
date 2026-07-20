@@ -1256,4 +1256,4 @@ de dúvida, qualificar como `Inferência forte` ou `Hipótese` antes de registra
 
 ## Edição textual aprovada no Codex
 
-Quando a alteração já estiver aprovada, siga xpz-codex-apply-patch-alternative/SKILL.md: transmita o patch textual como Base64 contíguo para o -DryRun de scripts/Apply-ApprovedPatch.ps1, confirme stagedPatchId/patchSha256 no JSON e aplique com ambos. O motor não substitui a validação posterior nem autorização humana; ele não faz commit, push, checkout, reset ou rollback.
+Quando a alteração já estiver aprovada, siga xpz-codex-apply-patch-alternative/SKILL.md: na rota canônica com ProcessStartInfo.ArgumentList, envie um patch e um -AllowedPath por ciclo; transmita o Base64 contíguo ao -DryRun com StandardInput.Write(...) seguido de StandardInput.Close(), sem WriteLine, pipe ou whitespace. Para vários arquivos, repita os ciclos independentes de stage -> apply, sem atomicidade entre os já aplicados. Confirme stagedPatchId/patchSha256 no JSON e aplique com ambos. O motor não substitui a validação posterior nem autorização humana; ele não faz commit, push, checkout, reset ou rollback.
