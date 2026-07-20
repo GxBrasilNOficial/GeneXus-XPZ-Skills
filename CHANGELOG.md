@@ -8,7 +8,7 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 ### Unreleased
 
-- **Rota canônica do patch aprovado para Codex:** a skill `xpz-codex-apply-patch-alternative` agora explica a transmissão Base64 sem newline pela rota ProcessStartInfo, os limites dessa rota para múltiplos caminhos, o formato textual aceito e a cobertura de regressão para Base64, caminhos compostos, CRLF e aliases curtos do Windows. O motor aceita grafias curta/longa equivalentes de `RepositoryRoot` e acrescenta diagnóstico Git em falhas de pré-verificação; códigos de saída e fluxo de stage/apply permanecem compatíveis.
+- **Rota canônica do patch aprovado para Codex:** a skill `xpz-codex-apply-patch-alternative` agora explica a transmissão Base64 sem newline pela rota ProcessStartInfo, os limites dessa rota para múltiplos caminhos, o formato textual aceito e a cobertura de regressão para Base64, caminhos compostos, CRLF, criação, deleção e aliases curtos do Windows. O motor aceita grafias curta/longa equivalentes de `RepositoryRoot` e acrescenta diagnóstico Git em falhas de pré-verificação; códigos de saída e fluxo de stage/apply permanecem compatíveis.
 
 - **Motor de patch aprovado para Codex:** `scripts/Apply-ApprovedPatch.ps1` prepara um patch textual Base64, vincula SHA-256 e caminhos exatos antes da aplicação e nunca faz commit, push, checkout, reset ou rollback. Nova skill local: `xpz-codex-apply-patch-alternative`.
 
@@ -141,7 +141,7 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 ### Unreleased
 
-- **Ruta canónica del parche aprobado para Codex:** la skill `xpz-codex-apply-patch-alternative` ahora explica la transmisión Base64 sin newline mediante la ruta ProcessStartInfo, los límites de esa ruta para múltiples rutas, el formato textual aceptado y la cobertura de regresión para Base64, rutas compuestas, CRLF y alias cortos de Windows. El motor acepta grafías corta/larga equivalentes de `RepositoryRoot` y agrega diagnóstico Git en fallas de prevalidación; los códigos de salida y el flujo de stage/apply siguen siendo compatibles.
+- **Ruta canónica del parche aprobado para Codex:** la skill `xpz-codex-apply-patch-alternative` ahora explica la transmisión Base64 sin newline mediante la ruta ProcessStartInfo, los límites de esa ruta para múltiples rutas, el formato textual aceptado y la cobertura de regresión para Base64, rutas compuestas, CRLF, creación, eliminación y alias cortos de Windows. El motor acepta grafías corta/larga equivalentes de `RepositoryRoot` y agrega diagnóstico Git en fallas de prevalidación; los códigos de salida y el flujo de stage/apply siguen siendo compatibles.
 
 - **Motor de parche aprobado para Codex:** `scripts/Apply-ApprovedPatch.ps1` prepara un parche textual Base64, vincula su SHA-256 y rutas exactas antes de aplicarlo y nunca hace commit, push, checkout, reset ni rollback. Nueva skill local: `xpz-codex-apply-patch-alternative`.
 
@@ -267,7 +267,7 @@ The format keeps an `Unreleased` section for changes not yet published in a form
 
 ### Unreleased
 
-- **Canonical approved-patch route for Codex:** the `xpz-codex-apply-patch-alternative` skill now explains newline-free Base64 delivery through the ProcessStartInfo route, that route's limits for multiple paths, the accepted textual format, and regression coverage for Base64, composite paths, CRLF, and Windows short aliases. The engine accepts equivalent short/long `RepositoryRoot` spellings and adds Git diagnostics to preflight failures; exit codes and the stage/apply flow remain compatible.
+- **Canonical approved-patch route for Codex:** the `xpz-codex-apply-patch-alternative` skill now explains newline-free Base64 delivery through the ProcessStartInfo route, that route's limits for multiple paths, the accepted textual format, and regression coverage for Base64, composite paths, CRLF, creation, deletion, and Windows short aliases. The engine accepts equivalent short/long `RepositoryRoot` spellings and adds Git diagnostics to preflight failures; exit codes and the stage/apply flow remain compatible.
 
 - **Approved patch engine for Codex:** `scripts/Apply-ApprovedPatch.ps1` now stages a Base64 textual patch, binds its SHA-256 and exact paths before applying, and never commits, pushes, checks out, resets, or rolls back. New local skill: `xpz-codex-apply-patch-alternative`.
 
