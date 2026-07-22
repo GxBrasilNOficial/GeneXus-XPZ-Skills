@@ -598,6 +598,18 @@ $confirmWideRebuildMode    = $null
 $allowWideRebuildConfirmed = $false
 $confirmCostlyBuildOptionsMode = $null
 $allowCostlyBuildOptionsConfirmed = $false
+$msBuildExitCode = $null
+$stdOutText = ''
+$stdErrText = ''
+$postProcessingFailed = $false
+$postProcessingError = $null
+$buildStatus = $null
+$msBuildCategoryBBlocked = $false
+$operationalSubStateSpecify = $null
+$activeVersionOutput = $null
+$activeEnvironmentOutput = $null
+$specifyDone = $false
+$generateDone = $false
 
 $resolvedLogPath = Get-FullPathSafe -PathValue $LogPath
 
@@ -1293,9 +1305,6 @@ try {
     $stdOutText = Read-TextFileSafe -PathValue $stdOutPath
     $stdErrText = Read-TextFileSafe -PathValue $stdErrPath
 
-    $postProcessingFailed = $false
-    $postProcessingError  = $null
-
     $stdErrFilteredNoise = ''
     $stdErrFiltered      = ''
     $stdOutNoiseLines    = @()
@@ -1444,8 +1453,6 @@ try {
         }
     }
 
-    $msBuildCategoryBBlocked = $false
-    $operationalSubStateSpecify = $null
     if ($msBuildExitCode -eq 0 -and $buildStatus.ExitCode -eq 0) {
         $categoryBExit = Resolve-GeneXusMsBuildCategoryBExitCode `
             -BaseExitCode $buildStatus.ExitCode `
@@ -1722,13 +1729,15 @@ try {
     exit $buildStatus.ExitCode
 }
 catch {
-    if (($null -ne $msBuildExitCode) -and ($msBuildExitCode -eq 0)) {
-        $recoveryStatus = 'specify e generate concluídos com falha no pos-processamento'
-        $recoverySummary = 'SpecifyAll/GenerateOnly concluiu sem erro de MSBuild, mas o wrapper falhou ao montar o diagnostico. Consulte msbuild.stdout.log nos artefatos.'
+    $outerCatchError = $_.Exception.Message
+    $postProcessingError = $outerCatchError
+    if ($null -ne $msBuildExitCode) {
         $recoverySpecifyDone = $false
         $recoveryGenerateDone = $false
-        $recoveryStdErrContent = @()
+        $recoveryStdOut = ''
+        $recoveryStdErr = $stdErrText
         $recoveryStdErrFilteredNoise = @()
+        $recoveryStdErrContent = @()
         try {
             if (-not [string]::IsNullOrWhiteSpace($stdOutPath) -and (Test-Path -LiteralPath $stdOutPath -PathType Leaf)) {
                 $recoveryStdOut = Read-TextFileSafe -PathValue $stdOutPath
@@ -1740,32 +1749,59 @@ catch {
             # best effort apenas
         }
         try {
-            if (-not [string]::IsNullOrWhiteSpace($stdErrPath) -and (Test-Path -LiteralPath $stdErrPath -PathType Leaf)) {
+            if ([string]::IsNullOrEmpty($recoveryStdErr) -and -not [string]::IsNullOrWhiteSpace($stdErrPath) -and (Test-Path -LiteralPath $stdErrPath -PathType Leaf)) {
                 $recoveryStdErr = Read-TextFileSafe -PathValue $stdErrPath
-                $recoveryStdErrClassification = Get-GeneXusMsBuildStderrNoiseClassification -Text $recoveryStdErr
-                $recoveryStdErrContent = Split-NonEmptyLines -Text $recoveryStdErrClassification.FilteredText
-                $recoveryStdErrFilteredNoise = Split-NonEmptyLines -Text $recoveryStdErrClassification.NoiseText
             }
+            $recoveryStdErrClassification = Get-GeneXusMsBuildStderrNoiseClassification -Text $recoveryStdErr
+            $recoveryStdErrContent = Split-NonEmptyLines -Text $recoveryStdErrClassification.FilteredText
+            $recoveryStdErrFilteredNoise = Split-NonEmptyLines -Text $recoveryStdErrClassification.NoiseText
         }
         catch {
             # best effort apenas
         }
 
+        $recoveryBuildStatus = $buildStatus
+        if ($null -eq $recoveryBuildStatus) {
+            $recoveryBuildStatus = Resolve-BuildStatus `
+                -MsBuildExitCode $msBuildExitCode `
+                -SpecifyDone $recoverySpecifyDone `
+                -GenerateDone $recoveryGenerateDone `
+                -StdOutText $recoveryStdOut `
+                -StdErrText ($recoveryStdErrContent -join "`n")
+        }
+
+        if (($recoveryBuildStatus.Status -eq 'specify e generate concluídos') -and (-not $recoverySpecifyDone -or -not $recoveryGenerateDone)) {
+            $recoveryBuildStatus = Resolve-BuildStatus `
+                -MsBuildExitCode $msBuildExitCode `
+                -SpecifyDone $recoverySpecifyDone `
+                -GenerateDone $recoveryGenerateDone `
+                -StdOutText $recoveryStdOut `
+                -StdErrText ($recoveryStdErrContent -join "`n")
+        }
+
+        $recoveryExitCode = [int]$recoveryBuildStatus.ExitCode
+        $recoveryStatus = [string]$recoveryBuildStatus.Status
+        $recoverySummary = [string]$recoveryBuildStatus.Summary
+        if (($recoveryExitCode -eq 0) -and ($recoveryStatus -eq 'specify e generate concluídos') -and $recoverySpecifyDone -and $recoveryGenerateDone) {
+            $recoveryStatus = 'specify e generate concluídos com falha no pos-processamento'
+            $recoverySummary = 'SpecifyAll/GenerateOnly concluiu sem erro de MSBuild e com marcadores de conclusão, mas o wrapper falhou ao montar o diagnóstico. Consulte msbuild.stdout.log nos artefatos.'
+        } else {
+            $recoverySummary = $recoverySummary + ' O diagnóstico completo falhou após o MSBuild; a classificação e a evidência disponível foram preservadas.'
+        }
+
         $recovery = [ordered]@{
             status               = $recoveryStatus
             summary              = $recoverySummary
-            exitCode             = 0
+            exitCode             = $recoveryExitCode
             executionEvidence    = [ordered]@{
                 msBuildExitCode = $msBuildExitCode
-                msBuildFailed   = $false
-                wrapperExitCode = 0
+                msBuildFailed   = ($msBuildExitCode -ne 0)
+                wrapperExitCode = $recoveryExitCode
                 StdOutPath      = $stdOutPath
                 StdErrPath      = $stdErrPath
             }
             postProcessingFailed = $true
-            postProcessingError  = $_.Exception.Message
-            stderrContent        = $recoveryStdErrContent
-            stderrFilteredNoise  = $recoveryStdErrFilteredNoise
+            postProcessingError  = $postProcessingError
             stage                = 'specify-generate'
             observedContext      = [ordered]@{
                 SpecifyDone       = $recoverySpecifyDone
@@ -1785,6 +1821,11 @@ catch {
             }
             watcherContext       = $script:WatcherContext
             timing               = (Get-GeneXusMsBuildTimingSection -TimingLog $script:TimingLog -MonitorLogPath $MonitorLogPath)
+            stderrContent        = @($recoveryStdErrContent | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+            stderrFilteredNoise  = @($recoveryStdErrFilteredNoise | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+            blockingReasons      = @($script:BlockingReasons)
+            warnings             = @($script:Warnings)
+            strategyTrace        = @($script:StrategyTrace)
             note                 = 'Diagnostico completo indisponivel apos falha interna; consultar msbuild.stdout.log para evidencia primaria.'
         }
         try {
@@ -1798,7 +1839,7 @@ catch {
                 # best effort apenas
             }
             Write-Output $recoveryJson
-            exit 0
+            exit $recoveryExitCode
         }
         catch {
             # cair no failure padrão abaixo

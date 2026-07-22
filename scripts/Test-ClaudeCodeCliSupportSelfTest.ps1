@@ -38,6 +38,14 @@ Assert-Equal 'help incompleto' (Test-ClaudeCodeHelpSupportsContract '--model') $
 
 $err = Get-ClaudeCodeErrorMessage -StdoutText '' -StderrText 'Error: model not available'
 Assert-Equal 'extrai erro simples' $err 'Error: model not available'
+$trustErr = 'Claude Code refused to run because this workspace is not trusted. Mark this workspace as trusted to continue.'
+Assert-Equal 'detecta workspace nao confiavel' (Test-ClaudeCodeWorkspaceNotTrusted -Text $trustErr) $true
+Assert-Equal 'erro workspace not trusted vira mensagem canonica' ((Get-ClaudeCodeErrorMessage -StdoutText '' -StderrText $trustErr) -match 'workspace-not-trusted') $true
+Assert-Equal 'erro workspace preserva stderr bruto' ((Get-ClaudeCodeErrorMessage -StdoutText '' -StderrText $trustErr) -match [regex]::Escape($trustErr)) $true
+Assert-Equal 'erro workspace pede pacote de evidencia' ((Get-ClaudeCodeErrorMessage -StdoutText '' -StderrText $trustErr) -match 'claude --version') $true
+Assert-Equal 'workspace informativo nao vira erro generico' (Get-ClaudeCodeErrorMessage -StdoutText '' -StderrText 'Workspace cache atualizado.') $null
+Assert-Equal 'cannot nao casa como not' (Test-ClaudeCodeWorkspaceNotTrusted -Text 'Workspace initialization cannot continue: trusted certificate missing.') $false
+Assert-Equal 'texto de stdout nao classifica workspace not trusted' (Get-ClaudeCodeErrorMessage -StdoutText $trustErr -StderrText '') $null
 
 $s1 = Resolve-ClaudeCodeJobStatus -FinalText 'ok' -StreamError '' -Stderr 'Error: ruidoso'
 Assert-Equal 'status resposta final manda' $s1.status 'completed'
@@ -47,6 +55,8 @@ $s3 = Resolve-ClaudeCodeJobStatus -FinalText '' -StreamError '' -Stderr 'Error: 
 Assert-Equal 'status erro stderr' $s3.status 'error'
 $s4 = Resolve-ClaudeCodeJobStatus -FinalText '' -StreamError '' -Stderr ''
 Assert-Equal 'status sem texto' $s4.status 'sem-texto'
+$s5 = Resolve-ClaudeCodeJobStatus -FinalText '' -StreamError '' -Stderr $trustErr
+Assert-Equal 'status workspace not trusted' $s5.status 'unavailable'
 
 function New-FakeClaudeCodeExe {
     param([string]$TempRoot)
@@ -62,6 +72,10 @@ if "%1"=="--version" (
 if "%1"=="--help" (
   echo --model --print --output-format --no-session-persistence --permission-mode --tools --max-turns
   exit /b 0
+)
+if "%FAKE_CLAUDE_UNTRUSTED%"=="1" (
+  echo Claude Code refused to run because this workspace is not trusted. Mark this workspace as trusted to continue. 1>&2
+  exit /b 1
 )
 echo %*>>"$argsFile"
 echo OK fake claude
@@ -90,6 +104,13 @@ try {
     & (Join-Path $PSScriptRoot 'Invoke-ClaudeCode.ps1') 'adapter tools vazio' -ClaudeExe $fake.Exe -Tools '' -TimeoutSec 30 | Out-Null
     $invokeEmptyArgs = Read-LastFakeClaudeArgs -Path $fake.ArgsFile
     Assert-Equal 'invoke tools vazio omite --tools' ($invokeEmptyArgs -notmatch '--tools') $true
+
+    $env:FAKE_CLAUDE_UNTRUSTED = '1'
+    $threwTrust = $false
+    $trustMsg = ''
+    try { & (Join-Path $PSScriptRoot 'Invoke-ClaudeCode.ps1') 'workspace nao confiavel' -ClaudeExe $fake.Exe -TimeoutSec 30 | Out-Null } catch { $threwTrust = $true; $trustMsg = [string]$_.Exception.Message }
+    $env:FAKE_CLAUDE_UNTRUSTED = $null
+    Assert-Equal 'invoke workspace not trusted bloqueia com codigo canonico' ($threwTrust -and $trustMsg -match 'workspace-not-trusted') $true
 
     $jobDir = Join-Path $tmp 'jobs'
     $jobJson = & (Join-Path $PSScriptRoot 'Start-ClaudeCodeJob.ps1') 'job default tools' -ClaudeExe $fake.Exe -NoWatcher -TempDir $jobDir

@@ -3,8 +3,9 @@
 .SYNOPSIS
     Chama o opencode (one-shot, sincrono) e devolve a resposta em texto.
 .DESCRIPTION
-    Backend opencode da skill xpz-llm-delegate. Resolve o opencode.exe real (atras do shim npm)
-    e o executa com o prompt entregue por STDIN (arquivo), FORA do argv. Entregar o prompt por
+    Backend opencode da skill xpz-llm-delegate. Resolve o opencode.exe por -OpenCodeExe, PATH
+    (WinGet/Scoop/binario direto) ou npm legado, e o executa com o prompt entregue por STDIN
+    (arquivo), FORA do argv. Entregar o prompt por
     stdin (e nao como argumento posicional de 'run') resolve o limite ~32KB de linha de comando do
     Windows para prompts grandes e usa redirecao EXPLICITA de stdout/stderr a arquivo
     (Start-Process -RedirectStandard*), evitando o erro nao-deterministico "StandardOutputEncoding
@@ -79,6 +80,8 @@ try { [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false) } catc
 
 # Funções compartilhadas de parsing do stream do opencode (dot-source)
 . (Join-Path $PSScriptRoot 'OpenCodeStreamSupport.ps1')
+# Descoberta do opencode CLI (npm, WinGet/PATH, override explicito)
+. (Join-Path $PSScriptRoot 'OpenCodeCliSupport.ps1')
 # Guard least-privilege do reviewer-ro (default escopado + pre/pos-check fail-closed)
 . (Join-Path $PSScriptRoot 'OpenCodeReviewerRoGuard.ps1')
 
@@ -90,19 +93,8 @@ if ($PSCmdlet.ParameterSetName -eq 'FromFile') {
     $Message = Get-Content -LiteralPath $MessagePath -Raw -Encoding utf8
 }
 
-# 1) Resolve o opencode.exe: override explicito (-OpenCodeExe) ou descoberta sob %APPDATA%\npm
-if ($OpenCodeExe) {
-    if (-not (Test-Path -LiteralPath $OpenCodeExe -PathType Leaf)) {
-        throw "BLOCK: -OpenCodeExe nao encontrado: $OpenCodeExe"
-    }
-    $exe = $OpenCodeExe
-} else {
-    $exe = Get-ChildItem -Path "$env:APPDATA\npm\node_modules\opencode-ai" `
-        -Recurse -Filter 'opencode.exe' -ErrorAction SilentlyContinue |
-        Where-Object FullName -like '*windows-x64\bin\opencode.exe' |
-        Select-Object -First 1 -ExpandProperty FullName
-    if (-not $exe) { throw "BLOCK: opencode.exe nao encontrado sob $env:APPDATA\npm" }
-}
+# 1) Resolve o opencode.exe: override explicito, PATH (WinGet/Scoop/binario direto) ou npm legado.
+$exe = Resolve-OpenCodeExe -Override $OpenCodeExe
 
 # 1b) D1/D2: postura de seguranca no ADAPTER (design congelado). Default -Agent reviewer-ro
 #     ESCOPADO ao caminho revisor: sem -Agent explicito, o agente efetivo e reviewer-ro e o

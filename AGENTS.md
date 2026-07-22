@@ -5,6 +5,12 @@
 - Ler primeiro o `README.md` local antes de agir.
 - Reler a documentação local quando o contexto da conversa ficar longo, ambíguo ou perder aderência às convenções da raiz.
 
+## Edição local pelo Codex
+
+- Nesta raiz, para uma alteração já aprovada, seguir `xpz-codex-apply-patch-alternative/SKILL.md` e usar `scripts/Apply-ApprovedPatch.ps1`; não usar a ferramenta Codex `apply_patch`.
+- Na rota canônica, `pwsh -File` recebe argv literal, inclusive via `ProcessStartInfo.ArgumentList`; por isso, transmita o patch unificado textual como Base64 contíguo por stdin para `-DryRun`, com `-RepositoryRoot` e um único `-AllowedPath` por ciclo. O motor continua exigindo que esse caminho corresponda ao conjunto completo e exato do patch. Se `-AllowedPath` for repetido, o binder falha antes do motor: stdout fica sem JSON e o diagnóstico deve ser lido no stderr. Só então chamar `-StagedPatchId` + `-ExpectedPatchSha256` para aplicar.
+- Após a aplicação, reler o trecho alterado, conferir encoding/EOL e executar o parse ou teste pertinente. O motor não faz commit, push, checkout, reset ou rollback automático; não usar esse mecanismo para ampliar o escopo aprovado.
+
 ## Revisão por pares como termo operacional
 
 - Quando o usuário pedir `revisão por pares`, `peer review`, `painel multi-modelo` ou `validar plano multi-modelo`, tratar isso como termo operacional reservado desta raiz, não como sinônimo de parecer crítico solo.

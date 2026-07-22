@@ -14,32 +14,40 @@
     confidencialidade (Resolve-LlmDelegateAuthorization.ps1) NAO consome este arquivo;
     ele reavalia destino e sensibilidade deterministicamente a cada uso. Nao acoplar.
 
-    SANITIZACAO POR DESENHO: o manifesto grava SOMENTE metadados nao sensiveis -
-    canonicalModel, backend, locality, reasonCode (codigo curto, sem host/baseURL) e
-    sourceKind. NUNCA grava token, chave de API, baseURL/host, header, caminho de config,
+    SANITIZACAO POR DESENHO: o manifesto grava SOMENTE metadados nao sensiveis, como
+    backend, targetModelKey, canonicalModel, provider, family, sourceKind, sourceConfidence,
+    availableInManifest, locality, reasonCode (codigo curto, sem host/baseURL), hardVeto e
+    diagnostics. NUNCA grava token, chave de API, baseURL/host, header, caminho de config,
     prompt nem politica por-KB. O self-test prova essa ausencia.
 
-    ENUMERACAO: so opencode (provider/modelo em opencode.json) e Codex (config.toml) tem
-    fonte de enumeracao de modelos. Claude Code, Copilot e Gemini nao tem enumeracao
-    nativa - registrados como instalados com models=[] e enumeration=none-native; o modelo
+    ENUMERACAO: opencode le provider/modelo em opencode.json/jsonc; Codex usa config.toml
+    e resolvedor; Claude Code combina settings configurado e cache historico/fraco
+    (enumeration=settings-or-historical). Copilot e Gemini seguem registrados como
+    instalados sem enumeracao nativa forte (models=[] e enumeration=none-native); o modelo
     default deles vive na doc da skill/no 14, nao aqui.
 
     ESTAVEL vs VOLATIL: o que o manifesto grava (instalado? local/externo?) e estavel e
     cacheavel. A SAUDE do backend ("responde agora?") e volatil e fica em lastHealthCheck
     (null por padrao) - reverificada de leve no momento da revisao, nao nesta sondagem.
 
-    Reuso: chama Resolve-OpenCodeModelLocality.ps1 / Resolve-CodexModelLocality.ps1 em
-    processo para a localidade de cada modelo (a chave de destino canonica). A enumeracao
-    em si (listar os modelos) e logica nova, pois os resolvers classificam UM modelo dado.
+    Reuso: chama Resolve-OpenCodeModelLocality.ps1, Resolve-CodexModelLocality.ps1 e
+    Resolve-ClaudeCodeModelLocality.ps1 em processo para a localidade de cada modelo (a chave
+    de destino canonica). A enumeracao em si (listar os modelos) e logica propria deste script,
+    pois os resolvers classificam UM modelo dado.
 .PARAMETER OutputPath
     Caminho do manifesto machine-level. Default: %LOCALAPPDATA%\xpz-llm-delegate\capabilities.json.
 .PARAMETER SnapshotPath
     Quando informado, grava tambem um snapshot por-KB (cache re-derivavel) com snapshotAt e
     sourceGeneratedAt. O setup da pasta paralela usa Temp\llm-delegate-capabilities.snapshot.json.
 .PARAMETER OpenCodeConfigPath
-    Caminho do opencode.json. Default: ~/.config/opencode/opencode.json.
+    Caminho do opencode.json/jsonc. Default: ~/.config/opencode/opencode.json; se ausente,
+    tenta ~/.config/opencode/opencode.jsonc.
 .PARAMETER CodexConfigPath
     Caminho do config.toml do Codex. Default: ~/.codex/config.toml.
+.PARAMETER ClaudeSettingsPath
+    Caminho do settings.json/jsonc do Claude Code. Default: ~/.claude/settings.json.
+.PARAMETER ClaudeStatsCachePath
+    Caminho opcional do stats-cache.json do Claude Code. Fonte historica/fraca.
 .EXAMPLE
     .\Build-LlmDelegateCapabilityManifest.ps1
 .EXAMPLE
@@ -50,7 +58,9 @@ param(
     [string] $OutputPath = (Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'xpz-llm-delegate' | Join-Path -ChildPath 'capabilities.json'),
     [string] $SnapshotPath,
     [string] $OpenCodeConfigPath = (Join-Path $HOME '.config' | Join-Path -ChildPath 'opencode' | Join-Path -ChildPath 'opencode.json'),
-    [string] $CodexConfigPath = (Join-Path $HOME '.codex' | Join-Path -ChildPath 'config.toml')
+    [string] $CodexConfigPath = (Join-Path $HOME '.codex' | Join-Path -ChildPath 'config.toml'),
+    [string] $ClaudeSettingsPath = (Join-Path $HOME '.claude' | Join-Path -ChildPath 'settings.json'),
+    [string] $ClaudeStatsCachePath = (Join-Path $HOME '.claude' | Join-Path -ChildPath 'stats-cache.json')
 )
 
 Set-StrictMode -Version Latest
@@ -59,6 +69,7 @@ $ErrorActionPreference = 'Stop'
 $scriptsDir = $PSScriptRoot
 $openResolver = Join-Path $scriptsDir 'Resolve-OpenCodeModelLocality.ps1'
 $codexResolver = Join-Path $scriptsDir 'Resolve-CodexModelLocality.ps1'
+$claudeResolver = Join-Path $scriptsDir 'Resolve-ClaudeCodeModelLocality.ps1'
 
 function Get-Prop {
     param($Obj, [string]$Name)
@@ -73,6 +84,30 @@ function Test-CommandPresent {
     return [bool](Get-Command -Name $Name -ErrorAction SilentlyContinue)
 }
 
+function ConvertFrom-JsoncText {
+    param([Parameter(Mandatory)] [string]$Text)
+    $withoutBlock = [regex]::Replace($Text, '(?s)/\*.*?\*/', '')
+    $withoutLine = [regex]::Replace($withoutBlock, '(?m)^\s*//.*$', '')
+    $withoutTrailingCommas = [regex]::Replace($withoutLine, ',(\s*[\}\]])', '$1')
+    return $withoutTrailingCommas | ConvertFrom-Json
+}
+
+function Read-JsonOrJsoncFile {
+    param([string]$Path)
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $null }
+    return ConvertFrom-JsoncText -Text (Get-Content -LiteralPath $Path -Raw -Encoding utf8)
+}
+
+function Resolve-OpenCodeConfigPath {
+    param([string]$Path)
+    if (Test-Path -LiteralPath $Path -PathType Leaf) { return $Path }
+    if ($Path.EndsWith('.json', [System.StringComparison]::OrdinalIgnoreCase)) {
+        $jsonc = $Path.Substring(0, $Path.Length - 5) + '.jsonc'
+        if (Test-Path -LiteralPath $jsonc -PathType Leaf) { return $jsonc }
+    }
+    return $Path
+}
+
 # Mapeia a saida do resolver para um reasonCode CURTO e sanitizado (sem host/baseURL).
 function ConvertTo-ReasonCode {
     param([string]$Locality)
@@ -83,12 +118,59 @@ function ConvertTo-ReasonCode {
     }
 }
 
+function Get-ProviderFromModelKey {
+    param([string]$TargetModelKey)
+    if ([string]::IsNullOrWhiteSpace($TargetModelKey) -or $TargetModelKey -notmatch '/') { return 'unknown' }
+    return @($TargetModelKey -split '/', 2)[0]
+}
+
+function Test-HardVetoModel {
+    param([string]$TargetModelKey)
+    if ([string]::IsNullOrWhiteSpace($TargetModelKey)) { return $false }
+    $modelPart = @($TargetModelKey -split '/')[-1].ToLowerInvariant()
+    foreach ($v in @('mistral-large-3', 'nemotron-3-ultra')) {
+        if ($modelPart.Contains($v)) { return $true }
+    }
+    return $false
+}
+
+function New-CapabilityEntry {
+    param(
+        [Parameter(Mandatory)] [string]$Backend,
+        [Parameter(Mandatory)] [string]$TargetModelKey,
+        [string]$CanonicalModel,
+        [string]$Provider,
+        [string]$Locality = 'unknown',
+        [ValidateSet('configured', 'catalog', 'cache', 'historical', 'probe')] [string]$SourceKind = 'configured',
+        [ValidateSet('strong', 'medium', 'weak')] [string]$SourceConfidence = 'strong',
+        [bool]$AvailableInManifest = $true,
+        [string[]]$Diagnostics = @()
+    )
+    if ([string]::IsNullOrWhiteSpace($CanonicalModel)) { $CanonicalModel = $TargetModelKey }
+    if ([string]::IsNullOrWhiteSpace($Provider)) { $Provider = Get-ProviderFromModelKey $CanonicalModel }
+    [pscustomobject]@{
+        backend             = $Backend
+        targetModelKey      = $TargetModelKey
+        canonicalModel      = $CanonicalModel
+        provider            = $Provider
+        family              = $Provider
+        sourceKind          = $SourceKind
+        sourceConfidence    = $SourceConfidence
+        availableInManifest = $AvailableInManifest
+        locality            = $Locality
+        reasonCode          = ConvertTo-ReasonCode $Locality
+        hardVeto            = (Test-HardVetoModel $CanonicalModel)
+        diagnostics         = @($Diagnostics | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) })
+    }
+}
+
 function Get-OpenCodeModelEntries {
     param([string]$ConfigPath)
     $entries = @()
+    $ConfigPath = Resolve-OpenCodeConfigPath -Path $ConfigPath
     if (-not (Test-Path -LiteralPath $ConfigPath -PathType Leaf)) { return $entries }
     $cfg = $null
-    try { $cfg = Get-Content -LiteralPath $ConfigPath -Raw | ConvertFrom-Json } catch { return $entries }
+    try { $cfg = Read-JsonOrJsoncFile -Path $ConfigPath } catch { return $entries }
     $providers = Get-Prop $cfg 'provider'
     if ($null -eq $providers) { return $entries }
     foreach ($prop in $providers.PSObject.Properties) {
@@ -105,13 +187,9 @@ function Get-OpenCodeModelEntries {
                     $locality = [string](Get-Prop $res 'locality')
                 }
             } catch { $locality = 'unknown' }
-            $sourceKind = if (@('ollama-cloud', 'opencode-go') -contains $provName) { 'known-cloud' } else { 'config' }
-            $entries += [pscustomobject]@{
-                canonicalModel = $canonical
-                locality       = $locality
-                reasonCode     = ConvertTo-ReasonCode $locality
-                sourceKind     = $sourceKind
-            }
+            $entries += New-CapabilityEntry -Backend 'opencode' -TargetModelKey $canonical `
+                -CanonicalModel $canonical -Provider $provName -Locality $locality `
+                -SourceKind 'configured' -SourceConfidence 'strong' -AvailableInManifest $true
         }
     }
     return $entries
@@ -151,15 +229,54 @@ function Get-CodexModelEntries {
             $res = $resJson | ConvertFrom-Json
             $canonical = [string](Get-Prop $res 'canonicalModel')
             if ([string]::IsNullOrWhiteSpace($canonical)) { continue }
+            $provider = [string](Get-Prop $res 'provider')
+            if ([string]::IsNullOrWhiteSpace($provider) -or $canonical -notmatch '/') {
+                if (-not $seen.Add("weak:$canonical")) { continue }
+                $entries.Add((New-CapabilityEntry -Backend 'codex' -TargetModelKey $canonical `
+                            -CanonicalModel $canonical -Provider 'unknown' -Locality 'unknown' `
+                            -SourceKind 'configured' -SourceConfidence 'weak' -AvailableInManifest $true `
+                            -Diagnostics @('provider de destino nao comprovado pelo resolvedor; nao inventar prefixo openai')))
+                continue
+            }
             if (-not $seen.Add($canonical)) { continue }
             $locality = [string](Get-Prop $res 'locality')
-            $entries.Add([pscustomobject]@{
-                canonicalModel = $canonical
-                locality       = $locality
-                reasonCode     = ConvertTo-ReasonCode $locality
-                sourceKind     = 'config'
-            })
+            $entries.Add((New-CapabilityEntry -Backend 'codex' -TargetModelKey $canonical `
+                        -CanonicalModel $canonical -Provider $provider -Locality $locality `
+                        -SourceKind 'configured' -SourceConfidence 'strong' -AvailableInManifest $true))
         } catch { }
+    }
+    return $entries
+}
+
+function Get-ClaudeCodeModelEntries {
+    param([string]$SettingsPath, [string]$StatsCachePath)
+    $entries = [System.Collections.Generic.List[object]]::new()
+    $seen = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+
+    foreach ($source in @(
+            @{ path = $SettingsPath; kind = 'configured'; confidence = 'strong' }
+            @{ path = $StatsCachePath; kind = 'historical'; confidence = 'weak' }
+        )) {
+        if (-not (Test-Path -LiteralPath $source.path -PathType Leaf)) { continue }
+        $raw = Get-Content -LiteralPath $source.path -Raw -Encoding utf8
+        $matches = [regex]::Matches($raw, '(?i)\b(claude-[a-z0-9][a-z0-9\-]*|opus)\b')
+        foreach ($m in $matches) {
+            $model = $m.Groups[1].Value
+            try {
+                $res = (& $claudeResolver -Model $model) | ConvertFrom-Json
+                $canonical = [string](Get-Prop $res 'canonicalModel')
+                if ([string]::IsNullOrWhiteSpace($canonical)) { continue }
+                $seenKey = "$($source.kind):$canonical"
+                if (-not $seen.Add($seenKey)) { continue }
+                $diagnostics = @()
+                if ($source.kind -eq 'historical') { $diagnostics += 'fonte historica/fraca; nao prova disponibilidade atual' }
+                $entries.Add((New-CapabilityEntry -Backend 'claude-code' -TargetModelKey $canonical `
+                            -CanonicalModel $canonical -Provider ([string](Get-Prop $res 'provider')) `
+                            -Locality ([string](Get-Prop $res 'locality')) -SourceKind $source.kind `
+                            -SourceConfidence $source.confidence -AvailableInManifest ($source.kind -ne 'historical') `
+                            -Diagnostics $diagnostics))
+            } catch { }
+        }
     }
     return $entries
 }
@@ -182,8 +299,14 @@ $backends += [pscustomobject]@{
     models      = @(Get-CodexModelEntries -ConfigPath $CodexConfigPath)
 }
 
+$backends += [pscustomobject]@{
+    backend     = 'claude-code'
+    installed   = (Test-CommandPresent 'claude')
+    enumeration = 'settings-or-historical'
+    models      = @(Get-ClaudeCodeModelEntries -SettingsPath $ClaudeSettingsPath -StatsCachePath $ClaudeStatsCachePath)
+}
+
 foreach ($b in @(
-        @{ name = 'claude-code'; cmd = 'claude' }
         @{ name = 'copilot'; cmd = 'copilot' }
         @{ name = 'gemini'; cmd = 'gemini' }
     )) {

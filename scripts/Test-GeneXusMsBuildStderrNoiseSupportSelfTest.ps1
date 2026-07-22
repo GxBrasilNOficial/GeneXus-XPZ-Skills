@@ -38,8 +38,8 @@ foreach ($wrapperName in @('Invoke-GeneXusKbBuildAll.ps1', 'Invoke-GeneXusKbSpec
     if ([regex]::Matches($wrapperText, 'Get-GeneXusMsBuildStderrNoiseClassification').Count -lt 2) {
         throw "$wrapperName deve usar o filtro compartilhado no fluxo normal e no recovery."
     }
-    if ($wrapperText -notmatch 'stderrContent\s*=\s*\$recoveryStdErrContent' -or
-        $wrapperText -notmatch 'stderrFilteredNoise\s*=\s*\$recoveryStdErrFilteredNoise') {
+    if ($wrapperText -notmatch 'stderrContent\s*=\s*@\(\$recoveryStdErrContent' -or
+        $wrapperText -notmatch 'stderrFilteredNoise\s*=\s*@\(\$recoveryStdErrFilteredNoise') {
         throw "$wrapperName deve expor stderr filtrado no recovery."
     }
 }

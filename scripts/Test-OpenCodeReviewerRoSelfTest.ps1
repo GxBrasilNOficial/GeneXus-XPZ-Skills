@@ -255,21 +255,26 @@ sem mode
     Assert-True ((-not $pcaa.pass) -and $pcaa.reason -eq 'agentlist' -and $pcaa.detail -match 'nao encontrado') "(b) agente ausente (agent list valido sem reviewer-ro) => BLOCK reason=agentlist detail 'nao encontrado' (got: $($pcaa.reason))"
     $env:FAKE_OC_AGENTLIST = $sampleAgentList
 
-    # ── (B4) equivalencia permission:deny == tools:false (fixture medido em 1.4.4) ──
+    # ── (B4) equivalencia permission:deny == tools:false (fixture medido em 1.17.20) ──
     $equivLines = @(Get-Content -LiteralPath $equivFixture -Encoding utf8)
     $permBlock = Resolve-OpenCodeReviewerRoAllowSet -Rules (Get-OpenCodeReviewerRoBlockFromAgentList -Lines $equivLines -Name 'probe-perm')
     $toolsBlock = Resolve-OpenCodeReviewerRoAllowSet -Rules (Get-OpenCodeReviewerRoBlockFromAgentList -Lines $equivLines -Name 'probe-tools')
     Assert-True ([string]$permBlock.effective['webfetch'] -eq 'deny' -and [string]$toolsBlock.effective['webfetch'] -eq 'deny') "(B4) permission:deny E tools:false resolvem webfetch=deny (equivalencia)"
 
-    # ── (B5) merge global<->project = substituicao, nao campo a campo (fixture medido) ──
+    # ── (B5) global-only e project-local resolvem o mesmo allow-set least-privilege (fixture medido) ──
     $mergeGlobal = Resolve-OpenCodeReviewerRoAllowSet -Rules (Get-OpenCodeReviewerRoBlockFromAgentList -Lines @(Get-Content -LiteralPath $mergeFixture -Encoding utf8) -Name 'reviewer-ro')
     $mergeProject = Resolve-OpenCodeReviewerRoAllowSet -Rules (Get-OpenCodeReviewerRoBlockFromAgentList -Lines @(Get-Content -LiteralPath $sampleAgentList -Encoding utf8) -Name 'reviewer-ro')
-    Assert-True (@($mergeGlobal.allowSet) -contains '*') "(B5) so-global (tools:) resolve '*'=allow (allow-set wide)"
-    Assert-True (@($mergeProject.allowSet) -notcontains '*' -and (@($mergeProject.allowSet | Sort-Object) -join ',') -eq 'glob,grep,list,read') "(B5) com project-local resolve '*'=deny + allow-set {read,grep,glob,list} => SUBSTITUICAO integral (nao merge campo a campo)"
+    Assert-True (@($mergeGlobal.allowSet) -notcontains '*' -and (@($mergeGlobal.allowSet | Sort-Object) -join ',') -eq 'glob,grep,list,read') "(B5) so-global resolve '*'=deny + allow-set {read,grep,glob,list}"
+    Assert-True (@($mergeProject.allowSet) -notcontains '*' -and (@($mergeProject.allowSet | Sort-Object) -join ',') -eq 'glob,grep,list,read') "(B5) com project-local resolve '*'=deny + allow-set {read,grep,glob,list}"
 
     # ── (e) pos-check: warning de fallback detectado; texto limpo nao ──
     $fbText = Get-Content -LiteralPath $fallbackFixture -Raw -Encoding utf8
+    $pattern1 = Get-OpenCodeReviewerRoFallbackWarningPattern
+    $pattern2 = Get-OpenCodeReviewerRoFallbackWarningPattern
+    Assert-True (-not [string]::IsNullOrWhiteSpace($pattern1) -and $pattern1 -eq $pattern2) "(e) accessor Get-OpenCodeReviewerRoFallbackWarningPattern retorna padrao estavel nao vazio"
+    Assert-True ($fbText -match $pattern1) "(e) fixture real casa com o padrao logico unico do fallback"
     Assert-True (Test-OpenCodeReviewerRoFallbackWarning -Text $fbText) "(e) pos-check detecta warning de fallback do fixture"
+    Assert-True (Test-OpenCodeReviewerRoFallbackWarning -Text ("ruido antes`n" + $fbText + "`nruido depois")) "(e) pos-check detecta warning com ruido antes/depois"
     Assert-True (-not (Test-OpenCodeReviewerRoFallbackWarning -Text "stderr limpo sem warning")) "(e) pos-check nao dispara em stderr limpo"
 
     # ── (g) instalador preserva comentarios/formatacao/demais chaves ──

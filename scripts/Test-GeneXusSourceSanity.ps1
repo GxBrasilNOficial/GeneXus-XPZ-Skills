@@ -42,6 +42,28 @@ $script:ForbiddenNonEmptyParts = @{}
 $script:ForbiddenNonEmptyParts[$script:ProcedureObjectType] = @{}
 $script:ForbiddenNonEmptyParts[$script:ProcedureObjectType][$script:ConditionsPartType] = 'Procedure nao deve ter codigo na parte Conditions; mover predicados para For Each ... Where ou remover (conteudo aqui causa src0055 no import).'
 
+# Modo declarativo type-aware: pares (Object type, Part type) cujo Source e
+# DECLARATIVO, nao procedural. So a parte Rules (9b0a32a3) de uma Transaction
+# (1db606f2) entra hoje: as rules de Transaction sao clausulas declarativas
+# (`atributo = expr if cond;`, `noaccept(...) if cond;`, `error(...) if cond;`)
+# encerradas por ';' e opcionalmente envolvidas por bloco `[web] { ... }`, nao
+# blocos procedurais If/For/Do/Sub. O balanceador procedural gera falso
+# unexpected-close/mismatched-close/unclosed-block nesse Source. Nesse UNICO par
+# suprimimos apenas esses tres findings estruturais e preservamos todos os
+# avisos de estilo (elseif, iif, dense-condition, call-in-condition).
+# Nao generalizar para Conditions: WebPanel/Prompt/Selection List usam `when`
+# multiline (nao casa If/For/Do/Sub) e ja passam no balanceamento procedural;
+# DataSelector Condition/Source aninhado fica fora da cobertura. Events,
+# Procedure e demais pares seguem no balanceamento procedural.
+# GUID da parte Rules documentado em 01a/01b; Transaction em 01a-catalogo.
+$script:TransactionObjectType = '1db606f2-af09-4cf9-a3b5-b481519d28f6'
+$script:RulesPartType = '9b0a32a3-de6d-4be1-a4dd-1b85d3741534'
+$script:DeclarativeBalancingCodes = @('unexpected-close', 'mismatched-close', 'unclosed-block')
+
+$script:DeclarativeSourceParts = @{}
+$script:DeclarativeSourceParts[$script:TransactionObjectType] = @{}
+$script:DeclarativeSourceParts[$script:TransactionObjectType][$script:RulesPartType] = $true
+
 trap {
     [ordered]@{
         status = 'bloqueado'
@@ -328,7 +350,16 @@ foreach ($sourceTarget in $sourceTargets) {
     }
 
     $findings = Test-SourceTextSanity -SourceText $sourceTarget.sourceText -SourceLabel $sourceTarget.sourceLabel
+
+    # Modo declarativo: neste par (Object type, Part type) o Source e declarativo;
+    # suprime so os findings de balanceamento procedural, preserva os avisos.
+    $isDeclarativePart = $script:DeclarativeSourceParts.ContainsKey($sourceTarget.objectType) -and
+        $script:DeclarativeSourceParts[$sourceTarget.objectType].ContainsKey($sourceTarget.partType)
+
     foreach ($finding in $findings) {
+        if ($isDeclarativePart -and ($script:DeclarativeBalancingCodes -contains $finding.code)) {
+            continue
+        }
         $allFindings.Add($finding) | Out-Null
     }
 }

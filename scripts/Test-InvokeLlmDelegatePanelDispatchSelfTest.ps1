@@ -12,7 +12,7 @@
     sem single-flight (fake NÃO re-invocado + concurrencySaturationWarning); classificação
     mecânica (responded mesmo off-task); -Cd (precedência + fail-closed); contrato (stdout 1 linha
     JSON Kind/SchemaVersion PascalCase, acentos íntegros, stderr separado, state subset,
-    targetModelKey vazio->null, ledger por estado, unavailableCount, ReviewersJson inline/arquivo/
+    targetModelKey vazio->null, ledger por estado, unavailableCount, quotaCount, ReviewersJson inline/arquivo/
     inválido, RoundId ausente->guid, slug Windows-safe).
 
     O harness é invocado como PROCESSO FILHO (pwsh -File) com stdout/stderr redirecionados a
@@ -103,8 +103,8 @@ if ($model -match 'sleep') { Start-Sleep -Milliseconds 1200 }
 if ($model -match 'timeout') { Start-Sleep -Milliseconds 5000 }
 Append-Log("$fam`tEXIT`t$([DateTime]::UtcNow.Ticks)`t$model")
 if ($model -match 'cota') {
-    # evento de erro de stream com 429/limite de uso -> Invoke-OpenCode lanca BLOCK; harness -> unavailable
-    '{"type":"error","error":{"data":{"message":"limite de uso do provider (HTTP 429) weekly usage limit"}}}'
+    # evento de erro de stream com 402/quota/saldo -> Invoke-OpenCode lanca BLOCK; harness -> quota
+    '{"type":"error","error":{"data":{"message":"Payment Required: insufficient coding plan balance (HTTP 402) sem quota livre"}}}'
 } elseif ($model -match 'empty') {
     '{"type":"step_finish","part":{"reason":"stop"}}'
 } else {
@@ -152,6 +152,10 @@ if ($args -contains '--version') { '2.1.118 (Claude Code fake)'; exit 0 }
 if ($args -contains '--help') {
     '--model --print --output-format --no-session-persistence --permission-mode --tools --max-turns'
     exit 0
+}
+if ($model -eq 'claude-untrusted-workspace') {
+    [Console]::Error.WriteLine('Claude Code refused to run because this workspace is not trusted. Mark this workspace as trusted to continue.')
+    exit 1
 }
 $null = [Console]::In.ReadToEnd()
 'CLAUDE cwd=' + (Get-Location).Path + ' model=' + $model + ' revisao'
@@ -238,7 +242,11 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
             [string] $Sensitivity = 'public',
             [hashtable] $Extra = @{},
             [switch] $NoRoundId,
-            [switch] $NoExeMap
+            [switch] $NoExeMap,
+            [switch] $UseManuscriptText,
+            [switch] $OmitManuscriptSource,
+            [switch] $BothManuscriptSources,
+            [AllowEmptyString()] [string] $ManuscriptText = ''
         )
         $rid = [guid]::NewGuid().ToString('N')
         $revFile = Join-Path $tmp "rev-$rid.json"
@@ -248,11 +256,19 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
 
         $argList = @(
             '-NoProfile', '-File', $harness,
-            '-ManuscriptPath', $manuscript,
             '-ReviewersJson', $revFile,
             '-PayloadSensitivity', $Sensitivity,
             '-TempDir', $ledgerRoot
         )
+        if ($OmitManuscriptSource) {
+            # Intencional: exercita validacao estruturada de origem ausente.
+        } elseif ($BothManuscriptSources) {
+            $argList += @('-ManuscriptPath', $manuscript, '-ManuscriptText', $ManuscriptText)
+        } elseif ($UseManuscriptText) {
+            $argList += @('-ManuscriptText', $ManuscriptText)
+        } else {
+            $argList += @('-ManuscriptPath', $manuscript)
+        }
         if (-not $NoRoundId) { $argList += @('-RoundId', $rid) }
         if (-not $NoExeMap) { $argList += @('-BackendExeMap', $exeMapFile) }
         foreach ($k in $Extra.Keys) { $argList += @("-$k", [string]$Extra[$k]) }
@@ -458,15 +474,17 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
     Assert-True ($vtext -match 'revisão') 'acentos: o texto do verdict deveria preservar acentuação pt-BR (revisão)'
 
     # =======================================================================================
-    # 8b) CLASSIFICAÇÃO EM DESPACHO: cota → unavailable; timeout → timeout
+    # 8b) CLASSIFICAÇÃO EM DESPACHO: cota → quota; timeout → timeout
     # =======================================================================================
-    # cota: fake-opencode emite erro de stream com 429/limite de uso -> adapter lança BLOCK -> unavailable
+    # cota: fake-opencode emite erro de stream com 402/quota/saldo -> adapter lança BLOCK -> quota
     $r = Invoke-Harness -Reviewers @(@{ backend = 'opencode'; targetModelKey = 'ollama-cloud/cota-1'; invokeArgs = @{} }) `
         -Sensitivity 'public' -Extra @{ OpenCodeConfigPath = $ocCfg }
     $rv = Get-Reviewer $r.json 0
-    Assert-True ($rv.state -eq 'unavailable') "cota: 429/limite de uso em despacho deveria virar unavailable; got $($rv.state)"
-    Assert-True ([int]$r.json.unavailableCount -ge 1) 'cota: unavailableCount >= 1'
-    Assert-True ($null -ne $rv.errorPath -or $null -ne $rv.statePath) 'cota: deveria gravar ledger'
+    Assert-True ($rv.state -eq 'quota') "cota: 402/quota/saldo em despacho deveria virar quota; got $($rv.state)"
+    Assert-True ([int]$r.json.quotaCount -ge 1) 'cota: quotaCount >= 1'
+    Assert-True ($null -ne $rv.statePath) 'cota: deveria gravar .state.txt no ledger'
+    $quotaLedger = Get-Content -LiteralPath $rv.statePath -Raw -Encoding utf8
+    Assert-True ($quotaLedger -match 'Payment Required' -and $quotaLedger -match 'insufficient coding plan balance' -and $quotaLedger -match '402' -and $quotaLedger -match 'sem quota') 'cota: .state.txt deveria preservar a evidencia bruta de quota/saldo/402'
 
     # timeout: fake dorme além do -TimeoutSec (via invokeArgs.timeoutSec) -> adapter "excedeu...encerrado" -> timeout
     $r = Invoke-Harness -Reviewers @(@{ backend = 'opencode'; targetModelKey = 'openai/timeout-1'; invokeArgs = @{ timeoutSec = 2 } }) `
@@ -475,6 +493,71 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
     Assert-True ($rv.state -eq 'timeout') "timeout: deveria classificar timeout; got $($rv.state)"
     Assert-True ([int]$r.json.timeoutCount -ge 1) 'timeout: timeoutCount >= 1'
     Assert-True ($null -ne $rv.errorPath) 'timeout: deveria gravar .error.txt'
+
+    # =======================================================================================
+    # 8d) FALLBACK: ativacao auditavel, skip por sucesso e divergencia pre-dispatch
+    # =======================================================================================
+    $r = Invoke-Harness -Reviewers @(@{
+            backend = 'opencode'; targetModelKey = 'openai/primary-ok'; invokeArgs = @{}
+            fallbackChain = @(
+                @{ backend = 'opencode'; targetModelKey = 'openai/fallback-skip'; invokeArgs = @{ backend = 'opencode'; model = 'openai/fallback-skip' } }
+            )
+        }) -Sensitivity 'public' -Extra @{ OpenCodeConfigPath = $ocCfg }
+    Assert-True (@($r.json.reviewers).Count -eq 2) 'fallback skip: deveria registrar primario + fallback.'
+    $rv0 = Get-Reviewer $r.json 0
+    $rv1 = Get-Reviewer $r.json 1
+    Assert-True ($rv0.state -eq 'responded') 'fallback skip: primario deveria responder.'
+    Assert-True ($rv1.state -eq 'skippedAfterSuccess') "fallback skip: fallback deveria ficar skippedAfterSuccess; got $($rv1.state)"
+    Assert-True ($rv1.countsForDiversity -eq $false) 'fallback skip: skippedAfterSuccess nao conta diversidade.'
+    Assert-True ($rv1.fallbackOf -eq 'openai/primary-ok') 'fallback skip: fallbackOf deveria apontar para primario.'
+
+    $r = Invoke-Harness -Reviewers @(@{
+            backend = 'opencode'; targetModelKey = 'openai/empty-primary'; invokeArgs = @{}
+            fallbackChain = @(
+                @{ backend = 'opencode'; targetModelKey = 'openai/fallback-ok'; invokeArgs = @{ backend = 'opencode'; model = 'openai/fallback-ok' } }
+            )
+        }) -Sensitivity 'public' -Extra @{ OpenCodeConfigPath = $ocCfg }
+    Assert-True (@($r.json.reviewers).Count -eq 2) 'fallback ativado: deveria registrar primario + fallback.'
+    $rv0 = Get-Reviewer $r.json 0
+    $rv1 = Get-Reviewer $r.json 1
+    Assert-True ($rv0.state -eq 'error') 'fallback ativado: primario empty deveria virar error.'
+    Assert-True ($rv1.state -eq 'responded') "fallback ativado: fallback deveria responder; got $($rv1.state)"
+    Assert-True ($rv1.attemptRole -eq 'fallback') 'fallback ativado: attemptRole=fallback.'
+    Assert-True ($rv1.activationReason -eq 'error') 'fallback ativado: activationReason deveria ser error.'
+    Assert-True ($rv1.countsForDiversity -eq $true) 'fallback respondido deve contar diversidade.'
+
+    $r = Invoke-Harness -Reviewers @(@{
+            backend = 'opencode'; targetModelKey = 'openai/empty-primary-timeout-fallback'; invokeArgs = @{}
+            fallbackChain = @(
+                @{ backend = 'opencode'; targetModelKey = 'openai/timeout-fallback'; invokeArgs = @{ backend = 'opencode'; model = 'openai/timeout-fallback'; timeoutSec = 2 } }
+            )
+        }) -Sensitivity 'public' -Extra @{ OpenCodeConfigPath = $ocCfg }
+    Assert-True (@($r.json.reviewers).Count -eq 2) 'fallback timeout: deveria registrar primario + fallback.'
+    $rv1 = Get-Reviewer $r.json 1
+    Assert-True ($rv1.state -eq 'timeout') "fallback timeout: fallback deveria registrar timeout; got $($rv1.state)"
+    Assert-True ($rv1.countsForDiversity -eq $false) 'fallback timeout nao deve contar diversidade.'
+
+    $harnessText = Get-Content -LiteralPath $harness -Raw -Encoding utf8
+    Assert-True ($harnessText -match 'Get-FallbackDispatcherTimeoutMs') 'fallback dispatcher: timeout do processo filho deve derivar do invokeArgs.timeoutSec.'
+    Assert-True ($harnessText -notmatch 'WaitForExit\(180000\)') 'fallback dispatcher: nao pode haver timeout fixo de 180000ms no processo filho.'
+    Assert-True ($harnessText -match 'Get-CurrentPowerShellExecutable') 'fallback dispatcher: processo filho deve usar o executavel PowerShell atual/validado, nao depender de pwsh cru no PATH.'
+    Assert-True ($harnessText -notmatch "Start-Process\s+-FilePath\s+'pwsh'") 'fallback dispatcher: nao pode resolver pwsh cru pelo PATH.'
+    Assert-True ($harnessText -notmatch "return\s+'pwsh'") 'fallback dispatcher: nao pode ter fallback silencioso para pwsh cru no PATH.'
+
+    Set-Content -LiteralPath $concLog -Value '' -NoNewline -Encoding utf8
+    $r = Invoke-Harness -Reviewers @(@{
+            backend = 'opencode'; targetModelKey = 'openai/bad-primary'; invokeArgs = @{ backend = 'opencode'; model = 'openai/bad-primary' }
+            fallbackChain = @(
+                @{ backend = 'opencode'; targetModelKey = 'openai/fb-0'; invokeArgs = @{ backend = 'opencode'; model = 'openai/fb-0' } },
+                @{ backend = 'codex'; targetModelKey = 'openai/fb-1'; invokeArgs = @{ backend = 'opencode'; model = 'gpt-5.5' } }
+            )
+        }) -Sensitivity 'public' -Extra @{ OpenCodeConfigPath = $ocCfg }
+    $rv0 = Get-Reviewer $r.json 0
+    Assert-True ($rv0.state -eq 'error') 'fallback divergente: deveria falhar em pre-dispatch.'
+    Assert-True ([string]$rv0.reason -match 'invokeArgs.backend') 'fallback divergente: reason deveria citar invokeArgs.backend.'
+    $logAfterBad = @(Get-Content -LiteralPath $concLog -ErrorAction SilentlyContinue | Where-Object { $_ })
+    $badCalls = @($logAfterBad | Where-Object { $_ -match 'bad-primary|fb-0|fb-1' })
+    Assert-True ($badCalls.Count -eq 0) "fallback divergente: fake executor nao deveria ser chamado para a entrada invalida; chamadas=[$($badCalls -join ' | ')]"
 
     # =======================================================================================
     # 8c) DESPACHO REAL de claude-code / copilot / gemini (prova -Model + -Cd + exe-param por backend)
@@ -503,6 +586,29 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
     $tGm = Get-Content -LiteralPath $rvGm.verdictPath -Raw -Encoding utf8
     Assert-True ($tGm -match 'model=gemini-3-flash-preview') 'gemini despacho: -Model deveria chegar ao adapter'
     Assert-True ($tGm -match [regex]::Escape($tmpFwd)) 'gemini despacho: -Cd deveria virar o WorkingDirectory (cwd)'
+
+    # Claude Code workspace nao confiavel -> unavailable, para permitir fallback em painel.
+    $r = Invoke-Harness -Reviewers @(@{ backend = 'claude-code'; invokeArgs = @{ model = 'claude-untrusted-workspace' } }) `
+        -Sensitivity 'public' -Extra @{ Cd = $tmp }
+    $rvClUntrusted = Get-Reviewer $r.json 0
+    Assert-True ($rvClUntrusted.state -eq 'unavailable') "claude-code workspace-not-trusted: esperado unavailable; got $($rvClUntrusted.state)"
+    Assert-True ([string]$rvClUntrusted.reason -match 'workspace-not-trusted') 'claude-code workspace-not-trusted: reason deveria citar codigo canonico'
+
+    # workspace-not-trusted do titular deve ativar fallback como qualquer unavailable tecnico.
+    $r = Invoke-Harness -Reviewers @(@{
+            backend = 'claude-code'; targetModelKey = 'anthropic/claude-opus-4-8'; invokeArgs = @{ model = 'claude-untrusted-workspace' }
+            fallbackChain = @(
+                @{ backend = 'opencode'; targetModelKey = 'openai/fallback-after-unavailable'; invokeArgs = @{ backend = 'opencode'; model = 'openai/fallback-after-unavailable' } }
+            )
+        }) -Sensitivity 'public' -Extra @{ Cd = $tmp; OpenCodeConfigPath = $ocCfg }
+    Assert-True (@($r.json.reviewers).Count -eq 2) 'fallback workspace-not-trusted: deveria registrar titular + fallback.'
+    $rvClUntrusted = Get-Reviewer $r.json 0
+    $rvFallbackUntrusted = Get-Reviewer $r.json 1
+    Assert-True ($rvClUntrusted.state -eq 'unavailable') "fallback workspace-not-trusted: titular deveria ficar unavailable; got $($rvClUntrusted.state)"
+    Assert-True ($rvFallbackUntrusted.state -eq 'responded') "fallback workspace-not-trusted: fallback deveria responder; got $($rvFallbackUntrusted.state)"
+    Assert-True ($rvFallbackUntrusted.attemptRole -eq 'fallback') 'fallback workspace-not-trusted: attemptRole=fallback.'
+    Assert-True ($rvFallbackUntrusted.activationReason -eq 'unavailable') 'fallback workspace-not-trusted: activationReason deveria ser unavailable.'
+    Assert-True ($rvFallbackUntrusted.countsForDiversity -eq $true) 'fallback workspace-not-trusted respondido deve contar diversidade.'
 
     # =======================================================================================
     # 9) -Cd: precedência (explícito / cwd / ParallelKbRoot) + fail-closed
@@ -549,7 +655,7 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
     Assert-True ($r.json.Kind -eq 'xpz-llm-panel-dispatch-result') 'contrato: Kind PascalCase'
     Assert-True ([int]$r.json.SchemaVersion -eq 1) 'contrato: SchemaVersion=1 PascalCase'
     # state subset
-    $validStates = @('responded', 'error', 'unavailable', 'timeout', 'gateAsk', 'gateDeny')
+    $validStates = @('responded', 'error', 'quota', 'unavailable', 'timeout', 'gateAsk', 'gateDeny')
     foreach ($rev in $r.json.reviewers) { Assert-True ($validStates -contains $rev.state) "contrato: state '$($rev.state)' deveria estar no subset valido" }
     # targetModelKey vazio -> null (claude-code sem model)
     $rvClaude = Get-Reviewer $r.json 1
@@ -563,6 +669,60 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
     $r = Invoke-Harness -Reviewers @(@{ backend = 'opencode'; targetModelKey = 'openai/x'; invokeArgs = @{} }) `
         -Sensitivity 'public' -Extra @{ OpenCodeConfigPath = $ocCfg } -NoRoundId
     Assert-True ($r.json.roundId -match '^[0-9a-f]{32}$') "RoundId ausente: deveria gerar guid 'N'; got '$($r.json.roundId)'"
+
+    # ManuscriptText -> preparador transacional antes do despacho
+    $r = Invoke-Harness -Reviewers @(@{ backend = 'opencode'; targetModelKey = 'openai/texto-inline'; invokeArgs = @{} }) `
+        -Sensitivity 'public' -Extra @{ OpenCodeConfigPath = $ocCfg } -UseManuscriptText `
+        -ManuscriptText 'manuscrito-inline'
+    Assert-True ($r.exit -eq 0) 'ManuscriptText: exit 0 esperado'
+    Assert-True ($r.json.success -eq $true) 'ManuscriptText: success=true'
+    Assert-True ($r.json.roundStarted -eq $true) 'ManuscriptText: roundStarted=true'
+    Assert-True ($r.json.dispatchStarted -eq $true) 'ManuscriptText: dispatchStarted=true'
+    Assert-True ([int]$r.json.reviewersDispatched -eq 1) 'ManuscriptText: reviewersDispatched=1'
+    Assert-True ($null -eq $r.json.preparationError) 'ManuscriptText: preparationError=null'
+    Assert-True ((Get-Reviewer $r.json 0).state -eq 'responded') 'ManuscriptText: revisor deveria responder'
+    $prepManifest = Join-Path $ledgerRoot $r.roundId 'preparation-manifest.json'
+    Assert-True (Test-Path -LiteralPath $prepManifest -PathType Leaf) 'ManuscriptText: preparation-manifest.json deveria existir'
+
+    # ManuscriptText grande -> bloqueio estruturado antes de preparar/despachar
+    $r = Invoke-Harness -Reviewers @(@{ backend = 'opencode'; targetModelKey = 'openai/texto-grande'; invokeArgs = @{} }) `
+        -Sensitivity 'public' -Extra @{ OpenCodeConfigPath = $ocCfg } -UseManuscriptText `
+        -ManuscriptText ('x' * 30001)
+    Assert-True ($r.exit -eq 1) 'ManuscriptText grande: exit 1 esperado'
+    Assert-True ($r.json.Kind -eq 'xpz-llm-panel-dispatch-result') 'ManuscriptText grande: Kind do dispatcher esperado'
+    Assert-True ($r.json.roundStarted -eq $false) 'ManuscriptText grande: roundStarted=false'
+    Assert-True ($r.json.dispatchStarted -eq $false) 'ManuscriptText grande: dispatchStarted=false'
+    Assert-True ([int]$r.json.reviewersDispatched -eq 0) 'ManuscriptText grande: zero despachos'
+    Assert-True ($r.json.preparationError.failureCode -eq 'manuscript-text-too-large') 'ManuscriptText grande: failureCode manuscript-text-too-large'
+
+    # Origem ausente/ambigua -> bloqueio estruturado antes de preparar/despachar
+    $r = Invoke-Harness -Reviewers @(@{ backend = 'opencode'; targetModelKey = 'openai/origem-ausente'; invokeArgs = @{} }) `
+        -Sensitivity 'public' -Extra @{ OpenCodeConfigPath = $ocCfg } -OmitManuscriptSource
+    Assert-True ($r.exit -eq 1) 'Origem ausente: exit 1 esperado'
+    Assert-True ($r.json.Kind -eq 'xpz-llm-panel-dispatch-result') 'Origem ausente: Kind do dispatcher esperado'
+    Assert-True ($r.json.roundStarted -eq $false) 'Origem ausente: roundStarted=false'
+    Assert-True ($r.json.dispatchStarted -eq $false) 'Origem ausente: dispatchStarted=false'
+    Assert-True ([int]$r.json.reviewersDispatched -eq 0) 'Origem ausente: zero despachos'
+    Assert-True ($r.json.preparationError.failureCode -eq 'manuscript-source-missing') 'Origem ausente: failureCode manuscript-source-missing'
+
+    $r = Invoke-Harness -Reviewers @(@{ backend = 'opencode'; targetModelKey = 'openai/origem-ambigua'; invokeArgs = @{} }) `
+        -Sensitivity 'public' -Extra @{ OpenCodeConfigPath = $ocCfg } -BothManuscriptSources -ManuscriptText 'manuscrito-inline'
+    Assert-True ($r.exit -eq 1) 'Origem ambigua: exit 1 esperado'
+    Assert-True ($r.json.Kind -eq 'xpz-llm-panel-dispatch-result') 'Origem ambigua: Kind do dispatcher esperado'
+    Assert-True ($r.json.roundStarted -eq $false) 'Origem ambigua: roundStarted=false'
+    Assert-True ($r.json.dispatchStarted -eq $false) 'Origem ambigua: dispatchStarted=false'
+    Assert-True ([int]$r.json.reviewersDispatched -eq 0) 'Origem ambigua: zero despachos'
+    Assert-True ($r.json.preparationError.failureCode -eq 'manuscript-source-ambiguous') 'Origem ambigua: failureCode manuscript-source-ambiguous'
+
+    # Falha de preparacao -> summary proprio do dispatcher, sem iniciar rodada/despacho
+    $r = Invoke-Harness -Reviewers @(@{ backend = 'opencode'; targetModelKey = 'openai/texto-invalido'; invokeArgs = 'nao-objeto' }) `
+        -Sensitivity 'public' -Extra @{ OpenCodeConfigPath = $ocCfg } -UseManuscriptText -ManuscriptText 'manuscrito-inline'
+    Assert-True ($r.exit -eq 1) 'ManuscriptText invalido: exit 1 esperado'
+    Assert-True ($r.json.Kind -eq 'xpz-llm-panel-dispatch-result') 'ManuscriptText invalido: Kind do dispatcher esperado'
+    Assert-True ($r.json.roundStarted -eq $false) 'ManuscriptText invalido: roundStarted=false'
+    Assert-True ($r.json.dispatchStarted -eq $false) 'ManuscriptText invalido: dispatchStarted=false'
+    Assert-True ([int]$r.json.reviewersDispatched -eq 0) 'ManuscriptText invalido: zero despachos'
+    Assert-True ($r.json.preparationError.failureCode -eq 'reviewer-invalid-invokeArgs') 'ManuscriptText invalido: failureCode reviewer-invalid-invokeArgs'
 
     # ReviewersJson INLINE (não-arquivo) + INVÁLIDO — testados em processo IN-PROCESS lendo o ledger
     $ridInline = [guid]::NewGuid().ToString('N')

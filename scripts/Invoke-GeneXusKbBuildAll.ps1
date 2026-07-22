@@ -173,6 +173,11 @@ Repassado a Watch-GeneXusMsBuildLog.ps1. Padrão: 120. Intervalo válido: 30-360
 
 .PARAMETER VerboseLog
 Amplia o detalhamento gravado no log sem alterar o resultado lógico.
+
+.PARAMETER SelfTestForceOuterRecovery
+Uso exclusivo do self-test controlado. Depois de o MSBuild terminar e os seus logs
+brutos estarem disponíveis, força uma exceção local imediatamente antes da escrita
+do diagnóstico normal para exercitar o recovery externo. Não usar operacionalmente.
 #>
 
 param(
@@ -245,7 +250,10 @@ param(
 
     [switch]$SkipDeployBinCheck,
 
-    [switch]$StrictDeployBinCheck
+    [switch]$StrictDeployBinCheck,
+
+    [Parameter(DontShow = $true)]
+    [switch]$SelfTestForceOuterRecovery
 )
 
 Set-StrictMode -Version Latest
@@ -688,6 +696,15 @@ $confirmReorgMode       = $null
 $confirmWideRebuildMode = $null
 $confirmCostlyBuildOptionsMode = $null
 $allowCostlyBuildOptionsConfirmed = $false
+$msBuildExitCode = $null
+$timedOut = $false
+$stdOutText = ''
+$stdErrText = ''
+$postProcessingFailed = $false
+$postProcessingError = $null
+$buildStatus = $null
+$msBuildCategoryBBlocked = $false
+$operationalSubStateBuild = $null
 
 $resolvedLogPath = Get-FullPathSafe -PathValue $LogPath
 
@@ -1730,11 +1747,6 @@ try {
     $stdOutText = Read-TextFileSafe -PathValue $stdOutPath
     $stdErrText = Read-TextFileSafe -PathValue $stdErrPath
 
-    $postProcessingFailed = $false
-    $postProcessingError  = $null
-    $msBuildCategoryBBlocked = $false
-    $operationalSubStateBuild = $null
-
     $kbOpenMarker     = Get-MarkerValue -Text $stdOutText -Marker '__KB_OPEN__='
     $buildAllDoneMarker = Get-MarkerValue -Text $stdOutText -Marker '__BUILDALL_DONE__='
     $kbOpen       = ($kbOpenMarker -eq 'true')
@@ -2209,18 +2221,24 @@ try {
         }
     }
 
+    if ($SelfTestForceOuterRecovery.IsPresent) {
+        throw 'SELFTEST: falha artificial antes da escrita do diagnostico normal.'
+    }
+
     Write-JsonLog -TargetLogPath $resolvedLogPath -JsonPayload $json
     Write-Output $json
     exit $buildStatus.ExitCode
 }
 catch {
-    if (($null -ne $msBuildExitCode) -and ($msBuildExitCode -eq 0)) {
-        $recoveryStatus = 'compilou limpo com falha no pos-processamento'
-        $recoverySummary = 'BuildAll concluiu sem erro de MSBuild, mas o wrapper falhou ao montar o diagnostico. Consulte msbuild.stdout.log nos artefatos.'
+    $outerCatchError = $_.Exception.Message
+    $postProcessingError = $outerCatchError
+    if ($null -ne $msBuildExitCode) {
         $recoveryBuildAllDone = $false
         $recoveryKbOpen = $false
-        $recoveryStdErrContent = @()
+        $recoveryStdOut = ''
+        $recoveryStdErr = $stdErrText
         $recoveryStdErrFilteredNoise = @()
+        $recoveryStdErrContent = @()
         try {
             if (-not [string]::IsNullOrWhiteSpace($stdOutPath) -and (Test-Path -LiteralPath $stdOutPath -PathType Leaf)) {
                 $recoveryStdOut = Read-TextFileSafe -PathValue $stdOutPath
@@ -2232,32 +2250,62 @@ catch {
             # best effort apenas
         }
         try {
-            if (-not [string]::IsNullOrWhiteSpace($stdErrPath) -and (Test-Path -LiteralPath $stdErrPath -PathType Leaf)) {
+            if ([string]::IsNullOrEmpty($recoveryStdErr) -and -not [string]::IsNullOrWhiteSpace($stdErrPath) -and (Test-Path -LiteralPath $stdErrPath -PathType Leaf)) {
                 $recoveryStdErr = Read-TextFileSafe -PathValue $stdErrPath
-                $recoveryStdErrClassification = Get-GeneXusMsBuildStderrNoiseClassification -Text $recoveryStdErr
-                $recoveryStdErrContent = Split-NonEmptyLines -Text $recoveryStdErrClassification.FilteredText
-                $recoveryStdErrFilteredNoise = Split-NonEmptyLines -Text $recoveryStdErrClassification.NoiseText
             }
+            $recoveryStdErrClassification = Get-GeneXusMsBuildStderrNoiseClassification -Text $recoveryStdErr
+            $recoveryStdErrContent = Split-NonEmptyLines -Text $recoveryStdErrClassification.FilteredText
+            $recoveryStdErrFilteredNoise = Split-NonEmptyLines -Text $recoveryStdErrClassification.NoiseText
         }
         catch {
             # best effort apenas
         }
 
+        $recoveryBuildStatus = $buildStatus
+        if ($null -eq $recoveryBuildStatus) {
+            $recoveryReorgDetected = [bool](($recoveryStdOut + $recoveryStdErr) -match '(?i)reorgan')
+            $recoveryBuildStatus = Resolve-BuildStatus `
+                -MsBuildExitCode $msBuildExitCode `
+                -KbOpen $recoveryKbOpen `
+                -BuildAllDone $recoveryBuildAllDone `
+                -ReorgDetected $recoveryReorgDetected `
+                -TimedOut $timedOut `
+                -AllowReorgConfirmed $allowReorgConfirmed
+        }
+
+        if (($recoveryBuildStatus.Status -eq 'compilou limpo') -and (-not $recoveryKbOpen -or -not $recoveryBuildAllDone)) {
+            $recoveryBuildStatus = Resolve-BuildStatus `
+                -MsBuildExitCode $msBuildExitCode `
+                -KbOpen $recoveryKbOpen `
+                -BuildAllDone $recoveryBuildAllDone `
+                -ReorgDetected $false `
+                -TimedOut $timedOut `
+                -AllowReorgConfirmed $allowReorgConfirmed
+        }
+
+        $recoveryExitCode = [int]$recoveryBuildStatus.ExitCode
+        $recoveryStatus = [string]$recoveryBuildStatus.Status
+        $recoverySummary = [string]$recoveryBuildStatus.Summary
+        if (($recoveryExitCode -eq 0) -and ($recoveryStatus -eq 'compilou limpo') -and $recoveryKbOpen -and $recoveryBuildAllDone) {
+            $recoveryStatus = 'compilou limpo com falha no pos-processamento'
+            $recoverySummary = 'BuildAll concluiu sem erro de MSBuild e com marcador de conclusão, mas o wrapper falhou ao montar o diagnóstico. Consulte msbuild.stdout.log nos artefatos.'
+        } else {
+            $recoverySummary = $recoverySummary + ' O diagnóstico completo falhou após o MSBuild; a classificação e a evidência disponível foram preservadas.'
+        }
+
         $recovery = [ordered]@{
             status               = $recoveryStatus
             summary              = $recoverySummary
-            exitCode             = 0
+            exitCode             = $recoveryExitCode
             executionEvidence    = [ordered]@{
                 msBuildExitCode = $msBuildExitCode
-                msBuildFailed   = $false
-                wrapperExitCode = 0
+                msBuildFailed   = ($msBuildExitCode -ne 0)
+                wrapperExitCode = $recoveryExitCode
                 StdOutPath      = $stdOutPath
                 StdErrPath      = $stdErrPath
             }
             postProcessingFailed = $true
-            postProcessingError  = $_.Exception.Message
-            stderrContent        = $recoveryStdErrContent
-            stderrFilteredNoise  = $recoveryStdErrFilteredNoise
+            postProcessingError  = $postProcessingError
             stage                = 'build-all'
             observedContext      = [ordered]@{
                 KbOpen       = $recoveryKbOpen
@@ -2278,6 +2326,11 @@ catch {
             }
             watcherContext       = $script:WatcherContext
             timing               = (Get-GeneXusMsBuildTimingSection -TimingLog $script:TimingLog -MonitorLogPath $MonitorLogPath)
+            stderrContent        = @($recoveryStdErrContent | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+            stderrFilteredNoise  = @($recoveryStdErrFilteredNoise | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+            blockingReasons      = @($script:BlockingReasons)
+            warnings             = @($script:Warnings)
+            strategyTrace        = @($script:StrategyTrace)
             note                 = 'Diagnostico completo indisponivel apos falha interna; consultar msbuild.stdout.log para evidencia primaria. buildSignals.Complete=true: reorg/erros/eventos pos-build sao integrais e confiaveis (nao reabrir o log para eles). Complete=false: bucket parcial — campo null nao e zero/vazio, reabrir o log para os campos null.'
         }
         try {
@@ -2291,7 +2344,7 @@ catch {
                 # best effort apenas
             }
             Write-Output $recoveryJson
-            exit 0
+            exit $recoveryExitCode
         }
         catch {
             # cair no failure padrão abaixo

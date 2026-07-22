@@ -23,11 +23,11 @@
       - 'agentlist'= `opencode agent list` falhou/timeout/erro (INTERMITENTE — SQLite
                      `PRAGMA wal_checkpoint`; transitorio -> retentar).
 
-    Pos-check (defesa-em-profundidade, NAO a barreira): Test-OpenCodeReviewerRoFallbackWarning
-    varre stderr pelo warning de fallback silencioso (`agent "..." not found. Falling back to
-    default agent`), que o opencode emite quando `--agent <ausente>` cai no `build` full-access.
+    Pos-check (defesa-em-profundidade, NAO a barreira do spawn): Test-OpenCodeReviewerRoFallbackWarning
+    varre stderr pelo warning generico de fallback silencioso (`agent "..." not found. Falling back to
+    default agent`), que o opencode emite quando `--agent <ausente>` cai no agente default.
 
-    Claims empiricos medidos em opencode 1.4.4 (fixtures versionados em
+    Claims empiricos medidos em opencode 1.17.20 (fixtures versionados em
     xpz-llm-delegate/fixtures/opencode-reviewer-ro/). Se um claim nao reproduzir na versao
     instalada, o pre-check (versao) ja bloqueia — NAO ativar sem revisitar D2/D3.
 .NOTES
@@ -421,7 +421,7 @@ function Test-OpenCodeReviewerRoPrecheck {
     }
     if ($installed -ne $ExpectedVersion) {
         return @{ pass = $false; reason = 'version'
-            detail = "opencode $installed != versao testada dos fixtures ($ExpectedVersion). Os claims de resolucao podem nao valer; revisitar D2/D3 e re-capturar fixtures antes de ativar." }
+            detail = "opencode $installed != versao testada dos fixtures ($ExpectedVersion). Os claims de resolucao podem nao valer; antes de desistir, rode scripts/Test-OpenCodeReviewerRoInstalledCompatibility.ps1 -AsJson para diagnostico estrutural. Se a estrutura estiver OK, re-capture os fixtures empiricos do reviewer-ro para esta versao antes de ativar." }
     }
 
     # 3) agent list -> allow-set exato + external_directory nao-allow
@@ -471,11 +471,17 @@ function Test-OpenCodeAgentResolves {
 
 function Test-OpenCodeReviewerRoFallbackWarning {
     <#
-        Pos-check (defesa-em-profundidade): $true se o texto contiver o warning de fallback
-        silencioso do opencode (`agent "..." not found. Falling back to default agent`), sinal de
-        que o `--agent` caiu no `build` full-access. Tolera codigos ANSI e o nome entre aspas.
+        Pos-check (defesa-em-profundidade): $true se o texto contiver o warning generico de
+        fallback silencioso do opencode (`agent "..." not found. Falling back to default agent`),
+        sinal de que o `--agent` caiu no agente default. O padrao logico e exposto por
+        Get-OpenCodeReviewerRoFallbackWarningPattern.
     #>
     param([string] $Text)
     if ([string]::IsNullOrEmpty($Text)) { return $false }
-    return ($Text -match 'not found\. Falling back to default agent')
+    return ($Text -match (Get-OpenCodeReviewerRoFallbackWarningPattern))
+}
+
+function Get-OpenCodeReviewerRoFallbackWarningPattern {
+    <# Padrao logico unico do warning de fallback silencioso emitido pelo opencode. #>
+    return 'not found\. Falling back to default agent'
 }

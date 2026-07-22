@@ -71,9 +71,9 @@ Reúne as duas entradas do `999` que eram **problema** e **conserto** da mesma c
 **Correção de premissas (medido em opencode 1.4.4 — o self-test é o gate dos claims):**
 
 - **`permission: deny` ≡ `tools: false`** — a nota antiga do `999` («`tools: false` desabilita a ferramenta, **mais forte** que `permission: deny`») está **REFUTADA pela medição**: os dois resolvem idêntico e removem a tool em headless. A forma canônica é `permission` (curinga `"*": deny` funciona por last-match-wins; `webfetch`/`websearch`/`task: deny` removem as tools).
-- **Eixo de leitura NÃO é machine-wide** — a nota antiga («`read` lê qualquer arquivo da máquina») está **invertida pela medição**: o opencode tem a dimensão nativa `external_directory` (base `ask`, auto-rejeitada em headless) que gateia leituras **fora** do cwd; o reviewer-ro fixa `external_directory: deny` explícito → leitura **confinada ao cwd herdado**, garantida e independente do modo.
+- **Eixo de leitura NÃO é machine-wide** — a nota antiga («`read` lê qualquer arquivo da máquina») está **invertida pela medição**: o opencode tem a dimensão nativa `external_directory` (base `ask`, auto-rejeitada em headless) que gateia leituras **fora** do cwd; o reviewer-ro fixa `external_directory: deny` explícito → leitura fora do cwd fica **bloqueada por padrão**, sem provar isolamento absoluto de todo path externo específico.
 
-**ADIADO (entrada nova no `999`, eixo de leitura):** liberar opencode em `kb-sensitive`/pasta paralela (segue `unavailable`) + **mecanizar cwd-seguro** (hoje o confinamento é ao cwd HERDADO, mas escolher um cwd sem segredos não-versionados é responsabilidade operacional de quem dispara).
+**ADIADO (entrada nova no `999`, eixo de leitura):** liberar opencode em `kb-sensitive`/pasta paralela (segue `unavailable`) + **mecanizar cwd-seguro** (hoje o bloqueio de leitura fora do cwd herdado não protege `.env`, logs, caches ou outros segredos não-versionados dentro do próprio cwd; escolher um cwd seguro é responsabilidade operacional de quem dispara).
 
 ### Rastreabilidade
 

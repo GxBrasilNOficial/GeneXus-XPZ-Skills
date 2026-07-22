@@ -11,6 +11,11 @@
     responded->noResponse (off-task), single-flight nem confinamento do opencode. Tudo isso e do
     ORQUESTRADOR (fora deste script). Ver 15-revisao-por-pares.md e xpz-llm-delegate/SKILL.md.
 
+    Aceita exatamente uma origem de manuscrito: -ManuscriptPath (legado) OU -ManuscriptText.
+    No modo -ManuscriptText, prepara artefatos transacionais com New-LlmDelegatePeerReviewArtifacts.ps1
+    antes de qualquer gate/despacho; falha de preparacao emite summary proprio com rodada/despacho
+    nao iniciados e zero revisores despachados.
+
     Por revisor (sequencial, pre-despacho):
       - opencode em kb-sensitive -> state=unavailable (sem gate, sem despacho; confinamento diferido);
       - modelo efetivo + fail-closeds (ver -ReviewersJson);
@@ -24,19 +29,25 @@
     Despacho CONCORRENTE: ForEach-Object -Parallel -ThrottleLimit 8 + SemaphoreSlim($OllamaConcurrency)
     via $using: SO para family 'ollama-cloud' (validado empirico PS 7.6.2). Captura antes do Dispose.
 
-    Classificacao do resultado (ESTRUTURAL, sem parsear prosa): texto nao-vazio -> responded;
-    sentinela de cota (BLOCK + 429/limite de uso) -> unavailable; timeout (BLOCK excedeu ... encerrado)
-    -> timeout; vazio/resto -> error. Sem single-flight (diferido).
+    Classificacao do resultado (ESTRUTURAL, sem parsear prosa de parecer): texto nao-vazio -> responded;
+    sentinela de cota/saldo/limite -> quota; timeout (BLOCK excedeu ... encerrado) -> timeout;
+    vazio/resto -> error. Sem single-flight (diferido).
 
     DISCIPLINA DE STDOUT: este harness e processo filho. panel-summary.json e a UNICA linha de stdout.
     Todo texto humano sai por [Console]::Error (Write-Host/Write-Warning/Write-Information VAZAM para o
     stdout capturado num processo filho; so [Console]::Error fica fora). O chamador DEVE capturar stdout
     e stderr SEPARADAMENTE; redirecionar stderr->stdout corromperia o JSON.
 .PARAMETER ManuscriptPath
-    Caminho do manuscrito enviado a cada revisor (UTF-8). Repassado como -MessagePath ao adapter.
+    Caminho do manuscrito enviado a cada revisor (UTF-8). Exclusivo com -ManuscriptText.
+.PARAMETER ManuscriptText
+    Texto do manuscrito. Exclusivo com -ManuscriptPath; gera manuscript.md/reviewers.json/manifest
+    em <TempDir>\<RoundId> antes de iniciar o despacho. Use apenas para payload curto; para
+    payload grande, use -ManuscriptPath para evitar o limite de linha de comando do Windows.
 .PARAMETER ReviewersJson
-    Array JSON [{backend, targetModelKey, invokeArgs, family?}] inline OU caminho de arquivo. O
-    orquestrador ja decidiu o conjunto (subagente nativo injetado FORA). family por ordem: explicita
+    Array JSON [{backend, targetModelKey, invokeArgs, family?, rank?, fallbackChain?}] inline OU caminho de arquivo. O
+    orquestrador ja decidiu o conjunto (subagente nativo injetado FORA). fallbackChain[] e lista ordenada
+    de revisores completos; o harness registra attemptRole/fallbackOf/countsForDiversity no resultado.
+    family por ordem: explicita
     -> targetModelKey canonico do gate (split '/'[0]) -> $null (despachavel, mas nao conta no piso).
     Modelo efetivo: opencode = invokeArgs.model ou o targetModelKey de ENTRADA (o resolvedor opencode
     exige -Model; o gate recebe o mesmo valor); codex = invokeArgs.model ou, se ausente, gate SEM -Model
@@ -71,7 +82,8 @@
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)] [string] $ManuscriptPath,
+    [string] $ManuscriptPath,
+    [AllowEmptyString()] [string] $ManuscriptText,
     [Parameter(Mandatory)] [string] $ReviewersJson,
     [Parameter(Mandatory)] [ValidateSet('public', 'kb-sensitive')] [string] $PayloadSensitivity,
     [string] $RoundId,
@@ -91,6 +103,7 @@ $ErrorActionPreference = 'Stop'
 
 # Disciplina de stdout: UTF-8 sem BOM; o JSON-resumo e a UNICA linha de stdout.
 try { [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false) } catch { }
+$MaxInlineManuscriptChars = 30000
 
 # Adapter por backend; parametro de exe-override (so teste) por backend.
 $AdapterScript = @{
@@ -130,11 +143,114 @@ function Get-Slug {
     return ([regex]::Replace($Value, '[^A-Za-z0-9._-]', '-'))
 }
 
-# 0) Precondicoes de chamador (erro de uso -> nao produz summary)
-if (-not (Test-Path -LiteralPath $ManuscriptPath -PathType Leaf)) {
-    throw "BLOCK: -ManuscriptPath nao encontrado: $ManuscriptPath"
+$quotaFailurePattern = '(?i)(^|[^0-9])402([^0-9]|$)|Payment Required|insufficient coding plan balance|quota|rate limit|weekly usage limit|limite de uso|sem quota|saldo insuficiente'
+$unavailableFailurePattern = '(?i)workspace-not-trusted'
+
+function Test-QuotaFailureMessage {
+    param([AllowNull()] [string] $Message)
+    if ([string]::IsNullOrWhiteSpace($Message)) { return $false }
+    return ($Message -match $script:quotaFailurePattern)
 }
-$manuscriptFull = (Resolve-Path -LiteralPath $ManuscriptPath).Path
+
+function Test-UnavailableFailureMessage {
+    param([AllowNull()] [string] $Message)
+    if ([string]::IsNullOrWhiteSpace($Message)) { return $false }
+    return ($Message -match $script:unavailableFailurePattern)
+}
+
+function Get-FallbackDispatcherTimeoutMs {
+    param($InvokeArgs)
+    $defaultTimeoutMs = 180000
+    $overheadMs = 30000
+    $timeoutSecValue = Get-Prop $InvokeArgs 'timeoutSec'
+    if ($null -eq $timeoutSecValue) { return $defaultTimeoutMs }
+
+    $timeoutSec = 0
+    if (-not [int]::TryParse([string]$timeoutSecValue, [ref]$timeoutSec)) { return $defaultTimeoutMs }
+    if ($timeoutSec -lt 1) { return $defaultTimeoutMs }
+
+    $derivedTimeoutMs = ([int64]$timeoutSec * 1000) + $overheadMs
+    if ($derivedTimeoutMs -lt $defaultTimeoutMs) { return $defaultTimeoutMs }
+    if ($derivedTimeoutMs -gt [int]::MaxValue) { return [int]::MaxValue }
+    return [int]$derivedTimeoutMs
+}
+
+function Get-CurrentPowerShellExecutable {
+    $currentExe = ''
+    try { $currentExe = [string]([System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName) } catch { }
+    if (-not [string]::IsNullOrWhiteSpace($currentExe) -and (Test-Path -LiteralPath $currentExe -PathType Leaf)) {
+        return $currentExe
+    }
+
+    $psHomeExeName = if ($IsWindows) { 'pwsh.exe' } else { 'pwsh' }
+    $psHomeExe = Join-Path $PSHOME $psHomeExeName
+    if (Test-Path -LiteralPath $psHomeExe -PathType Leaf) {
+        return $psHomeExe
+    }
+
+    throw "BLOCK: executavel PowerShell atual nao resolvido para fallback recursivo"
+}
+
+function Test-InvokeArgsBackendDivergence {
+    param($Reviewer, [string]$Label)
+    $backend = [string](Get-Prop $Reviewer 'backend')
+    $invokeArgs = Get-Prop $Reviewer 'invokeArgs'
+    $invBackend = [string](Get-Prop $invokeArgs 'backend')
+    if (-not [string]::IsNullOrWhiteSpace($invBackend) -and $invBackend -ne $backend) {
+        return "invokeArgs.backend ('$invBackend') diverge de backend ('$backend') em $Label"
+    }
+    return $null
+}
+
+function Get-FallbackItems {
+    param($Reviewer)
+    $fallbackItems = Get-Prop $Reviewer 'fallbackChain'
+    if ($null -eq $fallbackItems) { return @() }
+    return @($fallbackItems)
+}
+
+function Add-SkippedFallbackRecords {
+    param(
+        [System.Collections.Generic.List[object]]$Records,
+        [object[]]$FallbackItems,
+        [string]$FallbackOf,
+        [string]$State,
+        [string]$Reason,
+        [int]$BaseRank
+    )
+    for ($skipIdx = 0; $skipIdx -lt @($FallbackItems).Count; $skipIdx++) {
+        $fb = @($FallbackItems)[$skipIdx]
+        $idx = $Records.Count
+        $fbTarget = [string](Get-Prop $fb 'targetModelKey')
+        $fbBackend = [string](Get-Prop $fb 'backend')
+        $Records.Add([ordered]@{
+                index              = $idx
+                backend            = $fbBackend
+                family             = if ($fbTarget) { @($fbTarget -split '/', 2)[0] } else { $null }
+                targetModelKey     = $fbTarget
+                effectiveModel     = [string](Get-Prop (Get-Prop $fb 'invokeArgs') 'model')
+                gateVerdict        = $null
+                state              = $State
+                verdictPath        = $null
+                errorPath          = $null
+                statePath          = $null
+                startedAt          = $null
+                endedAt            = $null
+                durationMs         = $null
+                attempts           = 0
+                reason             = $Reason
+                droppedArgs        = @()
+                securityBlockedArgs = @()
+                attemptRole        = 'fallback'
+                fallbackOf         = $FallbackOf
+                fallbackIndex      = $skipIdx
+                activationReason   = $null
+                countsForDiversity = $false
+                rank               = $BaseRank
+                fallbackChain      = @()
+            })
+    }
+}
 
 $scriptsDir = $PSScriptRoot
 $gateScript = Join-Path $scriptsDir 'Resolve-LlmDelegateAuthorization.ps1'
@@ -148,8 +264,202 @@ $tempRoot = $TempDir
 if ([string]::IsNullOrWhiteSpace($tempRoot)) {
     $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) 'xpz-llm-panel-dispatch'
 }
-$ledgerDir = Join-Path $tempRoot $RoundId
-New-Item -ItemType Directory -Path $ledgerDir -Force | Out-Null
+
+# 0) Precondicoes de chamador: exatamente um entre -ManuscriptPath e -ManuscriptText
+$useManuscriptText = ($PSBoundParameters.ContainsKey('ManuscriptText'))
+$useManuscriptPath = ($PSBoundParameters.ContainsKey('ManuscriptPath'))
+if ($useManuscriptText -eq $useManuscriptPath) {
+    $failureCode = if ($useManuscriptText) { 'manuscript-source-ambiguous' } else { 'manuscript-source-missing' }
+    $message = if ($useManuscriptText) {
+        'Informe apenas um entre -ManuscriptText e -ManuscriptPath.'
+    } else {
+        'Informe exatamente um entre -ManuscriptText e -ManuscriptPath.'
+    }
+    $blockResult = [ordered]@{
+        Kind                         = 'xpz-llm-panel-dispatch-result'
+        SchemaVersion                = 1
+        success                      = $false
+        roundStarted                 = $false
+        dispatchStarted              = $false
+        reviewersDispatched          = 0
+        roundId                      = $RoundId
+        payloadSensitivity           = $PayloadSensitivity
+        parallelKbRoot               = $null
+        policyPath                   = $null
+        manuscriptPath               = $null
+        ollamaConcurrency            = $OllamaConcurrency
+        reviewers                    = @()
+        dispatched                   = 0
+        respondedCount               = 0
+        errorCount                   = 0
+        timeoutCount                 = 0
+        quotaCount                   = 0
+        unavailableCount             = 0
+        gateAsk                      = 0
+        gateDeny                     = 0
+        ollamaQuotaWarning           = $null
+        concurrencySaturationWarning = $null
+        preparationError             = [ordered]@{
+            failureStage = 'parameter-validation'
+            failureCode  = $failureCode
+            message      = $message
+        }
+    }
+    [Console]::Error.WriteLine("BLOCK: ${failureCode}: $message")
+    [Console]::Out.WriteLine(($blockResult | ConvertTo-Json -Compress -Depth 8))
+    exit 1
+}
+if ($useManuscriptText -and $ManuscriptText.Length -gt $MaxInlineManuscriptChars) {
+    $blockResult = [ordered]@{
+        Kind                         = 'xpz-llm-panel-dispatch-result'
+        SchemaVersion                = 1
+        success                      = $false
+        roundStarted                 = $false
+        dispatchStarted              = $false
+        reviewersDispatched          = 0
+        roundId                      = $RoundId
+        payloadSensitivity           = $PayloadSensitivity
+        parallelKbRoot               = $null
+        policyPath                   = $null
+        manuscriptPath               = $null
+        ollamaConcurrency            = $OllamaConcurrency
+        reviewers                    = @()
+        dispatched                   = 0
+        respondedCount               = 0
+        errorCount                   = 0
+        timeoutCount                 = 0
+        quotaCount                   = 0
+        unavailableCount             = 0
+        gateAsk                      = 0
+        gateDeny                     = 0
+        ollamaQuotaWarning           = $null
+        concurrencySaturationWarning = $null
+        preparationError             = [ordered]@{
+            failureStage = 'parameter-validation'
+            failureCode  = 'manuscript-text-too-large'
+            message      = "-ManuscriptText excede $MaxInlineManuscriptChars caracteres; use -ManuscriptPath para payload grande."
+        }
+    }
+    [Console]::Error.WriteLine("BLOCK: manuscript-text-too-large: -ManuscriptText excede $MaxInlineManuscriptChars caracteres; use -ManuscriptPath.")
+    [Console]::Out.WriteLine(($blockResult | ConvertTo-Json -Compress -Depth 8))
+    exit 1
+}
+if ($useManuscriptPath) {
+    if (-not (Test-Path -LiteralPath $ManuscriptPath -PathType Leaf)) {
+        throw "BLOCK: -ManuscriptPath nao encontrado: $ManuscriptPath"
+    }
+    $manuscriptFull = (Resolve-Path -LiteralPath $ManuscriptPath).Path
+    $ledgerDir = Join-Path $tempRoot $RoundId
+    New-Item -ItemType Directory -Path $ledgerDir -Force | Out-Null
+} else {
+    # -ManuscriptText: preparar artefatos transacionalmente
+    $preparerScript = Join-Path $scriptsDir 'New-LlmDelegatePeerReviewArtifacts.ps1'
+    if (-not (Test-Path -LiteralPath $preparerScript -PathType Leaf)) {
+        throw "BLOCK: preparador de artefatos nao encontrado: $preparerScript"
+    }
+    $prepReviewers = if (Test-Path -LiteralPath $ReviewersJson -PathType Leaf) {
+        Get-Content -LiteralPath $ReviewersJson -Raw -Encoding utf8
+    } else {
+        $ReviewersJson
+    }
+    [System.IO.Directory]::CreateDirectory($tempRoot) | Out-Null
+    $prepGuid = [guid]::NewGuid().ToString('N')
+    $prepInputPath = Join-Path $tempRoot ".dispatch-prep-$prepGuid.manuscript.md"
+    $prepReviewersPath = Join-Path $tempRoot ".dispatch-prep-$prepGuid.reviewers.json"
+    $prepStdoutPath = Join-Path $tempRoot ".dispatch-prep-$prepGuid.stdout"
+    $prepStderrPath = Join-Path $tempRoot ".dispatch-prep-$prepGuid.stderr"
+    $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+    [System.IO.File]::WriteAllText($prepInputPath, $ManuscriptText, $utf8NoBom)
+    [System.IO.File]::WriteAllText($prepReviewersPath, $prepReviewers, $utf8NoBom)
+
+    $prepExitCode = $null
+    $prepJson = $null
+    $prepFailureMessage = $null
+    try {
+        $prepArgList = @(
+            '-NoProfile',
+            '-File', $preparerScript,
+            '-ManuscriptPath', $prepInputPath,
+            '-ReviewersJson', $prepReviewersPath,
+            '-RoundId', $RoundId,
+            '-TempDir', $tempRoot
+        )
+        $prepProcess = Start-Process -FilePath (Get-CurrentPowerShellExecutable) -ArgumentList $prepArgList -NoNewWindow -PassThru -RedirectStandardOutput $prepStdoutPath -RedirectStandardError $prepStderrPath
+        if (-not $prepProcess.WaitForExit(120000)) {
+            try { $prepProcess.Kill() } catch { }
+            $prepExitCode = 124
+            $prepFailureMessage = 'Preparador de artefatos excedeu 120s e foi encerrado.'
+        } else {
+            $prepExitCode = [int]$prepProcess.ExitCode
+        }
+
+        $prepStdout = Get-Content -LiteralPath $prepStdoutPath -Raw -Encoding utf8 -ErrorAction SilentlyContinue
+        if ($null -eq $prepStdout) { $prepStdout = '' }
+        if (-not [string]::IsNullOrWhiteSpace($prepStdout)) {
+            $prepJsonLine = @($prepStdout.Trim() -split "`r?`n") | Select-Object -Last 1
+            try { $prepJson = $prepJsonLine | ConvertFrom-Json } catch { $prepFailureMessage = "Preparador retornou JSON invalido: $($_.Exception.Message)" }
+        } elseif ($null -eq $prepFailureMessage) {
+            $prepFailureMessage = 'Preparador nao emitiu JSON no stdout.'
+        }
+    } finally {
+        foreach ($p in @($prepInputPath, $prepReviewersPath, $prepStdoutPath, $prepStderrPath)) {
+            try { Remove-Item -LiteralPath $p -Force -ErrorAction SilentlyContinue } catch { }
+        }
+    }
+
+    $prepSuccess = $false
+    if ($null -ne $prepJson -and $prepJson.PSObject.Properties['success']) {
+        $prepSuccess = [bool]$prepJson.success
+    }
+    if ($prepExitCode -ne 0 -or -not $prepSuccess) {
+        $failureStage = 'artifactPreparation'
+        $failureCode = 'artifact-preparation-failed'
+        $message = $prepFailureMessage
+        if ($null -ne $prepJson) {
+            if ($prepJson.PSObject.Properties['failureStage']) { $failureStage = [string]$prepJson.failureStage }
+            if ($prepJson.PSObject.Properties['failureCode']) { $failureCode = [string]$prepJson.failureCode }
+            if ($prepJson.PSObject.Properties['message']) { $message = [string]$prepJson.message }
+        }
+        if ([string]::IsNullOrWhiteSpace($message)) { $message = 'Preparacao de artefatos falhou.' }
+        $blockResult = [ordered]@{
+            Kind                         = 'xpz-llm-panel-dispatch-result'
+            SchemaVersion                = 1
+            success                      = $false
+            roundStarted                 = $false
+            dispatchStarted              = $false
+            reviewersDispatched          = 0
+            roundId                      = $RoundId
+            payloadSensitivity           = $PayloadSensitivity
+            parallelKbRoot               = $null
+            policyPath                   = $null
+            manuscriptPath               = $null
+            ollamaConcurrency            = $OllamaConcurrency
+            reviewers                    = @()
+            dispatched                   = 0
+            respondedCount               = 0
+            errorCount                   = 0
+            timeoutCount                 = 0
+            quotaCount                   = 0
+            unavailableCount             = 0
+            gateAsk                      = 0
+            gateDeny                     = 0
+            ollamaQuotaWarning           = $null
+            concurrencySaturationWarning = $null
+            preparationError             = [ordered]@{
+                failureStage = $failureStage
+                failureCode  = $failureCode
+                message      = $message
+            }
+        }
+        $blockJson = $blockResult | ConvertTo-Json -Compress -Depth 8
+        [Console]::Error.WriteLine("BLOCK: preparacao de artefatos falhou: $failureCode - $message")
+        [Console]::Out.WriteLine($blockJson)
+        exit 1
+    }
+    $manuscriptFull = [string]$prepJson.artifactPaths.manuscript
+    $ReviewersJson = [string]$prepJson.artifactPaths.reviewers
+    $ledgerDir = Join-Path $tempRoot $RoundId
+}
 
 # Mapa de fake-exe (so teste): inline OU arquivo
 $exeMap = $null
@@ -182,6 +492,7 @@ for ($i = 0; $i -lt $reviewers.Count; $i++) {
     $r = $reviewers[$i]
     $backend = [string](Get-Prop $r 'backend')
     $invokeArgs = Get-Prop $r 'invokeArgs'
+    $fallbackItems = @(Get-FallbackItems -Reviewer $r)
 
     $inputKey = [string](Get-Prop $r 'targetModelKey')
     if ([string]::IsNullOrWhiteSpace($inputKey)) { $inputKey = $null }
@@ -207,6 +518,30 @@ for ($i = 0; $i -lt $reviewers.Count; $i++) {
         reason             = $null
         droppedArgs        = @()
         securityBlockedArgs = @()
+        attemptRole        = 'primary'
+        fallbackOf         = $null
+        fallbackIndex      = $null
+        activationReason   = $null
+        countsForDiversity = $false
+        rank               = if ($null -ne (Get-Prop $r 'rank')) { [int](Get-Prop $r 'rank') } else { $i + 1 }
+        fallbackChain      = @($fallbackItems)
+    }
+
+    $backendDivergence = Test-InvokeArgsBackendDivergence -Reviewer $r -Label "revisor[$i]"
+    if ($backendDivergence) {
+        $rec.state = 'error'
+        $rec.reason = "BLOCK: $backendDivergence"
+        $records.Add($rec); continue
+    }
+    $fallbackDivergence = $null
+    for ($fbIdx = 0; $fbIdx -lt $fallbackItems.Count; $fbIdx++) {
+        $fallbackDivergence = Test-InvokeArgsBackendDivergence -Reviewer $fallbackItems[$fbIdx] -Label "fallbackChain[$fbIdx] de $inputKey"
+        if ($fallbackDivergence) { break }
+    }
+    if ($fallbackDivergence) {
+        $rec.state = 'error'
+        $rec.reason = "BLOCK: $fallbackDivergence"
+        $records.Add($rec); continue
     }
 
     # Backend invalido -> erro defensivo
@@ -419,6 +754,8 @@ try {
             $useSem = ($item.family -eq 'ollama-cloud')
             $acquired = $false
             $result = $null
+            $quotaPattern = $using:quotaFailurePattern
+            $unavailablePattern = $using:unavailableFailurePattern
             # try EXTERNO envolve TODO o corpo: nada (nem Wait, nem Get-Date, nem o build do objeto)
             # escapa do runspace (conforme v11 "o bloco nunca lanca para fora").
             try {
@@ -442,7 +779,9 @@ try {
                 $state = $null; $textOut = $null; $errText = $null
                 if ($null -ne $errRec) {
                     $msg = [string]$errRec.Exception.Message
-                    if ($msg -match 'BLOCK:' -and ($msg -match '429' -or $msg -match 'weekly usage limit' -or $msg -match 'limite de uso')) {
+                    if ($msg -match 'BLOCK:' -and $msg -match $quotaPattern) {
+                        $state = 'quota'
+                    } elseif ($msg -match 'BLOCK:' -and $msg -match $unavailablePattern) {
                         $state = 'unavailable'
                     } elseif ($msg -match 'excedeu' -and $msg -match 'foi encerrado') {
                         $state = 'timeout'
@@ -509,6 +848,162 @@ foreach ($res in $collected) {
     $rec.attempts = $res.attempts
     $rec['__text'] = $res.text
     $rec['__errorText'] = $res.errorText
+    if ([string]::IsNullOrWhiteSpace([string]$rec.reason) -and -not [string]::IsNullOrWhiteSpace([string]$res.errorText)) {
+        $rec.reason = [string]$res.errorText
+    }
+}
+
+# --------------------------------------------------------------------------------------------
+# FALLBACK ORDENADO (segunda passagem): o primario falhou por estado ativavel, entao cada
+# fallback passa pelo mesmo gate/adapter via invocacao recursiva sem herdar autorizacao.
+# Estados de nao tentativa nunca contam diversidade.
+# --------------------------------------------------------------------------------------------
+$activateFallbackOn = @('quota', 'timeout', 'error', 'unavailable')
+$skipPolicyStates = @('gateAsk', 'gateDeny')
+$originalRecords = @($records)
+foreach ($rec in $originalRecords) {
+    $fallbackItems = @($rec.fallbackChain)
+    if ($fallbackItems.Count -eq 0) { continue }
+    if ($rec.state -eq 'responded') {
+        Add-SkippedFallbackRecords -Records $records -FallbackItems $fallbackItems -FallbackOf ([string]$rec.targetModelKey) `
+            -State 'skippedAfterSuccess' -Reason 'fallback nao tentado porque o primario respondeu' -BaseRank ([int]$rec.rank)
+        continue
+    }
+    if ([string]$rec.state -eq 'error' -and [int]$rec.attempts -eq 0 -and [string]$rec.reason -like 'BLOCK:*') {
+        Add-SkippedFallbackRecords -Records $records -FallbackItems $fallbackItems -FallbackOf ([string]$rec.targetModelKey) `
+            -State 'skippedByPolicy' -Reason "fallback nao tentado por erro de validacao pre-despacho: $($rec.reason)" -BaseRank ([int]$rec.rank)
+        continue
+    }
+    if ($skipPolicyStates -contains [string]$rec.state) {
+        Add-SkippedFallbackRecords -Records $records -FallbackItems $fallbackItems -FallbackOf ([string]$rec.targetModelKey) `
+            -State 'skippedByPolicy' -Reason "fallback nao tentado porque o primario terminou em $($rec.state)" -BaseRank ([int]$rec.rank)
+        continue
+    }
+    if ($activateFallbackOn -notcontains [string]$rec.state) {
+        Add-SkippedFallbackRecords -Records $records -FallbackItems $fallbackItems -FallbackOf ([string]$rec.targetModelKey) `
+            -State 'notAttempted' -Reason "fallback nao alcançado; estado primario=$($rec.state)" -BaseRank ([int]$rec.rank)
+        continue
+    }
+
+    $fallbackSucceeded = $false
+    for ($fbIdx = 0; $fbIdx -lt $fallbackItems.Count; $fbIdx++) {
+        $fb = $fallbackItems[$fbIdx]
+        if ($fallbackSucceeded) {
+            Add-SkippedFallbackRecords -Records $records -FallbackItems @($fb) -FallbackOf ([string]$rec.targetModelKey) `
+                -State 'skippedAfterSuccess' -Reason 'fallback nao tentado porque tentativa anterior da cadeia respondeu' -BaseRank ([int]$rec.rank)
+            continue
+        }
+
+        $fbJsonPath = Join-Path $ledgerDir ("fallback-$($rec.index)-$fbIdx.reviewers.json")
+        $fbClean = [pscustomobject]@{
+            backend        = [string](Get-Prop $fb 'backend')
+            targetModelKey = [string](Get-Prop $fb 'targetModelKey')
+            invokeArgs     = (Get-Prop $fb 'invokeArgs')
+            family         = (Get-Prop $fb 'family')
+            rank           = [int]$rec.rank
+        }
+        @($fbClean) | ConvertTo-Json -Depth 10 -AsArray | Set-Content -LiteralPath $fbJsonPath -Encoding utf8
+        $fbArgs = @{
+            ManuscriptPath     = $manuscriptFull
+            ReviewersJson      = $fbJsonPath
+            PayloadSensitivity = $PayloadSensitivity
+            RoundId            = "$RoundId-fb-$($rec.index)-$fbIdx"
+            TempDir            = $tempRoot
+            OllamaConcurrency  = $OllamaConcurrency
+        }
+        if ($Cd) { $fbArgs['Cd'] = $Cd }
+        if ($ParallelKbRoot) { $fbArgs['ParallelKbRoot'] = $ParallelKbRoot }
+        if ($PolicyPath) { $fbArgs['PolicyPath'] = $PolicyPath }
+        if ($OpenCodeConfigPath) { $fbArgs['OpenCodeConfigPath'] = $OpenCodeConfigPath }
+        if ($CodexConfigPath) { $fbArgs['CodexConfigPath'] = $CodexConfigPath }
+        if ($BackendExeMap) { $fbArgs['BackendExeMap'] = $BackendExeMap }
+
+        $fbRecord = $null
+        try {
+            $fbOutPath = Join-Path $ledgerDir ("fallback-$($rec.index)-$fbIdx.stdout.json")
+            $fbErrPath = Join-Path $ledgerDir ("fallback-$($rec.index)-$fbIdx.stderr.txt")
+            $argList = @(
+                '-NoProfile', '-File', $PSCommandPath,
+                '-ManuscriptPath', $fbArgs.ManuscriptPath,
+                '-ReviewersJson', $fbArgs.ReviewersJson,
+                '-PayloadSensitivity', $fbArgs.PayloadSensitivity,
+                '-RoundId', $fbArgs.RoundId,
+                '-TempDir', $fbArgs.TempDir,
+                '-OllamaConcurrency', ([string]$fbArgs.OllamaConcurrency)
+            )
+            foreach ($optionalKey in @('Cd', 'ParallelKbRoot', 'PolicyPath', 'OpenCodeConfigPath', 'CodexConfigPath', 'BackendExeMap')) {
+                if ($fbArgs.ContainsKey($optionalKey)) { $argList += @("-$optionalKey", [string]$fbArgs[$optionalKey]) }
+            }
+            $p = Start-Process -FilePath (Get-CurrentPowerShellExecutable) -ArgumentList $argList -NoNewWindow -PassThru `
+                -RedirectStandardOutput $fbOutPath -RedirectStandardError $fbErrPath
+            $fallbackDispatcherTimeoutMs = Get-FallbackDispatcherTimeoutMs -InvokeArgs $fbClean.invokeArgs
+            $exited = $p.WaitForExit($fallbackDispatcherTimeoutMs)
+            if (-not $exited) {
+                try {
+                    $p.Kill($true)
+                    $p.WaitForExit()
+                } catch { }
+                throw "fallback dispatcher timeout excedeu ${fallbackDispatcherTimeoutMs}ms; processo encerrado"
+            }
+            $fbStdout = ''
+            if (Test-Path -LiteralPath $fbOutPath -PathType Leaf) {
+                $fbStdout = Get-Content -LiteralPath $fbOutPath -Raw -Encoding utf8
+            }
+            if ($p.ExitCode -ne 0 -or [string]::IsNullOrWhiteSpace($fbStdout)) {
+                throw "fallback dispatcher exit=$($p.ExitCode)"
+            }
+            $fbSummary = ($fbStdout.Trim() -split "`r?`n" | Select-Object -Last 1) | ConvertFrom-Json
+            $fbRecord = @($fbSummary.reviewers)[0]
+        } catch {
+            $fallbackState = 'error'
+            if ([string]$_.Exception.Message -match 'timeout|excedeu') { $fallbackState = 'timeout' }
+            elseif (Test-QuotaFailureMessage -Message ([string]$_.Exception.Message)) { $fallbackState = 'quota' }
+            elseif (Test-UnavailableFailureMessage -Message ([string]$_.Exception.Message)) { $fallbackState = 'unavailable' }
+            $fbRecord = [pscustomobject]@{
+                backend        = [string](Get-Prop $fb 'backend')
+                targetModelKey = [string](Get-Prop $fb 'targetModelKey')
+                family         = (Get-Prop $fb 'family')
+                state          = $fallbackState
+                reason         = "fallback dispatcher falhou: $($_.Exception.Message)"
+                attempts       = 0
+            }
+        }
+        $newIdx = $records.Count
+        $fbState = [string](Get-Prop $fbRecord 'state')
+        $counts = ($fbState -eq 'responded')
+        $records.Add([ordered]@{
+                index              = $newIdx
+                backend            = [string](Get-Prop $fbRecord 'backend')
+                family             = [string](Get-Prop $fbRecord 'family')
+                targetModelKey     = [string](Get-Prop $fbRecord 'targetModelKey')
+                effectiveModel     = [string](Get-Prop $fbRecord 'effectiveModel')
+                gateVerdict        = [string](Get-Prop $fbRecord 'gateVerdict')
+                state              = $fbState
+                verdictPath        = [string](Get-Prop $fbRecord 'verdictPath')
+                errorPath          = [string](Get-Prop $fbRecord 'errorPath')
+                statePath          = [string](Get-Prop $fbRecord 'statePath')
+                startedAt          = [string](Get-Prop $fbRecord 'startedAt')
+                endedAt            = [string](Get-Prop $fbRecord 'endedAt')
+                durationMs         = Get-Prop $fbRecord 'durationMs'
+                attempts           = [int](Get-Prop $fbRecord 'attempts')
+                reason             = [string](Get-Prop $fbRecord 'reason')
+                droppedArgs        = @(Get-Prop $fbRecord 'droppedArgs')
+                securityBlockedArgs = @(Get-Prop $fbRecord 'securityBlockedArgs')
+                attemptRole        = 'fallback'
+                fallbackOf         = [string]$rec.targetModelKey
+                fallbackIndex      = $fbIdx
+                activationReason   = [string]$rec.state
+                countsForDiversity = $counts
+                rank               = [int]$rec.rank
+                fallbackChain      = @()
+            })
+        if ($fbState -eq 'responded') { $fallbackSucceeded = $true }
+    }
+}
+
+foreach ($rec in $records) {
+    if ($rec.state -eq 'responded') { $rec.countsForDiversity = $true }
+    if ($rec.state -in @('skippedByPolicy', 'skippedAfterSuccess', 'notAttempted')) { $rec.countsForDiversity = $false }
 }
 
 # --------------------------------------------------------------------------------------------
@@ -530,20 +1025,27 @@ foreach ($rec in $records) {
 
     switch ($rec.state) {
         'responded' {
-            $path = Join-Path $ledgerDir "$baseName.verdict.txt"
-            Set-Content -LiteralPath $path -Value ([string]$text) -Encoding utf8
-            $rec.verdictPath = $path
+            if ([string]::IsNullOrWhiteSpace([string]$rec.verdictPath)) {
+                $path = Join-Path $ledgerDir "$baseName.verdict.txt"
+                Set-Content -LiteralPath $path -Value ([string]$text) -Encoding utf8
+                $rec.verdictPath = $path
+            }
         }
         { $_ -in @('error', 'timeout') } {
-            $path = Join-Path $ledgerDir "$baseName.error.txt"
-            $content = if ($errText) { $errText } else { [string]$rec.reason }
-            Set-Content -LiteralPath $path -Value ([string]$content) -Encoding utf8
-            $rec.errorPath = $path
+            if ([string]::IsNullOrWhiteSpace([string]$rec.errorPath)) {
+                $path = Join-Path $ledgerDir "$baseName.error.txt"
+                $content = if ($errText) { $errText } else { [string]$rec.reason }
+                Set-Content -LiteralPath $path -Value ([string]$content) -Encoding utf8
+                $rec.errorPath = $path
+            }
         }
-        { $_ -in @('gateAsk', 'gateDeny', 'unavailable') } {
-            $path = Join-Path $ledgerDir "$baseName.state.txt"
-            Set-Content -LiteralPath $path -Value ([string]$rec.reason) -Encoding utf8
-            $rec.statePath = $path
+            { $_ -in @('gateAsk', 'gateDeny', 'quota', 'unavailable', 'skippedByPolicy', 'skippedAfterSuccess', 'notAttempted') } {
+            if ([string]::IsNullOrWhiteSpace([string]$rec.statePath)) {
+                $path = Join-Path $ledgerDir "$baseName.state.txt"
+                $content = if ($errText) { $errText } else { [string]$rec.reason }
+                Set-Content -LiteralPath $path -Value ([string]$content) -Encoding utf8
+                $rec.statePath = $path
+            }
         }
     }
     $reviewerFiles.Add([pscustomobject]@{
@@ -555,11 +1057,11 @@ foreach ($rec in $records) {
     if ($rec.Contains('__errorText')) { $rec.Remove('__errorText') }
 }
 
-# concurrencySaturationWarning: 2+ ollama-cloud/* em error neste lote (sem redisparo - single-flight diferido)
+# concurrencySaturationWarning: 2+ ollama-cloud/* em error neste lote (sem redisparo automatico - single-flight diferido)
 $ollamaErrors = @($records | Where-Object { $_.family -eq 'ollama-cloud' -and $_.state -eq 'error' }).Count
 $concurrencySaturationWarning = $null
 if ($ollamaErrors -ge 2) {
-    $concurrencySaturationWarning = "concurrencySaturationWarning: $ollamaErrors revisores ollama-cloud/* terminaram em error neste lote; possivel saturacao de concorrencia. Sem redisparo automatico (single-flight diferido) — o orquestrador pode redisparar isolado."
+    $concurrencySaturationWarning = "concurrencySaturationWarning: $ollamaErrors revisores ollama-cloud/* terminaram em error neste lote; possivel saturacao de concorrencia. Sem redisparo automatico (single-flight diferido) — o orquestrador so pode redisparar isolado com decisao humana explicita."
 }
 
 # Contagens
@@ -567,6 +1069,7 @@ $dispatched = @($records | Where-Object { [int]$_.attempts -ge 1 }).Count
 $respondedCount = @($records | Where-Object { $_.state -eq 'responded' }).Count
 $errorCount = @($records | Where-Object { $_.state -eq 'error' }).Count
 $timeoutCount = @($records | Where-Object { $_.state -eq 'timeout' }).Count
+$quotaCount = @($records | Where-Object { $_.state -eq 'quota' }).Count
 $unavailableCount = @($records | Where-Object { $_.state -eq 'unavailable' }).Count
 $gateAskCount = @($records | Where-Object { $_.state -eq 'gateAsk' }).Count
 $gateDenyCount = @($records | Where-Object { $_.state -eq 'gateDeny' }).Count
@@ -579,6 +1082,10 @@ $policyPathOut = $null; if (-not [string]::IsNullOrWhiteSpace($PolicyPath)) { $p
 $summary = [ordered]@{
     Kind                         = 'xpz-llm-panel-dispatch-result'
     SchemaVersion                = 1
+    success                      = $true
+    roundStarted                 = $true
+    dispatchStarted              = $true
+    reviewersDispatched          = $dispatched
     roundId                      = $RoundId
     payloadSensitivity           = $PayloadSensitivity
     parallelKbRoot               = $parallelKbRootOut
@@ -590,11 +1097,13 @@ $summary = [ordered]@{
     respondedCount               = $respondedCount
     errorCount                   = $errorCount
     timeoutCount                 = $timeoutCount
+    quotaCount                   = $quotaCount
     unavailableCount             = $unavailableCount
     gateAsk                      = $gateAskCount
     gateDeny                     = $gateDenyCount
     ollamaQuotaWarning           = $ollamaQuotaWarning
     concurrencySaturationWarning = $concurrencySaturationWarning
+    preparationError             = $null
 }
 
 $summaryPath = Join-Path $ledgerDir 'panel-summary.json'

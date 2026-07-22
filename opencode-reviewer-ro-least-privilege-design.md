@@ -27,8 +27,8 @@ Eixos de risco: (i) execução/escrita local; (ii) exfiltração (agravante do m
 
 - **Fecha:** escrita/execução (`bash`/`edit`) e as **ferramentas** de rede (`webfetch`/`websearch`).
 - **NÃO fecha (residual nomeado e aceito em `public`):** o canal do próprio parecer ao provider
-  (inerente a qualquer revisor externo). A leitura fica **confinada ao workspace do cwd** (ver D4),
-  não é machine-wide — mas o D-min **não mecaniza** "o cwd é seguro" (isso é operacional).
+  (inerente a qualquer revisor externo). `external_directory` bloqueia por padrão leitura fora
+  do workspace do cwd (ver D4), mas não prova isolamento absoluto nem torna o cwd seguro.
 - **ADIADO para outra sessão:** liberar opencode em `kb-sensitive`/pasta paralela de KB, e mecanizar
   a contenção de leitura (cwd-seguro). Hoje opencode em `kb-sensitive` é `unavailable`
   (`Invoke-LlmDelegatePanelDispatch.ps1:253-258`).
@@ -80,10 +80,11 @@ campo, cair para estático + hash do arquivo, aceitando o ponto cego de merge-gl
 
 **Pós-check (DEFESA-EM-PROFUNDIDADE, não a barreira).** Síncrono (`Invoke-OpenCode.ps1`): lê o
 CONTEÚDO de `$err` (arquivo temp descartado no `finally` em `:200`) **antes** do `Remove-Item`, e
-varre pelo warning de fallback. Assíncrono (`Start-OpenCodeJob.ps1` não tem `finally`-remove — usa
-limpeza por idade, `:89-96`): o check de fallback é **diagnóstico** no `Watch-OpenCodeJob.ps1`
-(`:211-214`, que já lê o stderr persistido). O pós-check assíncrono é diagnóstico, **não**
-bloqueador (o pré-check no spawn é a barreira).
+varre pelo warning de fallback. Assíncrono: `Start-OpenCodeJob.ps1` mantém artefatos do job por
+idade e `Watch-OpenCodeJob.ps1` lê o stderr persistido. Depois do contrato v2 do watcher, fallback
+assíncrono para `build`/default não é mais apenas diagnóstico aceitável: ele invalida o aceite
+técnico (`resultAccepted=false`, `watcherExitCode=20`) e só permanece como diagnóstico em
+`fallbackDetail`.
 
 **Limite operacional:** o fail-closed torna o opencode-revisor **indisponível** sob contenção
 transitória de SQLite. Registrar `unavailable` (+ motivo) no recibo e aplicar a régua normal de
@@ -118,9 +119,9 @@ permission:
   webfetch: deny
   websearch: deny
   task: deny
-  external_directory: deny   # confina leitura ao cwd (ver D4)
+  external_directory: deny   # bloqueia por padrão leitura fora do cwd (ver D4)
 ```
-`mode: all` (garante seleção por `--agent` em headless). Medido em opencode 1.4.4: `permission:deny`
+`mode: all` (garante seleção por `--agent` em headless). Medido em opencode 1.17.20: `permission:deny`
 ≡ `tools:false` (resolvem idêntico, removem a tool em headless); `webfetch/websearch/task: deny`
 removem as tools; `"*": deny` curinga funciona. A nota de `999:168` ("`tools:false` mais forte que
 `permission:deny`") é **refutada pela medição** — corrigir **condicionada** ao self-test confirmar.
@@ -136,14 +137,17 @@ self-test; passo de **migração** do interino global (forma antiga `tools:` →
 dependência de setup (o `agentsPath` dele é do MCP do Cursor — `999:167` — não cobre agentes
 opencode).
 
-**Merge global↔project comprovado LIMPO:** o project-local substitui o agente inteiro (não mistura
-campo a campo).
+**Global-only e project-local resolvem o contrato least-privilege:** o global provisionado e o
+project-local resolvem `*` final `deny` + allow-set `{read,grep,glob,list}`. A captura sanitizada
+1.17.20 ficou byte-equivalente entre os dois caminhos; isso cobre o contrato efetivo fora da raiz
+do repo, mas não deve ser lido como prova independente de semântica de merge/substituição campo a
+campo.
 
 **Pré-requisito de cwd:** opencode **não** recebe `-Cd` (`Invoke-LlmDelegatePanelDispatch.ps1:362-363`
 `$cdCapable` exclui opencode; `:373` `(Get-Location).Path` é código morto para opencode). Herda a
 cwd ambiente (`Invoke-OpenCode.ps1:135`, `Start-Process` sem `-WorkingDirectory`).
 
-### D4 — Escopo D-min; leitura confinada ao cwd herdado; cwd-seguro é OPERACIONAL
+### D4 — Escopo D-min; bloqueio padrão fora do cwd herdado; cwd-seguro é OPERACIONAL
 
 Fecha escrita/execução e as **ferramentas** de rede (`webfetch/websearch` negadas) — **não** o canal
 do parecer ao provider (residual aceito).
@@ -151,32 +155,38 @@ do parecer ao provider (residual aceito).
 **Confinamento de leitura (MEDIDO):** a tool `read` **não** lê qualquer arquivo da máquina. O
 opencode tem a dimensão nativa **`external_directory`** (base `action: ask`) que gateia leituras
 **fora** do workspace do cwd; em `opencode run` headless o `ask` é **auto-rejeitado** → ler fora do
-cwd é **bloqueado** (provado: agentes com e sem curinga ambos bloqueados ao ler arquivo fora do cwd,
-pela mesma regra base). `external_directory: deny` explícito (D3) torna o confinamento **garantido**
-e independente do modo. **Este achado INVERTE a premissa** de `SKILL.md:838-840` (que hoje diz que
-`read` lê "qualquer arquivo") — tratar a reescrita da doc como **correção de premissa**, versionada
-por fixture, condicionada ao self-test na versão instalada.
+cwd é **bloqueado por padrão** (provado: agentes com e sem curinga ambos bloquearam a leitura
+do arquivo-sentinela fora do cwd pela mesma regra base). `external_directory: deny` explícito
+(D3) torna o padrão `external_directory[*]` bloqueado independente do modo. Em 1.17.20 há
+exceções `allow` para diretórios internos do opencode, como o tool-output; elas não autorizam
+tratar o cwd como "seguro" nem como proibição absoluta de todo path externo específico.
+**Este achado INVERTE a premissa** de
+`SKILL.md:838-840` (que hoje diz que `read` lê "qualquer arquivo") — tratar a reescrita da doc como
+**correção de premissa**, versionada por fixture, condicionada ao self-test na versão instalada.
 
 **Qual é o cwd:** herdado do orquestrador (`Invoke-OpenCode.ps1:135`, sem `-WorkingDirectory`);
 opencode nunca recebe `-Cd`. Confinamento por **herança**, não por controle explícito.
 
-**Garante / NÃO garante:** garante mecanicamente confinamento ao cwd herdado (`external_directory`,
-self-test). **Não** mecaniza "o cwd é seguro" — não há BLOCK por cwd em `public` (só em
-`kb-sensitive`). cwd-seguro em `public` é **operacional**: o operador dispara revisão `public` da
-raiz do repo de skills (onde, medido, não há segredo REAL versionado — só iscas de self-test).
+**Garante / NÃO garante:** garante mecanicamente o bloqueio padrão de leitura fora do cwd herdado
+(`external_directory`, self-test), sem provar isolamento absoluto de todo path externo específico.
+**Não** mecaniza "o cwd é seguro" — não há BLOCK por cwd em `public` (só em `kb-sensitive`).
+cwd-seguro em `public` é **operacional**: o operador dispara revisão `public` da raiz do repo de
+skills (onde, medido, não há segredo REAL versionado — só iscas de self-test).
 **Nota de operador** (em `SKILL.md`/`15`): "cwd-seguro é responsabilidade de quem dispara; se o cwd
 contiver segredos não-versionados (`.env` local, logs, cache), o revisor pode lê-los; iscas de
-self-test não substituem revisar segredos reais no diretório." Mecanizar cwd-seguro pertence ao
-read-containment **adiado**.
+self-test não substituem revisar segredos reais no diretório." Em 1.17.20 o OpenCode traz proteção
+nativa `read "*.env" -> ask`, mas o bloco posterior `read "*" -> allow` do `reviewer-ro` tende a
+anulá-la por `last-match-wins`; resolver esse recorte é urgente no `999`. Mecanizar cwd-seguro
+pertence ao read-containment **adiado**.
 
 Renomear "read-only" → **"sem execução/escrita"** (a leitura não está totalmente contida).
 
 ## Self-tests, fixtures e GATE DE ATIVAÇÃO
 
-**Fixtures versionados** (capturados em opencode 1.4.4; ancoram os self-tests contra drift de
+**Fixtures versionados** (capturados em opencode 1.17.20; ancoram os self-tests contra drift de
 versão): warning de fallback; `agent list` do `reviewer-ro` (allow-set + `external_directory`);
 equivalência `permission`↔`tools`; merge global↔project; `webfetch/websearch/task: deny` resolvido;
-`"*": deny` curinga; **leitura fora do cwd bloqueada** headless.
+`"*": deny` curinga; **leitura fora do cwd bloqueada por padrão** em headless.
 
 **Novo `scripts/Test-OpenCodeReviewerRoSelfTest.ps1`** (token `OPENCODE_REVIEWER_RO_SELFTEST_OK`):
 (a) default `reviewer-ro` no argv (síncrono E assíncrono); (b) fail-closed com agente ausente /
@@ -189,7 +199,7 @@ preserva comentários/formatação/demais chaves do `opencode.jsonc`. **Não** h
 `public` fora da raiz ⇒ BLOCK" (o D-min não mecaniza cwd-seguro).
 
 **Detecção de versão:** o adapter detecta a versão instalada (`opencode --version`) e a cláusula de
-validade compara contra a versão dos fixtures — não fixar `1.4.4` como produção sem checar.
+validade compara contra a versão dos fixtures — não fixar uma versão como produção sem checar.
 
 **Natureza HONESTA do gate (fold-in G1):** o **runtime** é protegido pelo **pré-check do D2**
 (código, fail-closed) — esse é o mecanismo. O "bloqueio de ativação" pelos self-tests é um **GATE DE
@@ -217,7 +227,8 @@ README trilíngue: refletir em ES/EN se a regra operacional mudar.
 1. **D3** — `.gitignore` (exceção); `.opencode/agent/reviewer-ro.md`; fixtures; instalador;
    self-test. Suíte verde.
 2. **D1+D2** — `Invoke-OpenCode.ps1` (default escopado + pré/pós-check); `Start-OpenCodeJob.ps1`
-   (default + pré-check no spawn); `Watch-OpenCodeJob.ps1` (fallback diagnóstico).
+   (default + pré-check no spawn); `Watch-OpenCodeJob.ps1` (contrato aceito/rejeitado; fallback
+   invalida aceite).
 3. **Doc** — paridade acima.
 4. **Fechamento** — pré-push reforçada (revisão por pares do código real) → push (com ok humano).
 
@@ -226,5 +237,5 @@ README trilíngue: refletir em ES/EN se a regra operacional mudar.
 Congelado após 8 rodadas de revisão por pares (v1→v8) — anthropic (subagente nativo), openai
 (Codex gpt-5.5), ollama-cloud (glm-5.2/kimi-k2.7-code/deepseek-v4-pro), nvidia
 (glm-5.2/kimi-k2.6/deepseek-v4-pro/minimax-m3). Arquitetura nunca reaberta; freeze por decisão
-humana com a prova transferida para os self-tests. Claims empíricos medidos em opencode 1.4.4
+humana com a prova transferida para os self-tests. Claims empíricos promovidos para opencode 1.17.20
 (fixtures versionados).

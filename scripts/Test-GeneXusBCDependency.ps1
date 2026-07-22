@@ -32,7 +32,11 @@ $AttCustomTypeRegex = [regex]::new('<Property>\s*<Name>ATTCUSTOMTYPE</Name>\s*<V
                                    [System.Text.RegularExpressions.RegexOptions]::Singleline)
 $VariableNameRegex  = [regex]::new('Name="(?<name>[^"]*)"',
                                    [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
-$LevelNameRegex     = [regex]::new('<Level\s[^>]*name="(?<n>[^"]+)"',
+$LevelRegex         = [regex]::new('<Level\s(?<attrs>[^>]*)>',
+                                   [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+$LevelNameRegex     = [regex]::new('\bname="(?<n>[^"]+)"',
+                                   [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+$LevelTypeRegex     = [regex]::new('\btype="(?<n>[^"]+)"',
                                    [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
 
 function Normalize-CustomType {
@@ -99,8 +103,16 @@ function Get-TransactionLevels {
     param([string]$XmlPath)
     $text = Get-Content -LiteralPath $XmlPath -Raw -Encoding UTF8
     $names = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
-    foreach ($m in $LevelNameRegex.Matches($text)) {
-        [void]$names.Add($m.Groups['n'].Value)
+    foreach ($m in $LevelRegex.Matches($text)) {
+        $attrs = $m.Groups['attrs'].Value
+        $nameMatch = $LevelNameRegex.Match($attrs)
+        if ($nameMatch.Success) {
+            [void]$names.Add($nameMatch.Groups['n'].Value)
+        }
+        $typeMatch = $LevelTypeRegex.Match($attrs)
+        if ($typeMatch.Success) {
+            [void]$names.Add($typeMatch.Groups['n'].Value)
+        }
     }
     return ,$names
 }
@@ -125,7 +137,7 @@ function Get-BCDependencies {
             TransactionName = $txName
         }
     }
-    return $deps
+    return ,@($deps)
 }
 
 # Validar parâmetros
