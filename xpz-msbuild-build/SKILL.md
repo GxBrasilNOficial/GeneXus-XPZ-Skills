@@ -435,6 +435,10 @@ wrapper deve detectar a falha de `SetActiveVersion`/`SetActiveEnvironment`, emit
 > filtra esse padrão antes de classificar o status — uma execução bem-sucedida cujo stderr
 > contenha apenas esse ruído é classificada como `specify e generate concluídos`. Ver nota
 > expandida com evidência técnica completa na seção `Invoke-GeneXusKbBuildAll.ps1`.
+> O filtro compartilhado também reconhece somente o par comprovado
+> `context [/g_service_worker] <linha>:<coluna> attribute obj isn't defined`; combinações
+> cruzadas (`anonymous` + `obj`, `g_service_worker` + `component`) permanecem em
+> `stderrContent`. O mesmo helper é aplicado no fluxo normal e no recovery.
 
 ### Invoke-GeneXusKbBuildAll.ps1
 
@@ -511,6 +515,15 @@ e confirmação explícita** por frase exata.
   detectada, mas stderr não vazio após filtro de ruído estrutural, ou evento
   pós-build não registrado/não reconhecido (`postBuildEventClassification.shouldDowngrade=true`),
   ou marcador de conclusão não detectado; validação funcional depende de inspeção na IDE
+
+**Eventos de timing no pós-build:** outputs estritamente validados de `TimeSpan`
+(`Days`, `Hours`, `Minutes`, `Seconds`, `Milliseconds`, `Ticks` com inteiro; propriedades
+`Total*` com número completo) e uma data/hora civil válida são ruído estrutural inerte da
+janela e não entram como comandos. As linhas `Powershell New-TimeSpan ...`,
+`Powershell (Get-Date).ToString()` e marcadores como `> Build All Task Sucesso` são eventos
+reais: sem fingerprint em `kb_environment_post_build_event_hashes`, rebaixam por cautela.
+Valores incompletos ou inválidos (`Days: not-a-number`, `TotalSeconds: ERROR`, data impossível)
+também permanecem não reconhecidos e rebaixam; não ampliar esse conjunto sem evidência.
 
 > **Alternativa manual para processo já separado ou retomada após timeout:**
 > Em execução nova de `BuildAll` ou `SpecifyGenerate`, preferir `-StartWatcher` no
@@ -652,6 +665,12 @@ e confirmação explícita** por frase exata.
 > scripts filtram esse padrão antes de classificar o status — uma execução bem-sucedida
 > cujo stderr contenha apenas esse ruído é classificada como `compilou limpo` /
 > `specify e generate concluídos`.
+> Há ainda um segundo par comprovado e fechado:
+> `context [/g_service_worker] <linha>:<coluna> attribute obj isn't defined`. O filtro não
+> aceita o produto cartesiano entre os dois contextos e os dois atributos; qualquer par
+> cruzado continua sendo stderr real. No recovery, as mesmas regras alimentam
+> `stderrFilteredNoise` e `stderrContent`, evitando que a falha de pós-processamento perca
+> essa distinção.
 
 ### Invoke-GeneXusDbImpact.ps1
 

@@ -48,6 +48,48 @@ function Test-GeneXusMsBuildPhaseBoundaryLine {
     return ($Line -match '^\s*=+\s*.*=+\s*$')
 }
 
+function Test-GeneXusPostBuildTimingOutputLine {
+    param(
+        [AllowNull()]
+        [string]$Line
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Line)) {
+        return $false
+    }
+
+    $value = $Line.Trim()
+    if ($value -match '^(Days|Hours|Minutes|Seconds|Milliseconds|Ticks)\s*:\s*[+-]?\d+$') {
+        return $true
+    }
+    if ($value -match '^(TotalDays|TotalHours|TotalMinutes|TotalSeconds|TotalMilliseconds)\s*:\s*[+-]?\d+(?:[.,]\d+)?$') {
+        return $true
+    }
+
+    $dateMatch = [regex]::Match(
+        $value,
+        '^(?<day>\d{1,2})/(?<month>\d{1,2})/(?<year>\d{4})\s+(?<hour>\d{1,2}):(?<minute>\d{2}):(?<second>\d{2})$'
+    )
+    if (-not $dateMatch.Success) {
+        return $false
+    }
+
+    try {
+        $null = [datetime]::new(
+            [int]$dateMatch.Groups['year'].Value,
+            [int]$dateMatch.Groups['month'].Value,
+            [int]$dateMatch.Groups['day'].Value,
+            [int]$dateMatch.Groups['hour'].Value,
+            [int]$dateMatch.Groups['minute'].Value,
+            [int]$dateMatch.Groups['second'].Value
+        )
+        return $true
+    }
+    catch {
+        return $false
+    }
+}
+
 function Test-GeneXusPostBuildWindowDiagnosticLine {
     param(
         [AllowNull()]
@@ -61,6 +103,9 @@ function Test-GeneXusPostBuildWindowDiagnosticLine {
         return $true
     }
     if (Test-GeneXusMsBuildPhaseBoundaryLine -Line $Line) {
+        return $true
+    }
+    if (Test-GeneXusPostBuildTimingOutputLine -Line $Line) {
         return $true
     }
     if ($Line -match '(?i)\(\d+,\d+\)\s*:\s*(warning|error)\s*:') {
@@ -116,7 +161,8 @@ function Test-GeneXusPostBuildEventInert {
     if ([string]::IsNullOrWhiteSpace($Line)) {
         return $true
     }
-    return ($Line -match '^\(commented\)')
+    return (($Line -match '^\(commented\)') -or
+            (Test-GeneXusPostBuildTimingOutputLine -Line $Line))
 }
 
 function Get-GeneXusPostBuildEventNormalizedHash {
@@ -144,26 +190,6 @@ function Test-GeneXusPostBuildEventBenignBySound {
     if ($Line -match '(?i)\bPlaySync\b') { return $true }
     if ($Line -match '(?i)\bPlaySound\b') { return $true }
     if ($Line -match '(?i)\bstart\b.*\.(wav|mp3|wma|wave|mid|midi|aac|ogg|flac)\b') { return $true }
-    return $false
-}
-
-function Test-GeneXusPostBuildEventBenignByTimingDiagnostic {
-    param([AllowNull()][string]$Line)
-
-    # Algumas KBs usam eventos pos-build apenas para imprimir duracao/data no Output.
-    # Essas linhas nao disparam processo externo relevante nem alteram artefatos; sao
-    # tratadas como benignas quando aparecem sem registro explicito do environment.
-    if ([string]::IsNullOrWhiteSpace($Line)) {
-        return $false
-    }
-
-    $value = $Line.Trim()
-    if ($value -match '(?i)^Powershell\s+New-TimeSpan\s+-Start\s+\(Get-Content\s+Inicio\.txt\)\s+-End\s+\(Get-Date\)$') { return $true }
-    if ($value -match '(?i)^Powershell\s+\(Get-Date\)\.ToString\(\)$') { return $true }
-    if ($value -match '^(Days|Hours|Minutes|Seconds|Milliseconds|Ticks|TotalDays|TotalHours|TotalMinutes|TotalSeconds|TotalMilliseconds)\s*:') { return $true }
-    if ($value -match '^\d{1,2}/\d{1,2}/\d{4}\s+\d{1,2}:\d{2}:\d{2}$') { return $true }
-    if ($value -match '^>\s*Build\s+All\s+Task\s+Sucesso$') { return $true }
-
     return $false
 }
 
@@ -203,8 +229,7 @@ function Get-GeneXusPostBuildEventClassification {
                 [void]$unexpected.Add($line)
             }
         } else {
-            if ((Test-GeneXusPostBuildEventBenignBySound -Line $line) -or
-                (Test-GeneXusPostBuildEventBenignByTimingDiagnostic -Line $line)) {
+            if (Test-GeneXusPostBuildEventBenignBySound -Line $line) {
                 [void]$benignFallback.Add($line)
             } else {
                 [void]$unknownFallback.Add($line)

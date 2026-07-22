@@ -60,4 +60,24 @@ if ($emptyEvents.Count -ne 0) {
     throw "Janela vazia nao deveria produzir eventos; obtido: $($emptyEvents.Count)"
 }
 
+$timingWindowLines = @(
+    'Executando eventos pos-construcao ...'
+    'Powershell New-TimeSpan -Start (Get-Content Inicio.txt) -End (Get-Date)'
+    'Days              : 0'
+    'TotalSeconds      : 49,0339218'
+    'Powershell (Get-Date).ToString()'
+    '10/07/2026 16:35:06'
+    '> Build All Task Sucesso'
+    '========== fim =========='
+)
+$timingWindowEvents = @(Get-GeneXusMsBuildPostBuildEventLines -StdOutLines $timingWindowLines)
+if ($timingWindowEvents.Count -ne 3) {
+    throw "Esperava somente 3 comandos/marcadores, sem as 3 linhas de output inerte; obtido: $($timingWindowEvents.Count)"
+}
+if ($timingWindowEvents[0] -notmatch '^Powershell New-TimeSpan' -or
+    $timingWindowEvents[1] -notmatch '^Powershell \(Get-Date\)' -or
+    $timingWindowEvents[2] -ne '> Build All Task Sucesso') {
+    throw "Separacao comando/output de timing inesperada: $($timingWindowEvents -join ' | ')"
+}
+
 Write-Output 'GENEXUS_MSBUILD_POST_BUILD_EVENTS_SUPPORT_SELFTEST_OK'

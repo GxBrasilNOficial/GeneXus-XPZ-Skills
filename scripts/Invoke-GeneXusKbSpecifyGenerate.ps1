@@ -213,6 +213,12 @@ if (-not (Test-Path -LiteralPath $gamPlatformsSupportPath -PathType Leaf)) {
 }
 . $gamPlatformsSupportPath
 
+$stderrNoiseSupportPath = Join-Path (Split-Path -Parent $PSCommandPath) 'GeneXusMsBuildStderrNoiseSupport.ps1'
+if (-not (Test-Path -LiteralPath $stderrNoiseSupportPath -PathType Leaf)) {
+    throw "MSBuild stderr noise support script not found: $stderrNoiseSupportPath"
+}
+. $stderrNoiseSupportPath
+
 $postBuildEventsSupportPath = Join-Path (Split-Path -Parent $PSCommandPath) 'GeneXusMsBuildPostBuildEventsSupport.ps1'
 if (-not (Test-Path -LiteralPath $postBuildEventsSupportPath -PathType Leaf)) {
     throw "Post-build events support script not found: $postBuildEventsSupportPath"
@@ -1309,8 +1315,9 @@ try {
     # GeneXus 18 grava exatamente 3 linhas "context [anonymous] N:N attribute component
     # isn't defined" no stderr durante SpecifyAll — ruído sistêmico do modo headless;
     # a IDE absorve sem registrar. Filtrar antes de classificar.
-    $stdErrFilteredNoise = @([regex]::Matches($stdErrText, '(?m)context \[anonymous\] \d+:\d+ attribute component isn''t defined') | ForEach-Object { $_.Value }) -join "`n"
-    $stdErrFiltered      = ($stdErrText -replace '(?m)^context \[anonymous\] \d+:\d+ attribute component isn''t defined\r?\n?', '').Trim()
+    $stdErrNoiseClassification = Get-GeneXusMsBuildStderrNoiseClassification -Text $stdErrText
+    $stdErrFilteredNoise = $stdErrNoiseClassification.NoiseText
+    $stdErrFiltered      = $stdErrNoiseClassification.FilteredText
 
     # Ruido estrutural GAM/NetCore: GeneXusMsBuildGamPlatformsSupport.ps1 (ver SKILL.md).
     $stdOutLines      = if ([string]::IsNullOrEmpty($stdOutText)) { @() } else { $stdOutText -split "`r?`n" }
@@ -1367,7 +1374,7 @@ try {
     if ($postBuildEventLines.Count -gt 0) {
         $metadataPathForPostBuild = $null
         if ($null -ne $script:DeploymentEnvironmentContext) {
-            $metadataPathForPostBuild = $script:DeploymentEnvironmentContext['kbSourceMetadataPath']
+            $metadataPathForPostBuild = Get-GeneXusKbDeploymentContextValue -DeploymentEnvironmentContext $script:DeploymentEnvironmentContext -Name 'kbSourceMetadataPath'
         }
         $registeredPostBuildHashes = Get-GeneXusRegisteredPostBuildEventHashesForEnvironment `
             -MetadataPath $metadataPathForPostBuild -EnvironmentName $activeEnvironmentOutput
@@ -1502,7 +1509,7 @@ try {
     if ($null -ne $buildStatus -and $msBuildExitCode -eq 0) {
         $validationEnvForDeployBin = $EnvironmentName
         if ($null -ne $script:DeploymentEnvironmentContext) {
-            $ctxResolvedDeploy = $script:DeploymentEnvironmentContext['validationEnvironmentResolved']
+            $ctxResolvedDeploy = Get-GeneXusKbDeploymentContextValue -DeploymentEnvironmentContext $script:DeploymentEnvironmentContext -Name 'validationEnvironmentResolved'
             if (-not [string]::IsNullOrWhiteSpace($ctxResolvedDeploy)) {
                 $validationEnvForDeployBin = $ctxResolvedDeploy
             }
@@ -1523,7 +1530,7 @@ try {
 
         $metadataPathDeploy = $null
         if ($null -ne $script:DeploymentEnvironmentContext) {
-            $metadataPathDeploy = $script:DeploymentEnvironmentContext['kbSourceMetadataPath']
+            $metadataPathDeploy = Get-GeneXusKbDeploymentContextValue -DeploymentEnvironmentContext $script:DeploymentEnvironmentContext -Name 'kbSourceMetadataPath'
         }
 
         # Decide o gate de deploy bin pelo fato (exit 0 + specify e generate concluidos), não pela
@@ -1566,7 +1573,7 @@ try {
 
     if ($null -ne $script:DeploymentEnvironmentContext) {
         if (-not (Test-GeneXusKbActiveEnvironmentMatchesValidation -ActiveEnvironment $activeEnvironmentOutput -DeploymentEnvironmentContext $script:DeploymentEnvironmentContext)) {
-            $expectedEnv = $script:DeploymentEnvironmentContext['validationEnvironmentResolved']
+            $expectedEnv = Get-GeneXusKbDeploymentContextValue -DeploymentEnvironmentContext $script:DeploymentEnvironmentContext -Name 'validationEnvironmentResolved'
             Add-WarningMessage -Message ("ActiveEnvironment observado ('{0}') diverge do environment de validacao resolvido ('{1}'). Nao tratar specify/generate concluidos como validacao deploy nesse environment." -f $activeEnvironmentOutput, $expectedEnv)
         }
     }
@@ -1720,11 +1727,24 @@ catch {
         $recoverySummary = 'SpecifyAll/GenerateOnly concluiu sem erro de MSBuild, mas o wrapper falhou ao montar o diagnostico. Consulte msbuild.stdout.log nos artefatos.'
         $recoverySpecifyDone = $false
         $recoveryGenerateDone = $false
+        $recoveryStdErrContent = @()
+        $recoveryStdErrFilteredNoise = @()
         try {
             if (-not [string]::IsNullOrWhiteSpace($stdOutPath) -and (Test-Path -LiteralPath $stdOutPath -PathType Leaf)) {
                 $recoveryStdOut = Read-TextFileSafe -PathValue $stdOutPath
                 $recoverySpecifyDone = ((Get-MarkerValue -Text $recoveryStdOut -Marker '__SPECIFY_DONE__=') -eq 'true')
                 $recoveryGenerateDone = ((Get-MarkerValue -Text $recoveryStdOut -Marker '__GENERATE_DONE__=') -eq 'true')
+            }
+        }
+        catch {
+            # best effort apenas
+        }
+        try {
+            if (-not [string]::IsNullOrWhiteSpace($stdErrPath) -and (Test-Path -LiteralPath $stdErrPath -PathType Leaf)) {
+                $recoveryStdErr = Read-TextFileSafe -PathValue $stdErrPath
+                $recoveryStdErrClassification = Get-GeneXusMsBuildStderrNoiseClassification -Text $recoveryStdErr
+                $recoveryStdErrContent = Split-NonEmptyLines -Text $recoveryStdErrClassification.FilteredText
+                $recoveryStdErrFilteredNoise = Split-NonEmptyLines -Text $recoveryStdErrClassification.NoiseText
             }
         }
         catch {
@@ -1744,6 +1764,8 @@ catch {
             }
             postProcessingFailed = $true
             postProcessingError  = $_.Exception.Message
+            stderrContent        = $recoveryStdErrContent
+            stderrFilteredNoise  = $recoveryStdErrFilteredNoise
             stage                = 'specify-generate'
             observedContext      = [ordered]@{
                 SpecifyDone       = $recoverySpecifyDone

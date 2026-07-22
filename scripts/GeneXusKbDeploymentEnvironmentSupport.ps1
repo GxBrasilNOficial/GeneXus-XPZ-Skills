@@ -443,12 +443,9 @@ function Test-GeneXusKbActiveEnvironmentMatchesValidation {
         return $true
     }
 
-    if ($DeploymentEnvironmentContext -is [System.Collections.IDictionary]) {
-        $resolved = $DeploymentEnvironmentContext['validationEnvironmentResolved']
-    } else {
-        $property = $DeploymentEnvironmentContext.PSObject.Properties['validationEnvironmentResolved']
-        $resolved = if ($null -ne $property) { $property.Value } else { $null }
-    }
+    $resolved = Get-GeneXusKbDeploymentContextValue `
+        -DeploymentEnvironmentContext $DeploymentEnvironmentContext `
+        -Name 'validationEnvironmentResolved'
     if ([string]::IsNullOrWhiteSpace($resolved)) {
         return $true
     }
@@ -458,6 +455,31 @@ function Test-GeneXusKbActiveEnvironmentMatchesValidation {
     }
 
     return ($ActiveEnvironment.Trim() -ieq $resolved.Trim())
+}
+
+function Get-GeneXusKbDeploymentContextValue {
+    param(
+        [AllowNull()][object]$DeploymentEnvironmentContext,
+        [Parameter(Mandatory = $true)][string]$Name
+    )
+
+    if ($null -eq $DeploymentEnvironmentContext -or [string]::IsNullOrWhiteSpace($Name)) {
+        return $null
+    }
+
+    if ($DeploymentEnvironmentContext -is [System.Collections.IDictionary]) {
+        if ($DeploymentEnvironmentContext.Contains($Name)) {
+            return $DeploymentEnvironmentContext[$Name]
+        }
+        return $null
+    }
+
+    $property = $DeploymentEnvironmentContext.PSObject.Properties[$Name]
+    if ($null -ne $property) {
+        return $property.Value
+    }
+
+    return $null
 }
 
 function Split-GeneXusKbDeploymentMetadataEnvironmentNames {

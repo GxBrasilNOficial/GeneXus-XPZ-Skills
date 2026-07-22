@@ -287,6 +287,12 @@ if (-not (Test-Path -LiteralPath $gamPlatformsSupportPath -PathType Leaf)) {
 }
 . $gamPlatformsSupportPath
 
+$stderrNoiseSupportPath = Join-Path (Split-Path -Parent $PSCommandPath) 'GeneXusMsBuildStderrNoiseSupport.ps1'
+if (-not (Test-Path -LiteralPath $stderrNoiseSupportPath -PathType Leaf)) {
+    throw "MSBuild stderr noise support script not found: $stderrNoiseSupportPath"
+}
+. $stderrNoiseSupportPath
+
 $postBuildEventsSupportPath = Join-Path (Split-Path -Parent $PSCommandPath) 'GeneXusMsBuildPostBuildEventsSupport.ps1'
 if (-not (Test-Path -LiteralPath $postBuildEventsSupportPath -PathType Leaf)) {
     throw "Post-build events support script not found: $postBuildEventsSupportPath"
@@ -588,31 +594,6 @@ function Split-NonEmptyLines {
     [string[]]$result = @($Text -split "(`r`n|`n|`r)" |
                           Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
     return ,$result
-}
-
-function Get-ObjectValueByName {
-    param(
-        [object]$InputObject,
-        [string]$Name
-    )
-
-    if ($null -eq $InputObject -or [string]::IsNullOrWhiteSpace($Name)) {
-        return $null
-    }
-
-    if ($InputObject -is [System.Collections.IDictionary]) {
-        if ($InputObject.Contains($Name)) {
-            return $InputObject[$Name]
-        }
-        return $null
-    }
-
-    $property = $InputObject.PSObject.Properties[$Name]
-    if ($null -ne $property) {
-        return $property.Value
-    }
-
-    return $null
 }
 
 function Resolve-BuildStatus {
@@ -1820,9 +1801,9 @@ try {
     # O GeneXus não conta isso como erro: stdout reporta "0 avisos, 0 erros".
     # Evidencia empirica: FabricaBrasil18 e wsEducacaoSpTeste em 2026-05-10, sempre 3x,
     # mesma posicao, independente do conteúdo da KB. Filtrar antes de classificar.
-    $stdErrBenignNoisePattern = '(?m)^context \[(anonymous|/g_service_worker)\] \d+:\d+ attribute (component|obj) isn''t defined\r?$'
-    $stdErrFilteredNoise = @([regex]::Matches($stdErrText, $stdErrBenignNoisePattern) | ForEach-Object { $_.Value }) -join "`n"
-    $stdErrFiltered      = ($stdErrText -replace ($stdErrBenignNoisePattern + '\r?\n?'), '').Trim()
+    $stdErrNoiseClassification = Get-GeneXusMsBuildStderrNoiseClassification -Text $stdErrText
+    $stdErrFilteredNoise = $stdErrNoiseClassification.NoiseText
+    $stdErrFiltered      = $stdErrNoiseClassification.FilteredText
 
     # Ruido estrutural GAM/NetCore: GeneXusMsBuildGamPlatformsSupport.ps1 (ver SKILL.md).
     $stdOutLines      = if ([string]::IsNullOrEmpty($stdOutText)) { @() } else { $stdOutText -split "`r?`n" }
@@ -1874,7 +1855,7 @@ try {
         # inesperado/nao reconhecido — sino, diagnostico de tempo e deploy registrados não rebaixam mais.
         $metadataPathForPostBuild = $null
         if ($null -ne $script:DeploymentEnvironmentContext) {
-            $metadataPathForPostBuild = Get-ObjectValueByName -InputObject $script:DeploymentEnvironmentContext -Name 'kbSourceMetadataPath'
+            $metadataPathForPostBuild = Get-GeneXusKbDeploymentContextValue -DeploymentEnvironmentContext $script:DeploymentEnvironmentContext -Name 'kbSourceMetadataPath'
         }
         $registeredPostBuildHashes = Get-GeneXusRegisteredPostBuildEventHashesForEnvironment `
             -MetadataPath $metadataPathForPostBuild -EnvironmentName $activeEnvironmentOutput
@@ -2013,7 +1994,7 @@ try {
     if ($null -ne $buildStatus -and $msBuildExitCode -eq 0) {
         $validationEnvForDeployBin = $EnvironmentName
         if ($null -ne $script:DeploymentEnvironmentContext) {
-            $ctxResolvedDeploy = Get-ObjectValueByName -InputObject $script:DeploymentEnvironmentContext -Name 'validationEnvironmentResolved'
+            $ctxResolvedDeploy = Get-GeneXusKbDeploymentContextValue -DeploymentEnvironmentContext $script:DeploymentEnvironmentContext -Name 'validationEnvironmentResolved'
             if (-not [string]::IsNullOrWhiteSpace($ctxResolvedDeploy)) {
                 $validationEnvForDeployBin = $ctxResolvedDeploy
             }
@@ -2034,7 +2015,7 @@ try {
 
         $metadataPathDeploy = $null
         if ($null -ne $script:DeploymentEnvironmentContext) {
-            $metadataPathDeploy = Get-ObjectValueByName -InputObject $script:DeploymentEnvironmentContext -Name 'kbSourceMetadataPath'
+            $metadataPathDeploy = Get-GeneXusKbDeploymentContextValue -DeploymentEnvironmentContext $script:DeploymentEnvironmentContext -Name 'kbSourceMetadataPath'
         }
 
         # Decide o gate de deploy bin pelo fato (exit 0 + BuildAll concluido), não pela string
@@ -2077,7 +2058,7 @@ try {
 
     if ($null -ne $script:DeploymentEnvironmentContext) {
         if (-not (Test-GeneXusKbActiveEnvironmentMatchesValidation -ActiveEnvironment $activeEnvironmentOutput -DeploymentEnvironmentContext $script:DeploymentEnvironmentContext)) {
-            $expectedEnv = Get-ObjectValueByName -InputObject $script:DeploymentEnvironmentContext -Name 'validationEnvironmentResolved'
+            $expectedEnv = Get-GeneXusKbDeploymentContextValue -DeploymentEnvironmentContext $script:DeploymentEnvironmentContext -Name 'validationEnvironmentResolved'
             Add-WarningMessage -Message ("ActiveEnvironment observado ('{0}') diverge do environment de validacao resolvido ('{1}'). Nao tratar compilou limpo como validacao deploy nesse environment." -f $activeEnvironmentOutput, $expectedEnv)
         }
     }
@@ -2238,11 +2219,24 @@ catch {
         $recoverySummary = 'BuildAll concluiu sem erro de MSBuild, mas o wrapper falhou ao montar o diagnostico. Consulte msbuild.stdout.log nos artefatos.'
         $recoveryBuildAllDone = $false
         $recoveryKbOpen = $false
+        $recoveryStdErrContent = @()
+        $recoveryStdErrFilteredNoise = @()
         try {
             if (-not [string]::IsNullOrWhiteSpace($stdOutPath) -and (Test-Path -LiteralPath $stdOutPath -PathType Leaf)) {
                 $recoveryStdOut = Read-TextFileSafe -PathValue $stdOutPath
                 $recoveryBuildAllDone = ((Get-MarkerValue -Text $recoveryStdOut -Marker '__BUILDALL_DONE__=') -eq 'true')
                 $recoveryKbOpen = ((Get-MarkerValue -Text $recoveryStdOut -Marker '__KB_OPEN__=') -eq 'true')
+            }
+        }
+        catch {
+            # best effort apenas
+        }
+        try {
+            if (-not [string]::IsNullOrWhiteSpace($stdErrPath) -and (Test-Path -LiteralPath $stdErrPath -PathType Leaf)) {
+                $recoveryStdErr = Read-TextFileSafe -PathValue $stdErrPath
+                $recoveryStdErrClassification = Get-GeneXusMsBuildStderrNoiseClassification -Text $recoveryStdErr
+                $recoveryStdErrContent = Split-NonEmptyLines -Text $recoveryStdErrClassification.FilteredText
+                $recoveryStdErrFilteredNoise = Split-NonEmptyLines -Text $recoveryStdErrClassification.NoiseText
             }
         }
         catch {
@@ -2262,6 +2256,8 @@ catch {
             }
             postProcessingFailed = $true
             postProcessingError  = $_.Exception.Message
+            stderrContent        = $recoveryStdErrContent
+            stderrFilteredNoise  = $recoveryStdErrFilteredNoise
             stage                = 'build-all'
             observedContext      = [ordered]@{
                 KbOpen       = $recoveryKbOpen
