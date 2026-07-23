@@ -23,6 +23,12 @@ Satellite of `xpz-builder/SKILL.md` for the `API` object type. **Load this file 
 - An `API` service delegates to an implementation object (`=> Proc(...)`). **The real import validates this reference**: it FAILS (`Object Reference <name> not found`) when the implementation Procedure is absent from BOTH the import batch AND the target KB. GeneXus resolves the reference intra-batch (API + its Procedure in the same package → OK) or against the pre-existing KB (staging).
 - **Rule:** package the `API` together with its implementation Procedure(s), OR stage the Procedure(s) into the KB before the API. NEVER import an `API` whose implementation Procedure is absent from both. The batch dependency-ordering gate (`Test-GeneXusBatchDependencyOrdering.ps1`, 9-IDO) does NOT model the `API → Procedure` edge (it only derives edges from `Procedure` objects); this is safe because the import itself resolves the reference — but it means the gate gives no ordering signal for API chains, so the packaging/staging rule above is the operative safeguard.
 
+### Functional list variant — OnlineShopSS evidence (2026-07-23)
+
+- `confirmado-acervo`: in the OnlineShopSS test KB, a public list endpoint used the triad `API -> Procedure -> SDT` with `GET /categories`, a service variable `&SdtCategoryApiResponseCollection` declared as `ATTCUSTOMTYPE=sdt:SdtCategoryApiResponse` plus `AttCollection=True`, and an implementation Procedure in the same package/front. The response SDT root remained an item (`AttCollection=False`); the collection is represented by the variables, not by turning the SDT root into a collection.
+- For API list endpoints that return a collection SDT, treat `Service contract` and `Data contract` as the primary blocks: method/route/signature, output variable, SDT item shape, implementation Procedure, and HTTP proof must stay coherent. If the implementation Procedure lists rows with `For each` over a real Transaction/base table, describe that literally; do not call it "via BC" unless the Procedure declares a variable with `ATTCUSTOMTYPE=bc:<Transaction>`.
+- HTTP 200 on the served endpoint is functional evidence for that method/route/payload/environment only. It is not GAM enforcement evidence; `[SecurityLevel]`, generated OpenAPI, and a public 200 still require the runtime checks documented in [api-gam-runtime.md](api-gam-runtime.md) before any "secure" conclusion.
+
 ### Preview is not API validation
 
 - The import **preview** reports `importTaskSuccess: true` even for an API the **real import rejects** (invalid `[SecurityLevel]` value, missing implementation reference). Preview parses but does NOT run the API grammar/reference validation. **Validate a from-spec `API` by REAL import, never by preview.**
@@ -38,7 +44,8 @@ Satellite of `xpz-builder/SKILL.md` for the `API` object type. **Load this file 
 - [ ] For `API`, `[SecurityLevel]` uses only `None`/`Authentication`/`Authorization` (never `Authorize`)
 - [ ] For `API` with write operations, `SecurityLevel(None)` is NOT the final state; the GAM runtime precondition in `api-gam-runtime.md` was satisfied and the 2-phase smoke passed
 - [ ] For `API`, the implementation Procedure(s) are in the same package or already in the KB (real-import reference resolution)
-- [ ] For `API`, validation used a REAL import (not preview) and enforcement was checked by C# + HTTP smoke (not OpenAPI)
+- [ ] For `API`, validation used a REAL import (not preview); when security/enforcement was in scope, enforcement was checked by C# + HTTP smoke (not OpenAPI), and when it was out of scope that limit was declared explicitly
+- [ ] For `API` returning an SDT collection, the API variable uses `AttCollection=True`, the SDT root remains an item unless a nested schema proves otherwise, and the HTTP proof records method, route, status, payload summary, and served environment separately from security enforcement
 
 ## Related rules in main SKILL.md WORKFLOW
 
@@ -56,5 +63,5 @@ The following API-specific rules live inside WORKFLOW step 11 (Locate template, 
 
 - [api-gam-runtime.md](api-gam-runtime.md) — GAM runtime precondition (Face 2) and the 2-phase enforcement smoke; blocks an unwarranted "secure" conclusion.
 - nexa `object-api.md` and `properties-common-integrated-security.md` — API syntax and integrated-security levels (layer 1). Reference, do not duplicate. Note: nexa `object-api.md` lists `Authorize` for the annotation, which is a documentation bug — use `Authorization`.
-- [01e-moldes-sanitizados-core.md](../../01e-moldes-sanitizados-core.md) — sanitized API molds: the dense `APIExemploIntegracao` and the minimal self-contained triad (API + implementation Procedure + a single response SDT; the request is a path parameter plus a body-enveloped payload — a consumption contract documented in `api-gam-runtime.md`, not a separate request SDT in this minimal mold).
+- [01e-moldes-sanitizados-core.md](../../01e-moldes-sanitizados-core.md) — sanitized API molds: the dense `APIExemploIntegracao` and the minimal self-contained triad (API + implementation Procedure + a single response SDT; includes a documented OnlineShopSS list variant where the Procedure body uses `For each` over a real Transaction/base table, while GAM enforcement remains a separate runtime proof).
 - `historico/IdeiasImplementadas_202607.md` — implemented-idea entry «Criar/alterar objeto GeneXus do tipo `API` (from-spec, com segurança GAM)» with its «Resultados da Fase 0 empírica» block (empirical evidence, dated KMW 4.0.187794 + GAM 3.15.78); the `999-ideias-pendentes.md` entry migrated here on close, leaving only the future scripted-gate item in `999`.

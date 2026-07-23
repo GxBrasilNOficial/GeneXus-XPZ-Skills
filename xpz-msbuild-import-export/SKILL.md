@@ -43,6 +43,8 @@ Orquestre operações de `XPZ` via `MSBuild` com parâmetros explícitos, coleta
 
 > **Exceção — validação de `API` (from-spec):** o `PreviewMode` prioriza inspeção, mas **não valida** uma `API` — reporta `importTaskSuccess:true` mesmo para `API` inválida (valor de `[SecurityLevel]` inválido, `Procedure` de implementação ausente). Só a **importação real** roda a validação de gramática/referências da `API` (inclusive a resolução `API => Procedure`). Quando o objetivo for **validar** uma `API` from-spec, usar importação real (empacotando a `API` com seu `Procedure`, ou fazendo staging do `Procedure` antes) — a autorização de import real e os gates de envelope continuam valendo. Ver `10-base-operacional-msbuild-headless.md` e `xpz-builder/responsibilities-by-type/api.md`.
 
+> **Limite da importação real em API:** import real prova gramática e resolução de referência da API, mas não prova que o runtime servido reflete o import nem que o endpoint funciona. Quando a frente exige prova funcional de endpoint, registrar build/deploy aplicável e teste HTTP separado (método, rota, status, payload resumido, ambiente servido); isso também não substitui smoke GAM 401/403/200 quando segurança estiver em escopo.
+
 ## PATH RESOLUTION
 
 - Este `SKILL.md` fica em uma subpasta de skill sob a raiz do repositório.

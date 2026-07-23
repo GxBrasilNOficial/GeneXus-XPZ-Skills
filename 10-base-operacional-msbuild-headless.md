@@ -151,6 +151,7 @@ O probe (sondagem técnica inicial) não deve:
 - considerar `UpdateFile` como artefato útil para análise de impacto antes de importação efetiva
 - considerar `IncludeItems` e `ExcludeItems` como mecanismos de recorte fino para cenários controlados
 - achado empírico (API, 2026-07-01, KMW 4.0.187794 + GAM 3.15.78): o `PreviewMode` **não** valida uma `API` — reporta `importTaskSuccess:true` mesmo para `API` inválida (valor de `[SecurityLevel]` inválido, `Procedure` de implementação ausente). Só a **importação real** roda a validação de gramática/referências da `API`, inclusive a resolução `API => Procedure` (rejeita se o `Procedure` está ausente do lote **e** da KB; resolve intra-lote ou contra a KB pré-existente). Para validar `API` from-spec, usar importação real, nunca preview; empacotar a `API` junto com seu `Procedure` de implementação, ou fazer staging do `Procedure` antes. Ver `xpz-builder/responsibilities-by-type/api.md` e `03-risco-e-decisao-por-tipo.md`
+- achado empírico (API listagem funcional, 2026-07-23, OnlineShopSS): importação real, build/deploy e sync full ainda não substituem a confirmação funcional do endpoint quando o objetivo é provar a rota servida. A prova HTTP deve registrar método, rota, status, payload resumido e ambiente servido; isso é distinto do gate `-PostImportDeployValidation` e distinto de enforcement GAM. `HTTP 200` em endpoint público confirma funcionamento daquele contrato no ambiente testado, não autorização.
 
 ### 3. Operações Headless
 
