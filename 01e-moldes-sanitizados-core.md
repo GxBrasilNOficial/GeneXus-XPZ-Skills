@@ -1701,7 +1701,7 @@ Endsub
 
 #### Substituição reutilizável do `Source` para listagem por `For each`
 
-Use esta variante quando a KB destino já tiver uma `Transaction` real e atributos compatíveis com o SDT da tríade mínima. O ponto de partida continua sendo a tríade acima; substitua apenas o CDATA do `Source` da `procExemploApiList`, preservando `parm(out:&SdtExemploApiResponseCollection)` e as variáveis `sdt:SdtExemploApiResponse` / `sdt:SdtExemploApiResponse` com `AttCollection=True`.
+Use esta variante quando a KB destino já tiver uma `Transaction` real e atributos compatíveis com o SDT da tríade mínima. O ponto de partida continua sendo a tríade acima; substitua apenas o CDATA do `Source` da `procExemploApiList`, preservando `parm(out:&SdtExemploApiResponseCollection)`, a variável de item `&SdtExemploApiResponse` com `ATTCUSTOMTYPE=sdt:SdtExemploApiResponse` sem `AttCollection=True`, e a variável de saída `&SdtExemploApiResponseCollection` com o mesmo `ATTCUSTOMTYPE` e `AttCollection=True`.
 
 Antes de materializar, conferir no acervo da KB destino:
 
