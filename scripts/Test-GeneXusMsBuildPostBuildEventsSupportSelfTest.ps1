@@ -60,6 +60,17 @@ if ($emptyEvents.Count -ne 0) {
     throw "Janela vazia nao deveria produzir eventos; obtido: $($emptyEvents.Count)"
 }
 
+$isolatedWindowEvents = @(Get-GeneXusMsBuildPostBuildEventLines -StdOutLines @(
+    'start c:\temp\fora-da-janela.bat'
+    'Executando eventos pos-construcao ...'
+    'Days              : 0'
+    '10/07/2026 16:35:06'
+    '========== fim =========='
+))
+if ($isolatedWindowEvents.Count -ne 0) {
+    throw "Fallback nao deveria capturar evento externo quando a janela foi detectada; obtido: $($isolatedWindowEvents -join ' | ')"
+}
+
 $timingWindowLines = @(
     'Executando eventos pos-construcao ...'
     'Powershell New-TimeSpan -Start (Get-Content Inicio.txt) -End (Get-Date)'

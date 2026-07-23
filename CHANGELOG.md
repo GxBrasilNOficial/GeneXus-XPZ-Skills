@@ -142,6 +142,8 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 ### Unreleased
 
+- **Refinamiento de la clasificación post-build de BuildAll/SpecifyGenerate:** las salidas variables de `TimeSpan` y de fecha civil válida ahora se tratan como ruido inerte estrictamente validado, mientras los comandos de timing y el marcador de éxito siguen requiriendo fingerprint por environment. El filtro compartido de stderr acepta únicamente los pares comprobados `anonymous`+`component` y `g_service_worker`+`obj`, se usa también en recovery y preserva errores reales/pares cruzados. El acceso al contexto de deployment ahora admite `IDictionary` y `PSCustomObject` en ambos wrappers. Los nuevos self-tests cubren el flujo completo, registro parcial, controles negativos, recovery y paridad de SpecifyGenerate.
+
 - **Ruta canónica del parche aprobado para Codex:** la skill `xpz-codex-apply-patch-alternative` ahora explica la transmisión Base64 sin newline mediante la ruta ProcessStartInfo, los límites de esa ruta para múltiples rutas, el formato textual aceptado y la cobertura de regresión para Base64, rutas compuestas, CRLF, creación, eliminación y alias cortos de Windows. El motor acepta grafías corta/larga equivalentes de `RepositoryRoot` y agrega diagnóstico Git en fallas de prevalidación; los códigos de salida y el flujo de stage/apply siguen siendo compatibles.
 
 - **Motor de parche aprobado para Codex:** `scripts/Apply-ApprovedPatch.ps1` prepara un parche textual Base64, vincula su SHA-256 y rutas exactas antes de aplicarlo y nunca hace commit, push, checkout, reset ni rollback. Nueva skill local: `xpz-codex-apply-patch-alternative`.
@@ -267,6 +269,8 @@ All relevant changes to this repository will be recorded here from this adoption
 The format keeps an `Unreleased` section for changes not yet published in a formal version. This repository does not yet use public semantic versioning; when that changes, future sections should record the corresponding tag.
 
 ### Unreleased
+
+- **Refined BuildAll/SpecifyGenerate post-build classification:** variable `TimeSpan` output and valid civil date/time output are now treated as strictly validated inert noise, while timing commands and the success marker still require an environment fingerprint. The shared stderr filter accepts only the proven `anonymous`+`component` and `g_service_worker`+`obj` pairs, is also used during recovery, and preserves real errors/crossed pairs. Deployment context access now supports `IDictionary` and `PSCustomObject` in both wrappers. New self-tests cover the full flow, partial registration, negative controls, recovery, and SpecifyGenerate parity.
 
 - **Canonical approved-patch route for Codex:** the `xpz-codex-apply-patch-alternative` skill now explains newline-free Base64 delivery through the ProcessStartInfo route, that route's limits for multiple paths, the accepted textual format, and regression coverage for Base64, composite paths, CRLF, creation, deletion, and Windows short aliases. The engine accepts equivalent short/long `RepositoryRoot` spellings and adds Git diagnostics to preflight failures; exit codes and the stage/apply flow remain compatible.
 

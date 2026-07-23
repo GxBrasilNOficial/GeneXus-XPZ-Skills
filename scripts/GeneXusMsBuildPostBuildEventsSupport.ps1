@@ -126,11 +126,13 @@ function Get-GeneXusMsBuildPostBuildEventLines {
     $lines = @($StdOutLines)
     $windowEvents = [System.Collections.Generic.List[string]]::new()
     $insidePostBuildWindow = $false
+    $postBuildWindowDetected = $false
 
     foreach ($line in $lines) {
         if (-not $insidePostBuildWindow) {
             if (Test-GeneXusPostBuildPhaseStartLine -Line $line) {
                 $insidePostBuildWindow = $true
+                $postBuildWindowDetected = $true
             }
             continue
         }
@@ -145,7 +147,7 @@ function Get-GeneXusMsBuildPostBuildEventLines {
         [void]$windowEvents.Add((Convert-GeneXusPostBuildEventLine -Line $line))
     }
 
-    if ($windowEvents.Count -gt 0) {
+    if ($postBuildWindowDetected) {
         return @($windowEvents)
     }
 
