@@ -1113,6 +1113,7 @@ English: when using `Start-OpenCodeJob.ps1`, the initial JSON contains job ident
 - `Calibração (from-spec + GAM, 2026-07-01)`: além do caso único de cadeia grande, existe o perfil `API` autocontido from-spec — tríade `API` -> `Procedure` -> `SDT` escrita em XML, importável por importação real (não por preview). Ver `03-risco-e-decisao-por-tipo.md` (`API (cadeia)` vs `API (from-spec)`) e `xpz-builder/responsibilities-by-type/api.md` + `api-gam-runtime.md`
 - validar `API` from-spec por importação real, nunca por preview (o preview reporta sucesso para `API` inválida); empacotar a `API` junto com seu `Procedure` de implementação, ou fazer staging do `Procedure` antes
 - `[SecurityLevel]` só aceita `None`/`Authentication`/`Authorization` (nunca `Authorize`); `SecurityHigh` em C# não prova enforcement — o enforcement GAM é pré-condição de runtime (ver `api-gam-runtime.md`), não risco de envelope; não declarar uma `API` "segura" sem o smoke 2 fases (401/403/200)
+- Calibração OnlineShopSS (2026-07-23): para listagem funcional pública, separar o raciocínio em `Service contract` (GET/rota), `Data contract` (SDT item + variáveis coleção com `AttCollection=True`), `Procedure` de implementação (`parm(out:...)`, variáveis e `For each` quando houver), `Transaction`/base table navegada e prova HTTP do endpoint servido. Não chamar `For each` de "via BC"; 9-BC só entra quando existir variável `bc:<Transaction>`. `HTTP 200` registra funcionamento do método/rota/payload/ambiente, não segurança GAM.
 
 ### Theme
 

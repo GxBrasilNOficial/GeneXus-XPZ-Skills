@@ -42,9 +42,15 @@ When changing a `Procedure`, run a minimum semantic pre-packaging gate on the `P
 - if the current `Source` delta introduces a method call on a variable, accept it only when that method is compatible with the declared variable type and is anchored by the methodological base loaded for the case
 - if the current `Source` delta introduces cleanup or reinitialization of a collection, SDT, or `Messages, GeneXus.Common`, accept only patterns anchored by the methodological base for that declared type
 
+### Procedure returning an SDT collection
+
+- When a `Procedure` returns a list as `parm(out:&<Collection>)`, verify the `Rules/parm` and `Variables` blocks together: the output variable must exist, use `ATTCUSTOMTYPE=sdt:<ItemSdt>`, and carry `AttCollection=True`; the item/helper variable should use the same `ATTCUSTOMTYPE` without `AttCollection=True` unless a nested collection shape is explicitly intended.
+- If the `Source` builds the collection with `For each <Transaction>` over a real Transaction/base table, describe the mechanism as `For each` navigation over that Transaction/base table. Do not describe it as "via BC" unless the Procedure declares and uses a variable with `ATTCUSTOMTYPE=bc:<Transaction>`.
+- For every attribute copied from the `For each` navigation into the response SDT, confirm that the attribute exists in the target KB/corpus and that the SDT item shape matches the published API data contract.
+
 ### Type-specific gate triggers
 
-- **BC dependency preflight gate (9-BC)**: when the candidate batch contains a `Procedure` that declares a variable with `ATTCUSTOMTYPE = bc:<X>`, run `& ..\scripts\Test-GeneXusBCDependency.ps1` before packaging. The script locates Transaction `X` in the batch or in `ObjetosDaKbEmXml`, verifies `idISBUSINESSCOMPONENT=True`, and supports `bc:Pai.Filho` sublevel references. Treat absence of confirmation as a hard blocker (fail).
+- **BC dependency preflight gate (9-BC)**: when the candidate batch contains a `Procedure` that declares a variable with `ATTCUSTOMTYPE = bc:<X>`, run `& ..\scripts\Test-GeneXusBCDependency.ps1` before packaging. The script locates Transaction `X` in the batch or in `ObjetosDaKbEmXml`, verifies `idISBUSINESSCOMPONENT=True`, and supports `bc:Pai.Filho` sublevel references. Treat absence of confirmation as a hard blocker (fail). A `Procedure` that only navigates a Transaction/base table with `For each` does not trigger 9-BC unless it also declares a `bc:<X>` variable.
 - **Procedure New Writability gate (9-PNW)**: when the candidate batch contains a `Procedure` whose `Source` has `New`, run `& ..\scripts\Test-GeneXusNewWritableTargets.ps1` before packaging (facade over `GeneXusTransactionWritabilityCore.py` for classification; PowerShell retains `New` block parsing and target resolution). The script checks direct left-side assignments inside each `New` against Transaction writability classification. Treat assignment to `formula`, descriptive/extended, subtype-derived descriptive, unclassified, or unresolved-base attributes as a hard blocker (fail); do not confuse readable attributes with attributes physically assignable in the `New` target.
 - **Sub-pattern Mirroring gate (9-PSM)**: when the candidate batch contains a `Procedure` whose `Source` delta introduces or materially expands a `Sub` block, run `& ..\scripts\Test-GeneXusProcedureSubPattern.ps1`. The script scans the procedure's pre-existing `Sub` delegation structure; if a dominant `iteration-sub → unit-sub` pattern exists and the new block is `mixed`, the script emits an `alert` finding. Treat as advisory, not as a hard packaging blocker — require user acknowledgment or restructuring.
 
@@ -52,6 +58,7 @@ When changing a `Procedure`, run a minimum semantic pre-packaging gate on the `P
 
 - [ ] For `Procedure`, the primary edit block was declared before editing and any block transition was justified explicitly
 - [ ] If `Procedure` `Source` contains `New`, `Test-GeneXusNewWritableTargets.ps1` was run and no `fail` finding remained before packaging
+- [ ] If `Procedure` returns an SDT collection, the `parm(out:...)`, collection variable, item/helper variable, and response SDT item shape were reviewed as one data contract; 9-BC was required only when a `bc:<Transaction>` variable exists
 
 ## Related rules in main SKILL.md WORKFLOW
 

@@ -8,6 +8,8 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 ### Unreleased
 
+- **API Object — listagem funcional OnlineShopSS:** a frente API from-spec ganhou uma calibração incremental baseada na KB local de teste OnlineShopSS: variável de coleção em `API` com `AttCollection=True`, Procedure de listagem por `For each` sobre Transaction/base table real, SDT de item com `AttCollection=False`, coexistência datada de `idISBUSINESSCOMPONENT=True` com `idIsDynTrn=False` e prova HTTP 200 como confirmação funcional do endpoint servido, sem inferir enforcement GAM. Documentação alinhada em `xpz-builder`, `01e`, `02`, `03`, `08`, `10-base` e skills MSBuild; o gate scriptado de runtime permanece futuro em `999`.
+
 - **Rota canônica do patch aprovado para Codex:** a skill `xpz-codex-apply-patch-alternative` agora explica a transmissão Base64 sem newline pela rota ProcessStartInfo, os limites dessa rota para múltiplos caminhos, o formato textual aceito e a cobertura de regressão para Base64, caminhos compostos, CRLF, criação, deleção e aliases curtos do Windows. O motor aceita grafias curta/longa equivalentes de `RepositoryRoot` e acrescenta diagnóstico Git em falhas de pré-verificação; códigos de saída e fluxo de stage/apply permanecem compatíveis.
 
 - **Motor de patch aprovado para Codex:** `scripts/Apply-ApprovedPatch.ps1` prepara um patch textual Base64, vincula SHA-256 e caminhos exatos antes da aplicação e nunca faz commit, push, checkout, reset ou rollback. Nova skill local: `xpz-codex-apply-patch-alternative`.
@@ -141,6 +143,8 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 ### Unreleased
 
+- **API Object — listado funcional OnlineShopSS:** el frente API from-spec recibió una calibración incremental basada en la KB local de prueba OnlineShopSS: variable de colección en `API` con `AttCollection=True`, Procedure de listado por `For each` sobre una Transaction/base table real, SDT de ítem con `AttCollection=False`, coexistencia fechada de `idISBUSINESSCOMPONENT=True` con `idIsDynTrn=False` y prueba HTTP 200 como confirmación funcional del endpoint servido, sin inferir enforcement GAM. Documentación alineada en `xpz-builder`, `01e`, `02`, `03`, `08`, `10-base` y skills MSBuild; el gate scriptado de runtime sigue como futuro en `999`.
+
 - **Ruta canónica del parche aprobado para Codex:** la skill `xpz-codex-apply-patch-alternative` ahora explica la transmisión Base64 sin newline mediante la ruta ProcessStartInfo, los límites de esa ruta para múltiples rutas, el formato textual aceptado y la cobertura de regresión para Base64, rutas compuestas, CRLF, creación, eliminación y alias cortos de Windows. El motor acepta grafías corta/larga equivalentes de `RepositoryRoot` y agrega diagnóstico Git en fallas de prevalidación; los códigos de salida y el flujo de stage/apply siguen siendo compatibles.
 
 - **Motor de parche aprobado para Codex:** `scripts/Apply-ApprovedPatch.ps1` prepara un parche textual Base64, vincula su SHA-256 y rutas exactas antes de aplicarlo y nunca hace commit, push, checkout, reset ni rollback. Nueva skill local: `xpz-codex-apply-patch-alternative`.
@@ -266,6 +270,8 @@ All relevant changes to this repository will be recorded here from this adoption
 The format keeps an `Unreleased` section for changes not yet published in a formal version. This repository does not yet use public semantic versioning; when that changes, future sections should record the corresponding tag.
 
 ### Unreleased
+
+- **API Object — OnlineShopSS functional listing:** the API from-spec front gained an incremental calibration based on the local OnlineShopSS test KB: an `API` collection variable with `AttCollection=True`, a listing Procedure using `For each` over a real Transaction/base table, an item SDT with `AttCollection=False`, dated coexistence of `idISBUSINESSCOMPONENT=True` with `idIsDynTrn=False`, and HTTP 200 as functional confirmation of the served endpoint without inferring GAM enforcement. Documentation was aligned in `xpz-builder`, `01e`, `02`, `03`, `08`, `10-base`, and the MSBuild skills; the scripted runtime gate remains future work in `999`.
 
 - **Canonical approved-patch route for Codex:** the `xpz-codex-apply-patch-alternative` skill now explains newline-free Base64 delivery through the ProcessStartInfo route, that route's limits for multiple paths, the accepted textual format, and regression coverage for Base64, composite paths, CRLF, creation, deletion, and Windows short aliases. The engine accepts equivalent short/long `RepositoryRoot` spellings and adds Git diagnostics to preflight failures; exit codes and the stage/apply flow remain compatible.
 

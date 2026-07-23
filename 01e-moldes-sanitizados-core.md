@@ -1691,6 +1691,14 @@ Endsub
 </Object>
 ```
 
+#### Variante de listagem funcional pública — evidência OnlineShopSS (2026-07-23)
+
+- Evidência direta: na KB local de teste OnlineShopSS, a tríade `ApiCategory` + `procCategoryApiList` + `SdtCategoryApiResponse` expôs `GET /categories`, importou, buildou, sincronizou para o acervo full e respondeu `HTTP 200` no ambiente servido `OnlineShopSSNETSQLServer` com uma coleção JSON de categorias.
+- Delta em relação ao molde mínimo acima: o corpo autocontido da Procedure pode ser substituído por uma navegação real `For each <Transaction>` para preencher o item SDT e adicioná-lo à variável coleção. Essa substituição deixa de ser autocontida: passa a depender da `Transaction`, dos atributos copiados e da KB de destino.
+- Contrato de coleção: o SDT de item permanece `AttCollection=False`; as variáveis de saída na API e na Procedure usam `ATTCUSTOMTYPE=sdt:<SdtItem>` com `AttCollection=True`.
+- Terminologia: chamar esse perfil de listagem por `For each` sobre a base table/atributos da `Transaction`; não chamar de "via BC" a menos que a Procedure declare uma variável `ATTCUSTOMTYPE=bc:<Transaction>`. No caso OnlineShopSS, a `Transaction` também estava com `idISBUSINESSCOMPONENT=True` e `idIsDynTrn=False`, mas isso é evidência datada de coexistência, não receita universal para inicialização/carga.
+- Prova funcional: registrar método, rota, status, payload resumido e ambiente servido. `HTTP 200`, OpenAPI ou `[SecurityLevel]` não provam enforcement GAM; quando segurança estiver em escopo, usar o smoke runtime de `xpz-builder/responsibilities-by-type/api-gam-runtime.md`.
+
 ## Moldes sanitizados completos de WorkWithForWeb
 
 - Evidência direta: o acervo usado nesta base contem 183 objetos WorkWithForWeb.
