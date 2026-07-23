@@ -20,7 +20,24 @@ Ideia futura: avaliar se os wrappers MSBuild GeneXus (`Invoke-GeneXusKbBuildAll.
 
 Não faz parte da correção atual/Fase 0. A Fase 0 deve sanar o incidente estreito observado: build operacional limpo com ruído conhecido em stderr não pode virar JSON degradado por variável não inicializada.
 
+Adendo de retomada (2026-07-23, revisão do PR #2 `fix: refine build post-processing classification`): a frente v2/finalizador também deve absorver os follow-ups de cobertura que ficaram fora do aceite do PR. Subcasos concretos:
+
+- adicionar self-test para janela `Executando eventos pós-construção` detectada porém vazia, com evento pós-build real fora da janela, garantindo que a correção não produza falso sucesso limpo;
+- confirmar paridade explícita de `Invoke-GeneXusKbSpecifyGenerate.ps1` frente ao filtro de ruído em `stderr` e à extração/classificação de eventos pós-build, não só por leitura de implementação compartilhada;
+- coletar, quando houver KB disponível, evidência empírica de `.NET Framework` com build limpo e sem rebaixamento por pós-build real não registrado.
+
 Detalhes e critérios para retomada: [`msbuild-result-contract-v2-finalizador-compartilhado.md`](msbuild-result-contract-v2-finalizador-compartilhado.md).
+
+## Investigar divergência de `observedContext.ActiveEnvironment` após `SetActiveEnvironment`
+
+- **Importância** — média (não mascarou erro nem bloqueou a aceitação do PR #2, mas enfraquece a rastreabilidade em KB multi-environment e pode induzir diagnóstico errado de validação deploy).
+- **Maturidade** — pesquisa feita (caso real observado em builds headless de duas KBs multi-environment; falta isolar se é comportamento do GeneXus/MSBuild, timing do wrapper ou leitura de contexto após troca de environment).
+
+Durante a revisão do PR #2 (`fix: refine build post-processing classification`), builds reais com `-EnvironmentName` explícito em KBs multi-environment registraram `observedContext.ActiveEnvironment` divergente do environment solicitado/resolvido em alguns JSONs. O MSBuild respeitou a execução e o PR não mascarou erro real; por isso o achado não bloqueou a aceitação do PR. Ainda assim, o campo é usado como evidência operacional e merece frente própria.
+
+Premissa relacionada em `998-ideias-descartadas-e-porque.md`: a entrada `CreateEnvironment` registra que `SetActiveEnvironment` via `-EnvironmentName` e `GetActiveEnvironment` cobrem o fluxo existente. O achado atual não reabre `CreateEnvironment`; ele pede revalidar a fidelidade do diagnóstico `observedContext.ActiveEnvironment` após troca de environment em KB multi-environment.
+
+Direção: montar repro mínimo com dois environments, registrar requested/resolved/observed antes e depois de `BuildAll`/`SpecifyGenerate`, comparar stdout bruto do `GetActiveEnvironment` com o JSON final e decidir se o wrapper deve capturar o active environment em outro momento, manter ambos os valores ou rebaixar a confiança desse campo.
 
 ## Drift de tipagem entre delta empacotado e snapshot oficial — fases residuais
 
