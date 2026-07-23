@@ -1710,7 +1710,7 @@ Antes de materializar, conferir no acervo da KB destino:
 - os tipos e tamanhos dos atributos são compatíveis com os itens do SDT;
 - `Found`, `Code` e `Message` continuam coerentes com o contrato escolhido. Na tríade mínima, esses campos vivem no item SDT; se o contrato materializado mover envelope para outro SDT/variável, ajuste o desenho explicitamente.
 
-```geneexus
+```genexus
 &SdtExemploApiResponseCollection.Clear()
 
 For each <Transaction>
