@@ -1699,6 +1699,33 @@ Endsub
 - Terminologia: chamar esse perfil de listagem por `For each` sobre a base table/atributos da `Transaction`; não chamar de "via BC" a menos que a Procedure declare uma variável `ATTCUSTOMTYPE=bc:<Transaction>`. No caso OnlineShopSS, a `Transaction` também estava com `idISBUSINESSCOMPONENT=True` e `idIsDynTrn=False`, mas isso é evidência datada de coexistência, não receita universal para inicialização/carga.
 - Prova funcional: registrar método, rota, status, payload resumido e ambiente servido. `HTTP 200`, OpenAPI ou `[SecurityLevel]` não provam enforcement GAM; quando segurança estiver em escopo, usar o smoke runtime de `xpz-builder/responsibilities-by-type/api-gam-runtime.md`.
 
+#### Substituição reutilizável do `Source` para listagem por `For each`
+
+Use esta variante quando a KB destino já tiver uma `Transaction` real e atributos compatíveis com o SDT da tríade mínima. O ponto de partida continua sendo a tríade acima; substitua apenas o CDATA do `Source` da `procExemploApiList`, preservando `parm(out:&SdtExemploApiResponseCollection)` e as variáveis `sdt:SdtExemploApiResponse` / `sdt:SdtExemploApiResponse` com `AttCollection=True`.
+
+Antes de materializar, conferir no acervo da KB destino:
+
+- a `Transaction` existe e é a base esperada para a listagem;
+- cada atributo copiado existe com o nome real da KB destino;
+- os tipos e tamanhos dos atributos são compatíveis com os itens do SDT;
+- `Found`, `Code` e `Message` continuam coerentes com o contrato escolhido. Na tríade mínima, esses campos vivem no item SDT; se o contrato materializado mover envelope para outro SDT/variável, ajuste o desenho explicitamente.
+
+```geneexus
+&SdtExemploApiResponseCollection.Clear()
+
+For each <Transaction>
+    &SdtExemploApiResponse = new()
+    &SdtExemploApiResponse.Id = <TransactionId>
+    &SdtExemploApiResponse.Nome = <TransactionNome>
+    &SdtExemploApiResponse.Found = true
+    &SdtExemploApiResponse.Code = !"OK"
+    &SdtExemploApiResponse.Message = !"Registro listado."
+    &SdtExemploApiResponseCollection.Add(&SdtExemploApiResponse)
+EndFor
+```
+
+Os identificadores entre `<...>` são placeholders: troque por nomes reais como `Categoria`, `CategoriaId` e `CategoriaNome` somente depois de confirmar a estrutura da KB destino. A navegação `For each` não torna a implementação "via BC"; a regra de BC só entra quando a Procedure declara variável `ATTCUSTOMTYPE=bc:<Transaction>` ou outro uso explícito via BC. Esta variante também não altera a conclusão de segurança: `HTTP 200` confirma método/rota/payload/ambiente servido, mas não prova enforcement GAM.
+
 ## Moldes sanitizados completos de WorkWithForWeb
 
 - Evidência direta: o acervo usado nesta base contem 183 objetos WorkWithForWeb.
