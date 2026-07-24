@@ -470,6 +470,8 @@ identificado neste contexto.
 **Não reavaliar** salvo surgimento de projeto com pipeline headless de API REST GeneXus
 que exija especificação OpenAPI automatizada.
 
+Ressalva 2026-07-24: a regra documental de ler YAML OpenAPI já gerado como evidência complementar pós-build do contrato público observado não reabre esta frente. Reabrir `SpecifyOpenAPI` continua exigindo o critério acima: pipeline headless que precise especificação OpenAPI automatizada.
+
 ---
 
 ## GenerateChatbot
@@ -511,6 +513,8 @@ O público-alvo desta frente não opera pipelines de publicação OpenAPI headle
 
 **Não reavaliar** salvo surgimento de projeto com deploy headless de REST API GeneXus
 com geração de especificação OpenAPI como requisito de automação.
+
+Ressalva 2026-07-24: a regra documental de ler YAML OpenAPI já gerado como evidência complementar pós-build do contrato público observado não reabre esta frente. Reabrir `GenerateOpenAPI` continua exigindo o critério acima: deploy headless de REST API GeneXus com geração OpenAPI como requisito de automação.
 
 ---
 
