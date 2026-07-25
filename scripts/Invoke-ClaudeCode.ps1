@@ -5,8 +5,9 @@
 .DESCRIPTION
     Backend claude-code da skill xpz-llm-delegate. Envia o prompt por stdin para evitar
     payload em argumento de processo, usa `claude -p` e captura stdout. Por padrao roda em
-    modo de consulta curta restrita: sem persistencia de sessao, max-turns baixo,
-    permission-mode plan e ferramentas somente leitura.
+    modo de consulta curta restrita: sem persistencia de sessao, permission-mode plan e
+    ferramentas somente leitura. Nao limita turnos agenticos: a CLI 2.1.215 removeu
+    `--max-turns` do `--help` e o adapter nao tem como negociar esse limite (ver CHANGELOG).
 
     CONFIDENCIALIDADE: este script NAO decide se o payload pode ir para Anthropic. Antes de
     enviar payload sensivel, passe por Resolve-LlmDelegateAuthorization.ps1 -Backend
@@ -25,8 +26,6 @@
 .PARAMETER Tools
     Lista de ferramentas disponiveis. Default: Read,Glob,Grep. Use "" para desabilitar todas
     (vira --tools "" na CLI) ou "default" para liberar o conjunto padrao completo da CLI.
-.PARAMETER MaxTurns
-    Limite de turnos agenticos em modo print. Default: 1.
 .PARAMETER Cd
     Diretorio de trabalho do processo Claude Code. Default: diretorio atual do chamador.
 .PARAMETER ClaudeExe
@@ -41,7 +40,6 @@ param(
     [string] $Model = 'claude-opus-4-8',
     [ValidateSet('default', 'acceptEdits', 'plan', 'auto', 'dontAsk', 'bypassPermissions')] [string] $PermissionMode = 'plan',
     [string] $Tools = 'Read,Glob,Grep',
-    [ValidateRange(1, 100)] [int] $MaxTurns = 1,
     [string] $Cd,
     [string] $ClaudeExe,
     [int] $TimeoutSec = 300
@@ -76,12 +74,9 @@ $arguments = @(
     '--no-session-persistence',
     '--permission-mode', $PermissionMode
 )
-try {
-    $helpText = (& $exe --help 2>&1 | Out-String)
-    if ($helpText -match [regex]::Escape('--max-turns')) {
-        $arguments += @('--max-turns', "$MaxTurns")
-    }
-} catch { }
+# Sem limite de turnos: a CLI 2.1.215 nao anuncia mais `--max-turns` no `--help`. O adapter
+# tinha um parametro -MaxTurns cujo valor era descartado em silencio por causa dessa sondagem,
+# entao o parametro foi removido em vez de mantido mentindo (medido em 2026-07-25).
 # A CLI aceita --tools "" para desabilitar todas as ferramentas. O valor vazio precisa ir
 # aspado: Start-Process descarta string vazia do ArgumentList e, como --tools e variadica,
 # ela passaria a consumir o argumento seguinte.

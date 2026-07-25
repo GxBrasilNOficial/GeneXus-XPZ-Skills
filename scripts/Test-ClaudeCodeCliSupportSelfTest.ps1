@@ -98,7 +98,7 @@ if "%1"=="--version" (
   exit /b 0
 )
 if "%1"=="--help" (
-  echo --model --print --output-format --no-session-persistence --permission-mode --tools --max-turns
+  echo --model --print --output-format --no-session-persistence --permission-mode --tools
   exit /b 0
 )
 if "%FAKE_CLAUDE_UNTRUSTED%"=="1" (
@@ -128,6 +128,8 @@ try {
     & (Join-Path $PSScriptRoot 'Invoke-ClaudeCode.ps1') 'adapter default tools' -ClaudeExe $fake.Exe -TimeoutSec 30 | Out-Null
     $invokeDefaultArgs = Read-LastFakeClaudeArgs -Path $fake.ArgsFile
     Assert-Equal 'invoke default passa --tools' ($invokeDefaultArgs -match '--tools Read,Glob,Grep') $true
+    # A CLI 2.1.215 nao anuncia mais --max-turns e os adapters deixaram de tentar negocia-lo.
+    Assert-Equal 'invoke nao passa --max-turns' ($invokeDefaultArgs -notmatch '--max-turns') $true
 
     & (Join-Path $PSScriptRoot 'Invoke-ClaudeCode.ps1') 'adapter tools vazio' -ClaudeExe $fake.Exe -Tools '' -TimeoutSec 30 | Out-Null
     $invokeEmptyArgs = Read-LastFakeClaudeArgs -Path $fake.ArgsFile
@@ -152,6 +154,7 @@ try {
         $jobDefaultArgs = Read-LastFakeClaudeArgs -Path $fake.ArgsFile
     } while ($jobDefaultArgs -notmatch 'stream-json' -and (Get-Date) -lt $deadline)
     Assert-Equal 'job default passa --tools' ($jobDefaultArgs -match '--tools Read,Glob,Grep') $true
+    Assert-Equal 'job nao passa --max-turns' ($jobDefaultArgs -notmatch '--max-turns') $true
     if ($job.pid) {
         Wait-Process -Id ([int]$job.pid) -Timeout 5 -ErrorAction SilentlyContinue
     }

@@ -26,7 +26,7 @@ function Get-ClaudeCodeErrorMessage {
     # termina com exit 0 e resposta valida (medido em 2026-07-25: mesmo stderr, byte a byte, em
     # execucao bem-sucedida e em execucao falha). Por isso eles nao podem classificar falha:
     # sao removidos antes de qualquer decisao. Ver 999-ideias-pendentes.md
-    # «Revisor Claude Code falha por MaxTurns=1 assim que usa uma ferramenta».
+    # «Falso alarme de workspace nao confiavel no backend claude-code» (historico 202607).
     $cleanStderr = Remove-ClaudeCodeEnvironmentNoise -Text $StderrText
     $combined = @($cleanStderr, $StdoutText) -join "`n"
     if ([string]::IsNullOrWhiteSpace($combined)) { return $null }
@@ -72,7 +72,7 @@ function New-ClaudeCodeMaxTurnsExhaustedEvidenceMessage {
     return @"
 Claude Code max-turns-exhausted: a chamada gastou todos os turnos agenticos antes de produzir resposta.
 
-Causa tipica: com --max-turns 1, a primeira chamada de ferramenta consome o unico turno e nao sobra turno para responder. Correcao: aumentar -MaxTurns, ou rodar sem ferramentas quando a consulta nao precisar ler o workspace. Isto NAO e problema de confianca de workspace nem indisponibilidade do modelo.
+Quando ha limite de turnos, a primeira chamada de ferramenta pode consumir o unico turno e nao sobrar turno para responder. Os adapters deste repositorio NAO passam mais --max-turns (a CLI 2.1.215 removeu a flag do --help), entao um limite ativo vem da propria CLI ou de configuracao externa: investigue de onde. Alternativa imediata: rodar sem ferramentas quando a consulta nao precisar ler o workspace. Isto NAO e problema de confianca de workspace nem indisponibilidade do modelo.
 
 --- EVIDENCIA (stdout + stderr, sem ruido de ambiente) ---
 $evidence

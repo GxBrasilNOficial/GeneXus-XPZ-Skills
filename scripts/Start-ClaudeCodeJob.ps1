@@ -24,7 +24,6 @@ param(
     [string] $Model = 'claude-opus-4-8',
     [ValidateSet('default', 'acceptEdits', 'plan', 'auto', 'dontAsk', 'bypassPermissions')] [string] $PermissionMode = 'plan',
     [string] $Tools = 'Read,Glob,Grep',
-    [ValidateRange(1, 100)] [int] $MaxTurns = 1,
     [string] $Cd,
     [string] $ClaudeExe,
     [switch] $NoWatcher,
@@ -90,12 +89,9 @@ $arguments = @(
     '--no-session-persistence',
     '--permission-mode', $PermissionMode
 )
-try {
-    $helpText = (& $exe --help 2>&1 | Out-String)
-    if ($helpText -match [regex]::Escape('--max-turns')) {
-        $arguments += @('--max-turns', "$MaxTurns")
-    }
-} catch { }
+# Sem limite de turnos: a CLI 2.1.215 nao anuncia mais `--max-turns` no `--help`. O adapter
+# tinha um parametro -MaxTurns cujo valor era descartado em silencio por causa dessa sondagem,
+# entao o parametro foi removido em vez de mantido mentindo (medido em 2026-07-25).
 # A CLI aceita --tools "" para desabilitar todas as ferramentas. O valor vazio precisa ir
 # aspado: Start-Process descarta string vazia do ArgumentList e, como --tools e variadica,
 # ela passaria a consumir o argumento seguinte.
