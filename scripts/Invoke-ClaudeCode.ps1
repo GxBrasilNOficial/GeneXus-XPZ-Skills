@@ -23,7 +23,8 @@
 .PARAMETER PermissionMode
     Modo de permissao do Claude Code. Default: plan.
 .PARAMETER Tools
-    Lista de ferramentas disponiveis. Default: Read,Glob,Grep. Use "" para desabilitar.
+    Lista de ferramentas disponiveis. Default: Read,Glob,Grep. Use "" para desabilitar todas
+    (vira --tools "" na CLI) ou "default" para liberar o conjunto padrao completo da CLI.
 .PARAMETER MaxTurns
     Limite de turnos agenticos em modo print. Default: 1.
 .PARAMETER Cd
@@ -81,7 +82,12 @@ try {
         $arguments += @('--max-turns', "$MaxTurns")
     }
 } catch { }
-if (-not [string]::IsNullOrWhiteSpace($Tools)) {
+# A CLI aceita --tools "" para desabilitar todas as ferramentas. O valor vazio precisa ir
+# aspado: Start-Process descarta string vazia do ArgumentList e, como --tools e variadica,
+# ela passaria a consumir o argumento seguinte.
+if ([string]::IsNullOrWhiteSpace($Tools)) {
+    $arguments += @('--tools', '""')
+} else {
     $arguments += @('--tools', $Tools)
 }
 

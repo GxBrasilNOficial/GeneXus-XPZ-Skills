@@ -96,7 +96,12 @@ try {
         $arguments += @('--max-turns', "$MaxTurns")
     }
 } catch { }
-if (-not [string]::IsNullOrWhiteSpace($Tools)) {
+# A CLI aceita --tools "" para desabilitar todas as ferramentas. O valor vazio precisa ir
+# aspado: Start-Process descarta string vazia do ArgumentList e, como --tools e variadica,
+# ela passaria a consumir o argumento seguinte.
+if ([string]::IsNullOrWhiteSpace($Tools)) {
+    $arguments += @('--tools', '""')
+} else {
     $arguments += @('--tools', $Tools)
 }
 

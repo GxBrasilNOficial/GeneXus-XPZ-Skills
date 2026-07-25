@@ -131,7 +131,10 @@ try {
 
     & (Join-Path $PSScriptRoot 'Invoke-ClaudeCode.ps1') 'adapter tools vazio' -ClaudeExe $fake.Exe -Tools '' -TimeoutSec 30 | Out-Null
     $invokeEmptyArgs = Read-LastFakeClaudeArgs -Path $fake.ArgsFile
-    Assert-Equal 'invoke tools vazio omite --tools' ($invokeEmptyArgs -notmatch '--tools') $true
+    # A CLI desabilita todas as ferramentas com --tools "". Omitir a flag faz o oposto: libera o
+    # conjunto padrao completo. O valor vazio tem de chegar aspado, porque Start-Process descarta
+    # string vazia do ArgumentList e --tools e variadica.
+    Assert-Equal 'invoke tools vazio passa --tools ""' ($invokeEmptyArgs -match '--tools ""') $true
 
     $env:FAKE_CLAUDE_UNTRUSTED = '1'
     $threwTrust = $false
@@ -151,6 +154,19 @@ try {
     Assert-Equal 'job default passa --tools' ($jobDefaultArgs -match '--tools Read,Glob,Grep') $true
     if ($job.pid) {
         Wait-Process -Id ([int]$job.pid) -Timeout 5 -ErrorAction SilentlyContinue
+    }
+
+    # Mesmo contrato de -Tools vazio no adapter assincrono.
+    $jobEmptyJson = & (Join-Path $PSScriptRoot 'Start-ClaudeCodeJob.ps1') 'job tools vazio' -ClaudeExe $fake.Exe -Tools '' -NoWatcher -TempDir $jobDir
+    $jobEmpty = $jobEmptyJson | ConvertFrom-Json
+    $deadline = (Get-Date).AddSeconds(10)
+    do {
+        Start-Sleep -Milliseconds 100
+        $jobEmptyArgs = Read-LastFakeClaudeArgs -Path $fake.ArgsFile
+    } while ($jobEmptyArgs -notmatch '--tools' -and (Get-Date) -lt $deadline)
+    Assert-Equal 'job tools vazio passa --tools ""' ($jobEmptyArgs -match '--tools ""') $true
+    if ($jobEmpty.pid) {
+        Wait-Process -Id ([int]$jobEmpty.pid) -Timeout 5 -ErrorAction SilentlyContinue
     }
 } finally {
     if (Test-Path -LiteralPath $tmp) {
