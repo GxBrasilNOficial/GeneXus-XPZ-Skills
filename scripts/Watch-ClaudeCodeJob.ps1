@@ -111,6 +111,9 @@ $result = [ordered]@{
     status = $status.status
     finalText = $finalText
     error = $status.error
+    # Falha observada DEPOIS de o job ja ter produzido texto (tipico do esgotamento de turno):
+    # nao muda o status, mas preserva a evidencia de que a resposta pode estar truncada.
+    failureAfterText = $status.failureAfterText
     stderr = $stderr
     finishedAt = (Get-Date).ToString('o')
 }

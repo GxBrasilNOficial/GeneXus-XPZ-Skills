@@ -214,34 +214,60 @@ function Resolve-ClaudeCodeExe {
     return $exe
 }
 
+# O erro do stream passa pelos mesmos detectores do caminho sincrono: sem isto, o job assincrono
+# devolvia texto cru e nunca emitia os codigos canonicos que a doc promete.
+function Resolve-ClaudeCodeStreamErrorClassification {
+    param([AllowNull()] [string] $StreamError)
+
+    if (Test-ClaudeCodeMaxTurnsExhausted -Text $StreamError) {
+        return [pscustomobject]@{
+            status = 'error'
+            error  = (New-ClaudeCodeMaxTurnsExhaustedEvidenceMessage -EvidenceText $StreamError)
+        }
+    }
+    if (Test-ClaudeCodeWorkspaceNotTrusted -Text $StreamError) {
+        return [pscustomobject]@{
+            status = 'unavailable'
+            error  = (New-ClaudeCodeWorkspaceNotTrustedEvidenceMessage -StderrText $StreamError)
+        }
+    }
+    return [pscustomobject]@{ status = 'error'; error = $StreamError }
+}
+
+<#
+.SYNOPSIS
+    Classifica o desfecho de um job assincrono do Claude Code.
+.DESCRIPTION
+    Resposta final manda: texto produzido continua `completed`. Mas o esgotamento de turno chega
+    SEMPRE depois de algum texto (o job gasta os turnos produzindo saida e morre sem concluir),
+    entao descartar o erro nesse caso mascararia resposta truncada como resposta boa. O erro
+    observado depois do texto vai em `failureAfterText`, sem mudar `status`/`error`: quem decide se
+    um parecer truncado vale e o orquestrador do painel, na reclassificacao pos-hoc do `15`.
+    Todos os retornos tem o mesmo shape (`status`, `error`, `failureAfterText`).
+#>
 function Resolve-ClaudeCodeJobStatus {
     param([string]$FinalText, [string]$StreamError, [string]$Stderr)
     if (-not [string]::IsNullOrWhiteSpace($FinalText)) {
-        return [pscustomobject]@{ status = 'completed'; error = $null }
+        $failureAfterText = $null
+        if (-not [string]::IsNullOrWhiteSpace($StreamError)) {
+            $failureAfterText = (Resolve-ClaudeCodeStreamErrorClassification -StreamError $StreamError).error
+        }
+        return [pscustomobject]@{ status = 'completed'; error = $null; failureAfterText = $failureAfterText }
     }
     if (-not [string]::IsNullOrWhiteSpace($StreamError)) {
-        # O erro do stream passa pelos mesmos detectores do caminho sincrono: sem isto, o job
-        # assincrono devolvia texto cru e nunca emitia os codigos canonicos que a doc promete.
-        if (Test-ClaudeCodeMaxTurnsExhausted -Text $StreamError) {
-            return [pscustomobject]@{
-                status = 'error'
-                error  = (New-ClaudeCodeMaxTurnsExhaustedEvidenceMessage -EvidenceText $StreamError)
-            }
-        }
-        if (Test-ClaudeCodeWorkspaceNotTrusted -Text $StreamError) {
-            return [pscustomobject]@{
-                status = 'unavailable'
-                error  = (New-ClaudeCodeWorkspaceNotTrustedEvidenceMessage -StderrText $StreamError)
-            }
-        }
-        return [pscustomobject]@{ status = 'error'; error = $StreamError }
+        $classified = Resolve-ClaudeCodeStreamErrorClassification -StreamError $StreamError
+        return [pscustomobject]@{ status = $classified.status; error = $classified.error; failureAfterText = $null }
     }
     $errMsg = Get-ClaudeCodeErrorMessage -StdoutText '' -StderrText $Stderr
     if ($errMsg) {
         if ($errMsg -match '(?i)\bworkspace-not-trusted\b') {
-            return [pscustomobject]@{ status = 'unavailable'; error = $errMsg }
+            return [pscustomobject]@{ status = 'unavailable'; error = $errMsg; failureAfterText = $null }
         }
-        return [pscustomobject]@{ status = 'error'; error = $errMsg }
+        return [pscustomobject]@{ status = 'error'; error = $errMsg; failureAfterText = $null }
     }
-    return [pscustomobject]@{ status = 'sem-texto'; error = 'Claude Code encerrou sem resposta final.' }
+    return [pscustomobject]@{
+        status           = 'sem-texto'
+        error            = 'Claude Code encerrou sem resposta final.'
+        failureAfterText = $null
+    }
 }

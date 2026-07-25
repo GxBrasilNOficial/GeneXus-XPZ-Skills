@@ -109,6 +109,16 @@ $evTypeError = '{"type":"error","message":"boom"}' | ConvertFrom-Json
 Assert-Equal 'evento type=error continua capturado' ((Get-ClaudeCodeStreamEventErrorText -StreamEvent $evTypeError) -match 'boom') $true
 Assert-Equal 'evento nulo nao vira erro' (Get-ClaudeCodeStreamEventErrorText -StreamEvent $null) ''
 
+# Falha DEPOIS de texto: `error_max_turns` chega sempre apos alguma saida, entao descartar o erro
+# mascararia resposta truncada como resposta boa. O status nao muda; a evidencia e preservada.
+$s8 = Resolve-ClaudeCodeJobStatus -FinalText 'parecer truncado' -StreamError $streamMaxTurns -Stderr ''
+Assert-Equal 'texto parcial com falha continua completed' $s8.status 'completed'
+Assert-Equal 'texto parcial com falha nao inventa error' $s8.error $null
+Assert-Equal 'falha apos texto preserva evidencia' ($s8.failureAfterText -match 'max-turns-exhausted') $true
+Assert-Equal 'resposta limpa nao tem falha residual' $s1.failureAfterText $null
+Assert-Equal 'falha sem texto nao vira falha apos texto' $s6.failureAfterText $null
+Assert-Equal 'sem-texto tambem expoe o campo' $s4.failureAfterText $null
+
 function New-FakeClaudeCodeExe {
     param([string]$TempRoot)
 
