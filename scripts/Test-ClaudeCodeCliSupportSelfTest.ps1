@@ -205,7 +205,9 @@ try {
     do {
         Start-Sleep -Milliseconds 100
         $jobEmptyArgs = Read-LastFakeClaudeArgs -Path $fake.ArgsFile
-    } while ($jobEmptyArgs -notmatch '--tools' -and (Get-Date) -lt $deadline)
+        # Esperar por `--tools` seria satisfeito de imediato pela linha do job ANTERIOR (que traz
+        # `--tools Read,Glob,Grep`); a sentinela discriminante aqui e o valor vazio aspado.
+    } while ($jobEmptyArgs -notmatch '--tools ""' -and (Get-Date) -lt $deadline)
     Assert-Equal 'job tools vazio passa --tools ""' ($jobEmptyArgs -match '--tools ""') $true
     if ($jobEmpty.pid) {
         Wait-Process -Id ([int]$jobEmpty.pid) -Timeout 5 -ErrorAction SilentlyContinue

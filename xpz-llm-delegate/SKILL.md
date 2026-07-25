@@ -728,8 +728,14 @@ descolamento do `ok`/`responded` da matéria do manuscrito, NÃO contagem de cha
 é piso automático — piso/heurística segue **frente aberta** no `999`.
 
 **Cobertura por adapter (varredura confirmatória, escopo declarado).** A detecção por `reason`
-acima é **opencode-only** — é fenômeno do **streaming agêntico** do opencode. Os demais adapters
-**não** têm sinal de finish-reason equivalente. Uma **varredura confirmatória** (inspeção
+acima é **opencode-only** — é fenômeno do **streaming agêntico** do opencode. Nenhum dos demais
+adapters expõe equivalente a `reason=length`, que é o sinal que importa para truncamento. **Ressalva
+(2026-07-25):** o Claude Code **assíncrono** tem, sim, um sinal terminal estruturado — o evento final
+`type=result` com `subtype` (`success`, `error_max_turns`, …) e `is_error`, medido em `claude 2.1.220`
+e **consumido** desde então pelo `Watch-ClaudeCodeJob.ps1` para classificar **falha** (ver o backend
+Claude Code acima). Ele **não** cobre corte por limite de tokens, então o limite residual abaixo
+continua de pé; o que caducou foi a formulação absoluta «nenhum tem sinal de finish-reason». Uma
+**varredura confirmatória** (inspeção
 **estática do código-fonte** dos adapters em 2026-06-20 — contrato de extração, **não** teste de
 truncamento ao vivo) mostrou: **Codex** (`output-last-message`, arquivo dedicado), **Claude Code**
 (stdout final), **Gemini** (`$json.response`) entregam a **mensagem final canônica** por **campo

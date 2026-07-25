@@ -25,8 +25,8 @@ function Get-ClaudeCodeErrorMessage {
     # O Claude Code emite em stderr avisos de ambiente que aparecem INCLUSIVE quando a chamada
     # termina com exit 0 e resposta valida (medido em 2026-07-25: mesmo stderr, byte a byte, em
     # execucao bem-sucedida e em execucao falha). Por isso eles nao podem classificar falha:
-    # sao removidos antes de qualquer decisao. Ver 999-ideias-pendentes.md
-    # «Falso alarme de workspace nao confiavel no backend claude-code» (historico 202607).
+    # sao removidos antes de qualquer decisao. Ver historico/IdeiasImplementadas_202607.md,
+    # «Capturar a recusa real de workspace nao confiavel do Claude Code».
     $cleanStderr = Remove-ClaudeCodeEnvironmentNoise -Text $StderrText
     $combined = @($cleanStderr, $StdoutText) -join "`n"
     if ([string]::IsNullOrWhiteSpace($combined)) { return $null }
