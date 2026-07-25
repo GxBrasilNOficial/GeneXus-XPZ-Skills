@@ -2560,3 +2560,40 @@ Painel dividido (2026-06-13): deepseek-v4-pro, glm-5.1 e minimax-m3 inclinaram a
 **Origem:** desmembrado da frente «Criar/alterar objeto GeneXus do tipo `API` (from-spec, com segurança GAM) nas skills XPZ», **concluída e migrada** para `historico/IdeiasImplementadas_202607.md` (2026-07-01). Aquela frente resolveu a **Face 3** (prova de runtime do enforcement GAM) por **checklist textual + sub-estado pós-build**, documentado em `xpz-builder/responsibilities-by-type/api-gam-runtime.md`.
 
 **Ideia:** automatizar o **smoke de 2 fases** (anônimo→401; usuário sem papel→403; com papel→200) + OAuth + reversibilidade num **gate `.ps1`**, em vez do checklist manual. **Não cabe como gate `9-*`** (que é preflight estático pré-import): é um **teste HTTP de runtime pós-deploy**, outra categoria — por isso ficou como evolução futura (decisão D2 da frente original). **Gatilho:** quando houver demanda real de automatizar a prova de enforcement (e uma forma estável de subir/consultar o app headless no fluxo).
+
+## Revisor Claude Code falha por `MaxTurns=1` assim que usa uma ferramenta
+
+- **Importância** — alta (falso negativo crítico: a voz Claude Code some do painel de revisão por pares sem que o operador perceba, então o piso de ≥2 famílias pode ficar satisfeito só na aparência; agravado porque a falha vinha rotulada com a causa errada, desviando o diagnóstico para confiança de workspace).
+- **Maturidade** — pesquisa feita (mecanismo medido empiricamente em 2026-07-25; falta decidir a política, porque `Invoke-LlmDelegatePanelDispatch.ps1` recusa override de `tools`/`maxturns`/`permissionmode` do Claude Code via `ContentionKeys`).
+
+**Mecanismo medido.** `scripts/Invoke-ClaudeCode.ps1` roda `claude -p` com `--max-turns 1` e ferramentas `Read,Glob,Grep` habilitadas. Quando o modelo gasta o único turno na chamada de ferramenta e não sobra turno para responder, a CLI sai com `exit 1` e stdout `Error: Reached max turns (1)` — a chamada inteira se perde.
+
+**O comportamento é intermitente, não determinístico.** Esta é a característica mais importante da entrada e foi medida por contraprova: com a **mesma** configuração, o **mesmo** modelo e a **mesma** pasta, três execuções falharam e duas passaram. Às vezes o modelo cabe no orçamento de um turno, às vezes não — inclusive quando o prompt foi desenhado para forçar duas chamadas de ferramenta em sequência (E2 abaixo), caso em que ainda assim respondeu. Não é possível prever, a partir do prompt, se a chamada vai sobreviver.
+
+Isso torna o gap **pior** de conviver, não melhor: uma voz do painel que falha de forma aleatória é exatamente o tipo de defeito que passa despercebido numa rotina cuja função é pegar o que passou despercebido. E explica por que, no caso que originou o diagnóstico, a terceira tentativa do Codex funcionou — não foi mérito do `-Tools ""` que ele usou, foi sorte.
+
+**Evidência empírica** (2026-07-25, pastas descartáveis, `claude 2.1.215`, `--permission-mode plan --max-turns 1`, modelo Haiku):
+
+| Ensaio | Prompt exige ferramenta | `exit` | stdout |
+|---|---|---|---|
+| R1 | sim | 1 | `Error: Reached max turns (1)` |
+| R2 | sim (com `-Tools ""`) | 1 | `Error: Reached max turns (1)` |
+| R3 | sim (pasta sem `.claude/settings.json`) | 1 | `Error: Reached max turns (1)` |
+| R4 | não (proibindo explicitamente usar ferramenta) | 0 | resposta válida |
+| E1 | sim (mesmo prompt de R1, pelo adapter) | 0 | resposta válida |
+| E2 | sim (dois passos de ferramenta encadeados) | 0 | resposta válida |
+
+R1–R4 rodaram por script de sondagem direto; E1–E2 pelo `Invoke-ClaudeCode.ps1`, já com o classificador corrigido. R1 e E1 são a mesma configuração com desfechos opostos — é essa contraprova que estabelece a intermitência.
+
+**Por que ficou invisível.** `Get-ClaudeCodeErrorMessage` (`scripts/ClaudeCodeCliSupport.ps1`) testava o detector de workspace não confiável **antes** do filtro genérico de erro, e o `stderr` da CLI traz um aviso benigno (`Ignoring N permissions.allow entries ... this workspace has not been trusted`) que aparece **inclusive em execuções bem-sucedidas** — medido em R4, `exit 0`, com o aviso presente e idêntico. Resultado: toda falha por esgotamento de turno era reportada como `workspace-not-trusted`, classificada como `unavailable` no painel e mandada para fallback, sem que ninguém olhasse para o `stdout`, onde a causa real estava escrita em texto claro. **O mascaramento já foi corrigido** (2026-07-25, frente própria): o ruído de ambiente é descartado antes de qualquer classificação e o esgotamento de turno passou a ter código canônico `max-turns-exhausted`. Esta entrada trata da **causa de fundo**, que sobrevive à correção do rótulo — agora ela apenas fica visível em vez de disfarçada.
+
+**Achado colateral, no mesmo motor.** `Invoke-ClaudeCode.ps1` documenta em `.PARAMETER Tools` que `""` serve para **desabilitar** ferramentas, mas o código apenas **omite a flag `--tools`** quando o valor é vazio — e a CLI, sem essa flag, habilita o **conjunto padrão completo**. Confirmado por **leitura do código** — o bloco que monta os argumentos só acrescenta `--tools` quando o valor não é vazio. R2 é apenas consistente com isso, não prova nada por si: dada a intermitência descrita acima, um único ensaio não distingue "tinha ferramentas" de "não tinha". Portanto o contrato documentado está invertido em relação ao efeito real, e quem usa `-Tools ""` para "rodar sem ferramentas" está na verdade rodando com **mais** ferramentas do que o default do adapter. Falta o ensaio que meça o efeito diretamente.
+
+**Direções a avaliar** (nenhuma decidida):
+
+- elevar o `MaxTurns` default do adapter, aceitando que "consulta curta restrita" precisa de pelo menos um turno para a ferramenta e outro para a resposta — mede-se antes qual é o piso real;
+- corrigir o contrato de `-Tools ""` para de fato desabilitar ferramentas (e alinhar a documentação do parâmetro), decidindo se o valor vazio significa "sem ferramentas" ou "default da CLI";
+- reclassificar `Reached max turns` como código canônico próprio (`max-turns-exhausted`), acionável e distinto de indisponibilidade de ambiente;
+- rever, no painel, se o Claude Code semantic-only deve rodar **sem** ferramentas e com dossiê pronto (rota já descrita em `13-revisao-pre-push.md` «Modo assistido por dossiê») em vez de com ferramentas que ele não consegue usar dentro do orçamento de turnos.
+
+**Origem:** diagnóstico do falso alarme de workspace não confiável (2026-07-25). O Codex reportou duas falhas do backend `claude-code` na skill `xpz-llm-delegate` durante uma pré-push reforçada; o `stderr` bruto e o experimento controlado subsequente mostraram que o problema de confiança era ruído e que a falha real era o esgotamento de turno. Relaciona-se com a entrada «Capturar a recusa real de workspace não confiável do Claude Code» — cuja premissa de que a CLI **recusa executar** também foi contrariada pelo mesmo experimento (R3: workspace não confiável, sem menção alguma a trust, execução normal).
