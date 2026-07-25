@@ -316,10 +316,12 @@ Se `-Model` for omitido, o adapter não força modelo e deixa o default da ferra
 modelo fixado pelo adapter.
 
 Backend Claude Code (`claude -p`, Opus 4.8 por padrão, externo Anthropic):
-- `Invoke-ClaudeCode.ps1 [-Message <prompt> | -MessagePath <arquivo>] [-Model <m>] [-PermissionMode <mode>] [-Tools <list>] [-MaxTurns <n>] [-Cd <dir>] [-ClaudeExe <path>] [-TimeoutSec <s>]` — síncrono (prompt → texto). Prompt via stdin (`-MessagePath` lê de arquivo, exclusivo com `-Message`; stdin-based, sem o teto ~32KB); por padrão usa consulta curta restrita (`PermissionMode=plan`, `Tools=Read,Glob,Grep`, sem persistência de sessão). `-MaxTurns` é aplicado somente quando a versão local do Claude Code expõe `--max-turns`.
-- `Start-ClaudeCodeJob.ps1 [-Message <prompt> | -MessagePath <arquivo>] [-Model <m>] [-PermissionMode <mode>] [-Tools <list>] [-MaxTurns <n>] [-Cd <dir>] [-ClaudeExe <path>] [-NoWatcher] [-TempDir <path>] [-KeepDays <n>]` — assíncrono; retorna `{jobId, pid, stream, result, watcher}`; abre janela de acompanhamento por padrão. `-MessagePath` exclusivo com `-Message` (o texto do prompt segue persistido em `request.json`/`stdin.txt`). `-MaxTurns` é aplicado somente quando a CLI suportar a flag.
-- `Watch-ClaudeCodeJob.ps1 -JobId <guid> -ProcessId <pid> [-TempDir <path>] [-IntervalSeconds <1-30>] [-SilenceThresholdSeconds <30-3600>]` — monitor incremental do stream `--output-format stream-json`; grava `<GUID>.result.json` ao fim (`status`, `finalText`, `error`). Quando o `stderr` do job casa o detector heurístico de workspace não confiável, o `status` é `unavailable` e o erro canônico `workspace-not-trusted` preserva a evidência e a instrução de coleta segura.
-- `ClaudeCodeCliSupport.ps1` (dot-source) — descoberta **fail-closed** do `claude.exe`, validação de versão/flags mínimas, extração de erros e classificação heurística de `workspace-not-trusted` a partir de `stderr`; preserva esse `stderr` na mensagem canônica e pede o pacote de evidências para melhoria da skill.
+- `Invoke-ClaudeCode.ps1 [-Message <prompt> | -MessagePath <arquivo>] [-Model <m>] [-PermissionMode <mode>] [-Tools <list>] [-Cd <dir>] [-ClaudeExe <path>] [-TimeoutSec <s>]` — síncrono (prompt → texto). Prompt via stdin (`-MessagePath` lê de arquivo, exclusivo com `-Message`; stdin-based, sem o teto ~32KB); por padrão usa consulta curta restrita (`PermissionMode=plan`, `Tools=Read,Glob,Grep`, sem persistência de sessão). `-Tools ""` desabilita todas as ferramentas (vira `--tools ""`); `-Tools default` libera o conjunto padrão completo da CLI. **Sem limite de turnos** — ver nota abaixo.
+- `Start-ClaudeCodeJob.ps1 [-Message <prompt> | -MessagePath <arquivo>] [-Model <m>] [-PermissionMode <mode>] [-Tools <list>] [-Cd <dir>] [-ClaudeExe <path>] [-NoWatcher] [-TempDir <path>] [-KeepDays <n>]` — assíncrono; retorna `{jobId, pid, stream, result, watcher}`; abre janela de acompanhamento por padrão. `-MessagePath` exclusivo com `-Message` (o texto do prompt segue persistido em `request.json`/`stdin.txt`). Mesmo contrato de `-Tools` e mesma ausência de limite de turnos.
+- `Watch-ClaudeCodeJob.ps1 -JobId <guid> -ProcessId <pid> [-TempDir <path>] [-IntervalSeconds <1-30>] [-SilenceThresholdSeconds <30-3600>]` — monitor incremental do stream `--output-format stream-json`; grava `<GUID>.result.json` ao fim (`status`, `finalText`, `error`). Quando o `stderr` do job casa o detector heurístico de **recusa** de workspace não confiável, o `status` é `unavailable` e o erro canônico `workspace-not-trusted` preserva a evidência e a instrução de coleta segura.
+- `ClaudeCodeCliSupport.ps1` (dot-source) — descoberta **fail-closed** do `claude.exe`, validação de versão/flags mínimas, extração de erros e classificação a partir de `stdout`/`stderr`. **Descarta ruído de ambiente antes de classificar**: os avisos `Ignoring N permissions.allow entries…` e `Permission allow rule (…)` aparecem inclusive em execução bem-sucedida (medido em 2026-07-25) e não são evidência de falha. Emite `max-turns-exhausted` para esgotamento de turno e reserva `workspace-not-trusted` para recusa genuína.
+
+> **Sem `-MaxTurns` (2026-07-25).** O parâmetro existia nos dois adapters e era **descartado em silêncio**: eles só enviavam `--max-turns` se a flag aparecesse no `claude --help`, e a CLI 2.1.215 deixou de anunciá-la. As chamadas sempre rodaram com turnos ilimitados. O parâmetro foi removido em vez de mantido mentindo; a direção de calibrar o limite está **descartada** em `998-ideias-descartadas-e-porque.md`, com a medição que mostra por que "passar a flag sempre" seria danoso.
 
 Backend GitHub Copilot CLI (`copilot -p`, externo GitHub Copilot):
 - `Invoke-Copilot.ps1 [-Message <prompt> | -MessagePath <arquivo>] [-Model <m>] [-Cd <dir>] [-CopilotExe <path>] [-TimeoutSec <s>]` — síncrono (prompt → texto). Usa `--no-custom-instructions`, `--disable-builtin-mcps`, `--available-tools=` e JSONL para consulta curta sem ferramentas disponíveis; `--allow-all-tools` permanece porque o CLI exige aprovação automática em modo não interativo. `-MessagePath` lê o prompt de arquivo (exclusivo com `-Message`; elimina o `(Get-Content)` inline), mas é **argument-based** — o prompt segue no argv, então **não** levanta o teto ~32KB; um guard fail-closed (`$MaxArgvPromptChars = 30000`, heurístico em chars) recusa prompts grandes com `BLOCK`.
@@ -909,25 +911,34 @@ payload para Anthropic (`anthropic/claude-opus-4-8`) e, portanto, é externo. Co
   externo sem política durável devolve `ask`; `allow` exige anunciar `targetModelKey`.
 - Para **consulta curta restrita**, usar os defaults do adapter: `-PermissionMode plan`,
   `-Tools Read,Glob,Grep`, persistência de sessão desabilitada e `-Cd` apontando ao menor
-  diretório necessário. `-MaxTurns` só entra quando a CLI local suportar `--max-turns`.
-- Se o `stderr` do Claude Code casar o detector **heurístico** de workspace ainda não confiável,
-  isso é tratado como bloqueio operacional do backend, não parecer do revisor. O adapter emite
-  `workspace-not-trusted`; no painel o estado deve ser `unavailable`, acionando fallback quando
+  diretório necessário. Não há limite de turnos: `-MaxTurns` foi removido em 2026-07-25 porque a
+  CLI parou de anunciar `--max-turns` e o valor era descartado em silêncio.
+- Se o `stderr` do Claude Code casar o detector **heurístico** de **recusa** por workspace não
+  confiável, isso é tratado como bloqueio operacional do backend, não parecer do revisor. O adapter
+  emite `workspace-not-trusted`; no painel o estado deve ser `unavailable`, acionando fallback quando
   houver. A mensagem traz o `stderr` bruto e pede ao agente que informe ao usuário como enviar
   evidência (stderr sem segredos, `claude --version`, Desktop ou CLI) para melhorar a skill; não marcar
   confiança automaticamente nem pedir que o usuário a marque para contornar o bloqueio.
+- **Não confundir recusa com aviso.** Workspace não confiável **não impede** a CLI de rodar: ela
+  executa e apenas descarta as regras `permissions.allow` do projeto, avisando em `stderr`. Esse
+  aviso aparece **também em execução bem-sucedida**, medido em 2026-07-25, e por isso é descartado
+  como ruído antes de qualquer classificação. A recusa propriamente dita nunca foi observada — o
+  detector segue por precaução, não por evidência.
 - Para **revisor pré-push**, a rotina pode precisar de `git` e scripts locais. Definir
   explicitamente ferramentas/permissões suficientes para leitura e comandos de validação
   (sem `bypassPermissions`) **só vale FORA do painel** — via `Invoke-ClaudeCode.ps1` **direto**.
   **In-panel é INALCANÇÁVEL:** `Invoke-LlmDelegatePanelDispatch.ps1` recusa override de
   `tools`/`maxturns`/`permissionmode` do Claude Code (`ContentionKeys`), então no painel o Claude
-  Code roda como **semantic-only** (`plan`, `Read,Glob,Grep`, `MaxTurns=1`) e **não** obtém git. Para
+  Code roda como **semantic-only** (`plan`, `Read,Glob,Grep`) e **não** obtém git. A chave
+  `maxturns` segue recusada por precaução, embora o parâmetro não exista mais. Para
   dar git a um revisor pré-push, use um **git-capable** (Codex-delegate ou subagente nativo) ou o
   **modo assistido por dossiê** — o orquestrador roda o mecânico e entrega o dossiê ao semantic-only
   (ver [`13-revisao-pre-push.md`](../13-revisao-pre-push.md) «Modo assistido por dossiê» e
-  [`14-revisao-pre-push-reforcada.md`](../14-revisao-pre-push-reforcada.md)). Limite adicional: mesmo
-  como semantic-only, o Claude Code in-panel é **fraco** (`MaxTurns=1`) — preferir o opencode
-  `reviewer-ro` como voz semantic-only.
+  [`14-revisao-pre-push-reforcada.md`](../14-revisao-pre-push-reforcada.md)). A alegação anterior de
+  que o Claude Code in-panel seria **fraco por `MaxTurns=1`** foi **retirada em 2026-07-25**: o
+  limite nunca esteve em vigor. Não há medição de qualidade que sustente preferir outra voz por esse
+  motivo; se houver preferência pelo opencode `reviewer-ro` como semantic-only, ela precisa de
+  justificativa própria.
 - Os adapters `Invoke-ClaudeCode.ps1` e `Start-ClaudeCodeJob.ps1` bloqueiam
   `PermissionMode=bypassPermissions`; esse modo não faz parte da delegação XPZ.
 

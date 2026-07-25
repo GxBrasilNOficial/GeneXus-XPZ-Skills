@@ -84,3 +84,29 @@ Reúne as duas entradas do `999` que eram **problema** e **conserto** da mesma c
 - Design congelado: `opencode-reviewer-ro-least-privilege-design.md` (8 rodadas de revisão por pares, 4 famílias — anthropic/openai/ollama-cloud/nvidia; arquitetura nunca reaberta; freeze por decisão humana com a prova transferida aos self-tests).
 - Arquivos materiais: `.opencode/agent/reviewer-ro.md`, `.gitignore` (exceção em cascata), `scripts/OpenCodeReviewerRoGuard.ps1`, `scripts/Install-OpenCodeReviewerRoAgent.ps1`, `scripts/Test-OpenCodeReviewerRoSelfTest.ps1`, `scripts/Invoke-OpenCode.ps1`, `scripts/Start-OpenCodeJob.ps1`, `scripts/Watch-OpenCodeJob.ps1`, `xpz-llm-delegate/fixtures/opencode-reviewer-ro/*`, `xpz-llm-delegate/SKILL.md`, `15-revisao-por-pares.md`, `xpz-skills-setup/SKILL.md`, `08-guia-para-agente-gpt.md`, `09-inventario-e-rastreabilidade-publica.md`, `CHANGELOG.md`, `999-ideias-pendentes.md` (2 entradas removidas → esta; entrada nova do eixo de leitura mantida).
 - Self-test/versão: `OPENCODE_REVIEWER_RO_SELFTEST_OK`; fixtures/claims medidos em opencode 1.4.4.
+
+## Capturar a recusa real de workspace não confiável do Claude Code
+
+- **Importância** — baixa-média na entrada original (detector heurístico podendo divergir da mensagem real da CLI). Na prática revelou-se **alta**: o detector não só divergia como **mascarava** todas as falhas do backend.
+- **Maturidade** — era "ideia pronta para validar quando houver nova ocorrência". A ocorrência veio em 2026-07-25 e a captura foi feita.
+
+**Origem da pendência:** revisão pré-push reforçada de 2026-07-15, após relato — sem `stderr` bruto — de que o Claude Code teria recusado executar em workspace não confiável. A entrada pedia preservar a evidência (stderr sem segredos, `claude --version`, contexto Desktop/CLI) para ancorar ou substituir a heurística.
+
+**O que a captura mostrou.** A premissa estava errada nos dois eixos. A CLI **não recusa** executar em workspace não confiável: ela roda normalmente e apenas **descarta** as regras `permissions.allow` do projeto, avisando em `stderr`. E esse aviso aparece **inclusive em execução bem-sucedida** — medido com `exit 0`, resposta válida e o aviso presente byte a byte igual ao de uma execução falha. Em pasta sem `.claude/settings.json` para descartar, o aviso nem é emitido, ainda que o workspace continue não confiável.
+
+Consequência: o detector `workspace-not-trusted` disparava a partir de um texto sem valor diagnóstico algum, e como ele era testado **antes** do filtro genérico de erro, sequestrava a classificação de qualquer falha — inclusive as que traziam a causa escrita em texto claro no `stdout`.
+
+**Correções implementadas** (2026-07-25):
+
+- ruído de ambiente (`Ignoring N permissions.allow entries…`, `Permission allow rule (…)`) descartado antes de qualquer classificação, em `Get-ClaudeCodeErrorMessage` e dentro do próprio `Test-ClaudeCodeWorkspaceNotTrusted`;
+- código canônico novo `max-turns-exhausted` para esgotamento de turno, testado antes do detector de confiança;
+- `workspace-not-trusted` preservado **apenas** para recusa genuína, documentado como heurístico e **nunca observado empiricamente**;
+- fixtures de regressão ancoradas no `stderr` literal capturado, cobrindo o caso de sucesso e o de falha.
+
+**Achados derivados, tratados em frentes próprias na mesma sessão:** o contrato de `-Tools ""`, que omitia a flag em vez de desabilitar ferramentas (invertendo o efeito documentado); e o parâmetro `-MaxTurns`, descartado em silêncio porque a CLI 2.1.215 deixou de anunciar `--max-turns` no `--help` — removido, com a direção de calibragem registrada em `998-ideias-descartadas-e-porque.md`.
+
+### Rastreabilidade
+
+- Arquivos materiais: `scripts/ClaudeCodeCliSupport.ps1`, `scripts/Invoke-ClaudeCode.ps1`, `scripts/Start-ClaudeCodeJob.ps1`, `scripts/Test-ClaudeCodeCliSupportSelfTest.ps1`, `xpz-llm-delegate/SKILL.md`, `09-inventario-e-rastreabilidade-publica.md`, `CHANGELOG.md`, `998-ideias-descartadas-e-porque.md`, `999-ideias-pendentes.md` (esta entrada removida).
+- Evidência: `claude 2.1.215`; ensaios controlados em pastas descartáveis, com e sem `.claude/settings.json`, com e sem `--max-turns` explícito.
+- Self-test: `OK: Test-ClaudeCodeCliSupportSelfTest.ps1` (36 casos).

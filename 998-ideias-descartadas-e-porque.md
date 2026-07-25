@@ -1573,3 +1573,37 @@ não-atômico", nunca "hook PreToolUse" genérico — `deny` e `allow` saem do *
 necessidade explícita de **auditoria/treinamento** de disciplina de comando (modo diagnóstico
 não-bloqueante), que seria uma frente diferente (observabilidade local), não bloqueio operacional —
 e mesmo nesse caso o ponto de observação já existiria no hook positivo.
+
+---
+
+## Ajustar o limite de turnos (`MaxTurns`) do backend claude-code
+
+**Origem:** diagnóstico do falso alarme de workspace não confiável no backend `claude-code`,
+2026-07-25.
+
+**O que é:** calibrar o limite de turnos agênticos do revisor Claude Code — elevar o default,
+tornar o valor negociável no painel, ou garantir que a flag `--max-turns` chegue à CLI. A hipótese
+inicial era que `MaxTurns=1` derrubava o revisor assim que ele usasse uma ferramenta, porque a
+primeira chamada consome o único turno e não sobra turno para responder.
+
+**Por que foi descartada:**
+
+O limite **nunca estava em vigor**. Os adapters só enviavam `--max-turns` se a flag aparecesse no
+`claude --help`, e a CLI 2.1.215 deixou de anunciá-la (`claude --help | grep -c -- "--max-turns"`
+devolve `0`). O parâmetro `-MaxTurns` era, portanto, descartado em silêncio: passar `1` ou `50`
+dava no mesmo, e as chamadas rodavam com turnos ilimitados. O parâmetro foi **removido** dos dois
+adapters em 2026-07-25 — remoção sem efeito prático algum, já que só alinhou a documentação com o
+que acontecia.
+
+A alternativa "passar a flag sempre, já que a CLI ainda a honra" foi avaliada e é **ativamente
+danosa**: com o default `1`, passaríamos a derrubar toda chamada que use ferramenta. Mediu-se o
+efeito em ensaios controlados — com `--max-turns 1` explícito, 6 falhas em 6 tentativas
+(`exit 1`, `Error: Reached max turns (1)`); com `--max-turns 2`, sucesso; sem a flag, 13 sucessos
+em 13. Ou seja: restaurar o controle criaria a falha que se imaginava estar corrigindo.
+
+Fica registrado que a CLI **ainda honra** `--max-turns` quando a flag é passada à mão; o que se
+perdeu foi a negociação por `--help`, não a capacidade.
+
+**Não reavaliar salvo** versão futura da CLI que volte a anunciar `--max-turns` no `--help` — e,
+mesmo então, qualquer default abaixo de `2` precisa de medição antes, porque um único turno não
+cobre ferramenta + resposta.
