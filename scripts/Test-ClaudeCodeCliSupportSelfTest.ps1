@@ -85,6 +85,29 @@ $s4 = Resolve-ClaudeCodeJobStatus -FinalText '' -StreamError '' -Stderr ''
 Assert-Equal 'status sem texto' $s4.status 'sem-texto'
 $s5 = Resolve-ClaudeCodeJobStatus -FinalText '' -StreamError '' -Stderr $trustErr
 Assert-Equal 'status workspace not trusted' $s5.status 'unavailable'
+Assert-Equal 'stream boom preserva o texto cru' $s2.error 'stream boom'
+
+# --- Caminho ASSINCRONO: o erro do stream passa pelos mesmos detectores do sincrono -------------
+# Medido em 2026-07-25 (claude 2.1.220): o desfecho do `--output-format stream-json` NAO vem em um
+# evento `type=error`; a ultima linha e `type=result` com `subtype` e `is_error`.
+$streamMaxTurns = 'subtype=error_max_turns: Error: Reached max turns (1)'
+$s6 = Resolve-ClaudeCodeJobStatus -FinalText '' -StreamError $streamMaxTurns -Stderr ''
+Assert-Equal 'status max turns por stream continua error' $s6.status 'error'
+Assert-Equal 'erro de stream de max turns vira codigo canonico' ($s6.error -match 'max-turns-exhausted') $true
+$s7 = Resolve-ClaudeCodeJobStatus -FinalText '' -StreamError $trustErr -Stderr ''
+Assert-Equal 'recusa de workspace por stream vira unavailable' $s7.status 'unavailable'
+Assert-Equal 'recusa de workspace por stream vira codigo canonico' ($s7.error -match 'workspace-not-trusted') $true
+Assert-Equal 'subtype error_max_turns isolado casa o detector' (Test-ClaudeCodeMaxTurnsExhausted -Text 'subtype=error_max_turns') $true
+
+$evSuccess = '{"type":"result","subtype":"success","is_error":false,"result":"OK"}' | ConvertFrom-Json
+Assert-Equal 'evento result de sucesso nao vira erro' (Get-ClaudeCodeStreamEventErrorText -StreamEvent $evSuccess) ''
+$evAssistant = '{"type":"assistant","message":{"content":[{"text":"parcial"}]}}' | ConvertFrom-Json
+Assert-Equal 'evento assistant nao vira erro' (Get-ClaudeCodeStreamEventErrorText -StreamEvent $evAssistant) ''
+$evMaxTurns = '{"type":"result","subtype":"error_max_turns","is_error":true,"result":"Error: Reached max turns (1)"}' | ConvertFrom-Json
+Assert-Equal 'evento result com is_error traz subtype e texto' (Get-ClaudeCodeStreamEventErrorText -StreamEvent $evMaxTurns) 'subtype=error_max_turns: Error: Reached max turns (1)'
+$evTypeError = '{"type":"error","message":"boom"}' | ConvertFrom-Json
+Assert-Equal 'evento type=error continua capturado' ((Get-ClaudeCodeStreamEventErrorText -StreamEvent $evTypeError) -match 'boom') $true
+Assert-Equal 'evento nulo nao vira erro' (Get-ClaudeCodeStreamEventErrorText -StreamEvent $null) ''
 
 function New-FakeClaudeCodeExe {
     param([string]$TempRoot)

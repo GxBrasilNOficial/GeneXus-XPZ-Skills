@@ -78,9 +78,11 @@ while ($true) {
                 $finalText += $txt
                 $lastActivity = Get-Date
             }
-            $type = [string](Get-CcProp $ev 'type')
-            if ($type -eq 'error') {
-                $streamError = ($ev | ConvertTo-Json -Compress)
+            # Cobre tanto `type=error` quanto o evento final `type=result` com `is_error=true`
+            # (subtype `error_max_turns` e afins), que e a forma real do desfecho no stream-json.
+            $evError = Get-ClaudeCodeStreamEventErrorText -StreamEvent $ev
+            if (-not [string]::IsNullOrWhiteSpace($evError)) {
+                $streamError = $evError
                 $lastActivity = Get-Date
             }
         }

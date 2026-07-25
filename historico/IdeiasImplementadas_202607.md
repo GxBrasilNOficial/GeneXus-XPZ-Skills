@@ -103,10 +103,12 @@ Consequência: o detector `workspace-not-trusted` disparava a partir de um texto
 - `workspace-not-trusted` preservado **apenas** para recusa genuína, documentado como heurístico e **nunca observado empiricamente**;
 - fixtures de regressão ancoradas no `stderr` literal capturado, cobrindo o caso de sucesso e o de falha.
 
+**Achado derivado da revisão pré-push (mesma sessão).** O caminho **assíncrono** não normalizava nada: `Watch-ClaudeCodeJob.ps1` só marcava erro em um evento `type=error`, que a CLI **não** emite no desfecho — medido com `claude 2.1.220`, a última linha do `--output-format stream-json` é `type=result` com `subtype` (`success`, `error_max_turns`, …) e `is_error` —, e `Resolve-ClaudeCodeJobStatus` devolvia o erro de stream cru, sem passar pelos detectores. Com isso, o job assíncrono nunca emitia os códigos canônicos que a documentação prometia. Corrigido: o watcher reconhece o evento final com `is_error=true` (via `Get-ClaudeCodeStreamEventErrorText`), o erro de stream passa pelos mesmos detectores do síncrono e `error_max_turns` casa o detector de esgotamento de turno.
+
 **Achados derivados, tratados em frentes próprias na mesma sessão:** o contrato de `-Tools ""`, que omitia a flag em vez de desabilitar ferramentas (invertendo o efeito documentado); e o parâmetro `-MaxTurns`, descartado em silêncio porque a CLI 2.1.215 deixou de anunciar `--max-turns` no `--help` — removido, com a direção de calibragem registrada em `998-ideias-descartadas-e-porque.md`.
 
 ### Rastreabilidade
 
-- Arquivos materiais: `scripts/ClaudeCodeCliSupport.ps1`, `scripts/Invoke-ClaudeCode.ps1`, `scripts/Start-ClaudeCodeJob.ps1`, `scripts/Test-ClaudeCodeCliSupportSelfTest.ps1`, `xpz-llm-delegate/SKILL.md`, `09-inventario-e-rastreabilidade-publica.md`, `CHANGELOG.md`, `998-ideias-descartadas-e-porque.md`, `999-ideias-pendentes.md` (esta entrada removida).
-- Evidência: `claude 2.1.215`; ensaios controlados em pastas descartáveis, com e sem `.claude/settings.json`, com e sem `--max-turns` explícito.
-- Self-test: `OK: Test-ClaudeCodeCliSupportSelfTest.ps1` (37 casos).
+- Arquivos materiais: `scripts/ClaudeCodeCliSupport.ps1`, `scripts/Invoke-ClaudeCode.ps1`, `scripts/Start-ClaudeCodeJob.ps1`, `scripts/Watch-ClaudeCodeJob.ps1`, `scripts/Test-ClaudeCodeCliSupportSelfTest.ps1`, `scripts/Test-InvokeLlmDelegatePanelDispatchSelfTest.ps1`, `xpz-llm-delegate/SKILL.md`, `09-inventario-e-rastreabilidade-publica.md`, `CHANGELOG.md`, `998-ideias-descartadas-e-porque.md`, `999-ideias-pendentes.md` (esta entrada removida).
+- Evidência: `claude 2.1.215`; ensaios controlados em pastas descartáveis, com e sem `.claude/settings.json`, com e sem `--max-turns` explícito. Do achado assíncrono: job real em `claude 2.1.220`, cujo stream JSONL termina em `type=result`/`subtype=success` e cujo evento `init` traz `"tools":[]` sob `--tools ""` (confirmação de que o valor vazio desabilita as ferramentas de fato).
+- Self-test: `OK: Test-ClaudeCodeCliSupportSelfTest.ps1` (48 casos).

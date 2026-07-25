@@ -83,7 +83,46 @@ $evidence
 function Test-ClaudeCodeMaxTurnsExhausted {
     param([AllowNull()] [string] $Text)
     if ([string]::IsNullOrWhiteSpace($Text)) { return $false }
-    return ($Text -match '(?i)reached\s+max\s+turns')
+    # `Reached max turns` e o texto do modo --output-format text; `error_max_turns` e o subtype do
+    # evento final do stream-json (medido em 2026-07-25, claude 2.1.220).
+    return ($Text -match '(?i)(reached\s+max\s+turns|\berror_max_turns\b)')
+}
+
+<#
+.SYNOPSIS
+    Extrai o texto de erro de um evento do stream JSONL (`--output-format stream-json`).
+.DESCRIPTION
+    O desfecho do stream nao vem em um evento `type=error`: medido em 2026-07-25 (claude 2.1.220),
+    a ultima linha e `type=result` com `subtype` (`success`, `error_max_turns`, ...) e `is_error`.
+    Observar apenas `type=error` deixava o esgotamento de turno e a falha de execucao invisiveis
+    para o caminho assincrono. Devolve string vazia quando o evento nao carrega falha.
+#>
+function Get-ClaudeCodeStreamEventErrorText {
+    param([AllowNull()] $StreamEvent)
+
+    if ($null -eq $StreamEvent) { return '' }
+    $props = $StreamEvent.PSObject.Properties
+
+    $type = ''
+    if ($props['type']) { $type = [string]$props['type'].Value }
+
+    if ($type -eq 'error') { return ($StreamEvent | ConvertTo-Json -Compress -Depth 10) }
+    if ($type -ne 'result') { return '' }
+
+    $isError = $false
+    if ($props['is_error']) { $isError = [bool]$props['is_error'].Value }
+    if (-not $isError) { return '' }
+
+    $subtype = ''
+    if ($props['subtype']) { $subtype = [string]$props['subtype'].Value }
+    $resultText = ''
+    if ($props['result']) { $resultText = [string]$props['result'].Value }
+
+    $parts = @()
+    if (-not [string]::IsNullOrWhiteSpace($subtype)) { $parts += "subtype=$subtype" }
+    if (-not [string]::IsNullOrWhiteSpace($resultText)) { $parts += $resultText.Trim() }
+    if ($parts.Count -eq 0) { return ($StreamEvent | ConvertTo-Json -Compress -Depth 10) }
+    return ($parts -join ': ')
 }
 
 # Avisos de ambiente do Claude Code: aparecem em stderr independentemente do desfecho da chamada
@@ -181,6 +220,20 @@ function Resolve-ClaudeCodeJobStatus {
         return [pscustomobject]@{ status = 'completed'; error = $null }
     }
     if (-not [string]::IsNullOrWhiteSpace($StreamError)) {
+        # O erro do stream passa pelos mesmos detectores do caminho sincrono: sem isto, o job
+        # assincrono devolvia texto cru e nunca emitia os codigos canonicos que a doc promete.
+        if (Test-ClaudeCodeMaxTurnsExhausted -Text $StreamError) {
+            return [pscustomobject]@{
+                status = 'error'
+                error  = (New-ClaudeCodeMaxTurnsExhaustedEvidenceMessage -EvidenceText $StreamError)
+            }
+        }
+        if (Test-ClaudeCodeWorkspaceNotTrusted -Text $StreamError) {
+            return [pscustomobject]@{
+                status = 'unavailable'
+                error  = (New-ClaudeCodeWorkspaceNotTrustedEvidenceMessage -StderrText $StreamError)
+            }
+        }
         return [pscustomobject]@{ status = 'error'; error = $StreamError }
     }
     $errMsg = Get-ClaudeCodeErrorMessage -StdoutText '' -StderrText $Stderr
