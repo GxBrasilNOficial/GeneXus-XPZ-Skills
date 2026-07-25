@@ -109,4 +109,4 @@ Consequência: o detector `workspace-not-trusted` disparava a partir de um texto
 
 - Arquivos materiais: `scripts/ClaudeCodeCliSupport.ps1`, `scripts/Invoke-ClaudeCode.ps1`, `scripts/Start-ClaudeCodeJob.ps1`, `scripts/Test-ClaudeCodeCliSupportSelfTest.ps1`, `xpz-llm-delegate/SKILL.md`, `09-inventario-e-rastreabilidade-publica.md`, `CHANGELOG.md`, `998-ideias-descartadas-e-porque.md`, `999-ideias-pendentes.md` (esta entrada removida).
 - Evidência: `claude 2.1.215`; ensaios controlados em pastas descartáveis, com e sem `.claude/settings.json`, com e sem `--max-turns` explícito.
-- Self-test: `OK: Test-ClaudeCodeCliSupportSelfTest.ps1` (36 casos).
+- Self-test: `OK: Test-ClaudeCodeCliSupportSelfTest.ps1` (37 casos).
