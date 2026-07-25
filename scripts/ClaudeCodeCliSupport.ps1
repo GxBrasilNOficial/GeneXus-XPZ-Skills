@@ -4,8 +4,10 @@
     Funcoes compartilhadas do backend claude-code da skill xpz-llm-delegate.
 .DESCRIPTION
     Resolve o claude.exe, valida o contrato minimo de flags usado pelos adapters e extrai
-    mensagens de erro de saidas do Claude Code. Sem rede por conta propria, exceto quando
-    Resolve-ClaudeCodeExe precisa chamar `claude --version` / `claude --help` no candidato.
+    mensagens de erro de saidas do Claude Code. Antes de classificar, descarta avisos de
+    ambiente que o Claude Code emite em stderr mesmo quando a chamada da certo. Sem rede por
+    conta propria, exceto quando Resolve-ClaudeCodeExe precisa chamar `claude --version` /
+    `claude --help` no candidato.
 #>
 
 Set-StrictMode -Version Latest
@@ -19,8 +21,20 @@ function ConvertFrom-ClaudeCodeVersionText {
 
 function Get-ClaudeCodeErrorMessage {
     param([string]$StdoutText, [string]$StderrText)
-    $combined = @($StderrText, $StdoutText) -join "`n"
+
+    # O Claude Code emite em stderr avisos de ambiente que aparecem INCLUSIVE quando a chamada
+    # termina com exit 0 e resposta valida (medido em 2026-07-25: mesmo stderr, byte a byte, em
+    # execucao bem-sucedida e em execucao falha). Por isso eles nao podem classificar falha:
+    # sao removidos antes de qualquer decisao. Ver 999-ideias-pendentes.md
+    # «Revisor Claude Code falha por MaxTurns=1 assim que usa uma ferramenta».
+    $cleanStderr = Remove-ClaudeCodeEnvironmentNoise -Text $StderrText
+    $combined = @($cleanStderr, $StdoutText) -join "`n"
     if ([string]::IsNullOrWhiteSpace($combined)) { return $null }
+
+    # Falha real observada empiricamente; precede o detector heuristico de confianca.
+    if (Test-ClaudeCodeMaxTurnsExhausted -Text $combined) {
+        return New-ClaudeCodeMaxTurnsExhaustedEvidenceMessage -EvidenceText $combined
+    }
 
     if (Test-ClaudeCodeWorkspaceNotTrusted -Text $StderrText) {
         return New-ClaudeCodeWorkspaceNotTrustedEvidenceMessage -StderrText $StderrText
@@ -51,8 +65,50 @@ $rawStderr
 "@.Trim()
 }
 
+function New-ClaudeCodeMaxTurnsExhaustedEvidenceMessage {
+    param([AllowNull()] [string] $EvidenceText)
+
+    $evidence = ([string]$EvidenceText).Trim()
+    return @"
+Claude Code max-turns-exhausted: a chamada gastou todos os turnos agenticos antes de produzir resposta.
+
+Causa tipica: com --max-turns 1, a primeira chamada de ferramenta consome o unico turno e nao sobra turno para responder. Correcao: aumentar -MaxTurns, ou rodar sem ferramentas quando a consulta nao precisar ler o workspace. Isto NAO e problema de confianca de workspace nem indisponibilidade do modelo.
+
+--- EVIDENCIA (stdout + stderr, sem ruido de ambiente) ---
+$evidence
+--- FIM EVIDENCIA ---
+"@.Trim()
+}
+
+function Test-ClaudeCodeMaxTurnsExhausted {
+    param([AllowNull()] [string] $Text)
+    if ([string]::IsNullOrWhiteSpace($Text)) { return $false }
+    return ($Text -match '(?i)reached\s+max\s+turns')
+}
+
+# Avisos de ambiente do Claude Code: aparecem em stderr independentemente do desfecho da chamada
+# (inclusive em exit 0 com resposta valida), portanto nao sao evidencia de falha.
+function Test-ClaudeCodeEnvironmentNoiseLine {
+    param([AllowNull()] [string] $Line)
+    if ([string]::IsNullOrWhiteSpace($Line)) { return $false }
+    return (
+        $Line -match '(?i)^\s*ignoring\s+\d+\s+permissions\.allow\s+entries\b' -or
+        $Line -match '(?i)^\s*permission\s+allow\s+rule\s*\('
+    )
+}
+
+function Remove-ClaudeCodeEnvironmentNoise {
+    param([AllowNull()] [string] $Text)
+    if ([string]::IsNullOrWhiteSpace($Text)) { return '' }
+    $kept = @(@([string]$Text -split "`r?`n") | Where-Object { -not (Test-ClaudeCodeEnvironmentNoiseLine -Line $_) })
+    return (($kept -join "`n").Trim())
+}
+
 function Test-ClaudeCodeWorkspaceNotTrusted {
     param([AllowNull()] [string] $Text)
+    # Detecta apenas RECUSA de execucao. O aviso "this workspace has not been trusted" que
+    # acompanha o descarte de regras allow e ruido de ambiente e nao pode disparar este detector.
+    $Text = Remove-ClaudeCodeEnvironmentNoise -Text $Text
     if ([string]::IsNullOrWhiteSpace($Text)) { return $false }
     return (
         $Text -match '(?i)workspace.{0,80}\b(not|nao|não)\b.{0,80}(trusted|confiavel|confiável)' -or

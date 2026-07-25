@@ -47,6 +47,34 @@ Assert-Equal 'workspace informativo nao vira erro generico' (Get-ClaudeCodeError
 Assert-Equal 'cannot nao casa como not' (Test-ClaudeCodeWorkspaceNotTrusted -Text 'Workspace initialization cannot continue: trusted certificate missing.') $false
 Assert-Equal 'texto de stdout nao classifica workspace not trusted' (Get-ClaudeCodeErrorMessage -StdoutText $trustErr -StderrText '') $null
 
+# --- Regressao ancorada em evidencia empirica (2026-07-25, claude 2.1.215) ---------------------
+# stderr REAL de execucao em workspace nao confiavel. Medido em quatro ensaios: aparece identico
+# (mesmo tamanho, mesmo texto) tanto em exit 1 quanto em exit 0 com resposta valida. Portanto nao
+# e evidencia de falha e nao pode disparar o detector de workspace nao confiavel.
+$noiseStderr = @'
+Ignoring 3 permissions.allow entries from .claude/settings.json: this workspace has not been trusted. Run Claude Code interactively here once and accept the trust dialog, or set projects["C:/tmp/probe"].hasTrustDialogAccepted: true in C:\Users\Fulano\.claude.json.
+Permission allow rule (C:\Users\Fulano\.claude\settings.json): Glob(C:/Dev/**) is not matched by file permission checks - only Read(path) rules are. Use Read(C:/Dev/**) instead (Read rules cover all file-reading tools).
+Permission allow rule (C:\Users\Fulano\.claude\settings.json): Write(C:/Dev/**) is not matched by file permission checks - only Edit(path) rules are. Use Edit(C:/Dev/**) instead (Edit rules cover all file-editing tools).
+'@
+
+Assert-Equal 'aviso de ambiente nao e recusa de workspace' (Test-ClaudeCodeWorkspaceNotTrusted -Text $noiseStderr) $false
+Assert-Equal 'ruido de ambiente e removido por inteiro' (Remove-ClaudeCodeEnvironmentNoise -Text $noiseStderr) ''
+# Ensaio R4: exit 0, resposta valida, aviso presente -> nenhum erro deve ser reportado.
+Assert-Equal 'execucao bem-sucedida com aviso nao vira erro' (Get-ClaudeCodeErrorMessage -StdoutText 'OK' -StderrText $noiseStderr) $null
+# Ensaio R1: exit 1 por esgotamento de turno, com o mesmo aviso em stderr.
+$maxTurnsMsg = Get-ClaudeCodeErrorMessage -StdoutText 'Error: Reached max turns (1)' -StderrText $noiseStderr
+Assert-Equal 'falha real vira codigo canonico max-turns-exhausted' ($maxTurnsMsg -match 'max-turns-exhausted') $true
+Assert-Equal 'falha real NAO e rotulada como workspace-not-trusted' ($maxTurnsMsg -match 'workspace-not-trusted') $false
+Assert-Equal 'mensagem de max turns preserva a evidencia' ($maxTurnsMsg -match [regex]::Escape('Error: Reached max turns (1)')) $true
+Assert-Equal 'mensagem de max turns nao repete ruido de ambiente' ($maxTurnsMsg -match 'permissions\.allow entries') $false
+Assert-Equal 'detector de max turns isolado' (Test-ClaudeCodeMaxTurnsExhausted -Text 'Error: Reached max turns (1)') $true
+Assert-Equal 'detector de max turns nao casa texto qualquer' (Test-ClaudeCodeMaxTurnsExhausted -Text 'Error: model not available') $false
+# A protecao contra recusa genuina continua ativa, inclusive convivendo com o ruido.
+$trustPlusNoise = $noiseStderr + "`n" + $trustErr
+Assert-Equal 'recusa genuina ainda detectada sob ruido' (Test-ClaudeCodeWorkspaceNotTrusted -Text $trustPlusNoise) $true
+Assert-Equal 'status recusa genuina sob ruido continua unavailable' (Resolve-ClaudeCodeJobStatus -FinalText '' -StreamError '' -Stderr $trustPlusNoise).status 'unavailable'
+Assert-Equal 'status aviso de ambiente puro nao vira unavailable' (Resolve-ClaudeCodeJobStatus -FinalText '' -StreamError '' -Stderr $noiseStderr).status 'sem-texto'
+
 $s1 = Resolve-ClaudeCodeJobStatus -FinalText 'ok' -StreamError '' -Stderr 'Error: ruidoso'
 Assert-Equal 'status resposta final manda' $s1.status 'completed'
 $s2 = Resolve-ClaudeCodeJobStatus -FinalText '' -StreamError 'stream boom' -Stderr ''
