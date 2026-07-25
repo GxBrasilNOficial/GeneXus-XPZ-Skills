@@ -138,6 +138,12 @@ try {
     # string vazia do ArgumentList e --tools e variadica.
     Assert-Equal 'invoke tools vazio passa --tools ""' ($invokeEmptyArgs -match '--tools ""') $true
 
+    # `--tools default` e o valor que a CLI documenta para liberar o conjunto padrao completo
+    # (`claude --help`, 2.1.215). O adapter repassa o literal, sem tratamento especial.
+    & (Join-Path $PSScriptRoot 'Invoke-ClaudeCode.ps1') 'adapter tools default' -ClaudeExe $fake.Exe -Tools 'default' -TimeoutSec 30 | Out-Null
+    $invokeAllToolsArgs = Read-LastFakeClaudeArgs -Path $fake.ArgsFile
+    Assert-Equal 'invoke tools default passa --tools default' ($invokeAllToolsArgs -match '--tools default') $true
+
     $env:FAKE_CLAUDE_UNTRUSTED = '1'
     $threwTrust = $false
     $trustMsg = ''
