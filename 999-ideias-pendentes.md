@@ -2594,9 +2594,9 @@ Ressalva de medição: a auditoria por `Get-Help` contou 14 scripts renderizando
 
 **A diretiva fica onde está.** `#requires -Version 7.4` em ponto de entrada público é regra operacional obrigatória (`02-regras-operacionais-e-runtime.md`, seção de regra operacional; `README.md` trilíngue). A correção **não** a move nem a remove: acrescenta uma linha em branco depois dela. Não há trade-off com a proteção de runtime.
 
-**Exceções nominais, já medidas:** `Test-XpzPowerShellRuntime.ps1` não tem `#requires` (precisa rodar em 5.1) nem `.PARAMETER` — fica fora por construção. `Invoke-ParallelKbEnvelopeScan.ps1` também não tem a diretiva.
+**Exceções nominais, já medidas:** `Test-XpzPowerShellRuntime.ps1` não tem `#requires` (precisa rodar em 5.1) nem `.PARAMETER` — fica fora por construção. `Invoke-ParallelKbEnvelopeScan.ps1` **não** é exceção sem diretiva: tem `#Requires -Version 7.4` em caixa mista, colado ao `<#`, e portanto pertence ao grupo de adjacência quebrada quando o detector tratar a diretiva sem depender de caixa.
 
-**O que a frente faria:** inserir a linha em branco nos arquivos afetados (mecânico, um caractere por arquivo); criar **gate de regressão** — detectar `#requires` imediatamente seguido de `<#` em arquivo com bloco de ajuda é uma regex de uma linha, e os 29 arquivos corretos servem de referência —; e avaliar se a regra do `02`/`README` deve passar a dizer **como** a diretiva convive com o bloco de ajuda, não só que ela deve existir. Sem o gate, a frente vira dívida recorrente.
+**O que a frente faria:** inserir a linha em branco nos arquivos afetados (mecânico, um caractere por arquivo); criar **gate de regressão** — detectar `#requires`/`#Requires` imediatamente seguido de `<#` em arquivo com bloco de ajuda é uma regex de uma linha com comparação sem depender de caixa, e os 29 arquivos corretos servem de referência —; e avaliar se a regra do `02`/`README` deve passar a dizer **como** a diretiva convive com o bloco de ajuda, não só que ela deve existir. Sem o gate, a frente vira dívida recorrente.
 
 **Origem:** revisão do commit `83d4c6a` (documentação dos parâmetros do `Start-ClaudeCodeJob.ps1`), 2026-07-26. A verificação da justificativa do commit — «quem chamasse `Get-Help` não encontrava nada» — revelou que continua não encontrando, e que o defeito atinge quase todo o `scripts/`.
 
