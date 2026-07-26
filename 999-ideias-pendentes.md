@@ -233,7 +233,7 @@ Critério para retomar: caso real em que a ausência do cache Codex prejudique a
 
 **Origem:** revisão pré-push reforçada de 2026-07-25, ao fechar o gap encadeado do caminho assíncrono (ver `historico/IdeiasImplementadas_202607.md`). Apontado na triagem como limite consciente da correção: o campo fecha a perda de evidência, não a decisão.
 
-**Relacionado:** «Detecção de truncamento fora do opencode (paridade dos adapters stdin/JSONL)» acima (contrato de saída tipado); `scripts/ClaudeCodeCliSupport.ps1`, `scripts/Watch-ClaudeCodeJob.ps1`; `15-revisao-por-pares.md`.
+**Relacionado:** «Detecção de truncamento fora do opencode (paridade dos adapters stdin/JSONL)» abaixo (contrato de saída tipado); `scripts/ClaudeCodeCliSupport.ps1`, `scripts/Watch-ClaudeCodeJob.ps1`; `15-revisao-por-pares.md`.
 
 ## Variante de prompt read-only para vozes "coder" do painel de revisão por pares (evitar truncamento por tool-calls) — RESOLVIDA E MIGRADA
 
