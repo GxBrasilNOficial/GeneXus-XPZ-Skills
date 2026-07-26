@@ -16,6 +16,28 @@
     substituicao de comando ("(Get-Content ...)") na linha de comando do chamador. O texto do
     prompt segue persistido em <GUID>.request.json e <GUID>.stdin.txt como hoje; -MessagePath
     muda so a origem do texto.
+.PARAMETER Model
+    Modelo aceito pelo Claude Code. Default: claude-opus-4-8.
+.PARAMETER PermissionMode
+    Modo de permissao do Claude Code. Default: plan. bypassPermissions e recusado.
+.PARAMETER Tools
+    Lista de ferramentas disponiveis. Default: Read,Glob,Grep. Use "" para desabilitar todas
+    (vira --tools "" na CLI) ou "default" para liberar o conjunto padrao completo da CLI.
+    Mesmo contrato do adapter sincrono Invoke-ClaudeCode.ps1.
+.PARAMETER Cd
+    Diretorio de trabalho do processo Claude Code. Default: diretorio atual do chamador.
+.PARAMETER ClaudeExe
+    Forca caminho de claude.exe.
+.PARAMETER NoWatcher
+    Nao abrir a janela do watcher (apenas dispara o job).
+.PARAMETER TempDir
+    Pasta dos arquivos de job. Default: <temp do usuario>\claude-code-jobs.
+.PARAMETER KeepDays
+    Idade maxima (dias) dos arquivos de job antes da auto-limpeza. Default 3.
+.EXAMPLE
+    .\Start-ClaudeCodeJob.ps1 "tarefa longa" -NoWatcher
+.EXAMPLE
+    .\Start-ClaudeCodeJob.ps1 -MessagePath .\prompt-grande.txt -Tools "" -NoWatcher
 #>
 [CmdletBinding(DefaultParameterSetName = 'Inline')]
 param(
