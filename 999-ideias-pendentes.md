@@ -2566,27 +2566,38 @@ Painel dividido (2026-06-13): deepseek-v4-pro, glm-5.1 e minimax-m3 inclinaram a
 
 **Ideia:** automatizar o **smoke de 2 fases** (anônimo→401; usuário sem papel→403; com papel→200) + OAuth + reversibilidade num **gate `.ps1`**, em vez do checklist manual. **Não cabe como gate `9-*`** (que é preflight estático pré-import): é um **teste HTTP de runtime pós-deploy**, outra categoria — por isso ficou como evolução futura (decisão D2 da frente original). **Gatilho:** quando houver demanda real de automatizar a prova de enforcement (e uma forma estável de subir/consultar o app headless no fluxo).
 
-## `Get-Help` não enxerga o comment-based help de nenhum script do repositório
+## `Get-Help` não enxerga o comment-based help da maioria dos scripts (falta linha em branco após `#requires`)
 
-- **Importância** — média. Não há risco de dano (nem contaminação de KB, nem perda de trabalho, nem falso negativo em gate) e o contorno é trivial — abrir o arquivo, que é o que todo mundo já faz. O que pesa é a **extensão**: são **89 de 89** scripts com `.PARAMETER`, ou seja, convenção do repositório quebrada por inteiro, não lacuna pontual. Esforço de documentação inteiramente investido e inalcançável pelo mecanismo padrão, com tendência a se propagar para cada script novo. Já induziu erro factual: em 2026-07-26 uma mensagem de commit justificou documentar parâmetros alegando que `Get-Help` passaria a mostrá-los — não passa.
-- **Maturidade** — pronta para implementar. Direção fechada e **medida nas duas pontas** (abaixo); falta executar nos 89 arquivos e decidir se entra gate de regressão.
+- **Importância** — média. Não há risco de dano (nem contaminação de KB, nem perda de trabalho, nem falso negativo em gate) e o contorno é trivial — abrir o arquivo, que é o que todo mundo já faz. O que pesa é a **extensão**: **218 de 248** scripts com bloco de ajuda ficam invisíveis ao `Get-Help`. É **deriva de convenção**, não convenção ausente: 29 arquivos já usam o padrão correto, então o repositório tem as duas formas convivendo e a errada é a maioria — cada script novo tende a nascer quebrado. Já induziu erro factual: em 2026-07-26 uma mensagem de commit justificou documentar parâmetros alegando que `Get-Help` passaria a mostrá-los — não passa.
+- **Maturidade** — pronta para implementar. Causa isolada por experimento controlado, correção verificada, e o padrão-alvo já existe no próprio repositório; falta executar e decidir o gate.
 
-**Causa, medida em 2026-07-26.** O `#requires -Version 7.4` colocado **antes** do bloco `<# ... #>` faz o PowerShell descartar o comment-based help inteiro. Experimento controlado com duas cópias do mesmo arquivo (`scripts/Start-ClaudeCodeJob.ps1`), diferindo só nessa linha:
+**Causa, medida em 2026-07-26.** Não é o `#requires` estar antes do bloco de ajuda — é ele estar **colado** ao bloco. Sem uma linha em branco separando a diretiva do `<#`, o PowerShell descarta o comment-based help inteiro. Contraste entre dois arquivos reais do repositório:
 
-| Cópia | `Get-Help -Full` |
+| Arquivo | Cabeçalho | `Get-Help -Full` |
+|---|---|---|
+| `Start-ClaudeCodeJob.ps1` | `#requires` **colado** ao `<#` | `params=1` (só a sintaxe auto-gerada) |
+| `Build-GeneXusImportFileEnvelope.ps1` | `#requires`, linha em branco, `<#` | `params=12` + sinopse real |
+
+Confirmado por injeção: acrescentar **uma linha em branco** numa cópia do primeiro devolve `params=10` e a sinopse real, sem mover a diretiva.
+
+**Levantamento (auditoria por `Get-Help` real, script a script, não por regex):**
+
+| | |
 |---|---|
-| com `#requires` antes do help | `params=1` (só a sintaxe auto-gerada) |
-| sem a linha | `params=10` + sinopse real |
+| Scripts com bloco de ajuda | 248 |
+| Com `#requires` colado ao `<#` — **quebrados** | **218** |
+| Com linha em branco — já funcionam | 29 |
+| Sem `#requires` (fora do escopo) | 1 |
+| Dos 89 com `.PARAMETER`, quebrados | 72 |
 
-Varredura do `scripts/`: **89** scripts têm `.PARAMETER` no help; **89** têm `#requires` antes do bloco; **0** têm help visível ao `Get-Help`.
+Ressalva de medição: a auditoria por `Get-Help` contou 14 scripts renderizando parâmetros e a contagem por adjacência prevê 17; a diferença vem do filtro `> 1 parâmetro` usado na auditoria, que descarta scripts de um parâmetro só. Os três casos não foram conferidos individualmente — não muda a conclusão, mas quem retomar deve refazer a contagem antes de tratar 218 como lista definitiva.
 
-**Remover a diretiva está fora de questão:** `#requires -Version 7.4` em ponto de entrada público é regra operacional obrigatória (`02-regras-operacionais-e-runtime.md`, seção de regra operacional; `README.md` trilíngue), com exceção nominal para `Test-XpzPowerShellRuntime.ps1`, que precisa rodar em 5.1.
+**A diretiva fica onde está.** `#requires -Version 7.4` em ponto de entrada público é regra operacional obrigatória (`02-regras-operacionais-e-runtime.md`, seção de regra operacional; `README.md` trilíngue). A correção **não** a move nem a remove: acrescenta uma linha em branco depois dela. Não há trade-off com a proteção de runtime.
 
-**Correção viável, com as duas pontas verificadas.** Reordenar — bloco de ajuda primeiro, `#requires` logo depois:
+**Exceções nominais, já medidas:** `Test-XpzPowerShellRuntime.ps1` não tem `#requires` (precisa rodar em 5.1) nem `.PARAMETER` — fica fora por construção. `Invoke-ParallelKbEnvelopeScan.ps1` também não tem a diretiva.
 
-- `Get-Help -Full` volta a render 10 parâmetros e a sinopse real; parse limpo (0 erros);
-- a diretiva **continua bloqueando** fora da primeira linha: a cópia reordenada executada em Windows PowerShell 5.1 recusa com `ScriptRequiresUnmatchedPSVersion`.
+**O que a frente faria:** inserir a linha em branco nos arquivos afetados (mecânico, um caractere por arquivo); criar **gate de regressão** — detectar `#requires` imediatamente seguido de `<#` em arquivo com bloco de ajuda é uma regex de uma linha, e os 29 arquivos corretos servem de referência —; e avaliar se a regra do `02`/`README` deve passar a dizer **como** a diretiva convive com o bloco de ajuda, não só que ela deve existir. Sem o gate, a frente vira dívida recorrente.
 
-**O que a frente faria:** reordenar os 89 arquivos (mecânico), decidir se cria gate de regressão — um teste que falhe quando `#requires` preceder o bloco de ajuda em script com `.PARAMETER` seria barato e evitaria a reincidência —, e avaliar se a regra do `02`/`README` deve passar a dizer **onde** a diretiva vai, não só que ela deve existir.
+**Origem:** revisão do commit `83d4c6a` (documentação dos parâmetros do `Start-ClaudeCodeJob.ps1`), 2026-07-26. A verificação da justificativa do commit — «quem chamasse `Get-Help` não encontrava nada» — revelou que continua não encontrando, e que o defeito atinge quase todo o `scripts/`.
 
-**Origem:** revisão do commit `83d4c6a` (documentação dos parâmetros do `Start-ClaudeCodeJob.ps1`), 2026-07-26. A verificação da justificativa do commit — «quem chamasse `Get-Help` não encontrava nada» — revelou que continua não encontrando, e que o defeito é do repositório inteiro. Terceiro caso na mesma sessão em que conferir «o contrato documentado corresponde ao efeito real?» derrubou uma premissa, depois de `-Tools ""` e `-MaxTurns`.
+**Correção do próprio registro (mesma data).** A primeira versão desta entrada afirmava «89 de 89, zero visíveis» e propunha **reordenar** a diretiva. Estava errada na causa, nos números e na correção: o experimento inicial removia a linha do `#requires` e portanto mudava **duas** variáveis ao mesmo tempo — a diretiva e a adjacência —, atribuindo o efeito à errada. O erro só apareceu porque uma segunda voz estranhou que as duas contagens casassem exatamente e pediu conferência independente; a auditoria por `Get-Help` real mostrou 14 scripts funcionando, o que era incompatível com a causa alegada. Fica como lição de método: contagem por regex não substitui medição do comportamento, e experimento que muda duas variáveis não isola causa nenhuma.
