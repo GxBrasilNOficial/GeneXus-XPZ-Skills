@@ -228,6 +228,39 @@ try {
     if ($jobEmpty.pid) {
         Wait-Process -Id ([int]$jobEmpty.pid) -Timeout 5 -ErrorAction SilentlyContinue
     }
+
+    # --- Watch-ClaudeCodeJob.ps1 de ponta a ponta ---------------------------------------------
+    # Ate 2026-07-26 nenhum self-test executava o watcher: as funcoes da biblioteca eram cobertas
+    # isoladamente, mas a LIGACAO entre elas e o <GUID>.result.json (leitura do stream, extracao
+    # do evento final, gravacao de failureAfterText) nao tinha rede. Aqui o stream e sintetico e
+    # o processo "dono" ja nao existe, entao o laco encerra na primeira passada.
+    $watchDir = Join-Path $tmp 'watch'
+    New-Item -ItemType Directory -Path $watchDir -Force | Out-Null
+    $watchJobId = [guid]::NewGuid().ToString()
+    $watchStream = Join-Path $watchDir "$watchJobId.stream.jsonl"
+    # Evento final REAL do esgotamento de turno (claude 2.1.220): sem campo `result`, mensagem em
+    # `errors[]`. Precedido de texto, que e o caso em que `failureAfterText` importa.
+    $watchLines = @(
+        '{"type":"assistant","message":{"content":[{"text":"parecer parcial antes do corte"}]}}'
+        '{"is_error":true,"terminal_reason":"max_turns","subtype":"error_max_turns","errors":["Reached maximum number of turns (1)"],"type":"result"}'
+    )
+    Set-Content -LiteralPath $watchStream -Value $watchLines -Encoding utf8
+
+    # PID garantidamente morto: sondar ate achar um identificador sem processo vivo.
+    $deadPid = 999999
+    while ($null -ne (Get-Process -Id $deadPid -ErrorAction SilentlyContinue)) { $deadPid-- }
+
+    & (Join-Path $PSScriptRoot 'Watch-ClaudeCodeJob.ps1') -JobId $watchJobId -ProcessId $deadPid `
+        -TempDir $watchDir -IntervalSeconds 1 6>$null | Out-Null
+
+    $watchResultPath = Join-Path $watchDir "$watchJobId.result.json"
+    Assert-Equal 'watcher grava result.json' (Test-Path -LiteralPath $watchResultPath -PathType Leaf) $true
+    $watchResult = Get-Content -LiteralPath $watchResultPath -Raw -Encoding utf8 | ConvertFrom-Json
+    Assert-Equal 'watcher mantem completed com texto parcial' $watchResult.status 'completed'
+    Assert-Equal 'watcher acumula o texto do stream' $watchResult.finalText 'parecer parcial antes do corte'
+    Assert-Equal 'watcher nao inventa error com texto presente' $watchResult.error $null
+    Assert-Equal 'watcher grava failureAfterText canonico' ($watchResult.failureAfterText -match 'max-turns-exhausted') $true
+    Assert-Equal 'watcher preserva a mensagem de errors[] no result.json' ($watchResult.failureAfterText -match 'Reached maximum number of turns \(1\)') $true
 } finally {
     if (Test-Path -LiteralPath $tmp) {
         Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
