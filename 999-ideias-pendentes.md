@@ -2318,6 +2318,27 @@ No FBgx18MCP, build longo vira job em background; o canal MCP devolve `job_id` r
 
 **Atualização (2026-06-09):** o `Add-GeneXusButton.ps1` ganhou a âncora simétrica `-BeforeControlName` (insere a nova `<cell>` **antes** da célula do controle folha; mutuamente exclusiva com `-AfterControlName` via parameter sets). Reusa toda a validação fail-closed existente (folha, `RESPONSIVE_UNSAFE`, unicidade) sem alteração; o primitivo `Invoke-GeneXusXmlLiteralPatch` em `GeneXusXmlSurgicalEditSupport.ps1` ganhou o modo `InsertBefore`. Permanecem ideia, neste mesmo helper: âncora por tabela nomeada / inserção como última célula, célula não-folha e reescrita segura de `responsiveSizes` em Responsive preenchido.
 
+### Insumo da `nexa`: piloto de correspondência semântica para propriedades XPZ
+
+**Origem (2026-07-26):** estudo comparativo da skill `nexa`, mantida no repositório `genexuslabs/genexus-skills`, frente aos catálogos, moldes e gates desta base.
+
+Antes de implementar `Set-XpzTransactionProperty`, avaliar um piloto de correspondência entre o conceito documentado pela `nexa` e sua serialização XPZ empiricamente comprovada. Exemplo inicial: conceito `Business Component` na `nexa` versus propriedade `idISBUSINESSCOMPONENT` no XML XPZ.
+
+O piloto deve registrar, para cada candidata:
+
+- conceito e referência de origem na `nexa`;
+- nome efetivo da propriedade no XML XPZ;
+- tipo e valores serializados observados;
+- evidência XPZ (`confirmado-import`, `confirmado-build`, `confirmado-acervo` ou não comprovado);
+- versão GeneXus em que a evidência foi obtida;
+- estado da correspondência: confirmada, parcial, contraditória ou ainda não comprovada.
+
+A `nexa` é fonte semântica e lista de candidatas, **não** autoridade de serialização XPZ. Nenhum nome, valor padrão, enumeração ou restrição deve migrar automaticamente de artefatos `.gx`/GeneXus Next para XPZ de GeneXus 18 ou formato legado. A autoridade operacional continua sendo XML comparável, molde sanitizado e evidência real de importação/build desta trilha.
+
+O piloto só deve virar contrato de escrita após provar valor sobre leitura/validação e fechar o mapeamento com evidência suficiente. Também é válido concluir que a correspondência não cabe no catálogo semântico, que outro tipo de objeto é piloto melhor ou que a ideia deve ser descartada.
+
+**Margem de reavaliação:** quem retomar deve reler o estado atual da `nexa` e desta base, verificar se já existe mecanismo equivalente e redesenhar o piloto se necessário; este registro não fixa `Transaction`, o formato da tabela nem `Set-XpzTransactionProperty` como implementação obrigatória.
+
 ### Desdobramentos derivados (registrados em 2026-06-09, sem código)
 
 Ao avaliar "outros tipos poderiam ter inserção como o botão", separar duas camadas — a generalização barata (mesmo modelo estrutural) das operações de tipo diferente (cada uma é frente própria):
@@ -2611,3 +2632,60 @@ Ressalva de medição: a auditoria por `Get-Help` contou 14 scripts renderizando
 **Origem:** revisão do commit `83d4c6a` (documentação dos parâmetros do `Start-ClaudeCodeJob.ps1`), 2026-07-26. A verificação da justificativa do commit — «quem chamasse `Get-Help` não encontrava nada» — revelou que continua não encontrando, e que o defeito atinge quase todo o `scripts/`.
 
 **Correção do próprio registro (mesma data).** A primeira versão desta entrada afirmava «89 de 89, zero visíveis» e propunha **reordenar** a diretiva. Estava errada na causa, nos números e na correção: o experimento inicial removia a linha do `#requires` e portanto mudava **duas** variáveis ao mesmo tempo — a diretiva e a adjacência —, atribuindo o efeito à errada. O erro só apareceu porque uma segunda voz estranhou que as duas contagens casassem exatamente e pediu conferência independente; a auditoria por `Get-Help` real mostrou 14 scripts funcionando, o que era incompatível com a causa alegada. Fica como lição de método: contagem por regex não substitui medição do comportamento, e experimento que muda duas variáveis não isola causa nenhuma.
+
+## Divulgação progressiva nos `SKILL.md` extensos
+
+- **Importância** — média (arquivos muito extensos aumentam custo de contexto e tornam mais difícil distinguir regra sempre obrigatória de detalhe condicional; há contorno manual por leitura dirigida e satélites já existentes).
+- **Maturidade** — ideia (arquitetura candidata identificada, mas ainda sem medição de perda real de aderência, desenho fechado ou escolha definitiva de skill-piloto).
+
+**Origem (2026-07-26):** estudo comparativo da organização modular da `nexa` — `SKILL.md` como fluxo principal e referências `object-*`, `common-*`, `global-*`, `model-*` e `properties-*` carregadas conforme o caso — frente à estrutura atual das skills XPZ.
+
+### Problema a verificar
+
+Algumas skills XPZ concentram grande volume no arquivo principal, apesar de já haver precedentes internos de satélites:
+
+- `xpz-kb-parallel-setup/SKILL.md`: cerca de 207 KB;
+- `xpz-msbuild-import-export/SKILL.md`: cerca de 118 KB;
+- `xpz-builder/SKILL.md`: cerca de 108 KB;
+- `xpz-msbuild-build/SKILL.md`: cerca de 107 KB.
+
+Tamanho sozinho **não prova defeito**. Regras absolutas, sequência de gates e fronteiras de segurança podem perder aderência se forem deslocadas para arquivos que o agente não carrega. A investigação precisa medir se há custo ou falha concreta antes de tratar modularização como correção.
+
+### Hipótese de melhoria
+
+Avaliar divulgação progressiva: manter no `SKILL.md` um roteador operacional compacto e deslocar apenas conteúdo realmente condicional para referências explicitamente acionadas.
+
+Em um desenho possível, não obrigatório:
+
+- o arquivo principal preserva gatilhos, fronteiras, ordem do workflow, regras `NEVER`/`ABORT` e chamadas obrigatórias;
+- satélites concentram detalhes por tipo, variante, gate ou fase;
+- cada referência tem gatilho explícito e deve ser lida integralmente quando acionada;
+- o checklist final confere que todos os satélites aplicáveis foram carregados.
+
+### Reavaliação obrigatória antes de propor mudança
+
+Esta entrada registra uma direção para estudo, não uma decisão de refatoração. Quem retomar deve:
+
+1. reler a skill candidata e seus satélites no estado atual;
+2. medir tamanho, duplicação, referências cruzadas e sinais reais de falha de carregamento/aderência;
+3. mapear o que precisa permanecer sempre carregado e o que é genuinamente condicional;
+4. comparar alternativas como compactação local, remoção de duplicação, índice roteador ou nenhuma mudança;
+5. admitir como resultados válidos escolher outra skill-piloto, manter a estrutura atual ou descartar a ideia.
+
+### Piloto possível, não fixado
+
+`xpz-builder` é candidata inicial porque já possui `responsibilities-by-type/`, `quality-checklist.md` e `wwp-packaging.md`, permitindo testar o desenho com menor invenção estrutural. Isso **não** fixa a `xpz-builder` como primeira implementação: a análise futura pode escolher outra skill ou concluir que o piloto não se justifica.
+
+### Decisões em aberto
+
+- Qual dor empírica justificaria a reorganização: limite de contexto, regra omitida, duplicação ou dificuldade de manutenção?
+- Que conteúdo é invariavelmente carregado e não pode sair do `SKILL.md`?
+- Como impedir que o roteador e os satélites divirjam?
+- Como fazer a migração em recortes pequenos, preservando histórico e evitando reescrita ampla de Markdown?
+
+### Relacionado
+
+- `xpz-builder/SKILL.md`, `xpz-builder/quality-checklist.md`, `xpz-builder/wwp-packaging.md` e `xpz-builder/responsibilities-by-type/`;
+- `xpz-kb-parallel-pre-push/SKILL.md` e seus satélites, precedente interno de skill principal enxuta;
+- entrada «Pré-push: reduzir dependência de interpretação em `.md` (opções B e C)» neste arquivo, pela preocupação comum com contratos espalhados;
+- entrada «Catálogo semântico de operações em `xpz-builder`» neste arquivo, que pode criar novos satélites condicionais.
