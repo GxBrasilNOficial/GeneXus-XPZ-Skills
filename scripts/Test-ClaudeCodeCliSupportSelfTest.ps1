@@ -113,6 +113,14 @@ $realText = Get-ClaudeCodeStreamEventErrorText -StreamEvent $evMaxTurnsReal
 Assert-Equal 'evento real de max turns preserva a mensagem de errors[]' ($realText -match 'Reached maximum number of turns \(1\)') $true
 Assert-Equal 'evento real de max turns preserva terminal_reason' ($realText -match 'terminal_reason=max_turns') $true
 Assert-Equal 'evento real de max turns ainda casa o detector' (Test-ClaudeCodeMaxTurnsExhausted -Text $realText) $true
+# O texto real de errors[] NAO casa `reached max turns`; sem a alternancia, a deteccao dependeria
+# so do subtype vir prefixado na evidencia montada.
+Assert-Equal 'texto real de errors[] casa o detector sozinho' (Test-ClaudeCodeMaxTurnsExhausted -Text 'Reached maximum number of turns (1)') $true
+# A mensagem canonica e reusada no caminho failureAfterText, onde HOUVE texto antes do corte:
+# nao pode afirmar que a chamada terminou sem produzir resposta.
+$maxTurnsCanonical = New-ClaudeCodeMaxTurnsExhaustedEvidenceMessage -EvidenceText 'subtype=error_max_turns'
+Assert-Equal 'mensagem canonica nao afirma ausencia de resposta' ($maxTurnsCanonical -match 'antes de produzir resposta') $false
+Assert-Equal 'mensagem canonica admite texto parcial' ($maxTurnsCanonical -match 'texto parcial') $true
 $evTypeError = '{"type":"error","message":"boom"}' | ConvertFrom-Json
 Assert-Equal 'evento type=error continua capturado' ((Get-ClaudeCodeStreamEventErrorText -StreamEvent $evTypeError) -match 'boom') $true
 Assert-Equal 'evento nulo nao vira erro' (Get-ClaudeCodeStreamEventErrorText -StreamEvent $null) ''

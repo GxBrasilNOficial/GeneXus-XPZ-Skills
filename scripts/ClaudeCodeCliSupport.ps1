@@ -70,9 +70,9 @@ function New-ClaudeCodeMaxTurnsExhaustedEvidenceMessage {
 
     $evidence = ([string]$EvidenceText).Trim()
     return @"
-Claude Code max-turns-exhausted: a chamada gastou todos os turnos agenticos antes de produzir resposta.
+Claude Code max-turns-exhausted: a chamada gastou todos os turnos agenticos sem concluir. Pode ter havido texto parcial antes do corte — nesse caso a resposta existe, mas esta truncada.
 
-Quando ha limite de turnos, a primeira chamada de ferramenta pode consumir o unico turno e nao sobrar turno para responder. Os adapters deste repositorio NAO passam mais --max-turns (a CLI 2.1.215 removeu a flag do --help), entao um limite ativo vem da propria CLI ou de configuracao externa: investigue de onde. Alternativa imediata: rodar sem ferramentas quando a consulta nao precisar ler o workspace. Isto NAO e problema de confianca de workspace nem indisponibilidade do modelo.
+Quando ha limite de turnos, a primeira chamada de ferramenta pode consumir o unico turno e nao sobrar turno para concluir. Os adapters deste repositorio NAO passam mais --max-turns (a CLI 2.1.215 removeu a flag do --help), entao um limite ativo vem da propria CLI ou de configuracao externa: investigue de onde. Alternativa imediata: rodar sem ferramentas quando a consulta nao precisar ler o workspace. Isto NAO e problema de confianca de workspace nem indisponibilidade do modelo.
 
 --- EVIDENCIA (stdout + stderr, sem ruido de ambiente) ---
 $evidence
@@ -83,9 +83,11 @@ $evidence
 function Test-ClaudeCodeMaxTurnsExhausted {
     param([AllowNull()] [string] $Text)
     if ([string]::IsNullOrWhiteSpace($Text)) { return $false }
-    # `Reached max turns` e o texto do modo --output-format text; `error_max_turns` e o subtype do
-    # evento final do stream-json (medido em 2026-07-25, claude 2.1.220).
-    return ($Text -match '(?i)(reached\s+max\s+turns|\berror_max_turns\b)')
+    # Tres gatilhos, todos medidos em 2026-07-25: `Reached max turns` (modo --output-format text),
+    # `Reached maximum number of turns (N)` (campo errors[] do evento final do stream-json) e o
+    # subtype `error_max_turns` do mesmo evento. O segundo NAO casa o primeiro padrao — sem ele, a
+    # deteccao dependia so do subtype vir prefixado na evidencia.
+    return ($Text -match '(?i)(reached\s+max(imum\s+number\s+of)?\s+turns|\berror_max_turns\b)')
 }
 
 <#
