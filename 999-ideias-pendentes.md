@@ -2578,7 +2578,7 @@ Painel dividido (2026-06-13): deepseek-v4-pro, glm-5.1 e minimax-m3 inclinaram a
 
 ## `Get-Help` não enxerga o comment-based help da maioria dos scripts (falta linha em branco após `#requires`)
 
-- **Importância** — média. Não há risco de dano (nem contaminação de KB, nem perda de trabalho, nem falso negativo em gate) e o contorno é trivial — abrir o arquivo, que é o que todo mundo já faz. O que pesa é a **extensão**: **218 de 248** scripts com bloco de ajuda ficam invisíveis ao `Get-Help`. É **deriva de convenção**, não convenção ausente: 29 arquivos já usam o padrão correto, então o repositório tem as duas formas convivendo e a errada é a maioria — cada script novo tende a nascer quebrado. Já induziu erro factual: em 2026-07-26 uma mensagem de commit justificou documentar parâmetros alegando que `Get-Help` passaria a mostrá-los — não passa.
+- **Importância** — média. Não há risco de dano (nem contaminação de KB, nem perda de trabalho, nem falso negativo em gate) e o contorno é trivial — abrir o arquivo, que é o que todo mundo já faz. O que pesa é a **extensão**: **218 de 248** scripts em `scripts/` com bloco de ajuda real (`.SYNOPSIS`) ficam invisíveis ao `Get-Help`. É **deriva de convenção**, não convenção ausente: 29 arquivos já usam o padrão correto, então o repositório tem as duas formas convivendo e a errada é a maioria — cada script novo tende a nascer quebrado. Já induziu erro factual: em 2026-07-26 uma mensagem de commit justificou documentar parâmetros alegando que `Get-Help` passaria a mostrá-los — não passa.
 - **Maturidade** — pronta para implementar. Causa isolada por experimento controlado, correção verificada, e o padrão-alvo já existe no próprio repositório; falta executar e decidir o gate.
 
 **Causa, medida em 2026-07-26.** Não é o `#requires` estar antes do bloco de ajuda — é ele estar **colado** ao bloco. Sem uma linha em branco separando a diretiva do `<#`, o PowerShell descarta o comment-based help inteiro. Contraste entre dois arquivos reais do repositório:
@@ -2590,23 +2590,23 @@ Painel dividido (2026-06-13): deepseek-v4-pro, glm-5.1 e minimax-m3 inclinaram a
 
 Confirmado por injeção: acrescentar **uma linha em branco** numa cópia do primeiro devolve `params=10` e a sinopse real, sem mover a diretiva.
 
-**Levantamento (auditoria por `Get-Help` real, script a script, não por regex):**
+**Levantamento de `scripts/` (auditoria por `Get-Help` real, script a script, não por regex):**
 
 | | |
 |---|---|
-| Scripts com bloco de ajuda | 248 |
+| Scripts em `scripts/` com bloco de ajuda real (`.SYNOPSIS`) | 248 |
 | Com `#requires` colado ao `<#` — **quebrados** | **218** |
 | Com linha em branco — já funcionam | 29 |
-| Sem `#requires` (fora do escopo) | 1 |
+| Sem `#requires` antes do help — `Test-XpzPowerShellRuntime.ps1`, exceção 5.1 | 1 |
 | Dos 89 com `.PARAMETER`, quebrados | 72 |
 
-Ressalva de medição: a auditoria por `Get-Help` contou 14 scripts renderizando parâmetros e a contagem por adjacência prevê 17; a diferença vem do filtro `> 1 parâmetro` usado na auditoria, que descarta scripts de um parâmetro só. Os três casos não foram conferidos individualmente — não muda a conclusão, mas quem retomar deve refazer a contagem antes de tratar 218 como lista definitiva.
+Ressalva de medição: a auditoria por `Get-Help` contou 14 scripts renderizando parâmetros e a contagem por adjacência prevê 17; a diferença vem do filtro `> 1 parâmetro` usado na auditoria, que descarta scripts de um parâmetro só. Os três casos não foram conferidos individualmente — não muda a conclusão, mas quem retomar deve refazer a contagem antes de tratar 218 como lista definitiva. `scripts-maintenance/` foi conferido separadamente em 2026-07-26: são 5 arquivos com bloco de ajuda real, todos com `#requires` colado ao `<#`; se a frente incluir esse diretório, o alvo total de adjacência quebrada passa de 218 para 223.
 
 **A diretiva fica onde está.** `#requires -Version 7.4` em ponto de entrada público é regra operacional obrigatória (`02-regras-operacionais-e-runtime.md`, seção de regra operacional; `README.md` trilíngue). A correção **não** a move nem a remove: acrescenta uma linha em branco depois dela. Não há trade-off com a proteção de runtime.
 
-**Exceções nominais, já medidas:** `Test-XpzPowerShellRuntime.ps1` não tem `#requires` (precisa rodar em 5.1) nem `.PARAMETER` — fica fora por construção. `Invoke-ParallelKbEnvelopeScan.ps1` **não** é exceção sem diretiva: tem `#Requires -Version 7.4` em caixa mista, colado ao `<#`, e portanto pertence ao grupo de adjacência quebrada quando o detector tratar a diretiva sem depender de caixa.
+**Exceções nominais, já medidas:** o `1` da tabela é `Test-XpzPowerShellRuntime.ps1`, que não tem `#requires` (precisa rodar em 5.1) nem `.PARAMETER` — fica fora por construção. `Invoke-ParallelKbEnvelopeScan.ps1` **não** é exceção sem diretiva: tem `#Requires -Version 7.4` em caixa mista, colado ao `<#`, e portanto pertence ao grupo de adjacência quebrada quando o detector tratar a diretiva sem depender de caixa.
 
-**O que a frente faria:** inserir a linha em branco nos arquivos afetados (mecânico, um caractere por arquivo); criar **gate de regressão** — detectar `#requires`/`#Requires` imediatamente seguido de `<#` em arquivo com bloco de ajuda é uma regex de uma linha com comparação sem depender de caixa, e os 29 arquivos corretos servem de referência —; e avaliar se a regra do `02`/`README` deve passar a dizer **como** a diretiva convive com o bloco de ajuda, não só que ela deve existir. Sem o gate, a frente vira dívida recorrente.
+**O que a frente faria:** inserir a linha em branco nos 218 arquivos afetados de `scripts/` e decidir explicitamente se inclui também os 5 de `scripts-maintenance/` (mecânico, um caractere por arquivo); criar **gate de regressão** — detectar `#requires`/`#Requires` imediatamente seguido de `<#` em arquivo com bloco de ajuda é uma regex de uma linha com comparação sem depender de caixa, e os 29 arquivos corretos servem de referência —; e avaliar se a regra do `02`/`README` deve passar a dizer **como** a diretiva convive com o bloco de ajuda, não só que ela deve existir. Sem o gate, a frente vira dívida recorrente.
 
 **Origem:** revisão do commit `83d4c6a` (documentação dos parâmetros do `Start-ClaudeCodeJob.ps1`), 2026-07-26. A verificação da justificativa do commit — «quem chamasse `Get-Help` não encontrava nada» — revelou que continua não encontrando, e que o defeito atinge quase todo o `scripts/`.
 
