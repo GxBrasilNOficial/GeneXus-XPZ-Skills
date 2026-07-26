@@ -235,6 +235,16 @@ Critério para retomar: caso real em que a ausência do cache Codex prejudique a
 
 **Relacionado:** «Detecção de truncamento fora do opencode (paridade dos adapters stdin/JSONL)» abaixo (contrato de saída tipado); `scripts/ClaudeCodeCliSupport.ps1`, `scripts/Watch-ClaudeCodeJob.ps1`; `15-revisao-por-pares.md`.
 
+## Preservar mais evidência quando o `claude` sai `1` sem saída classificável
+
+- **Importância** — baixa-média. Em 2026-07-26, uma chamada real `Invoke-ClaudeCode.ps1 -Message "responda OK" -Tools "" -TimeoutSec 60` retornou `exit 1` sem resposta e sem `stderr` capturado, durante janela em que o limite de 5 horas do Claude Code estava zerado. Esse contexto operacional deve ser preservado, mas a causa permanece **não classificável** pela evidência disponível: a documentação oficial do Claude Code não publica uma tabela geral de exit codes para `claude`/`claude -p`, e a própria referência de erros diz que `code N` sozinho não informa o que falhou.
+- **Maturidade** — ideia curta. O `SKILL.md` agora registra o glossário operacional baseado em menções oficiais (`0` sucesso; `1` falha genérica quando sem causa textual; `2` bloqueio de hook, não contrato geral do `claude -p`; `137` processo morto/kill/OOM em contexto de instalação). Falta decidir se o adapter deve enriquecer o `BLOCK` opaco com versão, cwd, argv sanitizado, existência/tamanho dos arquivos temporários, `claude auth status`/`claude doctor` opcional, ou outro caminho oficial de log, sempre sem inferir causa pelo número.
+- **Não** mapear `exit 1` para quota/limite/auth/workspace/modelo sem sinal textual ou fixture oficial. A melhoria é de **observabilidade**, não de classificação por número.
+
+**Origem:** teste operacional solicitado pelo usuário em 2026-07-26 após a frente do falso `workspace-not-trusted` do backend Claude Code.
+
+**Relacionado:** `xpz-llm-delegate/SKILL.md` (backend Claude Code, códigos de saída); `scripts/Invoke-ClaudeCode.ps1`; `scripts/ClaudeCodeCliSupport.ps1`; contrato de saída tipado dos adapters na entrada «Detecção de truncamento fora do opencode (paridade dos adapters stdin/JSONL)».
+
 ## Variante de prompt read-only para vozes "coder" do painel de revisão por pares (evitar truncamento por tool-calls) — RESOLVIDA E MIGRADA
 
 > Investigação concluída e migrada para `historico/IdeiasImplementadas_202606.md` em 2026-06-23. Truncamento das vozes coder = **não-determinismo de cauda raro** (não cota/429, não orçamento-de-passos, não propriedade fixa "coder=trunca"); corroborado por experimento controlado (12 runs, 4 modelos × 3) que reproduziu 1 truncamento real (`reason=tool-calls`, 28 `tool_use`, sem 429). Correção **implementada**: `-MaxAttempts` (retry-once) em `Invoke-OpenCode.ps1`, já no despacho do painel (`Invoke-LlmDelegatePanelDispatch.ps1`). A "variante read-only por prompt" foi **descartada como solução de truncamento** (`--agent plan` auto-aprova bash); a substância de menor-privilégio foi **implementada** (frente D-min do reviewer-ro, 2026-07-04 — ver `historico/IdeiasImplementadas_202607.md`), restando apenas o eixo de leitura como entrada **ADIADA** abaixo. Gap derivado novo (resposta `stop` quase-vazia escapa do veredito/retry) registrado em entrada própria abaixo.
