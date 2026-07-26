@@ -225,6 +225,16 @@ Critério para retomar: caso real em que a ausência do cache Codex prejudique a
 
 **Origem:** frente da detecção de 429 no `Invoke-OpenCode` (2026-06-21), nascida de uma pré-push reforçada em que 3 modelos `ollama-cloud` (kimi/minimax/glm) "estouraram timeout" sem causa visível — era a **cota semanal** esgotada da conta ollama-cloud. Deixado como follow-up para não bundlar na frente do `.ContainsKey`.
 
+## Consumir `failureAfterText` do job claude-code de forma mecânica (hoje é só registro)
+
+- **Importância** — baixa-média. O campo `failureAfterText` do `<GUID>.result.json` (backend claude-code, 2026-07-25) marca que o job produziu texto **e depois** falhou — tipicamente esgotamento de turno —, ou seja, que o parecer pode estar truncado. Mas ele é **informativo**: nada falha se o consumidor ignorá-lo. A decisão sobre parecer truncado continua na reclassificação **pós-hoc humana** do `15` (`responded`→`noResponse`). «Registrado» não é «impedido».
+- **Maturidade** — ideia, não desenho. O consumidor natural seria o `Invoke-LlmDelegatePanelDispatch.ps1`, mas ele usa o adapter **síncrono** do Claude Code, que não expõe o campo (o síncrono é fail-closed: descarta stdout parcial e lança). Implementar exigiria decidir se o painel passa a usar o job assíncrono, ou se o adapter síncrono ganha sinal equivalente — e isso esbarra na frente já registrada do **contrato de saída tipado dos adapters**, que é onde este eixo provavelmente deve morar.
+- **Não** transformar em bloqueio automático sem essa decisão: um `completed` com texto parcial ainda pode ser parecer utilizável, e recusá-lo mecanicamente derrubaria respostas legítimas.
+
+**Origem:** revisão pré-push reforçada de 2026-07-25, ao fechar o gap encadeado do caminho assíncrono (ver `historico/IdeiasImplementadas_202607.md`). Apontado na triagem como limite consciente da correção: o campo fecha a perda de evidência, não a decisão.
+
+**Relacionado:** «Detecção de truncamento fora do opencode (paridade dos adapters stdin/JSONL)» acima (contrato de saída tipado); `scripts/ClaudeCodeCliSupport.ps1`, `scripts/Watch-ClaudeCodeJob.ps1`; `15-revisao-por-pares.md`.
+
 ## Variante de prompt read-only para vozes "coder" do painel de revisão por pares (evitar truncamento por tool-calls) — RESOLVIDA E MIGRADA
 
 > Investigação concluída e migrada para `historico/IdeiasImplementadas_202606.md` em 2026-06-23. Truncamento das vozes coder = **não-determinismo de cauda raro** (não cota/429, não orçamento-de-passos, não propriedade fixa "coder=trunca"); corroborado por experimento controlado (12 runs, 4 modelos × 3) que reproduziu 1 truncamento real (`reason=tool-calls`, 28 `tool_use`, sem 429). Correção **implementada**: `-MaxAttempts` (retry-once) em `Invoke-OpenCode.ps1`, já no despacho do painel (`Invoke-LlmDelegatePanelDispatch.ps1`). A "variante read-only por prompt" foi **descartada como solução de truncamento** (`--agent plan` auto-aprova bash); a substância de menor-privilégio foi **implementada** (frente D-min do reviewer-ro, 2026-07-04 — ver `historico/IdeiasImplementadas_202607.md`), restando apenas o eixo de leitura como entrada **ADIADA** abaixo. Gap derivado novo (resposta `stop` quase-vazia escapa do veredito/retry) registrado em entrada própria abaixo.

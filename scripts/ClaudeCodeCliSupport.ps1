@@ -96,6 +96,11 @@ function Test-ClaudeCodeMaxTurnsExhausted {
     a ultima linha e `type=result` com `subtype` (`success`, `error_max_turns`, ...) e `is_error`.
     Observar apenas `type=error` deixava o esgotamento de turno e a falha de execucao invisiveis
     para o caminho assincrono. Devolve string vazia quando o evento nao carrega falha.
+
+    A mensagem legivel NAO esta garantida em `result`: no evento de esgotamento de turno medido
+    (`subtype=error_max_turns`) o campo `result` nem existe, e o texto vive em `errors[]`
+    («Reached maximum number of turns (1)»), com `terminal_reason=max_turns` ao lado. Por isso a
+    extracao le os quatro campos: sem `errors[]` a evidencia preservada era so o subtype.
 #>
 function Get-ClaudeCodeStreamEventErrorText {
     param([AllowNull()] $StreamEvent)
@@ -115,12 +120,20 @@ function Get-ClaudeCodeStreamEventErrorText {
 
     $subtype = ''
     if ($props['subtype']) { $subtype = [string]$props['subtype'].Value }
+    $terminalReason = ''
+    if ($props['terminal_reason']) { $terminalReason = [string]$props['terminal_reason'].Value }
     $resultText = ''
     if ($props['result']) { $resultText = [string]$props['result'].Value }
+    $errorsText = ''
+    if ($props['errors']) {
+        $errorsText = ((@($props['errors'].Value) | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | ForEach-Object { ([string]$_).Trim() }) -join ' | ')
+    }
 
     $parts = @()
     if (-not [string]::IsNullOrWhiteSpace($subtype)) { $parts += "subtype=$subtype" }
+    if (-not [string]::IsNullOrWhiteSpace($terminalReason)) { $parts += "terminal_reason=$terminalReason" }
     if (-not [string]::IsNullOrWhiteSpace($resultText)) { $parts += $resultText.Trim() }
+    if (-not [string]::IsNullOrWhiteSpace($errorsText)) { $parts += $errorsText }
     if ($parts.Count -eq 0) { return ($StreamEvent | ConvertTo-Json -Compress -Depth 10) }
     return ($parts -join ': ')
 }
@@ -238,9 +251,11 @@ function Resolve-ClaudeCodeStreamErrorClassification {
 .SYNOPSIS
     Classifica o desfecho de um job assincrono do Claude Code.
 .DESCRIPTION
-    Resposta final manda: texto produzido continua `completed`. Mas o esgotamento de turno chega
-    SEMPRE depois de algum texto (o job gasta os turnos produzindo saida e morre sem concluir),
-    entao descartar o erro nesse caso mascararia resposta truncada como resposta boa. O erro
+    Resposta final manda: texto produzido continua `completed`. Mas o esgotamento de turno PODE
+    chegar depois de ja haver texto — medido em 2026-07-25 nos dois modos: um ensaio cortou com o
+    turno gasto so em `tool_use` (sem texto), outro com o assistente ja tendo emitido uma frase
+    antes da ferramenta. No segundo caso, descartar o erro mascararia resposta truncada como
+    resposta boa; no primeiro, `FinalText` fica vazio e o desfecho e `error` normal. O erro
     observado depois do texto vai em `failureAfterText`, sem mudar `status`/`error`: quem decide se
     um parecer truncado vale e o orquestrador do painel, na reclassificacao pos-hoc do `15`.
     Todos os retornos tem o mesmo shape (`status`, `error`, `failureAfterText`).

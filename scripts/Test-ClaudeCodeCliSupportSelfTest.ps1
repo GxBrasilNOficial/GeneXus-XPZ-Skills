@@ -105,6 +105,14 @@ $evAssistant = '{"type":"assistant","message":{"content":[{"text":"parcial"}]}}'
 Assert-Equal 'evento assistant nao vira erro' (Get-ClaudeCodeStreamEventErrorText -StreamEvent $evAssistant) ''
 $evMaxTurns = '{"type":"result","subtype":"error_max_turns","is_error":true,"result":"Error: Reached max turns (1)"}' | ConvertFrom-Json
 Assert-Equal 'evento result com is_error traz subtype e texto' (Get-ClaudeCodeStreamEventErrorText -StreamEvent $evMaxTurns) 'subtype=error_max_turns: Error: Reached max turns (1)'
+# Evento REAL de esgotamento de turno, medido em 2026-07-25 (claude 2.1.220, `--max-turns 1`):
+# nao existe campo `result` — a mensagem legivel vive em `errors[]`, com `terminal_reason` ao lado.
+# Sem ler esses campos, a evidencia preservada seria apenas `subtype=error_max_turns`.
+$evMaxTurnsReal = '{"is_error":true,"terminal_reason":"max_turns","subtype":"error_max_turns","errors":["Reached maximum number of turns (1)"],"type":"result"}' | ConvertFrom-Json
+$realText = Get-ClaudeCodeStreamEventErrorText -StreamEvent $evMaxTurnsReal
+Assert-Equal 'evento real de max turns preserva a mensagem de errors[]' ($realText -match 'Reached maximum number of turns \(1\)') $true
+Assert-Equal 'evento real de max turns preserva terminal_reason' ($realText -match 'terminal_reason=max_turns') $true
+Assert-Equal 'evento real de max turns ainda casa o detector' (Test-ClaudeCodeMaxTurnsExhausted -Text $realText) $true
 $evTypeError = '{"type":"error","message":"boom"}' | ConvertFrom-Json
 Assert-Equal 'evento type=error continua capturado' ((Get-ClaudeCodeStreamEventErrorText -StreamEvent $evTypeError) -match 'boom') $true
 Assert-Equal 'evento nulo nao vira erro' (Get-ClaudeCodeStreamEventErrorText -StreamEvent $null) ''
