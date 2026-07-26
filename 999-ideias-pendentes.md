@@ -2565,3 +2565,28 @@ Painel dividido (2026-06-13): deepseek-v4-pro, glm-5.1 e minimax-m3 inclinaram a
 **Origem:** desmembrado da frente «Criar/alterar objeto GeneXus do tipo `API` (from-spec, com segurança GAM) nas skills XPZ», **concluída e migrada** para `historico/IdeiasImplementadas_202607.md` (2026-07-01). Aquela frente resolveu a **Face 3** (prova de runtime do enforcement GAM) por **checklist textual + sub-estado pós-build**, documentado em `xpz-builder/responsibilities-by-type/api-gam-runtime.md`.
 
 **Ideia:** automatizar o **smoke de 2 fases** (anônimo→401; usuário sem papel→403; com papel→200) + OAuth + reversibilidade num **gate `.ps1`**, em vez do checklist manual. **Não cabe como gate `9-*`** (que é preflight estático pré-import): é um **teste HTTP de runtime pós-deploy**, outra categoria — por isso ficou como evolução futura (decisão D2 da frente original). **Gatilho:** quando houver demanda real de automatizar a prova de enforcement (e uma forma estável de subir/consultar o app headless no fluxo).
+
+## `Get-Help` não enxerga o comment-based help de nenhum script do repositório
+
+- **Importância** — média. Não há risco de dano (nem contaminação de KB, nem perda de trabalho, nem falso negativo em gate) e o contorno é trivial — abrir o arquivo, que é o que todo mundo já faz. O que pesa é a **extensão**: são **89 de 89** scripts com `.PARAMETER`, ou seja, convenção do repositório quebrada por inteiro, não lacuna pontual. Esforço de documentação inteiramente investido e inalcançável pelo mecanismo padrão, com tendência a se propagar para cada script novo. Já induziu erro factual: em 2026-07-26 uma mensagem de commit justificou documentar parâmetros alegando que `Get-Help` passaria a mostrá-los — não passa.
+- **Maturidade** — pronta para implementar. Direção fechada e **medida nas duas pontas** (abaixo); falta executar nos 89 arquivos e decidir se entra gate de regressão.
+
+**Causa, medida em 2026-07-26.** O `#requires -Version 7.4` colocado **antes** do bloco `<# ... #>` faz o PowerShell descartar o comment-based help inteiro. Experimento controlado com duas cópias do mesmo arquivo (`scripts/Start-ClaudeCodeJob.ps1`), diferindo só nessa linha:
+
+| Cópia | `Get-Help -Full` |
+|---|---|
+| com `#requires` antes do help | `params=1` (só a sintaxe auto-gerada) |
+| sem a linha | `params=10` + sinopse real |
+
+Varredura do `scripts/`: **89** scripts têm `.PARAMETER` no help; **89** têm `#requires` antes do bloco; **0** têm help visível ao `Get-Help`.
+
+**Remover a diretiva está fora de questão:** `#requires -Version 7.4` em ponto de entrada público é regra operacional obrigatória (`02-regras-operacionais-e-runtime.md`, seção de regra operacional; `README.md` trilíngue), com exceção nominal para `Test-XpzPowerShellRuntime.ps1`, que precisa rodar em 5.1.
+
+**Correção viável, com as duas pontas verificadas.** Reordenar — bloco de ajuda primeiro, `#requires` logo depois:
+
+- `Get-Help -Full` volta a render 10 parâmetros e a sinopse real; parse limpo (0 erros);
+- a diretiva **continua bloqueando** fora da primeira linha: a cópia reordenada executada em Windows PowerShell 5.1 recusa com `ScriptRequiresUnmatchedPSVersion`.
+
+**O que a frente faria:** reordenar os 89 arquivos (mecânico), decidir se cria gate de regressão — um teste que falhe quando `#requires` preceder o bloco de ajuda em script com `.PARAMETER` seria barato e evitaria a reincidência —, e avaliar se a regra do `02`/`README` deve passar a dizer **onde** a diretiva vai, não só que ela deve existir.
+
+**Origem:** revisão do commit `83d4c6a` (documentação dos parâmetros do `Start-ClaudeCodeJob.ps1`), 2026-07-26. A verificação da justificativa do commit — «quem chamasse `Get-Help` não encontrava nada» — revelou que continua não encontrando, e que o defeito é do repositório inteiro. Terceiro caso na mesma sessão em que conferir «o contrato documentado corresponde ao efeito real?» derrubou uma premissa, depois de `-Tools ""` e `-MaxTurns`.
