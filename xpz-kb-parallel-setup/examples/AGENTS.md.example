@@ -154,8 +154,8 @@ do motor.
 - Em cada nova sessao, antes de sync ou materializacao longa, executar
   `GeneXus-XPZ-Skills/scripts/Test-XpzCatalogOverrideSessionReminder.ps1` com
   `-ParallelKbRoot` apontando para esta pasta (wrapper local fino opcional).
-  Se `reminderRequired=true`, avisar o usuario que ainda falta alinhar
-  GeneXus-XPZ-Skills.
+  Se `noticeRequired=true`, avisar o usuario conforme o `status`: pendencia
+  upstream, override bloqueado/invalido ou limpeza local recomendada.
 - Antes de materializar XPZ full ou primeira carga, pre-varredura obrigatoria:
   `Get-GeneXusImportPackageObjectInventory.ps1` com `-FailOnUnknownTypes` e
   `-ParallelKbRoot`. Se bloquear, nao chamar sync ate resolver o tipo.
