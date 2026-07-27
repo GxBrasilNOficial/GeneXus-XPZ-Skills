@@ -14,6 +14,7 @@ $scriptDir = $PSScriptRoot
 function Assert-True { param([bool]$Condition,[string]$Message) if(-not $Condition){ throw $Message } }
 function Write-JsonFile { param([string]$Path,[object]$Value) [IO.File]::WriteAllText($Path, ($Value | ConvertTo-Json -Depth 8), (Get-Utf8NoBomEncoding)) }
 function New-CaseRoot { param([string]$Name) $root=Join-Path ([IO.Path]::GetTempPath()) ("gx-catalog-override-$Name-" + [guid]::NewGuid().ToString('N')); [void](New-Item -ItemType Directory -Path (Join-Path $root 'scripts') -Force); return $root }
+function New-BareRoot { param([string]$Name) $root=Join-Path ([IO.Path]::GetTempPath()) ("gx-catalog-override-$Name-" + [guid]::NewGuid().ToString('N')); [void](New-Item -ItemType Directory -Path $root -Force); return $root }
 function Invoke-Reminder { param([string]$Root) return Get-GeneXusCatalogOverrideSessionReminder -ParallelKbRoot $Root }
 
 $basePath = Get-GeneXusObjectTypeCatalogDefaultBasePath
@@ -131,6 +132,32 @@ $registerExit = $LASTEXITCODE
 Assert-True ($registerExit -eq 2) 'registro sobre override invalido deve sair com codigo 2'
 $registerResult = $registerOut | ConvertFrom-Json
 Assert-True ($registerResult.status -eq 'INVALID_OVERRIDE_SHAPE' -and $registerResult.blocked) 'registro deve devolver diagnostico estruturado para override invalido existente'
+
+$redundantRegisterRoot = New-BareRoot 'register-redundant'
+$redundantRegisterOut = & pwsh -NoProfile -File (Join-Path $scriptDir 'Register-GeneXusObjectTypeCatalogOverride.ps1') -ParallelKbRoot $redundantRegisterRoot -TypeName 'WorkWith' -ObjectTypeGuid $workWith.objectTypeGuid -FolderName $workWith.folderName -UserApproved -AsJson
+$redundantRegisterExit = $LASTEXITCODE
+Assert-True ($redundantRegisterExit -eq 2) 'registro redundante deve sair com codigo 2'
+$redundantRegisterResult = $redundantRegisterOut | ConvertFrom-Json
+Assert-True ($redundantRegisterResult.status -eq 'LOCAL_OVERRIDE_REDUNDANT_BLOCKED' -and $redundantRegisterResult.blocked) 'registro redundante deve bloquear com status especifico'
+Assert-True ($redundantRegisterResult.baseTypeName -eq 'WorkWith' -and $redundantRegisterResult.diagnosticReason -eq 'equivalent') 'registro redundante deve apontar equivalencia com base'
+Assert-True (-not (Test-Path -LiteralPath (Join-Path $redundantRegisterRoot 'scripts') -PathType Container)) 'registro redundante nao deve criar scripts antes de bloquear'
+Assert-True (-not (Test-Path -LiteralPath (Join-Path $redundantRegisterRoot 'scripts/gx-object-type-catalog.override.json') -PathType Leaf)) 'registro redundante nao deve gravar override nem recarimbar pendencia'
+
+$shadowRegisterRoot = New-BareRoot 'register-shadow'
+$shadowRegisterOut = & pwsh -NoProfile -File (Join-Path $scriptDir 'Register-GeneXusObjectTypeCatalogOverride.ps1') -ParallelKbRoot $shadowRegisterRoot -TypeName 'Attribute' -ObjectTypeGuid 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee' -FolderName 'Attribute' -UserApproved -AsJson
+$shadowRegisterExit = $LASTEXITCODE
+Assert-True ($shadowRegisterExit -eq 2) 'registro com shadowing inseguro deve sair com codigo 2'
+$shadowRegisterResult = $shadowRegisterOut | ConvertFrom-Json
+Assert-True ($shadowRegisterResult.status -eq 'LOCAL_OVERRIDE_UNSAFE_SHADOWING_BLOCKED' -and $shadowRegisterResult.reason -eq 'unsafe-shadowing') 'registro com shadowing inseguro deve bloquear com status especifico'
+Assert-True (-not (Test-Path -LiteralPath (Join-Path $shadowRegisterRoot 'scripts') -PathType Container)) 'registro com shadowing inseguro nao deve criar scripts antes de bloquear'
+
+$duplicateRegisterRoot = New-BareRoot 'register-duplicate-guid'
+$duplicateRegisterOut = & pwsh -NoProfile -File (Join-Path $scriptDir 'Register-GeneXusObjectTypeCatalogOverride.ps1') -ParallelKbRoot $duplicateRegisterRoot -TypeName 'WorkWith' -ObjectTypeGuid $procedure.objectTypeGuid -FolderName $workWith.folderName -UserApproved -AsJson
+$duplicateRegisterExit = $LASTEXITCODE
+Assert-True ($duplicateRegisterExit -eq 2) 'registro com GUID duplicado inseguro deve sair com codigo 2'
+$duplicateRegisterResult = $duplicateRegisterOut | ConvertFrom-Json
+Assert-True ($duplicateRegisterResult.status -eq 'LOCAL_OVERRIDE_UNSAFE_DUPLICATE_GUID_BLOCKED' -and $duplicateRegisterResult.reason -eq 'unsafe-duplicate-guid') 'registro com GUID duplicado inseguro deve bloquear com status especifico'
+Assert-True (-not (Test-Path -LiteralPath (Join-Path $duplicateRegisterRoot 'scripts') -PathType Container)) 'registro com GUID duplicado inseguro nao deve criar scripts antes de bloquear'
 
 $invalidSourceRoot = Join-Path $invalidRoot 'ObjetosDaKbEmXml'
 [void](New-Item -ItemType Directory -Path $invalidSourceRoot -Force)
