@@ -4,6 +4,7 @@ Todas as mudanças relevantes deste repositório serão registradas aqui a parti
 
 ## Português (BR)
 
+- Alinhado o contrato público de override local do catálogo XPZ: divergência operacional não-identitária continua como lembrete com `REMINDER_REQUIRED` e merge advertido, enquanto divergência de identidade (`objectTypeGuid`, `rootKind`, `folderName`) bloqueia a resolução do catálogo efetivo com `unsafe-identity-divergence`. A mesma regra agora está refletida em `01a`, `02`, `09` e nos núcleos PowerShell/Python.
 - Evoluido o contrato de `gx-object-type-catalog.override.json`: lembrete/auditoria agora distingue entradas `pending`, `redundant` e `divergent`; redundancia equivalente retorna `CLEANUP_RECOMMENDED`/exit 0 com `effectiveUpstreamPending=false`; merge efetivo preserva campos operacionais da base ausentes no override, incluindo `exportTaskLabel`; registro local bloqueia redundancia antes de qualquer escrita; setup de pasta paralela deve oferecer a limpeza redundante no plano consolidado, mediante aprovação, inclusive quando já houver item obrigatório como recarimbo de assinatura. Self-test novo: `scripts/Test-XpzCatalogOverrideClassificationSelfTest.ps1`.
 
 O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda não publicadas em versão formal. Este repositório ainda não adota versionamento semântico público; quando isso mudar, as seções futuras devem registrar a tag correspondente.
