@@ -58,6 +58,7 @@ Efeito: o declarado entra em `requestedItemsFound`; deixa `requestedItemsMissing
 ### Matriz GxTest3 — coexistência mobile e web (2026-07-26)
 
 Ensaios controlados na KB de teste `GxTest3`, com inventário do XPZ por GUID. O resultado confiável exige rótulo aceito sem erro de tipo e identidade exata no pacote.
+Artefatos: `C:\Dev\Knowledge\GeneXus-XPZ-Skills\Temp\workwith-export-matrix-20260726\` (matriz e Categoria B), `C:\Dev\Knowledge\GeneXus-XPZ-Skills\Temp\workwith-global-export-20260726\` (mobile) e `C:\Dev\Knowledge\GeneXus-XPZ-Skills\Temp\workwith-web-global-export-20260726\` (web).
 
 | Candidato `-ObjectList` | Sinal da task | Resultado confiável |
 |-------------------------|----------------|----------------------|
