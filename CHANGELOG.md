@@ -146,6 +146,7 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 ## Español
 
+- Alineado el contrato público del override local del catálogo XPZ: la divergencia operacional no identitaria continúa como recordatorio con `REMINDER_REQUIRED` y merge con advertencia, mientras la divergencia de identidad (`objectTypeGuid`, `rootKind`, `folderName`) bloquea la resolución del catálogo efectivo con `unsafe-identity-divergence`. La misma regla ahora está reflejada en `01a`, `02`, `09` y en los núcleos PowerShell/Python.
 - Evolucionado el contrato de `gx-object-type-catalog.override.json`: el recordatorio/auditoría ahora distingue entradas `pending`, `redundant` y `divergent`; una redundancia equivalente retorna `CLEANUP_RECOMMENDED`/exit 0 con `effectiveUpstreamPending=false`; el merge efectivo preserva campos operacionales de la base ausentes en el override, incluso `exportTaskLabel`; el registro local bloquea redundancia antes de cualquier escritura; el setup de carpeta paralela debe ofrecer la limpieza redundante en el plan consolidado, con aprobación, incluso cuando ya exista un ítem obligatorio como recarimbo de firma. Nuevo self-test: `scripts/Test-XpzCatalogOverrideClassificationSelfTest.ps1`.
 
 Todos los cambios relevantes de este repositorio se registrarán aquí a partir de esta adopción. El historial anterior permanece distribuido en `historico/`, commits y documentación de frentes de trabajo.
@@ -282,6 +283,7 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 ## English
 
+- Aligned the public contract for local XPZ catalog overrides: non-identity operational divergence remains a warning reminder with `REMINDER_REQUIRED` and warned merge, while identity divergence (`objectTypeGuid`, `rootKind`, `folderName`) blocks effective catalog resolution with `unsafe-identity-divergence`. The same rule is now reflected in `01a`, `02`, `09`, and the PowerShell/Python cores.
 - Evolved the `gx-object-type-catalog.override.json` contract: reminder/audit now distinguishes `pending`, `redundant`, and `divergent` entries; equivalent redundancy returns `CLEANUP_RECOMMENDED`/exit 0 with `effectiveUpstreamPending=false`; effective merge preserves base operational fields missing from the override, including `exportTaskLabel`; local registration blocks redundancy before any write; parallel-folder setup must offer redundant cleanup in the consolidated plan, with approval, even when another mandatory item such as signature restamping is present. New self-test: `scripts/Test-XpzCatalogOverrideClassificationSelfTest.ps1`.
 
 All relevant changes to this repository will be recorded here from this adoption onward. Earlier history remains distributed across `historico/`, commits, and work-front documentation.
