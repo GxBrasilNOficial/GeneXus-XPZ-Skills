@@ -1206,7 +1206,7 @@ English: when using `Start-OpenCodeJob.ps1`, the initial JSON contains job ident
 - cada residuo do objeto molde deve ser classificado como intencional, dependencia necessária ou erro de clonagem; ocorrência sem classificação bloqueia o pacote
 - o agente não deve gerar `KnowledgeBase`, `Settings` nem elemento top-level com nome da KB ao montar `.xpz` normal de objetos
 - se a serializacao depender de bloco especial de KB, o agente deve tratar isso como export especial e recusar a montagem normal de objetos
-- o agente pode usar a pasta local `from-anywhere-to-GeneXus` apenas como confirmacao secundaria de envelope mínimo; não deve copiar dela valores hardcoded como `Build=0`, `SampleKB`, `BusinessLogic`, `root`, `parentGuid` fixo ou `moduleGuid` fixo
+- o agente pode usar a pasta local `C:\Dev\Fork\from-anywhere-to-GeneXus` apenas como confirmacao secundaria de envelope mínimo; não deve copiar dela valores hardcoded como `Build=0`, `SampleKB`, `BusinessLogic`, `root`, `parentGuid` fixo ou `moduleGuid` fixo
 - antes de empacotar, validar parse XML, presenca de todos os `Part type` recorrentes e coerência entre objeto clonado e molde-base
 - o agente não deve afirmar “sem erro de importação”; deve afirmar apenas que seguiu a especificacao mais conservadora disponível
 - ha evidência direta de importação bem-sucedida para um caso mínimo de `Procedure`; isso ajuda a validar o envelope normal, mas não autoriza generalizacao irrestrita para todos os tipos

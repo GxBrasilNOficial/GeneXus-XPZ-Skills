@@ -145,7 +145,7 @@ Regras de uso:
 
 ## Evidencia complementar de gerador local
 
-- `Evidência direta`: a pasta local `C:\Dev\Test\from-anywhere-to-GeneXus` contem um gerador simplificado que monta XML de importação GeneXus usando um envelope com `ExportFile`, `KMW`, `Source`, `Objects`, `Dependencies` e `ObjectsIdentityMapping`.
+- `Evidência direta`: a pasta local `C:\Dev\Fork\from-anywhere-to-GeneXus` contem um gerador simplificado que monta XML de importação GeneXus usando um envelope com `ExportFile`, `KMW`, `Source`, `Objects`, `Dependencies` e `ObjectsIdentityMapping`.
 - `Evidência direta`: nesse gerador local, o `README` e o script principal apontam para geração de `import_file.xml` e importação direta do XML, não para empacotamento `.xpz` zipado real.
 - `Inferência forte`: essa fonte local serve como confirmacao secundaria de envelope mínimo plausivel e do formato de `ObjectIdentity`, mas não como autoridade principal para valores concretos de producao.
 - `Inferência forte`: o gerador local reforca a decisão de manter `KnowledgeBase` e `Settings` fora do formato normal de objetos.
