@@ -1069,6 +1069,52 @@ Implementar quando houver: (a) reflexão do assembly confirmando a task acessív
 parâmetros documentados, e (b) caso concreto de projeto que usa categorias como convenção
 de organização de objetos, tornando a seleção por categoria mais prática que a lista manual.
 
+## Seleção temporal de objetos salvos para exportação incremental
+
+**Importância:** média
+**Maturidade:** ideia (direção identificada; contrato e fontes de leitura ainda exigem validação empírica)
+
+**Origem:** necessidade de exportar por MSBuild apenas objetos da KB nativa alterados desde um instante de corte, quando o exportador aceita lista nominal ou tudo. A disponibilidade de `LastUpdate` no SDK Artech foi observada no plugin FBGxBrain; a IDE também permite seleção por objetos modificados após data/hora. Essas evidências não confirmam, por si, toda a semântica nem o fuso da propriedade.
+
+### Problema concreto que motiva a ideia
+
+O exportador MSBuild seletivo aceita uma lista de objetos, mas não oferece seleção temporal. Sem uma fonte confiável dessa lista, o usuário precisa montar nomes manualmente ou exportar tudo. Isso torna oneroso o fluxo incremental baseado em uma janela de alteração.
+
+### Direção técnica proposta
+
+Criar uma capacidade **somente de leitura** que receba um instante de corte e devolva objetos **salvos** com `LastUpdate >= corte`, prontos para conversão ao formato de lista nominal aceito pela exportação MSBuild.
+
+O primeiro contrato não deve alegar distinguir criação de modificação: deve reportar «alterado desde». Criação entra naturalmente apenas se o microteste confirmar que o primeiro salvamento estabelece `LastUpdate` conforme esperado.
+
+Cada item deve devolver, quando disponível: nome, tipo, módulo, GUID e `lastUpdate`. A resposta também deve declarar o corte recebido, a zona/representação temporal observada e limitações conhecidas.
+
+### Alternativas a estudar
+
+1. **Plugin GeneXus/MCP somente leitura, via SDK Artech** — enumerar `model.Objects.GetAll()` e ler `LastUpdate`. É a rota preferencial se a semântica e a disponibilidade na versão-alvo forem confirmadas.
+2. **Script PowerShell ou Python com consultas SQL somente leitura ao banco `GX_KB_*`** — alternativa sem plugin/IDE ativa, condicionada a identificar e validar o esquema interno por versão. Nunca escrever no banco fonte da KB.
+3. **Seleção manual na IDE** — referência comportamental e fallback operacional.
+
+As rotas automatizadas devem devolver o mesmo contrato de saída; a escolha não pode ficar implícita no agente.
+
+### Perguntas e gates antes de implementar
+
+- Executar microteste controlado: criar e salvar objeto, medir `LastUpdate`; editar/salvar e confirmar avanço; avaliar rename e objeto não salvo.
+- Confirmar precisão, fuso horário e `DateTime.Kind`; aceitar corte RFC 3339 explicitamente e só declarar conversão a UTC após prova.
+- Declarar que objetos removidos não aparecem na enumeração de objetos existentes; rename só entra se a operação atualiza `LastUpdate`, até confirmação.
+- Validar formato da lista (`Tipo:Nome` ou equivalente) contra o wrapper/exportador MSBuild real, inclusive tipos com nomes de task divergentes.
+- Preservar operação somente de leitura: a capacidade seleciona e relata; nunca exporta, importa ou altera KB por conta própria.
+
+### Limiar para implementar
+
+Implementar quando houver uma KB e uma janela real de exportação incremental a automatizar, mais microteste que confirme a semântica operacional de `LastUpdate` na versão-alvo e teste de ponta a ponta que prove que a lista retornada seleciona exatamente os objetos esperados no exportador MSBuild.
+
+### Relacionado
+
+- `xpz-msbuild-import-export/SKILL.md` e `10a-gx-export-task-labels.md`;
+- `GetCategoryObjects — seleção de objetos por categoria para Export/Import`, nesta seção;
+- `02-regras-operacionais-e-runtime.md` (evidência de seleção temporal pela IDE);
+- [Options — Build](https://docs.genexus.com/en/wiki?24030) (dependência de relógio correto em mecanismos de alteração).
+
 ---
 
 ## CalculateChecksums + AreObjectsEqual — diagnóstico de integridade de objeto pré/pós-operação
@@ -2477,6 +2523,57 @@ Há texto útil para triagem que hoje só sai por `rg` no acervo, não pelo índ
 
 - `historico/IdeiasImplementadas_202606.md` (entrada-mãe das classes CSS, camadas 1 e 2)
 - `scripts/Build-KbIntelligenceIndex.py`, `scripts/Query-KbIntelligenceIndex.py`
+
+## Diagramas determinísticos focais no `xpz-doc-builder`
+
+**Importância:** baixa-média
+**Maturidade:** ideia (escopo inicial delimitado; aguarda demanda empírica)
+
+**Origem:** avaliação do repositório `FBGxBrain` em 2026-07-26. O pipeline de documentação daquele projeto calcula grafos e diagramas a partir do SDK antes de apresentá-los ao LLM. A inspiração válida aqui é o princípio de visualização derivada de fatos determinísticos, não o seu pipeline de LLM/D2.
+
+### Problema concreto que motivaria a ideia
+
+O modo `advanced-docs` do `xpz-doc-builder` já gera matrizes, catálogos, diffs e guias, mas não uma visualização focal das relações que já podem ser extraídas do XML oficial ou do `KbIntelligence`. Em uma triagem humana, a saída textual de `impact-basic`, `who-uses` ou da estrutura de uma `Transaction`/SDT pode exigir leitura cruzada de vários resultados para compreender relações diretas.
+
+### Direção técnica proposta
+
+Adicionar, de forma **opt-in** ao `advanced-docs`, geração de Markdown com bloco Mermaid e artefato de cobertura para um alvo explícito, limitado inicialmente à profundidade 1:
+
+- grafo de impacto direto, somente após o gate de índice aplicável estar OK;
+- estrutura de `Transaction` (`Level → Attribute`, chave/FK) e de SDT (`Level → Item`) a partir do XML oficial;
+- relações `Attribute → Transaction`/SDT apenas quando houver evidência estrutural explícita, nunca por homonímia.
+
+Cada aresta deve declarar `relationKind`, fonte (`index` ou XML oficial), objeto/caminho de origem e cobertura. Tipo com `queryableByKbIntelligence=false`, índice inválido ou chamada dinâmica não é grafo vazio: deve aparecer como indisponibilidade ou limitação declarada.
+
+### Limites e não fazer
+
+- não gerar grafo da KB inteira, nem UI interativa;
+- não usar LLM para criar, completar, reparar ou interpretar o diagrama;
+- não usar D2, SVG/PNG ou renderização externa na primeira versão;
+- não inferir chamadas dinâmicas, fluxo funcional, nem `Attribute ↔ SDT` por nome parecido;
+- o XML oficial e as consultas do índice continuam fontes normativas; o diagrama é visualização derivada.
+
+### Filiação e reavaliação conjunta
+
+Esta entrada pertence à família «evidência de relações da KB». Antes de implementar qualquer frente desta família, reavaliar conjuntamente:
+
+- `Plano A — Implementar relação references_attribute no índice KbIntelligence`;
+- `Expansão do índice SQLite para fingerprint de call site`;
+- `Camada 3 — texto livre geral no índice KbIntelligence`;
+- consultas existentes de impacto e rastreio funcional.
+
+As frentes de índice ampliam a matéria-prima; esta frente só a apresenta e não pode antecipar relações que elas ainda não provam. Uma evolução em qualquer membro deve revisar cobertura, contrato de saída e impacto nos demais.
+
+### Limiar para implementar
+
+Implementar somente após dois pedidos reais de documentação/triagem humana, em KBs distintas, nos quais a saída textual atual não baste para compreender relações diretas, ou após caso concreto de retrabalho causado por relações dispersas. A primeira entrega deve ser um diagrama focal determinístico, com fixtures sanitizadas e asserts de nós, arestas e cobertura.
+
+### Relacionado
+
+- `xpz-doc-builder/SKILL.md` e `scripts/generate-kb-advanced-docs.ps1`;
+- `xpz-index-triage/SKILL.md` e `scripts/README-kb-intelligence.md`;
+- `scripts/Build-KbIntelligenceIndex.py`, `scripts/Query-KbIntelligenceIndex.py`;
+- entradas de `999` citadas em «Filiação e reavaliação conjunta».
 
 ## Gate de coerência para `Transaction` `GenerateObject=False` — Fase 2 (nível de pacote)
 
