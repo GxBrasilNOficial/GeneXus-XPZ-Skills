@@ -135,6 +135,7 @@ LAYOUT_CLASS_ATTR_RE = re.compile(
 )
 
 from GeneXusObjectTypeCatalogCore import (  # noqa: E402
+    CatalogOverrideDiagnosticError,
     build_type_guid_index,
     load_gx_object_type_catalog,
     resolve_effective_object_type_catalog,
@@ -144,6 +145,20 @@ from GeneXusTransactionWritabilityCore import (  # noqa: E402
     build_corpus_writability,
     get_transaction_type_guid,
 )
+
+
+def build_catalog_override_blocked_result(exc: CatalogOverrideDiagnosticError) -> dict[str, object]:
+    diagnostic = dict(exc.diagnostic)
+    return {
+        "status": diagnostic.get("status", "OVERRIDE_RESOLUTION_BLOCKED"),
+        "blocked": True,
+        "reason": diagnostic.get("reason"),
+        "diagnosticReason": diagnostic.get("diagnosticReason"),
+        "fieldPath": diagnostic.get("fieldPath"),
+        "overridePath": diagnostic.get("overridePath"),
+        "message": diagnostic.get("message", str(exc)),
+        "catalogOverrideDiagnostic": diagnostic,
+    }
 
 
 def activate_object_type_catalog(
@@ -2742,11 +2757,15 @@ def main() -> int:
     if not source_root.exists():
         raise SystemExit(f"SourceRoot not found: {source_root}")
 
-    activate_object_type_catalog(
-        source_root,
-        parallel_kb_root=args.parallel_kb_root.resolve() if args.parallel_kb_root else None,
-        catalog_override_path=args.catalog_override_path.resolve() if args.catalog_override_path else None,
-    )
+    try:
+        activate_object_type_catalog(
+            source_root,
+            parallel_kb_root=args.parallel_kb_root.resolve() if args.parallel_kb_root else None,
+            catalog_override_path=args.catalog_override_path.resolve() if args.catalog_override_path else None,
+        )
+    except CatalogOverrideDiagnosticError as exc:
+        print(json.dumps(build_catalog_override_blocked_result(exc), indent=2, ensure_ascii=False))
+        return 2
 
     objects_by_type, scan_summary = collect_all_objects(source_root)
     inventory_semantics = validate_inventory_semantics(objects_by_type, scan_summary)

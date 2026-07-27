@@ -100,9 +100,34 @@ Assert-True ($r.status -eq 'CLEANUP_RECOMMENDED' -and -not $r.effectiveUpstreamP
 
 # Shape invalido.
 $invalidRoot = New-CaseRoot 'invalid'
-[IO.File]::WriteAllText((Join-Path $invalidRoot 'scripts/gx-object-type-catalog.override.json'), '{"upstreamPending":"yes","types":{}}', (Get-Utf8NoBomEncoding))
+$invalidOverridePath = Join-Path $invalidRoot 'scripts/gx-object-type-catalog.override.json'
+[IO.File]::WriteAllText($invalidOverridePath, '{"upstreamPending":"yes","types":{}}', (Get-Utf8NoBomEncoding))
 $r = Invoke-Reminder -Root $invalidRoot
 Assert-True ($r.status -eq 'INVALID_OVERRIDE_SHAPE' -and $r.diagnosticReason -eq 'upstream-pending-not-boolean') 'upstreamPending invalido deve ser shape invalido'
+
+$registerOut = & pwsh -NoProfile -File (Join-Path $scriptDir 'Register-GeneXusObjectTypeCatalogOverride.ps1') -ParallelKbRoot $invalidRoot -TypeName 'LocalInvalid' -ObjectTypeGuid '22222222-3333-4444-5555-666666666666' -UserApproved -AsJson
+$registerExit = $LASTEXITCODE
+Assert-True ($registerExit -eq 2) 'registro sobre override invalido deve sair com codigo 2'
+$registerResult = $registerOut | ConvertFrom-Json
+Assert-True ($registerResult.status -eq 'INVALID_OVERRIDE_SHAPE' -and $registerResult.blocked) 'registro deve devolver diagnostico estruturado para override invalido existente'
+
+$invalidSourceRoot = Join-Path $invalidRoot 'ObjetosDaKbEmXml'
+[void](New-Item -ItemType Directory -Path $invalidSourceRoot -Force)
+$buildOut = & python (Join-Path $scriptDir 'Build-KbIntelligenceIndex.py') --source-root $invalidSourceRoot --output-path (Join-Path $invalidRoot 'index.sqlite') --catalog-override-path $invalidOverridePath
+$buildExit = $LASTEXITCODE
+Assert-True ($buildExit -eq 2) 'build do indice deve bloquear override invalido com codigo 2'
+Assert-True (-not (($buildOut -join "`n") -match 'Traceback')) 'build do indice nao deve emitir traceback para override invalido'
+$buildResult = $buildOut | ConvertFrom-Json
+Assert-True ($buildResult.status -eq 'INVALID_OVERRIDE_SHAPE' -and $buildResult.blocked) 'build do indice deve devolver JSON estruturado para override invalido'
+
+$queryIndexPath = Join-Path $invalidRoot 'empty.sqlite'
+[IO.File]::WriteAllBytes($queryIndexPath, [byte[]]@())
+$queryOut = & python (Join-Path $scriptDir 'Query-KbIntelligenceIndex.py') --index-path $queryIndexPath --query who-uses --object-type Procedure --object-name Foo --catalog-override-path $invalidOverridePath
+$queryExit = $LASTEXITCODE
+Assert-True ($queryExit -eq 2) 'query semantica deve bloquear override invalido com codigo 2'
+Assert-True (-not (($queryOut -join "`n") -match 'Traceback')) 'query semantica nao deve emitir traceback para override invalido'
+$queryResult = $queryOut | ConvertFrom-Json
+Assert-True ($queryResult.status -eq 'INVALID_OVERRIDE_SHAPE' -and $queryResult.blocked) 'query semantica deve devolver JSON estruturado para override invalido'
 
 # Unsafe shadowing e GUID duplicado.
 $shadowRoot = New-CaseRoot 'shadow'

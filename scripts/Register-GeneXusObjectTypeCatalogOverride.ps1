@@ -98,6 +98,25 @@ $guidValue = $ObjectTypeGuid.Trim().ToLowerInvariant()
 
 $overrideObject = $null
 if (Test-Path -LiteralPath $CatalogOverridePath -PathType Leaf) {
+    $existingClassification = Get-GeneXusCatalogOverrideClassification `
+        -CatalogOverridePath $CatalogOverridePath `
+        -ParallelKbRoot $resolvedKbRoot
+    if ($existingClassification.status -in @('INVALID_OVERRIDE_SHAPE', 'OVERRIDE_RESOLUTION_BLOCKED')) {
+        $result = [pscustomobject]@{
+            status           = $existingClassification.status
+            blocked          = $true
+            reason           = $existingClassification.reason
+            diagnosticReason = $existingClassification.diagnosticReason
+            fieldPath        = $existingClassification.fieldPath
+            overridePath     = $CatalogOverridePath
+            typeName         = $typeNameKey
+            objectTypeGuid   = $guidValue
+            message          = 'Override local existente invalido ou bloqueante; registro nao gravado para preservar diagnostico estruturado.'
+            classification   = $existingClassification
+        }
+        if ($AsJson) { $result | ConvertTo-Json -Depth 10 } else { $result | Format-List }
+        exit 2
+    }
     $overrideObject = Read-GeneXusObjectTypeCatalogFile -Path $CatalogOverridePath
 } else {
     $overrideObject = [pscustomobject]@{
