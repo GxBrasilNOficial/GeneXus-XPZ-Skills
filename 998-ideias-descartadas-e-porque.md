@@ -1607,3 +1607,48 @@ perdeu foi a negociação por `--help`, não a capacidade.
 **Não reavaliar salvo** versão futura da CLI que volte a anunciar `--max-turns` no `--help` — e,
 mesmo então, qualquer default abaixo de `2` precisa de medição antes, porque um único turno não
 cobre ferramenta + resposta.
+
+---
+
+## Extrair novas capacidades XPZ de `from-anywhere-to-GeneXus`
+
+**Origem:** reavaliação do fork local `C:\Dev\Fork\from-anywhere-to-GeneXus`, em
+2026-07-26, com três coletas independentes e leitura crítica do estado publicado e das mudanças
+locais ainda não commitadas. O escopo correto foi o trabalho normal das skills XPZ; ficou
+explicitamente excluída a função do fork de ler código de outros sistemas para levá-lo ao GeneXus.
+
+**O que era:** procurar no fork padrões que justificassem novas capacidades ou frentes para as
+skills `xpz-reader`, `xpz-builder`, `xpz-sync`, `xpz-doc-builder`, `xpz-msbuild-*`,
+`xpz-kb-parallel-*` ou `xpz-llm-delegate`.
+
+**Por que foi descartada como fonte de nova frente:**
+
+1. **O reaproveitamento seguro já ocorreu.** A base já registra o fork como confirmação secundária
+   do envelope mínimo e proíbe copiar seus valores fixos (`Build=0`, `SampleKB`, `BusinessLogic`,
+   `root`, `parentGuid` e `moduleGuid`). A montagem estruturada, o inventário nominal, a ordenação
+   determinística, a validação em camadas e o bloqueio antes da materialização já são mais fortes
+   nos motores e workflows atuais.
+2. **Os mecanismos concretos do fork são inferiores para a trilha XPZ conservadora.** Os templates
+   fixam identidade de KB, módulo, usuário, datas e GUIDs; a serialização usa substituição textual e
+   reserialização ampla; o GUID determinístico deriva apenas do nome; a leitura tolerante a BOM e a
+   substituição de caracteres podem mascarar corrupção; e o fluxo pode continuar após falha por
+   objeto e materializar pacote parcial.
+3. **A abstração de provedores não supera `xpz-llm-delegate`.** O fork oferece uma interface comum,
+   mas usa seleção/default implícitos, silencia algumas indisponibilidades e não entrega veredito de
+   saída tipado. A base XPZ já separa adapter, destino, localidade, autorização, confidencialidade,
+   despacho e recibo.
+4. **Os testes não provam o que importa para XPZ.** A maior parte valida presença de métodos ou
+   campos e disponibilidade do provedor, sem demonstrar envelope correto, importação, especificação
+   GeneXus ou build. A estratificação entre mock, disponibilidade e chamada real é um bom princípio,
+   mas já existe aqui com critérios mais rigorosos.
+
+**O que sobrevive sem criar ideia nova:** em operações de lote, coletar um livro-razão nominal de
+falhas por item, mas impedir qualquer materialização se houver bloqueio; e concluir o contrato de
+saída tipado dos adapters de `xpz-llm-delegate` (`ok|empty|timeout|quota|unavailable|error|truncated`).
+Ambos já estão cobertos pela metodologia atual ou por entrada própria em `999-ideias-pendentes.md`.
+O fork apenas reforça essas decisões; não justifica duplicá-las como nova pendência.
+
+**Não reavaliar salvo** mudança material do fork que introduza capacidade operacional ainda ausente
+nesta base e comprovada por validação real de envelope, importação ou build, ou mecanismo de adapter
+mais seguro que o contrato vigente. Mudanças cosméticas, novos provedores, mais linguagens de origem,
+empacotamento ZIP simples ou novos prompts sem oráculo de validação não reabrem esta frente.
