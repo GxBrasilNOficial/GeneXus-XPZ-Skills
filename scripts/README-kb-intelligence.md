@@ -22,7 +22,7 @@ Catalogo técnico canonico de tipos:
 - `inventoryEligible=true`: o tipo entra no inventario do índice (objeto listavel em `object-info`, `search-objects`, `list-by-type`) quando houver XML em subpasta de `ObjetosDaKbEmXml`.
 - `queryableByKbIntelligence=true`: consultas semânticas do índice (`who-uses`, `what-uses`, `impact-basic`, `functional-trace-basic`) são **aptas** para o tipo com o extrator atual — o grafo tende a refletir dependencias tecnicas reais no acervo.
 - `queryableByKbIntelligence=false`: o objeto pode estar no inventario, mas **não** usar as consultas semânticas acima como prova de impacto ou dependencia; o motor atual não extrai relacoes desse tipo (respostas vazias parecem “sem impacto”). Preferir `object-info`, `search-objects` ou leitura pontual do XML. Lista canônica: cada entrada em `scripts/gx-object-type-catalog.json` (amostra multi-KB: `scripts/Invoke-ParallelKbEnvelopeScan.ps1`; grafo zero: consulta a `kb-intelligence.sqlite`).
-- `Query-KbIntelligenceIndex.py` recusa `who-uses`, `what-uses`, `impact-basic` e `functional-trace-basic` quando o tipo tem `queryableByKbIntelligence=false` no **catalogo efetivo** (base + override): JSON com `blocked=true`, `reason=QUERY_NOT_SEMANTIC_FOR_TYPE`, exit `11`. Wrappers devem repassar `-ParallelKbRoot` / `-CatalogOverridePath` como no build.
+- `Query-KbIntelligenceIndex.py` recusa `who-uses`, `what-uses`, `impact-basic` e `functional-trace-basic` quando o tipo tem `queryableByKbIntelligence=false` no **catalogo efetivo** (base + override): JSON com `blocked=true`, `reason=QUERY_NOT_SEMANTIC_FOR_TYPE`, exit `11`; se o override bloquear a resolução do catálogo efetivo, JSON com `status=INVALID_OVERRIDE_SHAPE`/`OVERRIDE_RESOLUTION_BLOCKED` e exit `2`. Wrappers devem repassar `-ParallelKbRoot` / `-CatalogOverridePath` como no build.
 
 ### Tipos com grafo assimétrico (`queryableByKbIntelligence=true`)
 
@@ -87,7 +87,7 @@ Eles não substituem o acervo XML em `ObjetosDaKbEmXml` e não provam comportame
 
 - rebuild do índice exige **Python 3.x utilizavel** no `PATH` (resolucao em `scripts/GeneXusPythonPrerequisite.ps1`, chamado por `Build-KbIntelligenceIndex.ps1`)
 - stub `WindowsApps` da Microsoft Store não conta; ausencia retorna exit `8` com mensagem `PREREQUISITO AUSENTE`
-- falha do motor Python propaga stderr/saida capturada no `throw` do wrapper PowerShell
+- falha do motor Python em `Build-KbIntelligenceIndex.ps1` repassa a saída capturada e preserva o exit code do `.py` (incluindo exit `2` para override de catálogo inválido/bloqueado)
 - **rigor**: sync XPZ/XML oficial **não** termina sem índice regenerado — a materialização em `ObjetosDaKbEmXml` pode já ter concluido; declarar **fluxo incompleto**, não sync OK nem falha do pacote exportado; não autorizar triagem ampla sem índice; ver `README.md`, `08-guia-para-agente-gpt.md` e `xpz-sync`
 
 ## Gerar índice
