@@ -3,9 +3,10 @@
 .SYNOPSIS
     Self-test de contrato das funcoes puras de CodexCliSupport.ps1 (skill xpz-llm-delegate).
 .DESCRIPTION
-    Valida Get-CodexExecErrorMessage (extracao de erro do stdout/stderr) e Resolve-CodexExe
-    no modo -Override, sem depender da app Codex instalada. A descoberta automatica de
-    binario (varredura por versao) depende do ambiente real e e exercitada pelos adapters.
+    Valida Get-CodexExecErrorMessage (extracao de erro do stdout/stderr), Resolve-CodexExe
+    no modo -Override e a descoberta automatica deterministica com uma raiz sintetica:
+    executavel canonico prevalece, diretorios backup-* ficam excluidos e o fallback e usado
+    somente quando o canonico nao esta disponivel.
     Sentinela de sucesso: OK: Test-CodexCliSupportSelfTest.ps1
 #>
 [CmdletBinding()]
@@ -48,6 +49,56 @@ Assert-Equal 'override existente devolve o caminho' $rOk $self
 $threw = $false
 try { Resolve-CodexExe -Override 'C:\__nao_existe__\codex.exe' | Out-Null } catch { $threw = $true }
 Assert-Equal 'override inexistente lanca BLOCK' $threw $true
+
+# Resolve-CodexExe - descoberta automatica deterministica
+$tempRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())
+$probeRoot = [IO.Path]::GetFullPath((Join-Path $tempRoot ('CodexCliSupportSelfTest_' + [guid]::NewGuid().ToString('N'))))
+if (-not $probeRoot.StartsWith($tempRoot, [StringComparison]::OrdinalIgnoreCase)) {
+    throw "BLOCK: raiz temporaria inesperada no self-test: $probeRoot"
+}
+$canonicalPath = Join-Path $probeRoot 'codex.exe'
+$stagedDir = Join-Path $probeRoot 'staged-alpha'
+$stagedPath = Join-Path $stagedDir 'codex.exe'
+$backupDir = Join-Path $probeRoot 'backup-before-0.142.5'
+$backupPath = Join-Path $backupDir 'codex.exe'
+$originalVersionProbe = ${function:Get-CodexExeVersion}
+try {
+    New-Item -ItemType Directory -Path $stagedDir, $backupDir -Force | Out-Null
+    New-Item -ItemType File -Path $canonicalPath, $stagedPath, $backupPath -Force | Out-Null
+
+    function Get-CodexExeVersion {
+        param([string]$ExePath)
+        if ([string]::Equals($ExePath, $canonicalPath, [StringComparison]::OrdinalIgnoreCase)) {
+            return [version]'0.142.5'
+        }
+        if ([string]::Equals($ExePath, $stagedPath, [StringComparison]::OrdinalIgnoreCase)) {
+            return [version]'0.146.0'
+        }
+        if ([string]::Equals($ExePath, $backupPath, [StringComparison]::OrdinalIgnoreCase)) {
+            return [version]'9.9.9'
+        }
+        return $null
+    }
+
+    $candidates = @(Get-CodexExeCandidatePaths -BasePath $probeRoot)
+    Assert-Equal 'descoberta: exclui backup-*' ($candidates -contains $backupPath) $false
+    Assert-Equal 'descoberta: canonico primeiro' $candidates[0] $canonicalPath
+    Assert-Equal 'resolve: canonico prevalece sobre alpha maior' (Resolve-CodexExe -BasePath $probeRoot) $canonicalPath
+
+    Remove-Item -LiteralPath $canonicalPath -Force
+    Assert-Equal 'resolve: fallback sem canonico' (Resolve-CodexExe -BasePath $probeRoot) $stagedPath
+
+    Remove-Item -LiteralPath $stagedPath -Force
+    $onlyBackupThrew = $false
+    try { Resolve-CodexExe -BasePath $probeRoot | Out-Null } catch { $onlyBackupThrew = $true }
+    Assert-Equal 'resolve: somente backup bloqueia' $onlyBackupThrew $true
+}
+finally {
+    Set-Item -Path Function:Get-CodexExeVersion -Value $originalVersionProbe
+    if (Test-Path -LiteralPath $probeRoot -PathType Container) {
+        Remove-Item -LiteralPath $probeRoot -Recurse -Force
+    }
+}
 
 # Resolve-CodexJobStatus — a resposta final manda; stderr ruidoso nao gera falso 'error'
 $s1 = Resolve-CodexJobStatus -FinalText 'VEREDICTO: nenhum gap' -StreamError '' -Stderr 'ERROR: {"error":{"message":"x"}}'
