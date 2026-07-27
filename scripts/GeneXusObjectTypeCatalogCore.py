@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import uuid
 from collections import Counter
 from pathlib import Path
 from typing import Any
@@ -99,13 +100,42 @@ def _guid_key(value: object) -> str | None:
     return text or None
 
 
+def _valid_guid(value: object) -> bool:
+    if value is None:
+        return False
+    try:
+        uuid.UUID(str(value).strip())
+    except (TypeError, ValueError):
+        return False
+    return True
+
+
+def _invalid_operational_field(entry: dict[str, object], fields: tuple[str, ...]) -> tuple[str, str] | None:
+    for field in fields:
+        if field not in entry:
+            continue
+        value = entry[field]
+        if field in {"inventoryEligible", "queryableByKbIntelligence", "containerType"}:
+            if not isinstance(value, bool):
+                return field, "field-not-boolean"
+        elif field == "objectTypeGuid":
+            if not _valid_guid(value):
+                return field, "invalid-guid"
+        else:
+            if not isinstance(value, str):
+                return field, "field-not-string"
+            if not value.strip():
+                return field, "field-empty"
+    return None
+
+
 def _field_equivalent(override_entry: dict[str, object], base_entry: dict[str, object], field: str) -> bool:
     if field not in override_entry:
         return True
     if field not in base_entry:
         return False
     if field in {"inventoryEligible", "queryableByKbIntelligence", "containerType"}:
-        return bool(override_entry[field]) == bool(base_entry[field])
+        return override_entry[field] == base_entry[field]
     return str(override_entry[field]).casefold() == str(base_entry[field]).casefold()
 
 
@@ -155,6 +185,12 @@ def classify_gx_object_type_catalog_override(base: dict[str, object], override: 
             missing = [field for field in REQUIRED_WITHOUT_BASE if field not in entry]
             if missing:
                 entries.append(_entry(name, entry, "divergent", "invalid-operational-field", "required-field-missing", f"types.{name}.{missing[0]}", ignored=ignored, unsupported=unsupported, action="block-resolution")); continue
+        invalid = _invalid_operational_field(entry, OPERATIONAL_FIELDS)
+        if invalid:
+            invalid_field, diagnostic = invalid
+            base_name = base_match[0] if base_match else None
+            base_entry = base_match[1] if base_match else None
+            entries.append(_entry(name, entry, "divergent", "invalid-operational-field", diagnostic, f"types.{name}.{invalid_field}", base_name, base_entry, ignored=ignored, unsupported=unsupported, action="block-resolution")); continue
         if base_by_guid and base_match and base_by_guid.casefold() != base_match[0].casefold():
             base_name, base_entry = base_by_name[base_by_guid.casefold()]
             entries.append(_entry(name, entry, "divergent", "unsafe-duplicate-guid", "guid-collides-with-other-base-type", f"types.{name}.objectTypeGuid", base_name, base_entry, ignored=ignored, unsupported=unsupported, action="block-resolution")); continue
@@ -175,7 +211,8 @@ def classify_gx_object_type_catalog_override(base: dict[str, object], override: 
         status = "INVALID_OVERRIDE_SHAPE" if first["reason"] in {"invalid-override-shape", "invalid-operational-field"} else "OVERRIDE_RESOLUTION_BLOCKED"
         return _result(status, entries, declared, override_path, first["reason"], first["diagnosticReason"], first["fieldPath"], "block-resolution")
     if any(entry["classification"] in {"pending", "divergent"} for entry in entries):
-        return _result("REMINDER_REQUIRED", entries, declared, override_path, "missing-in-base", "missing-in-base", None, "merge-with-warning")
+        reason = "missing-in-base" if any(entry["classification"] == "pending" for entry in entries) else "field-divergence"
+        return _result("REMINDER_REQUIRED", entries, declared, override_path, reason, reason, None, "merge-with-warning")
     return _cleanup(entries, declared, override_path, "equivalent")
 
 

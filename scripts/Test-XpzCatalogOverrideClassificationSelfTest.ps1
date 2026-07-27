@@ -141,17 +141,33 @@ $r = Invoke-Reminder -Root $dupRoot
 Assert-True ($r.status -eq 'CLEANUP_RECOMMENDED' -and $r.redundantTypeNames -contains 'ProcedureAlias' -and $r.classificationEntries[0].baseTypeName -eq 'Procedure') 'alias por GUID equivalente deve ser redundante'
 Assert-True (-not (Resolve-GeneXusObjectTypeCatalogPaths -ParallelKbRoot $dupRoot).MergedCatalog.types.PSObject.Properties['ProcedureAlias']) 'alias redundante nao deve criar tipo efetivo novo'
 
-# Paridade Python basica: redundante preserva exportTaskLabel.
+# CLI textual deve distinguir cleanup de ausencia de override.
+$textReminder = & pwsh -NoProfile -File (Join-Path $scriptDir 'Test-XpzCatalogOverrideSessionReminder.ps1') -ParallelKbRoot $redundantRoot
+Assert-True (($textReminder -join "`n") -match 'CLEANUP_RECOMMENDED') 'saida textual redundante deve recomendar limpeza'
+Assert-True (-not (($textReminder -join "`n") -match 'nenhum override local')) 'saida textual redundante nao deve dizer que nao ha override ativo'
+
+# Paridade Python: redundante, campos operacionais invalidos e motivo de divergencia.
 $py = @"
 from pathlib import Path
-from GeneXusObjectTypeCatalogCore import resolve_effective_object_type_catalog
+from GeneXusObjectTypeCatalogCore import classify_gx_object_type_catalog_override, load_gx_object_type_catalog, resolve_effective_object_type_catalog
 cat, override = resolve_effective_object_type_catalog(Path(r'$redundantRoot') / 'ObjetosDaKbEmXml', parallel_kb_root=Path(r'$redundantRoot'))
 assert cat['types']['WorkWith']['exportTaskLabel'] == '$($workWith.exportTaskLabel)'
 assert 'canonicalType' in cat['types']['WorkWith']
+base = load_gx_object_type_catalog()
+proc = dict(base['types']['Procedure'])
+bool_string = {'schemaVersion': 1, 'upstreamPending': True, 'types': {'Procedure': dict(proc, queryableByKbIntelligence='false')}}
+r = classify_gx_object_type_catalog_override(base, bool_string, Path('override.json'))
+assert r['status'] == 'INVALID_OVERRIDE_SHAPE' and r['diagnosticReason'] == 'field-not-boolean', r
+bad_guid = {'schemaVersion': 1, 'upstreamPending': True, 'types': {'Procedure': dict(proc, objectTypeGuid='not-a-guid')}}
+r = classify_gx_object_type_catalog_override(base, bad_guid, Path('override.json'))
+assert r['status'] == 'INVALID_OVERRIDE_SHAPE' and r['diagnosticReason'] == 'invalid-guid', r
+divergent_only = {'schemaVersion': 1, 'upstreamPending': True, 'types': {'Procedure': dict(proc, folderName='ProcedureX')}}
+r = classify_gx_object_type_catalog_override(base, divergent_only, Path('override.json'))
+assert r['status'] == 'REMINDER_REQUIRED' and r['reason'] == 'field-divergence' and r['diagnosticReason'] == 'field-divergence', r
 "@
 $env:PYTHONPATH = $scriptDir
 $py | python -
-if($LASTEXITCODE -ne 0){ throw 'paridade Python falhou para WorkWith redundante' }
+if($LASTEXITCODE -ne 0){ throw 'paridade Python falhou para classificacao de override' }
 
 Write-Output 'OK: Test-XpzCatalogOverrideClassificationSelfTest.ps1'
 exit 0
