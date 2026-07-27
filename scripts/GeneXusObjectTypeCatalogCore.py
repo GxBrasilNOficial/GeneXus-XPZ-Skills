@@ -261,7 +261,7 @@ def merge_gx_object_type_catalogs(base: dict[str, object], override: dict[str, o
             target = diag.get("baseTypeName") or name
             merged = dict(merged_types.get(target, {}))
             for key, value in payload.items():
-                if key in SUPPORTED_FIELDS:
+                if key in OPERATIONAL_FIELDS:
                     merged[key] = value
             merged["canonicalType"] = target
             merged_types[str(target)] = merged

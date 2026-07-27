@@ -131,7 +131,7 @@ function Merge-GeneXusObjectTypeCatalog {
     param([object]$BaseCatalog,[object]$OverrideCatalog,[object]$OverrideClassification)
     if($null -eq $OverrideCatalog -or $null -eq $OverrideCatalog.PSObject.Properties['types']){return $BaseCatalog}
     if($null -ne $OverrideClassification -and $OverrideClassification.effectiveCatalogAction -eq 'block-resolution'){throw "OVERRIDE_RESOLUTION_BLOCKED: $($OverrideClassification.reason)"}
-    $supported=@('objectTypeGuid','rootKind','folderName','inventoryEligible','queryableByKbIntelligence','containerType','exportTaskLabel','evidenceSummary','wikiLinks','nexaFindings','notes','lastObservedAt')
+    $supported=@('objectTypeGuid','rootKind','folderName','inventoryEligible','queryableByKbIntelligence','containerType','exportTaskLabel')
     $mergedTypes=[ordered]@{}
     foreach($p in $BaseCatalog.types.PSObject.Properties){$h=[ordered]@{}; foreach($ep in $p.Value.PSObject.Properties){$h[$ep.Name]=$ep.Value}; $h['canonicalType']=$p.Name; $mergedTypes[$p.Name]=[pscustomobject]$h}
     foreach($p in $OverrideCatalog.types.PSObject.Properties){$ce=$null; if($null -ne $OverrideClassification){$ce=@($OverrideClassification.classificationEntries|Where-Object{$_.typeName -eq $p.Name}|Select-Object -First 1)}; if($null -ne $ce -and $ce.effectiveCatalogAction -eq 'block-resolution'){continue}; $target=if($null -ne $ce -and -not [string]::IsNullOrWhiteSpace($ce.baseTypeName)){$ce.baseTypeName}else{$p.Name}; $h=[ordered]@{}; if($mergedTypes.Contains($target)){foreach($ep in $mergedTypes[$target].PSObject.Properties){$h[$ep.Name]=$ep.Value}}; foreach($ep in $p.Value.PSObject.Properties){if($ep.Name -in $supported){$h[$ep.Name]=$ep.Value}}; $h['canonicalType']=$target; $mergedTypes[$target]=[pscustomobject]$h}

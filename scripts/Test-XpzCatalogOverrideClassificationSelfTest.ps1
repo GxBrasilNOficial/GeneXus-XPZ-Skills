@@ -42,6 +42,7 @@ Write-JsonFile -Path $overridePath -Value ([ordered]@{
             queryableByKbIntelligence = $workWith.queryableByKbIntelligence
             containerType = $workWith.containerType
             notes = 'metadata only for local evidence'
+            evidenceSummary = 'local evidence must not affect runtime catalog'
         }
     }
 })
@@ -53,6 +54,8 @@ $res = Resolve-GeneXusObjectTypeCatalogPaths -ParallelKbRoot $redundantRoot
 Assert-True ($res.UpstreamPending -eq $false -and $res.DeclaredUpstreamPending -eq $true -and $res.EffectiveUpstreamPending -eq $false) 'aliases de pendencia devem refletir efetivo/declarado'
 Assert-True ($res.MergedCatalog.types.WorkWith.exportTaskLabel -eq $workWith.exportTaskLabel) 'merge deve preservar exportTaskLabel da base'
 Assert-True ($res.MergedCatalog.types.WorkWith.canonicalType -eq 'WorkWith') 'canonicalType deve ser derivado'
+Assert-True ($res.MergedCatalog.types.WorkWith.notes -eq $workWith.notes) 'metadata local nao deve sobrescrever metadata da base no catalogo efetivo'
+Assert-True ($null -eq $res.MergedCatalog.types.WorkWith.PSObject.Properties['evidenceSummary']) 'metadata local nao deve entrar no catalogo efetivo'
 
 # Pendente real.
 $pendingRoot = New-CaseRoot 'pending'
@@ -199,9 +202,11 @@ $py = @"
 from pathlib import Path
 from GeneXusObjectTypeCatalogCore import classify_gx_object_type_catalog_override, load_gx_object_type_catalog, resolve_effective_object_type_catalog
 cat, override = resolve_effective_object_type_catalog(Path(r'$redundantRoot') / 'ObjetosDaKbEmXml', parallel_kb_root=Path(r'$redundantRoot'))
+base = load_gx_object_type_catalog()
 assert cat['types']['WorkWith']['exportTaskLabel'] == '$($workWith.exportTaskLabel)'
 assert 'canonicalType' in cat['types']['WorkWith']
-base = load_gx_object_type_catalog()
+assert cat['types']['WorkWith']['notes'] == base['types']['WorkWith']['notes']
+assert 'evidenceSummary' not in cat['types']['WorkWith']
 proc = dict(base['types']['Procedure'])
 bool_string = {'schemaVersion': 1, 'upstreamPending': True, 'types': {'Procedure': dict(proc, queryableByKbIntelligence='false')}}
 r = classify_gx_object_type_catalog_override(base, bool_string, Path('override.json'))
