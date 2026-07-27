@@ -87,17 +87,14 @@ if ($CatalogOverridePath) {
 }
 
 $output = @(& $python.Source @arguments 2>&1)
-if ($LASTEXITCODE -ne 0) {
-    $detail = (($output | ForEach-Object { $_.ToString() }) -join [Environment]::NewLine).Trim()
-    if ([string]::IsNullOrWhiteSpace($detail)) {
-        $detail = '(sem saida capturada do motor Python)'
-    }
-
-    throw "KbIntelligence index build failed (exit $LASTEXITCODE).`n$detail"
-}
+$engineExitCode = $LASTEXITCODE
 
 if ($output.Count -gt 0) {
     $output | ForEach-Object { Write-Output $_ }
+}
+
+if ($engineExitCode -ne 0) {
+    exit $engineExitCode
 }
 
 exit 0
