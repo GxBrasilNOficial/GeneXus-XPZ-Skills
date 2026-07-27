@@ -1062,7 +1062,7 @@ try {
     $overrideReminder = $null
     if (-not [string]::IsNullOrWhiteSpace($ParallelKbRoot)) {
         $overrideReminder = Get-GeneXusCatalogOverrideSessionReminder -ParallelKbRoot $ParallelKbRoot -CatalogOverridePath $CatalogOverridePath
-        if ($overrideReminder.reminderRequired -and -not [string]::IsNullOrWhiteSpace($overrideReminder.message)) {
+        if ($overrideReminder.noticeRequired -and -not [string]::IsNullOrWhiteSpace($overrideReminder.message)) {
             $warnings.Add($overrideReminder.message) | Out-Null
         }
     }

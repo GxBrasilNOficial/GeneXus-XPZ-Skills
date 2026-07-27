@@ -139,7 +139,7 @@ Quando sync ou pre-varredura bloquearem por GUID de `Object/@type` ausente do ca
 4. Se houver identificacao segura do tipo exportavel, oferecer em passos separados:
    - registro local paliativo (`Register-GeneXusObjectTypeCatalogOverride.ps1` com `-UserApproved`);
    - prompt copiavel para o mantenedor (`New-GeneXusUnknownTypeMaintainerPrompt.ps1`).
-5. Em **cada nova sessao** na pasta paralela com override ativo, executar `Test-XpzCatalogOverrideSessionReminder.ps1` e lembrar que falta alinhar GeneXus-XPZ-Skills.
+5. Em **cada nova sessao** na pasta paralela com override ativo, executar `Test-XpzCatalogOverrideSessionReminder.ps1 -AsJson` e ler `status`, `noticeRequired`, `reminderRequired`, `cleanupRecommended`, `declaredUpstreamPending`, `effectiveUpstreamPending` e as listas `pendingTypeNames`/`redundantTypeNames`/`divergentTypeNames`. `CLEANUP_RECOMMENDED` significa que a pendencia efetiva acabou, mas há limpeza local a planejar; não remover o arquivo sem aprovação.
 6. NUNCA registrar no catálogo compartilhado a partir da pasta paralela sem troca de contexto; NUNCA materializar parcialmente.
 
 Pre-varredura obrigatória antes de sync full ou primeira materialização longa:

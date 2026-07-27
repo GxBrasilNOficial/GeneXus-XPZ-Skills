@@ -11,6 +11,13 @@ Cada entrada usa dois campos curtos logo abaixo do titulo:
 
 Entradas legadas sem avaliação carregam `FALTA AVALIAR` em ambos os campos até que sejam revistas em sessão dedicada.
 
+## Follow-up do override de catálogo XPZ: auditor simétrico de wrappers e `-AllowRedundant`
+
+- **Importância** — média (a frente atual bloqueia redundancia no registro e classifica lembretes, mas ainda falta auditoria dedicada de clones locais antigos e não há modo consciente para registrar redundante).
+- **Maturidade** — pesquisa feita (decisões adiadas no plano v17).
+
+Pendências deliberadamente fora da implementação do plano v17: avaliar `-AllowRedundant` no `Register-GeneXusObjectTypeCatalogOverride.ps1` somente se surgir caso real justificável; e implementar detector em `Test-XpzWrapperInventory.ps1` para apontar wrappers locais que ainda tratam qualquer override como `REMINDER_REQUIRED` ou não leem `noticeRequired`/listas `redundantTypeNames`/`divergentTypeNames`.
+
 ## Avaliar contrato v2/finalizador compartilhado para wrappers MSBuild GeneXus
 
 - **Importância** — média (risco real de regressão e duplicação em pós-processamento de wrappers, mas a Fase 0 cobre a dor atual sem precisar desta arquitetura).

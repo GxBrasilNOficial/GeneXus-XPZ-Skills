@@ -4,6 +4,8 @@ Todas as mudanças relevantes deste repositório serão registradas aqui a parti
 
 ## Português (BR)
 
+- Evoluido o contrato de `gx-object-type-catalog.override.json`: lembrete/auditoria agora distingue entradas `pending`, `redundant` e `divergent`; redundancia equivalente retorna `CLEANUP_RECOMMENDED`/exit 0 com `effectiveUpstreamPending=false`; merge efetivo preserva campos operacionais da base ausentes no override, incluindo `exportTaskLabel`; registro local bloqueia redundancia antes de qualquer escrita. Self-test novo: `scripts/Test-XpzCatalogOverrideClassificationSelfTest.ps1`.
+
 O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda não publicadas em versão formal. Este repositório ainda não adota versionamento semântico público; quando isso mudar, as seções futuras devem registrar a tag correspondente.
 
 ### Unreleased
@@ -143,6 +145,8 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 ## Español
 
+- Evolucionado el contrato de `gx-object-type-catalog.override.json`: el recordatorio/auditoría ahora distingue entradas `pending`, `redundant` y `divergent`; una redundancia equivalente retorna `CLEANUP_RECOMMENDED`/exit 0 con `effectiveUpstreamPending=false`; el merge efectivo preserva campos operacionales de la base ausentes en el override, incluso `exportTaskLabel`; el registro local bloquea redundancia antes de cualquier escritura. Nuevo self-test: `scripts/Test-XpzCatalogOverrideClassificationSelfTest.ps1`.
+
 Todos los cambios relevantes de este repositorio se registrarán aquí a partir de esta adopción. El historial anterior permanece distribuido en `historico/`, commits y documentación de frentes de trabajo.
 
 El formato mantiene una sección `Unreleased` para cambios aún no publicados en una versión formal. Este repositorio todavía no adopta versionado semántico público; cuando eso cambie, las secciones futuras deberán registrar la etiqueta correspondiente.
@@ -276,6 +280,8 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 - Agregados documentos públicos de gobernanza: `SECURITY.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md` y `CHANGELOG.md`.
 
 ## English
+
+- Evolved the `gx-object-type-catalog.override.json` contract: reminder/audit now distinguishes `pending`, `redundant`, and `divergent` entries; equivalent redundancy returns `CLEANUP_RECOMMENDED`/exit 0 with `effectiveUpstreamPending=false`; effective merge preserves base operational fields missing from the override, including `exportTaskLabel`; local registration blocks redundancy before any write. New self-test: `scripts/Test-XpzCatalogOverrideClassificationSelfTest.ps1`.
 
 All relevant changes to this repository will be recorded here from this adoption onward. Earlier history remains distributed across `historico/`, commits, and work-front documentation.
 

@@ -89,11 +89,6 @@ if ([string]::IsNullOrWhiteSpace($CatalogOverridePath)) {
     throw 'BLOCK: CatalogOverridePath nao resolvido.'
 }
 
-$scriptsDir = Split-Path -Parent $CatalogOverridePath
-if (-not (Test-Path -LiteralPath $scriptsDir)) {
-    New-Item -ItemType Directory -Path $scriptsDir -Force | Out-Null
-}
-
 if ([string]::IsNullOrWhiteSpace($FolderName)) {
     $FolderName = $TypeName.Trim()
 }
@@ -126,21 +121,83 @@ $typeEntry = [ordered]@{
     notes           = 'Entrada paliativa local; upstreamPending na base GeneXus-XPZ-Skills.'
 }
 
-$typesTable = [ordered]@{}
-if ($null -ne $overrideObject.types) {
+
+$candidateTypesTable = [ordered]@{}
+if ($null -ne $overrideObject -and $null -ne $overrideObject.PSObject.Properties['types'] -and $null -ne $overrideObject.types) {
     foreach ($property in $overrideObject.types.PSObject.Properties) {
-        $typesTable[$property.Name] = $property.Value
+        $candidateTypesTable[$property.Name] = $property.Value
     }
 }
-$typesTable[$typeNameKey] = [pscustomobject]$typeEntry
+$candidateTypesTable[$typeNameKey] = [pscustomobject]$typeEntry
 
-$payload = [ordered]@{
-    schemaVersion             = 1
-    upstreamPending           = $true
-    lastLocalRegistrationAt   = (Get-Date).ToString('o')
-    registrationRequiresUpstreamSync = $true
-    types                     = [pscustomobject]$typesTable
+$candidateRoot = [ordered]@{}
+if ($null -ne $overrideObject) {
+    foreach ($property in $overrideObject.PSObject.Properties) {
+        if ($property.Name -ne 'types') {
+            $candidateRoot[$property.Name] = $property.Value
+        }
+    }
 }
+if (-not $candidateRoot.Contains('schemaVersion')) { $candidateRoot['schemaVersion'] = 1 }
+if (-not $candidateRoot.Contains('upstreamPending')) { $candidateRoot['upstreamPending'] = $true }
+$candidateRoot['types'] = [pscustomobject]$candidateTypesTable
+$candidateOverride = [pscustomobject]$candidateRoot
+
+$candidateClassification = Get-GeneXusCatalogOverrideClassification `
+    -CatalogOverridePath $CatalogOverridePath `
+    -ParallelKbRoot $resolvedKbRoot `
+    -OverrideCatalog $candidateOverride `
+    -OverridePathForDiagnostics $CatalogOverridePath
+$candidateEntry = @($candidateClassification.classificationEntries | Where-Object { $_.typeName -eq $typeNameKey } | Select-Object -First 1)
+
+if ($candidateClassification.status -in @('INVALID_OVERRIDE_SHAPE', 'OVERRIDE_RESOLUTION_BLOCKED') -or ($null -ne $candidateEntry -and $candidateEntry.effectiveCatalogAction -eq 'block-resolution')) {
+    $result = [pscustomobject]@{
+        status           = if ($candidateEntry.reason -eq 'unsafe-shadowing') { 'LOCAL_OVERRIDE_UNSAFE_SHADOWING_BLOCKED' } elseif ($candidateEntry.reason -eq 'unsafe-duplicate-guid') { 'LOCAL_OVERRIDE_UNSAFE_DUPLICATE_GUID_BLOCKED' } else { $candidateClassification.status }
+        blocked          = $true
+        reason           = if ($null -ne $candidateEntry) { $candidateEntry.reason } else { $candidateClassification.reason }
+        diagnosticReason = if ($null -ne $candidateEntry) { $candidateEntry.diagnosticReason } else { $candidateClassification.diagnosticReason }
+        overridePath     = $CatalogOverridePath
+        typeName         = $typeNameKey
+        objectTypeGuid   = $guidValue
+        message          = 'Override local nao gravado porque bloquearia a resolucao segura do catalogo efetivo.'
+        classification   = $candidateClassification
+    }
+    if ($AsJson) { $result | ConvertTo-Json -Depth 10 } else { $result | Format-List }
+    exit 2
+}
+
+if ($null -ne $candidateEntry -and $candidateEntry.classification -eq 'redundant') {
+    $result = [pscustomobject]@{
+        status           = 'LOCAL_OVERRIDE_REDUNDANT_BLOCKED'
+        blocked          = $true
+        reason           = $candidateEntry.reason
+        diagnosticReason = $candidateEntry.diagnosticReason
+        overridePath     = $CatalogOverridePath
+        typeName         = $typeNameKey
+        objectTypeGuid   = $guidValue
+        baseTypeName     = $candidateEntry.baseTypeName
+        message          = 'Nao gravado porque o tipo ja esta no catalogo base de modo equivalente; remova ou evite override local redundante.'
+        classification   = $candidateClassification
+    }
+    if ($AsJson) { $result | ConvertTo-Json -Depth 10 } else { $result | Format-List }
+    exit 2
+}
+
+$scriptsDir = Split-Path -Parent $CatalogOverridePath
+if (-not (Test-Path -LiteralPath $scriptsDir)) {
+    New-Item -ItemType Directory -Path $scriptsDir -Force | Out-Null
+}
+
+$typesTable = $candidateTypesTable
+
+$payload = [ordered]@{}
+foreach ($property in $candidateOverride.PSObject.Properties) {
+    if ($property.Name -ne 'types') { $payload[$property.Name] = $property.Value }
+}
+$payload['upstreamPending'] = $true
+$payload['lastLocalRegistrationAt'] = (Get-Date).ToString('o')
+$payload['registrationRequiresUpstreamSync'] = $true
+$payload['types'] = [pscustomobject]$typesTable
 
 $json = ($payload | ConvertTo-Json -Depth 8)
 [System.IO.File]::WriteAllText($CatalogOverridePath, $json, (Get-Utf8NoBomEncoding))

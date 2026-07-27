@@ -638,7 +638,7 @@ No handoff final, usar literalmente um dos estados canonicos listados acima. Nã
 
 ## WORKFLOW
 
-0. **Catálogo XPZ (cada sessão na pasta paralela):** executar `Test-XpzCatalogOverrideSessionReminder.ps1 -ParallelKbRoot <raiz> -AsJson`. Se `reminderRequired=true`, exibir a mensagem ao usuário antes de sync ou materialização — override local e paliativo; falta alinhar GeneXus-XPZ-Skills.
+0. **Catálogo XPZ (cada sessão na pasta paralela):** executar `Test-XpzCatalogOverrideSessionReminder.ps1 -ParallelKbRoot <raiz> -AsJson`. Ler `status`, `noticeRequired`, `reminderRequired`, `cleanupRecommended`, `declaredUpstreamPending`, `effectiveUpstreamPending` e as listas `pendingTypeNames`/`redundantTypeNames`/`divergentTypeNames`. Se `reminderRequired=true`, exibir a mensagem ao usuário antes de sync ou materialização. Se `cleanupRecommended=true`, planejar limpeza local aprovada (ex.: remover só entrada redundante), sem alterar automaticamente.
 1. Confirmar se o usuário está falando da pasta nativa da KB ou da pasta paralela da KB
 2. Se o caminho da pasta nativa da KB não vier informado, pedir esse caminho ao usuário antes de concluir o setup inicial
 3. Se o caminho da pasta nativa da KB vier informado, verificar existencia/acesso quando isso for seguro e barato; se não existir ou não estiver acessivel, não gravar nem tentar corrigir a pasta nativa, apenas registrar a ressalva no handoff
