@@ -352,6 +352,16 @@
       "containerType": false,
       "notes": "Work Panel legado GeneXus (deprecated desde GeneXus 15); Form Type=Windows."
     },
+    "WorkWith": {
+      "objectTypeGuid": "15cf49b5-fc38-4899-91b5-395d02d79889",
+      "rootKind": "Object",
+      "folderName": "WorkWith",
+      "exportTaskLabel": "WorkWithDevices",
+      "inventoryEligible": true,
+      "queryableByKbIntelligence": true,
+      "containerType": false,
+      "notes": "WW para SD/mobile. Nome atual: Work With. Nome histórico: Work With for Smart Devices. Nomes históricos de patterns não definem o tipo; classificar sempre pelo GUID."
+    },
     "WorkWithForWeb": {
       "objectTypeGuid": "78cecefe-be7d-4980-86ce-8d6e91fba04b",
       "rootKind": "Object",
@@ -360,7 +370,7 @@
       "inventoryEligible": true,
       "queryableByKbIntelligence": true,
       "containerType": false,
-      "notes": "Pattern web por transacao. Task Export aceita WorkWith em -ObjectList; ver 10a-gx-export-task-labels.md."
+      "notes": "WW para Web por transação. Nomes históricos de patterns podem ser ambíguos, inclusive aparecer como WorkWith; classificar sempre pelo GUID. Task Export aceita WorkWith em -ObjectList; ver 10a-gx-export-task-labels.md."
     },
     "WorkWithPlusInstance": {
       "objectTypeGuid": "07135890-56fc-489b-b408-063722fa9f7d",

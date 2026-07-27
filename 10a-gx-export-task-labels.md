@@ -8,6 +8,9 @@ Documento de divergências entre o vocabulário aceito pela task MSBuild `Export
 
 - Montar `-ObjectList` com o **rótulo da task Export**, não com o nome do tipo no catálogo ou no índice, quando existir divergência documentada abaixo.
 - Consultar `exportTaskLabel` em `scripts/gx-object-type-catalog.json` quando o consumidor montar lista a partir do catálogo ou de `search-objects` / `list-by-type`.
+- `exportTaskLabel` é vocabulário textual da task MSBuild; o GUID do tipo não o substitui. Ensaios com os dois GUIDs de Work With foram rejeitados como tipo inválido e só produziram objeto por fallback nominal, portanto são Categoria B e não exportações confiáveis.
+- A identidade canônica continua sendo o GUID do `Object/@type`. Nomes atuais ou históricos de patterns não classificam o objeto e podem ser ambíguos entre WW para SD/mobile e WW para Web.
+- Na pré-validação seletiva de **exportação**, uma coincidência explícita em `exportTaskLabel` precede nome canônico e `folderName`; por isso `WorkWith` resolve o tipo web e `WorkWithDevices` resolve o mobile. Fora do contexto Export, o nome canônico `WorkWith` continua resolvendo o tipo mobile.
 - O inventário pós-export (`packageInventory`, `Get-GeneXusImportPackageObjectInventory.ps1`) classifica objetos pelo **catálogo/GUID** (`WorkWithForWeb` para `78cecefe-...`). Após export com `-ObjectList "WorkWith:Nome"`, o par no pacote aparece como `WorkWithForWeb:Nome` — isso **não** é falha de export. O motor de inventário reconcilia via `deltaComparison.aliasResolutions[]` quando existir `exportTaskLabel` no catálogo (regra `exportTaskLabel`: declarado `WorkWith:Nome` ↔ inventário `WorkWithForWeb:Nome`); `requestedItemsFound` / `missingCount` já refletem o alias. Resumo compacto em `packageInventory` (`aliasResolutionCount`, `aliasResolutions` ou `aliasResolutionsFullListAt` no sidecar).
 - Em importação, equivalências diferentes podem existir (ex.: `Panel` vs `SDPanel` em `itemAliasMatches` — ver `10-base-operacional-msbuild-headless.md`); não assumir que o mesmo alias vale na exportação.
 
@@ -37,6 +40,7 @@ Efeito: o declarado entra em `requestedItemsFound`; deixa `requestedItemsMissing
 
 | GUID | Catálogo / pasta / índice | `exportTaskLabel` (task Export) | Evidência | Notas |
 |------|---------------------------|----------------------------------|-----------|-------|
+| `15cf49b5-fc38-4899-91b5-395d02d79889` | `WorkWith` | `WorkWithDevices` | Matriz GxTest3 em 2026-07-26, `WorkWithRoute` | WW para SD/mobile. `WorkWithDevices:Nome` exportou limpo e o inventário classificou pelo GUID como `WorkWith`; `WorkWith:Nome` procurou o tipo web e não encontrou o objeto mobile. |
 | `78cecefe-be7d-4980-86ce-8d6e91fba04b` | `WorkWithForWeb` | `WorkWith` | Matriz A1 em 2026-05-25, KB FabricaBrasil18, `WorkWithWebCliente`; artefatos em `C:\Dev\Prod\Gx_FabricaBrasil\Temp\export-task-label-matrix-20260525\` | Controle positivo quebrado: `WorkWithForWeb:Nome` → `error : WorkWithForWeb is not a valid type`, `invalidTypesRejected` contém `WorkWithForWeb`. `WorkWith:Nome` → sem `invalidTypesRejected`, XPZ com o objeto (tipo no pacote: `WorkWithForWeb`). |
 
 ### Matriz A1 (resumo)
@@ -51,6 +55,19 @@ Efeito: o declarado entra em `requestedItemsFound`; deixa `requestedItemsMissing
 | `PatternInstance:...` | `PatternInstance` | sim | não |
 | só `WorkWithWebCliente` | (vazio) | não | inventário degradado (formato exige `Tipo:Nome`) |
 
+### Matriz GxTest3 — coexistência mobile e web (2026-07-26)
+
+Ensaios controlados na KB de teste `GxTest3`, com inventário do XPZ por GUID. O resultado confiável exige rótulo aceito sem erro de tipo e identidade exata no pacote.
+
+| Candidato `-ObjectList` | Sinal da task | Resultado confiável |
+|-------------------------|----------------|----------------------|
+| `WorkWithDevices:WorkWithRoute` | sem erro de tipo | sim: um `WorkWith`, GUID `15cf49b5-fc38-4899-91b5-395d02d79889` |
+| `WorkWith:WorkWithRoute` | a task procura “Work With for Web”; objeto não encontrado | não: pacote vazio |
+| `15cf49b5-fc38-4899-91b5-395d02d79889:WorkWithRoute` | GUID rejeitado como tipo; fallback por nome | não: Categoria B, embora o objeto mobile apareça |
+| `WorkWith:WorkWithWebRoute` | sem erro de tipo | sim: um `WorkWithForWeb`, GUID `78cecefe-be7d-4980-86ce-8d6e91fba04b` |
+| `WorkWithForWeb:WorkWithWebRoute` | tipo rejeitado; fallback por nome | não: Categoria B |
+| `78cecefe-be7d-4980-86ce-8d6e91fba04b:WorkWithWebRoute` | GUID rejeitado como tipo; fallback por nome | não: Categoria B |
+
 ## Campanha P5 multi-KB (2026-05-30)
 
 Artefatos: `historico/export-task-label-matrix-20260530/` (`coverage-map.json`, `consolidation-report.json`, `campaign-log.json`, `matrix/**/matrix-summary.json` e `export.json` por candidato).
@@ -62,7 +79,7 @@ KBs com índice KbIntelligence na campanha: FabricaBrasil18 (`C:\GxModels\Fabric
 | Tipos `inventoryEligible` + `rootKind=Object` no catálogo | 40 |
 | Com espécime (matriz executada) | 33 |
 | Sem instância nas 3 KBs | 7 |
-| Divergência `exportTaskLabel` (além da já conhecida) | 0 — só `WorkWithForWeb` → `WorkWith` (reconfirma A1) |
+| Divergência `exportTaskLabel` observada naquela campanha de maio | só `WorkWithForWeb` → `WorkWith` (reconfirma A1); o tipo mobile ainda não fazia parte do catálogo avaliado |
 | Rótulo da task = nome do catálogo em `Tipo:Nome` | 22 |
 | Inconcluso ou export limpo só com nome (sem `Tipo:`) | 10 |
 

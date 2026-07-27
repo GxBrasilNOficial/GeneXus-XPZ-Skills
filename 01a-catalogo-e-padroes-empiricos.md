@@ -43,7 +43,7 @@ Servir como base conceitual para os documentos empíricos e operacionais.
 - `Evidência direta`: em 2026-05-30, amostra em quatro pastas paralelas (`Gx_FabricaBrasil`, `Gx_wsEducacaoSpTeste` em Prod e Test, `Gx_OnlineShopSS` em Test) via `scripts/Invoke-ParallelKbEnvelopeScan.ps1` confirmou `only_properties_in_sample` para `Generator`, `DataStore`, `ThemeClass`, `ThemeColor` (quando presente) e `Folder` em todas as KBs que tinham o tipo; `PatternSettings` tem `<Part>` com `<Data>` em CDATA, mas o extrator do índice não parseia esse bloco.
 - `Regra editorial`: `queryableByKbIntelligence=false` no catálogo técnico (`scripts/gx-object-type-catalog.json`) marca tipos para os quais **o motor atual do índice não deve** ser usado em `who-uses`, `what-uses`, `impact-basic` nem `functional-trace-basic` — critério é cobertura do extrator, não “objeto irrelevante na KB”. Lista canônica: campo `queryableByKbIntelligence` em cada entrada do JSON (atualizada em 2026-05-30 com amostra multi-KB + grafo zero em `kb-intelligence.sqlite` de FabricaBrasil).
 - `Evidência direta`: segunda passagem 2026-05-30 — tipos com `<Part>` no export mas **zero arestas** de entrada e saída no índice de FabricaBrasil (ex.: `SubTypeGroup` 710 objetos, `Image` 251, `Theme`, `File`, `Module`, `PackagedModule`, `Stencil`, `UserControl`, `Panel`, …) passaram a `queryableByKbIntelligence=false`; `Query`, `DataView`, `WorkPanel` e similares **permanecem** `true` no catálogo enquanto não houver reclassificação explícita.
-- `Regra editorial`: tipos que **permanecem** `queryableByKbIntelligence=true` apesar de grafo assimétrico (`API`, `DataSelector`, `WorkWithForWeb`, `ExternalObject`) estão documentados em `scripts/README-kb-intelligence.md` — consultas semânticas ainda podem informar dependências **de saída** ou entrada esparsa; não confundir com “sem impacto”.
+- `Regra editorial`: tipos que **permanecem** `queryableByKbIntelligence=true` apesar de grafo assimétrico (`API`, `DataSelector`, `WorkWith`, `WorkWithForWeb`, `ExternalObject`) estão documentados em `scripts/README-kb-intelligence.md` — consultas semânticas ainda podem informar dependências **de saída** ou entrada esparsa; não confundir com “sem impacto”.
 - `Evidência direta`: `Attribute` tem envelope próprio e diferente de todos os demais — raiz `<Attributes><Attribute>` no lugar de `<Object type="...">`. Possui `<Part type="...">` interno, mas não segue o envelope padrão.
 - `Inferência forte`: a ausência de `<Part>` em um XML não indica objeto vazio ou corrompido — pode ser a estrutura normal do tipo.
 - `Inferência forte`: para este acervo, o GUID em `Object/@type` é um identificador estável do tipo extraído do objeto.
@@ -57,7 +57,7 @@ Tipos que geram arquivo XML próprio no acervo. Containers de organização est�
 - `Regra editorial`: a fonte técnica canônica executável desta lista fica em `scripts/gx-object-type-catalog.json`.
 - `Regra editorial`: este catálogo cobre **só** tipos modernos identificados por GUID em `Object/@type`. Elementos de export **legado GeneXus 9** (`ExportFile` com `<GXObject><Elemento>` por **nome**, sem GUID de tipo) ficam **fora** deste catálogo, no registro próprio `scripts/gx-legacy-export-element-registry.json` (doc-dono `01k-registro-elementos-legados.md`) — não inventar GUID nem reusar o GUID do tipo moderno sucessor para representar um elemento legado.
 - `Regra editorial`: este documento continua como referência explicativa e histórica, não como ponto único de leitura por scripts.
-- `Regra editorial`: na coluna Descrição, `queryableByKbIntelligence=false` indica que o motor atual do índice **não** deve ser usado em `who-uses`, `what-uses`, `impact-basic` nem `functional-trace-basic` (lista canônica no JSON). Tipos sem essa marca na tabela permanecem `true` no catálogo — inclusive com grafo assimétrico (`API`, `DataSelector`, `WorkWithForWeb`, `ExternalObject`; ver `scripts/README-kb-intelligence.md`).
+- `Regra editorial`: na coluna Descrição, `queryableByKbIntelligence=false` indica que o motor atual do índice **não** deve ser usado em `who-uses`, `what-uses`, `impact-basic` nem `functional-trace-basic` (lista canônica no JSON). Tipos sem essa marca na tabela permanecem `true` no catálogo — inclusive com grafo assimétrico (`API`, `DataSelector`, `WorkWith`, `WorkWithForWeb`, `ExternalObject`; ver `scripts/README-kb-intelligence.md`).
 
 | Tipo | GUID em `Object/@type` | Descrição | Dir. Sugerido |
 | --- | --- | --- | --- |
@@ -96,6 +96,7 @@ Tipos que geram arquivo XML próprio no acervo. Containers de organização est�
 | `UserControl` | `562f4793-aabe-449f-8821-fc77e550698e` | User Control customizado; `queryableByKbIntelligence=false` | `UserControl/` |
 | `WebPanel` | `c9584656-94b6-4ccd-890f-332d11fc2c25` | Tela web (eventos e layout) | `WebPanel/` |
 | `WorkPanel` | `198e8ea4-1d49-4c9c-8a9a-417024baa9d1` | Work Panel legado GeneXus (deprecated desde GeneXus 15); `Form Type=Windows` | `WorkPanel/` |
+| `WorkWith` | `15cf49b5-fc38-4899-91b5-395d02d79889` | WW para SD/mobile; nome atual “Work With”; nome histórico “Work With for Smart Devices”. A identidade é o GUID, não o nome histórico do pattern. | `WorkWith/` |
 | `WorkWithForWeb` | `78cecefe-be7d-4980-86ce-8d6e91fba04b` | Work With For Web (gerado por padrão) | `WorkWithForWeb/` |
 | `WorkWithPlusInstance` | `07135890-56fc-489b-b408-063722fa9f7d` | Instância do Pattern WorkWithPlus (third-party) aplicada a objeto GeneXus, tipicamente `WebPanel`; XML traz `Pattern="07135890-…"` | `WorkWithPlusInstance/` |
 | `WorkWithPlusTemplate` | `083f1b21-5715-45e1-8a8d-ceadef141e02` | Template do WorkWithPlus (`WWPTemplate_Type`, `WWPTemplate_TemplateXml`) | `WorkWithPlusTemplate/` |
@@ -171,11 +172,19 @@ Estes não são tipos de objeto programáveis. São a infraestrutura de organiza
 - `Evidência direta`: arquivos como `ActionAttribute.xml` e `ActionButtons.xml` contêm propriedades `ThemeElementThemeTypes` e `ThemeElementInternalType`.
 - `Inferência forte`: essas propriedades são marcadores estáveis para reconhecer objetos do diretório `ThemeClass` neste acervo.
 
+### `WorkWith`
+
+- `Evidência direta` (KB de teste `GxTest3`, GeneXus 18, 2026-07-26): o GUID `15cf49b5-fc38-4899-91b5-395d02d79889` materializa cinco objetos em `WorkWith/`.
+- `Evidência direta`: os XMLs contêm estrutura `List`/`Detail`, ações `GeneXus.SD` e vínculo com a `Transaction` pai, confirmando WW para SD/mobile.
+- `Evidência direta`: a mesma KB contém também cinco objetos `WorkWithForWeb` com o GUID distinto `78cecefe-be7d-4980-86ce-8d6e91fba04b`; as duas famílias coexistem.
+- `Regra editorial`: “Work With” é o nome atual de “Work With for Smart Devices”. Nomes históricos de patterns podem ser ambíguos; a classificação deve usar sempre o GUID.
+
 ### `WorkWithForWeb`
 
 - `Evidência direta`: arquivos como `WorkWithWebTRNExemplo0001.xml` exibem `Object/@name` iniciando com `WorkWithWeb`.
 - `Evidência direta`: nesses mesmos arquivos aparece `<Data Pattern="78cecefe-be7d-4980-86ce-8d6e91fba04b">`.
 - `Inferência forte`: os XMLs em `WorkWithForWeb` guardam configuração de artefatos gerados por padrão web associada ao objeto pai.
+- `Regra editorial`: este é o WW para Web, identificado pelo GUID `78cecefe-be7d-4980-86ce-8d6e91fba04b`. Um nome histórico pode aparecer como `WorkWith`, mas não redefine o tipo; o GUID prevalece.
 
 ## Relações aparentes observadas
 

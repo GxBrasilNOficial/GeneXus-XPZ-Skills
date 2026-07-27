@@ -112,11 +112,26 @@ function Read-GeneXusObjectListItemsFromText {
 function Resolve-GeneXusCatalogTypeForExportLabel {
     param(
         [object]$MergedCatalog,
-        [string]$ExportLabel
+        [string]$ExportLabel,
+        [bool]$PreferExportTaskLabel = $true
     )
 
     if ($null -eq $MergedCatalog -or $null -eq $MergedCatalog.types) {
         return $null
+    }
+
+    if ($PreferExportTaskLabel) {
+        foreach ($property in $MergedCatalog.types.PSObject.Properties) {
+            $entry = $property.Value
+            if ($null -eq $entry.PSObject.Properties['exportTaskLabel']) {
+                continue
+            }
+            $exportTaskLabel = [string]$entry.exportTaskLabel
+            if (-not [string]::IsNullOrWhiteSpace($exportTaskLabel) -and
+                $exportTaskLabel.Equals($ExportLabel, [System.StringComparison]::OrdinalIgnoreCase)) {
+                return [string]$property.Name
+            }
+        }
     }
 
     foreach ($property in $MergedCatalog.types.PSObject.Properties) {
@@ -459,7 +474,7 @@ function Invoke-GeneXusObjectListIdentityPreflight {
     foreach ($item in $items) {
         $catalogTypeName = Resolve-GeneXusCatalogTypeForExportLabel `
             -MergedCatalog $catalogResolved.MergedCatalog `
-            -ExportLabel ([string]$item.declaredTypeLabel)
+            -ExportLabel ([string]$item.declaredTypeLabel) -PreferExportTaskLabel ($GateContext -eq 'export')
 
         $row = Get-GeneXusObjectListIdentityPreflightItem `
             -Item $item `
