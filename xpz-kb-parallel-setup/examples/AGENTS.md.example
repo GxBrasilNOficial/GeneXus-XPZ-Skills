@@ -150,7 +150,7 @@ do motor.
 
 - Catalogo efetivo = `GeneXus-XPZ-Skills/scripts/gx-object-type-catalog.json` +
   `scripts/gx-object-type-catalog.override.json` nesta pasta paralela quando existir.
-- Override local e paliativo (`upstreamPending` declarado); nao e silencioso. O lembrete classifica entradas como pendentes, redundantes ou divergentes. `CLEANUP_RECOMMENDED` deve entrar no plano consolidado como oferta explícita de limpeza local aprovada (por exemplo, remover só a entrada redundante); nao autoriza remocao automática.
+- Override local e paliativo (`upstreamPending` declarado); nao e silencioso. O lembrete classifica entradas como pendentes, redundantes ou divergentes. `CLEANUP_RECOMMENDED` deve entrar no plano consolidado como oferta explícita de limpeza local aprovada (por exemplo, remover só a entrada redundante), mesmo quando o plano também tiver recarimbo obrigatório de assinatura; nao autoriza remocao automática.
 - Em cada nova sessao, antes de sync ou materializacao longa, executar
   `GeneXus-XPZ-Skills/scripts/Test-XpzCatalogOverrideSessionReminder.ps1` com
   `-ParallelKbRoot` apontando para esta pasta (wrapper local fino opcional).
