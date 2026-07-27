@@ -47,7 +47,7 @@ O KB Intelligence pode reduzir custo de busca, orientar a trilha de leitura e or
 1. executar `object-info` para confirmar existência e caminho do objeto
 2. se o nome ou tipo ainda estiver incerto, executar `search-objects`
 3. antes de `who-uses`, `what-uses`, `impact-basic` ou `functional-trace-basic`, conferir no catalogo efetivo (`scripts/gx-object-type-catalog.json` + override local da pasta paralela) se o tipo tem `queryableByKbIntelligence=true`; quando for `false`, o `Query-KbIntelligenceIndex` devolve exit `11` e `blocked=true` — **não** tratar como zero dependencias; usar `object-info`, `search-objects`, `list-by-type` ou XML pontual
-4. executar `impact-basic` (ou `who-uses` / `what-uses`) **somente** quando o tipo for `queryableByKbIntelligence=true`, para obter dependentes e dependencias diretas; para grafo assimétrico esperado (`API`, `DataSelector`, `WorkWithForWeb`, `ExternalObject`), ver `scripts/README-kb-intelligence.md`
+4. executar `impact-basic` (ou `who-uses` / `what-uses`) **somente** quando o tipo for `queryableByKbIntelligence=true`, para obter dependentes e dependencias diretas; para grafo assimétrico esperado (`API`, `DataSelector`, `WorkWith`, `WorkWithForWeb`, `ExternalObject`), ver `scripts/README-kb-intelligence.md`; entre os dois Work With, usar o GUID como identidade, nunca o nome histórico
 5. escolher apenas as relacoes que mudam a trilha de leitura
 6. executar `show-evidence` nessas relacoes
 7. abrir o XML oficial somente nos pontos necessários

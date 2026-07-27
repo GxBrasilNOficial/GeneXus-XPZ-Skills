@@ -41,7 +41,7 @@ from pathlib import Path
 from typing import Iterable
 
 # Incrementar quando a cobertura ou regras do indexador mudarem de forma material (nao em refator inerte).
-EXTRACTOR_SIGNATURE_VERSION = "9"
+EXTRACTOR_SIGNATURE_VERSION = "10"
 
 
 def compute_extractor_signature_hash() -> str:
