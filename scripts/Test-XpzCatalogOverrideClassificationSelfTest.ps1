@@ -92,6 +92,27 @@ $r = Invoke-Reminder -Root $divRoot
 Assert-True ($r.status -eq 'REMINDER_REQUIRED' -and $r.divergentTypeNames -contains 'Procedure') 'campo divergente deve ser divergent'
 Assert-True (@($r.classificationEntries[0].divergentFields) -contains 'queryableByKbIntelligence') 'campo divergente deve ser nomeado'
 
+# Divergente de identidade.
+$identityRoot = New-CaseRoot 'identity-divergent'
+Write-JsonFile -Path (Join-Path $identityRoot 'scripts/gx-object-type-catalog.override.json') -Value ([ordered]@{
+    schemaVersion = 1
+    upstreamPending = $true
+    types = [ordered]@{
+        Procedure = [ordered]@{
+            objectTypeGuid = $procedure.objectTypeGuid
+            rootKind = $procedure.rootKind
+            folderName = 'ProcedureX'
+            inventoryEligible = $procedure.inventoryEligible
+            queryableByKbIntelligence = $procedure.queryableByKbIntelligence
+            containerType = $procedure.containerType
+        }
+    }
+})
+$r = Invoke-Reminder -Root $identityRoot
+Assert-True ($r.status -eq 'OVERRIDE_RESOLUTION_BLOCKED' -and $r.reason -eq 'unsafe-identity-divergence') 'campo de identidade divergente deve bloquear resolucao'
+Assert-True ($r.diagnosticReason -eq 'identity-field-divergence' -and $r.fieldPath -eq 'types.Procedure.folderName') 'bloqueio de identidade deve apontar o campo divergente'
+Assert-True ($r.blockedTypeNames -contains 'Procedure') 'tipo com identidade divergente deve aparecer em blockedTypeNames'
+
 # Metadata-only / types vazio.
 $metaRoot = New-CaseRoot 'metadata'
 Write-JsonFile -Path (Join-Path $metaRoot 'scripts/gx-object-type-catalog.override.json') -Value ([ordered]@{ schemaVersion = 1; upstreamPending = $true; notes = 'legacy root metadata' })
@@ -163,7 +184,7 @@ r = classify_gx_object_type_catalog_override(base, bad_guid, Path('override.json
 assert r['status'] == 'INVALID_OVERRIDE_SHAPE' and r['diagnosticReason'] == 'invalid-guid', r
 divergent_only = {'schemaVersion': 1, 'upstreamPending': True, 'types': {'Procedure': dict(proc, folderName='ProcedureX')}}
 r = classify_gx_object_type_catalog_override(base, divergent_only, Path('override.json'))
-assert r['status'] == 'REMINDER_REQUIRED' and r['reason'] == 'field-divergence' and r['diagnosticReason'] == 'field-divergence', r
+assert r['status'] == 'OVERRIDE_RESOLUTION_BLOCKED' and r['reason'] == 'unsafe-identity-divergence' and r['diagnosticReason'] == 'identity-field-divergence', r
 "@
 $env:PYTHONPATH = $scriptDir
 $py | python -

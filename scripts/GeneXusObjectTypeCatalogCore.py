@@ -22,6 +22,7 @@ OPERATIONAL_FIELDS = (
 )
 REQUIRED_WITHOUT_BASE = OPERATIONAL_FIELDS[:-1]
 METADATA_FIELDS = {"evidenceSummary", "wikiLinks", "nexaFindings", "notes", "lastObservedAt"}
+IDENTITY_FIELDS = {"objectTypeGuid", "rootKind", "folderName"}
 SUPPORTED_FIELDS = set(OPERATIONAL_FIELDS) | METADATA_FIELDS
 
 
@@ -200,7 +201,11 @@ def classify_gx_object_type_catalog_override(base: dict[str, object], override: 
                 entries.append(_entry(name, entry, "divergent", "unsafe-shadowing", "unsafe-shadowing-base-type-without-guid", f"types.{name}.objectTypeGuid", base_name, base_entry, ignored=ignored, unsupported=unsupported, action="block-resolution")); continue
             divergent = [field for field in OPERATIONAL_FIELDS if not _field_equivalent(entry, base_entry, field)]
             if divergent:
-                entries.append(_entry(name, entry, "divergent", "field-divergence", "field-divergence", f"types.{name}", base_name, base_entry, divergent, ignored, unsupported, "merge-with-warning"))
+                identity_divergent = [field for field in divergent if field in IDENTITY_FIELDS]
+                if identity_divergent:
+                    entries.append(_entry(name, entry, "divergent", "unsafe-identity-divergence", "identity-field-divergence", f"types.{name}.{identity_divergent[0]}", base_name, base_entry, divergent, ignored, unsupported, "block-resolution"))
+                else:
+                    entries.append(_entry(name, entry, "divergent", "field-divergence", "field-divergence", f"types.{name}", base_name, base_entry, divergent, ignored, unsupported, "merge-with-warning"))
             else:
                 entries.append(_entry(name, entry, "redundant", "equivalent", "equivalent", f"types.{name}", base_name, base_entry, ignored=ignored, unsupported=unsupported, action="merge"))
         else:
