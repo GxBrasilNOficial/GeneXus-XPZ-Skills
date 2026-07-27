@@ -32,8 +32,10 @@ Estes tipos **permanecem** aptos a consultas semânticas; o grafo pode ser só d
 | --- | --- | --- |
 | `API` | Quase sempre **origem** (chamadas em `Source`); raramente destino | Informa o que o API dispara |
 | `DataSelector` | Idem `API`, volume menor | Idem |
-| `WorkWithForWeb` | Forte **origem** (actions, links, transação); quase nunca `target_type` WorkWith | Informa dependências que o WW referencia |
+| `WorkWith` / `WorkWithForWeb` | Forte **origem** (actions, links, transação); quase nunca destino | Informa dependências que o WW mobile ou web referencia |
 | `ExternalObject` | Pode receber entrada via `ATTCUSTOMTYPE` resolvido e por chamada de método em variável `exo:<ExternalObject>` no `Source` efetivo; esparsa por KB | `who-uses` pode achar referencias declarativas e usos efetivos; grafo vazio em KB pequena não prova ausencia global |
+
+Nos itens de cobertura abaixo, as referências a `WorkWithForWeb` abrangem também `WorkWith`: os dois tipos percorrem os mesmos extratores, mas preservam seus GUIDs e nomes canônicos distintos. A deduplicação inclui `source_type`, de modo que objetos mobile e web homônimos não colapsem numa única relação.
 
 Não confundir com tipos `false` (ex.: `Image`, `Theme`, `SubTypeGroup`), em que o extrator **nunca** cria arestas para esse `target_type`.
 

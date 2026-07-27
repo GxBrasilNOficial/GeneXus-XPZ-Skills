@@ -16,6 +16,28 @@
     substituicao de comando ("(Get-Content ...)") na linha de comando do chamador. O texto do
     prompt segue persistido em <GUID>.request.json e <GUID>.stdin.txt como hoje; -MessagePath
     muda so a origem do texto.
+.PARAMETER Model
+    Modelo aceito pelo Claude Code. Default: claude-opus-4-8.
+.PARAMETER PermissionMode
+    Modo de permissao do Claude Code. Default: plan. bypassPermissions e recusado.
+.PARAMETER Tools
+    Lista de ferramentas disponiveis. Default: Read,Glob,Grep. Use "" para desabilitar todas
+    (vira --tools "" na CLI) ou "default" para liberar o conjunto padrao completo da CLI.
+    Mesmo contrato do adapter sincrono Invoke-ClaudeCode.ps1.
+.PARAMETER Cd
+    Diretorio de trabalho do processo Claude Code. Default: diretorio atual do chamador.
+.PARAMETER ClaudeExe
+    Forca caminho de claude.exe.
+.PARAMETER NoWatcher
+    Nao abrir a janela do watcher (apenas dispara o job).
+.PARAMETER TempDir
+    Pasta dos arquivos de job. Default: <temp do usuario>\claude-code-jobs.
+.PARAMETER KeepDays
+    Idade maxima (dias) dos arquivos de job antes da auto-limpeza. Default 3.
+.EXAMPLE
+    .\Start-ClaudeCodeJob.ps1 "tarefa longa" -NoWatcher
+.EXAMPLE
+    .\Start-ClaudeCodeJob.ps1 -MessagePath .\prompt-grande.txt -Tools "" -NoWatcher
 #>
 [CmdletBinding(DefaultParameterSetName = 'Inline')]
 param(
@@ -24,7 +46,6 @@ param(
     [string] $Model = 'claude-opus-4-8',
     [ValidateSet('default', 'acceptEdits', 'plan', 'auto', 'dontAsk', 'bypassPermissions')] [string] $PermissionMode = 'plan',
     [string] $Tools = 'Read,Glob,Grep',
-    [ValidateRange(1, 100)] [int] $MaxTurns = 1,
     [string] $Cd,
     [string] $ClaudeExe,
     [switch] $NoWatcher,
@@ -90,13 +111,15 @@ $arguments = @(
     '--no-session-persistence',
     '--permission-mode', $PermissionMode
 )
-try {
-    $helpText = (& $exe --help 2>&1 | Out-String)
-    if ($helpText -match [regex]::Escape('--max-turns')) {
-        $arguments += @('--max-turns', "$MaxTurns")
-    }
-} catch { }
-if (-not [string]::IsNullOrWhiteSpace($Tools)) {
+# Sem limite de turnos: a CLI 2.1.215 nao anuncia mais `--max-turns` no `--help`. O adapter
+# tinha um parametro -MaxTurns cujo valor era descartado em silencio por causa dessa sondagem,
+# entao o parametro foi removido em vez de mantido mentindo (medido em 2026-07-25).
+# A CLI aceita --tools "" para desabilitar todas as ferramentas. O valor vazio precisa ir
+# aspado: Start-Process descarta string vazia do ArgumentList e, como --tools e variadica,
+# ela passaria a consumir o argumento seguinte.
+if ([string]::IsNullOrWhiteSpace($Tools)) {
+    $arguments += @('--tools', '""')
+} else {
     $arguments += @('--tools', $Tools)
 }
 

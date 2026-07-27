@@ -150,7 +150,7 @@ $model = ''
 for ($i = 0; $i -lt $args.Count; $i++) { if ($args[$i] -eq '--model') { $model = [string]$args[$i + 1] } }
 if ($args -contains '--version') { '2.1.118 (Claude Code fake)'; exit 0 }
 if ($args -contains '--help') {
-    '--model --print --output-format --no-session-persistence --permission-mode --tools --max-turns'
+    '--model --print --output-format --no-session-persistence --permission-mode --tools'
     exit 0
 }
 if ($model -eq 'claude-untrusted-workspace') {

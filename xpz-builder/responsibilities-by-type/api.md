@@ -33,18 +33,22 @@ Satellite of `xpz-builder/SKILL.md` for the `API` object type. **Load this file 
 
 - The import **preview** reports `importTaskSuccess: true` even for an API the **real import rejects** (invalid `[SecurityLevel]` value, missing implementation reference). Preview parses but does NOT run the API grammar/reference validation. **Validate a from-spec `API` by REAL import, never by preview.**
 
-### OpenAPI is not security evidence
+### OpenAPI: not security evidence, but public-contract evidence when present
 
-- The generated OpenAPI shows `oAuthGXGAM` even when the API is `SecurityLevel(None)`. Do NOT use OpenAPI as proof of enforcement; the reliable evidence is the generated C# (`GAMSecurityLevel.*`) plus a real HTTP smoke (see satellite). Authorization-via-event (`If NOT IsRegisteredUser → 403`, nexa Example 3) is a **non-canonical 4th mode**, outside the standard GAM path — do not conflate it with `[SecurityLevel]` enforcement.
+- The generated OpenAPI may be used as complementary post-build evidence of the observed public contract when it is tied to a declared build/deploy environment. It is not a source for generating the `API`, and it does not replace the official XML/XPZ, real import, build, served HTTP proof, or GAM runtime checks.
+- OpenAPI does NOT prove security in either direction: presence of `securitySchemes` or `oAuthGXGAM` does not prove runtime enforcement, and absence of `securitySchemes` does not prove the absence of internal GAM/auth configuration in the GeneXus backend. The reliable security evidence is the generated C# (`GAMSecurityLevel.*`) plus a real HTTP smoke (see satellite). Authorization-via-event (`If NOT IsRegisteredUser → 403`, nexa Example 3) is a **non-canonical 4th mode**, outside the standard GAM path — do not conflate it with `[SecurityLevel]` enforcement.
+- When generated OpenAPI YAML exists and contract review is in scope, record the YAML file, KB/version/environment or model folder, freshness/link to the observed build or deploy, `servers.url`, `paths`, HTTP method, `operationId`, path/query/header parameters, `requestBody`, input/output schemas, arrays/collections, and `securitySchemes` as public declaration only. For `securitySchemes`, repeat the symmetry explicitly: presence does not prove runtime enforcement; absence does not prove the absence of internal GAM/auth configuration in the GeneXus backend.
+- Missing OpenAPI YAML does not invalidate import/build/smoke evidence; it only reduces the documentary evidence available for the observed public contract.
 
 ## Quality Checklist
 
 - [ ] For `API`, the primary edit block was declared before editing and any block transition was justified explicitly
 - [ ] For `API`, contract deltas were reviewed explicitly against the published operation and the effective orchestration before packaging
+- [ ] For `API`, when generated OpenAPI YAML was available and contract review was in scope, the YAML file, served environment, freshness/link to build or deploy, and public contract deltas were recorded separately from XML/XPZ source and security enforcement
 - [ ] For `API`, `[SecurityLevel]` uses only `None`/`Authentication`/`Authorization` (never `Authorize`)
 - [ ] For `API` with write operations, `SecurityLevel(None)` is NOT the final state; the GAM runtime precondition in `api-gam-runtime.md` was satisfied and the 2-phase smoke passed
 - [ ] For `API`, the implementation Procedure(s) are in the same package or already in the KB (real-import reference resolution)
-- [ ] For `API`, validation used a REAL import (not preview); when security/enforcement was in scope, enforcement was checked by C# + HTTP smoke (not OpenAPI), and when it was out of scope that limit was declared explicitly
+- [ ] For `API`, validation used a REAL import (not preview); when security/enforcement was in scope, enforcement was checked by C# + HTTP smoke (not OpenAPI/securitySchemes), and when it was out of scope that limit was declared explicitly
 - [ ] For `API` returning an SDT collection, the API variable uses `AttCollection=True`, the SDT root remains an item unless a nested schema proves otherwise, and the HTTP proof records method, route, status, payload summary, and served environment separately from security enforcement
 
 ## Related rules in main SKILL.md WORKFLOW

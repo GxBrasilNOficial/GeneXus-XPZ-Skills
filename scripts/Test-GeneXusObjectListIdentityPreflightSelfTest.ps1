@@ -23,6 +23,31 @@ if ($wwType -ne 'WorkWithForWeb') {
     throw "Esperava WorkWith -> WorkWithForWeb no catalogo; obtido: $wwType"
 }
 
+$wwCanonicalType = Resolve-GeneXusCatalogTypeForExportLabel -MergedCatalog $catalogResolved.MergedCatalog -ExportLabel 'WorkWith' -PreferExportTaskLabel $false
+if ($wwCanonicalType -ne 'WorkWith') {
+    throw "Esperava WorkWith canonico -> WorkWith fora do contexto Export; obtido: $wwCanonicalType"
+}
+
+$wwMobileType = Resolve-GeneXusCatalogTypeForExportLabel -MergedCatalog $catalogResolved.MergedCatalog -ExportLabel 'WorkWithDevices'
+if ($wwMobileType -ne 'WorkWith') {
+    throw "Esperava WorkWithDevices -> WorkWith no catalogo; obtido: $wwMobileType"
+}
+
+$mobileEntry = $catalogResolved.MergedCatalog.types.WorkWith
+$webEntry = $catalogResolved.MergedCatalog.types.WorkWithForWeb
+if ($mobileEntry.objectTypeGuid -ne '15cf49b5-fc38-4899-91b5-395d02d79889') {
+    throw 'GUID mobile WorkWith inesperado no catalogo'
+}
+if ($webEntry.objectTypeGuid -ne '78cecefe-be7d-4980-86ce-8d6e91fba04b') {
+    throw 'GUID web WorkWithForWeb inesperado no catalogo'
+}
+if ($mobileEntry.objectTypeGuid -eq $webEntry.objectTypeGuid) {
+    throw 'WorkWith e WorkWithForWeb devem coexistir com GUIDs distintos'
+}
+if ($mobileEntry.folderName -ne 'WorkWith' -or $webEntry.folderName -ne 'WorkWithForWeb') {
+    throw 'WorkWith e WorkWithForWeb devem materializar em pastas distintas'
+}
+
 $blocked = Invoke-GeneXusObjectListIdentityPreflight `
     -ObjectList 'Procedure:Demo' `
     -ExportAll 'false' `

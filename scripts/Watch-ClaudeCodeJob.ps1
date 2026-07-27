@@ -78,9 +78,11 @@ while ($true) {
                 $finalText += $txt
                 $lastActivity = Get-Date
             }
-            $type = [string](Get-CcProp $ev 'type')
-            if ($type -eq 'error') {
-                $streamError = ($ev | ConvertTo-Json -Compress)
+            # Cobre tanto `type=error` quanto o evento final `type=result` com `is_error=true`
+            # (subtype `error_max_turns` e afins), que e a forma real do desfecho no stream-json.
+            $evError = Get-ClaudeCodeStreamEventErrorText -StreamEvent $ev
+            if (-not [string]::IsNullOrWhiteSpace($evError)) {
+                $streamError = $evError
                 $lastActivity = Get-Date
             }
         }
@@ -109,6 +111,10 @@ $result = [ordered]@{
     status = $status.status
     finalText = $finalText
     error = $status.error
+    # Falha observada DEPOIS de o job ja ter produzido texto (acontece no esgotamento de turno
+    # quando o assistente emitiu algo antes de gastar o ultimo turno numa ferramenta): nao muda o
+    # status, mas preserva a evidencia de que a resposta pode estar truncada.
+    failureAfterText = $status.failureAfterText
     stderr = $stderr
     finishedAt = (Get-Date).ToString('o')
 }

@@ -7,12 +7,12 @@ Current scope:
 - object identity via guid extracted from XML
 - Source relations among Procedure, WebPanel, DataProvider, Transaction, API and DataSelector
   (including static calls resolved from the local inventory and legacy call/udp forms)
-- WorkWithForWeb action gxobject links to Procedure and WebPanel
-- WorkWithForWeb condition expressions to Procedure
-- WorkWithForWeb condition attributes to Procedure
-- WorkWithForWeb explicit link tags to WebPanel
-- WorkWithForWeb explicit prompt attributes to WebPanel
-- WorkWithForWeb explicit transaction binding
+- WorkWith and WorkWithForWeb action gxobject links to Procedure and WebPanel
+- WorkWith and WorkWithForWeb condition expressions to Procedure
+- WorkWith and WorkWithForWeb condition attributes to Procedure
+- WorkWith and WorkWithForWeb explicit link tags to WebPanel
+- WorkWith and WorkWithForWeb explicit prompt attributes to WebPanel
+- WorkWith and WorkWithForWeb explicit transaction binding
 - Source WebComponent Create calls to WebPanel
 - literal ATTCUSTOMTYPE CustomType values
 - explicit Source for each table references in Procedure and WebPanel
@@ -41,7 +41,7 @@ from pathlib import Path
 from typing import Iterable
 
 # Incrementar quando a cobertura ou regras do indexador mudarem de forma material (nao em refator inerte).
-EXTRACTOR_SIGNATURE_VERSION = "9"
+EXTRACTOR_SIGNATURE_VERSION = "10"
 
 
 def compute_extractor_signature_hash() -> str:
@@ -1613,9 +1613,9 @@ def extract_workwith_condition_evidence(
                 evidence_role="WorkWith condition",
             )
 
-    unique: dict[tuple[str, str, str, int], Evidence] = {}
+    unique: dict[tuple[str, str, str, str, int], Evidence] = {}
     for evidence in evidences:
-        unique[(evidence.source_name, evidence.target_name, evidence.extractor_rule, evidence.line)] = evidence
+        unique[(evidence.source_type, evidence.source_name, evidence.target_name, evidence.extractor_rule, evidence.line)] = evidence
     return list(unique.values())
 
 
@@ -1666,9 +1666,9 @@ def extract_workwith_condition_attribute_evidence(
                     evidence_role="WorkWith condition attribute",
                 )
 
-    unique: dict[tuple[str, str, str, int], Evidence] = {}
+    unique: dict[tuple[str, str, str, str, int], Evidence] = {}
     for evidence in evidences:
-        unique[(evidence.source_name, evidence.target_name, evidence.extractor_rule, evidence.line)] = evidence
+        unique[(evidence.source_type, evidence.source_name, evidence.target_name, evidence.extractor_rule, evidence.line)] = evidence
     return list(unique.values())
 
 
@@ -1701,9 +1701,9 @@ def extract_workwith_transaction_evidence(
                 evidence_role="WorkWith transaction",
             )
 
-    unique: dict[tuple[str, str, str, int], Evidence] = {}
+    unique: dict[tuple[str, str, str, str, int], Evidence] = {}
     for evidence in evidences:
-        unique[(evidence.source_name, evidence.target_name, evidence.extractor_rule, evidence.line)] = evidence
+        unique[(evidence.source_type, evidence.source_name, evidence.target_name, evidence.extractor_rule, evidence.line)] = evidence
     return list(unique.values())
 
 
@@ -1734,9 +1734,9 @@ def extract_workwith_webpanel_link_evidence(
                 evidence_role="WorkWith link",
             )
 
-    unique: dict[tuple[str, str, str, int], Evidence] = {}
+    unique: dict[tuple[str, str, str, str, int], Evidence] = {}
     for evidence in evidences:
-        unique[(evidence.source_name, evidence.target_name, evidence.extractor_rule, evidence.line)] = evidence
+        unique[(evidence.source_type, evidence.source_name, evidence.target_name, evidence.extractor_rule, evidence.line)] = evidence
     return list(unique.values())
 
 
@@ -1769,9 +1769,9 @@ def extract_workwith_prompt_evidence(
                 evidence_role="WorkWith prompt",
             )
 
-    unique: dict[tuple[str, str, str, int], Evidence] = {}
+    unique: dict[tuple[str, str, str, str, int], Evidence] = {}
     for evidence in evidences:
-        unique[(evidence.source_name, evidence.target_name, evidence.extractor_rule, evidence.line)] = evidence
+        unique[(evidence.source_type, evidence.source_name, evidence.target_name, evidence.extractor_rule, evidence.line)] = evidence
     return list(unique.values())
 
 
@@ -2757,7 +2757,10 @@ def main() -> int:
     data_selectors = objects_by_type.get("DataSelector", {})
     domains = objects_by_type.get("Domain", {})
     sdts = objects_by_type.get("SDT", {})
-    workwiths = objects_by_type.get("WorkWithForWeb", {})
+    workwith_objects = [
+        *objects_by_type.get("WorkWith", {}).values(),
+        *objects_by_type.get("WorkWithForWeb", {}).values(),
+    ]
     transactions = objects_by_type.get("Transaction", {})
     attributes = objects_by_type.get("Attribute", {})
     tables = objects_by_type.get("Table", {})
@@ -2806,28 +2809,28 @@ def main() -> int:
         external_object_names=set(external_objects),
     )
     workwith_evidences = extract_workwith_action_evidence(
-        workwiths.values(),
+        workwith_objects,
         procedure_names=set(procedures),
         webpanel_names=set(webpanels),
     )
     workwith_condition_evidences = extract_workwith_condition_evidence(
-        workwiths.values(),
+        workwith_objects,
         procedure_names=set(procedures),
     )
     workwith_condition_attribute_evidences = extract_workwith_condition_attribute_evidence(
-        workwiths.values(),
+        workwith_objects,
         procedure_names=set(procedures),
     )
     workwith_transaction_evidences = extract_workwith_transaction_evidence(
-        workwiths.values(),
+        workwith_objects,
         transaction_names=set(transactions),
     )
     workwith_webpanel_link_evidences = extract_workwith_webpanel_link_evidence(
-        workwiths.values(),
+        workwith_objects,
         webpanel_names=set(webpanels),
     )
     workwith_prompt_evidences = extract_workwith_prompt_evidence(
-        workwiths.values(),
+        workwith_objects,
         webpanel_names=set(webpanels),
     )
     relation_scope_objects = [
@@ -2838,7 +2841,7 @@ def main() -> int:
         *data_selectors.values(),
         *domains.values(),
         *sdts.values(),
-        *workwiths.values(),
+        *workwith_objects,
         *transactions.values(),
     ]
     custom_type_evidences = extract_attcustomtype_evidence(relation_scope_objects)

@@ -63,7 +63,7 @@ Servir como local único para conflitos não resolvidos silenciosamente.
 - `Evidência direta`: nos exports normais lidos, `Source/Version/@name`, `Object/@name` e `ObjectIdentity/@Name` não apareceram vazios.
 - `Inferência forte`: a coerência mais útil entre `<Objects>` e `ObjectsIdentityMapping` ocorre via `parentGuid` e `moduleGuid`, não via duplicacao de `Object/@guid` dentro do mapeamento.
 - `Hipótese forte`: o erro `Fail creating backup: Empty name is not allowed.` está mais ligado a variantes especiais com `KnowledgeBase` sem `name` do que ao formato normal de `ObjectsIdentityMapping`.
-- `Evidência direta`: a pasta local `C:\\Dev\\Test\\from-anywhere-to-GeneXus` usa um envelope mínimo com `ExportFile`, `KMW`, `Source`, `Objects`, `Dependencies` e `ObjectsIdentityMapping`, sem `KnowledgeBase` nem `Settings`.
+- `Evidência direta`: a pasta local `C:\\Dev\\Fork\\from-anywhere-to-GeneXus` usa um envelope mínimo com `ExportFile`, `KMW`, `Source`, `Objects`, `Dependencies` e `ObjectsIdentityMapping`, sem `KnowledgeBase` nem `Settings`.
 - `Inferência forte`: essa fonte local e útil como evidencia complementar de envelope mínimo, mas não deve ensinar valores fixos de `Build`, `username`, `kb`, `parentGuid`, `moduleGuid` ou nomes como `SampleKB` e `BusinessLogic`.
 - `Inferência forte`: isso fecha a lacuna anterior sobre "como o XPZ é formado" para o formato de export observado nesta trilha.
 - `Evidência direta`: em frente posterior desta trilha, um pacote embutido com `4` `Transaction`, `4` `WorkWithForWeb` e `3` `Procedure` passou com sucesso por `Import File Load`, `Import`, `Updating table information` e `Pattern generation`.

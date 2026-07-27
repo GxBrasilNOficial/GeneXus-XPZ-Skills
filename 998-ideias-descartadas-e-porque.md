@@ -470,6 +470,8 @@ identificado neste contexto.
 **Não reavaliar** salvo surgimento de projeto com pipeline headless de API REST GeneXus
 que exija especificação OpenAPI automatizada.
 
+Ressalva 2026-07-24: a regra documental de ler YAML OpenAPI já gerado como evidência complementar pós-build do contrato público observado não reabre esta frente. Reabrir `SpecifyOpenAPI` continua exigindo o critério acima: pipeline headless que precise especificação OpenAPI automatizada.
+
 ---
 
 ## GenerateChatbot
@@ -511,6 +513,8 @@ O público-alvo desta frente não opera pipelines de publicação OpenAPI headle
 
 **Não reavaliar** salvo surgimento de projeto com deploy headless de REST API GeneXus
 com geração de especificação OpenAPI como requisito de automação.
+
+Ressalva 2026-07-24: a regra documental de ler YAML OpenAPI já gerado como evidência complementar pós-build do contrato público observado não reabre esta frente. Reabrir `GenerateOpenAPI` continua exigindo o critério acima: deploy headless de REST API GeneXus com geração OpenAPI como requisito de automação.
 
 ---
 
@@ -1569,3 +1573,82 @@ não-atômico", nunca "hook PreToolUse" genérico — `deny` e `allow` saem do *
 necessidade explícita de **auditoria/treinamento** de disciplina de comando (modo diagnóstico
 não-bloqueante), que seria uma frente diferente (observabilidade local), não bloqueio operacional —
 e mesmo nesse caso o ponto de observação já existiria no hook positivo.
+
+---
+
+## Ajustar o limite de turnos (`MaxTurns`) do backend claude-code
+
+**Origem:** diagnóstico do falso alarme de workspace não confiável no backend `claude-code`,
+2026-07-25.
+
+**O que é:** calibrar o limite de turnos agênticos do revisor Claude Code — elevar o default,
+tornar o valor negociável no painel, ou garantir que a flag `--max-turns` chegue à CLI. A hipótese
+inicial era que `MaxTurns=1` derrubava o revisor assim que ele usasse uma ferramenta, porque a
+primeira chamada consome o único turno e não sobra turno para responder.
+
+**Por que foi descartada:**
+
+O limite **nunca estava em vigor**. Os adapters só enviavam `--max-turns` se a flag aparecesse no
+`claude --help`, e a CLI 2.1.215 deixou de anunciá-la (`claude --help | grep -c -- "--max-turns"`
+devolve `0`). O parâmetro `-MaxTurns` era, portanto, descartado em silêncio: passar `1` ou `50`
+dava no mesmo, e as chamadas rodavam com turnos ilimitados. O parâmetro foi **removido** dos dois
+adapters em 2026-07-25 — remoção sem efeito prático algum, já que só alinhou a documentação com o
+que acontecia.
+
+A alternativa "passar a flag sempre, já que a CLI ainda a honra" foi avaliada e é **ativamente
+danosa**: com o default `1`, passaríamos a derrubar toda chamada que use ferramenta. Mediu-se o
+efeito em ensaios controlados — com `--max-turns 1` explícito, 6 falhas em 6 tentativas
+(`exit 1`, `Error: Reached max turns (1)`); com `--max-turns 2`, sucesso; sem a flag, 13 sucessos
+em 13. Ou seja: restaurar o controle criaria a falha que se imaginava estar corrigindo.
+
+Fica registrado que a CLI **ainda honra** `--max-turns` quando a flag é passada à mão; o que se
+perdeu foi a negociação por `--help`, não a capacidade.
+
+**Não reavaliar salvo** versão futura da CLI que volte a anunciar `--max-turns` no `--help` — e,
+mesmo então, qualquer default abaixo de `2` precisa de medição antes, porque um único turno não
+cobre ferramenta + resposta.
+
+---
+
+## Extrair novas capacidades XPZ de `from-anywhere-to-GeneXus`
+
+**Origem:** reavaliação do fork local `C:\Dev\Fork\from-anywhere-to-GeneXus`, em
+2026-07-26, com três coletas independentes e leitura crítica do estado publicado e das mudanças
+locais ainda não commitadas. O escopo correto foi o trabalho normal das skills XPZ; ficou
+explicitamente excluída a função do fork de ler código de outros sistemas para levá-lo ao GeneXus.
+
+**O que era:** procurar no fork padrões que justificassem novas capacidades ou frentes para as
+skills `xpz-reader`, `xpz-builder`, `xpz-sync`, `xpz-doc-builder`, `xpz-msbuild-*`,
+`xpz-kb-parallel-*` ou `xpz-llm-delegate`.
+
+**Por que foi descartada como fonte de nova frente:**
+
+1. **O reaproveitamento seguro já ocorreu.** A base já registra o fork como confirmação secundária
+   do envelope mínimo e proíbe copiar seus valores fixos (`Build=0`, `SampleKB`, `BusinessLogic`,
+   `root`, `parentGuid` e `moduleGuid`). A montagem estruturada, o inventário nominal, a ordenação
+   determinística, a validação em camadas e o bloqueio antes da materialização já são mais fortes
+   nos motores e workflows atuais.
+2. **Os mecanismos concretos do fork são inferiores para a trilha XPZ conservadora.** Os templates
+   fixam identidade de KB, módulo, usuário, datas e GUIDs; a serialização usa substituição textual e
+   reserialização ampla; o GUID determinístico deriva apenas do nome; a leitura tolerante a BOM e a
+   substituição de caracteres podem mascarar corrupção; e o fluxo pode continuar após falha por
+   objeto e materializar pacote parcial.
+3. **A abstração de provedores não supera `xpz-llm-delegate`.** O fork oferece uma interface comum,
+   mas usa seleção/default implícitos, silencia algumas indisponibilidades e não entrega veredito de
+   saída tipado. A base XPZ já separa adapter, destino, localidade, autorização, confidencialidade,
+   despacho e recibo.
+4. **Os testes não provam o que importa para XPZ.** A maior parte valida presença de métodos ou
+   campos e disponibilidade do provedor, sem demonstrar envelope correto, importação, especificação
+   GeneXus ou build. A estratificação entre mock, disponibilidade e chamada real é um bom princípio,
+   mas já existe aqui com critérios mais rigorosos.
+
+**O que sobrevive sem criar ideia nova:** em operações de lote, coletar um livro-razão nominal de
+falhas por item, mas impedir qualquer materialização se houver bloqueio; e concluir o contrato de
+saída tipado dos adapters de `xpz-llm-delegate` (`ok|empty|timeout|quota|unavailable|error|truncated`).
+Ambos já estão cobertos pela metodologia atual ou por entrada própria em `999-ideias-pendentes.md`.
+O fork apenas reforça essas decisões; não justifica duplicá-las como nova pendência.
+
+**Não reavaliar salvo** mudança material do fork que introduza capacidade operacional ainda ausente
+nesta base e comprovada por validação real de envelope, importação ou build, ou mecanismo de adapter
+mais seguro que o contrato vigente. Mudanças cosméticas, novos provedores, mais linguagens de origem,
+empacotamento ZIP simples ou novos prompts sem oráculo de validação não reabrem esta frente.

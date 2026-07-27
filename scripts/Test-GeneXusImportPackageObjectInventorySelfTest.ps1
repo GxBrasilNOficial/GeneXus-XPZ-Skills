@@ -20,6 +20,7 @@ $packagedModuleGuid = 'c88fffcd-b6f8-0000-8fec-00b5497e2117'
 $procedureGuid = '84a12160-f59b-4ad7-a683-ea4481ac23e9'
 $externalObjectGuid = 'c163e562-42c6-4158-ad83-5b21a14cf30e'
 $transactionGuid = '1db606f2-af09-4cf9-a3b5-b481519d28f6'
+$workWithGuid = '15cf49b5-fc38-4899-91b5-395d02d79889'
 $workWithForWebGuid = '78cecefe-be7d-4980-86ce-8d6e91fba04b'
 
 $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('gx-import-inventory-selftest-{0}' -f ([guid]::NewGuid().ToString('N')))
@@ -148,6 +149,27 @@ if ($resultAliasMatch.deltaComparison.status -ne 'MATCH') {
 }
 if ($resultAliasMatch.deltaComparison.aliasResolutionCount -ne 1) {
     throw 'aliasResolutionCount esperado 1 na lista completa'
+}
+
+$mobileExportLabelXml = @"
+<ExportFile>
+  <Objects>
+    <Object type="$workWithGuid" name="MobileWW" guid="55555555-5555-5555-5555-555555555503" />
+  </Objects>
+</ExportFile>
+"@
+$mobileExportLabelPath = Join-Path $tempRoot 'package-mobile-export-label.import_file.xml'
+[System.IO.File]::WriteAllText($mobileExportLabelPath, $mobileExportLabelXml, (Get-Utf8NoBomEncoding))
+$resultMobileAlias = (& $inventoryScript -InputPath $mobileExportLabelPath -DeclaredDeltaItems 'WorkWithDevices:MobileWW' | ConvertFrom-Json)
+if ($resultMobileAlias.deltaComparison.status -ne 'MATCH') {
+    throw "delta status MATCH esperado para WorkWithDevices; obtido $($resultMobileAlias.deltaComparison.status)"
+}
+if ($resultMobileAlias.deltaComparison.aliasResolutionCount -ne 1) {
+    throw 'aliasResolutionCount esperado 1 para WorkWithDevices'
+}
+$mobileAlias = @($resultMobileAlias.deltaComparison.aliasResolutions)[0]
+if ($mobileAlias.rule -ne 'exportTaskLabel' -or $mobileAlias.declaredTypeName -ne 'WorkWithDevices' -or $mobileAlias.inventoryTypeName -ne 'WorkWith') {
+    throw 'alias deve ligar WorkWithDevices declarado a WorkWith mobile no inventario'
 }
 
 Remove-Item -LiteralPath $tempRoot -Recurse -Force

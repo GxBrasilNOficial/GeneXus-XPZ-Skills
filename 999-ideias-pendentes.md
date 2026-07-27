@@ -20,7 +20,24 @@ Ideia futura: avaliar se os wrappers MSBuild GeneXus (`Invoke-GeneXusKbBuildAll.
 
 Não faz parte da correção atual/Fase 0. A Fase 0 deve sanar o incidente estreito observado: build operacional limpo com ruído conhecido em stderr não pode virar JSON degradado por variável não inicializada.
 
+Adendo de retomada (2026-07-23, revisão do PR #2 `fix: refine build post-processing classification`): a frente v2/finalizador também deve absorver os follow-ups de cobertura que ficaram fora do aceite do PR. Subcasos concretos:
+
+- adicionar self-test para janela `Executando eventos pós-construção` detectada porém vazia, com evento pós-build real fora da janela, garantindo que a correção não produza falso sucesso limpo;
+- confirmar paridade explícita de `Invoke-GeneXusKbSpecifyGenerate.ps1` frente ao filtro de ruído em `stderr` e à extração/classificação de eventos pós-build, não só por leitura de implementação compartilhada;
+- coletar, quando houver KB disponível, evidência empírica de `.NET Framework` com build limpo e sem rebaixamento por pós-build real não registrado.
+
 Detalhes e critérios para retomada: [`msbuild-result-contract-v2-finalizador-compartilhado.md`](msbuild-result-contract-v2-finalizador-compartilhado.md).
+
+## Investigar divergência de `observedContext.ActiveEnvironment` após `SetActiveEnvironment`
+
+- **Importância** — média (não mascarou erro nem bloqueou a aceitação do PR #2, mas enfraquece a rastreabilidade em KB multi-environment e pode induzir diagnóstico errado de validação deploy).
+- **Maturidade** — pesquisa feita (caso real observado em builds headless de duas KBs multi-environment; falta isolar se é comportamento do GeneXus/MSBuild, timing do wrapper ou leitura de contexto após troca de environment).
+
+Durante a revisão do PR #2 (`fix: refine build post-processing classification`), builds reais com `-EnvironmentName` explícito em KBs multi-environment registraram `observedContext.ActiveEnvironment` divergente do environment solicitado/resolvido em alguns JSONs. O MSBuild respeitou a execução e o PR não mascarou erro real; por isso o achado não bloqueou a aceitação do PR. Ainda assim, o campo é usado como evidência operacional e merece frente própria.
+
+Premissa relacionada em `998-ideias-descartadas-e-porque.md`: a entrada `CreateEnvironment` registra que `SetActiveEnvironment` via `-EnvironmentName` e `GetActiveEnvironment` cobrem o fluxo existente. O achado atual não reabre `CreateEnvironment`; ele pede revalidar a fidelidade do diagnóstico `observedContext.ActiveEnvironment` após troca de environment em KB multi-environment.
+
+Direção: montar repro mínimo com dois environments, registrar requested/resolved/observed antes e depois de `BuildAll`/`SpecifyGenerate`, comparar stdout bruto do `GetActiveEnvironment` com o JSON final e decidir se o wrapper deve capturar o active environment em outro momento, manter ambos os valores ou rebaixar a confiança desse campo.
 
 ## Drift de tipagem entre delta empacotado e snapshot oficial — fases residuais
 
@@ -208,12 +225,25 @@ Critério para retomar: caso real em que a ausência do cache Codex prejudique a
 
 **Origem:** frente da detecção de 429 no `Invoke-OpenCode` (2026-06-21), nascida de uma pré-push reforçada em que 3 modelos `ollama-cloud` (kimi/minimax/glm) "estouraram timeout" sem causa visível — era a **cota semanal** esgotada da conta ollama-cloud. Deixado como follow-up para não bundlar na frente do `.ContainsKey`.
 
-## Capturar a recusa real de workspace não confiável do Claude Code
+## Consumir `failureAfterText` do job claude-code de forma mecânica (hoje é só registro)
 
-- **Importância** — baixa-média (o detector atual permite classificar a indisponibilidade e acionar fallback, mas ainda é heurístico e pode divergir da mensagem real da CLI).
-- **Maturidade** — ideia pronta para validar quando houver nova ocorrência: preservar, após remover segredos, o `stderr` bruto, `claude --version` e o contexto Desktop/CLI; então ancorar o detector nessa evidência e incluir fixture de regressão. Não confirmar a confiança do workspace automaticamente.
+- **Importância** — baixa-média. O campo `failureAfterText` do `<GUID>.result.json` (backend claude-code, 2026-07-25) marca que o job produziu texto **e depois** falhou — tipicamente esgotamento de turno —, ou seja, que o parecer pode estar truncado. Mas ele é **informativo**: nada falha se o consumidor ignorá-lo. A decisão sobre parecer truncado continua na reclassificação **pós-hoc humana** do `15` (`responded`→`noResponse`). «Registrado» não é «impedido».
+- **Maturidade** — ideia, não desenho. O consumidor natural seria o `Invoke-LlmDelegatePanelDispatch.ps1`, mas ele usa o adapter **síncrono** do Claude Code, que não expõe o campo (o síncrono é fail-closed: descarta stdout parcial e lança). Implementar exigiria decidir se o painel passa a usar o job assíncrono, ou se o adapter síncrono ganha sinal equivalente — e isso esbarra na frente já registrada do **contrato de saída tipado dos adapters**, que é onde este eixo provavelmente deve morar.
+- **Não** transformar em bloqueio automático sem essa decisão: um `completed` com texto parcial ainda pode ser parecer utilizável, e recusá-lo mecanicamente derrubaria respostas legítimas.
 
-**Origem:** revisão pré-push reforçada de 2026-07-15, após relato sem `stderr` bruto de que Claude Code recusou executar em workspace não confiável. A implementação atual classifica `workspace-not-trusted` como `unavailable` e orienta a coleta segura; falta a captura empírica para substituir ou calibrar a heurística.
+**Origem:** revisão pré-push reforçada de 2026-07-25, ao fechar o gap encadeado do caminho assíncrono (ver `historico/IdeiasImplementadas_202607.md`). Apontado na triagem como limite consciente da correção: o campo fecha a perda de evidência, não a decisão.
+
+**Relacionado:** «Detecção de truncamento fora do opencode (paridade dos adapters stdin/JSONL)» abaixo (contrato de saída tipado); `scripts/ClaudeCodeCliSupport.ps1`, `scripts/Watch-ClaudeCodeJob.ps1`; `15-revisao-por-pares.md`.
+
+## Preservar mais evidência quando o `claude` sai `1` sem saída classificável
+
+- **Importância** — baixa-média. Em 2026-07-26, uma chamada real `Invoke-ClaudeCode.ps1 -Message "responda OK" -Tools "" -TimeoutSec 60` retornou `exit 1` sem resposta e sem `stderr` capturado, durante janela em que o limite de 5 horas do Claude Code estava zerado. Esse contexto operacional deve ser preservado, mas a causa permanece **não classificável** pela evidência disponível: a documentação oficial do Claude Code não publica uma tabela geral de exit codes para `claude`/`claude -p`, e a própria referência de erros diz que `code N` sozinho não informa o que falhou.
+- **Maturidade** — ideia curta. O `SKILL.md` agora registra o glossário operacional baseado em menções oficiais (`0` sucesso; `1` falha genérica quando sem causa textual; `2` bloqueio de hook, não contrato geral do `claude -p`; `137` processo morto/kill/OOM em contexto de instalação). Falta decidir se o adapter deve enriquecer o `BLOCK` opaco com versão, cwd, argv sanitizado, existência/tamanho dos arquivos temporários, `claude auth status`/`claude doctor` opcional, ou outro caminho oficial de log, sempre sem inferir causa pelo número.
+- **Não** mapear `exit 1` para quota/limite/auth/workspace/modelo sem sinal textual ou fixture oficial. A melhoria é de **observabilidade**, não de classificação por número.
+
+**Origem:** teste operacional solicitado pelo usuário em 2026-07-26 após a frente do falso `workspace-not-trusted` do backend Claude Code.
+
+**Relacionado:** `xpz-llm-delegate/SKILL.md` (backend Claude Code, códigos de saída); `scripts/Invoke-ClaudeCode.ps1`; `scripts/ClaudeCodeCliSupport.ps1`; contrato de saída tipado dos adapters na entrada «Detecção de truncamento fora do opencode (paridade dos adapters stdin/JSONL)».
 
 ## Variante de prompt read-only para vozes "coder" do painel de revisão por pares (evitar truncamento por tool-calls) — RESOLVIDA E MIGRADA
 
@@ -236,6 +266,70 @@ Critério para retomar: caso real em que a ausência do cache Codex prejudique a
 - **Recorte:** a frente D-min (implementada) deixou na `xpz-skills-setup` **só** a auditoria read-only (cita o instalador como dependência). Esta entrada é a **extensão para resolução ativa** — provavelmente + um check de presença/deriva e um passo de oferta no `WORKFLOW`, com paridade em `09` se nascer contrato novo.
 
 **Origem:** decisão do usuário (2026-07-04) ao fechar a frente least-privilege do revisor opencode — «deixar o trabalho [de instalação global] para a `xpz-skills-setup`» (opção B).
+
+## Adicionar o `mimo` (fork do opencode) como 6º backend da skill `xpz-llm-delegate`
+
+- **Importância** — baixa-média (agrega **uma família nova** ao piso de diversidade do painel — `mimo`/`xiaomi`, MiMo V2.5 — e é **gratuita, sem credencial e sem cota** observada, atrativo frente ao teto semanal do `ollama-cloud`, que hoje é a única família externa "barata" da lista preferida). Sem ela, os 5 backends atuais seguem cobrindo delegação e painel; nenhuma capacidade é perdida.
+- **Maturidade** — pesquisa feita (premissas medidas e **re-medidas**; falta fechar **uma** decisão de desenho e executar). **Não** classificar como «pronta para implementar»: o custo subiu com o guard `reviewer-ro`, que não existia quando a ideia nasceu.
+
+**Histórico da entrada:** coleta original em 2026-06-24 (quando o `mimo` foi instalado); **replanejada em 2026-07-25** após 303 commits em `origin/main` que invalidaram parte das premissas. As invalidações estão explicitadas abaixo — não reciclar conclusões da coleta de junho sem reler esta seção.
+
+### O que o `mimo` é (medido 2026-07-25)
+
+Fork do opencode publicado como npm `@mimo-ai/cli` **0.1.3** (o opencode instalado hoje é **1.17.20** — versões muito distantes; o `mimo` derivou de um opencode da era ~1.4.x).
+
+- **exe:** `%APPDATA%\npm\node_modules\@mimo-ai\cli\node_modules\@mimo-ai\mimocode-windows-x64\bin\mimo.exe` (existe também a variante `...-windows-x64-baseline\bin\mimo.exe`); shim em `%APPDATA%\npm\mimo`.
+- **CLI compatível** com o que os adapters opencode usam: `run --format json`, `--model provider/modelo`, `--agent`, `agent list`, `models`, `debug config`, `debug paths`. **Extra que o opencode não tem: `--dir`** (diretório de trabalho).
+- **Paths próprios** (de `mimo debug paths`): config `~/.config/mimocode`, data `~/.local/share/mimocode`, cache `~/.cache/mimocode`, state `~/.local/state/mimocode`; credenciais em `~/.local/share/mimocode/auth.json`.
+- **Agente project-local em `.mimocode/agent/`** — **não** `.opencode/agent/`. Medido de forma conclusiva: rodando da raiz deste repositório (que versiona `.opencode/agent/reviewer-ro.md`), `opencode agent list` **lista** `reviewer-ro (all)` e `mimo agent list` **não lista**; o literal `.mimocode/agent` aparece no binário.
+- **Sem config global de agente:** `~/.config/mimocode/` só tem `package.json`/`package-lock.json` (plugins). Não há equivalente ao `opencode.jsonc` global. Consequência: o caminho de provisionamento do agente read-only é **só project-local** — mais simples que no opencode (que tem os dois), mas o fallback global do check estático não se aplica.
+- **Providers built-in** (de `mimo debug config`): `xiaomi` (`api: https://api.xiaomimimo.com/v1`) e `mimo` (`api: https://api.xiaomimimo.com/api/free-ai/openai`, `options.apiKey: "anonymous"`). Ambos **externos** (cloud `xiaomimimo.com`). **Divergência estrutural:** a baseURL vive no campo **`api`**, **não** em `options.baseURL` como no opencode — o resolvedor de localidade precisa ler `api` (mantendo `options.baseURL` por compatibilidade, para provider custom que siga a forma do opencode).
+- **Catálogo volátil — não fixar lista em documentação:** `mimo models` devolvia **7** modelos em 2026-06-24 (`mimo/mimo-auto`, `xiaomi/mimo-v2-flash`, `mimo-v2-omni`, `mimo-v2-pro`, `mimo-v2.5`, `mimo-v2.5-pro`, `mimo-v2.5-pro-ultraspeed`) e **4** em 2026-07-25 (`mimo/mimo-auto`, `xiaomi/mimo-v2.5`, `xiaomi/mimo-v2.5-pro`, `xiaomi/mimo-v2.5-pro-ultraspeed`) — a série `v2` saiu em um mês.
+- **Modelo gratuito sem credencial:** `mimo/mimo-auto` = "MiMo Auto (MiMo-V2.5, limited-time free)", `apiKey: "anonymous"`, `cost: 0`. `mimo providers list` reporta **0 credentials** e ainda assim o modelo responde (revalidado 2026-07-25, um mês após a 1ª medição). **É *limited-time*:** não assumir gratuidade permanente; quando expirar, passa a exigir credencial e o tratamento não deve quebrar silenciosamente.
+
+### Medições que sustentam o reuso (e como re-verificar)
+
+1. **Stream — parser reutilizável sem alteração.** `mimo run --format json` lê o prompt por **stdin** quando o argumento posicional é omitido (mesma premissa dos adapters stdin-based). O stream emite `step_start` → `text` (`part.text`) → `step_finish` (`reason`, `tokens`, `cost`). Passado pelas funções **atuais** de `scripts/OpenCodeStreamSupport.ps1` (contrato v2, alinhado ao opencode 1.17.20) — `ConvertFrom-OpenCodeStreamLines`, `Get-OpenCodeTextParts`, `Get-OpenCodeFinalText`, `Get-OpenCodeCompletionSignal`, `Get-OpenCodeCompletionVerdict` — devolveu `finalText` correto, `hasStepFinish=true`, `reason=stop`, `verdictStatus=ok`. **Conclusão: `OpenCodeStreamSupport.ps1` serve o `mimo` verbatim** (medido contra o parser de hoje, não o de junho).
+2. **Guard `reviewer-ro` — o modelo de contenção PORTA.** Copiando o **mesmo** `.opencode/agent/reviewer-ro.md` deste repo para `<dir>/.mimocode/agent/reviewer-ro.md`, o `mimo agent list` resolve allow-set **idêntico** ao do opencode: `{glob, grep, list, read}` com `external_directory[*]='deny'` (computado com as próprias funções do guard: `Get-OpenCodeReviewerRoBlockFromAgentList` + `Resolve-OpenCodeReviewerRoAllowSet`). O schema de saída de `agent list` é o mesmo (`{permission, action, pattern}` em array JSON após cabeçalho `nome (modo)`), então **os parsers do guard funcionam sobre o `mimo` sem alteração**. O schema de frontmatter `permission:` é honrado igual (a forma antiga `tools:` também é aceita, mas não muda a resolução).
+   - **Cuidado com falso-negativo de leitura:** `mimo agent list` **abre** com `{"permission":"*","action":"allow","pattern":"*"}` — igual ao opencode. Isso **não** significa acesso total: a resolução é **last-match-wins** e as regras restritivas vêm depois (62 regras no opencode, 86 no mimo). Inspecionar só o começo da saída (ex.: `grep -A 45`) leva à conclusão errada de que a contenção foi ignorada. **Sempre** resolver o conjunto com `Resolve-OpenCodeReviewerRoAllowSet`, nunca ler o topo do array.
+   - **`list` é permissão válida no `mimo`** apesar de **não** aparecer no help de `mimo agent create --tools` (que lista `bash, read, write, edit, glob, grep, webfetch, actor, task`). Não confiar nesse help como catálogo de permissões.
+3. **NÃO existe atalho por `-OpenCodeExe`.** Apontar o adapter opencode para o binário do mimo é **corretamente bloqueado** pelo guard: `pwsh -NoProfile -File scripts/Invoke-OpenCode.ps1 -MessagePath <arq> -OpenCodeExe <mimo.exe>` → `BLOCK: guard reviewer-ro fail-closed (motivo=version): opencode 0.1.3 != versao testada dos fixtures (1.17.20)`. A cláusula de validade do D2 faz exatamente seu trabalho. **Consequência de desenho: o `mimo` exige backend próprio com fixtures e `VERSION.txt` próprios (`0.1.3`)** — não há caminho de "reaproveitar o adapter apontando o exe".
+4. **Risco `.env` — HERDADO, não novo.** A ordem das regras `read` do `reviewer-ro` é a **mesma** nos dois CLIs: `read * → allow` aparece **depois** de `*.env → ask` / `*.env.* → ask` / `*.env.example → allow`, anulando a proteção nativa por last-match-wins (opencode: posições 47–52 de 62; mimo: 71–76 de 86; nos dois a última `read *` resolve `allow` e a última `read *.env` resolve `ask`, mas o `*` tardio é que vale para o caminho concreto). **É a mesma exposição já registrada no recorte urgente da frente «Confinar leitura do revisor opencode…» (acima).** Portanto: a correção do `.env` decidida lá deve ser aplicada **na mesma frente** ao `mimo` — nunca só a um dos dois (lockstep obrigatório, sob pena de o `mimo` virar a porta de escape do fix).
+
+**Receita de re-verificação rápida** (somente leitura, exceto a chamada ao modelo gratuito): (a) resolver allow-set — dot-source `scripts/OpenCodeReviewerRoGuard.ps1`, rodar `<cli> agent list`, passar por `Get-OpenCodeReviewerRoBlockFromAgentList -Name reviewer-ro` e `Resolve-OpenCodeReviewerRoAllowSet`, comparar `{glob,grep,list,read}` + `externalDirStar='deny'`; (b) stream — `Start-Process <mimo.exe> -ArgumentList run,--format,json,--model,mimo/mimo-auto,--agent,reviewer-ro -RedirectStandardInput <prompt> -RedirectStandardOutput <out>` e passar `<out>` pelas funções de `OpenCodeStreamSupport.ps1`. O agente `reviewer-ro` precisa existir em `.mimocode/agent/` do cwd usado no teste.
+
+### Superfície a criar (maior que a estimativa de 2026-06)
+
+- `scripts/MimoCliSupport.ps1` — descoberta por override explícito / PATH (`Get-Command mimo -All`) / raiz npm `@mimo-ai/cli`, com validação por `--version` (espelha `OpenCodeCliSupport.ps1`, que **hoje** já não presume npm — esta é uma das invalidações de junho: a descoberta **não** está mais hard-coded no adapter).
+- `scripts/Resolve-MimoModelLocality.ps1` — ler o campo **`api`** (e `options.baseURL` por compat) para detectar loopback; `xiaomi`/`mimo` tratados como **externos conhecidos** (espelhando `ollama-cloud`/`opencode-go`). Chave de destino canônica: `xiaomi/<modelo>` e `mimo/<modelo>` — **nunca** `mimo-backend/*`; a política casa o **provider de destino** (invariante da `## ANATOMIA` da skill).
+- **Contenção read-only (a maior peça, inexistente no plano de junho):** `.mimocode/agent/reviewer-ro.md` versionado neste repo + fixtures próprios em `xpz-llm-delegate/fixtures/mimo-reviewer-ro/` (`VERSION.txt=0.1.3` + amostra de `agent list` + amostra do warning de fallback) + instalador e teste de compatibilidade análogos a `scripts/Install-OpenCodeReviewerRoAgent.ps1` e `scripts/Test-OpenCodeReviewerRoInstalledCompatibility.ps1` (no mimo, **sem** a parte de edição do JSONC global, que não existe).
+- `scripts/Invoke-Mimo.ps1` — reusa `OpenCodeStreamSupport.ps1`; default `-Agent reviewer-ro` **com** guard fail-closed (pre-check estático + `agent list` + versão; pós-check do warning de fallback), espelhando D1/D2: **nunca «default sem guard»** — os dois são inseparáveis por decisão de segurança congelada.
+- Assíncrono `Start-MimoJob.ps1` / `Watch-MimoJob.ps1` — **só se** o v1 incluir async (ver escopo abaixo).
+- **Registro nos pontos fechados** (verificados em 2026-07-25 como ainda sendo os mesmos 5 backends): `$AdapterScript`, `$ExeParam` (`'mimo' = 'MimoExe'`) e `$ContentionKeys` (`'mimo' = @('agent')`, igual ao opencode) em `scripts/Invoke-LlmDelegatePanelDispatch.ps1`; `ValidateSet` de `-Backend` em `scripts/Resolve-LlmDelegateAuthorization.ps1` (+ o `switch` de seleção do resolvedor); enumeração em `scripts/Build-LlmDelegateCapabilityManifest.ps1` (por `mimo models` ou pela config resolvida — preferir a que não dependa de rede).
+- **Self-tests** (padrão da casa: fake-exe injetado por `-MimoExe`, sentinela `OK: <nome>`): locality, stream/verdito, guard reviewer-ro e, se houver async, watcher.
+- **Paridade documental obrigatória:** `xpz-llm-delegate/SKILL.md` (backends ativos, tabela de adapters/resolvedores, seções de LIMITE CONHECIDO, forma canônica de invocação), `README.md` **trilíngue** (PT/ES/EN — a menção aos backends aparece nas três seções), `09-inventario-e-rastreabilidade-publica.md`, `15-revisao-por-pares.md` e a oferta de `preferred-reviewers`.
+
+### `kb-sensitive` — decisão JÁ tomada por precedente (não reabrir)
+
+O `mimo` nasce **`unavailable` em `kb-sensitive`**, espelhando o opencode em `Invoke-LlmDelegatePanelDispatch.ps1` (terminal, sem gate nem despacho). Em junho isto figurava como «decisão em aberto (conservador vs `--dir`)»; **não é mais**: a liberação depende da frente «Confinar leitura do revisor opencode + liberar em `kb-sensitive`/pasta paralela» (acima), que exige cwd-seguro mecanizado + provisão project-local do agente na pasta paralela. O **`--dir`** do `mimo` (ausente no opencode) é **insumo** dessa frente — possivelmente o caminho mais limpo de confinamento de cwd —, não uma decisão desta.
+
+### DECISÃO DE DESENHO EM ABERTO (única) — clonar vs generalizar o guard
+
+- **(a) Clonar** `MimoReviewerRoGuard.ps1`: isola o `mimo` e não toca o opencode, mas duplica ~490 linhas de código **de segurança** e cria dois lugares para corrigir — inclusive o fix do `.env`, com risco real de divergência.
+- **(b) Generalizar** o guard existente por parâmetro (diretório project-local do agente, config global **opcional**, fonte da versão esperada, nome do CLI nas mensagens), preservando os nomes de função atuais por compatibilidade. Tecnicamente mais limpo **porque a identidade de schema, allow-set e parsers foi MEDIDA** (ver medição 2). Contra: toca arquivo de segurança com **design congelado (D1/D2/D3, 8 rodadas de painel / 4 famílias)** e seus self-tests.
+- **Recomendação:** **(b)**, submetendo a generalização a **revisão por pares** antes de alterar qualquer comportamento do caminho opencode. Se o painel resistir a tocar o design congelado, cair em **(a)** e registrar a duplicação como dívida explícita, com **lockstep obrigatório** anotado nos dois guards e no recorte `.env`.
+
+### Escopo sugerido do v1
+
+Só **síncrono**: `Invoke-Mimo.ps1` + `Resolve-MimoModelLocality.ps1` + `MimoCliSupport.ps1` + contenção `reviewer-ro` + registro no gate/dispatch/manifest + self-tests + paridade documental. Async (`Start-`/`Watch-MimoJob`) e uso no painel ficam para uma segunda etapa, depois de o síncrono rodar numa rodada real.
+
+### Não testado / risco residual
+
+A falha `uv_spawn ENAMETOOLONG` / stdout vazio do `opencode run` em cwd de **git worktree** (ver «LIMITE CONHECIDO — `opencode run` FALHA EM CWD DE GIT WORKTREE (WINDOWS)» no `SKILL.md`) é **provavelmente herdada** pelo `mimo`. Uma simulação com `.git` como arquivo-gitlink no scratchpad **não** reproduziu (exit 0, resposta normal), mas é **evidência fraca**: o `gitdir` apontava para caminho inexistente e o `mimo` pulou o snapshot naquela execução (o campo `snapshot` some do `step_start`, ao contrário da execução na raiz do repo real). **Não testado em worktree real** — testar antes de confiar, e manter o workaround documentado (rodar de diretório plano sem `.git`).
+
+**Caveat de método:** comportamento, invocação e quirk de adapter são **conhecimento de skill** → vão para `SKILL.md`/doc/scripts (viajam com a skill), não para memória do agente. A frente passa por **revisão por pares** (toca o gate de confidencialidade e a contenção do revisor). Frente no repositório de skills — **não** aciona `xpz-kb-parallel-setup`.
+
+**Origem:** sessão de coleta 2026-06-24 (instalação do `mimo`), com replanejamento integral em 2026-07-25 sobre o repositório atual. Relacionadas: as duas frentes do `reviewer-ro` imediatamente acima (recorte `.env` e provisionamento global via `xpz-skills-setup`) e a entrada de detecção de truncamento fora do opencode.
 
 ## Resposta `stop` porém quase-vazia escapa do veredito e do retry (gate de qualidade/aderência ausente)
 
@@ -398,7 +492,7 @@ Adicionar ao extrator a relação **`references_attribute`** ("objeto X referenc
 ### Arquivo e âncoras (estado em 2026-06-12)
 
 `scripts/Build-KbIntelligenceIndex.py`:
-- `EXTRACTOR_SIGNATURE_VERSION` (linha ~42) — em 2026-06-12 era `"6"`; **atualização 2026-06-24:** já está em `"7"` (frente de export legado GX9); **atualização 2026-07-03:** o valor `"8"` foi consumido pela frente de objetos gerados por Pattern no KbIntelligence; **atualização 2026-07-16:** o valor `"9"` foi consumido pela frente de chamadas de `Procedure` resolvidas por inventário real, então **esta** frente futura (`references_attribute`) deve bumpar `9→10` se ainda alterar materialmente o extrator. O bump muda `extractor_signature_version`, e **qualquer edição no `.py` muda o hash SHA-256 dos bytes** (também parte da assinatura). O gate canônico `Test-*KbIndexGate.ps1` **lê a assinatura** (via `GeneXusKbIntelligenceExtractorContract.ps1`) e **bloqueia com `BLOCK:`** quando a metadata do índice diverge do motor (ver `scripts/README-kb-intelligence.md:124-125` e `xpz-kb-parallel-setup/examples/Test-KbIndexGate.example.ps1:122-132`); o que o gate **não** faz é **executar** o rebuild. Logo: **rodar o rebuild explicitamente** após editar o extrator. (A instância local `Test-FabricaBrasilKbIndexGate.ps1` está **defasada** — sem o check de assinatura; wrapper stale, não o contrato canônico.)
+- `EXTRACTOR_SIGNATURE_VERSION` (linha ~42) — em 2026-06-12 era `"6"`; **atualização 2026-06-24:** já está em `"7"` (frente de export legado GX9); **atualização 2026-07-03:** o valor `"8"` foi consumido pela frente de objetos gerados por Pattern no KbIntelligence; **atualização 2026-07-16:** o valor `"9"` foi consumido pela frente de chamadas de `Procedure` resolvidas por inventário real; **atualização 2026-07-27:** o valor `"10"` foi consumido pela cobertura de `WorkWith` mobile nos mesmos extratores de relações de `WorkWithForWeb`, preservando `source_type`. Portanto, **esta** frente futura (`references_attribute`) deve bumpar `10→11` se ainda alterar materialmente o extrator. O bump muda `extractor_signature_version`, e **qualquer edição no `.py` muda o hash SHA-256 dos bytes** (também parte da assinatura). O gate canônico `Test-*KbIndexGate.ps1` **lê a assinatura** (via `GeneXusKbIntelligenceExtractorContract.ps1`) e **bloqueia com `BLOCK:`** quando a metadata do índice diverge do motor (ver `scripts/README-kb-intelligence.md:124-125` e `xpz-kb-parallel-setup/examples/Test-KbIndexGate.example.ps1:122-132`); o que o gate **não** faz é **executar** o rebuild. Logo: **rodar o rebuild explicitamente** após editar o extrator. (A instância local `Test-FabricaBrasilKbIndexGate.ps1` está **defasada** — sem o check de assinatura; wrapper stale, não o contrato canônico.)
 - Cada `def extract_*` devolve `list[Evidence]` com `relation_kind` e é registrado; espelhar:
   - **Código em `<Source>`**: `extract_source_for_each_explicit_table_evidence` (~728, `navigates_explicit_table`) — reusar o tokenizador de Source/CDATA.
   - **idBasedOn**: `extract_attribute_idbasedon_domain_evidence` (~1577, `based_on_domain`) + regex `idBasedOn` (~96). O value pode ser `Domain:X` **ou** `Attribute:X` (membro de SDT é `Attribute:OperacaoItemContaId`). Hoje filtra Domain; **estender** para emitir `references_attribute` quando o value for `Attribute:` — quase uma extensão, não código do zero.
@@ -497,7 +591,9 @@ Após implementar + rebuild:
 **Importância:** baixa-média (rede de segurança; o vazamento crítico já está fechado). **2026-06-22:** ganhou **consumidor concreto** — o harness `Invoke-LlmDelegatePanelDispatch` (frente A) precisa classificar o resultado de cada revisor sem parsear prosa. Isso move a frente de "rede de segurança" para "há quem consuma", mas a frente A **deliberadamente não bloqueia** nela (ver bullet do contrato estruturado).
 **Maturidade:** pesquisa feita (varredura estática concluída; falta teste empírico + eventual código)
 
-**Origem:** frente dos 4 achados da revisão por pares, Achado D / G1-R, 2026-06-20. O D-fix da Fase 1 detecta truncamento (`reason` do `step_finish`) **só no opencode**. A varredura confirmatória dos demais adapters (inspeção **estática** do código em 2026-06-20) concluiu: o **vazamento-do-D** (preâmbulo virar parecer) **não se reproduz** em Codex/Claude Code/Gemini/Copilot — todos entregam a mensagem final canônica (campo terminal nomeado; Copilot por last-wins de stream). **Mas** nenhum dos quatro detecta **truncamento por limite de tokens** (não há equivalente a `reason=length`).
+**Origem:** frente dos 4 achados da revisão por pares, Achado D / G1-R, 2026-06-20. O D-fix da Fase 1 detecta truncamento (`reason` do `step_finish`) **só no opencode**. A varredura confirmatória dos demais adapters (inspeção **estática** do código em 2026-06-20) concluiu: o **vazamento-do-D** (preâmbulo virar parecer) **não se reproduz** em Codex/Claude Code/Gemini/Copilot — todos entregam a mensagem final canônica (campo terminal nomeado; Copilot por last-wins de stream). **Mas** nenhum dos quatro detecta **truncamento por limite de tokens** (não há equivalente a `reason=length`) — isso segue verdadeiro.
+
+**Ressalva (2026-07-25/26), espelhando a do `xpz-llm-delegate/SKILL.md` («Detecção de truncamento (Achado D)»).** A conclusão «não se reproduz em Claude Code — entrega a mensagem final canônica» veio de inspeção **estática** e **não vale para o caminho assíncrono em esgotamento de turno**: medido em `claude 2.1.220`, o job morre sem mensagem final canônica e o texto acumulado até ali sai como `finalText` com `status=completed` — parcial entregue como se fosse completo, que é exatamente o vazamento que a frase nega. Mitigado, **não** eliminado: o `<GUID>.result.json` ganhou `failureAfterText`, que registra a falha ocorrida depois de já haver texto; a decisão sobre aproveitar parecer truncado continua na reclassificação pós-hoc do `15`, e consumir esse campo mecanicamente é entrada própria acima («Consumir `failureAfterText` do job claude-code de forma mecânica»). O corte por **limite de tokens** — o objeto desta entrada — continua sem sinal em qualquer adapter não-opencode.
 
 **O que esta frente futura faria:**
 
@@ -506,7 +602,7 @@ Após implementar + rebuild:
 - **Eventual paridade de detecção:** se algum adapter expuser sinal de término, aplicar verdito análogo ao `Get-OpenCodeCompletionVerdict`; senão, declarar contrato explícito "sem sinal de completude disponível; risco aceito/mitigado por X".
 - **Contrato de saída ESTRUTURADO dos adapters (surfado na frente A, `Invoke-LlmDelegatePanelDispatch`, 2026-06-22):** hoje os adapters sinalizam falha **lançando** `BLOCK:` em prosa pt-BR, sem status tipado (só o opencode tem `Get-OpenCodeCompletionVerdict`, e mesmo ele lança a truncagem como string). Um consumidor que precise classificar o resultado (o harness de despacho do painel) fica entre (a) classificar por **sinais estruturais** (exit code + stdout vazio/não-vazio) e por sentinelas explícitas de infraestrutura, guardando a prosa **crua** no ledger — o que a frente atual adotou para `quota` — ou (b) **parsear a prosa de forma ampla** (frágil). A frente futura: dar aos 6 adapters um **status de saída tipado** (ex.: verdict `ok|empty|timeout|quota|unavailable|error|truncated` em campo machine-readable), que o harness e outros consumidores aproveitariam, eliminando classificação por prosa. **Decisão vigente:** NÃO refatorar os 6 adapters agora — escopo/risco desproporcional ao ganho imediato; o harness só consome sentinelas explícitas de infraestrutura (`quota`/timeout), não semântica de parecer. Registrado aqui como frente própria.
 
-**Relacionado:** `xpz-llm-delegate/SKILL.md` (seção «Detecção de truncamento (Achado D)», cobertura por adapter); `scripts/Invoke-Codex.ps1`, `scripts/Invoke-ClaudeCode.ps1`, `scripts/Invoke-Gemini.ps1`, `scripts/Invoke-Copilot.ps1`, `scripts/CopilotCliSupport.ps1`; frente dos 4 achados da revisão por pares; frente A (`Invoke-LlmDelegatePanelDispatch`) e `15-revisao-por-pares.md`.
+**Relacionado:** `xpz-llm-delegate/SKILL.md` (seção «Detecção de truncamento (Achado D)», cobertura por adapter); `scripts/Invoke-Codex.ps1`, `scripts/Invoke-ClaudeCode.ps1`, `scripts/Invoke-Gemini.ps1`, `scripts/Invoke-Copilot.ps1`, `scripts/CopilotCliSupport.ps1`; do caminho assíncrono do Claude Code, `scripts/Watch-ClaudeCodeJob.ps1` e `scripts/ClaudeCodeCliSupport.ps1`; frente dos 4 achados da revisão por pares; frente A (`Invoke-LlmDelegatePanelDispatch`) e `15-revisao-por-pares.md`.
 
 ## Implementar `Invoke-LlmDelegatePanelDispatch.ps1` (frente A) — CONCLUÍDA E PUSHADA (origin/main `2e88905`)
 
@@ -1036,6 +1132,52 @@ sobre essa classificação visual, não sobre a estrutura interna de tipos.
 Implementar quando houver: (a) reflexão do assembly confirmando a task acessível com os
 parâmetros documentados, e (b) caso concreto de projeto que usa categorias como convenção
 de organização de objetos, tornando a seleção por categoria mais prática que a lista manual.
+
+## Seleção temporal de objetos salvos para exportação incremental
+
+**Importância:** média
+**Maturidade:** ideia (direção identificada; contrato e fontes de leitura ainda exigem validação empírica)
+
+**Origem:** necessidade de exportar por MSBuild apenas objetos da KB nativa alterados desde um instante de corte, quando o exportador aceita lista nominal ou tudo. A disponibilidade de `LastUpdate` no SDK Artech foi observada no plugin FBGxBrain; a IDE também permite seleção por objetos modificados após data/hora. Essas evidências não confirmam, por si, toda a semântica nem o fuso da propriedade.
+
+### Problema concreto que motiva a ideia
+
+O exportador MSBuild seletivo aceita uma lista de objetos, mas não oferece seleção temporal. Sem uma fonte confiável dessa lista, o usuário precisa montar nomes manualmente ou exportar tudo. Isso torna oneroso o fluxo incremental baseado em uma janela de alteração.
+
+### Direção técnica proposta
+
+Criar uma capacidade **somente de leitura** que receba um instante de corte e devolva objetos **salvos** com `LastUpdate >= corte`, prontos para conversão ao formato de lista nominal aceito pela exportação MSBuild.
+
+O primeiro contrato não deve alegar distinguir criação de modificação: deve reportar «alterado desde». Criação entra naturalmente apenas se o microteste confirmar que o primeiro salvamento estabelece `LastUpdate` conforme esperado.
+
+Cada item deve devolver, quando disponível: nome, tipo, módulo, GUID e `lastUpdate`. A resposta também deve declarar o corte recebido, a zona/representação temporal observada e limitações conhecidas.
+
+### Alternativas a estudar
+
+1. **Plugin GeneXus/MCP somente leitura, via SDK Artech** — enumerar `model.Objects.GetAll()` e ler `LastUpdate`. É a rota preferencial se a semântica e a disponibilidade na versão-alvo forem confirmadas.
+2. **Script PowerShell ou Python com consultas SQL somente leitura ao banco `GX_KB_*`** — alternativa sem plugin/IDE ativa, condicionada a identificar e validar o esquema interno por versão. Nunca escrever no banco fonte da KB.
+3. **Seleção manual na IDE** — referência comportamental e fallback operacional.
+
+As rotas automatizadas devem devolver o mesmo contrato de saída; a escolha não pode ficar implícita no agente.
+
+### Perguntas e gates antes de implementar
+
+- Executar microteste controlado: criar e salvar objeto, medir `LastUpdate`; editar/salvar e confirmar avanço; avaliar rename e objeto não salvo.
+- Confirmar precisão, fuso horário e `DateTime.Kind`; aceitar corte RFC 3339 explicitamente e só declarar conversão a UTC após prova.
+- Declarar que objetos removidos não aparecem na enumeração de objetos existentes; rename só entra se a operação atualiza `LastUpdate`, até confirmação.
+- Validar formato da lista (`Tipo:Nome` ou equivalente) contra o wrapper/exportador MSBuild real, inclusive tipos com nomes de task divergentes.
+- Preservar operação somente de leitura: a capacidade seleciona e relata; nunca exporta, importa ou altera KB por conta própria.
+
+### Limiar para implementar
+
+Implementar quando houver uma KB e uma janela real de exportação incremental a automatizar, mais microteste que confirme a semântica operacional de `LastUpdate` na versão-alvo e teste de ponta a ponta que prove que a lista retornada seleciona exatamente os objetos esperados no exportador MSBuild.
+
+### Relacionado
+
+- `xpz-msbuild-import-export/SKILL.md` e `10a-gx-export-task-labels.md`;
+- `GetCategoryObjects — seleção de objetos por categoria para Export/Import`, nesta seção;
+- `02-regras-operacionais-e-runtime.md` (evidência de seleção temporal pela IDE);
+- [Options — Build](https://docs.genexus.com/en/wiki?24030) (dependência de relógio correto em mecanismos de alteração).
 
 ---
 
@@ -2286,6 +2428,27 @@ No FBgx18MCP, build longo vira job em background; o canal MCP devolve `job_id` r
 
 **Atualização (2026-06-09):** o `Add-GeneXusButton.ps1` ganhou a âncora simétrica `-BeforeControlName` (insere a nova `<cell>` **antes** da célula do controle folha; mutuamente exclusiva com `-AfterControlName` via parameter sets). Reusa toda a validação fail-closed existente (folha, `RESPONSIVE_UNSAFE`, unicidade) sem alteração; o primitivo `Invoke-GeneXusXmlLiteralPatch` em `GeneXusXmlSurgicalEditSupport.ps1` ganhou o modo `InsertBefore`. Permanecem ideia, neste mesmo helper: âncora por tabela nomeada / inserção como última célula, célula não-folha e reescrita segura de `responsiveSizes` em Responsive preenchido.
 
+### Insumo da `nexa`: piloto de correspondência semântica para propriedades XPZ
+
+**Origem (2026-07-26):** estudo comparativo da skill `nexa`, mantida no repositório `genexuslabs/genexus-skills`, frente aos catálogos, moldes e gates desta base.
+
+Antes de implementar `Set-XpzTransactionProperty`, avaliar um piloto de correspondência entre o conceito documentado pela `nexa` e sua serialização XPZ empiricamente comprovada. Exemplo inicial: conceito `Business Component` na `nexa` versus propriedade `idISBUSINESSCOMPONENT` no XML XPZ.
+
+O piloto deve registrar, para cada candidata:
+
+- conceito e referência de origem na `nexa`;
+- nome efetivo da propriedade no XML XPZ;
+- tipo e valores serializados observados;
+- evidência XPZ (`confirmado-import`, `confirmado-build`, `confirmado-acervo` ou não comprovado);
+- versão GeneXus em que a evidência foi obtida;
+- estado da correspondência: confirmada, parcial, contraditória ou ainda não comprovada.
+
+A `nexa` é fonte semântica e lista de candidatas, **não** autoridade de serialização XPZ. Nenhum nome, valor padrão, enumeração ou restrição deve migrar automaticamente de artefatos `.gx`/GeneXus Next para XPZ de GeneXus 18 ou formato legado. A autoridade operacional continua sendo XML comparável, molde sanitizado e evidência real de importação/build desta trilha.
+
+O piloto só deve virar contrato de escrita após provar valor sobre leitura/validação e fechar o mapeamento com evidência suficiente. Também é válido concluir que a correspondência não cabe no catálogo semântico, que outro tipo de objeto é piloto melhor ou que a ideia deve ser descartada.
+
+**Margem de reavaliação:** quem retomar deve reler o estado atual da `nexa` e desta base, verificar se já existe mecanismo equivalente e redesenhar o piloto se necessário; este registro não fixa `Transaction`, o formato da tabela nem `Set-XpzTransactionProperty` como implementação obrigatória.
+
 ### Desdobramentos derivados (registrados em 2026-06-09, sem código)
 
 Ao avaliar "outros tipos poderiam ter inserção como o botão", separar duas camadas — a generalização barata (mesmo modelo estrutural) das operações de tipo diferente (cada uma é frente própria):
@@ -2425,6 +2588,57 @@ Há texto útil para triagem que hoje só sai por `rg` no acervo, não pelo índ
 - `historico/IdeiasImplementadas_202606.md` (entrada-mãe das classes CSS, camadas 1 e 2)
 - `scripts/Build-KbIntelligenceIndex.py`, `scripts/Query-KbIntelligenceIndex.py`
 
+## Diagramas determinísticos focais no `xpz-doc-builder`
+
+**Importância:** baixa-média
+**Maturidade:** ideia (escopo inicial delimitado; aguarda demanda empírica)
+
+**Origem:** avaliação do repositório `FBGxBrain` em 2026-07-26. O pipeline de documentação daquele projeto calcula grafos e diagramas a partir do SDK antes de apresentá-los ao LLM. A inspiração válida aqui é o princípio de visualização derivada de fatos determinísticos, não o seu pipeline de LLM/D2.
+
+### Problema concreto que motivaria a ideia
+
+O modo `advanced-docs` do `xpz-doc-builder` já gera matrizes, catálogos, diffs e guias, mas não uma visualização focal das relações que já podem ser extraídas do XML oficial ou do `KbIntelligence`. Em uma triagem humana, a saída textual de `impact-basic`, `who-uses` ou da estrutura de uma `Transaction`/SDT pode exigir leitura cruzada de vários resultados para compreender relações diretas.
+
+### Direção técnica proposta
+
+Adicionar, de forma **opt-in** ao `advanced-docs`, geração de Markdown com bloco Mermaid e artefato de cobertura para um alvo explícito, limitado inicialmente à profundidade 1:
+
+- grafo de impacto direto, somente após o gate de índice aplicável estar OK;
+- estrutura de `Transaction` (`Level → Attribute`, chave/FK) e de SDT (`Level → Item`) a partir do XML oficial;
+- relações `Attribute → Transaction`/SDT apenas quando houver evidência estrutural explícita, nunca por homonímia.
+
+Cada aresta deve declarar `relationKind`, fonte (`index` ou XML oficial), objeto/caminho de origem e cobertura. Tipo com `queryableByKbIntelligence=false`, índice inválido ou chamada dinâmica não é grafo vazio: deve aparecer como indisponibilidade ou limitação declarada.
+
+### Limites e não fazer
+
+- não gerar grafo da KB inteira, nem UI interativa;
+- não usar LLM para criar, completar, reparar ou interpretar o diagrama;
+- não usar D2, SVG/PNG ou renderização externa na primeira versão;
+- não inferir chamadas dinâmicas, fluxo funcional, nem `Attribute ↔ SDT` por nome parecido;
+- o XML oficial e as consultas do índice continuam fontes normativas; o diagrama é visualização derivada.
+
+### Filiação e reavaliação conjunta
+
+Esta entrada pertence à família «evidência de relações da KB». Antes de implementar qualquer frente desta família, reavaliar conjuntamente:
+
+- `Plano A — Implementar relação references_attribute no índice KbIntelligence`;
+- `Expansão do índice SQLite para fingerprint de call site`;
+- `Camada 3 — texto livre geral no índice KbIntelligence`;
+- consultas existentes de impacto e rastreio funcional.
+
+As frentes de índice ampliam a matéria-prima; esta frente só a apresenta e não pode antecipar relações que elas ainda não provam. Uma evolução em qualquer membro deve revisar cobertura, contrato de saída e impacto nos demais.
+
+### Limiar para implementar
+
+Implementar somente após dois pedidos reais de documentação/triagem humana, em KBs distintas, nos quais a saída textual atual não baste para compreender relações diretas, ou após caso concreto de retrabalho causado por relações dispersas. A primeira entrega deve ser um diagrama focal determinístico, com fixtures sanitizadas e asserts de nós, arestas e cobertura.
+
+### Relacionado
+
+- `xpz-doc-builder/SKILL.md` e `scripts/generate-kb-advanced-docs.ps1`;
+- `xpz-index-triage/SKILL.md` e `scripts/README-kb-intelligence.md`;
+- `scripts/Build-KbIntelligenceIndex.py`, `scripts/Query-KbIntelligenceIndex.py`;
+- entradas de `999` citadas em «Filiação e reavaliação conjunta».
+
 ## Gate de coerência para `Transaction` `GenerateObject=False` — Fase 2 (nível de pacote)
 
 **Importância:** baixa
@@ -2543,3 +2757,96 @@ Painel dividido (2026-06-13): deepseek-v4-pro, glm-5.1 e minimax-m3 inclinaram a
 **Origem:** desmembrado da frente «Criar/alterar objeto GeneXus do tipo `API` (from-spec, com segurança GAM) nas skills XPZ», **concluída e migrada** para `historico/IdeiasImplementadas_202607.md` (2026-07-01). Aquela frente resolveu a **Face 3** (prova de runtime do enforcement GAM) por **checklist textual + sub-estado pós-build**, documentado em `xpz-builder/responsibilities-by-type/api-gam-runtime.md`.
 
 **Ideia:** automatizar o **smoke de 2 fases** (anônimo→401; usuário sem papel→403; com papel→200) + OAuth + reversibilidade num **gate `.ps1`**, em vez do checklist manual. **Não cabe como gate `9-*`** (que é preflight estático pré-import): é um **teste HTTP de runtime pós-deploy**, outra categoria — por isso ficou como evolução futura (decisão D2 da frente original). **Gatilho:** quando houver demanda real de automatizar a prova de enforcement (e uma forma estável de subir/consultar o app headless no fluxo).
+
+## `Get-Help` não enxerga o comment-based help da maioria dos scripts (falta linha em branco após `#requires`)
+
+- **Importância** — média. Não há risco de dano (nem contaminação de KB, nem perda de trabalho, nem falso negativo em gate) e o contorno é trivial — abrir o arquivo, que é o que todo mundo já faz. O que pesa é a **extensão**: **218 de 248** scripts em `scripts/` com bloco de ajuda real (`.SYNOPSIS`) ficam invisíveis ao `Get-Help`. É **deriva de convenção**, não convenção ausente: 29 arquivos já usam o padrão correto, então o repositório tem as duas formas convivendo e a errada é a maioria — cada script novo tende a nascer quebrado. Já induziu erro factual: em 2026-07-26 uma mensagem de commit justificou documentar parâmetros alegando que `Get-Help` passaria a mostrá-los — não passa.
+- **Maturidade** — pronta para implementar. Causa isolada por experimento controlado, correção verificada, e o padrão-alvo já existe no próprio repositório; falta executar e decidir o gate.
+
+**Causa, medida em 2026-07-26.** Não é o `#requires` estar antes do bloco de ajuda — é ele estar **colado** ao bloco. Sem uma linha em branco separando a diretiva do `<#`, o PowerShell descarta o comment-based help inteiro. Contraste entre dois arquivos reais do repositório:
+
+| Arquivo | Cabeçalho | `Get-Help -Full` |
+|---|---|---|
+| `Start-ClaudeCodeJob.ps1` | `#requires` **colado** ao `<#` | `params=1` (só a sintaxe auto-gerada) |
+| `Build-GeneXusImportFileEnvelope.ps1` | `#requires`, linha em branco, `<#` | `params=12` + sinopse real |
+
+Confirmado por injeção: acrescentar **uma linha em branco** numa cópia do primeiro devolve `params=10` e a sinopse real, sem mover a diretiva.
+
+**Levantamento de `scripts/` (auditoria por `Get-Help` real, script a script, não por regex):**
+
+| | |
+|---|---|
+| Scripts em `scripts/` com bloco de ajuda real (`.SYNOPSIS`) | 248 |
+| Com `#requires` colado ao `<#` — **quebrados** | **218** |
+| Com linha em branco — já funcionam | 29 |
+| Sem `#requires` antes do help — `Test-XpzPowerShellRuntime.ps1`, exceção 5.1 | 1 |
+| Dos 89 com `.PARAMETER`, quebrados | 72 |
+
+Ressalva de medição: a auditoria por `Get-Help` contou 14 scripts renderizando parâmetros e a contagem por adjacência prevê 17; a diferença vem do filtro `> 1 parâmetro` usado na auditoria, que descarta scripts de um parâmetro só. Os três casos não foram conferidos individualmente — não muda a conclusão, mas quem retomar deve refazer a contagem antes de tratar 218 como lista definitiva. `scripts-maintenance/` foi conferido separadamente em 2026-07-26: são 5 arquivos com bloco de ajuda real, todos com `#requires` colado ao `<#`; se a frente incluir esse diretório, o alvo total de adjacência quebrada passa de 218 para 223.
+
+**A diretiva fica onde está.** `#requires -Version 7.4` em ponto de entrada público é regra operacional obrigatória (`02-regras-operacionais-e-runtime.md`, seção de regra operacional; `README.md` trilíngue). A correção **não** a move nem a remove: acrescenta uma linha em branco depois dela. Não há trade-off com a proteção de runtime.
+
+**Exceções nominais, já medidas:** o `1` da tabela é `Test-XpzPowerShellRuntime.ps1`, que não tem `#requires` (precisa rodar em 5.1) nem `.PARAMETER` — fica fora por construção. `Invoke-ParallelKbEnvelopeScan.ps1` **não** é exceção sem diretiva: tem `#Requires -Version 7.4` em caixa mista, colado ao `<#`, e portanto pertence ao grupo de adjacência quebrada quando o detector tratar a diretiva sem depender de caixa.
+
+**O que a frente faria:** inserir a linha em branco nos 218 arquivos afetados de `scripts/` e decidir explicitamente se inclui também os 5 de `scripts-maintenance/` (mecânico, um caractere por arquivo); criar **gate de regressão** — detectar `#requires`/`#Requires` imediatamente seguido de `<#` em arquivo com bloco de ajuda é uma regex de uma linha com comparação sem depender de caixa, e os 29 arquivos corretos servem de referência —; e avaliar se a regra do `02`/`README` deve passar a dizer **como** a diretiva convive com o bloco de ajuda, não só que ela deve existir. Sem o gate, a frente vira dívida recorrente.
+
+**Origem:** revisão do commit `83d4c6a` (documentação dos parâmetros do `Start-ClaudeCodeJob.ps1`), 2026-07-26. A verificação da justificativa do commit — «quem chamasse `Get-Help` não encontrava nada» — revelou que continua não encontrando, e que o defeito atinge quase todo o `scripts/`.
+
+**Correção do próprio registro (mesma data).** A primeira versão desta entrada afirmava «89 de 89, zero visíveis» e propunha **reordenar** a diretiva. Estava errada na causa, nos números e na correção: o experimento inicial removia a linha do `#requires` e portanto mudava **duas** variáveis ao mesmo tempo — a diretiva e a adjacência —, atribuindo o efeito à errada. O erro só apareceu porque uma segunda voz estranhou que as duas contagens casassem exatamente e pediu conferência independente; a auditoria por `Get-Help` real mostrou 14 scripts funcionando, o que era incompatível com a causa alegada. Fica como lição de método: contagem por regex não substitui medição do comportamento, e experimento que muda duas variáveis não isola causa nenhuma.
+
+## Divulgação progressiva nos `SKILL.md` extensos
+
+- **Importância** — média (arquivos muito extensos aumentam custo de contexto e tornam mais difícil distinguir regra sempre obrigatória de detalhe condicional; há contorno manual por leitura dirigida e satélites já existentes).
+- **Maturidade** — ideia (arquitetura candidata identificada, mas ainda sem medição de perda real de aderência, desenho fechado ou escolha definitiva de skill-piloto).
+
+**Origem (2026-07-26):** estudo comparativo da organização modular da `nexa` — `SKILL.md` como fluxo principal e referências `object-*`, `common-*`, `global-*`, `model-*` e `properties-*` carregadas conforme o caso — frente à estrutura atual das skills XPZ.
+
+### Problema a verificar
+
+Algumas skills XPZ concentram grande volume no arquivo principal, apesar de já haver precedentes internos de satélites:
+
+- `xpz-kb-parallel-setup/SKILL.md`: cerca de 207 KB;
+- `xpz-msbuild-import-export/SKILL.md`: cerca de 118 KB;
+- `xpz-builder/SKILL.md`: cerca de 108 KB;
+- `xpz-msbuild-build/SKILL.md`: cerca de 107 KB.
+
+Tamanho sozinho **não prova defeito**. Regras absolutas, sequência de gates e fronteiras de segurança podem perder aderência se forem deslocadas para arquivos que o agente não carrega. A investigação precisa medir se há custo ou falha concreta antes de tratar modularização como correção.
+
+### Hipótese de melhoria
+
+Avaliar divulgação progressiva: manter no `SKILL.md` um roteador operacional compacto e deslocar apenas conteúdo realmente condicional para referências explicitamente acionadas.
+
+Em um desenho possível, não obrigatório:
+
+- o arquivo principal preserva gatilhos, fronteiras, ordem do workflow, regras `NEVER`/`ABORT` e chamadas obrigatórias;
+- satélites concentram detalhes por tipo, variante, gate ou fase;
+- cada referência tem gatilho explícito e deve ser lida integralmente quando acionada;
+- o checklist final confere que todos os satélites aplicáveis foram carregados.
+
+### Reavaliação obrigatória antes de propor mudança
+
+Esta entrada registra uma direção para estudo, não uma decisão de refatoração. Quem retomar deve:
+
+1. reler a skill candidata e seus satélites no estado atual;
+2. medir tamanho, duplicação, referências cruzadas e sinais reais de falha de carregamento/aderência;
+3. mapear o que precisa permanecer sempre carregado e o que é genuinamente condicional;
+4. comparar alternativas como compactação local, remoção de duplicação, índice roteador ou nenhuma mudança;
+5. admitir como resultados válidos escolher outra skill-piloto, manter a estrutura atual ou descartar a ideia.
+
+### Piloto possível, não fixado
+
+`xpz-builder` é candidata inicial porque já possui `responsibilities-by-type/`, `quality-checklist.md` e `wwp-packaging.md`, permitindo testar o desenho com menor invenção estrutural. Isso **não** fixa a `xpz-builder` como primeira implementação: a análise futura pode escolher outra skill ou concluir que o piloto não se justifica.
+
+### Decisões em aberto
+
+- Qual dor empírica justificaria a reorganização: limite de contexto, regra omitida, duplicação ou dificuldade de manutenção?
+- Que conteúdo é invariavelmente carregado e não pode sair do `SKILL.md`?
+- Como impedir que o roteador e os satélites divirjam?
+- Como fazer a migração em recortes pequenos, preservando histórico e evitando reescrita ampla de Markdown?
+
+### Relacionado
+
+- `xpz-builder/SKILL.md`, `xpz-builder/quality-checklist.md`, `xpz-builder/wwp-packaging.md` e `xpz-builder/responsibilities-by-type/`;
+- `xpz-kb-parallel-pre-push/SKILL.md` e seus satélites, precedente interno de skill principal enxuta;
+- entrada «Pré-push: reduzir dependência de interpretação em `.md` (opções B e C)» neste arquivo, pela preocupação comum com contratos espalhados;
+- entrada «Catálogo semântico de operações em `xpz-builder`» neste arquivo, que pode criar novos satélites condicionais.

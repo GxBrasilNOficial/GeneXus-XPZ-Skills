@@ -1697,7 +1697,34 @@ Endsub
 - Delta em relação ao molde mínimo acima: o corpo autocontido da Procedure pode ser substituído por uma navegação real `For each <Transaction>` para preencher o item SDT e adicioná-lo à variável coleção. Essa substituição deixa de ser autocontida: passa a depender da `Transaction`, dos atributos copiados e da KB de destino.
 - Contrato de coleção: o SDT de item permanece `AttCollection=False`; as variáveis de saída na API e na Procedure usam `ATTCUSTOMTYPE=sdt:<SdtItem>` com `AttCollection=True`.
 - Terminologia: chamar esse perfil de listagem por `For each` sobre a base table/atributos da `Transaction`; não chamar de "via BC" a menos que a Procedure declare uma variável `ATTCUSTOMTYPE=bc:<Transaction>`. No caso OnlineShopSS, a `Transaction` também estava com `idISBUSINESSCOMPONENT=True` e `idIsDynTrn=False`, mas isso é evidência datada de coexistência, não receita universal para inicialização/carga.
-- Prova funcional: registrar método, rota, status, payload resumido e ambiente servido. `HTTP 200`, OpenAPI ou `[SecurityLevel]` não provam enforcement GAM; quando segurança estiver em escopo, usar o smoke runtime de `xpz-builder/responsibilities-by-type/api-gam-runtime.md`.
+- Prova funcional: registrar método, rota, status, payload resumido e ambiente servido. `HTTP 200`, OpenAPI ou `[SecurityLevel]` não provam enforcement GAM; quando segurança estiver em escopo, usar o smoke runtime de `xpz-builder/responsibilities-by-type/api-gam-runtime.md`. OpenAPI gerado pode ser evidência complementar do contrato público observado quando houver arquivo/ambiente/frescor declarados; ver `xpz-builder/responsibilities-by-type/api.md`.
+
+#### Substituição reutilizável do `Source` para listagem por `For each`
+
+Use esta variante quando a KB destino já tiver uma `Transaction` real e atributos compatíveis com o SDT da tríade mínima. O ponto de partida continua sendo a tríade acima; substitua apenas o CDATA do `Source` da `procExemploApiList`, preservando `parm(out:&SdtExemploApiResponseCollection)`, a variável de item `&SdtExemploApiResponse` com `ATTCUSTOMTYPE=sdt:SdtExemploApiResponse` sem `AttCollection=True`, e a variável de saída `&SdtExemploApiResponseCollection` com o mesmo `ATTCUSTOMTYPE` e `AttCollection=True`.
+
+Antes de materializar, conferir no acervo da KB destino:
+
+- a `Transaction` existe e é a base esperada para a listagem;
+- cada atributo copiado existe com o nome real da KB destino;
+- os tipos e tamanhos dos atributos são compatíveis com os itens do SDT;
+- `Found`, `Code` e `Message` continuam coerentes com o contrato escolhido. Na tríade mínima, esses campos vivem no item SDT; se o contrato materializado mover envelope para outro SDT/variável, ajuste o desenho explicitamente.
+
+```genexus
+&SdtExemploApiResponseCollection.Clear()
+
+For each <Transaction>
+    &SdtExemploApiResponse = new()
+    &SdtExemploApiResponse.Id = <TransactionId>
+    &SdtExemploApiResponse.Nome = <TransactionNome>
+    &SdtExemploApiResponse.Found = true
+    &SdtExemploApiResponse.Code = !"OK"
+    &SdtExemploApiResponse.Message = !"Registro listado."
+    &SdtExemploApiResponseCollection.Add(&SdtExemploApiResponse)
+EndFor
+```
+
+Os identificadores entre `<...>` são placeholders: troque por nomes reais como `Categoria`, `CategoriaId` e `CategoriaNome` somente depois de confirmar a estrutura da KB destino. A navegação `For each` não torna a implementação "via BC"; a regra de BC só entra quando a Procedure declara variável `ATTCUSTOMTYPE=bc:<Transaction>` ou outro uso explícito via BC. Esta variante também não altera a conclusão de segurança: `HTTP 200` confirma método/rota/payload/ambiente servido, mas não prova enforcement GAM. Se houver YAML OpenAPI gerado, ele pode complementar a evidência do contrato público observado, mas continua distinto de prova de segurança.
 
 ## Moldes sanitizados completos de WorkWithForWeb
 

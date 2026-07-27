@@ -4,8 +4,10 @@
     Funcoes compartilhadas do backend claude-code da skill xpz-llm-delegate.
 .DESCRIPTION
     Resolve o claude.exe, valida o contrato minimo de flags usado pelos adapters e extrai
-    mensagens de erro de saidas do Claude Code. Sem rede por conta propria, exceto quando
-    Resolve-ClaudeCodeExe precisa chamar `claude --version` / `claude --help` no candidato.
+    mensagens de erro de saidas do Claude Code. Antes de classificar, descarta avisos de
+    ambiente que o Claude Code emite em stderr mesmo quando a chamada da certo. Sem rede por
+    conta propria, exceto quando Resolve-ClaudeCodeExe precisa chamar `claude --version` /
+    `claude --help` no candidato.
 #>
 
 Set-StrictMode -Version Latest
@@ -19,8 +21,20 @@ function ConvertFrom-ClaudeCodeVersionText {
 
 function Get-ClaudeCodeErrorMessage {
     param([string]$StdoutText, [string]$StderrText)
-    $combined = @($StderrText, $StdoutText) -join "`n"
+
+    # O Claude Code emite em stderr avisos de ambiente que aparecem INCLUSIVE quando a chamada
+    # termina com exit 0 e resposta valida (medido em 2026-07-25: mesmo stderr, byte a byte, em
+    # execucao bem-sucedida e em execucao falha). Por isso eles nao podem classificar falha:
+    # sao removidos antes de qualquer decisao. Ver historico/IdeiasImplementadas_202607.md,
+    # «Capturar a recusa real de workspace nao confiavel do Claude Code».
+    $cleanStderr = Remove-ClaudeCodeEnvironmentNoise -Text $StderrText
+    $combined = @($cleanStderr, $StdoutText) -join "`n"
     if ([string]::IsNullOrWhiteSpace($combined)) { return $null }
+
+    # Falha real observada empiricamente; precede o detector heuristico de confianca.
+    if (Test-ClaudeCodeMaxTurnsExhausted -Text $combined) {
+        return New-ClaudeCodeMaxTurnsExhaustedEvidenceMessage -EvidenceText $combined
+    }
 
     if (Test-ClaudeCodeWorkspaceNotTrusted -Text $StderrText) {
         return New-ClaudeCodeWorkspaceNotTrustedEvidenceMessage -StderrText $StderrText
@@ -51,8 +65,104 @@ $rawStderr
 "@.Trim()
 }
 
+function New-ClaudeCodeMaxTurnsExhaustedEvidenceMessage {
+    param([AllowNull()] [string] $EvidenceText)
+
+    $evidence = ([string]$EvidenceText).Trim()
+    return @"
+Claude Code max-turns-exhausted: a chamada gastou todos os turnos agenticos sem concluir. Pode ter havido texto parcial antes do corte — nesse caso a resposta existe, mas esta truncada.
+
+Quando ha limite de turnos, a primeira chamada de ferramenta pode consumir o unico turno e nao sobrar turno para concluir. Os adapters deste repositorio NAO passam mais --max-turns (a CLI 2.1.215 removeu a flag do --help), entao um limite ativo vem da propria CLI ou de configuracao externa: investigue de onde. Alternativa imediata: rodar sem ferramentas quando a consulta nao precisar ler o workspace. Isto NAO e problema de confianca de workspace nem indisponibilidade do modelo.
+
+--- EVIDENCIA (stdout + stderr, sem ruido de ambiente) ---
+$evidence
+--- FIM EVIDENCIA ---
+"@.Trim()
+}
+
+function Test-ClaudeCodeMaxTurnsExhausted {
+    param([AllowNull()] [string] $Text)
+    if ([string]::IsNullOrWhiteSpace($Text)) { return $false }
+    # Tres gatilhos, todos medidos em 2026-07-25: `Reached max turns` (modo --output-format text),
+    # `Reached maximum number of turns (N)` (campo errors[] do evento final do stream-json) e o
+    # subtype `error_max_turns` do mesmo evento. O segundo NAO casa o primeiro padrao — sem ele, a
+    # deteccao dependia so do subtype vir prefixado na evidencia.
+    return ($Text -match '(?i)(reached\s+max(imum\s+number\s+of)?\s+turns|\berror_max_turns\b)')
+}
+
+<#
+.SYNOPSIS
+    Extrai o texto de erro de um evento do stream JSONL (`--output-format stream-json`).
+.DESCRIPTION
+    O desfecho do stream nao vem em um evento `type=error`: medido em 2026-07-25 (claude 2.1.220),
+    a ultima linha e `type=result` com `subtype` (`success`, `error_max_turns`, ...) e `is_error`.
+    Observar apenas `type=error` deixava o esgotamento de turno e a falha de execucao invisiveis
+    para o caminho assincrono. Devolve string vazia quando o evento nao carrega falha.
+
+    A mensagem legivel NAO esta garantida em `result`: no evento de esgotamento de turno medido
+    (`subtype=error_max_turns`) o campo `result` nem existe, e o texto vive em `errors[]`
+    («Reached maximum number of turns (1)»), com `terminal_reason=max_turns` ao lado. Por isso a
+    extracao le os quatro campos: sem `errors[]` a evidencia preservada era so o subtype.
+#>
+function Get-ClaudeCodeStreamEventErrorText {
+    param([AllowNull()] $StreamEvent)
+
+    if ($null -eq $StreamEvent) { return '' }
+    $props = $StreamEvent.PSObject.Properties
+
+    $type = ''
+    if ($props['type']) { $type = [string]$props['type'].Value }
+
+    if ($type -eq 'error') { return ($StreamEvent | ConvertTo-Json -Compress -Depth 10) }
+    if ($type -ne 'result') { return '' }
+
+    $isError = $false
+    if ($props['is_error']) { $isError = [bool]$props['is_error'].Value }
+    if (-not $isError) { return '' }
+
+    $subtype = ''
+    if ($props['subtype']) { $subtype = [string]$props['subtype'].Value }
+    $terminalReason = ''
+    if ($props['terminal_reason']) { $terminalReason = [string]$props['terminal_reason'].Value }
+    $resultText = ''
+    if ($props['result']) { $resultText = [string]$props['result'].Value }
+    $errorsText = ''
+    if ($props['errors']) {
+        $errorsText = ((@($props['errors'].Value) | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | ForEach-Object { ([string]$_).Trim() }) -join ' | ')
+    }
+
+    $parts = @()
+    if (-not [string]::IsNullOrWhiteSpace($subtype)) { $parts += "subtype=$subtype" }
+    if (-not [string]::IsNullOrWhiteSpace($terminalReason)) { $parts += "terminal_reason=$terminalReason" }
+    if (-not [string]::IsNullOrWhiteSpace($resultText)) { $parts += $resultText.Trim() }
+    if (-not [string]::IsNullOrWhiteSpace($errorsText)) { $parts += $errorsText }
+    if ($parts.Count -eq 0) { return ($StreamEvent | ConvertTo-Json -Compress -Depth 10) }
+    return ($parts -join ': ')
+}
+
+# Avisos de ambiente do Claude Code: aparecem em stderr independentemente do desfecho da chamada
+# (inclusive em exit 0 com resposta valida), portanto nao sao evidencia de falha.
+function Test-ClaudeCodeEnvironmentNoiseLine {
+    param([AllowNull()] [string] $Line)
+    if ([string]::IsNullOrWhiteSpace($Line)) { return $false }
+    return (
+        $Line -match '(?i)^\s*ignoring\s+\d+\s+permissions\.allow\s+entries\b' -or
+        $Line -match '(?i)^\s*permission\s+allow\s+rule\s*\('
+    )
+}
+
+function Remove-ClaudeCodeEnvironmentNoise {
+    param([AllowNull()] [string] $Text)
+    if ([string]::IsNullOrWhiteSpace($Text)) { return '' }
+    $kept = @(@([string]$Text -split "`r?`n") | Where-Object { -not (Test-ClaudeCodeEnvironmentNoiseLine -Line $_) })
+    return (($kept -join "`n").Trim())
+}
+
 function Test-ClaudeCodeWorkspaceNotTrusted {
     param([AllowNull()] [string] $Text)
+    # Detecta apenas RECUSA de execucao. O aviso "this workspace has not been trusted" que
+    # acompanha o descarte de regras allow e ruido de ambiente e nao pode disparar este detector.
+    $Text = Remove-ClaudeCodeEnvironmentNoise -Text $Text
     if ([string]::IsNullOrWhiteSpace($Text)) { return $false }
     return (
         $Text -match '(?i)workspace.{0,80}\b(not|nao|não)\b.{0,80}(trusted|confiavel|confiável)' -or
@@ -119,20 +229,62 @@ function Resolve-ClaudeCodeExe {
     return $exe
 }
 
+# O erro do stream passa pelos mesmos detectores do caminho sincrono: sem isto, o job assincrono
+# devolvia texto cru e nunca emitia os codigos canonicos que a doc promete.
+function Resolve-ClaudeCodeStreamErrorClassification {
+    param([AllowNull()] [string] $StreamError)
+
+    if (Test-ClaudeCodeMaxTurnsExhausted -Text $StreamError) {
+        return [pscustomobject]@{
+            status = 'error'
+            error  = (New-ClaudeCodeMaxTurnsExhaustedEvidenceMessage -EvidenceText $StreamError)
+        }
+    }
+    if (Test-ClaudeCodeWorkspaceNotTrusted -Text $StreamError) {
+        return [pscustomobject]@{
+            status = 'unavailable'
+            error  = (New-ClaudeCodeWorkspaceNotTrustedEvidenceMessage -StderrText $StreamError)
+        }
+    }
+    return [pscustomobject]@{ status = 'error'; error = $StreamError }
+}
+
+<#
+.SYNOPSIS
+    Classifica o desfecho de um job assincrono do Claude Code.
+.DESCRIPTION
+    Resposta final manda: texto produzido continua `completed`. Mas o esgotamento de turno PODE
+    chegar depois de ja haver texto — medido em 2026-07-25 nos dois modos: um ensaio cortou com o
+    turno gasto so em `tool_use` (sem texto), outro com o assistente ja tendo emitido uma frase
+    antes da ferramenta. No segundo caso, descartar o erro mascararia resposta truncada como
+    resposta boa; no primeiro, `FinalText` fica vazio e o desfecho e `error` normal. O erro
+    observado depois do texto vai em `failureAfterText`, sem mudar `status`/`error`: quem decide se
+    um parecer truncado vale e o orquestrador do painel, na reclassificacao pos-hoc do `15`.
+    Todos os retornos tem o mesmo shape (`status`, `error`, `failureAfterText`).
+#>
 function Resolve-ClaudeCodeJobStatus {
     param([string]$FinalText, [string]$StreamError, [string]$Stderr)
     if (-not [string]::IsNullOrWhiteSpace($FinalText)) {
-        return [pscustomobject]@{ status = 'completed'; error = $null }
+        $failureAfterText = $null
+        if (-not [string]::IsNullOrWhiteSpace($StreamError)) {
+            $failureAfterText = (Resolve-ClaudeCodeStreamErrorClassification -StreamError $StreamError).error
+        }
+        return [pscustomobject]@{ status = 'completed'; error = $null; failureAfterText = $failureAfterText }
     }
     if (-not [string]::IsNullOrWhiteSpace($StreamError)) {
-        return [pscustomobject]@{ status = 'error'; error = $StreamError }
+        $classified = Resolve-ClaudeCodeStreamErrorClassification -StreamError $StreamError
+        return [pscustomobject]@{ status = $classified.status; error = $classified.error; failureAfterText = $null }
     }
     $errMsg = Get-ClaudeCodeErrorMessage -StdoutText '' -StderrText $Stderr
     if ($errMsg) {
         if ($errMsg -match '(?i)\bworkspace-not-trusted\b') {
-            return [pscustomobject]@{ status = 'unavailable'; error = $errMsg }
+            return [pscustomobject]@{ status = 'unavailable'; error = $errMsg; failureAfterText = $null }
         }
-        return [pscustomobject]@{ status = 'error'; error = $errMsg }
+        return [pscustomobject]@{ status = 'error'; error = $errMsg; failureAfterText = $null }
     }
-    return [pscustomobject]@{ status = 'sem-texto'; error = 'Claude Code encerrou sem resposta final.' }
+    return [pscustomobject]@{
+        status           = 'sem-texto'
+        error            = 'Claude Code encerrou sem resposta final.'
+        failureAfterText = $null
+    }
 }
