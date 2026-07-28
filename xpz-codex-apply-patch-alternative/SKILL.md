@@ -1,14 +1,14 @@
 ---
 name: xpz-codex-apply-patch-alternative
-description: Aplica patch textual Git já aprovado no Codex sem usar apply_patch.
+description: Backup auditável para aplicar patch textual Git já aprovado no Codex quando a rota nativa apply_patch estiver indisponível, falhar antes de escrita local ou for solicitada explicitamente.
 ---
 
-# Aplicação aprovada de patch no Codex
+# Backup auditável de patch no Codex
 
-Use esta skill somente na raiz deste repositório e somente depois de aprovação humana explícita para os caminhos afetados.
+Use esta skill somente na raiz deste repositório, como backup auditável da rota nativa `apply_patch`, e somente depois de aprovação humana explícita para os caminhos afetados.
 
 1. Gere um patch unificado textual em UTF-8 sem BOM e com LF, sem binário, rename, copy ou troca de modo. O cabeçalho `diff --git a/<caminho> b/<caminho>` é obrigatório; o cabeçalho `index` é opcional. Arquivos textuais regulares `100644`, inclusive criação ou deleção, são aceitos.
-2. Na rota canônica desta skill, `pwsh -File` recebe argv literal, inclusive quando o chamador o monta com `ProcessStartInfo.ArgumentList`. Nessa forma, `-AllowedPath` repetido não é associado ao parâmetro array: a falha acontece antes do motor, não emite JSON no stdout e deixa o diagnóstico do binder no stderr. Aplique um patch e um `-AllowedPath` por ciclo. Envie o Base64 contíguo ao `-DryRun` por `StandardInput.Write(...)` e feche com `StandardInput.Close()`. Não use `WriteLine` nem pipe, pois ambos podem acrescentar newline/whitespace ao Base64. Essa limitação é da forma de invocação, não do motor: o motor continua exigindo que `-AllowedPath` corresponda ao conjunto completo e exato de caminhos do patch.
+2. Na rota de backup desta skill, `pwsh -File` recebe argv literal, inclusive quando o chamador o monta com `ProcessStartInfo.ArgumentList`. Nessa forma, `-AllowedPath` repetido não é associado ao parâmetro array: a falha acontece antes do motor, não emite JSON no stdout e deixa o diagnóstico do binder no stderr. Aplique um patch e um `-AllowedPath` por ciclo. Envie o Base64 contíguo ao `-DryRun` por `StandardInput.Write(...)` e feche com `StandardInput.Close()`. Não use `WriteLine` nem pipe, pois ambos podem acrescentar newline/whitespace ao Base64. Essa limitação é da forma de invocação, não do motor: o motor continua exigindo que `-AllowedPath` corresponda ao conjunto completo e exato de caminhos do patch.
 3. Para vários arquivos nessa rota, repita ciclos independentes de stage → apply, um por arquivo. Não há atomicidade entre ciclos já aplicados.
 4. Leia o JSON de retorno e guarde `stagedPatchId` e `patchSha256`.
 5. Chame o mesmo motor com `-StagedPatchId` e `-ExpectedPatchSha256`; não reenvie o patch.
