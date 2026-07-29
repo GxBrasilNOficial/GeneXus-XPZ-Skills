@@ -47,7 +47,13 @@ function Get-AsyncSha256Text {
 function Get-AsyncSha256File {
     param([string] $Path)
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $null }
-    $stream = [System.IO.File]::OpenRead($Path)
+    $share = [System.IO.FileShare]::ReadWrite -bor [System.IO.FileShare]::Delete
+    try {
+        $stream = [System.IO.File]::Open($Path, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, $share)
+    }
+    catch {
+        return $null
+    }
     try {
         $hash = [System.Security.Cryptography.SHA256]::HashData($stream)
         return ([System.BitConverter]::ToString($hash)).Replace('-', '').ToLowerInvariant()
@@ -161,43 +167,30 @@ function Get-AsyncIsoToUtc {
     try { return ([datetimeoffset]::Parse($Text, [System.Globalization.CultureInfo]::InvariantCulture)).UtcDateTime } catch { return $null }
 }
 
-function New-AsyncHalfOpenLease {
-    param([object]$Context, [int]$TimeoutSeconds)
+function Get-AsyncQuotaCircuitLockPath {
+    param([object]$Context)
+    return (Join-Path $Context.stateDir "$($Context.safeBaseKey).circuit.lock")
+}
+
+function Invoke-AsyncQuotaCircuitWithLock {
+    param(
+        [object]$Context,
+        [scriptblock]$ScriptBlock,
+        [int]$DeadlineMs = 250
+    )
+
     [System.IO.Directory]::CreateDirectory($Context.stateDir) | Out-Null
-    $leasePath = Join-Path $Context.stateDir "$($Context.safeBaseKey).lease.json"
-    $lockPath = Join-Path $Context.stateDir "$($Context.safeBaseKey).lease.lock"
-    $deadline = [datetime]::UtcNow.AddMilliseconds(250)
+    $lockPath = Get-AsyncQuotaCircuitLockPath -Context $Context
+    $deadline = [datetime]::UtcNow.AddMilliseconds($DeadlineMs)
     while ([datetime]::UtcNow -lt $deadline) {
         try {
             $lock = [System.IO.File]::Open($lockPath, [System.IO.FileMode]::OpenOrCreate, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None)
             try {
-                $read = Read-AsyncJsonWithDeadline -Path $leasePath -DeadlineMs 150
-                if ($read.status -eq 'ok') {
-                    $expires = Get-AsyncIsoToUtc -Text ([string](Get-ClaudeCodeProp $read.value 'probeExpiresAtUtc'))
-                    if ($null -ne $expires -and $expires -gt [datetime]::UtcNow) {
-                        return [pscustomobject]@{ status = 'observed'; leasePath = $leasePath }
-                    }
+                return [pscustomobject]@{
+                    lockAcquired = $true
+                    lockPath     = $lockPath
+                    value        = (& $ScriptBlock)
                 }
-                $now = [datetime]::UtcNow
-                $probeLeaseSeconds = [Math]::Max(($TimeoutSeconds + 30), 120)
-                $lease = [ordered]@{
-                    Kind              = 'claude-code-quota-half-open-lease'
-                    SchemaVersion     = 1
-                    baseKeyHash       = $Context.safeBaseKey
-                    probeOwner        = [ordered]@{
-                        adapterName = 'Invoke-ClaudeCodeAsync.ps1'
-                        jobId       = $script:jobId
-                        processId   = $PID
-                        machineName = $env:COMPUTERNAME
-                        userName    = $env:USERNAME
-                    }
-                    probeAttemptId    = $script:jobId
-                    probeLeaseSeconds = $probeLeaseSeconds
-                    probeStartedAtUtc = $now.ToString('yyyy-MM-ddTHH:mm:ssZ')
-                    probeExpiresAtUtc = $now.AddSeconds($probeLeaseSeconds).ToString('yyyy-MM-ddTHH:mm:ssZ')
-                }
-                Write-AsyncJsonAtomic -Path $leasePath -Object $lease -Depth 6
-                return [pscustomobject]@{ status = 'acquired'; leasePath = $leasePath }
             }
             finally {
                 $lock.Dispose()
@@ -206,98 +199,198 @@ function New-AsyncHalfOpenLease {
         catch [System.IO.IOException] {
             Start-Sleep -Milliseconds 25
         }
+        catch [System.UnauthorizedAccessException] {
+            Start-Sleep -Milliseconds 25
+        }
     }
-    return [pscustomobject]@{ status = 'inconclusive'; leasePath = $leasePath }
+
+    return [pscustomobject]@{
+        lockAcquired = $false
+        lockPath     = $lockPath
+        value        = $null
+    }
+}
+
+function Test-AsyncOwnsQuotaLease {
+    param([AllowNull()] $Lease, [object]$Context)
+
+    if ($null -eq $Lease) { return $false }
+    $baseKeyHash = [string](Get-ClaudeCodeProp $Lease 'baseKeyHash')
+    $probeAttemptId = [string](Get-ClaudeCodeProp $Lease 'probeAttemptId')
+    if ($baseKeyHash -ne $Context.safeBaseKey) { return $false }
+    if ([string]::IsNullOrWhiteSpace($probeAttemptId)) { return $false }
+    if ($probeAttemptId -ne $script:jobId) { return $false }
+
+    $probeOwner = Get-ClaudeCodeProp $Lease 'probeOwner'
+    $ownerJobId = [string](Get-ClaudeCodeProp $probeOwner 'jobId')
+    return ([string]::IsNullOrWhiteSpace($ownerJobId) -or $ownerJobId -eq $script:jobId)
+}
+
+function New-AsyncHalfOpenLeaseUnderLock {
+    param([object]$Context, [int]$TimeoutSeconds, [string]$LeasePath)
+
+    $read = Read-AsyncJsonWithDeadline -Path $LeasePath -DeadlineMs 150
+    if ($read.status -eq 'ok') {
+        $expires = Get-AsyncIsoToUtc -Text ([string](Get-ClaudeCodeProp $read.value 'probeExpiresAtUtc'))
+        if ($null -ne $expires -and $expires -gt [datetime]::UtcNow) {
+            return [pscustomobject]@{
+                status         = 'observed'
+                leasePath      = $LeasePath
+                ownsLease      = $false
+                probeAttemptId = $null
+            }
+        }
+    }
+
+    $now = [datetime]::UtcNow
+    $probeLeaseSeconds = [Math]::Max(($TimeoutSeconds + 30), 120)
+    $lease = [ordered]@{
+        Kind              = 'claude-code-quota-half-open-lease'
+        SchemaVersion     = 1
+        baseKeyHash       = $Context.safeBaseKey
+        probeOwner        = [ordered]@{
+            adapterName = 'Invoke-ClaudeCodeAsync.ps1'
+            jobId       = $script:jobId
+            processId   = $PID
+            machineName = $env:COMPUTERNAME
+            userName    = $env:USERNAME
+        }
+        probeAttemptId    = $script:jobId
+        probeLeaseSeconds = $probeLeaseSeconds
+        probeStartedAtUtc = $now.ToString('yyyy-MM-ddTHH:mm:ssZ')
+        probeExpiresAtUtc = $now.AddSeconds($probeLeaseSeconds).ToString('yyyy-MM-ddTHH:mm:ssZ')
+    }
+    Write-AsyncJsonAtomic -Path $LeasePath -Object $lease -Depth 6
+    return [pscustomobject]@{
+        status         = 'acquired'
+        leasePath      = $LeasePath
+        ownsLease      = $true
+        probeAttemptId = $script:jobId
+    }
+}
+
+function New-AsyncHalfOpenLease {
+    param([object]$Context, [int]$TimeoutSeconds)
+
+    [System.IO.Directory]::CreateDirectory($Context.stateDir) | Out-Null
+    $leasePath = Join-Path $Context.stateDir "$($Context.safeBaseKey).lease.json"
+    $locked = Invoke-AsyncQuotaCircuitWithLock -Context $Context -ScriptBlock {
+        New-AsyncHalfOpenLeaseUnderLock -Context $Context -TimeoutSeconds $TimeoutSeconds -LeasePath $leasePath
+    }
+    if (-not [bool]$locked.lockAcquired) {
+        return [pscustomobject]@{
+            status         = 'inconclusive'
+            leasePath      = $leasePath
+            ownsLease      = $false
+            probeAttemptId = $null
+        }
+    }
+
+    return $locked.value
 }
 
 function Get-AsyncQuotaCircuitDecision {
     param([object]$Context, [int]$TimeoutSeconds)
 
     [System.IO.Directory]::CreateDirectory($Context.stateDir) | Out-Null
-    $now = [datetime]::UtcNow
-    $variantDecisions = [System.Collections.Generic.List[object]]::new()
-    $stateFiles = @(Get-ChildItem -LiteralPath $Context.stateDir -Filter "$($Context.safeBaseKey).*" -File -ErrorAction SilentlyContinue | Where-Object { $_.Name.EndsWith('.state.json', [System.StringComparison]::OrdinalIgnoreCase) })
+    $leasePath = Join-Path $Context.stateDir "$($Context.safeBaseKey).lease.json"
+    $locked = Invoke-AsyncQuotaCircuitWithLock -Context $Context -ScriptBlock {
+        $now = [datetime]::UtcNow
+        $variantDecisions = [System.Collections.Generic.List[object]]::new()
+        $stateFiles = @(Get-ChildItem -LiteralPath $Context.stateDir -Filter "$($Context.safeBaseKey).*" -File -ErrorAction SilentlyContinue | Where-Object { $_.Name.EndsWith('.state.json', [System.StringComparison]::OrdinalIgnoreCase) })
 
-    $hadInvalid = $false
-    $hadExpiredOpen = $false
-    $hadReadInconclusive = $false
-    $hadOpen = $false
-    foreach ($file in $stateFiles) {
-        $variant = $file.BaseName
-        if ($variant.StartsWith("$($Context.safeBaseKey).", [System.StringComparison]::OrdinalIgnoreCase)) {
-            $variant = $variant.Substring($Context.safeBaseKey.Length + 1)
-            if ($variant.EndsWith('.state', [System.StringComparison]::OrdinalIgnoreCase)) {
-                $variant = $variant.Substring(0, $variant.Length - 6)
+        $hadInvalid = $false
+        $hadExpiredOpen = $false
+        $hadReadInconclusive = $false
+        $hadOpen = $false
+        foreach ($file in $stateFiles) {
+            $variant = $file.BaseName
+            if ($variant.StartsWith("$($Context.safeBaseKey).", [System.StringComparison]::OrdinalIgnoreCase)) {
+                $variant = $variant.Substring($Context.safeBaseKey.Length + 1)
+                if ($variant.EndsWith('.state', [System.StringComparison]::OrdinalIgnoreCase)) {
+                    $variant = $variant.Substring(0, $variant.Length - 6)
+                }
+            }
+            $read = Read-AsyncJsonWithDeadline -Path $file.FullName -DeadlineMs 150
+            if ($read.status -eq 'read-inconclusive') {
+                $variantDecisions.Add([ordered]@{ rateLimitType = $variant; decision = 'state-read-inconclusive' })
+                $hadReadInconclusive = $true
+                continue
+            }
+            if ($read.status -eq 'json-invalid') {
+                $hadInvalid = $true
+                $variantDecisions.Add([ordered]@{ rateLimitType = $variant; decision = 'state-json-invalid' })
+                continue
+            }
+            if ($read.status -ne 'ok') { continue }
+            $state = [string](Get-ClaudeCodeProp $read.value 'circuitState')
+            if ([string]::IsNullOrWhiteSpace($state)) { $state = [string](Get-ClaudeCodeProp $read.value 'state') }
+            $resetsAtUtc = Get-AsyncIsoToUtc -Text ([string](Get-ClaudeCodeProp $read.value 'resetsAtUtc'))
+            if ($state -eq 'open' -and $null -ne $resetsAtUtc -and $resetsAtUtc -gt $now) {
+                $variantDecisions.Add([ordered]@{ rateLimitType = $variant; decision = 'open'; resetsAtUtc = $resetsAtUtc.ToString('yyyy-MM-ddTHH:mm:ssZ') })
+                $hadOpen = $true
+                continue
+            }
+            if ($state -eq 'open') {
+                $hadExpiredOpen = $true
+                $variantDecisions.Add([ordered]@{ rateLimitType = $variant; decision = 'expired-open' })
+            }
+            else {
+                $variantDecisions.Add([ordered]@{ rateLimitType = $variant; decision = 'closed' })
             }
         }
-        $read = Read-AsyncJsonWithDeadline -Path $file.FullName -DeadlineMs 150
-        if ($read.status -eq 'read-inconclusive') {
-            $variantDecisions.Add([ordered]@{ rateLimitType = $variant; decision = 'state-read-inconclusive' })
-            $hadReadInconclusive = $true
-            continue
+
+        if ($hadReadInconclusive) {
+            return [pscustomobject]@{ blocked = $true; decision = 'state-read-inconclusive'; variants = @($variantDecisions); leasePath = $null; ownsLease = $false; probeAttemptId = $null }
         }
-        if ($read.status -eq 'json-invalid') {
-            $hadInvalid = $true
-            $variantDecisions.Add([ordered]@{ rateLimitType = $variant; decision = 'state-json-invalid' })
-            continue
+        if ($hadOpen) {
+            return [pscustomobject]@{ blocked = $true; decision = 'open'; variants = @($variantDecisions); leasePath = $null; ownsLease = $false; probeAttemptId = $null }
         }
-        if ($read.status -ne 'ok') { continue }
-        $state = [string](Get-ClaudeCodeProp $read.value 'circuitState')
-        if ([string]::IsNullOrWhiteSpace($state)) { $state = [string](Get-ClaudeCodeProp $read.value 'state') }
-        $resetsAtUtc = Get-AsyncIsoToUtc -Text ([string](Get-ClaudeCodeProp $read.value 'resetsAtUtc'))
-        if ($state -eq 'open' -and $null -ne $resetsAtUtc -and $resetsAtUtc -gt $now) {
-            $variantDecisions.Add([ordered]@{ rateLimitType = $variant; decision = 'open'; resetsAtUtc = $resetsAtUtc.ToString('yyyy-MM-ddTHH:mm:ssZ') })
-            $hadOpen = $true
-            continue
+
+        $leaseRead = Read-AsyncJsonWithDeadline -Path $leasePath -DeadlineMs 150
+        if ($leaseRead.status -eq 'read-inconclusive') {
+            return [pscustomobject]@{ blocked = $true; decision = 'state-read-inconclusive'; variants = @($variantDecisions); leasePath = $leasePath; ownsLease = $false; probeAttemptId = $null }
         }
-        if ($state -eq 'open') {
-            $hadExpiredOpen = $true
-            $variantDecisions.Add([ordered]@{ rateLimitType = $variant; decision = 'expired-open' })
+        if ($leaseRead.status -eq 'ok') {
+            $expires = Get-AsyncIsoToUtc -Text ([string](Get-ClaudeCodeProp $leaseRead.value 'probeExpiresAtUtc'))
+            if ($null -ne $expires -and $expires -gt $now) {
+                return [pscustomobject]@{ blocked = $true; decision = 'half-open-observed'; variants = @($variantDecisions); leasePath = $leasePath; ownsLease = $false; probeAttemptId = $null }
+            }
         }
-        else {
-            $variantDecisions.Add([ordered]@{ rateLimitType = $variant; decision = 'closed' })
+
+        if ($hadExpiredOpen -or $hadInvalid) {
+            $lease = New-AsyncHalfOpenLeaseUnderLock -Context $Context -TimeoutSeconds $TimeoutSeconds -LeasePath $leasePath
+            if ($lease.status -eq 'observed') {
+                return [pscustomobject]@{ blocked = $true; decision = 'half-open-observed'; variants = @($variantDecisions); leasePath = $lease.leasePath; ownsLease = $false; probeAttemptId = $null }
+            }
+            $decision = if ($hadInvalid) { 'closed-with-invalid-state-ignored' } else { 'half-open' }
+            return [pscustomobject]@{ blocked = $false; decision = $decision; variants = @($variantDecisions); leasePath = $lease.leasePath; ownsLease = $lease.ownsLease; probeAttemptId = $lease.probeAttemptId }
+        }
+
+        return [pscustomobject]@{ blocked = $false; decision = 'closed'; variants = @($variantDecisions); leasePath = $leasePath; ownsLease = $false; probeAttemptId = $null }
+    }
+
+    if (-not [bool]$locked.lockAcquired) {
+        return [pscustomobject]@{
+            blocked        = $true
+            decision       = 'state-read-inconclusive'
+            variants       = @([ordered]@{ rateLimitType = 'base-key'; decision = 'state-read-inconclusive'; evidence = 'circuit-lock-timeout' })
+            leasePath      = $leasePath
+            ownsLease      = $false
+            probeAttemptId = $null
         }
     }
 
-    if ($hadReadInconclusive) {
-        return [pscustomobject]@{ blocked = $true; decision = 'state-read-inconclusive'; variants = @($variantDecisions); leasePath = $null }
-    }
-    if ($hadOpen) {
-        return [pscustomobject]@{ blocked = $true; decision = 'open'; variants = @($variantDecisions); leasePath = $null }
-    }
-
-    $leasePath = Join-Path $Context.stateDir "$($Context.safeBaseKey).lease.json"
-    $leaseRead = Read-AsyncJsonWithDeadline -Path $leasePath -DeadlineMs 150
-    if ($leaseRead.status -eq 'read-inconclusive') {
-        return [pscustomobject]@{ blocked = $true; decision = 'state-read-inconclusive'; variants = @($variantDecisions); leasePath = $leasePath }
-    }
-    if ($leaseRead.status -eq 'ok') {
-        $expires = Get-AsyncIsoToUtc -Text ([string](Get-ClaudeCodeProp $leaseRead.value 'probeExpiresAtUtc'))
-        if ($null -ne $expires -and $expires -gt $now) {
-            return [pscustomobject]@{ blocked = $true; decision = 'half-open-observed'; variants = @($variantDecisions); leasePath = $leasePath }
-        }
-    }
-
-    if ($hadExpiredOpen -or $hadInvalid) {
-        $lease = New-AsyncHalfOpenLease -Context $Context -TimeoutSeconds $TimeoutSeconds
-        if ($lease.status -eq 'observed') {
-            return [pscustomobject]@{ blocked = $true; decision = 'half-open-observed'; variants = @($variantDecisions); leasePath = $lease.leasePath }
-        }
-        if ($lease.status -eq 'inconclusive') {
-            return [pscustomobject]@{ blocked = $true; decision = 'state-read-inconclusive'; variants = @($variantDecisions); leasePath = $lease.leasePath }
-        }
-        $decision = if ($hadInvalid) { 'closed-with-invalid-state-ignored' } else { 'half-open' }
-        return [pscustomobject]@{ blocked = $false; decision = $decision; variants = @($variantDecisions); leasePath = $lease.leasePath }
-    }
-
-    return [pscustomobject]@{ blocked = $false; decision = 'closed'; variants = @($variantDecisions); leasePath = $leasePath }
+    return $locked.value
 }
 
 function Set-AsyncQuotaCircuitOpen {
     param([object]$Context, [object]$QuotaEvidence)
     $resetsAtUtc = [string](Get-ClaudeCodeProp $QuotaEvidence 'resetsAtUtc')
     $resetUtc = Get-AsyncIsoToUtc -Text $resetsAtUtc
-    if ($null -eq $resetUtc -or $resetUtc -le [datetime]::UtcNow) { return }
+    if ($null -eq $resetUtc -or $resetUtc -le [datetime]::UtcNow) {
+        return [pscustomobject]@{ status = 'state-not-written'; statePath = $null; reason = 'reset-not-in-future'; leaseRemoved = $false }
+    }
     $rateLimitType = [string](Get-ClaudeCodeProp $QuotaEvidence 'rateLimitType')
     if ([string]::IsNullOrWhiteSpace($rateLimitType)) { $rateLimitType = 'unknown' }
     $rateLimitType = [regex]::Replace($rateLimitType, '[^A-Za-z0-9._-]', '-')
@@ -308,48 +401,75 @@ function Set-AsyncQuotaCircuitOpen {
     $effectiveLimitScope = if ($scopeAssumed) { 'credential-context' } else { $reportedLimitScopeText }
     $scopeAssumptionReason = if ($scopeAssumed) { 'reported-limit-scope-missing' } else { $null }
     $evidenceTypes = @(Get-ClaudeCodeProp $QuotaEvidence 'evidenceTypes')
-    $observedAtUtc = [datetime]::UtcNow
-    $existingHitCount = 0
-    $existingState = Read-AsyncJsonWithDeadline -Path $statePath -DeadlineMs 150
-    if ($existingState.status -eq 'ok') {
-        $existingHitCountValue = Get-ClaudeCodeProp $existingState.value 'hitCount'
-        if ($null -ne $existingHitCountValue) {
-            [void][int]::TryParse([string]$existingHitCountValue, [ref]$existingHitCount)
+
+    $locked = Invoke-AsyncQuotaCircuitWithLock -Context $Context -ScriptBlock {
+        $observedAtUtc = [datetime]::UtcNow
+        $existingHitCount = 0
+        $existingState = Read-AsyncJsonWithDeadline -Path $statePath -DeadlineMs 150
+        if ($existingState.status -eq 'ok') {
+            $existingHitCountValue = Get-ClaudeCodeProp $existingState.value 'hitCount'
+            if ($null -ne $existingHitCountValue) {
+                [void][int]::TryParse([string]$existingHitCountValue, [ref]$existingHitCount)
+            }
         }
-    }
-    $state = [ordered]@{
-        Kind                         = 'claude-code-quota-circuit-state'
-        SchemaVersion                = 1
-        circuitState                 = 'open'
-        baseKeyHash                  = $Context.safeBaseKey
-        provider                     = $Context.provider
-        backend                      = $Context.backend
-        model                        = $Model
-        modelKey                     = $Context.modelKey
-        credentialContextFingerprint = $Context.credentialFingerprint
-        rateLimitType                = $rateLimitType
-        reportedLimitScope           = $reportedLimitScopeText
-        effectiveLimitScope          = $effectiveLimitScope
-        scopeAssumed                 = $scopeAssumed
-        scopeAssumptionReason        = $scopeAssumptionReason
-        observedAtUtc                = $observedAtUtc.ToString('yyyy-MM-ddTHH:mm:ssZ')
-        openedAtUtc                  = $observedAtUtc.ToString('yyyy-MM-ddTHH:mm:ssZ')
-        resetsAtUtc                  = $resetUtc.ToString('yyyy-MM-ddTHH:mm:ssZ')
-        lastHitAtUtc                 = $observedAtUtc.ToString('yyyy-MM-ddTHH:mm:ssZ')
-        hitCount                     = ($existingHitCount + 1)
-        updatedAtUtc                 = $observedAtUtc.ToString('yyyy-MM-ddTHH:mm:ssZ')
-        evidenceTypes                = $evidenceTypes
-        sourceEvidence               = [ordered]@{
-            source             = 'claude-code-stream-json'
-            evidenceTypes      = $evidenceTypes
-            terminalReason     = Get-ClaudeCodeProp $QuotaEvidence 'terminalReason'
-            apiErrorStatus     = Get-ClaudeCodeProp $QuotaEvidence 'apiErrorStatus'
-            rateLimitType      = $rateLimitType
-            reportedLimitScope = $reportedLimitScopeText
-            resetsAtUtc        = $resetUtc.ToString('yyyy-MM-ddTHH:mm:ssZ')
+
+        $state = [ordered]@{
+            Kind                         = 'claude-code-quota-circuit-state'
+            SchemaVersion                = 1
+            circuitState                 = 'open'
+            baseKeyHash                  = $Context.safeBaseKey
+            provider                     = $Context.provider
+            backend                      = $Context.backend
+            model                        = $Model
+            modelKey                     = $Context.modelKey
+            credentialContextFingerprint = $Context.credentialFingerprint
+            rateLimitType                = $rateLimitType
+            reportedLimitScope           = $reportedLimitScopeText
+            effectiveLimitScope          = $effectiveLimitScope
+            scopeAssumed                 = $scopeAssumed
+            scopeAssumptionReason        = $scopeAssumptionReason
+            observedAtUtc                = $observedAtUtc.ToString('yyyy-MM-ddTHH:mm:ssZ')
+            openedAtUtc                  = $observedAtUtc.ToString('yyyy-MM-ddTHH:mm:ssZ')
+            resetsAtUtc                  = $resetUtc.ToString('yyyy-MM-ddTHH:mm:ssZ')
+            lastHitAtUtc                 = $observedAtUtc.ToString('yyyy-MM-ddTHH:mm:ssZ')
+            hitCount                     = ($existingHitCount + 1)
+            updatedAtUtc                 = $observedAtUtc.ToString('yyyy-MM-ddTHH:mm:ssZ')
+            evidenceTypes                = $evidenceTypes
+            sourceEvidence               = [ordered]@{
+                source             = 'claude-code-stream-json'
+                evidenceTypes      = $evidenceTypes
+                terminalReason     = Get-ClaudeCodeProp $QuotaEvidence 'terminalReason'
+                apiErrorStatus     = Get-ClaudeCodeProp $QuotaEvidence 'apiErrorStatus'
+                rateLimitType      = $rateLimitType
+                reportedLimitScope = $reportedLimitScopeText
+                resetsAtUtc        = $resetUtc.ToString('yyyy-MM-ddTHH:mm:ssZ')
+            }
         }
+        Write-AsyncJsonAtomic -Path $statePath -Object $state -Depth 8
+
+        $leaseRemoved = $false
+        if ($script:quotaCircuitLeaseOwned) {
+            $leasePath = Join-Path $Context.stateDir "$($Context.safeBaseKey).lease.json"
+            $leaseRead = Read-AsyncJsonWithDeadline -Path $leasePath -DeadlineMs 150
+            if ($leaseRead.status -eq 'ok' -and (Test-AsyncOwnsQuotaLease -Lease $leaseRead.value -Context $Context)) {
+                try {
+                    Remove-Item -LiteralPath $leasePath -Force -ErrorAction Stop
+                    $leaseRemoved = $true
+                }
+                catch {
+                    $leaseRemoved = $false
+                }
+            }
+        }
+
+        return [pscustomobject]@{ status = 'open-written'; statePath = $statePath; reason = $null; leaseRemoved = $leaseRemoved }
     }
-    Write-AsyncJsonAtomic -Path $statePath -Object $state -Depth 8
+
+    if (-not [bool]$locked.lockAcquired) {
+        return [pscustomobject]@{ status = 'state-write-inconclusive'; statePath = $statePath; reason = 'circuit-lock-timeout'; leaseRemoved = $false }
+    }
+
+    return $locked.value
 }
 
 function Test-AsyncQuotaStateNewerThanAttempt {
@@ -366,15 +486,48 @@ function Test-AsyncQuotaStateNewerThanAttempt {
 
 function Close-AsyncQuotaCircuitProbe {
     param([object]$Context)
-    $leasePath = Join-Path $Context.stateDir "$($Context.safeBaseKey).lease.json"
-    try { Remove-Item -LiteralPath $leasePath -Force -ErrorAction SilentlyContinue } catch { }
-    $stateFiles = @(Get-ChildItem -LiteralPath $Context.stateDir -Filter "$($Context.safeBaseKey).*" -File -ErrorAction SilentlyContinue | Where-Object { $_.Name.EndsWith('.state.json', [System.StringComparison]::OrdinalIgnoreCase) })
-    foreach ($file in $stateFiles) {
-        $read = Read-AsyncJsonWithDeadline -Path $file.FullName -DeadlineMs 150
-        if ($read.status -eq 'ok' -and -not (Test-AsyncQuotaStateNewerThanAttempt -State $read.value)) {
-            try { Remove-Item -LiteralPath $file.FullName -Force -ErrorAction SilentlyContinue } catch { }
-        }
+
+    if (-not $script:quotaCircuitLeaseOwned) {
+        return [pscustomobject]@{ status = 'not-owned'; removedLease = $false; removedStates = 0 }
     }
+
+    $leasePath = Join-Path $Context.stateDir "$($Context.safeBaseKey).lease.json"
+    $locked = Invoke-AsyncQuotaCircuitWithLock -Context $Context -ScriptBlock {
+        $leaseRead = Read-AsyncJsonWithDeadline -Path $leasePath -DeadlineMs 150
+        if ($leaseRead.status -ne 'ok' -or -not (Test-AsyncOwnsQuotaLease -Lease $leaseRead.value -Context $Context)) {
+            return [pscustomobject]@{ status = 'lease-not-owned'; removedLease = $false; removedStates = 0 }
+        }
+
+        $removedLease = $false
+        try {
+            Remove-Item -LiteralPath $leasePath -Force -ErrorAction Stop
+            $removedLease = $true
+        }
+        catch {
+            return [pscustomobject]@{ status = 'lease-remove-failed'; removedLease = $false; removedStates = 0 }
+        }
+
+        $removedStates = 0
+        $stateFiles = @(Get-ChildItem -LiteralPath $Context.stateDir -Filter "$($Context.safeBaseKey).*" -File -ErrorAction SilentlyContinue | Where-Object { $_.Name.EndsWith('.state.json', [System.StringComparison]::OrdinalIgnoreCase) })
+        foreach ($file in $stateFiles) {
+            $read = Read-AsyncJsonWithDeadline -Path $file.FullName -DeadlineMs 150
+            if ($read.status -eq 'ok' -and -not (Test-AsyncQuotaStateNewerThanAttempt -State $read.value)) {
+                try {
+                    Remove-Item -LiteralPath $file.FullName -Force -ErrorAction Stop
+                    $removedStates++
+                }
+                catch { }
+            }
+        }
+
+        return [pscustomobject]@{ status = 'closed'; removedLease = $removedLease; removedStates = $removedStates }
+    }
+
+    if (-not [bool]$locked.lockAcquired) {
+        return [pscustomobject]@{ status = 'close-inconclusive'; removedLease = $false; removedStates = 0 }
+    }
+
+    return $locked.value
 }
 
 function Get-AsyncLastResultEvent {
@@ -608,6 +761,8 @@ $script:cancelIssued = $false
 $script:cancelIdentityUnverifiable = $false
 $script:quotaEvidence = $null
 $script:quotaCircuitDecision = 'closed'
+$script:quotaCircuitLeaseOwned = $false
+$script:quotaCircuitProbeAttemptId = $null
 $script:retentionCleanupFailed = $false
 
 $tempRoot = if ($TempDir) { $TempDir } else { Join-Path ([System.IO.Path]::GetTempPath()) 'claude-code-async' }
@@ -629,10 +784,15 @@ try {
     $circuitContext = Get-AsyncCircuitContext -Root $circuitRoot -ModelName $Model
     $circuitDecision = Get-AsyncQuotaCircuitDecision -Context $circuitContext -TimeoutSeconds $TimeoutSec
     $script:quotaCircuitDecision = [string]$circuitDecision.decision
+    $ownsLeaseValue = Get-ClaudeCodeProp $circuitDecision 'ownsLease'
+    $script:quotaCircuitLeaseOwned = ($ownsLeaseValue -eq $true -or [string]$ownsLeaseValue -ieq 'true')
+    $script:quotaCircuitProbeAttemptId = Get-ClaudeCodeProp $circuitDecision 'probeAttemptId'
     $script:quotaEvidence = [ordered]@{
-        baseKeyHash      = $circuitContext.safeBaseKey
-        variantDecisions = @($circuitDecision.variants)
-        leasePathPresent = -not [string]::IsNullOrWhiteSpace([string]$circuitDecision.leasePath)
+        baseKeyHash              = $circuitContext.safeBaseKey
+        variantDecisions         = @($circuitDecision.variants)
+        leasePathPresent         = -not [string]::IsNullOrWhiteSpace([string]$circuitDecision.leasePath)
+        quotaCircuitLeaseOwned   = $script:quotaCircuitLeaseOwned
+        quotaCircuitProbeAttemptId = $script:quotaCircuitProbeAttemptId
     }
 
     if ($circuitDecision.blocked) {
@@ -693,6 +853,10 @@ try {
             }
         }
         $script:processIdentityVerified = $identityVerified
+        if ($env:XPZ_TEST_CLAUDE_ASYNC_FORCE_IDENTITY_UNVERIFIABLE -eq '1') {
+            $identityVerified = $false
+            $script:processIdentityVerified = $false
+        }
         if ($identityVerified) {
             try {
                 $process.Kill($true)
@@ -728,14 +892,18 @@ try {
 
     if ($quota.isQuota) {
         $script:quotaEvidence = [ordered]@{
-            baseKeyHash        = $circuitContext.safeBaseKey
-            variantDecisions   = @($circuitDecision.variants)
-            evidenceTypes      = @($quota.evidenceTypes)
-            rateLimitType      = $quota.rateLimitType
-            reportedLimitScope = $quota.reportedLimitScope
-            resetsAtUtc        = $quota.resetsAtUtc
+            baseKeyHash              = $circuitContext.safeBaseKey
+            variantDecisions         = @($circuitDecision.variants)
+            quotaCircuitLeaseOwned   = $script:quotaCircuitLeaseOwned
+            quotaCircuitProbeAttemptId = $script:quotaCircuitProbeAttemptId
+            evidenceTypes            = @($quota.evidenceTypes)
+            rateLimitType            = $quota.rateLimitType
+            reportedLimitScope       = $quota.reportedLimitScope
+            resetsAtUtc              = $quota.resetsAtUtc
         }
-        Set-AsyncQuotaCircuitOpen -Context $circuitContext -QuotaEvidence $quota
+        $stateWrite = Set-AsyncQuotaCircuitOpen -Context $circuitContext -QuotaEvidence $quota
+        $script:quotaEvidence['quotaCircuitStateWriteStatus'] = [string](Get-ClaudeCodeProp $stateWrite 'status')
+        $script:quotaEvidence['quotaCircuitLeaseRemoved'] = Get-ClaudeCodeProp $stateWrite 'leaseRemoved'
         $failureAfterText = New-AsyncFailureAfterText -Reason 'quota-after-text' -Text $acceptedText
         Complete-AsyncAdapter -TechnicalStatus 'quota' -ResultAccepted $false `
             -AcceptanceRejectionReason 'quota-signal' -ExitCode ([int]$process.ExitCode) `
@@ -745,7 +913,9 @@ try {
     }
 
     if ($process.ExitCode -eq 0 -and -not [string]::IsNullOrWhiteSpace($acceptedText) -and [bool]$streamInspection.terminalSuccess) {
-        Close-AsyncQuotaCircuitProbe -Context $circuitContext
+        if ($script:quotaCircuitLeaseOwned) {
+            [void](Close-AsyncQuotaCircuitProbe -Context $circuitContext)
+        }
         Complete-AsyncAdapter -TechnicalStatus 'completed' -ResultAccepted $true `
             -AcceptanceRejectionReason $null -ExitCode ([int]$process.ExitCode) -TerminalReason $terminalReason `
             -ApiErrorStatus $apiErrorStatus -FailureAfterText $null -StreamPath $streamPath -StderrPath $stderrPath `

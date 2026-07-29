@@ -75,6 +75,12 @@ if "%FAKE_CLAUDE_MODE%"=="success-stderr" (
   echo {"type":"result","subtype":"success","is_error":false}
   exit /b 0
 )
+if "%FAKE_CLAUDE_MODE%"=="success-slow" (
+  echo {"type":"content_block_delta","delta":{"type":"text_delta","text":"SONDA"}}
+  ping -n 4 127.0.0.1 >nul
+  echo {"type":"result","subtype":"success","is_error":false}
+  exit /b 0
+)
 if "%FAKE_CLAUDE_MODE%"=="success-no-terminal" (
   echo {"type":"content_block_delta","delta":{"type":"text_delta","text":"texto-sem-terminal"}}
   exit /b 0
@@ -121,12 +127,16 @@ function Invoke-AdapterCase {
         [string]$CircuitRoot,
         [string]$RetentionMode = 'public',
         [int]$TimeoutSec = 30,
-        [switch]$ForceRetentionCleanupFailure
+        [switch]$ForceRetentionCleanupFailure,
+        [switch]$ForceIdentityUnverifiable
     )
     $env:FAKE_CLAUDE_MODE = $Mode
     $previousForceCleanup = $env:XPZ_TEST_CLAUDE_ASYNC_FORCE_RETENTION_CLEANUP_FAIL
+    $previousForceIdentity = $env:XPZ_TEST_CLAUDE_ASYNC_FORCE_IDENTITY_UNVERIFIABLE
     if ($ForceRetentionCleanupFailure) { $env:XPZ_TEST_CLAUDE_ASYNC_FORCE_RETENTION_CLEANUP_FAIL = '1' }
     else { Remove-Item Env:\XPZ_TEST_CLAUDE_ASYNC_FORCE_RETENTION_CLEANUP_FAIL -ErrorAction SilentlyContinue }
+    if ($ForceIdentityUnverifiable) { $env:XPZ_TEST_CLAUDE_ASYNC_FORCE_IDENTITY_UNVERIFIABLE = '1' }
+    else { Remove-Item Env:\XPZ_TEST_CLAUDE_ASYNC_FORCE_IDENTITY_UNVERIFIABLE -ErrorAction SilentlyContinue }
     $caseId = [guid]::NewGuid().ToString('N')
     $prompt = Join-Path $TempRoot "prompt-$Mode-$caseId.md"
     Set-Content -LiteralPath $prompt -Value "prompt $Mode" -Encoding utf8
@@ -148,6 +158,78 @@ function Invoke-AdapterCase {
     finally {
         if ($null -eq $previousForceCleanup) { Remove-Item Env:\XPZ_TEST_CLAUDE_ASYNC_FORCE_RETENTION_CLEANUP_FAIL -ErrorAction SilentlyContinue }
         else { $env:XPZ_TEST_CLAUDE_ASYNC_FORCE_RETENTION_CLEANUP_FAIL = $previousForceCleanup }
+        if ($null -eq $previousForceIdentity) { Remove-Item Env:\XPZ_TEST_CLAUDE_ASYNC_FORCE_IDENTITY_UNVERIFIABLE -ErrorAction SilentlyContinue }
+        else { $env:XPZ_TEST_CLAUDE_ASYNC_FORCE_IDENTITY_UNVERIFIABLE = $previousForceIdentity }
+    }
+}
+
+function Start-AdapterProcessCase {
+    param(
+        [string]$TempRoot,
+        [string]$Mode,
+        [string]$ClaudeExe,
+        [string]$CircuitRoot,
+        [string]$RetentionMode = 'public',
+        [int]$TimeoutSec = 30
+    )
+
+    $env:FAKE_CLAUDE_MODE = $Mode
+    $caseId = [guid]::NewGuid().ToString('N')
+    $prompt = Join-Path $TempRoot "prompt-$Mode-$caseId.md"
+    Set-Content -LiteralPath $prompt -Value "prompt $Mode" -Encoding utf8
+    $sidecar = Join-Path $TempRoot "$Mode-$caseId.sidecar.json"
+    $adapterTemp = Join-Path $TempRoot "adapter-$Mode-$caseId"
+    $stdoutPath = Join-Path $TempRoot "$Mode-$caseId.stdout.txt"
+    $stderrPath = Join-Path $TempRoot "$Mode-$caseId.harness-stderr.txt"
+    New-Item -ItemType Directory -Path $adapterTemp -Force | Out-Null
+
+    $pwshPath = (Get-Command pwsh -ErrorAction Stop).Source
+    $arguments = @(
+        '-NoProfile',
+        '-File', $scriptUnderTest,
+        '-MessagePath', $prompt,
+        '-SidecarPath', $sidecar,
+        '-Model', 'claude-opus-4-8',
+        '-ClaudeExe', $ClaudeExe,
+        '-CircuitStateRoot', $CircuitRoot,
+        '-TempDir', $adapterTemp,
+        '-RetentionMode', $RetentionMode,
+        '-TimeoutSec', [string]$TimeoutSec,
+        '-Cd', $TempRoot
+    )
+    $process = Start-Process -FilePath $pwshPath -ArgumentList $arguments -PassThru -NoNewWindow `
+        -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
+
+    [pscustomobject]@{
+        Process     = $process
+        stdoutPath  = $stdoutPath
+        stderrPath  = $stderrPath
+        sidecarPath = $sidecar
+        adapterTemp = $adapterTemp
+    }
+}
+
+function Receive-AdapterProcessCase {
+    param([object]$Case, [int]$WaitMs = 20000)
+
+    if (-not $Case.Process.WaitForExit($WaitMs)) {
+        try { $Case.Process.Kill($true) } catch { }
+        throw "Processo de self-test nao terminou em $WaitMs ms: $($Case.sidecarPath)"
+    }
+    if (Test-Path -LiteralPath $Case.stdoutPath -PathType Leaf) {
+        $stdout = Get-Content -LiteralPath $Case.stdoutPath -Raw -Encoding utf8
+    }
+    else {
+        $stdout = ''
+    }
+    $stdoutText = if ($null -eq $stdout) { '' } else { [string]$stdout }
+    $sidecarJson = Get-Content -LiteralPath $Case.sidecarPath -Raw -Encoding utf8 | ConvertFrom-Json
+    [pscustomobject]@{
+        stdout      = $stdoutText.TrimEnd("`r", "`n")
+        sidecar     = $sidecarJson
+        path        = $Case.sidecarPath
+        adapterTemp = $Case.adapterTemp
+        exitCode    = $Case.Process.ExitCode
     }
 }
 
@@ -340,6 +422,48 @@ try {
     Assert-True ($observed.sidecar.quotaCircuitDecision -eq 'half-open-observed') "lease: decisao deveria ser half-open-observed; veio $($observed.sidecar.quotaCircuitDecision)."
     Assert-True ($observed.sidecar.spawnAttempted -eq $false) 'lease: nao deve spawn quando ha probe half-open ativo.'
 
+    $circuitConcurrentLease = Join-Path $tmp 'circuit-concurrent-lease'
+    $concurrentDir = Join-Path $circuitConcurrentLease 'claude-code-quota-circuit'
+    New-Item -ItemType Directory -Path $concurrentDir -Force | Out-Null
+    $expired | ConvertTo-Json -Compress -Depth 6 | Set-Content -LiteralPath (Join-Path $concurrentDir "$baseHash.weekly.state.json") -Encoding utf8
+    $expiredDaily = [ordered]@{
+        Kind          = 'claude-code-quota-circuit-state'
+        SchemaVersion = 1
+        circuitState  = 'open'
+        baseKeyHash   = $baseHash
+        backend       = 'claude-code'
+        model         = 'claude-opus-4-8'
+        rateLimitType = 'daily'
+        openedAtUtc   = '2020-01-01T00:00:00Z'
+        resetsAtUtc   = '2020-01-01T00:00:01Z'
+    }
+    $expiredDaily | ConvertTo-Json -Compress -Depth 6 | Set-Content -LiteralPath (Join-Path $concurrentDir "$baseHash.daily.state.json") -Encoding utf8
+    if (Test-Path -LiteralPath $fake.ArgsFile -PathType Leaf) {
+        $argsBeforeConcurrent = @(Get-Content -LiteralPath $fake.ArgsFile)
+    }
+    else {
+        $argsBeforeConcurrent = @()
+    }
+    $concurrentA = Start-AdapterProcessCase -TempRoot $tmp -Mode 'success-slow' -ClaudeExe $fake.Exe -CircuitRoot $circuitConcurrentLease
+    $concurrentB = Start-AdapterProcessCase -TempRoot $tmp -Mode 'success-slow' -ClaudeExe $fake.Exe -CircuitRoot $circuitConcurrentLease
+    $concurrentResultA = Receive-AdapterProcessCase -Case $concurrentA
+    $concurrentResultB = Receive-AdapterProcessCase -Case $concurrentB
+    $concurrentResults = @($concurrentResultA, $concurrentResultB)
+    $spawnedConcurrent = @($concurrentResults | Where-Object { $_.sidecar.spawnAttempted -eq $true })
+    $blockedConcurrent = @($concurrentResults | Where-Object { $_.sidecar.quotaCircuitDecision -eq 'half-open-observed' })
+    $argsAfterConcurrent = @(Get-Content -LiteralPath $fake.ArgsFile)
+    Assert-True ($spawnedConcurrent.Count -eq 1) "concorrencia half-open: exatamente uma sonda deveria spawnar; spawnaram $($spawnedConcurrent.Count)."
+    Assert-True ($blockedConcurrent.Count -eq 1) "concorrencia half-open: exatamente uma sonda deveria observar lease; observaram $($blockedConcurrent.Count)."
+    Assert-True ($spawnedConcurrent[0].sidecar.quotaCircuitDecision -eq 'half-open') "concorrencia half-open: a sonda dona deveria registrar half-open; veio $($spawnedConcurrent[0].sidecar.quotaCircuitDecision)."
+    Assert-True ($spawnedConcurrent[0].sidecar.resultAccepted -eq $true) 'concorrencia half-open: a sonda dona deveria aceitar resultado final.'
+    Assert-True ($spawnedConcurrent[0].stdout -eq 'SONDA') 'concorrencia half-open: stdout da sonda dona deveria conter texto aceito.'
+    Assert-True ($blockedConcurrent[0].sidecar.spawnAttempted -eq $false) 'concorrencia half-open: a chamada bloqueada nao deve spawnar.'
+    Assert-True ([string]::IsNullOrWhiteSpace($blockedConcurrent[0].stdout)) 'concorrencia half-open: a chamada bloqueada nao deve escrever stdout.'
+    Assert-True (($argsAfterConcurrent.Count - $argsBeforeConcurrent.Count) -eq 1) 'concorrencia half-open: fake CLI deveria receber exatamente uma chamada.'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $concurrentDir "$baseHash.lease.json") -PathType Leaf)) 'concorrencia half-open: lease proprio deveria ser removido apos sucesso.'
+    $remainingConcurrentStates = @(Get-ChildItem -LiteralPath $concurrentDir -Filter "$baseHash.*.state.json" -File -ErrorAction SilentlyContinue)
+    Assert-True ($remainingConcurrentStates.Count -eq 0) 'concorrencia half-open: estados expirados deveriam ser fechados sob lock da sonda dona.'
+
     $circuitProbeLease = Join-Path $tmp 'circuit-probe-lease'
     $probeLeaseDir = Join-Path $circuitProbeLease 'claude-code-quota-circuit'
     New-Item -ItemType Directory -Path $probeLeaseDir -Force | Out-Null
@@ -388,12 +512,23 @@ try {
     Assert-True ($timeout.sidecar.cancelRequested -eq $true) 'timeout: cancelRequested=true esperado.'
     Assert-True ($timeout.sidecar.processIdentity.startTimeUtc -ne $null) 'timeout: StartTime real deveria ser capturado.'
     Assert-True ($timeout.sidecar.acceptanceRejectionReason -eq 'timeout') 'timeout normal nao deve virar cancelled.'
+    Assert-True ($timeout.sidecar.processIdentityVerified -eq $true) 'timeout: identidade real deveria ser verificavel no caminho normal.'
+    Assert-True ($timeout.sidecar.cancelIssued -eq $true) 'timeout: processo com identidade verificavel deveria receber cancelamento.'
+
+    $unverifiableTimeout = Invoke-AdapterCase -TempRoot $tmp -Mode 'sleep' -ClaudeExe $fake.Exe `
+        -CircuitRoot (Join-Path $tmp 'circuit-timeout-unverifiable') -TimeoutSec 1 -ForceIdentityUnverifiable
+    Assert-True ($unverifiableTimeout.sidecar.technicalStatus -eq 'timeout') 'timeout identidade nao verificavel: technicalStatus deveria ser timeout.'
+    Assert-True ($unverifiableTimeout.sidecar.cancelRequested -eq $true) 'timeout identidade nao verificavel: cancelRequested=true esperado.'
+    Assert-True ($unverifiableTimeout.sidecar.processIdentityVerified -eq $false) 'timeout identidade nao verificavel: processIdentityVerified deveria ser false.'
+    Assert-True ($unverifiableTimeout.sidecar.cancelIdentityUnverifiable -eq $true) 'timeout identidade nao verificavel: deve registrar impossibilidade de validar identidade.'
+    Assert-True ($unverifiableTimeout.sidecar.cancelIssued -eq $false) 'timeout identidade nao verificavel: nao deve matar processo sem identidade verificavel.'
 
     Write-Output 'OK: Test-ClaudeCodeAsyncSelfTest.ps1'
 }
 finally {
     if ($null -eq $previousMode) { Remove-Item Env:\FAKE_CLAUDE_MODE -ErrorAction SilentlyContinue }
     else { $env:FAKE_CLAUDE_MODE = $previousMode }
+    Remove-Item Env:\XPZ_TEST_CLAUDE_ASYNC_FORCE_IDENTITY_UNVERIFIABLE -ErrorAction SilentlyContinue
     if (Test-Path -LiteralPath $tmp) {
         Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
     }
