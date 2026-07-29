@@ -27,41 +27,13 @@ $streamPath = "$base.stream.jsonl"
 $errPath = "$base.stderr.txt"
 $resultPath = "$base.result.json"
 
-function Get-CcProp {
-    param($Obj, [string]$Name)
-    if ($null -ne $Obj -and $Obj.PSObject.Properties[$Name]) {
-        return $Obj.PSObject.Properties[$Name].Value
-    }
-    return $null
-}
-
-function Get-ClaudeStreamText {
-    param($Event)
-    $type = [string](Get-CcProp $Event 'type')
-    if ($type -eq 'assistant') {
-        $message = Get-CcProp $Event 'message'
-        $content = @(Get-CcProp $message 'content')
-        $parts = @()
-        foreach ($c in $content) {
-            $txt = Get-CcProp $c 'text'
-            if (-not [string]::IsNullOrEmpty([string]$txt)) { $parts += [string]$txt }
-        }
-        return ($parts -join '')
-    }
-    if ($type -eq 'content_block_delta') {
-        $delta = Get-CcProp $Event 'delta'
-        $txt = Get-CcProp $delta 'text'
-        if ($txt) { return [string]$txt }
-    }
-    return ''
-}
-
 Write-Host "Monitorando Claude Code job $JobId (PID $ProcessId)" -ForegroundColor Cyan
 Write-Host "Stream: $streamPath" -ForegroundColor DarkGray
 
 $seen = 0
 $finalText = ''
 $streamError = ''
+$streamEvents = [System.Collections.Generic.List[object]]::new()
 $lastActivity = Get-Date
 
 while ($true) {
@@ -72,7 +44,8 @@ while ($true) {
             if ([string]::IsNullOrWhiteSpace($line)) { continue }
             $ev = $null
             try { $ev = $line | ConvertFrom-Json } catch { continue }
-            $txt = Get-ClaudeStreamText -Event $ev
+            $streamEvents.Add($ev)
+            $txt = Get-ClaudeCodeStreamEventText -StreamEvent $ev
             if (-not [string]::IsNullOrEmpty($txt)) {
                 Write-Host $txt -NoNewline
                 $finalText += $txt
@@ -104,6 +77,7 @@ $stderr = ''
 if (Test-Path -LiteralPath $errPath -PathType Leaf) {
     $stderr = Get-Content -LiteralPath $errPath -Raw -Encoding utf8 -ErrorAction SilentlyContinue
 }
+$finalText = Get-ClaudeCodeStreamAcceptedTextFromEvents -StreamEvents @($streamEvents)
 $status = Resolve-ClaudeCodeJobStatus -FinalText $finalText -StreamError $streamError -Stderr $stderr
 
 $result = [ordered]@{

@@ -158,7 +158,19 @@ if ($model -eq 'claude-untrusted-workspace') {
     exit 1
 }
 $null = [Console]::In.ReadToEnd()
-'CLAUDE cwd=' + (Get-Location).Path + ' model=' + $model + ' revisao'
+$text = 'CLAUDE cwd=' + (Get-Location).Path + ' model=' + $model + ' revisao'
+[pscustomobject]@{
+    type = 'assistant'
+    message = [ordered]@{
+        content = @([ordered]@{ text = $text })
+    }
+} | ConvertTo-Json -Compress -Depth 5
+[pscustomobject]@{
+    type = 'result'
+    subtype = 'success'
+    is_error = $false
+    result = 'NAO_E_VEREDITO'
+} | ConvertTo-Json -Compress -Depth 5
 exit 0
 '@ | Set-Content -LiteralPath $fakeClReader -Encoding utf8
     $fakeClCmd = Join-Path $tmp 'fake-claude.cmd'
@@ -236,6 +248,7 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
     # ---------------------------------------------------------------------------------------
     # Helper de invocação (processo filho, stdout/stderr separados em arquivo)
     # ---------------------------------------------------------------------------------------
+    $defaultClaudeCircuitRoot = Join-Path $tmp 'claude-circuit'
     function Invoke-Harness {
         param(
             [Parameter(Mandatory)] [object[]] $Reviewers,
@@ -271,6 +284,7 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
         }
         if (-not $NoRoundId) { $argList += @('-RoundId', $rid) }
         if (-not $NoExeMap) { $argList += @('-BackendExeMap', $exeMapFile) }
+        if (-not $Extra.ContainsKey('ClaudeCircuitStateRoot')) { $argList += @('-ClaudeCircuitStateRoot', $defaultClaudeCircuitRoot) }
         foreach ($k in $Extra.Keys) { $argList += @("-$k", [string]$Extra[$k]) }
 
         $p = Start-Process -FilePath 'pwsh' -ArgumentList $argList -NoNewWindow -PassThru `
@@ -571,9 +585,17 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
 
     $rvCl = Get-Reviewer $r.json 0
     Assert-True ($rvCl.state -eq 'responded') "claude-code despacho: esperado responded; got $($rvCl.state)"
+    Assert-True ($rvCl.sidecarAccepted -eq $true) 'claude-code despacho: sidecar deveria ser aceito.'
+    Assert-True ($rvCl.resultAccepted -eq $true) 'claude-code despacho: resultAccepted=true esperado.'
+    Assert-True ($rvCl.technicalStatus -eq 'completed') 'claude-code despacho: technicalStatus completed esperado.'
+    Assert-True (Test-Path -LiteralPath ([string]$rvCl.sidecarPath) -PathType Leaf) 'claude-code despacho: sidecarPath deveria existir.'
     $tCl = Get-Content -LiteralPath $rvCl.verdictPath -Raw -Encoding utf8
     Assert-True ($tCl -match 'model=claude-opus-4-8') 'claude-code despacho: -Model deveria chegar ao adapter'
     Assert-True ($tCl -match [regex]::Escape($tmp)) 'claude-code despacho: -Cd deveria virar o WorkingDirectory (cwd)'
+    Assert-True ([int]$r.json.reviewersDispatchAttempted -eq 3) 'contadores v2: reviewersDispatchAttempted=3 esperado.'
+    Assert-True ([int]$r.json.reviewersProcessCreated -eq 1) 'contadores v2: apenas Claude async declara processCreated=true.'
+    Assert-True ([int]$r.json.processCreatedUnknownCount -eq 2) 'contadores v2: copilot/gemini ficam processCreated desconhecido.'
+    Assert-True ([int]$r.json.sidecarAcceptedCount -eq 1) 'contadores v2: sidecarAcceptedCount=1 esperado.'
 
     $rvCp = Get-Reviewer $r.json 1
     Assert-True ($rvCp.state -eq 'responded') "copilot despacho: esperado responded; got $($rvCp.state)"
@@ -653,9 +675,9 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
     $stdoutTrim = $r.stdout.TrimEnd("`r", "`n")
     Assert-True (@($stdoutTrim -split "`n").Count -eq 1) 'contrato: stdout deveria ter exatamente 1 linha'
     Assert-True ($r.json.Kind -eq 'xpz-llm-panel-dispatch-result') 'contrato: Kind PascalCase'
-    Assert-True ([int]$r.json.SchemaVersion -eq 1) 'contrato: SchemaVersion=1 PascalCase'
+    Assert-True ([int]$r.json.SchemaVersion -eq 2) 'contrato: SchemaVersion=2 PascalCase'
     # state subset
-    $validStates = @('responded', 'error', 'quota', 'unavailable', 'timeout', 'gateAsk', 'gateDeny')
+    $validStates = @('responded', 'error', 'quota', 'unavailable', 'timeout', 'gateAsk', 'gateDeny', 'skippedAfterSuccess', 'skippedByPolicy', 'notAttempted')
     foreach ($rev in $r.json.reviewers) { Assert-True ($validStates -contains $rev.state) "contrato: state '$($rev.state)' deveria estar no subset valido" }
     # targetModelKey vazio -> null (claude-code sem model)
     $rvClaude = Get-Reviewer $r.json 1
