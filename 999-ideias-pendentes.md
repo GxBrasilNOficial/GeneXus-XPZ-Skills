@@ -29,7 +29,6 @@ Não faz parte da correção atual/Fase 0. A Fase 0 deve sanar o incidente estre
 
 Adendo de retomada (2026-07-23, revisão do PR #2 `fix: refine build post-processing classification`): a frente v2/finalizador também deve absorver os follow-ups de cobertura que ficaram fora do aceite do PR. Subcasos concretos:
 
-- adicionar self-test para janela `Executando eventos pós-construção` detectada porém vazia, com evento pós-build real fora da janela, garantindo que a correção não produza falso sucesso limpo;
 - confirmar paridade explícita de `Invoke-GeneXusKbSpecifyGenerate.ps1` frente ao filtro de ruído em `stderr` e à extração/classificação de eventos pós-build, não só por leitura de implementação compartilhada;
 - coletar, quando houver KB disponível, evidência empírica de `.NET Framework` com build limpo e sem rebaixamento por pós-build real não registrado.
 
