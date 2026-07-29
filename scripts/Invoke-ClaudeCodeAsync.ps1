@@ -384,6 +384,110 @@ function Get-AsyncQuotaCircuitDecision {
     return $locked.value
 }
 
+function New-AsyncQuotaCircuitOpenStateObject {
+    param(
+        [object]$Context,
+        [object]$QuotaEvidence,
+        [string]$RateLimitType,
+        [AllowNull()] [string]$ReportedLimitScopeText,
+        [string]$EffectiveLimitScope,
+        [bool]$ScopeAssumed,
+        [AllowNull()] [string]$ScopeAssumptionReason,
+        [object[]]$EvidenceTypes,
+        [datetime]$ResetUtc,
+        [datetime]$ObservedAtUtc,
+        [int]$HitCount,
+        [AllowNull()] [string]$PersistenceMode,
+        [AllowNull()] [string]$PersistenceReason
+    )
+
+    $reportedLimitScopeValue = if ([string]::IsNullOrWhiteSpace([string]$ReportedLimitScopeText)) { $null } else { [string]$ReportedLimitScopeText }
+    $scopeAssumptionReasonValue = if ([string]::IsNullOrWhiteSpace([string]$ScopeAssumptionReason)) { $null } else { [string]$ScopeAssumptionReason }
+    $sourceEvidence = [ordered]@{
+        source             = 'claude-code-stream-json'
+        evidenceTypes      = $EvidenceTypes
+        terminalReason     = Get-ClaudeCodeProp $QuotaEvidence 'terminalReason'
+        apiErrorStatus     = Get-ClaudeCodeProp $QuotaEvidence 'apiErrorStatus'
+        rateLimitType      = $RateLimitType
+        reportedLimitScope = $reportedLimitScopeValue
+        resetsAtUtc        = $ResetUtc.ToString('yyyy-MM-ddTHH:mm:ssZ')
+    }
+    if (-not [string]::IsNullOrWhiteSpace($PersistenceMode)) {
+        $sourceEvidence['persistenceMode'] = $PersistenceMode
+    }
+    if (-not [string]::IsNullOrWhiteSpace($PersistenceReason)) {
+        $sourceEvidence['persistenceReason'] = $PersistenceReason
+    }
+
+    return [ordered]@{
+        Kind                         = 'claude-code-quota-circuit-state'
+        SchemaVersion                = 1
+        circuitState                 = 'open'
+        baseKeyHash                  = $Context.safeBaseKey
+        provider                     = $Context.provider
+        backend                      = $Context.backend
+        model                        = $Model
+        modelKey                     = $Context.modelKey
+        credentialContextFingerprint = $Context.credentialFingerprint
+        rateLimitType                = $RateLimitType
+        reportedLimitScope           = $reportedLimitScopeValue
+        effectiveLimitScope          = $EffectiveLimitScope
+        scopeAssumed                 = $ScopeAssumed
+        scopeAssumptionReason        = $scopeAssumptionReasonValue
+        observedAtUtc                = $ObservedAtUtc.ToString('yyyy-MM-ddTHH:mm:ssZ')
+        openedAtUtc                  = $ObservedAtUtc.ToString('yyyy-MM-ddTHH:mm:ssZ')
+        resetsAtUtc                  = $ResetUtc.ToString('yyyy-MM-ddTHH:mm:ssZ')
+        lastHitAtUtc                 = $ObservedAtUtc.ToString('yyyy-MM-ddTHH:mm:ssZ')
+        hitCount                     = $HitCount
+        updatedAtUtc                 = $ObservedAtUtc.ToString('yyyy-MM-ddTHH:mm:ssZ')
+        evidenceTypes                = $EvidenceTypes
+        sourceEvidence               = $sourceEvidence
+    }
+}
+
+function Write-AsyncQuotaCircuitOpenConservativeFallback {
+    param(
+        [object]$Context,
+        [object]$QuotaEvidence,
+        [string]$RateLimitType,
+        [AllowNull()] [string]$ReportedLimitScopeText,
+        [string]$EffectiveLimitScope,
+        [bool]$ScopeAssumed,
+        [AllowNull()] [string]$ScopeAssumptionReason,
+        [object[]]$EvidenceTypes,
+        [datetime]$ResetUtc,
+        [string]$Reason
+    )
+
+    $observedAtUtc = [datetime]::UtcNow
+    $fallbackVariant = "$RateLimitType.write-inconclusive.$($script:jobId)"
+    $fallbackPath = Join-Path $Context.stateDir "$($Context.safeBaseKey).$fallbackVariant.state.json"
+    $state = New-AsyncQuotaCircuitOpenStateObject -Context $Context -QuotaEvidence $QuotaEvidence `
+        -RateLimitType $RateLimitType -ReportedLimitScopeText $ReportedLimitScopeText `
+        -EffectiveLimitScope $EffectiveLimitScope -ScopeAssumed $ScopeAssumed `
+        -ScopeAssumptionReason $ScopeAssumptionReason -EvidenceTypes $EvidenceTypes `
+        -ResetUtc $ResetUtc -ObservedAtUtc $observedAtUtc -HitCount 1 `
+        -PersistenceMode 'lock-free-conservative' -PersistenceReason $Reason
+
+    try {
+        Write-AsyncJsonAtomic -Path $fallbackPath -Object $state -Depth 8
+        return [pscustomobject]@{
+            status       = 'open-written-lock-free-conservative'
+            statePath    = $fallbackPath
+            reason       = $Reason
+            leaseRemoved = $false
+        }
+    }
+    catch {
+        return [pscustomobject]@{
+            status       = 'state-write-failed'
+            statePath    = $fallbackPath
+            reason       = "conservative-fallback-write-failed: $($_.Exception.Message)"
+            leaseRemoved = $false
+        }
+    }
+}
+
 function Set-AsyncQuotaCircuitOpen {
     param([object]$Context, [object]$QuotaEvidence)
     $resetsAtUtc = [string](Get-ClaudeCodeProp $QuotaEvidence 'resetsAtUtc')
@@ -413,38 +517,12 @@ function Set-AsyncQuotaCircuitOpen {
             }
         }
 
-        $state = [ordered]@{
-            Kind                         = 'claude-code-quota-circuit-state'
-            SchemaVersion                = 1
-            circuitState                 = 'open'
-            baseKeyHash                  = $Context.safeBaseKey
-            provider                     = $Context.provider
-            backend                      = $Context.backend
-            model                        = $Model
-            modelKey                     = $Context.modelKey
-            credentialContextFingerprint = $Context.credentialFingerprint
-            rateLimitType                = $rateLimitType
-            reportedLimitScope           = $reportedLimitScopeText
-            effectiveLimitScope          = $effectiveLimitScope
-            scopeAssumed                 = $scopeAssumed
-            scopeAssumptionReason        = $scopeAssumptionReason
-            observedAtUtc                = $observedAtUtc.ToString('yyyy-MM-ddTHH:mm:ssZ')
-            openedAtUtc                  = $observedAtUtc.ToString('yyyy-MM-ddTHH:mm:ssZ')
-            resetsAtUtc                  = $resetUtc.ToString('yyyy-MM-ddTHH:mm:ssZ')
-            lastHitAtUtc                 = $observedAtUtc.ToString('yyyy-MM-ddTHH:mm:ssZ')
-            hitCount                     = ($existingHitCount + 1)
-            updatedAtUtc                 = $observedAtUtc.ToString('yyyy-MM-ddTHH:mm:ssZ')
-            evidenceTypes                = $evidenceTypes
-            sourceEvidence               = [ordered]@{
-                source             = 'claude-code-stream-json'
-                evidenceTypes      = $evidenceTypes
-                terminalReason     = Get-ClaudeCodeProp $QuotaEvidence 'terminalReason'
-                apiErrorStatus     = Get-ClaudeCodeProp $QuotaEvidence 'apiErrorStatus'
-                rateLimitType      = $rateLimitType
-                reportedLimitScope = $reportedLimitScopeText
-                resetsAtUtc        = $resetUtc.ToString('yyyy-MM-ddTHH:mm:ssZ')
-            }
-        }
+        $state = New-AsyncQuotaCircuitOpenStateObject -Context $Context -QuotaEvidence $QuotaEvidence `
+            -RateLimitType $rateLimitType -ReportedLimitScopeText $reportedLimitScopeText `
+            -EffectiveLimitScope $effectiveLimitScope -ScopeAssumed $scopeAssumed `
+            -ScopeAssumptionReason $scopeAssumptionReason -EvidenceTypes $evidenceTypes `
+            -ResetUtc $resetUtc -ObservedAtUtc $observedAtUtc -HitCount ($existingHitCount + 1) `
+            -PersistenceMode $null -PersistenceReason $null
         Write-AsyncJsonAtomic -Path $statePath -Object $state -Depth 8
 
         $leaseRemoved = $false
@@ -466,7 +544,11 @@ function Set-AsyncQuotaCircuitOpen {
     }
 
     if (-not [bool]$locked.lockAcquired) {
-        return [pscustomobject]@{ status = 'state-write-inconclusive'; statePath = $statePath; reason = 'circuit-lock-timeout'; leaseRemoved = $false }
+        return Write-AsyncQuotaCircuitOpenConservativeFallback -Context $Context -QuotaEvidence $QuotaEvidence `
+            -RateLimitType $rateLimitType -ReportedLimitScopeText $reportedLimitScopeText `
+            -EffectiveLimitScope $effectiveLimitScope -ScopeAssumed $scopeAssumed `
+            -ScopeAssumptionReason $scopeAssumptionReason -EvidenceTypes $evidenceTypes `
+            -ResetUtc $resetUtc -Reason 'circuit-lock-timeout'
     }
 
     return $locked.value
@@ -901,7 +983,18 @@ try {
             reportedLimitScope       = $quota.reportedLimitScope
             resetsAtUtc              = $quota.resetsAtUtc
         }
-        $stateWrite = Set-AsyncQuotaCircuitOpen -Context $circuitContext -QuotaEvidence $quota
+        $testQuotaWriteLock = $null
+        if ($env:XPZ_TEST_CLAUDE_ASYNC_FORCE_QUOTA_STATE_WRITE_LOCK -eq '1') {
+            $testQuotaWriteLockPath = Get-AsyncQuotaCircuitLockPath -Context $circuitContext
+            [System.IO.Directory]::CreateDirectory([System.IO.Path]::GetDirectoryName($testQuotaWriteLockPath)) | Out-Null
+            $testQuotaWriteLock = [System.IO.File]::Open($testQuotaWriteLockPath, [System.IO.FileMode]::OpenOrCreate, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None)
+        }
+        try {
+            $stateWrite = Set-AsyncQuotaCircuitOpen -Context $circuitContext -QuotaEvidence $quota
+        }
+        finally {
+            if ($null -ne $testQuotaWriteLock) { $testQuotaWriteLock.Dispose() }
+        }
         $script:quotaEvidence['quotaCircuitStateWriteStatus'] = [string](Get-ClaudeCodeProp $stateWrite 'status')
         $script:quotaEvidence['quotaCircuitLeaseRemoved'] = Get-ClaudeCodeProp $stateWrite 'leaseRemoved'
         $failureAfterText = New-AsyncFailureAfterText -Reason 'quota-after-text' -Text $acceptedText

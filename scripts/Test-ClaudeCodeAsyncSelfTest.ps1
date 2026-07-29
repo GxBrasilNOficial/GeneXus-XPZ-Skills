@@ -128,15 +128,19 @@ function Invoke-AdapterCase {
         [string]$RetentionMode = 'public',
         [int]$TimeoutSec = 30,
         [switch]$ForceRetentionCleanupFailure,
-        [switch]$ForceIdentityUnverifiable
+        [switch]$ForceIdentityUnverifiable,
+        [switch]$ForceQuotaStateWriteLock
     )
     $env:FAKE_CLAUDE_MODE = $Mode
     $previousForceCleanup = $env:XPZ_TEST_CLAUDE_ASYNC_FORCE_RETENTION_CLEANUP_FAIL
     $previousForceIdentity = $env:XPZ_TEST_CLAUDE_ASYNC_FORCE_IDENTITY_UNVERIFIABLE
+    $previousForceQuotaLock = $env:XPZ_TEST_CLAUDE_ASYNC_FORCE_QUOTA_STATE_WRITE_LOCK
     if ($ForceRetentionCleanupFailure) { $env:XPZ_TEST_CLAUDE_ASYNC_FORCE_RETENTION_CLEANUP_FAIL = '1' }
     else { Remove-Item Env:\XPZ_TEST_CLAUDE_ASYNC_FORCE_RETENTION_CLEANUP_FAIL -ErrorAction SilentlyContinue }
     if ($ForceIdentityUnverifiable) { $env:XPZ_TEST_CLAUDE_ASYNC_FORCE_IDENTITY_UNVERIFIABLE = '1' }
     else { Remove-Item Env:\XPZ_TEST_CLAUDE_ASYNC_FORCE_IDENTITY_UNVERIFIABLE -ErrorAction SilentlyContinue }
+    if ($ForceQuotaStateWriteLock) { $env:XPZ_TEST_CLAUDE_ASYNC_FORCE_QUOTA_STATE_WRITE_LOCK = '1' }
+    else { Remove-Item Env:\XPZ_TEST_CLAUDE_ASYNC_FORCE_QUOTA_STATE_WRITE_LOCK -ErrorAction SilentlyContinue }
     $caseId = [guid]::NewGuid().ToString('N')
     $prompt = Join-Path $TempRoot "prompt-$Mode-$caseId.md"
     Set-Content -LiteralPath $prompt -Value "prompt $Mode" -Encoding utf8
@@ -160,6 +164,8 @@ function Invoke-AdapterCase {
         else { $env:XPZ_TEST_CLAUDE_ASYNC_FORCE_RETENTION_CLEANUP_FAIL = $previousForceCleanup }
         if ($null -eq $previousForceIdentity) { Remove-Item Env:\XPZ_TEST_CLAUDE_ASYNC_FORCE_IDENTITY_UNVERIFIABLE -ErrorAction SilentlyContinue }
         else { $env:XPZ_TEST_CLAUDE_ASYNC_FORCE_IDENTITY_UNVERIFIABLE = $previousForceIdentity }
+        if ($null -eq $previousForceQuotaLock) { Remove-Item Env:\XPZ_TEST_CLAUDE_ASYNC_FORCE_QUOTA_STATE_WRITE_LOCK -ErrorAction SilentlyContinue }
+        else { $env:XPZ_TEST_CLAUDE_ASYNC_FORCE_QUOTA_STATE_WRITE_LOCK = $previousForceQuotaLock }
     }
 }
 
@@ -323,6 +329,27 @@ try {
     Assert-True ($blocked.sidecar.promptTransmission -eq 'none') 'circuito aberto: nao deve transmitir prompt.'
     Assert-True ($blocked.sidecar.quotaCircuitDecision -eq 'open') "circuito aberto: decisao deveria ser open; veio $($blocked.sidecar.quotaCircuitDecision)."
     Assert-True ($argsAfterBlock.Count -eq $argsBeforeBlock.Count) 'circuito aberto: fake CLI nao deveria ser chamado.'
+    $baseHash = $blocked.sidecar.quotaEvidence.baseKeyHash
+
+    $circuitQuotaWriteContended = Join-Path $tmp 'circuit-quota-write-contended'
+    $quotaWriteContended = Invoke-AdapterCase -TempRoot $tmp -Mode 'quota-after-text' -ClaudeExe $fake.Exe `
+        -CircuitRoot $circuitQuotaWriteContended -ForceQuotaStateWriteLock
+    Assert-True ($quotaWriteContended.sidecar.technicalStatus -eq 'quota') 'cota com escrita sob contencao: chamada atual deveria ser quota.'
+    Assert-True ($quotaWriteContended.sidecar.quotaEvidence.quotaCircuitStateWriteStatus -eq 'open-written-lock-free-conservative') 'cota com escrita sob contencao: deveria gravar evidencia conservadora duravel.'
+    $contendedDir = Join-Path $circuitQuotaWriteContended 'claude-code-quota-circuit'
+    $contendedBaseHash = $quotaWriteContended.sidecar.quotaEvidence.baseKeyHash
+    $contendedStates = @(Get-ChildItem -LiteralPath $contendedDir -Filter "$contendedBaseHash.*.state.json" -File -ErrorAction SilentlyContinue)
+    Assert-True ($contendedStates.Count -eq 1) 'cota com escrita sob contencao: deveria existir exatamente um estado conservador.'
+    $contendedState = Get-Content -LiteralPath $contendedStates[0].FullName -Raw -Encoding utf8 | ConvertFrom-Json
+    Assert-True ($contendedState.circuitState -eq 'open') 'estado conservador: circuito deveria ficar open.'
+    Assert-True ($contendedState.sourceEvidence.persistenceMode -eq 'lock-free-conservative') 'estado conservador: persistenceMode deveria marcar fallback sem trava.'
+    Assert-True ($contendedState.sourceEvidence.persistenceReason -eq 'circuit-lock-timeout') 'estado conservador: persistenceReason deveria preservar a contencao.'
+    $argsBeforeContendedBlock = @(Get-Content -LiteralPath $fake.ArgsFile)
+    $blockedByContendedWrite = Invoke-AdapterCase -TempRoot $tmp -Mode 'success-delta' -ClaudeExe $fake.Exe -CircuitRoot $circuitQuotaWriteContended
+    $argsAfterContendedBlock = @(Get-Content -LiteralPath $fake.ArgsFile)
+    Assert-True ($blockedByContendedWrite.sidecar.quotaCircuitDecision -eq 'open') "estado conservador: chamada seguinte deveria bloquear como open; veio $($blockedByContendedWrite.sidecar.quotaCircuitDecision)."
+    Assert-True ($blockedByContendedWrite.sidecar.spawnAttempted -eq $false) 'estado conservador: chamada seguinte nao deve spawnar.'
+    Assert-True ($argsAfterContendedBlock.Count -eq $argsBeforeContendedBlock.Count) 'estado conservador: fake CLI nao deveria ser chamado na chamada seguinte.'
 
     $circuitInvalid = Join-Path $tmp 'circuit-invalid'
     $ctxDir = Join-Path $circuitInvalid 'claude-code-quota-circuit'
@@ -409,6 +436,72 @@ try {
         openedAtUtc   = '2020-01-01T00:00:00Z'
         resetsAtUtc   = '2020-01-01T00:00:01Z'
     }
+
+    $circuitExpiredAndOpen = Join-Path $tmp 'circuit-expired-and-open'
+    $expiredAndOpenDir = Join-Path $circuitExpiredAndOpen 'claude-code-quota-circuit'
+    New-Item -ItemType Directory -Path $expiredAndOpenDir -Force | Out-Null
+    $expired | ConvertTo-Json -Compress -Depth 6 | Set-Content -LiteralPath (Join-Path $expiredAndOpenDir "$baseHash.five_hour.state.json") -Encoding utf8
+    $futureOpen | ConvertTo-Json -Compress -Depth 6 | Set-Content -LiteralPath (Join-Path $expiredAndOpenDir "$baseHash.daily.state.json") -Encoding utf8
+    $argsBeforeExpiredAndOpen = @(Get-Content -LiteralPath $fake.ArgsFile)
+    $expiredAndOpenBlocked = Invoke-AdapterCase -TempRoot $tmp -Mode 'success-delta' -ClaudeExe $fake.Exe -CircuitRoot $circuitExpiredAndOpen
+    $argsAfterExpiredAndOpen = @(Get-Content -LiteralPath $fake.ArgsFile)
+    Assert-True ($expiredAndOpenBlocked.sidecar.quotaCircuitDecision -eq 'open') "multi-tipo expirado+aberto: decisao deveria ser open; veio $($expiredAndOpenBlocked.sidecar.quotaCircuitDecision)."
+    Assert-True ($expiredAndOpenBlocked.sidecar.spawnAttempted -eq $false) 'multi-tipo expirado+aberto: nao deve transmitir prompt.'
+    Assert-True ($argsAfterExpiredAndOpen.Count -eq $argsBeforeExpiredAndOpen.Count) 'multi-tipo expirado+aberto: fake CLI nao deveria ser chamado.'
+    $expiredAndOpenDecisions = @($expiredAndOpenBlocked.sidecar.quotaEvidence.variantDecisions | ForEach-Object { $_.decision })
+    Assert-True ($expiredAndOpenDecisions -contains 'open') 'multi-tipo expirado+aberto: deveria preservar variante aberta.'
+    Assert-True ($expiredAndOpenDecisions -contains 'expired-open') 'multi-tipo expirado+aberto: deveria preservar variante expirada.'
+
+    $circuitTwoOpen = Join-Path $tmp 'circuit-two-open'
+    $twoOpenDir = Join-Path $circuitTwoOpen 'claude-code-quota-circuit'
+    New-Item -ItemType Directory -Path $twoOpenDir -Force | Out-Null
+    $futureOpen | ConvertTo-Json -Compress -Depth 6 | Set-Content -LiteralPath (Join-Path $twoOpenDir "$baseHash.daily.state.json") -Encoding utf8
+    $futureOpenWeekly = [ordered]@{
+        Kind          = 'claude-code-quota-circuit-state'
+        SchemaVersion = 1
+        circuitState  = 'open'
+        baseKeyHash   = $baseHash
+        backend       = 'claude-code'
+        model         = 'claude-opus-4-8'
+        rateLimitType = 'weekly'
+        openedAtUtc   = '2029-12-31T00:00:00Z'
+        resetsAtUtc   = '2030-01-01T00:00:00Z'
+    }
+    $futureOpenWeekly | ConvertTo-Json -Compress -Depth 6 | Set-Content -LiteralPath (Join-Path $twoOpenDir "$baseHash.weekly.state.json") -Encoding utf8
+    $twoOpenBlocked = Invoke-AdapterCase -TempRoot $tmp -Mode 'success-delta' -ClaudeExe $fake.Exe -CircuitRoot $circuitTwoOpen
+    $twoOpenDecisions = @($twoOpenBlocked.sidecar.quotaEvidence.variantDecisions | Where-Object { $_.decision -eq 'open' })
+    Assert-True ($twoOpenBlocked.sidecar.quotaCircuitDecision -eq 'open') "duas variantes abertas: decisao deveria ser open; veio $($twoOpenBlocked.sidecar.quotaCircuitDecision)."
+    Assert-True ($twoOpenBlocked.sidecar.spawnAttempted -eq $false) 'duas variantes abertas: nao deve transmitir prompt.'
+    Assert-True ($twoOpenDecisions.Count -eq 2) "duas variantes abertas: deveria registrar duas variantes open; registrou $($twoOpenDecisions.Count)."
+
+    $circuitInvalidAndExpired = Join-Path $tmp 'circuit-invalid-and-expired'
+    $invalidAndExpiredDir = Join-Path $circuitInvalidAndExpired 'claude-code-quota-circuit'
+    New-Item -ItemType Directory -Path $invalidAndExpiredDir -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $invalidAndExpiredDir "$baseHash.hourly.state.json") -Value '{ json invalido' -Encoding utf8
+    $expired | ConvertTo-Json -Compress -Depth 6 | Set-Content -LiteralPath (Join-Path $invalidAndExpiredDir "$baseHash.daily.state.json") -Encoding utf8
+    $invalidAndExpired = Invoke-AdapterCase -TempRoot $tmp -Mode 'success-delta' -ClaudeExe $fake.Exe -CircuitRoot $circuitInvalidAndExpired
+    Assert-True ($invalidAndExpired.sidecar.quotaCircuitDecision -eq 'closed-with-invalid-state-ignored') "invalido+expirado: decisao deveria ser closed-with-invalid-state-ignored; veio $($invalidAndExpired.sidecar.quotaCircuitDecision)."
+    Assert-True ($invalidAndExpired.sidecar.quotaEvidence.quotaCircuitLeaseOwned -eq $true) 'invalido+expirado: deveria adquirir lease half-open por chave-base antes de transmitir.'
+    Assert-True ($invalidAndExpired.stdout -eq 'AB') 'invalido+expirado: sonda dona deveria aceitar texto.'
+    Assert-True (Test-Path -LiteralPath (Join-Path $invalidAndExpiredDir "$baseHash.hourly.state.json") -PathType Leaf) 'invalido+expirado: estado invalido nao deve ser apagado automaticamente.'
+
+    $circuitReadInconclusiveAndExpired = Join-Path $tmp 'circuit-read-inconclusive-and-expired'
+    $inconclusiveExpiredDir = Join-Path $circuitReadInconclusiveAndExpired 'claude-code-quota-circuit'
+    New-Item -ItemType Directory -Path $inconclusiveExpiredDir -Force | Out-Null
+    $expired | ConvertTo-Json -Compress -Depth 6 | Set-Content -LiteralPath (Join-Path $inconclusiveExpiredDir "$baseHash.daily.state.json") -Encoding utf8
+    $lockedExpiredPeerPath = Join-Path $inconclusiveExpiredDir "$baseHash.hourly.state.json"
+    $futureOpen | ConvertTo-Json -Compress -Depth 6 | Set-Content -LiteralPath $lockedExpiredPeerPath -Encoding utf8
+    $lockedExpiredPeer = [System.IO.File]::Open($lockedExpiredPeerPath, [System.IO.FileMode]::Open, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None)
+    try {
+        $inconclusiveAndExpired = Invoke-AdapterCase -TempRoot $tmp -Mode 'success-delta' -ClaudeExe $fake.Exe -CircuitRoot $circuitReadInconclusiveAndExpired
+    }
+    finally {
+        $lockedExpiredPeer.Dispose()
+    }
+    Assert-True ($inconclusiveAndExpired.sidecar.quotaCircuitDecision -eq 'state-read-inconclusive') "leitura inconclusiva+expirado: decisao deveria ser state-read-inconclusive; veio $($inconclusiveAndExpired.sidecar.quotaCircuitDecision)."
+    Assert-True ($inconclusiveAndExpired.sidecar.spawnAttempted -eq $false) 'leitura inconclusiva+expirado: nao deve transmitir prompt.'
+    Assert-True (@($inconclusiveAndExpired.sidecar.quotaEvidence.variantDecisions | ForEach-Object { $_.decision }) -contains 'expired-open') 'leitura inconclusiva+expirado: deveria preservar evidencia da variante expirada.'
+
     $expired | ConvertTo-Json -Compress -Depth 6 | Set-Content -LiteralPath (Join-Path $leaseDir "$baseHash.weekly.state.json") -Encoding utf8
     $lease = [ordered]@{
         Kind              = 'claude-code-quota-half-open-lease'
@@ -529,6 +622,7 @@ finally {
     if ($null -eq $previousMode) { Remove-Item Env:\FAKE_CLAUDE_MODE -ErrorAction SilentlyContinue }
     else { $env:FAKE_CLAUDE_MODE = $previousMode }
     Remove-Item Env:\XPZ_TEST_CLAUDE_ASYNC_FORCE_IDENTITY_UNVERIFIABLE -ErrorAction SilentlyContinue
+    Remove-Item Env:\XPZ_TEST_CLAUDE_ASYNC_FORCE_QUOTA_STATE_WRITE_LOCK -ErrorAction SilentlyContinue
     if (Test-Path -LiteralPath $tmp) {
         Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
     }
