@@ -75,7 +75,9 @@ function Write-AsyncJsonAtomic {
             [System.IO.File]::Replace($tmp, $targetPath, $backup, $true)
             $tmpOwnsContent = $false
             $replaceSucceeded = $true
-            if ([System.IO.File]::Exists($backup)) { [System.IO.File]::Delete($backup) }
+            if ([System.IO.File]::Exists($backup)) {
+                try { [System.IO.File]::Delete($backup) } catch { }
+            }
         }
         else {
             [System.IO.File]::Move($tmp, $targetPath, $false)
