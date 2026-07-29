@@ -129,18 +129,22 @@ function Invoke-AdapterCase {
         [int]$TimeoutSec = 30,
         [switch]$ForceRetentionCleanupFailure,
         [switch]$ForceIdentityUnverifiable,
-        [switch]$ForceQuotaStateWriteLock
+        [switch]$ForceQuotaStateWriteLock,
+        [string]$TestStartedAtUtc
     )
     $env:FAKE_CLAUDE_MODE = $Mode
     $previousForceCleanup = $env:XPZ_TEST_CLAUDE_ASYNC_FORCE_RETENTION_CLEANUP_FAIL
     $previousForceIdentity = $env:XPZ_TEST_CLAUDE_ASYNC_FORCE_IDENTITY_UNVERIFIABLE
     $previousForceQuotaLock = $env:XPZ_TEST_CLAUDE_ASYNC_FORCE_QUOTA_STATE_WRITE_LOCK
+    $previousTestStartedAtUtc = $env:XPZ_TEST_CLAUDE_ASYNC_STARTED_AT_UTC
     if ($ForceRetentionCleanupFailure) { $env:XPZ_TEST_CLAUDE_ASYNC_FORCE_RETENTION_CLEANUP_FAIL = '1' }
     else { Remove-Item Env:\XPZ_TEST_CLAUDE_ASYNC_FORCE_RETENTION_CLEANUP_FAIL -ErrorAction SilentlyContinue }
     if ($ForceIdentityUnverifiable) { $env:XPZ_TEST_CLAUDE_ASYNC_FORCE_IDENTITY_UNVERIFIABLE = '1' }
     else { Remove-Item Env:\XPZ_TEST_CLAUDE_ASYNC_FORCE_IDENTITY_UNVERIFIABLE -ErrorAction SilentlyContinue }
     if ($ForceQuotaStateWriteLock) { $env:XPZ_TEST_CLAUDE_ASYNC_FORCE_QUOTA_STATE_WRITE_LOCK = '1' }
     else { Remove-Item Env:\XPZ_TEST_CLAUDE_ASYNC_FORCE_QUOTA_STATE_WRITE_LOCK -ErrorAction SilentlyContinue }
+    if (-not [string]::IsNullOrWhiteSpace($TestStartedAtUtc)) { $env:XPZ_TEST_CLAUDE_ASYNC_STARTED_AT_UTC = $TestStartedAtUtc }
+    else { Remove-Item Env:\XPZ_TEST_CLAUDE_ASYNC_STARTED_AT_UTC -ErrorAction SilentlyContinue }
     $caseId = [guid]::NewGuid().ToString('N')
     $prompt = Join-Path $TempRoot "prompt-$Mode-$caseId.md"
     Set-Content -LiteralPath $prompt -Value "prompt $Mode" -Encoding utf8
@@ -166,6 +170,8 @@ function Invoke-AdapterCase {
         else { $env:XPZ_TEST_CLAUDE_ASYNC_FORCE_IDENTITY_UNVERIFIABLE = $previousForceIdentity }
         if ($null -eq $previousForceQuotaLock) { Remove-Item Env:\XPZ_TEST_CLAUDE_ASYNC_FORCE_QUOTA_STATE_WRITE_LOCK -ErrorAction SilentlyContinue }
         else { $env:XPZ_TEST_CLAUDE_ASYNC_FORCE_QUOTA_STATE_WRITE_LOCK = $previousForceQuotaLock }
+        if ($null -eq $previousTestStartedAtUtc) { Remove-Item Env:\XPZ_TEST_CLAUDE_ASYNC_STARTED_AT_UTC -ErrorAction SilentlyContinue }
+        else { $env:XPZ_TEST_CLAUDE_ASYNC_STARTED_AT_UTC = $previousTestStartedAtUtc }
     }
 }
 
@@ -305,13 +311,16 @@ try {
     Assert-True ($quota.sidecar.resultAccepted -eq $false) 'quota: resultAccepted=false esperado.'
     Assert-True ($quota.sidecar.failureAfterText.reason -eq 'quota-after-text') 'quota: failureAfterText deveria registrar falha apos texto.'
     $quotaStatePath = Join-Path (Join-Path $circuitQuota 'claude-code-quota-circuit') "$($quota.sidecar.quotaEvidence.baseKeyHash).weekly.state.json"
-    $quotaState = Get-Content -LiteralPath $quotaStatePath -Raw -Encoding utf8 | ConvertFrom-Json
+    $quotaStateRaw = Get-Content -LiteralPath $quotaStatePath -Raw -Encoding utf8
+    $quotaState = $quotaStateRaw | ConvertFrom-Json
     Assert-True ($quotaState.provider -eq 'anthropic') 'estado de cota: provider ausente/incorreto.'
     Assert-True ($quotaState.modelKey -eq 'claude-opus-4-8') 'estado de cota: modelKey ausente/incorreto.'
     Assert-True (-not [string]::IsNullOrWhiteSpace([string]$quotaState.credentialContextFingerprint)) 'estado de cota: credentialContextFingerprint ausente.'
     Assert-True (-not [string]::IsNullOrWhiteSpace([string]$quotaState.observedAtUtc)) 'estado de cota: observedAtUtc ausente.'
     Assert-True (-not [string]::IsNullOrWhiteSpace([string]$quotaState.lastHitAtUtc)) 'estado de cota: lastHitAtUtc ausente.'
     Assert-True (-not [string]::IsNullOrWhiteSpace([string]$quotaState.updatedAtUtc)) 'estado de cota: updatedAtUtc ausente.'
+    Assert-True ($quotaStateRaw -match '"observedAtUtc":"[^"]*\.\d{7}Z"') 'estado de cota: observedAtUtc deveria preservar precisao subsegundo.'
+    Assert-True ($quotaStateRaw -match '"updatedAtUtc":"[^"]*\.\d{7}Z"') 'estado de cota: updatedAtUtc deveria preservar precisao subsegundo.'
     Assert-True ([int]$quotaState.hitCount -ge 1) 'estado de cota: hitCount deveria ser >= 1.'
     Assert-True ($quotaState.effectiveLimitScope -eq 'subscription') 'estado de cota: effectiveLimitScope deveria refletir escopo reportado.'
     Assert-True ($quotaState.scopeAssumed -eq $false) 'estado de cota: scopeAssumed deveria ser false quando ha escopo reportado.'
@@ -383,6 +392,30 @@ try {
     Assert-True ($fenced.sidecar.quotaCircuitDecision -eq 'half-open') "estado com evidencia mais nova: deveria sondar half-open; veio $($fenced.sidecar.quotaCircuitDecision)."
     Assert-True ($fenced.stdout -eq 'AB') 'estado com evidencia mais nova: chamada deveria seguir e aceitar texto.'
     Assert-True (Test-Path -LiteralPath $fencePath -PathType Leaf) 'estado com evidencia mais nova nao deve ser apagado por limpeza de sonda antiga.'
+
+    $circuitSameSecondFence = Join-Path $tmp 'circuit-same-second-fence'
+    $sameSecondFenceDir = Join-Path $circuitSameSecondFence 'claude-code-quota-circuit'
+    New-Item -ItemType Directory -Path $sameSecondFenceDir -Force | Out-Null
+    $sameSecondFencePath = Join-Path $sameSecondFenceDir "$baseHash.weekly.state.json"
+    $sameSecondLegacyState = [ordered]@{
+        Kind          = 'claude-code-quota-circuit-state'
+        SchemaVersion = 1
+        circuitState  = 'open'
+        baseKeyHash   = $baseHash
+        backend       = 'claude-code'
+        model         = 'claude-opus-4-8'
+        rateLimitType = 'weekly'
+        openedAtUtc   = '2026-07-29T15:09:47Z'
+        updatedAtUtc  = '2026-07-29T15:09:47Z'
+        observedAtUtc = '2026-07-29T15:09:47Z'
+        resetsAtUtc   = '2020-01-01T00:00:01Z'
+    }
+    $sameSecondLegacyState | ConvertTo-Json -Compress -Depth 6 | Set-Content -LiteralPath $sameSecondFencePath -Encoding utf8
+    $sameSecondFenced = Invoke-AdapterCase -TempRoot $tmp -Mode 'success-delta' -ClaudeExe $fake.Exe `
+        -CircuitRoot $circuitSameSecondFence -TestStartedAtUtc '2026-07-29T15:09:47.5000000Z'
+    Assert-True ($sameSecondFenced.sidecar.quotaCircuitDecision -eq 'half-open') "estado legado no mesmo segundo: deveria sondar half-open; veio $($sameSecondFenced.sidecar.quotaCircuitDecision)."
+    Assert-True ($sameSecondFenced.stdout -eq 'AB') 'estado legado no mesmo segundo: chamada deveria seguir e aceitar texto.'
+    Assert-True (Test-Path -LiteralPath $sameSecondFencePath -PathType Leaf) 'estado legado no mesmo segundo nao deve ser apagado por truncamento de subsegundo.'
 
     $circuitInvalidAndOpen = Join-Path $tmp 'circuit-invalid-and-open'
     $mixedDir = Join-Path $circuitInvalidAndOpen 'claude-code-quota-circuit'
@@ -623,6 +656,7 @@ finally {
     else { $env:FAKE_CLAUDE_MODE = $previousMode }
     Remove-Item Env:\XPZ_TEST_CLAUDE_ASYNC_FORCE_IDENTITY_UNVERIFIABLE -ErrorAction SilentlyContinue
     Remove-Item Env:\XPZ_TEST_CLAUDE_ASYNC_FORCE_QUOTA_STATE_WRITE_LOCK -ErrorAction SilentlyContinue
+    Remove-Item Env:\XPZ_TEST_CLAUDE_ASYNC_STARTED_AT_UTC -ErrorAction SilentlyContinue
     if (Test-Path -LiteralPath $tmp) {
         Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
     }

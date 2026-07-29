@@ -34,7 +34,7 @@ try { [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false) } catc
 function ConvertTo-AsyncUtcIso {
     param([AllowNull()] $Value)
     if ($null -eq $Value) { return $null }
-    return ([datetime]$Value).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
+    return ([datetime]$Value).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ss.fffffffZ')
 }
 
 function Get-AsyncSha256Text {
@@ -434,12 +434,12 @@ function New-AsyncQuotaCircuitOpenStateObject {
         effectiveLimitScope          = $EffectiveLimitScope
         scopeAssumed                 = $ScopeAssumed
         scopeAssumptionReason        = $scopeAssumptionReasonValue
-        observedAtUtc                = $ObservedAtUtc.ToString('yyyy-MM-ddTHH:mm:ssZ')
-        openedAtUtc                  = $ObservedAtUtc.ToString('yyyy-MM-ddTHH:mm:ssZ')
+        observedAtUtc                = ConvertTo-AsyncUtcIso -Value $ObservedAtUtc
+        openedAtUtc                  = ConvertTo-AsyncUtcIso -Value $ObservedAtUtc
         resetsAtUtc                  = $ResetUtc.ToString('yyyy-MM-ddTHH:mm:ssZ')
-        lastHitAtUtc                 = $ObservedAtUtc.ToString('yyyy-MM-ddTHH:mm:ssZ')
+        lastHitAtUtc                 = ConvertTo-AsyncUtcIso -Value $ObservedAtUtc
         hitCount                     = $HitCount
-        updatedAtUtc                 = $ObservedAtUtc.ToString('yyyy-MM-ddTHH:mm:ssZ')
+        updatedAtUtc                 = ConvertTo-AsyncUtcIso -Value $ObservedAtUtc
         evidenceTypes                = $EvidenceTypes
         sourceEvidence               = $sourceEvidence
     }
@@ -558,8 +558,13 @@ function Test-AsyncQuotaStateNewerThanAttempt {
     param([AllowNull()] $State)
 
     foreach ($field in @('updatedAtUtc', 'observedAtUtc', 'openedAtUtc')) {
-        $stateTime = Get-AsyncIsoToUtc -Text ([string](Get-ClaudeCodeProp $State $field))
+        $stateTimeText = [string](Get-ClaudeCodeProp $State $field)
+        $stateTime = Get-AsyncIsoToUtc -Text $stateTimeText
         if ($null -ne $stateTime -and $stateTime -gt $script:startedAtUtc) {
+            return $true
+        }
+        if ($null -ne $stateTime -and $stateTimeText -notmatch 'T\d{2}:\d{2}:\d{2}\.' -and
+            $stateTime.ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ') -eq $script:startedAtUtc.ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')) {
             return $true
         }
     }
@@ -832,7 +837,12 @@ if ($PSBoundParameters.ContainsKey('PermissionMode') -and $PermissionMode -eq 'b
 }
 
 $script:jobId = [guid]::NewGuid().ToString('N')
-$script:startedAtUtc = [datetime]::UtcNow
+$testStartedAtUtcText = $env:XPZ_TEST_CLAUDE_ASYNC_STARTED_AT_UTC
+$testStartedAtUtc = Get-AsyncIsoToUtc -Text $testStartedAtUtcText
+if (-not [string]::IsNullOrWhiteSpace($testStartedAtUtcText) -and $null -eq $testStartedAtUtc) {
+    throw "XPZ_TEST_CLAUDE_ASYNC_STARTED_AT_UTC invalido: $testStartedAtUtcText"
+}
+$script:startedAtUtc = if ($null -ne $testStartedAtUtc) { $testStartedAtUtc } else { [datetime]::UtcNow }
 $script:promptTransmission = 'none'
 $script:spawnAttempted = $false
 $script:processCreated = $false
