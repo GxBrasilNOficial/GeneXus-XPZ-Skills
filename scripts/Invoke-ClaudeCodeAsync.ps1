@@ -220,6 +220,8 @@ function Get-AsyncQuotaCircuitDecision {
 
     $hadInvalid = $false
     $hadExpiredOpen = $false
+    $hadReadInconclusive = $false
+    $hadOpen = $false
     foreach ($file in $stateFiles) {
         $variant = $file.BaseName
         if ($variant.StartsWith("$($Context.safeBaseKey).", [System.StringComparison]::OrdinalIgnoreCase)) {
@@ -231,7 +233,8 @@ function Get-AsyncQuotaCircuitDecision {
         $read = Read-AsyncJsonWithDeadline -Path $file.FullName -DeadlineMs 150
         if ($read.status -eq 'read-inconclusive') {
             $variantDecisions.Add([ordered]@{ rateLimitType = $variant; decision = 'state-read-inconclusive' })
-            return [pscustomobject]@{ blocked = $true; decision = 'state-read-inconclusive'; variants = @($variantDecisions); leasePath = $null }
+            $hadReadInconclusive = $true
+            continue
         }
         if ($read.status -eq 'json-invalid') {
             $hadInvalid = $true
@@ -244,7 +247,8 @@ function Get-AsyncQuotaCircuitDecision {
         $resetsAtUtc = Get-AsyncIsoToUtc -Text ([string](Get-ClaudeCodeProp $read.value 'resetsAtUtc'))
         if ($state -eq 'open' -and $null -ne $resetsAtUtc -and $resetsAtUtc -gt $now) {
             $variantDecisions.Add([ordered]@{ rateLimitType = $variant; decision = 'open'; resetsAtUtc = $resetsAtUtc.ToString('yyyy-MM-ddTHH:mm:ssZ') })
-            return [pscustomobject]@{ blocked = $true; decision = 'open'; variants = @($variantDecisions); leasePath = $null }
+            $hadOpen = $true
+            continue
         }
         if ($state -eq 'open') {
             $hadExpiredOpen = $true
@@ -253,6 +257,13 @@ function Get-AsyncQuotaCircuitDecision {
         else {
             $variantDecisions.Add([ordered]@{ rateLimitType = $variant; decision = 'closed' })
         }
+    }
+
+    if ($hadReadInconclusive) {
+        return [pscustomobject]@{ blocked = $true; decision = 'state-read-inconclusive'; variants = @($variantDecisions); leasePath = $null }
+    }
+    if ($hadOpen) {
+        return [pscustomobject]@{ blocked = $true; decision = 'open'; variants = @($variantDecisions); leasePath = $null }
     }
 
     $leasePath = Join-Path $Context.stateDir "$($Context.safeBaseKey).lease.json"
@@ -298,6 +309,14 @@ function Set-AsyncQuotaCircuitOpen {
     $scopeAssumptionReason = if ($scopeAssumed) { 'reported-limit-scope-missing' } else { $null }
     $evidenceTypes = @(Get-ClaudeCodeProp $QuotaEvidence 'evidenceTypes')
     $observedAtUtc = [datetime]::UtcNow
+    $existingHitCount = 0
+    $existingState = Read-AsyncJsonWithDeadline -Path $statePath -DeadlineMs 150
+    if ($existingState.status -eq 'ok') {
+        $existingHitCountValue = Get-ClaudeCodeProp $existingState.value 'hitCount'
+        if ($null -ne $existingHitCountValue) {
+            [void][int]::TryParse([string]$existingHitCountValue, [ref]$existingHitCount)
+        }
+    }
     $state = [ordered]@{
         Kind                         = 'claude-code-quota-circuit-state'
         SchemaVersion                = 1
@@ -316,6 +335,9 @@ function Set-AsyncQuotaCircuitOpen {
         observedAtUtc                = $observedAtUtc.ToString('yyyy-MM-ddTHH:mm:ssZ')
         openedAtUtc                  = $observedAtUtc.ToString('yyyy-MM-ddTHH:mm:ssZ')
         resetsAtUtc                  = $resetUtc.ToString('yyyy-MM-ddTHH:mm:ssZ')
+        lastHitAtUtc                 = $observedAtUtc.ToString('yyyy-MM-ddTHH:mm:ssZ')
+        hitCount                     = ($existingHitCount + 1)
+        updatedAtUtc                 = $observedAtUtc.ToString('yyyy-MM-ddTHH:mm:ssZ')
         evidenceTypes                = $evidenceTypes
         sourceEvidence               = [ordered]@{
             source             = 'claude-code-stream-json'
@@ -330,6 +352,18 @@ function Set-AsyncQuotaCircuitOpen {
     Write-AsyncJsonAtomic -Path $statePath -Object $state -Depth 8
 }
 
+function Test-AsyncQuotaStateNewerThanAttempt {
+    param([AllowNull()] $State)
+
+    foreach ($field in @('updatedAtUtc', 'observedAtUtc', 'openedAtUtc')) {
+        $stateTime = Get-AsyncIsoToUtc -Text ([string](Get-ClaudeCodeProp $State $field))
+        if ($null -ne $stateTime -and $stateTime -gt $script:startedAtUtc) {
+            return $true
+        }
+    }
+    return $false
+}
+
 function Close-AsyncQuotaCircuitProbe {
     param([object]$Context)
     $leasePath = Join-Path $Context.stateDir "$($Context.safeBaseKey).lease.json"
@@ -337,7 +371,7 @@ function Close-AsyncQuotaCircuitProbe {
     $stateFiles = @(Get-ChildItem -LiteralPath $Context.stateDir -Filter "$($Context.safeBaseKey).*" -File -ErrorAction SilentlyContinue | Where-Object { $_.Name.EndsWith('.state.json', [System.StringComparison]::OrdinalIgnoreCase) })
     foreach ($file in $stateFiles) {
         $read = Read-AsyncJsonWithDeadline -Path $file.FullName -DeadlineMs 150
-        if ($read.status -eq 'ok') {
+        if ($read.status -eq 'ok' -and -not (Test-AsyncQuotaStateNewerThanAttempt -State $read.value)) {
             try { Remove-Item -LiteralPath $file.FullName -Force -ErrorAction SilentlyContinue } catch { }
         }
     }
@@ -350,6 +384,19 @@ function Get-AsyncLastResultEvent {
         if ([string](Get-ClaudeCodeProp $ev 'type') -eq 'result') { $last = $ev }
     }
     return $last
+}
+
+function Test-AsyncTerminalResultAccepted {
+    param([AllowNull()] $ResultEvent)
+
+    if ($null -eq $ResultEvent) { return $false }
+    if ([string](Get-ClaudeCodeProp $ResultEvent 'type') -ne 'result') { return $false }
+    if ([string](Get-ClaudeCodeProp $ResultEvent 'subtype') -ne 'success') { return $false }
+
+    $isError = Get-ClaudeCodeProp $ResultEvent 'is_error'
+    if ($null -eq $isError) { return $false }
+    if ($isError -is [bool]) { return (-not [bool]$isError) }
+    return ([string]$isError -ieq 'false')
 }
 
 function Read-AsyncClaudeCodeStream {
@@ -385,6 +432,7 @@ function Read-AsyncClaudeCodeStream {
         acceptedText   = $acceptedText
         quota          = $quota
         lastResult     = $lastResult
+        terminalSuccess = (Test-AsyncTerminalResultAccepted -ResultEvent $lastResult)
         terminalReason = $terminalReason
         apiErrorStatus = $apiErrorStatus
     }
@@ -418,6 +466,10 @@ function Remove-AsyncSensitiveRawCaptureFiles {
     foreach ($rawPath in @($StreamPath, $StderrPath)) {
         if ([string]::IsNullOrWhiteSpace([string]$rawPath)) { continue }
         if (-not (Test-Path -LiteralPath ([string]$rawPath) -PathType Leaf)) { continue }
+        if ($env:XPZ_TEST_CLAUDE_ASYNC_FORCE_RETENTION_CLEANUP_FAIL -eq '1') {
+            $script:retentionCleanupFailed = $true
+            continue
+        }
 
         $removed = $false
         for ($attempt = 0; $attempt -lt 3 -and -not $removed; $attempt++) {
@@ -521,6 +573,14 @@ function Complete-AsyncAdapter {
         $stdoutAcceptedText = ConvertTo-AsyncStdoutFinalText -Text $AcceptedText
     }
     Remove-AsyncSensitiveRawCaptureFiles -StreamPath $StreamPath -StderrPath $StderrPath
+    if ($RetentionMode -eq 'kb-sensitive' -and $ResultAccepted -and $script:retentionCleanupFailed) {
+        $FailureAfterText = New-AsyncFailureAfterText -Reason 'retention-cleanup-after-accepted-text' -Text $stdoutAcceptedText
+        $TechnicalStatus = 'internalError'
+        $ResultAccepted = $false
+        $AcceptanceRejectionReason = 'retention-cleanup-failed'
+        $FinalTextDisposition = 'none'
+        $stdoutAcceptedText = $null
+    }
     $sidecar = New-AsyncSidecarObject -TechnicalStatus $TechnicalStatus -ResultAccepted $ResultAccepted `
         -AcceptanceRejectionReason $AcceptanceRejectionReason -ExitCode $ExitCode `
         -TerminalReason $TerminalReason -ApiErrorStatus $ApiErrorStatus -FailureAfterText $FailureAfterText `
@@ -684,7 +744,7 @@ try {
         exit 0
     }
 
-    if ($process.ExitCode -eq 0 -and -not [string]::IsNullOrWhiteSpace($acceptedText)) {
+    if ($process.ExitCode -eq 0 -and -not [string]::IsNullOrWhiteSpace($acceptedText) -and [bool]$streamInspection.terminalSuccess) {
         Close-AsyncQuotaCircuitProbe -Context $circuitContext
         Complete-AsyncAdapter -TechnicalStatus 'completed' -ResultAccepted $true `
             -AcceptanceRejectionReason $null -ExitCode ([int]$process.ExitCode) -TerminalReason $terminalReason `

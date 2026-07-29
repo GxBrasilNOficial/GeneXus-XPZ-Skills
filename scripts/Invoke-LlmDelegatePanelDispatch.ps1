@@ -262,6 +262,8 @@ function Add-SkippedFallbackRecords {
                 technicalStatus    = $null
                 resultAccepted     = $null
                 acceptanceRejectionReason = $null
+                acceptedFinalTextSha256 = $null
+                acceptedFinalTextBytes = $null
                 promptTransmission = $null
                 quotaCircuitDecision = $null
                 quotaCircuitVariantDecisions = @()
@@ -275,6 +277,28 @@ function Get-TextSha256 {
     $bytes = [System.Text.Encoding]::UTF8.GetBytes([string]$Text)
     $hash = [System.Security.Cryptography.SHA256]::HashData($bytes)
     return ([System.BitConverter]::ToString($hash)).Replace('-', '').ToLowerInvariant()
+}
+
+function Read-PanelJsonFileWithDeadline {
+    param([string]$Path, [int]$DeadlineMs = 250)
+
+    $deadline = [datetime]::UtcNow.AddMilliseconds($DeadlineMs)
+    do {
+        try {
+            if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+                Start-Sleep -Milliseconds 25
+                continue
+            }
+            $raw = Get-Content -LiteralPath $Path -Raw -Encoding utf8 -ErrorAction Stop
+            return [pscustomobject]@{ status = 'ok'; value = ($raw | ConvertFrom-Json); error = $null }
+        } catch [System.IO.IOException] {
+            Start-Sleep -Milliseconds 25
+        } catch {
+            return [pscustomobject]@{ status = 'json-invalid'; value = $null; error = $_.Exception.Message }
+        }
+    } while ([datetime]::UtcNow -lt $deadline)
+
+    return [pscustomobject]@{ status = 'read-inconclusive'; value = $null; error = 'deadline' }
 }
 
 function Test-ClaudeCodeSidecarShape {
@@ -309,14 +333,35 @@ function Test-ClaudeCodeSidecarShape {
     if ([string](Get-Prop $Sidecar 'Kind') -ne 'claude-code-async-sidecar') {
         return [pscustomobject]@{ accepted = $false; reason = 'sidecar-kind-invalid' }
     }
-    if ([int](Get-Prop $Sidecar 'SchemaVersion') -ne 1) {
+    $schemaVersion = Get-Prop $Sidecar 'SchemaVersion'
+    if (($schemaVersion -isnot [int] -and $schemaVersion -isnot [long]) -or [int]$schemaVersion -ne 1) {
         return [pscustomobject]@{ accepted = $false; reason = 'sidecar-schema-invalid' }
     }
     if ([string](Get-Prop $Sidecar 'backend') -ne 'claude-code') {
         return [pscustomobject]@{ accepted = $false; reason = 'sidecar-backend-invalid' }
     }
-    $accepted = [bool](Get-Prop $Sidecar 'resultAccepted')
+    $acceptedValue = Get-Prop $Sidecar 'resultAccepted'
+    if ($acceptedValue -isnot [bool]) {
+        return [pscustomobject]@{ accepted = $false; reason = 'sidecar-resultAccepted-not-boolean' }
+    }
+    $accepted = [bool]$acceptedValue
+    $technicalStatus = [string](Get-Prop $Sidecar 'technicalStatus')
+    $finalTextDisposition = [string](Get-Prop $Sidecar 'finalTextDisposition')
+    $retentionCleanupFailedValue = Get-Prop $Sidecar 'retentionCleanupFailed'
+    if ($retentionCleanupFailedValue -isnot [bool]) {
+        return [pscustomobject]@{ accepted = $false; reason = 'sidecar-retentionCleanupFailed-not-boolean' }
+    }
+    $retentionCleanupFailed = [bool]$retentionCleanupFailedValue
     if ($accepted) {
+        if ($technicalStatus -ne 'completed') {
+            return [pscustomobject]@{ accepted = $false; reason = 'sidecar-accepted-with-noncompleted-status' }
+        }
+        if ($finalTextDisposition -ne 'stdout') {
+            return [pscustomobject]@{ accepted = $false; reason = 'sidecar-accepted-without-stdout-disposition' }
+        }
+        if ($retentionCleanupFailed) {
+            return [pscustomobject]@{ accepted = $false; reason = 'sidecar-accepted-with-retention-cleanup-failed' }
+        }
         if ([string]::IsNullOrWhiteSpace([string]$StdoutText)) {
             return [pscustomobject]@{ accepted = $false; reason = 'sidecar-accepted-with-empty-stdout' }
         }
@@ -324,9 +369,27 @@ function Test-ClaudeCodeSidecarShape {
         if ([string]::IsNullOrWhiteSpace($hash) -or $hash -ne (Get-TextSha256 -Text ([string]$StdoutText))) {
             return [pscustomobject]@{ accepted = $false; reason = 'sidecar-accepted-hash-mismatch' }
         }
+        $bytes = Get-Prop $Sidecar 'acceptedFinalTextBytes'
+        if ($bytes -isnot [int] -and $bytes -isnot [long]) {
+            return [pscustomobject]@{ accepted = $false; reason = 'sidecar-accepted-bytes-invalid' }
+        }
+        if ([long]$bytes -ne [System.Text.Encoding]::UTF8.GetByteCount([string]$StdoutText)) {
+            return [pscustomobject]@{ accepted = $false; reason = 'sidecar-accepted-bytes-mismatch' }
+        }
     }
-    elseif (-not [string]::IsNullOrWhiteSpace([string]$StdoutText)) {
-        return [pscustomobject]@{ accepted = $false; reason = 'sidecar-rejected-with-stdout' }
+    else {
+        if (-not [string]::IsNullOrWhiteSpace([string]$StdoutText)) {
+            return [pscustomobject]@{ accepted = $false; reason = 'sidecar-rejected-with-stdout' }
+        }
+        if ($finalTextDisposition -eq 'stdout') {
+            return [pscustomobject]@{ accepted = $false; reason = 'sidecar-rejected-with-stdout-disposition' }
+        }
+        if ($null -ne (Get-Prop $Sidecar 'acceptedFinalTextSha256')) {
+            return [pscustomobject]@{ accepted = $false; reason = 'sidecar-rejected-with-accepted-hash' }
+        }
+        if ($null -ne (Get-Prop $Sidecar 'acceptedFinalTextBytes')) {
+            return [pscustomobject]@{ accepted = $false; reason = 'sidecar-rejected-with-accepted-bytes' }
+        }
     }
     return [pscustomobject]@{ accepted = $true; reason = 'ok' }
 }
@@ -689,6 +752,8 @@ for ($i = 0; $i -lt $reviewers.Count; $i++) {
         technicalStatus    = $null
         resultAccepted     = $null
         acceptanceRejectionReason = $null
+        acceptedFinalTextSha256 = $null
+        acceptedFinalTextBytes = $null
         promptTransmission = $null
         quotaCircuitDecision = $null
         quotaCircuitVariantDecisions = @()
@@ -1044,8 +1109,9 @@ foreach ($res in $collected) {
         $sidecar = $null
         $sidecarReadReason = $null
         if (-not [string]::IsNullOrWhiteSpace([string]$rec.sidecarPath) -and (Test-Path -LiteralPath ([string]$rec.sidecarPath) -PathType Leaf)) {
-            try { $sidecar = Get-Content -LiteralPath ([string]$rec.sidecarPath) -Raw -Encoding utf8 | ConvertFrom-Json }
-            catch { $sidecarReadReason = "sidecar-json-invalid:$($_.Exception.Message)" }
+            $sidecarRead = Read-PanelJsonFileWithDeadline -Path ([string]$rec.sidecarPath) -DeadlineMs 250
+            if ($sidecarRead.status -eq 'ok') { $sidecar = $sidecarRead.value }
+            else { $sidecarReadReason = "sidecar-$($sidecarRead.status):$($sidecarRead.error)" }
         }
         else {
             $sidecarReadReason = 'sidecar-file-missing'
@@ -1076,6 +1142,8 @@ foreach ($res in $collected) {
         $rec.technicalStatus = [string](Get-Prop $sidecar 'technicalStatus')
         $rec.resultAccepted = [bool](Get-Prop $sidecar 'resultAccepted')
         $rec.acceptanceRejectionReason = [string](Get-Prop $sidecar 'acceptanceRejectionReason')
+        $rec.acceptedFinalTextSha256 = Get-Prop $sidecar 'acceptedFinalTextSha256'
+        $rec.acceptedFinalTextBytes = Get-Prop $sidecar 'acceptedFinalTextBytes'
         $rec.promptTransmission = [string](Get-Prop $sidecar 'promptTransmission')
         $rec.processCreated = [bool](Get-Prop $sidecar 'processCreated')
         $rec.quotaCircuitDecision = [string](Get-Prop $sidecar 'quotaCircuitDecision')
@@ -1259,6 +1327,8 @@ foreach ($rec in $originalRecords) {
                 technicalStatus    = [string](Get-Prop $fbRecord 'technicalStatus')
                 resultAccepted     = Get-Prop $fbRecord 'resultAccepted'
                 acceptanceRejectionReason = [string](Get-Prop $fbRecord 'acceptanceRejectionReason')
+                acceptedFinalTextSha256 = Get-Prop $fbRecord 'acceptedFinalTextSha256'
+                acceptedFinalTextBytes = Get-Prop $fbRecord 'acceptedFinalTextBytes'
                 promptTransmission = [string](Get-Prop $fbRecord 'promptTransmission')
                 quotaCircuitDecision = [string](Get-Prop $fbRecord 'quotaCircuitDecision')
                 quotaCircuitVariantDecisions = @(Get-Prop $fbRecord 'quotaCircuitVariantDecisions')

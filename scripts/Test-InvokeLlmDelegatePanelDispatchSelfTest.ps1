@@ -617,6 +617,10 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
     Assert-True ($rvCl.resultAccepted -eq $true) 'claude-code despacho: resultAccepted=true esperado.'
     Assert-True ($rvCl.technicalStatus -eq 'completed') 'claude-code despacho: technicalStatus completed esperado.'
     Assert-True (Test-Path -LiteralPath ([string]$rvCl.sidecarPath) -PathType Leaf) 'claude-code despacho: sidecarPath deveria existir.'
+    $sidecarCl = Get-Content -LiteralPath ([string]$rvCl.sidecarPath) -Raw -Encoding utf8 | ConvertFrom-Json
+    Assert-True (-not [string]::IsNullOrWhiteSpace([string]$rvCl.acceptedFinalTextSha256)) 'claude-code despacho: acceptedFinalTextSha256 deveria ser preservado no reviewer record.'
+    Assert-True ($rvCl.acceptedFinalTextSha256 -eq $sidecarCl.acceptedFinalTextSha256) 'claude-code despacho: acceptedFinalTextSha256 do reviewer deveria casar com sidecar.'
+    Assert-True ([int]$rvCl.acceptedFinalTextBytes -eq [int]$sidecarCl.acceptedFinalTextBytes) 'claude-code despacho: acceptedFinalTextBytes do reviewer deveria casar com sidecar.'
     $tCl = Get-Content -LiteralPath $rvCl.verdictPath -Raw -Encoding utf8
     Assert-True ($tCl -match 'model=claude-opus-4-8') 'claude-code despacho: -Model deveria chegar ao adapter'
     Assert-True ($tCl -match [regex]::Escape($tmp)) 'claude-code despacho: -Cd deveria virar o WorkingDirectory (cwd)'
