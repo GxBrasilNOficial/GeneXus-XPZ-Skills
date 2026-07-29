@@ -46,6 +46,15 @@ if "%FAKE_CLAUDE_MODE%"=="quota-after-text" (
   echo {"type":"result","is_error":true,"terminal_reason":"api_error","api_error_status":429,"rateLimitType":"weekly","reportedLimitScope":"subscription","resetsAt":1893456000,"result":"rate limit"}
   exit /b 1
 )
+if "%FAKE_CLAUDE_MODE%"=="timeout-after-text" (
+  echo {"type":"content_block_delta","delta":{"type":"text_delta","text":"parcial-timeout"}}
+  ping -n 6 127.0.0.1 >nul
+  exit /b 0
+)
+if "%FAKE_CLAUDE_MODE%"=="exit-after-text" (
+  echo {"type":"content_block_delta","delta":{"type":"text_delta","text":"parcial-exit"}}
+  exit /b 1
+)
 if "%FAKE_CLAUDE_MODE%"=="untrusted" (
   echo Claude Code refused to run because this workspace is not trusted. Mark this workspace as trusted to continue. 1>&2
   exit /b 1
@@ -119,6 +128,19 @@ try {
     Assert-True ($quota.sidecar.technicalStatus -eq 'quota') 'quota: technicalStatus deveria ser quota.'
     Assert-True ($quota.sidecar.resultAccepted -eq $false) 'quota: resultAccepted=false esperado.'
     Assert-True ($quota.sidecar.failureAfterText.reason -eq 'quota-after-text') 'quota: failureAfterText deveria registrar falha apos texto.'
+    $quotaStatePath = Join-Path (Join-Path $circuitQuota 'claude-code-quota-circuit') "$($quota.sidecar.quotaEvidence.baseKeyHash).weekly.state.json"
+    $quotaState = Get-Content -LiteralPath $quotaStatePath -Raw -Encoding utf8 | ConvertFrom-Json
+    Assert-True ($quotaState.provider -eq 'anthropic') 'estado de cota: provider ausente/incorreto.'
+    Assert-True ($quotaState.modelKey -eq 'claude-opus-4-8') 'estado de cota: modelKey ausente/incorreto.'
+    Assert-True (-not [string]::IsNullOrWhiteSpace([string]$quotaState.credentialContextFingerprint)) 'estado de cota: credentialContextFingerprint ausente.'
+    Assert-True (-not [string]::IsNullOrWhiteSpace([string]$quotaState.observedAtUtc)) 'estado de cota: observedAtUtc ausente.'
+    Assert-True ($quotaState.effectiveLimitScope -eq 'subscription') 'estado de cota: effectiveLimitScope deveria refletir escopo reportado.'
+    Assert-True ($quotaState.scopeAssumed -eq $false) 'estado de cota: scopeAssumed deveria ser false quando ha escopo reportado.'
+    Assert-True ($null -eq $quotaState.scopeAssumptionReason) 'estado de cota: scopeAssumptionReason deveria ser null quando ha escopo reportado.'
+    Assert-True ($null -ne $quotaState.sourceEvidence) 'estado de cota: sourceEvidence ausente.'
+    Assert-True (@($quotaState.sourceEvidence.evidenceTypes) -contains 'result-api-error-429') 'estado de cota: sourceEvidence nao preservou tipo de evidencia.'
+    Assert-True ($quotaState.sourceEvidence.terminalReason -eq 'api_error') 'estado de cota: sourceEvidence nao preservou terminalReason.'
+    Assert-True ([string]$quotaState.sourceEvidence.apiErrorStatus -eq '429') 'estado de cota: sourceEvidence nao preservou apiErrorStatus.'
     $argsBeforeBlock = @(Get-Content -LiteralPath $fake.ArgsFile)
     $blocked = Invoke-AdapterCase -TempRoot $tmp -Mode 'success-delta' -ClaudeExe $fake.Exe -CircuitRoot $circuitQuota
     $argsAfterBlock = @(Get-Content -LiteralPath $fake.ArgsFile)
@@ -165,6 +187,38 @@ try {
     $observed = Invoke-AdapterCase -TempRoot $tmp -Mode 'success-delta' -ClaudeExe $fake.Exe -CircuitRoot $circuitLease
     Assert-True ($observed.sidecar.quotaCircuitDecision -eq 'half-open-observed') "lease: decisao deveria ser half-open-observed; veio $($observed.sidecar.quotaCircuitDecision)."
     Assert-True ($observed.sidecar.spawnAttempted -eq $false) 'lease: nao deve spawn quando ha probe half-open ativo.'
+
+    $circuitProbeLease = Join-Path $tmp 'circuit-probe-lease'
+    $probeLeaseDir = Join-Path $circuitProbeLease 'claude-code-quota-circuit'
+    New-Item -ItemType Directory -Path $probeLeaseDir -Force | Out-Null
+    $expired | ConvertTo-Json -Compress -Depth 6 | Set-Content -LiteralPath (Join-Path $probeLeaseDir "$baseHash.weekly.state.json") -Encoding utf8
+    $probeTimeout = Invoke-AdapterCase -TempRoot $tmp -Mode 'timeout-after-text' -ClaudeExe $fake.Exe `
+        -CircuitRoot $circuitProbeLease -TimeoutSec 1 -RetentionMode 'kb-sensitive'
+    Assert-True ($probeTimeout.sidecar.quotaCircuitDecision -eq 'half-open') "lease novo: decisao deveria ser half-open; veio $($probeTimeout.sidecar.quotaCircuitDecision)."
+    Assert-True ([string]::IsNullOrWhiteSpace($probeTimeout.stdout)) 'timeout apos texto: stdout deveria ficar vazio.'
+    Assert-True ($probeTimeout.sidecar.technicalStatus -eq 'timeout') 'timeout apos texto: technicalStatus deveria ser timeout.'
+    Assert-True ($probeTimeout.sidecar.failureAfterText.reason -eq 'timeout-after-partial-text') 'timeout apos texto: failureAfterText deveria registrar timeout-after-partial-text.'
+    Assert-True ([int]$probeTimeout.sidecar.failureAfterText.textBytes -gt 0) 'timeout apos texto: textBytes deveria ser maior que zero.'
+    Assert-True ($null -eq $probeTimeout.sidecar.failureAfterText.textSha256) 'timeout apos texto kb-sensitive: textSha256 deveria ser null.'
+    $newLease = Get-Content -LiteralPath (Join-Path $probeLeaseDir "$baseHash.lease.json") -Raw -Encoding utf8 | ConvertFrom-Json
+    Assert-True ($newLease.probeOwner.jobId -eq $newLease.probeAttemptId) 'lease novo: probeOwner/probeAttemptId deveriam compartilhar o job da tentativa.'
+    Assert-True (-not [string]::IsNullOrWhiteSpace([string]$newLease.probeAttemptId)) 'lease novo: probeAttemptId ausente.'
+    Assert-True ([int]$newLease.probeLeaseSeconds -eq 120) 'lease novo: TimeoutSec=1 deveria gerar probeLeaseSeconds=120.'
+    $leaseSeconds = [int](([datetime]$newLease.probeExpiresAtUtc - [datetime]$newLease.probeStartedAtUtc).TotalSeconds)
+    Assert-True ($leaseSeconds -eq 120) 'lease novo: janela persistida deveria ser 120 segundos.'
+
+    $circuitProbeLeaseLong = Join-Path $tmp 'circuit-probe-lease-long'
+    $probeLeaseLongDir = Join-Path $circuitProbeLeaseLong 'claude-code-quota-circuit'
+    New-Item -ItemType Directory -Path $probeLeaseLongDir -Force | Out-Null
+    $expired | ConvertTo-Json -Compress -Depth 6 | Set-Content -LiteralPath (Join-Path $probeLeaseLongDir "$baseHash.weekly.state.json") -Encoding utf8
+    $exitPartial = Invoke-AdapterCase -TempRoot $tmp -Mode 'exit-after-text' -ClaudeExe $fake.Exe `
+        -CircuitRoot $circuitProbeLeaseLong -TimeoutSec 180
+    Assert-True ([string]::IsNullOrWhiteSpace($exitPartial.stdout)) 'process exit apos texto: stdout deveria ficar vazio.'
+    Assert-True ($exitPartial.sidecar.technicalStatus -eq 'internalError') 'process exit apos texto: technicalStatus deveria ser internalError.'
+    Assert-True ($exitPartial.sidecar.failureAfterText.reason -eq 'process-exit-after-partial-text') 'process exit apos texto: failureAfterText deveria registrar process-exit-after-partial-text.'
+    Assert-True (-not [string]::IsNullOrWhiteSpace([string]$exitPartial.sidecar.failureAfterText.textSha256)) 'process exit apos texto public: textSha256 deveria existir.'
+    $longLease = Get-Content -LiteralPath (Join-Path $probeLeaseLongDir "$baseHash.lease.json") -Raw -Encoding utf8 | ConvertFrom-Json
+    Assert-True ([int]$longLease.probeLeaseSeconds -eq 210) 'lease longo: TimeoutSec=180 deveria gerar probeLeaseSeconds=210.'
 
     $timeout = Invoke-AdapterCase -TempRoot $tmp -Mode 'sleep' -ClaudeExe $fake.Exe `
         -CircuitRoot (Join-Path $tmp 'circuit-timeout') -TimeoutSec 1

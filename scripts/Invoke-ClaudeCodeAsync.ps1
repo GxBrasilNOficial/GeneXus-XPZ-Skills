@@ -59,14 +59,37 @@ function Get-AsyncSha256File {
 
 function Write-AsyncJsonAtomic {
     param([string]$Path, [object]$Object, [int]$Depth = 12)
-    $dir = Split-Path -Parent $Path
-    if (-not [string]::IsNullOrWhiteSpace($dir)) {
-        [System.IO.Directory]::CreateDirectory($dir) | Out-Null
-    }
+    $targetPath = [System.IO.Path]::GetFullPath($Path)
+    $dir = [System.IO.Path]::GetDirectoryName($targetPath)
+    if ([string]::IsNullOrWhiteSpace($dir)) { $dir = [System.IO.Directory]::GetCurrentDirectory() }
+    [System.IO.Directory]::CreateDirectory($dir) | Out-Null
     $tmp = Join-Path $dir ('.tmp-' + [guid]::NewGuid().ToString('N') + '.json')
+    $backup = Join-Path $dir ('.bak-' + [guid]::NewGuid().ToString('N') + '.json')
     $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
-    [System.IO.File]::WriteAllText($tmp, ($Object | ConvertTo-Json -Compress -Depth $Depth), $utf8NoBom)
-    Move-Item -LiteralPath $tmp -Destination $Path -Force
+    $tmpOwnsContent = $false
+    $replaceSucceeded = $false
+    try {
+        [System.IO.File]::WriteAllText($tmp, ($Object | ConvertTo-Json -Compress -Depth $Depth), $utf8NoBom)
+        $tmpOwnsContent = $true
+        if ([System.IO.File]::Exists($targetPath)) {
+            [System.IO.File]::Replace($tmp, $targetPath, $backup, $true)
+            $tmpOwnsContent = $false
+            $replaceSucceeded = $true
+            if ([System.IO.File]::Exists($backup)) { [System.IO.File]::Delete($backup) }
+        }
+        else {
+            [System.IO.File]::Move($tmp, $targetPath, $false)
+            $tmpOwnsContent = $false
+        }
+    }
+    finally {
+        if ($tmpOwnsContent -and [System.IO.File]::Exists($tmp)) {
+            try { [System.IO.File]::Delete($tmp) } catch { }
+        }
+        if ($replaceSucceeded -and [System.IO.File]::Exists($backup)) {
+            try { [System.IO.File]::Delete($backup) } catch { }
+        }
+    }
 }
 
 function Read-AsyncJsonWithDeadline {
@@ -123,6 +146,9 @@ function Get-AsyncCircuitContext {
     [pscustomobject]@{
         stateDir              = $stateDir
         safeBaseKey           = $safeBaseKey
+        provider              = 'anthropic'
+        backend               = 'claude-code'
+        modelKey              = $ModelName
         credentialFingerprint = $credentialFingerprint
     }
 }
@@ -134,7 +160,7 @@ function Get-AsyncIsoToUtc {
 }
 
 function New-AsyncHalfOpenLease {
-    param([object]$Context)
+    param([object]$Context, [int]$TimeoutSeconds)
     [System.IO.Directory]::CreateDirectory($Context.stateDir) | Out-Null
     $leasePath = Join-Path $Context.stateDir "$($Context.safeBaseKey).lease.json"
     $lockPath = Join-Path $Context.stateDir "$($Context.safeBaseKey).lease.lock"
@@ -151,12 +177,22 @@ function New-AsyncHalfOpenLease {
                     }
                 }
                 $now = [datetime]::UtcNow
+                $probeLeaseSeconds = [Math]::Max(($TimeoutSeconds + 30), 120)
                 $lease = [ordered]@{
                     Kind              = 'claude-code-quota-half-open-lease'
                     SchemaVersion     = 1
                     baseKeyHash       = $Context.safeBaseKey
+                    probeOwner        = [ordered]@{
+                        adapterName = 'Invoke-ClaudeCodeAsync.ps1'
+                        jobId       = $script:jobId
+                        processId   = $PID
+                        machineName = $env:COMPUTERNAME
+                        userName    = $env:USERNAME
+                    }
+                    probeAttemptId    = $script:jobId
+                    probeLeaseSeconds = $probeLeaseSeconds
                     probeStartedAtUtc = $now.ToString('yyyy-MM-ddTHH:mm:ssZ')
-                    probeExpiresAtUtc = $now.AddMinutes(15).ToString('yyyy-MM-ddTHH:mm:ssZ')
+                    probeExpiresAtUtc = $now.AddSeconds($probeLeaseSeconds).ToString('yyyy-MM-ddTHH:mm:ssZ')
                 }
                 Write-AsyncJsonAtomic -Path $leasePath -Object $lease -Depth 6
                 return [pscustomobject]@{ status = 'acquired'; leasePath = $leasePath }
@@ -173,7 +209,7 @@ function New-AsyncHalfOpenLease {
 }
 
 function Get-AsyncQuotaCircuitDecision {
-    param([object]$Context)
+    param([object]$Context, [int]$TimeoutSeconds)
 
     [System.IO.Directory]::CreateDirectory($Context.stateDir) | Out-Null
     $now = [datetime]::UtcNow
@@ -230,7 +266,7 @@ function Get-AsyncQuotaCircuitDecision {
     }
 
     if ($hadExpiredOpen -or $hadInvalid) {
-        $lease = New-AsyncHalfOpenLease -Context $Context
+        $lease = New-AsyncHalfOpenLease -Context $Context -TimeoutSeconds $TimeoutSeconds
         if ($lease.status -eq 'observed') {
             return [pscustomobject]@{ blocked = $true; decision = 'half-open-observed'; variants = @($variantDecisions); leasePath = $lease.leasePath }
         }
@@ -254,19 +290,40 @@ function Set-AsyncQuotaCircuitOpen {
     $rateLimitType = [regex]::Replace($rateLimitType, '[^A-Za-z0-9._-]', '-')
     $statePath = Join-Path $Context.stateDir "$($Context.safeBaseKey).$rateLimitType.state.json"
     $reportedLimitScope = Get-ClaudeCodeProp $QuotaEvidence 'reportedLimitScope'
+    $reportedLimitScopeText = if ($null -eq $reportedLimitScope -or [string]::IsNullOrWhiteSpace([string]$reportedLimitScope)) { $null } else { [string]$reportedLimitScope }
+    $scopeAssumed = [string]::IsNullOrWhiteSpace($reportedLimitScopeText)
+    $effectiveLimitScope = if ($scopeAssumed) { 'credential-context' } else { $reportedLimitScopeText }
+    $scopeAssumptionReason = if ($scopeAssumed) { 'reported-limit-scope-missing' } else { $null }
     $evidenceTypes = @(Get-ClaudeCodeProp $QuotaEvidence 'evidenceTypes')
+    $observedAtUtc = [datetime]::UtcNow
     $state = [ordered]@{
-        Kind              = 'claude-code-quota-circuit-state'
-        SchemaVersion     = 1
-        circuitState      = 'open'
-        baseKeyHash       = $Context.safeBaseKey
-        backend           = 'claude-code'
-        model             = $Model
-        rateLimitType     = $rateLimitType
-        reportedLimitScope = $reportedLimitScope
-        openedAtUtc       = [datetime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ')
-        resetsAtUtc       = $resetUtc.ToString('yyyy-MM-ddTHH:mm:ssZ')
-        evidenceTypes     = $evidenceTypes
+        Kind                         = 'claude-code-quota-circuit-state'
+        SchemaVersion                = 1
+        circuitState                 = 'open'
+        baseKeyHash                  = $Context.safeBaseKey
+        provider                     = $Context.provider
+        backend                      = $Context.backend
+        model                        = $Model
+        modelKey                     = $Context.modelKey
+        credentialContextFingerprint = $Context.credentialFingerprint
+        rateLimitType                = $rateLimitType
+        reportedLimitScope           = $reportedLimitScopeText
+        effectiveLimitScope          = $effectiveLimitScope
+        scopeAssumed                 = $scopeAssumed
+        scopeAssumptionReason        = $scopeAssumptionReason
+        observedAtUtc                = $observedAtUtc.ToString('yyyy-MM-ddTHH:mm:ssZ')
+        openedAtUtc                  = $observedAtUtc.ToString('yyyy-MM-ddTHH:mm:ssZ')
+        resetsAtUtc                  = $resetUtc.ToString('yyyy-MM-ddTHH:mm:ssZ')
+        evidenceTypes                = $evidenceTypes
+        sourceEvidence               = [ordered]@{
+            source             = 'claude-code-stream-json'
+            evidenceTypes      = $evidenceTypes
+            terminalReason     = Get-ClaudeCodeProp $QuotaEvidence 'terminalReason'
+            apiErrorStatus     = Get-ClaudeCodeProp $QuotaEvidence 'apiErrorStatus'
+            rateLimitType      = $rateLimitType
+            reportedLimitScope = $reportedLimitScopeText
+            resetsAtUtc        = $resetUtc.ToString('yyyy-MM-ddTHH:mm:ssZ')
+        }
     }
     Write-AsyncJsonAtomic -Path $statePath -Object $state -Depth 8
 }
@@ -291,6 +348,56 @@ function Get-AsyncLastResultEvent {
         if ([string](Get-ClaudeCodeProp $ev 'type') -eq 'result') { $last = $ev }
     }
     return $last
+}
+
+function Read-AsyncClaudeCodeStream {
+    param([string]$StreamPath)
+
+    $events = [System.Collections.Generic.List[object]]::new()
+    $streamError = ''
+    if (Test-Path -LiteralPath $StreamPath -PathType Leaf) {
+        foreach ($line in @(Get-Content -LiteralPath $StreamPath -Encoding utf8 -ErrorAction SilentlyContinue)) {
+            if ([string]::IsNullOrWhiteSpace($line)) { continue }
+            try {
+                $ev = $line | ConvertFrom-Json
+                $events.Add($ev)
+                $evError = Get-ClaudeCodeStreamEventErrorText -StreamEvent $ev
+                if (-not [string]::IsNullOrWhiteSpace($evError)) { $streamError = $evError }
+            }
+            catch {
+                $streamError = 'stream-json-invalid'
+            }
+        }
+    }
+    $acceptedText = Get-ClaudeCodeStreamAcceptedTextFromEvents -StreamEvents @($events)
+    $quota = Get-ClaudeCodeStreamQuotaEvidence -StreamEvents @($events)
+    $lastResult = Get-AsyncLastResultEvent -Events @($events)
+    $terminalReason = [string](Get-ClaudeCodeProp $lastResult 'terminal_reason')
+    if ([string]::IsNullOrWhiteSpace($terminalReason)) { $terminalReason = [string](Get-ClaudeCodeProp $quota 'terminalReason') }
+    $apiErrorStatus = [string](Get-ClaudeCodeProp $lastResult 'api_error_status')
+    if ([string]::IsNullOrWhiteSpace($apiErrorStatus)) { $apiErrorStatus = [string](Get-ClaudeCodeProp $quota 'apiErrorStatus') }
+
+    return [pscustomobject]@{
+        events         = @($events)
+        streamError    = $streamError
+        acceptedText   = $acceptedText
+        quota          = $quota
+        lastResult     = $lastResult
+        terminalReason = $terminalReason
+        apiErrorStatus = $apiErrorStatus
+    }
+}
+
+function New-AsyncFailureAfterText {
+    param([string]$Reason, [AllowNull()] [string]$Text)
+    if ([string]::IsNullOrWhiteSpace($Text)) { return $null }
+    $partialTextHash = $null
+    if ($RetentionMode -eq 'public') { $partialTextHash = Get-AsyncSha256Text -Text $Text }
+    return [ordered]@{
+        reason     = $Reason
+        textBytes  = [System.Text.Encoding]::UTF8.GetByteCount([string]$Text)
+        textSha256 = $partialTextHash
+    }
 }
 
 function New-AsyncSidecarObject {
@@ -419,7 +526,7 @@ try {
 
     $circuitRoot = Get-AsyncDefaultCircuitRoot
     $circuitContext = Get-AsyncCircuitContext -Root $circuitRoot -ModelName $Model
-    $circuitDecision = Get-AsyncQuotaCircuitDecision -Context $circuitContext
+    $circuitDecision = Get-AsyncQuotaCircuitDecision -Context $circuitContext -TimeoutSeconds $TimeoutSec
     $script:quotaCircuitDecision = [string]$circuitDecision.decision
     $script:quotaEvidence = [ordered]@{
         baseKeyHash      = $circuitContext.safeBaseKey
@@ -498,10 +605,12 @@ try {
         else {
             $script:cancelIdentityUnverifiable = $true
         }
+        $streamInspection = Read-AsyncClaudeCodeStream -StreamPath $streamPath
+        $failureAfterText = New-AsyncFailureAfterText -Reason 'timeout-after-partial-text' -Text ([string]$streamInspection.acceptedText)
         Complete-AsyncAdapter -TechnicalStatus 'timeout' -ResultAccepted $false `
-            -AcceptanceRejectionReason 'timeout' -ExitCode $null -TerminalReason $null -ApiErrorStatus $null `
-            -FailureAfterText $null -StreamPath $streamPath -StderrPath $stderrPath -AcceptedText $null `
-            -FinalTextDisposition 'none'
+            -AcceptanceRejectionReason 'timeout' -ExitCode $null -TerminalReason $streamInspection.terminalReason `
+            -ApiErrorStatus $streamInspection.apiErrorStatus -FailureAfterText $failureAfterText -StreamPath $streamPath `
+            -StderrPath $stderrPath -AcceptedText $null -FinalTextDisposition 'none'
         exit 0
     }
 
@@ -509,29 +618,12 @@ try {
     if (Test-Path -LiteralPath $stderrPath -PathType Leaf) {
         $stderrText = Get-Content -LiteralPath $stderrPath -Raw -Encoding utf8 -ErrorAction SilentlyContinue
     }
-    $events = [System.Collections.Generic.List[object]]::new()
-    $streamError = ''
-    if (Test-Path -LiteralPath $streamPath -PathType Leaf) {
-        foreach ($line in @(Get-Content -LiteralPath $streamPath -Encoding utf8 -ErrorAction SilentlyContinue)) {
-            if ([string]::IsNullOrWhiteSpace($line)) { continue }
-            try {
-                $ev = $line | ConvertFrom-Json
-                $events.Add($ev)
-                $evError = Get-ClaudeCodeStreamEventErrorText -StreamEvent $ev
-                if (-not [string]::IsNullOrWhiteSpace($evError)) { $streamError = $evError }
-            }
-            catch {
-                $streamError = 'stream-json-invalid'
-            }
-        }
-    }
-    $acceptedText = Get-ClaudeCodeStreamAcceptedTextFromEvents -StreamEvents @($events)
-    $quota = Get-ClaudeCodeStreamQuotaEvidence -StreamEvents @($events)
-    $lastResult = Get-AsyncLastResultEvent -Events @($events)
-    $terminalReason = [string](Get-ClaudeCodeProp $lastResult 'terminal_reason')
-    if ([string]::IsNullOrWhiteSpace($terminalReason)) { $terminalReason = [string](Get-ClaudeCodeProp $quota 'terminalReason') }
-    $apiErrorStatus = [string](Get-ClaudeCodeProp $lastResult 'api_error_status')
-    if ([string]::IsNullOrWhiteSpace($apiErrorStatus)) { $apiErrorStatus = [string](Get-ClaudeCodeProp $quota 'apiErrorStatus') }
+    $streamInspection = Read-AsyncClaudeCodeStream -StreamPath $streamPath
+    $streamError = [string]$streamInspection.streamError
+    $acceptedText = [string]$streamInspection.acceptedText
+    $quota = $streamInspection.quota
+    $terminalReason = [string]$streamInspection.terminalReason
+    $apiErrorStatus = [string]$streamInspection.apiErrorStatus
 
     if ($quota.isQuota) {
         $script:quotaEvidence = [ordered]@{
@@ -543,16 +635,7 @@ try {
             resetsAtUtc        = $quota.resetsAtUtc
         }
         Set-AsyncQuotaCircuitOpen -Context $circuitContext -QuotaEvidence $quota
-        $failureAfterText = $null
-        if (-not [string]::IsNullOrWhiteSpace($acceptedText)) {
-            $partialTextHash = $null
-            if ($RetentionMode -eq 'public') { $partialTextHash = Get-AsyncSha256Text -Text $acceptedText }
-            $failureAfterText = [ordered]@{
-                reason     = 'quota-after-text'
-                textBytes  = [System.Text.Encoding]::UTF8.GetByteCount([string]$acceptedText)
-                textSha256 = $partialTextHash
-            }
-        }
+        $failureAfterText = New-AsyncFailureAfterText -Reason 'quota-after-text' -Text $acceptedText
         Complete-AsyncAdapter -TechnicalStatus 'quota' -ResultAccepted $false `
             -AcceptanceRejectionReason 'quota-signal' -ExitCode ([int]$process.ExitCode) `
             -TerminalReason $terminalReason -ApiErrorStatus $apiErrorStatus -FailureAfterText $failureAfterText `
@@ -579,9 +662,10 @@ try {
     }
 
     $reason = if ($errMsg) { $errMsg } elseif (-not [string]::IsNullOrWhiteSpace($streamError)) { $streamError } else { 'process-exited-without-accepted-result' }
+    $failureAfterText = New-AsyncFailureAfterText -Reason 'process-exit-after-partial-text' -Text $acceptedText
     Complete-AsyncAdapter -TechnicalStatus 'internalError' -ResultAccepted $false `
         -AcceptanceRejectionReason $reason -ExitCode ([int]$process.ExitCode) -TerminalReason $terminalReason `
-        -ApiErrorStatus $apiErrorStatus -FailureAfterText $null -StreamPath $streamPath -StderrPath $stderrPath `
+        -ApiErrorStatus $apiErrorStatus -FailureAfterText $failureAfterText -StreamPath $streamPath -StderrPath $stderrPath `
         -AcceptedText $null -FinalTextDisposition 'none'
     exit 0
 }
