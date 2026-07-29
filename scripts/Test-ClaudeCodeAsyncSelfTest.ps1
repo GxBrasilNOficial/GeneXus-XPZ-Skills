@@ -14,6 +14,22 @@ function Assert-True {
     if (-not $Condition) { throw $Message }
 }
 
+function Get-TestSha256Text {
+    param([AllowNull()] [string]$Text)
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes([string]$Text)
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try { return [Convert]::ToHexString($sha.ComputeHash($bytes)).ToLowerInvariant() }
+    finally { $sha.Dispose() }
+}
+
+function Assert-NoRawCaptureFiles {
+    param([string]$Path, [string]$Message)
+    $rawFiles = @(Get-ChildItem -LiteralPath $Path -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -like '*.stream.jsonl' -or $_.Name -like '*.stderr.txt' })
+    $rawFileNames = @($rawFiles | ForEach-Object { $_.Name })
+    Assert-True ($rawFiles.Count -eq 0) ("{0}: stream/stderr brutos permaneceram: {1}" -f $Message, ($rawFileNames -join ', '))
+}
+
 function New-FakeClaudeCodeExe {
     param([string]$TempRoot)
     $fakeExe = Join-Path $TempRoot 'claude.cmd'
@@ -38,6 +54,17 @@ if "%FAKE_CLAUDE_MODE%"=="success-delta" (
 )
 if "%FAKE_CLAUDE_MODE%"=="success-assistant" (
   echo {"type":"assistant","message":{"content":[{"text":"parecer aceito"}]}}
+  echo {"type":"result","subtype":"success","is_error":false}
+  exit /b 0
+)
+if "%FAKE_CLAUDE_MODE%"=="success-newline" (
+  echo {"type":"content_block_delta","delta":{"type":"text_delta","text":"linha\n"}}
+  echo {"type":"result","subtype":"success","is_error":false}
+  exit /b 0
+)
+if "%FAKE_CLAUDE_MODE%"=="success-stderr" (
+  echo {"type":"assistant","message":{"content":[{"text":"parecer com stderr"}]}}
+  echo detalhe bruto sensivel 1>&2
   echo {"type":"result","subtype":"success","is_error":false}
   exit /b 0
 )
@@ -80,19 +107,21 @@ function Invoke-AdapterCase {
         [int]$TimeoutSec = 30
     )
     $env:FAKE_CLAUDE_MODE = $Mode
-    $prompt = Join-Path $TempRoot "prompt-$Mode.md"
+    $caseId = [guid]::NewGuid().ToString('N')
+    $prompt = Join-Path $TempRoot "prompt-$Mode-$caseId.md"
     Set-Content -LiteralPath $prompt -Value "prompt $Mode" -Encoding utf8
-    $sidecar = Join-Path $TempRoot "$Mode.sidecar.json"
-    $adapterTemp = Join-Path $TempRoot "adapter-$Mode"
+    $sidecar = Join-Path $TempRoot "$Mode-$caseId.sidecar.json"
+    $adapterTemp = Join-Path $TempRoot "adapter-$Mode-$caseId"
     New-Item -ItemType Directory -Path $adapterTemp -Force | Out-Null
     $stdout = & $scriptUnderTest -MessagePath $prompt -SidecarPath $sidecar -Model 'claude-opus-4-8' `
         -ClaudeExe $ClaudeExe -CircuitStateRoot $CircuitRoot -TempDir $adapterTemp `
         -RetentionMode $RetentionMode -TimeoutSec $TimeoutSec -Cd $TempRoot
     $sidecarJson = Get-Content -LiteralPath $sidecar -Raw -Encoding utf8 | ConvertFrom-Json
     [pscustomobject]@{
-        stdout  = if ($null -eq $stdout) { '' } elseif ($stdout -is [array]) { $stdout -join "`n" } else { [string]$stdout }
-        sidecar = $sidecarJson
-        path    = $sidecar
+        stdout      = if ($null -eq $stdout) { '' } elseif ($stdout -is [array]) { $stdout -join "`n" } else { [string]$stdout }
+        sidecar     = $sidecarJson
+        path        = $sidecar
+        adapterTemp = $adapterTemp
     }
 }
 
@@ -116,11 +145,19 @@ try {
     Assert-True ($ok.sidecar.processCreated -eq $true) 'sidecar: processCreated=true esperado.'
     Assert-True ($ok.sidecar.quotaCircuitDecision -eq 'closed') 'sidecar: circuito sem estado deveria ser closed.'
 
-    $kb = Invoke-AdapterCase -TempRoot $tmp -Mode 'success-assistant' -ClaudeExe $fake.Exe `
+    $newline = Invoke-AdapterCase -TempRoot $tmp -Mode 'success-newline' -ClaudeExe $fake.Exe `
+        -CircuitRoot (Join-Path $tmp 'circuit-newline')
+    Assert-True ($newline.stdout -eq 'linha') 'newline terminal: stdout deveria remover apenas quebra final.'
+    Assert-True ($newline.sidecar.acceptedFinalTextSha256 -eq (Get-TestSha256Text -Text $newline.stdout)) 'newline terminal: hash do sidecar deveria casar com stdout capturado.'
+    Assert-True ([int]$newline.sidecar.acceptedFinalTextBytes -eq [System.Text.Encoding]::UTF8.GetByteCount($newline.stdout)) 'newline terminal: bytes do sidecar deveriam casar com stdout capturado.'
+
+    $kb = Invoke-AdapterCase -TempRoot $tmp -Mode 'success-stderr' -ClaudeExe $fake.Exe `
         -CircuitRoot (Join-Path $tmp 'circuit-kb') -RetentionMode 'kb-sensitive'
-    Assert-True ($kb.stdout -eq 'parecer aceito') 'kb-sensitive: stdout aceito deveria conter o parecer final.'
+    Assert-True ($kb.stdout -eq 'parecer com stderr') 'kb-sensitive: stdout aceito deveria conter o parecer final.'
     Assert-True ($null -eq $kb.sidecar.streamSha256) 'kb-sensitive: streamSha256 deve ser omitido/null.'
     Assert-True ($null -eq $kb.sidecar.stderrSha256) 'kb-sensitive: stderrSha256 deve ser omitido/null.'
+    Assert-True ($kb.sidecar.retentionCleanupFailed -eq $false) 'kb-sensitive: limpeza de stream/stderr deveria completar.'
+    Assert-NoRawCaptureFiles -Path $kb.adapterTemp -Message 'kb-sensitive sucesso'
 
     $circuitQuota = Join-Path $tmp 'circuit-quota'
     $quota = Invoke-AdapterCase -TempRoot $tmp -Mode 'quota-after-text' -ClaudeExe $fake.Exe -CircuitRoot $circuitQuota
@@ -200,6 +237,8 @@ try {
     Assert-True ($probeTimeout.sidecar.failureAfterText.reason -eq 'timeout-after-partial-text') 'timeout apos texto: failureAfterText deveria registrar timeout-after-partial-text.'
     Assert-True ([int]$probeTimeout.sidecar.failureAfterText.textBytes -gt 0) 'timeout apos texto: textBytes deveria ser maior que zero.'
     Assert-True ($null -eq $probeTimeout.sidecar.failureAfterText.textSha256) 'timeout apos texto kb-sensitive: textSha256 deveria ser null.'
+    Assert-True ($probeTimeout.sidecar.retentionCleanupFailed -eq $false) 'timeout apos texto kb-sensitive: limpeza de stream/stderr deveria completar.'
+    Assert-NoRawCaptureFiles -Path $probeTimeout.adapterTemp -Message 'kb-sensitive timeout apos texto'
     $newLease = Get-Content -LiteralPath (Join-Path $probeLeaseDir "$baseHash.lease.json") -Raw -Encoding utf8 | ConvertFrom-Json
     Assert-True ($newLease.probeOwner.jobId -eq $newLease.probeAttemptId) 'lease novo: probeOwner/probeAttemptId deveriam compartilhar o job da tentativa.'
     Assert-True (-not [string]::IsNullOrWhiteSpace([string]$newLease.probeAttemptId)) 'lease novo: probeAttemptId ausente.'
@@ -219,6 +258,14 @@ try {
     Assert-True (-not [string]::IsNullOrWhiteSpace([string]$exitPartial.sidecar.failureAfterText.textSha256)) 'process exit apos texto public: textSha256 deveria existir.'
     $longLease = Get-Content -LiteralPath (Join-Path $probeLeaseLongDir "$baseHash.lease.json") -Raw -Encoding utf8 | ConvertFrom-Json
     Assert-True ([int]$longLease.probeLeaseSeconds -eq 210) 'lease longo: TimeoutSec=180 deveria gerar probeLeaseSeconds=210.'
+
+    $sensitiveExitPartial = Invoke-AdapterCase -TempRoot $tmp -Mode 'exit-after-text' -ClaudeExe $fake.Exe `
+        -CircuitRoot (Join-Path $tmp 'circuit-exit-kb') -RetentionMode 'kb-sensitive'
+    Assert-True ([string]::IsNullOrWhiteSpace($sensitiveExitPartial.stdout)) 'process exit apos texto kb-sensitive: stdout deveria ficar vazio.'
+    Assert-True ($sensitiveExitPartial.sidecar.failureAfterText.reason -eq 'process-exit-after-partial-text') 'process exit apos texto kb-sensitive: failureAfterText deveria registrar process-exit-after-partial-text.'
+    Assert-True ($null -eq $sensitiveExitPartial.sidecar.failureAfterText.textSha256) 'process exit apos texto kb-sensitive: textSha256 deveria ser null.'
+    Assert-True ($sensitiveExitPartial.sidecar.retentionCleanupFailed -eq $false) 'process exit apos texto kb-sensitive: limpeza de stream/stderr deveria completar.'
+    Assert-NoRawCaptureFiles -Path $sensitiveExitPartial.adapterTemp -Message 'kb-sensitive process exit apos texto'
 
     $timeout = Invoke-AdapterCase -TempRoot $tmp -Mode 'sleep' -ClaudeExe $fake.Exe `
         -CircuitRoot (Join-Path $tmp 'circuit-timeout') -TimeoutSec 1

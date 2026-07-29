@@ -402,6 +402,39 @@ function New-AsyncFailureAfterText {
     }
 }
 
+function ConvertTo-AsyncStdoutFinalText {
+    param([AllowNull()] [string]$Text)
+    return ([string]$Text).TrimEnd("`r", "`n")
+}
+
+function Remove-AsyncSensitiveRawCaptureFiles {
+    param(
+        [AllowNull()] [string]$StreamPath,
+        [AllowNull()] [string]$StderrPath
+    )
+
+    if ($RetentionMode -ne 'kb-sensitive') { return }
+
+    foreach ($rawPath in @($StreamPath, $StderrPath)) {
+        if ([string]::IsNullOrWhiteSpace([string]$rawPath)) { continue }
+        if (-not (Test-Path -LiteralPath ([string]$rawPath) -PathType Leaf)) { continue }
+
+        $removed = $false
+        for ($attempt = 0; $attempt -lt 3 -and -not $removed; $attempt++) {
+            try {
+                Remove-Item -LiteralPath ([string]$rawPath) -Force -ErrorAction Stop
+                $removed = $true
+            } catch {
+                if ($attempt -lt 2) { Start-Sleep -Milliseconds 50 }
+            }
+        }
+
+        if (-not $removed -and (Test-Path -LiteralPath ([string]$rawPath) -PathType Leaf)) {
+            $script:retentionCleanupFailed = $true
+        }
+    }
+}
+
 function New-AsyncSidecarObject {
     param(
         [string]$TechnicalStatus,
@@ -421,8 +454,9 @@ function New-AsyncSidecarObject {
     $acceptedHash = $null
     $acceptedBytes = $null
     if ($ResultAccepted) {
-        $acceptedHash = Get-AsyncSha256Text -Text $AcceptedText
-        $acceptedBytes = [System.Text.Encoding]::UTF8.GetByteCount([string]$AcceptedText)
+        $stdoutAcceptedText = ConvertTo-AsyncStdoutFinalText -Text $AcceptedText
+        $acceptedHash = Get-AsyncSha256Text -Text $stdoutAcceptedText
+        $acceptedBytes = [System.Text.Encoding]::UTF8.GetByteCount([string]$stdoutAcceptedText)
     }
     $streamHash = $null
     $stderrHash = $null
@@ -482,14 +516,19 @@ function Complete-AsyncAdapter {
         [AllowNull()] [string]$AcceptedText,
         [string]$FinalTextDisposition = 'none'
     )
+    $stdoutAcceptedText = $null
+    if ($ResultAccepted) {
+        $stdoutAcceptedText = ConvertTo-AsyncStdoutFinalText -Text $AcceptedText
+    }
+    Remove-AsyncSensitiveRawCaptureFiles -StreamPath $StreamPath -StderrPath $StderrPath
     $sidecar = New-AsyncSidecarObject -TechnicalStatus $TechnicalStatus -ResultAccepted $ResultAccepted `
         -AcceptanceRejectionReason $AcceptanceRejectionReason -ExitCode $ExitCode `
         -TerminalReason $TerminalReason -ApiErrorStatus $ApiErrorStatus -FailureAfterText $FailureAfterText `
-        -StreamPath $StreamPath -StderrPath $StderrPath -AcceptedText $AcceptedText `
+        -StreamPath $StreamPath -StderrPath $StderrPath -AcceptedText $stdoutAcceptedText `
         -FinalTextDisposition $FinalTextDisposition
     Write-AsyncJsonAtomic -Path $SidecarPath -Object $sidecar -Depth 12
     if ($ResultAccepted) {
-        Write-Output (([string]$AcceptedText).TrimEnd("`r", "`n"))
+        Write-Output $stdoutAcceptedText
     }
 }
 

@@ -158,6 +158,22 @@ if ($model -eq 'claude-untrusted-workspace') {
     exit 1
 }
 $null = [Console]::In.ReadToEnd()
+if ($model -eq 'claude-sensitive-ledger') {
+    [Console]::Error.WriteLine('stderr bruto sensivel')
+    [pscustomobject]@{
+        type = 'content_block_delta'
+        delta = [ordered]@{
+            type = 'text_delta'
+            text = "PARECER sensivel`n"
+        }
+    } | ConvertTo-Json -Compress -Depth 5
+    [pscustomobject]@{
+        type = 'result'
+        subtype = 'success'
+        is_error = $false
+    } | ConvertTo-Json -Compress -Depth 5
+    exit 0
+}
 $text = 'CLAUDE cwd=' + (Get-Location).Path + ' model=' + $model + ' revisao'
 [pscustomobject]@{
     type = 'assistant'
@@ -237,6 +253,11 @@ model = "gpt-5.5"
 { "schemaVersion": 1, "defaultExternal": "ask", "models": { "openai/*": "allow-external" } }
 '@ | Set-Content -LiteralPath $pol -Encoding utf8
 
+    $polAnthropic = Join-Path $tmp 'llm-delegation-policy-anthropic.json'
+    @'
+{ "schemaVersion": 1, "defaultExternal": "ask", "models": { "anthropic/*": "allow-external" } }
+'@ | Set-Content -LiteralPath $polAnthropic -Encoding utf8
+
     # manuscrito (acentos)
     $manuscript = Join-Path $tmp 'manuscrito.md'
     @'
@@ -296,7 +317,14 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
         if ($null -eq $stderr) { $stderr = '' }
         $json = $null
         if (-not [string]::IsNullOrWhiteSpace($stdout)) { try { $json = $stdout | ConvertFrom-Json } catch { } }
-        return [pscustomobject]@{ stdout = $stdout; stderr = $stderr; exit = $p.ExitCode; json = $json; roundId = $rid }
+        return [pscustomobject]@{
+            stdout    = $stdout
+            stderr    = $stderr
+            exit      = $p.ExitCode
+            json      = $json
+            roundId   = $rid
+            ledgerDir = Join-Path $ledgerRoot $rid
+        }
     }
 
     # =======================================================================================
@@ -608,6 +636,26 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
     $tGm = Get-Content -LiteralPath $rvGm.verdictPath -Raw -Encoding utf8
     Assert-True ($tGm -match 'model=gemini-3-flash-preview') 'gemini despacho: -Model deveria chegar ao adapter'
     Assert-True ($tGm -match [regex]::Escape($tmpFwd)) 'gemini despacho: -Cd deveria virar o WorkingDirectory (cwd)'
+
+    $r = Invoke-Harness -Reviewers @(@{
+            backend = 'claude-code'
+            targetModelKey = 'anthropic/claude-sensitive-ledger'
+            invokeArgs = @{ model = 'claude-sensitive-ledger' }
+        }) -Sensitivity 'kb-sensitive' -Extra @{ Cd = $tmp; PolicyPath = $polAnthropic }
+    $rvClSensitive = Get-Reviewer $r.json 0
+    Assert-True ($rvClSensitive.state -eq 'responded') "claude-code kb-sensitive ledger: esperado responded; got $($rvClSensitive.state)"
+    Assert-True ($rvClSensitive.sidecarAccepted -eq $true) 'claude-code kb-sensitive ledger: sidecar deveria ser aceito.'
+    Assert-True ($rvClSensitive.resultAccepted -eq $true) 'claude-code kb-sensitive ledger: resultAccepted=true esperado.'
+    Assert-True (Test-Path -LiteralPath ([string]$rvClSensitive.verdictPath) -PathType Leaf) 'claude-code kb-sensitive ledger: .verdict.txt deveria existir.'
+    $rawLedgerFiles = @(Get-ChildItem -LiteralPath $r.ledgerDir -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -like '*.stream.jsonl' -or $_.Name -like '*.stderr.txt' })
+    $rawLedgerFileNames = @($rawLedgerFiles | ForEach-Object { $_.Name })
+    Assert-True ($rawLedgerFiles.Count -eq 0) ("claude-code kb-sensitive ledger: stream/stderr brutos nao deveriam permanecer no ledger; ficaram: {0}" -f ($rawLedgerFileNames -join ', '))
+    $sensitiveSidecar = Get-Content -LiteralPath ([string]$rvClSensitive.sidecarPath) -Raw -Encoding utf8 | ConvertFrom-Json
+    Assert-True ($sensitiveSidecar.retentionMode -eq 'kb-sensitive') 'claude-code kb-sensitive ledger: retentionMode deveria ser kb-sensitive.'
+    Assert-True ($sensitiveSidecar.retentionCleanupFailed -eq $false) 'claude-code kb-sensitive ledger: limpeza de stream/stderr deveria completar.'
+    Assert-True ($null -eq $sensitiveSidecar.streamSha256) 'claude-code kb-sensitive ledger: streamSha256 deve ser omitido/null.'
+    Assert-True ($null -eq $sensitiveSidecar.stderrSha256) 'claude-code kb-sensitive ledger: stderrSha256 deve ser omitido/null.'
 
     # Claude Code workspace nao confiavel -> unavailable, para permitir fallback em painel.
     $r = Invoke-Harness -Reviewers @(@{ backend = 'claude-code'; invokeArgs = @{ model = 'claude-untrusted-workspace' } }) `
