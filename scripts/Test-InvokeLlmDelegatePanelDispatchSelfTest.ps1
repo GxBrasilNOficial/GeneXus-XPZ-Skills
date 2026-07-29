@@ -406,11 +406,25 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
     # =======================================================================================
     # 5) SPLAT + CONTENÇÃO (per-backend) — sem despacho (kb-sensitive -> gateAsk)
     # =======================================================================================
-    # claude-code: permissionMode/tools/maxTurns -> securityBlockedArgs
-    $r = Invoke-Harness -Reviewers @(@{ backend = 'claude-code'; invokeArgs = @{ model = 'claude-opus-4-8'; permissionMode = 'bypassPermissions'; tools = 'Bash'; maxTurns = 9 } }) -Sensitivity 'kb-sensitive'
+    # claude-code: permissionMode/tools/maxTurns e chaves internas -> securityBlockedArgs
+    $r = Invoke-Harness -Reviewers @(@{ backend = 'claude-code'; invokeArgs = @{
+                    model = 'claude-opus-4-8'
+                    permissionMode = 'bypassPermissions'
+                    tools = 'Bash'
+                    maxTurns = 9
+                    SidecarPath = 'C:\tmp\roubar-sidecar.json'
+                    RetentionMode = 'public'
+                    TempDir = 'C:\tmp\roubar-ledger'
+                    CircuitStateRoot = 'C:\tmp\roubar-circuito'
+                    ClaudeExe = 'C:\tmp\fake-claude.exe'
+                    MessagePath = 'C:\tmp\outro-prompt.txt'
+                } }) -Sensitivity 'kb-sensitive'
     $rv = Get-Reviewer $r.json 0
     $sb = @($rv.securityBlockedArgs)
     Assert-True (($sb -contains 'permissionMode') -and ($sb -contains 'tools') -and ($sb -contains 'maxTurns')) "claude-code contenção: securityBlockedArgs deveria conter permissionMode/tools/maxTurns; got [$($sb -join ',')]"
+    foreach ($blockedInternalArg in @('SidecarPath', 'RetentionMode', 'TempDir', 'CircuitStateRoot', 'ClaudeExe', 'MessagePath')) {
+        Assert-True ($sb -contains $blockedInternalArg) "claude-code chaves internas: securityBlockedArgs deveria conter $blockedInternalArg; got [$($sb -join ',')]"
+    }
 
     # opencode: agent -> securityBlockedArgs (mesmo em kb-sensitive: classificação precede o unavailable)
     $r = Invoke-Harness -Reviewers @(@{ backend = 'opencode'; targetModelKey = 'ollama-cloud/x'; invokeArgs = @{ model = 'ollama-cloud/x'; agent = 'build' } }) -Sensitivity 'kb-sensitive'
@@ -581,6 +595,37 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
 
     $harnessText = Get-Content -LiteralPath $harness -Raw -Encoding utf8
     Assert-True ($harnessText -match 'Get-FallbackDispatcherTimeoutMs') 'fallback dispatcher: timeout do processo filho deve derivar do invokeArgs.timeoutSec.'
+    $parserErrors = $null
+    $tokens = $null
+    $harnessAst = [System.Management.Automation.Language.Parser]::ParseFile($harness, [ref]$tokens, [ref]$parserErrors)
+    Assert-True (@($parserErrors).Count -eq 0) "fallback dispatcher: harness deveria parsear sem erro; erros=$(@($parserErrors).Count)"
+    $functionAsts = @($harnessAst.FindAll({ param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $true))
+    $getPropAst = @($functionAsts | Where-Object { $_.Name -eq 'Get-Prop' })[0]
+    $timeoutAst = @($functionAsts | Where-Object { $_.Name -eq 'Get-FallbackDispatcherTimeoutMs' })[0]
+    Assert-True ($null -ne $getPropAst -and $null -ne $timeoutAst) 'fallback dispatcher: funcoes Get-Prop/Get-FallbackDispatcherTimeoutMs deveriam existir.'
+    $timeoutProbe = @"
+`$script:AdapterDefaultTimeoutSec = @{
+    'opencode' = 180
+    'codex' = 180
+    'claude-code' = 300
+    'copilot' = 300
+    'gemini' = 300
+}
+$($getPropAst.Extent.Text)
+$($timeoutAst.Extent.Text)
+[pscustomobject]@{
+    ClaudeDefault = Get-FallbackDispatcherTimeoutMs -Backend 'claude-code' -InvokeArgs ([pscustomobject]@{})
+    OpenCodeDefault = Get-FallbackDispatcherTimeoutMs -Backend 'opencode' -InvokeArgs ([pscustomobject]@{})
+    SmallExplicit = Get-FallbackDispatcherTimeoutMs -Backend 'claude-code' -InvokeArgs ([pscustomobject]@{ timeoutSec = 2 })
+    InvalidClaude = Get-FallbackDispatcherTimeoutMs -Backend 'claude-code' -InvokeArgs ([pscustomobject]@{ timeoutSec = 'abc' })
+}
+"@
+    $timeoutResult = & ([scriptblock]::Create($timeoutProbe))
+    Assert-True ([int]$timeoutResult.ClaudeDefault -eq 330000) "fallback dispatcher: claude-code sem timeoutSec deve esperar 300s+30s; got $($timeoutResult.ClaudeDefault)"
+    Assert-True ([int]$timeoutResult.InvalidClaude -eq 330000) "fallback dispatcher: claude-code com timeoutSec invalido deve cair no default 300s+30s; got $($timeoutResult.InvalidClaude)"
+    Assert-True ([int]$timeoutResult.OpenCodeDefault -eq 210000) "fallback dispatcher: opencode sem timeoutSec deve esperar 180s+30s; got $($timeoutResult.OpenCodeDefault)"
+    Assert-True ([int]$timeoutResult.SmallExplicit -eq 180000) "fallback dispatcher: timeoutSec pequeno deve manter piso conservador de 180s; got $($timeoutResult.SmallExplicit)"
+    Assert-True ($harnessText -match "Get-FallbackDispatcherTimeoutMs\s+-Backend") 'fallback dispatcher: chamada real deve informar o backend para escolher o default correto.'
     Assert-True ($harnessText -notmatch 'WaitForExit\(180000\)') 'fallback dispatcher: nao pode haver timeout fixo de 180000ms no processo filho.'
     Assert-True ($harnessText -match 'Get-CurrentPowerShellExecutable') 'fallback dispatcher: processo filho deve usar o executavel PowerShell atual/validado, nao depender de pwsh cru no PATH.'
     Assert-True ($harnessText -notmatch "Start-Process\s+-FilePath\s+'pwsh'") 'fallback dispatcher: nao pode resolver pwsh cru pelo PATH.'

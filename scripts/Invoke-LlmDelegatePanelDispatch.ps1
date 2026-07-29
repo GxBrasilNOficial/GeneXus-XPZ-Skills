@@ -22,7 +22,8 @@
       - gate Resolve-LlmDelegateAuthorization.ps1 (NAO autoriza): allow->fila de despacho,
         ask/deny->gateAsk/gateDeny, throw->error;
       - classifica invokeArgs por allowlist PER-BACKEND; contencao (permissionMode/tools/maxTurns,
-        agent, approvalMode!=plan) e RECUSADA (securityBlockedArgs) e NAO repassada ao adapter:
+        agent, approvalMode!=plan) e chaves internas do adapter sao RECUSADAS (securityBlockedArgs)
+        e NAO repassadas ao adapter:
         o despacho segue com os defaults seguros do adapter (decisao de seguranca, Posicao B);
       - resolve -Cd (precedencia + fail-closed; opencode nunca recebe -Cd).
 
@@ -124,13 +125,24 @@ $ExeParam = @{
     'copilot'     = 'CopilotExe'
     'gemini'      = 'GeminiExe'
 }
-# Chaves de contencao recusadas (securityBlockedArgs) por backend. gemini.approvalMode e condicional.
+# Chaves de contencao/internas recusadas (securityBlockedArgs) por backend. gemini.approvalMode e condicional.
 $ContentionKeys = @{
-    'claude-code' = @('permissionmode', 'tools', 'maxturns')
+    'claude-code' = @(
+        'permissionmode', 'tools', 'maxturns',
+        'sidecarpath', 'retentionmode', 'tempdir', 'circuitstateroot', 'claudeexe',
+        'message', 'messagepath'
+    )
     'opencode'    = @('agent')
     'gemini'      = @('approvalmode')
     'codex'       = @()
     'copilot'     = @()
+}
+$AdapterDefaultTimeoutSec = @{
+    'opencode'    = 180
+    'codex'       = 180
+    'claude-code' = 300
+    'copilot'     = 300
+    'gemini'      = 300
 }
 
 function Get-Prop {
@@ -163,15 +175,18 @@ function Test-UnavailableFailureMessage {
 }
 
 function Get-FallbackDispatcherTimeoutMs {
-    param($InvokeArgs)
+    param([string]$Backend, $InvokeArgs)
     $defaultTimeoutMs = 180000
     $overheadMs = 30000
+    $adapterDefaultTimeoutSec = 180
+    if (-not [string]::IsNullOrWhiteSpace($Backend) -and $script:AdapterDefaultTimeoutSec.ContainsKey($Backend)) {
+        $adapterDefaultTimeoutSec = [int]$script:AdapterDefaultTimeoutSec[$Backend]
+    }
     $timeoutSecValue = Get-Prop $InvokeArgs 'timeoutSec'
-    if ($null -eq $timeoutSecValue) { return $defaultTimeoutMs }
-
     $timeoutSec = 0
-    if (-not [int]::TryParse([string]$timeoutSecValue, [ref]$timeoutSec)) { return $defaultTimeoutMs }
-    if ($timeoutSec -lt 1) { return $defaultTimeoutMs }
+    if ($null -eq $timeoutSecValue -or -not [int]::TryParse([string]$timeoutSecValue, [ref]$timeoutSec) -or $timeoutSec -lt 1) {
+        $timeoutSec = $adapterDefaultTimeoutSec
+    }
 
     $derivedTimeoutMs = ([int64]$timeoutSec * 1000) + $overheadMs
     if ($derivedTimeoutMs -lt $defaultTimeoutMs) { return $defaultTimeoutMs }
@@ -1258,7 +1273,7 @@ foreach ($rec in $originalRecords) {
             }
             $p = Start-Process -FilePath (Get-CurrentPowerShellExecutable) -ArgumentList $argList -NoNewWindow -PassThru `
                 -RedirectStandardOutput $fbOutPath -RedirectStandardError $fbErrPath
-            $fallbackDispatcherTimeoutMs = Get-FallbackDispatcherTimeoutMs -InvokeArgs $fbClean.invokeArgs
+            $fallbackDispatcherTimeoutMs = Get-FallbackDispatcherTimeoutMs -Backend ([string]$fbClean.backend) -InvokeArgs $fbClean.invokeArgs
             $exited = $p.WaitForExit($fallbackDispatcherTimeoutMs)
             if (-not $exited) {
                 try {
