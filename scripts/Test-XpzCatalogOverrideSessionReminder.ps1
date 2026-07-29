@@ -32,15 +32,30 @@ $resolvedKbRoot = (Resolve-Path -LiteralPath $ParallelKbRoot).Path
 $reminder = Get-GeneXusCatalogOverrideSessionReminder -ParallelKbRoot $resolvedKbRoot -CatalogOverridePath $CatalogOverridePath
 
 $result = [pscustomobject]@{
-    status           = if ($reminder.reminderRequired) { 'REMINDER_REQUIRED' } else { 'OK' }
-    parallelKbRoot   = $resolvedKbRoot
-    reminderRequired = $reminder.reminderRequired
-    overrideActive   = $reminder.overrideActive
-    upstreamPending  = $reminder.upstreamPending
-    overridePath     = $reminder.overridePath
-    pendingTypeNames = $reminder.pendingTypeNames
-    pendingTypeGuids = $reminder.pendingTypeGuids
-    message          = $reminder.message
+    status                   = $reminder.status
+    parallelKbRoot           = $resolvedKbRoot
+    reminderRequired         = $reminder.reminderRequired
+    noticeRequired           = $reminder.noticeRequired
+    cleanupRecommended       = $reminder.cleanupRecommended
+    blocked                  = $reminder.blocked
+    overrideActive           = $reminder.overrideActive
+    upstreamPending          = $reminder.upstreamPending
+    declaredUpstreamPending  = $reminder.declaredUpstreamPending
+    effectiveUpstreamPending = $reminder.effectiveUpstreamPending
+    reason                   = $reminder.reason
+    diagnosticReason         = $reminder.diagnosticReason
+    fieldPath                = $reminder.fieldPath
+    overridePath             = $reminder.overridePath
+    pendingTypeNames         = $reminder.pendingTypeNames
+    pendingTypeGuids         = $reminder.pendingTypeGuids
+    redundantTypeNames       = $reminder.redundantTypeNames
+    redundantTypeGuids       = $reminder.redundantTypeGuids
+    divergentTypeNames       = $reminder.divergentTypeNames
+    divergentTypeGuids       = $reminder.divergentTypeGuids
+    blockedTypeNames         = $reminder.blockedTypeNames
+    blockedTypeGuids         = $reminder.blockedTypeGuids
+    classificationEntries    = $reminder.classificationEntries
+    message                  = $reminder.message
 }
 
 if ($AsJson) {
@@ -48,9 +63,18 @@ if ($AsJson) {
 } else {
     if ($reminder.reminderRequired) {
         Write-Output $reminder.message
+    } elseif ($reminder.cleanupRecommended) {
+        $names = @($reminder.redundantTypeNames) -join ', '
+        if ([string]::IsNullOrWhiteSpace($names)) {
+            Write-Output 'CLEANUP_RECOMMENDED: override local ativo sem pendencia efetiva; remocao local aprovada e recomendada se nao houver entradas de tipo.'
+        } else {
+            Write-Output ("CLEANUP_RECOMMENDED: override local redundante para: {0}. Remocao local aprovada e recomendada; nao ha pendencia global efetiva." -f $names)
+        }
+    } elseif ($reminder.overrideActive) {
+        Write-Output ("{0}: override local ativo sem lembrete pendente." -f $reminder.status)
     } else {
         Write-Output 'OK: nenhum override local de catalogo ativo.'
     }
 }
 
-exit $(if ($reminder.reminderRequired) { 2 } else { 0 })
+exit $(if ($reminder.status -in @('REMINDER_REQUIRED', 'INVALID_OVERRIDE_SHAPE', 'OVERRIDE_RESOLUTION_BLOCKED')) { 2 } else { 0 })

@@ -129,7 +129,7 @@ if (-not (Test-Path -LiteralPath $pythonPrerequisiteScript -PathType Leaf)) {
 $reminderScriptPath = Join-Path $SharedSkillsRoot 'scripts\Test-XpzCatalogOverrideSessionReminder.ps1'
 if (Test-Path -LiteralPath $reminderScriptPath -PathType Leaf) {
     $reminderResult = & $reminderScriptPath -ParallelKbRoot $repoRoot -AsJson | ConvertFrom-Json
-    if ($reminderResult.reminderRequired -and -not [string]::IsNullOrWhiteSpace($reminderResult.message)) {
+    if ($reminderResult.noticeRequired -and -not [string]::IsNullOrWhiteSpace($reminderResult.message)) {
         Write-HumanLine ("AVISO: " + $reminderResult.message)
     }
 }

@@ -1,0 +1,226 @@
+#requires -Version 7.4
+<#
+.SYNOPSIS
+    Self-test da classificacao de gx-object-type-catalog.override.json.
+#>
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+$scriptDir = $PSScriptRoot
+. (Join-Path $scriptDir 'GeneXusObjectTypeCatalogSupport.ps1')
+. (Join-Path $scriptDir 'Utf8NoBomEncodingSupport.ps1')
+
+function Assert-True { param([bool]$Condition,[string]$Message) if(-not $Condition){ throw $Message } }
+function Write-JsonFile { param([string]$Path,[object]$Value) [IO.File]::WriteAllText($Path, ($Value | ConvertTo-Json -Depth 8), (Get-Utf8NoBomEncoding)) }
+function New-CaseRoot { param([string]$Name) $root=Join-Path ([IO.Path]::GetTempPath()) ("gx-catalog-override-$Name-" + [guid]::NewGuid().ToString('N')); [void](New-Item -ItemType Directory -Path (Join-Path $root 'scripts') -Force); return $root }
+function New-BareRoot { param([string]$Name) $root=Join-Path ([IO.Path]::GetTempPath()) ("gx-catalog-override-$Name-" + [guid]::NewGuid().ToString('N')); [void](New-Item -ItemType Directory -Path $root -Force); return $root }
+function Invoke-Reminder { param([string]$Root) return Get-GeneXusCatalogOverrideSessionReminder -ParallelKbRoot $Root }
+
+$basePath = Get-GeneXusObjectTypeCatalogDefaultBasePath
+$base = Read-GeneXusObjectTypeCatalogFile -Path $basePath
+$workWith = $base.types.WorkWith
+$procedure = $base.types.Procedure
+
+# Sem override.
+$emptyRoot = New-CaseRoot 'empty'
+$r = Invoke-Reminder -Root $emptyRoot
+Assert-True ($r.status -eq 'OK' -and -not $r.noticeRequired) 'sem override deve ser OK'
+
+# Redundante identico, mas sem exportTaskLabel local: cleanup, sem pendencia efetiva, exportTaskLabel da base preservado.
+$redundantRoot = New-CaseRoot 'redundant'
+$overridePath = Join-Path $redundantRoot 'scripts/gx-object-type-catalog.override.json'
+Write-JsonFile -Path $overridePath -Value ([ordered]@{
+    schemaVersion = 1
+    upstreamPending = $true
+    types = [ordered]@{
+        WorkWith = [ordered]@{
+            objectTypeGuid = $workWith.objectTypeGuid
+            rootKind = $workWith.rootKind
+            folderName = $workWith.folderName
+            inventoryEligible = $workWith.inventoryEligible
+            queryableByKbIntelligence = $workWith.queryableByKbIntelligence
+            containerType = $workWith.containerType
+            notes = 'metadata only for local evidence'
+            evidenceSummary = 'local evidence must not affect runtime catalog'
+        }
+    }
+})
+$r = Invoke-Reminder -Root $redundantRoot
+Assert-True ($r.status -eq 'CLEANUP_RECOMMENDED') 'redundante deve recomendar limpeza'
+Assert-True (-not $r.effectiveUpstreamPending -and $r.declaredUpstreamPending) 'pendencia declarada nao pode virar pendencia efetiva em redundante'
+Assert-True ($r.redundantTypeNames -contains 'WorkWith' -and $r.pendingTypeNames.Count -eq 0) 'WorkWith deve ser redundante, nao pendente'
+$res = Resolve-GeneXusObjectTypeCatalogPaths -ParallelKbRoot $redundantRoot
+Assert-True ($res.UpstreamPending -eq $false -and $res.DeclaredUpstreamPending -eq $true -and $res.EffectiveUpstreamPending -eq $false) 'aliases de pendencia devem refletir efetivo/declarado'
+Assert-True ($res.MergedCatalog.types.WorkWith.exportTaskLabel -eq $workWith.exportTaskLabel) 'merge deve preservar exportTaskLabel da base'
+Assert-True ($res.MergedCatalog.types.WorkWith.canonicalType -eq 'WorkWith') 'canonicalType deve ser derivado'
+Assert-True ($res.MergedCatalog.types.WorkWith.notes -eq $workWith.notes) 'metadata local nao deve sobrescrever metadata da base no catalogo efetivo'
+Assert-True ($null -eq $res.MergedCatalog.types.WorkWith.PSObject.Properties['evidenceSummary']) 'metadata local nao deve entrar no catalogo efetivo'
+
+# Pendente real.
+$pendingRoot = New-CaseRoot 'pending'
+Write-JsonFile -Path (Join-Path $pendingRoot 'scripts/gx-object-type-catalog.override.json') -Value ([ordered]@{
+    schemaVersion = 1
+    upstreamPending = $true
+    types = [ordered]@{
+        LocalOnlyType = [ordered]@{
+            objectTypeGuid = '11111111-2222-3333-4444-555555555555'
+            rootKind = 'Object'
+            folderName = 'LocalOnlyType'
+            inventoryEligible = $true
+            queryableByKbIntelligence = $true
+            containerType = $false
+        }
+    }
+})
+$r = Invoke-Reminder -Root $pendingRoot
+Assert-True ($r.status -eq 'REMINDER_REQUIRED' -and $r.pendingTypeNames -contains 'LocalOnlyType') 'tipo ausente deve ser pending'
+
+# Divergente comum.
+$divRoot = New-CaseRoot 'divergent'
+Write-JsonFile -Path (Join-Path $divRoot 'scripts/gx-object-type-catalog.override.json') -Value ([ordered]@{
+    schemaVersion = 1
+    upstreamPending = $true
+    types = [ordered]@{
+        Procedure = [ordered]@{
+            objectTypeGuid = $procedure.objectTypeGuid
+            rootKind = $procedure.rootKind
+            folderName = $procedure.folderName
+            inventoryEligible = $procedure.inventoryEligible
+            queryableByKbIntelligence = (-not [bool]$procedure.queryableByKbIntelligence)
+            containerType = $procedure.containerType
+        }
+    }
+})
+$r = Invoke-Reminder -Root $divRoot
+Assert-True ($r.status -eq 'REMINDER_REQUIRED' -and $r.divergentTypeNames -contains 'Procedure') 'campo divergente deve ser divergent'
+Assert-True (@($r.classificationEntries[0].divergentFields) -contains 'queryableByKbIntelligence') 'campo divergente deve ser nomeado'
+
+# Divergente de identidade.
+$identityRoot = New-CaseRoot 'identity-divergent'
+Write-JsonFile -Path (Join-Path $identityRoot 'scripts/gx-object-type-catalog.override.json') -Value ([ordered]@{
+    schemaVersion = 1
+    upstreamPending = $true
+    types = [ordered]@{
+        Procedure = [ordered]@{
+            objectTypeGuid = $procedure.objectTypeGuid
+            rootKind = $procedure.rootKind
+            folderName = 'ProcedureX'
+            inventoryEligible = $procedure.inventoryEligible
+            queryableByKbIntelligence = $procedure.queryableByKbIntelligence
+            containerType = $procedure.containerType
+        }
+    }
+})
+$r = Invoke-Reminder -Root $identityRoot
+Assert-True ($r.status -eq 'OVERRIDE_RESOLUTION_BLOCKED' -and $r.reason -eq 'unsafe-identity-divergence') 'campo de identidade divergente deve bloquear resolucao'
+Assert-True ($r.diagnosticReason -eq 'identity-field-divergence' -and $r.fieldPath -eq 'types.Procedure.folderName') 'bloqueio de identidade deve apontar o campo divergente'
+Assert-True ($r.blockedTypeNames -contains 'Procedure') 'tipo com identidade divergente deve aparecer em blockedTypeNames'
+
+# Metadata-only / types vazio.
+$metaRoot = New-CaseRoot 'metadata'
+Write-JsonFile -Path (Join-Path $metaRoot 'scripts/gx-object-type-catalog.override.json') -Value ([ordered]@{ schemaVersion = 1; upstreamPending = $true; notes = 'legacy root metadata' })
+$r = Invoke-Reminder -Root $metaRoot
+Assert-True ($r.status -eq 'CLEANUP_RECOMMENDED' -and -not $r.effectiveUpstreamPending) 'metadata-only deve ser cleanup sem pendencia efetiva'
+
+# Shape invalido.
+$invalidRoot = New-CaseRoot 'invalid'
+$invalidOverridePath = Join-Path $invalidRoot 'scripts/gx-object-type-catalog.override.json'
+[IO.File]::WriteAllText($invalidOverridePath, '{"upstreamPending":"yes","types":{}}', (Get-Utf8NoBomEncoding))
+$r = Invoke-Reminder -Root $invalidRoot
+Assert-True ($r.status -eq 'INVALID_OVERRIDE_SHAPE' -and $r.diagnosticReason -eq 'upstream-pending-not-boolean') 'upstreamPending invalido deve ser shape invalido'
+
+$registerOut = & pwsh -NoProfile -File (Join-Path $scriptDir 'Register-GeneXusObjectTypeCatalogOverride.ps1') -ParallelKbRoot $invalidRoot -TypeName 'LocalInvalid' -ObjectTypeGuid '22222222-3333-4444-5555-666666666666' -UserApproved -AsJson
+$registerExit = $LASTEXITCODE
+Assert-True ($registerExit -eq 2) 'registro sobre override invalido deve sair com codigo 2'
+$registerResult = $registerOut | ConvertFrom-Json
+Assert-True ($registerResult.status -eq 'INVALID_OVERRIDE_SHAPE' -and $registerResult.blocked) 'registro deve devolver diagnostico estruturado para override invalido existente'
+
+$redundantRegisterRoot = New-BareRoot 'register-redundant'
+$redundantRegisterOut = & pwsh -NoProfile -File (Join-Path $scriptDir 'Register-GeneXusObjectTypeCatalogOverride.ps1') -ParallelKbRoot $redundantRegisterRoot -TypeName 'WorkWith' -ObjectTypeGuid $workWith.objectTypeGuid -FolderName $workWith.folderName -UserApproved -AsJson
+$redundantRegisterExit = $LASTEXITCODE
+Assert-True ($redundantRegisterExit -eq 2) 'registro redundante deve sair com codigo 2'
+$redundantRegisterResult = $redundantRegisterOut | ConvertFrom-Json
+Assert-True ($redundantRegisterResult.status -eq 'LOCAL_OVERRIDE_REDUNDANT_BLOCKED' -and $redundantRegisterResult.blocked) 'registro redundante deve bloquear com status especifico'
+Assert-True ($redundantRegisterResult.baseTypeName -eq 'WorkWith' -and $redundantRegisterResult.diagnosticReason -eq 'equivalent') 'registro redundante deve apontar equivalencia com base'
+Assert-True (-not (Test-Path -LiteralPath (Join-Path $redundantRegisterRoot 'scripts') -PathType Container)) 'registro redundante nao deve criar scripts antes de bloquear'
+Assert-True (-not (Test-Path -LiteralPath (Join-Path $redundantRegisterRoot 'scripts/gx-object-type-catalog.override.json') -PathType Leaf)) 'registro redundante nao deve gravar override nem recarimbar pendencia'
+
+$shadowRegisterRoot = New-BareRoot 'register-shadow'
+$shadowRegisterOut = & pwsh -NoProfile -File (Join-Path $scriptDir 'Register-GeneXusObjectTypeCatalogOverride.ps1') -ParallelKbRoot $shadowRegisterRoot -TypeName 'Attribute' -ObjectTypeGuid 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee' -FolderName 'Attribute' -UserApproved -AsJson
+$shadowRegisterExit = $LASTEXITCODE
+Assert-True ($shadowRegisterExit -eq 2) 'registro com shadowing inseguro deve sair com codigo 2'
+$shadowRegisterResult = $shadowRegisterOut | ConvertFrom-Json
+Assert-True ($shadowRegisterResult.status -eq 'LOCAL_OVERRIDE_UNSAFE_SHADOWING_BLOCKED' -and $shadowRegisterResult.reason -eq 'unsafe-shadowing') 'registro com shadowing inseguro deve bloquear com status especifico'
+Assert-True (-not (Test-Path -LiteralPath (Join-Path $shadowRegisterRoot 'scripts') -PathType Container)) 'registro com shadowing inseguro nao deve criar scripts antes de bloquear'
+
+$duplicateRegisterRoot = New-BareRoot 'register-duplicate-guid'
+$duplicateRegisterOut = & pwsh -NoProfile -File (Join-Path $scriptDir 'Register-GeneXusObjectTypeCatalogOverride.ps1') -ParallelKbRoot $duplicateRegisterRoot -TypeName 'WorkWith' -ObjectTypeGuid $procedure.objectTypeGuid -FolderName $workWith.folderName -UserApproved -AsJson
+$duplicateRegisterExit = $LASTEXITCODE
+Assert-True ($duplicateRegisterExit -eq 2) 'registro com GUID duplicado inseguro deve sair com codigo 2'
+$duplicateRegisterResult = $duplicateRegisterOut | ConvertFrom-Json
+Assert-True ($duplicateRegisterResult.status -eq 'LOCAL_OVERRIDE_UNSAFE_DUPLICATE_GUID_BLOCKED' -and $duplicateRegisterResult.reason -eq 'unsafe-duplicate-guid') 'registro com GUID duplicado inseguro deve bloquear com status especifico'
+Assert-True (-not (Test-Path -LiteralPath (Join-Path $duplicateRegisterRoot 'scripts') -PathType Container)) 'registro com GUID duplicado inseguro nao deve criar scripts antes de bloquear'
+
+$invalidSourceRoot = Join-Path $invalidRoot 'ObjetosDaKbEmXml'
+[void](New-Item -ItemType Directory -Path $invalidSourceRoot -Force)
+$buildOut = & python (Join-Path $scriptDir 'Build-KbIntelligenceIndex.py') --source-root $invalidSourceRoot --output-path (Join-Path $invalidRoot 'index.sqlite') --catalog-override-path $invalidOverridePath
+$buildExit = $LASTEXITCODE
+Assert-True ($buildExit -eq 2) 'build do indice deve bloquear override invalido com codigo 2'
+Assert-True (-not (($buildOut -join "`n") -match 'Traceback')) 'build do indice nao deve emitir traceback para override invalido'
+$buildResult = $buildOut | ConvertFrom-Json
+Assert-True ($buildResult.status -eq 'INVALID_OVERRIDE_SHAPE' -and $buildResult.blocked) 'build do indice deve devolver JSON estruturado para override invalido'
+
+$queryIndexPath = Join-Path $invalidRoot 'empty.sqlite'
+[IO.File]::WriteAllBytes($queryIndexPath, [byte[]]@())
+$queryOut = & python (Join-Path $scriptDir 'Query-KbIntelligenceIndex.py') --index-path $queryIndexPath --query who-uses --object-type Procedure --object-name Foo --catalog-override-path $invalidOverridePath
+$queryExit = $LASTEXITCODE
+Assert-True ($queryExit -eq 2) 'query semantica deve bloquear override invalido com codigo 2'
+Assert-True (-not (($queryOut -join "`n") -match 'Traceback')) 'query semantica nao deve emitir traceback para override invalido'
+$queryResult = $queryOut | ConvertFrom-Json
+Assert-True ($queryResult.status -eq 'INVALID_OVERRIDE_SHAPE' -and $queryResult.blocked) 'query semantica deve devolver JSON estruturado para override invalido'
+
+# Unsafe shadowing e GUID duplicado.
+$shadowRoot = New-CaseRoot 'shadow'
+Write-JsonFile -Path (Join-Path $shadowRoot 'scripts/gx-object-type-catalog.override.json') -Value ([ordered]@{ types = [ordered]@{ Attribute = [ordered]@{ objectTypeGuid='aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'; rootKind='Attribute'; folderName='Attribute'; inventoryEligible=$true; queryableByKbIntelligence=$true; containerType=$false } } })
+$r = Invoke-Reminder -Root $shadowRoot
+Assert-True ($r.status -eq 'OVERRIDE_RESOLUTION_BLOCKED' -and $r.reason -eq 'unsafe-shadowing') 'Attribute com GUID deve bloquear por shadowing'
+
+$dupRoot = New-CaseRoot 'dupguid'
+Write-JsonFile -Path (Join-Path $dupRoot 'scripts/gx-object-type-catalog.override.json') -Value ([ordered]@{ types = [ordered]@{ ProcedureAlias = [ordered]@{ objectTypeGuid=$procedure.objectTypeGuid; rootKind=$procedure.rootKind; folderName=$procedure.folderName; inventoryEligible=$procedure.inventoryEligible; queryableByKbIntelligence=$procedure.queryableByKbIntelligence; containerType=$procedure.containerType } } })
+$r = Invoke-Reminder -Root $dupRoot
+Assert-True ($r.status -eq 'CLEANUP_RECOMMENDED' -and $r.redundantTypeNames -contains 'ProcedureAlias' -and $r.classificationEntries[0].baseTypeName -eq 'Procedure') 'alias por GUID equivalente deve ser redundante'
+Assert-True (-not (Resolve-GeneXusObjectTypeCatalogPaths -ParallelKbRoot $dupRoot).MergedCatalog.types.PSObject.Properties['ProcedureAlias']) 'alias redundante nao deve criar tipo efetivo novo'
+
+# CLI textual deve distinguir cleanup de ausencia de override.
+$textReminder = & pwsh -NoProfile -File (Join-Path $scriptDir 'Test-XpzCatalogOverrideSessionReminder.ps1') -ParallelKbRoot $redundantRoot
+Assert-True (($textReminder -join "`n") -match 'CLEANUP_RECOMMENDED') 'saida textual redundante deve recomendar limpeza'
+Assert-True (-not (($textReminder -join "`n") -match 'nenhum override local')) 'saida textual redundante nao deve dizer que nao ha override ativo'
+
+# Paridade Python: redundante, campos operacionais invalidos e motivo de divergencia.
+$py = @"
+from pathlib import Path
+from GeneXusObjectTypeCatalogCore import classify_gx_object_type_catalog_override, load_gx_object_type_catalog, resolve_effective_object_type_catalog
+cat, override = resolve_effective_object_type_catalog(Path(r'$redundantRoot') / 'ObjetosDaKbEmXml', parallel_kb_root=Path(r'$redundantRoot'))
+base = load_gx_object_type_catalog()
+assert cat['types']['WorkWith']['exportTaskLabel'] == '$($workWith.exportTaskLabel)'
+assert 'canonicalType' in cat['types']['WorkWith']
+assert cat['types']['WorkWith']['notes'] == base['types']['WorkWith']['notes']
+assert 'evidenceSummary' not in cat['types']['WorkWith']
+proc = dict(base['types']['Procedure'])
+bool_string = {'schemaVersion': 1, 'upstreamPending': True, 'types': {'Procedure': dict(proc, queryableByKbIntelligence='false')}}
+r = classify_gx_object_type_catalog_override(base, bool_string, Path('override.json'))
+assert r['status'] == 'INVALID_OVERRIDE_SHAPE' and r['diagnosticReason'] == 'field-not-boolean', r
+bad_guid = {'schemaVersion': 1, 'upstreamPending': True, 'types': {'Procedure': dict(proc, objectTypeGuid='not-a-guid')}}
+r = classify_gx_object_type_catalog_override(base, bad_guid, Path('override.json'))
+assert r['status'] == 'INVALID_OVERRIDE_SHAPE' and r['diagnosticReason'] == 'invalid-guid', r
+divergent_only = {'schemaVersion': 1, 'upstreamPending': True, 'types': {'Procedure': dict(proc, folderName='ProcedureX')}}
+r = classify_gx_object_type_catalog_override(base, divergent_only, Path('override.json'))
+assert r['status'] == 'OVERRIDE_RESOLUTION_BLOCKED' and r['reason'] == 'unsafe-identity-divergence' and r['diagnosticReason'] == 'identity-field-divergence', r
+"@
+$env:PYTHONPATH = $scriptDir
+$py | python -
+if($LASTEXITCODE -ne 0){ throw 'paridade Python falhou para classificacao de override' }
+
+Write-Output 'OK: Test-XpzCatalogOverrideClassificationSelfTest.ps1'
+exit 0

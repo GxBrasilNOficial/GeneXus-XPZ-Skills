@@ -573,7 +573,7 @@ if ($unknownTypesDiscovery.Count -gt 0 -and $FailOnUnknownTypes) {
 $overrideReminder = $null
 if (-not [string]::IsNullOrWhiteSpace($ParallelKbRoot)) {
     $overrideReminder = Get-GeneXusCatalogOverrideSessionReminder -ParallelKbRoot $ParallelKbRoot -CatalogOverridePath $CatalogOverridePath
-    if ($overrideReminder.reminderRequired) {
+    if ($overrideReminder.noticeRequired -and -not [string]::IsNullOrWhiteSpace($overrideReminder.message)) {
         $warnings.Add($overrideReminder.message) | Out-Null
     }
 }

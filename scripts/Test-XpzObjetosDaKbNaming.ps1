@@ -281,7 +281,10 @@ try {
             catalogOverridePath    = $catalogResolution.OverridePath
             catalogOverrideActive  = $catalogResolution.OverrideActive
             catalogUpstreamPending = $catalogResolution.UpstreamPending
-        } | ConvertTo-Json -Depth 8
+            catalogDeclaredUpstreamPending = $catalogResolution.DeclaredUpstreamPending
+            catalogEffectiveUpstreamPending = $catalogResolution.EffectiveUpstreamPending
+            catalogOverrideClassification = $catalogResolution.OverrideClassification
+        } | ConvertTo-Json -Depth 10
     } else {
         $rows |
             Select-Object Diretorio, Root, TypeGuid, TipoReal, StatusNaming, NomeCanonicoEsperado |

@@ -150,12 +150,12 @@ do motor.
 
 - Catalogo efetivo = `GeneXus-XPZ-Skills/scripts/gx-object-type-catalog.json` +
   `scripts/gx-object-type-catalog.override.json` nesta pasta paralela quando existir.
-- Override local e paliativo (`upstreamPending`); nao e silencioso.
+- Override local e paliativo (`upstreamPending` declarado); nao e silencioso. O lembrete classifica entradas como pendentes, redundantes ou divergentes. `CLEANUP_RECOMMENDED` deve entrar no plano consolidado como oferta explícita de limpeza local aprovada (por exemplo, remover só a entrada redundante), mesmo quando o plano também tiver recarimbo obrigatório de assinatura; nao autoriza remocao automática.
 - Em cada nova sessao, antes de sync ou materializacao longa, executar
   `GeneXus-XPZ-Skills/scripts/Test-XpzCatalogOverrideSessionReminder.ps1` com
   `-ParallelKbRoot` apontando para esta pasta (wrapper local fino opcional).
-  Se `reminderRequired=true`, avisar o usuario que ainda falta alinhar
-  GeneXus-XPZ-Skills.
+  Se `noticeRequired=true`, avisar o usuario conforme o `status`: pendencia
+  upstream, override bloqueado/invalido ou limpeza local recomendada.
 - Antes de materializar XPZ full ou primeira carga, pre-varredura obrigatoria:
   `Get-GeneXusImportPackageObjectInventory.ps1` com `-FailOnUnknownTypes` e
   `-ParallelKbRoot`. Se bloquear, nao chamar sync ate resolver o tipo.

@@ -15,7 +15,10 @@ _SCRIPT_DIR = Path(__file__).resolve().parent
 if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
 
-from GeneXusObjectTypeCatalogCore import resolve_effective_object_type_catalog_for_query  # noqa: E402
+from GeneXusObjectTypeCatalogCore import (  # noqa: E402
+    CatalogOverrideDiagnosticError,
+    resolve_effective_object_type_catalog_for_query,
+)
 
 
 EXPECTED_SCHEMA_VERSION = "4"
@@ -37,6 +40,7 @@ SEMANTIC_QUERIES = frozenset(
     {"who-uses", "what-uses", "impact-basic", "functional-trace-basic"}
 )
 EXIT_QUERY_NOT_SEMANTIC_FOR_TYPE = 11
+EXIT_CATALOG_OVERRIDE_BLOCKED = 2
 _CATALOG_TYPES_CACHE: dict[tuple[str | None, str | None, str], dict[str, dict[str, object]]] = {}
 
 
@@ -123,6 +127,32 @@ def format_semantic_blocked_text(result: dict[str, object]) -> str:
         "suggested_queries: " + ", ".join(result.get("suggested_queries", [])),
     ]
     return "\n".join(lines)
+
+
+def build_catalog_override_blocked_result(exc: CatalogOverrideDiagnosticError) -> dict[str, object]:
+    diagnostic = dict(exc.diagnostic)
+    return {
+        "blocked": True,
+        "reason": diagnostic.get("reason"),
+        "status": diagnostic.get("status", "OVERRIDE_RESOLUTION_BLOCKED"),
+        "diagnosticReason": diagnostic.get("diagnosticReason"),
+        "fieldPath": diagnostic.get("fieldPath"),
+        "overridePath": diagnostic.get("overridePath"),
+        "message": diagnostic.get("message", str(exc)),
+        "catalogOverrideDiagnostic": diagnostic,
+    }
+
+
+def format_catalog_override_blocked_text(result: dict[str, object]) -> str:
+    return "\n".join(
+        [
+            f"catalog override: BLOCKED ({result.get('status')})",
+            f"reason: {result.get('reason')} / {result.get('diagnosticReason')}",
+            f"field: {result.get('fieldPath')}",
+            f"override: {result.get('overridePath')}",
+            str(result.get("message")),
+        ]
+    )
 
 
 def validate_schema_version(conn: sqlite3.Connection) -> None:
@@ -1301,11 +1331,19 @@ def main() -> int:
         raise SystemExit("--instance-key is only valid with search-objects.")
 
     if args.query in SEMANTIC_QUERIES and args.object_type:
-        catalog_types = load_catalog_types_by_name(
-            args.index_path,
-            parallel_kb_root=args.parallel_kb_root,
-            catalog_override_path=args.catalog_override_path,
-        )
+        try:
+            catalog_types = load_catalog_types_by_name(
+                args.index_path,
+                parallel_kb_root=args.parallel_kb_root,
+                catalog_override_path=args.catalog_override_path,
+            )
+        except CatalogOverrideDiagnosticError as exc:
+            blocked_override = build_catalog_override_blocked_result(exc)
+            if args.format == "text":
+                print(format_catalog_override_blocked_text(blocked_override))
+            else:
+                print(json.dumps(blocked_override, indent=2, ensure_ascii=False))
+            return EXIT_CATALOG_OVERRIDE_BLOCKED
         allowed, entry = semantic_query_allowed(args.object_type, catalog_types)
         if not allowed:
             blocked = build_semantic_blocked_result(

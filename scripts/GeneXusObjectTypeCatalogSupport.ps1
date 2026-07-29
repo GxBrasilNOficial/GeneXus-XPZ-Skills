@@ -37,76 +37,124 @@ function Read-GeneXusObjectTypeCatalogFile {
     return ($raw | ConvertFrom-Json)
 }
 
+
+function New-GeneXusCatalogOverrideDiagnosticResult {
+    param([string]$Status,[bool]$OverrideActive,[string]$OverridePath,[string]$Reason,[string]$DiagnosticReason,[string]$FieldPath,[string]$Message,[object[]]$Entries=@(),[bool]$DeclaredUpstreamPending=$false,[string]$EffectiveCatalogAction='none')
+    $pending=@($Entries|Where-Object{$_.classification -eq 'pending'}); $redundant=@($Entries|Where-Object{$_.classification -eq 'redundant'}); $divergent=@($Entries|Where-Object{$_.classification -eq 'divergent'}); $blocked=@($Entries|Where-Object{$_.effectiveCatalogAction -eq 'block-resolution'})
+    $effectivePending = $Status -in @('REMINDER_REQUIRED','INVALID_OVERRIDE_SHAPE','OVERRIDE_RESOLUTION_BLOCKED')
+    [pscustomobject]@{
+        status=$Status; overrideActive=$OverrideActive; overridePath=$OverridePath; reason=$Reason; diagnosticReason=$DiagnosticReason; fieldPath=$FieldPath; message=$Message; blocked=($Status -in @('INVALID_OVERRIDE_SHAPE','OVERRIDE_RESOLUTION_BLOCKED'))
+        classificationEntries=@($Entries); declaredUpstreamPending=$DeclaredUpstreamPending; effectiveUpstreamPending=$effectivePending; upstreamPending=$effectivePending; cleanupRecommended=($Status -eq 'CLEANUP_RECOMMENDED'); noticeRequired=($Status -ne 'OK'); reminderRequired=($Status -eq 'REMINDER_REQUIRED')
+        pendingTypeNames=@($pending|ForEach-Object{$_.typeName}|Sort-Object); pendingTypeGuids=@($pending|ForEach-Object{$_.objectTypeGuid}|Where-Object{-not [string]::IsNullOrWhiteSpace($_)})
+        redundantTypeNames=@($redundant|ForEach-Object{$_.typeName}|Sort-Object); redundantTypeGuids=@($redundant|ForEach-Object{$_.objectTypeGuid}|Where-Object{-not [string]::IsNullOrWhiteSpace($_)})
+        divergentTypeNames=@($divergent|ForEach-Object{$_.typeName}|Sort-Object); divergentTypeGuids=@($divergent|ForEach-Object{$_.objectTypeGuid}|Where-Object{-not [string]::IsNullOrWhiteSpace($_)})
+        blockedTypeNames=@($blocked|ForEach-Object{$_.typeName}|Sort-Object); blockedTypeGuids=@($blocked|ForEach-Object{$_.objectTypeGuid}|Where-Object{-not [string]::IsNullOrWhiteSpace($_)})
+        effectiveCatalogAction=$EffectiveCatalogAction; unsupportedFields=@($Entries|ForEach-Object{$_.unsupportedFields}|Sort-Object -Unique)
+    }
+}
+
+function Test-GeneXusCatalogGuidValue { param([object]$Value) $g=[Guid]::Empty; return ($null -ne $Value -and -not [string]::IsNullOrWhiteSpace([string]$Value) -and [Guid]::TryParse(([string]$Value).Trim(),[ref]$g)) }
+function Get-GeneXusCatalogEntryValue { param([object]$Entry,[string]$Name) if($null -eq $Entry -or $null -eq $Entry.PSObject.Properties[$Name]){return $null}; return $Entry.PSObject.Properties[$Name].Value }
+function Test-GeneXusCatalogFieldEquivalent { param([object]$Override,[object]$Base,[string]$Field) if($null -eq $Override.PSObject.Properties[$Field]){return $true}; if($null -eq $Base.PSObject.Properties[$Field]){return $false}; $a=$Override.PSObject.Properties[$Field].Value; $b=$Base.PSObject.Properties[$Field].Value; if($Field -in @('inventoryEligible','queryableByKbIntelligence','containerType')){return ([bool]$a -eq [bool]$b)}; return [string]::Equals([string]$a,[string]$b,[StringComparison]::OrdinalIgnoreCase) }
+
+function New-GeneXusCatalogOverrideClassificationEntry {
+    param([string]$TypeName,[object]$Entry,[string]$Classification,[string]$Reason,[string]$DiagnosticReason,[string]$FieldPath,[string]$BaseTypeName=$null,[object]$BaseEntry=$null,[string[]]$DivergentFields=@(),[string[]]$IgnoredFields=@(),[string[]]$UnsupportedFields=@(),[string]$Action='merge-with-warning')
+    [pscustomobject]@{ typeName=$TypeName; objectTypeGuid=if($null -ne $Entry){[string](Get-GeneXusCatalogEntryValue $Entry 'objectTypeGuid')}else{$null}; classification=$Classification; reason=$Reason; diagnosticReason=$DiagnosticReason; fieldPath=$FieldPath; baseTypeName=$BaseTypeName; baseObjectTypeGuid=if($null -ne $BaseEntry){[string](Get-GeneXusCatalogEntryValue $BaseEntry 'objectTypeGuid')}else{$null}; divergentFields=@($DivergentFields); duplicateTypeNames=@(); ignoredFields=@($IgnoredFields); unsupportedFields=@($UnsupportedFields); removalRecommended=($Classification -eq 'redundant'); effectiveCatalogAction=$Action }
+}
+
+function Test-GeneXusCatalogJsonHasDuplicateKey {
+    param([string]$Path)
+    if([string]::IsNullOrWhiteSpace($Path) -or -not (Test-Path -LiteralPath $Path -PathType Leaf)){return $null}
+    try{$doc=[System.Text.Json.JsonDocument]::Parse((Get-Content -LiteralPath $Path -Raw -Encoding UTF8))}catch{return [pscustomobject]@{diagnosticReason='invalid-json';fieldPath='$';message=$_.Exception.Message}}
+    $found=$null
+    function Visit([System.Text.Json.JsonElement]$Element,[string]$FieldPath){
+        if($null -ne $script:dupFound -or $Element.ValueKind -ne [System.Text.Json.JsonValueKind]::Object){return}
+        $seen=[System.Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+        foreach($p in $Element.EnumerateObject()){
+            if(-not $seen.Add($p.Name)){ $script:dupFound=[pscustomobject]@{diagnosticReason='duplicate-json-key';fieldPath=$FieldPath;message="Chave JSON duplicada '$($p.Name)' em $FieldPath."}; return }
+            $childPath = if($FieldPath -eq '$'){'$.'+$p.Name}else{$FieldPath+'.'+$p.Name}
+            if($p.Value.ValueKind -eq [System.Text.Json.JsonValueKind]::Object){ Visit $p.Value $childPath }
+        }
+    }
+    $script:dupFound=$null
+    try{Visit $doc.RootElement '$'}finally{$doc.Dispose()}
+    return $script:dupFound
+}
+
+function Get-GeneXusCatalogOverrideClassification {
+    param([string]$BaseCatalogPath,[string]$CatalogOverridePath,[string]$ParallelKbRoot,[object]$OverrideCatalog,[string]$OverridePathForDiagnostics)
+    if([string]::IsNullOrWhiteSpace($BaseCatalogPath)){$BaseCatalogPath=Get-GeneXusObjectTypeCatalogDefaultBasePath}
+    $resolvedOverridePath=$CatalogOverridePath
+    if([string]::IsNullOrWhiteSpace($resolvedOverridePath) -and -not [string]::IsNullOrWhiteSpace($ParallelKbRoot)){$resolvedOverridePath=Get-GeneXusObjectTypeCatalogDefaultOverridePath -ParallelKbRoot $ParallelKbRoot}
+    $overrideActive=($null -ne $OverrideCatalog) -or (-not [string]::IsNullOrWhiteSpace($resolvedOverridePath) -and (Test-Path -LiteralPath $resolvedOverridePath -PathType Leaf))
+    if(-not $overrideActive){ return New-GeneXusCatalogOverrideDiagnosticResult -Status 'OK' -OverrideActive:$false -OverridePath $null -Reason $null -DiagnosticReason $null -FieldPath $null -Message $null }
+    if([string]::IsNullOrWhiteSpace($OverridePathForDiagnostics) -and -not [string]::IsNullOrWhiteSpace($resolvedOverridePath) -and (Test-Path -LiteralPath $resolvedOverridePath -PathType Leaf)){$OverridePathForDiagnostics=(Resolve-Path -LiteralPath $resolvedOverridePath).Path}
+    $baseCatalog=Read-GeneXusObjectTypeCatalogFile -Path $BaseCatalogPath
+    if($null -eq $OverrideCatalog){
+        $dup=Test-GeneXusCatalogJsonHasDuplicateKey -Path $OverridePathForDiagnostics
+        if($null -ne $dup){ return New-GeneXusCatalogOverrideDiagnosticResult -Status 'INVALID_OVERRIDE_SHAPE' -OverrideActive:$true -OverridePath $OverridePathForDiagnostics -Reason 'invalid-override-shape' -DiagnosticReason $dup.diagnosticReason -FieldPath $dup.fieldPath -Message $dup.message -DeclaredUpstreamPending:$true -EffectiveCatalogAction 'block-resolution' }
+        try{$OverrideCatalog=Read-GeneXusObjectTypeCatalogFile -Path $OverridePathForDiagnostics}catch{ return New-GeneXusCatalogOverrideDiagnosticResult -Status 'INVALID_OVERRIDE_SHAPE' -OverrideActive:$true -OverridePath $OverridePathForDiagnostics -Reason 'invalid-override-shape' -DiagnosticReason 'invalid-json' -FieldPath '$' -Message $_.Exception.Message -DeclaredUpstreamPending:$true -EffectiveCatalogAction 'block-resolution' }
+    }
+    $declared=$false
+    if($null -ne $OverrideCatalog.PSObject.Properties['upstreamPending']){ if($OverrideCatalog.upstreamPending -isnot [bool]){ return New-GeneXusCatalogOverrideDiagnosticResult -Status 'INVALID_OVERRIDE_SHAPE' -OverrideActive:$true -OverridePath $OverridePathForDiagnostics -Reason 'invalid-override-shape' -DiagnosticReason 'upstream-pending-not-boolean' -FieldPath 'upstreamPending' -Message 'upstreamPending no override deve ser booleano real.' -DeclaredUpstreamPending:$true -EffectiveCatalogAction 'block-resolution' }; $declared=[bool]$OverrideCatalog.upstreamPending }
+    if($null -eq $OverrideCatalog.PSObject.Properties['types']){ return New-GeneXusCatalogOverrideDiagnosticResult -Status 'CLEANUP_RECOMMENDED' -OverrideActive:$true -OverridePath $OverridePathForDiagnostics -Reason 'metadata-only' -DiagnosticReason $null -FieldPath 'types' -Message 'Override local metadata-only; remocao do arquivo e recomendada se nao houver entrada de tipo.' -DeclaredUpstreamPending:$declared }
+    if($null -eq $OverrideCatalog.types -or $OverrideCatalog.types.GetType().Name -ne 'PSCustomObject'){ return New-GeneXusCatalogOverrideDiagnosticResult -Status 'INVALID_OVERRIDE_SHAPE' -OverrideActive:$true -OverridePath $OverridePathForDiagnostics -Reason 'invalid-override-shape' -DiagnosticReason 'types-not-object' -FieldPath 'types' -Message 'types no override deve ser objeto JSON.' -DeclaredUpstreamPending:$declared -EffectiveCatalogAction 'block-resolution' }
+    $baseByName=@{}; $baseGuidToName=@{}
+    foreach($p in $baseCatalog.types.PSObject.Properties){$baseByName[$p.Name.ToLowerInvariant()]=[pscustomobject]@{Name=$p.Name;Entry=$p.Value}; $g=Get-GeneXusCatalogEntryValue $p.Value 'objectTypeGuid'; if($null -ne $g -and -not [string]::IsNullOrWhiteSpace([string]$g)){$baseGuidToName[[string]$g.ToLowerInvariant()]=$p.Name}}
+    $fold=[System.Collections.Generic.Dictionary[string,string]]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach($p in $OverrideCatalog.types.PSObject.Properties){ if($fold.ContainsKey($p.Name)){ return New-GeneXusCatalogOverrideDiagnosticResult -Status 'INVALID_OVERRIDE_SHAPE' -OverrideActive:$true -OverridePath $OverridePathForDiagnostics -Reason 'invalid-override-shape' -DiagnosticReason 'duplicate-type-name-casefold' -FieldPath 'types' -Message "Chaves de tipo colidem ignorando caixa: $($fold[$p.Name]) / $($p.Name)." -DeclaredUpstreamPending:$declared -EffectiveCatalogAction 'block-resolution' }; $fold[$p.Name]=$p.Name }
+    $guidSeen=@{}; foreach($p in $OverrideCatalog.types.PSObject.Properties){$e=$p.Value; if($null -ne $e -and $e.GetType().Name -eq 'PSCustomObject' -and $null -ne $e.PSObject.Properties['objectTypeGuid']){$g=[string]$e.objectTypeGuid; if(-not [string]::IsNullOrWhiteSpace($g)){ $k=$g.ToLowerInvariant(); if($guidSeen.ContainsKey($k) -and -not $guidSeen[$k].Equals($p.Name,[StringComparison]::OrdinalIgnoreCase)){ $entry=New-GeneXusCatalogOverrideClassificationEntry -TypeName $p.Name -Entry $e -Classification 'divergent' -Reason 'unsafe-duplicate-guid' -DiagnosticReason 'duplicate-guid-in-override' -FieldPath "types.$($p.Name).objectTypeGuid" -Action 'block-resolution'; return New-GeneXusCatalogOverrideDiagnosticResult -Status 'OVERRIDE_RESOLUTION_BLOCKED' -OverrideActive:$true -OverridePath $OverridePathForDiagnostics -Reason 'unsafe-duplicate-guid' -DiagnosticReason 'duplicate-guid-in-override' -FieldPath 'types' -Message 'Override contem GUID duplicado entre entradas locais.' -Entries @($entry) -DeclaredUpstreamPending:$declared -EffectiveCatalogAction 'block-resolution' }; $guidSeen[$k]=$p.Name }}}
+    $ops=@('objectTypeGuid','rootKind','folderName','inventoryEligible','queryableByKbIntelligence','containerType','exportTaskLabel'); $identityFields=@('objectTypeGuid','rootKind','folderName'); $req=@('objectTypeGuid','rootKind','folderName','inventoryEligible','queryableByKbIntelligence','containerType'); $meta=@('evidenceSummary','wikiLinks','nexaFindings','notes','lastObservedAt'); $supported=@($ops+$meta); $entries=[System.Collections.Generic.List[object]]::new()
+    foreach($p in $OverrideCatalog.types.PSObject.Properties){
+        $type=[string]$p.Name; $e=$p.Value
+        if($null -eq $e -or $e.GetType().Name -ne 'PSCustomObject'){ $entries.Add((New-GeneXusCatalogOverrideClassificationEntry -TypeName $type -Entry ([pscustomobject]@{}) -Classification 'divergent' -Reason 'invalid-override-shape' -DiagnosticReason 'entry-not-object' -FieldPath "types.$type" -Action 'block-resolution'))|Out-Null; continue }
+        $unsupported=@($e.PSObject.Properties|Where-Object{$_.Name -notin $supported}|ForEach-Object{$_.Name}|Sort-Object); $ignored=@($e.PSObject.Properties|Where-Object{$_.Name -in $meta}|ForEach-Object{$_.Name}|Sort-Object)
+        $base=$null; if($baseByName.ContainsKey($type.ToLowerInvariant())){$base=$baseByName[$type.ToLowerInvariant()]}
+        $guid=Get-GeneXusCatalogEntryValue $e 'objectTypeGuid'; if($null -ne $base){$baseNameForEntry=$base.Name; $baseEntryForEntry=$base.Entry}else{$baseNameForEntry=$null; $baseEntryForEntry=$null}; if($null -ne $guid -and -not [string]::IsNullOrWhiteSpace([string]$guid) -and -not (Test-GeneXusCatalogGuidValue $guid)){ $entries.Add((New-GeneXusCatalogOverrideClassificationEntry $type $e 'divergent' 'invalid-operational-field' 'invalid-guid' "types.$type.objectTypeGuid" $baseNameForEntry $baseEntryForEntry @() $ignored $unsupported 'block-resolution'))|Out-Null; continue }
+        $guidKey=if($null -ne $guid -and -not [string]::IsNullOrWhiteSpace([string]$guid)){[string]$guid.ToLowerInvariant()}else{$null}; $baseByGuid=$null; if($null -ne $guidKey -and $baseGuidToName.ContainsKey($guidKey)){$baseByGuid=$baseGuidToName[$guidKey]}
+        if($null -eq $base -and $null -ne $baseByGuid){$base=$baseByName[$baseByGuid.ToLowerInvariant()]}
+        $invalid=$null; $diag=$null
+        foreach($f in $req){if($null -eq $base -and $null -eq $e.PSObject.Properties[$f]){$invalid=$f;$diag='required-field-missing';break}}
+        if($null -eq $invalid){foreach($f in $ops){if($null -eq $e.PSObject.Properties[$f]){continue}; $v=$e.PSObject.Properties[$f].Value; if($f -in @('inventoryEligible','queryableByKbIntelligence','containerType')){if($v -isnot [bool]){$invalid=$f;$diag='field-not-boolean';break}}elseif($f -eq 'objectTypeGuid'){if(-not (Test-GeneXusCatalogGuidValue $v)){$invalid=$f;$diag='invalid-guid';break}}else{if($v -isnot [string]){$invalid=$f;$diag='field-not-string';break}; if([string]::IsNullOrWhiteSpace([string]$v)){$invalid=$f;$diag='field-empty';break}}}}
+        if($null -ne $invalid){if($null -ne $base){$baseNameForEntry=$base.Name; $baseEntryForEntry=$base.Entry}else{$baseNameForEntry=$null; $baseEntryForEntry=$null}; $entries.Add((New-GeneXusCatalogOverrideClassificationEntry $type $e 'divergent' 'invalid-operational-field' $diag "types.$type.$invalid" $baseNameForEntry $baseEntryForEntry @() $ignored $unsupported 'block-resolution'))|Out-Null; continue}
+        if($null -ne $baseByGuid -and $null -ne $base -and -not $baseByGuid.Equals($base.Name,[StringComparison]::OrdinalIgnoreCase)){$entries.Add((New-GeneXusCatalogOverrideClassificationEntry $type $e 'divergent' 'unsafe-duplicate-guid' 'guid-collides-with-other-base-type' "types.$type.objectTypeGuid" $baseByGuid $baseByName[$baseByGuid.ToLowerInvariant()].Entry @() $ignored $unsupported 'block-resolution'))|Out-Null; continue}
+        if($null -ne $base){$bg=Get-GeneXusCatalogEntryValue $base.Entry 'objectTypeGuid'; if(($null -eq $bg -or [string]::IsNullOrWhiteSpace([string]$bg)) -and $null -ne $guid -and -not [string]::IsNullOrWhiteSpace([string]$guid)){$entries.Add((New-GeneXusCatalogOverrideClassificationEntry $type $e 'divergent' 'unsafe-shadowing' 'unsafe-shadowing-base-type-without-guid' "types.$type.objectTypeGuid" $base.Name $base.Entry @() $ignored $unsupported 'block-resolution'))|Out-Null; continue}; $div=[System.Collections.Generic.List[string]]::new(); foreach($f in $ops){if(-not (Test-GeneXusCatalogFieldEquivalent $e $base.Entry $f)){$div.Add($f)|Out-Null}}; if($div.Count -gt 0){$identityDiv=@($div|Where-Object{$_ -in $identityFields}); if($identityDiv.Count -gt 0){$entries.Add((New-GeneXusCatalogOverrideClassificationEntry $type $e 'divergent' 'unsafe-identity-divergence' 'identity-field-divergence' "types.$type.$($identityDiv[0])" $base.Name $base.Entry @($div) $ignored $unsupported 'block-resolution'))|Out-Null}else{$entries.Add((New-GeneXusCatalogOverrideClassificationEntry $type $e 'divergent' 'field-divergence' 'field-divergence' "types.$type" $base.Name $base.Entry @($div) $ignored $unsupported 'merge-with-warning'))|Out-Null}}else{$entries.Add((New-GeneXusCatalogOverrideClassificationEntry $type $e 'redundant' 'equivalent' 'equivalent' "types.$type" $base.Name $base.Entry @() $ignored $unsupported 'merge'))|Out-Null}}
+        else{$entries.Add((New-GeneXusCatalogOverrideClassificationEntry $type $e 'pending' 'missing-in-base' 'missing-in-base' "types.$type" $null $null @() $ignored $unsupported 'merge-with-warning'))|Out-Null}
+    }
+    $arr=@($entries); $blocked=@($arr|Where-Object{$_.effectiveCatalogAction -eq 'block-resolution'}); $pending=@($arr|Where-Object{$_.classification -eq 'pending'}); $redundant=@($arr|Where-Object{$_.classification -eq 'redundant'}); $divergent=@($arr|Where-Object{$_.classification -eq 'divergent'})
+    if($blocked.Count -gt 0){$b=$blocked[0]; $st=if($b.reason -in @('invalid-override-shape','invalid-operational-field')){'INVALID_OVERRIDE_SHAPE'}else{'OVERRIDE_RESOLUTION_BLOCKED'}; return New-GeneXusCatalogOverrideDiagnosticResult -Status $st -OverrideActive:$true -OverridePath $OverridePathForDiagnostics -Reason $b.reason -DiagnosticReason $b.diagnosticReason -FieldPath $b.fieldPath -Message 'Override local bloqueia a resolucao segura do catalogo efetivo.' -Entries $arr -DeclaredUpstreamPending:$declared -EffectiveCatalogAction 'block-resolution'}
+    if($pending.Count -gt 0 -or $divergent.Count -gt 0){$r=if($pending.Count -gt 0){'missing-in-base'}else{'field-divergence'}; return New-GeneXusCatalogOverrideDiagnosticResult -Status 'REMINDER_REQUIRED' -OverrideActive:$true -OverridePath $OverridePathForDiagnostics -Reason $r -DiagnosticReason $r -FieldPath $null -Message 'Override local ainda exige alinhamento com a base compartilhada.' -Entries $arr -DeclaredUpstreamPending:$declared -EffectiveCatalogAction 'merge-with-warning'}
+    return New-GeneXusCatalogOverrideDiagnosticResult -Status 'CLEANUP_RECOMMENDED' -OverrideActive:$true -OverridePath $OverridePathForDiagnostics -Reason 'equivalent' -DiagnosticReason 'equivalent' -FieldPath $null -Message 'Override local redundante; remocao das entradas equivalentes e recomendada.' -Entries $arr -DeclaredUpstreamPending:$declared -EffectiveCatalogAction 'merge'
+}
+
 function Merge-GeneXusObjectTypeCatalog {
-    param(
-        [object]$BaseCatalog,
-        [object]$OverrideCatalog
-    )
-
-    if ($null -eq $OverrideCatalog -or $null -eq $OverrideCatalog.types) {
-        return $BaseCatalog
-    }
-
-    $mergedTypes = [ordered]@{}
-    foreach ($property in $BaseCatalog.types.PSObject.Properties) {
-        $mergedTypes[$property.Name] = $property.Value
-    }
-
-    foreach ($property in $OverrideCatalog.types.PSObject.Properties) {
-        $mergedTypes[$property.Name] = $property.Value
-    }
-
-    $merged = [pscustomobject]@{
-        version = if ($null -ne $BaseCatalog.version) { $BaseCatalog.version } else { 1 }
-        types   = [pscustomobject]$mergedTypes
-    }
-
-    if ($null -ne $OverrideCatalog.PSObject.Properties['schemaVersion']) {
-        $merged | Add-Member -NotePropertyName schemaVersion -NotePropertyValue $OverrideCatalog.schemaVersion -Force
-    }
-
-    return $merged
+    param([object]$BaseCatalog,[object]$OverrideCatalog,[object]$OverrideClassification)
+    if($null -eq $OverrideCatalog -or $null -eq $OverrideCatalog.PSObject.Properties['types']){return $BaseCatalog}
+    if($null -ne $OverrideClassification -and $OverrideClassification.effectiveCatalogAction -eq 'block-resolution'){throw "OVERRIDE_RESOLUTION_BLOCKED: $($OverrideClassification.reason)"}
+    $supported=@('objectTypeGuid','rootKind','folderName','inventoryEligible','queryableByKbIntelligence','containerType','exportTaskLabel')
+    $mergedTypes=[ordered]@{}
+    foreach($p in $BaseCatalog.types.PSObject.Properties){$h=[ordered]@{}; foreach($ep in $p.Value.PSObject.Properties){$h[$ep.Name]=$ep.Value}; $h['canonicalType']=$p.Name; $mergedTypes[$p.Name]=[pscustomobject]$h}
+    foreach($p in $OverrideCatalog.types.PSObject.Properties){$ce=$null; if($null -ne $OverrideClassification){$ce=@($OverrideClassification.classificationEntries|Where-Object{$_.typeName -eq $p.Name}|Select-Object -First 1)}; if($null -ne $ce -and $ce.effectiveCatalogAction -eq 'block-resolution'){continue}; $target=if($null -ne $ce -and -not [string]::IsNullOrWhiteSpace($ce.baseTypeName)){$ce.baseTypeName}else{$p.Name}; $h=[ordered]@{}; if($mergedTypes.Contains($target)){foreach($ep in $mergedTypes[$target].PSObject.Properties){$h[$ep.Name]=$ep.Value}}; foreach($ep in $p.Value.PSObject.Properties){if($ep.Name -in $supported){$h[$ep.Name]=$ep.Value}}; $h['canonicalType']=$target; $mergedTypes[$target]=[pscustomobject]$h}
+    [pscustomobject]@{version=if($null -ne $BaseCatalog.PSObject.Properties['version']){$BaseCatalog.version}else{1}; types=[pscustomobject]$mergedTypes}
 }
 
 function Resolve-GeneXusObjectTypeCatalogPaths {
-    param(
-        [string]$BaseCatalogPath,
-        [string]$CatalogOverridePath,
-        [string]$ParallelKbRoot
-    )
+    param([string]$BaseCatalogPath,[string]$CatalogOverridePath,[string]$ParallelKbRoot)
+    if([string]::IsNullOrWhiteSpace($BaseCatalogPath)){$BaseCatalogPath=Get-GeneXusObjectTypeCatalogDefaultBasePath}
+    $classification=Get-GeneXusCatalogOverrideClassification -BaseCatalogPath $BaseCatalogPath -CatalogOverridePath $CatalogOverridePath -ParallelKbRoot $ParallelKbRoot
+    if($classification.effectiveCatalogAction -eq 'block-resolution'){throw "OVERRIDE_RESOLUTION_BLOCKED: $($classification.reason) / $($classification.diagnosticReason) at $($classification.overridePath)"}
+    $baseCatalog=Read-GeneXusObjectTypeCatalogFile -Path $BaseCatalogPath; $overrideCatalog=$null
+    if($classification.overrideActive -and -not [string]::IsNullOrWhiteSpace($classification.overridePath)){$overrideCatalog=Read-GeneXusObjectTypeCatalogFile -Path $classification.overridePath}
+    $mergedCatalog=Merge-GeneXusObjectTypeCatalog -BaseCatalog $baseCatalog -OverrideCatalog $overrideCatalog -OverrideClassification $classification
+    [pscustomobject]@{BaseCatalogPath=$BaseCatalogPath; OverridePath=$classification.overridePath; OverrideActive=$classification.overrideActive; UpstreamPending=$classification.effectiveUpstreamPending; DeclaredUpstreamPending=$classification.declaredUpstreamPending; EffectiveUpstreamPending=$classification.effectiveUpstreamPending; MergedCatalog=$mergedCatalog; OverrideCatalog=$overrideCatalog; OverrideClassification=$classification}
+}
 
-    if ([string]::IsNullOrWhiteSpace($BaseCatalogPath)) {
-        $BaseCatalogPath = Get-GeneXusObjectTypeCatalogDefaultBasePath
-    }
-
-    $resolvedOverridePath = $CatalogOverridePath
-    if ([string]::IsNullOrWhiteSpace($resolvedOverridePath) -and -not [string]::IsNullOrWhiteSpace($ParallelKbRoot)) {
-        $resolvedOverridePath = Get-GeneXusObjectTypeCatalogDefaultOverridePath -ParallelKbRoot $ParallelKbRoot
-    }
-
-    $overrideCatalog = $null
-    $overrideActive = $false
-    if (-not [string]::IsNullOrWhiteSpace($resolvedOverridePath) -and (Test-Path -LiteralPath $resolvedOverridePath -PathType Leaf)) {
-        $overrideCatalog = Read-GeneXusObjectTypeCatalogFile -Path $resolvedOverridePath
-        $overrideActive = $true
-    }
-
-    $baseCatalog = Read-GeneXusObjectTypeCatalogFile -Path $BaseCatalogPath
-    $mergedCatalog = Merge-GeneXusObjectTypeCatalog -BaseCatalog $baseCatalog -OverrideCatalog $overrideCatalog
-
-    $upstreamPending = $false
-    if ($overrideActive -and $null -ne $overrideCatalog.PSObject.Properties['upstreamPending']) {
-        $upstreamPending = [bool]$overrideCatalog.upstreamPending
-    }
-
-    return [pscustomobject]@{
-        BaseCatalogPath      = $BaseCatalogPath
-        OverridePath         = if ($overrideActive) { (Resolve-Path -LiteralPath $resolvedOverridePath).Path } else { $null }
-        OverrideActive       = $overrideActive
-        UpstreamPending      = $upstreamPending
-        MergedCatalog        = $mergedCatalog
-        OverrideCatalog      = $overrideCatalog
-    }
+function Get-GeneXusCatalogOverrideSessionReminder {
+    param([string]$ParallelKbRoot,[string]$CatalogOverridePath)
+    $c=Get-GeneXusCatalogOverrideClassification -CatalogOverridePath $CatalogOverridePath -ParallelKbRoot $ParallelKbRoot
+    $msg=$c.message
+    if($c.status -eq 'REMINDER_REQUIRED'){$names=@($c.pendingTypeNames+$c.divergentTypeNames)|Sort-Object -Unique; $msg=('CATALOGO_LOCAL_OVERRIDE_ATIVO: esta pasta paralela usa gx-object-type-catalog.override.json. Tipos pendentes/divergentes: {0}. Revise alinhamento com a base compartilhada.' -f ($names -join ', '))}
+    [pscustomobject]@{status=$c.status; reminderRequired=$c.reminderRequired; noticeRequired=$c.noticeRequired; cleanupRecommended=$c.cleanupRecommended; blocked=$c.blocked; overrideActive=$c.overrideActive; upstreamPending=$c.effectiveUpstreamPending; declaredUpstreamPending=$c.declaredUpstreamPending; effectiveUpstreamPending=$c.effectiveUpstreamPending; reason=$c.reason; diagnosticReason=$c.diagnosticReason; fieldPath=$c.fieldPath; message=$msg; overridePath=$c.overridePath; pendingTypeNames=$c.pendingTypeNames; pendingTypeGuids=$c.pendingTypeGuids; redundantTypeNames=$c.redundantTypeNames; redundantTypeGuids=$c.redundantTypeGuids; divergentTypeNames=$c.divergentTypeNames; divergentTypeGuids=$c.divergentTypeGuids; blockedTypeNames=$c.blockedTypeNames; blockedTypeGuids=$c.blockedTypeGuids; classificationEntries=$c.classificationEntries}
 }
 
 function Get-GeneXusCatalogGuidToFolderMap {
@@ -186,60 +234,6 @@ function Get-GeneXusExportTaskLabelAliasRules {
     }
 
     return @($rules)
-}
-
-function Get-GeneXusCatalogOverrideSessionReminder {
-    param(
-        [string]$ParallelKbRoot,
-        [string]$CatalogOverridePath
-    )
-
-    $resolution = Resolve-GeneXusObjectTypeCatalogPaths -CatalogOverridePath $CatalogOverridePath -ParallelKbRoot $ParallelKbRoot
-    if (-not $resolution.OverrideActive) {
-        return [pscustomobject]@{
-            reminderRequired = $false
-            overrideActive   = $false
-            upstreamPending  = $false
-            message          = $null
-            overridePath     = $null
-            pendingTypeNames = @()
-            pendingTypeGuids = @()
-        }
-    }
-
-    $pendingNames = [System.Collections.Generic.List[string]]::new()
-    $pendingGuids = [System.Collections.Generic.List[string]]::new()
-    if ($null -ne $resolution.OverrideCatalog -and $null -ne $resolution.OverrideCatalog.types) {
-        foreach ($property in $resolution.OverrideCatalog.types.PSObject.Properties) {
-            $entry = $property.Value
-            $pendingNames.Add([string]$property.Name) | Out-Null
-            if ($null -ne $entry.objectTypeGuid -and -not [string]::IsNullOrWhiteSpace([string]$entry.objectTypeGuid)) {
-                $pendingGuids.Add([string]$entry.objectTypeGuid) | Out-Null
-            }
-        }
-    }
-
-    $reminderRequired = $resolution.UpstreamPending -or $pendingNames.Count -gt 0
-    $message = $null
-    if ($reminderRequired) {
-        $typeList = ($pendingNames | Sort-Object) -join ', '
-        $message = @(
-            'CATÁLOGO_LOCAL_OVERRIDE_ATIVO: esta pasta paralela usa gx-object-type-catalog.override.json (paliativo).'
-            "Tipos no override local: $typeList."
-            'Ainda falta registrar o(s) mesmo(s) tipo(s) na base compartilhada GeneXus-XPZ-Skills (scripts/gx-object-type-catalog.json e 01a-catalogo-e-padroes-empiricos.md).'
-            'Nao trate o override como catálogo definitivo; encaminhe evidencia ao mantenedor da base XPZ quando possivel.'
-        ) -join ' '
-    }
-
-    return [pscustomobject]@{
-        reminderRequired = $reminderRequired
-        overrideActive     = $true
-        upstreamPending    = $resolution.UpstreamPending
-        message            = $message
-        overridePath       = $resolution.OverridePath
-        pendingTypeNames   = @($pendingNames | Sort-Object)
-        pendingTypeGuids   = @($pendingGuids)
-    }
 }
 
 function Get-GeneXusXmlObjectOuterSnippet {
