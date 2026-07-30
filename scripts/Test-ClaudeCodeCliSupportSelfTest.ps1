@@ -125,6 +125,24 @@ $evTypeError = '{"type":"error","message":"boom"}' | ConvertFrom-Json
 Assert-Equal 'evento type=error continua capturado' ((Get-ClaudeCodeStreamEventErrorText -StreamEvent $evTypeError) -match 'boom') $true
 Assert-Equal 'evento nulo nao vira erro' (Get-ClaudeCodeStreamEventErrorText -StreamEvent $null) ''
 
+$evDeltaA = '{"type":"content_block_delta","delta":{"type":"text_delta","text":"A"}}' | ConvertFrom-Json
+$evDeltaB = '{"type":"content_block_delta","delta":{"type":"text_delta","text":"B"}}' | ConvertFrom-Json
+$evResultWithText = '{"type":"result","subtype":"success","is_error":false,"result":"NAO_E_VEREDITO"}' | ConvertFrom-Json
+Assert-Equal 'content_block_delta extrai texto incremental' (Get-ClaudeCodeStreamEventText -StreamEvent $evDeltaA) 'A'
+Assert-Equal 'assistant content e fallback textual' (Get-ClaudeCodeStreamAcceptedTextFromEvents -StreamEvents @($evAssistant)) 'parcial'
+Assert-Equal 'deltas prevalecem sobre assistant para evitar duplicacao' (Get-ClaudeCodeStreamAcceptedTextFromEvents -StreamEvents @($evAssistant, $evDeltaA, $evDeltaB)) 'AB'
+Assert-Equal 'result.result nao vira texto aceito' (Get-ClaudeCodeStreamAcceptedTextFromEvents -StreamEvents @($evResultWithText)) ''
+
+$rateLimitRejected = '{"type":"rate_limit_event","status":"rejected","rateLimitType":"weekly","reportedLimitScope":"subscription","resetsAt":1893456000}' | ConvertFrom-Json
+$quotaEvidence = Get-ClaudeCodeStreamQuotaEvidence -StreamEvents @($rateLimitRejected)
+Assert-Equal 'quota: rate_limit_event rejected detectado' $quotaEvidence.isQuota $true
+Assert-Equal 'quota: rateLimitType preservado' $quotaEvidence.rateLimitType 'weekly'
+Assert-Equal 'quota: resetsAt unix convertido para UTC' $quotaEvidence.resetsAtUtc '2030-01-01T00:00:00Z'
+$result429 = '{"type":"result","is_error":true,"terminal_reason":"api_error","api_error_status":429,"result":"rate limit"}' | ConvertFrom-Json
+$quota429 = Get-ClaudeCodeStreamQuotaEvidence -StreamEvents @($result429)
+Assert-Equal 'quota: result api_error_status 429 detectado' $quota429.isQuota $true
+Assert-Equal 'quota: api_error_status preservado' $quota429.apiErrorStatus '429'
+
 # Falha DEPOIS de texto: `error_max_turns` PODE chegar apos alguma saida, entao descartar o erro
 # mascararia resposta truncada como resposta boa. O status nao muda; a evidencia e preservada.
 $s8 = Resolve-ClaudeCodeJobStatus -FinalText 'parecer truncado' -StreamError $streamMaxTurns -Stderr ''

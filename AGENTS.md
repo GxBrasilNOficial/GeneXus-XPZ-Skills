@@ -7,9 +7,10 @@
 
 ## Edição local pelo Codex
 
-- Nesta raiz, para uma alteração já aprovada, seguir `xpz-codex-apply-patch-alternative/SKILL.md` e usar `scripts/Apply-ApprovedPatch.ps1`; não usar a ferramenta Codex `apply_patch`.
-- Na rota canônica, `pwsh -File` recebe argv literal, inclusive via `ProcessStartInfo.ArgumentList`; por isso, transmita o patch unificado textual como Base64 contíguo por stdin para `-DryRun`, com `-RepositoryRoot` e um único `-AllowedPath` por ciclo. O motor continua exigindo que esse caminho corresponda ao conjunto completo e exato do patch. Se `-AllowedPath` for repetido, o binder falha antes do motor: stdout fica sem JSON e o diagnóstico deve ser lido no stderr. Só então chamar `-StagedPatchId` + `-ExpectedPatchSha256` para aplicar.
-- Após a aplicação, reler o trecho alterado, conferir encoding/EOL e executar o parse ou teste pertinente. O motor não faz commit, push, checkout, reset ou rollback automático; não usar esse mecanismo para ampliar o escopo aprovado.
+- Nesta raiz, para uma alteração textual já aprovada, usar normalmente a ferramenta Codex `apply_patch` quando a rota nativa estiver disponível e nenhuma instrução de maior precedência a proibir.
+- Manter `xpz-codex-apply-patch-alternative/SKILL.md` e `scripts/Apply-ApprovedPatch.ps1` como backup auditável quando a ferramenta nativa estiver indisponível, falhar antes de qualquer escrita local e a árvore/índice permanecerem sem modificação, ou quando houver instrução humana expressa.
+- Na rota de backup, `pwsh -File` recebe argv literal, inclusive via `ProcessStartInfo.ArgumentList`; por isso, transmita o patch unificado textual como Base64 contíguo por stdin para `-DryRun`, com `-RepositoryRoot` apontando para a raiz de uma work tree Git não-bare na branch `main`, e um único `-AllowedPath` por ciclo. Para vários arquivos, repetir ciclos independentes de stage -> apply, sem atomicidade entre ciclos já aplicados. Se `-AllowedPath` for repetido, o binder falha antes do motor: stdout fica sem JSON e o diagnóstico deve ser lido no stderr. Só então chamar `-StagedPatchId` + `-ExpectedPatchSha256` para aplicar.
+- Após qualquer aplicação, reler o trecho alterado, conferir encoding/EOL e executar o parse ou teste pertinente. Nenhuma rota faz commit, push, checkout, reset ou rollback automático; não usar esses mecanismos para ampliar o escopo aprovado.
 
 ## Revisão por pares como termo operacional
 

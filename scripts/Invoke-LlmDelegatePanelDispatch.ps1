@@ -22,16 +22,18 @@
       - gate Resolve-LlmDelegateAuthorization.ps1 (NAO autoriza): allow->fila de despacho,
         ask/deny->gateAsk/gateDeny, throw->error;
       - classifica invokeArgs por allowlist PER-BACKEND; contencao (permissionMode/tools/maxTurns,
-        agent, approvalMode!=plan) e RECUSADA (securityBlockedArgs) e NAO repassada ao adapter:
+        agent, approvalMode!=plan) e chaves internas do adapter sao RECUSADAS (securityBlockedArgs)
+        e NAO repassadas ao adapter:
         o despacho segue com os defaults seguros do adapter (decisao de seguranca, Posicao B);
       - resolve -Cd (precedencia + fail-closed; opencode nunca recebe -Cd).
 
     Despacho CONCORRENTE: ForEach-Object -Parallel -ThrottleLimit 8 + SemaphoreSlim($OllamaConcurrency)
     via $using: SO para family 'ollama-cloud' (validado empirico PS 7.6.2). Captura antes do Dispose.
 
-    Classificacao do resultado (ESTRUTURAL, sem parsear prosa de parecer): texto nao-vazio -> responded;
-    sentinela de cota/saldo/limite -> quota; timeout (BLOCK excedeu ... encerrado) -> timeout;
-    vazio/resto -> error. Sem single-flight (diferido).
+    Classificacao do resultado (ESTRUTURAL, sem parsear prosa de parecer): adapters legados seguem
+    texto nao-vazio -> responded; sentinela de cota/saldo/limite -> quota; timeout (BLOCK excedeu ...
+    encerrado) -> timeout; vazio/resto -> error. Claude Code no painel usa sidecar tecnico atomico:
+    o stdout so conta quando o sidecar aceito traz resultAccepted=true. Sem single-flight (diferido).
 
     DISCIPLINA DE STDOUT: este harness e processo filho. panel-summary.json e a UNICA linha de stdout.
     Todo texto humano sai por [Console]::Error (Write-Host/Write-Warning/Write-Information VAZAM para o
@@ -77,6 +79,8 @@
 .PARAMETER BackendExeMap
     (SO TESTE) JSON {backend: caminho-de-exe} (inline OU caminho de arquivo) para injetar fake-exe
     no adapter real via -<Backend>Exe.
+.PARAMETER ClaudeCircuitStateRoot
+    (SO TESTE) raiz do circuito de cota do adapter assíncrono do Claude Code.
 .EXAMPLE
     .\Invoke-LlmDelegatePanelDispatch.ps1 -ManuscriptPath .\manuscrito.md -ReviewersJson .\revisores.json -PayloadSensitivity public
 #>
@@ -95,7 +99,8 @@ param(
     # --- SO TESTE ---
     [string] $OpenCodeConfigPath,
     [string] $CodexConfigPath,
-    [string] $BackendExeMap
+    [string] $BackendExeMap,
+    [string] $ClaudeCircuitStateRoot
 )
 
 Set-StrictMode -Version Latest
@@ -109,7 +114,7 @@ $MaxInlineManuscriptChars = 30000
 $AdapterScript = @{
     'opencode'    = 'Invoke-OpenCode.ps1'
     'codex'       = 'Invoke-Codex.ps1'
-    'claude-code' = 'Invoke-ClaudeCode.ps1'
+    'claude-code' = 'Invoke-ClaudeCodeAsync.ps1'
     'copilot'     = 'Invoke-Copilot.ps1'
     'gemini'      = 'Invoke-Gemini.ps1'
 }
@@ -120,13 +125,24 @@ $ExeParam = @{
     'copilot'     = 'CopilotExe'
     'gemini'      = 'GeminiExe'
 }
-# Chaves de contencao recusadas (securityBlockedArgs) por backend. gemini.approvalMode e condicional.
+# Chaves de contencao/internas recusadas (securityBlockedArgs) por backend. gemini.approvalMode e condicional.
 $ContentionKeys = @{
-    'claude-code' = @('permissionmode', 'tools', 'maxturns')
+    'claude-code' = @(
+        'permissionmode', 'tools', 'maxturns',
+        'sidecarpath', 'retentionmode', 'tempdir', 'circuitstateroot', 'claudeexe',
+        'message', 'messagepath'
+    )
     'opencode'    = @('agent')
     'gemini'      = @('approvalmode')
     'codex'       = @()
     'copilot'     = @()
+}
+$AdapterDefaultTimeoutSec = @{
+    'opencode'    = 180
+    'codex'       = 180
+    'claude-code' = 300
+    'copilot'     = 300
+    'gemini'      = 300
 }
 
 function Get-Prop {
@@ -159,15 +175,18 @@ function Test-UnavailableFailureMessage {
 }
 
 function Get-FallbackDispatcherTimeoutMs {
-    param($InvokeArgs)
+    param([string]$Backend, $InvokeArgs)
     $defaultTimeoutMs = 180000
     $overheadMs = 30000
+    $adapterDefaultTimeoutSec = 180
+    if (-not [string]::IsNullOrWhiteSpace($Backend) -and $script:AdapterDefaultTimeoutSec.ContainsKey($Backend)) {
+        $adapterDefaultTimeoutSec = [int]$script:AdapterDefaultTimeoutSec[$Backend]
+    }
     $timeoutSecValue = Get-Prop $InvokeArgs 'timeoutSec'
-    if ($null -eq $timeoutSecValue) { return $defaultTimeoutMs }
-
     $timeoutSec = 0
-    if (-not [int]::TryParse([string]$timeoutSecValue, [ref]$timeoutSec)) { return $defaultTimeoutMs }
-    if ($timeoutSec -lt 1) { return $defaultTimeoutMs }
+    if ($null -eq $timeoutSecValue -or -not [int]::TryParse([string]$timeoutSecValue, [ref]$timeoutSec) -or $timeoutSec -lt 1) {
+        $timeoutSec = $adapterDefaultTimeoutSec
+    }
 
     $derivedTimeoutMs = ([int64]$timeoutSec * 1000) + $overheadMs
     if ($derivedTimeoutMs -lt $defaultTimeoutMs) { return $defaultTimeoutMs }
@@ -216,7 +235,8 @@ function Add-SkippedFallbackRecords {
         [string]$FallbackOf,
         [string]$State,
         [string]$Reason,
-        [int]$BaseRank
+        [int]$BaseRank,
+        [string]$FallbackSuppressedReason
     )
     for ($skipIdx = 0; $skipIdx -lt @($FallbackItems).Count; $skipIdx++) {
         $fb = @($FallbackItems)[$skipIdx]
@@ -248,7 +268,160 @@ function Add-SkippedFallbackRecords {
                 countsForDiversity = $false
                 rank               = $BaseRank
                 fallbackChain      = @()
+                dispatchAttempted  = $false
+                preDispatchBlocked = $false
+                processCreated     = $null
+                sidecarPath        = $null
+                sidecarAccepted    = $null
+                sidecarValidationReason = $null
+                technicalStatus    = $null
+                resultAccepted     = $null
+                acceptanceRejectionReason = $null
+                acceptedFinalTextSha256 = $null
+                acceptedFinalTextBytes = $null
+                promptTransmission = $null
+                quotaCircuitDecision = $null
+                quotaCircuitVariantDecisions = @()
+                fallbackSuppressedReason = $FallbackSuppressedReason
             })
+    }
+}
+
+function Get-TextSha256 {
+    param([AllowNull()] [string]$Text)
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes([string]$Text)
+    $hash = [System.Security.Cryptography.SHA256]::HashData($bytes)
+    return ([System.BitConverter]::ToString($hash)).Replace('-', '').ToLowerInvariant()
+}
+
+function Read-PanelJsonFileWithDeadline {
+    param([string]$Path, [int]$DeadlineMs = 250)
+
+    $deadline = [datetime]::UtcNow.AddMilliseconds($DeadlineMs)
+    do {
+        try {
+            if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+                Start-Sleep -Milliseconds 25
+                continue
+            }
+            $raw = Get-Content -LiteralPath $Path -Raw -Encoding utf8 -ErrorAction Stop
+            return [pscustomobject]@{ status = 'ok'; value = ($raw | ConvertFrom-Json); error = $null }
+        } catch [System.IO.IOException] {
+            Start-Sleep -Milliseconds 25
+        } catch {
+            return [pscustomobject]@{ status = 'json-invalid'; value = $null; error = $_.Exception.Message }
+        }
+    } while ([datetime]::UtcNow -lt $deadline)
+
+    return [pscustomobject]@{ status = 'read-inconclusive'; value = $null; error = 'deadline' }
+}
+
+function Test-ClaudeCodeSidecarShape {
+    param([AllowNull()] $Sidecar, [AllowNull()] [string]$StdoutText)
+
+    if ($null -eq $Sidecar) { return [pscustomobject]@{ accepted = $false; reason = 'sidecar-missing' } }
+    $forbidden = @(
+        'sidecarAccepted', 'sidecarValidationReason', 'state', 'countsForDiversity',
+        'preDispatchBlocked', 'dispatchAttempted', 'fallbackSuppressedReason',
+        'reviewersDispatched', 'reviewersProcessCreated', 'processCreatedUnknownCount', 'vNextState'
+    )
+    foreach ($name in $forbidden) {
+        if ($Sidecar.PSObject.Properties[$name]) {
+            return [pscustomobject]@{ accepted = $false; reason = "sidecar-forbidden-field:$name" }
+        }
+    }
+    $required = @(
+        'Kind', 'SchemaVersion', 'adapterName', 'backend', 'model', 'jobId', 'startedAtUtc',
+        'endedAtUtc', 'durationMs', 'technicalStatus', 'resultAccepted',
+        'acceptanceRejectionReason', 'exitCode', 'terminalReason', 'apiErrorStatus',
+        'failureAfterText', 'stderrSha256', 'streamSha256', 'acceptedFinalTextSha256',
+        'acceptedFinalTextBytes', 'finalTextDisposition', 'promptTransmission',
+        'spawnAttempted', 'processCreated', 'processIdentity', 'processIdentityVerified',
+        'cancelRequested', 'cancelIssued', 'cancelIdentityUnverifiable', 'quotaEvidence',
+        'quotaCircuitDecision', 'retentionMode', 'retentionCleanupFailed'
+    )
+    foreach ($name in $required) {
+        if (-not $Sidecar.PSObject.Properties[$name]) {
+            return [pscustomobject]@{ accepted = $false; reason = "sidecar-missing-field:$name" }
+        }
+    }
+    if ([string](Get-Prop $Sidecar 'Kind') -ne 'claude-code-async-sidecar') {
+        return [pscustomobject]@{ accepted = $false; reason = 'sidecar-kind-invalid' }
+    }
+    $schemaVersion = Get-Prop $Sidecar 'SchemaVersion'
+    if (($schemaVersion -isnot [int] -and $schemaVersion -isnot [long]) -or [int]$schemaVersion -ne 1) {
+        return [pscustomobject]@{ accepted = $false; reason = 'sidecar-schema-invalid' }
+    }
+    if ([string](Get-Prop $Sidecar 'backend') -ne 'claude-code') {
+        return [pscustomobject]@{ accepted = $false; reason = 'sidecar-backend-invalid' }
+    }
+    $acceptedValue = Get-Prop $Sidecar 'resultAccepted'
+    if ($acceptedValue -isnot [bool]) {
+        return [pscustomobject]@{ accepted = $false; reason = 'sidecar-resultAccepted-not-boolean' }
+    }
+    $accepted = [bool]$acceptedValue
+    $technicalStatus = [string](Get-Prop $Sidecar 'technicalStatus')
+    $finalTextDisposition = [string](Get-Prop $Sidecar 'finalTextDisposition')
+    $retentionCleanupFailedValue = Get-Prop $Sidecar 'retentionCleanupFailed'
+    if ($retentionCleanupFailedValue -isnot [bool]) {
+        return [pscustomobject]@{ accepted = $false; reason = 'sidecar-retentionCleanupFailed-not-boolean' }
+    }
+    $retentionCleanupFailed = [bool]$retentionCleanupFailedValue
+    if ($accepted) {
+        if ($technicalStatus -ne 'completed') {
+            return [pscustomobject]@{ accepted = $false; reason = 'sidecar-accepted-with-noncompleted-status' }
+        }
+        if ($finalTextDisposition -ne 'stdout') {
+            return [pscustomobject]@{ accepted = $false; reason = 'sidecar-accepted-without-stdout-disposition' }
+        }
+        if ($retentionCleanupFailed) {
+            return [pscustomobject]@{ accepted = $false; reason = 'sidecar-accepted-with-retention-cleanup-failed' }
+        }
+        if ([string]::IsNullOrWhiteSpace([string]$StdoutText)) {
+            return [pscustomobject]@{ accepted = $false; reason = 'sidecar-accepted-with-empty-stdout' }
+        }
+        $hash = [string](Get-Prop $Sidecar 'acceptedFinalTextSha256')
+        if ([string]::IsNullOrWhiteSpace($hash) -or $hash -ne (Get-TextSha256 -Text ([string]$StdoutText))) {
+            return [pscustomobject]@{ accepted = $false; reason = 'sidecar-accepted-hash-mismatch' }
+        }
+        $bytes = Get-Prop $Sidecar 'acceptedFinalTextBytes'
+        if ($bytes -isnot [int] -and $bytes -isnot [long]) {
+            return [pscustomobject]@{ accepted = $false; reason = 'sidecar-accepted-bytes-invalid' }
+        }
+        if ([long]$bytes -ne [System.Text.Encoding]::UTF8.GetByteCount([string]$StdoutText)) {
+            return [pscustomobject]@{ accepted = $false; reason = 'sidecar-accepted-bytes-mismatch' }
+        }
+    }
+    else {
+        if (-not [string]::IsNullOrWhiteSpace([string]$StdoutText)) {
+            return [pscustomobject]@{ accepted = $false; reason = 'sidecar-rejected-with-stdout' }
+        }
+        if ($finalTextDisposition -eq 'stdout') {
+            return [pscustomobject]@{ accepted = $false; reason = 'sidecar-rejected-with-stdout-disposition' }
+        }
+        if ($null -ne (Get-Prop $Sidecar 'acceptedFinalTextSha256')) {
+            return [pscustomobject]@{ accepted = $false; reason = 'sidecar-rejected-with-accepted-hash' }
+        }
+        if ($null -ne (Get-Prop $Sidecar 'acceptedFinalTextBytes')) {
+            return [pscustomobject]@{ accepted = $false; reason = 'sidecar-rejected-with-accepted-bytes' }
+        }
+    }
+    return [pscustomobject]@{ accepted = $true; reason = 'ok' }
+}
+
+function Convert-ClaudeCodeSidecarToPanelState {
+    param([object]$Sidecar)
+    $technicalStatus = [string](Get-Prop $Sidecar 'technicalStatus')
+    $resultAccepted = [bool](Get-Prop $Sidecar 'resultAccepted')
+    if ($technicalStatus -eq 'completed' -and $resultAccepted) { return [pscustomobject]@{ state = 'responded'; reason = $null } }
+    if ($technicalStatus -eq 'completed') { return [pscustomobject]@{ state = 'error'; reason = 'completed-without-accepted-result' } }
+    switch ($technicalStatus) {
+        'timeout' { return [pscustomobject]@{ state = 'timeout'; reason = [string](Get-Prop $Sidecar 'acceptanceRejectionReason') } }
+        'quota' { return [pscustomobject]@{ state = 'quota'; reason = [string](Get-Prop $Sidecar 'acceptanceRejectionReason') } }
+        'unavailable' { return [pscustomobject]@{ state = 'unavailable'; reason = [string](Get-Prop $Sidecar 'acceptanceRejectionReason') } }
+        'internalError' { return [pscustomobject]@{ state = 'error'; reason = [string](Get-Prop $Sidecar 'acceptanceRejectionReason') } }
+        'cancelled' { return [pscustomobject]@{ state = 'error'; reason = 'unexpected-cancelled-status' } }
+        default { return [pscustomobject]@{ state = 'error'; reason = "unexpected-technical-status:$technicalStatus" } }
     }
 }
 
@@ -277,11 +450,18 @@ if ($useManuscriptText -eq $useManuscriptPath) {
     }
     $blockResult = [ordered]@{
         Kind                         = 'xpz-llm-panel-dispatch-result'
-        SchemaVersion                = 1
+        SchemaVersion                = 2
         success                      = $false
         roundStarted                 = $false
         dispatchStarted              = $false
         reviewersDispatched          = 0
+        reviewersDispatchAttempted   = 0
+        reviewersProcessCreated      = 0
+        processCreatedUnknownCount   = 0
+        preDispatchBlockedCount      = 0
+        sidecarAcceptedCount         = 0
+        sidecarRejectedCount         = 0
+        fallbackSuppressedCount      = 0
         roundId                      = $RoundId
         payloadSensitivity           = $PayloadSensitivity
         parallelKbRoot               = $null
@@ -312,11 +492,18 @@ if ($useManuscriptText -eq $useManuscriptPath) {
 if ($useManuscriptText -and $ManuscriptText.Length -gt $MaxInlineManuscriptChars) {
     $blockResult = [ordered]@{
         Kind                         = 'xpz-llm-panel-dispatch-result'
-        SchemaVersion                = 1
+        SchemaVersion                = 2
         success                      = $false
         roundStarted                 = $false
         dispatchStarted              = $false
         reviewersDispatched          = 0
+        reviewersDispatchAttempted   = 0
+        reviewersProcessCreated      = 0
+        processCreatedUnknownCount   = 0
+        preDispatchBlockedCount      = 0
+        sidecarAcceptedCount         = 0
+        sidecarRejectedCount         = 0
+        fallbackSuppressedCount      = 0
         roundId                      = $RoundId
         payloadSensitivity           = $PayloadSensitivity
         parallelKbRoot               = $null
@@ -346,7 +533,46 @@ if ($useManuscriptText -and $ManuscriptText.Length -gt $MaxInlineManuscriptChars
 }
 if ($useManuscriptPath) {
     if (-not (Test-Path -LiteralPath $ManuscriptPath -PathType Leaf)) {
-        throw "BLOCK: -ManuscriptPath nao encontrado: $ManuscriptPath"
+        $blockResult = [ordered]@{
+            Kind                         = 'xpz-llm-panel-dispatch-result'
+            SchemaVersion                = 2
+            success                      = $false
+            roundStarted                 = $false
+            dispatchStarted              = $false
+            reviewersDispatched          = 0
+            reviewersDispatchAttempted   = 0
+            reviewersProcessCreated      = 0
+            processCreatedUnknownCount   = 0
+            preDispatchBlockedCount      = 0
+            sidecarAcceptedCount         = 0
+            sidecarRejectedCount         = 0
+            fallbackSuppressedCount      = 0
+            roundId                      = $RoundId
+            payloadSensitivity           = $PayloadSensitivity
+            parallelKbRoot               = $null
+            policyPath                   = $null
+            manuscriptPath               = $null
+            ollamaConcurrency            = $OllamaConcurrency
+            reviewers                    = @()
+            dispatched                   = 0
+            respondedCount               = 0
+            errorCount                   = 0
+            timeoutCount                 = 0
+            quotaCount                   = 0
+            unavailableCount             = 0
+            gateAsk                      = 0
+            gateDeny                     = 0
+            ollamaQuotaWarning           = $null
+            concurrencySaturationWarning = $null
+            preparationError             = [ordered]@{
+                failureStage = 'parameter-validation'
+                failureCode  = 'manuscript-path-not-found'
+                message      = "-ManuscriptPath nao encontrado: $ManuscriptPath"
+            }
+        }
+        [Console]::Error.WriteLine("BLOCK: manuscript-path-not-found: -ManuscriptPath nao encontrado.")
+        [Console]::Out.WriteLine(($blockResult | ConvertTo-Json -Compress -Depth 8))
+        exit 1
     }
     $manuscriptFull = (Resolve-Path -LiteralPath $ManuscriptPath).Path
     $ledgerDir = Join-Path $tempRoot $RoundId
@@ -423,11 +649,18 @@ if ($useManuscriptPath) {
         if ([string]::IsNullOrWhiteSpace($message)) { $message = 'Preparacao de artefatos falhou.' }
         $blockResult = [ordered]@{
             Kind                         = 'xpz-llm-panel-dispatch-result'
-            SchemaVersion                = 1
+            SchemaVersion                = 2
             success                      = $false
             roundStarted                 = $false
             dispatchStarted              = $false
             reviewersDispatched          = 0
+            reviewersDispatchAttempted   = 0
+            reviewersProcessCreated      = 0
+            processCreatedUnknownCount   = 0
+            preDispatchBlockedCount      = 0
+            sidecarAcceptedCount         = 0
+            sidecarRejectedCount         = 0
+            fallbackSuppressedCount      = 0
             roundId                      = $RoundId
             payloadSensitivity           = $PayloadSensitivity
             parallelKbRoot               = $null
@@ -525,6 +758,21 @@ for ($i = 0; $i -lt $reviewers.Count; $i++) {
         countsForDiversity = $false
         rank               = if ($null -ne (Get-Prop $r 'rank')) { [int](Get-Prop $r 'rank') } else { $i + 1 }
         fallbackChain      = @($fallbackItems)
+        dispatchAttempted  = $false
+        preDispatchBlocked = $false
+        processCreated     = $null
+        sidecarPath        = $null
+        sidecarAccepted    = $null
+        sidecarValidationReason = $null
+        technicalStatus    = $null
+        resultAccepted     = $null
+        acceptanceRejectionReason = $null
+        acceptedFinalTextSha256 = $null
+        acceptedFinalTextBytes = $null
+        promptTransmission = $null
+        quotaCircuitDecision = $null
+        quotaCircuitVariantDecisions = @()
+        fallbackSuppressedReason = $null
     }
 
     $backendDivergence = Test-InvokeArgsBackendDivergence -Reviewer $r -Label "revisor[$i]"
@@ -718,15 +966,30 @@ for ($i = 0; $i -lt $reviewers.Count; $i++) {
     # retry-once so opencode
     if ($backend -eq 'opencode') { $splat['MaxAttempts'] = 2 }
 
+    # Claude Code no painel usa adapter assincrono tipado: o dispatcher valida o sidecar tecnico
+    # e so aceita stdout como parecer quando resultAccepted=true.
+    if ($backend -eq 'claude-code') {
+        $sidecarPath = Join-Path $ledgerDir ('{0:D2}-claude-code.sidecar.json' -f $i)
+        $splat['SidecarPath'] = $sidecarPath
+        $splat['RetentionMode'] = $PayloadSensitivity
+        $splat['TempDir'] = $ledgerDir
+        if (-not [string]::IsNullOrWhiteSpace($ClaudeCircuitStateRoot)) {
+            $splat['CircuitStateRoot'] = $ClaudeCircuitStateRoot
+        }
+        $rec.sidecarPath = $sidecarPath
+    }
+
     # args allowlistados (TimeoutSec / codex Profile/Oss/LocalProvider)
     foreach ($ek in $extraSplat.Keys) { $splat[$ek] = $extraSplat[$ek] }
 
     $adapterPath = Join-Path $scriptsDir $AdapterScript[$backend]
     $dispatchList.Add([pscustomobject]@{
         index       = $i
+        backend     = $backend
         family      = $rec.family
         adapterPath = $adapterPath
         splat       = $splat
+        sidecarPath = if ($backend -eq 'claude-code') { $rec.sidecarPath } else { $null }
     })
 
     $rec.state = 'PENDING'
@@ -777,7 +1040,12 @@ try {
                 }
 
                 $state = $null; $textOut = $null; $errText = $null
-                if ($null -ne $errRec) {
+                if ($item.backend -eq 'claude-code') {
+                    $state = 'PENDING-SIDECAR'
+                    $textOut = $joined
+                    if ($null -ne $errRec) { $errText = [string]$errRec.Exception.Message }
+                }
+                elseif ($null -ne $errRec) {
                     $msg = [string]$errRec.Exception.Message
                     if ($msg -match 'BLOCK:' -and $msg -match $quotaPattern) {
                         $state = 'quota'
@@ -801,6 +1069,7 @@ try {
 
                 $result = [pscustomobject]@{
                     index      = $item.index
+                    backend    = $item.backend
                     state      = $state
                     text       = $textOut
                     errorText  = $errText
@@ -808,12 +1077,14 @@ try {
                     endedAt    = $endedAt.ToString('yyyy-MM-ddTHH:mm:ssZ')
                     durationMs = [int]($endedAt - $startedAt).TotalMilliseconds
                     attempts   = 1
+                    sidecarPath = $item.sidecarPath
                 }
             } catch {
                 # Defesa em profundidade: qualquer excecao inesperada no runspace (ex.: Wait,
                 # Get-Date) vira um resultado 'error' — nunca escapa do bloco (conforme v11).
                 $result = [pscustomobject]@{
                     index      = $item.index
+                    backend    = $item.backend
                     state      = 'error'
                     text       = $null
                     errorText  = "BLOCK: falha inesperada no runspace: $($_.Exception.Message)"
@@ -821,6 +1092,7 @@ try {
                     endedAt    = $null
                     durationMs = $null
                     attempts   = 1
+                    sidecarPath = $item.sidecarPath
                 }
             } finally {
                 # [void]: SemaphoreSlim.Release() devolve o contador anterior (int); sem o [void]
@@ -841,11 +1113,68 @@ foreach ($rec in $records) { $byIndex[[int]$rec.index] = $rec }
 foreach ($res in $collected) {
     $rec = $byIndex[[int]$res.index]
     if ($null -eq $rec) { continue }
-    $rec.state = $res.state
     $rec.startedAt = $res.startedAt
     $rec.endedAt = $res.endedAt
     $rec.durationMs = $res.durationMs
     $rec.attempts = $res.attempts
+    $rec.dispatchAttempted = ([int]$res.attempts -ge 1)
+
+    if ([string]$rec.backend -eq 'claude-code') {
+        $rec.sidecarPath = [string]$res.sidecarPath
+        $sidecar = $null
+        $sidecarReadReason = $null
+        if (-not [string]::IsNullOrWhiteSpace([string]$rec.sidecarPath) -and (Test-Path -LiteralPath ([string]$rec.sidecarPath) -PathType Leaf)) {
+            $sidecarRead = Read-PanelJsonFileWithDeadline -Path ([string]$rec.sidecarPath) -DeadlineMs 250
+            if ($sidecarRead.status -eq 'ok') { $sidecar = $sidecarRead.value }
+            else { $sidecarReadReason = "sidecar-$($sidecarRead.status):$($sidecarRead.error)" }
+        }
+        else {
+            $sidecarReadReason = 'sidecar-file-missing'
+        }
+
+        $validation = if ($null -eq $sidecar) {
+            [pscustomobject]@{ accepted = $false; reason = $sidecarReadReason }
+        }
+        else {
+            Test-ClaudeCodeSidecarShape -Sidecar $sidecar -StdoutText ([string]$res.text)
+        }
+        $rec.sidecarAccepted = [bool]$validation.accepted
+        $rec.sidecarValidationReason = [string]$validation.reason
+
+        if (-not [bool]$validation.accepted) {
+            $rec.state = 'error'
+            $rec.reason = "claude-code-sidecar-rejected:$($validation.reason)"
+            if (-not [string]::IsNullOrWhiteSpace([string]$res.errorText)) {
+                $rec.reason = "$($rec.reason); adapterError=$($res.errorText)"
+            }
+            $rec['__text'] = $null
+            $rec['__errorText'] = $rec.reason
+            continue
+        }
+
+        $projection = Convert-ClaudeCodeSidecarToPanelState -Sidecar $sidecar
+        $rec.state = [string]$projection.state
+        $rec.technicalStatus = [string](Get-Prop $sidecar 'technicalStatus')
+        $rec.resultAccepted = [bool](Get-Prop $sidecar 'resultAccepted')
+        $rec.acceptanceRejectionReason = [string](Get-Prop $sidecar 'acceptanceRejectionReason')
+        $rec.acceptedFinalTextSha256 = Get-Prop $sidecar 'acceptedFinalTextSha256'
+        $rec.acceptedFinalTextBytes = Get-Prop $sidecar 'acceptedFinalTextBytes'
+        $rec.promptTransmission = [string](Get-Prop $sidecar 'promptTransmission')
+        $rec.processCreated = [bool](Get-Prop $sidecar 'processCreated')
+        $rec.quotaCircuitDecision = [string](Get-Prop $sidecar 'quotaCircuitDecision')
+        $quotaEvidence = Get-Prop $sidecar 'quotaEvidence'
+        $rec.quotaCircuitVariantDecisions = @(Get-Prop $quotaEvidence 'variantDecisions')
+        $spawnAttempted = [bool](Get-Prop $sidecar 'spawnAttempted')
+        $rec.preDispatchBlocked = (-not $spawnAttempted -and [string]$rec.promptTransmission -eq 'none')
+        $reason = [string]$projection.reason
+        if ([string]::IsNullOrWhiteSpace($reason)) { $reason = [string]$rec.acceptanceRejectionReason }
+        if (-not [string]::IsNullOrWhiteSpace($reason)) { $rec.reason = $reason }
+        $rec['__text'] = if ($rec.state -eq 'responded') { $res.text } else { $null }
+        $rec['__errorText'] = if ($rec.state -eq 'responded') { $null } else { $rec.reason }
+        continue
+    }
+
+    $rec.state = $res.state
     $rec['__text'] = $res.text
     $rec['__errorText'] = $res.errorText
     if ([string]::IsNullOrWhiteSpace([string]$rec.reason) -and -not [string]::IsNullOrWhiteSpace([string]$res.errorText)) {
@@ -872,6 +1201,13 @@ foreach ($rec in $originalRecords) {
     if ([string]$rec.state -eq 'error' -and [int]$rec.attempts -eq 0 -and [string]$rec.reason -like 'BLOCK:*') {
         Add-SkippedFallbackRecords -Records $records -FallbackItems $fallbackItems -FallbackOf ([string]$rec.targetModelKey) `
             -State 'skippedByPolicy' -Reason "fallback nao tentado por erro de validacao pre-despacho: $($rec.reason)" -BaseRank ([int]$rec.rank)
+        continue
+    }
+    if ([bool]$rec.preDispatchBlocked) {
+        $rec.fallbackSuppressedReason = 'pre-dispatch-block-not-fallback-safe'
+        Add-SkippedFallbackRecords -Records $records -FallbackItems $fallbackItems -FallbackOf ([string]$rec.targetModelKey) `
+            -State 'skippedByPolicy' -Reason "fallback nao tentado porque o primario foi bloqueado antes de enviar prompt: $($rec.reason)" `
+            -BaseRank ([int]$rec.rank) -FallbackSuppressedReason ([string]$rec.fallbackSuppressedReason)
         continue
     }
     if ($skipPolicyStates -contains [string]$rec.state) {
@@ -917,6 +1253,7 @@ foreach ($rec in $originalRecords) {
         if ($OpenCodeConfigPath) { $fbArgs['OpenCodeConfigPath'] = $OpenCodeConfigPath }
         if ($CodexConfigPath) { $fbArgs['CodexConfigPath'] = $CodexConfigPath }
         if ($BackendExeMap) { $fbArgs['BackendExeMap'] = $BackendExeMap }
+        if ($ClaudeCircuitStateRoot) { $fbArgs['ClaudeCircuitStateRoot'] = $ClaudeCircuitStateRoot }
 
         $fbRecord = $null
         try {
@@ -931,12 +1268,12 @@ foreach ($rec in $originalRecords) {
                 '-TempDir', $fbArgs.TempDir,
                 '-OllamaConcurrency', ([string]$fbArgs.OllamaConcurrency)
             )
-            foreach ($optionalKey in @('Cd', 'ParallelKbRoot', 'PolicyPath', 'OpenCodeConfigPath', 'CodexConfigPath', 'BackendExeMap')) {
+            foreach ($optionalKey in @('Cd', 'ParallelKbRoot', 'PolicyPath', 'OpenCodeConfigPath', 'CodexConfigPath', 'BackendExeMap', 'ClaudeCircuitStateRoot')) {
                 if ($fbArgs.ContainsKey($optionalKey)) { $argList += @("-$optionalKey", [string]$fbArgs[$optionalKey]) }
             }
             $p = Start-Process -FilePath (Get-CurrentPowerShellExecutable) -ArgumentList $argList -NoNewWindow -PassThru `
                 -RedirectStandardOutput $fbOutPath -RedirectStandardError $fbErrPath
-            $fallbackDispatcherTimeoutMs = Get-FallbackDispatcherTimeoutMs -InvokeArgs $fbClean.invokeArgs
+            $fallbackDispatcherTimeoutMs = Get-FallbackDispatcherTimeoutMs -Backend ([string]$fbClean.backend) -InvokeArgs $fbClean.invokeArgs
             $exited = $p.WaitForExit($fallbackDispatcherTimeoutMs)
             if (-not $exited) {
                 try {
@@ -996,6 +1333,21 @@ foreach ($rec in $originalRecords) {
                 countsForDiversity = $counts
                 rank               = [int]$rec.rank
                 fallbackChain      = @()
+                dispatchAttempted  = [bool](Get-Prop $fbRecord 'dispatchAttempted')
+                preDispatchBlocked = [bool](Get-Prop $fbRecord 'preDispatchBlocked')
+                processCreated     = Get-Prop $fbRecord 'processCreated'
+                sidecarPath        = [string](Get-Prop $fbRecord 'sidecarPath')
+                sidecarAccepted    = Get-Prop $fbRecord 'sidecarAccepted'
+                sidecarValidationReason = [string](Get-Prop $fbRecord 'sidecarValidationReason')
+                technicalStatus    = [string](Get-Prop $fbRecord 'technicalStatus')
+                resultAccepted     = Get-Prop $fbRecord 'resultAccepted'
+                acceptanceRejectionReason = [string](Get-Prop $fbRecord 'acceptanceRejectionReason')
+                acceptedFinalTextSha256 = Get-Prop $fbRecord 'acceptedFinalTextSha256'
+                acceptedFinalTextBytes = Get-Prop $fbRecord 'acceptedFinalTextBytes'
+                promptTransmission = [string](Get-Prop $fbRecord 'promptTransmission')
+                quotaCircuitDecision = [string](Get-Prop $fbRecord 'quotaCircuitDecision')
+                quotaCircuitVariantDecisions = @(Get-Prop $fbRecord 'quotaCircuitVariantDecisions')
+                fallbackSuppressedReason = [string](Get-Prop $fbRecord 'fallbackSuppressedReason')
             })
         if ($fbState -eq 'responded') { $fallbackSucceeded = $true }
     }
@@ -1073,6 +1425,13 @@ $quotaCount = @($records | Where-Object { $_.state -eq 'quota' }).Count
 $unavailableCount = @($records | Where-Object { $_.state -eq 'unavailable' }).Count
 $gateAskCount = @($records | Where-Object { $_.state -eq 'gateAsk' }).Count
 $gateDenyCount = @($records | Where-Object { $_.state -eq 'gateDeny' }).Count
+$reviewersDispatchAttempted = @($records | Where-Object { $_.dispatchAttempted -eq $true }).Count
+$reviewersProcessCreated = @($records | Where-Object { $_.processCreated -eq $true }).Count
+$processCreatedUnknownCount = @($records | Where-Object { $_.dispatchAttempted -eq $true -and $null -eq $_.processCreated }).Count
+$preDispatchBlockedCount = @($records | Where-Object { $_.preDispatchBlocked -eq $true }).Count
+$sidecarAcceptedCount = @($records | Where-Object { $_.sidecarAccepted -eq $true }).Count
+$sidecarRejectedCount = @($records | Where-Object { $_.sidecarAccepted -eq $false }).Count
+$fallbackSuppressedCount = @($records | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_.fallbackSuppressedReason) }).Count
 
 $reviewerObjs = @($records | ForEach-Object { [pscustomobject]$_ })
 
@@ -1081,11 +1440,18 @@ $policyPathOut = $null; if (-not [string]::IsNullOrWhiteSpace($PolicyPath)) { $p
 
 $summary = [ordered]@{
     Kind                         = 'xpz-llm-panel-dispatch-result'
-    SchemaVersion                = 1
+    SchemaVersion                = 2
     success                      = $true
     roundStarted                 = $true
     dispatchStarted              = $true
     reviewersDispatched          = $dispatched
+    reviewersDispatchAttempted   = $reviewersDispatchAttempted
+    reviewersProcessCreated      = $reviewersProcessCreated
+    processCreatedUnknownCount   = $processCreatedUnknownCount
+    preDispatchBlockedCount      = $preDispatchBlockedCount
+    sidecarAcceptedCount         = $sidecarAcceptedCount
+    sidecarRejectedCount         = $sidecarRejectedCount
+    fallbackSuppressedCount      = $fallbackSuppressedCount
     roundId                      = $RoundId
     payloadSensitivity           = $PayloadSensitivity
     parallelKbRoot               = $parallelKbRootOut

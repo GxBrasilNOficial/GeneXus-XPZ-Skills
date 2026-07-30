@@ -158,7 +158,35 @@ if ($model -eq 'claude-untrusted-workspace') {
     exit 1
 }
 $null = [Console]::In.ReadToEnd()
-'CLAUDE cwd=' + (Get-Location).Path + ' model=' + $model + ' revisao'
+if ($model -eq 'claude-sensitive-ledger') {
+    [Console]::Error.WriteLine('stderr bruto sensivel')
+    [pscustomobject]@{
+        type = 'content_block_delta'
+        delta = [ordered]@{
+            type = 'text_delta'
+            text = "PARECER sensivel`n"
+        }
+    } | ConvertTo-Json -Compress -Depth 5
+    [pscustomobject]@{
+        type = 'result'
+        subtype = 'success'
+        is_error = $false
+    } | ConvertTo-Json -Compress -Depth 5
+    exit 0
+}
+$text = 'CLAUDE cwd=' + (Get-Location).Path + ' model=' + $model + ' revisao'
+[pscustomobject]@{
+    type = 'assistant'
+    message = [ordered]@{
+        content = @([ordered]@{ text = $text })
+    }
+} | ConvertTo-Json -Compress -Depth 5
+[pscustomobject]@{
+    type = 'result'
+    subtype = 'success'
+    is_error = $false
+    result = 'NAO_E_VEREDITO'
+} | ConvertTo-Json -Compress -Depth 5
 exit 0
 '@ | Set-Content -LiteralPath $fakeClReader -Encoding utf8
     $fakeClCmd = Join-Path $tmp 'fake-claude.cmd'
@@ -225,6 +253,11 @@ model = "gpt-5.5"
 { "schemaVersion": 1, "defaultExternal": "ask", "models": { "openai/*": "allow-external" } }
 '@ | Set-Content -LiteralPath $pol -Encoding utf8
 
+    $polAnthropic = Join-Path $tmp 'llm-delegation-policy-anthropic.json'
+    @'
+{ "schemaVersion": 1, "defaultExternal": "ask", "models": { "anthropic/*": "allow-external" } }
+'@ | Set-Content -LiteralPath $polAnthropic -Encoding utf8
+
     # manuscrito (acentos)
     $manuscript = Join-Path $tmp 'manuscrito.md'
     @'
@@ -236,6 +269,7 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
     # ---------------------------------------------------------------------------------------
     # Helper de invocação (processo filho, stdout/stderr separados em arquivo)
     # ---------------------------------------------------------------------------------------
+    $defaultClaudeCircuitRoot = Join-Path $tmp 'claude-circuit'
     function Invoke-Harness {
         param(
             [Parameter(Mandatory)] [object[]] $Reviewers,
@@ -271,6 +305,7 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
         }
         if (-not $NoRoundId) { $argList += @('-RoundId', $rid) }
         if (-not $NoExeMap) { $argList += @('-BackendExeMap', $exeMapFile) }
+        if (-not $Extra.ContainsKey('ClaudeCircuitStateRoot')) { $argList += @('-ClaudeCircuitStateRoot', $defaultClaudeCircuitRoot) }
         foreach ($k in $Extra.Keys) { $argList += @("-$k", [string]$Extra[$k]) }
 
         $p = Start-Process -FilePath 'pwsh' -ArgumentList $argList -NoNewWindow -PassThru `
@@ -282,7 +317,14 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
         if ($null -eq $stderr) { $stderr = '' }
         $json = $null
         if (-not [string]::IsNullOrWhiteSpace($stdout)) { try { $json = $stdout | ConvertFrom-Json } catch { } }
-        return [pscustomobject]@{ stdout = $stdout; stderr = $stderr; exit = $p.ExitCode; json = $json; roundId = $rid }
+        return [pscustomobject]@{
+            stdout    = $stdout
+            stderr    = $stderr
+            exit      = $p.ExitCode
+            json      = $json
+            roundId   = $rid
+            ledgerDir = Join-Path $ledgerRoot $rid
+        }
     }
 
     # =======================================================================================
@@ -364,11 +406,25 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
     # =======================================================================================
     # 5) SPLAT + CONTENÇÃO (per-backend) — sem despacho (kb-sensitive -> gateAsk)
     # =======================================================================================
-    # claude-code: permissionMode/tools/maxTurns -> securityBlockedArgs
-    $r = Invoke-Harness -Reviewers @(@{ backend = 'claude-code'; invokeArgs = @{ model = 'claude-opus-4-8'; permissionMode = 'bypassPermissions'; tools = 'Bash'; maxTurns = 9 } }) -Sensitivity 'kb-sensitive'
+    # claude-code: permissionMode/tools/maxTurns e chaves internas -> securityBlockedArgs
+    $r = Invoke-Harness -Reviewers @(@{ backend = 'claude-code'; invokeArgs = @{
+                    model = 'claude-opus-4-8'
+                    permissionMode = 'bypassPermissions'
+                    tools = 'Bash'
+                    maxTurns = 9
+                    SidecarPath = 'C:\tmp\roubar-sidecar.json'
+                    RetentionMode = 'public'
+                    TempDir = 'C:\tmp\roubar-ledger'
+                    CircuitStateRoot = 'C:\tmp\roubar-circuito'
+                    ClaudeExe = 'C:\tmp\fake-claude.exe'
+                    MessagePath = 'C:\tmp\outro-prompt.txt'
+                } }) -Sensitivity 'kb-sensitive'
     $rv = Get-Reviewer $r.json 0
     $sb = @($rv.securityBlockedArgs)
     Assert-True (($sb -contains 'permissionMode') -and ($sb -contains 'tools') -and ($sb -contains 'maxTurns')) "claude-code contenção: securityBlockedArgs deveria conter permissionMode/tools/maxTurns; got [$($sb -join ',')]"
+    foreach ($blockedInternalArg in @('SidecarPath', 'RetentionMode', 'TempDir', 'CircuitStateRoot', 'ClaudeExe', 'MessagePath')) {
+        Assert-True ($sb -contains $blockedInternalArg) "claude-code chaves internas: securityBlockedArgs deveria conter $blockedInternalArg; got [$($sb -join ',')]"
+    }
 
     # opencode: agent -> securityBlockedArgs (mesmo em kb-sensitive: classificação precede o unavailable)
     $r = Invoke-Harness -Reviewers @(@{ backend = 'opencode'; targetModelKey = 'ollama-cloud/x'; invokeArgs = @{ model = 'ollama-cloud/x'; agent = 'build' } }) -Sensitivity 'kb-sensitive'
@@ -539,6 +595,37 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
 
     $harnessText = Get-Content -LiteralPath $harness -Raw -Encoding utf8
     Assert-True ($harnessText -match 'Get-FallbackDispatcherTimeoutMs') 'fallback dispatcher: timeout do processo filho deve derivar do invokeArgs.timeoutSec.'
+    $parserErrors = $null
+    $tokens = $null
+    $harnessAst = [System.Management.Automation.Language.Parser]::ParseFile($harness, [ref]$tokens, [ref]$parserErrors)
+    Assert-True (@($parserErrors).Count -eq 0) "fallback dispatcher: harness deveria parsear sem erro; erros=$(@($parserErrors).Count)"
+    $functionAsts = @($harnessAst.FindAll({ param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $true))
+    $getPropAst = @($functionAsts | Where-Object { $_.Name -eq 'Get-Prop' })[0]
+    $timeoutAst = @($functionAsts | Where-Object { $_.Name -eq 'Get-FallbackDispatcherTimeoutMs' })[0]
+    Assert-True ($null -ne $getPropAst -and $null -ne $timeoutAst) 'fallback dispatcher: funcoes Get-Prop/Get-FallbackDispatcherTimeoutMs deveriam existir.'
+    $timeoutProbe = @"
+`$script:AdapterDefaultTimeoutSec = @{
+    'opencode' = 180
+    'codex' = 180
+    'claude-code' = 300
+    'copilot' = 300
+    'gemini' = 300
+}
+$($getPropAst.Extent.Text)
+$($timeoutAst.Extent.Text)
+[pscustomobject]@{
+    ClaudeDefault = Get-FallbackDispatcherTimeoutMs -Backend 'claude-code' -InvokeArgs ([pscustomobject]@{})
+    OpenCodeDefault = Get-FallbackDispatcherTimeoutMs -Backend 'opencode' -InvokeArgs ([pscustomobject]@{})
+    SmallExplicit = Get-FallbackDispatcherTimeoutMs -Backend 'claude-code' -InvokeArgs ([pscustomobject]@{ timeoutSec = 2 })
+    InvalidClaude = Get-FallbackDispatcherTimeoutMs -Backend 'claude-code' -InvokeArgs ([pscustomobject]@{ timeoutSec = 'abc' })
+}
+"@
+    $timeoutResult = & ([scriptblock]::Create($timeoutProbe))
+    Assert-True ([int]$timeoutResult.ClaudeDefault -eq 330000) "fallback dispatcher: claude-code sem timeoutSec deve esperar 300s+30s; got $($timeoutResult.ClaudeDefault)"
+    Assert-True ([int]$timeoutResult.InvalidClaude -eq 330000) "fallback dispatcher: claude-code com timeoutSec invalido deve cair no default 300s+30s; got $($timeoutResult.InvalidClaude)"
+    Assert-True ([int]$timeoutResult.OpenCodeDefault -eq 210000) "fallback dispatcher: opencode sem timeoutSec deve esperar 180s+30s; got $($timeoutResult.OpenCodeDefault)"
+    Assert-True ([int]$timeoutResult.SmallExplicit -eq 180000) "fallback dispatcher: timeoutSec pequeno deve manter piso conservador de 180s; got $($timeoutResult.SmallExplicit)"
+    Assert-True ($harnessText -match "Get-FallbackDispatcherTimeoutMs\s+-Backend") 'fallback dispatcher: chamada real deve informar o backend para escolher o default correto.'
     Assert-True ($harnessText -notmatch 'WaitForExit\(180000\)') 'fallback dispatcher: nao pode haver timeout fixo de 180000ms no processo filho.'
     Assert-True ($harnessText -match 'Get-CurrentPowerShellExecutable') 'fallback dispatcher: processo filho deve usar o executavel PowerShell atual/validado, nao depender de pwsh cru no PATH.'
     Assert-True ($harnessText -notmatch "Start-Process\s+-FilePath\s+'pwsh'") 'fallback dispatcher: nao pode resolver pwsh cru pelo PATH.'
@@ -571,9 +658,21 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
 
     $rvCl = Get-Reviewer $r.json 0
     Assert-True ($rvCl.state -eq 'responded') "claude-code despacho: esperado responded; got $($rvCl.state)"
+    Assert-True ($rvCl.sidecarAccepted -eq $true) 'claude-code despacho: sidecar deveria ser aceito.'
+    Assert-True ($rvCl.resultAccepted -eq $true) 'claude-code despacho: resultAccepted=true esperado.'
+    Assert-True ($rvCl.technicalStatus -eq 'completed') 'claude-code despacho: technicalStatus completed esperado.'
+    Assert-True (Test-Path -LiteralPath ([string]$rvCl.sidecarPath) -PathType Leaf) 'claude-code despacho: sidecarPath deveria existir.'
+    $sidecarCl = Get-Content -LiteralPath ([string]$rvCl.sidecarPath) -Raw -Encoding utf8 | ConvertFrom-Json
+    Assert-True (-not [string]::IsNullOrWhiteSpace([string]$rvCl.acceptedFinalTextSha256)) 'claude-code despacho: acceptedFinalTextSha256 deveria ser preservado no reviewer record.'
+    Assert-True ($rvCl.acceptedFinalTextSha256 -eq $sidecarCl.acceptedFinalTextSha256) 'claude-code despacho: acceptedFinalTextSha256 do reviewer deveria casar com sidecar.'
+    Assert-True ([int]$rvCl.acceptedFinalTextBytes -eq [int]$sidecarCl.acceptedFinalTextBytes) 'claude-code despacho: acceptedFinalTextBytes do reviewer deveria casar com sidecar.'
     $tCl = Get-Content -LiteralPath $rvCl.verdictPath -Raw -Encoding utf8
     Assert-True ($tCl -match 'model=claude-opus-4-8') 'claude-code despacho: -Model deveria chegar ao adapter'
     Assert-True ($tCl -match [regex]::Escape($tmp)) 'claude-code despacho: -Cd deveria virar o WorkingDirectory (cwd)'
+    Assert-True ([int]$r.json.reviewersDispatchAttempted -eq 3) 'contadores v2: reviewersDispatchAttempted=3 esperado.'
+    Assert-True ([int]$r.json.reviewersProcessCreated -eq 1) 'contadores v2: apenas Claude async declara processCreated=true.'
+    Assert-True ([int]$r.json.processCreatedUnknownCount -eq 2) 'contadores v2: copilot/gemini ficam processCreated desconhecido.'
+    Assert-True ([int]$r.json.sidecarAcceptedCount -eq 1) 'contadores v2: sidecarAcceptedCount=1 esperado.'
 
     $rvCp = Get-Reviewer $r.json 1
     Assert-True ($rvCp.state -eq 'responded') "copilot despacho: esperado responded; got $($rvCp.state)"
@@ -586,6 +685,26 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
     $tGm = Get-Content -LiteralPath $rvGm.verdictPath -Raw -Encoding utf8
     Assert-True ($tGm -match 'model=gemini-3-flash-preview') 'gemini despacho: -Model deveria chegar ao adapter'
     Assert-True ($tGm -match [regex]::Escape($tmpFwd)) 'gemini despacho: -Cd deveria virar o WorkingDirectory (cwd)'
+
+    $r = Invoke-Harness -Reviewers @(@{
+            backend = 'claude-code'
+            targetModelKey = 'anthropic/claude-sensitive-ledger'
+            invokeArgs = @{ model = 'claude-sensitive-ledger' }
+        }) -Sensitivity 'kb-sensitive' -Extra @{ Cd = $tmp; PolicyPath = $polAnthropic }
+    $rvClSensitive = Get-Reviewer $r.json 0
+    Assert-True ($rvClSensitive.state -eq 'responded') "claude-code kb-sensitive ledger: esperado responded; got $($rvClSensitive.state)"
+    Assert-True ($rvClSensitive.sidecarAccepted -eq $true) 'claude-code kb-sensitive ledger: sidecar deveria ser aceito.'
+    Assert-True ($rvClSensitive.resultAccepted -eq $true) 'claude-code kb-sensitive ledger: resultAccepted=true esperado.'
+    Assert-True (Test-Path -LiteralPath ([string]$rvClSensitive.verdictPath) -PathType Leaf) 'claude-code kb-sensitive ledger: .verdict.txt deveria existir.'
+    $rawLedgerFiles = @(Get-ChildItem -LiteralPath $r.ledgerDir -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -like '*.stream.jsonl' -or $_.Name -like '*.stderr.txt' })
+    $rawLedgerFileNames = @($rawLedgerFiles | ForEach-Object { $_.Name })
+    Assert-True ($rawLedgerFiles.Count -eq 0) ("claude-code kb-sensitive ledger: stream/stderr brutos nao deveriam permanecer no ledger; ficaram: {0}" -f ($rawLedgerFileNames -join ', '))
+    $sensitiveSidecar = Get-Content -LiteralPath ([string]$rvClSensitive.sidecarPath) -Raw -Encoding utf8 | ConvertFrom-Json
+    Assert-True ($sensitiveSidecar.retentionMode -eq 'kb-sensitive') 'claude-code kb-sensitive ledger: retentionMode deveria ser kb-sensitive.'
+    Assert-True ($sensitiveSidecar.retentionCleanupFailed -eq $false) 'claude-code kb-sensitive ledger: limpeza de stream/stderr deveria completar.'
+    Assert-True ($null -eq $sensitiveSidecar.streamSha256) 'claude-code kb-sensitive ledger: streamSha256 deve ser omitido/null.'
+    Assert-True ($null -eq $sensitiveSidecar.stderrSha256) 'claude-code kb-sensitive ledger: stderrSha256 deve ser omitido/null.'
 
     # Claude Code workspace nao confiavel -> unavailable, para permitir fallback em painel.
     $r = Invoke-Harness -Reviewers @(@{ backend = 'claude-code'; invokeArgs = @{ model = 'claude-untrusted-workspace' } }) `
@@ -653,9 +772,9 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
     $stdoutTrim = $r.stdout.TrimEnd("`r", "`n")
     Assert-True (@($stdoutTrim -split "`n").Count -eq 1) 'contrato: stdout deveria ter exatamente 1 linha'
     Assert-True ($r.json.Kind -eq 'xpz-llm-panel-dispatch-result') 'contrato: Kind PascalCase'
-    Assert-True ([int]$r.json.SchemaVersion -eq 1) 'contrato: SchemaVersion=1 PascalCase'
+    Assert-True ([int]$r.json.SchemaVersion -eq 2) 'contrato: SchemaVersion=2 PascalCase'
     # state subset
-    $validStates = @('responded', 'error', 'quota', 'unavailable', 'timeout', 'gateAsk', 'gateDeny')
+    $validStates = @('responded', 'error', 'quota', 'unavailable', 'timeout', 'gateAsk', 'gateDeny', 'skippedAfterSuccess', 'skippedByPolicy', 'notAttempted')
     foreach ($rev in $r.json.reviewers) { Assert-True ($validStates -contains $rev.state) "contrato: state '$($rev.state)' deveria estar no subset valido" }
     # targetModelKey vazio -> null (claude-code sem model)
     $rvClaude = Get-Reviewer $r.json 1

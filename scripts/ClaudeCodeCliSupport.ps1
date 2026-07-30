@@ -12,6 +12,14 @@
 
 Set-StrictMode -Version Latest
 
+function Get-ClaudeCodeProp {
+    param([AllowNull()] $Obj, [string]$Name)
+    if ($null -ne $Obj -and -not [string]::IsNullOrEmpty($Name) -and $Obj.PSObject.Properties[$Name]) {
+        return $Obj.PSObject.Properties[$Name].Value
+    }
+    return $null
+}
+
 function ConvertFrom-ClaudeCodeVersionText {
     param([string]$Text)
     $m = [regex]::Match([string]$Text, '(\d+)\.(\d+)\.(\d+)')
@@ -138,6 +146,164 @@ function Get-ClaudeCodeStreamEventErrorText {
     if (-not [string]::IsNullOrWhiteSpace($errorsText)) { $parts += $errorsText }
     if ($parts.Count -eq 0) { return ($StreamEvent | ConvertTo-Json -Compress -Depth 10) }
     return ($parts -join ': ')
+}
+
+function Get-ClaudeCodeStreamEventText {
+    param([AllowNull()] $StreamEvent)
+
+    $type = [string](Get-ClaudeCodeProp $StreamEvent 'type')
+    if ($type -eq 'content_block_delta') {
+        $delta = Get-ClaudeCodeProp $StreamEvent 'delta'
+        $txt = Get-ClaudeCodeProp $delta 'text'
+        if ($null -ne $txt) { return [string]$txt }
+        return ''
+    }
+
+    if ($type -eq 'assistant') {
+        $message = Get-ClaudeCodeProp $StreamEvent 'message'
+        $content = @(Get-ClaudeCodeProp $message 'content')
+        $parts = @()
+        foreach ($c in $content) {
+            $txt = Get-ClaudeCodeProp $c 'text'
+            if ($null -ne $txt -and -not [string]::IsNullOrEmpty([string]$txt)) {
+                $parts += [string]$txt
+            }
+        }
+        return ($parts -join '')
+    }
+
+    # O evento terminal `type=result` pode conter `result.result`, mas esse campo nao e texto
+    # aceito pelo contrato do painel: e metadado tecnico do CLI e nunca vira parecer.
+    return ''
+}
+
+function Get-ClaudeCodeStreamAcceptedTextFromEvents {
+    param([AllowNull()] [object[]]$StreamEvents)
+
+    $deltaParts = [System.Collections.Generic.List[string]]::new()
+    $assistantParts = [System.Collections.Generic.List[string]]::new()
+    foreach ($ev in @($StreamEvents)) {
+        $type = [string](Get-ClaudeCodeProp $ev 'type')
+        if ($type -eq 'content_block_delta') {
+            $txt = Get-ClaudeCodeStreamEventText -StreamEvent $ev
+            if (-not [string]::IsNullOrEmpty($txt)) { $deltaParts.Add($txt) }
+            continue
+        }
+        if ($type -eq 'assistant') {
+            $txt = Get-ClaudeCodeStreamEventText -StreamEvent $ev
+            if (-not [string]::IsNullOrEmpty($txt)) { $assistantParts.Add($txt) }
+        }
+    }
+    if ($deltaParts.Count -gt 0) { return ($deltaParts -join '') }
+    return ($assistantParts -join '')
+}
+
+function ConvertTo-ClaudeCodeUtcFromUnixSeconds {
+    param([AllowNull()] $Value)
+    if ($null -eq $Value) { return $null }
+    $seconds = [double]0
+    if (-not [double]::TryParse([string]$Value, [System.Globalization.NumberStyles]::Float, [System.Globalization.CultureInfo]::InvariantCulture, [ref]$seconds)) {
+        return $null
+    }
+    if ($seconds -le 0) { return $null }
+    try {
+        return ([System.DateTimeOffset]::FromUnixTimeSeconds([int64][math]::Floor($seconds))).UtcDateTime.ToString('yyyy-MM-ddTHH:mm:ssZ')
+    } catch {
+        return $null
+    }
+}
+
+function Get-ClaudeCodeStreamEventQuotaEvidence {
+    param([AllowNull()] $StreamEvent)
+
+    if ($null -eq $StreamEvent) { return $null }
+    $type = [string](Get-ClaudeCodeProp $StreamEvent 'type')
+    $evidenceType = $null
+    $apiErrorStatus = Get-ClaudeCodeProp $StreamEvent 'api_error_status'
+    $terminalReason = [string](Get-ClaudeCodeProp $StreamEvent 'terminal_reason')
+    $rateLimitType = [string](Get-ClaudeCodeProp $StreamEvent 'rateLimitType')
+    if ([string]::IsNullOrWhiteSpace($rateLimitType)) { $rateLimitType = [string](Get-ClaudeCodeProp $StreamEvent 'rate_limit_type') }
+    $reportedLimitScope = [string](Get-ClaudeCodeProp $StreamEvent 'reportedLimitScope')
+    if ([string]::IsNullOrWhiteSpace($reportedLimitScope)) { $reportedLimitScope = [string](Get-ClaudeCodeProp $StreamEvent 'limit_scope') }
+    $resetsAtUtc = ConvertTo-ClaudeCodeUtcFromUnixSeconds (Get-ClaudeCodeProp $StreamEvent 'resetsAt')
+
+    $rateLimitInfo = Get-ClaudeCodeProp $StreamEvent 'rate_limit_info'
+    if ($null -ne $rateLimitInfo) {
+        if ([string]::IsNullOrWhiteSpace($rateLimitType)) { $rateLimitType = [string](Get-ClaudeCodeProp $rateLimitInfo 'type') }
+        if ([string]::IsNullOrWhiteSpace($reportedLimitScope)) { $reportedLimitScope = [string](Get-ClaudeCodeProp $rateLimitInfo 'scope') }
+        if ([string]::IsNullOrWhiteSpace($resetsAtUtc)) { $resetsAtUtc = ConvertTo-ClaudeCodeUtcFromUnixSeconds (Get-ClaudeCodeProp $rateLimitInfo 'resetsAt') }
+    }
+
+    if ($type -eq 'rate_limit_event') {
+        $status = [string](Get-ClaudeCodeProp $StreamEvent 'status')
+        if ($status -eq 'rejected') { $evidenceType = 'rate-limit-event-rejected' }
+    }
+    elseif ($type -eq 'assistant') {
+        $assistantError = [string](Get-ClaudeCodeProp $StreamEvent 'error')
+        if ([string]::IsNullOrWhiteSpace($assistantError)) {
+            $message = Get-ClaudeCodeProp $StreamEvent 'message'
+            $assistantError = [string](Get-ClaudeCodeProp $message 'error')
+        }
+        if ($assistantError -match '(?i)rate[_\s-]?limit') { $evidenceType = 'assistant-rate-limit-error' }
+    }
+    elseif ($type -eq 'result') {
+        $resultText = [string](Get-ClaudeCodeProp $StreamEvent 'result')
+        $errorsText = ''
+        if ($null -ne (Get-ClaudeCodeProp $StreamEvent 'errors')) {
+            $errorsText = ((@(Get-ClaudeCodeProp $StreamEvent 'errors') | ForEach-Object { [string]$_ }) -join ' ')
+        }
+        $combined = @($terminalReason, $resultText, $errorsText) -join ' '
+        if ([string]$apiErrorStatus -eq '429') { $evidenceType = 'result-api-error-429' }
+        elseif ($terminalReason -eq 'api_error' -and $combined -match '(?i)(429|quota|rate\s*limit|usage\s*limit)') {
+            $evidenceType = 'result-api-error-rate-limit'
+        }
+    }
+
+    if ([string]::IsNullOrWhiteSpace($evidenceType)) { return $null }
+    return [pscustomobject]@{
+        evidenceType       = $evidenceType
+        apiErrorStatus     = if ($null -ne $apiErrorStatus) { [string]$apiErrorStatus } else { $null }
+        terminalReason     = if ([string]::IsNullOrWhiteSpace($terminalReason)) { $null } else { $terminalReason }
+        rateLimitType      = if ([string]::IsNullOrWhiteSpace($rateLimitType)) { $null } else { $rateLimitType }
+        reportedLimitScope = if ([string]::IsNullOrWhiteSpace($reportedLimitScope)) { $null } else { $reportedLimitScope }
+        resetsAtUtc        = if ([string]::IsNullOrWhiteSpace($resetsAtUtc)) { $null } else { $resetsAtUtc }
+    }
+}
+
+function Get-ClaudeCodeStreamQuotaEvidence {
+    param([AllowNull()] [object[]]$StreamEvents)
+
+    $items = [System.Collections.Generic.List[object]]::new()
+    foreach ($ev in @($StreamEvents)) {
+        $item = Get-ClaudeCodeStreamEventQuotaEvidence -StreamEvent $ev
+        if ($null -ne $item) { $items.Add($item) }
+    }
+    if ($items.Count -eq 0) {
+        return [pscustomobject]@{
+            isQuota            = $false
+            evidenceTypes      = @()
+            apiErrorStatus     = $null
+            terminalReason     = $null
+            rateLimitType      = $null
+            reportedLimitScope = $null
+            resetsAtUtc        = $null
+        }
+    }
+
+    $apiErrorStatus = @($items | ForEach-Object { $_.apiErrorStatus } | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | Select-Object -First 1)
+    $terminalReason = @($items | ForEach-Object { $_.terminalReason } | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | Select-Object -First 1)
+    $rateLimitType = @($items | ForEach-Object { $_.rateLimitType } | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | Select-Object -First 1)
+    $reportedLimitScope = @($items | ForEach-Object { $_.reportedLimitScope } | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | Select-Object -First 1)
+    $resetsAtUtc = @($items | ForEach-Object { $_.resetsAtUtc } | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | Sort-Object | Select-Object -Last 1)
+    return [pscustomobject]@{
+        isQuota            = $true
+        evidenceTypes      = @($items | ForEach-Object { $_.evidenceType } | Select-Object -Unique)
+        apiErrorStatus     = if ($apiErrorStatus.Count -gt 0) { [string]$apiErrorStatus[0] } else { $null }
+        terminalReason     = if ($terminalReason.Count -gt 0) { [string]$terminalReason[0] } else { $null }
+        rateLimitType      = if ($rateLimitType.Count -gt 0) { [string]$rateLimitType[0] } else { $null }
+        reportedLimitScope = if ($reportedLimitScope.Count -gt 0) { [string]$reportedLimitScope[0] } else { $null }
+        resetsAtUtc        = if ($resetsAtUtc.Count -gt 0) { [string]$resetsAtUtc[0] } else { $null }
+    }
 }
 
 # Avisos de ambiente do Claude Code: aparecem em stderr independentemente do desfecho da chamada
