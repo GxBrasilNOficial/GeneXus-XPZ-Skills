@@ -20,18 +20,18 @@
 - Se não houver lista de revisores preferidos (`preferred-reviewers.json`) já configurada, perguntar ao usuário quais ferramentas/modelos ele tem disponíveis ou prefere antes de oferecer painel. A pergunta deve ser acessível para usuário GeneXus: citar ferramentas por nome (`Claude Code`, `opencode/Ollama Cloud`, `Codex`, `Copilot`, `Gemini`, subagente nativo da ferramenta atual), explicar que subagente nativo pode participar, mas não substitui uma família externa, e não presumir assinatura de Gemini/Copilot/Codex cloud sem confirmação ou preferência registrada.
 - Antes de usar o rótulo `revisão por pares`, apresentar um **recibo mínimo**: arquivos metodológicos lidos, manuscrito/prompt enviado, revisores efetivamente consultados, família de cada revisor, resultado do piso de diversidade, veredito de cada revisor, o **estado da vN+1** (`vNextState`: `notProduced`/`pendingResubmission`/`resubmitted`/`resubmissionDeclinedByHuman`), o estado final de cada revisor preferido quando houver lista (`preferred-reviewers.json`) e o adendo de fechamento (`Resolve-LlmDelegatePeerReviewCloseout.ps1`) quando a rodada passar pela `xpz-llm-delegate`. Sem esse recibo, não usar o rótulo.
 - Resposta quase imediata é evidência de invalidez: se a resposta sair em menos de 30 segundos desde o pedido, ela é incompatível com revisão por pares real nesta metodologia e deve ser rotulada como `parecer solo`, salvo se o agente demonstrar que está apenas reportando um painel já concluído anteriormente e identificável.
-- Neste repositório, não invoque a skill via ferramenta `Skill`: consulte a documentação da `xpz-llm-delegate` e use o mecanismo descrito nela apenas sob acionamento humano, respeitando autorização, confidencialidade e piso de diversidade.
+- Neste repositório, a `xpz-llm-delegate` pode ser usada como mecanismo operacional, inclusive para melhorar este próprio repositório, quando houver acionamento humano. Antes, consulte sua documentação; ao usá-la, respeite autorização, confidencialidade e piso de diversidade. A saída do painel é insumo de avaliação, não autorização automática para editar, concluir convergência, fazer commit ou push.
 
 ## Interpretação de prompts de terceiros
 
 - Quando o usuário indicar que o texto seguinte é um prompt com sugestões de outro agente, tratar esse texto como insumo de avaliação.
-- Neste repositório, o foco é **melhorar as skills XPZ**, não usá-las — então o workflow é:
+- Quando o prompt de terceiro propuser alterar uma skill XPZ, o foco inicial é avaliar criticamente a mudança proposta — então o workflow é:
   1. **Estude a documentação** das skills afetadas para entender sua metodologia
   2. **Estude o prompt** do outro agente para entender a solicitação
   3. **Avalie criticamente**: o que faz sentido, o que conflita, o que precisa ajuste
   4. **Apresente um plano** ao usuário: claramente o que será alterado, por quê e onde
   5. **Aguarde aprovação explícita** antes de fazer qualquer mudança
-- Não invoque as skills como ferramentas (via `Skill` tool) — elas são o objeto do seu trabalho, não suporte para ele.
+- A skill afetada não substitui essa análise crítica nem autoriza automaticamente mudança no próprio contrato. Isso não impede usar skills XPZ como mecanismos operacionais de uma tarefa humana autorizada, inclusive nesta raiz, quando seu contrato for pertinente.
 
 ## README trilíngue
 
@@ -47,8 +47,9 @@
 ## Trabalho nas skills XPZ
 
 - Esta raiz contém a documentação metodológica de múltiplas skills (xpz-reader, xpz-builder, xpz-sync, xpz-doc-builder, xpz-daemon, xpz-kb-parallel-setup, xpz-kb-parallel-pre-push, xpz-msbuild-import-export, xpz-msbuild-build, xpz-index-triage, xpz-llm-delegate e xpz-skills-setup) e outros artefatos compartilhados.
+- Skills XPZ podem ser usadas como mecanismos operacionais para melhorar este próprio repositório quando a tarefa humana autorizada se enquadrar no seu contrato. Quando a frente alterar a própria skill usada, separar o uso operacional da avaliação crítica e manter a aprovação explícita exigida para gravar mudanças.
 - Ao trabalhar na melhoria de uma skill, estudar sua documentação de forma crítica e compreender seu propósito antes de propor mudanças.
-- Quando receber um prompt de outro agente solicitando mudança em uma skill, não invoque essa skill como ferramenta — consulte sua documentação, analise o impacto e apresente um plano.
+- Quando receber um prompt de outro agente solicitando mudança em uma skill, consulte sua documentação, analise o impacto e apresente um plano antes de gravar. O uso operacional dessa ou de outra skill continua possível quando for pertinente à tarefa humana autorizada; ele não substitui a análise nem a aprovação da mudança.
 - Neste repositório (desenvolvimento das skills XPZ; conversa setada **fora** de qualquer pasta paralela), consultar uma pasta paralela de KB real (ex.: `Gx_FabricaBrasil/ObjetosDaKbEmXml`) como **corpus de amostras** — estudar a estrutura real de objetos para construir/validar scripts e documentação — é **consulta de fora**: leitura de referência permitida, sem invocar `xpz-kb-parallel-setup` (ver a distinção trabalhar-vs-consultar no `AGENTS.md` global). O setup só seria exigido se a frente passasse a **escrever** na pasta paralela.
 - Ao avaliar mudanças em uma skill, verificar o contexto de uso para o qual ela foi projetada. Exemplo: conteúdo embutido em `xpz-skills-setup` pode parecer desatualizado em relação ao ambiente do mantenedor, mas ser correto para quem está configurando um ambiente do zero — os dois contextos coexistem.
 - Antes de pesquisar uma task, abordagem ou ideia nova relacionada às skills XPZ, consultar `999-ideias-pendentes.md` e `998-ideias-descartadas-e-porque.md`. O que já foi avaliado está registrado lá — não repetir a pesquisa.
