@@ -1377,9 +1377,10 @@ try {
     $postBuildEventLines = @(Get-GeneXusMsBuildPostBuildEventLines -StdOutLines $stdOutNonNoiseLines)
 
     # Classifica os eventos contra o conjunto registrado do environment ativo em
-    # kb-source-metadata.md. Registrado = esperado (informativo); não registrado = inesperado
-    # (rebaixa). Sem registro, rede de seguranca por padrão de som. Só o veredito agregado
-    # entra como impedimento em Resolve-BuildStatus.
+    # kb-source-metadata.md. Saidas inertes ja foram separadas pelo suporte compartilhado;
+    # cada evento restante registrado e esperado (informativo), e cada evento restante sem
+    # registro rebaixa. Sem registro, so o fallback estrito de som e benigno. Apenas o
+    # veredito agregado entra como impedimento em Resolve-BuildStatus.
     if ($postBuildEventLines.Count -gt 0) {
         $metadataPathForPostBuild = $null
         if ($null -ne $script:DeploymentEnvironmentContext) {

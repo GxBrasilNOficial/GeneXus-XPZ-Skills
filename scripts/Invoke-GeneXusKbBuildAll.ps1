@@ -1861,10 +1861,10 @@ try {
 
     if ($postBuildEventLines.Count -gt 0) {
         # Classifica os eventos contra o conjunto registrado do environment ativo em
-        # kb-source-metadata.md (kb_environment_post_build_event_hashes). Evento registrado =
-        # esperado (informativo); não registrado = inesperado (rebaixa). Sem registro para o
-        # environment, cai na rede de seguranca por padroes benignos conhecidos. Só rebaixa se houver evento
-        # inesperado/nao reconhecido — sino, diagnostico de tempo e deploy registrados não rebaixam mais.
+        # kb-source-metadata.md (kb_environment_post_build_event_hashes). Saidas inertes ja
+        # foram separadas pelo suporte compartilhado; cada evento restante registrado e esperado
+        # (informativo), e cada evento restante sem registro rebaixa. Sem registro para o
+        # environment, so o fallback estrito de som e benigno.
         $metadataPathForPostBuild = $null
         if ($null -ne $script:DeploymentEnvironmentContext) {
             $metadataPathForPostBuild = Get-GeneXusKbDeploymentContextValue -DeploymentEnvironmentContext $script:DeploymentEnvironmentContext -Name 'kbSourceMetadataPath'
