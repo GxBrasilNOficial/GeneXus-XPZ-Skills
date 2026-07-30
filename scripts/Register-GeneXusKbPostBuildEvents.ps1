@@ -7,7 +7,8 @@
 .DESCRIPTION
     Le os eventos pos-build observados no JSON de um build (stdoutSignals.postBuildEvents,
     gravado por Invoke-GeneXusKbBuildAll.ps1 / Invoke-GeneXusKbSpecifyGenerate.ps1), filtra
-    inertes (linhas REM comentadas), normaliza e gera fingerprints SHA-256, e grava:
+    inertes (linhas REM comentadas, duração TimeSpan válida ou data civil válida),
+    normaliza e gera fingerprints SHA-256, e grava:
       - kb_environment_post_build_event_hashes: campo plano (env=h1,h2; ...) que o build le.
       - secao-espelho legivel "## Eventos pos-build registrados": auditoria humana, com as
         linhas cruas; o build NÃO le o espelho, só os hashes.

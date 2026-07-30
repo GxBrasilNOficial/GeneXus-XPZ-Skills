@@ -52,6 +52,58 @@ if ($d.inert.Count -ne 1) { throw "ASSERT_FAILED: caso D deveria ter 1 inerte, a
 $e = Get-GeneXusPostBuildEventClassification -PostBuildEventLines @($sino) -RegisteredHashes @()
 if ($e.shouldDowngrade) { throw 'ASSERT_FAILED: caso E sino-only sem registro nao deveria rebaixar' }
 
+# Caso F: outputs numericos/data validos sao inertes, mas comandos e marcador exigem registro.
+$timerCommands = @(
+    'Powershell New-TimeSpan -Start (Get-Content Inicio.txt) -End (Get-Date)',
+    'Powershell (Get-Date).ToString()',
+    '> Build All Task Sucesso'
+)
+$timerOutput = @(
+    'Days              : 0',
+    'Hours             : 0',
+    'Minutes           : 0',
+    'Seconds           : 49',
+    'Milliseconds      : 33',
+    'Ticks             : 490339218',
+    'TotalDays         : 0,000567522243055555',
+    'TotalHours        : 0,0136205338333333',
+    'TotalMinutes      : 0,81723203',
+    'TotalSeconds      : 49,0339218',
+    'TotalMilliseconds : 49033,9218',
+    '10/07/2026 16:35:06'
+)
+$f = Get-GeneXusPostBuildEventClassification -PostBuildEventLines @($timerCommands + $timerOutput) -RegisteredHashes @()
+if (-not $f.shouldDowngrade) { throw 'ASSERT_FAILED: caso F comandos de timing sem registro deveriam rebaixar' }
+if ($f.inert.Count -ne $timerOutput.Count) { throw "ASSERT_FAILED: caso F deveria ter outputs inertes=$($timerOutput.Count), atual=$($f.inert.Count)" }
+if ($f.unknownFallback.Count -ne $timerCommands.Count) { throw "ASSERT_FAILED: caso F deveria ter comandos desconhecidos=$($timerCommands.Count), atual=$($f.unknownFallback.Count)" }
+
+# Caso G: comandos/marcador registrados + outputs inertes -> fluxo limpo.
+$timerCommandHashes = @($timerCommands | ForEach-Object { Get-GeneXusPostBuildEventNormalizedHash -Line $_ })
+$g = Get-GeneXusPostBuildEventClassification -PostBuildEventLines @($timerCommands + $timerOutput) -RegisteredHashes $timerCommandHashes
+if ($g.shouldDowngrade) { throw 'ASSERT_FAILED: caso G comandos registrados e outputs inertes nao deveriam rebaixar' }
+if ($g.expected.Count -ne $timerCommands.Count -or $g.inert.Count -ne $timerOutput.Count) {
+    throw 'ASSERT_FAILED: caso G separacao entre comandos esperados e outputs inertes falhou'
+}
+
+# Caso H: registro parcial continua cauteloso.
+$h = Get-GeneXusPostBuildEventClassification -PostBuildEventLines @($timerCommands + $timerOutput) -RegisteredHashes @($timerCommandHashes[0])
+if (-not $h.shouldDowngrade -or $h.unexpected.Count -ne 2) {
+    throw 'ASSERT_FAILED: caso H registro parcial deveria rebaixar pelos dois eventos restantes'
+}
+
+# Caso I: output inerte junto de evento real desconhecido nao mascara o evento.
+$i = Get-GeneXusPostBuildEventClassification -PostBuildEventLines @('Seconds : 49', 'call c:\scripts\desconhecido.bat') -RegisteredHashes @()
+if (-not $i.shouldDowngrade -or $i.inert.Count -ne 1 -or $i.unknownFallback.Count -ne 1) {
+    throw 'ASSERT_FAILED: caso I output inerte nao deveria mascarar evento desconhecido'
+}
+
+# Caso J: controles negativos nao podem ser classificados como output inerte.
+$invalidTimingOutput = @('Days: not-a-number', 'TotalSeconds: ERROR', '99/99/9999 99:99:99')
+$j = Get-GeneXusPostBuildEventClassification -PostBuildEventLines $invalidTimingOutput -RegisteredHashes @()
+if (-not $j.shouldDowngrade -or $j.unknownFallback.Count -ne $invalidTimingOutput.Count -or $j.inert.Count -ne 0) {
+    throw 'ASSERT_FAILED: caso J valores/data invalidos deveriam permanecer desconhecidos'
+}
+
 # Hash estavel a variacao inocua de espacos/caixa.
 $sinoSpaced = '  start ""   powershell -NoProfile -WindowStyle Hidden -Command "(New-Object System.Media.SoundPlayer ''C:\TEMP\SINO.WAV'').PlaySync()"  '
 if ((Get-GeneXusPostBuildEventNormalizedHash -Line $sinoSpaced) -ne $sinoHash) {

@@ -6,6 +6,8 @@ param()
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+. (Join-Path $PSScriptRoot 'GeneXusMsBuildStderrNoiseSupport.ps1')
+
 function Assert-True {
     param([bool]$Condition, [string]$Message)
     if (-not $Condition) {
@@ -16,11 +18,22 @@ function Assert-True {
 function Split-KnownGeneXusStderrNoise {
     param([AllowNull()][string]$Text)
 
-    $pattern = '^context \[anonymous\] \d+:\d+ attribute component isn''t defined$'
-    $lines = if ([string]::IsNullOrEmpty($Text)) { @() } else { @($Text -split "`r?`n") }
+    $classification = Get-GeneXusMsBuildStderrNoiseClassification -Text $Text
+    $noiseLines = [System.Collections.Generic.List[string]]::new()
+    $contentLines = [System.Collections.Generic.List[string]]::new()
+    if (-not [string]::IsNullOrWhiteSpace($classification.NoiseText)) {
+        foreach ($line in @($classification.NoiseText -split "`n")) {
+            [void]$noiseLines.Add($line)
+        }
+    }
+    if (-not [string]::IsNullOrWhiteSpace($classification.FilteredText)) {
+        foreach ($line in @($classification.FilteredText -split "`n")) {
+            [void]$contentLines.Add($line)
+        }
+    }
     return [ordered]@{
-        noise = @($lines | Where-Object { $_ -match $pattern })
-        content = @($lines | Where-Object { $_ -notmatch $pattern } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+        noise = $noiseLines.ToArray()
+        content = $contentLines.ToArray()
     }
 }
 
@@ -81,8 +94,8 @@ foreach ($scriptUnderTest in $scripts) {
     Assert-True -Condition ($source -match '\$recoveryExitCode = \[int\]\$recoveryBuildStatus\.ExitCode') -Message 'Recovery deve preservar o exitCode da classificação.'
     Assert-True -Condition ($source -match 'wrapperExitCode = \$recoveryExitCode') -Message 'executionEvidence deve repetir o exitCode preservado.'
     Assert-True -Condition ($source -match 'exit \$recoveryExitCode') -Message 'Processo deve sair com o exitCode preservado pelo recovery.'
-    Assert-True -Condition ($source -match [regex]::Escape('^context \[anonymous\] \d+:\d+ attribute component')) -Message 'Filtro stderr full-line ausente.'
-    Assert-True -Condition ($source -match 'stderrFilteredNoise\s*= \@\(\$recoveryStdErrFilteredNoise') -Message 'Recovery deve expor stderrFilteredNoise.'
+    Assert-True -Condition ([regex]::Matches($source, 'Get-GeneXusMsBuildStderrNoiseClassification').Count -ge 2) -Message 'Filtro stderr compartilhado deve ser usado no fluxo normal e no recovery.'
+    Assert-True -Condition ($source -match 'stderrFilteredNoise\s*=\s*@\(\$recoveryStdErrFilteredNoise') -Message 'Recovery deve expor stderrFilteredNoise.'
 
     if ($subState -eq 'operationalSubStateBuild') {
         Assert-True -Condition ($source -match '\$recoveryStatus -eq ''compilou limpo''') -Message 'BuildAll deve exigir status limpo anterior para promover recovery limpo.'

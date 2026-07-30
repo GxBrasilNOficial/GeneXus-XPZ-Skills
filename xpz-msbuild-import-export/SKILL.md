@@ -504,7 +504,7 @@ pwsh -NoProfile -File scripts/Invoke-GeneXusXpzImport.ps1 `
    - `stdoutSignals` com campos semânticos do domínio (ex: `importWarnings`, `exportMarkerFound`/`gxWarnings`) — presente nos scripts de import/export; omitido nos scripts cujos sinais de domínio já fluem por campos próprios (`observedContext`, `propertyValue`, `consistencyResult`)
    - `observedContext.pathEnrichment` — registro preventivo do enriquecimento de `PATH` aplicado pelo wrapper (`applied`, `subdirsAdded`, `subdirsSkipped`)
    - `stderrContent` — linhas reais de stderr após filtrar ruído GeneXus 18; pode conter o padrão lateral `mismatched input ']' expecting 'default'`, documentado em `10-base-operacional-msbuild-headless.md` como ruído de runtime não bloqueante — não confundir com falha operacional
-   - `stderrFilteredNoise` — linhas filtradas do ruído GeneXus 18 (`context [anonymous] N:N attribute component isn't defined`)
+   - `stderrFilteredNoise` — linhas que casam exatamente com os dois ruídos estruturais comprovados do GeneXus 18: `context [anonymous] N:N attribute component isn't defined` ou `context [/g_service_worker] N:N attribute obj isn't defined`; qualquer outra linha permanece em `stderrContent`
    - caminho do `.msbuild`
    - caminho do log
    - artefatos gerados ou consumidos

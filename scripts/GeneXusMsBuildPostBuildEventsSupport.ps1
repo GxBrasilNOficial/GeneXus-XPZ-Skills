@@ -48,6 +48,48 @@ function Test-GeneXusMsBuildPhaseBoundaryLine {
     return ($Line -match '^\s*=+\s*.*=+\s*$')
 }
 
+function Test-GeneXusPostBuildTimingOutputLine {
+    param(
+        [AllowNull()]
+        [string]$Line
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Line)) {
+        return $false
+    }
+
+    $value = $Line.Trim()
+    if ($value -match '^(Days|Hours|Minutes|Seconds|Milliseconds|Ticks)\s*:\s*[+-]?\d+$') {
+        return $true
+    }
+    if ($value -match '^(TotalDays|TotalHours|TotalMinutes|TotalSeconds|TotalMilliseconds)\s*:\s*[+-]?\d+(?:[.,]\d+)?$') {
+        return $true
+    }
+
+    $dateMatch = [regex]::Match(
+        $value,
+        '^(?<day>\d{1,2})/(?<month>\d{1,2})/(?<year>\d{4})\s+(?<hour>\d{1,2}):(?<minute>\d{2}):(?<second>\d{2})$'
+    )
+    if (-not $dateMatch.Success) {
+        return $false
+    }
+
+    try {
+        $null = [datetime]::new(
+            [int]$dateMatch.Groups['year'].Value,
+            [int]$dateMatch.Groups['month'].Value,
+            [int]$dateMatch.Groups['day'].Value,
+            [int]$dateMatch.Groups['hour'].Value,
+            [int]$dateMatch.Groups['minute'].Value,
+            [int]$dateMatch.Groups['second'].Value
+        )
+        return $true
+    }
+    catch {
+        return $false
+    }
+}
+
 function Test-GeneXusPostBuildWindowDiagnosticLine {
     param(
         [AllowNull()]
@@ -61,6 +103,9 @@ function Test-GeneXusPostBuildWindowDiagnosticLine {
         return $true
     }
     if (Test-GeneXusMsBuildPhaseBoundaryLine -Line $Line) {
+        return $true
+    }
+    if (Test-GeneXusPostBuildTimingOutputLine -Line $Line) {
         return $true
     }
     if ($Line -match '(?i)\(\d+,\d+\)\s*:\s*(warning|error)\s*:') {
@@ -81,11 +126,13 @@ function Get-GeneXusMsBuildPostBuildEventLines {
     $lines = @($StdOutLines)
     $windowEvents = [System.Collections.Generic.List[string]]::new()
     $insidePostBuildWindow = $false
+    $postBuildWindowDetected = $false
 
     foreach ($line in $lines) {
         if (-not $insidePostBuildWindow) {
             if (Test-GeneXusPostBuildPhaseStartLine -Line $line) {
                 $insidePostBuildWindow = $true
+                $postBuildWindowDetected = $true
             }
             continue
         }
@@ -100,7 +147,7 @@ function Get-GeneXusMsBuildPostBuildEventLines {
         [void]$windowEvents.Add((Convert-GeneXusPostBuildEventLine -Line $line))
     }
 
-    if ($windowEvents.Count -gt 0) {
+    if ($postBuildWindowDetected) {
         return @($windowEvents)
     }
 
@@ -116,7 +163,8 @@ function Test-GeneXusPostBuildEventInert {
     if ([string]::IsNullOrWhiteSpace($Line)) {
         return $true
     }
-    return ($Line -match '^\(commented\)')
+    return (($Line -match '^\(commented\)') -or
+            (Test-GeneXusPostBuildTimingOutputLine -Line $Line))
 }
 
 function Get-GeneXusPostBuildEventNormalizedHash {

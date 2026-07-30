@@ -213,6 +213,12 @@ if (-not (Test-Path -LiteralPath $gamPlatformsSupportPath -PathType Leaf)) {
 }
 . $gamPlatformsSupportPath
 
+$stderrNoiseSupportPath = Join-Path (Split-Path -Parent $PSCommandPath) 'GeneXusMsBuildStderrNoiseSupport.ps1'
+if (-not (Test-Path -LiteralPath $stderrNoiseSupportPath -PathType Leaf)) {
+    throw "MSBuild stderr noise support script not found: $stderrNoiseSupportPath"
+}
+. $stderrNoiseSupportPath
+
 $postBuildEventsSupportPath = Join-Path (Split-Path -Parent $PSCommandPath) 'GeneXusMsBuildPostBuildEventsSupport.ps1'
 if (-not (Test-Path -LiteralPath $postBuildEventsSupportPath -PathType Leaf)) {
     throw "Post-build events support script not found: $postBuildEventsSupportPath"
@@ -1315,13 +1321,12 @@ try {
     $knownStdOutNoiseSpecify = @()
 
     try {
-    # Full-line intencional: nao filtra mensagens maiores que apenas contenham a frase.
-    $knownStdErrNoisePattern = '^context \[anonymous\] \d+:\d+ attribute component isn''t defined$'
-    $stdErrLines = if ([string]::IsNullOrEmpty($stdErrText)) { @() } else { @($stdErrText -split "`r?`n") }
-    $stdErrNoiseLines = @($stdErrLines | Where-Object { $_ -match $knownStdErrNoisePattern })
-    $stdErrContentLines = @($stdErrLines | Where-Object { $_ -notmatch $knownStdErrNoisePattern })
-    $stdErrFilteredNoise = $stdErrNoiseLines -join "`n"
-    $stdErrFiltered      = $stdErrContentLines -join "`n"
+    # GeneXus 18 grava exatamente 3 linhas "context [anonymous] N:N attribute component
+    # isn't defined" no stderr durante SpecifyAll — ruído sistêmico do modo headless;
+    # a IDE absorve sem registrar. Filtrar antes de classificar.
+    $stdErrNoiseClassification = Get-GeneXusMsBuildStderrNoiseClassification -Text $stdErrText
+    $stdErrFilteredNoise = $stdErrNoiseClassification.NoiseText
+    $stdErrFiltered      = $stdErrNoiseClassification.FilteredText
 
     # Ruido estrutural GAM/NetCore: GeneXusMsBuildGamPlatformsSupport.ps1 (ver SKILL.md).
     $stdOutLines      = if ([string]::IsNullOrEmpty($stdOutText)) { @() } else { $stdOutText -split "`r?`n" }
@@ -1372,13 +1377,14 @@ try {
     $postBuildEventLines = @(Get-GeneXusMsBuildPostBuildEventLines -StdOutLines $stdOutNonNoiseLines)
 
     # Classifica os eventos contra o conjunto registrado do environment ativo em
-    # kb-source-metadata.md. Registrado = esperado (informativo); não registrado = inesperado
-    # (rebaixa). Sem registro, rede de seguranca por padrão de som. Só o veredito agregado
-    # entra como impedimento em Resolve-BuildStatus.
+    # kb-source-metadata.md. Saidas inertes ja foram separadas pelo suporte compartilhado;
+    # cada evento restante registrado e esperado (informativo), e cada evento restante sem
+    # registro rebaixa. Sem registro, so o fallback estrito de som e benigno. Apenas o
+    # veredito agregado entra como impedimento em Resolve-BuildStatus.
     if ($postBuildEventLines.Count -gt 0) {
         $metadataPathForPostBuild = $null
         if ($null -ne $script:DeploymentEnvironmentContext) {
-            $metadataPathForPostBuild = $script:DeploymentEnvironmentContext['kbSourceMetadataPath']
+            $metadataPathForPostBuild = Get-GeneXusKbDeploymentContextValue -DeploymentEnvironmentContext $script:DeploymentEnvironmentContext -Name 'kbSourceMetadataPath'
         }
         $registeredPostBuildHashes = Get-GeneXusRegisteredPostBuildEventHashesForEnvironment `
             -MetadataPath $metadataPathForPostBuild -EnvironmentName $activeEnvironmentOutput
@@ -1390,7 +1396,7 @@ try {
             Add-WarningMessage -Message "Evento pos-build registrado reconhecido (nao afeta a classificacao): '$evt'"
         }
         foreach ($evt in $pbClassification.benignFallback) {
-            Add-WarningMessage -Message "Evento pos-build benigno reconhecido sem registro (player de som): '$evt'. Registre via xpz-kb-parallel-setup (Register-GeneXusKbPostBuildEvents.ps1) para reconhecimento explicito."
+            Add-WarningMessage -Message "Evento pos-build benigno reconhecido sem registro: '$evt'. Registre via xpz-kb-parallel-setup (Register-GeneXusKbPostBuildEvents.ps1) para reconhecimento explicito."
         }
         foreach ($evt in $pbClassification.unexpected) {
             Add-WarningMessage -Message "Evento pos-build NAO registrado detectado: '$evt'. Se for legitimo, registre via xpz-kb-parallel-setup (Register-GeneXusKbPostBuildEvents.ps1); status rebaixado por cautela."
@@ -1511,7 +1517,7 @@ try {
     if ($null -ne $buildStatus -and $msBuildExitCode -eq 0) {
         $validationEnvForDeployBin = $EnvironmentName
         if ($null -ne $script:DeploymentEnvironmentContext) {
-            $ctxResolvedDeploy = $script:DeploymentEnvironmentContext['validationEnvironmentResolved']
+            $ctxResolvedDeploy = Get-GeneXusKbDeploymentContextValue -DeploymentEnvironmentContext $script:DeploymentEnvironmentContext -Name 'validationEnvironmentResolved'
             if (-not [string]::IsNullOrWhiteSpace($ctxResolvedDeploy)) {
                 $validationEnvForDeployBin = $ctxResolvedDeploy
             }
@@ -1532,7 +1538,7 @@ try {
 
         $metadataPathDeploy = $null
         if ($null -ne $script:DeploymentEnvironmentContext) {
-            $metadataPathDeploy = $script:DeploymentEnvironmentContext['kbSourceMetadataPath']
+            $metadataPathDeploy = Get-GeneXusKbDeploymentContextValue -DeploymentEnvironmentContext $script:DeploymentEnvironmentContext -Name 'kbSourceMetadataPath'
         }
 
         # Decide o gate de deploy bin pelo fato (exit 0 + specify e generate concluidos), não pela
@@ -1575,7 +1581,7 @@ try {
 
     if ($null -ne $script:DeploymentEnvironmentContext) {
         if (-not (Test-GeneXusKbActiveEnvironmentMatchesValidation -ActiveEnvironment $activeEnvironmentOutput -DeploymentEnvironmentContext $script:DeploymentEnvironmentContext)) {
-            $expectedEnv = $script:DeploymentEnvironmentContext['validationEnvironmentResolved']
+            $expectedEnv = Get-GeneXusKbDeploymentContextValue -DeploymentEnvironmentContext $script:DeploymentEnvironmentContext -Name 'validationEnvironmentResolved'
             Add-WarningMessage -Message ("ActiveEnvironment observado ('{0}') diverge do environment de validacao resolvido ('{1}'). Nao tratar specify/generate concluidos como validacao deploy nesse environment." -f $activeEnvironmentOutput, $expectedEnv)
         }
     }
@@ -1743,15 +1749,13 @@ catch {
         catch {
             # best effort apenas
         }
-
         try {
             if ([string]::IsNullOrEmpty($recoveryStdErr) -and -not [string]::IsNullOrWhiteSpace($stdErrPath) -and (Test-Path -LiteralPath $stdErrPath -PathType Leaf)) {
                 $recoveryStdErr = Read-TextFileSafe -PathValue $stdErrPath
             }
-            $recoveryStdErrLines = if ([string]::IsNullOrEmpty($recoveryStdErr)) { @() } else { @($recoveryStdErr -split "`r?`n") }
-            $recoveryStdErrNoisePattern = '^context \[anonymous\] \d+:\d+ attribute component isn''t defined$'
-            $recoveryStdErrFilteredNoise = @($recoveryStdErrLines | Where-Object { $_ -match $recoveryStdErrNoisePattern })
-            $recoveryStdErrContent = @($recoveryStdErrLines | Where-Object { $_ -notmatch $recoveryStdErrNoisePattern })
+            $recoveryStdErrClassification = Get-GeneXusMsBuildStderrNoiseClassification -Text $recoveryStdErr
+            $recoveryStdErrContent = Split-NonEmptyLines -Text $recoveryStdErrClassification.FilteredText
+            $recoveryStdErrFilteredNoise = Split-NonEmptyLines -Text $recoveryStdErrClassification.NoiseText
         }
         catch {
             # best effort apenas

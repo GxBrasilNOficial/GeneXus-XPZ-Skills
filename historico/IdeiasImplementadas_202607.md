@@ -2,6 +2,12 @@
 
 Registro de ideias que sairam de `999-ideias-pendentes.md` por terem sido implementadas ou incorporadas ao contrato metodologico vigente.
 
+## Follow-up de cobertura da janela pós-build do PR #2
+
+Implementado na PR #2 `fix: refine build post-processing classification`: o self-test cobre uma janela `Executando eventos pós-construção` detectada, contendo apenas saída inerte de duração/data, com um `start c:\temp\fora-da-janela.bat` antes do marcador. A extração retorna zero eventos e não executa o fallback global quando a janela existe.
+
+O caso evita **falso rebaixamento** por um comando externo à janela; não é um caso de falso sucesso limpo. A paridade de `Invoke-GeneXusKbSpecifyGenerate.ps1` e a evidência empírica .NET Framework permanecem como follow-ups vivos na entrada do contrato v2/finalizador compartilhado.
+
 ## Criar/alterar objeto GeneXus do tipo `API` (from-spec, com segurança GAM) nas skills XPZ
 
 - **Importância** — média (gap real com workaround manual; risco de **falso-positivo de segurança**). Hoje um agente em pasta paralela tem o envelope/clonagem coberto, mas nada que o guie em "API + **GAM** + **validação de runtime**" — a parte que mais deu trabalho no caso real. Sem isso, um objeto `API` com `[SecurityLevel(Authorization)]` pode ser entregue como "seguro" **sem enforcement** (aplicação GAM com "Habilitar autorização?" desmarcada) — falso-positivo que parece seguro e não é.

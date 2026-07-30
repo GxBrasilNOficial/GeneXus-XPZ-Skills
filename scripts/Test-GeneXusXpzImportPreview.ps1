@@ -160,6 +160,12 @@ if (-not (Test-Path -LiteralPath $utf8NoBomEncodingSupportPath -PathType Leaf)) 
 }
 . $utf8NoBomEncodingSupportPath
 
+$stderrNoiseSupportPath = Join-Path (Split-Path -Parent $PSCommandPath) 'GeneXusMsBuildStderrNoiseSupport.ps1'
+if (-not (Test-Path -LiteralPath $stderrNoiseSupportPath -PathType Leaf)) {
+    throw "Stderr noise support script not found: $stderrNoiseSupportPath"
+}
+. $stderrNoiseSupportPath
+
 $logPathGateSupportPath = Join-Path (Split-Path -Parent $PSCommandPath) 'GeneXusMsBuildLogPathSupport.ps1'
 if (-not (Test-Path -LiteralPath $logPathGateSupportPath -PathType Leaf)) {
     throw "LogPath gate support script not found: $logPathGateSupportPath"
@@ -1055,9 +1061,9 @@ try {
     try {
         $stdOutText = Read-TextFileSafe -PathValue $stdOutPath
         $stdErrText = Read-TextFileSafe -PathValue $stdErrPath
-        $stdErrMatches  = @([regex]::Matches($stdErrText, '(?m)context \[anonymous\] \d+:\d+ attribute component isn''t defined') | ForEach-Object { $_.Value })
-        $stdErrNoise    = [string]::Join("`n", $stdErrMatches)
-        $stdErrFiltered = ($stdErrText -replace '(?m)^context \[anonymous\] \d+:\d+ attribute component isn''t defined\r?\n?', '').Trim()
+        $stdErrNoiseClassification = Get-GeneXusMsBuildStderrNoiseClassification -Text $stdErrText
+        $stdErrNoise    = $stdErrNoiseClassification.NoiseText
+        $stdErrFiltered = $stdErrNoiseClassification.FilteredText
         $importedItems      = @(Get-MatchingLines -Text $stdOutText -Prefix '__IMPORTED_ITEM__=')
         $importWarningLines = @([regex]::Matches($stdOutText, '(?m)[^\r\n]*\(\d+,\d+\)\s*:\s*warning\s*:[^\r\n]*') | ForEach-Object { $_.Value.Trim() })
     }
