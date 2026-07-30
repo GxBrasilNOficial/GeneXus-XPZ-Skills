@@ -84,6 +84,12 @@ if (-not (Test-Path -LiteralPath $logPathGateSupportPath -PathType Leaf)) {
 }
 . $logPathGateSupportPath
 
+$stderrNoiseSupportPath = Join-Path (Split-Path -Parent $PSCommandPath) 'GeneXusMsBuildStderrNoiseSupport.ps1'
+if (-not (Test-Path -LiteralPath $stderrNoiseSupportPath -PathType Leaf)) {
+    throw "Stderr noise support script not found: $stderrNoiseSupportPath"
+}
+. $stderrNoiseSupportPath
+
 $ProgramFilesX86 = [System.IO.Path]::GetFullPath('C:\Program Files (x86)')
 
 
@@ -442,8 +448,9 @@ try {
     $msBuildExitCode = Invoke-MsBuildFile -ResolvedMsBuildPath $resolvedMsBuildPath -MsBuildFilePath $msBuildFilePath -StdOutPath $stdOutPath -StdErrPath $stdErrPath
     $stdOutText = Read-TextFileSafe -PathValue $stdOutPath
     $stdErrText = Read-TextFileSafe -PathValue $stdErrPath
-    $stdErrNoise    = @([regex]::Matches($stdErrText, '(?m)context \[anonymous\] \d+:\d+ attribute component isn''t defined') | ForEach-Object { $_.Value }) -join "`n"
-    $stdErrFiltered = ($stdErrText -replace '(?m)^context \[anonymous\] \d+:\d+ attribute component isn''t defined\r?\n?', '').Trim()
+    $stdErrNoiseClassification = Get-GeneXusMsBuildStderrNoiseClassification -Text $stdErrText
+    $stdErrNoise = $stdErrNoiseClassification.NoiseText
+    $stdErrFiltered = $stdErrNoiseClassification.FilteredText
 
     $openOutput = Get-MarkerValue -Text $stdOutText -Marker '__OPEN_OUTPUT__='
     $setVersionFailed     = [bool]($stdOutText -match 'Set Active Version falhou')

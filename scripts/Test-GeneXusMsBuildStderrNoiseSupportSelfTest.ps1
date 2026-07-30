@@ -44,7 +44,7 @@ foreach ($wrapperName in @('Invoke-GeneXusKbBuildAll.ps1', 'Invoke-GeneXusKbSpec
     }
 }
 
-foreach ($consumerName in @('Invoke-GeneXusXpzImport.ps1', 'Invoke-GeneXusXpzExport.ps1', 'Test-GeneXusXpzImportPreview.ps1')) {
+foreach ($consumerName in @('Invoke-GeneXusXpzImport.ps1', 'Invoke-GeneXusXpzExport.ps1', 'Test-GeneXusXpzImportPreview.ps1', 'Open-GeneXusKbHeadless.ps1', 'Get-GeneXusKbProperty.ps1', 'Test-GeneXusKbConsistency.ps1')) {
     $consumerText = Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot $consumerName)
     if ($consumerText -notmatch '\. \$stderrNoiseSupportPath' -or
         [regex]::Matches($consumerText, 'Get-GeneXusMsBuildStderrNoiseClassification').Count -ne 1) {
