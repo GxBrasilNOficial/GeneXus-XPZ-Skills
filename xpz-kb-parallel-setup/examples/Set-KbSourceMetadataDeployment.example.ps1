@@ -111,5 +111,14 @@ if ($DatabaseUser) { $invokeArgs['DatabaseUser'] = $DatabaseUser }
 if ($DatabasePassword) { $invokeArgs['DatabasePassword'] = $DatabasePassword }
 if ($AsJson.IsPresent) { $invokeArgs['AsJson'] = $true }
 
+$global:LASTEXITCODE = $null
 & $engineScript @invokeArgs
-exit $LASTEXITCODE
+$lastCommandSucceeded = $?
+$lastExitCodeVariable = Get-Variable -Name LASTEXITCODE -Scope Global -ErrorAction SilentlyContinue
+if ($null -ne $lastExitCodeVariable -and $lastExitCodeVariable.Value -is [int]) {
+    exit $lastExitCodeVariable.Value
+}
+if (-not $lastCommandSucceeded) {
+    exit 1
+}
+exit 0

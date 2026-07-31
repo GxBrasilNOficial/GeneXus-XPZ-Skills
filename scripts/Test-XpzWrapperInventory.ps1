@@ -22,7 +22,9 @@
                                             nao existe na base canonica; surface_mismatch quando o
                                             wrapper local PERDE contrato obrigatorio do molde
                                             (mandatory ausente/rebaixado, no_param_block com molde
-                                            obrigatorio) — diff de superficie param()/ValidateSet)
+                                            obrigatorio) — diff de superficie param()/ValidateSet;
+                                            unsafe_last_exitcode_after_ps1_engine quando wrapper que
+                                            chama motor PowerShell ainda sai por exit $LASTEXITCODE)
       INVENTORY_ENGINE_DIAGNOSTIC: <lista> - diagnostico brando (motor canonico ausente/parse-broken,
                                             engine_unresolved_or_unparseable); NAO bloqueia o estado de
                                             setup (rotulo fora dos tokens de pendencia do agregador)
@@ -322,15 +324,17 @@ foreach ($exampleFile in Get-ChildItem -LiteralPath $SkillsExamplesPath -Filter 
             }
         }
 
-        if ($baseName -ieq 'Register-KbPostBuildEvents') {
-            $localText = [System.IO.File]::ReadAllText($standardPath)
-            # O motor compartilhado deste wrapper e um .ps1; chamada PowerShell bem-sucedida
-            # nao garante $LASTEXITCODE definido. Sob StrictMode, `exit $LASTEXITCODE` pode
-            # falhar depois de gravar a metadata, exatamente o tipo de wrapper quebrado que
-            # parse/superficie nao pegam. O molde atual consulta a variavel via Get-Variable.
-            if ($localText -match 'exit\s+\$LASTEXITCODE\b') {
-                $customized.Add(('{0}(reason=unsafe_last_exitcode_after_ps1_engine)' -f $standardLocalName))
-            }
+        $localTextForEngineExit = [System.IO.File]::ReadAllText($standardPath)
+        # Motores compartilhados e wrappers auxiliares locais sao .ps1; chamada PowerShell
+        # bem-sucedida nao garante $LASTEXITCODE definido, e valor antigo pode vazar. Sob
+        # StrictMode, `exit $LASTEXITCODE` pode falhar ou devolver codigo obsoleto depois de
+        # executar o motor. O molde atual zera $global:LASTEXITCODE antes da chamada e consulta
+        # a variavel via Get-Variable, preservando `$?` como fallback.
+        if (
+            $localTextForEngineExit -match '&\s+\$(enginePath|engineScript|engine|PowerShellRuntimeWrapperPath)\b' -and
+            $localTextForEngineExit -match 'exit\s+\$LASTEXITCODE\b'
+        ) {
+            $customized.Add(('{0}(reason=unsafe_last_exitcode_after_ps1_engine)' -f $standardLocalName))
         }
 
         # Check generico: parametro repassado a motor compartilhado advanced que o motor nao

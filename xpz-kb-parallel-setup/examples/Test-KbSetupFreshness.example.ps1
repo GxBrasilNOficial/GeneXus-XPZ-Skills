@@ -35,9 +35,15 @@ if (-not (Test-Path -LiteralPath $PowerShellRuntimeWrapperPath -PathType Leaf)) 
     throw "BLOCK: wrapper de runtime PowerShell ausente: $PowerShellRuntimeWrapperPath"
 }
 
+$global:LASTEXITCODE = $null
 & $PowerShellRuntimeWrapperPath
-if ($LASTEXITCODE -ne 0) {
-    exit $LASTEXITCODE
+$runtimeCommandSucceeded = $?
+$runtimeExitCodeVariable = Get-Variable -Name LASTEXITCODE -Scope Global -ErrorAction SilentlyContinue
+if ($null -ne $runtimeExitCodeVariable -and $runtimeExitCodeVariable.Value -is [int] -and $runtimeExitCodeVariable.Value -ne 0) {
+    exit $runtimeExitCodeVariable.Value
+}
+if (-not $runtimeCommandSucceeded) {
+    exit 1
 }
 
 $enginePath = Join-Path $SharedSkillsRoot 'scripts\Test-XpzSetupFreshness.ps1'
@@ -46,5 +52,14 @@ if (-not (Test-Path -LiteralPath $enginePath)) {
     throw "Engine script not found: $enginePath"
 }
 
+$global:LASTEXITCODE = $null
 & $enginePath -KbParallelRoot $KbParallelRoot -SkillsRoot $SharedSkillsRoot
-exit $LASTEXITCODE
+$lastCommandSucceeded = $?
+$lastExitCodeVariable = Get-Variable -Name LASTEXITCODE -Scope Global -ErrorAction SilentlyContinue
+if ($null -ne $lastExitCodeVariable -and $lastExitCodeVariable.Value -is [int]) {
+    exit $lastExitCodeVariable.Value
+}
+if (-not $lastCommandSucceeded) {
+    exit 1
+}
+exit 0

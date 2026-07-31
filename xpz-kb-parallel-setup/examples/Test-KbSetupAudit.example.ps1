@@ -117,6 +117,7 @@ if (-not (Test-Path -LiteralPath $enginePath -PathType Leaf)) {
     throw "Shared setup audit script not found: $enginePath"
 }
 
+$global:LASTEXITCODE = $null
 & $enginePath `
     -KbRoot $KbRoot `
     -GateWrapperPath $GateWrapperPath `
@@ -126,4 +127,12 @@ if (-not (Test-Path -LiteralPath $enginePath -PathType Leaf)) {
     -SourceSanityWrapperPath $SourceSanityWrapperPath `
     -PackageCollisionWrapperPath $PackageCollisionWrapperPath `
     -AsJson:$AsJson
-exit $LASTEXITCODE
+$lastCommandSucceeded = $?
+$lastExitCodeVariable = Get-Variable -Name LASTEXITCODE -Scope Global -ErrorAction SilentlyContinue
+if ($null -ne $lastExitCodeVariable -and $lastExitCodeVariable.Value -is [int]) {
+    exit $lastExitCodeVariable.Value
+}
+if (-not $lastCommandSucceeded) {
+    exit 1
+}
+exit 0

@@ -119,5 +119,14 @@ if ($Generated) { $params.Generated = $true }
 if ($Authored) { $params.Authored = $true }
 if ($Limit) { $params.Limit = $Limit }
 
+$global:LASTEXITCODE = $null
 & $enginePath @params
-exit $LASTEXITCODE
+$lastCommandSucceeded = $?
+$lastExitCodeVariable = Get-Variable -Name LASTEXITCODE -Scope Global -ErrorAction SilentlyContinue
+if ($null -ne $lastExitCodeVariable -and $lastExitCodeVariable.Value -is [int]) {
+    exit $lastExitCodeVariable.Value
+}
+if (-not $lastCommandSucceeded) {
+    exit 1
+}
+exit 0

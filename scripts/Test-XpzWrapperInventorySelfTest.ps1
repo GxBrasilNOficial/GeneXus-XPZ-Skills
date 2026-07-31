@@ -9,7 +9,8 @@
     tratar Test-*KbPowerShellRuntime.ps1 como falso positivo. Também valida os sinais
     consultivos de wrappers recomendados ausentes e os sinais bloqueantes de scripts
     legados orfaos, e os motivos de INVENTORY_CUSTOMIZED: missing_AsJson_passthrough
-    (K8/K9), consumes_legacy_text_stdout (Update-*KbFromXpz) e forwards_unknown_engine_param
+    (K8/K9), consumes_legacy_text_stdout (Update-*KbFromXpz),
+    unsafe_last_exitcode_after_ps1_engine (wrappers que chamam motor PowerShell) e forwards_unknown_engine_param
     (repasse a motor compartilhado advanced de parametro nao-declarado; caso end-to-end).
     Valida ainda o diff de superficie wrapper-vs-molde (surface_mismatch -> INVENTORY_CUSTOMIZED;
     reducoes opcionais/ValidateSet -> INVENTORY_SURFACE_ADVISORY) em casos de unidade + end-to-end,
@@ -391,12 +392,13 @@ $raw
 
     Assert-NotContains -Text $output -Pattern 'Update-DemoKbFromXpz\.ps1\(reason=consumes_legacy_text_stdout\)' -Message 'wrapper Update-*KbFromXpz migrado para JSON v1 nao pode ser sinalizado por esse motivo'
 
-    # Register-KbPostBuildEvents: motor compartilhado .ps1 bem-sucedido nao define
-    # necessariamente $LASTEXITCODE. O padrao legado `exit $LASTEXITCODE` quebra sob
-    # StrictMode mesmo depois de registrar a metadata.
+    # Motor compartilhado .ps1 bem-sucedido nao define necessariamente $LASTEXITCODE.
+    # O padrao legado `exit $LASTEXITCODE` quebra sob StrictMode ou reaproveita valor
+    # antigo. A regra e generica para wrappers que chamam motores PowerShell.
     @'
 #requires -Version 7.4
 param([string]$BuildResultJsonPath)
+$global:LASTEXITCODE = $null
 & $engineScript -BuildResultJsonPath $BuildResultJsonPath
 $lastCommandSucceeded = $?
 $lastExitCodeVariable = Get-Variable -Name LASTEXITCODE -Scope Global -ErrorAction SilentlyContinue
@@ -420,11 +422,12 @@ exit $LASTEXITCODE
     $output = (& $inventoryScriptPath -KbParallelRoot $kbRoot -SkillsExamplesPath $examplesPath 2>&1 |
         ForEach-Object { $_.ToString() }) -join ' '
 
-    Assert-Contains -Text $output -Pattern 'Register-DemoKbPostBuildEvents\.ps1\(reason=unsafe_last_exitcode_after_ps1_engine\)' -Message 'wrapper Register-*KbPostBuildEvents com exit LASTEXITCODE apos .ps1 deve ser sinalizado'
+    Assert-Contains -Text $output -Pattern 'Register-DemoKbPostBuildEvents\.ps1\(reason=unsafe_last_exitcode_after_ps1_engine\)' -Message 'wrapper que chama motor PowerShell com exit LASTEXITCODE deve ser sinalizado'
 
     @'
 #requires -Version 7.4
 param([string]$BuildResultJsonPath)
+$global:LASTEXITCODE = $null
 & $engineScript -BuildResultJsonPath $BuildResultJsonPath
 $lastCommandSucceeded = $?
 $lastExitCodeVariable = Get-Variable -Name LASTEXITCODE -Scope Global -ErrorAction SilentlyContinue
@@ -440,7 +443,7 @@ exit 0
     $output = (& $inventoryScriptPath -KbParallelRoot $kbRoot -SkillsExamplesPath $examplesPath 2>&1 |
         ForEach-Object { $_.ToString() }) -join ' '
 
-    Assert-NotContains -Text $output -Pattern 'Register-DemoKbPostBuildEvents\.ps1\(reason=unsafe_last_exitcode_after_ps1_engine\)' -Message 'wrapper Register-*KbPostBuildEvents com saida segura nao pode ser sinalizado por esse motivo'
+    Assert-NotContains -Text $output -Pattern 'Register-DemoKbPostBuildEvents\.ps1\(reason=unsafe_last_exitcode_after_ps1_engine\)' -Message 'wrapper que chama motor PowerShell com saida segura nao pode ser sinalizado por esse motivo'
 
     # forwards_unknown_engine_param end-to-end: wrapper local que repassa parametro inexistente
     # a motor compartilhado advanced REAL (Test-GeneXusSourceSanity.ps1) deve sair dentro da

@@ -58,6 +58,7 @@ if ($MetadataPath) { $invokeArgs['MetadataPath'] = $MetadataPath }
 if ($ConfirmRegistration.IsPresent) { $invokeArgs['ConfirmRegistration'] = $true }
 if ($AsJson.IsPresent) { $invokeArgs['AsJson'] = $true }
 
+$global:LASTEXITCODE = $null
 & $engineScript @invokeArgs
 $lastCommandSucceeded = $?
 $lastExitCodeVariable = Get-Variable -Name LASTEXITCODE -Scope Global -ErrorAction SilentlyContinue

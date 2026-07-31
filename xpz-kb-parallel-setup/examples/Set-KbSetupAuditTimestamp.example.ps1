@@ -50,9 +50,15 @@ if (-not (Test-Path -LiteralPath $PowerShellRuntimeWrapperPath -PathType Leaf)) 
     throw "BLOCK: wrapper de runtime PowerShell ausente: $PowerShellRuntimeWrapperPath"
 }
 
+$global:LASTEXITCODE = $null
 & $PowerShellRuntimeWrapperPath
-if ($LASTEXITCODE -ne 0) {
-    exit $LASTEXITCODE
+$runtimeCommandSucceeded = $?
+$runtimeExitCodeVariable = Get-Variable -Name LASTEXITCODE -Scope Global -ErrorAction SilentlyContinue
+if ($null -ne $runtimeExitCodeVariable -and $runtimeExitCodeVariable.Value -is [int] -and $runtimeExitCodeVariable.Value -ne 0) {
+    exit $runtimeExitCodeVariable.Value
+}
+if (-not $runtimeCommandSucceeded) {
+    exit 1
 }
 
 $enginePath = Join-Path $SharedSkillsRoot 'scripts\Set-XpzSetupAuditTimestamp.ps1'
@@ -74,5 +80,14 @@ if ($AsJson) {
     $params['AsJson'] = $true
 }
 
+$global:LASTEXITCODE = $null
 & $enginePath @params
-exit $LASTEXITCODE
+$lastCommandSucceeded = $?
+$lastExitCodeVariable = Get-Variable -Name LASTEXITCODE -Scope Global -ErrorAction SilentlyContinue
+if ($null -ne $lastExitCodeVariable -and $lastExitCodeVariable.Value -is [int]) {
+    exit $lastExitCodeVariable.Value
+}
+if (-not $lastCommandSucceeded) {
+    exit 1
+}
+exit 0
