@@ -10,7 +10,7 @@
     consultivos de wrappers recomendados ausentes e os sinais bloqueantes de scripts
     legados orfaos, e os motivos de INVENTORY_CUSTOMIZED: missing_AsJson_passthrough
     (K8/K9), consumes_legacy_text_stdout (Update-*KbFromXpz),
-    unsafe_last_exitcode_after_ps1_engine (wrappers que chamam motor PowerShell) e forwards_unknown_engine_param
+    unsafe_last_exitcode_after_ps1_engine (wrappers auditados que chamam motor PowerShell por variavel) e forwards_unknown_engine_param
     (repasse a motor compartilhado advanced de parametro nao-declarado; caso end-to-end).
     Valida ainda o diff de superficie wrapper-vs-molde (surface_mismatch -> INVENTORY_CUSTOMIZED;
     reducoes opcionais/ValidateSet -> INVENTORY_SURFACE_ADVISORY) em casos de unidade + end-to-end,
@@ -423,6 +423,18 @@ exit $LASTEXITCODE
         ForEach-Object { $_.ToString() }) -join ' '
 
     Assert-Contains -Text $output -Pattern 'Register-DemoKbPostBuildEvents\.ps1\(reason=unsafe_last_exitcode_after_ps1_engine\)' -Message 'wrapper que chama motor PowerShell com exit LASTEXITCODE deve ser sinalizado'
+
+    @'
+#requires -Version 7.4
+param([string]$BuildResultJsonPath)
+& $ScriptPath -BuildResultJsonPath $BuildResultJsonPath
+exit $LASTEXITCODE
+'@ | Set-Content -LiteralPath $registerStandardPath -Encoding utf8NoBOM
+
+    $output = (& $inventoryScriptPath -KbParallelRoot $kbRoot -SkillsExamplesPath $examplesPath 2>&1 |
+        ForEach-Object { $_.ToString() }) -join ' '
+
+    Assert-Contains -Text $output -Pattern 'Register-DemoKbPostBuildEvents\.ps1\(reason=unsafe_last_exitcode_after_ps1_engine\)' -Message 'wrapper que chama motor PowerShell por variavel generica com exit LASTEXITCODE deve ser sinalizado'
 
     @'
 #requires -Version 7.4

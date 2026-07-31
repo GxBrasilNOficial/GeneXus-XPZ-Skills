@@ -23,8 +23,8 @@
                                             wrapper local PERDE contrato obrigatorio do molde
                                             (mandatory ausente/rebaixado, no_param_block com molde
                                             obrigatorio) — diff de superficie param()/ValidateSet;
-                                            unsafe_last_exitcode_after_ps1_engine quando wrapper que
-                                            chama motor PowerShell ainda sai por exit $LASTEXITCODE)
+                                            unsafe_last_exitcode_after_ps1_engine quando wrapper auditado
+                                            chama motor PowerShell por variavel e ainda sai por exit $LASTEXITCODE)
       INVENTORY_ENGINE_DIAGNOSTIC: <lista> - diagnostico brando (motor canonico ausente/parse-broken,
                                             engine_unresolved_or_unparseable); NAO bloqueia o estado de
                                             setup (rotulo fora dos tokens de pendencia do agregador)
@@ -328,10 +328,12 @@ foreach ($exampleFile in Get-ChildItem -LiteralPath $SkillsExamplesPath -Filter 
         # Motores compartilhados e wrappers auxiliares locais sao .ps1; chamada PowerShell
         # bem-sucedida nao garante $LASTEXITCODE definido, e valor antigo pode vazar. Sob
         # StrictMode, `exit $LASTEXITCODE` pode falhar ou devolver codigo obsoleto depois de
-        # executar o motor. O molde atual zera $global:LASTEXITCODE antes da chamada e consulta
-        # a variavel via Get-Variable, preservando `$?` como fallback.
+        # executar o motor. No escopo auditado dos wrappers locais, qualquer chamada por variavel
+        # seguida de saida crua por LASTEXITCODE e insegura, independentemente do nome da variavel.
+        # O molde atual zera $global:LASTEXITCODE antes da chamada e consulta a variavel via
+        # Get-Variable, preservando `$?` como fallback.
         if (
-            $localTextForEngineExit -match '&\s+\$(enginePath|engineScript|engine|PowerShellRuntimeWrapperPath)\b' -and
+            $localTextForEngineExit -match '&\s+\$[A-Za-z_][A-Za-z0-9_]*\b' -and
             $localTextForEngineExit -match 'exit\s+\$LASTEXITCODE\b'
         ) {
             $customized.Add(('{0}(reason=unsafe_last_exitcode_after_ps1_engine)' -f $standardLocalName))
