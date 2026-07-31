@@ -174,6 +174,9 @@ function Get-GeneXusPostBuildEventNormalizedHash {
     # (paths e comandos no Windows são case-insensitive). SHA-256 hex, a prova de delimitador
     # para caber no encoding plano `env=h1,h2; env=h3` do kb-source-metadata.md.
     $normalized = (($Line.Trim()) -replace '\s+', ' ').ToLowerInvariant()
+    if ($normalized -match '^verify-gxjs: verificados \d+ \.js .* \| invalidos: 0 \| tempo: \d+ ms$') {
+        $normalized = $normalized -replace '\| tempo: \d+ ms$', '| tempo: <ms> ms'
+    }
     $bytes = [System.Text.Encoding]::UTF8.GetBytes($normalized)
     $hashBytes = [System.Security.Cryptography.SHA256]::HashData($bytes)
     return [System.Convert]::ToHexString($hashBytes).ToLowerInvariant()

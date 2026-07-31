@@ -110,4 +110,16 @@ if ((Get-GeneXusPostBuildEventNormalizedHash -Line $sinoSpaced) -ne $sinoHash) {
     throw 'ASSERT_FAILED: hash deveria ser estavel a espacos/caixa (path Windows case-insensitive)'
 }
 
+# Hash estavel para a saida prevista do contorno Verify-GxJs quando a unica variacao e o tempo.
+$verifyOk1 = 'Verify-GxJs: verificados 2161 .js (modulos pulados: 389 | placeholders pulados: 0) | invalidos: 0 | tempo: 2388 ms'
+$verifyOk2 = 'Verify-GxJs: verificados 2161 .js (modulos pulados: 389 | placeholders pulados: 0) | invalidos: 0 | tempo: 2289 ms'
+$verifyHash = Get-GeneXusPostBuildEventNormalizedHash -Line $verifyOk1
+if ((Get-GeneXusPostBuildEventNormalizedHash -Line $verifyOk2) -ne $verifyHash) {
+    throw 'ASSERT_FAILED: hash do Verify-GxJs deveria ignorar variacao de tempo quando invalidos=0'
+}
+$k = Get-GeneXusPostBuildEventClassification -PostBuildEventLines @($verifyOk2) -RegisteredHashes @($verifyHash)
+if ($k.shouldDowngrade -or $k.expected.Count -ne 1) {
+    throw 'ASSERT_FAILED: Verify-GxJs com tempo diferente deveria ser esperado apos registro'
+}
+
 'GENEXUS_POST_BUILD_EVENT_CLASSIFICATION_SELFTEST_OK'

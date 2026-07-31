@@ -526,6 +526,10 @@ janela e não entram como comandos. As linhas `Powershell New-TimeSpan ...`,
 reais: sem fingerprint em `kb_environment_post_build_event_hashes`, rebaixam por cautela.
 Valores incompletos ou inválidos (`Days: not-a-number`, `TotalSeconds: ERROR`, data impossível)
 também permanecem não reconhecidos e rebaixam; não ampliar esse conjunto sem evidência.
+Quando um pós-build registrado inclui a saída prevista do contorno `Verify-GxJs`
+(`invalidos: 0`), o fingerprint normaliza somente o trecho dinâmico `tempo: <n> ms`;
+mudanças em contagens, raiz, módulos pulados ou `invalidos` continuam exigindo novo
+registro ou rebaixamento por cautela.
 
 > **Alternativa manual para processo já separado ou retomada após timeout:**
 > Em execução nova de `BuildAll` ou `SpecifyGenerate`, preferir `-StartWatcher` no
