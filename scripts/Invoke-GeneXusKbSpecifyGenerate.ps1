@@ -1321,9 +1321,9 @@ try {
     $knownStdOutNoiseSpecify = @()
 
     try {
-    # GeneXus 18 grava exatamente 3 linhas "context [anonymous] N:N attribute component
-    # isn't defined" no stderr durante SpecifyAll — ruído sistêmico do modo headless;
-    # a IDE absorve sem registrar. Filtrar antes de classificar.
+    # GeneXus 18 grava ruídos conhecidos no stderr durante SpecifyAll:
+    # [anonymous]+component (evidência datada) e [/g_service_worker]+obj (observado
+    # em KBs Java/Tomcat). Pares cruzados permanecem stderr real. Filtrar antes.
     $stdErrNoiseClassification = Get-GeneXusMsBuildStderrNoiseClassification -Text $stdErrText
     $stdErrFilteredNoise = $stdErrNoiseClassification.NoiseText
     $stdErrFiltered      = $stdErrNoiseClassification.FilteredText

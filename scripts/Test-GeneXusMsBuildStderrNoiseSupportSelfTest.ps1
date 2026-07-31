@@ -19,7 +19,11 @@ if (-not [string]::IsNullOrWhiteSpace($pureNoise.FilteredText)) {
     throw "Ruido puro deveria resultar em stderr vazio: $($pureNoise.FilteredText)"
 }
 if (@($pureNoise.NoiseText -split "`n").Count -ne 2) {
-    throw 'Os dois pares comprovados deveriam ser filtrados.'
+    throw 'Os dois pares conhecidos deveriam ser filtrados.'
+}
+$noiseLines = @($pureNoise.NoiseText -split "`n")
+if (@($noiseLines | Where-Object { $_.EndsWith("`r") }).Count -ne 0) {
+    throw 'Linhas em stderrFilteredNoise nao podem carregar CR residual.'
 }
 
 $mixed = Get-GeneXusMsBuildStderrNoiseClassification -Text ($anonymousComponent + "`n" + $realError)
@@ -30,7 +34,13 @@ if ($mixed.FilteredText -ne $realError) {
 $negative = Get-GeneXusMsBuildStderrNoiseClassification -Text ($anonymousObj + "`n" + $serviceWorkerComponent)
 $negativeLines = @($negative.FilteredText -split "`n")
 if ($negativeLines -notcontains $anonymousObj -or $negativeLines -notcontains $serviceWorkerComponent) {
-    throw 'Pares cruzados nao comprovados nao podem ser filtrados.'
+    throw 'Pares cruzados nao documentados nao podem ser filtrados.'
+}
+
+$embeddedPattern = "WARN: $anonymousComponent"
+$embedded = Get-GeneXusMsBuildStderrNoiseClassification -Text $embeddedPattern
+if ($embedded.FilteredText -ne $embeddedPattern -or -not [string]::IsNullOrWhiteSpace($embedded.NoiseText)) {
+    throw 'Linha que apenas contem padrao conhecido deve permanecer como stderr real.'
 }
 
 foreach ($wrapperName in @('Invoke-GeneXusKbBuildAll.ps1', 'Invoke-GeneXusKbSpecifyGenerate.ps1')) {

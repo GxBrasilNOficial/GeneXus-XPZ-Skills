@@ -34,6 +34,13 @@ Adendo de retomada (2026-07-23, revisão do PR #2 `fix: refine build post-proces
 
 Detalhes e critérios para retomada: [`msbuild-result-contract-v2-finalizador-compartilhado.md`](msbuild-result-contract-v2-finalizador-compartilhado.md).
 
+## Registrar evidência detalhada do ruído `g_service_worker`/`obj`
+
+- **Importância** — média (o filtro já é fechado e preserva pares cruzados, mas a documentação não deve tratar o par como empiricamente provado sem registrar KB, versão, data e ocorrência observada).
+- **Maturidade** — pesquisa feita (padrão já isolado no helper e coberto por self-test; falta anexar evidência operacional concreta em frente própria).
+
+Coletar e registrar evidência empírica do ruído `context [/g_service_worker] N:N attribute obj isn't defined` em KB Java/Tomcat: KB/environment, versão GeneXus, data, quantidade/posição das linhas, stdout de sucesso e confirmação de que pares cruzados continuam stderr real. Até esse registro existir, a documentação deve descrever o par como observado/conhecido, não como "provado" no mesmo nível do par `anonymous`/`component`.
+
 ## Investigar divergência de `observedContext.ActiveEnvironment` após `SetActiveEnvironment`
 
 - **Importância** — média (não mascarou erro nem bloqueou a aceitação do PR #2, mas enfraquece a rastreabilidade em KB multi-environment e pode induzir diagnóstico errado de validação deploy).

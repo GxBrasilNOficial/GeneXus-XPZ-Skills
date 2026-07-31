@@ -267,7 +267,7 @@ Barragem estrutural compartilhada: `scripts/GeneXusMsBuildCategoryBSupport.ps1` 
 
 ### Pós-processamento resiliente (BuildAll / SpecifyGenerate)
 
-Após a task `MSBuild` concluir, `Invoke-GeneXusKbBuildAll.ps1` e `Invoke-GeneXusKbSpecifyGenerate.ps1` envolvem parse de stdout, montagem do diagnóstico e serialização JSON em `try/catch` (motor compartilhado `scripts/GeneXusMsBuildGamPlatformsSupport.ps1` para filtro GAM/NetCore).
+Após a task `MSBuild` concluir, `Invoke-GeneXusKbBuildAll.ps1` e `Invoke-GeneXusKbSpecifyGenerate.ps1` envolvem parse de stdout, montagem do diagnóstico e serialização JSON em `try/catch` (motores compartilhados `scripts/GeneXusMsBuildGamPlatformsSupport.ps1` para filtro GAM/NetCore e `scripts/GeneXusMsBuildStderrNoiseSupport.ps1` para separar `stderrFilteredNoise` de `stderrContent`).
 
 - `postProcessingFailed` / `postProcessingError` — falha **local** do wrapper depois que o `MSBuild` já rodou (parse, classificação, hints consultivos, serialização ou gravação do log). **Não** reclassificam automaticamente `executionEvidence.msBuildExitCode=0` como falha operacional nem elevam para exit **90** quando a evidência primária do log bruto sustenta conclusão limpa da task.
 - Evidência primária completa por trilha quando `postProcessingFailed=true` e `executionEvidence.msBuildExitCode=0`:
@@ -437,10 +437,14 @@ wrapper deve detectar a falha de `SetActiveVersion`/`SetActiveEnvironment`, emit
 > filtra esse padrão antes de classificar o status — uma execução bem-sucedida cujo stderr
 > contenha apenas esse ruído é classificada como `specify e generate concluídos`. Ver nota
 > expandida com evidência técnica completa na seção `Invoke-GeneXusKbBuildAll.ps1`.
-> O filtro compartilhado também reconhece somente o par comprovado
+> O filtro compartilhado (`scripts/GeneXusMsBuildStderrNoiseSupport.ps1`) também
+> reconhece somente o par observado em KBs Java/Tomcat, ainda com evidência detalhada
+> pendente de registro:
 > `context [/g_service_worker] <linha>:<coluna> attribute obj isn't defined`; combinações
 > cruzadas (`anonymous` + `obj`, `g_service_worker` + `component`) permanecem em
 > `stderrContent`. O mesmo helper é aplicado no fluxo normal e no recovery.
+> Validação: `scripts/Test-GeneXusMsBuildStderrNoiseSupportSelfTest.ps1`
+> (`GENEXUS_MSBUILD_STDERR_NOISE_SUPPORT_SELFTEST_OK`).
 
 ### Invoke-GeneXusKbBuildAll.ps1
 
@@ -675,7 +679,8 @@ módulos pulados ou qualquer linha com `invalidos` diferente de zero.
 > scripts filtram esse padrão antes de classificar o status — uma execução bem-sucedida
 > cujo stderr contenha apenas esse ruído é classificada como `compilou limpo` /
 > `specify e generate concluídos`.
-> Há ainda um segundo par comprovado e fechado:
+> Há ainda um segundo par fechado no filtro e observado em KBs Java/Tomcat, mas com
+> evidência detalhada ainda pendente de registro:
 > `context [/g_service_worker] <linha>:<coluna> attribute obj isn't defined`. O filtro não
 > aceita o produto cartesiano entre os dois contextos e os dois atributos; qualquer par
 > cruzado continua sendo stderr real. No recovery, as mesmas regras alimentam
@@ -1048,8 +1053,8 @@ $scriptPath = "C:\Dev\Knowledge\GeneXus-XPZ-Skills\scripts\Start-GeneXusKbBuildD
    - caminho do log
 9. Ler `exitCode`, `msBuildCategoryBBlocked` e `buildErrors`/`specifyErrors` no JSON **antes** de classificar. Com `exitCode=48` ou `msBuildCategoryBBlocked=true`, classificar como `falha operacional com rejeicao MSBuild no log`, reproduzir linhas `error :` ao usuário e **não** usar `compilou limpo` nem `specify e generate concluídos`. Caso contrário, escanear stdout e stderr por padrões de erro e risco antes de classificar, inclusive quando `executionEvidence.msBuildExitCode=0` e `exitCode=0`:
    - padrão bloqueante máximo: `Reorganiza` em stdout → status `reorg detectada ou executada`; não declarar sucesso; informar ao usuário e aguardar instrução
-   - eventos pós-build: linhas dentro da janela `Executando eventos pos-construcao ...` ate o próximo separador `==========` em stdout; se o marcador não existir, fallback para linhas `start c:` ou `start cmd`. Saídas inertes estritamente reconhecidas (`REM` comentado, duração `TimeSpan` válida ou data civil válida) não contam como evento; comando de timing/marcador e demais linhas operacionais dentro da janela entram na classificação, exceto diagnósticos estruturais descartados pelo motor (`(N,N): warning|error:`, `Build succeeded`/`Build FAILED`, `Compilación`/`Compilação`). Classificados contra `kb_environment_post_build_event_hashes` do environment ativo (`kb-source-metadata.md`): registrado = esperado (informativo, **não** rebaixa); não registrado/não reconhecido = rebaixa por cautela; sem registro para o environment, player de som (`SoundPlayer`/`PlaySync`/`.wav`) é benigno e o resto rebaixa. Registrar via `xpz-kb-parallel-setup` (`Register-GeneXusKbPostBuildEvents.ps1`); ver `stdoutSignals.postBuildEventClassification`
-   - stderr não vazio: após separar os pares completos de ruído estrutural provado em `stderrFilteredNoise`, qualquer conteúdo restante em `stderrContent` → registrar como warning; impede `specify e generate concluídos`
+   - eventos pós-build: linhas dentro da janela `Executando eventos pos-construcao ...` ate o próximo separador `==========` em stdout; se o marcador não existir, fallback para linhas `start c:` ou `start cmd`. Duração `TimeSpan` válida e data civil válida são descartadas na extração da janela e não aparecem como eventos; `REM` comentado pode aparecer como item `(commented)` e é classificado como `inert`, sem rebaixar. Comando de timing/marcador e demais linhas operacionais dentro da janela entram na classificação, exceto diagnósticos estruturais descartados pelo motor (`(N,N): warning|error:`, `Build succeeded`/`Build FAILED`, `Compilación`/`Compilação`). Classificados contra `kb_environment_post_build_event_hashes` do environment ativo (`kb-source-metadata.md`): registrado = esperado (informativo, **não** rebaixa); não registrado/não reconhecido = rebaixa por cautela; sem registro para o environment, player de som (`SoundPlayer`/`PlaySync`/`.wav`) é benigno e o resto rebaixa. Registrar via `xpz-kb-parallel-setup` (`Register-GeneXusKbPostBuildEvents.ps1`); ver `stdoutSignals.postBuildEventClassification`
+   - stderr não vazio: após separar os pares completos de ruído estrutural conhecido em `stderrFilteredNoise`, qualquer conteúdo restante em `stderrContent` → registrar como warning; impede `specify e generate concluídos`
    - demais padrões relevantes: `Access denied`, `error MSB`, `: error `, `FAILED`, stack traces de exceção
    - **carve-out para ruído estrutural GAM/NetCore:** linhas que casam uma das assinaturas conhecidas (`error MSB3491` ou `NuGet.targets(...): error :`) junto com `is denied`/`acesso negado` e caminho contendo `\GeneXus\` e `\Library\GAM\Platforms\` são removidas de stdout antes desta varredura e listadas em `stdoutFilteredNoise`; padrões legítimos de `Access denied` em qualquer outro contexto **permanecem** bloqueantes
    - se encontrados: registrar no diagnóstico e usar `operação concluída, pendente de confirmação funcional` em lugar de `compilou limpo`
@@ -1163,7 +1168,7 @@ $scriptPath = "C:\Dev\Knowledge\GeneXus-XPZ-Skills\scripts\Start-GeneXusKbBuildD
 - NEVER classificar como `compilou limpo` quando stdout ou stderr contiver padrões de erro (`Access denied`, `error MSB`, `: error `, `FAILED`, stack traces) fora do ruído estrutural GAM/NetCore documentado, mesmo que exitCode = 0
 - NEVER ignorar **`exitCode=48`** (`msBuildCategoryBBlocked=true`) — Categoria B: `executionEvidence.msBuildExitCode=0` com linhas `error :` em `buildErrors`/`specifyErrors` no JSON; ver `scripts/msbuild-exit-codes.catalog.json` e Categorias A/B em `xpz-msbuild-import-export/SKILL.md`
 - NEVER classificar como `specify e generate concluídos` quando stdout contiver padrão `Reorganiza` — o status correto é `reorg detectada ou executada`
-- NEVER tratar stderr não vazio como irrelevante — separar primeiro os pares completos de ruído estrutural provado em `stderrFilteredNoise`; qualquer conteúdo restante em `stderrContent` deve ser registrado como warning e impede classificação como `specify e generate concluídos`
+- NEVER tratar stderr não vazio como irrelevante — separar primeiro os pares completos de ruído estrutural conhecido em `stderrFilteredNoise`; qualquer conteúdo restante em `stderrContent` deve ser registrado como warning e impede classificação como `specify e generate concluídos`
 - NEVER chamar `Invoke-GeneXusKbSpecifyGenerate.ps1` quando houver sinal de alteração estrutural de atributo no import recente sem a confirmação explícita do usuário com a frase `entendo que haverá reorg e concordo que prossiga`
 - NEVER aceitar paráfrases ou confirmações genéricas no lugar da frase exata de confirmação de reorg
 - NEVER executar `Invoke-GeneXusDbReorg.ps1` sem confirmação interativa explícita do usuário, mesmo quando `ImpactDatabaseOnly` já foi executado na mesma sessão

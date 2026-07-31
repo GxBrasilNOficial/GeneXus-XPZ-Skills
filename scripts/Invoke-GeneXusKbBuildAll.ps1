@@ -1806,13 +1806,10 @@ try {
     $knownStdOutNoiseBuild = @()
 
     try {
-    # GeneXus 18 grava linhas "context [anonymous] N:N attribute component isn't defined"
-    # e, em algumas KBs Java/Tomcat, "context [/g_service_worker] N:N attribute obj isn't defined"
-    # no stderr durante BuildAll/SpecifyAll. O GeneXus nao conta isso como erro quando stdout
-    # conclui com sucesso; filtrar antes de classificar.
-    # O GeneXus não conta isso como erro: stdout reporta "0 avisos, 0 erros".
-    # Evidencia empirica: FabricaBrasil18 e wsEducacaoSpTeste em 2026-05-10, sempre 3x,
-    # mesma posicao, independente do conteúdo da KB. Filtrar antes de classificar.
+    # GeneXus 18 grava ruídos conhecidos no stderr durante BuildAll/SpecifyAll.
+    # O par [anonymous]+component tem evidencia datada em FabricaBrasil18/wsEducacaoSpTeste
+    # (2026-05-10, 3x); o par [/g_service_worker]+obj foi observado em KBs Java/Tomcat.
+    # Pares cruzados permanecem stderr real. Filtrar antes de classificar.
     $stdErrNoiseClassification = Get-GeneXusMsBuildStderrNoiseClassification -Text $stdErrText
     $stdErrFilteredNoise = $stdErrNoiseClassification.NoiseText
     $stdErrFiltered      = $stdErrNoiseClassification.FilteredText
