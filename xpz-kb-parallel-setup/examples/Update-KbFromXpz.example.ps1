@@ -137,8 +137,18 @@ if (Test-Path -LiteralPath $reminderScriptPath -PathType Leaf) {
 if (-not $VerifyOnly) {
     $inventoryScriptPath = Join-Path $SharedSkillsRoot 'scripts\Get-GeneXusImportPackageObjectInventory.ps1'
     if (Test-Path -LiteralPath $inventoryScriptPath -PathType Leaf) {
+        $global:LASTEXITCODE = $null
         $null = & $inventoryScriptPath -InputPath $InputPath -ParallelKbRoot $repoRoot -FailOnUnknownTypes 2>&1
-        if ($LASTEXITCODE -eq 3) {
+        $inventorySucceeded = $?
+        $inventoryExitCodeVariable = Get-Variable -Name LASTEXITCODE -Scope Global -ErrorAction SilentlyContinue
+        $inventoryExitCode = if ($null -ne $inventoryExitCodeVariable -and $inventoryExitCodeVariable.Value -is [int]) {
+            $inventoryExitCodeVariable.Value
+        } elseif ($inventorySucceeded) {
+            0
+        } else {
+            1
+        }
+        if ($inventoryExitCode -eq 3) {
             throw 'Pre-varredura bloqueada: tipos nao mapeados no catalogo efetivo (base + override). Resolver antes de materializar; ver xpz-sync e 08-guia-para-agente-gpt.md.'
         }
     }
@@ -174,13 +184,23 @@ function Invoke-IndexRefresh {
     $prefix = 'Index refresh failed after XPZ/XML materialization. A materializacao XPZ/XML foi concluida; apenas o indice KbIntelligence nao foi gerado.'
 
     try {
+        $global:LASTEXITCODE = $null
         & $ScriptPath @rebuildParams
-        if ($LASTEXITCODE -ne 0) {
-            if ($LASTEXITCODE -eq 8) {
+        $rebuildSucceeded = $?
+        $rebuildExitCodeVariable = Get-Variable -Name LASTEXITCODE -Scope Global -ErrorAction SilentlyContinue
+        $rebuildExitCode = if ($null -ne $rebuildExitCodeVariable -and $rebuildExitCodeVariable.Value -is [int]) {
+            $rebuildExitCodeVariable.Value
+        } elseif ($rebuildSucceeded) {
+            0
+        } else {
+            1
+        }
+        if ($rebuildExitCode -ne 0) {
+            if ($rebuildExitCode -eq 8) {
                 throw "$(Get-GeneXusPythonPrerequisiteErrorMessage)"
             }
 
-            throw "Falha no rebuild do indice (exit $LASTEXITCODE)."
+            throw "Falha no rebuild do indice (exit $rebuildExitCode)."
         }
     } catch {
         if ($_.Exception.Message -match '^PREREQUISITO AUSENTE:') {
