@@ -27,15 +27,20 @@ $transactionDir = Join-Path $objetosPath 'Transaction'
 $attributeDir = Join-Path $objetosPath 'Attribute'
 $workWithDir = Join-Path $objetosPath 'WorkWith'
 $workWithForWebDir = Join-Path $objetosPath 'WorkWithForWeb'
+$webPanelDir = Join-Path $objetosPath 'WebPanel'
 $kbIntelDir = Join-Path $parallelRoot 'KbIntelligence'
-[void](New-Item -ItemType Directory -Path $procedureDir, $transactionDir, $attributeDir, $workWithDir, $workWithForWebDir, $kbIntelDir -Force)
+[void](New-Item -ItemType Directory -Path $procedureDir, $transactionDir, $attributeDir, $workWithDir, $workWithForWebDir, $webPanelDir, $kbIntelDir -Force)
 
 $procedureTargets = @(
     @{ Name = 'PStaticNoPrefixFake'; Guid = '22222222-2222-2222-2222-222222222201' },
     @{ Name = 'PCommandNoPrefixFake'; Guid = '22222222-2222-2222-2222-222222222202' },
     @{ Name = 'PValueNoPrefixFake'; Guid = '22222222-2222-2222-2222-222222222203' },
     @{ Name = 'PMethodNoPrefixFake'; Guid = '22222222-2222-2222-2222-222222222204' },
-    @{ Name = 'PUnusedNoPrefixFake'; Guid = '22222222-2222-2222-2222-222222222205' }
+    @{ Name = 'PUnusedNoPrefixFake'; Guid = '22222222-2222-2222-2222-222222222205' },
+    @{ Name = 'PLinkTargetFake'; Guid = '22222222-2222-2222-2222-222222222207' },
+    @{ Name = 'PActionLinkTargetAFake'; Guid = '22222222-2222-2222-2222-222222222208' },
+    @{ Name = 'PActionLinkTargetBFake'; Guid = '22222222-2222-2222-2222-222222222209' },
+    @{ Name = 'PWrapperFake'; Guid = '22222222-2222-2222-2222-222222222210' }
 )
 foreach ($target in $procedureTargets) {
     $xml = @"
@@ -53,6 +58,7 @@ PStaticNoPrefixFake()
 Call(PCommandNoPrefixFake, &sdtLog)
 &val = udp(PValueNoPrefixFake, 0)
 &other = PMethodNoPrefixFake.Udp("C")
+&url = PLinkTargetFake.Link(&OrderId)
 //PUnusedNoPrefixFake()
 Call(&DynamicProcedureName, &x)
 Call(ATT:DynamicProcedureAttribute, &x)
@@ -60,6 +66,17 @@ Call(ATT:DynamicProcedureAttribute, &x)
 </Object>
 "@
 [System.IO.File]::WriteAllText((Join-Path $procedureDir 'PUsesCallFormsFake.xml'), $callerXml, (Get-Utf8NoBomEncoding))
+
+$webPanelXml = @"
+<Object type="c9584656-94b6-4ccd-890f-332d11fc2c25" name="WPUsesProcedureLinkFake" guid="66666666-6666-6666-6666-666666666601">
+  <Source><![CDATA[
+Event 'Open'
+  Extensions.Web.Window.OpenNewWindow(PActionLinkTargetAFake.Link(&OrderId))
+EndEvent
+]]></Source>
+</Object>
+"@
+[System.IO.File]::WriteAllText((Join-Path $webPanelDir 'WPUsesProcedureLinkFake.xml'), $webPanelXml, (Get-Utf8NoBomEncoding))
 
 $transactionXml = @"
 <Object type="$transactionGuid" name="TOrderCallFormsFake" guid="33333333-3333-3333-3333-333333333301">
@@ -74,7 +91,7 @@ OrderNote = udp(PValueNoPrefixFake, OrderId) if OrderNote.IsEmpty() on aftervali
 $attrFormulaXml = @"
 <Attribute name="AttrComputedCallFormsFake" guid="44444444-4444-4444-4444-444444444401">
   <Properties>
-    <Property><Name>Formula</Name><Value>PStaticNoPrefixFake(0) + Call(PCommandNoPrefixFake, 0) + udp(PValueNoPrefixFake, 0) + PMethodNoPrefixFake.Udp("C")</Value></Property>
+    <Property><Name>Formula</Name><Value>PStaticNoPrefixFake(0) + Call(PCommandNoPrefixFake, 0) + udp(PValueNoPrefixFake, 0) + PMethodNoPrefixFake.Udp("C") + PLinkTargetFake.Link(0)</Value></Property>
   </Properties>
 </Attribute>
 "@
@@ -89,6 +106,17 @@ $workWithXml = @"
   <Condition value="PMethodNoPrefixFake.Udp(&amp;Mode)"/>
   <Grid CommandCondition="Call(PCommandNoPrefixFake, &amp;Mode)"/>
   <Grid FilterCondition="PStaticNoPrefixFake()" RowCondition="PCommandNoPrefixFake.Call()" ColCondition="PMethodNoPrefixFake.Udp(&amp;Mode)"/>
+  <action name="OpenIndirectA" gxobject="$procedureGuid-PWrapperFake">
+    <parameters>
+      <parameter name="PActionLinkTargetAFake.Link(&amp;OrderId)" />
+      <parameter name="0" />
+    </parameters>
+  </action>
+  <action name="OpenIndirectB" gxobject="$procedureGuid-PWrapperFake">
+    <parameters>
+      <parameter name="PActionLinkTargetBFake.Link(procLeEmpresaSessao(), &amp;OrderId)" />
+    </parameters>
+  </action>
 </Object>
 "@
 [System.IO.File]::WriteAllText((Join-Path $workWithForWebDir 'WWCallFormsFake.xml'), $workWithXml, (Get-Utf8NoBomEncoding))
@@ -100,18 +128,24 @@ $cases = @(
     @{ id = 'source-call-command'; source = 'Procedure:PUsesCallFormsFake'; target = 'Procedure:PCommandNoPrefixFake'; expected_rule = 'procedure_call_command'; should_exist = $true },
     @{ id = 'source-udp-function'; source = 'Procedure:PUsesCallFormsFake'; target = 'Procedure:PValueNoPrefixFake'; expected_rule = 'procedure_udp_func'; should_exist = $true },
     @{ id = 'source-dot-udp'; source = 'Procedure:PUsesCallFormsFake'; target = 'Procedure:PMethodNoPrefixFake'; expected_rule = 'procedure_dot_udp'; should_exist = $true },
+    @{ id = 'source-dot-link'; source = 'Procedure:PUsesCallFormsFake'; target = 'Procedure:PLinkTargetFake'; expected_rule = 'procedure_dot_link'; should_exist = $true },
+    @{ id = 'webpanel-source-dot-link-open-new-window'; source = 'WebPanel:WPUsesProcedureLinkFake'; target = 'Procedure:PActionLinkTargetAFake'; expected_rule = 'procedure_dot_link'; should_exist = $true },
     @{ id = 'commented-static-call'; source = 'Procedure:PUsesCallFormsFake'; target = 'Procedure:PUnusedNoPrefixFake'; expected_rule = 'procedure_direct_call'; should_exist = $false },
     @{ id = 'transaction-rule-static-no-prefix'; source = 'Transaction:TOrderCallFormsFake'; target = 'Procedure:PStaticNoPrefixFake'; expected_rule = 'procedure_direct_call'; should_exist = $true },
     @{ id = 'attribute-formula-static-no-prefix'; source = 'Attribute:AttrComputedCallFormsFake'; target = 'Procedure:PStaticNoPrefixFake'; expected_rule = 'attribute_formula_procedure_direct_call'; should_exist = $true },
     @{ id = 'attribute-formula-call-command'; source = 'Attribute:AttrComputedCallFormsFake'; target = 'Procedure:PCommandNoPrefixFake'; expected_rule = 'attribute_formula_procedure_call_command'; should_exist = $true },
     @{ id = 'attribute-formula-udp-function'; source = 'Attribute:AttrComputedCallFormsFake'; target = 'Procedure:PValueNoPrefixFake'; expected_rule = 'attribute_formula_procedure_udp_func'; should_exist = $true },
     @{ id = 'attribute-formula-dot-udp'; source = 'Attribute:AttrComputedCallFormsFake'; target = 'Procedure:PMethodNoPrefixFake'; expected_rule = 'attribute_formula_procedure_dot_udp'; should_exist = $true },
+    @{ id = 'attribute-formula-dot-link'; source = 'Attribute:AttrComputedCallFormsFake'; target = 'Procedure:PLinkTargetFake'; expected_rule = 'attribute_formula_procedure_dot_link'; should_exist = $true },
     @{ id = 'workwith-condition-static-no-prefix'; source = 'WorkWithForWeb:WWCallFormsFake'; target = 'Procedure:PStaticNoPrefixFake'; expected_rule = 'workwith_condition_procedure'; should_exist = $true },
     @{ id = 'workwith-mobile-same-name-condition'; source = 'WorkWith:WWCallFormsFake'; target = 'Procedure:PStaticNoPrefixFake'; expected_rule = 'workwith_condition_procedure'; should_exist = $true },
     @{ id = 'workwith-condition-call-command'; source = 'WorkWithForWeb:WWCallFormsFake'; target = 'Procedure:PCommandNoPrefixFake'; expected_rule = 'workwith_condition_procedure_call_command'; should_exist = $true },
     @{ id = 'workwith-condition-dot-call'; source = 'WorkWithForWeb:WWCallFormsFake'; target = 'Procedure:PCommandNoPrefixFake'; expected_rule = 'workwith_condition_procedure_dot_call'; should_exist = $true },
     @{ id = 'workwith-condition-attribute-call-command'; source = 'WorkWithForWeb:WWCallFormsFake'; target = 'Procedure:PCommandNoPrefixFake'; expected_rule = 'workwith_condition_attribute_procedure_call_command'; should_exist = $true },
-    @{ id = 'workwith-condition-attribute-dot-udp'; source = 'WorkWithForWeb:WWCallFormsFake'; target = 'Procedure:PMethodNoPrefixFake'; expected_rule = 'workwith_condition_attribute_procedure_dot_udp'; should_exist = $true }
+    @{ id = 'workwith-condition-attribute-dot-udp'; source = 'WorkWithForWeb:WWCallFormsFake'; target = 'Procedure:PMethodNoPrefixFake'; expected_rule = 'workwith_condition_attribute_procedure_dot_udp'; should_exist = $true },
+    @{ id = 'workwith-action-wrapper-gxobject-preserved'; source = 'WorkWithForWeb:WWCallFormsFake'; target = 'Procedure:PWrapperFake'; expected_rule = 'workwith_action_gxobject'; should_exist = $true },
+    @{ id = 'workwith-action-parameter-procedure-dot-link-a'; source = 'WorkWithForWeb:WWCallFormsFake'; target = 'Procedure:PActionLinkTargetAFake'; expected_rule = 'workwith_action_parameter_procedure_dot_link'; should_exist = $true },
+    @{ id = 'workwith-action-parameter-procedure-dot-link-b'; source = 'WorkWithForWeb:WWCallFormsFake'; target = 'Procedure:PActionLinkTargetBFake'; expected_rule = 'workwith_action_parameter_procedure_dot_link'; should_exist = $true }
 )
 $validationCasesPath = Join-Path $kbIntelDir 'procedure-call-forms-validation.json'
 [pscustomobject]@{ cases = $cases } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $validationCasesPath -Encoding utf8NoBOM

@@ -8,6 +8,7 @@ Current scope:
 - Source relations among Procedure, WebPanel, DataProvider, Transaction, API and DataSelector
   (including static calls resolved from the local inventory and legacy call/udp forms)
 - WorkWith and WorkWithForWeb action gxobject links to Procedure and WebPanel
+- WorkWith and WorkWithForWeb action parameters with Procedure .Link() references
 - WorkWith and WorkWithForWeb condition expressions to Procedure
 - WorkWith and WorkWithForWeb condition attributes to Procedure
 - WorkWith and WorkWithForWeb explicit link tags to WebPanel
@@ -23,6 +24,7 @@ Current scope:
 - Source Business Component Check calls with receiver resolved by variable ATTCUSTOMTYPE
 - Source simple Business Component Insert and Update calls with receiver resolved by variable ATTCUSTOMTYPE
 - Source ExternalObject method calls with receiver resolved by variable ATTCUSTOMTYPE
+- Procedure .Link() references in effective Source and Attribute Formula
 - Attribute Formula property references to Procedure, WebPanel and DataProvider when resolvable in the local inventory
 """
 
@@ -41,7 +43,7 @@ from pathlib import Path
 from typing import Iterable
 
 # Incrementar quando a cobertura ou regras do indexador mudarem de forma material (nao em refator inerte).
-EXTRACTOR_SIGNATURE_VERSION = "10"
+EXTRACTOR_SIGNATURE_VERSION = "11"
 
 
 def compute_extractor_signature_hash() -> str:
@@ -57,6 +59,7 @@ PROCEDURE_DOT_CALL_RE = re.compile(r"\b(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*\.\s*C
 PROCEDURE_CALL_COMMAND_RE = re.compile(r"(?<![&.\w])call\s*\(\s*(?P<name>[A-Za-z_][A-Za-z0-9_]*)(?!\s*:)", re.IGNORECASE)
 PROCEDURE_UDP_FUNC_RE = re.compile(r"(?<![&.\w])udp\s*\(\s*(?P<name>[A-Za-z_][A-Za-z0-9_]*)(?!\s*:)", re.IGNORECASE)
 PROCEDURE_DOT_UDP_RE = re.compile(r"(?<![&.])\b(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*\.\s*udp\s*\(", re.IGNORECASE)
+PROCEDURE_DOT_LINK_RE = re.compile(r"(?<![&.])\b(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*\.\s*Link\s*\(", re.IGNORECASE)
 WEBPANEL_DOT_LINK_RE = re.compile(r"\b(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*\.\s*Link\s*\(", re.IGNORECASE)
 WEBPANEL_DOT_CREATE_RE = re.compile(r"(?<![&.])\b(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*\.\s*Create\s*\(", re.IGNORECASE)
 FOR_EACH_EXPLICIT_TABLE_RE = re.compile(
@@ -83,8 +86,10 @@ INDEXED_SOURCE_TYPES = ("Procedure", "WebPanel", "DataProvider", "Transaction", 
 FOR_EACH_SOURCE_TYPES = ("Procedure", "WebPanel")
 BC_LOAD_SOURCE_TYPES = ("Procedure", "WebPanel", "DataProvider")
 ACTION_RE = re.compile(r"<action\b(?P<attrs>[^>]*)>", re.IGNORECASE | re.DOTALL)
+ACTION_BLOCK_RE = re.compile(r"<action\b(?P<attrs>[^>]*)>(?P<body>.*?)</action>", re.IGNORECASE | re.DOTALL)
 CONDITION_RE = re.compile(r"<condition\b(?P<attrs>[^>]*)>", re.IGNORECASE | re.DOTALL)
 TAG_RE = re.compile(r"<(?P<tag>[A-Za-z][A-Za-z0-9]*)\b(?P<attrs>[^>]*)>", re.IGNORECASE | re.DOTALL)
+PARAMETER_RE = re.compile(r"<parameter\b(?P<attrs>[^>]*)/?>", re.IGNORECASE | re.DOTALL)
 VARIABLE_RE = re.compile(r"<Variable\b(?P<attrs>[^>]*)>(?P<body>.*?)</Variable>", re.IGNORECASE | re.DOTALL)
 ATTR_RE = re.compile(r'(?P<name>[A-Za-z_][A-Za-z0-9_]*)="(?P<value>[^"]*)"')
 GXOBJECT_RE = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}-(?P<name>.+)$")
@@ -693,6 +698,7 @@ def append_call_evidences_from_expression(
     relation_kind_dataprovider: str,
     extractor_rule_procedure_direct: str,
     extractor_rule_procedure_dot: str,
+    extractor_rule_procedure_dot_link: str,
     extractor_rule_webpanel_link: str,
     extractor_rule_procedure_call_command: str | None,
     extractor_rule_webpanel_create: str,
@@ -789,6 +795,23 @@ def append_call_evidences_from_expression(
                     extractor_rule=extractor_rule_procedure_dot_udp,
                     evidence_role=evidence_role,
                 )
+
+    for match in PROCEDURE_DOT_LINK_RE.finditer(expression):
+        matched_name = match.group("name")
+        target_name = procedure_lookup.get(matched_name.lower())
+        if target_name:
+            add_evidence(
+                evidences,
+                source=source,
+                target_type="Procedure",
+                target_name=target_name,
+                relation_kind=relation_kind_procedure,
+                line=line_no,
+                column=match.start("name") + 1,
+                snippet=expression,
+                extractor_rule=extractor_rule_procedure_dot_link,
+                evidence_role=evidence_role,
+            )
 
     for match in WEBPANEL_DOT_LINK_RE.finditer(expression):
         matched_name = match.group("name")
@@ -945,6 +968,22 @@ def extract_evidence(
                             column=match.start("name") + 1,
                             snippet=cleaned,
                             extractor_rule="procedure_dot_udp",
+                        )
+
+                for match in PROCEDURE_DOT_LINK_RE.finditer(cleaned):
+                    matched_name = match.group("name")
+                    target_name = procedure_lookup.get(matched_name.lower())
+                    if target_name:
+                        add_evidence(
+                            evidences,
+                            source=source,
+                            target_type="Procedure",
+                            target_name=target_name,
+                            relation_kind="calls_procedure",
+                            line=line_no,
+                            column=match.start("name") + 1,
+                            snippet=cleaned,
+                            extractor_rule="procedure_dot_link",
                         )
 
                 for match in WEBPANEL_DOT_LINK_RE.finditer(cleaned):
@@ -1542,7 +1581,43 @@ def extract_workwith_action_evidence(
                 evidence_role="WorkWith action",
             )
 
-    return evidences
+        for action_match in ACTION_BLOCK_RE.finditer(xml_text):
+            action_body = action_match.group("body")
+            for parameter_match in PARAMETER_RE.finditer(action_body):
+                attrs = parse_attributes(parameter_match.group("attrs"))
+                expression = attrs.get("name")
+                if not expression:
+                    continue
+                parameter_start = action_match.start("body") + parameter_match.start()
+                for link_match in PROCEDURE_DOT_LINK_RE.finditer(expression):
+                    target_name = procedure_lookup.get(link_match.group("name").lower())
+                    if not target_name:
+                        continue
+                    add_evidence(
+                        evidences,
+                        source=source,
+                        target_type="Procedure",
+                        target_name=target_name,
+                        relation_kind="workwith_action_parameter_calls_procedure",
+                        line=line_number_at(xml_text, parameter_start),
+                        column=link_match.start("name") + 1,
+                        snippet=parameter_match.group(0),
+                        extractor_rule="workwith_action_parameter_procedure_dot_link",
+                        evidence_role="WorkWith action parameter",
+                    )
+
+    unique: dict[tuple[str, str, str, str, int, str], Evidence] = {}
+    for evidence in evidences:
+        key = (
+            evidence.source_type,
+            evidence.source_name,
+            evidence.target_type,
+            evidence.target_name,
+            evidence.line,
+            evidence.extractor_rule,
+        )
+        unique[key] = evidence
+    return list(unique.values())
 
 
 def append_workwith_condition_extra_procedure_calls(
@@ -1991,6 +2066,7 @@ def extract_attribute_formula_call_evidence(
                 relation_kind_dataprovider="formula_calls_dataprovider",
                 extractor_rule_procedure_direct="attribute_formula_procedure_direct_call",
                 extractor_rule_procedure_dot="attribute_formula_procedure_dot_call",
+                extractor_rule_procedure_dot_link="attribute_formula_procedure_dot_link",
                 extractor_rule_webpanel_link="attribute_formula_webpanel_dot_link",
                 extractor_rule_procedure_call_command="attribute_formula_procedure_call_command",
                 extractor_rule_webpanel_create="attribute_formula_webpanel_dot_create",

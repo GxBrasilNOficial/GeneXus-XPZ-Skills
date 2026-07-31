@@ -2,6 +2,14 @@
 
 Registro de ideias que sairam de `999-ideias-pendentes.md` por terem sido implementadas ou incorporadas ao contrato metodologico vigente.
 
+## Procedure.Link em parametros de action no KbIntelligence
+
+Implementado em 2026-07-31 para fechar falso negativo real observado em `FabricaBrasil`: actions `WorkWithForWeb` chamavam a procedure wrapper `procDisplayUrlSemPaginaEmbutida` por `gxobject`, mas passavam a procedure de relatório real como primeiro parâmetro em `Procedure.Link(...)`; o `who-uses` enxergava o wrapper e perdia a dependência indireta.
+
+O extrator `scripts/Build-KbIntelligenceIndex.py` passou a reconhecer `Procedure.Link(...)` em `Source` efetivo, `Property Formula` e parâmetros de action `WorkWithForWeb`, emitindo `procedure_dot_link`, `attribute_formula_procedure_dot_link` e `workwith_action_parameter_procedure_dot_link`. A relação `workwith_action_gxobject` com o wrapper foi preservada. `EXTRACTOR_SIGNATURE_VERSION` mudou de `10` para `11`, então índices existentes precisam de rebuild para expor a nova cobertura.
+
+Validação: `scripts/Test-KbIntelligenceProcedureCallFormsSelfTest.ps1` cobre `Procedure.Link(...)` em `Source`, `WebPanel` com `Extensions.Web.Window.OpenNewWindow(...)`, fórmula de atributo e action com wrapper. Em índice temporário contra `C:\Dev\Prod\Gx_FabricaBrasil\ObjetosDaKbEmXml`, `who-uses` passou a retornar os usos indiretos de `procRelatorioPedidosDeEmbarque` e `procRelatorioAutorizacaoExpedicao` em `WorkWithWebVendaPedido`, além dos casos correlatos em `WorkWithWebCarga`, `wpCarga` e `wpCargaPainel`.
+
 ## Follow-up de cobertura da janela pós-build do PR #2
 
 Implementado na PR #2 `fix: refine build post-processing classification`: o self-test cobre uma janela `Executando eventos pós-construção` detectada, contendo apenas saída inerte de duração/data, com um `start c:\temp\fora-da-janela.bat` antes do marcador. A extração retorna zero eventos e não executa o fallback global quando a janela existe.
