@@ -322,6 +322,17 @@ foreach ($exampleFile in Get-ChildItem -LiteralPath $SkillsExamplesPath -Filter 
             }
         }
 
+        if ($baseName -ieq 'Register-KbPostBuildEvents') {
+            $localText = [System.IO.File]::ReadAllText($standardPath)
+            # O motor compartilhado deste wrapper e um .ps1; chamada PowerShell bem-sucedida
+            # nao garante $LASTEXITCODE definido. Sob StrictMode, `exit $LASTEXITCODE` pode
+            # falhar depois de gravar a metadata, exatamente o tipo de wrapper quebrado que
+            # parse/superficie nao pegam. O molde atual consulta a variavel via Get-Variable.
+            if ($localText -match 'exit\s+\$LASTEXITCODE\b') {
+                $customized.Add(('{0}(reason=unsafe_last_exitcode_after_ps1_engine)' -f $standardLocalName))
+            }
+        }
+
         # Check generico: parametro repassado a motor compartilhado advanced que o motor nao
         # declara (forwards_unknown_engine_param), caminho de motor inexistente
         # (shared_engine_unresolved) -> desvios-de-wrapper, viram INVENTORY_CUSTOMIZED (capturado

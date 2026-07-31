@@ -391,6 +391,57 @@ $raw
 
     Assert-NotContains -Text $output -Pattern 'Update-DemoKbFromXpz\.ps1\(reason=consumes_legacy_text_stdout\)' -Message 'wrapper Update-*KbFromXpz migrado para JSON v1 nao pode ser sinalizado por esse motivo'
 
+    # Register-KbPostBuildEvents: motor compartilhado .ps1 bem-sucedido nao define
+    # necessariamente $LASTEXITCODE. O padrao legado `exit $LASTEXITCODE` quebra sob
+    # StrictMode mesmo depois de registrar a metadata.
+    @'
+#requires -Version 7.4
+param([string]$BuildResultJsonPath)
+& $engineScript -BuildResultJsonPath $BuildResultJsonPath
+$lastCommandSucceeded = $?
+$lastExitCodeVariable = Get-Variable -Name LASTEXITCODE -Scope Global -ErrorAction SilentlyContinue
+if ($null -ne $lastExitCodeVariable -and $lastExitCodeVariable.Value -is [int]) {
+    exit $lastExitCodeVariable.Value
+}
+if (-not $lastCommandSucceeded) {
+    exit 1
+}
+exit 0
+'@ | Set-Content -LiteralPath (Join-Path $examplesPath 'Register-KbPostBuildEvents.example.ps1') -Encoding utf8NoBOM
+
+    $registerStandardPath = Join-Path $scriptsPath 'Register-DemoKbPostBuildEvents.ps1'
+    @'
+#requires -Version 7.4
+param([string]$BuildResultJsonPath)
+& $engineScript -BuildResultJsonPath $BuildResultJsonPath
+exit $LASTEXITCODE
+'@ | Set-Content -LiteralPath $registerStandardPath -Encoding utf8NoBOM
+
+    $output = (& $inventoryScriptPath -KbParallelRoot $kbRoot -SkillsExamplesPath $examplesPath 2>&1 |
+        ForEach-Object { $_.ToString() }) -join ' '
+
+    Assert-Contains -Text $output -Pattern 'Register-DemoKbPostBuildEvents\.ps1\(reason=unsafe_last_exitcode_after_ps1_engine\)' -Message 'wrapper Register-*KbPostBuildEvents com exit LASTEXITCODE apos .ps1 deve ser sinalizado'
+
+    @'
+#requires -Version 7.4
+param([string]$BuildResultJsonPath)
+& $engineScript -BuildResultJsonPath $BuildResultJsonPath
+$lastCommandSucceeded = $?
+$lastExitCodeVariable = Get-Variable -Name LASTEXITCODE -Scope Global -ErrorAction SilentlyContinue
+if ($null -ne $lastExitCodeVariable -and $lastExitCodeVariable.Value -is [int]) {
+    exit $lastExitCodeVariable.Value
+}
+if (-not $lastCommandSucceeded) {
+    exit 1
+}
+exit 0
+'@ | Set-Content -LiteralPath $registerStandardPath -Encoding utf8NoBOM
+
+    $output = (& $inventoryScriptPath -KbParallelRoot $kbRoot -SkillsExamplesPath $examplesPath 2>&1 |
+        ForEach-Object { $_.ToString() }) -join ' '
+
+    Assert-NotContains -Text $output -Pattern 'Register-DemoKbPostBuildEvents\.ps1\(reason=unsafe_last_exitcode_after_ps1_engine\)' -Message 'wrapper Register-*KbPostBuildEvents com saida segura nao pode ser sinalizado por esse motivo'
+
     # forwards_unknown_engine_param end-to-end: wrapper local que repassa parametro inexistente
     # a motor compartilhado advanced REAL (Test-GeneXusSourceSanity.ps1) deve sair dentro da
     # linha INVENTORY_CUSTOMIZED (capturada pelo agregador).

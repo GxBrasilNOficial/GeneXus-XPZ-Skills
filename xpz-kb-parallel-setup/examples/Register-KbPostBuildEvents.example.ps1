@@ -59,4 +59,12 @@ if ($ConfirmRegistration.IsPresent) { $invokeArgs['ConfirmRegistration'] = $true
 if ($AsJson.IsPresent) { $invokeArgs['AsJson'] = $true }
 
 & $engineScript @invokeArgs
-exit $LASTEXITCODE
+$lastCommandSucceeded = $?
+$lastExitCodeVariable = Get-Variable -Name LASTEXITCODE -Scope Global -ErrorAction SilentlyContinue
+if ($null -ne $lastExitCodeVariable -and $lastExitCodeVariable.Value -is [int]) {
+    exit $lastExitCodeVariable.Value
+}
+if (-not $lastCommandSucceeded) {
+    exit 1
+}
+exit 0
