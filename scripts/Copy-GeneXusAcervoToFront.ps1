@@ -7,28 +7,39 @@
 .DESCRIPTION
     Para cada XML de objeto na pasta da frente que tem homonimo no acervo com lastUpdate
     mais recente, copia o arquivo do acervo sobre o da frente e bumpa o lastUpdate para
-    garantir que o novo arquivo fique estritamente mais novo que o acervo. Excecao:
-    quando o mesmo guid tem Object/@type divergente, a copia automatica e bloqueada.
+    garantir que o novo arquivo fique estritamente mais novo que o acervo. Quando alvo
+    explicito e informado (-ObjectList/-ObjectNames/-ObjectGuids), tambem permite
+    reconstruir a copia a partir do acervo mesmo se a frente ja estiver mais nova; isso
+    cobre a remediacao de front-textual-fidelity-trim-removal-churn. Excecao: quando o
+    mesmo guid tem Object/@type divergente, a copia automatica e bloqueada.
 
     Resolve o anti-padrao "editar acervo esperando que o pacote pegue": em vez de editar
     o acervo, o agente copia a versão mais recente do acervo para a frente e depois edita
     a copia. O gate 9-FD (Test-GeneXusFrontAcervoDrift.ps1) detecta o drift; este script
-    resolve apenas drift temporal copiando e bumpando; drift de Object/@type
-    por mesmo guid exige decisao humana antes de qualquer autocopia.
+    resolve drift temporal e reconstrução textual explicita copiando e bumpando; drift
+    de Object/@type por mesmo guid exige decisao humana antes de qualquer autocopia.
 
     Comportamento por finding do gate 9-FD:
       - front-older-than-acervo: copia do acervo e bumpa lastUpdate (ação primaria)
       - front-equals-acervo: copia do acervo e bumpa lastUpdate (conservative; o agente
         pode querer preservar, mas copiar e bumpar e o caminho seguro para edicoes futuras)
       - front-only-new-object: ignorado (objeto novo, sem homonimo no acervo)
-      - front-newer-than-acervo: ignorado (frente já e mais recente)
+      - front-newer-than-acervo: ignorado na varredura sem alvo explicito; com alvo
+        explicito, copia do acervo e bumpa lastUpdate para reconstruir a frente
       - lastupdate-unparseable: ignorado (requer resolucao manual)
       - front-object-type-drift: ignorado (requer decisao humana; nao autocopiar)
+      - front-textual-fidelity-trim-removal-churn: usar alvo explicito para reconstruir
+        do acervo, bumpar lastUpdate e reaplicar apenas o delta funcional
+      - front-textual-fidelity-info: informativo restrito a falha de leitura/decodificação
+        UTF-8 comparável após baseline único por GUID; sem ação automatica
 
     Quando -ObjectList, -ObjectNames ou -ObjectGuids e fornecido, só os objetos listados
     são considerados para copia. Quando omitido, todos os objetos com drift são copiados.
     Se um objeto listado explicitamente ainda não existir na frente, o script faz seed
-    inicial desse objeto a partir do acervo. Seed nunca ocorre sem alvo explicito.
+    inicial desse objeto a partir do acervo. Se o objeto já existir na frente e estiver
+    mais novo que o acervo, alvo explicito autoriza reconstruir/sobrescrever a copia
+    local para remediar bloqueio textual; use -DryRun quando houver dúvida. Seed nunca
+    ocorre sem alvo explicito.
 
 .PARAMETER FrontFolder
     Caminho da pasta da frente (ObjetosGeradosParaImportacaoNaKbNoGenexus/<NomeCurto_GUID_YYYYMMDD>).
@@ -43,7 +54,9 @@
     Nome canonico do contrato de selecao de objeto por nome. Aceita nomes simples
     ou entradas `Tipo:Nome`; o script usa apenas o nome para localizar o XML no
     acervo. Quando omitido (junto com -ObjectNames/-ObjectGuids), copia todos com
-    drift. Para seed inicial, deve identificar um único XML no acervo.
+    drift. Para seed inicial, deve identificar um único XML no acervo. Quando o
+    objeto já existe na frente, alvo explicito pode sobrescrever a copia mais nova
+    para reconstrução textual deliberada.
 
 .PARAMETER ObjectNames
     Sinonimo aceito de -ObjectList (mesma semantica de selecao por nome); mantido
@@ -52,7 +65,9 @@
 
 .PARAMETER ObjectGuids
     GUIDs de objetos a copiar (opcional). Quando omitido, copia todos com drift.
-    Para seed inicial, deve identificar um único XML no acervo.
+    Para seed inicial, deve identificar um único XML no acervo. Quando o objeto já
+    existe na frente, alvo explicito pode sobrescrever a copia mais nova para
+    reconstrução textual deliberada.
 
 .PARAMETER FreshnessMarginSeconds
     Margem em segundos aplicada sobre o lastUpdate do acervo ao bumpar. Default: 60.
@@ -68,6 +83,8 @@
     # Seed inicial: copia objetos específicos do acervo para uma frente em que eles ainda
     # não existem. Seed só ocorre com alvo explicito (-ObjectList/-ObjectNames/-ObjectGuids);
     # sem alvo, nada e semeado e o status pode vir 'not-applicable'/objectsScanned:0 — esperado, não erro.
+    # Se um alvo explicito já existir e estiver mais novo na frente, o script pode
+    # reconstruir/sobrescrever essa copia; use -DryRun para preview.
     .\Copy-GeneXusAcervoToFront.ps1 -FrontFolder C:\Kb\ObjetosGeradosParaImportacaoNaKbNoGenexus\GtaP3_c34f_20260528 -AcervoFolder C:\Kb\ObjetosDaKbEmXml -ObjectList 'Procedure:PReabastecerEstoque','SDT_Item'
 #>
 
@@ -469,12 +486,12 @@ if ($frontMetas.Count -eq 0 -and $frontXmls.Count -eq 0) {
             continue
         }
 
-        if ($fMeta.LastUpdate -gt $aMeta.LastUpdate) {
-            # Frente já e mais recente
+        if ($fMeta.LastUpdate -gt $aMeta.LastUpdate -and -not $explicitTargetsProvided) {
+            # Frente já e mais recente; sem alvo explicito, nao sobrescrever delta funcional por varredura.
             continue
         }
 
-        # Frente e mais antiga ou igual: copiar do acervo e bumpar lastUpdate
+        # Frente mais antiga/igual, ou alvo explicito para reconstrução textual: copiar do acervo e bumpar lastUpdate
         $fLastStr = Format-GeneXusLastUpdate $fMeta.LastUpdate
         $aLastStr = Format-GeneXusLastUpdate $aMeta.LastUpdate
         $aRel = [System.IO.Path]::GetRelativePath($AcervoFolder, $aMeta.Path)

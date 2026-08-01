@@ -10,6 +10,8 @@
       - lastUpdate: se o acervo e mais recente que a frente, emite finding.
       - Object/@type: se frente e acervo compartilham o mesmo guid e têm tipos
         GeneXus divergentes, emite front-object-type-drift fatal.
+      - fidelidade textual: se frente e acervo compartilham GUID unico, bloqueia
+        remocao forte de trailing whitespace herdado contra baseline.
       - presenca no acervo: se o objeto da frente não existe no acervo, classifica
         como objeto novo presumido. O gate não enumera objetos do acervo ausentes
         da frente, porque a frente e o escopo operacional do empacotamento.
@@ -19,8 +21,9 @@
                  na frente = objeto novo)
       warn    — revisao obrigatória antes de empacotar (frente com mesmo lastUpdate
                  do acervo, ou lastUpdate não parseavel)
-      fail    — frente com lastUpdate mais antigo que acervo, ou mesmo guid com
-                 Object/@type divergente (front-object-type-drift)
+      fail    — frente com lastUpdate mais antigo que acervo, mesmo guid com
+                 Object/@type divergente (front-object-type-drift), ou remoção
+                 forte de trailing whitespace herdado
 
 .PARAMETER FrontFolder
     Caminho da pasta da frente (ObjetosGeradosParaImportacaoNaKbNoGenexus/<NomeCurto_GUID_YYYYMMDD>).
@@ -101,7 +104,26 @@ function New-Finding {
         [string]$FrontObjectTypeNormalized,
         [string]$AcervoObjectTypeNormalized,
         [string]$MatchBasis,
-        [string[]]$CandidateAcervoPaths
+        [string[]]$CandidateAcervoPaths,
+        [hashtable]$ExtraFields
+    )
+    $protectedKeys = @(
+        'code',
+        'severity',
+        'objectName',
+        'objectGuid',
+        'objectFile',
+        'message',
+        'acervoFile',
+        'acervoPath',
+        'candidateAcervoPaths',
+        'frontObjectType',
+        'acervoObjectType',
+        'frontObjectTypeNormalized',
+        'acervoObjectTypeNormalized',
+        'frontLastUpdate',
+        'acervoLastUpdate',
+        'matchBasis'
     )
     $finding = [ordered]@{
         severity         = $Severity
@@ -137,7 +159,214 @@ function New-Finding {
     if ($CandidateAcervoPaths -and $CandidateAcervoPaths.Count -gt 0) {
         $finding.candidateAcervoPaths = @($CandidateAcervoPaths | ForEach-Object { ([string]$_).Replace('\', '/') })
     }
+    if ($null -ne $ExtraFields) {
+        foreach ($key in $ExtraFields.Keys) {
+            if ([string]$key -in $protectedKeys) {
+                throw "ExtraFields nao pode sobrescrever campo protegido de finding: $key"
+            }
+        }
+        foreach ($key in $ExtraFields.Keys) {
+            $finding[[string]$key] = $ExtraFields[$key]
+        }
+    }
     return [pscustomobject]$finding
+}
+
+function Read-ComparableUtf8Lines {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path
+    )
+
+    try {
+        $bytes = [System.IO.File]::ReadAllBytes($Path)
+    } catch {
+        return [pscustomobject]@{
+            ok     = $false
+            reason = 'read-failed'
+            lines  = @()
+        }
+    }
+    $offset = 0
+    if ($bytes.Length -ge 4) {
+        if ($bytes[0] -eq 0xFF -and $bytes[1] -eq 0xFE -and $bytes[2] -eq 0x00 -and $bytes[3] -eq 0x00) {
+            return [pscustomobject]@{ ok = $false; reason = 'utf-32-le-bom'; lines = @() }
+        }
+        if ($bytes[0] -eq 0x00 -and $bytes[1] -eq 0x00 -and $bytes[2] -eq 0xFE -and $bytes[3] -eq 0xFF) {
+            return [pscustomobject]@{ ok = $false; reason = 'utf-32-be-bom'; lines = @() }
+        }
+    }
+    if ($bytes.Length -ge 2) {
+        if ($bytes[0] -eq 0xFF -and $bytes[1] -eq 0xFE) {
+            return [pscustomobject]@{ ok = $false; reason = 'utf-16-le-bom'; lines = @() }
+        }
+        if ($bytes[0] -eq 0xFE -and $bytes[1] -eq 0xFF) {
+            return [pscustomobject]@{ ok = $false; reason = 'utf-16-be-bom'; lines = @() }
+        }
+    }
+    if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {
+        $offset = 3
+    }
+
+    try {
+        $encoding = [System.Text.UTF8Encoding]::new($false, $true)
+        $stream = [System.IO.MemoryStream]::new($bytes, $offset, $bytes.Length - $offset, $false)
+        $reader = [System.IO.StreamReader]::new($stream, $encoding, $false)
+        try {
+            $lines = [System.Collections.Generic.List[string]]::new()
+            while (-not $reader.EndOfStream) {
+                $lines.Add($reader.ReadLine()) | Out-Null
+            }
+            return [pscustomobject]@{ ok = $true; reason = ''; lines = @($lines) }
+        } finally {
+            $reader.Dispose()
+            $stream.Dispose()
+        }
+    } catch {
+        return [pscustomobject]@{ ok = $false; reason = 'utf-8-decode-failed'; lines = @() }
+    }
+}
+
+function ConvertTo-CanonicalGeneXusTextLine {
+    param([Parameter(Mandatory = $true)][AllowEmptyString()][string]$Line)
+
+    $result = [regex]::Replace(
+        $Line,
+        'lastUpdate\s*=\s*"[^"]*"',
+        'lastUpdate="__GENEXUS_LASTUPDATE__"',
+        [System.Text.RegularExpressions.RegexOptions]::IgnoreCase
+    )
+    $result = [regex]::Replace(
+        $result,
+        "lastUpdate\s*=\s*'[^']*'",
+        "lastUpdate='__GENEXUS_LASTUPDATE__'",
+        [System.Text.RegularExpressions.RegexOptions]::IgnoreCase
+    )
+    return $result
+}
+
+function New-LineMultiset {
+    param([string[]]$Lines)
+
+    $dict = [System.Collections.Generic.Dictionary[string, int]]::new([System.StringComparer]::Ordinal)
+    foreach ($line in $Lines) {
+        if ($dict.ContainsKey($line)) { $dict[$line] += 1 }
+        else { $dict[$line] = 1 }
+    }
+    return $dict
+}
+
+function Get-LineResidue {
+    param(
+        [Parameter(Mandatory = $true)]$Left,
+        [Parameter(Mandatory = $true)]$Right
+    )
+
+    $residue = [System.Collections.Generic.List[string]]::new()
+    foreach ($key in $Left.Keys) {
+        $rightCount = 0
+        if ($Right.ContainsKey($key)) { $rightCount = $Right[$key] }
+        $remaining = $Left[$key] - $rightCount
+        for ($i = 0; $i -lt $remaining; $i++) {
+            $residue.Add($key) | Out-Null
+        }
+    }
+    return @($residue)
+}
+
+function Test-FrontTextualFidelity {
+    param(
+        [Parameter(Mandatory = $true)]$FMeta,
+        [Parameter(Mandatory = $true)]$AMeta,
+        [Parameter(Mandatory = $true)][string]$FRel,
+        [Parameter(Mandatory = $true)][string]$ARel
+    )
+
+    $frontRead = Read-ComparableUtf8Lines -Path $FMeta.Path
+    $acervoRead = Read-ComparableUtf8Lines -Path $AMeta.Path
+    if (-not $frontRead.ok -or -not $acervoRead.ok) {
+        $reasons = @()
+        if (-not $frontRead.ok) { $reasons += "frente=$($frontRead.reason)" }
+        if (-not $acervoRead.ok) { $reasons += "acervo=$($acervoRead.reason)" }
+        return @(
+            New-Finding -Severity 'info' -Code 'front-textual-fidelity-info' `
+                -Message "Baseline unico por GUID encontrado para '$($FMeta.Name)', mas a leitura/decodificacao UTF-8 comparavel falhou ($($reasons -join '; ')); o empacotamento nao foi bloqueado por trim global nesse caso." `
+                -ObjectName $FMeta.Name -ObjectGuid $FMeta.Guid `
+                -ObjectFile $FRel -AcervoFile $ARel -AcervoPath $ARel `
+                -FrontLastUpdate '' -AcervoLastUpdate '' -MatchBasis 'guid' `
+                -ExtraFields @{
+                    classification = 'not-applicable'
+                    reason = ($reasons -join '; ')
+                }
+        )
+    }
+
+    $frontLines = @($frontRead.lines | ForEach-Object { ConvertTo-CanonicalGeneXusTextLine -Line $_ })
+    $acervoLines = @($acervoRead.lines | ForEach-Object { ConvertTo-CanonicalGeneXusTextLine -Line $_ })
+    $frontSet = New-LineMultiset -Lines $frontLines
+    $acervoSet = New-LineMultiset -Lines $acervoLines
+    $resAcervo = @(Get-LineResidue -Left $acervoSet -Right $frontSet)
+    $resFront = @(Get-LineResidue -Left $frontSet -Right $acervoSet)
+    if ($resAcervo.Count -eq 0 -and $resFront.Count -eq 0) {
+        return @()
+    }
+
+    $frontResidueByTrim = [System.Collections.Generic.Dictionary[string, System.Collections.Generic.List[string]]]::new([System.StringComparer]::Ordinal)
+    foreach ($line in $resFront) {
+        $trimmed = $line.TrimEnd()
+        if (-not $frontResidueByTrim.ContainsKey($trimmed)) {
+            $frontResidueByTrim[$trimmed] = [System.Collections.Generic.List[string]]::new()
+        }
+        $frontResidueByTrim[$trimmed].Add($line) | Out-Null
+    }
+
+    $acervoResidueByTrim = [System.Collections.Generic.Dictionary[string, System.Collections.Generic.List[string]]]::new([System.StringComparer]::Ordinal)
+    foreach ($line in $resAcervo) {
+        $trimmed = $line.TrimEnd()
+        if (-not $acervoResidueByTrim.ContainsKey($trimmed)) {
+            $acervoResidueByTrim[$trimmed] = [System.Collections.Generic.List[string]]::new()
+        }
+        $acervoResidueByTrim[$trimmed].Add($line) | Out-Null
+    }
+
+    $whitespaceTrimPairCount = 0
+    foreach ($key in $acervoResidueByTrim.Keys) {
+        if (-not $frontResidueByTrim.ContainsKey($key)) { continue }
+        $aWs = @($acervoResidueByTrim[$key] | Where-Object { $_ -ne $_.TrimEnd() }).Count
+        $fTrim = @($frontResidueByTrim[$key] | Where-Object { $_ -eq $key }).Count
+        $whitespaceTrimPairCount += [Math]::Min($aWs, $fTrim)
+    }
+
+    $functionalChangedLineEstimate = [Math]::Max(
+        $resAcervo.Count - $whitespaceTrimPairCount,
+        $resFront.Count - $whitespaceTrimPairCount
+    )
+    $minWhitespaceChurnLines = 25
+    $churnDominanceFactor = 3
+    $globalTrimRatio = 0.50
+    $dominantTrim = $whitespaceTrimPairCount -ge ($churnDominanceFactor * [Math]::Max($functionalChangedLineEstimate, 1))
+    $globalTrim = $whitespaceTrimPairCount -ge ($globalTrimRatio * [Math]::Max($acervoLines.Count, 1))
+    if ($whitespaceTrimPairCount -ge $minWhitespaceChurnLines -and ($dominantTrim -or $globalTrim)) {
+        return @(
+            New-Finding -Severity 'fail' -Code 'front-textual-fidelity-trim-removal-churn' `
+                -Message "Objeto '$($FMeta.Name)' removeu trailing whitespace herdado do acervo em escala forte ($whitespaceTrimPairCount linha(s)); reconstruir via Copy-GeneXusAcervoToFront.ps1 com alvo explicito e reaplicar apenas o delta funcional." `
+                -ObjectName $FMeta.Name -ObjectGuid $FMeta.Guid `
+                -ObjectFile $FRel -AcervoFile $ARel -AcervoPath $ARel `
+                -FrontLastUpdate '' -AcervoLastUpdate '' -MatchBasis 'guid' `
+                -ExtraFields @{
+                    classification = 'trim-removal-churn'
+                    whitespaceTrimPairCount = $whitespaceTrimPairCount
+                    functionalChangedLineEstimate = $functionalChangedLineEstimate
+                    acervoLineCount = $acervoLines.Count
+                    thresholds = [ordered]@{
+                        MinWhitespaceChurnLines = $minWhitespaceChurnLines
+                        ChurnDominanceFactor = $churnDominanceFactor
+                        GlobalTrimRatio = $globalTrimRatio
+                    }
+                }
+        )
+    }
+
+    return @()
 }
 
 function Get-ObjectMetadata {
@@ -354,6 +583,10 @@ if ($objectsScanned -eq 0 -and $frontXmls.Count -eq 0) {
 
         $fLastStr = if ($null -ne $fMeta.LastUpdate) { Format-GeneXusLastUpdate $fMeta.LastUpdate } else { '' }
         $aLastStr = if ($null -ne $aMeta.LastUpdate) { Format-GeneXusLastUpdate $aMeta.LastUpdate } else { '' }
+
+        if ($matchBasis -eq 'guid') {
+            $findings += @(Test-FrontTextualFidelity -FMeta $fMeta -AMeta $aMeta -FRel $fRel -ARel $aRel)
+        }
 
         if ($null -eq $fMeta.LastUpdate -or $null -eq $aMeta.LastUpdate) {
             $findings += New-Finding -Severity 'warn' -Code 'lastupdate-unparseable' `

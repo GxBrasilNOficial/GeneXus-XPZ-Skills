@@ -45,6 +45,38 @@ function New-FixtureObjectXml {
 "@
 }
 
+function New-TextualFidelityFixtureObjectXml {
+    param(
+        [Parameter(Mandatory = $true)][string]$Name,
+        [Parameter(Mandatory = $true)][string]$Guid,
+        [Parameter(Mandatory = $true)][string]$LastUpdate,
+        [string]$TypeGuid = '84a12160-f59b-4ad7-a683-ea4481ac23e9',
+        [switch]$TrimTrailingWhitespace,
+        [int]$FunctionalChanges = 0
+    )
+    $lines = [System.Collections.Generic.List[string]]::new()
+    $rootLine = "<Object type=""$TypeGuid"" name=""$Name"" guid=""$Guid"" fullyQualifiedName=""$Name"" lastUpdate=""$LastUpdate"">"
+    if (-not $TrimTrailingWhitespace) { $rootLine += '  ' }
+    $lines.Add($rootLine) | Out-Null
+    $lines.Add('  <Properties>') | Out-Null
+    $lines.Add('    <Property>') | Out-Null
+    $lines.Add('      <Name>Name</Name>') | Out-Null
+    $lines.Add("      <Value>$Name</Value>") | Out-Null
+    $lines.Add('    </Property>') | Out-Null
+    for ($i = 1; $i -le 40; $i++) {
+        $line = "      <Property><Name>P$i</Name><Value>V$i</Value></Property>"
+        if (-not $TrimTrailingWhitespace) { $line += '  ' }
+        $lines.Add($line) | Out-Null
+    }
+    for ($i = 1; $i -le $FunctionalChanges; $i++) {
+        $lines.Add("      <Property><Name>Func$i</Name><Value>$Name-$i</Value></Property>") | Out-Null
+    }
+    $lines.Add('  </Properties>') | Out-Null
+    $lines.Add('  <Source><![CDATA[]]></Source>') | Out-Null
+    $lines.Add('</Object>') | Out-Null
+    return ($lines -join "`n") + "`n"
+}
+
 function New-FrontWithObject {
     param(
         [Parameter(Mandatory = $true)][string]$RepoRoot,
@@ -186,6 +218,30 @@ if ($typeFinding4[0].frontObjectTypeNormalized -ne $webPanelTypeGuid) {
 }
 if ($typeFinding4[0].acervoObjectTypeNormalized -ne $procedureTypeGuid) {
     throw "Caso 4: acervoObjectTypeNormalized inesperado: '$($typeFinding4[0].acervoObjectTypeNormalized)'."
+}
+
+# Caso 5: trim global forte bloqueia pacote e propaga finding textual
+$repo5 = Join-Path $tempRoot 'repo5'
+$front5Dir = Join-Path $repo5 'ObjetosGeradosParaImportacaoNaKbNoGenexus' $frontName
+$acervo5Dir = Join-Path $tempRoot 'acervo5' 'Procedure'
+[void](New-Item -ItemType Directory -Path $front5Dir -Force)
+[void](New-Item -ItemType Directory -Path $acervo5Dir -Force)
+[System.IO.File]::WriteAllText((Join-Path $front5Dir "$objName.xml"), (New-TextualFidelityFixtureObjectXml -Name $objName -Guid $objGuid -LastUpdate $newStamp -TrimTrailingWhitespace -FunctionalChanges 2), (Get-Utf8NoBomEncoding))
+[System.IO.File]::WriteAllText((Join-Path $acervo5Dir "$objName.xml"), (New-TextualFidelityFixtureObjectXml -Name $objName -Guid $objGuid -LastUpdate $oldStamp), (Get-Utf8NoBomEncoding))
+$r5 = & $scriptPath -RepoRoot $repo5 -FrontName $frontName -AcervoPath (Split-Path -Parent $acervo5Dir) | ConvertFrom-Json
+$code5 = $LASTEXITCODE
+if ($r5.status -ne 'bloqueado') {
+    throw "Caso 5: status deveria ser 'bloqueado'; obtido '$($r5.status)'."
+}
+if ($code5 -ne 20) {
+    throw "Caso 5: exitCode deveria ser 20; obtido '$code5'."
+}
+$textFinding5 = @($r5.driftFindings | Where-Object { $_.code -eq 'front-textual-fidelity-trim-removal-churn' } | Select-Object -First 1)
+if ($textFinding5.Count -ne 1) {
+    throw 'Caso 5: driftFindings deveria preservar front-textual-fidelity-trim-removal-churn.'
+}
+if ((@($r5.blockingReasons) -join ' ') -notmatch 'trailing whitespace') {
+    throw "Caso 5: blockingReasons deveria citar trailing whitespace; obtido '$(@($r5.blockingReasons) -join ' ')'."
 }
 
 Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue

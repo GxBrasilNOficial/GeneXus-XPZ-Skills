@@ -65,7 +65,7 @@ Do NOT use esta skill para:
 3. Rodar o orquestrador: `pwsh -File <repo-skills>\scripts\Invoke-XpzKbParallelPrePushPhase1.ps1 -RepoRoot <pasta-paralela>` (JSON de máquina por padrão; `-AsText` para leitura humana).
 4. Ler `pushReadiness`:
    - `ready` (exit 0) → Fase 1 mecânica sem bloqueio; seguir para a triagem 2a/2b.
-   - `warn` (exit 2) → há gate warn (ex.: branch≠main, working tree sujo, whitespace só no acervo); reportar e pedir decisão do usuário.
+   - `warn` (exit 2) → há gate warn (ex.: branch≠main, working tree sujo, whitespace só no acervo ou em XML novo/adicionado da frente); reportar e pedir decisão do usuário. Em G4, `warn` não autoriza limpeza global: corrigir só linhas novas/editadas; o 9-FD decide trim forte quando houver baseline por GUID único.
    - `blocked` (exit 1) → há gate `block` **ou** `unknown`; push proibido até saneamento. Diagnosticar cada gate por `fase1-mecanica.md`.
 5. Para gates **K8/K9** em `block`: se a causa for wrapper local ausente/ambíguo/defasado (`resolvedBy` = `none`/`ambiguous`, ou `resolvedBy='config'` apontando arquivo inexistente, ou contrato `-AsJson` não emitido), encaminhar à `xpz-kb-parallel-setup` (`atualizar_bootstrap_local`/`corrigir_wrapper_local`). Não editar o wrapper aqui.
 6. Fase 2a estrutural: rodar `Test-XpzKbFrenteHygiene.ps1` (higiene de frente/pacote) — ver `fase2a-estrutural.md`. A correção dos `warn` (remover frentes não-conformes / pacotes órfãos) é a **forma canônica** via `Remove-XpzKbFrenteHygieneFindings.ps1` (fail-safe: dry-run por padrão, `-Apply` sob decisão humana, consome o JSON do motor como fonte de verdade) — **NUNCA** um passo automático desta rotina nem deleção ad-hoc.

@@ -18,7 +18,7 @@
     G1 commitsBehind > 0                       block (unknown se BaseRef invalido)
     G2 branch != main                          warn
     G3 working tree com mudancas nao commitadas warn (ignora pasta do indice)
-    G4 git diff --check (whitespace)           block, ou warn se so em XML do acervo
+    G4 git diff --check (whitespace)           block, warn em acervo ou XML novo da frente
     G5 parse de *.ps1 em <RepoRoot>/scripts    block
     K1/K2 paths perigosos                      block   [Test-XpzKbDangerousPaths]
     K3/K4 camadas derivada/oficial             warn    [Test-XpzKbLayerDiff]
@@ -90,12 +90,44 @@ $tempDirNames        = @(Get-LayerToken 'tempDirNames' @('Temp'))
 $nativeKbRootPattern = [string](Get-LayerToken 'nativeKbRootPattern' '(?i)(^|[\\/])GxModels[\\/]')
 $indexDirName        = [string](Get-LayerToken 'indexDirName' 'KbIntelligence')
 $acervoDirName       = [string](Get-LayerToken 'acervoDirName' 'ObjetosDaKbEmXml')
+$frontDirName        = [string](Get-LayerToken 'frontDirName' 'ObjetosGeradosParaImportacaoNaKbNoGenexus')
 $metadataFileName    = [string](Get-LayerToken 'metadataFileName' 'kb-source-metadata.md')
 
 $gates = [System.Collections.Generic.List[object]]::new()
 function Add-Gate {
   param($Id, $Status, $Message, $Detail = $null)
   $gates.Add([pscustomobject]@{ id = $Id; status = $Status; message = $Message; detail = $Detail })
+}
+
+function Format-GateDetailForText {
+  param($Detail)
+
+  if ($null -eq $Detail) { return '' }
+  if ($Detail -is [string]) { return $Detail }
+
+  $propertyNames = @($Detail.PSObject.Properties.Name)
+  if ($propertyNames -contains 'path' -and $propertyNames -contains 'line' -and $propertyNames -contains 'message') {
+    $path = [string]$Detail.path
+    $line = $Detail.line
+    $message = [string]$Detail.message
+    $classification = if ($propertyNames -contains 'classification') { [string]$Detail.classification } else { '' }
+
+    if (-not [string]::IsNullOrWhiteSpace($path) -and $null -ne $line) {
+      $rendered = "${path}:${line}: $message"
+    } else {
+      $rendered = $message
+    }
+    if (-not [string]::IsNullOrWhiteSpace($classification)) {
+      $rendered = "$rendered [classification=$classification]"
+    }
+    return $rendered
+  }
+
+  try {
+    return ($Detail | ConvertTo-Json -Depth 4 -Compress)
+  } catch {
+    return [string]$Detail
+  }
 }
 
 function Resolve-LocalWrapper {
@@ -112,6 +144,55 @@ function Resolve-LocalWrapper {
   if ($cands.Count -eq 1) { return [pscustomobject]@{ ok = $true; path = $cands[0].FullName; resolvedBy = 'convention' } }
   if ($cands.Count -eq 0) { return [pscustomobject]@{ ok = $false; resolvedBy = 'none'; message = "nenhum wrapper '$Convention' em $localScripts e sem config -- fail-closed" } }
   return [pscustomobject]@{ ok = $false; resolvedBy = 'ambiguous'; message = "$($cands.Count) wrappers '$Convention' em $localScripts e sem config para desambiguar -- fail-closed (declare em kb-parallel-pre-push.config.json)" }
+}
+
+function Normalize-GitPathForG4 {
+  param([AllowEmptyString()][string]$Path)
+  if ([string]::IsNullOrWhiteSpace($Path)) { return '' }
+  $p = ([string]$Path).Trim()
+  if (($p.Length -ge 2) -and (($p[0] -eq '"' -and $p[$p.Length - 1] -eq '"') -or ($p[0] -eq "'" -and $p[$p.Length - 1] -eq "'"))) {
+    $p = $p.Substring(1, $p.Length - 2)
+  }
+  $p = $p -replace '\\', '/'
+  return $p.TrimStart('/')
+}
+
+function ConvertFrom-GitDiffCheckLine {
+  param([Parameter(Mandatory)][AllowEmptyString()][string]$Line)
+
+  $raw = [string]$Line
+  $text = $raw.Trim()
+  if (($text.Length -ge 2) -and (($text[0] -eq '"' -and $text[$text.Length - 1] -eq '"') -or ($text[0] -eq "'" -and $text[$text.Length - 1] -eq "'"))) {
+    $text = $text.Substring(1, $text.Length - 2)
+  }
+  $m = [regex]::Match($text, '^(.+?):(\d+):\s*(.+)$')
+  if (-not $m.Success) {
+    return [pscustomobject]@{ path = $null; line = $null; message = $raw; classification = 'unparsed' }
+  }
+  return [pscustomobject]@{
+    path = (Normalize-GitPathForG4 -Path $m.Groups[1].Value)
+    line = [int]$m.Groups[2].Value
+    message = $m.Groups[3].Value
+    classification = ''
+  }
+}
+
+function Get-G4WhitespaceClassification {
+  param(
+    [Parameter(Mandatory)][string]$Path,
+    [Parameter(Mandatory)]$AddedPathSet,
+    [Parameter(Mandatory)][string]$AcervoDirName,
+    [Parameter(Mandatory)][string]$FrontDirName
+  )
+
+  $acervoPrefix = "$(Normalize-GitPathForG4 -Path $AcervoDirName)/"
+  $frontPrefix = "$(Normalize-GitPathForG4 -Path $FrontDirName)/"
+  if ($Path.StartsWith($acervoPrefix, [System.StringComparison]::OrdinalIgnoreCase)) { return 'warn' }
+  if ($Path.StartsWith($frontPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+    if ($AddedPathSet.Contains($Path) -and $Path.EndsWith('.xml', [System.StringComparison]::OrdinalIgnoreCase)) { return 'warn' }
+    return 'block'
+  }
+  return 'block'
 }
 
 # ---- G0: fetch ----
@@ -157,24 +238,39 @@ else { Add-Gate 'G3' 'ok' "working tree limpo ($indexDirName/ untracked ignorado
 # ---- G4: diff --check ----
 # Trailing whitespace em XMLs do acervo (default ObjetosDaKbEmXml/) vem do exportador
 # do GeneXus IDE (saida de gerador, nao codigo humano) -- policy override declarada:
-# warn, nao block. Demais arquivos: block.
+# warn, nao block. XML novo/adicionado na frente tambem fica warn nesta versao,
+# porque G4 nao prova se o whitespace foi herdado ou introduzido; o 9-FD decide
+# trim forte por baseline de GUID unico quando houver baseline. Arquivo rastreado
+# modificado na frente e demais caminhos continuam block.
 # Stringifica a saida (incl. stderr via 2>&1): evita ErrorRecord profundo no
 # detail, que truncaria o JSON de maquina; mantem o -match por linha funcionando.
-$diffCheck = @(git -C $RepoRoot diff --check $range 2>&1 | ForEach-Object { $_.ToString() })
+$diffCheck = @(git -C $RepoRoot -c core.quotePath=false diff --no-renames --check $range 2>&1 | ForEach-Object { $_.ToString() })
 $diffCheckExit = $LASTEXITCODE
+$addedPathsRaw = @(git -C $RepoRoot -c core.quotePath=false diff --no-renames --name-only --diff-filter=A $range 2>$null | ForEach-Object { $_.ToString() })
+$addedPathSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+foreach ($addedPath in $addedPathsRaw) {
+  $normalizedAddedPath = Normalize-GitPathForG4 -Path $addedPath
+  if (-not [string]::IsNullOrWhiteSpace($normalizedAddedPath)) { [void]$addedPathSet.Add($normalizedAddedPath) }
+}
 if ($diffCheckExit -ne 0) {
-  $errorLines = @($diffCheck | Where-Object { $_ -match '^([^:]+):\d+:' })
-  if ($errorLines.Count -eq 0) {
+  $parsedLines = @($diffCheck | ForEach-Object { ConvertFrom-GitDiffCheckLine -Line $_ })
+  $parseableLines = @($parsedLines | Where-Object { $_.classification -ne 'unparsed' })
+  if ($parseableLines.Count -eq 0) {
     # exit != 0 sem nenhuma linha no formato de erro de whitespace = falha tecnica
     # do git (ex.: BaseRef/range invalido), NAO "0 erros". Nao mascarar como warn.
-    Add-Gate 'G4' 'unknown' "git diff --check retornou exit $diffCheckExit sem linhas de erro de whitespace -- BaseRef/range invalido?" $diffCheck
+    Add-Gate 'G4' 'unknown' "git diff --check retornou exit $diffCheckExit sem linhas parseaveis de erro de whitespace -- BaseRef/range invalido?" $parsedLines
   } else {
-    $acervoPrefix = "$(($acervoDirName -replace '\\','/').TrimEnd('/'))/"
-    $nonGeneratedHits = @($errorLines | Where-Object { $_ -notmatch ("^" + [regex]::Escape($acervoPrefix)) })
-    if ($nonGeneratedHits.Count -eq 0) {
-      Add-Gate 'G4' 'warn' "$($errorLines.Count) whitespace error(s), exclusivamente em XMLs do acervo ($acervoDirName/, gerados pelo IDE) -- policy override" $diffCheck
+    foreach ($line in $parseableLines) {
+      $line.classification = Get-G4WhitespaceClassification -Path $line.path -AddedPathSet $addedPathSet -AcervoDirName $acervoDirName -FrontDirName $frontDirName
+    }
+    $blockHits = @($parseableLines | Where-Object { $_.classification -eq 'block' })
+    $warnHits = @($parseableLines | Where-Object { $_.classification -eq 'warn' })
+    if ($blockHits.Count -gt 0) {
+      Add-Gate 'G4' 'block' "$($blockHits.Count) whitespace error(s) em arquivos que nao sao acervo nem XML novo/adicionado da frente" $parsedLines
+    } elseif ($warnHits.Count -gt 0) {
+      Add-Gate 'G4' 'warn' "$($warnHits.Count) whitespace error(s) apenas em acervo ou XML novo/adicionado da frente; nao limpar arquivo inteiro, corrigir so linhas novas/editadas; 9-FD decide trim forte quando houver baseline" $parsedLines
     } else {
-      Add-Gate 'G4' 'block' "$($nonGeneratedHits.Count) whitespace error(s) em arquivos NAO gerados pelo IDE" $nonGeneratedHits
+      Add-Gate 'G4' 'unknown' 'git diff --check retornou linhas parseaveis, mas nenhuma classificacao G4 conhecida foi atribuida' $parsedLines
     }
   }
 } else {
@@ -309,7 +405,7 @@ if ($AsText) {
     if ($g.detail -and $g.status -ne 'ok') {
       $detailList = @($g.detail)
       $shown = $detailList | Select-Object -First 5
-      foreach ($d in $shown) { "           $d" }
+      foreach ($d in $shown) { "           $(Format-GateDetailForText -Detail $d)" }
       if ($detailList.Count -gt 5) { "           ... (+$($detailList.Count - 5) linha(s); use o JSON para detalhe completo)" }
     }
   }

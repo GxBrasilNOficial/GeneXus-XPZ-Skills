@@ -43,9 +43,15 @@
     bloqueado (fail-closed). Se o gate detectar que um XML da frente está mais
     antigo que o homonimo no acervo (front-older-than-acervo) ou Object/@type
     divergente para o mesmo guid (front-object-type-drift), o empacotamento e
-    abortado. Findings warn (front-equals-acervo ou lastupdate-unparseable)
-    também bloqueiam esta chamada automática ate confirmacao/resolucao fora do
-    wrapper; front-object-type-drift exige decisao humana, sem autocopia/bump.
+    abortado. O gate também bloqueia remocao forte de trailing whitespace herdado
+    contra baseline por GUID unico (front-textual-fidelity-trim-removal-churn);
+    essa protecao e parcial, não um detector completo de whitespace,
+    reindentacao ou EOL. O finding front-textual-fidelity-info e apenas
+    informativo quando havia baseline unico por GUID, mas a leitura/decodificacao
+    UTF-8 comparavel falhou. Findings warn (front-equals-acervo ou
+    lastupdate-unparseable) também bloqueiam esta chamada automática ate
+    confirmacao/resolucao fora do wrapper; front-object-type-drift exige decisao
+    humana, sem autocopia/bump.
 
 #>
 

@@ -19,7 +19,10 @@ omitido, o acervo canonico <RepoRoot>/ObjetosDaKbEmXml e resolvido
 automaticamente. Sem acervo resolvivel, o empacotamento e bloqueado. O gate
 detecta XMLs na frente com lastUpdate mais antigo que o homonimo no acervo e
 bloqueia Object/@type divergente quando frente e acervo compartilham o mesmo
-guid. Acervo ambiguo por guid gera diagnostico informativo
+guid. Protecao mecanica parcial nesta versao: o 9-FD tambem detecta remocao
+forte de trailing whitespace herdado contra baseline por GUID unico; nao
+detecta introducao de trailing whitespace novo e nao e detector completo de
+whitespace, reindentacao ou EOL. Acervo ambiguo por guid gera diagnostico informativo
 front-object-type-drift-ambiguous-acervo, sem escolher tipo automaticamente.
 
 .PARAMETER FrontName
@@ -42,8 +45,10 @@ automaticamente. O gate de drift frente-vs-acervo executa sempre antes do
 empacotamento (fail-closed); sem acervo resolvivel, o empacotamento e bloqueado.
 Se o gate detectar que um XML da frente está mais antigo que o homonimo no
 acervo ou que o mesmo guid tem Object/@type divergente entre frente e acervo,
-o empacotamento e abortado. Ambiguidade por guid no acervo e diagnostico
-informativo, reportado como front-object-type-drift-ambiguous-acervo.
+ou remocao forte de trailing whitespace herdado
+(front-textual-fidelity-trim-removal-churn), o empacotamento e abortado.
+Ambiguidade por guid no acervo e diagnostico informativo, reportado como
+front-object-type-drift-ambiguous-acervo.
 
 .PARAMETER SharedSkillsRoot
 Raiz local da base compartilhada `GeneXus-XPZ-Skills`.

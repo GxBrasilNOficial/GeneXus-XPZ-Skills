@@ -18,6 +18,13 @@
     8. fetch fail   - sem -SkipFetch e sem remote -> G0 unknown -> blocked.
     9. G5 broken    - .ps1 local com erro de parse -> G5 block -> blocked.
    10. K11 fires    - acervo com antipattern not-not no diff -> blocked.
+   11. G4 acervo     - whitespace no acervo -> warn.
+   12. G4 front add  - whitespace em XML novo/adicionado da frente -> warn + -AsText legivel.
+   13. G4 front nonXML - whitespace em nao-XML novo/adicionado da frente -> block.
+   14. G4 front mod  - whitespace em XML rastreado/modificado da frente -> block.
+   15. G4 other      - whitespace fora de acervo/frente -> block.
+   16. G4 path a/b   - caminho real iniciando por a/b nao e reclassificado.
+   17. G4 unknown    - saida nao parseavel de git diff --check permanece unknown.
 #>
 
 Set-StrictMode -Version Latest
@@ -61,9 +68,10 @@ function New-OrchBase {
 }
 
 function Invoke-Orch {
-  param([string]$Root, [string]$BaseRef, [switch]$NoSkipFetch)
+  param([string]$Root, [string]$BaseRef, [switch]$NoSkipFetch, [switch]$AsText)
   $a = @('-RepoRoot', $Root, '-BaseRef', $BaseRef)
   if (-not $NoSkipFetch) { $a += '-SkipFetch' }
+  if ($AsText) { $a += '-AsText' }
   return Invoke-XpzSelfTestScript -ScriptPath $orch -ScriptArgs $a
 }
 
@@ -145,6 +153,92 @@ try {
   $o10 = Invoke-Orch -Root $r10.Root -BaseRef $r10.Base
   Assert-True ($o10.json.pushReadiness -eq 'blocked') "10: blocked esperado; obtido $($o10.json.pushReadiness)"
   Assert-True ((@($o10.json.gates | Where-Object { $_.id -eq 'K11' })[0]).status -eq 'block') "10: K11 block esperado"
+
+  # --- 11: G4 whitespace no acervo -> warn ---
+  $r11 = New-OrchBase
+  & git -C $r11.Root config core.whitespace blank-at-eol 2>$null
+  & git -C $r11.Root config core.autocrlf false 2>$null
+  Set-XpzPrePushSelfTestFile -Root $r11.Root -RelPath 'ObjetosDaKbEmXml/Procedure/Objeto.xml' -Content "<Object>`n  <Source>ok</Source>  `n</Object>`n"
+  [void](New-XpzPrePushSelfTestCommit -Root $r11.Root -Message '11: whitespace acervo')
+  $o11 = Invoke-Orch -Root $r11.Root -BaseRef $r11.Base
+  $g4_11 = (@($o11.json.gates | Where-Object { $_.id -eq 'G4' })[0])
+  Assert-True ($o11.exit -eq 2) "11: exit 2 esperado por warn; obtido $($o11.exit). stdout=$($o11.stdout)"
+  Assert-True ($g4_11.status -eq 'warn') "11: G4 warn esperado; obtido $($g4_11.status)"
+  $g4_11WarnDetails = @($g4_11.detail | Where-Object { $_.path -eq 'ObjetosDaKbEmXml/Procedure/Objeto.xml' -and $_.classification -eq 'warn' })
+  Assert-True ($g4_11WarnDetails.Count -gt 0) '11: G4 deveria classificar path de acervo como warn.'
+
+  # --- 12: G4 whitespace em XML novo/adicionado na frente, com acento e espaco -> warn ---
+  $r12 = New-OrchBase
+  & git -C $r12.Root config core.whitespace blank-at-eol 2>$null
+  & git -C $r12.Root config core.autocrlf false 2>$null
+  Set-XpzPrePushSelfTestFile -Root $r12.Root -RelPath 'ObjetosGeradosParaImportacaoNaKbNoGenexus/Frente Acento/Objeto Açao.xml' -Content "<Object>`n  <Source>ok</Source>  `n</Object>`n"
+  [void](New-XpzPrePushSelfTestCommit -Root $r12.Root -Message '12: whitespace frente adicionada')
+  $o12 = Invoke-Orch -Root $r12.Root -BaseRef $r12.Base
+  $g4_12 = (@($o12.json.gates | Where-Object { $_.id -eq 'G4' })[0])
+  Assert-True ($o12.exit -eq 2) "12: exit 2 esperado por warn; obtido $($o12.exit). stdout=$($o12.stdout)"
+  Assert-True ($g4_12.status -eq 'warn') "12: G4 warn esperado; obtido $($g4_12.status)"
+  $g4_12WarnDetails = @($g4_12.detail | Where-Object { $_.path -eq 'ObjetosGeradosParaImportacaoNaKbNoGenexus/Frente Acento/Objeto Açao.xml' -and $_.classification -eq 'warn' })
+  Assert-True ($g4_12WarnDetails.Count -gt 0) '12: path com acento/espaco em arquivo adicionado da frente deveria ser warn, nao block.'
+  $o12Text = Invoke-Orch -Root $r12.Root -BaseRef $r12.Base -AsText
+  Assert-True ($o12Text.exit -eq 2) "12: -AsText deveria preservar exit 2; obtido $($o12Text.exit). stdout=$($o12Text.stdout)"
+  Assert-True ($o12Text.stdout -match 'ObjetosGeradosParaImportacaoNaKbNoGenexus/Frente Acento/Objeto Açao\.xml:\d+: trailing whitespace\. \[classification=warn\]') '12: -AsText deveria renderizar detalhe G4 estruturado como path:linha: mensagem [classification=warn].'
+  Assert-True ($o12Text.stdout -notmatch '@\{|path=|classification=warn;') '12: -AsText nao deveria vazar renderizacao bruta de PSCustomObject.'
+
+  # --- 13: G4 whitespace em arquivo nao-XML novo/adicionado na frente -> block ---
+  $r13 = New-OrchBase
+  & git -C $r13.Root config core.whitespace blank-at-eol 2>$null
+  & git -C $r13.Root config core.autocrlf false 2>$null
+  Set-XpzPrePushSelfTestFile -Root $r13.Root -RelPath 'ObjetosGeradosParaImportacaoNaKbNoGenexus/Frente/README.md' -Content "nota com espaco  `n"
+  [void](New-XpzPrePushSelfTestCommit -Root $r13.Root -Message '13: whitespace frente nao xml adicionada')
+  $o13 = Invoke-Orch -Root $r13.Root -BaseRef $r13.Base
+  $g4_13 = (@($o13.json.gates | Where-Object { $_.id -eq 'G4' })[0])
+  Assert-True ($o13.json.pushReadiness -eq 'blocked') "13: blocked esperado; obtido $($o13.json.pushReadiness)"
+  Assert-True ($g4_13.status -eq 'block') "13: G4 block esperado para arquivo nao-XML adicionado; obtido $($g4_13.status)"
+
+  # --- 14: G4 whitespace em XML rastreado/modificado da frente -> block ---
+  $r14 = New-OrchBase
+  & git -C $r14.Root config core.whitespace blank-at-eol 2>$null
+  & git -C $r14.Root config core.autocrlf false 2>$null
+  Set-XpzPrePushSelfTestFile -Root $r14.Root -RelPath 'ObjetosGeradosParaImportacaoNaKbNoGenexus/Frente/Objeto.xml' -Content "<Object>`n  <Source>base</Source>`n</Object>`n"
+  $r14Base2 = New-XpzPrePushSelfTestCommit -Root $r14.Root -Message '14: base frente'
+  Set-XpzPrePushSelfTestFile -Root $r14.Root -RelPath 'ObjetosGeradosParaImportacaoNaKbNoGenexus/Frente/Objeto.xml' -Content "<Object>`n  <Source>modificado</Source>  `n</Object>`n"
+  [void](New-XpzPrePushSelfTestCommit -Root $r14.Root -Message '14: whitespace frente rastreada')
+  $o14 = Invoke-Orch -Root $r14.Root -BaseRef $r14Base2
+  $g4_14 = (@($o14.json.gates | Where-Object { $_.id -eq 'G4' })[0])
+  Assert-True ($o14.json.pushReadiness -eq 'blocked') "14: blocked esperado; obtido $($o14.json.pushReadiness)"
+  Assert-True ($g4_14.status -eq 'block') "14: G4 block esperado; obtido $($g4_14.status)"
+
+  # --- 15: G4 whitespace fora do acervo/frente -> block ---
+  $r15 = New-OrchBase
+  & git -C $r15.Root config core.whitespace blank-at-eol 2>$null
+  & git -C $r15.Root config core.autocrlf false 2>$null
+  Set-XpzPrePushSelfTestFile -Root $r15.Root -RelPath 'docs/Nota.txt' -Content "linha com espaco  `n"
+  [void](New-XpzPrePushSelfTestCommit -Root $r15.Root -Message '15: whitespace fora')
+  $o15 = Invoke-Orch -Root $r15.Root -BaseRef $r15.Base
+  $g4_15 = (@($o15.json.gates | Where-Object { $_.id -eq 'G4' })[0])
+  Assert-True ($o15.json.pushReadiness -eq 'blocked') "15: blocked esperado; obtido $($o15.json.pushReadiness)"
+  Assert-True ($g4_15.status -eq 'block') "15: G4 block esperado; obtido $($g4_15.status)"
+
+  # --- 16: G4 nao remove a/b de caminho real ---
+  $r16 = New-OrchBase
+  & git -C $r16.Root config core.whitespace blank-at-eol 2>$null
+  & git -C $r16.Root config core.autocrlf false 2>$null
+  Set-XpzPrePushSelfTestFile -Root $r16.Root -RelPath 'a/b/ObjetosDaKbEmXml/Procedure/Objeto.xml' -Content "<Object>`n  <Source>ok</Source>  `n</Object>`n"
+  [void](New-XpzPrePushSelfTestCommit -Root $r16.Root -Message '16: caminho real a b')
+  $o16 = Invoke-Orch -Root $r16.Root -BaseRef $r16.Base
+  $g4_16 = (@($o16.json.gates | Where-Object { $_.id -eq 'G4' })[0])
+  Assert-True ($o16.json.pushReadiness -eq 'blocked') "16: blocked esperado; obtido $($o16.json.pushReadiness)"
+  Assert-True ($g4_16.status -eq 'block') "16: G4 block esperado para path real a/b; obtido $($g4_16.status)"
+  $g4_16Details = @($g4_16.detail | Where-Object { $_.path -eq 'a/b/ObjetosDaKbEmXml/Procedure/Objeto.xml' -and $_.classification -eq 'block' })
+  Assert-True ($g4_16Details.Count -gt 0) '16: path real a/b/... nao deve virar acervo por normalizacao.'
+
+  # --- 17: G4 preserva unknown quando so ha linhas nao parseaveis ---
+  $r17 = New-OrchBase
+  $o17 = Invoke-Orch -Root $r17.Root -BaseRef 'refs/heads/inexistente'
+  $g4_17 = (@($o17.json.gates | Where-Object { $_.id -eq 'G4' })[0])
+  Assert-True ($g4_17.status -eq 'unknown') "17: G4 unknown esperado; obtido $($g4_17.status)"
+  $g4_17UnparsedDetails = @($g4_17.detail | Where-Object { $_.classification -eq 'unparsed' })
+  Assert-True ($g4_17UnparsedDetails.Count -gt 0) '17: G4 deveria preservar linha nao parseada como detalhe unparsed.'
 
   'XPZ_KB_PREPUSH_PHASE1_SELFTEST_OK'
 }

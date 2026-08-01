@@ -11,8 +11,12 @@ editar o acervo, copia a versão mais recente para a frente e bumpa o lastUpdate
 Se frente e acervo compartilharem o mesmo guid com Object/@type divergente, a
 copia automatica e bloqueada; a resolucao exige decisao humana antes de
 autocopiar ou fazer bump.
-Quando ObjectList, ObjectNames ou ObjectGuids e informado e o objeto ainda não existe na frente,
-faz seed inicial desse objeto a partir do acervo. Seed nunca ocorre sem alvo explicito.
+Quando ObjectList, ObjectNames ou ObjectGuids e informado, o alvo explicito limita
+a operacao aos objetos listados. Se o objeto ainda não existe na frente, faz seed
+inicial a partir do acervo. Se o objeto já existe e a frente está mais nova, alvo
+explicito pode reconstruir/sobrescrever a copia local para remediar
+front-textual-fidelity-trim-removal-churn; usar de forma deliberada, de
+preferencia com -DryRun. Seed nunca ocorre sem alvo explicito.
 
 .PARAMETER FrontName
 Nome da subpasta da frente no formato NomeCurto_GUID_YYYYMMDD, conforme devolvido por
@@ -23,7 +27,8 @@ retomar); este wrapper apenas popula uma frente existente, não cria a pasta.
 Nome canonico da selecao de objeto por nome. Aceita nomes simples ou entradas
 `Tipo:Nome`; o wrapper repassa apenas o nome ao motor de copia. Quando omitido
 (junto com -ObjectNames/-ObjectGuids), copia todos com drift. Para seed inicial,
-deve identificar um único XML no acervo.
+deve identificar um único XML no acervo. Para objeto já existente/editado na
+frente, alvo explicito pode sobrescrever a copia local para reconstrução textual.
 
 .PARAMETER ObjectNames
 Sinonimo aceito de -ObjectList (mesma semantica de selecao por nome), mantido por
@@ -31,7 +36,9 @@ retrocompatibilidade. Itens de -ObjectNames e -ObjectList são combinados.
 
 .PARAMETER ObjectGuids
 GUIDs de objetos a copiar (opcional). Quando omitido, copia todos com drift.
-Para seed inicial, deve identificar um único XML no acervo.
+Para seed inicial, deve identificar um único XML no acervo. Para objeto já
+existente/editado na frente, alvo explicito pode sobrescrever a copia local para
+reconstrução textual.
 
 .PARAMETER DryRun
 Mostra o que seria copiado sem gravar.
@@ -48,9 +55,12 @@ Raiz local da base compartilhada GeneXus-XPZ-Skills.
 .\Copy-KbAcervoToFront.ps1 -FrontName GtaP3_c34f_20260528
 
 .EXAMPLE
-# Seed inicial de objetos específicos do acervo para a frente (ainda não existem nela).
-# Seed só ocorre com alvo explicito; sem -ObjectList/-ObjectNames/-ObjectGuids nada e
-# semeado e objectsScanned:0 / 'not-applicable' e o resultado esperado, não um erro.
+# Alvo explicito para seed inicial ou reconstrução textual.
+# Se o objeto ainda não existe na frente, faz seed a partir do acervo. Se já existe
+# e está mais novo/editado, pode sobrescrever a copia local para remediar
+# front-textual-fidelity-trim-removal-churn; prefira validar antes com -DryRun.
+# Sem -ObjectList/-ObjectNames/-ObjectGuids nada e semeado e objectsScanned:0 /
+# 'not-applicable' e o resultado esperado, não um erro.
 .\Copy-KbAcervoToFront.ps1 -FrontName GtaP3_c34f_20260528 -ObjectList 'Procedure:PReabastecerEstoque','SDT_Item'
 #>
 

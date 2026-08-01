@@ -44,7 +44,7 @@ Os gates emitem `ok` / `warn` / `block` / `unknown`. A consolidação é **fail-
 | **G1** commitsBehind | `block` (>0) · `unknown` (BaseRef inválido) | remoto à frente | `rev-list` falho (ex.: `BaseRef` inexistente) → `unknown`, `commitsBehind=null`; `commitsBehind>0` → `block` |
 | **G2** branch | `warn` | branch ≠ `main` | detached HEAD → `branch=''` → `warn` (guarda StrictMode) |
 | **G3** working tree | `warn` | mudanças não commitadas | **ignora só `<indexDirName>/` (default `KbIntelligence/`) quando UNTRACKED** (`?? KbIntelligence/`); arquivo do índice rastreado/modificado ainda alerta |
-| **G4** diff --check | `block` · `warn` (override) · `unknown` | whitespace no `BaseRef..HEAD` | hits **exclusivamente** sob `<acervoDirName>/` (default `ObjetosDaKbEmXml/`, saída do gerador do IDE) → `warn` (policy override); qualquer hit fora do acervo → `block`; exit≠0 sem linha de erro de whitespace → `unknown` (BaseRef/range inválido) |
+| **G4** diff --check | `block` · `warn` (override) · `unknown` | whitespace no `BaseRef..HEAD` | roda `git diff --no-renames --check` e classifica linhas parseadas por caminho; hits sob `<acervoDirName>/` (default `ObjetosDaKbEmXml/`) → `warn`; hits sob `<frontDirName>/` (default `ObjetosGeradosParaImportacaoNaKbNoGenexus/`) em arquivo adicionado no range → `warn`; hits sob a frente em arquivo rastreado/modificado ou em qualquer outro caminho → `block`; exit≠0 sem linha parseável → `unknown` (BaseRef/range inválido); linhas parseáveis sem nenhuma classificação conhecida → `unknown` defensivo. No JSON, `detail[]` preserva linhas de `git diff --check` como objetos `{ path, line, message, classification }`; linhas não parseáveis usam `path`/`line` nulos e `classification='unparsed'`. `warn` não autoriza limpeza global: corrigir só linhas novas/editadas; o 9-FD decide trim forte quando houver baseline por GUID único. |
 | **G5** parse PS | `block` | parse dos `*.ps1` **LOCAIS** | parseia os `.ps1` em **`<RepoRoot>\scripts`** (wrappers da **pasta paralela**), não os scripts do repo de skills; erro de parse → `block` |
 | **K1/K2** paths perigosos | `block` · `unknown` | `Test-XpzKbDangerousPaths.ps1` | motor com `status=unknown` (ex.: git falho) → gate `unknown` (**anti-fail-open**: lê o status top-level para o gate não sumir da consolidação — sumir é que seria fail-open; com ele o `unknown` propaga e consolida em `blocked`, fail-closed) |
 | **K3/K4** camadas | `warn` · `unknown` | `Test-XpzKbLayerDiff.ps1` | camada derivada/oficial; severidade do motor mapeada `warn`/`unknown`/→`ok` |
@@ -87,6 +87,7 @@ O orquestrador lê tokens de camada do `kb-parallel-pre-push.config.json` (bloco
 | `nativeKbRootPattern` | `(?i)(^|[\\/])GxModels[\\/]` | K1/K2 (raiz da KB nativa) |
 | `indexDirName` | `KbIntelligence` | G3 (untracked ignorado), K3/K4 |
 | `acervoDirName` | `ObjetosDaKbEmXml` | G4 (override de whitespace), K3/K4, K11 |
+| `frontDirName` | `ObjetosGeradosParaImportacaoNaKbNoGenexus` | G4 (override de whitespace em XML novo/adicionado da frente) |
 | `metadataFileName` | `kb-source-metadata.md` | K3/K4 (evidência de camada/sync) |
 
 Só declarar `layerTokens` na config quando a pasta paralela usar nomes **não-padrão**; caso contrário os defaults bastam (ver `examples/kb-parallel-pre-push.config.json.example`).

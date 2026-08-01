@@ -11,6 +11,15 @@ Cada entrada usa dois campos curtos logo abaixo do titulo:
 
 Entradas legadas sem avaliação carregam `FALTA AVALIAR` em ambos os campos até que sejam revistas em sessão dedicada.
 
+## Evolução futura de fidelidade textual em XML GeneXus antes do empacotamento
+
+- **Importância** — média (a primeira proteção bloqueia o churn global forte observado, mas ainda há falsos negativos conscientes).
+- **Maturidade** — pesquisa feita (escopo inicial implementado de forma enxuta; sobras deliberadas devem ser retomadas só com caso real ou decisão explícita).
+
+A primeira implementação cobre `New-XpzImportPackage.ps1` via 9-FD: detecção de remoção forte de trailing whitespace herdado contra baseline por GUID único. O foco desta entrada é whitespace/EOL/diff textual, sem duplicar a ideia já existente de mojibake/UTF-8 por bytes.
+
+Pendências deliberadas: levar detector textual para `Build-GeneXusImportFileEnvelope.ps1`; detectar trailing whitespace introduzido em arquivo novo/adicionado da frente usando baseline por GUID quando existir; avaliar bloqueio independente de flip de EOL, reindentação global e calibração de limites por fixtures reais.
+
 ## Follow-up do override de catálogo XPZ: auditor simétrico de wrappers e `-AllowRedundant`
 
 - **Importância** — média (a frente atual bloqueia redundancia no registro e classifica lembretes, mas ainda falta auditoria dedicada de clones locais antigos e não há modo consciente para registrar redundante).

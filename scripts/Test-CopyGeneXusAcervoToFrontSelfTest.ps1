@@ -43,7 +43,9 @@ $frontSeedObjectList = Join-Path $tempRoot 'FrontSeedObjectList'
 $frontSeedGuid = Join-Path $tempRoot 'FrontSeedGuid'
 $frontMissing = Join-Path $tempRoot 'FrontMissing'
 $frontTypeDrift = Join-Path $tempRoot 'FrontTypeDrift'
-[void](New-Item -ItemType Directory -Path $procedureDir, $frontEmpty, $frontSeed, $frontSeedObjectList, $frontSeedGuid, $frontMissing, $frontTypeDrift -Force)
+$frontExplicitNewer = Join-Path $tempRoot 'FrontExplicitNewer'
+$frontExplicitNewerDryRun = Join-Path $tempRoot 'FrontExplicitNewerDryRun'
+[void](New-Item -ItemType Directory -Path $procedureDir, $frontEmpty, $frontSeed, $frontSeedObjectList, $frontSeedGuid, $frontMissing, $frontTypeDrift, $frontExplicitNewer, $frontExplicitNewerDryRun -Force)
 
 $objName = 'procSeedTeste'
 $objGuid = '11111111-1111-1111-1111-111111111111'
@@ -109,6 +111,56 @@ if (-not (Test-Path -LiteralPath (Join-Path $frontSeedGuid "$objGuidName.xml") -
     throw 'Seed explicito por GUID nao criou XML na frente.'
 }
 
+$explicitNewerName = 'procExplicitNewer'
+$explicitNewerGuid = '44444444-4444-4444-4444-444444444444'
+$explicitNewerAcervoXml = New-FixtureObjectXml -Name $explicitNewerName -Guid $explicitNewerGuid -LastUpdate '2026-01-01T00:00:00.0000000Z'
+$explicitNewerFrontXml = New-FixtureObjectXml -Name $explicitNewerName -Guid $explicitNewerGuid -LastUpdate '2026-03-01T00:00:00.0000000Z'
+[System.IO.File]::WriteAllText((Join-Path $procedureDir "$explicitNewerName.xml"), $explicitNewerAcervoXml, (Get-Utf8NoBomEncoding))
+$explicitNewerFrontPath = Join-Path $frontExplicitNewer "$explicitNewerName.xml"
+[System.IO.File]::WriteAllText($explicitNewerFrontPath, $explicitNewerFrontXml, (Get-Utf8NoBomEncoding))
+$explicitUnlistedName = 'procExplicitUnlisted'
+$explicitUnlistedGuid = '55555555-5555-5555-5555-555555555555'
+$explicitUnlistedAcervoXml = New-FixtureObjectXml -Name $explicitUnlistedName -Guid $explicitUnlistedGuid -LastUpdate '2026-01-01T00:00:00.0000000Z'
+$explicitUnlistedFrontXml = New-FixtureObjectXml -Name $explicitUnlistedName -Guid $explicitUnlistedGuid -LastUpdate '2026-04-01T00:00:00.0000000Z'
+[System.IO.File]::WriteAllText((Join-Path $procedureDir "$explicitUnlistedName.xml"), $explicitUnlistedAcervoXml, (Get-Utf8NoBomEncoding))
+$explicitUnlistedFrontPath = Join-Path $frontExplicitNewer "$explicitUnlistedName.xml"
+[System.IO.File]::WriteAllText($explicitUnlistedFrontPath, $explicitUnlistedFrontXml, (Get-Utf8NoBomEncoding))
+$explicitNewerResult = & $scriptPath -FrontFolder $frontExplicitNewer -AcervoFolder $acervo -ObjectList "Procedure:$explicitNewerName" | ConvertFrom-Json
+if ($explicitNewerResult.status -ne 'pass') {
+    throw "Reconstrucao explicita de frente mais nova deveria retornar pass; obtido $($explicitNewerResult.status)"
+}
+$explicitNewerFinding = @($explicitNewerResult.findings | Where-Object { $_.code -eq 'copied-and-bumped' -and $_.objectName -eq $explicitNewerName })
+if ($explicitNewerFinding.Count -ne 1) {
+    throw "Reconstrucao explicita de frente mais nova deveria gerar copied-and-bumped; obtido $($explicitNewerFinding.Count)"
+}
+$explicitNewerText = Get-Content -LiteralPath $explicitNewerFrontPath -Raw -Encoding UTF8
+if ($explicitNewerText -match 'lastUpdate="2026-03-01T00:00:00.0000000Z"') {
+    throw 'Reconstrucao explicita nao deveria preservar o lastUpdate antigo da frente mais nova.'
+}
+$explicitUnlistedText = Get-Content -LiteralPath $explicitUnlistedFrontPath -Raw -Encoding UTF8
+if ($explicitUnlistedText -notmatch 'lastUpdate="2026-04-01T00:00:00.0000000Z"') {
+    throw 'Reconstrucao explicita nao deveria sobrescrever objeto mais novo fora do alvo listado.'
+}
+$explicitUnlistedFinding = @($explicitNewerResult.findings | Where-Object { $_.objectName -eq $explicitUnlistedName })
+if ($explicitUnlistedFinding.Count -ne 0) {
+    throw "Reconstrucao explicita nao deveria gerar finding para objeto fora do alvo listado; obtido $($explicitUnlistedFinding.Count)"
+}
+
+$explicitNewerDryRunFrontPath = Join-Path $frontExplicitNewerDryRun "$explicitNewerName.xml"
+[System.IO.File]::WriteAllText($explicitNewerDryRunFrontPath, $explicitNewerFrontXml, (Get-Utf8NoBomEncoding))
+$explicitNewerDryRunResult = & $scriptPath -FrontFolder $frontExplicitNewerDryRun -AcervoFolder $acervo -ObjectList "Procedure:$explicitNewerName" -DryRun | ConvertFrom-Json
+if ($explicitNewerDryRunResult.status -ne 'pass') {
+    throw "DryRun de reconstrucao explicita de frente mais nova deveria retornar pass; obtido $($explicitNewerDryRunResult.status)"
+}
+$explicitNewerDryRunFinding = @($explicitNewerDryRunResult.findings | Where-Object { $_.code -eq 'dry-run-copy' -and $_.objectName -eq $explicitNewerName })
+if ($explicitNewerDryRunFinding.Count -ne 1) {
+    throw "DryRun de reconstrucao explicita deveria gerar dry-run-copy; obtido $($explicitNewerDryRunFinding.Count)"
+}
+$explicitNewerDryRunText = Get-Content -LiteralPath $explicitNewerDryRunFrontPath -Raw -Encoding UTF8
+if ($explicitNewerDryRunText -notmatch 'lastUpdate="2026-03-01T00:00:00.0000000Z"') {
+    throw 'DryRun de reconstrucao explicita nao deveria gravar sobre frente mais nova.'
+}
+
 $missingResult = & $scriptPath -FrontFolder $frontMissing -AcervoFolder $acervo -ObjectNames 'procInexistente' | ConvertFrom-Json
 if ($missingResult.status -ne 'fail') {
     throw "Seed de alvo inexistente deveria retornar fail; obtido $($missingResult.status)"
@@ -136,6 +188,19 @@ if ($typeDriftFinding.Count -ne 1) {
 $typeDriftFrontText = Get-Content -LiteralPath $typeDriftFrontPath -Raw -Encoding UTF8
 if ($typeDriftFrontText -notmatch [regex]::Escape("type=`"$webPanelTypeGuid`"")) {
     throw 'Drift de Object/@type nao deveria copiar o XML do acervo sobre a frente.'
+}
+
+$typeDriftExplicitResult = & $scriptPath -FrontFolder $frontTypeDrift -AcervoFolder $acervo -ObjectList "Procedure:$typeDriftName" | ConvertFrom-Json
+if ($typeDriftExplicitResult.status -ne 'fail') {
+    throw 'Alvo explicito nao deveria furar bloqueio de Object/@type divergente.'
+}
+$typeDriftExplicitFinding = @($typeDriftExplicitResult.findings | Where-Object { $_.code -eq 'front-object-type-drift-skip' -and $_.objectName -eq $typeDriftName })
+if ($typeDriftExplicitFinding.Count -ne 1) {
+    throw 'Alvo explicito deveria manter finding front-object-type-drift-skip.'
+}
+$typeDriftExplicitFrontText = Get-Content -LiteralPath $typeDriftFrontPath -Raw -Encoding UTF8
+if ($typeDriftExplicitFrontText -notmatch [regex]::Escape("type=`"$webPanelTypeGuid`"")) {
+    throw 'Alvo explicito com Object/@type divergente nao deveria sobrescrever a frente.'
 }
 
 Write-Output 'OK: Test-CopyGeneXusAcervoToFrontSelfTest.ps1'

@@ -14,7 +14,8 @@
     "",
     "layerTokens: so necessario quando a pasta paralela usa nomes NAO-padrao.",
     "Os defaults abaixo sao os nomes-padrao da casa; omita o bloco se eles bastarem.",
-    "tempDirNames aceita lista; nativeKbRootPattern e regex .NET."
+    "tempDirNames aceita lista; nativeKbRootPattern e regex .NET.",
+    "frontDirName identifica a area de frentes de importacao para o G4."
   ],
   "setupAuditWrapper": "Test-MinhaKbSetupAudit.ps1",
   "indexGateWrapper": "Test-MinhaKbIndexGate.ps1",
@@ -23,6 +24,7 @@
     "nativeKbRootPattern": "(?i)(^|[\\\\/])GxModels[\\\\/]",
     "indexDirName": "KbIntelligence",
     "acervoDirName": "ObjetosDaKbEmXml",
+    "frontDirName": "ObjetosGeradosParaImportacaoNaKbNoGenexus",
     "metadataFileName": "kb-source-metadata.md"
   }
 }
