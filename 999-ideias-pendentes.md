@@ -41,6 +41,22 @@ Detalhes e critérios para retomada: [`msbuild-result-contract-v2-finalizador-co
 
 Coletar e registrar evidência empírica do ruído `context [/g_service_worker] N:N attribute obj isn't defined` em KB Java/Tomcat: KB/environment, versão GeneXus, data, quantidade/posição das linhas, stdout de sucesso e confirmação de que pares cruzados continuam stderr real. Até esse registro existir, a documentação deve descrever o par como observado/conhecido, não como "provado" no mesmo nível do par `anonymous`/`component`.
 
+## Wrapper local opcional para pacote a partir de delta Git do acervo
+
+- **Importância** — média (gap real com workaround manual: identificar o ultimo push, separar XML importavel de metadado local, abrir frente, copiar do acervo, resolver `lastUpdate`/9-FD, empacotar e inventariar).
+- **Maturidade** — pesquisa feita (direção técnica delimitada; falta decisão explícita antes de criar molde opcional, script compartilhado ou ampliar cobertura de tipos).
+
+Caso real motivador: numa pasta paralela de KB, o pedido "gere um pacote do que entrou no último push" terminou em pacote de um `WebPanel` (`wpProcessaArquivoDeTransacaoDePagamento`). O fluxo manual confirmou que a metodologia existente já cobre quase tudo: `New-GeneXusXpzFront.ps1`, `Copy-GeneXusAcervoToFront.ps1`, gate 9-FD, `Set-GeneXusXmlLastUpdate.ps1` quando necessário, `New-XpzImportPackage.ps1` e inventário pós-build do pacote.
+
+Decisão registrada: não criar uma nova metodologia paralela nem um orquestrador compartilhado que replique o WORKFLOW do `xpz-builder`. Se a ideia for retomada, a forma candidata deve ser um wrapper local opcional em `xpz-kb-parallel-setup/examples/`, que derive `Object` XMLs alterados em `ObjetosDaKbEmXml` por intervalo Git, exija working tree limpa, bloqueie deletes/metadados/raízes não-`Object`, abra ou retome frente via wrapper local, semeie por GUID com `Copy-*KbAcervoToFront.ps1` e delegue o pacote a `New-*KbImportPackage.ps1`.
+
+Follow-ups antes de promover:
+
+- validar em uma segunda pasta paralela real se o default `HEAD~1..HEAD` cobre bem "último push" ou se o wrapper deve preferir `origin/main@{1}..origin/main`/range explícito no fluxo local;
+- decidir se `Attribute` e outros roots importáveis devem entrar no wrapper ou permanecer bloqueados para empacotamento manual guiado por `xpz-builder`;
+- decidir se o wrapper deve ser apenas exemplo opcional ou entrar como wrapper recomendado no inventário de setup;
+- se virar script compartilhado, atualizar `09`, `CHANGELOG`, self-tests e paridade com `xpz-builder`/`xpz-kb-parallel-setup`.
+
 ## Investigar divergência de `observedContext.ActiveEnvironment` após `SetActiveEnvironment`
 
 - **Importância** — média (não mascarou erro nem bloqueou a aceitação do PR #2, mas enfraquece a rastreabilidade em KB multi-environment e pode induzir diagnóstico errado de validação deploy).
