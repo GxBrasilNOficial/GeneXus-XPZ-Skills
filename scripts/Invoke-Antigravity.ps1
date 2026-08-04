@@ -137,19 +137,28 @@ try {
         throw "BLOCK: Antigravity CLI retornou resposta vazia."
     }
 
+    $isJson = $false
+    $respStatus = $null
+    $respText = $null
     try {
         $jsonResp = $stdoutText | ConvertFrom-Json
         $respStatus = [string]$jsonResp.status
         $respText = [string]$jsonResp.response
+        $isJson = $true
+    } catch [System.Text.Json.JsonException], [System.ArgumentException] {
+        $isJson = $false
+    }
+
+    if ($isJson) {
         if ($respStatus -and $respStatus -ne 'SUCCESS') {
             throw "BLOCK: Antigravity CLI retornou status '$respStatus'."
         }
         return $respText.Trim()
-    } catch [System.Text.Json.JsonException], [System.ArgumentException], [System.Management.Automation.RuntimeException] {
-        # Fallback a texto bruto se nao for JSON
-        $cleanText = [regex]::Replace([string]$stdoutText, '\x1B\[[0-9;]*[a-zA-Z]', '').Trim()
-        return $cleanText
     }
+
+    # Fallback a texto bruto se nao for JSON
+    $cleanText = [regex]::Replace([string]$stdoutText, '\x1B\[[0-9;]*[a-zA-Z]', '').Trim()
+    return $cleanText
 
 } finally {
     if ($null -ne $proc) { $proc.Dispose() }

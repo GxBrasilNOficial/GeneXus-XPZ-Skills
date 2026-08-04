@@ -100,6 +100,37 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File "%~dp0fake-agy-raw.ps1" %*
     $rawOutput = & $invokeScript -AntigravityExe $fakeRawCmd -Message 'Teste texto puro' -Model 'gemini-3.6-flash-high' -Mode plan
     Assert-True ($rawOutput -eq 'RESPOSTA_EM_TEXTO_BRUTO_SEM_JSON') "Invoke-Antigravity.ps1 via fake-exe de texto puro ativou fallback sem excecao de tipo"
 
+    # 7. Prova Comportamental: Injeção de fake-exe que retorna JSON com status != SUCCESS (N5 fix validation)
+    $fakeErrPs1 = Join-Path $tempDir 'fake-agy-err.ps1'
+    @'
+param()
+if ($args -contains '--help') {
+    "Usage of agy: -p Run a prompt --mode Set agent mode"
+    exit 0
+}
+@{
+    status = "ERROR"
+    response = "nao deveria ser usado"
+} | ConvertTo-Json -Compress
+exit 0
+'@ | Set-Content -LiteralPath $fakeErrPs1 -Encoding utf8
+
+    $fakeErrCmd = Join-Path $tempDir 'fake-agy-err.cmd'
+    @'
+@echo off
+pwsh -NoProfile -ExecutionPolicy Bypass -File "%~dp0fake-agy-err.ps1" %*
+'@ | Set-Content -LiteralPath $fakeErrCmd -Encoding ascii
+
+    $n5ErrorCaught = $false
+    try {
+        $null = & $invokeScript -AntigravityExe $fakeErrCmd -Message 'Teste status ERROR' -Model 'gemini-3.6-flash-high' -Mode plan
+    } catch {
+        if ($_.Exception.Message -like "*status 'ERROR'*") {
+            $n5ErrorCaught = $true
+        }
+    }
+    Assert-True $n5ErrorCaught "Invoke-Antigravity.ps1 lanca excecao BLOCK com status ERROR sem engolir pelo catch"
+
 } finally {
     Remove-Item -LiteralPath $tempDir -Recurse -Force -ErrorAction SilentlyContinue
 }

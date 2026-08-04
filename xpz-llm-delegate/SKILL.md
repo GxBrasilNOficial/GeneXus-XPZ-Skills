@@ -143,7 +143,7 @@ política pelo backend abre brecha de confidencialidade). Os eixos:
 | Eixo | Pergunta | Onde mora |
 |---|---|---|
 | **Tarefa** | é delegável (mecânica/2ª opinião) ou é juízo GeneXus? | `## O QUE NÃO DELEGAR` |
-| **Adapter** (como o dado é enviado) | qual motor leva o prompt? | o **script** que se chama (`Invoke-Codex`, `Invoke-OpenCode`, `Invoke-ClaudeCode`, `Invoke-Copilot`, `Invoke-Gemini`) |
+| **Adapter** (como o dado é enviado) | qual motor leva o prompt? | o **script** que se chama (`Invoke-Codex`, `Invoke-OpenCode`, `Invoke-ClaudeCode`, `Invoke-Copilot`, `Invoke-Gemini`, `Invoke-Antigravity`) |
 | **Destino** (para onde o dado vai) | o tráfego sai da máquina? para qual provider? | resolvedor de localidade + política |
 
 **Invariante de destino (a regra que evita o erro):** a chave de modelo no gate e na
@@ -349,7 +349,7 @@ Backend Gemini CLI (`gemini -p`, externo Google):
 
 Backend Antigravity CLI (`agy -p`, externo Antigravity/Google):
 - `Invoke-Antigravity.ps1 [-Message <prompt> | -MessagePath <arquivo>] [-Model <m>] [-Mode plan] [-Cd <dir>] [-AntigravityExe <path>] [-TimeoutSec <s>]` — síncrono (prompt → texto em JSON `.response`). Usa `--mode plan`, `--output-format json` e `--print-timeout "$($TimeoutSec)s"`; o adapter bloqueia modos diferentes de `plan`. `-MessagePath` lê o prompt de arquivo (exclusivo com `-Message`; elimina o `(Get-Content)` inline), mas é **argument-based** — o prompt segue no argv, então **não** levanta o teto ~32KB; um guard fail-closed (`$MaxArgvPromptChars = 30000`, heurístico em chars) recusa prompts grandes com `BLOCK`.
-- `AntigravityCliSupport.ps1` (dot-source) — descoberta **fail-closed** do `agy.exe` (no `PATH` ou `%LOCALAPPDATA%\agy\bin\agy.exe`), suporte aos modelos com sufixo de esforço (`gemini-3.6-flash-high`, `claude-sonnet-4-6`, etc.), validação de contrato de flags (`--print`/`--prompt` e `--mode`) e extração de erros/cota (`$quotaFailurePattern`).
+- `AntigravityCliSupport.ps1` (dot-source) — descoberta **fail-closed** do `agy.exe` (no `PATH` ou `%LOCALAPPDATA%\agy\bin\agy.exe`), validação de contrato de flags (`--print`/`--prompt` e `--mode`) e extração de erros de cota (`$quotaFailurePattern` exportado para autotestes).
 
 Latência por provedor: modelos externos OAuth (`openai/*`, Codex externo; `anthropic/*`,
 Opus 4.8 do Claude Code; `github-copilot/*`; `google/*`) podem passar de 180s — ajustar `-TimeoutSec`; `ollama-cloud/*` e
@@ -600,7 +600,7 @@ A allowlist do harness (Claude Code, Codex, OpenCode, Cursor) casa comandos **at
 
 **`-Cd` (quando o adapter suportar):** Codex, Claude Code, Copilot, Gemini e Antigravity aceitam `-Cd`; **opencode NÃO tem** `-Cd`. Quando suportado, omitir `-Cd` se o `cwd` já é a raiz; preferir apontar o diretório pelo parâmetro `workdir` da própria ferramenta em vez de passar `-Cd` no comando; **nunca** `-Cd` como segundo segmento entre aspas (foi exatamente um `-Cd "<path>"` somado a um prompt inline entre aspas que produziu o caso real de 2026-06-21, ver abaixo).
 
-**Ressalva ~32KB (cross-reference):** `-MessagePath` elimina a substituição de comando inline (`(Get-Content)` / `"$(cat ...)"`) **no chamador** em **todos** os adapters; mas só os **stdin-based** (Codex, opencode, Claude Code) também movem o prompt para **fora** do `argv` (escapam do teto). Nos **argument-based** (Gemini/Copilot/Antigravity) o adapter lê o arquivo e repassa o prompt no `argv` interno — o teto ~32KB permanece, com o guard fail-closed de 30000 chars ativo. `-MessagePath` não levanta o teto nesses dois. Ver a seção de limite no `SKILL.md` para detalhe.
+**Ressalva ~32KB (cross-reference):** `-MessagePath` elimina a substituição de comando inline (`(Get-Content)` / `"$(cat ...)"`) **no chamador** em **todos** os adapters; mas só os **stdin-based** (Codex, opencode, Claude Code) também movem o prompt para **fora** do `argv` (escapam do teto). Nos **argument-based** (Gemini/Copilot/Antigravity) o adapter lê o arquivo e repassa o prompt no `argv` interno — o teto ~32KB permanece, com o guard fail-closed de 30000 chars ativo. `-MessagePath` não levanta o teto nesses três. Ver a seção de limite no `SKILL.md` para detalhe.
 
 **O caso real que motivou o item:** em 2026-06-21, `Invoke-Codex.ps1` foi chamado como:
 ```powershell
@@ -830,7 +830,7 @@ is redirected`. Pela ferramenta Bash (stdout = pipe) funcionava.
 **Limite de ~32KB de linha de comando do Windows** (reproduzível): passar o prompt como
 **argumento** estoura `Argument list too long` acima de ~32767 caracteres.
 - **argument-based** (`Invoke-Gemini`, `Invoke-Copilot`, `Invoke-Antigravity`): o prompt vai no **argv** via runner → o
-  teto ~32KB **persiste**. Os dois ganharam `-MessagePath` (lê o prompt de arquivo e elimina o
+  teto ~32KB **persiste**. Os três ganharam `-MessagePath` (lê o prompt de arquivo e elimina o
   `(Get-Content)`/`"$(cat ...)"` inline do chamador), mas ele **não** levanta o teto; um **guard de
   tamanho fail-closed** (`$MaxArgvPromptChars = 30000`, **heurístico em chars** — UTF-16 code units,
   margem deliberada conservadora sob o teto físico ~32767 do command line, não um limite em bytes)
