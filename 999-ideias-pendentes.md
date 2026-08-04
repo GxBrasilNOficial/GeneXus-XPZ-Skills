@@ -305,9 +305,9 @@ Critério para retomar: caso real em que a ausência do cache Codex prejudique a
 
 **Origem:** decisão do usuário (2026-07-04) ao fechar a frente least-privilege do revisor opencode — «deixar o trabalho [de instalação global] para a `xpz-skills-setup`» (opção B).
 
-## Adicionar o `mimo` (fork do opencode) como 6º backend da skill `xpz-llm-delegate`
+## Adicionar o `mimo` (fork do opencode) como 7º backend da skill `xpz-llm-delegate`
 
-- **Importância** — baixa-média (agrega **uma família nova** ao piso de diversidade do painel — `mimo`/`xiaomi`, MiMo V2.5 — e é **gratuita, sem credencial e sem cota** observada, atrativo frente ao teto semanal do `ollama-cloud`, que hoje é a única família externa "barata" da lista preferida). Sem ela, os 5 backends atuais seguem cobrindo delegação e painel; nenhuma capacidade é perdida.
+- **Importância** — baixa-média (agrega **uma família nova** ao piso de diversidade do painel — `mimo`/`xiaomi`, MiMo V2.5 — e é **gratuita, sem credencial e sem cota** observada, atrativo frente ao teto semanal do `ollama-cloud`, que hoje é a única família externa "barata" da lista preferida). Sem ela, os 6 backends atuais seguem cobrindo delegação e painel; nenhuma capacidade é perdida.
 - **Maturidade** — pesquisa feita (premissas medidas e **re-medidas**; falta fechar **uma** decisão de desenho e executar). **Não** classificar como «pronta para implementar»: o custo subiu com o guard `reviewer-ro`, que não existia quando a ideia nasceu.
 
 **Histórico da entrada:** coleta original em 2026-06-24 (quando o `mimo` foi instalado); **replanejada em 2026-07-25** após 303 commits em `origin/main` que invalidaram parte das premissas. As invalidações estão explicitadas abaixo — não reciclar conclusões da coleta de junho sem reler esta seção.

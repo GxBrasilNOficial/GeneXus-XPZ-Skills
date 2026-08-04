@@ -1038,13 +1038,13 @@ pwsh -NoProfile -Command "Set-Location 'C:\Users\<user>\AppData\Local\Temp\xr'; 
 
 ## BACKENDS
 
-Ativos: **opencode** (#1), **Codex** (#2), **Claude Code** (#3), **GitHub Copilot CLI** (#4)
-e **Gemini CLI** (#5). O Codex exerceu o ponto de
+Ativos: **opencode** (#1), **Codex** (#2), **Claude Code** (#3), **GitHub Copilot CLI** (#4),
+**Gemini CLI** (#5) e **Antigravity CLI** (#6). O Codex exerceu o ponto de
 extensão do núcleo: o gate ganhou `-Backend` e passou a casar a política pelo `canonicalModel`
 do resolvedor (chave de destino), sem renomear `LlmDelegate` nem tocar o resolvedor do
 opencode. O Claude Code reaproveita o mesmo eixo: adapter próprio, resolvedor próprio e chave
-de destino `anthropic/*`. Copilot e Gemini seguem a mesma regra, com chave de destino
-`github-copilot/*` e `google/*`, respectivamente.
+de destino `anthropic/*`. Copilot, Gemini e Antigravity seguem a mesma regra, com chave de destino
+`github-copilot/*`, `google/*` e `antigravity/*`, respectivamente.
 
 Futuros (ex.: CLIs one-shot tipo `llm`/`mods`, mais seguras para segunda opinião pois não varrem
 o filesystem) entram do mesmo jeito: um adapter de invocação + um resolvedor de localidade
