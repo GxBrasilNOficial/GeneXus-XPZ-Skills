@@ -351,9 +351,23 @@ Backend Antigravity CLI (`agy -p`, externo Antigravity/Google):
 - `Invoke-Antigravity.ps1 [-Message <prompt> | -MessagePath <arquivo>] [-Model <m>] [-Mode plan] [-Cd <dir>] [-AntigravityExe <path>] [-TimeoutSec <s>]` — síncrono (prompt → texto em JSON `.response`). Usa `--mode plan`, `--output-format json` e `--print-timeout "$($TimeoutSec)s"`; o adapter bloqueia modos diferentes de `plan`. `-MessagePath` lê o prompt de arquivo (exclusivo com `-Message`; elimina o `(Get-Content)` inline), mas é **argument-based** — o prompt segue no argv, então **não** levanta o teto ~32KB; um guard fail-closed (`$MaxArgvPromptChars = 30000`, heurístico em chars) recusa prompts grandes com `BLOCK`.
 - `AntigravityCliSupport.ps1` (dot-source) — descoberta **fail-closed** do `agy.exe` (no `PATH` ou `%LOCALAPPDATA%\agy\bin\agy.exe`), validação de contrato de flags (`--print`/`--prompt` e `--mode`) e extração de erros de cota (`$quotaFailurePattern` exportado para autotestes).
 
+**Contrato JSON observado no `agy.exe` instalado** (medição direta, 2026-08-04 — não coberto por self-test, que usa fake-exe):
+
+```json
+{"conversation_id":"…","status":"SUCCESS","response":"OK\n","duration_seconds":42.6,"num_turns":1,"usage":{"input_tokens":17125,"output_tokens":43,"thinking_tokens":39,"cache_read_tokens":0,"total_tokens":17168}}
+```
+
+Em falha, o mesmo envelope traz `status="ERROR"`, `response=""` e `error` com o motivo — e o processo sai com **exit code ≠ 0**. Ou seja, o caminho de erro que o CLI realmente usa é o do exit code (tratado antes do parse, com `Get-AntigravityErrorMessage`); o guard de `status != SUCCESS` no adapter é **defesa em profundidade** para um exit 0 com status de erro, não o fluxo observado. Campos além de `status`/`response` não são consumidos pelo adapter.
+
 Latência por provedor: modelos externos OAuth (`openai/*`, Codex externo; `anthropic/*`,
 Opus 4.8 do Claude Code; `github-copilot/*`; `google/*`) podem passar de 180s — ajustar `-TimeoutSec`; `ollama-cloud/*` e
 `opencode-go/*` costumam responder mais rápido.
+
+**Antigravity (`antigravity/*`) é caro e lento mesmo em prompt trivial.** Medição de 2026-08-04:
+`responda apenas OK` (18 chars) levou **42,6s** e consumiu **17.125 tokens de input** — o CLI injeta
+contexto próprio grande antes do prompt, então o custo **não** acompanha o tamanho do manuscrito.
+Com dossiê de pré-push perto do teto de 30000 chars, contar com latência bem acima disso e revisar
+`-TimeoutSec` (default 300s, repassado ao `--print-timeout` do CLI) antes de usá-lo em painel.
 
 Em painéis com múltiplos revisores `ollama-cloud/*`, limitar o paralelismo desse provider a
 **3 chamadas simultâneas** e enfileirar os demais. Em teste real, disparar 4 modelos
