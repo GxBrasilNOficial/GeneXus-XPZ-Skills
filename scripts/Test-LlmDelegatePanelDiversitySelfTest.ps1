@@ -68,4 +68,12 @@ Assert-True ($r8.state -eq 'insufficientDiversityAfterFallback') "Caso 8: espera
 Assert-True ($r8.panelReady -eq $false) 'Caso 8: panelReady deveria ser false.'
 Assert-True (@($r8.distinctFamiliesAllow).Count -eq 1) 'Caso 8: skips com countsForDiversity=false nao devem inflar familias.'
 
+# (9) antigravity/gemini-* colapsa em google (sem diversidade contra google direto)
+$r9 = Invoke-Diversity '[{"targetModelKey":"antigravity/gemini-3.6-flash","verdict":"allow"},{"targetModelKey":"google/gemini-3-flash-preview","verdict":"allow"}]'
+Assert-True ($r9.state -eq 'insufficientDiversity') "Caso 9: antigravity/gemini e google compartilham familia google; esperado insufficientDiversity; veio '$($r9.state)'."
+
+# (10) antigravity/claude-* pontua como anthropic (diversidade real contra google)
+$r10 = Invoke-Diversity '[{"targetModelKey":"antigravity/claude-sonnet-4.6","verdict":"allow"},{"targetModelKey":"google/gemini-3-flash-preview","verdict":"allow"}]'
+Assert-True ($r10.state -eq 'panelReady') "Caso 10: antigravity/claude e google sao familias distintas; esperado panelReady; veio '$($r10.state)'."
+
 Write-Output 'OK: Test-LlmDelegatePanelDiversitySelfTest.ps1'

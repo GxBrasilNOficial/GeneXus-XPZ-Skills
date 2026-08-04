@@ -108,6 +108,8 @@ $ErrorActionPreference = 'Stop'
 
 # Disciplina de stdout: UTF-8 sem BOM; o JSON-resumo e a UNICA linha de stdout.
 try { [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false) } catch { }
+. (Join-Path $PSScriptRoot 'LlmDelegateTargetFamilySupport.ps1')
+
 $MaxInlineManuscriptChars = 30000
 
 # Adapter por backend; parametro de exe-override (so teste) por backend.
@@ -117,6 +119,7 @@ $AdapterScript = @{
     'claude-code' = 'Invoke-ClaudeCodeAsync.ps1'
     'copilot'     = 'Invoke-Copilot.ps1'
     'gemini'      = 'Invoke-Gemini.ps1'
+    'antigravity' = 'Invoke-Antigravity.ps1'
 }
 $ExeParam = @{
     'opencode'    = 'OpenCodeExe'
@@ -124,6 +127,7 @@ $ExeParam = @{
     'claude-code' = 'ClaudeExe'
     'copilot'     = 'CopilotExe'
     'gemini'      = 'GeminiExe'
+    'antigravity' = 'AntigravityExe'
 }
 # Chaves de contencao/internas recusadas (securityBlockedArgs) por backend. gemini.approvalMode e condicional.
 $ContentionKeys = @{
@@ -134,6 +138,7 @@ $ContentionKeys = @{
     )
     'opencode'    = @('agent')
     'gemini'      = @('approvalmode')
+    'antigravity' = @('mode', 'agent', 'approvalmode')
     'codex'       = @()
     'copilot'     = @()
 }
@@ -143,6 +148,7 @@ $AdapterDefaultTimeoutSec = @{
     'claude-code' = 300
     'copilot'     = 300
     'gemini'      = 300
+    'antigravity' = 300
 }
 
 function Get-Prop {
@@ -943,7 +949,7 @@ for ($i = 0; $i -lt $reviewers.Count; $i++) {
     $splat = @{ MessagePath = $manuscriptFull; Model = $effectiveModel }
 
     # -Cd: precedencia + fail-closed (opencode nunca recebe -Cd)
-    $cdCapable = ($backend -in @('codex', 'claude-code', 'gemini', 'copilot'))
+    $cdCapable = ($backend -in @('codex', 'claude-code', 'gemini', 'copilot', 'antigravity'))
     if ($cdCapable) {
         if ($PayloadSensitivity -eq 'kb-sensitive' -and -not $Cd -and -not $ParallelKbRoot) {
             $rec.state = 'error'

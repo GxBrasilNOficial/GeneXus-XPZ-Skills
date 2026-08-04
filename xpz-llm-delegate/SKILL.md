@@ -11,17 +11,18 @@ delegação é uma **ferramenta dirigida pelo humano**: nunca é acionada automa
 pelo agente — só a pedido do usuário ou com a concordância explícita dele a uma
 sugestão.
 
-Há cinco motores de delegação (backends): o **opencode** (backend #1, agêntico), o
+Há seis motores de delegação (backends): o **opencode** (backend #1, agêntico), o
 **Codex** (backend #2, `codex exec`, usando o default da própria ferramenta quando `-Model` é omitido), o **Claude Code**
 (backend #3, `claude -p` com Opus 4.8 por padrão), o **GitHub Copilot CLI**
-(backend #4, `copilot -p`) e o **Gemini CLI** (backend #5, `gemini -p`). A skill é **backend-agnóstica**:
+(backend #4, `copilot -p`), o **Gemini CLI** (backend #5, `gemini -p`) e o **Antigravity CLI**
+(backend #6, `agy -p`). A skill é **backend-agnóstica**:
 o núcleo (classificação de localidade, política de confidencialidade por KB, validação de
 saída) é o mesmo para todos; cada backend só contribui seu **adapter de invocação** e seu
 **resolvedor de localidade**. O backend é distinguido pelo script que se chama
-(`Invoke-Codex`, `Invoke-OpenCode`, `Invoke-ClaudeCode`, `Invoke-Copilot` ou `Invoke-Gemini`) e pelo parâmetro `-Backend`
+(`Invoke-Codex`, `Invoke-OpenCode`, `Invoke-ClaudeCode`, `Invoke-Copilot`, `Invoke-Gemini` ou `Invoke-Antigravity`) e pelo parâmetro `-Backend`
 do gate — **nunca** pela chave de modelo na política (ver `## ANATOMIA`).
 
-> **Nota de separação conceitual**: O registro do Antigravity como ferramenta de agente gerenciada pela skill `xpz-skills-setup` trata da detecção de instalação, diretórios de skills (`~/.gemini/config/skills/`) e instrucionais globais do Antigravity. Não se confunde com o backend `gemini -p` (backend #5 desta skill), que atua como adapter de delegação a LLM de forma isolada.
+> **Nota de separação conceitual**: O registro do Antigravity como ferramenta de agente gerenciada pela skill `xpz-skills-setup` trata da detecção de instalação, diretórios de skills (`~/.gemini/config/skills/`) e instrucionais globais do Antigravity. Não se confunde com os backends `gemini -p` (backend #5) e Antigravity CLI `agy -p` (backend #6) desta skill, que atuam como adapters de delegação a LLM de forma isolada.
 
 Esta skill é transversal — opera tanto na **raiz de desenvolvimento das skills XPZ**
 quanto, com regras mais estreitas, em sessão dentro de uma **pasta paralela de KB**.
@@ -155,14 +156,15 @@ Codex passar: brecha silenciosa no eixo que o gate existe para proteger. Pelo me
 Claude Code com Opus 4.8 casa `anthropic/claude-opus-4-8`, nunca `claude-code/*`.
 GitHub Copilot CLI casa `github-copilot/<modelo>` (ex.: `github-copilot/gpt-5-mini`),
 nunca `openai/*`, porque o destino operacional é o serviço Copilot. Gemini CLI casa
-`google/<modelo>` (ex.: `google/gemini-3-flash-preview`).
+`google/<modelo>` (ex.: `google/gemini-3-flash-preview`). Antigravity CLI casa
+`antigravity/<modelo>` (ex.: `antigravity/gemini-3.6-flash`).
 
 Mapa de responsabilidade por componente (em `scripts/`, na raiz):
 
 | Componente | Governa | Não faz |
 |---|---|---|
 | `Invoke-*` / `Start-*Job` (adapter) | **como** o prompt é enviado (mecânica do motor) | não decide destino nem confidencialidade |
-| `Resolve-OpenCodeModelLocality` / `Resolve-CodexModelLocality` / `Resolve-ClaudeCodeModelLocality` / `Resolve-CopilotModelLocality` / `Resolve-GeminiModelLocality` | traduz a invocação → **`provider/modelo` de destino** (`canonicalModel`) + local/external | não lê o payload |
+| `Resolve-OpenCodeModelLocality` / `Resolve-CodexModelLocality` / `Resolve-ClaudeCodeModelLocality` / `Resolve-CopilotModelLocality` / `Resolve-GeminiModelLocality` / `Resolve-AntigravityModelLocality` | traduz a invocação → **`provider/modelo` de destino** (`canonicalModel`) + local/external | não lê o payload |
 | `Resolve-LlmDelegateAuthorization` (gate) | veredito allow/ask/deny por destino + sensibilidade + política | não envia nada; seleciona o resolvedor por `-Backend` |
 | `llm-delegation-policy.json` (política por-KB; nome legado `opencode-delegation-policy.json` ainda aceito) | autorização durável por **chave de destino** | não conhece o adapter |
 
@@ -179,6 +181,7 @@ No Claude Code, modelos Claude explícitos são tratados como destino Anthropic 
 mapeados ficam `unknown`.
 No Copilot CLI, o destino é sempre externo e normalizado para `github-copilot/<modelo>`.
 No Gemini CLI, o destino é sempre externo e normalizado para `google/<modelo>`.
+No Antigravity CLI, o destino é sempre externo e normalizado para `antigravity/<modelo>`.
 Já a pergunta *"este payload é sensível?"* **não** é determinística — ancora no
 **contexto/origem**, não em varrer o texto. Não há selo técnico: o que segura é gatilho
 humano + gate + contrato.
@@ -197,7 +200,8 @@ Scripts do gate (em `scripts/`, na raiz do repositório):
 - `Resolve-ClaudeCodeModelLocality.ps1 [-Model <m>]` → JSON `{ locality, canonicalModel, reason }`. Backend Claude Code; `opus` e `claude-opus-4-8` casam `anthropic/claude-opus-4-8`.
 - `Resolve-CopilotModelLocality.ps1 [-Model <m>]` → JSON `{ locality, canonicalModel, reason }`. Backend Copilot; `canonicalModel` casa `github-copilot/<modelo>`.
 - `Resolve-GeminiModelLocality.ps1 [-Model <m>]` → JSON `{ locality, canonicalModel, reason }`. Backend Gemini; `canonicalModel` casa `google/<modelo>`.
-- `Resolve-LlmDelegateAuthorization.ps1 [-Model <m>] -PayloadSensitivity <kb-sensitive|public> [-Backend <opencode|codex|claude-code|copilot|gemini>] [-Oss] [-LocalProvider <p>] [-Profile <id>] [-ConfigPath <opencode.json|config.toml>] [-PolicyPath <json>] [-ParallelKbRoot <dir>]` → JSON `{ verdict: allow|ask|deny, targetModelKey, policyNameStatus, ... }`. Núcleo backend-agnóstico; seleciona o resolvedor por `-Backend` e casa a política pela chave de destino. `-ConfigPath` é repassado ao resolvedor de localidade (config do backend: `opencode.json` no opencode, `config.toml` no codex). Com `-ParallelKbRoot` (e sem `-PolicyPath`), descobre a política pelo nome canônico com fallback ao legado e reporta `policyNameStatus`; `-PolicyPath` explícito prevalece.
+- `Resolve-AntigravityModelLocality.ps1 [-Model <m>]` → JSON `{ locality, canonicalModel, reason }`. Backend Antigravity; `canonicalModel` casa `antigravity/<modelo>`.
+- `Resolve-LlmDelegateAuthorization.ps1 [-Model <m>] -PayloadSensitivity <kb-sensitive|public> [-Backend <opencode|codex|claude-code|copilot|gemini|antigravity>] [-Oss] [-LocalProvider <p>] [-Profile <id>] [-ConfigPath <opencode.json|config.toml>] [-PolicyPath <json>] [-ParallelKbRoot <dir>]` → JSON `{ verdict: allow|ask|deny, targetModelKey, policyNameStatus, ... }`. Núcleo backend-agnóstico; seleciona o resolvedor por `-Backend` e casa a política pela chave de destino. `-ConfigPath` é repassado ao resolvedor de localidade (config do backend: `opencode.json` no opencode, `config.toml` no codex). Com `-ParallelKbRoot` (e sem `-PolicyPath`), descobre a política pelo nome canônico com fallback ao legado e reporta `policyNameStatus`; `-PolicyPath` explícito prevalece.
 
 Lógica do gate:
 

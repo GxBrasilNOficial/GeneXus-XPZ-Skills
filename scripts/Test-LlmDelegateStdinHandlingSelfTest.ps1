@@ -89,6 +89,7 @@ exit 7
     $argumentBased = @(
         'Invoke-Gemini.ps1'
         'Invoke-Copilot.ps1'
+        'Invoke-Antigravity.ps1'
     )
     foreach ($name in $argumentBased) {
         $path = Join-Path $scriptsDir $name
@@ -193,6 +194,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File "%~dp0fake-reader.ps1" %*
         'Start-ClaudeCodeJob.ps1'
         'Invoke-Gemini.ps1'
         'Invoke-Copilot.ps1'
+        'Invoke-Antigravity.ps1'
     )
     foreach ($name in $messagePathAdapters) {
         $mpPath = Join-Path $scriptsDir $name
@@ -214,8 +216,8 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File "%~dp0fake-reader.ps1" %*
             "Adapter '$name' deveria guardar -MessagePath com 'Test-Path -LiteralPath `$MessagePath -PathType Leaf'."
     }
 
-    # Adapters argument-based (Gemini/Copilot): guard de tamanho fail-closed (prompt vai no argv).
-    foreach ($name in @('Invoke-Gemini.ps1', 'Invoke-Copilot.ps1')) {
+    # Adapters argument-based (Gemini/Copilot/Antigravity): guard de tamanho fail-closed (prompt vai no argv).
+    foreach ($name in @('Invoke-Gemini.ps1', 'Invoke-Copilot.ps1', 'Invoke-Antigravity.ps1')) {
         $agText = [System.IO.File]::ReadAllText((Join-Path $scriptsDir $name))
         Assert-True ($agText -match '\$MaxArgvPromptChars\s*=\s*30000') `
             "Adapter argument-based '$name' deveria definir o guard de tamanho `$MaxArgvPromptChars = 30000."

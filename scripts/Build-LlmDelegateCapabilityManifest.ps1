@@ -306,6 +306,14 @@ $backends += [pscustomobject]@{
     models      = @(Get-ClaudeCodeModelEntries -SettingsPath $ClaudeSettingsPath -StatsCachePath $ClaudeStatsCachePath)
 }
 
+. (Join-Path $PSScriptRoot 'LlmDelegateTargetFamilySupport.ps1')
+
+function Test-AntigravityPresent {
+    if (Test-CommandPresent 'agy') { return $true }
+    $defaultPath = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'agy\bin\agy.exe'
+    return (Test-Path -LiteralPath $defaultPath -PathType Leaf)
+}
+
 foreach ($b in @(
         @{ name = 'copilot'; cmd = 'copilot' }
         @{ name = 'gemini'; cmd = 'gemini' }
@@ -316,6 +324,13 @@ foreach ($b in @(
         enumeration = 'none-native'
         models      = @()
     }
+}
+
+$backends += [pscustomobject]@{
+    backend     = 'antigravity'
+    installed   = (Test-AntigravityPresent)
+    enumeration = 'none-native'
+    models      = @()
 }
 
 $generatedAt = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')

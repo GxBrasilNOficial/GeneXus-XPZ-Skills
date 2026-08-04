@@ -194,7 +194,7 @@ Presença isolada de subdiretório de cache não conta como instalação. Em
 particular, `%APPDATA%/opencode/EBWebView/` é apenas cache do Edge WebView do
 desktop app — não é evidência de OpenCode CLI configurado.
 
-> **Nota de separação conceitual**: A adição do Antigravity na `xpz-skills-setup` trata do registro de skills e instrucionais globais da ferramenta de agente Antigravity na máquina. Não confundir com o backend de execução CLI do Gemini (`gemini -p`), utilizado isoladamente como motor de delegação a LLM pela skill `xpz-llm-delegate`.
+> **Nota de separação conceitual**: A adição do Antigravity na `xpz-skills-setup` trata do registro de skills e instrucionais globais da ferramenta de agente Antigravity na máquina. Não confundir com os backends de execução CLI do Gemini (`gemini -p`, backend #5) e Antigravity CLI (`agy -p`, backend #6), utilizados isoladamente como motores de delegação a LLM pela skill `xpz-llm-delegate`.
 
 O `git` é tratado à parte — é pré-requisito de versionamento, não ferramenta de
 agente. Sua presença é verificada (`Get-Command git` ou caminhos padrão de

@@ -58,7 +58,7 @@ function Get-Prop {
 # Veto duro por baixo aterramento comprovado (README, politica de modelos). Casado pelo
 # NOME do modelo (parte apos a ultima '/'), case-insensitive.
 $hardVetoPatterns = @('mistral-large-3', 'nemotron-3-ultra')
-$allowedBackends = @('opencode', 'codex', 'claude-code', 'copilot', 'gemini')
+$allowedBackends = @('opencode', 'codex', 'claude-code', 'copilot', 'gemini', 'antigravity')
 $allowedInvokeArgs = @('backend', 'model', 'profile', 'localProvider', 'oss', 'timeoutSec')
 $supportedFallbackActivateOn = @('quota', 'timeout', 'error', 'unavailable')
 $legacyFallbackActivateOn = @('quota', 'timeout', 'error', 'unavailable', 'noResponse')

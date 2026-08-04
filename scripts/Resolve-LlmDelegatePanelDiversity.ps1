@@ -58,6 +58,8 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+. (Join-Path $PSScriptRoot 'LlmDelegateTargetFamilySupport.ps1')
+
 function Get-Prop {
     param($Obj, [string]$Name)
     if ($null -ne $Obj -and -not [string]::IsNullOrEmpty($Name) -and $Obj.PSObject.Properties[$Name]) {
@@ -68,8 +70,7 @@ function Get-Prop {
 
 function Get-Family {
     param([string]$TargetModelKey)
-    if ([string]::IsNullOrWhiteSpace($TargetModelKey)) { return $null }
-    return @($TargetModelKey -split '/')[0].Trim()
+    return Get-LlmDelegateTargetFamily -TargetModelKey $TargetModelKey
 }
 
 $parsed = $null
