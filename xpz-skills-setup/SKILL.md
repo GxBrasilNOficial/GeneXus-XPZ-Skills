@@ -126,7 +126,7 @@ Quatro caminhos cobrem as cinco ferramentas sem usar `~/.agents/skills/` como pi
 **Opcional:** `~/.agents/skills/` — alguns setups já mantêm junctions aqui porque
 Cursor e OpenCode também tratam esse diretório como USER nativo e porque o Codex
 indexa esse segundo âmbito USER; **não entra na compacta recomendada** porque
-`.claude` + `.codex` + `.config/opencode` já cobrem as quatro ferramentas sem depender
+`.claude` + `.codex` + `.config/opencode` + `.gemini/config` já cobrem as cinco ferramentas sem depender
 de compatibilidade opcional do OpenCode com Claude Code.
 
 **Dois junctions para o mesmo alvo:** registrar `nome-da-skill` como junction tanto
