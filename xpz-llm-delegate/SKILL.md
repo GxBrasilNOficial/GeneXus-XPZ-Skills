@@ -156,8 +156,7 @@ Codex passar: brecha silenciosa no eixo que o gate existe para proteger. Pelo me
 Claude Code com Opus 4.8 casa `anthropic/claude-opus-4-8`, nunca `claude-code/*`.
 GitHub Copilot CLI casa `github-copilot/<modelo>` (ex.: `github-copilot/gpt-5-mini`),
 nunca `openai/*`, porque o destino operacional é o serviço Copilot. Gemini CLI casa
-`google/<modelo>` (ex.: `google/gemini-3-flash-preview`). Antigravity CLI casa
-`antigravity/<modelo>` (ex.: `antigravity/gemini-3.6-flash`).
+`google/<modelo>` (ex.: `google/gemini-3-flash-preview`). Antigravity CLI casa `antigravity/<modelo>` (ex.: `antigravity/gemini-3.6-flash-high`).
 
 Mapa de responsabilidade por componente (em `scripts/`, na raiz):
 
@@ -347,6 +346,10 @@ Backend GitHub Copilot CLI (`copilot -p`, externo GitHub Copilot):
 Backend Gemini CLI (`gemini -p`, externo Google):
 - `Invoke-Gemini.ps1 [-Message <prompt> | -MessagePath <arquivo>] [-Model <m>] [-ApprovalMode plan] [-Cd <dir>] [-GeminiExe <path>] [-TimeoutSec <s>]` — síncrono (prompt → texto). Usa `--approval-mode plan` e `--output-format json`; o adapter bloqueia modos diferentes de `plan`. `-MessagePath` lê o prompt de arquivo (exclusivo com `-Message`; elimina o `(Get-Content)` inline), mas é **argument-based** — o prompt segue no argv, então **não** levanta o teto ~32KB; um guard fail-closed (`$MaxArgvPromptChars = 30000`, heurístico em chars) recusa prompts grandes com `BLOCK`.
 - `GeminiCliSupport.ps1` (dot-source) — descoberta **fail-closed** do `gemini`, validação de versão/flags mínimas e extração de erros.
+
+Backend Antigravity CLI (`agy -p`, externo Antigravity/Google):
+- `Invoke-Antigravity.ps1 [-Message <prompt> | -MessagePath <arquivo>] [-Model <m>] [-Mode plan] [-Cd <dir>] [-AntigravityExe <path>] [-TimeoutSec <s>]` — síncrono (prompt → texto em JSON `.response`). Usa `--mode plan`, `--output-format json` e `--print-timeout "$($TimeoutSec)s"`; o adapter bloqueia modos diferentes de `plan`. `-MessagePath` lê o prompt de arquivo (exclusivo com `-Message`; elimina o `(Get-Content)` inline), mas é **argument-based** — o prompt segue no argv, então **não** levanta o teto ~32KB; um guard fail-closed (`$MaxArgvPromptChars = 30000`, heurístico em chars) recusa prompts grandes com `BLOCK`.
+- `AntigravityCliSupport.ps1` (dot-source) — descoberta **fail-closed** do `agy.exe` (no `PATH` ou `%LOCALAPPDATA%\agy\bin\agy.exe`), suporte aos modelos com sufixo de esforço (`gemini-3.6-flash-high`, `claude-sonnet-4-6`, etc.), validação de contrato de flags (`--print`/`--prompt` e `--mode`) e extração de erros/cota (`$quotaFailurePattern`).
 
 Latência por provedor: modelos externos OAuth (`openai/*`, Codex externo; `anthropic/*`,
 Opus 4.8 do Claude Code; `github-copilot/*`; `google/*`) podem passar de 180s — ajustar `-TimeoutSec`; `ollama-cloud/*` e
@@ -595,9 +598,9 @@ A allowlist do harness (Claude Code, Codex, OpenCode, Cursor) casa comandos **at
 
 **Arquivo de `-MessagePath`:** preferir caminho **sem espaços**, sob o `Temp` do usuário (`%LOCALAPPDATA%\Temp`, já allowlistado para escrita) — fecha o ciclo escrita+leitura sem prompt; se o caminho exigir aspas, um **único** par e nada de prompt inline.
 
-**`-Cd` (quando o adapter suportar):** Codex, Claude Code, Copilot e Gemini aceitam `-Cd`; **opencode NÃO tem** `-Cd`. Quando suportado, omitir `-Cd` se o `cwd` já é a raiz; preferir apontar o diretório pelo parâmetro `workdir` da própria ferramenta em vez de passar `-Cd` no comando; **nunca** `-Cd` como segundo segmento entre aspas (foi exatamente um `-Cd "<path>"` somado a um prompt inline entre aspas que produziu o caso real de 2026-06-21, ver abaixo).
+**`-Cd` (quando o adapter suportar):** Codex, Claude Code, Copilot, Gemini e Antigravity aceitam `-Cd`; **opencode NÃO tem** `-Cd`. Quando suportado, omitir `-Cd` se o `cwd` já é a raiz; preferir apontar o diretório pelo parâmetro `workdir` da própria ferramenta em vez de passar `-Cd` no comando; **nunca** `-Cd` como segundo segmento entre aspas (foi exatamente um `-Cd "<path>"` somado a um prompt inline entre aspas que produziu o caso real de 2026-06-21, ver abaixo).
 
-**Ressalva ~32KB (cross-reference):** `-MessagePath` elimina a substituição de comando inline (`(Get-Content)` / `"$(cat ...)"`) **no chamador** em **todos** os adapters; mas só os **stdin-based** (Codex, opencode, Claude Code) também movem o prompt para **fora** do `argv` (escapam do teto). Nos **argument-based** (Gemini/Copilot) o adapter lê o arquivo e repassa o prompt no `argv` interno — o teto ~32KB permanece, com o guard fail-closed de 30000 chars ativo. `-MessagePath` não levanta o teto nesses dois. Ver a seção de limite no `SKILL.md` para detalhe.
+**Ressalva ~32KB (cross-reference):** `-MessagePath` elimina a substituição de comando inline (`(Get-Content)` / `"$(cat ...)"`) **no chamador** em **todos** os adapters; mas só os **stdin-based** (Codex, opencode, Claude Code) também movem o prompt para **fora** do `argv` (escapam do teto). Nos **argument-based** (Gemini/Copilot/Antigravity) o adapter lê o arquivo e repassa o prompt no `argv` interno — o teto ~32KB permanece, com o guard fail-closed de 30000 chars ativo. `-MessagePath` não levanta o teto nesses dois. Ver a seção de limite no `SKILL.md` para detalhe.
 
 **O caso real que motivou o item:** em 2026-06-21, `Invoke-Codex.ps1` foi chamado como:
 ```powershell
@@ -785,14 +788,14 @@ pendurava por minutos. Todos os adapters dão **EOF** ao CLI, por um de dois reg
   **fora do argv** (ver a seção do limite ~32KB) e vem de `-Message` (inline) ou `-MessagePath`
   (arquivo, exclusivos) — `-MessagePath` muda só a **origem** do texto, não o transporte por stdin. O opencode lê o prompt do stdin quando o
   argumento posicional de `run` é **omitido** (verificado no opencode em uso nesta máquina, 2026-06).
-- **argument-based** (`Invoke-Gemini`, `Invoke-Copilot`): passam o prompt como **argumento** e
+- **argument-based** (`Invoke-Gemini`, `Invoke-Copilot`, `Invoke-Antigravity`): passam o prompt como **argumento** e
   **fecham o stdin** no runner com `$null | & ([string]$req.exe) @args` (`$null` = EOF puro, sem
   bytes, **não** `'' |`, que mandaria uma linha vazia antes do EOF). O runner é invocado por
   `pwsh -File` (que **não** lê stdin); migrar para `pwsh -Command` reintroduziria o hang.
 
 - **Ressalva de evolução**: para os **argument-based**, se o CLI ganhar um modo `--stdin`/pipe de
   entrada, o stdin fechado quebraria **silenciosamente**; os self-tests de contrato de flags
-  (`Test-GeminiCliSupportSelfTest`, `Test-CopilotCliSupportSelfTest`) acusam flag nova no help —
+  (`Test-GeminiCliSupportSelfTest`, `Test-CopilotCliSupportSelfTest`, `Test-AntigravityCliSupportSelfTest`) acusam flag nova no help —
   revisar quando ocorrer. Para os **stdin-based**, a dependência inversa: se o CLI deixar de aceitar
   o prompt por stdin (ex.: voltar a exigir o posicional), o adapter precisaria retornar ao argv —
   vigiar no upgrade do opencode (a forma `run` sem posicional + stdin está fixada no comentário do
@@ -816,7 +819,7 @@ is redirected`. Pela ferramenta Bash (stdout = pipe) funcionava.
   (console-handle) e/ou o prompt grande por argv; **não** reproduzido de forma determinística
   (medições mostraram `[Console]::IsOutputRedirected=True` nas sessões testadas, em que o erro
   **não** ocorre). Tratar como **sintoma observado**, não diagnóstico fechado.
-- **Workaround** para os adapters **argument-based** (`Invoke-Gemini`, `Invoke-Copilot`): invocá-los
+- **Workaround** para os adapters **argument-based** (`Invoke-Gemini`, `Invoke-Copilot`, `Invoke-Antigravity`): invocá-los
   pela ferramenta **Bash** (ou shell com stdout em **pipe**) e manter o prompt **enxuto**.
 - **opencode resolvido por desenho.** `Invoke-OpenCode` usa `Start-Process -RedirectStandardOutput/-Error`
   direto; `Start-OpenCodeJob` usa um runner mínimo, mas o runner também chama `Start-Process` com
@@ -826,7 +829,7 @@ is redirected`. Pela ferramenta Bash (stdout = pipe) funcionava.
 
 **Limite de ~32KB de linha de comando do Windows** (reproduzível): passar o prompt como
 **argumento** estoura `Argument list too long` acima de ~32767 caracteres.
-- **argument-based** (`Invoke-Gemini`, `Invoke-Copilot`): o prompt vai no **argv** via runner → o
+- **argument-based** (`Invoke-Gemini`, `Invoke-Copilot`, `Invoke-Antigravity`): o prompt vai no **argv** via runner → o
   teto ~32KB **persiste**. Os dois ganharam `-MessagePath` (lê o prompt de arquivo e elimina o
   `(Get-Content)`/`"$(cat ...)"` inline do chamador), mas ele **não** levanta o teto; um **guard de
   tamanho fail-closed** (`$MaxArgvPromptChars = 30000`, **heurístico em chars** — UTF-16 code units,
