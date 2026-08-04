@@ -41,4 +41,3 @@ Assert-Equal $res3.family 'openai' "Familia e openai"
 Write-Host "Resultado do autoteste: $passed passou, $failed falhou."
 if ($failed -gt 0) { exit 1 }
 Write-Host "OK: Test-AntigravityModelLocalitySelfTest.ps1"
-
