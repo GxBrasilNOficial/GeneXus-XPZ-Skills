@@ -28,10 +28,28 @@ function Get-ProfileRoot {
     return $env:USERPROFILE
 }
 
+function Test-UsableCliOnPath {
+    param([string]$Name)
+    $cmds = Get-Command $Name -ErrorAction SilentlyContinue
+    if ($null -eq $cmds) { return $false }
+    foreach ($cmd in @($cmds)) {
+        if ([string]::IsNullOrWhiteSpace($cmd.Source)) { continue }
+        if ($cmd.Source -match '\\WindowsApps\\') { continue }
+        if (Test-Path -LiteralPath $cmd.Source -PathType Leaf) {
+            try {
+                if ((Get-Item -LiteralPath $cmd.Source).Length -gt 0) {
+                    return $true
+                }
+            } catch {}
+        }
+    }
+    return $false
+}
+
 function Test-ToolInstalled {
     param(
         [Parameter(Mandatory = $true)]
-        [ValidateSet('Codex', 'Claude', 'Cursor', 'OpenCode')]
+        [ValidateSet('Codex', 'Claude', 'Cursor', 'OpenCode', 'Antigravity')]
         [string]$Tool
     )
 
@@ -63,6 +81,18 @@ function Test-ToolInstalled {
             $configDir = Join-Path $profileRoot '.config\opencode'
             if (Test-Path -LiteralPath (Join-Path $configDir 'opencode.json') -PathType Leaf) { return $true }
             if (Test-Path -LiteralPath (Join-Path $configDir 'opencode.jsonc') -PathType Leaf) { return $true }
+            return $false
+        }
+        'Antigravity' {
+            if (Test-UsableCliOnPath -Name 'agy') { return $true }
+            if (Test-UsableCliOnPath -Name 'antigravity') { return $true }
+            $geminiConfigDir = Join-Path $profileRoot '.gemini\config'
+            if (Test-Path -LiteralPath (Join-Path $geminiConfigDir 'config.json') -PathType Leaf) { return $true }
+            if (Test-Path -LiteralPath (Join-Path $geminiConfigDir 'AGENTS.md') -PathType Leaf) { return $true }
+            if (Test-Path -LiteralPath (Join-Path $geminiConfigDir 'GEMINI.md') -PathType Leaf) { return $true }
+            $geminiDir = Join-Path $profileRoot '.gemini'
+            if (Test-Path -LiteralPath (Join-Path $geminiDir 'AGENTS.md') -PathType Leaf) { return $true }
+            if (Test-Path -LiteralPath (Join-Path $geminiDir 'GEMINI.md') -PathType Leaf) { return $true }
             return $false
         }
     }
@@ -110,10 +140,11 @@ function Resolve-GlobalAgentsInstructionsPath {
     $codexInstalled = Test-ToolInstalled -Tool 'Codex'
     $claudeInstalled = Test-ToolInstalled -Tool 'Claude'
     $opencodeInstalled = Test-ToolInstalled -Tool 'OpenCode'
+    $antigravityInstalled = Test-ToolInstalled -Tool 'Antigravity'
 
     $claudePath = Join-Path $profileRoot '.claude\CLAUDE.md'
     foreach ($referenced in (Get-InstructionReferencePaths -FilePath $claudePath)) {
-        if (Test-Path -LiteralPath $referenced -PathType Leaf) {
+        if ((Test-Path -LiteralPath $referenced -PathType Leaf) -and ((Get-Item -LiteralPath $referenced).Length -gt 0)) {
             return (Resolve-Path -LiteralPath $referenced).Path
         }
     }
@@ -134,7 +165,7 @@ function Resolve-GlobalAgentsInstructionsPath {
             foreach ($instructionPath in $instructionPaths) {
                 if ([string]::IsNullOrWhiteSpace($instructionPath)) { continue }
                 $expanded = Expand-UserPath $instructionPath
-                if (Test-Path -LiteralPath $expanded -PathType Leaf) {
+                if ((Test-Path -LiteralPath $expanded -PathType Leaf) -and ((Get-Item -LiteralPath $expanded).Length -gt 0)) {
                     return (Resolve-Path -LiteralPath $expanded).Path
                 }
             }
@@ -146,29 +177,44 @@ function Resolve-GlobalAgentsInstructionsPath {
 
     if ($codexInstalled) {
         $codexAgents = Join-Path $profileRoot '.codex\AGENTS.md'
-        if (Test-Path -LiteralPath $codexAgents -PathType Leaf) {
+        if ((Test-Path -LiteralPath $codexAgents -PathType Leaf) -and ((Get-Item -LiteralPath $codexAgents).Length -gt 0)) {
             return (Resolve-Path -LiteralPath $codexAgents).Path
         }
-        throw "BLOCK: Codex instalado, mas arquivo ausente: $codexAgents. Crie o arquivo ou passe -AgentsPath."
+        throw "BLOCK: Codex instalado, mas arquivo ausente ou vazio: $codexAgents. Crie o arquivo ou passe -AgentsPath."
     }
 
     if ($claudeInstalled) {
-        if (Test-Path -LiteralPath $claudePath -PathType Leaf) {
+        if ((Test-Path -LiteralPath $claudePath -PathType Leaf) -and ((Get-Item -LiteralPath $claudePath).Length -gt 0)) {
             return (Resolve-Path -LiteralPath $claudePath).Path
         }
-        throw "BLOCK: Claude Code instalado, mas arquivo ausente: $claudePath. Crie o arquivo ou passe -AgentsPath."
+        throw "BLOCK: Claude Code instalado, mas arquivo ausente ou vazio: $claudePath. Crie o arquivo ou passe -AgentsPath."
     }
 
     if ($opencodeInstalled) {
         $openCodeAgents = Join-Path $profileRoot '.config\opencode\AGENTS.md'
-        if (Test-Path -LiteralPath $openCodeAgents -PathType Leaf) {
+        if ((Test-Path -LiteralPath $openCodeAgents -PathType Leaf) -and ((Get-Item -LiteralPath $openCodeAgents).Length -gt 0)) {
             return (Resolve-Path -LiteralPath $openCodeAgents).Path
         }
-        throw "BLOCK: OpenCode instalado, mas arquivo ausente: $openCodeAgents. Crie o arquivo ou passe -AgentsPath."
+        throw "BLOCK: OpenCode instalado, mas arquivo ausente ou vazio: $openCodeAgents. Crie o arquivo ou passe -AgentsPath."
+    }
+
+    if ($antigravityInstalled) {
+        $antigravityCandidates = @(
+            (Join-Path $profileRoot '.gemini\config\AGENTS.md'),
+            (Join-Path $profileRoot '.gemini\config\GEMINI.md'),
+            (Join-Path $profileRoot '.gemini\AGENTS.md'),
+            (Join-Path $profileRoot '.gemini\GEMINI.md')
+        )
+        foreach ($cand in $antigravityCandidates) {
+            if ((Test-Path -LiteralPath $cand -PathType Leaf) -and ((Get-Item -LiteralPath $cand).Length -gt 0)) {
+                return (Resolve-Path -LiteralPath $cand).Path
+            }
+        }
+        throw "BLOCK: Antigravity instalado, mas arquivo de instrucoes ausente ou vazio em ~/.gemini/config/ ou ~/.gemini/. Crie o arquivo ou passe -AgentsPath."
     }
 
     throw @(
-        'BLOCK: nenhuma ferramenta de agente com instrucionais globais detectada (Codex, Claude Code, OpenCode).',
+        'BLOCK: nenhuma ferramenta de agente com instrucionais globais detectada (Codex, Claude Code, OpenCode, Antigravity).',
         'Instale ao menos uma delas e crie o arquivo global correspondente, ou passe -AgentsPath explicitamente.'
     ) -join ' '
 }

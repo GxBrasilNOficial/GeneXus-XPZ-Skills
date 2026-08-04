@@ -80,12 +80,13 @@ Sobre cherry-pick: sempre use o hash do commit literal ao integrar.
 
 $originalProfile = $env:USERPROFILE
 
-# --- Setup A: todas as fontes cobrem; Codex usa variacao; Claude usa @ref ------
+# --- Setup A: todas as fontes cobrem; Codex usa variacao; Claude/Antigravity usam @ref ------
 $fpA = New-TempDir
 try {
     Write-File -Path (Join-Path $fpA '.codex\AGENTS.md') -Content $variant
     Write-File -Path (Join-Path $fpA '.claude\CLAUDE.md') -Content '@~/.codex/AGENTS.md'
     Write-File -Path (Join-Path $fpA '.config\opencode\AGENTS.md') -Content $covered
+    Write-File -Path (Join-Path $fpA '.gemini\config\AGENTS.md') -Content '@~/.codex/AGENTS.md'
     Write-File -Path (Join-Path $fpA '.cursor\xpz-global-instructions-mcp\config.json') `
         -Content ('{ "agentsPath": "' + ((Join-Path $fpA '.codex\AGENTS.md') -replace '\\', '\\') + '" }')
 
@@ -97,6 +98,8 @@ try {
     Assert-Equal 'A: Codex cherry-pick (variacao)' 'presente' (Get-Coverage $repA 'Codex' 'cherry-pick-worktree')
     Assert-Equal 'A: Claude busca-shell (via @ref)' 'presente' (Get-Coverage $repA 'ClaudeCode' 'busca-shell')
     Assert-Equal 'A: OpenCode cherry-pick' 'presente' (Get-Coverage $repA 'OpenCode' 'cherry-pick-worktree')
+    Assert-Equal 'A: Antigravity busca-shell (via @ref)' 'presente' (Get-Coverage $repA 'Antigravity' 'busca-shell')
+    Assert-Equal 'A: Antigravity cherry-pick (via @ref)' 'presente' (Get-Coverage $repA 'Antigravity' 'cherry-pick-worktree')
     Assert-Equal 'A: overall OK' 'GLOBAL_INSTRUCTIONS_OK' $repA.overall
 }
 finally { $env:USERPROFILE = $originalProfile; Remove-TempDir -Path $fpA }

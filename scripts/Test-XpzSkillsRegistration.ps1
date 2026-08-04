@@ -90,6 +90,24 @@ function Get-ProfileRoot {
     return $env:USERPROFILE
 }
 
+function Test-UsableCliOnPath {
+    param([string]$Name)
+    $cmds = Get-Command $Name -ErrorAction SilentlyContinue
+    if ($null -eq $cmds) { return $false }
+    foreach ($cmd in @($cmds)) {
+        if ([string]::IsNullOrWhiteSpace($cmd.Source)) { continue }
+        if ($cmd.Source -match '\\WindowsApps\\') { continue }
+        if (Test-Path -LiteralPath $cmd.Source -PathType Leaf) {
+            try {
+                if ((Get-Item -LiteralPath $cmd.Source).Length -gt 0) {
+                    return $true
+                }
+            } catch {}
+        }
+    }
+    return $false
+}
+
 function Test-ToolInstalled {
     param([string]$Tool)
     $profileRoot = Get-ProfileRoot
@@ -119,6 +137,18 @@ function Test-ToolInstalled {
             $configDir = Join-Path $profileRoot '.config\opencode'
             if (Test-Path -LiteralPath (Join-Path $configDir 'opencode.json') -PathType Leaf) { return $true }
             if (Test-Path -LiteralPath (Join-Path $configDir 'opencode.jsonc') -PathType Leaf) { return $true }
+            return $false
+        }
+        'Antigravity' {
+            if (Test-UsableCliOnPath -Name 'agy') { return $true }
+            if (Test-UsableCliOnPath -Name 'antigravity') { return $true }
+            $geminiConfigDir = Join-Path $profileRoot '.gemini\config'
+            if (Test-Path -LiteralPath (Join-Path $geminiConfigDir 'config.json') -PathType Leaf) { return $true }
+            if (Test-Path -LiteralPath (Join-Path $geminiConfigDir 'AGENTS.md') -PathType Leaf) { return $true }
+            if (Test-Path -LiteralPath (Join-Path $geminiConfigDir 'GEMINI.md') -PathType Leaf) { return $true }
+            $geminiDir = Join-Path $profileRoot '.gemini'
+            if (Test-Path -LiteralPath (Join-Path $geminiDir 'AGENTS.md') -PathType Leaf) { return $true }
+            if (Test-Path -LiteralPath (Join-Path $geminiDir 'GEMINI.md') -PathType Leaf) { return $true }
             return $false
         }
     }
@@ -216,7 +246,8 @@ $toolDefs = @(
     [ordered]@{ Name = 'ClaudeCode'; Native = @('.claude\skills'); Compat = @() },
     [ordered]@{ Name = 'Codex'; Native = @('.codex\skills', '.agents\skills'); Compat = @() },
     [ordered]@{ Name = 'Cursor'; Native = @('.cursor\skills', '.agents\skills'); Compat = @('.claude\skills', '.codex\skills') },
-    [ordered]@{ Name = 'OpenCode'; Native = @('.config\opencode\skills', '.agents\skills'); Compat = @() }
+    [ordered]@{ Name = 'OpenCode'; Native = @('.config\opencode\skills', '.agents\skills'); Compat = @() },
+    [ordered]@{ Name = 'Antigravity'; Native = @('.gemini\config\skills', '.agents\skills'); Compat = @() }
 )
 
 $toolsReport = @()
@@ -269,11 +300,20 @@ foreach ($def in $toolDefs) {
     }
 }
 
-# Orfas: varrer cada diretório de skills conhecido uma única vez
+# Orfas: varrer cada diretório de skills conhecido uma única vez (deduplicado por caminho canonico)
 $rootNorm = (ConvertTo-LongPath -Path $root).TrimEnd('\').ToLowerInvariant()
 $allDirs = [System.Collections.Generic.List[string]]::new()
-foreach ($rel in @('.claude\skills', '.codex\skills', '.agents\skills', '.cursor\skills', '.config\opencode\skills')) {
-    [void]$allDirs.Add((Join-Path $profileRoot $rel))
+$seenCanonical = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+foreach ($rel in @('.claude\skills', '.codex\skills', '.agents\skills', '.cursor\skills', '.config\opencode\skills', '.gemini\config\skills')) {
+    $fullDir = Join-Path $profileRoot $rel
+    if (Test-Path -LiteralPath $fullDir -PathType Container) {
+        $canonical = (Resolve-Path -LiteralPath $fullDir).Path
+        $canonLong = (ConvertTo-LongPath -Path $canonical).TrimEnd('\').ToLowerInvariant()
+        if (-not $seenCanonical.Contains($canonLong)) {
+            [void]$seenCanonical.Add($canonLong)
+            [void]$allDirs.Add($fullDir)
+        }
+    }
 }
 $orphans = @()
 foreach ($dir in $allDirs) {

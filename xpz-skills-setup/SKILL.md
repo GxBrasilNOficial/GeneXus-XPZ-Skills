@@ -1,6 +1,6 @@
 ---
 name: xpz-skills-setup
-description: Audita e mantém o registro global das skills XPZ nas ferramentas de agente instaladas na máquina (Codex, Claude Code, Cursor, OpenCode), com verificação pós-git-pull e oferta de resolução de gaps
+description: Audita e mantém o registro global das skills XPZ nas ferramentas de agente instaladas na máquina (Codex, Claude Code, Cursor, OpenCode, Antigravity), com verificação pós-git-pull e oferta de resolução de gaps
 ---
 
 # xpz-skills-setup
@@ -42,7 +42,7 @@ de um novo usuário.
   cair automaticamente para **junction** e informar ao usuário o que foi usado e por quê
 - Nunca copiar arquivos como alternativa a symlink/junction — cópia gera
   desatualização silenciosa após `git pull`
-- Não instalar as ferramentas de agente (Codex, Claude Code, Cursor, OpenCode) —
+- Não instalar as ferramentas de agente (Codex, Claude Code, Cursor, OpenCode, Antigravity) —
   apenas gerenciar o registro das skills dentro delas. **Exceção:** o `git` é
   pré-requisito de versionamento (não é ferramenta de agente) e **pode ser
   instalado** por esta skill quando ausente, pois sem ele a pasta baixada como
@@ -100,6 +100,7 @@ nativo nesta skill para evitar depender de compatibilidade opcional com Claude C
 | Claude Code | `~/.claude/skills/` | — |
 | Cursor | `~/.cursor/skills/` ou `~/.agents/skills/` | `~/.claude/skills/`, `~/.codex/skills/` |
 | OpenCode | `~/.config/opencode/skills/` ou `~/.agents/skills/` | — |
+| Antigravity | `~/.gemini/config/skills/` (global) ou `~/.agents/skills/` (compartilhado) | — |
 
 `~` no Windows resolve para `%USERPROFILE%`. Não confundir `~/.config/opencode/`
 (caminho oficial de configuração do OpenCode, inclusive no Windows) com
@@ -115,11 +116,12 @@ A skill apresenta duas estratégias e adota a **compacta** como padrão. Aceita 
 
 ### Compacta (padrão)
 
-Três caminhos cobrem as quatro ferramentas sem usar `~/.agents/skills/` como pilar:
+Quatro caminhos cobrem as cinco ferramentas sem usar `~/.agents/skills/` como pilar único:
 
 - `~/.claude/skills/` → Claude Code (nativo), Cursor (compat)
 - `~/.codex/skills/` → Codex (nativo via `$CODEX_HOME/skills/` / instalador), Cursor (compat)
 - `~/.config/opencode/skills/` → OpenCode (nativo)
+- `~/.gemini/config/skills/` → Antigravity (nativo global)
 
 **Opcional:** `~/.agents/skills/` — alguns setups já mantêm junctions aqui porque
 Cursor e OpenCode também tratam esse diretório como USER nativo e porque o Codex
@@ -139,7 +141,7 @@ afetar as demais exige promover para a estratégia expansiva primeiro.
 
 ### Expansiva (opt-in)
 
-Quatro caminhos próprios, um por ferramenta:
+Cinco caminhos próprios, um por ferramenta:
 
 - `~/.codex/skills/` (Codex — caminho por padrão do instalador `$skill-installer`,
   `$CODEX_HOME/skills/`; coexistência opcional com `~/.agents/skills/` quando se
@@ -147,6 +149,7 @@ Quatro caminhos próprios, um por ferramenta:
 - `~/.claude/skills/` (Claude Code)
 - `~/.cursor/skills/` (Cursor)
 - `~/.config/opencode/skills/` (OpenCode)
+- `~/.gemini/config/skills/` (Antigravity)
 
 Vantagem: controle independente por ferramenta. Desvantagem: cada skill aparece
 em até quatro vínculos; cada vínculo é um ponto adicional de manutenção.
@@ -176,7 +179,7 @@ Considerar uma ferramenta instalada quando ao menos uma destas evidências for
 verdadeira:
 
 - O executável de CLI está disponível no PATH (`Get-Command codex`, `claude`,
-  `cursor`, `opencode` retorna algo), **ou**
+  `cursor`, `opencode`, `agy` ou `antigravity` retorna algo, ignorando stubs de `WindowsApps` via helper `Test-UsableCliOnPath`), **ou**
 - O arquivo principal de configuração existe:
   - Codex: `~/.codex/config.toml`
   - Claude Code: `~/.claude/settings.json` ou `~/.claude/CLAUDE.md`
@@ -184,10 +187,14 @@ verdadeira:
     `skills-cursor/`, `rules/`)
   - OpenCode: `~/.config/opencode/opencode.json` ou
     `~/.config/opencode/opencode.jsonc`
+  - Antigravity: `~/.gemini/config/config.json`, `~/.gemini/config/AGENTS.md`,
+    `~/.gemini/config/GEMINI.md`, `~/.gemini/AGENTS.md` ou `~/.gemini/GEMINI.md`
 
 Presença isolada de subdiretório de cache não conta como instalação. Em
 particular, `%APPDATA%/opencode/EBWebView/` é apenas cache do Edge WebView do
 desktop app — não é evidência de OpenCode CLI configurado.
+
+> **Nota de separação conceitual**: A adição do Antigravity na `xpz-skills-setup` trata do registro de skills e instrucionais globais da ferramenta de agente Antigravity na máquina. Não confundir com o backend de execução CLI do Gemini (`gemini -p`), utilizado isoladamente como motor de delegação a LLM pela skill `xpz-llm-delegate`.
 
 O `git` é tratado à parte — é pré-requisito de versionamento, não ferramenta de
 agente. Sua presença é verificada (`Get-Command git` ou caminhos padrão de
@@ -299,7 +306,7 @@ Use esta skill para:
   inicializar o Git e, se necessário, instalar o Git (ver
   `## BOOTSTRAP DO REPOSITÓRIO`)
 - Verificar se todas as skills XPZ estão registradas globalmente após `git pull`,
-  em qualquer ferramenta instalada (Codex, Claude Code, Cursor, OpenCode)
+  em qualquer ferramenta instalada (Codex, Claude Code, Cursor, OpenCode, Antigravity)
 - Configurar o ambiente de um novo usuário que clonou o repositório de skills XPZ
 - Detectar skills ausentes, órfãs, com vínculo quebrado ou cobertas apenas por
   compatibilidade cruzada nas ferramentas instaladas
@@ -313,7 +320,7 @@ Use esta skill para:
   skills XPZ
 
 Do NOT use this skill para:
-- Instalar Codex, Claude Code, Cursor ou OpenCode na máquina
+- Instalar Codex, Claude Code, Cursor, OpenCode ou Antigravity na máquina
 - Registrar skills de outros repositórios **além da `nexa`** (ex: outras skills
   GeneXus oficiais, ou as que coabitam o repo da `nexa` como `gx-sap`). A `nexa`
   é exceção gerenciada nomeada — ver `## SKILL EXTERNA GERENCIADA: NEXA`
@@ -334,6 +341,7 @@ instruções persistentes do usuário:
 | Claude Code | `~/.claude/CLAUDE.md` |
 | OpenCode | `~/.config/opencode/AGENTS.md` (aceita também `~/.claude/CLAUDE.md` como fallback) |
 | Cursor | MCP global em `~/.cursor/mcp.json` (servidor `xpz-global-instructions`) lendo a **fonte efetiva** de outra ferramenta instalada — ver `## CURSOR — INSTRUCIONAIS GLOBAIS VIA MCP`. Regras em `~/.cursor/rules/` ou `AGENTS.md` no perfil **não** substituem esse mecanismo para instruções globais do Agent |
+| Antigravity | `~/.gemini/config/AGENTS.md` (precedência: `~/.gemini/config/AGENTS.md` > `~/.gemini/config/GEMINI.md` > `~/.gemini/AGENTS.md` > `~/.gemini/GEMINI.md`) |
 
 As ferramentas não precisam duplicar o mesmo texto em cada arquivo global: é válido
 **centralizar** as práticas recomendadas em um único arquivo e referenciar esse arquivo
@@ -473,9 +481,10 @@ detecta o `server.py` defasado comparando o hash instalado com o canônico do re
    ferramenta como **OK**, **coberta por compatibilidade**, **ausente**, **órfã**
    ou **quebrada** — aplicando as regras de `## CAMINHOS DE SKILLS POR FERRAMENTA`
    e `### Classificação ao auditar` (Codex indexa `.codex` + `.agents`; OpenCode
-   exige nativo; Cursor lê `.claude`/`.codex` por compatibilidade). O motor é
-   **somente leitura**: não cria nem remove vínculos. Este `SKILL.md` permanece a
-   fonte das regras que o motor implementa. Além das skills internas, o motor
+   exige nativo; Cursor lê `.claude`/`.codex` por compatibilidade; Antigravity lê `.gemini/config` e `.agents`).
+   O motor trata diretórios compartilhados (`.agents/skills/`) de forma deduplicada
+   via `(Resolve-Path).Path` canonizado. O motor é **somente leitura**: não cria nem remove vínculos.
+   Este `SKILL.md` permanece a fonte das regras que o motor implementa. Além das skills internas, o motor
    classifica também a skill externa gerenciada `nexa` em seção separada
    (`externalSkills` / `externalOverall`) — ver `## SKILL EXTERNA GERENCIADA: NEXA`.
 3. Ler o resultado do motor:
@@ -563,7 +572,7 @@ detecta o `server.py` defasado comparando o hash instalado com o canônico do re
        OpenCode não carregar essa referência, quando a validação não for possível e o
        usuário preferir garantia por arquivo autocontido, ou quando o usuário pedir
        explicitamente duplicação literal.
-     - **Codex / Claude Code:** alinhar `~/.codex/AGENTS.md` e/ou `~/.claude/CLAUDE.md`
+     - **Codex / Claude Code / Antigravity:** alinhar `~/.codex/AGENTS.md`, `~/.claude/CLAUDE.md` e/ou `~/.gemini/config/AGENTS.md`
        ao bloco recomendado ou à centralização já descrita nesta skill, sempre com
        confirmação antes de gravar
    - Depois da confirmação: executar só o que foi aprovado, gravar os arquivos

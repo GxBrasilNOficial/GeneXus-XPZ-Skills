@@ -76,8 +76,10 @@ $fakeRepo = New-TempDir
 $fakeProfile = New-TempDir
 $brokenTarget = Join-Path $fakeProfile 'broken-target'
 $originalProfile = $env:USERPROFILE
+$originalPath = $env:PATH
 
 try {
+    $env:PATH = ''
     # Inventario: skill-a, skill-b, skill-c (com SKILL.md). skill-removida sem SKILL.md.
     New-FakeSkill -RepoRoot $fakeRepo -Name 'skill-a' | Out-Null
     New-FakeSkill -RepoRoot $fakeRepo -Name 'skill-b' | Out-Null
@@ -88,6 +90,7 @@ try {
 
     $claudeSkills = Join-Path $fakeProfile '.claude\skills'
     $codexSkills = Join-Path $fakeProfile '.codex\skills'
+    $geminiSkills = Join-Path $fakeProfile '.gemini\config\skills'
 
     # OK em Claude
     New-Junction -LinkDir $claudeSkills -Name 'skill-a' -Target (Join-Path $fakeRepo 'skill-a')
@@ -97,14 +100,22 @@ try {
     New-Junction -LinkDir $claudeSkills -Name 'skill-removida' -Target (Join-Path $fakeRepo 'skill-removida')
     # OK em Codex
     New-Junction -LinkDir $codexSkills -Name 'skill-b' -Target (Join-Path $fakeRepo 'skill-b')
+    # OK em Antigravity (.gemini\config\skills)
+    New-Junction -LinkDir $geminiSkills -Name 'skill-a' -Target (Join-Path $fakeRepo 'skill-a')
 
     # Tornar skill-c quebrada: remover o alvo do junction
     Remove-Item -LiteralPath $brokenTarget -Recurse -Force
 
-    # Marca ClaudeCode como instalada de forma deterministica (independe do PATH real):
-    # garante ao menos uma ferramenta instalada para que a skill externa nexa (ausente
-    # no fixture) seja avaliada e externalOverall resulte em EXTERNAL_SKILLS_GAPS.
+    # Marca ferramentas como instaladas de forma deterministica (independe do PATH real):
     Set-Content -LiteralPath (Join-Path $fakeProfile '.claude\settings.json') -Value '{}' -Encoding utf8
+    New-Item -ItemType Directory -Path (Join-Path $fakeProfile '.codex') -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $fakeProfile '.codex\config.toml') -Value '' -Encoding utf8
+    New-Item -ItemType Directory -Path (Join-Path $fakeProfile '.cursor') -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $fakeProfile '.cursor\mcp.json') -Value '{}' -Encoding utf8
+    New-Item -ItemType Directory -Path (Join-Path $fakeProfile '.config\opencode') -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $fakeProfile '.config\opencode\opencode.json') -Value '{}' -Encoding utf8
+    New-Item -ItemType Directory -Path (Join-Path $fakeProfile '.gemini\config') -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $fakeProfile '.gemini\config\config.json') -Value '{}' -Encoding utf8
 
     $env:USERPROFILE = $fakeProfile
     $json = & $scriptUnderTest -RepoRoot $fakeRepo -AsJson | Out-String
@@ -118,6 +129,8 @@ try {
     Assert-Equal 'Cursor/skill-a compat' 'coberta_por_compatibilidade' (Get-SkillStatus -Report $report -Tool 'Cursor' -Skill 'skill-a')
     Assert-Equal 'Cursor/skill-b compat' 'coberta_por_compatibilidade' (Get-SkillStatus -Report $report -Tool 'Cursor' -Skill 'skill-b')
     Assert-Equal 'OpenCode/skill-a ausente' 'ausente' (Get-SkillStatus -Report $report -Tool 'OpenCode' -Skill 'skill-a')
+    Assert-Equal 'Antigravity/skill-a OK' 'OK' (Get-SkillStatus -Report $report -Tool 'Antigravity' -Skill 'skill-a')
+    Assert-Equal 'Antigravity/skill-b ausente' 'ausente' (Get-SkillStatus -Report $report -Tool 'Antigravity' -Skill 'skill-b')
 
     $script:cases++
     $orphanNames = @($report.orphans | ForEach-Object { $_.name })
@@ -154,6 +167,7 @@ try {
     Assert-Equal 'summary.externalOverall espelha topo' ([string]$report.externalOverall) ([string]$report.summary.externalOverall)
 }
 finally {
+    $env:PATH = $originalPath
     $env:USERPROFILE = $originalProfile
     foreach ($p in @($fakeProfile, $fakeRepo)) {
         if (Test-Path -LiteralPath $p) {

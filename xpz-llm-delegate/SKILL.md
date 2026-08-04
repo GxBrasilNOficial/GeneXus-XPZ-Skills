@@ -21,6 +21,8 @@ saída) é o mesmo para todos; cada backend só contribui seu **adapter de invoc
 (`Invoke-Codex`, `Invoke-OpenCode`, `Invoke-ClaudeCode`, `Invoke-Copilot` ou `Invoke-Gemini`) e pelo parâmetro `-Backend`
 do gate — **nunca** pela chave de modelo na política (ver `## ANATOMIA`).
 
+> **Nota de separação conceitual**: O registro do Antigravity como ferramenta de agente gerenciada pela skill `xpz-skills-setup` trata da detecção de instalação, diretórios de skills (`~/.gemini/config/skills/`) e instrucionais globais do Antigravity. Não se confunde com o backend `gemini -p` (backend #5 desta skill), que atua como adapter de delegação a LLM de forma isolada.
+
 Esta skill é transversal — opera tanto na **raiz de desenvolvimento das skills XPZ**
 quanto, com regras mais estreitas, em sessão dentro de uma **pasta paralela de KB**.
 Ela não manipula XPZ/XML; o prefixo `xpz-` é marcador de família, como em

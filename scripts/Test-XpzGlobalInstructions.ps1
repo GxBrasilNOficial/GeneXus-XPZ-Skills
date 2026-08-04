@@ -65,6 +65,24 @@ function Expand-UserPath {
     return $Path
 }
 
+function Test-UsableCliOnPath {
+    param([string]$Name)
+    $cmds = Get-Command $Name -ErrorAction SilentlyContinue
+    if ($null -eq $cmds) { return $false }
+    foreach ($cmd in @($cmds)) {
+        if ([string]::IsNullOrWhiteSpace($cmd.Source)) { continue }
+        if ($cmd.Source -match '\\WindowsApps\\') { continue }
+        if (Test-Path -LiteralPath $cmd.Source -PathType Leaf) {
+            try {
+                if ((Get-Item -LiteralPath $cmd.Source).Length -gt 0) {
+                    return $true
+                }
+            } catch {}
+        }
+    }
+    return $false
+}
+
 function Test-ToolInstalled {
     param([string]$Tool)
     $profileRoot = Get-ProfileRoot
@@ -94,6 +112,18 @@ function Test-ToolInstalled {
             $configDir = Join-Path $profileRoot '.config\opencode'
             if (Test-Path -LiteralPath (Join-Path $configDir 'opencode.json') -PathType Leaf) { return $true }
             if (Test-Path -LiteralPath (Join-Path $configDir 'opencode.jsonc') -PathType Leaf) { return $true }
+            return $false
+        }
+        'Antigravity' {
+            if (Test-UsableCliOnPath -Name 'agy') { return $true }
+            if (Test-UsableCliOnPath -Name 'antigravity') { return $true }
+            $geminiConfigDir = Join-Path $profileRoot '.gemini\config'
+            if (Test-Path -LiteralPath (Join-Path $geminiConfigDir 'config.json') -PathType Leaf) { return $true }
+            if (Test-Path -LiteralPath (Join-Path $geminiConfigDir 'AGENTS.md') -PathType Leaf) { return $true }
+            if (Test-Path -LiteralPath (Join-Path $geminiConfigDir 'GEMINI.md') -PathType Leaf) { return $true }
+            $geminiDir = Join-Path $profileRoot '.gemini'
+            if (Test-Path -LiteralPath (Join-Path $geminiDir 'AGENTS.md') -PathType Leaf) { return $true }
+            if (Test-Path -LiteralPath (Join-Path $geminiDir 'GEMINI.md') -PathType Leaf) { return $true }
             return $false
         }
     }
@@ -184,6 +214,24 @@ function Get-EffectiveSources {
                 catch { }
             }
         }
+        'Antigravity' {
+            $candidates = @(
+                (Join-Path $profileRoot '.gemini\config\AGENTS.md'),
+                (Join-Path $profileRoot '.gemini\config\GEMINI.md'),
+                (Join-Path $profileRoot '.gemini\AGENTS.md'),
+                (Join-Path $profileRoot '.gemini\GEMINI.md')
+            )
+            foreach ($cand in $candidates) {
+                if (Test-Path -LiteralPath $cand -PathType Leaf) {
+                    try {
+                        if ((Get-Item -LiteralPath $cand).Length -gt 0) {
+                            $sources += $cand
+                            break
+                        }
+                    } catch {}
+                }
+            }
+        }
     }
     return @($sources | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
 }
@@ -215,7 +263,7 @@ function Get-TopicStatus {
 }
 
 # --- Auditar por ferramenta ---------------------------------------------------
-$toolNames = @('Codex', 'ClaudeCode', 'OpenCode', 'Cursor')
+$toolNames = @('Codex', 'ClaudeCode', 'OpenCode', 'Cursor', 'Antigravity')
 $toolsReport = @()
 $needsReview = $false
 
