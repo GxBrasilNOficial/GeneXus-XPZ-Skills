@@ -116,7 +116,7 @@ A skill apresenta duas estratégias e adota a **compacta** como padrão. Aceita 
 
 ### Compacta (padrão)
 
-Quatro caminhos cobrem as cinco ferramentas sem usar `~/.agents/skills/` como pilar único:
+Os diretórios nativos abaixo cobrem todas as ferramentas instaladas sem usar `~/.agents/skills/` como pilar único:
 
 - `~/.claude/skills/` → Claude Code (nativo), Cursor (compat)
 - `~/.codex/skills/` → Codex (nativo via `$CODEX_HOME/skills/` / instalador), Cursor (compat)
@@ -126,7 +126,7 @@ Quatro caminhos cobrem as cinco ferramentas sem usar `~/.agents/skills/` como pi
 **Opcional:** `~/.agents/skills/` — alguns setups já mantêm junctions aqui porque
 Cursor e OpenCode também tratam esse diretório como USER nativo e porque o Codex
 indexa esse segundo âmbito USER; **não entra na compacta recomendada** porque
-`.claude` + `.codex` + `.config/opencode` + `.gemini/config` já cobrem as cinco ferramentas sem depender
+os caminhos nativos das ferramentas principais já cobrem o ecossistema sem depender
 de compatibilidade opcional do OpenCode com Claude Code.
 
 **Dois junctions para o mesmo alvo:** registrar `nome-da-skill` como junction tanto
@@ -141,7 +141,7 @@ afetar as demais exige promover para a estratégia expansiva primeiro.
 
 ### Expansiva (opt-in)
 
-Cinco caminhos próprios, um por ferramenta:
+Um caminho próprio por ferramenta configurada:
 
 - `~/.codex/skills/` (Codex — caminho por padrão do instalador `$skill-installer`,
   `$CODEX_HOME/skills/`; coexistência opcional com `~/.agents/skills/` quando se
@@ -151,8 +151,8 @@ Cinco caminhos próprios, um por ferramenta:
 - `~/.config/opencode/skills/` (OpenCode)
 - `~/.gemini/config/skills/` (Antigravity)
 
-Vantagem: controle independente por ferramenta. Desvantagem: cada skill aparece
-em até quatro vínculos; cada vínculo é um ponto adicional de manutenção.
+Vantagem: controle independente por ferramenta. Desvantagem: multiplica os vínculos
+por ferramenta (um em cada diretório nativo), aumentando os pontos de manutenção e verificação após `git pull`.
 
 ### Classificação ao auditar
 
