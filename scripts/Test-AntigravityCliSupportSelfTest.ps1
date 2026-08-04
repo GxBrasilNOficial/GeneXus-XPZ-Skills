@@ -137,3 +137,5 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File "%~dp0fake-agy-err.ps1" %*
 
 Write-Host "Resultado do autoteste: $passed passou, $failed falhou."
 if ($failed -gt 0) { exit 1 }
+Write-Host "OK: Test-AntigravityCliSupportSelfTest.ps1"
+
