@@ -8,6 +8,7 @@
       - antigravity/claude-* -> anthropic
       - antigravity/gpt-*    -> openai
       - antigravity/gemini-* ou modelo padrao -> google
+    Chaves sem barra (ex: 'unknown', 'gpt-5') preservam a própria chave como familia.
 #>
 
 function Get-LlmDelegateTargetFamily {
@@ -16,9 +17,12 @@ function Get-LlmDelegateTargetFamily {
         [string]$TargetModelKey
     )
     Set-StrictMode -Version Latest
-    if ([string]::IsNullOrWhiteSpace($TargetModelKey) -or $TargetModelKey -notmatch '/') { return $null }
+    if ([string]::IsNullOrWhiteSpace($TargetModelKey)) { return $null }
 
-    $parts = @($TargetModelKey -split '/', 2)
+    $trimmed = $TargetModelKey.Trim()
+    if ($trimmed -notmatch '/') { return $trimmed }
+
+    $parts = @($trimmed -split '/', 2)
     $fam = $parts[0].Trim()
     $modelId = if ($parts.Count -gt 1) { $parts[1].Trim() } else { '' }
 

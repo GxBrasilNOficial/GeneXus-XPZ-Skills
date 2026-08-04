@@ -44,7 +44,7 @@ try {
     Assert-True $false "Falha ao resolver agy.exe: $($_.Exception.Message)"
 }
 
-# 5. Prova Comportamental: Injeção de fake-exe via -AntigravityExe para Invoke-Antigravity.ps1
+# 5. Prova Comportamental: Injeção de fake-exe (JSON) via -AntigravityExe para Invoke-Antigravity.ps1
 $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) ('agy-fake-test-' + [System.Guid]::NewGuid().ToString('N'))
 [void][System.IO.Directory]::CreateDirectory($tempDir)
 
@@ -78,6 +78,28 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File "%~dp0fake-agy-reader.ps1" %*
 
     $output = & $invokeScript -AntigravityExe $fakeCmd -MessagePath $promptFile -Model 'gemini-3.6-flash-high' -Mode plan
     Assert-True ($output -eq 'FAKE_AGY_RESPONSE: Teste de prompt via MessagePath') "Invoke-Antigravity.ps1 via fake-exe parseou JSON e retornou resposta (.response)"
+
+    # 6. Prova Comportamental: Injeção de fake-exe que retorna TEXTO PURO (não-JSON) para validar fallback sem estourar tipo
+    $fakeRawPs1 = Join-Path $tempDir 'fake-agy-raw.ps1'
+    @'
+param()
+if ($args -contains '--help') {
+    "Usage of agy: -p Run a prompt --mode Set agent mode"
+    exit 0
+}
+Write-Output "RESPOSTA_EM_TEXTO_BRUTO_SEM_JSON"
+exit 0
+'@ | Set-Content -LiteralPath $fakeRawPs1 -Encoding utf8
+
+    $fakeRawCmd = Join-Path $tempDir 'fake-agy-raw.cmd'
+    @'
+@echo off
+pwsh -NoProfile -ExecutionPolicy Bypass -File "%~dp0fake-agy-raw.ps1" %*
+'@ | Set-Content -LiteralPath $fakeRawCmd -Encoding ascii
+
+    $rawOutput = & $invokeScript -AntigravityExe $fakeRawCmd -Message 'Teste texto puro' -Model 'gemini-3.6-flash-high' -Mode plan
+    Assert-True ($rawOutput -eq 'RESPOSTA_EM_TEXTO_BRUTO_SEM_JSON') "Invoke-Antigravity.ps1 via fake-exe de texto puro ativou fallback sem excecao de tipo"
+
 } finally {
     Remove-Item -LiteralPath $tempDir -Recurse -Force -ErrorAction SilentlyContinue
 }

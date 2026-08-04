@@ -145,7 +145,7 @@ try {
             throw "BLOCK: Antigravity CLI retornou status '$respStatus'."
         }
         return $respText.Trim()
-    } catch [System.Text.Json.JsonException], [System.Management.Automation.ArgumentException] {
+    } catch [System.Text.Json.JsonException], [System.ArgumentException], [System.Management.Automation.RuntimeException] {
         # Fallback a texto bruto se nao for JSON
         $cleanText = [regex]::Replace([string]$stdoutText, '\x1B\[[0-9;]*[a-zA-Z]', '').Trim()
         return $cleanText

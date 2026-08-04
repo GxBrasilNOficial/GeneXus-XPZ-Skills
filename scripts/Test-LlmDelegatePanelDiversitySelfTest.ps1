@@ -72,8 +72,13 @@ Assert-True (@($r8.distinctFamiliesAllow).Count -eq 1) 'Caso 8: skips com counts
 $r9 = Invoke-Diversity '[{"targetModelKey":"antigravity/gemini-3.6-flash","verdict":"allow"},{"targetModelKey":"google/gemini-3-flash-preview","verdict":"allow"}]'
 Assert-True ($r9.state -eq 'insufficientDiversity') "Caso 9: antigravity/gemini e google compartilham familia google; esperado insufficientDiversity; veio '$($r9.state)'."
 
-# (10) antigravity/claude-* pontua como anthropic (diversidade real contra google)
-$r10 = Invoke-Diversity '[{"targetModelKey":"antigravity/claude-sonnet-4.6","verdict":"allow"},{"targetModelKey":"google/gemini-3-flash-preview","verdict":"allow"}]'
-Assert-True ($r10.state -eq 'panelReady') "Caso 10: antigravity/claude e google sao familias distintas; esperado panelReady; veio '$($r10.state)'."
+# (10) antigravity/claude-* vs google/gemini-* sao 2 familias distintas (anthropic vs google)
+$r10 = Invoke-Diversity '[{"targetModelKey":"antigravity/claude-sonnet-4-6","verdict":"allow"},{"targetModelKey":"google/gemini-3-flash-preview","verdict":"allow"}]'
+Assert-True ($r10.state -eq 'panelReady') "Caso 10: antigravity/claude-* (anthropic) + google (google) -> panelReady; veio '$($r10.state)'."
 
-Write-Output 'OK: Test-LlmDelegatePanelDiversitySelfTest.ps1'
+# (11) chave 'unknown' (sem barra) nao eh descartada e conta como familia propria (unknown)
+$r11 = Invoke-Diversity '[{"targetModelKey":"unknown","verdict":"allow"},{"targetModelKey":"google/gemini-3-flash-preview","verdict":"allow"}]'
+Assert-True ($r11.state -eq 'panelReady') "Caso 11: chave 'unknown' sem barra deve contar como familia propria; veio '$($r11.state)'."
+Assert-True (@($r11.dispatchable).Count -eq 2) "Caso 11: ambos candidatos devem ser dispatchable; veio '$(@($r11.dispatchable).Count)'."
+
+Write-Host "OK: Test-LlmDelegatePanelDiversitySelfTest.ps1"

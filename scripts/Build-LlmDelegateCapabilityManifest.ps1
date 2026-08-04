@@ -67,6 +67,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $scriptsDir = $PSScriptRoot
+. (Join-Path $scriptsDir 'LlmDelegateTargetFamilySupport.ps1')
 $openResolver = Join-Path $scriptsDir 'Resolve-OpenCodeModelLocality.ps1'
 $codexResolver = Join-Path $scriptsDir 'Resolve-CodexModelLocality.ps1'
 $claudeResolver = Join-Path $scriptsDir 'Resolve-ClaudeCodeModelLocality.ps1'
@@ -140,20 +141,23 @@ function New-CapabilityEntry {
         [Parameter(Mandatory)] [string]$TargetModelKey,
         [string]$CanonicalModel,
         [string]$Provider,
+        [string]$Family,
         [string]$Locality = 'unknown',
-        [ValidateSet('configured', 'catalog', 'cache', 'historical', 'probe')] [string]$SourceKind = 'configured',
+        [ValidateSet('configured', 'catalog', 'cache', 'historical', 'probe', 'cli')] [string]$SourceKind = 'configured',
         [ValidateSet('strong', 'medium', 'weak')] [string]$SourceConfidence = 'strong',
         [bool]$AvailableInManifest = $true,
         [string[]]$Diagnostics = @()
     )
     if ([string]::IsNullOrWhiteSpace($CanonicalModel)) { $CanonicalModel = $TargetModelKey }
     if ([string]::IsNullOrWhiteSpace($Provider)) { $Provider = Get-ProviderFromModelKey $CanonicalModel }
+    if ([string]::IsNullOrWhiteSpace($Family)) { $Family = Get-LlmDelegateTargetFamily -TargetModelKey $CanonicalModel }
+    if ([string]::IsNullOrWhiteSpace($Family)) { $Family = $Provider }
     [pscustomobject]@{
         backend             = $Backend
         targetModelKey      = $TargetModelKey
         canonicalModel      = $CanonicalModel
         provider            = $Provider
-        family              = $Provider
+        family              = $Family
         sourceKind          = $SourceKind
         sourceConfidence    = $SourceConfidence
         availableInManifest = $AvailableInManifest
@@ -330,11 +334,7 @@ function Get-AntigravityModelEntries {
     } catch { }
 
     if ($rawModels.Count -eq 0) {
-        $rawModels = @(
-            'gemini-3.6-flash-high', 'gemini-3.6-flash-medium', 'gemini-3.6-flash-low',
-            'gemini-3.5-flash-high', 'gemini-3.1-pro-high',
-            'claude-sonnet-4-6', 'claude-opus-4-6-thinking', 'gpt-oss-120b-medium'
-        )
+        return $entries
     }
 
     foreach ($m in $rawModels) {
@@ -344,6 +344,7 @@ function Get-AntigravityModelEntries {
             if ([string]::IsNullOrWhiteSpace($canonical)) { continue }
             $entries.Add((New-CapabilityEntry -Backend 'antigravity' -TargetModelKey $canonical `
                         -CanonicalModel $canonical -Provider ([string](Get-Prop $res 'provider')) `
+                        -Family ([string](Get-Prop $res 'family')) `
                         -Locality ([string](Get-Prop $res 'locality')) -SourceKind 'cli' `
                         -SourceConfidence 'strong' -AvailableInManifest $true))
         } catch { }
@@ -370,11 +371,14 @@ foreach ($b in @(
 }
 
 $isAgyInstalled = Test-AntigravityPresent
+$agyModelEntries = @(Get-AntigravityModelEntries)
+$hasAgyModels = ($agyModelEntries.Count -gt 0)
+
 $backends += [pscustomobject]@{
     backend     = 'antigravity'
     installed   = $isAgyInstalled
-    enumeration = if ($isAgyInstalled) { 'cli' } else { 'none-native' }
-    models      = if ($isAgyInstalled) { @(Get-AntigravityModelEntries) } else { @() }
+    enumeration = if ($hasAgyModels) { 'cli' } else { 'none-native' }
+    models      = [object[]]$agyModelEntries
 }
 
 $generatedAt = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
