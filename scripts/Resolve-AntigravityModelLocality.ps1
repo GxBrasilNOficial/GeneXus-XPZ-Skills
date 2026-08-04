@@ -9,11 +9,11 @@
 
     Saida: objeto JSON de maquina no stdout.
 .PARAMETER Model
-    Modelo solicitado ao Antigravity CLI. Default: gemini-3.6-flash.
+    Modelo solicitado ao Antigravity CLI. Default: gemini-3.6-flash-high.
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Position = 0)] [string] $Model = 'gemini-3.6-flash'
+    [Parameter(Position = 0)] [string] $Model = 'gemini-3.6-flash-high'
 )
 
 Set-StrictMode -Version Latest
@@ -26,7 +26,7 @@ $modelId = $raw
 if ($raw -like 'antigravity/*') {
     $modelId = ($raw -split '/', 2)[1].Trim()
 }
-if ([string]::IsNullOrWhiteSpace($modelId)) { $modelId = 'gemini-3.6-flash' }
+if ([string]::IsNullOrWhiteSpace($modelId)) { $modelId = 'gemini-3.6-flash-high' }
 
 $canonicalModel = "antigravity/$modelId"
 $family = Get-LlmDelegateTargetFamily -TargetModelKey $canonicalModel

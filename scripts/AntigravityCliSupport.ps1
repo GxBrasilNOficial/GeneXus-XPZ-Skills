@@ -14,7 +14,7 @@ $quotaFailurePattern = '(?i)\b(quota|rate\s*limit|exhausted|too\s*many\s*request
 function Test-AntigravityHelpSupportsContract {
     param([string]$HelpText)
     if ([string]::IsNullOrWhiteSpace($HelpText)) { return $false }
-    $hasPrint = $HelpText -match '(?i)--print|-p|--prompt'
+    $hasPrint = $HelpText -match '(?i)(--print|(?<=\s|^|[\s,\(])-p(?=[\s,\)]|$)|--prompt)'
     $hasMode = $HelpText -match '(?i)--mode'
     return ($hasPrint -and $hasMode)
 }
@@ -64,7 +64,7 @@ function Get-AntigravityErrorMessage {
     if ([string]::IsNullOrWhiteSpace($combined)) { return $null }
     $lines = @($combined -split "`r?`n")
     $interesting = @($lines | Where-Object {
-        $_ -match '(?i)\b(error|failed|unauthorized|forbidden|not\s+available|requires|login|auth|invalid|quota|rate\s*limit)\b'
+        $_ -match '(?i)\b(error|failed|unauthorized|forbidden|not\s+available|requires|login|auth|invalid|quota|rate\s*limit|exhausted)\b'
     })
     if ($interesting.Count -gt 0) {
         return (($interesting | Select-Object -First 8) -join "`n").Trim()

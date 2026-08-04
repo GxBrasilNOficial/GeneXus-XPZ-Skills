@@ -3,8 +3,8 @@
 .SYNOPSIS
     Chama o Antigravity CLI (agy, sincrono) e devolve a resposta final em texto.
 .DESCRIPTION
-    Backend antigravity da skill xpz-llm-delegate. Usa `agy -p` com `--mode plan`,
-    modo consultivo/read-only.
+    Backend antigravity da skill xpz-llm-delegate. Usa `agy -p` com `--mode plan`
+    e `--output-format json`, modo consultivo/read-only.
 
     CONFIDENCIALIDADE: este script NAO decide se o payload pode ir ao Antigravity. Antes de
     enviar payload sensivel, passe por Resolve-LlmDelegateAuthorization.ps1 -Backend antigravity.
@@ -16,7 +16,7 @@
     (o prompt vai no argv via runner), entao -MessagePath NAO levanta o teto ~32KB do command line
     do Windows; um guard fail-closed (~30000 chars) recusa prompts grandes.
 .PARAMETER Model
-    Modelo aceito pelo Antigravity CLI. Default: gemini-3.6-flash.
+    Modelo aceito pelo Antigravity CLI. Default: gemini-3.6-flash-high.
 .PARAMETER Mode
     Modo de execucao do Antigravity CLI. Somente 'plan' e permitido na delegacao XPZ. Default: plan.
 .PARAMETER Cd
@@ -30,7 +30,7 @@
 param(
     [Parameter(Mandatory, Position = 0, ParameterSetName = 'Inline')] [string] $Message,
     [Parameter(Mandatory, ParameterSetName = 'FromFile')] [string] $MessagePath,
-    [string] $Model = 'gemini-3.6-flash',
+    [string] $Model = 'gemini-3.6-flash-high',
     [ValidateSet('plan')] [string] $Mode = 'plan',
     [string] $Cd,
     [string] $AntigravityExe,
@@ -73,15 +73,16 @@ $rawModel = $Model.Trim()
 if ($rawModel -like 'antigravity/*') {
     $rawModel = ($rawModel -split '/', 2)[1].Trim()
 }
-if ([string]::IsNullOrWhiteSpace($rawModel)) { $rawModel = 'gemini-3.6-flash' }
+if ([string]::IsNullOrWhiteSpace($rawModel)) { $rawModel = 'gemini-3.6-flash-high' }
 
 $request = [ordered]@{
-    exe        = $exe
-    prompt     = $Message
-    model      = $rawModel
-    mode       = $Mode
-    stdoutPath = $out.FullName
-    stderrPath = $err.FullName
+    exe          = $exe
+    prompt       = $Message
+    model        = $rawModel
+    mode         = $Mode
+    timeoutSec   = $TimeoutSec
+    stdoutPath   = $out.FullName
+    stderrPath   = $err.FullName
 }
 $request | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $req.FullName -Encoding utf8
 
@@ -93,6 +94,8 @@ $req = Get-Content -LiteralPath $RequestPath -Raw -Encoding utf8 | ConvertFrom-J
 $agyArgs = @(
     '-p', [string]$req.prompt,
     '--mode', [string]$req.mode,
+    '--output-format', 'json',
+    '--print-timeout', "$([string]$req.timeoutSec)s",
     '--model', [string]$req.model
 )
 # Stdin fechado ($null) para agy nao travar aguardando TTY
@@ -130,9 +133,23 @@ try {
         throw "BLOCK: erro na execucao do Antigravity CLI: $errMsg"
     }
 
-    # Remove sequencias ANSI se presentes
-    $cleanText = [regex]::Replace([string]$stdoutText, '\x1B\[[0-9;]*[a-zA-Z]', '').Trim()
-    return $cleanText
+    if ([string]::IsNullOrWhiteSpace($stdoutText)) {
+        throw "BLOCK: Antigravity CLI retornou resposta vazia."
+    }
+
+    try {
+        $jsonResp = $stdoutText | ConvertFrom-Json
+        $respStatus = [string]$jsonResp.status
+        $respText = [string]$jsonResp.response
+        if ($respStatus -and $respStatus -ne 'SUCCESS') {
+            throw "BLOCK: Antigravity CLI retornou status '$respStatus'."
+        }
+        return $respText.Trim()
+    } catch [System.Text.Json.JsonException], [System.Management.Automation.ArgumentException] {
+        # Fallback a texto bruto se nao for JSON
+        $cleanText = [regex]::Replace([string]$stdoutText, '\x1B\[[0-9;]*[a-zA-Z]', '').Trim()
+        return $cleanText
+    }
 
 } finally {
     if ($null -ne $proc) { $proc.Dispose() }

@@ -165,7 +165,7 @@ function Get-Slug {
     return ([regex]::Replace($Value, '[^A-Za-z0-9._-]', '-'))
 }
 
-$quotaFailurePattern = '(?i)(^|[^0-9])402([^0-9]|$)|Payment Required|insufficient coding plan balance|quota|rate limit|weekly usage limit|limite de uso|sem quota|saldo insuficiente'
+$quotaFailurePattern = '(?i)(^|[^0-9])(402|429)([^0-9]|$)|Payment Required|insufficient coding plan balance|quota|rate limit|exhausted|resource_exhausted|too many requests|weekly usage limit|limite de uso|sem quota|saldo insuficiente'
 $unavailableFailurePattern = '(?i)workspace-not-trusted'
 
 function Test-QuotaFailureMessage {

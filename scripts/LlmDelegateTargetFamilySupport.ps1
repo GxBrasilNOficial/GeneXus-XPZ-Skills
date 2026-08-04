@@ -16,9 +16,9 @@ function Get-LlmDelegateTargetFamily {
         [string]$TargetModelKey
     )
     Set-StrictMode -Version Latest
-    if ([string]::IsNullOrWhiteSpace($TargetModelKey)) { return $null }
+    if ([string]::IsNullOrWhiteSpace($TargetModelKey) -or $TargetModelKey -notmatch '/') { return $null }
 
-    $parts = @($TargetModelKey -split '/')
+    $parts = @($TargetModelKey -split '/', 2)
     $fam = $parts[0].Trim()
     $modelId = if ($parts.Count -gt 1) { $parts[1].Trim() } else { '' }
 

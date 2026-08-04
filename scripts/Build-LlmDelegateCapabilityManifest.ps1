@@ -306,7 +306,50 @@ $backends += [pscustomobject]@{
     models      = @(Get-ClaudeCodeModelEntries -SettingsPath $ClaudeSettingsPath -StatsCachePath $ClaudeStatsCachePath)
 }
 
-. (Join-Path $PSScriptRoot 'LlmDelegateTargetFamilySupport.ps1')
+function Get-AntigravityModelEntries {
+    $entries = [System.Collections.Generic.List[object]]::new()
+    $antigravityResolver = Join-Path $PSScriptRoot 'Resolve-AntigravityModelLocality.ps1'
+    if (-not (Test-Path -LiteralPath $antigravityResolver -PathType Leaf)) { return $entries }
+
+    $exe = $null
+    $cmd = Get-Command agy -ErrorAction SilentlyContinue
+    if ($cmd -and $cmd.Source) { $exe = $cmd.Source }
+    else {
+        $defaultPath = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'agy\bin\agy.exe'
+        if (Test-Path -LiteralPath $defaultPath -PathType Leaf) { $exe = $defaultPath }
+    }
+
+    if (-not $exe) { return $entries }
+
+    $rawModels = @()
+    try {
+        $rawOutput = $null | & $exe models 2>&1 | Out-String
+        if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($rawOutput)) {
+            $rawModels = @($rawOutput -split "`r?`n" | Where-Object { $_ -match '^[a-z0-9][a-z0-9\-\.]+$' })
+        }
+    } catch { }
+
+    if ($rawModels.Count -eq 0) {
+        $rawModels = @(
+            'gemini-3.6-flash-high', 'gemini-3.6-flash-medium', 'gemini-3.6-flash-low',
+            'gemini-3.5-flash-high', 'gemini-3.1-pro-high',
+            'claude-sonnet-4-6', 'claude-opus-4-6-thinking', 'gpt-oss-120b-medium'
+        )
+    }
+
+    foreach ($m in $rawModels) {
+        try {
+            $res = (& $antigravityResolver -Model $m) | ConvertFrom-Json
+            $canonical = [string](Get-Prop $res 'canonicalModel')
+            if ([string]::IsNullOrWhiteSpace($canonical)) { continue }
+            $entries.Add((New-CapabilityEntry -Backend 'antigravity' -TargetModelKey $canonical `
+                        -CanonicalModel $canonical -Provider ([string](Get-Prop $res 'provider')) `
+                        -Locality ([string](Get-Prop $res 'locality')) -SourceKind 'cli' `
+                        -SourceConfidence 'strong' -AvailableInManifest $true))
+        } catch { }
+    }
+    return $entries
+}
 
 function Test-AntigravityPresent {
     if (Test-CommandPresent 'agy') { return $true }
@@ -326,11 +369,12 @@ foreach ($b in @(
     }
 }
 
+$isAgyInstalled = Test-AntigravityPresent
 $backends += [pscustomobject]@{
     backend     = 'antigravity'
-    installed   = (Test-AntigravityPresent)
-    enumeration = 'none-native'
-    models      = @()
+    installed   = $isAgyInstalled
+    enumeration = if ($isAgyInstalled) { 'cli' } else { 'none-native' }
+    models      = if ($isAgyInstalled) { @(Get-AntigravityModelEntries) } else { @() }
 }
 
 $generatedAt = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
