@@ -17,8 +17,10 @@
     revisor, e so conta familias. O gate continua soberano por destino+sensibilidade.
 
     Familia = familia estrutural do modelo de DESTINO (resolvida via Get-LlmDelegateTargetFamily):
-    openai, anthropic, ollama, google, github-copilot, etc. Modelos da mesma familia
-    compartilham vieses de treino, logo nao contam como diversidade entre si.
+    em geral o prefixo do provedor em targetModelKey (ex.: openai, anthropic, ollama-cloud,
+    nvidia, opencode-go, atlas-cloud, google, github-copilot); antigravity/* colapsa para a
+    familia do modelo subjacente. Modelos da mesma familia compartilham vieses de treino,
+    logo nao contam como diversidade entre si.
 
     Piso: >=2 familias distintas entre si entre os revisores DESPACHAVEIS (verdict=allow).
     `ask` ainda nao conta como painel montado — conta como candidato AUTORIZAVEL (se
