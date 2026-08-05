@@ -1,6 +1,6 @@
 ---
 name: xpz-llm-delegate
-description: Permite ao agente principal delegar tarefas menores, pedir segunda opinião ou conduzir revisão por pares/peer review de plano/design por painel multi-modelo via opencode, Codex, Claude Code (Opus 4.8), GitHub Copilot CLI ou Gemini CLI; ao receber "revisão por pares", carregar esta skill, perguntar revisores preferidos se não houver preferred-reviewers.json, não presumir assinatura externa e nunca rotular parecer solo como revisão por pares; acionamento sempre humano
+description: Permite ao agente principal delegar tarefas menores, pedir segunda opinião ou conduzir revisão por pares/peer review de plano/design por painel multi-modelo via opencode, Codex, Claude Code (Opus 4.8), GitHub Copilot CLI, Gemini CLI ou Antigravity CLI; ao receber "revisão por pares", carregar esta skill, perguntar revisores preferidos se não houver preferred-reviewers.json, não presumir assinatura externa e nunca rotular parecer solo como revisão por pares; acionamento sempre humano
 ---
 
 # xpz-llm-delegate
@@ -58,7 +58,7 @@ Regra prática para o agente consumidor:
    diretório machine-level).
 3. Se não houver lista, perguntar ao usuário quais ferramentas/modelos ele tem disponíveis ou
    prefere, usando nomes reconhecíveis: `Claude Code`, `opencode/Ollama Cloud`, `Codex`,
-   `Copilot`, `Gemini`, ou subagente nativo da ferramenta atual. A pergunta deve calibrar
+   `Copilot`, `Gemini`, `Antigravity CLI`, ou subagente nativo da ferramenta atual. A pergunta deve calibrar
    preferência humana, não enumerar tudo que está instalado como menu prescritivo. Backend
    detectado sem preferência registrada deve aparecer como "detectado; confirme se quer usar",
    nunca como recomendação implícita. Não sugerir "caminho mais simples" com serviço externo
@@ -278,13 +278,14 @@ Use esta skill para:
   dele a uma sugestão
 - Pedir segunda opinião de um modelo distinto (ex.: diversidade de modelo na revisão pré-push)
 - Conduzir uma **revisão por pares** de um plano/design — montar um painel multi-modelo e ofertar a composição conforme os modelos/backends disponíveis na máquina (gatilhos: "revisão por pares", "peer review", "painel de modelos", "validar plano multi-modelo"); ver [`15-revisao-por-pares.md`](../15-revisao-por-pares.md)
-- Calibrar e usar a **lista de revisores preferidos** (`preferred-reviewers.json`) que alimenta a oferta de painel sem re-sondar; no 1º uso de revisão por pares sem lista, perguntar ao usuário quais ferramentas/modelos ele tem disponíveis ou prefere, em linguagem de ferramenta (`Claude Code`, `opencode/Ollama Cloud`, `Codex`, `Copilot`, `Gemini`, subagente nativo), antes de oferecer painel — ver `Set-`/`Resolve-LlmDelegatePreferredReviewers.ps1`
+- Calibrar e usar a **lista de revisores preferidos** (`preferred-reviewers.json`) que alimenta a oferta de painel sem re-sondar; no 1º uso de revisão por pares sem lista, perguntar ao usuário quais ferramentas/modelos ele tem disponíveis ou prefere, em linguagem de ferramenta (`Claude Code`, `opencode/Ollama Cloud`, `Codex`, `Copilot`, `Gemini`, `Antigravity`, subagente nativo), antes de oferecer painel — ver `Set-`/`Resolve-LlmDelegatePreferredReviewers.ps1`
 - Disparar uma tarefa longa sem bloquear (job assíncrono com janela de acompanhamento)
 - Delegar a um sub-agente Codex (`codex exec`) — síncrono ou assíncrono
 - Delegar a um sub-agente Claude Code (`claude -p`, Opus 4.8) — síncrono ou assíncrono
 - Delegar consulta curta ao GitHub Copilot CLI (`copilot -p`) — síncrono
 - Delegar consulta curta ao Gemini CLI (`gemini -p`) — síncrono
-- Classificar se um modelo do opencode, Codex, Claude Code, Copilot ou Gemini é local ou externo
+- Delegar consulta curta ao Antigravity CLI (`agy -p`) — síncrono
+- Classificar se um modelo do opencode, Codex, Claude Code, Copilot, Gemini ou Antigravity é local ou externo
 - Decidir, via gate, se um payload pode ser enviado a um modelo (allow/ask/deny), em qualquer backend
 
 Do NOT use esta skill para:
@@ -381,10 +382,10 @@ decisão humana explícita. Não transformar esse caso em laço de redisparo nem
 recibo. Escopo: falha sem texto em lote concorrente — não `gateDeny`/`gateAsk`/timeout legítimo.
 
 Núcleo backend-agnóstico:
-- `Resolve-OpenCodeModelLocality.ps1`, `Resolve-CodexModelLocality.ps1`, `Resolve-ClaudeCodeModelLocality.ps1`, `Resolve-CopilotModelLocality.ps1`, `Resolve-GeminiModelLocality.ps1`, `Resolve-LlmDelegationPolicyPath.ps1` (resolve o caminho do arquivo de política: nome canônico `llm-delegation-policy.json` com fallback ao legado `opencode-delegation-policy.json`; `status` `new|legacy|both|none`) e `Resolve-LlmDelegateAuthorization.ps1` (ver `## ANATOMIA` e `## CONFIDENCIALIDADE`).
+- `Resolve-OpenCodeModelLocality.ps1`, `Resolve-CodexModelLocality.ps1`, `Resolve-ClaudeCodeModelLocality.ps1`, `Resolve-CopilotModelLocality.ps1`, `Resolve-GeminiModelLocality.ps1`, `Resolve-AntigravityModelLocality.ps1`, `Resolve-LlmDelegationPolicyPath.ps1` (resolve o caminho do arquivo de política: nome canônico `llm-delegation-policy.json` com fallback ao legado `opencode-delegation-policy.json`; `status` `new|legacy|both|none`) e `Resolve-LlmDelegateAuthorization.ps1` (ver `## ANATOMIA` e `## CONFIDENCIALIDADE`).
 
 Sondagem de capacidade (para a oferta de revisão por pares — ver [`15-revisao-por-pares.md`](../15-revisao-por-pares.md)):
-- `Build-LlmDelegateCapabilityManifest.ps1 [-OutputPath <json>] [-SnapshotPath <json>] [-OpenCodeConfigPath <opencode.json|jsonc>] [-CodexConfigPath <config.toml>] [-ClaudeSettingsPath <settings.json>] [-ClaudeStatsCachePath <stats.json>]` — sonda os backends instalados e enumera capacidade **sem fabricar provider**: opencode lê JSON/JSONC; Codex usa `config.toml`/resolvedor e deixa provider `unknown` quando a fonte não prova o destino; Claude Code combina settings configurado (`sourceKind=configured`, `sourceConfidence=strong`) com cache histórico (`historical`, `weak`, `availableInManifest=false`, `enumeration=settings-or-historical`); Copilot/Gemini seguem como capacidade sem enumeração nativa forte. Grava manifesto sanitizado machine-level (default `%LOCALAPPDATA%\xpz-llm-delegate\capabilities.json`) com `backend`, `targetModelKey`, `canonicalModel`, `provider`, `family`, `sourceKind`, `sourceConfidence`, `availableInManifest`, `locality`, `reasonCode`, `hardVeto` e `diagnostics` — **nunca** token, chave, baseURL, header, path de config, prompt ou política. É **dica de oferta**: o gate (`Resolve-LlmDelegateAuthorization.ps1`) **não** o consome — reavalia destino e sensibilidade sempre. Self-test `Test-LlmDelegateCapabilityManifestSelfTest.ps1`.
+- `Build-LlmDelegateCapabilityManifest.ps1 [-OutputPath <json>] [-SnapshotPath <json>] [-OpenCodeConfigPath <opencode.json|jsonc>] [-CodexConfigPath <config.toml>] [-ClaudeSettingsPath <settings.json>] [-ClaudeStatsCachePath <stats.json>]` — sonda os backends instalados e enumera capacidade **sem fabricar provider**: opencode lê JSON/JSONC; Codex usa `config.toml`/resolvedor e deixa provider `unknown` quando a fonte não prova o destino; Claude Code combina settings configurado (`sourceKind=configured`, `sourceConfidence=strong`) com cache histórico (`historical`, `weak`, `availableInManifest=false`, `enumeration=settings-or-historical`); Copilot/Gemini/Antigravity seguem como capacidade sem enumeração nativa forte. Grava manifesto sanitizado machine-level (default `%LOCALAPPDATA%\xpz-llm-delegate\capabilities.json`) com `backend`, `targetModelKey`, `canonicalModel`, `provider`, `family`, `sourceKind`, `sourceConfidence`, `availableInManifest`, `locality`, `reasonCode`, `hardVeto` e `diagnostics` — **nunca** token, chave, baseURL, header, path de config, prompt ou política. É **dica de oferta**: o gate (`Resolve-LlmDelegateAuthorization.ps1`) **não** o consome — reavalia destino e sensibilidade sempre. Self-test `Test-LlmDelegateCapabilityManifestSelfTest.ps1`.
 - `Set-LlmDelegatePreferredReviewers.ps1 -ReviewersJson <json> [-OutputPath <json>] [-Preview]` — persiste a **curadoria** de revisores preferidos do usuário em `%LOCALAPPDATA%\xpz-llm-delegate\preferred-reviewers.json` (machine-level), schema v2: metadados `updatedAt` e `migratedFrom` (schema de origem; `1` quando ausente), titulares validados e ordenados por `rank` positivo/único (`rank` omitido é atribuído depois do maior `rank` explícito válido), `targetModelKey`, `backend`, `invokeArgs.backend` e `fallbackChain[]` ordenado `0..N`. Cada fallback é revisor completo (`backend`, `targetModelKey`, `invokeArgs`) e não herda implicitamente do titular; `invokeArgs` é sanitizado (`backend`/`model`/`profile`/`oss`/`localProvider`/`timeoutSec`; **nunca** token/baseURL/header/path). `fallbackPolicy` é restrito ao contrato suportado pelo dispatcher (`ordered-chain`, ativação em `quota`/`timeout`/`error`/`unavailable`, `gateAsk=ask-human`, `gateDeny=stop-or-suggest-manual-alternative`). Bloqueia veto duro, backend inválido, rank inválido/duplicado, política de fallback divergente, divergência `backend` × `invokeArgs.backend`, duplicidade/ciclo na cadeia e escreve com backup + substituição atômica, limpando o `.tmp-*` em falha; `-Preview` valida e mostra a forma normalizada sem gravar.
 - `Resolve-LlmDelegatePreferredReviewers.ps1 [-PreferredPath <json>] [-CapabilitiesPath <json>]` — lê curadoria v1 legada ou v2, cruza com `capabilities.json` (`availableInManifest`, `capability`, `diagnostics`, best-effort) e devolve a **composição sugerida** do painel com `schemaVersion`, `updatedAt`, `migratedFrom`, titulares ordenados por `rank` e `fallbackChain` resolvida. Sem arquivo → `hasPreferences=false`. Bloqueia antes do dispatcher hard veto, rank inválido/duplicado, `fallbackPolicy` fora do contrato suportado, ciclo/duplicidade e divergência `invokeArgs.backend != backend`. **Invariante: preferência ≠ autorização** — não consome o manifesto como verdade do gate; o `Resolve-LlmDelegateAuthorization.ps1` reavalia **por revisor** no envio. Self-test `Test-LlmDelegatePreferredReviewersSelfTest.ps1`.
 - `Resolve-LlmDelegatePanelDiversity.ps1 -CandidatesJson <json> [-Floor <n>] [-AuthorFamily <fam>]` — avalia (consultivo) o **piso de diversidade** do painel (≥2 famílias distintas = provider de destino) a partir dos candidatos + vereditos do gate ou estados pós-despacho. Ignora candidatos com `countsForDiversity=false` (ex.: `skippedAfterSuccess`, `skippedByPolicy`, `notAttempted`) e devolve `insufficientDiversityAfterFallback` quando houve fallback/skip auditável mas as famílias efetivamente respondidas ficaram abaixo do piso. **Não** decide autorização (o gate é soberano). Self-test `Test-LlmDelegatePanelDiversitySelfTest.ps1`.
@@ -573,7 +574,7 @@ decisão humana sobre redisparo isolado         │    gateAsk,gateDeny,skippedA
 ```
 
 - **Preparação de artefatos:** o harness aceita `-ManuscriptPath` legado ou `-ManuscriptText` para payload curto; para dossiê/manuscrito grande, use `-ManuscriptPath` para evitar o limite de linha de comando do Windows. Com `-ManuscriptText`, antes de qualquer gate/despacho ele chama `New-LlmDelegatePeerReviewArtifacts.ps1`, que publica `manuscript.md`, `reviewers.json` e `preparation-manifest.json` sob `<TempDir>/<RoundId>`; falha nessa etapa termina com resumo estruturado do próprio dispatcher (`roundStarted=false`, `dispatchStarted=false`, zero revisores despachados).
-- **Modelo efetivo:** opencode = `invokeArgs.model` ou o `targetModelKey` de **entrada** (o resolvedor opencode exige `-Model`; o gate recebe o mesmo valor); codex = `invokeArgs.model` ou, se ausente, gate **sem** `-Model` → último segmento do `targetModelKey` retornado; claude-code/copilot/gemini = `invokeArgs.model` **obrigatório** (ausente → `state=error` fail-closed). `targetModelKey` nulo onde exigido (opencode/codex) → `state=error`.
+- **Modelo efetivo:** opencode = `invokeArgs.model` ou o `targetModelKey` de **entrada** (o resolvedor opencode exige `-Model`; o gate recebe o mesmo valor); codex = `invokeArgs.model` ou, se ausente, gate **sem** `-Model` → último segmento do `targetModelKey` retornado; claude-code/copilot/gemini/antigravity = `invokeArgs.model` **obrigatório** (ausente → `state=error` fail-closed). `targetModelKey` nulo onde exigido (opencode/codex) → `state=error`.
 - **`responded` é MECÂNICO** (texto não-vazio), **não** «parecer válido»: o harness não inspeciona o conteúdo. A reclassificação `responded`→`noResponse` (revisor off-task **ou on-task raquítico**) é **post-hoc do orquestrador** antes do closeout (`15-revisao-por-pares.md`, `## Recibo e livro-razão`) — um off-task **ou parecer raquítico** não soma para o piso.
 - **Contenção = trava fail-closed PER-BACKEND (Posição B, decisão de segurança):** as chaves de contenção do backend que as aceita — claude-code `{permissionMode,tools,maxTurns}` (`maxTurns` é **chave morta** desde 2026-07-25: o adapter não tem mais esse parâmetro, e a chave segue recusada só por precaução), opencode `{agent}`, gemini `{approvalMode != plan}` — são **recusadas** (`securityBlockedArgs`) e **não** repassadas ao adapter; o mesmo vale, no Claude Code de painel, para chaves internas do adapter assíncrono (`SidecarPath`, `RetentionMode`, `TempDir`, `CircuitStateRoot`, `ClaudeExe`, `MessagePath`/`Message`). O despacho segue com os **defaults seguros** do adapter. **O default seguro do opencode é agora o agente `reviewer-ro` least-privilege** (default escopado + guard fail-closed no adapter — ver «OPENCODE — REVISOR LEAST-PRIVILEGE»); como o painel bloqueia `{agent}`, o revisor opencode **sempre** cai no `reviewer-ro`. O harness **nunca** expõe nem relaxa contenção ou artefatos internos. `approvalMode=plan` (gemini, o default) → `droppedArgs` silencioso; codex/copilot não têm parâmetro de contenção (chave estranha → `droppedArgs`).
 - **Claude Code no painel:** o backend não usa o adapter síncrono; usa `Invoke-ClaudeCodeAsync.ps1`, que lê `stream-json`, grava sidecar técnico atômico (`claude-code-async-sidecar`, `SchemaVersion=1`) e só envia ao stdout o texto final aceito quando `resultAccepted=true`. O aceite exige texto não vazio e evento terminal `type=result`, `subtype=success`, `is_error=false`; texto parcial seguido de timeout, encerramento sem terminal válido ou falha de limpeza sensível vira `failureAfterText`/erro, sem stdout aceito. O dispatcher valida o sidecar antes de projetar estados: `completed+true→responded`, `completed+false→error`, `timeout→timeout`, `quota→quota`, `unavailable→unavailable`, `internalError→error`; `cancelled` é inesperado e vira `error`. `panel-summary.json` é `SchemaVersion=2` em sucesso e falhas estruturadas, enquanto `manifest.json` e o preparador mantêm seus schemas próprios. Em `kb-sensitive`, texto bruto parcial não persiste; hashes de stream/stderr são omitidos e o único texto bruto aceito é o `.verdict.txt`.
@@ -608,7 +609,7 @@ A allowlist do harness (Claude Code, Codex, OpenCode, Cursor) casa comandos **at
 **Síncrono vs assíncrono (parâmetros próprios do adapter):**
 
 - Síncrono `Invoke-*`: `-MessagePath <arquivo> [-Model <m>] [-TimeoutSec <s>]`.
-- Assíncrono `Start-*Job` (os existentes: opencode, Codex, Claude Code — Gemini/Copilot **não** têm job): `-MessagePath <arquivo> [-Model <m>] [-NoWatcher] [-TempDir <dir>] [-KeepDays <n>]` — `-TimeoutSec` **não** se aplica aos jobs. A regra `-MessagePath`/atômico vale igual para os dois.
+- Assíncrono `Start-*Job` (os existentes: opencode, Codex, Claude Code — Gemini/Copilot/Antigravity **não** têm job): `-MessagePath <arquivo> [-Model <m>] [-NoWatcher] [-TempDir <dir>] [-KeepDays <n>]` — `-TimeoutSec` **não** se aplica aos jobs. A regra `-MessagePath`/atômico vale igual para os dois.
 
 **Arquivo de `-MessagePath`:** preferir caminho **sem espaços**, sob o `Temp` do usuário (`%LOCALAPPDATA%\Temp`, já allowlistado para escrita) — fecha o ciclo escrita+leitura sem prompt; se o caminho exigir aspas, um **único** par e nada de prompt inline.
 
@@ -684,7 +685,6 @@ registra-se como `noResponse`, nunca `responded`.
     entra no recibo mínimo (ver [`15-revisao-por-pares.md`](../15-revisao-por-pares.md)).
 4. Escolher o backend e o modelo. Rodar `Resolve-LlmDelegateAuthorization.ps1` com modelo +
    sensibilidade + `-Backend opencode|codex|claude-code|copilot|gemini|antigravity` (em pasta paralela, passar
-
    `-ParallelKbRoot <raiz>` para descobrir a política pelo nome canônico com fallback ao legado, ou
    `-PolicyPath` para um caminho explícito; com `policyNameStatus` `legacy`/`both`, avisar o usuário
    que o nome legado está em uso e oferecer renomear).
@@ -780,7 +780,7 @@ continua de pé; o que caducou foi a formulação absoluta «nenhum tem sinal de
 **varredura confirmatória** (inspeção
 **estática do código-fonte** dos adapters em 2026-06-20 — contrato de extração, **não** teste de
 truncamento ao vivo) mostrou: **Codex** (`output-last-message`, arquivo dedicado), **Claude Code**
-(stdout final), **Gemini** (`$json.response`) entregam a **mensagem final canônica** por **campo
+(stdout final), **Gemini** (`$json.response`) e **Antigravity** (`$json.response`) entregam a **mensagem final canônica** por **campo
 terminal nomeado**; **Copilot** isola a final por **last-wins de stream** (último `assistant.message`
 vence) + `result.exitCode`, mecanismo **diferente** mas com a mesma proteção prática. Critério
 positivo: o adapter entrega a mensagem final canônica, **não** o stream/preâmbulo. **Resultado:**
@@ -990,11 +990,11 @@ payload para Anthropic (`anthropic/claude-opus-4-8`) e, portanto, é externo. Co
 - Os adapters `Invoke-ClaudeCode.ps1`, `Invoke-ClaudeCodeAsync.ps1` e `Start-ClaudeCodeJob.ps1` bloqueiam
   `PermissionMode=bypassPermissions`; esse modo não faz parte da delegação XPZ.
 
-## LIMITE CONHECIDO — COPILOT CLI E GEMINI CLI TAMBÉM SÃO AGÊNTICOS EXTERNOS
+## LIMITE CONHECIDO — COPILOT CLI, GEMINI CLI E ANTIGRAVITY CLI TAMBÉM SÃO AGÊNTICOS EXTERNOS
 
-O `copilot -p` e o `gemini -p` são CLIs agênticas, não backends one-shot puros. Mesmo em
+O `copilot -p`, o `gemini -p` e o `agy -p` são CLIs agênticas, não backends one-shot puros. Mesmo em
 consulta curta, podem carregar contexto próprio e são serviços externos: Copilot casa
-`github-copilot/*`; Gemini casa `google/*`. Consequências:
+`github-copilot/*`; Gemini casa `google/*`; Antigravity casa `antigravity/*`. Consequências:
 
 - O gate de confidencialidade continua obrigatório para payload `kb-sensitive`; sem política
   durável, ambos devolvem `ask`.
@@ -1003,7 +1003,9 @@ consulta curta, podem carregar contexto próprio e são serviços externos: Copi
   executadas e `filesModified=[]`.
 - Para Gemini, o adapter usa `--approval-mode plan`; os testes manuais em PowerShell 7
   comprovaram `tools.totalCalls=0` e `files.totalLinesAdded/Removed=0`.
-- Nenhum dos dois substitui o backend one-shot futuro (`llm`/`mods`/equivalente) para o caso
+- Para Antigravity, o adapter usa `--mode plan`; os testes manuais e a medição direta em PowerShell 7
+  comprovaram o retorno de status `SUCCESS` ou a rejeição por erro com exit code ≠ 0.
+- Nenhum dos três substitui o backend one-shot futuro (`llm`/`mods`/equivalente) para o caso
   em que é essencial enviar só o prompt sem camada agêntica.
 
 ## LIMITE CONHECIDO — `opencode run` FALHA EM CWD DE GIT WORKTREE (WINDOWS)
@@ -1022,7 +1024,7 @@ direto falha igual) e estado travado (reiniciar a máquina **não** resolve; tro
 
 **Impacto na revisão por pares / pré-push reforçada:** o Claude Code desktop **sempre** roda em
 worktree, e o harness fixa o cwd no worktree. Logo, despachar revisores **opencode** do cwd do
-worktree **falha em silêncio**. Os demais backends (Codex/Claude Code/Copilot/Gemini) têm `-Cd`
+worktree **falha em silêncio**. Os demais backends (Codex/Claude Code/Copilot/Gemini/Antigravity) têm `-Cd`
 próprio e não dependem disto; o opencode **não** tem `-Cd` (a contenção é pelo cwd herdado).
 
 **Workaround (materializar dir plano):** rodar o opencode de um cwd **fora de worktree**. Para

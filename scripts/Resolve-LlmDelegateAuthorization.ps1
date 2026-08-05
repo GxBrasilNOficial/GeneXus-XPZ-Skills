@@ -8,7 +8,8 @@
     Nucleo backend-agnostico da skill. A localidade e resolvida pelo resolvedor do backend
     selecionado por -Backend: opencode -> Resolve-OpenCodeModelLocality.ps1; codex ->
     Resolve-CodexModelLocality.ps1; claude-code -> Resolve-ClaudeCodeModelLocality.ps1;
-    copilot -> Resolve-CopilotModelLocality.ps1; gemini -> Resolve-GeminiModelLocality.ps1
+    copilot -> Resolve-CopilotModelLocality.ps1; gemini -> Resolve-GeminiModelLocality.ps1;
+    antigravity -> Resolve-AntigravityModelLocality.ps1
     (mesma pasta). A chave que casa na politica e o
     provider/modelo de DESTINO (canonicalModel do resolvedor), nao o backend/adapter: dois
     backends que enviam para o mesmo provider casam a mesma regra (ex: 'openai/*').
@@ -45,11 +46,11 @@
     default da config do Codex. No backend claude-code, o nome do modelo Claude
     (ex: claude-opus-4-8; alias 'opus' normalizado); quando omitido, a localidade fica
     'unknown' e o gate trata como externo (fail-safe -> ask para payload sensivel). Nos
-    backends copilot e gemini, o nome do modelo; quando omitido, o resolvedor aplica o
-    default do proprio CLI (gpt-5-mini no copilot, gemini-3-flash-preview no gemini).
+    backends copilot, gemini e antigravity, o nome do modelo; quando omitido, o resolvedor aplica o
+    default do proprio CLI (gpt-5-mini no copilot, gemini-3-flash-preview no gemini, gemini-3.6-flash-high no antigravity).
 .PARAMETER Backend
-    Backend de delegacao: 'opencode' (default), 'codex', 'claude-code', 'copilot' ou
-    'gemini'. Seleciona o resolvedor de localidade.
+    Backend de delegacao: 'opencode' (default), 'codex', 'claude-code', 'copilot', 'gemini' ou 'antigravity'.
+    Seleciona o resolvedor de localidade.
 .PARAMETER Oss
     (codex) Invocacao OSS local (--oss); implica modelo local. Repassado ao resolvedor codex.
 .PARAMETER LocalProvider

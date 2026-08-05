@@ -6,8 +6,8 @@
 .DESCRIPTION
     Artefato do ORQUESTRADOR (quem tem git). Monta um dossie unico e o EMITE em stdout;
     a entrega inline no prompt ao revisor semantic-only e decisao do ORQUESTRADOR (stdin
-    nos stdin-dossier-capable como opencode/Claude Code; argv nos argv-limited Copilot/
-    Gemini, se couber — ver 13/14). O revisor semantic-only nao roda o passo mecanico do
+    nos stdin-dossier-capable como opencode; argv nos argv-limited Copilot/
+    Gemini/Antigravity, se couber — ver 13/14). O revisor semantic-only nao roda o passo mecanico do
     13 (nega bash/shell). O dossie tem duas secoes rotuladas:
 
       - SECAO A - git BRUTO (fato): rev-parse HEAD, log origin/main..HEAD,

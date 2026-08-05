@@ -53,7 +53,7 @@
     -> targetModelKey canonico do gate (split '/'[0]) -> $null (despachavel, mas nao conta no piso).
     Modelo efetivo: opencode = invokeArgs.model ou o targetModelKey de ENTRADA (o resolvedor opencode
     exige -Model; o gate recebe o mesmo valor); codex = invokeArgs.model ou, se ausente, gate SEM -Model
-    -> ultimo segmento do targetModelKey retornado; claude-code/copilot/gemini = invokeArgs.model
+    -> ultimo segmento do targetModelKey retornado; claude-code/copilot/gemini/antigravity = invokeArgs.model
     OBRIGATORIO (ausente -> state=error fail-closed). targetModelKey nulo no opencode/codex onde exigido
     -> state=error fail-closed.
 .PARAMETER PayloadSensitivity
@@ -61,7 +61,7 @@
 .PARAMETER RoundId
     Identificador da rodada (subpasta do ledger). Default: [guid]::NewGuid().ToString('N').
 .PARAMETER Cd
-    Diretorio de trabalho explicito para os adapters que aceitam -Cd (codex/claude-code/gemini/copilot).
+    Diretorio de trabalho explicito para os adapters que aceitam -Cd (codex/claude-code/gemini/copilot/antigravity).
     Precedencia: explicito -> $ParallelKbRoot em kb-sensitive -> cwd em public. opencode NUNCA recebe -Cd.
 .PARAMETER ParallelKbRoot
     Raiz da pasta paralela de KB; repassada ao gate (descoberta de politica) e usada como -Cd em kb-sensitive.
@@ -252,7 +252,7 @@ function Add-SkippedFallbackRecords {
         $Records.Add([ordered]@{
                 index              = $idx
                 backend            = $fbBackend
-                family             = if ($fbTarget) { @($fbTarget -split '/', 2)[0] } else { $null }
+                family             = if ($fbTarget) { Get-LlmDelegateTargetFamily -TargetModelKey $fbTarget } else { $null }
                 targetModelKey     = $fbTarget
                 effectiveModel     = [string](Get-Prop (Get-Prop $fb 'invokeArgs') 'model')
                 gateVerdict        = $null
@@ -842,7 +842,7 @@ for ($i = 0; $i -lt $reviewers.Count; $i++) {
     if ($backend -eq 'opencode' -and $PayloadSensitivity -eq 'kb-sensitive') {
         $rec.state = 'unavailable'
         $rec.reason = 'opencode em kb-sensitive: confinamento por agente custom diferido (frente 999); sem gate nem despacho'
-        if (-not $rec.family -and $inputKey) { $rec.family = @($inputKey -split '/', 2)[0] }
+        if (-not $rec.family -and $inputKey) { $rec.family = Get-LlmDelegateTargetFamily -TargetModelKey $inputKey }
         $records.Add($rec); continue
     }
 
@@ -870,7 +870,7 @@ for ($i = 0; $i -lt $reviewers.Count; $i++) {
         if (-not $invModel) {
             $rec.state = 'error'
             $rec.reason = "invokeArgs.model obrigatorio para backend ${backend}: o default do adapter e implicito e pode divergir da chave resolvida pelo gate; exigir model torna o destino declarado e auditavel"
-            if (-not $rec.family -and $inputKey) { $rec.family = @($inputKey -split '/', 2)[0] }
+            if (-not $rec.family -and $inputKey) { $rec.family = Get-LlmDelegateTargetFamily -TargetModelKey $inputKey }
             $records.Add($rec); continue
         }
         $effectiveModel = $invModel
@@ -899,7 +899,7 @@ for ($i = 0; $i -lt $reviewers.Count; $i++) {
         $rec.state = 'error'
         $rec.gateVerdict = $null
         $rec.reason = "gate lancou: $($_.Exception.Message)"
-        if (-not $rec.family -and $inputKey) { $rec.family = @($inputKey -split '/', 2)[0] }
+        if (-not $rec.family -and $inputKey) { $rec.family = Get-LlmDelegateTargetFamily -TargetModelKey $inputKey }
         $records.Add($rec); continue
     }
 
@@ -915,7 +915,7 @@ for ($i = 0; $i -lt $reviewers.Count; $i++) {
         if (-not $returnedKey) {
             $rec.state = 'error'
             $rec.reason = 'codex sem modelo resolvivel: gate sem -Model nao derivou targetModelKey da config (fail-closed)'
-            if (-not $rec.family -and $inputKey) { $rec.family = @($inputKey -split '/', 2)[0] }
+            if (-not $rec.family -and $inputKey) { $rec.family = Get-LlmDelegateTargetFamily -TargetModelKey $inputKey }
             $records.Add($rec); continue
         }
         $effectiveModel = @($returnedKey -split '/')[-1]
@@ -924,8 +924,8 @@ for ($i = 0; $i -lt $reviewers.Count; $i++) {
 
     # family definitiva
     if (-not $rec.family) {
-        if ($returnedKey) { $rec.family = @($returnedKey -split '/', 2)[0] }
-        elseif ($inputKey) { $rec.family = @($inputKey -split '/', 2)[0] }
+        if ($returnedKey) { $rec.family = Get-LlmDelegateTargetFamily -TargetModelKey $returnedKey }
+        elseif ($inputKey) { $rec.family = Get-LlmDelegateTargetFamily -TargetModelKey $inputKey }
     }
 
     # Verdito

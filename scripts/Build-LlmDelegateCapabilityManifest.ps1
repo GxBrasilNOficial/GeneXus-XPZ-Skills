@@ -22,16 +22,17 @@
 
     ENUMERACAO: opencode le provider/modelo em opencode.json/jsonc; Codex usa config.toml
     e resolvedor; Claude Code combina settings configurado e cache historico/fraco
-    (enumeration=settings-or-historical). Copilot e Gemini seguem registrados como
-    instalados sem enumeracao nativa forte (models=[] e enumeration=none-native); o modelo
-    default deles vive na doc da skill/no 14, nao aqui.
+    (enumeration=settings-or-historical); Antigravity CLI sonda modelos via agy models
+    (enumeration=cli). Copilot e Gemini seguem registrados como instalados sem enumeracao nativa
+    forte (models=[] e enumeration=none-native); o modelo default deles vive na doc da skill/no 14, nao aqui.
 
     ESTAVEL vs VOLATIL: o que o manifesto grava (instalado? local/externo?) e estavel e
     cacheavel. A SAUDE do backend ("responde agora?") e volatil e fica em lastHealthCheck
     (null por padrao) - reverificada de leve no momento da revisao, nao nesta sondagem.
 
-    Reuso: chama Resolve-OpenCodeModelLocality.ps1, Resolve-CodexModelLocality.ps1 e
-    Resolve-ClaudeCodeModelLocality.ps1 em processo para a localidade de cada modelo (a chave
+    Reuso: chama Resolve-OpenCodeModelLocality.ps1, Resolve-CodexModelLocality.ps1,
+    Resolve-ClaudeCodeModelLocality.ps1, Resolve-CopilotModelLocality.ps1, Resolve-GeminiModelLocality.ps1
+    e Resolve-AntigravityModelLocality.ps1 em processo para a localidade de cada modelo (a chave
     de destino canonica). A enumeracao em si (listar os modelos) e logica propria deste script,
     pois os resolvers classificam UM modelo dado.
 .PARAMETER OutputPath
