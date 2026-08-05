@@ -49,6 +49,8 @@
     Caminho do settings.json/jsonc do Claude Code. Default: ~/.claude/settings.json.
 .PARAMETER ClaudeStatsCachePath
     Caminho opcional do stats-cache.json do Claude Code. Fonte historica/fraca.
+.PARAMETER AntigravityExe
+    Caminho do executavel do Antigravity CLI (agy.exe). Quando omitido, e resolvido via AntigravityCliSupport.ps1.
 .EXAMPLE
     .\Build-LlmDelegateCapabilityManifest.ps1
 .EXAMPLE
@@ -61,7 +63,8 @@ param(
     [string] $OpenCodeConfigPath = (Join-Path $HOME '.config' | Join-Path -ChildPath 'opencode' | Join-Path -ChildPath 'opencode.json'),
     [string] $CodexConfigPath = (Join-Path $HOME '.codex' | Join-Path -ChildPath 'config.toml'),
     [string] $ClaudeSettingsPath = (Join-Path $HOME '.claude' | Join-Path -ChildPath 'settings.json'),
-    [string] $ClaudeStatsCachePath = (Join-Path $HOME '.claude' | Join-Path -ChildPath 'stats-cache.json')
+    [string] $ClaudeStatsCachePath = (Join-Path $HOME '.claude' | Join-Path -ChildPath 'stats-cache.json'),
+    [string] $AntigravityExe
 )
 
 Set-StrictMode -Version Latest
@@ -312,19 +315,21 @@ $backends += [pscustomobject]@{
 }
 
 function Get-AntigravityModelEntries {
+    param([string]$AntigravityExe)
     $entries = [System.Collections.Generic.List[object]]::new()
     $antigravityResolver = Join-Path $PSScriptRoot 'Resolve-AntigravityModelLocality.ps1'
     if (-not (Test-Path -LiteralPath $antigravityResolver -PathType Leaf)) { return $entries }
 
-    $exe = $null
-    $cmd = Get-Command agy -ErrorAction SilentlyContinue
-    if ($cmd -and $cmd.Source) { $exe = $cmd.Source }
-    else {
-        $defaultPath = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'agy\bin\agy.exe'
-        if (Test-Path -LiteralPath $defaultPath -PathType Leaf) { $exe = $defaultPath }
+    $exe = $AntigravityExe
+    if (-not $exe) {
+        $supportScript = Join-Path $PSScriptRoot 'AntigravityCliSupport.ps1'
+        if (Test-Path -LiteralPath $supportScript -PathType Leaf) {
+            . $supportScript
+            $exe = Get-AntigravityExecutable -ErrorAction SilentlyContinue
+        }
     }
 
-    if (-not $exe) { return $entries }
+    if (-not $exe -or -not (Test-Path -LiteralPath $exe -PathType Leaf)) { return $entries }
 
     $rawModels = @()
     try {
@@ -354,9 +359,14 @@ function Get-AntigravityModelEntries {
 }
 
 function Test-AntigravityPresent {
-    if (Test-CommandPresent 'agy') { return $true }
-    $defaultPath = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'agy\bin\agy.exe'
-    return (Test-Path -LiteralPath $defaultPath -PathType Leaf)
+    param([string]$AntigravityExe)
+    if ($AntigravityExe -and (Test-Path -LiteralPath $AntigravityExe -PathType Leaf)) { return $true }
+    $supportScript = Join-Path $PSScriptRoot 'AntigravityCliSupport.ps1'
+    if (Test-Path -LiteralPath $supportScript -PathType Leaf) {
+        . $supportScript
+        return [bool](Get-AntigravityExecutable -ErrorAction SilentlyContinue)
+    }
+    return (Test-CommandPresent 'agy')
 }
 
 foreach ($b in @(
@@ -371,8 +381,8 @@ foreach ($b in @(
     }
 }
 
-$isAgyInstalled = Test-AntigravityPresent
-$agyModelEntries = @(Get-AntigravityModelEntries)
+$isAgyInstalled = Test-AntigravityPresent -AntigravityExe $AntigravityExe
+$agyModelEntries = @(Get-AntigravityModelEntries -AntigravityExe $AntigravityExe)
 $hasAgyModels = ($agyModelEntries.Count -gt 0)
 
 $backends += [pscustomobject]@{

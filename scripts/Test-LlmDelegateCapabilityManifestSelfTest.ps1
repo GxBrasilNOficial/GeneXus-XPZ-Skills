@@ -84,12 +84,25 @@ base_url = "http://localhost:11434/v1"
   "lastModel": "claude-opus-4-7"
 }
 '@ | Set-Content -LiteralPath $claudeStats -Encoding utf8
+
+    $fakeAgy = Join-Path $tempRoot 'fake-agy.bat'
+    @'
+@echo off
+if "%1"=="models" (
+    echo gemini-3.6-flash-high
+    echo claude-sonnet-4-6
+    exit /b 0
+)
+exit /b 1
+'@ | Set-Content -LiteralPath $fakeAgy -Encoding ascii
+
     $outPath = Join-Path $tempRoot 'capabilities.json'
     $snapPath = Join-Path $tempRoot 'snap.json'
 
     & $scriptUnderTest -OutputPath $outPath -SnapshotPath $snapPath `
         -OpenCodeConfigPath $openCfg -CodexConfigPath $codexCfg `
-        -ClaudeSettingsPath $claudeSettings -ClaudeStatsCachePath $claudeStats 1> $null
+        -ClaudeSettingsPath $claudeSettings -ClaudeStatsCachePath $claudeStats `
+        -AntigravityExe $fakeAgy 1> $null
 
     Assert-True (Test-Path -LiteralPath $outPath -PathType Leaf) 'Manifesto nao foi gravado.'
     $manifestText = [System.IO.File]::ReadAllText($outPath)
@@ -100,7 +113,7 @@ base_url = "http://localhost:11434/v1"
     Assert-True (-not [string]::IsNullOrWhiteSpace([string]$manifest.generatedAt)) 'generatedAt ausente.'
     Assert-True ($null -eq $manifest.lastHealthCheck) 'lastHealthCheck deveria ser null (saude e volatil).'
     $backendNames = @($manifest.backends | ForEach-Object { $_.backend })
-    foreach ($expected in @('opencode', 'codex', 'claude-code', 'copilot', 'gemini')) {
+    foreach ($expected in @('opencode', 'codex', 'claude-code', 'copilot', 'gemini', 'antigravity')) {
         Assert-True ($backendNames -contains $expected) "Backend ausente do manifesto: $expected"
     }
     foreach ($b in $manifest.backends) {
@@ -160,6 +173,14 @@ base_url = "http://localhost:11434/v1"
     Assert-True ($ccHistorical.sourceKind -eq 'historical') 'Claude stats-cache deveria ser sourceKind=historical.'
     Assert-True ($ccHistorical.sourceConfidence -eq 'weak') 'Claude stats-cache deveria ser fonte fraca.'
     Assert-True ($ccHistorical.availableInManifest -eq $false) 'Claude stats-cache nao deve provar disponibilidade atual.'
+
+    # (G) Antigravity: enumeracao via CLI agy models (fake-exe).
+    $agy = $manifest.backends | Where-Object { $_.backend -eq 'antigravity' }
+    Assert-True ($agy.enumeration -eq 'cli') 'antigravity deveria ter enumeration=cli.'
+    $agyModel = $agy.models | Where-Object { $_.canonicalModel -eq 'antigravity/gemini-3.6-flash-high' }
+    Assert-True ($null -ne $agyModel) 'antigravity deveria enumerar gemini-3.6-flash-high.'
+    Assert-True ($agyModel.sourceKind -eq 'cli') 'antigravity deveria ser sourceKind=cli.'
+    Assert-True ($agyModel.sourceConfidence -eq 'strong') 'antigravity deveria ser sourceConfidence=strong.'
 
     # (B) Sanitizacao por desenho
     foreach ($forbidden in @($secretApiKey, $externalHost, 'apiKey', 'baseURL', 'Authorization', '11434', $openCfg, $codexCfg, $claudeSettings, $claudeStats)) {
