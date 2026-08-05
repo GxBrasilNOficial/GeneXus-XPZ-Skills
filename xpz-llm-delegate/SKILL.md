@@ -683,7 +683,8 @@ registra-se como `noResponse`, nunca `responded`.
     A transição só acontece por **nova invocação** do closeout com o novo `-VNextState`; o `vNextState`
     entra no recibo mínimo (ver [`15-revisao-por-pares.md`](../15-revisao-por-pares.md)).
 4. Escolher o backend e o modelo. Rodar `Resolve-LlmDelegateAuthorization.ps1` com modelo +
-   sensibilidade + `-Backend opencode|codex|claude-code|copilot|gemini` (em pasta paralela, passar
+   sensibilidade + `-Backend opencode|codex|claude-code|copilot|gemini|antigravity` (em pasta paralela, passar
+
    `-ParallelKbRoot <raiz>` para descobrir a política pelo nome canônico com fallback ao legado, ou
    `-PolicyPath` para um caminho explícito; com `policyNameStatus` `legacy`/`both`, avisar o usuário
    que o nome legado está em uso e oferecer renomear).
