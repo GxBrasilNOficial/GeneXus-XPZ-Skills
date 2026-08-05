@@ -16,8 +16,8 @@
     recebe os vereditos que o gate (Resolve-LlmDelegateAuthorization.ps1) ja emitiu por
     revisor, e so conta familias. O gate continua soberano por destino+sensibilidade.
 
-    Familia = provider de DESTINO (parte antes da primeira '/' do targetModelKey): openai,
-    anthropic, ollama-cloud, google, github-copilot, etc. Modelos do mesmo provider
+    Familia = familia estrutural do modelo de DESTINO (resolvida via Get-LlmDelegateTargetFamily):
+    openai, anthropic, ollama, google, github-copilot, etc. Modelos da mesma familia
     compartilham vieses de treino, logo nao contam como diversidade entre si.
 
     Piso: >=2 familias distintas entre si entre os revisores DESPACHAVEIS (verdict=allow).

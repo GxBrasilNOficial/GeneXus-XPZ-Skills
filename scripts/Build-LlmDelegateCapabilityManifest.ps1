@@ -325,7 +325,7 @@ function Get-AntigravityModelEntries {
         $supportScript = Join-Path $PSScriptRoot 'AntigravityCliSupport.ps1'
         if (Test-Path -LiteralPath $supportScript -PathType Leaf) {
             . $supportScript
-            $exe = Get-AntigravityExecutable -ErrorAction SilentlyContinue
+            try { $exe = Resolve-AntigravityExe -SkipContractCheck } catch { }
         }
     }
 
@@ -364,7 +364,7 @@ function Test-AntigravityPresent {
     $supportScript = Join-Path $PSScriptRoot 'AntigravityCliSupport.ps1'
     if (Test-Path -LiteralPath $supportScript -PathType Leaf) {
         . $supportScript
-        return [bool](Get-AntigravityExecutable -ErrorAction SilentlyContinue)
+        try { return [bool](Resolve-AntigravityExe -SkipContractCheck) } catch { return $false }
     }
     return (Test-CommandPresent 'agy')
 }

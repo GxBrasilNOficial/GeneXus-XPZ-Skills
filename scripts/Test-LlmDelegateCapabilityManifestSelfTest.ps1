@@ -182,6 +182,13 @@ exit /b 1
     Assert-True ($agyModel.sourceKind -eq 'cli') 'antigravity deveria ser sourceKind=cli.'
     Assert-True ($agyModel.sourceConfidence -eq 'strong') 'antigravity deveria ser sourceConfidence=strong.'
 
+    # (H) Antigravity fallback sem -AntigravityExe: nao deve lancar excecao sob StrictMode
+    $outPathNoArg = Join-Path $tempRoot 'cap-no-arg.json'
+    & $scriptUnderTest -OutputPath $outPathNoArg `
+        -OpenCodeConfigPath $openCfg -CodexConfigPath $codexCfg `
+        -ClaudeSettingsPath $claudeSettings -ClaudeStatsCachePath $claudeStats 1> $null
+    Assert-True (Test-Path -LiteralPath $outPathNoArg -PathType Leaf) 'Manifesto sem -AntigravityExe deveria ser gravado sem erro.'
+
     # (B) Sanitizacao por desenho
     foreach ($forbidden in @($secretApiKey, $externalHost, 'apiKey', 'baseURL', 'Authorization', '11434', $openCfg, $codexCfg, $claudeSettings, $claudeStats)) {
         Assert-True (-not ($manifestText -like "*$forbidden*")) "Manifesto vazou conteudo sensivel proibido: '$forbidden'."

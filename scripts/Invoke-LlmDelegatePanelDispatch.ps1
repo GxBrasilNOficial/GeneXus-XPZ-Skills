@@ -50,7 +50,7 @@
     orquestrador ja decidiu o conjunto (subagente nativo injetado FORA). fallbackChain[] e lista ordenada
     de revisores completos; o harness registra attemptRole/fallbackOf/countsForDiversity no resultado.
     family por ordem: explicita
-    -> targetModelKey canonico do gate (split '/'[0]) -> $null (despachavel, mas nao conta no piso).
+    -> familia resolvida via Get-LlmDelegateTargetFamily -> $null (despachavel, mas nao conta no piso).
     Modelo efetivo: opencode = invokeArgs.model ou o targetModelKey de ENTRADA (o resolvedor opencode
     exige -Model; o gate recebe o mesmo valor); codex = invokeArgs.model ou, se ausente, gate SEM -Model
     -> ultimo segmento do targetModelKey retornado; claude-code/copilot/gemini/antigravity = invokeArgs.model

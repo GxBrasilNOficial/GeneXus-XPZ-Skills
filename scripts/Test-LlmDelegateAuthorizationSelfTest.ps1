@@ -118,7 +118,7 @@ try {
     Assert-Verdict -Model 'gemini-3-flash-preview' -Backend gemini -Sensitivity 'kb-sensitive' -Expected 'ask'   -Note 'Gemini externo sem politica -> ask'
     Assert-Verdict -Model 'gemini-3.6-flash-high' -Backend antigravity -Sensitivity 'public'       -Expected 'allow' -WithPolicy -Note 'Antigravity publico -> allow'
     Assert-Verdict -Model 'gemini-deny-test'        -Backend antigravity -Sensitivity 'kb-sensitive' -Expected 'deny'  -WithPolicy -Note 'Antigravity respeita deny-external exato'
-    Assert-Verdict -Model 'gemini-3.6-flash-high' -Backend antigravity -Sensitivity 'kb-sensitive' -Expected 'allow' -WithPolicy -Note 'Antigravity casa google/*'
+    Assert-Verdict -Model 'gemini-3.6-flash-high' -Backend antigravity -Sensitivity 'kb-sensitive' -Expected 'allow' -WithPolicy -Note 'Antigravity casa antigravity/*'
     Assert-Verdict -Model 'gemini-3.6-flash-high' -Backend antigravity -Sensitivity 'kb-sensitive' -Expected 'ask'   -Note 'Antigravity externo sem politica -> ask'
 
     # B2: descoberta do arquivo de politica por -ParallelKbRoot, com fallback de nome.
