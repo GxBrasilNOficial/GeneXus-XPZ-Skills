@@ -44,9 +44,8 @@ try { [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false) } catc
 
 . (Join-Path $PSScriptRoot 'AntigravityCliSupport.ps1')
 
-if ($Mode -ne 'plan') {
-    throw 'BLOCK: Antigravity CLI opera exclusivamente sob modo plan'
-}
+# $Mode e barrado em tempo de binding pelo [ValidateSet('plan')] na assinatura; nao ha fluxo
+# alternativo a proteger aqui (paridade com Invoke-Gemini.ps1 / Invoke-Copilot.ps1).
 
 # Prompt: inline (-Message) ou de arquivo (-MessagePath, UTF-8). Le ANTES do guard de tamanho.
 if ($PSCmdlet.ParameterSetName -eq 'FromFile') {
@@ -145,7 +144,11 @@ try {
         $respStatus = [string]$jsonResp.status
         $respText = [string]$jsonResp.response
         $isJson = $true
-    } catch [System.Text.Json.JsonException], [System.ArgumentException] {
+    } catch {
+        # ConvertFrom-Json em PS 7.4 lanca Microsoft.PowerShell.Commands.JsonConvertionException
+        # (herda de System.SystemException, nao de System.Text.Json.JsonException). Catch sem
+        # filtro de tipo e robusto sob StrictMode e cobre qualquer falha de parse, devolvendo
+        # o fluxo ao fallback de texto bruto abaixo (paridade com o comentario da funcao).
         $isJson = $false
     }
 
