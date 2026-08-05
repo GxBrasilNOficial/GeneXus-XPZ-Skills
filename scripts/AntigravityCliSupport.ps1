@@ -3,8 +3,10 @@
 .SYNOPSIS
     Funcoes compartilhadas do backend antigravity da skill xpz-llm-delegate.
 .DESCRIPTION
-    Resolve o executavel agy.exe, valida o contrato minimo de flags usado pelo adapter e extrai
-    mensagens de erro da saida do Antigravity CLI.
+    Resolve o executavel agy.exe, valida o contrato minimo de descoberta (--print/--prompt e --mode)
+    e extrai mensagens de erro da saida do Antigravity CLI. Flags adicionais do adapter
+    (--output-format, --print-timeout, --model) nao entram neste probe: a prova delas e via
+    fake-exe nos self-tests do Invoke-Antigravity.
 #>
 
 Set-StrictMode -Version Latest

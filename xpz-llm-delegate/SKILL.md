@@ -350,7 +350,7 @@ Backend Gemini CLI (`gemini -p`, externo Google):
 
 Backend Antigravity CLI (`agy -p`, externo Antigravity/Google):
 - `Invoke-Antigravity.ps1 [-Message <prompt> | -MessagePath <arquivo>] [-Model <m>] [-Mode plan] [-Cd <dir>] [-AntigravityExe <path>] [-TimeoutSec <s>]` — síncrono (prompt → texto em JSON `.response`). Usa `--mode plan`, `--output-format json` e `--print-timeout "$($TimeoutSec)s"`; o adapter bloqueia modos diferentes de `plan`. `-MessagePath` lê o prompt de arquivo (exclusivo com `-Message`; elimina o `(Get-Content)` inline), mas é **argument-based** — o prompt segue no argv, então **não** levanta o teto ~32KB; um guard fail-closed (`$MaxArgvPromptChars = 30000`, heurístico em chars) recusa prompts grandes com `BLOCK`.
-- `AntigravityCliSupport.ps1` (dot-source) — descoberta **fail-closed** do `agy.exe` (no `PATH` ou `%LOCALAPPDATA%\agy\bin\agy.exe`), validação de contrato de flags (`--print`/`--prompt` e `--mode`) e extração de erros de cota (`$quotaFailurePattern` exportado para autotestes).
+- `AntigravityCliSupport.ps1` (dot-source) — descoberta **fail-closed** do `agy.exe` (no `PATH` ou `%LOCALAPPDATA%\agy\bin\agy.exe`), validação de contrato **mínimo de descoberta** (`--print`/`--prompt` e `--mode` — basta para distinguir o CLI certo; o adapter usa também `--output-format`, `--print-timeout` e `--model`, cobertos por fake-exe nos self-tests, não por este probe de help) e extração de erros de cota (`$quotaFailurePattern` exportado para autotestes).
 
 **Contrato JSON observado no `agy.exe` instalado** (medição direta, 2026-08-04 — não coberto por self-test, que usa fake-exe):
 
@@ -498,7 +498,7 @@ ao usuário deve seguir este formato enxuto antes de qualquer envio:
 2. Declarar a classe do payload (`public` ou `kb-sensitive`).
 3. Perguntar: "Quais ferramentas/modelos você tem e quer usar como revisores?"
 4. Citar exemplos de ferramentas em linguagem humana (`Claude Code`, `opencode/Ollama Cloud`,
-   `Codex`, `Copilot`, `Gemini`, subagente nativo), mas **filtrar** qualquer ferramenta que o
+   `Codex`, `Copilot`, `Gemini`, `Antigravity`, subagente nativo), mas **filtrar** qualquer ferramenta que o
    usuário já tenha descartado na conversa corrente.
 5. Declarar que inventário detectado e veredito de autorização são diagnóstico, não preferência:
    o gate será rodado por destino depois da escolha.
@@ -661,7 +661,7 @@ registra-se como `noResponse`, nunca `responded`.
 3a. Em **revisão por pares**, antes de escolher backends, resolver `preferred-reviewers.json`.
     Se não houver lista (`hasPreferences=false`), perguntar ao usuário quais ferramentas/modelos
     ele tem disponíveis ou prefere (`Claude Code`, `opencode/Ollama Cloud`, `Codex`, `Copilot`,
-    `Gemini`, subagente nativo). A pergunta é de preferência e assinatura/login, não de
+    `Gemini`, `Antigravity`, subagente nativo). A pergunta é de preferência e assinatura/login, não de
     inventário: não substituir por enumeração técnica de providers nem por menu de tudo que está
     instalado. Backend detectado sem preferência deve ser apresentado como "detectado; confirme se
     quer usar"; não sugerir composição padrão com externo sem preferência confirmada. Seguir o

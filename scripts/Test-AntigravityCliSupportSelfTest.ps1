@@ -36,12 +36,13 @@ Assert-True ($errText -like "*429*") "Extrai mensagem de erro de cota/rate limit
 Assert-True ("quota exceeded" -match $quotaFailurePattern) "Regex de cota reconhece 'quota exceeded'"
 Assert-True ("429 Too Many Requests" -match $quotaFailurePattern) "Regex de cota reconhece 429 / Too Many Requests"
 
-# 4. Resolve-AntigravityExe
+# 4. Resolve-AntigravityExe — sonda opcional do binario real (maquina sem agy NAO falha a suite;
+#    a prova fail-closed do contrato e dos adapters esta nos casos 5-7 com fake-exe).
 try {
     $exe = Resolve-AntigravityExe
     Assert-True (Test-Path -LiteralPath $exe -PathType Leaf) "Resolve executavel agy.exe no sistema ($exe)"
 } catch {
-    Assert-True $false "Falha ao resolver agy.exe: $($_.Exception.Message)"
+    Write-Host "[SKIP] Resolve-AntigravityExe (agy nao instalado nesta maquina): $($_.Exception.Message)" -ForegroundColor Yellow
 }
 
 # 5. Prova Comportamental: Injeção de fake-exe (JSON) via -AntigravityExe para Invoke-Antigravity.ps1
