@@ -146,5 +146,5 @@ $fallbackLabel = if ($state -ne 'panelReady') { "segunda opiniao ($($dispatchabl
     authorFamily              = $AuthorFamily
     authorFamilyInPanel       = $authorInPanel
     fallbackLabel             = $fallbackLabel
-    note                      = 'Consultivo; NAO e autorizacao. O gate Resolve-LlmDelegateAuthorization decide allow/ask/deny por revisor. Familia = provider de destino. Piso conta familias distintas entre despachaveis (allow); ask = autorizavel; deny ignorado.'
+    note                      = 'Consultivo; NAO e autorizacao. O gate Resolve-LlmDelegateAuthorization decide allow/ask/deny por revisor. Familia = familia estrutural do modelo de DESTINO (via Get-LlmDelegateTargetFamily; antigravity/* colapsa na fundacao do modelo subjacente). Piso conta familias distintas entre despachaveis (allow); ask = autorizavel; deny ignorado.'
 } | ConvertTo-Json -Depth 8

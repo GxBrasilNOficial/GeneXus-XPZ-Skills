@@ -1,7 +1,7 @@
 #requires -Version 7.4
 <#
 .SYNOPSIS
-    Resolve a familia de modelos (provider de destino) para avaliacao do piso de diversidade.
+    Resolve a familia estrutural de modelos para avaliacao do piso de diversidade.
 .DESCRIPTION
     Extrai a familia estrutural do targetModelKey. Modelos sob o servico Antigravity (antigravity/*)
     sao dinamica e conservadoramente resolvidos para a familia do modelo subjacente:

@@ -28,6 +28,10 @@
     /pela metodologia do 15 ao montar o painel — nao por este script (papel "forte/fraco"
     nao e dado de maquina). O veto duro ja foi descartado na gravacao (Set-...).
 
+    Campo `family` da composicao sugerida: via Get-LlmDelegateTargetFamily (familia
+    estrutural). Chaves sem barra (ex.: malformadas) preservam a propria chave como familia
+    — alinhado ao helper compartilhado; nao voltam null.
+
     Sem o arquivo de preferencia -> hasPreferences=false (a oferta cai no comportamento
     atual: catalogo + politica do README).
 
