@@ -14,8 +14,9 @@ $ErrorActionPreference = 'Stop'
 #      lista os dois modelos com a localidade correta.
 #  (B) Sanitizacao por desenho: o manifesto NAO contem segredo-isca (apiKey, host externo,
 #      baseURL, caminho de config) plantados no fixture.
-#  (C) Schema: schemaVersion/generatedAt/backends presentes; os 5 backends; metadados v11
-#      por entrada (provider/family/sourceKind/sourceConfidence/availableInManifest/hardVeto);
+#  (C) Schema: schemaVersion/generatedAt/backends presentes (lista canônica em
+#      xpz-llm-delegate/SKILL.md); metadados v11 por entrada
+#      (provider/family/sourceKind/sourceConfidence/availableInManifest/hardVeto);
 #      Copilot/Gemini none-native com models=[]; lastHealthCheck null.
 #  (D) Snapshot por-KB: snapshotAt presente e sourceGeneratedAt == generatedAt do manifesto.
 #  (E) Codex: nao inventa openai/<slug> quando o resolvedor nao prova provider.

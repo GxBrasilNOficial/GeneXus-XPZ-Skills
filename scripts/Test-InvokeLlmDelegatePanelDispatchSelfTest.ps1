@@ -224,7 +224,22 @@ $c = 'GEMINI cwd=' + (Get-Location).Path.Replace('\', '/') + ' model=' + $model 
 exit 0
 '@ | Set-Content -LiteralPath $fakeGemini -Encoding utf8
 
-    # Mapa de fake-exe (arquivo) — todos os 5 backends
+    # fake-antigravity: argument-based como Gemini/Copilot; --help precisa expor -p/--print e --mode
+    # (contrato de Resolve-AntigravityExe). Resposta no envelope {status,response} do agy.
+    $fakeAntigravity = Join-Path $tmp 'fake-antigravity.ps1'
+    @'
+$model = ''
+for ($i = 0; $i -lt $args.Count; $i++) { if ($args[$i] -eq '--model') { $model = [string]$args[$i + 1] } }
+if ($args -contains '--help') {
+    'Usage of agy: -p Run a prompt --mode Set agent mode --output-format json --model'
+    exit 0
+}
+$c = 'AGY cwd=' + (Get-Location).Path.Replace('\', '/') + ' model=' + $model + ' revisao'
+(@{ status = 'SUCCESS'; response = $c } | ConvertTo-Json -Compress)
+exit 0
+'@ | Set-Content -LiteralPath $fakeAntigravity -Encoding utf8
+
+    # Mapa de fake-exe (arquivo) — backends ativos (lista canônica em xpz-llm-delegate/SKILL.md)
     $exeMapFile = Join-Path $tmp 'exemap.json'
     ([ordered]@{
         opencode      = $fakeOcCmd
@@ -232,6 +247,7 @@ exit 0
         'claude-code' = $fakeClCmd
         copilot       = $fakeCopilot
         gemini        = $fakeGemini
+        antigravity   = $fakeAntigravity
     } | ConvertTo-Json -Compress) | Set-Content -LiteralPath $exeMapFile -Encoding utf8
 
     # config opencode sintética (loopback p/ ollama; usada só onde o gate consulta config)
@@ -357,8 +373,8 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
     $rv = Get-Reviewer $r.json 0
     Assert-True ($rv.state -eq 'error') "codex sem model e sem config: esperado error; got $($rv.state)"
 
-    # claude-code/copilot/gemini sem model -> error
-    foreach ($b in @('claude-code', 'copilot', 'gemini')) {
+    # claude-code/copilot/gemini/antigravity sem model -> error
+    foreach ($b in @('claude-code', 'copilot', 'gemini', 'antigravity')) {
         $r = Invoke-Harness -Reviewers @(@{ backend = $b; invokeArgs = @{} }) -Sensitivity 'public'
         $rv = Get-Reviewer $r.json 0
         Assert-True ($rv.state -eq 'error') "$b sem model: esperado error fail-closed; got $($rv.state)"
@@ -647,12 +663,13 @@ $($timeoutAst.Extent.Text)
     Assert-True ($badCalls.Count -eq 0) "fallback divergente: fake executor nao deveria ser chamado para a entrada invalida; chamadas=[$($badCalls -join ' | ')]"
 
     # =======================================================================================
-    # 8c) DESPACHO REAL de claude-code / copilot / gemini (prova -Model + -Cd + exe-param por backend)
+    # 8c) DESPACHO REAL de claude-code / copilot / gemini / antigravity (prova -Model + -Cd + exe-param)
     # =======================================================================================
     $r = Invoke-Harness -Reviewers @(
         @{ backend = 'claude-code'; invokeArgs = @{ model = 'claude-opus-4-8' } },
         @{ backend = 'copilot';     invokeArgs = @{ model = 'gpt-5-mini' } },
-        @{ backend = 'gemini';      invokeArgs = @{ model = 'gemini-3-flash-preview' } }
+        @{ backend = 'gemini';      invokeArgs = @{ model = 'gemini-3-flash-preview' } },
+        @{ backend = 'antigravity'; invokeArgs = @{ model = 'gemini-3.6-flash-high' } }
     ) -Sensitivity 'public' -Extra @{ Cd = $tmp }
     $tmpFwd = $tmp.Replace('\', '/')
 
@@ -669,9 +686,9 @@ $($timeoutAst.Extent.Text)
     $tCl = Get-Content -LiteralPath $rvCl.verdictPath -Raw -Encoding utf8
     Assert-True ($tCl -match 'model=claude-opus-4-8') 'claude-code despacho: -Model deveria chegar ao adapter'
     Assert-True ($tCl -match [regex]::Escape($tmp)) 'claude-code despacho: -Cd deveria virar o WorkingDirectory (cwd)'
-    Assert-True ([int]$r.json.reviewersDispatchAttempted -eq 3) 'contadores v2: reviewersDispatchAttempted=3 esperado.'
+    Assert-True ([int]$r.json.reviewersDispatchAttempted -eq 4) 'contadores v2: reviewersDispatchAttempted=4 esperado.'
     Assert-True ([int]$r.json.reviewersProcessCreated -eq 1) 'contadores v2: apenas Claude async declara processCreated=true.'
-    Assert-True ([int]$r.json.processCreatedUnknownCount -eq 2) 'contadores v2: copilot/gemini ficam processCreated desconhecido.'
+    Assert-True ([int]$r.json.processCreatedUnknownCount -eq 3) 'contadores v2: copilot/gemini/antigravity ficam processCreated desconhecido.'
     Assert-True ([int]$r.json.sidecarAcceptedCount -eq 1) 'contadores v2: sidecarAcceptedCount=1 esperado.'
 
     $rvCp = Get-Reviewer $r.json 1
@@ -685,6 +702,12 @@ $($timeoutAst.Extent.Text)
     $tGm = Get-Content -LiteralPath $rvGm.verdictPath -Raw -Encoding utf8
     Assert-True ($tGm -match 'model=gemini-3-flash-preview') 'gemini despacho: -Model deveria chegar ao adapter'
     Assert-True ($tGm -match [regex]::Escape($tmpFwd)) 'gemini despacho: -Cd deveria virar o WorkingDirectory (cwd)'
+
+    $rvAg = Get-Reviewer $r.json 3
+    Assert-True ($rvAg.state -eq 'responded') "antigravity despacho: esperado responded; got $($rvAg.state)"
+    $tAg = Get-Content -LiteralPath $rvAg.verdictPath -Raw -Encoding utf8
+    Assert-True ($tAg -match 'model=gemini-3.6-flash-high') 'antigravity despacho: -Model deveria chegar ao adapter'
+    Assert-True ($tAg -match [regex]::Escape($tmpFwd)) 'antigravity despacho: -Cd deveria virar o WorkingDirectory (cwd)'
 
     $r = Invoke-Harness -Reviewers @(@{
             backend = 'claude-code'

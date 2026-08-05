@@ -10,7 +10,7 @@ Três documentos, três camadas:
 - [`14-revisao-pre-push-reforcada.md`](14-revisao-pre-push-reforcada.md) — a **aplicação** da revisão por pares ao caso **pré-push** (painel sobre a rotina do `13`); herda a régua **deste** documento.
 - **este `15`** — a **metodologia geral**, aplicável à **validação de plano/design** antes ou durante a implementação, não só a pré-push.
 
-O **mecanismo** de delegação (como disparar revisores secundários — opencode, Codex, Claude Code, Copilot, Gemini —, prompt, job assíncrono + watcher, leitura do resultado) é da skill [`xpz-llm-delegate`](xpz-llm-delegate/SKILL.md) — **não** é duplicado aqui. Este documento guarda a **metodologia**; a skill guarda o mecanismo.
+O **mecanismo** de delegação (como disparar revisores secundários — backends, prompt, job assíncrono + watcher, leitura do resultado) é da skill [`xpz-llm-delegate`](xpz-llm-delegate/SKILL.md) — **não** é duplicado aqui. Este documento guarda a **metodologia**; a skill guarda o mecanismo.
 
 Acionamento é **sempre humano** (como toda delegação — ver `xpz-llm-delegate`). O painel **não** se monta nem dispara por iniciativa do agente; o agente **sugere** e só executa a pedido ou com a concordância explícita do usuário.
 

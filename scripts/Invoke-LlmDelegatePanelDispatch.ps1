@@ -866,7 +866,7 @@ for ($i = 0; $i -lt $reviewers.Count; $i++) {
         if ($invModel) { $gateModel = $invModel }   # senao omite -Model
     }
     else {
-        # claude-code / copilot / gemini -> invokeArgs.model OBRIGATORIO
+        # claude-code / copilot / gemini / antigravity -> invokeArgs.model OBRIGATORIO
         if (-not $invModel) {
             $rec.state = 'error'
             $rec.reason = "invokeArgs.model obrigatorio para backend ${backend}: o default do adapter e implicito e pode divergir da chave resolvida pelo gate; exigir model torna o destino declarado e auditavel"
