@@ -11,6 +11,23 @@ Cada entrada usa dois campos curtos logo abaixo do titulo:
 
 Entradas legadas sem avaliação carregam `FALTA AVALIAR` em ambos os campos até que sejam revistas em sessão dedicada.
 
+## Gate consultivo de paridade de enumeração de BACKENDS (irmão do de gates)
+
+- **Importância** — média (o modo de falha já se materializou **seis vezes numa única frente**, e é invisível para os gates atuais).
+- **Maturidade** — ideia (o padrão a copiar está provado, mas a decisão de desenho que controla o ruído está **em aberto** — ver a ressalva; não classificar como «pronta para implementar»).
+
+**Motivação medida (2026-08-06, frente do 6º backend Antigravity).** Ao inserir um backend novo, seis enumerações de backends ficaram para trás em documentos distintos — `09` (ponteiro do dossiê), `999` (três: varredura do Achado D, frente de migração stdin, frente de contrato tipado), mais a referência cruzada quebrada pela própria correção. Cinco foram achadas **depois** da pré-push formal: uma por revisão externa, as demais por varredura provocada por ela.
+
+**Por que os gates atuais não pegam.** O `Test-PrePushNewTokenPropagation.ps1` procura o termo **novo** (`Antigravity`) em vizinhança do termo introduzido; a linha defasada **não contém** o termo novo — é justamente por isso que está defasada. A verificação «o termo novo está presente?» é cega para «a lista que não o recebeu».
+
+**O padrão a copiar já existe e é do mesmo formato.** `scripts/Test-PrePushGateEnumerationParity.ps1` resolve exatamente esse modo de falha para o domínio dos **gates**: deriva a verdade do código (o conjunto que o orquestrador realmente executa) e sinaliza toda linha da doc que enumere ≥2 membros como **subconjunto próprio**. O cabeçalho dele registra que «três revisões perderam isso» antes de existir. A frente aqui é o mesmo gate com outra **fonte de verdade**: o conjunto de backends ativos derivado de `$AdapterScript` em `scripts/Invoke-LlmDelegatePanelDispatch.ps1` (ou do `ValidateSet` de `-Backend` em `scripts/Resolve-LlmDelegateAuthorization.ps1` — escolher **uma** e justificar).
+
+**Arquivos previstos** — novos: `scripts/Test-PrePushBackendEnumerationParity.ps1` + self-test próprio. Alterados: `scripts/Invoke-PrePushMechanicalChecks.ps1` (tabela de gates, execução e objeto `gates` do JSON), `13-revisao-pre-push.md` (dono da rotina: prosa + tabela de gates), `09-inventario-e-rastreabilidade-publica.md` (entrada do script) e `08-guia-para-agente-gpt.md` (bullet do gate). Mais `CHANGELOG` trilíngue.
+
+**Ressalva de desenho (a decisão em aberto, e o motivo de não estar pronta).** O `newTokenPropagation` já emite **41 candidatas consultivas** por rodada, todas falsos positivos há semanas. Ruído consultivo demais é o que leva o revisor a truncar a saída para triar rápido — e foi **exatamente** assim que o gap do `09:114` passou em 2026-08-06: o filtro certo foi rodado, o gap veio em primeiro lugar na lista, e a linha foi cortada em 220 chars antes do trecho problemático. Um gate novo com heurística ampla **agrava** a causa em vez de curá-la. Portanto, o v1 precisa fechar antes: (a) restringir a linhas em **contexto normativo** (contrato/inventário/regra), não qualquer menção em prosa ou comentário; (b) excluir por construção os falsos positivos conhecidos — quebras de linha em que o membro faltante está na linha seguinte, comentários de self-test cuja lista restrita é correta (ex.: `enumeration=none-native` deve conter só copilot/gemini), documentos de design congelados e o `CHANGELOG` (registro histórico, não se reescreve); (c) definir se o `999` entra no escopo — as três defasagens dele mostram que **deve** entrar, ainda que seja «ideias futuras», porque é onde o escopo das frentes vive.
+
+**Relacionado:** `scripts/Test-PrePushGateEnumerationParity.ps1` (padrão a espelhar), `scripts/Test-PrePushNewTokenPropagation.ps1` (o gate cego a este caso) e a entrada «Destino do backend Gemini CLI (#5)» abaixo, que nasceu da mesma frente.
+
 ## Destino do backend Gemini CLI (#5) — inelegível para conta individual desde 2026-08-06
 
 - **Importância** — média (o backend #5 está **inoperante** nesta máquina; há workaround via Antigravity para a família `google`, mas a documentação segue descrevendo o Gemini como ativo).
