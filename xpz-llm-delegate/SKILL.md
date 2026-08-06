@@ -363,6 +363,8 @@ Backend Antigravity CLI (`agy -p`, externo Antigravity/Google):
 {"conversation_id":"…","status":"SUCCESS","response":"OK\n","duration_seconds":42.6,"num_turns":1,"usage":{"input_tokens":17125,"output_tokens":43,"thinking_tokens":39,"cache_read_tokens":0,"total_tokens":17168}}
 ```
 
+**Fallback de texto bruto (fail-closed desde 2026-08-06).** Quando o stdout **não** parseia como JSON e o exit é **0**, o adapter cai num fallback que devolve o texto bruto. Antes do guard, isso promovia erro a parecer: um CLI que sai 0 e escreve texto humano no stdout — medido no **Gemini CLI**, da mesma família, sem credencial em cache: `Opening authentication page in your browser...` — teria esse texto devolvido como resposta do modelo e, como `responded` no dispatcher é **mecânico** (texto não-vazio basta), a falha de autenticação entraria no recibo do painel como revisor que **respondeu**, contando para o piso de diversidade. Agora o fallback consulta `Get-AntigravityErrorMessage` **antes** de devolver: casou erro conhecido ⇒ `BLOCK` com o motivo; senão, segue devolvendo o texto bruto (resiliência a mudança de formato do CLI). Provas comportamentais por fake-exe no `Test-AntigravityCliSupportSelfTest.ps1`, nos dois sentidos — o texto puro legítimo continua passando pelo fallback.
+
 Em falha, o mesmo envelope traz `status="ERROR"`, `response=""` e `error` com o motivo — e o processo sai com **exit code ≠ 0**. Ou seja, o caminho de erro que o CLI realmente usa é o do exit code (tratado antes do parse, com `Get-AntigravityErrorMessage`); o guard de `status != SUCCESS` no adapter é **defesa em profundidade** para um exit 0 com status de erro, não o fluxo observado. Campos além de `status`/`response` não são consumidos pelo adapter.
 
 Latência por provedor: modelos externos OAuth (`openai/*`, Codex externo; `anthropic/*`,
@@ -790,7 +792,7 @@ truncamento ao vivo) mostrou: **Codex** (`output-last-message`, arquivo dedicado
 terminal nomeado**; **Copilot** isola a final por **last-wins de stream** (último `assistant.message`
 vence) + `result.exitCode`, mecanismo **diferente** mas com a mesma proteção prática. Critério
 positivo: o adapter entrega a mensagem final canônica, **não** o stream/preâmbulo. **Resultado:**
-o vazamento do Achado D (preâmbulo virar parecer) **não se reproduz** nos não-opencode listados acima;
+o vazamento do Achado D (preâmbulo virar parecer) **não se reproduz** nos não-opencode listados acima — com a ressalva de que, no **Antigravity**, o `$json.response` é o caminho normal, mas há **fallback de texto bruto** quando o stdout não parseia com exit 0; esse fallback é **fail-closed** contra erro conhecido desde 2026-08-06 (ver «Fallback de texto bruto» na seção do backend), o que fecha o vetor de promover falha de auth a parecer, mas o texto devolvido nesse caminho não vem de campo terminal nomeado;
 resta um **limite conhecido residual** — truncamento por **limite de tokens** **não é detectado**
 fora do opencode (nenhum tem equivalente a `reason=length`). Esse limite (paridade de detecção de
 truncamento nos adapters stdin/JSONL), o **risco residual do last-wins do Copilot** (se o agente

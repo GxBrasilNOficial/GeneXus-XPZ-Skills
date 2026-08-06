@@ -32,6 +32,16 @@ Assert-True (-not (Test-AntigravityHelpSupportsContract -HelpText $helpSubstring
 $errText = Get-AntigravityErrorMessage -StdoutText "" -StderrText "Error 429: rate limit exceeded for resource"
 Assert-True ($errText -like "*429*") "Extrai mensagem de erro de cota/rate limit"
 
+# 2b. Formas flexionadas de auth. `\bauth\b` isolado NAO casa "authentication"/"authenticating" —
+# as palavras exatas das duas falhas reais medidas em 2026-08-06 no CLI irmao (Gemini). Aqui o
+# custo do falso negativo e maior que no Gemini: o adapter tem fallback de texto bruto (caso 8).
+$authPrompt = Get-AntigravityErrorMessage -StdoutText "Opening authentication page in your browser. Do you want to continue? [Y/n]:" -StderrText ""
+Assert-True ($null -ne $authPrompt) "Reconhece prompt interativo de autenticacao no stdout"
+$authErr = Get-AntigravityErrorMessage -StdoutText "" -StderrText "Error authenticating: IneligibleTierError: client no longer supported"
+Assert-True ($null -ne $authErr) "Reconhece erro de autenticacao no stderr"
+$semRuido = Get-AntigravityErrorMessage -StdoutText "Loaded cached credentials" -StderrText ""
+Assert-True ($null -eq $semRuido) "NAO trata 'Loaded cached credentials' (linha informativa de execucao normal) como erro"
+
 # 3. Quota failure pattern
 Assert-True ("quota exceeded" -match $quotaFailurePattern) "Regex de cota reconhece 'quota exceeded'"
 Assert-True ("429 Too Many Requests" -match $quotaFailurePattern) "Regex de cota reconhece 429 / Too Many Requests"
@@ -131,6 +141,39 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File "%~dp0fake-agy-err.ps1" %*
         }
     }
     Assert-True $n5ErrorCaught "Invoke-Antigravity.ps1 lanca excecao BLOCK com status ERROR sem engolir pelo catch"
+
+    # 8. Prova Comportamental: FALLBACK DE TEXTO BRUTO E FAIL-CLOSED CONTRA ERRO CONHECIDO.
+    # Reproduz o estado medido em 2026-08-06 no Gemini CLI (mesma familia, sem credencial em cache):
+    # prompt interativo de login no STDOUT e exit 0. Sem o guard, esse texto era devolvido como
+    # PARECER do modelo e, como `responded` no dispatcher e mecanico (texto nao-vazio basta), a
+    # falha de auth entrava no recibo do painel como revisor que RESPONDEU. O caso 6 acima prova
+    # que o fallback legitimo (texto que nao casa erro conhecido) segue funcionando.
+    $fakeAuthPs1 = Join-Path $tempDir 'fake-agy-auth.ps1'
+    @'
+param()
+if ($args -contains '--help') {
+    "Usage of agy: -p Run a prompt --mode Set agent mode"
+    exit 0
+}
+Write-Output "Opening authentication page in your browser. Do you want to continue? [Y/n]:"
+exit 0
+'@ | Set-Content -LiteralPath $fakeAuthPs1 -Encoding utf8
+
+    $fakeAuthCmd = Join-Path $tempDir 'fake-agy-auth.cmd'
+    @'
+@echo off
+pwsh -NoProfile -ExecutionPolicy Bypass -File "%~dp0fake-agy-auth.ps1" %*
+'@ | Set-Content -LiteralPath $fakeAuthCmd -Encoding ascii
+
+    $authBlockCaught = $false
+    $authReturned = $null
+    try {
+        $authReturned = & $invokeScript -AntigravityExe $fakeAuthCmd -Message 'ping' -Model 'gemini-3.6-flash-high' -Mode plan
+    } catch {
+        if ($_.Exception.Message -like '*erro conhecido*') { $authBlockCaught = $true }
+    }
+    Assert-True $authBlockCaught "Stdout de auth com exit 0 deve virar BLOCK, nao parecer (fallback fail-closed)"
+    Assert-True ([string]::IsNullOrEmpty([string]$authReturned)) "Stdout de auth nao pode ser devolvido como resposta do modelo"
 
 } finally {
     Remove-Item -LiteralPath $tempDir -Recurse -Force -ErrorAction SilentlyContinue

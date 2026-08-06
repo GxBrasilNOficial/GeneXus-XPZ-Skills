@@ -65,8 +65,14 @@ function Get-AntigravityErrorMessage {
     $combined = @($StderrText, $StdoutText) -join "`n"
     if ([string]::IsNullOrWhiteSpace($combined)) { return $null }
     $lines = @($combined -split "`r?`n")
+    # `auth` isolado (\bauth\b) NAO casa "authentication"/"authenticating" - paridade com o mesmo
+    # defeito corrigido em GeminiCliSupport.ps1 (2026-08-06). Importa aqui mais que no Gemini: o
+    # Invoke-Antigravity tem FALLBACK de texto bruto, entao um prompt interativo de login com exit 0
+    # ("Opening authentication page in your browser...") seria devolvido como PARECER do modelo se o
+    # extrator nao o reconhecesse. `credential` fica FORA de proposito: CLIs desta familia emitem
+    # "Loaded cached credentials" em execucao normal, e isso viraria ruido dentro do erro.
     $interesting = @($lines | Where-Object {
-        $_ -match '(?i)\b(error|failed|unauthorized|forbidden|not\s+available|requires|login|auth|invalid|quota|rate\s*limit|exhausted)\b'
+        $_ -match '(?i)\b(error|failed|unauthorized|forbidden|not\s+available|requires|login|sign\s*in|auth|authenticat\w*|authoriz\w*|invalid|quota|rate\s*limit|exhausted)\b'
     })
     if ($interesting.Count -gt 0) {
         return (($interesting | Select-Object -First 8) -join "`n").Trim()

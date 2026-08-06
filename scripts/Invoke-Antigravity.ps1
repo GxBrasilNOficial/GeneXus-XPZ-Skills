@@ -159,7 +159,19 @@ try {
         return $respText.Trim()
     }
 
-    # Fallback a texto bruto se nao for JSON
+    # Fallback a texto bruto se nao for JSON - mas FAIL-CLOSED contra erro conhecido.
+    # Sem este guard, um CLI que sai 0 e escreve texto humano no stdout tem esse texto devolvido
+    # como PARECER do modelo. Nao e hipotetico: medido em 2026-08-06 no Gemini CLI (mesma familia,
+    # sem credencial em cache), que imprime "Opening authentication page in your browser..." no
+    # stdout e sai 0. Como `responded` no dispatcher e mecanico (texto nao-vazio basta), uma falha
+    # de autenticacao entraria no recibo do painel como revisor que RESPONDEU, contando para o piso
+    # de diversidade. O fallback segue existindo para stdout que nao e JSON NEM casa erro conhecido
+    # (resiliencia a mudanca de formato do CLI); o que ele deixa de fazer e promover erro a parecer.
+    $rawErrMsg = Get-AntigravityErrorMessage -StdoutText $stdoutText -StderrText $stderrText
+    if ($rawErrMsg) {
+        throw "BLOCK: Antigravity CLI nao retornou JSON e a saida casa erro conhecido (exit 0): $rawErrMsg"
+    }
+
     $cleanText = [regex]::Replace([string]$stdoutText, '\x1B\[[0-9;]*[a-zA-Z]', '').Trim()
     return $cleanText
 
