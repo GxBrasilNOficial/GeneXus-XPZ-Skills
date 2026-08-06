@@ -8,7 +8,7 @@ $ErrorActionPreference = 'Stop'
 
 # Self-test do tratamento de stdin nos adapters da skill xpz-llm-delegate.
 #
-# Bug coberto: um CLI agentico (opencode/gemini/copilot) chamado de uma shell
+# Bug coberto: um CLI agentico (opencode/gemini/copilot/antigravity) chamado de uma shell
 # headless sem TTY TRAVA lendo o stdin herdado (pipe aberto, sem EOF).
 #
 # Dois regimes de adapter, ambos dao EOF ao CLI (anti-hang):
@@ -16,7 +16,7 @@ $ErrorActionPreference = 'Stop'
 #    Invoke-OpenCode/Start-OpenCodeJob): entregam o prompt POR stdin via
 #    Start-Process -RedirectStandardInput <arquivo>; o fim do arquivo da EOF. O prompt
 #    fica FORA do argv (resolve o limite ~32KB de linha de comando do Windows).
-#  - argument-based (Invoke-Gemini/Invoke-Copilot): passam o prompt como ARGUMENTO e
+#  - argument-based (Invoke-Gemini/Invoke-Copilot/Invoke-Antigravity): passam o prompt como ARGUMENTO e
 #    fecham o stdin no runner com "$null | & ([string]$req.exe)" (EOF puro, sem bytes).
 #
 # Camadas:
@@ -186,7 +186,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File "%~dp0fake-reader.ps1" %*
     # -Raw -Encoding utf8, e guarda Test-Path -LiteralPath $MessagePath -PathType Leaf. Espelha
     # Invoke-OpenCode.ps1:61-89. NAO ha prova comportamental de >32KB aqui para os 4 stdin-based
     # (o caso C ja prova o principio para o opencode) nem para os 2 argument-based (seria enganoso:
-    # Gemini/Copilot seguem no argv). So Invoke-Codex tem prova comportamental dedicada (secao E).
+    # Gemini/Copilot/Antigravity seguem no argv). So Invoke-Codex tem prova comportamental dedicada (secao E).
     $messagePathAdapters = @(
         'Invoke-Codex.ps1'
         'Start-CodexJob.ps1'
