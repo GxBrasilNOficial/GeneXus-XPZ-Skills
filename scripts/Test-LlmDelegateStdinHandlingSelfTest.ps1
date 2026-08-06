@@ -180,12 +180,15 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File "%~dp0fake-reader.ps1" %*
     Assert-True ($seen -ge 32768) `
         "O prompt > 32KB deveria chegar inteiro pelo stdin; o fake-exe leu $seen chars (esperado >= 32768) — sinal de que o prompt nao passou por stdin."
 
-    # --- (D) Guard estatico de -MessagePath nos 6 adapters (Frente 1) -------
+    # --- (D) Guard estatico de -MessagePath nos adapters de $messagePathAdapters (Frente 1) ---
+    # SEM CONTAGEM no texto, de proposito: contagem em prosa nao acompanha backend novo e nenhuma
+    # busca por nome de backend a encontra ("quatro" nao contem "Antigravity"). A lista abaixo e a
+    # unica fonte; o texto se refere a ela, nunca a um numero.
     # Por TOKENS independentes (nao substring fixa, pois a ordem -Raw/-Encoding pode variar):
     # parametro -MessagePath em set 'FromFile', leitura Get-Content -LiteralPath $MessagePath
     # -Raw -Encoding utf8, e guarda Test-Path -LiteralPath $MessagePath -PathType Leaf. Espelha
-    # Invoke-OpenCode.ps1:61-89. NAO ha prova comportamental de >32KB aqui para os 4 stdin-based
-    # (o caso C ja prova o principio para o opencode) nem para os 2 argument-based (seria enganoso:
+    # Invoke-OpenCode.ps1:61-89. NAO ha prova comportamental de >32KB aqui para os stdin-based
+    # (o caso C ja prova o principio para o opencode) nem para os argument-based (seria enganoso:
     # Gemini/Copilot/Antigravity seguem no argv). So Invoke-Codex tem prova comportamental dedicada (secao E).
     $messagePathAdapters = @(
         'Invoke-Codex.ps1'

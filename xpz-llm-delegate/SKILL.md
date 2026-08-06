@@ -790,7 +790,7 @@ truncamento ao vivo) mostrou: **Codex** (`output-last-message`, arquivo dedicado
 terminal nomeado**; **Copilot** isola a final por **last-wins de stream** (último `assistant.message`
 vence) + `result.exitCode`, mecanismo **diferente** mas com a mesma proteção prática. Critério
 positivo: o adapter entrega a mensagem final canônica, **não** o stream/preâmbulo. **Resultado:**
-o vazamento do Achado D (preâmbulo virar parecer) **não se reproduz** nos quatro não-opencode;
+o vazamento do Achado D (preâmbulo virar parecer) **não se reproduz** nos não-opencode listados acima;
 resta um **limite conhecido residual** — truncamento por **limite de tokens** **não é detectado**
 fora do opencode (nenhum tem equivalente a `reason=length`). Esse limite (paridade de detecção de
 truncamento nos adapters stdin/JSONL), o **risco residual do last-wins do Copilot** (se o agente
