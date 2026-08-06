@@ -165,7 +165,11 @@ function Get-Slug {
     return ([regex]::Replace($Value, '[^A-Za-z0-9._-]', '-'))
 }
 
-$quotaFailurePattern = '(?i)(^|[^0-9])(402|429)([^0-9]|$)|Payment Required|insufficient coding plan balance|quota|rate limit|exhausted|resource_exhausted|too many requests|weekly usage limit|limite de uso|sem quota|saldo insuficiente'
+# `exhausted` NAO entra solto: erro generico de rede/contexto ("retries exhausted", "connection pool
+# exhausted", "context window exhausted") viraria quota em TODOS os backends e mandaria o operador
+# esperar reset de ciclo por falha que nao e cota. Ancorar no sujeito esgotado (resource_exhausted,
+# credits/balance/saldo exhausted); "quota exhausted" ja casa pelo termo `quota`.
+$quotaFailurePattern = '(?i)(^|[^0-9])(402|429)([^0-9]|$)|Payment Required|insufficient coding plan balance|quota|rate limit|resource_exhausted|(?:credits?|balance|saldo)\s+exhausted|too many requests|weekly usage limit|limite de uso|sem quota|saldo insuficiente'
 $unavailableFailurePattern = '(?i)workspace-not-trusted'
 
 function Test-QuotaFailureMessage {

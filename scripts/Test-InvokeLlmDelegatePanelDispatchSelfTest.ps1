@@ -105,6 +105,9 @@ Append-Log("$fam`tEXIT`t$([DateTime]::UtcNow.Ticks)`t$model")
 if ($model -match 'cota') {
     # evento de erro de stream com 402/quota/saldo -> Invoke-OpenCode lanca BLOCK; harness -> quota
     '{"type":"error","error":{"data":{"message":"Payment Required: insufficient coding plan balance (HTTP 402) sem quota livre"}}}'
+} elseif ($model -match 'exausto') {
+    # erro GENERICO que contem a palavra "exhausted" sem ser cota -> deve virar error, NAO quota
+    '{"type":"error","error":{"data":{"message":"stream failed: retries exhausted after 3 attempts"}}}'
 } elseif ($model -match 'empty') {
     '{"type":"step_finish","part":{"reason":"stop"}}'
 } else {
@@ -557,6 +560,15 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
     Assert-True ($null -ne $rv.statePath) 'cota: deveria gravar .state.txt no ledger'
     $quotaLedger = Get-Content -LiteralPath $rv.statePath -Raw -Encoding utf8
     Assert-True ($quotaLedger -match 'Payment Required' -and $quotaLedger -match 'insufficient coding plan balance' -and $quotaLedger -match '402' -and $quotaLedger -match 'sem quota') 'cota: .state.txt deveria preservar a evidencia bruta de quota/saldo/402'
+
+    # NAO-cota: erro generico que contem "exhausted" (rede/contexto) NAO pode virar quota. Trava a
+    # regressao do $quotaFailurePattern alargado, que classificava "retries exhausted" como cota em
+    # TODOS os backends e mandaria o operador esperar reset de ciclo por falha que nao e de cota.
+    $r = Invoke-Harness -Reviewers @(@{ backend = 'opencode'; targetModelKey = 'openai/exausto-1'; invokeArgs = @{} }) `
+        -Sensitivity 'public' -Extra @{ OpenCodeConfigPath = $ocCfg }
+    $rv = Get-Reviewer $r.json 0
+    Assert-True ($rv.state -eq 'error') "nao-cota: 'retries exhausted' deveria virar error, nao quota; got $($rv.state)"
+    Assert-True ([int]$r.json.quotaCount -eq 0) "nao-cota: quotaCount deveria seguir 0; got $($r.json.quotaCount)"
 
     # timeout: fake dorme além do -TimeoutSec (via invokeArgs.timeoutSec) -> adapter "excedeu...encerrado" -> timeout
     $r = Invoke-Harness -Reviewers @(@{ backend = 'opencode'; targetModelKey = 'openai/timeout-1'; invokeArgs = @{ timeoutSec = 2 } }) `
