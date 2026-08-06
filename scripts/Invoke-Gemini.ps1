@@ -114,7 +114,21 @@ try {
     if ($p.ExitCode -eq 0 -and -not [string]::IsNullOrWhiteSpace($stdoutText)) {
         $json = $null
         try { $json = $stdoutText | ConvertFrom-Json } catch {
-            throw "BLOCK: Gemini CLI retornou JSON invalido: $($_.Exception.Message)"
+            # O CLI pode sair 0 e ainda assim escrever TEXTO HUMANO no stdout em vez do JSON -
+            # medido em 2026-08-06 com o gemini sem credencial em cache, que imprime o prompt
+            # interativo de login ("Opening authentication page in your browser..."). Antes desta
+            # ordem, o parse estourava aqui e o adapter morria com "JSON invalido: Unexpected
+            # character... O" - o 'O' de "Opening" -, sem NUNCA consultar Get-GeminiErrorMessage,
+            # que fica adiante e teria achado o motivo real. Consultar o extrator ANTES de
+            # desistir: erro de auth/servico vira mensagem acionavel; so o que ele nao reconhece
+            # e que continua sendo reportado como contrato JSON quebrado, agora com uma amostra
+            # do stdout para o diagnostico nao ficar cego.
+            $parseErr = $_.Exception.Message
+            $errMsgOnParse = Get-GeminiErrorMessage -StdoutText $stdoutText -StderrText $stderrText
+            if ($errMsgOnParse) { throw "BLOCK: Gemini CLI retornou erro: $errMsgOnParse" }
+            $amostra = ([string]$stdoutText).Trim()
+            if ($amostra.Length -gt 400) { $amostra = $amostra.Substring(0, 400) + '...' }
+            throw "BLOCK: Gemini CLI retornou JSON invalido: $parseErr`nstdout:`n$amostra"
         }
         if ($json.PSObject.Properties['response'] -and -not [string]::IsNullOrWhiteSpace([string]$json.response)) {
             return ([string]$json.response).TrimEnd("`r", "`n")

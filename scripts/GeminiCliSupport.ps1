@@ -76,8 +76,15 @@ function Get-GeminiErrorMessage {
     $combined = @($StderrText, $StdoutText) -join "`n"
     if ([string]::IsNullOrWhiteSpace($combined)) { return $null }
     $lines = @($combined -split "`r?`n")
+    # `auth` estava so na forma isolada (\bauth\b) e NAO casava "authentication"/"authenticating" -
+    # exatamente as palavras das duas falhas reais medidas em 2026-08-06: o prompt interativo
+    # "Opening authentication page in your browser..." (stdout, exit 0) e o
+    # "Error authenticating: IneligibleTierError..." (stderr, exit 1). Sem as formas flexionadas,
+    # o extrator devolvia $null e o adapter perdia o motivo. `credential` fica FORA de proposito:
+    # o CLI emite "Loaded cached credentials" como linha informativa em execucao normal, e
+    # inclui-la traria ruido para dentro da mensagem de erro.
     $interesting = @($lines | Where-Object {
-        $_ -match '(?i)\b(error|failed|unauthorized|forbidden|not\s+available|requires|login|auth|invalid)\b'
+        $_ -match '(?i)\b(error|failed|unauthorized|forbidden|not\s+available|requires|login|sign\s*in|auth|authenticat\w*|authoriz\w*|invalid)\b'
     })
     if ($interesting.Count -gt 0) {
         return (($interesting | Select-Object -First 8) -join "`n").Trim()

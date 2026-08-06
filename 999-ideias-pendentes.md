@@ -11,6 +11,35 @@ Cada entrada usa dois campos curtos logo abaixo do titulo:
 
 Entradas legadas sem avaliação carregam `FALTA AVALIAR` em ambos os campos até que sejam revistas em sessão dedicada.
 
+## Destino do backend Gemini CLI (#5) — inelegível para conta individual desde 2026-08-06
+
+- **Importância** — média (o backend #5 está **inoperante** nesta máquina; há workaround via Antigravity para a família `google`, mas a documentação segue descrevendo o Gemini como ativo).
+- **Maturidade** — pesquisa feita (o diagnóstico está fechado; falta **decisão humana** sobre a via de autenticação antes de qualquer mudança documental).
+
+**Medido em 2026-08-06** (despacho real de saúde por backend). O `Invoke-Gemini.ps1` falha com:
+
+```
+Error authenticating: IneligibleTierError: This client is no longer supported for Gemini
+Code Assist for individuals. To continue using Gemini, please migrate to the Antigravity
+suite of products: https://antigravity.google        (reasonCode: UNSUPPORTED_CLIENT)
+```
+
+**Não é versão do cliente:** atualizar 0.35.3 → **0.54.0** (`npm install -g @google/gemini-cli@0.54.0`) reproduz o mesmo erro. «This client» é o Gemini CLI como cliente do **Code Assist para contas individuais**, não o binário desatualizado.
+
+**O adapter não está quebrado:** com 0.54.0 o `Resolve-GeminiExe` continua passando — versão mínima validada (`0.35.3`) e contrato de flags (`--prompt`, `--approval-mode`, `--output-format`, `--model`) seguem compatíveis. O que falha é a autorização do serviço, fora do alcance do adapter.
+
+**Decisão em aberto (humana).** Restam duas vias de auth não testadas, ambas fora do Code Assist tier: **Gemini API Key** (AI Studio) e **Vertex AI**. Em 2026-08-06 o usuário decidiu **não** testá-las nem buscar essas assinaturas. Enquanto a decisão não for tomada:
+
+- **não** aposentar nem marcar o backend #5 como removido em `xpz-llm-delegate/SKILL.md`, `02`, `09` e `14` — ele pode voltar por outra via de auth;
+- ao montar painel nesta máquina, tratar o Gemini como indisponível de fato e lembrar que a família `google` só entra por `antigravity/gemini-*` (que colapsa para `google` via `Get-LlmDelegateTargetFamily`).
+
+**Subfrente residual do detector (camadas 2 e 3).** A **camada 1** já foi feita em 2026-08-06 (o adapter consulta `Get-GeminiErrorMessage` antes de desistir no parse, e o extrator passou a reconhecer as formas flexionadas `authenticat*`/`authoriz*`/`sign in` — antes, `\bauth\b` **não** casava «authentication»). Ficam pendentes:
+
+- **(2)** classificar falha de auth como **`unavailable`** em vez de `error` no painel — retentar não resolve, e é o mesmo tratamento que o `workspace-not-trusted` do Claude Code já recebe. Exige detector nomeado no `GeminiCliSupport.ps1` + entrada no `$unavailableFailurePattern` do dispatcher.
+- **(3)** tratar `IneligibleTierError`/`UNSUPPORTED_CLIENT` como **permanente**: nem fallback nem retry ajudam; a mensagem deve dizer que a ação é humana (trocar a via de auth ou usar o Antigravity), em vez de cair no balaio genérico de erro de auth. Só vale investir depois da decisão acima.
+
+**Dois estados de falha distintos, ambos medidos** (importam para quem for mexer no detector): **sem** credencial em cache o CLI escreve o prompt interativo de login no **stdout** e sai **0**; **com** credencial em cache sai **1** com o stderr estruturado acima. O primeiro estado é o que derrubava o diagnóstico antes da camada 1.
+
 ## Evolução futura de fidelidade textual em XML GeneXus antes do empacotamento
 
 - **Importância** — média (a primeira proteção bloqueia o churn global forte observado, mas ainda há falsos negativos conscientes).
