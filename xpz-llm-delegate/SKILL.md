@@ -696,8 +696,9 @@ registra-se como `noResponse`, nunca `responded`.
 5. Invocar o adapter do backend escolhido: opencode (`Invoke-OpenCode.ps1` / `Start-OpenCodeJob.ps1`),
    codex (`Invoke-Codex.ps1` / `Start-CodexJob.ps1`), Claude Code (`Invoke-ClaudeCode.ps1`,
    `Invoke-ClaudeCodeAsync.ps1` no painel, ou `Start-ClaudeCodeJob.ps1`), Copilot
-   (`Invoke-Copilot.ps1`) ou Gemini (`Invoke-Gemini.ps1`) — síncrono (curto), adapter tipado do
-   painel quando aplicável, ou assíncrono longo quando o backend tiver job.
+   (`Invoke-Copilot.ps1`), Gemini (`Invoke-Gemini.ps1`) ou Antigravity (`Invoke-Antigravity.ps1`) —
+   síncrono (curto), adapter tipado do painel quando aplicável, ou assíncrono longo quando o
+   backend tiver job.
 6. **Validar a saída** com o agente forte antes de usá-la. Não confiar em timestamps/fatos
    reportados pelo subagente.
 
