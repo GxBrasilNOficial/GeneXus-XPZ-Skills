@@ -28,7 +28,14 @@ Oito das nove foram achadas **depois** da pré-push formal: por revisão externa
 
 **Direção decidida (usuário, 2026-08-06): centralizar a fonte de verdade em vez de multiplicar listas.** A política já existia em parte — vários pontos do `02` e do `15` trazem «dono normativo: `xpz-llm-delegate/SKILL.md` — não duplicar aqui», e os commits `0711394`, `1f661ce` e `bb22400` desta frente já converteram enumerações em ponteiro. Os gaps de 2026-08-06 são exatamente os lugares onde isso **não** foi feito. Três níveis, do mais barato ao mais caro:
 
-**Nível 1 — eliminar contagens numéricas (FEITO em 2026-08-06).** A contagem quase nunca acrescenta informação e é a forma mais traiçoeira de defasagem. Corrigidas por **remoção**, não por atualização: `xpz-llm-delegate/SKILL.md` («nos quatro não-opencode» → «nos não-opencode listados acima») e `scripts/Test-LlmDelegateStdinHandlingSelfTest.ps1` (cabeçalho da seção (D) e o texto sobre stdin-based/argument-based passam a referir a lista `$messagePathAdapters`, sem número — inclusive na contagem que ainda estava **correta**, para não deixar bomba-relógio na mesma frase). Regra derivada: **não introduzir contagem de backends/adapters em prosa; referir a lista.**
+**Nível 1 — eliminar contagens numéricas (FEITO em 2026-08-06).** A contagem quase nunca acrescenta informação e é a forma mais traiçoeira de defasagem. Corrigidas por **remoção**, não por atualização, **inclusive as que ainda estavam certas** — contagem correta hoje é bomba-relógio no próximo backend, e o custo de removê-la é zero:
+
+- `xpz-llm-delegate/SKILL.md` — «Há **seis** motores de delegação» → «Os motores de delegação (backends) ativos são»; «nos **quatro** não-opencode» → «nos não-opencode listados acima». Os identificadores `#1`..`#6` **permanecem**: são identidade estável de cada backend (citada em todo o repo como «backend #6»), não contagem do conjunto.
+- `scripts/Test-LlmDelegateStdinHandlingSelfTest.ps1` — cabeçalho da seção (D) e o texto sobre stdin-based/argument-based passam a referir a lista `$messagePathAdapters`, sem número.
+- `09-inventario-e-rastreabilidade-publica.md` — «nos **7** adapters Codex/…/Antigravity» → «nos adapters Codex/…/Antigravity» (a lista completa já está na própria frase; o número era redundante).
+- `999` (entrada do `mimo`) — «os **6** backends atuais» → «os backends atuais».
+
+Regra derivada: **não introduzir contagem de backends/adapters em prosa; referir a lista.** Fora do escopo por serem registro imutável: `CHANGELOG`, `historico/` e documentos de design congelados (ex.: `opencode-reviewer-ro-least-privilege-design.md`, que fala de «4 backends» porque eram quatro quando foi escrito).
 
 **Nível 2 — ponteiro onde é duplicação pura (ABERTO).** Seguir o que `0711394` já fez, caso a caso. A decisão em aberto é **onde não se aplica**: nem toda lista é duplicação. O `09` é inventário público — enumerar é a razão de existir dele; comentários de código precisam ser autocontidos (um comentário «ver `SKILL.md`» é pior para quem lê o script); e `13`/`14` **não** repetem a lista da skill, elas a **recortam por outro eixo** (`git-capable` vs `semantic-only`, `argv-limited` vs `stdin-dossier-capable`) — esse recorte é conhecimento da pré-push, não da skill. Distinção que governa a triagem: **enumeração normativa** (define o conjunto — deve ter dono único) vs **enumeração derivada** (aplica o conjunto a um eixo — legítima, mas precisa do nível 3).
 
@@ -365,7 +372,7 @@ Critério para retomar: caso real em que a ausência do cache Codex prejudique a
 
 ## Adicionar o `mimo` (fork do opencode) como 7º backend da skill `xpz-llm-delegate`
 
-- **Importância** — baixa-média (agrega **uma família nova** ao piso de diversidade do painel — `mimo`/`xiaomi`, MiMo V2.5 — e é **gratuita, sem credencial e sem cota** observada, atrativo frente ao teto semanal do `ollama-cloud`, que hoje é a única família externa "barata" da lista preferida). Sem ela, os 6 backends atuais seguem cobrindo delegação e painel; nenhuma capacidade é perdida.
+- **Importância** — baixa-média (agrega **uma família nova** ao piso de diversidade do painel — `mimo`/`xiaomi`, MiMo V2.5 — e é **gratuita, sem credencial e sem cota** observada, atrativo frente ao teto semanal do `ollama-cloud`, que hoje é a única família externa "barata" da lista preferida). Sem ela, os backends atuais seguem cobrindo delegação e painel; nenhuma capacidade é perdida.
 - **Maturidade** — pesquisa feita (premissas medidas e **re-medidas**; falta fechar **uma** decisão de desenho e executar). **Não** classificar como «pronta para implementar»: o custo subiu com o guard `reviewer-ro`, que não existia quando a ideia nasceu.
 
 **Histórico da entrada:** coleta original em 2026-06-24 (quando o `mimo` foi instalado); **replanejada em 2026-07-25** após 303 commits em `origin/main` que invalidaram parte das premissas. As invalidações estão explicitadas abaixo — não reciclar conclusões da coleta de junho sem reler esta seção.

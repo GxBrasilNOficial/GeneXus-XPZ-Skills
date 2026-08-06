@@ -11,7 +11,7 @@ delegação é uma **ferramenta dirigida pelo humano**: nunca é acionada automa
 pelo agente — só a pedido do usuário ou com a concordância explícita dele a uma
 sugestão.
 
-Há seis motores de delegação (backends): o **opencode** (backend #1, agêntico), o
+Os motores de delegação (backends) ativos são: o **opencode** (backend #1, agêntico), o
 **Codex** (backend #2, `codex exec`, usando o default da própria ferramenta quando `-Model` é omitido), o **Claude Code**
 (backend #3, `claude -p` com Opus 4.8 por padrão), o **GitHub Copilot CLI**
 (backend #4, `copilot -p`), o **Gemini CLI** (backend #5, `gemini -p`) e o **Antigravity CLI**
