@@ -47,7 +47,8 @@
     (ex: claude-opus-4-8; alias 'opus' normalizado); quando omitido, a localidade fica
     'unknown' e o gate trata como externo (fail-safe -> ask para payload sensivel). Nos
     backends copilot, gemini e antigravity, o nome do modelo; quando omitido, o resolvedor aplica o
-    default do proprio CLI (gpt-5-mini no copilot, gemini-3-flash-preview no gemini, gemini-3.6-flash-high no antigravity).
+    default do resolvedor (auto no copilot - o proprio CLI escolhe o modelo -, gemini-3-flash-preview
+    no gemini, gemini-3.6-flash-high no antigravity).
 .PARAMETER Backend
     Backend de delegacao: 'opencode' (default), 'codex', 'claude-code', 'copilot', 'gemini' ou 'antigravity'.
     Seleciona o resolvedor de localidade.

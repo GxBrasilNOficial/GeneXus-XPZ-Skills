@@ -20,7 +20,11 @@
     levanta o teto ~32KB do command line do Windows; um guard fail-closed (~30000 chars) recusa
     prompts grandes. So os adapters stdin-based (Codex/Claude Code/opencode) sao imunes ao teto.
 .PARAMETER Model
-    Modelo aceito pelo Copilot CLI. Default: gpt-5-mini.
+    Modelo aceito pelo Copilot CLI. Default: auto (o proprio Copilot escolhe). Nao fixar um
+    nome concreto: o catalogo do Copilot muda entre versoes do CLI e um id aposentado faz o
+    CLI recusar a chamada. Medido em 2026-08-06 (Copilot CLI 1.0.78): o antigo default
+    'gpt-5-mini' passou a responder «Model "gpt-5-mini" from --model flag is not available»,
+    enquanto 'auto' respondeu normalmente. 'auto' e documentado no proprio --help do CLI.
 .PARAMETER Cd
     Diretorio de trabalho do processo Copilot. Default: diretorio atual do chamador.
 .PARAMETER CopilotExe
@@ -32,7 +36,7 @@
 param(
     [Parameter(Mandatory, Position = 0, ParameterSetName = 'Inline')] [string] $Message,
     [Parameter(Mandatory, ParameterSetName = 'FromFile')] [string] $MessagePath,
-    [string] $Model = 'gpt-5-mini',
+    [string] $Model = 'auto',
     [string] $Cd,
     [string] $CopilotExe,
     [int] $TimeoutSec = 300

@@ -331,13 +331,47 @@ function Get-AntigravityModelEntries {
 
     if (-not $exe -or -not (Test-Path -LiteralPath $exe -PathType Leaf)) { return $entries }
 
+    # `agy models` e a UNICA sondagem deste manifesto que EXECUTA um CLI e espera resposta de rede
+    # (opencode/codex/claude-code leem arquivo de config; copilot/gemini so checam presenca no PATH).
+    # Sem teto de tempo, um CLI que pendure - token expirado que caia em prompt interativo de login,
+    # rede lenta, servico fora do ar - penduraria o manifesto INTEIRO, e com ele a oferta de painel e
+    # o snapshot do xpz-kb-parallel-setup. Medido em 2026-08-06: 2,2s no caminho feliz (~80% do tempo
+    # total do manifesto). Teto de 20s = folga larga sobre isso sem virar trava. Estouro/erro degrada
+    # para lista vazia -> enumeration=none-native, o mesmo caminho ja usado quando nao ha modelos.
+    $AntigravityProbeTimeoutSec = 20
     $rawModels = @()
+    $proc = $null
     try {
-        $rawOutput = $null | & $exe models 2>&1 | Out-String
-        if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($rawOutput)) {
-            $rawModels = @($rawOutput -split "`r?`n" | Where-Object { $_ -match '^[a-z0-9][a-z0-9\-\.]+$' })
+        $psi = [System.Diagnostics.ProcessStartInfo]::new()
+        $psi.FileName = $exe
+        $psi.ArgumentList.Add('models')
+        $psi.UseShellExecute = $false
+        $psi.CreateNoWindow = $true
+        $psi.RedirectStandardInput = $true    # fechado logo abaixo: EOF puro, sem pendurar em TTY
+        $psi.RedirectStandardOutput = $true
+        $psi.RedirectStandardError = $true
+
+        $proc = [System.Diagnostics.Process]::Start($psi)
+        $proc.StandardInput.Close()
+        # Drenar os DOIS pipes de forma assincrona antes do WaitForExit. O stderr nao e consumido,
+        # mas precisa ser lido: pipe cheio bloqueia o processo filho e o timeout viraria a regra em
+        # vez da excecao.
+        $stdoutTask = $proc.StandardOutput.ReadToEndAsync()
+        $null = $proc.StandardError.ReadToEndAsync()
+
+        if ($proc.WaitForExit($AntigravityProbeTimeoutSec * 1000)) {
+            $rawOutput = $stdoutTask.GetAwaiter().GetResult()
+            if ($proc.ExitCode -eq 0 -and -not [string]::IsNullOrWhiteSpace($rawOutput)) {
+                $rawModels = @($rawOutput -split "`r?`n" | Where-Object { $_ -match '^[a-z0-9][a-z0-9\-\.]+$' })
+            }
+        }
+        else {
+            try { $proc.Kill($true) } catch { }
         }
     } catch { }
+    finally {
+        if ($null -ne $proc) { try { $proc.Dispose() } catch { } }
+    }
 
     if ($rawModels.Count -eq 0) {
         return $entries

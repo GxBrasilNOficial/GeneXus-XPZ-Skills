@@ -154,7 +154,7 @@ que enviam para o **mesmo** provider normalizam para a **mesma** chave; o backen
 chave `codex/*`. Namespear por adapter faria uma regra `openai/*: deny-external` deixar o
 Codex passar: brecha silenciosa no eixo que o gate existe para proteger. Pelo mesmo motivo,
 Claude Code com Opus 4.8 casa `anthropic/claude-opus-4-8`, nunca `claude-code/*`.
-GitHub Copilot CLI casa `github-copilot/<modelo>` (ex.: `github-copilot/gpt-5-mini`),
+GitHub Copilot CLI casa `github-copilot/<modelo>` (ex.: `github-copilot/auto`),
 nunca `openai/*`, porque o destino operacional é o serviço Copilot. Gemini CLI casa
 `google/<modelo>` (ex.: `google/gemini-3-flash-preview`). Antigravity CLI casa `antigravity/<modelo>` (ex.: `antigravity/gemini-3.6-flash-high`).
 
@@ -246,7 +246,7 @@ A chave é sempre o **provider de destino** (ver `## ANATOMIA`), não o backend.
 quando manda para a OpenAI. Não existe (nem deve existir) prefixo `codex/` na política.
 O Claude Code com Opus 4.8 casa `anthropic/claude-opus-4-8` / `anthropic/*`; não existe
 prefixo `claude-code/` na política.
-O Copilot CLI casa `github-copilot/gpt-5-mini` / `github-copilot/*`; não existe prefixo
+O Copilot CLI casa `github-copilot/auto` / `github-copilot/*`; não existe prefixo
 `copilot/` na política. O Gemini CLI casa `google/gemini-3-flash-preview` / `google/*`;
 não existe prefixo `gemini/` na política. O Antigravity CLI é o único backend em que
 a chave de política usa o prefixo do adapter: casa `antigravity/<modelo>` /
@@ -346,6 +346,8 @@ Backend Claude Code (`claude -p`, Opus 4.8 por padrão, externo Anthropic):
 Backend GitHub Copilot CLI (`copilot -p`, externo GitHub Copilot):
 - `Invoke-Copilot.ps1 [-Message <prompt> | -MessagePath <arquivo>] [-Model <m>] [-Cd <dir>] [-CopilotExe <path>] [-TimeoutSec <s>]` — síncrono (prompt → texto). Usa `--no-custom-instructions`, `--disable-builtin-mcps`, `--available-tools=` e JSONL para consulta curta sem ferramentas disponíveis; `--allow-all-tools` permanece porque o CLI exige aprovação automática em modo não interativo. `-MessagePath` lê o prompt de arquivo (exclusivo com `-Message`; elimina o `(Get-Content)` inline), mas é **argument-based** — o prompt segue no argv, então **não** levanta o teto ~32KB; um guard fail-closed (`$MaxArgvPromptChars = 30000`, heurístico em chars) recusa prompts grandes com `BLOCK`.
 - `CopilotCliSupport.ps1` (dot-source) — descoberta **fail-closed** do `copilot`, validação de versão/flags mínimas e extração de resposta do JSONL.
+
+> **Modelo do Copilot: use `auto`, não um id concreto (medido 2026-08-06).** O default do adapter e do resolvedor é **`auto`** — o próprio Copilot escolhe. O catálogo do CLI muda entre versões e um id aposentado faz o CLI **recusar a chamada**: no Copilot CLI **1.0.78**, o antigo default `gpt-5-mini` passou a responder `Model "gpt-5-mini" from --model flag is not available`, enquanto `auto` respondeu normalmente. O adapter passa `--model` **sempre**, então um default podre quebra o backend inteiro, inclusive quando o chamador **omite** `-Model`. `auto` é documentado no próprio `copilot --help`. Modelo concreto continua aceito quando o chamador o informa e sabe que existe naquela versão.
 
 Backend Gemini CLI (`gemini -p`, externo Google):
 - `Invoke-Gemini.ps1 [-Message <prompt> | -MessagePath <arquivo>] [-Model <m>] [-ApprovalMode plan] [-Cd <dir>] [-GeminiExe <path>] [-TimeoutSec <s>]` — síncrono (prompt → texto). Usa `--approval-mode plan` e `--output-format json`; o adapter bloqueia modos diferentes de `plan`. `-MessagePath` lê o prompt de arquivo (exclusivo com `-Message`; elimina o `(Get-Content)` inline), mas é **argument-based** — o prompt segue no argv, então **não** levanta o teto ~32KB; um guard fail-closed (`$MaxArgvPromptChars = 30000`, heurístico em chars) recusa prompts grandes com `BLOCK`.

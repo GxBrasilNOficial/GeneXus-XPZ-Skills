@@ -10,12 +10,15 @@
 
     Saida: objeto JSON de maquina no stdout.
 .PARAMETER Model
-    Modelo solicitado ao Copilot CLI. Default: gpt-5-mini, observado como default local
-    do CLI validado nesta maquina.
+    Modelo solicitado ao Copilot CLI. Default: auto, espelhando o default do adapter
+    Invoke-Copilot.ps1 (o proprio Copilot escolhe o modelo). A chave fica
+    github-copilot/auto: o destino operacional continua sendo o servico Copilot, entao ela
+    casa github-copilot/* na politica igual a qualquer id concreto. Nao fixar nome de modelo
+    aqui - ver a nota de catalogo volatil no Invoke-Copilot.ps1.
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Position = 0)] [string] $Model = 'gpt-5-mini'
+    [Parameter(Position = 0)] [string] $Model = 'auto'
 )
 
 Set-StrictMode -Version Latest
@@ -23,7 +26,7 @@ $ErrorActionPreference = 'Stop'
 
 $modelParts = @($Model -split '/')
 $modelId = $modelParts[$modelParts.Count - 1].Trim()
-if ([string]::IsNullOrWhiteSpace($modelId)) { $modelId = 'gpt-5-mini' }
+if ([string]::IsNullOrWhiteSpace($modelId)) { $modelId = 'auto' }
 
 [pscustomobject]@{
     model          = $Model
