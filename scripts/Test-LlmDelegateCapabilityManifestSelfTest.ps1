@@ -190,6 +190,35 @@ exit /b 1
         -ClaudeSettingsPath $claudeSettings -ClaudeStatsCachePath $claudeStats 1> $null
     Assert-True (Test-Path -LiteralPath $outPathNoArg -PathType Leaf) 'Manifesto sem -AntigravityExe deveria ser gravado sem erro.'
 
+    # (I) Antigravity: sondagem PENDURADA e cortada pelo teto de tempo.
+    # `agy models` e a unica sondagem deste manifesto que executa um CLI e espera resposta de rede;
+    # sem teto, um agy travado (token expirado que caia em prompt interativo, servico fora do ar)
+    # penduraria o manifesto INTEIRO. Aqui o fake dorme muito mais que o teto injetado: o manifesto
+    # tem de voltar mesmo assim, degradando SO o antigravity para none-native.
+    $fakeAgyHang = Join-Path $tempRoot 'fake-agy-hang.bat'
+    @'
+@echo off
+ping -n 60 127.0.0.1 > nul
+exit /b 0
+'@ | Set-Content -LiteralPath $fakeAgyHang -Encoding ascii
+
+    $outPathHang = Join-Path $tempRoot 'cap-hang.json'
+    $swHang = [System.Diagnostics.Stopwatch]::StartNew()
+    & $scriptUnderTest -OutputPath $outPathHang `
+        -OpenCodeConfigPath $openCfg -CodexConfigPath $codexCfg `
+        -ClaudeSettingsPath $claudeSettings -ClaudeStatsCachePath $claudeStats `
+        -AntigravityExe $fakeAgyHang -AntigravityProbeTimeoutSec 2 1> $null
+    $swHang.Stop()
+
+    Assert-True ($swHang.Elapsed.TotalSeconds -lt 30) "Sondagem pendurada deveria ser cortada pelo teto; levou $([math]::Round($swHang.Elapsed.TotalSeconds,1))s."
+    Assert-True (Test-Path -LiteralPath $outPathHang -PathType Leaf) 'Manifesto deveria ser gravado mesmo com a sondagem do agy pendurada.'
+    $manifestHang = [System.IO.File]::ReadAllText($outPathHang) | ConvertFrom-Json
+    $agyHang = $manifestHang.backends | Where-Object { $_.backend -eq 'antigravity' }
+    Assert-True ($agyHang.enumeration -eq 'none-native') "agy pendurado deveria degradar para none-native; got $($agyHang.enumeration)."
+    Assert-True (@($agyHang.models).Count -eq 0) 'agy pendurado nao deveria enumerar modelo algum.'
+    $ocHang = $manifestHang.backends | Where-Object { $_.backend -eq 'opencode' }
+    Assert-True (@($ocHang.models).Count -gt 0) 'Os demais backends deveriam seguir enumerados apesar do agy pendurado.'
+
     # (B) Sanitizacao por desenho
     foreach ($forbidden in @($secretApiKey, $externalHost, 'apiKey', 'baseURL', 'Authorization', '11434', $openCfg, $codexCfg, $claudeSettings, $claudeStats)) {
         Assert-True (-not ($manifestText -like "*$forbidden*")) "Manifesto vazou conteudo sensivel proibido: '$forbidden'."

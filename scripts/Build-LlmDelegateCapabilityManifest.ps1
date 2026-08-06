@@ -51,6 +51,9 @@
     Caminho opcional do stats-cache.json do Claude Code. Fonte historica/fraca.
 .PARAMETER AntigravityExe
     Caminho do executavel do Antigravity CLI (agy.exe). Quando omitido, e resolvido via AntigravityCliSupport.ps1.
+.PARAMETER AntigravityProbeTimeoutSec
+    TEST-ONLY. Teto de tempo da sondagem `agy models`. Default 20s. Existe para o self-test provar
+    o corte sem esperar o teto real; nao usar em chamada normal.
 .EXAMPLE
     .\Build-LlmDelegateCapabilityManifest.ps1
 .EXAMPLE
@@ -64,7 +67,8 @@ param(
     [string] $CodexConfigPath = (Join-Path $HOME '.codex' | Join-Path -ChildPath 'config.toml'),
     [string] $ClaudeSettingsPath = (Join-Path $HOME '.claude' | Join-Path -ChildPath 'settings.json'),
     [string] $ClaudeStatsCachePath = (Join-Path $HOME '.claude' | Join-Path -ChildPath 'stats-cache.json'),
-    [string] $AntigravityExe
+    [string] $AntigravityExe,
+    [ValidateRange(1, 600)] [int] $AntigravityProbeTimeoutSec = 20
 )
 
 Set-StrictMode -Version Latest
@@ -315,7 +319,7 @@ $backends += [pscustomobject]@{
 }
 
 function Get-AntigravityModelEntries {
-    param([string]$AntigravityExe)
+    param([string]$AntigravityExe, [int]$ProbeTimeoutSec = 20)
     $entries = [System.Collections.Generic.List[object]]::new()
     $antigravityResolver = Join-Path $PSScriptRoot 'Resolve-AntigravityModelLocality.ps1'
     if (-not (Test-Path -LiteralPath $antigravityResolver -PathType Leaf)) { return $entries }
@@ -338,7 +342,7 @@ function Get-AntigravityModelEntries {
     # o snapshot do xpz-kb-parallel-setup. Medido em 2026-08-06: 2,2s no caminho feliz (~80% do tempo
     # total do manifesto). Teto de 20s = folga larga sobre isso sem virar trava. Estouro/erro degrada
     # para lista vazia -> enumeration=none-native, o mesmo caminho ja usado quando nao ha modelos.
-    $AntigravityProbeTimeoutSec = 20
+    # O teto e injetavel (TEST-ONLY) so para o self-test provar o corte sem esperar 20s.
     $rawModels = @()
     $proc = $null
     try {
@@ -359,7 +363,7 @@ function Get-AntigravityModelEntries {
         $stdoutTask = $proc.StandardOutput.ReadToEndAsync()
         $null = $proc.StandardError.ReadToEndAsync()
 
-        if ($proc.WaitForExit($AntigravityProbeTimeoutSec * 1000)) {
+        if ($proc.WaitForExit($ProbeTimeoutSec * 1000)) {
             $rawOutput = $stdoutTask.GetAwaiter().GetResult()
             if ($proc.ExitCode -eq 0 -and -not [string]::IsNullOrWhiteSpace($rawOutput)) {
                 $rawModels = @($rawOutput -split "`r?`n" | Where-Object { $_ -match '^[a-z0-9][a-z0-9\-\.]+$' })
@@ -416,7 +420,7 @@ foreach ($b in @(
 }
 
 $isAgyInstalled = Test-AntigravityPresent -AntigravityExe $AntigravityExe
-$agyModelEntries = @(Get-AntigravityModelEntries -AntigravityExe $AntigravityExe)
+$agyModelEntries = @(Get-AntigravityModelEntries -AntigravityExe $AntigravityExe -ProbeTimeoutSec $AntigravityProbeTimeoutSec)
 $hasAgyModels = ($agyModelEntries.Count -gt 0)
 
 $backends += [pscustomobject]@{
