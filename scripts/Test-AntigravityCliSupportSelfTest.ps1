@@ -45,6 +45,15 @@ Assert-True ($null -eq $semRuido) "NAO trata 'Loaded cached credentials' (linha 
 # 3. Quota failure pattern
 Assert-True ("quota exceeded" -match $quotaFailurePattern) "Regex de cota reconhece 'quota exceeded'"
 Assert-True ("429 Too Many Requests" -match $quotaFailurePattern) "Regex de cota reconhece 429 / Too Many Requests"
+Assert-True ("resource_exhausted" -match $quotaFailurePattern) "Regex de cota reconhece resource_exhausted"
+Assert-True ("credits exhausted for this billing cycle" -match $quotaFailurePattern) "Regex de cota reconhece 'credits exhausted'"
+
+# Casos NEGATIVOS: `exhausted` solto classificava erro generico de rede/contexto como cota. Paridade
+# com o mesmo defeito ja corrigido no $quotaFailurePattern do dispatcher (2026-08-06). Reportar cota
+# onde nao ha manda o operador esperar reset de ciclo por falha que nao e de cota.
+Assert-True (-not ("retries exhausted after 3 attempts" -match $quotaFailurePattern)) "NAO trata 'retries exhausted' (rede) como cota"
+Assert-True (-not ("connection pool exhausted" -match $quotaFailurePattern)) "NAO trata 'connection pool exhausted' como cota"
+Assert-True (-not ("context window exhausted" -match $quotaFailurePattern)) "NAO trata 'context window exhausted' como cota"
 
 # 4. Resolve-AntigravityExe — sonda opcional do binario real (maquina sem agy NAO falha a suite;
 #    a prova fail-closed do contrato e dos adapters esta nos casos 5-7 com fake-exe).

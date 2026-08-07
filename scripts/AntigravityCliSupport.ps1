@@ -11,7 +11,12 @@
 
 Set-StrictMode -Version Latest
 
-$quotaFailurePattern = '(?i)\b(quota|rate\s*limit|exhausted|too\s*many\s*requests|429|resource_exhausted)\b'
+# `exhausted` NAO entra solto - paridade com $quotaFailurePattern de Invoke-LlmDelegatePanelDispatch.ps1
+# (corrigido em 2026-08-06). O \b(...)\b nao protege: "exhausted" e palavra inteira em "retries
+# exhausted", "connection pool exhausted", "context window exhausted" - erro generico de rede ou
+# contexto que viraria cota e mandaria o operador esperar reset de ciclo. Ancorar no sujeito
+# esgotado; "quota exhausted" ja casa pelo termo `quota`.
+$quotaFailurePattern = '(?i)\b(quota|rate\s*limit|too\s*many\s*requests|429|resource_exhausted|(?:credits?|balance|saldo)\s+exhausted)\b'
 
 function Test-AntigravityHelpSupportsContract {
     param([string]$HelpText)
