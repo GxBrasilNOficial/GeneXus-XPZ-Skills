@@ -1428,7 +1428,15 @@ As skills XPZ operam sobre XPZ/XML exportados, acervo `ObjetosDaKbEmXml` e índi
 SQLite (`KbIntelligence`). Nenhuma dessas camadas cobre o banco interno da KB (`GX_KB_*`
 no SQL Server ou LocalDB). Metadados de designer de providers como K2BTools são persistidos
 diretamente no banco interno em tabelas como `EntityType`, `Entity`, `EntityVersion` e
-`EntityVersionComposition` — e nunca aparecem em XPZ exportado.
+`EntityVersionComposition` — e, **no caso empírico que motivou esta entrada** (`FormDesigner` /
+`FormDesignerPart` e registros de tipo só no SQL), **não** aparecem como objetos comuns no XPZ.
+
+**Ressalva (2026-08-12):** a frase absoluta «nunca aparecem em XPZ» **não** vale para os tipos
+`WebPanelDesigner` (GUID `562b39a3-…`) e `SDPanelDesigner` (GUID `a84e76c6-…`), promovidos ao
+catálogo compartilhado como objetos **exportáveis** (`inventoryEligible=true`, evidência em XPZ
+da KB `siawk603_P14web_GX18_UP15`; ver `01a` e `CHANGELOG`). Continuam distintos de
+`FormDesignerPart` e demais parts internos que seguem só no banco. Os GUIDs cruzam com a
+investigação SQL abaixo (`999:1467-1468`); o cruzamento é bidirecional — SQL e XPZ.
 
 O risco prático é o **falso negativo**: agente busca `FormDesigner`, `K2B Object Designer`
 ou o GUID do provider no XPZ/XML, não encontra nada, e conclui prematuramente que não há
