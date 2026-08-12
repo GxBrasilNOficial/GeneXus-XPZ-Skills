@@ -50,7 +50,7 @@ A reconciliação por GUID (`reconcilableByGuid`) é **invariante de classe**, n
 
 ## Inventário dos 12 elementos
 
-Tabela peer-validada e **confirmada por export GeneXus 9 real** (amostra `FinGX90`, KB "Financeiro": 11 dos 12 elementos observados; só `Theme` não observado). `equivalent` (10):
+Tabela peer-validada e **confirmada por export GeneXus 9 real** (amostra `FinGX90`, KB "Financeiro": 11 dos 12 elementos observados; só `Theme` não observado). `equivalent` (11):
 
 | Elemento GX9 | `catalogType` (moderno) |
 | --- | --- |
