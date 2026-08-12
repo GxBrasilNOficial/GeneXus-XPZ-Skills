@@ -72,6 +72,8 @@ Nota sobre `WorkPanel`: o elemento legado `WorkPanel` mapeia para o tipo moderno
 
 Nota sobre `Menubar`: o elemento legado `<Menubar>` mapeia para o tipo moderno **`Menubar`** (GUID `28eca899-…`, pasta `Menubar`), residual em KBs convertidas / geradores Win; wiki [Menu Bar](https://docs.genexus.com/en/wiki?7610%2CMenu+Bar=) (deprecated desde GeneXus 15). Até 2026-08-12 estava classificado como `orphan` (`gxlegacy/Menubar`) sob a hipótese de “sem sucessor moderno”; evidência em export GeneXus 18 (KB `siawk603_P14web_GX18_UP15`, objetos `BbInfo`/`Bbinfo2`) reclassificou para `equivalent`, no mesmo padrão de `WorkPanel`. Distinto do `Menu` de Native Mobile e do `K2BMenu` (addon).
 
+**Migração de acervo (obrigatória se já materializou o órfão):** com a reclassificação, `Menubar/` **deixa** de ser pasta órfã pulável pelo `Build-KbIntelligenceIndex.py` (só `Report` permanece em `orphan`). XMLs ainda com `type="gxlegacy/Menubar"` sob `Menubar/` passam a ser GUID/token desconhecido → o rebuild do índice **falha** (`SystemExit` / unknown type), não mascara como órfão. Antes do rebuild: re-sync do pacote legado (materializa GUID real) ou limpeza manual desses arquivos.
+
 `orphan` (1):
 
 | Elemento GX9 | `materializedFolderName` | `typeToken` | `modernSuccessor` | `successorRelation` |

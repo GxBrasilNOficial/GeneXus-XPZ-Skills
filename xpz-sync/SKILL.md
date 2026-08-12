@@ -379,6 +379,7 @@ No ramo legado o motor (`scripts/GeneXusLegacyExportFileSupport.ps1`) consome o 
 
 - `equivalent` → materializa no `folderName` do tipo moderno, com `type=<GUID real do catálogo>`;
 - `orphan` (`Report`) → materializa em `materializedFolderName` próprio, com `type="gxlegacy/<Elemento>"`;
+- **`<Menubar>` legado** é `equivalent`→`Menubar` (GUID moderno), não mais órfão. Se o acervo ainda tiver XMLs com `type="gxlegacy/Menubar"` sob `Menubar/` (materialização anterior à reclassificação), o rebuild do KbIntelligence **falha** — a pasta deixa de ser pulável como órfã. Re-sync do pacote legado ou limpeza antes do índice; detalhe em `01k`;
 - cada item vira envelope `Object`/`Attribute` com `dataSource="gx-legacy-export"`, payload
   original preservado em `<GxLegacyPayload>` e `guid=""` (não participa do rename por GUID);
 - **colisão cross-fluxo:** se o mesmo `FolderType|NormalizedName` já existir no acervo como
