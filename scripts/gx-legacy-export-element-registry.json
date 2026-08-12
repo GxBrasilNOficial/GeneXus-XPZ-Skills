@@ -12,19 +12,13 @@
     "Group": { "class": "equivalent", "catalogType": "SubTypeGroup" },
     "Procedure": { "class": "equivalent", "catalogType": "Procedure" },
     "DataView": { "class": "equivalent", "catalogType": "DataView" },
+    "Menubar": { "class": "equivalent", "catalogType": "Menubar" },
     "Report": {
       "class": "orphan",
       "materializedFolderName": "Report",
       "typeToken": "gxlegacy/Report",
       "modernSuccessor": "Procedure",
       "successorRelation": "absorbed"
-    },
-    "Menubar": {
-      "class": "orphan",
-      "materializedFolderName": "Menubar",
-      "typeToken": "gxlegacy/Menubar",
-      "modernSuccessor": null,
-      "successorRelation": "none"
     }
   }
 }

@@ -203,7 +203,7 @@ def load_legacy_export_registry() -> dict:
 
 
 def build_legacy_orphan_folders(registry: dict) -> set[str]:
-    """Conjunto de materializedFolderName dos elementos legados de classe 'orphan' (ex.: Report, Menubar)."""
+    """Conjunto de materializedFolderName dos elementos legados de classe 'orphan' (ex.: Report)."""
     folders: set[str] = set()
     elements = registry.get("elements", {})
     if not isinstance(elements, dict):

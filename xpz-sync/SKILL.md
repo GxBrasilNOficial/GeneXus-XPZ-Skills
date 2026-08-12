@@ -378,7 +378,7 @@ No ramo legado o motor (`scripts/GeneXusLegacyExportFileSupport.ps1`) consome o 
 `scripts/gx-legacy-export-element-registry.json` (doc-dono `01k-registro-elementos-legados.md`):
 
 - `equivalent` → materializa no `folderName` do tipo moderno, com `type=<GUID real do catálogo>`;
-- `orphan` (`Report`/`Menubar`) → materializa em `materializedFolderName` próprio, com `type="gxlegacy/<Elemento>"`;
+- `orphan` (`Report`) → materializa em `materializedFolderName` próprio, com `type="gxlegacy/<Elemento>"`;
 - cada item vira envelope `Object`/`Attribute` com `dataSource="gx-legacy-export"`, payload
   original preservado em `<GxLegacyPayload>` e `guid=""` (não participa do rename por GUID);
 - **colisão cross-fluxo:** se o mesmo `FolderType|NormalizedName` já existir no acervo como

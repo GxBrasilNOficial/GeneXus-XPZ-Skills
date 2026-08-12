@@ -163,6 +163,51 @@
       "containerType": false,
       "notes": "Imagem (Part; GUIDs em WW nao viram arestas no indice). queryableByKbIntelligence=false."
     },
+    "K2BEntityServices": {
+      "objectTypeGuid": "589d4b49-e3f9-4d49-aaf4-fad023028eb1",
+      "rootKind": "Object",
+      "folderName": "K2BEntityServices",
+      "inventoryEligible": true,
+      "queryableByKbIntelligence": false,
+      "containerType": false,
+      "notes": "Instancia do pattern Entity Services do addon K2BTools (EntityTypeNamespace K2BTools). queryableByKbIntelligence=false: extrator atual nao garante arestas semanticas; nao usar who-uses/what-uses/impact-basic/functional-trace-basic. Usar object-info, search-objects ou list-by-type."
+    },
+    "K2BGeneralSettings": {
+      "objectTypeGuid": "75a2b955-749a-3f29-99e0-aec666f802a2",
+      "rootKind": "Object",
+      "folderName": "K2BGeneralSettings",
+      "inventoryEligible": true,
+      "queryableByKbIntelligence": false,
+      "containerType": false,
+      "notes": "Configuracao global do addon K2BTools. queryableByKbIntelligence=false: motor atual nao extrai relacoes; nao usar who-uses/what-uses/impact-basic/functional-trace-basic. Usar object-info, search-objects ou list-by-type."
+    },
+    "K2BMenu": {
+      "objectTypeGuid": "ce7b18b7-b5b0-4b27-8c21-b77743938ddf",
+      "rootKind": "Object",
+      "folderName": "K2BMenu",
+      "inventoryEligible": true,
+      "queryableByKbIntelligence": false,
+      "containerType": false,
+      "notes": "Menu de aplicacao do addon K2BTools. queryableByKbIntelligence=false: extrator atual nao garante arestas semanticas; nao usar who-uses/what-uses/impact-basic/functional-trace-basic."
+    },
+    "K2BPrompt": {
+      "objectTypeGuid": "589d4b49-e3f9-4d49-aaf4-fad023028eb6",
+      "rootKind": "Object",
+      "folderName": "K2BPrompt",
+      "inventoryEligible": true,
+      "queryableByKbIntelligence": false,
+      "containerType": false,
+      "notes": "Prompt/selecao do addon K2BTools. queryableByKbIntelligence=false: extrator atual nao garante arestas semanticas; nao usar who-uses/what-uses/impact-basic/functional-trace-basic."
+    },
+    "K2BTrnForm": {
+      "objectTypeGuid": "bcc946b1-3fe3-4980-8948-42574dc14209",
+      "rootKind": "Object",
+      "folderName": "K2BTrnForm",
+      "inventoryEligible": true,
+      "queryableByKbIntelligence": false,
+      "containerType": false,
+      "notes": "Web Form de Transaction gerado pelo pattern K2BTools (K2BTrnForm). queryableByKbIntelligence=false: extrator atual nao garante arestas semanticas; nao usar who-uses/what-uses/impact-basic/functional-trace-basic."
+    },
     "Language": {
       "objectTypeGuid": "88313f43-5eb2-0000-0028-e8d9f5bf9588",
       "rootKind": "Object",
@@ -171,6 +216,15 @@
       "queryableByKbIntelligence": false,
       "containerType": false,
       "notes": "Idioma (Part; extrator atual nao gera arestas). queryableByKbIntelligence=false."
+    },
+    "Menubar": {
+      "objectTypeGuid": "28eca899-04c7-4114-9556-5879b0a6414c",
+      "rootKind": "Object",
+      "folderName": "Menubar",
+      "inventoryEligible": true,
+      "queryableByKbIntelligence": false,
+      "containerType": false,
+      "notes": "Menu Bar / Menubar (geradores Win: VB/Java Win/VFP). Deprecated desde GeneXus 15 (wiki Menu Bar). Residuo em KBs convertidas (ex.: BbInfo description MICRO Info). queryableByKbIntelligence=false: extrator atual nao garante arestas semanticas; nao usar who-uses/what-uses/impact-basic/functional-trace-basic. Distinto do Menu object de Native Mobile e do K2BMenu (addon K2BTools)."
     },
     "Module": {
       "objectTypeGuid": "00000000-0000-0000-0000-000000000006",
@@ -234,6 +288,15 @@
       "queryableByKbIntelligence": true,
       "containerType": false,
       "notes": "Query object GeneXus (QueryElement, filtros, parametros, chart/card settings)."
+    },
+    "SDPanelDesigner": {
+      "objectTypeGuid": "a84e76c6-ccf5-4b03-a9d2-7c31c3d717e6",
+      "rootKind": "Object",
+      "folderName": "SDPanelDesigner",
+      "inventoryEligible": true,
+      "queryableByKbIntelligence": false,
+      "containerType": false,
+      "notes": "Objeto de settings do designer SD do addon K2BTools (EntityType SDPanelDesigner; tipicamente SDPanelDesignerSettings). queryableByKbIntelligence=false: motor atual nao extrai relacoes; nao usar who-uses/what-uses/impact-basic/functional-trace-basic."
     },
     "SDT": {
       "objectTypeGuid": "447527b5-9210-4523-898b-5dccb17be60a",
@@ -342,6 +405,15 @@
       "queryableByKbIntelligence": true,
       "containerType": false,
       "notes": "WebPanel."
+    },
+    "WebPanelDesigner": {
+      "objectTypeGuid": "562b39a3-dde2-4349-9252-e9e69090c53e",
+      "rootKind": "Object",
+      "folderName": "WebPanelDesigner",
+      "inventoryEligible": true,
+      "queryableByKbIntelligence": false,
+      "containerType": false,
+      "notes": "Objeto de settings do designer Web do addon K2BTools (EntityType WebPanelDesigner; tipicamente WebPanelDesignerSettings). Distinto de FormDesignerPart interno no SQL da KB. queryableByKbIntelligence=false: motor atual nao extrai relacoes; nao usar who-uses/what-uses/impact-basic/functional-trace-basic."
     },
     "WorkPanel": {
       "objectTypeGuid": "198e8ea4-1d49-4c9c-8a9a-417024baa9d1",

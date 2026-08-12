@@ -13,7 +13,7 @@
     Cobertura da fixture (spec congelada Fase 2, v2.8.5, §6.1):
     - equivalent com LastUpdate (Transaction), WorkPanel (correcao de tag), Procedure SEM
       LastUpdate (sentinela);
-    - orphan Report e Menubar;
+    - Report orphan; Menubar permanece na fixture GX9 (no registro e equivalent→Menubar);
     - bloco Attributes com 2 GXAtt (Title com acento);
     - payload adversario: <Objects>/<Object> e <Attribute> aninhados em Structure (>=2 niveis),
       para provar XPath-nao-vaza;

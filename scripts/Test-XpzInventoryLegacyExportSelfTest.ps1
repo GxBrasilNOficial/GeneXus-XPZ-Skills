@@ -8,13 +8,14 @@
     iso-8859-1 gerada on-the-fly, travando o contrato do perfil legado (spec congelada
     Fase 2 v2.8.5, secao 4.2) que ate aqui so era coberto pelo support isolado:
     - perfil legado-puro detectado: legacyFormatDetected=true; itens known-legacy com
-      rootKind sintetico Object/Attribute; equivalent -> typeName real (Transaction),
-      orphan -> typeName gxlegacy/Report e gxlegacy/Menubar; guid=null;
+      rootKind sintetico Object/Attribute; equivalent -> typeName real (Transaction, Menubar),
+      orphan -> typeName gxlegacy/Report; guid=null;
     - unknownTypeCount=0 e unknownTypesDiscovery=[] (forma statement: o fail-closed de tag
       vive no parser, nao no discovery moderno por GUID; guarda contra regressao do gotcha
       StrictMode if-expressao @()->null);
-    - delta declarado orfao registry-aware: 'Report:RelMov'/'Menubar:MenuPrincipal' (sem
-      prefixo) casam gxlegacy/Report:RelMov / gxlegacy/Menubar:MenuPrincipal (matchedCount);
+    - delta declarado: 'Report:RelMov' (orphan sem prefixo) casa gxlegacy/Report:RelMov;
+      'Menubar:MenuPrincipal' e 'Transaction:Cliente' (equivalent) casam tipo moderno;
+      matchedCount=3;
     - pacote MISTO -> BLOCK (exit != 0), nao materializa nem inventaria.
     Token de sucesso no stdout + exit 0.
 #>
@@ -82,7 +83,7 @@ try {
     $relmov = @($inv.inventory | Where-Object { $_.name -eq 'RelMov' })
     if ($relmov.Count -ne 1 -or $relmov[0].type -ne 'gxlegacy/Report') { throw "Caso1: orphan Report RelMov type='$($relmov[0].type)' (esperado gxlegacy/Report)." }
     $menu = @($inv.inventory | Where-Object { $_.name -eq 'MenuPrincipal' })
-    if ($menu.Count -ne 1 -or $menu[0].type -ne 'gxlegacy/Menubar') { throw "Caso1: orphan Menubar type='$($menu[0].type)' (esperado gxlegacy/Menubar)." }
+    if ($menu.Count -ne 1 -or $menu[0].type -ne 'Menubar') { throw "Caso1: equivalent Menubar type='$($menu[0].type)' (esperado Menubar)." }
     $attr = @($inv.inventory | Where-Object { $_.rootKind -eq 'Attribute' })
     if ($attr.Count -ne 2) { throw "Caso1: esperado 2 atributos known-legacy, obtido $($attr.Count)." }
 } finally {
@@ -98,7 +99,7 @@ try {
     $inv = Invoke-InventoryJson -InvArgs @('-InputPath', $fixture, '-DeclaredDeltaItems', 'Report:RelMov;Menubar:MenuPrincipal;Transaction:Cliente')
 
     if ($null -eq $inv.deltaComparison) { throw 'Caso2: deltaComparison ausente.' }
-    if ($inv.deltaComparison.matchedCount -ne 3) { throw "Caso2: matchedCount=$($inv.deltaComparison.matchedCount) (esperado 3; orphan declarado sem prefixo deve casar gxlegacy/<Tag>:Nome)." }
+    if ($inv.deltaComparison.matchedCount -ne 3) { throw "Caso2: matchedCount=$($inv.deltaComparison.matchedCount) (esperado 3; Report orphan + Menubar/Transaction equivalent)." }
     if ($inv.deltaComparison.missingCount -ne 0) { throw "Caso2: missingCount=$($inv.deltaComparison.missingCount) (esperado 0)." }
 } finally {
     if (Test-Path -LiteralPath $work2) { Remove-Item -LiteralPath $work2 -Recurse -Force }

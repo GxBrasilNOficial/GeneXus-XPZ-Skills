@@ -83,11 +83,18 @@ Tipos que geram arquivo XML próprio no acervo. Containers de organização est�
 | `File` | `1132ac08-290f-4fd1-bd18-64777b7329d1` | Arquivo estático embarcado; `queryableByKbIntelligence=false` | `File/` |
 | `Generator` | `ecececec-dfe0-4a57-ae8f-c6e31b0dcbc0` | Gerador de código; `queryableByKbIntelligence=false` | `Generator/` |
 | `Image` | `9fb193d9-64a4-4d30-b129-ff7c76830f7e` | Recurso de imagem; `queryableByKbIntelligence=false` | `Image/` |
+| `K2BEntityServices` | `589d4b49-e3f9-4d49-aaf4-fad023028eb1` | Instância do pattern Entity Services do addon K2BTools; `queryableByKbIntelligence=false` | `K2BEntityServices/` |
+| `K2BGeneralSettings` | `75a2b955-749a-3f29-99e0-aec666f802a2` | Configuração global do addon K2BTools; `queryableByKbIntelligence=false` | `K2BGeneralSettings/` |
+| `K2BMenu` | `ce7b18b7-b5b0-4b27-8c21-b77743938ddf` | Menu de aplicação K2BTools; `queryableByKbIntelligence=false` | `K2BMenu/` |
+| `K2BPrompt` | `589d4b49-e3f9-4d49-aaf4-fad023028eb6` | Prompt/seleção K2BTools; `queryableByKbIntelligence=false` | `K2BPrompt/` |
+| `K2BTrnForm` | `bcc946b1-3fe3-4980-8948-42574dc14209` | Web Form de Transaction do pattern K2BTools; `queryableByKbIntelligence=false` | `K2BTrnForm/` |
 | `Language` | `88313f43-5eb2-0000-0028-e8d9f5bf9588` | Configuração de idioma; `queryableByKbIntelligence=false` | `Language/` |
+| `Menubar` | `28eca899-04c7-4114-9556-5879b0a6414c` | Menu Bar Win (deprecated desde GeneXus 15); `queryableByKbIntelligence=false` | `Menubar/` |
 | `Panel` | `d82625fd-5892-40b0-99c9-5c8559c197fc` | Panel para dispositivos móveis (SmartDevices); `queryableByKbIntelligence=false` | `Panel/` |
 | `PatternSettings` | `83476c1e-fa72-4229-9930-f51b954fca2d` | Configuração de padrão aplicado; `queryableByKbIntelligence=false` | `PatternSettings/` |
 | `Procedure` | `84a12160-f59b-4ad7-a683-ea4481ac23e9` | Procedure (código GeneXus) | `Procedure/` |
 | `Query` | `926a06b9-3417-4ab4-9f8c-09c2f626bb1c` | Query object GeneXus (`QueryElement`, filtros, parâmetros, chart/card settings) | `Query/` |
+| `SDPanelDesigner` | `a84e76c6-ccf5-4b03-a9d2-7c31c3d717e6` | Settings do designer SD do addon K2BTools (`SDPanelDesignerSettings`); `queryableByKbIntelligence=false` | `SDPanelDesigner/` |
 | `SDT` | `447527b5-9210-4523-898b-5dccb17be60a` | Structured Data Type | `SDT/` |
 | `SmartDevicesApplication` | `9bdcc055-174e-4af6-96cb-a2ceef6c5f09` | Aplicação Smart Devices do addon SmartDevicesPlus/WWPM (dashboard + eventos em `Source`; **não** é o tipo `Dashboard` do catálogo) | `SmartDevicesApplication/` |
 | `SmartDevicesPlus` | `c84ec0ea-d159-46e2-a118-2108860379bb` | Objeto de configuração global do addon Smart Devices Plus (`SDPlus_Settings_*` em `Properties`; pai típico `RootModule`); no catálogo técnico `queryableByKbIntelligence=false` — inventário sim, `who-uses`/`impact-basic` não | `SmartDevicesPlus/` |
@@ -100,6 +107,7 @@ Tipos que geram arquivo XML próprio no acervo. Containers de organização est�
 | `Transaction` | `1db606f2-af09-4cf9-a3b5-b481519d28f6` | Transação (formulário + modelo de dados) | `Transaction/` |
 | `UserControl` | `562f4793-aabe-449f-8821-fc77e550698e` | User Control customizado; `queryableByKbIntelligence=false` | `UserControl/` |
 | `WebPanel` | `c9584656-94b6-4ccd-890f-332d11fc2c25` | Tela web (eventos e layout) | `WebPanel/` |
+| `WebPanelDesigner` | `562b39a3-dde2-4349-9252-e9e69090c53e` | Settings do designer Web do addon K2BTools (`WebPanelDesignerSettings`); distinto de `FormDesignerPart` interno no SQL; `queryableByKbIntelligence=false` | `WebPanelDesigner/` |
 | `WorkPanel` | `198e8ea4-1d49-4c9c-8a9a-417024baa9d1` | Work Panel legado GeneXus (deprecated desde GeneXus 15); `Form Type=Windows` | `WorkPanel/` |
 | `WorkWith` | `15cf49b5-fc38-4899-91b5-395d02d79889` | WW para SD/mobile; nome atual “Work With”; nome histórico “Work With for Smart Devices”. A identidade é o GUID, não o nome histórico do pattern. | `WorkWith/` |
 | `WorkWithForWeb` | `78cecefe-be7d-4980-86ce-8d6e91fba04b` | Work With For Web (gerado por padrão) | `WorkWithForWeb/` |
@@ -108,6 +116,8 @@ Tipos que geram arquivo XML próprio no acervo. Containers de organização est�
 
 - `Evidência direta` (KB `NewWaySystem`, XPZ `NewWaySystem16052026FULL.xpz`, 2026-05-16): as linhas `Query`, `WorkPanel`, `WorkWithPlusInstance` e `WorkWithPlusTemplate` acima foram registradas a partir de bloqueio do `Sync-GeneXusXpzToXml.ps1` por GUIDs desconhecidos. Contagens observadas naquele XPZ: `WorkWithPlusInstance` = 420 (ex.: `WorkWithPlusHome`, `WorkWithPlusGAMApplicationEntry`); `WorkWithPlusTemplate` = 67 (ex.: `ListNoBaseTable`, `Dashboard1`, `CardWithMainImage`); `Query` = 31 (ex.: `QVendaPeriodo`, `QFaturamentoPeriodo`); `WorkPanel` = 1 (`ImpressaoEtiqueta`). As contagens do panorama no início deste documento referem-se ao acervo FabricaBrasil e não foram refeitas.
 - `Evidência direta` (KB `Evo1`, GeneXus `18.0.13.186738` U13, XPZ/XML 2026-05): `DataView` = 8 (ex.: `Tgol421`, `CEP001`); `SmartDevicesApplication` = 2 (`Evo`, `MDFSampleApp`); `SmartDevicesPlus` = 1 (`SmartDevicesPlus`, propriedades `SDPlus_Settings_*`). XML com `DataViewAttribute` / `DataViewStructurePlatform`, `Dashboard` embutido em `Part`, e `parentGuid`/`moduleGuid` apontando para `RootModule` (`afa47377-41d5-4ae8-9755-6f53150aa361`). Pesquisa C4: wiki GeneXus (Data View), docs WorkWithPlus (addon SDP), fórum 2015 com o mesmo GUID de `SmartDevicesApplication` em erro de import.
+- `Evidência direta` (KB `siawk603_P14web_GX18_UP15`, GeneXus 18 Upgrade 15, XPZ/XML 2026-07 via override local `upstreamPending` promovido em 2026-08-12): sete tipos do addon K2BTools registrados a partir de bloqueio de sync por GUID desconhecido — `K2BEntityServices` = 172; `K2BTrnForm` = 149; `K2BMenu` = 38; `K2BPrompt` = 23; `K2BGeneralSettings` = 1; `WebPanelDesigner` = 1 (`WebPanelDesignerSettings`); `SDPanelDesigner` = 1 (`SDPanelDesignerSettings`). GUIDs de `WebPanelDesigner` (`562b39a3-…`) e `SDPanelDesigner` (`a84e76c6-…`) cruzam com investigação SQL em `999-ideias-pendentes.md` (EntityTypeNamespace `K2BTools`). No catálogo técnico todos ficam `queryableByKbIntelligence=false` até o extrator garantir arestas.
+- `Evidência direta` (mesma KB `siawk603_P14web_GX18_UP15`, 2026-08-12): o GUID `28eca899-04c7-4114-9556-5879b0a6414c`, inicialmente rotulado no override local como `MicroInfo` a partir da description, é o tipo **`Menubar`** (IDE: objetos `BbInfo` / `Bbinfo2`, Type=`Menubar`, descriptions `MICRO Info` / `MICRO Info Java`). Wiki [Menu Bar](https://docs.genexus.com/en/wiki?7610%2CMenu+Bar=) (deprecated desde GeneXus 15; geradores Win). Promovido ao catálogo moderno; o registro legado GX9 reclassifica o elemento `<Menubar>` de `orphan` para `equivalent`→`Menubar` (mesmo padrão de `WorkPanel`).
 
 ## Containers de organização da KB
 

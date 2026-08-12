@@ -109,8 +109,12 @@ if ($proc.Node.GetAttribute('lastUpdate') -ne '0001-01-01T00:00:00.0000000Z') { 
 # orphan -> gxlegacy/<Tag> em pasta propria
 $rep = $byElem['Report'][0]
 if ($rep.TypeGuid -ne 'gxlegacy/Report' -or $rep.FolderType -ne 'Report') { throw "Report orphan falhou (type=$($rep.TypeGuid), folder=$($rep.FolderType))." }
+
+# Menubar e equivalent (GUID real do catalogo moderno), nao mais orphan gxlegacy/Menubar
 $menu = $byElem['Menubar'][0]
-if ($menu.TypeGuid -ne 'gxlegacy/Menubar' -or $menu.FolderType -ne 'Menubar') { throw "Menubar orphan falhou (type=$($menu.TypeGuid), folder=$($menu.FolderType))." }
+if ($menu.FolderType -ne 'Menubar') { throw "Menubar folder errado: $($menu.FolderType)." }
+if ($menu.TypeGuid -notmatch '^[0-9a-fA-F-]{36}$') { throw "Menubar deveria ter GUID real; obtido '$($menu.TypeGuid)'." }
+if ($menu.TypeGuid -ne '28eca899-04c7-4114-9556-5879b0a6414c') { throw "Menubar GUID inesperado: $($menu.TypeGuid)." }
 
 # acento Latin-1 preservado (nao transliterado) no payload materializado
 if ($tx.Node.OuterXml -notmatch 'Configuração de clientes') { throw 'Acento nao preservado no payload da Transaction.' }
@@ -133,10 +137,10 @@ foreach ($iv in $inv.Items) {
 $invRep = @($inv.Items | Where-Object { $_.legacyElement -eq 'Report' })[0]
 if ($invRep.typeName -ne 'gxlegacy/Report' -or $invRep.rootKind -ne 'Object') { throw 'Inventario Report orphan falhou.' }
 
-# --- Delta declarado orphan registry-aware (todo orphan) ---
+# --- Delta declarado orphan registry-aware (so Report permanece orphan) ---
 if ((Convert-LegacyDeclaredDeltaKeyToCanonical -DeclaredKey 'Report:RelMov' -Registry $registry) -ne 'gxlegacy/Report:RelMov') { throw 'Delta orphan Report falhou.' }
 if ((Convert-LegacyDeclaredDeltaKeyToCanonical -DeclaredKey 'gxlegacy/Report:RelMov' -Registry $registry) -ne 'gxlegacy/Report:RelMov') { throw 'Delta orphan Report (forma canonica) falhou.' }
-if ((Convert-LegacyDeclaredDeltaKeyToCanonical -DeclaredKey 'Menubar:MenuPrincipal' -Registry $registry) -ne 'gxlegacy/Menubar:MenuPrincipal') { throw 'Delta orphan Menubar falhou.' }
+if ((Convert-LegacyDeclaredDeltaKeyToCanonical -DeclaredKey 'Menubar:MenuPrincipal' -Registry $registry) -ne 'Menubar:MenuPrincipal') { throw 'Delta equivalent Menubar nao deveria ser normalizado para gxlegacy.' }
 if ((Convert-LegacyDeclaredDeltaKeyToCanonical -DeclaredKey 'Transaction:Cliente' -Registry $registry) -ne 'Transaction:Cliente') { throw 'Delta equivalent nao deveria ser normalizado.' }
 
 # --- Fail-closed: misto ---

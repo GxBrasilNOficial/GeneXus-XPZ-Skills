@@ -64,22 +64,23 @@ Tabela peer-validada e **confirmada por export GeneXus 9 real** (amostra `FinGX9
 | `Folder` | `Folder` |
 | `Group` | `SubTypeGroup` |
 | `Theme` | `Theme` (não observado na amostra — ver «Resíduos conhecidos») |
+| `Menubar` | `Menubar` |
 
 Nota sobre `Group`: na nomenclatura GeneXus o **Subtype Group** é chamado "Group" (a wiki descreve-o como *"A Group can be viewed as a 'virtual' transaction"*); por isso o elemento legado `Group` mapeia para o tipo moderno `SubTypeGroup`. O elemento legado `Folder` (pasta organizacional) é separado e mapeia para o tipo `Folder`. Ambos confirmados na amostra (`Group` traz `<Subtype><Name>/<Supertype>`; `Folder` é pasta organizacional).
 
 Nota sobre `WorkPanel`: o elemento legado `WorkPanel` mapeia para o tipo moderno **`WorkPanel`** (objeto do gerador desktop/Windows, *deprecated* desde GeneXus 15, com GUID próprio no catálogo) — **não** para `WebPanel` (página web, runtime distinto). A entrada anterior `WebPanel` do registro era erro de tag/tipo da versão validada sem amostra; `FinGX90` confirma a tag real `WorkPanel` (169 ocorrências).
 
-`orphan` (2):
+Nota sobre `Menubar`: o elemento legado `<Menubar>` mapeia para o tipo moderno **`Menubar`** (GUID `28eca899-…`, pasta `Menubar`), residual em KBs convertidas / geradores Win; wiki [Menu Bar](https://docs.genexus.com/en/wiki?7610%2CMenu+Bar=) (deprecated desde GeneXus 15). Até 2026-08-12 estava classificado como `orphan` (`gxlegacy/Menubar`) sob a hipótese de “sem sucessor moderno”; evidência em export GeneXus 18 (KB `siawk603_P14web_GX18_UP15`, objetos `BbInfo`/`Bbinfo2`) reclassificou para `equivalent`, no mesmo padrão de `WorkPanel`. Distinto do `Menu` de Native Mobile e do `K2BMenu` (addon).
+
+`orphan` (1):
 
 | Elemento GX9 | `materializedFolderName` | `typeToken` | `modernSuccessor` | `successorRelation` |
 | --- | --- | --- | --- | --- |
 | `Report` | `Report` | `gxlegacy/Report` | `Procedure` | `absorbed` |
-| `Menubar` | `Menubar` | `gxlegacy/Menubar` | `null` | `none` |
 
 ### Descontinuação dos órfãos (prosa)
 
 - **`Report`**: o objeto Report do GeneXus clássico foi **absorvido** pela Procedure moderna (geração de saída por procedure com layout de impressão). `modernSuccessor` registra `Procedure` apenas como rastro de migração — o artefato legado continua representado por `gxlegacy/Report`, não como Procedure.
-- **`Menubar`**: conceito sem sucessor moderno direto no GeneXus 18 (`successorRelation: none`, `modernSuccessor: null`). Materializa-se isolado em `gxlegacy/Menubar` para preservar o objeto no acervo sem inventar identidade moderna.
 
 ## Resíduos conhecidos (não bloqueiam a representação)
 
