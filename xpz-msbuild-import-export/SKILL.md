@@ -20,7 +20,7 @@ Exceções já mapeadas que a skill deve tratar explicitamente:
 - conteúdo inconsistente da KB/`XPZ`, como `KB_Teste_A`
 - validação funcional incompleta por `GeneXus Server` ou licença, como `KB_Teste_E`
 - execução longa em KB grande, como `KB_Teste_Grande_A`
-- warning estrutural por extensão ausente, como `WebPanelDesigner`/`K2B Object Designer`
+- warning estrutural por extensão ausente, como `WebPanelDesigner`/`K2B Object Designer` (o mesmo rótulo `WebPanelDesigner` também existe como tipo exportável no catálogo compartilhado — camadas distintas; ver `02` «Limite do XPZ/XML frente a providers»)
 
 Critério atual de prontidão operacional desta skill:
 

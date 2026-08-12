@@ -1217,7 +1217,7 @@ A task executa até 7 etapas:
 - `ExitCode = 0` não basta para afirmar KB limpa — é obrigatório checar o stdout por linhas de inconsistência
 - `ExitCode = 1` não significa KB quebrada — pode ser timeout da Etapa 3 em KB com índices fragmentados; distinguir lendo o stdout em busca de `Tempo Limite de Execução Expirado`
 - quando `Fix` for omitido, a task emite dois warnings informativos mas se comporta igual a `Fix="false"`; o wrapper deve passar `Fix="false"` explicitamente para evitar ruído
-- o warning de extensão ausente (`WebPanelDesigner` / `K2B Object Designer`) pode aparecer no `OpenKnowledgeBase` sem impedir o check de rodar
+- o warning de extensão ausente (`WebPanelDesigner` / `K2B Object Designer`) pode aparecer no `OpenKnowledgeBase` sem impedir o check de rodar; distinto do tipo exportável homônimo no catálogo — ver `02`
 
 ### Status desta frente
 
@@ -1294,7 +1294,7 @@ Classificação mínima que a documentação da skill deve espelhar a partir daq
 - problema de conteúdo da KB/`XPZ`, como `KB_Teste_A`
 - validação funcional incompleta por dependência externa ou licença, como `KB_Teste_E`
 - execução longa em KB grande, como `KB_Teste_Grande_A`
-- warning estrutural por extensão ausente, como `WebPanelDesigner`/`K2B Object Designer`
+- warning estrutural por extensão ausente, como `WebPanelDesigner`/`K2B Object Designer` (homônimo no catálogo compartilhado = tipo exportável; ver `02`)
 
 Enquanto essa consolidação não estiver totalmente espelhada na skill e nos critérios de uso, o mecanismo central já deve ser tratado como validado, com operação controlada e classificação explícita dos limites remanescentes.
 

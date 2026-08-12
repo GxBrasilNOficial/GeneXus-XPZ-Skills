@@ -1436,7 +1436,8 @@ diretamente no banco interno em tabelas como `EntityType`, `Entity`, `EntityVers
 catálogo compartilhado como objetos **exportáveis** (`inventoryEligible=true`, evidência em XPZ
 da KB `siawk603_P14web_GX18_UP15`; ver `01a` e `CHANGELOG`). Continuam distintos de
 `FormDesignerPart` e demais parts internos que seguem só no banco. Os GUIDs cruzam com a
-investigação SQL abaixo (`999:1467-1468`); o cruzamento é bidirecional — SQL e XPZ.
+investigação SQL abaixo (bloco `EntityVersion` / `EntityVersionName=WebPanelDesigner` e
+`SDPanelDesigner`, mesmo `ProviderId` K2B); o cruzamento é bidirecional — SQL e XPZ.
 
 O risco prático é o **falso negativo**: agente busca `FormDesigner`, `K2B Object Designer`
 ou o GUID do provider no XPZ/XML, não encontra nada, e conclui prematuramente que não há
