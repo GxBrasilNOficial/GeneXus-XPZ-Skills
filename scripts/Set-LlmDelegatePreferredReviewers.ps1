@@ -14,12 +14,12 @@
 
     SCHEMA DE 2 EIXOS (ver `## ANATOMIA` do SKILL): cada revisor guarda
       - targetModelKey : chave de DESTINO canonica (ex.: openai/gpt-5.5) -> politica/autorizacao
-      - invokeArgs     : argumentos sanitizados do adapter (model, e quando aplicavel
-                         profile/oss/localProvider) -> mecanica da chamada
+      - invokeArgs     : argumentos sanitizados do adapter (backend/model, e quando aplicavel
+                         profile/oss/localProvider/timeoutSec) -> mecanica da chamada
     canonicalModel sozinho nao reproduz a chamada do Codex (que usa -Model nu + profile/oss).
 
     SANITIZACAO POR DESENHO: grava SOMENTE backend, targetModelKey e invokeArgs com os
-    campos permitidos (model/profile/oss/localProvider). NUNCA token, chave, baseURL,
+    campos permitidos (backend/model/profile/oss/localProvider/timeoutSec). NUNCA token, chave, baseURL,
     header, path de config ou politica.
 
     VETO DURO: revisores cujo modelo casa baixo-aterramento-comprovado (Mistral Large 3,
