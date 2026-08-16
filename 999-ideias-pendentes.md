@@ -393,6 +393,42 @@ Critério para retomar: caso real em que a ausência do cache Codex prejudique a
 
 **Origem:** achados colaterais da re-verificação empírica de 2026-08-16 que levou ao descarte do backend `mimo`. Sobreviveram ao descarte por serem independentes daquele backend — valem para qualquer motor futuro.
 
+## Piso de diversidade subconta em provedor agregador — `nvidia/*` sem o tratamento que `antigravity/*` já tem
+
+- **Importância** — alta (o piso de diversidade é **gate mecânico** da revisão por pares: subcontar família **reprova painel legítimo**, e pode levar o orquestrador a incluir voz desnecessária ou a concluir que não há diversidade quando há).
+- **Maturidade** — pronta para implementar no recorte `nvidia/*` (o precedente idêntico já está resolvido no código); decisão em aberto para os demais agregadores.
+
+**O defeito.** O [`15-revisao-por-pares.md`](15-revisao-por-pares.md) define família como **fundação estrutural do modelo** — linhagem, não provedor — e `Get-LlmDelegateTargetFamily` (`scripts/LlmDelegateTargetFamilySupport.ps1`) já trata `antigravity/*` como agregador, colapsando na fundação do modelo subjacente (`antigravity/claude-*` → `anthropic`). O provedor **`nvidia` é agregador igual e não recebeu esse tratamento**. Medido em 2026-08-16:
+
+```
+nvidia/minimaxai/minimax-m3              -> nvidia
+nvidia/z-ai/glm-5.2                      -> nvidia
+nvidia/nvidia/nemotron-3-super-120b-a12b -> nvidia
+```
+
+São **três fundações distintas** (MiniMax, Z.ai/GLM, NVIDIA Nemotron) contadas como **uma**. Um painel formado só por elas falharia o piso de ≥2 famílias sendo, de fato, três linhagens independentes.
+
+**Por que o fix é barato neste recorte.** O catálogo NVIDIA já nomeia `nvidia/<criador>/<modelo>`, então a linhagem é o **segundo segmento**: `nvidia/deepseek-ai/*` → `deepseek-ai`, `nvidia/meta/llama-*` → `meta`, `nvidia/openai/gpt-oss-*` → `openai`. Mesma forma do fix do `antigravity`, com paridade em `Test-LlmDelegatePanelDiversitySelfTest.ps1` e no texto do `15`.
+
+**Decisão em aberto — os outros agregadores.** `opencode-go/*` e `ollama-cloud/*` têm **dois** níveis (`opencode-go/glm-5.2`), logo a linhagem **não** é derivável do nome e exigiria mapa mantido à mão, que envelhece a cada modelo novo. Decidir entre: (a) entram no mesmo fix, por mapa; (b) ficam de fora, com a subcontagem aceita e **documentada** como limite conhecido; (c) o schema passa a admitir família estrutural **declarada** por revisor.
+
+**Cuidado de método:** família de **destino** (o provedor, consumida pelo gate de autorização) e família **estrutural** (a linhagem, consumida pelo piso de diversidade) são eixos distintos. O campo `family` do `preferred-reviewers.json` segue sendo o de destino; o fix é no resolvedor do piso, **não** no gate.
+
+**Origem:** achado ao conferir a lista de revisores preferidos em 2026-08-16, depois de o usuário fixar o critério «diversidade de **linhagem**, não de provedor». Precedente: o mesmo modo de falha já corrigido para `antigravity/*`.
+
+## Declarar o nível de esforço de raciocínio por revisor/harness
+
+- **Importância** — média-alta (afeta a **qualidade** do parecer e a **auditabilidade** do recibo: hoje um rebaixamento de esforço é **invisível** — não aparece na preferência nem no recibo mínimo).
+- **Maturidade** — ideia (levantamento por fazer; nenhum harness pesquisado além do Codex).
+
+**O problema.** `scripts/Set-LlmDelegatePreferredReviewers.ps1` aceita em `invokeArgs` apenas `backend`, `model`, `profile`, `oss`, `localProvider` e `timeoutSec` — **não há campo para esforço de raciocínio**. Medido em 2026-08-16: o revisor Codex roda em `xhigh` porque o `~/.codex/config.toml` **global** traz `model_reasoning_effort = "xhigh"`; a preferência **não** grava isso. Se esse default global mudar por qualquer motivo alheio ao painel, o revisor passa a opinar com esforço menor **sem aviso**, e o **recibo mínimo** do `15-revisao-por-pares.md` não mostraria a diferença — a rodada pareceria idêntica.
+
+**A levantar, por harness:** como (e se) cada backend expõe nível de esforço — Codex (`model_reasoning_effort`, e se um `[profiles.*]` dedicado torna a preferência auto-contida via o `profile` **já aceito** pelo schema), Claude Code, opencode, Copilot, Gemini, Antigravity. Nem todos devem expor; registrar **quais não expõem** também é resultado útil, para não prometer o que não existe.
+
+**Direção a decidir:** (a) campo novo em `invokeArgs` — exige mexer na **sanitização por desenho** do `Set-`, hoje allowlist estrita, e por isso não é mudança trivial; (b) só convenção — perfil dedicado por harness, referenciado pelo `profile` existente, **sem** tocar no schema; (c) nada no schema, mas o **recibo** passa a registrar o esforço efetivo quando o harness o reporta.
+
+**Origem:** ressalva levantada em 2026-08-16 ao promover o Codex `gpt-5.6-luna` a rank 1 da lista de preferidos — o «Extra alto» escolhido pelo usuário não tinha onde ser gravado.
+
 ## Resposta `stop` porém quase-vazia escapa do veredito e do retry (gate de qualidade/aderência ausente)
 
 - **Importância** — baixa-média (ruído **silencioso** no painel: uma voz pode "responder" sem opinar e ainda contar como revisor válido, enfraquecendo a diversidade sem alarme).
