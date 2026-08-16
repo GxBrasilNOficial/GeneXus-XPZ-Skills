@@ -1652,3 +1652,54 @@ O fork apenas reforça essas decisões; não justifica duplicá-las como nova pe
 nesta base e comprovada por validação real de envelope, importação ou build, ou mecanismo de adapter
 mais seguro que o contrato vigente. Mudanças cosméticas, novos provedores, mais linguagens de origem,
 empacotamento ZIP simples ou novos prompts sem oráculo de validação não reabrem esta frente.
+
+---
+
+## Backend `mimo` (fork do opencode) como motor próprio da `xpz-llm-delegate`
+
+**Origem:** coleta em 2026-06-24 (instalação do `mimo`), replanejamento integral em 2026-07-25
+(`c8790bf`, entrada no `999-ideias-pendentes.md`), **descartada em 2026-08-16** após re-verificação
+empírica sobre o `mimo` **0.1.12**.
+
+**O que é:** adicionar o `mimo` — fork do opencode publicado como npm `@mimo-ai/cli` — como backend
+próprio da skill, com `MimoCliSupport.ps1`, `Invoke-Mimo.ps1`, `Resolve-MimoModelLocality.ps1`,
+fixtures e `VERSION.txt` próprios, contenção `reviewer-ro` em `.mimocode/agent/`, registro no
+dispatcher/gate/manifesto, self-tests e paridade documental trilíngue. A entrada carregava **uma**
+decisão de desenho em aberto: **clonar** `OpenCodeReviewerRoGuard.ps1` em um guard próprio (duplicando
+~490 linhas de código de segurança) ou **generalizar** o guard existente por parâmetro.
+
+**Por que foi descartada — quatro motivos independentes, todos medidos em 2026-08-16:**
+
+1. **A premissa de valor caiu.** O tier gratuito do CLI nativo **encerrou**: `mimo run` responde
+   `"MiMo free API service has ended. Sign in or configure a third-party API."`, com
+   `mimo providers list` em **0 credentials**. A entrada previa o risco (o modelo era
+   *limited-time free*) e o prazo venceu. Cuidado de método para quem re-verificar:
+   `mimo debug config` **continua** reportando `apiKey: "anonymous"` e `cost: 0` — a config **não**
+   revela o encerramento; só a chamada real revela.
+2. **O objetivo declarado já estava atendido por caminho existente.** `opencode models` lista
+   `opencode/mimo-v2.5-free`, `opencode-go/mimo-v2.5` e `opencode-go/mimo-v2.5-pro`. A família
+   `mimo`/`xiaomi` é alcançável pelo backend **opencode**, sob o guard `reviewer-ro` já implementado,
+   sem uma linha de código nova. Medido: `opencode/mimo-v2.5-free` respondeu com
+   `completionVerdict=ok`, `reason=stop`, `cost=0`.
+3. **O modelo já havia sido reprovado neste papel.** `historico/IdeiasImplementadas_202607.md`
+   registra `mimo-v2.5` do Zen grátis entre as vozes **reprovadas** como revisoras de manuscrito
+   (truncam por `tool-calls` / resposta raquítica). Um teste trivial passa (5 tokens de saída) e
+   **não** é evidência de aptidão como revisor — não confundir os dois.
+4. **O harness não tem vantagem sobre o opencode.** A superfície de comandos é idêntica, exceto que
+   o **opencode tem `web`** e o mimo não. O **`--dir`** — única vantagem que o plano alegava, e que
+   a seção `kb-sensitive` tratava como insumo do confinamento de cwd — **foi removido** na 0.1.12.
+   O mimo tem 11 agentes builtin contra 7 (`checkpoint-writer`, `compose`, `distill`, `dream`) e um
+   sistema de **skills** que o opencode não tem, mas são capacidades de sessão longa/interativa, sem
+   uso no papel de revisor headless. Decisão do usuário (2026-08-16): não vale como backend de painel
+   **nem** como harness de trabalho interativo.
+
+**A decisão de desenho «clonar vs generalizar o guard» fica sem objeto** — não há segundo CLI a
+conter. A evidência colhida a favor de generalizar (identidade de schema, allow-set e parsers entre
+os dois CLIs) foi preservada, pelo que tem de aproveitável, na frente de confinamento do revisor
+opencode em `999-ideias-pendentes.md`.
+
+**Não reavaliar salvo** (a) surgimento no harness `mimo` de capacidade **ausente no opencode** e
+relevante para delegação **headless** — capacidade de sessão interativa não conta —, **ou**
+(b) evidência de que `mimo-v2.5` deixou de truncar em manuscrito longo. Restabelecimento de
+gratuidade, novos modelos no catálogo ou mudança de preço **não** reabrem esta frente: o acesso ao
+modelo já existe pelo backend opencode.
