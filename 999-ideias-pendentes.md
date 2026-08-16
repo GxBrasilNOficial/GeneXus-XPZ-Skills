@@ -198,6 +198,7 @@ Follow-ups vivos:
 - motor Java do Eixo B (fonte gerado `.java`);
 - motor Java do Eixo C (runtime-freshness Java por `ObjNavig`, XMLs de navegação/specification e artefatos locais `.java`/`.class`/`.js`);
 - aferição eventual de stack clássico puro Tomcat 8/9 + JDK 8;
+- decidir o destino do quadrante `unexpected-publication` diante de clean/rebuild dedicado: a medição da Fase 5 confirmou `Lf=∅, Pf≠∅` (medido `Lf=0, Pf=624`), que é o fail-safe **projetado** — não prova de que todo «Rebuild All» caia nele. O design já previa «se frequente, avaliar estado de última publicação bem-sucedida»; decidir entre **relaxar** para recompile-only e **manter** o conservador (o checklist da Fase 3 §8a ainda sugere renomear o rótulo para `unattested-publication`);
 - retirada dos aliases legados do registro após um ciclo de release;
 - automação futura de metadata Java além do assistente read-only, se algum dia for aprovada sem perder confirmação explícita.
 
