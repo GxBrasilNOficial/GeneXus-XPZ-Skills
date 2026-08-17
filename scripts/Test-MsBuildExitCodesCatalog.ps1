@@ -139,6 +139,63 @@ else {
                 }
             }
         }
+
+        # Lockstep do exit 46: causa 'watcher-sem-monitor-log' deriva os 5 wrappers do
+        # proprio catalogo; helper deve conter a atribuicao literal da causa e cada
+        # wrapper deve propagar causeId no payload JSON do bloqueio.
+        $exit46Entry = @($catalog.codes | Where-Object { [int]$_.exit -eq 46 })[0]
+        if ($null -eq $exit46Entry) {
+            Add-Finding -Code 'CATALOG_46_CAUSE' -Message 'Entrada de exit 46 ausente no catalogo.'
+        }
+        else {
+            $watcherCause = @($exit46Entry.causes | Where-Object { $_.id -eq 'watcher-sem-monitor-log' })[0]
+            if ($null -eq $watcherCause) {
+                Add-Finding -Code 'CATALOG_46_CAUSE' -Message "Causa 'watcher-sem-monitor-log' ausente em causes[] do exit 46."
+            }
+            else {
+                $causeWrappers = @($watcherCause.wrappers)
+                $expectedWrappers = @(
+                    'Invoke-GeneXusKbBuildAll.ps1'
+                    'Invoke-GeneXusKbSpecifyGenerate.ps1'
+                    'Invoke-GeneXusXpzImport.ps1'
+                    'Invoke-GeneXusXpzExport.ps1'
+                    'Test-GeneXusXpzImportPreview.ps1'
+                )
+                foreach ($expected in $expectedWrappers) {
+                    if ($causeWrappers -notcontains $expected) {
+                        Add-Finding -Code 'CATALOG_46_CAUSE' -Message "Wrapper esperado ausente na causa 'watcher-sem-monitor-log': $expected"
+                    }
+                }
+                foreach ($w in $causeWrappers) {
+                    if ($expectedWrappers -notcontains $w) {
+                        Add-Finding -Code 'CATALOG_46_CAUSE' -Message "Wrapper inesperado na causa 'watcher-sem-monitor-log': $w"
+                    }
+                }
+
+                $watcherSupportPath = Join-Path $PSScriptRoot 'GeneXusMsBuildWatcherSupport.ps1'
+                if (-not (Test-Path -LiteralPath $watcherSupportPath -PathType Leaf)) {
+                    Add-Finding -Code 'WRAPPER_MISSING' -Message "Helper ausente: GeneXusMsBuildWatcherSupport.ps1"
+                }
+                else {
+                    $supportText = [System.IO.File]::ReadAllText($watcherSupportPath)
+                    if ($supportText -notmatch 'causeId\s*=\s*''watcher-sem-monitor-log''') {
+                        Add-Finding -Code 'CAUSEID_LITERAL' -Message "Helper GeneXusMsBuildWatcherSupport.ps1 deve conter a atribuicao literal causeId = 'watcher-sem-monitor-log'."
+                    }
+                }
+
+                foreach ($w in $causeWrappers) {
+                    $wrapperPath = Join-Path $PSScriptRoot $w
+                    if (-not (Test-Path -LiteralPath $wrapperPath -PathType Leaf)) {
+                        Add-Finding -Code 'WRAPPER_MISSING' -Message "Wrapper ausente: $w"
+                        continue
+                    }
+                    $text = [System.IO.File]::ReadAllText($wrapperPath)
+                    if ($text -notmatch 'causeId\s*=\s*\$watcherParameterValidation\.causeId') {
+                        Add-Finding -Code 'CAUSEID_MISSING' -Message "Wrapper $w deve propagar causeId = `$watcherParameterValidation.causeId no payload de exit 46."
+                    }
+                }
+            }
+        }
     }
 }
 

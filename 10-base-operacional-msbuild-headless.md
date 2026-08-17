@@ -750,7 +750,7 @@ Parâmetros transversais esperados:
 - `-WorkingDirectory`
 - `-LogPath`
 - `-VerboseLog`
-- `-StartWatcher` (quando suportado pelo wrapper, dispara `Watch-GeneXusMsBuildLog.ps1` antes do MSBuild; requer `-MonitorLogPath`; ausência de `-MonitorLogPath` deve bloquear cedo por política com exit 46)
+- `-StartWatcher` (quando suportado pelo wrapper, dispara `Watch-GeneXusMsBuildLog.ps1` antes do MSBuild; requer `-MonitorLogPath`; ausência de `-MonitorLogPath` deve bloquear cedo por política com exit 46 — nessa causa, o payload JSON do bloqueio carrega `causeId: 'watcher-sem-monitor-log'`, o único `causeId` emitido nesta versão)
 - `-MonitorLogPath` (caminho do log próprio do watcher; quando existir, alimenta `timing.phases`)
 - `-WatcherIntervalSeconds` (default 5; intervalo válido: 1-60)
 - `-WatcherSilenceThresholdSeconds` (default 120; intervalo válido: 30-3600)
@@ -825,7 +825,7 @@ Saídas esperadas dos scripts:
 - **Fonte machine-readable:** `scripts/msbuild-exit-codes.catalog.json` (`schemaVersion`, `legend`, `codes[]`, `families.probe`, `families.headlessKbOpen`).
 - **Esta base (`10-base`)** mantém regras de interpretação (`exitCode` classificado vs `executionEvidence.msBuildExitCode`, pós-processamento, Categorias A/B) e o contrato completo do probe `Test-GeneXusMsBuildSetup.ps1` (códigos `10`–`16`) — **não** duplicar a tabela inteira de exits aqui.
 - **`02` e `08`:** ponteiro operacional curto; **`09`:** rastreabilidade pública; skills `xpz-msbuild-build` / `xpz-msbuild-import-export`: subconjunto operacional + link para o JSON.
-- **Exit `46`:** `disambiguationRequired=true` no catálogo — políticas distintas (watcher, wide rebuild, reorg). Ler `summary`, `blockingReasons`, `requestedContext` e `causes[]` no JSON; **não** inferir causa só pelo número no terminal.
+- **Exit `46`:** `disambiguationRequired=true` no catálogo — políticas distintas (watcher, wide rebuild, reorg). Ler `summary`, `blockingReasons`, `requestedContext` e `causes[]` no JSON; **não** inferir causa só pelo número no terminal. Nesta versão, apenas a causa watcher emite `causeId` no `causes[]` (`'watcher-sem-monitor-log'`); as demais causas do exit 46 não emitem `causeId` (ver `jsonHints` da causa no catálogo `scripts/msbuild-exit-codes.catalog.json`).
 - **Exit `48`:** Categoria B — ver secção anterior; detalhe de campos no catálogo (`jsonHints`).
 - **Exit `50`:** gate fail-fast de `-LogPath` (categoria `parametro-invalido`) — o `-LogPath` resolvido aponta para um **diretório existente**. O wrapper bloqueia **cedo** (antes de abrir a KB / registrar tarefa) emitindo o bloco **só no stdout**, em vez de rodar a operação inteira e só falhar na gravação final do JSON, mascarando o resultado como `exit 90` («falha operacional») quando a operação concluiu. Motor compartilhado `scripts/GeneXusMsBuildLogPathSupport.ps1`; condição `Test-Path -PathType Container` (não bloqueia arquivo-a-criar com pai válido). Informe um caminho de **arquivo** de log.
 - **Build/specify:** códigos `40`–`45` e `status` rico (`compilou limpo`, `reorg necessaria detectada`, …) estão no catálogo; quando `exitCode` e `status` divergirem em importância, priorizar o JSON completo do wrapper.

@@ -2163,3 +2163,78 @@ Leitura tecnica do caso:
 </Object>
 ```
 
+## Moldes sanitizados completos de DataView
+
+### Molde sanitizado de DataView 1 - `dvExemploMultiDbms`
+
+- Perfil: `DataView` sobre tabela externa, com as quatro peças obrigatórias (`Attribute` + `Transaction` estrutural + `DataView` + `DVAssocTable`/`DVDataStore`), plataforma de estrutura por DBMS dos environments e plataforma de índice só onde o nome físico é estável.
+- Origem: KB `FabricaBrasil18`, GX 18 U13, frente GamAuditoria (2026-08-15/17); sanitizado a partir de XPZ exportado pela IDE; validado por import + build com `-FailIfReorg true` nos environments PostgreSQL e SQL Server (`reorgDetected: None`, zero `CREATE`/`ALTER TABLE`).
+- Uso operacional: referência para leitura de tabela que **já existe** no banco e não deve ser criada nem alterada pelo GeneXus. Antes de gerar, ver `xpz-builder/responsibilities-by-type/dataview.md` (regra multi-DBMS, delimitação de `NAME` e checklist).
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<Object parentGuid="{GUID-DA-PASTA}" user="{DOMINIO\USUARIO}" versionDate="0001-01-01T00:00:00.0000000"
+        lastUpdate="{ISO-UTC}" checksum="" fullyQualifiedName="dvExemploMultiDbms"
+        moduleGuid="{GUID-DO-MODULO-RAIZ}" guid="{GUID-NOVO}" name="dvExemploMultiDbms"
+        type="19abc6ff-2cd2-0000-0006-6d172bc2333b" description="dv Exemplo Multi Dbms"
+        parent="{NOME-DA-PASTA}" parentType="00000000-0000-0000-0000-000000000008">
+      <Part type="19abc6ff-2cd2-1000-0006-6d172bc2333b">
+        <Attributes>
+          <DataViewAttribute InternalName="ExemploRepId" ExternalName="repid" />
+          <DataViewAttribute InternalName="ExemploId"    ExternalName="exemploid" />
+          <DataViewAttribute InternalName="ExemploNome"  ExternalName="exemplonome" />
+        </Attributes>
+        <Platforms>
+          <!-- um bloco por DBMS presente nos environments da KB -->
+          <DataViewStructurePlatform Dbms="15">
+            <PlatformProperties>
+              <Properties><Property><Name>NAME</Name><Value>exemplo</Value></Property><Property><Name>SCHEMA</Name><Value>meuschema</Value></Property></Properties>
+            </PlatformProperties>
+          </DataViewStructurePlatform>
+          <DataViewStructurePlatform Dbms="12">
+            <PlatformProperties>
+              <Properties><Property><Name>NAME</Name><Value>Exemplo</Value></Property><Property><Name>SCHEMA</Name><Value>meuschema</Value></Property></Properties>
+            </PlatformProperties>
+          </DataViewStructurePlatform>
+        </Platforms>
+        <Properties><Property><Name>IsDefault</Name><Value>False</Value></Property></Properties>
+      </Part>
+      <Part type="7706bd3b-212a-1000-0006-8aaeb59068b9">
+        <Indexes>
+          <Object Type="Unique" parentGuid="{GUID-DO-MODULO-RAIZ}" user="{DOMINIO\USUARIO}"
+                  versionDate="0001-01-01T00:00:00.0000000" lastUpdate="{ISO-UTC}" checksum=""
+                  fullyQualifiedName="IdvExemploPK" moduleGuid="{GUID-DO-MODULO-RAIZ}" guid="{GUID-NOVO}"
+                  name="IdvExemploPK" type="fc1b76c4-95c5-0000-0101-44f9543121bd" description="Idv Exemplo PK">
+            <Platforms>
+              <!-- declarar só onde o nome do índice é estável entre instalações -->
+              <DataViewIndexesPlatform Dbms="15">
+                <PlatformProperties>
+                  <Properties><Property><Name>NAME</Name><Value>exemplo_pkey</Value></Property><Property><Name>SCHEMA</Name><Value>meuschema</Value></Property></Properties>
+                </PlatformProperties>
+              </DataViewIndexesPlatform>
+            </Platforms>
+            <Part type="fe47b55c-ea2a-1000-0101-5b38901e24f7">
+              <Members>
+                <Member Order="Ascending">ExemploRepId</Member>
+                <Member Order="Ascending">ExemploId</Member>
+              </Members>
+              <Properties />
+            </Part>
+            <Properties><Property><Name>Name</Name><Value>IdvExemploPK</Value></Property></Properties>
+          </Object>
+        </Indexes>
+        <Properties><Property><Name>IsDefault</Name><Value>False</Value></Property></Properties>
+      </Part>
+      <Part type="babf62c5-0111-49e9-a1c3-cc004d90900a">
+        <Properties />
+      </Part>
+      <Properties><Property><Name>Name</Name><Value>dvExemploMultiDbms</Value></Property><Property><Name>DVAssocTable</Name><Value>adbb33c9-0906-4971-833c-998de27e0676-ExemploRepId;adbb33c9-0906-4971-833c-998de27e0676-ExemploId</Value></Property><Property><Name>DVDataStore</Name><Value>{NOME-DO-DATASTORE}</Value></Property><Property><Name>IsDefault</Name><Value>False</Value></Property></Properties>
+    </Object>
+```
+
+### Anti-molde - `dvExemploSingleDbmsMissingPlatform`
+
+- Perfil: **não gerar** — igual ao `dvExemploMultiDbms` com **um único** `<DataViewStructurePlatform>` (apenas `Dbms="15"`, PostgreSQL), numa KB que também tem environment SQL Server.
+- Consequência medida: no environment sem bloco de plataforma, a `Transaction` volta a ser tabela comum do modelo e a análise de impacto pede `CREATE TABLE <schema>.<NomeDaTransaction> (...)` — inclusive em instalação de cliente, em produção. Depois de acrescentar o bloco `Dbms="12"`, os dois environments fecharam com `reorgDetected: None` e zero `CREATE`/`ALTER TABLE`.
+- Uso operacional: referência de diagnóstico; se um DataView gerado ou recebido tiver menos blocos do que o número de DBMS dos environments da KB, a correção é completar os blocos antes de empacotar.
+

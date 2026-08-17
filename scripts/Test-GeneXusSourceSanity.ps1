@@ -224,7 +224,11 @@ function Test-SourceTextSanity {
                 $findings.Add((New-Finding -Severity "warn" -Code "dense-condition" -Message "${SourceLabel}: condicao potencialmente densa; revisar se o delta pode ser reescrito em forma mais conservadora." -LineNumber $lineNumber -LinePreview $preview)) | Out-Null
             }
 
-            if ($lineWithoutComment -match '(?i)\b[a-z_][a-z0-9_]*\s*\(') {
+            $conditionBody = $lineWithoutComment -replace '^(?i)\s*(if|elseif)\b', ''
+            $stripped = $conditionBody -replace '(?i)\b(and|or|not)\s*\(', '('
+            $stripped = $stripped -replace '(?i)\biif\s*\(', '('
+            $stripped = $stripped -replace '(?i)&[a-z_][a-z0-9_]*(\.[a-z_][a-z0-9_]*)*\s*\(', ''
+            if ($stripped -match '(?i)\b[a-z_][a-z0-9_]*\s*\(') {
                 $findings.Add((New-Finding -Severity "warn" -Code "call-in-condition" -Message "${SourceLabel}: chamada detectada dentro de condicao; comparar com o estilo dominante do proprio objeto antes de empacotar." -LineNumber $lineNumber -LinePreview $preview)) | Out-Null
             }
         }

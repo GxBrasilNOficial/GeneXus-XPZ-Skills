@@ -156,3 +156,11 @@ Forma correta no XML da variável:
 
 - **Regra operacional**: em `WebPanel` com `GxMultiForm`, não tentar substituir o FileUpload UC por atributo `Blob` com `controlType="Blob"` ou por `PATTERN_ELEMENT_CUSTOM_PROPERTIES` com `ControlType=Upload`; esses caminhos foram testados e falharam.
 - **Regra operacional**: Abstract Layout em `WebPanel` é caminho não validado para upload; se o objetivo for upload em `WebPanel`, preferir layout responsivo (`GxMultiForm`) com o UCW FileUpload.
+
+---
+
+## Hipótese técnica: `Rows` para `Character` longo em `GxMultiForm`
+
+- **Problema medido** (frente GamAuditoria, 2026-08-17): variável `Character(254)` em `WebPanel` com layout responsivo (`GxMultiForm`) renderiza como `textarea` de três linhas; declarar `ControlType = Edit` nas propriedades da variável **não** converteu para input de uma linha.
+- **Hipótese técnica (não validada)**: o controle equivalente à altura de linha do `textarea` no layout `GxMultiForm` pode ser controlado por propriedade de layout (candidata: `Rows=1` no controle correspondente dentro do CDATA do layout) em vez de propriedade da variável.
+- **Ressalva obrigatória**: **não empacotar** objetos com essa propriedade até a hipótese ser validada em fixture com `.cs` gerado conferido e renderização visual confirmada. A propriedade `Rows` citada é candidata, não padrão confirmado; ver `999-ideias-pendentes.md` (entrada da hipótese `Rows`) e `Temp/subsidios-dataview-e-webpanel-sdt-20260817.md` (§3.2-c) para a rastreabilidade da medição.

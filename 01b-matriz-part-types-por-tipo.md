@@ -91,6 +91,20 @@ Separar observação direta de leitura heurística preliminar.
 | babf62c5-0111-49e9-a1c3-cc004d90900a | 24 | 100 | 100 | aparentemente obrigatório | exemplos sanitizados |
 | e4c4ade7-53f0-4a56-bdfd-843735b66f47 | 24 | 100 | 4.2 | aparentemente obrigatório | exemplos sanitizados |
 
+## DataView
+
+- Evidência direta: Object/@type = 19abc6ff-2cd2-0000-0006-6d172bc2333b em 1 objeto (KB `FabricaBrasil18`, GX 18 U13, frente GamAuditoria; molde sanitizado `dvExemploMultiDbms` em `01e`).
+- Evidência direta: média de Part por objeto: 3.
+- Evidência direta: a part índices (`7706bd3b-212a-1000-0006-8aaeb59068b9`) carrega um `Object` aninhado de índice (`fc1b76c4-95c5-0000-0101-44f9543121bd`) com part própria de membros (`fe47b55c-ea2a-1000-0101-5b38901e24f7`); propriedades de nível-objeto: `Name`, `DVAssocTable` (atributos por `<GUID-do-tipo-Attribute>-<Nome>`, `;`, ordem da chave primária), `DVDataStore`, `IsDefault`.
+- Inferência forte: classificações aparentemente obrigatorio/opcional/raro/vazio dependem da recorrência observada nesta KB.
+- Hipótese: como a amostra deste tipo tem menos de 3 objetos, a leitura de obrigatoriedade/opcionalidade deve ser tratada com cautela extra.
+
+| PartType | ObjectsWithPart | PresencePct | EmptyPct | PreliminaryClass | exemplos sanitizados |
+| --- | --- | --- | --- | --- | --- |
+| 19abc6ff-2cd2-1000-0006-6d172bc2333b | 1 | 100 | 0 | aparentemente obrigatório (amostra muito pequena) | exemplos sanitizados |
+| 7706bd3b-212a-1000-0006-8aaeb59068b9 | 1 | 100 | 0 | aparentemente obrigatório (amostra muito pequena) | exemplos sanitizados |
+| babf62c5-0111-49e9-a1c3-cc004d90900a | 1 | 100 | 100 | aparentemente obrigatório (amostra muito pequena) | exemplos sanitizados |
+
 ## DataSelector
 
 - Evidência direta: Object/@type = ffd44be7-3bb4-4d01-9e7e-d1c1a3c095af em 2 objetos.

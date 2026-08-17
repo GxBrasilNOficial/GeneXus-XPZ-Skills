@@ -22,16 +22,18 @@ function Test-GeneXusMsBuildWatcherParameters {
 
     if ($StartWatcherRequested -and [string]::IsNullOrWhiteSpace($MonitorLogPath)) {
         return [ordered]@{
-            ok      = $false
-            reason  = '-StartWatcher requer -MonitorLogPath. Forneca o caminho do log do monitor para que watcher e execucao MSBuild possam ser conectados.'
-            summary = '-StartWatcher requer -MonitorLogPath. Execute novamente informando -MonitorLogPath com o caminho do log do monitor.'
+            ok       = $false
+            causeId  = 'watcher-sem-monitor-log'
+            reason   = '-StartWatcher requer -MonitorLogPath. Forneca o caminho do log do monitor para que watcher e execucao MSBuild possam ser conectados.'
+            summary  = '-StartWatcher requer -MonitorLogPath. Execute novamente informando -MonitorLogPath com o caminho do log do monitor.'
         }
     }
 
     return [ordered]@{
-        ok      = $true
-        reason  = $null
-        summary = $null
+        ok       = $true
+        causeId  = $null
+        reason   = $null
+        summary  = $null
     }
 }
 

@@ -2972,3 +2972,11 @@ Esta entrada registra uma direção para estudo, não uma decisão de refatoraç
 - `xpz-kb-parallel-pre-push/SKILL.md` e seus satélites, precedente interno de skill principal enxuta;
 - entrada «Pré-push: reduzir dependência de interpretação em `.md` (opções B e C)» neste arquivo, pela preocupação comum com contratos espalhados;
 - entrada «Catálogo semântico de operações em `xpz-builder`» neste arquivo, que pode criar novos satélites condicionais.
+
+## Hipótese técnica: `Rows` para `Character` longo em layout `GxMultiForm` (WebPanel)
+
+- **Importância** — baixa/média (conforto de geração de WebPanel). Medido na frente GamAuditoria (2026-08-17): variável `Character(254)` em WebPanel com layout responsivo (`GxMultiForm`) renderiza como `textarea` de três linhas; `ControlType = Edit` nas propriedades da **variável** não converteu para input de uma linha.
+- **Hipótese (não validada)**: a altura pode ser controlada por propriedade de **layout** no controle correspondente dentro do CDATA do `GxMultiForm` (candidata: `Rows=1`), em vez de propriedade da variável.
+- **Ressalva obrigatória**: não empacotar objetos com essa propriedade até validação em fixture com `.cs` conferido e renderização visual confirmada. A propriedade `Rows` é candidata, não padrão confirmado; há riscos de nomenclatura/propriedade divergentes entre versões do GeneXus.
+- **Rastreabilidade**: medição original em `Temp/subsidios-dataview-e-webpanel-sdt-20260817.md` (§3.2-c, relatório de origem da frente, ignorado pelo git — insumo apenas); síntese documentada em `04-webpanel-familias-e-templates.md` (armadilha sem solução) e em `04b-ucw-gxcontroltype-reference.md` (seção «Hipótese técnica: `Rows` para `Character` longo em `GxMultiForm`»).
+- **Frente futura sugerida**: fixture de WebPanel com Character longo testando `Rows=1` no layout + build com `.cs` conferido + renderização; se validado, promover a propriedade a regra operacional no `04b` e registrar o molde no `01e`.

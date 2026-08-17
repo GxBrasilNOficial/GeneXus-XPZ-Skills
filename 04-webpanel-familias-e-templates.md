@@ -345,6 +345,24 @@ Permitir escolha automatizavel de template interno real, reduzindo dependencia d
 - Inferencia forte: clonar apenas com semelhanca muito clara ao template.
 - Hipotese: abortar se o alvo puder ser encaixado em familia principal mais padronizada.
 
+## Grid por SDT sem tabela base
+
+Padrão transversal (não é uma familia do snapshot, e sim uma forma de carga observada na frente GamAuditoria, 2026-08-17): `WebPanel` de lista cujo grid é alimentado por **coleção SDT**, sem `For Each` no evento (rejeitado — `src0065`) e sem base table.
+
+- `Regra operacional`: a leitura mora numa `Procedure`; o evento `Load` do grid itera a coleção:
+  `Event GridX.Load` → `procQueLe(&filtros..., &Itens)` → `For &Item in &Itens` → atribuir `&ColunaA = &Item.CampoA` → `Load` → `EndFor` → `EndEvent`.
+- `Regra operacional`: o grid é `<simplegrid>` com `<item attribute="&Variavel" />` por coluna; o título da coluna vem da `Description` da variável — não é preciso `titleExp`.
+- `Regra operacional` (armadilha medida): `ColWidth` **não tem efeito** com `ColAutoResize=True`; as larguras só passaram a valer depois de `ColAutoResize=False` em cada coluna (antes, a tabela extrapolava a viewport e a última coluna saía da tela).
+- `Regra operacional` (armadilha medida): painel de filtros flutuante exige `<section>` — replicar as classes (`filters-container` + toggle para `filters-container-floating--visible`) **não basta**; sem envolver grid e filtros num `<section controlName="...">` com um `<item>` para cada, o painel renderiza no fim da página em vez de flutuar (a classe estava correta no DOM, mas `getBoundingClientRect().y` = 20526 px; custou uma rodada de import+build).
+- `Armadilha sem solução nesta frente`: `ControlType = Edit` na variável **não** converteu `textarea` em input — variável `Character(254)` renderiza como `textarea` de três linhas; a declaração nas propriedades da variável não surtiu efeito (provavelmente precisa vir do controle no webform ou de tamanho menor). Ver a hipótese técnica `Rows` em `04b-ucw-gxcontroltype-reference.md` e a entrada em `999-ideias-pendentes.md`.
+
+### Stencils do GAM: replicação manual estruturada
+
+- `Regra operacional`: telas `GAMExample*` usam stencils (`GAM_HeaderWW`, `GAM_FiltersWW`, `GAM_PagingWW`) com `stencilCache` grande e escapado em várias camadas. Para escrita manual em XML, **replicar a estrutura e as classes sem declarar stencil** é mais seguro do que tentar gerar `stencilCache` à mão.
+- `Consequência assumida`: a tela replicada não acompanha atualizações futuras dos stencils. Registro explícito da alternativa como aceitável, com o custo documentado: divergência visual/manutenção futura em troca de determinismo do XML.
+- `Regra operacional`: componente de mensagens do GAM — padrão de duas partes copiado de `GAMExampleWWRoles`: `<row><cell><component controlName="WCMessages" /></cell></row>` + `WCMessages.Object = GAMExampleMessages.Create()`; `GAMExampleMessages` é web component (`WEB_COMP=Yes`) sem `parm`, que lê `GAMRepository.GetLastErrors()` e mensagens postadas em `WebSession` no `Start` — serve tanto para erro do GAM quanto para aviso próprio.
+- `Regra operacional` (segurança): ausência de `IntegratedSecurityLevel` **não** significa tela desprotegida — o valor efetivo vem do `model.ini` (ex.: `IntegratedSecurityLevel=SecurityHigh`), exigindo autenticação e a permissão `<objeto>_Execute`, criada automaticamente no build. Conferir o default do modelo antes de declarar nível de segurança.
+
 ## Regras operacionais por familia
 
 - Evidencia direta: todas as familias aqui descritas foram observadas no mesmo `Object/@type` de `WebPanel`.

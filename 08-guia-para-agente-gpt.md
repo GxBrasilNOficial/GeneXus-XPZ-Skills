@@ -270,6 +270,25 @@ English: when using `Start-OpenCodeJob.ps1`, the initial JSON contains job ident
 - para afirmar que uma `Procedure` A chama uma `Procedure` B, a evidencia deve estar no `Source` efetivo de A, na linha da chamada a B; o `parm(...)` de B prova assinatura do chamado, não ponto de chamada
 - em cadeia de chamadas, separar sempre arquivo/linha do chamador e arquivo/linha da assinatura do chamado
 
+### Tabela de erros de source (síntese)
+
+Tabela atômica com chave composta (Código + Fase + Contexto); fonte canônica e detalhes em `02-regras-operacionais-e-runtime.md` (seção `Modos de falha observados e correcoes`). Frente GamAuditoria (KB `FabricaBrasil18`, GX 18 U13, 2026-08-15/17).
+
+| Código | Fase | Contexto | Correção |
+|---|---|---|---|
+| `spc0031` | Especificação | DataView sem Associated table | criar `Transaction` estrutural + `DVAssocTable` |
+| `src0013` | Import | `For each` no Event Start | mover a leitura para `Procedure` |
+| `src0051` | Import | método sobre retorno de proc | atribuir a variável primeiro |
+| `src0054` | Import | método sobre parênteses | atribuir a variável primeiro |
+| `src0065` | Import | `For Each` em evento de WebPanel | mover para `Procedure`; grid itera coleção |
+| `src0216` | Import | condition órfã em WorkWith | incluir o atributo ou remover a condition |
+| `src0294` / `src0246` | Import | Trn estrutural (`GenerateObject=False`) | remover `Events`/`Rules` WWP e `Apply:<wwp>` |
+| `src0294` | Import | `.IsNull()` em escalar | usar `.IsEmpty()` (só atributo/BC tem `IsNull`) |
+| `src0229` | Import | `.SetNull()` em escalar | usar `.SetEmpty()` (só atributo/BC tem `SetNull`) |
+| `CS2001` | Build (C#) | `right()`/`left()` inexistentes → `udp("right")` órfão | usar `.Substring`, `.PadLeft`, `.ToString` |
+
+`src0294` aparece em dois contextos (chave composta): "Trn estrutural" já coberto na base (Catalog 3 do `transaction.md`); "escalar `.IsNull`" é entrada nova — código repetido não é prova de cobertura. `src0216` é a primeira entrada da base.
+
 ### Regra adicional para `Procedure` de relatório
 
 - em relatório simples, `Source` deve ser validado junto com a camada onde cada sintoma nasceu: `Source`, `Rules` ou layout
@@ -332,6 +351,18 @@ English: when using `Start-OpenCodeJob.ps1`, the initial JSON contains job ident
 - usar `Navigation context` como bloco inicial para base implicita, contexto transacional/fisico, encaixe no modelo e coerência da selecao com a moldura de navegacao
 - usar `Identity and container` como bloco inicial para `name`, `fullyQualifiedName`, `guid`, `parent`, `moduleGuid`, origem estrutural e risco de estar olhando o seletor errado
 - manter separado o que e contrato de parâmetro, o que e filtro aplicado e o que depende da existência real de atributo ou função no destino; não colapsar essas camadas cedo demais
+
+### Regra adicional para revisao de `DataView` (síntese rápida)
+
+- em `DataView`, revisar por blocos funcionais; não tratar objeto declarativo como leitura monolitica quando a pergunta for de plataforma, tabela associada, indice ou diagnostico fino
+- os blocos canonicos sao `DataView structure and platform`, `Associated table (DVAssocTable)`, `Indexes by platform` e `Identity and container`
+- as quatro pecas obrigatorias existem juntas: `Attribute`(s) com prefixo exclusivo (datas via `idBasedOn = Domain:<DominioDeDataHora>`), `Transaction` apenas estrutural (sem tela, sem rules), `DataView` com `<DataViewStructurePlatform Dbms="NN">` + `NAME`/`SCHEMA`, e propriedades `DVDataStore` + `DVAssocTable`
+- sem `DVAssocTable` a especificacao falha com `spc0031: No relationship found among attributes`; `DVAssocTable` referencia atributos por GUID do tipo `Attribute` (`adbb33c9-0906-4971-833c-998de27e0676`, constante) + nome, separados por `;`, na ordem da chave primaria
+- regra multi-DBMS com alerta critico de producao: o DataView marca a tabela como externa **so nas plataformas declaradas**; ambiente sem `<DataViewStructurePlatform>` trata a `Transaction` estrutural como tabela normal e o Impact Analysis pede `CREATE TABLE` — inclusive em instalacao de cliente, em producao. Uma entrada por DBMS presente nos environments (Oracle `7`, SQL Server `12`, PostgreSQL `15` — ler do `model.ini`)
+- indices: `<DataViewIndexesPlatform>` so onde o nome fisico e estavel entre instalacoes (PostgreSQL `_pkey`); em SQL Server o PK sem nome recebe sufixo gerado (`PK__Role__97C0052AA095D3D6`) que muda por instalacao — omitir
+- delimitacao de nomes e assimetrica: PostgreSQL `NAME="User"` (com aspas, o gerador nao delimita sozinho) vs SQL Server `NAME=User` (sem aspas; aspas duplas viram `[[User]]` → `Sintaxe incorreta`); so importa com maiuscula/palavra reservada (ex.: tabela `User` do GAM)
+- `For Each` de DataView em evento de WebPanel e rejeitado (`src0065`); a leitura mora em `Procedure` e o grid itera colecao (`For &Item in &Itens ... Load ... EndFor`)
+- referencia completa: satelite `xpz-builder/responsibilities-by-type/dataview.md`; risco `alto` no `03` (nota de recalibracao 2026-08-17); moldes `dvExemploMultiDbms`/`dvExemploSingleDbmsMissingPlatform` no `01e`
 
 ### Regra adicional para revisao de `API`
 

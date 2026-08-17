@@ -116,6 +116,11 @@ function Test-HasCondFinding {
     return @($Result.findings | Where-Object { $_.code -eq $findingCode }).Count -gt 0
 }
 
+function Get-FindingCount {
+    param($Result, [string]$Code)
+    return @($Result.findings | Where-Object { $_.code -eq $Code }).Count
+}
+
 $dirtyConditions = @'
 // Comentario indevido
 &varMsg = ''
@@ -211,6 +216,30 @@ $r9 = Invoke-Gate (New-SinglePartObjectXml -ObjectType $procType -Name 'procUncl
 if (-not (Test-HasCode $r9 'unclosed-block')) { throw "Caso 9: Procedure com If sem fechamento deveria emitir 'unclosed-block'." }
 if ($r9.sourceSanityStatus -ne 'fail') { throw "Caso 9: sourceSanityStatus deveria ser 'fail'; obtido '$($r9.sourceSanityStatus)'." }
 if ($r9.probablyImportable) { throw 'Caso 9: probablyImportable deveria ser false.' }
+
+# Casos 10-16: regra call-in-condition refinada (normalizacao sequencial sobre $conditionBody).
+# Positivos: chamadas a tokens nus ou qualificadas por modulo disparam o aviso.
+$r10 = Invoke-Gate (New-SinglePartObjectXml -ObjectType $procType -Name 'procCallBare' -PartType $mainPart -Source "If MinhaProc(&x) > 0`nEndif")
+if ((Get-FindingCount $r10 'call-in-condition') -lt 1) { throw "Caso 10: 'If MinhaProc(&x) > 0' deveria disparar call-in-condition (chamada a token nu)." }
+
+$r11 = Invoke-Gate (New-SinglePartObjectXml -ObjectType $procType -Name 'procCallModuleQualified' -PartType $mainPart -Source "If Modulo.MinhaProc(&x) > 0`nEndif")
+if ((Get-FindingCount $r11 'call-in-condition') -lt 1) { throw "Caso 11: 'If Modulo.MinhaProc(&x) > 0' deveria disparar call-in-condition (qualificada por modulo)." }
+
+# Negativos: metodo com receptor de variavel, indexacao e parenteses logicos nao disparam.
+$r12 = Invoke-Gate (New-SinglePartObjectXml -ObjectType $procType -Name 'procVarMethod' -PartType $mainPart -Source "If &var.Metodo() > 0`nEndif")
+if ((Get-FindingCount $r12 'call-in-condition') -ne 0) { throw "Caso 12: 'If &var.Metodo() > 0' nao deveria disparar call-in-condition." }
+
+$r13 = Invoke-Gate (New-SinglePartObjectXml -ObjectType $procType -Name 'procVarIndex' -PartType $mainPart -Source "If &col(1) > 0`nEndif")
+if ((Get-FindingCount $r13 'call-in-condition') -ne 0) { throw "Caso 13: 'If &col(1) > 0' nao deveria disparar call-in-condition (indexacao)." }
+
+$r14 = Invoke-Gate (New-SinglePartObjectXml -ObjectType $procType -Name 'procNotParens' -PartType $mainPart -Source "If not (&a and &b)`nEndif")
+if ((Get-FindingCount $r14 'call-in-condition') -ne 0) { throw "Caso 14: 'If not (&a and &b)' nao deveria disparar call-in-condition." }
+
+$r15 = Invoke-Gate (New-SinglePartObjectXml -ObjectType $procType -Name 'procParens' -PartType $mainPart -Source "If (&a and &b)`nEndif")
+if ((Get-FindingCount $r15 'call-in-condition') -ne 0) { throw "Caso 15: 'If (&a and &b)' nao deveria disparar call-in-condition." }
+
+$r16 = Invoke-Gate (New-SinglePartObjectXml -ObjectType $procType -Name 'procIsEmpty' -PartType $mainPart -Source "If &x.IsEmpty()`nEndif")
+if ((Get-FindingCount $r16 'call-in-condition') -ne 0) { throw "Caso 16: 'If &x.IsEmpty()' nao deveria disparar call-in-condition (metodo de tipo basico)." }
 
 Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
 

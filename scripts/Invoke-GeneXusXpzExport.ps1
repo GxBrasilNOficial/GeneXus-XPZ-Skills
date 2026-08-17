@@ -719,6 +719,7 @@ try {
         Add-BlockingReason -Reason $watcherParameterValidation.reason
         $blocked = [ordered]@{
             status = 'bloqueado por politica de seguranca'
+            causeId = $watcherParameterValidation.causeId
             summary = $watcherParameterValidation.summary
             exitCode = 46
             stage = 'pre-export'

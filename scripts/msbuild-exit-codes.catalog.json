@@ -282,7 +282,7 @@
             "Invoke-GeneXusXpzExport.ps1",
             "Test-GeneXusXpzImportPreview.ps1"
           ],
-          "jsonHints": ["watcherContext.startWatcherRequested", "resolvedPaths", "blockingReasons"]
+          "jsonHints": ["causeId", "watcherContext.startWatcherRequested", "resolvedPaths", "blockingReasons"]
         },
         {
           "id": "roundtrip-import-nao-apto-build",
