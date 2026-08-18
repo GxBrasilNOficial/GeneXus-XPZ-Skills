@@ -2175,47 +2175,77 @@ Leitura tecnica do caso:
 - Origem: KB `FabricaBrasil18`, GX 18 U13, frente GamAuditoria (2026-08-15/17); sanitizado a partir de XPZ exportado pela IDE; validado por import + build com `-FailIfReorg true` nos environments PostgreSQL e SQL Server (`reorgDetected: None`, zero `CREATE`/`ALTER TABLE`).
 - Uso operacional: referência para leitura de tabela que **já existe** no banco e não deve ser criada nem alterada pelo GeneXus. Antes de gerar, ver `xpz-builder/responsibilities-by-type/dataview.md` (regra multi-DBMS, delimitação de `NAME` e checklist).
 
-#### Peça 1 — Molde de Atributos (`<Attribute>`, raiz top-level)
+#### Peça 1 — Moldes dos Atributos (`<Attribute>`, raiz top-level para cada coluna)
 
-Variante 1A — Atributo com domínio (ex.: data/hora baseado em domínio):
+Para empacotamento em XPZ, cada coluna mapeada no DataView e na Transaction estrutural exige um elemento top-level `<Attribute>` individual no pacote:
+
+1. `ExemploRepId` (chave numérica primária / partição):
 
 ```xml
 <?xml version="1.0" encoding="utf-8"?>
-<Attribute parentGuid="00000000-0000-0000-0000-000000000000" user="{DOMINIO\USUARIO}" versionDate="0001-01-01T00:00:00.0000000" lastUpdate="{ISO-UTC}" checksum="" fullyQualifiedName="ExemploCreDate" moduleGuid="00000000-0000-0000-0000-000000000000" guid="{GUID-DO-ATRIBUTO-CREDATE}" name="ExemploCreDate" description="Exemplo Cre Date">
+<Attribute parentGuid="00000000-0000-0000-0000-000000000000" user="{DOMINIO\USUARIO}" versionDate="0001-01-01T00:00:00.0000000" lastUpdate="{ISO-UTC}" checksum="" fullyQualifiedName="ExemploRepId" moduleGuid="00000000-0000-0000-0000-000000000000" guid="{GUID-DO-ATRIBUTO-REPID}" name="ExemploRepId" description="Exemplo Rep Id">
       <Part type="ad3ca970-19d0-44e1-a7b7-db05556e820c">
-        <Help>
-          <HelpItem>
-            <Language>{GUID-IDIOMA}-Portuguese</Language>
-            <Content />
-          </HelpItem>
-        </Help>
+        <Help><HelpItem><Language>{GUID-IDIOMA}-Portuguese</Language><Content /></HelpItem></Help>
         <Properties><Property><Name>IsDefault</Name><Value>False</Value></Property></Properties>
       </Part>
-      <Part type="babf62c5-0111-49e9-a1c3-cc004d90900a">
-        <Properties />
-      </Part>
-      <Properties><Property><Name>Name</Name><Value>ExemploCreDate</Value></Property><Property><Name>Description</Name><Value>Exemplo Cre Date</Value></Property><Property><Name>ContextualTitle</Name><Value>Criado em</Value></Property><Property><Name>idBasedOn</Name><Value>Domain:{DOMINIO-DE-DATA-HORA}</Value></Property><Property><Name>IsDefault</Name><Value>False</Value></Property></Properties>
+      <Part type="babf62c5-0111-49e9-a1c3-cc004d90900a"><Properties /></Part>
+      <Properties><Property><Name>Name</Name><Value>ExemploRepId</Value></Property><Property><Name>Description</Name><Value>Exemplo Rep Id</Value></Property><Property><Name>ContextualTitle</Name><Value>Repositório</Value></Property><Property><Name>ATTCUSTOMTYPE</Name><Value>bas:Numeric</Value></Property><Property><Name>Length</Name><Value>4</Value></Property><Property><Name>AttMaxLen</Name><Value>4</Value></Property><Property><Name>Decimals</Name><Value>0</Value></Property><Property><Name>Signed</Name><Value>False</Value></Property><Property><Name>IsDefault</Name><Value>False</Value></Property></Properties>
     </Attribute>
 ```
 
-Variante 1B — Atributo por tipo básico (ex.: texto / VarChar):
+2. `ExemploId` (chave numérica primária / identificador):
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<Attribute parentGuid="00000000-0000-0000-0000-000000000000" user="{DOMINIO\USUARIO}" versionDate="0001-01-01T00:00:00.0000000" lastUpdate="{ISO-UTC}" checksum="" fullyQualifiedName="ExemploId" moduleGuid="00000000-0000-0000-0000-000000000000" guid="{GUID-DO-ATRIBUTO-ID}" name="ExemploId" description="Exemplo Id">
+      <Part type="ad3ca970-19d0-44e1-a7b7-db05556e820c">
+        <Help><HelpItem><Language>{GUID-IDIOMA}-Portuguese</Language><Content /></HelpItem></Help>
+        <Properties><Property><Name>IsDefault</Name><Value>False</Value></Property></Properties>
+      </Part>
+      <Part type="babf62c5-0111-49e9-a1c3-cc004d90900a"><Properties /></Part>
+      <Properties><Property><Name>Name</Name><Value>ExemploId</Value></Property><Property><Name>Description</Name><Value>Exemplo Id</Value></Property><Property><Name>ContextualTitle</Name><Value>Identificador</Value></Property><Property><Name>ATTCUSTOMTYPE</Name><Value>bas:Numeric</Value></Property><Property><Name>Length</Name><Value>10</Value></Property><Property><Name>AttMaxLen</Name><Value>10</Value></Property><Property><Name>Decimals</Name><Value>0</Value></Property><Property><Name>Signed</Name><Value>False</Value></Property><Property><Name>IsDefault</Name><Value>False</Value></Property></Properties>
+    </Attribute>
+```
+
+3. `ExemploNome` (descrição textual / VarChar):
 
 ```xml
 <?xml version="1.0" encoding="utf-8"?>
 <Attribute parentGuid="00000000-0000-0000-0000-000000000000" user="{DOMINIO\USUARIO}" versionDate="0001-01-01T00:00:00.0000000" lastUpdate="{ISO-UTC}" checksum="" fullyQualifiedName="ExemploNome" moduleGuid="00000000-0000-0000-0000-000000000000" guid="{GUID-DO-ATRIBUTO-NOME}" name="ExemploNome" description="Exemplo Nome">
       <Part type="ad3ca970-19d0-44e1-a7b7-db05556e820c">
-        <Help>
-          <HelpItem>
-            <Language>{GUID-IDIOMA}-Portuguese</Language>
-            <Content />
-          </HelpItem>
-        </Help>
+        <Help><HelpItem><Language>{GUID-IDIOMA}-Portuguese</Language><Content /></HelpItem></Help>
         <Properties><Property><Name>IsDefault</Name><Value>False</Value></Property></Properties>
       </Part>
-      <Part type="babf62c5-0111-49e9-a1c3-cc004d90900a">
-        <Properties />
-      </Part>
+      <Part type="babf62c5-0111-49e9-a1c3-cc004d90900a"><Properties /></Part>
       <Properties><Property><Name>Name</Name><Value>ExemploNome</Value></Property><Property><Name>Description</Name><Value>Exemplo Nome</Value></Property><Property><Name>ContextualTitle</Name><Value>Nome</Value></Property><Property><Name>ATTCUSTOMTYPE</Name><Value>bas:VarChar</Value></Property><Property><Name>Length</Name><Value>250</Value></Property><Property><Name>AttMaxLen</Name><Value>250</Value></Property><Property><Name>IsDefault</Name><Value>False</Value></Property></Properties>
+    </Attribute>
+```
+
+4. `ExemploCreDate` (data/hora de criação baseada em domínio):
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<Attribute parentGuid="00000000-0000-0000-0000-000000000000" user="{DOMINIO\USUARIO}" versionDate="0001-01-01T00:00:00.0000000" lastUpdate="{ISO-UTC}" checksum="" fullyQualifiedName="ExemploCreDate" moduleGuid="00000000-0000-0000-0000-000000000000" guid="{GUID-DO-ATRIBUTO-CREDATE}" name="ExemploCreDate" description="Exemplo Cre Date">
+      <Part type="ad3ca970-19d0-44e1-a7b7-db05556e820c">
+        <Help><HelpItem><Language>{GUID-IDIOMA}-Portuguese</Language><Content /></HelpItem></Help>
+        <Properties><Property><Name>IsDefault</Name><Value>False</Value></Property></Properties>
+      </Part>
+      <Part type="babf62c5-0111-49e9-a1c3-cc004d90900a"><Properties /></Part>
+      <Properties><Property><Name>Name</Name><Value>ExemploCreDate</Value></Property><Property><Name>Description</Name><Value>Exemplo Cre Date</Value></Property><Property><Name>ContextualTitle</Name><Value>Criado em</Value></Property><Property><Name>idBasedOn</Name><Value>Domain:{DOMINIO-DE-DATA-HORA}</Value></Property><Property><Name>IsDefault</Name><Value>False</Value></Property></Properties>
+    </Attribute>
+```
+
+5. `ExemploCreUser` (usuário de criação / VarChar):
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<Attribute parentGuid="00000000-0000-0000-0000-000000000000" user="{DOMINIO\USUARIO}" versionDate="0001-01-01T00:00:00.0000000" lastUpdate="{ISO-UTC}" checksum="" fullyQualifiedName="ExemploCreUser" moduleGuid="00000000-0000-0000-0000-000000000000" guid="{GUID-DO-ATRIBUTO-CREUSER}" name="ExemploCreUser" description="Exemplo Cre User">
+      <Part type="ad3ca970-19d0-44e1-a7b7-db05556e820c">
+        <Help><HelpItem><Language>{GUID-IDIOMA}-Portuguese</Language><Content /></HelpItem></Help>
+        <Properties><Property><Name>IsDefault</Name><Value>False</Value></Property></Properties>
+      </Part>
+      <Part type="babf62c5-0111-49e9-a1c3-cc004d90900a"><Properties /></Part>
+      <Properties><Property><Name>Name</Name><Value>ExemploCreUser</Value></Property><Property><Name>Description</Name><Value>Exemplo Cre User</Value></Property><Property><Name>ContextualTitle</Name><Value>Criado por</Value></Property><Property><Name>ATTCUSTOMTYPE</Name><Value>bas:VarChar</Value></Property><Property><Name>Length</Name><Value>100</Value></Property><Property><Name>AttMaxLen</Name><Value>100</Value></Property><Property><Name>IsDefault</Name><Value>False</Value></Property></Properties>
     </Attribute>
 ```
 
@@ -2223,7 +2253,7 @@ Variante 1B — Atributo por tipo básico (ex.: texto / VarChar):
 > - `parentGuid` e `moduleGuid` ficam zerados (`00000000-0000-0000-0000-000000000000`) porque `Attribute` não mora em pasta;
 > - `ContextualTitle` é o rótulo exibido em grades/formulários;
 > - Datas/timestamps devem sempre usar `idBasedOn` com domínio apropriado;
-> - Numéricos acrescentam `<Property><Name>Decimals</Name><Value>0</Value></Property>` e `<Property><Name>Signed</Name><Value>False</Value></Property>`.
+> - Numéricos usam `ATTCUSTOMTYPE=bas:Numeric`, `Length`, `AttMaxLen`, `Decimals=0` e `Signed=False`.
 
 #### Peça 2 — Molde de Transaction Estrutural (Associação e Tabela no Modelo)
 
