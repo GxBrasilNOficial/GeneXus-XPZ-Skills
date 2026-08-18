@@ -50,7 +50,12 @@ When changing a `Procedure`, run a minimum semantic pre-packaging gate on the `P
 
 ### Collection operations, Sub control flow, and parameter hygiene
 
-- **Collection sorting**: `.Sort()` on GeneXus collections is strictly ascending (natural order). For descending sort, use an explicit inversion loop (e.g. `&i = &Col.Count`, `Do While &i >= 1 ... &i -= 1`, accessing items via `.Item(&i)` with 1-based indexing).
+- **Collection sorting**: `.Sort()` on GeneXus collections supports both ascending and descending criteria (ref: skill `nexa`, `references/common-collections.md` and production usage in `FabricaBrasil18`):
+  - `&Col.Sort()` or `&Col.Sort("")`: ascending order (default);
+  - `&Numbers.Sort("()")`: descending order for collections of basic/scalar types;
+  - `&Products.Sort("Member1, Member2")`: ascending order by multiple SDT members;
+  - `&Products.Sort("Member1, (Member2)")`: mixed order on SDT collections, where parentheses `(MemberName)` specify descending sort for that specific member (e.g. `&lista.Sort("ItemId, (DataDeEntrada)")`).
+  - Iterating backwards with `&i = &Col.Count`, `Do While &i >= 1 ... &i -= 1`, `.Item(&i)` (1-based index) remains a valid pattern for reverse traversal, but is not required as a workaround for sorting.
 - **Collection count**: `.Count` is an unsigned property without parentheses (e.g. `&Col.Count`), not a method call.
 - **Control flow in `Sub`**: calling `Return` inside a sub-routine (`Sub ... EndSub`) in a Procedure was avoided in practice as an operational precaution to ensure predictable control flow; structure sub-routines with explicit `If` blocks around the body rather than early returns. Do not use `Exit` as a substitute for exiting a sub-routine (`Exit` exits the innermost `For`/`Do While` loop, not the `Sub`).
 - **Parameter hygiene**: reassigning a variable declared as `in` in `parm(in:...)` works technically, but masks the source of the input value; as a style and clarity convention, assign to and manipulate a dedicated local variable instead.
