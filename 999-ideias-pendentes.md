@@ -11,6 +11,8 @@ Cada entrada usa dois campos curtos logo abaixo do titulo:
 
 Entradas legadas sem avaliação carregam `FALTA AVALIAR` em ambos os campos até que sejam revistas em sessão dedicada.
 
+**Editar a substância de um gap já registrado (neste arquivo ou no `998-ideias-descartadas-e-porque.md`) exige justificativa no corpo do commit.** Enfraquecer, reprecisar ou descartar a severidade de uma afirmação — não apenas corrigir redação, adicionar contexto ou reorganizar — precisa dizer **por que**: nova evidência medida, releitura do código, ou correção de erro anterior. Motivo: uma edição que suaviza um gap sem dizer por que **parece resolvido** para quem lê depois, e é pior do que o gap não ter sido achado — quem lê para de investigar. Caso real (2026-08-17): um commit sem corpo trocou «não é citado em lugar nenhum» por «não era coberto na documentação normativa»; a formulação nova era defensável à primeira vista, mas escondia que a única outra menção ao símbolo no repositório era uma cópia **defasada** num self-test — a frase sugeria mitigação onde havia agravante. Só foi achado porque outra sessão foi verificar; sem corpo no commit, não havia como saber se a mudança vinha de leitura nova ou só de estilo.
+
 ## Centralizar a fonte de verdade do conjunto de backends/adapters (três níveis)
 
 - **Importância** — média (o modo de falha já se materializou **nove vezes numa única frente**, em três classes distintas, e é invisível para os gates atuais).
