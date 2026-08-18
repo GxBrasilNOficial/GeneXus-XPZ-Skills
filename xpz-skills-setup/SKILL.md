@@ -354,6 +354,13 @@ referência curta para essa fonte como proposta preferencial antes de sugerir du
 literal. Neste contexto, "equivalente" significa carregar a mesma fonte efetiva, não
 necessariamente repetir o mesmo texto em todos os arquivos.
 
+**Particularidade do Antigravity:** o runtime nativo do produto não interpreta
+referências textuais `@<caminho>` em tempo de execução — ele injeta o conteúdo
+bruto do arquivo diretamente no prompt do agente. Por isso, a centralização do
+Antigravity com `~/.codex/AGENTS.md` deve ser feita via **vínculo no sistema de arquivos**
+(hardlink no mesmo volume ou symlink) ou arquivo com conteúdo integral, nunca por
+linha de referência textual solta `@~/.codex/AGENTS.md`.
+
 **Fonte efetiva por ferramenta instalada:** não apontar o Cursor (nem o MCP) para
 `~/.codex/AGENTS.md` quando o Codex **não** estiver instalado na máquina; o mesmo
 vale para `~/.claude/CLAUDE.md` sem Claude Code e para `~/.config/opencode/AGENTS.md`
@@ -572,9 +579,14 @@ detecta o `server.py` defasado comparando o hash instalado com o canônico do re
        OpenCode não carregar essa referência, quando a validação não for possível e o
        usuário preferir garantia por arquivo autocontido, ou quando o usuário pedir
        explicitamente duplicação literal.
-     - **Codex / Claude Code / Antigravity:** alinhar `~/.codex/AGENTS.md`, `~/.claude/CLAUDE.md` e/ou `~/.gemini/config/AGENTS.md`
+     - **Codex / Claude Code:** alinhar `~/.codex/AGENTS.md` e/ou `~/.claude/CLAUDE.md`
        ao bloco recomendado ou à centralização já descrita nesta skill, sempre com
        confirmação antes de gravar
+     - **Antigravity:** alinhar `~/.gemini/config/AGENTS.md` (ou `~/.gemini/GEMINI.md`)
+       ao bloco recomendado ou, preferencialmente quando houver centralização em
+       `~/.codex/AGENTS.md`, criar/restaurar um vínculo de arquivo (hardlink/symlink)
+       apontando para a fonte efetiva, garantindo que o runtime carregue o conteúdo
+       integral sem duplicar manutenção manual
    - Depois da confirmação: executar só o que foi aprovado, gravar os arquivos
      acordados e **revalidar por nova leitura**; no Codex, por exemplo, reler com
      `Get-Content` ou conferir com `rg`. Se o ambiente bloquear escrita (ex.:

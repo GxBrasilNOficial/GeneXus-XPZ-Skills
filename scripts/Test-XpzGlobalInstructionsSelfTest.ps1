@@ -80,13 +80,13 @@ Sobre cherry-pick: sempre use o hash do commit literal ao integrar.
 
 $originalProfile = $env:USERPROFILE
 
-# --- Setup A: todas as fontes cobrem; Codex usa variacao; Claude/Antigravity usam @ref ------
+# --- Setup A: todas as fontes cobrem; Codex usa variacao; Claude usa @ref; Antigravity usa conteudo/vinculo ------
 $fpA = New-TempDir
 try {
     Write-File -Path (Join-Path $fpA '.codex\AGENTS.md') -Content $variant
     Write-File -Path (Join-Path $fpA '.claude\CLAUDE.md') -Content '@~/.codex/AGENTS.md'
     Write-File -Path (Join-Path $fpA '.config\opencode\AGENTS.md') -Content $covered
-    Write-File -Path (Join-Path $fpA '.gemini\config\AGENTS.md') -Content '@~/.codex/AGENTS.md'
+    Write-File -Path (Join-Path $fpA '.gemini\config\AGENTS.md') -Content $covered
     Write-File -Path (Join-Path $fpA '.cursor\xpz-global-instructions-mcp\config.json') `
         -Content ('{ "agentsPath": "' + ((Join-Path $fpA '.codex\AGENTS.md') -replace '\\', '\\') + '" }')
 
@@ -98,8 +98,8 @@ try {
     Assert-Equal 'A: Codex cherry-pick (variacao)' 'presente' (Get-Coverage $repA 'Codex' 'cherry-pick-worktree')
     Assert-Equal 'A: Claude busca-shell (via @ref)' 'presente' (Get-Coverage $repA 'ClaudeCode' 'busca-shell')
     Assert-Equal 'A: OpenCode cherry-pick' 'presente' (Get-Coverage $repA 'OpenCode' 'cherry-pick-worktree')
-    Assert-Equal 'A: Antigravity busca-shell (via @ref)' 'presente' (Get-Coverage $repA 'Antigravity' 'busca-shell')
-    Assert-Equal 'A: Antigravity cherry-pick (via @ref)' 'presente' (Get-Coverage $repA 'Antigravity' 'cherry-pick-worktree')
+    Assert-Equal 'A: Antigravity busca-shell (conteudo/vinculo)' 'presente' (Get-Coverage $repA 'Antigravity' 'busca-shell')
+    Assert-Equal 'A: Antigravity cherry-pick (conteudo/vinculo)' 'presente' (Get-Coverage $repA 'Antigravity' 'cherry-pick-worktree')
     Assert-Equal 'A: overall OK' 'GLOBAL_INSTRUCTIONS_OK' $repA.overall
 }
 finally { $env:USERPROFILE = $originalProfile; Remove-TempDir -Path $fpA }
@@ -117,6 +117,25 @@ try {
     Assert-Equal 'B: overall REVIEW' 'GLOBAL_INSTRUCTIONS_REVIEW' $repB.overall
 }
 finally { $env:USERPROFILE = $originalProfile; Remove-TempDir -Path $fpB }
+
+# --- Setup C: Antigravity com @ref textual -> nao_detectado (runtime nao expande @ref) ---
+$fpC = New-TempDir
+try {
+    Write-File -Path (Join-Path $fpC '.codex\AGENTS.md') -Content $covered
+    Write-File -Path (Join-Path $fpC '.claude\CLAUDE.md') -Content '@~/.codex/AGENTS.md'
+    Write-File -Path (Join-Path $fpC '.config\opencode\AGENTS.md') -Content $covered
+    Write-File -Path (Join-Path $fpC '.gemini\config\AGENTS.md') -Content '@~/.codex/AGENTS.md'
+    Write-File -Path (Join-Path $fpC '.cursor\xpz-global-instructions-mcp\config.json') `
+        -Content ('{ "agentsPath": "' + ((Join-Path $fpC '.codex\AGENTS.md') -replace '\\', '\\') + '" }')
+
+    $env:USERPROFILE = $fpC
+    $repC = (& $scriptUnderTest -RepoRoot $repoRoot -AsJson | Out-String | ConvertFrom-Json)
+    $env:USERPROFILE = $originalProfile
+
+    Assert-Equal 'C: Antigravity busca-shell nao_detectado por @ref' 'nao_detectado' (Get-Coverage $repC 'Antigravity' 'busca-shell')
+    Assert-Equal 'C: overall REVIEW por Antigravity @ref' 'GLOBAL_INSTRUCTIONS_REVIEW' $repC.overall
+}
+finally { $env:USERPROFILE = $originalProfile; Remove-TempDir -Path $fpC }
 
 # --- Paridade contrato <-> SKILL.md -------------------------------------------
 $contract = Import-PowerShellDataFile -LiteralPath $contractPath

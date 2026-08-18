@@ -146,7 +146,10 @@ function Get-ReferencePaths {
 }
 
 function Read-EffectiveText {
-    param([string[]]$RootFiles)
+    param(
+        [string[]]$RootFiles,
+        [bool]$FollowReferences = $true
+    )
 
     $visited = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
     $sb = [System.Text.StringBuilder]::new()
@@ -166,8 +169,10 @@ function Read-EffectiveText {
         if ($null -eq $content) { $content = '' }
         [void]$sb.AppendLine($content)
 
-        foreach ($ref in (Get-ReferencePaths -BaseFile $full -Content $content)) {
-            $queue.Enqueue($ref)
+        if ($FollowReferences) {
+            foreach ($ref in (Get-ReferencePaths -BaseFile $full -Content $content)) {
+                $queue.Enqueue($ref)
+            }
         }
     }
     return $sb.ToString()
@@ -276,7 +281,8 @@ foreach ($tool in $toolNames) {
     if ($installed) {
         $sources = @(Get-EffectiveSources -Tool $tool)
         $existing = @($sources | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf })
-        if ($existing.Count -gt 0) { $text = Read-EffectiveText -RootFiles $existing } else { $text = '' }
+        $allowRefs = ($tool -ne 'Antigravity')
+        if ($existing.Count -gt 0) { $text = Read-EffectiveText -RootFiles $existing -FollowReferences $allowRefs } else { $text = '' }
         $sourceFound = -not [string]::IsNullOrWhiteSpace($text)
 
         foreach ($topic in $topics) {
