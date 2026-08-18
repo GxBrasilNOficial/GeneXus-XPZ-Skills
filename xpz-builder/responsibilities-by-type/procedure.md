@@ -48,6 +48,13 @@ When changing a `Procedure`, run a minimum semantic pre-packaging gate on the `P
 - If the `Source` builds the collection with `For each <Transaction>` over a real Transaction/base table, describe the mechanism as `For each` navigation over that Transaction/base table. Do not describe it as "via BC" unless the Procedure declares and uses a variable with `ATTCUSTOMTYPE=bc:<Transaction>`.
 - For every attribute copied from the `For each` navigation into the response SDT, confirm that the attribute exists in the target KB/corpus and that the SDT item shape matches the published API data contract.
 
+### Collection operations, Sub control flow, and parameter hygiene
+
+- **Collection sorting**: `.Sort()` on GeneXus collections is strictly ascending (natural order). For descending sort, use an explicit inversion loop (e.g. `&i = &Col.Count`, `Do While &i >= 1 ... &i -= 1`, accessing items via `.Item(&i)` with 1-based indexing).
+- **Collection count**: `.Count` is an unsigned property without parentheses (e.g. `&Col.Count`), not a method call.
+- **Control flow in `Sub`**: calling `Return` inside a sub-routine (`Sub ... EndSub`) in a Procedure was avoided in practice as an operational precaution to ensure predictable control flow; structure sub-routines with explicit `If` blocks around the body rather than early returns. Do not use `Exit` as a substitute for exiting a sub-routine (`Exit` exits the innermost `For`/`Do While` loop, not the `Sub`).
+- **Parameter hygiene**: reassigning a variable declared as `in` in `parm(in:...)` works technically, but masks the source of the input value; as a style and clarity convention, assign to and manipulate a dedicated local variable instead.
+
 ### Type-specific gate triggers
 
 - **BC dependency preflight gate (9-BC)**: when the candidate batch contains a `Procedure` that declares a variable with `ATTCUSTOMTYPE = bc:<X>`, run `& ..\scripts\Test-GeneXusBCDependency.ps1` before packaging. The script locates Transaction `X` in the batch or in `ObjetosDaKbEmXml`, verifies `idISBUSINESSCOMPONENT=True`, and supports `bc:Pai.Filho` sublevel references. Treat absence of confirmation as a hard blocker (fail). A `Procedure` that only navigates a Transaction/base table with `For each` does not trigger 9-BC unless it also declares a `bc:<X>` variable.

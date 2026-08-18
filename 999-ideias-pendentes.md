@@ -2975,8 +2975,17 @@ Esta entrada registra uma direção para estudo, não uma decisão de refatoraç
 
 ## Hipótese técnica: `Rows` para `Character` longo em layout `GxMultiForm` (WebPanel)
 
-- **Importância** — baixa/média (conforto de geração de WebPanel). Medido na frente GamAuditoria (2026-08-17): variável `Character(254)` em WebPanel com layout responsivo (`GxMultiForm`) renderiza como `textarea` de três linhas; `ControlType = Edit` nas propriedades da **variável** não converteu para input de uma linha.
+- **Importância** — baixa/média (conforto de geração de WebPanel). Medido na frente GamAuditoria (KB `FabricaBrasil18`, GX 18 U13, 2026-08-15/17): variável `Character(254)` em WebPanel com layout responsivo (`GxMultiForm`) renderiza como `textarea` de três linhas; `ControlType = Edit` nas propriedades da **variável** não converteu para input de uma linha.
 - **Hipótese (não validada)**: a altura pode ser controlada por propriedade de **layout** no controle correspondente dentro do CDATA do `GxMultiForm` (candidata: `Rows=1`), em vez de propriedade da variável.
 - **Ressalva obrigatória**: não empacotar objetos com essa propriedade até validação em fixture com `.cs` conferido e renderização visual confirmada. A propriedade `Rows` é candidata, não padrão confirmado; há riscos de nomenclatura/propriedade divergentes entre versões do GeneXus.
-- **Rastreabilidade**: medição original em `Temp/subsidios-dataview-e-webpanel-sdt-20260817.md` (§3.2-c, relatório de origem da frente, ignorado pelo git — insumo apenas); síntese documentada em `04-webpanel-familias-e-templates.md` (armadilha sem solução) e em `04b-ucw-gxcontroltype-reference.md` (seção «Hipótese técnica: `Rows` para `Character` longo em `GxMultiForm`»).
+- **Rastreabilidade**: medição empírica na frente GamAuditoria (KB `FabricaBrasil18`, GX 18 U13, 2026-08-15/17); síntese documentada em `04-webpanel-familias-e-templates.md` (armadilha sem solução) e em `04b-ucw-gxcontroltype-reference.md` (seção «Hipótese técnica: `Rows` para `Character` longo em `GxMultiForm`»).
 - **Frente futura sugerida**: fixture de WebPanel com Character longo testando `Rows=1` no layout + build com `.cs` conferido + renderização; se validado, promover a propriedade a regra operacional no `04b` e registrar o molde no `01e`.
+
+## Ferramental: Diagnóstico de existência ativa de objeto na KB (`Test-GeneXusObjectExists.ps1` / Lacuna de verificação)
+
+- **Importância** — média (segurança operacional e prevenção de erros em ferramentas e automações).
+- **Problema identificado (2026-08-17, frente GamAuditoria)**: ausência de método direto e confiável para responder programmaticamente: *"este objeto ainda existe ativamente nesta KB?"*. Três tentativas investigadas falharam:
+  1. *Tabelas `Entity` e `EntityVersion` no banco relacional SQL Server da KB (`GX_KB_<NomeDaKB>`)*: guardam histórico completo e registros túmulo de objetos excluídos, inviabilizando a filtragem direta de objetos ativos;
+  2. *Tabela `OBJECT` no banco SQL Server da KB*: não contém o inventário ativo dos objetos de modelo da aplicação;
+  3. *Arquivo `nav_objs.xml` do MSBuild*: reflete somente o escopo da última geração parcial realizada pelo MSBuild, omitindo objetos não compilados na rodada.
+- **Proposta de frente futura**: desenvolvimento de ferramenta dedicada (`scripts/Test-GeneXusObjectExists.ps1`) baseada em introspecção segura do acervo exportado ou catálogo consolidado para verificar a existência e o estado ativo de um objeto antes de disparar automações de import/export/build.

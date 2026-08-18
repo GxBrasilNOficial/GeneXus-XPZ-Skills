@@ -1696,6 +1696,10 @@ Endsub
 - Evidência direta: na KB local de teste OnlineShopSS, a tríade `ApiCategory` + `procCategoryApiList` + `SdtCategoryApiResponse` expôs `GET /categories`, importou, buildou, sincronizou para o acervo full e respondeu `HTTP 200` no ambiente servido `OnlineShopSSNETSQLServer` com uma coleção JSON de categorias.
 - Delta em relação ao molde mínimo acima: o corpo autocontido da Procedure pode ser substituído por uma navegação real `For each <Transaction>` para preencher o item SDT e adicioná-lo à variável coleção. Essa substituição deixa de ser autocontida: passa a depender da `Transaction`, dos atributos copiados e da KB de destino.
 - Contrato de coleção: o SDT de item permanece `AttCollection=False`; as variáveis de saída na API e na Procedure usam `ATTCUSTOMTYPE=sdt:<SdtItem>` com `AttCollection=True`.
+- **Convenções de Coleção em SDT na mesma KB**:
+  - *Convenção A (Dominante / Recomendada)*: Objeto SDT definido como item estruturado simples (`AttCollection=False`), declarando a coleção na variável (`AttCollection=True` no nó `<Variable>`). A variável referencia o tipo direto `sdt:MeuSdt`.
+  - *Convenção B (Coleção no Objeto SDT)*: Objeto SDT marcado com `AttCollection=True` no próprio nó `<Object>`. A variável que referencia esse SDT precisa ser tipada como `sdt:MeuSdt.MeuSdtItem`.
+  - *Custo de errar*: Misturar as convenções na mesma KB ou tipar a variável de uma convenção com a sintaxe da outra resulta em incompatibilidade de tipos de coleções e erro de tipagem na compilação do gerador.
 - Terminologia: chamar esse perfil de listagem por `For each` sobre a base table/atributos da `Transaction`; não chamar de "via BC" a menos que a Procedure declare uma variável `ATTCUSTOMTYPE=bc:<Transaction>`. No caso OnlineShopSS, a `Transaction` também estava com `idISBUSINESSCOMPONENT=True` e `idIsDynTrn=False`, mas isso é evidência datada de coexistência, não receita universal para inicialização/carga.
 - Prova funcional: registrar método, rota, status, payload resumido e ambiente servido. `HTTP 200`, OpenAPI ou `[SecurityLevel]` não provam enforcement GAM; quando segurança estiver em escopo, usar o smoke runtime de `xpz-builder/responsibilities-by-type/api-gam-runtime.md`. OpenAPI gerado pode ser evidência complementar do contrato público observado quando houver arquivo/ambiente/frescor declarados; ver `xpz-builder/responsibilities-by-type/api.md`.
 
@@ -2165,11 +2169,99 @@ Leitura tecnica do caso:
 
 ## Moldes sanitizados completos de DataView
 
-### Molde sanitizado de DataView 1 - `dvExemploMultiDbms`
+### Molde sanitizado de DataView 1 - `dvExemploMultiDbms` (Conjunto Completo: Attribute + Transaction Estrutural + DataView)
 
-- Perfil: `DataView` sobre tabela externa, com as quatro peças obrigatórias (`Attribute` + `Transaction` estrutural + `DataView` + `DVAssocTable`/`DVDataStore`), plataforma de estrutura por DBMS dos environments e plataforma de índice só onde o nome físico é estável.
+- Perfil: `DataView` sobre tabela externa, com as quatro peças obrigatórias (`Attribute` + `Transaction` estrutural associada + `DataView` com `<DataViewStructurePlatform>` multi-DBMS + propriedades `DVAssocTable`/`DVDataStore`), plataforma de estrutura por DBMS dos environments e plataforma de índice só onde o nome físico é estável.
 - Origem: KB `FabricaBrasil18`, GX 18 U13, frente GamAuditoria (2026-08-15/17); sanitizado a partir de XPZ exportado pela IDE; validado por import + build com `-FailIfReorg true` nos environments PostgreSQL e SQL Server (`reorgDetected: None`, zero `CREATE`/`ALTER TABLE`).
 - Uso operacional: referência para leitura de tabela que **já existe** no banco e não deve ser criada nem alterada pelo GeneXus. Antes de gerar, ver `xpz-builder/responsibilities-by-type/dataview.md` (regra multi-DBMS, delimitação de `NAME` e checklist).
+
+#### Peça 1 — Molde de Atributo (`<Attribute>`, raiz top-level)
+
+Variante com domínio (ex.: datas/timestamps baseados em domínio):
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<Attribute parentGuid="00000000-0000-0000-0000-000000000000" user="{DOMINIO\USUARIO}" versionDate="0001-01-01T00:00:00.0000000" lastUpdate="{ISO-UTC}" checksum="" fullyQualifiedName="ExemploCreDate" moduleGuid="00000000-0000-0000-0000-000000000000" guid="{GUID-NOVO}" name="ExemploCreDate" description="Exemplo Cre Date">
+      <Part type="ad3ca970-19d0-44e1-a7b7-db05556e820c">
+        <Help>
+          <HelpItem>
+            <Language>{GUID-IDIOMA}-Portuguese</Language>
+            <Content />
+          </HelpItem>
+        </Help>
+        <Properties><Property><Name>IsDefault</Name><Value>False</Value></Property></Properties>
+      </Part>
+      <Part type="babf62c5-0111-49e9-a1c3-cc004d90900a">
+        <Properties />
+      </Part>
+      <Properties><Property><Name>Name</Name><Value>ExemploCreDate</Value></Property><Property><Name>Description</Name><Value>Exemplo Cre Date</Value></Property><Property><Name>ContextualTitle</Name><Value>Criado em</Value></Property><Property><Name>idBasedOn</Name><Value>Domain:{DOMINIO-DE-DATA-HORA}</Value></Property><Property><Name>IsDefault</Name><Value>False</Value></Property></Properties>
+    </Attribute>
+```
+
+> **Notas de Atributo**:
+> - `parentGuid` e `moduleGuid` ficam zerados (`00000000-0000-0000-0000-000000000000`) porque `Attribute` não mora em pasta;
+> - `ContextualTitle` é o rótulo exibido em grades/formulários;
+> - Datas/timestamps devem sempre usar `idBasedOn` com domínio apropriado;
+> - Para variante por tipo primitivo (texto/numérico), substituir o `idBasedOn` por `<Property><Name>ATTCUSTOMTYPE</Name><Value>bas:VarChar</Value></Property><Property><Name>Length</Name><Value>250</Value></Property><Property><Name>AttMaxLen</Name><Value>250</Value></Property>` (numéricos acrescentam `Decimals` e `Signed`).
+
+#### Peça 2 — Molde de Transaction Estrutural (Associação e Tabela no Modelo)
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<Object parentGuid="{GUID-DA-PASTA}" user="{DOMINIO\USUARIO}" versionDate="0001-01-01T00:00:00.0000000" lastUpdate="{ISO-UTC}" checksum="" fullyQualifiedName="Exemplo" moduleGuid="{GUID-DO-MODULO-RAIZ}" guid="{GUID-NOVO}" name="Exemplo" type="1db606f2-af09-4cf9-a3b5-b481519d28f6" description="Exemplo (estrutura do DataView dvExemplo)" parent="{NOME-DA-PASTA}" parentType="00000000-0000-0000-0000-000000000008">
+      <Part type="264be5fb-1b28-4b25-a598-6ca900dd059f">
+        <Level Name="Exemplo" Type="Exemplo" Description="Exemplo (estrutura do DataView dvExemplo)" Guid="{MESMO-GUID-DO-OBJETO}">
+          <Properties />
+          <Attribute key="True" guid="{GUID-DO-ATRIBUTO}">ExemploRepId</Attribute>
+          <Attribute key="True" guid="{GUID-DO-ATRIBUTO}">ExemploId</Attribute>
+          <Attribute key="False" guid="{GUID-DO-ATRIBUTO}" isNullable="True">ExemploNome</Attribute>
+          <Attribute key="False" guid="{GUID-DO-ATRIBUTO}" isNullable="True">ExemploCreDate</Attribute>
+          <Attribute key="False" guid="{GUID-DO-ATRIBUTO}" isNullable="True">ExemploCreUser</Attribute>
+        </Level>
+        <Properties><Property><Name>IsDefault</Name><Value>False</Value></Property></Properties>
+      </Part>
+      <Part type="d24a58ad-57ba-41b7-9e6e-eaca3543c778">
+        <Properties><Property><Name>IsDefault</Name><Value>True</Value></Property><Property><Name>Defaults</Name><Value>gx:TrnDefaultWebForm.dkt</Value></Property></Properties>
+      </Part>
+      <Part type="4c28dfb9-f83b-46f0-9cf3-f7e090b525d5">
+        <Properties><Property><Name>IsDefault</Name><Value>True</Value></Property><Property><Name>Defaults</Name><Value>gx:TrnDefaultWinForm.dkt</Value></Property></Properties>
+      </Part>
+      <Part type="9b0a32a3-de6d-4be1-a4dd-1b85d3741534">
+        <Source><![CDATA[]]></Source>
+        <Properties><Property><Name>IsDefault</Name><Value>False</Value></Property></Properties>
+      </Part>
+      <Part type="c44bd5ff-f918-415b-98e6-aca44fed84fa">
+        <Source><![CDATA[]]></Source>
+        <Properties><Property><Name>IsDefault</Name><Value>False</Value></Property></Properties>
+      </Part>
+      <Part type="e4c4ade7-53f0-4a56-bdfd-843735b66f47">
+        <Properties><Property><Name>IsDefault</Name><Value>False</Value></Property></Properties>
+      </Part>
+      <Part type="ad3ca970-19d0-44e1-a7b7-db05556e820c">
+        <Help>
+          <HelpItem>
+            <Language>{GUID-IDIOMA}-Portuguese</Language>
+            <Content />
+          </HelpItem>
+        </Help>
+        <Properties><Property><Name>IsDefault</Name><Value>False</Value></Property></Properties>
+      </Part>
+      <Part type="babf62c5-0111-49e9-a1c3-cc004d90900a">
+        <Properties />
+      </Part>
+      <Properties><Property><Name>Name</Name><Value>Exemplo</Value></Property><Property><Name>Description</Name><Value>Exemplo (estrutura do DataView dvExemplo)</Value></Property><Property><Name>IntegratedSecurityPermissionPrefix</Name><Value>Exemplo</Value></Property><Property><Name>IsDefault</Name><Value>False</Value></Property></Properties>
+    </Object>
+```
+
+> **Notas sobre a Transaction estrutural**:
+> - Rules (`9b0a32a3`), Events (`c44bd5ff`) e Variables (`e4c4ade7`) ficam **vazios** (CDATA vazio); Web/Win Forms usam defaults (`IsDefault=True`);
+> - O `Guid` da tag `<Level>` repete o mesmo GUID do objeto Transaction;
+> - A descrição declarando a finalidade (`"Exemplo (estrutura do DataView dvExemplo)"`) documenta a dependência e evita exclusão acidental;
+> - Todos os atributos não-chave usam `isNullable="True"`;
+> - A Transaction materializa uma Table no modelo GeneXus que **não** gera tabela física no banco, porque o DataView a associa como externa via `DVAssocTable` (`reorgDetected: None`);
+> - Os GUIDs dos `<Attribute>` declarados no `<Level>` são idênticos aos referenciados na propriedade `DVAssocTable` do DataView (`adbb33c9-0906-4971-833c-998de27e0676-<NomeAtributo>`).
+
+#### Peça 3 — Molde de DataView (`<Object type="19abc6ff-2cd2-0000-0006-6d172bc2333b">`)
 
 ```xml
 <?xml version="1.0" encoding="utf-8"?>
@@ -2214,10 +2306,8 @@ Leitura tecnica do caso:
               </DataViewIndexesPlatform>
             </Platforms>
             <Part type="fe47b55c-ea2a-1000-0101-5b38901e24f7">
-              <Members>
-                <Member Order="Ascending">ExemploRepId</Member>
-                <Member Order="Ascending">ExemploId</Member>
-              </Members>
+              <Member Order="Ascending">ExemploRepId</Member>
+              <Member Order="Ascending">ExemploId</Member>
               <Properties />
             </Part>
             <Properties><Property><Name>Name</Name><Value>IdvExemploPK</Value></Property></Properties>

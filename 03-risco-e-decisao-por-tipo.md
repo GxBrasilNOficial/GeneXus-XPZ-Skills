@@ -63,7 +63,7 @@ Preservar explicitamente o caráter heurístico dessas leituras.
 
 ## DataView
 
-- Evidência direta: total de objetos analisados: 1 (KB `FabricaBrasil18`, GX 18 U13, frente GamAuditoria, 2026-08-15/17; fonte primária `Temp/subsidios-dataview-e-webpanel-sdt-20260817.md`).
+- Evidência direta: total de objetos analisados: 1 (KB `FabricaBrasil18`, GX 18 U13, frente GamAuditoria, 2026-08-15/17; validado por import + build com `-FailIfReorg true` nos environments PostgreSQL e SQL Server com `reorgDetected: None`).
 - Evidência direta: o tipo não constava do snapshot original da Fase 0; a linha da tabela resumo é recalibração empírica posterior, não contagem amostral do snapshot.
 - Evidência direta: GUIDs de part types e propriedades observados: objeto `DataView` `19abc6ff-2cd2-0000-0006-6d172bc2333b`, part estrutura `19abc6ff-2cd2-1000-0006-6d172bc2333b`, part índices `7706bd3b-212a-1000-0006-8aaeb59068b9`, objeto índice `fc1b76c4-95c5-0000-0101-44f9543121bd`, part membros do índice `fe47b55c-ea2a-1000-0101-5b38901e24f7`; propriedades `DVDataStore` e `DVAssocTable` (referencia atributos por `<GUID-do-tipo-Attribute>-<Nome>`, separados por `;`, na ordem da chave primária).
 - Evidência direta: DataView exige as quatro peças obrigatórias (`Attribute` com prefixo exclusivo, `Transaction` estrutural sem tela/regras, `DataView` com `<DataViewStructurePlatform Dbms="NN">` + `NAME`/`SCHEMA`, `DVDataStore` + `DVAssocTable`); sem `DVAssocTable` a especificação falha com `spc0031: No relationship found among attributes`.

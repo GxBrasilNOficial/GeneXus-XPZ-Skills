@@ -4,7 +4,7 @@ Satellite of `xpz-builder/SKILL.md` for the `DataView` object type. **Load this 
 
 This file consolidates type-specific RESPONSIBILITIES and QUALITY CHECKLIST entries. Type-agnostic rules (envelope serialization, package collision gate, manifest, etc.) remain in the main `SKILL.md`.
 
-Evidence base: KB `FabricaBrasil18` (GX 18 U13), frente GamAuditoria, 2026-08-15/17. Fonte primária: `Temp/subsidios-dataview-e-webpanel-sdt-20260817.md` (insumo, não publicado). Todos os GUIDs e shapes abaixo vêm de XPZ exportado pela IDE, validados por import + build com `-FailIfReorg true` nos environments PostgreSQL e SQL Server da KB de origem.
+Evidence base: KB `FabricaBrasil18` (GX 18 U13), frente GamAuditoria, 2026-08-15/17. Todos os GUIDs e shapes abaixo vêm de XPZ exportado pela IDE, validados por import + build com `-FailIfReorg true` nos environments PostgreSQL e SQL Server da KB de origem.
 
 ## Responsibilities
 
@@ -98,7 +98,6 @@ Observed in GX 18 U13 (KB `FabricaBrasil18`, XPZ exported by the IDE). Confidenc
 
 ## Related references
 
-- `Temp/subsidios-dataview-e-webpanel-sdt-20260817.md` — primary source of the subsidies (ignored by git, insumo only)
 - `03-risco-e-decisao-por-tipo.md` — risk table, `## DataView` section and recalibration note
 - `02-regras-operacionais-e-runtime.md` — source error table (`spc0031`, `src0013`, `src0051`, `src0054`, `src0065`, `src0216`, `src0294`/`src0246`, `src0294` scalar `.IsNull`, `src0229` scalar `.SetNull`, `CS2001` `right()`/`left()`) and Impact Analysis heuristic
 - `04-webpanel-familias-e-templates.md` — grid by SDT without base table (Event Grid.Load with `For &Item in &Itens ... Load ... EndFor`)
