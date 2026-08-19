@@ -43,6 +43,7 @@ function Get-LlmDelegateTargetFamily {
     if ($fam -ieq 'nvidia') {
         if ($parts.Count -ge 3) {
             $creatorRaw = $parts[1].Trim().ToLowerInvariant()
+            # Os slugs canonicos adotados refletem a convencao oficial do catalogo de modelos
             switch ($creatorRaw) {
                 'deepseek-ai' { return 'deepseek' }
                 'mistralai'   { return 'mistral' }
@@ -63,7 +64,6 @@ function Get-LlmDelegateTargetFamily {
             $modelId = $parts[1].Trim()
             if ($modelId -ilike 'nemotron-*') { return 'nvidia' }
             if ($modelId -ilike 'llama-*')    { return 'meta' }
-            if (-not [string]::IsNullOrWhiteSpace($modelId)) { return $modelId }
             return 'nvidia'
         }
         return 'nvidia'

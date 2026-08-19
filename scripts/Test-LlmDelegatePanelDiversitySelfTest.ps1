@@ -124,4 +124,10 @@ Assert-True ($r20.state -eq 'insufficientDiversity') "Caso 20: antigravity/gpt-*
 $r21 = Invoke-Diversity '[{"targetModelKey":"antigravity/custom-model-y","verdict":"allow"},{"targetModelKey":"google/gemini-3-flash-preview","verdict":"allow"}]'
 Assert-True ($r21.state -eq 'insufficientDiversity') "Caso 21: antigravity com modelo desconhecido deve cair no default google; esperado insufficientDiversity; veio '$($r21.state)'."
 
+# (22) chaves nvidia de 2 niveis desconhecidas colapsam ambas no fallback conservador nvidia (evita supercontagem)
+$r22 = Invoke-Diversity '[{"targetModelKey":"nvidia/custom-model-a","verdict":"allow"},{"targetModelKey":"nvidia/custom-model-b","verdict":"allow"}]'
+Assert-True ($r22.state -eq 'insufficientDiversity') "Caso 22: chaves nvidia de 2 niveis desconhecidas devem colapsar em nvidia (sem supercontar); esperado insufficientDiversity; veio '$($r22.state)'."
+Assert-True (@($r22.distinctFamiliesAllow).Count -eq 1) "Caso 22: esperado 1 distinctFamiliesAllow ('nvidia'); veio '$(@($r22.distinctFamiliesAllow).Count)'."
+Assert-True (@($r22.distinctFamiliesAllow) -contains 'nvidia') "Caso 22: distinctFamiliesAllow deve conter 'nvidia'."
+
 Write-Host "OK: Test-LlmDelegatePanelDiversitySelfTest.ps1"
