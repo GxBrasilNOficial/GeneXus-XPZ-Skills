@@ -530,12 +530,12 @@ detecta o `server.py` defasado comparando o hash instalado com o canônico do re
 9. **Auditoria dos instrucionais globais** (obrigatória quando os passos anteriores
    foram executados nesta mesma sessão como auditoria/setup completo — não adiar nem
    delegar a uma "próxima mensagem"):
-   - Executar o **motor de instrucionais globais** `scripts/Test-XpzGlobalInstructions.ps1`
-     (`-AsJson` para agentes). Ele resolve, para cada ferramenta instalada, **onde está
-     o texto efetivo** (segue centralização e referências `@<caminho>`, `instructions[]`
-     do OpenCode e o `agentsPath` do MCP do Cursor) e sinaliza a cobertura dos tópicos
-     mínimos contra o contrato `scripts/xpz-global-instructions-topics.psd1`. O motor é
-     **somente leitura**.
+    - Executar o **motor de instrucionais globais** `scripts/Test-XpzGlobalInstructions.ps1`
+      (`-AsJson` para agentes). Ele resolve, para cada ferramenta instalada, **onde está
+      o texto efetivo** (segue centralização e referências `@<caminho>` no Claude Code/OpenCode,
+      `instructions[]` do OpenCode, `agentsPath` do MCP do Cursor, e precedência de fontes /
+      vínculo de arquivo no Antigravity) e sinaliza a cobertura dos tópicos mínimos contra o
+      contrato `scripts/xpz-global-instructions-topics.psd1`. O motor é **somente leitura**.
    - Interpretar o resultado de forma **conservadora**: por tópico, `presente` =
      coberto no texto efetivo; `nao_detectado` = **o agente deve revisar manualmente**
      (NÃO significa ausente — pode ser a mesma regra escrita de outra forma que as

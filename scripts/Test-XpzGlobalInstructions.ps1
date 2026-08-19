@@ -13,7 +13,9 @@
       - ClaudeCode -> ~/.claude/CLAUDE.md (segue linhas '@<caminho>')
       - OpenCode   -> ~/.config/opencode/AGENTS.md + instructions[] de opencode.json(c)
       - Cursor     -> agentsPath de ~/.cursor/xpz-global-instructions-mcp/config.json
-    Referencias '@<caminho>.md' são seguidas recursivamente (com protecao a loop).
+      - Antigravity -> precedencia ~/.gemini/config/AGENTS.md > config/GEMINI.md > AGENTS.md > GEMINI.md (exige vinculo/conteudo real; nao expande '@<caminho>')
+    Referencias '@<caminho>.md' são seguidas recursivamente apenas para ferramentas
+    que as suportam (Claude Code/OpenCode; desativadas para Antigravity).
 
     Camada 2 (sinal conservador): aplica as ancoras do contrato
     scripts/xpz-global-instructions-topics.psd1. Por topico: QUALQUER ancora que

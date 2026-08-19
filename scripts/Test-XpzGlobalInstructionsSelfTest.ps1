@@ -8,7 +8,7 @@
     Sem rede. Monta perfis de usuário falsos via $env:USERPROFILE e confere:
       - deteccao positiva e por variacao verbal das ancoras (status "presente");
       - ausencia de cobertura (status "nao_detectado" e overall REVIEW);
-      - seguimento de referencia '@<caminho>' (Claude -> AGENTS.md referenciado);
+      - seguimento de referencia '@<caminho>' (Claude -> AGENTS.md referenciado) e rejeicao de '@<caminho>' no Antigravity;
       - paridade contrato <-> SKILL.md: cada SkillHeading do contrato existe no
         bloco "## AGENTS.MD RECOMENDADO" do SKILL.md (anti-drift).
 
