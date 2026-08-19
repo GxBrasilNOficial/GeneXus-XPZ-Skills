@@ -137,14 +137,7 @@ a skill [`xpz-kb-parallel-pre-push`](../xpz-kb-parallel-pre-push/SKILL.md): roti
 
 ## ANATOMIA (cada parte faz o quê, e qual eixo governa)
 
-A skill separa **quatro eixos independentes** (formalizados nos 4 substantivos conceituais da taxonomia abaixo). Confundi-los gera erro (ex.: namespear a política pelo backend abre brecha de confidencialidade; usar o provedor de destino no piso de diversidade gera subcontagem):
-
-| Substantivo / Eixo | O que define | Quem governa | Exemplos |
-|---|---|---|---|
-| **1. Backend / Harness** | A ferramenta de software / CLI local que transporta o prompt. | Adapters (`Invoke-*`) e dispatcher (`Invoke-LlmDelegatePanelDispatch.ps1`). | `opencode`, `codex`, `claude-code`, `copilot`, `gemini`, `antigravity` |
-| **2. Provedor de Destino (Endpoint)** | O serviço / servidor na nuvem que recebe a conexão de rede. | Gate de Confidencialidade e Política por KB (`Resolve-LlmDelegateAuthorization.ps1`); Semáforo de concorrência no Dispatcher. | `openai`, `anthropic`, `nvidia`, `ollama-cloud`, `antigravity` |
-| **3. Criador do Modelo** | O laboratório / organização que treinou a arquitetura e os pesos da IA (independência cognitiva). | Piso de Diversidade da Revisão por Pares (`Get-LlmDelegateTargetFamily` / `Resolve-LlmDelegatePanelDiversity.ps1`). | `openai`, `anthropic`, `google`, `deepseek`, `z-ai`, `moonshot`, `alibaba`, `meta`, `minimaxai`, `mistral`, `microsoft`, `nvidia` |
-| **4. Família do Modelo** | A linha ou série específica de modelos dentro do portfólio do Criador. | Identificador de catálogo do Criador (não governa o piso de diversidade). | Gemini vs Gemma; GPT vs o1; Mistral vs Codestral; Qwen vs Qwen-Coder |
+A skill separa **quatro eixos independentes** (formalizados nos 4 substantivos conceituais da taxonomia). Confundi-los gera erro (ex.: namespear a política pelo backend abre brecha de confidencialidade; usar o provedor de destino no piso de diversidade gera subcontagem). A tabela completa dos 4 substantivos (Backend/Harness, Provedor de Destino, Criador do Modelo, Família do Modelo — o que cada um define, quem governa e exemplos) mora em [`15-revisao-por-pares.md`](../15-revisao-por-pares.md) (dono da metodologia); não duplicar aqui.
 
 > **Nota de mapeamento no código:** Nos scripts e contratos JSON legados, a propriedade `family` e a função `Get-LlmDelegateTargetFamily` representam o **Criador do Modelo** (substantivo #3). A "Família do Modelo" (#4) é categoria descritiva e não é resolvida mecanicamente. O gate de confidencialidade deriva o provedor de destino diretamente do prefixo cru da chave de modelo (`targetModelKey`), nunca da função de criador.
 
