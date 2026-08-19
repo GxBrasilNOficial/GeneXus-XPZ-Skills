@@ -16,11 +16,11 @@
     recebe os vereditos que o gate (Resolve-LlmDelegateAuthorization.ps1) ja emitiu por
     revisor, e so conta familias. O gate continua soberano por destino+sensibilidade.
 
-    Familia = familia estrutural do modelo de DESTINO (resolvida via Get-LlmDelegateTargetFamily):
+    Familia = Criador do Modelo / familia estrutural de DESTINO (resolvida via Get-LlmDelegateTargetFamily):
     em geral o prefixo do provedor em targetModelKey (ex.: openai, anthropic, ollama-cloud,
-    nvidia, opencode-go, atlas-cloud, google, github-copilot); antigravity/* colapsa para a
-    familia do modelo subjacente. Modelos da mesma familia compartilham vieses de treino,
-    logo nao contam como diversidade entre si.
+    opencode-go, atlas-cloud, google, github-copilot); modelos sob provedores agregadores
+    como nvidia/* e antigravity/* colapsam para o Criador do Modelo subjacente (com normalizacao canonica).
+    Modelos do mesmo criador compartilham vieses de treino, logo nao contam como diversidade entre si.
 
     Piso: >=2 familias distintas entre si entre os revisores DESPACHAVEIS (verdict=allow).
     `ask` ainda nao conta como painel montado — conta como candidato AUTORIZAVEL (se
@@ -148,5 +148,5 @@ $fallbackLabel = if ($state -ne 'panelReady') { "segunda opiniao ($($dispatchabl
     authorFamily              = $AuthorFamily
     authorFamilyInPanel       = $authorInPanel
     fallbackLabel             = $fallbackLabel
-    note                      = 'Consultivo; NAO e autorizacao. O gate Resolve-LlmDelegateAuthorization decide allow/ask/deny por revisor. Familia = familia estrutural do modelo de DESTINO (via Get-LlmDelegateTargetFamily; antigravity/* colapsa na fundacao do modelo subjacente). Piso conta familias distintas entre despachaveis (allow); ask = autorizavel; deny ignorado.'
+    note                      = 'Consultivo; NAO e autorizacao. O gate Resolve-LlmDelegateAuthorization decide allow/ask/deny por revisor. Familia = Criador do Modelo / familia estrutural de DESTINO (via Get-LlmDelegateTargetFamily; antigravity/* e nvidia/* colapsam no Criador do Modelo subjacente). Piso conta familias distintas entre despachaveis (allow); ask = autorizavel; deny ignorado.'
 } | ConvertTo-Json -Depth 8

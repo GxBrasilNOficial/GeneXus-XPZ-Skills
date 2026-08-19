@@ -402,34 +402,24 @@ E a **única outra menção ao símbolo no repositório é uma cópia defasada**
 
 **Origem:** achados colaterais da re-verificação empírica de 2026-08-16 que levou ao descarte do backend `mimo`. Sobreviveram ao descarte por serem independentes daquele backend — valem para qualquer motor futuro.
 
-## Piso de diversidade subconta em provedor agregador — `nvidia/*` sem o tratamento que `antigravity/*` já tem
+## Piso de diversidade subconta em provedor agregador — `nvidia/*` sem o tratamento que `antigravity/*` já tem [RESOLVIDO no recorte `nvidia/*` com normalização canônica; limite conhecido mantido para 2 níveis]
 
 - **Importância** — alta (o piso de diversidade é **gate mecânico** da revisão por pares: subcontar família **reprova painel legítimo**, e pode levar o orquestrador a incluir voz desnecessária ou a concluir que não há diversidade quando há).
-- **Maturidade** — pronta para implementar no recorte `nvidia/*` (o precedente idêntico já está resolvido no código); decisão em aberto para os demais agregadores.
+- **Maturidade** — **resolvido** no recorte `nvidia/*` em 2026-08-19 (implementado colapso do Criador do Modelo com tabela canônica de normalização para evitar falsos-positivos de sub-orgs da NVIDIA contra nomes canônicos); para agregadores de 2 níveis sem criador no path (`ollama-cloud/*`, `opencode-go/*`), formalizada a **Opção (b)** no `15-revisao-por-pares.md` como limite conhecido documentado para proteger os semáforos de concorrência do dispatcher (`-OllamaConcurrency`).
 
-**O defeito.** O [`15-revisao-por-pares.md`](15-revisao-por-pares.md) define família como **fundação estrutural do modelo** — linhagem, não provedor — e `Get-LlmDelegateTargetFamily` (`scripts/LlmDelegateTargetFamilySupport.ps1`) já trata `antigravity/*` como agregador, colapsando na fundação do modelo subjacente (`antigravity/claude-*` → `anthropic`). O provedor **`nvidia` é agregador igual e não recebeu esse tratamento**. Medido em 2026-08-16:
+**O defeito.** O [`15-revisao-por-pares.md`](15-revisao-por-pares.md) define família como **fundação estrutural do modelo** (Criador do Modelo, substantivo #3 da taxonomia) e `Get-LlmDelegateTargetFamily` (`scripts/LlmDelegateTargetFamilySupport.ps1`) já tratava `antigravity/*` como agregador, colapsando no Criador do modelo subjacente (`antigravity/claude-*` → `anthropic`). O provedor **`nvidia` era agregador igual e não recebia esse tratamento**. Medido em 2026-08-16:
 
 ```
-nvidia/minimaxai/minimax-m3              -> nvidia
-nvidia/z-ai/glm-5.2                      -> nvidia
+nvidia/minimaxai/minimax-m3              -> nvidia (anteriormente)
+nvidia/z-ai/glm-5.2                      -> nvidia (anteriormente)
 nvidia/nvidia/nemotron-3-super-120b-a12b -> nvidia
 ```
 
-São **três fundações distintas** (MiniMax, Z.ai/GLM, NVIDIA Nemotron) contadas como **uma**. Um painel formado só por elas falharia o piso de ≥2 famílias sendo, de fato, três linhagens independentes.
+São **três criadores distintos** (MiniMax, Z.ai/GLM, NVIDIA Nemotron). O fix implementou a extração do 2º segmento em `nvidia/<criador>/<modelo>` com normalização canônica central (`deepseek-ai` → `deepseek`, `mistralai` → `mistral`, `qwen` → `alibaba`, `meta-llama`/`facebook` → `meta`, `thudm`/`glm` → `z-ai`, `minimax`/`minimaxai` → `minimaxai`, `moonshotai` → `moonshot`), além de suporte a chaves NVIDIA de 2 níveis (`nemotron-*` → `nvidia`, `llama-*` → `meta`).
 
-**Por que o fix é barato neste recorte.** O catálogo NVIDIA já nomeia `nvidia/<criador>/<modelo>`, então a linhagem é o **segundo segmento**: `nvidia/deepseek-ai/*` → `deepseek-ai`, `nvidia/meta/llama-*` → `meta`, `nvidia/openai/gpt-oss-*` → `openai`. Mesma forma do fix do `antigravity`.
+**Decisão dos outros agregadores.** Para agregadores de 2 níveis (`opencode-go/*` e `ollama-cloud/*`), adotada a **Opção (b)**: ficam mapeados pelo endpoint de destino, documentados como limite conhecido no `15-revisao-por-pares.md`, preservando a integridade dos semáforos de concorrência no `Invoke-LlmDelegatePanelDispatch.ps1`.
 
-**Paridade obrigatória ao implementar** (lista completa — não só self-test + `15`):
-
-- `scripts/LlmDelegateTargetFamilySupport.ps1` (synopsis/description + ramo `nvidia`)
-- `scripts/Resolve-LlmDelegatePanelDiversity.ps1` (cabeçalho `.DESCRIPTION`: hoje lista `nvidia` como família de prefixo e só cita colapso de `antigravity/*` — **passaria a mentir** após o fix)
-- [`15-revisao-por-pares.md`](15-revisao-por-pares.md) (definição de família / exceção de agregador)
-- `scripts/Test-LlmDelegatePanelDiversitySelfTest.ps1` (casos `nvidia/<criador>/*`)
-- `xpz-llm-delegate/SKILL.md` — **duas** coisas: (a) bullet de `Resolve-LlmDelegatePanelDiversity` / `Get-LlmDelegateTargetFamily` ganha exemplo `nvidia/<criador>/*` → linhagem; (b) **linha 881 — trocar «famílias» por «caminhos»**. Hoje: «Outras famílias (Codex/Claude Code nativo/nvidia) **não** são afetadas pela cota do ollama-cloud» — mas a lista mistura **backend** (`Codex`), **subagente nativo** e **provedor** (`nvidia`); nunca foi enumeração de família, e é a **única** enumeração concreta do termo no arquivo, contra ~10 usos no sentido estrito do piso (`:71`, `:72`, `:87`, `:88`, `:118`, `:451`, `:488`, `:678`, `:679`, `:685`). Redação-alvo: «Os demais **caminhos** (Codex, Claude Code nativo, provedor `nvidia` via opencode) **não** são afetados pela cota do `ollama-cloud`». O **conteúdo não muda** (segue verdadeiro antes e depois do fix — o provedor `nvidia` não passa pela cota do ollama-cloud); muda o **termo**, que pós-fix contradiria a definição usada no resto do documento. **Revisão de redação, não de contrato.**
-
-**Decisão em aberto — os outros agregadores.** `opencode-go/*` e `ollama-cloud/*` têm **dois** níveis (`opencode-go/glm-5.2`), logo a linhagem **não** é derivável do nome e exigiria mapa mantido à mão, que envelhece a cada modelo novo. Decidir entre: (a) entram no mesmo fix, por mapa; (b) ficam de fora, com a subcontagem aceita e **documentada** como limite conhecido; (c) o schema passa a admitir família estrutural **declarada** por revisor.
-
-**Cuidado de método:** família de **destino** (o provedor, consumida pelo gate de autorização) e família **estrutural** (a linhagem, consumida pelo piso de diversidade) são eixos distintos. O campo `family` do `preferred-reviewers.json` segue sendo o de destino; o fix é no resolvedor do piso, **não** no gate.
+**Cuidado de método:** Provedor de Destino (governança de rede / gate de confidencialidade / semáforo) e Criador do Modelo (independência cognitiva no piso) são eixos formalmente separados na taxonomia dos 4 substantivos. O gate continua soberano e deriva o provedor do prefixo cru, enquanto `Get-LlmDelegateTargetFamily` alimenta o piso de diversidade.
 
 **Origem:** achado ao conferir a lista de revisores preferidos em 2026-08-16, depois de o usuário fixar o critério «diversidade de **linhagem**, não de provedor». Precedente: o mesmo modo de falha já corrigido para `antigravity/*`.
 

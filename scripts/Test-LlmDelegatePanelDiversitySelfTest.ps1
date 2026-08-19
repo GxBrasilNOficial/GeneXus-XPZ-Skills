@@ -81,4 +81,47 @@ $r11 = Invoke-Diversity '[{"targetModelKey":"unknown","verdict":"allow"},{"targe
 Assert-True ($r11.state -eq 'panelReady') "Caso 11: chave 'unknown' sem barra deve contar como familia propria; veio '$($r11.state)'."
 Assert-True (@($r11.dispatchable).Count -eq 2) "Caso 11: ambos candidatos devem ser dispatchable; veio '$(@($r11.dispatchable).Count)'."
 
+# (12) nvidia/minimaxai/* vs nvidia/z-ai/* sao 2 criadores distintos (minimaxai vs z-ai) -> panelReady
+$r12 = Invoke-Diversity '[{"targetModelKey":"nvidia/minimaxai/minimax-m3","verdict":"allow"},{"targetModelKey":"nvidia/z-ai/glm-5.2","verdict":"allow"}]'
+Assert-True ($r12.state -eq 'panelReady') "Caso 12: nvidia/minimaxai e nvidia/z-ai sao criadores distintos; esperado panelReady; veio '$($r12.state)'."
+Assert-True (@($r12.distinctFamiliesAllow).Count -eq 2) "Caso 12: esperado 2 distinctFamiliesAllow; veio '$(@($r12.distinctFamiliesAllow).Count)'."
+
+# (13) nvidia/meta/* vs meta/* direto compartilham criador meta -> insufficientDiversity
+$r13 = Invoke-Diversity '[{"targetModelKey":"nvidia/meta/llama-3.3-70b-instruct","verdict":"allow"},{"targetModelKey":"meta/llama-3.3-70b-instruct","verdict":"allow"}]'
+Assert-True ($r13.state -eq 'insufficientDiversity') "Caso 13: nvidia/meta e meta direto compartilham criador meta; esperado insufficientDiversity; veio '$($r13.state)'."
+
+# (14) normalizacao canonica de sub-org: nvidia/deepseek-ai/* colapsa em deepseek
+$r14 = Invoke-Diversity '[{"targetModelKey":"nvidia/deepseek-ai/deepseek-r1","verdict":"allow"},{"targetModelKey":"deepseek/deepseek-r1","verdict":"allow"}]'
+Assert-True ($r14.state -eq 'insufficientDiversity') "Caso 14: deepseek-ai e deepseek normalizam para o mesmo criador; esperado insufficientDiversity; veio '$($r14.state)'."
+
+# (15) normalizacao canonica de sub-org: nvidia/mistralai/* colapsa em mistral
+$r15 = Invoke-Diversity '[{"targetModelKey":"nvidia/mistralai/mistral-large","verdict":"allow"},{"targetModelKey":"mistral/mistral-large","verdict":"allow"}]'
+Assert-True ($r15.state -eq 'insufficientDiversity') "Caso 15: mistralai e mistral normalizam para o mesmo criador; esperado insufficientDiversity; veio '$($r15.state)'."
+
+# (16) normalizacao canonica de sub-org: nvidia/qwen/* colapsa em alibaba
+$r16 = Invoke-Diversity '[{"targetModelKey":"nvidia/qwen/qwen2.5-coder-32b","verdict":"allow"},{"targetModelKey":"alibaba/qwen2.5-coder-32b","verdict":"allow"}]'
+Assert-True ($r16.state -eq 'insufficientDiversity') "Caso 16: qwen e alibaba normalizam para o mesmo criador; esperado insufficientDiversity; veio '$($r16.state)'."
+
+# (17) nvidia/nvidia/* (Nemotron) vs nvidia/minimaxai/* sao 2 criadores distintos (nvidia vs minimaxai)
+$r17 = Invoke-Diversity '[{"targetModelKey":"nvidia/nvidia/nemotron-3-super-120b-a12b","verdict":"allow"},{"targetModelKey":"nvidia/minimaxai/minimax-m3","verdict":"allow"}]'
+Assert-True ($r17.state -eq 'panelReady') "Caso 17: nvidia/nvidia e nvidia/minimaxai sao criadores distintos; esperado panelReady; veio '$($r17.state)'."
+
+# (18) chave nvidia de 2 niveis (ex.: nvidia/nemotron-*) resolve criador nvidia
+$r18 = Invoke-Diversity '[{"targetModelKey":"nvidia/nemotron-3-super-120b-a12b","verdict":"allow"},{"targetModelKey":"google/gemini-3-flash-preview","verdict":"allow"}]'
+Assert-True ($r18.state -eq 'panelReady') "Caso 18: chave nvidia de 2 niveis deve resolver criador nvidia; veio '$($r18.state)'."
+Assert-True (@($r18.distinctFamiliesAllow) -contains 'nvidia') "Caso 18: distinctFamiliesAllow deve conter 'nvidia'."
+
+# (19) sub-org desconhecida sob nvidia usa o 2o segmento as-is
+$r19 = Invoke-Diversity '[{"targetModelKey":"nvidia/custom-lab/model-x","verdict":"allow"},{"targetModelKey":"google/gemini-3-flash-preview","verdict":"allow"}]'
+Assert-True ($r19.state -eq 'panelReady') "Caso 19: sub-org desconhecida deve contar como criador proprio; veio '$($r19.state)'."
+Assert-True (@($r19.distinctFamiliesAllow) -contains 'custom-lab') "Caso 19: distinctFamiliesAllow deve conter 'custom-lab'."
+
+# (20) antigravity/gpt-* colapsa em openai
+$r20 = Invoke-Diversity '[{"targetModelKey":"antigravity/gpt-5-preview","verdict":"allow"},{"targetModelKey":"openai/gpt-5.5","verdict":"allow"}]'
+Assert-True ($r20.state -eq 'insufficientDiversity') "Caso 20: antigravity/gpt-* e openai compartilham criador openai; esperado insufficientDiversity; veio '$($r20.state)'."
+
+# (21) antigravity com modelo desconhecido preserva default historico google
+$r21 = Invoke-Diversity '[{"targetModelKey":"antigravity/custom-model-y","verdict":"allow"},{"targetModelKey":"google/gemini-3-flash-preview","verdict":"allow"}]'
+Assert-True ($r21.state -eq 'insufficientDiversity') "Caso 21: antigravity com modelo desconhecido deve cair no default google; esperado insufficientDiversity; veio '$($r21.state)'."
+
 Write-Host "OK: Test-LlmDelegatePanelDiversitySelfTest.ps1"
