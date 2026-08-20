@@ -1,5 +1,6 @@
 # Plano de implementação da v1 do daemon `PreToolUse` (auto-allow) do Claude Code
 
+<!-- backend-parity: ignore -->
 > **STATUS: CONGELADO (v2.22) — congelado em 2026-06-29 por Antonio José (antonio@frigobyte.com).**
 > Este é o **plano de implementação** da v1 (o *como construir*), derivado dos designs congelados
 > `claude-code-pretooluse-daemon-design.md` (v4 + §9-0e re-enquadrado) e
@@ -318,6 +319,7 @@ Levantadas pelo painel na confirmação da v2.22, para atenção durante os Pass
 
 ## 6. Proveniência (revisão por pares)
 
+<!-- backend-parity: ignore -->
 Campanha conduzida pela skill `xpz-llm-delegate` sob a régua de `15-revisao-por-pares.md`; acionamento humano.
 Painel de **5 linhagens distintas** (anthropic/Opus 4.8 via subagente nativo; openai/Codex gpt-5.5; e via
 opencode/Ollama-Cloud: Moonshot/kimi-k2.7-code, Z-ai/glm-5.2, DeepSeek/deepseek-v4-pro). O plano iterou v1 →

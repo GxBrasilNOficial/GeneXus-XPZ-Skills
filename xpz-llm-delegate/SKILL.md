@@ -22,7 +22,7 @@ saída) é o mesmo para todos; cada backend só contribui seu **adapter de invoc
 (`Invoke-Codex`, `Invoke-OpenCode`, `Invoke-ClaudeCode`, `Invoke-Copilot`, `Invoke-Gemini` ou `Invoke-Antigravity`) e pelo parâmetro `-Backend`
 do gate — **nunca** pela chave de modelo na política (ver `## ANATOMIA`).
 
-> **Nota de separação conceitual**: O registro do Antigravity como ferramenta de agente gerenciada pela skill `xpz-skills-setup` trata da detecção de instalação, diretórios de skills (`~/.gemini/config/skills/`) e instrucionais globais do Antigravity. Não se confunde com os backends `gemini -p` (backend #5) e Antigravity CLI `agy -p` (backend #6) desta skill, que atuam como adapters de delegação a LLM de forma isolada.
+> <!-- backend-parity: ignore --> **Nota de separação conceitual**: O registro do Antigravity como ferramenta de agente gerenciada pela skill `xpz-skills-setup` trata da detecção de instalação, diretórios de skills (`~/.gemini/config/skills/`) e instrucionais globais do Antigravity. Não se confunde com os backends `gemini -p` (backend #5) e Antigravity CLI `agy -p` (backend #6) desta skill, que atuam como adapters de delegação a LLM de forma isolada.
 
 Esta skill é transversal — opera tanto na **raiz de desenvolvimento das skills XPZ**
 quanto, com regras mais estreitas, em sessão dentro de uma **pasta paralela de KB**.
@@ -56,7 +56,7 @@ Regra prática para o agente consumidor:
    concluir `hasPreferences=false` a partir disso é anti-padrão; a **única** fonte de verdade é o
    `hasPreferences` devolvido pelo resolvedor. O mesmo vale para o `capabilities.json` (mesmo
    diretório machine-level).
-3. Se não houver lista, perguntar ao usuário quais ferramentas/modelos ele tem disponíveis ou
+3. <!-- backend-parity: ignore --> Se não houver lista, perguntar ao usuário quais ferramentas/modelos ele tem disponíveis ou
    prefere, usando nomes reconhecíveis: `Claude Code`, `opencode/Ollama Cloud`, `Codex`,
    `Copilot`, `Gemini`, `Antigravity CLI`, ou subagente nativo da ferramenta atual. A pergunta deve calibrar
    preferência humana, não enumerar tudo que está instalado como menu prescritivo. Backend
@@ -141,6 +141,7 @@ A skill separa **quatro eixos independentes** (formalizados nos 4 substantivos c
 
 > **Nota de mapeamento no código:** Nos scripts e contratos JSON legados, a propriedade `family` e a função `Get-LlmDelegateTargetFamily` representam o **Criador do Modelo** (substantivo #3). A "Família do Modelo" (#4) é categoria descritiva e não é resolvida mecanicamente. O gate de confidencialidade deriva o provedor de destino diretamente do prefixo cru da chave de modelo (`targetModelKey`), nunca da função de criador.
 
+<!-- backend-parity: ignore -->
 **Invariante de destino (a regra que evita o erro):** a chave de modelo no gate e na
 política é o **`provider/modelo` de DESTINO** — para onde o tráfego vai. Adapters diferentes
 que enviam para o **mesmo** provider normalizam para a **mesma** chave; o backend/adapter
@@ -195,7 +196,7 @@ Scripts do gate (em `scripts/`, na raiz do repositório):
 - `Resolve-CopilotModelLocality.ps1 [-Model <m>]` → JSON `{ locality, canonicalModel, reason }`. Backend Copilot; `canonicalModel` casa `github-copilot/<modelo>`.
 - `Resolve-GeminiModelLocality.ps1 [-Model <m>]` → JSON `{ locality, canonicalModel, reason }`. Backend Gemini; `canonicalModel` casa `google/<modelo>`.
 - `Resolve-AntigravityModelLocality.ps1 [-Model <m>]` → JSON `{ locality, canonicalModel, reason }`. Backend Antigravity; `canonicalModel` casa `antigravity/<modelo>`.
-- `Resolve-LlmDelegateAuthorization.ps1 [-Model <m>] -PayloadSensitivity <kb-sensitive|public> [-Backend <opencode|codex|claude-code|copilot|gemini|antigravity>] [-Oss] [-LocalProvider <p>] [-Profile <id>] [-ConfigPath <opencode.json|config.toml>] [-PolicyPath <json>] [-ParallelKbRoot <dir>]` → JSON `{ verdict: allow|ask|deny, targetModelKey, policyNameStatus, ... }`. Núcleo backend-agnóstico; seleciona o resolvedor por `-Backend` e casa a política pela chave de destino. `-ConfigPath` é repassado ao resolvedor de localidade (config do backend: `opencode.json` no opencode, `config.toml` no codex). Com `-ParallelKbRoot` (e sem `-PolicyPath`), descobre a política pelo nome canônico com fallback ao legado e reporta `policyNameStatus`; `-PolicyPath` explícito prevalece.
+- <!-- backend-parity: ignore --> `Resolve-LlmDelegateAuthorization.ps1 [-Model <m>] -PayloadSensitivity <kb-sensitive|public> [-Backend <opencode|codex|claude-code|copilot|gemini|antigravity>] [-Oss] [-LocalProvider <p>] [-Profile <id>] [-ConfigPath <opencode.json|config.toml>] [-PolicyPath <json>] [-ParallelKbRoot <dir>]` → JSON `{ verdict: allow|ask|deny, targetModelKey, policyNameStatus, ... }`. Núcleo backend-agnóstico; seleciona o resolvedor por `-Backend` e casa a política pela chave de destino. `-ConfigPath` é repassado ao resolvedor de localidade (config do backend: `opencode.json` no opencode, `config.toml` no codex). Com `-ParallelKbRoot` (e sem `-PolicyPath`), descobre a política pelo nome canônico com fallback ao legado e reporta `policyNameStatus`; `-PolicyPath` explícito prevalece.
 
 Lógica do gate:
 
@@ -236,6 +237,7 @@ Resolução do modelo na política: chave exata → curinga `provider/*` → cur
 `defaultExternal` → `ask` (quando não há arquivo). Valores válidos por entrada:
 `allow-external`, `deny-external`, `ask`.
 
+<!-- backend-parity: ignore -->
 A chave é sempre o **provider de destino** (ver `## ANATOMIA`), não o backend. O Codex com
 `gpt-5.5` casa `openai/gpt-5.5` / `openai/*` — as **mesmas** entradas que governam o opencode
 quando manda para a OpenAI. Não existe (nem deve existir) prefixo `codex/` na política.
@@ -314,6 +316,7 @@ Backend codex (`codex exec`, default da própria ferramenta/config quando `-Mode
 - `Watch-CodexJob.ps1 -JobId <guid> -ProcessId <pid> [-TempDir <path>] [-IntervalSeconds <1-30>] [-SilenceThresholdSeconds <30-3600>]` — monitor incremental do stream `--json`; grava `<GUID>.result.json` ao fim (`status`, `finalText`, `error`, `inputTokens`, `outputTokens`).
 - `CodexCliSupport.ps1` (dot-source) — descoberta **fail-closed** do `codex.exe` compatível: prefere o executável canônico `%LOCALAPPDATA%\OpenAI\Codex\bin\codex.exe` quando responde a `--version`, exclui diretórios `backup-*` e só então recorre aos subdiretórios não-backup pela maior versão utilizável; ignora o shim npm do PATH.
 
+<!-- backend-parity: ignore -->
 Nota de default de modelo: `Invoke-OpenCode.ps1` e `Invoke-Codex.ps1` seguem o mesmo contrato.
 Se `-Model` for omitido, o adapter não força modelo e deixa o default da ferramenta/config valer.
 `gpt-5.5` permanece apenas como exemplo/sugestão de revisor Codex no painel reforçado, não como
@@ -362,6 +365,7 @@ Backend Antigravity CLI (`agy -p`, externo Antigravity/Google):
 
 Em falha, o mesmo envelope traz `status="ERROR"`, `response=""` e `error` com o motivo — e o processo sai com **exit code ≠ 0**. Ou seja, o caminho de erro que o CLI realmente usa é o do exit code (tratado antes do parse, com `Get-AntigravityErrorMessage`); o guard de `status != SUCCESS` no adapter é **defesa em profundidade** para um exit 0 com status de erro, não o fluxo observado. Campos além de `status`/`response` não são consumidos pelo adapter.
 
+<!-- backend-parity: ignore -->
 Latência por provedor: modelos externos OAuth (`openai/*`, Codex externo; `anthropic/*`,
 Opus 4.8 do Claude Code; `github-copilot/*`; `google/*`) podem passar de 180s — ajustar `-TimeoutSec`; `ollama-cloud/*` e
 `opencode-go/*` costumam responder mais rápido.
@@ -390,7 +394,7 @@ Sondagem de capacidade (para a oferta de revisão por pares — ver [`15-revisao
 - `Build-LlmDelegateCapabilityManifest.ps1 [-OutputPath <json>] [-SnapshotPath <json>] [-OpenCodeConfigPath <opencode.json|jsonc>] [-CodexConfigPath <config.toml>] [-ClaudeSettingsPath <settings.json>] [-ClaudeStatsCachePath <stats.json>] [-AntigravityExe <path>]` — sonda os backends instalados e enumera capacidade **sem fabricar provider**: opencode lê JSON/JSONC; Codex usa `config.toml`/resolvedor e deixa provider `unknown` quando a fonte não prova o destino; Claude Code combina settings configurado (`sourceKind=configured`, `sourceConfidence=strong`) com cache histórico (`historical`, `weak`, `availableInManifest=false`, `enumeration=settings-or-historical`); Antigravity CLI sonda modelos via `agy models` (`enumeration=cli`, `sourceConfidence=strong`) — **a única sondagem que executa um CLI e espera resposta de rede**, por isso com **teto de tempo de 20s** (`Start-Process` + `WaitForExit` + `Kill`): estouro ou erro degrada esse backend para `enumeration=none-native` sem travar o manifesto nem os demais (`-AntigravityProbeTimeoutSec` é TEST-ONLY, para o self-test provar o corte sem esperar o teto real); Copilot/Gemini seguem como capacidade sem enumeração nativa forte (`enumeration=none-native`). Grava manifesto sanitizado machine-level (default `%LOCALAPPDATA%\xpz-llm-delegate\capabilities.json`) com `backend`, `targetModelKey`, `canonicalModel`, `provider`, `family`, `sourceKind`, `sourceConfidence`, `availableInManifest`, `locality`, `reasonCode`, `hardVeto` e `diagnostics` — **nunca** token, chave, baseURL, header, path de config, prompt ou política. É **dica de oferta**: o gate (`Resolve-LlmDelegateAuthorization.ps1`) **não** o consome — reavalia destino e sensibilidade sempre. Self-test `Test-LlmDelegateCapabilityManifestSelfTest.ps1`.
 - `Set-LlmDelegatePreferredReviewers.ps1 -ReviewersJson <json> [-OutputPath <json>] [-Preview]` — persiste a **curadoria** de revisores preferidos do usuário em `%LOCALAPPDATA%\xpz-llm-delegate\preferred-reviewers.json` (machine-level), schema v2: metadados `updatedAt` e `migratedFrom` (schema de origem; `1` quando ausente), titulares validados e ordenados por `rank` positivo/único (`rank` omitido é atribuído depois do maior `rank` explícito válido), `targetModelKey`, `backend`, `invokeArgs.backend` e `fallbackChain[]` ordenado `0..N`. Cada fallback é revisor completo (`backend`, `targetModelKey`, `invokeArgs`) e não herda implicitamente do titular; `invokeArgs` é sanitizado (`backend`/`model`/`profile`/`oss`/`localProvider`/`timeoutSec`; **nunca** token/baseURL/header/path). `fallbackPolicy` é restrito ao contrato suportado pelo dispatcher (`ordered-chain`, ativação em `quota`/`timeout`/`error`/`unavailable`, `gateAsk=ask-human`, `gateDeny=stop-or-suggest-manual-alternative`). Bloqueia veto duro, backend inválido, rank inválido/duplicado, política de fallback divergente, divergência `backend` × `invokeArgs.backend`, duplicidade/ciclo na cadeia e escreve com backup + substituição atômica, limpando o `.tmp-*` em falha; `-Preview` valida e mostra a forma normalizada sem gravar.
 - `Resolve-LlmDelegatePreferredReviewers.ps1 [-PreferredPath <json>] [-CapabilitiesPath <json>]` — lê curadoria v1 legada ou v2, cruza com `capabilities.json` (`availableInManifest`, `capability`, `diagnostics`, best-effort) e devolve a **composição sugerida** do painel com `schemaVersion`, `updatedAt`, `migratedFrom`, titulares ordenados por `rank` e `fallbackChain` resolvida. Sem arquivo → `hasPreferences=false`. Bloqueia antes do dispatcher hard veto, rank inválido/duplicado, `fallbackPolicy` fora do contrato suportado, ciclo/duplicidade e divergência `invokeArgs.backend != backend`. **Invariante: preferência ≠ autorização** — não consome o manifesto como verdade do gate; o `Resolve-LlmDelegateAuthorization.ps1` reavalia **por revisor** no envio. Self-test `Test-LlmDelegatePreferredReviewersSelfTest.ps1`.
-- `Resolve-LlmDelegatePanelDiversity.ps1 -CandidatesJson <json> [-Floor <n>] [-AuthorFamily <fam>]` — avalia (consultivo) o **piso de diversidade** do painel (≥2 Criadores de Modelo distintos, onde a família reflete o Criador do Modelo resolvido via `Get-LlmDelegateTargetFamily`, ex.: `google` para `antigravity/gemini-*`, `anthropic` para `antigravity/claude-*`, `openai` para `openai/*`, `minimaxai` para `nvidia/minimaxai/*` e `z-ai` para `nvidia/z-ai/*` com normalização canônica) a partir dos candidatos + vereditos do gate ou estados pós-despacho. Ignora candidatos com `countsForDiversity=false` (ex.: `skippedAfterSuccess`, `skippedByPolicy`, `notAttempted`) e devolve `insufficientDiversityAfterFallback` quando houve fallback/skip auditável mas as famílias efetivamente respondidas ficaram abaixo do piso. **Não** decide autorização (o gate é soberano). Self-test `Test-LlmDelegatePanelDiversitySelfTest.ps1`.
+- <!-- backend-parity: ignore --> `Resolve-LlmDelegatePanelDiversity.ps1 -CandidatesJson <json> [-Floor <n>] [-AuthorFamily <fam>]` — avalia (consultivo) o **piso de diversidade** do painel (≥2 Criadores de Modelo distintos, onde a família reflete o Criador do Modelo resolvido via `Get-LlmDelegateTargetFamily`, ex.: `google` para `antigravity/gemini-*`, `anthropic` para `antigravity/claude-*`, `openai` para `openai/*`, `minimaxai` para `nvidia/minimaxai/*` e `z-ai` para `nvidia/z-ai/*` com normalização canônica) a partir dos candidatos + vereditos do gate ou estados pós-despacho. Ignora candidatos com `countsForDiversity=false` (ex.: `skippedAfterSuccess`, `skippedByPolicy`, `notAttempted`) e devolve `insufficientDiversityAfterFallback` quando houve fallback/skip auditável mas as famílias efetivamente respondidas ficaram abaixo do piso. **Não** decide autorização (o gate é soberano). Self-test `Test-LlmDelegatePanelDiversitySelfTest.ps1`.
 - `Resolve-LlmDelegatePeerReviewCloseout.ps1 -HadPreferredReviewers <true|false> -ManualReviewerSelection <true|false> [-PreferredReviewersOfferState not_made|offered|accepted|declined|deferred|not_applicable] [-SelectedReviewersJson <json>] [-PreferredReviewerStatesJson <json>] [-DiversityState <state>] [-RoundId <id>] [-VNextState notProduced|pendingResubmission|resubmitted|resubmissionDeclinedByHuman] [-ResubmissionDeclinedBy <quem>] [-ResubmissionDeclineReason <motivo>]` — verifica o **fechamento** da revisão por pares: se não havia `preferred-reviewers.json` e houve escolha manual de revisores, bloqueia o recibo final enquanto a oferta de salvar essa seleção não tiver sido feita; se havia `preferred-reviewers.json`, `-SelectedReviewersJson` é obrigatório e deve conter a lista esperada da rodada; se a seleção manual informou `SelectedReviewersJson`, essa lista também vira contrato de completude. Em ambos os casos, expande titulares + `fallbackChain[]` e bloqueia estado ausente, duplicado ou sem correspondente (identidade por `backend`/`targetModelKey`/`attemptRole`/`fallbackOf`), estado incompleto (`gateAllow`, `dispatched`, `enqueued`) e `notAttempted` como estado primário silencioso. Estados finais de fallback incluem `quota`, `skippedAfterSuccess`, `skippedByPolicy` e `notAttempted`; skips precisam ter `countsForDiversity=false`. `-DiversityState insufficientDiversityAfterFallback` bloqueia o fechamento. **Eixo de estado da vN+1 (Achado A):** `pendingResubmission` bloqueia; `resubmissionDeclinedByHuman` bloqueia sem quem/motivo/`RoundId`; `resubmitted`/`notProduced` são neutros. O recibo ecoa `attemptRole`, `fallbackOf`, `countsForDiversity`, `expectedPreferredReviewerStates`, `preferredReviewerStates` e `vNextState`. Self-test `Test-LlmDelegatePeerReviewCloseoutSelfTest.ps1`.
 
 Harness de disparo do painel (orquestração mecânica — ver `### Harness de disparo do painel`):
@@ -399,6 +403,7 @@ Harness de disparo do painel (orquestração mecânica — ver `### Harness de d
 
 `-ManuscriptText` é reservado para payload curto. Para dossiê/manuscrito grande, use `-ManuscriptPath` para evitar o limite de linha de comando do Windows; origem ausente, origem ambígua e inline grande retornam JSON estruturado (`manuscript-source-missing`, `manuscript-source-ambiguous`, `manuscript-text-too-large`).
 
+<!-- backend-parity: ignore -->
 **Três artefatos distintos** (não confundir): **política por-KB** (`llm-delegation-policy.json`, autorização durável, raiz da pasta paralela) ≠ **capacidade** (`capabilities.json`, probe do instalado, machine-level) ≠ **preferência** (`preferred-reviewers.json`, curadoria do usuário, machine-level). A curadoria v2 é lista de **titulares** ordenados (`rank`) com `fallbackChain[]` por titular; fallback é substituto auditável, não autorização, não pool opcional e não reduz o piso de diversidade. A curadoria é **ofertada, nunca gravada automaticamente**, em quatro momentos: (a) no 1º uso de revisão por pares sem lista — pergunta *just-in-time* antes de oferecer painel e, depois que o usuário escolher revisores para a rodada, oferta separada para salvar essa seleção; (b) opt-in na `xpz-skills-setup` (setup de máquina); (c) recalibração sob demanda ou por defasagem (`updatedAt`); (d) quando uma seleção manual recorrente divergir da lista existente e o usuário pedir ou confirmar recalibração. Sem lista, o agente não deve presumir assinatura de Gemini/Copilot/Codex cloud nem ignorar `Claude Code`/`opencode`; pergunta ao usuário quais revisores estão disponíveis/preferidos e então roda o gate por destino.
 
 **Quatro eixos na seleção de revisores** (não confundir):
@@ -484,6 +489,7 @@ piso de "≥2 famílias efetivamente consultadas" (ver [`15-revisao-por-pares.md
 recibo). Preferência continua subordinada à política de papel e
 ao gate.
 
+<!-- backend-parity: ignore -->
 Sem `preferred-reviewers.json`, o agente não deve recomendar composição padrão com Gemini,
 Copilot, Codex cloud ou qualquer externo só porque o backend foi detectado ou o gate devolveu
 `allow`/`ask`. A pergunta correta é de calibração: quais ferramentas o usuário tem e quer usar.
@@ -576,11 +582,11 @@ decisão humana sobre redisparo isolado         │    gateAsk,gateDeny,skippedA
 ```
 
 - **Preparação de artefatos:** o harness aceita `-ManuscriptPath` legado ou `-ManuscriptText` para payload curto; para dossiê/manuscrito grande, use `-ManuscriptPath` para evitar o limite de linha de comando do Windows. Com `-ManuscriptText`, antes de qualquer gate/despacho ele chama `New-LlmDelegatePeerReviewArtifacts.ps1`, que publica `manuscript.md`, `reviewers.json` e `preparation-manifest.json` sob `<TempDir>/<RoundId>`; falha nessa etapa termina com resumo estruturado do próprio dispatcher (`roundStarted=false`, `dispatchStarted=false`, zero revisores despachados).
-- **Modelo efetivo:** opencode = `invokeArgs.model` ou o `targetModelKey` de **entrada** (o resolvedor opencode exige `-Model`; o gate recebe o mesmo valor); codex = `invokeArgs.model` ou, se ausente, gate **sem** `-Model` → último segmento do `targetModelKey` retornado; claude-code/copilot/gemini/antigravity = `invokeArgs.model` **obrigatório** (ausente → `state=error` fail-closed). `targetModelKey` nulo onde exigido (opencode/codex) → `state=error`.
+- <!-- backend-parity: ignore --> **Modelo efetivo:** opencode = `invokeArgs.model` ou o `targetModelKey` de **entrada** (o resolvedor opencode exige `-Model`; o gate recebe o mesmo valor); codex = `invokeArgs.model` ou, se ausente, gate **sem** `-Model` → último segmento do `targetModelKey` retornado; claude-code/copilot/gemini/antigravity = `invokeArgs.model` **obrigatório** (ausente → `state=error` fail-closed). `targetModelKey` nulo onde exigido (opencode/codex) → `state=error`.
 - **`responded` é MECÂNICO** (texto não-vazio), **não** «parecer válido»: o harness não inspeciona o conteúdo. A reclassificação `responded`→`noResponse` (revisor off-task **ou on-task raquítico**) é **post-hoc do orquestrador** antes do closeout (`15-revisao-por-pares.md`, `## Recibo e livro-razão`) — um off-task **ou parecer raquítico** não soma para o piso.
-- **Contenção = trava fail-closed PER-BACKEND (Posição B, decisão de segurança):** as chaves de contenção do backend que as aceita — claude-code `{permissionMode,tools,maxTurns}` (`maxTurns` é **chave morta** desde 2026-07-25: o adapter não tem mais esse parâmetro, e a chave segue recusada só por precaução), opencode `{agent}`, gemini `{approvalMode != plan}`, antigravity `{mode,agent,approvalMode}` — são **recusadas** (`securityBlockedArgs`) e **não** repassadas ao adapter; o mesmo vale, no Claude Code de painel, para chaves internas do adapter assíncrono (`SidecarPath`, `RetentionMode`, `TempDir`, `CircuitStateRoot`, `ClaudeExe`, `MessagePath`/`Message`). O despacho segue com os **defaults seguros** do adapter. **O default seguro do opencode é agora o agente `reviewer-ro` least-privilege** (default escopado + guard fail-closed no adapter — ver «OPENCODE — REVISOR LEAST-PRIVILEGE»); como o painel bloqueia `{agent}`, o revisor opencode **sempre** cai no `reviewer-ro`. O harness **nunca** expõe nem relaxa contenção ou artefatos internos. `approvalMode=plan` (gemini, o default) → `droppedArgs` silencioso; codex/copilot não têm parâmetro de contenção (chave estranha → `droppedArgs`).
+- <!-- backend-parity: ignore --> **Contenção = trava fail-closed PER-BACKEND (Posição B, decisão de segurança):** as chaves de contenção do backend que as aceita — claude-code `{permissionMode,tools,maxTurns}` (`maxTurns` é **chave morta** desde 2026-07-25: o adapter não tem mais esse parâmetro, e a chave segue recusada só por precaução), opencode `{agent}`, gemini `{approvalMode != plan}`, antigravity `{mode,agent,approvalMode}` — são **recusadas** (`securityBlockedArgs`) e **não** repassadas ao adapter; o mesmo vale, no Claude Code de painel, para chaves internas do adapter assíncrono (`SidecarPath`, `RetentionMode`, `TempDir`, `CircuitStateRoot`, `ClaudeExe`, `MessagePath`/`Message`). O despacho segue com os **defaults seguros** do adapter. **O default seguro do opencode é agora o agente `reviewer-ro` least-privilege** (default escopado + guard fail-closed no adapter — ver «OPENCODE — REVISOR LEAST-PRIVILEGE»); como o painel bloqueia `{agent}`, o revisor opencode **sempre** cai no `reviewer-ro`. O harness **nunca** expõe nem relaxa contenção ou artefatos internos. `approvalMode=plan` (gemini, o default) → `droppedArgs` silencioso; codex/copilot não têm parâmetro de contenção (chave estranha → `droppedArgs`). Governança de `$ContentionKeys`: O conjunto `$ContentionKeys` de cada adapter é derivado da inspeção de `--help` da versão instalada do CLI do backend e de seus aliases/equivalências de flags (ex.: `--print`/`--prompt`, `--mode plan`/`--mode=plan`, `--sandbox read-only`). Qualquer novo backend ou evolução de CLI existente deve ter suas chaves de contenção e equivalências mapeadas explicitamente no topo de `Invoke-LlmDelegatePanelDispatch.ps1`, validadas pelo `Test-InvokeLlmDelegatePanelDispatchSelfTest.ps1`.
 - **Claude Code no painel:** o backend não usa o adapter síncrono; usa `Invoke-ClaudeCodeAsync.ps1`, que lê `stream-json`, grava sidecar técnico atômico (`claude-code-async-sidecar`, `SchemaVersion=1`) e só envia ao stdout o texto final aceito quando `resultAccepted=true`. O aceite exige texto não vazio e evento terminal `type=result`, `subtype=success`, `is_error=false`; texto parcial seguido de timeout, encerramento sem terminal válido ou falha de limpeza sensível vira `failureAfterText`/erro, sem stdout aceito. O dispatcher valida o sidecar antes de projetar estados: `completed+true→responded`, `completed+false→error`, `timeout→timeout`, `quota→quota`, `unavailable→unavailable`, `internalError→error`; `cancelled` é inesperado e vira `error`. `panel-summary.json` é `SchemaVersion=2` em sucesso e falhas estruturadas, enquanto `manifest.json` e o preparador mantêm seus schemas próprios. Em `kb-sensitive`, texto bruto parcial não persiste; hashes de stream/stderr são omitidos e o único texto bruto aceito é o `.verdict.txt`.
-- **Fontes de `unavailable`:** opencode em `kb-sensitive` → `unavailable` (sem gate/despacho); no Claude Code, um `stderr` que casa o detector **heurístico** de **recusa** por workspace não confiável — avaliado só depois de descartado o ruído de ambiente, que aparece inclusive em execução bem-sucedida — emite `workspace-not-trusted` e é classificado como `unavailable`. Fora do painel, a mensagem canônica preserva o `stderr` bruto e instrui o agente a pedir ao usuário, antes de compartilhar e após remoção de segredos, o texto bruto, `claude --version` e o contexto Desktop/CLI. Assim a próxima ocorrência gera evidência para melhorar o detector sem o agente marcar confiança automaticamente. O bloqueio padrão de leitura fora do cwd pelo agente custom do opencode **está ATIVO** (default `reviewer-ro` sem execução/escrita, `external_directory[*]=deny` para leitura fora do cwd herdado, com exceções internas do opencode observadas nos fixtures 1.17.20); liberar opencode em `kb-sensitive`/pasta paralela + mecanizar cwd-seguro ficou **ADIADO** (`999-ideias-pendentes.md`, eixo de leitura). O recorte `.env` dentro do cwd é **urgente**: o OpenCode 1.17.20 traz `read "*.env" -> ask`, mas o bloco posterior do `reviewer-ro` tende a reabrir `read "*" -> allow`; não usar cwd com `.env` real até a frente ser resolvida. O adapter opencode **não** tem `-Cd` (por isso nunca o recebe; o bloqueio padrão é relativo ao cwd HERDADO); os demais (codex/claude-code/gemini/copilot/antigravity) recebem `-Cd` por precedência (explícito → `ParallelKbRoot` em `kb-sensitive` → cwd em `public`) com **fail-closed** quando `kb-sensitive` e faltam ambos.
+- <!-- backend-parity: ignore --> **Fontes de `unavailable`:** opencode em `kb-sensitive` → `unavailable` (sem gate/despacho); no Claude Code, um `stderr` que casa o detector **heurístico** de **recusa** por workspace não confiável — avaliado só depois de descartado o ruído de ambiente, que aparece inclusive em execução bem-sucedida — emite `workspace-not-trusted` e é classificado como `unavailable`. Fora do painel, a mensagem canônica preserva o `stderr` bruto e instrui o agente a pedir ao usuário, antes de compartilhar e após remoção de segredos, o texto bruto, `claude --version` e o contexto Desktop/CLI. Assim a próxima ocorrência gera evidência para melhorar o detector sem o agente marcar confiança automaticamente. O bloqueio padrão de leitura fora do cwd pelo agente custom do opencode **está ATIVO** (default `reviewer-ro` sem execução/escrita, `external_directory[*]=deny` para leitura fora do cwd herdado, com exceções internas do opencode observadas nos fixtures 1.17.20); liberar opencode em `kb-sensitive`/pasta paralela + mecanizar cwd-seguro ficou **ADIADO** (`999-ideias-pendentes.md`, eixo de leitura). O recorte `.env` dentro do cwd é **urgente**: o OpenCode 1.17.20 traz `read "*.env" -> ask`, mas o bloco posterior do `reviewer-ro` tende a reabrir `read "*" -> allow`; não usar cwd com `.env` real até a frente ser resolvida. O adapter opencode **não** tem `-Cd` (por isso nunca o recebe; o bloqueio padrão é relativo ao cwd HERDADO); os demais (codex/claude-code/gemini/copilot/antigravity) recebem `-Cd` por precedência (explícito → `ParallelKbRoot` em `kb-sensitive` → cwd em `public`) com **fail-closed** quando `kb-sensitive` e faltam ambos.
 - **Fallback de curadoria v2:** depois da rodada dos titulares, o harness ativa `fallbackChain` em ordem para falha técnica/indisponibilidade emitida pelo dispatcher (`quota`, `timeout`, `error`, `unavailable`). Sinais explícitos de falta de saldo/cota/limite (`402`, `429`, `Payment Required`, `insufficient coding plan balance`, `quota`, `rate limit`, `resource_exhausted`, `credits`/`balance`/`saldo` + `exhausted`, `too many requests`, `weekly usage limit`, `limite de uso`, `sem quota`, `saldo insuficiente`) viram `quota`; **`exhausted` sozinho não conta** — erro genérico de rede ou contexto (`retries exhausted`, `connection pool exhausted`, `context window exhausted`) é `error`, para não mandar o operador esperar reset de ciclo por falha que não é de cota (caso negativo travado em `Test-InvokeLlmDelegatePanelDispatchSelfTest.ps1`); a recusa canônica `workspace-not-trusted` vira `unavailable`. No Claude Code, o circuito durável de cota bloqueia antes de spawn/prompt por chave-base (não por `rateLimitType`) e varre variantes da chave; `state-json-invalid` é evidência por variante e não é apagado automaticamente. Bloqueio pré-spawn/prompt suprime fallback automático sem regra explícita (`fallbackSuppressedReason=pre-dispatch-block-not-fallback-safe`). Sucesso do titular gera `skippedAfterSuccess`; `gateAsk`, `gateDeny` e bloqueio de validação pré-despacho geram `skippedByPolicy`. Fallback respondido herda a regra de parecer utilizável do orquestrador e pode contar diversidade; skips e `notAttempted` sempre têm `countsForDiversity=false`. `noResponse` fica reservado à reclassificação pós-hoc do orquestrador quando houve texto sem parecer utilizável; não é gatilho primário do dispatcher.
 - **Recibo humano de `quota`:** o estado `quota` é **categoria operacional**, não diagnóstico de
   periodicidade. No recibo final, escrever "bateu limite de uso" ou "retornou limite de uso" e
@@ -617,6 +623,7 @@ A allowlist do harness (Claude Code, Codex, OpenCode, Cursor) casa comandos **at
 
 **`-Cd` (quando o adapter suportar):** Codex, Claude Code, Copilot, Gemini e Antigravity aceitam `-Cd`; **opencode NÃO tem** `-Cd`. Quando suportado, omitir `-Cd` se o `cwd` já é a raiz; preferir apontar o diretório pelo parâmetro `workdir` da própria ferramenta em vez de passar `-Cd` no comando; **nunca** `-Cd` como segundo segmento entre aspas (foi exatamente um `-Cd "<path>"` somado a um prompt inline entre aspas que produziu o caso real de 2026-06-21, ver abaixo).
 
+<!-- backend-parity: ignore -->
 **Ressalva ~32KB (cross-reference):** `-MessagePath` elimina a substituição de comando inline (`(Get-Content)` / `"$(cat ...)"`) **no chamador** em **todos** os adapters; mas só os **stdin-based** (Codex, opencode, Claude Code) também movem o prompt para **fora** do `argv` (escapam do teto). Nos **argument-based** (Gemini/Copilot/Antigravity) o adapter lê o arquivo e repassa o prompt no `argv` interno — o teto ~32KB permanece, com o guard fail-closed de 30000 chars ativo. `-MessagePath` não levanta o teto nesses três. Ver a seção de limite no `SKILL.md` para detalhe.
 
 **O caso real que motivou o item:** em 2026-06-21, `Invoke-Codex.ps1` foi chamado como:
@@ -641,6 +648,7 @@ auditáveis, como "o XML observado tem `AUTONUMBER=True`", "há N usos encontrad
 do plano é que a descrição curta deva comunicar X". O revisor recebe o manuscrito para confirmar
 ou refutar, não para ratificar conclusão já embalada como verdade.
 
+<!-- backend-parity: ignore -->
 **Blinde o papel do revisor.** O prompt vai a backends **agênticos** (opencode, Codex, Claude Code)
 que podem ler o manuscrito como ordem para **executar** o plano ou **conduzir eles mesmos** uma
 revisão por pares — risco agudo quando o manuscrito é autorreferente (a própria metodologia).
@@ -772,6 +780,7 @@ orquestrador (`15-revisao-por-pares.md`, §Papéis parágrafo «Recibo mínimo o
 descolamento do `ok`/`responded` da matéria do manuscrito, NÃO contagem de chars (ver `15`).** **Não**
 é piso automático — piso/heurística segue **frente aberta** no `999`.
 
+<!-- backend-parity: ignore -->
 **Cobertura por adapter (varredura confirmatória, escopo declarado).** A detecção por `reason`
 acima é **opencode-only** — é fenômeno do **streaming agêntico** do opencode. Nenhum dos demais
 adapters expõe equivalente a `reason=length`, que é o sinal que importa para truncamento. **Ressalva
@@ -800,13 +809,13 @@ Chamado de uma **shell headless sem TTY** (a ferramenta Bash/PowerShell de um ag
 agêntico **trava** lendo o stdin herdado (um pipe aberto que nunca dá EOF): medido — o opencode
 pendurava por minutos. Todos os adapters dão **EOF** ao CLI, por um de dois regimes:
 
-- **stdin-based** (`Invoke-OpenCode`/`Start-OpenCodeJob`, `Invoke-Codex`/`Start-CodexJob`,
+- <!-- backend-parity: ignore --> **stdin-based** (`Invoke-OpenCode`/`Start-OpenCodeJob`, `Invoke-Codex`/`Start-CodexJob`,
   `Invoke-ClaudeCode`/`Start-ClaudeCodeJob`): entregam o prompt **por stdin** via
   `Start-Process -RedirectStandardInput <arquivo>`; o **fim do arquivo dá o EOF**. O prompt fica
   **fora do argv** (ver a seção do limite ~32KB) e vem de `-Message` (inline) ou `-MessagePath`
   (arquivo, exclusivos) — `-MessagePath` muda só a **origem** do texto, não o transporte por stdin. O opencode lê o prompt do stdin quando o
   argumento posicional de `run` é **omitido** (verificado no opencode em uso nesta máquina, 2026-06).
-- **argument-based** (`Invoke-Gemini`, `Invoke-Copilot`, `Invoke-Antigravity`): passam o prompt como **argumento** e
+- <!-- backend-parity: ignore --> **argument-based** (`Invoke-Gemini`, `Invoke-Copilot`, `Invoke-Antigravity`): passam o prompt como **argumento** e
   **fecham o stdin** no runner com `$null | & ([string]$req.exe) @args` (`$null` = EOF puro, sem
   bytes, **não** `'' |`, que mandaria uma linha vazia antes do EOF). O runner é invocado por
   `pwsh -File` (que **não** lê stdin); migrar para `pwsh -Command` reintroduziria o hang.
@@ -828,8 +837,8 @@ pendurava por minutos. Todos os adapters dão **EOF** ao CLI, por um de dois reg
 
 ## LIMITE CONHECIDO — `StandardOutputEncoding` E LINHA DE COMANDO (~32KB)
 
-**Sintoma observado** (relato, não-determinístico): pela ferramenta PowerShell de um agente, "em
-algumas sessões", uma chamada de adapter **argument-based** falhava com exit 1 e
+Sintoma observado (relato, não-determinístico): pela ferramenta PowerShell de um agente, "em
+algumas sessões", uma chamada de adapter argument-based falhava com exit 1 e
 `Program '<cli>.exe' failed to run: StandardOutputEncoding is only supported when standard output
 is redirected`. Pela ferramenta Bash (stdout = pipe) funcionava.
 
@@ -837,7 +846,7 @@ is redirected`. Pela ferramenta Bash (stdout = pipe) funcionava.
   (console-handle) e/ou o prompt grande por argv; **não** reproduzido de forma determinística
   (medições mostraram `[Console]::IsOutputRedirected=True` nas sessões testadas, em que o erro
   **não** ocorre). Tratar como **sintoma observado**, não diagnóstico fechado.
-- **Workaround** para os adapters **argument-based** (`Invoke-Gemini`, `Invoke-Copilot`, `Invoke-Antigravity`): invocá-los
+- <!-- backend-parity: ignore --> **Workaround** para os adapters **argument-based** (`Invoke-Gemini`, `Invoke-Copilot`, `Invoke-Antigravity`): invocá-los
   pela ferramenta **Bash** (ou shell com stdout em **pipe**) e manter o prompt **enxuto**.
 - **opencode resolvido por desenho.** `Invoke-OpenCode` usa `Start-Process -RedirectStandardOutput/-Error`
   direto; `Start-OpenCodeJob` usa um runner mínimo, mas o runner também chama `Start-Process` com
@@ -847,7 +856,7 @@ is redirected`. Pela ferramenta Bash (stdout = pipe) funcionava.
 
 **Limite de ~32KB de linha de comando do Windows** (reproduzível): passar o prompt como
 **argumento** estoura `Argument list too long` acima de ~32767 caracteres.
-- **argument-based** (`Invoke-Gemini`, `Invoke-Copilot`, `Invoke-Antigravity`): o prompt vai no **argv** via runner → o
+- <!-- backend-parity: ignore --> **argument-based** (`Invoke-Gemini`, `Invoke-Copilot`, `Invoke-Antigravity`): o prompt vai no **argv** via runner → o
   teto ~32KB **persiste**. Os três ganharam `-MessagePath` (lê o prompt de arquivo e elimina o
   `(Get-Content)`/`"$(cat ...)"` inline do chamador), mas ele **não** levanta o teto; um **guard de
   tamanho fail-closed** (`$MaxArgvPromptChars = 30000`, **heurístico em chars** — UTF-16 code units,
@@ -855,7 +864,7 @@ is redirected`. Pela ferramenta Bash (stdout = pipe) funcionava.
   recusa prompts grandes com `BLOCK` claro antes do estouro de `Argument list too long`. A migração
   real para **stdin** segue como follow-up (bloqueada por falta de assinatura para validar
   empiricamente) — `999-ideias-pendentes.md`.
-- **stdin-based** (opencode, Codex, ClaudeCode — síncronos e jobs): o prompt vai por **stdin/arquivo**,
+- <!-- backend-parity: ignore --> **stdin-based** (opencode, Codex, ClaudeCode — síncronos e jobs): o prompt vai por **stdin/arquivo**,
   não pelo argv — sem o limite. Use `-MessagePath <arquivo>` (ou `-Message`): além de evitar o limite,
   dispensa `"$(cat ...)"`/`(Get-Content)` na linha de comando do chamador (sem substituição de comando
   = sem prompt de autorização desnecessário no harness).
@@ -872,7 +881,7 @@ gravado **apenas no log próprio** do opencode (`~/.local/share/opencode/log/<ts
   processo por `"statusCode":429` + a mensagem de limite e lança um erro **claro** ("limite de uso
   do provider (HTTP 429)… aguardar o reset do ciclo"), em vez de "excedeu Xs". Self-test
   `Test-OpenCodeUsageLimitDetectionSelfTest.ps1` (token `OPENCODE_USAGE_LIMIT_DETECTION_SELFTEST_OK`).
-- **Não adianta redisparar nem aumentar o timeout** — só reseta no ciclo de uso (semanal no
+- <!-- backend-parity: ignore --> **Não adianta redisparar nem aumentar o timeout** — só reseta no ciclo de uso (semanal no
   ollama-cloud) ou com upgrade/extra usage. Os demais **caminhos e provedores** (Codex, Claude Code nativo, provedor `nvidia` via opencode) **não**
   são afetados pela cota do ollama-cloud.
 - **Follow-up:** estender a detecção aos jobs opencode (`Start-`/`Watch-OpenCodeJob`) e aos demais
@@ -993,8 +1002,9 @@ payload para Anthropic (`anthropic/claude-opus-4-8`) e, portanto, é externo. Co
 - Os adapters `Invoke-ClaudeCode.ps1`, `Invoke-ClaudeCodeAsync.ps1` e `Start-ClaudeCodeJob.ps1` bloqueiam
   `PermissionMode=bypassPermissions`; esse modo não faz parte da delegação XPZ.
 
-## LIMITE CONHECIDO — COPILOT CLI, GEMINI CLI E ANTIGRAVITY CLI TAMBÉM SÃO AGÊNTICOS EXTERNOS
+## <!-- backend-parity: ignore --> LIMITE CONHECIDO — COPILOT CLI, GEMINI CLI E ANTIGRAVITY CLI TAMBÉM SÃO AGÊNTICOS EXTERNOS
 
+<!-- backend-parity: ignore -->
 O `copilot -p`, o `gemini -p` e o `agy -p` são CLIs agênticas, não backends one-shot puros. Mesmo em
 consulta curta, podem carregar contexto próprio e são serviços externos: Copilot casa
 `github-copilot/*`; Gemini casa `google/*`; Antigravity casa `antigravity/*`. Consequências:
@@ -1044,6 +1054,7 @@ pwsh -NoProfile -Command "Set-Location 'C:\Users\<user>\AppData\Local\Temp\xr'; 
 
 ## BACKENDS
 
+<!-- backend-parity: ignore -->
 Ativos: **opencode** (#1), **Codex** (#2), **Claude Code** (#3), **GitHub Copilot CLI** (#4),
 **Gemini CLI** (#5) e **Antigravity CLI** (#6). O Codex exerceu o ponto de
 extensão do núcleo: o gate ganhou `-Backend` e passou a casar a política pelo `canonicalModel`

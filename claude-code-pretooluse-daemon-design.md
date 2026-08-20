@@ -175,6 +175,7 @@ esse modo, a paridade é circular e não prova nada.
 | **Named pipe** | **ACL nativa por-usuário** (modelo de confiança forte); sem porta de escuta | `open(r'\\.\pipe\...')` da stdlib Python **não** basta para `PIPE_ACCESS_DUPLEX`/message-mode → exige `pywin32`/`ctypes` (**derruba o "zero dep"**) ou um cliente **NativeAOT** (que fala pipe nativamente) |
 | **TCP loopback** | stdlib `socket` puro (zero dep), simples em Python | `127.0.0.1` ≠ "só este hook" → **token de sessão** obrigatório (auth caseira, mais frágil que ACL nativa); **porta de escuta dispara DLP/endpoint-protection corporativo** (apontado pelo painel) — pode ser **inviável** para devs em ambiente corporativo |
 
+<!-- backend-parity: ignore -->
 **Dissidência registrada do painel:** glm-5.1 preferiu TCP stdlib (zero-dep); Codex e Claude
 preferiram named pipe (ACL nativa > token-em-arquivo). A própria objeção corporativa (DLP) de glm-5.1
 **reforça** named pipe. **Posição da v4 (enquadramento honesto — correção da rodada 3):** o painel
@@ -401,9 +402,10 @@ Todas dependem **dos números** do passo 0 — não há mais decisão de papel p
 
 ## 11. Proveniência (revisão por pares)
 
+<!-- backend-parity: ignore -->
 - **Rodada 1 `daemon-design-v1`** (2026-06-27): manuscrito = v1; veredito unânime "revisar — direção
   certa, não congelar"; 7 gaps convergentes.
-- **Rodada 2** (2026-06-27): manuscrito = v2 (commit `a8c1bc1`); mesmo painel (Claude Opus nativo
+- <!-- backend-parity: ignore --> **Rodada 2** (2026-06-27): manuscrito = v2 (commit `a8c1bc1`); mesmo painel (Claude Opus nativo
   `anthropic`; Codex `gpt-5.5` `openai`; `nvidia/z-ai/glm-5.1`, `nvidia/moonshotai/kimi-k2.6`,
   `nvidia/minimaxai/minimax-m2.7`; preferidos `ollama-cloud/*` `unavailable` por cota, substituídos
   pelos NVIDIA). **5 vozes / 3 famílias.** Veredito: **4 aprova-com-ressalvas + 1 revisar** — os 7 gaps
@@ -411,7 +413,7 @@ Todas dependem **dos números** do passo 0 — não há mais decisão de papel p
   tabela de decisão de transporte, identidade completa (repo+roots), critério de regressão do
   `defer`-comum, staleness com backoff, ciclo mutex↔ready, protocolo versionado, log na v1. Dissidência
   de transporte (TCP zero-dep vs pipe ACL) registrada em §4.2.
-- **Rodada 3** (2026-06-27): manuscrito = v3 (commit `7d464a8`); mesmo painel (Claude Opus nativo;
+- <!-- backend-parity: ignore --> **Rodada 3** (2026-06-27): manuscrito = v3 (commit `7d464a8`); mesmo painel (Claude Opus nativo;
   Codex `gpt-5.5`; NVIDIA glm-5.1/kimi-k2.6/minimax-m2.7; `ollama-cloud` segue `unavailable` por cota).
   **5 vozes / 3 famílias.** Veredito: **3 *congelar* (Claude, glm-5.1, minimax) + 2 aprova-com-ressalvas
   (Codex, kimi)** — os 7 gaps da rodada 1 e os convergentes da rodada 2 aceitos como fechados; as 2
@@ -419,7 +421,7 @@ Todas dependem **dos números** do passo 0 — não há mais decisão de papel p
   congelamento≠liberação + gate de saída do passo 0, recuperação do `defer-only`, e enquadramento
   honesto do transporte. Minoria (kimi) sobre o transporte: registrada e acatada (default preferido +
   fallback).
-- **Rodada 4** (2026-06-27): manuscrito = v4 (commit `60094ea`); mesmo painel. **5 vozes / 3 famílias.**
+- <!-- backend-parity: ignore --> **Rodada 4** (2026-06-27): manuscrito = v4 (commit `60094ea`); mesmo painel. **5 vozes / 3 famílias.**
   Veredito: **4 *congelar* (Claude, Codex, glm-5.1, minimax) + 1 aprova-com-ressalvas (kimi)**, esta
   última condicionada a 3 polish de contrato (gate 0f vinculante, caminho do log, resíduo lexical) e
   **sem exigir nova rodada**. Polish aplicado no commit `b575b74`.

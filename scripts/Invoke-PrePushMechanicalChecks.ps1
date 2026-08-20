@@ -366,6 +366,12 @@ $gateEnumParityGate = [ordered]@{
     findings = @()
 }
 
+$backendEnumParityGate = [ordered]@{
+    script   = 'scripts/Test-PrePushBackendEnumerationParity.ps1'
+    status   = 'skipped'
+    findings = @()
+}
+
 $mechanicalFailures = [System.Collections.Generic.List[string]]::new()
 
 if (-not $SkipParse) {
@@ -601,6 +607,30 @@ if (Test-Path -LiteralPath $gateEnumParityScript -PathType Leaf) {
     }
 }
 
+$backendEnumParityScript = Join-Path $PSScriptRoot 'Test-PrePushBackendEnumerationParity.ps1'
+if (Test-Path -LiteralPath $backendEnumParityScript -PathType Leaf) {
+    $backendEnumOutput = & $backendEnumParityScript -RootPath $resolvedRoot -BaseRef $effectiveBaseRef -ChangedFiles $changedFiles -AsJson 2>&1
+    $backendEnumExitCode = $LASTEXITCODE
+    $backendEnumJsonText = ($backendEnumOutput | ForEach-Object { $_.ToString() }) -join [Environment]::NewLine
+    $backendEnumObject = $null
+    if (-not [string]::IsNullOrWhiteSpace($backendEnumJsonText)) {
+        $backendEnumObject = $backendEnumJsonText | ConvertFrom-Json
+    }
+
+    if ($backendEnumExitCode -eq 0 -and $null -ne $backendEnumObject) {
+        $backendEnumParityGate.status = $backendEnumObject.status
+        $backendEnumParityGate.findings = @($backendEnumObject.findings)
+    } else {
+        $backendEnumParityGate.status = 'warn'
+        $backendEnumParityGate.findings = @([pscustomobject][ordered]@{
+            code     = 'BACKEND_ENUMERATION_PARITY_SCRIPT_ERROR'
+            severity = 'warn'
+            path     = 'scripts/Test-PrePushBackendEnumerationParity.ps1'
+            message  = "Falha consultiva ao executar Test-PrePushBackendEnumerationParity.ps1: $backendEnumJsonText"
+        })
+    }
+}
+
 $overallStatus = if ($mechanicalFailures.Count -eq 0) { 'pass' } else { 'fail' }
 
 $pushReadiness = if ($commitsBehind -gt 0) { 'blocked' } else { 'ok' }
@@ -701,6 +731,11 @@ foreach ($gateEnumFinding in @($gateEnumParityGate.findings)) {
         ("Enumeracao de gates defasada na doc (candidata consultiva) ({0}): {1} [{2}]" -f $gateEnumFinding.code, $gateEnumFinding.message, $gateEnumFinding.path)
     )
 }
+foreach ($backendEnumFinding in @($backendEnumParityGate.findings)) {
+    [void]$agentWarnings.Add(
+        ("Enumeracao de backends defasada na doc (candidata consultiva) ({0}): {1} [{2}]" -f $backendEnumFinding.code, $backendEnumFinding.message, $backendEnumFinding.path)
+    )
+}
 
 # Segregacao das candidatas NAO-PROSA do gate de propagacao: são as que não
 # admitem justificativa coletiva (13: disciplina de confronto por classe) e
@@ -774,6 +809,7 @@ $result = [ordered]@{
         sharedScriptSkillCoverage = $sharedScriptSkillGate
         historyCommitPlaceholder = $historyCommitGate
         gateEnumerationParity = $gateEnumParityGate
+        backendEnumerationParity = $backendEnumParityGate
     }
     mechanicalFailures       = @($mechanicalFailures)
     agentOperationalReminders = @($agentOperationalReminders)
@@ -876,6 +912,11 @@ if ($AsJson) {
     Write-Output ("GATE_ENUMERATION_PARITY_GATE={0}" -f $gateEnumParityGate.status)
     foreach ($finding in @($gateEnumParityGate.findings)) {
         Write-Output ("GATE_ENUMERATION_SUBSET: {0}: {1}" -f $finding.path, $finding.message)
+    }
+
+    Write-Output ("BACKEND_ENUMERATION_PARITY_GATE={0}" -f $backendEnumParityGate.status)
+    foreach ($finding in @($backendEnumParityGate.findings)) {
+        Write-Output ("BACKEND_ENUMERATION_SUBSET: {0}: {1}" -f $finding.path, $finding.message)
     }
 
     if ($changedFiles.Count -gt 0) {

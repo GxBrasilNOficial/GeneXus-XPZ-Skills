@@ -42,6 +42,7 @@ Quando `commitsBehind > 0`, o intervalo `BaseRef..HEAD` deixa de representar lim
 
 ### Modo assistido por dossiê (revisor semantic-only)
 
+<!-- backend-parity: ignore -->
 No tier **reforçado** ([`14`](14-revisao-pre-push-reforcada.md)), nem todo revisor consegue **executar** este passo mecânico: os adapters de LLM rodam os backends em modo restrito, e há uma classe **semantic-only** que **não tem shell** (não roda git nem `pwsh`) — o opencode `reviewer-ro` (nega `bash`) e, por configuração de adapter, Claude Code, Copilot, Gemini e Antigravity. A classe **git-capable** (roda git) é o Codex-delegate (sandbox read-only) e o subagente nativo (Bash). Duas capacidades, provadas empiricamente por probe, não inferidas.
 
 Para o revisor **semantic-only**, o orquestrador — que tem git — roda o passo mecânico **uma vez** e monta um **dossiê** com [`scripts/Build-PrePushReviewDossier.ps1`](scripts/Build-PrePushReviewDossier.ps1), entregue **inline no prompt** (o transporte por adapter — stdin vs argv — está no «Eixo do transporte» abaixo):
@@ -50,6 +51,7 @@ Para o revisor **semantic-only**, o orquestrador — que tem git — roda o pass
 - **Seção B — diagnóstico mecânico (NÃO verdade):** o container inteiro do `Invoke-PrePushMechanicalChecks.ps1 -AsJson`, sob cabeçalho literal único rotulado «candidatas a verificar, NÃO verdade». O mecânico é a **fonte de verdade** de `commitsBehind`/`pushReadiness`; o builder **referencia** (lê do `-AsJson`), não reencena a **política push-ready** do motor. Se o mecânico falhar ou lançar (JSON imparseável), o dossiê continua **pronto** com `mechanicalStatus=failed`; nesse modo degradado o builder reafirma **apenas o fato bruto `commitsBehind`** por git, deixando `pushReadiness`/`intervalDiffDiagnosticOnly` **indeterminados** (`unknown`/`null`) — não fabrica um veredito de push paralelo à fonte de verdade.
 - **Sentinelas** ao fim (`HEAD:` + `END_DOSSIER sha256=`), **anti-truncamento**: o revisor as ecoa; o hash cobre o **corpo** (bytes UTF-8 sem BOM, EOL=LF, excluindo as sentinelas). Eco ausente **mas parecer on-task** = `responded`+`noEchoSentinel` no recibo (não `noResponse`). É anti-truncamento, **não** anti-dossiê-errado — contra isso vale o invariante git-capable (`14`).
 
+<!-- backend-parity: ignore -->
 **Eixo do transporte.** Adapters `stdin-dossier-capable` (opencode, Claude Code) recebem o dossiê por stdin, sem teto prático. Adapters `argv-limited` (Copilot, Gemini, Antigravity) passam o prompt por argv, com guard fail-closed (~30000 chars): dossiê acima do teto ⇒ o orquestrador **omite** o revisor (`unavailable`+`dossier-too-large`), sem truncar nem degradar em silêncio.
 
 O revisor semantic-only roda **só a fase semântica** read-only sobre o dossiê; **não** roda o passo mecânico (não pode). O revisor git-capable é **inalterado**: roda a rotina inteira e reproduz a Seção A por conta própria. Um painel reforçado válido retém **≥1 git-capable** que reproduz a Seção A (ver [`14`](14-revisao-pre-push-reforcada.md)).
@@ -78,7 +80,9 @@ Suporte mecânico (consultivo): `scripts/Test-PrePushNewTokenPropagation.ps1`, c
 
 **Salvaguarda de diversidade de modelo (recomendada acima de limiar).** Quando as candidatas não-prosa do gate de propagação excederem o limiar (hoje **> 5**), o orquestrador recomenda no `agentSemanticChecklist` uma segunda passada da fase semântica por um **modelo distinto** antes de fechar o veredito. Passadas do mesmo modelo tendem a repetir o mesmo ponto cego — e o sinal mecânico completo **não basta**: em incidente real, mesmo com todas as candidatas não-prosa surgidas (sem truncamento) e a disciplina de classe em vigor, uma passada de um modelo confrontou um `param-list-item` (gap) e deixou **outro, igualmente sinalizado**, passar; só um modelo distinto pegou o segundo. Antes disso, três passadas do mesmo modelo já haviam descartado em lote uma candidata legítima que um modelo diferente confirmou. É mitigante probabilístico, não garantia; abaixo do limiar continua sendo julgamento do revisor, acima dele deixa de ser opcional silencioso.
 
-A regra acima vale para qualquer **conjunto enumerado**, não só parâmetros: quando a frente adiciona um membro a um conjunto que o repositório descreve em mais de um lugar (gates da pré-push, scripts, estados, exit codes), **toda** enumeração desse conjunto — inclusive afirmações fechadas do tipo «os X são A e B» — precisa refletir o membro novo. Atenção ao **furo de direção**: buscar só o termo *novo* é cego a enumerações que descrevem o conjunto sem nomeá-lo (a frase defasada cita os membros *antigos*, não o novo). Por isso, ao adicionar um membro, buscar **também a co-ocorrência dos termos antigos** e conferir se aquela enumeração recebeu o novo. Para o conjunto de **gates da pré-push** há suporte mecânico: `scripts/Test-PrePushGateEnumerationParity.ps1` deriva do orquestrador os gates realmente executados e sinaliza enumerações na doc que ficaram como subconjunto próprio.
+A regra acima vale para qualquer **conjunto enumerado**, não só parâmetros: quando a frente adiciona um membro a um conjunto que o repositório descreve em mais de um lugar (gates da pré-push, backends de delegação, scripts, estados, exit codes), **toda** enumeração desse conjunto — inclusive afirmações fechadas do tipo «os X são A e B» — precisa refletir o membro novo. Atenção ao **furo de direção**: buscar só o termo *novo* é cego a enumerações que descrevem o conjunto sem nomeá-lo (a frase defasada cita os membros *antigos*, não o novo). Por isso, ao adicionar um membro, buscar **também a co-ocorrência dos termos antigos** e conferir se aquela enumeração recebeu o novo.
+Para o conjunto de **gates da pré-push**, há suporte mecânico em `scripts/Test-PrePushGateEnumerationParity.ps1`.
+Para o conjunto de **backends de delegação**, há suporte em `scripts/Test-PrePushBackendEnumerationParity.ps1`. Ambos derivam do código a verdade e sinalizam enumerações na doc que ficaram como subconjunto próprio.
 
 ### 3. Comparação documental
 
@@ -208,6 +212,7 @@ Ver `10-base-operacional-msbuild-headless.md` e gate `Test-PrePushMsBuildProbeDo
 | `scripts/Test-PrePushSharedScriptSkillCoverage.ps1` | Script compartilhado alterado documentado em SKILL.md/quality-checklist.md fora do diff (consultivo) |
 | `scripts/Test-PrePushHistoryCommitPlaceholder.ps1` | Placeholder genérico em campo `Commit:`/`PR:` de `historico/` no diff (consultivo) |
 | `scripts/Test-PrePushGateEnumerationParity.ps1` | Enumeração de gates na doc que ficou subconjunto próprio do que o orquestrador executa (consultivo) |
+| `scripts/Test-PrePushBackendEnumerationParity.ps1` | Enumeração de backends de delegação na doc que ficou subconjunto próprio de `$AdapterScript` no dispatcher (consultivo) |
 
 ## Espelho em outros documentos
 

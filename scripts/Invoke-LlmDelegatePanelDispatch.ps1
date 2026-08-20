@@ -150,6 +150,14 @@ $AdapterDefaultTimeoutSec = @{
     'gemini'      = 300
     'antigravity' = 300
 }
+$AdapterCdCapable = @{
+    'opencode'    = $false # contrato: opencode nunca recebe -Cd
+    'codex'       = $true
+    'claude-code' = $true
+    'copilot'     = $true
+    'gemini'      = $true
+    'antigravity' = $true
+}
 
 function Get-Prop {
     param($Obj, [string]$Name)
@@ -953,7 +961,7 @@ for ($i = 0; $i -lt $reviewers.Count; $i++) {
     $splat = @{ MessagePath = $manuscriptFull; Model = $effectiveModel }
 
     # -Cd: precedencia + fail-closed (opencode nunca recebe -Cd)
-    $cdCapable = ($backend -in @('codex', 'claude-code', 'gemini', 'copilot', 'antigravity'))
+    $cdCapable = [bool]$AdapterCdCapable[$backend]
     if ($cdCapable) {
         if ($PayloadSensitivity -eq 'kb-sensitive' -and -not $Cd -and -not $ParallelKbRoot) {
             $rec.state = 'error'

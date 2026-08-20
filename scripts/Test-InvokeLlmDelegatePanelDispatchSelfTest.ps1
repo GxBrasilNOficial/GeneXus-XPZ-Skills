@@ -631,14 +631,14 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
     $getPropAst = @($functionAsts | Where-Object { $_.Name -eq 'Get-Prop' })[0]
     $timeoutAst = @($functionAsts | Where-Object { $_.Name -eq 'Get-FallbackDispatcherTimeoutMs' })[0]
     Assert-True ($null -ne $getPropAst -and $null -ne $timeoutAst) 'fallback dispatcher: funcoes Get-Prop/Get-FallbackDispatcherTimeoutMs deveriam existir.'
+    $timeoutMapAssign = @($harnessAst.FindAll({
+        param($node)
+        $node -is [System.Management.Automation.Language.AssignmentStatementAst] -and
+        $node.Left.Extent.Text.Trim() -eq '$AdapterDefaultTimeoutSec'
+    }, $true))[0]
+    Assert-True ($null -ne $timeoutMapAssign) 'fallback dispatcher: declaracao de $AdapterDefaultTimeoutSec deve existir no AST.'
     $timeoutProbe = @"
-`$script:AdapterDefaultTimeoutSec = @{
-    'opencode' = 180
-    'codex' = 180
-    'claude-code' = 300
-    'copilot' = 300
-    'gemini' = 300
-}
+`$script:AdapterDefaultTimeoutSec = $($timeoutMapAssign.Right.Extent.Text)
 $($getPropAst.Extent.Text)
 $($timeoutAst.Extent.Text)
 [pscustomobject]@{
@@ -658,6 +658,118 @@ $($timeoutAst.Extent.Text)
     Assert-True ($harnessText -match 'Get-CurrentPowerShellExecutable') 'fallback dispatcher: processo filho deve usar o executavel PowerShell atual/validado, nao depender de pwsh cru no PATH.'
     Assert-True ($harnessText -notmatch "Start-Process\s+-FilePath\s+'pwsh'") 'fallback dispatcher: nao pode resolver pwsh cru pelo PATH.'
     Assert-True ($harnessText -notmatch "return\s+'pwsh'") 'fallback dispatcher: nao pode ter fallback silencioso para pwsh cru no PATH.'
+
+    # =======================================================================================
+    # AST Guard: Paridade estrita de chaves entre os 5 mapas do dispatcher, ValidateSet e preferences
+    # =======================================================================================
+    function Get-AstHashtableKeys {
+        param($Ast, [string]$VarName)
+        $assign = @($Ast.FindAll({
+            param($node)
+            $node -is [System.Management.Automation.Language.AssignmentStatementAst] -and
+            $node.Left.Extent.Text.Trim() -eq "`$$VarName"
+        }, $true))[0]
+        Assert-True ($null -ne $assign) "AST Guard: declaracao de `$$VarName nao encontrada no AST"
+        $ht = if ($assign.Right -is [System.Management.Automation.Language.HashtableAst]) {
+            $assign.Right
+        } else {
+            @($assign.Right.FindAll({ param($node) $node -is [System.Management.Automation.Language.HashtableAst] }, $true))[0]
+        }
+        Assert-True ($null -ne $ht) "AST Guard: HashtableAst nao encontrada para `$$VarName"
+        $keys = [System.Collections.Generic.List[string]]::new()
+        foreach ($pair in $ht.KeyValuePairs) {
+            $keys.Add($pair.Item1.Extent.Text.Trim("'", '"', ' '))
+        }
+        return @($keys)
+    }
+
+    function Get-AstBackendValidateSet {
+        param([string]$FilePath)
+        $pErrors = $null
+        $pTokens = $null
+        $fileAst = [System.Management.Automation.Language.Parser]::ParseFile($FilePath, [ref]$pTokens, [ref]$pErrors)
+        Assert-True (@($pErrors).Count -eq 0) "AST Guard: erro ao parsear $FilePath"
+        $paramAst = @($fileAst.FindAll({
+            param($node)
+            $node -is [System.Management.Automation.Language.ParameterAst] -and
+            $node.Name.VariablePath.UserPath -eq 'Backend'
+        }, $true))[0]
+        Assert-True ($null -ne $paramAst) "AST Guard: parametro Backend nao encontrado em $FilePath"
+        $valSetAttr = @($paramAst.Attributes | Where-Object {
+            $_.TypeName.FullName -eq 'ValidateSet' -or $_.TypeName.Name -eq 'ValidateSet'
+        })[0]
+        Assert-True ($null -ne $valSetAttr) "AST Guard: atributo ValidateSet nao encontrado no parametro Backend em $FilePath"
+        $vals = [System.Collections.Generic.List[string]]::new()
+        foreach ($arg in $valSetAttr.PositionalArguments) {
+            $vals.Add($arg.Extent.Text.Trim("'", '"', ' '))
+        }
+        return @($vals)
+    }
+
+    function Get-AstArrayAssignmentValues {
+        param([string]$FilePath, [string]$VarName)
+        $pErrors = $null
+        $pTokens = $null
+        $fileAst = [System.Management.Automation.Language.Parser]::ParseFile($FilePath, [ref]$pTokens, [ref]$pErrors)
+        Assert-True (@($pErrors).Count -eq 0) "AST Guard: erro ao parsear $FilePath"
+        $assign = @($fileAst.FindAll({
+            param($node)
+            $node -is [System.Management.Automation.Language.AssignmentStatementAst] -and
+            $node.Left.Extent.Text.Trim() -eq "`$$VarName"
+        }, $true))[0]
+        Assert-True ($null -ne $assign) "AST Guard: declaracao de `$$VarName nao encontrada em $FilePath"
+        $vals = [System.Collections.Generic.List[string]]::new()
+        $elements = @($assign.Right.FindAll({
+            param($node)
+            $node -is [System.Management.Automation.Language.StringConstantExpressionAst]
+        }, $true))
+        foreach ($el in $elements) {
+            $vals.Add($el.Value)
+        }
+        return @($vals)
+    }
+
+    $mapAdapterScriptKeys = @(Get-AstHashtableKeys $harnessAst 'AdapterScript')
+    $canonicalSorted = @($mapAdapterScriptKeys | Sort-Object)
+    Assert-True ($canonicalSorted.Count -eq 6) "AST Guard: esperado exatamente 6 backends canonicos; got $($canonicalSorted.Count)"
+
+    $collectionsToCompare = [ordered]@{
+        'Invoke-LlmDelegatePanelDispatch.ps1 ($ExeParam)'                = @(Get-AstHashtableKeys $harnessAst 'ExeParam' | Sort-Object)
+        'Invoke-LlmDelegatePanelDispatch.ps1 ($ContentionKeys)'          = @(Get-AstHashtableKeys $harnessAst 'ContentionKeys' | Sort-Object)
+        'Invoke-LlmDelegatePanelDispatch.ps1 ($AdapterDefaultTimeoutSec)'= @(Get-AstHashtableKeys $harnessAst 'AdapterDefaultTimeoutSec' | Sort-Object)
+        'Invoke-LlmDelegatePanelDispatch.ps1 ($AdapterCdCapable)'        = @(Get-AstHashtableKeys $harnessAst 'AdapterCdCapable' | Sort-Object)
+        'Resolve-LlmDelegateAuthorization.ps1 (ValidateSet -Backend)'   = @(Get-AstBackendValidateSet (Join-Path $scriptsDir 'Resolve-LlmDelegateAuthorization.ps1') | Sort-Object)
+        'Set-LlmDelegatePreferredReviewers.ps1 ($allowedBackends)'       = @(Get-AstArrayAssignmentValues (Join-Path $scriptsDir 'Set-LlmDelegatePreferredReviewers.ps1') 'allowedBackends' | Sort-Object)
+    }
+    foreach ($entry in $collectionsToCompare.GetEnumerator()) {
+        $name = $entry.Key
+        $keys = $entry.Value
+        Assert-True ($keys.Count -eq $canonicalSorted.Count) "AST Guard: contagem de chaves divergente em $name ($($keys.Count) vs $($canonicalSorted.Count))"
+        for ($i = 0; $i -lt $canonicalSorted.Count; $i++) {
+            Assert-True ($keys[$i] -eq $canonicalSorted[$i]) "AST Guard: chave divergente na posicao $i em $name ('$($keys[$i])' vs '$($canonicalSorted[$i])')"
+        }
+    }
+
+    $localityPascalTable = [ordered]@{
+        'opencode'    = 'OpenCode'
+        'codex'       = 'Codex'
+        'claude-code' = 'ClaudeCode'
+        'copilot'     = 'Copilot'
+        'gemini'      = 'Gemini'
+        'antigravity' = 'Antigravity'
+    }
+    $tableKeysSorted = @($localityPascalTable.Keys | Sort-Object)
+    Assert-True ($tableKeysSorted.Count -eq $canonicalSorted.Count) "AST Guard: tabela PascalCase de localidade deve conter $($canonicalSorted.Count) entradas; got $($tableKeysSorted.Count)"
+    for ($i = 0; $i -lt $canonicalSorted.Count; $i++) {
+        Assert-True ($tableKeysSorted[$i] -eq $canonicalSorted[$i]) "AST Guard: tabela PascalCase chave divergente na posicao $i ('$($tableKeysSorted[$i])' vs '$($canonicalSorted[$i])')"
+    }
+    foreach ($b in $localityPascalTable.Keys) {
+        $pascal = $localityPascalTable[$b]
+        $resolverScript = Join-Path $scriptsDir "Resolve-${pascal}ModelLocality.ps1"
+        $selfTestScript = Join-Path $scriptsDir "Test-${pascal}ModelLocalitySelfTest.ps1"
+        Assert-True (Test-Path -LiteralPath $resolverScript -PathType Leaf) "AST Guard: script de localidade $resolverScript nao encontrado"
+        Assert-True (Test-Path -LiteralPath $selfTestScript -PathType Leaf) "AST Guard: self-test de localidade $selfTestScript nao encontrado"
+    }
 
     Set-Content -LiteralPath $concLog -Value '' -NoNewline -Encoding utf8
     $r = Invoke-Harness -Reviewers @(@{
