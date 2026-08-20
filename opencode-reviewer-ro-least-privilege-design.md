@@ -235,6 +235,7 @@ README trilíngue: refletir em ES/EN se a regra operacional mudar.
 
 ## Proveniência
 
+<!-- backend-parity: ignore -->
 Congelado após 8 rodadas de revisão por pares (v1→v8) — anthropic (subagente nativo), openai
 (Codex gpt-5.5), ollama-cloud (glm-5.2/kimi-k2.7-code/deepseek-v4-pro), nvidia
 (glm-5.2/kimi-k2.6/deepseek-v4-pro/minimax-m3). Arquitetura nunca reaberta; freeze por decisão

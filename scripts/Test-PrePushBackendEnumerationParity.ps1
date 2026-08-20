@@ -70,12 +70,12 @@ $ignoredCount = 0
 function Get-BackendRegex {
     param([string]$Backend)
     switch ($Backend.ToLowerInvariant()) {
-        'opencode'    { return [regex]::new('(?i)\bopencode\b') }
-        'codex'       { return [regex]::new('(?i)\bcodex\b') }
-        'claude-code' { return [regex]::new('(?i)\b(?:claude-code|claudecode|claude(?:\s+code)?)\b') }
-        'copilot'     { return [regex]::new('(?i)\b(?:github\s+)?copilot(?:\s+cli)?\b') }
-        'gemini'      { return [regex]::new('(?i)\bgemini(?:\s+cli)?\b') }
-        'antigravity' { return [regex]::new('(?i)\b(?:antigravity(?:\s+cli)?|agy)\b') }
+        'opencode'    { return [regex]::new('(?i)\b(?:opencode(?:\/(?:ollama[\s\-_]*cloud|mimo))?)\b') }
+        'codex'       { return [regex]::new('(?i)\b(?:codex(?:[\s\-_]*delegate|[\s\-_]*cli)?)\b') }
+        'claude-code' { return [regex]::new('(?i)\b(?:claude[\s\-_]*code|claudecode|claude)\b') }
+        'copilot'     { return [regex]::new('(?i)\b(?:github[\s\-_]+)?copilot(?:[\s\-_]+cli)?\b') }
+        'gemini'      { return [regex]::new('(?i)\bgemini(?:[\s\-_]+cli)?\b') }
+        'antigravity' { return [regex]::new('(?i)\b(?:antigravity(?:[\s\-_]+(?:cli|2\.0))?|agy)\b') }
         default       { return [regex]::new("(?i)\b$([regex]::Escape($Backend))\b") }
     }
 }
@@ -253,38 +253,30 @@ if ($canonicalBackends.Count -ge 2) {
                 continue
             }
 
-            $sentenceSplits = [regex]::Split($flatText, '(?<=[.!?])\s+(?=[A-Z0-9`"''\(\[])')
-
-            foreach ($sentence in $sentenceSplits) {
-                if ($truncated) { break }
-                if ([string]::IsNullOrWhiteSpace($sentence)) { continue }
-                if ($sentence -match '(?i)\bcursor\b') { continue }
-
-                $onSentence = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
-                foreach ($b in $canonicalBackends) {
-                    if ($backendPatterns[$b].IsMatch($sentence)) {
-                        [void]$onSentence.Add($b)
-                    }
+            $onUnit = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+            foreach ($b in $canonicalBackends) {
+                if ($backendPatterns[$b].IsMatch($flatText)) {
+                    [void]$onUnit.Add($b)
                 }
-
-                if ($onSentence.Count -lt 2) { continue }
-                if ($onSentence.Count -ge $canonicalBackends.Count) { continue }
-
-                if ($findings.Count -ge $MaxFindings) {
-                    $truncated = $true
-                    break
-                }
-
-                $listed = @($onSentence | Sort-Object)
-                $missing = @($canonicalBackends | Where-Object { -not $onSentence.Contains($_) })
-
-                $findings.Add([pscustomobject][ordered]@{
-                    code     = 'BACKEND_ENUMERATION_SUBSET'
-                    severity = 'warn'
-                    path     = ('{0}:{1}' -f $relPath, $u.StartLine)
-                    message  = ("enumera {0} de {1} backends canonicos ({2}); se a frase descreve o conjunto de backends, confirmar se esta completa — ausente(s): {3}" -f $onSentence.Count, $canonicalBackends.Count, ($listed -join ', '), ($missing -join ', '))
-                })
             }
+
+            if ($onUnit.Count -lt 2) { continue }
+            if ($onUnit.Count -ge $canonicalBackends.Count) { continue }
+
+            if ($findings.Count -ge $MaxFindings) {
+                $truncated = $true
+                break
+            }
+
+            $listed = @($onUnit | Sort-Object)
+            $missing = @($canonicalBackends | Where-Object { -not $onUnit.Contains($_) })
+
+            $findings.Add([pscustomobject][ordered]@{
+                code     = 'BACKEND_ENUMERATION_SUBSET'
+                severity = 'warn'
+                path     = ('{0}:{1}' -f $relPath, $u.StartLine)
+                message  = ("enumera {0} de {1} backends canonicos ({2}); se o bloco descreve o conjunto de backends, confirmar se esta completo — ausente(s): {3}" -f $onUnit.Count, $canonicalBackends.Count, ($listed -join ', '), ($missing -join ', '))
+            })
         }
     }
 }

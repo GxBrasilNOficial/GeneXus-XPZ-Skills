@@ -425,7 +425,7 @@ Todas dependem **dos números** do passo 0 — não há mais decisão de papel p
   Veredito: **4 *congelar* (Claude, Codex, glm-5.1, minimax) + 1 aprova-com-ressalvas (kimi)**, esta
   última condicionada a 3 polish de contrato (gate 0f vinculante, caminho do log, resíduo lexical) e
   **sem exigir nova rodada**. Polish aplicado no commit `b575b74`.
-- **Re-consulta da versão final** (2026-06-27, sobre `b575b74`): por decisão humana de escopo,
+- <!-- backend-parity: ignore --> **Re-consulta da versão final** (2026-06-27, sobre `b575b74`): por decisão humana de escopo,
   consultaram-se primeiro os 2 revisores que levantaram os 3 itens (kimi: ressalvas A/B fechadas;
   Claude: lexical limpo) e, em seguida, o **painel inteiro** confirmou a versão exata final — **5/5
   "pode congelar", 3 famílias, zero gap de papel**. (1ª tentativa do Codex inválida por contradição no
