@@ -58,6 +58,12 @@ Ambas se somam à causa já registrada (truncar a linha em N chars para triar r�
 
 **Ressalva de desenho do nível 3 (histórico).** O `newTokenPropagation` já emitia candidatas consultivas por rodada. O gate novo de backend enumeration parity foi desenhado com parser de unidades lógicas (parágrafos, itens de lista, blocos), exclusão de Domínio B (`Cursor`), suporte a marcadores `<!-- backend-parity: ignore -->` / `# backend-parity: ignore` e validação estrita com saldo zero de findings no baseline.
 
+- **Limite conhecido / melhoria futura do parser (ocorrências dentro de crases):**
+  - **Importância** — baixa (limite conhecido inofensivo no acervo atual).
+  - **Maturidade** — ideia / backlog futuro.
+  - **Diagnóstico:** O regex de detecção do marcador em `scripts/Test-PrePushBackendEnumerationParity.ps1` avalia a linha textual bruta, casando o padrão mesmo quando contido estritamente dentro de spans de código inline (entre crases, ex.: `` `<!-- backend-parity: ignore -->` ``). No acervo atual isso não mascara findings reais, mas constitui vetor teórico de silenciamento acidental se uma citação em prosa ocorrer em unidade que contenha enumeração parcial real de backends.
+  - **Direção futura:** Refinar o extrator em `Test-PrePushBackendEnumerationParity.ps1` para ignorar correspondências contidas dentro de delimitadores de código inline (spans de crases) antes de classificar `$hasIgnore`.
+
 **Relacionado:**
 - `scripts/Test-PrePushGateEnumerationParity.ps1` (padrão a espelhar)
 - `scripts/Test-PrePushNewTokenPropagation.ps1` (o gate cego a este caso)
