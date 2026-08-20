@@ -56,7 +56,6 @@ Ambas se somam à causa já registrada (truncar a linha em N chars para triar r�
 
 **Arquivos previstos (nível 3)** — novos: `scripts/Test-PrePushBackendEnumerationParity.ps1` + self-test próprio. Alterados: `scripts/Invoke-PrePushMechanicalChecks.ps1` (tabela de gates, execução e objeto `gates` do JSON), `13-revisao-pre-push.md` (dono da rotina: prosa + tabela de gates), `09-inventario-e-rastreabilidade-publica.md` (entrada do script) e `08-guia-para-agente-gpt.md` (bullet do gate). Mais `CHANGELOG` trilíngue.
 
-<!-- backend-parity: ignore -->
 **Ressalva de desenho do nível 3 (histórico).** O `newTokenPropagation` já emitia candidatas consultivas por rodada. O gate novo de backend enumeration parity foi desenhado com parser de unidades lógicas (parágrafos, itens de lista, blocos), exclusão de Domínio B (`Cursor`), suporte a marcadores `<!-- backend-parity: ignore -->` / `# backend-parity: ignore` e validação estrita com saldo zero de findings no baseline.
 
 **Relacionado:**
@@ -397,7 +396,6 @@ Critério para retomar: caso real em que a ausência do cache Codex prejudique a
 
 **Gap 1 — o dispatcher tem CINCO pontos de registro [RESOLVIDO em 2026-08-19].** O mapa `$AdapterCdCapable` foi promovido ao topo de `scripts/Invoke-LlmDelegatePanelDispatch.ps1` junto a `$AdapterScript`, `$ExeParam`, `$ContentionKeys` e `$AdapterDefaultTimeoutSec`. O self-test `scripts/Test-InvokeLlmDelegatePanelDispatchSelfTest.ps1` ganhou AST Guard estrito que valida a paridade exata de chaves dos 5 mapas contra o `ValidateSet` de `Resolve-LlmDelegateAuthorization.ps1` e `$allowedBackends` de `Set-LlmDelegatePreferredReviewers.ps1`, checa a existência física dos 12 scripts de localidade e extrai dinamicamente `$AdapterDefaultTimeoutSec` via AST (eliminando a cópia manual).
 
-<!-- backend-parity: ignore -->
 E a **única outra menção ao símbolo no repositório era uma cópia defasada** (resolvida em 2026-08-19): o probe de `Get-FallbackDispatcherTimeoutMs` em `scripts/Test-InvokeLlmDelegatePanelDispatchSelfTest.ps1` agora extrai os timeouts reais do dispatcher via AST e cobre todos os 6 backends canônicos.
 
 **Gap 2 — `$ContentionKeys` copiado de um CLI para outro envelhece mal [RESOLVIDO em 2026-08-19].** Documentada nota normativa de governança em `xpz-llm-delegate/SKILL.md` estipulando que o conjunto `$ContentionKeys` de cada backend é derivado da inspeção de `--help` da versão instalada de cada CLI e do mapeamento de suas equivalências de flags (ex.: `--print`/`--prompt`, `--mode plan`/`--mode=plan`), mantendo asserção no self-test.
@@ -704,7 +702,6 @@ Após implementar + rebuild:
 **Importância:** baixa-média (rede de segurança; o vazamento crítico já está fechado). **2026-06-22:** ganhou **consumidor concreto** — o harness `Invoke-LlmDelegatePanelDispatch` (frente A) precisa classificar o resultado de cada revisor sem parsear prosa. Isso move a frente de "rede de segurança" para "há quem consuma", mas a frente A **deliberadamente não bloqueia** nela (ver bullet do contrato estruturado).
 **Maturidade:** pesquisa feita (varredura estática concluída; falta teste empírico + eventual código)
 
-<!-- backend-parity: ignore -->
 **Origem:** frente dos 4 achados da revisão por pares, Achado D / G1-R, 2026-06-20. O D-fix da Fase 1 detecta truncamento (`reason` do `step_finish`) **só no opencode**. A varredura confirmatória dos demais adapters (inspeção **estática** do código em 2026-06-20) concluiu: o **vazamento-do-D** (preâmbulo virar parecer) **não se reproduz** em Codex/Claude Code/Gemini/Copilot — todos entregam a mensagem final canônica (campo terminal nomeado; Copilot por last-wins de stream). O **Antigravity** (backend #6, 2026-08-04) entra na mesma conclusão: entrega a final por campo terminal nomeado (`$json.response`) — ver a varredura por adapter em `xpz-llm-delegate/SKILL.md`. **Mas** nenhum deles detecta **truncamento por limite de tokens** (não há equivalente a `reason=length`) — isso segue verdadeiro.
 
 <!-- backend-parity: ignore -->

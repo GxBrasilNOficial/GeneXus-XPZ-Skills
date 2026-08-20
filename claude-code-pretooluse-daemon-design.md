@@ -402,7 +402,6 @@ Todas dependem **dos números** do passo 0 — não há mais decisão de papel p
 
 ## 11. Proveniência (revisão por pares)
 
-<!-- backend-parity: ignore -->
 - **Rodada 1 `daemon-design-v1`** (2026-06-27): manuscrito = v1; veredito unânime "revisar — direção
   certa, não congelar"; 7 gaps convergentes.
 - <!-- backend-parity: ignore --> **Rodada 2** (2026-06-27): manuscrito = v2 (commit `a8c1bc1`); mesmo painel (Claude Opus nativo
