@@ -1101,7 +1101,10 @@ try {
                     $msg = [string]$errRec.Exception.Message
                     if ($msg -match 'BLOCK:' -and $msg -match $quotaPattern) {
                         $state = 'quota'
-                    } elseif ($item.backend -eq 'antigravity' -and $msg -match 'reason=(cliMissing|inputTooLarge|unsafeWorkspace|refusedSensitivity)') {
+                    # `refusedSensitivity` NAO entra aqui: o adapter nunca a emite (nao recebe
+                    # sensibilidade) e o bloqueio pre-despacho registra o estado e faz `continue`
+                    # antes de qualquer chamada, entao este classificador jamais a veria.
+                    } elseif ($item.backend -eq 'antigravity' -and $msg -match 'reason=(cliMissing|inputTooLarge|unsafeWorkspace)') {
                         $state = 'unavailable'
                     } elseif ($item.backend -eq 'antigravity' -and $msg -match 'reason=timeout') {
                         $state = 'timeout'
@@ -1253,7 +1256,21 @@ foreach ($res in $collected) {
         $rec.cleanupIssues = @(Get-Prop $receipt 'CleanupIssues')
         $rec.keyringIsolation = [string](Get-Prop $receipt 'KeyringIsolation')
         $receiptReason = [string](Get-Prop $receipt 'Reason')
-        if (-not [string]::IsNullOrWhiteSpace($receiptReason)) { $rec.reason = $receiptReason }
+        if (-not [string]::IsNullOrWhiteSpace($receiptReason)) {
+            # PRECEDENCIA: a classificacao de estado por sentinela especifica (cota/timeout)
+            # vence a reason do recibo. O adapter nao conhece cota — um `agy` que sai por
+            # limite de uso vira `processFailure` no recibo enquanto o dispatcher ja
+            # classificou `quota` pelo texto. Sobrescrever cru produzia o par contraditorio
+            # `state=quota` + `reason=processFailure`, apagando do campo lido pelo operador
+            # a unica evidencia de cota (e o recibo humano de `quota` tem tratamento proprio,
+            # alem de a fallbackChain ativar nesse estado). Compor preserva as duas leituras
+            # em vez de o dispatcher escolher qual verdade descartar.
+            if ($res.state -in @('quota', 'timeout') -and $receiptReason -ne [string]$res.state) {
+                $rec.reason = ('{0}; adapterReason={1}' -f $res.state, $receiptReason)
+            } else {
+                $rec.reason = $receiptReason
+            }
+        }
     }
 
     $rec.state = $res.state

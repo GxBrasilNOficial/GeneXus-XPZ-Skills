@@ -190,6 +190,32 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File "%~dp0fake-agy-auth.ps1" %*
     Assert-True $authBlockCaught "Stdout de auth com exit 0 deve virar BLOCK unauthenticated, nao parecer"
     Assert-True ([string]::IsNullOrEmpty([string]$authReturned)) "Stdout de auth nao pode ser devolvido como resposta do modelo"
 
+    # --- Get-AntigravityCliVersion: os tres ramos ---
+    # A versao virou dependencia dura do recibo public-review, e falha aqui derruba o
+    # backend inteiro (cliMissing -> unavailable). Os fake-exes do self-test do perfil
+    # sempre devolvem 'agy 1.1.19', entao os ramos de erro nao tinham cobertura alguma.
+    $fakeVerOk = Join-Path $tempDir 'fake-agy-ver-ok.cmd'
+    "@echo off`r`necho agy 1.1.19" | Set-Content -LiteralPath $fakeVerOk -Encoding ascii
+    Assert-True ((Get-AntigravityCliVersion -AntigravityExe $fakeVerOk) -eq '1.1.19') "Get-AntigravityCliVersion extrai a versao de 'agy 1.1.19'"
+
+    $fakeVerEmpty = Join-Path $tempDir 'fake-agy-ver-empty.cmd'
+    "@echo off`r`nexit /b 0" | Set-Content -LiteralPath $fakeVerEmpty -Encoding ascii
+    $verEmptyBlocked = $false
+    try { [void](Get-AntigravityCliVersion -AntigravityExe $fakeVerEmpty) } catch { $verEmptyBlocked = ($_.Exception.Message -match 'retornou vazio') }
+    Assert-True $verEmptyBlocked "Get-AntigravityCliVersion bloqueia saida vazia de --version"
+
+    $fakeVerJunk = Join-Path $tempDir 'fake-agy-ver-junk.cmd'
+    "@echo off`r`necho garbage" | Set-Content -LiteralPath $fakeVerJunk -Encoding ascii
+    $verJunkBlocked = $false
+    try { [void](Get-AntigravityCliVersion -AntigravityExe $fakeVerJunk) } catch { $verJunkBlocked = ($_.Exception.Message -match 'nao reconhecida') }
+    Assert-True $verJunkBlocked "Get-AntigravityCliVersion bloqueia saida que nao casa versao"
+
+    # --- Test-AntigravityAuthenticationFailure: positivo e negativo ---
+    # O negativo trava a regressao de classificar linha informativa de execucao normal
+    # como falha de autenticacao.
+    Assert-True (Test-AntigravityAuthenticationFailure -Text 'Error authenticating: token expired') "Detector de auth casa mensagem de autenticacao"
+    Assert-True (-not (Test-AntigravityAuthenticationFailure -Text 'Loaded cached credentials')) "Detector de auth NAO casa linha informativa de credencial em cache"
+
 } finally {
     Remove-Item -LiteralPath $tempDir -Recurse -Force -ErrorAction SilentlyContinue
 }
