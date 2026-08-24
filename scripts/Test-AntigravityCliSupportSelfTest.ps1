@@ -100,7 +100,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File "%~dp0fake-agy-reader.ps1" %*
     $output = & $invokeScript -AntigravityExe $fakeCmd -MessagePath $promptFile -Model 'gemini-3.6-flash-high' -Mode plan
     Assert-True ($output -eq 'FAKE_AGY_RESPONSE: Teste de prompt via MessagePath') "Invoke-Antigravity.ps1 via fake-exe parseou JSON e retornou resposta (.response)"
 
-    # 6. Prova Comportamental: Injeção de fake-exe que retorna TEXTO PURO (não-JSON) para validar fallback sem estourar tipo
+    # 6. Prova Comportamental: Injeção de fake-exe que retorna TEXTO PURO (não-JSON) para validar rejeição fail-closed como invalidOutput
     $fakeRawPs1 = Join-Path $tempDir 'fake-agy-raw.ps1'
     @'
 param()
@@ -156,12 +156,12 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File "%~dp0fake-agy-err.ps1" %*
     }
     Assert-True $n5ErrorCaught "Invoke-Antigravity.ps1 lanca excecao BLOCK com status ERROR sem engolir pelo catch"
 
-    # 8. Prova Comportamental: FALLBACK DE TEXTO BRUTO E FAIL-CLOSED CONTRA ERRO CONHECIDO.
+    # 8. Prova Comportamental: REJEIÇÃO DE TEXTO NÃO-JSON E CLASSIFICAÇÃO DE ERRO DE AUTENTICAÇÃO.
     # Reproduz o estado medido em 2026-08-06 no Gemini CLI (mesma familia, sem credencial em cache):
     # prompt interativo de login no STDOUT e exit 0. Sem o guard, esse texto era devolvido como
     # PARECER do modelo e, como `responded` no dispatcher e mecanico (texto nao-vazio basta), a
     # falha de auth entrava no recibo do painel como revisor que RESPONDEU. O caso 6 acima prova
-    # que o fallback legitimo (texto que nao casa erro conhecido) segue funcionando.
+    # que texto não-JSON genérico vira invalidOutput; este caso distingue auth como unauthenticated.
     $fakeAuthPs1 = Join-Path $tempDir 'fake-agy-auth.ps1'
     @'
 param()
