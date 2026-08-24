@@ -34,7 +34,7 @@ Assert-True ($errText -like "*429*") "Extrai mensagem de erro de cota/rate limit
 
 # 2b. Formas flexionadas de auth. `\bauth\b` isolado NAO casa "authentication"/"authenticating" —
 # as palavras exatas das duas falhas reais medidas em 2026-08-06 no CLI irmao (Gemini). Aqui o
-# custo do falso negativo e maior que no Gemini: o adapter tem fallback de texto bruto (caso 8).
+# custo do falso negativo continua alto: texto de auth deve virar unauthenticated, nunca parecer (caso 8).
 $authPrompt = Get-AntigravityErrorMessage -StdoutText "Opening authentication page in your browser. Do you want to continue? [Y/n]:" -StderrText ""
 Assert-True ($null -ne $authPrompt) "Reconhece prompt interativo de autenticacao no stdout"
 $authErr = Get-AntigravityErrorMessage -StdoutText "" -StderrText "Error authenticating: IneligibleTierError: client no longer supported"
@@ -187,7 +187,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File "%~dp0fake-agy-auth.ps1" %*
     } catch {
         if ($_.Exception.Message -match 'reason=unauthenticated') { $authBlockCaught = $true }
     }
-    Assert-True $authBlockCaught "Stdout de auth com exit 0 deve virar BLOCK, nao parecer (fallback fail-closed)"
+    Assert-True $authBlockCaught "Stdout de auth com exit 0 deve virar BLOCK unauthenticated, nao parecer"
     Assert-True ([string]::IsNullOrEmpty([string]$authReturned)) "Stdout de auth nao pode ser devolvido como resposta do modelo"
 
 } finally {
