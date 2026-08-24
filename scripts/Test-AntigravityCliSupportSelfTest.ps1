@@ -72,6 +72,7 @@ try {
     $fakePs1 = Join-Path $tempDir 'fake-agy-reader.ps1'
     @'
 param()
+if ($args -contains '--version') { 'agy 1.1.19'; exit 0 }
 if ($args -contains '--help') {
     "Usage of agy: -p Run a prompt --mode Set agent mode --output-format json"
     exit 0
@@ -103,6 +104,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File "%~dp0fake-agy-reader.ps1" %*
     $fakeRawPs1 = Join-Path $tempDir 'fake-agy-raw.ps1'
     @'
 param()
+if ($args -contains '--version') { 'agy 1.1.19'; exit 0 }
 if ($args -contains '--help') {
     "Usage of agy: -p Run a prompt --mode Set agent mode"
     exit 0
@@ -117,13 +119,16 @@ exit 0
 pwsh -NoProfile -ExecutionPolicy Bypass -File "%~dp0fake-agy-raw.ps1" %*
 '@ | Set-Content -LiteralPath $fakeRawCmd -Encoding ascii
 
-    $rawOutput = & $invokeScript -AntigravityExe $fakeRawCmd -Message 'Teste texto puro' -Model 'gemini-3.6-flash-high' -Mode plan
-    Assert-True ($rawOutput -eq 'RESPOSTA_EM_TEXTO_BRUTO_SEM_JSON') "Invoke-Antigravity.ps1 via fake-exe de texto puro ativou fallback sem excecao de tipo"
+    $rawBlocked = $false
+    try { $null = & $invokeScript -AntigravityExe $fakeRawCmd -Message 'Teste texto puro' -Model 'gemini-3.6-flash-high' -Mode plan }
+    catch { $rawBlocked = ($_.Exception.Message -match 'reason=invalidOutput') }
+    Assert-True $rawBlocked "public-review rejeita texto puro sem envelope JSON com invalidOutput"
 
     # 7. Prova Comportamental: Injeção de fake-exe que retorna JSON com status != SUCCESS (N5 fix validation)
     $fakeErrPs1 = Join-Path $tempDir 'fake-agy-err.ps1'
     @'
 param()
+if ($args -contains '--version') { 'agy 1.1.19'; exit 0 }
 if ($args -contains '--help') {
     "Usage of agy: -p Run a prompt --mode Set agent mode"
     exit 0
@@ -145,7 +150,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File "%~dp0fake-agy-err.ps1" %*
     try {
         $null = & $invokeScript -AntigravityExe $fakeErrCmd -Message 'Teste status ERROR' -Model 'gemini-3.6-flash-high' -Mode plan
     } catch {
-        if ($_.Exception.Message -like "*status 'ERROR'*") {
+        if ($_.Exception.Message -match 'reason=processFailure' -and $_.Exception.Message -like "*status 'ERROR'*") {
             $n5ErrorCaught = $true
         }
     }
@@ -160,6 +165,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File "%~dp0fake-agy-err.ps1" %*
     $fakeAuthPs1 = Join-Path $tempDir 'fake-agy-auth.ps1'
     @'
 param()
+if ($args -contains '--version') { 'agy 1.1.19'; exit 0 }
 if ($args -contains '--help') {
     "Usage of agy: -p Run a prompt --mode Set agent mode"
     exit 0
@@ -179,7 +185,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File "%~dp0fake-agy-auth.ps1" %*
     try {
         $authReturned = & $invokeScript -AntigravityExe $fakeAuthCmd -Message 'ping' -Model 'gemini-3.6-flash-high' -Mode plan
     } catch {
-        if ($_.Exception.Message -like '*erro conhecido*') { $authBlockCaught = $true }
+        if ($_.Exception.Message -match 'reason=unauthenticated') { $authBlockCaught = $true }
     }
     Assert-True $authBlockCaught "Stdout de auth com exit 0 deve virar BLOCK, nao parecer (fallback fail-closed)"
     Assert-True ([string]::IsNullOrEmpty([string]$authReturned)) "Stdout de auth nao pode ser devolvido como resposta do modelo"

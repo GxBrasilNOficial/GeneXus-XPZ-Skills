@@ -21,11 +21,14 @@
       - modelo efetivo + fail-closeds (ver -ReviewersJson);
       - gate Resolve-LlmDelegateAuthorization.ps1 (NAO autoriza): allow->fila de despacho,
         ask/deny->gateAsk/gateDeny, throw->error;
+      - Antigravity public-review com gate allow em kb-sensitive -> unavailable/refusedSensitivity
+        antes do adapter; ask/deny permanecem estados do gate;
       - classifica invokeArgs por allowlist PER-BACKEND; contencao (permissionMode/tools/maxTurns,
         agent, approvalMode!=plan) e chaves internas do adapter sao RECUSADAS (securityBlockedArgs)
         e NAO repassadas ao adapter:
         o despacho segue com os defaults seguros do adapter (decisao de seguranca, Posicao B);
-      - resolve -Cd (precedencia + fail-closed; opencode nunca recebe -Cd).
+      - resolve -Cd (precedencia + fail-closed; opencode nunca recebe -Cd; Antigravity
+        public-review cria scratch proprio e recusa cwd herdado).
 
     Despacho CONCORRENTE: ForEach-Object -Parallel -ThrottleLimit 8 + SemaphoreSlim($OllamaConcurrency)
     via $using: SO para family 'ollama-cloud' (validado empirico PS 7.6.2). Captura antes do Dispose.
@@ -61,8 +64,9 @@
 .PARAMETER RoundId
     Identificador da rodada (subpasta do ledger). Default: [guid]::NewGuid().ToString('N').
 .PARAMETER Cd
-    Diretorio de trabalho explicito para os adapters que aceitam -Cd (codex/claude-code/gemini/copilot/antigravity).
-    Precedencia: explicito -> $ParallelKbRoot em kb-sensitive -> cwd em public. opencode NUNCA recebe -Cd.
+    Diretorio de trabalho explicito para os adapters que aceitam -Cd (codex/claude-code/gemini/copilot).
+    Precedencia: explicito -> $ParallelKbRoot em kb-sensitive -> cwd em public. opencode NUNCA recebe
+    -Cd; Antigravity public-review cria scratch proprio e nao recebe a raiz do repositorio.
 .PARAMETER ParallelKbRoot
     Raiz da pasta paralela de KB; repassada ao gate (descoberta de politica) e usada como -Cd em kb-sensitive.
 .PARAMETER PolicyPath
@@ -138,7 +142,10 @@ $ContentionKeys = @{
     )
     'opencode'    = @('agent')
     'gemini'      = @('approvalmode')
-    'antigravity' = @('mode', 'agent', 'approvalmode')
+    'antigravity' = @(
+        'mode', 'agent', 'approvalmode', 'profile', 'cd', 'scratchpath', 'simulatecleanupfailure', 'receiptpath',
+        'antigravityexe', 'message', 'messagepath'
+    )
     'codex'       = @()
     'copilot'     = @()
 }
@@ -156,7 +163,7 @@ $AdapterCdCapable = @{
     'claude-code' = $true
     'copilot'     = $true
     'gemini'      = $true
-    'antigravity' = $true
+    'antigravity' = $false # public-review cria scratch proprio; nunca herda cwd do dispatcher
 }
 
 function Get-Prop {
@@ -791,6 +798,13 @@ for ($i = 0; $i -lt $reviewers.Count; $i++) {
         quotaCircuitDecision = $null
         quotaCircuitVariantDecisions = @()
         fallbackSuppressedReason = $null
+        adapterReceiptPath = $null
+        publicReviewProfile = $null
+        cliVersion = $null
+        cliVersionMatchesBaseline = $null
+        cleanupStatus = $null
+        cleanupIssues = @()
+        keyringIsolation = $null
     }
 
     $backendDivergence = Test-InvokeArgsBackendDivergence -Reviewer $r -Label "revisor[$i]"
@@ -957,6 +971,18 @@ for ($i = 0; $i -lt $reviewers.Count; $i++) {
         $records.Add($rec); continue
     }
 
+    # Antigravity public-review e exclusivamente publico. O gate continua dono da confidencialidade
+    # e sempre roda primeiro: ask/deny preservam seus estados normativos. Se uma politica duravel
+    # permitir kb-sensitive, a postura fixa recusa o despacho antes do adapter e registra a
+    # divergencia como unavailable + refusedSensitivity; o adapter nao classifica o payload.
+    if ($backend -eq 'antigravity' -and $PayloadSensitivity -eq 'kb-sensitive') {
+        $rec.state = 'unavailable'
+        $rec.reason = 'refusedSensitivity'
+        $rec.preDispatchBlocked = $true
+        $rec.publicReviewProfile = 'public-review'
+        $records.Add($rec); continue
+    }
+
     # --- allow: monta o despacho ---
     $splat = @{ MessagePath = $manuscriptFull; Model = $effectiveModel }
 
@@ -996,6 +1022,13 @@ for ($i = 0; $i -lt $reviewers.Count; $i++) {
         }
         $rec.sidecarPath = $sidecarPath
     }
+    elseif ($backend -eq 'antigravity') {
+        $receiptPath = Join-Path $ledgerDir ('{0:D2}-antigravity-public-review.receipt.json' -f $i)
+        $splat['Profile'] = 'public-review'
+        $splat['ReceiptPath'] = $receiptPath
+        $rec.adapterReceiptPath = $receiptPath
+        $rec.publicReviewProfile = 'public-review'
+    }
 
     # args allowlistados (TimeoutSec / codex Profile/Oss/LocalProvider)
     foreach ($ek in $extraSplat.Keys) { $splat[$ek] = $extraSplat[$ek] }
@@ -1008,6 +1041,7 @@ for ($i = 0; $i -lt $reviewers.Count; $i++) {
         adapterPath = $adapterPath
         splat       = $splat
         sidecarPath = if ($backend -eq 'claude-code') { $rec.sidecarPath } else { $null }
+        adapterReceiptPath = if ($backend -eq 'antigravity') { $rec.adapterReceiptPath } else { $null }
     })
 
     $rec.state = 'PENDING'
@@ -1067,6 +1101,10 @@ try {
                     $msg = [string]$errRec.Exception.Message
                     if ($msg -match 'BLOCK:' -and $msg -match $quotaPattern) {
                         $state = 'quota'
+                    } elseif ($item.backend -eq 'antigravity' -and $msg -match 'reason=(cliMissing|inputTooLarge|unsafeWorkspace|refusedSensitivity)') {
+                        $state = 'unavailable'
+                    } elseif ($item.backend -eq 'antigravity' -and $msg -match 'reason=timeout') {
+                        $state = 'timeout'
                     } elseif ($msg -match 'BLOCK:' -and $msg -match $unavailablePattern) {
                         $state = 'unavailable'
                     } elseif ($msg -match 'excedeu' -and $msg -match 'foi encerrado') {
@@ -1096,6 +1134,7 @@ try {
                     durationMs = [int]($endedAt - $startedAt).TotalMilliseconds
                     attempts   = 1
                     sidecarPath = $item.sidecarPath
+                    adapterReceiptPath = $item.adapterReceiptPath
                 }
             } catch {
                 # Defesa em profundidade: qualquer excecao inesperada no runspace (ex.: Wait,
@@ -1111,6 +1150,7 @@ try {
                     durationMs = $null
                     attempts   = 1
                     sidecarPath = $item.sidecarPath
+                    adapterReceiptPath = $item.adapterReceiptPath
                 }
             } finally {
                 # [void]: SemaphoreSlim.Release() devolve o contador anterior (int); sem o [void]
@@ -1190,6 +1230,30 @@ foreach ($res in $collected) {
         $rec['__text'] = if ($rec.state -eq 'responded') { $res.text } else { $null }
         $rec['__errorText'] = if ($rec.state -eq 'responded') { $null } else { $rec.reason }
         continue
+    }
+
+    if ([string]$rec.backend -eq 'antigravity') {
+        $rec.adapterReceiptPath = [string]$res.adapterReceiptPath
+        $receipt = $null
+        if (-not [string]::IsNullOrWhiteSpace([string]$rec.adapterReceiptPath) -and
+            (Test-Path -LiteralPath ([string]$rec.adapterReceiptPath) -PathType Leaf)) {
+            try { $receipt = Get-Content -LiteralPath ([string]$rec.adapterReceiptPath) -Raw -Encoding utf8 | ConvertFrom-Json } catch { $receipt = $null }
+        }
+        if ($null -eq $receipt -or [string](Get-Prop $receipt 'Kind') -ne 'antigravity-public-review-receipt' -or
+            [int](Get-Prop $receipt 'SchemaVersion') -ne 1 -or [string](Get-Prop $receipt 'Profile') -ne 'public-review') {
+            $rec.state = 'error'
+            $rec.reason = 'invalidOutput'
+            $rec['__text'] = $null
+            $rec['__errorText'] = 'invalidOutput: recibo public-review ausente ou invalido'
+            continue
+        }
+        $rec.cliVersion = [string](Get-Prop $receipt 'CliVersion')
+        $rec.cliVersionMatchesBaseline = [bool](Get-Prop $receipt 'CliVersionMatchesBaseline')
+        $rec.cleanupStatus = [string](Get-Prop $receipt 'CleanupStatus')
+        $rec.cleanupIssues = @(Get-Prop $receipt 'CleanupIssues')
+        $rec.keyringIsolation = [string](Get-Prop $receipt 'KeyringIsolation')
+        $receiptReason = [string](Get-Prop $receipt 'Reason')
+        if (-not [string]::IsNullOrWhiteSpace($receiptReason)) { $rec.reason = $receiptReason }
     }
 
     $rec.state = $res.state

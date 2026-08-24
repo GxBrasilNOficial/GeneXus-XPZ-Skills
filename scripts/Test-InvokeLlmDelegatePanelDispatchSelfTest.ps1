@@ -233,10 +233,12 @@ exit 0
     @'
 $model = ''
 for ($i = 0; $i -lt $args.Count; $i++) { if ($args[$i] -eq '--model') { $model = [string]$args[$i + 1] } }
+if ($args -contains '--version') { 'agy 1.1.19'; exit 0 }
 if ($args -contains '--help') {
     'Usage of agy: -p Run a prompt --mode Set agent mode --output-format json --model'
     exit 0
 }
+$args -join ' ' | Add-Content -LiteralPath (Join-Path $PSScriptRoot 'antigravity.calls.log') -Encoding utf8
 $c = 'AGY cwd=' + (Get-Location).Path.Replace('\', '/') + ' model=' + $model + ' revisao'
 (@{ status = 'SUCCESS'; response = $c } | ConvertTo-Json -Compress)
 exit 0
@@ -276,6 +278,11 @@ model = "gpt-5.5"
     @'
 { "schemaVersion": 1, "defaultExternal": "ask", "models": { "anthropic/*": "allow-external" } }
 '@ | Set-Content -LiteralPath $polAnthropic -Encoding utf8
+
+    $polAntigravity = Join-Path $tmp 'llm-delegation-policy-antigravity.json'
+    @'
+{ "schemaVersion": 1, "defaultExternal": "ask", "models": { "antigravity/*": "allow-external" } }
+'@ | Set-Content -LiteralPath $polAntigravity -Encoding utf8
 
     # manuscrito (acentos)
     $manuscript = Join-Path $tmp 'manuscrito.md'
@@ -460,6 +467,18 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
     Assert-True (@($rvPlan.droppedArgs) -contains 'approvalMode') 'gemini approvalMode=plan -> droppedArgs'
     Assert-True (@($rvPlan.securityBlockedArgs).Count -eq 0) 'gemini approvalMode=plan -> NÃO securityBlocked'
     Assert-True (@($rvYolo.securityBlockedArgs) -contains 'approvalMode') 'gemini approvalMode=yolo -> securityBlockedArgs'
+
+    # antigravity public-review: nenhum override de perfil/cwd/conteção ou seam interno atravessa.
+    $r = Invoke-Harness -Reviewers @(@{ backend = 'antigravity'; invokeArgs = @{
+        model = 'gemini-3.6-flash-high'; mode = 'plan'; profile = 'public-review'; cd = $tmp
+        agent = 'custom'; approvalMode = 'plan'; scratchPath = $tmp; receiptPath = 'x.json'
+        simulateCleanupFailure = 'failed'; antigravityExe = 'x'; message = 'x'; messagePath = 'x'
+    } }) -Sensitivity 'public'
+    $rvAgBlocked = Get-Reviewer $r.json 0
+    $agyBlocked = @($rvAgBlocked.securityBlockedArgs)
+    foreach ($key in @('mode','profile','cd','agent','approvalMode','scratchPath','receiptPath','simulateCleanupFailure','antigravityExe','message','messagePath')) {
+        Assert-True ($agyBlocked -contains $key) "antigravity contenção: $key deve ficar em securityBlockedArgs"
+    }
 
     # codex / copilot: chave estranha -> droppedArgs ; não-codex com profile -> droppedArgs
     $r = Invoke-Harness -Reviewers @(
@@ -787,7 +806,7 @@ $($timeoutAst.Extent.Text)
     Assert-True ($badCalls.Count -eq 0) "fallback divergente: fake executor nao deveria ser chamado para a entrada invalida; chamadas=[$($badCalls -join ' | ')]"
 
     # =======================================================================================
-    # 8c) DESPACHO REAL de claude-code / copilot / gemini / antigravity (prova -Model + -Cd + exe-param)
+    # 8c) DESPACHO REAL de claude-code / copilot / gemini / antigravity (modelo, cwd e recibo)
     # =======================================================================================
     $r = Invoke-Harness -Reviewers @(
         @{ backend = 'claude-code'; invokeArgs = @{ model = 'claude-opus-4-8' } },
@@ -831,7 +850,34 @@ $($timeoutAst.Extent.Text)
     Assert-True ($rvAg.state -eq 'responded') "antigravity despacho: esperado responded; got $($rvAg.state)"
     $tAg = Get-Content -LiteralPath $rvAg.verdictPath -Raw -Encoding utf8
     Assert-True ($tAg -match 'model=gemini-3.6-flash-high') 'antigravity despacho: -Model deveria chegar ao adapter'
-    Assert-True ($tAg -match [regex]::Escape($tmpFwd)) 'antigravity despacho: -Cd deveria virar o WorkingDirectory (cwd)'
+    Assert-True ($tAg -notmatch [regex]::Escape($tmpFwd)) 'antigravity public-review nao deve herdar -Cd do dispatcher'
+    Assert-True ($rvAg.publicReviewProfile -eq 'public-review') 'antigravity despacho: perfil fixo public-review esperado'
+    Assert-True ($rvAg.cliVersion -eq '1.1.19' -and $rvAg.cliVersionMatchesBaseline) 'antigravity despacho: recibo deve registrar cliVersion'
+    Assert-True ($rvAg.cleanupStatus -eq 'clean' -and $rvAg.keyringIsolation -eq 'not-isolated-global-keyring') 'antigravity despacho: limpeza clean e limite do keyring registrados'
+    Assert-True (Test-Path -LiteralPath ([string]$rvAg.adapterReceiptPath) -PathType Leaf) 'antigravity despacho: recibo tecnico deve existir no ledger'
+
+    # public-review nunca recebe kb-sensitive: o gate roda primeiro e o adapter nunca e invocado.
+    $agyCallLog = Join-Path $tmp 'antigravity.calls.log'
+    $agyCallsBefore = if (Test-Path $agyCallLog) { @(Get-Content $agyCallLog).Count } else { 0 }
+    $r = Invoke-Harness -Reviewers @(@{
+        backend = 'antigravity'; targetModelKey = 'antigravity/gemini-3.6-flash-high'
+        invokeArgs = @{ model = 'gemini-3.6-flash-high' }
+    }) -Sensitivity 'kb-sensitive'
+    $rvAgGateAsk = Get-Reviewer $r.json 0
+    $agyCallsAfterGateAsk = if (Test-Path $agyCallLog) { @(Get-Content $agyCallLog).Count } else { 0 }
+    Assert-True ($rvAgGateAsk.gateVerdict -eq 'ask' -and $rvAgGateAsk.state -eq 'gateAsk') 'antigravity kb-sensitive sem politica preserva gateAsk do gate'
+    Assert-True (-not $rvAgGateAsk.dispatchAttempted -and $agyCallsAfterGateAsk -eq $agyCallsBefore) 'gateAsk de antigravity bloqueia antes do adapter'
+
+    # Com politica duravel allow, a postura fixa ainda recusa kb-sensitive via refusedSensitivity.
+    $r = Invoke-Harness -Reviewers @(@{
+        backend = 'antigravity'; targetModelKey = 'antigravity/gemini-3.6-flash-high'
+        invokeArgs = @{ model = 'gemini-3.6-flash-high' }
+    }) -Sensitivity 'kb-sensitive' -Extra @{ PolicyPath = $polAntigravity }
+    $rvAgSensitive = Get-Reviewer $r.json 0
+    $agyCallsAfter = if (Test-Path $agyCallLog) { @(Get-Content $agyCallLog).Count } else { 0 }
+    Assert-True ($rvAgSensitive.gateVerdict -eq 'allow') 'antigravity kb-sensitive: gate deve continuar dono da confidencialidade e rodar antes da recusa do perfil'
+    Assert-True ($rvAgSensitive.state -eq 'unavailable' -and $rvAgSensitive.reason -eq 'refusedSensitivity') 'antigravity kb-sensitive usa unavailable + refusedSensitivity'
+    Assert-True (-not $rvAgSensitive.dispatchAttempted -and $agyCallsAfter -eq $agyCallsBefore) 'gate de perfil bloqueia kb-sensitive antes do adapter'
 
     $r = Invoke-Harness -Reviewers @(@{
             backend = 'claude-code'

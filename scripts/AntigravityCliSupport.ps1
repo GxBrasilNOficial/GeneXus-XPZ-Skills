@@ -3,19 +3,14 @@
 .SYNOPSIS
     Funcoes compartilhadas do backend antigravity da skill xpz-llm-delegate.
 .DESCRIPTION
-    Resolve o executavel agy.exe, valida o contrato minimo de descoberta (--print/--prompt e --mode)
-    e extrai mensagens de erro da saida do Antigravity CLI. Flags adicionais do adapter
-    (--output-format, --print-timeout, --model) nao entram neste probe: a prova delas e via
-    fake-exe nos self-tests do Invoke-Antigravity.
+    Resolve o executavel agy.exe, valida o contrato minimo de descoberta (--print/--prompt e --mode),
+    obtem a versao observada da CLI e extrai mensagens de erro da saida do Antigravity CLI. Flags
+    adicionais do adapter (--output-format, --print-timeout, --model) nao entram neste probe: a prova
+    delas e via fake-exe nos self-tests do Invoke-Antigravity.
 #>
 
 Set-StrictMode -Version Latest
 
-# `exhausted` NAO entra solto - paridade com $quotaFailurePattern de Invoke-LlmDelegatePanelDispatch.ps1
-# (corrigido em 2026-08-06). O \b(...)\b nao protege: "exhausted" e palavra inteira em "retries
-# exhausted", "connection pool exhausted", "context window exhausted" - erro generico de rede ou
-# contexto que viraria cota e mandaria o operador esperar reset de ciclo. Ancorar no sujeito
-# esgotado; "quota exhausted" ja casa pelo termo `quota`.
 $quotaFailurePattern = '(?i)\b(quota|rate\s*limit|too\s*many\s*requests|429|resource_exhausted|(?:credits?|balance|saldo)\s+exhausted)\b'
 
 function Test-AntigravityHelpSupportsContract {
@@ -65,17 +60,29 @@ function Resolve-AntigravityExe {
     return $exe
 }
 
+function Get-AntigravityCliVersion {
+    param([Parameter(Mandatory)] [string] $AntigravityExe)
+    $text = ''
+    try { $text = (& $AntigravityExe --version 2>&1 | Out-String).Trim() } catch {
+        throw "BLOCK: agy --version falhou: $($_.Exception.Message)"
+    }
+    if ([string]::IsNullOrWhiteSpace($text)) { throw 'BLOCK: agy --version retornou vazio.' }
+    $match = [regex]::Match($text, '(?i)(?:agy\s+)?v?(\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?)')
+    if (-not $match.Success) { throw "BLOCK: versao do agy nao reconhecida: $text" }
+    return $match.Groups[1].Value
+}
+
+function Test-AntigravityAuthenticationFailure {
+    param([AllowNull()] [string] $Text)
+    if ([string]::IsNullOrWhiteSpace($Text)) { return $false }
+    return ($Text -match '(?i)unauthoriz|forbidden|login|sign\s*in|authenticat\w*|authoriz\w*|ineligibletier|opening\s+authentication\s+page')
+}
+
 function Get-AntigravityErrorMessage {
     param([string]$StdoutText, [string]$StderrText)
     $combined = @($StderrText, $StdoutText) -join "`n"
     if ([string]::IsNullOrWhiteSpace($combined)) { return $null }
     $lines = @($combined -split "`r?`n")
-    # `auth` isolado (\bauth\b) NAO casa "authentication"/"authenticating" - paridade com o mesmo
-    # defeito corrigido em GeminiCliSupport.ps1 (2026-08-06). Importa aqui mais que no Gemini: o
-    # Invoke-Antigravity tem FALLBACK de texto bruto, entao um prompt interativo de login com exit 0
-    # ("Opening authentication page in your browser...") seria devolvido como PARECER do modelo se o
-    # extrator nao o reconhecesse. `credential` fica FORA de proposito: CLIs desta familia emitem
-    # "Loaded cached credentials" em execucao normal, e isso viraria ruido dentro do erro.
     $interesting = @($lines | Where-Object {
         $_ -match '(?i)\b(error|failed|unauthorized|forbidden|not\s+available|requires|login|sign\s*in|auth|authenticat\w*|authoriz\w*|invalid|quota|rate\s*limit|exhausted)\b'
     })
