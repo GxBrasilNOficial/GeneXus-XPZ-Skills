@@ -126,6 +126,26 @@ function Resolve-GitRepositoryContext {
     }
 }
 
+function Get-PropOrDefault {
+    # Acesso seguro a propriedade de objeto vindo de ConvertFrom-Json: sob
+    # Set-StrictMode -Version Latest, ler propriedade inexistente lanca. Usado para
+    # projetar campos opcionais de gate sem acoplar o orquestrador a uma versao
+    # especifica do JSON do gate.
+    param(
+        $Object,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Name,
+
+        $Default = $null
+    )
+
+    if ($null -eq $Object) { return $Default }
+    $prop = $Object.PSObject.Properties[$Name]
+    if ($null -eq $prop -or $null -eq $prop.Value) { return $Default }
+    return $prop.Value
+}
+
 function Get-ChangedFileKind {
     param(
         [Parameter(Mandatory = $true)]
@@ -343,9 +363,13 @@ $unexpectedCharGate = [ordered]@{
 }
 
 $newTokenPropagationGate = [ordered]@{
-    script   = 'scripts/Test-PrePushNewTokenPropagation.ps1'
-    status   = 'skipped'
-    findings = @()
+    script              = 'scripts/Test-PrePushNewTokenPropagation.ps1'
+    status              = 'skipped'
+    candidateCount      = 0
+    classCounts         = $null
+    truncated           = $false
+    truncatedProseCount = 0
+    findings            = @()
 }
 
 $sharedScriptSkillGate = [ordered]@{
@@ -524,6 +548,14 @@ if (Test-Path -LiteralPath $newTokenPropagationScript -PathType Leaf) {
     if ($newTokenExitCode -eq 0 -and $null -ne $newTokenObject) {
         $newTokenPropagationGate.status = $newTokenObject.status
         $newTokenPropagationGate.findings = @($newTokenObject.findings)
+        # O teto -MaxFindings trunca so a classe 'prose'. Sem projetar estes campos,
+        # o revisor (em especial o semantic-only, que so tem o dossie) ve as candidatas
+        # listadas e nao sabe quantas foram descartadas — e o 13 (passo 2) promete que
+        # truncatedProseCount informa exatamente isso.
+        $newTokenPropagationGate.candidateCount = [int](Get-PropOrDefault $newTokenObject 'candidateCount' 0)
+        $newTokenPropagationGate.classCounts = (Get-PropOrDefault $newTokenObject 'classCounts' $null)
+        $newTokenPropagationGate.truncated = [bool](Get-PropOrDefault $newTokenObject 'truncated' $false)
+        $newTokenPropagationGate.truncatedProseCount = [int](Get-PropOrDefault $newTokenObject 'truncatedProseCount' 0)
     } else {
         $newTokenPropagationGate.status = 'warn'
         $newTokenPropagationGate.findings = @([pscustomobject][ordered]@{
@@ -711,6 +743,11 @@ foreach ($unexpectedCharFinding in @($unexpectedCharGate.findings)) {
         ("Caractere inesperado ({0}): {1}" -f $unexpectedCharFinding.code, $unexpectedCharFinding.message)
     )
 }
+if ($newTokenPropagationGate.truncated) {
+    [void]$agentWarnings.Add(
+        ("Propagacao de termo novo: {0} candidata(s) de classe 'prose' foram DESCARTADAS pelo teto -MaxFindings e nao aparecem nas candidatas listadas; as nao-prosa nunca truncam. Ruido alto de prosa pode diluir uma candidata legitima — conferir os pares em pairsConsidered antes de tratar a lista como exaustiva." -f $newTokenPropagationGate.truncatedProseCount)
+    )
+}
 foreach ($newTokenFinding in @($newTokenPropagationGate.findings)) {
     [void]$agentWarnings.Add(
         ("Propagacao de termo novo (candidata consultiva) ({0}): {1} [{2}]" -f $newTokenFinding.code, $newTokenFinding.message, $newTokenFinding.path)
@@ -895,6 +932,9 @@ if ($AsJson) {
     }
 
     Write-Output ("NEW_TOKEN_PROPAGATION_GATE={0}" -f $newTokenPropagationGate.status)
+    if ($newTokenPropagationGate.truncated) {
+        Write-Output ("NEW_TOKEN_PROPAGATION_PROSE_TRUNCATED={0}" -f $newTokenPropagationGate.truncatedProseCount)
+    }
     foreach ($finding in @($newTokenPropagationGate.findings)) {
         Write-Output ("NEW_TOKEN_PROPAGATION_CANDIDATE: {0}: {1}" -f $finding.path, $finding.message)
     }
