@@ -22,9 +22,14 @@
          e a assinatura de "alias acrescentado a uma enumeracao existente"
          (ex.: '- ...-ObjectNames ou -ObjectGuids' -> '+ ...-ObjectList,
          -ObjectNames ou -ObjectGuids').
-      4. Varre o estado atual do repositório (.md, .ps1, .py fora de historico/)
-         por linhas que mencionam P sem T (ignorando a própria declaracao de P:
-         .PARAMETER P e bloco param): cada uma e uma CANDIDATA a mencao defasada.
+      4. Varre o estado atual do repositório (.md, .ps1, .py VERSIONADOS, fora de
+         historico/) por linhas que mencionam P sem T (ignorando a própria
+         declaracao de P: .PARAMETER P e bloco param): cada uma e uma CANDIDATA a
+         mencao defasada. A varredura usa `git ls-files` porque material ignorado
+         ou nao rastreado (rascunho de rodada em Temp/, node_modules/ vendorizado)
+         não e documento do repositório e não pode ficar defasado num push — so
+         inflaria o livro-razao de vereditos. Raiz que não seja work tree Git cai
+         no walk de filesystem.
 
     Consultivo: não prova propagacao completa nem reprova sozinho. Findings são
     severity 'warn'; o orquestrador os despeja em agentWarnings e a fase
@@ -304,11 +309,27 @@ $proseCount = 0
 $truncatedProseCount = 0
 
 if ($pairs.Count -gt 0) {
-    $files = @(Get-ChildItem -LiteralPath $resolvedRoot -Recurse -File -ErrorAction SilentlyContinue |
-        Where-Object {
-            $_.Extension -in @('.md', '.ps1', '.py') -and
-            $_.FullName -notmatch '[\\/](\.git|historico)[\\/]'
-        })
+    # Universo da varredura = arquivos VERSIONADOS. Material ignorado/nao rastreado
+    # (Temp/ de rodadas de revisao, node_modules/ vendorizado) nao e documento do
+    # repositório: nao pode ficar defasado num push e so infla o livro-razao de
+    # vereditos exigido pelo orquestrador. Fallback ao walk de filesystem quando a
+    # raiz nao for uma work tree Git (uso fora do orquestrador).
+    $trackedResult = Invoke-RepoGit -RepositoryRoot $resolvedRoot -Arguments @('ls-files', '--cached', '--', '*.md', '*.ps1', '*.py')
+    if ($trackedResult.ExitCode -eq 0) {
+        $files = @($trackedResult.Lines |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+            ForEach-Object { [System.IO.FileInfo]::new((Join-Path $resolvedRoot $_)) } |
+            Where-Object {
+                $_.Exists -and
+                $_.FullName -notmatch '[\\/](\.git|historico)[\\/]'
+            })
+    } else {
+        $files = @(Get-ChildItem -LiteralPath $resolvedRoot -Recurse -File -ErrorAction SilentlyContinue |
+            Where-Object {
+                $_.Extension -in @('.md', '.ps1', '.py') -and
+                $_.FullName -notmatch '[\\/](\.git|historico)[\\/]'
+            })
+    }
 
     foreach ($file in $files) {
         $fileLines = @()
