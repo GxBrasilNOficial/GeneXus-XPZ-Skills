@@ -16,7 +16,12 @@
         código cercado -> 'command-example';
       - truncamento ciente de classe: com teto baixo e prosa abundante, a
         prosa e limitada (truncatedProseCount > 0) mas a candidata nao-prosa
-        sobrevive ao truncamento.
+        sobrevive ao truncamento;
+      - universo VERSIONADO da varredura: mencao defasada em arquivo ignorado
+        pelo .gitignore (Temp/, node_modules/) ou apenas nao rastreado NAO vira
+        candidata, enquanto a mencao versionada equivalente continua virando —
+        trava a regressao de voltar ao walk de filesystem, que inflava o
+        livro-razao de vereditos com material que nao e documento do repo.
 #>
 
 Set-StrictMode -Version Latest
@@ -200,6 +205,37 @@ if ($null -ne $ObjectGuids -and $ObjectGuids.Count -gt 0) { $usaGuids = $true }
     $paramListKept = @($truncPaths | Where-Object { $_ -like 'param-list.md:*' })
     if ($paramListKept.Count -eq 0) {
         throw "candidata param-list-item NAO deveria ser truncada pelo teto; ausente em: $($truncPaths -join ', ')"
+    }
+
+    # --- Universo VERSIONADO: ignorado/nao rastreado fica fora da varredura ---
+    # A varredura usa `git ls-files`; material ignorado (rascunho de rodada em
+    # Temp/, dependencia vendorizada em node_modules/) ou apenas nao rastreado
+    # nao e documento do repositório: nao pode ficar defasado num push e so
+    # inflaria o livro-razao de vereditos exigido pelo orquestrador.
+    Write-TempFile -RelativePath '.gitignore' -Content "Temp/`nnode_modules/`n"
+    Write-TempFile -RelativePath 'Temp/rascunho.md' -Content "Rascunho: use ObjectNames por enquanto.`n"
+    Write-TempFile -RelativePath 'node_modules/vendor.md' -Content "Vendor doc mentions ObjectNames only.`n"
+    # Nao ignorado, mas nunca adicionado ao indice (apenas nao rastreado).
+    Write-TempFile -RelativePath 'nao-rastreado.md' -Content "Nota solta citando ObjectNames.`n"
+    [void](Invoke-TempGit @('add', '.gitignore'))
+    [void](Invoke-TempGit @('commit', '-q', '-m', 'ignora Temp e node_modules'))
+
+    $trackedOutput = & pwsh -NoProfile -File $scriptPath -RootPath $tempRoot -BaseRef $baseSha -AsJson 2>&1
+    $trackedResult = (($trackedOutput | Out-String).Trim()) | ConvertFrom-Json
+    $trackedPaths = @($trackedResult.findings | ForEach-Object { $_.path })
+
+    foreach ($fora in @('rascunho.md', 'vendor.md', 'nao-rastreado.md')) {
+        $hit = @($trackedPaths | Where-Object { $_ -like "*$fora*" })
+        if ($hit.Count -ne 0) {
+            throw "$fora nao e versionado e NAO deveria virar candidata (regressao para o walk de filesystem); candidatas: $($trackedPaths -join ', ')"
+        }
+    }
+
+    # Controle positivo do mesmo run: a mencao VERSIONADA equivalente continua
+    # virando candidata — prova que a varredura nao ficou vazia por acidente.
+    $versionadoHit = @($trackedPaths | Where-Object { $_ -like 'exemplo.md:*' })
+    if ($versionadoHit.Count -eq 0) {
+        throw "exemplo.md (mencao defasada VERSIONADA) deveria continuar candidata; candidatas: $($trackedPaths -join ', ')"
     }
 
     Write-Output 'OK: Test-PrePushNewTokenPropagationSelfTest.ps1'
