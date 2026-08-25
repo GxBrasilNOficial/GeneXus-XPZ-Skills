@@ -308,6 +308,21 @@ No backend opencode, `-Model` deve usar o identificador aceito pelo CLI no forma
 `provider/modelo`. Para Ollama Cloud, use `ollama-cloud/deepseek-v4-pro`; o nome curto
 `deepseek-v4-pro` não identifica o provider e tende a falhar antes da chamada.
 
+> **`opencode models` LISTA ≠ o endpoint ACEITA (medido 2026-08-24).** O catálogo do opencode
+> continua anunciando ids que o provider já aposentou: a chamada morre com
+> `AI_APICallError: Gone` (HTTP **410**) e o adapter devolve `BLOCK: opencode saiu com codigo 1`
+> com **stdout e stderr vazios** — a causa só aparece no log próprio do opencode
+> (`~/.local/share/opencode/log/`, respeita `XDG_DATA_HOME`), como no caso do 429. Medido em
+> `nvidia/*`: `z-ai/glm-5.2` e `deepseek-ai/deepseek-v4-pro` deram 410 estando listados, enquanto
+> `minimaxai/minimax-m3` respondia normalmente — é **por modelo**, não por endpoint. Consequências:
+> (a) 410 é **permanente**, não adianta redisparar nem aumentar timeout — o id precisa mudar;
+> (b) no painel, classificar como `unavailable` (reason `model-gone`), **não** `error` nem `timeout`,
+> que sugeririam algo re-tentável; (c) **não** promover modelo a titular ou a `fallbackChain` só
+> porque aparece no catálogo — sondar com prompt trivial antes de gravar curadoria (mesmo espírito
+> da nota do Copilot sobre id aposentado acima). Cuidado ao sondar vários em rajada: o `nvidia/*`
+> também devolve `ResourceExhausted: Worker local total request limit reached`, que é **saturação de
+> concorrência** e não aposentadoria — espaçar as sondas para não confundir os dois.
+
 Backend codex (`codex exec`, default da própria ferramenta/config quando `-Model` é omitido, sandbox `read-only` fixo):
 - `Invoke-Codex.ps1 [-Message <prompt> | -MessagePath <arquivo>] [-Model <m>] [-Oss] [-LocalProvider <ollama|lmstudio>] [-Profile <id>] [-Cd <dir>] [-CodexExe <path>] [-TimeoutSec <s>]` — síncrono (prompt → texto). Prompt via stdin; resposta final pelo `output-last-message`. `-MessagePath` lê o prompt de arquivo (exclusivo com `-Message`; dispensa `(Get-Content)` inline no chamador); stdin-based, então **não** está sujeito ao teto ~32KB.
 - `Start-CodexJob.ps1 [-Message <prompt> | -MessagePath <arquivo>] [-Model <m>] [-Oss] [-LocalProvider <p>] [-Profile <id>] [-Cd <dir>] [-CodexExe <path>] [-NoWatcher] [-TempDir <path>] [-KeepDays <n>]` — assíncrono; retorna `{jobId, pid, stream, lastmsg, result, watcher}`; abre janela de acompanhamento por padrão. `-MessagePath` exclusivo com `-Message` (o texto do prompt segue persistido em `request.json`/`stdin.txt`).
