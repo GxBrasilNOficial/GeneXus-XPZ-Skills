@@ -100,7 +100,7 @@ Assert-True (
     (@($r5.blockingReasons) -contains 'preferred-snapshot-missing')
 ) 'Caso 5: deveria bloquear por states-missing e/ou snapshot-missing.'
 
-# (6) Ja havia preferred-reviewers.json + estados finais + snapshot -> not_applicable e valido.
+# (6) Ja havia lista preferida resolvida + estados finais + snapshot -> not_applicable e valido.
 $statesOk = @'
 [
   {"backend":"claude-code","targetModelKey":"anthropic/claude-opus-4-8","family":"anthropic","state":"responded"},
@@ -123,6 +123,8 @@ Assert-True ($r6.closeoutReady -eq $true) ("Caso 6: preferencias existentes com 
 Assert-True ($r6.requiresPreferredOffer -eq $false) 'Caso 6: requiresPreferredOffer deveria ser false.'
 Assert-True (@($r6.preferredReviewerStates).Count -eq 4) 'Caso 6: deveria ecoar 4 estados de revisores preferidos.'
 Assert-True ([string]$r6.receiptAddendum -match 'registrados=4') 'Caso 6: recibo deveria registrar quantidade de estados.'
+Assert-True ([string]$r6.receiptAddendum -match 'lista preferida ja resolvida no inicio da rodada') 'Caso 6: motivo de curadoria nao deve citar so preferred-reviewers.json.'
+Assert-True ([string]$r6.receiptAddendum -notmatch 'preferred-reviewers\.json ja existia') 'Caso 6: frase legada do motivo de curadoria nao deve voltar.'
 
 # (7) Estado incompleto em revisor preferido -> bloqueia.
 $statesIncomplete = '[{"backend":"opencode","targetModelKey":"ollama-cloud/kimi-k2.7-code","family":"ollama-cloud","state":"gateAllow"}]'

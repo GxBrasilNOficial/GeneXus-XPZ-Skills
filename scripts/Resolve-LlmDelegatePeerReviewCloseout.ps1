@@ -560,7 +560,7 @@ $closeoutReady = ($blockingReasons.Count -eq 0)
 $curationReceipt = if ($requiresOffer) {
     "Curadoria de revisores preferidos: oferta=$PreferredReviewersOfferState; destino=$preferredPath."
 } else {
-    "Curadoria de revisores preferidos: not_applicable; motivo=" + ($(if ($hadPreferred) { 'preferred-reviewers.json ja existia' } else { 'sem selecao manual de revisores' }))
+    "Curadoria de revisores preferidos: not_applicable; motivo=" + ($(if ($hadPreferred) { 'lista preferida ja resolvida no inicio da rodada' } else { 'sem selecao manual de revisores' }))
 }
 $stateReceipt = if ($hadPreferred) {
     "Estados dos revisores preferidos: registrados=$($preferredStateRows.Count)."
