@@ -82,7 +82,7 @@
 param(
     [Parameter(Position = 0)] [string] $Model,
     [Parameter(Mandatory)] [ValidateSet('kb-sensitive', 'public')] [string] $PayloadSensitivity,
-    [ValidateSet('opencode', 'codex', 'claude-code', 'copilot', 'gemini', 'antigravity')] [string] $Backend = 'opencode',
+    [ValidateSet('opencode', 'codex', 'claude-code', 'copilot', 'gemini', 'antigravity', 'orchestrator-native')] [string] $Backend = 'opencode',
     [switch] $Oss,
     [ValidateSet('ollama', 'lmstudio')] [string] $LocalProvider,
     [string] $Profile,
@@ -144,12 +144,13 @@ if (-not $PolicyPath -and $ParallelKbRoot) {
 
 # 1) Resolve a localidade do modelo (resolvedor por backend)
 $resolverName = switch ($Backend) {
-    'codex'       { 'Resolve-CodexModelLocality.ps1' }
-    'claude-code' { 'Resolve-ClaudeCodeModelLocality.ps1' }
-    'copilot'     { 'Resolve-CopilotModelLocality.ps1' }
-    'gemini'      { 'Resolve-GeminiModelLocality.ps1' }
-    'antigravity' { 'Resolve-AntigravityModelLocality.ps1' }
-    default       { 'Resolve-OpenCodeModelLocality.ps1' }
+    'codex'                { 'Resolve-CodexModelLocality.ps1' }
+    'claude-code'          { 'Resolve-ClaudeCodeModelLocality.ps1' }
+    'copilot'              { 'Resolve-CopilotModelLocality.ps1' }
+    'gemini'               { 'Resolve-GeminiModelLocality.ps1' }
+    'antigravity'          { 'Resolve-AntigravityModelLocality.ps1' }
+    'orchestrator-native'  { 'Resolve-OrchestratorNativeModelLocality.ps1' }
+    default                { 'Resolve-OpenCodeModelLocality.ps1' }
 }
 $localityScript = Join-Path $PSScriptRoot $resolverName
 if (-not (Test-Path -LiteralPath $localityScript -PathType Leaf)) {

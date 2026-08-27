@@ -1,51 +1,33 @@
 #requires -Version 7.4
 <#
 .SYNOPSIS
-    Le a lista curada de revisores preferidos e a cruza com o manifesto de capacidade,
-    devolvendo a composicao SUGERIDA do painel de revisao por pares.
+    Le a lista curada de revisores preferidos (schema 3) em cascata orchestrator->machine
+    e a cruza com o manifesto de capacidade.
 .DESCRIPTION
     Parte do mecanismo da skill xpz-llm-delegate; metodologia em 15-revisao-por-pares.md.
+    INVARIANTE: preferencia != autorizacao. O gate Resolve-LlmDelegateAuthorization.ps1
+    reavalia por revisor no envio.
 
-    INVARIANTE (preferencia != autorizacao): este resolvedor NAO emite veredito de
-    autorizacao e NAO consome capabilities.json como verdade do gate. A autorizacao
-    continua sendo do Resolve-LlmDelegateAuthorization.ps1, chamado POR REVISOR no momento
-    do envio (reavalia destino+sensibilidade). Aqui so se sugere "o que voce prefere que
-    esta disponivel".
+    Cascata (sem -PreferredPath): preferred-reviewers.<orch>.json schema 3, senao machine
+    preferred-reviewers.json schema 3. Ficheiro efetivo ilegivel/schema!=3 -> exit 2
+    (nao cai no nivel seguinte). Desvio -PreferredPath: so esse ficheiro.
 
-    Cruza:
-      - preferencia (preferred-reviewers.json) — o que o usuario curou
-      - disponivel (capabilities.json) — best-effort: o manifesto pode NAO enumerar opencode
-        (config minima), entao availableInManifest=false ali nao prova indisponibilidade.
-
-    Compatibilidade:
-      - ausencia de schemaVersion = v1;
-      - schema v1 plano continua aceito;
-      - schema v2 aceita rank e fallbackChain[];
-      - invokeArgs.backend, quando presente, deve coincidir com backend no primario e em
-        cada fallback; divergencia bloqueia antes do dispatcher.
-
-    A regra de PAPEL do README (forte vs voz adicional; veto duro) e aplicada pelo agente
-    /pela metodologia do 15 ao montar o painel — nao por este script (papel "forte/fraco"
-    nao e dado de maquina). O veto duro ja foi descartado na gravacao (Set-...).
-
-    Campo `family` da composicao sugerida: via Get-LlmDelegateTargetFamily (familia
-    estrutural). Chaves sem barra (ex.: malformadas) preservam a propria chave como familia
-    — alinhado ao helper compartilhado; nao voltam null.
-
-    Sem o arquivo de preferencia -> hasPreferences=false (a oferta cai no comportamento
-    atual: catalogo + politica do README).
-
-    Saida: objeto JSON de maquina no stdout.
+    -Orchestrator obrigatorio no corpo (cursor|claude-code|codex|opencode).
+    stdout=JSON; stderr=diagnostico.
+.PARAMETER Orchestrator
+    cursor|claude-code|codex|opencode.
+.PARAMETER PreferredRoot
+    Default %LOCALAPPDATA%\xpz-llm-delegate (cascata).
 .PARAMETER PreferredPath
-    Caminho do preferred-reviewers.json. Default: %LOCALAPPDATA%\xpz-llm-delegate\preferred-reviewers.json.
+    Desvio explicito sem default.
 .PARAMETER CapabilitiesPath
-    Caminho do capabilities.json. Default: %LOCALAPPDATA%\xpz-llm-delegate\capabilities.json.
-.EXAMPLE
-    .\Resolve-LlmDelegatePreferredReviewers.ps1
+    Default %LOCALAPPDATA%\xpz-llm-delegate\capabilities.json (nao derivado de PreferredRoot).
 #>
 [CmdletBinding()]
 param(
-    [string] $PreferredPath = (Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'xpz-llm-delegate' | Join-Path -ChildPath 'preferred-reviewers.json'),
+    [string] $Orchestrator,
+    [string] $PreferredRoot,
+    [string] $PreferredPath,
     [string] $CapabilitiesPath = (Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'xpz-llm-delegate' | Join-Path -ChildPath 'capabilities.json')
 )
 
@@ -56,9 +38,58 @@ $ErrorActionPreference = 'Stop'
 
 function Get-Prop {
     param($Obj, [string]$Name)
-    if ($null -ne $Obj -and $Obj.PSObject.Properties[$Name]) { return $Obj.PSObject.Properties[$Name].Value }
+    if ($null -ne $Obj -and -not [string]::IsNullOrEmpty($Name) -and $Obj.PSObject.Properties[$Name]) {
+        return $Obj.PSObject.Properties[$Name].Value
+    }
     return $null
 }
+
+function Write-ErrDiag {
+    param([string]$Message)
+    if (-not [string]::IsNullOrWhiteSpace($Message)) {
+        [Console]::Error.WriteLine($Message)
+    }
+}
+
+function Emit-ResolveResult {
+    param([hashtable]$Fields, [int]$ExitCode = 0)
+    ([pscustomobject]$Fields) | ConvertTo-Json -Depth 12
+    exit $ExitCode
+}
+
+function Stop-WithReason {
+    param(
+        [string]$Reason,
+        [int]$ExitCode,
+        [string]$Detail = '',
+        [hashtable]$Extra = @{}
+    )
+    Write-ErrDiag $Detail
+    $fields = @{
+        hasPreferences         = $false
+        reason                 = $Reason
+        schemaVersion          = $null
+        preferenceSource       = $null
+        effectivePreferredPath = $null
+        orchestrator           = $null
+        calibratedBy           = $null
+        fallbackPolicy         = $null
+        diagnostics            = @()
+        reviewers              = @()
+        note                   = $script:Note
+        updatedAt              = $null
+        migratedFrom           = $null
+    }
+    foreach ($k in $Extra.Keys) { $fields[$k] = $Extra[$k] }
+    Emit-ResolveResult -Fields $fields -ExitCode $ExitCode
+}
+
+$script:Note = 'Sugestao de composicao; NAO e autorizacao. O gate Resolve-LlmDelegateAuthorization.ps1 reavalia destino+sensibilidade POR REVISOR no envio. availableInManifest e best-effort: o manifesto pode nao enumerar opencode (config minima).'
+$allowedOrchestrators = @('cursor', 'claude-code', 'codex', 'opencode')
+$allowedDispatchBackends = @('opencode', 'codex', 'claude-code', 'copilot', 'gemini', 'antigravity')
+$allowedNativeBackends = @('orchestrator-native')
+$supportedFallbackActivateOn = @('quota', 'timeout', 'error', 'unavailable')
+$legacyFallbackActivateOn = @('quota', 'timeout', 'error', 'unavailable', 'noResponse')
 
 function Get-Family {
     param([string]$TargetModelKey)
@@ -70,7 +101,7 @@ function Get-ManifestModelMap {
     $map = @{}
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $map }
     try {
-        $cap = Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
+        $cap = Get-Content -LiteralPath $Path -Raw -Encoding utf8 | ConvertFrom-Json
         foreach ($b in @(Get-Prop $cap 'backends')) {
             foreach ($m in @(Get-Prop $b 'models')) {
                 $cm = [string](Get-Prop $m 'canonicalModel')
@@ -91,16 +122,17 @@ function Test-HardVetoTarget {
     return $false
 }
 
-$supportedFallbackActivateOn = @('quota', 'timeout', 'error', 'unavailable')
-$legacyFallbackActivateOn = @('quota', 'timeout', 'error', 'unavailable', 'noResponse')
-
 function Assert-ValidRankSet {
     param([object[]]$Reviewers)
     $seenRanks = [System.Collections.Generic.HashSet[int]]::new()
     foreach ($reviewer in @($Reviewers)) {
         $rank = [int](Get-Prop $reviewer 'rank')
-        if ($rank -lt 1) { throw "BLOCK: rank invalido ($rank); use inteiros positivos a partir de 1" }
-        if (-not $seenRanks.Add($rank)) { throw "BLOCK: rank duplicado ($rank) em preferred-reviewers.json" }
+        if ($rank -lt 1) {
+            Stop-WithReason -Reason 'rank-invalid' -ExitCode 3 -Detail "rank invalido ($rank)"
+        }
+        if (-not $seenRanks.Add($rank)) {
+            Stop-WithReason -Reason 'rank-duplicate' -ExitCode 3 -Detail "rank duplicado ($rank)"
+        }
     }
 }
 
@@ -108,7 +140,9 @@ function ConvertTo-SupportedFallbackPolicy {
     param($Policy)
     if ($null -eq $Policy) { return $null }
     $mode = [string](Get-Prop $Policy 'mode')
-    if ($mode -ne 'ordered-chain') { throw "BLOCK: fallbackPolicy.mode suportado e somente 'ordered-chain'; veio '$mode'" }
+    if ($mode -ne 'ordered-chain') {
+        Stop-WithReason -Reason 'fallback-policy-invalid' -ExitCode 3 -Detail "fallbackPolicy.mode='$mode'"
+    }
     $activateOn = @(Get-Prop $Policy 'defaultActivateOn' | ForEach-Object { [string]$_ })
     $legacyNoResponsePolicy = ($activateOn.Count -eq $legacyFallbackActivateOn.Count)
     if ($legacyNoResponsePolicy) {
@@ -117,20 +151,22 @@ function ConvertTo-SupportedFallbackPolicy {
         }
     }
     if (-not $legacyNoResponsePolicy -and $activateOn.Count -ne $supportedFallbackActivateOn.Count) {
-        throw "BLOCK: fallbackPolicy.defaultActivateOn deve casar o contrato suportado: $($supportedFallbackActivateOn -join ', ')"
+        Stop-WithReason -Reason 'fallback-policy-invalid' -ExitCode 3 -Detail 'defaultActivateOn fora do contrato'
     }
     if (-not $legacyNoResponsePolicy) {
         for ($i = 0; $i -lt $supportedFallbackActivateOn.Count; $i++) {
             if ($activateOn[$i] -ne $supportedFallbackActivateOn[$i]) {
-                throw "BLOCK: fallbackPolicy.defaultActivateOn deve preservar a ordem suportada: $($supportedFallbackActivateOn -join ', ')"
+                Stop-WithReason -Reason 'fallback-policy-invalid' -ExitCode 3 -Detail 'defaultActivateOn ordem invalida'
             }
         }
     }
     $gateAsk = [string](Get-Prop $Policy 'gateAskBehavior')
-    if ($gateAsk -ne 'ask-human') { throw "BLOCK: fallbackPolicy.gateAskBehavior suportado e somente 'ask-human'; veio '$gateAsk'" }
+    if ($gateAsk -ne 'ask-human') {
+        Stop-WithReason -Reason 'fallback-policy-invalid' -ExitCode 3 -Detail "gateAskBehavior='$gateAsk'"
+    }
     $gateDeny = [string](Get-Prop $Policy 'gateDenyBehavior')
     if ($gateDeny -ne 'stop-or-suggest-manual-alternative') {
-        throw "BLOCK: fallbackPolicy.gateDenyBehavior suportado e somente 'stop-or-suggest-manual-alternative'; veio '$gateDeny'"
+        Stop-WithReason -Reason 'fallback-policy-invalid' -ExitCode 3 -Detail "gateDenyBehavior='$gateDeny'"
     }
     return [pscustomobject]@{
         mode              = 'ordered-chain'
@@ -146,14 +182,14 @@ function Assert-ReviewerValid {
     $target = [string](Get-Prop $Reviewer 'targetModelKey')
     $invokeArgs = Get-Prop $Reviewer 'invokeArgs'
     if ([string]::IsNullOrWhiteSpace($backend) -or [string]::IsNullOrWhiteSpace($target) -or $null -eq $invokeArgs) {
-        throw "BLOCK: $OwnerLabel sem backend, targetModelKey ou invokeArgs completo"
+        Stop-WithReason -Reason 'reviewer-incomplete' -ExitCode 3 -Detail "$OwnerLabel incompleto"
     }
     $invBackend = [string](Get-Prop $invokeArgs 'backend')
     if (-not [string]::IsNullOrWhiteSpace($invBackend) -and $invBackend -ne $backend) {
-        throw "BLOCK: $OwnerLabel tem invokeArgs.backend ('$invBackend') divergente de backend ('$backend')"
+        Stop-WithReason -Reason 'invoke-args-backend-divergent' -ExitCode 3 -Detail "$OwnerLabel invokeArgs.backend diverge"
     }
     if (Test-HardVetoTarget -TargetModelKey $target) {
-        throw "BLOCK: $OwnerLabel usa modelo sob veto duro: $target"
+        Stop-WithReason -Reason 'hard-veto' -ExitCode 3 -Detail "$OwnerLabel veto duro: $target"
     }
 }
 
@@ -162,8 +198,29 @@ function ConvertTo-ResolvedReviewer {
     Assert-ReviewerValid -Reviewer $Reviewer -OwnerLabel 'revisor preferido'
     $backend = [string](Get-Prop $Reviewer 'backend')
     $target = [string](Get-Prop $Reviewer 'targetModelKey')
+    $isNative = ($allowedNativeBackends -contains $backend)
+    $typeRaw = Get-Prop $Reviewer 'type'
+    $type = if ($null -ne $typeRaw -and -not [string]::IsNullOrWhiteSpace([string]$typeRaw)) {
+        [string]$typeRaw
+    } elseif ($isNative) {
+        'orchestrator-native-subagent'
+    } else {
+        'delegation-cli'
+    }
     $rankValue = Get-Prop $Reviewer 'rank'
     $rank = if ($null -ne $rankValue) { [int]$rankValue } else { $DefaultRank }
+    $effortRaw = Get-Prop $Reviewer 'reasoningEffort'
+    $effort = if ($null -eq $effortRaw -or [string]::IsNullOrWhiteSpace([string]$effortRaw)) { 'unset' } else { [string]$effortRaw }
+    $harnessRaw = Get-Prop $Reviewer 'harnessModelId'
+    $harnessId = if ($isNative) {
+        if ($null -eq $harnessRaw -or [string]::IsNullOrWhiteSpace([string]$harnessRaw)) {
+            Stop-WithReason -Reason 'native-harness-model-id-missing' -ExitCode 3 -Detail 'harnessModelId ausente no nativo'
+        }
+        ([string]$harnessRaw).Trim()
+    } else {
+        $null
+    }
+
     $manifestEntry = $ManifestMap[$target]
     $available = ($null -ne $manifestEntry)
     $diagnostics = [System.Collections.Generic.List[string]]::new()
@@ -176,13 +233,19 @@ function ConvertTo-ResolvedReviewer {
     $fallbackIndex = 0
     $fallbackItems = Get-Prop $Reviewer 'fallbackChain'
     if ($null -eq $fallbackItems) { $fallbackItems = @() }
+    if ($isNative -and @($fallbackItems).Count -gt 0) {
+        Stop-WithReason -Reason 'native-fallback-chain-forbidden' -ExitCode 3 -Detail 'nativo com fallbackChain'
+    }
     foreach ($fb in @($fallbackItems)) {
         Assert-ReviewerValid -Reviewer $fb -OwnerLabel "fallbackChain[$fallbackIndex] de $target"
         $fbBackend = [string](Get-Prop $fb 'backend')
         $fbTarget = [string](Get-Prop $fb 'targetModelKey')
+        if ($allowedNativeBackends -contains $fbBackend) {
+            Stop-WithReason -Reason 'native-fallback-chain-forbidden' -ExitCode 3 -Detail "nativo como elo: $fbTarget"
+        }
         $key = "$fbBackend|$fbTarget"
         if (-not $seen.Add($key)) {
-            throw "BLOCK: ciclo/duplicidade em fallbackChain de $target envolvendo $fbTarget"
+            Stop-WithReason -Reason 'fallback-cycle' -ExitCode 3 -Detail "ciclo envolvendo $fbTarget"
         }
         $fbManifest = $ManifestMap[$fbTarget]
         $fbAvailable = ($null -ne $fbManifest)
@@ -201,6 +264,9 @@ function ConvertTo-ResolvedReviewer {
                 availableInManifest = $fbAvailable
                 capability          = $fbManifest
                 diagnostics         = @($fbDiagnostics)
+                type                = 'delegation-cli'
+                harnessModelId      = $null
+                reasoningEffort     = 'unset'
             })
         $fallbackIndex++
     }
@@ -215,54 +281,194 @@ function ConvertTo-ResolvedReviewer {
         availableInManifest = $available
         capability          = $manifestEntry
         diagnostics         = @($diagnostics)
+        type                = $type
+        harnessModelId      = $harnessId
+        reasoningEffort     = $effort
     }
 }
 
-$note = 'Sugestao de composicao; NAO e autorizacao. O gate Resolve-LlmDelegateAuthorization.ps1 reavalia destino+sensibilidade POR REVISOR no envio. availableInManifest e best-effort: o manifesto pode nao enumerar opencode (config minima).'
-
-if (-not (Test-Path -LiteralPath $PreferredPath -PathType Leaf)) {
-    [pscustomobject]@{
-        hasPreferences = $false
-        reason         = 'no-preferred-file'
-        reviewers      = @()
-        note           = $note
-    } | ConvertTo-Json -Depth 8
-    return
+function Get-DefaultPreferredRoot {
+    return (Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'xpz-llm-delegate')
 }
 
-$pref = $null
-try { $pref = Get-Content -LiteralPath $PreferredPath -Raw | ConvertFrom-Json } catch {
-    [pscustomobject]@{
-        hasPreferences = $false
-        reason         = "preferred-file-unreadable: $($_.Exception.Message)"
-        reviewers      = @()
-        note           = $note
-    } | ConvertTo-Json -Depth 8
-    return
+function Read-PreferredDocument {
+    param(
+        [string]$Path,
+        [string]$PreferenceSource,
+        [string]$OrchestratorExpected,
+        [bool]$RequireOrchestratorMatch,
+        [System.Collections.Generic.List[string]]$Diagnostics
+    )
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+        return $null
+    }
+    $pref = $null
+    try {
+        $pref = Get-Content -LiteralPath $Path -Raw -Encoding utf8 | ConvertFrom-Json
+    } catch {
+        Stop-WithReason -Reason 'preferred-file-unreadable' -ExitCode 2 -Detail $_.Exception.Message -Extra @{
+            preferenceSource       = $PreferenceSource
+            effectivePreferredPath = [System.IO.Path]::GetFullPath($Path)
+            diagnostics            = @($Diagnostics)
+        }
+    }
+    $sv = Get-Prop $pref 'schemaVersion'
+    if ($null -eq $sv -or [int]$sv -ne 3) {
+        Stop-WithReason -Reason 'preferred-schema-unsupported' -ExitCode 2 -Detail "schemaVersion='$sv' em $Path; regrave com Set- schema 3" -Extra @{
+            preferenceSource       = $PreferenceSource
+            effectivePreferredPath = [System.IO.Path]::GetFullPath($Path)
+            schemaVersion          = $sv
+            diagnostics            = @($Diagnostics)
+        }
+    }
+    $fileOrch = [string](Get-Prop $pref 'orchestrator')
+    if ($RequireOrchestratorMatch) {
+        if ([string]::IsNullOrWhiteSpace($fileOrch) -or -not $fileOrch.Equals($OrchestratorExpected, [System.StringComparison]::OrdinalIgnoreCase)) {
+            Stop-WithReason -Reason 'orchestrator-mismatch' -ExitCode 2 -Detail "ficheiro orchestrator='$fileOrch' vs '$OrchestratorExpected'" -Extra @{
+                preferenceSource       = $PreferenceSource
+                effectivePreferredPath = [System.IO.Path]::GetFullPath($Path)
+                schemaVersion          = 3
+                orchestrator           = $fileOrch
+                diagnostics            = @($Diagnostics)
+            }
+        }
+    } elseif (-not [string]::IsNullOrWhiteSpace($fileOrch)) {
+        if (-not $fileOrch.Equals($OrchestratorExpected, [System.StringComparison]::OrdinalIgnoreCase)) {
+            Stop-WithReason -Reason 'orchestrator-mismatch' -ExitCode 2 -Detail "campo orchestrator='$fileOrch' vs '$OrchestratorExpected'" -Extra @{
+                preferenceSource       = $PreferenceSource
+                effectivePreferredPath = [System.IO.Path]::GetFullPath($Path)
+                schemaVersion          = 3
+                orchestrator           = $fileOrch
+                diagnostics            = @($Diagnostics)
+            }
+        }
+    }
+    return $pref
 }
 
-$schemaVersion = Get-Prop $pref 'schemaVersion'
-if ($null -eq $schemaVersion) { $schemaVersion = 1 }
-$reviewers = @(Get-Prop $pref 'reviewers')
-$fallbackPolicy = Get-Prop $pref 'fallbackPolicy'
-$fallbackPolicy = ConvertTo-SupportedFallbackPolicy -Policy $fallbackPolicy
-$manifestMap = Get-ManifestModelMap -Path $CapabilitiesPath
+function Emit-ResolvedDocument {
+    param(
+        $Pref,
+        [string]$PreferenceSource,
+        [string]$EffectivePath,
+        [string]$CapabilitiesPath,
+        [System.Collections.Generic.List[string]]$Diagnostics
+    )
+    $fallbackPolicy = ConvertTo-SupportedFallbackPolicy -Policy (Get-Prop $Pref 'fallbackPolicy')
+    $manifestMap = Get-ManifestModelMap -Path $CapabilitiesPath
+    $reviewers = @(Get-Prop $Pref 'reviewers')
+    $out = [System.Collections.Generic.List[object]]::new()
+    $rankCounter = 0
+    foreach ($r in $reviewers) {
+        $rankCounter++
+        $out.Add((ConvertTo-ResolvedReviewer -Reviewer $r -ManifestMap $manifestMap -DefaultRank $rankCounter))
+    }
+    $outSorted = @($out | Sort-Object -Property @{ Expression = { [int](Get-Prop $_ 'rank') } }, @{ Expression = { [string](Get-Prop $_ 'targetModelKey') } })
+    Assert-ValidRankSet -Reviewers $outSorted
 
-$out = [System.Collections.Generic.List[object]]::new()
-$rankCounter = 0
-foreach ($r in $reviewers) {
-    $rankCounter++
-    $out.Add((ConvertTo-ResolvedReviewer -Reviewer $r -ManifestMap $manifestMap -DefaultRank $rankCounter))
+    $updatedAtRaw = Get-Prop $Pref 'updatedAt'
+    $updatedAtOut = if ($updatedAtRaw -is [datetime]) {
+        $updatedAtRaw.ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
+    } else {
+        [string]$updatedAtRaw
+    }
+
+    Emit-ResolveResult -ExitCode 0 -Fields @{
+        hasPreferences         = $true
+        reason                 = $null
+        schemaVersion          = 3
+        preferenceSource       = $PreferenceSource
+        effectivePreferredPath = [System.IO.Path]::GetFullPath($EffectivePath)
+        orchestrator           = Get-Prop $Pref 'orchestrator'
+        calibratedBy           = Get-Prop $Pref 'calibratedBy'
+        fallbackPolicy         = $fallbackPolicy
+        diagnostics            = @($Diagnostics)
+        reviewers              = @($outSorted)
+        note                   = $script:Note
+        updatedAt              = $updatedAtOut
+        migratedFrom           = Get-Prop $Pref 'migratedFrom'
+    }
 }
-$outSorted = @($out | Sort-Object -Property @{ Expression = { [int](Get-Prop $_ 'rank') } }, @{ Expression = { [string](Get-Prop $_ 'targetModelKey') } })
-Assert-ValidRankSet -Reviewers $outSorted
 
-[pscustomobject]@{
-    hasPreferences = $true
-    schemaVersion  = [int]$schemaVersion
-    updatedAt      = [string](Get-Prop $pref 'updatedAt')
-    migratedFrom   = Get-Prop $pref 'migratedFrom'
-    fallbackPolicy = $fallbackPolicy
-    reviewers      = @($outSorted)
-    note           = $note
-} | ConvertTo-Json -Depth 12
+# --- params ---
+$orchTrim = if ($null -eq $Orchestrator) { '' } else { $Orchestrator.Trim() }
+if ([string]::IsNullOrWhiteSpace($orchTrim)) {
+    Stop-WithReason -Reason 'orchestrator-required' -ExitCode 1
+}
+if ($allowedOrchestrators -notcontains $orchTrim) {
+    Stop-WithReason -Reason 'orchestrator-invalid' -ExitCode 1 -Detail "orchestrator='$orchTrim'"
+}
+
+$hasPreferredPath = $PSBoundParameters.ContainsKey('PreferredPath') -and -not [string]::IsNullOrWhiteSpace($PreferredPath)
+$hasPreferredRoot = $PSBoundParameters.ContainsKey('PreferredRoot')
+if ($hasPreferredPath -and $hasPreferredRoot) {
+    Stop-WithReason -Reason 'preferred-path-mode-conflict' -ExitCode 1
+}
+
+$diagnostics = [System.Collections.Generic.List[string]]::new()
+
+if ($hasPreferredPath) {
+    $fullPath = [System.IO.Path]::GetFullPath($PreferredPath)
+    if (-not (Test-Path -LiteralPath $fullPath -PathType Leaf)) {
+        Emit-ResolveResult -ExitCode 0 -Fields @{
+            hasPreferences         = $false
+            reason                 = 'no-preferred-file'
+            schemaVersion          = $null
+            preferenceSource       = 'explicit-path'
+            effectivePreferredPath = $fullPath
+            orchestrator           = $null
+            calibratedBy           = $null
+            fallbackPolicy         = $null
+            diagnostics            = @()
+            reviewers              = @()
+            note                   = $script:Note
+            updatedAt              = $null
+            migratedFrom           = $null
+        }
+    }
+    $pref = Read-PreferredDocument -Path $fullPath -PreferenceSource 'explicit-path' `
+        -OrchestratorExpected $orchTrim -RequireOrchestratorMatch:$false -Diagnostics $diagnostics
+    Emit-ResolvedDocument -Pref $pref -PreferenceSource 'explicit-path' -EffectivePath $fullPath `
+        -CapabilitiesPath $CapabilitiesPath -Diagnostics $diagnostics
+}
+
+$root = if ($hasPreferredRoot -and -not [string]::IsNullOrWhiteSpace($PreferredRoot)) {
+    [System.IO.Path]::GetFullPath($PreferredRoot)
+} else {
+    Get-DefaultPreferredRoot
+}
+
+$orchPath = [System.IO.Path]::GetFullPath((Join-Path $root "preferred-reviewers.$orchTrim.json"))
+$machinePath = [System.IO.Path]::GetFullPath((Join-Path $root 'preferred-reviewers.json'))
+
+if (Test-Path -LiteralPath $orchPath -PathType Leaf) {
+    $pref = Read-PreferredDocument -Path $orchPath -PreferenceSource 'orchestrator' `
+        -OrchestratorExpected $orchTrim -RequireOrchestratorMatch:$true -Diagnostics $diagnostics
+    Emit-ResolvedDocument -Pref $pref -PreferenceSource 'orchestrator' -EffectivePath $orchPath `
+        -CapabilitiesPath $CapabilitiesPath -Diagnostics $diagnostics
+}
+
+$diagnostics.Add('orchestrator-file-absent')
+
+if (Test-Path -LiteralPath $machinePath -PathType Leaf) {
+    $pref = Read-PreferredDocument -Path $machinePath -PreferenceSource 'machine' `
+        -OrchestratorExpected $orchTrim -RequireOrchestratorMatch:$false -Diagnostics $diagnostics
+    Emit-ResolvedDocument -Pref $pref -PreferenceSource 'machine' -EffectivePath $machinePath `
+        -CapabilitiesPath $CapabilitiesPath -Diagnostics $diagnostics
+}
+
+Emit-ResolveResult -ExitCode 0 -Fields @{
+    hasPreferences         = $false
+    reason                 = 'no-preferred-file'
+    schemaVersion          = $null
+    preferenceSource       = 'none'
+    effectivePreferredPath = $null
+    orchestrator           = $null
+    calibratedBy           = $null
+    fallbackPolicy         = $null
+    diagnostics            = @($diagnostics)
+    reviewers              = @()
+    note                   = $script:Note
+    updatedAt              = $null
+    migratedFrom           = $null
+}

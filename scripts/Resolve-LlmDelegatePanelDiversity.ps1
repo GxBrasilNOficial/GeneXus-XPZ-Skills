@@ -6,49 +6,24 @@
 .DESCRIPTION
     Parte do mecanismo da skill xpz-llm-delegate; metodologia em 15-revisao-por-pares.md.
 
-    Por que existe: o modo de falha real foi o painel COLAPSAR para 1 revisor em contexto
-    kb-sensitive (os diversos eram externos -> gate `ask` -> agente descartou os `ask` em
-    silencio e seguiu com o unico pre-autorizado). Uma "revisao por pares" com 1 voz NAO e
-    revisao por pares (guardrail do 15/14). Este motor torna o piso MECANICO, em vez de
-    depender de regra textual que pode ser ignorada em silencio.
+    Familia no piso = Criador do Modelo via Get-LlmDelegateTargetFamily(targetModelKey).
+    family explicita no item e eco (nao governa allow/potential/dropped).
+    So criadores em Test-LlmDelegateFamilyKnown contam; unknown vao a droppedUnknownFamilies.
 
-    INVARIANTE (consultivo, nao autorizacao): este motor NAO decide allow/ask/deny — ele
-    recebe os vereditos que o gate (Resolve-LlmDelegateAuthorization.ps1) ja emitiu por
-    revisor, e so conta familias. O gate continua soberano por destino+sensibilidade.
+    hasFallbackEvidence exige (attemptRole=fallback OU fallbackOf nao vazio) E
+    (dispatchAttempted=true OU attempts>=1).
 
-    Familia = Criador do Modelo / familia estrutural de DESTINO (resolvida via Get-LlmDelegateTargetFamily):
-    em geral o prefixo do provedor em targetModelKey (ex.: openai, anthropic, ollama-cloud,
-    opencode-go, atlas-cloud, google, github-copilot); modelos sob provedores agregadores
-    como nvidia/* e antigravity/* colapsam para o Criador do Modelo subjacente (com normalizacao canonica).
-    Modelos do mesmo criador compartilham vieses de treino, logo nao contam como diversidade entre si.
+    Estados: panelReady | needsBatchAuthorization | insufficientDiversityAfterFallback |
+    insufficientDiversity.
 
-    Piso: >=2 familias distintas entre si entre os revisores DESPACHAVEIS (verdict=allow).
-    `ask` ainda nao conta como painel montado — conta como candidato AUTORIZAVEL (se
-    autorizar fecha o piso, o estado e needsBatchAuthorization). `deny` e ignorado.
-    Idealmente as familias sao distintas da do autor (-AuthorFamily); familia do autor no
-    painel nao reprova, mas e sinalizada (authorFamilyInPanel).
-
-    Estados:
-      panelReady              -> >=2 familias distintas ja em `allow`
-      needsBatchAuthorization -> `allow` tem <2 familias, mas allow+ask alcancam >=2:
-                                 apresentar askToAuthorize ao usuario para autorizacao EM LOTE
-      insufficientDiversity   -> nem allow+ask alcancam >=2 familias: nao ha painel possivel;
-                                 fallbackLabel = "segunda opiniao (N)" (N = despachaveis allow)
-      insufficientDiversityAfterFallback -> pos-despacho: houve fallback/skip auditavel, mas as
-                                 familias efetivamente respondidas ficaram abaixo do piso
-
-    Saida: objeto JSON de maquina no stdout.
+    Saida: objeto JSON de maquina no stdout (acrescenta droppedUnknownFamilies,
+    unknownFamiliesPresent).
 .PARAMETER CandidatesJson
-    JSON (array) dos candidatos com veredito do gate: [{ "targetModelKey": "openai/gpt-5.5",
-    "verdict": "allow|ask|deny", "backend": "codex" }]. `backend` e opcional (so repassado).
-    Para avaliacao pos-despacho, aceita tambem `state=responded` e `countsForDiversity=false`
-    em tentativas de fallback/skip; skips nao contam familias.
+    JSON (array) dos candidatos.
 .PARAMETER Floor
-    Piso de familias distintas. Default 2. Nao baixar para 1 (reintroduz o bug).
+    Piso de familias distintas. Default 2.
 .PARAMETER AuthorFamily
-    Familia do autor/orquestrador (ex.: anthropic), para sinalizar falta de cego externo.
-.EXAMPLE
-    .\Resolve-LlmDelegatePanelDiversity.ps1 -CandidatesJson '[{"targetModelKey":"openai/gpt-5.5","verdict":"allow"},{"targetModelKey":"ollama-cloud/deepseek-v4-pro","verdict":"ask"}]'
+    Criador do Modelo do autor do manuscrito (nao o nome da ferramenta).
 #>
 [CmdletBinding()]
 param(
@@ -85,8 +60,26 @@ $allowFamilies = [System.Collections.Generic.HashSet[string]]::new([System.Strin
 $askByNewFamily = [System.Collections.Generic.List[object]]::new()
 $potentialFamilies = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
 $dispatchable = [System.Collections.Generic.List[object]]::new()
+$droppedUnknown = [System.Collections.Generic.List[object]]::new()
+$droppedKeys = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
 
-# 1) Familias ja despachaveis (allow).
+# Passagem 0: todos os itens (inclusive countsForDiversity=false) — unknown families
+foreach ($it in $items) {
+    $target = [string](Get-Prop $it 'targetModelKey')
+    $fam = Get-Family $target
+    $known = (Test-LlmDelegateFamilyKnown -Family $fam)
+    if (-not $known -or [string]::IsNullOrWhiteSpace($fam)) {
+        if (-not [string]::IsNullOrWhiteSpace($target) -and $droppedKeys.Add($target)) {
+            $droppedUnknown.Add([pscustomobject]@{
+                    targetModelKey = $target
+                    resolvedFamily = $fam
+                    backend        = [string](Get-Prop $it 'backend')
+                })
+        }
+    }
+}
+
+# 1) Familias ja despachaveis (allow) — so known
 foreach ($it in $items) {
     $countsRaw = Get-Prop $it 'countsForDiversity'
     if ($countsRaw -eq $false) { continue }
@@ -96,6 +89,7 @@ foreach ($it in $items) {
     $target = [string](Get-Prop $it 'targetModelKey')
     $fam = Get-Family $target
     if ([string]::IsNullOrWhiteSpace($fam)) { continue }
+    if (-not (Test-LlmDelegateFamilyKnown -Family $fam)) { continue }
     if ($verdict -eq 'allow') {
         [void]$allowFamilies.Add($fam)
         [void]$potentialFamilies.Add($fam)
@@ -103,7 +97,7 @@ foreach ($it in $items) {
     }
 }
 
-# 2) `ask` que adicionam familia ainda nao coberta por `allow` (candidatos a autorizar em lote).
+# 2) `ask` que adicionam familia ainda nao coberta por `allow`
 foreach ($it in $items) {
     $countsRaw = Get-Prop $it 'countsForDiversity'
     if ($countsRaw -eq $false) { continue }
@@ -114,6 +108,7 @@ foreach ($it in $items) {
     $target = [string](Get-Prop $it 'targetModelKey')
     $fam = Get-Family $target
     if ([string]::IsNullOrWhiteSpace($fam)) { continue }
+    if (-not (Test-LlmDelegateFamilyKnown -Family $fam)) { continue }
     [void]$potentialFamilies.Add($fam)
     if (-not $allowFamilies.Contains($fam)) {
         $askByNewFamily.Add([pscustomobject]@{ targetModelKey = $target; family = $fam; backend = [string](Get-Prop $it 'backend') })
@@ -123,7 +118,14 @@ foreach ($it in $items) {
 $allowCount = $allowFamilies.Count
 $potentialCount = $potentialFamilies.Count
 
-$hasFallbackEvidence = @($items | Where-Object { -not [string]::IsNullOrWhiteSpace([string](Get-Prop $_ 'fallbackOf')) -or [string](Get-Prop $_ 'attemptRole') -eq 'fallback' }).Count -gt 0
+$hasFallbackEvidence = @($items | Where-Object {
+        $isFb = (-not [string]::IsNullOrWhiteSpace([string](Get-Prop $_ 'fallbackOf'))) -or ([string](Get-Prop $_ 'attemptRole') -eq 'fallback')
+        if (-not $isFb) { return $false }
+        $dispatched = ([bool](Get-Prop $_ 'dispatchAttempted') -eq $true)
+        $attempts = 0
+        try { $attempts = [int](Get-Prop $_ 'attempts') } catch { $attempts = 0 }
+        return ($dispatched -or $attempts -ge 1)
+    }).Count -gt 0
 
 $state = if ($allowCount -ge $Floor) { 'panelReady' }
 elseif ($potentialCount -ge $Floor) { 'needsBatchAuthorization' }
@@ -136,6 +138,7 @@ if (-not [string]::IsNullOrWhiteSpace($AuthorFamily)) {
 }
 
 $fallbackLabel = if ($state -ne 'panelReady') { "segunda opiniao ($($dispatchable.Count))" } else { $null }
+$unknownPresent = $droppedUnknown.Count -gt 0
 
 [pscustomobject]@{
     floor                     = $Floor
@@ -148,5 +151,7 @@ $fallbackLabel = if ($state -ne 'panelReady') { "segunda opiniao ($($dispatchabl
     authorFamily              = $AuthorFamily
     authorFamilyInPanel       = $authorInPanel
     fallbackLabel             = $fallbackLabel
-    note                      = 'Consultivo; NAO e autorizacao. O gate Resolve-LlmDelegateAuthorization decide allow/ask/deny por revisor. Familia = Criador do Modelo / familia estrutural de DESTINO (via Get-LlmDelegateTargetFamily; antigravity/* e nvidia/* colapsam no Criador do Modelo subjacente). Piso conta familias distintas entre despachaveis (allow); ask = autorizavel; deny ignorado.'
+    droppedUnknownFamilies    = @($droppedUnknown)
+    unknownFamiliesPresent    = $unknownPresent
+    note                      = 'Consultivo; NAO e autorizacao. Familia = Criador do Modelo via Get-LlmDelegateTargetFamily(targetModelKey); so criadores em Test-LlmDelegateFamilyKnown contam no piso. family de entrada e eco. hasFallbackEvidence exige despacho efetivo no elo de cadeia.'
 } | ConvertTo-Json -Depth 8

@@ -752,14 +752,18 @@ $($timeoutAst.Extent.Text)
     $canonicalSorted = @($mapAdapterScriptKeys | Sort-Object)
     Assert-True ($canonicalSorted.Count -eq 6) "AST Guard: esperado exatamente 6 backends canonicos; got $($canonicalSorted.Count)"
 
+    $authValidateSet = @(Get-AstBackendValidateSet (Join-Path $scriptsDir 'Resolve-LlmDelegateAuthorization.ps1'))
+    $authDispatchOnly = @($authValidateSet | Where-Object { $_ -ne 'orchestrator-native' } | Sort-Object)
+
     $collectionsToCompare = [ordered]@{
         'Invoke-LlmDelegatePanelDispatch.ps1 ($ExeParam)'                = @(Get-AstHashtableKeys $harnessAst 'ExeParam' | Sort-Object)
         'Invoke-LlmDelegatePanelDispatch.ps1 ($ContentionKeys)'          = @(Get-AstHashtableKeys $harnessAst 'ContentionKeys' | Sort-Object)
         'Invoke-LlmDelegatePanelDispatch.ps1 ($AdapterDefaultTimeoutSec)'= @(Get-AstHashtableKeys $harnessAst 'AdapterDefaultTimeoutSec' | Sort-Object)
         'Invoke-LlmDelegatePanelDispatch.ps1 ($AdapterCdCapable)'        = @(Get-AstHashtableKeys $harnessAst 'AdapterCdCapable' | Sort-Object)
-        'Resolve-LlmDelegateAuthorization.ps1 (ValidateSet -Backend)'   = @(Get-AstBackendValidateSet (Join-Path $scriptsDir 'Resolve-LlmDelegateAuthorization.ps1') | Sort-Object)
-        'Set-LlmDelegatePreferredReviewers.ps1 ($allowedBackends)'       = @(Get-AstArrayAssignmentValues (Join-Path $scriptsDir 'Set-LlmDelegatePreferredReviewers.ps1') 'allowedBackends' | Sort-Object)
+        'Resolve-LlmDelegateAuthorization.ps1 (ValidateSet -Backend, sem orchestrator-native)' = $authDispatchOnly
+        'Set-LlmDelegatePreferredReviewers.ps1 ($allowedDispatchBackends)' = @(Get-AstArrayAssignmentValues (Join-Path $scriptsDir 'Set-LlmDelegatePreferredReviewers.ps1') 'allowedDispatchBackends' | Sort-Object)
     }
+    Assert-True ($authValidateSet -contains 'orchestrator-native') 'AST Guard: ValidateSet de Authorization deve incluir orchestrator-native'
     foreach ($entry in $collectionsToCompare.GetEnumerator()) {
         $name = $entry.Key
         $keys = $entry.Value
@@ -789,6 +793,8 @@ $($timeoutAst.Extent.Text)
         Assert-True (Test-Path -LiteralPath $resolverScript -PathType Leaf) "AST Guard: script de localidade $resolverScript nao encontrado"
         Assert-True (Test-Path -LiteralPath $selfTestScript -PathType Leaf) "AST Guard: self-test de localidade $selfTestScript nao encontrado"
     }
+    $nativeLocality = Join-Path $scriptsDir 'Resolve-OrchestratorNativeModelLocality.ps1'
+    Assert-True (Test-Path -LiteralPath $nativeLocality -PathType Leaf) "AST Guard: script de localidade $nativeLocality nao encontrado"
 
     Set-Content -LiteralPath $concLog -Value '' -NoNewline -Encoding utf8
     $r = Invoke-Harness -Reviewers @(@{
@@ -965,7 +971,7 @@ $($timeoutAst.Extent.Text)
     $stdoutTrim = $r.stdout.TrimEnd("`r", "`n")
     Assert-True (@($stdoutTrim -split "`n").Count -eq 1) 'contrato: stdout deveria ter exatamente 1 linha'
     Assert-True ($r.json.Kind -eq 'xpz-llm-panel-dispatch-result') 'contrato: Kind PascalCase'
-    Assert-True ([int]$r.json.SchemaVersion -eq 2) 'contrato: SchemaVersion=2 PascalCase'
+    Assert-True ([int]$r.json.SchemaVersion -eq 3) 'contrato: SchemaVersion=3 PascalCase'
     # state subset
     $validStates = @('responded', 'error', 'quota', 'unavailable', 'timeout', 'gateAsk', 'gateDeny', 'skippedAfterSuccess', 'skippedByPolicy', 'notAttempted')
     foreach ($rev in $r.json.reviewers) { Assert-True ($validStates -contains $rev.state) "contrato: state '$($rev.state)' deveria estar no subset valido" }
@@ -1002,6 +1008,7 @@ $($timeoutAst.Extent.Text)
         -ManuscriptText ('x' * 30001)
     Assert-True ($r.exit -eq 1) 'ManuscriptText grande: exit 1 esperado'
     Assert-True ($r.json.Kind -eq 'xpz-llm-panel-dispatch-result') 'ManuscriptText grande: Kind do dispatcher esperado'
+    Assert-True ([int]$r.json.SchemaVersion -eq 3) 'ManuscriptText grande: SchemaVersion=3'
     Assert-True ($r.json.roundStarted -eq $false) 'ManuscriptText grande: roundStarted=false'
     Assert-True ($r.json.dispatchStarted -eq $false) 'ManuscriptText grande: dispatchStarted=false'
     Assert-True ([int]$r.json.reviewersDispatched -eq 0) 'ManuscriptText grande: zero despachos'
@@ -1012,6 +1019,7 @@ $($timeoutAst.Extent.Text)
         -Sensitivity 'public' -Extra @{ OpenCodeConfigPath = $ocCfg } -OmitManuscriptSource
     Assert-True ($r.exit -eq 1) 'Origem ausente: exit 1 esperado'
     Assert-True ($r.json.Kind -eq 'xpz-llm-panel-dispatch-result') 'Origem ausente: Kind do dispatcher esperado'
+    Assert-True ([int]$r.json.SchemaVersion -eq 3) 'Origem ausente: SchemaVersion=3'
     Assert-True ($r.json.roundStarted -eq $false) 'Origem ausente: roundStarted=false'
     Assert-True ($r.json.dispatchStarted -eq $false) 'Origem ausente: dispatchStarted=false'
     Assert-True ([int]$r.json.reviewersDispatched -eq 0) 'Origem ausente: zero despachos'
@@ -1021,6 +1029,7 @@ $($timeoutAst.Extent.Text)
         -Sensitivity 'public' -Extra @{ OpenCodeConfigPath = $ocCfg } -BothManuscriptSources -ManuscriptText 'manuscrito-inline'
     Assert-True ($r.exit -eq 1) 'Origem ambigua: exit 1 esperado'
     Assert-True ($r.json.Kind -eq 'xpz-llm-panel-dispatch-result') 'Origem ambigua: Kind do dispatcher esperado'
+    Assert-True ([int]$r.json.SchemaVersion -eq 3) 'Origem ambigua: SchemaVersion=3'
     Assert-True ($r.json.roundStarted -eq $false) 'Origem ambigua: roundStarted=false'
     Assert-True ($r.json.dispatchStarted -eq $false) 'Origem ambigua: dispatchStarted=false'
     Assert-True ([int]$r.json.reviewersDispatched -eq 0) 'Origem ambigua: zero despachos'
@@ -1031,6 +1040,7 @@ $($timeoutAst.Extent.Text)
         -Sensitivity 'public' -Extra @{ OpenCodeConfigPath = $ocCfg } -UseManuscriptText -ManuscriptText 'manuscrito-inline'
     Assert-True ($r.exit -eq 1) 'ManuscriptText invalido: exit 1 esperado'
     Assert-True ($r.json.Kind -eq 'xpz-llm-panel-dispatch-result') 'ManuscriptText invalido: Kind do dispatcher esperado'
+    Assert-True ([int]$r.json.SchemaVersion -eq 3) 'ManuscriptText invalido: SchemaVersion=3'
     Assert-True ($r.json.roundStarted -eq $false) 'ManuscriptText invalido: roundStarted=false'
     Assert-True ($r.json.dispatchStarted -eq $false) 'ManuscriptText invalido: dispatchStarted=false'
     Assert-True ([int]$r.json.reviewersDispatched -eq 0) 'ManuscriptText invalido: zero despachos'

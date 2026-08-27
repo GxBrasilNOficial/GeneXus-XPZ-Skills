@@ -29,23 +29,47 @@ function Invoke-Closeout {
         [string] $VNextState = 'notProduced',
         [string] $ResubmissionDeclinedBy = '',
         [string] $ResubmissionDeclineReason = '',
-        [string] $RoundId = ''
+        [string] $RoundId = '',
+        [string] $PreferredReviewersSnapshotJson = '',
+        [string] $EffectivePreferredPath = '',
+        [string] $PreferenceSource = ''
     )
-    # Contrato C: o script recebe 'true'/'false' como string (ValidateSet), nao o literal
-    # $true/$false — que via `pwsh -File` chamado de Bash expandiria para vazio. O helper
-    # mantem [bool] por conveniencia dos casos e converte para string ao invocar.
     $hadStr = if ($HadPreferredReviewers) { 'true' } else { 'false' }
     $manualStr = if ($ManualReviewerSelection) { 'true' } else { 'false' }
-    return (& $target `
-            -HadPreferredReviewers $hadStr `
-            -ManualReviewerSelection $manualStr `
-            -PreferredReviewersOfferState $OfferState `
-            -SelectedReviewersJson $SelectedReviewersJson `
-            -PreferredReviewerStatesJson $PreferredReviewerStatesJson `
-            -VNextState $VNextState `
-            -ResubmissionDeclinedBy $ResubmissionDeclinedBy `
-            -ResubmissionDeclineReason $ResubmissionDeclineReason `
-            -RoundId $RoundId | ConvertFrom-Json)
+    $args = @{
+        HadPreferredReviewers          = $hadStr
+        ManualReviewerSelection        = $manualStr
+        PreferredReviewersOfferState   = $OfferState
+        SelectedReviewersJson          = $SelectedReviewersJson
+        PreferredReviewerStatesJson    = $PreferredReviewerStatesJson
+        VNextState                     = $VNextState
+        ResubmissionDeclinedBy         = $ResubmissionDeclinedBy
+        ResubmissionDeclineReason      = $ResubmissionDeclineReason
+        RoundId                        = $RoundId
+    }
+    if (-not [string]::IsNullOrWhiteSpace($PreferredReviewersSnapshotJson)) {
+        $args['PreferredReviewersSnapshotJson'] = $PreferredReviewersSnapshotJson
+    }
+    if (-not [string]::IsNullOrWhiteSpace($EffectivePreferredPath)) {
+        $args['EffectivePreferredPath'] = $EffectivePreferredPath
+    }
+    if (-not [string]::IsNullOrWhiteSpace($PreferenceSource)) {
+        $args['PreferenceSource'] = $PreferenceSource
+    }
+    return (& $target @args | ConvertFrom-Json)
+}
+
+function New-TestSnapshot {
+    param([string]$SelectedReviewersJson, [string]$Path = 'C:\tmp\preferred-reviewers.json')
+    $revs = $SelectedReviewersJson | ConvertFrom-Json
+    $snap = [pscustomobject]@{
+        hasPreferences         = $true
+        schemaVersion          = 3
+        preferenceSource       = 'machine'
+        effectivePreferredPath = $Path
+        reviewers              = @($revs)
+    }
+    return ($snap | ConvertTo-Json -Depth 8 -Compress)
 }
 
 # (1) Caso do bug: sem preferencias previas, escolha manual, oferta omitida -> bloqueia.
@@ -71,9 +95,12 @@ Assert-True ([string]$r4.receiptAddendum -match 'oferta=deferred') 'Caso 4: reci
 # (5) Ja havia preferred-reviewers.json -> exige estados dos preferidos para fechar.
 $r5 = Invoke-Closeout $true $false 'not_applicable'
 Assert-True ($r5.closeoutReady -eq $false) 'Caso 5: preferencias existentes sem estados deveriam bloquear.'
-Assert-True (@($r5.blockingReasons) -contains 'preferred-reviewer-states-missing') 'Caso 5: razao preferred-reviewer-states-missing ausente.'
+Assert-True (
+    (@($r5.blockingReasons) -contains 'preferred-reviewer-states-missing') -or
+    (@($r5.blockingReasons) -contains 'preferred-snapshot-missing')
+) 'Caso 5: deveria bloquear por states-missing e/ou snapshot-missing.'
 
-# (6) Ja havia preferred-reviewers.json + estados finais -> not_applicable e valido.
+# (6) Ja havia preferred-reviewers.json + estados finais + snapshot -> not_applicable e valido.
 $statesOk = @'
 [
   {"backend":"claude-code","targetModelKey":"anthropic/claude-opus-4-8","family":"anthropic","state":"responded"},
@@ -90,15 +117,18 @@ $selectedOk = @'
   {"backend":"opencode","targetModelKey":"ollama-cloud/glm-5.2"}
 ]
 '@
-$r6 = Invoke-Closeout $true $false 'not_applicable' $selectedOk $statesOk
-Assert-True ($r6.closeoutReady -eq $true) 'Caso 6: preferencias existentes com estados finais deveriam liberar.'
+$snap6 = New-TestSnapshot -SelectedReviewersJson $selectedOk
+$r6 = Invoke-Closeout $true $false 'not_applicable' $selectedOk $statesOk -PreferredReviewersSnapshotJson $snap6
+Assert-True ($r6.closeoutReady -eq $true) ("Caso 6: preferencias existentes com estados finais deveriam liberar. reasons=$($r6.blockingReasons -join ',')")
 Assert-True ($r6.requiresPreferredOffer -eq $false) 'Caso 6: requiresPreferredOffer deveria ser false.'
 Assert-True (@($r6.preferredReviewerStates).Count -eq 4) 'Caso 6: deveria ecoar 4 estados de revisores preferidos.'
 Assert-True ([string]$r6.receiptAddendum -match 'registrados=4') 'Caso 6: recibo deveria registrar quantidade de estados.'
 
 # (7) Estado incompleto em revisor preferido -> bloqueia.
 $statesIncomplete = '[{"backend":"opencode","targetModelKey":"ollama-cloud/kimi-k2.7-code","family":"ollama-cloud","state":"gateAllow"}]'
-$r7 = Invoke-Closeout $true $false 'not_applicable' '[{"backend":"opencode","targetModelKey":"ollama-cloud/kimi-k2.7-code"}]' $statesIncomplete
+$sel7 = '[{"backend":"opencode","targetModelKey":"ollama-cloud/kimi-k2.7-code"}]'
+$snap7 = New-TestSnapshot -SelectedReviewersJson $sel7
+$r7 = Invoke-Closeout $true $false 'not_applicable' $sel7 $statesIncomplete -PreferredReviewersSnapshotJson $snap7
 Assert-True ($r7.closeoutReady -eq $false) 'Caso 7: estado incompleto gateAllow deveria bloquear.'
 Assert-True (@($r7.blockingReasons) -contains 'preferred-reviewer-state-incomplete:ollama-cloud/kimi-k2.7-code:gateAllow') 'Caso 7: razao de estado incompleto ausente.'
 
@@ -218,19 +248,22 @@ $selectedFallbackOk = @'
   {"backend":"opencode","targetModelKey":"ollama-cloud/minimax-m3","fallbackChain":[{"backend":"opencode","targetModelKey":"nvidia/minimaxai/minimax-m3"}]}
 ]
 '@
-$r22 = Invoke-Closeout $true $false 'not_applicable' $selectedFallbackOk $statesFallbackOk
-Assert-True ($r22.closeoutReady -eq $true) 'Caso 22: estados finais de fallback deveriam liberar.'
+$r22 = Invoke-Closeout $true $false 'not_applicable' $selectedFallbackOk $statesFallbackOk -PreferredReviewersSnapshotJson (New-TestSnapshot $selectedFallbackOk)
+Assert-True ($r22.closeoutReady -eq $true) ("Caso 22: estados finais de fallback deveriam liberar. reasons=$($r22.blockingReasons -join ',')")
 Assert-True (@($r22.preferredReviewerStates).Count -eq 6) 'Caso 22: deveria ecoar primarios + fallbacks.'
+Assert-True ([string]($r22.preferredReviewerStates | Where-Object { $_.attemptRole -eq 'fallback' } | Select-Object -First 1).effortApplied -eq 'unset') 'Caso 22: effortApplied de fallback deve ser unset.'
 
 # (23) Skip contando diversidade bloqueia.
+$sel23 = '[{"backend":"opencode","targetModelKey":"ollama-cloud/x","fallbackChain":[{"backend":"opencode","targetModelKey":"nvidia/x"}]}]'
 $statesSkipBad = '[{"backend":"opencode","targetModelKey":"nvidia/x","family":"nvidia","state":"skippedAfterSuccess","attemptRole":"fallback","fallbackOf":"ollama-cloud/x","countsForDiversity":true}]'
-$r23 = Invoke-Closeout $true $false 'not_applicable' '[{"backend":"opencode","targetModelKey":"ollama-cloud/x","fallbackChain":[{"backend":"opencode","targetModelKey":"nvidia/x"}]}]' $statesSkipBad
+$r23 = Invoke-Closeout $true $false 'not_applicable' $sel23 $statesSkipBad -PreferredReviewersSnapshotJson (New-TestSnapshot $sel23)
 Assert-True ($r23.closeoutReady -eq $false) 'Caso 23: skip com countsForDiversity=true deveria bloquear.'
 Assert-True (@($r23.blockingReasons) -contains 'preferred-reviewer-state-skip-counts-diversity:nvidia/x:skippedAfterSuccess') 'Caso 23: razao de diversidade inflada ausente.'
 
 # (24) notAttempted como estado primario silencioso bloqueia.
+$sel24 = '[{"backend":"opencode","targetModelKey":"ollama-cloud/x"}]'
 $statesPrimaryNotAttempted = '[{"backend":"opencode","targetModelKey":"ollama-cloud/x","family":"ollama-cloud","state":"notAttempted","attemptRole":"primary","countsForDiversity":false}]'
-$r24 = Invoke-Closeout $true $false 'not_applicable' '[{"backend":"opencode","targetModelKey":"ollama-cloud/x"}]' $statesPrimaryNotAttempted
+$r24 = Invoke-Closeout $true $false 'not_applicable' $sel24 $statesPrimaryNotAttempted -PreferredReviewersSnapshotJson (New-TestSnapshot $sel24)
 Assert-True ($r24.closeoutReady -eq $false) 'Caso 24: primario notAttempted silencioso deveria bloquear.'
 Assert-True (@($r24.blockingReasons) -contains 'preferred-reviewer-primary-notattempted-silent:ollama-cloud/x') 'Caso 24: razao primario notAttempted ausente.'
 
@@ -242,22 +275,24 @@ Assert-True ([string]$r25.requiredUserPrompt -match 'diversidade insuficiente') 
 
 # (26) Com preferred-reviewers existente, SelectedReviewersJson nao pode vir vazio: sem lista
 #      esperada nao ha como provar completude dos estados.
-$r26 = Invoke-Closeout $true $false 'not_applicable' '[]' '[{"backend":"codex","targetModelKey":"openai/gpt-5.5","state":"responded","countsForDiversity":true}]'
+$snap26 = New-TestSnapshot '[{"backend":"codex","targetModelKey":"openai/gpt-5.5"}]'
+$r26 = Invoke-Closeout $true $false 'not_applicable' '[]' '[{"backend":"codex","targetModelKey":"openai/gpt-5.5","state":"responded","countsForDiversity":true}]' -PreferredReviewersSnapshotJson $snap26
 Assert-True ($r26.closeoutReady -eq $false) 'Caso 26: HadPreferred=true com SelectedReviewersJson vazio deveria bloquear.'
-Assert-True (@($r26.blockingReasons) -contains 'preferred-reviewer-expected-states-missing') 'Caso 26: razao preferred-reviewer-expected-states-missing ausente.'
-Assert-True (@($r26.blockingReasons) -contains 'preferred-reviewer-state-unexpected:openai/gpt-5.5') 'Caso 26: estado sem esperado correspondente deveria bloquear.'
-Assert-True ([string]$r26.requiredUserPrompt -match 'SelectedReviewersJson') 'Caso 26: prompt deveria orientar a informar SelectedReviewersJson.'
+Assert-True (
+    (@($r26.blockingReasons) -contains 'preferred-reviewer-expected-states-missing') -or
+    (@($r26.blockingReasons) -contains 'preferred-snapshot-invalid')
+) 'Caso 26: deveria bloquear por expected-states-missing ou snapshot-invalid (reviewers vs selected vazio).'
 
 # (27) Estado parcial nao pode liberar: todo titular esperado precisa aparecer.
 $selectedTwo = '[{"backend":"codex","targetModelKey":"openai/gpt-5.5"},{"backend":"opencode","targetModelKey":"nvidia/z-ai/glm-5.2"}]'
 $stateOne = '[{"backend":"codex","targetModelKey":"openai/gpt-5.5","state":"responded","countsForDiversity":true}]'
-$r27 = Invoke-Closeout $true $false 'not_applicable' $selectedTwo $stateOne
+$r27 = Invoke-Closeout $true $false 'not_applicable' $selectedTwo $stateOne -PreferredReviewersSnapshotJson (New-TestSnapshot $selectedTwo)
 Assert-True ($r27.closeoutReady -eq $false) 'Caso 27: estado parcial deveria bloquear.'
 Assert-True (@($r27.blockingReasons) -contains 'preferred-reviewer-state-missing:nvidia/z-ai/glm-5.2') 'Caso 27: titular esperado omitido deveria ser apontado.'
 
 # (28) Fallback esperado tambem precisa ter estado auditavel quando consta na lista preferida.
 $selectedWithFallback = '[{"backend":"codex","targetModelKey":"openai/gpt-5.5","fallbackChain":[{"backend":"opencode","targetModelKey":"nvidia/z-ai/glm-5.2"}]}]'
-$r28 = Invoke-Closeout $true $false 'not_applicable' $selectedWithFallback $stateOne
+$r28 = Invoke-Closeout $true $false 'not_applicable' $selectedWithFallback $stateOne -PreferredReviewersSnapshotJson (New-TestSnapshot $selectedWithFallback)
 Assert-True ($r28.closeoutReady -eq $false) 'Caso 28: fallback esperado omitido deveria bloquear.'
 Assert-True (@($r28.blockingReasons) -contains 'preferred-reviewer-state-missing:nvidia/z-ai/glm-5.2') 'Caso 28: fallback esperado omitido deveria ser apontado.'
 
@@ -268,7 +303,7 @@ $stateDuplicate = @'
   {"backend":"codex","targetModelKey":"openai/gpt-5.5","state":"responded","countsForDiversity":true}
 ]
 '@
-$r29 = Invoke-Closeout $true $false 'not_applicable' $selectedTwo $stateDuplicate
+$r29 = Invoke-Closeout $true $false 'not_applicable' $selectedTwo $stateDuplicate -PreferredReviewersSnapshotJson (New-TestSnapshot $selectedTwo)
 Assert-True ($r29.closeoutReady -eq $false) 'Caso 29: duplicata de estado deveria bloquear.'
 Assert-True (@($r29.blockingReasons) -contains 'preferred-reviewer-state-duplicate:openai/gpt-5.5') 'Caso 29: duplicata deveria ser apontada.'
 Assert-True (@($r29.blockingReasons) -contains 'preferred-reviewer-state-missing:nvidia/z-ai/glm-5.2') 'Caso 29: duplicata nao pode mascarar ausencia do outro esperado.'

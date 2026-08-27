@@ -261,7 +261,8 @@ function Add-SkippedFallbackRecords {
         [string]$State,
         [string]$Reason,
         [int]$BaseRank,
-        [string]$FallbackSuppressedReason
+        [string]$FallbackSuppressedReason,
+        [int]$EntryIndex
     )
     for ($skipIdx = 0; $skipIdx -lt @($FallbackItems).Count; $skipIdx++) {
         $fb = @($FallbackItems)[$skipIdx]
@@ -270,6 +271,10 @@ function Add-SkippedFallbackRecords {
         $fbBackend = [string](Get-Prop $fb 'backend')
         $Records.Add([ordered]@{
                 index              = $idx
+                ledgerIndex        = $script:LedgerSeq++
+                entryIndex         = $EntryIndex
+                suppressedFallbackChain = @()
+                dispatchChannel    = 'cli'
                 backend            = $fbBackend
                 family             = if ($fbTarget) { Get-LlmDelegateTargetFamily -TargetModelKey $fbTarget } else { $null }
                 targetModelKey     = $fbTarget
@@ -475,7 +480,7 @@ if ($useManuscriptText -eq $useManuscriptPath) {
     }
     $blockResult = [ordered]@{
         Kind                         = 'xpz-llm-panel-dispatch-result'
-        SchemaVersion                = 2
+        SchemaVersion                = 3
         success                      = $false
         roundStarted                 = $false
         dispatchStarted              = $false
@@ -517,7 +522,7 @@ if ($useManuscriptText -eq $useManuscriptPath) {
 if ($useManuscriptText -and $ManuscriptText.Length -gt $MaxInlineManuscriptChars) {
     $blockResult = [ordered]@{
         Kind                         = 'xpz-llm-panel-dispatch-result'
-        SchemaVersion                = 2
+        SchemaVersion                = 3
         success                      = $false
         roundStarted                 = $false
         dispatchStarted              = $false
@@ -560,7 +565,7 @@ if ($useManuscriptPath) {
     if (-not (Test-Path -LiteralPath $ManuscriptPath -PathType Leaf)) {
         $blockResult = [ordered]@{
             Kind                         = 'xpz-llm-panel-dispatch-result'
-            SchemaVersion                = 2
+            SchemaVersion                = 3
             success                      = $false
             roundStarted                 = $false
             dispatchStarted              = $false
@@ -674,7 +679,7 @@ if ($useManuscriptPath) {
         if ([string]::IsNullOrWhiteSpace($message)) { $message = 'Preparacao de artefatos falhou.' }
         $blockResult = [ordered]@{
             Kind                         = 'xpz-llm-panel-dispatch-result'
-            SchemaVersion                = 2
+            SchemaVersion                = 3
             success                      = $false
             roundStarted                 = $false
             dispatchStarted              = $false
@@ -745,6 +750,7 @@ try { $reviewers = @($reviewersRaw | ConvertFrom-Json) } catch { throw "BLOCK: -
 # --------------------------------------------------------------------------------------------
 $records = [System.Collections.Generic.List[object]]::new()
 $dispatchList = [System.Collections.Generic.List[object]]::new()
+$script:LedgerSeq = 0
 
 for ($i = 0; $i -lt $reviewers.Count; $i++) {
     $r = $reviewers[$i]
@@ -760,6 +766,10 @@ for ($i = 0; $i -lt $reviewers.Count; $i++) {
     # Registro base (todas as chaves do contrato; mutado adiante)
     $rec = [ordered]@{
         index              = $i
+        ledgerIndex        = $script:LedgerSeq++
+        entryIndex         = $i
+        suppressedFallbackChain = @()
+        dispatchChannel    = 'cli'
         backend            = $backend
         family             = $familyExplicit
         targetModelKey     = $inputKey
@@ -805,6 +815,20 @@ for ($i = 0; $i -lt $reviewers.Count; $i++) {
         cleanupStatus = $null
         cleanupIssues = @()
         keyringIsolation = $null
+    }
+
+    # Defesa em profundidade: nativo nao despacha neste harness
+    if ($rec.backend -eq 'orchestrator-native') {
+        $rec.state = 'error'
+        $rec.reason = 'orchestrator-native-leaked-to-dispatch'
+        $rec.dispatchAttempted = $false
+        $rec.attempts = 0
+        $rec.countsForDiversity = $false
+        $rec.suppressedFallbackChain = @($rec.fallbackChain)
+        $rec.fallbackChain = @()
+        $rec.entryIndex = $i
+        $records.Add($rec)
+        continue
     }
 
     $backendDivergence = Test-InvokeArgsBackendDivergence -Reviewer $r -Label "revisor[$i]"
@@ -1290,33 +1314,43 @@ $activateFallbackOn = @('quota', 'timeout', 'error', 'unavailable')
 $skipPolicyStates = @('gateAsk', 'gateDeny')
 $originalRecords = @($records)
 foreach ($rec in $originalRecords) {
+    # Leak nativo: fonte efetiva e suppressedFallbackChain (fallbackChain ja vazia)
+    if ([string]$rec.reason -eq 'orchestrator-native-leaked-to-dispatch') {
+        $suppressed = @($rec.suppressedFallbackChain)
+        if ($suppressed.Count -gt 0) {
+            Add-SkippedFallbackRecords -Records $records -FallbackItems $suppressed -FallbackOf ([string]$rec.targetModelKey) `
+                -State 'skippedByPolicy' -Reason 'fallback nao tentado porque o primario nativo vazou no dispatcher' `
+                -BaseRank ([int]$rec.rank) -FallbackSuppressedReason 'primary-native-leaked' -EntryIndex ([int]$rec.entryIndex)
+        }
+        continue
+    }
     $fallbackItems = @($rec.fallbackChain)
     if ($fallbackItems.Count -eq 0) { continue }
     if ($rec.state -eq 'responded') {
         Add-SkippedFallbackRecords -Records $records -FallbackItems $fallbackItems -FallbackOf ([string]$rec.targetModelKey) `
-            -State 'skippedAfterSuccess' -Reason 'fallback nao tentado porque o primario respondeu' -BaseRank ([int]$rec.rank)
+            -State 'skippedAfterSuccess' -Reason 'fallback nao tentado porque o primario respondeu' -BaseRank ([int]$rec.rank) -EntryIndex ([int]$rec.entryIndex)
         continue
     }
     if ([string]$rec.state -eq 'error' -and [int]$rec.attempts -eq 0 -and [string]$rec.reason -like 'BLOCK:*') {
         Add-SkippedFallbackRecords -Records $records -FallbackItems $fallbackItems -FallbackOf ([string]$rec.targetModelKey) `
-            -State 'skippedByPolicy' -Reason "fallback nao tentado por erro de validacao pre-despacho: $($rec.reason)" -BaseRank ([int]$rec.rank)
+            -State 'skippedByPolicy' -Reason "fallback nao tentado por erro de validacao pre-despacho: $($rec.reason)" -BaseRank ([int]$rec.rank) -EntryIndex ([int]$rec.entryIndex)
         continue
     }
     if ([bool]$rec.preDispatchBlocked) {
         $rec.fallbackSuppressedReason = 'pre-dispatch-block-not-fallback-safe'
         Add-SkippedFallbackRecords -Records $records -FallbackItems $fallbackItems -FallbackOf ([string]$rec.targetModelKey) `
             -State 'skippedByPolicy' -Reason "fallback nao tentado porque o primario foi bloqueado antes de enviar prompt: $($rec.reason)" `
-            -BaseRank ([int]$rec.rank) -FallbackSuppressedReason ([string]$rec.fallbackSuppressedReason)
+            -BaseRank ([int]$rec.rank) -FallbackSuppressedReason ([string]$rec.fallbackSuppressedReason) -EntryIndex ([int]$rec.entryIndex)
         continue
     }
     if ($skipPolicyStates -contains [string]$rec.state) {
         Add-SkippedFallbackRecords -Records $records -FallbackItems $fallbackItems -FallbackOf ([string]$rec.targetModelKey) `
-            -State 'skippedByPolicy' -Reason "fallback nao tentado porque o primario terminou em $($rec.state)" -BaseRank ([int]$rec.rank)
+            -State 'skippedByPolicy' -Reason "fallback nao tentado porque o primario terminou em $($rec.state)" -BaseRank ([int]$rec.rank) -EntryIndex ([int]$rec.entryIndex)
         continue
     }
     if ($activateFallbackOn -notcontains [string]$rec.state) {
         Add-SkippedFallbackRecords -Records $records -FallbackItems $fallbackItems -FallbackOf ([string]$rec.targetModelKey) `
-            -State 'notAttempted' -Reason "fallback nao alcançado; estado primario=$($rec.state)" -BaseRank ([int]$rec.rank)
+            -State 'notAttempted' -Reason "fallback nao alcançado; estado primario=$($rec.state)" -BaseRank ([int]$rec.rank) -EntryIndex ([int]$rec.entryIndex)
         continue
     }
 
@@ -1325,7 +1359,7 @@ foreach ($rec in $originalRecords) {
         $fb = $fallbackItems[$fbIdx]
         if ($fallbackSucceeded) {
             Add-SkippedFallbackRecords -Records $records -FallbackItems @($fb) -FallbackOf ([string]$rec.targetModelKey) `
-                -State 'skippedAfterSuccess' -Reason 'fallback nao tentado porque tentativa anterior da cadeia respondeu' -BaseRank ([int]$rec.rank)
+                -State 'skippedAfterSuccess' -Reason 'fallback nao tentado porque tentativa anterior da cadeia respondeu' -BaseRank ([int]$rec.rank) -EntryIndex ([int]$rec.entryIndex)
             continue
         }
 
@@ -1409,6 +1443,10 @@ foreach ($rec in $originalRecords) {
         $counts = ($fbState -eq 'responded')
         $records.Add([ordered]@{
                 index              = $newIdx
+                ledgerIndex        = $script:LedgerSeq++
+                entryIndex         = [int]$rec.entryIndex
+                suppressedFallbackChain = @()
+                dispatchChannel    = 'cli'
                 backend            = [string](Get-Prop $fbRecord 'backend')
                 family             = [string](Get-Prop $fbRecord 'family')
                 targetModelKey     = [string](Get-Prop $fbRecord 'targetModelKey')
@@ -1539,7 +1577,7 @@ $policyPathOut = $null; if (-not [string]::IsNullOrWhiteSpace($PolicyPath)) { $p
 
 $summary = [ordered]@{
     Kind                         = 'xpz-llm-panel-dispatch-result'
-    SchemaVersion                = 2
+    SchemaVersion                = 3
     success                      = $true
     roundStarted                 = $true
     dispatchStarted              = $true
@@ -1592,3 +1630,4 @@ if ($concurrencySaturationWarning) { [Console]::Error.WriteLine($concurrencySatu
 
 # stdout = UNICA linha (o panel-summary.json)
 [Console]::Out.WriteLine($summaryJson)
+

@@ -7,9 +7,9 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 # Self-test de Resolve-LlmDelegatePanelDiversity.ps1 (skill xpz-llm-delegate).
-# Cobre o piso de diversidade (>=2 familias distintas) e os tres estados:
-#  panelReady / needsBatchAuthorization / insufficientDiversity, mais o sinal de familia
-#  do autor no painel e a indiferenca a `deny`.
+# Cobre o piso de diversidade (>=2 familias distintas) e os estados:
+#  panelReady / needsBatchAuthorization / insufficientDiversity /
+#  insufficientDiversityAfterFallback, mais droppedUnknownFamilies.
 
 $target = Join-Path $PSScriptRoot 'Resolve-LlmDelegatePanelDiversity.ps1'
 
@@ -62,8 +62,8 @@ Assert-True ($r6.state -eq 'insufficientDiversity') "Caso 6: deny nao deveria co
 Assert-True ($null -eq ($r1.PSObject.Properties['verdict'])) 'Caso 7: a saida NAO deve ter campo verdict (e consultiva, nao autorizacao).'
 Assert-True (-not [string]::IsNullOrWhiteSpace([string]$r1.note)) 'Caso 7: note (invariante consultivo) ausente.'
 
-# (8) Pos-fallback: skip nao conta diversidade; uma familia respondida apos fallback ainda e insuficiente.
-$r8 = Invoke-Diversity '[{"targetModelKey":"openai/gpt-5.5","state":"responded","attemptRole":"fallback","fallbackOf":"ollama-cloud/deepseek","countsForDiversity":true},{"targetModelKey":"ollama-cloud/deepseek","state":"skippedAfterSuccess","attemptRole":"fallback","fallbackOf":"ollama-cloud/primary","countsForDiversity":false}]'
+# (8) Pos-fallback: exige dispatchAttempted=true OU attempts>=1 para AfterFallback
+$r8 = Invoke-Diversity '[{"targetModelKey":"openai/gpt-5.5","state":"responded","attemptRole":"fallback","fallbackOf":"ollama-cloud/deepseek","dispatchAttempted":true,"countsForDiversity":true},{"targetModelKey":"ollama-cloud/deepseek","state":"skippedAfterSuccess","attemptRole":"fallback","fallbackOf":"ollama-cloud/primary","countsForDiversity":false}]'
 Assert-True ($r8.state -eq 'insufficientDiversityAfterFallback') "Caso 8: esperado insufficientDiversityAfterFallback; veio '$($r8.state)'."
 Assert-True ($r8.panelReady -eq $false) 'Caso 8: panelReady deveria ser false.'
 Assert-True (@($r8.distinctFamiliesAllow).Count -eq 1) 'Caso 8: skips com countsForDiversity=false nao devem inflar familias.'
@@ -76,10 +76,11 @@ Assert-True ($r9.state -eq 'insufficientDiversity') "Caso 9: antigravity/gemini 
 $r10 = Invoke-Diversity '[{"targetModelKey":"antigravity/claude-sonnet-4-6","verdict":"allow"},{"targetModelKey":"google/gemini-3-flash-preview","verdict":"allow"}]'
 Assert-True ($r10.state -eq 'panelReady') "Caso 10: antigravity/claude-* (anthropic) + google (google) -> panelReady; veio '$($r10.state)'."
 
-# (11) chave 'unknown' (sem barra) nao eh descartada e conta como familia propria (unknown)
+# (11) chave 'unknown' (sem barra) e descartada; so google conta -> insufficientDiversity
 $r11 = Invoke-Diversity '[{"targetModelKey":"unknown","verdict":"allow"},{"targetModelKey":"google/gemini-3-flash-preview","verdict":"allow"}]'
-Assert-True ($r11.state -eq 'panelReady') "Caso 11: chave 'unknown' sem barra deve contar como familia propria; veio '$($r11.state)'."
-Assert-True (@($r11.dispatchable).Count -eq 2) "Caso 11: ambos candidatos devem ser dispatchable; veio '$(@($r11.dispatchable).Count)'."
+Assert-True ($r11.state -eq 'insufficientDiversity') "Caso 11: unknown descartado; esperado insufficientDiversity; veio '$($r11.state)'."
+Assert-True ($r11.unknownFamiliesPresent -eq $true) 'Caso 11: unknownFamiliesPresent deveria ser true.'
+Assert-True (@($r11.dispatchable).Count -eq 1) "Caso 11: so google deve ser dispatchable; veio '$(@($r11.dispatchable).Count)'."
 
 # (12) nvidia/minimaxai/* vs nvidia/z-ai/* sao 2 criadores distintos (minimaxai vs z-ai) -> panelReady
 $r12 = Invoke-Diversity '[{"targetModelKey":"nvidia/minimaxai/minimax-m3","verdict":"allow"},{"targetModelKey":"nvidia/z-ai/glm-5.2","verdict":"allow"}]'
@@ -111,10 +112,11 @@ $r18 = Invoke-Diversity '[{"targetModelKey":"nvidia/nemotron-3-super-120b-a12b",
 Assert-True ($r18.state -eq 'panelReady') "Caso 18: chave nvidia de 2 niveis deve resolver criador nvidia; veio '$($r18.state)'."
 Assert-True (@($r18.distinctFamiliesAllow) -contains 'nvidia') "Caso 18: distinctFamiliesAllow deve conter 'nvidia'."
 
-# (19) sub-org desconhecida sob nvidia usa o 2o segmento as-is
+# (19) sub-org desconhecida sob nvidia e descartada (custom-lab fora da allowlist)
 $r19 = Invoke-Diversity '[{"targetModelKey":"nvidia/custom-lab/model-x","verdict":"allow"},{"targetModelKey":"google/gemini-3-flash-preview","verdict":"allow"}]'
-Assert-True ($r19.state -eq 'panelReady') "Caso 19: sub-org desconhecida deve contar como criador proprio; veio '$($r19.state)'."
-Assert-True (@($r19.distinctFamiliesAllow) -contains 'custom-lab') "Caso 19: distinctFamiliesAllow deve conter 'custom-lab'."
+Assert-True ($r19.state -eq 'insufficientDiversity') "Caso 19: custom-lab descartado; esperado insufficientDiversity; veio '$($r19.state)'."
+Assert-True ($r19.unknownFamiliesPresent -eq $true) 'Caso 19: unknownFamiliesPresent deveria ser true.'
+Assert-True (-not (@($r19.distinctFamiliesAllow) -contains 'custom-lab')) 'Caso 19: custom-lab nao deve contar no piso.'
 
 # (20) antigravity/gpt-* colapsa em openai
 $r20 = Invoke-Diversity '[{"targetModelKey":"antigravity/gpt-5-preview","verdict":"allow"},{"targetModelKey":"openai/gpt-5.5","verdict":"allow"}]'
@@ -129,5 +131,16 @@ $r22 = Invoke-Diversity '[{"targetModelKey":"nvidia/custom-model-a","verdict":"a
 Assert-True ($r22.state -eq 'insufficientDiversity') "Caso 22: chaves nvidia de 2 niveis desconhecidas devem colapsar em nvidia (sem supercontar); esperado insufficientDiversity; veio '$($r22.state)'."
 Assert-True (@($r22.distinctFamiliesAllow).Count -eq 1) "Caso 22: esperado 1 distinctFamiliesAllow ('nvidia'); veio '$(@($r22.distinctFamiliesAllow).Count)'."
 Assert-True (@($r22.distinctFamiliesAllow) -contains 'nvidia') "Caso 22: distinctFamiliesAllow deve conter 'nvidia'."
+
+# (23) dois primarios, um responde, sem cadeia -> insufficientDiversity (nao AfterFallback)
+$r23 = Invoke-Diversity '[{"targetModelKey":"openai/gpt-5.5","state":"responded","attemptRole":"primary"},{"targetModelKey":"anthropic/claude-opus-4-8","state":"error","attemptRole":"primary"}]'
+Assert-True ($r23.state -eq 'insufficientDiversity') "Caso 23: esperado insufficientDiversity (sem evidencia de fallback); veio '$($r23.state)'."
+Assert-True ($r23.state -ne 'insufficientDiversityAfterFallback') 'Caso 23: nao deve ser AfterFallback sem cadeia despachada.'
+
+# (24) unknown descartado aparece em droppedUnknownFamilies
+$r24 = Invoke-Diversity '[{"targetModelKey":"unknown","verdict":"allow"},{"targetModelKey":"google/gemini-3-flash-preview","verdict":"allow"}]'
+Assert-True ($r24.unknownFamiliesPresent -eq $true) 'Caso 24: unknownFamiliesPresent deveria ser true.'
+$droppedKeys = @($r24.droppedUnknownFamilies | ForEach-Object { [string]$_.targetModelKey })
+Assert-True ($droppedKeys -contains 'unknown') "Caso 24: droppedUnknownFamilies deveria conter 'unknown'; veio '$($droppedKeys -join ',')'."
 
 Write-Host "OK: Test-LlmDelegatePanelDiversitySelfTest.ps1"

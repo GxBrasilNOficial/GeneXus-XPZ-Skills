@@ -17,7 +17,31 @@
     do provedor (limite conhecido documentado para preservacao dos semaforos de concorrencia do dispatcher).
 
     Chaves sem barra (ex: 'unknown', 'gpt-5') preservam a própria chave como familia.
+
+    Test-LlmDelegateFamilyKnown: allowlist versionada de criadores que contam no piso de diversidade.
+    Familia derivada fora da lista e unknown para o piso (nao colapsa no helper Get-*).
 #>
+
+# Lista normativa inicial (case-insensitive). Ampliar so com decisao humana + docs.
+$script:LlmDelegateKnownFamilies = @(
+    'openai', 'anthropic', 'google', 'moonshot', 'z-ai', 'deepseek', 'mistral', 'alibaba',
+    'meta', 'minimaxai', 'nvidia', 'ollama-cloud', 'opencode-go', 'atlas-cloud',
+    'github-copilot', 'microsoft'
+)
+
+function Test-LlmDelegateFamilyKnown {
+    [CmdletBinding()]
+    param(
+        [string]$Family
+    )
+    Set-StrictMode -Version Latest
+    if ([string]::IsNullOrWhiteSpace($Family)) { return $false }
+    $trim = $Family.Trim()
+    foreach ($f in $script:LlmDelegateKnownFamilies) {
+        if ($f.Equals($trim, [System.StringComparison]::OrdinalIgnoreCase)) { return $true }
+    }
+    return $false
+}
 
 function Get-LlmDelegateTargetFamily {
     [CmdletBinding()]

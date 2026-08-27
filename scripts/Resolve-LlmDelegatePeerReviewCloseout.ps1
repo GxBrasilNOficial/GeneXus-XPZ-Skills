@@ -124,7 +124,13 @@ param(
     [ValidateSet('notProduced', 'pendingResubmission', 'resubmitted', 'resubmissionDeclinedByHuman')]
     [string] $VNextState = 'notProduced',
     [string] $ResubmissionDeclinedBy,
-    [string] $ResubmissionDeclineReason
+    [string] $ResubmissionDeclineReason,
+    [string] $PreferredReviewersSnapshotJson,
+    [string] $EffectivePreferredPath,
+    [string] $PreferenceSource,
+    [string] $PreferredRoot,
+    [string] $Orchestrator,
+    [string] $ProposedPreferredPath
 )
 
 Set-StrictMode -Version Latest
@@ -196,6 +202,43 @@ function Add-ExpectedReviewerState {
         })
 }
 
+function Get-NormalizedFullPath {
+    param([string]$Path)
+    if ([string]::IsNullOrWhiteSpace($Path)) { return $null }
+    $expanded = [Environment]::ExpandEnvironmentVariables($Path.Trim())
+    try {
+        return [System.IO.Path]::GetFullPath($expanded)
+    } catch {
+        return $expanded
+    }
+}
+
+function Resolve-EffortApplied {
+    param($StateRow, $SnapshotReviewers)
+    $attemptRole = [string](Get-Prop $StateRow 'attemptRole')
+    $fallbackOf = [string](Get-Prop $StateRow 'fallbackOf')
+    if ($attemptRole -eq 'fallback' -or -not [string]::IsNullOrWhiteSpace($fallbackOf)) {
+        return 'unset'
+    }
+    if ($null -eq $SnapshotReviewers) { return 'unset' }
+    $backend = [string](Get-Prop $StateRow 'backend')
+    $target = [string](Get-Prop $StateRow 'targetModelKey')
+    $hit = $null
+    foreach ($r in @($SnapshotReviewers)) {
+        $rb = [string](Get-Prop $r 'backend')
+        $rt = [string](Get-Prop $r 'targetModelKey')
+        if ($rb.Equals($backend, [System.StringComparison]::OrdinalIgnoreCase) -and
+            $rt.Equals($target, [System.StringComparison]::OrdinalIgnoreCase)) {
+            $hit = $r
+            break
+        }
+    }
+    if ($null -eq $hit) { return 'unset' }
+    $effort = [string](Get-Prop $hit 'reasoningEffort')
+    if ([string]::IsNullOrWhiteSpace($effort) -or $effort -eq 'unset') { return 'unset' }
+    return 'unsupported'
+}
+
 $selectedReviewers = @()
 try {
     $parsed = $SelectedReviewersJson | ConvertFrom-Json
@@ -214,6 +257,131 @@ try {
 
 $requiresOffer = (-not $hadPreferred) -and $manualSelection
 $blockingReasons = [System.Collections.Generic.List[string]]::new()
+
+# Snapshot / proveniencia
+$snapshotObj = $null
+$snapshotReviewers = @()
+$resolvedPreferenceSource = $PreferenceSource
+$resolvedEffectivePath = $EffectivePreferredPath
+
+if ($hadPreferred) {
+    if ([string]::IsNullOrWhiteSpace($PreferredReviewersSnapshotJson) -or $PreferredReviewersSnapshotJson.Trim() -eq '[]') {
+        $blockingReasons.Add('preferred-snapshot-missing')
+    } else {
+        try {
+            $snapshotObj = $PreferredReviewersSnapshotJson | ConvertFrom-Json
+        } catch {
+            $blockingReasons.Add('preferred-snapshot-unreadable')
+        }
+        if ($null -ne $snapshotObj) {
+            $isObj = $snapshotObj -isnot [System.Array]
+            $svOk = $false
+            try { $svOk = ([int](Get-Prop $snapshotObj 'schemaVersion') -eq 3) } catch { $svOk = $false }
+            $src = [string](Get-Prop $snapshotObj 'preferenceSource')
+            $srcOk = $src -in @('orchestrator', 'machine', 'explicit-path')
+            $pathSnap = [string](Get-Prop $snapshotObj 'effectivePreferredPath')
+            $pathOk = -not [string]::IsNullOrWhiteSpace($pathSnap)
+            $hasPref = [bool](Get-Prop $snapshotObj 'hasPreferences')
+            $revNode = Get-Prop $snapshotObj 'reviewers'
+            $revOk = $null -ne $revNode
+            if (-not ($isObj -and $hasPref -and $svOk -and $srcOk -and $pathOk -and $revOk)) {
+                $blockingReasons.Add('preferred-snapshot-invalid')
+            } else {
+                $snapshotReviewers = @($revNode)
+                foreach ($sr in $snapshotReviewers) {
+                    if ([string]::IsNullOrWhiteSpace([string](Get-Prop $sr 'backend')) -or
+                        [string]::IsNullOrWhiteSpace([string](Get-Prop $sr 'targetModelKey'))) {
+                        $blockingReasons.Add('preferred-snapshot-invalid')
+                        break
+                    }
+                }
+                if ([string]::IsNullOrWhiteSpace($resolvedPreferenceSource)) {
+                    $resolvedPreferenceSource = $src
+                }
+                if ([string]::IsNullOrWhiteSpace($resolvedEffectivePath)) {
+                    $resolvedEffectivePath = $pathSnap
+                } else {
+                    $a = Get-NormalizedFullPath $resolvedEffectivePath
+                    $b = Get-NormalizedFullPath $pathSnap
+                    if ($null -ne $a -and $null -ne $b -and -not $a.Equals($b, [System.StringComparison]::OrdinalIgnoreCase)) {
+                        $blockingReasons.Add('preferred-path-mismatch')
+                    }
+                }
+                if (-not [string]::IsNullOrWhiteSpace($PreferenceSource) -and
+                    -not $PreferenceSource.Equals($src, [System.StringComparison]::OrdinalIgnoreCase)) {
+                    $blockingReasons.Add('preferred-path-mismatch')
+                }
+                # Correspondencia Selected ⊆ snapshot.reviewers
+                foreach ($sel in $selectedReviewers) {
+                    $sb = [string](Get-Prop $sel 'backend')
+                    $st = Get-ReviewerTarget $sel
+                    $found = $false
+                    foreach ($sr in $snapshotReviewers) {
+                        if ([string](Get-Prop $sr 'backend').Equals($sb, [System.StringComparison]::OrdinalIgnoreCase) -and
+                            [string](Get-Prop $sr 'targetModelKey').Equals($st, [System.StringComparison]::OrdinalIgnoreCase)) {
+                            $found = $true
+                            break
+                        }
+                    }
+                    if (-not $found) {
+                        $blockingReasons.Add('preferred-snapshot-selection-mismatch')
+                        break
+                    }
+                }
+            }
+        }
+    }
+} else {
+    # Sem preferencias: snapshot omitido ou {}; effortApplied=unset
+    if (-not [string]::IsNullOrWhiteSpace($PreferredReviewersSnapshotJson) -and
+        $PreferredReviewersSnapshotJson.Trim() -notin @('{}', '')) {
+        try {
+            $tmpSnap = $PreferredReviewersSnapshotJson | ConvertFrom-Json
+            if ($tmpSnap -is [System.Array] -or [bool](Get-Prop $tmpSnap 'hasPreferences')) {
+                # nao invalidar se for {} simples
+            }
+        } catch { }
+    }
+}
+
+if ($requiresOffer -or $hadPreferred) {
+    if ([string]::IsNullOrWhiteSpace($resolvedEffectivePath) -and [string]::IsNullOrWhiteSpace($resolvedPreferenceSource)) {
+        if ($requiresOffer) {
+            # oferta: ProposedPreferredPath ou default machine
+            $proposed = $ProposedPreferredPath
+            if ([string]::IsNullOrWhiteSpace($proposed)) {
+                $proposed = '%LOCALAPPDATA%\xpz-llm-delegate\preferred-reviewers.json'
+            }
+            $resolvedEffectivePath = Get-NormalizedFullPath $proposed
+            if ([string]::IsNullOrWhiteSpace($resolvedPreferenceSource)) {
+                $resolvedPreferenceSource = 'none'
+            }
+            $rootResolved = if (-not [string]::IsNullOrWhiteSpace($PreferredRoot)) {
+                Get-NormalizedFullPath $PreferredRoot
+            } else {
+                Get-NormalizedFullPath ([Environment]::GetFolderPath('LocalApplicationData') + '\xpz-llm-delegate')
+            }
+            $dirName = [System.IO.Path]::GetDirectoryName($resolvedEffectivePath)
+            $fileName = [System.IO.Path]::GetFileName($resolvedEffectivePath)
+            $allowedNames = @('preferred-reviewers.json')
+            if (-not [string]::IsNullOrWhiteSpace($Orchestrator)) {
+                $allowedNames += "preferred-reviewers.$($Orchestrator.Trim()).json"
+            }
+            if ($null -eq $dirName -or $null -eq $rootResolved -or
+                -not $dirName.Equals($rootResolved, [System.StringComparison]::OrdinalIgnoreCase) -or
+                ($allowedNames -notcontains $fileName)) {
+                # nao bloquear se root nao informado e path e o default machine expandido
+                if (-not [string]::IsNullOrWhiteSpace($PreferredRoot)) {
+                    $blockingReasons.Add('preferred-path-mismatch')
+                }
+            }
+        } else {
+            $blockingReasons.Add('preferred-path-provenance-missing')
+        }
+    } elseif ([string]::IsNullOrWhiteSpace($resolvedEffectivePath) -or [string]::IsNullOrWhiteSpace($resolvedPreferenceSource)) {
+        $blockingReasons.Add('preferred-path-provenance-missing')
+    }
+}
 
 if ($requiresOffer -and $PreferredReviewersOfferState -eq 'not_made') {
     $blockingReasons.Add('preferred-reviewers-offer-missing')
@@ -313,6 +481,7 @@ foreach ($st in $preferredReviewerStates) {
             attemptRole         = $attemptRole
             fallbackOf          = $fallbackOf
             countsForDiversity  = $countsForDiversityRaw
+            effortApplied       = (Resolve-EffortApplied -StateRow $st -SnapshotReviewers $snapshotReviewers)
         })
 }
 
@@ -371,6 +540,16 @@ if ($blockingReasons -contains 'vnext-pending-resubmission') {
     $requiredPrompt = 'Antes de encerrar a revisão por pares: a composição final após fallback ficou com diversidade insuficiente. Não use o rótulo revisão por pares; registre como parecer solo, segunda opinião ou rodada não concluída.'
 } elseif ($requiresOffer -and ($blockingReasons -contains 'preferred-reviewers-offer-missing' -or $blockingReasons -contains 'preferred-reviewers-offer-state-invalid-for-manual-selection')) {
     $requiredPrompt = "Antes de encerrar a revisão por pares: você quer salvar $selectedText como revisores preferidos desta máquina em ${preferredPath}? Se responder sim, vou usar Set-LlmDelegatePreferredReviewers.ps1; se preferir não salvar ou adiar, sigo sem bloquear esta rodada."
+} elseif ($blockingReasons -contains 'preferred-path-provenance-missing') {
+    $requiredPrompt = 'Antes de encerrar a revisão por pares: informe a proveniência do path de preferidos (-EffectivePreferredPath / -PreferenceSource ou snapshot).'
+} elseif ($blockingReasons -contains 'preferred-path-mismatch') {
+    $requiredPrompt = 'Antes de encerrar a revisão por pares: o path/preferenceSource informado diverge do snapshot do Resolve-.'
+} elseif ($blockingReasons -contains 'preferred-snapshot-missing') {
+    $requiredPrompt = 'Antes de encerrar a revisão por pares: passe -PreferredReviewersSnapshotJson com o envelope completo do Resolve- do início da rodada.'
+} elseif ($blockingReasons -contains 'preferred-snapshot-invalid' -or $blockingReasons -contains 'preferred-snapshot-unreadable') {
+    $requiredPrompt = 'Antes de encerrar a revisão por pares: o snapshot de preferidos é inválido (schema 3, hasPreferences, preferenceSource, path e reviewers).'
+} elseif ($blockingReasons -contains 'preferred-snapshot-selection-mismatch') {
+    $requiredPrompt = 'Antes de encerrar a revisão por pares: algum item de -SelectedReviewersJson não existe no snapshot.reviewers.'
 } elseif ($blockingReasons -contains 'preferred-reviewer-expected-states-missing') {
     $requiredPrompt = 'Antes de encerrar a revisão por pares: informe -SelectedReviewersJson com a lista esperada da rodada (titulares e fallbackChain[]) e re-rote este closeout junto de -PreferredReviewerStatesJson. Sem a lista esperada, o script não consegue provar completude dos estados auditáveis.'
 } elseif ($blockingReasons.Count -gt 0) {
@@ -397,7 +576,8 @@ if ($VNextState -eq 'resubmissionDeclinedByHuman') {
     $declineRound = if ([string]::IsNullOrWhiteSpace($RoundId)) { '(sem RoundId)' } else { $RoundId }
     $vNextReceipt = "Estado da vN+1: vNextState=$VNextState; declinadoPor=$declineWho; motivo=$declineWhy; RoundId=$declineRound."
 }
-$receiptAddendum = "$curationReceipt $stateReceipt $vNextReceipt"
+$pathReceipt = "preferenceSource=$resolvedPreferenceSource; effectivePreferredPath=$resolvedEffectivePath."
+$receiptAddendum = "$curationReceipt $stateReceipt $vNextReceipt $pathReceipt"
 
 [pscustomobject]@{
     closeoutReady                = $closeoutReady
@@ -414,6 +594,8 @@ $receiptAddendum = "$curationReceipt $stateReceipt $vNextReceipt"
     selectedReviewers            = @($labels)
     expectedPreferredReviewerStates = @($expectedStateRows)
     preferredReviewerStates      = @($preferredStateRows)
+    effectivePreferredPath       = $resolvedEffectivePath
+    preferenceSource             = $resolvedPreferenceSource
     requiredUserPrompt           = $requiredPrompt
     receiptAddendum              = $receiptAddendum
     note                         = 'Fechamento consultivo/deterministico da revisao por pares; nao grava preferencia, nao decide autorizacao e nao recalcula diversidade. Se closeoutReady=false, nao encerrar a rodada nem emitir recibo final sem antes apresentar requiredUserPrompt.'
