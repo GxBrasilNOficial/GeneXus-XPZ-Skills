@@ -23,3 +23,4 @@ Entradas do `999` atualizadas (não removidas por completo): esforço de racioc�
 - Commit material: `18c3ebe` (`Implementa preferidos por orquestrador (schema 3, cascata, nativo).`).
 - Commit material (closeout): `15455ae` (`Neutraliza motivo de curadoria no recibo do closeout.`).
 - Commit material (pós-v20): `758a901` (`Fecha gaps pós-v20: teste de leak nativo, README e recibo.`).
+- Commit material (closeout path): `a4de10e` (`Faz prompt e recibo do closeout ecoarem o path resolvido da oferta.`).
