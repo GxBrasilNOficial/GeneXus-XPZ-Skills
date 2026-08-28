@@ -21,6 +21,8 @@
          b. deteccao: le o alvo de qualquer vinculo global já existente de `nexa`
             (o vinculo aponta para <repo>\nexa; a raiz e a pasta-pai); senao
          c. default: pasta-irma da raiz XPZ (<pai-da-raiz-XPZ>\GeneXus-Skills-From-Zip).
+         Em migração de clone legado (origin != oficial), NEXA_REMOTE_MISMATCH bloqueia
+         sem reescrever o remoto; chamar de novo com -NexaRepoRoot = pasta canônica.
       3. Se a raiz já for repositório Git: confere se origin aponta para o oficial
          (tolera remotos extras, ex.: um `fork` pessoal). origin ausente -> adiciona.
       4. Se a pasta não existir ou estiver vazia: CLONA o oficial para a raiz.
@@ -306,7 +308,10 @@ if ($isRepo) {
             -Remote $originCheck.Text.Trim() -RepoRoot $repoRoot -Messages @(
             "origin aponta para outro remoto: $($originCheck.Text.Trim())",
             "Oficial esperado: $NexaOfficialRemoteUrl",
-            'Nao alterado automaticamente. Ajuste o remoto manualmente se desejar religar ao oficial.'))
+            'Nao alterado automaticamente (o remoto do clone atual nao e reescrito).',
+            'Migracao para o canonico: chame de novo com -NexaRepoRoot apontando para a pasta-irma GeneXus-Skills-From-Zip',
+            '(caminho canônico da auditoria: repoRootCanonical). Sem -NexaRepoRoot, a deteccao pelo vinculo existente',
+            'redetecta este clone legado e repete o BLOCK. Depois recrie os vinculos nexa para <canonico>\nexa.'))
 }
 
 # --- 4. Pasta existe, tem conteúdo, mas não e repositório Git -----------------

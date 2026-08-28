@@ -84,6 +84,9 @@ try {
     & git -C $tmp remote add origin 'https://example.com/outro/repo.git' *> $null
     $out = & $scriptUnderTest -NexaRepoRoot $tmp -AsJson | Out-String
     Assert-Label -CaseName 'remote-mismatch' -ExpectedLabel 'NEXA_REMOTE_MISMATCH' -Output $out
+    if ($out -notmatch '-NexaRepoRoot' -or $out -notmatch 'GeneXus-Skills-From-Zip') {
+        throw "Caso remote-mismatch: mensagem deve orientar -NexaRepoRoot / GeneXus-Skills-From-Zip. Saida: $out"
+    }
 }
 finally { Remove-TempDir -Path $tmp }
 

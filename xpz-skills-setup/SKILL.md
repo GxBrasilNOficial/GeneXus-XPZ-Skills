@@ -291,13 +291,22 @@ da `nexa` **não** marca `REGISTRATION_GAPS`, mas marca `EXTERNAL_SKILLS_GAPS`.
 
 **Resolução de gaps da `nexa`:** quando `externalOverall = EXTERNAL_SKILLS_GAPS`,
 primeiro garantir o repositório **canônico** com `scripts/Initialize-NexaRepoGit.ps1`
-(sem `-NexaRepoRoot` salvo override explícito do usuário: clona/liga
-`GeneXus-Skills-From-Zip` quando ausente) e **só então** criar/recriar o vínculo
-da `nexa` nos caminhos da estratégia ativa, apontando para
-`<repoRootCanonical>\nexa` (nunca o repo inteiro). Se os vínculos já existem mas
-apontam para clone legado, a resolução inclui **recriar** os vínculos para o repo
-canônico após confirmação — sempre com **confirmação explícita** do usuário, igual
-aos passos 6–7 das skills internas.
+e **só então** criar/recriar o vínculo da `nexa` nos caminhos da estratégia ativa,
+apontando para `<repoRootCanonical>\nexa` (nunca o repo inteiro).
+
+- **Sem clone / sem vínculos `nexa`:** chamar **sem** `-NexaRepoRoot` (cai no default
+  pasta-irmã `GeneXus-Skills-From-Zip` e clona quando ausente).
+- **Vínculos apontam para clone legado** (`repoBootstrapDetected.label` =
+  `NEXA_REMOTE_MISMATCH` ou equivalente): **obrigatório** passar
+  `-NexaRepoRoot <repoRootCanonical>` (o caminho canônico que a auditoria já
+  expôs). Omitir o parâmetro faz o motor **redetectar o legado** pelo vínculo
+  existente e devolver de novo `NEXA_REMOTE_MISMATCH` — sem clonar o canônico.
+  Depois do canônico OK, **recriar** os vínculos para `<repoRootCanonical>\nexa`
+  após confirmação.
+
+Sempre com **confirmação explícita** do usuário, igual aos passos 6–7 das skills
+internas. Override de pasta fora do canônico só se o usuário pedir caminho
+alternativo.
 
 ## PATH RESOLUTION
 
@@ -530,14 +539,14 @@ detecta o `server.py` defasado comparando o hash instalado com o canônico do re
    - **Órfã** → remover vínculo do diretório
    - **Quebrada** → recriar vínculo
    - **Gap da `nexa`** (`EXTERNAL_SKILLS_GAPS`) → primeiro garantir o repositório
-     **canônico** com `scripts/Initialize-NexaRepoGit.ps1` (clona/liga
-     `GeneXus-Skills-From-Zip` quando ausente; tolera `-NexaRepoRoot` só se o
-     usuário pedir caminho alternativo) e **só então** criar/recriar o vínculo da
-     `nexa` nos caminhos da estratégia ativa, apontando para a subpasta `nexa` do
-     clone canônico (nunca o repo inteiro). Se os vínculos existem mas apontam para
-     clone legado (`repoBootstrapDetected.label = NEXA_REMOTE_MISMATCH` ou equivalente),
-     incluir **recriação** dos vínculos para `<repoRootCanonical>\nexa` — ver
-     `## SKILL EXTERNA GERENCIADA: NEXA`
+     **canônico** com `scripts/Initialize-NexaRepoGit.ps1`: sem vínculos/legado,
+     chamar **sem** `-NexaRepoRoot` (default `GeneXus-Skills-From-Zip`); se a
+     auditoria marcou clone legado (`repoBootstrapDetected.label =
+     NEXA_REMOTE_MISMATCH` ou equivalente), chamar **com**
+     `-NexaRepoRoot <repoRootCanonical>` — omitir o parâmetro redetecta o legado
+     e bloqueia de novo. **Só então** criar/recriar o vínculo da `nexa` nos
+     caminhos da estratégia ativa, apontando para `<repoRootCanonical>\nexa`
+     (nunca o repo inteiro). Ver `## SKILL EXTERNA GERENCIADA: NEXA`.
 6. Aguardar confirmação explícita do usuário
 7. Executar as correções aprovadas
 8. Confirmar resultado por ferramenta

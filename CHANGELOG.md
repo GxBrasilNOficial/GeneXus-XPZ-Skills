@@ -8,6 +8,8 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 ### Unreleased
 
+- **nexa: repo oficial `GeneXus-Skills-From-Zip` + migração de clone legado:** `Initialize-NexaRepoGit.ps1` e auditoria apontam para `GxBrasilNOficial/genexus-skills-from-zip` (pasta default `GeneXus-Skills-From-Zip`); `Test-XpzSkillsRegistration.ps1` marca `EXTERNAL_SKILLS_GAPS` quando vínculos OK apontam para remoto legado (`repoBootstrapDetected` / `repoRootCanonical`). Correção pós-pré-push: roteiro da `xpz-skills-setup` exige `-NexaRepoRoot <repoRootCanonical>` na migração (omitir o parâmetro redetecta o legado); mensagem de `NEXA_REMOTE_MISMATCH` orienta o mesmo caminho. Self-test `Test-XpzSkillsRegistrationNexaRepoSelfTest.ps1`; README/`09` alinhados.
+
 - **Ordem de validação do painel no `14`:** após a matriz operacional, explicitar (1) ≥1 git-capable → (2) piso de famílias no `15` → (3) transporte/omissão; não declarar painel viável só porque o piso de diversidade fecha. Achado do teste cego pós-matriz (2026-08-28).
 
 - **Matriz operacional capacidade × transporte no `14`:** tabela única no `14-revisao-pre-push-reforcada.md` (backend/rota × papel no painel × fora do painel × transporte do dossiê), com remissões ao invariante git-capable, ao `15` e ao parágrafo de Omissão; ponteiro ampliado no `13` sem nomear backends. Manutenção explícita: uma rota por linha — o gate de paridade não detecta ausência de linha nova. Sem alteração de motor.
@@ -221,6 +223,8 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 ### Unreleased
 
+- **nexa: repo oficial `GeneXus-Skills-From-Zip` + migración de clone legado:** `Initialize-NexaRepoGit.ps1` y la auditoría apuntan a `GxBrasilNOficial/genexus-skills-from-zip` (carpeta default `GeneXus-Skills-From-Zip`); `Test-XpzSkillsRegistration.ps1` marca `EXTERNAL_SKILLS_GAPS` cuando vínculos OK apuntan a remoto legado (`repoBootstrapDetected` / `repoRootCanonical`). Corrección post-pre-push: el guion de `xpz-skills-setup` exige `-NexaRepoRoot <repoRootCanonical>` en la migración (omitir el parámetro redetecta el legado); el mensaje de `NEXA_REMOTE_MISMATCH` orienta el mismo camino. Self-test `Test-XpzSkillsRegistrationNexaRepoSelfTest.ps1`; README/`09` alineados.
+
 - **Orden de validación del panel en el `14`:** tras la matriz operacional, explicitar (1) ≥1 git-capable → (2) piso de familias en el `15` → (3) transporte/omisión; no declarar el panel viable solo porque el piso de diversidad cierra. Hallazgo del test ciego post-matriz (2026-08-28).
 
 - **Matriz operacional capacidad × transporte en el `14`:** tabla única en `14-revisao-pre-push-reforcada.md` (backend/ruta × rol en el panel × fuera del panel × transporte del dossier), con remisiones al invariante git-capable, al `15` y al párrafo de Omisión; puntero ampliado en el `13` sin nombrar backends. Mantenimiento explícito: una ruta por línea — el gate de paridad no detecta ausencia de línea nueva. Sin cambio de motor.
@@ -426,6 +430,8 @@ All relevant changes to this repository will be recorded here from this adoption
 The format keeps an `Unreleased` section for changes not yet published in a formal version. This repository does not yet use public semantic versioning; when that changes, future sections should record the corresponding tag.
 
 ### Unreleased
+
+- **nexa: official repo `GeneXus-Skills-From-Zip` + legacy clone migration:** `Initialize-NexaRepoGit.ps1` and the audit target `GxBrasilNOficial/genexus-skills-from-zip` (default folder `GeneXus-Skills-From-Zip`); `Test-XpzSkillsRegistration.ps1` marks `EXTERNAL_SKILLS_GAPS` when OK links point at a legacy remote (`repoBootstrapDetected` / `repoRootCanonical`). Post-pre-push fix: `xpz-skills-setup` workflow requires `-NexaRepoRoot <repoRootCanonical>` for migration (omitting the parameter re-detects the legacy clone); `NEXA_REMOTE_MISMATCH` message guides the same path. Self-test `Test-XpzSkillsRegistrationNexaRepoSelfTest.ps1`; README/`09` aligned.
 
 - **Panel validation order in `14`:** after the operational matrix, spell out (1) ≥1 git-capable → (2) family floor in `15` → (3) transport/omission; do not call a panel viable only because the diversity floor is met. Found in the post-matrix blind test (2026-08-28).
 
