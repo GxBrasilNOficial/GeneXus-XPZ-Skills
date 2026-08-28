@@ -19,7 +19,8 @@
       2. Resolve a raiz do repo nexa:
          a. parâmetro -NexaRepoRoot explicito; senao
          b. deteccao: le o alvo de qualquer vinculo global já existente de `nexa`
-            (o vinculo aponta para <repo>\nexa; a raiz e a pasta-pai); senao
+            (Claude/Codex/agents/Cursor/OpenCode/Antigravity `.gemini\config\skills`;
+            o vinculo aponta para <repo>\nexa; a raiz e a pasta-pai); senao
          c. default: pasta-irma da raiz XPZ (<pai-da-raiz-XPZ>\GeneXus-Skills-From-Zip).
          Em migração de clone legado (origin != oficial), NEXA_REMOTE_MISMATCH bloqueia
          sem reescrever o remoto; chamar de novo com -NexaRepoRoot = pasta canônica.
@@ -159,7 +160,7 @@ function Find-ExistingNexaRepoRoot {
     $profileRoot = $env:USERPROFILE
     $skillDirs = @(
         '.claude\skills', '.codex\skills', '.agents\skills',
-        '.cursor\skills', '.config\opencode\skills'
+        '.cursor\skills', '.config\opencode\skills', '.gemini\config\skills'
     )
     foreach ($rel in $skillDirs) {
         $full = Join-Path (Join-Path $profileRoot $rel) $SkillName

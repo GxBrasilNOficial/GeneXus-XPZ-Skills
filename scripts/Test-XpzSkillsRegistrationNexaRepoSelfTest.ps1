@@ -7,7 +7,8 @@
 .DESCRIPTION
     Monta perfil falso com vinculos validos da nexa apontando para um clone Git com
     origin divergente do oficial. Confere que externalOverall = EXTERNAL_SKILLS_GAPS
-    e repoBootstrapDetected.label = NEXA_REMOTE_MISMATCH, sem rede.
+    e repoBootstrapDetected.label = NEXA_REMOTE_MISMATCH, sem rede. Inclui caso misto
+    (Claude no canonico + Antigravity no legado) para impedir falso EXTERNAL_SKILLS_OK.
 #>
 
 [CmdletBinding()]
@@ -124,6 +125,65 @@ finally {
     $env:PATH = $originalPath
     $env:USERPROFILE = $originalProfile
     foreach ($p in @($fakeProfile, $fakeRepo, $legacyRepo)) {
+        Remove-TempDir -Path $p
+    }
+}
+
+# Caso 2: instalacao mista — primeiro vinculo canônico, Antigravity ainda no legado
+$fakeRepo2 = New-TempDir
+$fakeProfile2 = New-TempDir
+$legacyRepo2 = New-TempDir
+$canonicalRepo2 = New-TempDir
+try {
+    $env:PATH = ''
+
+    $skillDir2 = Join-Path $fakeRepo2 'xpz-skills-setup'
+    New-Item -ItemType Directory -Path $skillDir2 -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $skillDir2 'SKILL.md') -Value '# setup' -Encoding utf8
+
+    & $git.Source -C $legacyRepo2 init -b main *> $null
+    & $git.Source -C $legacyRepo2 remote add origin $legacyOrigin *> $null
+    $legacyNexa = Join-Path $legacyRepo2 'nexa'
+    New-Item -ItemType Directory -Path $legacyNexa -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $legacyNexa 'SKILL.md') -Value '# nexa' -Encoding utf8
+
+    & $git.Source -C $canonicalRepo2 init -b main *> $null
+    & $git.Source -C $canonicalRepo2 remote add origin $official *> $null
+    $canonNexa = Join-Path $canonicalRepo2 'nexa'
+    New-Item -ItemType Directory -Path $canonNexa -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $canonNexa 'SKILL.md') -Value '# nexa' -Encoding utf8
+
+    # Claude (primeiro na ordem) -> canonico; Antigravity nativo -> legado
+    New-Junction -LinkDir (Join-Path $fakeProfile2 '.claude\skills') -Name 'nexa' -Target $canonNexa
+    New-Junction -LinkDir (Join-Path $fakeProfile2 '.gemini\config\skills') -Name 'nexa' -Target $legacyNexa
+
+    Set-Content -LiteralPath (Join-Path $fakeProfile2 '.claude\settings.json') -Value '{}' -Encoding utf8
+    $geminiConfig = Join-Path $fakeProfile2 '.gemini\config'
+    New-Item -ItemType Directory -Path $geminiConfig -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $geminiConfig 'config.json') -Value '{}' -Encoding utf8
+
+    $env:USERPROFILE = $fakeProfile2
+    $json2 = & $scriptUnderTest -RepoRoot $fakeRepo2 -AsJson | Out-String
+    $env:USERPROFILE = $originalProfile
+    $report2 = $json2 | ConvertFrom-Json
+
+    Assert-Equal 'misto: externalOverall GAPS' 'EXTERNAL_SKILLS_GAPS' ([string]$report2.externalOverall)
+    $nexa2 = @($report2.externalSkills | Where-Object { $_.name -eq 'nexa' })
+    if ($nexa2.Count -eq 1) {
+        Assert-Equal 'misto: bootstrap NEXA_REMOTE_MISMATCH' 'NEXA_REMOTE_MISMATCH' ([string]$nexa2[0].repoBootstrapDetected.label)
+        Assert-Equal 'misto: Claude OK' 'OK' ([string](@($nexa2[0].tools | Where-Object { $_.name -eq 'ClaudeCode' }).status))
+        Assert-Equal 'misto: Antigravity OK (vinculo legado valido)' 'OK' ([string](@($nexa2[0].tools | Where-Object { $_.name -eq 'Antigravity' }).status))
+    }
+    else {
+        $script:cases++
+        $script:failures++
+        Write-Output 'FAIL: misto: externalSkills deveria conter nexa'
+    }
+}
+finally {
+    $env:PATH = $originalPath
+    $env:USERPROFILE = $originalProfile
+    foreach ($p in @($fakeProfile2, $fakeRepo2, $legacyRepo2, $canonicalRepo2)) {
         Remove-TempDir -Path $p
     }
 }

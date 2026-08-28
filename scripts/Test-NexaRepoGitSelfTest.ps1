@@ -10,7 +10,8 @@
     local e confere o "label" produzido. Os caminhos que exigiriam clone/fetch do
     remoto oficial são exercitados via -WhatIf, que para antes de qualquer operacao
     de rede ou escrita. A raiz e sempre passada por -NexaRepoRoot explicito, de modo
-    que a deteccao por vinculo global e os defaults não interferem.
+    que a deteccao por vinculo global e os defaults não interferem, salvo o caso
+    explicito que valida deteccao via `.gemini\config\skills` (Antigravity).
 
     Requer o executavel Git disponível (o próprio recurso depende dele).
 #>
@@ -127,6 +128,40 @@ try {
     Assert-Label -CaseName 'clone-skipped-whatif' -ExpectedLabel 'NEXA_CLONE_SKIPPED' -Output $out
 }
 finally { Remove-TempDir -Path $tmp }
+
+# Caso F: deteccao via .gemini\config\skills (Antigravity) SEM -NexaRepoRoot
+$profile = New-TempDir
+$repo = New-TempDir
+$originalProfile = $env:USERPROFILE
+try {
+    & git -C $repo init -b main *> $null
+    & git -C $repo remote add origin $official *> $null
+    $nexaDir = Join-Path $repo 'nexa'
+    New-Item -ItemType Directory -Path $nexaDir -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $nexaDir 'SKILL.md') -Value '# nexa' -Encoding utf8
+    $geminiSkills = Join-Path $profile '.gemini\config\skills'
+    New-Item -ItemType Directory -Path $geminiSkills -Force | Out-Null
+    New-Item -ItemType Junction -Path (Join-Path $geminiSkills 'nexa') -Target $nexaDir | Out-Null
+    $env:USERPROFILE = $profile
+    $out = & $scriptUnderTest -AsJson | Out-String
+    Assert-Label -CaseName 'detect-antigravity-gemini-skills' -ExpectedLabel 'NEXA_ALREADY_LINKED' -Output $out
+    $parsed = $out | ConvertFrom-Json
+    $detected = [System.IO.Path]::GetFullPath([string]$parsed.repoRoot).TrimEnd('\').ToLowerInvariant()
+    $expected = [System.IO.Path]::GetFullPath($repo).TrimEnd('\').ToLowerInvariant()
+    $script:cases++
+    if ($detected -eq $expected) {
+        Write-Output 'PASS: detect-antigravity-gemini-skills repoRoot'
+    }
+    else {
+        $script:failures++
+        Write-Output ("FAIL: detect-antigravity-gemini-skills repoRoot -> esperado '{0}', obtido '{1}'" -f $expected, $detected)
+    }
+}
+finally {
+    $env:USERPROFILE = $originalProfile
+    Remove-TempDir -Path $profile
+    Remove-TempDir -Path $repo
+}
 
 Write-Output ('---')
 if ($failures -eq 0) {

@@ -256,9 +256,10 @@ agentes) faz, de forma determinística:
 1. Garante o `git` (mesma lógica do bootstrap XPZ: instala via `winget` quando
    ausente e permitido; bloqueia ou pede reabrir a sessão conforme o caso).
 2. Resolve a raiz do repo nexa nesta ordem: parâmetro `-NexaRepoRoot` explícito →
-   **detecção** (lê o alvo de qualquer vínculo global de `nexa` já existente; a raiz
-   é a pasta-pai do alvo) → **default** (pasta-irmã da raiz XPZ:
-   `<pai-da-raiz-XPZ>\GeneXus-Skills-From-Zip`).
+   **detecção** (lê o alvo de qualquer vínculo global de `nexa` já existente —
+   `.claude` / `.codex` / `.agents` / `.cursor` / `.config/opencode` /
+   `.gemini/config/skills` (Antigravity); a raiz é a pasta-pai do alvo) → **default**
+   (pasta-irmã da raiz XPZ: `<pai-da-raiz-XPZ>\GeneXus-Skills-From-Zip`).
 3. Se a raiz já for repositório Git: confere `origin` = oficial (**tolera remotos
    extras**, ex.: um `fork` pessoal); `origin` ausente → adiciona.
 4. Se a pasta não existir ou estiver vazia: **clona** o oficial.
@@ -282,7 +283,10 @@ quebrada dos vínculos e a **estratégia compacta** (registro em `~/.claude`,
 `~/.codex`, `~/.config/opencode`; Cursor por compatibilidade). Além dos vínculos,
 o motor confere **read-only** o clone local detectado (`repoBootstrapDetected`,
 labels `NEXA_*`) contra a URL oficial e expõe o caminho canônico
-(`repoRootCanonical` = pasta-irmã `GeneXus-Skills-From-Zip`). Vínculos válidos
+(`repoRootCanonical` = pasta-irmã `GeneXus-Skills-From-Zip`). Avalia **todos** os
+roots distintos apontados pelos vínculos das ferramentas instaladas (não só o
+primeiro na ordem Claude→…→Antigravity): instalação mista (um canônico + um
+legado) marca gap. Vínculos válidos
 apontando para repo legado (`NEXA_REMOTE_MISMATCH`, `NEXA_DIR_NOT_REPO`,
 `NEXA_ORIGIN_MISSING`, `GIT_UNAVAILABLE`) ou subpasta `nexa` ausente marcam
 `EXTERNAL_SKILLS_GAPS` mesmo quando nenhum vínculo está ausente/quebrado.

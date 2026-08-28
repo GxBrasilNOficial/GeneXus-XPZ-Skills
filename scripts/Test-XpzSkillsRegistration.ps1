@@ -516,7 +516,8 @@ $extHasGap = $false
 $gitExe = Find-GitExecutable
 foreach ($ext in $externalSkillDefs) {
     $perTool = @()
-    $repoRootDetected = ''
+    $detectedRoots = [System.Collections.Generic.List[string]]::new()
+    $seenRoots = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
     $extHasRegistration = $false
     foreach ($def in $toolDefs) {
         $installed = Test-ToolInstalled -Tool $def.Name
@@ -527,9 +528,15 @@ foreach ($ext in $externalSkillDefs) {
         $cls = Get-SkillToolStatus -Skill $ext.name -ToolDef $def -ProfileRoot $profileRoot
         if ($cls.status -eq 'ausente' -or $cls.status -eq 'quebrada') { $extHasGap = $true }
         if ($cls.status -eq 'OK' -or $cls.status -eq 'coberta_por_compatibilidade') { $extHasRegistration = $true }
-        if ([string]::IsNullOrWhiteSpace($repoRootDetected) -and -not [string]::IsNullOrWhiteSpace($cls.target)) {
+        if (-not [string]::IsNullOrWhiteSpace($cls.target)) {
             # O vinculo aponta para <repo>\<skill>; a raiz do repo externo e a pasta-pai.
-            $repoRootDetected = [System.IO.Path]::GetDirectoryName($cls.target)
+            $parent = [System.IO.Path]::GetDirectoryName($cls.target)
+            if (-not [string]::IsNullOrWhiteSpace($parent)) {
+                $parentFull = [System.IO.Path]::GetFullPath($parent)
+                if ($seenRoots.Add($parentFull)) {
+                    [void]$detectedRoots.Add($parentFull)
+                }
+            }
         }
         $perTool += [ordered]@{
             name      = $def.Name
@@ -541,16 +548,36 @@ foreach ($ext in $externalSkillDefs) {
     }
 
     $repoRootCanonical = Get-NexaCanonicalRepoRoot -XpzRoot $root
-    $repoBootstrapDetected = Get-ExternalRepoBootstrapState -RepoRoot $repoRootDetected -OfficialUrl $ext.officialUrl -SkillName $ext.name -GitExe $gitExe
     $repoBootstrapCanonical = Get-ExternalRepoBootstrapState -RepoRoot $repoRootCanonical -OfficialUrl $ext.officialUrl -SkillName $ext.name -GitExe $gitExe
 
+    # Bootstrap: avaliar TODOS os roots distintos apontados pelos vinculos (nao so o primeiro).
+    # Instalacao mista (um canônico + um legado) deve marcar EXTERNAL_SKILLS_GAPS.
+    $repoRootDetected = ''
+    $repoBootstrapDetected = Get-ExternalRepoBootstrapState -RepoRoot '' -OfficialUrl $ext.officialUrl -SkillName $ext.name -GitExe $gitExe
     $extHasRepoGap = $false
-    if ($extHasRegistration) {
-        if (-not $repoBootstrapDetected.originOk) { $extHasRepoGap = $true }
-        if (-not $repoBootstrapDetected.skillPresent) { $extHasRepoGap = $true }
-        if (@('NEXA_DIR_NOT_REPO', 'NEXA_ORIGIN_MISSING', 'GIT_UNAVAILABLE') -contains $repoBootstrapDetected.label) {
-            $extHasRepoGap = $true
+    foreach ($rr in $detectedRoots) {
+        $st = Get-ExternalRepoBootstrapState -RepoRoot $rr -OfficialUrl $ext.officialUrl -SkillName $ext.name -GitExe $gitExe
+        $stFails = (-not [bool]$st.originOk) -or (-not [bool]$st.skillPresent) -or (
+            @('NEXA_DIR_NOT_REPO', 'NEXA_ORIGIN_MISSING', 'GIT_UNAVAILABLE') -contains [string]$st.label
+        )
+        if ($extHasRegistration -and $stFails) { $extHasRepoGap = $true }
+
+        $preferredFails = (-not [bool]$repoBootstrapDetected.originOk) -or (-not [bool]$repoBootstrapDetected.skillPresent) -or (
+            @('NEXA_DIR_NOT_REPO', 'NEXA_ORIGIN_MISSING', 'GIT_UNAVAILABLE', 'NEXA_REPO_MISSING') -contains [string]$repoBootstrapDetected.label
+        )
+        if ([string]::IsNullOrWhiteSpace($repoRootDetected)) {
+            $repoRootDetected = $rr
+            $repoBootstrapDetected = $st
         }
+        elseif ($stFails -and -not $preferredFails) {
+            # Prefere expor um root com gap no recibo (evita mascarar legado atras de um canônico anterior).
+            $repoRootDetected = $rr
+            $repoBootstrapDetected = $st
+        }
+    }
+    if ($extHasRegistration -and [string]::IsNullOrWhiteSpace($repoRootDetected)) {
+        # Mesma semantica do bootstrap vazio: registro sem path resolvivel = gap.
+        $extHasRepoGap = $true
     }
     if ($extHasRepoGap) { $extHasGap = $true }
 
