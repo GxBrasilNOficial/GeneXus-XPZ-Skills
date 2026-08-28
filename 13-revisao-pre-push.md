@@ -57,7 +57,7 @@ O revisor semantic-only roda **só a fase semântica** read-only sobre o dossiê
 
 **Gate de árvore limpa (pré-condição adicional do modo dossiê).** O semantic-only lê a árvore **viva** por `read`/`grep`/`glob`, e a Seção A cobre só o commitado — conteúdo não-commitado contaminaria a leitura dele **sem que ele possa distinguir** committed de working-tree (não tem git). Por isso, com `workingTreeDirty=true`, o orquestrador **não despacha** os revisores semantic-only: para, reporta a **lista de paths sujos** (`git status --porcelain`) e pede **commit ou stash**. Só gateia o semantic-only — o git-capable **pode distinguir** committed de working-tree e segue normal. É pré-condição **adicional** do modo dossiê, coerente com o item «Working tree» dos limites acima (que trata do passo mecânico apenas **avisar**): aqui a leitura da árvore viva pelo próprio revisor exige a garantia.
 
-A **política de painel** (invariante git-capable, piso de diversidade, serial por custo, dossiê regenerado a cada novo HEAD) é normativa no [`14`](14-revisao-pre-push-reforcada.md).
+A **política de painel** (invariante git-capable, piso de diversidade, serial por custo, dossiê regenerado a cada novo HEAD; **matriz operacional capacidade × transporte**) é normativa no [`14`](14-revisao-pre-push-reforcada.md).
 
 ## Fase semântica — por frente alterada
 
