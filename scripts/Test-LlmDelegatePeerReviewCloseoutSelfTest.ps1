@@ -32,7 +32,10 @@ function Invoke-Closeout {
         [string] $RoundId = '',
         [string] $PreferredReviewersSnapshotJson = '',
         [string] $EffectivePreferredPath = '',
-        [string] $PreferenceSource = ''
+        [string] $PreferenceSource = '',
+        [string] $ProposedPreferredPath = '',
+        [string] $PreferredRoot = '',
+        [string] $Orchestrator = ''
     )
     $hadStr = if ($HadPreferredReviewers) { 'true' } else { 'false' }
     $manualStr = if ($ManualReviewerSelection) { 'true' } else { 'false' }
@@ -55,6 +58,15 @@ function Invoke-Closeout {
     }
     if (-not [string]::IsNullOrWhiteSpace($PreferenceSource)) {
         $args['PreferenceSource'] = $PreferenceSource
+    }
+    if (-not [string]::IsNullOrWhiteSpace($ProposedPreferredPath)) {
+        $args['ProposedPreferredPath'] = $ProposedPreferredPath
+    }
+    if (-not [string]::IsNullOrWhiteSpace($PreferredRoot)) {
+        $args['PreferredRoot'] = $PreferredRoot
+    }
+    if (-not [string]::IsNullOrWhiteSpace($Orchestrator)) {
+        $args['Orchestrator'] = $Orchestrator
     }
     return (& $target @args | ConvertFrom-Json)
 }
@@ -315,6 +327,20 @@ Assert-True (@($r29.blockingReasons) -contains 'preferred-reviewer-state-missing
 $r30 = Invoke-Closeout $false $true 'offered' $selectedTwo $stateOne
 Assert-True ($r30.closeoutReady -eq $false) 'Caso 30: selecao manual com estado parcial deveria bloquear.'
 Assert-True (@($r30.blockingReasons) -contains 'preferred-reviewer-state-missing:nvidia/z-ai/glm-5.2') 'Caso 30: revisor manual esperado omitido deveria ser apontado.'
+
+# (31) Oferta com -ProposedPreferredPath / -PreferredRoot / -Orchestrator: prompt e recibo
+#      devem ecoar o path resolvido (preferred-reviewers.<orch>.json), nao o literal machine.
+$orchRoot = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'xpz-llm-delegate'
+$orchProposed = Join-Path $orchRoot 'preferred-reviewers.cursor.json'
+$r31 = Invoke-Closeout $false $true 'not_made' '[{"backend":"opencode","targetModelKey":"ollama-cloud/deepseek-v4-pro"}]' `
+    -ProposedPreferredPath $orchProposed -PreferredRoot $orchRoot -Orchestrator 'cursor'
+Assert-True ($r31.closeoutReady -eq $false) 'Caso 31: oferta omitida deveria bloquear.'
+Assert-True (@($r31.blockingReasons) -contains 'preferred-reviewers-offer-missing') 'Caso 31: razao de oferta ausente.'
+Assert-True ([string]$r31.requiredUserPrompt -match 'preferred-reviewers\.cursor\.json') 'Caso 31: prompt deveria citar preferred-reviewers.cursor.json.'
+Assert-True ([string]$r31.requiredUserPrompt -match "orquestrador 'cursor'") 'Caso 31: prompt deveria rotular orquestrador cursor, nao so desta maquina.'
+Assert-True ([string]$r31.requiredUserPrompt -notmatch 'preferidos desta máquina em %LOCALAPPDATA%\\xpz-llm-delegate\\preferred-reviewers\.json') 'Caso 31: prompt nao deve citar so o literal machine fixo.'
+Assert-True ([string]$r31.receiptAddendum -match 'destino=.*preferred-reviewers\.cursor\.json') 'Caso 31: recibo destino= deveria ecoar o path do orquestrador.'
+Assert-True ([string]$r31.effectivePreferredPath -match 'preferred-reviewers\.cursor\.json$') 'Caso 31: effectivePreferredPath deveria ser o path proposto.'
 
 <#
 Casos antigos mantidos por cobertura historica:

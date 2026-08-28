@@ -560,7 +560,20 @@ if ($DiversityState -eq 'insufficientDiversityAfterFallback') {
 $labels = @($selectedReviewers | ForEach-Object { Get-ReviewerLabel $_ } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
 $selectedText = if ($labels.Count -gt 0) { ($labels -join ', ') } else { 'os revisores escolhidos nesta rodada' }
 
-$preferredPath = '%LOCALAPPDATA%\xpz-llm-delegate\preferred-reviewers.json'
+# Path no prompt/recibo = o resolvido (ProposedPreferredPath / PreferredRoot / Orchestrator / snapshot),
+# nao o literal machine fixo. Fallback so se a resolucao nao materializou path.
+$preferredPathDisplay = if (-not [string]::IsNullOrWhiteSpace($resolvedEffectivePath)) {
+    [string]$resolvedEffectivePath
+} else {
+    '%LOCALAPPDATA%\xpz-llm-delegate\preferred-reviewers.json'
+}
+$offerLeaf = [System.IO.Path]::GetFileName($preferredPathDisplay)
+$offerScopeLabel = if ($offerLeaf -match '^preferred-reviewers\.(.+)\.json$') {
+    "como revisores preferidos do orquestrador '$($Matches[1])'"
+} else {
+    'como revisores preferidos desta máquina'
+}
+
 $roundLabel = 'desta rodada'
 if (-not [string]::IsNullOrWhiteSpace($RoundId)) { $roundLabel = "da rodada '$RoundId'" }
 $requiredPrompt = $null
@@ -571,7 +584,7 @@ if ($blockingReasons -contains 'vnext-pending-resubmission') {
 } elseif ($blockingReasons -contains 'insufficient-diversity-after-fallback') {
     $requiredPrompt = 'Antes de encerrar a revisão por pares: a composição final após fallback ficou com diversidade insuficiente. Não use o rótulo revisão por pares; registre como parecer solo, segunda opinião ou rodada não concluída.'
 } elseif ($requiresOffer -and ($blockingReasons -contains 'preferred-reviewers-offer-missing' -or $blockingReasons -contains 'preferred-reviewers-offer-state-invalid-for-manual-selection')) {
-    $requiredPrompt = "Antes de encerrar a revisão por pares: você quer salvar $selectedText como revisores preferidos desta máquina em ${preferredPath}? Se responder sim, vou usar Set-LlmDelegatePreferredReviewers.ps1; se preferir não salvar ou adiar, sigo sem bloquear esta rodada."
+    $requiredPrompt = "Antes de encerrar a revisão por pares: você quer salvar $selectedText $offerScopeLabel em ${preferredPathDisplay}? Se responder sim, vou usar Set-LlmDelegatePreferredReviewers.ps1 -Orchestrator/-Scope conforme o destino; se preferir não salvar ou adiar, sigo sem bloquear esta rodada."
 } elseif ($blockingReasons -contains 'preferred-path-provenance-missing') {
     $requiredPrompt = 'Antes de encerrar a revisão por pares: informe a proveniência do path de preferidos (-EffectivePreferredPath / -PreferenceSource ou snapshot).'
 } elseif ($blockingReasons -contains 'preferred-path-mismatch') {
@@ -590,7 +603,7 @@ if ($blockingReasons -contains 'vnext-pending-resubmission') {
 
 $closeoutReady = ($blockingReasons.Count -eq 0)
 $curationReceipt = if ($requiresOffer) {
-    "Curadoria de revisores preferidos: oferta=$PreferredReviewersOfferState; destino=$preferredPath."
+    "Curadoria de revisores preferidos: oferta=$PreferredReviewersOfferState; destino=$preferredPathDisplay."
 } else {
     "Curadoria de revisores preferidos: not_applicable; motivo=" + ($(if ($hadPreferred) { 'lista preferida ja resolvida no inicio da rodada' } else { 'sem selecao manual de revisores' }))
 }
