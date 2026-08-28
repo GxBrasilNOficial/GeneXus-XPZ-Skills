@@ -26,7 +26,7 @@ if (-not (Test-Path -LiteralPath $scriptUnderTest -PathType Leaf)) {
     throw "BLOCK: script alvo nao encontrado: $scriptUnderTest"
 }
 
-$official = 'https://github.com/genexuslabs/genexus-skills.git'
+$official = 'https://github.com/GxBrasilNOficial/genexus-skills-from-zip.git'
 $git = (Get-Command git -ErrorAction SilentlyContinue)
 if (-not $git) {
     throw 'BLOCK: git ausente; este self-test requer o executavel git.'
@@ -92,7 +92,7 @@ $tmp = New-TempDir
 try {
     & git -C $tmp init -b main *> $null
     & git -C $tmp remote add origin $official *> $null
-    & git -C $tmp remote add fork 'https://github.com/alguem/genexus-skills.git' *> $null
+    & git -C $tmp remote add fork 'https://github.com/alguem/genexus-skills-from-zip.git' *> $null
     $out = & $scriptUnderTest -NexaRepoRoot $tmp -AsJson | Out-String
     Assert-Label -CaseName 'official-with-extra-fork' -ExpectedLabel 'NEXA_ALREADY_LINKED' -Output $out
 }
@@ -119,7 +119,7 @@ finally { Remove-TempDir -Path $tmp }
 # Caso E: pasta inexistente + WhatIf -> NEXA_CLONE_SKIPPED (para antes do clone)
 $tmp = New-TempDir
 try {
-    $target = Join-Path $tmp 'genexus-skills'
+    $target = Join-Path $tmp 'GeneXus-Skills-From-Zip'
     $out = & $scriptUnderTest -NexaRepoRoot $target -AsJson -WhatIf | Out-String
     Assert-Label -CaseName 'clone-skipped-whatif' -ExpectedLabel 'NEXA_CLONE_SKIPPED' -Output $out
 }

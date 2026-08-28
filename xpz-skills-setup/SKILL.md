@@ -49,8 +49,7 @@ de um novo usuário.
   ZIP não se liga ao repositório oficial — ver `## BOOTSTRAP DO REPOSITÓRIO`
 - Não registrar skills de outros repositórios, **com uma exceção gerenciada
   nomeada: a `nexa`** (ver `## SKILL EXTERNA GERENCIADA: NEXA`). Demais skills de
-  outros repositórios — inclusive as que coabitam o repositório da `nexa`
-  (ex.: `gx-sap`) — ficam fora de escopo e permanecem dormentes
+  outros repositórios ficam fora de escopo
 - Não alterar configurações gerais das ferramentas fora do âmbito desta skill;
   **exceção explícita:** instrucionais globais cobertos pelo passo 9 do `WORKFLOW`
   (incluindo instalação do MCP Cursor via
@@ -240,12 +239,13 @@ git clone https://github.com/GxBrasilNOficial/GeneXus-XPZ-Skills.git
 ## SKILL EXTERNA GERENCIADA: NEXA
 
 A `nexa` é a **única** skill de outro repositório que esta skill gerencia por nome.
-Ela **não** é um repositório próprio: vive como subpasta do repositório multi-skill
-`genexus-skills` (GenexusLabs), que pode conter outras skills (ex.: `gx-sap`)
-deixadas **dormentes** — esta skill nunca as registra nem remove.
+Ela **não** é um repositório próprio: vive como subpasta do repositório comunitário
+`GeneXus-Skills-From-Zip`, mantido a partir dos zips oficiais GeneXus.
 
 Repositório oficial da `nexa`:
-`https://github.com/genexuslabs/genexus-skills.git` (público, GenexusLabs).
+`https://github.com/GxBrasilNOficial/genexus-skills-from-zip.git` (público,
+comunitário GxBrasil). O repositório histórico `genexuslabs/genexus-skills` deixou
+de ser acessível; esta base passou a ser a fonte de instalação.
 
 **Bootstrap do repositório (clonar quando ausente):** diferente do
 `## BOOTSTRAP DO REPOSITÓRIO` do próprio repo XPZ — que liga uma pasta já existente
@@ -258,7 +258,7 @@ agentes) faz, de forma determinística:
 2. Resolve a raiz do repo nexa nesta ordem: parâmetro `-NexaRepoRoot` explícito →
    **detecção** (lê o alvo de qualquer vínculo global de `nexa` já existente; a raiz
    é a pasta-pai do alvo) → **default** (pasta-irmã da raiz XPZ:
-   `<pai-da-raiz-XPZ>\genexus-skills`).
+   `<pai-da-raiz-XPZ>\GeneXus-Skills-From-Zip`).
 3. Se a raiz já for repositório Git: confere `origin` = oficial (**tolera remotos
    extras**, ex.: um `fork` pessoal); `origin` ausente → adiciona.
 4. Se a pasta não existir ou estiver vazia: **clona** o oficial.
@@ -276,18 +276,28 @@ só ocorrem em modo simulação (`-WhatIf`). Mesma convenção vale para o boots
 XPZ (passo 0 do `## WORKFLOW`).
 
 **Auditoria de registro da `nexa`:** o motor `scripts/Test-XpzSkillsRegistration.ps1`
-já classifica a `nexa` em uma seção separada (`externalSkills` / `externalOverall`),
+classifica a `nexa` em uma seção separada (`externalSkills` / `externalOverall`),
 aplicando a **mesma** classificação OK / coberta_por_compatibilidade / ausente /
-quebrada das skills internas e a **estratégia compacta** (registro em `~/.claude`,
-`~/.codex`, `~/.config/opencode`; Cursor por compatibilidade). `externalOverall` é
-**independente** de `overall`: ausência/quebra da `nexa` **não** marca
-`REGISTRATION_GAPS`, mas marca `EXTERNAL_SKILLS_GAPS`.
+quebrada dos vínculos e a **estratégia compacta** (registro em `~/.claude`,
+`~/.codex`, `~/.config/opencode`; Cursor por compatibilidade). Além dos vínculos,
+o motor confere **read-only** o clone local detectado (`repoBootstrapDetected`,
+labels `NEXA_*`) contra a URL oficial e expõe o caminho canônico
+(`repoRootCanonical` = pasta-irmã `GeneXus-Skills-From-Zip`). Vínculos válidos
+apontando para repo legado (`NEXA_REMOTE_MISMATCH`, `NEXA_DIR_NOT_REPO`,
+`NEXA_ORIGIN_MISSING`, `GIT_UNAVAILABLE`) ou subpasta `nexa` ausente marcam
+`EXTERNAL_SKILLS_GAPS` mesmo quando nenhum vínculo está ausente/quebrado.
+`externalOverall` é **independente** de `overall`: ausência/quebra/repo desatualizado
+da `nexa` **não** marca `REGISTRATION_GAPS`, mas marca `EXTERNAL_SKILLS_GAPS`.
 
 **Resolução de gaps da `nexa`:** quando `externalOverall = EXTERNAL_SKILLS_GAPS`,
-primeiro garantir o repositório local (passo de bootstrap acima) e **só então** criar
-os vínculos de registro para a `nexa` nos caminhos da estratégia ativa — sempre com
-**confirmação explícita** do usuário, igual aos passos 6–7 das skills internas. O alvo
-de cada vínculo é a subpasta `nexa` dentro do repo clonado, nunca o repo inteiro.
+primeiro garantir o repositório **canônico** com `scripts/Initialize-NexaRepoGit.ps1`
+(sem `-NexaRepoRoot` salvo override explícito do usuário: clona/liga
+`GeneXus-Skills-From-Zip` quando ausente) e **só então** criar/recriar o vínculo
+da `nexa` nos caminhos da estratégia ativa, apontando para
+`<repoRootCanonical>\nexa` (nunca o repo inteiro). Se os vínculos já existem mas
+apontam para clone legado, a resolução inclui **recriar** os vínculos para o repo
+canônico após confirmação — sempre com **confirmação explícita** do usuário, igual
+aos passos 6–7 das skills internas.
 
 ## PATH RESOLUTION
 
@@ -321,8 +331,7 @@ Use esta skill para:
 
 Do NOT use this skill para:
 - Instalar Codex, Claude Code, Cursor, OpenCode ou Antigravity na máquina
-- Registrar skills de outros repositórios **além da `nexa`** (ex: outras skills
-  GeneXus oficiais, ou as que coabitam o repo da `nexa` como `gx-sap`). A `nexa`
+- Registrar skills de outros repositórios **além da `nexa`**. A `nexa`
   é exceção gerenciada nomeada — ver `## SKILL EXTERNA GERENCIADA: NEXA`
 - Preparar ou auditar a pasta paralela de uma KB GeneXus (use `xpz-kb-parallel-setup`)
 - Sincronizar XPZ de uma KB (use `xpz-sync`)
@@ -504,8 +513,9 @@ detecta o `server.py` defasado comparando o hash instalado com o canônico do re
      apontam para o repo sem skill correspondente; `cursorMcp.label` o estado do
      MCP global do Cursor (tratado no passo 9)
    - `externalOverall` → `EXTERNAL_SKILLS_OK` ou `EXTERNAL_SKILLS_GAPS` (independente
-     de `overall`); `externalSkills[]` traz o status da `nexa` por ferramenta e o
-     `repoRootDetected` (clone local, se houver) — ver `## SKILL EXTERNA GERENCIADA: NEXA`
+     de `overall`); `externalSkills[]` traz o status da `nexa` por ferramenta,
+     `repoRootDetected`, `repoRootCanonical`, `repoBootstrapDetected` / `repoBootstrapCanonical`
+     e `repoOriginOk` — ver `## SKILL EXTERNA GERENCIADA: NEXA`
    - O `summary` (ok / coveredByCompat / missing / broken / orphans / cursorMcp /
      externalOverall) alimenta o relatório
 4. Apresentar relatório consolidado por ferramenta, declarando explicitamente
@@ -520,10 +530,14 @@ detecta o `server.py` defasado comparando o hash instalado com o canônico do re
    - **Órfã** → remover vínculo do diretório
    - **Quebrada** → recriar vínculo
    - **Gap da `nexa`** (`EXTERNAL_SKILLS_GAPS`) → primeiro garantir o repositório
-     local com `scripts/Initialize-NexaRepoGit.ps1` (clona se ausente; liga ao
-     oficial) e **só então** criar/recriar o vínculo da `nexa` nos caminhos da
-     estratégia ativa, apontando para a subpasta `nexa` do clone (nunca o repo
-     inteiro) — ver `## SKILL EXTERNA GERENCIADA: NEXA`
+     **canônico** com `scripts/Initialize-NexaRepoGit.ps1` (clona/liga
+     `GeneXus-Skills-From-Zip` quando ausente; tolera `-NexaRepoRoot` só se o
+     usuário pedir caminho alternativo) e **só então** criar/recriar o vínculo da
+     `nexa` nos caminhos da estratégia ativa, apontando para a subpasta `nexa` do
+     clone canônico (nunca o repo inteiro). Se os vínculos existem mas apontam para
+     clone legado (`repoBootstrapDetected.label = NEXA_REMOTE_MISMATCH` ou equivalente),
+     incluir **recriação** dos vínculos para `<repoRootCanonical>\nexa` — ver
+     `## SKILL EXTERNA GERENCIADA: NEXA`
 6. Aguardar confirmação explícita do usuário
 7. Executar as correções aprovadas
 8. Confirmar resultado por ferramenta

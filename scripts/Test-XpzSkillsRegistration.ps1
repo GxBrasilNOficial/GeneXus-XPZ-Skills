@@ -29,10 +29,12 @@
     Vinculos para outros repositórios não contam como orfas do repo XPZ.
 
     Skills externas gerenciadas (ex.: nexa): vivem em outro repositório (nexa está
-    em genexuslabs/genexus-skills) mas são auditadas por nome em uma seção separada
-    (externalSkills / externalOverall), com a mesma classificação OK / coberta /
-    ausente / quebrada. Só `nexa` e gerenciada por nome; demais skills do repo
-    externo (ex.: gx-sap) ficam dormentes e não são auditadas nem reportadas.
+    em GxBrasilNOficial/genexus-skills-from-zip) mas são auditadas por nome em uma
+    seção separada (externalSkills / externalOverall), com a mesma classificação OK /
+    coberta / ausente / quebrada para os vínculos. Além disso, confere se o clone
+    local detectado pelos vínculos tem origin oficial (labels NEXA_* read-only) e
+    expõe repoRootCanonical. origin divergente ou repo ausente marca EXTERNAL_SKILLS_GAPS
+    mesmo quando os vínculos existem. Só `nexa` e gerenciada por nome.
 
     Freshness do MCP do Cursor (Candidato B): compara o server.py instalado com o
     canonico do repositório e valida config.json/registro em mcp.json.
@@ -228,6 +230,110 @@ function Get-SkillToolStatus {
     return [ordered]@{ status = $status; linkType = $linkType; target = $target }
 }
 
+function ConvertTo-NormalizedUrl {
+    param([string]$Url)
+
+    if ([string]::IsNullOrWhiteSpace($Url)) { return '' }
+    $u = $Url.Trim().ToLowerInvariant()
+    $u = $u.TrimEnd('/')
+    if ($u.EndsWith('.git')) { $u = $u.Substring(0, $u.Length - 4) }
+    return $u
+}
+
+function Find-GitExecutable {
+    $cmd = Get-Command git -ErrorAction SilentlyContinue
+    if ($cmd) { return $cmd.Source }
+
+    $candidates = @(
+        (Join-Path $env:ProgramFiles 'Git\cmd\git.exe'),
+        (Join-Path ${env:ProgramFiles(x86)} 'Git\cmd\git.exe'),
+        (Join-Path $env:LOCALAPPDATA 'Programs\Git\cmd\git.exe')
+    )
+    foreach ($c in $candidates) {
+        if (-not [string]::IsNullOrWhiteSpace($c) -and (Test-Path -LiteralPath $c -PathType Leaf)) {
+            return $c
+        }
+    }
+    return $null
+}
+
+function Get-RepoOriginUrl {
+    param(
+        [Parameter(Mandatory = $true)][string]$GitExe,
+        [Parameter(Mandatory = $true)][string]$RepoRoot
+    )
+
+    if (-not (Test-Path -LiteralPath (Join-Path $RepoRoot '.git'))) { return '' }
+    $out = & $GitExe -C $RepoRoot remote get-url origin 2>&1
+    if ($LASTEXITCODE -ne 0) { return '' }
+    return ((@($out) | ForEach-Object { $_.ToString() }) -join [Environment]::NewLine).Trim()
+}
+
+function Get-NexaCanonicalRepoRoot {
+    param([Parameter(Mandatory = $true)][string]$XpzRoot)
+
+    $parent = [System.IO.Path]::GetDirectoryName($XpzRoot)
+    return (Join-Path $parent 'GeneXus-Skills-From-Zip')
+}
+
+function Get-ExternalRepoBootstrapState {
+    param(
+        [AllowEmptyString()][string]$RepoRoot,
+        [Parameter(Mandatory = $true)][string]$OfficialUrl,
+        [Parameter(Mandatory = $true)][string]$SkillName,
+        [string]$GitExe
+    )
+
+    $skillPath = if ([string]::IsNullOrWhiteSpace($RepoRoot)) { '' } else { Join-Path $RepoRoot $SkillName }
+    $result = [ordered]@{
+        repoRoot     = $RepoRoot
+        label        = 'NEXA_REPO_MISSING'
+        originUrl    = ''
+        originOk     = $false
+        skillPresent = $false
+        skillPath    = $skillPath
+    }
+
+    if ([string]::IsNullOrWhiteSpace($RepoRoot)) { return $result }
+
+    if (Test-Path -LiteralPath $skillPath -PathType Container) {
+        $result.skillPresent = (Test-Path -LiteralPath (Join-Path $skillPath 'SKILL.md') -PathType Leaf)
+    }
+
+    if (-not (Test-Path -LiteralPath $RepoRoot -PathType Container)) { return $result }
+
+    if (-not (Test-Path -LiteralPath (Join-Path $RepoRoot '.git'))) {
+        $children = @(Get-ChildItem -LiteralPath $RepoRoot -Force -ErrorAction SilentlyContinue)
+        if ($children.Count -gt 0) {
+            $result.label = 'NEXA_DIR_NOT_REPO'
+        }
+        return $result
+    }
+
+    if ([string]::IsNullOrWhiteSpace($GitExe)) {
+        $result.label = 'GIT_UNAVAILABLE'
+        return $result
+    }
+
+    $originUrl = Get-RepoOriginUrl -GitExe $GitExe -RepoRoot $RepoRoot
+    if ([string]::IsNullOrWhiteSpace($originUrl)) {
+        $result.label = 'NEXA_ORIGIN_MISSING'
+        return $result
+    }
+
+    $result.originUrl = $originUrl
+    $officialNorm = ConvertTo-NormalizedUrl -Url $OfficialUrl
+    $originNorm = ConvertTo-NormalizedUrl -Url $originUrl
+    if ($originNorm -eq $officialNorm) {
+        $result.originOk = $true
+        $result.label = 'NEXA_ALREADY_LINKED'
+    }
+    else {
+        $result.label = 'NEXA_REMOTE_MISMATCH'
+    }
+    return $result
+}
+
 # --- Setup --------------------------------------------------------------------
 $root = Resolve-RepoRoot -Requested $RepoRoot
 $profileRoot = Get-ProfileRoot
@@ -400,17 +506,18 @@ function Get-CursorMcpReport {
 $cursorMcp = Get-CursorMcpReport -ProfileRoot $profileRoot -RepoRoot $root
 
 # --- Skills externas gerenciadas (apenas nexa) --------------------------------
-# nexa vive em genexuslabs/genexus-skills; auditada por nome em seção separada.
-# Demais skills do repo externo (ex.: gx-sap) ficam dormentes e não são auditadas.
+# nexa vive em GxBrasilNOficial/genexus-skills-from-zip; auditada por nome em seção separada.
 $externalSkillDefs = @(
-    [ordered]@{ name = 'nexa'; repo = 'genexus-skills'; officialUrl = 'https://github.com/genexuslabs/genexus-skills.git' }
+    [ordered]@{ name = 'nexa'; repo = 'GeneXus-Skills-From-Zip'; officialUrl = 'https://github.com/GxBrasilNOficial/genexus-skills-from-zip.git' }
 )
 
 $externalSkills = @()
 $extHasGap = $false
+$gitExe = Find-GitExecutable
 foreach ($ext in $externalSkillDefs) {
     $perTool = @()
     $repoRootDetected = ''
+    $extHasRegistration = $false
     foreach ($def in $toolDefs) {
         $installed = Test-ToolInstalled -Tool $def.Name
         if (-not $installed) {
@@ -419,6 +526,7 @@ foreach ($ext in $externalSkillDefs) {
         }
         $cls = Get-SkillToolStatus -Skill $ext.name -ToolDef $def -ProfileRoot $profileRoot
         if ($cls.status -eq 'ausente' -or $cls.status -eq 'quebrada') { $extHasGap = $true }
+        if ($cls.status -eq 'OK' -or $cls.status -eq 'coberta_por_compatibilidade') { $extHasRegistration = $true }
         if ([string]::IsNullOrWhiteSpace($repoRootDetected) -and -not [string]::IsNullOrWhiteSpace($cls.target)) {
             # O vinculo aponta para <repo>\<skill>; a raiz do repo externo e a pasta-pai.
             $repoRootDetected = [System.IO.Path]::GetDirectoryName($cls.target)
@@ -431,12 +539,31 @@ foreach ($ext in $externalSkillDefs) {
             target    = $cls.target
         }
     }
+
+    $repoRootCanonical = Get-NexaCanonicalRepoRoot -XpzRoot $root
+    $repoBootstrapDetected = Get-ExternalRepoBootstrapState -RepoRoot $repoRootDetected -OfficialUrl $ext.officialUrl -SkillName $ext.name -GitExe $gitExe
+    $repoBootstrapCanonical = Get-ExternalRepoBootstrapState -RepoRoot $repoRootCanonical -OfficialUrl $ext.officialUrl -SkillName $ext.name -GitExe $gitExe
+
+    $extHasRepoGap = $false
+    if ($extHasRegistration) {
+        if (-not $repoBootstrapDetected.originOk) { $extHasRepoGap = $true }
+        if (-not $repoBootstrapDetected.skillPresent) { $extHasRepoGap = $true }
+        if (@('NEXA_DIR_NOT_REPO', 'NEXA_ORIGIN_MISSING', 'GIT_UNAVAILABLE') -contains $repoBootstrapDetected.label) {
+            $extHasRepoGap = $true
+        }
+    }
+    if ($extHasRepoGap) { $extHasGap = $true }
+
     $externalSkills += [ordered]@{
-        name             = $ext.name
-        repo             = $ext.repo
-        officialUrl      = $ext.officialUrl
-        repoRootDetected = $repoRootDetected
-        tools            = $perTool
+        name                  = $ext.name
+        repo                  = $ext.repo
+        officialUrl           = $ext.officialUrl
+        repoRootDetected      = $repoRootDetected
+        repoRootCanonical     = $repoRootCanonical
+        repoBootstrapDetected = $repoBootstrapDetected
+        repoBootstrapCanonical = $repoBootstrapCanonical
+        repoOriginOk          = [bool]$repoBootstrapDetected.originOk
+        tools                 = $perTool
     }
 }
 if ($extHasGap) { $externalOverall = 'EXTERNAL_SKILLS_GAPS' } else { $externalOverall = 'EXTERNAL_SKILLS_OK' }
@@ -505,7 +632,12 @@ Write-Output ''
 Write-Output ("Skills externas gerenciadas: {0}" -f $externalOverall)
 foreach ($ext in $externalSkills) {
     $repoInfo = if ([string]::IsNullOrWhiteSpace($ext.repoRootDetected)) { '(repo local nao detectado)' } else { $ext.repoRootDetected }
-    Write-Output ("  [{0}] repo={1} | local={2}" -f $ext.name, $ext.repo, $repoInfo)
+    $bootstrapLabel = [string]$ext.repoBootstrapDetected.label
+    Write-Output ("  [{0}] repo={1} | local={2} | bootstrap={3} | originOk={4}" -f `
+            $ext.name, $ext.repo, $repoInfo, $bootstrapLabel, $ext.repoOriginOk)
+    if (-not [string]::IsNullOrWhiteSpace([string]$ext.repoRootCanonical)) {
+        Write-Output ("      canonico={0} | bootstrap={1}" -f $ext.repoRootCanonical, $ext.repoBootstrapCanonical.label)
+    }
     foreach ($pt in $ext.tools) {
         if (-not $pt.installed) { continue }
         Write-Output ("      {0,-12} {1}" -f $pt.name, $pt.status)

@@ -34,8 +34,8 @@ function New-TempDir {
 }
 
 function New-FakeSkill {
-    param([string]$RepoRoot, [string]$Name, [switch]$WithoutSkillMd)
-    $dir = Join-Path $RepoRoot $Name
+    param([string]$SkillRepoRoot, [string]$Name, [switch]$WithoutSkillMd)
+    $dir = Join-Path $SkillRepoRoot $Name
     New-Item -ItemType Directory -Path $dir -Force | Out-Null
     if (-not $WithoutSkillMd) {
         Set-Content -LiteralPath (Join-Path $dir 'SKILL.md') -Value "# $Name" -Encoding utf8
@@ -81,10 +81,10 @@ $originalPath = $env:PATH
 try {
     $env:PATH = ''
     # Inventario: skill-a, skill-b, skill-c (com SKILL.md). skill-removida sem SKILL.md.
-    New-FakeSkill -RepoRoot $fakeRepo -Name 'skill-a' | Out-Null
-    New-FakeSkill -RepoRoot $fakeRepo -Name 'skill-b' | Out-Null
-    New-FakeSkill -RepoRoot $fakeRepo -Name 'skill-c' | Out-Null
-    New-FakeSkill -RepoRoot $fakeRepo -Name 'skill-removida' -WithoutSkillMd | Out-Null
+    New-FakeSkill -SkillRepoRoot $fakeRepo -Name 'skill-a' | Out-Null
+    New-FakeSkill -SkillRepoRoot $fakeRepo -Name 'skill-b' | Out-Null
+    New-FakeSkill -SkillRepoRoot $fakeRepo -Name 'skill-c' | Out-Null
+    New-FakeSkill -SkillRepoRoot $fakeRepo -Name 'skill-removida' -WithoutSkillMd | Out-Null
 
     New-Item -ItemType Directory -Path $brokenTarget -Force | Out-Null
 

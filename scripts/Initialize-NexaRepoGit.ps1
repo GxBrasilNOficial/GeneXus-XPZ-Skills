@@ -3,14 +3,12 @@
 <#
 .SYNOPSIS
     Garante que exista um clone local do repositório que hospeda a skill `nexa`,
-    ligado ao remoto oficial no GitHub (genexuslabs/genexus-skills).
+    ligado ao remoto oficial no GitHub (GxBrasilNOficial/genexus-skills-from-zip).
 
 .DESCRIPTION
     A skill `nexa` NÃO e um repositório próprio: vive como subpasta do repositório
-    multi-skill `genexus-skills` (GenexusLabs), que pode conter outras skills
-    (ex.: `gx-sap`) deixadas dormentes. Esta skill (xpz-skills-setup) gerencia
-    apenas `nexa` por nome; as demais skills do repo não são registradas nem
-    removidas.
+    comunitário `GeneXus-Skills-From-Zip` (snapshot importado dos zips oficiais
+    GeneXus). Esta skill (xpz-skills-setup) gerencia apenas `nexa` por nome.
 
     Diferenca em relacao a Initialize-XpzSkillsRepoGit.ps1: aquele bootstrap liga
     uma pasta JÁ existente (vinda de ZIP) e PROIBE clonar; aqui o repositório nexa
@@ -22,7 +20,7 @@
          a. parâmetro -NexaRepoRoot explicito; senao
          b. deteccao: le o alvo de qualquer vinculo global já existente de `nexa`
             (o vinculo aponta para <repo>\nexa; a raiz e a pasta-pai); senao
-         c. default: pasta-irma da raiz XPZ (<pai-da-raiz-XPZ>\genexus-skills).
+         c. default: pasta-irma da raiz XPZ (<pai-da-raiz-XPZ>\GeneXus-Skills-From-Zip).
       3. Se a raiz já for repositório Git: confere se origin aponta para o oficial
          (tolera remotos extras, ex.: um `fork` pessoal). origin ausente -> adiciona.
       4. Se a pasta não existir ou estiver vazia: CLONA o oficial para a raiz.
@@ -38,7 +36,7 @@
 param(
     [string]$NexaRepoRoot,
 
-    [string]$NexaOfficialRemoteUrl = 'https://github.com/genexuslabs/genexus-skills.git',
+    [string]$NexaOfficialRemoteUrl = 'https://github.com/GxBrasilNOficial/genexus-skills-from-zip.git',
 
     [string]$DefaultBranch = 'main',
 
@@ -199,7 +197,7 @@ function Resolve-NexaRepoRoot {
     # Default: pasta-irma da raiz XPZ.
     $xpzRoot = Resolve-XpzRepoRoot
     $parent = [System.IO.Path]::GetDirectoryName($xpzRoot)
-    return (Join-Path $parent 'genexus-skills')
+    return (Join-Path $parent 'GeneXus-Skills-From-Zip')
 }
 
 function Test-DirectoryEmpty {
@@ -316,7 +314,7 @@ if ((Test-Path -LiteralPath $repoRoot -PathType Container) -and -not (Test-Direc
     return (Write-Result -Status 'BLOCK' -Label 'NEXA_DIR_NOT_REPO' -RepoRoot $repoRoot -Messages @(
             'A pasta-alvo existe com conteudo, mas nao e um repositorio Git.',
             'Para evitar sobrescrita, nada foi feito. Remova/realoque a pasta ou indique outra via -NexaRepoRoot,',
-            'ou ligue-a manualmente ao oficial se o conteudo ja for o repo genexus-skills.'))
+            'ou ligue-a manualmente ao oficial se o conteudo ja for o repo GeneXus-Skills-From-Zip.'))
 }
 
 # --- 5. Pasta inexistente ou vazia: clonar o oficial --------------------------
