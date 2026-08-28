@@ -37,6 +37,8 @@ Os papéis — montagem e opinião pelo agente (sob acionamento humano) vs **dec
 
 **Matriz operacional — capacidade × transporte (montagem do painel).** Dois eixos independentes: **capacidade de execução** no painel (`git-capable` vs `semantic-only`) e **transporte do dossiê** (`stdin-dossier-capable` vs `argv-limited`). Ferramenta forte ≠ papel git-capable no painel. A enumeração normativa de backends continua em [`xpz-llm-delegate/SKILL.md`](xpz-llm-delegate/SKILL.md); o gate [`Test-PrePushBackendEnumerationParity.ps1`](scripts/Test-PrePushBackendEnumerationParity.ps1) deriva o conjunto canônico de `$AdapterScript` no dispatcher — donos distintos. Esta seção é só o **recorte pré-push** por eixo (regra nível 2 do [`999`](999-ideias-pendentes.md)).
 
+**Ordem ao validar composição do painel reforçado:** (1) ≥1 git-capable (invariante acima) — se falhar, já é «não conclui» / degrada; (2) piso de famílias no [`15`](15-revisao-por-pares.md); (3) transporte/omissão (parágrafo **Omissão** abaixo). Não declarar o painel viável só porque o piso de diversidade fecha.
+
 **Manutenção:** a tabela abaixo é enumeração fechada por eixo, com **uma rota por linha**. Nesse formato o gate de paridade **não detecta a ausência de uma linha nova** (`onUnit.Count = 1` por linha). Ao adicionar backend ao dispatcher, **atualizar as linhas desta matriz** na mesma frente — senão ela envelhece em silêncio.
 
 Causas de omissão do semantic-only (árvore suja, dossiê indisponível, teto de transporte) estão no parágrafo **Omissão** imediatamente abaixo — não só no eixo de transporte.

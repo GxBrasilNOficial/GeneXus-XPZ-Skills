@@ -8,6 +8,8 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 ### Unreleased
 
+- **Ordem de validação do painel no `14`:** após a matriz operacional, explicitar (1) ≥1 git-capable → (2) piso de famílias no `15` → (3) transporte/omissão; não declarar painel viável só porque o piso de diversidade fecha. Achado do teste cego pós-matriz (2026-08-28).
+
 - **Matriz operacional capacidade × transporte no `14`:** tabela única no `14-revisao-pre-push-reforcada.md` (backend/rota × papel no painel × fora do painel × transporte do dossiê), com remissões ao invariante git-capable, ao `15` e ao parágrafo de Omissão; ponteiro ampliado no `13` sem nomear backends. Manutenção explícita: uma rota por linha — o gate de paridade não detecta ausência de linha nova. Sem alteração de motor.
 
 - **Closeout: prompt/recibo da oferta usam o path resolvido (não o literal machine):** `Resolve-LlmDelegatePeerReviewCloseout.ps1` materializa `-ProposedPreferredPath`/`-PreferredRoot`/`-Orchestrator` em `effectivePreferredPath`, mas o `requiredUserPrompt` e o `destino=` do recibo ainda citavam só `%LOCALAPPDATA%\…\preferred-reviewers.json`. Agora ecoam o path resolvido e rotulam orquestrador vs máquina pelo nome do ficheiro; self-test caso 31. Achado Claude (semantic-only) na pré-push reforçada de 2026-08-28.
@@ -219,6 +221,8 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 ### Unreleased
 
+- **Orden de validación del panel en el `14`:** tras la matriz operacional, explicitar (1) ≥1 git-capable → (2) piso de familias en el `15` → (3) transporte/omisión; no declarar el panel viable solo porque el piso de diversidad cierra. Hallazgo del test ciego post-matriz (2026-08-28).
+
 - **Matriz operacional capacidad × transporte en el `14`:** tabla única en `14-revisao-pre-push-reforcada.md` (backend/ruta × rol en el panel × fuera del panel × transporte del dossier), con remisiones al invariante git-capable, al `15` y al párrafo de Omisión; puntero ampliado en el `13` sin nombrar backends. Mantenimiento explícito: una ruta por línea — el gate de paridad no detecta ausencia de línea nueva. Sin cambio de motor.
 
 - **Closeout: el prompt/recibo de la oferta usan el path resuelto (no el literal machine):** `Resolve-LlmDelegatePeerReviewCloseout.ps1` materializa `-ProposedPreferredPath`/`-PreferredRoot`/`-Orchestrator` en `effectivePreferredPath`, pero el `requiredUserPrompt` y el `destino=` del recibo aún citaban solo `%LOCALAPPDATA%\…\preferred-reviewers.json`. Ahora ecoan el path resuelto y etiquetan orquestador vs máquina por el nombre del fichero; self-test caso 31. Hallazgo Claude (semantic-only) en el pre-push reforzado de 2026-08-28.
@@ -422,6 +426,8 @@ All relevant changes to this repository will be recorded here from this adoption
 The format keeps an `Unreleased` section for changes not yet published in a formal version. This repository does not yet use public semantic versioning; when that changes, future sections should record the corresponding tag.
 
 ### Unreleased
+
+- **Panel validation order in `14`:** after the operational matrix, spell out (1) ≥1 git-capable → (2) family floor in `15` → (3) transport/omission; do not call a panel viable only because the diversity floor is met. Found in the post-matrix blind test (2026-08-28).
 
 - **Operational capacity × transport matrix in `14`:** single table in `14-revisao-pre-push-reforcada.md` (backend/route × panel role × outside panel × dossier transport), with remissions to the git-capable invariant, `15`, and the Omission paragraph; expanded pointer in `13` without naming backends. Explicit maintenance: one route per row — the parity gate does not detect a missing new row. No motor change.
 
