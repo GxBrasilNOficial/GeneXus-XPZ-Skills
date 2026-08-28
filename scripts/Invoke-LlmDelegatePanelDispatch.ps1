@@ -1630,4 +1630,3 @@ if ($concurrencySaturationWarning) { [Console]::Error.WriteLine($concurrencySatu
 
 # stdout = UNICA linha (o panel-summary.json)
 [Console]::Out.WriteLine($summaryJson)
-
