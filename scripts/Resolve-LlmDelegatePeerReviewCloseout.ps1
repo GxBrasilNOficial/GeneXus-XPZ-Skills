@@ -9,7 +9,8 @@
     Por que existe: em teste real, o agente consumidor leu a regra de persistencia de
     preferred-reviewers.json, pediu os revisores, executou o painel e encerrou a rodada sem
     oferecer salvar a curadoria. Este resolvedor torna esse ponto de fechamento mecanico:
-    quando a rodada comeca sem preferred-reviewers.json e o usuario escolhe revisores
+    quando a rodada comeca sem lista preferida resolvida (hasPreferences=false no envelope
+    do Resolve-LlmDelegatePreferredReviewers.ps1) e o usuario escolhe revisores
     manualmente, o encerramento so fica pronto se a oferta foi feita ou se houve decisao
     explicita equivalente.
 
@@ -17,6 +18,15 @@
     recalcula diversidade. Ele so emite JSON de maquina para o orquestrador:
     pronto/bloqueado, razoes, prompt obrigatorio e adendo de recibo. A gravacao continua
     sendo de Set-LlmDelegatePreferredReviewers.ps1.
+
+    Eixo snapshot/proveniencia (schema 3): quando HadPreferredReviewers=true, o fechamento
+    exige -PreferredReviewersSnapshotJson com o envelope completo do Resolve- do inicio da
+    rodada (schemaVersion=3, preferenceSource, effectivePreferredPath, reviewers[]). O recibo
+    ecoa preferenceSource / effectivePreferredPath (via snapshot e/ou -PreferenceSource /
+    -EffectivePreferredPath). Sem preferidos, a oferta pode usar -ProposedPreferredPath,
+    -PreferredRoot e -Orchestrator para materializar o path proposto no recibo
+    (preferenceSource=none). A unica fonte de verdade do path efetivo e o envelope do
+    Resolve- — nao procurar preferred-reviewers*.json no repositorio.
 
     Estados de oferta:
       not_made       -> oferta obrigatoria ainda nao feita
@@ -26,11 +36,11 @@
       deferred       -> usuario adiou salvar curadoria
       not_applicable -> nao havia obrigacao de ofertar nesta rodada
 
-    Regra fail-closed: se nao havia preferred-reviewers.json, houve selecao manual, e o estado
+    Regra fail-closed: se nao havia lista preferida resolvida, houve selecao manual, e o estado
     vier not_applicable ou ausente, o fechamento bloqueia. not_applicable so e valido quando
     ja havia preferencias ou quando a rodada nao usou selecao manual de revisores.
 
-    Quando preferred-reviewers.json existia, a lista preferida nao e autorizacao nem obriga
+    Quando havia lista preferida resolvida, ela nao e autorizacao nem obriga
     parecer util de todos, mas tambem nao pode virar pool opcional silencioso. O fechamento
     exige estado auditavel para cada revisor preferido da rodada. Estados incompletos
     (`gateAllow`, `dispatched`, `enqueued`) bloqueiam o recibo final; estados finais como
@@ -57,11 +67,12 @@
     afirmacao auditavel e falsificavel), nao a prova de FABRICACAO.
 .PARAMETER HadPreferredReviewers
     Indica se Resolve-LlmDelegatePreferredReviewers.ps1 devolveu hasPreferences=true no inicio
-    da montagem do painel.
+    da montagem do painel (lista preferida resolvida via cascata schema 3 ou desvio).
 .PARAMETER ManualReviewerSelection
     Indica se o usuario escolheu revisores manualmente para esta rodada.
 .PARAMETER PreferredReviewersOfferState
-    Estado da oferta de salvar a selecao em preferred-reviewers.json.
+    Estado da oferta de salvar a selecao na curadoria machine-level / por orquestrador
+    (preferred-reviewers*.json fora do repositorio).
 .PARAMETER RoundId
     Identificador da rodada, usado para recibo e auditoria. Opcional em geral, mas
     OBRIGATORIO quando -VNextState resubmissionDeclinedByHuman (escopa o declinio a rodada;
@@ -95,6 +106,27 @@
     Por que a re-submissao foi declinada. Exigido apenas quando
     -VNextState resubmissionDeclinedByHuman; ausente/vazio nesse caso bloqueia o fechamento.
     Ignorado nos demais estados.
+.PARAMETER PreferredReviewersSnapshotJson
+    Envelope JSON completo do Resolve-LlmDelegatePreferredReviewers.ps1 no inicio da rodada
+    (schema 3). Obrigatorio quando HadPreferredReviewers=true; deve trazer schemaVersion=3,
+    preferenceSource (orchestrator|machine|explicit-path), effectivePreferredPath, hasPreferences
+    e reviewers[]. SelectedReviewersJson deve ser subconjunto dos reviewers do snapshot.
+    Sem preferidos, omitir ou passar {}.
+.PARAMETER EffectivePreferredPath
+    Path efetivo da curadoria (eco do Resolve-). Opcional se o snapshot ja trouxer
+    effectivePreferredPath; se ambos vierem, devem casar (senao preferred-path-mismatch).
+.PARAMETER PreferenceSource
+    Proveniencia: orchestrator | machine | explicit-path | none. Opcional se o snapshot ja
+    trouxer preferenceSource; se ambos vierem, devem casar.
+.PARAMETER PreferredRoot
+    Raiz machine-level da curadoria (default tipico %LOCALAPPDATA%\xpz-llm-delegate). Usado
+    quando nao ha preferidos e a oferta precisa materializar o path proposto no recibo.
+.PARAMETER Orchestrator
+    cursor|claude-code|codex|opencode. Usado na oferta sem preferidos para validar o nome
+    permitido preferred-reviewers.<orch>.json junto de preferred-reviewers.json.
+.PARAMETER ProposedPreferredPath
+    Path proposto para gravar a curadoria quando a rodada comeca sem preferidos e ha selecao
+    manual. Default tipico: %LOCALAPPDATA%\xpz-llm-delegate\preferred-reviewers.json.
 .EXAMPLE
     .\Resolve-LlmDelegatePeerReviewCloseout.ps1 -HadPreferredReviewers false -ManualReviewerSelection true -PreferredReviewersOfferState not_made
 
