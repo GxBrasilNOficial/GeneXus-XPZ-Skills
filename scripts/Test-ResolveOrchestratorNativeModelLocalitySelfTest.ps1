@@ -45,4 +45,16 @@ $r3 = & $locality -Model 'cursor/composer-2' | ConvertFrom-Json
 Assert-True ([string]$r3.locality -eq 'unknown') "(3) locality deveria ser unknown; veio '$($r3.locality)'."
 Assert-True ([string]$r3.reason -eq 'native-cursor-prefix') "(3) reason deveria ser native-cursor-prefix; veio '$($r3.reason)'."
 
+# (4) criador cloud conhecido -> external / native-cloud-creator (resolvedor direto)
+$r4 = & $locality -Model 'moonshot/kimi-k3-max' | ConvertFrom-Json
+Assert-True ([string]$r4.locality -eq 'external') "(4) locality deveria ser external; veio '$($r4.locality)'."
+Assert-True ([string]$r4.reason -eq 'native-cloud-creator') "(4) reason deveria ser native-cloud-creator; veio '$($r4.reason)'."
+Assert-True ([string]$r4.family -eq 'moonshot') "(4) family deveria ser moonshot; veio '$($r4.family)'."
+
+# (5) G16: criador fora da allowlist -> unknown / native-unknown-family (nunca local)
+$r5 = & $locality -Model 'fabrica-inventada/modelo-x' | ConvertFrom-Json
+Assert-True ([string]$r5.locality -eq 'unknown') "(5) criador desconhecido deveria ser unknown; veio '$($r5.locality)'."
+Assert-True ([string]$r5.reason -eq 'native-unknown-family') "(5) reason deveria ser native-unknown-family; veio '$($r5.reason)'."
+Assert-True ([string]$r5.locality -ne 'local') '(5) nativo nunca deveria classificar como local.'
+
 Write-Host 'OK: Test-ResolveOrchestratorNativeModelLocalitySelfTest.ps1'

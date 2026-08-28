@@ -38,6 +38,10 @@ function Get-Reviewer {
     param($Json, [int]$Index)
     return @($Json.reviewers | Where-Object { [int]$_.index -eq $Index })[0]
 }
+function Get-ReviewerByTarget {
+    param($Json, [string]$TargetModelKey)
+    return @($Json.reviewers | Where-Object { [string]$_.targetModelKey -eq $TargetModelKey })[0]
+}
 
 $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ('gx-panel-dispatch-selftest-' + [guid]::NewGuid().ToString('N'))
 [System.IO.Directory]::CreateDirectory($tmp) | Out-Null
@@ -628,6 +632,71 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
     Assert-True ($rv1.attemptRole -eq 'fallback') 'fallback ativado: attemptRole=fallback.'
     Assert-True ($rv1.activationReason -eq 'error') 'fallback ativado: activationReason deveria ser error.'
     Assert-True ($rv1.countsForDiversity -eq $true) 'fallback respondido deve contar diversidade.'
+
+    # =======================================================================================
+    # 8e) LEAK NATIVO (V40): orchestrator-native no harness -> erro defensivo + cadeia suprimida
+    # =======================================================================================
+    Set-Content -LiteralPath $concLog -Value '' -NoNewline -Encoding utf8
+    $r = Invoke-Harness -Reviewers @(
+        @{
+            backend = 'orchestrator-native'
+            targetModelKey = 'moonshot/kimi-k3-max'
+            harnessModelId = 'kimi-k3-max'
+            invokeArgs = @{}
+            fallbackChain = @(
+                @{ backend = 'opencode'; targetModelKey = 'openai/native-fallback-skip'; invokeArgs = @{ model = 'openai/native-fallback-skip' } }
+            )
+        },
+        @{
+            backend = 'opencode'
+            targetModelKey = 'openai/parallel-after-native'
+            invokeArgs = @{}
+        }
+    ) -Sensitivity 'public' -Extra @{ OpenCodeConfigPath = $ocCfg }
+    Assert-True (@($r.json.reviewers).Count -eq 3) 'leak nativo: deveria registrar primario nativo + fallback suprimido + revisor CLI paralelo.'
+    $rvNative = Get-Reviewer $r.json 0
+    Assert-True ($rvNative.state -eq 'error') "leak nativo: state deveria ser error; got $($rvNative.state)"
+    Assert-True ($rvNative.reason -eq 'orchestrator-native-leaked-to-dispatch') "leak nativo: reason esperada orchestrator-native-leaked-to-dispatch; got '$($rvNative.reason)'"
+    Assert-True ($rvNative.dispatchAttempted -eq $false) 'leak nativo: dispatchAttempted deveria ser false.'
+    Assert-True ([int]$rvNative.attempts -eq 0) 'leak nativo: attempts deveria ser 0.'
+    Assert-True ($rvNative.countsForDiversity -eq $false) 'leak nativo: nao conta diversidade.'
+    Assert-True ([int]$rvNative.ledgerIndex -eq 0) 'leak nativo: ledgerIndex na criacao deveria ser 0.'
+    Assert-True (@($rvNative.fallbackChain).Count -eq 0) 'leak nativo: fallbackChain do primario deveria estar vazia.'
+    Assert-True (@($rvNative.suppressedFallbackChain).Count -eq 1) 'leak nativo: suppressedFallbackChain deveria preservar a cadeia original.'
+    Assert-True ($rvNative.suppressedFallbackChain[0].targetModelKey -eq 'openai/native-fallback-skip') 'leak nativo: suppressedFallbackChain deveria conter o fallback original.'
+    $rvNativeSkip = Get-ReviewerByTarget $r.json 'openai/native-fallback-skip'
+    Assert-True ($null -ne $rvNativeSkip) 'leak nativo: deveria existir registro do fallback suprimido.'
+    Assert-True ($rvNativeSkip.state -eq 'skippedByPolicy') "leak nativo: fallback deveria ser skippedByPolicy; got $($rvNativeSkip.state)"
+    Assert-True ($rvNativeSkip.attemptRole -eq 'fallback') 'leak nativo: registro suprimido deveria ser attemptRole=fallback.'
+    Assert-True ($rvNativeSkip.fallbackSuppressedReason -eq 'primary-native-leaked') "leak nativo: fallbackSuppressedReason esperado primary-native-leaked; got '$($rvNativeSkip.fallbackSuppressedReason)'"
+    Assert-True ($rvNativeSkip.fallbackOf -eq 'moonshot/kimi-k3-max') 'leak nativo: fallbackOf deveria apontar para o primario nativo.'
+    Assert-True ($rvNativeSkip.dispatchAttempted -eq $false) 'leak nativo: fallback suprimido nao deveria despachar.'
+    $rvParallel = Get-ReviewerByTarget $r.json 'openai/parallel-after-native'
+    Assert-True ($rvParallel.state -eq 'responded') "leak nativo: revisor CLI paralelo deveria responder; got $($rvParallel.state)"
+    $logLinesLeak = @(Get-Content -LiteralPath $concLog -ErrorAction SilentlyContinue | Where-Object { $_ })
+    $parallelEnters = @($logLinesLeak | Where-Object {
+        $parts = @($_ -split "`t")
+        $parts.Count -ge 4 -and $parts[1] -eq 'ENTER' -and $parts[3] -eq 'openai/parallel-after-native'
+    }).Count
+    $fallbackEnters = @($logLinesLeak | Where-Object {
+        $parts = @($_ -split "`t")
+        $parts.Count -ge 4 -and $parts[1] -eq 'ENTER' -and $parts[3] -eq 'openai/native-fallback-skip'
+    }).Count
+    Assert-True ($parallelEnters -eq 1) "leak nativo: revisor CLI paralelo deveria ser invocado uma vez; medido $parallelEnters"
+    Assert-True ($fallbackEnters -eq 0) "leak nativo: fallback suprimido nao deveria invocar adapter; medido $fallbackEnters"
+
+    $r = Invoke-Harness -Reviewers @(
+        @{
+            backend = 'orchestrator-native'
+            targetModelKey = 'moonshot/kimi-k3-max'
+            harnessModelId = 'kimi-k3-max'
+            invokeArgs = @{}
+        }
+    ) -Sensitivity 'public' -Extra @{ OpenCodeConfigPath = $ocCfg }
+    Assert-True (@($r.json.reviewers).Count -eq 1) 'leak nativo sem fallback: deveria registrar so o primario.'
+    $rvNativeOnly = Get-Reviewer $r.json 0
+    Assert-True ($rvNativeOnly.reason -eq 'orchestrator-native-leaked-to-dispatch') 'leak nativo sem fallback: reason de leak esperada.'
+    Assert-True (@($rvNativeOnly.suppressedFallbackChain).Count -eq 0) 'leak nativo sem fallback: suppressedFallbackChain deveria estar vazia.'
 
     $r = Invoke-Harness -Reviewers @(@{
             backend = 'opencode'; targetModelKey = 'openai/empty-primary-timeout-fallback'; invokeArgs = @{}
