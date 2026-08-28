@@ -457,49 +457,9 @@ Isso casa com `scripts/Invoke-PrePushMechanicalChecks.ps1` **deste** repositóri
 2. **Checker consumidor** — alargar a assinatura local opcionalmente (`-RootPath`/`-BaseRef` no-op ou reais) para casar com o builder atual.
 3. **Contorno de orquestrador** — montar Seção B colando o JSON já obtido pela forma canônica do repo alvo; frágil, só sessão.
 
-**Relacionado:** «Modo dossiê compacto…» (mesmo builder, outro eixo); «Matriz git-capable…» abaixo (invariante ≥1 git-capable cobre Seção A, mas não impede falso gap na Seção B); `13` («Modo assistido por dossiê»); `scripts/Build-PrePushReviewDossier.ps1` (`-MechanicalScriptPath`).
+**Relacionado:** «Modo dossiê compacto…» (mesmo builder, outro eixo); «Matriz git-capable…» em `historico/IdeiasImplementadas_202608.md` (invariante ≥1 git-capable cobre Seção A, mas não impede falso gap na Seção B); `13` («Modo assistido por dossiê»); `scripts/Build-PrePushReviewDossier.ps1` (`-MechanicalScriptPath`).
 
 **Origem:** triagem humana na pré-push reforçada do Open API Builder (gap G4 do Claude semantic-only, 2026-08-28); usuário pediu anotar no `999` após confirmar que as entradas do dia não cobriam o caso.
-
-## Matriz git-capable vs semantic-only vs argv-limited no `14` (operador da pré-push reforçada)
-
-- **Importância** — média (expectativa errada ao montar painel impede convergência ou gera retrabalho; o conhecimento **existe** espalhado no `14`, `13` e `xpz-llm-delegate/SKILL.md`, mas não há tabela operacional única «backend × capacidade × transporte»).
-- **Maturidade** — ideia (conteúdo já discutido e parcialmente normativo; falta sessão dedicada para redigir no `14` sem duplicar o dono normativo da skill).
-
-**Motivação (dogfooding pré-push reforçada schema 3, 2026-08-28).** O `14-revisao-pre-push-reforcada.md` já distingue dois **regimes por capacidade de execução** (não por persona):
-
-- **git-capable** — roda a rotina **inteira** do `13` (passo mecânico + fase semântica), prompt verbatim `execute a rotina pre push, sem push`.
-- **semantic-only** — recebe **dossiê** + executa **só** a fase semântica read-only; **não** roda git/shell.
-
-Na prática, quem monta o painel ainda confunde **ferramenta forte** com **papel git-capable no painel**. Medido na mesma sessão: Claude Code funciona git-capable **fora** do painel, mas no painel entra semantic-only; Codex timeoutou enquanto smoke test direto passou; Antigravity sumiu por `dossier-too-large` (eixo argv-limited, não git-capable).
-
-**O que a matriz deveria deixar explícito (rascunho operacional).**
-
-| Backend / rota | No painel | Fora do painel | Transporte do dossiê | Notas |
-|----------------|-----------|----------------|----------------------|-------|
-| Codex-delegate | git-capable | git-capable (adapter direto) | N/A (roda rotina) | sandbox read-only no painel |
-| orchestrator-native | git-capable | N/A típico | N/A | âncora frequente; `gitCapableAnchorFamily=orchestrator-native` |
-| Claude Code async | **semantic-only** | git-capable (`-Tools default -PermissionMode dontAsk`) | stdin-dossier-capable | Posição B; ver entrada «Perfil git-capable opcional…» acima |
-| opencode (+ reviewer-ro) | semantic-only | idem | stdin | cwd/worktree/`.env` — notas de operador já no `14` |
-| Copilot / Gemini / Antigravity | semantic-only | idem | **argv-limited** (~30k) | dossiê grande ⇒ `dossier-too-large` ⇒ omitido |
-
-**Invariantes que a matriz deve amarrar (já no `14`, hoje em prosa).**
-
-1. Painel válido retém **≥1 git-capable** — sem isso, Seção A não-verificada ⇒ não conclui.
-2. Claude no **preferido** ≠ Claude git-capable **no painel** — convergência do `14` não conta adapter direto fora do dispatcher.
-3. **argv-limited** ≠ incapacidade do modelo — é limite de transporte; relacionado à entrada «Modo dossiê compacto…» acima.
-
-**Direção de implementação documental (não código).**
-
-1. Seção curta no `14` — tabela operacional + ponteiro «dono normativo: `xpz-llm-delegate/SKILL.md` — não duplicar enumeração de backends».
-2. **Não** promover a enumeração completa de backends para o `14` — seguir regra do nível 2 da entrada «Centralizar a fonte de verdade…» (recorte por eixo é legítimo).
-3. Opcional: bullet espelho no `08` ou nota no `AGENTS.md` só se operadores non-Cursor também montarem painel reforçado.
-
-**Não** implementar na sessão de dogfooding — registrar no `999` para redigir com calma.
-
-**Relacionado:** «Perfil git-capable opcional para Claude Code CLI…» e «Modo dossiê compacto…» acima; `14-revisao-pre-push-reforcada.md` (regimes por capacidade, invariante git-capable, omissão semantic-only); `13-revisao-pre-push.md` («Modo assistido por dossiê»); `xpz-llm-delegate/SKILL.md` (matriz de backends, Posição B).
-
-**Origem:** dogfooding pré-push reforçada schema 3 (2026-08-28); usuário pediu lembrete da ideia «matriz git-capable no `14`» e registro no `999` antes de editar o documento.
 
 ## Variante de prompt read-only para vozes "coder" do painel de revisão por pares (evitar truncamento por tool-calls) — RESOLVIDA E MIGRADA
 
