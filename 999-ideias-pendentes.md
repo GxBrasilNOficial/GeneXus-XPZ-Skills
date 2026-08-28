@@ -436,6 +436,31 @@ Smoke test retornou `HEAD` correto em ~13 s; a falha no painel foi **modo de inv
 
 **Origem:** dogfooding pré-push reforçada schema 3 (2026-08-28): Antigravity omitido com dossiê ~354k > ~30k argv; usuário pediu anotação no `999` para nova sessão antes de implementar.
 
+## Compatibilidade de assinatura do mecânico injetado via `-MechanicalScriptPath` (dossiê pré-push)
+
+- **Importância** — média (Seção B do dossiê falha em repositório consumidor com checker local estreito; semantic-only pode acusar falso impedimento de push por `pushReadiness` ausente, mesmo com git-capable + checker canônico verdes).
+- **Maturidade** — ideia (sintoma medido; remédio de desenho em aberto — não misturar com «Modo dossiê compacto» acima).
+
+**Problema medido (2026-08-28, pré-push reforçada no repositório `Genexus-Open-API-Builder`).** `Build-PrePushReviewDossier.ps1` aceita `-MechanicalScriptPath` para apontar o checker do **repo alvo**, mas a invocação hardcoda sempre:
+
+```powershell
+& $mechanicalScript -RootPath $resolvedRoot -BaseRef $BaseRef -AsJson
+```
+
+Isso casa com `scripts/Invoke-PrePushMechanicalChecks.ps1` **deste** repositório de skills (`-RootPath`/`-BaseRef` existem). O checker local do Open API Builder só declara `-AsJson` (e `-Fetch`); a chamada explode com `A parameter cannot be found that matches parameter name 'RootPath'`, o builder captura a exceção, a Seção B fica `mechanicalStatus=failed` / sem JSON, e o revisor semantic-only (Claude Code) tratou a ausência de `pushReadiness` como **Com impedimento para push** — falso positivo frente ao mecânico canônico já `readyLocal` (orquestrador + Kimi + Codex).
+
+**Não é** o eixo tamanho/`dossier-too-large` (entrada «Modo dossiê compacto»): mesmo com dossiê pequeno, a Seção B continua quebrada se a assinatura do script injetado não aceitar `-RootPath`/`-BaseRef`.
+
+**Direções candidatas (escolher numa sessão; não hotfix sem desenho).**
+
+1. **Builder (skills)** — sondar parâmetros do script mecânico (ou tentar `-AsJson` + `cwd`/`Push-Location` no root) e só passar `-RootPath`/`-BaseRef` quando existirem; self-test com fake checker estreito.
+2. **Checker consumidor** — alargar a assinatura local opcionalmente (`-RootPath`/`-BaseRef` no-op ou reais) para casar com o builder atual.
+3. **Contorno de orquestrador** — montar Seção B colando o JSON já obtido pela forma canônica do repo alvo; frágil, só sessão.
+
+**Relacionado:** «Modo dossiê compacto…» (mesmo builder, outro eixo); «Matriz git-capable…» abaixo (invariante ≥1 git-capable cobre Seção A, mas não impede falso gap na Seção B); `13` («Modo assistido por dossiê»); `scripts/Build-PrePushReviewDossier.ps1` (`-MechanicalScriptPath`).
+
+**Origem:** triagem humana na pré-push reforçada do Open API Builder (gap G4 do Claude semantic-only, 2026-08-28); usuário pediu anotar no `999` após confirmar que as entradas do dia não cobriam o caso.
+
 ## Matriz git-capable vs semantic-only vs argv-limited no `14` (operador da pré-push reforçada)
 
 - **Importância** — média (expectativa errada ao montar painel impede convergência ou gera retrabalho; o conhecimento **existe** espalhado no `14`, `13` e `xpz-llm-delegate/SKILL.md`, mas não há tabela operacional única «backend × capacidade × transporte»).
