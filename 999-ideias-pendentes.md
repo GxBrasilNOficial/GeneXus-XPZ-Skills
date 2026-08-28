@@ -372,6 +372,70 @@ Critério para retomar: caso real em que a ausência do cache Codex prejudique a
 <!-- backend-parity: ignore -->
 **Relacionado:** `xpz-llm-delegate/SKILL.md` (backend Claude Code, códigos de saída); `scripts/Invoke-ClaudeCode.ps1`; `scripts/ClaudeCodeCliSupport.ps1`; contrato de saída tipado dos adapters na entrada «Detecção de truncamento fora do opencode (paridade dos adapters stdin/JSONL)».
 
+## Perfil git-capable opcional para Claude Code CLI na delegação XPZ (painel / pré-push reforçada)
+
+- **Importância** — média (gap real com workaround manual: o adapter síncrono direto **já** funciona fora do painel; dentro do painel, Claude permanece semantic-only e a pré-push reforçada (`14`) não converge se o revisor preferido for esperado como git-capable no despacho paralelo).
+- **Maturidade** — ideia (Posição B deliberada e documentada; mudança exige decisões de segurança, não só ligar um flag).
+
+**Estado medido (dogfooding pré-push reforçada schema 3, 2026-08-28).** No painel (`Invoke-LlmDelegatePanelDispatch.ps1`), Claude Code CLI entra como **semantic-only** por contenção de segurança, não por falta de capacidade do modelo:
+
+1. `$ContentionKeys['claude-code']` bloqueia `permissionMode`, `tools` e afins no `invokeArgs` do preferido (`securityBlockedArgs` no despacho).
+2. `Invoke-ClaudeCodeAsync.ps1` fixa `PermissionMode=plan` e `Tools=Read,Glob,Grep` — **sem Bash**.
+3. `bypassPermissions` permanece proibido em toda a delegação XPZ.
+
+Papel desejado **no painel**: ler o dossiê e opinar (semantic-only), não executar comandos arbitrários no cwd. Isso contrasta com Codex no painel, que entra com sandbox `read-only` explícito.
+
+**Fora do painel**, git-capable **já funciona** via adapter síncrono direto — medido na mesma sessão:
+
+```powershell
+Invoke-ClaudeCode.ps1 -MessagePath <arquivo> -Tools default -PermissionMode dontAsk -TimeoutSec 1800
+```
+
+Smoke test retornou `HEAD` correto em ~13 s; a falha no painel foi **modo de invocação**, não incapacidade do CLI.
+
+**Por que não basta «corrigir a chamada» no painel atual.** Relaxar `$ContentionKeys` ou injetar `-Tools default -PermissionMode dontAsk` no despacho **sem frente dedicada** quebraria a Posição B fail-closed: Bash no cwd do repositório ≠ sandbox read-only do Codex; o risco de execução arbitrária precisa ser avaliado antes de qualquer perfil git-capable in-panel.
+
+**Direção de reforma cuidadosa (decisões em aberto).**
+
+1. **Perfil explícito** — ex.: `git-capable-pre-push` ou flag de payload `public` que autorize o modo ampliado só em contextos delimitados (pré-push reforçada? revisão por pares com recibo?).
+2. **`$ContentionKeys` e dispatcher** — relaxar ou perfilar as chaves bloqueadas do `claude-code`; injetar `-Tools default -PermissionMode dontAsk` só quando o perfil estiver ativo; manter fail-closed como default.
+3. **Transporte** — decidir se git-capable in-panel usa rota assíncrona existente (`Invoke-ClaudeCodeAsync.ps1`) com defaults condicionais, rota síncrona dedicada no dispatcher, ou continua **fora** do painel (workaround documentado).
+4. **Paridade doc↔motor** — `xpz-llm-delegate/SKILL.md`, `14-revisao-pre-push-reforcada.md`, `02-regras-operacionais-e-runtime.md`, matriz `git-capable` vs `semantic-only` vs `argv-limited`.
+5. **Testes e revisão de segurança** — self-tests do dispatcher, AST Guard dos 5 mapas, cenário adversarial de Bash no cwd; comparar com contenção já feita no opencode (`reviewer-ro`) e no Codex (`read-only`).
+
+**Workaround vigente (sem implementar esta frente).**
+
+- **Semantic-only no painel:** dossiê + `Invoke-ClaudeCodeAsync.ps1` (como hoje).
+- **Git-capable:** `Invoke-ClaudeCode.ps1` **direto**, fora do `Invoke-LlmDelegatePanelDispatch.ps1`, com flags explícitas acima — não contar como voz git-capable do painel na convergência do `14`.
+
+**Não** implementar como hotfix de timeout ou troca de modelo no preferido: o smoke test provou que o CLI responde; o bloqueio é contrato de segurança do painel.
+
+**Relacionado:** «Reclassificar mecanicamente `failureAfterText` do Claude Code no painel» e «Fallback de voz anthropic no painel quando o subagente nativo cai em 529» acima (rotas assíncronas semantic-only); «Registro de backend novo na `xpz-llm-delegate`» (governança de `$ContentionKeys`); `14-revisao-pre-push-reforcada.md` (≥1 git-capable no painel); `xpz-llm-delegate/SKILL.md` (~Posição B, matriz de backends).
+
+**Origem:** dogfooding da pré-push reforçada schema 3 preferidos por orquestrador (2026-08-28): Claude no painel falhou com `plan` + `Read,Glob,Grep`; chamada direta com `-Tools default -PermissionMode dontAsk` confirmou git-capable; usuário concluiu que a contenção é intencional e pediu registro no `999`.
+
+## Modo dossiê compacto para revisores semantic-only / argv-limited (pré-push reforçada)
+
+- **Importância** — média (revisor semantic-only omitido por tamanho do payload impede convergência do painel; workaround hoje é omitir o revisor ou trocar backend — não há modo de transporte enxuto).
+- **Maturidade** — ideia (estudar com calma em sessão dedicada **antes** de implementar; decisões de o que manter vs cortar ainda em aberto).
+
+**Problema medido (dogfooding pré-push reforçada schema 3, 2026-08-28).** `Build-PrePushReviewDossier.ps1` monta Seção A (git bruto) incluindo **`git diff origin/main..HEAD` integral**. Na frente schema 3 (6 commits, diff amplo), o dossiê ficou com **~354k caracteres**. Backends **argv-limited** (Copilot, Gemini, Antigravity — teto ~30k pelo guard do dispatcher) recebem `unavailable` + `reason=dossier-too-large` e **somem do painel**. Medido: Antigravity omitido por esse motivo na rodada de dogfooding.
+
+**O que o semantic-only precisa de fato (hipótese a validar).** Para a fase semântica read-only do `13`, o revisor lê árvore viva + contexto git **resumido** + JSON mecânico rotulado «não verdade» — não necessariamente o diff linha a linha inteiro. Fatos úteis: `HEAD`, intervalo, lista de commits, arquivos tocados, `git diff --stat`, trechos citados sob demanda pelo git-capable, saída de `Invoke-PrePushMechanicalChecks.ps1 -AsJson`.
+
+**Direção candidata (não implementar sem desenho).**
+
+1. **Flag ou perfil** — ex.: `-Compact` / `-DiffMode stat|none|full` em `Build-PrePushReviewDossier.ps1`.
+2. **Default conservador** — manter `full` como hoje; compact só quando orquestrador/dispatcher pedir (pré-push reforçada com argv-limited no painel).
+3. **Contrato doc** — alinhar `13` («Modo assistido por dossiê»), `14` (omissão por tamanho) e `xpz-llm-delegate/SKILL.md` (stdin-dossier vs argv-limited).
+4. **Risco a avaliar** — compact demais pode esconder gap que só aparece no diff; definir o que o git-capable **deve** cobrir vs o que o semantic-only pode opinar sem diff integral.
+
+**Não** implementar como hotfix na sessão de dogfooding: o usuário pediu registro no `999` para estudo posterior.
+
+**Relacionado:** «Perfil git-capable opcional para Claude Code CLI…» acima (mesma rodada); `14-revisao-pre-push-reforcada.md` (omissão `dossier-too-large`); `scripts/Build-PrePushReviewDossier.ps1`; entrada «Centralizar a fonte de verdade…» (eixo `argv-limited` vs `stdin-dossier-capable`).
+
+**Origem:** dogfooding pré-push reforçada schema 3 (2026-08-28): Antigravity omitido com dossiê ~354k > ~30k argv; usuário pediu anotação no `999` para nova sessão antes de implementar.
+
 ## Variante de prompt read-only para vozes "coder" do painel de revisão por pares (evitar truncamento por tool-calls) — RESOLVIDA E MIGRADA
 
 > Investigação concluída e migrada para `historico/IdeiasImplementadas_202606.md` em 2026-06-23. Truncamento das vozes coder = **não-determinismo de cauda raro** (não cota/429, não orçamento-de-passos, não propriedade fixa "coder=trunca"); corroborado por experimento controlado (12 runs, 4 modelos × 3) que reproduziu 1 truncamento real (`reason=tool-calls`, 28 `tool_use`, sem 429). Correção **implementada**: `-MaxAttempts` (retry-once) em `Invoke-OpenCode.ps1`, já no despacho do painel (`Invoke-LlmDelegatePanelDispatch.ps1`). A "variante read-only por prompt" foi **descartada como solução de truncamento** (`--agent plan` auto-aprova bash); a substância de menor-privilégio foi **implementada** (frente D-min do reviewer-ro, 2026-07-04 — ver `historico/IdeiasImplementadas_202607.md`), restando apenas o eixo de leitura como entrada **ADIADA** abaixo. Gap derivado novo (resposta `stop` quase-vazia escapa do veredito/retry) registrado em entrada própria abaixo.

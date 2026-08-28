@@ -22,3 +22,4 @@ Entradas do `999` atualizadas (não removidas por completo): esforço de racioc�
 - Arquivos materiais: `scripts/Set-LlmDelegatePreferredReviewers.ps1`, `scripts/Resolve-LlmDelegatePreferredReviewers.ps1`, `scripts/Resolve-OrchestratorNativeModelLocality.ps1`, `scripts/Resolve-LlmDelegateAuthorization.ps1`, `scripts/Resolve-LlmDelegatePanelDiversity.ps1`, `scripts/LlmDelegateTargetFamilySupport.ps1`, `scripts/Invoke-LlmDelegatePanelDispatch.ps1`, `scripts/Resolve-LlmDelegatePeerReviewCloseout.ps1`, self-tests associados, `xpz-llm-delegate/SKILL.md`, `xpz-skills-setup/SKILL.md`, `15`/`14`/`08`/`09`/`AGENTS.md`/`999`/`CHANGELOG.md`.
 - Commit material: `18c3ebe` (`Implementa preferidos por orquestrador (schema 3, cascata, nativo).`).
 - Commit material (closeout): `15455ae` (`Neutraliza motivo de curadoria no recibo do closeout.`).
+- Commit material (pós-v20): `758a901` (`Fecha gaps pós-v20: teste de leak nativo, README e recibo.`).
