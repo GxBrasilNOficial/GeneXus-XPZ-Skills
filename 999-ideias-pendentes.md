@@ -436,6 +436,46 @@ Smoke test retornou `HEAD` correto em ~13 s; a falha no painel foi **modo de inv
 
 **Origem:** dogfooding pré-push reforçada schema 3 (2026-08-28): Antigravity omitido com dossiê ~354k > ~30k argv; usuário pediu anotação no `999` para nova sessão antes de implementar.
 
+## Matriz git-capable vs semantic-only vs argv-limited no `14` (operador da pré-push reforçada)
+
+- **Importância** — média (expectativa errada ao montar painel impede convergência ou gera retrabalho; o conhecimento **existe** espalhado no `14`, `13` e `xpz-llm-delegate/SKILL.md`, mas não há tabela operacional única «backend × capacidade × transporte»).
+- **Maturidade** — ideia (conteúdo já discutido e parcialmente normativo; falta sessão dedicada para redigir no `14` sem duplicar o dono normativo da skill).
+
+**Motivação (dogfooding pré-push reforçada schema 3, 2026-08-28).** O `14-revisao-pre-push-reforcada.md` já distingue dois **regimes por capacidade de execução** (não por persona):
+
+- **git-capable** — roda a rotina **inteira** do `13` (passo mecânico + fase semântica), prompt verbatim `execute a rotina pre push, sem push`.
+- **semantic-only** — recebe **dossiê** + executa **só** a fase semântica read-only; **não** roda git/shell.
+
+Na prática, quem monta o painel ainda confunde **ferramenta forte** com **papel git-capable no painel**. Medido na mesma sessão: Claude Code funciona git-capable **fora** do painel, mas no painel entra semantic-only; Codex timeoutou enquanto smoke test direto passou; Antigravity sumiu por `dossier-too-large` (eixo argv-limited, não git-capable).
+
+**O que a matriz deveria deixar explícito (rascunho operacional).**
+
+| Backend / rota | No painel | Fora do painel | Transporte do dossiê | Notas |
+|----------------|-----------|----------------|----------------------|-------|
+| Codex-delegate | git-capable | git-capable (adapter direto) | N/A (roda rotina) | sandbox read-only no painel |
+| orchestrator-native | git-capable | N/A típico | N/A | âncora frequente; `gitCapableAnchorFamily=orchestrator-native` |
+| Claude Code async | **semantic-only** | git-capable (`-Tools default -PermissionMode dontAsk`) | stdin-dossier-capable | Posição B; ver entrada «Perfil git-capable opcional…» acima |
+| opencode (+ reviewer-ro) | semantic-only | idem | stdin | cwd/worktree/`.env` — notas de operador já no `14` |
+| Copilot / Gemini / Antigravity | semantic-only | idem | **argv-limited** (~30k) | dossiê grande ⇒ `dossier-too-large` ⇒ omitido |
+
+**Invariantes que a matriz deve amarrar (já no `14`, hoje em prosa).**
+
+1. Painel válido retém **≥1 git-capable** — sem isso, Seção A não-verificada ⇒ não conclui.
+2. Claude no **preferido** ≠ Claude git-capable **no painel** — convergência do `14` não conta adapter direto fora do dispatcher.
+3. **argv-limited** ≠ incapacidade do modelo — é limite de transporte; relacionado à entrada «Modo dossiê compacto…» acima.
+
+**Direção de implementação documental (não código).**
+
+1. Seção curta no `14` — tabela operacional + ponteiro «dono normativo: `xpz-llm-delegate/SKILL.md` — não duplicar enumeração de backends».
+2. **Não** promover a enumeração completa de backends para o `14` — seguir regra do nível 2 da entrada «Centralizar a fonte de verdade…» (recorte por eixo é legítimo).
+3. Opcional: bullet espelho no `08` ou nota no `AGENTS.md` só se operadores non-Cursor também montarem painel reforçado.
+
+**Não** implementar na sessão de dogfooding — registrar no `999` para redigir com calma.
+
+**Relacionado:** «Perfil git-capable opcional para Claude Code CLI…» e «Modo dossiê compacto…» acima; `14-revisao-pre-push-reforcada.md` (regimes por capacidade, invariante git-capable, omissão semantic-only); `13-revisao-pre-push.md` («Modo assistido por dossiê»); `xpz-llm-delegate/SKILL.md` (matriz de backends, Posição B).
+
+**Origem:** dogfooding pré-push reforçada schema 3 (2026-08-28); usuário pediu lembrete da ideia «matriz git-capable no `14`» e registro no `999` antes de editar o documento.
+
 ## Variante de prompt read-only para vozes "coder" do painel de revisão por pares (evitar truncamento por tool-calls) — RESOLVIDA E MIGRADA
 
 > Investigação concluída e migrada para `historico/IdeiasImplementadas_202606.md` em 2026-06-23. Truncamento das vozes coder = **não-determinismo de cauda raro** (não cota/429, não orçamento-de-passos, não propriedade fixa "coder=trunca"); corroborado por experimento controlado (12 runs, 4 modelos × 3) que reproduziu 1 truncamento real (`reason=tool-calls`, 28 `tool_use`, sem 429). Correção **implementada**: `-MaxAttempts` (retry-once) em `Invoke-OpenCode.ps1`, já no despacho do painel (`Invoke-LlmDelegatePanelDispatch.ps1`). A "variante read-only por prompt" foi **descartada como solução de truncamento** (`--agent plan` auto-aprova bash); a substância de menor-privilégio foi **implementada** (frente D-min do reviewer-ro, 2026-07-04 — ver `historico/IdeiasImplementadas_202607.md`), restando apenas o eixo de leitura como entrada **ADIADA** abaixo. Gap derivado novo (resposta `stop` quase-vazia escapa do veredito/retry) registrado em entrada própria abaixo.
