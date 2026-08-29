@@ -8,6 +8,8 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 ### Unreleased
 
+- **Clarifica `NEXA_REPO_MISSING` canônico vs gap por vínculo:** em `xpz-skills-setup/SKILL.md` e `09`, `repoBootstrapCanonical = NEXA_REPO_MISSING` (pasta-irmã ainda inexistente) é informativo e não abre `EXTERNAL_SKILLS_GAPS` sozinho; o gap de bootstrap continua ligado aos roots dos vínculos / registro sem path. Sem mudança de motor.
+
 - **Paridade pós-painel (G1/G2/G4/G5):** documenta `NEXA_REPO_MISSING` no roteiro da `xpz-skills-setup`; distingue no `09` bootstrap dos vínculos (`repoBootstrapDetected`) vs caminho canônico irmão (`repoRootCanonical`/`repoBootstrapCanonical`); registra `8337d8c` na rastreabilidade da matriz no `historico/IdeiasImplementadas_202608.md`; na origem da ideia do `999` sobre piloto `nexa`, marca `genexuslabs/genexus-skills` como referência de época e aponta a base atual `GeneXus-Skills-From-Zip`. Achados Claude (semantic-only) na pré-push reforçada de 2026-08-28.
 
 - **nexa: detecção Antigravity + auditoria de instalação mista:** `Initialize-NexaRepoGit.ps1` passa a incluir `.gemini\config\skills` em `Find-ExistingNexaRepoRoot` (paridade com «qualquer vínculo global»). `Test-XpzSkillsRegistration.ps1` avalia o `origin` de **todos** os roots distintos apontados pelos vínculos — instalação mista (canônico + legado) marca `EXTERNAL_SKILLS_GAPS` e prefere expor o root com gap no recibo. Self-tests: caso Antigravity em `Test-NexaRepoGitSelfTest.ps1`; caso misto em `Test-XpzSkillsRegistrationNexaRepoSelfTest.ps1`.
@@ -227,6 +229,8 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 ### Unreleased
 
+- **Aclara `NEXA_REPO_MISSING` canónico vs gap por vínculo:** en `xpz-skills-setup/SKILL.md` y `09`, `repoBootstrapCanonical = NEXA_REPO_MISSING` (carpeta hermana aún inexistente) es informativo y no abre `EXTERNAL_SKILLS_GAPS` solo; el gap de bootstrap sigue ligado a los roots de los vínculos / registro sin path. Sin cambio de motor.
+
 - **Paridad post-panel (G1/G2/G4/G5):** documenta `NEXA_REPO_MISSING` en el guion de `xpz-skills-setup`; distingue en el `09` el bootstrap de los vínculos (`repoBootstrapDetected`) vs la ruta canónica hermana (`repoRootCanonical`/`repoBootstrapCanonical`); registra `8337d8c` en la trazabilidad de la matriz en `historico/IdeiasImplementadas_202608.md`; en el origen de la idea del `999` sobre el piloto `nexa`, marca `genexuslabs/genexus-skills` como referencia de época y apunta a la base actual `GeneXus-Skills-From-Zip`. Hallazgos Claude (semantic-only) en el pre-push reforzado de 2026-08-28.
 
 - **nexa: detección Antigravity + auditoría de instalación mixta:** `Initialize-NexaRepoGit.ps1` incluye `.gemini\config\skills` en `Find-ExistingNexaRepoRoot`. `Test-XpzSkillsRegistration.ps1` evalúa el `origin` de **todos** los roots distintos de los vínculos — instalación mixta (canónico + legado) marca `EXTERNAL_SKILLS_GAPS` y prefiere exponer el root con gap. Self-tests Antigravity y caso mixto.
@@ -438,6 +442,8 @@ All relevant changes to this repository will be recorded here from this adoption
 The format keeps an `Unreleased` section for changes not yet published in a formal version. This repository does not yet use public semantic versioning; when that changes, future sections should record the corresponding tag.
 
 ### Unreleased
+
+- **Clarify canonical `NEXA_REPO_MISSING` vs link-root gap:** in `xpz-skills-setup/SKILL.md` and `09`, `repoBootstrapCanonical = NEXA_REPO_MISSING` (sibling folder not yet present) is informative and does not open `EXTERNAL_SKILLS_GAPS` by itself; bootstrap gaps still come from link roots / registration without a resolvable path. No motor change.
 
 - **Post-panel parity (G1/G2/G4/G5):** documents `NEXA_REPO_MISSING` in the `xpz-skills-setup` playbook; distinguishes in `09` link-root bootstrap (`repoBootstrapDetected`) vs sibling canonical path (`repoRootCanonical`/`repoBootstrapCanonical`); records `8337d8c` in the matrix traceability in `historico/IdeiasImplementadas_202608.md`; in the `999` origin note for the `nexa` pilot idea, marks `genexuslabs/genexus-skills` as period reference and points to the current `GeneXus-Skills-From-Zip` base. Found by Claude (semantic-only) in the 2026-08-28 reinforced pre-push.
 
