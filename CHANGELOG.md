@@ -8,6 +8,8 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 ### Unreleased
 
+- **Paridade pós-painel (G1/G2/G4/G5):** documenta `NEXA_REPO_MISSING` no roteiro da `xpz-skills-setup`; distingue no `09` bootstrap dos vínculos (`repoBootstrapDetected`) vs caminho canônico irmão (`repoRootCanonical`/`repoBootstrapCanonical`); registra `8337d8c` na rastreabilidade da matriz no `historico/IdeiasImplementadas_202608.md`; na origem da ideia do `999` sobre piloto `nexa`, marca `genexuslabs/genexus-skills` como referência de época e aponta a base atual `GeneXus-Skills-From-Zip`. Achados Claude (semantic-only) na pré-push reforçada de 2026-08-28.
+
 - **nexa: detecção Antigravity + auditoria de instalação mista:** `Initialize-NexaRepoGit.ps1` passa a incluir `.gemini\config\skills` em `Find-ExistingNexaRepoRoot` (paridade com «qualquer vínculo global»). `Test-XpzSkillsRegistration.ps1` avalia o `origin` de **todos** os roots distintos apontados pelos vínculos — instalação mista (canônico + legado) marca `EXTERNAL_SKILLS_GAPS` e prefere expor o root com gap no recibo. Self-tests: caso Antigravity em `Test-NexaRepoGitSelfTest.ps1`; caso misto em `Test-XpzSkillsRegistrationNexaRepoSelfTest.ps1`.
 
 - **nexa: repo oficial `GeneXus-Skills-From-Zip` + migração de clone legado:** `Initialize-NexaRepoGit.ps1` e auditoria apontam para `GxBrasilNOficial/genexus-skills-from-zip` (pasta default `GeneXus-Skills-From-Zip`); `Test-XpzSkillsRegistration.ps1` marca `EXTERNAL_SKILLS_GAPS` quando vínculos OK apontam para remoto legado (`repoBootstrapDetected` / `repoRootCanonical`). Correção pós-pré-push: roteiro da `xpz-skills-setup` exige `-NexaRepoRoot <repoRootCanonical>` na migração (omitir o parâmetro redetecta o legado); mensagem de `NEXA_REMOTE_MISMATCH` orienta o mesmo caminho. Self-test `Test-XpzSkillsRegistrationNexaRepoSelfTest.ps1`; README/`09` alinhados.
@@ -225,6 +227,8 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 ### Unreleased
 
+- **Paridad post-panel (G1/G2/G4/G5):** documenta `NEXA_REPO_MISSING` en el guion de `xpz-skills-setup`; distingue en el `09` el bootstrap de los vínculos (`repoBootstrapDetected`) vs la ruta canónica hermana (`repoRootCanonical`/`repoBootstrapCanonical`); registra `8337d8c` en la trazabilidad de la matriz en `historico/IdeiasImplementadas_202608.md`; en el origen de la idea del `999` sobre el piloto `nexa`, marca `genexuslabs/genexus-skills` como referencia de época y apunta a la base actual `GeneXus-Skills-From-Zip`. Hallazgos Claude (semantic-only) en el pre-push reforzado de 2026-08-28.
+
 - **nexa: detección Antigravity + auditoría de instalación mixta:** `Initialize-NexaRepoGit.ps1` incluye `.gemini\config\skills` en `Find-ExistingNexaRepoRoot`. `Test-XpzSkillsRegistration.ps1` evalúa el `origin` de **todos** los roots distintos de los vínculos — instalación mixta (canónico + legado) marca `EXTERNAL_SKILLS_GAPS` y prefiere exponer el root con gap. Self-tests Antigravity y caso mixto.
 
 - **nexa: repo oficial `GeneXus-Skills-From-Zip` + migración de clone legado:** `Initialize-NexaRepoGit.ps1` y la auditoría apuntan a `GxBrasilNOficial/genexus-skills-from-zip` (carpeta default `GeneXus-Skills-From-Zip`); `Test-XpzSkillsRegistration.ps1` marca `EXTERNAL_SKILLS_GAPS` cuando vínculos OK apuntan a remoto legado (`repoBootstrapDetected` / `repoRootCanonical`). Corrección post-pre-push: el guion de `xpz-skills-setup` exige `-NexaRepoRoot <repoRootCanonical>` en la migración (omitir el parámetro redetecta el legado); el mensaje de `NEXA_REMOTE_MISMATCH` orienta el mismo camino. Self-test `Test-XpzSkillsRegistrationNexaRepoSelfTest.ps1`; README/`09` alineados.
@@ -434,6 +438,8 @@ All relevant changes to this repository will be recorded here from this adoption
 The format keeps an `Unreleased` section for changes not yet published in a formal version. This repository does not yet use public semantic versioning; when that changes, future sections should record the corresponding tag.
 
 ### Unreleased
+
+- **Post-panel parity (G1/G2/G4/G5):** documents `NEXA_REPO_MISSING` in the `xpz-skills-setup` playbook; distinguishes in `09` link-root bootstrap (`repoBootstrapDetected`) vs sibling canonical path (`repoRootCanonical`/`repoBootstrapCanonical`); records `8337d8c` in the matrix traceability in `historico/IdeiasImplementadas_202608.md`; in the `999` origin note for the `nexa` pilot idea, marks `genexuslabs/genexus-skills` as period reference and points to the current `GeneXus-Skills-From-Zip` base. Found by Claude (semantic-only) in the 2026-08-28 reinforced pre-push.
 
 - **nexa: Antigravity detection + mixed-install audit:** `Initialize-NexaRepoGit.ps1` includes `.gemini\config\skills` in `Find-ExistingNexaRepoRoot`. `Test-XpzSkillsRegistration.ps1` checks `origin` on **all** distinct roots from links — a mixed install (canonical + legacy) marks `EXTERNAL_SKILLS_GAPS` and prefers exposing the failing root. Self-tests for Antigravity and the mixed case.
 

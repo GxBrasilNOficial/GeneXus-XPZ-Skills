@@ -286,9 +286,13 @@ labels `NEXA_*`) contra a URL oficial e expõe o caminho canônico
 (`repoRootCanonical` = pasta-irmã `GeneXus-Skills-From-Zip`). Avalia **todos** os
 roots distintos apontados pelos vínculos das ferramentas instaladas (não só o
 primeiro na ordem Claude→…→Antigravity): instalação mista (um canônico + um
-legado) marca gap. Vínculos válidos
-apontando para repo legado (`NEXA_REMOTE_MISMATCH`, `NEXA_DIR_NOT_REPO`,
-`NEXA_ORIGIN_MISSING`, `GIT_UNAVAILABLE`) ou subpasta `nexa` ausente marcam
+legado) marca gap. Labels de bootstrap da auditoria: `NEXA_ALREADY_LINKED`,
+`NEXA_REMOTE_MISMATCH`, `NEXA_DIR_NOT_REPO`, `NEXA_ORIGIN_MISSING`,
+`GIT_UNAVAILABLE`, e `NEXA_REPO_MISSING` (root ainda inexistente — estado
+esperado de `repoBootstrapCanonical` antes do clone; também quando o alvo do
+vínculo aponta para pasta que sumiu). Vínculos válidos apontando para repo
+legado (`NEXA_REMOTE_MISMATCH`, `NEXA_DIR_NOT_REPO`, `NEXA_ORIGIN_MISSING`,
+`GIT_UNAVAILABLE`, `NEXA_REPO_MISSING`) ou subpasta `nexa` ausente marcam
 `EXTERNAL_SKILLS_GAPS` mesmo quando nenhum vínculo está ausente/quebrado.
 `externalOverall` é **independente** de `overall`: ausência/quebra/repo desatualizado
 da `nexa` **não** marca `REGISTRATION_GAPS`, mas marca `EXTERNAL_SKILLS_GAPS`.

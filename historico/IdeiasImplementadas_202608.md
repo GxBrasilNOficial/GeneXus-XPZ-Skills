@@ -6,7 +6,7 @@ Registro de ideias que sairam de `999-ideias-pendentes.md` por terem sido implem
 
 Implementado em 2026-08-28 a partir do manuscrito v4 (`matriz-14-plan-v4`).
 
-Documentação operacional no `14-revisao-pre-push-reforcada.md`: tabela única backend/rota × papel no painel × fora do painel (adapter XPZ) × transporte do dossiê, com remissões ao invariante git-capable, ao `15` e ao parágrafo de Omissão. Ponteiro ampliado no `13` sem nomear backends. Manutenção explícita (uma rota por linha; o gate de paridade não detecta ausência de linha nova). Sem alteração de motor.
+Documentação operacional no `14-revisao-pre-push-reforcada.md`: tabela única backend/rota × papel no painel × fora do painel (adapter XPZ) × transporte do dossiê, com remissões ao invariante git-capable, ao `15` e ao parágrafo de Omissão. Ponteiro ampliado no `13` sem nomear backends. Manutenção explícita (uma rota por linha; o gate de paridade não detecta ausência de linha nova). Ordem ao validar composição do painel: (1) ≥1 git-capable → (2) piso de famílias no `15` → (3) transporte/omissão. Sem alteração de motor.
 
 Resíduos do painel v3 incorporados no v4: whitespace do `<!-- backend-parity: ignore -->` na Omissão; glosa Posição B; sandbox «no painel»; ponteiro ancorado no `13`; redação «não detecta a ausência de uma linha nova».
 
@@ -16,6 +16,7 @@ Limitações fora desta frente permanecem no `999`: perfil git-capable in-panel;
 
 - Arquivos materiais: `14-revisao-pre-push-reforcada.md`, `13-revisao-pre-push.md`, `CHANGELOG.md` (pt/es/en).
 - Commit material: `8260e59` (`Documenta matriz operacional capacidade × transporte no 14.`).
+- Commit material: `8337d8c` (`Explicitar ordem de validacao do painel reforcado no 14.`).
 
 ## Preferidos por orquestrador (schema 3, cascata, nativo rota A)
 

@@ -2669,7 +2669,7 @@ No FBgx18MCP, build longo vira job em background; o canal MCP devolve `job_id` r
 
 ### Insumo da `nexa`: piloto de correspondência semântica para propriedades XPZ
 
-**Origem (2026-07-26):** estudo comparativo da skill `nexa`, mantida no repositório `genexuslabs/genexus-skills`, frente aos catálogos, moldes e gates desta base.
+**Origem (2026-07-26):** estudo comparativo da skill `nexa`, à época mantida no repositório `genexuslabs/genexus-skills` (hoje inacessível; base atual de instalação = `GxBrasilNOficial/genexus-skills-from-zip` / pasta `GeneXus-Skills-From-Zip` — ver `xpz-skills-setup`), frente aos catálogos, moldes e gates desta base.
 
 Antes de implementar `Set-XpzTransactionProperty`, avaliar um piloto de correspondência entre o conceito documentado pela `nexa` e sua serialização XPZ empiricamente comprovada. Exemplo inicial: conceito `Business Component` na `nexa` versus propriedade `idISBUSINESSCOMPONENT` no XML XPZ.
 
