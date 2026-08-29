@@ -280,7 +280,8 @@ XPZ (passo 0 do `## WORKFLOW`).
 classifica a `nexa` em uma seção separada (`externalSkills` / `externalOverall`),
 aplicando a **mesma** classificação OK / coberta_por_compatibilidade / ausente /
 quebrada dos vínculos e a **estratégia compacta** (registro em `~/.claude`,
-`~/.codex`, `~/.config/opencode`; Cursor por compatibilidade). Além dos vínculos,
+`~/.codex`, `~/.config/opencode`, `~/.gemini/config/skills`; Cursor por
+compatibilidade). Além dos vínculos,
 o motor confere **read-only** o clone local detectado (`repoBootstrapDetected`,
 labels `NEXA_*`) contra a URL oficial e expõe o caminho canônico
 (`repoRootCanonical` = pasta-irmã `GeneXus-Skills-From-Zip`). Avalia **todos** os

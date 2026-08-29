@@ -9,6 +9,9 @@
     origin divergente do oficial. Confere que externalOverall = EXTERNAL_SKILLS_GAPS
     e repoBootstrapDetected.label = NEXA_REMOTE_MISMATCH, sem rede. Inclui caso misto
     (Claude no canonico + Antigravity no legado) para impedir falso EXTERNAL_SKILLS_OK.
+    Inclui caso positivo: perfil sem ferramentas/vinculos e pasta-irma canônica
+    ausente — repoBootstrapCanonical = NEXA_REPO_MISSING e EXTERNAL_SKILLS_OK
+    (canônico ausente e informativo; nao abre gap sozinho).
     Durante a invocacao do motor, PATH fica reduzido ao diretorio do git ja resolvido
     (sem CLIs de agente; nao depende dos fallbacks Program Files do Find-GitExecutable).
 #>
@@ -190,6 +193,43 @@ finally {
     $env:PATH = $originalPath
     $env:USERPROFILE = $originalProfile
     foreach ($p in @($fakeProfile2, $fakeRepo2, $legacyRepo2, $canonicalRepo2)) {
+        Remove-TempDir -Path $p
+    }
+}
+
+# Caso 3: canônico ausente sem registro — NEXA_REPO_MISSING informativo, EXTERNAL_SKILLS_OK
+$fakeRepo3 = New-TempDir
+$fakeProfile3 = New-TempDir
+try {
+    $env:PATH = $gitBinDir
+
+    $skillDir3 = Join-Path $fakeRepo3 'xpz-skills-setup'
+    New-Item -ItemType Directory -Path $skillDir3 -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $skillDir3 'SKILL.md') -Value '# setup' -Encoding utf8
+    # Sem markers de ferramenta em $fakeProfile3 e sem CLIs no PATH => nenhuma
+    # ferramenta "instalada"; canônico irmão GeneXus-Skills-From-Zip nao existe.
+
+    $env:USERPROFILE = $fakeProfile3
+    $json3 = & $scriptUnderTest -RepoRoot $fakeRepo3 -AsJson | Out-String
+    $env:USERPROFILE = $originalProfile
+    $report3 = $json3 | ConvertFrom-Json
+
+    Assert-Equal 'canonico ausente: externalOverall OK' 'EXTERNAL_SKILLS_OK' ([string]$report3.externalOverall)
+    $nexa3 = @($report3.externalSkills | Where-Object { $_.name -eq 'nexa' })
+    if ($nexa3.Count -eq 1) {
+        Assert-equal 'canonico ausente: repoBootstrapCanonical NEXA_REPO_MISSING' 'NEXA_REPO_MISSING' ([string]$nexa3[0].repoBootstrapCanonical.label)
+        Assert-Equal 'canonico ausente: repoOriginOk false' 'False' ([string]$nexa3[0].repoOriginOk)
+    }
+    else {
+        $script:cases++
+        $script:failures++
+        Write-Output 'FAIL: canonico ausente: externalSkills deveria conter nexa'
+    }
+}
+finally {
+    $env:PATH = $originalPath
+    $env:USERPROFILE = $originalProfile
+    foreach ($p in @($fakeProfile3, $fakeRepo3)) {
         Remove-TempDir -Path $p
     }
 }
