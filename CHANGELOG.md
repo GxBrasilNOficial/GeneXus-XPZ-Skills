@@ -8,6 +8,8 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 ### Unreleased
 
+- **Paridade pós-painel (G1/G2/G3 da rodada terra):** ponteiro da matriz no `999` (perfil git-capable Claude) aponta à seção normativa do `14`; nova ideia no `999` para extrair `Find-GitExecutable` compartilhado (cópia triplicada); `Test-XpzSkillsRegistrationNexaRepoSelfTest.ps1` usa PATH mínimo = diretório do git já resolvido (não depende dos 3 fallbacks Program Files). Achados Claude (semantic-only) na pré-push reforçada de 2026-08-28.
+
 - **Clarifica `NEXA_REPO_MISSING` canônico vs gap por vínculo:** em `xpz-skills-setup/SKILL.md` e `09`, `repoBootstrapCanonical = NEXA_REPO_MISSING` (pasta-irmã ainda inexistente) é informativo e não abre `EXTERNAL_SKILLS_GAPS` sozinho; o gap de bootstrap continua ligado aos roots dos vínculos / registro sem path. Sem mudança de motor.
 
 - **Paridade pós-painel (G1/G2/G4/G5):** documenta `NEXA_REPO_MISSING` no roteiro da `xpz-skills-setup`; distingue no `09` bootstrap dos vínculos (`repoBootstrapDetected`) vs caminho canônico irmão (`repoRootCanonical`/`repoBootstrapCanonical`); registra `8337d8c` na rastreabilidade da matriz no `historico/IdeiasImplementadas_202608.md`; na origem da ideia do `999` sobre piloto `nexa`, marca `genexuslabs/genexus-skills` como referência de época e aponta a base atual `GeneXus-Skills-From-Zip`. Achados Claude (semantic-only) na pré-push reforçada de 2026-08-28.
@@ -229,6 +231,8 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 ### Unreleased
 
+- **Paridad post-panel (G1/G2/G3 de la ronda terra):** el puntero de la matriz en el `999` (perfil git-capable Claude) apunta a la sección normativa del `14`; nueva idea en el `999` para extraer `Find-GitExecutable` compartido (copia triplicada); `Test-XpzSkillsRegistrationNexaRepoSelfTest.ps1` usa PATH mínimo = directorio del git ya resuelto (no depende de los 3 fallbacks Program Files). Hallazgos Claude (semantic-only) en el pre-push reforzado de 2026-08-28.
+
 - **Aclara `NEXA_REPO_MISSING` canónico vs gap por vínculo:** en `xpz-skills-setup/SKILL.md` y `09`, `repoBootstrapCanonical = NEXA_REPO_MISSING` (carpeta hermana aún inexistente) es informativo y no abre `EXTERNAL_SKILLS_GAPS` solo; el gap de bootstrap sigue ligado a los roots de los vínculos / registro sin path. Sin cambio de motor.
 
 - **Paridad post-panel (G1/G2/G4/G5):** documenta `NEXA_REPO_MISSING` en el guion de `xpz-skills-setup`; distingue en el `09` el bootstrap de los vínculos (`repoBootstrapDetected`) vs la ruta canónica hermana (`repoRootCanonical`/`repoBootstrapCanonical`); registra `8337d8c` en la trazabilidad de la matriz en `historico/IdeiasImplementadas_202608.md`; en el origen de la idea del `999` sobre el piloto `nexa`, marca `genexuslabs/genexus-skills` como referencia de época y apunta a la base actual `GeneXus-Skills-From-Zip`. Hallazgos Claude (semantic-only) en el pre-push reforzado de 2026-08-28.
@@ -442,6 +446,8 @@ All relevant changes to this repository will be recorded here from this adoption
 The format keeps an `Unreleased` section for changes not yet published in a formal version. This repository does not yet use public semantic versioning; when that changes, future sections should record the corresponding tag.
 
 ### Unreleased
+
+- **Post-panel parity (G1/G2/G3 from the terra round):** the matrix pointer in `999` (Claude git-capable profile) points to the normative `14` section; new `999` idea to extract shared `Find-GitExecutable` (triplicated copy); `Test-XpzSkillsRegistrationNexaRepoSelfTest.ps1` uses a minimal PATH = already-resolved git directory (does not depend on the three Program Files fallbacks). Found by Claude (semantic-only) in the 2026-08-28 reinforced pre-push.
 
 - **Clarify canonical `NEXA_REPO_MISSING` vs link-root gap:** in `xpz-skills-setup/SKILL.md` and `09`, `repoBootstrapCanonical = NEXA_REPO_MISSING` (sibling folder not yet present) is informative and does not open `EXTERNAL_SKILLS_GAPS` by itself; bootstrap gaps still come from link roots / registration without a resolvable path. No motor change.
 

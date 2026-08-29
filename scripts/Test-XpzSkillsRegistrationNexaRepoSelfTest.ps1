@@ -9,6 +9,8 @@
     origin divergente do oficial. Confere que externalOverall = EXTERNAL_SKILLS_GAPS
     e repoBootstrapDetected.label = NEXA_REMOTE_MISMATCH, sem rede. Inclui caso misto
     (Claude no canonico + Antigravity no legado) para impedir falso EXTERNAL_SKILLS_OK.
+    Durante a invocacao do motor, PATH fica reduzido ao diretorio do git ja resolvido
+    (sem CLIs de agente; nao depende dos fallbacks Program Files do Find-GitExecutable).
 #>
 
 [CmdletBinding()]
@@ -73,9 +75,13 @@ $fakeProfile = New-TempDir
 $legacyRepo = New-TempDir
 $originalProfile = $env:USERPROFILE
 $originalPath = $env:PATH
+# PATH minimo: so o diretorio do git ja resolvido. Evita CLIs de agente no PATH
+# (determinismo de Test-ToolInstalled) sem depender dos 3 fallbacks hard-coded
+# de Find-GitExecutable (Program Files / LOCALAPPDATA) — scoop/choco/portatil.
+$gitBinDir = Split-Path -Parent $git.Source
 
 try {
-    $env:PATH = ''
+    $env:PATH = $gitBinDir
 
     # Inventario minimo na raiz XPZ falsa
     $skillDir = Join-Path $fakeRepo 'xpz-skills-setup'
@@ -118,7 +124,7 @@ try {
     if ($nexaEntry.Count -eq 1) {
         Assert-Equal 'repoBootstrapDetected NEXA_REMOTE_MISMATCH' 'NEXA_REMOTE_MISMATCH' ([string]$nexaEntry[0].repoBootstrapDetected.label)
         Assert-Equal 'repoOriginOk false' 'False' ([string]$nexaEntry[0].repoOriginOk)
-        Assert-Equal 'Claude nexa OK (vinculo valido)' 'OK' ([string](@($nexaEntry[0].tools | Where-Object { $_.name -eq 'ClaudeCode' }).status))
+        Assert-equal 'Claude nexa OK (vinculo valido)' 'OK' ([string](@($nexaEntry[0].tools | Where-Object { $_.name -eq 'ClaudeCode' }).status))
     }
 }
 finally {
@@ -135,7 +141,7 @@ $fakeProfile2 = New-TempDir
 $legacyRepo2 = New-TempDir
 $canonicalRepo2 = New-TempDir
 try {
-    $env:PATH = ''
+    $env:PATH = $gitBinDir
 
     $skillDir2 = Join-Path $fakeRepo2 'xpz-skills-setup'
     New-Item -ItemType Directory -Path $skillDir2 -Force | Out-Null

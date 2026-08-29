@@ -400,7 +400,7 @@ Smoke test retornou `HEAD` correto em ~13 s; a falha no painel foi **modo de inv
 1. **Perfil explícito** — ex.: `git-capable-pre-push` ou flag de payload `public` que autorize o modo ampliado só em contextos delimitados (pré-push reforçada? revisão por pares com recibo?).
 2. **`$ContentionKeys` e dispatcher** — relaxar ou perfilar as chaves bloqueadas do `claude-code`; injetar `-Tools default -PermissionMode dontAsk` só quando o perfil estiver ativo; manter fail-closed como default.
 3. **Transporte** — decidir se git-capable in-panel usa rota assíncrona existente (`Invoke-ClaudeCodeAsync.ps1`) com defaults condicionais, rota síncrona dedicada no dispatcher, ou continua **fora** do painel (workaround documentado).
-4. **Paridade doc↔motor** — `xpz-llm-delegate/SKILL.md`, `14-revisao-pre-push-reforcada.md`, `02-regras-operacionais-e-runtime.md`, matriz `git-capable` vs `semantic-only` vs `argv-limited`.
+4. **Paridade doc↔motor** — `xpz-llm-delegate/SKILL.md`, `14-revisao-pre-push-reforcada.md`, `02-regras-operacionais-e-runtime.md`, matriz operacional do `14` (§ *Matriz operacional — capacidade × transporte*).
 5. **Testes e revisão de segurança** — self-tests do dispatcher, AST Guard dos 5 mapas, cenário adversarial de Bash no cwd; comparar com contenção já feita no opencode (`reviewer-ro`) e no Codex (`read-only`).
 
 **Workaround vigente (sem implementar esta frente).**
@@ -460,6 +460,27 @@ Isso casa com `scripts/Invoke-PrePushMechanicalChecks.ps1` **deste** repositóri
 **Relacionado:** «Modo dossiê compacto…» (mesmo builder, outro eixo); «Matriz git-capable…» em `historico/IdeiasImplementadas_202608.md` (invariante ≥1 git-capable cobre Seção A, mas não impede falso gap na Seção B); `13` («Modo assistido por dossiê»); `scripts/Build-PrePushReviewDossier.ps1` (`-MechanicalScriptPath`).
 
 **Origem:** triagem humana na pré-push reforçada do Open API Builder (gap G4 do Claude semantic-only, 2026-08-28); usuário pediu anotar no `999` após confirmar que as entradas do dia não cobriam o caso.
+
+## Extrair `Find-GitExecutable` compartilhado (cópia triplicada nos motores de skills-setup / nexa)
+
+- **Importância** — baixa/média (hoje as três cópias coincidem; divergência futura entre bootstrap e auditoria produziria veredito diferente sem gate mecânico detectar).
+- **Maturidade** — ideia (não refatorar na frente corrente; registrar e extrair em sessão dedicada).
+
+**Estado medido (pré-push reforçada, 2026-08-28).** `Find-GitExecutable` está **idêntico** em:
+
+1. `scripts/Initialize-XpzSkillsRepoGit.ps1`
+2. `scripts/Initialize-NexaRepoGit.ps1`
+3. `scripts/Test-XpzSkillsRegistration.ps1` (auditoria read-only passou a depender de git para bootstrap da `nexa`)
+
+Mesmos três caminhos hard-coded (`%ProgramFiles%\Git\cmd`, x86, `%LOCALAPPDATA%\Programs\Git\cmd`). O repositório já tem convenção de suporte compartilhado por dot-source (`*CliSupport.ps1`, `GeneXusObjectTypeCatalogSupport.ps1`, etc.).
+
+**Direção candidata (não implementar agora).** Extrair para um `GitExecutableSupport.ps1` (ou estender suporte existente), dot-source nos três consumidores, self-test de descoberta com fixture de paths. Avaliar se scoop/choco/portátil devem entrar no fallback — ortogonal à extração.
+
+**Não** misturar com hotfixes de self-test da auditoria nexa (PATH mínimo já tratado à parte).
+
+**Relacionado:** `xpz-skills-setup/SKILL.md`; `scripts/Test-XpzSkillsRegistration.ps1`; `scripts/Initialize-NexaRepoGit.ps1`; `scripts/Initialize-XpzSkillsRepoGit.ps1`.
+
+**Origem:** gap G2 do Claude (semantic-only) na pré-push reforçada de 2026-08-28 (HEAD `b21c808`); triagem humana pediu anotar no `999` sem refatorar nesta frente.
 
 ## Variante de prompt read-only para vozes "coder" do painel de revisão por pares (evitar truncamento por tool-calls) — RESOLVIDA E MIGRADA
 
