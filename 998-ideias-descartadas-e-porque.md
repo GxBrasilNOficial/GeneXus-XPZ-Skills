@@ -1703,3 +1703,39 @@ relevante para delegação **headless** — capacidade de sessão interativa nã
 (b) evidência de que `mimo-v2.5` deixou de truncar em manuscrito longo. Restabelecimento de
 gratuidade, novos modelos no catálogo ou mudança de preço **não** reabrem esta frente: o acesso ao
 modelo já existe pelo backend opencode.
+
+---
+
+## Destino do backend Gemini CLI (#5) — auth/ineligible e detector residual
+
+**Origem:** saúde por backend em 2026-08-06; descarte operacional em 2026-08-28 (sem assinatura
+Gemini nesta máquina; família `google` via Antigravity).
+
+**O que é:** backlog ligado ao Gemini CLI como backend #5 da `xpz-llm-delegate`: decisão humana
+sobre vias de auth alternativas (API Key / Vertex AI), classificação de falha de auth como
+`unavailable` no painel (camada 2) e tratamento permanente de `IneligibleTierError`/`UNSUPPORTED_CLIENT`
+(camada 3). A camada 1 do detector (`Get-GeminiErrorMessage` com formas flexionadas
+`authenticat*`/`authoriz*`/`sign in`) já estava feita e permanece no código.
+
+**Diagnóstico preservado (2026-08-06):** `Invoke-Gemini.ps1` falha com
+`IneligibleTierError: This client is no longer supported for Gemini Code Assist for individuals`
+(`reasonCode: UNSUPPORTED_CLIENT`). Atualizar o CLI 0.35.3 → 0.54.0 reproduz o mesmo erro —
+«this client» é o Gemini CLI como cliente do Code Assist para contas individuais, não binário
+desatualizado. O adapter (`Resolve-GeminiExe`, flags) segue compatível; a falha é autorização
+do serviço. Dois estados medidos: sem credencial em cache o CLI escreve prompt interativo de
+login no stdout e sai 0; com credencial em cache sai 1 com stderr estruturado.
+
+**Por que foi descartada:**
+
+Não há assinatura Gemini nesta máquina e a decisão humana (2026-08-06, reiterada 2026-08-28) é
+não buscar API Key (AI Studio) nem Vertex AI. A família `google` no painel entra por
+`antigravity/gemini-*` (colapsa para `google` via `Get-LlmDelegateTargetFamily`). Investir em
+camadas 2/3 ou em vias de auth sem intenção de uso só gera ruído no `999`.
+
+**O que este descarte NÃO faz:** não aposenta o backend #5 na documentação nem remove
+`Invoke-Gemini.ps1` / `GeminiCliSupport.ps1` do inventário — o adapter pode voltar se houver
+assinatura/via de auth funcional. Só encerra o backlog de destino operacional e detector residual
+nesta máquina.
+
+**Não reavaliar salvo** assinatura ou via de auth Gemini funcional nesta máquina (Code Assist
+elegível, API Key ou Vertex) com intenção explícita de reativar o backend #5 no painel.

@@ -67,36 +67,7 @@ Ambas se somam à causa já registrada (truncar a linha em N chars para triar r�
 **Relacionado:**
 - `scripts/Test-PrePushGateEnumerationParity.ps1` (padrão a espelhar)
 - `scripts/Test-PrePushNewTokenPropagation.ps1` (o gate cego a este caso)
-- A entrada «Registro de backend novo na `xpz-llm-delegate`» (invariante dos mapas + nota de `$ContentionKeys`) e a entrada «Destino do backend Gemini CLI (#5)» abaixo, que nasceu da mesma frente.
-
-## Destino do backend Gemini CLI (#5) — inelegível para conta individual desde 2026-08-06
-
-- <!-- backend-parity: ignore --> **Importância** — média (o backend #5 está **inoperante** nesta máquina; há workaround via Antigravity para a família `google`, mas a documentação segue descrevendo o Gemini como ativo).
-- **Maturidade** — pesquisa feita (o diagnóstico está fechado; falta **decisão humana** sobre a via de autenticação antes de qualquer mudança documental).
-
-**Medido em 2026-08-06** (despacho real de saúde por backend). O `Invoke-Gemini.ps1` falha com:
-
-```
-Error authenticating: IneligibleTierError: This client is no longer supported for Gemini
-Code Assist for individuals. To continue using Gemini, please migrate to the Antigravity
-suite of products: https://antigravity.google        (reasonCode: UNSUPPORTED_CLIENT)
-```
-
-**Não é versão do cliente:** atualizar 0.35.3 → **0.54.0** (`npm install -g @google/gemini-cli@0.54.0`) reproduz o mesmo erro. «This client» é o Gemini CLI como cliente do **Code Assist para contas individuais**, não o binário desatualizado.
-
-**O adapter não está quebrado:** com 0.54.0 o `Resolve-GeminiExe` continua passando — versão mínima validada (`0.35.3`) e contrato de flags (`--prompt`, `--approval-mode`, `--output-format`, `--model`) seguem compatíveis. O que falha é a autorização do serviço, fora do alcance do adapter.
-
-**Decisão em aberto (humana).** Restam duas vias de auth não testadas, ambas fora do Code Assist tier: **Gemini API Key** (AI Studio) e **Vertex AI**. Em 2026-08-06 o usuário decidiu **não** testá-las nem buscar essas assinaturas. Enquanto a decisão não for tomada:
-
-- **não** aposentar nem marcar o backend #5 como removido em `xpz-llm-delegate/SKILL.md`, `02`, `09` e `14` — ele pode voltar por outra via de auth;
-- <!-- backend-parity: ignore --> ao montar painel nesta máquina, tratar o Gemini como indisponível de fato e lembrar que a família `google` só entra por `antigravity/gemini-*` (que colapsa para `google` via `Get-LlmDelegateTargetFamily`).
-
-**Subfrente residual do detector (camadas 2 e 3).** A **camada 1** já foi feita em 2026-08-06 (o adapter consulta `Get-GeminiErrorMessage` antes de desistir no parse, e o extrator passou a reconhecer as formas flexionadas `authenticat*`/`authoriz*`/`sign in` — antes, `\bauth\b` **não** casava «authentication»). Ficam pendentes:
-
-- **(2)** classificar falha de auth como **`unavailable`** em vez de `error` no painel — retentar não resolve, e é o mesmo tratamento que o `workspace-not-trusted` do Claude Code já recebe. Exige detector nomeado no `GeminiCliSupport.ps1` + entrada no `$unavailableFailurePattern` do dispatcher.
-- **(3)** tratar `IneligibleTierError`/`UNSUPPORTED_CLIENT` como **permanente**: nem fallback nem retry ajudam; a mensagem deve dizer que a ação é humana (trocar a via de auth ou usar o Antigravity), em vez de cair no balaio genérico de erro de auth. Só vale investir depois da decisão acima.
-
-**Dois estados de falha distintos, ambos medidos** (importam para quem for mexer no detector): **sem** credencial em cache o CLI escreve o prompt interativo de login no **stdout** e sai **0**; **com** credencial em cache sai **1** com o stderr estruturado acima. O primeiro estado é o que derrubava o diagnóstico antes da camada 1.
+- A entrada «Registro de backend novo na `xpz-llm-delegate`» (invariante dos mapas + nota de `$ContentionKeys`). O destino operacional do Gemini CLI (#5) nesta máquina foi descartado em `998-ideias-descartadas-e-porque.md` (família `google` via Antigravity).
 
 ## Evolução futura de fidelidade textual em XML GeneXus antes do empacotamento
 
@@ -289,7 +260,7 @@ Origem: levantado pelo usuário em 2026-06-30 ao ver o mapa por subpasta durante
 ## <!-- backend-parity: ignore --> Migrar `Invoke-Gemini`/`Invoke-Copilot`/`Invoke-Antigravity` para stdin e/ou guard de tamanho de prompt
 
 - <!-- backend-parity: ignore --> **Importância** — baixa (workaround trivial existe). Os adapters argument-based `Invoke-Gemini.ps1`, `Invoke-Copilot.ps1` e `Invoke-Antigravity.ps1` ainda passam o prompt por **argv**, sujeitos ao **limite ~32KB de linha de comando do Windows** (`Argument list too long`) e ao sintoma não-determinístico `StandardOutputEncoding` em host com stdout não-redirecionado. Workaround atual: invocá-los pela ferramenta Bash (stdout em pipe) com prompt enxuto. **O Antigravity (backend #6, 2026-08-04) é o caso mais sensível dos três:** por injetar contexto próprio grande, é o que mais tende a estourar o teto e ser omitido com `dossier-too-large` na pré-push reforçada.
-- <!-- backend-parity: ignore --> **Maturidade** — (b) IMPLEMENTADA 2026-06-22 (estendida ao Antigravity em 2026-08-04); resíduo (a) bloqueado por dependência externa. Direções: (a) **AINDA ABERTO** — quando houver **assinatura/acesso funcional** de Gemini/Copilot/Antigravity nesta máquina, testar `gemini -p`/`copilot -p`/`agy -p` lendo stdin e, se aceitarem, migrá-los ao padrão **stdin-based** espelhando o opencode (`Invoke-OpenCode`/`Start-OpenCodeJob`); só assim o teto ~32KB cai de fato para esses três. Sobre o Gemini, ver a entrada «Destino do backend Gemini CLI (#5)» — hoje ele nem autentica, então a validação empírica dele está duplamente bloqueada. (b) **guard de tamanho — IMPLEMENTADO** (2026-06-22): `$MaxArgvPromptChars = 30000` fail-closed (heurístico em chars) em `Invoke-Gemini`/`Invoke-Copilot` e, desde 2026-08-04, em `Invoke-Antigravity`; recusa com `BLOCK` claro antes do `Argument list too long`; cobre `-Message` e `-MessagePath`. Migrado ao `historico/IdeiasImplementadas_202606.md`; ver `CHANGELOG`.
+- <!-- backend-parity: ignore --> **Maturidade** — (b) IMPLEMENTADA 2026-06-22 (estendida ao Antigravity em 2026-08-04); resíduo (a) bloqueado por dependência externa. Direções: (a) **AINDA ABERTO** — quando houver **assinatura/acesso funcional** de Copilot/Antigravity nesta máquina, testar `copilot -p`/`agy -p` lendo stdin e, se aceitarem, migrá-los ao padrão **stdin-based** espelhando o opencode (`Invoke-OpenCode`/`Start-OpenCodeJob`); só assim o teto ~32KB cai de fato para esses dois. O Gemini CLI saiu do residual (a): destino operacional nesta máquina descartado em `998-ideias-descartadas-e-porque.md` (adapter permanece no inventário; validação empírica de stdin não será feita sem assinatura). (b) **guard de tamanho — IMPLEMENTADO** (2026-06-22): `$MaxArgvPromptChars = 30000` fail-closed (heurístico em chars) em `Invoke-Gemini`/`Invoke-Copilot` e, desde 2026-08-04, em `Invoke-Antigravity`; recusa com `BLOCK` claro antes do `Argument list too long`; cobre `-Message` e `-MessagePath`. Migrado ao `historico/IdeiasImplementadas_202606.md`; ver `CHANGELOG`.
 
 ## Follow-up: versão-de-contrato confrontável + gate consultivo de lockstep (etapa 2 da auditoria de drift de consumo)
 
