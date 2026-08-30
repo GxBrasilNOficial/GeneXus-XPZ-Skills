@@ -16,7 +16,8 @@
     proprio watcher antes da promocao atomica sai com codigo 99, emite WATCHER_INTERNAL_ERROR no
     stderr e nao promove <GUID>.result.json. -WatchTimeoutSec (default 0) e opt-in; se o processo
     observado ainda estiver vivo no prazo, o watcher tenta encerrar a arvore do runner e promove
-    rejeicao opencode-watch-timeout (exit 20). result.json preexistente recusa clobber (exit 21).
+    rejeicao opencode-watch-timeout (exit 20). Esperas do poll usam o restante em milissegundos e
+    nao arredondam para cima alem do prazo. result.json preexistente recusa clobber (exit 21).
     Jobs com watcher classificam limite de uso/taxa do provider via o resolvedor compartilhado.
 .PARAMETER WatchTimeoutSec
     Timeout opt-in do observador (0 = desligado, maximo 86400). Independente do alerta de silencio.
@@ -233,13 +234,13 @@ try {
     $offset = [long]0
     $silenceAlerted = $false
 
-    function Get-WatchSleepSecLocal {
+    function Get-WatchSleepMsLocal {
         param([double]$DefaultSec, $Deadline)
-        if ($null -eq $Deadline) { return [Math]::Max(1, [int][Math]::Ceiling($DefaultSec)) }
-        $rem = ($Deadline - [datetime]::UtcNow).TotalSeconds
-        if ($rem -le 0) { return 0 }
-        $m = [Math]::Min($DefaultSec, $rem)
-        if ($m -lt 1 -and $rem -gt 0) { return 1 }
+        $defaultMs = $DefaultSec * 1000.0
+        if ($null -eq $Deadline) { return [Math]::Max(1, [int][Math]::Ceiling($defaultMs)) }
+        $remMs = ($Deadline - [datetime]::UtcNow).TotalMilliseconds
+        if ($remMs -le 0) { return 0 }
+        $m = [Math]::Min($defaultMs, $remMs)
         return [int][Math]::Floor($m)
     }
     function Test-WatchAliveLocal {
@@ -266,12 +267,12 @@ try {
             break
         }
         Write-Line "Aguardando stream do opencode..." 'DarkGray'
-        $sl = Get-WatchSleepSecLocal -DefaultSec 2 -Deadline $deadlineUtc
+        $sl = Get-WatchSleepMsLocal -DefaultSec 2 -Deadline $deadlineUtc
         if ($sl -le 0) {
             if (Test-WatchAliveLocal) { $watchTimedOut = $true }
             break
         }
-        Start-Sleep -Seconds $sl
+        Start-Sleep -Milliseconds $sl
     }
 
     :loop while (-not $watchTimedOut) {
@@ -296,18 +297,18 @@ try {
         }
 
         if (-not $alive) {
-            $slTail = Get-WatchSleepSecLocal -DefaultSec 2 -Deadline $deadlineUtc
-            if ($slTail -gt 0) { Start-Sleep -Seconds $slTail }
+            $slTail = Get-WatchSleepMsLocal -DefaultSec 2 -Deadline $deadlineUtc
+            if ($slTail -gt 0) { Start-Sleep -Milliseconds $slTail }
             Add-WatchStreamLinesLocal (Read-NewLines ([ref]$offset))
             break loop
         }
 
-        $sl = Get-WatchSleepSecLocal -DefaultSec $IntervalSeconds -Deadline $deadlineUtc
+        $sl = Get-WatchSleepMsLocal -DefaultSec $IntervalSeconds -Deadline $deadlineUtc
         if ($sl -le 0) {
             if (Test-WatchAliveLocal) { $watchTimedOut = $true }
             break loop
         }
-        Start-Sleep -Seconds $sl
+        Start-Sleep -Milliseconds $sl
     }
 
     if (Test-Path -LiteralPath $resultPath -PathType Leaf) {

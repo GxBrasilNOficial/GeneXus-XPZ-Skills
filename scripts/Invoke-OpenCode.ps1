@@ -37,7 +37,9 @@
     Forca um caminho de opencode.exe (contorna a descoberta automatica). Usado tambem pelos
     self-tests para injetar um fake-exe.
 .PARAMETER Raw
-    Devolve o stream JSON cru (um evento por linha) em vez do texto final.
+    Devolve o stream JSON cru (um evento por linha) em vez do texto final. Sem retry. No timeout,
+    o adapter ainda classifica limite de uso/taxa (nao ha stream util para devolver). Nos demais
+    terminais (exit!=0, etc.), -Raw nao classifica limite.
 .PARAMETER AllText
     Devolve toda a narracao (preambulos de passo + resposta final) concatenada, em vez de só a resposta final.
 .PARAMETER TimeoutSec
