@@ -8,6 +8,8 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 ### Unreleased
 
+- **Paridade pós-painel (G1 da rodada Codex, 2026-08-30):** `Test-OpenCodeWatchJobLimitSelfTest.ps1` passa a exercitar classificação real de limite no watcher (`limite-uso` via stderr do job, sem injetar `LimitHit`) e o timeout com kill por identidade verificada. Ponteiros no `09` e no `SKILL`. Sem mudança de motor. `README.md` sem mudança.
+
 - **Paridade pós-painel (G1 da 3ª rodada Opus, 2026-08-30):** no comment-based help e no comentário do laço de retry de `Invoke-OpenCode.ps1`, troca «429» por limite de uso/taxa e alinha a precedência (3) ao resolvedor no ramo esgotado (já documentado no `SKILL`). Sem mudança de motor. `README.md` sem mudança.
 
 - **Paridade pós-painel (G1/G2 da 2ª rodada Opus, 2026-08-30):** restaura `.PARAMETER` de `JobId`, `ProcessId`, `TempDir`, `IntervalSeconds` e `SilenceThresholdSeconds` no comment-based help de `Watch-OpenCodeJob.ps1` (mantém `WatchTimeoutSec` / `ExpectedStartTimeUtc`); na nota HTTP 410 do `SKILL`, documenta classificação de limite em `exit≠0` sem `-Raw` antes do BLOCK genérico e o risco de 429 sem timestamp no log mascarar 410. Sem mudança de motor. `README.md` sem mudança.
@@ -241,6 +243,8 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 ### Unreleased
 
+- **Paridad post-panel (G1 de la ronda Codex, 2026-08-30):** `Test-OpenCodeWatchJobLimitSelfTest.ps1` ejercita la clasificación real de límite en el watcher (`limite-uso` vía stderr del job, sin inyectar `LimitHit`) y el timeout con kill por identidad verificada. Punteros en `09` y en el `SKILL`. Sin cambio de motor. Sin cambio en `README.md`.
+
 - **Paridad post-panel (G1 de la 3.ª ronda Opus, 2026-08-30):** en el comment-based help y el comentario del bucle de retry de `Invoke-OpenCode.ps1`, sustituye «429» por límite de uso/tasa y alinea la precedencia (3) con el resolvedor en el ramo agotado (ya documentado en el `SKILL`). Sin cambio de motor. Sin cambio en `README.md`.
 
 - **Paridad post-panel (G1/G2 de la 2.ª ronda Opus, 2026-08-30):** restaura `.PARAMETER` de `JobId`, `ProcessId`, `TempDir`, `IntervalSeconds` y `SilenceThresholdSeconds` en el comment-based help de `Watch-OpenCodeJob.ps1` (conserva `WatchTimeoutSec` / `ExpectedStartTimeUtc`); en la nota HTTP 410 del `SKILL`, documenta la clasificación de límite en `exit≠0` sin `-Raw` antes del BLOCK genérico y el riesgo de que un 429 sin timestamp en el log enmascare un 410. Sin cambio de motor. Sin cambio en `README.md`.
@@ -466,6 +470,8 @@ All relevant changes to this repository will be recorded here from this adoption
 The format keeps an `Unreleased` section for changes not yet published in a formal version. This repository does not yet use public semantic versioning; when that changes, future sections should record the corresponding tag.
 
 ### Unreleased
+
+- **Post-panel parity (G1 from the Codex round, 2026-08-30):** `Test-OpenCodeWatchJobLimitSelfTest.ps1` now exercises real watcher limit classification (`limite-uso` via job stderr, without injecting `LimitHit`) and timeout kill with verified identity. Pointers in `09` and `SKILL`. No engine change. No `README.md` change.
 
 - **Post-panel parity (G1 from the 3rd Opus round, 2026-08-30):** in `Invoke-OpenCode.ps1` comment-based help and the retry-loop comment, replaces «429» with usage/rate limit and aligns precedence (3) with the resolver on the exhausted branch (already documented in `SKILL`). No engine change. No `README.md` change.
 
