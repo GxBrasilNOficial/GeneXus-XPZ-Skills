@@ -11,7 +11,7 @@ Jobs opencode **com watcher** classificam limite de uso e de taxa (evidência po
 ### Rastreabilidade
 
 - Arquivos materiais: `scripts/OpenCodeStreamSupport.ps1`, `scripts/Invoke-OpenCode.ps1`, `scripts/Start-OpenCodeJob.ps1`, `scripts/Watch-OpenCodeJob.ps1`, self-tests associados, `xpz-llm-delegate/SKILL.md`, `02`/`08`/`09`/`CHANGELOG.md`/`999`.
-- Commit material: (preencher após o commit desta frente).
+- Commit material: `17c2c43` (`Detecta limite de uso e de taxa do provider nos jobs opencode.`).
 
 ## Matriz git-capable vs semantic-only vs argv-limited no `14` (operador da pré-push reforçada)
 
