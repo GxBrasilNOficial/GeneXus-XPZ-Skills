@@ -19,6 +19,18 @@
     rejeicao opencode-watch-timeout (exit 20). Esperas do poll usam o restante em milissegundos e
     nao arredondam para cima alem do prazo. result.json preexistente recusa clobber (exit 21).
     Jobs com watcher classificam limite de uso/taxa do provider via o resolvedor compartilhado.
+.PARAMETER JobId
+    GUID do job (nome-base dos arquivos em -TempDir).
+.PARAMETER ProcessId
+    PID do processo observado cuja vida delimita o monitoramento. No fluxo padrao de
+    Start-OpenCodeJob.ps1, e o PID do runner pwsh; o exit do opencode deve vir de
+    <GUID>.exitcode.txt.
+.PARAMETER TempDir
+    Pasta dos arquivos de job. Default: <temp do usuário>\opencode-jobs.
+.PARAMETER IntervalSeconds
+    Intervalo de polling. Default 2. Faixa 1-30.
+.PARAMETER SilenceThresholdSeconds
+    Segundos sem nova linha antes de alertar. Default 120. Faixa 30-3600.
 .PARAMETER WatchTimeoutSec
     Timeout opt-in do observador (0 = desligado, maximo 86400). Independente do alerta de silencio.
 .PARAMETER ExpectedStartTimeUtc
