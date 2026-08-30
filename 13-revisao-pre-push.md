@@ -101,6 +101,8 @@ Quando a mudança afetar regra operacional compartilhada, `02-regras-operacionai
 
 Antes de declarar que um termo, self-test, script, regra ou evidência está ausente de um documento, confrontar a alegação com o conjunto completo de resultados de busca e leituras já coletados na fase semântica — não só com a busca mais recente ou mais estreita. Uma ausência só vira gap confirmado se nenhuma busca anterior, diff, leitura de seção ou trecho aberto contradisser a alegação; se houver conflito entre resultados, reler o arquivo-alvo no ponto citado antes de reportar.
 
+**Inventário de produto vs fato de máquina (`998`).** Descarte no `998` de backlog **operacional desta instalação** (ex.: Gemini CLI #5 sem assinatura) **não** exige que `xpz-llm-delegate/SKILL.md` ou o `14` ecoem «indisponível nesta máquina». A skill lista o inventário do produto; a composição do painel nesta máquina é curadoria `preferred-reviewers*.json` + gate + `15` (não presumir assinatura). Não confirmar gap só porque a nota operacional ficou no `998` enquanto o adapter permanece no inventário. Gap seria aposentar o backend na skill sem retirar o adapter, ou reabrir o `999` sem via de auth nova.
+
 ### 4. Avaliação de `CHANGELOG.md`
 
 Para cada frente alterada, avaliar se houve mudança de comportamento público, contrato operacional, script público, skill, governança, segurança, fluxo de contribuição, remoção, rename ou incompatibilidade relevante para quem usa ou acompanha o repositório.

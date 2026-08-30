@@ -67,7 +67,7 @@ Ambas se somam à causa já registrada (truncar a linha em N chars para triar r�
 **Relacionado:**
 - `scripts/Test-PrePushGateEnumerationParity.ps1` (padrão a espelhar)
 - `scripts/Test-PrePushNewTokenPropagation.ps1` (o gate cego a este caso)
-- A entrada «Registro de backend novo na `xpz-llm-delegate`» (invariante dos mapas + nota de `$ContentionKeys`). O destino operacional do Gemini CLI (#5) nesta máquina foi descartado em `998-ideias-descartadas-e-porque.md` (família `google` via Antigravity).
+- A entrada «Registro de backend novo na `xpz-llm-delegate`» (invariante dos mapas + nota de `$ContentionKeys`). O destino operacional do Gemini CLI (#5) nesta máquina foi descartado em `998-ideias-descartadas-e-porque.md` (família `google` via Antigravity). Isso **não** é gap da skill ainda listar o #5 no inventário.
 
 ## Evolução futura de fidelidade textual em XML GeneXus antes do empacotamento
 

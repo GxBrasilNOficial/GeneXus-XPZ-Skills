@@ -1737,5 +1737,10 @@ camadas 2/3 ou em vias de auth sem intenção de uso só gera ruído no `999`.
 assinatura/via de auth funcional. Só encerra o backlog de destino operacional e detector residual
 nesta máquina.
 
+**Pré-push:** não confirmar gap só porque `xpz-llm-delegate/SKILL.md` ou o `14` não repetem a frase
+«indisponível nesta máquina». Inventário do produto ≠ disponibilidade desta instalação; a
+composição do painel segue a curadoria e o gate. Ver seção BACKENDS da skill e o parágrafo
+«Inventário de produto vs fato de máquina» no `13`.
+
 **Não reavaliar salvo** assinatura ou via de auth Gemini funcional nesta máquina (Code Assist
 elegível, API Key ou Vertex) com intenção explícita de reativar o backend #5 no painel.
