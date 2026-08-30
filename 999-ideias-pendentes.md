@@ -323,6 +323,17 @@ Critério para retomar: caso real em que a ausência do cache Codex prejudique a
 
 **Origem:** frente da detecção de 429 no `Invoke-OpenCode` (2026-06-21), nascida de uma pré-push reforçada em que 3 modelos `ollama-cloud` (kimi/minimax/glm) "estouraram timeout" sem causa visível — era a **cota semanal** esgotada da conta ollama-cloud. Fatia opencode (jobs + detector compartilhado) implementada em 2026-08-30.
 
+## Retry / re-despacho no caminho assíncrono opencode (`Start-`/`Watch-OpenCodeJob`)
+
+- **Importância** — baixa-média. O Achado D (truncagem por `reason` ≠ `stop`) já é classificado no watcher (`result.json` rejeitado, `watcherExitCode=20`). No síncrono, `-MaxAttempts` pode re-disparar `truncated`/`no-completion`. No job, a truncagem **para** no resultado rejeitado: não há segunda tentativa. No painel isso vira `noResponse`/`error` conforme o orquestrador, sem a mitigação rara-de-cauda que o síncrono tem.
+- **Maturidade** — ideia. O recorte **não** é copiar `-MaxAttempts` para o watcher. Quem re-dispara, quando, e o que acontece com um `result.json` já promovido são decisões de desenho ainda abertas.
+- **Já fechado (não reabrir nesta entrada):** retry síncrono em `Invoke-OpenCode.ps1` (`-MaxAttempts`, `Test-OpenCodeRetrySelfTest.ps1`) — ver `historico/IdeiasImplementadas_202606.md` e a entrada «Variante de prompt read-only…» (RESOLVIDA E MIGRADA). Classificação de limite no watcher — fatia 2026-08-30, não é retry.
+- **Ortogonal (não misturar):** «Resposta `stop` porém quase-vazia…» abaixo — veredito `ok` com texto raquítico; `-MaxAttempts` **não** cobre esse caso nem no síncrono.
+- **A decidir, se a frente abrir:** (1) o re-despacho vive no `Watch-OpenCodeJob`, no `Start-OpenCodeJob`, ou só no orquestrador/painel depois de `resultAccepted=false`; (2) se o `result.json` da 1ª tentativa já foi promovido, clobber (exit 21) impede overwrite — retry precisa de novo `jobId` ou política explícita; (3) timeout do observador (`-WatchTimeoutSec`) e limite de uso/taxa na janela da tentativa **não** devem re-queimar cota (o síncrono já terminaliza nesses ramos).
+- **Não** implementar de passagem numa correção documental. Ponteiro normativo: `xpz-llm-delegate/SKILL.md` (Achado D / «Síncrono-only o retry»).
+
+**Origem:** gap G1 do Claude (semantic-only) na pré-push reforçada de 2026-08-30 (HEAD `a4b7f08`): o `SKILL` apontava follow-up no `999` e a entrada não existia.
+
 ## Reclassificar mecanicamente `failureAfterText` do Claude Code no painel
 
 - **Importância** — baixa-média. O campo `failureAfterText` do `<GUID>.result.json` (backend claude-code, 2026-07-25) marca que o job produziu texto **e depois** falhou — tipicamente esgotamento de turno —, ou seja, que o parecer pode estar truncado. No painel, o Claude Code passou a usar `Invoke-ClaudeCodeAsync.ps1` via `Invoke-LlmDelegatePanelDispatch.ps1` (2026-07-29): o sidecar tipado já impede aceitar stdout em timeout, encerramento sem terminal válido ou falha de limpeza sensível. Ainda resta a política de decisão: quando houver texto aceito com evidência residual de truncamento em `failureAfterText`, a decisão sobre aproveitar o parecer continua na reclassificação **pós-hoc humana** do `15` (`responded`→`noResponse`). «Registrado no sidecar/ledger» não é «impedido por política».

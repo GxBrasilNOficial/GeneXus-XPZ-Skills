@@ -8,6 +8,8 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 ### Unreleased
 
+- **Paridade pós-painel (G1 da 5ª rodada Opus, 2026-08-30):** abre no `999` a ideia de retry/re-despacho no caminho assíncrono opencode (`Start-`/`Watch-OpenCodeJob`) e o `SKILL` (Achado D) passa a apontar esse título. Distingue do retry síncrono já migrado e da entrada de `stop` quase-vazio. Sem mudança de motor. `README.md` sem mudança.
+
 - **Paridade pós-painel (G1/G2 da 4ª rodada Opus, 2026-08-30):** no `09`, a anexação após `-NoWatcher` deixa de dizer que `-ExpectedStartTimeUtc` é obrigatório (o script não exige; sem o parâmetro o observador opera com identidade não verificável e ainda promove `result.json`); no `SKILL`, a nota de limite/410 registra o log global da máquina e o risco de atribuição cruzada entre runs concorrentes; o `999` anota a evolução (correlacionar por sessão/job/PID) sem mudar o motor. `README.md` sem mudança.
 
 - **Paridade pós-painel (G1 da rodada Codex, 2026-08-30):** `Test-OpenCodeWatchJobLimitSelfTest.ps1` passa a exercitar classificação real de limite no watcher (`limite-uso` via stderr do job, sem injetar `LimitHit`) e o timeout com kill por identidade verificada. Ponteiros no `09` e no `SKILL`. Sem mudança de motor. `README.md` sem mudança.
@@ -245,6 +247,8 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 ### Unreleased
 
+- **Paridad post-panel (G1 de la 5.ª ronda Opus, 2026-08-30):** abre en el `999` la idea de retry/re-despacho en el camino asíncrono opencode (`Start-`/`Watch-OpenCodeJob`) y el `SKILL` (Achado D) pasa a apuntar ese título. Distingue del retry síncrono ya migrado y de la entrada de `stop` casi vacío. Sin cambio de motor. Sin cambio en `README.md`.
+
 - **Paridad post-panel (G1/G2 de la 4.ª ronda Opus, 2026-08-30):** en el `09`, la anexión tras `-NoWatcher` deja de afirmar que `-ExpectedStartTimeUtc` es obligatorio (el script no lo exige; sin el parámetro el observador opera con identidad no verificable y aún promueve `result.json`); en el `SKILL`, la nota de límite/410 registra el log global de la máquina y el riesgo de atribución cruzada entre runs concurrentes; el `999` anota la evolución (correlacionar por sesión/job/PID) sin cambiar el motor. Sin cambio en `README.md`.
 
 - **Paridad post-panel (G1 de la ronda Codex, 2026-08-30):** `Test-OpenCodeWatchJobLimitSelfTest.ps1` ejercita la clasificación real de límite en el watcher (`limite-uso` vía stderr del job, sin inyectar `LimitHit`) y el timeout con kill por identidad verificada. Punteros en `09` y en el `SKILL`. Sin cambio de motor. Sin cambio en `README.md`.
@@ -474,6 +478,8 @@ All relevant changes to this repository will be recorded here from this adoption
 The format keeps an `Unreleased` section for changes not yet published in a formal version. This repository does not yet use public semantic versioning; when that changes, future sections should record the corresponding tag.
 
 ### Unreleased
+
+- **Post-panel parity (G1 from the 5th Opus round, 2026-08-30):** opens in `999` the idea of retry/re-dispatch on the async opencode path (`Start-`/`Watch-OpenCodeJob`) and `SKILL` (Finding D) now points at that heading. Distinguishes it from the already-migrated sync retry and from the near-empty `stop` entry. No engine change. No `README.md` change.
 
 - **Post-panel parity (G1/G2 from the 4th Opus round, 2026-08-30):** in `09`, attach after `-NoWatcher` no longer claims `-ExpectedStartTimeUtc` is mandatory (the script does not require it; without it the watcher runs with unverifiable identity and still promotes `result.json`); in `SKILL`, the limit/410 note records the machine-global log and cross-attribution risk across concurrent runs; `999` notes the follow-up (correlate by session/job/PID) with no engine change. No `README.md` change.
 

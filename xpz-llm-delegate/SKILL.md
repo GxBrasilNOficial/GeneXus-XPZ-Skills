@@ -805,7 +805,7 @@ cota). Sem re-tentativa pendente (`-MaxAttempts 1` — o default — ou última 
 corre nesses vereditos esgotados; se não houver hit, o veredito reportado é o de conclusão (ex.: `truncado`). `-TimeoutSec` é **por tentativa** (com `-MaxAttempts 2` o tempo de
 parede pode dobrar); `-Raw` **não** re-tenta (devolve a 1ª execução quando há stream); **não** classifica limite em exit≠0 / stream / veredito — no **timeout** a classificação de limite **continua** (não há stream útil). Cada re-tentativa emite em stderr
 `OPENCODE_RETRY: attempt=N status=… reason=…`. **Síncrono-only o retry** — o assíncrono (`Start-`/`Watch-OpenCodeJob`)
-sofre a mesma truncagem mas **não** tem retry (follow-up em `999-ideias-pendentes.md`); o watcher **passa** a classificar limite quando está ligado. Guard:
+sofre a mesma truncagem mas **não** tem retry (follow-up em `999-ideias-pendentes.md`, «Retry / re-despacho no caminho assíncrono opencode (`Start-`/`Watch-OpenCodeJob`)»); o watcher **passa** a classificar limite quando está ligado. Guard:
 `scripts/Test-OpenCodeRetrySelfTest.ps1` (token `OK: Test-OpenCodeRetrySelfTest.ps1`; fake-exe com
 contador em arquivo + seam `XDG_DATA_HOME` para o caso 429).
 
