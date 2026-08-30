@@ -148,7 +148,7 @@ $attempt = 0
 try {
     while ($true) {
         $attempt++
-        $startedAt = Get-Date
+        $startedAt = (Get-Date).ToUniversalTime()
         $out = (New-TemporaryFile).FullName
         $err = (New-TemporaryFile).FullName
 
@@ -156,13 +156,19 @@ try {
             -RedirectStandardInput $in -RedirectStandardOutput $out -RedirectStandardError $err
         if (-not $p.WaitForExit($TimeoutSec * 1000)) {
             try { $p.Kill($true) } catch { }
-            $usageLimit = Get-OpenCodeUsageLimitError -SinceTime $startedAt
-            if ($usageLimit) {
-                throw "BLOCK: opencode atingiu o limite de uso do provider (HTTP 429) e ficou retentando em silencio ate ${TimeoutSec}s: $usageLimit. NAO e timeout tecnico nem indisponibilidade do provider; aguardar o reset do ciclo de uso (ex.: ollama-cloud weekly usage limit)."
+            $limitHit = Resolve-OpenCodeProviderLimitHit -StreamErrors @(Get-OpenCodeStreamErrorCandidates -Lines @(Get-Content -LiteralPath $out -Encoding utf8 -ErrorAction SilentlyContinue)) -StderrText ([string](Get-Content -LiteralPath $err -Raw -Encoding utf8 -ErrorAction SilentlyContinue)) -SinceTime $startedAt
+            if ($null -ne $limitHit) {
+                throw (Format-OpenCodeLimitBlock -Kind ([string](Get-OcProp $limitHit 'kind')) -Message ([string](Get-OcProp $limitHit 'message')))
             }
             throw "BLOCK: opencode excedeu ${TimeoutSec}s e foi encerrado."
         }
         if ($p.ExitCode -ne 0) {
+            if (-not $Raw) {
+                $limitHit = Resolve-OpenCodeProviderLimitHit -StreamErrors @(Get-OpenCodeStreamErrorCandidates -Lines @(Get-Content -LiteralPath $out -Encoding utf8 -ErrorAction SilentlyContinue)) -StderrText ([string](Get-Content -LiteralPath $err -Raw -Encoding utf8 -ErrorAction SilentlyContinue)) -SinceTime $startedAt
+                if ($null -ne $limitHit) {
+                    throw (Format-OpenCodeLimitBlock -Kind ([string](Get-OcProp $limitHit 'kind')) -Message ([string](Get-OcProp $limitHit 'message')))
+                }
+            }
             throw "BLOCK: opencode saiu com codigo $($p.ExitCode).`nstderr:`n$(Get-Content -LiteralPath $err -Raw -ErrorAction SilentlyContinue)"
         }
 
@@ -184,7 +190,13 @@ try {
 
         # Erro explicito do agente no stream tem prioridade sobre a ausencia de texto e e terminal.
         $errMsg = Get-OpenCodeStreamErrorMessage -Events $events
-        if ($errMsg) { throw "BLOCK: opencode retornou erro no stream: $errMsg" }
+        if ($errMsg) {
+            $limitHit = Resolve-OpenCodeProviderLimitHit -StreamErrors @(Get-OpenCodeStreamErrorCandidates -Lines @($lines)) -StderrText ([string](Get-Content -LiteralPath $err -Raw -Encoding utf8 -ErrorAction SilentlyContinue)) -SinceTime $startedAt
+            if ($null -ne $limitHit) {
+                throw (Format-OpenCodeLimitBlock -Kind ([string](Get-OcProp $limitHit 'kind')) -Message ([string](Get-OcProp $limitHit 'message')))
+            }
+            throw "BLOCK: opencode retornou erro no stream: $errMsg"
+        }
 
         $parts = @(Get-OpenCodeTextParts -Events $events)
         $finalText = Get-OpenCodeFinalText -TextParts $parts
@@ -204,11 +216,9 @@ try {
         # So 'truncated'/'no-completion' sao re-tentaveis; 'empty' (conclusao limpa) e terminal.
         $retryable = ($verdict.status -eq 'truncated' -or $verdict.status -eq 'no-completion')
         if ($retryable -and $attempt -lt $MaxAttempts) {
-            # Guarda anti-429 POR TENTATIVA: precede o status de conclusao. Um 429 mascarado (que
-            # voltou rapido, sem timeout) nao deve ser re-tentado (re-queimaria a cota semanal).
-            $usageLimit = Get-OpenCodeUsageLimitError -SinceTime $startedAt
-            if ($usageLimit) {
-                throw "BLOCK: opencode atingiu o limite de uso do provider (HTTP 429) na tentativa ${attempt}; nao re-tentar: $usageLimit. Aguardar o reset do ciclo de uso (ex.: ollama-cloud weekly usage limit)."
+            $limitHit = Resolve-OpenCodeProviderLimitHit -StreamErrors @(Get-OpenCodeStreamErrorCandidates -Lines @($lines)) -StderrText ([string](Get-Content -LiteralPath $err -Raw -Encoding utf8 -ErrorAction SilentlyContinue)) -SinceTime $startedAt
+            if ($null -ne $limitHit) {
+                throw (Format-OpenCodeLimitBlock -Kind ([string](Get-OcProp $limitHit 'kind')) -Message ([string](Get-OcProp $limitHit 'message')))
             }
             [Console]::Error.WriteLine("OPENCODE_RETRY: attempt=$attempt status=$($verdict.status) reason=$($verdict.reason)")
             Remove-Item -LiteralPath $out, $err -Force -ErrorAction SilentlyContinue
@@ -218,6 +228,10 @@ try {
         }
 
         # Esgotado ou nao-retryable (inclui 'empty'): lanca com o status da ULTIMA tentativa.
+        $limitHit = Resolve-OpenCodeProviderLimitHit -StreamErrors @(Get-OpenCodeStreamErrorCandidates -Lines @($lines)) -StderrText ([string](Get-Content -LiteralPath $err -Raw -Encoding utf8 -ErrorAction SilentlyContinue)) -SinceTime $startedAt
+        if ($null -ne $limitHit) {
+            throw (Format-OpenCodeLimitBlock -Kind ([string](Get-OcProp $limitHit 'kind')) -Message ([string](Get-OcProp $limitHit 'message')))
+        }
         if ($attempt -gt 1) {
             throw "$($verdict.message) (apos $attempt tentativas; ultimo status=$($verdict.status) reason=$($verdict.reason))"
         }

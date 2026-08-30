@@ -8,6 +8,8 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 ### Unreleased
 
+- **Limite de uso/taxa do provider nos jobs opencode + resolvedor compartilhado:** `Watch-OpenCodeJob` classifica cota e taxa (evidência pode estar só no log) e promove `result.json` v2 (`limite-uso` / `limite-taxa` / `opencode-watch-timeout`); `Invoke-OpenCode` usa o mesmo `Resolve-OpenCodeProviderLimitHit` nos terminais (não só timeout/retry); `-WatchTimeoutSec` opt-in; wrapper `Get-OpenCodeUsageLimitError` passa a devolver objeto. Dispatcher de painel intocado (no síncrono, usage e rate continuam no circuito `quota`). Self-tests e docs (`SKILL`, `02`, `08`, `09`); `README.md` sem mudança.
+
 - **Paridade pós-painel (G1/G2 da rodada Opus via Cursor):** `xpz-skills-setup/SKILL.md` inclui `~/.gemini/config/skills` na enumeração da estratégia compacta da auditoria `nexa`; `Test-XpzSkillsRegistrationNexaRepoSelfTest.ps1` ganha caso positivo (`EXTERNAL_SKILLS_OK` + `repoBootstrapCanonical = NEXA_REPO_MISSING` sem vínculos). Achados Claude Opus 5 (semantic-only, Task Cursor) na pré-push reforçada de 2026-08-28.
 
 - **Paridade pós-painel (G1/G2/G3 da rodada terra):** ponteiro da matriz no `999` (perfil git-capable Claude) aponta à seção normativa do `14`; nova ideia no `999` para extrair `Find-GitExecutable` compartilhado (cópia triplicada); `Test-XpzSkillsRegistrationNexaRepoSelfTest.ps1` usa PATH mínimo = diretório do git já resolvido (não depende dos 3 fallbacks Program Files). Achados Claude (semantic-only) na pré-push reforçada de 2026-08-28.
@@ -233,6 +235,8 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 ### Unreleased
 
+- **Límite de uso/tasa del provider en jobs opencode + resolvedor compartido:** `Watch-OpenCodeJob` clasifica cuota y tasa (la evidencia puede estar solo en el log) y promueve `result.json` v2 (`limite-uso` / `limite-taxa` / `opencode-watch-timeout`); `Invoke-OpenCode` usa el mismo `Resolve-OpenCodeProviderLimitHit` en los terminales; `-WatchTimeoutSec` opt-in; el wrapper `Get-OpenCodeUsageLimitError` ahora devuelve objeto. Dispatcher del panel intacto. Self-tests y docs; sin cambio en `README.md`.
+
 - **Paridad post-panel (G1/G2 de la ronda Opus vía Cursor):** `xpz-skills-setup/SKILL.md` incluye `~/.gemini/config/skills` en la enumeración de la estrategia compacta de la auditoría `nexa`; `Test-XpzSkillsRegistrationNexaRepoSelfTest.ps1` gana caso positivo (`EXTERNAL_SKILLS_OK` + `repoBootstrapCanonical = NEXA_REPO_MISSING` sin vínculos). Hallazgos Claude Opus 5 (semantic-only, Task Cursor) en el pre-push reforzado de 2026-08-28.
 
 - **Paridad post-panel (G1/G2/G3 de la ronda terra):** el puntero de la matriz en el `999` (perfil git-capable Claude) apunta a la sección normativa del `14`; nueva idea en el `999` para extraer `Find-GitExecutable` compartido (copia triplicada); `Test-XpzSkillsRegistrationNexaRepoSelfTest.ps1` usa PATH mínimo = directorio del git ya resuelto (no depende de los 3 fallbacks Program Files). Hallazgos Claude (semantic-only) en el pre-push reforzado de 2026-08-28.
@@ -450,6 +454,8 @@ All relevant changes to this repository will be recorded here from this adoption
 The format keeps an `Unreleased` section for changes not yet published in a formal version. This repository does not yet use public semantic versioning; when that changes, future sections should record the corresponding tag.
 
 ### Unreleased
+
+- **Provider usage/rate-limit detection on opencode jobs + shared resolver:** `Watch-OpenCodeJob` classifies quota and rate (evidence may live only in the log) and promotes v2 `result.json` (`limite-uso` / `limite-taxa` / `opencode-watch-timeout`); `Invoke-OpenCode` uses the same `Resolve-OpenCodeProviderLimitHit` on terminal paths; opt-in `-WatchTimeoutSec`; `Get-OpenCodeUsageLimitError` now returns an object. Panel dispatcher untouched. Self-tests and docs; no `README.md` change.
 
 - **Post-panel parity (G1/G2 from the Opus-via-Cursor round):** `xpz-skills-setup/SKILL.md` includes `~/.gemini/config/skills` in the compact strategy enumeration for the `nexa` audit; `Test-XpzSkillsRegistrationNexaRepoSelfTest.ps1` gains a positive case (`EXTERNAL_SKILLS_OK` + `repoBootstrapCanonical = NEXA_REPO_MISSING` with no links). Found by Claude Opus 5 (semantic-only, Cursor Task) in the 2026-08-28 reinforced pre-push.
 

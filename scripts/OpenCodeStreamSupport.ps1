@@ -4,8 +4,8 @@
     Funções compartilhadas de parsing do stream JSON do opencode (skill xpz-llm-delegate).
 .DESCRIPTION
     Módulo dot-source consumido por Invoke-OpenCode.ps1 e Watch-OpenCodeJob.ps1 para evitar
-    duplicar a lógica de extracao. Não invoca opencode (o parsing é puro; a única leitura externa
-    é Get-OpenCodeUsageLimitError, que apenas LÊ o log do opencode para diagnosticar HTTP 429).
+    duplicar a lógica de extracao. Não invoca opencode (o parsing é puro; a unica leitura externa
+    e o resolvedor de limite de provider, que apenas LE o log do opencode).
 
     Eventos do `opencode run --format json`: um objeto JSON por linha, com `type`
     (`step_start`, `text`, `tool_use`, `step_finish`, `error`) e `part`. Cada evento `text`
@@ -148,35 +148,289 @@ function Get-OpenCodeCompletionVerdict {
     return [pscustomobject]@{ status = 'ok'; reason = $Reason; message = '' }
 }
 
-function Get-OpenCodeUsageLimitError {
-    # O opencode retenta o HTTP 429 (limite de uso do provider) em SILENCIO: stdout/stderr ficam
-    # vazios e a chamada so estoura por -TimeoutSec, mascarando a causa como "timeout". O 429 e
-    # gravado apenas no log proprio do opencode (~/.local/share/opencode/log/<ts>.log; respeita
-    # XDG_DATA_HOME). Varre os logs escritos na janela do processo (mtime >= SinceTime - 5s) e
-    # devolve a mensagem do limite, ou $null se nao houver 429 no periodo. SO LEITURA do log;
-    # nao invoca opencode. -LogDir (override; default = dir real) habilita o self-test por fixture.
-    param(
-        [Parameter(Mandatory)][datetime]$SinceTime,
-        [string]$LogDir
-    )
-    if ([string]::IsNullOrWhiteSpace($LogDir)) {
-        $base = if ($env:XDG_DATA_HOME) { $env:XDG_DATA_HOME } else { Join-Path $env:USERPROFILE '.local/share' }
-        $LogDir = Join-Path $base 'opencode/log'
-    }
-    if (-not (Test-Path -LiteralPath $LogDir -PathType Container)) { return $null }
-    $cutoff = $SinceTime.AddSeconds(-5)
-    $logs = @(Get-ChildItem -LiteralPath $LogDir -Filter '*.log' -File -ErrorAction SilentlyContinue |
-        Where-Object { $_.LastWriteTime -ge $cutoff } | Sort-Object LastWriteTime -Descending)
-    foreach ($log in $logs) {
-        $text = Get-Content -LiteralPath $log.FullName -Raw -ErrorAction SilentlyContinue
-        if ([string]::IsNullOrEmpty($text)) { continue }
-        if ($text -match '"statusCode":\s*429') {
-            $m = [regex]::Match($text, 'reached your[^"\\]*usage limit[^"\\]*')
-            if ($m.Success) { return $m.Value.Trim() }
-            return 'HTTP 429 - limite de uso do provider'
+function Get-OpenCodeDefaultProviderLogDir {
+    $base = if ($env:XDG_DATA_HOME) { $env:XDG_DATA_HOME } else { Join-Path $env:USERPROFILE '.local/share' }
+    return (Join-Path $base 'opencode/log')
+}
+
+function Convert-OpenCodeSinceTimeUtc {
+    param([datetime]$SinceTime)
+    if ($SinceTime.Kind -eq [DateTimeKind]::Utc) { return $SinceTime }
+    return $SinceTime.ToUniversalTime()
+}
+
+function Convert-OpenCodeLineTimestampUtc {
+    param($Value)
+    if ($null -eq $Value) { return $null }
+    if ($Value -is [datetime]) {
+        $dt = [datetime]$Value
+        if ($dt.Kind -eq [DateTimeKind]::Utc) { return $dt }
+        if ($dt.Kind -eq [DateTimeKind]::Unspecified) {
+            return [DateTime]::SpecifyKind($dt, [DateTimeKind]::Utc)
         }
+        return $dt.ToUniversalTime()
+    }
+    $s = [string]$Value
+    if ([string]::IsNullOrWhiteSpace($s)) { return $null }
+    $dto = [datetimeoffset]::MinValue
+    if ([datetimeoffset]::TryParse($s, [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::RoundtripKind, [ref]$dto)) {
+        return $dto.UtcDateTime
     }
     return $null
+}
+
+function Get-OpenCodeProviderLimitKindFromText {
+    param([string]$Text)
+    if ([string]::IsNullOrWhiteSpace($Text)) { return $null }
+    $usagePhrase = '(?i)usage limit|Monthly usage limit|weekly usage limit|Insufficient balance|limite de uso|insufficient coding plan balance|resource_exhausted|Payment Required'
+    $usageRx = @(
+        '(?i)insufficient\s+balance',
+        '(?i)insufficient\s+coding\s+plan\s+balance',
+        '(?i)(?:credits?|balance|saldo)\s+exhausted',
+        '(?i)saldo\s+insuficiente',
+        '(?i)sem\s+quota'
+    )
+    $isUsage = ($Text -match $usagePhrase)
+    if (-not $isUsage) {
+        foreach ($rx in $usageRx) {
+            if ($Text -match $rx) { $isUsage = $true; break }
+        }
+    }
+    if (-not $isUsage) {
+        if ($Text -match '"statusCode"\s*:\s*402') { $isUsage = $true }
+        elseif ($Text -match '(?i)(?:^|\s)statusCode=402(?:\s|$)') { $isUsage = $true }
+    }
+    if ($isUsage) { return 'usage-limit' }
+    if ($Text -match '"statusCode"\s*:\s*429') { return 'rate-limit' }
+    if ($Text -match '(?i)(?:^|\s)statusCode=429(?:\s|$)') { return 'rate-limit' }
+    if ($Text -match '(?i)Too Many Requests|rate limit|rate_limit') { return 'rate-limit' }
+    return $null
+}
+
+function Get-OpenCodeProviderLimitLevelRank {
+    param([string]$Level)
+    if ([string]::IsNullOrWhiteSpace($Level)) { return 1 }
+    if ($Level -match '(?i)^(ERROR|WARN|WARNING)$') { return 0 }
+    if ($Level -match '(?i)^INFO$') { return 2 }
+    return 1
+}
+
+function Get-OpenCodeStreamErrorCandidates {
+    param([string[]]$Lines)
+    $list = [System.Collections.Generic.List[object]]::new()
+    $i = -1
+    foreach ($line in @($Lines)) {
+        $i++
+        if ([string]::IsNullOrWhiteSpace($line)) { continue }
+        $evt = $null
+        try { $evt = $line | ConvertFrom-Json } catch { continue }
+        if ((Get-OcProp $evt 'type') -ne 'error') { continue }
+        $text = Get-OcProp (Get-OcProp (Get-OcProp $evt 'error') 'data') 'message'
+        if ([string]::IsNullOrWhiteSpace($text)) { $text = ($evt | ConvertTo-Json -Compress) }
+        $list.Add([pscustomobject]@{ lineIndex = $i; text = [string]$text })
+    }
+    return @($list)
+}
+
+function Get-OpenCodeProviderLimitLogLines {
+    param(
+        [Parameter(Mandatory)][datetime]$SinceTime,
+        [string]$LogDir,
+        [datetime]$NowUtc = [datetime]::UtcNow
+    )
+    if ([string]::IsNullOrWhiteSpace($LogDir)) { $LogDir = Get-OpenCodeDefaultProviderLogDir }
+    $result = [System.Collections.Generic.List[object]]::new()
+    if (-not (Test-Path -LiteralPath $LogDir -PathType Container)) { return @($result) }
+    $t0 = Convert-OpenCodeSinceTimeUtc -SinceTime $SinceTime
+    if ($NowUtc.Kind -ne [DateTimeKind]::Utc) { $NowUtc = $NowUtc.ToUniversalTime() }
+    $fileStart = $t0.AddSeconds(-5)
+    $logs = @(Get-ChildItem -LiteralPath $LogDir -Filter '*.log' -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.LastWriteTimeUtc -ge $fileStart -and $_.LastWriteTimeUtc -le $NowUtc })
+    foreach ($log in $logs) {
+        $rawLines = @(Get-Content -LiteralPath $log.FullName -Encoding utf8 -ErrorAction SilentlyContinue)
+        $li = -1
+        foreach ($raw in $rawLines) {
+            $li++
+            $lineTs = $null
+            $level = ''
+            $obj = $null
+            if (-not [string]::IsNullOrWhiteSpace($raw)) {
+                try { $obj = $raw | ConvertFrom-Json } catch { $obj = $null }
+            }
+            if ($null -ne $obj) {
+                foreach ($name in @('time', 'timestamp', 'ts')) {
+                    $lineTs = Convert-OpenCodeLineTimestampUtc (Get-OcProp $obj $name)
+                    if ($null -ne $lineTs) { break }
+                }
+                $level = [string](Get-OcProp $obj 'level')
+            } elseif ($raw -match 'timestamp=([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+(?:Z|[+-][0-9]{2}:[0-9]{2}))') {
+                $lineTs = Convert-OpenCodeLineTimestampUtc $Matches[1]
+                if ($raw -match '(?i)(?:^|\s)level=([A-Za-z]+)') { $level = [string]$Matches[1] }
+            }
+            if ($null -ne $lineTs) {
+                if ($lineTs -lt $t0 -or $lineTs -gt $NowUtc) { continue }
+            }
+            $result.Add([pscustomobject]@{
+                path = [string]$log.FullName
+                lineIndex = $li
+                raw = [string]$raw
+                lineTimestampUtc = $lineTs
+                lastWriteTimeUtc = $log.LastWriteTimeUtc
+                level = $level
+            })
+        }
+    }
+    return @($result)
+}
+
+function Select-OpenCodeProviderLimitHit {
+    param([object[]]$Candidates)
+    $usage = @($Candidates | Where-Object { $_.kind -eq 'usage-limit' })
+    $rate = @($Candidates | Where-Object { $_.kind -eq 'rate-limit' })
+    $pool = $usage
+    if ($pool.Count -eq 0) { $pool = $rate }
+    if ($pool.Count -eq 0) { return $null }
+    $withTs = @($pool | Where-Object { $null -ne $_.lineTimestampUtc })
+    if ($withTs.Count -gt 0) {
+        $maxTs = ($withTs | Measure-Object -Property lineTimestampUtc -Maximum).Maximum
+        $pool = @($withTs | Where-Object { $_.lineTimestampUtc -eq $maxTs })
+    }
+    $bestLevel = ($pool | ForEach-Object { [int]$_.levelRank } | Measure-Object -Minimum).Minimum
+    $pool = @($pool | Where-Object { [int]$_.levelRank -eq $bestLevel })
+    $bestSrc = ($pool | ForEach-Object { [int]$_.sourceRank } | Measure-Object -Minimum).Minimum
+    $pool = @($pool | Where-Object { [int]$_.sourceRank -eq $bestSrc })
+    $logPool = @($pool | Where-Object { $_.source -eq 'log' })
+    if ($logPool.Count -gt 0 -and $pool.Count -eq $logPool.Count) {
+        $maxMtime = ($logPool | Measure-Object -Property lastWriteTimeUtc -Maximum).Maximum
+        $pool = @($logPool | Where-Object { $_.lastWriteTimeUtc -eq $maxMtime })
+    }
+    $ord = @($pool | Sort-Object @{ Expression = { [string]$_.sourceFile }; Ascending = $true }, @{ Expression = { [int]$_.lineIndex }; Ascending = $true })
+    $win = $ord[0]
+    return [pscustomobject]@{
+        kind = [string]$win.kind
+        message = [string]$win.message
+        lineTimestampUtc = $win.lineTimestampUtc
+        sourceFile = [string]$win.sourceFile
+        lineIndex = [int]$win.lineIndex
+        source = [string]$win.source
+    }
+}
+
+function Resolve-OpenCodeProviderLimitHit {
+    param(
+        [object[]]$StreamErrors,
+        [string]$StderrText = '',
+        [object[]]$LogLines,
+        [datetime]$SinceTime,
+        [string]$LogDir,
+        [datetime]$NowUtc = [datetime]::UtcNow
+    )
+    $cands = [System.Collections.Generic.List[object]]::new()
+    foreach ($se in @($StreamErrors)) {
+        $text = [string](Get-OcProp $se 'text')
+        $kind = Get-OpenCodeProviderLimitKindFromText -Text $text
+        if ($null -eq $kind) { continue }
+        $idx = 0
+        $idxVal = Get-OcProp $se 'lineIndex'
+        if ($null -ne $idxVal) { $idx = [int]$idxVal }
+        $cands.Add([pscustomobject]@{
+            kind = $kind; message = $text; lineTimestampUtc = $null
+            sourceFile = 'stream'; lineIndex = $idx; source = 'stream'
+            sourceRank = 0; levelRank = 1; lastWriteTimeUtc = [datetime]::MinValue
+        })
+    }
+    if (-not [string]::IsNullOrWhiteSpace($StderrText)) {
+        $kind = Get-OpenCodeProviderLimitKindFromText -Text $StderrText
+        if ($null -ne $kind) {
+            $cands.Add([pscustomobject]@{
+                kind = $kind; message = [string]$StderrText; lineTimestampUtc = $null
+                sourceFile = 'stderr'; lineIndex = 0; source = 'stderr'
+                sourceRank = 1; levelRank = 1; lastWriteTimeUtc = [datetime]::MinValue
+            })
+        }
+    }
+    if (-not $PSBoundParameters.ContainsKey('LogLines')) {
+        if ($PSBoundParameters.ContainsKey('SinceTime')) {
+            $LogLines = @(Get-OpenCodeProviderLimitLogLines -SinceTime $SinceTime -LogDir $LogDir -NowUtc $NowUtc)
+        } else {
+            $LogLines = @()
+        }
+    }
+    foreach ($ll in @($LogLines)) {
+        $raw = [string](Get-OcProp $ll 'raw')
+        $kind = Get-OpenCodeProviderLimitKindFromText -Text $raw
+        if ($null -eq $kind) { continue }
+        $cands.Add([pscustomobject]@{
+            kind = $kind; message = $raw
+            lineTimestampUtc = (Get-OcProp $ll 'lineTimestampUtc')
+            sourceFile = [string](Get-OcProp $ll 'path')
+            lineIndex = [int](Get-OcProp $ll 'lineIndex')
+            source = 'log'; sourceRank = 2
+            levelRank = (Get-OpenCodeProviderLimitLevelRank -Level ([string](Get-OcProp $ll 'level')))
+            lastWriteTimeUtc = $(if ($null -ne (Get-OcProp $ll 'lastWriteTimeUtc')) { Get-OcProp $ll 'lastWriteTimeUtc' } else { [datetime]::MinValue })
+        })
+    }
+    return (Select-OpenCodeProviderLimitHit -Candidates @($cands))
+}
+
+function Format-OpenCodeLimitBlock {
+    param(
+        [Parameter(Mandatory)][ValidateSet('usage-limit', 'rate-limit')][string]$Kind,
+        [string]$Message = ''
+    )
+    $fixed = if ($Kind -eq 'usage-limit') {
+        'BLOCK: opencode atingiu o limite de uso do provider. NAO e timeout tecnico; aguardar o reset do ciclo de uso (limite de uso).'
+    } else {
+        'BLOCK: opencode atingiu o limite de taxa do provider. Nao re-tentar imediatamente (rate limit / too many requests).'
+    }
+    if ([string]::IsNullOrWhiteSpace($Message)) { return $fixed }
+    return ($fixed + ' ' + $Message)
+}
+
+function Format-OpenCodeWatchTimeoutBlock {
+    param([Parameter(Mandatory)][int]$WatchTimeoutSec)
+    return "BLOCK: Watch-OpenCodeJob atingiu WatchTimeoutSec=$WatchTimeoutSec; processo observado ainda vivo. opencode-watch-timeout"
+}
+
+function Get-OpenCodeUsageLimitError {
+    # Wrapper do resolvedor (somente fonte log, janela T0). Devolve o objeto tipado ou $null.
+    param(
+        [Parameter(Mandatory)][datetime]$SinceTime,
+        [string]$LogDir,
+        [datetime]$NowUtc = [datetime]::UtcNow
+    )
+    return Resolve-OpenCodeProviderLimitHit -StreamErrors @() -StderrText '' -SinceTime $SinceTime -LogDir $LogDir -NowUtc $NowUtc
+}
+
+function Get-OpenCodeWatchedProcess {
+    param([Parameter(Mandatory)][int]$ProcessId)
+    try { return [System.Diagnostics.Process]::GetProcessById($ProcessId) } catch { return $null }
+}
+
+function Test-OpenCodeWatchedProcessIdentity {
+    param($Process, [AllowNull()][Nullable[datetime]]$ExpectedStartTimeUtc)
+    if ($null -eq $Process) { return $false }
+    if ($Process.HasExited) { return $false }
+    if ($null -eq $ExpectedStartTimeUtc) { return $false }
+    try {
+        $st = $Process.StartTime
+        if ($st.Kind -ne [DateTimeKind]::Utc) { $st = $st.ToUniversalTime() }
+        $exp = [datetime]$ExpectedStartTimeUtc
+        if ($exp.Kind -ne [DateTimeKind]::Utc) { $exp = $exp.ToUniversalTime() }
+        return ([Math]::Abs(($st - $exp).TotalMilliseconds) -lt 1000)
+    } catch {
+        return $false
+    }
+}
+
+function Stop-OpenCodeWatchedProcess {
+    param($Process)
+    if (-not [string]::IsNullOrWhiteSpace($env:XPZ_TEST_OPENCODE_WATCH_KILL_LOG)) {
+        Add-Content -LiteralPath $env:XPZ_TEST_OPENCODE_WATCH_KILL_LOG -Value 'Kill(true)' -Encoding utf8
+    }
+    if ($env:XPZ_TEST_OPENCODE_WATCH_KILL_THROW -eq '1') { throw 'test kill throw' }
+    if ($env:XPZ_TEST_OPENCODE_WATCH_KILL_NOOP -eq '1') { return }
+    $Process.Kill($true)
 }
 
 function Get-OpenCodeRequestedAgent {
@@ -209,7 +463,15 @@ function Get-OpenCodeWatchResult {
         [string] $RequestedAgent = '(unknown)',
         [AllowNull()] [Nullable[int]] $OpencodeExitCode,
         [bool] $OpencodeExitObserved,
-        [datetime] $FinishedAt = (Get-Date)
+        [datetime] $FinishedAt = (Get-Date),
+        [bool] $WatchTimedOut = $false,
+        $LimitHit = $null,
+        [string] $SinceTimeSource = '',
+        [int] $WatchTimeoutSec = 0,
+        [AllowNull()] [Nullable[bool]] $ProcessIdentityVerified = $null,
+        [AllowNull()] [Nullable[bool]] $CancelIdentityUnverifiable = $null,
+        [AllowNull()] [Nullable[bool]] $CancelAttempted = $null,
+        [AllowNull()] [Nullable[bool]] $WatchedProcessStillAliveAtPromote = $null
     )
 
     $finalText = [string](Get-OcProp $CompletionSignal 'finalText')
@@ -316,7 +578,38 @@ function Get-OpenCodeWatchResult {
         $errorText = 'BLOCK: opencode watch result rejected.'
     }
 
-    return [pscustomobject]([ordered]@{
+    $limitKind = $null
+    $limitMessage = ''
+    if ($null -ne $LimitHit) {
+        $limitKind = [string](Get-OcProp $LimitHit 'kind')
+        $limitMessage = [string](Get-OcProp $LimitHit 'message')
+        if ($limitKind -ne 'usage-limit' -and $limitKind -ne 'rate-limit') { $limitKind = $null }
+    }
+    if (-not $FallbackToBuild -and -not $accepted -and $limitKind) {
+        if ($limitKind -eq 'usage-limit') {
+            $status = 'limite-uso'
+            $disposition = 'rejected-usage-limit'
+            $rejectionReason = 'provider-usage-limit'
+        } else {
+            $status = 'limite-taxa'
+            $disposition = 'rejected-rate-limit'
+            $rejectionReason = 'provider-rate-limit'
+        }
+        if ($completionVerdict -eq 'ok') { $completionVerdict = 'error' }
+        $errorText = Format-OpenCodeLimitBlock -Kind $limitKind -Message $limitMessage
+        $accepted = $false
+        $watcherExitCode = 20
+    } elseif (-not $FallbackToBuild -and $WatchTimedOut) {
+        $status = 'error'
+        $disposition = 'rejected-error'
+        $rejectionReason = 'opencode-watch-timeout'
+        if ($completionVerdict -eq 'ok') { $completionVerdict = 'error' }
+        $errorText = Format-OpenCodeWatchTimeoutBlock -WatchTimeoutSec $WatchTimeoutSec
+        $accepted = $false
+        $watcherExitCode = 20
+    }
+
+    $ht = [ordered]@{
         schemaVersion = 2
         jobId = $JobId
         status = $status
@@ -338,7 +631,17 @@ function Get-OpenCodeWatchResult {
         fallbackDetail = $fallbackDetail
         requestedAgent = $RequestedAgent
         finishedAt = $FinishedAt.ToString('o')
-    })
+    }
+    if (-not [string]::IsNullOrWhiteSpace($SinceTimeSource)) { $ht['sinceTimeSource'] = $SinceTimeSource }
+    if ($null -ne $ProcessIdentityVerified -or $null -ne $CancelIdentityUnverifiable -or $null -ne $CancelAttempted) {
+        $ht['processIdentityVerified'] = [bool]$ProcessIdentityVerified
+        $ht['cancelIdentityUnverifiable'] = [bool]$CancelIdentityUnverifiable
+        $ht['cancelAttempted'] = [bool]$CancelAttempted
+    }
+    if ($null -ne $WatchedProcessStillAliveAtPromote) {
+        $ht['watchedProcessStillAliveAtPromote'] = [bool]$WatchedProcessStillAliveAtPromote
+    }
+    return [pscustomobject]$ht
 }
 
 function Get-OpenCodeAcceptedResult {
@@ -398,13 +701,37 @@ function Get-OpenCodeAcceptedResult {
         $opencodeExitCode = $opencodeExitCodeParsed.value
     }
 
-    $validStatus = @('completed','truncado','sem-conclusao','sem-texto','error')
+    $validStatus = @('completed','truncado','sem-conclusao','sem-texto','error','limite-uso','limite-taxa')
     $validVerdict = @('ok','truncated','no-completion','empty','error')
-    $validDisposition = @('accepted','rejected-fallback','rejected-error','rejected-truncated','rejected-no-completion','rejected-empty')
-    $validReason = @('opencode-agent-fallback-to-build','opencode-exit-nonzero','opencode-exit-unknown','opencode-error','truncated','no-completion','empty')
+    $validDisposition = @('accepted','rejected-fallback','rejected-error','rejected-truncated','rejected-no-completion','rejected-empty','rejected-usage-limit','rejected-rate-limit')
+    $validReason = @('opencode-agent-fallback-to-build','opencode-exit-nonzero','opencode-exit-unknown','opencode-error','truncated','no-completion','empty','provider-usage-limit','provider-rate-limit','opencode-watch-timeout')
     if ($validStatus -notcontains [string](Val $obj 'status')) { return (& $failResult 'invalid-status' 'Invalid status.') }
     if ($validVerdict -notcontains [string](Val $obj 'completionVerdict')) { return (& $failResult 'invalid-completionVerdict' 'Invalid completionVerdict.') }
     if ($validDisposition -notcontains [string](Val $obj 'finalTextDisposition')) { return (& $failResult 'invalid-finalTextDisposition' 'Invalid finalTextDisposition.') }
+    if (HasProp $obj 'sinceTimeSource') {
+        $sts = [string](Val $obj 'sinceTimeSource')
+        if ($sts -ne 'request-startedAt' -and $sts -ne 'watcher-attach-fallback') {
+            return (& $failResult 'invalid-sinceTimeSource' 'sinceTimeSource must be request-startedAt or watcher-attach-fallback.')
+        }
+    }
+    $idNames = @('processIdentityVerified','cancelIdentityUnverifiable','cancelAttempted')
+    $idPresent = @($idNames | Where-Object { HasProp $obj $_ }).Count
+    if ($idPresent -gt 0 -and $idPresent -lt 3) {
+        return (& $failResult 'rejected-identity-incoherent' 'Identity fields must appear together.')
+    }
+    if ($idPresent -eq 3) {
+        foreach ($n in $idNames) {
+            if ((Val $obj $n) -isnot [bool]) { return (& $failResult 'rejected-identity-incoherent' 'Identity fields must be boolean.') }
+        }
+        if ([bool](Val $obj 'processIdentityVerified') -and [bool](Val $obj 'cancelIdentityUnverifiable')) {
+            return (& $failResult 'rejected-identity-incoherent' 'processIdentityVerified and cancelIdentityUnverifiable cannot both be true.')
+        }
+    }
+    if (HasProp $obj 'watchedProcessStillAliveAtPromote') {
+        if ((Val $obj 'watchedProcessStillAliveAtPromote') -isnot [bool]) {
+            return (& $failResult 'invalid-watchedProcessStillAliveAtPromote' 'watchedProcessStillAliveAtPromote must be boolean.')
+        }
+    }
     if ((Val $obj 'finalText') -isnot [string] -or (Val $obj 'acceptedFinalText') -isnot [string] -or (Val $obj 'rejectionReason') -isnot [string]) {
         return (& $failResult 'invalid-string-shape' 'Critical text fields must be strings.')
     }
@@ -507,6 +834,42 @@ function Get-OpenCodeAcceptedResult {
             }
             if ($completionVerdict -ne 'empty' -or $status -ne 'sem-texto' -or -not $hasStepFinish -or $finishReason -ne 'stop') {
                 return (& $failResult 'rejected-verdict-incoherent' 'empty rejection has incoherent completion signal.')
+            }
+        }
+        'provider-usage-limit' {
+            if ($finalTextDisposition -ne 'rejected-usage-limit' -or $status -ne 'limite-uso') {
+                return (& $failResult 'rejected-status-incoherent' 'provider-usage-limit requires limite-uso / rejected-usage-limit.')
+            }
+            if ($completionVerdict -eq 'ok') {
+                return (& $failResult 'rejected-verdict-incoherent' 'provider-usage-limit cannot have completionVerdict ok.')
+            }
+            $fixedUsage = Format-OpenCodeLimitBlock -Kind 'usage-limit' -Message ''
+            if ([string](Val $obj 'error') -notlike ($fixedUsage + '*')) {
+                return (& $failResult 'rejected-shape-incoherent' 'provider-usage-limit error must use Format-OpenCodeLimitBlock usage text.')
+            }
+        }
+        'provider-rate-limit' {
+            if ($finalTextDisposition -ne 'rejected-rate-limit' -or $status -ne 'limite-taxa') {
+                return (& $failResult 'rejected-status-incoherent' 'provider-rate-limit requires limite-taxa / rejected-rate-limit.')
+            }
+            if ($completionVerdict -eq 'ok') {
+                return (& $failResult 'rejected-verdict-incoherent' 'provider-rate-limit cannot have completionVerdict ok.')
+            }
+            $fixedRate = Format-OpenCodeLimitBlock -Kind 'rate-limit' -Message ''
+            if ([string](Val $obj 'error') -notlike ($fixedRate + '*')) {
+                return (& $failResult 'rejected-shape-incoherent' 'provider-rate-limit error must use Format-OpenCodeLimitBlock rate text.')
+            }
+        }
+        'opencode-watch-timeout' {
+            if ($finalTextDisposition -ne 'rejected-error' -or $status -ne 'error') {
+                return (& $failResult 'rejected-status-incoherent' 'opencode-watch-timeout requires status error.')
+            }
+            if ($completionVerdict -eq 'ok') {
+                return (& $failResult 'rejected-verdict-incoherent' 'opencode-watch-timeout cannot have completionVerdict ok.')
+            }
+            $err = [string](Val $obj 'error')
+            if ($err -notmatch '^BLOCK: Watch-OpenCodeJob atingiu WatchTimeoutSec=\d+; processo observado ainda vivo\. opencode-watch-timeout$') {
+                return (& $failResult 'rejected-shape-incoherent' 'opencode-watch-timeout error must be the canonical timeout BLOCK.')
             }
         }
     }

@@ -778,16 +778,15 @@ viraria `truncado` — nesse caso, revisar `Get-OpenCodeCompletionVerdict` e est
 **não-determinismo de cauda** (o modelo encerra logo após um tool-call sem o `stop` final). Como some
 na repetição, `Invoke-OpenCode.ps1` aceita `-MaxAttempts <1-3>` (default **1** = comportamento
 histórico, sem re-tentativa): com 2+, re-despacha **apenas** veredito `truncated`/`no-completion`.
-Precedência por tentativa: **(1)** timeout/exit≠0/erro-explícito-de-stream → terminal (lançam antes
-do veredito); **(2)** veredito de conclusão — `ok` retorna, **`empty` (stop limpo sem texto) é
+Precedência por tentativa: **(1)** timeout/exit≠0/erro-explícito-de-stream → terminal (antes do veredito; com evidência de limite, `Format-OpenCodeLimitBlock`); **(2)** veredito de conclusão — `ok` retorna, **`empty` (stop limpo sem texto) é
 terminal**, só `{truncated,no-completion}` são re-tentáveis; **(3)** ao **decidir re-tentar** um
-`truncated`/`no-completion`, checa **429 na janela da tentativa** (`Get-OpenCodeUsageLimitError`,
-`$startedAt` reatribuído por iteração) → se houver, **terminal** (não re-tentar, para não re-queimar a
-cota). Sem re-tentativa pendente (`-MaxAttempts 1` — o default — ou última tentativa), o veredito
-reportado é o de conclusão (ex.: `truncado`); a checagem de 429 do passo (3) não se aplica. `-TimeoutSec` é **por tentativa** (com `-MaxAttempts 2` o tempo de
-parede pode dobrar); `-Raw` **não** re-tenta (devolve a 1ª execução); cada re-tentativa emite em stderr
-`OPENCODE_RETRY: attempt=N status=… reason=…`. **Síncrono-only** — o assíncrono (`Start-`/`Watch-OpenCodeJob`)
-sofre a mesma truncagem mas **não** tem retry (follow-up em `999-ideias-pendentes.md`). Guard:
+`truncated`/`no-completion`, checa **limite de uso/taxa na janela da tentativa** (`Resolve-OpenCodeProviderLimitHit`,
+`$startedAt` UTC reatribuído por iteração) → se houver, **terminal** (não re-tentar, para não re-queimar a
+cota). Sem re-tentativa pendente (`-MaxAttempts 1` — o default — ou última tentativa), o resolvedor ainda
+corre nesses vereditos esgotados; se não houver hit, o veredito reportado é o de conclusão (ex.: `truncado`). `-TimeoutSec` é **por tentativa** (com `-MaxAttempts 2` o tempo de
+parede pode dobrar); `-Raw` **não** re-tenta (devolve a 1ª execução) e **não** classifica limite; cada re-tentativa emite em stderr
+`OPENCODE_RETRY: attempt=N status=… reason=…`. **Síncrono-only o retry** — o assíncrono (`Start-`/`Watch-OpenCodeJob`)
+sofre a mesma truncagem mas **não** tem retry (follow-up em `999-ideias-pendentes.md`); o watcher **passa** a classificar limite quando está ligado. Guard:
 `scripts/Test-OpenCodeRetrySelfTest.ps1` (token `OK: Test-OpenCodeRetrySelfTest.ps1`; fake-exe com
 contador em arquivo + seam `XDG_DATA_HOME` para o caso 429).
 
@@ -898,16 +897,10 @@ o opencode **retenta em silêncio**: stdout/stderr ficam **vazios** (confirmado 
 gravado **apenas no log próprio** do opencode (`~/.local/share/opencode/log/<ts>.log`; respeita
 `XDG_DATA_HOME`). Sem tratamento, a chamada só estoura por `-TimeoutSec` e **parece timeout técnico**.
 
-- **`Invoke-OpenCode.ps1` diagnostica isso:** no branch de timeout, `Get-OpenCodeUsageLimitError`
-  (em `OpenCodeStreamSupport.ps1`, dot-source; `-LogDir` para fixture) varre o log da janela do
-  processo por `"statusCode":429` + a mensagem de limite e lança um erro **claro** ("limite de uso
-  do provider (HTTP 429)… aguardar o reset do ciclo"), em vez de "excedeu Xs". Self-test
-  `Test-OpenCodeUsageLimitDetectionSelfTest.ps1` (token `OPENCODE_USAGE_LIMIT_DETECTION_SELFTEST_OK`).
-- <!-- backend-parity: ignore --> **Não adianta redisparar nem aumentar o timeout** — só reseta no ciclo de uso (semanal no
-  ollama-cloud) ou com upgrade/extra usage. Os demais **caminhos e provedores** (Codex, Claude Code nativo, provedor `nvidia` via opencode) **não**
-  são afetados pela cota do ollama-cloud.
-- **Follow-up:** estender a detecção aos jobs opencode (`Start-`/`Watch-OpenCodeJob`) e aos demais
-  backends — `999-ideias-pendentes.md`.
+- **`Invoke-OpenCode.ps1` diagnostica isso:** nos caminhos terminais (timeout, exit≠0, erro de stream, veredito esgotado), `Resolve-OpenCodeProviderLimitHit` (em `OpenCodeStreamSupport.ps1`; o wrapper `Get-OpenCodeUsageLimitError` lê só o log) classifica **limite de uso** vs **limite de taxa** a partir do stream, stderr e log na janela T0 (UTC). A evidência de cota pode estar **só no log**. O throw usa `Format-OpenCodeLimitBlock` (texto fixo com `limite de uso` ou `rate limit` / `too many requests`). Resposta `ok` **não** eleva rejeição se restar 429 no log. `-Raw` não classifica. Self-test `Test-OpenCodeUsageLimitDetectionSelfTest.ps1` (token `OK: Test-OpenCodeUsageLimitDetectionSelfTest.ps1`).
+- **Jobs com watcher** (`Watch-OpenCodeJob.ps1`, inclusive anexado depois de `-NoWatcher`): a mesma classificação promove `result.json` v2 com `limite-uso` / `limite-taxa` (reasons `provider-usage-limit` / `provider-rate-limit`) ou timeout do observador (`opencode-watch-timeout`, `-WatchTimeoutSec` default 0). `-NoWatcher` sozinho **não** detecta nem promove result. `-WatchTimeoutSec > 0` é incompatível com `-NoWatcher`. Exit **20** = este run promoveu result; **21** = recusa de clobber (`result.json` já existia); aceite feliz continua `watcherExitCode=0`.
+- **Painel síncrono:** rate e usage no throw do Invoke continuam caindo no circuito `quota` do dispatcher (`$quotaFailurePattern` **intocado**). Jobs **não** passam por esse circuito.
+- <!-- backend-parity: ignore --> **Não adianta redisparar nem aumentar o timeout** no caso de **uso/cota** — só reseta no ciclo de uso (semanal no ollama-cloud) ou com upgrade/extra usage. Limite de **taxa** é fenômeno curto (não re-tentar imediatamente). Os demais **adapters** (Codex, Claude Code, Copilot, Gemini, Antigravity) **não** estão nesta frente — `999-ideias-pendentes.md`.
 
 ## OPENCODE — REVISOR LEAST-PRIVILEGE "SEM EXECUÇÃO/ESCRITA" (ATIVO)
 

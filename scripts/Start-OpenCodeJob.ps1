@@ -38,7 +38,9 @@
 .PARAMETER OpenCodeExe
     Forca um caminho de opencode.exe (contorna a descoberta automatica por PATH/npm).
 .PARAMETER NoWatcher
-    Não abrir a janela do watcher (apenas dispara o job).
+    Não abrir a janela do watcher (apenas dispara o job). Sem watcher nao ha result.json promovido nem deteccao de limite nesta frente.
+.PARAMETER WatchTimeoutSec
+    Timeout opt-in do observador (0 = desligado). Incompativel com -NoWatcher quando maior que 0.
 .PARAMETER TempDir
     Pasta dos arquivos de job. Default: <temp do usuário>\opencode-jobs.
 .PARAMETER KeepDays
@@ -54,12 +56,17 @@ param(
     [string] $Agent,
     [string] $OpenCodeExe,
     [switch] $NoWatcher,
+    [ValidateRange(0, 86400)] [int] $WatchTimeoutSec = 0,
     [string] $TempDir = (Join-Path ([System.IO.Path]::GetTempPath()) 'opencode-jobs'),
     [int]    $KeepDays = 3
 )
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+
+if ($WatchTimeoutSec -gt 0 -and $NoWatcher) {
+    throw 'BLOCK: -WatchTimeoutSec exige watcher; omita -NoWatcher ou use WatchTimeoutSec=0.'
+}
 
 # Guard least-privilege do reviewer-ro (default escopado + pre-check fail-closed no spawn)
 . (Join-Path $PSScriptRoot 'OpenCodeCliSupport.ps1')
@@ -179,17 +186,35 @@ $runnerArgs = @(
     '-StderrPath', $errPath,
     '-ExitCodePath', $exitCodePath
 )
+$t0 = (Get-Date).ToUniversalTime()
+$request.startedAt = $t0.ToString('yyyy-MM-ddTHH:mm:ss.fffZ')
+$request | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $reqPath -Encoding utf8
 $proc = Start-Process -FilePath pwsh -ArgumentList $runnerArgs -WindowStyle Hidden -PassThru
 $procId = $proc.Id
+$expectedStartUtc = $null
+try {
+    $st = $proc.StartTime
+    if ($st.Kind -ne [DateTimeKind]::Utc) { $st = $st.ToUniversalTime() }
+    $expectedStartUtc = $st.ToString('yyyy-MM-ddTHH:mm:ss.fffZ')
+} catch {
+    [Console]::Error.WriteLine('AVISO: StartTime do runner indisponivel; kill por identidade ficara nao verificavel.')
+}
 
 # 7) Abre o watcher numa janela visivel (a menos que -NoWatcher)
 $watcher = Join-Path $PSScriptRoot 'Watch-OpenCodeJob.ps1'
 if (-not $NoWatcher) {
     if (Test-Path -LiteralPath $watcher -PathType Leaf) {
-        Start-Process pwsh -WindowStyle Normal -ArgumentList @(
+        $watchArgs = [System.Collections.Generic.List[string]]::new()
+        [void]$watchArgs.AddRange([string[]]@(
             '-NoExit', '-NoProfile', '-File', $watcher,
-            '-JobId', $jobId, '-ProcessId', "$procId", '-TempDir', $TempDir
-        ) | Out-Null
+            '-JobId', $jobId, '-ProcessId', "$procId", '-TempDir', $TempDir,
+            '-WatchTimeoutSec', "$WatchTimeoutSec"
+        ))
+        if (-not [string]::IsNullOrWhiteSpace($expectedStartUtc)) {
+            [void]$watchArgs.Add('-ExpectedStartTimeUtc')
+            [void]$watchArgs.Add($expectedStartUtc)
+        }
+        Start-Process pwsh -WindowStyle Normal -ArgumentList @($watchArgs) | Out-Null
     } else {
         Write-Warning "Watcher nao encontrado em $watcher; job segue rodando sem janela."
     }

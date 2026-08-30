@@ -430,5 +430,83 @@ Invoke-WatcherE2E -Name 'watch-exit-nonzero' -StreamLines $watchLinesOk -Opencod
 Invoke-WatcherE2E -Name 'watch-exit-unknown' -StreamLines $watchLinesOk -OpencodeProcessExitCode 0 -WriteExitCodeFile $false `
     -ExpectAccepted $false -ExpectedWatcherExitCode 20 -ExpectedDisposition 'rejected-error' -ExpectedReason 'opencode-exit-unknown' -ExpectFinalLabel $false -ExpectOpencodeExitCodeNull $true
 
+# --- limite/taxa/timeout no contrato v2 ---
+$fixedUsage = Format-OpenCodeLimitBlock -Kind 'usage-limit' -Message ''
+$fixedRate = Format-OpenCodeLimitBlock -Kind 'rate-limit' -Message ''
+Assert-Eq 'format usage literal' $fixedUsage 'BLOCK: opencode atingiu o limite de uso do provider. NAO e timeout tecnico; aguardar o reset do ciclo de uso (limite de uso).'
+Assert-Eq 'format rate literal' $fixedRate 'BLOCK: opencode atingiu o limite de taxa do provider. Nao re-tentar imediatamente (rate limit / too many requests).'
+Assert-Eq 'format rate sem 429 na parte fixa' ($fixedRate -notmatch '429') $true
+$toBlock = Format-OpenCodeWatchTimeoutBlock -WatchTimeoutSec 12
+Assert-Eq 'format timeout literal' $toBlock 'BLOCK: Watch-OpenCodeJob atingiu WatchTimeoutSec=12; processo observado ainda vivo. opencode-watch-timeout'
+
+$usageHit = [pscustomobject]@{ kind = 'usage-limit'; message = 'weekly usage limit' }
+$wrUsage = Get-OpenCodeWatchResult -JobId 'job-test' -CompletionSignal (Get-OpenCodeCompletionSignal -Events (ConvertFrom-OpenCodeStreamLines -Lines $linesNoFin)) `
+    -StderrText '' -FallbackToBuild:$false -FallbackStderrPattern 'p' -RequestedAgent 'reviewer-ro' `
+    -OpencodeExitCode 1 -OpencodeExitObserved:$true -FinishedAt ([datetime]'2026-01-01T00:00:00Z') `
+    -LimitHit $usageHit -SinceTimeSource 'request-startedAt'
+Assert-Eq 'usage result status' $wrUsage.status 'limite-uso'
+Assert-Eq 'usage helper reason' (Get-OpenCodeAcceptedResult -Result $wrUsage).reason 'provider-usage-limit'
+Assert-Eq 'usage sinceTimeSource' $wrUsage.sinceTimeSource 'request-startedAt'
+
+$rateHitObj = [pscustomobject]@{ kind = 'rate-limit'; message = 'Too Many Requests' }
+$wrRate = Get-OpenCodeWatchResult -JobId 'job-test' -CompletionSignal (Get-OpenCodeCompletionSignal -Events (ConvertFrom-OpenCodeStreamLines -Lines $linesStop)) `
+    -StderrText '' -FallbackToBuild:$false -FallbackStderrPattern 'p' -RequestedAgent 'reviewer-ro' `
+    -OpencodeExitCode 0 -OpencodeExitObserved:$true -FinishedAt ([datetime]'2026-01-01T00:00:00Z') `
+    -LimitHit $rateHitObj
+Assert-Eq 'accepted ignora rate no log' $wrRate.resultAccepted $true
+
+$wrRate2 = Get-OpenCodeWatchResult -JobId 'job-test' -CompletionSignal (Get-OpenCodeCompletionSignal -Events (ConvertFrom-OpenCodeStreamLines -Lines $linesNoFin)) `
+    -StderrText '' -FallbackToBuild:$false -FallbackStderrPattern 'p' -RequestedAgent 'reviewer-ro' `
+    -OpencodeExitCode 2 -OpencodeExitObserved:$true -FinishedAt ([datetime]'2026-01-01T00:00:00Z') `
+    -LimitHit $rateHitObj
+Assert-Eq 'rate result status' $wrRate2.status 'limite-taxa'
+Assert-Eq 'rate helper' (Get-OpenCodeAcceptedResult -Result $wrRate2).reason 'provider-rate-limit'
+
+$wrTo = Get-OpenCodeWatchResult -JobId 'job-test' -CompletionSignal (Get-OpenCodeCompletionSignal -Events (ConvertFrom-OpenCodeStreamLines -Lines $linesStop)) `
+    -StderrText '' -FallbackToBuild:$false -FallbackStderrPattern 'p' -RequestedAgent 'reviewer-ro' `
+    -OpencodeExitCode $null -OpencodeExitObserved:$false -FinishedAt ([datetime]'2026-01-01T00:00:00Z') `
+    -WatchTimedOut:$true -WatchTimeoutSec 5
+Assert-Eq 'timeout status' $wrTo.status 'error'
+Assert-Eq 'timeout reason' $wrTo.rejectionReason 'opencode-watch-timeout'
+Assert-Eq 'timeout error canonico' $wrTo.error (Format-OpenCodeWatchTimeoutBlock -WatchTimeoutSec 5)
+Assert-Eq 'timeout helper' (Get-OpenCodeAcceptedResult -Result $wrTo).reason 'opencode-watch-timeout'
+Assert-Eq 'timeout verdict not ok' ($wrTo.completionVerdict -ne 'ok') $true
+
+$oldV2 = $wrOk.PSObject.Copy()
+Assert-Eq 'sinceTimeSource ausente ainda aceita' (Get-OpenCodeAcceptedResult -Result $oldV2).accepted $true
+
+$badOkUsage = $wrUsage.PSObject.Copy()
+$badOkUsage.completionVerdict = 'ok'
+Assert-Eq 'usage + verdict ok recusado' (Get-OpenCodeAcceptedResult -Result $badOkUsage).reason 'rejected-verdict-incoherent'
+
+$stream429 = @(Get-OpenCodeStreamErrorCandidates -Lines @('{"type":"error","error":{"data":{"message":"statusCode\":429"}}}'))
+$logUsage = @([pscustomobject]@{ path = 'C:\z.log'; lineIndex = 0; raw = 'weekly usage limit'; lineTimestampUtc = $null; lastWriteTimeUtc = [datetime]::UtcNow; level = 'ERROR' })
+$kindGlobal = Resolve-OpenCodeProviderLimitHit -StreamErrors $stream429 -StderrText '' -LogLines $logUsage
+Assert-Eq 'kind global usage vence stream 429' $kindGlobal.kind 'usage-limit'
+
+foreach ($rxCase in @(
+    @{ t = 'insufficient balance'; k = 'usage-limit' },
+    @{ t = 'insufficient coding plan balance'; k = 'usage-limit' },
+    @{ t = 'credits exhausted'; k = 'usage-limit' },
+    @{ t = 'saldo insuficiente'; k = 'usage-limit' },
+    @{ t = 'sem quota'; k = 'usage-limit' }
+)) {
+    Assert-Eq ("regex $($rxCase.t)") (Get-OpenCodeProviderLimitKindFromText -Text $rxCase.t) $rxCase.k
+}
+Assert-Eq 'quota isolado miss' ($null -eq (Get-OpenCodeProviderLimitKindFromText -Text 'quota')) $true
+Assert-Eq 'retries exhausted miss' ($null -eq (Get-OpenCodeProviderLimitKindFromText -Text 'retries exhausted')) $true
+Assert-Eq 'insufficient permissions miss' ($null -eq (Get-OpenCodeProviderLimitKindFromText -Text 'insufficient permissions')) $true
+Assert-Eq 'rate_limit' (Get-OpenCodeProviderLimitKindFromText -Text 'rate_limit') 'rate-limit'
+Assert-Eq '1402 nao e 402 estrutural' ($null -eq (Get-OpenCodeProviderLimitKindFromText -Text '{"n":1402}')) $true
+Assert-Eq 'USAGE LIMIT case' (Get-OpenCodeProviderLimitKindFromText -Text 'USAGE LIMIT') 'usage-limit'
+
+$dispatchPath = Join-Path $PSScriptRoot 'Invoke-LlmDelegatePanelDispatch.ps1'
+$patternRaw = Get-Content -LiteralPath $dispatchPath -Raw -Encoding utf8
+$mPat = [regex]::Match($patternRaw, '\$quotaFailurePattern = ''([^'']+)''')
+if (-not $mPat.Success) { throw 'FAIL: atribuicao $quotaFailurePattern nao encontrada' }
+$patternText = $mPat.Groups[1].Value
+Assert-Eq 'quota pattern casa usage fixo' ($fixedUsage -match $patternText) $true
+Assert-Eq 'quota pattern casa rate fixo' ($fixedRate -match $patternText) $true
+
 if ($fail -gt 0) { throw "BLOCK: $fail caso(s) falharam em Test-OpenCodeStreamSupportSelfTest.ps1" }
 Write-Host 'OK: Test-OpenCodeStreamSupportSelfTest.ps1' -ForegroundColor Cyan

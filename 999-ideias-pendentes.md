@@ -315,12 +315,12 @@ Triagem dos itens:
 
 Critério para retomar: caso real em que a ausência do cache Codex prejudique a oferta de revisores, ou decisão explícita de criar uma frente de capacidade LLM com probes opt-in. Não bundlar com correções de pré-push; tratar como evolução separada da `xpz-llm-delegate`, com self-tests e paridade no `09`/`SKILL.md` se algum contrato mudar.
 
-## Estender a detecção de limite de uso (HTTP 429) do provider aos adapters de delegação irmãos
+## Estender a detecção de limite de uso/taxa do provider aos adapters de delegação irmãos
 
-- <!-- backend-parity: ignore --> **Importância** — média (mesmo atrito que custou horas numa pré-push reforçada, mas agora coberto só na rota síncrona do opencode). O `scripts/Invoke-OpenCode.ps1` já **diagnostica o 429 no timeout** lendo o log do opencode via `Get-OpenCodeUsageLimitError` (em `scripts/OpenCodeStreamSupport.ps1`, dot-source, com `-LogDir`) — ver `CHANGELOG`. Falta o mesmo para: (a) **jobs opencode** `Start-OpenCodeJob.ps1`/`Watch-OpenCodeJob.ps1` (mesmo log do opencode; o watcher classifica `finishReason` mas **não** diagnostica o 429 — quando a cota estoura, o job assíncrono também mascara); (b) **outros backends** — `Invoke-Codex`/`Start-CodexJob`, `Invoke-Gemini`, `Invoke-Copilot` — que têm logs/retries próprios.
-- <!-- backend-parity: ignore --> **Maturidade** — pronta para implementar no caso **opencode-jobs** (reusar o `Get-OpenCodeUsageLimitError` já compartilhado, com o `-SinceTime` do início do job; self-test análogo ao `Test-OpenCodeUsageLimitDetectionSelfTest.ps1`). **Ideia/pesquisa** para os demais backends: depende de descobrir **onde** Codex/Gemini/Copilot expõem o 429/limite (stderr? log próprio? silêncio como o opencode?) — e Gemini/Copilot **não têm assinatura nesta máquina** para reproduzir o caso real.
+- <!-- backend-parity: ignore --> **Importância** — média. A fatia **opencode síncrono + jobs com watcher** (resolvedor compartilhado, `result.json` tipado, `-WatchTimeoutSec`) já está implementada — ver `historico/IdeiasImplementadas_202608.md`. Falta o mesmo diagnóstico nos **outros backends**: `Invoke-Codex`/`Start-CodexJob`, `Invoke-Gemini`, `Invoke-Copilot`, e (quando couber) Claude Code / Antigravity, que têm logs/retries próprios.
+- <!-- backend-parity: ignore --> **Maturidade** — **ideia/pesquisa**: depende de descobrir **onde** Codex/Gemini/Copilot/Claude/Antigravity expõem o 429/limite (stderr? log próprio? silêncio como o opencode?) — e Gemini/Copilot **não têm assinatura nesta máquina** para reproduzir o caso real.
 
-**Origem:** frente da detecção de 429 no `Invoke-OpenCode` (2026-06-21), nascida de uma pré-push reforçada em que 3 modelos `ollama-cloud` (kimi/minimax/glm) "estouraram timeout" sem causa visível — era a **cota semanal** esgotada da conta ollama-cloud. Deixado como follow-up para não bundlar na frente do `.ContainsKey`.
+**Origem:** frente da detecção de 429 no `Invoke-OpenCode` (2026-06-21), nascida de uma pré-push reforçada em que 3 modelos `ollama-cloud` (kimi/minimax/glm) "estouraram timeout" sem causa visível — era a **cota semanal** esgotada da conta ollama-cloud. Fatia opencode (jobs + detector compartilhado) implementada em 2026-08-30.
 
 ## Reclassificar mecanicamente `failureAfterText` do Claude Code no painel
 

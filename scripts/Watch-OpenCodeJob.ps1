@@ -14,19 +14,14 @@
     <GUID>.exitcode.txt; -ProcessId delimita a vida do processo observado (runner pwsh criado por
     Start-OpenCodeJob.ps1, ou processo equivalente em invocacoes manuais). Falha interna do
     proprio watcher antes da promocao atomica sai com codigo 99, emite WATCHER_INTERNAL_ERROR no
-    stderr e nao promove <GUID>.result.json.
-.PARAMETER JobId
-    GUID do job (nome-base dos arquivos em -TempDir).
-.PARAMETER ProcessId
-    PID do processo observado cuja vida delimita o monitoramento. No fluxo padrao de
-    Start-OpenCodeJob.ps1, e o PID do runner pwsh; o exit do opencode deve vir de
-    <GUID>.exitcode.txt.
-.PARAMETER TempDir
-    Pasta dos arquivos de job. Default: <temp do usuário>\opencode-jobs.
-.PARAMETER IntervalSeconds
-    Intervalo de polling. Default 2. Faixa 1-30.
-.PARAMETER SilenceThresholdSeconds
-    Segundos sem nova linha antes de alertar. Default 120. Faixa 30-3600.
+    stderr e nao promove <GUID>.result.json. -WatchTimeoutSec (default 0) e opt-in; se o processo
+    observado ainda estiver vivo no prazo, o watcher tenta encerrar a arvore do runner e promove
+    rejeicao opencode-watch-timeout (exit 20). result.json preexistente recusa clobber (exit 21).
+    Jobs com watcher classificam limite de uso/taxa do provider via o resolvedor compartilhado.
+.PARAMETER WatchTimeoutSec
+    Timeout opt-in do observador (0 = desligado, maximo 86400). Independente do alerta de silencio.
+.PARAMETER ExpectedStartTimeUtc
+    StartTime UTC do runner (ISO-Z), para kill por identidade (PID + StartTime).
 .EXAMPLE
     .\Watch-OpenCodeJob.ps1 -JobId a1b2c3 -ProcessId 12345
 #>
@@ -36,7 +31,9 @@ param(
     [Parameter(Mandatory = $true)] [int]    $ProcessId,
     [string] $TempDir = (Join-Path ([System.IO.Path]::GetTempPath()) 'opencode-jobs'),
     [ValidateRange(1, 30)]   [int] $IntervalSeconds = 2,
-    [ValidateRange(30, 3600)][int] $SilenceThresholdSeconds = 120
+    [ValidateRange(30, 3600)][int] $SilenceThresholdSeconds = 120,
+    [ValidateRange(0, 86400)][int] $WatchTimeoutSec = 0,
+    [string] $ExpectedStartTimeUtc
 )
 
 Set-StrictMode -Version Latest
@@ -141,8 +138,23 @@ function Write-OpenCodeResultAtomic {
     )
     $json = $Result | ConvertTo-Json -Depth 8
     $tmp = "$Path.tmp"
+    if (Test-Path -LiteralPath $Path -PathType Leaf) {
+        if (Test-Path -LiteralPath $tmp -PathType Leaf) {
+            Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
+        }
+        $ex = [System.InvalidOperationException]::new('OPENCODE_RESULT_CLOBBER')
+        throw $ex
+    }
     Set-Content -LiteralPath $tmp -Value $json -Encoding utf8
-    Move-Item -LiteralPath $tmp -Destination $Path -Force
+    try {
+        Move-Item -LiteralPath $tmp -Destination $Path
+    } catch {
+        if (Test-Path -LiteralPath $tmp -PathType Leaf) {
+            Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
+        }
+        $ex = [System.InvalidOperationException]::new('OPENCODE_RESULT_CLOBBER')
+        throw $ex
+    }
 }
 
 function Write-HumanResult {
@@ -182,39 +194,100 @@ try {
     Write-Line ("PID   : {0}" -f $ProcessId) 'White'
     Write-Host "-------------------------------------------------------------" -ForegroundColor White
 
-    $observedProcess = $null
-    try { $observedProcess = [System.Diagnostics.Process]::GetProcessById($ProcessId) } catch { $observedProcess = $null }
-    $opencodeExitObserved = $false
-    $opencodeExitCode = $null
-
-    $waited = 0
-    while (-not (Test-Path -LiteralPath $streamPath -PathType Leaf) -and $waited -lt 30) {
-        Write-Line "Aguardando stream do opencode..." 'DarkGray'
-        Start-Sleep -Seconds 2
-        $waited += 2
+    if (Test-Path -LiteralPath $resultPath -PathType Leaf) {
+        [Console]::Error.WriteLine('BLOCK: result.json ja existe; recusa clobber.')
+        $exitCode = 21
+        exit $exitCode
     }
 
+    $sinceTimeSource = 'watcher-attach-fallback'
+    $t0 = [datetime]::UtcNow
+    if (Test-Path -LiteralPath $reqPath -PathType Leaf) {
+        try {
+            $reqObj = Get-Content -LiteralPath $reqPath -Raw -Encoding utf8 | ConvertFrom-Json
+            $startedRaw = Get-Prop $reqObj 'startedAt'
+            $parsedT0 = Convert-OpenCodeLineTimestampUtc $startedRaw
+            if ($null -eq $parsedT0 -and $null -ne $startedRaw) {
+                $dto = [datetimeoffset]::MinValue
+                if ([datetimeoffset]::TryParse([string]$startedRaw, [ref]$dto)) { $parsedT0 = $dto.UtcDateTime }
+            }
+            if ($null -ne $parsedT0) {
+                $t0 = $parsedT0
+                $sinceTimeSource = 'request-startedAt'
+            }
+        } catch { }
+    }
+
+    $expectedStart = $null
+    if (-not [string]::IsNullOrWhiteSpace($ExpectedStartTimeUtc)) {
+        $dtoExp = [datetimeoffset]::MinValue
+        if ([datetimeoffset]::TryParse($ExpectedStartTimeUtc, [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::RoundtripKind, [ref]$dtoExp)) {
+            $expectedStart = $dtoExp.UtcDateTime
+        }
+    }
+
+    $deadlineUtc = $null
+    if ($WatchTimeoutSec -gt 0) { $deadlineUtc = [datetime]::UtcNow.AddSeconds($WatchTimeoutSec) }
+    $watchTimedOut = $false
+    $lastActivity = [datetime]::UtcNow
     $offset = [long]0
-    $lastActivity = [DateTime]::Now
     $silenceAlerted = $false
 
-    :loop while ($true) {
-        $alive = if ($observedProcess) { -not $observedProcess.HasExited } else { $null -ne (Get-Process -Id $ProcessId -ErrorAction SilentlyContinue) }
+    function Get-WatchSleepSecLocal {
+        param([double]$DefaultSec, $Deadline)
+        if ($null -eq $Deadline) { return [Math]::Max(1, [int][Math]::Ceiling($DefaultSec)) }
+        $rem = ($Deadline - [datetime]::UtcNow).TotalSeconds
+        if ($rem -le 0) { return 0 }
+        $m = [Math]::Min($DefaultSec, $rem)
+        if ($m -lt 1 -and $rem -gt 0) { return 1 }
+        return [int][Math]::Floor($m)
+    }
+    function Test-WatchAliveLocal {
+        $procNow = Get-OpenCodeWatchedProcess -ProcessId $ProcessId
+        if ($null -eq $procNow) { return $false }
+        return (-not $procNow.HasExited)
+    }
+    function Add-WatchStreamLinesLocal {
+        param($Lines)
+        foreach ($line in @($Lines)) {
+            if ([string]::IsNullOrWhiteSpace($line)) { continue }
+            try {
+                $j = $line | ConvertFrom-Json
+                $script:events.Add($j)
+                Show-Event $j
+            } catch { continue }
+        }
+    }
+
+    while (-not (Test-Path -LiteralPath $streamPath -PathType Leaf)) {
+        if (-not (Test-WatchAliveLocal)) { break }
+        if ($null -ne $deadlineUtc -and [datetime]::UtcNow -ge $deadlineUtc) {
+            if (Test-WatchAliveLocal) { $watchTimedOut = $true }
+            break
+        }
+        Write-Line "Aguardando stream do opencode..." 'DarkGray'
+        $sl = Get-WatchSleepSecLocal -DefaultSec 2 -Deadline $deadlineUtc
+        if ($sl -le 0) {
+            if (Test-WatchAliveLocal) { $watchTimedOut = $true }
+            break
+        }
+        Start-Sleep -Seconds $sl
+    }
+
+    :loop while (-not $watchTimedOut) {
+        $alive = Test-WatchAliveLocal
+        if ($null -ne $deadlineUtc -and [datetime]::UtcNow -ge $deadlineUtc -and $alive) {
+            $watchTimedOut = $true
+            break loop
+        }
         $new = @(Read-NewLines ([ref]$offset))
 
         if ($new.Count -gt 0) {
-            $lastActivity = [DateTime]::Now
+            $lastActivity = [datetime]::UtcNow
             $silenceAlerted = $false
-            foreach ($line in $new) {
-                if ([string]::IsNullOrWhiteSpace($line)) { continue }
-                try {
-                    $j = $line | ConvertFrom-Json
-                    $script:events.Add($j)
-                    Show-Event $j
-                } catch { continue }
-            }
+            Add-WatchStreamLinesLocal $new
         } else {
-            $silenceSec = [int]([DateTime]::Now - $lastActivity).TotalSeconds
+            $silenceSec = [int]([datetime]::UtcNow - $lastActivity).TotalSeconds
             if ($silenceSec -ge $SilenceThresholdSeconds -and -not $silenceAlerted) {
                 $silenceAlerted = $true
                 $procLabel = if ($alive) { "PID $ProcessId ativo" } else { "PID $ProcessId encerrado" }
@@ -223,22 +296,67 @@ try {
         }
 
         if (-not $alive) {
-            Start-Sleep -Seconds 2
-            $tail = @(Read-NewLines ([ref]$offset))
-            foreach ($line in $tail) {
-                if ([string]::IsNullOrWhiteSpace($line)) { continue }
-                try {
-                    $j = $line | ConvertFrom-Json
-                    $script:events.Add($j)
-                    Show-Event $j
-                } catch { continue }
-            }
+            $slTail = Get-WatchSleepSecLocal -DefaultSec 2 -Deadline $deadlineUtc
+            if ($slTail -gt 0) { Start-Sleep -Seconds $slTail }
+            Add-WatchStreamLinesLocal (Read-NewLines ([ref]$offset))
             break loop
         }
 
-        Start-Sleep -Seconds $IntervalSeconds
+        $sl = Get-WatchSleepSecLocal -DefaultSec $IntervalSeconds -Deadline $deadlineUtc
+        if ($sl -le 0) {
+            if (Test-WatchAliveLocal) { $watchTimedOut = $true }
+            break loop
+        }
+        Start-Sleep -Seconds $sl
     }
 
+    if (Test-Path -LiteralPath $resultPath -PathType Leaf) {
+        [Console]::Error.WriteLine('BLOCK: result.json ja existe; recusa clobber.')
+        $exitCode = 21
+        exit $exitCode
+    }
+
+    $processIdentityVerified = $null
+    $cancelIdentityUnverifiable = $null
+    $cancelAttempted = $null
+    $stillAliveAtPromote = $null
+    $aliveNow = Test-WatchAliveLocal
+    if ($watchTimedOut -and $aliveNow) {
+        $forceUnverifiable = ($env:XPZ_TEST_OPENCODE_WATCH_FORCE_IDENTITY_UNVERIFIABLE -eq '1')
+        $proc = Get-OpenCodeWatchedProcess -ProcessId $ProcessId
+        $identOk = (-not $forceUnverifiable) -and (Test-OpenCodeWatchedProcessIdentity -Process $proc -ExpectedStartTimeUtc $expectedStart)
+        if ($forceUnverifiable -or -not $identOk) {
+            [Console]::Error.WriteLine('AVISO: StartTime do runner indisponivel; kill por identidade ficara nao verificavel.')
+        }
+        if ($identOk) {
+            $processIdentityVerified = $true
+            $cancelIdentityUnverifiable = $false
+            $cancelAttempted = $true
+            try { Stop-OpenCodeWatchedProcess -Process $proc } catch { }
+            $flushUntil = [datetime]::UtcNow.AddSeconds(2)
+            while ([datetime]::UtcNow -lt $flushUntil) {
+                $proc = Get-OpenCodeWatchedProcess -ProcessId $ProcessId
+                if ($null -eq $proc -or $proc.HasExited) { break }
+                Start-Sleep -Milliseconds 100
+            }
+        } else {
+            $processIdentityVerified = $false
+            $cancelIdentityUnverifiable = $true
+            $cancelAttempted = $false
+        }
+        $aliveNow = Test-WatchAliveLocal
+        $stillAliveAtPromote = $aliveNow
+        if ($stillAliveAtPromote) {
+            [Console]::Error.WriteLine('AVISO: result.json promovido com processo observado ainda vivo; escritas tardias nao reclobberam o result.')
+        }
+        Add-WatchStreamLinesLocal (Read-NewLines ([ref]$offset))
+    } else {
+        $watchTimedOut = $false
+        Add-WatchStreamLinesLocal (Read-NewLines ([ref]$offset))
+    }
+
+    $opencodeExitObserved = $false
+    $opencodeExitCode = $null
     if (Test-Path -LiteralPath $exitCodePath -PathType Leaf) {
         $rawExitCode = (Get-Content -LiteralPath $exitCodePath -Raw -Encoding utf8 -ErrorAction SilentlyContinue).Trim()
         $parsedExit = 0
@@ -251,20 +369,53 @@ try {
     if (Test-Path -LiteralPath $errPath -PathType Leaf) {
         $errText = Get-Content -LiteralPath $errPath -Raw -Encoding utf8 -ErrorAction SilentlyContinue
     }
+    $rawStream = @()
+    if (Test-Path -LiteralPath $streamPath -PathType Leaf) {
+        $rawStream = @(Get-Content -LiteralPath $streamPath -Encoding utf8 -ErrorAction SilentlyContinue)
+    }
+    $streamErrors = @(Get-OpenCodeStreamErrorCandidates -Lines $rawStream)
+    $limitHit = Resolve-OpenCodeProviderLimitHit -StreamErrors $streamErrors -StderrText $errText -SinceTime $t0
     $requestedAgent = Get-OpenCodeRequestedAgent -RequestPath $reqPath
     $fallbackToBuild = Test-OpenCodeReviewerRoFallbackWarning -Text $errText
     $fallbackPattern = Get-OpenCodeReviewerRoFallbackWarningPattern
     $signal = Get-OpenCodeCompletionSignal -Events @($script:events)
-    $result = Get-OpenCodeWatchResult -JobId $JobId -CompletionSignal $signal -StderrText $errText `
-        -FallbackToBuild:$fallbackToBuild -FallbackStderrPattern $fallbackPattern -RequestedAgent $requestedAgent `
-        -OpencodeExitCode $opencodeExitCode -OpencodeExitObserved:$opencodeExitObserved -FinishedAt (Get-Date)
+    $wrSplat = @{
+        JobId = $JobId
+        CompletionSignal = $signal
+        StderrText = $errText
+        FallbackToBuild = $fallbackToBuild
+        FallbackStderrPattern = $fallbackPattern
+        RequestedAgent = $requestedAgent
+        OpencodeExitCode = $opencodeExitCode
+        OpencodeExitObserved = $opencodeExitObserved
+        FinishedAt = (Get-Date).ToUniversalTime()
+        WatchTimedOut = $watchTimedOut
+        LimitHit = $limitHit
+        SinceTimeSource = $sinceTimeSource
+        WatchTimeoutSec = $WatchTimeoutSec
+    }
+    if ($null -ne $processIdentityVerified) {
+        $wrSplat['ProcessIdentityVerified'] = $processIdentityVerified
+        $wrSplat['CancelIdentityUnverifiable'] = $cancelIdentityUnverifiable
+        $wrSplat['CancelAttempted'] = $cancelAttempted
+    }
+    if ($null -ne $stillAliveAtPromote) { $wrSplat['WatchedProcessStillAliveAtPromote'] = $stillAliveAtPromote }
+    $result = Get-OpenCodeWatchResult @wrSplat
 
     Write-OpenCodeResultAtomic -Result $result -Path $resultPath
     $exitCode = [int]$result.watcherExitCode
     Write-HumanResult -Result $result -Path $resultPath
 } catch {
-    try { [Console]::Error.WriteLine("WATCHER_INTERNAL_ERROR: $($_.Exception.Message)") } catch { }
-    $exitCode = 99
+    if ($_.Exception.Message -eq 'OPENCODE_RESULT_CLOBBER') {
+        [Console]::Error.WriteLine('BLOCK: result.json ja existe; recusa clobber.')
+        if (Test-Path -LiteralPath "$resultPath.tmp" -PathType Leaf) {
+            Remove-Item -LiteralPath "$resultPath.tmp" -Force -ErrorAction SilentlyContinue
+        }
+        $exitCode = 21
+    } else {
+        try { [Console]::Error.WriteLine("WATCHER_INTERNAL_ERROR: $($_.Exception.Message)") } catch { }
+        $exitCode = 99
+    }
 }
 
 exit $exitCode

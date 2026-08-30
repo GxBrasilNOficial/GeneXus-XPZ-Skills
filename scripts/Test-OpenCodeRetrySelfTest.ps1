@@ -26,6 +26,7 @@ $ErrorActionPreference = 'Stop'
 
 $scriptsDir = $PSScriptRoot
 $invoke = Join-Path $scriptsDir 'Invoke-OpenCode.ps1'
+. (Join-Path $scriptsDir 'OpenCodeStreamSupport.ps1')
 
 function Assert-True {
     param([bool]$Condition, [string]$Message)
@@ -46,6 +47,10 @@ try {
 $a = @($args)
 # Guard D1/D2: o adapter chama `agent list` (opt-out -Agent reviewer-fake -> so confirma que
 # resolve). Responder ANTES da logica de contador (nao consome tentativa) e sem ler stdin.
+if ($a.Count -ge 1 -and $a[0] -eq '--version') {
+    '1.0.0-fake'
+    exit 0
+}
 if ($a.Count -ge 2 -and $a[0] -eq 'agent' -and $a[1] -eq 'list') {
     'reviewer-fake (all)'
     '['
@@ -148,7 +153,10 @@ exit /b %errorlevel%
     try { & $invoke -OpenCodeExe $fakeCmd -Agent 'reviewer-fake' -MessagePath $promptFile -Model 'fake/model' -TimeoutSec 60 -MaxAttempts 2 } catch { $threw = $true; $msg = $_.Exception.Message }
     $env:XDG_DATA_HOME = $cleanXdg
     Assert-True $threw "(v) 429 na janela deveria bloquear o retry (lancar)."
-    Assert-True ($msg -match '429') "(v) mensagem deveria citar 429; veio: '$msg'."
+    Assert-True ($msg -match 'limite de uso') "(v) mensagem deveria ser Format usage; veio: '$msg'."
+    Assert-True ($msg -notmatch 'System\.Collections|@{kind') "(v) throw nao deve interpolar hashtable; veio: '$msg'."
+    $fixedRate = Format-OpenCodeLimitBlock -Kind 'rate-limit' -Message ''
+    Assert-True ($fixedRate -notmatch '429') "(v) parte fixa de rate nao deve conter 429: $fixedRate"
     Assert-True ((Get-Counter $c) -eq 1) "(v) 429 NAO deve re-tentar; contador=$(Get-Counter $c)."
 
     Write-Output 'OK: Test-OpenCodeRetrySelfTest.ps1'

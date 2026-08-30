@@ -2,6 +2,17 @@
 
 Registro de ideias que sairam de `999-ideias-pendentes.md` por terem sido implementadas ou incorporadas ao contrato metodologico vigente.
 
+## Detecção de limite de uso/taxa nos jobs opencode e resolvedor compartilhado
+
+Implementado em 2026-08-30 a partir do manuscrito `Temp/manuscript-v29.md`.
+
+Jobs opencode **com watcher** classificam limite de uso e de taxa (evidência pode estar só no log) e promovem `result.json` v2 tipado. `Invoke-OpenCode` e o watcher compartilham `Resolve-OpenCodeProviderLimitHit`. Opt-in `-WatchTimeoutSec`. Wrapper `Get-OpenCodeUsageLimitError` passa a devolver objeto. Dispatcher de painel intocado. Fatia restante (adapters irmãos) permanece no `999`.
+
+### Rastreabilidade
+
+- Arquivos materiais: `scripts/OpenCodeStreamSupport.ps1`, `scripts/Invoke-OpenCode.ps1`, `scripts/Start-OpenCodeJob.ps1`, `scripts/Watch-OpenCodeJob.ps1`, self-tests associados, `xpz-llm-delegate/SKILL.md`, `02`/`08`/`09`/`CHANGELOG.md`/`999`.
+- Commit material: (preencher após o commit desta frente).
+
 ## Matriz git-capable vs semantic-only vs argv-limited no `14` (operador da pré-push reforçada)
 
 Implementado em 2026-08-28 a partir do manuscrito v4 (`matriz-14-plan-v4`).
