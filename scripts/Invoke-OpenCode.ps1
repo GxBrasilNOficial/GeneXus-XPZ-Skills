@@ -49,8 +49,8 @@
     Número máximo de tentativas (1-3, default 1 = comportamento histórico, sem re-tentativa).
     Com 2+, re-despacha UMA vez por tentativa adicional APENAS quando o veredito de conclusão for
     'truncated' ou 'no-completion' (truncagem intermitente de cauda do opencode). NUNCA re-tenta
-    timeout, exit code != 0, erro explícito de stream, 429 detectado na janela da tentativa, nem
-    'empty' (conclusão limpa sem texto). Não tem efeito com -Raw (que devolve a 1ª execução).
+    timeout, exit code != 0, erro explícito de stream, limite de uso/taxa detectado na janela da
+    tentativa, nem 'empty' (conclusão limpa sem texto). Não tem efeito com -Raw (que devolve a 1ª execução).
     Cada re-tentativa emite, em stderr, uma linha 'OPENCODE_RETRY: attempt=N status=... reason=...'.
 .EXAMPLE
     .\Invoke-OpenCode.ps1 "oi"
@@ -139,13 +139,14 @@ $attempt = 0
 
 # Retry-once (opt-in por -MaxAttempts; default 1 = comportamento historico, sem re-tentativa).
 # Re-tentar SO um veredito de conclusao truncada/sem-conclusao (nao-determinismo de cauda do
-# opencode); NUNCA timeout, exit!=0, erro explicito de stream, 429 mascarado ou 'empty' (conclusao
-# limpa). A decisao de re-tentar le $verdict.status DIRETAMENTE (nao captura o throw), entao os
-# terminais lancados antes do veredito escapam do laco. Precedencia por tentativa:
+# opencode); NUNCA timeout, exit!=0, erro explicito de stream, limite de uso/taxa mascarado ou
+# 'empty' (conclusao limpa). A decisao de re-tentar le $verdict.status DIRETAMENTE (nao captura o
+# throw), entao os terminais lancados antes do veredito escapam do laco. Precedencia por tentativa:
 #   (1) timeout / exit!=0 / erro explicito de stream  -> terminal (sai do laco)
 #   (2) veredito de conclusao: 'ok' retorna; 'empty' terminal; so {truncated, no-completion} re-tentaveis
-#   (3) ao DECIDIR re-tentar, checa 429 na janela      -> terminal (gate da re-tentativa). Sem
-#       re-tentativa pendente (-MaxAttempts 1 / ultima tentativa), reporta o veredito de conclusao.
+#   (3) ao DECIDIR re-tentar, checa limite de uso/taxa na janela -> terminal (gate da re-tentativa).
+#       Sem re-tentativa pendente (-MaxAttempts 1 / ultima tentativa), o resolvedor ainda corre;
+#       sem hit, reporta o veredito de conclusao.
 # -TimeoutSec e POR TENTATIVA (com -MaxAttempts 2 o tempo de parede pode dobrar).
 try {
     while ($true) {
