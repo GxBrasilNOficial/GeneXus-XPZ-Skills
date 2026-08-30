@@ -8,6 +8,8 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 ### Unreleased
 
+- **Paridade pós-painel (G1/G2 da 4ª rodada Opus, 2026-08-30):** no `09`, a anexação após `-NoWatcher` deixa de dizer que `-ExpectedStartTimeUtc` é obrigatório (o script não exige; sem o parâmetro o observador opera com identidade não verificável e ainda promove `result.json`); no `SKILL`, a nota de limite/410 registra o log global da máquina e o risco de atribuição cruzada entre runs concorrentes; o `999` anota a evolução (correlacionar por sessão/job/PID) sem mudar o motor. `README.md` sem mudança.
+
 - **Paridade pós-painel (G1 da rodada Codex, 2026-08-30):** `Test-OpenCodeWatchJobLimitSelfTest.ps1` passa a exercitar classificação real de limite no watcher (`limite-uso` via stderr do job, sem injetar `LimitHit`) e o timeout com kill por identidade verificada. Ponteiros no `09` e no `SKILL`. Sem mudança de motor. `README.md` sem mudança.
 
 - **Paridade pós-painel (G1 da 3ª rodada Opus, 2026-08-30):** no comment-based help e no comentário do laço de retry de `Invoke-OpenCode.ps1`, troca «429» por limite de uso/taxa e alinha a precedência (3) ao resolvedor no ramo esgotado (já documentado no `SKILL`). Sem mudança de motor. `README.md` sem mudança.
@@ -243,6 +245,8 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 ### Unreleased
 
+- **Paridad post-panel (G1/G2 de la 4.ª ronda Opus, 2026-08-30):** en el `09`, la anexión tras `-NoWatcher` deja de afirmar que `-ExpectedStartTimeUtc` es obligatorio (el script no lo exige; sin el parámetro el observador opera con identidad no verificable y aún promueve `result.json`); en el `SKILL`, la nota de límite/410 registra el log global de la máquina y el riesgo de atribución cruzada entre runs concurrentes; el `999` anota la evolución (correlacionar por sesión/job/PID) sin cambiar el motor. Sin cambio en `README.md`.
+
 - **Paridad post-panel (G1 de la ronda Codex, 2026-08-30):** `Test-OpenCodeWatchJobLimitSelfTest.ps1` ejercita la clasificación real de límite en el watcher (`limite-uso` vía stderr del job, sin inyectar `LimitHit`) y el timeout con kill por identidad verificada. Punteros en `09` y en el `SKILL`. Sin cambio de motor. Sin cambio en `README.md`.
 
 - **Paridad post-panel (G1 de la 3.ª ronda Opus, 2026-08-30):** en el comment-based help y el comentario del bucle de retry de `Invoke-OpenCode.ps1`, sustituye «429» por límite de uso/tasa y alinea la precedencia (3) con el resolvedor en el ramo agotado (ya documentado en el `SKILL`). Sin cambio de motor. Sin cambio en `README.md`.
@@ -470,6 +474,8 @@ All relevant changes to this repository will be recorded here from this adoption
 The format keeps an `Unreleased` section for changes not yet published in a formal version. This repository does not yet use public semantic versioning; when that changes, future sections should record the corresponding tag.
 
 ### Unreleased
+
+- **Post-panel parity (G1/G2 from the 4th Opus round, 2026-08-30):** in `09`, attach after `-NoWatcher` no longer claims `-ExpectedStartTimeUtc` is mandatory (the script does not require it; without it the watcher runs with unverifiable identity and still promotes `result.json`); in `SKILL`, the limit/410 note records the machine-global log and cross-attribution risk across concurrent runs; `999` notes the follow-up (correlate by session/job/PID) with no engine change. No `README.md` change.
 
 - **Post-panel parity (G1 from the Codex round, 2026-08-30):** `Test-OpenCodeWatchJobLimitSelfTest.ps1` now exercises real watcher limit classification (`limite-uso` via job stderr, without injecting `LimitHit`) and timeout kill with verified identity. Pointers in `09` and `SKILL`. No engine change. No `README.md` change.
 

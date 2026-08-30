@@ -314,7 +314,17 @@ No backend opencode, `-Model` deve usar o identificador aceito pelo CLI no forma
 > cai nesse BLOCK genérico — o resolvedor **não** trata 410 como limite. Risco: linha **429 sem
 > `ts`/`time`/`timestamp`** num `.log` cujo `LastWriteTime` está na janela T0 (o resolvedor
 > aceita linha sem timestamp se o arquivo passou no filtro de mtime) pode promover
-> `Format-OpenCodeLimitBlock` e **mascarar** um 410 da mesma execução. Com `-Raw`, `exit≠0`
+> `Format-OpenCodeLimitBlock` e **mascarar** um 410 da mesma execução. **Log compartilhado
+> da máquina:** `Get-OpenCodeDefaultProviderLogDir` resolve `~/.local/share/opencode/log`
+> (respeita `XDG_DATA_HOME`); `Get-OpenCodeProviderLimitLogLines` filtra **só** por janela
+> temporal (`LastWriteTime` do arquivo + `ts`/`time`/`timestamp` da linha, quando existe) —
+> **não** por sessão, job ou PID. Chamadas concorrentes (`Invoke-OpenCode` / `Watch-OpenCodeJob`,
+> inclusive o painel `ForEach-Object -Parallel`) podem atribuir um 429/cota da execução A à B
+> na mesma janela. Esta frente ampliou a classificação além do timeout (terminais `exit≠0`,
+> erro de stream, veredito esgotado e o watcher). Não tratar `Format-OpenCodeLimitBlock` como
+> prova exclusiva daquela execução se houver outros runs opencode na mesma janela. Correlacionar
+> evidência de log por sessão/job/PID fica no `999` (sem mudança de motor nesta frente).
+> Com `-Raw`, `exit≠0`
 > **não** classifica limite. Medido em `nvidia/*`: `z-ai/glm-5.2` e `deepseek-ai/deepseek-v4-pro`
 > deram 410 estando listados, enquanto `minimaxai/minimax-m3` respondia normalmente — é **por
 > modelo**, não por endpoint. Consequências:
