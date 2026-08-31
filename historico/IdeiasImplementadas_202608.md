@@ -2,6 +2,17 @@
 
 Registro de ideias que sairam de `999-ideias-pendentes.md` por terem sido implementadas ou incorporadas ao contrato metodologico vigente.
 
+## Captura durável Codex (Invoke / Start / Watch)
+
+Implementado em 2026-08-31 a partir do plano `Temp/plano-xpz-llm-delegate-captura-duravel-codex-20260830-v20.md`.
+
+Torna recuperável o transporte do adapter Codex: ledger em `codex-jobs` (TempDir/KeepDays/RetentionMode), sentinelas `XPZ_CODEX_*` em stderr, rewrite de `captureOutcome`, identidade PID+hora no watcher (exits 0/21/22/99), splat `TempDir`/`RetentionMode` no ramo `codex` do dispatcher com strip do prefixo antes da classificação, self-test `Test-CodexDurableCaptureSelfTest.ps1` (inclui 2c/5l/12e/12f/12g), e item 13 fora do CI com Codex real. Paridade documental em `SKILL.md` / `14` / `09` / `CHANGELOG` / `999` (residuais operacionais permanecem no `999`). `02`/`08`/`README` deliberadamente fora do recorte.
+
+### Rastreabilidade
+
+- Arquivos materiais: `scripts/CodexCliSupport.ps1`, `scripts/Invoke-Codex.ps1`, `scripts/Start-CodexJob.ps1`, `scripts/Watch-CodexJob.ps1`, `scripts/Invoke-LlmDelegatePanelDispatch.ps1`, `scripts/Test-CodexDurableCaptureSelfTest.ps1`, self-tests stdin/painel, `xpz-llm-delegate/SKILL.md`, `14`/`09`/`999`/`CHANGELOG.md`.
+- Commit material: `78a9237` (`Implementa captura durável Codex (Invoke/Start/Watch) com self-test e paridade documental.`).
+
 ## Detecção de limite de uso/taxa nos jobs opencode e resolvedor compartilhado
 
 Implementado em 2026-08-30 a partir do manuscrito `Temp/manuscript-v29.md`.
