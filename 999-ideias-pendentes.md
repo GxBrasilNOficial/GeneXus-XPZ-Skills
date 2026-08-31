@@ -346,14 +346,21 @@ Critério para retomar: caso real em que a ausência do cache Codex prejudique a
 
 ## Preservar mais evidência quando o `claude` sai `1` sem saída classificável
 
-- **Importância** — baixa-média. Em 2026-07-26, uma chamada real `Invoke-ClaudeCode.ps1 -Message "responda OK" -Tools "" -TimeoutSec 60` retornou `exit 1` sem resposta e sem `stderr` capturado, durante janela em que o limite de 5 horas do Claude Code estava zerado. Esse contexto operacional deve ser preservado, mas a causa permanece **não classificável** pela evidência disponível: a documentação oficial do Claude Code não publica uma tabela geral de exit codes para `claude`/`claude -p`, e a própria referência de erros diz que `code N` sozinho não informa o que falhou.
-- **Maturidade** — ideia curta. O `SKILL.md` agora registra o glossário operacional baseado em menções oficiais (`0` sucesso; `1` falha genérica quando sem causa textual; `2` bloqueio de hook, não contrato geral do `claude -p`; `137` processo morto/kill/OOM em contexto de instalação). Falta decidir se o adapter deve enriquecer o `BLOCK` opaco com versão, cwd, argv sanitizado, existência/tamanho dos arquivos temporários, `claude auth status`/`claude doctor` opcional, ou outro caminho oficial de log, sempre sem inferir causa pelo número.
-- **Não** mapear `exit 1` para quota/limite/auth/workspace/modelo sem sinal textual ou fixture oficial. A melhoria é de **observabilidade**, não de classificação por número.
+- **Importância** — média (gap real com workaround: o orquestrador lê o `BLOCK` e diagnostica errado). Em 2026-07-26, uma chamada real `Invoke-ClaudeCode.ps1 -Message "responda OK" -Tools "" -TimeoutSec 60` retornou `exit 1` sem resposta e sem `stderr` capturado, durante janela em que o limite de 5 horas do Claude Code estava zerado. Em **2026-08-31** houve **dois modos irmãos** do mesmo erro de classificação:
+  1. **Sinal no stdout, adapter omite** (sessão captura durável Codex v20): `claude -p` exit 1 com **stdout** `You've hit your monthly spend limit — raise it at claude.ai/settings/usage…` e stderr só com avisos `Write(**/…) → Edit(**/…)` no `settings.json`. O `Invoke-ClaudeCode.ps1:110-115` não casou «spend limit» em `Get-ClaudeCodeErrorMessage`, caiu no ramo «saiu com codigo 1 **sem resposta**» e dumpou **só** `$stderrText` — o orquestrador propagou «settings Write/Edit» e omitiu a cota. O async do painel na mesma sessão já tinha classificado `quota` (429); o síncrono mascarou o mesmo eixo.
+  2. **Sem stdout, só ruído no stderr** (outra sessão / outro agente, mesmo dia, rota git-capable sync): exit 1 em ~6 s, stdout vazio, stderr só Write vs Edit. O orquestrador tratou esse stderr como causa e pediu «consertar o settings». A skill já diz que código `1` sozinho não prova cota/auth/modelo; o detector de cota do Claude Code vive no `stream-json` (`rate_limit_event`, 429) do `Invoke-ClaudeCodeAsync.ps1` (sidecar + circuito), **não** no `--output-format text` do `Invoke-ClaudeCode.ps1`. Sem sidecar e sem texto de spend-limit, **cota não foi medida** nessa invocação. Rótulo correto: `error` sem causa confirmada; «Claude Code não devolveu parecer; tipo/período de limite não determinado por esta rota» — não pedir consertar settings; não inferir disponibilidade nem indisponibilidade do modelo a partir do ruído.
+- **Maturidade** — ideia curta, com dois casos medidos (stdout com spend-limit escondido; canal sync cego + ruído settings). O `SKILL.md` registra o glossário operacional de exit codes. Melhorias concretas a decidir/implementar:
+  1. **Nunca** rotular «sem resposta» se stdout ou stderr tiver texto; o `BLOCK` do ramo `exit ≠ 0` deve incluir **stdout e stderr** (ou o que `Get-ClaudeCodeErrorMessage` devolver).
+  2. Em `Get-ClaudeCodeErrorMessage` / classificador do painel: sentinelas de **spend limit** / `claude.ai/settings/usage` / monthly limit → mensagem de cota (sem inferir só pelo número `1`).
+  3. Em `Remove-ClaudeCodeEnvironmentNoise`: tratar avisos `Permission deny rule … Use Edit(…) instead of Write(…)` como ruído de ambiente (como outros avisos que aparecem mesmo em sucesso), para não dominarem o `BLOCK`.
+  4. **Regra de orquestrador / skill (rota sync text):** após remover ruído, se não restar sinal classificável → rotular `error` sem causa confirmada e declarar explicitamente que **cota não foi medida nesta rota** (sync ≠ async/sidecar). Proibido tratar stderr de settings Write/Edit como causa raiz ou pedir «consertar o settings» como se fosse o problema. Cota vista na conta UI pelo humano **não** passa por esse stderr.
+  5. Avaliar se a rota git-capable sync precisa de paridade mínima de evidência de cota (text sentinels e/ou opção stream-json) sem misturar o circuito do painel — decisão de frente dedicada, não inferência ad hoc.
+- **Não** mapear `exit 1` sozinho para quota/limite/auth sem sinal textual. A melhoria é de **superfície do adapter** (não esconder stdout) + classificação quando o texto já existe + **disciplina do orquestrador** quando a rota sync não mede cota.
 
-**Origem:** teste operacional solicitado pelo usuário em 2026-07-26 após a frente do falso `workspace-not-trusted` do backend Claude Code.
+**Origem:** teste operacional 2026-07-26 (limite 5 h); reincidências 2026-08-31 (stdout spend-limit omitido no BLOCK; e sessão irmã com stdout vazio + diagnóstico «settings» no sync git-capable).
 
 <!-- backend-parity: ignore -->
-**Relacionado:** `xpz-llm-delegate/SKILL.md` (backend Claude Code, códigos de saída); `scripts/Invoke-ClaudeCode.ps1`; `scripts/ClaudeCodeCliSupport.ps1`; contrato de saída tipado dos adapters na entrada «Detecção de truncamento fora do opencode (paridade dos adapters stdin/JSONL)».
+**Relacionado:** `xpz-llm-delegate/SKILL.md` (backend Claude Code, códigos de saída; rota sync vs async); `scripts/Invoke-ClaudeCode.ps1` (`:110-115`, `--output-format text`); `scripts/ClaudeCodeCliSupport.ps1` (`Get-ClaudeCodeErrorMessage`, `Remove-ClaudeCodeEnvironmentNoise`, `Get-ClaudeCodeStreamQuotaEvidence`); `Invoke-ClaudeCodeAsync.ps1` (stream-json, sidecar, circuito de cota); contrato tipado na entrada «Detecção de truncamento fora do opencode».
 
 ## Perfil git-capable opcional para Claude Code CLI na delegação XPZ (painel / pré-push reforçada)
 
@@ -836,7 +843,28 @@ Após implementar + rebuild:
 - **Contrato de saída ESTRUTURADO dos adapters (surfado na frente A, `Invoke-LlmDelegatePanelDispatch`, 2026-06-22; reescopado em 2026-07-29):** o Claude Code do painel já ganhou contrato tipado próprio por `Invoke-ClaudeCodeAsync.ps1` + sidecar (`completed`/`timeout`/`quota`/`unavailable`/`internalError`, `resultAccepted`, `failureAfterText`). Nos adapters restantes, falhas ainda chegam majoritariamente como `BLOCK:` em prosa pt-BR ou por sinais estruturais pobres; mesmo o opencode tem `Get-OpenCodeCompletionVerdict`, mas ainda lança truncagem como string. Um consumidor que precise classificar resultado fora do Claude Code fica entre (a) classificar por exit code + stdout vazio/não-vazio e por sentinelas explícitas de infraestrutura, guardando a prosa **crua** no ledger, ou (b) **parsear a prosa de forma ampla** (frágil). A frente futura: dar status de saída tipado aos adapters restantes (`Invoke-Codex`, `Start-CodexJob`, `Invoke-Gemini`, `Invoke-Copilot`, `Invoke-Antigravity` — backend #6, que também devolve falha como `BLOCK:` em prosa — e a rota opencode onde ainda faltar), com verdict machine-readable (`ok|empty|timeout|quota|unavailable|error|truncated` ou equivalente) para o harness e outros consumidores. **Decisão vigente:** não generalizar todos os adapters nesta frente; o Claude Code no painel foi fechado como caso prioritário, e a paridade ampla segue aberta.
 
 <!-- backend-parity: ignore -->
-**Relacionado:** `xpz-llm-delegate/SKILL.md` (seção «Detecção de truncamento (Achado D)», cobertura por adapter); `scripts/Invoke-Codex.ps1`, `scripts/Invoke-ClaudeCode.ps1`, `scripts/Invoke-Gemini.ps1`, `scripts/Invoke-Copilot.ps1`, `scripts/Invoke-Antigravity.ps1`, `scripts/CopilotCliSupport.ps1`; do caminho assíncrono do Claude Code, `scripts/Watch-ClaudeCodeJob.ps1` e `scripts/ClaudeCodeCliSupport.ps1`; frente dos 4 achados da revisão por pares; frente A (`Invoke-LlmDelegatePanelDispatch`) e `15-revisao-por-pares.md`.
+**Relacionado:** `xpz-llm-delegate/SKILL.md` (seção «Detecção de truncamento (Achado D)», cobertura por adapter); `scripts/Invoke-Codex.ps1`, `scripts/Invoke-ClaudeCode.ps1`, `scripts/Invoke-Gemini.ps1`, `scripts/Invoke-Copilot.ps1`, `scripts/Invoke-Antigravity.ps1`, `scripts/CopilotCliSupport.ps1`; do caminho assíncrono do Claude Code, `scripts/Watch-ClaudeCodeJob.ps1` e `scripts/ClaudeCodeCliSupport.ps1`; frente dos 4 achados da revisão por pares; frente A (`Invoke-LlmDelegatePanelDispatch`) e `15-revisao-por-pares.md`. Captura durável Codex (2026-08-31) **não** implementa contrato tipado: `captureOutcome=success` ≠ `ok` tipado; distinguir truncamento por tokens vs parcialidade por Kill (timeout com bytes no lastmsg continua `timeout`).
+
+<!-- backend-parity: ignore -->
+## Residuais da captura durável Codex (transporte Invoke/Start/Watch)
+
+**Importância:** baixa (operacional; não bloqueia o ganho de bytes duráveis).
+**Maturidade:** residual registrado na frente de 2026-08-31.
+
+- NTFS/corrida em `result.json` → exit 21; Move-Item sem `-Force`.
+- PID reciclado no CI: identidade &lt; 1000 ms + KeepDays. **Item 13 (fora do CI) cumprido em 2026-08-31** — roteiro `Temp/validate-codex-durable-item13.ps1` com Codex real (`0.151.0-alpha.7.2`): identidade delta &lt; 1 ms, auto-watcher, anexação, 4c, pai morto, dois watchers (21), PID/hora errada (22).
+- lastmsg parcial no Watch → `completed` (Achado D futuro).
+- Start-CodexJob sem `RetentionMode` (job longo / kb-sensitive): skill+este residual.
+- C-shared = Claude async **e** órfão Codex só-stream (indistinguível) — nunca apagar sem marcador exclusivo.
+- `verdict.txt` do harness permanece em kb-sensitive (residual de paridade Claude).
+- `Kill($true)` + prompt em `invoke-in`: confidencialidade; `Kill()` simples permanece no Invoke.
+- `ContentionKeys['codex']` permanece `@()`: allowlist + splat TempDir bastam; assimetria com claude-code fica aqui.
+- KeepDays inerte no ledger fresco do painel (TempDir por rodada).
+- `2>&1` no sucesso mistura sentinelas ao stdout agregado (skill avisa).
+- `$quotaFailurePattern` ainda pode casar `429` noutro `BLOCK:` **no prefixo** (fora das linhas `XPZ_CODEX_`).
+- `result.json` órfão de um Watch Claude apontado ao mesmo TempDir Codex (improvável; defaults são pastas distintas).
+
+**Relacionado:** `xpz-llm-delegate/SKILL.md`; `scripts/Invoke-Codex.ps1`, `Start-CodexJob.ps1`, `Watch-CodexJob.ps1`, `CodexCliSupport.ps1`; Achado D acima.
 
 ## Implementar `Invoke-LlmDelegatePanelDispatch.ps1` (frente A) — CONCLUÍDA E PUSHADA (origin/main `2e88905`)
 

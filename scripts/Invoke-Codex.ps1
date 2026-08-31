@@ -5,7 +5,8 @@
 .DESCRIPTION
     Backend codex da skill xpz-llm-delegate. Resolve o codex.exe compativel (app desktop,
     nao o shim npm), envia o prompt via stdin e captura a resposta final pelo arquivo de
-    output-last-message (-o). Bloqueia ate a resposta (ou ate -TimeoutSec).
+    output-last-message (-o) no grupo duravel sob TempDir. Bloqueia ate a resposta (ou ate
+    -TimeoutSec).
 
     Esta e a invocacao sincrona canonica. Para tarefas longas que voce quer disparar sem
     bloquear, use Start-CodexJob.ps1.
@@ -17,6 +18,10 @@
     CONFIDENCIALIDADE: este script NAO decide para onde o dado pode ir. Antes de enviar
     payload sensivel (conteudo de pasta paralela de KB) a um modelo, o chamador deve passar
     pelo gate Resolve-LlmDelegateAuthorization.ps1 (use -Backend codex), conforme a skill.
+
+    request.json (source invoke-sync) NAO persiste o prompt; o prompt vive em invoke-in.txt
+    ate a limpeza. Sentinelas XPZ_CODEX_* saem por [Console]::Error (nunca Write-Error).
+    Stdout de sucesso: so o parecer.
 .PARAMETER Message
     Prompt a enviar ao agente (posicional). Enviado via stdin. Exclusivo com -MessagePath.
 .PARAMETER MessagePath
@@ -40,6 +45,17 @@
     Forca um caminho de codex.exe (contorna a descoberta automatica).
 .PARAMETER TimeoutSec
     Tempo maximo de espera pela resposta (default 180s). Modelos externos podem ser lentos.
+.PARAMETER TempDir
+    Pasta dos arquivos de job. Sem default no param(); o default efetivo vive em
+    Resolve-CodexJobTempDir (Bound nao-branco -> env XPZ_CODEX_JOBS_DIR -> %TEMP%\codex-jobs),
+    sempre absoluto.
+.PARAMETER KeepDays
+    Idade maxima (dias) dos arquivos de job antes da auto-limpeza por classe. Default 3
+    (ValidateRange 1..3650). Limpeza best-effort; falha nao bloqueia a invocacao.
+.PARAMETER RetentionMode
+    public (default): lastmsg/request permanecem no disco; so invoke-* e apagado apos
+    rewrite de captureOutcome. kb-sensitive: apaga lastmsg/invoke-* e o request apos
+    rewrite; em falha de execucao copia o lastmsg para a Exception.Message.
 .EXAMPLE
     .\Invoke-Codex.ps1 "resuma este log"
 .EXAMPLE
@@ -57,19 +73,20 @@ param(
     [string] $Profile,
     [string] $Cd,
     [string] $CodexExe,
-    [int]    $TimeoutSec = 180
+    [int]    $TimeoutSec = 180,
+    [string] $TempDir,
+    [ValidateRange(1, 3650)] [int] $KeepDays = 3,
+    [ValidateSet('public', 'kb-sensitive')] [string] $RetentionMode = 'public'
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-# Garante saida UTF-8 (acentos) ao devolver o texto pelo stdout
 try { [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false) } catch { }
 
-# Funcoes compartilhadas de descoberta do binario do Codex (dot-source)
 . (Join-Path $PSScriptRoot 'CodexCliSupport.ps1')
 
-# Prompt: inline (-Message) ou de arquivo (-MessagePath). Le como UTF-8 antes de qualquer uso.
+# Zero ficheiros de job ate o exe resolver.
 if ($PSCmdlet.ParameterSetName -eq 'FromFile') {
     if (-not (Test-Path -LiteralPath $MessagePath -PathType Leaf)) {
         throw "BLOCK: -MessagePath nao encontrado: $MessagePath"
@@ -77,58 +94,277 @@ if ($PSCmdlet.ParameterSetName -eq 'FromFile') {
     $Message = Get-Content -LiteralPath $MessagePath -Raw -Encoding utf8
 }
 
-# 1) Resolve o binario compativel (fail-closed)
 $exe = Resolve-CodexExe -Override $CodexExe
 
-# 2) Argumentos do `codex exec`
-$outMsg = (New-TemporaryFile).FullName
+$tempOverride = $null
+if ($PSBoundParameters.ContainsKey('TempDir') -and -not [string]::IsNullOrWhiteSpace($TempDir)) {
+    $tempOverride = $TempDir.Trim()
+}
+$TempDir = Resolve-CodexJobTempDir -Override $tempOverride
+
+try {
+    Invoke-CodexJobsKeepDaysCleanup -TempDir $TempDir -KeepDays $KeepDays
+} catch { }
+
+$jobId       = [guid]::NewGuid().ToString('N')
+$base        = Join-Path $TempDir $jobId
+$reqPath     = "$base.request.json"
+$lastMsgPath = "$base.lastmsg.txt"
+$invokeIn    = "$base.invoke-in.txt"
+$invokeOut   = "$base.invoke-out.txt"
+$invokeErr   = "$base.invoke-err.txt"
+
+$startedAt = Format-CodexUtcTimestamp -Value (Get-Date).ToUniversalTime()
+$requestObj = [ordered]@{
+    schemaVersion = 1
+    source        = 'invoke-sync'
+    jobId         = $jobId
+    model         = if ($Model) { $Model } else { $null }
+    startedAt     = $startedAt
+    lastMsgPath   = $lastMsgPath
+}
+Write-CodexJsonAtomic -Object $requestObj -Path $reqPath
+
+Set-Content -LiteralPath $invokeIn -Value $Message -Encoding utf8 -NoNewline
+Set-Content -LiteralPath $invokeOut -Value '' -Encoding utf8 -NoNewline
+Set-Content -LiteralPath $invokeErr -Value '' -Encoding utf8 -NoNewline
+
 $arguments = @(
     'exec', '--skip-git-repo-check', '-s', 'read-only', '--color', 'never',
-    '-o', $outMsg
+    '-o', $lastMsgPath
 )
 if ($Model) { $arguments += @('-m', $Model) }
 if ($Oss) { $arguments += '--oss' }
 if ($LocalProvider) { $arguments += @('--local-provider', $LocalProvider) }
 if ($Profile) { $arguments += @('-p', $Profile) }
 if ($Cd) { $arguments += @('-C', $Cd) }
-$arguments += '-'   # prompt lido do stdin
+$arguments += '-'
 
-# 3) stdin = o prompt
-$in = (New-TemporaryFile).FullName
-Set-Content -LiteralPath $in -Value $Message -Encoding utf8 -NoNewline
-$out = (New-TemporaryFile).FullName
-$err = (New-TemporaryFile).FullName
+$script:captureOutcome = 'success'
+$script:pendingExceptionMessage = $null
+$script:successText = $null
+
+function Append-CodexPendingBlock {
+    param([Parameter(Mandatory)] [string] $Block)
+    if ($null -eq $script:pendingExceptionMessage) {
+        $script:pendingExceptionMessage = $Block
+    } else {
+        $script:pendingExceptionMessage = $script:pendingExceptionMessage + "`n" + $Block
+    }
+}
+
+function Ensure-CodexPendingSentinels {
+    if ($null -eq $script:pendingExceptionMessage) { return }
+    if ($script:pendingExceptionMessage -notmatch '(?m)^XPZ_CODEX_LASTMSG=') {
+        $script:pendingExceptionMessage = $script:pendingExceptionMessage + "`nXPZ_CODEX_LASTMSG=$lastMsgPath"
+    }
+    if ($script:pendingExceptionMessage -notmatch '(?m)^XPZ_CODEX_REQUEST=') {
+        $script:pendingExceptionMessage = $script:pendingExceptionMessage + "`nXPZ_CODEX_REQUEST=$reqPath"
+    }
+}
+
+function Write-CodexInvokeRequestRewrite {
+    param(
+        [Parameter(Mandatory)] [string] $Outcome,
+        [bool] $IncludeRetentionFlag = $false,
+        [bool] $RetentionCleanupFailed = $false
+    )
+    if ($env:XPZ_TEST_CODEX_INVOKE_FAIL_REWRITE -eq '1') {
+        throw 'hook: request rewrite fail'
+    }
+    $requestObj['captureOutcome'] = $Outcome
+    if ($IncludeRetentionFlag) {
+        $requestObj['retentionCleanupFailed'] = [bool]$RetentionCleanupFailed
+    } elseif ($requestObj.Contains('retentionCleanupFailed')) {
+        $requestObj.Remove('retentionCleanupFailed')
+    }
+    Write-CodexJsonAtomic -Object $requestObj -Path $reqPath -Force
+}
 
 try {
-    $p = Start-Process -FilePath $exe -ArgumentList $arguments -NoNewWindow -PassThru `
-        -RedirectStandardOutput $out -RedirectStandardError $err -RedirectStandardInput $in
-    if (-not $p.WaitForExit($TimeoutSec * 1000)) {
-        try { $p.Kill() } catch { }
-        throw "BLOCK: codex excedeu ${TimeoutSec}s e foi encerrado."
+    if ($env:XPZ_TEST_CODEX_INVOKE_UNEXPECTED -eq '1') {
+        throw 'BLOCK: falha inesperada de teste.'
     }
 
-    $stdoutText = (Get-Content -LiteralPath $out -Raw -ErrorAction SilentlyContinue)
-    $stderrText = (Get-Content -LiteralPath $err -Raw -ErrorAction SilentlyContinue)
+    $p = Start-Process -FilePath $exe -ArgumentList $arguments -NoNewWindow -PassThru `
+        -RedirectStandardOutput $invokeOut -RedirectStandardError $invokeErr -RedirectStandardInput $invokeIn
+
+    $timedOut = $false
+    if ($env:XPZ_TEST_CODEX_FORCE_TIMEOUT -eq '1') {
+        # Hook de teste: espera o fake gravar -o e sair; classifica como timeout com ficheiros destrancados.
+        try { [void]$p.WaitForExit(60000) } catch { }
+        $timedOut = $true
+    }
+    elseif (-not $p.WaitForExit($TimeoutSec * 1000)) {
+        try { $p.Kill() } catch { }
+        try { [void]$p.WaitForExit(5000) } catch { }
+        Start-Sleep -Milliseconds 300
+        $timedOut = $true
+    }
+
+    $stdoutText = (Get-Content -LiteralPath $invokeOut -Raw -ErrorAction SilentlyContinue)
+    $stderrText = (Get-Content -LiteralPath $invokeErr -Raw -ErrorAction SilentlyContinue)
 
     $final = ''
-    if (Test-Path -LiteralPath $outMsg -PathType Leaf) {
-        $final = (Get-Content -LiteralPath $outMsg -Raw -Encoding utf8 -ErrorAction SilentlyContinue)
+    if (Test-Path -LiteralPath $lastMsgPath -PathType Leaf) {
+        $final = (Get-Content -LiteralPath $lastMsgPath -Raw -Encoding utf8 -ErrorAction SilentlyContinue)
     }
+    if ($null -eq $final) { $final = '' }
 
-    # A resposta final (output-last-message) e a evidencia primaria de sucesso: havendo-a,
-    # devolve-se direto. So sem resposta investiga-se erro — o stdout/stderr do agente pode
-    # conter "ERROR: {...}" de comandos internos (grep, leitura de arquivos) sem ser erro da sessao.
-    if (-not [string]::IsNullOrWhiteSpace($final)) {
-        return $final.TrimEnd("`r", "`n")
+    if ($timedOut) {
+        $script:captureOutcome = 'timeout'
+        $script:pendingExceptionMessage = "BLOCK: codex excedeu ${TimeoutSec}s e foi encerrado."
     }
-
-    $errMsg = Get-CodexExecErrorMessage -StdoutText $stdoutText -StderrText $stderrText
-    if ($errMsg) { throw "BLOCK: codex retornou erro: $errMsg" }
-    if ($p.ExitCode -ne 0) {
-        throw "BLOCK: codex saiu com codigo $($p.ExitCode) sem resposta.`nstderr:`n$stderrText"
+    elseif (-not [string]::IsNullOrWhiteSpace($final)) {
+        $script:successText = $final.TrimEnd("`r", "`n")
     }
-    throw "BLOCK: codex nao produziu resposta (output-last-message vazio)."
+    elseif ($p.ExitCode -eq 0) {
+        $script:captureOutcome = 'empty'
+        $script:pendingExceptionMessage = 'BLOCK: codex nao produziu resposta (output-last-message vazio).'
+    }
+    else {
+        $script:captureOutcome = 'error'
+        $errMsg = Get-CodexExecErrorMessage -StdoutText $stdoutText -StderrText $stderrText
+        if ($errMsg) {
+            $script:pendingExceptionMessage = "BLOCK: codex retornou erro: $errMsg"
+        } else {
+            $script:pendingExceptionMessage = "BLOCK: codex saiu com codigo $($p.ExitCode) sem resposta.`nstderr:`n$stderrText"
+        }
+    }
+}
+catch {
+    $script:captureOutcome = 'error'
+    $msg = [string]$_.Exception.Message
+    if ([string]::IsNullOrWhiteSpace($msg)) { $msg = 'erro inesperado' }
+    if ($msg -notlike 'BLOCK:*') {
+        $msg = "BLOCK: $msg"
+    }
+    $script:pendingExceptionMessage = $msg
 }
 finally {
-    Remove-Item -LiteralPath $out, $err, $in, $outMsg -Force -ErrorAction SilentlyContinue
+    # NUNCA throw a partir do finally.
+
+    # 2b. Sentinelas em stderr (sucesso e falha).
+    try {
+        [Console]::Error.WriteLine("XPZ_CODEX_LASTMSG=$lastMsgPath")
+        [Console]::Error.WriteLine("XPZ_CODEX_REQUEST=$reqPath")
+    } catch { }
+
+    if ($RetentionMode -eq 'public') {
+        $rewriteOk = $false
+        try {
+            Write-CodexInvokeRequestRewrite -Outcome $script:captureOutcome -IncludeRetentionFlag:$false
+            $rewriteOk = $true
+        } catch {
+            $rewriteOk = $false
+        }
+
+        if (-not $rewriteOk) {
+            if ($null -ne $script:pendingExceptionMessage) {
+                Append-CodexPendingBlock -Block 'BLOCK: falha ao gravar request.json.'
+            }
+            # Sucesso: nao bloqueia successText; nao apaga o grupo.
+        } else {
+            foreach ($f in @($invokeIn, $invokeOut, $invokeErr)) {
+                Remove-Item -LiteralPath $f -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+    else {
+        # kb-sensitive
+        $isExecFailure = ($null -ne $script:pendingExceptionMessage) -or (
+            $script:captureOutcome -eq 'timeout' -or
+            $script:captureOutcome -eq 'error' -or
+            $script:captureOutcome -eq 'empty'
+        )
+
+        if ($isExecFailure) {
+            if ((Test-Path -LiteralPath $lastMsgPath -PathType Leaf)) {
+                $captured = $null
+                try {
+                    $captured = Get-Content -LiteralPath $lastMsgPath -Raw -Encoding utf8 -ErrorAction SilentlyContinue
+                } catch { $captured = $null }
+                if (-not [string]::IsNullOrWhiteSpace($captured)) {
+                    Ensure-CodexPendingSentinels
+                    Append-CodexPendingBlock -Block 'XPZ_CODEX_CAPTURED_TEXT_BEGIN'
+                    $script:pendingExceptionMessage = $script:pendingExceptionMessage + "`n" + $captured
+                }
+            }
+        }
+
+        $rewriteOk = $false
+        try {
+            Write-CodexInvokeRequestRewrite -Outcome $script:captureOutcome -IncludeRetentionFlag:$true -RetentionCleanupFailed:$false
+            $rewriteOk = $true
+        } catch {
+            $rewriteOk = $false
+        }
+
+        if (-not $rewriteOk) {
+            try {
+                if (Test-Path -LiteralPath $reqPath -PathType Leaf) {
+                    [Console]::Error.WriteLine("XPZ_CODEX_REQUEST=$reqPath")
+                }
+                if (Test-Path -LiteralPath $lastMsgPath -PathType Leaf) {
+                    [Console]::Error.WriteLine("XPZ_CODEX_LASTMSG=$lastMsgPath")
+                }
+            } catch { }
+            Append-CodexPendingBlock -Block 'BLOCK: falha ao gravar request.json antes da limpeza kb-sensitive.'
+        }
+        else {
+            $deleteFailed = $false
+            foreach ($pass in 1..5) {
+                $deleteFailed = $false
+                foreach ($f in @($invokeIn, $invokeOut, $invokeErr, $lastMsgPath)) {
+                    try {
+                        if (Test-Path -LiteralPath $f -PathType Leaf) {
+                            Remove-Item -LiteralPath $f -Force -ErrorAction Stop
+                        }
+                    } catch {
+                        $deleteFailed = $true
+                    }
+                }
+                if (-not $deleteFailed) { break }
+                Start-Sleep -Milliseconds 200
+            }
+            if (-not $deleteFailed) {
+                try {
+                    if (Test-Path -LiteralPath $reqPath -PathType Leaf) {
+                        Remove-Item -LiteralPath $reqPath -Force -ErrorAction Stop
+                    }
+                } catch {
+                    $deleteFailed = $true
+                }
+            }
+
+            if ($deleteFailed) {
+                try {
+                    Write-CodexInvokeRequestRewrite -Outcome $script:captureOutcome -IncludeRetentionFlag:$true -RetentionCleanupFailed:$true
+                } catch { }
+                Append-CodexPendingBlock -Block 'BLOCK: falha ao limpar artefatos kb-sensitive.'
+                try {
+                    if (Test-Path -LiteralPath $reqPath -PathType Leaf) {
+                        [Console]::Error.WriteLine("XPZ_CODEX_REQUEST=$reqPath")
+                    }
+                    if (Test-Path -LiteralPath $lastMsgPath -PathType Leaf) {
+                        [Console]::Error.WriteLine("XPZ_CODEX_LASTMSG=$lastMsgPath")
+                    }
+                } catch { }
+            }
+        }
+    }
+
+    if ($null -ne $script:pendingExceptionMessage) {
+        Ensure-CodexPendingSentinels
+    }
+}
+
+if ($null -ne $script:pendingExceptionMessage) {
+    throw $script:pendingExceptionMessage
+}
+elseif ($null -ne $script:successText) {
+    return $script:successText
+}
+else {
+    throw 'BLOCK: Invoke-Codex sem parecer nem erro pendente.'
 }

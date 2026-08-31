@@ -52,6 +52,9 @@ $mutexName = 'panel-fake-mtx-' + [guid]::NewGuid().ToString('N')
 # Env compartilhado com o processo filho (e com os fake-exe via Start-Process herdado)
 $env:PANEL_FAKE_LOG = $concLog
 $env:PANEL_FAKE_MUTEX = $mutexName
+# Isola KeepDays do Invoke-Codex (splat Bound TempDir do harness vence env; DISABLE evita limpeza).
+$script:prevCodexDisableKeepDays = $env:XPZ_CODEX_DISABLE_KEEPDAYS
+$env:XPZ_CODEX_DISABLE_KEEPDAYS = '1'
 # Guard D1/D2: versao testada dos fixtures (o fake-opencode a devolve em --version p/ o pre-check)
 $repoRoot = Split-Path -Parent $scriptsDir
 $env:PANEL_FAKE_OC_VERSION = ((Get-Content -LiteralPath (Join-Path $repoRoot 'xpz-llm-delegate\fixtures\opencode-reviewer-ro\VERSION.txt') -Raw -Encoding utf8).Trim())
@@ -1137,5 +1140,10 @@ finally {
     Remove-Item Env:\PANEL_FAKE_LOG -ErrorAction SilentlyContinue
     Remove-Item Env:\PANEL_FAKE_MUTEX -ErrorAction SilentlyContinue
     Remove-Item Env:\PANEL_FAKE_OC_VERSION -ErrorAction SilentlyContinue
+    if ($null -eq $script:prevCodexDisableKeepDays) {
+        Remove-Item Env:\XPZ_CODEX_DISABLE_KEEPDAYS -ErrorAction SilentlyContinue
+    } else {
+        $env:XPZ_CODEX_DISABLE_KEEPDAYS = $script:prevCodexDisableKeepDays
+    }
     if (Test-Path -LiteralPath $tmp) { Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue }
 }

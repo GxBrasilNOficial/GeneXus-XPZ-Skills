@@ -258,7 +258,19 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File "%~dp0fake-codex-reader.ps1" %*
     $codexExpectedLen = $codexPromptText.Length
 
     $invokeCodex = Join-Path $scriptsDir 'Invoke-Codex.ps1'
-    $codexAnswer = [string](& $invokeCodex -CodexExe $fakeCodexCmd -MessagePath $codexFile -TimeoutSec 60)
+    $codexTempDir = Join-Path $tempRoot 'codex-jobs-isolated'
+    [System.IO.Directory]::CreateDirectory($codexTempDir) | Out-Null
+    $prevCodexDisableKeepDays = $env:XPZ_CODEX_DISABLE_KEEPDAYS
+    $env:XPZ_CODEX_DISABLE_KEEPDAYS = '1'
+    try {
+        $codexAnswer = [string](& $invokeCodex -CodexExe $fakeCodexCmd -MessagePath $codexFile -TimeoutSec 60 -TempDir $codexTempDir)
+    } finally {
+        if ($null -eq $prevCodexDisableKeepDays) {
+            Remove-Item Env:\XPZ_CODEX_DISABLE_KEEPDAYS -ErrorAction SilentlyContinue
+        } else {
+            $env:XPZ_CODEX_DISABLE_KEEPDAYS = $prevCodexDisableKeepDays
+        }
+    }
 
     Assert-True ($codexAnswer -match 'CODEXFAKE=(\d+)') `
         "Invoke-Codex -MessagePath deveria devolver o conteudo literal do output-last-message do fake (CODEXFAKE=<n>); devolveu: '$codexAnswer'."

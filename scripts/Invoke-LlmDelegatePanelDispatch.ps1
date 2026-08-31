@@ -1046,6 +1046,12 @@ for ($i = 0; $i -lt $reviewers.Count; $i++) {
         }
         $rec.sidecarPath = $sidecarPath
     }
+    elseif ($backend -eq 'codex') {
+        # Paridade de destino com Claude (~1042-1043): TempDir do ledger + RetentionMode.
+        # Nao abrir ContentionKeys/allowlist — TempDir Bound vence; invokeArgs.tempdir cai em droppedArgs.
+        $splat['RetentionMode'] = $PayloadSensitivity
+        $splat['TempDir'] = $ledgerDir
+    }
     elseif ($backend -eq 'antigravity') {
         $receiptPath = Join-Path $ledgerDir ('{0:D2}-antigravity-public-review.receipt.json' -f $i)
         $splat['Profile'] = 'public-review'
@@ -1122,7 +1128,25 @@ try {
                     if ($null -ne $errRec) { $errText = [string]$errRec.Exception.Message }
                 }
                 elseif ($null -ne $errRec) {
-                    $msg = [string]$errRec.Exception.Message
+                    # $errText = mensagem completa (sentinelas XPZ_CODEX_* + captura kb-sensitive).
+                    # $msgClassificado = prefixo ANTES da primeira linha XPZ_CODEX_ (apos normalizar
+                    # \r\n -> \n). NAO chamar funcao do runspace pai — inline / $using: apenas.
+                    $errText = [string]$errRec.Exception.Message
+                    $errNorm = $errText -replace "`r`n", "`n"
+                    $msgClassificado = $errNorm
+                    $cut = -1
+                    if ($errNorm.StartsWith('XPZ_CODEX_')) {
+                        $cut = 0
+                    } else {
+                        $marker = "`nXPZ_CODEX_"
+                        $cut = $errNorm.IndexOf($marker)
+                    }
+                    if ($cut -eq 0) {
+                        $msgClassificado = ''
+                    } elseif ($cut -gt 0) {
+                        $msgClassificado = $errNorm.Substring(0, $cut)
+                    }
+                    $msg = $msgClassificado
                     if ($msg -match 'BLOCK:' -and $msg -match $quotaPattern) {
                         $state = 'quota'
                     # `refusedSensitivity` NAO entra aqui: o adapter nunca a emite (nao recebe
@@ -1139,7 +1163,7 @@ try {
                     } else {
                         $state = 'error'
                     }
-                    $errText = $msg
+                    # errorPath / __errorText usam $errText completo (sentinelas + captura).
                 } else {
                     if ([string]::IsNullOrWhiteSpace($joined)) {
                         $state = 'error'

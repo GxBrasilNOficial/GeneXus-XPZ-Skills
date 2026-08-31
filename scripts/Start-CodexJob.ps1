@@ -6,8 +6,8 @@
     Backend codex da skill xpz-llm-delegate. Cria um job identificado por GUID em <TempDir> e
     dispara `codex exec --json` desanexado, com o stream JSONL crescendo em <GUID>.stream.jsonl
     e a resposta final escrita por -o em <GUID>.lastmsg.txt. Retorna imediatamente jobId+pid
-    (nao bloqueia o chamador). Por padrao abre Watch-CodexJob.ps1 numa janela visivel; use
-    -NoWatcher para suprimir.
+    (nao bloqueia o chamador). Por padrao abre Watch-CodexJob.ps1 numa janela visivel quando a
+    hora de inicio do processo for utilizavel; use -NoWatcher para suprimir.
 
     Para perguntas curtas (resposta na hora) use Invoke-Codex.ps1. Este script e para tarefas
     longas que voce quer disparar e acompanhar sem bloquear.
@@ -16,19 +16,20 @@
     passe antes pelo gate Resolve-LlmDelegateAuthorization.ps1 (-Backend codex).
 
     Arquivos do job (todos compartilham o mesmo GUID, em <TempDir>):
-        <GUID>.request.json   o que foi pedido (model, prompt)
+        <GUID>.request.json   pedido (schema 1, source start-job, prompt persistido)
         <GUID>.stream.jsonl   eventos do codex exec --json, cresce incrementalmente
         <GUID>.lastmsg.txt    resposta final (output-last-message do codex)
         <GUID>.stderr.txt     erros do processo
         <GUID>.stdin.txt      o prompt enviado via stdin
+        <GUID>.identity.json  fallback de pid/processStartTimeUtc se o rewrite do request falhar
         <GUID>.result.json    resposta final + status (gravado pelo watcher no fim)
 .PARAMETER Message
     Prompt a enviar (posicional). Exclusivo com -MessagePath.
 .PARAMETER MessagePath
     Caminho de um arquivo de onde ler o prompt (UTF-8). Exclusivo com -Message. Evita
     substituicao de comando ("(Get-Content ...)") na linha de comando do chamador. O texto do
-    prompt segue persistido em <GUID>.request.json e <GUID>.stdin.txt como hoje; -MessagePath
-    muda so a origem do texto, nao o transporte.
+    prompt segue persistido em <GUID>.request.json e <GUID>.stdin.txt; -MessagePath muda so a
+    origem do texto, nao o transporte.
 .PARAMETER Model
     Modelo do Codex (nu). Opcional; quando omitido, o adapter nao passa -m e deixa o
     default do proprio Codex/config valer.
@@ -45,9 +46,12 @@
 .PARAMETER NoWatcher
     Nao abrir a janela do watcher (apenas dispara o job).
 .PARAMETER TempDir
-    Pasta dos arquivos de job. Default: <temp do usuario>\codex-jobs.
+    Pasta dos arquivos de job. Sem default no param(); o default efetivo vive em
+    Resolve-CodexJobTempDir (Bound nao-branco -> env XPZ_CODEX_JOBS_DIR -> %TEMP%\codex-jobs),
+    sempre absoluto.
 .PARAMETER KeepDays
-    Idade maxima (dias) dos arquivos de job antes da auto-limpeza. Default 3.
+    Idade maxima (dias) dos arquivos de job antes da auto-limpeza por classe. Default 3
+    (ValidateRange 1..3650). Limpeza best-effort; falha nao bloqueia o spawn.
 .EXAMPLE
     .\Start-CodexJob.ps1 "tarefa longa" -NoWatcher
 .EXAMPLE
@@ -64,18 +68,16 @@ param(
     [string] $Cd,
     [string] $CodexExe,
     [switch] $NoWatcher,
-    [string] $TempDir = (Join-Path ([System.IO.Path]::GetTempPath()) 'codex-jobs'),
-    [int]    $KeepDays = 3
+    [string] $TempDir,
+    [ValidateRange(1, 3650)] [int] $KeepDays = 3
 )
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
-# Funcoes compartilhadas de descoberta do binario do Codex (dot-source)
 . (Join-Path $PSScriptRoot 'CodexCliSupport.ps1')
 
-# Prompt: inline (-Message) ou de arquivo (-MessagePath). Le como UTF-8 ANTES de montar
-# request.json / stdin.txt (que persistem o texto de $Message).
+# Prompt: inline (-Message) ou de arquivo (-MessagePath). Zero ficheiros de job ate o exe.
 if ($PSCmdlet.ParameterSetName -eq 'FromFile') {
     if (-not (Test-Path -LiteralPath $MessagePath -PathType Leaf)) {
         throw "BLOCK: -MessagePath nao encontrado: $MessagePath"
@@ -83,48 +85,44 @@ if ($PSCmdlet.ParameterSetName -eq 'FromFile') {
     $Message = Get-Content -LiteralPath $MessagePath -Raw -Encoding utf8
 }
 
-# 1) Resolve o binario compativel (fail-closed)
 $exe = Resolve-CodexExe -Override $CodexExe
 
-# 2) Pasta de jobs
-if (-not (Test-Path -LiteralPath $TempDir -PathType Container)) {
-    New-Item -Path $TempDir -ItemType Directory -Force | Out-Null
+$tempOverride = $null
+if ($PSBoundParameters.ContainsKey('TempDir') -and -not [string]::IsNullOrWhiteSpace($TempDir)) {
+    $tempOverride = $TempDir.Trim()
 }
+$TempDir = Resolve-CodexJobTempDir -Override $tempOverride
 
-# 2b) Auto-limpeza: remove arquivos de jobs com mais de -KeepDays dias.
 try {
-    $limite = (Get-Date).AddDays(-[Math]::Abs($KeepDays))
-    Get-ChildItem -LiteralPath $TempDir -File -ErrorAction SilentlyContinue |
-        Where-Object { $_.LastWriteTime -lt $limite } |
-        ForEach-Object { Remove-Item -LiteralPath $_.FullName -Force -ErrorAction SilentlyContinue }
+    Invoke-CodexJobsKeepDaysCleanup -TempDir $TempDir -KeepDays $KeepDays
 } catch { }
 
-# 3) Identidade do job (GUID sem hifens) e caminhos
-$jobId      = [guid]::NewGuid().ToString('N')
-$base       = Join-Path $TempDir $jobId
-$reqPath    = "$base.request.json"
-$streamPath = "$base.stream.jsonl"
+$jobId       = [guid]::NewGuid().ToString('N')
+$base        = Join-Path $TempDir $jobId
+$reqPath     = "$base.request.json"
+$streamPath  = "$base.stream.jsonl"
 $lastMsgPath = "$base.lastmsg.txt"
-$errPath    = "$base.stderr.txt"
-$stdinPath  = "$base.stdin.txt"
-$resultPath = "$base.result.json"
+$errPath     = "$base.stderr.txt"
+$stdinPath   = "$base.stdin.txt"
+$resultPath  = "$base.result.json"
+$identityPath = "$base.identity.json"
 
-# 4) request.json
+$startedAt = Format-CodexUtcTimestamp -Value (Get-Date).ToUniversalTime()
 $request = [ordered]@{
-    jobId       = $jobId
-    model       = if ($Model) { $Model } else { $null }
-    prompt      = $Message
-    startedAt   = (Get-Date).ToString('o')
-    streamPath  = $streamPath
-    lastMsgPath = $lastMsgPath
-    resultPath  = $resultPath
+    schemaVersion = 1
+    source        = 'start-job'
+    jobId         = $jobId
+    model         = if ($Model) { $Model } else { $null }
+    prompt        = $Message
+    startedAt     = $startedAt
+    streamPath    = $streamPath
+    lastMsgPath   = $lastMsgPath
+    resultPath    = $resultPath
 }
-$request | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $reqPath -Encoding utf8
+Write-CodexJsonAtomic -Object $request -Path $reqPath
 
-# 5) stdin = o prompt
 Set-Content -LiteralPath $stdinPath -Value $Message -Encoding utf8 -NoNewline
 
-# 6) Dispara o codex exec desanexado (janela oculta, nao espera)
 $cxArgs = @(
     'exec', '--skip-git-repo-check', '-s', 'read-only', '--color', 'never',
     '--json', '-o', $lastMsgPath
@@ -136,29 +134,120 @@ if ($Profile) { $cxArgs += @('-p', $Profile) }
 if ($Cd) { $cxArgs += @('-C', $Cd) }
 $cxArgs += '-'
 
-$proc = Start-Process -FilePath $exe -ArgumentList $cxArgs -WindowStyle Hidden -PassThru `
-    -RedirectStandardOutput $streamPath -RedirectStandardError $errPath -RedirectStandardInput $stdinPath
-$procId = $proc.Id
+$procId = $null
+$processStartTimeUtc = $null
+$spawnFailed = $false
 
-# 7) Abre o watcher numa janela visivel (a menos que -NoWatcher)
-$watcher = Join-Path $PSScriptRoot 'Watch-CodexJob.ps1'
+try {
+    if ($env:XPZ_TEST_CODEX_START_FAIL_SPAWN -eq '1') {
+        throw 'BLOCK: falha ao iniciar processo Codex.'
+    }
+    $proc = Start-Process -FilePath $exe -ArgumentList $cxArgs -WindowStyle Hidden -PassThru `
+        -RedirectStandardOutput $streamPath -RedirectStandardError $errPath -RedirectStandardInput $stdinPath
+    $procId = $proc.Id
+    try {
+        $st = $proc.StartTime
+        if ($st.Kind -ne [DateTimeKind]::Utc) { $st = $st.ToUniversalTime() }
+        $processStartTimeUtc = Format-CodexUtcTimestamp -Value $st
+    } catch {
+        $processStartTimeUtc = $null
+    }
+} catch {
+    $spawnFailed = $true
+}
+
+if ($spawnFailed) {
+    $rewriteOk = $false
+    try {
+        if ($env:XPZ_TEST_CODEX_START_FAIL_REQUEST_REWRITE -eq '1') {
+            throw 'hook: request rewrite fail'
+        }
+        $request['captureOutcome'] = 'error'
+        Write-CodexJsonAtomic -Object $request -Path $reqPath -Force
+        $rewriteOk = $true
+    } catch {
+        $rewriteOk = $false
+    }
+
+    if (-not $rewriteOk) {
+        [Console]::Error.WriteLine('BLOCK: falha ao iniciar processo Codex.')
+        [Console]::Error.WriteLine('BLOCK: falha ao gravar request.json.')
+        try {
+            $ident = [ordered]@{ jobId = $jobId }
+            if ($null -ne $procId) { $ident['pid'] = $procId }
+            if (-not [string]::IsNullOrWhiteSpace($processStartTimeUtc)) {
+                $ident['processStartTimeUtc'] = $processStartTimeUtc
+            }
+            Write-CodexJsonAtomic -Object $ident -Path $identityPath -Force
+        } catch { }
+        throw 'BLOCK: falha ao iniciar processo Codex.'
+    }
+
+    throw 'BLOCK: falha ao iniciar processo Codex.'
+}
+
+# Spawn ok: gravar pid + processStartTimeUtc no request (Force).
+$rewritePidOk = $false
+try {
+    if ($env:XPZ_TEST_CODEX_START_FAIL_REQUEST_REWRITE -eq '1') {
+        throw 'hook: request rewrite fail'
+    }
+    $request['pid'] = $procId
+    if (-not [string]::IsNullOrWhiteSpace($processStartTimeUtc)) {
+        $request['processStartTimeUtc'] = $processStartTimeUtc
+    }
+    Write-CodexJsonAtomic -Object $request -Path $reqPath -Force
+    $rewritePidOk = $true
+} catch {
+    $rewritePidOk = $false
+}
+
+if (-not $rewritePidOk) {
+    [Console]::Error.WriteLine('BLOCK: falha ao gravar request.json.')
+    try {
+        $ident = [ordered]@{
+            jobId = $jobId
+            pid   = $procId
+        }
+        if (-not [string]::IsNullOrWhiteSpace($processStartTimeUtc)) {
+            $ident['processStartTimeUtc'] = $processStartTimeUtc
+        }
+        Write-CodexJsonAtomic -Object $ident -Path $identityPath -Force
+    } catch { }
+}
+
+# Watcher: true so se a janela foi tentada E o Start-Process do watcher teve sucesso.
+$watcherFlag = $false
 if (-not $NoWatcher) {
-    if (Test-Path -LiteralPath $watcher -PathType Leaf) {
-        Start-Process pwsh -WindowStyle Normal -ArgumentList @(
-            '-NoExit', '-NoProfile', '-File', $watcher,
-            '-JobId', $jobId, '-ProcessId', "$procId", '-TempDir', $TempDir
-        ) | Out-Null
-    } else {
-        Write-Warning "Watcher nao encontrado em $watcher; job segue rodando sem janela."
+    $resolved = Resolve-CodexPidAndStartTime -TempDir $TempDir -JobId $jobId
+    $expectedUtc = $resolved.processStartTimeUtc
+    if (-not [string]::IsNullOrWhiteSpace($expectedUtc)) {
+        $watcherScript = Join-Path $PSScriptRoot 'Watch-CodexJob.ps1'
+        if (Test-Path -LiteralPath $watcherScript -PathType Leaf) {
+            try {
+                $watchPid = if ($null -ne $resolved.pid) { $resolved.pid } else { $procId }
+                Start-Process pwsh -WindowStyle Normal -ArgumentList @(
+                    '-NoExit', '-NoProfile', '-File', $watcherScript,
+                    '-JobId', $jobId,
+                    '-ProcessId', "$watchPid",
+                    '-TempDir', $TempDir,
+                    '-ExpectedStartTimeUtc', $expectedUtc
+                ) | Out-Null
+                $watcherFlag = $true
+            } catch {
+                Write-Warning 'Falha ao lancar o watcher; job segue rodando sem janela.'
+            }
+        } else {
+            Write-Warning "Watcher nao encontrado em $watcherScript; job segue rodando sem janela."
+        }
     }
 }
 
-# 8) Devolve a identidade do job ao chamador (JSON compacto numa linha)
 [pscustomobject]@{
     jobId   = $jobId
     pid     = $procId
     stream  = $streamPath
     lastmsg = $lastMsgPath
     result  = $resultPath
-    watcher = (-not $NoWatcher)
+    watcher = [bool]$watcherFlag
 } | ConvertTo-Json -Compress
