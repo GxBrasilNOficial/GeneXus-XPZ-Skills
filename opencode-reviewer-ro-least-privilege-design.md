@@ -223,7 +223,7 @@ D2/D3.
 
 - **Feito:** `xpz-llm-delegate/SKILL.md:927-984` (seção «OPENCODE — REVISOR LEAST-PRIVILEGE»;
   rename «sem execução/escrita» em `:927`; inversão de premissa `external_directory` em `:965-971`);
-  harness `:633-636`); `15-revisao-por-pares.md:96` (+ nota de operador cwd);
+  harness `:633-636`; `15-revisao-por-pares.md:96` (+ nota de operador cwd);
   `08-guia-para-agente-gpt.md`; `09-inventario-e-rastreabilidade-publica.md` (scripts + token
   `OPENCODE_REVIEWER_RO_SELFTEST_OK`); `CHANGELOG` (breaking-change do default);
   `#1+#2` em `historico/IdeiasImplementadas_202607.md`; nota `:484` no `999`.
