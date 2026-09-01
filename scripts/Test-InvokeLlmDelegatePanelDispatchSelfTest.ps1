@@ -7,7 +7,8 @@
     (no adapter REAL) e dirige o gate REAL por configs/política sintéticas. Cobre a lista de
     self-test da v11: modelo efetivo + fail-closeds; gate codex com oss; gate geral (fixture,
     fail-closed kb-sensitive, gate que LANÇA); opencode kb-sensitive -> unavailable; splat +
-    contenção; paralelismo (ocupação <= OllamaConcurrency p/ ollama-cloud, outros livres, bloco
+    contenção; captura durável Codex no painel (TempDir/RetentionMode Bound, invokeArgs.tempdir→droppedArgs,
+    strip XPZ_CODEX_ com 429 no path); paralelismo (ocupação <= OllamaConcurrency p/ ollama-cloud, outros livres, bloco
     que lança não aborta os demais, OllamaConcurrency=0 -> validação, Dispose após captura);
     sem single-flight (fake NÃO re-invocado + concurrencySaturationWarning); classificação
     mecânica (responded mesmo off-task); -Cd (precedência + fail-closed); contrato (stdout 1 linha
@@ -496,6 +497,58 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
     Assert-True (@((Get-Reviewer $r.json 0).droppedArgs) -contains 'foobar') 'codex chave estranha -> droppedArgs'
     Assert-True (@((Get-Reviewer $r.json 1).droppedArgs) -contains 'foobar') 'copilot chave estranha -> droppedArgs'
     Assert-True (@((Get-Reviewer $r.json 2).droppedArgs) -contains 'profile') 'claude-code com profile -> droppedArgs (profile é só do codex)'
+
+    # =======================================================================================
+    # 5b) CAPTURA DURÁVEL CODEX NO PAINEL: splat Bound + droppedArgs + strip XPZ_CODEX_
+    # =======================================================================================
+    # (a)+(b) TempDir/RetentionMode Bound do ledger; invokeArgs.tempdir/retentionMode -> droppedArgs
+    # (assimetria deliberada vs claude-code, que manda TempDir a securityBlockedArgs). Bound vence.
+    $stolenCodexLedger = Join-Path $tmp 'roubar-codex-ledger'
+    [IO.Directory]::CreateDirectory($stolenCodexLedger) | Out-Null
+    $r = Invoke-Harness -Reviewers @(@{
+            backend = 'codex'
+            invokeArgs = @{
+                model          = 'gpt-5.5'
+                tempdir        = $stolenCodexLedger
+                retentionMode  = 'kb-sensitive'
+            }
+        }) -Sensitivity 'public' -Extra @{ CodexConfigPath = $cxCfg }
+    $rv = Get-Reviewer $r.json 0
+    Assert-True ($rv.state -eq 'responded') "codex durable splat: esperado responded; got $($rv.state)"
+    $droppedCodex = @($rv.droppedArgs)
+    Assert-True ($droppedCodex -contains 'tempdir') "codex durable: tempdir deveria cair em droppedArgs; got [$($droppedCodex -join ',')]"
+    Assert-True ($droppedCodex -contains 'retentionMode') "codex durable: retentionMode deveria cair em droppedArgs; got [$($droppedCodex -join ',')]"
+    $secCodex = @($rv.securityBlockedArgs)
+    Assert-True ($secCodex -notcontains 'tempdir' -and $secCodex -notcontains 'retentionMode') "codex durable: tempdir/retentionMode NAO sao securityBlockedArgs; got [$($secCodex -join ',')]"
+    Assert-True (@(Get-ChildItem -LiteralPath $stolenCodexLedger -Filter '*.request.json' -File -ErrorAction SilentlyContinue).Count -eq 0) 'codex durable: invokeArgs.tempdir NAO deve receber request.json (Bound vence)'
+    $boundReqs = @(Get-ChildItem -LiteralPath $r.ledgerDir -Filter '*.request.json' -File -ErrorAction SilentlyContinue)
+    $boundMsgs = @(Get-ChildItem -LiteralPath $r.ledgerDir -Filter '*.lastmsg.txt' -File -ErrorAction SilentlyContinue)
+    Assert-True ($boundReqs.Count -ge 1) "codex durable splat TempDir: request.json sob o ledger Bound; got $($boundReqs.Count)"
+    Assert-True ($boundMsgs.Count -ge 1) 'codex durable RetentionMode=public Bound: lastmsg permanece no ledger (kb-sensitive do invokeArgs foi dropado)'
+    $cap = (Get-Content -LiteralPath $boundReqs[0].FullName -Raw -Encoding utf8 | ConvertFrom-Json).captureOutcome
+    Assert-True ($cap -eq 'success') "codex durable: captureOutcome=success; got '$cap'"
+
+    # (c) strip XPZ_CODEX_ no Parallel: path/RoundId com 429 nas sentinelas NAO vira quota
+    $prevForceTimeout = $env:XPZ_TEST_CODEX_FORCE_TIMEOUT
+    $env:XPZ_TEST_CODEX_FORCE_TIMEOUT = '1'
+    try {
+        $rid429 = 'panel-strip-429-' + [guid]::NewGuid().ToString('N')
+        $r = Invoke-Harness -Reviewers @(@{ backend = 'codex'; invokeArgs = @{ model = 'gpt-5.5'; timeoutSec = 2 } }) `
+            -Sensitivity 'public' -NoRoundId -Extra @{ RoundId = $rid429; CodexConfigPath = $cxCfg }
+        $rv = Get-Reviewer $r.json 0
+        Assert-True ($rv.state -eq 'timeout') "codex strip 429: esperado timeout (nao quota); got $($rv.state)"
+        Assert-True ([int]$r.json.quotaCount -eq 0) "codex strip 429: quotaCount deveria ser 0; got $($r.json.quotaCount)"
+        Assert-True ($null -ne $rv.errorPath) 'codex strip 429: deveria gravar .error.txt com errText completo'
+        $errLedger = Get-Content -LiteralPath $rv.errorPath -Raw -Encoding utf8
+        Assert-True ($errLedger -match '429') 'codex strip 429: errorPath preserva path/429 (errText completo)'
+        Assert-True ($errLedger -match 'excedeu' -and $errLedger -match 'foi encerrado') 'codex strip 429: evidencia de timeout no errorPath'
+    } finally {
+        if ($null -eq $prevForceTimeout) {
+            Remove-Item Env:\XPZ_TEST_CODEX_FORCE_TIMEOUT -ErrorAction SilentlyContinue
+        } else {
+            $env:XPZ_TEST_CODEX_FORCE_TIMEOUT = $prevForceTimeout
+        }
+    }
 
     # =======================================================================================
     # 6) PARALELISMO: ocupação <= OllamaConcurrency p/ ollama-cloud; outros livres; lança não aborta

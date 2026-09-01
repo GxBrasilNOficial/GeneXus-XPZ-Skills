@@ -441,6 +441,8 @@ exit 0
     Write-Host 'PASS 5e sem-texto shape' -ForegroundColor Green
 
     # ===== 2c: path com 429 nas sentinelas; classificador usa prefixo (timeout, nao quota) =====
+    # Lock do ALGORITMO de corte (prefixo antes de XPZ_CODEX_). A integracao no Parallel do
+    # dispatcher e o caso 5b de Test-InvokeLlmDelegatePanelDispatchSelfTest.ps1.
     $j2c = Join-Path $jobs 'ledger-with-429-in-name'
     [IO.Directory]::CreateDirectory($j2c) | Out-Null
     $env:XPZ_TEST_CODEX_FORCE_TIMEOUT = '1'
