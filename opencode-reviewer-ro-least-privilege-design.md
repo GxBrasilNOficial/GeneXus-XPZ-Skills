@@ -15,10 +15,10 @@ headless, o agente default `build` (e `--agent plan`) **auto-aprova** `bash`/`ed
 revisor pode executar comandos e editar arquivos. Incidente real (2026-06-24): um revisor opencode
 (`kimi-k2.7-code`, agente default) **editou** um `.md` do repo. O harness
 `scripts/Invoke-LlmDelegatePanelDispatch.ps1` **bloqueia** a chave `agent` do opencode
-(`$ContentionKeys['opencode']=@('agent')`, `:113`; classificação `:230-237`), então não há via
+(`$ContentionKeys['opencode']=@('agent')`, `:143`; classificação `:858-889`), então não há via
 oficial para passar um agente seguro — o revisor sempre cai no `build`. A mitigação atual é só
-textual (`xpz-llm-delegate/SKILL.md:818-842`). O gate `Resolve-LlmDelegateAuthorization.ps1` governa
-**se o dado sai** (`public`→`allow` automático em `:173-178`), **não** a capacidade de executar/ler
+textual (`xpz-llm-delegate/SKILL.md:927-984`). O gate `Resolve-LlmDelegateAuthorization.ps1` governa
+**se o dado sai** (`public`→`allow` automático em `:177-182`), **não** a capacidade de executar/ler
 local.
 
 Eixos de risco: (i) execução/escrita local; (ii) exfiltração (agravante do modelo externo).
@@ -31,7 +31,7 @@ Eixos de risco: (i) execução/escrita local; (ii) exfiltração (agravante do m
   do workspace do cwd (ver D4), mas não prova isolamento absoluto nem torna o cwd seguro.
 - **ADIADO para outra sessão:** liberar opencode em `kb-sensitive`/pasta paralela de KB, e mecanizar
   a contenção de leitura (cwd-seguro). Hoje opencode em `kb-sensitive` é `unavailable`
-  (`Invoke-LlmDelegatePanelDispatch.ps1:253-258`).
+  (`Invoke-LlmDelegatePanelDispatch.ps1:891-896`).
 
 ## Decisões (D1–D4)
 
@@ -80,7 +80,7 @@ sem confirmar"). O BLOCK registra no recibo **qual** check falhou: **estático d
 campo, cair para estático + hash do arquivo, aceitando o ponto cego de merge-global (frente futura).
 
 **Pós-check (DEFESA-EM-PROFUNDIDADE, não a barreira).** Síncrono (`Invoke-OpenCode.ps1`): lê o
-CONTEÚDO de `$err` (arquivo temp descartado no `finally` em `:200`) **antes** do `Remove-Item`, e
+CONTEÚDO de `$err` (pós-check `:178-186`; descarte no `finally` `:244-247`) **antes** do `Remove-Item`, e
 varre pelo warning de fallback. Assíncrono: `Start-OpenCodeJob.ps1` mantém artefatos do job por
 idade e `Watch-OpenCodeJob.ps1` lê o stderr persistido. Depois do contrato v2 do watcher, fallback
 assíncrono para `build`/default não é mais apenas diagnóstico aceitável: ele invalida o aceite
@@ -128,7 +128,7 @@ removem as tools; `"*": deny` curinga funciona. A nota de `999:168` ("`tools:fal
 `permission:deny`") é **refutada pela medição** — corrigir **condicionada** ao self-test confirmar.
 
 **(b) Global (qualquer cwd):** instalador dedicado `scripts/Install-OpenCodeReviewerRoAgent.ps1`,
-**dono `xpz-llm-delegate`**. `Read-McpRoot` de `Install-CursorGlobalInstructionsMcp.ps1:191-213` é
+**dono `xpz-llm-delegate`**. `Read-McpRoot` de `Install-CursorGlobalInstructionsMcp.ps1:237-259` é
 hardcoded para `mcpServers` e **não** reusável → função nova. Alvo:
 `~/.config/opencode/opencode.jsonc`. **Contrato:** edição **localizada** do bloco
 `agent.reviewer-ro` preservando comentários/formatação/demais chaves (não reescrita total); a
@@ -144,9 +144,10 @@ project-local resolvem `*` final `deny` + allow-set `{read,grep,glob,list}`. A c
 do repo, mas não deve ser lido como prova independente de semântica de merge/substituição campo a
 campo.
 
-**Pré-requisito de cwd:** opencode **não** recebe `-Cd` (`Invoke-LlmDelegatePanelDispatch.ps1:362-363`
-`$cdCapable` exclui opencode; `:373` `(Get-Location).Path` é código morto para opencode). Herda a
-cwd ambiente (`Invoke-OpenCode.ps1:135`, `Start-Process` sem `-WorkingDirectory`).
+**Pré-requisito de cwd:** opencode **não** recebe `-Cd` (`Invoke-LlmDelegatePanelDispatch.ps1:161`
+`$AdapterCdCapable` exclui opencode; `:1013-1024` resolve `-Cd` só para backends cd-capable;
+`:1024` `(Get-Location).Path` não alcança opencode). Herda a cwd ambiente (`Invoke-OpenCode.ps1:158-159`,
+`Start-Process` sem `-WorkingDirectory`).
 
 ### D4 — Escopo D-min; bloqueio padrão fora do cwd herdado; cwd-seguro é OPERACIONAL
 
@@ -162,10 +163,10 @@ do arquivo-sentinela fora do cwd pela mesma regra base). `external_directory: de
 exceções `allow` para diretórios internos do opencode, como o tool-output; elas não autorizam
 tratar o cwd como "seguro" nem como proibição absoluta de todo path externo específico.
 **Este achado INVERTE a premissa** de
-`SKILL.md:838-840` (que hoje diz que `read` lê "qualquer arquivo") — tratar a reescrita da doc como
+`SKILL.md:965-971` (premissa anterior de que `read` lê "qualquer arquivo") — tratar a reescrita da doc como
 **correção de premissa**, versionada por fixture, condicionada ao self-test na versão instalada.
 
-**Qual é o cwd:** herdado do orquestrador (`Invoke-OpenCode.ps1:135`, sem `-WorkingDirectory`);
+**Qual é o cwd:** herdado do orquestrador (`Invoke-OpenCode.ps1:158-159`, sem `-WorkingDirectory`);
 opencode nunca recebe `-Cd`. Confinamento por **herança**, não por controle explícito.
 
 **Garante / NÃO garante:** garante mecanicamente o bloqueio padrão de leitura fora do cwd herdado
@@ -204,7 +205,7 @@ validade compara contra a versão dos fixtures — não fixar uma versão como p
 
 **Natureza HONESTA do gate (fold-in G1):** o **runtime** é protegido pelo **pré-check do D2**
 (código, fail-closed) — esse é o mecanismo. O "bloqueio de ativação" pelos self-tests é um **GATE DE
-PROCESSO/CI** (análogo ao closeout de `15:87`): os self-tests devem passar na versão-alvo
+PROCESSO/CI** (análogo ao closeout de `15:53`): os self-tests devem passar na versão-alvo
 (pré-push/CI) **antes** de a frente ser considerada ativada e o default `-Agent reviewer-ro` ser
 ligado. **Não** é mecanismo de runtime; o token no `09` é **rastreabilidade**, não enforcement.
 Cláusula de validade: fixture que não reproduz na versão instalada ⇒ **não ativar** + revisitar
@@ -212,9 +213,9 @@ D2/D3.
 
 ## Paridade doc (fase final)
 
-`xpz-llm-delegate/SKILL.md:818-842` (reescrever a seção "LIMITE CONHECIDO — OPENCODE…", inclui rename
-"read-only obrigatório" → "sem execução/escrita" em `:842`; `external_directory` como **inversão de
-premissa**), `:534-535`; `15-revisao-por-pares.md:83` (+ nota de operador cwd);
+`xpz-llm-delegate/SKILL.md:927-984` (seção «OPENCODE — REVISOR LEAST-PRIVILEGE»; rename
+"read-only obrigatório" → "sem execução/escrita" em `:927`; `external_directory` como **inversão de
+premissa** em `:965-971`), `:534-535`; `15-revisao-por-pares.md:96` (+ nota de operador cwd);
 `xpz-skills-setup/SKILL.md` (hook de auditoria citando o instalador); `08-guia-para-agente-gpt.md`
 (runtime da delegação); `09-inventario-e-rastreabilidade-publica.md` (scripts novos + token
 `OPENCODE_REVIEWER_RO_SELFTEST_OK`); `CHANGELOG` (+ breaking-change do default); `999-ideias-pendentes.md:145-168`
