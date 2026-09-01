@@ -216,7 +216,7 @@ D2/D3.
 
 `xpz-llm-delegate/SKILL.md:927-984` (seção «OPENCODE — REVISOR LEAST-PRIVILEGE»; rename
 "read-only obrigatório" → "sem execução/escrita" em `:927`; `external_directory` como **inversão de
-premissa** em `:965-971`), `:534-535`; `15-revisao-por-pares.md:96` (+ nota de operador cwd);
+premissa** em `:965-971`), `:633-636`; `15-revisao-por-pares.md:96` (+ nota de operador cwd);
 `xpz-skills-setup/SKILL.md` (hook de auditoria citando o instalador); `08-guia-para-agente-gpt.md`
 (runtime da delegação); `09-inventario-e-rastreabilidade-publica.md` (scripts novos + token
 `OPENCODE_REVIEWER_RO_SELFTEST_OK`); `CHANGELOG` (+ breaking-change do default); `999-ideias-pendentes.md:479-496`
