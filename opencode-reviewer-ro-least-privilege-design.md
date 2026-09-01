@@ -129,7 +129,7 @@ permission:
 ```
 `mode: all` (garante seleção por `--agent` em headless). Medido em opencode 1.17.20: `permission:deny`
 ≡ `tools:false` (resolvem idêntico, removem a tool em headless); `webfetch/websearch/task: deny`
-removem as tools; `"*": deny` curinga funciona. A equivalência medida está em `999:483`
+removem as tools; `"*": deny` curinga funciona. A equivalência medida está em `999:484`
 (`permission:deny` ≡ `tools:false`); a nota antiga de que `tools:false` seria mais forte que
 `permission:deny` foi **refutada pela medição** — corrigir **condicionada** ao self-test confirmar.
 
@@ -226,9 +226,9 @@ D2/D3.
   harness `:633-636`); `15-revisao-por-pares.md:96` (+ nota de operador cwd);
   `08-guia-para-agente-gpt.md`; `09-inventario-e-rastreabilidade-publica.md` (scripts + token
   `OPENCODE_REVIEWER_RO_SELFTEST_OK`); `CHANGELOG` (breaking-change do default);
-  `#1+#2` em `historico/IdeiasImplementadas_202607.md`; nota `:483` no `999`.
+  `#1+#2` em `historico/IdeiasImplementadas_202607.md`; nota `:484` no `999`.
 - **Parcial:** `xpz-skills-setup/SKILL.md` — só ponteiro de dependência (`:63-64`); fiação ativa
-  pendente (`999:490-496`).
+  pendente (`999:491-497`).
 - **Adiado (esperado):** eixo de leitura/`kb-sensitive` (`999:479-488`).
 - **README trilíngue:** entrada `xpz-llm-delegate` cita default `-Agent reviewer-ro`.
 
