@@ -22,4 +22,5 @@ Entrada residual preservada em `999-ideias-pendentes.md`: item 5 (avaliar parida
 
 ### Rastreabilidade
 
+- Commit material: `71480d5` (`feat(claude-code): preservar evidencia textual em exit 1 e ampliar filtro de ruido`)
 - Arquivos materiais: `scripts/ClaudeCodeCliSupport.ps1`, `scripts/Invoke-ClaudeCode.ps1`, `scripts/Test-ClaudeCodeCliSupportSelfTest.ps1`, `xpz-llm-delegate/SKILL.md`, `09-inventario-e-rastreabilidade-publica.md`, `CHANGELOG.md`, `999-ideias-pendentes.md`.

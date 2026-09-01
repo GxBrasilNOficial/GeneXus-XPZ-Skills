@@ -50,7 +50,7 @@ function Get-ClaudeCodeErrorMessage {
 
     $lines = @($combined -split "`r?`n")
     $interesting = @($lines | Where-Object {
-        $_ -match '(?i)\b(error|failed|unauthorized|forbidden|not\s+available|requires|login|auth|spend\s+limit|monthly\s+limit|rate\s*limit|usage\s*limit|quota)\b' -or
+        $_ -match '(?i)\b(error|failed|unauthorized|forbidden|not\s+available|requires|login|auth|spend\s+limit|monthly\s+limit|session\s+limit|rate\s*limit|usage\s*limit|quota)\b' -or
         $_ -match '(?i)claude\.ai/settings/usage'
     })
     if ($interesting.Count -gt 0) {

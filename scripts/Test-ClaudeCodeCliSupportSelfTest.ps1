@@ -98,6 +98,10 @@ Assert-Equal 'spend limit URL preservada' ($spendFromStdout -match 'claude\.ai/s
 $spendFromStderr = Get-ClaudeCodeErrorMessage -StdoutText '' -StderrText $spendLimitStdout
 Assert-Equal 'spend limit em stderr com stdout vazio extraido' ($spendFromStderr -match '(?i)spend limit') $true
 
+$sessionLimitStdout = "You've hit your session limit · resets 9:40pm (America/Sao_Paulo)"
+$sessionFromStdout = Get-ClaudeCodeErrorMessage -StdoutText $sessionLimitStdout -StderrText $denyNoise
+Assert-Equal 'session limit em stdout medido em 2026-09-01 extraido' ($sessionFromStdout -match '(?i)session limit') $true
+
 # --- Ruido puro: nenhum erro classificavel --------------------------------------------------
 $pureNoiseResult = Get-ClaudeCodeErrorMessage -StdoutText '' -StderrText $noiseStderr
 Assert-Equal 'ruido puro retorna null' $pureNoiseResult $null
