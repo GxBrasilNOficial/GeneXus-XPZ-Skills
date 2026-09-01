@@ -404,11 +404,12 @@ Smoke test retornou `HEAD` correto em ~13 s; a falha no painel foi **modo de inv
 
 **Origem:** dogfooding da pré-push reforçada schema 3 preferidos por orquestrador (2026-08-28): Claude no painel falhou com `plan` + `Read,Glob,Grep`; chamada direta com `-Tools default -PermissionMode dontAsk` confirmou git-capable; usuário concluiu que a contenção é intencional e pediu registro no `999`.
 
-## Modo dossiê compacto para revisores semantic-only / argv-limited (pré-push reforçada)
+## <!-- backend-parity: ignore --> Modo dossiê compacto para revisores semantic-only / argv-limited (pré-push reforçada)
 
 - **Importância** — média (revisor semantic-only omitido por tamanho do payload impede convergência do painel; workaround hoje é omitir o revisor ou trocar backend — não há modo de transporte enxuto).
 - **Maturidade** — ideia (estudar com calma em sessão dedicada **antes** de implementar; decisões de o que manter vs cortar ainda em aberto).
 
+<!-- backend-parity: ignore -->
 **Problema medido (dogfooding pré-push reforçada schema 3, 2026-08-28).** `Build-PrePushReviewDossier.ps1` monta Seção A (git bruto) incluindo **`git diff origin/main..HEAD` integral**. Na frente schema 3 (6 commits, diff amplo), o dossiê ficou com **~354k caracteres**. Backends **argv-limited** (Copilot, Gemini, Antigravity — teto ~30k pelo guard do dispatcher) recebem `unavailable` + `reason=dossier-too-large` e **somem do painel**. Medido: Antigravity omitido por esse motivo na rodada de dogfooding.
 
 **O que o semantic-only precisa de fato (hipótese a validar).** Para a fase semântica read-only do `13`, o revisor lê árvore viva + contexto git **resumido** + JSON mecânico rotulado «não verdade» — não necessariamente o diff linha a linha inteiro. Fatos úteis: `HEAD`, intervalo, lista de commits, arquivos tocados, `git diff --stat`, trechos citados sob demanda pelo git-capable, saída de `Invoke-PrePushMechanicalChecks.ps1 -AsJson`.
