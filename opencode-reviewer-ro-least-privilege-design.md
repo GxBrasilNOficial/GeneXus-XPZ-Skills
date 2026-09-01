@@ -124,8 +124,9 @@ permission:
 ```
 `mode: all` (garante seleção por `--agent` em headless). Medido em opencode 1.17.20: `permission:deny`
 ≡ `tools:false` (resolvem idêntico, removem a tool em headless); `webfetch/websearch/task: deny`
-removem as tools; `"*": deny` curinga funciona. A nota de `999:168` ("`tools:false` mais forte que
-`permission:deny`") é **refutada pela medição** — corrigir **condicionada** ao self-test confirmar.
+removem as tools; `"*": deny` curinga funciona. A equivalência medida está em `999:483`
+(`permission:deny` ≡ `tools:false`); a nota antiga de que `tools:false` seria mais forte que
+`permission:deny` foi **refutada pela medição** — corrigir **condicionada** ao self-test confirmar.
 
 **(b) Global (qualquer cwd):** instalador dedicado `scripts/Install-OpenCodeReviewerRoAgent.ps1`,
 **dono `xpz-llm-delegate`**. `Read-McpRoot` de `Install-CursorGlobalInstructionsMcp.ps1:237-259` é
@@ -135,7 +136,7 @@ hardcoded para `mcpServers` e **não** reusável → função nova. Alvo:
 definição global é **derivada** do markdown project-local (fonte única) + guard de deriva por
 self-test; passo de **migração** do interino global (forma antiga `tools:` → `permission`). O
 `xpz-skills-setup` ganha **só** um hook de auditoria read-only citando este instalador como
-dependência de setup (o `agentsPath` dele é do MCP do Cursor — `999:167` — não cobre agentes
+dependência de setup (o `agentsPath` dele é do MCP do Cursor — `xpz-skills-setup/SKILL.md:63-64` — não cobre agentes
 opencode).
 
 **Global-only e project-local resolvem o contrato least-privilege:** o global provisionado e o
@@ -218,9 +219,9 @@ D2/D3.
 premissa** em `:965-971`), `:534-535`; `15-revisao-por-pares.md:96` (+ nota de operador cwd);
 `xpz-skills-setup/SKILL.md` (hook de auditoria citando o instalador); `08-guia-para-agente-gpt.md`
 (runtime da delegação); `09-inventario-e-rastreabilidade-publica.md` (scripts novos + token
-`OPENCODE_REVIEWER_RO_SELFTEST_OK`); `CHANGELOG` (+ breaking-change do default); `999-ideias-pendentes.md:145-168`
-(mover #1+#2 para `historico/IdeiasImplementadas_202607.md`; corrigir a nota `:168` condicionada ao
-self-test; manter o eixo de leitura/`kb-sensitive` como entrada **adiada**). **NÃO** usar
+`OPENCODE_REVIEWER_RO_SELFTEST_OK`); `CHANGELOG` (+ breaking-change do default); `999-ideias-pendentes.md:479-496`
+(mover #1+#2 para `historico/IdeiasImplementadas_202607.md`; corrigir a nota `:483` condicionada ao
+self-test; manter o eixo de leitura/`kb-sensitive` em `:479-488` e fiação `xpz-skills-setup` em `:490-496` como entrada **adiada**). **NÃO** usar
 `02-regras-operacionais-e-runtime.md` (é runtime do GeneXus/XPZ, não do harness de delegação).
 README trilíngue: refletir em ES/EN se a regra operacional mudar.
 
