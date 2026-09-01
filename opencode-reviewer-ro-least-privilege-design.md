@@ -41,9 +41,9 @@ Eixos de risco: (i) execução/escrita local; (ii) exfiltração (agravante do m
 `Invoke-OpenCode.ps1` e `Start-OpenCodeJob.ps1` ganham **default `-Agent reviewer-ro`** (`$Agent`
 hoje é opcional sem default). Espelha os 4 backends que fixam a postura no adapter: claude-code
 `Invoke-ClaudeCode.ps1:41` (`plan`), codex `Invoke-Codex.ps1:133` (`-s read-only`), gemini
-`Invoke-Gemini.ps1:36`+`:49-51` (throw≠plan), copilot `Invoke-Copilot.ps1:92` (`--available-tools=`
-vazio; `--allow-all-tools` em `:93` é **necessário** pelo CLI e vira no-op sob cardápio vazio). O
-painel bloqueia `agent` (`:113`) → o revisor **sempre** cai no default `reviewer-ro`.
+`Invoke-Gemini.ps1:36`+`:49-51` (throw≠plan), copilot `Invoke-Copilot.ps1:96` (`--available-tools=`
+vazio; `--allow-all-tools` em `:97` é **necessário** pelo CLI e vira no-op sob cardápio vazio). O
+painel bloqueia `agent` (`:143`) → o revisor **sempre** cai no default `reviewer-ro`.
 
 **Escopo do enforce (fold-in G2):** o enforce read-only do D2 vale quando o **agente efetivo é o
 default `reviewer-ro`** (o caminho revisor). Um chamador que passa `-Agent <x>` **explicitamente**
