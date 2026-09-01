@@ -107,14 +107,35 @@ try {
         return $stdoutText.TrimEnd("`r", "`n")
     }
 
+    # Exit 0 sem output -- preservar comportamento atual
+    if ($p.ExitCode -eq 0) {
+        throw 'BLOCK: Claude Code nao produziu resposta.'
+    }
+
+    # ExitCode != 0 -- preservar evidencia de ambos os canais
     $errMsg = Get-ClaudeCodeErrorMessage -StdoutText $stdoutText -StderrText $stderrText
     if ($errMsg) {
         throw "BLOCK: Claude Code retornou erro: $errMsg"
     }
-    if ($p.ExitCode -ne 0) {
-        throw "BLOCK: Claude Code saiu com codigo $($p.ExitCode) sem resposta.`nstderr:`n$stderrText"
+
+    $stdoutClean = if ($stdoutText) { $stdoutText.Trim() } else { '' }
+    $cleanStderr = Remove-ClaudeCodeEnvironmentNoise -Text $stderrText
+
+    if ($stdoutClean -or $cleanStderr) {
+        $parts = @()
+        if ($stdoutClean) {
+            $stdoutLines = @($stdoutClean -split "`r?`n" | Select-Object -First 8) -join "`n"
+            $parts += "stdout:`n$stdoutLines"
+        }
+        if ($cleanStderr) {
+            $stderrLines = @($cleanStderr -split "`r?`n" | Select-Object -First 8) -join "`n"
+            $parts += "stderr:`n$stderrLines"
+        }
+        $detailsText = $parts -join "`n---`n"
+        throw "BLOCK: Claude Code saiu com codigo $($p.ExitCode).`n$detailsText"
     }
-    throw 'BLOCK: Claude Code nao produziu resposta.'
+
+    throw "BLOCK: Claude Code saiu com codigo $($p.ExitCode) sem resposta."
 }
 finally {
     Remove-Item -LiteralPath $in, $out, $err -Force -ErrorAction SilentlyContinue

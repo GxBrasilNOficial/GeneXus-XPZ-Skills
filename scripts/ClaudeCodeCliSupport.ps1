@@ -50,7 +50,8 @@ function Get-ClaudeCodeErrorMessage {
 
     $lines = @($combined -split "`r?`n")
     $interesting = @($lines | Where-Object {
-        $_ -match '(?i)\b(error|failed|unauthorized|forbidden|not\s+available|requires|login|auth)\b'
+        $_ -match '(?i)\b(error|failed|unauthorized|forbidden|not\s+available|requires|login|auth|spend\s+limit|monthly\s+limit|rate\s*limit|usage\s*limit|quota)\b' -or
+        $_ -match '(?i)claude\.ai/settings/usage'
     })
     if ($interesting.Count -gt 0) {
         return (($interesting | Select-Object -First 8) -join "`n").Trim()
@@ -312,8 +313,8 @@ function Test-ClaudeCodeEnvironmentNoiseLine {
     param([AllowNull()] [string] $Line)
     if ([string]::IsNullOrWhiteSpace($Line)) { return $false }
     return (
-        $Line -match '(?i)^\s*ignoring\s+\d+\s+permissions\.allow\s+entries\b' -or
-        $Line -match '(?i)^\s*permission\s+allow\s+rule\s*\('
+        $Line -match '(?i)^\s*ignoring\s+\d+\s+permissions\.(allow|deny)\s+entries\b' -or
+        $Line -match '(?i)^\s*permission\s+(allow|deny)\s+rule\s*\('
     )
 }
 

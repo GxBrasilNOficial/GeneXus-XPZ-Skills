@@ -75,6 +75,37 @@ Assert-Equal 'recusa genuina ainda detectada sob ruido' (Test-ClaudeCodeWorkspac
 Assert-Equal 'status recusa genuina sob ruido continua unavailable' (Resolve-ClaudeCodeJobStatus -FinalText '' -StreamError '' -Stderr $trustPlusNoise).status 'unavailable'
 Assert-Equal 'status aviso de ambiente puro nao vira unavailable' (Resolve-ClaudeCodeJobStatus -FinalText '' -StreamError '' -Stderr $noiseStderr).status 'sem-texto'
 
+# --- Filtragem de ruido deny (2026-08-31: aviso Write vs Edit aparece como deny rule) -----------
+$denyNoise = @'
+Ignoring 2 permissions.deny entries from .claude/settings.json: this workspace has not been trusted.
+Permission deny rule (C:\Users\Fulano\.claude\settings.json): Write(C:/Dev/**) is not matched by file permission checks - only Edit(path) rules are. Use Edit(C:/Dev/**) instead (Edit rules cover all file-editing tools).
+'@
+Assert-Equal 'deny noise removido por inteiro' (Remove-ClaudeCodeEnvironmentNoise -Text $denyNoise) ''
+Assert-Equal 'deny noise nao vira erro' (Get-ClaudeCodeErrorMessage -StdoutText 'OK' -StderrText $denyNoise) $null
+
+# Stderr misto: ruido deny + erro real -> erro real preservado, ruido removido
+$mixedDenyErr = $denyNoise + "`nError: model not available"
+$mixedMsg = Get-ClaudeCodeErrorMessage -StdoutText '' -StderrText $mixedDenyErr
+Assert-Equal 'stderr misto deny+erro preserva erro real' ($mixedMsg -match 'model not available') $true
+Assert-Equal 'stderr misto deny+erro remove ruido' ($mixedMsg -match '(?i)permission deny rule') $false
+
+# --- Extracao simetrica de spend limit (2026-08-31: stdout e stderr) ----------------------------
+$spendLimitStdout = "You've hit your monthly spend limit -- raise it at claude.ai/settings/usage."
+$spendFromStdout = Get-ClaudeCodeErrorMessage -StdoutText $spendLimitStdout -StderrText $denyNoise
+Assert-Equal 'spend limit em stdout com ruido em stderr extraido' ($spendFromStdout -match '(?i)spend limit') $true
+Assert-Equal 'spend limit URL preservada' ($spendFromStdout -match 'claude\.ai/settings/usage') $true
+
+$spendFromStderr = Get-ClaudeCodeErrorMessage -StdoutText '' -StderrText $spendLimitStdout
+Assert-Equal 'spend limit em stderr com stdout vazio extraido' ($spendFromStderr -match '(?i)spend limit') $true
+
+# --- Ruido puro: nenhum erro classificavel --------------------------------------------------
+$pureNoiseResult = Get-ClaudeCodeErrorMessage -StdoutText '' -StderrText $noiseStderr
+Assert-Equal 'ruido puro retorna null' $pureNoiseResult $null
+Assert-Equal 'ruido puro status sem-texto' (Resolve-ClaudeCodeJobStatus -FinalText '' -StreamError '' -Stderr $noiseStderr).status 'sem-texto'
+
+# --- Exit 0 + ruido + resposta valida: sucesso intacto -------------------------------------
+Assert-Equal 'exit 0 com ruido e resposta nao vira erro' (Get-ClaudeCodeErrorMessage -StdoutText 'resposta valida' -StderrText ($denyNoise + "`n" + $noiseStderr)) $null
+
 $s1 = Resolve-ClaudeCodeJobStatus -FinalText 'ok' -StreamError '' -Stderr 'Error: ruidoso'
 Assert-Equal 'status resposta final manda' $s1.status 'completed'
 $s2 = Resolve-ClaudeCodeJobStatus -FinalText '' -StreamError 'stream boom' -Stderr ''
@@ -160,18 +191,43 @@ function New-FakeClaudeCodeExe {
     $argsFile = Join-Path $TempRoot 'args.txt'
     $script = @"
 @echo off
-if "%1"=="--version" (
-  echo 2.1.118
-  exit /b 0
-)
-if "%1"=="--help" (
-  echo --model --print --output-format --no-session-persistence --permission-mode --tools
-  exit /b 0
-)
-if "%FAKE_CLAUDE_UNTRUSTED%"=="1" (
-  echo Claude Code refused to run because this workspace is not trusted. Mark this workspace as trusted to continue. 1>&2
-  exit /b 1
-)
+if "%1"=="--version" goto :VERSION
+if "%1"=="--help" goto :HELP
+if "%FAKE_CLAUDE_UNTRUSTED%"=="1" goto :UNTRUSTED
+if "%FAKE_CLAUDE_SPEND_LIMIT%"=="1" goto :SPEND_LIMIT
+if "%FAKE_CLAUDE_NOISE_ONLY%"=="1" goto :NOISE_ONLY
+if "%FAKE_CLAUDE_UNCLASSIFIED%"=="1" goto :UNCLASSIFIED
+goto :DEFAULT
+
+:VERSION
+echo 2.1.118
+exit /b 0
+
+:HELP
+echo --model --print --output-format --no-session-persistence --permission-mode --tools
+exit /b 0
+
+:UNTRUSTED
+echo Claude Code refused to run because this workspace is not trusted. Mark this workspace as trusted to continue. 1>&2
+exit /b 1
+
+:SPEND_LIMIT
+echo Permission allow rule: Write vs Edit noise 1>&2
+echo You have hit your monthly spend limit -- raise it at claude.ai/settings/usage.
+exit /b 1
+
+:NOISE_ONLY
+echo Permission deny rule (settings.json): Write vs Edit noise 1>&2
+echo Ignoring 1 permissions.deny entries from .claude/settings.json 1>&2
+exit /b 1
+
+:UNCLASSIFIED
+echo unclassified output line 1
+echo unclassified output line 2
+echo some warning 1>&2
+exit /b 1
+
+:DEFAULT
 echo %*>>"$argsFile"
 echo OK fake claude
 exit /b 0
@@ -217,6 +273,38 @@ try {
     try { & (Join-Path $PSScriptRoot 'Invoke-ClaudeCode.ps1') 'workspace nao confiavel' -ClaudeExe $fake.Exe -TimeoutSec 30 | Out-Null } catch { $threwTrust = $true; $trustMsg = [string]$_.Exception.Message }
     $env:FAKE_CLAUDE_UNTRUSTED = $null
     Assert-Equal 'invoke workspace not trusted bloqueia com codigo canonico' ($threwTrust -and $trustMsg -match 'workspace-not-trusted') $true
+
+    # --- E2E: spend limit (2026-08-31) --------------------------------------------------------
+    $env:FAKE_CLAUDE_SPEND_LIMIT = '1'
+    $threwSpend = $false
+    $spendMsg = ''
+    try { & (Join-Path $PSScriptRoot 'Invoke-ClaudeCode.ps1') 'spend limit' -ClaudeExe $fake.Exe -TimeoutSec 30 | Out-Null } catch { $threwSpend = $true; $spendMsg = [string]$_.Exception.Message }
+    $env:FAKE_CLAUDE_SPEND_LIMIT = $null
+    Assert-Equal 'invoke spend limit bloqueia' $threwSpend $true
+    Assert-Equal 'invoke spend limit extrai mensagem' ($spendMsg -match '(?i)spend limit') $true
+    Assert-Equal 'invoke spend limit preserva URL' ($spendMsg -match 'claude\.ai/settings/usage') $true
+
+    # --- E2E: noise only (2026-08-31) ---------------------------------------------------------
+    $env:FAKE_CLAUDE_NOISE_ONLY = '1'
+    $threwNoise = $false
+    $noiseMsg = ''
+    try { & (Join-Path $PSScriptRoot 'Invoke-ClaudeCode.ps1') 'noise only' -ClaudeExe $fake.Exe -TimeoutSec 30 | Out-Null } catch { $threwNoise = $true; $noiseMsg = [string]$_.Exception.Message }
+    $env:FAKE_CLAUDE_NOISE_ONLY = $null
+    Assert-Equal 'invoke noise only bloqueia' $threwNoise $true
+    Assert-Equal 'invoke noise only diz sem resposta' ($noiseMsg -match 'sem resposta') $true
+    Assert-Equal 'invoke noise only nao despeja deny rule' ($noiseMsg -notmatch '(?i)permission (allow|deny) rule') $true
+    Assert-Equal 'invoke noise only nao despeja ignoring' ($noiseMsg -notmatch '(?i)ignoring \d+ permissions') $true
+
+    # --- E2E: unclassified output (2026-08-31) ------------------------------------------------
+    $env:FAKE_CLAUDE_UNCLASSIFIED = '1'
+    $threwUnclass = $false
+    $unclassMsg = ''
+    try { & (Join-Path $PSScriptRoot 'Invoke-ClaudeCode.ps1') 'unclassified' -ClaudeExe $fake.Exe -TimeoutSec 30 | Out-Null } catch { $threwUnclass = $true; $unclassMsg = [string]$_.Exception.Message }
+    $env:FAKE_CLAUDE_UNCLASSIFIED = $null
+    Assert-Equal 'invoke unclassified bloqueia' $threwUnclass $true
+    Assert-Equal 'invoke unclassified tem bloco stdout' ($unclassMsg -match 'stdout:') $true
+    Assert-Equal 'invoke unclassified preserva conteudo' ($unclassMsg -match 'unclassified output line') $true
+    Assert-Equal 'invoke unclassified nao diz sem resposta' ($unclassMsg -notmatch 'sem resposta') $true
 
     $jobDir = Join-Path $tmp 'jobs'
     $jobJson = & (Join-Path $PSScriptRoot 'Start-ClaudeCodeJob.ps1') 'job default tools' -ClaudeExe $fake.Exe -NoWatcher -TempDir $jobDir

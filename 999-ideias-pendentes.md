@@ -344,23 +344,15 @@ Critério para retomar: caso real em que a ausência do cache Codex prejudique a
 
 **Relacionado:** «Detecção de truncamento fora do opencode (paridade dos adapters stdin/JSONL)» abaixo (contrato de saída tipado dos adapters restantes); `scripts/Invoke-ClaudeCodeAsync.ps1`, `scripts/ClaudeCodeCliSupport.ps1`, `scripts/Watch-ClaudeCodeJob.ps1`, `scripts/Invoke-LlmDelegatePanelDispatch.ps1`; `15-revisao-por-pares.md`.
 
-## Preservar mais evidência quando o `claude` sai `1` sem saída classificável
+## Paridade mínima de evidência de cota na rota síncrona Claude Code (residual)
 
-- **Importância** — média (gap real com workaround: o orquestrador lê o `BLOCK` e diagnostica errado). Em 2026-07-26, uma chamada real `Invoke-ClaudeCode.ps1 -Message "responda OK" -Tools "" -TimeoutSec 60` retornou `exit 1` sem resposta e sem `stderr` capturado, durante janela em que o limite de 5 horas do Claude Code estava zerado. Em **2026-08-31** houve **dois modos irmãos** do mesmo erro de classificação:
-  1. **Sinal no stdout, adapter omite** (sessão captura durável Codex v20): `claude -p` exit 1 com **stdout** `You've hit your monthly spend limit — raise it at claude.ai/settings/usage…` e stderr só com avisos `Write(**/…) → Edit(**/…)` no `settings.json`. O `Invoke-ClaudeCode.ps1:110-115` não casou «spend limit» em `Get-ClaudeCodeErrorMessage`, caiu no ramo «saiu com codigo 1 **sem resposta**» e dumpou **só** `$stderrText` — o orquestrador propagou «settings Write/Edit» e omitiu a cota. O async do painel na mesma sessão já tinha classificado `quota` (429); o síncrono mascarou o mesmo eixo.
-  2. **Sem stdout, só ruído no stderr** (outra sessão / outro agente, mesmo dia, rota git-capable sync): exit 1 em ~6 s, stdout vazio, stderr só Write vs Edit. O orquestrador tratou esse stderr como causa e pediu «consertar o settings». A skill já diz que código `1` sozinho não prova cota/auth/modelo; o detector de cota do Claude Code vive no `stream-json` (`rate_limit_event`, 429) do `Invoke-ClaudeCodeAsync.ps1` (sidecar + circuito), **não** no `--output-format text` do `Invoke-ClaudeCode.ps1`. Sem sidecar e sem texto de spend-limit, **cota não foi medida** nessa invocação. Rótulo correto: `error` sem causa confirmada; «Claude Code não devolveu parecer; tipo/período de limite não determinado por esta rota» — não pedir consertar settings; não inferir disponibilidade nem indisponibilidade do modelo a partir do ruído.
-- **Maturidade** — ideia curta, com dois casos medidos (stdout com spend-limit escondido; canal sync cego + ruído settings). O `SKILL.md` registra o glossário operacional de exit codes. Melhorias concretas a decidir/implementar:
-  1. **Nunca** rotular «sem resposta» se stdout ou stderr tiver texto; o `BLOCK` do ramo `exit ≠ 0` deve incluir **stdout e stderr** (ou o que `Get-ClaudeCodeErrorMessage` devolver).
-  2. Em `Get-ClaudeCodeErrorMessage` / classificador do painel: sentinelas de **spend limit** / `claude.ai/settings/usage` / monthly limit → mensagem de cota (sem inferir só pelo número `1`).
-  3. Em `Remove-ClaudeCodeEnvironmentNoise`: tratar avisos `Permission deny rule … Use Edit(…) instead of Write(…)` como ruído de ambiente (como outros avisos que aparecem mesmo em sucesso), para não dominarem o `BLOCK`.
-  4. **Regra de orquestrador / skill (rota sync text):** após remover ruído, se não restar sinal classificável → rotular `error` sem causa confirmada e declarar explicitamente que **cota não foi medida nesta rota** (sync ≠ async/sidecar). Proibido tratar stderr de settings Write/Edit como causa raiz ou pedir «consertar o settings» como se fosse o problema. Cota vista na conta UI pelo humano **não** passa por esse stderr.
-  5. Avaliar se a rota git-capable sync precisa de paridade mínima de evidência de cota (text sentinels e/ou opção stream-json) sem misturar o circuito do painel — decisão de frente dedicada, não inferência ad hoc.
-- **Não** mapear `exit 1` sozinho para quota/limite/auth sem sinal textual. A melhoria é de **superfície do adapter** (não esconder stdout) + classificação quando o texto já existe + **disciplina do orquestrador** quando a rota sync não mede cota.
-
-**Origem:** teste operacional 2026-07-26 (limite 5 h); reincidências 2026-08-31 (stdout spend-limit omitido no BLOCK; e sessão irmã com stdout vazio + diagnóstico «settings» no sync git-capable).
+- **Importância** — baixa (reflexão futura, não gap ativo). Oriunda do item 5 da frente «Preservar mais evidência quando o `claude` sai `1` sem saída classificável» (implementada em 2026-09-01; ver `historico/IdeiasImplementadas_202609.md`).
+- **Maturidade** — ideia; decisão de frente dedicada.
+- A rota síncrona (`Invoke-ClaudeCode.ps1`, `--output-format text`) agora extrai sentinelas textuais de spend-limit quando o Claude Code emite a mensagem no stdout/stderr, mas **não** produz o estado estruturado `quota` reservado ao sidecar assíncrono (`Invoke-ClaudeCodeAsync.ps1`, stream-json + circuito). Avaliar se a rota git-capable sync precisa de paridade mínima de evidência de cota (text sentinels e/ou opção stream-json) sem misturar o circuito do painel.
+- **Não** é um gap ativo: a melhoria já entregue resolve os três modos de falha de diagnóstico medidos em 2026-08-31.
 
 <!-- backend-parity: ignore -->
-**Relacionado:** `xpz-llm-delegate/SKILL.md` (backend Claude Code, códigos de saída; rota sync vs async); `scripts/Invoke-ClaudeCode.ps1` (`:110-115`, `--output-format text`); `scripts/ClaudeCodeCliSupport.ps1` (`Get-ClaudeCodeErrorMessage`, `Remove-ClaudeCodeEnvironmentNoise`, `Get-ClaudeCodeStreamQuotaEvidence`); `Invoke-ClaudeCodeAsync.ps1` (stream-json, sidecar, circuito de cota); contrato tipado na entrada «Detecção de truncamento fora do opencode».
+**Relacionado:** `xpz-llm-delegate/SKILL.md` (backend Claude Code, rota sync vs async); `historico/IdeiasImplementadas_202609.md`.
 
 ## Perfil git-capable opcional para Claude Code CLI na delegação XPZ (painel / pré-push reforçada)
 
