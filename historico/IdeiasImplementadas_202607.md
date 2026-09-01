@@ -86,7 +86,8 @@ Reúne as duas entradas do `999` que eram **problema** e **conserto** da mesma c
 - **D1+D2 (adapter):** `Invoke-OpenCode.ps1`/`Start-OpenCodeJob.ps1` ganham **default `-Agent reviewer-ro`** escopado ao caminho revisor + **guard fail-closed** (pré-check estático + `opencode agent list` allow-set resolvido EXATAMENTE `{read,grep,glob,list}` + versão testada; BLOCK com motivo `static`/`version`/`allowset`/`agentlist`-transitório). `-Agent <x>` explícito = opt-out consciente (confirma só que resolve). Pós-check síncrono varre o warning de fallback; assíncrono é diagnóstico no `Watch-OpenCodeJob.ps1`. O painel segue bloqueando a chave `agent` → o revisor sempre cai no `reviewer-ro`. **Breaking change** do default (CHANGELOG).
 - **D3 (provisionamento):** `.opencode/agent/reviewer-ro.md` (project-local versionado, forma `permission` `"*": deny` + allowlist) + `scripts/Install-OpenCodeReviewerRoAgent.ps1` (global, edição JSONC localizada preservando comentários, migra o interino `tools:`→`permission`) + `scripts/OpenCodeReviewerRoGuard.ps1` (guard compartilhado) + `scripts/Test-OpenCodeReviewerRoSelfTest.ps1` (`OPENCODE_REVIEWER_RO_SELFTEST_OK`) + fixtures versionados.
 
-**Correção de premissas (medido em opencode 1.4.4 — o self-test é o gate dos claims):**
+**Correção de premissas (medido inicialmente em opencode 1.4.4; fixtures promovidos para **1.17.20** —
+o self-test é o gate dos claims):**
 
 - **`permission: deny` ≡ `tools: false`** — a nota antiga do `999` («`tools: false` desabilita a ferramenta, **mais forte** que `permission: deny`») está **REFUTADA pela medição**: os dois resolvem idêntico e removem a tool em headless. A forma canônica é `permission` (curinga `"*": deny` funciona por last-match-wins; `webfetch`/`websearch`/`task: deny` removem as tools).
 - **Eixo de leitura NÃO é machine-wide** — a nota antiga («`read` lê qualquer arquivo da máquina») está **invertida pela medição**: o opencode tem a dimensão nativa `external_directory` (base `ask`, auto-rejeitada em headless) que gateia leituras **fora** do cwd; o reviewer-ro fixa `external_directory: deny` explícito → leitura fora do cwd fica **bloqueada por padrão**, sem provar isolamento absoluto de todo path externo específico.
@@ -97,7 +98,8 @@ Reúne as duas entradas do `999` que eram **problema** e **conserto** da mesma c
 
 - Design congelado: `opencode-reviewer-ro-least-privilege-design.md` (8 rodadas de revisão por pares, 4 famílias — anthropic/openai/ollama-cloud/nvidia; arquitetura nunca reaberta; freeze por decisão humana com a prova transferida aos self-tests).
 - Arquivos materiais: `.opencode/agent/reviewer-ro.md`, `.gitignore` (exceção em cascata), `scripts/OpenCodeReviewerRoGuard.ps1`, `scripts/Install-OpenCodeReviewerRoAgent.ps1`, `scripts/Test-OpenCodeReviewerRoSelfTest.ps1`, `scripts/Invoke-OpenCode.ps1`, `scripts/Start-OpenCodeJob.ps1`, `scripts/Watch-OpenCodeJob.ps1`, `xpz-llm-delegate/fixtures/opencode-reviewer-ro/*`, `xpz-llm-delegate/SKILL.md`, `15-revisao-por-pares.md`, `xpz-skills-setup/SKILL.md`, `08-guia-para-agente-gpt.md`, `09-inventario-e-rastreabilidade-publica.md`, `CHANGELOG.md`, `999-ideias-pendentes.md` (2 entradas removidas → esta; entrada nova do eixo de leitura mantida).
-- Self-test/versão: `OPENCODE_REVIEWER_RO_SELFTEST_OK`; fixtures/claims medidos em opencode 1.4.4.
+- Self-test/versão: `OPENCODE_REVIEWER_RO_SELFTEST_OK`; fixtures/claims ancorados em opencode **1.17.20**
+  (promovidos desde a implementação inicial em 1.4.4).
 
 ## Capturar a recusa real de workspace não confiável do Claude Code
 

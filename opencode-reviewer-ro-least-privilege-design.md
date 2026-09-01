@@ -10,14 +10,19 @@ documento é a fonte-verdade da implementação; a prova dos claims empíricos v
 
 ## Problema
 
+> **Nota temporal:** o parágrafo abaixo descreve o **estado no freeze do design** (pré-D-min).
+> Após a implementação (2026-07-04; fixtures promovidos para opencode **1.17.20**), o default do
+> adapter é `-Agent reviewer-ro` com guard fail-closed — ver D1–D2 e `xpz-llm-delegate/SKILL.md:927+`.
+
 O painel de revisão-por-pares (`xpz-llm-delegate`) despacha revisores opencode. Em `opencode run`
 headless, o agente default `build` (e `--agent plan`) **auto-aprova** `bash`/`edit` sem gate — o
 revisor pode executar comandos e editar arquivos. Incidente real (2026-06-24): um revisor opencode
 (`kimi-k2.7-code`, agente default) **editou** um `.md` do repo. O harness
 `scripts/Invoke-LlmDelegatePanelDispatch.ps1` **bloqueia** a chave `agent` do opencode
 (`$ContentionKeys['opencode']=@('agent')`, `:143`; classificação `:858-889`), então não há via
-oficial para passar um agente seguro — o revisor sempre cai no `build`. A mitigação atual é só
-textual (`xpz-llm-delegate/SKILL.md:927-984`). O gate `Resolve-LlmDelegateAuthorization.ps1` governa
+oficial para passar um agente seguro via `invokeArgs` — **na época do freeze**, sem default seguro
+no adapter, o revisor caía no `build`. A mitigação **então** era só textual (hoje substituída pela
+seção **ATIVO** em `xpz-llm-delegate/SKILL.md:927-984`). O gate `Resolve-LlmDelegateAuthorization.ps1` governa
 **se o dado sai** (`public`→`allow` automático em `:177-182`), **não** a capacidade de executar/ler
 local.
 
@@ -214,18 +219,23 @@ D2/D3.
 
 ## Paridade doc (fase final)
 
-`xpz-llm-delegate/SKILL.md:927-984` (seção «OPENCODE — REVISOR LEAST-PRIVILEGE»; rename
-"read-only obrigatório" → "sem execução/escrita" em `:927`; `external_directory` como **inversão de
-premissa** em `:965-971`), `:633-636`; `15-revisao-por-pares.md:96` (+ nota de operador cwd);
-`xpz-skills-setup/SKILL.md` (hook de auditoria citando o instalador); `08-guia-para-agente-gpt.md`
-(runtime da delegação); `09-inventario-e-rastreabilidade-publica.md` (scripts novos + token
-`OPENCODE_REVIEWER_RO_SELFTEST_OK`); `CHANGELOG` (+ breaking-change do default); `999-ideias-pendentes.md:479-496`
-(mover #1+#2 para `historico/IdeiasImplementadas_202607.md`; corrigir a nota `:483` condicionada ao
-self-test; manter o eixo de leitura/`kb-sensitive` em `:479-488` e fiação `xpz-skills-setup` em `:490-496` como entrada **adiada**). **NÃO** usar
-`02-regras-operacionais-e-runtime.md` (é runtime do GeneXus/XPZ, não do harness de delegação).
-README trilíngue: refletir em ES/EN se a regra operacional mudar.
+**Estado pós-implementação (2026-07-04; fixtures promovidos para opencode 1.17.20):**
 
-## Ordem de implementação
+- **Feito:** `xpz-llm-delegate/SKILL.md:927-984` (seção «OPENCODE — REVISOR LEAST-PRIVILEGE»;
+  rename «sem execução/escrita» em `:927`; inversão de premissa `external_directory` em `:965-971`);
+  harness `:633-636`); `15-revisao-por-pares.md:96` (+ nota de operador cwd);
+  `08-guia-para-agente-gpt.md`; `09-inventario-e-rastreabilidade-publica.md` (scripts + token
+  `OPENCODE_REVIEWER_RO_SELFTEST_OK`); `CHANGELOG` (breaking-change do default);
+  `#1+#2` em `historico/IdeiasImplementadas_202607.md`; nota `:483` no `999`.
+- **Parcial:** `xpz-skills-setup/SKILL.md` — só ponteiro de dependência (`:63-64`); fiação ativa
+  pendente (`999:490-496`).
+- **Adiado (esperado):** eixo de leitura/`kb-sensitive` (`999:479-488`).
+- **README trilíngue:** entrada `xpz-llm-delegate` cita default `-Agent reviewer-ro`.
+
+**NÃO** usar `02-regras-operacionais-e-runtime.md` (é runtime do GeneXus/XPZ, não do harness de
+delegação).
+
+## Ordem de implementação (histórico — concluída 2026-07-04)
 
 1. **D3** — `.gitignore` (exceção); `.opencode/agent/reviewer-ro.md`; fixtures; instalador;
    self-test. Suíte verde.
