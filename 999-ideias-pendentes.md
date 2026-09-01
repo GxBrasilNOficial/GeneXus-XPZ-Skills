@@ -855,14 +855,14 @@ Após implementar + rebuild:
 - PID reciclado no CI: identidade &lt; 1000 ms + KeepDays. **Item 13 (fora do CI) cumprido em 2026-08-31** — roteiro `Temp/validate-codex-durable-item13.ps1` com Codex real (`0.151.0-alpha.7.2`): identidade delta &lt; 1 ms, auto-watcher, anexação, 4c, pai morto, dois watchers (21), PID/hora errada (22).
 - lastmsg parcial no Watch → `completed` (Achado D futuro).
 - Start-CodexJob sem `RetentionMode` (job longo / kb-sensitive): skill+este residual.
-- C-shared = Claude async **e** órfão Codex só-stream (indistinguível) — nunca apagar sem marcador exclusivo.
+- <!-- backend-parity: ignore --> C-shared = Claude async **e** órfão Codex só-stream (indistinguível) — nunca apagar sem marcador exclusivo.
 - `verdict.txt` do harness permanece em kb-sensitive (residual de paridade Claude).
 - `Kill($true)` + prompt em `invoke-in`: confidencialidade; `Kill()` simples permanece no Invoke.
-- `ContentionKeys['codex']` permanece `@()`: allowlist + splat TempDir bastam; assimetria com claude-code fica aqui.
+- <!-- backend-parity: ignore --> `ContentionKeys['codex']` permanece `@()`: allowlist + splat TempDir bastam; assimetria com claude-code fica aqui.
 - KeepDays inerte no ledger fresco do painel (TempDir por rodada).
 - `2>&1` no sucesso mistura sentinelas ao stdout agregado (skill avisa).
 - `$quotaFailurePattern` ainda pode casar `429` noutro `BLOCK:` **no prefixo** (fora das linhas `XPZ_CODEX_`).
-- `result.json` órfão de um Watch Claude apontado ao mesmo TempDir Codex (improvável; defaults são pastas distintas).
+- <!-- backend-parity: ignore --> `result.json` órfão de um Watch Claude apontado ao mesmo TempDir Codex (improvável; defaults são pastas distintas).
 
 **Relacionado:** `xpz-llm-delegate/SKILL.md`; `scripts/Invoke-Codex.ps1`, `Start-CodexJob.ps1`, `Watch-CodexJob.ps1`, `CodexCliSupport.ps1`; Achado D acima.
 
