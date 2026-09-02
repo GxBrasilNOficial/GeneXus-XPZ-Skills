@@ -766,7 +766,7 @@ function New-AsyncSidecarObject {
         jobId                         = $script:jobId
         startedAtUtc                  = $script:startedAtUtc.ToString('yyyy-MM-ddTHH:mm:ssZ')
         endedAtUtc                    = $endedAtUtcValue.ToString('yyyy-MM-ddTHH:mm:ssZ')
-        durationMs                    = [int]($endedAtUtcValue - $script:startedAtUtc).TotalMilliseconds
+        durationMs                    = [long]($endedAtUtcValue - $script:startedAtUtc).TotalMilliseconds
         technicalStatus               = $TechnicalStatus
         resultAccepted                = $ResultAccepted
         acceptanceRejectionReason     = $AcceptanceRejectionReason

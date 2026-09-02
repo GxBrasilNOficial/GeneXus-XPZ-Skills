@@ -1017,7 +1017,7 @@ payload para Anthropic (`anthropic/claude-opus-4-8`) e, portanto, é externo. Co
   evidência (stderr sem segredos, `claude --version`, Desktop ou CLI) para melhorar a skill; não marcar
   confiança automaticamente nem pedir que o usuário a marque para contornar o bloqueio.
 - **Não confundir recusa com aviso.** Workspace não confiável **não impede** a CLI de rodar: ela
-  executa e apenas descarta as regras `permissions.allow` do projeto, avisando em `stderr`. Esse
+  executa e apenas descarta as regras `permissions.allow` e `permissions.deny` do projeto, avisando em `stderr`. Esse
   aviso aparece **também em execução bem-sucedida**, medido em 2026-07-25, e por isso é descartado
   como ruído antes de qualquer classificação. A recusa propriamente dita nunca foi observada — o
   detector segue por precaução, não por evidência.
