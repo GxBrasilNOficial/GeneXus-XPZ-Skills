@@ -6,7 +6,7 @@ Registro de ideias que sairam de 999-ideias-pendentes.md por terem sido implemen
 
 Implementado em 2026-09-01 a partir do manuscrito `Temp/manuscript-claude-evidence-preservation-v3.md`.
 
-Quatro falhas de diagnostico e runtime foram corrigidas nos adapters do Claude Code (`Invoke-ClaudeCode.ps1`, `Invoke-ClaudeCodeAsync.ps1`) e na biblioteca de suporte (`ClaudeCodeCliSupport.ps1`):
+Quatro falhas de diagnostico e runtime foram corrigidas nos adapters (`Invoke-ClaudeCode.ps1`, `Invoke-ClaudeCodeAsync.ps1`), no dispatcher (`Invoke-LlmDelegatePanelDispatch.ps1`) e na biblioteca de suporte (`ClaudeCodeCliSupport.ps1`):
 
 1. **Filtro de ruido de ambiente ampliado para `deny`:** `Test-ClaudeCodeEnvironmentNoiseLine` e `Remove-ClaudeCodeEnvironmentNoise` passaram a filtrar avisos `Permission deny rule (...)` e `Ignoring N permissions.deny entries...` alem dos `allow` ja cobertos. Corrige o incidente de 2026-08-31 onde avisos `Write vs Edit` no stderr dominaram o diagnostico erroneamente.
 
@@ -29,4 +29,5 @@ Entrada residual preservada em `999-ideias-pendentes.md`: item 5 (avaliar parida
 - Commit material (alinhamento documental): `2919d39` (`docs(claude-code): alinhar session limit na documentacao, changelog e rastreabilidade historica`)
 - Commit material (fix factual e durationMs): `1ef6ca8` (`fix(claude-code): corrigir contagem de testes, paridade deny no SKILL e overflow de durationMs no async`)
 - Commit material (documentacao durationMs): `8a4e64b` (`docs(claude-code): documentar correcao durationMs no changelog e atualizar historico`)
-- Arquivos materiais: `scripts/ClaudeCodeCliSupport.ps1`, `scripts/Invoke-ClaudeCode.ps1`, `scripts/Invoke-ClaudeCodeAsync.ps1`, `scripts/Invoke-LlmDelegatePanelDispatch.ps1`, `scripts/Test-ClaudeCodeCliSupportSelfTest.ps1`, `scripts/Test-ClaudeCodeAsyncSelfTest.ps1`, `xpz-llm-delegate/SKILL.md`, `09-inventario-e-rastreabilidade-publica.md`, `CHANGELOG.md`, `999-ideias-pendentes.md`.
+- Commit material (uniformizacao dispatcher): `0a6ca4a` (`fix(llm-delegate): uniformizar durationMs para long em Invoke-LlmDelegatePanelDispatch`)
+- Arquivos materiais: `scripts/ClaudeCodeCliSupport.ps1`, `scripts/Invoke-ClaudeCode.ps1`, `scripts/Invoke-ClaudeCodeAsync.ps1`, `scripts/Invoke-LlmDelegatePanelDispatch.ps1`, `scripts/Test-ClaudeCodeCliSupportSelfTest.ps1`, `xpz-llm-delegate/SKILL.md`, `09-inventario-e-rastreabilidade-publica.md`, `CHANGELOG.md`, `999-ideias-pendentes.md`.
