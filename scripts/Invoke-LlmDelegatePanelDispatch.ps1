@@ -1182,7 +1182,7 @@ try {
                     errorText  = $errText
                     startedAt  = $startedAt.ToString('yyyy-MM-ddTHH:mm:ssZ')
                     endedAt    = $endedAt.ToString('yyyy-MM-ddTHH:mm:ssZ')
-                    durationMs = [int]($endedAt - $startedAt).TotalMilliseconds
+                    durationMs = [long]($endedAt - $startedAt).TotalMilliseconds
                     attempts   = 1
                     sidecarPath = $item.sidecarPath
                     adapterReceiptPath = $item.adapterReceiptPath
