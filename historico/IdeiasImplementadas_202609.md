@@ -59,4 +59,5 @@ Documentacao atualizada: `xpz-llm-delegate/SKILL.md` (backend Codex), `09-invent
 
 ### Rastreabilidade
 
+- Commit material: `bad2cdb` (`feat(codex): aprimorar deteccao de erros, cota e preservacao de evidencia`)
 - Arquivos materiais: `scripts/CodexCliSupport.ps1`, `scripts/Invoke-Codex.ps1`, `scripts/Test-CodexCliSupportSelfTest.ps1`, `scripts/Test-CodexDurableCaptureSelfTest.ps1`, `xpz-llm-delegate/SKILL.md`, `09-inventario-e-rastreabilidade-publica.md`, `CHANGELOG.md`, `999-ideias-pendentes.md`, `historico/IdeiasImplementadas_202609.md`.
