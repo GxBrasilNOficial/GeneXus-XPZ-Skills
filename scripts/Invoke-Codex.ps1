@@ -228,7 +228,23 @@ try {
         if ($errMsg) {
             $script:pendingExceptionMessage = "BLOCK: codex retornou erro: $errMsg"
         } else {
-            $script:pendingExceptionMessage = "BLOCK: codex saiu com codigo $($p.ExitCode) sem resposta.`nstderr:`n$stderrText"
+            $stdoutClean = if ($stdoutText) { $stdoutText.Trim() } else { '' }
+            $stderrClean = if ($stderrText) { $stderrText.Trim() } else { '' }
+            if ($stdoutClean -or $stderrClean) {
+                $parts = @()
+                if ($stdoutClean) {
+                    $stdoutLines = @($stdoutClean -split "`r?`n" | Select-Object -First 8) -join "`n"
+                    $parts += "stdout:`n$stdoutLines"
+                }
+                if ($stderrClean) {
+                    $stderrLines = @($stderrClean -split "`r?`n" | Select-Object -First 8) -join "`n"
+                    $parts += "stderr:`n$stderrLines"
+                }
+                $detailsText = $parts -join "`n---`n"
+                $script:pendingExceptionMessage = "BLOCK: codex saiu com codigo $($p.ExitCode).`n$detailsText"
+            } else {
+                $script:pendingExceptionMessage = "BLOCK: codex saiu com codigo $($p.ExitCode) sem resposta."
+            }
         }
     }
 }

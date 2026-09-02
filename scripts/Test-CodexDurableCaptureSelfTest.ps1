@@ -350,6 +350,30 @@ exit 0
     }
     Write-Host 'PASS 12o unexpected' -ForegroundColor Green
 
+    # ===== 12q exit != 0 com stdout e stderr nao-classificados =====
+    $j12q = Join-Path $jobs 't12q'
+    $errReader = Join-Path $tmp 'fake-exit1.ps1'
+    @'
+[Console]::Out.WriteLine('linha de stdout 1')
+[Console]::Error.WriteLine('linha de stderr 1')
+exit 1
+'@ | Set-Content -LiteralPath $errReader -Encoding utf8
+    $errCmd = Join-Path $tmp 'fake-exit1.cmd'
+    "@echo off`r`npwsh -NoProfile -ExecutionPolicy Bypass -File `"$errReader`" %*`r`n" | Set-Content -LiteralPath $errCmd -Encoding ascii
+    $threw12q = $false; $msg12q = $null
+    try {
+        & $invoke -CodexExe $errCmd -MessagePath $prompt -TempDir $j12q -TimeoutSec 60 -RetentionMode public | Out-Null
+    } catch {
+        $threw12q = $true
+        $msg12q = [string]$_.Exception.Message
+    }
+    Assert-True $threw12q '12q: throw'
+    Assert-True ($msg12q -match 'BLOCK: codex saiu com codigo 1\.') '12q: BLOCK com codigo 1.'
+    Assert-True ($msg12q -match 'stdout:\r?\nlinha de stdout 1') '12q: preserva stdout'
+    Assert-True ($msg12q -match 'stderr:\r?\nlinha de stderr 1') '12q: preserva stderr'
+    Assert-True ($msg12q -notmatch 'sem resposta') '12q: nao afirma sem resposta'
+    Write-Host 'PASS 12q exit 1 com stdout/stderr preservados' -ForegroundColor Green
+
     # ===== 12h Bound TempDir vazio =====
     $j12h = Join-Path $jobs 't12h-env'
     $env:XPZ_CODEX_JOBS_DIR = $j12h

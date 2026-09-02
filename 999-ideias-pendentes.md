@@ -317,11 +317,12 @@ Critério para retomar: caso real em que a ausência do cache Codex prejudique a
 
 ## Estender a detecção de limite de uso/taxa do provider aos adapters de delegação irmãos
 
-- <!-- backend-parity: ignore --> **Importância** — média. A fatia **opencode síncrono + jobs com watcher** (resolvedor compartilhado, `result.json` tipado, `-WatchTimeoutSec`) já está implementada — ver `historico/IdeiasImplementadas_202608.md`. Falta o mesmo diagnóstico nos **outros backends**: `Invoke-Codex`/`Start-CodexJob`, `Invoke-Gemini`, `Invoke-Copilot`, e (quando couber) Claude Code / Antigravity, que têm logs/retries próprios.
+- <!-- backend-parity: ignore --> **Importância** — média. As fatias **opencode síncrono + jobs com watcher** (ver `historico/IdeiasImplementadas_202608.md`), **Claude Code** (2026-09-01) e **Codex** (`Get-CodexExecErrorMessage` com JSON nativo e sentinelas de cota/rate-limit/auth/serviço + `Resolve-CodexJobStatus` e `Invoke-Codex.ps1`, 2026-09-01; ver `historico/IdeiasImplementadas_202609.md`) já estão implementadas. Falta o mesmo diagnóstico nos **outros backends**: `Invoke-Gemini`, `Invoke-Copilot`, e (quando couber) Antigravity CLI.
 - **Limitação consciente da fatia opencode (documentada 2026-08-30):** o log do provider é **global à máquina**; a classificação usa só janela temporal (mtime + timestamp de linha, quando existe), sem sessão/job/PID. Runs concorrentes (incluindo o painel em paralelo) podem cruzar atribuição de 429/cota. Dono da nota: `xpz-llm-delegate/SKILL.md` (bloco HTTP 410 / limite). Evolução possível: correlacionar evidência de log por sessão/job/PID — **não** misturar com a extensão aos adapters irmãos sem desenho próprio.
-- <!-- backend-parity: ignore --> **Maturidade** — **ideia/pesquisa**: depende de descobrir **onde** Codex/Gemini/Copilot/Claude/Antigravity expõem o 429/limite (stderr? log próprio? silêncio como o opencode?) — e Gemini/Copilot **não têm assinatura nesta máquina** para reproduzir o caso real.
+- <!-- backend-parity: ignore --> **Maturidade** — **ideia/pesquisa**: depende de descobrir **onde** Gemini/Copilot/Antigravity expõem o 429/limite (stderr? log próprio? silêncio como o opencode?) — e Gemini/Copilot **não têm assinatura nesta máquina** para reproduzir o caso real.
 
-**Origem:** frente da detecção de 429 no `Invoke-OpenCode` (2026-06-21), nascida de uma pré-push reforçada em que 3 modelos `ollama-cloud` (kimi/minimax/glm) "estouraram timeout" sem causa visível — era a **cota semanal** esgotada da conta ollama-cloud. Fatia opencode (jobs + detector compartilhado) implementada em 2026-08-30.
+<!-- backend-parity: ignore -->
+**Origem:** frente da detecção de 429 no `Invoke-OpenCode` (2026-06-21), nascida de uma pré-push reforçada em que 3 modelos `ollama-cloud` (kimi/minimax/glm) "estouraram timeout" sem causa visível — era a **cota semanal** esgotada da conta ollama-cloud. Fatias opencode implementada em 2026-08-30, Claude Code e Codex implementadas em 2026-09-01.
 
 ## Retry / re-despacho no caminho assíncrono opencode (`Start-`/`Watch-OpenCodeJob`)
 

@@ -41,6 +41,33 @@ Assert-Equal 'erro no stderr (modelo novo)' $e3 'The gpt-5.5 model requires a ne
 $e4 = Get-CodexExecErrorMessage -StdoutText 'ERROR: {json invalido' -StderrText ''
 Assert-Equal 'erro com json invalido -> texto cru' $e4 '{json invalido'
 
+$e5 = Get-CodexExecErrorMessage -StdoutText '' -StderrText '{"error":{"message":"You exceeded your current quota, please check your plan and billing details.","type":"insufficient_quota"}}'
+Assert-Equal 'erro: json nativo da API sem prefixo ERROR' $e5 'You exceeded your current quota, please check your plan and billing details.'
+
+$e6 = Get-CodexExecErrorMessage -StdoutText '' -StderrText '{"error":"rate_limit_exceeded"}'
+Assert-Equal 'erro: json nativo com erro string' $e6 'rate_limit_exceeded'
+
+$e7 = Get-CodexExecErrorMessage -StdoutText '' -StderrText 'HTTP 429: rate_limit_exceeded - Requests per minute quota exceeded'
+Assert-Equal 'erro: sentinela 429 / rate limit no stderr' $e7 'HTTP 429: rate_limit_exceeded - Requests per minute quota exceeded'
+
+$e8 = Get-CodexExecErrorMessage -StdoutText '' -StderrText 'Your credit balance is too low to access the OpenAI API.'
+Assert-Equal 'erro: sentinela credit balance no stderr' $e8 'Your credit balance is too low to access the OpenAI API.'
+
+$e9 = Get-CodexExecErrorMessage -StdoutText '' -StderrText '401 Unauthorized: Invalid API key provided.'
+Assert-Equal 'erro: sentinela auth / unauthorized' $e9 '401 Unauthorized: Invalid API key provided.'
+
+$e10 = Get-CodexExecErrorMessage -StdoutText '' -StderrText 'Authentication failed: token expired.'
+Assert-Equal 'erro: sentinela token expired' $e10 'Authentication failed: token expired.'
+
+$e11 = Get-CodexExecErrorMessage -StdoutText '' -StderrText 'The model gpt-5 does not exist or you do not have access to it.'
+Assert-Equal 'erro: sentinela model does not exist' $e11 'The model gpt-5 does not exist or you do not have access to it.'
+
+$e12 = Get-CodexExecErrorMessage -StdoutText '' -StderrText 'Server is overloaded. Please try again later.'
+Assert-Equal 'erro: sentinela overloaded' $e12 'Server is overloaded. Please try again later.'
+
+$e13 = Get-CodexExecErrorMessage -StdoutText '' -StderrText 'ERROR: Falha geral de comunicacao'
+Assert-Equal 'erro: fallback ERROR: texto puro' $e13 'Falha geral de comunicacao'
+
 # Resolve-CodexExe -Override
 $self = (Get-Command pwsh).Source
 $rOk = Resolve-CodexExe -Override $self
@@ -106,12 +133,27 @@ Assert-Equal 'status: resposta final + stderr ruidoso -> completed' $s1.status '
 
 $s2 = Resolve-CodexJobStatus -FinalText '' -StreamError '' -Stderr 'ERROR: {"error":{"message":"modelo nao suportado"}}'
 Assert-Equal 'status: sem resposta + erro de servidor -> error' $s2.status 'error'
+Assert-Equal 'status: sem resposta + erro de servidor propaga mensagem' $s2.error 'modelo nao suportado'
 
 $s3 = Resolve-CodexJobStatus -FinalText '' -StreamError 'evento de erro do stream' -Stderr ''
 Assert-Equal 'status: sem resposta + erro de stream -> error' $s3.status 'error'
+Assert-Equal 'status: sem resposta + erro de stream propaga mensagem' $s3.error 'evento de erro do stream'
 
 $s4 = Resolve-CodexJobStatus -FinalText '' -StreamError '' -Stderr 'tudo limpo, sem erro'
 Assert-Equal 'status: sem resposta sem erro -> sem-texto' $s4.status 'sem-texto'
+Assert-Equal 'status: sem resposta sem erro tem error null' $s4.error $null
+
+$s5 = Resolve-CodexJobStatus -FinalText '' -StreamError '' -Stderr '{"error":{"message":"insufficient_quota","type":"insufficient_quota"}}'
+Assert-Equal 'status: sem resposta + json API sem prefixo -> error' $s5.status 'error'
+Assert-Equal 'status: sem resposta + json API preserva mensagem' $s5.error 'insufficient_quota'
+
+$s6 = Resolve-CodexJobStatus -FinalText '' -StreamError '' -Stderr 'HTTP 429: rate_limit_exceeded'
+Assert-Equal 'status: sem resposta + 429 no stderr -> error' $s6.status 'error'
+Assert-Equal 'status: sem resposta + 429 preserva mensagem' $s6.error 'HTTP 429: rate_limit_exceeded'
+
+$s7 = Resolve-CodexJobStatus -FinalText '' -StreamError '' -Stderr '401 Unauthorized: token expired'
+Assert-Equal 'status: sem resposta + auth error no stderr -> error' $s7.status 'error'
+Assert-Equal 'status: sem resposta + auth error preserva mensagem' $s7.error '401 Unauthorized: token expired'
 
 if ($fail -gt 0) { throw "BLOCK: $fail caso(s) falharam em Test-CodexCliSupportSelfTest.ps1" }
 Write-Host 'OK: Test-CodexCliSupportSelfTest.ps1' -ForegroundColor Cyan

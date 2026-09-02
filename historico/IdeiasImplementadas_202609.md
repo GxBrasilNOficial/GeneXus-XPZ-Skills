@@ -31,3 +31,32 @@ Entrada residual preservada em `999-ideias-pendentes.md`: item 5 (avaliar parida
 - Commit material (documentacao durationMs): `8a4e64b` (`docs(claude-code): documentar correcao durationMs no changelog e atualizar historico`)
 - Commit material (uniformizacao dispatcher): `0a6ca4a` (`fix(llm-delegate): uniformizar durationMs para long em Invoke-LlmDelegatePanelDispatch`)
 - Arquivos materiais: `scripts/ClaudeCodeCliSupport.ps1`, `scripts/Invoke-ClaudeCode.ps1`, `scripts/Invoke-ClaudeCodeAsync.ps1`, `scripts/Invoke-LlmDelegatePanelDispatch.ps1`, `scripts/Test-ClaudeCodeCliSupportSelfTest.ps1`, `xpz-llm-delegate/SKILL.md`, `09-inventario-e-rastreabilidade-publica.md`, `CHANGELOG.md`, `999-ideias-pendentes.md`.
+
+## Deteccao de erro, cota/rate-limit e preservacao de evidencia no backend Codex
+
+Implementado em 2026-09-01 conforme previsto em `999-ideias-pendentes.md` (fatia Codex de «Estender a detecção de limite de uso/taxa do provider aos adapters de delegação irmãos» e residuais da captura durável).
+
+Três aprimoramentos principais no backend Codex (`CodexCliSupport.ps1`, `Invoke-Codex.ps1`, `Watch-CodexJob.ps1`):
+
+1. **Extracao ampliada de mensagens de erro em `Get-CodexExecErrorMessage`:**
+   - Mantida extracao de linhas `ERROR: {json}` e fallback `ERROR: <texto>`.
+   - Adicionada extracao de objetos JSON de erro nativos da API (ex: `{"error":{"message":"...","type":"..."}}` ou `{"error":"..."}`) sem a obrigatoriedade do prefixo literal `ERROR:`.
+   - Adicionada deteccao de sentinelas de cota/rate-limit (`429`, `rate_limit`, `insufficient_quota`, `quota`, `credit balance`, `token limit`, `too many requests`, `usage limit`), autenticacao (`unauthorized`, `authentication`, `auth error`, `invalid_api_key`, `token expired`, `session expired`, `forbidden`) e servico/modelo (`overloaded`, `service unavailable`, `model ... does not exist`, `not supported`, `not available`, `not found`) no texto combinado de stdout e stderr limpos.
+
+2. **Preservacao de status `error` em `Resolve-CodexJobStatus` (`Watch-CodexJob.ps1`):**
+   - Na ausencia de resposta final (`FinalText` vazio), quando `Get-CodexExecErrorMessage` reconhece erro no stream ou stderr, o status do job e classificado como `error` com a mensagem preservada, evitando classificacao incorreta como `sem-texto`.
+
+3. **Preservacao simetrica de evidencia em `Invoke-Codex.ps1`:**
+   - Em `exit != 0`, quando `Get-CodexExecErrorMessage` extrai erro, propaga `BLOCK: codex retornou erro: <msg>`.
+   - Quando nao ha erro reconhecido, porem ha texto em `stdout` e/ou `stderr`, preserva ate 8 linhas limpas de cada canal sob `stdout:` / `stderr:`, sem afirmar "sem resposta" quando ha saida nos canais.
+   - Quando ambos os canais estao vazios, preserva a mensagem `BLOCK: codex saiu com codigo N sem resposta.`.
+
+Testes adicionados e validados:
+- 17 novos casos em `Test-CodexCliSupportSelfTest.ps1` cobrindo JSON de erro da API sem prefixo, sentinelas de rate limit/429/cota/saldo/autenticacao/modelo inexistente/servidor sobrecarregado, e classificacao `Resolve-CodexJobStatus` com preservacao de mensagem. Total: 32 asserts PASS.
+- Caso 12q adicionado em `Test-CodexDurableCaptureSelfTest.ps1` validando preservacao de stdout/stderr em `exit 1` sem erro reconhecido. Suite inteira PASS.
+
+Documentacao atualizada: `xpz-llm-delegate/SKILL.md` (backend Codex), `09-inventario-e-rastreabilidade-publica.md` (ponteiros de `CodexCliSupport.ps1` e `Invoke-Codex.ps1`), `CHANGELOG.md` (trilingue) e `999-ideias-pendentes.md`.
+
+### Rastreabilidade
+
+- Arquivos materiais: `scripts/CodexCliSupport.ps1`, `scripts/Invoke-Codex.ps1`, `scripts/Test-CodexCliSupportSelfTest.ps1`, `scripts/Test-CodexDurableCaptureSelfTest.ps1`, `xpz-llm-delegate/SKILL.md`, `09-inventario-e-rastreabilidade-publica.md`, `CHANGELOG.md`, `999-ideias-pendentes.md`, `historico/IdeiasImplementadas_202609.md`.

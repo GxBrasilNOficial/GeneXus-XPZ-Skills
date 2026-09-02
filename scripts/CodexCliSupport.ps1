@@ -112,25 +112,64 @@ function Resolve-CodexExe {
 
 function Get-CodexExecErrorMessage {
     # Extrai mensagem de erro do stdout/stderr do `codex exec` quando o servidor rejeita o
-    # pedido (ex: modelo nao suportado). Procura linhas 'ERROR: {json}' e devolve a 'message'.
+    # pedido (ex: modelo nao suportado, cota/rate-limit, autenticacao). Suporta:
+    # 1. Linhas 'ERROR: {json}' ou JSON de erro nativo da API sem prefixo 'ERROR:'
+    # 2. Linhas 'ERROR: <texto>'
+    # 3. Sentinelas de cota, taxa, saldo, autenticacao e servico indisponivel em stdout/stderr.
     param([string]$StdoutText, [string]$StderrText)
     $combined = @($StdoutText, $StderrText) -join "`n"
+    if ([string]::IsNullOrWhiteSpace($combined)) { return $null }
+
+    # 1. Linhas com prefixo ERROR: e JSON
     $jsonMatches = [regex]::Matches($combined, 'ERROR:\s*(\{.*\})')
     if ($jsonMatches.Count -gt 0) {
         $jsonText = $jsonMatches[$jsonMatches.Count - 1].Groups[1].Value
         try {
             $obj = $jsonText | ConvertFrom-Json
             $msg = $null
-            if ($obj.PSObject.Properties['error'] -and $obj.error.PSObject.Properties['message']) {
-                $msg = [string]$obj.error.message
+            if ($obj.PSObject.Properties['error']) {
+                if ($obj.error -is [string]) { $msg = [string]$obj.error }
+                elseif ($obj.error.PSObject.Properties['message']) { $msg = [string]$obj.error.message }
+            } elseif ($obj.PSObject.Properties['message']) {
+                $msg = [string]$obj.message
             }
-            if (-not [string]::IsNullOrWhiteSpace($msg)) { return $msg }
+            if (-not [string]::IsNullOrWhiteSpace($msg)) { return $msg.Trim() }
         } catch { }
-        return $jsonText
+        return $jsonText.Trim()
     }
-    # Fallback: linha 'ERROR: <texto>' sem JSON balanceado
+
+    # 2. JSON de erro nativo da API sem prefixo ERROR:
+    $rawJsonMatches = [regex]::Matches($combined, '(?m)^\s*(\{.*"error".*\})\s*$')
+    if ($rawJsonMatches.Count -gt 0) {
+        $jsonText = $rawJsonMatches[$rawJsonMatches.Count - 1].Groups[1].Value
+        try {
+            $obj = $jsonText | ConvertFrom-Json
+            $msg = $null
+            if ($obj.PSObject.Properties['error']) {
+                if ($obj.error -is [string]) { $msg = [string]$obj.error }
+                elseif ($obj.error.PSObject.Properties['message']) { $msg = [string]$obj.error.message }
+            } elseif ($obj.PSObject.Properties['message']) {
+                $msg = [string]$obj.message
+            }
+            if (-not [string]::IsNullOrWhiteSpace($msg)) { return $msg.Trim() }
+        } catch { }
+        return $jsonText.Trim()
+    }
+
+    # 3. Fallback: linha 'ERROR: <texto>' sem JSON
     $lineMatch = [regex]::Match($combined, 'ERROR:\s*(\S.*)')
     if ($lineMatch.Success) { return $lineMatch.Groups[1].Value.Trim() }
+
+    # 4. Sentinelas de cota, taxa, autenticacao e servico em linhas do texto combinado
+    $lines = @($combined -split "`r?`n")
+    $interesting = @($lines | Where-Object {
+        $_ -match '(?i)\b(429|rate[_\s-]?limit(?:ed|exceeded)?|insufficient_quota|quota|credit\s+balance|token\s+limit|too\s+many\s+requests|usage\s*limit|unauthorized|authentication|auth\s+error|invalid_api_key|token\s+expired|session\s+expired|forbidden|overloaded|service\s+unavailable|does\s+not\s+exist|not\s+supported|not\s+available|not\s+found)\b' -or
+        $_ -match '(?i)model.{0,60}\b(does\s+not\s+exist|not\s+found|not\s+supported|unavailable|not\s+available)\b'
+    })
+    if ($interesting.Count -gt 0) {
+        return (($interesting | Select-Object -First 8) -join "`n").Trim()
+    }
+
     return $null
 }
 
