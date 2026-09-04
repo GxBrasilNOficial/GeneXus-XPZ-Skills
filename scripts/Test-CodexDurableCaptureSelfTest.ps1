@@ -154,6 +154,27 @@ exit 0
     Assert-True ($req2b.captureOutcome -eq 'timeout') '2b: captureOutcome=timeout'
     Write-Host 'PASS 2b timeout sem bytes' -ForegroundColor Green
 
+    # ===== 2d: timeout REAL (sem FORCE_TIMEOUT) com lastmsg -> recupera parecer =====
+    $hangReader = Join-Path $tmp 'fake-hang-after-lastmsg.ps1'
+    @'
+$o = $null
+for ($i = 0; $i -lt $args.Count; $i++) { if ($args[$i] -eq '-o') { $o = $args[$i + 1]; break } }
+[void][Console]::In.ReadToEnd()
+if ($o) { Set-Content -LiteralPath $o -Value 'RECOVERED-AFTER-KILL' -Encoding utf8 -NoNewline }
+Start-Sleep -Seconds 30
+exit 0
+'@ | Set-Content -LiteralPath $hangReader -Encoding utf8
+    $hangCmd = Join-Path $tmp 'fake-hang-after-lastmsg.cmd'
+    "@echo off`r`npwsh -NoProfile -ExecutionPolicy Bypass -File `"$hangReader`" %*`r`n" | Set-Content -LiteralPath $hangCmd -Encoding ascii
+    $j2d = Join-Path $jobs 'j2d-recover'
+    [IO.Directory]::CreateDirectory($j2d) | Out-Null
+    $ans2d = [string](& $invoke -CodexExe $hangCmd -MessagePath $prompt -TempDir $j2d -TimeoutSec 2 -RetentionMode public)
+    Assert-True ($ans2d -eq 'RECOVERED-AFTER-KILL') "2d: deveria recuperar lastmsg apos Kill; got '$ans2d'"
+    $req2d = Get-Content -LiteralPath (@(Get-ChildItem -LiteralPath $j2d -Filter '*.request.json')[0].FullName) -Raw -Encoding utf8 | ConvertFrom-Json
+    Assert-True ($req2d.captureOutcome -eq 'success') '2d: captureOutcome=success apos recuperacao'
+    Assert-True ([bool]$req2d.recoveredAfterTimeout) '2d: recoveredAfterTimeout=true no request.json'
+    Write-Host 'PASS 2d recover after timeout' -ForegroundColor Green
+
     # ===== 3 MessagePath invalido =====
     $j3 = Join-Path $jobs 't3'
     [IO.Directory]::CreateDirectory($j3) | Out-Null

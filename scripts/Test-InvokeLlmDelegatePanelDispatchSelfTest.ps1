@@ -501,8 +501,8 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
     # =======================================================================================
     # 5b) CAPTURA DURÁVEL CODEX NO PAINEL: splat Bound + droppedArgs + strip XPZ_CODEX_
     # =======================================================================================
-    # (a)+(b) TempDir/RetentionMode Bound do ledger; invokeArgs.tempdir/retentionMode -> droppedArgs
-    # (assimetria deliberada vs claude-code, que manda TempDir a securityBlockedArgs). Bound vence.
+    # (a)+(b) TempDir Bound em %TEMP%\xpz-llm-panel-codex\<RoundId> (fora do ledger/Cd);
+    # invokeArgs.tempdir/retentionMode -> droppedArgs. Bound vence.
     $stolenCodexLedger = Join-Path $tmp 'roubar-codex-ledger'
     [IO.Directory]::CreateDirectory($stolenCodexLedger) | Out-Null
     $r = Invoke-Harness -Reviewers @(@{
@@ -521,10 +521,13 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
     $secCodex = @($rv.securityBlockedArgs)
     Assert-True ($secCodex -notcontains 'tempdir' -and $secCodex -notcontains 'retentionMode') "codex durable: tempdir/retentionMode NAO sao securityBlockedArgs; got [$($secCodex -join ',')]"
     Assert-True (@(Get-ChildItem -LiteralPath $stolenCodexLedger -Filter '*.request.json' -File -ErrorAction SilentlyContinue).Count -eq 0) 'codex durable: invokeArgs.tempdir NAO deve receber request.json (Bound vence)'
-    $boundReqs = @(Get-ChildItem -LiteralPath $r.ledgerDir -Filter '*.request.json' -File -ErrorAction SilentlyContinue)
-    $boundMsgs = @(Get-ChildItem -LiteralPath $r.ledgerDir -Filter '*.lastmsg.txt' -File -ErrorAction SilentlyContinue)
-    Assert-True ($boundReqs.Count -ge 1) "codex durable splat TempDir: request.json sob o ledger Bound; got $($boundReqs.Count)"
-    Assert-True ($boundMsgs.Count -ge 1) 'codex durable RetentionMode=public Bound: lastmsg permanece no ledger (kb-sensitive do invokeArgs foi dropado)'
+    $codexCaptureDir = Join-Path (Join-Path ([IO.Path]::GetTempPath()) 'xpz-llm-panel-codex') ([string]$r.json.roundId)
+    Assert-True (Test-Path -LiteralPath $codexCaptureDir -PathType Container) "codex durable: TempDir Bound em xpz-llm-panel-codex/<RoundId>; missing $codexCaptureDir"
+    $boundReqs = @(Get-ChildItem -LiteralPath $codexCaptureDir -Filter '*.request.json' -File -ErrorAction SilentlyContinue)
+    $boundMsgs = @(Get-ChildItem -LiteralPath $codexCaptureDir -Filter '*.lastmsg.txt' -File -ErrorAction SilentlyContinue)
+    Assert-True ($boundReqs.Count -ge 1) "codex durable splat TempDir: request.json sob xpz-llm-panel-codex Bound; got $($boundReqs.Count)"
+    Assert-True ($boundMsgs.Count -ge 1) 'codex durable RetentionMode=public Bound: lastmsg permanece no capture dir (kb-sensitive do invokeArgs foi dropado)'
+    Assert-True (@(Get-ChildItem -LiteralPath $r.ledgerDir -Filter '*.request.json' -File -ErrorAction SilentlyContinue).Count -eq 0) 'codex durable: request.json NAO fica no ledger (so verdict/error)'
     $cap = (Get-Content -LiteralPath $boundReqs[0].FullName -Raw -Encoding utf8 | ConvertFrom-Json).captureOutcome
     Assert-True ($cap -eq 'success') "codex durable: captureOutcome=success; got '$cap'"
 
@@ -549,6 +552,16 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
             $env:XPZ_TEST_CODEX_FORCE_TIMEOUT = $prevForceTimeout
         }
     }
+
+    # (d) GAP-2: timeoutSec invalido -> error so naquele revisor; outro responde
+    $r = Invoke-Harness -Reviewers @(
+        @{ backend = 'codex'; invokeArgs = @{ model = 'gpt-5.5'; timeoutSec = '600s' } },
+        @{ backend = 'codex'; invokeArgs = @{ model = 'gpt-5.5' } }
+    ) -Sensitivity 'public' -Extra @{ CodexConfigPath = $cxCfg }
+    Assert-True ((Get-Reviewer $r.json 0).state -eq 'error') "GAP-2: timeoutSec '600s' -> error; got $((Get-Reviewer $r.json 0).state)"
+    Assert-True ((Get-Reviewer $r.json 0).reason -match 'timeoutSec invalido') 'GAP-2: reason cita timeoutSec invalido'
+    Assert-True ((Get-Reviewer $r.json 1).state -eq 'responded') "GAP-2: segundo revisor nao deve cair com o painel; got $((Get-Reviewer $r.json 1).state)"
+    Assert-True ([int]$r.json.respondedCount -eq 1 -and [int]$r.json.errorCount -eq 1) 'GAP-2: painel completa com 1 responded + 1 error'
 
     # =======================================================================================
     # 6) PARALELISMO: ocupação <= OllamaConcurrency p/ ollama-cloud; outros livres; lança não aborta
@@ -793,11 +806,15 @@ $($timeoutAst.Extent.Text)
 }
 "@
     $timeoutResult = & ([scriptblock]::Create($timeoutProbe))
-    Assert-True ([int]$timeoutResult.ClaudeDefault -eq 330000) "fallback dispatcher: claude-code sem timeoutSec deve esperar 300s+30s; got $($timeoutResult.ClaudeDefault)"
-    Assert-True ([int]$timeoutResult.InvalidClaude -eq 330000) "fallback dispatcher: claude-code com timeoutSec invalido deve cair no default 300s+30s; got $($timeoutResult.InvalidClaude)"
-    Assert-True ([int]$timeoutResult.OpenCodeDefault -eq 210000) "fallback dispatcher: opencode sem timeoutSec deve esperar 180s+30s; got $($timeoutResult.OpenCodeDefault)"
+    Assert-True ([int]$timeoutResult.ClaudeDefault -eq 420000) "fallback dispatcher: claude-code sem timeoutSec deve esperar 300s+120s; got $($timeoutResult.ClaudeDefault)"
+    Assert-True ([int]$timeoutResult.InvalidClaude -eq 420000) "fallback dispatcher: claude-code com timeoutSec invalido deve cair no default 300s+120s; got $($timeoutResult.InvalidClaude)"
+    Assert-True ([int]$timeoutResult.OpenCodeDefault -eq 2520000) "fallback dispatcher: opencode sem timeoutSec deve esperar 2*1200s+120s; got $($timeoutResult.OpenCodeDefault)"
     Assert-True ([int]$timeoutResult.SmallExplicit -eq 180000) "fallback dispatcher: timeoutSec pequeno deve manter piso conservador de 180s; got $($timeoutResult.SmallExplicit)"
     Assert-True ($harnessText -match "Get-FallbackDispatcherTimeoutMs\s+-Backend") 'fallback dispatcher: chamada real deve informar o backend para escolher o default correto.'
+    Assert-True ($harnessText -match "extraSplat\.ContainsKey\('TimeoutSec'\)") 'painel: TimeoutSec do AdapterDefaultTimeoutSec deve ser injetado no splat quando invokeArgs omite timeoutSec'
+    Assert-True ($harnessText -match "backend -in @\('codex', 'opencode'\)") 'painel: injecao TimeoutSec restrita a codex/opencode'
+    Assert-True ($harnessText -match 'invokeArgs\.timeoutSec invalido') 'painel: timeoutSec invalido deve virar error local (GAP-2)'
+    Assert-True ($harnessText -match 'recoveredAfterTimeout') 'painel: deve projetar recoveredAfterTimeout (GAP-3)'
     Assert-True ($harnessText -notmatch 'WaitForExit\(180000\)') 'fallback dispatcher: nao pode haver timeout fixo de 180000ms no processo filho.'
     Assert-True ($harnessText -match 'Get-CurrentPowerShellExecutable') 'fallback dispatcher: processo filho deve usar o executavel PowerShell atual/validado, nao depender de pwsh cru no PATH.'
     Assert-True ($harnessText -notmatch "Start-Process\s+-FilePath\s+'pwsh'") 'fallback dispatcher: nao pode resolver pwsh cru pelo PATH.'

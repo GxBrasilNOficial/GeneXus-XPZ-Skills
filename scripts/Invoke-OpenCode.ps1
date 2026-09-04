@@ -70,7 +70,7 @@ param(
     [string] $OpenCodeExe,
     [switch] $Raw,
     [switch] $AllText,
-    [int]    $TimeoutSec = 180,
+    [ValidateRange(1, 3600)] [int] $TimeoutSec = 180,
     [ValidateRange(1, 3)] [int] $MaxAttempts = 1
 )
 

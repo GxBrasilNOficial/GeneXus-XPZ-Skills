@@ -150,8 +150,9 @@ $ContentionKeys = @{
     'copilot'     = @()
 }
 $AdapterDefaultTimeoutSec = @{
-    'opencode'    = 180
-    'codex'       = 180
+    # Revisao agentica (ler repo) costuma passar de 180s; medido 2026-09-04: Codex Luna ~646s.
+    'opencode'    = 1200
+    'codex'       = 1200
     'claude-code' = 300
     'copilot'     = 300
     'gemini'      = 300
@@ -202,7 +203,8 @@ function Test-UnavailableFailureMessage {
 function Get-FallbackDispatcherTimeoutMs {
     param([string]$Backend, $InvokeArgs)
     $defaultTimeoutMs = 180000
-    $overheadMs = 30000
+    # Folga apos o adapter: classificacao, ledger, summary (era 30s; GAP-4 GLM 2026-09-04).
+    $overheadMs = 120000
     $adapterDefaultTimeoutSec = 180
     if (-not [string]::IsNullOrWhiteSpace($Backend) -and $script:AdapterDefaultTimeoutSec.ContainsKey($Backend)) {
         $adapterDefaultTimeoutSec = [int]$script:AdapterDefaultTimeoutSec[$Backend]
@@ -213,7 +215,13 @@ function Get-FallbackDispatcherTimeoutMs {
         $timeoutSec = $adapterDefaultTimeoutSec
     }
 
-    $derivedTimeoutMs = ([int64]$timeoutSec * 1000) + $overheadMs
+    # OpenCode no painel: MaxAttempts=2 e TimeoutSec por tentativa (parede ~2x).
+    $attemptFactor = 1
+    if ($Backend -eq 'opencode') {
+        $attemptFactor = 2
+    }
+
+    $derivedTimeoutMs = ([int64]$timeoutSec * 1000 * [int64]$attemptFactor) + $overheadMs
     if ($derivedTimeoutMs -lt $defaultTimeoutMs) { return $defaultTimeoutMs }
     if ($derivedTimeoutMs -gt [int]::MaxValue) { return [int]::MaxValue }
     return [int]$derivedTimeoutMs
@@ -462,6 +470,11 @@ if (-not (Test-Path -LiteralPath $gateScript -PathType Leaf)) {
 }
 
 if ([string]::IsNullOrWhiteSpace($RoundId)) { $RoundId = [guid]::NewGuid().ToString('N') }
+# Mesma higiene do New-LlmDelegatePeerReviewArtifacts: RoundId entra em ledger e em
+# %TEMP%\xpz-llm-panel-codex\<RoundId> — fail-closed contra chars inseguros / traversal.
+if ($RoundId -match '[^A-Za-z0-9._-]' -or $RoundId -match '\.\.' -or $RoundId -match '[/\\]') {
+    throw "BLOCK: RoundId inseguro: '$RoundId'. Use apenas letras, numeros, ponto, hifen e underscore."
+}
 
 $tempRoot = $TempDir
 if ([string]::IsNullOrWhiteSpace($tempRoot)) {
@@ -815,6 +828,7 @@ for ($i = 0; $i -lt $reviewers.Count; $i++) {
         cleanupStatus = $null
         cleanupIssues = @()
         keyringIsolation = $null
+        recoveredAfterTimeout = $null
     }
 
     # Defesa em profundidade: nativo nao despacha neste harness
@@ -859,6 +873,7 @@ for ($i = 0; $i -lt $reviewers.Count; $i++) {
     $dropped = [System.Collections.Generic.List[string]]::new()
     $secBlocked = [System.Collections.Generic.List[string]]::new()
     $extraSplat = @{}
+    $timeoutSecParseError = $null
     if ($null -ne $invokeArgs) {
         foreach ($prop in $invokeArgs.PSObject.Properties) {
             $k = $prop.Name
@@ -876,7 +891,16 @@ for ($i = 0; $i -lt $reviewers.Count; $i++) {
                 continue
             }
             # allowlist de despacho
-            if ($kl -eq 'timeoutsec') { $extraSplat['TimeoutSec'] = [int]$v; continue }
+            if ($kl -eq 'timeoutsec') {
+                # GAP-2: nao usar [int]$v (throw global). Revisor local em error; painel segue.
+                $parsedTs = 0
+                if (-not [int]::TryParse([string]$v, [ref]$parsedTs) -or $parsedTs -lt 1 -or $parsedTs -gt 3600) {
+                    $timeoutSecParseError = "invokeArgs.timeoutSec invalido: '$v' (exige inteiro 1..3600)"
+                } else {
+                    $extraSplat['TimeoutSec'] = $parsedTs
+                }
+                continue
+            }
             if ($backend -eq 'codex') {
                 if ($kl -eq 'profile') { $extraSplat['Profile'] = [string]$v; continue }
                 if ($kl -eq 'oss') { if ($v) { $extraSplat['Oss'] = $true }; continue }   # -Oss so quando verdadeiro
@@ -887,6 +911,13 @@ for ($i = 0; $i -lt $reviewers.Count; $i++) {
     }
     $rec.droppedArgs = @($dropped)
     $rec.securityBlockedArgs = @($secBlocked)
+
+    if ($null -ne $timeoutSecParseError) {
+        $rec.state = 'error'
+        $rec.reason = $timeoutSecParseError
+        if (-not $rec.family -and $inputKey) { $rec.family = Get-LlmDelegateTargetFamily -TargetModelKey $inputKey }
+        $records.Add($rec); continue
+    }
 
     # --- opencode em kb-sensitive: terminal unavailable (sem gate/despacho) ---
     if ($backend -eq 'opencode' -and $PayloadSensitivity -eq 'kb-sensitive') {
@@ -1047,10 +1078,14 @@ for ($i = 0; $i -lt $reviewers.Count; $i++) {
         $rec.sidecarPath = $sidecarPath
     }
     elseif ($backend -eq 'codex') {
-        # Paridade de destino com Claude (~1042-1043): TempDir do ledger + RetentionMode.
-        # Nao abrir ContentionKeys/allowlist — TempDir Bound vence; invokeArgs.tempdir cai em droppedArgs.
+        # TempDir FORA do -Cd/workspace sob revisao: job files (request/stream/lastmsg) no %TEMP%
+        # evitam o agente explorar artefatos do proprio despacho. Ledger do painel continua em
+        # $ledgerDir (verdict/error). Bound vence; invokeArgs.tempdir cai em droppedArgs.
+        $codexCaptureRoot = Join-Path ([System.IO.Path]::GetTempPath()) 'xpz-llm-panel-codex'
+        $codexCaptureDir = Join-Path $codexCaptureRoot $RoundId
+        [void][System.IO.Directory]::CreateDirectory($codexCaptureDir)
         $splat['RetentionMode'] = $PayloadSensitivity
-        $splat['TempDir'] = $ledgerDir
+        $splat['TempDir'] = $codexCaptureDir
     }
     elseif ($backend -eq 'antigravity') {
         $receiptPath = Join-Path $ledgerDir ('{0:D2}-antigravity-public-review.receipt.json' -f $i)
@@ -1058,6 +1093,13 @@ for ($i = 0; $i -lt $reviewers.Count; $i++) {
         $splat['ReceiptPath'] = $receiptPath
         $rec.adapterReceiptPath = $receiptPath
         $rec.publicReviewProfile = 'public-review'
+    }
+
+    # TimeoutSec: so codex/opencode (defaults de adapter 180 < mapa 1200). Demais backends
+    # mantem o default do proprio adapter (300) — evita apertar teto por injecao universal.
+    if (-not $extraSplat.ContainsKey('TimeoutSec') -and $backend -in @('codex', 'opencode') -and
+        $AdapterDefaultTimeoutSec.ContainsKey($backend)) {
+        $extraSplat['TimeoutSec'] = [int]$AdapterDefaultTimeoutSec[$backend]
     }
 
     # args allowlistados (TimeoutSec / codex Profile/Oss/LocalProvider)
@@ -1164,13 +1206,42 @@ try {
                         $state = 'error'
                     }
                     # errorPath / __errorText usam $errText completo (sentinelas + captura).
-                } else {
+                }                 else {
                     if ([string]::IsNullOrWhiteSpace($joined)) {
                         $state = 'error'
                         $errText = 'BLOCK: adapter retornou texto vazio (defensivo).'
                     } else {
                         $state = 'responded'
                         $textOut = $joined
+                    }
+                }
+
+                # GAP-3: projetar recoveredAfterTimeout do request.json Codex (pareamento por lastmsg).
+                $recoveredAfterTimeout = $null
+                if ($state -eq 'responded' -and $item.backend -eq 'codex' -and -not [string]::IsNullOrWhiteSpace($textOut)) {
+                    $recoveredAfterTimeout = $false
+                    try {
+                        $codexTd = $null
+                        if ($null -ne $item.splat -and $item.splat.ContainsKey('TempDir')) {
+                            $codexTd = [string]$item.splat['TempDir']
+                        }
+                        if (-not [string]::IsNullOrWhiteSpace($codexTd) -and (Test-Path -LiteralPath $codexTd -PathType Container)) {
+                            $want = $textOut.TrimEnd("`r", "`n")
+                            foreach ($lm in @(Get-ChildItem -LiteralPath $codexTd -Filter '*.lastmsg.txt' -File -ErrorAction SilentlyContinue)) {
+                                $body = Get-Content -LiteralPath $lm.FullName -Raw -Encoding utf8 -ErrorAction SilentlyContinue
+                                if ($null -eq $body) { continue }
+                                if ($body.TrimEnd("`r", "`n") -ne $want) { continue }
+                                $reqSibling = $lm.FullName -replace '\.lastmsg\.txt$', '.request.json'
+                                if (-not (Test-Path -LiteralPath $reqSibling -PathType Leaf)) { break }
+                                $ro = Get-Content -LiteralPath $reqSibling -Raw -Encoding utf8 | ConvertFrom-Json
+                                if ($null -ne $ro -and $ro.PSObject.Properties['recoveredAfterTimeout'] -and [bool]$ro.recoveredAfterTimeout) {
+                                    $recoveredAfterTimeout = $true
+                                }
+                                break
+                            }
+                        }
+                    } catch {
+                        $recoveredAfterTimeout = $false
                     }
                 }
 
@@ -1186,6 +1257,7 @@ try {
                     attempts   = 1
                     sidecarPath = $item.sidecarPath
                     adapterReceiptPath = $item.adapterReceiptPath
+                    recoveredAfterTimeout = $recoveredAfterTimeout
                 }
             } catch {
                 # Defesa em profundidade: qualquer excecao inesperada no runspace (ex.: Wait,
@@ -1202,6 +1274,7 @@ try {
                     attempts   = 1
                     sidecarPath = $item.sidecarPath
                     adapterReceiptPath = $item.adapterReceiptPath
+                    recoveredAfterTimeout = $null
                 }
             } finally {
                 # [void]: SemaphoreSlim.Release() devolve o contador anterior (int); sem o [void]
@@ -1324,6 +1397,9 @@ foreach ($res in $collected) {
     $rec.state = $res.state
     $rec['__text'] = $res.text
     $rec['__errorText'] = $res.errorText
+    if ($null -ne (Get-Prop $res 'recoveredAfterTimeout')) {
+        $rec.recoveredAfterTimeout = [bool](Get-Prop $res 'recoveredAfterTimeout')
+    }
     if ([string]::IsNullOrWhiteSpace([string]$rec.reason) -and -not [string]::IsNullOrWhiteSpace([string]$res.errorText)) {
         $rec.reason = [string]$res.errorText
     }

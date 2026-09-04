@@ -5,11 +5,14 @@
 .DESCRIPTION
     Backend codex da skill xpz-llm-delegate. Resolve o codex.exe compativel (app desktop,
     nao o shim npm), envia o prompt via stdin e captura a resposta final pelo arquivo de
-    output-last-message (-o) no grupo duravel sob TempDir. Bloqueia ate a resposta (ou ate
-    -TimeoutSec).
+    output-last-message (-o) no grupo duravel sob TempDir, com stream `--json` em
+    <GUID>.stream.jsonl (mesmo transporte do Start-CodexJob). Bloqueia ate a resposta (ou ate
+    -TimeoutSec). Se o timeout matar o processo mas o lastmsg ja tiver bytes, o parecer e
+    recuperado (captureOutcome=success + sentinela XPZ_CODEX_RECOVERED_AFTER_TIMEOUT); sem
+    bytes no lastmsg, lanca timeout como antes.
 
-    Esta e a invocacao sincrona canonica. Para tarefas longas que voce quer disparar sem
-    bloquear, use Start-CodexJob.ps1.
+    Esta e a invocacao sincrona canonica (o painel chama este adapter com TimeoutSec alto).
+    Para disparar sem bloquear o chamador, use Start-CodexJob.ps1.
 
     Sandbox: read-only fixo (delegacao e leitura/segunda-opiniao, nunca escrita). O Codex
     exec e agentico e PODE ler o filesystem do workspace; isso NAO contorna o gate de
@@ -73,7 +76,7 @@ param(
     [string] $Profile,
     [string] $Cd,
     [string] $CodexExe,
-    [int]    $TimeoutSec = 180,
+    [ValidateRange(1, 3600)] [int] $TimeoutSec = 180,
     [string] $TempDir,
     [ValidateRange(1, 3650)] [int] $KeepDays = 3,
     [ValidateSet('public', 'kb-sensitive')] [string] $RetentionMode = 'public'
@@ -110,6 +113,7 @@ $jobId       = [guid]::NewGuid().ToString('N')
 $base        = Join-Path $TempDir $jobId
 $reqPath     = "$base.request.json"
 $lastMsgPath = "$base.lastmsg.txt"
+$streamPath  = "$base.stream.jsonl"
 $invokeIn    = "$base.invoke-in.txt"
 $invokeOut   = "$base.invoke-out.txt"
 $invokeErr   = "$base.invoke-err.txt"
@@ -131,7 +135,7 @@ Set-Content -LiteralPath $invokeErr -Value '' -Encoding utf8 -NoNewline
 
 $arguments = @(
     'exec', '--skip-git-repo-check', '-s', 'read-only', '--color', 'never',
-    '-o', $lastMsgPath
+    '--json', '-o', $lastMsgPath
 )
 if ($Model) { $arguments += @('-m', $Model) }
 if ($Oss) { $arguments += '--oss' }
@@ -143,6 +147,7 @@ $arguments += '-'
 $script:captureOutcome = 'success'
 $script:pendingExceptionMessage = $null
 $script:successText = $null
+$script:recoveredAfterTimeout = $false
 
 function Append-CodexPendingBlock {
     param([Parameter(Mandatory)] [string] $Block)
@@ -173,6 +178,11 @@ function Write-CodexInvokeRequestRewrite {
         throw 'hook: request rewrite fail'
     }
     $requestObj['captureOutcome'] = $Outcome
+    if ($script:recoveredAfterTimeout) {
+        $requestObj['recoveredAfterTimeout'] = $true
+    } elseif ($requestObj.Contains('recoveredAfterTimeout')) {
+        $requestObj.Remove('recoveredAfterTimeout')
+    }
     if ($IncludeRetentionFlag) {
         $requestObj['retentionCleanupFailed'] = [bool]$RetentionCleanupFailed
     } elseif ($requestObj.Contains('retentionCleanupFailed')) {
@@ -187,7 +197,7 @@ try {
     }
 
     $p = Start-Process -FilePath $exe -ArgumentList $arguments -NoNewWindow -PassThru `
-        -RedirectStandardOutput $invokeOut -RedirectStandardError $invokeErr -RedirectStandardInput $invokeIn
+        -RedirectStandardOutput $streamPath -RedirectStandardError $invokeErr -RedirectStandardInput $invokeIn
 
     $timedOut = $false
     if ($env:XPZ_TEST_CODEX_FORCE_TIMEOUT -eq '1') {
@@ -196,13 +206,19 @@ try {
         $timedOut = $true
     }
     elseif (-not $p.WaitForExit($TimeoutSec * 1000)) {
-        try { $p.Kill() } catch { }
+        try { $p.Kill($true) } catch {
+            try { $p.Kill() } catch { }
+        }
         try { [void]$p.WaitForExit(5000) } catch { }
         Start-Sleep -Milliseconds 300
         $timedOut = $true
     }
 
-    $stdoutText = (Get-Content -LiteralPath $invokeOut -Raw -ErrorAction SilentlyContinue)
+    # Stream JSONL e a saida primaria; invoke-out fica vazio (legado do contrato pre--json).
+    $stdoutText = (Get-Content -LiteralPath $streamPath -Raw -ErrorAction SilentlyContinue)
+    if ([string]::IsNullOrWhiteSpace($stdoutText)) {
+        $stdoutText = (Get-Content -LiteralPath $invokeOut -Raw -ErrorAction SilentlyContinue)
+    }
     $stderrText = (Get-Content -LiteralPath $invokeErr -Raw -ErrorAction SilentlyContinue)
 
     $final = ''
@@ -212,8 +228,21 @@ try {
     if ($null -eq $final) { $final = '' }
 
     if ($timedOut) {
-        $script:captureOutcome = 'timeout'
-        $script:pendingExceptionMessage = "BLOCK: codex excedeu ${TimeoutSec}s e foi encerrado."
+        # FORCE_TIMEOUT preserva o contrato historico dos self-tests (sempre timeout).
+        # Em timeout real, se o lastmsg ja tiver bytes, recupera o parecer (Kill prematuro).
+        if ($env:XPZ_TEST_CODEX_FORCE_TIMEOUT -eq '1') {
+            $script:captureOutcome = 'timeout'
+            $script:pendingExceptionMessage = "BLOCK: codex excedeu ${TimeoutSec}s e foi encerrado."
+        }
+        elseif (-not [string]::IsNullOrWhiteSpace($final)) {
+            $script:captureOutcome = 'success'
+            $script:successText = $final.TrimEnd("`r", "`n")
+            $script:recoveredAfterTimeout = $true
+        }
+        else {
+            $script:captureOutcome = 'timeout'
+            $script:pendingExceptionMessage = "BLOCK: codex excedeu ${TimeoutSec}s e foi encerrado."
+        }
     }
     elseif (-not [string]::IsNullOrWhiteSpace($final)) {
         $script:successText = $final.TrimEnd("`r", "`n")
@@ -264,6 +293,9 @@ finally {
     try {
         [Console]::Error.WriteLine("XPZ_CODEX_LASTMSG=$lastMsgPath")
         [Console]::Error.WriteLine("XPZ_CODEX_REQUEST=$reqPath")
+        if ($script:recoveredAfterTimeout) {
+            [Console]::Error.WriteLine('XPZ_CODEX_RECOVERED_AFTER_TIMEOUT=1')
+        }
     } catch { }
 
     if ($RetentionMode -eq 'public') {
@@ -284,6 +316,7 @@ finally {
             foreach ($f in @($invokeIn, $invokeOut, $invokeErr)) {
                 Remove-Item -LiteralPath $f -Force -ErrorAction SilentlyContinue
             }
+            # stream.jsonl permanece em public (paridade Start-CodexJob / diagnostico).
         }
     }
     else {
@@ -331,7 +364,7 @@ finally {
             $deleteFailed = $false
             foreach ($pass in 1..5) {
                 $deleteFailed = $false
-                foreach ($f in @($invokeIn, $invokeOut, $invokeErr, $lastMsgPath)) {
+                foreach ($f in @($invokeIn, $invokeOut, $invokeErr, $lastMsgPath, $streamPath)) {
                     try {
                         if (Test-Path -LiteralPath $f -PathType Leaf) {
                             Remove-Item -LiteralPath $f -Force -ErrorAction Stop
