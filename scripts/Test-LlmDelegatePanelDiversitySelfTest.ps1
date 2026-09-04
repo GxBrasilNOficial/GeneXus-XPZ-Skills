@@ -143,4 +143,24 @@ Assert-True ($r24.unknownFamiliesPresent -eq $true) 'Caso 24: unknownFamiliesPre
 $droppedKeys = @($r24.droppedUnknownFamilies | ForEach-Object { [string]$_.targetModelKey })
 Assert-True ($droppedKeys -contains 'unknown') "Caso 24: droppedUnknownFamilies deveria conter 'unknown'; veio '$($droppedKeys -join ',')'."
 
+# (25) Grok nativo no Cursor sem barra resolve em xai e abre diversidade contra openai
+$r25 = Invoke-Diversity '[{"targetModelKey":"cursor-grok-4.6-medium","verdict":"allow"},{"targetModelKey":"openai/gpt-5.6","verdict":"allow"}]'
+Assert-True ($r25.state -eq 'panelReady') "Caso 25: cursor-grok-* + openai deveriam formar panelReady; veio '$($r25.state)'."
+Assert-True (@($r25.distinctFamiliesAllow).Count -eq 2) "Caso 25: esperado xai + openai; veio '$(@($r25.distinctFamiliesAllow) -join ',')'."
+Assert-True (@($r25.distinctFamiliesAllow) -contains 'xai') "Caso 25: distinctFamiliesAllow deveria conter 'xai'."
+Assert-True (@($r25.distinctFamiliesAllow) -contains 'openai') "Caso 25: distinctFamiliesAllow deveria conter 'openai'."
+
+# (26) as duas grafias do Grok nativo no Cursor representam o mesmo criador xai
+$r26 = Invoke-Diversity '[{"targetModelKey":"cursor-grok-4.6-medium","verdict":"allow"},{"targetModelKey":"cursor/grok-4","verdict":"allow"}]'
+Assert-True ($r26.state -eq 'insufficientDiversity') "Caso 26: as duas grafias de Cursor/Grok nao deveriam criar diversidade; veio '$($r26.state)'."
+Assert-True (@($r26.distinctFamiliesAllow).Count -eq 1) "Caso 26: esperado um unico criador; veio '$(@($r26.distinctFamiliesAllow) -join ',')'."
+Assert-True (@($r26.distinctFamiliesAllow) -contains 'xai') "Caso 26: distinctFamiliesAllow deveria conter 'xai'."
+
+# (27) Cursor sem mapeamento explicito continua desconhecido no piso de diversidade
+$r27 = Invoke-Diversity '[{"targetModelKey":"cursor/composer-2","verdict":"allow"},{"targetModelKey":"openai/gpt-5.6","verdict":"allow"}]'
+Assert-True ($r27.state -eq 'insufficientDiversity') "Caso 27: cursor/composer-* desconhecido nao deveria abrir diversidade; veio '$($r27.state)'."
+Assert-True ($r27.unknownFamiliesPresent -eq $true) 'Caso 27: cursor/composer-* deveria sinalizar familia desconhecida.'
+Assert-True (@($r27.distinctFamiliesAllow).Count -eq 1) "Caso 27: apenas openai deveria contar; veio '$(@($r27.distinctFamiliesAllow) -join ',')'."
+Assert-True (-not (@($r27.distinctFamiliesAllow) -contains 'cursor')) "Caso 27: cursor nao deveria contar como criador conhecido."
+
 Write-Host "OK: Test-LlmDelegatePanelDiversitySelfTest.ps1"
