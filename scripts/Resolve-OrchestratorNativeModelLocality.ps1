@@ -30,12 +30,24 @@ $locality = 'unknown'
 $reason = 'native-unknown-family'
 
 $first = if ($parts.Count -ge 1) { $parts[0] } else { '' }
-if ($first.Equals('cursor', [System.StringComparison]::OrdinalIgnoreCase)) {
-    $locality = 'unknown'
-    $reason = 'native-cursor-prefix'
+if ($first.Equals('cursor', [System.StringComparison]::OrdinalIgnoreCase) -and $parts.Count -ge 2) {
+    # cursor/<modelo>: se o Criador resolvido e conhecido (ex. cursor/grok-* -> xai), conta como nuvem.
+    if ((Test-LlmDelegateFamilyKnown -Family $family)) {
+        $locality = 'external'
+        $reason = 'native-cloud-creator'
+    } else {
+        $locality = 'unknown'
+        $reason = 'native-cursor-prefix'
+    }
 } elseif ($raw -notmatch '/') {
-    $locality = 'unknown'
-    $reason = 'native-key-no-slash'
+    # Slug de harness sem barra (ex. cursor-grok-*) pode mapear para Criador conhecido.
+    if ((Test-LlmDelegateFamilyKnown -Family $family)) {
+        $locality = 'external'
+        $reason = 'native-cloud-creator'
+    } else {
+        $locality = 'unknown'
+        $reason = 'native-key-no-slash'
+    }
 } elseif (-not (Test-LlmDelegateFamilyKnown -Family $family)) {
     $locality = 'unknown'
     $reason = 'native-unknown-family'

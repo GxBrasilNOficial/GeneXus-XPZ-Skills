@@ -16,7 +16,8 @@
     Para agregadores de 2 niveis sem criador no path (ex.: ollama-cloud/*, opencode-go/*), retorna o prefixo
     do provedor (limite conhecido documentado para preservacao dos semaforos de concorrencia do dispatcher).
 
-    Chaves sem barra (ex: 'unknown', 'gpt-5') preservam a própria chave como familia.
+    Chaves sem barra (ex: 'unknown', 'gpt-5') preservam a própria chave como familia,
+    salvo slugs de harness Cursor que mapeiam para o Criador do Modelo (ex.: cursor-grok-* -> xai).
 
     Test-LlmDelegateFamilyKnown: allowlist versionada de criadores que contam no piso de diversidade.
     Familia derivada fora da lista e unknown para o piso (nao colapsa no helper Get-*).
@@ -26,7 +27,7 @@
 $script:LlmDelegateKnownFamilies = @(
     'openai', 'anthropic', 'google', 'moonshot', 'z-ai', 'deepseek', 'mistral', 'alibaba',
     'meta', 'minimaxai', 'nvidia', 'ollama-cloud', 'opencode-go', 'atlas-cloud',
-    'github-copilot', 'microsoft'
+    'github-copilot', 'microsoft', 'xai'
 )
 
 function Test-LlmDelegateFamilyKnown {
@@ -52,10 +53,20 @@ function Get-LlmDelegateTargetFamily {
     if ([string]::IsNullOrWhiteSpace($TargetModelKey)) { return $null }
 
     $trimmed = $TargetModelKey.Trim()
+
+    # Slugs nativos do Cursor (harness) sem barra: cursor-grok-* -> Criador xAI.
+    if ($trimmed -ilike 'cursor-grok-*') { return 'xai' }
+
     if ($trimmed -notmatch '/') { return $trimmed }
 
     $parts = @($trimmed -split '/')
     $fam = $parts[0].Trim()
+
+    # cursor/grok-* (forma com barra, se aparecer) -> xai
+    if ($fam -ieq 'cursor') {
+        $modelId = if ($parts.Count -gt 1) { ($parts[1..($parts.Count - 1)] -join '/').Trim() } else { '' }
+        if ($modelId -ilike 'grok-*') { return 'xai' }
+    }
 
     if ($fam -ieq 'antigravity') {
         $modelId = if ($parts.Count -gt 1) { ($parts[1..($parts.Count - 1)] -join '/').Trim() } else { '' }

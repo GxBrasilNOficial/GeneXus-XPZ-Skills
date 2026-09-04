@@ -57,4 +57,16 @@ Assert-True ([string]$r5.locality -eq 'unknown') "(5) criador desconhecido dever
 Assert-True ([string]$r5.reason -eq 'native-unknown-family') "(5) reason deveria ser native-unknown-family; veio '$($r5.reason)'."
 Assert-True ([string]$r5.locality -ne 'local') '(5) nativo nunca deveria classificar como local.'
 
+# (6) cursor-grok-* (slug sem barra) -> xai / external / native-cloud-creator
+$r6 = & $locality -Model 'cursor-grok-4.6-medium' | ConvertFrom-Json
+Assert-True ([string]$r6.family -eq 'xai') "(6) family deveria ser xai; veio '$($r6.family)'."
+Assert-True ([string]$r6.locality -eq 'external') "(6) locality deveria ser external; veio '$($r6.locality)'."
+Assert-True ([string]$r6.reason -eq 'native-cloud-creator') "(6) reason deveria ser native-cloud-creator; veio '$($r6.reason)'."
+
+# (7) cursor/grok-* (forma com barra) -> xai / external
+$r7 = & $locality -Model 'cursor/grok-4' | ConvertFrom-Json
+Assert-True ([string]$r7.family -eq 'xai') "(7) family deveria ser xai; veio '$($r7.family)'."
+Assert-True ([string]$r7.locality -eq 'external') "(7) locality deveria ser external; veio '$($r7.locality)'."
+Assert-True ([string]$r7.reason -eq 'native-cloud-creator') "(7) reason deveria ser native-cloud-creator; veio '$($r7.reason)'."
+
 Write-Host 'OK: Test-ResolveOrchestratorNativeModelLocalitySelfTest.ps1'
