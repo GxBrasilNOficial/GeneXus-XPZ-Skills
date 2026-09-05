@@ -64,6 +64,20 @@ function Test-LlmDelegateCursorHarnessKey {
     return $first.Equals('cursor', [System.StringComparison]::OrdinalIgnoreCase)
 }
 
+# Harness ao qual a chave pertence, quando a propria chave o identifica ('cursor/grok-4' e
+# 'cursor-grok-*' -> 'cursor'). Devolve $null quando a chave nao carrega essa informacao
+# (ex.: 'moonshot/kimi-k3-max', que pode ser o nativo de qualquer harness) — por isso o
+# enforcing de harness x orquestrador e PARCIAL por natureza, e isso esta declarado no 15.
+function Get-LlmDelegateKeyHarness {
+    [CmdletBinding()]
+    param(
+        [string]$TargetModelKey
+    )
+    Set-StrictMode -Version Latest
+    if (Test-LlmDelegateCursorHarnessKey -TargetModelKey $TargetModelKey) { return 'cursor' }
+    return $null
+}
+
 function Get-LlmDelegateTargetFamily {
     [CmdletBinding()]
     param(

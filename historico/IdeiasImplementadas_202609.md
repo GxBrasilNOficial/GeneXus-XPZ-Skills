@@ -91,12 +91,12 @@ Os itens 4 e 5 nao vieram da frente original: sairam de revisao externa sobre os
 ### Testes
 
 - `Test-LlmDelegatePreferredReviewersSelfTest.ps1`: bloco (K2) no escritor — nativo `cursor/grok-4` e `cursor-composer-2-medium` aceitos; nativo sem Criador conhecido, alvo CLI nas duas grafias e elo de fallback bloqueados. Bloco (K3) no leitor — arquivo schema 3 escrito a mao com chave de harness Cursor sob backend CLI ou como elo e recusado na leitura; nativo `cursor/grok-4` resolve com `family=xai`.
-- `Test-LlmDelegatePanelDiversitySelfTest.ps1`: casos 28 e 29 — Composer resolve `anysphere` e abre piso contra `openai`; Composer + Grok formam `panelReady` com duas familias.
+- `Test-LlmDelegatePanelDiversitySelfTest.ps1`: casos 25 a 27 — `cursor-grok-*` resolve `xai` e abre piso contra `openai`; as duas grafias do Grok contam como um unico criador; `cursor/<modelo>` sem mapeamento continua desconhecido. Casos 28 e 29 — Composer resolve `anysphere` e abre piso contra `openai`; Composer + Grok formam `panelReady` com duas familias.
 - `Test-ResolveOrchestratorNativeModelLocalitySelfTest.ps1`: casos 8 e 9 nas duas grafias do Composer; o caso 3 passou a usar `cursor/modelo-sem-mapeamento` para preservar a cobertura do ramo desconhecido.
 
 ### Rastreabilidade
 
-- Commits materiais: `ec7c5d3` (`fix(llm-delegate): estabilizar painel Cursor para Codex/OpenCode em revisao longa`), `49dca32` (`feat(llm-delegate): reconhecer familia xai para Grok nativo no Cursor`), `8369ba7` (`docs(llm-delegate): documentar mapeamento cursor-grok -> xai no 15 e SKILL`), `c1ec5e0` (`test(llm-delegate): reforcar diversidade do Cursor/Grok`) e `f123f84` (`feat(llm-delegate): Criador anysphere e contrato de chave de harness Cursor`, correcao dos gaps apontados em revisao externa).
+- Commits materiais: `ec7c5d3` (`fix(llm-delegate): estabilizar painel Cursor para Codex/OpenCode em revisao longa`), `49dca32` (`feat(llm-delegate): reconhecer familia xai para Grok nativo no Cursor`), `8369ba7` (`docs(llm-delegate): documentar mapeamento cursor-grok -> xai no 15 e SKILL`), `c1ec5e0` (`test(llm-delegate): reforcar diversidade do Cursor/Grok`), `f123f84` (`feat(llm-delegate): Criador anysphere e contrato de chave de harness Cursor`, correcao dos gaps apontados em revisao externa) e `f644c41` (`fix(llm-delegate): aplicar contrato de chave de harness Cursor tambem na leitura`, predicado compartilhado + paridade escritor/leitor).
 - Arquivos materiais: `scripts/LlmDelegateTargetFamilySupport.ps1`, `scripts/Set-LlmDelegatePreferredReviewers.ps1`, `scripts/Resolve-OrchestratorNativeModelLocality.ps1`, `scripts/Invoke-Codex.ps1`, `scripts/Invoke-OpenCode.ps1`, `scripts/Invoke-LlmDelegatePanelDispatch.ps1`, os tres self-tests acima, `scripts/Test-CodexDurableCaptureSelfTest.ps1`, `scripts/Test-InvokeLlmDelegatePanelDispatchSelfTest.ps1`, `15-revisao-por-pares.md`, `xpz-llm-delegate/SKILL.md`, `09-inventario-e-rastreabilidade-publica.md`, `CHANGELOG.md`.
 
 ## Titular de subagente nativo pertence ao orquestrador, nao a maquina
@@ -135,3 +135,39 @@ O achado veio de um aviso consultivo (`SHARED_SCRIPT_SKILL_DOC_NOT_IN_DIFF` sobr
 
 - Commit material: `5e11685` (`fix(llm-delegate): titular nativo exige escopo de orquestrador`)
 - Arquivos materiais: `scripts/Set-LlmDelegatePreferredReviewers.ps1`, `scripts/Resolve-LlmDelegatePreferredReviewers.ps1`, `scripts/Test-LlmDelegatePreferredReviewersSelfTest.ps1`, `15-revisao-por-pares.md`, `xpz-llm-delegate/SKILL.md`, `xpz-skills-setup/SKILL.md`, `09-inventario-e-rastreabilidade-publica.md`, `CHANGELOG.md`.
+
+## Harness x orquestrador na curadoria e honestidade do recoveredAfterTimeout em kb-sensitive
+
+Implementado em 2026-09-04, fechando cinco apontamentos de uma segunda revisao externa sobre os commits do dia.
+
+### 1. Voz fantasma pelo eixo do orquestrador (gap comportamental)
+
+O gate `native-machine-scope-forbidden` da rodada anterior fechou o eixo machine, mas nao o eixo do orquestrador. Verificado empiricamente: `Set- -Orchestrator claude-code -Scope orchestrator` com titular nativo `cursor/grok-4` gravava `preferred-reviewers.claude-code.json` com `written:1`, sem reclamar — a mesma voz fantasma por outra porta, e a chave ainda somaria `xai` no piso de diversidade.
+
+Correcao: novo predicado `Get-LlmDelegateKeyHarness` na biblioteca compartilhada e gate `native-harness-orchestrator-mismatch` (exit 3) no `Set-`; o `Resolve-` diagnostica o mesmo caso em arquivos anteriores ao gate, sem bloquear.
+
+**Limite declarado:** o casamento so e verificavel quando a propria chave carrega o harness (`cursor/*`, `cursor-*`). Chave neutra como `moonshot/kimi-k3-max` nao diz de qual harness veio e continua aceita em qualquer orquestrador. Isso esta escrito no `15` como limite, nao deixado implicito.
+
+### 2. `recoveredAfterTimeout` silenciosamente falso em kb-sensitive (gap comportamental)
+
+Em `kb-sensitive`, o `Invoke-Codex.ps1` apaga `lastmsg` e `request.json` no caminho de **sucesso** — e recuperacao pos-timeout e sucesso. O dispatcher pareia por esses ficheiros, entao o campo saia `false` mesmo quando houve recuperacao.
+
+A sugestao do revisor era aproveitar a sentinela `XPZ_CODEX_RECOVERED_AFTER_TIMEOUT=1`. **Ela nao e aplicavel:** a sentinela e escrita com `[Console]::Error.WriteLine`, ou seja, no stderr do PROCESSO — nao passa pelo fluxo de erro do PowerShell e o dispatcher so a veria se o adapter lancasse (no ramo de sucesso, nao lanca). Capturar exigiria `2>&1`, que misturaria a sentinela ao parecer, ou reter um recibo em `kb-sensitive`, o que contraria a promessa do modo (o modo apaga tudo).
+
+Correcao adotada: em `kb-sensitive` o campo fica `null` (desconhecido) em vez de `false`. `null` ja e o valor para "nao aplicavel" nos demais backends, e deixa de afirmar uma negativa que o dispatcher nao tem como saber.
+
+### 3, 4 e 5. Rastreabilidade e residuais
+
+- `f644c41` acrescentado a rastreabilidade da secao anterior, e a subsecao de testes dela passou a citar tambem os casos 25 a 27 da diversidade.
+- `999`: a linha «`Kill()` simples permanece no Invoke» estava invertida — o `Invoke-Codex.ps1` usa `Kill($true)` com fallback desde 2026-09-04; marcada como resolvida. **Nao** havia no arquivo o texto «timeout com bytes no lastmsg continua timeout» que a revisao externa atribuiu a linha 840; essa metade do apontamento era falsa e foi descartada.
+- `999`: residual novo para a retencao do diretorio `%TEMP%\xpz-llm-panel-codex\<RoundId>` — nada limpa rodadas anteriores e o `KeepDays` do adapter e inerte ali, porque o TempDir muda a cada rodada. Retencao hoje e diagnostica e manual; ponteiro tambem no `SKILL`.
+
+### Testes
+
+- `Test-LlmDelegatePreferredReviewersSelfTest.ps1`, bloco (K5): nativo `cursor/grok-4` sob `-Orchestrator claude-code` recusado; chave neutra aceita em outro orquestrador (limite declarado); arquivo legado com harness divergente lido sem bloqueio e com diagnostico.
+- `Test-InvokeLlmDelegatePanelDispatchSelfTest.ps1`: guarda textual de que o ramo de projecao exclui `kb-sensitive`.
+
+### Rastreabilidade
+
+- Commit material: a preencher no commit seguinte.
+- Arquivos materiais: `scripts/LlmDelegateTargetFamilySupport.ps1`, `scripts/Set-LlmDelegatePreferredReviewers.ps1`, `scripts/Resolve-LlmDelegatePreferredReviewers.ps1`, `scripts/Invoke-LlmDelegatePanelDispatch.ps1`, `scripts/Test-LlmDelegatePreferredReviewersSelfTest.ps1`, `scripts/Test-InvokeLlmDelegatePanelDispatchSelfTest.ps1`, `15-revisao-por-pares.md`, `xpz-llm-delegate/SKILL.md`, `09-inventario-e-rastreabilidade-publica.md`, `999-ideias-pendentes.md`, `CHANGELOG.md`.

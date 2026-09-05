@@ -280,6 +280,13 @@ function ConvertTo-ReviewerV3 {
         if ($scopeTrim -eq 'machine') {
             Stop-WithReason -Reason 'native-machine-scope-forbidden' -ExitCode 3 -Detail "nativo exige -Scope orchestrator; targetModelKey='$target'"
         }
+        # Mesmo eixo, outra porta: escopo de orquestrador nao basta se a chave for de OUTRO
+        # harness. Enforcing PARCIAL por natureza — so vale quando a chave identifica o harness
+        # (cursor/*, cursor-*); chave neutra como moonshot/kimi-k3-max nao e verificavel aqui.
+        $keyHarness = Get-LlmDelegateKeyHarness -TargetModelKey $target
+        if ($null -ne $keyHarness -and -not $keyHarness.Equals($orchTrim, [System.StringComparison]::OrdinalIgnoreCase)) {
+            Stop-WithReason -Reason 'native-harness-orchestrator-mismatch' -ExitCode 3 -Detail "chave do harness '$keyHarness' sob -Orchestrator '$orchTrim'; targetModelKey='$target'"
+        }
         if ($null -eq $harnessRaw -or [string]::IsNullOrWhiteSpace([string]$harnessRaw)) {
             Stop-WithReason -Reason 'native-harness-model-id-missing' -ExitCode 3 -Detail 'harnessModelId obrigatorio no nativo'
         }

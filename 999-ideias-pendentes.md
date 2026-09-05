@@ -851,7 +851,8 @@ Após implementar + rebuild:
 - Start-CodexJob sem `RetentionMode` (job longo / kb-sensitive): skill+este residual.
 - <!-- backend-parity: ignore --> C-shared = Claude async **e** órfão Codex só-stream (indistinguível) — nunca apagar sem marcador exclusivo.
 - `verdict.txt` do harness permanece em kb-sensitive (residual de paridade Claude).
-- `Kill($true)` + prompt em `invoke-in`: confidencialidade; `Kill()` simples permanece no Invoke.
+- `Kill($true)` + prompt em `invoke-in`: confidencialidade. **Resolvido em 2026-09-04:** o `Invoke-Codex.ps1` passou a usar `Kill($true)` (árvore de processos) com fallback para `Kill()` simples.
+- Diretório de captura Codex do painel (`%TEMP%\xpz-llm-panel-codex\<RoundId>`): nada limpa rodadas anteriores. O `KeepDays` do adapter só varre **dentro** do TempDir que recebe, e esse TempDir muda a cada `RoundId` — então cada rodada (e cada elo `…-fb-*`) deixa um diretório irmão órfão, vazio em `kb-sensitive` e com artefatos em `public`. Mesma classe do item «KeepDays inerte no ledger fresco do painel» acima, em outro diretório. Limpeza entre rodadas é frente própria; hoje a retenção é **diagnóstica e manual**.
 - <!-- backend-parity: ignore --> `ContentionKeys['codex']` permanece `@()`: allowlist + splat TempDir bastam; assimetria com claude-code fica aqui.
 - KeepDays inerte no ledger fresco do painel (TempDir por rodada).
 - `2>&1` no sucesso mistura sentinelas ao stdout agregado (skill avisa).

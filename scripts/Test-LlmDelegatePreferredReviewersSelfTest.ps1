@@ -709,6 +709,54 @@ try {
     $orchDiag = @($kRead5.json.reviewers[0].diagnostics)
     Assert-True (@($orchDiag | Where-Object { $_ -like '*escopo machine*' }).Count -eq 0) "(K4) escopo orquestrador nao deveria trazer o diagnostico; veio '$($orchDiag -join ' | ')'."
 
+    # (K5) escopo de orquestrador nao basta: chave que identifica OUTRO harness e recusada.
+    # Enforcing parcial — so vale para chave que carrega o harness (cursor/*, cursor-*).
+    $kMismatch = Invoke-Set @{
+        ReviewersJson = $nativeGrok
+        Orchestrator  = 'claude-code'
+        Scope         = 'orchestrator'
+        OutputPath    = (Join-Path $tempRoot 'native-mismatch.json')
+    }
+    Assert-ReasonExit -Result $kMismatch -Reason 'native-harness-orchestrator-mismatch' -ExitCode 3 -Label '(K5) nativo cursor sob claude-code'
+
+    # Chave neutra (sem harness na chave) continua aceita em qualquer orquestrador: o motor
+    # nao tem como saber de qual harness ela veio, e isso e limite declarado, nao bug.
+    $kNeutral = Invoke-Set @{
+        ReviewersJson = $nativeOk
+        Orchestrator  = 'claude-code'
+        Scope         = 'orchestrator'
+        OutputPath    = (Join-Path $tempRoot 'native-neutral.json')
+    }
+    Assert-True ($kNeutral.code -eq 0) "(K5) chave neutra deveria exit 0 em outro orquestrador; veio $($kNeutral.code)."
+
+    # Arquivo anterior ao gate: a leitura nao bloqueia, mas diagnostica o harness divergente.
+    $mismatchRoot = Join-Path $tempRoot 'legacy-mismatch'
+    [System.IO.Directory]::CreateDirectory($mismatchRoot) | Out-Null
+    @'
+{
+  "schemaVersion": 3,
+  "orchestrator": "claude-code",
+  "reviewers": [
+    {
+      "type": "orchestrator-native-subagent",
+      "backend": "orchestrator-native",
+      "targetModelKey": "cursor/grok-4",
+      "harnessModelId": "grok-4",
+      "rank": 1,
+      "invokeArgs": {}
+    }
+  ]
+}
+'@ | Set-Content -LiteralPath (Join-Path $mismatchRoot 'preferred-reviewers.claude-code.json') -Encoding utf8
+    $kRead6 = Invoke-Resolve @{
+        Orchestrator     = 'claude-code'
+        PreferredRoot    = $mismatchRoot
+        CapabilitiesPath = $capPath
+    }
+    Assert-True ($kRead6.code -eq 0) "(K5) leitura de arquivo legado com harness divergente nao deveria bloquear; veio $($kRead6.code)."
+    $mismatchDiag = @($kRead6.json.reviewers[0].diagnostics)
+    Assert-True (@($mismatchDiag | Where-Object { $_ -like "*harness 'cursor'*" }).Count -ge 1) "(K5) deveria diagnosticar harness divergente; veio '$($mismatchDiag -join ' | ')'."
+
     # --------------------------------------------------------------------------------------
     # (L) cascata PreferredRoot vazio -> no-preferred-file preferenceSource=none
     # --------------------------------------------------------------------------------------

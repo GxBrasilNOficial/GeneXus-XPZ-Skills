@@ -237,6 +237,14 @@ function ConvertTo-ResolvedReviewer {
     # Arquivo machine gravado antes do gate 'native-machine-scope-forbidden' do Set- pode conter
     # titular nativo de OUTRO harness. Nao bloqueia a leitura (o arquivo ja existe), mas avisa:
     # o orquestrador precisa confirmar antes de contar essa voz no piso de diversidade.
+    if ($isNative) {
+        # Chave que identifica outro harness (cursor/* sob orquestrador != cursor): arquivo
+        # anterior ao gate 'native-harness-orchestrator-mismatch'. Diagnostico, nao bloqueio.
+        $keyHarness = Get-LlmDelegateKeyHarness -TargetModelKey $target
+        if ($null -ne $keyHarness -and -not $keyHarness.Equals($orchTrim, [System.StringComparison]::OrdinalIgnoreCase)) {
+            $diagnostics.Add("titular nativo com chave do harness '$keyHarness' sob orquestrador '$orchTrim' — este harness não resolve esse nativo; não contar no piso sem confirmar")
+        }
+    }
     if ($isNative -and $PreferenceSource -eq 'machine') {
         $diagnostics.Add('titular nativo em escopo machine; nativo pertence ao harness que o executa — confirmar que este orquestrador o oferece antes de compor o painel')
     }

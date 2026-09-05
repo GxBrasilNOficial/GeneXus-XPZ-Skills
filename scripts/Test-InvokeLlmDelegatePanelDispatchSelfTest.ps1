@@ -815,6 +815,7 @@ $($timeoutAst.Extent.Text)
     Assert-True ($harnessText -match "backend -in @\('codex', 'opencode'\)") 'painel: injecao TimeoutSec restrita a codex/opencode'
     Assert-True ($harnessText -match 'invokeArgs\.timeoutSec invalido') 'painel: timeoutSec invalido deve virar error local (GAP-2)'
     Assert-True ($harnessText -match 'recoveredAfterTimeout') 'painel: deve projetar recoveredAfterTimeout (GAP-3)'
+    Assert-True ($harnessText -match "codexRetention -ne 'kb-sensitive'") 'painel: em kb-sensitive o pareamento por lastmsg e impossivel (adapter apaga no sucesso) — recoveredAfterTimeout deve ficar $null, nunca false silencioso'
     Assert-True ($harnessText -notmatch 'WaitForExit\(180000\)') 'fallback dispatcher: nao pode haver timeout fixo de 180000ms no processo filho.'
     Assert-True ($harnessText -match 'Get-CurrentPowerShellExecutable') 'fallback dispatcher: processo filho deve usar o executavel PowerShell atual/validado, nao depender de pwsh cru no PATH.'
     Assert-True ($harnessText -notmatch "Start-Process\s+-FilePath\s+'pwsh'") 'fallback dispatcher: nao pode resolver pwsh cru pelo PATH.'

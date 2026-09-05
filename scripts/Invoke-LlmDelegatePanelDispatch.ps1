@@ -1218,7 +1218,19 @@ try {
 
                 # GAP-3: projetar recoveredAfterTimeout do request.json Codex (pareamento por lastmsg).
                 $recoveredAfterTimeout = $null
-                if ($state -eq 'responded' -and $item.backend -eq 'codex' -and -not [string]::IsNullOrWhiteSpace($textOut)) {
+                # Em kb-sensitive o proprio adapter apaga lastmsg + request.json no caminho de
+                # SUCESSO — e recuperacao pos-timeout e sucesso. Sem esses ficheiros nao ha
+                # pareamento possivel, entao o campo fica $null (desconhecido) em vez de $false:
+                # false afirmaria "nao houve recuperacao", o que o dispatcher nao pode saber aqui.
+                # A sentinela XPZ_CODEX_RECOVERED_AFTER_TIMEOUT vai para o stderr do PROCESSO via
+                # [Console]::Error e nao passa pelo fluxo de erro do PowerShell, entao nao esta
+                # disponivel neste ramo (so quando o adapter lanca). Reter recibo em kb-sensitive
+                # contrariaria a promessa do modo — o modo apaga tudo.
+                $codexRetention = $null
+                if ($null -ne $item.splat -and $item.splat.ContainsKey('RetentionMode')) {
+                    $codexRetention = [string]$item.splat['RetentionMode']
+                }
+                if ($state -eq 'responded' -and $item.backend -eq 'codex' -and $codexRetention -ne 'kb-sensitive' -and -not [string]::IsNullOrWhiteSpace($textOut)) {
                     $recoveredAfterTimeout = $false
                     try {
                         $codexTd = $null
