@@ -192,5 +192,5 @@ A varredura de eixos do gate de `RoundId` sugeriu que o motor irmao `New-LlmDele
 
 ### Rastreabilidade
 
-- Commit material: a preencher no commit seguinte.
+- Commit material: `27529bb` (`fix(llm-delegate): faixa 1..3600 de -TimeoutSec nos tres adapters restantes`); regra registrada em `dc85f04` (`docs(pre-push): exigir enumeracao dos eixos vizinhos ao introduzir gate`)
 - Arquivos materiais: `scripts/Invoke-ClaudeCode.ps1`, `scripts/Invoke-Copilot.ps1`, `scripts/Invoke-Gemini.ps1`, `xpz-llm-delegate/SKILL.md`, `999-ideias-pendentes.md`, `CHANGELOG.md`.
