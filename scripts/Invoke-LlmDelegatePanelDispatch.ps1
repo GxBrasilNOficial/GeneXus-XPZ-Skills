@@ -1206,7 +1206,7 @@ try {
                         $state = 'error'
                     }
                     # errorPath / __errorText usam $errText completo (sentinelas + captura).
-                }                 else {
+                } else {
                     if ([string]::IsNullOrWhiteSpace($joined)) {
                         $state = 'error'
                         $errText = 'BLOCK: adapter retornou texto vazio (defensivo).'

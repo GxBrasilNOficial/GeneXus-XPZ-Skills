@@ -17,7 +17,9 @@
     do provedor (limite conhecido documentado para preservacao dos semaforos de concorrencia do dispatcher).
 
     Chaves sem barra (ex: 'unknown', 'gpt-5') preservam a própria chave como familia,
-    salvo slugs de harness Cursor que mapeiam para o Criador do Modelo (ex.: cursor-grok-* -> xai).
+    salvo slugs de harness Cursor que mapeiam para o Criador do Modelo (ex.: cursor-grok-* -> xai,
+    cursor-composer-* -> anysphere). Criador = quem treinou os pesos, nao o dono societario:
+    Composer (Anysphere) e Grok (xAI) sao criadores distintos e somam no piso.
 
     Test-LlmDelegateFamilyKnown: allowlist versionada de criadores que contam no piso de diversidade.
     Familia derivada fora da lista e unknown para o piso (nao colapsa no helper Get-*).
@@ -27,7 +29,7 @@
 $script:LlmDelegateKnownFamilies = @(
     'openai', 'anthropic', 'google', 'moonshot', 'z-ai', 'deepseek', 'mistral', 'alibaba',
     'meta', 'minimaxai', 'nvidia', 'ollama-cloud', 'opencode-go', 'atlas-cloud',
-    'github-copilot', 'microsoft', 'xai'
+    'github-copilot', 'microsoft', 'xai', 'anysphere'
 )
 
 function Test-LlmDelegateFamilyKnown {
@@ -54,18 +56,20 @@ function Get-LlmDelegateTargetFamily {
 
     $trimmed = $TargetModelKey.Trim()
 
-    # Slugs nativos do Cursor (harness) sem barra: cursor-grok-* -> Criador xAI.
-    if ($trimmed -ilike 'cursor-grok-*') { return 'xai' }
+    # Slugs nativos do Cursor (harness) sem barra: mapeiam para o Criador dos pesos.
+    if ($trimmed -ilike 'cursor-grok-*')     { return 'xai' }
+    if ($trimmed -ilike 'cursor-composer-*') { return 'anysphere' }
 
     if ($trimmed -notmatch '/') { return $trimmed }
 
     $parts = @($trimmed -split '/')
     $fam = $parts[0].Trim()
 
-    # cursor/grok-* (forma com barra, se aparecer) -> xai
+    # cursor/grok-* e cursor/composer-* (forma com barra) -> Criador dos pesos
     if ($fam -ieq 'cursor') {
         $modelId = if ($parts.Count -gt 1) { ($parts[1..($parts.Count - 1)] -join '/').Trim() } else { '' }
-        if ($modelId -ilike 'grok-*') { return 'xai' }
+        if ($modelId -ilike 'grok-*')     { return 'xai' }
+        if ($modelId -ilike 'composer-*') { return 'anysphere' }
     }
 
     if ($fam -ieq 'antigravity') {

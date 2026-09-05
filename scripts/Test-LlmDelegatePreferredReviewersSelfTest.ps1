@@ -460,6 +460,111 @@ try {
     }
     Assert-ReasonExit -Result $kCur -Reason 'native-cursor-prefix' -ExitCode 3 -Label '(K) cursor prefix'
 
+    # (K2) chave de harness Cursor: legitima como titular NATIVO com Criador conhecido,
+    # proibida como alvo CLI (indespachavel) nas duas grafias e como elo de fallbackChain.
+    $nativeGrok = @'
+{
+  "reviewers": [
+    {
+      "backend": "orchestrator-native",
+      "targetModelKey": "cursor/grok-4",
+      "harnessModelId": "grok-4",
+      "invokeArgs": {}
+    }
+  ]
+}
+'@
+    $grokPath = Join-Path $tempRoot 'native-grok.json'
+    $kGrok = Invoke-Set @{
+        ReviewersJson = $nativeGrok
+        Orchestrator  = 'cursor'
+        Scope         = 'machine'
+        OutputPath    = $grokPath
+    }
+    Assert-True ($kGrok.code -eq 0) "(K2) nativo cursor/grok-* deveria exit 0; veio $($kGrok.code)."
+    $grokDoc = Get-Content -LiteralPath $grokPath -Raw -Encoding utf8 | ConvertFrom-Json
+    Assert-True ($grokDoc.reviewers[0].targetModelKey -eq 'cursor/grok-4') '(K2) targetModelKey nativo deveria ser preservado.'
+
+    $nativeComposer = @'
+{
+  "reviewers": [
+    {
+      "backend": "orchestrator-native",
+      "targetModelKey": "cursor-composer-2-medium",
+      "harnessModelId": "composer-2-medium",
+      "invokeArgs": {}
+    }
+  ]
+}
+'@
+    $kComposer = Invoke-Set @{
+        ReviewersJson = $nativeComposer
+        Orchestrator  = 'cursor'
+        Scope         = 'machine'
+        OutputPath    = (Join-Path $tempRoot 'native-composer.json')
+    }
+    Assert-True ($kComposer.code -eq 0) "(K2) nativo cursor-composer-* deveria exit 0; veio $($kComposer.code)."
+
+    $nativeUnmapped = @'
+{
+  "reviewers": [
+    {
+      "backend": "orchestrator-native",
+      "targetModelKey": "cursor/modelo-sem-mapeamento",
+      "harnessModelId": "modelo-sem-mapeamento",
+      "invokeArgs": {}
+    }
+  ]
+}
+'@
+    $kUnmapped = Invoke-Set @{
+        ReviewersJson = $nativeUnmapped
+        Orchestrator  = 'cursor'
+        Scope         = 'machine'
+        OutputPath    = (Join-Path $tempRoot 'native-unmapped.json')
+    }
+    Assert-ReasonExit -Result $kUnmapped -Reason 'native-cursor-prefix' -ExitCode 3 -Label '(K2) nativo sem Criador conhecido'
+
+    $cliGrokSlug = '{"reviewers":[{ "backend": "opencode", "targetModelKey": "cursor-grok-4.6-medium", "invokeArgs": {} }]}'
+    $kCliSlug = Invoke-Set @{
+        ReviewersJson = $cliGrokSlug
+        Orchestrator  = 'cursor'
+        Scope         = 'machine'
+        OutputPath    = (Join-Path $tempRoot 'cli-grok-slug.json')
+    }
+    Assert-ReasonExit -Result $kCliSlug -Reason 'native-cursor-prefix' -ExitCode 3 -Label '(K2) CLI slug sem barra'
+
+    $cliGrokSlash = '{"reviewers":[{ "backend": "codex", "targetModelKey": "cursor/grok-4", "invokeArgs": {} }]}'
+    $kCliSlash = Invoke-Set @{
+        ReviewersJson = $cliGrokSlash
+        Orchestrator  = 'cursor'
+        Scope         = 'machine'
+        OutputPath    = (Join-Path $tempRoot 'cli-grok-slash.json')
+    }
+    Assert-ReasonExit -Result $kCliSlash -Reason 'native-cursor-prefix' -ExitCode 3 -Label '(K2) CLI grafia com barra'
+
+    $fbCursor = @'
+{
+  "reviewers": [
+    {
+      "backend": "codex",
+      "targetModelKey": "openai/gpt-5.5",
+      "invokeArgs": {},
+      "fallbackChain": [
+        { "backend": "opencode", "targetModelKey": "cursor/grok-4", "invokeArgs": {} }
+      ]
+    }
+  ]
+}
+'@
+    $kFbCursor = Invoke-Set @{
+        ReviewersJson = $fbCursor
+        Orchestrator  = 'cursor'
+        Scope         = 'machine'
+        OutputPath    = (Join-Path $tempRoot 'fb-cursor.json')
+    }
+    Assert-ReasonExit -Result $kFbCursor -Reason 'native-cursor-prefix' -ExitCode 3 -Label '(K2) fallback cursor'
+
     # --------------------------------------------------------------------------------------
     # (L) cascata PreferredRoot vazio -> no-preferred-file preferenceSource=none
     # --------------------------------------------------------------------------------------

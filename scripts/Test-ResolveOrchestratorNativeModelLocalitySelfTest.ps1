@@ -40,8 +40,8 @@ $r2 = & $locality -Model 'kimi-k3-max' | ConvertFrom-Json
 Assert-True ([string]$r2.locality -eq 'unknown') "(2) locality deveria ser unknown; veio '$($r2.locality)'."
 Assert-True ([string]$r2.reason -eq 'native-key-no-slash') "(2) reason deveria ser native-key-no-slash; veio '$($r2.reason)'."
 
-# (3) prefixo cursor -> unknown / native-cursor-prefix
-$r3 = & $locality -Model 'cursor/composer-2' | ConvertFrom-Json
+# (3) prefixo cursor sem mapeamento de Criador -> unknown / native-cursor-prefix
+$r3 = & $locality -Model 'cursor/modelo-sem-mapeamento' | ConvertFrom-Json
 Assert-True ([string]$r3.locality -eq 'unknown') "(3) locality deveria ser unknown; veio '$($r3.locality)'."
 Assert-True ([string]$r3.reason -eq 'native-cursor-prefix') "(3) reason deveria ser native-cursor-prefix; veio '$($r3.reason)'."
 
@@ -68,5 +68,17 @@ $r7 = & $locality -Model 'cursor/grok-4' | ConvertFrom-Json
 Assert-True ([string]$r7.family -eq 'xai') "(7) family deveria ser xai; veio '$($r7.family)'."
 Assert-True ([string]$r7.locality -eq 'external') "(7) locality deveria ser external; veio '$($r7.locality)'."
 Assert-True ([string]$r7.reason -eq 'native-cloud-creator') "(7) reason deveria ser native-cloud-creator; veio '$($r7.reason)'."
+
+# (8) cursor/composer-* -> anysphere / external (Criador dos pesos, nao o dono societario)
+$r8 = & $locality -Model 'cursor/composer-2' | ConvertFrom-Json
+Assert-True ([string]$r8.family -eq 'anysphere') "(8) family deveria ser anysphere; veio '$($r8.family)'."
+Assert-True ([string]$r8.locality -eq 'external') "(8) locality deveria ser external; veio '$($r8.locality)'."
+Assert-True ([string]$r8.reason -eq 'native-cloud-creator') "(8) reason deveria ser native-cloud-creator; veio '$($r8.reason)'."
+
+# (9) cursor-composer-* (slug sem barra) -> anysphere / external
+$r9 = & $locality -Model 'cursor-composer-2-medium' | ConvertFrom-Json
+Assert-True ([string]$r9.family -eq 'anysphere') "(9) family deveria ser anysphere; veio '$($r9.family)'."
+Assert-True ([string]$r9.locality -eq 'external') "(9) locality deveria ser external; veio '$($r9.locality)'."
+Assert-True ([string]$r9.reason -eq 'native-cloud-creator') "(9) reason deveria ser native-cloud-creator; veio '$($r9.reason)'."
 
 Write-Host 'OK: Test-ResolveOrchestratorNativeModelLocalitySelfTest.ps1'

@@ -61,3 +61,38 @@ Documentacao atualizada: `xpz-llm-delegate/SKILL.md` (backend Codex), `09-invent
 
 - Commit material: `bad2cdb` (`feat(codex): aprimorar deteccao de erros, cota e preservacao de evidencia`)
 - Arquivos materiais: `scripts/CodexCliSupport.ps1`, `scripts/Invoke-Codex.ps1`, `scripts/Test-CodexCliSupportSelfTest.ps1`, `scripts/Test-CodexDurableCaptureSelfTest.ps1`, `xpz-llm-delegate/SKILL.md`, `09-inventario-e-rastreabilidade-publica.md`, `CHANGELOG.md`, `999-ideias-pendentes.md`, `historico/IdeiasImplementadas_202609.md`.
+
+## Estabilizacao do painel no Cursor e taxonomia de Criador para os nativos do harness
+
+Implementado em 2026-09-04, em quatro commits encadeados mais a rodada de correcao de gaps apontada por revisao externa. Frente pontual, sem item previo no `999`.
+
+### O que motivou
+
+Revisao agentica longa conduzida a partir do Cursor esbarrava em dois problemas distintos que se apresentavam juntos: (a) titulares `codex` e `opencode` estouravam o default de 180s do adapter em manuscritos grandes, e (b) os subagentes nativos do proprio Cursor nao tinham Criador do Modelo resolvivel, entao nao contavam no piso de diversidade e o painel montado de dentro do Cursor nunca fechava `panelReady` sem um backend CLI externo.
+
+### O que foi feito
+
+1. **Timeout e transporte do painel (`ec7c5d3`):** default de `TimeoutSec` de `codex`/`opencode` passou de 180 para 1200, injetado no splat somente nesses dois backends quando `invokeArgs` omite `timeoutSec`; TempDir Bound do Codex isolado em `%TEMP%\xpz-llm-panel-codex\<RoundId>`, fora do `-Cd` e do ledger; validacao fail-closed de `RoundId` antes de qualquer despacho (o valor compoe caminho); `ValidateRange(1, 3600)` em `-TimeoutSec` nos dois adapters; fallback com overhead de 120s e `MaxAttempts=2` no opencode.
+
+2. **Criador `xai` para o Grok nativo (`49dca32`, `8369ba7`, `c1ec5e0`):** allowlist de Criadores ampliada com `xai`; `cursor-grok-*` (slug de harness sem barra) e `cursor/grok-*` passam a resolver `xai`; `Resolve-OrchestratorNativeModelLocality.ps1` classifica esses slugs como `external`/`native-cloud-creator`.
+
+3. **Criador `anysphere` para o Composer nativo e contrato de chave de harness:** allowlist ampliada com `anysphere`; `cursor-composer-*` / `cursor/composer-*` resolvem `anysphere`. A decisao humana registrada aqui e a que importa para o futuro: **Criador do Modelo e quem treinou os pesos, nao o dono societario**. A xAI ter comprado o Cursor nao funde as linhagens — Composer (Anysphere) e Grok (xAI) continuam Criadores distintos e somam duas familias no piso, do mesmo modo que `microsoft` e `openai` ja conviviam na tabela do `15`. Fundir os dois em `xai` teria o efeito oposto ao desejado: um painel Composer + Grok cairia em `insufficientDiversity`.
+
+4. **Contrato de chave de harness Cursor no motor de curadoria:** `Test-CursorPrefix` virou `Test-CursorHarnessKey` em `Set-LlmDelegatePreferredReviewers.ps1`, reconhecendo as duas grafias. Chave de harness Cursor agora e aceita apenas como titular **nativo** com Criador conhecido; como alvo CLI (nenhum backend da lista despacha para modelo que so existe dentro do Cursor) e como elo de `fallbackChain[]` continua bloqueada com `native-cursor-prefix` e exit 3. O bloqueio passou a cobrir tambem o slug sem barra, que antes escapava por o `split` em `/` devolver a chave inteira.
+
+5. **Paridade documental e higiene:** faixa `1..3600` de `-TimeoutSec` e validacao fail-closed de `RoundId` descritas no dono normativo (`xpz-llm-delegate/SKILL.md`); normalizacao de um `} else {` deformado no dispatcher.
+
+### Como isso foi encontrado
+
+Os itens 4 e 5 nao vieram da frente original: sairam de revisao externa sobre os commits de 04/09, e a triagem humana confirmou dois gaps reais. A correcao recomendada pelo revisor para o item 4 (abrir excecao para `cursor/grok-*` dentro do `Test-CursorPrefix`) foi **recusada** na triagem por trocar o gap de lado — liberaria a chave tambem para titular CLI e para elo de cadeia, ambos indespachaveis. O eixo correto e nativo vs CLI, nao qual modelo.
+
+### Testes
+
+- `Test-LlmDelegatePreferredReviewersSelfTest.ps1`: bloco (K2) — nativo `cursor/grok-4` e `cursor-composer-2-medium` aceitos; nativo sem Criador conhecido, alvo CLI nas duas grafias e elo de fallback bloqueados.
+- `Test-LlmDelegatePanelDiversitySelfTest.ps1`: casos 28 e 29 — Composer resolve `anysphere` e abre piso contra `openai`; Composer + Grok formam `panelReady` com duas familias.
+- `Test-ResolveOrchestratorNativeModelLocalitySelfTest.ps1`: casos 8 e 9 nas duas grafias do Composer; o caso 3 passou a usar `cursor/modelo-sem-mapeamento` para preservar a cobertura do ramo desconhecido.
+
+### Rastreabilidade
+
+- Commits materiais: `ec7c5d3` (`fix(llm-delegate): estabilizar painel Cursor para Codex/OpenCode em revisao longa`), `49dca32` (`feat(llm-delegate): reconhecer familia xai para Grok nativo no Cursor`), `8369ba7` (`docs(llm-delegate): documentar mapeamento cursor-grok -> xai no 15 e SKILL`), `c1ec5e0` (`test(llm-delegate): reforcar diversidade do Cursor/Grok`) mais o commit desta correcao de gaps.
+- Arquivos materiais: `scripts/LlmDelegateTargetFamilySupport.ps1`, `scripts/Set-LlmDelegatePreferredReviewers.ps1`, `scripts/Resolve-OrchestratorNativeModelLocality.ps1`, `scripts/Invoke-Codex.ps1`, `scripts/Invoke-OpenCode.ps1`, `scripts/Invoke-LlmDelegatePanelDispatch.ps1`, os tres self-tests acima, `scripts/Test-CodexDurableCaptureSelfTest.ps1`, `scripts/Test-InvokeLlmDelegatePanelDispatchSelfTest.ps1`, `15-revisao-por-pares.md`, `xpz-llm-delegate/SKILL.md`, `09-inventario-e-rastreabilidade-publica.md`, `CHANGELOG.md`.

@@ -104,10 +104,14 @@ function Test-HardVetoTarget {
     return $false
 }
 
-function Test-CursorPrefix {
+# Chave de harness Cursor nas duas grafias: 'cursor/<modelo>' (com barra) e 'cursor-<modelo>'
+# (slug sem barra, ex. cursor-grok-*, cursor-composer-*). Esses modelos so existem dentro do
+# Cursor: nenhum backend CLI da lista despacha para eles.
+function Test-CursorHarnessKey {
     param([string]$TargetModelKey)
     if ([string]::IsNullOrWhiteSpace($TargetModelKey)) { return $false }
     $t = $TargetModelKey.Trim()
+    if ($t -notmatch '/') { return $t.StartsWith('cursor-', [System.StringComparison]::OrdinalIgnoreCase) }
     $first = @($t -split '/')[0]
     return $first.Equals('cursor', [System.StringComparison]::OrdinalIgnoreCase)
 }
@@ -257,8 +261,14 @@ function ConvertTo-ReviewerV3 {
     $type = Resolve-TitularType -Backend $backend -TypeRaw (Get-Prop $Item 'type')
     $isNative = ($type -eq 'orchestrator-native-subagent')
 
-    if (Test-CursorPrefix -TargetModelKey $target) {
-        Stop-WithReason -Reason 'native-cursor-prefix' -ExitCode 3 -Detail "targetModelKey='$target'"
+    # Chave de harness Cursor e legitima APENAS como titular nativo e com Criador conhecido
+    # (cursor/grok-* e cursor-grok-* -> xai; cursor/composer-* e cursor-composer-* -> anysphere).
+    # Como alvo CLI seria titular indespachavel; com Criador desconhecido nao contaria no piso.
+    if (Test-CursorHarnessKey -TargetModelKey $target) {
+        $cursorFamily = Get-LlmDelegateTargetFamily -TargetModelKey $target
+        if (-not $isNative -or -not (Test-LlmDelegateFamilyKnown -Family $cursorFamily)) {
+            Stop-WithReason -Reason 'native-cursor-prefix' -ExitCode 3 -Detail "targetModelKey='$target'"
+        }
     }
     if (Test-HardVetoTarget -TargetModelKey $target) {
         Stop-WithReason -Reason 'hard-veto' -ExitCode 3 -Detail "veto duro: $target"
@@ -321,7 +331,8 @@ function ConvertTo-ReviewerV3 {
         if ($allowedDispatchBackends -notcontains $fbBackend) {
             Stop-WithReason -Reason 'backend-not-allowed' -ExitCode 3 -Detail "fallback backend='$fbBackend'"
         }
-        if (Test-CursorPrefix -TargetModelKey $fbTarget) {
+        # Elo de cadeia e sempre CLI: nenhuma grafia de harness Cursor e despachavel aqui.
+        if (Test-CursorHarnessKey -TargetModelKey $fbTarget) {
             Stop-WithReason -Reason 'native-cursor-prefix' -ExitCode 3 -Detail "fallback targetModelKey='$fbTarget'"
         }
         if (Test-HardVetoTarget -TargetModelKey $fbTarget) {

@@ -157,10 +157,22 @@ Assert-True (@($r26.distinctFamiliesAllow).Count -eq 1) "Caso 26: esperado um un
 Assert-True (@($r26.distinctFamiliesAllow) -contains 'xai') "Caso 26: distinctFamiliesAllow deveria conter 'xai'."
 
 # (27) Cursor sem mapeamento explicito continua desconhecido no piso de diversidade
-$r27 = Invoke-Diversity '[{"targetModelKey":"cursor/composer-2","verdict":"allow"},{"targetModelKey":"openai/gpt-5.6","verdict":"allow"}]'
-Assert-True ($r27.state -eq 'insufficientDiversity') "Caso 27: cursor/composer-* desconhecido nao deveria abrir diversidade; veio '$($r27.state)'."
-Assert-True ($r27.unknownFamiliesPresent -eq $true) 'Caso 27: cursor/composer-* deveria sinalizar familia desconhecida.'
+$r27 = Invoke-Diversity '[{"targetModelKey":"cursor/modelo-sem-mapeamento","verdict":"allow"},{"targetModelKey":"openai/gpt-5.6","verdict":"allow"}]'
+Assert-True ($r27.state -eq 'insufficientDiversity') "Caso 27: cursor/<modelo> desconhecido nao deveria abrir diversidade; veio '$($r27.state)'."
+Assert-True ($r27.unknownFamiliesPresent -eq $true) 'Caso 27: cursor/<modelo> sem mapeamento deveria sinalizar familia desconhecida.'
 Assert-True (@($r27.distinctFamiliesAllow).Count -eq 1) "Caso 27: apenas openai deveria contar; veio '$(@($r27.distinctFamiliesAllow) -join ',')'."
 Assert-True (-not (@($r27.distinctFamiliesAllow) -contains 'cursor')) "Caso 27: cursor nao deveria contar como criador conhecido."
+
+# (28) Composer nativo resolve em anysphere (Criador dos pesos) e abre diversidade contra openai
+$r28 = Invoke-Diversity '[{"targetModelKey":"cursor/composer-2","verdict":"allow"},{"targetModelKey":"openai/gpt-5.6","verdict":"allow"}]'
+Assert-True ($r28.state -eq 'panelReady') "Caso 28: cursor/composer-* + openai deveriam formar panelReady; veio '$($r28.state)'."
+Assert-True (@($r28.distinctFamiliesAllow) -contains 'anysphere') "Caso 28: distinctFamiliesAllow deveria conter 'anysphere'; veio '$(@($r28.distinctFamiliesAllow) -join ',')'."
+
+# (29) Composer e Grok sao Criadores DISTINTOS: aquisicao societaria nao funde linhagem de pesos
+$r29 = Invoke-Diversity '[{"targetModelKey":"cursor-composer-2-medium","verdict":"allow"},{"targetModelKey":"cursor/grok-4","verdict":"allow"}]'
+Assert-True ($r29.state -eq 'panelReady') "Caso 29: Composer + Grok deveriam formar panelReady; veio '$($r29.state)'."
+Assert-True (@($r29.distinctFamiliesAllow).Count -eq 2) "Caso 29: esperado anysphere + xai; veio '$(@($r29.distinctFamiliesAllow) -join ',')'."
+Assert-True (@($r29.distinctFamiliesAllow) -contains 'anysphere') "Caso 29: distinctFamiliesAllow deveria conter 'anysphere'."
+Assert-True (@($r29.distinctFamiliesAllow) -contains 'xai') "Caso 29: distinctFamiliesAllow deveria conter 'xai'."
 
 Write-Host "OK: Test-LlmDelegatePanelDiversitySelfTest.ps1"
