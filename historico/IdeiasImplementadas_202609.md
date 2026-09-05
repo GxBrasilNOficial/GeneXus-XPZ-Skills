@@ -221,3 +221,26 @@ Um segundo revisor (opencode/Nemotron) apontou seis itens; quatro ele mesmo clas
 
 - Commit material: `e32de6f` (`fix(llm-delegate): subdiretorio por revisor na captura Codex do painel`)
 - Arquivos materiais: `scripts/Invoke-LlmDelegatePanelDispatch.ps1`, `scripts/Test-InvokeLlmDelegatePanelDispatchSelfTest.ps1`, `xpz-llm-delegate/SKILL.md`, `09-inventario-e-rastreabilidade-publica.md`, `999-ideias-pendentes.md`, `CHANGELOG.md`.
+
+## Varredura da suite inteira de self-tests apos a frente do painel
+
+Executada em 2026-09-05, ao fim da frente. Motivo: ao longo de 16 commits foram tocados motores compartilhados (biblioteca de familia, dispatcher, tres adapters, escritor e leitor da curadoria), e ate entao so tinham sido rodados os self-tests julgados afetados. Julgar quem e afetado e a suposicao que falhou tres vezes nesta mesma frente; a varredura troca o julgamento por medicao.
+
+### Resultado
+
+130 self-tests, um processo por teste, teto de 300s cada: **128 PASS, 2 FAIL, 0 TIMEOUT**. As duas falhas sao **pre-existentes** — `git log origin/main..HEAD` sobre os arquivos envolvidos volta vazio nos dois casos.
+
+### Falha 1 — falso positivo do guard de fonte unica (CORRIGIDA)
+
+`Test-GeneXusKbHostingKindSupportDriftSelfTest.ps1` acusava `Test-GeneXusRuntimeFreshness.ps1` de redigitar o literal `skipped-hosting-unsupported` fora do registro. A ocorrencia estava num **comentario de comment-based help** descrevendo o comportamento, nao em codigo emissor — o guard varre o arquivo inteiro com `ReadAllText` + regex e nao distingue prosa de codigo.
+
+Corrigido pelo lado da prosa: o texto passa a apontar o registro (`Get-GeneXusKbHostingKindSupportRecord`) em vez de repetir o literal. A alternativa — ensinar o guard a ignorar comentarios — foi descartada: um literal em comentario tambem enverelhece e engana quem le, e afrouxar o guard custa mais do que reescrever uma frase. Self-test volta a `GENEXUS_HOSTING_KIND_DRIFT_SELFTEST_OK`.
+
+### Falha 2 — self-test do daemon PreToolUse (REGISTRADA, nao corrigida)
+
+`Test-ClaudeCodePreToolUseSafeAllowDaemonSelfTest.ps1` falha com 2 asseracoes no cenario `F-stale-classify`. E frente propria (produto PreToolUse, Fases 3-5), depende de daemon/pipe/mutex e respawn, e nao foi tocada por esta frente. Registrada na entrada existente do `999` com o diagnostico do que se sabe e do que nao se sabe, e com a consequencia operacional: **precisa fechar antes da Fase 4**, porque ligar `enforce` com o self-test adversarial vermelho seria ligar efeito real sem a rede de protecao que o justifica.
+
+### Rastreabilidade
+
+- Commit material: a preencher no commit seguinte.
+- Arquivos materiais: `scripts/Test-GeneXusRuntimeFreshness.ps1`, `scripts/Invoke-LlmDelegatePanelDispatch.ps1` (comentario do gate de RoundId), `999-ideias-pendentes.md`.

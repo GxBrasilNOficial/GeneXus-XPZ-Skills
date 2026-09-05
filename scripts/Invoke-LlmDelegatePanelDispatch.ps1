@@ -470,8 +470,9 @@ if (-not (Test-Path -LiteralPath $gateScript -PathType Leaf)) {
 }
 
 if ([string]::IsNullOrWhiteSpace($RoundId)) { $RoundId = [guid]::NewGuid().ToString('N') }
-# Mesma higiene do New-LlmDelegatePeerReviewArtifacts: RoundId entra em ledger e em
-# %TEMP%\xpz-llm-panel-codex\<RoundId> — fail-closed contra chars inseguros / traversal.
+# Mesma higiene do New-LlmDelegatePeerReviewArtifacts (que bloqueia com outra redacao,
+# 'roundId-path-traversal'): RoundId entra em ledger e em
+# %TEMP%\xpz-llm-panel-codex\<RoundId>\<NN> — fail-closed contra chars inseguros / traversal.
 if ($RoundId -match '[^A-Za-z0-9._-]' -or $RoundId -match '\.\.' -or $RoundId -match '[/\\]') {
     throw "BLOCK: RoundId inseguro: '$RoundId'. Use apenas letras, numeros, ponto, hifen e underscore."
 }

@@ -13,7 +13,8 @@
     2. Artefatos gerados .NET (CSharpModel\web): timestamp dos arquivos gerados vs ImportedAt
 
     Em KB Java/Tomcat conhecida, passe -DeploymentHostingKind java-tomcat: o Eixo C ainda é
-    recognized-no-engine/Pós-v1 e o script pula com skipped-hosting-unsupported, sem derivar
+    recognized-no-engine/Pós-v1 e o script pula com o status de skip do registro
+    (`Get-GeneXusKbHostingKindSupportRecord`; o literal vive só lá), sem derivar
     CSharpModel\web. Nesse caso, ObjStatus não é critério isolado de freshness Java; a evidência
     operacional exige cruzar ObjNavig, XMLs de navegação/specification e artefatos .java/.class/.js
     em frente futura.
