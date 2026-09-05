@@ -171,3 +171,26 @@ Correcao adotada: em `kb-sensitive` o campo fica `null` (desconhecido) em vez de
 
 - Commit material: `63b34f8` (`fix(llm-delegate): fechar harness x orquestrador e nao afirmar recuperacao desconhecida`)
 - Arquivos materiais: `scripts/LlmDelegateTargetFamilySupport.ps1`, `scripts/Set-LlmDelegatePreferredReviewers.ps1`, `scripts/Resolve-LlmDelegatePreferredReviewers.ps1`, `scripts/Invoke-LlmDelegatePanelDispatch.ps1`, `scripts/Test-LlmDelegatePreferredReviewersSelfTest.ps1`, `scripts/Test-InvokeLlmDelegatePanelDispatchSelfTest.ps1`, `15-revisao-por-pares.md`, `xpz-llm-delegate/SKILL.md`, `09-inventario-e-rastreabilidade-publica.md`, `999-ideias-pendentes.md`, `CHANGELOG.md`.
+
+## Primeira aplicacao da regra de eixos vizinhos na pre-push
+
+Implementado em 2026-09-04, logo apos registrar a regra no `13-revisao-pre-push.md` (§5) e no `08-guia-para-agente-gpt.md`.
+
+### Por que a regra existe
+
+Tres rodadas seguidas da frente do dia fecharam um eixo cada e deixaram o vizinho aberto — escritor sem leitor; `-Scope machine` sem o eixo do orquestrador; `public` sem `kb-sensitive`. Nas tres, a pre-push mecanica passou e a fase semantica foi executada. A falha nao era de execucao: a fase semantica pergunta se o termo propagou e se a enumeracao recebeu o membro novo, e nenhuma dessas perguntas alcanca «este gate fecha um caminho; por quais outros o mesmo defeito ainda chega?».
+
+### O que a primeira execucao achou
+
+Ao enumerar os eixos do `ValidateRange(1, 3600)` que a frente adicionou em `Invoke-Codex.ps1` e `Invoke-OpenCode.ps1`, apareceram tres adapters irmaos sem faixa nenhuma: `Invoke-ClaudeCode.ps1`, `Invoke-Copilot.ps1` e `Invoke-Gemini.ps1`. Os tres chamam `WaitForExit($TimeoutSec * 1000)`; sem faixa, `-TimeoutSec -1` vira `WaitForExit(-1)`, que em .NET e **espera infinita** — um revisor do painel travaria sem timeout —, e `0` da timeout imediato. Corrigido nos tres, com as assinaturas atualizadas no `SKILL`.
+
+Tambem foi corrigida uma afirmacao fechada demais no proprio item novo do `999` («por que os gates atuais nao pegam» -> «por que os gates de propagacao e enumeracao nao pegam»), sinalizada pelo `Test-PrePushGateEnumerationParity.ps1`.
+
+### Um falso gap evitado, que vale registrar
+
+A varredura de eixos do gate de `RoundId` sugeriu que o motor irmao `New-LlmDelegatePeerReviewArtifacts.ps1` nao bloqueava traversal: `grep "RoundId inseguro"` nao casa nesse arquivo, e a validacao dele (`-match '[^A-Za-z0-9._-]'`) parece deixar `..` passar, ja que o ponto esta no conjunto permitido. Antes de reportar, foi feito o teste: `-RoundId '..'` devolve `BLOCK: roundId-path-traversal` com `failureCode` proprio. O motor bloqueia, so com mensagem diferente. Registrar aqui porque o erro evitado — concluir ausencia a partir de `grep` que nao casou a redacao — e exatamente o que a propria sessao tinha acabado de apontar num parecer externo.
+
+### Rastreabilidade
+
+- Commit material: a preencher no commit seguinte.
+- Arquivos materiais: `scripts/Invoke-ClaudeCode.ps1`, `scripts/Invoke-Copilot.ps1`, `scripts/Invoke-Gemini.ps1`, `xpz-llm-delegate/SKILL.md`, `999-ideias-pendentes.md`, `CHANGELOG.md`.

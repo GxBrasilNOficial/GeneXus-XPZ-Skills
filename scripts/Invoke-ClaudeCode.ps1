@@ -42,7 +42,7 @@ param(
     [string] $Tools = 'Read,Glob,Grep',
     [string] $Cd,
     [string] $ClaudeExe,
-    [int] $TimeoutSec = 300
+    [ValidateRange(1, 3600)] [int] $TimeoutSec = 300
 )
 
 Set-StrictMode -Version Latest
