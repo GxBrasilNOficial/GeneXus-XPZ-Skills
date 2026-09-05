@@ -297,6 +297,11 @@ function Get-XpzExecutionReportSnapshot {
     if ($snapshot.Kind -ne 'xpz-package-execution-report' -or [int]$snapshot.SchemaVersion -ne 1 -or [string]$snapshot.runId -ne $Context.RunId) {
         throw 'relatorio de execucao ausente, corrompido ou com runId divergente'
     }
+    $document = [ordered]@{}
+    foreach ($property in $snapshot.PSObject.Properties) {
+        $document[$property.Name] = $property.Value
+    }
+    $Context.Document = $document
     return $snapshot
 }
 

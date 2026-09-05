@@ -201,7 +201,11 @@ function New-PackageInventoryResult {
         }
 
         $inventory = (& $inventoryScriptPath @invokeParams | ConvertFrom-Json)
-        $inventoryExitCode = [int]$LASTEXITCODE
+        $inventoryExitProperty = $inventory.PSObject.Properties['exitCode']
+        if ($null -eq $inventoryExitProperty) {
+            throw 'motor de inventario nao publicou exitCode no JSON'
+        }
+        $inventoryExitCode = [int]$inventoryExitProperty.Value
         $namedItems = [System.Collections.Generic.List[pscustomobject]]::new()
         foreach ($item in @($inventory.inventory)) {
             $namedItems.Add([pscustomobject]@{

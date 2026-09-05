@@ -81,6 +81,11 @@ try {
     if ($successDoc.Kind -ne 'xpz-package-execution-report' -or [int]$successDoc.SchemaVersion -ne 1) { throw 'schema do relatorio feliz invalido' }
     if ($successDoc.executionState -ne 'completed' -or $successDoc.packageState -ne 'accepted' -or $successDoc.inventoryDecision -ne 'accepted') { throw 'estado final do relatorio feliz invalido' }
     if ($successDoc.inventoryStatus -ne 'INVENTORY_OK' -or $successDoc.deltaStatus -ne 'MATCH') { throw 'inventario do relatorio feliz nao foi confirmado' }
+    $successStages = @($successDoc.stageHistory | ForEach-Object { $_.stage })
+    foreach ($requiredStage in @('engine-start', 'classify-front', 'load-template', 'write-package', 'validate-envelope', 'engine-finished', 'post-inventory', 'completed')) {
+        if ($successStages -notcontains $requiredStage) { throw "fase $requiredStage do motor Python/pos-inventario nao foi preservada" }
+    }
+    if (@($successStages | Where-Object { $_ -eq 'completed' }).Count -ne 1) { throw 'relatorio feliz tem conclusao terminal duplicada ou ausente' }
     $successBytes = [IO.File]::ReadAllBytes($successReport)
     if ($successBytes.Length -ge 3 -and $successBytes[0] -eq 0xEF -and $successBytes[1] -eq 0xBB -and $successBytes[2] -eq 0xBF) { throw 'relatorio feliz contem BOM inesperado' }
 
@@ -92,6 +97,13 @@ try {
     if ($unknown.exitCode -eq 0) { throw 'tipo desconhecido nao bloqueou o inventario' }
     $unknownDoc = Get-Content -LiteralPath $unknownReport -Raw | ConvertFrom-Json
     if ($unknownDoc.executionState -ne 'blocked' -or $unknownDoc.packageState -ne 'candidate' -or $unknownDoc.inventoryDecision -ne 'unknown') { throw 'inventario desconhecido promoveu estado incorreto' }
+    if ($unknownDoc.inventoryStatus -ne 'UNKNOWN_TYPES_BLOCKED' -or [int]$unknownDoc.resultExitCode -ne 3) { throw 'exitCode do inventario desconhecido nao foi propagado ao relatorio' }
+    $unknownStages = @($unknownDoc.stageHistory | ForEach-Object { $_.stage })
+    foreach ($requiredStage in @('engine-start', 'classify-front', 'load-template', 'write-package', 'validate-envelope', 'engine-finished', 'post-inventory')) {
+        if ($unknownStages -notcontains $requiredStage) { throw "fase $requiredStage nao foi preservada no bloqueio de inventario" }
+    }
+    if (@($unknownStages | Where-Object { $_ -eq 'completed' }).Count -ne 0) { throw 'bloqueio de inventario registrou conclusao completed indevida' }
+    if (@($unknownStages | Where-Object { $_ -eq 'post-inventory' }).Count -ne 1) { throw 'bloqueio de inventario registrou post-inventory duplicado' }
 
     $holdRoot = Join-Path $tempRoot 'hold'
     $holdFront = 'Observabilidade_33333333_20260905'

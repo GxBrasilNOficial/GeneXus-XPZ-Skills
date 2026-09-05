@@ -189,6 +189,12 @@ function Complete-XpzReportFromResult {
     )
 
     if ($null -eq $script:reportContext -or $script:preserveRunningReport) { return }
+
+    $existingReport = Get-XpzExecutionReportSnapshot -Context $script:reportContext
+    if ($null -ne (Get-XpzPropertyValue -InputObject $existingReport -Name 'completedAtUtc')) {
+        return
+    }
+
     $status = [string](Get-XpzPropertyValue -InputObject $InputObject -Name 'status' -Default 'erro')
     $rejected = Get-XpzPropertyValue -InputObject $InputObject -Name 'rejectedPath'
     $output = Get-XpzPropertyValue -InputObject $InputObject -Name 'outputPath'
@@ -416,7 +422,13 @@ if (-not [string]::IsNullOrWhiteSpace($resultOutputPath)) {
             $result.blockingReasons = @($existingReasons + "inventario retornou exitCode $inventoryExitCode ($inventoryStatus)")
             $reportValues.errors = @($result.blockingReasons)
         }
-        Complete-XpzExecutionReport -Context $script:reportContext -ExecutionState 'completed' -Stage 'completed' -ResultExitCode ([int](Get-XpzPropertyValue -InputObject $result -Name 'exitCode' -Default 0)) -ProcessExitCode $engineExitCode -PackageState $packageState -InventoryDecision $inventoryDecision -Values $reportValues
+        $reportExecutionState = 'completed'
+        $reportStage = 'completed'
+        if ($inventoryExitCode -ne 0) {
+            $reportExecutionState = 'blocked'
+            $reportStage = 'post-inventory'
+        }
+        Complete-XpzExecutionReport -Context $script:reportContext -ExecutionState $reportExecutionState -Stage $reportStage -ResultExitCode ([int](Get-XpzPropertyValue -InputObject $result -Name 'exitCode' -Default 0)) -ProcessExitCode $engineExitCode -PackageState $packageState -InventoryDecision $inventoryDecision -Values $reportValues
     }
 }
 
