@@ -169,5 +169,5 @@ Correcao adotada: em `kb-sensitive` o campo fica `null` (desconhecido) em vez de
 
 ### Rastreabilidade
 
-- Commit material: a preencher no commit seguinte.
+- Commit material: `63b34f8` (`fix(llm-delegate): fechar harness x orquestrador e nao afirmar recuperacao desconhecida`)
 - Arquivos materiais: `scripts/LlmDelegateTargetFamilySupport.ps1`, `scripts/Set-LlmDelegatePreferredReviewers.ps1`, `scripts/Resolve-LlmDelegatePreferredReviewers.ps1`, `scripts/Invoke-LlmDelegatePanelDispatch.ps1`, `scripts/Test-LlmDelegatePreferredReviewersSelfTest.ps1`, `scripts/Test-InvokeLlmDelegatePanelDispatchSelfTest.ps1`, `15-revisao-por-pares.md`, `xpz-llm-delegate/SKILL.md`, `09-inventario-e-rastreabilidade-publica.md`, `999-ideias-pendentes.md`, `CHANGELOG.md`.
