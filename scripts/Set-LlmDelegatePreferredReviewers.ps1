@@ -104,18 +104,6 @@ function Test-HardVetoTarget {
     return $false
 }
 
-# Chave de harness Cursor nas duas grafias: 'cursor/<modelo>' (com barra) e 'cursor-<modelo>'
-# (slug sem barra, ex. cursor-grok-*, cursor-composer-*). Esses modelos so existem dentro do
-# Cursor: nenhum backend CLI da lista despacha para eles.
-function Test-CursorHarnessKey {
-    param([string]$TargetModelKey)
-    if ([string]::IsNullOrWhiteSpace($TargetModelKey)) { return $false }
-    $t = $TargetModelKey.Trim()
-    if ($t -notmatch '/') { return $t.StartsWith('cursor-', [System.StringComparison]::OrdinalIgnoreCase) }
-    $first = @($t -split '/')[0]
-    return $first.Equals('cursor', [System.StringComparison]::OrdinalIgnoreCase)
-}
-
 function Assert-KnownProperties {
     param($Obj, [string[]]$Allowed, [string]$Context)
     if ($null -eq $Obj) { return }
@@ -264,7 +252,7 @@ function ConvertTo-ReviewerV3 {
     # Chave de harness Cursor e legitima APENAS como titular nativo e com Criador conhecido
     # (cursor/grok-* e cursor-grok-* -> xai; cursor/composer-* e cursor-composer-* -> anysphere).
     # Como alvo CLI seria titular indespachavel; com Criador desconhecido nao contaria no piso.
-    if (Test-CursorHarnessKey -TargetModelKey $target) {
+    if (Test-LlmDelegateCursorHarnessKey -TargetModelKey $target) {
         $cursorFamily = Get-LlmDelegateTargetFamily -TargetModelKey $target
         if (-not $isNative -or -not (Test-LlmDelegateFamilyKnown -Family $cursorFamily)) {
             Stop-WithReason -Reason 'native-cursor-prefix' -ExitCode 3 -Detail "targetModelKey='$target'"
@@ -332,7 +320,7 @@ function ConvertTo-ReviewerV3 {
             Stop-WithReason -Reason 'backend-not-allowed' -ExitCode 3 -Detail "fallback backend='$fbBackend'"
         }
         # Elo de cadeia e sempre CLI: nenhuma grafia de harness Cursor e despachavel aqui.
-        if (Test-CursorHarnessKey -TargetModelKey $fbTarget) {
+        if (Test-LlmDelegateCursorHarnessKey -TargetModelKey $fbTarget) {
             Stop-WithReason -Reason 'native-cursor-prefix' -ExitCode 3 -Detail "fallback targetModelKey='$fbTarget'"
         }
         if (Test-HardVetoTarget -TargetModelKey $fbTarget) {

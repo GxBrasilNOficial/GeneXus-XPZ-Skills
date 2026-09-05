@@ -565,6 +565,83 @@ try {
     }
     Assert-ReasonExit -Result $kFbCursor -Reason 'native-cursor-prefix' -ExitCode 3 -Label '(K2) fallback cursor'
 
+    # (K3) leitor com o MESMO contrato do escritor: arquivo schema 3 editado a mao com chave de
+    # harness Cursor sob backend CLI (ou como elo de cadeia) e recusado na leitura; nativo passa.
+    $readerCliPath = Join-Path $tempRoot 'reader-cursor-cli.json'
+    @'
+{
+  "schemaVersion": 3,
+  "reviewers": [
+    {
+      "type": "delegation-cli",
+      "backend": "opencode",
+      "targetModelKey": "cursor/grok-4",
+      "rank": 1,
+      "invokeArgs": { "backend": "opencode", "model": "cursor/grok-4" }
+    }
+  ]
+}
+'@ | Set-Content -LiteralPath $readerCliPath -Encoding utf8
+    $kRead1 = Invoke-Resolve @{
+        Orchestrator     = 'cursor'
+        PreferredPath    = $readerCliPath
+        CapabilitiesPath = $capPath
+    }
+    Assert-ReasonExit -Result $kRead1 -Reason 'native-cursor-prefix' -ExitCode 3 -Label '(K3) leitor CLI cursor'
+
+    $readerFbPath = Join-Path $tempRoot 'reader-cursor-fallback.json'
+    @'
+{
+  "schemaVersion": 3,
+  "reviewers": [
+    {
+      "type": "delegation-cli",
+      "backend": "codex",
+      "targetModelKey": "openai/gpt-5.5",
+      "rank": 1,
+      "invokeArgs": { "backend": "codex", "model": "gpt-5.5" },
+      "fallbackChain": [
+        {
+          "backend": "opencode",
+          "targetModelKey": "cursor-grok-4.6-medium",
+          "invokeArgs": { "backend": "opencode", "model": "cursor-grok-4.6-medium" }
+        }
+      ]
+    }
+  ]
+}
+'@ | Set-Content -LiteralPath $readerFbPath -Encoding utf8
+    $kRead2 = Invoke-Resolve @{
+        Orchestrator     = 'cursor'
+        PreferredPath    = $readerFbPath
+        CapabilitiesPath = $capPath
+    }
+    Assert-ReasonExit -Result $kRead2 -Reason 'native-cursor-prefix' -ExitCode 3 -Label '(K3) leitor fallback cursor'
+
+    $readerNativePath = Join-Path $tempRoot 'reader-cursor-native.json'
+    @'
+{
+  "schemaVersion": 3,
+  "reviewers": [
+    {
+      "type": "orchestrator-native-subagent",
+      "backend": "orchestrator-native",
+      "targetModelKey": "cursor/grok-4",
+      "harnessModelId": "grok-4",
+      "rank": 1,
+      "invokeArgs": {}
+    }
+  ]
+}
+'@ | Set-Content -LiteralPath $readerNativePath -Encoding utf8
+    $kRead3 = Invoke-Resolve @{
+        Orchestrator     = 'cursor'
+        PreferredPath    = $readerNativePath
+        CapabilitiesPath = $capPath
+    }
+    Assert-True ($kRead3.code -eq 0) "(K3) leitor nativo cursor/grok-* deveria exit 0; veio $($kRead3.code)."
+    Assert-True ([string]$kRead3.json.reviewers[0].family -eq 'xai') "(K3) family do nativo deveria ser xai; veio '$($kRead3.json.reviewers[0].family)'."
+
     # --------------------------------------------------------------------------------------
     # (L) cascata PreferredRoot vazio -> no-preferred-file preferenceSource=none
     # --------------------------------------------------------------------------------------

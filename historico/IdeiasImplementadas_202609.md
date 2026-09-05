@@ -78,9 +78,11 @@ Revisao agentica longa conduzida a partir do Cursor esbarrava em dois problemas 
 
 3. **Criador `anysphere` para o Composer nativo e contrato de chave de harness:** allowlist ampliada com `anysphere`; `cursor-composer-*` / `cursor/composer-*` resolvem `anysphere`. A decisao humana registrada aqui e a que importa para o futuro: **Criador do Modelo e quem treinou os pesos, nao o dono societario**. A xAI ter comprado o Cursor nao funde as linhagens — Composer (Anysphere) e Grok (xAI) continuam Criadores distintos e somam duas familias no piso, do mesmo modo que `microsoft` e `openai` ja conviviam na tabela do `15`. Fundir os dois em `xai` teria o efeito oposto ao desejado: um painel Composer + Grok cairia em `insufficientDiversity`.
 
-4. **Contrato de chave de harness Cursor no motor de curadoria:** `Test-CursorPrefix` virou `Test-CursorHarnessKey` em `Set-LlmDelegatePreferredReviewers.ps1`, reconhecendo as duas grafias. Chave de harness Cursor agora e aceita apenas como titular **nativo** com Criador conhecido; como alvo CLI (nenhum backend da lista despacha para modelo que so existe dentro do Cursor) e como elo de `fallbackChain[]` continua bloqueada com `native-cursor-prefix` e exit 3. O bloqueio passou a cobrir tambem o slug sem barra, que antes escapava por o `split` em `/` devolver a chave inteira.
+4. **Contrato de chave de harness Cursor na curadoria:** `Test-CursorPrefix` saiu do `Set-LlmDelegatePreferredReviewers.ps1` e virou `Test-LlmDelegateCursorHarnessKey` na biblioteca compartilhada `LlmDelegateTargetFamilySupport.ps1`, reconhecendo as duas grafias. Chave de harness Cursor agora e aceita apenas como titular **nativo** com Criador conhecido; como alvo CLI (nenhum backend da lista despacha para modelo que so existe dentro do Cursor) e como elo de `fallbackChain[]` fica bloqueada com `native-cursor-prefix` e exit 3. O bloqueio passou a cobrir tambem o slug sem barra, que antes escapava por o `split` em `/` devolver a chave inteira.
 
-5. **Paridade documental e higiene:** faixa `1..3600` de `-TimeoutSec` e validacao fail-closed de `RoundId` descritas no dono normativo (`xpz-llm-delegate/SKILL.md`); normalizacao de um `} else {` deformado no dispatcher.
+   O predicado ficou na biblioteca porque a mesma regra vale nos dois sentidos: o `Resolve-LlmDelegatePreferredReviewers.ps1` passou a aplica-la na **leitura**. Antes, so o escritor validava — arquivo de curadoria editado a mao com chave de harness Cursor sob backend CLI era lido sem reclamacao e entregava ao painel um titular indespachavel, que so falhava no adapter como `state=error`. Assimetria pre-existente, encontrada na fase semantica da propria pre-push desta frente e fechada aqui a pedido do usuario: gap pre-existente nao deixa de ser gap.
+
+5. **Paridade documental e higiene:** faixa `1..3600` de `-TimeoutSec` e validacao fail-closed de `RoundId` descritas no dono normativo (`xpz-llm-delegate/SKILL.md`), e o gate de `RoundId` tambem registrado no ponteiro do dispatcher no `09` — a linha ja citava o caminho `%TEMP%\xpz-llm-panel-codex\<RoundId>` sem citar a validacao que o protege; normalizacao de um `} else {` deformado no dispatcher.
 
 ### Como isso foi encontrado
 
@@ -88,7 +90,7 @@ Os itens 4 e 5 nao vieram da frente original: sairam de revisao externa sobre os
 
 ### Testes
 
-- `Test-LlmDelegatePreferredReviewersSelfTest.ps1`: bloco (K2) — nativo `cursor/grok-4` e `cursor-composer-2-medium` aceitos; nativo sem Criador conhecido, alvo CLI nas duas grafias e elo de fallback bloqueados.
+- `Test-LlmDelegatePreferredReviewersSelfTest.ps1`: bloco (K2) no escritor — nativo `cursor/grok-4` e `cursor-composer-2-medium` aceitos; nativo sem Criador conhecido, alvo CLI nas duas grafias e elo de fallback bloqueados. Bloco (K3) no leitor — arquivo schema 3 escrito a mao com chave de harness Cursor sob backend CLI ou como elo e recusado na leitura; nativo `cursor/grok-4` resolve com `family=xai`.
 - `Test-LlmDelegatePanelDiversitySelfTest.ps1`: casos 28 e 29 — Composer resolve `anysphere` e abre piso contra `openai`; Composer + Grok formam `panelReady` com duas familias.
 - `Test-ResolveOrchestratorNativeModelLocalitySelfTest.ps1`: casos 8 e 9 nas duas grafias do Composer; o caso 3 passou a usar `cursor/modelo-sem-mapeamento` para preservar a cobertura do ramo desconhecido.
 

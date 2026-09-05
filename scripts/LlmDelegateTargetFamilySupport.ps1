@@ -46,6 +46,24 @@ function Test-LlmDelegateFamilyKnown {
     return $false
 }
 
+# Chave de harness Cursor nas duas grafias: 'cursor/<modelo>' (com barra) e 'cursor-<modelo>'
+# (slug sem barra, ex. cursor-grok-*, cursor-composer-*). Esses modelos so existem dentro do
+# Cursor: legitimos como titular nativo com Criador conhecido, nunca como alvo de backend CLI
+# nem como elo de fallbackChain. Predicado compartilhado pelo escritor (Set-) e pelo leitor
+# (Resolve-) da curadoria, para os dois lados nao divergirem.
+function Test-LlmDelegateCursorHarnessKey {
+    [CmdletBinding()]
+    param(
+        [string]$TargetModelKey
+    )
+    Set-StrictMode -Version Latest
+    if ([string]::IsNullOrWhiteSpace($TargetModelKey)) { return $false }
+    $t = $TargetModelKey.Trim()
+    if ($t -notmatch '/') { return $t.StartsWith('cursor-', [System.StringComparison]::OrdinalIgnoreCase) }
+    $first = @($t -split '/')[0]
+    return $first.Equals('cursor', [System.StringComparison]::OrdinalIgnoreCase)
+}
+
 function Get-LlmDelegateTargetFamily {
     [CmdletBinding()]
     param(

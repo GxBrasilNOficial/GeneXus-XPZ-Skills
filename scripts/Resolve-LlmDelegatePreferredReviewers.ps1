@@ -221,6 +221,16 @@ function ConvertTo-ResolvedReviewer {
         $null
     }
 
+    # Mesmo contrato do escritor (Set-): chave de harness Cursor so vale como titular nativo
+    # com Criador conhecido. Arquivo editado a mao com ela sob backend CLI entregaria ao painel
+    # um titular indespachavel, entao a leitura tambem recusa fail-closed.
+    if (Test-LlmDelegateCursorHarnessKey -TargetModelKey $target) {
+        $cursorFamily = Get-Family $target
+        if (-not $isNative -or -not (Test-LlmDelegateFamilyKnown -Family $cursorFamily)) {
+            Stop-WithReason -Reason 'native-cursor-prefix' -ExitCode 3 -Detail "targetModelKey='$target'"
+        }
+    }
+
     $manifestEntry = $ManifestMap[$target]
     $available = ($null -ne $manifestEntry)
     $diagnostics = [System.Collections.Generic.List[string]]::new()
@@ -242,6 +252,10 @@ function ConvertTo-ResolvedReviewer {
         $fbTarget = [string](Get-Prop $fb 'targetModelKey')
         if ($allowedNativeBackends -contains $fbBackend) {
             Stop-WithReason -Reason 'native-fallback-chain-forbidden' -ExitCode 3 -Detail "nativo como elo: $fbTarget"
+        }
+        # Elo de cadeia e sempre CLI: nenhuma grafia de harness Cursor e despachavel aqui.
+        if (Test-LlmDelegateCursorHarnessKey -TargetModelKey $fbTarget) {
+            Stop-WithReason -Reason 'native-cursor-prefix' -ExitCode 3 -Detail "fallback targetModelKey='$fbTarget'"
         }
         $key = "$fbBackend|$fbTarget"
         if (-not $seen.Add($key)) {
