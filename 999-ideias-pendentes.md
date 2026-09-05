@@ -13,6 +13,25 @@ Entradas legadas sem avaliação carregam `FALTA AVALIAR` em ambos os campos at�
 
 **Editar a substância de um gap já registrado (neste arquivo ou no `998-ideias-descartadas-e-porque.md`) exige justificativa no corpo do commit.** Enfraquecer, reprecisar ou descartar a severidade de uma afirmação — não apenas corrigir redação, adicionar contexto ou reorganizar — precisa dizer **por que**: nova evidência medida, releitura do código, ou correção de erro anterior. Motivo: uma edição que suaviza um gap sem dizer por que **parece resolvido** para quem lê depois, e é pior do que o gap não ter sido achado — quem lê para de investigar. Caso real (2026-08-17): um commit sem corpo trocou «não é citado em lugar nenhum» por «não era coberto na documentação normativa»; a formulação nova era defensável à primeira vista, mas escondia que a única outra menção ao símbolo no repositório era uma cópia **defasada** num self-test — a frase sugeria mitigação onde havia agravante. Só foi achado porque outra sessão foi verificar; sem corpo no commit, não havia como saber se a mudança vinha de leitura nova ou só de estilo.
 
+## URGENTE — Gate consultivo de eixos vizinhos para bloqueio/validação nova
+
+- **Importância** — alta (o modo de falha se materializou **três vezes numa única frente**, em 2026-09-04, e as três passaram pela pré-push formal sem serem vistas; as três foram achadas por revisão externa depois).
+- **Maturidade** — pesquisa feita (o sinal a detectar está definido e é textual no diff; falta desenhar o recorte de falso-positivo e o formato do veredito exigido).
+
+**O modo de falha.** Uma frente introduz bloqueio novo, fecha o caminho que motivou a correção e deixa aberto um caminho **irmão** pelo qual o mesmo defeito ainda chega. Casos medidos na frente de 2026-09-04, todos com a pré-push mecânica em `pass` e a fase semântica executada:
+
+- contrato de chave de harness Cursor imposto no **escritor** (`Set-`) e ausente no **leitor** (`Resolve-`) — arquivo editado à mão contornava;
+- gate `native-machine-scope-forbidden` fechando o eixo `-Scope machine` e deixando aberto o eixo `-Orchestrator` divergente (medido: nativo `cursor/grok-4` gravado sob `claude-code` com `written:1`);
+- projeção de `recoveredAfterTimeout` correta em `public` e silenciosamente falsa em `kb-sensitive`.
+
+**Por que os gates atuais não pegam.** `Test-PrePushNewTokenPropagation.ps1` procura propagação de **termo** por transição co-localizada; um motivo de recusa novo não gera par, e o eixo vizinho normalmente **não menciona** o termo novo — é justamente o caminho que ficou sem a regra. `Test-PrePushGateEnumerationParity.ps1` e `Test-PrePushBackendEnumerationParity.ps1` derivam conjuntos **fechados** conhecidos (gates, backends); «eixos que alcançam este estado» não é conjunto enumerável a priori.
+
+**Direção proposta.** Gate consultivo que detecte no diff do intervalo a introdução de recusa/validação — `Stop-WithReason -Reason '<novo>'`, `throw "BLOCK: …"`, `ValidateSet`/`ValidateRange` novo, predicado `Test-*` usado em ramo de bloqueio — e emita `agentWarning` exigindo o **veredito por eixo** que a regra do `13` (§5, «Gate novo exige enumerar os eixos vizinhos») já tornou obrigatório. O gate não decide: obriga o relatório a se pronunciar, como o `nonProseVerdictRequired` já faz para candidatas não-prosa.
+
+**Decisões em aberto.** (a) Recorte de falso-positivo — refatoração que só move um `Stop-WithReason` de arquivo não é gate novo; comparar por motivo (`-Reason`) e não por linha. (b) Se o veredito por eixo entra em campo estruturado próprio (`neighborAxisVerdictRequired`) ou só em `agentSemanticChecklist`. (c) Se o gate tenta **sugerir** eixos (procurando o mesmo predicado em motores pares) ou apenas exige a enumeração manual.
+
+**Registro da regra (já feito):** `13-revisao-pre-push.md` §5 e espelho no `08-guia-para-agente-gpt.md`. Este item é a mecanização dela.
+
 ## Centralizar a fonte de verdade do conjunto de backends/adapters (três níveis)
 
 - **Importância** — média (o modo de falha já se materializou **nove vezes numa única frente**, em três classes distintas, e é invisível para os gates atuais).

@@ -127,6 +127,16 @@ Quando a frente introduzir ou alterar regra que cite **motor por nome** (ex.: «
 - `Build-KbIntelligenceIndex.py` incrementa `EXTRACTOR_SIGNATURE_VERSION`, mas documento operacional ainda menciona a versão antiga do extrator.
 - Tipo `queryableByKbIntelligence=true` ganha nova aresta ou regra de extração, mas `02-regras-operacionais-e-runtime.md` não explica o que o índice materializa e o que ainda exige leitura XML.
 
+**Gate novo exige enumerar os eixos vizinhos (obrigatório).** Quando a frente introduz bloqueio, recusa ou validação — `Stop-WithReason` com motivo novo, `throw "BLOCK: …"`, `ValidateSet`/`ValidateRange` novo, predicado de recusa —, não basta confirmar que o caminho corrigido ficou fechado. Listar explicitamente por quais **outros caminhos** o mesmo defeito ainda é alcançável e dar **veredito por eixo**: fechado, deixado aberto com justificativa, ou registrado como residual. Eixos que se repetem na prática:
+
+- **motor par escritor ↔ leitor** — quem grava valida, quem lê não (ou vice-versa), e arquivo editado à mão vira a porta dos fundos do contrato;
+- **outro parâmetro que alcança o mesmo estado** — fechar `-Scope machine` sem fechar `-Orchestrator` divergente;
+- **outra grafia da mesma chave** — `cursor/grok-4` bloqueado e `cursor-grok-4.6-medium` passando, porque o `split` devolve a chave inteira;
+- **titular vs elo de cadeia** — regra aplicada ao titular e não ao `fallbackChain[]`, ou o contrário;
+- **modo de retenção / sensibilidade** — o caminho `public` corrigido e o `kb-sensitive` seguindo com o comportamento antigo.
+
+Fechar um eixo e não varrer os irmãos é **gap de completude**, não «fora do escopo desta frente». Motivação empírica (2026-09-04): três rodadas seguidas da mesma frente fecharam um eixo cada e deixaram o vizinho aberto — escritor sem o leitor; `-Scope machine` sem o eixo do orquestrador; `public` sem o `kb-sensitive` —, e os três vizinhos foram achados por revisão externa **depois** da pré-push formal, que havia passado.
+
 ### 6. Regra em camadas para skills longas
 
 Ao alinhar nomenclatura ou contrato (ex.: `lastUpdate`, `-AcervoPath`, `executionEvidence`, `pathEnrichment`, `queryableByKbIntelligence`), varrer o `SKILL.md` **e os satélites que ele manda carregar** antes de considerar a frente fechada — não basta o `SKILL.md` estar alinhado. Exemplos em `xpz-builder`: [quality-checklist.md](xpz-builder/quality-checklist.md), [wwp-packaging.md](xpz-builder/wwp-packaging.md), `responsibilities-by-type/*.md`. Três cortes: (1) checklist final ou gates de fechamento; (2) fluxo operacional e captura de resultado; (3) inventário de scripts e contratos por script.
@@ -144,6 +154,7 @@ Confirmar se há:
 - rastreabilidade pública desatualizada em `09-inventario-e-rastreabilidade-publica.md` (presença do termo não basta — comparar abrangência)
 - rastreabilidade agregada demais no `09` (motor vs bateria com papéis distintos)
 - selftest que não cobre contrato novo documentado (reportar como área não coberta ou gap de teste)
+- bloqueio/validação novo sem o veredito por eixo vizinho exigido no §5 (escritor↔leitor, outro parâmetro, outra grafia, titular vs cadeia, `public` vs `kb-sensitive`)
 - mudança com impacto público sem entrada correspondente em `CHANGELOG.md` nem justificativa explícita de omissão
 - campo de rastreabilidade em `historico/` (`Commit:`/`PR:`) com placeholder genérico (`este commit`, `este PR`, `TODO`, `TBD`, vazio ou `<...>`) em vez do hash real — salvo quando o commit ainda não existe e o campo será preenchido no commit seguinte (reportar como "a preencher"). Suporte mecânico (consultivo): `scripts/Test-PrePushHistoryCommitPlaceholder.ps1`, sobre os `historico/*.md` no diff
 
