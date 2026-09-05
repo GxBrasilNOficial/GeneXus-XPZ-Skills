@@ -133,5 +133,5 @@ O achado veio de um aviso consultivo (`SHARED_SCRIPT_SKILL_DOC_NOT_IN_DIFF` sobr
 
 ### Rastreabilidade
 
-- Commit material: a preencher no commit seguinte.
+- Commit material: `5e11685` (`fix(llm-delegate): titular nativo exige escopo de orquestrador`)
 - Arquivos materiais: `scripts/Set-LlmDelegatePreferredReviewers.ps1`, `scripts/Resolve-LlmDelegatePreferredReviewers.ps1`, `scripts/Test-LlmDelegatePreferredReviewersSelfTest.ps1`, `15-revisao-por-pares.md`, `xpz-llm-delegate/SKILL.md`, `xpz-skills-setup/SKILL.md`, `09-inventario-e-rastreabilidade-publica.md`, `CHANGELOG.md`.
