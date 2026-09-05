@@ -364,6 +364,12 @@ Parâmetros específicos de importação:
 - **Recomendado** executar o mesmo inventário antes de `PreviewMode` quando o pacote veio de **export MSBuild**, **reempacotamento manual** ou qualquer fluxo em que o agente não controlou fecho do lote na conversa.
 - **Exportação com lista explícita (`-ObjectList` / `Objects`) não garante**, por si só, pacote com um único objeto nem equivalência “lista nominal = conteúdo do zip”. Para pacote cirúrgico nominal, use `-DependencyType "None" -ReferenceType "None"` como prevenção na origem; ainda assim, **nunca** tratar tudo o que veio no pacote como intencional sem inventário e confronto.
 
+### Observabilidade do empacotamento por frente
+
+- `New-XpzImportPackage.ps1 -ReportPath <caminho-absoluto.json>` é opt-in e registra a execução do empacotamento por frente antes, durante e depois do inventário. O contrato é `Kind=xpz-package-execution-report`, `SchemaVersion=1`, com `runId`, `stageHistory`, `executionState`, `packageState`, `inventoryDecision`, `packageWritten`, `processExitCode` e `resultExitCode`.
+- O relatório não substitui `Test-GeneXusImportFileEnvelope.ps1`, `packageInventory`, sidecar, importação real, build, evidência da IDE ou validação funcional. `packageState=candidate` e `inventoryDecision=unknown` não liberam importação; `executionState=running` após interrupção é execução incompleta/órfã.
+- O caminho deve ser absoluto, novo, `.json`, com pai existente e fora de áreas de fonte/acervo, scripts, `KbIntelligence`, `.git`, histórico e artefatos do pacote. A publicação usa UTF-8 sem BOM e substituição atômica; stdout e stderr dos filhos são separados. Em modo de relatório, divergência de inventário retorna decisão `unknown`/pacote `candidate` ou bloqueio explícito, sem promover o artefato a aceito.
+
 ---
 
 ## Categorias A e B (MSBuild headless)

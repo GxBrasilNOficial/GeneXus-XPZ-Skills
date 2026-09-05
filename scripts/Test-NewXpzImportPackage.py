@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -85,6 +86,42 @@ def assert_collision_gate_accepts_free_round(engine: Any) -> None:
         assert result["requestedNN"] == "01", result
 
 
+def assert_execution_report_atomic_and_handoff(engine: Any) -> None:
+    with tempfile.TemporaryDirectory() as temp_dir:
+        report_path = Path(temp_dir) / "execution.json"
+        run_id = "11111111-1111-1111-1111-111111111111"
+        report_path.write_text(
+            json.dumps(
+                {
+                    "Kind": engine.ExecutionReporter.KIND,
+                    "SchemaVersion": engine.ExecutionReporter.SCHEMA_VERSION,
+                    "runId": run_id,
+                    "currentStage": "preflight",
+                    "stageHistory": [{"stage": "preflight"}],
+                }
+            ),
+            encoding="utf-8",
+        )
+        reporter = engine.ExecutionReporter(report_path, run_id)
+        reporter.update(stage="engine-start", note="teste")
+        first = json.loads(report_path.read_text(encoding="utf-8"))
+        assert first["currentStage"] == "engine-start", first
+        assert first["lastWriter"] == "python", first
+        assert first["stageHistory"][-1]["stage"] == "engine-start", first
+        assert report_path.read_bytes()[:3] != b"\xef\xbb\xbf"
+        history_count = len(first["stageHistory"])
+        reporter.heartbeat(stage="engine-start", progress="sem mudanca")
+        second = json.loads(report_path.read_text(encoding="utf-8"))
+        assert len(second["stageHistory"]) == history_count, second
+
+        try:
+            engine.ExecutionReporter(report_path, "22222222-2222-2222-2222-222222222222")
+        except engine.ReportPublicationError as exc:
+            assert "runId divergente" in str(exc), exc
+        else:
+            raise AssertionError("expected mismatched runId to block handoff")
+
+
 def main() -> int:
     script_dir = Path(__file__).resolve().parent
     engine = load_engine(script_dir)
@@ -93,6 +130,7 @@ def main() -> int:
     assert_blocks_reference_named_object(engine)
     assert_collision_gate_accepts_free_round(engine)
     assert_collision_gate_reports_next_round(engine)
+    assert_execution_report_atomic_and_handoff(engine)
 
     print("Test-NewXpzImportPackage.py: passed")
     return 0

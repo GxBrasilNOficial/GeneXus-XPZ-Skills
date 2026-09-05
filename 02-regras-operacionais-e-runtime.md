@@ -1082,6 +1082,8 @@ Vocabulario canonico dos parâmetros dos wrappers e motores compartilhados XPZ. 
 
 ## Checklist obrigatório antes do empacotamento
 
+- `Regra operacional`: `scripts/New-XpzImportPackage.ps1 -ReportPath <caminho-absoluto.json>` é observabilidade opt-in: o destino deve ser novo, ter pasta pai existente, ser publicado atomicamente em UTF-8 sem BOM e ficar fora de áreas de acervo, frente, scripts, `KbIntelligence`, `.git`, `ArquivoMorto`, metadata e artefatos do pacote. Caminho inválido retorna `stage=validate-report-path`, `exitCode=20` sem criar artefato.
+- `Regra operacional`: o relatório `Kind=xpz-package-execution-report`, `SchemaVersion=1` separa `executionState`, `packageState` e `inventoryDecision`; `packageState=candidate` não significa `accepted`, e `executionState=running` após interrupção externa significa execução incompleta/órfã, nunca sucesso. O relatório não comprova importação real, build, IDE ou comportamento funcional.
 - `Regra operacional`: antes de empacotar, classificar cada XML ativo como `alterado na rodada` ou `reenviado sem mudanca por dependencia obrigatoria`.
 - `Regra operacional`: ao criar uma copia alterada de XML GeneXus em `ObjetosGeradosParaImportacaoNaKbNoGenexus`, preservar fielmente o XML de origem fora do delta funcional aprovado; a operacao padrão e edicao cirurgica, não reconstrucao nem reserializacao ampla.
 - `Regra operacional`: fora do delta funcional, preservar comentarios, `CDATA`, indentacao, linhas em branco, ordem de nos, quebras de linha e whitespace herdado; não introduzir espacos ou tabs finais em linhas novas ou modificadas.

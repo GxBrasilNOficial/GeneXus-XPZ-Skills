@@ -10,6 +10,10 @@
 
 ## Português (BR)
 
+### Observabilidade do empacotamento XPZ
+
+`scripts/New-XpzImportPackage.ps1` aceita `-ReportPath <caminho-absoluto.json>` como observabilidade opt-in. O relatório `Kind=xpz-package-execution-report`, `SchemaVersion=1` é publicado atomicamente em UTF-8 sem BOM, separa `executionState`, `packageState` e `inventoryDecision`, e registra o handoff entre PowerShell, gate de drift, motor Python e inventário. `candidate`, `unknown` ou `running` não significam pacote aceito; `running` após interrupção é execução incompleta/órfã. Caminho inválido bloqueia antes de criar pacote ou relatório. Esse arquivo não prova importação real, build, IDE ou comportamento funcional.
+
 Este repositório existe para sustentar e operacionalizar skills para agentes dedicadas ao ecossistema `XPZ`/XML de GeneXus, em especial `xpz-reader`, `xpz-builder`, `xpz-sync`, `xpz-doc-builder`, `xpz-daemon`, `xpz-kb-parallel-setup`, `xpz-kb-parallel-pre-push`, `xpz-msbuild-import-export`, `xpz-msbuild-build`, `xpz-index-triage`, `xpz-llm-delegate`, `xpz-skills-setup` e `xpz-codex-apply-patch-alternative`.
 
 A documentação consolidada e os scripts desta raiz funcionam como base metodológica e operacional dessas skills, com foco em:
@@ -254,6 +258,10 @@ Se você quer entender a base rapidamente:
 
 ## Español
 
+### Observabilidad del empaquetado XPZ
+
+`scripts/New-XpzImportPackage.ps1` acepta `-ReportPath <ruta-absoluta.json>` como observabilidad opt-in. El informe `Kind=xpz-package-execution-report`, `SchemaVersion=1` se publica atómicamente en UTF-8 sin BOM, separa `executionState`, `packageState` e `inventoryDecision`, y registra el handoff entre PowerShell, gate de drift, motor Python e inventario. `candidate`, `unknown` o `running` no significan paquete aceptado; `running` tras una interrupción es una ejecución incompleta/huérfana. Una ruta inválida bloquea antes de crear paquete o informe. Este archivo no prueba importación real, build, IDE ni comportamiento funcional.
+
 Este repositorio reúne documentación consolidada sobre análisis estructural de objetos GeneXus a partir de XMLs extraídos de `XPZ`, con foco en skills para agentes dedicadas al ecosistema `XPZ`/XML de GeneXus, en especial `xpz-reader`, `xpz-builder`, `xpz-sync`, `xpz-doc-builder`, `xpz-daemon`, `xpz-kb-parallel-setup`, `xpz-kb-parallel-pre-push`, `xpz-msbuild-import-export`, `xpz-msbuild-build`, `xpz-index-triage`, `xpz-llm-delegate`, `xpz-skills-setup` y `xpz-codex-apply-patch-alternative`.
 
 - lectura e interpretación de estructura XML
@@ -495,6 +503,10 @@ Si quieres entender la base rápidamente:
 ---
 
 ## English
+
+### XPZ packaging observability
+
+`scripts/New-XpzImportPackage.ps1` accepts `-ReportPath <absolute-path.json>` as opt-in observability. The `Kind=xpz-package-execution-report`, `SchemaVersion=1` report is published atomically as UTF-8 without BOM, separates `executionState`, `packageState`, and `inventoryDecision`, and records the handoff between PowerShell, the drift gate, the Python engine, and inventory. `candidate`, `unknown`, or `running` do not mean that the package is accepted; `running` after interruption is an incomplete/orphaned execution. An invalid path blocks before creating a package or report. This file does not prove real import, build, IDE evidence, or functional behavior.
 
 This repository contains consolidated documentation about structural analysis of GeneXus objects based on XML extracted from `XPZ`, with emphasis on skills for agents dedicated to the `XPZ`/XML ecosystem of GeneXus, especially `xpz-reader`, `xpz-builder`, `xpz-sync`, `xpz-doc-builder`, `xpz-daemon`, `xpz-kb-parallel-setup`, `xpz-kb-parallel-pre-push`, `xpz-msbuild-import-export`, `xpz-msbuild-build`, `xpz-index-triage`, `xpz-llm-delegate`, `xpz-skills-setup`, and `xpz-codex-apply-patch-alternative`.
 

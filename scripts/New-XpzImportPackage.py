@@ -10,10 +10,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
+import stat
 import sys
+import time
 import xml.etree.ElementTree as ET
 import zipfile
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from xml.sax.saxutils import quoteattr
@@ -33,6 +37,140 @@ class BlockedError(RuntimeError):
         super().__init__(message)
         self.reason = reason
         self.details = details or {}
+
+
+class ReportPublicationError(RuntimeError):
+    """Falha fail-closed ao validar ou publicar o relatorio de execucao."""
+
+
+def utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
+
+def path_has_reparse_point(path: Path) -> str | None:
+    """Retorna o primeiro componente reparse/symlink sem seguir o componente."""
+
+    current = Path(os.path.abspath(os.fspath(path)))
+    while True:
+        try:
+            info = current.lstat()
+        except FileNotFoundError:
+            pass
+        else:
+            is_reparse = stat.S_ISLNK(info.st_mode)
+            if hasattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT"):
+                is_reparse = is_reparse or bool(info.st_file_attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT)
+            if is_reparse:
+                return os.fspath(current)
+        parent = current.parent
+        if parent == current:
+            break
+        current = parent
+    return None
+
+
+class ExecutionReporter:
+    """Escritor Python exclusivo durante a execucao do motor."""
+
+    KIND = "xpz-package-execution-report"
+    SCHEMA_VERSION = 1
+    HEARTBEAT_SECONDS = 5.0
+    MAX_HISTORY = 16
+
+    def __init__(self, path: Path, run_id: str) -> None:
+        self.path = Path(os.path.abspath(os.fspath(path)))
+        self.run_id = run_id
+        self._last_heartbeat = 0.0
+        self._validate_path()
+        try:
+            snapshot = json.loads(self.path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+            raise ReportPublicationError(f"relatorio de execucao nao pode ser lido: {exc}") from exc
+        self._validate_snapshot(snapshot)
+        self.document: dict[str, Any] = snapshot
+
+    def _validate_path(self) -> None:
+        parent = self.path.parent
+        if parent == self.path or not parent.is_dir():
+            raise ReportPublicationError("a pasta pai do relatorio de execucao deve existir")
+        reparse = path_has_reparse_point(self.path)
+        if reparse is not None:
+            raise ReportPublicationError(f"relatorio de execucao ou componente pai e ponto de reanalise: {reparse}")
+        try:
+            if self.path.exists() and not self.path.is_file():
+                raise ReportPublicationError("relatorio de execucao existente nao e arquivo regular")
+        except OSError as exc:
+            raise ReportPublicationError(f"nao foi possivel verificar relatorio de execucao: {exc}") from exc
+
+    def _validate_snapshot(self, snapshot: Any) -> None:
+        if not isinstance(snapshot, dict):
+            raise ReportPublicationError("relatorio de execucao nao contem um objeto JSON")
+        if snapshot.get("Kind") != self.KIND or snapshot.get("SchemaVersion") != self.SCHEMA_VERSION:
+            raise ReportPublicationError("relatorio de execucao com Kind ou SchemaVersion inesperado")
+        if snapshot.get("runId") != self.run_id:
+            raise ReportPublicationError("relatorio de execucao com runId divergente")
+
+    def _write_atomic(self) -> None:
+        self._validate_path()
+        try:
+            current = json.loads(self.path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+            raise ReportPublicationError(f"relatorio de execucao nao pode ser relido antes da publicacao: {exc}") from exc
+        self._validate_snapshot(current)
+        payload = (json.dumps(self.document, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+        temporary = self.path.with_name(f"{self.path.name}.tmp.{os.getpid()}.{self.run_id.replace('-', '')}")
+        file_descriptor: int | None = None
+        try:
+            file_descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(file_descriptor, "wb") as stream:
+                file_descriptor = None
+                stream.write(payload)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temporary, self.path)
+        except OSError as exc:
+            raise ReportPublicationError(f"publicacao atomica do relatorio falhou: {exc}") from exc
+        finally:
+            if file_descriptor is not None:
+                os.close(file_descriptor)
+            try:
+                temporary.unlink()
+            except FileNotFoundError:
+                pass
+            except OSError:
+                pass
+
+    def update(self, *, stage: str | None = None, note: str | None = None, writer: str = "python", **values: Any) -> None:
+        now = utc_now()
+        if stage is not None and self.document.get("currentStage") != stage:
+            history = list(self.document.get("stageHistory") or [])
+            history.append({"stage": stage, "atUtc": now, "writer": writer, "note": note})
+            if len(history) > self.MAX_HISTORY:
+                history = [history[0], *history[-(self.MAX_HISTORY - 1) :]]
+            self.document["stageHistory"] = history
+            self.document["currentStage"] = stage
+        self.document.update(values)
+        self.document["updatedAtUtc"] = now
+        self.document["lastWriter"] = writer
+        self._write_atomic()
+
+    def heartbeat(self, *, stage: str, progress: str) -> None:
+        now = time.monotonic()
+        if now - self._last_heartbeat < self.HEARTBEAT_SECONDS:
+            return
+        self._last_heartbeat = now
+        self.update(stage=stage, writer="python", progress=progress)
+
+    def engine_finished(self, *, process_exit_code: int, package_written: bool, package_state: str, rejected_path: str | None = None) -> None:
+        self.update(
+            stage="engine-finished",
+            note="motor Python encerrou; wrapper retomara a posse",
+            writer="python",
+            processExitCode=process_exit_code,
+            packageWritten=package_written,
+            packageState=package_state,
+            rejectedPath=rejected_path,
+        )
 
 
 def block(message: str, *, reason: str = "BLOCKED", details: dict[str, Any] | None = None) -> None:
@@ -429,17 +567,49 @@ def rejected_path(base_path: Path) -> Path:
     raise AssertionError("unreachable")
 
 
+def print_result(result: dict[str, Any]) -> None:
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+
+
+def report_engine_failure(
+    reporter: ExecutionReporter | None,
+    *,
+    process_exit_code: int,
+    package_written: bool,
+    package_state: str,
+    rejected_path: str | None = None,
+) -> None:
+    if reporter is not None:
+        reporter.engine_finished(
+            process_exit_code=process_exit_code,
+            package_written=package_written,
+            package_state=package_state,
+            rejected_path=rejected_path,
+        )
+
+
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-root", required=True)
     parser.add_argument("--front-name", required=True)
     parser.add_argument("--nn", default="01")
     parser.add_argument("--template-package-path")
+    parser.add_argument("--execution-report-path")
+    parser.add_argument("--run-id")
     args = parser.parse_args(argv)
 
+    reporter: ExecutionReporter | None = None
+    package_written = False
+    package_state = "not-written"
+    rejected: Path | None = None
     try:
         if re.search(r"[\\/]", args.front_name):
             block("FrontName invalido; informe apenas o nome da subpasta da frente")
+        if bool(args.execution_report_path) != bool(args.run_id):
+            block("--execution-report-path e --run-id devem ser informados juntos", reason="REPORT_HANDOFF_INVALID")
+        if args.execution_report_path and args.run_id:
+            reporter = ExecutionReporter(Path(args.execution_report_path), args.run_id)
+            reporter.update(stage="engine-start", note="motor Python recebeu o relatorio")
         repo = Path(args.repo_root).resolve()
         if not repo.is_dir():
             block(f"RepoRoot inexistente: {repo}")
@@ -452,24 +622,46 @@ def main(argv: list[str]) -> int:
             block(f"pasta da frente nao encontrada: {front_dir}")
         if not metadata_path.is_file():
             block(f"kb-source-metadata.md nao encontrado: {metadata_path}")
+        if reporter is not None:
+            reporter.update(stage="classify-front", note="classificando XMLs da frente")
         template_path = Path(args.template_package_path).resolve() if args.template_package_path else None
         object_roots, attribute_roots = classify_front_xmls(front_dir)
         collision_result = check_collision(output_path, args.front_name, round_text)
+        if reporter is not None:
+            reporter.update(stage="load-template", note="carregando envelope comparavel")
         template_root, envelope_source, envelope_warnings = load_template(template_path, metadata_path)
         validate_template(template_root)
         package_text = build_package_text(template_root, object_roots, attribute_roots)
         package_root = ET.fromstring(package_text)
+        if reporter is not None:
+            reporter.update(stage="write-package", note="gravando pacote candidato")
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(package_text, encoding="utf-8", newline="\n")
+        package_written = True
+        package_state = "candidate"
+        if reporter is not None:
+            reporter.update(stage="write-package", packageWritten=True, packageState=package_state, packagePath=str(output_path))
+            hold_stage = os.environ.get("XPZ_NEW_XPZ_TEST_HOLD_STAGE", "")
+            hold_file = os.environ.get("XPZ_NEW_XPZ_TEST_HOLD_FILE", "")
+            ready_file = os.environ.get("XPZ_NEW_XPZ_TEST_READY_FILE", "")
+            if hold_stage == "write-package" and hold_file:
+                if ready_file:
+                    Path(ready_file).write_text("ready\n", encoding="utf-8", newline="\n")
+                while Path(hold_file).exists():
+                    reporter.heartbeat(stage="write-package", progress="pacote candidato gravado; aguardando teste")
+                    time.sleep(0.25)
+        if reporter is not None:
+            reporter.update(stage="validate-envelope", note="validando envelope e regras de tipo")
         status, blocking, validation_warnings = validate_envelope(package_root)
         panel_warnings, panel_information = panel_package_findings(object_roots, envelope_source, template_root)
         all_warnings = envelope_warnings + validation_warnings + panel_warnings
         if not blocking and all_warnings:
             status = "apto com ressalvas"
-        rejected = None
         if status == "não apto para prosseguir":
             rejected = rejected_path(output_path)
             output_path.replace(rejected)
+            package_written = True
+            package_state = "rejected"
         template_blocks = {local_name(child.tag): child for child in list(template_root)}
         top_level_attr_source = (
             "front"
@@ -498,8 +690,25 @@ def main(argv: list[str]) -> int:
             "information": panel_information,
             "includedFiles": [str(path) for path, _, _ in object_roots + attribute_roots],
         }
-        print(json.dumps(result, ensure_ascii=False, indent=2))
+        if reporter is not None:
+            reporter.engine_finished(
+                process_exit_code=0,
+                package_written=package_written,
+                package_state=package_state,
+                rejected_path=None if rejected is None else str(rejected),
+            )
+        print_result(result)
         return 0
+    except ReportPublicationError as exc:
+        print_result({
+            "status": "erro",
+            "exitCode": 90,
+            "stage": "execution-report",
+            "blockingReasons": [str(exc)],
+            "reportPublicationBlocked": True,
+            "warnings": [],
+        })
+        return 90
     except BlockedError as exc:
         result = {
             "status": "bloqueado",
@@ -510,10 +719,36 @@ def main(argv: list[str]) -> int:
             "warnings": [],
         }
         result.update(exc.details)
-        print(json.dumps(result, ensure_ascii=False, indent=2))
+        try:
+            report_engine_failure(
+                reporter,
+                process_exit_code=20,
+                package_written=package_written,
+                package_state=package_state,
+                rejected_path=None if rejected is None else str(rejected),
+            )
+        except ReportPublicationError as report_exc:
+            result["reportPublicationBlocked"] = True
+            result["blockingReasons"].append(str(report_exc))
+            result["exitCode"] = 90
+            print_result(result)
+            return 90
+        print_result(result)
         return 20
     except Exception as exc:
-        print(json.dumps({"status": "erro", "exitCode": 90, "stage": "python-engine", "blockingReasons": [str(exc)]}, ensure_ascii=False, indent=2))
+        result = {"status": "erro", "exitCode": 90, "stage": "python-engine", "blockingReasons": [str(exc)]}
+        try:
+            report_engine_failure(
+                reporter,
+                process_exit_code=90,
+                package_written=package_written,
+                package_state=package_state,
+                rejected_path=None if rejected is None else str(rejected),
+            )
+        except ReportPublicationError as report_exc:
+            result["reportPublicationBlocked"] = True
+            result["blockingReasons"].append(str(report_exc))
+        print_result(result)
         return 90
 
 

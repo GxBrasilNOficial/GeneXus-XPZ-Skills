@@ -13,6 +13,10 @@ le
 Este wrapper e recomendado quando a pasta paralela adota empacotamento local
 recorrente e precisa de comando curto, auditavel e aderente a allowlist.
 
+Quando `-ReportPath` e informado, o wrapper grava um relatorio atomico de execucao
+em JSON com fases, estado do pacote e decisao do inventario; ele nao prova
+importacao real, build ou evidencia da IDE.
+
 O gate de drift frente-vs-acervo (Test-GeneXusFrontAcervoDrift.ps1) executa
 sempre antes do empacotamento (fail-closed). -AcervoPath e opcional; quando
 omitido, o acervo canonico <RepoRoot>/ObjetosDaKbEmXml e resolvido
@@ -50,6 +54,11 @@ ou remocao forte de trailing whitespace herdado
 Ambiguidade por guid no acervo e diagnostico informativo, reportado como
 front-object-type-drift-ambiguous-acervo.
 
+.PARAMETER ReportPath
+Caminho absoluto, novo e terminado em `.json`, preferencialmente sob `Temp`.
+A pasta pai deve existir; caminhos em areas de acervo, frente, scripts,
+`KbIntelligence`, `.git`, historico ou artefatos do pacote sao bloqueados.
+
 .PARAMETER SharedSkillsRoot
 Raiz local da base compartilhada `GeneXus-XPZ-Skills`.
 
@@ -66,6 +75,8 @@ param(
     [string]$TemplatePackagePath,
 
     [string]$AcervoPath,
+
+    [string]$ReportPath,
 
     [string]$SharedSkillsRoot = "C:\CAMINHO\PARA\GeneXus-XPZ-Skills"
 )
@@ -92,6 +103,10 @@ if (-not [string]::IsNullOrWhiteSpace($TemplatePackagePath)) {
 
 if (-not [string]::IsNullOrWhiteSpace($AcervoPath)) {
     $argsForEngine.AcervoPath = $AcervoPath
+}
+
+if (-not [string]::IsNullOrWhiteSpace($ReportPath)) {
+    $argsForEngine.ReportPath = $ReportPath
 }
 
 & $enginePath @argsForEngine

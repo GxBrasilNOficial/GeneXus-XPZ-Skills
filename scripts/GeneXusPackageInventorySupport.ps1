@@ -163,13 +163,16 @@ function New-PackageInventoryResult {
     param(
         [Parameter(Mandatory = $true)][string]$InputPath,
         [string]$DeclaredDeltaItems,
-        [string]$SidecarInventoryPath
+        [string]$SidecarInventoryPath,
+        [switch]$FailOnDeltaMismatch,
+        [switch]$FailOnUnknownTypes
     )
 
     $inventoryScriptPath = Join-Path $PSScriptRoot 'Get-GeneXusImportPackageObjectInventory.ps1'
     $result = [ordered]@{
         inventoryDegraded    = $true
         inventoryError       = $null
+        inventoryExitCode    = 90
         packageInventory     = $null
         packageInventoryPath = $SidecarInventoryPath
     }
@@ -190,8 +193,15 @@ function New-PackageInventoryResult {
         if (-not [string]::IsNullOrWhiteSpace($DeclaredDeltaItems)) {
             $invokeParams['DeclaredDeltaItems'] = $DeclaredDeltaItems
         }
+        if ($FailOnDeltaMismatch) {
+            $invokeParams['FailOnDeltaMismatch'] = $true
+        }
+        if ($FailOnUnknownTypes) {
+            $invokeParams['FailOnUnknownTypes'] = $true
+        }
 
         $inventory = (& $inventoryScriptPath @invokeParams | ConvertFrom-Json)
+        $inventoryExitCode = [int]$LASTEXITCODE
         $namedItems = [System.Collections.Generic.List[pscustomobject]]::new()
         foreach ($item in @($inventory.inventory)) {
             $namedItems.Add([pscustomobject]@{
@@ -240,6 +250,7 @@ function New-PackageInventoryResult {
             systemObjectsPresent           = @($inventory.systemObjectsPresent)
             declaredIncludesTransaction    = [bool]$inventory.declaredIncludesTransaction
             attributesTopLevelUnreconciled = [bool]$inventory.attributesTopLevelUnreconciled
+            inventoryExitCode              = $inventoryExitCode
             packageInventoryPath           = $result.packageInventoryPath
         }
         if (@($inventory.warnings).Count -gt 0) {
@@ -297,8 +308,13 @@ function New-PackageInventoryResult {
             $summary.nominalInventoryAt = $result.packageInventoryPath
         }
 
-        $result.inventoryDegraded = $false
-        $result.inventoryError = $null
+        $result.inventoryExitCode = $inventoryExitCode
+        $result.inventoryDegraded = $inventoryExitCode -ne 0
+        if ($inventoryExitCode -eq 0) {
+            $result.inventoryError = $null
+        } else {
+            $result.inventoryError = "inventario retornou exitCode $inventoryExitCode ($($inventory.status))"
+        }
         $result.packageInventory = [pscustomobject]$summary
         return [pscustomobject]$result
     } catch {
