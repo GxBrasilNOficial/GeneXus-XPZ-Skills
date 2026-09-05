@@ -83,7 +83,7 @@ de um novo usuário.
   passos 6–7: nada gravado sem confirmação explícita) — não substituir esse passo
   por oferta genérica do tipo "na próxima mensagem posso auditar", que confunde
   quem espera um relatório fechado nesta execução
-- **Opcional (não-bloqueante): calibração de revisores preferidos.** No setup de máquina, oferecer (sem cobrar) calibrar a lista de **revisores preferidos** para a revisão por pares, executando `Set-LlmDelegatePreferredReviewers.ps1` da skill `xpz-llm-delegate` (dona do arquivo) — esta skill apenas **oferece rodar** o script, não é dona do contrato. A oferta de 1º uso grava **machine-scope** (`preferred-reviewers.json`); calibração por orquestrador (`preferred-reviewers.<orch>.json`) é `Set- … -Scope orchestrator` na sessão da ferramenta. Nunca grava sem confirmação.
+- **Opcional (não-bloqueante): calibração de revisores preferidos.** No setup de máquina, oferecer (sem cobrar) calibrar a lista de **revisores preferidos** para a revisão por pares, executando `Set-LlmDelegatePreferredReviewers.ps1` da skill `xpz-llm-delegate` (dona do arquivo) — esta skill apenas **oferece rodar** o script, não é dona do contrato. A oferta de 1º uso grava **machine-scope** (`preferred-reviewers.json`); calibração por orquestrador (`preferred-reviewers.<orch>.json`) é `Set- … -Scope orchestrator` na sessão da ferramenta. **Titular de subagente nativo não cabe em machine-scope** — o script recusa (`native-machine-scope-forbidden`), porque o nativo pertence ao harness que o executa; se a calibração incluir um nativo, ele vai em `-Scope orchestrator` na sessão daquela ferramenta. Nunca grava sem confirmação.
 
 ## CAMINHOS DE SKILLS POR FERRAMENTA
 

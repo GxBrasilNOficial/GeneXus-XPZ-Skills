@@ -194,7 +194,7 @@ function Assert-ReviewerValid {
 }
 
 function ConvertTo-ResolvedReviewer {
-    param($Reviewer, $ManifestMap, [int]$DefaultRank)
+    param($Reviewer, $ManifestMap, [int]$DefaultRank, [string]$PreferenceSource)
     Assert-ReviewerValid -Reviewer $Reviewer -OwnerLabel 'revisor preferido'
     $backend = [string](Get-Prop $Reviewer 'backend')
     $target = [string](Get-Prop $Reviewer 'targetModelKey')
@@ -234,6 +234,12 @@ function ConvertTo-ResolvedReviewer {
     $manifestEntry = $ManifestMap[$target]
     $available = ($null -ne $manifestEntry)
     $diagnostics = [System.Collections.Generic.List[string]]::new()
+    # Arquivo machine gravado antes do gate 'native-machine-scope-forbidden' do Set- pode conter
+    # titular nativo de OUTRO harness. Nao bloqueia a leitura (o arquivo ja existe), mas avisa:
+    # o orquestrador precisa confirmar antes de contar essa voz no piso de diversidade.
+    if ($isNative -and $PreferenceSource -eq 'machine') {
+        $diagnostics.Add('titular nativo em escopo machine; nativo pertence ao harness que o executa — confirmar que este orquestrador o oferece antes de compor o painel')
+    }
     if (-not $available) { $diagnostics.Add('availableInManifest=false; diagnostico, nao bloqueio do gate') }
     elseif ((Get-Prop $manifestEntry 'sourceConfidence') -eq 'weak') { $diagnostics.Add('capability sourceConfidence=weak') }
 
@@ -375,7 +381,7 @@ function Emit-ResolvedDocument {
     $rankCounter = 0
     foreach ($r in $reviewers) {
         $rankCounter++
-        $out.Add((ConvertTo-ResolvedReviewer -Reviewer $r -ManifestMap $manifestMap -DefaultRank $rankCounter))
+        $out.Add((ConvertTo-ResolvedReviewer -Reviewer $r -ManifestMap $manifestMap -DefaultRank $rankCounter -PreferenceSource $PreferenceSource))
     }
     $outSorted = @($out | Sort-Object -Property @{ Expression = { [int](Get-Prop $_ 'rank') } }, @{ Expression = { [string](Get-Prop $_ 'targetModelKey') } })
     Assert-ValidRankSet -Reviewers $outSorted

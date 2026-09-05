@@ -274,6 +274,12 @@ function ConvertTo-ReviewerV3 {
     $chainOut = [System.Collections.Generic.List[object]]::new()
 
     if ($isNative) {
+        # harnessModelId e um id DENTRO de um harness: titular nativo pertence ao orquestrador,
+        # nao a maquina. Em escopo machine ele seria resolvido por outro orquestrador como se
+        # fosse o nativo dele — voz fantasma que ainda somaria familia no piso de diversidade.
+        if ($scopeTrim -eq 'machine') {
+            Stop-WithReason -Reason 'native-machine-scope-forbidden' -ExitCode 3 -Detail "nativo exige -Scope orchestrator; targetModelKey='$target'"
+        }
         if ($null -eq $harnessRaw -or [string]::IsNullOrWhiteSpace([string]$harnessRaw)) {
             Stop-WithReason -Reason 'native-harness-model-id-missing' -ExitCode 3 -Detail 'harnessModelId obrigatorio no nativo'
         }

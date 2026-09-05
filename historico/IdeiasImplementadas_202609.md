@@ -98,3 +98,40 @@ Os itens 4 e 5 nao vieram da frente original: sairam de revisao externa sobre os
 
 - Commits materiais: `ec7c5d3` (`fix(llm-delegate): estabilizar painel Cursor para Codex/OpenCode em revisao longa`), `49dca32` (`feat(llm-delegate): reconhecer familia xai para Grok nativo no Cursor`), `8369ba7` (`docs(llm-delegate): documentar mapeamento cursor-grok -> xai no 15 e SKILL`), `c1ec5e0` (`test(llm-delegate): reforcar diversidade do Cursor/Grok`) e `f123f84` (`feat(llm-delegate): Criador anysphere e contrato de chave de harness Cursor`, correcao dos gaps apontados em revisao externa).
 - Arquivos materiais: `scripts/LlmDelegateTargetFamilySupport.ps1`, `scripts/Set-LlmDelegatePreferredReviewers.ps1`, `scripts/Resolve-OrchestratorNativeModelLocality.ps1`, `scripts/Invoke-Codex.ps1`, `scripts/Invoke-OpenCode.ps1`, `scripts/Invoke-LlmDelegatePanelDispatch.ps1`, os tres self-tests acima, `scripts/Test-CodexDurableCaptureSelfTest.ps1`, `scripts/Test-InvokeLlmDelegatePanelDispatchSelfTest.ps1`, `15-revisao-por-pares.md`, `xpz-llm-delegate/SKILL.md`, `09-inventario-e-rastreabilidade-publica.md`, `CHANGELOG.md`.
+
+## Titular de subagente nativo pertence ao orquestrador, nao a maquina
+
+Implementado em 2026-09-04, no fechamento da mesma frente. Achado da fase semantica da pre-push, nao previsto no `999`.
+
+### O defeito
+
+A curadoria de revisores preferidos aceita dois escopos: `preferred-reviewers.json` (machine) e `preferred-reviewers.<orquestrador>.json`. Nada — nem doc nem motor — impedia gravar um titular `orchestrator-native-subagent` no escopo machine. Mas `harnessModelId` e, por definicao, um id DENTRO de um harness: o nativo do Cursor e o Grok, o do Claude Code e o Claude.
+
+Verificacao empirica que fechou o diagnostico: com um `preferred-reviewers.json` machine contendo titular nativo `cursor/grok-4` + `harnessModelId: grok-4`, o comando
+
+    Resolve-LlmDelegatePreferredReviewers.ps1 -Orchestrator claude-code -PreferredRoot <dir>
+
+devolvia `exit 0` e entregava esse titular ao Claude Code como se fosse o nativo dele. O unico sinal era `availableInManifest=false`, que o proprio envelope rotula como diagnostico e nao bloqueio.
+
+O dano nao e o titular falhar no despacho: e o **piso de diversidade** contar a familia (`xai`, no caso) de um revisor que nunca sera consultado naquele harness, permitindo declarar `panelReady` sobre uma voz fantasma.
+
+### O que foi feito
+
+1. **Escritor:** `Set-LlmDelegatePreferredReviewers.ps1` recusa titular nativo com `-Scope machine` (`native-machine-scope-forbidden`, exit 3). Nativo vai em `-Scope orchestrator`, na sessao da ferramenta que o oferece.
+2. **Leitor:** `Resolve-LlmDelegatePreferredReviewers.ps1` nao bloqueia arquivos machine gravados antes do gate — eles ja existem e nao ha como reescreve-los retroativamente —, mas marca o titular nativo com `diagnostics` de escopo, para o orquestrador confirmar antes de compor o painel.
+3. **Documentacao:** paragrafo novo «Curadoria de nativo e por orquestrador, nunca machine» no `15-revisao-por-pares.md`; regra nos ponteiros do `09` e nas descricoes do `xpz-llm-delegate/SKILL.md`; e ajuste na oferta de 1o uso da `xpz-skills-setup/SKILL.md`, que documenta gravar machine-scope por padrao — agora diz explicitamente que titular nativo nao cabe ali.
+
+### Atribuicao honesta
+
+O defeito e **pre-existente** e vale para qualquer nativo, nao so os do Cursor: um `moonshot/kimi-k3-max` nativo gravado em machine e resolvido pelo Codex tem exatamente o mesmo problema. O que mudou nesta frente foi a **visibilidade**: ate entao uma chave `cursor/*` sequer podia ser persistida, e ela e o caso onde o erro e inequivoco, porque `cursor/grok-4` so existe no Cursor.
+
+O achado veio de um aviso consultivo (`SHARED_SCRIPT_SKILL_DOC_NOT_IN_DIFF` sobre `xpz-skills-setup/SKILL.md`) que dois revisores — este agente e um agente externo — haviam classificado, corretamente, como descartavel quanto ao contrato do `Set-`. O gap real nao estava no contrato, e sim na interacao entre aquele arquivo (que documenta o default machine-scope) e titulares nativos. Licao de metodo: descartar um aviso pelo motivo certo nao dispensa olhar o que ele tangencia.
+
+### Testes
+
+- `Test-LlmDelegatePreferredReviewersSelfTest.ps1`, bloco (K4): gravacao de nativo em `-Scope machine` bloqueada; leitura de arquivo machine legado nao bloqueia e traz o diagnostico; o mesmo titular em escopo orquestrador nao traz o diagnostico. Os blocos nativos pre-existentes (K) e (K2) passaram a gravar em `-Scope orchestrator`, coerentes com o novo contrato.
+
+### Rastreabilidade
+
+- Commit material: a preencher no commit seguinte.
+- Arquivos materiais: `scripts/Set-LlmDelegatePreferredReviewers.ps1`, `scripts/Resolve-LlmDelegatePreferredReviewers.ps1`, `scripts/Test-LlmDelegatePreferredReviewersSelfTest.ps1`, `15-revisao-por-pares.md`, `xpz-llm-delegate/SKILL.md`, `xpz-skills-setup/SKILL.md`, `09-inventario-e-rastreabilidade-publica.md`, `CHANGELOG.md`.

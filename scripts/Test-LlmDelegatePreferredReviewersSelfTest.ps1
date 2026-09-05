@@ -420,7 +420,7 @@ try {
     $kOk = Invoke-Set @{
         ReviewersJson = $nativeOk
         Orchestrator  = 'cursor'
-        Scope         = 'machine'
+        Scope         = 'orchestrator'
         OutputPath    = $nativePath
     }
     Assert-True ($kOk.code -eq 0) "(K) nativo valido deveria exit 0; veio $($kOk.code)."
@@ -446,7 +446,7 @@ try {
     $kFb = Invoke-Set @{
         ReviewersJson = $nativeFb
         Orchestrator  = 'cursor'
-        Scope         = 'machine'
+        Scope         = 'orchestrator'
         OutputPath    = (Join-Path $tempRoot 'native-fb.json')
     }
     Assert-ReasonExit -Result $kFb -Reason 'native-fallback-chain-forbidden' -ExitCode 3 -Label '(K) native fallback'
@@ -478,7 +478,7 @@ try {
     $kGrok = Invoke-Set @{
         ReviewersJson = $nativeGrok
         Orchestrator  = 'cursor'
-        Scope         = 'machine'
+        Scope         = 'orchestrator'
         OutputPath    = $grokPath
     }
     Assert-True ($kGrok.code -eq 0) "(K2) nativo cursor/grok-* deveria exit 0; veio $($kGrok.code)."
@@ -500,7 +500,7 @@ try {
     $kComposer = Invoke-Set @{
         ReviewersJson = $nativeComposer
         Orchestrator  = 'cursor'
-        Scope         = 'machine'
+        Scope         = 'orchestrator'
         OutputPath    = (Join-Path $tempRoot 'native-composer.json')
     }
     Assert-True ($kComposer.code -eq 0) "(K2) nativo cursor-composer-* deveria exit 0; veio $($kComposer.code)."
@@ -520,7 +520,7 @@ try {
     $kUnmapped = Invoke-Set @{
         ReviewersJson = $nativeUnmapped
         Orchestrator  = 'cursor'
-        Scope         = 'machine'
+        Scope         = 'orchestrator'
         OutputPath    = (Join-Path $tempRoot 'native-unmapped.json')
     }
     Assert-ReasonExit -Result $kUnmapped -Reason 'native-cursor-prefix' -ExitCode 3 -Label '(K2) nativo sem Criador conhecido'
@@ -641,6 +641,73 @@ try {
     }
     Assert-True ($kRead3.code -eq 0) "(K3) leitor nativo cursor/grok-* deveria exit 0; veio $($kRead3.code)."
     Assert-True ([string]$kRead3.json.reviewers[0].family -eq 'xai') "(K3) family do nativo deveria ser xai; veio '$($kRead3.json.reviewers[0].family)'."
+
+    # (K4) titular nativo pertence ao harness: gravar em -Scope machine e proibido, porque outro
+    # orquestrador resolveria a entrada como se fosse o nativo dele (voz fantasma no piso).
+    $kNativeMachine = Invoke-Set @{
+        ReviewersJson = $nativeGrok
+        Orchestrator  = 'cursor'
+        Scope         = 'machine'
+        OutputPath    = (Join-Path $tempRoot 'native-machine.json')
+    }
+    Assert-ReasonExit -Result $kNativeMachine -Reason 'native-machine-scope-forbidden' -ExitCode 3 -Label '(K4) nativo em escopo machine'
+
+    # Arquivo machine gravado ANTES desse gate ainda existe: a leitura nao bloqueia, mas marca
+    # diagnostico no titular nativo para o orquestrador confirmar antes de compor o painel.
+    $legacyMachineRoot = Join-Path $tempRoot 'legacy-machine-native'
+    [System.IO.Directory]::CreateDirectory($legacyMachineRoot) | Out-Null
+    @'
+{
+  "schemaVersion": 3,
+  "reviewers": [
+    {
+      "type": "orchestrator-native-subagent",
+      "backend": "orchestrator-native",
+      "targetModelKey": "cursor/grok-4",
+      "harnessModelId": "grok-4",
+      "rank": 1,
+      "invokeArgs": {}
+    }
+  ]
+}
+'@ | Set-Content -LiteralPath (Join-Path $legacyMachineRoot 'preferred-reviewers.json') -Encoding utf8
+    $kRead4 = Invoke-Resolve @{
+        Orchestrator     = 'claude-code'
+        PreferredRoot    = $legacyMachineRoot
+        CapabilitiesPath = $capPath
+    }
+    Assert-True ($kRead4.code -eq 0) "(K4) leitura de arquivo machine legado nao deveria bloquear; veio $($kRead4.code)."
+    Assert-True ([string]$kRead4.json.preferenceSource -eq 'machine') "(K4) preferenceSource deveria ser machine; veio '$($kRead4.json.preferenceSource)'."
+    $nativeDiag = @($kRead4.json.reviewers[0].diagnostics)
+    Assert-True (@($nativeDiag | Where-Object { $_ -like '*escopo machine*' }).Count -ge 1) "(K4) titular nativo deveria trazer diagnostico de escopo machine; veio '$($nativeDiag -join ' | ')'."
+
+    # O mesmo titular em escopo orquestrador NAO carrega esse diagnostico.
+    $orchRoot = Join-Path $tempRoot 'orch-native'
+    [System.IO.Directory]::CreateDirectory($orchRoot) | Out-Null
+    @'
+{
+  "schemaVersion": 3,
+  "orchestrator": "cursor",
+  "reviewers": [
+    {
+      "type": "orchestrator-native-subagent",
+      "backend": "orchestrator-native",
+      "targetModelKey": "cursor/grok-4",
+      "harnessModelId": "grok-4",
+      "rank": 1,
+      "invokeArgs": {}
+    }
+  ]
+}
+'@ | Set-Content -LiteralPath (Join-Path $orchRoot 'preferred-reviewers.cursor.json') -Encoding utf8
+    $kRead5 = Invoke-Resolve @{
+        Orchestrator     = 'cursor'
+        PreferredRoot    = $orchRoot
+        CapabilitiesPath = $capPath
+    }
+    Assert-True ($kRead5.code -eq 0) "(K4) leitura em escopo orquestrador deveria exit 0; veio $($kRead5.code)."
+    $orchDiag = @($kRead5.json.reviewers[0].diagnostics)
+    Assert-True (@($orchDiag | Where-Object { $_ -like '*escopo machine*' }).Count -eq 0) "(K4) escopo orquestrador nao deveria trazer o diagnostico; veio '$($orchDiag -join ' | ')'."
 
     # --------------------------------------------------------------------------------------
     # (L) cascata PreferredRoot vazio -> no-preferred-file preferenceSource=none
