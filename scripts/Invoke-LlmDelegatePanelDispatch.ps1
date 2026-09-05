@@ -1081,8 +1081,13 @@ for ($i = 0; $i -lt $reviewers.Count; $i++) {
         # TempDir FORA do -Cd/workspace sob revisao: job files (request/stream/lastmsg) no %TEMP%
         # evitam o agente explorar artefatos do proprio despacho. Ledger do painel continua em
         # $ledgerDir (verdict/error). Bound vence; invokeArgs.tempdir cai em droppedArgs.
+        # Subdiretorio POR REVISOR (<RoundId>\<NN>): o pareamento de recoveredAfterTimeout casa
+        # o texto devolvido com o *.lastmsg.txt do diretorio. Com diretorio compartilhado pela
+        # rodada, dois titulares codex que devolvessem o MESMO texto tornariam o pareamento
+        # ambiguo e a recuperacao podia ser atribuida ao revisor errado. Um diretorio por revisor
+        # elimina a colisao na origem, em vez de desempatar por heuristica.
         $codexCaptureRoot = Join-Path ([System.IO.Path]::GetTempPath()) 'xpz-llm-panel-codex'
-        $codexCaptureDir = Join-Path $codexCaptureRoot $RoundId
+        $codexCaptureDir = Join-Path (Join-Path $codexCaptureRoot $RoundId) ('{0:D2}' -f $i)
         [void][System.IO.Directory]::CreateDirectory($codexCaptureDir)
         $splat['RetentionMode'] = $PayloadSensitivity
         $splat['TempDir'] = $codexCaptureDir

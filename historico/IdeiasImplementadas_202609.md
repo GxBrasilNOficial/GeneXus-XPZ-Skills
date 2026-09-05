@@ -194,3 +194,30 @@ A varredura de eixos do gate de `RoundId` sugeriu que o motor irmao `New-LlmDele
 
 - Commit material: `27529bb` (`fix(llm-delegate): faixa 1..3600 de -TimeoutSec nos tres adapters restantes`); regra registrada em `dc85f04` (`docs(pre-push): exigir enumeracao dos eixos vizinhos ao introduzir gate`)
 - Arquivos materiais: `scripts/Invoke-ClaudeCode.ps1`, `scripts/Invoke-Copilot.ps1`, `scripts/Invoke-Gemini.ps1`, `xpz-llm-delegate/SKILL.md`, `999-ideias-pendentes.md`, `CHANGELOG.md`.
+
+## Subdiretorio por revisor na captura Codex do painel
+
+Implementado em 2026-09-05, a partir de apontamento externo do Codex GPT.
+
+### O defeito
+
+O `TempDir` Bound do Codex era `%TEMP%\xpz-llm-panel-codex\<RoundId>` — um diretorio para a rodada inteira, compartilhado por todos os titulares `codex` dela. O pareamento de `recoveredAfterTimeout` percorre os `*.lastmsg.txt` do diretorio, casa por igualdade de texto com o parecer devolvido e usa a **primeira** coincidencia, sem identidade de job. Dois titulares `codex` que devolvessem o mesmo texto na mesma rodada — plausivel em parecer curto como «sem gaps» — podiam ter a recuperacao atribuida ao revisor errado.
+
+### A correcao
+
+Subdiretorio por revisor: `<RoundId>\<NN>`. A colisao deixa de existir na origem, em vez de ser desempatada por heuristica (a alternativa considerada era marcar `null` quando houvesse mais de uma coincidencia, o que degradaria o campo em vez de corrigi-lo).
+
+Eixos vizinhos varridos conforme a regra do `13` §5: o fallback recursivo usa outro `RoundId`, entao ja tinha diretorio proprio e agora tambem ganha o subnivel; `kb-sensitive` continua com o campo `null` porque o adapter apaga a evidencia no sucesso; a acumulacao de diretorios orfaos entre rodadas permanece como residual ja registrado no `999`, agora um nivel mais fundo.
+
+### Sobre os outros apontamentos da mesma leva
+
+Um segundo revisor (opencode/Nemotron) apontou seis itens; quatro ele mesmo classificou como coerentes. Dos dois restantes:
+
+- «Os tres adapters novos desta frente (`Invoke-Gemini`, `Invoke-Copilot`, `Invoke-Antigravity`) nao tem entrada no `09`» — **falso em dois pontos**, verificado: os tres tem entrada no `09` (linhas 176, 179 e 182), e nao sao desta frente: Copilot e Gemini existem desde 2026-06-13 (`17e0ab1`), Antigravity desde 2026-08-04 (`2e80a70`). O unico toque neles no intervalo foi o `27529bb`, que so acrescentou a faixa de `-TimeoutSec`.
+- Auditoria do agente `reviewer-ro` pelo motor da `xpz-skills-setup` — limitacao **ja declarada** na propria skill e com entrada no `999`; nao e gap desta frente, e priorizar essa frente e decisao humana.
+- Verificacao trilingue do `CHANGELOG` — conferida por contagem: cada entrada da frente aparece nas tres secoes.
+
+### Rastreabilidade
+
+- Commit material: a preencher no commit seguinte.
+- Arquivos materiais: `scripts/Invoke-LlmDelegatePanelDispatch.ps1`, `scripts/Test-InvokeLlmDelegatePanelDispatchSelfTest.ps1`, `xpz-llm-delegate/SKILL.md`, `09-inventario-e-rastreabilidade-publica.md`, `999-ideias-pendentes.md`, `CHANGELOG.md`.

@@ -501,7 +501,9 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
     # =======================================================================================
     # 5b) CAPTURA DURÁVEL CODEX NO PAINEL: splat Bound + droppedArgs + strip XPZ_CODEX_
     # =======================================================================================
-    # (a)+(b) TempDir Bound em %TEMP%\xpz-llm-panel-codex\<RoundId> (fora do ledger/Cd);
+    # (a)+(b) TempDir Bound em %TEMP%\xpz-llm-panel-codex\<RoundId>\<NN> (fora do ledger/Cd),
+    # com subdiretorio POR REVISOR para o pareamento de recoveredAfterTimeout nao ficar ambiguo
+    # quando dois titulares codex devolvem o mesmo texto na mesma rodada;
     # invokeArgs.tempdir/retentionMode -> droppedArgs. Bound vence.
     $stolenCodexLedger = Join-Path $tmp 'roubar-codex-ledger'
     [IO.Directory]::CreateDirectory($stolenCodexLedger) | Out-Null
@@ -521,8 +523,11 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
     $secCodex = @($rv.securityBlockedArgs)
     Assert-True ($secCodex -notcontains 'tempdir' -and $secCodex -notcontains 'retentionMode') "codex durable: tempdir/retentionMode NAO sao securityBlockedArgs; got [$($secCodex -join ',')]"
     Assert-True (@(Get-ChildItem -LiteralPath $stolenCodexLedger -Filter '*.request.json' -File -ErrorAction SilentlyContinue).Count -eq 0) 'codex durable: invokeArgs.tempdir NAO deve receber request.json (Bound vence)'
-    $codexCaptureDir = Join-Path (Join-Path ([IO.Path]::GetTempPath()) 'xpz-llm-panel-codex') ([string]$r.json.roundId)
-    Assert-True (Test-Path -LiteralPath $codexCaptureDir -PathType Container) "codex durable: TempDir Bound em xpz-llm-panel-codex/<RoundId>; missing $codexCaptureDir"
+    $codexRoundDir = Join-Path (Join-Path ([IO.Path]::GetTempPath()) 'xpz-llm-panel-codex') ([string]$r.json.roundId)
+    Assert-True (Test-Path -LiteralPath $codexRoundDir -PathType Container) "codex durable: TempDir Bound em xpz-llm-panel-codex/<RoundId>; missing $codexRoundDir"
+    $codexCaptureDir = Join-Path $codexRoundDir '00'
+    Assert-True (Test-Path -LiteralPath $codexCaptureDir -PathType Container) "codex durable: capture deve ficar no subdiretorio POR REVISOR <RoundId>\00; missing $codexCaptureDir"
+    Assert-True (@(Get-ChildItem -LiteralPath $codexRoundDir -Filter '*.request.json' -File -ErrorAction SilentlyContinue).Count -eq 0) 'codex durable: request.json nao pode ficar solto na raiz da rodada (ambiguidade de pareamento entre titulares)'
     $boundReqs = @(Get-ChildItem -LiteralPath $codexCaptureDir -Filter '*.request.json' -File -ErrorAction SilentlyContinue)
     $boundMsgs = @(Get-ChildItem -LiteralPath $codexCaptureDir -Filter '*.lastmsg.txt' -File -ErrorAction SilentlyContinue)
     Assert-True ($boundReqs.Count -ge 1) "codex durable splat TempDir: request.json sob xpz-llm-panel-codex Bound; got $($boundReqs.Count)"
