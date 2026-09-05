@@ -83,6 +83,8 @@ A regra acima vale para qualquer **conjunto enumerado**, não só parâmetros: q
 Para o conjunto de **gates da pré-push**, há suporte mecânico em `scripts/Test-PrePushGateEnumerationParity.ps1`.
 Para o conjunto de **backends de delegação**, há suporte em `scripts/Test-PrePushBackendEnumerationParity.ps1`. Ambos derivam do código a verdade e sinalizam enumerações na doc que ficaram como subconjunto próprio.
 
+**Quando marcar `<!-- backend-parity: ignore -->` e quando triar (o marcador não é silenciador de ruído).** O marcador declara **recorte intencional por eixo** e vale para linha cujo conteúdo é **fechado por natureza**: nota datada de medição, registro de incidente, comparação de prior art entre dois backends específicos — texto que um 7º backend não tornaria falso. **Não** marcar linha que descreve **contrato vivo**, ainda que hoje cite só dois membros: descrição de ramo especial por backend no dispatcher, tabela de capacidade por adapter, enumeração de gates executados. Essas continuam disparando o aviso a cada rodada **de propósito** — é o gate pedindo reconfirmação de que o subconjunto ainda é o certo, e o custo é uma linha de triagem no relatório. Um marcador é permanente e invisível para quem lê depois; posto na linha errada, remove justamente a detecção que motivou o gate. Na dúvida entre marcar e triar, **triar**. Motivação empírica (2026-09-05): uma revisão externa recomendou marcar em lote as cinco ocorrências de `BACKEND_ENUMERATION_SUBSET` da rodada — uma delas era a descrição dos ramos por backend do dispatcher, que precisa ser reconferida sempre que um backend ganhar ramo próprio.
+
 ### 3. Comparação documental
 
 Comparar a documentação afetada com:
