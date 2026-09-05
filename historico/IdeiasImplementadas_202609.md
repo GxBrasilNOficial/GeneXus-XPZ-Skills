@@ -219,5 +219,5 @@ Um segundo revisor (opencode/Nemotron) apontou seis itens; quatro ele mesmo clas
 
 ### Rastreabilidade
 
-- Commit material: a preencher no commit seguinte.
+- Commit material: `e32de6f` (`fix(llm-delegate): subdiretorio por revisor na captura Codex do painel`)
 - Arquivos materiais: `scripts/Invoke-LlmDelegatePanelDispatch.ps1`, `scripts/Test-InvokeLlmDelegatePanelDispatchSelfTest.ps1`, `xpz-llm-delegate/SKILL.md`, `09-inventario-e-rastreabilidade-publica.md`, `999-ideias-pendentes.md`, `CHANGELOG.md`.
