@@ -242,5 +242,5 @@ Corrigido pelo lado da prosa: o texto passa a apontar o registro (`Get-GeneXusKb
 
 ### Rastreabilidade
 
-- Commit material: a preencher no commit seguinte.
+- Commit material: `30f47f6` (`fix(selftests): fechar falso positivo do guard de fonte unica e registrar daemon vermelho`)
 - Arquivos materiais: `scripts/Test-GeneXusRuntimeFreshness.ps1`, `scripts/Invoke-LlmDelegatePanelDispatch.ps1` (comentario do gate de RoundId), `999-ideias-pendentes.md`.
