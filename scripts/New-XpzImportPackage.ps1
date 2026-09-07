@@ -7,7 +7,8 @@
     Wrapper fino para scripts\New-XpzImportPackage.py. Mantem um ponto de entrada
     PowerShell curto para allowlist local, deixando a montagem XML no motor Python.
     Quando -ReportPath e informado, publica um relatorio atomico e fail-closed da
-    execucao; o relatorio nao e prova de importacao, build ou evidencia da IDE.
+    execucao e endurece o pos-inventario (FailOnDeltaMismatch + FailOnUnknownTypes);
+    o relatorio nao e prova de importacao, build ou evidencia da IDE.
 
 .PARAMETER RepoRoot
     Raiz da pasta paralela da KB.
@@ -30,6 +31,10 @@
     Caminho absoluto, novo e terminado em .json para o relatorio de execucao.
     A pasta pai deve existir e nao pode ser area de fonte, acervo, script,
     inteligencia, historico ou artefato do pacote.
+    Com ReportPath valido, o pos-inventario do wrapper liga FailOnDeltaMismatch
+    e FailOnUnknownTypes; inventoryExitCode diferente de 0 pode marcar
+    status=bloqueado no stdout e alterar o exit do empacotamento. Sem ReportPath,
+    o inventario corre em modo informativo e nao promove esse exit.
 #>
 
 [CmdletBinding()]

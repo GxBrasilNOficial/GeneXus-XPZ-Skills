@@ -8,6 +8,8 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 ### Unreleased
 
+- **Contrato `-ReportPath` → inventário fail-closed (2026-09-07):** documentado que, com `-ReportPath` válido, `New-XpzImportPackage.ps1` liga `FailOnDeltaMismatch`/`FailOnUnknownTypes` no pós-inventário e pode mudar o exit (`status=bloqueado`); sem `-ReportPath`, inventário informativo. Docs: help do script, `README`, `02`, `08`, `09`, `xpz-builder` (+ checklist), `xpz-msbuild-import-export`. Comportamento inalterado.
+
 - **Prosa residual da compacta `nexa` alinhada ao Cursor nativo (2026-09-07):** em `xpz-skills-setup/SKILL.md` («Auditoria de registro da `nexa`»), o resumo da compacta deixa de dizer «Cursor por compatibilidade» e passa a exigir `~/.cursor/skills/` (só-compat = `EXTERNAL_SKILLS_GAPS`). `README.md` sem mudança.
 
 - **Help `-Strategy` do wrapper Gx4A alinhado ao motor (2026-09-07):** `Invoke-GeneXusForAgentsSetupSafe.ps1` — comment-based help deixava de espelhar `Get-SkillLinkDestinationRels` (Cursor sempre; `.codex` só nexa na compacta / também gam na expansiva). Só documentação embutida; comportamento inalterado. `README.md` sem mudança.
@@ -299,6 +301,8 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 ### Unreleased
 
+- **Contrato `-ReportPath` → inventario fail-closed (2026-09-07):** documentado que, con `-ReportPath` válido, `New-XpzImportPackage.ps1` activa `FailOnDeltaMismatch`/`FailOnUnknownTypes` en el post-inventario y puede cambiar el exit (`status=bloqueado`); sin `-ReportPath`, inventario informativo. Docs: help del script, `README`, `02`, `08`, `09`, `xpz-builder` (+ checklist), `xpz-msbuild-import-export`. Comportamiento sin cambio.
+
 - **Prosa residual de la compacta `nexa` alineada al Cursor nativo (2026-09-07):** en `xpz-skills-setup/SKILL.md` («Auditoria de registro da `nexa`»), el resumen de la compacta deja de decir «Cursor por compatibilidade» y pasa a exigir `~/.cursor/skills/` (solo-compat = `EXTERNAL_SKILLS_GAPS`). `README.md` sin cambio.
 
 - **Help `-Strategy` del wrapper Gx4A alineado al motor (2026-09-07):** `Invoke-GeneXusForAgentsSetupSafe.ps1` — el help comment-based dejaba de espejar `Get-SkillLinkDestinationRels` (Cursor siempre; `.codex` solo nexa en compacta / también gam en expansiva). Solo documentación embebida; comportamiento sin cambio. `README.md` sin cambio.
@@ -582,6 +586,8 @@ All relevant changes to this repository will be recorded here from this adoption
 The format keeps an `Unreleased` section for changes not yet published in a formal version. This repository does not yet use public semantic versioning; when that changes, future sections should record the corresponding tag.
 
 ### Unreleased
+
+- **`-ReportPath` → fail-closed inventory contract (2026-09-07):** documented that with a valid `-ReportPath`, `New-XpzImportPackage.ps1` enables `FailOnDeltaMismatch`/`FailOnUnknownTypes` on post-inventory and may change the packaging exit (`status=bloqueado`); without `-ReportPath`, inventory stays informative. Docs: script help, `README`, `02`, `08`, `09`, `xpz-builder` (+ checklist), `xpz-msbuild-import-export`. Behavior unchanged.
 
 - **Residual compact-strategy prose for `nexa` aligned to native Cursor (2026-09-07):** in `xpz-skills-setup/SKILL.md` («Auditoria de registro da `nexa`»), the compact summary no longer says «Cursor by compatibility» and now requires `~/.cursor/skills/` (compat-only = `EXTERNAL_SKILLS_GAPS`). No `README.md` change.
 

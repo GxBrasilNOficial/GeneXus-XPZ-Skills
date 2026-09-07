@@ -19,7 +19,7 @@ Preservar rastreabilidade da consolidacao, inventario documental, inventario bru
 
 - `scripts/XpzExecutionReportSupport.ps1` (support-library) — valida `ReportPath`, impede áreas proibidas/reparse/artifact collision e publica atomicamente o contrato `Kind=xpz-package-execution-report`, `SchemaVersion=1`; mantém histórico limitado, estados de execução/pacote/inventário e handoff seguro entre PowerShell e Python. Consumido por `scripts/New-XpzImportPackage.ps1`.
 - `scripts/Test-NewXpzImportPackageObservabilitySelfTest.ps1` (self-test) — cobre caminho inválido sem efeito colateral, caminho feliz com inventário aceito, tipo desconhecido bloqueado pelo inventário e interrupção durante escrita preservando `running`/`candidate`. Token: `NEW_XPZ_IMPORT_PACKAGE_OBSERVABILITY_SELFTEST_OK`.
-- `-ReportPath` é observabilidade opt-in; o JSON não é prova de importação real, build, IDE ou comportamento funcional. `executionState=running` após interrupção é execução incompleta/órfã; `packageState=candidate` não é aceite automático.
+- `-ReportPath` é observabilidade opt-in; o JSON não é prova de importação real, build, IDE ou comportamento funcional. `executionState=running` após interrupção é execução incompleta/órfã; `packageState=candidate` não é aceite automático. Com `-ReportPath` válido, `New-XpzImportPackage.ps1` liga inventário fail-closed (`FailOnDeltaMismatch` + `FailOnUnknownTypes`) e pode alterar o exit do empacotamento; sem `-ReportPath`, o inventário não promove esse exit.
 
 ## Nota sobre histórico detalhado
 
