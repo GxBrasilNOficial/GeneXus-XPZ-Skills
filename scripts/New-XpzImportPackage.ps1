@@ -30,7 +30,8 @@
 .PARAMETER ReportPath
     Caminho absoluto, novo e terminado em .json para o relatorio de execucao.
     A pasta pai deve existir e nao pode ser area de fonte, acervo, script,
-    inteligencia, historico ou artefato do pacote.
+    inteligencia, historico, PacotesGeradosParaImportacaoNaKbNoGenexus
+    ou artefato do pacote.
     Com ReportPath valido, o pos-inventario do wrapper liga FailOnDeltaMismatch
     e FailOnUnknownTypes; inventoryExitCode diferente de 0 pode marcar
     status=bloqueado no stdout e alterar o exit do empacotamento. Sem ReportPath,

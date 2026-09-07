@@ -704,7 +704,7 @@ $externalSkillDefs = @(
 )
 
 $externalSkills = @()
-$extHasGap = $false
+$anyExtHasGap = $false
 $gitExe = Find-GitExecutable
 foreach ($ext in $externalSkillDefs) {
     if ($ext.kind -eq 'nexa') {
@@ -720,6 +720,7 @@ foreach ($ext in $externalSkillDefs) {
     $seenRoots = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
     $extHasRegistration = $false
     $extHasOpaqueOrStale = $false
+    $extHasGap = $false
     $preferredKind = [string]$preferred.preferredKind
     $preferredPath = [string]$preferred.preferredPath
 
@@ -872,8 +873,9 @@ foreach ($ext in $externalSkillDefs) {
         repoOriginOk           = [bool]$repoBootstrapDetected.originOk
         tools                  = $perTool
     }
+    if ($extHasGap) { $anyExtHasGap = $true }
 }
-if ($extHasGap) { $externalOverall = 'EXTERNAL_SKILLS_GAPS' } else { $externalOverall = 'EXTERNAL_SKILLS_OK' }
+if ($anyExtHasGap) { $externalOverall = 'EXTERNAL_SKILLS_GAPS' } else { $externalOverall = 'EXTERNAL_SKILLS_OK' }
 
 # --- Veredito -----------------------------------------------------------------
 $mcpIsGap = @('MCP_SERVER_STALE', 'MCP_CONFIG_INVALID') -contains $cursorMcp.label

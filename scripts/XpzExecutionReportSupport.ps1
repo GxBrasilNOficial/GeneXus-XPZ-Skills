@@ -65,11 +65,13 @@ function Test-XpzForbiddenReportArea {
     $forbidden = @(
         (Join-Path $RepoRoot 'ObjetosDaKbEmXml'),
         (Join-Path $RepoRoot 'ObjetosGeradosParaImportacaoNaKbNoGenexus'),
+        (Join-Path $RepoRoot 'PacotesGeradosParaImportacaoNaKbNoGenexus'),
         (Join-Path $RepoRoot 'XpzExportadosPelaIDE'),
         (Join-Path $RepoRoot 'scripts'),
         (Join-Path $RepoRoot 'KbIntelligence'),
         (Join-Path $RepoRoot '.git'),
         (Join-Path $RepoRoot 'ArquivoMorto'),
+        (Join-Path $RepoRoot 'historico'),
         (Join-Path $RepoRoot 'kb-source-metadata.md')
     )
     foreach ($area in $forbidden) {

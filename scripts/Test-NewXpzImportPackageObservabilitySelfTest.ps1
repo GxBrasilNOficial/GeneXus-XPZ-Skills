@@ -71,6 +71,24 @@ try {
     if (Test-Path -LiteralPath $invalidReport -PathType Leaf) { throw 'ReportPath invalido criou relatorio' }
     if (Test-Path -LiteralPath (Join-Path $invalidRoot 'PacotesGeradosParaImportacaoNaKbNoGenexus')) { throw 'ReportPath invalido criou pasta de pacotes' }
 
+    $historicoRoot = Join-Path $tempRoot 'forbidden-historico'
+    New-ObservabilityFixture -Root $historicoRoot -FrontName 'Observabilidade_55555555_20260905'
+    [void](New-Item -ItemType Directory -Path (Join-Path $historicoRoot 'historico') -Force)
+    $historicoReport = Join-Path $historicoRoot 'historico/report.json'
+    $historico = Invoke-ObservabilityWrapper -Root $historicoRoot -FrontName 'Observabilidade_55555555_20260905' -Report $historicoReport
+    if ($historico.exitCode -ne 20 -or $historico.result.stage -ne 'validate-report-path') { throw 'ReportPath sob historico nao bloqueou no preflight esperado' }
+    if (Test-Path -LiteralPath $historicoReport -PathType Leaf) { throw 'ReportPath sob historico criou relatorio' }
+    if (Test-Path -LiteralPath (Join-Path $historicoRoot 'PacotesGeradosParaImportacaoNaKbNoGenexus')) { throw 'ReportPath sob historico criou pasta de pacotes' }
+
+    $packagesRoot = Join-Path $tempRoot 'forbidden-packages'
+    New-ObservabilityFixture -Root $packagesRoot -FrontName 'Observabilidade_66666666_20260905'
+    $packagesDir = Join-Path $packagesRoot 'PacotesGeradosParaImportacaoNaKbNoGenexus'
+    [void](New-Item -ItemType Directory -Path $packagesDir -Force)
+    $packagesReport = Join-Path $packagesDir 'side-report.json'
+    $packages = Invoke-ObservabilityWrapper -Root $packagesRoot -FrontName 'Observabilidade_66666666_20260905' -Report $packagesReport
+    if ($packages.exitCode -ne 20 -or $packages.result.stage -ne 'validate-report-path') { throw 'ReportPath sob PacotesGerados nao bloqueou no preflight esperado' }
+    if (Test-Path -LiteralPath $packagesReport -PathType Leaf) { throw 'ReportPath sob PacotesGerados criou relatorio' }
+
     $successRoot = Join-Path $tempRoot 'success'
     $successFront = 'Observabilidade_22222222_20260905'
     New-ObservabilityFixture -Root $successRoot -FrontName $successFront

@@ -13,8 +13,9 @@
     ausente — repoBootstrapCanonical = NEXA_REPO_MISSING e EXTERNAL_SKILLS_OK
     (canônico ausente e informativo; nao abre gap sozinho).
     Isola LOCALAPPDATA para nao herdar GeneXus4Agents real da maquina.
-    Casos adicionais: copia_opaca nexa/gam (payload Gx4A preferido) e
-    fonte_desatualizada (junction From-Zip com payload mais novo).
+    Casos adicionais: copia_opaca nexa/gam (payload Gx4A preferido),
+    fonte_desatualizada (junction From-Zip com payload mais novo) e isolamento
+    de resolveAction (gap na nexa nao vaza para gam saudavel).
     Durante a invocacao do motor, PATH fica reduzido ao diretorio do git ja resolvido
     (sem CLIs de agente; nao depende dos fallbacks Program Files do Find-GitExecutable).
 #>
@@ -441,6 +442,79 @@ finally {
     $env:USERPROFILE = $originalProfile
     $env:LOCALAPPDATA = $originalLocalAppData
     foreach ($p in @($fakeProfile6, $fakeRepo6, $fakeLocalAppData6, $fromZip6)) {
+        Remove-TempDir -Path $p
+    }
+}
+
+# Caso 7: gap na nexa nao vaza resolveAction para gam saudavel
+$fakeRepo7 = New-TempDir
+$fakeProfile7 = New-TempDir
+$fakeLocalAppData7 = New-TempDir
+try {
+    $env:PATH = $gitBinDir
+    $env:LOCALAPPDATA = $fakeLocalAppData7
+    $env:USERPROFILE = $fakeProfile7
+
+    $skillDir7 = Join-Path $fakeRepo7 'xpz-skills-setup'
+    New-Item -ItemType Directory -Path $skillDir7 -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $skillDir7 'SKILL.md') -Value '# setup' -Encoding utf8
+
+    $payloadNexa7 = Join-Path $fakeLocalAppData7 'Programs\GeneXus\GeneXus4Agents\payload\skills\nexa'
+    New-Item -ItemType Directory -Path $payloadNexa7 -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $payloadNexa7 'SKILL.md') -Value @"
+---
+name: nexa
+metadata:
+  version: "9.9.9"
+---
+# nexa
+"@ -Encoding utf8
+
+    $payloadGam7 = Join-Path $fakeLocalAppData7 'Programs\GeneXus\GeneXus4Agents\payload\skills\gam'
+    New-Item -ItemType Directory -Path $payloadGam7 -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $payloadGam7 'SKILL.md') -Value @"
+---
+name: gam
+metadata:
+  version: "1.0.0"
+---
+# gam
+"@ -Encoding utf8
+
+    Set-Content -LiteralPath (Join-Path $fakeLocalAppData7 'Programs\GeneXus\GeneXus4Agents\.skill-managed-nexa') -Value @"
+v1
+$($fakeProfile7)\.claude\skills\nexa
+"@ -Encoding utf8
+
+    $opaqueNexa7 = Join-Path $fakeProfile7 '.claude\skills\nexa'
+    New-Item -ItemType Directory -Path $opaqueNexa7 -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $opaqueNexa7 'SKILL.md') -Value '# nexa opaque' -Encoding utf8
+
+    New-Item -ItemType Directory -Path (Join-Path $fakeProfile7 '.claude\skills') -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $fakeProfile7 '.claude\settings.json') -Value '{}' -Encoding utf8
+    New-Junction -LinkDir (Join-Path $fakeProfile7 '.claude\skills') -Name 'gam' -Target $payloadGam7
+
+    $json7 = & $scriptUnderTest -RepoRoot $fakeRepo7 -AsJson | Out-String
+    $report7 = $json7 | ConvertFrom-Json
+    Assert-Equal 'leak: externalOverall GAPS' 'EXTERNAL_SKILLS_GAPS' ([string]$report7.externalOverall)
+    $nexa7 = @($report7.externalSkills | Where-Object { $_.name -eq 'nexa' })
+    $gam7 = @($report7.externalSkills | Where-Object { $_.name -eq 'gam' })
+    if ($nexa7.Count -eq 1 -and $gam7.Count -eq 1) {
+        Assert-Equal 'leak: nexa resolveAction replace' 'replace-with-junction-to-preferred' ([string]$nexa7[0].resolveAction)
+        Assert-Equal 'leak: gam resolveAction none' 'none' ([string]$gam7[0].resolveAction)
+        Assert-Equal 'leak: gam Claude OK' 'OK' ([string](@($gam7[0].tools | Where-Object { $_.name -eq 'ClaudeCode' }).status))
+    }
+    else {
+        $script:cases++
+        $script:failures++
+        Write-Output 'FAIL: leak: externalSkills deveria conter nexa e gam'
+    }
+}
+finally {
+    $env:PATH = $originalPath
+    $env:USERPROFILE = $originalProfile
+    $env:LOCALAPPDATA = $originalLocalAppData
+    foreach ($p in @($fakeProfile7, $fakeRepo7, $fakeLocalAppData7)) {
         Remove-TempDir -Path $p
     }
 }

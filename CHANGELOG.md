@@ -8,6 +8,8 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 ### Unreleased
 
+- **ReportPath + resolveAction (2026-09-07):** `Test-XpzForbiddenReportArea` passa a bloquear `historico` e toda a pasta `PacotesGeradosParaImportacaoNaKbNoGenexus` (antes só colisão com o artefato da rodada). `Test-XpzSkillsRegistration.ps1`: `extHasGap`/`resolveAction` por skill externa — gap da `nexa` não vaza para `gam`. `09`: Exit do empacotamento documenta também `2`/`3` propagados com `-ReportPath`. Self-tests de observabilidade e nexa/gam. Docs: help do wrapper, `xpz-builder`, `xpz-kb-parallel-setup` (+ exemplo).
+
 - **Contrato `-ReportPath` → inventário fail-closed (2026-09-07):** documentado que, com `-ReportPath` válido, `New-XpzImportPackage.ps1` liga `FailOnDeltaMismatch`/`FailOnUnknownTypes` no pós-inventário e pode mudar o exit (`status=bloqueado`); sem `-ReportPath`, inventário informativo. Docs: help do script, `README`, `02`, `08`, `09`, `xpz-builder` (+ checklist), `xpz-msbuild-import-export`, `xpz-kb-parallel-setup` (+ `examples/New-KbImportPackage.example.ps1`). Comportamento inalterado.
 
 - **Prosa residual da compacta `nexa` alinhada ao Cursor nativo (2026-09-07):** em `xpz-skills-setup/SKILL.md` («Auditoria de registro da `nexa`»), o resumo da compacta deixa de dizer «Cursor por compatibilidade» e passa a exigir `~/.cursor/skills/` (só-compat = `EXTERNAL_SKILLS_GAPS`). `README.md` sem mudança.
@@ -301,6 +303,8 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 ### Unreleased
 
+- **ReportPath + resolveAction (2026-09-07):** `Test-XpzForbiddenReportArea` ahora bloquea `historico` y toda la carpeta `PacotesGeradosParaImportacaoNaKbNoGenexus` (antes solo colisión con el artefacto de la ronda). `Test-XpzSkillsRegistration.ps1`: `extHasGap`/`resolveAction` por skill externa — el gap de `nexa` no se filtra a `gam`. `09`: el Exit del empaquetado documenta también `2`/`3` propagados con `-ReportPath`. Self-tests de observabilidad y nexa/gam. Docs: help del wrapper, `xpz-builder`, `xpz-kb-parallel-setup` (+ ejemplo).
+
 - **Contrato `-ReportPath` → inventario fail-closed (2026-09-07):** documentado que, con `-ReportPath` válido, `New-XpzImportPackage.ps1` activa `FailOnDeltaMismatch`/`FailOnUnknownTypes` en el post-inventario y puede cambiar el exit (`status=bloqueado`); sin `-ReportPath`, inventario informativo. Docs: help del script, `README`, `02`, `08`, `09`, `xpz-builder` (+ checklist), `xpz-msbuild-import-export`, `xpz-kb-parallel-setup` (+ `examples/New-KbImportPackage.example.ps1`). Comportamiento sin cambio.
 
 - **Prosa residual de la compacta `nexa` alineada al Cursor nativo (2026-09-07):** en `xpz-skills-setup/SKILL.md` («Auditoria de registro da `nexa`»), el resumen de la compacta deja de decir «Cursor por compatibilidade» y pasa a exigir `~/.cursor/skills/` (solo-compat = `EXTERNAL_SKILLS_GAPS`). `README.md` sin cambio.
@@ -586,6 +590,8 @@ All relevant changes to this repository will be recorded here from this adoption
 The format keeps an `Unreleased` section for changes not yet published in a formal version. This repository does not yet use public semantic versioning; when that changes, future sections should record the corresponding tag.
 
 ### Unreleased
+
+- **ReportPath + resolveAction (2026-09-07):** `Test-XpzForbiddenReportArea` now blocks `historico` and the entire `PacotesGeradosParaImportacaoNaKbNoGenexus` folder (previously only collision with the round's artifact). `Test-XpzSkillsRegistration.ps1`: per-external-skill `extHasGap`/`resolveAction` — a `nexa` gap no longer leaks into `gam`. `09`: packaging Exit also documents propagated `2`/`3` with `-ReportPath`. Observability and nexa/gam self-tests. Docs: wrapper help, `xpz-builder`, `xpz-kb-parallel-setup` (+ example).
 
 - **`-ReportPath` → fail-closed inventory contract (2026-09-07):** documented that with a valid `-ReportPath`, `New-XpzImportPackage.ps1` enables `FailOnDeltaMismatch`/`FailOnUnknownTypes` on post-inventory and may change the packaging exit (`status=bloqueado`); without `-ReportPath`, inventory stays informative. Docs: script help, `README`, `02`, `08`, `09`, `xpz-builder` (+ checklist), `xpz-msbuild-import-export`, `xpz-kb-parallel-setup` (+ `examples/New-KbImportPackage.example.ps1`). Behavior unchanged.
 
