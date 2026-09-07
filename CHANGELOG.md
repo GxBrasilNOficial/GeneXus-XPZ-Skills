@@ -8,6 +8,8 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 ### Unreleased
 
+- **Help `-Strategy` do wrapper Gx4A alinhado ao motor (2026-09-07):** `Invoke-GeneXusForAgentsSetupSafe.ps1` — comment-based help deixava de espelhar `Get-SkillLinkDestinationRels` (Cursor sempre; `.codex` só nexa na compacta / também gam na expansiva). Só documentação embutida; comportamento inalterado. `README.md` sem mudança.
+
 - **Pré-push: WORKFLOW da setup alinhado ao Cursor nativo (2026-09-07):** passos 2–3 do `WORKFLOW` em `xpz-skills-setup/SKILL.md` passam a dizer que Cursor **OK** exige `~/.cursor/skills/` e que `coberta_por_compatibilidade` marca `REGISTRATION_GAPS` / `EXTERNAL_SKILLS_GAPS`. `README.md` sem mudança.
 
 - **Prosa do recibo: internas ≠ externas no alvo do vínculo (2026-09-07):** no passo 4 do `WORKFLOW` da `xpz-skills-setup`, proibir resumo «todas as skills OK → repo»; internas → repo desta raiz; `nexa`/`gam` → `preferredKind`/`preferredPath` do motor. Docs: `xpz-skills-setup/SKILL.md`. `README.md` sem mudança.
@@ -295,6 +297,8 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 ### Unreleased
 
+- **Help `-Strategy` del wrapper Gx4A alineado al motor (2026-09-07):** `Invoke-GeneXusForAgentsSetupSafe.ps1` — el help comment-based dejaba de espejar `Get-SkillLinkDestinationRels` (Cursor siempre; `.codex` solo nexa en compacta / también gam en expansiva). Solo documentación embebida; comportamiento sin cambio. `README.md` sin cambio.
+
 - **Pre-push: WORKFLOW del setup alineado al Cursor nativo (2026-09-07):** pasos 2–3 del `WORKFLOW` en `xpz-skills-setup/SKILL.md` pasan a decir que Cursor **OK** exige `~/.cursor/skills/` y que `coberta_por_compatibilidade` marca `REGISTRATION_GAPS` / `EXTERNAL_SKILLS_GAPS`. `README.md` sin cambio.
 
 - **Prosa del recibo: internas ≠ externas en el destino del vínculo (2026-09-07):** en el paso 4 del `WORKFLOW` de `xpz-skills-setup`, prohibir el resumen «todas las skills OK → repo»; internas → repo de esta raíz; `nexa`/`gam` → `preferredKind`/`preferredPath` del motor. Docs: `xpz-skills-setup/SKILL.md`. `README.md` sin cambio.
@@ -574,6 +578,8 @@ All relevant changes to this repository will be recorded here from this adoption
 The format keeps an `Unreleased` section for changes not yet published in a formal version. This repository does not yet use public semantic versioning; when that changes, future sections should record the corresponding tag.
 
 ### Unreleased
+
+- **Gx4A wrapper `-Strategy` help aligned to the engine (2026-09-07):** `Invoke-GeneXusForAgentsSetupSafe.ps1` — comment-based help no longer contradicted `Get-SkillLinkDestinationRels` (Cursor always; `.codex` only for nexa in compact / also gam in expansive). Docs-in-script only; behavior unchanged. No `README.md` change.
 
 - **Pre-push: setup WORKFLOW aligned to native Cursor (2026-09-07):** `WORKFLOW` steps 2–3 in `xpz-skills-setup/SKILL.md` now state Cursor **OK** requires `~/.cursor/skills/` and that `coberta_por_compatibilidade` marks `REGISTRATION_GAPS` / `EXTERNAL_SKILLS_GAPS`. No `README.md` change.
 

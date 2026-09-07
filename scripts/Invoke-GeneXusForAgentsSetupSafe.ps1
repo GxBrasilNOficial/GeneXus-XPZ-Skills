@@ -28,8 +28,10 @@
     Nao executa o setup; so reaplica os vinculos ao payload.
 
 .PARAMETER Strategy
-    compacta (padrao): .claude, .codex, .agents, .config/opencode, .gemini/config.
-    expansiva: inclui tambem .cursor/skills.
+    compacta (padrao): .claude, .agents, .config/opencode, .gemini/config e
+    sempre .cursor/skills (nativo Cursor obrigatorio). Inclui .codex/skills
+    somente para nexa (Codex tambem coberto via .agents).
+    expansiva: o mesmo conjunto e tambem .codex/skills para gam (alem de nexa).
 
 .PARAMETER Skills
     Quais skills reparar. Default: nexa e gam.
