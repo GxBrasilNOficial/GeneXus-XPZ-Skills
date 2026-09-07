@@ -8,6 +8,8 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 ### Unreleased
 
+- **Exit `90` no ponteiro de `New-XpzImportPackage` (2026-09-07):** `09` passa a listar `90` (erro interno/publicação do relatório/drift inesperado/motor Python/handoff/inventário degradado), além de `20` e dos `2`/`3` com `-ReportPath`. Só documentação.
+
 - **ReportPath + resolveAction (2026-09-07):** `Test-XpzForbiddenReportArea` passa a bloquear `historico` e toda a pasta `PacotesGeradosParaImportacaoNaKbNoGenexus` (antes só colisão com o artefato da rodada). `Test-XpzSkillsRegistration.ps1`: `extHasGap`/`resolveAction` por skill externa — gap da `nexa` não vaza para `gam`. `09`: Exit do empacotamento documenta também `2`/`3` propagados com `-ReportPath`. Self-tests de observabilidade e nexa/gam. Docs: help do wrapper, `xpz-builder`, `xpz-kb-parallel-setup` (+ exemplo).
 
 - **Contrato `-ReportPath` → inventário fail-closed (2026-09-07):** documentado que, com `-ReportPath` válido, `New-XpzImportPackage.ps1` liga `FailOnDeltaMismatch`/`FailOnUnknownTypes` no pós-inventário e pode mudar o exit (`status=bloqueado`); sem `-ReportPath`, inventário informativo. Docs: help do script, `README`, `02`, `08`, `09`, `xpz-builder` (+ checklist), `xpz-msbuild-import-export`, `xpz-kb-parallel-setup` (+ `examples/New-KbImportPackage.example.ps1`). Comportamento inalterado.
@@ -303,6 +305,8 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 ### Unreleased
 
+- **Exit `90` en el puntero de `New-XpzImportPackage` (2026-09-07):** `09` pasa a listar `90` (error interno/publicación del informe/drift inesperado/motor Python/handoff/inventario degradado), además de `20` y de los `2`/`3` con `-ReportPath`. Solo documentación.
+
 - **ReportPath + resolveAction (2026-09-07):** `Test-XpzForbiddenReportArea` ahora bloquea `historico` y toda la carpeta `PacotesGeradosParaImportacaoNaKbNoGenexus` (antes solo colisión con el artefacto de la ronda). `Test-XpzSkillsRegistration.ps1`: `extHasGap`/`resolveAction` por skill externa — el gap de `nexa` no se filtra a `gam`. `09`: el Exit del empaquetado documenta también `2`/`3` propagados con `-ReportPath`. Self-tests de observabilidad y nexa/gam. Docs: help del wrapper, `xpz-builder`, `xpz-kb-parallel-setup` (+ ejemplo).
 
 - **Contrato `-ReportPath` → inventario fail-closed (2026-09-07):** documentado que, con `-ReportPath` válido, `New-XpzImportPackage.ps1` activa `FailOnDeltaMismatch`/`FailOnUnknownTypes` en el post-inventario y puede cambiar el exit (`status=bloqueado`); sin `-ReportPath`, inventario informativo. Docs: help del script, `README`, `02`, `08`, `09`, `xpz-builder` (+ checklist), `xpz-msbuild-import-export`, `xpz-kb-parallel-setup` (+ `examples/New-KbImportPackage.example.ps1`). Comportamiento sin cambio.
@@ -590,6 +594,8 @@ All relevant changes to this repository will be recorded here from this adoption
 The format keeps an `Unreleased` section for changes not yet published in a formal version. This repository does not yet use public semantic versioning; when that changes, future sections should record the corresponding tag.
 
 ### Unreleased
+
+- **Exit `90` on the `New-XpzImportPackage` pointer (2026-09-07):** `09` now lists `90` (internal error/report publication/unexpected drift/Python engine/handoff/degraded inventory), in addition to `20` and the `2`/`3` with `-ReportPath`. Docs only.
 
 - **ReportPath + resolveAction (2026-09-07):** `Test-XpzForbiddenReportArea` now blocks `historico` and the entire `PacotesGeradosParaImportacaoNaKbNoGenexus` folder (previously only collision with the round's artifact). `Test-XpzSkillsRegistration.ps1`: per-external-skill `extHasGap`/`resolveAction` — a `nexa` gap no longer leaks into `gam`. `09`: packaging Exit also documents propagated `2`/`3` with `-ReportPath`. Observability and nexa/gam self-tests. Docs: wrapper help, `xpz-builder`, `xpz-kb-parallel-setup` (+ example).
 
