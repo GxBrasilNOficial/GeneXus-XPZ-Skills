@@ -614,7 +614,9 @@ detecta o `server.py` defasado comparando o hash instalado com o canônico do re
    ferramenta como **OK**, **coberta por compatibilidade**, **ausente**, **órfã**
    ou **quebrada** — aplicando as regras de `## CAMINHOS DE SKILLS POR FERRAMENTA`
    e `### Classificação ao auditar` (Codex indexa `.codex` + `.agents`; OpenCode
-   exige nativo; Cursor lê `.claude`/`.codex` por compatibilidade; Antigravity lê `.gemini/config` e `.agents`).
+   exige nativo; Cursor **OK só** com nativo em `~/.cursor/skills/` — vínculo só em
+   `.agents`/`.claude`/`.codex` é compat e **marca `REGISTRATION_GAPS`**; Antigravity
+   lê `.gemini/config` e `.agents`).
    O motor trata diretórios compartilhados (`.agents/skills/`) de forma deduplicada
    via `(Resolve-Path).Path` canonizado. O motor é **somente leitura**: não cria nem remove vínculos.
    Este `SKILL.md` permanece a fonte das regras que o motor implementa. Além das skills internas, o motor
@@ -623,10 +625,13 @@ detecta o `server.py` defasado comparando o hash instalado com o canônico do re
    `## SKILL EXTERNA GERENCIADA: GAM` e `## GENEXUS FOR AGENTS — CÓPIAS OPACAS`.
 3. Ler o resultado do motor:
    - `overall` → `REGISTRATION_OK` (registro íntegro) ou `REGISTRATION_GAPS`
-     (há ausências, quebradas, órfãs e/ou o MCP do Cursor defasado/inválido —
-     `MCP_SERVER_STALE`/`MCP_CONFIG_INVALID`). `MCP_NOT_INSTALLED` **não** marca
-     `REGISTRATION_GAPS` (pode ser intencional), mas é tratado no passo 9 como
-     gatilho de oferta de instalação do MCP
+     (há ausências, quebradas, órfãs, **`coberta_por_compatibilidade` no Cursor**
+     quando instalado sem nativo em `~/.cursor/skills/`, e/ou o MCP do Cursor
+     defasado/inválido — `MCP_SERVER_STALE`/`MCP_CONFIG_INVALID`). `MCP_NOT_INSTALLED`
+     **não** marca `REGISTRATION_GAPS` (pode ser intencional), mas é tratado no
+     passo 9 como gatilho de oferta de instalação do MCP
+   - Nas externas, o mesmo status de Cursor sem nativo marca `EXTERNAL_SKILLS_GAPS`
+     (independente de `overall`)
    - `tools[].skills[]` traz o status por skill; `orphans[]` os vínculos que
      apontam para o repo sem skill correspondente; `cursorMcp.label` o estado do
      MCP global do Cursor (tratado no passo 9)
