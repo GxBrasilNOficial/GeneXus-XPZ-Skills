@@ -8,6 +8,18 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 ### Unreleased
 
+- **Prosa do recibo: internas ≠ externas no alvo do vínculo (2026-09-07):** no passo 4 do `WORKFLOW` da `xpz-skills-setup`, proibir resumo «todas as skills OK → repo»; internas → repo desta raiz; `nexa`/`gam` → `preferredKind`/`preferredPath` do motor. Docs: `xpz-skills-setup/SKILL.md`. `README.md` sem mudança.
+
+- **Anti-padrão `reviewer-ro` na auditoria da setup (2026-09-07):** enquanto não houver motor na `xpz-skills-setup`, o ponteiro documental do `reviewer-ro` **não** entra no recibo de auditoria/setup (sem secção explicativa, sem pre-check, sem amarrar a preferidos; pedidos mistos → recibos separados). Docs: `xpz-skills-setup/SKILL.md`. `README.md` sem mudança.
+
+- **Lista preferida: editar o ficheiro que o harness resolve (2026-09-07):** regra operacional em `xpz-llm-delegate`/`15`/`xpz-skills-setup` — pedido genérico nesta sessão → `-Scope orchestrator` quando existe/é efetiva a lista do orquestrador; machine só com pedido explícito. `Resolve-` expõe `cascade*`; `Set-` emite `harnessResolveReadsThisPath` e `machine-write-shadowed-by-orchestrator-file`. Self-test bloco (V). `README.md` sem mudança.
+
+- **Cursor: nativo obrigatório em `~/.cursor/skills/` (2026-09-07):** na compacta, Cursor só conta **OK** com vínculo em `~/.cursor/skills/`; `.agents`/`.claude`/`.codex` passam a compat e `coberta_por_compatibilidade` marca `REGISTRATION_GAPS` (e gap nas externas `nexa`/`gam`). Wrapper Gx4A também cria links em `.cursor/skills`. Docs: `xpz-skills-setup/SKILL.md`. `README.md` sem mudança.
+
+- **Wrapper seguro GeneXus for Agents (opção C, 2026-09-07):** `Invoke-GeneXusForAgentsSetupSafe.ps1` — roda o setup oficial (opcional) e reaplica junctions/symlinks de `nexa`/`gam` ao payload Gx4A (`-RepairOnly`, `-AsJson`). Dono: `xpz-skills-setup`. Self-test `GX4A_SETUP_SAFE_SELFTEST_OK`. Docs: `SKILL`, `09`. `README.md` sem mudança.
+
+- **GeneXus for Agents: detectar cópias opacas de `nexa`/`gam` e fonte preferida (2026-09-07):** `Test-XpzSkillsRegistration.ps1` passa a classificar `copia_opaca` (pasta real) e `fonte_desatualizada` (vínculo ≠ preferida); `nexa` prefere a mais nova entre From-Zip e `%LOCALAPPDATA%\...\GeneXus4Agents\payload\skills\nexa`; `gam` prefere só o payload; recibo com `preferredPath`/`resolveAction`/`gx4aManagedPaths`. Docs: `xpz-skills-setup/SKILL.md`, `09`. Self-test: casos 4–6 em `Test-XpzSkillsRegistrationNexaRepoSelfTest.ps1` (24/24). Sem restore automático — outra sessão confirma. `README.md` sem mudança.
+
 - **Observabilidade do empacotamento por frente:** `New-XpzImportPackage.ps1` ganhou `-ReportPath` opt-in com validação fail-closed de caminho, publicação atômica UTF-8 sem BOM, `Kind=xpz-package-execution-report`/`SchemaVersion=1`, estados separados de execução/pacote/inventário, captura separada de stdout/stderr e handoff de escritor PowerShell↔Python. Divergência de inventário não promove candidato a aceito; interrupção externa preserva `running`/`candidate`. Self-test: `NEW_XPZ_IMPORT_PACKAGE_OBSERVABILITY_SELFTEST_OK`. Sem prova de importação real, build ou IDE.
 
 - **Pré-push: quando marcar `backend-parity: ignore` e quando triar (2026-09-05):** `13-revisao-pre-push.md` (§2) passa a definir o critério, que até agora só existia como comentário dentro do gate. O marcador vale para conteúdo **fechado por natureza** (nota datada de medição, registro de incidente, comparação entre dois backends específicos) e **não** para descrição de **contrato vivo** (ramo especial por backend no dispatcher, capacidade por adapter, gates executados) — essas disparam o aviso a cada rodada de propósito, e o custo é uma linha de triagem. Na dúvida, triar: o marcador é permanente e invisível, e na linha errada remove a detecção que motivou o gate. Motivação empírica: revisão externa recomendou marcar em lote cinco ocorrências, uma delas a descrição dos ramos por backend do dispatcher. `README.md` sem mudança.
@@ -281,6 +293,18 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 ### Unreleased
 
+- **Prosa del recibo: internas ≠ externas en el destino del vínculo (2026-09-07):** en el paso 4 del `WORKFLOW` de `xpz-skills-setup`, prohibir el resumen «todas las skills OK → repo»; internas → repo de esta raíz; `nexa`/`gam` → `preferredKind`/`preferredPath` del motor. Docs: `xpz-skills-setup/SKILL.md`. `README.md` sin cambio.
+
+- **Anti-patrón `reviewer-ro` en la auditoría del setup (2026-09-07):** mientras no haya motor en `xpz-skills-setup`, el puntero documental del `reviewer-ro` **no** entra en el recibo de auditoría/setup (sin sección explicativa, sin pre-check, sin atarlo a preferidos; pedidos mixtos → recibos separados). Docs: `xpz-skills-setup/SKILL.md`. `README.md` sin cambio.
+
+- **Lista preferida: editar el archivo que el harness resuelve (2026-09-07):** regla operacional en `xpz-llm-delegate`/`15`/`xpz-skills-setup` — pedido genérico en esta sesión → `-Scope orchestrator` cuando existe/es efectiva la lista del orquestador; machine solo con pedido explícito. `Resolve-` expone `cascade*`; `Set-` emite `harnessResolveReadsThisPath` y `machine-write-shadowed-by-orchestrator-file`. Self-test bloque (V). `README.md` sin cambio.
+
+- **Cursor: nativo obligatorio en `~/.cursor/skills/` (2026-09-07):** en la compacta, Cursor solo cuenta **OK** con vínculo en `~/.cursor/skills/`; `.agents`/`.claude`/`.codex` pasan a compat y `coberta_por_compatibilidade` marca `REGISTRATION_GAPS` (y gap en externas `nexa`/`gam`). El wrapper Gx4A también crea links en `.cursor/skills`. Docs: `xpz-skills-setup/SKILL.md`. `README.md` sin cambio.
+
+- **Wrapper seguro GeneXus for Agents (opción C, 2026-09-07):** `Invoke-GeneXusForAgentsSetupSafe.ps1` — ejecuta el setup oficial (opcional) y reaplica junctions/symlinks de `nexa`/`gam` al payload Gx4A (`-RepairOnly`, `-AsJson`). Dueño: `xpz-skills-setup`. Self-test `GX4A_SETUP_SAFE_SELFTEST_OK`. Docs: `SKILL`, `09`. `README.md` sin cambio.
+
+- **GeneXus for Agents: detectar copias opacas de `nexa`/`gam` y fuente preferida (2026-09-07):** `Test-XpzSkillsRegistration.ps1` clasifica `copia_opaca` (carpeta real) y `fonte_desatualizada` (vínculo ≠ preferida); `nexa` prefiere la más nueva entre From-Zip y el payload de GeneXus for Agents; `gam` solo el payload; recibo con `preferredPath`/`resolveAction`/`gx4aManagedPaths`. Docs: `xpz-skills-setup/SKILL.md`, `09`. Self-test: casos 4–6 en `Test-XpzSkillsRegistrationNexaRepoSelfTest.ps1` (24/24). Sin restore automático. `README.md` sin cambio.
+
 - **Observabilidad del empaquetado por frente:** `New-XpzImportPackage.ps1` incorporó `-ReportPath` opt-in con validación fail-closed de ruta, publicación atómica UTF-8 sin BOM, `Kind=xpz-package-execution-report`/`SchemaVersion=1`, estados separados de ejecución/paquete/inventario, captura separada de stdout/stderr y handoff de escritor PowerShell↔Python. La divergencia de inventario no promueve un candidato a aceptado; la interrupción externa conserva `running`/`candidate`. Self-test: `NEW_XPZ_IMPORT_PACKAGE_OBSERVABILITY_SELFTEST_OK`. Sin prueba de importación real, build o IDE.
 
 - **Pre-push: cuándo marcar `backend-parity: ignore` y cuándo triar (2026-09-05):** `13-revisao-pre-push.md` (§2) define el criterio, que hasta ahora solo existía como comentario dentro del gate. El marcador vale para contenido **cerrado por naturaleza** (nota fechada de medición, registro de incidente, comparación entre dos backends específicos) y **no** para descripción de **contrato vivo** (rama especial por backend en el dispatcher, capacidad por adapter, gates ejecutados) — esas disparan el aviso en cada ronda a propósito, y el costo es una línea de triaje. Ante la duda, triar: el marcador es permanente e invisible, y en la línea equivocada elimina la detección que motivó el gate. Motivación empírica: una revisión externa recomendó marcar en lote cinco ocurrencias, una de ellas la descripción de las ramas por backend del dispatcher. `README.md` sin cambio.
@@ -546,6 +570,18 @@ All relevant changes to this repository will be recorded here from this adoption
 The format keeps an `Unreleased` section for changes not yet published in a formal version. This repository does not yet use public semantic versioning; when that changes, future sections should record the corresponding tag.
 
 ### Unreleased
+
+- **Receipt wording: internals ≠ externals for link targets (2026-09-07):** in `xpz-skills-setup` `WORKFLOW` step 4, forbid a single «all skills OK → repo» summary; internals → this repo root; `nexa`/`gam` → motor `preferredKind`/`preferredPath`. Docs: `xpz-skills-setup/SKILL.md`. No `README.md` change.
+
+- **`reviewer-ro` anti-pattern in setup audit (2026-09-07):** until `xpz-skills-setup` has a motor, the documentary `reviewer-ro` pointer is **not** part of the audit/setup receipt (no explainer section, no pre-check, no hitchhiking preferred reviewers; mixed asks → separate receipts). Docs: `xpz-skills-setup/SKILL.md`. No `README.md` change.
+
+- **Preferred list: edit the file this harness resolves (2026-09-07):** operational rule in `xpz-llm-delegate`/`15`/`xpz-skills-setup` — generic ask in this session → `-Scope orchestrator` when the orchestrator file exists/is effective; machine only on explicit ask. `Resolve-` exposes `cascade*`; `Set-` emits `harnessResolveReadsThisPath` and `machine-write-shadowed-by-orchestrator-file`. Self-test block (V). No `README.md` change.
+
+- **Cursor: native required under `~/.cursor/skills/` (2026-09-07):** in compact strategy, Cursor is **OK** only with a link in `~/.cursor/skills/`; `.agents`/`.claude`/`.codex` are compat and `coberta_por_compatibilidade` marks `REGISTRATION_GAPS` (and gaps for external `nexa`/`gam`). Gx4A wrapper also creates links under `.cursor/skills`. Docs: `xpz-skills-setup/SKILL.md`. No `README.md` change.
+
+- **Safe GeneXus for Agents wrapper (option C, 2026-09-07):** `Invoke-GeneXusForAgentsSetupSafe.ps1` — optionally runs the official setup, then re-applies `nexa`/`gam` junctions/symlinks to the Gx4A payload (`-RepairOnly`, `-AsJson`). Owner: `xpz-skills-setup`. Self-test `GX4A_SETUP_SAFE_SELFTEST_OK`. Docs: `SKILL`, `09`. No `README.md` change.
+
+- **GeneXus for Agents: detect opaque `nexa`/`gam` copies and preferred source (2026-09-07):** `Test-XpzSkillsRegistration.ps1` classifies `copia_opaca` (real directory) and `fonte_desatualizada` (link ≠ preferred); `nexa` prefers the newer of From-Zip vs GeneXus for Agents payload; `gam` prefers payload only; receipt adds `preferredPath`/`resolveAction`/`gx4aManagedPaths`. Docs: `xpz-skills-setup/SKILL.md`, `09`. Self-test: cases 4–6 in `Test-XpzSkillsRegistrationNexaRepoSelfTest.ps1` (24/24). No automatic restore. No `README.md` change.
 
 - **Front-based packaging observability:** `New-XpzImportPackage.ps1` adds opt-in `-ReportPath` with fail-closed path validation, atomic UTF-8 without BOM publication, `Kind=xpz-package-execution-report`/`SchemaVersion=1`, separate execution/package/inventory states, separate stdout/stderr capture, and PowerShell↔Python writer handoff. Inventory divergence does not promote a candidate to accepted; external interruption preserves `running`/`candidate`. Self-test: `NEW_XPZ_IMPORT_PACKAGE_OBSERVABILITY_SELFTEST_OK`. No proof of real import, build, or IDE.
 

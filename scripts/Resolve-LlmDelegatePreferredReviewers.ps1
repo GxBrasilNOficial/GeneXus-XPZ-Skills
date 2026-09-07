@@ -12,6 +12,10 @@
     preferred-reviewers.json schema 3. Ficheiro efetivo ilegivel/schema!=3 -> exit 2
     (nao cai no nivel seguinte). Desvio -PreferredPath: so esse ficheiro.
 
+    Envelope inclui sempre cascadeOrchestratorPath/cascadeMachinePath e
+    cascadeOrchestratorExists/cascadeMachineExists (sob PreferredRoot ou default),
+    para o agente editar o ficheiro que este harness realmente resolve — nao so a machine.
+
     -Orchestrator obrigatorio no corpo (cursor|claude-code|codex|opencode).
     stdout=JSON; stderr=diagnostico.
 .PARAMETER Orchestrator
@@ -53,6 +57,14 @@ function Write-ErrDiag {
 
 function Emit-ResolveResult {
     param([hashtable]$Fields, [int]$ExitCode = 0)
+    $cascadeVar = Get-Variable -Scope Script -Name CascadeMeta -ErrorAction SilentlyContinue
+    if ($null -ne $cascadeVar -and $null -ne $cascadeVar.Value) {
+        foreach ($k in @($cascadeVar.Value.Keys)) {
+            if (-not $Fields.ContainsKey($k)) {
+                $Fields[$k] = $cascadeVar.Value[$k]
+            }
+        }
+    }
     ([pscustomobject]$Fields) | ConvertTo-Json -Depth 12
     exit $ExitCode
 }
@@ -319,6 +331,21 @@ function Get-DefaultPreferredRoot {
     return (Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'xpz-llm-delegate')
 }
 
+function New-CascadeMeta {
+    param(
+        [string]$Root,
+        [string]$Orchestrator
+    )
+    $orchPath = [System.IO.Path]::GetFullPath((Join-Path $Root "preferred-reviewers.$Orchestrator.json"))
+    $machinePath = [System.IO.Path]::GetFullPath((Join-Path $Root 'preferred-reviewers.json'))
+    return [ordered]@{
+        cascadeOrchestratorPath   = $orchPath
+        cascadeMachinePath        = $machinePath
+        cascadeOrchestratorExists = [bool](Test-Path -LiteralPath $orchPath -PathType Leaf)
+        cascadeMachineExists      = [bool](Test-Path -LiteralPath $machinePath -PathType Leaf)
+    }
+}
+
 function Read-PreferredDocument {
     param(
         [string]$Path,
@@ -427,6 +454,8 @@ if ($allowedOrchestrators -notcontains $orchTrim) {
     Stop-WithReason -Reason 'orchestrator-invalid' -ExitCode 1 -Detail "orchestrator='$orchTrim'"
 }
 
+$script:CascadeMeta = New-CascadeMeta -Root (Get-DefaultPreferredRoot) -Orchestrator $orchTrim
+
 $hasPreferredPath = $PSBoundParameters.ContainsKey('PreferredPath') -and -not [string]::IsNullOrWhiteSpace($PreferredPath)
 $hasPreferredRoot = $PSBoundParameters.ContainsKey('PreferredRoot')
 if ($hasPreferredPath -and $hasPreferredRoot) {
@@ -466,8 +495,9 @@ $root = if ($hasPreferredRoot -and -not [string]::IsNullOrWhiteSpace($PreferredR
     Get-DefaultPreferredRoot
 }
 
-$orchPath = [System.IO.Path]::GetFullPath((Join-Path $root "preferred-reviewers.$orchTrim.json"))
-$machinePath = [System.IO.Path]::GetFullPath((Join-Path $root 'preferred-reviewers.json'))
+$script:CascadeMeta = New-CascadeMeta -Root $root -Orchestrator $orchTrim
+$orchPath = $script:CascadeMeta.cascadeOrchestratorPath
+$machinePath = $script:CascadeMeta.cascadeMachinePath
 
 if (Test-Path -LiteralPath $orchPath -PathType Leaf) {
     $pref = Read-PreferredDocument -Path $orchPath -PreferenceSource 'orchestrator' `

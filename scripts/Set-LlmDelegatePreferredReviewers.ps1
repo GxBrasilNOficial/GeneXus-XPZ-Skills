@@ -13,7 +13,10 @@
 .PARAMETER Orchestrator
     cursor|claude-code|codex|opencode.
 .PARAMETER Scope
-    machine|orchestrator.
+    machine|orchestrator. Ao editar a lista «deste harness», preferir orchestrator
+    quando Resolve ja usa preferred-reviewers.<orch>.json; machine so sob pedido
+    explicito «lista da maquina». stdout inclui sibling* e harnessResolveReadsThisPath
+    para detectar gravacao machine sombreada pelo ficheiro do orquestrador.
 .PARAMETER PreferredRoot
     Default %LOCALAPPDATA%\xpz-llm-delegate (cascata).
 .PARAMETER OutputPath
@@ -423,6 +426,32 @@ if ($hasOutputPath) {
     $effectivePath = [System.IO.Path]::GetFullPath((Join-Path $root $fileName))
 }
 
+$siblingOrchestratorPath = [System.IO.Path]::GetFullPath((Join-Path $root "preferred-reviewers.$orchTrim.json"))
+$siblingMachinePath = [System.IO.Path]::GetFullPath((Join-Path $root 'preferred-reviewers.json'))
+$siblingOrchestratorExists = [bool](Test-Path -LiteralPath $siblingOrchestratorPath -PathType Leaf)
+$siblingMachineExists = [bool](Test-Path -LiteralPath $siblingMachinePath -PathType Leaf)
+$setDiagnostics = [System.Collections.Generic.List[string]]::new()
+
+$orchExistsAfterWrite = $siblingOrchestratorExists -or ($effectivePath -eq $siblingOrchestratorPath)
+$machineExistsAfterWrite = $siblingMachineExists -or ($effectivePath -eq $siblingMachinePath)
+$resolveWouldPreferAfterWrite = if ($orchExistsAfterWrite) {
+    'orchestrator'
+} elseif ($machineExistsAfterWrite) {
+    'machine'
+} else {
+    'none'
+}
+$harnessResolveReadsThisPath = if ($resolveWouldPreferAfterWrite -eq 'orchestrator') {
+    ($effectivePath -eq $siblingOrchestratorPath)
+} elseif ($resolveWouldPreferAfterWrite -eq 'machine') {
+    ($effectivePath -eq $siblingMachinePath)
+} else {
+    $false
+}
+if ($scopeTrim -eq 'machine' -and $siblingOrchestratorExists -and ($effectivePath -eq $siblingMachinePath)) {
+    [void]$setDiagnostics.Add('machine-write-shadowed-by-orchestrator-file')
+}
+
 if (-not $Preview -and -not $Overwrite -and (Test-PersistedSchema3Valid -Path $effectivePath)) {
     Stop-WithReason -Reason 'overwrite-required' -ExitCode 1 -Detail "destino schema 3: $effectivePath" -Extra @{
         effectivePreferredPath = $effectivePath
@@ -544,12 +573,21 @@ if (-not $Preview) {
 }
 
 Emit-SetResult -ExitCode 0 -Fields @{
-    written                = $kept.Count
-    discardedVeto          = @()
-    reason                 = $null
-    effectivePreferredPath = $effectivePath
-    schemaVersion          = 3
-    outputPath             = $effectivePath
-    preview                = [bool]$Preview
-    document               = if ($Preview) { $doc } else { $null }
+    written                       = $kept.Count
+    discardedVeto                 = @()
+    reason                        = $null
+    effectivePreferredPath        = $effectivePath
+    schemaVersion                 = 3
+    outputPath                    = $effectivePath
+    preview                       = [bool]$Preview
+    document                      = if ($Preview) { $doc } else { $null }
+    scope                         = $scopeTrim
+    orchestrator                  = $orchTrim
+    siblingOrchestratorPath       = $siblingOrchestratorPath
+    siblingOrchestratorExists     = $siblingOrchestratorExists
+    siblingMachinePath            = $siblingMachinePath
+    siblingMachineExists          = $siblingMachineExists
+    resolveWouldPreferAfterWrite  = $resolveWouldPreferAfterWrite
+    harnessResolveReadsThisPath   = [bool]$harnessResolveReadsThisPath
+    diagnostics                   = @($setDiagnostics)
 }

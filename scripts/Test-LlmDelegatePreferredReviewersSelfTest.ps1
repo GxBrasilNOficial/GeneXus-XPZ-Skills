@@ -929,6 +929,43 @@ try {
     $setScriptText = Get-Content -LiteralPath $setScript -Raw -Encoding utf8
     Assert-True ($setScriptText -match 'Remove-Item -LiteralPath \$tmpPath') '(U) Escrita atomica deveria limpar o arquivo temporario se Move-Item falhar.'
 
+    # --------------------------------------------------------------------------------------
+    # (V) Cascata: gravacao machine com preferred-reviewers.<orch>.json presente e sombreada
+    # --------------------------------------------------------------------------------------
+    $vRoot = Join-Path $tempRoot 'cascade-shadow'
+    New-Item -ItemType Directory -Path $vRoot -Force | Out-Null
+    $vOrch = Invoke-Set @{
+        ReviewersJson = '{"reviewers":[{ "backend": "codex", "targetModelKey": "openai/gpt-5.5", "invokeArgs": {} }]}'
+        Orchestrator  = 'cursor'
+        Scope         = 'orchestrator'
+        PreferredRoot = $vRoot
+    }
+    Assert-True ($vOrch.code -eq 0) '(V) Setup orchestrator deveria exit 0.'
+    Assert-True ($vOrch.json.harnessResolveReadsThisPath -eq $true) '(V) Scope orchestrator deve afetar Resolve do harness.'
+    Assert-True ($vOrch.json.resolveWouldPreferAfterWrite -eq 'orchestrator') '(V) resolveWouldPreferAfterWrite=orchestrator esperado.'
+
+    $vMach = Invoke-Set @{
+        ReviewersJson = '{"reviewers":[{ "backend": "claude-code", "targetModelKey": "anthropic/claude-opus-5", "invokeArgs": {} }]}'
+        Orchestrator  = 'cursor'
+        Scope         = 'machine'
+        PreferredRoot = $vRoot
+    }
+    Assert-True ($vMach.code -eq 0) '(V) Scope machine deveria exit 0 mesmo sombreada.'
+    Assert-True ($vMach.json.harnessResolveReadsThisPath -eq $false) '(V) machine sombreada: harnessResolveReadsThisPath=false.'
+    Assert-True ($vMach.json.resolveWouldPreferAfterWrite -eq 'orchestrator') '(V) apos machine write, Resolve ainda prefere orchestrator.'
+    Assert-True (@($vMach.json.diagnostics) -contains 'machine-write-shadowed-by-orchestrator-file') '(V) diagnostics deve citar machine-write-shadowed-by-orchestrator-file.'
+
+    $vRes = Invoke-Resolve @{
+        Orchestrator     = 'cursor'
+        PreferredRoot    = $vRoot
+        CapabilitiesPath = $capPath
+    }
+    Assert-True ($vRes.code -eq 0) '(V) Resolve deveria exit 0.'
+    Assert-True ($vRes.json.preferenceSource -eq 'orchestrator') "(V) preferenceSource=orchestrator; veio '$($vRes.json.preferenceSource)'."
+    Assert-True ($vRes.json.cascadeOrchestratorExists -eq $true) '(V) cascadeOrchestratorExists=true.'
+    Assert-True ($vRes.json.cascadeMachineExists -eq $true) '(V) cascadeMachineExists=true apos machine write.'
+    Assert-True ($vRes.json.reviewers[0].backend -eq 'codex') '(V) Resolve deve ler o ficheiro orchestrator (codex), nao machine.'
+
     # politica invalida ainda bloqueia
     $badPolicy = @'
 {

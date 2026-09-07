@@ -16,25 +16,30 @@
       coberta_por_compatibilidade vinculo valido apenas em diretório lido por compat
       ausente                     nenhum vinculo valido encontrado
       quebrada                    vinculo presente, mas alvo inexistente
+      copia_opaca                 pasta real (nao link) onde deveria haver vinculo
+      fonte_desatualizada         link valido, mas alvo != fonte preferida atual
 
     Regras especiais (espelham xpz-skills-setup/SKILL.md):
       - Codex indexa DOIS ambitos USER (.codex/skills e .agents/skills); presenca
         em qualquer um conta como OK.
       - OpenCode exige vinculo nativo (.config/opencode/skills ou .agents/skills);
         não conta compatibilidade com .claude/skills.
-      - Cursor le por compatibilidade de .claude/skills e .codex/skills.
+      - Cursor: nativo obrigatorio apenas em ~/.cursor/skills; .agents/.claude/.codex
+        sao compat e coberta_por_compatibilidade marca REGISTRATION_GAPS.
 
     Orfas: vinculos sob um diretório de skills cujo alvo aponta para DENTRO do
     repositório de skills XPZ, mas cujo nome não está mais no inventario da raiz.
     Vinculos para outros repositórios não contam como orfas do repo XPZ.
 
-    Skills externas gerenciadas (ex.: nexa): vivem em outro repositório (nexa está
-    em GxBrasilNOficial/genexus-skills-from-zip) mas são auditadas por nome em uma
-    seção separada (externalSkills / externalOverall), com a mesma classificação OK /
-    coberta / ausente / quebrada para os vínculos. Além disso, confere se o clone
-    local detectado pelos vínculos tem origin oficial (labels NEXA_* read-only) e
-    expõe repoRootCanonical. origin divergente ou repo ausente marca EXTERNAL_SKILLS_GAPS
-    mesmo quando os vínculos existem. Só `nexa` e gerenciada por nome.
+    Skills externas gerenciadas (`nexa`, `gam`) em externalSkills / externalOverall:
+      - nexa: fonte preferida = a mais nova entre GeneXus-Skills-From-Zip\nexa e
+        %LOCALAPPDATA%\Programs\GeneXus\GeneXus4Agents\payload\skills\nexa
+        (empate → From-Zip). Bootstrap git (labels NEXA_*) só para roots From-Zip;
+        junction correto ao payload Gx4A nao exige From-Zip em detectedRoots.
+      - gam: fonte preferida unica = GeneXus4Agents\payload\skills\gam.
+      - Copia opaca (Directory) ou link para alvo != preferida → EXTERNAL_SKILLS_GAPS.
+      - Marcadores .skill-managed-nexa / .skill-managed-gam (quando existirem) sao
+        evidencia corroborante exposta no recibo; nao substituem a classificacao.
 
     Freshness do MCP do Cursor (Candidato B): compara o server.py instalado com o
     canonico do repositório e valida config.json/registro em mcp.json.
@@ -276,6 +281,179 @@ function Get-NexaCanonicalRepoRoot {
     return (Join-Path $parent 'GeneXus-Skills-From-Zip')
 }
 
+function Get-GeneXus4AgentsRoot {
+    if ([string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) { return '' }
+    return (Join-Path $env:LOCALAPPDATA 'Programs\GeneXus\GeneXus4Agents')
+}
+
+function Test-SamePath {
+    param([string]$A, [string]$B)
+    if ([string]::IsNullOrWhiteSpace($A) -or [string]::IsNullOrWhiteSpace($B)) { return $false }
+    try {
+        $pa = [System.IO.Path]::GetFullPath($A)
+        $pb = [System.IO.Path]::GetFullPath($B)
+        return [string]::Equals($pa, $pb, [System.StringComparison]::OrdinalIgnoreCase)
+    }
+    catch {
+        return $false
+    }
+}
+
+function Get-SkillMdVersion {
+    param([string]$SkillDir)
+    $skillMd = Join-Path $SkillDir 'SKILL.md'
+    if (-not (Test-Path -LiteralPath $skillMd -PathType Leaf)) { return '' }
+    $lines = @(Get-Content -LiteralPath $skillMd -TotalCount 40 -ErrorAction SilentlyContinue)
+    if ($lines.Count -eq 0) { return '' }
+    $inFm = $false
+    foreach ($line in $lines) {
+        if ($line -eq '---') {
+            if (-not $inFm) { $inFm = $true; continue }
+            break
+        }
+        if (-not $inFm) { continue }
+        if ($line -match '^\s*version:\s*["'']?([^"''\s]+)["'']?\s*$') {
+            return [string]$Matches[1]
+        }
+    }
+    return ''
+}
+
+function Get-SkillSourceCandidate {
+    param(
+        [AllowEmptyString()][string]$SkillDir,
+        [Parameter(Mandatory = $true)][string]$Kind
+    )
+    $info = [ordered]@{
+        path           = $SkillDir
+        kind           = $Kind
+        present        = $false
+        version        = ''
+        skillMdTimeUtc = $null
+    }
+    if ([string]::IsNullOrWhiteSpace($SkillDir)) { return $info }
+    if (-not (Test-Path -LiteralPath $SkillDir -PathType Container)) { return $info }
+    $skillMd = Join-Path $SkillDir 'SKILL.md'
+    if (-not (Test-Path -LiteralPath $skillMd -PathType Leaf)) { return $info }
+    $info.present = $true
+    $info.version = Get-SkillMdVersion -SkillDir $SkillDir
+    $info.skillMdTimeUtc = (Get-Item -LiteralPath $skillMd).LastWriteTimeUtc
+    return $info
+}
+
+function Compare-SkillSourceFreshness {
+    # 1 => A mais nova; -1 => B mais nova; 0 => empate.
+    param($A, $B)
+    if (-not [bool]$A.present -and -not [bool]$B.present) { return 0 }
+    if ([bool]$A.present -and -not [bool]$B.present) { return 1 }
+    if ([bool]$B.present -and -not [bool]$A.present) { return -1 }
+
+    $verA = $null
+    $verB = $null
+    $hasA = -not [string]::IsNullOrWhiteSpace([string]$A.version) -and [version]::TryParse([string]$A.version, [ref]$verA)
+    $hasB = -not [string]::IsNullOrWhiteSpace([string]$B.version) -and [version]::TryParse([string]$B.version, [ref]$verB)
+    if ($hasA -and $hasB) {
+        if ($verA -gt $verB) { return 1 }
+        if ($verB -gt $verA) { return -1 }
+    }
+    elseif ($hasA -and -not $hasB) { return 1 }
+    elseif ($hasB -and -not $hasA) { return -1 }
+
+    if ($null -ne $A.skillMdTimeUtc -and $null -ne $B.skillMdTimeUtc) {
+        if ($A.skillMdTimeUtc -gt $B.skillMdTimeUtc) { return 1 }
+        if ($B.skillMdTimeUtc -gt $A.skillMdTimeUtc) { return -1 }
+    }
+    return 0
+}
+
+function Resolve-NexaPreferredSource {
+    param([Parameter(Mandatory = $true)][string]$XpzRoot)
+
+    $fromZipRoot = Get-NexaCanonicalRepoRoot -XpzRoot $XpzRoot
+    $fromZip = Get-SkillSourceCandidate -SkillDir (Join-Path $fromZipRoot 'nexa') -Kind 'from-zip'
+    $gx4aRoot = Get-GeneXus4AgentsRoot
+    $payloadDir = if ([string]::IsNullOrWhiteSpace($gx4aRoot)) { '' } else { Join-Path $gx4aRoot 'payload\skills\nexa' }
+    $payload = Get-SkillSourceCandidate -SkillDir $payloadDir -Kind 'gx4a-payload'
+
+    $cmp = Compare-SkillSourceFreshness -A $payload -B $fromZip
+    if ($cmp -gt 0) {
+        $preferred = $payload
+    }
+    elseif ($cmp -lt 0) {
+        $preferred = $fromZip
+    }
+    elseif ([bool]$fromZip.present) {
+        $preferred = $fromZip
+    }
+    else {
+        $preferred = $payload
+    }
+
+    return [ordered]@{
+        preferredPath    = if ([bool]$preferred.present) { [string]$preferred.path } else { '' }
+        preferredKind    = if ([bool]$preferred.present) { [string]$preferred.kind } else { 'missing' }
+        preferredVersion = [string]$preferred.version
+        fromZip          = $fromZip
+        gx4aPayload      = $payload
+        fromZipRepoRoot  = $fromZipRoot
+        gx4aRoot         = $gx4aRoot
+    }
+}
+
+function Resolve-GamPreferredSource {
+    $gx4aRoot = Get-GeneXus4AgentsRoot
+    $payloadDir = if ([string]::IsNullOrWhiteSpace($gx4aRoot)) { '' } else { Join-Path $gx4aRoot 'payload\skills\gam' }
+    $payload = Get-SkillSourceCandidate -SkillDir $payloadDir -Kind 'gx4a-payload'
+    return [ordered]@{
+        preferredPath    = if ([bool]$payload.present) { [string]$payload.path } else { '' }
+        preferredKind    = if ([bool]$payload.present) { 'gx4a-payload' } else { 'missing' }
+        preferredVersion = [string]$payload.version
+        fromZip          = $null
+        gx4aPayload      = $payload
+        fromZipRepoRoot  = ''
+        gx4aRoot         = $gx4aRoot
+    }
+}
+
+function Get-Gx4aSkillManagedPaths {
+    param([Parameter(Mandatory = $true)][string]$SkillName)
+    $root = Get-GeneXus4AgentsRoot
+    if ([string]::IsNullOrWhiteSpace($root)) { return @() }
+    $marker = Join-Path $root ('.skill-managed-' + $SkillName)
+    if (-not (Test-Path -LiteralPath $marker -PathType Leaf)) { return @() }
+    $paths = [System.Collections.Generic.List[string]]::new()
+    foreach ($line in @(Get-Content -LiteralPath $marker -ErrorAction SilentlyContinue)) {
+        $t = ([string]$line).Trim()
+        if ($t -match '^[A-Za-z]:\\' -or $t -match '^\\\\') {
+            [void]$paths.Add($t)
+        }
+    }
+    return @($paths)
+}
+
+function Refine-ExternalToolStatus {
+    param(
+        [Parameter(Mandatory = $true)][string]$Status,
+        [string]$LinkType,
+        [string]$Target,
+        [string]$PreferredPath
+    )
+
+    if ($Status -ne 'OK' -and $Status -ne 'coberta_por_compatibilidade') {
+        return [ordered]@{ status = $Status; linkType = $LinkType; target = $Target; reason = '' }
+    }
+    if ([string]::IsNullOrWhiteSpace($PreferredPath)) {
+        return [ordered]@{ status = $Status; linkType = $LinkType; target = $Target; reason = '' }
+    }
+    if ($LinkType -eq 'Directory') {
+        return [ordered]@{ status = 'copia_opaca'; linkType = $LinkType; target = $Target; reason = 'directory-not-link' }
+    }
+    if (-not (Test-SamePath -A $Target -B $PreferredPath)) {
+        return [ordered]@{ status = 'fonte_desatualizada'; linkType = $LinkType; target = $Target; reason = 'target-not-preferred' }
+    }
+    return [ordered]@{ status = $Status; linkType = $LinkType; target = $Target; reason = '' }
+}
+
 function Get-ExternalRepoBootstrapState {
     param(
         [AllowEmptyString()][string]$RepoRoot,
@@ -348,10 +526,12 @@ $inventorySet = [System.Collections.Generic.HashSet[string]]::new([System.String
 foreach ($s in $inventory) { [void]$inventorySet.Add($s) }
 
 # Mapa de diretórios por ferramenta (nativo + compatibilidade)
+# Cursor: nativo exigido e so ~/.cursor/skills (compacta e expansiva). .agents/.claude/.codex
+# entram como compat — coberta_por_compatibilidade conta como REGISTRATION_GAPS.
 $toolDefs = @(
     [ordered]@{ Name = 'ClaudeCode'; Native = @('.claude\skills'); Compat = @() },
     [ordered]@{ Name = 'Codex'; Native = @('.codex\skills', '.agents\skills'); Compat = @() },
-    [ordered]@{ Name = 'Cursor'; Native = @('.cursor\skills', '.agents\skills'); Compat = @('.claude\skills', '.codex\skills') },
+    [ordered]@{ Name = 'Cursor'; Native = @('.cursor\skills'); Compat = @('.agents\skills', '.claude\skills', '.codex\skills') },
     [ordered]@{ Name = 'OpenCode'; Native = @('.config\opencode\skills', '.agents\skills'); Compat = @() },
     [ordered]@{ Name = 'Antigravity'; Native = @('.gemini\config\skills', '.agents\skills'); Compat = @() }
 )
@@ -505,99 +685,201 @@ function Get-CursorMcpReport {
 
 $cursorMcp = Get-CursorMcpReport -ProfileRoot $profileRoot -RepoRoot $root
 
-# --- Skills externas gerenciadas (apenas nexa) --------------------------------
-# nexa vive em GxBrasilNOficial/genexus-skills-from-zip; auditada por nome em seção separada.
+# --- Skills externas gerenciadas (nexa + gam) ---------------------------------
+# nexa: From-Zip comunitário e/ou payload GeneXus for Agents (fonte preferida = mais nova).
+# gam: somente payload GeneXus for Agents.
 $externalSkillDefs = @(
-    [ordered]@{ name = 'nexa'; repo = 'GeneXus-Skills-From-Zip'; officialUrl = 'https://github.com/GxBrasilNOficial/genexus-skills-from-zip.git' }
+    [ordered]@{
+        name        = 'nexa'
+        repo        = 'GeneXus-Skills-From-Zip'
+        officialUrl = 'https://github.com/GxBrasilNOficial/genexus-skills-from-zip.git'
+        kind        = 'nexa'
+    },
+    [ordered]@{
+        name        = 'gam'
+        repo        = 'GeneXus4Agents'
+        officialUrl = ''
+        kind        = 'gam'
+    }
 )
 
 $externalSkills = @()
 $extHasGap = $false
 $gitExe = Find-GitExecutable
 foreach ($ext in $externalSkillDefs) {
+    if ($ext.kind -eq 'nexa') {
+        $preferred = Resolve-NexaPreferredSource -XpzRoot $root
+    }
+    else {
+        $preferred = Resolve-GamPreferredSource
+    }
+
+    $managedPaths = @(Get-Gx4aSkillManagedPaths -SkillName $ext.name)
     $perTool = @()
     $detectedRoots = [System.Collections.Generic.List[string]]::new()
     $seenRoots = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
     $extHasRegistration = $false
+    $extHasOpaqueOrStale = $false
+    $preferredKind = [string]$preferred.preferredKind
+    $preferredPath = [string]$preferred.preferredPath
+
     foreach ($def in $toolDefs) {
         $installed = Test-ToolInstalled -Tool $def.Name
         if (-not $installed) {
-            $perTool += [ordered]@{ name = $def.Name; installed = $false; status = 'nao_avaliada'; linkType = ''; target = '' }
+            $perTool += [ordered]@{
+                name = $def.Name; installed = $false; status = 'nao_avaliada'
+                linkType = ''; target = ''; reason = ''
+            }
             continue
         }
         $cls = Get-SkillToolStatus -Skill $ext.name -ToolDef $def -ProfileRoot $profileRoot
-        if ($cls.status -eq 'ausente' -or $cls.status -eq 'quebrada') { $extHasGap = $true }
-        if ($cls.status -eq 'OK' -or $cls.status -eq 'coberta_por_compatibilidade') { $extHasRegistration = $true }
-        if (-not [string]::IsNullOrWhiteSpace($cls.target)) {
-            # O vinculo aponta para <repo>\<skill>; a raiz do repo externo e a pasta-pai.
-            $parent = [System.IO.Path]::GetDirectoryName($cls.target)
-            if (-not [string]::IsNullOrWhiteSpace($parent)) {
-                $parentFull = [System.IO.Path]::GetFullPath($parent)
-                if ($seenRoots.Add($parentFull)) {
-                    [void]$detectedRoots.Add($parentFull)
+        $refined = Refine-ExternalToolStatus -Status $cls.status -LinkType $cls.linkType -Target $cls.target -PreferredPath $preferredPath
+        if ($refined.status -eq 'ausente' -or $refined.status -eq 'quebrada') {
+            if ($preferredKind -ne 'missing') { $extHasGap = $true }
+            elseif ($refined.status -eq 'quebrada') { $extHasGap = $true }
+        }
+        if ($refined.status -eq 'copia_opaca' -or $refined.status -eq 'fonte_desatualizada') {
+            $extHasOpaqueOrStale = $true
+            $extHasGap = $true
+        }
+        # Cursor exige vinculo nativo em ~/.cursor/skills; compat (.agents/.claude/.codex) e gap.
+        if ($refined.status -eq 'coberta_por_compatibilidade' -and $def.Name -eq 'Cursor') {
+            $extHasGap = $true
+        }
+        if ($refined.status -eq 'OK' -or $refined.status -eq 'coberta_por_compatibilidade' -or
+            $refined.status -eq 'copia_opaca' -or $refined.status -eq 'fonte_desatualizada') {
+            $extHasRegistration = $true
+        }
+        if (-not [string]::IsNullOrWhiteSpace($refined.target)) {
+            # Bootstrap git so se aplica a roots From-Zip. Alvo preferido gx4a-payload
+            # nao entra em detectedRoots (evita falso NEXA_DIR_NOT_REPO / registro sem root).
+            $isPreferredTarget = (Test-SamePath -A $refined.target -B $preferredPath)
+            $includeForGitBootstrap = $false
+            if ($ext.kind -eq 'nexa') {
+                if ($isPreferredTarget) {
+                    if ($preferredKind -eq 'from-zip') { $includeForGitBootstrap = $true }
+                }
+                else {
+                    # Alvo nao preferido: so roots que parecem repo (tem .git) ou pasta nexa legada.
+                    $parentProbe = [System.IO.Path]::GetDirectoryName($refined.target)
+                    if (-not [string]::IsNullOrWhiteSpace($parentProbe) -and (Test-Path -LiteralPath (Join-Path $parentProbe '.git'))) {
+                        $includeForGitBootstrap = $true
+                    }
+                    elseif ($refined.status -eq 'fonte_desatualizada') {
+                        $includeForGitBootstrap = $true
+                    }
+                }
+            }
+            if ($includeForGitBootstrap) {
+                $parent = [System.IO.Path]::GetDirectoryName($refined.target)
+                if (-not [string]::IsNullOrWhiteSpace($parent)) {
+                    $parentFull = [System.IO.Path]::GetFullPath($parent)
+                    if ($seenRoots.Add($parentFull)) {
+                        [void]$detectedRoots.Add($parentFull)
+                    }
                 }
             }
         }
         $perTool += [ordered]@{
             name      = $def.Name
             installed = $true
-            status    = $cls.status
-            linkType  = $cls.linkType
-            target    = $cls.target
+            status    = $refined.status
+            linkType  = $refined.linkType
+            target    = $refined.target
+            reason    = $refined.reason
         }
     }
 
-    $repoRootCanonical = Get-NexaCanonicalRepoRoot -XpzRoot $root
-    $repoBootstrapCanonical = Get-ExternalRepoBootstrapState -RepoRoot $repoRootCanonical -OfficialUrl $ext.officialUrl -SkillName $ext.name -GitExe $gitExe
+    $repoRootCanonical = [string]$preferred.fromZipRepoRoot
+    $repoBootstrapCanonical = if ($ext.kind -eq 'nexa') {
+        Get-ExternalRepoBootstrapState -RepoRoot $repoRootCanonical -OfficialUrl $ext.officialUrl -SkillName $ext.name -GitExe $gitExe
+    }
+    else {
+        [ordered]@{
+            repoRoot = ''; label = 'NEXA_REPO_MISSING'; originUrl = ''
+            originOk = $false; skillPresent = $false; skillPath = ''
+        }
+    }
 
-    # Bootstrap: avaliar TODOS os roots distintos apontados pelos vinculos (nao so o primeiro).
-    # Instalacao mista (um canônico + um legado) deve marcar EXTERNAL_SKILLS_GAPS.
     $repoRootDetected = ''
-    $repoBootstrapDetected = Get-ExternalRepoBootstrapState -RepoRoot '' -OfficialUrl $ext.officialUrl -SkillName $ext.name -GitExe $gitExe
+    $repoBootstrapDetected = Get-ExternalRepoBootstrapState -RepoRoot '' -OfficialUrl $(if ($ext.officialUrl) { $ext.officialUrl } else { 'https://example.invalid/none.git' }) -SkillName $ext.name -GitExe $gitExe
     $extHasRepoGap = $false
-    foreach ($rr in $detectedRoots) {
-        $st = Get-ExternalRepoBootstrapState -RepoRoot $rr -OfficialUrl $ext.officialUrl -SkillName $ext.name -GitExe $gitExe
-        $stFails = (-not [bool]$st.originOk) -or (-not [bool]$st.skillPresent) -or (
-            @('NEXA_DIR_NOT_REPO', 'NEXA_ORIGIN_MISSING', 'GIT_UNAVAILABLE') -contains [string]$st.label
-        )
-        if ($extHasRegistration -and $stFails) { $extHasRepoGap = $true }
+    if ($ext.kind -eq 'nexa') {
+        foreach ($rr in $detectedRoots) {
+            $st = Get-ExternalRepoBootstrapState -RepoRoot $rr -OfficialUrl $ext.officialUrl -SkillName $ext.name -GitExe $gitExe
+            $stFails = (-not [bool]$st.originOk) -or (-not [bool]$st.skillPresent) -or (
+                @('NEXA_DIR_NOT_REPO', 'NEXA_ORIGIN_MISSING', 'GIT_UNAVAILABLE') -contains [string]$st.label
+            )
+            if ($extHasRegistration -and $stFails) { $extHasRepoGap = $true }
 
-        $preferredFails = (-not [bool]$repoBootstrapDetected.originOk) -or (-not [bool]$repoBootstrapDetected.skillPresent) -or (
-            @('NEXA_DIR_NOT_REPO', 'NEXA_ORIGIN_MISSING', 'GIT_UNAVAILABLE', 'NEXA_REPO_MISSING') -contains [string]$repoBootstrapDetected.label
-        )
-        if ([string]::IsNullOrWhiteSpace($repoRootDetected)) {
-            $repoRootDetected = $rr
-            $repoBootstrapDetected = $st
+            $preferredFails = (-not [bool]$repoBootstrapDetected.originOk) -or (-not [bool]$repoBootstrapDetected.skillPresent) -or (
+                @('NEXA_DIR_NOT_REPO', 'NEXA_ORIGIN_MISSING', 'GIT_UNAVAILABLE', 'NEXA_REPO_MISSING') -contains [string]$repoBootstrapDetected.label
+            )
+            if ([string]::IsNullOrWhiteSpace($repoRootDetected)) {
+                $repoRootDetected = $rr
+                $repoBootstrapDetected = $st
+            }
+            elseif ($stFails -and -not $preferredFails) {
+                $repoRootDetected = $rr
+                $repoBootstrapDetected = $st
+            }
         }
-        elseif ($stFails -and -not $preferredFails) {
-            # Prefere expor um root com gap no recibo (evita mascarar legado atras de um canônico anterior).
-            $repoRootDetected = $rr
-            $repoBootstrapDetected = $st
+        if ($extHasRegistration -and [string]::IsNullOrWhiteSpace($repoRootDetected)) {
+            # Com fonte preferida gx4a-payload, ausencia de root git e esperada quando
+            # os vinculos ja apontam ao payload (ou so ha copia_opaca sem root git).
+            if ($preferredKind -eq 'from-zip') {
+                $extHasRepoGap = $true
+            }
+            elseif ($preferredKind -eq 'missing') {
+                $extHasRepoGap = $true
+            }
+            # preferredKind gx4a-payload: nao exige detectedRoots
         }
-    }
-    if ($extHasRegistration -and [string]::IsNullOrWhiteSpace($repoRootDetected)) {
-        # Mesma semantica do bootstrap vazio: registro sem path resolvivel = gap.
-        $extHasRepoGap = $true
     }
     if ($extHasRepoGap) { $extHasGap = $true }
+    if ($extHasOpaqueOrStale) { $extHasGap = $true }
+
+    $resolveAction = 'none'
+    if ($extHasOpaqueOrStale -or ($extHasGap -and $preferredKind -ne 'missing')) {
+        if ($preferredKind -eq 'missing') {
+            $resolveAction = 'blocked-no-preferred-source'
+        }
+        else {
+            $resolveAction = 'replace-with-junction-to-preferred'
+        }
+    }
+
+    $fromZipBehind = $false
+    if ($ext.kind -eq 'nexa' -and $preferredKind -eq 'gx4a-payload' -and $null -ne $preferred.fromZip -and [bool]$preferred.fromZip.present) {
+        $fromZipBehind = $true
+    }
 
     $externalSkills += [ordered]@{
-        name                  = $ext.name
-        repo                  = $ext.repo
-        officialUrl           = $ext.officialUrl
-        repoRootDetected      = $repoRootDetected
-        repoRootCanonical     = $repoRootCanonical
-        repoBootstrapDetected = $repoBootstrapDetected
+        name                   = $ext.name
+        repo                   = $ext.repo
+        officialUrl            = $ext.officialUrl
+        kind                   = $ext.kind
+        preferredPath          = $preferredPath
+        preferredKind          = $preferredKind
+        preferredVersion       = [string]$preferred.preferredVersion
+        fromZipBehindPreferred = $fromZipBehind
+        gx4aManagedPaths       = @($managedPaths)
+        resolveAction          = $resolveAction
+        repoRootDetected       = $repoRootDetected
+        repoRootCanonical      = $repoRootCanonical
+        repoBootstrapDetected  = $repoBootstrapDetected
         repoBootstrapCanonical = $repoBootstrapCanonical
-        repoOriginOk          = [bool]$repoBootstrapDetected.originOk
-        tools                 = $perTool
+        repoOriginOk           = [bool]$repoBootstrapDetected.originOk
+        tools                  = $perTool
     }
 }
 if ($extHasGap) { $externalOverall = 'EXTERNAL_SKILLS_GAPS' } else { $externalOverall = 'EXTERNAL_SKILLS_OK' }
 
 # --- Veredito -----------------------------------------------------------------
 $mcpIsGap = @('MCP_SERVER_STALE', 'MCP_CONFIG_INVALID') -contains $cursorMcp.label
-$hasGaps = ($sumMissing -gt 0) -or ($sumBroken -gt 0) -or (@($orphans).Count -gt 0) -or $mcpIsGap
+# coberta_por_compatibilidade no Cursor (falta ~/.cursor/skills) conta como gap —
+# registro nativo em ~/.cursor/skills e obrigatorio quando o Cursor esta instalado.
+$hasGaps = ($sumMissing -gt 0) -or ($sumBroken -gt 0) -or ($sumCompat -gt 0) -or (@($orphans).Count -gt 0) -or $mcpIsGap
 if ($hasGaps) { $overall = 'REGISTRATION_GAPS' } else { $overall = 'REGISTRATION_OK' }
 
 $result = [ordered]@{
@@ -660,14 +942,25 @@ Write-Output ("Skills externas gerenciadas: {0}" -f $externalOverall)
 foreach ($ext in $externalSkills) {
     $repoInfo = if ([string]::IsNullOrWhiteSpace($ext.repoRootDetected)) { '(repo local nao detectado)' } else { $ext.repoRootDetected }
     $bootstrapLabel = [string]$ext.repoBootstrapDetected.label
-    Write-Output ("  [{0}] repo={1} | local={2} | bootstrap={3} | originOk={4}" -f `
-            $ext.name, $ext.repo, $repoInfo, $bootstrapLabel, $ext.repoOriginOk)
+    Write-Output ("  [{0}] repo={1} | preferred={2} ({3} v={4}) | resolve={5}" -f `
+            $ext.name, $ext.repo, $ext.preferredKind, $ext.preferredPath, $ext.preferredVersion, $ext.resolveAction)
+    Write-Output ("      local={0} | bootstrap={1} | originOk={2}" -f `
+            $repoInfo, $bootstrapLabel, $ext.repoOriginOk)
     if (-not [string]::IsNullOrWhiteSpace([string]$ext.repoRootCanonical)) {
-        Write-Output ("      canonico={0} | bootstrap={1}" -f $ext.repoRootCanonical, $ext.repoBootstrapCanonical.label)
+        Write-Output ("      canonico={0} | bootstrap={1} | fromZipBehind={2}" -f `
+                $ext.repoRootCanonical, $ext.repoBootstrapCanonical.label, $ext.fromZipBehindPreferred)
+    }
+    if (@($ext.gx4aManagedPaths).Count -gt 0) {
+        Write-Output ("      gx4a-managed: {0}" -f ((@($ext.gx4aManagedPaths) | Select-Object -First 4) -join '; '))
     }
     foreach ($pt in $ext.tools) {
         if (-not $pt.installed) { continue }
-        Write-Output ("      {0,-12} {1}" -f $pt.name, $pt.status)
+        if ($pt.status -eq 'OK') {
+            Write-Output ("      {0,-12} {1}" -f $pt.name, $pt.status)
+        }
+        else {
+            Write-Output ("      {0,-12} {1} {2}" -f $pt.name, $pt.status, $pt.reason)
+        }
     }
 }
 Write-Output ''

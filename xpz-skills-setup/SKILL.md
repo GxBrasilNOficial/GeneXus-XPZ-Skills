@@ -32,8 +32,11 @@ de um novo usuário.
   para o Codex — ver `## CAMINHOS DE SKILLS POR FERRAMENTA`
 - Classificar cada skill por ferramenta: **OK**, **coberta por compatibilidade**
   (registrada em diretório que a ferramenta lê por compatibilidade, sem registro
-  nativo nela), **ausente**, **órfã** (registrada mas não existe mais no repo) ou
-  **quebrada** (symlink/junction inválido)
+  nativo nela), **ausente**, **órfã** (registrada mas não existe mais no repo),
+  **quebrada** (symlink/junction inválido), e — só para skills externas
+  gerenciadas (`nexa`, `gam`) — **copia_opaca** (pasta real onde deveria haver
+  vínculo) ou **fonte_desatualizada** (vínculo válido cujo alvo não é a fonte
+  preferida atual)
 - Apresentar relatório consolidado por ferramenta antes de qualquer ação
 - Oferecer resolver cada gap identificado — nunca agir silenciosamente
 - Aguardar confirmação explícita do usuário antes de criar ou remover qualquer vínculo
@@ -41,15 +44,19 @@ de um novo usuário.
 - No Windows, tentar **symlink** como mecanismo preferencial; se falhar por permissão,
   cair automaticamente para **junction** e informar ao usuário o que foi usado e por quê
 - Nunca copiar arquivos como alternativa a symlink/junction — cópia gera
-  desatualização silenciosa após `git pull`
+  desatualização silenciosa após `git pull` **ou** após atualização do
+  GeneXus for Agents; o instalador oficial que copia skills para os diretórios
+  das ferramentas é detectado como `copia_opaca` (ver
+  `## GENEXUS FOR AGENTS — CÓPIAS OPACAS`)
 - Não instalar as ferramentas de agente (Codex, Claude Code, Cursor, OpenCode, Antigravity) —
   apenas gerenciar o registro das skills dentro delas. **Exceção:** o `git` é
   pré-requisito de versionamento (não é ferramenta de agente) e **pode ser
   instalado** por esta skill quando ausente, pois sem ele a pasta baixada como
   ZIP não se liga ao repositório oficial — ver `## BOOTSTRAP DO REPOSITÓRIO`
-- Não registrar skills de outros repositórios, **com uma exceção gerenciada
-  nomeada: a `nexa`** (ver `## SKILL EXTERNA GERENCIADA: NEXA`). Demais skills de
-  outros repositórios ficam fora de escopo
+- Não registrar skills de outros repositórios, **com exceções gerenciadas
+  nomeadas: `nexa` e `gam`** (ver `## SKILL EXTERNA GERENCIADA: NEXA` e
+  `## SKILL EXTERNA GERENCIADA: GAM`). Demais skills de outros repositórios
+  ficam fora de escopo
 - Não alterar configurações gerais das ferramentas fora do âmbito desta skill;
   **exceção explícita:** instrucionais globais cobertos pelo passo 9 do `WORKFLOW`
   (incluindo instalação do MCP Cursor via
@@ -74,6 +81,18 @@ de um novo usuário.
   `reviewer-ro` só é considerado ativo quando `scripts/Test-OpenCodeReviewerRoSelfTest.ps1`
   passa na versão-alvo (token `OPENCODE_REVIEWER_RO_SELFTEST_OK`); quando a auditoria
   em código existir, conferir esse gate faz parte dela.
+  **Anti-padrão (obrigatório enquanto não houver motor nesta skill):**
+  - Em auditoria/setup **completo** ou parcial desta skill: **não** abrir secção
+    «o que é o `reviewer-ro`», **não** reportar status/integridade, **não** correr
+    pre-check/`Test-OpenCodeReviewerRoInstalledCompatibility`/`Install-…` — o ponteiro
+    acima **não** é item do recibo.
+  - **Não** amarrar `reviewer-ro` à calibração/edição de **revisores preferidos**
+    (lista do painel ≠ agente least-privilege do OpenCode). São frentes distintas;
+    se o usuário pedir as duas na mesma mensagem, cumprir em **recibos separados**
+    (ou secções claramente independentes), sem um único «ok» misturado.
+  - Exceções: pedido **explícito** do usuário sobre `reviewer-ro`; ou iminência de
+    despacho opencode via `xpz-llm-delegate` (aí o guard/adapters daquela skill
+    mandam — não esta).
 - Verificar existência de diretórios com `Test-Path` individual por ferramenta — nunca
   agrupar em hashtable ou bloco de verificação coletiva
 - Quando o usuário pedir auditoria ou setup **completo** (ex.: após `git pull`,
@@ -83,7 +102,7 @@ de um novo usuário.
   passos 6–7: nada gravado sem confirmação explícita) — não substituir esse passo
   por oferta genérica do tipo "na próxima mensagem posso auditar", que confunde
   quem espera um relatório fechado nesta execução
-- **Opcional (não-bloqueante): calibração de revisores preferidos.** No setup de máquina, oferecer (sem cobrar) calibrar a lista de **revisores preferidos** para a revisão por pares, executando `Set-LlmDelegatePreferredReviewers.ps1` da skill `xpz-llm-delegate` (dona do arquivo) — esta skill apenas **oferece rodar** o script, não é dona do contrato. A oferta de 1º uso grava **machine-scope** (`preferred-reviewers.json`); calibração por orquestrador (`preferred-reviewers.<orch>.json`) é `Set- … -Scope orchestrator` na sessão da ferramenta. **Titular de subagente nativo não cabe em machine-scope** — o script recusa (`native-machine-scope-forbidden`), porque o nativo pertence ao harness que o executa; se a calibração incluir um nativo, ele vai em `-Scope orchestrator` na sessão daquela ferramenta. Nunca grava sem confirmação.
+- **Opcional (não-bloqueante): calibração de revisores preferidos.** No setup de máquina, oferecer (sem cobrar) calibrar a lista de **revisores preferidos** para a revisão por pares, executando `Set-LlmDelegatePreferredReviewers.ps1` da skill `xpz-llm-delegate` (dona do arquivo) — esta skill apenas **oferece rodar** o script, não é dona do contrato. **Antes de oferecer scope:** rodar `Resolve-LlmDelegatePreferredReviewers.ps1 -Orchestrator <harness da sessão>` e mostrar `preferenceSource` / `effectivePreferredPath` / se já existe ficheiro do orquestrador. Não vender machine como «a» lista se `cascadeOrchestratorExists=true` — perguntar: (a) lista **deste harness** (`-Scope orchestrator`) ou (b) lista **machine** (fallback quando não há ficheiro do orquestrador). Oferta de 1º uso **sem** ficheiro de orquestrador ainda pode gravar machine; se o harness já tem `preferred-reviewers.<orch>.json`, a calibração desta sessão deve ir para orchestrator salvo o usuário pedir machine. **Titular de subagente nativo não cabe em machine-scope** — o script recusa (`native-machine-scope-forbidden`), porque o nativo pertence ao harness que o executa; se a calibração incluir um nativo, ele vai em `-Scope orchestrator` na sessão daquela ferramenta. Nunca grava sem confirmação. **Não** incluir checagem/instalação/`reviewer-ro` neste passo (ver anti-padrão no bullet do `reviewer-ro`).
 
 ## CAMINHOS DE SKILLS POR FERRAMENTA
 
@@ -97,7 +116,7 @@ nativo nesta skill para evitar depender de compatibilidade opcional com Claude C
 |---|---|---|
 | Codex | `~/.codex/skills/` (`$CODEX_HOME/skills/` por padrão — destino do `$skill-installer` embutido; inclui `.system/` empacotadas com o produto) | `~/.agents/skills/` — segundo âmbito USER que o Codex também indexa (doc oficial OpenAI); não substitui `.codex/skills/` como “lar” do instalador |
 | Claude Code | `~/.claude/skills/` | — |
-| Cursor | `~/.cursor/skills/` ou `~/.agents/skills/` | `~/.claude/skills/`, `~/.codex/skills/` |
+| Cursor | `~/.cursor/skills/` (nativo exigido por esta skill) | `~/.agents/skills/`, `~/.claude/skills/`, `~/.codex/skills/` |
 | OpenCode | `~/.config/opencode/skills/` ou `~/.agents/skills/` | — |
 | Antigravity | `~/.gemini/config/skills/` (global) ou `~/.agents/skills/` (compartilhado) | — |
 
@@ -115,28 +134,30 @@ A skill apresenta duas estratégias e adota a **compacta** como padrão. Aceita 
 
 ### Compacta (padrão)
 
-Os diretórios nativos abaixo cobrem todas as ferramentas instaladas sem usar `~/.agents/skills/` como pilar único:
+Os diretórios nativos abaixo cobrem as ferramentas instaladas:
 
-- `~/.claude/skills/` → Claude Code (nativo), Cursor (compat)
-- `~/.codex/skills/` → Codex (nativo via `$CODEX_HOME/skills/` / instalador), Cursor (compat)
+- `~/.claude/skills/` → Claude Code (nativo); Cursor só por compatibilidade
+- `~/.codex/skills/` → Codex (nativo via `$CODEX_HOME/skills/` / instalador); Cursor só por compatibilidade
+- `~/.cursor/skills/` → Cursor (**nativo obrigatório** quando o Cursor estiver instalado)
 - `~/.config/opencode/skills/` → OpenCode (nativo)
 - `~/.gemini/config/skills/` → Antigravity (nativo global)
 
-**Opcional:** `~/.agents/skills/` — alguns setups já mantêm junctions aqui porque
-Cursor e OpenCode também tratam esse diretório como USER nativo e porque o Codex
-indexa esse segundo âmbito USER; **não entra na compacta recomendada** porque
-os caminhos nativos das ferramentas principais já cobrem o ecossistema sem depender
-de compatibilidade opcional do OpenCode com Claude Code.
+**Opcional:** `~/.agents/skills/` — segundo âmbito USER do Codex e caminho nativo
+de produto para Cursor/OpenCode; **não substitui** `~/.cursor/skills/` nesta skill.
+Se a skill só existir em `.agents`/`.claude`/`.codex` e o Cursor estiver instalado,
+a classificação em Cursor é **coberta por compatibilidade** e isso **marca
+`REGISTRATION_GAPS`** — o restore deve criar o vínculo em `~/.cursor/skills/`.
 
 **Dois junctions para o mesmo alvo:** registrar `nome-da-skill` como junction tanto
 em `~/.codex/skills/` quanto em `~/.agents/skills/` apontando para a mesma pasta do
 repositório não duplica conteúdo em disco — são dois pontos de entrada redundantes.
-Útil apenas quando se quer exposição explícita nos dois âmbitos USER do ecossistema;
-caso contrário, um único vínculo por skill na compacta basta.
+Útil quando se quer exposição explícita nos dois âmbitos USER do Codex; caso
+contrário, um único vínculo por skill na compacta basta (exceto Cursor, que exige
+o nativo em `~/.cursor/skills/`).
 
-Vantagem: menos symlinks/junctions para manter, menos pontos de falha após
-`git pull`. Desvantagem: desinstalar uma skill de uma única ferramenta sem
-afetar as demais exige promover para a estratégia expansiva primeiro.
+Vantagem: menos symlinks/junctions para manter (exceto o nativo Cursor). Desvantagem:
+desinstalar uma skill de uma única ferramenta sem afetar as demais exige a
+estratégia expansiva.
 
 ### Expansiva (opt-in)
 
@@ -146,7 +167,7 @@ Um caminho próprio por ferramenta configurada:
   `$CODEX_HOME/skills/`; coexistência opcional com `~/.agents/skills/` quando se
   quer dois âmbitos USER indexados pelo Codex)
 - `~/.claude/skills/` (Claude Code)
-- `~/.cursor/skills/` (Cursor)
+- `~/.cursor/skills/` (Cursor — também obrigatório na compacta)
 - `~/.config/opencode/skills/` (OpenCode)
 - `~/.gemini/config/skills/` (Antigravity)
 
@@ -155,12 +176,12 @@ por ferramenta (um em cada diretório nativo), aumentando os pontos de manutenç
 
 ### Classificação ao auditar
 
-Antes de classificar uma skill como **ausente** em Cursor, verificar se já existe
-registro em algum diretório que essa ferramenta lê por compatibilidade (ver
-`## CAMINHOS DE SKILLS POR FERRAMENTA`). Se existir,
-classificar como **coberta por compatibilidade** em vez de **ausente** — o
-relatório informa ao usuário que a skill já é detectável e oferece, sem cobrar,
-promoção para registro nativo.
+Para **Cursor** com a ferramenta instalada: o nativo exigido é **somente**
+`~/.cursor/skills/`. Se a skill existir só em `~/.agents/skills/`, `~/.claude/skills/`
+ou `~/.codex/skills/`, classificar como **coberta por compatibilidade** — e tratar
+como **gap de registro** (`REGISTRATION_GAPS` /, nas externas, `EXTERNAL_SKILLS_GAPS`):
+oferecer criar symlink/junction em `~/.cursor/skills/` apontando para o mesmo alvo
+(repo XPZ ou payload Gx4A). Não deixar como “opcional sem cobrar”.
 
 Para **OpenCode**, exigir vínculo em `~/.config/opencode/skills/` ou
 `~/.agents/skills/`. Não classificar como **coberta por compatibilidade** apenas
@@ -278,16 +299,26 @@ XPZ (passo 0 do `## WORKFLOW`).
 
 **Auditoria de registro da `nexa`:** o motor `scripts/Test-XpzSkillsRegistration.ps1`
 classifica a `nexa` em uma seção separada (`externalSkills` / `externalOverall`),
-aplicando a **mesma** classificação OK / coberta_por_compatibilidade / ausente /
-quebrada dos vínculos e a **estratégia compacta** (registro em `~/.claude`,
-`~/.codex`, `~/.config/opencode`, `~/.gemini/config/skills`; Cursor por
-compatibilidade). Além dos vínculos,
-o motor confere **read-only** o clone local detectado (`repoBootstrapDetected`,
-labels `NEXA_*`) contra a URL oficial e expõe o caminho canônico
-(`repoRootCanonical` = pasta-irmã `GeneXus-Skills-From-Zip`). Avalia **todos** os
-roots distintos apontados pelos vínculos das ferramentas instaladas (não só o
-primeiro na ordem Claude→…→Antigravity): instalação mista (um canônico + um
-legado) marca gap.
+aplicando a classificação OK / coberta_por_compatibilidade / ausente / quebrada /
+**copia_opaca** / **fonte_desatualizada** e a **estratégia compacta** (registro em
+`~/.claude`, `~/.codex`, `~/.config/opencode`, `~/.gemini/config/skills`; Cursor por
+compatibilidade).
+
+**Fonte preferida da `nexa`:** entre (a) `<repoRootCanonical>\nexa` (From-Zip) e
+(b) `%LOCALAPPDATA%\Programs\GeneXus\GeneXus4Agents\payload\skills\nexa` (payload do
+GeneXus for Agents), o motor escolhe a **mais nova** — compara `metadata.version` do
+`SKILL.md` quando parseável; se empatar ou faltar versão, usa `LastWriteTimeUtc` do
+`SKILL.md`; empate final prefere From-Zip (lar comunitário). O recibo expõe
+`preferredPath` / `preferredKind` (`from-zip` | `gx4a-payload` | `missing`) e
+`fromZipBehindPreferred` quando o payload ganhou. **Não** restaurar para o From-Zip
+quando ele estiver atrás do payload — isso seria downgrade.
+
+Além dos vínculos, o motor confere **read-only** o clone local detectado
+(`repoBootstrapDetected`, labels `NEXA_*`) contra a URL oficial e expõe o caminho
+canônico (`repoRootCanonical` = pasta-irmã `GeneXus-Skills-From-Zip`). Avalia
+**todos** os roots distintos apontados pelos vínculos **From-Zip** (não o parent do
+payload Gx4A): instalação mista (um canônico + um legado) marca gap. Junction correto
+ao payload preferido **não** exige `detectedRoots` git.
 
 Labels de bootstrap da auditoria: `NEXA_ALREADY_LINKED`, `NEXA_REMOTE_MISMATCH`,
 `NEXA_DIR_NOT_REPO`, `NEXA_ORIGIN_MISSING`, `GIT_UNAVAILABLE`, `NEXA_REPO_MISSING`.
@@ -296,33 +327,86 @@ Labels de bootstrap da auditoria: `NEXA_ALREADY_LINKED`, `NEXA_REMOTE_MISMATCH`,
   antes do clone) é **estado esperado / informativo** — **não** abre
   `EXTERNAL_SKILLS_GAPS` sozinho.
 - **`EXTERNAL_SKILLS_GAPS` por bootstrap** quando há registro da `nexa` e algum root
-  dos **vínculos** falha: legado/`NEXA_REMOTE_MISMATCH`, `NEXA_DIR_NOT_REPO`,
-  `NEXA_ORIGIN_MISSING`, `GIT_UNAVAILABLE`; ou registro sem root resolvível /
-  alvo de vínculo sumido (`NEXA_REPO_MISSING` em `repoBootstrapDetected`). Também
-  marca gap subpasta `nexa` ausente no root avaliado — mesmo quando nenhum vínculo
-  está ausente/quebrado na classificação por ferramenta.
+  dos **vínculos From-Zip** falha: legado/`NEXA_REMOTE_MISMATCH`, `NEXA_DIR_NOT_REPO`,
+  `NEXA_ORIGIN_MISSING`, `GIT_UNAVAILABLE`; ou registro sem root resolvível com
+  `preferredKind=from-zip` / alvo de vínculo sumido (`NEXA_REPO_MISSING` em
+  `repoBootstrapDetected`). Também marca gap subpasta `nexa` ausente no root avaliado
+  — mesmo quando nenhum vínculo está ausente/quebrado na classificação por ferramenta.
+- **`EXTERNAL_SKILLS_GAPS` por cópia/fonte:** qualquer ferramenta com `copia_opaca` ou
+  `fonte_desatualizada`; `resolveAction=replace-with-junction-to-preferred`.
 
 `externalOverall` é **independente** de `overall`: ausência/quebra/repo desatualizado
 da `nexa` **não** marca `REGISTRATION_GAPS`, mas marca `EXTERNAL_SKILLS_GAPS`.
 
 **Resolução de gaps da `nexa`:** quando `externalOverall = EXTERNAL_SKILLS_GAPS`,
-primeiro garantir o repositório **canônico** com `scripts/Initialize-NexaRepoGit.ps1`
-e **só então** criar/recriar o vínculo da `nexa` nos caminhos da estratégia ativa,
-apontando para `<repoRootCanonical>\nexa` (nunca o repo inteiro).
 
-- **Sem clone / sem vínculos `nexa`:** chamar **sem** `-NexaRepoRoot` (cai no default
-  pasta-irmã `GeneXus-Skills-From-Zip` e clona quando ausente).
-- **Vínculos apontam para clone legado** (`repoBootstrapDetected.label` =
-  `NEXA_REMOTE_MISMATCH` ou equivalente): **obrigatório** passar
-  `-NexaRepoRoot <repoRootCanonical>` (o caminho canônico que a auditoria já
-  expôs). Omitir o parâmetro faz o motor **redetectar o legado** pelo vínculo
-  existente e devolver de novo `NEXA_REMOTE_MISMATCH` — sem clonar o canônico.
-  Depois do canônico OK, **recriar** os vínculos para `<repoRootCanonical>\nexa`
-  após confirmação.
+1. Ler `preferredPath` / `preferredKind` / `resolveAction` no recibo do motor.
+2. Se `preferredKind=from-zip` (ou se o usuário pedir o lar comunitário em dia):
+   garantir o repositório **canônico** com `scripts/Initialize-NexaRepoGit.ps1` e
+   apontar vínculos para `<repoRootCanonical>\nexa`. Sem clone / sem vínculos:
+   chamar **sem** `-NexaRepoRoot`. Se a auditoria marcou clone legado
+   (`NEXA_REMOTE_MISMATCH`), chamar **com** `-NexaRepoRoot <repoRootCanonical>`.
+3. Se `preferredKind=gx4a-payload`: **não** recriar vínculos para o From-Zip atrasado.
+   Remover só a **cópia opaca** (pasta real; nunca o alvo de um junction) ou o
+   junction desatualizado, e criar symlink/junction → `preferredPath` (payload).
+   Oferecer, sem cobrar, importar depois o snapshot do payload no From-Zip (frente
+   comunitária aparte) para o lar git voltar a ser preferido.
+4. Sempre com **confirmação explícita** do usuário, igual aos passos 6–7 das skills
+   internas. Override de pasta fora do preferido só se o usuário pedir caminho
+   alternativo.
 
-Sempre com **confirmação explícita** do usuário, igual aos passos 6–7 das skills
-internas. Override de pasta fora do canônico só se o usuário pedir caminho
-alternativo.
+## SKILL EXTERNA GERENCIADA: GAM
+
+A `gam` (GeneXus Access Manager) é a segunda skill externa gerenciada por nome.
+**Não** vive no From-Zip hoje: a fonte oficial local é o payload do GeneXus for Agents:
+
+`%LOCALAPPDATA%\Programs\GeneXus\GeneXus4Agents\payload\skills\gam`
+
+O motor a inclui em `externalSkills` com `preferredKind=gx4a-payload` quando o
+`SKILL.md` do payload existe. Cópias opacas e marcador `.skill-managed-gam` seguem
+`## GENEXUS FOR AGENTS — CÓPIAS OPACAS`. Resolução: após confirmação, remover a cópia
+opaca e criar junction/symlink → `preferredPath` do payload. Se o payload estiver
+ausente, `resolveAction=blocked-no-preferred-source` — não inventar outra origem.
+
+## GENEXUS FOR AGENTS — CÓPIAS OPACAS
+
+O setup GeneXus for Agents (`gx4a-setup`) pode instalar `nexa` e `gam` **copiando**
+pastas reais para Claude Code, OpenCode, `.agents` (Codex) e Antigravity, removendo
+junctions/symlinks pré-existentes e gravando marcadores
+`%LOCALAPPDATA%\Programs\GeneXus\GeneXus4Agents\.skill-managed-nexa` e
+`.skill-managed-gam` (lista de destinos).
+
+Isso **contradiz** a regra «nunca copiar» desta skill. O motor trata:
+
+- pasta real (`linkType=Directory`) com fonte preferida conhecida → **`copia_opaca`**
+- junction/symlink cujo alvo ≠ `preferredPath` → **`fonte_desatualizada`**
+- caminhos listados nos marcadores `.skill-managed-*` → campo `gx4aManagedPaths`
+  (corroboração; a classificação não depende só do marcador)
+
+`resolveAction=replace-with-junction-to-preferred` orienta o agente a oferecer o
+restore; **esta skill e o motor não aplicam** o restore sozinhos — só após
+confirmação explícita (passos 6–7). Um novo `gx4a-setup` pode reincidir até a
+GeneXus mudar o instalador (pedido típico: não destruir links; preferir um
+diretório-fonte + vínculos; opção de não instalar skills).
+
+### Wrapper seguro (opção C)
+
+Para **atualizar ou reinstalar** GeneXus for Agents sem deixar cópias opacas, usar
+o wrapper desta skill:
+
+`scripts/Invoke-GeneXusForAgentsSetupSafe.ps1`
+
+- Com `-SetupPath <instalador>`: executa o setup oficial e, em seguida, reaplica
+  symlink/junction de `nexa`/`gam` → `GeneXus4Agents\payload\skills\…`
+- Com `-RepairOnly`: só o restore (útil depois de um setup feito fora do wrapper)
+- `-AsJson` para agentes; tenta symlink e cai para junction se a permissão negar
+- Não impede o `gx4a-setup` se ele for clicado fora do script — só cobre o caminho
+  que passa pelo wrapper
+
+Esta skill **passa a ser o dono normativo** desse wrapper de instalação/reparo do
+GeneXus for Agents no ecossistema XPZ. Outras skills do repositório **podem**
+invocá-lo mais tarde (sem compromisso nesta frente). Validação:
+`Test-GeneXusForAgentsSetupSafeSelfTest.ps1` (`GX4A_SETUP_SAFE_SELFTEST_OK`).
 
 ## PATH RESOLUTION
 
@@ -345,9 +429,15 @@ Use esta skill para:
 - Configurar o ambiente de um novo usuário que clonou o repositório de skills XPZ
 - Detectar skills ausentes, órfãs, com vínculo quebrado ou cobertas apenas por
   compatibilidade cruzada nas ferramentas instaladas
-- Validar se a skill externa gerenciada `nexa` está instalada globalmente e, se o
-  repositório local dela estiver ausente, cloná-lo do oficial e registrar a `nexa`
-  (ver `## SKILL EXTERNA GERENCIADA: NEXA`)
+- Validar se as skills externas gerenciadas `nexa` e `gam` estão instaladas
+  globalmente (fonte preferida, sem cópia opaca); na `nexa`, se o repositório
+  From-Zip local estiver ausente e for a fonte preferida, cloná-lo do oficial e
+  registrar (ver `## SKILL EXTERNA GERENCIADA: NEXA` e `## SKILL EXTERNA GERENCIADA: GAM`)
+- Detectar cópias opacas deixadas pelo GeneXus for Agents e oferecer replace por
+  junction/symlink à fonte preferida (ver `## GENEXUS FOR AGENTS — CÓPIAS OPACAS`)
+- Instalar ou atualizar GeneXus for Agents pelo wrapper seguro
+  `scripts/Invoke-GeneXusForAgentsSetupSafe.ps1` (setup + restore de links; ou
+  `-RepairOnly`), dono normativo nesta skill
 - Registrar uma nova skill adicionada ao repositório
 - Remover o registro de uma skill removida do repositório
 - Verificar se as instruções globais do usuário (AGENTS.md, CLAUDE.md ou
@@ -356,10 +446,12 @@ Use esta skill para:
 
 Do NOT use this skill para:
 - Instalar Codex, Claude Code, Cursor, OpenCode ou Antigravity na máquina
-- Registrar skills de outros repositórios **além da `nexa`**. A `nexa`
-  é exceção gerenciada nomeada — ver `## SKILL EXTERNA GERENCIADA: NEXA`
+- Registrar skills de outros repositórios **além de `nexa` e `gam`**. Essas duas
+  são exceções gerenciadas nomeadas — ver as seções correspondentes
 - Preparar ou auditar a pasta paralela de uma KB GeneXus (use `xpz-kb-parallel-setup`)
 - Sincronizar XPZ de uma KB (use `xpz-sync`)
+- Aplicar restore de `copia_opaca`/`fonte_desatualizada` sem confirmação explícita
+  do usuário nesta sessão
 
 ---
 
@@ -526,8 +618,9 @@ detecta o `server.py` defasado comparando o hash instalado com o canônico do re
    O motor trata diretórios compartilhados (`.agents/skills/`) de forma deduplicada
    via `(Resolve-Path).Path` canonizado. O motor é **somente leitura**: não cria nem remove vínculos.
    Este `SKILL.md` permanece a fonte das regras que o motor implementa. Além das skills internas, o motor
-   classifica também a skill externa gerenciada `nexa` em seção separada
-   (`externalSkills` / `externalOverall`) — ver `## SKILL EXTERNA GERENCIADA: NEXA`.
+   classifica também as skills externas gerenciadas `nexa` e `gam` em seção separada
+   (`externalSkills` / `externalOverall`) — ver `## SKILL EXTERNA GERENCIADA: NEXA`,
+   `## SKILL EXTERNA GERENCIADA: GAM` e `## GENEXUS FOR AGENTS — CÓPIAS OPACAS`.
 3. Ler o resultado do motor:
    - `overall` → `REGISTRATION_OK` (registro íntegro) ou `REGISTRATION_GAPS`
      (há ausências, quebradas, órfãs e/ou o MCP do Cursor defasado/inválido —
@@ -538,31 +631,43 @@ detecta o `server.py` defasado comparando o hash instalado com o canônico do re
      apontam para o repo sem skill correspondente; `cursorMcp.label` o estado do
      MCP global do Cursor (tratado no passo 9)
    - `externalOverall` → `EXTERNAL_SKILLS_OK` ou `EXTERNAL_SKILLS_GAPS` (independente
-     de `overall`); `externalSkills[]` traz o status da `nexa` por ferramenta,
-     `repoRootDetected`, `repoRootCanonical`, `repoBootstrapDetected` / `repoBootstrapCanonical`
-     e `repoOriginOk` — ver `## SKILL EXTERNA GERENCIADA: NEXA`
+     de `overall`); `externalSkills[]` traz por skill (`nexa`, `gam`) o status por
+     ferramenta, `preferredPath`/`preferredKind`/`preferredVersion`,
+     `resolveAction`, `gx4aManagedPaths`, `fromZipBehindPreferred` (nexa),
+     `repoRootDetected`, `repoRootCanonical`, `repoBootstrapDetected` /
+     `repoBootstrapCanonical` e `repoOriginOk` — ver seções das skills externas
    - O `summary` (ok / coveredByCompat / missing / broken / orphans / cursorMcp /
      externalOverall) alimenta o relatório
 4. Apresentar relatório consolidado por ferramenta, declarando explicitamente
    qual estratégia de registro está em uso (compacta por padrão; expansiva se o
-   usuário tiver indicado) — ver `## ESTRATÉGIA DE REGISTRO`
+   usuário tiver indicado) — ver `## ESTRATÉGIA DE REGISTRO`.
+   **Prosa do recibo (alvo dos vínculos):** não colapsar internas e externas num
+   único «todas as skills OK → repo».
+   - Skills **XPZ internas** (`tools[].skills` / contagens de `summary` ligadas a
+     `overall`): symlink/junction → **repo desta raiz**.
+   - Skills **externas** (`externalSkills[]`: `nexa`, `gam`): no resumo e no detalhe,
+     usar o alvo do motor — `preferredKind` / `preferredPath` (ex.: payload Gx4A ou
+     From-Zip). **Nunca** escrever que `nexa`/`gam` apontam ao repo XPZ só porque
+     o status é `OK`.
+   - Frase agregada permitida: «internas OK → repo; externas OK → fonte preferida
+     (ver detalhe)» (ou equivalente), com o detalhe das externas sempre citando
+     `preferredKind`/`preferredVersion` quando `EXTERNAL_SKILLS_OK`.
 5. Para cada gap identificado, oferecer ação de resolução:
    - **Ausente** → criar symlink (ou junction se symlink falhar por permissão)
      no caminho da estratégia ativa
-   - **Coberta por compatibilidade** → apenas informar; oferecer promoção para
-     registro nativo se o usuário pedir, sem cobrar (aplica-se a Cursor nesta
-     estratégia)
+   - **Coberta por compatibilidade (Cursor)** → **gap**: criar symlink/junction em
+     `~/.cursor/skills/<skill>` para o mesmo alvo já usado em `.claude`/`.codex`/
+     `.agents` (repo XPZ ou payload Gx4A). Não tratar como opcional “sem cobrar”
    - **Órfã** → remover vínculo do diretório
    - **Quebrada** → recriar vínculo
-   - **Gap da `nexa`** (`EXTERNAL_SKILLS_GAPS`) → primeiro garantir o repositório
-     **canônico** com `scripts/Initialize-NexaRepoGit.ps1`: sem vínculos/legado,
-     chamar **sem** `-NexaRepoRoot` (default `GeneXus-Skills-From-Zip`); se a
-     auditoria marcou clone legado (`repoBootstrapDetected.label =
-     NEXA_REMOTE_MISMATCH` ou equivalente), chamar **com**
-     `-NexaRepoRoot <repoRootCanonical>` — omitir o parâmetro redetecta o legado
-     e bloqueia de novo. **Só então** criar/recriar o vínculo da `nexa` nos
-     caminhos da estratégia ativa, apontando para `<repoRootCanonical>\nexa`
-     (nunca o repo inteiro). Ver `## SKILL EXTERNA GERENCIADA: NEXA`.
+   - **`copia_opaca` / `fonte_desatualizada`** (`resolveAction=
+     replace-with-junction-to-preferred`) → remover a pasta real opaca **ou** o
+     junction desatualizado e criar symlink/junction → `preferredPath` (nexa:
+     payload Gx4A ou From-Zip conforme `preferredKind`; gam: sempre payload
+     Gx4A). Nunca apontar a `nexa` para From-Zip se `fromZipBehindPreferred=true`
+   - **Gap da `nexa` por bootstrap git** → seguir `## SKILL EXTERNA GERENCIADA: NEXA`
+     (Initialize-NexaRepoGit + vínculos ao preferido)
+   - **Gap da `gam`** → ver `## SKILL EXTERNA GERENCIADA: GAM`
 6. Aguardar confirmação explícita do usuário
 7. Executar as correções aprovadas
 8. Confirmar resultado por ferramenta

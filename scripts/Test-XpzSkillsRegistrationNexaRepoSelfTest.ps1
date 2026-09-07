@@ -12,6 +12,9 @@
     Inclui caso positivo: perfil sem ferramentas/vinculos e pasta-irma canônica
     ausente — repoBootstrapCanonical = NEXA_REPO_MISSING e EXTERNAL_SKILLS_OK
     (canônico ausente e informativo; nao abre gap sozinho).
+    Isola LOCALAPPDATA para nao herdar GeneXus4Agents real da maquina.
+    Casos adicionais: copia_opaca nexa/gam (payload Gx4A preferido) e
+    fonte_desatualizada (junction From-Zip com payload mais novo).
     Durante a invocacao do motor, PATH fica reduzido ao diretorio do git ja resolvido
     (sem CLIs de agente; nao depende dos fallbacks Program Files do Find-GitExecutable).
 #>
@@ -76,8 +79,10 @@ function Assert-Equal {
 $fakeRepo = New-TempDir
 $fakeProfile = New-TempDir
 $legacyRepo = New-TempDir
+$fakeLocalAppData = New-TempDir
 $originalProfile = $env:USERPROFILE
 $originalPath = $env:PATH
+$originalLocalAppData = $env:LOCALAPPDATA
 # PATH minimo: so o diretorio do git ja resolvido. Evita CLIs de agente no PATH
 # (determinismo de Test-ToolInstalled) sem depender dos 3 fallbacks hard-coded
 # de Find-GitExecutable (Program Files / LOCALAPPDATA) — scoop/choco/portatil.
@@ -85,6 +90,7 @@ $gitBinDir = Split-Path -Parent $git.Source
 
 try {
     $env:PATH = $gitBinDir
+    $env:LOCALAPPDATA = $fakeLocalAppData
 
     # Inventario minimo na raiz XPZ falsa
     $skillDir = Join-Path $fakeRepo 'xpz-skills-setup'
@@ -133,7 +139,8 @@ try {
 finally {
     $env:PATH = $originalPath
     $env:USERPROFILE = $originalProfile
-    foreach ($p in @($fakeProfile, $fakeRepo, $legacyRepo)) {
+    $env:LOCALAPPDATA = $originalLocalAppData
+    foreach ($p in @($fakeProfile, $fakeRepo, $legacyRepo, $fakeLocalAppData)) {
         Remove-TempDir -Path $p
     }
 }
@@ -143,8 +150,10 @@ $fakeRepo2 = New-TempDir
 $fakeProfile2 = New-TempDir
 $legacyRepo2 = New-TempDir
 $canonicalRepo2 = New-TempDir
+$fakeLocalAppData2 = New-TempDir
 try {
     $env:PATH = $gitBinDir
+    $env:LOCALAPPDATA = $fakeLocalAppData2
 
     $skillDir2 = Join-Path $fakeRepo2 'xpz-skills-setup'
     New-Item -ItemType Directory -Path $skillDir2 -Force | Out-Null
@@ -192,7 +201,8 @@ try {
 finally {
     $env:PATH = $originalPath
     $env:USERPROFILE = $originalProfile
-    foreach ($p in @($fakeProfile2, $fakeRepo2, $legacyRepo2, $canonicalRepo2)) {
+    $env:LOCALAPPDATA = $originalLocalAppData
+    foreach ($p in @($fakeProfile2, $fakeRepo2, $legacyRepo2, $canonicalRepo2, $fakeLocalAppData2)) {
         Remove-TempDir -Path $p
     }
 }
@@ -200,8 +210,10 @@ finally {
 # Caso 3: canônico ausente sem registro — NEXA_REPO_MISSING informativo, EXTERNAL_SKILLS_OK
 $fakeRepo3 = New-TempDir
 $fakeProfile3 = New-TempDir
+$fakeLocalAppData3 = New-TempDir
 try {
     $env:PATH = $gitBinDir
+    $env:LOCALAPPDATA = $fakeLocalAppData3
 
     $skillDir3 = Join-Path $fakeRepo3 'xpz-skills-setup'
     New-Item -ItemType Directory -Path $skillDir3 -Force | Out-Null
@@ -229,7 +241,206 @@ try {
 finally {
     $env:PATH = $originalPath
     $env:USERPROFILE = $originalProfile
-    foreach ($p in @($fakeProfile3, $fakeRepo3)) {
+    $env:LOCALAPPDATA = $originalLocalAppData
+    foreach ($p in @($fakeProfile3, $fakeRepo3, $fakeLocalAppData3)) {
+        Remove-TempDir -Path $p
+    }
+}
+
+# Caso 4: copia_opaca nexa — payload Gx4A mais novo que From-Zip; Claude tem pasta real
+$fakeRepo4 = New-TempDir
+$fakeProfile4 = New-TempDir
+$fakeLocalAppData4 = New-TempDir
+$fromZip4 = Join-Path ([System.IO.Path]::GetDirectoryName($fakeRepo4)) 'GeneXus-Skills-From-Zip'
+try {
+    $env:PATH = $gitBinDir
+    $env:LOCALAPPDATA = $fakeLocalAppData4
+
+    $skillDir4 = Join-Path $fakeRepo4 'xpz-skills-setup'
+    New-Item -ItemType Directory -Path $skillDir4 -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $skillDir4 'SKILL.md') -Value '# setup' -Encoding utf8
+
+    # From-Zip irmao (mais velho, sem version)
+    $fromZipNexa = Join-Path $fromZip4 'nexa'
+    New-Item -ItemType Directory -Path $fromZipNexa -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $fromZipNexa 'SKILL.md') -Value @"
+---
+name: nexa
+description: old
+---
+"@ -Encoding utf8
+    (Get-Item (Join-Path $fromZipNexa 'SKILL.md')).LastWriteTimeUtc = [datetime]::UtcNow.AddDays(-30)
+
+    # Payload Gx4A mais novo (1.0.3)
+    $payloadNexa = Join-Path $fakeLocalAppData4 'Programs\GeneXus\GeneXus4Agents\payload\skills\nexa'
+    New-Item -ItemType Directory -Path $payloadNexa -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $payloadNexa 'SKILL.md') -Value @"
+---
+name: nexa
+description: new
+metadata:
+  version: "1.0.3"
+  author: "GeneXus"
+---
+"@ -Encoding utf8
+    $managed = Join-Path $fakeLocalAppData4 'Programs\GeneXus\GeneXus4Agents\.skill-managed-nexa'
+    Set-Content -LiteralPath $managed -Value @"
+2026-09-07T11:10:08
+checksum=ABC
+$($fakeProfile4)\.claude\skills\nexa
+"@ -Encoding utf8
+
+    # Copia opaca em Claude
+    $opaque = Join-Path $fakeProfile4 '.claude\skills\nexa'
+    New-Item -ItemType Directory -Path $opaque -Force | Out-Null
+    Copy-Item -LiteralPath (Join-Path $payloadNexa 'SKILL.md') -Destination (Join-Path $opaque 'SKILL.md')
+    Set-Content -LiteralPath (Join-Path $fakeProfile4 '.claude\settings.json') -Value '{}' -Encoding utf8
+
+    $env:USERPROFILE = $fakeProfile4
+    $json4 = & $scriptUnderTest -RepoRoot $fakeRepo4 -AsJson | Out-String
+    $env:USERPROFILE = $originalProfile
+    $report4 = $json4 | ConvertFrom-Json
+
+    Assert-Equal 'copia_opaca: externalOverall GAPS' 'EXTERNAL_SKILLS_GAPS' ([string]$report4.externalOverall)
+    $nexa4 = @($report4.externalSkills | Where-Object { $_.name -eq 'nexa' })
+    if ($nexa4.Count -eq 1) {
+        Assert-equal 'copia_opaca: preferredKind gx4a-payload' 'gx4a-payload' ([string]$nexa4[0].preferredKind)
+        Assert-equal 'copia_opaca: Claude status' 'copia_opaca' ([string](@($nexa4[0].tools | Where-Object { $_.name -eq 'ClaudeCode' }).status))
+        Assert-equal 'copia_opaca: resolveAction' 'replace-with-junction-to-preferred' ([string]$nexa4[0].resolveAction)
+        Assert-Equal 'copia_opaca: fromZipBehind true' 'True' ([string]$nexa4[0].fromZipBehindPreferred)
+    }
+    else {
+        $script:cases++
+        $script:failures++
+        Write-Output 'FAIL: copia_opaca: externalSkills deveria conter nexa'
+    }
+}
+finally {
+    $env:PATH = $originalPath
+    $env:USERPROFILE = $originalProfile
+    $env:LOCALAPPDATA = $originalLocalAppData
+    foreach ($p in @($fakeProfile4, $fakeRepo4, $fakeLocalAppData4, $fromZip4)) {
+        Remove-TempDir -Path $p
+    }
+}
+
+# Caso 5: gam copia_opaca → preferred payload
+$fakeRepo5 = New-TempDir
+$fakeProfile5 = New-TempDir
+$fakeLocalAppData5 = New-TempDir
+try {
+    $env:PATH = $gitBinDir
+    $env:LOCALAPPDATA = $fakeLocalAppData5
+
+    $skillDir5 = Join-Path $fakeRepo5 'xpz-skills-setup'
+    New-Item -ItemType Directory -Path $skillDir5 -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $skillDir5 'SKILL.md') -Value '# setup' -Encoding utf8
+
+    $payloadGam = Join-Path $fakeLocalAppData5 'Programs\GeneXus\GeneXus4Agents\payload\skills\gam'
+    New-Item -ItemType Directory -Path $payloadGam -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $payloadGam 'SKILL.md') -Value @"
+---
+name: gam
+metadata:
+  version: "1.0.4"
+---
+"@ -Encoding utf8
+    Set-Content -LiteralPath (Join-Path $fakeLocalAppData5 'Programs\GeneXus\GeneXus4Agents\.skill-managed-gam') -Value @"
+checksum=DEF
+$($fakeProfile5)\.claude\skills\gam
+"@ -Encoding utf8
+
+    $opaqueGam = Join-Path $fakeProfile5 '.claude\skills\gam'
+    New-Item -ItemType Directory -Path $opaqueGam -Force | Out-Null
+    Copy-Item -LiteralPath (Join-Path $payloadGam 'SKILL.md') -Destination (Join-Path $opaqueGam 'SKILL.md')
+    Set-Content -LiteralPath (Join-Path $fakeProfile5 '.claude\settings.json') -Value '{}' -Encoding utf8
+
+    $env:USERPROFILE = $fakeProfile5
+    $json5 = & $scriptUnderTest -RepoRoot $fakeRepo5 -AsJson | Out-String
+    $env:USERPROFILE = $originalProfile
+    $report5 = $json5 | ConvertFrom-Json
+
+    Assert-Equal 'gam opaca: externalOverall GAPS' 'EXTERNAL_SKILLS_GAPS' ([string]$report5.externalOverall)
+    $gam5 = @($report5.externalSkills | Where-Object { $_.name -eq 'gam' })
+    if ($gam5.Count -eq 1) {
+        Assert-Equal 'gam opaca: preferredKind' 'gx4a-payload' ([string]$gam5[0].preferredKind)
+        Assert-Equal 'gam opaca: Claude status' 'copia_opaca' ([string](@($gam5[0].tools | Where-Object { $_.name -eq 'ClaudeCode' }).status))
+        Assert-Equal 'gam opaca: resolveAction' 'replace-with-junction-to-preferred' ([string]$gam5[0].resolveAction)
+    }
+    else {
+        $script:cases++
+        $script:failures++
+        Write-Output 'FAIL: gam opaca: externalSkills deveria conter gam'
+    }
+}
+finally {
+    $env:PATH = $originalPath
+    $env:USERPROFILE = $originalProfile
+    $env:LOCALAPPDATA = $originalLocalAppData
+    foreach ($p in @($fakeProfile5, $fakeRepo5, $fakeLocalAppData5)) {
+        Remove-TempDir -Path $p
+    }
+}
+
+# Caso 6: junction From-Zip com payload mais novo → fonte_desatualizada
+$fakeRepo6 = New-TempDir
+$fakeProfile6 = New-TempDir
+$fakeLocalAppData6 = New-TempDir
+$fromZip6 = Join-Path ([System.IO.Path]::GetDirectoryName($fakeRepo6)) 'GeneXus-Skills-From-Zip'
+try {
+    $env:PATH = $gitBinDir
+    $env:LOCALAPPDATA = $fakeLocalAppData6
+
+    $skillDir6 = Join-Path $fakeRepo6 'xpz-skills-setup'
+    New-Item -ItemType Directory -Path $skillDir6 -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $skillDir6 'SKILL.md') -Value '# setup' -Encoding utf8
+
+    & $git.Source -C $fromZip6 init -b main *> $null
+    & $git.Source -C $fromZip6 remote add origin $official *> $null
+    $fromZipNexa6 = Join-Path $fromZip6 'nexa'
+    New-Item -ItemType Directory -Path $fromZipNexa6 -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $fromZipNexa6 'SKILL.md') -Value @"
+---
+name: nexa
+---
+"@ -Encoding utf8
+    (Get-Item (Join-Path $fromZipNexa6 'SKILL.md')).LastWriteTimeUtc = [datetime]::UtcNow.AddDays(-20)
+
+    $payloadNexa6 = Join-Path $fakeLocalAppData6 'Programs\GeneXus\GeneXus4Agents\payload\skills\nexa'
+    New-Item -ItemType Directory -Path $payloadNexa6 -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $payloadNexa6 'SKILL.md') -Value @"
+---
+name: nexa
+metadata:
+  version: "1.0.3"
+---
+"@ -Encoding utf8
+
+    New-Junction -LinkDir (Join-Path $fakeProfile6 '.claude\skills') -Name 'nexa' -Target $fromZipNexa6
+    Set-Content -LiteralPath (Join-Path $fakeProfile6 '.claude\settings.json') -Value '{}' -Encoding utf8
+
+    $env:USERPROFILE = $fakeProfile6
+    $json6 = & $scriptUnderTest -RepoRoot $fakeRepo6 -AsJson | Out-String
+    $env:USERPROFILE = $originalProfile
+    $report6 = $json6 | ConvertFrom-Json
+
+    Assert-Equal 'stale: externalOverall GAPS' 'EXTERNAL_SKILLS_GAPS' ([string]$report6.externalOverall)
+    $nexa6 = @($report6.externalSkills | Where-Object { $_.name -eq 'nexa' })
+    if ($nexa6.Count -eq 1) {
+        Assert-Equal 'stale: preferredKind gx4a-payload' 'gx4a-payload' ([string]$nexa6[0].preferredKind)
+        Assert-Equal 'stale: Claude fonte_desatualizada' 'fonte_desatualizada' ([string](@($nexa6[0].tools | Where-Object { $_.name -eq 'ClaudeCode' }).status))
+    }
+    else {
+        $script:cases++
+        $script:failures++
+        Write-Output 'FAIL: stale: externalSkills deveria conter nexa'
+    }
+}
+finally {
+    $env:PATH = $originalPath
+    $env:USERPROFILE = $originalProfile
+    $env:LOCALAPPDATA = $originalLocalAppData
+    foreach ($p in @($fakeProfile6, $fakeRepo6, $fakeLocalAppData6, $fromZip6)) {
         Remove-TempDir -Path $p
     }
 }
