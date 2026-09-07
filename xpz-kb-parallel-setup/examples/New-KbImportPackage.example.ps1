@@ -14,8 +14,12 @@ Este wrapper e recomendado quando a pasta paralela adota empacotamento local
 recorrente e precisa de comando curto, auditavel e aderente a allowlist.
 
 Quando `-ReportPath` e informado, o wrapper grava um relatorio atomico de execucao
-em JSON com fases, estado do pacote e decisao do inventario; ele nao prova
-importacao real, build ou evidencia da IDE.
+em JSON com fases, estado do pacote e decisao do inventario; com path valido o
+pos-inventario do motor compartilhado liga FailOnDeltaMismatch e
+FailOnUnknownTypes, e inventario com exit diferente de 0 pode marcar
+status=bloqueado no stdout e alterar o exit do empacotamento. Sem -ReportPath,
+o inventario corre em modo informativo e nao promove esse exit. O relatorio nao
+prova importacao real, build ou evidencia da IDE.
 
 O gate de drift frente-vs-acervo (Test-GeneXusFrontAcervoDrift.ps1) executa
 sempre antes do empacotamento (fail-closed). -AcervoPath e opcional; quando
@@ -58,6 +62,8 @@ front-object-type-drift-ambiguous-acervo.
 Caminho absoluto, novo e terminado em `.json`, preferencialmente sob `Temp`.
 A pasta pai deve existir; caminhos em areas de acervo, frente, scripts,
 `KbIntelligence`, `.git`, historico ou artefatos do pacote sao bloqueados.
+Com ReportPath valido, o pos-inventario liga FailOnDeltaMismatch e
+FailOnUnknownTypes; sem ReportPath, o inventario permanece informativo.
 
 .PARAMETER SharedSkillsRoot
 Raiz local da base compartilhada `GeneXus-XPZ-Skills`.
