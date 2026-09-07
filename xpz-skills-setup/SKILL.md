@@ -301,8 +301,9 @@ XPZ (passo 0 do `## WORKFLOW`).
 classifica a `nexa` em uma seção separada (`externalSkills` / `externalOverall`),
 aplicando a classificação OK / coberta_por_compatibilidade / ausente / quebrada /
 **copia_opaca** / **fonte_desatualizada** e a **estratégia compacta** (registro em
-`~/.claude`, `~/.codex`, `~/.config/opencode`, `~/.gemini/config/skills`; Cursor por
-compatibilidade).
+`~/.claude`, `~/.codex`, `~/.cursor/skills` (nativo Cursor obrigatório),
+`~/.config/opencode`, `~/.gemini/config/skills`; vínculo só em `.agents`/`.claude`/
+`.codex` para Cursor = coberta_por_compatibilidade e marca `EXTERNAL_SKILLS_GAPS`).
 
 **Fonte preferida da `nexa`:** entre (a) `<repoRootCanonical>\nexa` (From-Zip) e
 (b) `%LOCALAPPDATA%\Programs\GeneXus\GeneXus4Agents\payload\skills\nexa` (payload do

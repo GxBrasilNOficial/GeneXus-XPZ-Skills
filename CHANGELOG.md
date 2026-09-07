@@ -8,6 +8,8 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 ### Unreleased
 
+- **Prosa residual da compacta `nexa` alinhada ao Cursor nativo (2026-09-07):** em `xpz-skills-setup/SKILL.md` («Auditoria de registro da `nexa`»), o resumo da compacta deixa de dizer «Cursor por compatibilidade» e passa a exigir `~/.cursor/skills/` (só-compat = `EXTERNAL_SKILLS_GAPS`). `README.md` sem mudança.
+
 - **Help `-Strategy` do wrapper Gx4A alinhado ao motor (2026-09-07):** `Invoke-GeneXusForAgentsSetupSafe.ps1` — comment-based help deixava de espelhar `Get-SkillLinkDestinationRels` (Cursor sempre; `.codex` só nexa na compacta / também gam na expansiva). Só documentação embutida; comportamento inalterado. `README.md` sem mudança.
 
 - **Pré-push: WORKFLOW da setup alinhado ao Cursor nativo (2026-09-07):** passos 2–3 do `WORKFLOW` em `xpz-skills-setup/SKILL.md` passam a dizer que Cursor **OK** exige `~/.cursor/skills/` e que `coberta_por_compatibilidade` marca `REGISTRATION_GAPS` / `EXTERNAL_SKILLS_GAPS`. `README.md` sem mudança.
@@ -297,6 +299,8 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 ### Unreleased
 
+- **Prosa residual de la compacta `nexa` alineada al Cursor nativo (2026-09-07):** en `xpz-skills-setup/SKILL.md` («Auditoria de registro da `nexa`»), el resumen de la compacta deja de decir «Cursor por compatibilidade» y pasa a exigir `~/.cursor/skills/` (solo-compat = `EXTERNAL_SKILLS_GAPS`). `README.md` sin cambio.
+
 - **Help `-Strategy` del wrapper Gx4A alineado al motor (2026-09-07):** `Invoke-GeneXusForAgentsSetupSafe.ps1` — el help comment-based dejaba de espejar `Get-SkillLinkDestinationRels` (Cursor siempre; `.codex` solo nexa en compacta / también gam en expansiva). Solo documentación embebida; comportamiento sin cambio. `README.md` sin cambio.
 
 - **Pre-push: WORKFLOW del setup alineado al Cursor nativo (2026-09-07):** pasos 2–3 del `WORKFLOW` en `xpz-skills-setup/SKILL.md` pasan a decir que Cursor **OK** exige `~/.cursor/skills/` y que `coberta_por_compatibilidade` marca `REGISTRATION_GAPS` / `EXTERNAL_SKILLS_GAPS`. `README.md` sin cambio.
@@ -578,6 +582,8 @@ All relevant changes to this repository will be recorded here from this adoption
 The format keeps an `Unreleased` section for changes not yet published in a formal version. This repository does not yet use public semantic versioning; when that changes, future sections should record the corresponding tag.
 
 ### Unreleased
+
+- **Residual compact-strategy prose for `nexa` aligned to native Cursor (2026-09-07):** in `xpz-skills-setup/SKILL.md` («Auditoria de registro da `nexa`»), the compact summary no longer says «Cursor by compatibility» and now requires `~/.cursor/skills/` (compat-only = `EXTERNAL_SKILLS_GAPS`). No `README.md` change.
 
 - **Gx4A wrapper `-Strategy` help aligned to the engine (2026-09-07):** `Invoke-GeneXusForAgentsSetupSafe.ps1` — comment-based help no longer contradicted `Get-SkillLinkDestinationRels` (Cursor always; `.codex` only for nexa in compact / also gam in expansive). Docs-in-script only; behavior unchanged. No `README.md` change.
 
