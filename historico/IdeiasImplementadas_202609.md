@@ -244,3 +244,101 @@ Corrigido pelo lado da prosa: o texto passa a apontar o registro (`Get-GeneXusKb
 
 - Commit material: `30f47f6` (`fix(selftests): fechar falso positivo do guard de fonte unica e registrar daemon vermelho`)
 - Arquivos materiais: `scripts/Test-GeneXusRuntimeFreshness.ps1`, `scripts/Invoke-LlmDelegatePanelDispatch.ps1` (comentario do gate de RoundId), `999-ideias-pendentes.md`.
+
+## Observabilidade opt-in do empacotamento por frente (`-ReportPath`)
+
+Implementado em 2026-09-07.
+
+### O que motivou
+
+O empacotamento por frente não deixava trilha auditável entre o preflight do wrapper PowerShell, o motor interno Python e o pós-inventário. Uma execução interrompida de fora ficava indistinguível de sucesso: havia pacote em disco e nenhum registro dizendo em que fase a rodada parou.
+
+### O que foi feito
+
+`New-XpzImportPackage.ps1` ganhou `-ReportPath` opt-in, servido pela biblioteca nova `scripts/XpzExecutionReportSupport.ps1`:
+
+- validação fail-closed do caminho antes de qualquer efeito colateral — absoluto, `.json`, novo, pasta pai existente, sem ponto de reanálise no caminho, fora das áreas proibidas e sem colidir com artefatos do pacote; caminho inválido retorna `stage=validate-report-path`, `exitCode=20` e não cria nem pacote nem relatório;
+- contrato `Kind=xpz-package-execution-report`, `SchemaVersion=1`, com `runId`, `stageHistory` limitado e os estados separados `executionState`, `packageState` e `inventoryDecision`, além de `packageWritten`, `processExitCode` e `resultExitCode`;
+- publicação atômica em UTF-8 sem BOM, com handoff explícito de escritor: o PowerShell é dono do preflight e do pós-inventário, o Python é o único escritor enquanto o motor executa e devolve o arquivo só depois de stdout e stderr serem drenados.
+
+Acoplamento deliberado, não apenas observabilidade: com `-ReportPath` válido o pós-inventário liga fail-closed (`FailOnDeltaMismatch` + `FailOnUnknownTypes`), então um inventário com exit ≠ 0 pode marcar `status=bloqueado` no stdout e mudar o exit do empacotamento. Sem `-ReportPath`, o inventário continua informativo e não promove esse exit.
+
+Endurecimento posterior na mesma frente: `Test-XpzForbiddenReportArea` passou a bloquear `historico` e toda a pasta `PacotesGeradosParaImportacaoNaKbNoGenexus`, não só a colisão com o artefato da rodada.
+
+### Limite declarado
+
+O relatório não prova importação real, build, evidência da IDE ou comportamento funcional. `packageState=candidate` não é `accepted`; divergência de inventário não promove candidato a aceito; `executionState=running` depois de interrupção externa é execução incompleta/órfã, para investigação — nunca sucesso.
+
+### Eixos vizinhos (`13` §5)
+
+O gate de caminho vive no wrapper PowerShell. O motor Python aceita `--execution-report-path` (exigindo `--run-id` junto) e não revalida a área proibida — eixo escritor↔leitor deixado **aberto por design**, porque a documentação já declara que a chamada direta ao `.py` não é rota operacional equivalente. Os demais eixos ficaram fechados: `-ReportPath` é o único parâmetro que aponta destino de relatório, a comparação usa caminho canonizado (não grafia), e as colisões com o artefato da rodada e com os `*.rejected.*` estão cobertas.
+
+### Testes
+
+`Test-NewXpzImportPackageObservabilitySelfTest.ps1` (token `NEW_XPZ_IMPORT_PACKAGE_OBSERVABILITY_SELFTEST_OK`) cobre caminho inválido sem efeito colateral, `historico` bloqueado, caminho feliz com inventário aceito, tipo desconhecido bloqueado e interrupção durante a escrita preservando `running`/`candidate`. `Test-NewXpzImportPackage.py` continua verde.
+
+### Rastreabilidade
+
+- Commits materiais: `75fdaae` (observabilidade), `5c0531c` (rastreabilidade do self-test), `059358c` (trilha do relatório), `88091ea` (acoplamento fail-closed na doc), `58c4a12` (espelho na `xpz-kb-parallel-setup`), `bf81fd9` (endurecimento do `ReportPath`), `84ed033` (exit `90` no ponteiro do `09`)
+- Arquivos materiais: `scripts/XpzExecutionReportSupport.ps1`, `scripts/New-XpzImportPackage.ps1`, `scripts/New-XpzImportPackage.py`, `scripts/GeneXusPackageInventorySupport.ps1`, `scripts/Test-NewXpzImportPackageObservabilitySelfTest.ps1`, `scripts/Test-NewXpzImportPackage.py`, `02-regras-operacionais-e-runtime.md`, `08-guia-para-agente-gpt.md`, `09-inventario-e-rastreabilidade-publica.md`, `README.md`, `xpz-builder/SKILL.md`, `xpz-builder/quality-checklist.md`, `xpz-msbuild-import-export/SKILL.md`, `xpz-kb-parallel-setup/SKILL.md`, `xpz-kb-parallel-setup/examples/New-KbImportPackage.example.ps1`, `CHANGELOG.md`.
+- A revisão pré-push desta rodada apontou que a enumeração das áreas proibidas ficara subconjunto em `02`, `xpz-msbuild-import-export/SKILL.md` e no exemplo; a correção entra no commit seguinte.
+
+## GeneXus for Agents: cópias opacas, fonte preferida e Cursor nativo obrigatório
+
+Implementado em 2026-09-07.
+
+### O defeito
+
+O instalador oficial do GeneXus for Agents (`gx4a-setup`) instala `nexa` e `gam` **copiando** pastas reais para os diretórios das ferramentas, removendo junctions/symlinks pré-existentes. Isso contradiz a regra «nunca copiar» desta skill e produz desatualização silenciosa: a cópia não acompanha nem `git pull` do From-Zip nem atualização do payload. A auditoria anterior não tinha vocabulário para nomear esse estado, e o Cursor era tratado por compatibilidade, de modo que uma instalação sem vínculo nativo passava como aceitável.
+
+### O que foi feito
+
+Em `Test-XpzSkillsRegistration.ps1`:
+
+- classificações novas para as externas gerenciadas: `copia_opaca` (pasta real onde deveria haver vínculo) e `fonte_desatualizada` (vínculo válido cujo alvo não é a fonte preferida);
+- fonte preferida por skill — `nexa` escolhe a mais nova entre o From-Zip e o payload Gx4A (versão parseável do `SKILL.md` decide; `LastWriteTimeUtc` só em empate ou ausência de versão nos dois lados), `gam` só existe no payload;
+- recibo com `preferredPath`, `preferredKind`, `preferredVersion`, `resolveAction`, `gx4aManagedPaths` e `fromZipBehindPreferred`;
+- `extHasGap` e `resolveAction` calculados **por skill externa**, para o gap da `nexa` não vazar para a `gam`;
+- `resolveAction=blocked-no-preferred-source` quando `preferredKind=missing` e há registro ou gap que pediria restore — antes o ramo era inalcançável;
+- Cursor passa a exigir vínculo nativo em `~/.cursor/skills/`: `.agents`, `.claude` e `.codex` viram compat, e `coberta_por_compatibilidade` marca `REGISTRATION_GAPS` nas internas e `EXTERNAL_SKILLS_GAPS` nas externas.
+
+Entrou também o wrapper `scripts/Invoke-GeneXusForAgentsSetupSafe.ps1` (opção C): executa o setup oficial quando recebe `-SetupPath` e reaplica os vínculos de `nexa`/`gam` ao payload; `-RepairOnly` faz só o restore; `-AsJson` para agentes; labels `GX4A_SETUP_SAFE_OK` / `PARTIAL` / `AUDIT_GAPS`. A `xpz-skills-setup` é a dona normativa desse wrapper.
+
+### O que deliberadamente não foi feito
+
+Nenhum restore automático. O motor é read-only e classifica; a remoção de cópia opaca e a criação de vínculo continuam exigindo confirmação explícita do usuário (passos 6–7 da skill). O wrapper também não impede um `gx4a-setup` clicado fora dele — cobre só o caminho que passa pelo wrapper.
+
+### Testes
+
+`Test-XpzSkillsRegistrationNexaRepoSelfTest.ps1` 30/30, com os casos novos de cópia opaca (`nexa` e `gam`), fonte desatualizada, isolamento `nexa`→`gam` e `blocked-no-preferred-source` sem payload. `Test-GeneXusForAgentsSetupSafeSelfTest.ps1` 11/11 (`GX4A_SETUP_SAFE_SELFTEST_OK`), incluindo `BLOCK` quando o payload está ausente.
+
+### Rastreabilidade
+
+- Commits materiais: `f336a2b` (motor, wrapper e skill), `c18a958` (WORKFLOW alinhado ao Cursor nativo), `436b805` (help de `-Strategy` do wrapper), `0f24562` (prosa residual da compacta), `bf81fd9` (isolamento de `resolveAction`), `32a9bf3` (`blocked-no-preferred-source` alcançável e prosa de frescor)
+- Arquivos materiais: `scripts/Test-XpzSkillsRegistration.ps1`, `scripts/Invoke-GeneXusForAgentsSetupSafe.ps1`, `scripts/Test-GeneXusForAgentsSetupSafeSelfTest.ps1`, `scripts/Test-XpzSkillsRegistrationNexaRepoSelfTest.ps1`, `xpz-skills-setup/SKILL.md`, `09-inventario-e-rastreabilidade-publica.md`, `CHANGELOG.md`.
+
+## Editar a lista preferida é editar o ficheiro que este harness resolve
+
+Implementado em 2026-09-07.
+
+### O defeito
+
+A curadoria de revisores vive em cascata (`preferred-reviewers.<orquestrador>.json` → `preferred-reviewers.json` machine). Gravar em machine com o ficheiro do orquestrador presente **não muda** o que aquele harness resolve, mas nada no recibo dizia isso: o agente anunciava «lista atualizada» e a lista efetiva continuava a mesma.
+
+### O que foi feito
+
+- `Resolve-LlmDelegatePreferredReviewers.ps1` passa a expor sempre `cascadeOrchestratorPath`, `cascadeMachinePath`, `cascadeOrchestratorExists` e `cascadeMachineExists`, para o escopo ser escolhido **antes** de gravar;
+- `Set-LlmDelegatePreferredReviewers.ps1` passa a emitir `siblingOrchestratorPath`/`siblingOrchestratorExists`, `siblingMachinePath`/`siblingMachineExists`, `resolveWouldPreferAfterWrite`, `harnessResolveReadsThisPath` e o diagnóstico `machine-write-shadowed-by-orchestrator-file` quando a gravação machine fica sombreada;
+- regra operacional correspondente em `15-revisao-por-pares.md`, `xpz-llm-delegate/SKILL.md` (passo 2 da persistência) e `xpz-skills-setup/SKILL.md` (oferta de calibração): pedido genérico nesta sessão vai para `-Scope orchestrator` quando o ficheiro do orquestrador existe ou é a fonte efetiva; `-Scope machine` só com pedido explícito de lista da máquina.
+
+Nenhum bloqueio novo: o eixo é de **honestidade do recibo**, não de recusa. Gravar machine continua permitido; o que muda é o agente ter de mostrar que aquilo não altera o que este harness lê.
+
+### Testes
+
+`Test-LlmDelegatePreferredReviewersSelfTest.ps1` (bloco novo de escopo/sombreamento) verde.
+
+### Rastreabilidade
+
+- Commit material: `f336a2b` (`Endurece setup XPZ perante GeneXus for Agents e curadoria do harness`)
+- Arquivos materiais: `scripts/Resolve-LlmDelegatePreferredReviewers.ps1`, `scripts/Set-LlmDelegatePreferredReviewers.ps1`, `scripts/Test-LlmDelegatePreferredReviewersSelfTest.ps1`, `15-revisao-por-pares.md`, `xpz-llm-delegate/SKILL.md`, `xpz-skills-setup/SKILL.md`, `09-inventario-e-rastreabilidade-publica.md`, `CHANGELOG.md`.
+- A revisão pré-push desta rodada apontou que o `08-guia-para-agente-gpt.md` descrevia a mesma operação sem a regra de escopo; a correção entra no commit seguinte.

@@ -8,6 +8,8 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 ### Unreleased
 
+- **Gaps da revisão pré-push das frentes de 2026-09-07:** `02-regras-operacionais-e-runtime.md` e `xpz-msbuild-import-export/SKILL.md` (e o exemplo `New-KbImportPackage.example.ps1`) passam a enumerar por completo as áreas proibidas de `-ReportPath` que o motor bloqueia — faltavam `historico`, `PacotesGeradosParaImportacaoNaKbNoGenexus` e `XpzExportadosPelaIDE`, justamente os endurecidos na frente. `08-guia-para-agente-gpt.md` recebe a regra de escopo da lista preferida (`cascade*`, `-Scope orchestrator` por padrão nesta sessão, `machine-write-shadowed-by-orchestrator-file`), já presente em `15`, `xpz-llm-delegate` e `xpz-skills-setup`. As três frentes ganham entrada em `historico/IdeiasImplementadas_202609.md`. Só documentação; comportamento inalterado. `README.md` sem mudança.
+
 - **resolveAction `blocked-no-preferred-source` alcançável + prosa de frescor (2026-09-07):** `Test-XpzSkillsRegistration.ps1` emite `blocked-no-preferred-source` quando `preferredKind=missing` e há registro/gap (antes o ramo era inalcançável). Self-test caso 8 (`gam` pasta real sem payload). Doc da frescor `nexa`: versão unilateral vence sem mtime; mtime só em empate/ausência de versão nos dois lados. CHANGELOG Gx4A: self-test 4–8 / contagem atual. Docs: `xpz-skills-setup/SKILL.md`.
 
 - **Exit `90` no ponteiro de `New-XpzImportPackage` (2026-09-07):** `09` passa a listar `90` (erro interno/publicação do relatório/drift inesperado/motor Python/handoff/inventário degradado), além de `20` e dos `2`/`3` com `-ReportPath`. Só documentação.
@@ -307,6 +309,8 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 ### Unreleased
 
+- **Gaps de la revisión pre-push de los frentes de 2026-09-07:** `02-regras-operacionais-e-runtime.md` y `xpz-msbuild-import-export/SKILL.md` (y el ejemplo `New-KbImportPackage.example.ps1`) pasan a enumerar completas las áreas prohibidas de `-ReportPath` que el motor bloquea — faltaban `historico`, `PacotesGeradosParaImportacaoNaKbNoGenexus` y `XpzExportadosPelaIDE`, justo las endurecidas en el frente. `08-guia-para-agente-gpt.md` recibe la regla de scope de la lista preferida (`cascade*`, `-Scope orchestrator` por defecto en esta sesión, `machine-write-shadowed-by-orchestrator-file`), ya presente en `15`, `xpz-llm-delegate` y `xpz-skills-setup`. Los tres frentes obtienen entrada en `historico/IdeiasImplementadas_202609.md`. Solo documentación; comportamiento sin cambio. `README.md` sin cambio.
+
 - **resolveAction `blocked-no-preferred-source` alcanzable + prosa de frescura (2026-09-07):** `Test-XpzSkillsRegistration.ps1` emite `blocked-no-preferred-source` cuando `preferredKind=missing` y hay registro/gap (antes el ramo era inalcanzable). Self-test caso 8 (`gam` carpeta real sin payload). Doc de frescura `nexa`: versión unilateral gana sin mtime; mtime solo en empate/ausencia de versión en ambos lados. CHANGELOG Gx4A: self-test 4–8. Docs: `xpz-skills-setup/SKILL.md`.
 
 - **Exit `90` en el puntero de `New-XpzImportPackage` (2026-09-07):** `09` pasa a listar `90` (error interno/publicación del informe/drift inesperado/motor Python/handoff/inventario degradado), además de `20` y de los `2`/`3` con `-ReportPath`. Solo documentación.
@@ -598,6 +602,8 @@ All relevant changes to this repository will be recorded here from this adoption
 The format keeps an `Unreleased` section for changes not yet published in a formal version. This repository does not yet use public semantic versioning; when that changes, future sections should record the corresponding tag.
 
 ### Unreleased
+
+- **Pre-push review gaps for the 2026-09-07 fronts:** `02-regras-operacionais-e-runtime.md` and `xpz-msbuild-import-export/SKILL.md` (plus the `New-KbImportPackage.example.ps1` example) now enumerate in full the `-ReportPath` forbidden areas the engine blocks — `historico`, `PacotesGeradosParaImportacaoNaKbNoGenexus` and `XpzExportadosPelaIDE` were missing, exactly the ones hardened in the front. `08-guia-para-agente-gpt.md` gains the preferred-list scope rule (`cascade*`, `-Scope orchestrator` by default in this session, `machine-write-shadowed-by-orchestrator-file`), already present in `15`, `xpz-llm-delegate` and `xpz-skills-setup`. All three fronts get an entry in `historico/IdeiasImplementadas_202609.md`. Docs only; behavior unchanged. No `README.md` change.
 
 - **`blocked-no-preferred-source` reachable + freshness prose (2026-09-07):** `Test-XpzSkillsRegistration.ps1` emits `blocked-no-preferred-source` when `preferredKind=missing` and there is registration/gap (the branch was previously unreachable). Self-test case 8 (`gam` real directory, no payload). `nexa` freshness docs: unilateral parseable version wins without mtime; mtime only on version tie/absence on both sides. Gx4A CHANGELOG: self-test cases 4–8. Docs: `xpz-skills-setup/SKILL.md`.
 

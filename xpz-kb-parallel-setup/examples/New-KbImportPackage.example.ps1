@@ -62,7 +62,8 @@ front-object-type-drift-ambiguous-acervo.
 Caminho absoluto, novo e terminado em `.json`, preferencialmente sob `Temp`.
 A pasta pai deve existir; caminhos em areas de acervo, frente, scripts,
 `KbIntelligence`, `.git`, `ArquivoMorto`, `historico`,
-`PacotesGeradosParaImportacaoNaKbNoGenexus` ou artefatos do pacote sao bloqueados.
+`PacotesGeradosParaImportacaoNaKbNoGenexus`, `XpzExportadosPelaIDE` ou artefatos
+do pacote sao bloqueados.
 Com ReportPath valido, o pos-inventario liga FailOnDeltaMismatch e
 FailOnUnknownTypes; sem ReportPath, o inventario permanece informativo.
 
