@@ -841,13 +841,16 @@ foreach ($ext in $externalSkillDefs) {
     if ($extHasOpaqueOrStale) { $extHasGap = $true }
 
     $resolveAction = 'none'
-    if ($extHasOpaqueOrStale -or ($extHasGap -and $preferredKind -ne 'missing')) {
-        if ($preferredKind -eq 'missing') {
+    if ($preferredKind -eq 'missing') {
+        # Sem fonte preferida: nao inventar origem. Sinaliza bloqueio quando ha
+        # registro ou gap que pediria restore (copia_opaca/fonte_desatualizada
+        # exigem PreferredPath nao-vazio e nao nascem neste ramo).
+        if ($extHasGap -or $extHasRegistration) {
             $resolveAction = 'blocked-no-preferred-source'
         }
-        else {
-            $resolveAction = 'replace-with-junction-to-preferred'
-        }
+    }
+    elseif ($extHasOpaqueOrStale -or $extHasGap) {
+        $resolveAction = 'replace-with-junction-to-preferred'
     }
 
     $fromZipBehind = $false

@@ -308,8 +308,10 @@ aplicando a classificação OK / coberta_por_compatibilidade / ausente / quebrad
 **Fonte preferida da `nexa`:** entre (a) `<repoRootCanonical>\nexa` (From-Zip) e
 (b) `%LOCALAPPDATA%\Programs\GeneXus\GeneXus4Agents\payload\skills\nexa` (payload do
 GeneXus for Agents), o motor escolhe a **mais nova** — compara `metadata.version` do
-`SKILL.md` quando parseável; se empatar ou faltar versão, usa `LastWriteTimeUtc` do
-`SKILL.md`; empate final prefere From-Zip (lar comunitário). O recibo expõe
+`SKILL.md` quando **ambos** os lados têm versão parseável; se **só um** lado tem
+versão parseável, esse lado vence (sem consultar `LastWriteTimeUtc`); se empatam ou
+nenhum tem versão, usa `LastWriteTimeUtc` do `SKILL.md`; empate final prefere
+From-Zip (lar comunitário). O recibo expõe
 `preferredPath` / `preferredKind` (`from-zip` | `gx4a-payload` | `missing`) e
 `fromZipBehindPreferred` quando o payload ganhou. **Não** restaurar para o From-Zip
 quando ele estiver atrás do payload — isso seria downgrade.
@@ -367,7 +369,8 @@ O motor a inclui em `externalSkills` com `preferredKind=gx4a-payload` quando o
 `SKILL.md` do payload existe. Cópias opacas e marcador `.skill-managed-gam` seguem
 `## GENEXUS FOR AGENTS — CÓPIAS OPACAS`. Resolução: após confirmação, remover a cópia
 opaca e criar junction/symlink → `preferredPath` do payload. Se o payload estiver
-ausente, `resolveAction=blocked-no-preferred-source` — não inventar outra origem.
+ausente e houver registro ou gap que pediria restore,
+`resolveAction=blocked-no-preferred-source` — não inventar outra origem.
 
 ## GENEXUS FOR AGENTS — CÓPIAS OPACAS
 
@@ -671,6 +674,10 @@ detecta o `server.py` defasado comparando o hash instalado com o canônico do re
      junction desatualizado e criar symlink/junction → `preferredPath` (nexa:
      payload Gx4A ou From-Zip conforme `preferredKind`; gam: sempre payload
      Gx4A). Nunca apontar a `nexa` para From-Zip se `fromZipBehindPreferred=true`
+   - **`resolveAction=blocked-no-preferred-source`** → fonte preferida ausente
+     (`preferredKind=missing`); **não** inventar origem (ex.: From-Zip para `gam`).
+     Orientar instalação/restauração do payload GeneXus for Agents antes de
+     criar vínculos
    - **Gap da `nexa` por bootstrap git** → seguir `## SKILL EXTERNA GERENCIADA: NEXA`
      (Initialize-NexaRepoGit + vínculos ao preferido)
    - **Gap da `gam`** → ver `## SKILL EXTERNA GERENCIADA: GAM`

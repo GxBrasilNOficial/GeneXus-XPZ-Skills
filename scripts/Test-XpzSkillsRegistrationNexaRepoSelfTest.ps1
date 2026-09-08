@@ -14,8 +14,9 @@
     (canônico ausente e informativo; nao abre gap sozinho).
     Isola LOCALAPPDATA para nao herdar GeneXus4Agents real da maquina.
     Casos adicionais: copia_opaca nexa/gam (payload Gx4A preferido),
-    fonte_desatualizada (junction From-Zip com payload mais novo) e isolamento
-    de resolveAction (gap na nexa nao vaza para gam saudavel).
+    fonte_desatualizada (junction From-Zip com payload mais novo), isolamento
+    de resolveAction (gap na nexa nao vaza para gam saudavel) e
+    blocked-no-preferred-source (gam com pasta real e payload ausente).
     Durante a invocacao do motor, PATH fica reduzido ao diretorio do git ja resolvido
     (sem CLIs de agente; nao depende dos fallbacks Program Files do Find-GitExecutable).
 #>
@@ -515,6 +516,47 @@ finally {
     $env:USERPROFILE = $originalProfile
     $env:LOCALAPPDATA = $originalLocalAppData
     foreach ($p in @($fakeProfile7, $fakeRepo7, $fakeLocalAppData7)) {
+        Remove-TempDir -Path $p
+    }
+}
+
+# Caso 8: gam com pasta real e payload ausente → blocked-no-preferred-source
+$fakeRepo8 = New-TempDir
+$fakeProfile8 = New-TempDir
+$fakeLocalAppData8 = New-TempDir
+try {
+    $env:PATH = $gitBinDir
+    $env:LOCALAPPDATA = $fakeLocalAppData8
+    $env:USERPROFILE = $fakeProfile8
+
+    $skillDir8 = Join-Path $fakeRepo8 'xpz-skills-setup'
+    New-Item -ItemType Directory -Path $skillDir8 -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $skillDir8 'SKILL.md') -Value '# setup' -Encoding utf8
+
+    # Sem Programs\GeneXus\GeneXus4Agents\payload\skills\gam
+    $opaqueGam8 = Join-Path $fakeProfile8 '.claude\skills\gam'
+    New-Item -ItemType Directory -Path $opaqueGam8 -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $opaqueGam8 'SKILL.md') -Value '# gam opaque sem payload' -Encoding utf8
+    Set-Content -LiteralPath (Join-Path $fakeProfile8 '.claude\settings.json') -Value '{}' -Encoding utf8
+
+    $json8 = & $scriptUnderTest -RepoRoot $fakeRepo8 -AsJson | Out-String
+    $report8 = $json8 | ConvertFrom-Json
+    $gam8 = @($report8.externalSkills | Where-Object { $_.name -eq 'gam' })
+    if ($gam8.Count -eq 1) {
+        Assert-Equal 'blocked: preferredKind missing' 'missing' ([string]$gam8[0].preferredKind)
+        Assert-Equal 'blocked: resolveAction' 'blocked-no-preferred-source' ([string]$gam8[0].resolveAction)
+    }
+    else {
+        $script:cases++
+        $script:failures++
+        Write-Output 'FAIL: blocked: externalSkills deveria conter gam'
+    }
+}
+finally {
+    $env:PATH = $originalPath
+    $env:USERPROFILE = $originalProfile
+    $env:LOCALAPPDATA = $originalLocalAppData
+    foreach ($p in @($fakeProfile8, $fakeRepo8, $fakeLocalAppData8)) {
         Remove-TempDir -Path $p
     }
 }
