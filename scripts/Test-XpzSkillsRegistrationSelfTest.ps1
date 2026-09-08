@@ -11,6 +11,8 @@
     via $env:USERPROFILE durante a invocacao e restaurado ao final.
 
     Cobre: OK, ausente, quebrada, coberta_por_compatibilidade e orfa.
+    Casos isolados adicionais: compat do Cursor sozinho marca REGISTRATION_GAPS;
+    vinculo nativo em ~/.cursor/skills produz Cursor OK e REGISTRATION_OK.
 #>
 
 [CmdletBinding()]
@@ -170,6 +172,85 @@ finally {
     $env:PATH = $originalPath
     $env:USERPROFILE = $originalProfile
     foreach ($p in @($fakeProfile, $fakeRepo)) {
+        if (Test-Path -LiteralPath $p) {
+            Get-ChildItem -LiteralPath $p -Recurse -Force -ErrorAction SilentlyContinue |
+                ForEach-Object { try { $_.Attributes = 'Normal' } catch { } }
+            Remove-Item -LiteralPath $p -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
+# Caso isolado: so Cursor + skill so em .claude → compat marca REGISTRATION_GAPS
+$compatRepo = New-TempDir
+$compatProfile = New-TempDir
+$compatLocal = New-TempDir
+$originalLocalAppData = $env:LOCALAPPDATA
+try {
+    $env:PATH = ''
+    $env:LOCALAPPDATA = $compatLocal
+    New-FakeSkill -SkillRepoRoot $compatRepo -Name 'skill-only' | Out-Null
+    New-Junction -LinkDir (Join-Path $compatProfile '.claude\skills') -Name 'skill-only' -Target (Join-Path $compatRepo 'skill-only')
+    New-Item -ItemType Directory -Path (Join-Path $compatProfile '.cursor') -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $compatProfile '.cursor\mcp.json') -Value '{}' -Encoding utf8
+
+    $env:USERPROFILE = $compatProfile
+    $compatJson = & $scriptUnderTest -RepoRoot $compatRepo -AsJson | Out-String
+    $env:USERPROFILE = $originalProfile
+    $compatReport = $compatJson | ConvertFrom-Json
+
+    Assert-Equal 'isolado: Cursor compat' 'coberta_por_compatibilidade' (Get-SkillStatus -Report $compatReport -Tool 'Cursor' -Skill 'skill-only')
+    Assert-Equal 'isolado: overall GAPS por compat' 'REGISTRATION_GAPS' ([string]$compatReport.overall)
+    Assert-Equal 'isolado: missing 0' '0' ([string]$compatReport.summary.missing)
+    Assert-Equal 'isolado: broken 0' '0' ([string]$compatReport.summary.broken)
+    Assert-Equal 'isolado: orphans 0' '0' ([string]$compatReport.summary.orphans)
+    $script:cases++
+    if ([int]$compatReport.summary.coveredByCompat -ge 1) {
+        Write-Output 'PASS: isolado: coveredByCompat >= 1'
+    }
+    else {
+        $script:failures++
+        Write-Output ("FAIL: isolado: coveredByCompat esperado >= 1, obtido {0}" -f $compatReport.summary.coveredByCompat)
+    }
+}
+finally {
+    $env:PATH = $originalPath
+    $env:USERPROFILE = $originalProfile
+    $env:LOCALAPPDATA = $originalLocalAppData
+    foreach ($p in @($compatProfile, $compatRepo, $compatLocal)) {
+        if (Test-Path -LiteralPath $p) {
+            Get-ChildItem -LiteralPath $p -Recurse -Force -ErrorAction SilentlyContinue |
+                ForEach-Object { try { $_.Attributes = 'Normal' } catch { } }
+            Remove-Item -LiteralPath $p -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
+# Caso isolado: vinculo nativo em .cursor/skills → Cursor OK e REGISTRATION_OK
+$nativeRepo = New-TempDir
+$nativeProfile = New-TempDir
+$nativeLocal = New-TempDir
+try {
+    $env:PATH = ''
+    $env:LOCALAPPDATA = $nativeLocal
+    New-FakeSkill -SkillRepoRoot $nativeRepo -Name 'skill-only' | Out-Null
+    New-Junction -LinkDir (Join-Path $nativeProfile '.cursor\skills') -Name 'skill-only' -Target (Join-Path $nativeRepo 'skill-only')
+    New-Item -ItemType Directory -Path (Join-Path $nativeProfile '.cursor') -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $nativeProfile '.cursor\mcp.json') -Value '{}' -Encoding utf8
+
+    $env:USERPROFILE = $nativeProfile
+    $nativeJson = & $scriptUnderTest -RepoRoot $nativeRepo -AsJson | Out-String
+    $env:USERPROFILE = $originalProfile
+    $nativeReport = $nativeJson | ConvertFrom-Json
+
+    Assert-Equal 'nativo: Cursor OK' 'OK' (Get-SkillStatus -Report $nativeReport -Tool 'Cursor' -Skill 'skill-only')
+    Assert-Equal 'nativo: overall OK' 'REGISTRATION_OK' ([string]$nativeReport.overall)
+    Assert-Equal 'nativo: coveredByCompat 0' '0' ([string]$nativeReport.summary.coveredByCompat)
+}
+finally {
+    $env:PATH = $originalPath
+    $env:USERPROFILE = $originalProfile
+    $env:LOCALAPPDATA = $originalLocalAppData
+    foreach ($p in @($nativeProfile, $nativeRepo, $nativeLocal)) {
         if (Test-Path -LiteralPath $p) {
             Get-ChildItem -LiteralPath $p -Recurse -Force -ErrorAction SilentlyContinue |
                 ForEach-Object { try { $_.Attributes = 'Normal' } catch { } }

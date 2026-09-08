@@ -3,6 +3,11 @@
 <#
 .SYNOPSIS
     Self-test de Invoke-GeneXusForAgentsSetupSafe.ps1 em modo -RepairOnly (sem setup real).
+
+.DESCRIPTION
+    Cobre replace de copia opaca, retarget de junction, matriz compacta
+    (.claude/.agents/.config/.gemini/.cursor + .codex so para nexa), expansiva
+    (.codex tambem para gam) e BLOCK quando o payload esta ausente.
 #>
 
 [CmdletBinding()]
@@ -136,6 +141,31 @@ metadata:
     $actions = @($report.links | ForEach-Object { [string]$_.action })
     Assert-True 'houve replace-copy' ($actions -contains 'replace-copy')
     Assert-True 'houve retarget' ($actions -contains 'retarget')
+
+    function Assert-LinkToPayload {
+        param([string]$CaseName, [string]$LinkPath, [string]$PayloadPath)
+        $item = Get-Item -LiteralPath $LinkPath -Force
+        Assert-True ("$CaseName e link") (-not [string]::IsNullOrWhiteSpace([string]$item.LinkType))
+        Assert-True ("$CaseName -> payload") (
+            [string]::Equals([string]@($item.Target)[0], (Get-Item $PayloadPath).FullName, [StringComparison]::OrdinalIgnoreCase)
+        )
+    }
+
+    # Matriz compacta: todos os destinos de Get-SkillLinkDestinationRels
+    foreach ($skill in @('nexa', 'gam')) {
+        $payload = if ($skill -eq 'nexa') { $payloadNexa } else { $payloadGam }
+        foreach ($rel in @(
+                '.claude\skills',
+                '.agents\skills',
+                '.config\opencode\skills',
+                '.gemini\config\skills',
+                '.cursor\skills'
+            )) {
+            Assert-LinkToPayload -CaseName ("compacta $rel/$skill") -LinkPath (Join-Path $fakeProfile (Join-Path $rel $skill)) -PayloadPath $payload
+        }
+    }
+    Assert-LinkToPayload -CaseName 'compacta .codex/nexa' -LinkPath (Join-Path $fakeProfile '.codex\skills\nexa') -PayloadPath $payloadNexa
+    Assert-True 'compacta sem .codex/gam' (-not (Test-Path -LiteralPath (Join-Path $fakeProfile '.codex\skills\gam')))
 }
 finally {
     $env:USERPROFILE = $originalProfile
@@ -170,6 +200,40 @@ finally {
     $env:LOCALAPPDATA = $originalLocal
     $env:PATH = $originalPath
     foreach ($p in @($fakeProfile2, $fakeLocal2)) { Remove-TempDir -Path $p }
+}
+
+# Caso: -Strategy expansiva cria .codex/skills/gam
+$fakeProfile3 = New-TempDir
+$fakeLocal3 = New-TempDir
+try {
+    $env:USERPROFILE = $fakeProfile3
+    $env:LOCALAPPDATA = $fakeLocal3
+    $env:PATH = ($env:SystemRoot + '\System32')
+
+    $payloadNexa3 = Join-Path $fakeLocal3 'Programs\GeneXus\GeneXus4Agents\payload\skills\nexa'
+    $payloadGam3 = Join-Path $fakeLocal3 'Programs\GeneXus\GeneXus4Agents\payload\skills\gam'
+    New-Item -ItemType Directory -Path $payloadNexa3, $payloadGam3 -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $payloadNexa3 'SKILL.md') -Value "# nexa`n" -Encoding utf8
+    Set-Content -LiteralPath (Join-Path $payloadGam3 'SKILL.md') -Value "# gam`n" -Encoding utf8
+
+    $json3 = & $scriptUnderTest -RepairOnly -SkipAudit -Strategy expansiva -AsJson -Confirm:$false | Out-String
+    $report3 = $json3 | ConvertFrom-Json
+    Assert-Equal 'expansiva label OK' 'GX4A_SETUP_SAFE_OK' ([string]$report3.label)
+    Assert-Equal 'expansiva strategy' 'expansiva' ([string]$report3.strategy)
+
+    $codexGam = Get-Item -LiteralPath (Join-Path $fakeProfile3 '.codex\skills\gam') -Force
+    Assert-True 'expansiva .codex/gam e link' (-not [string]::IsNullOrWhiteSpace([string]$codexGam.LinkType))
+    Assert-True 'expansiva .codex/gam -> payload' (
+        [string]::Equals([string]@($codexGam.Target)[0], (Get-Item $payloadGam3).FullName, [StringComparison]::OrdinalIgnoreCase)
+    )
+    $cursorGam = Get-Item -LiteralPath (Join-Path $fakeProfile3 '.cursor\skills\gam') -Force
+    Assert-True 'expansiva .cursor/gam e link' (-not [string]::IsNullOrWhiteSpace([string]$cursorGam.LinkType))
+}
+finally {
+    $env:USERPROFILE = $originalProfile
+    $env:LOCALAPPDATA = $originalLocal
+    $env:PATH = $originalPath
+    foreach ($p in @($fakeProfile3, $fakeLocal3)) { Remove-TempDir -Path $p }
 }
 
 Write-Output '---'
