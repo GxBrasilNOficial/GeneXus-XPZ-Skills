@@ -16,7 +16,9 @@
     machine|orchestrator. Ao editar a lista «deste harness», preferir orchestrator
     quando Resolve ja usa preferred-reviewers.<orch>.json; machine so sob pedido
     explicito «lista da maquina». stdout inclui sibling* e harnessResolveReadsThisPath
-    para detectar gravacao machine sombreada pelo ficheiro do orquestrador.
+    para detectar gravacao machine sombreada pelo ficheiro do orquestrador; esses campos
+    saem tanto no sucesso quanto na recusa overwrite-required, para o sinal de sombreamento
+    aparecer ja na primeira tentativa, antes de -Overwrite.
 .PARAMETER PreferredRoot
     Default %LOCALAPPDATA%\xpz-llm-delegate (cascata).
 .PARAMETER OutputPath
@@ -454,9 +456,18 @@ if ($scopeTrim -eq 'machine' -and $siblingOrchestratorExists -and ($effectivePat
 
 if (-not $Preview -and -not $Overwrite -and (Test-PersistedSchema3Valid -Path $effectivePath)) {
     Stop-WithReason -Reason 'overwrite-required' -ExitCode 1 -Detail "destino schema 3: $effectivePath" -Extra @{
-        effectivePreferredPath = $effectivePath
-        schemaVersion          = 3
-        outputPath             = $effectivePath
+        effectivePreferredPath       = $effectivePath
+        schemaVersion                = 3
+        outputPath                   = $effectivePath
+        scope                        = $scopeTrim
+        orchestrator                 = $orchTrim
+        siblingOrchestratorPath      = $siblingOrchestratorPath
+        siblingOrchestratorExists    = $siblingOrchestratorExists
+        siblingMachinePath           = $siblingMachinePath
+        siblingMachineExists         = $siblingMachineExists
+        resolveWouldPreferAfterWrite = $resolveWouldPreferAfterWrite
+        harnessResolveReadsThisPath  = [bool]$harnessResolveReadsThisPath
+        diagnostics                  = @($setDiagnostics)
     }
 }
 

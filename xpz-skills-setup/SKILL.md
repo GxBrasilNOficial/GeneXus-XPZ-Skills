@@ -404,6 +404,15 @@ o wrapper desta skill:
   symlink/junction de `nexa`/`gam` → `GeneXus4Agents\payload\skills\…`
 - Com `-RepairOnly`: só o restore (útil depois de um setup feito fora do wrapper)
 - `-AsJson` para agentes; tenta symlink e cai para junction se a permissão negar
+- `-Strategy compacta` (padrão) cria vínculo em `.claude/skills`, `.agents/skills`,
+  `.config/opencode/skills`, `.gemini/config/skills` e `.cursor/skills` (nativo do
+  Cursor, sempre), mais `.codex/skills` **só** para `nexa`; `-Strategy expansiva`
+  acrescenta `.codex/skills` também para `gam`. Essa matriz é do restore
+  (`Get-SkillLinkDestinationRels` no wrapper) e inclui `.agents/skills` sempre — não
+  confundir com `## ESTRATÉGIA DE REGISTRO`, onde `.agents` é opcional para as skills
+  deste repositório
+- `-Skills nexa,gam` (padrão: as duas) restringe quais skills reparar;
+  `-SkipAudit` não chama `Test-XpzSkillsRegistration.ps1` ao final
 - Não impede o `gx4a-setup` se ele for clicado fora do script — só cobre o caminho
   que passa pelo wrapper
 

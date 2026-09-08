@@ -12,9 +12,12 @@
     preferred-reviewers.json schema 3. Ficheiro efetivo ilegivel/schema!=3 -> exit 2
     (nao cai no nivel seguinte). Desvio -PreferredPath: so esse ficheiro.
 
-    Envelope inclui sempre cascadeOrchestratorPath/cascadeMachinePath e
-    cascadeOrchestratorExists/cascadeMachineExists (sob PreferredRoot ou default),
-    para o agente editar o ficheiro que este harness realmente resolve — nao so a machine.
+    A partir da validacao de -Orchestrator, o envelope inclui cascadeOrchestratorPath/
+    cascadeMachinePath e cascadeOrchestratorExists/cascadeMachineExists (sob PreferredRoot
+    ou default), para o agente editar o ficheiro que este harness realmente resolve — nao so
+    a machine. Recusa anterior a essa validacao (orchestrator ausente ou fora do conjunto
+    permitido) sai sem esses campos: sem orquestrador valido nao ha caminho de cascata a
+    computar.
 
     -Orchestrator obrigatorio no corpo (cursor|claude-code|codex|opencode).
     stdout=JSON; stderr=diagnostico.

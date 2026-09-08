@@ -966,6 +966,20 @@ try {
     Assert-True ($vRes.json.cascadeMachineExists -eq $true) '(V) cascadeMachineExists=true apos machine write.'
     Assert-True ($vRes.json.reviewers[0].backend -eq 'codex') '(V) Resolve deve ler o ficheiro orchestrator (codex), nao machine.'
 
+    # (V.1) overwrite-required tambem carrega o sinal de sombreamento, antes de -Overwrite
+    $vShadowAgain = Invoke-Set @{
+        ReviewersJson = '{"reviewers":[{ "backend": "gemini", "targetModelKey": "google/gemini-3-pro", "invokeArgs": {} }]}'
+        Orchestrator  = 'cursor'
+        Scope         = 'machine'
+        PreferredRoot = $vRoot
+    }
+    Assert-True ($vShadowAgain.code -eq 1) '(V.1) segunda gravacao machine sem -Overwrite deveria exit 1.'
+    Assert-True ($vShadowAgain.json.reason -eq 'overwrite-required') "(V.1) reason=overwrite-required; veio '$($vShadowAgain.json.reason)'."
+    Assert-True ($vShadowAgain.json.harnessResolveReadsThisPath -eq $false) '(V.1) recusa deve trazer harnessResolveReadsThisPath=false.'
+    Assert-True ($vShadowAgain.json.resolveWouldPreferAfterWrite -eq 'orchestrator') '(V.1) recusa deve trazer resolveWouldPreferAfterWrite=orchestrator.'
+    Assert-True (@($vShadowAgain.json.diagnostics) -contains 'machine-write-shadowed-by-orchestrator-file') '(V.1) recusa deve citar machine-write-shadowed-by-orchestrator-file.'
+    Assert-True ($vShadowAgain.json.siblingOrchestratorExists -eq $true) '(V.1) recusa deve trazer siblingOrchestratorExists=true.'
+
     # politica invalida ainda bloqueia
     $badPolicy = @'
 {

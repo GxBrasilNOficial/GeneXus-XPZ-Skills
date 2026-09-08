@@ -310,12 +310,13 @@ Nenhum restore automático. O motor é read-only e classifica; a remoção de c�
 
 ### Testes
 
-`Test-XpzSkillsRegistrationNexaRepoSelfTest.ps1` 30/30, com os casos novos de cópia opaca (`nexa` e `gam`), fonte desatualizada, isolamento `nexa`→`gam` e `blocked-no-preferred-source` sem payload. `Test-GeneXusForAgentsSetupSafeSelfTest.ps1` 11/11 (`GX4A_SETUP_SAFE_SELFTEST_OK`), incluindo `BLOCK` quando o payload está ausente.
+`Test-XpzSkillsRegistrationNexaRepoSelfTest.ps1` 30/30, com os casos novos de cópia opaca (`nexa` e `gam`), fonte desatualizada, isolamento `nexa`→`gam` e `blocked-no-preferred-source` sem payload. `Test-GeneXusForAgentsSetupSafeSelfTest.ps1` 39/39 (`GX4A_SETUP_SAFE_SELFTEST_OK`), incluindo `BLOCK` quando o payload está ausente, a matriz completa de destinos da compacta (`.claude`/`.agents`/`.config/opencode`/`.gemini/config`/`.cursor` para `nexa` e `gam`, `.codex` só para `nexa`) e o caso `-Strategy expansiva` (`.codex/skills/gam`). `Test-XpzSkillsRegistrationSelfTest.ps1` 23/23, com os casos isolados de compat do Cursor sozinho (`REGISTRATION_GAPS`) e vínculo nativo em `~/.cursor/skills` (`REGISTRATION_OK`).
 
 ### Rastreabilidade
 
-- Commits materiais: `f336a2b` (motor, wrapper e skill), `c18a958` (WORKFLOW alinhado ao Cursor nativo), `436b805` (help de `-Strategy` do wrapper), `0f24562` (prosa residual da compacta), `bf81fd9` (isolamento de `resolveAction`), `32a9bf3` (`blocked-no-preferred-source` alcançável e prosa de frescor)
-- Arquivos materiais: `scripts/Test-XpzSkillsRegistration.ps1`, `scripts/Invoke-GeneXusForAgentsSetupSafe.ps1`, `scripts/Test-GeneXusForAgentsSetupSafeSelfTest.ps1`, `scripts/Test-XpzSkillsRegistrationNexaRepoSelfTest.ps1`, `xpz-skills-setup/SKILL.md`, `09-inventario-e-rastreabilidade-publica.md`, `CHANGELOG.md`.
+- Commits materiais: `f336a2b` (motor, wrapper e skill), `c18a958` (WORKFLOW alinhado ao Cursor nativo), `436b805` (help de `-Strategy` do wrapper), `0f24562` (prosa residual da compacta), `bf81fd9` (isolamento de `resolveAction`), `32a9bf3` (`blocked-no-preferred-source` alcançável e prosa de frescor), `d26f67c` (self-tests de Cursor nativo e da matriz `-Strategy`)
+- Arquivos materiais: `scripts/Test-XpzSkillsRegistration.ps1`, `scripts/Invoke-GeneXusForAgentsSetupSafe.ps1`, `scripts/Test-GeneXusForAgentsSetupSafeSelfTest.ps1`, `scripts/Test-XpzSkillsRegistrationNexaRepoSelfTest.ps1`, `scripts/Test-XpzSkillsRegistrationSelfTest.ps1`, `xpz-skills-setup/SKILL.md`, `09-inventario-e-rastreabilidade-publica.md`, `CHANGELOG.md`.
+- A revisão pré-push apontou que a seção «Wrapper seguro (opção C)» da skill não citava `-Strategy`, `-Skills` nem `-SkipAudit`, embora `-Strategy` decida os destinos de vínculo; documentado no commit seguinte, com a ressalva de que a matriz do restore inclui `.agents/skills` sempre, ao contrário da `## ESTRATÉGIA DE REGISTRO`.
 
 ## Editar a lista preferida é editar o ficheiro que este harness resolve
 
@@ -327,18 +328,19 @@ A curadoria de revisores vive em cascata (`preferred-reviewers.<orquestrador>.js
 
 ### O que foi feito
 
-- `Resolve-LlmDelegatePreferredReviewers.ps1` passa a expor sempre `cascadeOrchestratorPath`, `cascadeMachinePath`, `cascadeOrchestratorExists` e `cascadeMachineExists`, para o escopo ser escolhido **antes** de gravar;
-- `Set-LlmDelegatePreferredReviewers.ps1` passa a emitir `siblingOrchestratorPath`/`siblingOrchestratorExists`, `siblingMachinePath`/`siblingMachineExists`, `resolveWouldPreferAfterWrite`, `harnessResolveReadsThisPath` e o diagnóstico `machine-write-shadowed-by-orchestrator-file` quando a gravação machine fica sombreada;
+- `Resolve-LlmDelegatePreferredReviewers.ps1` passa a expor `cascadeOrchestratorPath`, `cascadeMachinePath`, `cascadeOrchestratorExists` e `cascadeMachineExists` a partir da validação de `-Orchestrator`, para o escopo ser escolhido **antes** de gravar; recusa anterior a essa validação (orquestrador ausente ou inválido) sai sem esses campos, porque não há caminho de cascata a computar;
+- `Set-LlmDelegatePreferredReviewers.ps1` passa a emitir `siblingOrchestratorPath`/`siblingOrchestratorExists`, `siblingMachinePath`/`siblingMachineExists`, `resolveWouldPreferAfterWrite`, `harnessResolveReadsThisPath` e o diagnóstico `machine-write-shadowed-by-orchestrator-file` quando a gravação machine fica sombreada — tanto no sucesso quanto na recusa `overwrite-required`, para o sinal aparecer já na primeira tentativa, antes de `-Overwrite`;
 - regra operacional correspondente em `15-revisao-por-pares.md`, `xpz-llm-delegate/SKILL.md` (passo 2 da persistência) e `xpz-skills-setup/SKILL.md` (oferta de calibração): pedido genérico nesta sessão vai para `-Scope orchestrator` quando o ficheiro do orquestrador existe ou é a fonte efetiva; `-Scope machine` só com pedido explícito de lista da máquina.
 
 Nenhum bloqueio novo: o eixo é de **honestidade do recibo**, não de recusa. Gravar machine continua permitido; o que muda é o agente ter de mostrar que aquilo não altera o que este harness lê.
 
 ### Testes
 
-`Test-LlmDelegatePreferredReviewersSelfTest.ps1` (bloco novo de escopo/sombreamento) verde.
+`Test-LlmDelegatePreferredReviewersSelfTest.ps1` (bloco novo de escopo/sombreamento, casos (V) e (V.1)) verde. O (V.1) prova que a recusa `overwrite-required` já carrega `harnessResolveReadsThisPath=false`, `resolveWouldPreferAfterWrite=orchestrator` e o diagnóstico de sombreamento.
 
 ### Rastreabilidade
 
 - Commit material: `f336a2b` (`Endurece setup XPZ perante GeneXus for Agents e curadoria do harness`)
 - Arquivos materiais: `scripts/Resolve-LlmDelegatePreferredReviewers.ps1`, `scripts/Set-LlmDelegatePreferredReviewers.ps1`, `scripts/Test-LlmDelegatePreferredReviewersSelfTest.ps1`, `15-revisao-por-pares.md`, `xpz-llm-delegate/SKILL.md`, `xpz-skills-setup/SKILL.md`, `09-inventario-e-rastreabilidade-publica.md`, `CHANGELOG.md`.
 - A revisão pré-push desta rodada apontou que o `08-guia-para-agente-gpt.md` descrevia a mesma operação sem a regra de escopo; a correção entra no commit seguinte.
+- A segunda passagem da revisão pré-push apontou duas lacunas de contrato: os campos de sombreamento saíam só no exit `0` (invisíveis na recusa `overwrite-required`) e o help do `Resolve-` prometia `cascade*` «sempre». Ambas fechadas no commit seguinte, junto com a documentação de `-Strategy`/`-Skills`/`-SkipAudit` no wrapper Gx4A.
