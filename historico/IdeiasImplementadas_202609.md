@@ -344,3 +344,32 @@ Nenhum bloqueio novo: o eixo é de **honestidade do recibo**, não de recusa. Gr
 - Arquivos materiais: `scripts/Resolve-LlmDelegatePreferredReviewers.ps1`, `scripts/Set-LlmDelegatePreferredReviewers.ps1`, `scripts/Test-LlmDelegatePreferredReviewersSelfTest.ps1`, `15-revisao-por-pares.md`, `xpz-llm-delegate/SKILL.md`, `xpz-skills-setup/SKILL.md`, `09-inventario-e-rastreabilidade-publica.md`, `CHANGELOG.md`.
 - A revisão pré-push desta rodada apontou que o `08-guia-para-agente-gpt.md` descrevia a mesma operação sem a regra de escopo; a correção entra no commit seguinte.
 - A segunda passagem da revisão pré-push apontou duas lacunas de contrato: os campos de sombreamento saíam só no exit `0` (invisíveis na recusa `overwrite-required`) e o help do `Resolve-` prometia `cascade*` «sempre». Ambas fechadas no commit seguinte, junto com a documentação de `-Strategy`/`-Skills`/`-SkipAudit` no wrapper Gx4A.
+
+## Edição em lote de metadados de XML da frente dirigida por manifesto
+
+Implementado em 2026-09-13.
+
+### O defeito
+
+Numa frente real (schemas de CTe), 131 objetos foram editados por um script descartável que operava por nome de arquivo, fazia no-op silencioso quando o atributo não existia, escrevia documentação na primeira ocorrência de `<InnerHtml>` do arquivo inteiro, gravava `UtcNow+90s` como `lastUpdate` para todos, gravava dentro do laço sem rollback e esquecia `description=` no rename. Funcionou, e reportou `status = ok` em todos esses cenários. O motor cirúrgico existente (`Edit-GeneXusXmlSurgical.ps1`) resolve **um** delta por chamada e não tem vocabulário para declarar precondição de identidade, de modo que a repetição por arquivo reproduz o mesmo risco em escala.
+
+### O que foi feito
+
+- `scripts/Edit-GeneXusXmlBatchMetadata.ps1` e o núcleo `scripts/GeneXusXmlBatchMetadataSupport.ps1`: três operações (`setDocumentation`, `setParent`, `renameDomain`) declaradas em manifesto JSON (`Kind=xpz-batch-metadata-manifest`), com `guid`, tipo, nome e `expected` conferidos contra o arquivo real antes de qualquer escrita; dois escopos léxicos nomeados (intervalo da tag raiz × conteúdo do elemento raiz sem subárvores `<Object>` aninhadas), com a varredura pulando `CDATA`, comentário e instrução de processamento antes de contar profundidade; contagem de âncora e gravação sempre no mesmo escopo;
+- identidade de bytes deixou de ser promessa: o rastreador guarda cada mutação em coordenadas do texto original **e** do final, e a pós-condição remove os intervalos declarados dos dois textos e exige igualdade do resto;
+- `lastUpdate` compõe os três termos da D1 materializando um baseline sintético em `-WorkDir` com a string do vencedor **verbatim** — o motor existente continua sendo a única fonte da fórmula, do formato e da leitura de `UtcNow`;
+- recuperação: journal durável com `pathBefore`/`pathAfter`/`bakPath`/`hashBefore`/`hashAfter` por passo, `.bak` e baseline sintético em `-WorkDir` **fora** da frente, rollback que desfaz renomes em ordem inversa antes de restaurar, e `scripts/Show-GeneXusXmlBatchMetadataRecoveryPlan.ps1` para o que o rollback automático já não alcança;
+- entregáveis de suporte: `scripts/XpzAtomicTextWriteSupport.ps1` (`Write-XpzTextFileAtomic` com `-TempDir`), `scripts/XpzProtectedAreaSupport.ps1` (guardas extraídos da decisão D2, com `XpzExecutionReportSupport.ps1` passando a dot-sourceá-los sem migrar consumidor) e `-BaselineXmlPath` opcional em `Get-NewGeneXusLastUpdateValueFromEngine`, que era `Mandatory` e tornava inexecutável o ramo sem baseline.
+
+Decisões que o desenho congelado não fechava, documentadas nos cabeçalhos dos scripts: código `MANIFEST_SCHEMA_INVALID` acrescentado à lista de bloqueios (a §10 só previa `Kind` e `SchemaVersion`); «duplicidade por guid bloqueia globalmente» lido como o mesmo guid em mais de um `xmlPath`, sob pena de matar a composição da §4; âncora de documentação contada e gravada no escopo do próprio `<Part>`; ocorrência de âncora dentro de `CDATA` não conta; `lastUpdate` calculado na Fase 1b para a Fase 1a não escrever nada; hard link indeterminável (`fsutil` «Erro 50» em alguns volumes) vira aviso declarado em vez de bloqueio.
+
+### Testes
+
+`Test-EditGeneXusXmlBatchMetadataContract.ps1` verde, cobrindo os casos 1, 1b, 2, 3, 4, 5, 6, 6b, 7, 8, 9 e 10 da §13 do desenho, mais o caso 11 (`setParent` e composição de duas operações no mesmo arquivo, que a §13 não enumerava). O caso 3 injeta falha de substituição no 120º de 131 alvos e exige zero hash alterado após o rollback. `Test-GeneXusLastUpdateEngineOptionalBaselineSelfTest.ps1` verde. Bateria adjacente sem regressão: edição cirúrgica, `lastUpdate`, copy-to-front, drift, observabilidade de empacotamento, nomenclatura e colisão de pacote.
+
+### Rastreabilidade
+
+- Commit material: `c65b3ba` (`Implementa Edit-GeneXusXmlBatchMetadata.ps1 (desenho congelado v10)`)
+- Arquivos materiais: `scripts/Edit-GeneXusXmlBatchMetadata.ps1`, `scripts/GeneXusXmlBatchMetadataSupport.ps1`, `scripts/Show-GeneXusXmlBatchMetadataRecoveryPlan.ps1`, `scripts/XpzAtomicTextWriteSupport.ps1`, `scripts/XpzProtectedAreaSupport.ps1`, `scripts/Test-EditGeneXusXmlBatchMetadataContract.ps1`, `scripts/Test-GeneXusLastUpdateEngineOptionalBaselineSelfTest.ps1`, `scripts/GeneXusXmlSurgicalEditSupport.ps1`, `scripts/XpzExecutionReportSupport.ps1`, `scripts/Test-XpzParameterNamingContract.ps1`, `09-inventario-e-rastreabilidade-publica.md`, `999-ideias-pendentes.md`, `CHANGELOG.md`.
+- Desenho congelado em `edit-genexus-xml-batch-metadata-design.md` (commit `9c02975`), após dez pareceres de quatro famílias.
+- A revisão pré-push desta rodada apontou quatro gaps de documentação: ausência de regra operacional no `02`, ausência da entrada equivalente no `08`, ausência do motor em `xpz-builder/SKILL.md` e no `quality-checklist.md` (com o «Dono» do ponteiro do `09` apontando um documento de desenho em vez de uma skill) e ausência desta entrada no histórico mensal. O `02`, o `08` e esta entrada foram corrigidos no commit seguinte; a definição do dono normativo ficou como decisão humana pendente.
