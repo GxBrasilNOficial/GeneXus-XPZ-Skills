@@ -116,7 +116,11 @@ $inputPathWithPathAlias = @(
     'Test-GeneXusObjectVariableDelta.ps1',
     'Test-GeneXusTransactionCoherence.ps1',
     'New-GeneXusUnknownTypeMaintainerPrompt.ps1',
-    'Set-GeneXusXmlLastUpdate.ps1'
+    'Set-GeneXusXmlLastUpdate.ps1',
+    # Ressalva semantica registrada: aqui a entrada primaria e um manifesto
+    # JSON, nao um XML. -Path entra por consistencia de familia (os dois irmaos
+    # mais proximos deste motor ja o expoem), nao por ser descritivo.
+    'Edit-GeneXusXmlBatchMetadata.ps1'
 )
 foreach ($scriptFile in $inputPathWithPathAlias) {
     Assert-CanonicalParameter -ScriptFileName $scriptFile -ParameterName 'InputPath' -RequiredAliases @('Path')

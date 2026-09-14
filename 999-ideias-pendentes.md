@@ -3181,3 +3181,18 @@ As contagens são de **arquivos que mencionam o token**, não de parâmetros exc
 - Se wrappers locais em pastas paralelas de KB precisam de passo de migração pela `xpz-kb-parallel-setup`.
 
 **Relacionado.** `998-ideias-descartadas-e-porque.md` (entrada que descartou um orquestrador único de gates) cita justamente `-FrontFolder`+`-CorpusFolder` entre os «contratos heterogêneos» que tornaram aquele orquestrador caro — ou seja, a divergência já cobrou preço antes, num contexto diferente.
+
+## Medir importação com `checksum=""` em KB de ensaio
+
+- **Importância** — média (fecha com evidência uma questão que hoje se sustenta em `n=1`; enquanto não fechada, todo motor que edita XML da frente preserva `checksum` obsoleto e rebaixa o status do relatório por precaução).
+- **Maturidade** — ideia (o experimento está desenhado; falta a KB de ensaio e a janela).
+
+**Pergunta a responder.** O GeneXus aceita importar um objeto cujo `checksum` da tag raiz esteja **vazio** (`checksum=""`), e o que ele faz depois — recalcula, ignora ou recusa?
+
+**Por que ela existe.** `Edit-GeneXusXmlBatchMetadata.ps1` preserva o `checksum` como está (intervalo nulo de mutação) e emite o status de máquina `checksumStale`. A única evidência real de que o checksum obsoleto não atrapalha é o caso CTe: 131 objetos importados com checksum desatualizado e importação bem-sucedida. Isso é **um** caminho observado com `n=1`, não uma regra do GeneXus. Zerar o campo troca um caminho medido por um não medido — por isso a recusa de zerar foi mantida (§14 do desenho), com a medição registrada aqui.
+
+**Como medir.** Em KB de ensaio descartável: exportar um objeto, editar só o `checksum` para `""` na cópia da frente, importar, e registrar (a) se a importação passa, (b) qual valor o objeto fica tendo na KB depois, (c) se o `Test-GeneXusImportFileEnvelope.ps1` e o empacotamento aceitam o pacote. Repetir com o checksum **obsoleto** (o caminho de hoje) para ter os dois braços do mesmo experimento.
+
+**Esta entrada NÃO é a entrada da task `CalculateChecksums`.** A entrada existente sobre `CalculateChecksums` / `AreObjectsEqual` (neste mesmo documento, seção sobre tasks MSBuild não documentadas) trata de **outra** pergunta: usar tasks do MSBuild para comparar o estado dos objetos **antes e depois** do import, com granularidade de conjunto. Aqui a pergunta é sobre o **valor do atributo no XML da frente** e o que a importação faz com ele. Um implementador futuro não deve marcar esta obrigação como cumprida pela outra: elas se cruzam no vocabulário («checksum») e divergem no objeto de medição.
+
+**Relacionado.** `edit-genexus-xml-batch-metadata-design.md` §12 e §14; `Edit-GeneXusXmlBatchMetadata.ps1` (aviso `checksumStale` e status de máquina homônimo).

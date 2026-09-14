@@ -13,47 +13,17 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+# D2: as primitivas de caminho vivem em XpzProtectedAreaSupport.ps1. Este suporte
+# continua expondo os mesmos nomes de funcao aos seus consumidores por
+# dot-source; nenhum consumidor migra.
+$xpzProtectedAreaSupportPath = Join-Path (Split-Path -Parent $PSCommandPath) 'XpzProtectedAreaSupport.ps1'
+if (-not (Test-Path -LiteralPath $xpzProtectedAreaSupportPath -PathType Leaf)) {
+    throw "XpzProtectedAreaSupport.ps1 nao encontrado: $xpzProtectedAreaSupportPath"
+}
+. $xpzProtectedAreaSupportPath
+
 function Get-XpzReportUtcNow {
     return [DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ss.fffZ', [Globalization.CultureInfo]::InvariantCulture)
-}
-
-function Get-XpzCanonicalPath {
-    param([Parameter(Mandatory = $true)][string]$Path)
-
-    return [IO.Path]::GetFullPath($Path)
-}
-
-function Test-XpzPathEqualOrUnder {
-    param(
-        [Parameter(Mandatory = $true)][string]$Candidate,
-        [Parameter(Mandatory = $true)][string]$Base
-    )
-
-    $candidateFull = Get-XpzCanonicalPath -Path $Candidate
-    $baseFull = Get-XpzCanonicalPath -Path $Base
-    if ($candidateFull.Equals($baseFull, [StringComparison]::OrdinalIgnoreCase)) {
-        return $true
-    }
-    $basePrefix = $baseFull.TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
-    return $candidateFull.StartsWith($basePrefix, [StringComparison]::OrdinalIgnoreCase)
-}
-
-function Get-XpzReparsePointInPath {
-    param([Parameter(Mandatory = $true)][string]$Path)
-
-    $cursor = Get-XpzCanonicalPath -Path $Path
-    while (-not [string]::IsNullOrWhiteSpace($cursor)) {
-        $item = Get-Item -LiteralPath $cursor -Force -ErrorAction SilentlyContinue
-        if ($null -ne $item -and ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
-            return $item.FullName
-        }
-        $parent = [IO.Directory]::GetParent($cursor)
-        if ($null -eq $parent -or $parent.FullName.Equals($cursor, [StringComparison]::OrdinalIgnoreCase)) {
-            break
-        }
-        $cursor = $parent.FullName
-    }
-    return $null
 }
 
 function Test-XpzForbiddenReportArea {
@@ -62,18 +32,7 @@ function Test-XpzForbiddenReportArea {
         [Parameter(Mandatory = $true)][string]$RepoRoot
     )
 
-    $forbidden = @(
-        (Join-Path $RepoRoot 'ObjetosDaKbEmXml'),
-        (Join-Path $RepoRoot 'ObjetosGeradosParaImportacaoNaKbNoGenexus'),
-        (Join-Path $RepoRoot 'PacotesGeradosParaImportacaoNaKbNoGenexus'),
-        (Join-Path $RepoRoot 'XpzExportadosPelaIDE'),
-        (Join-Path $RepoRoot 'scripts'),
-        (Join-Path $RepoRoot 'KbIntelligence'),
-        (Join-Path $RepoRoot '.git'),
-        (Join-Path $RepoRoot 'ArquivoMorto'),
-        (Join-Path $RepoRoot 'historico'),
-        (Join-Path $RepoRoot 'kb-source-metadata.md')
-    )
+    $forbidden = Get-XpzProtectedAreaPaths -RepoRoot $RepoRoot
     foreach ($area in $forbidden) {
         if (Test-XpzPathEqualOrUnder -Candidate $Candidate -Base $area) {
             return [pscustomobject]@{ blocked = $true; reason = "ReportPath pertence a area proibida: $area" }

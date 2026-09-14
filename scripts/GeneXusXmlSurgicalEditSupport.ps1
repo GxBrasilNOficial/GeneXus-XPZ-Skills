@@ -51,8 +51,14 @@ function Get-FirstObjectLastUpdateFromText {
 }
 
 function Get-NewGeneXusLastUpdateValueFromEngine {
+    <#
+        -BaselineXmlPath e OPCIONAL: quando omitido (ou vazio), o valor e
+        UtcNow + margem, comportamento herdado de Get-GeneXusXpzLastUpdate.ps1,
+        que ja aceita o parametro como opcional. O ramo sem baseline e exigido
+        pelo chamador em lote quando nem o alvo nem o acervo tem lastUpdate
+        legivel.
+    #>
     param(
-        [Parameter(Mandatory = $true)]
         [string]$BaselineXmlPath,
 
         [int]$FreshnessMarginSeconds = $script:FreshnessMarginSecondsDefault
@@ -63,7 +69,11 @@ function Get-NewGeneXusLastUpdateValueFromEngine {
         throw "Motor Get-GeneXusXpzLastUpdate.ps1 nao encontrado: $enginePath"
     }
 
-    $timestamp = & $enginePath -BaselineXmlPath $BaselineXmlPath -FreshnessMarginSeconds $FreshnessMarginSeconds -Count 1
+    if ([string]::IsNullOrWhiteSpace($BaselineXmlPath)) {
+        $timestamp = & $enginePath -FreshnessMarginSeconds $FreshnessMarginSeconds -Count 1
+    } else {
+        $timestamp = & $enginePath -BaselineXmlPath $BaselineXmlPath -FreshnessMarginSeconds $FreshnessMarginSeconds -Count 1
+    }
     return [string]$timestamp
 }
 
