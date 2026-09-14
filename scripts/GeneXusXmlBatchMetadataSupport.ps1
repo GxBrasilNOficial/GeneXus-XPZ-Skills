@@ -1107,18 +1107,34 @@ function Get-GeneXusModuleNameByGuid {
         [Parameter(Mandatory = $true)][string]$ModuleGuid
     )
 
+    # Arquivo ilegivel NAO pode sumir em silencio: mesmo quando o efeito e
+    # fail-closed, quem le o relatorio precisa saber que a varredura teve
+    # buraco. As quatro funcoes de indice deste arquivo seguem a mesma
+    # disciplina, cada uma com o seu veredito declarado no cabecalho.
+    $unreadable = [System.Collections.Generic.List[object]]::new()
     $moduleFolder = Join-Path $AcervoPath 'Module'
-    if (-not (Test-Path -LiteralPath $moduleFolder -PathType Container)) { return $null }
+    if (-not (Test-Path -LiteralPath $moduleFolder -PathType Container)) {
+        return [pscustomobject]@{ Name = $null; Unreadable = @($unreadable) }
+    }
     foreach ($file in (Get-ChildItem -LiteralPath $moduleFolder -Filter '*.xml' -File)) {
-        $raw = [System.IO.File]::ReadAllText($file.FullName)
+        $raw = $null
+        try {
+            $raw = [System.IO.File]::ReadAllText($file.FullName)
+        } catch {
+            [void]$unreadable.Add([pscustomobject]@{ path = $file.FullName; reason = "Module ilegivel: $($_.Exception.Message)" })
+            continue
+        }
         if ($raw.IndexOf($ModuleGuid, [StringComparison]::OrdinalIgnoreCase) -lt 0) { continue }
         $info = Get-GeneXusObjectRootInfo -Text $raw
-        if (-not $info.Valid) { continue }
+        if (-not $info.Valid) {
+            [void]$unreadable.Add([pscustomobject]@{ path = $file.FullName; reason = "Module que cita o moduleGuid do alvo nao e XML valido: $($info.Reason)" })
+            continue
+        }
         if ([string]::Equals([string]$info.Attributes['guid'], $ModuleGuid, [StringComparison]::OrdinalIgnoreCase)) {
-            return [string]$info.Attributes['name']
+            return [pscustomobject]@{ Name = [string]$info.Attributes['name']; Unreadable = @($unreadable) }
         }
     }
-    return $null
+    return [pscustomobject]@{ Name = $null; Unreadable = @($unreadable) }
 }
 
 function Get-GeneXusXmlCDataNodes {
@@ -1234,12 +1250,28 @@ function Build-GeneXusDomainReferenceIndex {
 function Get-GeneXusDomainDefinitionIndex {
     param([Parameter(Mandatory = $true)][string]$AcervoPath)
 
+    # Veredito de eixo: aqui o silencio era FAIL-OPEN. Um Domain/*.xml ilegivel
+    # some do indice, a forma curta deixa de resolver para o alvo e uma
+    # referencia real deixa de bloquear o rename. Passa a alimentar
+    # REFERENCE_SCAN_INCOMPLETE, que e o codigo que a secao 7 reserva para
+    # "arquivo ilegivel" - zero com cobertura incompleta nao e sucesso.
     $byName = @{}
+    $unreadable = [System.Collections.Generic.List[object]]::new()
     $domainFolder = Join-Path $AcervoPath 'Domain'
     if (Test-Path -LiteralPath $domainFolder -PathType Container) {
         foreach ($file in (Get-ChildItem -LiteralPath $domainFolder -Filter '*.xml' -File)) {
-            $info = Get-GeneXusObjectRootInfo -Text ([System.IO.File]::ReadAllText($file.FullName))
-            if (-not $info.Valid) { continue }
+            $raw = $null
+            try {
+                $raw = [System.IO.File]::ReadAllText($file.FullName)
+            } catch {
+                [void]$unreadable.Add([pscustomobject]@{ path = $file.FullName; reason = "Domain do acervo ilegivel: $($_.Exception.Message)" })
+                continue
+            }
+            $info = Get-GeneXusObjectRootInfo -Text $raw
+            if (-not $info.Valid) {
+                [void]$unreadable.Add([pscustomobject]@{ path = $file.FullName; reason = "Domain do acervo nao e XML valido: $($info.Reason)" })
+                continue
+            }
             $name = [string]$info.Attributes['name']
             if ([string]::IsNullOrWhiteSpace($name)) { continue }
             $key = $name.ToLowerInvariant()
@@ -1252,7 +1284,7 @@ function Get-GeneXusDomainDefinitionIndex {
             })
         }
     }
-    return $byName
+    return [pscustomobject]@{ ByName = $byName; Unreadable = @($unreadable) }
 }
 
 function Test-GeneXusPackagedModuleHomonym {
@@ -1331,7 +1363,12 @@ function Resolve-GeneXusDomainReferenceVerdict {
         [Parameter(Mandatory = $true)][string]$TargetGuid,
         [AllowNull()][string]$TargetModuleName,
         [Parameter(Mandatory = $true)][object]$DomainDefinitions,
-        [AllowEmptyCollection()][object[]]$PackagedHomonyms = @()
+        [AllowEmptyCollection()][object[]]$PackagedHomonyms = @(),
+
+        # Arquivos que a varredura do acervo nao conseguiu ler ou parsear. Cada
+        # um vira cobertura incompleta: afirmar "zero referencias" sobre uma
+        # varredura furada e o oposto do que a secao 7 manda.
+        [AllowEmptyCollection()][object[]]$ScanUnreadable = @()
     )
 
     $blockingOccurrences = [System.Collections.Generic.List[object]]::new()
@@ -1384,7 +1421,7 @@ function Resolve-GeneXusDomainReferenceVerdict {
 
         $key = $namePart.ToLowerInvariant()
         $definitions = @()
-        if ($DomainDefinitions.ContainsKey($key)) { $definitions = @($DomainDefinitions[$key]) }
+        if ($DomainDefinitions.ByName.ContainsKey($key)) { $definitions = @($DomainDefinitions.ByName[$key]) }
         if ($definitions.Count -eq 0) {
             [void]$incompleteReasons.Add("grafia '$value' nao resolve para nenhum Domain do acervo ($($occurrence.path)).")
             continue
@@ -1432,6 +1469,10 @@ function Resolve-GeneXusDomainReferenceVerdict {
 
     foreach ($entry in $Index.Unreadable) {
         [void]$incompleteReasons.Add("arquivo ilegivel na varredura: $($entry.path) ($($entry.reason)).")
+    }
+    foreach ($entry in @($ScanUnreadable)) {
+        if ($null -eq $entry) { continue }
+        [void]$incompleteReasons.Add("arquivo ilegivel no indice do acervo: $($entry.path) ($($entry.reason)).")
     }
 
     return [pscustomobject]@{
@@ -2416,23 +2457,38 @@ function Get-GeneXusAcervoTypeFolderIndex {
         [Parameter(Mandatory = $true)][string]$FolderName
     )
 
+    # Veredito de eixo: aqui o silencio tambem era FAIL-OPEN. Um XML ilegivel
+    # na pasta do tipo esconde o homonimo, e objectState:new passa onde devia
+    # dar NEW_OBJECT_EXISTS_IN_ACERVO. O chamador bloqueia com cobertura
+    # incompleta em vez de afirmar "nao existe" sobre uma varredura furada.
     $byGuid = @{}
     $byName = @{}
+    $unreadable = [System.Collections.Generic.List[object]]::new()
     $folder = Join-Path $AcervoPath $FolderName
     if (-not (Test-Path -LiteralPath $folder -PathType Container)) {
-        return [pscustomobject]@{ ByGuid = $byGuid; ByName = $byName; Scanned = 0; FolderExists = $false }
+        return [pscustomobject]@{ ByGuid = $byGuid; ByName = $byName; Scanned = 0; FolderExists = $false; Unreadable = @($unreadable) }
     }
     $scanned = 0
     foreach ($file in (Get-ChildItem -LiteralPath $folder -Filter '*.xml' -File)) {
         $scanned++
-        $info = Get-GeneXusObjectRootInfo -Text ([System.IO.File]::ReadAllText($file.FullName))
-        if (-not $info.Valid) { continue }
+        $raw = $null
+        try {
+            $raw = [System.IO.File]::ReadAllText($file.FullName)
+        } catch {
+            [void]$unreadable.Add([pscustomobject]@{ path = $file.FullName; reason = "objeto do acervo ilegivel: $($_.Exception.Message)" })
+            continue
+        }
+        $info = Get-GeneXusObjectRootInfo -Text $raw
+        if (-not $info.Valid) {
+            [void]$unreadable.Add([pscustomobject]@{ path = $file.FullName; reason = "objeto do acervo nao e XML valido: $($info.Reason)" })
+            continue
+        }
         $guid = [string]$info.Attributes['guid']
         $name = [string]$info.Attributes['name']
         if (-not [string]::IsNullOrWhiteSpace($guid)) { $byGuid[$guid.ToLowerInvariant()] = $file.FullName }
         if (-not [string]::IsNullOrWhiteSpace($name)) { $byName[$name.ToLowerInvariant()] = $file.FullName }
     }
-    return [pscustomobject]@{ ByGuid = $byGuid; ByName = $byName; Scanned = $scanned; FolderExists = $true }
+    return [pscustomobject]@{ ByGuid = $byGuid; ByName = $byName; Scanned = $scanned; FolderExists = $true; Unreadable = @($unreadable) }
 }
 
 function Get-GeneXusFolderObjectIndex {
@@ -2443,14 +2499,29 @@ function Get-GeneXusFolderObjectIndex {
     #>
     param([AllowEmptyCollection()][string[]]$Roots)
 
+    # Veredito de eixo: aqui o silencio e FAIL-CLOSED - um Folder ilegivel some
+    # do grafo e o destino vira PARENT_TARGET_MISSING, que bloqueia. Fica como
+    # esta, mas o arquivo ilegivel passa a aparecer no relatorio: o operador
+    # precisa distinguir "destino nao existe" de "nao consegui ler o destino".
     $byGuid = @{}
+    $unreadable = [System.Collections.Generic.List[object]]::new()
     foreach ($root in $Roots) {
         if ([string]::IsNullOrWhiteSpace($root)) { continue }
         $folder = Join-Path $root 'Folder'
         if (-not (Test-Path -LiteralPath $folder -PathType Container)) { continue }
         foreach ($file in (Get-ChildItem -LiteralPath $folder -Filter '*.xml' -File)) {
-            $info = Get-GeneXusObjectRootInfo -Text ([System.IO.File]::ReadAllText($file.FullName))
-            if (-not $info.Valid) { continue }
+            $raw = $null
+            try {
+                $raw = [System.IO.File]::ReadAllText($file.FullName)
+            } catch {
+                [void]$unreadable.Add([pscustomobject]@{ path = $file.FullName; reason = "Folder ilegivel: $($_.Exception.Message)" })
+                continue
+            }
+            $info = Get-GeneXusObjectRootInfo -Text $raw
+            if (-not $info.Valid) {
+                [void]$unreadable.Add([pscustomobject]@{ path = $file.FullName; reason = "Folder nao e XML valido: $($info.Reason)" })
+                continue
+            }
             $guid = [string]$info.Attributes['guid']
             if ([string]::IsNullOrWhiteSpace($guid)) { continue }
             $byGuid[$guid.ToLowerInvariant()] = [pscustomobject]@{
@@ -2461,11 +2532,12 @@ function Get-GeneXusFolderObjectIndex {
             }
         }
     }
-    return $byGuid
+    return [pscustomobject]@{ ByGuid = $byGuid; Unreadable = @($unreadable) }
 }
 
 function Test-GeneXusParentChain {
     param(
+        # o mapa guid -> Folder (a propriedade ByGuid do indice), nao o indice
         [Parameter(Mandatory = $true)][hashtable]$FolderIndex,
         [Parameter(Mandatory = $true)][string]$TargetGuid,
         [Parameter(Mandatory = $true)][string]$NewParentGuid
@@ -2581,6 +2653,15 @@ function Invoke-GeneXusXmlBatchMetadataCore {
         }
         if (Test-XpzPathEqualOrUnder -Candidate $workDirFull -Base $frontFull) {
             [void]$blocks.Add((New-GeneXusBatchBlock -Code 'ARTIFACT_PATH_COLLISION' -Message "-WorkDir nao pode ficar dentro da frente: $workDirFull" -Path $workDirFull))
+            return (New-GeneXusBatchMetadataReport -RunId $runId -Status 'blocked' -Phase 'phase0' -Blocks $blocks)
+        }
+        # Mesmo eixo do -ReportPath e da frente: um ponto de reanalise no
+        # caminho do -WorkDir manda journal, .bak e baseline para outro lugar.
+        # Checar aqui e antes de criar o diretorio, para nao materializar nada
+        # dentro do caminho recusado.
+        $workDirReparse = Get-XpzReparsePointInPath -Path $workDirFull
+        if ($null -ne $workDirReparse) {
+            [void]$blocks.Add((New-GeneXusBatchBlock -Code 'PROTECTED_AREA' -Message "ponto de reanalise no caminho do -WorkDir: $workDirReparse" -Path $workDirFull))
             return (New-GeneXusBatchMetadataReport -RunId $runId -Status 'blocked' -Phase 'phase0' -Blocks $blocks)
         }
         if (-not (Test-Path -LiteralPath $workDirFull -PathType Container)) {
@@ -2713,7 +2794,11 @@ function Invoke-GeneXusXmlBatchMetadataCore {
         $needsParentGraph = @($operations | Where-Object { $_.Op -eq 'setParent' }).Count -gt 0
         $folderIndex = $null
         if ($needsParentGraph) {
-            $folderIndex = Get-GeneXusFolderObjectIndex -Roots @($acervoFull, $frontFull)
+            $folderIndexResult = Get-GeneXusFolderObjectIndex -Roots @($acervoFull, $frontFull)
+            $folderIndex = $folderIndexResult.ByGuid
+            foreach ($entry in @($folderIndexResult.Unreadable)) {
+                [void]$warnings.Add((New-GeneXusBatchWarning -Kind 'acervoFileUnreadable' -Message "Folder ilegivel no grafo de pais (o destino pode virar PARENT_TARGET_MISSING por isso): $($entry.reason)" -Path $entry.path))
+            }
         }
 
         $typeIndexCache = @{}
@@ -2820,6 +2905,12 @@ function Invoke-GeneXusXmlBatchMetadataCore {
                     [void]$blocks.Add((New-GeneXusBatchBlock -Code 'NEW_OBJECT_EXISTS_IN_ACERVO' -Message "objeto declarado novo ja existe no acervo (pasta $catalogFolder)." -OpId $first.Id -Path $relativePath))
                     continue
                 }
+                # "nao existe homonimo" so vale se a varredura leu tudo: XML
+                # ilegivel na pasta do tipo esconderia justamente o homonimo.
+                if (@($typeIndex.Unreadable).Count -gt 0) {
+                    [void]$blocks.Add((New-GeneXusBatchBlock -Code 'REFERENCE_SCAN_INCOMPLETE' -Message "sanidade de objectState:new com cobertura incompleta na pasta $catalogFolder do acervo." -OpId $first.Id -Path $relativePath -Detail @($typeIndex.Unreadable | Select-Object -First 20)))
+                    continue
+                }
             }
 
             $acervoTargetPath = Join-Path $acervoFull $relativePath
@@ -2902,11 +2993,23 @@ function Invoke-GeneXusXmlBatchMetadataCore {
                     $result = Invoke-GeneXusSetParentPatch -Text $text -Scopes $scopes -Operation $operation `
                         -RootAttributes $currentRoot.Attributes -Tracker $tracker
                 } else {
+                    $moduleLookup = Get-GeneXusModuleNameByGuid -AcervoPath $acervoFull -ModuleGuid ([string]$currentRoot.Attributes['moduleGuid'])
+                    foreach ($entry in @($moduleLookup.Unreadable)) {
+                        [void]$warnings.Add((New-GeneXusBatchWarning -Kind 'acervoFileUnreadable' -Message "Module ilegivel ao resolver o modulo do alvo: $($entry.reason)" -OpId $operation.Id -Path $entry.path))
+                    }
+                    # Só o índice de Domain entra como cobertura incompleta: ele
+                    # era o ramo FAIL-OPEN. O Module ilegível fica em aviso
+                    # porque o seu efeito já é fail-closed - sem nome de módulo,
+                    # ocorrência qualificada com o nome do alvo vira incompleta
+                    # por conta própria.
+                    $scanUnreadable = @($domainDefinitions.Unreadable)
+
                     $verdict = Resolve-GeneXusDomainReferenceVerdict -Index $referenceIndex `
                         -TargetName $operation.ExpectedName -TargetGuid $operation.Guid `
-                        -TargetModuleName (Get-GeneXusModuleNameByGuid -AcervoPath $acervoFull -ModuleGuid ([string]$currentRoot.Attributes['moduleGuid'])) `
+                        -TargetModuleName $moduleLookup.Name `
                         -DomainDefinitions $domainDefinitions `
-                        -PackagedHomonyms @(Test-GeneXusPackagedModuleHomonym -AcervoPath $acervoFull -DomainName $operation.ExpectedName)
+                        -PackagedHomonyms @(Test-GeneXusPackagedModuleHomonym -AcervoPath $acervoFull -DomainName $operation.ExpectedName) `
+                        -ScanUnreadable $scanUnreadable
 
                     foreach ($occurrence in $verdict.ReportOnly) {
                         [void]$warnings.Add((New-GeneXusBatchWarning -Kind 'cdataOccurrence' -Message "ocorrencia em CDATA de documentacao (report-only): $($occurrence.path)" -OpId $operation.Id))

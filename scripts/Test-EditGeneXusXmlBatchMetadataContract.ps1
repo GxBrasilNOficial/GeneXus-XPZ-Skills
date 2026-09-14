@@ -1139,11 +1139,114 @@ try {
     $report = Invoke-WithReportPath -ManifestPath $manifestPath -FrontFolder $sandbox.Front -ReportPath $reportInWorkDir
     Assert-BlockCode -Case 'Caso 12.4' -Report $report -Expected 'ARTIFACT_PATH_COLLISION'
 
+    # 12.5b caminho relativo e pasta pai inexistente
+    $report = Invoke-WithReportPath -ManifestPath $manifestPath -FrontFolder $sandbox.Front -ReportPath 'relatorio-relativo.json'
+    Assert-BlockCode -Case 'Caso 12.5b (relativo)' -Report $report -Expected 'ARTIFACT_PATH_COLLISION'
+    $report = Invoke-WithReportPath -ManifestPath $manifestPath -FrontFolder $sandbox.Front -ReportPath (Join-Path $sandbox.Root 'pasta-que-nao-existe\relatorio.json')
+    Assert-BlockCode -Case 'Caso 12.5b (pasta pai)' -Report $report -Expected 'ARTIFACT_PATH_COLLISION'
+
     # 12.5 destino existente que nao e arquivo regular
     $reportAsDirectory = Join-Path $sandbox.Root 'relatorio-pasta.json'
     [void](New-Item -ItemType Directory -Path $reportAsDirectory -Force)
     $report = Invoke-WithReportPath -ManifestPath $manifestPath -FrontFolder $sandbox.Front -ReportPath $reportAsDirectory
     Assert-BlockCode -Case 'Caso 12.5' -Report $report -Expected 'ARTIFACT_PATH_COLLISION'
+
+    # ----------------------------------------------------------------------
+    # Caso 14 - XML ilegivel no indice do acervo nao pode passar em silencio
+    #
+    # Os ramos fail-open que a varredura de eixos vizinhos encontrou: um
+    # Domain/*.xml invalido sumia do indice de definicoes (a forma curta
+    # deixava de resolver e a referencia real deixava de bloquear), e um XML
+    # invalido na pasta do tipo escondia o homonimo de objectState:new.
+    # ----------------------------------------------------------------------
+    $xmlInvalido = '<?xml version="1.0" encoding="utf-8"?>' + "`r`n" + '<Object name="Quebrado" type="' + $domainTypeGuid + '">' + "`r`n"
+
+    # 14.1 Domain do acervo invalido durante um renameDomain
+    $sandbox = New-PackagedModuleSandbox -Name 'caso14-domain-invalido'
+    Write-TextFile -Path (Join-Path $sandbox.Acervo 'Domain\OutroDominio.xml') -Text $xmlInvalido
+    $manifestPath = Join-Path $sandbox.Root 'manifesto.json'
+    Write-Manifest -Path $manifestPath -Operations @($renameOperation)
+    $result = Invoke-Engine -ManifestPath $manifestPath -FrontFolder $sandbox.Front -Apply
+    Assert-BlockCode -Case 'Caso 14.1' -Report $result.Report -Expected 'REFERENCE_SCAN_INCOMPLETE'
+    if (Test-Path -LiteralPath (Join-Path $sandbox.Front 'Domain\SemUso_GAMMessageType.xml')) {
+        throw 'Caso 14.1: indice de Domain com buraco nao pode deixar o rename acontecer.'
+    }
+
+    # 14.2 XML invalido na pasta do tipo com objectState: new
+    $sandbox = New-Sandbox -Name 'caso14-tipo-invalido'
+    $guidNovo = '1e1e1e1e-1e1e-1e1e-1e1e-1e1e1e1e1e01'
+    Write-TextFile -Path (Join-Path $sandbox.Front 'SDT\SdtNovoLimpo.xml') -Text (New-ObjectXmlText -Name 'SdtNovoLimpo' -Guid $guidNovo -TypeGuid $sdtTypeGuid)
+    Write-TextFile -Path (Join-Path $sandbox.Acervo 'SDT\SdtQuebrado.xml') -Text ('<?xml version="1.0" encoding="utf-8"?>' + "`r`n" + '<Object name="SdtQuebrado" type="' + $sdtTypeGuid + '">' + "`r`n")
+    $manifestPath = Join-Path $sandbox.Root 'manifesto.json'
+    Write-Manifest -Path $manifestPath -Operations @(
+        (New-DocumentationOperation -Id 'op-novo' -Guid $guidNovo -Name 'SdtNovoLimpo' -XmlPath 'SDT/SdtNovoLimpo.xml' -ObjectState 'new')
+    )
+    $result = Invoke-Engine -ManifestPath $manifestPath -FrontFolder $sandbox.Front
+    Assert-BlockCode -Case 'Caso 14.2' -Report $result.Report -Expected 'REFERENCE_SCAN_INCOMPLETE'
+
+    # 14.3 Folder ilegivel no grafo de pais: fail-closed ja cobre o risco, mas
+    #      o arquivo tem de aparecer no relatorio, para o operador distinguir
+    #      "destino nao existe" de "nao consegui ler o destino".
+    $sandbox = New-ParentSandbox -Name 'caso14-folder-invalido' -ObjectGuid $objectGuid
+    Write-TextFile -Path (Join-Path $sandbox.Acervo 'Folder\FolderQuebrado.xml') -Text ('<?xml version="1.0" encoding="utf-8"?>' + "`r`n" + '<Object name="FolderQuebrado" type="' + $folderTypeGuid + '">' + "`r`n")
+    $manifestPath = Join-Path $sandbox.Root 'manifesto.json'
+    Write-Manifest -Path $manifestPath -Operations @((New-ParentOperation -ObjectGuid $objectGuid -DestinationGuid $folderGuid))
+    $result = Invoke-Engine -ManifestPath $manifestPath -FrontFolder $sandbox.Front
+    $kinds = @(@($result.Report.warnings) | ForEach-Object { $_.kind })
+    if ($kinds -notcontains 'acervoFileUnreadable') {
+        throw 'Caso 14.3: Folder ilegivel deveria aparecer como aviso no relatorio.'
+    }
+    if ($result.Report.status -eq 'blocked') {
+        throw "Caso 14.3: Folder ilegivel de outro destino nao deveria bloquear [$((Get-BlockCodes -Report $result.Report) -join ', ')]."
+    }
+
+    # 14.4 -WorkDir com ponto de reanalise no caminho
+    $sandbox = New-Sandbox -Name 'caso14-workdir-reparse'
+    $guidReparse = '1e1e1e1e-1e1e-1e1e-1e1e-1e1e1e1e1e02'
+    $textReparse = New-ObjectXmlText -Name 'SdtReparse' -Guid $guidReparse -TypeGuid $sdtTypeGuid
+    Write-TextFile -Path (Join-Path $sandbox.Front 'SDT\SdtReparse.xml') -Text $textReparse
+    Write-TextFile -Path (Join-Path $sandbox.Acervo 'SDT\SdtReparse.xml') -Text $textReparse
+    $manifestPath = Join-Path $sandbox.Root 'manifesto.json'
+    Write-Manifest -Path $manifestPath -Operations @(
+        (New-DocumentationOperation -Id 'op-reparse' -Guid $guidReparse -Name 'SdtReparse' -XmlPath 'SDT/SdtReparse.xml')
+    )
+    $realWorkDir = Join-Path $sandbox.Root 'work-real'
+    $linkedWorkDir = Join-Path $sandbox.Root 'work-link'
+    [void](New-Item -ItemType Directory -Path $realWorkDir -Force)
+    $junction = $null
+    try {
+        $junction = New-Item -ItemType Junction -Path $linkedWorkDir -Target $realWorkDir -ErrorAction Stop
+    } catch {
+        $junction = $null
+    }
+    if ($null -eq $junction) {
+        Write-Verbose 'Caso 14.4: sem permissao para criar junction; caso inconclusivo nesta rodada.'
+    } else {
+        $splat = @{ InputPath = $manifestPath; FrontFolder = $sandbox.Front; WorkDir = (Join-Path $linkedWorkDir 'sub') }
+        $output = & $enginePath @splat
+        $report = ((@($output) -join "`n") | ConvertFrom-Json)
+        Assert-BlockCode -Case 'Caso 14.4' -Report $report -Expected 'PROTECTED_AREA'
+        if (Test-Path -LiteralPath (Join-Path $realWorkDir 'sub')) {
+            throw 'Caso 14.4: o motor criou o -WorkDir dentro do caminho recusado.'
+        }
+    }
+
+    # ----------------------------------------------------------------------
+    # Caso 15 - -AcknowledgeReferences registra o limite e NAO autoriza
+    # ----------------------------------------------------------------------
+    $sandbox = New-PackagedModuleSandbox -Name 'caso15-acknowledge'
+    Write-TextFile -Path (Join-Path $sandbox.Acervo 'PackagedModule\PacoteComHomonimo.xml') -Text (New-PackagedModuleXmlText -PackageName 'PacoteExterno' -DomainName 'GAMMessageType')
+    $manifestPath = Join-Path $sandbox.Root 'manifesto.json'
+    Write-Manifest -Path $manifestPath -Operations @($renameOperation)
+    $result = Invoke-Engine -ManifestPath $manifestPath -FrontFolder $sandbox.Front -Apply -ExtraArguments @('-AcknowledgeReferences')
+    Assert-BlockCode -Case 'Caso 15' -Report $result.Report -Expected 'REFERENCE_SCAN_INCOMPLETE'
+    $kinds = @(@($result.Report.warnings) | ForEach-Object { $_.kind })
+    if ($kinds -notcontains 'referenceLimitAcknowledged') {
+        throw 'Caso 15: a aceitacao do limite deveria ficar registrada no relatorio.'
+    }
+    if (Test-Path -LiteralPath (Join-Path $sandbox.Front 'Domain\SemUso_GAMMessageType.xml')) {
+        throw 'Caso 15: -AcknowledgeReferences nao pode transformar medicao incompleta em autorizacao.'
+    }
 
     # ----------------------------------------------------------------------
     # Caso 13 - dependencia que SOME entre as fases vira PLAN_STALE
@@ -1203,6 +1306,102 @@ try {
         $mensagens = @(@($result.Report.blocks) | Where-Object { $_.code -eq 'PLAN_STALE' } | ForEach-Object { $_.message })
         if (-not ($mensagens -match 'desapareceu|indisponivel|ilegivel')) {
             throw "Caso 13 ($vanishCase): PLAN_STALE nao nomeou o sumico: $($mensagens -join ' | ')"
+        }
+    }
+
+    # ----------------------------------------------------------------------
+    # Caso 16 - rollback do RENAME
+    #
+    # O caso 3 exercita a falha na escrita. Aqui a falha e no rename, que e o
+    # passo que a secao 14 usa como pilar: a recusa de adiar renameDomain se
+    # apoia em "o rename e desfeito em ordem inversa antes de restaurar os
+    # .bak". Injecao: um intruso cria o arquivo de DESTINO do segundo rename
+    # depois que as escritas terminaram - a colisao foi conferida na Fase 1a,
+    # e a corrida e justamente o que o rollback existe para tratar.
+    # ----------------------------------------------------------------------
+    $sandbox = New-Sandbox -Name 'caso16-rollback-rename'
+    $renameGuids = @{ A = '16161616-1616-1616-1616-161616161601'; B = '16161616-1616-1616-1616-161616161602' }
+    $renameTargets = @{}
+    foreach ($sufixo in @('A', 'B')) {
+        $nome = "DomRollback$sufixo"
+        $objectText = New-ObjectXmlText -Name $nome -Guid $renameGuids[$sufixo] -TypeGuid $domainTypeGuid -ModuleGuid $moduleGuid -FullyQualifiedName "GAM.$nome"
+        $alvo = Join-Path $sandbox.Front ('Domain\{0}.xml' -f $nome)
+        Write-TextFile -Path $alvo -Text $objectText
+        Write-TextFile -Path (Join-Path $sandbox.Acervo ('Domain\{0}.xml' -f $nome)) -Text $objectText
+        $renameTargets[$sufixo] = $alvo
+    }
+    Write-TextFile -Path (Join-Path $sandbox.Acervo 'Module\GAM.xml') -Text (New-ObjectXmlText -Name 'GAM' -Guid $moduleGuid -TypeGuid '00000000-0000-0000-0000-000000000006' -ModuleGuid '00000000-0000-0000-0000-000000000000')
+
+    $renameOperations = @()
+    foreach ($sufixo in @('A', 'B')) {
+        $nome = "DomRollback$sufixo"
+        $renameOperations += [ordered]@{
+            id          = "op-rollback-$sufixo"
+            op          = 'renameDomain'
+            objectState = 'existing'
+            target      = [ordered]@{ guid = $renameGuids[$sufixo]; expectedType = 'Domain'; expectedName = $nome; xmlPath = "Domain/$nome.xml" }
+            expected    = [ordered]@{ name = $nome; fullyQualifiedName = "GAM.$nome"; propertyName = $nome; description = $nome }
+            new         = [ordered]@{ name = "SemUso_$nome" }
+            renameFile  = $true
+        }
+    }
+    $manifestPath = Join-Path $sandbox.Root 'manifesto.json'
+    Write-Manifest -Path $manifestPath -Operations $renameOperations
+
+    $hashesAntes = @{}
+    foreach ($sufixo in @('A', 'B')) { $hashesAntes[$sufixo] = Get-Sha256 -Path $renameTargets[$sufixo] }
+    $workDir = Join-Path $sandbox.Root 'Temp\xpz-batch-metadata\Frente01'
+    $intruso = Join-Path $sandbox.Front 'Domain\SemUso_DomRollbackB.xml'
+    $conteudoIntruso = 'INTRUSO'
+
+    $collider = Start-ThreadJob -ScriptBlock {
+        param($WorkDir, $Intruder, $Content)
+        $deadline = [DateTime]::UtcNow.AddSeconds(30)
+        while ([DateTime]::UtcNow -lt $deadline) {
+            $journal = @(Get-ChildItem -LiteralPath $WorkDir -Filter '*.journal.json' -File -ErrorAction SilentlyContinue)
+            if ($journal.Count -gt 0) {
+                $raw = ''
+                try { $raw = [System.IO.File]::ReadAllText($journal[0].FullName) } catch { $raw = '' }
+                if (([regex]::Matches($raw, '"state":\s*"committed"')).Count -ge 2) {
+                    [System.IO.File]::WriteAllText($Intruder, $Content, [System.Text.UTF8Encoding]::new($false))
+                    return $true
+                }
+            }
+            Start-Sleep -Milliseconds 15
+        }
+        return $false
+    } -ArgumentList $workDir, $intruso, $conteudoIntruso
+
+    $result = Invoke-Engine -ManifestPath $manifestPath -FrontFolder $sandbox.Front -Apply
+    $colliderFired = $false
+    $colliderCompleted = Wait-Job -Job $collider -Timeout 40
+    if ($null -ne $colliderCompleted) { $colliderFired = [bool](Receive-Job -Job $collider) }
+    Remove-Job -Job $collider -Force -ErrorAction SilentlyContinue
+
+    if (-not $colliderFired) {
+        Write-Verbose 'Caso 16: o intruso nao chegou a tempo; caso inconclusivo nesta rodada.'
+    } else {
+        if (@('rollbackComplete', 'rollbackIncomplete') -notcontains $result.Report.status) {
+            $detalhe = @(@($result.Report.blocks) | ForEach-Object { "$($_.code): $($_.message)" }) -join ' | '
+            throw "Caso 16: a colisao no rename deveria levar a rollback; status '$($result.Report.status)' [$detalhe]."
+        }
+        if ($result.Report.status -eq 'rollbackIncomplete') {
+            throw "Caso 16: rollback do rename ficou incompleto: $(@($result.Report.rollbackErrors) -join '; ')"
+        }
+        foreach ($sufixo in @('A', 'B')) {
+            $alvo = $renameTargets[$sufixo]
+            if (-not (Test-Path -LiteralPath $alvo -PathType Leaf)) {
+                throw "Caso 16: o alvo $sufixo nao voltou ao nome original apos o rollback."
+            }
+            if ((Get-Sha256 -Path $alvo) -ne $hashesAntes[$sufixo]) {
+                throw "Caso 16: o alvo $sufixo voltou com conteudo diferente do original."
+            }
+        }
+        if (Test-Path -LiteralPath (Join-Path $sandbox.Front 'Domain\SemUso_DomRollbackA.xml')) {
+            throw 'Caso 16: o rename do primeiro alvo nao foi desfeito.'
+        }
+        if ([System.IO.File]::ReadAllText($intruso) -ne $conteudoIntruso) {
+            throw 'Caso 16: o motor escreveu por cima do arquivo que causou a colisao.'
         }
     }
 
