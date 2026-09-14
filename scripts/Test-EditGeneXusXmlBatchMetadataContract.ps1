@@ -334,6 +334,62 @@ try {
     }
 
     # ----------------------------------------------------------------------
+    # Caso 2b - Part de documentacao dentro de <Object> ANINHADO nao conta
+    #
+    # E a regra central da secao 6.0: a contagem da ancora e do escopo B, que
+    # exclui subarvores <Object> aninhadas - nao do arquivo inteiro. A medicao
+    # que a motivou e PackagedModule\GeneXus.xml, com 248 Parts. Contar no
+    # arquivo daria ANCHOR_AMBIGUOUS; contar em B da exatamente 1, e o patch
+    # tem de entrar no Part da RAIZ, deixando a subarvore aninhada intacta.
+    # ----------------------------------------------------------------------
+    $sandbox = New-Sandbox -Name 'caso02b'
+    $guid = '22222222-2222-2222-2222-2222222222b1'
+    # Interpolacao, nao concatenacao: em array literal a virgula tem
+    # precedencia MAIOR que o '+', e 'a' + $x + 'b' se desfaz em elementos
+    # separados - o fixture sairia com quebra de linha no meio dos atributos.
+    $nestedBlock = @(
+        "      <Object guid=`"22222222-2222-2222-2222-2222222222b2`" name=`"ObjetoEmpacotado`" type=`"$($sdtTypeGuid)`" lastUpdate=`"2019-01-01T00:00:00.0000000Z`" description=`"ObjetoEmpacotado`">",
+        "        <Part type=`"$($docPartGuid)`">",
+        '          <InnerHtml><![CDATA[Documentação do objeto empacotado.]]></InnerHtml>',
+        '          <Properties />',
+        '        </Part>',
+        '      </Object>'
+    ) -join "`r`n"
+    $text = New-ObjectXmlText -Name 'SdtComAninhado' -Guid $guid -TypeGuid $sdtTypeGuid -ExtraContent $nestedBlock
+    Write-TextFile -Path (Join-Path $sandbox.Front 'SDT\SdtComAninhado.xml') -Text $text
+    Write-TextFile -Path (Join-Path $sandbox.Acervo 'SDT\SdtComAninhado.xml') -Text $text
+    $manifestPath = Join-Path $sandbox.Root 'manifesto.json'
+    Write-Manifest -Path $manifestPath -Operations @(
+        (New-DocumentationOperation -Id 'op-aninhado' -Guid $guid -Name 'SdtComAninhado' -XmlPath 'SDT/SdtComAninhado.xml' -NewDocumentation 'Documentação da raiz.')
+    )
+    $result = Invoke-Engine -ManifestPath $manifestPath -FrontFolder $sandbox.Front -Apply
+    if ($result.Report.status -eq 'blocked') {
+        throw "Caso 2b: Part em <Object> aninhado foi contado no escopo errado [$((Get-BlockCodes -Report $result.Report) -join ', ')]."
+    }
+    $nestedFinal = [System.IO.File]::ReadAllText((Join-Path $sandbox.Front 'SDT\SdtComAninhado.xml'))
+    if (-not $nestedFinal.Contains($nestedBlock)) {
+        throw 'Caso 2b: a subarvore <Object> aninhada deveria sair byte-identica.'
+    }
+    if (([regex]::Matches($nestedFinal, [regex]::Escape('<Part type="' + $docPartGuid + '">'))).Count -ne 2) {
+        throw 'Caso 2b: o arquivo deveria continuar com os dois Part (raiz e aninhado).'
+    }
+    if (([regex]::Matches($nestedFinal, [regex]::Escape('Documentação da raiz.'))).Count -ne 1) {
+        throw 'Caso 2b: a documentacao nova nao entrou exatamente uma vez no Part da raiz.'
+    }
+    $rootPartIndex = $nestedFinal.IndexOf('<Part type="' + $docPartGuid + '">', [StringComparison]::Ordinal)
+    $nestedIndex = $nestedFinal.IndexOf('<Object guid="22222222-2222-2222-2222-2222222222b2"', [StringComparison]::Ordinal)
+    if ($nestedFinal.IndexOf('Documentação da raiz.', [StringComparison]::Ordinal) -lt $rootPartIndex -or
+        $nestedFinal.IndexOf('Documentação da raiz.', [StringComparison]::Ordinal) -gt $nestedIndex) {
+        throw 'Caso 2b: a documentacao nova foi gravada fora do Part da raiz.'
+    }
+    if (([regex]::Matches($nestedFinal, 'lastUpdate="')).Count -ne 2) {
+        throw 'Caso 2b: o arquivo deveria manter os dois lastUpdate (raiz e aninhado).'
+    }
+    if ($nestedFinal -notmatch 'lastUpdate="2019-01-01T00:00:00\.0000000Z"') {
+        throw 'Caso 2b: o lastUpdate do objeto aninhado foi alterado; o bump e da raiz.'
+    }
+
+    # ----------------------------------------------------------------------
     # Caso 4 - nao-escrita
     # ----------------------------------------------------------------------
     $sandbox = New-Sandbox -Name 'caso04'
@@ -541,6 +597,91 @@ try {
     Write-Manifest -Path $manifestPath -Operations @($operationComEvidencia)
     $result = Invoke-Engine -ManifestPath $manifestPath -FrontFolder $sandbox.Front
     Assert-BlockCode -Case 'Caso 7.5' -Report $result.Report -Expected 'DOMAIN_STILL_REFERENCED'
+
+    # ----------------------------------------------------------------------
+    # Caso 7.6 a 7.8 - PackagedModule (secao 7 e secao 13.7)
+    #
+    # Domain definido dentro de PackagedModule esta FORA de escopo do rename,
+    # e o buraco real medido na v7 e o oposto do que se imaginava: um nome que
+    # existe tanto em Domain/ quanto dentro de um PackagedModule resolvia com
+    # confianca para o objeto do acervo, com o homonimo empacotado invisivel.
+    # ----------------------------------------------------------------------
+    function New-PackagedModuleSandbox {
+        param([Parameter(Mandatory = $true)][string]$Name)
+
+        $sandbox = New-Sandbox -Name $Name
+        Write-TextFile -Path (Join-Path $sandbox.Front 'Domain\GAMMessageType.xml') -Text $domainText
+        Write-TextFile -Path (Join-Path $sandbox.Acervo 'Domain\GAMMessageType.xml') -Text $domainText
+        Write-TextFile -Path (Join-Path $sandbox.Acervo 'Module\GAM.xml') -Text (New-ObjectXmlText -Name 'GAM' -Guid $moduleGuid -TypeGuid '00000000-0000-0000-0000-000000000006' -ModuleGuid '00000000-0000-0000-0000-000000000000')
+        return $sandbox
+    }
+
+    function New-PackagedModuleXmlText {
+        param(
+            [Parameter(Mandatory = $true)][string]$PackageName,
+            [Parameter(Mandatory = $true)][string]$DomainName
+        )
+
+        # Interpolacao, nao concatenacao: ver a nota do caso 2b sobre a
+        # precedencia da virgula sobre o '+' em array literal.
+        return (@(
+            '<?xml version="1.0" encoding="utf-8"?>',
+            "<Object guid=`"0a0a0a0a-0000-0000-0000-00000000000a`" name=`"$($PackageName)`" type=`"9e5d0ef7-7a37-4d76-9f05-8b5e4a2a4a2a`" lastUpdate=`"2020-01-01T00:00:00.0000000Z`" description=`"$($PackageName)`">",
+            "      <Object guid=`"0b0b0b0b-0000-0000-0000-00000000000b`" name=`"$($DomainName)`" type=`"$($domainTypeGuid)`" description=`"$($DomainName)`">",
+            "        <Properties><Property><Name>Name</Name><Value>$($DomainName)</Value></Property></Properties>",
+            '      </Object>',
+            '</Object>',
+            ''
+        ) -join "`r`n")
+    }
+
+    # 7.6 grafia qualificada cujo definidor vive dentro de PackagedModule
+    $sandbox = New-PackagedModuleSandbox -Name 'caso07-packaged-definidor'
+    Write-TextFile -Path (Join-Path $sandbox.Acervo 'PackagedModule\OutroPacote.xml') -Text (New-PackagedModuleXmlText -PackageName 'OutroModulo' -DomainName 'GAMMessageType')
+    $consumidor = New-ObjectXmlText -Name 'SdtQualificado' -Guid '77777777-7777-7777-7777-7777777777d1' -TypeGuid $sdtTypeGuid `
+        -ExtraContent '      <Item><Properties><Property><Name>Type</Name><Value>Domain:GAMMessageType, OutroModulo</Value></Property></Properties></Item>'
+    Write-TextFile -Path (Join-Path $sandbox.Acervo 'SDT\SdtQualificado.xml') -Text $consumidor
+    $manifestPath = Join-Path $sandbox.Root 'manifesto.json'
+    Write-Manifest -Path $manifestPath -Operations @($renameOperation)
+    $result = Invoke-Engine -ManifestPath $manifestPath -FrontFolder $sandbox.Front -Apply
+    Assert-BlockCode -Case 'Caso 7.6' -Report $result.Report -Expected 'REFERENCE_SCAN_INCOMPLETE'
+    if (Test-Path -LiteralPath (Join-Path $sandbox.Front 'Domain\SemUso_GAMMessageType.xml')) {
+        throw 'Caso 7.6: cobertura incompleta nao pode deixar o rename acontecer.'
+    }
+
+    # 7.7 homonimo em PackagedModule, sem nenhuma referencia no acervo
+    $sandbox = New-PackagedModuleSandbox -Name 'caso07-packaged-homonimo'
+    Write-TextFile -Path (Join-Path $sandbox.Acervo 'PackagedModule\PacoteComHomonimo.xml') -Text (New-PackagedModuleXmlText -PackageName 'PacoteExterno' -DomainName 'GAMMessageType')
+    $manifestPath = Join-Path $sandbox.Root 'manifesto.json'
+    Write-Manifest -Path $manifestPath -Operations @($renameOperation)
+    $result = Invoke-Engine -ManifestPath $manifestPath -FrontFolder $sandbox.Front -Apply
+    Assert-BlockCode -Case 'Caso 7.7' -Report $result.Report -Expected 'REFERENCE_SCAN_INCOMPLETE'
+    $detalhe7 = (@(@($result.Report.blocks) | Where-Object { $_.code -eq 'REFERENCE_SCAN_INCOMPLETE' } | ForEach-Object { @($_.detail) -join ' ' }) -join ' ')
+    if ($detalhe7 -notmatch 'PackagedModule') {
+        throw "Caso 7.7: o bloqueio nao nomeou o homonimo empacotado: $detalhe7"
+    }
+    if (Test-Path -LiteralPath (Join-Path $sandbox.Front 'Domain\SemUso_GAMMessageType.xml')) {
+        throw 'Caso 7.7: homonimo empacotado nao pode deixar o rename acontecer.'
+    }
+
+    # 7.8 PackagedModule mal formado que ja casou nome e tipo Domain:
+    #     nao pode ser pulado em silencio (regressao do endurecimento).
+    #     O conteudo evita a substring 'Domain:' de proposito, para o indice de
+    #     referencias nao o pegar antes e o caso isolar o detector de homonimo.
+    $sandbox = New-PackagedModuleSandbox -Name 'caso07-packaged-malformado'
+    $malformado = '<?xml version="1.0" encoding="utf-8"?>' + "`r`n" + '<Object name="PacoteQuebrado"><Object name="GAMMessageType" type="' + $domainTypeGuid + '">' + "`r`n"
+    Write-TextFile -Path (Join-Path $sandbox.Acervo 'PackagedModule\PacoteQuebrado.xml') -Text $malformado
+    $manifestPath = Join-Path $sandbox.Root 'manifesto.json'
+    Write-Manifest -Path $manifestPath -Operations @($renameOperation)
+    $result = Invoke-Engine -ManifestPath $manifestPath -FrontFolder $sandbox.Front -Apply
+    Assert-BlockCode -Case 'Caso 7.8' -Report $result.Report -Expected 'REFERENCE_SCAN_INCOMPLETE'
+    $detalhe8 = (@(@($result.Report.blocks) | Where-Object { $_.code -eq 'REFERENCE_SCAN_INCOMPLETE' } | ForEach-Object { @($_.detail) -join ' ' }) -join ' ')
+    if ($detalhe8 -notmatch 'bem formado|ilegivel') {
+        throw "Caso 7.8: o bloqueio nao nomeou o XML de PackagedModule ilegivel/mal formado: $detalhe8"
+    }
+    if (Test-Path -LiteralPath (Join-Path $sandbox.Front 'Domain\SemUso_GAMMessageType.xml')) {
+        throw 'Caso 7.8: XML de PackagedModule ilegivel nao pode deixar o rename acontecer.'
+    }
 
     # ----------------------------------------------------------------------
     # Caso 8 - lock
