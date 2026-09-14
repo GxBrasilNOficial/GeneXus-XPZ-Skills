@@ -3153,3 +3153,31 @@ Esta entrada registra uma direção para estudo, não uma decisão de refatoraç
   2. *Tabela `OBJECT` no banco SQL Server da KB*: não contém o inventário ativo dos objetos de modelo da aplicação;
   3. *Arquivo `nav_objs.xml` do MSBuild*: reflete somente o escopo da última geração parcial realizada pelo MSBuild, omitindo objetos não compilados na rodada.
 - **Proposta de frente futura**: desenvolvimento de ferramenta dedicada (`scripts/Test-GeneXusObjectExists.ps1`) baseada em introspecção segura do acervo exportado ou catálogo consolidado para verificar a existência e o estado ativo de um objeto antes de disparar automações de import/export/build.
+
+## Três nomes de parâmetro para a mesma pasta do acervo (`-AcervoPath` / `-AcervoFolder` / `-CorpusFolder`)
+
+- **Importância** — média (gap real com workaround trivial: quem chama consulta o `.SYNOPSIS` do script específico. Não há risco de dano — nenhum dos três nomes aceita a pasta errada em silêncio —, mas é atrito recorrente para agente e humano, e cada motor novo precisa escolher um lado sem critério documentado).
+- **Maturidade** — ideia (o mapeamento está medido; falta decidir o nome vencedor, a política de alias retroativo e o recorte de quais consumidores migram).
+
+**O que foi medido (2026-09-13, `grep -l` sobre `scripts/*.ps1`).** A pasta `ObjetosDaKbEmXml` é recebida por três nomes distintos, agrupados por família de uso:
+
+| Nome | Arquivos que o citam | Família |
+|---|---|---|
+| `-AcervoPath` | 7 | empacotamento e drift — `Build-GeneXusImportFileEnvelope.ps1`, `New-XpzImportPackage.ps1`, `Test-GeneXusFrontAcervoDrift.ps1`, `GeneXusObjectTypeDriftSupport.ps1` e self-tests |
+| `-AcervoFolder` | 5 | `Copy-GeneXusAcervoToFront.ps1` e self-tests; `New-XpzImportPackage.ps1` e `Test-GeneXusFrontAcervoDrift.ps1` aparecem nas duas listas (aceitam ambos) |
+| `-CorpusFolder` | 9 | gates de análise — `Test-GeneXusBatchDependencyOrdering.ps1`, `Test-GeneXusTransactionWritability.ps1`, `Test-GeneXusNewWritableTargets.ps1`, `Test-GeneXusBCDependency.ps1`, `Test-GeneXusProcedureSubPattern.ps1`, `Test-GeneXusWorkWithWebApply.ps1`, `GeneXusTransactionWritabilitySupport.ps1` e paridade KbIntelligence |
+
+As contagens são de **arquivos que mencionam o token**, não de parâmetros exclusivos — os dois motores que aceitam `-AcervoPath` e `-AcervoFolder` contam nas duas linhas.
+
+**Como apareceu.** Revisão por pares do desenho de `Edit-GeneXusXmlBatchMetadata.ps1` (sessão de 2026-09-13). Um revisor apontou que o `-AcervoPath` proposto conflitava com `-CorpusFolder` «já em uso para o mesmo conceito»; a verificação confirmou o conflito e revelou que são **três** nomes, não dois. O desenho novo adotou `-AcervoPath` por pertencer à família de empacotamento/drift (é o nome que o `README.md` documenta para `New-XpzImportPackage.ps1` e `Build-GeneXusImportFileEnvelope.ps1`) e registrou a unificação aqui, em vez de resolvê-la de carona.
+
+**Por que não foi resolvido na frente que o encontrou.** Unificar toca ~21 arquivos entre motores, self-tests e `Test-XpzParameterNamingContract.ps1`, mais a documentação das skills que citam cada nome. É frente própria; puxá-la para dentro de outra frente misturaria um refactor amplo com uma entrega funcional e dificultaria a revisão de ambas.
+
+**Decisões em aberto.**
+
+- Qual nome vence. `-AcervoPath` tem o respaldo do `README.md` e segue o padrão `-*Path` do contrato de nomenclatura; `-CorpusFolder` tem mais arquivos e é o vocabulário dos gates de análise, onde «corpus» descreve melhor o papel de referência somente-leitura.
+- Se os nomes perdedores viram **alias permanente** (como `-ObjectNames` é sinônimo aceito de `-ObjectList`) ou se há janela de depreciação. Alias permanente é mais barato e não quebra wrapper local de pasta paralela.
+- Se `Test-XpzParameterNamingContract.ps1` passa a travar o nome canônico — hoje ele não cobre este conceito.
+- Se wrappers locais em pastas paralelas de KB precisam de passo de migração pela `xpz-kb-parallel-setup`.
+
+**Relacionado.** `998-ideias-descartadas-e-porque.md` (entrada que descartou um orquestrador único de gates) cita justamente `-FrontFolder`+`-CorpusFolder` entre os «contratos heterogêneos» que tornaram aquele orquestrador caro — ou seja, a divergência já cobrou preço antes, num contexto diferente.
