@@ -40,6 +40,20 @@
     Caminho absoluto .json para gravar o relatorio. O JSON de maquina sai no
     stdout por padrao, SEMPRE - inclusive quando a gravacao aqui falhar.
 
+    Relacao com a promessa de "nenhum artefato persistente" sem -Apply: a
+    promessa cobre os artefatos que o MOTOR cria por conta propria - journal,
+    .bak, baseline sintetico, temporarios de escrita e o -WorkDir que ele
+    tenha criado. O relatorio nao e artefato do motor: e saida que o chamador
+    pediu explicitamente, num caminho que ele mesmo deu, do mesmo modo que o
+    JSON do stdout. Rodada sem -Apply com -ReportPath grava o relatorio e
+    NADA mais - isso e verificado por caso proprio na bateria de contrato.
+
+    O caminho passa pela mesma familia de guardas dos demais (D2): absoluto,
+    terminado em .json, fora da frente e do -WorkDir, fora de area protegida,
+    sem ponto de reanalise no caminho, pasta pai existente e, quando ja
+    existir, arquivo regular. Recusado o caminho, o motor bloqueia e o
+    relatorio sai apenas no stdout.
+
 .PARAMETER AcknowledgeReferences
     Registra aceitacao do limite de cobertura da varredura de referencias. NAO
     transforma medicao incompleta em autorizacao.
@@ -126,7 +140,15 @@ try {
 
 $json = ($report | ConvertTo-Json -Depth 20)
 
-if (-not [string]::IsNullOrWhiteSpace($ReportPath)) {
+# O motor valida o -ReportPath com a mesma familia de guardas dos demais
+# caminhos e sinaliza a recusa em reportPathRefused. Gravar assim mesmo seria
+# escrever justamente no caminho que o motor acabou de recusar.
+$reportPathRefused = $true
+if ($null -ne $report['reportPathRefused']) {
+    $reportPathRefused = [bool]$report['reportPathRefused']
+}
+
+if (-not [string]::IsNullOrWhiteSpace($ReportPath) -and -not $reportPathRefused) {
     try {
         $reportDirectory = [System.IO.Path]::GetDirectoryName([System.IO.Path]::GetFullPath($ReportPath))
         if (-not (Test-Path -LiteralPath $reportDirectory -PathType Container)) {

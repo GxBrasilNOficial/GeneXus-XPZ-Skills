@@ -436,18 +436,18 @@ try {
     $sandbox = New-Sandbox -Name 'caso07'
     $domainGuid = '77777777-7777-7777-7777-777777777701'
     $moduleGuid = '77777777-0000-0000-0000-0000000000aa'
-    $domainText = New-ObjectXmlText -Name 'DomTeste' -Guid $domainGuid -TypeGuid $domainTypeGuid -ModuleGuid $moduleGuid -FullyQualifiedName 'ModTeste.DomTeste'
-    Write-TextFile -Path (Join-Path $sandbox.Front 'Domain\DomTeste.xml') -Text $domainText
-    Write-TextFile -Path (Join-Path $sandbox.Acervo 'Domain\DomTeste.xml') -Text $domainText
-    Write-TextFile -Path (Join-Path $sandbox.Acervo 'Module\ModTeste.xml') -Text (New-ObjectXmlText -Name 'ModTeste' -Guid $moduleGuid -TypeGuid '00000000-0000-0000-0000-000000000006' -ModuleGuid '00000000-0000-0000-0000-000000000000')
+    $domainText = New-ObjectXmlText -Name 'GAMMessageType' -Guid $domainGuid -TypeGuid $domainTypeGuid -ModuleGuid $moduleGuid -FullyQualifiedName 'GAM.GAMMessageType'
+    Write-TextFile -Path (Join-Path $sandbox.Front 'Domain\GAMMessageType.xml') -Text $domainText
+    Write-TextFile -Path (Join-Path $sandbox.Acervo 'Domain\GAMMessageType.xml') -Text $domainText
+    Write-TextFile -Path (Join-Path $sandbox.Acervo 'Module\GAM.xml') -Text (New-ObjectXmlText -Name 'GAM' -Guid $moduleGuid -TypeGuid '00000000-0000-0000-0000-000000000006' -ModuleGuid '00000000-0000-0000-0000-000000000000')
 
     $renameOperation = [ordered]@{
         id          = 'op-rename'
         op          = 'renameDomain'
         objectState = 'existing'
-        target      = [ordered]@{ guid = $domainGuid; expectedType = 'Domain'; expectedName = 'DomTeste'; xmlPath = 'Domain/DomTeste.xml' }
-        expected    = [ordered]@{ name = 'DomTeste'; fullyQualifiedName = 'ModTeste.DomTeste'; propertyName = 'DomTeste'; description = 'DomTeste' }
-        new         = [ordered]@{ name = 'SemUso_DomTeste' }
+        target      = [ordered]@{ guid = $domainGuid; expectedType = 'Domain'; expectedName = 'GAMMessageType'; xmlPath = 'Domain/GAMMessageType.xml' }
+        expected    = [ordered]@{ name = 'GAMMessageType'; fullyQualifiedName = 'GAM.GAMMessageType'; propertyName = 'GAMMessageType'; description = 'GAMMessageType' }
+        new         = [ordered]@{ name = 'SemUso_GAMMessageType' }
         renameFile  = $true
     }
     $manifestPath = Join-Path $sandbox.Root 'manifesto.json'
@@ -458,22 +458,24 @@ try {
     if ($result.Report.status -eq 'blocked') {
         throw "Caso 7.1: rename sem referencia foi bloqueado [$((Get-BlockCodes -Report $result.Report) -join ', ')]."
     }
-    if (-not (Test-Path -LiteralPath (Join-Path $sandbox.Front 'Domain\SemUso_DomTeste.xml'))) {
+    if (-not (Test-Path -LiteralPath (Join-Path $sandbox.Front 'Domain\SemUso_GAMMessageType.xml'))) {
         throw 'Caso 7.1: arquivo nao foi renomeado.'
     }
-    $renamedText = [System.IO.File]::ReadAllText((Join-Path $sandbox.Front 'Domain\SemUso_DomTeste.xml'))
-    foreach ($expectedFragment in @(' name="SemUso_DomTeste"', 'fullyQualifiedName="ModTeste.SemUso_DomTeste"', '<Name>Name</Name><Value>SemUso_DomTeste</Value>', 'description="SemUso_DomTeste"')) {
+    $renamedText = [System.IO.File]::ReadAllText((Join-Path $sandbox.Front 'Domain\SemUso_GAMMessageType.xml'))
+    foreach ($expectedFragment in @(' name="SemUso_GAMMessageType"', 'fullyQualifiedName="GAM.SemUso_GAMMessageType"', '<Name>Name</Name><Value>SemUso_GAMMessageType</Value>', 'description="SemUso_GAMMessageType"')) {
         if (-not $renamedText.Contains($expectedFragment)) {
             throw "Caso 7.1: ponto do rename nao aplicado: '$expectedFragment'."
         }
     }
 
     # 7.2 referencia qualificada 'Domain:Nome, Modulo' bloqueia
-    foreach ($grafia in @('Domain:DomTeste', 'Domain:DomTeste, ModTeste', 'domain:domteste')) {
+    # As tres formas medidas no acervo para o MESMO objeto, mais a variacao só
+    # na caixa: curta, qualificada com virgula e espaco, e caixa divergente.
+    foreach ($grafia in @('Domain:GAMMessageType', 'Domain:GAMMessageType, GAM', 'domain:gammessagetype')) {
         $sandbox = New-Sandbox -Name ('caso07-ref-' + ([guid]::NewGuid().ToString('N').Substring(0, 6)))
-        Write-TextFile -Path (Join-Path $sandbox.Front 'Domain\DomTeste.xml') -Text $domainText
-        Write-TextFile -Path (Join-Path $sandbox.Acervo 'Domain\DomTeste.xml') -Text $domainText
-        Write-TextFile -Path (Join-Path $sandbox.Acervo 'Module\ModTeste.xml') -Text (New-ObjectXmlText -Name 'ModTeste' -Guid $moduleGuid -TypeGuid '00000000-0000-0000-0000-000000000006' -ModuleGuid '00000000-0000-0000-0000-000000000000')
+        Write-TextFile -Path (Join-Path $sandbox.Front 'Domain\GAMMessageType.xml') -Text $domainText
+        Write-TextFile -Path (Join-Path $sandbox.Acervo 'Domain\GAMMessageType.xml') -Text $domainText
+        Write-TextFile -Path (Join-Path $sandbox.Acervo 'Module\GAM.xml') -Text (New-ObjectXmlText -Name 'GAM' -Guid $moduleGuid -TypeGuid '00000000-0000-0000-0000-000000000006' -ModuleGuid '00000000-0000-0000-0000-000000000000')
         $consumidor = New-ObjectXmlText -Name 'SdtConsumidor' -Guid '77777777-7777-7777-7777-7777777777c1' -TypeGuid $sdtTypeGuid `
             -ExtraContent ('      <Item><Properties><Property><Name>Type</Name><Value>' + $grafia + '</Value></Property></Properties></Item>')
         Write-TextFile -Path (Join-Path $sandbox.Acervo 'SDT\SdtConsumidor.xml') -Text $consumidor
@@ -488,14 +490,14 @@ try {
             @{ Name = 'documentacao'; Blocks = $false },
             @{ Name = 'source'; Blocks = $true })) {
         $sandbox = New-Sandbox -Name ('caso07-cdata-' + $cdataCase.Name)
-        Write-TextFile -Path (Join-Path $sandbox.Front 'Domain\DomTeste.xml') -Text $domainText
-        Write-TextFile -Path (Join-Path $sandbox.Acervo 'Domain\DomTeste.xml') -Text $domainText
-        Write-TextFile -Path (Join-Path $sandbox.Acervo 'Module\ModTeste.xml') -Text (New-ObjectXmlText -Name 'ModTeste' -Guid $moduleGuid -TypeGuid '00000000-0000-0000-0000-000000000006' -ModuleGuid '00000000-0000-0000-0000-000000000000')
+        Write-TextFile -Path (Join-Path $sandbox.Front 'Domain\GAMMessageType.xml') -Text $domainText
+        Write-TextFile -Path (Join-Path $sandbox.Acervo 'Domain\GAMMessageType.xml') -Text $domainText
+        Write-TextFile -Path (Join-Path $sandbox.Acervo 'Module\GAM.xml') -Text (New-ObjectXmlText -Name 'GAM' -Guid $moduleGuid -TypeGuid '00000000-0000-0000-0000-000000000006' -ModuleGuid '00000000-0000-0000-0000-000000000000')
         if ($cdataCase.Name -eq 'documentacao') {
-            $consumidor = New-ObjectXmlText -Name 'SdtCdata' -Guid '77777777-7777-7777-7777-7777777777c2' -TypeGuid $sdtTypeGuid -Documentation 'Este objeto cita Domain:DomTeste em prosa.'
+            $consumidor = New-ObjectXmlText -Name 'SdtCdata' -Guid '77777777-7777-7777-7777-7777777777c2' -TypeGuid $sdtTypeGuid -Documentation 'Este objeto cita Domain:GAMMessageType em prosa.'
         } else {
             $consumidor = New-ObjectXmlText -Name 'SdtCdata' -Guid '77777777-7777-7777-7777-7777777777c2' -TypeGuid $sdtTypeGuid `
-                -ExtraContent '      <Source><![CDATA[&Var = Domain:DomTeste]]></Source>'
+                -ExtraContent '      <Source><![CDATA[&Var = Domain:GAMMessageType]]></Source>'
         }
         Write-TextFile -Path (Join-Path $sandbox.Acervo 'SDT\SdtCdata.xml') -Text $consumidor
         $manifestPath = Join-Path $sandbox.Root 'manifesto.json'
@@ -516,11 +518,11 @@ try {
 
     # 7.4 grafia desconhecida que colide com o alvo -> REFERENCE_SCAN_INCOMPLETE
     $sandbox = New-Sandbox -Name 'caso07-desconhecida'
-    Write-TextFile -Path (Join-Path $sandbox.Front 'Domain\DomTeste.xml') -Text $domainText
-    Write-TextFile -Path (Join-Path $sandbox.Acervo 'Domain\DomTeste.xml') -Text $domainText
-    Write-TextFile -Path (Join-Path $sandbox.Acervo 'Module\ModTeste.xml') -Text (New-ObjectXmlText -Name 'ModTeste' -Guid $moduleGuid -TypeGuid '00000000-0000-0000-0000-000000000006' -ModuleGuid '00000000-0000-0000-0000-000000000000')
+    Write-TextFile -Path (Join-Path $sandbox.Front 'Domain\GAMMessageType.xml') -Text $domainText
+    Write-TextFile -Path (Join-Path $sandbox.Acervo 'Domain\GAMMessageType.xml') -Text $domainText
+    Write-TextFile -Path (Join-Path $sandbox.Acervo 'Module\GAM.xml') -Text (New-ObjectXmlText -Name 'GAM' -Guid $moduleGuid -TypeGuid '00000000-0000-0000-0000-000000000006' -ModuleGuid '00000000-0000-0000-0000-000000000000')
     $consumidor = New-ObjectXmlText -Name 'SdtOutroModulo' -Guid '77777777-7777-7777-7777-7777777777c3' -TypeGuid $sdtTypeGuid `
-        -ExtraContent '      <Item><Properties><Property><Name>Type</Name><Value>Domain:DomTeste, OutroModulo</Value></Property></Properties></Item>'
+        -ExtraContent '      <Item><Properties><Property><Name>Type</Name><Value>Domain:GAMMessageType, OutroModulo</Value></Property></Properties></Item>'
     Write-TextFile -Path (Join-Path $sandbox.Acervo 'SDT\SdtOutroModulo.xml') -Text $consumidor
     $manifestPath = Join-Path $sandbox.Root 'manifesto.json'
     Write-Manifest -Path $manifestPath -Operations @($renameOperation)
@@ -529,12 +531,12 @@ try {
 
     # 7.5 unusedEvidence declarando uso bloqueia mesmo sem medicao positiva
     $sandbox = New-Sandbox -Name 'caso07-evidencia'
-    Write-TextFile -Path (Join-Path $sandbox.Front 'Domain\DomTeste.xml') -Text $domainText
-    Write-TextFile -Path (Join-Path $sandbox.Acervo 'Domain\DomTeste.xml') -Text $domainText
-    Write-TextFile -Path (Join-Path $sandbox.Acervo 'Module\ModTeste.xml') -Text (New-ObjectXmlText -Name 'ModTeste' -Guid $moduleGuid -TypeGuid '00000000-0000-0000-0000-000000000006' -ModuleGuid '00000000-0000-0000-0000-000000000000')
+    Write-TextFile -Path (Join-Path $sandbox.Front 'Domain\GAMMessageType.xml') -Text $domainText
+    Write-TextFile -Path (Join-Path $sandbox.Acervo 'Domain\GAMMessageType.xml') -Text $domainText
+    Write-TextFile -Path (Join-Path $sandbox.Acervo 'Module\GAM.xml') -Text (New-ObjectXmlText -Name 'GAM' -Guid $moduleGuid -TypeGuid '00000000-0000-0000-0000-000000000006' -ModuleGuid '00000000-0000-0000-0000-000000000000')
     $operationComEvidencia = [ordered]@{}
     foreach ($entry in $renameOperation.GetEnumerator()) { $operationComEvidencia[$entry.Key] = $entry.Value }
-    $operationComEvidencia['unusedEvidence'] = [ordered]@{ source = 'kb-intelligence'; query = 'what-uses DomTeste'; result = '3 dependentes'; statedBy = 'humano' }
+    $operationComEvidencia['unusedEvidence'] = [ordered]@{ source = 'kb-intelligence'; query = 'what-uses GAMMessageType'; result = '3 dependentes'; statedBy = 'humano' }
     $manifestPath = Join-Path $sandbox.Root 'manifesto.json'
     Write-Manifest -Path $manifestPath -Operations @($operationComEvidencia)
     $result = Invoke-Engine -ManifestPath $manifestPath -FrontFolder $sandbox.Front
@@ -583,16 +585,34 @@ try {
     )
     # o acervo consultado muda entre o plano e a aplicacao: o motor so descobre
     # na reconferencia da Fase 2, ja com journal e .bak materializados.
+    # Gatilho observavel (o primeiro .bak aparecendo em -WorkDir) em vez de
+    # espera cega: com Start-Sleep fixo a corrida quase nunca acontecia e o
+    # caso passava sem provar nada.
     $acervoB = Join-Path $sandbox.Acervo 'SDT\SdtB.xml'
+    $workDir = Join-Path $sandbox.Root 'Temp\xpz-batch-metadata\Frente01'
     $watcher = Start-ThreadJob -ScriptBlock {
-        param($Path)
-        Start-Sleep -Milliseconds 900
-        $raw = [System.IO.File]::ReadAllText($Path)
-        [System.IO.File]::WriteAllText($Path, $raw.Replace('description="SdtB"', 'description="SdtB "'), [System.Text.UTF8Encoding]::new($false))
-    } -ArgumentList $acervoB
+        param($WorkDir, $Path)
+        $deadline = [DateTime]::UtcNow.AddSeconds(30)
+        while ([DateTime]::UtcNow -lt $deadline) {
+            if (Test-Path -LiteralPath $WorkDir -PathType Container) {
+                if (@(Get-ChildItem -LiteralPath $WorkDir -Filter '*.bak' -File -ErrorAction SilentlyContinue).Count -gt 0) {
+                    $raw = [System.IO.File]::ReadAllText($Path)
+                    [System.IO.File]::WriteAllText($Path, $raw.Replace('description="SdtB"', 'description="SdtB "'), [System.Text.UTF8Encoding]::new($false))
+                    return $true
+                }
+            }
+            Start-Sleep -Milliseconds 20
+        }
+        return $false
+    } -ArgumentList $workDir, $acervoB
     $result = Invoke-Engine -ManifestPath $manifestPath -FrontFolder $sandbox.Front -Apply
-    [void](Wait-Job -Job $watcher -Timeout 30)
+    $watcherFired = $false
+    $watcherCompleted = Wait-Job -Job $watcher -Timeout 40
+    if ($null -ne $watcherCompleted) { $watcherFired = [bool](Receive-Job -Job $watcher) }
     Remove-Job -Job $watcher -Force -ErrorAction SilentlyContinue
+    if (-not $watcherFired) {
+        Write-Verbose 'Caso 9: o gatilho nao disparou; caso inconclusivo nesta rodada.'
+    }
 
     if ($result.Report.status -eq 'blocked') {
         $codes = Get-BlockCodes -Report $result.Report
@@ -860,6 +880,189 @@ try {
     $restoreTargets = @(@($recovery.restore) | ForEach-Object { $_.target })
     if ($restoreTargets -notcontains $targetPath) {
         throw 'Caso 5: o roteiro nao apontou o alvo a restaurar.'
+    }
+
+    # 5b - rename interrompido entre 'started' e 'committed': o move pode ter
+    #      acontecido ou nao, e o roteiro precisa dizer o que conferir. Sem
+    #      isso, o pilar da secao 14 (recusa de adiar renameDomain apoiada na
+    #      recuperabilidade) fica sem roteiro no caso interrompido.
+    $renameFrom = Join-Path $sandbox.Front 'Domain\AlvoAntigo.xml'
+    $renameTo = Join-Path $sandbox.Front 'Domain\AlvoNovo.xml'
+    Write-TextFile -Path $renameTo -Text (New-ObjectXmlText -Name 'AlvoNovo' -Guid '55555555-5555-5555-5555-555555555502' -TypeGuid $domainTypeGuid)
+    $renameBak = Join-Path $workDir 'run.AlvoAntigo.xml.bak'
+    Write-TextFile -Path $renameBak -Text (New-ObjectXmlText -Name 'AlvoAntigo' -Guid '55555555-5555-5555-5555-555555555502' -TypeGuid $domainTypeGuid)
+    $journalRenamePath = Join-Path $workDir 'run-rename.journal.json'
+    Write-TextFile -Path $journalRenamePath -Text (([ordered]@{
+        Kind          = 'xpz-batch-metadata-journal'
+        SchemaVersion = 1
+        runId         = 'run-rename'
+        startedAtUtc  = '2024-01-01T00:00:00Z'
+        workDir       = $workDir
+        steps         = @(
+            [ordered]@{ seq = 1; opId = 'op-r'; action = 'write'; state = 'started'; pathBefore = $renameFrom; pathAfter = $renameFrom; bakPath = $renameBak; hashBefore = 'abc'; hashAfter = $null; atUtc = '2024-01-01T00:00:01Z' },
+            [ordered]@{ seq = 2; opId = 'op-r'; action = 'write'; state = 'committed'; pathBefore = $renameFrom; pathAfter = $renameFrom; bakPath = $renameBak; hashBefore = 'abc'; hashAfter = 'def'; atUtc = '2024-01-01T00:00:02Z' },
+            [ordered]@{ seq = 3; opId = 'op-r'; action = 'rename'; state = 'started'; pathBefore = $renameFrom; pathAfter = $renameTo; bakPath = $renameBak; hashBefore = $null; hashAfter = $null; atUtc = '2024-01-01T00:00:03Z' }
+        )
+    }) | ConvertTo-Json -Depth 8)
+
+    $recoveryRename = & $recoveryScript -JournalPath $journalRenamePath -AsJson | ConvertFrom-Json
+    if ($recoveryRename.status -ne 'interrupted') {
+        throw "Caso 5b: rodada com rename interrompido deveria sair como interrompida; obtido '$($recoveryRename.status)'."
+    }
+    $uncertain = @($recoveryRename.undoRenamesUncertain)
+    if ($uncertain.Count -ne 1) {
+        throw "Caso 5b: o roteiro deveria listar 1 rename incerto; listou $($uncertain.Count)."
+    }
+    if ($uncertain[0].from -ne $renameTo -or $uncertain[0].to -ne $renameFrom) {
+        throw 'Caso 5b: o rename incerto nao trouxe os dois caminhos (destino e origem).'
+    }
+    if (-not $uncertain[0].fromPresent -or $uncertain[0].toPresent) {
+        throw 'Caso 5b: o roteiro nao mediu corretamente qual dos dois caminhos existe em disco.'
+    }
+    if (@($recoveryRename.undoRenames).Count -ne 0) {
+        throw 'Caso 5b: rename sem committed nao pode entrar na lista de renomes confirmados.'
+    }
+    $textoRoteiro = (& $recoveryScript -JournalPath $journalRenamePath) -join "`n"
+    if ($textoRoteiro -notmatch 'o move ACONTECEU') {
+        throw 'Caso 5b: o roteiro textual nao instruiu o operador sobre o rename interrompido.'
+    }
+
+    # ----------------------------------------------------------------------
+    # Caso 12 - -ReportPath: guardas e fronteira com a promessa de nao-escrita
+    # ----------------------------------------------------------------------
+    $sandbox = New-Sandbox -Name 'caso12'
+    $guid = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeee01'
+    $text = New-ObjectXmlText -Name 'SdtReport' -Guid $guid -TypeGuid $sdtTypeGuid
+    Write-TextFile -Path (Join-Path $sandbox.Front 'SDT\SdtReport.xml') -Text $text
+    Write-TextFile -Path (Join-Path $sandbox.Acervo 'SDT\SdtReport.xml') -Text $text
+    $manifestPath = Join-Path $sandbox.Root 'manifesto.json'
+    Write-Manifest -Path $manifestPath -Operations @(
+        (New-DocumentationOperation -Id 'op-report' -Guid $guid -Name 'SdtReport' -XmlPath 'SDT/SdtReport.xml')
+    )
+
+    function Invoke-WithReportPath {
+        param(
+            [Parameter(Mandatory = $true)][string]$ManifestPath,
+            [Parameter(Mandatory = $true)][string]$FrontFolder,
+            [Parameter(Mandatory = $true)][string]$ReportPath,
+            [switch]$Apply
+        )
+        $splat = @{ InputPath = $ManifestPath; FrontFolder = $FrontFolder; ReportPath = $ReportPath }
+        if ($Apply) { $splat['Apply'] = $true }
+        $output = & $enginePath @splat
+        return ((@($output) -join "`n") | ConvertFrom-Json)
+    }
+
+    # 12.1 sem -Apply e com -ReportPath: grava o relatorio e NADA mais.
+    #      A promessa de "nenhum artefato persistente" cobre o que o MOTOR cria
+    #      por conta propria (journal, .bak, baseline, temporario, -WorkDir);
+    #      o relatorio foi pedido pelo chamador, num caminho que ele deu.
+    $reportOut = Join-Path $sandbox.Root 'relatorio.json'
+    $report = Invoke-WithReportPath -ManifestPath $manifestPath -FrontFolder $sandbox.Front -ReportPath $reportOut
+    if ($report.status -eq 'blocked') {
+        throw "Caso 12.1: bloqueado indevidamente [$((Get-BlockCodes -Report $report) -join ', ')]."
+    }
+    if (-not (Test-Path -LiteralPath $reportOut -PathType Leaf)) {
+        throw 'Caso 12.1: -ReportPath nao gravou o relatorio.'
+    }
+    $reportFromDisk = [System.IO.File]::ReadAllText($reportOut) | ConvertFrom-Json
+    if ($reportFromDisk.runId -ne $report.runId) {
+        throw 'Caso 12.1: o relatorio em disco nao corresponde ao do stdout.'
+    }
+    $workDir = Join-Path $sandbox.Root 'Temp\xpz-batch-metadata\Frente01'
+    if (Test-Path -LiteralPath $workDir) {
+        $leftovers = @(Get-ChildItem -LiteralPath $workDir -Force)
+        if ($leftovers.Count -gt 0) {
+            throw "Caso 12.1: rodada sem -Apply deixou artefato do motor: $($leftovers[0].FullName)"
+        }
+    }
+
+    # 12.2 extensao que nao e .json
+    $reportBad = Join-Path $sandbox.Root 'relatorio.txt'
+    $report = Invoke-WithReportPath -ManifestPath $manifestPath -FrontFolder $sandbox.Front -ReportPath $reportBad
+    Assert-BlockCode -Case 'Caso 12.2' -Report $report -Expected 'ARTIFACT_PATH_COLLISION'
+    if (Test-Path -LiteralPath $reportBad) {
+        throw 'Caso 12.2: o motor recusou o caminho e mesmo assim gravou nele.'
+    }
+
+    # 12.3 area protegida (o proprio acervo)
+    $reportProtected = Join-Path $sandbox.Acervo 'relatorio.json'
+    $report = Invoke-WithReportPath -ManifestPath $manifestPath -FrontFolder $sandbox.Front -ReportPath $reportProtected
+    Assert-BlockCode -Case 'Caso 12.3' -Report $report -Expected 'PROTECTED_AREA'
+    if (Test-Path -LiteralPath $reportProtected) {
+        throw 'Caso 12.3: gravou relatorio dentro de area protegida.'
+    }
+
+    # 12.4 dentro do -WorkDir, onde vivem journal, .bak e baseline
+    $reportInWorkDir = Join-Path $workDir 'relatorio.json'
+    $report = Invoke-WithReportPath -ManifestPath $manifestPath -FrontFolder $sandbox.Front -ReportPath $reportInWorkDir
+    Assert-BlockCode -Case 'Caso 12.4' -Report $report -Expected 'ARTIFACT_PATH_COLLISION'
+
+    # 12.5 destino existente que nao e arquivo regular
+    $reportAsDirectory = Join-Path $sandbox.Root 'relatorio-pasta.json'
+    [void](New-Item -ItemType Directory -Path $reportAsDirectory -Force)
+    $report = Invoke-WithReportPath -ManifestPath $manifestPath -FrontFolder $sandbox.Front -ReportPath $reportAsDirectory
+    Assert-BlockCode -Case 'Caso 12.5' -Report $report -Expected 'ARTIFACT_PATH_COLLISION'
+
+    # ----------------------------------------------------------------------
+    # Caso 13 - dependencia que SOME entre as fases vira PLAN_STALE
+    # ----------------------------------------------------------------------
+    foreach ($vanishCase in @('acervo', 'alvo')) {
+        $sandbox = New-Sandbox -Name ('caso13-' + $vanishCase)
+        $guidA = 'ffffffff-ffff-ffff-ffff-ffffffffff01'
+        $guidB = 'ffffffff-ffff-ffff-ffff-ffffffffff02'
+        foreach ($pair in @(@{ Name = 'SdtSomeA'; Guid = $guidA }, @{ Name = 'SdtSomeB'; Guid = $guidB })) {
+            $objectText = New-ObjectXmlText -Name $pair.Name -Guid $pair.Guid -TypeGuid $sdtTypeGuid
+            Write-TextFile -Path (Join-Path $sandbox.Front ('SDT\{0}.xml' -f $pair.Name)) -Text $objectText
+            Write-TextFile -Path (Join-Path $sandbox.Acervo ('SDT\{0}.xml' -f $pair.Name)) -Text $objectText
+        }
+        $manifestPath = Join-Path $sandbox.Root 'manifesto.json'
+        Write-Manifest -Path $manifestPath -Operations @(
+            (New-DocumentationOperation -Id 'op-a' -Guid $guidA -Name 'SdtSomeA' -XmlPath 'SDT/SdtSomeA.xml'),
+            (New-DocumentationOperation -Id 'op-b' -Guid $guidB -Name 'SdtSomeB' -XmlPath 'SDT/SdtSomeB.xml')
+        )
+        $workDir = Join-Path $sandbox.Root 'Temp\xpz-batch-metadata\Frente01'
+        if ($vanishCase -eq 'acervo') {
+            $doomedPath = Join-Path $sandbox.Acervo 'SDT\SdtSomeB.xml'
+        } else {
+            $doomedPath = Join-Path $sandbox.Front 'SDT\SdtSomeB.xml'
+        }
+
+        # gatilho observavel em vez de espera cega: o apagamento acontece
+        # quando o primeiro .bak aparece, ou seja, com a Fase 1b em curso.
+        $vanisher = Start-ThreadJob -ScriptBlock {
+            param($WorkDir, $DoomedPath)
+            $deadline = [DateTime]::UtcNow.AddSeconds(30)
+            while ([DateTime]::UtcNow -lt $deadline) {
+                if (Test-Path -LiteralPath $WorkDir -PathType Container) {
+                    if (@(Get-ChildItem -LiteralPath $WorkDir -Filter '*.bak' -File -ErrorAction SilentlyContinue).Count -gt 0) {
+                        Remove-Item -LiteralPath $DoomedPath -Force -ErrorAction SilentlyContinue
+                        return $true
+                    }
+                }
+                Start-Sleep -Milliseconds 20
+            }
+            return $false
+        } -ArgumentList $workDir, $doomedPath
+
+        $result = Invoke-Engine -ManifestPath $manifestPath -FrontFolder $sandbox.Front -Apply
+        $fired = $false
+        $completed = Wait-Job -Job $vanisher -Timeout 40
+        if ($null -ne $completed) { $fired = [bool](Receive-Job -Job $vanisher) }
+        Remove-Job -Job $vanisher -Force -ErrorAction SilentlyContinue
+
+        if (-not $fired) {
+            Write-Verbose "Caso 13 ($vanishCase): o gatilho nao disparou; caso inconclusivo nesta rodada."
+            continue
+        }
+        if ($result.Report.status -eq 'internalError') {
+            throw "Caso 13 ($vanishCase): sumico entre fases virou erro interno em vez de bloqueio nomeado."
+        }
+        Assert-BlockCode -Case "Caso 13 ($vanishCase)" -Report $result.Report -Expected 'PLAN_STALE'
+        $mensagens = @(@($result.Report.blocks) | Where-Object { $_.code -eq 'PLAN_STALE' } | ForEach-Object { $_.message })
+        if (-not ($mensagens -match 'desapareceu|indisponivel|ilegivel')) {
+            throw "Caso 13 ($vanishCase): PLAN_STALE nao nomeou o sumico: $($mensagens -join ' | ')"
+        }
     }
 
     # ----------------------------------------------------------------------

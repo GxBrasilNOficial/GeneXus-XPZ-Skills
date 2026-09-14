@@ -1267,13 +1267,39 @@ function Test-GeneXusPackagedModuleHomonym {
     $domainTypeGuid = Get-GeneXusDomainTypeGuid
     $hits = [System.Collections.Generic.List[object]]::new()
     foreach ($file in (Get-ChildItem -LiteralPath $folder -Filter '*.xml' -File -Recurse)) {
-        $raw = [System.IO.File]::ReadAllText($file.FullName)
+        # Arquivo ilegivel ou mal formado aqui NAO pode ser pulado em silencio:
+        # ele ja casou o nome do Domain e o GUID do tipo Domain, ou seja, e o
+        # candidato mais provavel a definir o homonimo que este detector existe
+        # para achar. Pular seria fail-open no ramo fail-closed. Vira entrada
+        # de cobertura incompleta, como no indice de referencias.
+        $raw = $null
+        try {
+            $raw = [System.IO.File]::ReadAllText($file.FullName)
+        } catch {
+            [void]$hits.Add([pscustomobject]@{
+                Path   = $file.FullName
+                Name   = $DomainName
+                Kind   = 'unreadable'
+                Reason = "XML de PackagedModule ilegivel durante a busca de homonimo: $($file.FullName) ($($_.Exception.Message))."
+            })
+            continue
+        }
         if ($raw.IndexOf($DomainName, [StringComparison]::OrdinalIgnoreCase) -lt 0) { continue }
         if ($raw.IndexOf($domainTypeGuid, [StringComparison]::OrdinalIgnoreCase) -lt 0) { continue }
 
         $doc = New-Object System.Xml.XmlDocument
         $doc.PreserveWhitespace = $true
-        try { $doc.LoadXml($raw) } catch { continue }
+        try {
+            $doc.LoadXml($raw)
+        } catch {
+            [void]$hits.Add([pscustomobject]@{
+                Path   = $file.FullName
+                Name   = $DomainName
+                Kind   = 'unparseable'
+                Reason = "XML de PackagedModule que cita o nome do alvo e o tipo Domain nao e bem formado: $($file.FullName) ($($_.Exception.Message))."
+            })
+            continue
+        }
         foreach ($node in $doc.SelectNodes('//Object')) {
             $nodeType = ''
             $nodeName = ''
@@ -1281,7 +1307,12 @@ function Test-GeneXusPackagedModuleHomonym {
             if ($node.HasAttribute('name')) { $nodeName = $node.GetAttribute('name') }
             if (-not [string]::Equals($nodeType, $domainTypeGuid, [StringComparison]::OrdinalIgnoreCase)) { continue }
             if (-not [string]::Equals($nodeName, $DomainName, [StringComparison]::OrdinalIgnoreCase)) { continue }
-            [void]$hits.Add([pscustomobject]@{ Path = $file.FullName; Name = $nodeName })
+            [void]$hits.Add([pscustomobject]@{
+                Path   = $file.FullName
+                Name   = $nodeName
+                Kind   = 'homonym'
+                Reason = "Domain homonimo definido dentro de PackagedModule: $($file.FullName)."
+            })
             break
         }
     }
@@ -1368,10 +1399,20 @@ function Resolve-GeneXusDomainReferenceVerdict {
         [void]$blockingOccurrences.Add([pscustomobject]@{ path = $occurrence.path; value = $value; form = 'short' })
     }
 
-    if (@($PackagedHomonyms).Count -gt 0) {
-        foreach ($homonym in $PackagedHomonyms) {
-            [void]$incompleteReasons.Add("Domain homonimo definido dentro de PackagedModule: $($homonym.Path).")
+    foreach ($homonym in @($PackagedHomonyms)) {
+        # acesso defensivo: o que chega aqui vem de varredura de disco, e um
+        # elemento sem as propriedades esperadas nao pode derrubar a rodada com
+        # erro interno - o ramo inteiro existe para produzir cobertura
+        # incompleta, nao para falhar.
+        if ($null -eq $homonym -or $homonym -isnot [psobject]) { continue }
+        $reasonProperty = $homonym.PSObject.Properties['Reason']
+        if ($null -ne $reasonProperty -and -not [string]::IsNullOrWhiteSpace([string]$reasonProperty.Value)) {
+            [void]$incompleteReasons.Add([string]$reasonProperty.Value)
+            continue
         }
+        $pathProperty = $homonym.PSObject.Properties['Path']
+        if ($null -eq $pathProperty) { continue }
+        [void]$incompleteReasons.Add("Domain homonimo definido dentro de PackagedModule: $($pathProperty.Value).")
     }
 
     foreach ($occurrence in $Index.CdataOccurrences) {
@@ -2547,17 +2588,56 @@ function Invoke-GeneXusXmlBatchMetadataCore {
             $workDirCreated = $true
         }
 
+        # -ReportPath passa pela MESMA familia de guardas dos demais caminhos
+        # (D2). A validacao anterior so exigia caminho absoluto e fora da
+        # frente: aceitava extensao qualquer, area protegida, ponto de
+        # reanalise e destino existente que nao fosse arquivo regular.
+        # `reportPathRefused` existe para o wrapper NAO gravar no caminho que o
+        # motor acabou de recusar.
         $reportPathFull = $null
         if (-not [string]::IsNullOrWhiteSpace($ReportPath)) {
+            $extra['reportPathRefused'] = $true
             if (-not [System.IO.Path]::IsPathRooted($ReportPath)) {
                 [void]$blocks.Add((New-GeneXusBatchBlock -Code 'ARTIFACT_PATH_COLLISION' -Message '-ReportPath deve ser absoluto.' -Path $ReportPath))
-                return (New-GeneXusBatchMetadataReport -RunId $runId -Status 'blocked' -Phase 'phase0' -Blocks $blocks)
+                return (New-GeneXusBatchMetadataReport -RunId $runId -Status 'blocked' -Phase 'phase0' -Blocks $blocks -Extra $extra)
+            }
+            if (-not $ReportPath.EndsWith('.json', [StringComparison]::OrdinalIgnoreCase)) {
+                [void]$blocks.Add((New-GeneXusBatchBlock -Code 'ARTIFACT_PATH_COLLISION' -Message '-ReportPath deve terminar em .json.' -Path $ReportPath))
+                return (New-GeneXusBatchMetadataReport -RunId $runId -Status 'blocked' -Phase 'phase0' -Blocks $blocks -Extra $extra)
             }
             $reportPathFull = Get-XpzCanonicalPath -Path $ReportPath
             if (Test-XpzPathEqualOrUnder -Candidate $reportPathFull -Base $frontFull) {
                 [void]$blocks.Add((New-GeneXusBatchBlock -Code 'ARTIFACT_PATH_COLLISION' -Message "-ReportPath dentro da frente: $reportPathFull" -Path $reportPathFull))
-                return (New-GeneXusBatchMetadataReport -RunId $runId -Status 'blocked' -Phase 'phase0' -Blocks $blocks)
+                return (New-GeneXusBatchMetadataReport -RunId $runId -Status 'blocked' -Phase 'phase0' -Blocks $blocks -Extra $extra)
             }
+            if (Test-XpzPathEqualOrUnder -Candidate $reportPathFull -Base $workDirFull) {
+                [void]$blocks.Add((New-GeneXusBatchBlock -Code 'ARTIFACT_PATH_COLLISION' -Message "-ReportPath dentro do -WorkDir, onde vivem journal, .bak e baseline: $reportPathFull" -Path $reportPathFull))
+                return (New-GeneXusBatchMetadataReport -RunId $runId -Status 'blocked' -Phase 'phase0' -Blocks $blocks -Extra $extra)
+            }
+            $reportProtected = Test-XpzProtectedArea -Candidate $reportPathFull -RepoRoot $repoRoot
+            if ($reportProtected.blocked) {
+                [void]$blocks.Add((New-GeneXusBatchBlock -Code 'PROTECTED_AREA' -Message "-ReportPath em area protegida: $($reportProtected.reason)" -Path $reportPathFull))
+                return (New-GeneXusBatchMetadataReport -RunId $runId -Status 'blocked' -Phase 'phase0' -Blocks $blocks -Extra $extra)
+            }
+            $reportReparse = Get-XpzReparsePointInPath -Path $reportPathFull
+            if ($null -ne $reportReparse) {
+                [void]$blocks.Add((New-GeneXusBatchBlock -Code 'PROTECTED_AREA' -Message "ponto de reanalise no caminho do -ReportPath: $reportReparse" -Path $reportPathFull))
+                return (New-GeneXusBatchMetadataReport -RunId $runId -Status 'blocked' -Phase 'phase0' -Blocks $blocks -Extra $extra)
+            }
+            $reportParent = [System.IO.Directory]::GetParent($reportPathFull)
+            if ($null -eq $reportParent -or -not (Test-Path -LiteralPath $reportParent.FullName -PathType Container)) {
+                [void]$blocks.Add((New-GeneXusBatchBlock -Code 'ARTIFACT_PATH_COLLISION' -Message "a pasta pai do -ReportPath deve existir: $reportPathFull" -Path $reportPathFull))
+                return (New-GeneXusBatchMetadataReport -RunId $runId -Status 'blocked' -Phase 'phase0' -Blocks $blocks -Extra $extra)
+            }
+            if (Test-Path -LiteralPath $reportPathFull) {
+                $reportItem = Get-Item -LiteralPath $reportPathFull -Force
+                if ($reportItem.PSIsContainer -or (($reportItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0)) {
+                    [void]$blocks.Add((New-GeneXusBatchBlock -Code 'ARTIFACT_PATH_COLLISION' -Message "-ReportPath existente nao e arquivo regular: $reportPathFull" -Path $reportPathFull))
+                    return (New-GeneXusBatchMetadataReport -RunId $runId -Status 'blocked' -Phase 'phase0' -Blocks $blocks -Extra $extra)
+                }
+            }
+            $extra['reportPathRefused'] = $false
+            $extra['reportPath'] = $reportPathFull
         }
 
         $lock = Request-GeneXusBatchRunLock -WorkDir $workDirFull -RunId $runId
@@ -2826,7 +2906,7 @@ function Invoke-GeneXusXmlBatchMetadataCore {
                         -TargetName $operation.ExpectedName -TargetGuid $operation.Guid `
                         -TargetModuleName (Get-GeneXusModuleNameByGuid -AcervoPath $acervoFull -ModuleGuid ([string]$currentRoot.Attributes['moduleGuid'])) `
                         -DomainDefinitions $domainDefinitions `
-                        -PackagedHomonyms (Test-GeneXusPackagedModuleHomonym -AcervoPath $acervoFull -DomainName $operation.ExpectedName)
+                        -PackagedHomonyms @(Test-GeneXusPackagedModuleHomonym -AcervoPath $acervoFull -DomainName $operation.ExpectedName)
 
                     foreach ($occurrence in $verdict.ReportOnly) {
                         [void]$warnings.Add((New-GeneXusBatchWarning -Kind 'cdataOccurrence' -Message "ocorrencia em CDATA de documentacao (report-only): $($occurrence.path)" -OpId $operation.Id))
@@ -3025,7 +3105,14 @@ function Invoke-GeneXusXmlBatchMetadataCore {
                 [void]$blocks.Add((New-GeneXusBatchBlock -Code 'BAK_EXISTS' -Message "backup orfao dentro da frente (convencao de outro motor): $frontBak" -Path $plan.RelativePath))
                 continue
             }
-            [System.IO.File]::Copy($plan.TargetPath, $bakPath, $false)
+            # mesmo eixo da reconferencia da Fase 2: alvo que sumiu (ou ficou
+            # ilegivel) entre 1a e 1b e PLAN_STALE, nao erro interno.
+            try {
+                [System.IO.File]::Copy($plan.TargetPath, $bakPath, $false)
+            } catch {
+                [void]$blocks.Add((New-GeneXusBatchBlock -Code 'PLAN_STALE' -Message "alvo indisponivel ao materializar o backup: $($_.Exception.Message)" -Path $plan.RelativePath))
+                continue
+            }
             $plan | Add-Member -NotePropertyName BakPath -NotePropertyValue $bakPath -Force
 
             $baselinePath = Join-Path $workDirFull ("$runId." + $plan.Operations[0].Id + '.baseline.xml')
@@ -3076,16 +3163,40 @@ function Invoke-GeneXusXmlBatchMetadataCore {
         # ------------------------------------------------------------------
         # Fase 2 - aplicacao
         # ------------------------------------------------------------------
+        # Reconferencia defensiva: arquivo que SUMIU entre as fases e uma
+        # dependencia que mudou, nao um erro interno nem um caso a pular em
+        # silencio. Ler o hash de um alvo apagado lancaria excecao e mataria a
+        # rodada com erro interno; o acervo apagado caia no Test-Path falso e a
+        # conferencia era pulada sem aparecer em lugar nenhum.
         foreach ($plan in $plans) {
-            $currentHash = Get-GeneXusFileSha256 -Path $plan.TargetPath
+            if (-not (Test-Path -LiteralPath $plan.TargetPath -PathType Leaf)) {
+                [void]$blocks.Add((New-GeneXusBatchBlock -Code 'PLAN_STALE' -Message "alvo desapareceu entre o plano e a aplicacao: $($plan.RelativePath)" -Path $plan.RelativePath))
+                continue
+            }
+            $currentHash = $null
+            try {
+                $currentHash = Get-GeneXusFileSha256 -Path $plan.TargetPath
+            } catch {
+                [void]$blocks.Add((New-GeneXusBatchBlock -Code 'PLAN_STALE' -Message "alvo ficou ilegivel entre o plano e a aplicacao: $($_.Exception.Message)" -Path $plan.RelativePath))
+                continue
+            }
             if (-not [string]::Equals($currentHash, $plan.OriginalHash, [StringComparison]::Ordinal)) {
                 [void]$blocks.Add((New-GeneXusBatchBlock -Code 'PLAN_STALE' -Message "alvo mudou entre o plano e a aplicacao: $($plan.RelativePath)" -Path $plan.RelativePath))
             }
-            if ($null -ne $plan.AcervoHash -and (Test-Path -LiteralPath $plan.AcervoPath -PathType Leaf)) {
+            if ($null -eq $plan.AcervoHash) { continue }
+            if (-not (Test-Path -LiteralPath $plan.AcervoPath -PathType Leaf)) {
+                [void]$blocks.Add((New-GeneXusBatchBlock -Code 'PLAN_STALE' -Message "arquivo do acervo consultado desapareceu: $($plan.AcervoPath)" -Path $plan.RelativePath))
+                continue
+            }
+            $acervoHashNow = $null
+            try {
                 $acervoHashNow = Get-GeneXusFileSha256 -Path $plan.AcervoPath
-                if (-not [string]::Equals($acervoHashNow, $plan.AcervoHash, [StringComparison]::Ordinal)) {
-                    [void]$blocks.Add((New-GeneXusBatchBlock -Code 'PLAN_STALE' -Message "arquivo do acervo consultado mudou: $($plan.AcervoPath)" -Path $plan.RelativePath))
-                }
+            } catch {
+                [void]$blocks.Add((New-GeneXusBatchBlock -Code 'PLAN_STALE' -Message "arquivo do acervo consultado ficou ilegivel: $($_.Exception.Message)" -Path $plan.RelativePath))
+                continue
+            }
+            if (-not [string]::Equals($acervoHashNow, $plan.AcervoHash, [StringComparison]::Ordinal)) {
+                [void]$blocks.Add((New-GeneXusBatchBlock -Code 'PLAN_STALE' -Message "arquivo do acervo consultado mudou: $($plan.AcervoPath)" -Path $plan.RelativePath))
             }
         }
         if ($blocks.Count -gt 0) {

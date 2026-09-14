@@ -59,19 +59,35 @@ foreach ($step in $steps) {
 
 $interrupted = [System.Collections.Generic.List[object]]::new()
 $renames = [System.Collections.Generic.List[object]]::new()
+$uncertainRenames = [System.Collections.Generic.List[object]]::new()
 $restore = [System.Collections.Generic.List[object]]::new()
 
 foreach ($step in $steps) {
     if ($step.state -ne 'started') { continue }
     $key = "$($step.opId)|$($step.action)"
-    if (-not $committed.Contains($key)) {
-        [void]$interrupted.Add([ordered]@{
-            seq    = $step.seq
-            opId   = $step.opId
-            action = $step.action
-            target = $step.pathAfter
-        })
-    }
+    if ($committed.Contains($key)) { continue }
+
+    [void]$interrupted.Add([ordered]@{
+        seq    = $step.seq
+        opId   = $step.opId
+        action = $step.action
+        target = $step.pathAfter
+    })
+
+    # Rename com 'started' sem 'committed': o File.Move pode ter acontecido ou
+    # nao, e o journal sozinho nao decide. Quem recupera precisa dos DOIS
+    # caminhos e da instrucao condicional - sem isso, o pilar da secao 14 (a
+    # recusa de adiar renameDomain se apoia na recuperabilidade do rename)
+    # fica sem roteiro justamente no caso interrompido.
+    if ($step.action -ne 'rename') { continue }
+    [void]$uncertainRenames.Add([ordered]@{
+        seq            = $step.seq
+        opId           = $step.opId
+        from           = $step.pathAfter
+        to             = $step.pathBefore
+        fromPresent    = (-not [string]::IsNullOrWhiteSpace([string]$step.pathAfter) -and (Test-Path -LiteralPath ([string]$step.pathAfter) -PathType Leaf))
+        toPresent      = (-not [string]::IsNullOrWhiteSpace([string]$step.pathBefore) -and (Test-Path -LiteralPath ([string]$step.pathBefore) -PathType Leaf))
+    })
 }
 
 foreach ($step in $steps) {
@@ -119,6 +135,7 @@ $plan = [ordered]@{
     stepCount     = $steps.Count
     interrupted   = @($interrupted)
     undoRenames   = @($renamesReversed)
+    undoRenamesUncertain = @($uncertainRenames)
     restore       = @($restore)
 }
 
@@ -141,8 +158,28 @@ if ($interrupted.Count -gt 0) {
     Write-Output ''
 }
 
+if ($uncertainRenames.Count -gt 0) {
+    Write-Output '0) RENOMES INTERROMPIDOS (started sem committed) - CONFERIR ANTES DE TUDO:'
+    Write-Output '   O move pode ter acontecido ou nao; o journal nao decide sozinho.'
+    foreach ($entry in $uncertainRenames) {
+        Write-Output ("  seq {0} [{1}]" -f $entry.seq, $entry.opId)
+        Write-Output ("     origem  {0} ({1})" -f $entry.to, $(if ($entry.toPresent) { 'existe' } else { 'ausente' }))
+        Write-Output ("     destino {0} ({1})" -f $entry.from, $(if ($entry.fromPresent) { 'existe' } else { 'ausente' }))
+        if ($entry.fromPresent -and -not $entry.toPresent) {
+            Write-Output '     => o move ACONTECEU: mover de volta destino -> origem antes de restaurar o .bak.'
+        } elseif (-not $entry.fromPresent -and $entry.toPresent) {
+            Write-Output '     => o move NAO aconteceu: nada a desfazer neste passo.'
+        } elseif ($entry.fromPresent -and $entry.toPresent) {
+            Write-Output '     => os DOIS existem: nao mover nada por conta propria; comparar hash com o .bak e decidir com o humano.'
+        } else {
+            Write-Output '     => NENHUM dos dois existe: restaurar a partir do .bak para o caminho de origem.'
+        }
+    }
+    Write-Output ''
+}
+
 if ($renamesReversed.Count -gt 0) {
-    Write-Output '1) DESFAZER RENOMES, NESTA ORDEM:'
+    Write-Output '1) DESFAZER RENOMES CONFIRMADOS, NESTA ORDEM:'
     foreach ($entry in $renamesReversed) {
         Write-Output ("  mover  {0}" -f $entry.from)
         Write-Output ("     para {0}" -f $entry.to)
