@@ -4,6 +4,52 @@
 os self-tests. Congelamento decidido pelo humano em 2026-09-13, após o parecer sobre a v9
 concluir que *"a revisão de papel parou de render"* — não por abandono do ciclo.
 
+## Estado da implementação — nota aditiva de 2026-09-14
+
+Este bloco é **posterior ao congelamento** e existe porque o corpo abaixo não muda: ele foi
+escrito antes da implementação e continua sendo o registro do que se decidiu, com o tempo
+verbal do dia em que foi congelado. Quem lê o corpo lê o desenho; quem precisa do estado
+atual lê aqui.
+
+**Implementado em 2026-09-13/14.** O motor é
+[`scripts/Edit-GeneXusXmlBatchMetadata.ps1`](scripts/Edit-GeneXusXmlBatchMetadata.ps1), com o
+núcleo em `scripts/GeneXusXmlBatchMetadataSupport.ps1`, o roteiro de recuperação manual em
+`scripts/Show-GeneXusXmlBatchMetadataRecoveryPlan.ps1` e os suportes entregues por esta
+frente em `scripts/XpzAtomicTextWriteSupport.ps1` e `scripts/XpzProtectedAreaSupport.ps1`.
+A bateria de contrato é `scripts/Test-EditGeneXusXmlBatchMetadataContract.ps1`, mais
+`scripts/Test-GeneXusLastUpdateEngineOptionalBaselineSelfTest.ps1`.
+
+**O dono normativo do contrato passou a ser [`xpz-builder/SKILL.md`](xpz-builder/SKILL.md)**
+(com o satélite `xpz-builder/quality-checklist.md`); a regra operacional está em
+`02-regras-operacionais-e-runtime.md` e o ponteiro de rastreabilidade em
+`09-inventario-e-rastreabilidade-publica.md`. Este documento é o **racional**: ele explica
+por que cada regra existe e guarda as medições e os dez pareceres que a produziram. Detalhe
+de contrato que mudar depois desta data muda no dono, não aqui — documento congelado não
+acompanha motor.
+
+**Todos os entregáveis da §13.1 foram entregues**, incluindo a edição de
+`Test-XpzParameterNamingContract.ps1` e a entrada de `checksum=""` em `999`. Em particular,
+`-BaselineXmlPath` **já é opcional** em `Get-NewGeneXusLastUpdateValueFromEngine`: a frase
+«Hoje é `Mandatory = $true`» na §13.1 descreve o estado em 2026-09-13, não uma pendência.
+As citações ao `Mandatory` nas linhas do diagnóstico da v10 são narrativa histórica do erro
+da v9 e continuam corretas.
+
+**Correção factual à «Nota de custo» da §2.1.** O desenho afirma que um lote de 131 alvos
+gera «131 arquivos e **131 invocações de processo**». A segunda metade é falsa:
+`Get-NewGeneXusLastUpdateValueFromEngine` chama o motor com `& $enginePath`, que executa o
+`.ps1` **no mesmo processo**. *(Medido em 2026-09-14: PID do chamador idêntico ao PID dentro
+do script; 20 chamadas em 155 ms, ~8 ms cada — cerca de 1 segundo para as 131.)* O custo em
+disco é real (131 arquivos de baseline sintético); o custo de processo não existe. A frente
+própria que a §2.1 manda registrar continua valendo, com prioridade menor do que o texto
+sugere, e está em `999-ideias-pendentes.md`.
+
+**Decisões que o desenho não fechava e a implementação fechou** estão nos cabeçalhos dos
+scripts e na entrada desta frente em `historico/IdeiasImplementadas_202609.md`: o código
+`MANIFEST_SCHEMA_INVALID` acrescentado à §10, a leitura da regra de duplicidade por `guid`
+que preserva a composição da §4, o escopo da âncora de documentação no próprio `<Part>`, a
+recusa de contar âncora dentro de `CDATA`, o cálculo do `lastUpdate` na Fase 1b e o hard
+link indeterminável como aviso declarado.
+
 Consolidada após **dez pareceres de quatro famílias**: três sobre a v1 (openai/gpt-5.6-luna,
 anthropic/claude-opus-5, opencode/big-pickle), um sobre a v2 (openai/gpt-5.6-luna), um
 sobre a v3 (anthropic/claude-opus-5), um sobre a v4 (opencode/big-pickle), um sobre a v6

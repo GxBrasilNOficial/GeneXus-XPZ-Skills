@@ -3196,3 +3196,20 @@ As contagens são de **arquivos que mencionam o token**, não de parâmetros exc
 **Esta entrada NÃO é a entrada da task `CalculateChecksums`.** A entrada existente sobre `CalculateChecksums` / `AreObjectsEqual` (neste mesmo documento, seção sobre tasks MSBuild não documentadas) trata de **outra** pergunta: usar tasks do MSBuild para comparar o estado dos objetos **antes e depois** do import, com granularidade de conjunto. Aqui a pergunta é sobre o **valor do atributo no XML da frente** e o que a importação faz com ele. Um implementador futuro não deve marcar esta obrigação como cumprida pela outra: elas se cruzam no vocabulário («checksum») e divergem no objeto de medição.
 
 **Relacionado.** `edit-genexus-xml-batch-metadata-design.md` §12 e §14; `Edit-GeneXusXmlBatchMetadata.ps1` (aviso `checksumStale` e status de máquina homônimo).
+
+## Expor a composição do `lastUpdate` como função dot-sourceável do motor
+
+- **Importância** — baixa (o workaround em produção funciona, é testado e o custo real medido é pequeno; a ganho é de desenho, não de desempenho).
+- **Maturidade** — ideia (a forma da função está esboçada; falta decidir onde ela mora e quem migra).
+
+**De onde vem a obrigação.** A §2.1 de `edit-genexus-xml-batch-metadata-design.md` fecha a discussão do baseline dizendo, literalmente, que expor a composição como função dot-sourceável do motor é «a saída limpa», que aquilo é **frente própria** e que deve ser **registrada em `999`**. Esta é a entrada que faltava.
+
+**O que existe hoje.** `Get-GeneXusXpzLastUpdate.ps1` aceita **um** baseline e calcula `max(UtcNow + margem, baseline + margem)`. A D1 do desenho exige **três** termos (UtcNow, acervo, frente). Como o motor recebe **caminho** e não valor, `Edit-GeneXusXmlBatchMetadata.ps1` resolve quem vence entre acervo e frente, materializa um XML de baseline sintético em `-WorkDir` com a string do vencedor **verbatim** e chama o motor apontando para ele. O motor continua sendo a única fonte da fórmula, do formato e da leitura de `UtcNow` — que era o ponto —, mas o transporte de um valor que o chamador já tem em memória passa por um arquivo em disco.
+
+**Correção da premissa do desenho (medida em 2026-09-14).** A «Nota de custo» da §2.1 afirma que um lote de 131 alvos gera «131 arquivos e **131 invocações de processo**». A segunda metade é **falsa**: `Get-NewGeneXusLastUpdateValueFromEngine` chama o motor com `& $enginePath`, que executa o `.ps1` no **mesmo processo** — PID do chamador idêntico ao PID dentro do script, 20 chamadas em 155 ms (~8 ms cada), ou cerca de 1 segundo para as 131. O que permanece verdadeiro é o custo em **disco**: 131 arquivos de baseline sintético por lote, inventariados e cobertos por `ARTIFACT_PATH_COLLISION`. Ou seja, a frente continua fazendo sentido por **higiene de desenho**, não por desempenho — e quem a pegar não deve herdar do desenho a ideia de que há um gargalo de processo a eliminar.
+
+**Forma provável.** Extrair de `Get-GeneXusXpzLastUpdate.ps1` uma função `Get-GeneXusComposedLastUpdate` em suporte dot-sourceável, recebendo **valores** (zero ou mais baselines já lidos) e devolvendo o carimbo formatado; o script passa a ser um invólucro fino sobre ela, preservando a superfície atual. O chamador em lote deixa de materializar o sintético e passa a compor em memória.
+
+**Decisões em aberto.** Onde a função mora (`GeneXusXmlSurgicalEditSupport.ps1` já é o suporte que hospeda `Get-NewGeneXusLastUpdateValueFromEngine`, mas o dono da fórmula é o motor); se `Get-GeneXusXpzLastUpdate.ps1` passa a aceitar mais de um `-BaselineXmlPath` como caminho alternativo; e quem migra além do motor em lote (`Set-GeneXusXmlLastUpdate.ps1` e `Add-GeneXusButton.ps1` seguem com um baseline só, e não precisam da composição).
+
+**Relacionado.** `edit-genexus-xml-batch-metadata-design.md` §2.1 e a nota aditiva de estado no topo do mesmo documento; `Edit-GeneXusXmlBatchMetadata.ps1` (o baseline sintético é a quarta classe de artefato do `-WorkDir`).
