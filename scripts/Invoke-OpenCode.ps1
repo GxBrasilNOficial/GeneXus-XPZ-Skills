@@ -43,7 +43,7 @@
 .PARAMETER AllText
     Devolve toda a narracao (preambulos de passo + resposta final) concatenada, em vez de só a resposta final.
 .PARAMETER TimeoutSec
-    Tempo máximo de espera pela resposta (default 180s). É POR TENTATIVA: com -MaxAttempts > 1,
+    Tempo máximo de espera pela resposta (default 1200s). É POR TENTATIVA: com -MaxAttempts > 1,
     o tempo de parede total pode ser múltiplo deste valor.
 .PARAMETER MaxAttempts
     Número máximo de tentativas (1-3, default 1 = comportamento histórico, sem re-tentativa).
@@ -70,7 +70,7 @@ param(
     [string] $OpenCodeExe,
     [switch] $Raw,
     [switch] $AllText,
-    [ValidateRange(1, 3600)] [int] $TimeoutSec = 180,
+    [ValidateRange(1, 3600)] [int] $TimeoutSec = 1200,
     [ValidateRange(1, 3)] [int] $MaxAttempts = 1
 )
 

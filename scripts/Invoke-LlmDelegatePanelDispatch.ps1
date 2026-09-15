@@ -150,13 +150,13 @@ $ContentionKeys = @{
     'copilot'     = @()
 }
 $AdapterDefaultTimeoutSec = @{
-    # Revisao agentica (ler repo) costuma passar de 180s; medido 2026-09-04: Codex Luna ~646s.
+    # Revisao agentica (ler repo) pode ser longa; o default sincrono uniforme e 1200s.
     'opencode'    = 1200
     'codex'       = 1200
-    'claude-code' = 300
-    'copilot'     = 300
-    'gemini'      = 300
-    'antigravity' = 300
+    'claude-code' = 1200
+    'copilot'     = 1200
+    'gemini'      = 1200
+    'antigravity' = 1200
 }
 $AdapterCdCapable = @{
     'opencode'    = $false # contrato: opencode nunca recebe -Cd
@@ -1101,9 +1101,8 @@ for ($i = 0; $i -lt $reviewers.Count; $i++) {
         $rec.publicReviewProfile = 'public-review'
     }
 
-    # TimeoutSec: so codex/opencode (defaults de adapter 180 < mapa 1200). Demais backends
-    # mantem o default do proprio adapter (300) — evita apertar teto por injecao universal.
-    if (-not $extraSplat.ContainsKey('TimeoutSec') -and $backend -in @('codex', 'opencode') -and
+    # TimeoutSec: default uniforme do painel e dos adapters sincronos (1200s), salvo override valido.
+    if (-not $extraSplat.ContainsKey('TimeoutSec') -and
         $AdapterDefaultTimeoutSec.ContainsKey($backend)) {
         $extraSplat['TimeoutSec'] = [int]$AdapterDefaultTimeoutSec[$backend]
     }

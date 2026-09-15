@@ -811,13 +811,13 @@ $($timeoutAst.Extent.Text)
 }
 "@
     $timeoutResult = & ([scriptblock]::Create($timeoutProbe))
-    Assert-True ([int]$timeoutResult.ClaudeDefault -eq 420000) "fallback dispatcher: claude-code sem timeoutSec deve esperar 300s+120s; got $($timeoutResult.ClaudeDefault)"
-    Assert-True ([int]$timeoutResult.InvalidClaude -eq 420000) "fallback dispatcher: claude-code com timeoutSec invalido deve cair no default 300s+120s; got $($timeoutResult.InvalidClaude)"
+    Assert-True ([int]$timeoutResult.ClaudeDefault -eq 1320000) "fallback dispatcher: claude-code sem timeoutSec deve esperar 1200s+120s; got $($timeoutResult.ClaudeDefault)"
+    Assert-True ([int]$timeoutResult.InvalidClaude -eq 1320000) "fallback dispatcher: claude-code com timeoutSec invalido deve cair no default 1200s+120s; got $($timeoutResult.InvalidClaude)"
     Assert-True ([int]$timeoutResult.OpenCodeDefault -eq 2520000) "fallback dispatcher: opencode sem timeoutSec deve esperar 2*1200s+120s; got $($timeoutResult.OpenCodeDefault)"
     Assert-True ([int]$timeoutResult.SmallExplicit -eq 180000) "fallback dispatcher: timeoutSec pequeno deve manter piso conservador de 180s; got $($timeoutResult.SmallExplicit)"
     Assert-True ($harnessText -match "Get-FallbackDispatcherTimeoutMs\s+-Backend") 'fallback dispatcher: chamada real deve informar o backend para escolher o default correto.'
     Assert-True ($harnessText -match "extraSplat\.ContainsKey\('TimeoutSec'\)") 'painel: TimeoutSec do AdapterDefaultTimeoutSec deve ser injetado no splat quando invokeArgs omite timeoutSec'
-    Assert-True ($harnessText -match "backend -in @\('codex', 'opencode'\)") 'painel: injecao TimeoutSec restrita a codex/opencode'
+    Assert-True ($harnessText -notmatch "backend -in @\('codex', 'opencode'\)") 'painel: injecao TimeoutSec nao deve ficar restrita a codex/opencode'
     Assert-True ($harnessText -match 'invokeArgs\.timeoutSec invalido') 'painel: timeoutSec invalido deve virar error local (GAP-2)'
     Assert-True ($harnessText -match 'recoveredAfterTimeout') 'painel: deve projetar recoveredAfterTimeout (GAP-3)'
     Assert-True ($harnessText -match "codexRetention -ne 'kb-sensitive'") 'painel: em kb-sensitive o pareamento por lastmsg e impossivel (adapter apaga no sucesso) — recoveredAfterTimeout deve ficar $null, nunca false silencioso'

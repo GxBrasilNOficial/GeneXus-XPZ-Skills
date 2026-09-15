@@ -39,7 +39,7 @@ param(
     [string] $Model = 'auto',
     [string] $Cd,
     [string] $CopilotExe,
-    [ValidateRange(1, 3600)] [int] $TimeoutSec = 300
+    [ValidateRange(1, 3600)] [int] $TimeoutSec = 1200
 )
 
 Set-StrictMode -Version Latest

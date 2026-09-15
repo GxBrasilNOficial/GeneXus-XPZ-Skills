@@ -33,7 +33,7 @@
 .PARAMETER AntigravityExe
     Forca caminho do executavel agy.exe.
 .PARAMETER TimeoutSec
-    Tempo maximo de espera em segundos. Default: 300.
+    Tempo maximo de espera em segundos. Default: 1200.
 #>
 [CmdletBinding(DefaultParameterSetName = 'Inline')]
 param(
@@ -48,7 +48,7 @@ param(
     [string] $ScratchPath,
     [ValidateSet('none', 'degraded', 'failed')] [string] $SimulateCleanupFailure = 'none',
     [string] $AntigravityExe,
-    [ValidateRange(1, 3600)] [int] $TimeoutSec = 300
+    [ValidateRange(1, 3600)] [int] $TimeoutSec = 1200
 )
 
 Set-StrictMode -Version Latest

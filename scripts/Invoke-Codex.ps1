@@ -47,7 +47,7 @@
 .PARAMETER CodexExe
     Forca um caminho de codex.exe (contorna a descoberta automatica).
 .PARAMETER TimeoutSec
-    Tempo maximo de espera pela resposta (default 180s). Modelos externos podem ser lentos.
+    Tempo maximo de espera pela resposta (default 1200s). Modelos externos podem ser lentos.
 .PARAMETER TempDir
     Pasta dos arquivos de job. Sem default no param(); o default efetivo vive em
     Resolve-CodexJobTempDir (Bound nao-branco -> env XPZ_CODEX_JOBS_DIR -> %TEMP%\codex-jobs),
@@ -76,7 +76,7 @@ param(
     [string] $Profile,
     [string] $Cd,
     [string] $CodexExe,
-    [ValidateRange(1, 3600)] [int] $TimeoutSec = 180,
+    [ValidateRange(1, 3600)] [int] $TimeoutSec = 1200,
     [string] $TempDir,
     [ValidateRange(1, 3650)] [int] $KeepDays = 3,
     [ValidateSet('public', 'kb-sensitive')] [string] $RetentionMode = 'public'
