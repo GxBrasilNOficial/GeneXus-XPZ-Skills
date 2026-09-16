@@ -42,7 +42,7 @@ Assert-True ($null -ne $authErr) "Reconhece erro de autenticacao no stderr"
 $semRuido = Get-AntigravityErrorMessage -StdoutText "Loaded cached credentials" -StderrText ""
 Assert-True ($null -eq $semRuido) "NAO trata 'Loaded cached credentials' (linha informativa de execucao normal) como erro"
 
-# 3. Quota failure pattern (support — mais estrito que o dispatcher; nao afirmar paridade)
+# 3. Quota failure pattern (support — diferente do dispatcher por eixo; nao afirmar paridade/ordem total)
 Assert-True ("quota exceeded" -match $quotaFailurePattern) "Regex de cota reconhece 'quota exceeded'"
 Assert-True ("Individual Quota Reached" -match $quotaFailurePattern) "Regex de cota reconhece caixa mista 'Individual Quota Reached'"
 Assert-True ("429 Too Many Requests" -match $quotaFailurePattern) "Regex de cota reconhece 429 / Too Many Requests"

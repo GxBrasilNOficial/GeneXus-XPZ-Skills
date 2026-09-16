@@ -10,7 +10,7 @@ O adapter `public-review` deixava de tipar limite de uso: evidência real (`Indi
 
 O que foi feito:
 
-1. **`AntigravityCliSupport.ps1`:** `Resolve-AntigravityPublicReviewFailureReason` classifica sobre raw `stderr+stdout` (auth vence cota; `ErrorField` genérico não esconde auth no raw); Detail em janela ≤400; `$quotaFailurePattern` mais estrito que o do dispatcher de propósito (`\bquota\b`, `\b402\b`/`\b429\b`); `$DispatcherQuotaProbePattern` (cópia literal) só sanitiza Detail de auth.
+1. **`AntigravityCliSupport.ps1`:** `Resolve-AntigravityPublicReviewFailureReason` classifica sobre raw `stderr+stdout` (auth vence cota; `ErrorField` genérico não esconde auth no raw); Detail em janela ≤400; `$quotaFailurePattern` propositalmente diferente do dispatcher — mais estrito em `\bquota\b`/`\b402\b`/`\b429\b` e sem `exhausted` solto, mais permissivo em `rate\s*limit`/`too\s*many\s*requests` (sem ordem total nem paridade); `$DispatcherQuotaProbePattern` (cópia literal) só sanitiza Detail de auth.
 2. **`Invoke-Antigravity.ps1`:** ramos de falha usam Resolve; em timeout mata descendentes antes do runner para preservar residual e pode promover `quota`/`unauthenticated`.
 3. **Painel:** quando state e recibo alinham em `quota`, `reason` fica limpo (sem `adapterReason=processFailure`).
 4. **Docs/self-tests:** `SKILL`, `09`, `999` (Gemini/Copilot pendentes; não fecha `857`), `CHANGELOG` trilíngue; suites support, public-review e panel dispatch verdes.

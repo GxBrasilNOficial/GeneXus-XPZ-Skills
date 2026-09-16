@@ -9,10 +9,12 @@
     --print-timeout, --model) nao entram neste probe: a prova delas e via fake-exe nos self-tests
     do Invoke-Antigravity.
 
-    O $quotaFailurePattern do support e propositalmente mais estrito que o do dispatcher
-    (quota com \b; 402/429 com \b). Nao afirmar paridade de regex entre os dois. O probe
-    $DispatcherQuotaProbePattern e copia literal do dispatcher e serve SO para sanitizar Detail
-    de auth — nunca para classificar cota no adapter.
+    O $quotaFailurePattern do support e propositalmente diferente do dispatcher — nao ha ordem
+    total: mais estrito em \bquota\b / \b402\b / \b429\b e sem exhausted solto; mais permissivo
+    em rate\s*limit / too\s*many\s*requests (casa variantes que o literal do dispatcher nao
+    casa). Nao afirmar paridade de regex. O probe $DispatcherQuotaProbePattern e copia literal
+    do dispatcher e serve SO para sanitizar Detail de auth — nunca para classificar cota no
+    adapter.
 #>
 
 Set-StrictMode -Version Latest
