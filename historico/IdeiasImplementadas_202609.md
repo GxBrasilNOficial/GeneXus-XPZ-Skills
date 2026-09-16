@@ -2,6 +2,24 @@
 
 Registro de ideias que sairam de 999-ideias-pendentes.md por terem sido implementadas ou incorporadas ao contrato metodologico vigente.
 
+## Deteccao tipada de cota/auth no Antigravity `public-review`
+
+Implementado em 2026-09-16 conforme o plano congelado v9 (`Temp/plano-antigravity-deteccao-limite-uso-v9.md`), fatia Antigravity de «Estender a detecção de limite de uso/taxa do provider aos adapters de delegação irmãos» no `999`.
+
+O adapter `public-review` deixava de tipar limite de uso: evidência real (`Individual quota reached`, exit 1) virava `Reason=processFailure` no recibo enquanto o painel já classificava `state=quota` pelo BLOCK — composição `quota; adapterReason=processFailure`.
+
+O que foi feito:
+
+1. **`AntigravityCliSupport.ps1`:** `Resolve-AntigravityPublicReviewFailureReason` classifica sobre raw `stderr+stdout` (auth vence cota; `ErrorField` genérico não esconde auth no raw); Detail em janela ≤400; `$quotaFailurePattern` mais estrito que o do dispatcher de propósito (`\bquota\b`, `\b402\b`/`\b429\b`); `$DispatcherQuotaProbePattern` (cópia literal) só sanitiza Detail de auth.
+2. **`Invoke-Antigravity.ps1`:** ramos de falha usam Resolve; em timeout mata descendentes antes do runner para preservar residual e pode promover `quota`/`unauthenticated`.
+3. **Painel:** quando state e recibo alinham em `quota`, `reason` fica limpo (sem `adapterReason=processFailure`).
+4. **Docs/self-tests:** `SKILL`, `09`, `999` (Gemini/Copilot pendentes; não fecha `857`), `CHANGELOG` trilíngue; suites support, public-review e panel dispatch verdes.
+
+### Rastreabilidade
+
+- Commit material: `114aa99` (`feat(antigravity): classificar cota e auth tipados no public-review`)
+- Arquivos materiais: `scripts/AntigravityCliSupport.ps1`, `scripts/Invoke-Antigravity.ps1`, `scripts/Invoke-LlmDelegatePanelDispatch.ps1`, `scripts/Test-AntigravityCliSupportSelfTest.ps1`, `scripts/Test-AntigravityPublicReviewSelfTest.ps1`, `scripts/Test-InvokeLlmDelegatePanelDispatchSelfTest.ps1`, `xpz-llm-delegate/SKILL.md`, `09-inventario-e-rastreabilidade-publica.md`, `CHANGELOG.md`, `999-ideias-pendentes.md`.
+
 ## Preservar mais evidencia quando o `claude` sai `1` sem saida classificavel
 
 Implementado em 2026-09-01 a partir do manuscrito `Temp/manuscript-claude-evidence-preservation-v3.md`.
