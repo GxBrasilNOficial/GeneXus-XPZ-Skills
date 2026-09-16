@@ -264,6 +264,7 @@ exit $LASTEXITCODE
 
     $proc = [System.Diagnostics.Process]::Start($psi)
     $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSec)
+    $timedOut = $false
     while (-not $proc.HasExited) {
         try {
             foreach ($id in @(Get-DescendantProcessIds -RootProcessId $proc.Id)) { [void]$observedDescendantIds.Add([int]$id) }
@@ -271,36 +272,96 @@ exit $LASTEXITCODE
             $descendantEnumerationFailed = $true
         }
         if ([DateTime]::UtcNow -ge $deadline) {
-            try { $proc.Kill($true) } catch { }
-            throw (New-PublicReviewException -Reason 'timeout' -Detail "limite de $($TimeoutSec)s atingido; arvore do processo foi encerrada")
+            $timedOut = $true
+            # Matar descendentes (agy) primeiro e deixar o runner flushar 1>/2> nos
+            # arquivos temporarios; so entao Kill do runner se ainda vivo.
+            try {
+                foreach ($id in @(Get-DescendantProcessIds -RootProcessId $proc.Id)) {
+                    try { Stop-Process -Id $id -Force -ErrorAction Stop } catch { }
+                }
+            } catch { }
+            try { [void]$proc.WaitForExit(10000) } catch { }
+            if (-not $proc.HasExited) {
+                try { $proc.Kill($true) } catch { }
+                try { [void]$proc.WaitForExit(10000) } catch { }
+            }
+            Start-Sleep -Milliseconds 200
+            break
         }
         Start-Sleep -Milliseconds 100
     }
-    $proc.WaitForExit()
+    if (-not $timedOut) { $proc.WaitForExit() }
 
     $stdoutText = Get-Content -LiteralPath $out.FullName -Raw -ErrorAction SilentlyContinue
     $stderrText = Get-Content -LiteralPath $err.FullName -Raw -ErrorAction SilentlyContinue
+    $raw = Get-AntigravityClassificationRaw -StdoutText $stdoutText -StderrText $stderrText
+
+    if ($timedOut) {
+        $resolved = Resolve-AntigravityPublicReviewFailureReason -Raw $raw
+        if ($null -ne $resolved) {
+            throw (New-PublicReviewException -Reason $resolved.Reason -Detail $resolved.Detail)
+        }
+        throw (New-PublicReviewException -Reason 'timeout' -Detail "limite de $($TimeoutSec)s atingido; arvore do processo foi encerrada")
+    }
+
     if ($proc.ExitCode -ne 0) {
+        $errorField = $null
+        if (-not [string]::IsNullOrWhiteSpace($stdoutText)) {
+            try {
+                $errJson = $stdoutText | ConvertFrom-Json
+                if ($errJson.PSObject.Properties['error']) {
+                    $errorField = Normalize-AntigravityErrorField -ErrorField $errJson.error
+                }
+            } catch { }
+        }
+        $resolved = if ($null -ne $errorField) {
+            Resolve-AntigravityPublicReviewFailureReason -Raw $raw -ErrorField $errorField
+        } else {
+            Resolve-AntigravityPublicReviewFailureReason -Raw $raw
+        }
+        if ($null -ne $resolved) {
+            throw (New-PublicReviewException -Reason $resolved.Reason -Detail $resolved.Detail)
+        }
         $errMsg = Get-AntigravityErrorMessage -StdoutText $stdoutText -StderrText $stderrText
         if ([string]::IsNullOrWhiteSpace($errMsg)) { $errMsg = "processo finalizado com codigo $($proc.ExitCode)" }
-        $reason = if (Test-AntigravityAuthenticationFailure -Text $errMsg) { 'unauthenticated' } else { 'processFailure' }
-        throw (New-PublicReviewException -Reason $reason -Detail $errMsg)
+        throw (New-PublicReviewException -Reason 'processFailure' -Detail $errMsg)
     }
     if ([string]::IsNullOrWhiteSpace($stdoutText)) {
+        $resolved = Resolve-AntigravityPublicReviewFailureReason -Raw $raw
+        if ($null -ne $resolved) {
+            throw (New-PublicReviewException -Reason $resolved.Reason -Detail $resolved.Detail)
+        }
         throw (New-PublicReviewException -Reason 'invalidOutput' -Detail 'CLI retornou stdout vazio')
     }
 
     try { $jsonResp = $stdoutText | ConvertFrom-Json } catch {
-        $knownError = Get-AntigravityErrorMessage -StdoutText $stdoutText -StderrText $stderrText
-        $reason = if (Test-AntigravityAuthenticationFailure -Text $knownError) { 'unauthenticated' } else { 'invalidOutput' }
-        throw (New-PublicReviewException -Reason $reason -Detail 'CLI nao retornou o envelope JSON exigido')
+        $resolved = Resolve-AntigravityPublicReviewFailureReason -Raw $raw
+        if ($null -ne $resolved) {
+            throw (New-PublicReviewException -Reason $resolved.Reason -Detail $resolved.Detail)
+        }
+        throw (New-PublicReviewException -Reason 'invalidOutput' -Detail 'CLI nao retornou o envelope JSON exigido')
     }
     $respStatus = [string]$jsonResp.status
     $responseText = [string]$jsonResp.response
     if ($respStatus -ne 'SUCCESS') {
-        $reportedError = if ($jsonResp.PSObject.Properties['error']) { [string]$jsonResp.error } else { '' }
-        $reason = if (Test-AntigravityAuthenticationFailure -Text $reportedError) { 'unauthenticated' } else { 'processFailure' }
-        throw (New-PublicReviewException -Reason $reason -Detail "status '$respStatus': $reportedError")
+        $reportedError = $null
+        if ($jsonResp.PSObject.Properties['error']) {
+            $reportedError = Normalize-AntigravityErrorField -ErrorField $jsonResp.error
+        }
+        $resolved = if ($null -ne $reportedError) {
+            Resolve-AntigravityPublicReviewFailureReason -Raw $raw -ErrorField $reportedError
+        } else {
+            Resolve-AntigravityPublicReviewFailureReason -Raw $raw
+        }
+        if ($null -ne $resolved) {
+            throw (New-PublicReviewException -Reason $resolved.Reason -Detail $resolved.Detail)
+        }
+        $detail = if (-not [string]::IsNullOrWhiteSpace($reportedError)) {
+            "status '$respStatus': $reportedError"
+        } else {
+            "status '$respStatus'"
+        }
+        throw (New-PublicReviewException -Reason 'processFailure' -Detail $detail)
     }
     if ([string]::IsNullOrWhiteSpace($responseText)) {
         throw (New-PublicReviewException -Reason 'invalidOutput' -Detail 'envelope SUCCESS sem response utilizavel')

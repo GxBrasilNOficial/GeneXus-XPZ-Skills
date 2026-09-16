@@ -247,6 +247,12 @@ if ($args -contains '--help') {
     exit 0
 }
 $args -join ' ' | Add-Content -LiteralPath (Join-Path $PSScriptRoot 'antigravity.calls.log') -Encoding utf8
+$joined = $args -join ' '
+if ($joined -match 'FORCE_AGY_QUOTA') {
+    # Write-Output (stdout): `2>` do runner PowerShell nao captura [Console]::Error do .ps1 direto.
+    Write-Output 'Individual quota reached for forced panel self-test'
+    exit 1
+}
 $c = 'AGY cwd=' + (Get-Location).Path.Replace('\', '/') + ' model=' + $model + ' revisao'
 (@{ status = 'SUCCESS'; response = $c } | ConvertTo-Json -Compress)
 exit 0
@@ -1032,6 +1038,18 @@ $($timeoutAst.Extent.Text)
     Assert-True ($rvAgSensitive.gateVerdict -eq 'allow') 'antigravity kb-sensitive: gate deve continuar dono da confidencialidade e rodar antes da recusa do perfil'
     Assert-True ($rvAgSensitive.state -eq 'unavailable' -and $rvAgSensitive.reason -eq 'refusedSensitivity') 'antigravity kb-sensitive usa unavailable + refusedSensitivity'
     Assert-True (-not $rvAgSensitive.dispatchAttempted -and $agyCallsAfter -eq $agyCallsBefore) 'gate de perfil bloqueia kb-sensitive antes do adapter'
+
+    # Adapter tipado Reason=quota + dispatcher state=quota => reason limpo (sem adapterReason=processFailure).
+    # ManuscriptText sem espacos: Start-Process -ArgumentList do harness fragmenta valores com espaco.
+    $r = Invoke-Harness -Reviewers @(@{
+        backend = 'antigravity'; targetModelKey = 'antigravity/gemini-3.6-flash-high'
+        invokeArgs = @{ model = 'gemini-3.6-flash-high' }
+    }) -Sensitivity 'public' -UseManuscriptText -ManuscriptText 'FORCE_AGY_QUOTA'
+    Assert-True ($null -ne $r.json -and @($r.json.reviewers).Count -ge 1) 'antigravity cota tipada: summary com revisor esperado'
+    $rvAgQuota = Get-Reviewer $r.json 0
+    Assert-True ($rvAgQuota.state -eq 'quota') "antigravity cota tipada: esperado state=quota; got $($rvAgQuota.state)"
+    Assert-True ([string]$rvAgQuota.reason -eq 'quota') "antigravity cota tipada: reason limpo 'quota'; got '$($rvAgQuota.reason)'"
+    Assert-True ([int]$r.json.quotaCount -ge 1) 'antigravity cota tipada: quotaCount >= 1'
 
     $r = Invoke-Harness -Reviewers @(@{
             backend = 'claude-code'

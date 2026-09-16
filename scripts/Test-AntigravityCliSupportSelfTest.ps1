@@ -42,18 +42,46 @@ Assert-True ($null -ne $authErr) "Reconhece erro de autenticacao no stderr"
 $semRuido = Get-AntigravityErrorMessage -StdoutText "Loaded cached credentials" -StderrText ""
 Assert-True ($null -eq $semRuido) "NAO trata 'Loaded cached credentials' (linha informativa de execucao normal) como erro"
 
-# 3. Quota failure pattern
+# 3. Quota failure pattern (support — mais estrito que o dispatcher; nao afirmar paridade)
 Assert-True ("quota exceeded" -match $quotaFailurePattern) "Regex de cota reconhece 'quota exceeded'"
+Assert-True ("Individual Quota Reached" -match $quotaFailurePattern) "Regex de cota reconhece caixa mista 'Individual Quota Reached'"
 Assert-True ("429 Too Many Requests" -match $quotaFailurePattern) "Regex de cota reconhece 429 / Too Many Requests"
+Assert-True ("Payment Required" -match $quotaFailurePattern) "Regex de cota reconhece Payment Required"
+Assert-True ("insufficient coding plan balance" -match $quotaFailurePattern) "Regex de cota reconhece insufficient coding plan balance"
+Assert-True ("weekly usage limit" -match $quotaFailurePattern) "Regex de cota reconhece weekly usage limit"
+Assert-True ("limite de uso" -match $quotaFailurePattern) "Regex de cota reconhece limite de uso"
+Assert-True ("sem quota" -match $quotaFailurePattern) "Regex de cota reconhece sem quota"
+Assert-True ("saldo insuficiente" -match $quotaFailurePattern) "Regex de cota reconhece saldo insuficiente"
+Assert-True ("HTTP 402" -match $quotaFailurePattern) "Regex de cota reconhece 402 com word-boundary"
 Assert-True ("resource_exhausted" -match $quotaFailurePattern) "Regex de cota reconhece resource_exhausted"
 Assert-True ("credits exhausted for this billing cycle" -match $quotaFailurePattern) "Regex de cota reconhece 'credits exhausted'"
 
-# Casos NEGATIVOS: `exhausted` solto classificava erro generico de rede/contexto como cota. Paridade
-# com o mesmo defeito ja corrigido no $quotaFailurePattern do dispatcher (2026-08-06). Reportar cota
-# onde nao ha manda o operador esperar reset de ciclo por falha que nao e de cota.
+# Casos NEGATIVOS: `exhausted` solto e falsos positivos de fronteira numerica/palavra.
 Assert-True (-not ("retries exhausted after 3 attempts" -match $quotaFailurePattern)) "NAO trata 'retries exhausted' (rede) como cota"
 Assert-True (-not ("connection pool exhausted" -match $quotaFailurePattern)) "NAO trata 'connection pool exhausted' como cota"
 Assert-True (-not ("context window exhausted" -match $quotaFailurePattern)) "NAO trata 'context window exhausted' como cota"
+Assert-True (-not ("quotation marks" -match $quotaFailurePattern)) "NAO trata 'quotation' como cota"
+Assert-True (-not ("error 14029" -match $quotaFailurePattern)) "NAO trata 14029 como 429"
+Assert-True (-not ("error 1402" -match $quotaFailurePattern)) "NAO trata 1402 como 402"
+Assert-True (-not ("error 4020" -match $quotaFailurePattern)) "NAO trata 4020 como 402"
+
+# Paridade de string do probe (copia literal do dispatcher) — NAO usar para classificar cota.
+$dispatcherLiteral = '(?i)(^|[^0-9])(402|429)([^0-9]|$)|Payment Required|insufficient coding plan balance|quota|rate limit|resource_exhausted|(?:credits?|balance|saldo)\s+exhausted|too many requests|weekly usage limit|limite de uso|sem quota|saldo insuficiente'
+Assert-True ($DispatcherQuotaProbePattern -ceq $dispatcherLiteral) "DispatcherQuotaProbePattern e copia literal do dispatcher"
+
+# Resolve tipado: auth vence cota; Detail de quota vem do raw; extrator nao e o corpo.
+$q1 = Resolve-AntigravityPublicReviewFailureReason -Raw "prefix`nIndividual quota reached for model X`nsuffix"
+Assert-True ($q1.Reason -eq 'quota' -and $q1.Detail -match 'quota' -and $q1.Detail.Length -le 400) "Resolve classifica Individual quota reached como quota com Detail curto"
+$authWins = Resolve-AntigravityPublicReviewFailureReason -Raw "quota exceeded and also unauthorized token" -ErrorField "Error authenticating: unauthorized"
+Assert-True ($authWins.Reason -eq 'unauthenticated') "Resolve: auth no ErrorField vence cota no raw"
+Assert-True ($authWins.Detail -notmatch $DispatcherQuotaProbePattern) "Detail de auth sanitizado nao casa probe do dispatcher"
+$authFromRaw = Resolve-AntigravityPublicReviewFailureReason -Raw "Opening authentication page in your browser" -ErrorField "generic failure"
+Assert-True ($authFromRaw.Reason -eq 'unauthenticated') "ErrorField generico nao esconde auth no raw"
+$objErr = Normalize-AntigravityErrorField -ErrorField ([pscustomobject]@{ message = 'Opening authentication page' })
+Assert-True ($objErr -eq 'Opening authentication page') "Normalize-AntigravityErrorField le .message de objeto"
+$retries = Resolve-AntigravityPublicReviewFailureReason -Raw "retries exhausted after 3 attempts"
+Assert-True ($null -eq $retries) "Resolve NAO classifica retries exhausted como quota"
+
 
 # 4. Resolve-AntigravityExe — sonda opcional do binario real (maquina sem agy NAO falha a suite;
 #    a prova fail-closed do contrato e dos adapters esta nos casos 5-7 com fake-exe).

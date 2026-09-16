@@ -1396,13 +1396,12 @@ foreach ($res in $collected) {
         $receiptReason = [string](Get-Prop $receipt 'Reason')
         if (-not [string]::IsNullOrWhiteSpace($receiptReason)) {
             # PRECEDENCIA: a classificacao de estado por sentinela especifica (cota/timeout)
-            # vence a reason do recibo. O adapter nao conhece cota — um `agy` que sai por
-            # limite de uso vira `processFailure` no recibo enquanto o dispatcher ja
-            # classificou `quota` pelo texto. Sobrescrever cru produzia o par contraditorio
-            # `state=quota` + `reason=processFailure`, apagando do campo lido pelo operador
-            # a unica evidencia de cota (e o recibo humano de `quota` tem tratamento proprio,
-            # alem de a fallbackChain ativar nesse estado). Compor preserva as duas leituras
-            # em vez de o dispatcher escolher qual verdade descartar.
+            # vence a reason generica do recibo quando divergem. Com o adapter Antigravity
+            # public-review classificando cota tipada (Reason=quota), state e reason alinham e
+            # o campo fica limpo (`quota`). Quando ainda diverge (ex.: residual de timeout do
+            # adapter vs state=quota do dispatcher pelo texto do BLOCK — dispatcher mais
+            # permissivo, `quota` sem \b), a composicao `quota; adapterReason=...` preserva
+            # as duas leituras em vez de o dispatcher escolher qual verdade descartar.
             if ($res.state -in @('quota', 'timeout') -and $receiptReason -ne [string]$res.state) {
                 $rec.reason = ('{0}; adapterReason={1}' -f $res.state, $receiptReason)
             } else {

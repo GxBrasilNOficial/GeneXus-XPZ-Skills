@@ -66,9 +66,35 @@ $log | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $PSScriptRo
 switch ($prompt) {
     'AUTH0' { 'Opening authentication page in your browser'; exit 0 }
     'AUTH1' { [Console]::Error.WriteLine('Error authenticating: unauthorized'); exit 7 }
+    'AUTH_QUOTA' {
+        [Console]::Error.WriteLine('Error authenticating: unauthorized while Individual quota reached nearby')
+        exit 1
+    }
+    'QUOTA429' {
+        [Console]::Error.WriteLine('Individual quota reached for antigravity model gemini-3.6-flash-high')
+        exit 1
+    }
+    'RETRIES' {
+        [Console]::Error.WriteLine('retries exhausted after 3 attempts')
+        exit 1
+    }
+    'ERR_OBJ_QUOTA' {
+        @{ status='ERROR'; response=''; error=@{ message='HTTP 429: rate limit exceeded' } } | ConvertTo-Json -Compress -Depth 5
+        exit 0
+    }
     'BADJSON' { 'not-json'; exit 0 }
     'STATUSERROR' { @{ status='ERROR'; response=''; error='backend failed' } | ConvertTo-Json -Compress; exit 0 }
     'TIMEOUT' { Start-Sleep -Seconds 3; @{ status='SUCCESS'; response='late' } | ConvertTo-Json -Compress; exit 0 }
+    'TIMEOUT_QUOTA' {
+        # Escrever e flushar ANTES do sleep: o Kill do timeout pode cortar buffers nao sincronizados.
+        [Console]::Error.WriteLine('Individual quota reached before timeout residual')
+        [Console]::Error.Flush()
+        [Console]::Out.WriteLine('Individual quota reached before timeout residual')
+        [Console]::Out.Flush()
+        Start-Sleep -Milliseconds 400
+        Start-Sleep -Seconds 30
+        exit 0
+    }
     'CHILD' {
         $child = Start-Process pwsh -ArgumentList @('-NoProfile','-Command','Start-Sleep -Seconds 30') -PassThru
         Set-Content -LiteralPath (Join-Path $PSScriptRoot 'child.pid') -Value $child.Id -Encoding ascii
@@ -128,12 +154,25 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File "%~dp0fake-agy.ps1" %*
     Assert-True ($auth0.error -match 'reason=unauthenticated') 'autenticacao interativa com exit 0 usa unauthenticated'
     $auth1 = Invoke-CapturedPublicReview -Prompt 'AUTH1' -ReceiptPath (Join-Path $tempRoot 'auth1.json') -FakeExe $fakeCmd
     Assert-True ($auth1.error -match 'reason=unauthenticated') 'falha de autenticacao com exit diferente de zero usa unauthenticated'
+    $authQuota = Invoke-CapturedPublicReview -Prompt 'AUTH_QUOTA' -ReceiptPath (Join-Path $tempRoot 'auth-quota.json') -FakeExe $fakeCmd
+    Assert-True ($authQuota.error -match 'reason=unauthenticated') 'auth+cota no raw resolve para unauthenticated'
+    Assert-True ($authQuota.error -notmatch '(?i)(^|[^0-9])(402|429)([^0-9]|$)|Payment Required|insufficient coding plan balance|quota|rate limit|resource_exhausted|(?:credits?|balance|saldo)\s+exhausted|too many requests|weekly usage limit|limite de uso|sem quota|saldo insuficiente') 'Detail de auth+cota nao realimenta probe do dispatcher'
+    $quota429 = Invoke-CapturedPublicReview -Prompt 'QUOTA429' -ReceiptPath (Join-Path $tempRoot 'quota429.json') -FakeExe $fakeCmd
+    Assert-True ($quota429.error -match 'reason=quota') '429/Individual quota reached vira reason=quota'
+    Assert-True ($quota429.error -match 'quota' -and $quota429.error.Length -le 500) 'Detail de quota preserva evidencia e permanece curto'
+    Assert-True ($quota429.receipt.Reason -eq 'quota') 'recibo tipado grava Reason=quota'
+    $retries = Invoke-CapturedPublicReview -Prompt 'RETRIES' -ReceiptPath (Join-Path $tempRoot 'retries.json') -FakeExe $fakeCmd
+    Assert-True ($retries.error -match 'reason=processFailure' -and $retries.error -notmatch 'reason=quota') 'retries exhausted NAO vira quota'
+    $errObj = Invoke-CapturedPublicReview -Prompt 'ERR_OBJ_QUOTA' -ReceiptPath (Join-Path $tempRoot 'err-obj.json') -FakeExe $fakeCmd
+    Assert-True ($errObj.error -match 'reason=quota') '.error objeto com rate limit vira quota'
     $bad = Invoke-CapturedPublicReview -Prompt 'BADJSON' -ReceiptPath (Join-Path $tempRoot 'bad.json') -FakeExe $fakeCmd
     Assert-True ($bad.error -match 'reason=invalidOutput') 'JSON invalido usa invalidOutput'
     $statusError = Invoke-CapturedPublicReview -Prompt 'STATUSERROR' -ReceiptPath (Join-Path $tempRoot 'status.json') -FakeExe $fakeCmd
     Assert-True ($statusError.error -match 'reason=processFailure') 'status ERROR usa processFailure'
     $timeout = Invoke-CapturedPublicReview -Prompt 'TIMEOUT' -ReceiptPath (Join-Path $tempRoot 'timeout.json') -FakeExe $fakeCmd -Extra @{ TimeoutSec=1 }
-    Assert-True ($timeout.error -match 'reason=timeout') 'timeout usa reason timeout'
+    Assert-True ($timeout.error -match 'reason=timeout' -and $timeout.error -match 'limite de 1s') 'timeout sem cota preserva Detail de timeout'
+    $timeoutQuota = Invoke-CapturedPublicReview -Prompt 'TIMEOUT_QUOTA' -ReceiptPath (Join-Path $tempRoot 'timeout-quota.json') -FakeExe $fakeCmd -Extra @{ TimeoutSec=2 }
+    Assert-True ($timeoutQuota.error -match 'reason=quota') 'timeout com residual de cota promove quota'
     $cdOverride = Invoke-CapturedPublicReview -Prompt 'X' -ReceiptPath (Join-Path $tempRoot 'cd.json') -FakeExe $fakeCmd -Extra @{ Cd=$tempRoot }
     Assert-True ($cdOverride.error -match 'reason=unsafeWorkspace') 'override de Cd e recusado'
 
