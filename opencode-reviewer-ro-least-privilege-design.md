@@ -1,12 +1,19 @@
 # Least-privilege do revisor opencode — "sem execução/escrita" (design congelado, escopo D-min)
 
+> **Registro de freeze (não doc operacional vivo).** Pins de versão neste arquivo (ex.: opencode
+> `1.17.20`) são da época da implementação/freeze — não se promovem a cada bump do CLI.
+> **Versão viva dos fixtures** = [`xpz-llm-delegate/fixtures/opencode-reviewer-ro/VERSION.txt`](xpz-llm-delegate/fixtures/opencode-reviewer-ro/VERSION.txt).
+> Drift entre este design e `VERSION.txt` **não** é gap de pré-push; a classe imutável está no
+> `999-ideias-pendentes.md` (junto de `CHANGELOG` e `historico/`).
+
 ## Papel do documento
 
 Design **congelado** da frente de segurança das entradas #1+#2 do `999-ideias-pendentes.md`
 (least-privilege do revisor opencode). Congelado por revisão por pares: **8 rodadas**, **4 famílias**
 (anthropic, openai, ollama-cloud, nvidia), arquitetura **nunca reaberta**; encerramento por freeze
 (`resubmissionDeclinedByHuman`, motivo "prova transferida para implementação e self-test"). Este
-documento é a fonte-verdade da implementação; a prova dos claims empíricos vive nos self-tests.
+documento é a fonte-verdade **do design** (decisões D-min); a prova empírica viva vive nos fixtures
+(`VERSION.txt`) e nos self-tests — não neste arquivo.
 
 ## Problema
 

@@ -161,9 +161,10 @@ exit /b %errorlevel%
 
     # ── (d-behavioral) fixture golden da captura real "leitura fora do cwd bloqueada" (design D4) ──
     # O self-test deterministico nao re-executa o modelo; aqui so verifica que a captura documenta o
-    # desfecho (sem-leak) e nao contem sentinela literal. A asserção mecanica CI e o caso (d) acima.
+    # desfecho (sem-leak) e usa o placeholder sanitizado `<SENTINELA>` (o token real da sonda nao
+    # entra no repo). A assercao mecanica CI e o caso (d) acima.
     $roText = Get-Content -LiteralPath $readOutsideFixture -Raw -Encoding utf8
-    Assert-True (($roText -match 'SEM LEAK') -and ($roText -match 'external_directory') -and (-not ($roText -match 'ZQX789'))) "(d-behavioral) fixture documenta leitura-fora-do-cwd bloqueada (sem-leak, sem sentinela literal)"
+    Assert-True (($roText -match 'SEM LEAK') -and ($roText -match 'external_directory') -and ($roText -match '<SENTINELA>')) "(d-behavioral) fixture documenta leitura-fora-do-cwd bloqueada (sem-leak, sentinela sanitizada)"
 
     # ── (b-versao) versao instalada != testada => BLOCK version ──
     $env:FAKE_OC_AGENTLIST = $sampleAgentList
