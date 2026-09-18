@@ -40,7 +40,7 @@
 
 ## Fase 2b — classificação de regime (`Compare-XpzChecksums.ps1` + roteamento)
 
-- F1: SAME `<n>` · DIFF `<n>` · NEW `<n>` · DELETED `<n>`
+- F1: SAME `<n>` · DIFF `<n>` · NEW `<n>` · DELETED `<n>` · NO_CHECKSUM `<n>`
 - regimes encontrados (não-SAME): `<aditivo data-bearing / aditivo computado / delete / rename / troca de tipo-chave / alto volume / lógica de negócio>`
 - itens `suspeito-por-omissão` (triagem, não veredito): `<lista>`
 - itens roteados ao build (`xpz-msbuild-build` / `FailIfReorg`): `<lista>`
@@ -49,7 +49,7 @@
 
 - objetos elegíveis (não-SAME com Source relevante): `<n>`  ·  lidos: `<n>`  ·  cobertura: `<total | parcial | N/A | indisponível — F1 unknown>`
 - não lidos (cobertura parcial — listar nominalmente): `<lista ou n/a>`
-- classificação por objeto: `<aditivo | reescreveu ramo | ruído/lastUpdate | NEW-contrato | DELETED-N/A | regime-2b-N/A | estrutural-visual (GxMultiForm/layout)>`
+- classificação por objeto: `<aditivo | reescreveu ramo | ruído/lastUpdate | NEW-contrato | DELETED-N/A | NO_CHECKSUM — inspecionar artefato | regime-2b-N/A | estrutural-visual (GxMultiForm/layout)>`
 - suspeitas: `<lista ou nenhuma>`  ·  padrões suprimidos pelo catálogo da KB: `<lista>`
 - **triagem:** `<nada óbvio | suspeitas | precisa teste manual/caso real | N/A>`
 

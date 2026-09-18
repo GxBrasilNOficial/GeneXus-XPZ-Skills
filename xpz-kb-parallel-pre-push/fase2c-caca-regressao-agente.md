@@ -8,7 +8,7 @@ Distinta da pré-push do repositório de skills ([`13-revisao-pre-push.md`](../1
 
 ## Entrada: saída da Fase 2b
 
-Candidatos = entradas do JSON de `Compare-XpzChecksums.ps1` com status ≠ `SAME` (e, quando F1 = `unknown`/exit 3, a seção 2c do relatório fica `indisponível — F1 unknown`, sem inventar triagem).
+Candidatos = entradas do JSON de `Compare-XpzChecksums.ps1` com status ≠ `SAME` — inclui `DIFF`, `NEW`, `DELETED` e `NO_CHECKSUM` (e, quando F1 = `unknown`/exit 3, a seção 2c do relatório fica `indisponível — F1 unknown`, sem inventar triagem).
 
 Para cada candidato, **herdar** o regime/roteamento da 2b:
 
@@ -36,6 +36,7 @@ Expansão a SDT / WorkWith estrutural fora de Source **não** faz parte desta fa
 | `DIFF` com Source | Checklist: aditivo vs reescreveu ramo vs ruído/lastUpdate (ou estrutural-visual) |
 | `NEW` com Source | Sem “ramo antigo”; foco em contrato (`parm`, `Chamador`), ramos iniciais, padrões baratos |
 | `DELETED` | Em geral **N/A** para Source do removido; registrar remoção; seguir nota 2b (delete) + build |
+| `NO_CHECKSUM` | Checksum ausente nos **dois** lados — **não** aplicar checklist de código como se fosse `DIFF`. Registrar no relatório; triagem = inspecionar por que não há checksum (tipo/artefato/export). Token: `NO_CHECKSUM — inspecionar artefato`. **Não** concluir “nada óbvio” só porque não houve diff de Source legível via F1 |
 | `SAME` | Fora do filtro de leitura 2c. **Não** concluir ausência de impacto na cabeça associada — nuance em [`fase2a-estrutural.md`](fase2a-estrutural.md) / 2b |
 
 ## Insumo mecânico (sem script novo)
@@ -55,7 +56,7 @@ Antes de rotular **suspeita**: consultar o **catálogo de padrões aceitos por-K
 
 ## Checklist (agente)
 
-1. Classificar conforme F1 (aditivo / reescreveu / ruído / estrutural-visual / NEW-contrato / DELETED-N/A / regime-2b-N/A).
+1. Classificar conforme F1 (aditivo / reescreveu / ruído / estrutural-visual / NEW-contrato / DELETED-N/A / NO_CHECKSUM — inspecionar artefato / regime-2b-N/A).
 2. Padrões baratos (código): condição invertida; `Case`/exceção no banco/objeto errado; remoção/encurtamento de ramo (DIFF); mudança de contrato.
 3. Buckets: correção explícita / decisão consciente de adiar / **suspeita** (após catálogo).
 4. Rubrica no relatório: **triagem** (nunca “veredito de regressão”) — `nada óbvio` \| `suspeitas` \| `precisa teste manual/caso real`.

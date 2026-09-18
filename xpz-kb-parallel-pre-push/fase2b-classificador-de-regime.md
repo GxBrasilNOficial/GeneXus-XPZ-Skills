@@ -6,7 +6,7 @@ Satélite de [`SKILL.md`](SKILL.md). A Fase 2b **não** é um runbook determiní
 
 ## Passo 1 — F1: descartar `SAME` (`Compare-XpzChecksums.ps1`)
 
-O filtro F1 compara o atributo `checksum` no `<Object>` raiz dos XMLs do acervo entre `BaseRef` e `HEAD`, classificando cada arquivo alterado como **SAME** (checksum idêntico — mudou só por re-export, tipicamente `lastUpdate`), **DIFF**, **NEW** ou **DELETED**. É classificador puro: não bloqueia, só rotula.
+O filtro F1 compara o atributo `checksum` no `<Object>` raiz dos XMLs do acervo entre `BaseRef` e `HEAD`, classificando cada arquivo alterado como **SAME** (checksum idêntico — mudou só por re-export, tipicamente `lastUpdate`), **DIFF**, **NEW**, **DELETED** ou **NO_CHECKSUM** (checksum ausente nos dois lados — sem sinal F1 utilizável para comparar conteúdo). É classificador puro: não bloqueia, só rotula.
 
 ```text
 pwsh -File <repo-skills>\scripts\Compare-XpzChecksums.ps1 -RepoRoot <pasta-paralela-da-KB>

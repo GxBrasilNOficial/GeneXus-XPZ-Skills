@@ -8,7 +8,8 @@
 .DESCRIPTION
   Motor compartilhado, agnostico de KB. Classifica cada XML alterado como SAME
   (checksum identico -- mudou so por re-export, tipicamente lastUpdate), DIFF,
-  NEW ou DELETED. E classificador puro: nao bloqueia, so rotula para triagem.
+  NEW, DELETED ou NO_CHECKSUM (checksum ausente nos dois lados). E classificador
+  puro: nao bloqueia, so rotula para triagem.
 
   ATENCAO METODOLOGICA (checksum): em XMLs GeneXus exportados pela IDE o checksum
   e ATRIBUTO do elemento raiz <Object> (checksum="..."), NAO tag <Checksum>.
