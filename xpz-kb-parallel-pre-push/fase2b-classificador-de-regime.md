@@ -43,3 +43,5 @@ Certos padrões de código são intencionais e não devem disparar triagem repet
 ## O que a Fase 2b entrega
 
 Uma **classificação** por mudança (regime + roteamento + rótulos de triagem), não um carimbo de "sem regressão". O relatório da rodada (molde em `examples/`) registra os regimes encontrados, os itens `suspeito-por-omissão` e os que foram roteados ao build — para o usuário decidir o push com consciência do que a estática cobre e do que só o build/teste funcional cobre.
+
+Após classificar, se houver `DIFF`/`NEW` com Source relevante (tipicamente regime **lógica de negócio** / Procedure / WebPanel), o agente executa a **Fase 2c** — caça a regressão óbvia como **apresentação estruturada** no relatório ([`fase2c-caca-regressao-agente.md`](fase2c-caca-regressao-agente.md)). A 2c **não** amplia esta 2b a runbook determinístico nem prova ausência de regressão.

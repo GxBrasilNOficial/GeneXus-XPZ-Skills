@@ -29,11 +29,19 @@
 
 - bloqueios que **persistem**: `<lista>`
 - novos `unknown` (ex.: fetch falho nesta passada): `<lista>`  → lembrar que `unknown` mantém `pushReadiness=blocked`
-- itens de Fase 2a/2b reclassificados: `<lista>`
+- itens de Fase 2a/2b/2c reclassificados: `<lista>`
+
+## Delta Fase 2c
+
+- suspeitas **novas** / **resolvidas** / **persistentes**: `<listas>`
+- mudança de cobertura parcial (se houver): `<resumo; listar nominalmente o que ficou de fora>`
+- **triagem atual:** `<nada óbvio | suspeitas | precisa teste manual/caso real | N/A>`
+
+> Triagem, não prova. "Nada óbvio" NÃO é ausência de regressão e NÃO altera `pushReadiness`.
 
 ## Veredito da re-validação (sem ação automática)
 
 - **Convergiu para `ready`?** `<sim/não>` — se não, o que falta.
-- **Push:** `<proibido | permitido sob decisão do usuário | pendente>`
+- **Push:** `<proibido | permitido sob decisão do usuário | pendente>` — só a partir de `pushReadiness` (Fase 1) + decisão do usuário; a Fase 2c não libera push.
 
 > Este relatório é diagnóstico. Nenhuma correção, commit ou push foi feito.

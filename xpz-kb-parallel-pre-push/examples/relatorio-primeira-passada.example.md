@@ -45,10 +45,22 @@
 - itens `suspeito-por-omissão` (triagem, não veredito): `<lista>`
 - itens roteados ao build (`xpz-msbuild-build` / `FailIfReorg`): `<lista>`
 
+## Fase 2c — caça a regressão óbvia (triagem de agente, não prova)
+
+- objetos elegíveis (não-SAME com Source relevante): `<n>`  ·  lidos: `<n>`  ·  cobertura: `<total | parcial | N/A | indisponível — F1 unknown>`
+- não lidos (cobertura parcial — listar nominalmente): `<lista ou n/a>`
+- classificação por objeto: `<aditivo | reescreveu ramo | ruído/lastUpdate | NEW-contrato | DELETED-N/A | regime-2b-N/A | estrutural-visual (GxMultiForm/layout)>`
+- suspeitas: `<lista ou nenhuma>`  ·  padrões suprimidos pelo catálogo da KB: `<lista>`
+- **triagem:** `<nada óbvio | suspeitas | precisa teste manual/caso real | N/A>`
+
+> Triagem, não prova. "Nada óbvio" NÃO é ausência de regressão e NÃO altera `pushReadiness`.
+> No regime "lógica de negócio", a autoridade continua sendo o teste funcional (`fase2b`).
+> Layout WebPanel (`GxMultiForm`): estrutural-visual; checklist de código via eventos — preferir `Search-GeneXusXmlSourceBlock.ps1 -Block events`.
+
 ## Veredito e próximos passos (sem ação automática)
 
-- **Leitura:** `<resumo do que a Fase 1 bloqueou/avisou e o que a 2a/2b classificou>`
-- **Push:** `<proibido | permitido sob decisão do usuário | pendente de saneamento>`
+- **Leitura:** `<resumo do que a Fase 1 bloqueou/avisou e o que a 2a/2b/2c classificou/triou>`
+- **Push:** `<proibido | permitido sob decisão do usuário | pendente de saneamento>` — derivado **somente** de `pushReadiness` (Fase 1) e decisão do usuário; a Fase 2c **não** libera push.
 - **Pendências sugeridas (aguardando autorização):** `<lista>`
 
 > Este relatório é diagnóstico. Nenhuma correção, commit ou push foi feito.

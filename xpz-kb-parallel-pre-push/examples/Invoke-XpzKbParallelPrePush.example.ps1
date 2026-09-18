@@ -18,7 +18,10 @@ Contrato de saida herdado do motor:
 IMPORTANTE: este e um molde. Ao materializar o wrapper local final, ajustar
 `SharedSkillsRoot` para o caminho real da base compartilhada.
 
-Deve ser o unico ponto de execucao da rotina pre-push da pasta paralela da KB.
+Deve ser o unico ponto de execucao da **Fase 1 mecanica** da rotina pre-push da pasta
+paralela da KB. As Fases 2a (higiene), 2b (classificador de regime) e 2c (caca a
+regressao obvia — triagem de agente) ficam fora deste wrapper; ver
+`xpz-kb-parallel-pre-push/SKILL.md`.
 
 .PARAMETER BaseRef
 Referencia git base (default: origin/main); intervalo avaliado BaseRef..HEAD.
