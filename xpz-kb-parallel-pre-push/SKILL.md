@@ -1,11 +1,11 @@
 ---
 name: xpz-kb-parallel-pre-push
-description: Valida o estado de uma pasta paralela de KB GeneXus antes do push (rotina pré-push de pasta paralela), rodando o orquestrador de gates mecânicos local do repositório ativo; não é a rotina pré-push do repositório de skills (documento 13)
+description: Valida o estado de uma pasta paralela de KB GeneXus antes do push (rotina pré-push de pasta paralela) — Fase 1 (orquestrador de gates mecânicos), Fase 2a (higiene), Fase 2b (classificador de regime) e Fase 2c (caça a regressão óbvia no relatório, triagem de agente, não gate); não é a rotina pré-push do repositório de skills (documento 13)
 ---
 
 # xpz-kb-parallel-pre-push
 
-Roda a rotina pré-push de uma **pasta paralela de KB GeneXus**: invoca o orquestrador compartilhado `scripts\Invoke-XpzKbParallelPrePushPhase1.ps1` para consolidar gates mecânicos (G0–G5 + K1–K4/K8/K9/K11) sobre o estado dessa pasta antes de um push, e classifica o resultado em `pushReadiness` (`ready`/`warn`/`blocked`). Reporta ao usuário e não publica nada por conta própria.
+Roda a rotina pré-push de uma **pasta paralela de KB GeneXus**: invoca o orquestrador compartilhado `scripts\Invoke-XpzKbParallelPrePushPhase1.ps1` para consolidar gates mecânicos (G0–G5 + K1–K4/K8/K9/K11) e classificar `pushReadiness` (`ready`/`warn`/`blocked`); em seguida triagem estrutural (Fase 2a), classificação de regime (Fase 2b) e caça a regressão óbvia (Fase 2c — triagem de agente no relatório, não prova e não altera `pushReadiness`). Reporta ao usuário e não publica nada por conta própria.
 
 **Esta skill NÃO é a rotina pré-push do repositório de skills `GeneXus-XPZ-Skills`** — essa é o documento [`13-revisao-pre-push.md`](../13-revisao-pre-push.md) (e o tier reforçado [`14-revisao-pre-push-reforcada.md`](../14-revisao-pre-push-reforcada.md)). Aquela rotina valida o **repositório de skills** antes de publicar; esta valida o estado de uma **pasta paralela de KB** (com `ObjetosDaKbEmXml/`, `KbIntelligence/` etc.) antes de o usuário fazer push dessa KB. São coisas diferentes, com autoridade documental diferente.
 
