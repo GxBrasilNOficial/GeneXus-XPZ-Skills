@@ -24,12 +24,15 @@ equivalência permission/tools, warning de fallback, e captura behavioral D4).
 ## Arquivos
 
 - `VERSION.txt` — versão do opencode contra a qual os claims foram medidos.
-- `fallback-warning.txt` — warning verbatim que o opencode emite em `run --agent <ausente>` (cai
-  silenciosamente no agente default, hoje `build` full-access). Em 1.18.30 o literal capturado
-  inclui o prefixo `!  ` antes de `agent "..." not found...`; o pós-check varre o stderr pelo
-  padrão lógico exposto por `Get-OpenCodeReviewerRoFallbackWarningPattern` (não exige o prefixo).
-  No contrato v2 do watcher esse mesmo valor alimenta `fallbackDetail.stderrPattern` sem copiar
-  o literal em outros produtores/consumidores.
+- `fallback-warning.txt` — warning **verbatim do stderr** que o opencode emite em
+  `run --agent <ausente>` (cai silenciosamente no agente default, hoje `build` full-access). Em
+  1.18.30 a captura traz **sequências ANSI SGR** (`ESC[93m`, `ESC[1m`, `ESC[0m`, …) em volta do
+  `!`; **após remover os escapes**, o texto renderizado começa com o prefixo `!  ` antes de
+  `agent "..." not found...`. O pós-check varre o stderr pelo padrão lógico exposto por
+  `Get-OpenCodeReviewerRoFallbackWarningPattern` (não exige o prefixo nem a coloração). No
+  contrato v2 do watcher esse mesmo valor alimenta `fallbackDetail.stderrPattern` sem copiar o
+  literal em outros produtores/consumidores. Na re-captura: **preservar** os bytes ANSI emitidos
+  — não sanitizar para ASCII puro.
 - `agentlist-reviewer-ro.sample.txt` — bloco canônico (sanitizado) do `opencode agent list` para o
   `reviewer-ro` na forma `permission`. Os caminhos reais de `external_directory` (dirs de skills da
   máquina) foram substituídos por `<SANITIZED_SKILL_DIR>`; as regras de ferramenta são as reais.
@@ -97,7 +100,7 @@ Atualizar o set re-medido completo (sanitizando paths de `external_directory` on
 2. `agentlist-reviewer-ro.sample.txt` (project-local)
 3. `merge-global-only-reviewer-ro.sample.txt` (cwd sem `.opencode/`)
 4. `equiv-permission-vs-tools.sample.txt`
-5. `fallback-warning.txt` (stderr verbatim de `run --agent <ausente>`)
+5. `fallback-warning.txt` (stderr verbatim de `run --agent <ausente>`; manter ANSI se houver)
 6. `read-outside-cwd-blocked.sample.txt` (captura behavioral D4; token real → `<SENTINELA>`)
 
 Re-rodar `scripts/Test-OpenCodeReviewerRoSelfTest.ps1` até verde antes de reativar o default
