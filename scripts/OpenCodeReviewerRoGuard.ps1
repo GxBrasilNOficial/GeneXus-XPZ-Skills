@@ -27,9 +27,9 @@
     varre stderr pelo warning generico de fallback silencioso (`agent "..." not found. Falling back to
     default agent`), que o opencode emite quando `--agent <ausente>` cai no agente default.
 
-    Claims empiricos medidos em opencode 1.17.20 (fixtures versionados em
-    xpz-llm-delegate/fixtures/opencode-reviewer-ro/). Se um claim nao reproduzir na versao
-    instalada, o pre-check (versao) ja bloqueia — NAO ativar sem revisitar D2/D3.
+    Claims empiricos medidos na versao em
+    xpz-llm-delegate/fixtures/opencode-reviewer-ro/VERSION.txt. Se um claim nao reproduzir na
+    versao instalada, o pre-check (versao) ja bloqueia — NAO ativar sem revisitar D2/D3.
 .NOTES
     Este arquivo so DEFINE funcoes (dot-source); nao executa nada ao ser carregado.
 #>

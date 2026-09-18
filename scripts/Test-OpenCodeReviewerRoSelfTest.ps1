@@ -255,7 +255,7 @@ sem mode
     Assert-True ((-not $pcaa.pass) -and $pcaa.reason -eq 'agentlist' -and $pcaa.detail -match 'nao encontrado') "(b) agente ausente (agent list valido sem reviewer-ro) => BLOCK reason=agentlist detail 'nao encontrado' (got: $($pcaa.reason))"
     $env:FAKE_OC_AGENTLIST = $sampleAgentList
 
-    # ── (B4) equivalencia permission:deny == tools:false (fixture medido em 1.17.20) ──
+    # ── (B4) equivalencia permission:deny == tools:false (fixture medido; ver VERSION.txt) ──
     $equivLines = @(Get-Content -LiteralPath $equivFixture -Encoding utf8)
     $permBlock = Resolve-OpenCodeReviewerRoAllowSet -Rules (Get-OpenCodeReviewerRoBlockFromAgentList -Lines $equivLines -Name 'probe-perm')
     $toolsBlock = Resolve-OpenCodeReviewerRoAllowSet -Rules (Get-OpenCodeReviewerRoBlockFromAgentList -Lines $equivLines -Name 'probe-tools')

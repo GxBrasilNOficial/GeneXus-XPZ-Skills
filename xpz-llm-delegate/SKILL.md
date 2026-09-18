@@ -975,11 +975,11 @@ segurança no **próprio adapter**, de forma inseparável (nunca "default sem gu
   `scripts/Install-OpenCodeReviewerRoAgent.ps1` (global, dono desta skill). Gate de processo/CI:
   `scripts/Test-OpenCodeReviewerRoSelfTest.ps1` (`OPENCODE_REVIEWER_RO_SELFTEST_OK`) e
   `scripts/Test-OpenCodeCliSupportSelfTest.ps1` para a descoberta do CLI.
-- **Eixo de LEITURA — premissa INVERTIDA (medido em opencode 1.17.20).** A doc anterior afirmava que a
+- **Eixo de LEITURA — premissa INVERTIDA (medido em opencode 1.18.30; ver `fixtures/opencode-reviewer-ro/VERSION.txt`).** A doc anterior afirmava que a
   tool `read` lê **qualquer arquivo** da máquina; a **medição refuta**: o opencode tem a dimensão
   nativa `external_directory` (base `ask`, auto-rejeitada em `opencode run` headless) que gateia
   leituras **fora** do workspace do cwd. O reviewer-ro fixa `external_directory: deny` explícito → o
-  padrão `external_directory[*]` fica bloqueado independente do modo; fixtures 1.17.20
+  padrão `external_directory[*]` fica bloqueado independente do modo; fixtures 1.18.30
   ainda mostram exceções `allow` para diretórios internos do opencode, então isso não deve ser
   descrito como proibição absoluta de todo path externo específico. O D-min fecha
   execução/escrita e as **ferramentas** de rede (`webfetch`/`websearch`); **não** fecha o canal do
@@ -988,7 +988,7 @@ segurança no **próprio adapter**, de forma inseparável (nunca "default sem gu
   bloqueio padrão é relativo ao cwd HERDADO (o adapter opencode não recebe `-Cd`), mas **quem dispara** é
   responsável por escolher um cwd sem segredos não-versionados. Se o cwd contiver `.env` local,
   logs ou cache com segredos, o revisor pode lê-los; iscas de self-test não substituem revisar
-  segredos reais no diretório. Em 1.17.20 há proteção nativa `read "*.env" -> ask`, mas o bloco
+  segredos reais no diretório. Em 1.18.30 há proteção nativa `read "*.env" -> ask`, mas o bloco
   posterior do `reviewer-ro` tende a anulá-la com `read "*" -> allow`; esse recorte é alta
   prioridade no `999`. Mecanizar cwd-seguro + liberar opencode em `kb-sensitive`/pasta paralela
   ficou **ADIADO** (`999-ideias-pendentes.md`, entrada do eixo de leitura).
