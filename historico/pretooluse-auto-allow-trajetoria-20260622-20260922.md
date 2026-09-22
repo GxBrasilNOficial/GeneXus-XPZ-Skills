@@ -20,7 +20,7 @@ Consolidado em 2026-09-22 a partir das notas de sessão do agente, para que deci
 | 2026-06-30 | Passo F (medição do fio real) | Overhead e2e−floor ~20–34 ms: **reprova** o gate literal de 5 ms do §9-0e; fio aprovado no mérito por decisão datada do autor | `ff0e5b5`, `5db5734`, `d8b04c8`, `d212120` |
 | 2026-06-30 / 07-01 | Passo G (observe, install, wire) | Modo observe no fio real; instalador com deploy e `-Wire`; correção da saída §3.1 (abster = não emitir nada) | `ddc0b89`, `cc8306a`, `74a34b9`, `5c04745`, `eb6b705`, `fe5cd37`, `1e4b8a6` |
 | 2026-07-01 a 09-22 | Fase 3 (observe em uso real) | 1406 medições em 2 dias (10.322 até 09-22): zero `busy`, p50 2,4 ms / p95 5,4 ms no fio quente, 14% dos comandos Bash seriam auto-aprovados, 0 erros | `0e8f3a6` |
-| 2026-09-22 | Fase 4 (`enforce`) | Ligada e validada ao vivo nas duas direções; §8 verde quando rodado isolado; paridade `09`/`CHANGELOG` | `73a8fb5`, `20ff8fd` |
+| 2026-09-22 | Fase 4 (`enforce`) | Ligada e validada ao vivo nas duas direções; §8 verde quando rodado isolado; paridade `09`/`CHANGELOG` | `73a8fb5`, `20ff8fd`, `df92376` |
 
 ## Mudanças de entendimento
 
