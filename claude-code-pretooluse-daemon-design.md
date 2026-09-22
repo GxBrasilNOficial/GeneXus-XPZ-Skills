@@ -1,5 +1,7 @@
 # Daemon do hook `PreToolUse` (auto-allow) do Claude Code — design
 
+> **Estado operacional (nota datada 2026-09-22; não altera o contrato congelado):** Fase 4 (`enforce`) ligada em teste de uso; o observe da Fase 3 foi encerrado. Menções abaixo a "ativo em observe" ou a "condição pendente para liberar o enforce" são datadas e históricas. Estado vivo: entrada «Hook PreToolUse positivo (auto-allow) do Claude Code — Fases 3–5» do `999-ideias-pendentes.md`.
+
 > **STATUS: CONGELADO (v4) — congelado em 2026-06-27 por Antonio José (antonio@frigobyte.com).** Esta v4 incorpora **quatro rodadas** de revisão
 > por pares (5 vozes / 3 famílias cada: `anthropic`/Claude Opus subagente nativo, `openai`/Codex
 > gpt-5.5, `nvidia`/glm-5.1+kimi-k2.6+minimax-m2.7; os `ollama-cloud` preferidos caíram por cota e

@@ -1,5 +1,7 @@
 # Hook `PreToolUse` positivo (auto-allow) do Claude Code — spec de design
 
+> **Estado operacional (nota datada 2026-09-22; não altera a spec congelada):** Fase 4 (`enforce`) ligada em teste de uso, pelo caminho do daemon (cliente NativeAOT), não pelo decisor in-process desta spec; o observe da Fase 3 foi encerrado. Menções abaixo à Fase 4 como pendente são datadas e históricas. Estado vivo: entrada «Hook PreToolUse positivo (auto-allow) do Claude Code — Fases 3–5» do `999-ideias-pendentes.md`.
+
 > **ESCOPO — Claude Code apenas.** Esta solução é **exclusiva do Claude Code**: depende do hook
 > `PreToolUse` com `permissionDecision: allow`, recurso que **não existe** em Codex/Cursor/OpenCode.
 > O classificador (lógica de "comando read-only seguro?") é agnóstico de agente e poderia ser

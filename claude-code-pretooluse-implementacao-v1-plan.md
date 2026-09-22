@@ -1,5 +1,7 @@
 # Plano de implementação da v1 do daemon `PreToolUse` (auto-allow) do Claude Code
 
+> **Estado operacional (nota datada 2026-09-22; não altera o plano congelado):** Fase 4 (`enforce`) ligada em teste de uso; o observe da Fase 3 foi encerrado. Menções abaixo a "ativo em observe" ou a "condição pendente para liberar o enforce" são datadas e históricas. Estado vivo: entrada «Hook PreToolUse positivo (auto-allow) do Claude Code — Fases 3–5» do `999-ideias-pendentes.md`.
+
 <!-- backend-parity: ignore -->
 > **STATUS: CONGELADO (v2.22) — congelado em 2026-06-29 por Antonio José (antonio@frigobyte.com).**
 > Este é o **plano de implementação** da v1 (o *como construir*), derivado dos designs congelados
