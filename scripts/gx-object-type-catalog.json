@@ -388,6 +388,15 @@
       "containerType": false,
       "notes": "Transacao."
     },
+    "URLRewrite": {
+      "objectTypeGuid": "46e32e2d-023e-4188-95df-d13573bac2e0",
+      "rootKind": "Object",
+      "folderName": "URLRewrite",
+      "inventoryEligible": true,
+      "queryableByKbIntelligence": false,
+      "containerType": false,
+      "notes": "Objeto URL Rewrite do GeneXus (URL Rewrite object). GUID confirmado em export GeneXus 18; o indice atual nao extrai as regras nem arestas semanticas deste objeto. Definicao: https://wiki.genexus.com/commwiki/wiki?46523,Category:URL+Rewrite+object"
+    },
     "UserControl": {
       "objectTypeGuid": "562f4793-aabe-449f-8821-fc77e550698e",
       "rootKind": "Object",

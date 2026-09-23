@@ -22,6 +22,7 @@ $externalObjectGuid = 'c163e562-42c6-4158-ad83-5b21a14cf30e'
 $transactionGuid = '1db606f2-af09-4cf9-a3b5-b481519d28f6'
 $workWithGuid = '15cf49b5-fc38-4899-91b5-395d02d79889'
 $workWithForWebGuid = '78cecefe-be7d-4980-86ce-8d6e91fba04b'
+$urlRewriteGuid = '46e32e2d-023e-4188-95df-d13573bac2e0'
 
 $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('gx-import-inventory-selftest-{0}' -f ([guid]::NewGuid().ToString('N')))
 [void](New-Item -ItemType Directory -Path $tempRoot -Force)
@@ -170,6 +171,24 @@ if ($resultMobileAlias.deltaComparison.aliasResolutionCount -ne 1) {
 $mobileAlias = @($resultMobileAlias.deltaComparison.aliasResolutions)[0]
 if ($mobileAlias.rule -ne 'exportTaskLabel' -or $mobileAlias.declaredTypeName -ne 'WorkWithDevices' -or $mobileAlias.inventoryTypeName -ne 'WorkWith') {
     throw 'alias deve ligar WorkWithDevices declarado a WorkWith mobile no inventario'
+}
+
+$urlRewriteXml = @"
+<ExportFile>
+  <Objects>
+    <Object type="$urlRewriteGuid" name="URLRewrite1" guid="66666666-6666-6666-6666-666666666601" />
+  </Objects>
+</ExportFile>
+"@
+$urlRewritePath = Join-Path $tempRoot 'package-url-rewrite.import_file.xml'
+[System.IO.File]::WriteAllText($urlRewritePath, $urlRewriteXml, (Get-Utf8NoBomEncoding))
+$resultUrlRewrite = (& $inventoryScript -InputPath $urlRewritePath | ConvertFrom-Json)
+$urlRewriteItem = @($resultUrlRewrite.inventory | Where-Object { $_.name -eq 'URLRewrite1' } | Select-Object -First 1)
+if ($urlRewriteItem.Count -ne 1 -or $urlRewriteItem[0].typeName -ne 'URLRewrite') {
+    throw "GUID de URLRewrite deve ser reconhecido; obtido '$($urlRewriteItem[0].typeName)'"
+}
+if ($resultUrlRewrite.unknownTypeCount -ne 0) {
+    throw 'URLRewrite reconhecido nao pode aparecer como tipo desconhecido'
 }
 
 Remove-Item -LiteralPath $tempRoot -Recurse -Force
