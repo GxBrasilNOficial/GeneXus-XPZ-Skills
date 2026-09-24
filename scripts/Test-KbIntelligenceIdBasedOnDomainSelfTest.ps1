@@ -490,4 +490,3 @@ Assert-True ($rPanel.Count -eq 0) "G.2.18 Panel fora do escopo"
 
 Write-Output 'OK: Test-KbIntelligenceIdBasedOnDomainSelfTest.ps1'
 exit 0
-
