@@ -129,6 +129,8 @@ Write-DomainXml -Name 'DomNewline' -Fqfn 'DomNewline' -GuidSuffix '00000000000e'
 Write-DomainXml -Name 'DomDivergent' -Fqfn 'RealMod.DomDivergent' -GuidSuffix '00000000000f'
 Write-DomainXml -Name 'DomCombo' -Fqfn 'DomCombo' -GuidSuffix '000000000010'
 Write-DomainXml -Name 'DomPatho' -Fqfn 'DomPatho' -GuidSuffix '000000000011'
+Write-DomainXml -Name 'DomLeak' -Fqfn 'DomLeak' -GuidSuffix '000000000012'
+Write-DomainXml -Name 'DomSym' -Fqfn 'DomSym' -GuidSuffix '000000000013'
 
 # G.2.1 SDT item
 $sdtXml = @"
@@ -378,6 +380,28 @@ before <!-- span across
 "@
 [System.IO.File]::WriteAllText((Join-Path $procedureDir 'ProcCdataCommentPatho.xml'), $procPathoXml, (Get-Utf8NoBomEncoding))
 
+# G.2.14d comentario com literal <![CDATA[: Property falso antes do literal nao vaza; real fora permanece
+$procSymXml = @"
+<?xml version="1.0" encoding="utf-8"?>
+<Object type="$procedureGuid" name="ProcCommentCdataLiteral" guid="cccccccc-cccc-cccc-cccc-00000000000d" fullyQualifiedName="ProcCommentCdataLiteral">
+  <!--
+  <Property><Name>idBasedOn</Name><Value>Domain:DomLeak</Value></Property>
+  docs mention <![CDATA[
+  -->
+  <Part type="528d1c06-a9c2-420d-bd35-21dca83f12ff">
+    <Source><![CDATA[real source body]]></Source>
+  </Part>
+  <Part type="e4c4ade7-53f0-4a56-bdfd-843735b66f47">
+    <Variable Name="VReal">
+      <Properties>
+        <Property><Name>idBasedOn</Name><Value>Domain:DomSym</Value></Property>
+      </Properties>
+    </Variable>
+  </Part>
+</Object>
+"@
+[System.IO.File]::WriteAllText((Join-Path $procedureDir 'ProcCommentCdataLiteral.xml'), $procSymXml, (Get-Utf8NoBomEncoding))
+
 # G.2.16 &#xA; — value with entity newline; line must come from raw
 $procNlXml = @"
 <?xml version="1.0" encoding="utf-8"?>
@@ -509,9 +533,15 @@ $r = @(Find-Rows -Rows $rows -SourceType 'Procedure' -SourceName 'ProcCdataComme
 Assert-True ($r.Count -eq 1) "G.2.14b combo esperado 1 aresta real; obtido $($r.Count)"
 Assert-True ($r[0].extractor_rule -eq 'object_idbasedon_domain') "G.2.14b regra object_idbasedon_domain"
 
-# G.2.14c patogenico: com CDATA-primeiro o Property entre ]]> e --> permanece visivel
+# G.2.14c patogenico: Property entre ]]> e --> permanece visivel (comentario nao engole apos CDATA)
 $r = @(Find-Rows -Rows $rows -SourceType 'Procedure' -SourceName 'ProcCdataCommentPatho' -TargetName 'DomPatho')
 Assert-True ($r.Count -eq 1) "G.2.14c patogenico esperado 1 aresta real; obtido $($r.Count)"
+
+# G.2.14d comentario cita <![CDATA[: DomLeak no comentario nao vaza; DomSym real fora sim
+$rLeak = @(Find-Rows -Rows $rows -SourceType 'Procedure' -SourceName 'ProcCommentCdataLiteral' -TargetName 'DomLeak')
+Assert-True ($rLeak.Count -eq 0) "G.2.14d DomLeak no comentario nao deve vazar; obtido $($rLeak.Count)"
+$rSym = @(Find-Rows -Rows $rows -SourceType 'Procedure' -SourceName 'ProcCommentCdataLiteral' -TargetName 'DomSym')
+Assert-True ($rSym.Count -eq 1) "G.2.14d DomSym real esperado 1; obtido $($rSym.Count)"
 
 # G.2.16 &#xA;
 $r = @(Find-Rows -Rows $rows -SourceType 'Procedure' -SourceName 'ProcEntityNewline' -TargetName 'DomNewline')

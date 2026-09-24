@@ -365,17 +365,39 @@ def mask_xml_cdata_and_comments(text: str) -> str:
     Offsets no texto mascarado continuam validos no XML cru (line/snippet do cru).
     Distinto do strip em object_level_property_dict_via_regex, que apaga conteudo.
 
-    Ordem: CDATA primeiro, depois comentario. Assim sequencias ``<!--...-->``
-    dentro de CDATA nao sao tratadas como comentario real antes do bloco CDATA
-    ser neutralizado (evita falso negativo em XML patogenico com ``<!--``
-    abrindo dentro do CDATA e ``-->`` so depois do ``]]>``).
+    Uma passagem esquerda→direita com estado exclusivo: ao encontrar ``<![CDATA[``
+    mascara ate ``]]>`` (ignorando ``<!--`` no meio); ao encontrar ``<!--`` mascara
+    ate ``-->`` (ignorando ``<![CDATA[`` no meio). Bloco sem fechamento nao e
+    mascarado (mesmo contrato das regex antigas, que exigiam o closer).
     """
-
-    def _mask_match(match: re.Match[str]) -> str:
-        return "".join("\n" if ch == "\n" else "X" for ch in match.group(0))
-
-    masked = XML_CDATA_RE.sub(_mask_match, text)
-    return XML_COMMENT_RE.sub(_mask_match, masked)
+    n = len(text)
+    out = list(text)
+    i = 0
+    while i < n:
+        if text.startswith("<![CDATA[", i):
+            closer = text.find("]]>", i + 9)
+            if closer < 0:
+                i += 1
+                continue
+            end = closer + 3
+            for j in range(i, end):
+                if out[j] != "\n":
+                    out[j] = "X"
+            i = end
+            continue
+        if text.startswith("<!--", i):
+            closer = text.find("-->", i + 4)
+            if closer < 0:
+                i += 1
+                continue
+            end = closer + 3
+            for j in range(i, end):
+                if out[j] != "\n":
+                    out[j] = "X"
+            i = end
+            continue
+        i += 1
+    return "".join(out)
 
 
 def extract_root_fully_qualified_name(text: str) -> str | None:

@@ -60,7 +60,7 @@ Escopo de extracao de relacoes atual:
 - alvo resolvido por propriedade: `SDT`, `Domain` ou `ExternalObject` a partir de `ATTCUSTOMTYPE`, quando o objeto existir no inventario e a regra aprovada resolver o prefixo com seguranca
 - origem atual de `ATTCUSTOMTYPE` indexado: `Procedure`, `WebPanel`, `DataProvider`, `API`, `DataSelector`, `Domain`, `SDT`, `WorkWithForWeb` e `Transaction`
 - chamada efetiva de método em ExternalObject: `Procedure`, `WebPanel`, `DataProvider`, `Transaction`, `API` e `DataSelector` para `ExternalObject` a partir de `&Variavel.Metodo(...)` em `Source` efetivo, quando a variável tiver `ATTCUSTOMTYPE` `exo:<ExternalObject>` resolvido no inventario local
-- dominio base via `idBasedOn`: objetos no escopo `IDBASEDON_DOMAIN_SOURCE_TYPES` (`relation_scope` + `Attribute`; fora: `Panel`, `Stencil`, `PackagedModule`) para `Domain` a partir de `<Property><Name>idBasedOn</Name>…>`, quando o dominio existir no inventario local; sufixo de modulo `Domain:Nome, Modulo` so resolve se `fullyQualifiedName` do Domain for `Modulo.Nome` (comparacao `lower()`); `who-uses(Domain)` conta linhas de relacao `based_on_domain` (nao mais “só Attribute”); valor `Attribute:…` nao gera `based_on_domain`
+- dominio base via `idBasedOn`: objetos no escopo `IDBASEDON_DOMAIN_SOURCE_TYPES` (`relation_scope` + `Attribute`; fora: `Panel`, `Stencil`, `PackagedModule`) para `Domain` a partir de `<Property><Name>idBasedOn</Name>…>`, quando o dominio existir no inventario local; mascara CDATA/comentario em **passagem unica** (estado exclusivo por delimitador); sufixo de modulo `Domain:Nome, Modulo` so resolve se `fullyQualifiedName` do Domain for `Modulo.Nome` (comparacao `lower()`); `who-uses(Domain)` conta linhas de relacao `based_on_domain` (nao mais “só Attribute”); valor `Attribute:…` nao gera `based_on_domain`
 - chamada em atributo calculado: `Attribute` para `Procedure`, `WebPanel` ou `DataProvider` a partir de `Property Formula`, quando o alvo existir no inventario local e a forma for resolvivel estaticamente (`Nome(...)`, `Nome.Call(...)`, `Call(Nome, ...)`, `udp(Nome, ...)`, `Nome.Udp(...)`, `Nome.Link(...)`, `Nome.Create(...)`, chamada direta a `DataProvider`)
 - atributo estrutural de transacao: `Transaction` para `Attribute` a partir de `<Level>/<Attribute>`, quando o atributo existir no inventario local
 - tabela estrutural de transacao: `Transaction` para `Table` a partir de `Type` em `<Level>`, quando a tabela existir no inventario local
@@ -522,7 +522,7 @@ Self-test local (não depende de KBExemplo) para o sinal determinístico gerado-
 .\scripts\Test-KbIntelligenceGeneratedObjectExtractionSelfTest.ps1
 ```
 
-Self-test local (não depende de KBExemplo) para `idBasedOn`→`Domain` (`based_on_domain`, extrator 12): escopo além de `Attribute`, módulo por `fullyQualifiedName`, máscara CDATA/comentário e dedup:
+Self-test local (não depende de KBExemplo) para `idBasedOn`→`Domain` (`based_on_domain`, extrator 12): escopo além de `Attribute`, módulo por `fullyQualifiedName`, máscara CDATA/comentário em passagem única e dedup:
 
 ```powershell
 .\scripts\Test-KbIntelligenceIdBasedOnDomainSelfTest.ps1
