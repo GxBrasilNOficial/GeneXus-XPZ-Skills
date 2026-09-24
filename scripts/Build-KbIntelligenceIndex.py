@@ -364,13 +364,18 @@ def mask_xml_cdata_and_comments(text: str) -> str:
 
     Offsets no texto mascarado continuam validos no XML cru (line/snippet do cru).
     Distinto do strip em object_level_property_dict_via_regex, que apaga conteudo.
+
+    Ordem: CDATA primeiro, depois comentario. Assim sequencias ``<!--...-->``
+    dentro de CDATA nao sao tratadas como comentario real antes do bloco CDATA
+    ser neutralizado (evita falso negativo em XML patogenico com ``<!--``
+    abrindo dentro do CDATA e ``-->`` so depois do ``]]>``).
     """
 
     def _mask_match(match: re.Match[str]) -> str:
         return "".join("\n" if ch == "\n" else "X" for ch in match.group(0))
 
-    masked = XML_COMMENT_RE.sub(_mask_match, text)
-    return XML_CDATA_RE.sub(_mask_match, masked)
+    masked = XML_CDATA_RE.sub(_mask_match, text)
+    return XML_COMMENT_RE.sub(_mask_match, masked)
 
 
 def extract_root_fully_qualified_name(text: str) -> str | None:

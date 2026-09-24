@@ -127,6 +127,8 @@ Write-DomainXml -Name 'DomCdata' -Fqfn 'DomCdata' -GuidSuffix '00000000000c'
 Write-DomainXml -Name 'DomComment' -Fqfn 'DomComment' -GuidSuffix '00000000000d'
 Write-DomainXml -Name 'DomNewline' -Fqfn 'DomNewline' -GuidSuffix '00000000000e'
 Write-DomainXml -Name 'DomDivergent' -Fqfn 'RealMod.DomDivergent' -GuidSuffix '00000000000f'
+Write-DomainXml -Name 'DomCombo' -Fqfn 'DomCombo' -GuidSuffix '000000000010'
+Write-DomainXml -Name 'DomPatho' -Fqfn 'DomPatho' -GuidSuffix '000000000011'
 
 # G.2.1 SDT item
 $sdtXml = @"
@@ -334,6 +336,48 @@ $procCommentXml = @"
 "@
 [System.IO.File]::WriteAllText((Join-Path $procedureDir 'ProcCommentMask.xml'), $procCommentXml, (Get-Utf8NoBomEncoding))
 
+# G.2.14b combinacao bem-formada: <!--...--> completo + Property falso dentro do mesmo CDATA; real fora
+$procComboXml = @"
+<?xml version="1.0" encoding="utf-8"?>
+<Object type="$procedureGuid" name="ProcCdataCommentCombo" guid="cccccccc-cccc-cccc-cccc-00000000000b" fullyQualifiedName="ProcCdataCommentCombo">
+  <Part type="528d1c06-a9c2-420d-bd35-21dca83f12ff">
+    <Source><![CDATA[
+prefix <!-- fake comment --> suffix
+<Property><Name>idBasedOn</Name><Value>Domain:DomCombo</Value></Property>
+]]></Source>
+  </Part>
+  <Part type="e4c4ade7-53f0-4a56-bdfd-843735b66f47">
+    <Variable Name="VReal">
+      <Properties>
+        <Property><Name>idBasedOn</Name><Value>Domain:DomCombo</Value></Property>
+      </Properties>
+    </Variable>
+  </Part>
+</Object>
+"@
+[System.IO.File]::WriteAllText((Join-Path $procedureDir 'ProcCdataCommentCombo.xml'), $procComboXml, (Get-Utf8NoBomEncoding))
+
+# G.2.14c patogenico: <!-- abre no CDATA, --> so depois do ]]>; Property real entre ]]> e -->
+$procPathoXml = @"
+<?xml version="1.0" encoding="utf-8"?>
+<Object type="$procedureGuid" name="ProcCdataCommentPatho" guid="cccccccc-cccc-cccc-cccc-00000000000c" fullyQualifiedName="ProcCdataCommentPatho">
+  <Part type="528d1c06-a9c2-420d-bd35-21dca83f12ff">
+    <Source><![CDATA[
+before <!-- span across
+]]></Source>
+  </Part>
+  <Part type="e4c4ade7-53f0-4a56-bdfd-843735b66f47">
+    <Variable Name="VReal">
+      <Properties>
+        <Property><Name>idBasedOn</Name><Value>Domain:DomPatho</Value></Property>
+      </Properties>
+    </Variable>
+  </Part>
+-->
+</Object>
+"@
+[System.IO.File]::WriteAllText((Join-Path $procedureDir 'ProcCdataCommentPatho.xml'), $procPathoXml, (Get-Utf8NoBomEncoding))
+
 # G.2.16 &#xA; — value with entity newline; line must come from raw
 $procNlXml = @"
 <?xml version="1.0" encoding="utf-8"?>
@@ -459,6 +503,15 @@ Assert-True ($r[0].line -eq $expectedLine) "G.2.14 linha do cru esperado $expect
 # G.2.15 comment: uma aresta (a real)
 $r = @(Find-Rows -Rows $rows -SourceType 'Procedure' -SourceName 'ProcCommentMask' -TargetName 'DomComment')
 Assert-True ($r.Count -eq 1) "G.2.15 comentario esperado 1; obtido $($r.Count)"
+
+# G.2.14b combinacao CDATA+comentario bem-formada: so a aresta real (fora do CDATA)
+$r = @(Find-Rows -Rows $rows -SourceType 'Procedure' -SourceName 'ProcCdataCommentCombo' -TargetName 'DomCombo')
+Assert-True ($r.Count -eq 1) "G.2.14b combo esperado 1 aresta real; obtido $($r.Count)"
+Assert-True ($r[0].extractor_rule -eq 'object_idbasedon_domain') "G.2.14b regra object_idbasedon_domain"
+
+# G.2.14c patogenico: com CDATA-primeiro o Property entre ]]> e --> permanece visivel
+$r = @(Find-Rows -Rows $rows -SourceType 'Procedure' -SourceName 'ProcCdataCommentPatho' -TargetName 'DomPatho')
+Assert-True ($r.Count -eq 1) "G.2.14c patogenico esperado 1 aresta real; obtido $($r.Count)"
 
 # G.2.16 &#xA;
 $r = @(Find-Rows -Rows $rows -SourceType 'Procedure' -SourceName 'ProcEntityNewline' -TargetName 'DomNewline')
