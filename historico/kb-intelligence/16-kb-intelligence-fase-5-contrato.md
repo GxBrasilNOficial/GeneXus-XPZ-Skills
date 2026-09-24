@@ -82,12 +82,16 @@ Exemplos conceituais:
 
 ### Comportamento esperado
 
-Quando um `Attribute` declarar `idBasedOn` para um `Domain` existente no inventario, o indice deve criar uma relacao direta do atributo para o dominio.
+Quando um objeto no escopo declarar `idBasedOn` para um `Domain` existente no inventario, o indice deve criar uma relacao direta origem→dominio (`based_on_domain`).
+
+**Ampliação (decisão 2026-09-24, extrator 12):** o incremento 2 original cobria só `Attribute`. A frente generalizou a mesma relação a Procedure/SDT/WebPanel/Transaction/API/DataSelector/DataProvider/Domain/WorkWith(ForWeb), com máscara CDATA/comentário, resolvedor de módulo via `fullyQualifiedName` e dedup por par origem/destino. `Panel`/`Stencil`/`PackagedModule` permanecem fora. Forma escapada XML e unificação com `resolve_custom_type_target`/`exo:` ficam adiadas (ver `999`).
 
 Exemplos conceituais:
 
 - `Attribute:AbateOrdemData` com `idBasedOn` `Domain:Data` pode resolver para `Domain:Data`
-- `Domain:Geolocation, GeneXus` nao deve resolver se nao houver objeto correspondente no inventario local
+- `SDT`/`Procedure` com `idBasedOn` `Domain:NFe_v4_00_TAmb` resolve quando o Domain existe localmente
+- `Domain:Geolocation, GeneXus` nao deve resolver se o `fullyQualifiedName` local nao for `GeneXus.Geolocation` (dominio externo tipico)
+- `Domain:GAMMessageType, GAM` resolve quando o Domain local tem `fullyQualifiedName=GAM.GAMMessageType`
 
 ### Fora do incremento 2
 

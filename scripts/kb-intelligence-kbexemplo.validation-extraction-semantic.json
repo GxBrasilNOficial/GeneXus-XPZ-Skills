@@ -60,10 +60,24 @@
     {
       "id": "phase5-case-8-external-gx-domain-does-not-resolve",
       "source": "Attribute:EmpresaCoordenadas",
-      "target": "Domain:Geolocation, GeneXus",
+      "target": "Domain:Geolocation",
       "expected_rule": "attribute_idbasedon_domain",
       "should_exist": false,
-      "expectation": "External GeneXus domains must not create resolved Domain relations when absent from the local inventory"
+      "require_source_exists": true,
+      "require_property_in_source": "Domain:Geolocation, GeneXus",
+      "expectation": "External GeneXus domain suffix must not resolve to Domain:Geolocation; preconditions pin source + exact idBasedOn value so a short-name false positive fails the case"
+    },
+    {
+      "id": "phase5-case-8b-local-domain-module-suffix-mismatch",
+      "source": "Attribute:EmpresaCoordenadas",
+      "target": "Domain:Data",
+      "expected_rule": "attribute_idbasedon_domain",
+      "should_exist": false,
+      "require_source_exists": true,
+      "require_property_in_source": "Domain:Geolocation, GeneXus",
+      "require_target_exists": true,
+      "require_target_fully_qualified_name": "Data",
+      "expectation": "Module-suffixed idBasedOn must not create based_on_domain to an unrelated local Domain that exists with a divergent fqfn; EmpresaCoordenadas keeps Domain:Geolocation, GeneXus while Domain:Data remains present"
     },
     {
       "id": "phase5-case-9-attribute-without-idbasedon-does-not-resolve-domain",

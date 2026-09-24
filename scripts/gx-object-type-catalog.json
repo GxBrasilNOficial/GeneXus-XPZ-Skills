@@ -17,7 +17,7 @@
       "inventoryEligible": true,
       "queryableByKbIntelligence": true,
       "containerType": false,
-      "notes": "Envelope proprio com raiz <Attribute>. O indice materializa idBasedOn para Domain e chamadas resolviveis em Property Formula para Procedure, WebPanel e DataProvider (mesmos padroes de Source efetivo); nao cobre semantica completa da expressao nem funcoes de dominio nao mapeadas como objeto local."
+      "notes": "Envelope proprio com raiz <Attribute>. O indice materializa idBasedOn para Domain (regra attribute_idbasedon_domain; tambem object_idbasedon_domain em Procedure/SDT/WebPanel/etc.) e chamadas resolviveis em Property Formula para Procedure, WebPanel e DataProvider (mesmos padroes de Source efetivo); nao cobre semantica completa da expressao nem funcoes de dominio nao mapeadas como objeto local. who-uses(Domain) conta based_on_domain de qualquer origem no escopo, nao so Attribute."
     },
     "CategoryDiagram": {
       "objectTypeGuid": "280c149c-48b2-4284-a532-0c999df9e006",
@@ -260,7 +260,7 @@
       "inventoryEligible": true,
       "queryableByKbIntelligence": false,
       "containerType": false,
-      "notes": "Panel GeneXus (Part; extrator atual nao gera arestas). queryableByKbIntelligence=false."
+      "notes": "Panel GeneXus (Part; extrator atual nao gera arestas based_on_domain nem outras relacoes indexadas — fora de IDBASEDON_DOMAIN_SOURCE_TYPES). queryableByKbIntelligence=false."
     },
     "PatternSettings": {
       "objectTypeGuid": "83476c1e-fa72-4229-9930-f51b954fca2d",

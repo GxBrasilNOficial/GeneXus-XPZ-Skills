@@ -26,6 +26,7 @@ Current scope:
 - Source ExternalObject method calls with receiver resolved by variable ATTCUSTOMTYPE
 - Procedure .Link() references in effective Source and Attribute Formula
 - Attribute Formula property references to Procedure, WebPanel and DataProvider when resolvable in the local inventory
+- idBasedOn Domain relations (based_on_domain) from Attribute and other scoped object types, with module suffix resolution via fullyQualifiedName
 """
 
 from __future__ import annotations
@@ -43,7 +44,22 @@ from pathlib import Path
 from typing import Iterable
 
 # Incrementar quando a cobertura ou regras do indexador mudarem de forma material (nao em refator inerte).
-EXTRACTOR_SIGNATURE_VERSION = "11"
+EXTRACTOR_SIGNATURE_VERSION = "12"
+
+# Origens do extrator generalizado idBasedOn -> Domain (relation_scope + Attribute; fora: Panel/Stencil/PackagedModule).
+IDBASEDON_DOMAIN_SOURCE_TYPES = (
+    "Procedure",
+    "WebPanel",
+    "DataProvider",
+    "Transaction",
+    "API",
+    "DataSelector",
+    "Domain",
+    "SDT",
+    "WorkWith",
+    "WorkWithForWeb",
+    "Attribute",
+)
 
 
 def compute_extractor_signature_hash() -> str:
@@ -337,6 +353,44 @@ OBJECT_MARKER_PROPERTY_RE = re.compile(
 PROPERTIES_BLOCK_RE = re.compile(r"<Properties\b[^>]*>(?P<body>.*?)</Properties>", re.IGNORECASE | re.DOTALL)
 XML_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
 XML_CDATA_RE = re.compile(r"<!\[CDATA\[.*?\]\]>", re.DOTALL)
+ROOT_FQFN_RE = re.compile(
+    r"<(?:Object|Attribute)\b[^>]*\bfullyQualifiedName=\"(?P<fqfn>[^\"]*)\"",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def mask_xml_cdata_and_comments(text: str) -> str:
+    """Mascara CDATA e comentarios preservando comprimento e quebras de linha.
+
+    Offsets no texto mascarado continuam validos no XML cru (line/snippet do cru).
+    Distinto do strip em object_level_property_dict_via_regex, que apaga conteudo.
+    """
+
+    def _mask_match(match: re.Match[str]) -> str:
+        return "".join("\n" if ch == "\n" else "X" for ch in match.group(0))
+
+    masked = XML_COMMENT_RE.sub(_mask_match, text)
+    return XML_CDATA_RE.sub(_mask_match, masked)
+
+
+def extract_root_fully_qualified_name(text: str) -> str | None:
+    match = ROOT_FQFN_RE.search(text)
+    if not match:
+        return None
+    value = match.group("fqfn").strip()
+    return value or None
+
+
+def collect_fully_qualified_names(
+    objects_by_type: dict[str, dict[str, ObjectInfo]],
+) -> dict[tuple[str, str], str | None]:
+    """Mapa (tipo.lower(), path.stem.lower()) -> fqfn do elemento raiz (ou None)."""
+    result: dict[tuple[str, str], str | None] = {}
+    for object_type, by_name in objects_by_type.items():
+        type_key = object_type.lower()
+        for name, info in by_name.items():
+            result[(type_key, name.lower())] = extract_root_fully_qualified_name(read_text(info.path))
+    return result
 
 
 def markers_from_property_dict(props: dict[str, str]) -> tuple[int, str | None, str | None]:
@@ -1998,22 +2052,107 @@ def extract_sdt_item_attcustomtype_resolved_sdt_evidence(
     return evidences
 
 
-def extract_attribute_idbasedon_domain_evidence(
+def parse_domain_idbasedon_value(value: str) -> tuple[str, str | None] | None:
+    """Parse Domain:<nome>[, <módulo>] apos normalize_custom_type.
+
+    Retorna (nome, módulo_ou_None) ou None se nao for Domain: resolvivel na borda
+    (prefixo ausente, nome vazio, multiplas virgulas).
+    """
+    normalized = normalize_custom_type(value)
+    if not normalized.lower().startswith("domain:"):
+        return None
+    rest = normalized.split(":", 1)[1].strip()
+    if not rest:
+        return None
+    if rest.count(",") > 1:
+        return None
+    if "," in rest:
+        name_part, module_part = rest.split(",", 1)
+        name = name_part.strip()
+        module = module_part.strip()
+        if not name or not module:
+            return None
+        return name, module
+    return rest, None
+
+
+def resolve_domain_idbasedon_target(
+    value: str,
+    domain_lookup: dict[str, str],
+    domain_fqfn_by_name: dict[str, str | None],
+) -> str | None:
+    """Resolvedor da regra B (Attribute e demais tipos do escopo).
+
+    Sem modulo: lookup por nome curto (lower). Com modulo: so se
+    lower(fqfn) == lower(modulo + '.' + nome). Sem fqfn ou divergente: nao resolve.
+    """
+    parsed = parse_domain_idbasedon_value(value)
+    if parsed is None:
+        return None
+    domain_name, module = parsed
+    target_name = domain_lookup.get(domain_name.lower())
+    if not target_name:
+        return None
+    if module is None:
+        return target_name
+    fqfn = domain_fqfn_by_name.get(target_name.lower())
+    if not fqfn:
+        return None
+    expected = f"{module}.{domain_name}"
+    if fqfn.lower() == expected.lower():
+        return target_name
+    return None
+
+
+def dedup_based_on_domain_evidences(evidences: list[Evidence]) -> list[Evidence]:
+    """Dedup por (origem tipada, destino tipado) dentro de based_on_domain; primeira evidencia."""
+    seen: set[tuple[str, str, str, str]] = set()
+    result: list[Evidence] = []
+    for evidence in evidences:
+        if evidence.relation_kind != "based_on_domain":
+            result.append(evidence)
+            continue
+        key = (
+            evidence.source_type,
+            evidence.source_name,
+            evidence.target_type,
+            evidence.target_name,
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(evidence)
+    return result
+
+
+def extract_idbasedon_domain_evidence(
     source_objects: Iterable[ObjectInfo],
     domain_names: set[str],
+    domain_fqfn_by_name: dict[str, str | None],
 ) -> list[Evidence]:
+    """idBasedOn Domain:… em XML cru com CDATA/comentario mascarados; snippet/linha do cru."""
     evidences: list[Evidence] = []
     domain_lookup = case_insensitive_lookup(domain_names, "Domain")
     for source in source_objects:
+        if source.object_type not in IDBASEDON_DOMAIN_SOURCE_TYPES:
+            continue
         xml_text = read_text(source.path)
-        for match in IDBASEDON_PROPERTY_RE.finditer(xml_text):
-            value = normalize_custom_type(match.group("value"))
-            if not value.lower().startswith("domain:"):
-                continue
-            raw_domain_name = value.split(":", 1)[1].strip()
-            target_name = domain_lookup.get(raw_domain_name.lower())
+        masked = mask_xml_cdata_and_comments(xml_text)
+        extractor_rule = (
+            "attribute_idbasedon_domain"
+            if source.object_type == "Attribute"
+            else "object_idbasedon_domain"
+        )
+        for match in IDBASEDON_PROPERTY_RE.finditer(masked):
+            raw_value = xml_text[match.start("value") : match.end("value")]
+            target_name = resolve_domain_idbasedon_target(
+                raw_value,
+                domain_lookup,
+                domain_fqfn_by_name,
+            )
             if not target_name:
                 continue
+            raw_snippet = xml_text[match.start() : match.end()]
             add_evidence(
                 evidences,
                 source=source,
@@ -2022,11 +2161,21 @@ def extract_attribute_idbasedon_domain_evidence(
                 relation_kind="based_on_domain",
                 line=line_number_at(xml_text, match.start("value")),
                 column=1,
-                snippet=match.group(0),
-                extractor_rule="attribute_idbasedon_domain",
+                snippet=raw_snippet,
+                extractor_rule=extractor_rule,
                 evidence_role="Property idBasedOn",
             )
-    return evidences
+    return dedup_based_on_domain_evidences(evidences)
+
+
+def extract_attribute_idbasedon_domain_evidence(
+    source_objects: Iterable[ObjectInfo],
+    domain_names: set[str],
+    domain_fqfn_by_name: dict[str, str | None] | None = None,
+) -> list[Evidence]:
+    """Compat: Attribute-only; preferir extract_idbasedon_domain_evidence no build."""
+    fqfn_map = domain_fqfn_by_name or {}
+    return extract_idbasedon_domain_evidence(source_objects, domain_names, fqfn_map)
 
 
 def extract_attribute_formula_call_evidence(
@@ -2731,6 +2880,62 @@ def validation_report(
                 incoming += 1
         return incoming, outgoing
 
+    def source_has_idbasedon_value(info: ObjectInfo, expected_value: str) -> bool:
+        xml_text = read_text(info.path)
+        expected_norm = normalize_custom_type(expected_value)
+        for match in IDBASEDON_PROPERTY_RE.finditer(xml_text):
+            if normalize_custom_type(match.group("value")) == expected_norm:
+                return True
+        return False
+
+    def check_relation_preconditions(raw_case: dict[str, object]) -> list[str]:
+        """G.0: precondicoes opcionais retrocompativeis para casos de relacao."""
+        failures: list[str] = []
+        source_raw = raw_case.get("source")
+        target_raw = raw_case.get("target")
+        source_info: ObjectInfo | None = None
+        if source_raw is not None:
+            source_type, source_name = split_typed_name(str(source_raw))
+            source_info = object_info_exists(source_type, source_name)
+
+        if raw_case.get("require_source_exists"):
+            if source_raw is None:
+                failures.append("require_source_exists set but source missing in case")
+            elif source_info is None:
+                failures.append(f"require_source_exists: {source_raw} not found")
+
+        prop_req = raw_case.get("require_property_in_source")
+        if prop_req is not None:
+            if source_info is None:
+                failures.append("require_property_in_source: source not found")
+            else:
+                if isinstance(prop_req, dict):
+                    expected_value = str(prop_req.get("value", ""))
+                else:
+                    expected_value = str(prop_req)
+                if not source_has_idbasedon_value(source_info, expected_value):
+                    failures.append(
+                        f"require_property_in_source: idBasedOn value {expected_value!r} not found in source"
+                    )
+
+        if raw_case.get("require_target_exists"):
+            if target_raw is None:
+                failures.append("require_target_exists set but target missing in case")
+            else:
+                target_type, target_name = split_typed_name(str(target_raw))
+                target_info = object_info_exists(target_type, target_name)
+                if target_info is None:
+                    failures.append(f"require_target_exists: {target_raw} not found")
+                else:
+                    expected_fqfn = raw_case.get("require_target_fully_qualified_name")
+                    if expected_fqfn is not None:
+                        actual_fqfn = extract_root_fully_qualified_name(read_text(target_info.path))
+                        if (actual_fqfn or "").lower() != str(expected_fqfn).lower():
+                            failures.append(
+                                f"require_target_fully_qualified_name: got {actual_fqfn!r} expected {expected_fqfn!r}"
+                            )
+        return failures
+
     cases: list[dict[str, object]] = []
     if validation_cases_path:
         raw_cases = json.loads(validation_cases_path.read_text(encoding="utf-8"))
@@ -2763,16 +2968,18 @@ def validation_report(
                     if outgoing < min_outgoing:
                         failures.append(f"outgoing_relations={outgoing} below minimum {min_outgoing}")
             elif {"source", "target", "expected_rule"} <= set(raw_case):
-                source_type, source_name = split_typed_name(raw_case["source"])
-                target_type, target_name = split_typed_name(raw_case["target"])
-                expected_rule = raw_case["expected_rule"]
-                should_exist = bool(raw_case.get("should_exist", True))
-                relation_exists = has_relation(source_type, source_name, target_type, target_name, expected_rule)
-                if (relation_exists if should_exist else not relation_exists) is False:
-                    failures.append(
-                        f"relation {source_type}:{source_name} -> {target_type}:{target_name} via {expected_rule} "
-                        f"expected {should_exist} but got {relation_exists}"
-                    )
+                failures.extend(check_relation_preconditions(raw_case))
+                if not failures:
+                    source_type, source_name = split_typed_name(raw_case["source"])
+                    target_type, target_name = split_typed_name(raw_case["target"])
+                    expected_rule = raw_case["expected_rule"]
+                    should_exist = bool(raw_case.get("should_exist", True))
+                    relation_exists = has_relation(source_type, source_name, target_type, target_name, expected_rule)
+                    if (relation_exists if should_exist else not relation_exists) is False:
+                        failures.append(
+                            f"relation {source_type}:{source_name} -> {target_type}:{target_name} via {expected_rule} "
+                            f"expected {should_exist} but got {relation_exists}"
+                        )
             else:
                 failures.append(f"Unsupported validation case format: {query or 'relation'}")
 
@@ -2950,9 +3157,18 @@ def main() -> int:
         objects_by_type.get("SDT", {}).values(),
         sdt_names=set(objects_by_type.get("SDT", {})),
     )
-    attribute_idbasedon_domain_evidences = extract_attribute_idbasedon_domain_evidence(
-        attributes.values(),
+    attribute_idbasedon_domain_evidences = extract_idbasedon_domain_evidence(
+        [
+            obj
+            for obj in objects
+            if obj.object_type in IDBASEDON_DOMAIN_SOURCE_TYPES
+        ],
         domain_names=set(objects_by_type.get("Domain", {})),
+        domain_fqfn_by_name={
+            name.lower(): fqfn
+            for (object_type, name), fqfn in collect_fully_qualified_names(objects_by_type).items()
+            if object_type == "domain"
+        },
     )
     attribute_formula_call_evidences = extract_attribute_formula_call_evidence(
         attributes.values(),
