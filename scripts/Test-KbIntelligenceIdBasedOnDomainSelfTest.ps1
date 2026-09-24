@@ -111,6 +111,8 @@ function Write-DomainXml {
     [System.IO.File]::WriteAllText((Join-Path $domainDir "$Name.xml"), $xml, (Get-Utf8NoBomEncoding))
 }
 
+try {
+
 # Domains alvo
 Write-DomainXml -Name 'DomAlpha' -Fqfn 'DomAlpha' -GuidSuffix '000000000001'
 Write-DomainXml -Name 'DomBeta' -Fqfn 'DomBeta' -GuidSuffix '000000000002'
@@ -572,4 +574,8 @@ $rPanel = @(Find-Rows -Rows $rows -SourceType 'Panel' -SourceName 'PanelWithIdBa
 Assert-True ($rPanel.Count -eq 0) "G.2.18 Panel fora do escopo"
 
 Write-Output 'OK: Test-KbIntelligenceIdBasedOnDomainSelfTest.ps1'
-exit 0
+} finally {
+    if (Test-Path -LiteralPath $tempRoot) {
+        Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}

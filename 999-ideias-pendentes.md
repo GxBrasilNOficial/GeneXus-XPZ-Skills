@@ -735,6 +735,13 @@ A `decisao-001` adiou o runbook 2b até 2 experimentos (003 Transaction + 004 Pr
 2. **Unificação do resolvedor de módulo** com `resolve_custom_type_target` / item SDT / `exo:` — caminhos existentes **não** foram tocados na frente 12; unificar depois sem regressão.
 3. **Limitação de homônimos**: um arquivo por nome curto no inventário; Domains homônimos em módulos distintos não coexistem no modelo atual de pasta — fixture de homônimo monta um alvo divergente; não expandir schema agora.
 
+## Limpeza de `%TEMP%` nos self-tests KbIntelligence (família)
+
+- **Importância** — baixa (higiene; lixo por run em `%TEMP%`; se `$env:TEMP` apontar para `Temp/` do repo, pode sujar a working tree).
+- **Maturidade** — pronta (padrão `try`/`finally` + `Remove-Item -Recurse`).
+
+`Test-KbIntelligenceIdBasedOnDomainSelfTest.ps1` (2026-09-24) limpa `$tempRoot` ao terminar. Os irmãos ainda deixam a árvore GUID em `%TEMP%` sem remover a raiz: `Test-KbIntelligenceAttributeFormulaExtractionSelfTest.ps1`, `Test-KbIntelligenceProcedureCallFormsSelfTest.ps1`, `Test-KbIntelligenceCssClassExtractionSelfTest.ps1`, `Test-KbIntelligenceExternalObjectMethodExtractionSelfTest.ps1`, `Test-KbIntelligenceGeneratedObjectExtractionSelfTest.ps1`, `Test-KbIntelligenceLegacyOrphanSkipSelfTest.ps1`, `Test-KbIntelligenceQueryableGuardSelfTest.ps1`. Alinhar ao tocar cada um, ou em lote de higiene — não é gap funcional do extrator.
+
 ## Plano A — Implementar relação `references_attribute` no índice KbIntelligence
 
 **Importância:** baixa (rebaixada em 2026-06-12 — ver «Reavaliação» abaixo; a motivação de detecção de regressão ficou largamente coberta por IDE+build)
