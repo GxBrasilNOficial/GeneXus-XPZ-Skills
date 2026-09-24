@@ -17,8 +17,8 @@ Docs alinhadas: `02`, `08`, `09`, `scripts/README-kb-intelligence.md` (campos do
 - Commit material (máscara em passagem única): `a761cf1` (`fix(kb-intel): mascara idBasedOn em passagem unica CDATA/comentario`)
 - Commit material (EOF self-test / remove caso 8b): `56c317c` (`fix(kb-intel): limpa EOF do self-test e remove caso 8b vácuo`)
 - Commit material (higiene TEMP do self-test + nota 999): `e52eaca` (`fix(kb-intel): limpa TEMP do self-test idBasedOn e anota irmãos no 999`)
+- Commit material (paridade máscara no `require_property_in_source` + FQFN só Domain + G.2.20/21 + histórico + README): `0c5cc81` (`fix(kb-intel): paridade da máscara no require_property e fecha gaps do extrator 12`)
 - Arquivos materiais: `scripts/Build-KbIntelligenceIndex.py`, `scripts/Test-KbIntelligenceIdBasedOnDomainSelfTest.ps1`, `scripts/kb-intelligence-kbexemplo.validation-extraction-semantic.json`, `scripts/gx-object-type-catalog.json`, `scripts/README-kb-intelligence.md`, `02-regras-operacionais-e-runtime.md`, `08-guia-para-agente-gpt.md`, `09-inventario-e-rastreabilidade-publica.md`, `xpz-index-triage/SKILL.md`, `CHANGELOG.md`, `999-ideias-pendentes.md`, `historico/IdeiasImplementadas_202609.md`.
-- A correção de paridade do `require_property_in_source` (máscara), restrição de `collect_fully_qualified_names` a Domain e o caso G.2.20 entram no commit que grava esta entrada; o hash desse commit deve ser acrescentado em `### Rastreabilidade` no commit seguinte (meta-documental).
 
 ## Deteccao tipada de cota/auth no Antigravity `public-review`
 
