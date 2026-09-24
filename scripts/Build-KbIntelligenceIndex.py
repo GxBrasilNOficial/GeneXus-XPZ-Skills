@@ -2195,16 +2195,6 @@ def extract_idbasedon_domain_evidence(
     return dedup_based_on_domain_evidences(evidences)
 
 
-def extract_attribute_idbasedon_domain_evidence(
-    source_objects: Iterable[ObjectInfo],
-    domain_names: set[str],
-    domain_fqfn_by_name: dict[str, str | None] | None = None,
-) -> list[Evidence]:
-    """Compat: Attribute-only; preferir extract_idbasedon_domain_evidence no build."""
-    fqfn_map = domain_fqfn_by_name or {}
-    return extract_idbasedon_domain_evidence(source_objects, domain_names, fqfn_map)
-
-
 def extract_attribute_formula_call_evidence(
     source_objects: Iterable[ObjectInfo],
     procedure_names: set[str],
@@ -2908,10 +2898,13 @@ def validation_report(
         return incoming, outgoing
 
     def source_has_idbasedon_value(info: ObjectInfo, expected_value: str) -> bool:
+        # Paridade com extract_idbasedon_domain_evidence: so conta Property fora de CDATA/comentario.
         xml_text = read_text(info.path)
+        masked = mask_xml_cdata_and_comments(xml_text)
         expected_norm = normalize_custom_type(expected_value)
-        for match in IDBASEDON_PROPERTY_RE.finditer(xml_text):
-            if normalize_custom_type(match.group("value")) == expected_norm:
+        for match in IDBASEDON_PROPERTY_RE.finditer(masked):
+            raw_value = xml_text[match.start("value") : match.end("value")]
+            if normalize_custom_type(raw_value) == expected_norm:
                 return True
         return False
 
@@ -3193,7 +3186,9 @@ def main() -> int:
         domain_names=set(objects_by_type.get("Domain", {})),
         domain_fqfn_by_name={
             name.lower(): fqfn
-            for (object_type, name), fqfn in collect_fully_qualified_names(objects_by_type).items()
+            for (object_type, name), fqfn in collect_fully_qualified_names(
+                {"Domain": objects_by_type.get("Domain", {})}
+            ).items()
             if object_type == "domain"
         },
     )

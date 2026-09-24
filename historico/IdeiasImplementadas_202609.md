@@ -2,6 +2,24 @@
 
 Registro de ideias que sairam de 999-ideias-pendentes.md por terem sido implementadas ou incorporadas ao contrato metodologico vigente.
 
+## KbIntelligence extrator 12 — `idBasedOn`→`Domain` generalizado
+
+Implementado em 2026-09-24. A relação `based_on_domain` deixou de ser exclusiva de `Attribute`: o extrator passa a emitir arestas a partir de Procedure, SDT, WebPanel, Transaction e demais tipos no `relation_scope` (exceto Panel/Stencil/PackagedModule), com máscara em passagem única de CDATA/comentário (offsets e snippet no XML cru), resolvedor de módulo via `fullyQualifiedName` (`lower()`), dedup por par origem/destino e bump `EXTRACTOR_SIGNATURE_VERSION` 11→12 (`schema_version` permanece 4).
+
+O validador de casos de relação ganhou precondições opcionais (`require_source_exists`, `require_property_in_source`, `require_target_exists` / `require_target_fully_qualified_name`); `require_property_in_source` aplica a mesma máscara do extrator para não aprovar Property só dentro de comentário/CDATA. O mapa de FQFN de Domain no build restringe `collect_fully_qualified_names` ao tipo Domain (evita segunda leitura integral do acervo). Removida a função morta `extract_attribute_idbasedon_domain_evidence`. Self-test local: `scripts/Test-KbIntelligenceIdBasedOnDomainSelfTest.ps1` (G.2.20 precondição; G.2.21 WebPanel/Transaction/DataProvider/API/DataSelector/Domain/WorkWith/WorkWithForWeb). Caso 8 do `semantic.json` reforçado com as precondições. Medição em índice FabricaBrasil: NFe 0→16, GAM 0→1, 30 tuplas Attribute→Peso intactas.
+
+Docs alinhadas: `02`, `08`, `09`, `scripts/README-kb-intelligence.md` (campos dos casos; exemplos com `<PastaParalelaDaKb>` em vez do path fantasma `C:\KB\KBExemplo`), catálogo, `xpz-index-triage`, contrato fase 5, `CHANGELOG` trilíngue, residual e nota de higiene TEMP dos irmãos no `999`.
+
+### Rastreabilidade
+
+- Commit material: `bf061f7` (`kb-intel: generaliza idBasedOn→Domain no extrator 12`)
+- Commit material (máscara CDATA antes de comentário): `9cd10a5` (`fix(kb-intel): mascara CDATA antes de comentario no idBasedOn`)
+- Commit material (máscara em passagem única): `a761cf1` (`fix(kb-intel): mascara idBasedOn em passagem unica CDATA/comentario`)
+- Commit material (EOF self-test / remove caso 8b): `56c317c` (`fix(kb-intel): limpa EOF do self-test e remove caso 8b vácuo`)
+- Commit material (higiene TEMP do self-test + nota 999): `e52eaca` (`fix(kb-intel): limpa TEMP do self-test idBasedOn e anota irmãos no 999`)
+- Arquivos materiais: `scripts/Build-KbIntelligenceIndex.py`, `scripts/Test-KbIntelligenceIdBasedOnDomainSelfTest.ps1`, `scripts/kb-intelligence-kbexemplo.validation-extraction-semantic.json`, `scripts/gx-object-type-catalog.json`, `scripts/README-kb-intelligence.md`, `02-regras-operacionais-e-runtime.md`, `08-guia-para-agente-gpt.md`, `09-inventario-e-rastreabilidade-publica.md`, `xpz-index-triage/SKILL.md`, `CHANGELOG.md`, `999-ideias-pendentes.md`, `historico/IdeiasImplementadas_202609.md`.
+- A correção de paridade do `require_property_in_source` (máscara), restrição de `collect_fully_qualified_names` a Domain e o caso G.2.20 entram no commit que grava esta entrada; o hash desse commit deve ser acrescentado em `### Rastreabilidade` no commit seguinte (meta-documental).
+
 ## Deteccao tipada de cota/auth no Antigravity `public-review`
 
 Implementado em 2026-09-16 conforme o plano congelado v9 (`Temp/plano-antigravity-deteccao-limite-uso-v9.md`), fatia Antigravity de «Estender a detecção de limite de uso/taxa do provider aos adapters de delegação irmãos» no `999`.

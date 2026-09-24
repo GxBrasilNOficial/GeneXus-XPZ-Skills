@@ -94,22 +94,24 @@ Eles não substituem o acervo XML em `ObjetosDaKbEmXml` e não provam comportame
 
 ```powershell
 .\scripts\Build-KbIntelligenceIndex.ps1 `
-  -SourceRoot "C:\KB\KBExemplo\ObjetosDaKbEmXml" `
-  -OutputPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite" `
-  -ValidationReportPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence-validation.json" `
+  -SourceRoot "<PastaParalelaDaKb>\ObjetosDaKbEmXml" `
+  -OutputPath "<PastaParalelaDaKb>\KbIntelligence\kb-intelligence.sqlite" `
+  -ValidationReportPath "<PastaParalelaDaKb>\KbIntelligence\kb-intelligence-validation.json" `
   -ValidationCasesPath ".\scripts\kb-intelligence-kbexemplo.validation-extraction-basic.json" `
   -FailOnValidationFailure
 ```
 
-Para outra KB, troque `-SourceRoot`, `-OutputPath` e, se aplicavel, `-ValidationCasesPath`.
+Substitua `<PastaParalelaDaKb>` pela pasta paralela real (ex.: `C:\Dev\Prod\Gx_FabricaBrasil`). Troque `-ValidationCasesPath` pela bateria cujo inventário casa com essa KB.
 
-Para validar extracao estendida em `KBExemplo`, use:
+As baterias `scripts/kb-intelligence-kbexemplo.*.json` são **histórico de laboratório** (nomes de objeto da KB de ensaio das fases 1–6). Só fazem sentido se essa pasta ainda existir com esse inventário; caso contrário use self-tests locais (`Test-KbIntelligence*SelfTest.ps1`) ou baterias `kb-intelligence-fabricabrasil.*` / `kb-intelligence-wseducacaospteste.*`.
+
+Para validar extracao estendida com a bateria histórica `kbexemplo`, use:
 
 ```powershell
 .\scripts\Build-KbIntelligenceIndex.ps1 `
-  -SourceRoot "C:\KB\KBExemplo\ObjetosDaKbEmXml" `
-  -OutputPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite" `
-  -ValidationReportPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence-validation.json" `
+  -SourceRoot "<PastaParalelaDaKb>\ObjetosDaKbEmXml" `
+  -OutputPath "<PastaParalelaDaKb>\KbIntelligence\kb-intelligence.sqlite" `
+  -ValidationReportPath "<PastaParalelaDaKb>\KbIntelligence\kb-intelligence-validation.json" `
   -ValidationCasesPath ".\scripts\kb-intelligence-kbexemplo.validation-extraction-extended.json" `
   -FailOnValidationFailure
 ```
@@ -140,7 +142,7 @@ Para ler os metadados do índice pelo wrapper:
 
 ```powershell
 .\scripts\Query-KbIntelligenceIndex.ps1 `
-  -IndexPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite" `
+  -IndexPath "<PastaParalelaDaKb>\KbIntelligence\kb-intelligence.sqlite" `
   -Query index-metadata `
   -Format text
 ```
@@ -224,7 +226,7 @@ Depois de separar por prefixo, não tratar prefixo promissor como relacao resolv
 Contar ocorrências textuais de `ATTCUSTOMTYPE` no acervo:
 
 ```powershell
-Get-ChildItem -Path "C:\KB\KBExemplo\ObjetosDaKbEmXml" -Recurse -File |
+Get-ChildItem -Path "<PastaParalelaDaKb>\ObjetosDaKbEmXml" -Recurse -File |
   Select-String -Pattern 'ATTCUSTOMTYPE' |
   Measure-Object
 ```
@@ -232,7 +234,7 @@ Get-ChildItem -Path "C:\KB\KBExemplo\ObjetosDaKbEmXml" -Recurse -File |
 Agrupar valores de `ATTCUSTOMTYPE` por prefixo observavel:
 
 ```powershell
-Get-ChildItem -Path "C:\KB\KBExemplo\ObjetosDaKbEmXml" -Recurse -File |
+Get-ChildItem -Path "<PastaParalelaDaKb>\ObjetosDaKbEmXml" -Recurse -File |
   Select-String -Pattern 'ATTCUSTOMTYPE="([^"]+)"' -AllMatches |
   ForEach-Object { $_.Matches } |
   ForEach-Object { ($_.Groups[1].Value -split ':', 2)[0].ToLower() } |
@@ -243,7 +245,7 @@ Get-ChildItem -Path "C:\KB\KBExemplo\ObjetosDaKbEmXml" -Recurse -File |
 Abrir amostra curta de valores reais antes de decidir contrato:
 
 ```powershell
-Get-ChildItem -Path "C:\KB\KBExemplo\ObjetosDaKbEmXml" -Recurse -File |
+Get-ChildItem -Path "<PastaParalelaDaKb>\ObjetosDaKbEmXml" -Recurse -File |
   Select-String -Pattern 'ATTCUSTOMTYPE="([^"]+)"' -AllMatches |
   ForEach-Object { $_.Matches } |
   ForEach-Object { $_.Groups[1].Value } |
@@ -260,7 +262,7 @@ Evitar:
 
 ```powershell
 .\scripts\Query-KbIntelligenceIndex.ps1 `
-  -IndexPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite" `
+  -IndexPath "<PastaParalelaDaKb>\KbIntelligence\kb-intelligence.sqlite" `
   -Query search-objects `
   -ObjectName "*PlanilhaVolume*" `
   -Limit 10 `
@@ -271,7 +273,7 @@ Evitar:
 
 ```powershell
 .\scripts\Query-KbIntelligenceIndex.ps1 `
-  -IndexPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite" `
+  -IndexPath "<PastaParalelaDaKb>\KbIntelligence\kb-intelligence.sqlite" `
   -Query object-info `
   -ObjectType Procedure `
   -ObjectName procPlanilhaVolumeMovimento `
@@ -284,7 +286,7 @@ Para consulta leve de atributo, sem varrer XMLs em massa:
 
 ```powershell
 .\scripts\Query-KbIntelligenceIndex.ps1 `
-  -IndexPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite" `
+  -IndexPath "<PastaParalelaDaKb>\KbIntelligence\kb-intelligence.sqlite" `
   -Query attribute-info `
   -ObjectName ClienteTotal `
   -Format text
@@ -294,7 +296,7 @@ Para listar atributos de uma Transaction com classificação **materializada** d
 
 ```powershell
 .\scripts\Query-KbIntelligenceIndex.ps1 `
-  -IndexPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite" `
+  -IndexPath "<PastaParalelaDaKb>\KbIntelligence\kb-intelligence.sqlite" `
   -Query transaction-writable-attributes `
   -ObjectName Cliente `
   -Format text
@@ -310,9 +312,9 @@ Depois de gerar ou localizar um índice SQLite com `source_root` valido, snapsho
 
 ```powershell
 .\scripts\Test-KbIntelligenceQueries.ps1 `
-  -IndexPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite" `
+  -IndexPath "<PastaParalelaDaKb>\KbIntelligence\kb-intelligence.sqlite" `
   -ValidationCasesPath ".\scripts\kb-intelligence-kbexemplo.validation-queries-writability.json" `
-  -ValidationReportPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence-validation-queries-writability.json" `
+  -ValidationReportPath "<PastaParalelaDaKb>\KbIntelligence\kb-intelligence-validation-queries-writability.json" `
   -FailOnValidationFailure
 ```
 
@@ -324,7 +326,7 @@ Como esses casos validam consultas e trazem `query`, eles pertencem ao executor 
 
 ```powershell
 .\scripts\Query-KbIntelligenceIndex.ps1 `
-  -IndexPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite" `
+  -IndexPath "<PastaParalelaDaKb>\KbIntelligence\kb-intelligence.sqlite" `
   -Query who-uses `
   -ObjectType Procedure `
   -ObjectName procPlanilhaVolumeMovimento `
@@ -336,7 +338,7 @@ Como esses casos validam consultas e trazem `query`, eles pertencem ao executor 
 
 ```powershell
 .\scripts\Query-KbIntelligenceIndex.ps1 `
-  -IndexPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite" `
+  -IndexPath "<PastaParalelaDaKb>\KbIntelligence\kb-intelligence.sqlite" `
   -Query what-uses `
   -ObjectType WebPanel `
   -ObjectName wpRelatoriosDeMovimentosDeVolumes `
@@ -348,7 +350,7 @@ Como esses casos validam consultas e trazem `query`, eles pertencem ao executor 
 
 ```powershell
 .\scripts\Query-KbIntelligenceIndex.ps1 `
-  -IndexPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite" `
+  -IndexPath "<PastaParalelaDaKb>\KbIntelligence\kb-intelligence.sqlite" `
   -Query show-evidence `
   -SourceType WebPanel `
   -SourceName wpRelatoriosDeMovimentosDeVolumes `
@@ -363,7 +365,7 @@ O comando `impact-basic` resume dependentes diretos e dependencias diretas do ob
 
 ```powershell
 .\scripts\Query-KbIntelligenceIndex.ps1 `
-  -IndexPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite" `
+  -IndexPath "<PastaParalelaDaKb>\KbIntelligence\kb-intelligence.sqlite" `
   -Query impact-basic `
   -ObjectType Procedure `
   -ObjectName procPlanilhaVolumeMovimento `
@@ -390,7 +392,7 @@ Ele não abre XML automaticamente, não interpreta regra de negocio e não subst
 
 ```powershell
 .\scripts\Query-KbIntelligenceIndex.ps1 `
-  -IndexPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite" `
+  -IndexPath "<PastaParalelaDaKb>\KbIntelligence\kb-intelligence.sqlite" `
   -Query functional-trace-basic `
   -ObjectType Procedure `
   -ObjectName procAjustaCompraGadoIdDeAnimais `
@@ -407,12 +409,12 @@ Camada 1 — catalogo. `css_class` unifica os dois modelos de tema, com `model` 
 ```powershell
 # catalogo autoral (kb-authored); use -IncludeImported ou -Origin packaged-module para libs
 .\scripts\Query-KbIntelligenceIndex.ps1 `
-  -IndexPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite" `
+  -IndexPath "<PastaParalelaDaKb>\KbIntelligence\kb-intelligence.sqlite" `
   -Query css-classes -Model design-system -Format text
 
 # lookup de uma classe especifica (case-sensitive; acha tambem importada)
 .\scripts\Query-KbIntelligenceIndex.ps1 `
-  -IndexPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite" `
+  -IndexPath "<PastaParalelaDaKb>\KbIntelligence\kb-intelligence.sqlite" `
   -Query css-classes -ObjectName AttributeAvisos -Format text
 ```
 
@@ -420,7 +422,7 @@ Camada 2 — uso. `css-class-usage -ObjectName <classe>` lista os usos resolvive
 
 ```powershell
 .\scripts\Query-KbIntelligenceIndex.ps1 `
-  -IndexPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite" `
+  -IndexPath "<PastaParalelaDaKb>\KbIntelligence\kb-intelligence.sqlite" `
   -Query css-class-usage -ObjectName AttributeAvisos -Format text
 ```
 
@@ -432,15 +434,29 @@ Depois de gerar ou localizar um índice SQLite, valide o comportamento operacion
 
 ```powershell
 .\scripts\Test-KbIntelligenceQueries.ps1 `
-  -IndexPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite" `
+  -IndexPath "<PastaParalelaDaKb>\KbIntelligence\kb-intelligence.sqlite" `
   -ValidationCasesPath ".\scripts\kb-intelligence-kbexemplo.validation-queries-impact.json" `
-  -ValidationReportPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence-validation-queries-impact.json" `
+  -ValidationReportPath "<PastaParalelaDaKb>\KbIntelligence\kb-intelligence-validation-queries-impact.json" `
   -FailOnValidationFailure
 ```
 
 Esses casos conferem comportamento de consulta. Eles não regeneram o índice nem substituem as baterias de extracao.
 
 Escolha o executor pelo formato do caso. Casos com campo `query` pertencem a validação de consultas; casos com `source`, `target` e `expected_rule` pertencem a validação de extracao/geracao.
+
+### Campos dos casos de relação (extração / geração)
+
+Além de `source`, `target`, `expected_rule` e `expectation` (texto livre):
+
+| Campo | Papel |
+| --- | --- |
+| `should_exist` | Default `true`. Se `false`, o caso passa só quando a aresta **não** existe. |
+| `require_source_exists` | Se `true`, falha quando o `source` não está no inventário do build. |
+| `require_property_in_source` | String (valor esperado) ou objeto `{ "value": "..." }`. Exige Property `idBasedOn` com esse valor no XML da origem, **fora** de CDATA/comentário (mesma máscara do extrator). Serve para evitar falso verde em `should_exist:false` quando a Property nem existe de verdade. |
+| `require_target_exists` | Se `true`, falha quando o `target` tipado não está no inventário. |
+| `require_target_fully_qualified_name` | Compara o `fullyQualifiedName` do alvo (exige `require_target_exists`). Comparação case-insensitive. |
+
+Precondições (`require_*`) rodam **antes** da checagem da aresta; se alguma falhar, o caso falha sem olhar `should_exist`.
 
 ## Cuidado com validacoes SQLite no Windows
 
@@ -456,9 +472,9 @@ Depois de regenerar o índice, valide a presenca de tipos ampliados com:
 
 ```powershell
 .\scripts\Test-KbIntelligenceQueries.ps1 `
-  -IndexPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite" `
+  -IndexPath "<PastaParalelaDaKb>\KbIntelligence\kb-intelligence.sqlite" `
   -ValidationCasesPath ".\scripts\kb-intelligence-kbexemplo.validation-inventory-extended.json" `
-  -ValidationReportPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence-validation-inventory-extended.json" `
+  -ValidationReportPath "<PastaParalelaDaKb>\KbIntelligence\kb-intelligence-validation-inventory-extended.json" `
   -FailOnValidationFailure
 ```
 
@@ -476,9 +492,9 @@ Depois de regenerar o índice, valide a resolucao semantica aprovada com:
 
 ```powershell
 .\scripts\Build-KbIntelligenceIndex.ps1 `
-  -SourceRoot "C:\KB\KBExemplo\ObjetosDaKbEmXml" `
-  -OutputPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite" `
-  -ValidationReportPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence-validation.json" `
+  -SourceRoot "<PastaParalelaDaKb>\ObjetosDaKbEmXml" `
+  -OutputPath "<PastaParalelaDaKb>\KbIntelligence\kb-intelligence.sqlite" `
+  -ValidationReportPath "<PastaParalelaDaKb>\KbIntelligence\kb-intelligence-validation.json" `
   -ValidationCasesPath ".\scripts\kb-intelligence-kbexemplo.validation-extraction-semantic.json" `
   -FailOnValidationFailure
 ```
@@ -498,37 +514,37 @@ Para validar especificamente a extracao de criacao de WebComponent por `<WebPane
 
 Essa bateria cobre `webpanel_dot_create` e deve ser tratada como validação de extracao/geracao, não como validação de consulta.
 
-Self-test local (não depende de KBExemplo) para `Property Formula` em `Attribute`:
+Self-test local (não depende de pasta paralela real) para `Property Formula` em `Attribute`:
 
 ```powershell
 .\scripts\Test-KbIntelligenceAttributeFormulaExtractionSelfTest.ps1
 ```
 
-Self-test local (não depende de KBExemplo) para formas de chamada de `Procedure` resolvidas pelo inventario real, sem depender de prefixos como `proc*`:
+Self-test local (não depende de pasta paralela real) para formas de chamada de `Procedure` resolvidas pelo inventario real, sem depender de prefixos como `proc*`:
 
 ```powershell
 .\scripts\Test-KbIntelligenceProcedureCallFormsSelfTest.ps1
 ```
 
-Self-test local (não depende de KBExemplo) para chamada de método em variável `exo:<ExternalObject>` e protecao contra falso positivo por substring em chamada direta de `Procedure`:
+Self-test local (não depende de pasta paralela real) para chamada de método em variável `exo:<ExternalObject>` e protecao contra falso positivo por substring em chamada direta de `Procedure`:
 
 ```powershell
 .\scripts\Test-KbIntelligenceExternalObjectMethodExtractionSelfTest.ps1
 ```
 
-Self-test local (não depende de KBExemplo) para o sinal determinístico gerado-por-Pattern (`IsGeneratedObject`/`PatternObjectId`/`InstanceKey`) na tabela `objects`, com guarda contra marcadores de `<Object>` aninhado em `PackagedModule` e o caminho de fallback regex para XML malformado:
+Self-test local (não depende de pasta paralela real) para o sinal determinístico gerado-por-Pattern (`IsGeneratedObject`/`PatternObjectId`/`InstanceKey`) na tabela `objects`, com guarda contra marcadores de `<Object>` aninhado em `PackagedModule` e o caminho de fallback regex para XML malformado:
 
 ```powershell
 .\scripts\Test-KbIntelligenceGeneratedObjectExtractionSelfTest.ps1
 ```
 
-Self-test local (não depende de KBExemplo) para `idBasedOn`→`Domain` (`based_on_domain`, extrator 12): escopo além de `Attribute`, módulo por `fullyQualifiedName`, máscara CDATA/comentário em passagem única e dedup:
+Self-test local (não depende de pasta paralela real) para `idBasedOn`→`Domain` (`based_on_domain`, extrator 12): escopo além de `Attribute`, módulo por `fullyQualifiedName`, máscara CDATA/comentário em passagem única e dedup:
 
 ```powershell
 .\scripts\Test-KbIntelligenceIdBasedOnDomainSelfTest.ps1
 ```
 
-Casos positivos de `Property Formula` em KBs de producao ficam catalogados em `kb-intelligence-kbexemplo.validation-extraction-semantic.json` (ids `phase5-case-65..68`) e em baterias dedicadas por KB: `kb-intelligence-fabricabrasil.validation-extraction-attribute-formula.json`, `kb-intelligence-wseducacaospteste.validation-extraction-attribute-formula.json`. Validar cada bateria no rebuild da pasta paralela correspondente; o arquivo semantic completo continua orientado ao KBExemplo e inclui esses casos apenas como catalogo compartilhado.
+Casos positivos de `Property Formula` em KBs de producao ficam catalogados em `kb-intelligence-kbexemplo.validation-extraction-semantic.json` (ids `phase5-case-65..68`, como catálogo compartilhado) e em baterias dedicadas por KB: `kb-intelligence-fabricabrasil.validation-extraction-attribute-formula.json`, `kb-intelligence-wseducacaospteste.validation-extraction-attribute-formula.json`. Validar cada bateria no rebuild da pasta paralela correspondente — não no path genérico dos exemplos.
 
 Esses casos usam `source`, `target` e `expected_rule`, entao devem rodar no gerador/indexador. Se forem enviados por engano para `Test-KbIntelligenceQueries.ps1`, o resultado deve ser tratado primeiro como executor incompativel, não como regressao real da regra.
 
@@ -538,9 +554,9 @@ Depois de localizar ou regenerar o índice canonico, valide `functional-trace-ba
 
 ```powershell
 .\scripts\Test-KbIntelligenceQueries.ps1 `
-  -IndexPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence.sqlite" `
+  -IndexPath "<PastaParalelaDaKb>\KbIntelligence\kb-intelligence.sqlite" `
   -ValidationCasesPath ".\scripts\kb-intelligence-kbexemplo.validation-queries-functional-trace.json" `
-  -ValidationReportPath "C:\KB\KBExemplo\KbIntelligence\kb-intelligence-validation-queries-functional-trace.json" `
+  -ValidationReportPath "<PastaParalelaDaKb>\KbIntelligence\kb-intelligence-validation-queries-functional-trace.json" `
   -FailOnValidationFailure
 ```
 

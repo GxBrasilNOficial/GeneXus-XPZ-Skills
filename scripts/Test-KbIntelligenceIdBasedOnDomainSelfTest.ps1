@@ -87,6 +87,13 @@ $domainGuid = '00972a17-9975-449e-aab1-d26165d51393'
 $procedureGuid = '84a12160-f59b-4ad7-a683-ea4481ac23e9'
 $sdtGuid = '447527b5-9210-4523-898b-5dccb17be60a'
 $panelGuid = 'd82625fd-5892-40b0-99c9-5c8559c197fc'
+$webPanelGuid = 'c9584656-94b6-4ccd-890f-332d11fc2c25'
+$transactionGuid = '1db606f2-af09-4cf9-a3b5-b481519d28f6'
+$dataProviderGuid = '2a9e9aba-d2de-4801-ae7f-5e3819222daf'
+$apiGuid = '36e32e2d-023e-4188-95df-d13573bac2e0'
+$dataSelectorGuid = 'ffd44be7-3bb4-4d01-9e7e-d1c1a3c095af'
+$workWithGuid = '15cf49b5-fc38-4899-91b5-395d02d79889'
+$workWithForWebGuid = '78cecefe-be7d-4980-86ce-8d6e91fba04b'
 
 $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('kb-intel-idbasedon-domain-selftest-{0}' -f ([guid]::NewGuid().ToString('N')))
 $parallelRoot = Join-Path $tempRoot 'KbParalela'
@@ -96,8 +103,15 @@ $procedureDir = Join-Path $objetosPath 'Procedure'
 $sdtDir = Join-Path $objetosPath 'SDT'
 $attributeDir = Join-Path $objetosPath 'Attribute'
 $panelDir = Join-Path $objetosPath 'Panel'
+$webPanelDir = Join-Path $objetosPath 'WebPanel'
+$transactionDir = Join-Path $objetosPath 'Transaction'
+$dataProviderDir = Join-Path $objetosPath 'DataProvider'
+$apiDir = Join-Path $objetosPath 'API'
+$dataSelectorDir = Join-Path $objetosPath 'DataSelector'
+$workWithDir = Join-Path $objetosPath 'WorkWith'
+$workWithForWebDir = Join-Path $objetosPath 'WorkWithForWeb'
 $kbIntelDir = Join-Path $parallelRoot 'KbIntelligence'
-[void](New-Item -ItemType Directory -Path $domainDir, $procedureDir, $sdtDir, $attributeDir, $panelDir, $kbIntelDir -Force)
+[void](New-Item -ItemType Directory -Path $domainDir, $procedureDir, $sdtDir, $attributeDir, $panelDir, $webPanelDir, $transactionDir, $dataProviderDir, $apiDir, $dataSelectorDir, $workWithDir, $workWithForWebDir, $kbIntelDir -Force)
 
 function Write-DomainXml {
     param([string]$Name, [string]$Fqfn, [string]$GuidSuffix)
@@ -109,6 +123,27 @@ function Write-DomainXml {
 </Object>
 "@
     [System.IO.File]::WriteAllText((Join-Path $domainDir "$Name.xml"), $xml, (Get-Utf8NoBomEncoding))
+}
+
+function Write-TypedObjectWithIdBasedOn {
+    param(
+        [string]$TypeGuid,
+        [string]$FolderPath,
+        [string]$Name,
+        [string]$GuidSuffix,
+        [string]$DomainValue
+    )
+    $xml = @"
+<?xml version="1.0" encoding="utf-8"?>
+<Object type="$TypeGuid" name="$Name" guid="ffffffff-ffff-ffff-ffff-$GuidSuffix" fullyQualifiedName="$Name">
+  <Part type="e4c4ade7-53f0-4a56-bdfd-843735b66f47">
+    <Variable Name="V1">
+      <Properties><Property><Name>idBasedOn</Name><Value>$DomainValue</Value></Property></Properties>
+    </Variable>
+  </Part>
+</Object>
+"@
+    [System.IO.File]::WriteAllText((Join-Path $FolderPath "$Name.xml"), $xml, (Get-Utf8NoBomEncoding))
 }
 
 try {
@@ -133,6 +168,27 @@ Write-DomainXml -Name 'DomCombo' -Fqfn 'DomCombo' -GuidSuffix '000000000010'
 Write-DomainXml -Name 'DomPatho' -Fqfn 'DomPatho' -GuidSuffix '000000000011'
 Write-DomainXml -Name 'DomLeak' -Fqfn 'DomLeak' -GuidSuffix '000000000012'
 Write-DomainXml -Name 'DomSym' -Fqfn 'DomSym' -GuidSuffix '000000000013'
+Write-DomainXml -Name 'DomReqMask' -Fqfn 'DomReqMask' -GuidSuffix '000000000014'
+Write-DomainXml -Name 'DomScope' -Fqfn 'DomScope' -GuidSuffix '000000000015'
+
+# G.2.21 cobertura de tipos no escopo (alem de SDT/Procedure/Attribute ja cobertos)
+Write-TypedObjectWithIdBasedOn -TypeGuid $webPanelGuid -FolderPath $webPanelDir -Name 'WpUsesDomScope' -GuidSuffix '000000000001' -DomainValue 'Domain:DomScope'
+Write-TypedObjectWithIdBasedOn -TypeGuid $transactionGuid -FolderPath $transactionDir -Name 'TrnUsesDomScope' -GuidSuffix '000000000002' -DomainValue 'Domain:DomScope'
+Write-TypedObjectWithIdBasedOn -TypeGuid $dataProviderGuid -FolderPath $dataProviderDir -Name 'DpUsesDomScope' -GuidSuffix '000000000003' -DomainValue 'Domain:DomScope'
+Write-TypedObjectWithIdBasedOn -TypeGuid $apiGuid -FolderPath $apiDir -Name 'ApiUsesDomScope' -GuidSuffix '000000000004' -DomainValue 'Domain:DomScope'
+Write-TypedObjectWithIdBasedOn -TypeGuid $dataSelectorGuid -FolderPath $dataSelectorDir -Name 'DsUsesDomScope' -GuidSuffix '000000000005' -DomainValue 'Domain:DomScope'
+Write-TypedObjectWithIdBasedOn -TypeGuid $workWithGuid -FolderPath $workWithDir -Name 'WwUsesDomScope' -GuidSuffix '000000000006' -DomainValue 'Domain:DomScope'
+Write-TypedObjectWithIdBasedOn -TypeGuid $workWithForWebGuid -FolderPath $workWithForWebDir -Name 'WwWebUsesDomScope' -GuidSuffix '000000000007' -DomainValue 'Domain:DomScope'
+$domUsesScopeXml = @"
+<?xml version="1.0" encoding="utf-8"?>
+<Object type="$domainGuid" name="DomUsesDomScope" guid="aaaaaaaa-aaaa-aaaa-aaaa-000000000016" fullyQualifiedName="DomUsesDomScope">
+  <Properties>
+    <Property><Name>Name</Name><Value>DomUsesDomScope</Value></Property>
+    <Property><Name>idBasedOn</Name><Value>Domain:DomScope</Value></Property>
+  </Properties>
+</Object>
+"@
+[System.IO.File]::WriteAllText((Join-Path $domainDir 'DomUsesDomScope.xml'), $domUsesScopeXml, (Get-Utf8NoBomEncoding))
 
 # G.2.1 SDT item
 $sdtXml = @"
@@ -443,6 +499,46 @@ $attrYXml = @"
 "@
 [System.IO.File]::WriteAllText((Join-Path $attributeDir 'AttrUsesDomY.xml'), $attrYXml, (Get-Utf8NoBomEncoding))
 
+# G.2.20 require_property: Property so em comentario (nao deve satisfazer a precondicao mascarada)
+$procReqCommentOnlyXml = @"
+<?xml version="1.0" encoding="utf-8"?>
+<Object type="$procedureGuid" name="ProcReqPropCommentOnly" guid="cccccccc-cccc-cccc-cccc-00000000000e" fullyQualifiedName="ProcReqPropCommentOnly">
+  <!-- <Property><Name>idBasedOn</Name><Value>Domain:DomReqMask</Value></Property> -->
+  <Part type="e4c4ade7-53f0-4a56-bdfd-843735b66f47">
+    <Source><![CDATA[no real idBasedOn]]></Source>
+  </Part>
+</Object>
+"@
+[System.IO.File]::WriteAllText((Join-Path $procedureDir 'ProcReqPropCommentOnly.xml'), $procReqCommentOnlyXml, (Get-Utf8NoBomEncoding))
+
+$casesPath = Join-Path $kbIntelDir 'idbasedon-require-property-cases.json'
+$casesJson = @"
+{
+  "cases": [
+    {
+      "id": "g2-require-property-real",
+      "source": "Attribute:AttrUsesDomY",
+      "target": "Domain:DomY",
+      "expected_rule": "attribute_idbasedon_domain",
+      "should_exist": true,
+      "require_property_in_source": "Domain:DomY",
+      "expectation": "Property real fora de comentario/CDATA satisfaz require_property_in_source"
+    },
+    {
+      "id": "g2-require-property-comment-only",
+      "source": "Procedure:ProcReqPropCommentOnly",
+      "target": "Domain:DomReqMask",
+      "expected_rule": "object_idbasedon_domain",
+      "should_exist": false,
+      "require_source_exists": true,
+      "require_property_in_source": "Domain:DomReqMask",
+      "expectation": "Property so em comentario nao satisfaz require_property_in_source (paridade com mascara do extrator)"
+    }
+  ]
+}
+"@
+[System.IO.File]::WriteAllText($casesPath, $casesJson, (Get-Utf8NoBomEncoding))
+
 $sqlitePath = Join-Path $kbIntelDir 'kb-intelligence.sqlite'
 $validationPath = Join-Path $kbIntelDir 'kb-intelligence-validation.json'
 $indexScript = Join-Path $scriptDir 'Build-KbIntelligenceIndex.ps1'
@@ -451,6 +547,7 @@ $indexScript = Join-Path $scriptDir 'Build-KbIntelligenceIndex.ps1'
     -SourceRoot $objetosPath `
     -OutputPath $sqlitePath `
     -ValidationReportPath $validationPath `
+    -ValidationCasesPath $casesPath `
     -ParallelKbRoot $parallelRoot
 if ($LASTEXITCODE -ne 0) {
     throw "Build-KbIntelligenceIndex falhou no self-test idBasedOn; exit $LASTEXITCODE"
@@ -572,6 +669,35 @@ Assert-True ($rY[0].extractor_rule -eq 'attribute_idbasedon_domain') "G.2.19 reg
 # G.2.18 Panel
 $rPanel = @(Find-Rows -Rows $rows -SourceType 'Panel' -SourceName 'PanelWithIdBasedOn')
 Assert-True ($rPanel.Count -eq 0) "G.2.18 Panel fora do escopo"
+
+# G.2.21 tipos restantes do escopo (1 aresta object_idbasedon_domain cada)
+$scopeCases = @(
+    @{ Type = 'WebPanel'; Name = 'WpUsesDomScope' },
+    @{ Type = 'Transaction'; Name = 'TrnUsesDomScope' },
+    @{ Type = 'DataProvider'; Name = 'DpUsesDomScope' },
+    @{ Type = 'API'; Name = 'ApiUsesDomScope' },
+    @{ Type = 'DataSelector'; Name = 'DsUsesDomScope' },
+    @{ Type = 'WorkWith'; Name = 'WwUsesDomScope' },
+    @{ Type = 'WorkWithForWeb'; Name = 'WwWebUsesDomScope' },
+    @{ Type = 'Domain'; Name = 'DomUsesDomScope' }
+)
+foreach ($sc in $scopeCases) {
+    $r = @(Find-Rows -Rows $rows -SourceType $sc.Type -SourceName $sc.Name -TargetName 'DomScope' -Rule 'object_idbasedon_domain')
+    Assert-True ($r.Count -eq 1) "G.2.21 $($sc.Type):$($sc.Name)->DomScope esperado 1; obtido $($r.Count)"
+}
+
+# G.2.20 require_property_in_source: real passa; so-comentario falha a precondicao (nao passa em vacuo)
+$report = Get-Content -LiteralPath $validationPath -Raw | ConvertFrom-Json
+$caseReal = @($report.cases | Where-Object { $_.id -eq 'g2-require-property-real' })[0]
+$caseComment = @($report.cases | Where-Object { $_.id -eq 'g2-require-property-comment-only' })[0]
+Assert-True ($null -ne $caseReal) "G.2.20 caso real ausente no relatório"
+Assert-True ($null -ne $caseComment) "G.2.20 caso comment-only ausente no relatório"
+Assert-True ($caseReal.status -eq 'passed') "G.2.20 require real esperado passed; obtido $($caseReal.status)"
+Assert-True ($caseComment.status -eq 'failed') "G.2.20 require comment-only esperado failed; obtido $($caseComment.status)"
+$failText = [string]::Join(' | ', @($caseComment.failures))
+Assert-True ($failText -match 'require_property_in_source') "G.2.20 falha esperada require_property_in_source; obtido: $failText"
+$rReq = @(Find-Rows -Rows $rows -SourceType 'Procedure' -SourceName 'ProcReqPropCommentOnly' -TargetName 'DomReqMask')
+Assert-True ($rReq.Count -eq 0) "G.2.20 extrator nao deve emitir aresta de Property so em comentario"
 
 Write-Output 'OK: Test-KbIntelligenceIdBasedOnDomainSelfTest.ps1'
 } finally {
