@@ -522,6 +522,12 @@ Self-test local (não depende de KBExemplo) para o sinal determinístico gerado-
 .\scripts\Test-KbIntelligenceGeneratedObjectExtractionSelfTest.ps1
 ```
 
+Self-test local (não depende de KBExemplo) para `idBasedOn`→`Domain` (`based_on_domain`, extrator 12): escopo além de `Attribute`, módulo por `fullyQualifiedName`, máscara CDATA/comentário e dedup:
+
+```powershell
+.\scripts\Test-KbIntelligenceIdBasedOnDomainSelfTest.ps1
+```
+
 Casos positivos de `Property Formula` em KBs de producao ficam catalogados em `kb-intelligence-kbexemplo.validation-extraction-semantic.json` (ids `phase5-case-65..68`) e em baterias dedicadas por KB: `kb-intelligence-fabricabrasil.validation-extraction-attribute-formula.json`, `kb-intelligence-wseducacaospteste.validation-extraction-attribute-formula.json`. Validar cada bateria no rebuild da pasta paralela correspondente; o arquivo semantic completo continua orientado ao KBExemplo e inclui esses casos apenas como catalogo compartilhado.
 
 Esses casos usam `source`, `target` e `expected_rule`, entao devem rodar no gerador/indexador. Se forem enviados por engano para `Test-KbIntelligenceQueries.ps1`, o resultado deve ser tratado primeiro como executor incompativel, não como regressao real da regra.

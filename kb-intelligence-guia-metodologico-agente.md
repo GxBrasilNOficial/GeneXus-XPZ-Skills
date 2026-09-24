@@ -61,6 +61,7 @@ Use este ramo somente quando a pergunta for **triagem técnica** sobre atributos
 
 1. escolher a consulta mínima conforme `xpz-index-triage` (**QUERY PARAMETER REFERENCE**):
    - `attribute-info` — um atributo; sinais **leves** (`Formula`, `idBasedOn`, etc.)
+   - `who-uses` / `what-uses` em `Domain` — impacto técnico direto via `based_on_domain` (extrator 12: origens no escopo, não só Attribute); não confundir com consumo de atributo no corpo (`references_attribute` ainda pendente)
    - `transaction-attributes` ou `transaction-writable-attributes` — uma Transaction; classificação **materializada** no índice (`schema_version>=2`), com paridade contra `Test-GeneXusTransactionWritability.ps1`
 2. registrar o comando, o objeto e os sinais retornados como **evidencia direta**
 3. declarar explicitamente o **tipo de consulta**:
