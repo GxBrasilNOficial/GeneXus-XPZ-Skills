@@ -10,7 +10,7 @@ Medição ponta a ponta em índice temporário, com leitura do acervo FabricaBra
 
 ### Rastreabilidade
 
-- Commit material: `99da3b6` (`Indexa Domains de módulos empacotados`)
+- Commit material: `d946bec` (`Indexa Domains de módulos empacotados`)
 - Arquivos materiais: `scripts/Build-KbIntelligenceIndex.py`, consultas Python/PowerShell, self-tests, `scripts/README-kb-intelligence.md`, `xpz-index-triage`, `xpz-kb-parallel-setup`, `02`, `08`, `09`, `README`, `CHANGELOG`, `999`, guia metodológico da KB Intelligence e contrato da Fase 5.
 
 ## KbIntelligence extrator 12 — `idBasedOn`→`Domain` generalizado
