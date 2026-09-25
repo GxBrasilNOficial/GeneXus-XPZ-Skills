@@ -2,6 +2,12 @@
 <#
 .SYNOPSIS
     Queries a KB Intelligence SQLite index.
+
+.PARAMETER Origin
+Filtra resultados de css-classes, list-by-type ou search-objects por kb-authored ou packaged-module.
+
+.PARAMETER IncludeImported
+Remove o filtro padrão kb-authored em css-classes, list-by-type e search-objects por instance-key. Não altera buscas por nome.
 #>
 
 param(
@@ -21,6 +27,7 @@ param(
     [string]$TargetType,
     [string]$TargetName,
     [string]$Model,
+    [ValidateSet("kb-authored", "packaged-module")]
     [string]$Origin,
     [switch]$IncludeImported,
     [switch]$Generated,
@@ -75,5 +82,15 @@ if ($Format) { $arguments += @("--format", $Format) }
 if ($ParallelKbRoot) { $arguments += @("--parallel-kb-root", $ParallelKbRoot) }
 if ($CatalogOverridePath) { $arguments += @("--catalog-override-path", $CatalogOverridePath) }
 
-& $python.Source @arguments
-exit $LASTEXITCODE
+$previousPythonIoEncoding = [Environment]::GetEnvironmentVariable("PYTHONIOENCODING", "Process")
+$exitCode = 1
+try {
+    $env:PYTHONIOENCODING = [Console]::OutputEncoding.WebName
+    & $python.Source @arguments
+    $exitCode = $LASTEXITCODE
+}
+finally {
+    [Environment]::SetEnvironmentVariable("PYTHONIOENCODING", $previousPythonIoEncoding, "Process")
+}
+
+exit $exitCode

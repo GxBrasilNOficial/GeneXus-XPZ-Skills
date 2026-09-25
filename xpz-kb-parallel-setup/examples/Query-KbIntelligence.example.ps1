@@ -26,6 +26,12 @@ Usada para resolver `scripts/gx-object-type-catalog.override.json` no gate
 .PARAMETER CatalogOverridePath
 Caminho opcional do override de catalogo (prevalece sobre a deteccao por ParallelKbRoot).
 
+.PARAMETER Origin
+Filtra resultados de css-classes, list-by-type ou search-objects por kb-authored ou packaged-module.
+
+.PARAMETER IncludeImported
+Remove o filtro padrão kb-authored em css-classes, list-by-type e search-objects por instance-key. Não altera buscas por nome.
+
 .EXAMPLE
 .\Query-KbIntelligence.ps1 -Query impact-basic -ObjectType Procedure -ObjectName procExemplo -Limit 10 -Format text
 
@@ -55,6 +61,7 @@ param(
     [string]$TargetType,
     [string]$TargetName,
     [string]$Model,
+    [ValidateSet("kb-authored", "packaged-module")]
     [string]$Origin,
     [switch]$IncludeImported,
     [switch]$Generated,

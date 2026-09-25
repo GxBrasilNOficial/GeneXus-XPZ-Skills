@@ -201,7 +201,7 @@ Assert-True ($textJoined -match 'instance_key: 78cecefe') 'texto object-info dev
 
 # --- metadata: contador e schema_version ---
 $meta = Invoke-Query -QueryArgs @('--query', 'index-metadata')
-Assert-True ($meta.metadata.schema_version -eq '4') "schema_version deveria ser 4, foi $($meta.metadata.schema_version)"
+Assert-True ($meta.metadata.schema_version -eq '5') "schema_version deveria ser 5, foi $($meta.metadata.schema_version)"
 Assert-True ($meta.metadata.generated_objects_count -eq '5') "generated_objects_count deveria ser 5 (wpGenerated, wpMalformed, procDivergent, wpGenerated2, wpOrfa), foi $($meta.metadata.generated_objects_count)"
 
 # ============================================================================

@@ -1,7 +1,7 @@
 #requires -Version 7.4
 <#
 .SYNOPSIS
-    Self-test G.2 da frente idBasedOn -> Domain (extrator 12): fixtures nao-vacuos e evidencia persistida.
+    Self-test G.2 da frente idBasedOn -> Domain (extrator 13): fixtures nao-vacuos e evidencia persistida.
 #>
 
 Set-StrictMode -Version Latest
@@ -84,6 +84,8 @@ function Find-Rows {
 
 $scriptDir = $PSScriptRoot
 $domainGuid = '00972a17-9975-449e-aab1-d26165d51393'
+$packagedModuleGuid = 'c88fffcd-b6f8-0000-8fec-00b5497e2117'
+$packagedModuleExportPartGuid = 'ed1b7b1c-2aaf-46eb-9ec5-db348f6fa3fc'
 $procedureGuid = '84a12160-f59b-4ad7-a683-ea4481ac23e9'
 $sdtGuid = '447527b5-9210-4523-898b-5dccb17be60a'
 $panelGuid = 'd82625fd-5892-40b0-99c9-5c8559c197fc'
@@ -99,6 +101,7 @@ $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('kb-intel-idbasedon-dom
 $parallelRoot = Join-Path $tempRoot 'KbParalela'
 $objetosPath = Join-Path $parallelRoot 'ObjetosDaKbEmXml'
 $domainDir = Join-Path $objetosPath 'Domain'
+$packagedModuleDir = Join-Path $objetosPath 'PackagedModule'
 $procedureDir = Join-Path $objetosPath 'Procedure'
 $sdtDir = Join-Path $objetosPath 'SDT'
 $attributeDir = Join-Path $objetosPath 'Attribute'
@@ -111,7 +114,7 @@ $dataSelectorDir = Join-Path $objetosPath 'DataSelector'
 $workWithDir = Join-Path $objetosPath 'WorkWith'
 $workWithForWebDir = Join-Path $objetosPath 'WorkWithForWeb'
 $kbIntelDir = Join-Path $parallelRoot 'KbIntelligence'
-[void](New-Item -ItemType Directory -Path $domainDir, $procedureDir, $sdtDir, $attributeDir, $panelDir, $webPanelDir, $transactionDir, $dataProviderDir, $apiDir, $dataSelectorDir, $workWithDir, $workWithForWebDir, $kbIntelDir -Force)
+[void](New-Item -ItemType Directory -Path $domainDir, $packagedModuleDir, $procedureDir, $sdtDir, $attributeDir, $panelDir, $webPanelDir, $transactionDir, $dataProviderDir, $apiDir, $dataSelectorDir, $workWithDir, $workWithForWebDir, $kbIntelDir -Force)
 
 function Write-DomainXml {
     param([string]$Name, [string]$Fqfn, [string]$GuidSuffix)
@@ -146,6 +149,26 @@ function Write-TypedObjectWithIdBasedOn {
     [System.IO.File]::WriteAllText((Join-Path $FolderPath "$Name.xml"), $xml, (Get-Utf8NoBomEncoding))
 }
 
+function Write-PackagedModuleXml {
+    param(
+        [string]$FileName,
+        [string]$ModuleName,
+        [string]$ModuleGuidSuffix,
+        [string]$ChildrenXml
+    )
+    $xml = @"
+<?xml version="1.0" encoding="utf-8"?>
+<Object type="$packagedModuleGuid" name="$ModuleName" guid="eeeeeeee-eeee-eeee-eeee-$ModuleGuidSuffix" fullyQualifiedName="$ModuleName">
+  <Part type="$packagedModuleExportPartGuid">
+    <ExportFile><Objects>
+$ChildrenXml
+    </Objects></ExportFile>
+  </Part>
+</Object>
+"@
+    [System.IO.File]::WriteAllText((Join-Path $packagedModuleDir $FileName), $xml, (Get-Utf8NoBomEncoding))
+}
+
 try {
 
 # Domains alvo
@@ -170,6 +193,26 @@ Write-DomainXml -Name 'DomLeak' -Fqfn 'DomLeak' -GuidSuffix '000000000012'
 Write-DomainXml -Name 'DomSym' -Fqfn 'DomSym' -GuidSuffix '000000000013'
 Write-DomainXml -Name 'DomReqMask' -Fqfn 'DomReqMask' -GuidSuffix '000000000014'
 Write-DomainXml -Name 'DomScope' -Fqfn 'DomScope' -GuidSuffix '000000000015'
+Write-DomainXml -Name 'DomNoUsers' -Fqfn 'DomNoUsers' -GuidSuffix '000000000017'
+
+# Plano C: Domains diretos do PackagedModule, colisao authored, skips e campos do filho.
+$firstModuleChildren = @"
+      <Object type="$domainGuid" fullyQualifiedName="PkgAlpha.DomImported" guid="11111111-1111-1111-1111-000000000001" lastUpdate="2026-09-24T12:34:56" />
+      <Object type="$domainGuid" fullyQualifiedName="PkgAlpha.DomAlpha" guid="11111111-1111-1111-1111-000000000002" lastUpdate="2026-09-24T12:34:57" />
+      <Object type="$domainGuid" fullyQualifiedName="PkgAlpha.Dom_A" guid="11111111-1111-1111-1111-000000000003" lastUpdate="2026-09-24T12:34:58" />
+      <Object type="$domainGuid" fullyQualifiedName="PkgAlpha.DomXA" guid="11111111-1111-1111-1111-000000000004" lastUpdate="2026-09-24T12:34:59" />
+      <Object type="$domainGuid" guid="11111111-1111-1111-1111-000000000005" lastUpdate="2026-09-24T12:35:00" />
+"@
+Write-PackagedModuleXml -FileName 'A_First.xml' -ModuleName 'PkgAlpha' -ModuleGuidSuffix '000000000001' -ChildrenXml $firstModuleChildren
+$secondModuleChildren = @"
+      <Object type="$domainGuid" fullyQualifiedName="PkgAlpha.DomImported" guid="22222222-2222-2222-2222-000000000001" lastUpdate="2026-09-24T12:35:01" />
+      <Object type="$domainGuid" fullyQualifiedName="Mod.DomMod" guid="22222222-2222-2222-2222-000000000002" lastUpdate="2026-09-24T12:35:02" />
+"@
+Write-PackagedModuleXml -FileName 'B_Duplicates.xml' -ModuleName 'PkgBeta' -ModuleGuidSuffix '000000000002' -ChildrenXml $secondModuleChildren
+Write-TypedObjectWithIdBasedOn -TypeGuid $procedureGuid -FolderPath $procedureDir -Name 'ProcUsesPackagedFqfn' -GuidSuffix '000000000021' -DomainValue 'Domain:DomImported, PkgAlpha'
+Write-TypedObjectWithIdBasedOn -TypeGuid $procedureGuid -FolderPath $procedureDir -Name 'ProcUsesPackagedWithoutModule' -GuidSuffix '000000000022' -DomainValue 'Domain:DomImported'
+Write-TypedObjectWithIdBasedOn -TypeGuid $procedureGuid -FolderPath $procedureDir -Name 'ProcUsesPackagedAuthoredCollision' -GuidSuffix '000000000023' -DomainValue 'Domain:DomMod, Mod'
+Write-TypedObjectWithIdBasedOn -TypeGuid $procedureGuid -FolderPath $procedureDir -Name 'ProcUsesPackagedShortCollision' -GuidSuffix '000000000024' -DomainValue 'Domain:DomAlpha, PkgAlpha'
 
 # G.2.21 cobertura de tipos no escopo (alem de SDT/Procedure/Attribute ja cobertos)
 Write-TypedObjectWithIdBasedOn -TypeGuid $webPanelGuid -FolderPath $webPanelDir -Name 'WpUsesDomScope' -GuidSuffix '000000000001' -DomainValue 'Domain:DomScope'
@@ -542,6 +585,8 @@ $casesJson = @"
 $sqlitePath = Join-Path $kbIntelDir 'kb-intelligence.sqlite'
 $validationPath = Join-Path $kbIntelDir 'kb-intelligence-validation.json'
 $indexScript = Join-Path $scriptDir 'Build-KbIntelligenceIndex.ps1'
+$queryScript = Join-Path $scriptDir 'Query-KbIntelligenceIndex.py'
+$queryWrapper = Join-Path $scriptDir 'Query-KbIntelligenceIndex.ps1'
 
 & $indexScript `
     -SourceRoot $objetosPath `
@@ -554,9 +599,102 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 $metaVersion = & python -c "import sqlite3,sys; c=sqlite3.connect(sys.argv[1]); print(c.execute(""SELECT value FROM metadata WHERE key='extractor_signature_version'"").fetchone()[0])" $sqlitePath
-Assert-True ($metaVersion -eq '12') "extractor_signature_version esperado 12; obtido $metaVersion"
+Assert-True ($metaVersion -eq '13') "extractor_signature_version esperado 13; obtido $metaVersion"
+
+function Invoke-IndexQuery {
+    param([Parameter(Mandatory)][string[]]$QueryArgs)
+    $output = & python $queryScript --index-path $sqlitePath @QueryArgs
+    if ($LASTEXITCODE -ne 0) { throw "Consulta ao indice falhou; exit $LASTEXITCODE; args=$($QueryArgs -join ' ')" }
+    return (($output -join "`n") | ConvertFrom-Json)
+}
 
 $rows = Get-BasedOnDomainRows -SqlitePath $sqlitePath
+
+# Plano C: FQFN empacotado, authored-first, skips e escopo de arestas.
+$r = @(Find-Rows -Rows $rows -SourceType 'Procedure' -SourceName 'ProcUsesPackagedFqfn' -TargetName 'PkgAlpha.DomImported' -Rule 'object_idbasedon_domain')
+Assert-True ($r.Count -eq 1) "Plano C FQFN empacotado esperado 1; obtido $($r.Count)"
+$r = @(Find-Rows -Rows $rows -SourceType 'Procedure' -SourceName 'ProcUsesPackagedWithoutModule')
+Assert-True ($r.Count -eq 0) "Plano C referencia sem modulo nao deve resolver Domain empacotado"
+$r = @(Find-Rows -Rows $rows -SourceType 'Procedure' -SourceName 'ProcUsesPackagedAuthoredCollision' -TargetName 'DomMod')
+Assert-True ($r.Count -eq 1) "Plano C colisao FQFN deve priorizar Domain authored"
+$r = @(Find-Rows -Rows $rows -SourceType 'Procedure' -SourceName 'ProcUsesPackagedShortCollision' -TargetName 'PkgAlpha.DomAlpha')
+Assert-True ($r.Count -eq 1) "Plano C mesmo nome curto em outro modulo deve resolver pelo FQFN"
+
+$packagedInfo = Invoke-IndexQuery -QueryArgs @('--query', 'object-info', '--object-type', 'Domain', '--object-name', 'PkgAlpha.DomImported')
+Assert-True ($packagedInfo.found -and $packagedInfo.object.origin -eq 'packaged-module') 'Plano C object-info deve expor origem packaged-module'
+Assert-True ($packagedInfo.object.guid -eq '11111111-1111-1111-1111-000000000001') 'Plano C guid deve vir do Domain filho'
+Assert-True ($packagedInfo.object.last_update -eq '2026-09-24T12:34:56') 'Plano C lastUpdate deve vir do Domain filho'
+Assert-True ($packagedInfo.object.file_path -eq 'PackagedModule/A_First.xml') 'Plano C caminho deve apontar ao XML contêiner'
+Assert-True ($packagedInfo.outgoing_relations -eq 0) 'Plano C Domain empacotado nao deve ter arestas com origem'
+Assert-True ([string]$packagedInfo.notice -match 'alvo do grafo') 'Plano C object-info deve explicar Domain como alvo'
+
+$whoImported = Invoke-IndexQuery -QueryArgs @('--query', 'who-uses', '--object-type', 'Domain', '--object-name', 'PkgAlpha.DomImported')
+Assert-True ($whoImported.found -and $whoImported.total -eq 1) 'Plano C who-uses deve encontrar relacao ao FQFN empacotado'
+$whoMissing = Invoke-IndexQuery -QueryArgs @('--query', 'who-uses', '--object-type', 'Domain', '--object-name', 'DomImported')
+Assert-True (-not $whoMissing.found -and $whoMissing.total -eq 0 -and $whoMissing.shown -eq 0) 'Plano C who-uses ausente deve distinguir found=false'
+Assert-True ($whoMissing.did_you_mean[0].name -eq 'PkgAlpha.DomImported') 'Plano C who-uses ausente deve sugerir FQFN empacotado'
+$whoNoEdges = Invoke-IndexQuery -QueryArgs @('--query', 'who-uses', '--object-type', 'Domain', '--object-name', 'DomNoUsers')
+Assert-True ($whoNoEdges.found -and $whoNoEdges.total -eq 0 -and $whoNoEdges.PSObject.Properties.Name -notcontains 'did_you_mean') 'Plano C Domain authored presente sem arestas nao deve receber hint'
+$objectMissing = Invoke-IndexQuery -QueryArgs @('--query', 'object-info', '--object-type', 'Domain', '--object-name', 'DomImported')
+Assert-True (-not $objectMissing.found -and $objectMissing.did_you_mean[0].name -eq 'PkgAlpha.DomImported') 'Plano C object-info ausente deve sugerir FQFN'
+$fqfnMissing = Invoke-IndexQuery -QueryArgs @('--query', 'object-info', '--object-type', 'Domain', '--object-name', 'Wrong.DomImported')
+Assert-True ($fqfnMissing.PSObject.Properties.Name -notcontains 'did_you_mean') 'Plano C nome ausente com ponto nao deve receber hint'
+$underscoreHint = Invoke-IndexQuery -QueryArgs @('--query', 'object-info', '--object-type', 'Domain', '--object-name', 'Dom_A')
+Assert-True (($underscoreHint.did_you_mean | ForEach-Object { $_.name }) -contains 'PkgAlpha.Dom_A') 'Plano C sufixo literal com underscore deve casar'
+Assert-True (-not (($underscoreHint.did_you_mean | ForEach-Object { $_.name }) -contains 'PkgAlpha.DomXA')) 'Plano C underscore nao deve funcionar como curinga'
+$impactMissing = Invoke-IndexQuery -QueryArgs @('--query', 'impact-basic', '--object-type', 'Domain', '--object-name', 'DomImported')
+$traceMissing = Invoke-IndexQuery -QueryArgs @('--query', 'functional-trace-basic', '--object-type', 'Domain', '--object-name', 'DomImported')
+Assert-True ($impactMissing.did_you_mean[0].name -eq 'PkgAlpha.DomImported') 'Plano C impact-basic deve propagar hint em found=false'
+Assert-True ($traceMissing.did_you_mean[0].name -eq 'PkgAlpha.DomImported') 'Plano C functional-trace-basic deve propagar hint em found=false'
+$impactImported = Invoke-IndexQuery -QueryArgs @('--query', 'impact-basic', '--object-type', 'Domain', '--object-name', 'PkgAlpha.DomImported')
+$traceImported = Invoke-IndexQuery -QueryArgs @('--query', 'functional-trace-basic', '--object-type', 'Domain', '--object-name', 'PkgAlpha.DomImported')
+Assert-True (($impactImported.notice -match 'Impacto tecnico direto') -and ($impactImported.notice -match 'alvo do grafo')) 'Plano C notice de impacto deve compor aviso generico e alvo'
+Assert-True (($traceImported.notice -match 'Triagem funcional') -and ($traceImported.notice -match 'alvo do grafo')) 'Plano C notice funcional deve compor aviso generico e alvo'
+
+$listDefault = Invoke-IndexQuery -QueryArgs @('--query', 'list-by-type', '--object-type', 'Domain')
+$listImported = Invoke-IndexQuery -QueryArgs @('--query', 'list-by-type', '--object-type', 'Domain', '--include-imported')
+$listOrigin = Invoke-IndexQuery -QueryArgs @('--query', 'list-by-type', '--object-type', 'Domain', '--origin', 'packaged-module')
+Assert-True (-not (($listDefault.results | ForEach-Object { $_.name }) -contains 'PkgAlpha.DomImported')) 'Plano C list-by-type padrao deve permanecer authored-only'
+Assert-True (($listImported.results | ForEach-Object { $_.name }) -contains 'PkgAlpha.DomImported') 'Plano C --include-imported deve incluir Domains empacotados'
+Assert-True ($listOrigin.total -gt 0 -and @($listOrigin.results | Where-Object { $_.origin -ne 'packaged-module' }).Count -eq 0) 'Plano C --origin deve filtrar list-by-type'
+$wrapperImportedOutput = & $queryWrapper -IndexPath $sqlitePath -Query 'list-by-type' -ObjectType 'Domain' -IncludeImported -Format json
+if ($LASTEXITCODE -ne 0) { throw "Consulta pelo wrapper IncludeImported falhou; exit $LASTEXITCODE" }
+$wrapperImported = (($wrapperImportedOutput -join "`n") | ConvertFrom-Json)
+$wrapperOriginOutput = & $queryWrapper -IndexPath $sqlitePath -Query 'list-by-type' -ObjectType 'Domain' -Origin 'packaged-module' -Format json
+if ($LASTEXITCODE -ne 0) { throw "Consulta pelo wrapper Origin falhou; exit $LASTEXITCODE" }
+$wrapperOrigin = (($wrapperOriginOutput -join "`n") | ConvertFrom-Json)
+$wrapperInfoTextOutput = & $queryWrapper -IndexPath $sqlitePath -Query 'object-info' -ObjectType 'Domain' -ObjectName 'PkgAlpha.DomImported' -Format text
+if ($LASTEXITCODE -ne 0) { throw "Consulta pelo wrapper object-info text falhou; exit $LASTEXITCODE" }
+$wrapperInfoText = $wrapperInfoTextOutput -join "`n"
+Assert-True (($wrapperImported.results | ForEach-Object { $_.name }) -contains 'PkgAlpha.DomImported') 'Plano C wrapper deve encaminhar IncludeImported'
+Assert-True ($wrapperOrigin.total -gt 0 -and @($wrapperOrigin.results | Where-Object { $_.origin -ne 'packaged-module' }).Count -eq 0) 'Plano C wrapper deve encaminhar Origin'
+Assert-True ($wrapperInfoText -match 'Domain empacotado é alvo do grafo') 'Plano C wrapper deve preservar UTF-8 no aviso textual'
+$searchImported = Invoke-IndexQuery -QueryArgs @('--query', 'search-objects', '--object-type', 'Domain', '--object-name', 'PkgAlpha.DomImported')
+$searchImportedWithFlag = Invoke-IndexQuery -QueryArgs @('--query', 'search-objects', '--object-type', 'Domain', '--object-name', 'PkgAlpha.DomImported', '--include-imported')
+$searchAuthored = Invoke-IndexQuery -QueryArgs @('--query', 'search-objects', '--object-type', 'Domain', '--object-name', 'PkgAlpha.DomImported', '--origin', 'kb-authored')
+Assert-True (($searchImported.results | ForEach-Object { $_.name }) -contains 'PkgAlpha.DomImported') 'Plano C busca nominal deve achar imported sem filtro padrão'
+Assert-True ($searchImportedWithFlag.total -eq $searchImported.total) 'Plano C --include-imported em busca nominal deve ser no-op'
+Assert-True ($searchAuthored.total -eq 0) 'Plano C --origin deve filtrar search-objects'
+$instanceSearch = Invoke-IndexQuery -QueryArgs @('--query', 'search-objects', '--object-type', 'Domain', '--instance-key', 'no-matching-instance', '--include-imported')
+Assert-True ($instanceSearch.total -eq 0) 'Plano C instance-key deve aceitar --include-imported e manter guarda'
+$metadata = Invoke-IndexQuery -QueryArgs @('--query', 'index-metadata')
+$skipItems = @($metadata.metadata.packaged_domain_skips)
+$skipReasons = @($skipItems | ForEach-Object { $_.reason })
+Assert-True ($skipReasons -contains 'missing-or-unqualified-fqfn') 'Plano C metadata deve registrar Domain sem FQFN'
+Assert-True (@($skipItems | Where-Object { $_.reason -eq 'collision-fqfn-first-wins' -and $_.module_rel_path -eq 'PackagedModule/B_Duplicates.xml' -and $_.fqfn -eq 'PkgAlpha.DomImported' }).Count -eq 1) 'Plano C metadata deve registrar colisao entre FQFNs'
+Assert-True (@($skipItems | Where-Object { $_.reason -eq 'collision-fqfn-first-wins' -and $_.fqfn -eq 'Mod.DomMod' }).Count -eq 1) 'Plano C metadata deve registrar colisao com FQFN authored'
+$report = Get-Content -LiteralPath $validationPath -Raw | ConvertFrom-Json
+Assert-True (@($report.packaged_domain_skips).Count -eq @($metadata.metadata.packaged_domain_skips).Count) 'Plano C validation-report deve ecoar skips da metadata'
+$objectsRead = 0
+foreach ($property in $report.objects_read_by_type.PSObject.Properties) { $objectsRead += [int]$property.Value }
+Assert-True ($report.packaged_domains_written -eq $listOrigin.total) 'Plano C validation-report deve informar a quantidade de Domains empacotados gravados'
+Assert-True ($report.objects_written -eq ($objectsRead + $report.packaged_domains_written)) 'Plano C objects_written deve contar todas as linhas da tabela objects'
+
+$whoText = & python $queryScript --index-path $sqlitePath --query who-uses --object-type Domain --object-name DomImported --format text
+if ($LASTEXITCODE -ne 0) { throw "who-uses text de ausente falhou; exit $LASTEXITCODE" }
+$whoTextJoined = $whoText -join "`n"
+Assert-True ($whoTextJoined -match 'who-uses: Domain:DomImported not found') 'Plano C texto who-uses deve dizer not found'
+Assert-True ($whoTextJoined -match 'Domain:PkgAlpha\.DomImported \(packaged-module\)') 'Plano C texto who-uses deve imprimir did_you_mean'
 
 # G.2.1
 $r = @(Find-Rows -Rows $rows -SourceType 'SDT' -SourceName 'SdtUsesDomAlpha' -TargetName 'DomAlpha' -Rule 'object_idbasedon_domain')

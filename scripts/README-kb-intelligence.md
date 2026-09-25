@@ -60,7 +60,7 @@ Escopo de extracao de relacoes atual:
 - alvo resolvido por propriedade: `SDT`, `Domain` ou `ExternalObject` a partir de `ATTCUSTOMTYPE`, quando o objeto existir no inventario e a regra aprovada resolver o prefixo com seguranca
 - origem atual de `ATTCUSTOMTYPE` indexado: `Procedure`, `WebPanel`, `DataProvider`, `API`, `DataSelector`, `Domain`, `SDT`, `WorkWithForWeb` e `Transaction`
 - chamada efetiva de método em ExternalObject: `Procedure`, `WebPanel`, `DataProvider`, `Transaction`, `API` e `DataSelector` para `ExternalObject` a partir de `&Variavel.Metodo(...)` em `Source` efetivo, quando a variável tiver `ATTCUSTOMTYPE` `exo:<ExternalObject>` resolvido no inventario local
-- dominio base via `idBasedOn`: objetos no escopo `IDBASEDON_DOMAIN_SOURCE_TYPES` (`relation_scope` + `Attribute`; fora: `Panel`, `Stencil`, `PackagedModule`) para `Domain` a partir de `<Property><Name>idBasedOn</Name>…>`, quando o dominio existir no inventario local; mascara CDATA/comentario em **passagem unica** (estado exclusivo por delimitador); sufixo de modulo `Domain:Nome, Modulo` so resolve se `fullyQualifiedName` do Domain for `Modulo.Nome` (comparacao `lower()`); `who-uses(Domain)` conta linhas de relacao `based_on_domain` (nao mais “só Attribute”); valor `Attribute:…` nao gera `based_on_domain`
+- dominio base via `idBasedOn`: objetos no escopo `IDBASEDON_DOMAIN_SOURCE_TYPES` (`relation_scope` + `Attribute`; fora: `Panel`, `Stencil` e `PackagedModule` como origem de aresta) para `Domain` a partir de `<Property><Name>idBasedOn</Name>…>`, quando o dominio existir no inventario local; mascara CDATA/comentario em **passagem unica** (estado exclusivo por delimitador); sufixo `Domain:Nome, Modulo` resolve por FQFN exato em Domains autorais ou empacotados. Domains diretos de `PackagedModule` são alvos-only, armazenados pelo FQFN e sem arestas de saída; `who-uses(Domain)` conta linhas `based_on_domain`; valor `Attribute:…` nao gera `based_on_domain`
 - chamada em atributo calculado: `Attribute` para `Procedure`, `WebPanel` ou `DataProvider` a partir de `Property Formula`, quando o alvo existir no inventario local e a forma for resolvivel estaticamente (`Nome(...)`, `Nome.Call(...)`, `Call(Nome, ...)`, `udp(Nome, ...)`, `Nome.Udp(...)`, `Nome.Link(...)`, `Nome.Create(...)`, chamada direta a `DataProvider`)
 - atributo estrutural de transacao: `Transaction` para `Attribute` a partir de `<Level>/<Attribute>`, quando o atributo existir no inventario local
 - tabela estrutural de transacao: `Transaction` para `Table` a partir de `Type` em `<Level>`, quando a tabela existir no inventario local
@@ -164,16 +164,34 @@ O gate `Test-*KbIndexGate.ps1` (molde em `xpz-kb-parallel-setup/examples/Test-Kb
 
 ## Schema e versionamento
 
-O índice armazena `schema_version` na tabela `metadata`. O valor atual e `"4"` (inclui a tabela `transaction_attribute_writability` com `writability_rule_version`, a tabela `css_class` do catalogo de classes CSS e as colunas `is_generated_object`/`pattern_object_id`/`instance_key` na tabela `objects`).
+O índice armazena `schema_version` na tabela `metadata`. O valor atual e `"5"` (inclui a tabela `transaction_attribute_writability` com `writability_rule_version`, a tabela `css_class` do catalogo de classes CSS, os marcadores de Pattern e `origin TEXT NOT NULL` na tabela `objects`). O motor atual usa `EXTRACTOR_SIGNATURE_VERSION="13"`.
 
 O design e deliberado: o índice e artefato derivado e sempre regeneravel. Por isso não existe caminho de migracao de schema — qualquer mudanca estrutural no motor exige rebuild completo.
 
 Consequencias operacionais:
 
 - todo índice gerado antes da introducao de `schema_version` e tratado automaticamente como incompativel e bloqueia qualquer consulta com mensagem explicita de rebuild
-- a cada evolucao de schema (`"1"` → `"2"` → `"3"` → `"4"`), todo índice em versão anterior bloqueia da mesma forma — comportamento esperado, não bug
+- a cada evolucao de schema (`"1"` → `"2"` → `"3"` → `"4"` → `"5"`), todo índice em versão anterior bloqueia da mesma forma — comportamento esperado, não bug
 - o erro de schema version e detectado pelo próprio `Query-KbIntelligenceIndex.py` antes de qualquer query, incluindo `index-metadata`; portanto o gate `Test-*KbIndexGate.ps1` também falha com `BLOCK:` em índices incompativeis
 - a resposta correta a qualquer bloqueio por schema e rebuild via `Build-KbIntelligenceIndex.ps1`, nunca contorno por leitura direta do SQLite ou dos XMLs
+
+## Domains em `PackagedModule` e origem dos objetos
+
+O extrator 13 lê somente os filhos `<Object>` diretos de `ExportFile/Objects` no Part `ed1b7b1c-2aaf-46eb-9ec5-db348f6fa3fc` de um `PackagedModule`, filtrando o GUID de `Domain`. Não há recursão nem FQFN sintetizado: sem atributo `fullyQualifiedName` qualificado, o filho é ignorado e registrado em `packaged_domain_skips`.
+
+- Domain empacotado usa `name=fullyQualifiedName`, `origin=packaged-module`, GUID e `lastUpdate` do filho quando existem e caminho/hash do XML contêiner; Pattern fica `0/null`.
+- Só Domains autorais e empacotados vencedores são inseridos. FQFN autoral tem prioridade; colisões posteriores de FQFN são ignoradas em ordem determinística (`PackagedModule` por `rel_path`, filhos por ordem XML). A consulta `idBasedOn` com módulo resolve apenas o FQFN exato; sem módulo, o mapa curto continua autoral.
+- Relações podem apontar a um Domain empacotado, mas não partem dele. Em `object-info`, `impact-basic` e `functional-trace-basic`, `notice` esclarece que ele é alvo-only e que `file_path` é o XML contêiner.
+- `metadata.packaged_domain_skips` é um JSON array no SQLite e no `validation_report`; `index-metadata` devolve a chave já parseada e o texto resume quantidade e até três amostras. O relatório mantém `objects_read_by_type` como contagem do inventário em arquivos e informa `packaged_domains_written`; `objects_written` soma as linhas autorais e os Domains empacotados vencedores gravados. Não há sidecar adicional.
+- Em `object-info`, `who-uses`, `impact-basic` e `functional-trace-basic`, um Domain ausente cujo nome não contém `.` pode receber até cinco sugestões importadas por sufixo literal, case-insensitive, em ordem de nome. `_` e `%` são caracteres literais nessa sugestão. `who-uses` agora traz `found`: objeto presente com zero relações continua `found=true` e sem sugestão.
+
+Filtro de origem (`--origin` no Python, `-Origin` no wrapper; choices `kb-authored` e `packaged-module`):
+
+- `list-by-type` lista só `kb-authored` por padrão; `--include-imported` remove esse filtro.
+- `search-objects` por nome não filtra origem por padrão; `--origin` filtra e `--include-imported` é no-op. Busca só por `--instance-key` lista apenas autorais por padrão; `--include-imported` remove esse filtro.
+- `css-classes` conserva sua regra: sem lookup nominal e sem origem explícita lista só autorais; lookup por nome não filtra origem.
+- `object-info`, `who-uses`, `what-uses` e `show-evidence` não recebem filtro de origem.
+- O wrapper PowerShell define `PYTHONIOENCODING` com a codificação de saída do console apenas durante a chamada ao Python e restaura o valor anterior; assim JSON/texto mantêm Unicode ao atravessar o processo nativo.
 
 ## Objetos gerados por Pattern (autoral x gerado)
 
@@ -538,7 +556,7 @@ Self-test local (não depende de pasta paralela real) para o sinal determinísti
 .\scripts\Test-KbIntelligenceGeneratedObjectExtractionSelfTest.ps1
 ```
 
-Self-test local (não depende de pasta paralela real) para `idBasedOn`→`Domain` (`based_on_domain`, extrator 12): escopo além de `Attribute`, módulo por `fullyQualifiedName`, máscara CDATA/comentário em passagem única e dedup:
+Self-test local (não depende de pasta paralela real) para `idBasedOn`→`Domain` (`based_on_domain`, extrator 13): escopo além de `Attribute`, resolução de Domain em `PackagedModule` pelo FQFN, prioridade authored, skips auditáveis, filtros de origem, sugestões literais, avisos target-only, máscara CDATA/comentário em passagem única e dedup:
 
 ```powershell
 .\scripts\Test-KbIntelligenceIdBasedOnDomainSelfTest.ps1

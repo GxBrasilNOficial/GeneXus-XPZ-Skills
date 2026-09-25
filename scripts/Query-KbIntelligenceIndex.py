@@ -21,7 +21,7 @@ from GeneXusObjectTypeCatalogCore import (  # noqa: E402
 )
 
 
-EXPECTED_SCHEMA_VERSION = "4"
+EXPECTED_SCHEMA_VERSION = "5"
 LEVEL_RE = re.compile(r"<Level\b(?P<attrs>[^>]*)>(?P<body>.*?)</Level>", re.IGNORECASE | re.DOTALL)
 LEVEL_ATTRIBUTE_RE = re.compile(
     r"<Attribute\b(?P<attrs>[^>]*)>(?P<name>.*?)</Attribute>",
@@ -179,6 +179,11 @@ def validate_schema_version(conn: sqlite3.Connection) -> None:
             "Index schema is missing required column 'guid' in objects table. "
             "Rebuild the index with the current engine before querying."
         )
+    if "origin" not in columns:
+        raise SystemExit(
+            "Index schema is missing required column 'origin' in objects table. "
+            "Rebuild the index with the current engine before querying."
+        )
 
 
 def row_to_dict(cursor: sqlite3.Cursor, row: sqlite3.Row) -> dict[str, object]:
@@ -238,11 +243,41 @@ def fetch_object(conn: sqlite3.Connection, object_type: str, object_name: str) -
     return fetch_one(
         conn,
         """
-        SELECT object_id, type, name, guid, file_path, last_update, file_hash, is_generated_object, pattern_object_id, instance_key
+        SELECT object_id, type, name, origin, guid, file_path, last_update, file_hash, is_generated_object, pattern_object_id, instance_key
         FROM objects
         WHERE type = ? AND LOWER(name) = LOWER(?)
         """,
         (object_type, object_name),
+    )
+
+
+def packaged_domain_did_you_mean(
+    conn: sqlite3.Connection,
+    object_type: str,
+    object_name: str,
+) -> list[dict[str, str]]:
+    if object_type.casefold() != "domain" or "." in object_name:
+        return []
+    suffix = "." + object_name.casefold()
+    rows = fetch_all(
+        conn,
+        "SELECT type, name, origin FROM objects WHERE type = 'Domain' AND origin = 'packaged-module' ORDER BY name",
+        (),
+    )
+    return [
+        {"type": str(row["type"]), "name": str(row["name"]), "origin": str(row["origin"])}
+        for row in rows
+        if str(row["name"]).casefold().endswith(suffix)
+    ][:5]
+
+
+def packaged_domain_target_notice(obj: dict[str, object]) -> str | None:
+    if obj.get("type") != "Domain" or obj.get("origin") != "packaged-module":
+        return None
+    return (
+        "Domain empacotado é alvo do grafo; o índice não materializa arestas com origem neste objeto, "
+        "então valores zero em outgoing_relations/dependencies refletem esse desenho e não significam "
+        "ausência de uso. file_path aponta para o XML contêiner do PackagedModule; o Domain é um <Object> aninhado."
     )
 
 
@@ -259,6 +294,20 @@ def generated_filter_clause(generated_filter: str | None) -> str:
     if generated_filter == "authored":
         return "AND is_generated_object = 0"
     return ""
+
+
+def add_object_origin_filter(
+    where: list[str],
+    params: list[object],
+    origin: str | None,
+    include_imported: bool,
+    default_authored: bool,
+) -> None:
+    if origin:
+        where.append("origin = ?")
+        params.append(origin)
+    elif default_authored and not include_imported:
+        where.append("origin = 'kb-authored'")
 
 
 def generated_filter_from_args(args: argparse.Namespace) -> str | None:
@@ -320,6 +369,14 @@ def index_metadata(conn: sqlite3.Connection) -> dict[str, object]:
             "index-metadata requires metadata.last_index_build_run_at; "
             "legacy or incompatible index detected, regenerate before using it for triage."
         )
+    if "packaged_domain_skips" in metadata:
+        try:
+            skips = json.loads(str(metadata["packaged_domain_skips"]))
+        except json.JSONDecodeError as exc:
+            raise SystemExit(f"Invalid metadata.packaged_domain_skips JSON: {exc}") from exc
+        if not isinstance(skips, list):
+            raise SystemExit("metadata.packaged_domain_skips must be a JSON array.")
+        metadata["packaged_domain_skips"] = skips
     return {
         "query": "index-metadata",
         "metadata": metadata,
@@ -330,11 +387,15 @@ def index_metadata(conn: sqlite3.Connection) -> dict[str, object]:
 def object_info(conn: sqlite3.Connection, object_type: str, object_name: str) -> dict[str, object]:
     obj = fetch_object(conn, object_type, object_name)
     if obj is None:
-        return {
+        result: dict[str, object] = {
             "query": "object-info",
             "object": {"type": object_type, "name": object_name},
             "found": False,
         }
+        hints = packaged_domain_did_you_mean(conn, object_type, object_name)
+        if hints:
+            result["did_you_mean"] = hints
+        return result
 
     obj["instance_name"] = derive_instance_name(obj.get("instance_key"))
     outgoing = fetch_one(
@@ -347,13 +408,17 @@ def object_info(conn: sqlite3.Connection, object_type: str, object_name: str) ->
         "SELECT COUNT(*) AS count FROM relations WHERE target_type = ? AND LOWER(target_name) = LOWER(?)",
         (object_type, object_name),
     )
-    return {
+    result = {
         "query": "object-info",
         "object": obj,
         "found": True,
         "outgoing_relations": outgoing["count"] if outgoing else 0,
         "incoming_relations": incoming["count"] if incoming else 0,
     }
+    notice = packaged_domain_target_notice(obj)
+    if notice:
+        result["notice"] = notice
+    return result
 
 
 def attribute_info(conn: sqlite3.Connection, attribute_name: str) -> dict[str, object]:
@@ -489,7 +554,16 @@ def transaction_writable_attributes(conn: sqlite3.Connection, transaction_name: 
     }
 
 
-def search_objects(conn: sqlite3.Connection, object_name: str | None, object_type: str | None, limit: int | None, generated_filter: str | None = None, instance_filter: dict[str, str] | None = None) -> dict[str, object]:
+def search_objects(
+    conn: sqlite3.Connection,
+    object_name: str | None,
+    object_type: str | None,
+    limit: int | None,
+    generated_filter: str | None = None,
+    instance_filter: dict[str, str] | None = None,
+    origin: str | None = None,
+    include_imported: bool = False,
+) -> dict[str, object]:
     # WHERE dinamico: object_name pode ser None quando so -InstanceKey e usado.
     where: list[str] = []
     params: list[object] = []
@@ -510,12 +584,19 @@ def search_objects(conn: sqlite3.Connection, object_name: str | None, object_typ
         where.append("is_generated_object = 1")
     elif generated_filter == "authored":
         where.append("is_generated_object = 0")
+    add_object_origin_filter(
+        where,
+        params,
+        origin,
+        include_imported,
+        default_authored=object_name is None,
+    )
     where_sql = ("WHERE " + " AND ".join(where)) if where else ""
 
     rows = fetch_all(
         conn,
         f"""
-        SELECT type, name, guid, file_path, last_update, is_generated_object, pattern_object_id, instance_key
+        SELECT type, name, origin, guid, file_path, last_update, is_generated_object, pattern_object_id, instance_key
         FROM objects
         {where_sql}
         ORDER BY type, name
@@ -545,6 +626,21 @@ def search_objects(conn: sqlite3.Connection, object_name: str | None, object_typ
 
 
 def who_uses(conn: sqlite3.Connection, object_type: str, object_name: str, limit: int | None) -> dict[str, object]:
+    obj = fetch_object(conn, object_type, object_name)
+    if obj is None:
+        result: dict[str, object] = {
+            "query": "who-uses",
+            "object": {"type": object_type, "name": object_name},
+            "found": False,
+            "total": 0,
+            "shown": 0,
+            "results": [],
+        }
+        hints = packaged_domain_did_you_mean(conn, object_type, object_name)
+        if hints:
+            result["did_you_mean"] = hints
+        return result
+
     rows = fetch_all(
         conn,
         """
@@ -574,6 +670,7 @@ def who_uses(conn: sqlite3.Connection, object_type: str, object_name: str, limit
     return {
         "query": "who-uses",
         "object": {"type": object_type, "name": object_name},
+        "found": True,
         "total": total,
         "shown": len(limit_rows(rows, limit)),
         "results": limit_rows(rows, limit),
@@ -619,15 +716,22 @@ def what_uses(conn: sqlite3.Connection, object_type: str, object_name: str, limi
 def impact_basic(conn: sqlite3.Connection, object_type: str, object_name: str, limit: int | None) -> dict[str, object]:
     info = object_info(conn, object_type, object_name)
     if info.get("found") is False:
-        return {
+        result: dict[str, object] = {
             "query": "impact-basic",
             "object": {"type": object_type, "name": object_name},
             "found": False,
             "notice": "Impacto tecnico direto baseado no indice; nao representa impacto runtime completo.",
         }
+        if info.get("did_you_mean"):
+            result["did_you_mean"] = info["did_you_mean"]
+        return result
 
     incoming = who_uses(conn, object_type, object_name, limit)
     outgoing = what_uses(conn, object_type, object_name, limit)
+    notice = "Impacto tecnico direto baseado no indice; nao representa impacto runtime completo."
+    target_notice = info.get("notice")
+    if target_notice:
+        notice += " " + str(target_notice)
     return {
         "query": "impact-basic",
         "object": info["object"],
@@ -638,14 +742,14 @@ def impact_basic(conn: sqlite3.Connection, object_type: str, object_name: str, l
         "outgoing_shown": outgoing.get("shown", 0),
         "dependents": incoming.get("results", []),
         "dependencies": outgoing.get("results", []),
-        "notice": "Impacto tecnico direto baseado no indice; nao representa impacto runtime completo.",
+        "notice": notice,
     }
 
 
 def functional_trace_basic(conn: sqlite3.Connection, object_type: str, object_name: str, limit: int | None) -> dict[str, object]:
     impact = impact_basic(conn, object_type, object_name, None)
     if impact.get("found") is False:
-        return {
+        result: dict[str, object] = {
             "query": "functional-trace-basic",
             "object": {"type": object_type, "name": object_name},
             "found": False,
@@ -659,6 +763,9 @@ def functional_trace_basic(conn: sqlite3.Connection, object_type: str, object_na
             ],
             "notice": "Triagem funcional basica baseada em indice tecnico derivado. Nao representa prova funcional completa nem substitui leitura do XML oficial.",
         }
+        if impact.get("did_you_mean"):
+            result["did_you_mean"] = impact["did_you_mean"]
+        return result
 
     trace_rows: list[dict[str, object]] = []
     for direction, section in (("incoming", "dependents"), ("outgoing", "dependencies")):
@@ -738,6 +845,11 @@ def functional_trace_basic(conn: sqlite3.Connection, object_type: str, object_na
             },
         )
 
+    notice = "Triagem funcional basica baseada em indice tecnico derivado. Nao representa prova funcional completa nem substitui leitura do XML oficial."
+    if isinstance(impact.get("object"), dict):
+        target_notice = packaged_domain_target_notice(impact["object"])
+        if target_notice:
+            notice += " " + target_notice
     return {
         "query": "functional-trace-basic",
         "object": impact["object"],
@@ -754,21 +866,33 @@ def functional_trace_basic(conn: sqlite3.Connection, object_type: str, object_na
             "Inferencia forte",
             "Hipotese",
         ],
-        "notice": "Triagem funcional basica baseada em indice tecnico derivado. Nao representa prova funcional completa nem substitui leitura do XML oficial.",
+        "notice": notice,
     }
 
 
-def list_by_type(conn: sqlite3.Connection, object_type: str, limit: int | None, generated_filter: str | None = None) -> dict[str, object]:
+def list_by_type(
+    conn: sqlite3.Connection,
+    object_type: str,
+    limit: int | None,
+    generated_filter: str | None = None,
+    origin: str | None = None,
+    include_imported: bool = False,
+) -> dict[str, object]:
     generated_clause = generated_filter_clause(generated_filter)
+    where = ["type = ?"]
+    params: list[object] = [object_type]
+    if generated_clause:
+        where.append(generated_clause.removeprefix("AND "))
+    add_object_origin_filter(where, params, origin, include_imported, default_authored=True)
     rows = fetch_all(
         conn,
         f"""
-        SELECT type, name, guid, file_path, last_update, is_generated_object, pattern_object_id, instance_key
+        SELECT type, name, origin, guid, file_path, last_update, is_generated_object, pattern_object_id, instance_key
         FROM objects
-        WHERE type = ? {generated_clause}
+        WHERE {' AND '.join(where)}
         ORDER BY name
         """,
-        (object_type,),
+        tuple(params),
     )
     for r in rows:
         r["instance_name"] = derive_instance_name(r.get("instance_key"))
@@ -1016,6 +1140,17 @@ def format_text(result: dict[str, object]) -> str:
             for key in sorted(metadata):
                 if key == "last_index_build_run_at":
                     continue
+                if key == "packaged_domain_skips" and isinstance(metadata[key], list):
+                    skips = metadata[key]
+                    lines.append(f"packaged_domain_skips: count={len(skips)}")
+                    for item in skips[:3]:
+                        if not isinstance(item, dict):
+                            continue
+                        detail = item.get("fqfn") or item.get("module_rel_path") or "(sem caminho)"
+                        lines.append(f"  - {item.get('reason')}: {detail}")
+                    if len(skips) > 3:
+                        lines.append(f"  ... {len(skips) - 3} outros skips")
+                    continue
                 lines.append(f"{key}: {metadata[key]}")
         return "\n".join(lines)
 
@@ -1085,6 +1220,14 @@ def format_text(result: dict[str, object]) -> str:
     if isinstance(obj, dict):
         if result.get("found") is False:
             lines.append(f"{query}: {obj.get('type')}:{obj.get('name')} not found")
+            hints = result.get("did_you_mean", [])
+            if isinstance(hints, list) and hints:
+                lines.append("did_you_mean:")
+                for hint in hints:
+                    if isinstance(hint, dict):
+                        lines.append(
+                            f"  - {hint.get('type')}:{hint.get('name')} ({hint.get('origin')})"
+                        )
             if query in ("impact-basic", "functional-trace-basic"):
                 lines.append(str(result.get("notice")))
             return "\n".join(lines)
@@ -1109,12 +1252,15 @@ def format_text(result: dict[str, object]) -> str:
         lines.append(f"guid: {obj.get('guid')}")
         lines.append(f"file: {obj.get('file_path')}")
         lines.append(f"last_update: {obj.get('last_update')}")
+        lines.append(f"origin: {obj.get('origin')}")
         lines.append(f"generated: {obj.get('is_generated_object')}")
         lines.append(f"pattern_object_id: {obj.get('pattern_object_id')}")
         lines.append(f"instance_key: {obj.get('instance_key')}")
         lines.append(f"instance_name: {obj.get('instance_name')}")
         lines.append(f"incoming_relations: {result.get('incoming_relations', 0)}")
         lines.append(f"outgoing_relations: {result.get('outgoing_relations', 0)}")
+        if result.get("notice"):
+            lines.append(str(result.get("notice")))
         return "\n".join(lines)
 
     if query == "attribute-info":
@@ -1161,7 +1307,10 @@ def format_text(result: dict[str, object]) -> str:
         lines.append(f"last_update: {obj.get('last_update')}")
         lines.append(f"incoming_relations: {result.get('incoming_relations', 0)}")
         lines.append(f"outgoing_relations: {result.get('outgoing_relations', 0)}")
-        lines.append(str(result.get("notice")))
+        if obj.get("origin") is not None:
+            lines.append(f"origin: {obj.get('origin')}")
+        if result.get("notice"):
+            lines.append(str(result.get("notice")))
         for section, title in (("dependents", "dependents"), ("dependencies", "dependencies")):
             rows = result.get(section, [])
             shown_key = "incoming_shown" if section == "dependents" else "outgoing_shown"
@@ -1192,6 +1341,8 @@ def format_text(result: dict[str, object]) -> str:
         lines.append(f"last_update: {obj.get('last_update')}")
         lines.append(f"incoming_relations: {result.get('incoming_relations', 0)}")
         lines.append(f"outgoing_relations: {result.get('outgoing_relations', 0)}")
+        if obj.get("origin") is not None:
+            lines.append(f"origin: {obj.get('origin')}")
         lines.append(str(result.get("notice")))
 
         trace_rows = result.get("technical_trace", [])
@@ -1238,7 +1389,7 @@ def format_text(result: dict[str, object]) -> str:
             continue
         if query in ("search-objects", "list-by-type"):
             lines.append(f"- {row.get('type')}:{row.get('name')}")
-            line2 = f"  guid={row.get('guid')} {row.get('file_path')} last_update={row.get('last_update')} generated={row.get('is_generated_object')}"
+            line2 = f"  origin={row.get('origin')} guid={row.get('guid')} {row.get('file_path')} last_update={row.get('last_update')} generated={row.get('is_generated_object')}"
             if row.get("instance_name"):
                 line2 += f" instance_name={row.get('instance_name')}"
             lines.append(line2)
@@ -1283,11 +1434,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--object-type")
     parser.add_argument("--object-name")
     parser.add_argument("--model", help="Filtro de modelo para css-classes: legacy-theme | design-system.")
-    parser.add_argument("--origin", help="Filtro de origem para css-classes: kb-authored | packaged-module.")
+    parser.add_argument(
+        "--origin",
+        choices=["kb-authored", "packaged-module"],
+        help="Filtra por origem em css-classes, list-by-type e search-objects.",
+    )
     parser.add_argument(
         "--include-imported",
         action="store_true",
-        help="css-classes: inclui classes de PackagedModule (libs importadas) na visao sem lookup nominal.",
+        help=(
+            "Remove o filtro padrão kb-authored em css-classes, list-by-type e search-objects por instance-key. "
+            "Em search-objects por nome, não altera o resultado."
+        ),
     )
     generated_group = parser.add_mutually_exclusive_group()
     generated_group.add_argument(
@@ -1378,11 +1536,27 @@ def main() -> int:
             if not args.object_name and not args.instance_key:
                 raise SystemExit("search-objects requires --object-name or --instance-key.")
             instance_filter = classify_instance_filter(args.instance_key) if args.instance_key else None
-            result = search_objects(conn, args.object_name, args.object_type, args.limit, generated_filter_from_args(args), instance_filter)
+            result = search_objects(
+                conn,
+                args.object_name,
+                args.object_type,
+                args.limit,
+                generated_filter_from_args(args),
+                instance_filter,
+                args.origin,
+                args.include_imported,
+            )
         elif args.query == "list-by-type":
             if not args.object_type:
                 raise SystemExit("list-by-type requires --object-type.")
-            result = list_by_type(conn, args.object_type, args.limit, generated_filter_from_args(args))
+            result = list_by_type(
+                conn,
+                args.object_type,
+                args.limit,
+                generated_filter_from_args(args),
+                args.origin,
+                args.include_imported,
+            )
         elif args.query == "transaction-attributes":
             if not args.object_name:
                 raise SystemExit("transaction-attributes requires --object-name.")

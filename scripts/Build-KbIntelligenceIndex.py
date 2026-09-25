@@ -44,7 +44,7 @@ from pathlib import Path
 from typing import Iterable
 
 # Incrementar quando a cobertura ou regras do indexador mudarem de forma material (nao em refator inerte).
-EXTRACTOR_SIGNATURE_VERSION = "12"
+EXTRACTOR_SIGNATURE_VERSION = "13"
 
 # Origens do extrator generalizado idBasedOn -> Domain (relation_scope + Attribute; fora: Panel/Stencil/PackagedModule).
 IDBASEDON_DOMAIN_SOURCE_TYPES = (
@@ -132,6 +132,7 @@ ATTRIBUTE_ROOT_RE = re.compile(r"^\s*(?:<\?xml[^>]*\?>\s*)?<Attribute\b", re.IGN
 # O SCSS de classes do modelo design-system vive no Part "Styles" deste type GUID, tanto em objetos
 # DesignSystem autorais quanto em DesignSystem aninhados dentro de PackagedModule (libs importadas).
 DESIGN_SYSTEM_STYLES_PART_GUID = "c6b14574-4f5f-4e35-aaa7-e322e88a9a10"
+PACKAGED_MODULE_EXPORT_PART_GUID = "ed1b7b1c-2aaf-46eb-9ec5-db348f6fa3fc"
 CSS_USAGE_SOURCE_TYPES = ("WebPanel", "Panel", "Transaction")
 # Identificador de classe CSS aceita hifen e digito (ex.: Card-Basico) — distinto do identificador GeneXus.
 CSS_SELECTOR_RE = re.compile(r"^\s*\.(?P<name>[A-Za-z][A-Za-z0-9_-]*)\s*\{", re.MULTILINE)
@@ -288,6 +289,7 @@ class ObjectInfo:
     is_generated_object: int
     pattern_object_id: str | None
     instance_key: str | None
+    origin: str = "kb-authored"
 
 
 @dataclass(frozen=True)
@@ -530,6 +532,108 @@ def collect_objects(
             instance_key=instance_key,
         )
     return objects_by_type
+
+
+def collect_packaged_domain_candidates(
+    packaged_modules: Iterable[ObjectInfo],
+) -> tuple[list[ObjectInfo], list[dict[str, str]]]:
+    """Read only direct Domain children of PackagedModule ExportFile/Objects parts."""
+    domain_type_guid = str(GX_TYPE_CATALOG_BY_NAME["Domain"]["objectTypeGuid"]).lower()
+    candidates: list[ObjectInfo] = []
+    skips: list[dict[str, str]] = []
+
+    def local_name(tag: object) -> str:
+        return str(tag).rsplit("}", 1)[-1]
+
+    def add_skip(module: ObjectInfo, reason: str, fqfn: str | None = None) -> None:
+        item: dict[str, str] = {"module_rel_path": module.rel_path, "reason": reason}
+        if fqfn:
+            item["fqfn"] = fqfn
+        skips.append(item)
+
+    for module in sorted(packaged_modules, key=lambda item: item.rel_path):
+        xml_text = read_text(module.path)
+        try:
+            root = ElementTree.fromstring(xml_text)
+        except ElementTree.ParseError:
+            add_skip(module, "module-xml-invalid")
+            continue
+
+        for part in list(root):
+            if (
+                local_name(part.tag) != "Part"
+                or part.attrib.get("type", "").lower() != PACKAGED_MODULE_EXPORT_PART_GUID
+            ):
+                continue
+            for export_file in list(part):
+                if local_name(export_file.tag) != "ExportFile":
+                    continue
+                for objects_node in list(export_file):
+                    if local_name(objects_node.tag) != "Objects":
+                        continue
+                    for child in list(objects_node):
+                        if (
+                            local_name(child.tag) != "Object"
+                            or child.attrib.get("type", "").lower() != domain_type_guid
+                        ):
+                            continue
+                        fqfn = child.attrib.get("fullyQualifiedName", "").strip()
+                        module_name, separator, domain_name = fqfn.rpartition(".")
+                        if not separator or not module_name or not domain_name:
+                            add_skip(module, "missing-or-unqualified-fqfn", fqfn or None)
+                            continue
+                        candidates.append(
+                            ObjectInfo(
+                                object_type="Domain",
+                                name=fqfn,
+                                guid=child.attrib.get("guid") or None,
+                                path=module.path,
+                                rel_path=module.rel_path,
+                                last_update=child.attrib.get("lastUpdate") or None,
+                                file_hash=module.file_hash,
+                                is_generated_object=0,
+                                pattern_object_id=None,
+                                instance_key=None,
+                                origin="packaged-module",
+                            )
+                        )
+    return candidates, skips
+
+
+def select_packaged_domain_winners(
+    authored_domains: dict[str, ObjectInfo],
+    candidates: list[ObjectInfo],
+    skips: list[dict[str, str]],
+) -> tuple[list[ObjectInfo], dict[str, str], list[dict[str, str]]]:
+    """Resolve packaged FQFN collisions after authored Domains have claimed their names."""
+    authored_fqfns = collect_fully_qualified_names({"Domain": authored_domains})
+    authored_names_by_fold = {name.lower(): name for name in authored_domains}
+    fqfn_lookup: dict[str, str] = {}
+    for (object_type, name), fqfn in authored_fqfns.items():
+        if object_type == "domain" and fqfn:
+            fqfn_lookup.setdefault(fqfn.lower(), authored_names_by_fold[name])
+
+    authored_short_names = {name.lower() for name in authored_domains}
+    packaged_winners: list[ObjectInfo] = []
+    for candidate in candidates:
+        key = candidate.name.lower()
+        reason = None
+        if key in authored_short_names:
+            reason = "collision-with-authored-short-name"
+        elif key in fqfn_lookup:
+            reason = "collision-fqfn-first-wins"
+        if reason:
+            skips.append(
+                {
+                    "fqfn": candidate.name,
+                    "module_rel_path": candidate.rel_path,
+                    "reason": reason,
+                }
+            )
+            continue
+        fqfn_lookup[key] = candidate.name
+        packaged_winners.append(candidate)
+    return packaged_winners, fqfn_lookup, skips
 
 
 def folder_is_all_legacy_orphan(folder: Path) -> bool:
@@ -2106,29 +2210,21 @@ def parse_domain_idbasedon_value(value: str) -> tuple[str, str | None] | None:
 def resolve_domain_idbasedon_target(
     value: str,
     domain_lookup: dict[str, str],
-    domain_fqfn_by_name: dict[str, str | None],
+    domain_fqfn_lookup: dict[str, str],
 ) -> str | None:
     """Resolvedor da regra B (Attribute e demais tipos do escopo).
 
-    Sem modulo: lookup por nome curto (lower). Com modulo: so se
-    lower(fqfn) == lower(modulo + '.' + nome). Sem fqfn ou divergente: nao resolve.
+    Sem modulo: lookup pelo nome curto dos Domains autorais. Com modulo: lookup
+    exato do FQFN entre Domains autorais e packaged, sem fallback pelo nome curto.
     """
     parsed = parse_domain_idbasedon_value(value)
     if parsed is None:
         return None
     domain_name, module = parsed
-    target_name = domain_lookup.get(domain_name.lower())
-    if not target_name:
-        return None
     if module is None:
-        return target_name
-    fqfn = domain_fqfn_by_name.get(target_name.lower())
-    if not fqfn:
-        return None
-    expected = f"{module}.{domain_name}"
-    if fqfn.lower() == expected.lower():
-        return target_name
-    return None
+        return domain_lookup.get(domain_name.lower())
+    expected = f"{module}.{domain_name}".lower()
+    return domain_fqfn_lookup.get(expected)
 
 
 def dedup_based_on_domain_evidences(evidences: list[Evidence]) -> list[Evidence]:
@@ -2155,7 +2251,7 @@ def dedup_based_on_domain_evidences(evidences: list[Evidence]) -> list[Evidence]
 def extract_idbasedon_domain_evidence(
     source_objects: Iterable[ObjectInfo],
     domain_names: set[str],
-    domain_fqfn_by_name: dict[str, str | None],
+    domain_fqfn_lookup: dict[str, str],
 ) -> list[Evidence]:
     """idBasedOn Domain:… em XML cru com CDATA/comentario mascarados; snippet/linha do cru."""
     evidences: list[Evidence] = []
@@ -2175,7 +2271,7 @@ def extract_idbasedon_domain_evidence(
             target_name = resolve_domain_idbasedon_target(
                 raw_value,
                 domain_lookup,
-                domain_fqfn_by_name,
+                domain_fqfn_lookup,
             )
             if not target_name:
                 continue
@@ -2572,6 +2668,7 @@ def create_schema(conn: sqlite3.Connection) -> None:
             object_id INTEGER PRIMARY KEY AUTOINCREMENT,
             type TEXT NOT NULL,
             name TEXT NOT NULL,
+            origin TEXT NOT NULL,
             guid TEXT,
             file_path TEXT NOT NULL,
             last_update TEXT,
@@ -2605,6 +2702,7 @@ def create_schema(conn: sqlite3.Connection) -> None:
         );
 
         CREATE INDEX idx_objects_type_name ON objects(type, name);
+        CREATE INDEX idx_objects_origin ON objects(origin);
         CREATE INDEX idx_objects_is_generated ON objects(is_generated_object);
         CREATE INDEX idx_relations_target ON relations(target_type, target_name);
         CREATE INDEX idx_relations_source ON relations(source_object_id);
@@ -2732,10 +2830,12 @@ def write_index(
     output_path: Path,
     source_root: Path,
     objects: list[ObjectInfo],
+    packaged_objects: list[ObjectInfo],
     evidences: list[Evidence],
     css_classes: list[CssClass],
     index_build_run_at: str,
     inventory_semantics: dict[str, object],
+    packaged_domain_skips: list[dict[str, str]],
 ) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     if output_path.exists():
@@ -2751,7 +2851,7 @@ def write_index(
             [
                 ("last_index_build_run_at", index_build_run_at),
                 ("source_root", str(source_root)),
-                ("schema_version", "4"),
+                ("schema_version", "5"),
                 ("writability_rule_version", WRITABILITY_RULE_VERSION),
                 ("extractor_signature_version", EXTRACTOR_SIGNATURE_VERSION),
                 ("extractor_signature_hash", extractor_signature_hash),
@@ -2760,18 +2860,23 @@ def write_index(
                 ("inventory_validation_status", str(inventory_semantics["status"])),
                 ("inventory_mismatch_count", str(inventory_semantics["mismatch_count"])),
                 ("generated_objects_count", str(sum(1 for obj in objects if obj.is_generated_object))),
+                (
+                    "packaged_domain_skips",
+                    json.dumps(packaged_domain_skips, ensure_ascii=False, separators=(",", ":")),
+                ),
             ],
         )
 
-        for obj in objects:
+        for obj in [*objects, *packaged_objects]:
             conn.execute(
                 """
-                INSERT INTO objects(type, name, guid, file_path, last_update, file_hash, is_generated_object, pattern_object_id, instance_key)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO objects(type, name, origin, guid, file_path, last_update, file_hash, is_generated_object, pattern_object_id, instance_key)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     obj.object_type,
                     obj.name,
+                    obj.origin,
                     obj.guid,
                     obj.rel_path,
                     obj.last_update,
@@ -2870,6 +2975,8 @@ def validation_report(
     objects_by_type: dict[str, dict[str, ObjectInfo]],
     evidences: list[Evidence],
     css_classes: list[CssClass],
+    packaged_domain_skips: list[dict[str, str]],
+    packaged_domains_written: int,
     validation_cases_path: Path | None,
     index_build_run_at: str,
     inventory_semantics: dict[str, object],
@@ -3017,10 +3124,12 @@ def validation_report(
         "last_index_build_run_at": index_build_run_at,
         "source_root": str(source_root),
         "objects_read_by_type": {key: len(value) for key, value in objects_by_type.items()},
-        "objects_written": sum(len(value) for value in objects_by_type.values()),
+        "objects_written": sum(len(value) for value in objects_by_type.values()) + packaged_domains_written,
+        "packaged_domains_written": packaged_domains_written,
         "relations_written": len(evidences),
         "css_classes_written": len(css_classes),
         "css_classes_by_model": dict(sorted(css_classes_by_model.items())),
+        "packaged_domain_skips": packaged_domain_skips,
         "inventory_semantics": inventory_semantics,
         "validation_cases_path": str(validation_cases_path) if validation_cases_path else None,
         "cases": cases,
@@ -3078,6 +3187,14 @@ def main() -> int:
     apis = objects_by_type.get("API", {})
     data_selectors = objects_by_type.get("DataSelector", {})
     domains = objects_by_type.get("Domain", {})
+    packaged_domain_candidates, packaged_domain_skips = collect_packaged_domain_candidates(
+        objects_by_type.get("PackagedModule", {}).values()
+    )
+    packaged_domain_objects, domain_fqfn_lookup, packaged_domain_skips = select_packaged_domain_winners(
+        domains,
+        packaged_domain_candidates,
+        packaged_domain_skips,
+    )
     sdts = objects_by_type.get("SDT", {})
     workwith_objects = [
         *objects_by_type.get("WorkWith", {}).values(),
@@ -3183,14 +3300,8 @@ def main() -> int:
             for obj in objects
             if obj.object_type in IDBASEDON_DOMAIN_SOURCE_TYPES
         ],
-        domain_names=set(objects_by_type.get("Domain", {})),
-        domain_fqfn_by_name={
-            name.lower(): fqfn
-            for (object_type, name), fqfn in collect_fully_qualified_names(
-                {"Domain": objects_by_type.get("Domain", {})}
-            ).items()
-            if object_type == "domain"
-        },
+        domain_names=set(domains),
+        domain_fqfn_lookup=domain_fqfn_lookup,
     )
     attribute_formula_call_evidences = extract_attribute_formula_call_evidence(
         attributes.values(),
@@ -3265,10 +3376,12 @@ def main() -> int:
         args.output_path.resolve(),
         source_root,
         objects,
+        packaged_domain_objects,
         evidences,
         css_classes,
         index_build_run_at,
         inventory_semantics,
+        packaged_domain_skips,
     )
 
     validation_cases_path = args.validation_cases_path.resolve() if args.validation_cases_path else None
@@ -3280,6 +3393,8 @@ def main() -> int:
         objects_by_type,
         evidences,
         css_classes,
+        packaged_domain_skips,
+        len(packaged_domain_objects),
         validation_cases_path,
         index_build_run_at,
         inventory_semantics,
