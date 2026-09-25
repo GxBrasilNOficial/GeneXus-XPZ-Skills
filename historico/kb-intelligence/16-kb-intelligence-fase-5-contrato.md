@@ -86,6 +86,8 @@ Quando um objeto no escopo declarar `idBasedOn` para um `Domain` existente no in
 
 **Ampliação (decisão 2026-09-24, extrator 12):** o incremento 2 original cobria só `Attribute`. A frente generalizou a mesma relação a Procedure/SDT/WebPanel/Transaction/API/DataSelector/DataProvider/Domain/WorkWith(ForWeb), com máscara CDATA/comentário, resolvedor de módulo via `fullyQualifiedName` e dedup por par origem/destino. `Panel`/`Stencil`/`PackagedModule` permanecem fora. Forma escapada XML e unificação com `resolve_custom_type_target`/`exo:` ficam adiadas (ver `999`).
 
+**Complemento (decisão 2026-09-25, extrator 13/schema 5):** a exclusão de `PackagedModule` acima continua válida para a origem das relações, mas não para o destino: Domains filhos diretos podem entrar no índice como alvos consultáveis por `fullyQualifiedName`, com `origin=packaged-module`; o conteúdo importado não origina relações. O FQFN autoral prevalece, e colisões ou ausência de FQFN qualificado são skips auditáveis. Índices schema 4 ficam bloqueados até rebuild completo; ver `scripts/README-kb-intelligence.md`.
+
 Exemplos conceituais:
 
 - `Attribute:AbateOrdemData` com `idBasedOn` `Domain:Data` pode resolver para `Domain:Data`

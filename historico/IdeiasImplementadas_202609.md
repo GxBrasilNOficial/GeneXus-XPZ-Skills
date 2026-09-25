@@ -2,6 +2,17 @@
 
 Registro de ideias que sairam de 999-ideias-pendentes.md por terem sido implementadas ou incorporadas ao contrato metodologico vigente.
 
+## KbIntelligence schema 5 / extrator 13 — Domains em `PackagedModule` como alvos
+
+Implementado em 2026-09-25. O índice passa a registrar Domains filhos diretos de `PackagedModule` como alvos consultáveis (`origin=packaged-module`), resolvidos por `fullyQualifiedName` e acompanhados de `guid`, `lastUpdate` e caminho/hash do XML contêiner. O conteúdo importado não gera relações de saída; o FQFN autoral prevalece, e FQFNs duplicados ou ausentes/não qualificados ficam registrados nos skips e no relatório de validação. As consultas localizam esses alvos e distinguem Domain existente sem arestas de Domain ausente; listagens por tipo e consultas por chave de instância permanecem autorais por padrão. A mudança exige schema 5 e extrator 13: índices schema 4 são incompatíveis e precisam de rebuild nas pastas paralelas antes de consultas com o motor atualizado.
+
+Medição ponta a ponta em índice temporário, com leitura do acervo FabricaBrasil: 15.405 objetos (252 Domains empacotados), 78.997 relações, inventário `OK`, zero divergências e zero skips; `who-uses` retornou 2 relações para `GeneXusSecurityCommon.GAMUserActivationMethod` e 16 para `NFe_v4_00_TAmb`. Sem gravação no acervo ou importação na KB.
+
+### Rastreabilidade
+
+- Commit material: `99da3b6` (`Indexa Domains de módulos empacotados`)
+- Arquivos materiais: `scripts/Build-KbIntelligenceIndex.py`, consultas Python/PowerShell, self-tests, `scripts/README-kb-intelligence.md`, `xpz-index-triage`, `xpz-kb-parallel-setup`, `02`, `08`, `09`, `README`, `CHANGELOG`, `999`, guia metodológico da KB Intelligence e contrato da Fase 5.
+
 ## KbIntelligence extrator 12 — `idBasedOn`→`Domain` generalizado
 
 Implementado em 2026-09-24. A relação `based_on_domain` deixou de ser exclusiva de `Attribute`: o extrator passa a emitir arestas a partir de Procedure, SDT, WebPanel, Transaction e demais tipos no `relation_scope` (exceto Panel/Stencil/PackagedModule), com máscara em passagem única de CDATA/comentário (offsets e snippet no XML cru), resolvedor de módulo via `fullyQualifiedName` (`lower()`), dedup por par origem/destino e bump `EXTRACTOR_SIGNATURE_VERSION` 11→12 (`schema_version` permanece 4).
