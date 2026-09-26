@@ -219,6 +219,11 @@ Assert-True ([bool]$usage.found_in_catalog) 'PanelTitle deveria ser found_in_cat
 Assert-True ($usage.resolvable_uses_total -ge 2) "PanelTitle deveria ter >=2 usos resolviveis, teve $($usage.resolvable_uses_total)"
 Assert-True ($usage.dynamic_uses_total -ge 2) "Deveria haver >=2 atribuicoes dinamicas (&someVar e Format), teve $($usage.dynamic_uses_total)"
 
+# --- who-uses: alvo CSS com relacoes, mesmo sem linha correspondente em objects ---
+$whoUses = Invoke-CssQuery -QueryArgs @('--query', 'who-uses', '--object-type', 'CssClass', '--object-name', 'PanelTitle')
+Assert-True ([bool]$whoUses.found) 'PanelTitle deveria ser found=true pelas relacoes de entrada'
+Assert-True ($whoUses.total -ge 1) "PanelTitle deveria ter >=1 relacao de entrada, teve $($whoUses.total)"
+
 # --- css-class-usage: overview com classe usada mas não catalogada ---
 $overview = Invoke-CssQuery -QueryArgs @('--query', 'css-class-usage')
 Assert-True ($overview.used_but_uncatalogued -contains 'UncatalProof') 'UncatalProof deveria aparecer em used_but_uncatalogued'

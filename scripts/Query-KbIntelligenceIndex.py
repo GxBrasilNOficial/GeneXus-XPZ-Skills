@@ -626,21 +626,6 @@ def search_objects(
 
 
 def who_uses(conn: sqlite3.Connection, object_type: str, object_name: str, limit: int | None) -> dict[str, object]:
-    obj = fetch_object(conn, object_type, object_name)
-    if obj is None:
-        result: dict[str, object] = {
-            "query": "who-uses",
-            "object": {"type": object_type, "name": object_name},
-            "found": False,
-            "total": 0,
-            "shown": 0,
-            "results": [],
-        }
-        hints = packaged_domain_did_you_mean(conn, object_type, object_name)
-        if hints:
-            result["did_you_mean"] = hints
-        return result
-
     rows = fetch_all(
         conn,
         """
@@ -666,15 +651,22 @@ def who_uses(conn: sqlite3.Connection, object_type: str, object_name: str, limit
         """,
         (object_type, object_name),
     )
+    obj = fetch_object(conn, object_type, object_name)
+    found = obj is not None or bool(rows)
     total = len(rows)
-    return {
+    result: dict[str, object] = {
         "query": "who-uses",
         "object": {"type": object_type, "name": object_name},
-        "found": True,
+        "found": found,
         "total": total,
         "shown": len(limit_rows(rows, limit)),
         "results": limit_rows(rows, limit),
     }
+    if not found:
+        hints = packaged_domain_did_you_mean(conn, object_type, object_name)
+        if hints:
+            result["did_you_mean"] = hints
+    return result
 
 
 def what_uses(conn: sqlite3.Connection, object_type: str, object_name: str, limit: int | None) -> dict[str, object]:
