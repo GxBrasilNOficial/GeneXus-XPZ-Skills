@@ -553,15 +553,18 @@ São **três criadores distintos** (MiniMax, Z.ai/GLM, NVIDIA Nemotron). O fix i
 ## Declarar o nível de esforço de raciocínio por revisor/harness
 
 - **Importância** — média-alta (afeta a **qualidade** do parecer e a **auditabilidade** do recibo).
-- **Maturidade** — parcial (2026-08-27): schema 3 grava `reasoningEffort` top-level (`unset|low|medium|high|xhigh`) e o closeout ecoa `effortApplied` (`unset` se pedido unset; `unsupported` se pedido ≠ unset — nenhum adapter aplica knobs nesta frente). **Pendente:** knob real nos `Invoke-*.ps1` e levantamento por harness.
+- **Maturidade** — parcial avançada (2026-09-28): o harness de painel aplica `reasoningEffort` em Claude Code, Codex e opencode e registra `effortApplied` por revisor; o closeout prefere esse registro. **Pendente:** levantamento de Copilot, Gemini e Antigravity (hoje `unsupported`) e o subagente nativo.
 
-**O que esta frente resolveu.** Preferência schema 3 persiste o pedido humano; recibo do closeout mostra se foi aplicado ou ainda `unsupported`.
+**O que já foi resolvido.** Schema 3 persiste o pedido humano (2026-08-27). Em 2026-09-28, o `Invoke-LlmDelegatePanelDispatch.ps1` passou a repassar o campo top-level `reasoningEffort` ao CLI e a registrar `effortRequested`/`effortApplied`/`effortDetail` (`applied`, `unsupported`, `notDeclaredByModel`, `notDispatched`, `unset`); valor fora do enum vira `error` fail-closed. Cobertura em `Test-InvokeLlmDelegatePanelDispatchSelfTest.ps1` (seção 8f) e `Test-LlmDelegatePeerReviewCloseoutSelfTest.ps1` (caso 32).
 
-**O que permanece.** Medido em 2026-08-16: o revisor Codex pode rodar em `xhigh` porque o `~/.codex/config.toml` **global** traz `model_reasoning_effort = "xhigh"`; a preferência agora **grava** o pedido, mas **não** o injeta no adapter. Se o default global mudar, o esforço efetivo pode divergir do gravado até a frente de adapters.
+**Levantamento por harness (2026-09-28, CLIs desta máquina):**
+- Claude Code 2.1.280: `--effort low|medium|high|xhigh|max` → aplicado (`Invoke-ClaudeCode.ps1`/`Invoke-ClaudeCodeAsync.ps1 -Effort`).
+- Codex 0.158: `-c model_reasoning_effort=<nível>` → aplicado (`Invoke-Codex.ps1 -ReasoningEffort`); sobrepõe o `config.toml` global, que deixa de decidir em silêncio.
+- opencode 1.18.30: `--variant`, mas só vale para variantes que o catálogo declara por modelo; `commandcode/*` e `opencode/big-pickle` declaram `variants` vazio → `notDeclaredByModel` (nada a fazer do nosso lado).
+- <!-- backend-parity: ignore --> Copilot, Gemini, Antigravity: **não levantados**; o harness marca `unsupported`.
+- Subagente nativo: a ferramenta de subagente não aceita esforço; não verificado se herda o da sessão.
 
-**A levantar, por harness:** como (e se) cada backend expõe nível de esforço — Codex (`model_reasoning_effort`, e se um `[profiles.*]` dedicado torna a preferência auto-contida via o `profile` **já aceito**), Claude Code, opencode, Copilot, Gemini, Antigravity, nativo. Nem todos devem expor; registrar **quais não expõem** também é resultado útil.
-
-**Origem:** ressalva levantada em 2026-08-16 ao promover o Codex `gpt-5.6-luna` a rank 1; persistência schema 3 em 2026-08-27 (manuscrito v20).
+**Origem:** ressalva levantada em 2026-08-16 ao promover o Codex `gpt-5.6-luna` a rank 1; persistência schema 3 em 2026-08-27 (manuscrito v20); aplicação nos adapters em 2026-09-28.
 
 ## Resposta `stop` porém quase-vazia escapa do veredito e do retry (gate de qualidade/aderência ausente)
 

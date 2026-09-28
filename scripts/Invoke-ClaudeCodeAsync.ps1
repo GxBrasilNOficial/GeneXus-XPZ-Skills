@@ -21,7 +21,9 @@ param(
     [ValidateRange(1, 3600)] [int] $TimeoutSec = 300,
     [ValidateSet('public', 'kb-sensitive')] [string] $RetentionMode = 'public',
     [string] $CircuitStateRoot,
-    [string] $TempDir
+    [string] $TempDir,
+    # Nivel de esforco repassado como --effort; ausente -> default da sessao do CLI.
+    [ValidateSet('low', 'medium', 'high', 'xhigh', 'max')] [string] $Effort
 )
 
 Set-StrictMode -Version Latest
@@ -908,6 +910,9 @@ try {
     }
     else {
         $arguments += @('--tools', $Tools)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($Effort)) {
+        $arguments += @('--effort', $Effort)
     }
 
     if ($PSCmdlet.ParameterSetName -eq 'FromFile') {

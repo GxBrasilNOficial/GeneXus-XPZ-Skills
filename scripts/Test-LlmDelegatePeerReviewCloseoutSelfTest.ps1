@@ -342,6 +342,22 @@ Assert-True ([string]$r31.requiredUserPrompt -notmatch 'preferidos desta máquin
 Assert-True ([string]$r31.receiptAddendum -match 'destino=.*preferred-reviewers\.cursor\.json') 'Caso 31: recibo destino= deveria ecoar o path do orquestrador.'
 Assert-True ([string]$r31.effectivePreferredPath -match 'preferred-reviewers\.cursor\.json$') 'Caso 31: effectivePreferredPath deveria ser o path proposto.'
 
+# (32) effortApplied: o registro do despachante prevalece; sem ele, pedido != unset segue 'unsupported'.
+$sel32 = '[{"backend":"codex","targetModelKey":"openai/gpt-6-sol","reasoningEffort":"high"},{"backend":"opencode","targetModelKey":"commandcode/deepseek/deepseek-v4.1-flash","reasoningEffort":"xhigh"},{"backend":"claude-code","targetModelKey":"anthropic/claude-opus-5-5","reasoningEffort":"medium"}]'
+$states32 = @'
+[
+  {"backend":"codex","targetModelKey":"openai/gpt-6-sol","family":"openai","state":"responded","attemptRole":"primary","countsForDiversity":true,"effortApplied":"applied"},
+  {"backend":"opencode","targetModelKey":"commandcode/deepseek/deepseek-v4.1-flash","family":"deepseek","state":"responded","attemptRole":"primary","countsForDiversity":true,"effortApplied":"notDeclaredByModel"},
+  {"backend":"claude-code","targetModelKey":"anthropic/claude-opus-5-5","family":"anthropic","state":"responded","attemptRole":"primary","countsForDiversity":true}
+]
+'@
+$r32 = Invoke-Closeout $true $false 'not_applicable' $sel32 $states32 -PreferredReviewersSnapshotJson (New-TestSnapshot $sel32)
+$eff32 = @{}
+foreach ($s in @($r32.preferredReviewerStates)) { $eff32[[string]$s.targetModelKey] = [string]$s.effortApplied }
+Assert-True ($eff32['openai/gpt-6-sol'] -eq 'applied') "Caso 32: effortApplied do despachante (applied) deveria prevalecer; veio '$($eff32['openai/gpt-6-sol'])'."
+Assert-True ($eff32['commandcode/deepseek/deepseek-v4.1-flash'] -eq 'notDeclaredByModel') "Caso 32: notDeclaredByModel deveria ser ecoado; veio '$($eff32['commandcode/deepseek/deepseek-v4.1-flash'])'."
+Assert-True ($eff32['anthropic/claude-opus-5-5'] -eq 'unsupported') "Caso 32: sem registro do despachante, pedido != unset segue unsupported; veio '$($eff32['anthropic/claude-opus-5-5'])'."
+
 <#
 Casos antigos mantidos por cobertura historica:
   - sem preferencias previas + escolha manual + oferta omitida -> bloqueia;

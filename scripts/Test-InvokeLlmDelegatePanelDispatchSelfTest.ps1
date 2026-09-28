@@ -94,8 +94,24 @@ if ($a.Count -ge 2 -and $a[0] -eq 'agent' -and $a[1] -eq 'list') {
     ']'
     exit 0
 }
+# Catalogo (`models <provider> --verbose`): cabecalho com a chave + JSON do modelo. Modelos com
+# 'variants' no nome declaram low/medium/high; os demais declaram variants vazio. Sem ler stdin.
+if ($a.Count -ge 2 -and $a[0] -eq 'models') {
+    $prov = [string]$a[1]
+    foreach ($name in @('variants-model', 'plain-model')) {
+        "$prov/$name"
+        if ($name -match 'variants') {
+            '{ "id": "' + $name + '", "variants": { "low": { "reasoningEffort": "low" }, "medium": { "reasoningEffort": "medium" }, "high": { "reasoningEffort": "high" } } }'
+        } else {
+            '{ "id": "' + $name + '", "variants": {} }'
+        }
+    }
+    exit 0
+}
 $model = ''
 for ($i = 0; $i -lt $args.Count; $i++) { if ($args[$i] -eq '--model') { $model = [string]$args[$i + 1]; break } }
+$variant = ''
+for ($i = 0; $i -lt $args.Count; $i++) { if ($args[$i] -eq '--variant') { $variant = [string]$args[$i + 1]; break } }
 $null = [Console]::In.ReadToEnd()
 $fam = @($model -split '/', 2)[0]
 $log = $env:PANEL_FAKE_LOG
@@ -119,7 +135,7 @@ if ($model -match 'cota') {
 } elseif ($model -match 'empty') {
     '{"type":"step_finish","part":{"reason":"stop"}}'
 } else {
-    '{"type":"text","part":{"messageID":"m1","text":"PARECER de ' + $model + ' — revisão, dedução, ação (acentos pt-BR)."}}'
+    '{"type":"text","part":{"messageID":"m1","text":"PARECER de ' + $model + ' VARIANT=' + $variant + ' — revisão, dedução, ação (acentos pt-BR)."}}'
     '{"type":"step_finish","part":{"reason":"stop"}}'
 }
 exit 0
@@ -134,14 +150,15 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File "%~dp0fake-oc-reader.ps1" %*
     # fake-codex: varre args por -o/-C/-m, lê stdin, escreve "CD=<C> MODEL=<m>" (texto bruto) no -o.
     $fakeCxReader = Join-Path $tmp 'fake-cx-reader.ps1'
     @'
-$o = $null; $cd = ''; $m = ''
+$o = $null; $cd = ''; $m = ''; $cfg = ''
 for ($i = 0; $i -lt $args.Count; $i++) {
     if ($args[$i] -eq '-o') { $o = [string]$args[$i + 1] }
     if ($args[$i] -eq '-C') { $cd = [string]$args[$i + 1] }
     if ($args[$i] -eq '-m') { $m = [string]$args[$i + 1] }
+    if ($args[$i] -eq '-c') { $cfg = [string]$args[$i + 1] }
 }
 $null = [Console]::In.ReadToEnd()
-if ($o) { Set-Content -LiteralPath $o -Value ("CD=$cd MODEL=$m revisão") -Encoding utf8 -NoNewline }
+if ($o) { Set-Content -LiteralPath $o -Value ("CD=$cd MODEL=$m CFG=$cfg revisão") -Encoding utf8 -NoNewline }
 exit 0
 '@ | Set-Content -LiteralPath $fakeCxReader -Encoding utf8
 
@@ -159,6 +176,8 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File "%~dp0fake-cx-reader.ps1" %*
     @'
 $model = ''
 for ($i = 0; $i -lt $args.Count; $i++) { if ($args[$i] -eq '--model') { $model = [string]$args[$i + 1] } }
+$effort = ''
+for ($i = 0; $i -lt $args.Count; $i++) { if ($args[$i] -eq '--effort') { $effort = [string]$args[$i + 1] } }
 if ($args -contains '--version') { '2.1.118 (Claude Code fake)'; exit 0 }
 if ($args -contains '--help') {
     '--model --print --output-format --no-session-persistence --permission-mode --tools'
@@ -185,7 +204,7 @@ if ($model -eq 'claude-sensitive-ledger') {
     } | ConvertTo-Json -Compress -Depth 5
     exit 0
 }
-$text = 'CLAUDE cwd=' + (Get-Location).Path + ' model=' + $model + ' revisao'
+$text = 'CLAUDE cwd=' + (Get-Location).Path + ' model=' + $model + ' effort=' + $effort + ' revisao'
 [pscustomobject]@{
     type = 'assistant'
     message = [ordered]@{
@@ -1093,6 +1112,58 @@ $($timeoutAst.Extent.Text)
     Assert-True ($rvFallbackUntrusted.attemptRole -eq 'fallback') 'fallback workspace-not-trusted: attemptRole=fallback.'
     Assert-True ($rvFallbackUntrusted.activationReason -eq 'unavailable') 'fallback workspace-not-trusted: activationReason deveria ser unavailable.'
     Assert-True ($rvFallbackUntrusted.countsForDiversity -eq $true) 'fallback workspace-not-trusted respondido deve contar diversidade.'
+
+    # =======================================================================================
+    # 8f) ESFORÇO DE RACIOCÍNIO: reasoningEffort chega ao CLI (claude --effort, codex -c
+    #     model_reasoning_effort, opencode --variant só se declarada); registro effortApplied.
+    # =======================================================================================
+    $r = Invoke-Harness -Reviewers @(
+        @{ backend = 'claude-code'; reasoningEffort = 'high';   invokeArgs = @{ model = 'claude-opus-5-5' } },
+        @{ backend = 'codex';       reasoningEffort = 'xhigh';  invokeArgs = @{ model = 'gpt-5.5' } },
+        @{ backend = 'opencode';    reasoningEffort = 'high';   targetModelKey = 'ollama-cloud/variants-model'; invokeArgs = @{ model = 'ollama-cloud/variants-model' } },
+        @{ backend = 'opencode';    reasoningEffort = 'xhigh';  targetModelKey = 'ollama-cloud/plain-model';    invokeArgs = @{ model = 'ollama-cloud/plain-model' } },
+        @{ backend = 'copilot';     reasoningEffort = 'low';    invokeArgs = @{ model = 'gpt-5-mini' } },
+        @{ backend = 'claude-code';                             invokeArgs = @{ model = 'claude-opus-4-8' } }
+    ) -Sensitivity 'public' -Extra @{ Cd = $tmp; OpenCodeConfigPath = $ocCfg; CodexConfigPath = $cxCfg }
+
+    $e0 = Get-Reviewer $r.json 0
+    Assert-True ($e0.state -eq 'responded') "esforço claude-code: esperado responded; got $($e0.state) reason=$($e0.reason)"
+    Assert-True ($e0.effortRequested -eq 'high' -and $e0.effortApplied -eq 'applied') "esforço claude-code: esperado high/applied; got $($e0.effortRequested)/$($e0.effortApplied)"
+    Assert-True ((Get-Content -LiteralPath $e0.verdictPath -Raw -Encoding utf8) -match 'effort=high') 'esforço claude-code: --effort high deveria chegar ao CLI'
+
+    $e1 = Get-Reviewer $r.json 1
+    Assert-True ($e1.state -eq 'responded') "esforço codex: esperado responded; got $($e1.state) reason=$($e1.reason)"
+    Assert-True ($e1.effortApplied -eq 'applied') "esforço codex: esperado applied; got $($e1.effortApplied)"
+    Assert-True ((Get-Content -LiteralPath $e1.verdictPath -Raw -Encoding utf8) -match 'CFG=model_reasoning_effort=xhigh') 'esforço codex: -c model_reasoning_effort=xhigh deveria chegar ao CLI'
+
+    $e2 = Get-Reviewer $r.json 2
+    Assert-True ($e2.state -eq 'responded') "esforço opencode com variante: esperado responded; got $($e2.state) reason=$($e2.reason)"
+    Assert-True ($e2.effortApplied -eq 'applied') "esforço opencode com variante: esperado applied; got $($e2.effortApplied) detail=$($e2.effortDetail)"
+    Assert-True ((Get-Content -LiteralPath $e2.verdictPath -Raw -Encoding utf8) -match 'VARIANT=high') 'esforço opencode: --variant high deveria chegar ao CLI'
+
+    $e3 = Get-Reviewer $r.json 3
+    Assert-True ($e3.state -eq 'responded') "esforço opencode sem variante: esperado responded; got $($e3.state) reason=$($e3.reason)"
+    Assert-True ($e3.effortApplied -eq 'notDeclaredByModel') "esforço opencode sem variante: esperado notDeclaredByModel; got $($e3.effortApplied)"
+    Assert-True ((Get-Content -LiteralPath $e3.verdictPath -Raw -Encoding utf8) -match 'VARIANT= ') 'esforço opencode sem variante: --variant NAO deveria ser enviado'
+
+    $e4 = Get-Reviewer $r.json 4
+    Assert-True ($e4.state -eq 'responded') "esforço copilot: esperado responded; got $($e4.state)"
+    Assert-True ($e4.effortApplied -eq 'unsupported') "esforço copilot: esperado unsupported; got $($e4.effortApplied)"
+
+    $e5 = Get-Reviewer $r.json 5
+    Assert-True ($e5.effortRequested -eq 'unset' -and $e5.effortApplied -eq 'unset') "sem reasoningEffort: esperado unset/unset; got $($e5.effortRequested)/$($e5.effortApplied)"
+    Assert-True ((Get-Content -LiteralPath $e5.verdictPath -Raw -Encoding utf8) -match 'effort= ') 'sem reasoningEffort: --effort NAO deveria ser enviado'
+
+    # reasoningEffort fora do enum -> error fail-closed, sem despacho; pedido valido barrado no gate -> notDispatched
+    $r = Invoke-Harness -Reviewers @(
+        @{ backend = 'claude-code'; reasoningEffort = 'ultra'; invokeArgs = @{ model = 'claude-opus-4-8' } },
+        @{ backend = 'claude-code'; reasoningEffort = 'high';  invokeArgs = @{ model = 'claude-opus-4-8' } }
+    ) -Sensitivity 'kb-sensitive'
+    $eBad = Get-Reviewer $r.json 0
+    Assert-True ($eBad.state -eq 'error' -and [string]$eBad.reason -match 'reasoningEffort invalido') "esforço inválido: esperado error fail-closed; got $($eBad.state) reason=$($eBad.reason)"
+    Assert-True ($eBad.dispatchAttempted -eq $false) 'esforço inválido: nao deveria despachar'
+    $eAsk = Get-Reviewer $r.json 1
+    Assert-True ($eAsk.state -eq 'gateAsk' -and $eAsk.effortApplied -eq 'notDispatched') "esforço barrado no gate: esperado gateAsk/notDispatched; got $($eAsk.state)/$($eAsk.effortApplied)"
 
     # =======================================================================================
     # 9) -Cd: precedência (explícito / cwd / ParallelKbRoot) + fail-closed

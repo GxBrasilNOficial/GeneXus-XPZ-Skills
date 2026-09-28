@@ -113,6 +113,7 @@ $ErrorActionPreference = 'Stop'
 # Disciplina de stdout: UTF-8 sem BOM; o JSON-resumo e a UNICA linha de stdout.
 try { [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false) } catch { }
 . (Join-Path $PSScriptRoot 'LlmDelegateTargetFamilySupport.ps1')
+. (Join-Path $PSScriptRoot 'OpenCodeCliSupport.ps1')
 
 $MaxInlineManuscriptChars = 30000
 
@@ -173,6 +174,25 @@ function Get-Prop {
         return $Obj.PSObject.Properties[$Name].Value
     }
     return $null
+}
+
+# Esforco de raciocinio pedido pelo revisor (campo top-level reasoningEffort, schema 3 da lista
+# preferida). Ausente/vazio -> 'unset'. Valor fora do enum e devolvido como veio (minusculo) e o
+# pre-despacho o recusa fail-closed.
+$ValidEffortLevels = @('unset', 'low', 'medium', 'high', 'xhigh')
+function Get-ReviewerEffortRequested {
+    param($Reviewer)
+    $raw = [string](Get-Prop $Reviewer 'reasoningEffort')
+    if ([string]::IsNullOrWhiteSpace($raw)) { return 'unset' }
+    return $raw.Trim().ToLowerInvariant()
+}
+
+# effortApplied inicial: 'unset' quando nada foi pedido; 'notDispatched' quando foi pedido e o
+# revisor ainda nao chegou ao adapter (so vira applied/unsupported/notDeclaredByModel na montagem).
+function Get-InitialEffortApplied {
+    param([string]$EffortRequested)
+    if ([string]::IsNullOrWhiteSpace($EffortRequested) -or $EffortRequested -eq 'unset') { return 'unset' }
+    return 'notDispatched'
 }
 
 function Get-Slug {
@@ -321,6 +341,9 @@ function Add-SkippedFallbackRecords {
                 quotaCircuitDecision = $null
                 quotaCircuitVariantDecisions = @()
                 fallbackSuppressedReason = $FallbackSuppressedReason
+                effortRequested    = Get-ReviewerEffortRequested -Reviewer $fb
+                effortApplied      = Get-InitialEffortApplied -EffortRequested (Get-ReviewerEffortRequested -Reviewer $fb)
+                effortDetail       = $null
             })
     }
 }
@@ -776,6 +799,7 @@ for ($i = 0; $i -lt $reviewers.Count; $i++) {
     if ([string]::IsNullOrWhiteSpace($inputKey)) { $inputKey = $null }
     $familyExplicit = [string](Get-Prop $r 'family')
     if ([string]::IsNullOrWhiteSpace($familyExplicit)) { $familyExplicit = $null }
+    $effortRequested = Get-ReviewerEffortRequested -Reviewer $r
 
     # Registro base (todas as chaves do contrato; mutado adiante)
     $rec = [ordered]@{
@@ -830,6 +854,9 @@ for ($i = 0; $i -lt $reviewers.Count; $i++) {
         cleanupIssues = @()
         keyringIsolation = $null
         recoveredAfterTimeout = $null
+        effortRequested = $effortRequested
+        effortApplied = Get-InitialEffortApplied -EffortRequested $effortRequested
+        effortDetail = $null
     }
 
     # Defesa em profundidade: nativo nao despacha neste harness
@@ -867,6 +894,13 @@ for ($i = 0; $i -lt $reviewers.Count; $i++) {
     if (-not $AdapterScript.ContainsKey($backend)) {
         $rec.state = 'error'
         $rec.reason = "backend desconhecido: '$backend'"
+        $records.Add($rec); continue
+    }
+
+    # reasoningEffort fora do enum -> erro fail-closed (nao despachar com esforco ambiguo)
+    if ($ValidEffortLevels -notcontains $effortRequested) {
+        $rec.state = 'error'
+        $rec.reason = "reasoningEffort invalido: '$effortRequested' (esperado: $($ValidEffortLevels -join '|'))"
         $records.Add($rec); continue
     }
 
@@ -1109,6 +1143,48 @@ for ($i = 0; $i -lt $reviewers.Count; $i++) {
 
     # args allowlistados (TimeoutSec / codex Profile/Oss/LocalProvider)
     foreach ($ek in $extraSplat.Keys) { $splat[$ek] = $extraSplat[$ek] }
+
+    # Esforco de raciocinio: so os backends cujo CLI expoe o knob recebem o valor; o registro diz
+    # se ele chegou ao modelo (applied) ou por que nao (unsupported / notDeclaredByModel).
+    if ($effortRequested -ne 'unset') {
+        switch ($backend) {
+            'claude-code' {
+                $splat['Effort'] = $effortRequested
+                $rec.effortApplied = 'applied'
+            }
+            'codex' {
+                $splat['ReasoningEffort'] = $effortRequested
+                $rec.effortApplied = 'applied'
+            }
+            'opencode' {
+                # --variant so vale para variantes declaradas no catalogo do modelo.
+                $variantInfo = $null
+                try {
+                    $ocExeOverride = $null
+                    if ($splat.ContainsKey('OpenCodeExe')) { $ocExeOverride = [string]$splat['OpenCodeExe'] }
+                    $ocExe = Resolve-OpenCodeExe -Override $ocExeOverride
+                    $variantInfo = Get-OpenCodeModelVariantNames -ExePath $ocExe -Model $effectiveModel
+                } catch {
+                    $variantInfo = [pscustomobject]@{ ok = $false; variants = @(); reason = $_.Exception.Message }
+                }
+                $declared = @($variantInfo.variants)
+                if (-not $variantInfo.ok) {
+                    $rec.effortApplied = 'unsupported'
+                    $rec.effortDetail = "catalogo do opencode indisponivel: $($variantInfo.reason)"
+                } elseif (@($declared | Where-Object { $_ -ieq $effortRequested }).Count -gt 0) {
+                    $splat['Variant'] = @($declared | Where-Object { $_ -ieq $effortRequested })[0]
+                    $rec.effortApplied = 'applied'
+                } else {
+                    $rec.effortApplied = 'notDeclaredByModel'
+                    $rec.effortDetail = "variantes declaradas pelo modelo: [$($declared -join ',')]"
+                }
+            }
+            default {
+                $rec.effortApplied = 'unsupported'
+                $rec.effortDetail = "adapter $backend nao repassa esforco de raciocinio"
+            }
+        }
+    }
 
     $adapterPath = Join-Path $scriptsDir $AdapterScript[$backend]
     $dispatchList.Add([pscustomobject]@{
@@ -1601,6 +1677,9 @@ foreach ($rec in $originalRecords) {
                 quotaCircuitDecision = [string](Get-Prop $fbRecord 'quotaCircuitDecision')
                 quotaCircuitVariantDecisions = @(Get-Prop $fbRecord 'quotaCircuitVariantDecisions')
                 fallbackSuppressedReason = [string](Get-Prop $fbRecord 'fallbackSuppressedReason')
+                effortRequested    = if ($null -ne (Get-Prop $fbRecord 'effortRequested')) { [string](Get-Prop $fbRecord 'effortRequested') } else { Get-ReviewerEffortRequested -Reviewer $fb }
+                effortApplied      = if ($null -ne (Get-Prop $fbRecord 'effortApplied')) { [string](Get-Prop $fbRecord 'effortApplied') } else { Get-InitialEffortApplied -EffortRequested (Get-ReviewerEffortRequested -Reviewer $fb) }
+                effortDetail       = Get-Prop $fbRecord 'effortDetail'
             })
         if ($fbState -eq 'responded') { $fallbackSucceeded = $true }
     }

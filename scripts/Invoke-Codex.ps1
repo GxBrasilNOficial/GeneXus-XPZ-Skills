@@ -44,6 +44,9 @@
     Profile da config do Codex (codex exec -p <id>).
 .PARAMETER Cd
     Diretorio de trabalho do agente (codex exec -C <dir>).
+.PARAMETER ReasoningEffort
+    Nivel de esforco de raciocinio (codex exec -c model_reasoning_effort=<nivel>). Opcional;
+    quando omitido, vale o model_reasoning_effort do config.toml/profile.
 .PARAMETER CodexExe
     Forca um caminho de codex.exe (contorna a descoberta automatica).
 .PARAMETER TimeoutSec
@@ -79,7 +82,8 @@ param(
     [ValidateRange(1, 3600)] [int] $TimeoutSec = 1200,
     [string] $TempDir,
     [ValidateRange(1, 3650)] [int] $KeepDays = 3,
-    [ValidateSet('public', 'kb-sensitive')] [string] $RetentionMode = 'public'
+    [ValidateSet('public', 'kb-sensitive')] [string] $RetentionMode = 'public',
+    [ValidateSet('minimal', 'low', 'medium', 'high', 'xhigh')] [string] $ReasoningEffort
 )
 
 Set-StrictMode -Version Latest
@@ -142,6 +146,7 @@ if ($Oss) { $arguments += '--oss' }
 if ($LocalProvider) { $arguments += @('--local-provider', $LocalProvider) }
 if ($Profile) { $arguments += @('-p', $Profile) }
 if ($Cd) { $arguments += @('-C', $Cd) }
+if ($ReasoningEffort) { $arguments += @('-c', "model_reasoning_effort=$ReasoningEffort") }
 $arguments += '-'
 
 $script:captureOutcome = 'success'

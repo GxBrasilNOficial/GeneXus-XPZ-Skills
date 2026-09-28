@@ -52,6 +52,10 @@
     timeout, exit code != 0, erro explícito de stream, limite de uso/taxa detectado na janela da
     tentativa, nem 'empty' (conclusão limpa sem texto). Não tem efeito com -Raw (que devolve a 1ª execução).
     Cada re-tentativa emite, em stderr, uma linha 'OPENCODE_RETRY: attempt=N status=... reason=...'.
+.PARAMETER Variant
+    Variante do modelo (esforco de raciocinio especifico do provider, ex.: low, high, max),
+    repassada como --variant. So tem efeito se o catalogo do opencode declarar a variante para o
+    modelo (ver Get-OpenCodeModelVariantNames em OpenCodeCliSupport.ps1); o painel so a envia nesse caso.
 .EXAMPLE
     .\Invoke-OpenCode.ps1 "oi"
 .EXAMPLE
@@ -71,7 +75,8 @@ param(
     [switch] $Raw,
     [switch] $AllText,
     [ValidateRange(1, 3600)] [int] $TimeoutSec = 1200,
-    [ValidateRange(1, 3)] [int] $MaxAttempts = 1
+    [ValidateRange(1, 3)] [int] $MaxAttempts = 1,
+    [string] $Variant
 )
 
 Set-StrictMode -Version Latest
@@ -130,6 +135,7 @@ if ($isReviewerPath) {
 $ocArgs = @('run', '--format', 'json')
 if (-not [string]::IsNullOrWhiteSpace($Model)) { $ocArgs += @('--model', $Model) }
 if (-not [string]::IsNullOrWhiteSpace($Agent)) { $ocArgs += @('--agent', $Agent) }
+if (-not [string]::IsNullOrWhiteSpace($Variant)) { $ocArgs += @('--variant', $Variant) }
 
 $in  = (New-TemporaryFile).FullName
 Set-Content -LiteralPath $in -Value $Message -Encoding utf8 -NoNewline

@@ -32,6 +32,8 @@
     Forca caminho de claude.exe.
 .PARAMETER TimeoutSec
     Tempo maximo de espera. Modelos externos podem ser lentos.
+.PARAMETER Effort
+    Nivel de esforco (--effort low|medium|high|xhigh|max). Opcional; ausente -> default da CLI.
 #>
 [CmdletBinding(DefaultParameterSetName = 'Inline')]
 param(
@@ -42,7 +44,8 @@ param(
     [string] $Tools = 'Read,Glob,Grep',
     [string] $Cd,
     [string] $ClaudeExe,
-    [ValidateRange(1, 3600)] [int] $TimeoutSec = 1200
+    [ValidateRange(1, 3600)] [int] $TimeoutSec = 1200,
+    [ValidateSet('low', 'medium', 'high', 'xhigh', 'max')] [string] $Effort
 )
 
 Set-StrictMode -Version Latest
@@ -84,6 +87,9 @@ if ([string]::IsNullOrWhiteSpace($Tools)) {
     $arguments += @('--tools', '""')
 } else {
     $arguments += @('--tools', $Tools)
+}
+if (-not [string]::IsNullOrWhiteSpace($Effort)) {
+    $arguments += @('--effort', $Effort)
 }
 
 $in = (New-TemporaryFile).FullName

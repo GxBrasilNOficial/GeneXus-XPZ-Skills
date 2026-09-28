@@ -247,6 +247,10 @@ function Get-NormalizedFullPath {
 
 function Resolve-EffortApplied {
     param($StateRow, $SnapshotReviewers)
+    # Registro do despachante (Invoke-LlmDelegatePanelDispatch.ps1) prevalece: ele sabe se o
+    # esforco chegou ao adapter (applied/unsupported/notDeclaredByModel/notDispatched/unset).
+    $dispatched = [string](Get-Prop $StateRow 'effortApplied')
+    if (-not [string]::IsNullOrWhiteSpace($dispatched)) { return $dispatched }
     $attemptRole = [string](Get-Prop $StateRow 'attemptRole')
     $fallbackOf = [string](Get-Prop $StateRow 'fallbackOf')
     if ($attemptRole -eq 'fallback' -or -not [string]::IsNullOrWhiteSpace($fallbackOf)) {
