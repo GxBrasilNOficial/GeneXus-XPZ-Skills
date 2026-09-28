@@ -175,4 +175,30 @@ Assert-True (@($r29.distinctFamiliesAllow).Count -eq 2) "Caso 29: esperado anysp
 Assert-True (@($r29.distinctFamiliesAllow) -contains 'anysphere') "Caso 29: distinctFamiliesAllow deveria conter 'anysphere'."
 Assert-True (@($r29.distinctFamiliesAllow) -contains 'xai') "Caso 29: distinctFamiliesAllow deveria conter 'xai'."
 
+# (30) commandcode/<org>/<modelo> resolve o Criador pelo 2o segmento: deepseek + meta = 2 criadores
+$r30 = Invoke-Diversity '[{"targetModelKey":"commandcode/deepseek/deepseek-v4.1-flash","verdict":"allow"},{"targetModelKey":"commandcode/meta/muse-spark-1.3-contributor","verdict":"allow"}]'
+Assert-True ($r30.state -eq 'panelReady') "Caso 30: commandcode/deepseek + commandcode/meta deveriam formar panelReady; veio '$($r30.state)'."
+Assert-True (@($r30.distinctFamiliesAllow) -contains 'deepseek') "Caso 30: distinctFamiliesAllow deveria conter 'deepseek'; veio '$(@($r30.distinctFamiliesAllow) -join ',')'."
+Assert-True (@($r30.distinctFamiliesAllow) -contains 'meta') "Caso 30: distinctFamiliesAllow deveria conter 'meta'; veio '$(@($r30.distinctFamiliesAllow) -join ',')'."
+
+# (31) commandcode/deepseek e deepseek direto compartilham criador (agregador nao supercontar)
+$r31 = Invoke-Diversity '[{"targetModelKey":"commandcode/deepseek/deepseek-v4-pro","verdict":"allow"},{"targetModelKey":"nvidia/deepseek-ai/deepseek-v4-pro","verdict":"allow"}]'
+Assert-True ($r31.state -eq 'insufficientDiversity') "Caso 31: commandcode/deepseek e nvidia/deepseek-ai sao o mesmo criador; esperado insufficientDiversity; veio '$($r31.state)'."
+
+# (32) as duas grafias da Z.ai no Command Code (zai-org e z-ai) normalizam para o mesmo criador z-ai
+$r32 = Invoke-Diversity '[{"targetModelKey":"commandcode/zai-org/GLM-5.3","verdict":"allow"},{"targetModelKey":"commandcode/z-ai/glm-5.3-flash","verdict":"allow"}]'
+Assert-True ($r32.state -eq 'insufficientDiversity') "Caso 32: zai-org e z-ai devem colapsar em z-ai; veio '$($r32.state)'."
+Assert-True (@($r32.distinctFamiliesAllow) -contains 'z-ai') "Caso 32: distinctFamiliesAllow deveria conter 'z-ai'; veio '$(@($r32.distinctFamiliesAllow) -join ',')'."
+
+# (33) commandcode/stealth/* (criador oculto) nao conta no piso
+$r33 = Invoke-Diversity '[{"targetModelKey":"commandcode/stealth/space-bunny-alpha","verdict":"allow"},{"targetModelKey":"openai/gpt-6-sol","verdict":"allow"}]'
+Assert-True ($r33.state -eq 'insufficientDiversity') "Caso 33: stealth nao deveria abrir diversidade; veio '$($r33.state)'."
+Assert-True ($r33.unknownFamiliesPresent -eq $true) 'Caso 33: stealth deveria sinalizar familia desconhecida.'
+Assert-True (-not (@($r33.distinctFamiliesAllow) -contains 'stealth')) 'Caso 33: stealth nao deve contar no piso.'
+
+# (34) commandcode de 2 niveis (sem org no path) fica 'commandcode' e nao conta no piso
+$r34 = Invoke-Diversity '[{"targetModelKey":"commandcode/gpt-6-sol","verdict":"allow"},{"targetModelKey":"anthropic/claude-opus-5-5","verdict":"allow"}]'
+Assert-True ($r34.state -eq 'insufficientDiversity') "Caso 34: commandcode de 2 niveis nao deveria abrir diversidade; veio '$($r34.state)'."
+Assert-True (-not (@($r34.distinctFamiliesAllow) -contains 'commandcode')) 'Caso 34: commandcode nao deve contar como criador conhecido.'
+
 Write-Host "OK: Test-LlmDelegatePanelDiversitySelfTest.ps1"

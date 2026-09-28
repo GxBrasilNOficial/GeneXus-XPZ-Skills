@@ -10,6 +10,8 @@
         (ex.: deepseek-ai -> deepseek, mistralai -> mistral, qwen -> alibaba, meta-llama/facebook -> meta,
         thudm/glm -> z-ai, minimax/minimaxai -> minimaxai, moonshotai -> moonshot; desconhecido -> 2o segmento as-is).
       - nvidia/<modelo> (2 niveis) -> nemotron-* -> nvidia, llama-* -> meta, fallback -> nvidia.
+      - commandcode/<criador>/<modelo> (3 niveis) -> mesma normalizacao do nvidia (+ zai-org -> z-ai);
+        commandcode/stealth/* e commandcode/<modelo> (2 niveis) nao contam no piso.
       - antigravity/* (2 niveis) -> antigravity/claude-* -> anthropic, antigravity/gpt-* -> openai,
         antigravity/gemini-* ou modelo padrao -> google.
 
@@ -78,6 +80,33 @@ function Get-LlmDelegateKeyHarness {
     return $null
 }
 
+# Normalizacao canonica do segmento <criador> em agregadores de 3 niveis (nvidia/*, commandcode/*).
+# Compartilhada para os ramos nao divergirem. Segmento vazio -> $null; desconhecido -> as-is (minusculo),
+# que so conta no piso se estiver em Test-LlmDelegateFamilyKnown.
+function ConvertTo-LlmDelegateCanonicalCreator {
+    [CmdletBinding()]
+    param(
+        [string]$CreatorSegment
+    )
+    Set-StrictMode -Version Latest
+    if ([string]::IsNullOrWhiteSpace($CreatorSegment)) { return $null }
+    $creatorRaw = $CreatorSegment.Trim().ToLowerInvariant()
+    # Os slugs canonicos adotados refletem a convencao oficial do catalogo de modelos
+    switch ($creatorRaw) {
+        'deepseek-ai' { return 'deepseek' }
+        'mistralai'   { return 'mistral' }
+        'qwen'        { return 'alibaba' }
+        'meta-llama'  { return 'meta' }
+        'facebook'    { return 'meta' }
+        'thudm'       { return 'z-ai' }
+        'glm'         { return 'z-ai' }
+        'zai-org'     { return 'z-ai' }
+        'minimax'     { return 'minimaxai' }
+        'moonshotai'  { return 'moonshot' }
+        default       { return $creatorRaw }
+    }
+}
+
 function Get-LlmDelegateTargetFamily {
     [CmdletBinding()]
     param(
@@ -113,23 +142,9 @@ function Get-LlmDelegateTargetFamily {
 
     if ($fam -ieq 'nvidia') {
         if ($parts.Count -ge 3) {
-            $creatorRaw = $parts[1].Trim().ToLowerInvariant()
-            # Os slugs canonicos adotados refletem a convencao oficial do catalogo de modelos
-            switch ($creatorRaw) {
-                'deepseek-ai' { return 'deepseek' }
-                'mistralai'   { return 'mistral' }
-                'qwen'        { return 'alibaba' }
-                'meta-llama'  { return 'meta' }
-                'facebook'    { return 'meta' }
-                'thudm'       { return 'z-ai' }
-                'glm'         { return 'z-ai' }
-                'minimax'     { return 'minimaxai' }
-                'moonshotai'  { return 'moonshot' }
-                default {
-                    if (-not [string]::IsNullOrWhiteSpace($creatorRaw)) { return $creatorRaw }
-                    return 'nvidia'
-                }
-            }
+            $creator = ConvertTo-LlmDelegateCanonicalCreator -CreatorSegment $parts[1]
+            if ($creator) { return $creator }
+            return 'nvidia'
         }
         elseif ($parts.Count -eq 2) {
             $modelId = $parts[1].Trim()
@@ -138,6 +153,19 @@ function Get-LlmDelegateTargetFamily {
             return 'nvidia'
         }
         return 'nvidia'
+    }
+
+    # commandcode/<org>/<modelo> (3 niveis, catalogo Command Code via opencode): <org> e o prefixo
+    # do id nativo do Command Code, cujo campo 'vendor' confirma o laboratorio (ex.: deepseek,
+    # meta, Qwen, MiniMaxAI, moonshotai, zai-org, z-ai). 'stealth' e criador oculto por desenho:
+    # resolve as-is e fica fora da allowlist. 2 niveis (sem org no path) -> 'commandcode', que
+    # tambem fica fora da allowlist (sem regra para gpt-*/claude-* ate haver evidencia no catalogo).
+    if ($fam -ieq 'commandcode') {
+        if ($parts.Count -ge 3) {
+            $creator = ConvertTo-LlmDelegateCanonicalCreator -CreatorSegment $parts[1]
+            if ($creator) { return $creator }
+        }
+        return 'commandcode'
     }
 
     return $fam
