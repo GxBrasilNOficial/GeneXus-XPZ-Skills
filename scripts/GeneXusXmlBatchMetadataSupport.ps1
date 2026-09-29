@@ -110,7 +110,9 @@ function Get-GeneXusJsonPropertyNames {
 
 # Get-GeneXusTextEolProfile foi descida para GeneXusXmlSurgicalEditSupport.ps1
 # (dot-sourceado acima), com o contrato identico — { Eol; Mixed; CrLfCount;
-# LoneLfCount; LoneCrCount }. Consumida aqui em :2853-2855 e :2971 sem mudanca.
+# LoneLfCount; LoneCrCount }. Consumida sem mudanca por
+# Invoke-GeneXusXmlBatchMetadataCore (validacao EOL_MIXED do alvo, -Eol do
+# setDocumentation e campo EolProfile do relatorio).
 
 function ConvertTo-GeneXusPayloadWithEol {
     <#
