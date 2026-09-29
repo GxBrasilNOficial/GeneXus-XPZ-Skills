@@ -5,8 +5,10 @@
 
 .DESCRIPTION
     Delega a scripts/Edit-GeneXusXmlSurgical.ps1 na base GeneXus-XPZ-Skills.
-    Ajuste SharedSkillsRoot, caminhos da frente e strings Anchor/Replacement
-    (incluindo `r`n e tabs) antes de executar.
+    Ajuste SharedSkillsRoot, caminhos da frente, a ancora e o Replacement antes
+    de executar. As quebras do Replacement sao derivadas do EOL do proprio
+    arquivo-alvo ($newline): o motor nao normaliza EOL e bloqueia com
+    REPLACEMENT_EOL_MISMATCH/29 um Replacement cuja quebra divirja da dominante.
 
 .PARAMETER SharedSkillsRoot
     Raiz local da base compartilhada GeneXus-XPZ-Skills.
@@ -28,11 +30,17 @@ $workingXml = 'C:\CAMINHO\PARA\KbParalela\ObjetosGeradosParaImportacaoNaKbNoGene
 $acervoXml  = 'C:\CAMINHO\PARA\KbParalela\ObjetosDaKbEmXml\MeuObjeto.xml'
 $anchorRule = 'Default(CampoExemplo,procExemplo());'
 
+# Deriva a quebra de linha a partir do ALVO (mesma regra do motor: qualquer
+# CRLF vence; senao CR solto; senao LF), para nao cair no erro 29. O motor NAO
+# normaliza EOL — se o Replacement trouxer quebra divergente, nada e gravado.
+$targetText = [System.IO.File]::ReadAllText($workingXml)
+$newline = if ($targetText.Contains("`r`n")) { "`r`n" } elseif ($targetText.Contains("`r")) { "`r" } else { "`n" }
+
 # 1) Simular antes de gravar
 & $enginePath `
     -InputPath $workingXml `
     -Anchor $anchorRule `
-    -Replacement ("Default(CampoExemplo,procExemplo());{0}{0}// nova rule aprovada na frente" -f "`r`n") `
+    -Replacement ("Default(CampoExemplo,procExemplo());{0}{0}// nova rule aprovada na frente" -f $newline) `
     -EditMode Replace `
     -LastUpdateBaselinePath $acervoXml `
     -DryRun `
@@ -42,7 +50,7 @@ $anchorRule = 'Default(CampoExemplo,procExemplo());'
 & $enginePath `
     -InputPath $workingXml `
     -Anchor $anchorRule `
-    -Replacement ("Default(CampoExemplo,procExemplo());{0}{0}// nova rule aprovada na frente" -f "`r`n") `
+    -Replacement ("Default(CampoExemplo,procExemplo());{0}{0}// nova rule aprovada na frente" -f $newline) `
     -EditMode Replace `
     -LastUpdateBaselinePath $acervoXml `
     -AsJson
@@ -51,7 +59,7 @@ $anchorRule = 'Default(CampoExemplo,procExemplo());'
 & $enginePath `
     -InputPath $workingXml `
     -Anchor $anchorRule `
-    -Replacement ("{0}// comentario de rastreio da frente" -f "`r`n") `
+    -Replacement ("{0}// comentario de rastreio da frente" -f $newline) `
     -EditMode InsertAfter `
     -LastUpdateBaselinePath $acervoXml `
     -AsJson
@@ -66,3 +74,9 @@ $anchorRule = 'Default(CampoExemplo,procExemplo());'
 
 # 6) Remocao funcional: Replacement vazio em Replace (nao confundir com no-op).
 # & $enginePath -InputPath $workingXml -Anchor '<trecho a remover>' -Replacement '' -EditMode Replace -AsJson
+
+# 7) EOL: o Replacement tem de usar a quebra dominante do alvo. Um Replacement
+#    com quebra divergente (ou EOL misto dentro dele) sobre fonte uniforme
+#    devolve 29 REPLACEMENT_EOL_MISMATCH e NADA e gravado — por isso $newline e
+#    derivado do proprio arquivo acima. Fonte de EOL misto segue diagnostico
+#    (replacementEolMismatch=null) e grava; o motor nunca normaliza.
