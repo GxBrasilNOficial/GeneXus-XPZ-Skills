@@ -106,6 +106,14 @@ function New-CaseFile {
     return $path
 }
 
+function New-CaseFileEol {
+    param([string]$Name, [string]$Body, [string]$Eol)
+    $path = Join-Path $tempRoot "$Name.xml"
+    $text = (New-Xml -Body $Body).Replace("`r`n", $Eol)
+    [void](Write-Fixture -Path $path -Text $text -Encoding $utf8)
+    return $path
+}
+
 try {
     $anchor = 'Default(Field,proc());'
     $loneBody = $anchor + "`r`n"
@@ -300,12 +308,59 @@ try {
     Assert-Eq 26 $r.ExitCode 'c14 exit'
     Assert-Eq 'NOOP_REPLACEMENT' ([string]$r.Json.code) 'c14 code'
 
-    # ==== 15) CRLF multilinha + Replacement LF -> mismatch true ================
+    # ==== 15) EOL endurecido: fonte uniforme + quebra divergente -> 29 =========
     $script:cases++
-    $f = New-CaseFile -Name 'c15' -Body $loneBody
+    # (a) CRLF + Replacement LF -> erro no apply E no dry-run, arquivo intacto
+    foreach ($dry in @($false, $true)) {
+        $f = New-CaseFile -Name ('c15a_' + $dry) -Body $loneBody
+        $orig = [System.IO.File]::ReadAllText($f)
+        $args = @{ InputPath = $f; Anchor = $anchor; Replacement = ('A' + "`n" + 'B'); EditMode = 'Replace'; PreserveLastUpdate = $true }
+        if ($dry) { $args['DryRun'] = $true }
+        $r = Invoke-Surgical $args
+        Assert-Eq 29 $r.ExitCode ('c15a dry=' + $dry + ' exit')
+        Assert-Eq 'REPLACEMENT_EOL_MISMATCH' ([string]$r.Json.code) ('c15a dry=' + $dry + ' code')
+        Assert-True ([System.IO.File]::ReadAllText($f) -eq $orig) ('c15a dry=' + $dry + ' arquivo intacto')
+    }
+    # (b) CRLF + Replacement so com CR -> erro
+    $f = New-CaseFile -Name 'c15b' -Body $loneBody
+    $r = Invoke-Surgical @{ InputPath = $f; Anchor = $anchor; Replacement = ('A' + "`r" + 'B'); EditMode = 'Replace'; PreserveLastUpdate = $true }
+    Assert-Eq 29 $r.ExitCode 'c15b (CR sobre CRLF) exit'
+    Assert-Eq 'REPLACEMENT_EOL_MISMATCH' ([string]$r.Json.code) 'c15b code'
+    Assert-Eq 'CR' ([string]$r.Json.details.replacementEol) 'c15b replacementEol'
+    Assert-Eq 'CRLF' ([string]$r.Json.details.detectedEol) 'c15b detectedEol'
+    # (c) LF + Replacement CRLF -> erro
+    $f = New-CaseFileEol -Name 'c15c' -Body $loneBody -Eol "`n"
+    $r = Invoke-Surgical @{ InputPath = $f; Anchor = $anchor; Replacement = ('A' + "`r`n" + 'B'); EditMode = 'Replace'; PreserveLastUpdate = $true }
+    Assert-Eq 29 $r.ExitCode 'c15c (LF+CRLF) exit'
+    Assert-Eq 'LF' ([string]$r.Json.details.detectedEol) 'c15c detectedEol'
+    # (d) CR + Replacement LF -> erro
+    $f = New-CaseFileEol -Name 'c15d' -Body $loneBody -Eol "`r"
     $r = Invoke-Surgical @{ InputPath = $f; Anchor = $anchor; Replacement = ('A' + "`n" + 'B'); EditMode = 'Replace'; PreserveLastUpdate = $true }
-    Assert-Eq 'CRLF' ([string]$r.Json.detectedEol) 'c15 detectedEol'
-    Assert-True ($r.Json.replacementEolMismatch -eq $true) 'c15 mismatch true'
+    Assert-Eq 29 $r.ExitCode 'c15d (CR+LF) exit'
+    Assert-Eq 'CR' ([string]$r.Json.details.detectedEol) 'c15d detectedEol'
+    # (e) Replacement com EOL misto sobre fonte CRLF -> erro
+    $f = New-CaseFile -Name 'c15e' -Body $loneBody
+    $r = Invoke-Surgical @{ InputPath = $f; Anchor = $anchor; Replacement = ('A' + "`r`n" + 'B' + "`n" + 'C'); EditMode = 'Replace'; PreserveLastUpdate = $true }
+    Assert-Eq 29 $r.ExitCode 'c15e (misto) exit'
+    Assert-Eq 'MIXED' ([string]$r.Json.details.replacementEol) 'c15e replacementEol'
+    # (f) Replacement sem quebra -> OK; (g) Replacement com o mesmo EOL -> OK
+    $f = New-CaseFile -Name 'c15f' -Body $loneBody
+    $r = Invoke-Surgical @{ InputPath = $f; Anchor = $anchor; Replacement = 'Z'; EditMode = 'Replace'; PreserveLastUpdate = $true }
+    Assert-Eq 0 $r.ExitCode 'c15f (sem quebra) exit'
+    Assert-True ($r.Json.replacementEolMismatch -eq $false) 'c15f mismatch false'
+    $f = New-CaseFile -Name 'c15g' -Body $loneBody
+    $r = Invoke-Surgical @{ InputPath = $f; Anchor = $anchor; Replacement = ('A' + "`r`n" + 'B'); EditMode = 'Replace'; PreserveLastUpdate = $true }
+    Assert-Eq 0 $r.ExitCode 'c15g (mesmo EOL) exit'
+    # (h) InsertAfter com quebra divergente -> erro
+    $f = New-CaseFile -Name 'c15h' -Body $loneBody
+    $r = Invoke-Surgical @{ InputPath = $f; Anchor = $anchor; Replacement = ("`n" + '// x'); EditMode = 'InsertAfter'; PreserveLastUpdate = $true }
+    Assert-Eq 29 $r.ExitCode 'c15h (InsertAfter) exit'
+    # (i) ApplyToAll: erro antes de qualquer aplicacao, arquivo intacto
+    $f = New-CaseFile -Name 'c15i' -Body $dupBody
+    $orig = [System.IO.File]::ReadAllText($f)
+    $r = Invoke-Surgical @{ InputPath = $f; Anchor = $anchor; Replacement = ('A' + "`n" + 'B'); EditMode = 'Replace'; ExpectedAnchorCount = 2; ApplyToAllOccurrences = $true; PreserveLastUpdate = $true }
+    Assert-Eq 29 $r.ExitCode 'c15i (apply-all) exit'
+    Assert-True ([System.IO.File]::ReadAllText($f) -eq $orig) 'c15i arquivo intacto'
 
     # ==== 16) Mixed -> null + sourceEolMixed true ==============================
     $script:cases++

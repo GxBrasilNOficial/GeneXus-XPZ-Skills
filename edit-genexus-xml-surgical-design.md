@@ -16,6 +16,28 @@ Este bloco é **posterior ao congelamento** e existe porque o corpo abaixo não 
 4. **§4.2/§4.5 — BOM.** O motor não detecta BOM; a leitura consome um BOM eventual e a gravação é sempre UTF-8 sem BOM. O teste 27 fixa esse comportamento; detecção de BOM seria capacidade nova.
 5. **§4.2 — rollback.** A falha 19 detectada **em memória** (pré-gravação) não tem `.bak` a restaurar (`details.bakPath` nulo). A falha 19 detectada **no arquivo relido** (pós-gravação) restaura o `.bak` e expõe `details.bakPath`, simétrico ao 13.
 
+## Nota aditiva de 2026-09-29 — endurecimento do EOL do Replacement
+
+Decisão humana de 2026-09-29, **posterior ao congelamento**. O corpo abaixo (v6) não muda; esta nota registra a alteração de contrato e prevalece sobre a §4.4/§4.6 onde houver divergência.
+
+**O que mudou.** A §4.4 fixava o EOL divergente do `Replacement` como **só diagnóstico** (`replacementEolMismatch=true` sobre fonte uniforme, com gravação). Passa a ser **erro estruturado** `29 REPLACEMENT_EOL_MISMATCH`:
+
+- Fonte com EOL **uniforme** (CRLF, LF ou CR) e `Replacement` com **pelo menos uma quebra diferente da dominante**, ou com **EOL misto dentro do próprio `Replacement`** → erro `29`, **nada é gravado** (apply e dry-run devolvem o erro).
+- `details` = `{ detectedEol; replacementEol; sourceCounts{crlf,loneLf,loneCr}; replacementCounts{crlf,loneLf,loneCr} }`.
+- Mensagem humana acionável: reconstruir o `Replacement` com o EOL do arquivo (o motor **não** normaliza).
+- **Fonte `Mixed`**: sem mudança — segue `replacementEolMismatch=null` + `sourceEolMixed=true` e grava (dominante desconhecida).
+- **`Replacement` sem quebra, ou com o mesmo EOL da fonte**: sem mudança — `false`, OK.
+- **Sem switch de exceção** (nada de `-AllowEolMismatch`); caso real futuro vira frente própria.
+- O motor continua **não normalizando** nada.
+
+**Posição na ordem fixa (§4.2).** Depois do NOOP (26) e **antes** do patch: um no-op genuíno não tem patch a validar. Em `-ApplyToAllOccurrences`, o erro ocorre antes de qualquer aplicação. Consequência de schema: no sucesso, `replacementEolMismatch` passa a ser sempre `false` (fonte uniforme) ou `null` (fonte `Mixed`) — nunca `true`; o campo permanece por compatibilidade.
+
+**Fonte `NONE`** (arquivo sem quebra alguma) + `Replacement` multi-linha: **OK** — não há dominante a violar. Registrado como interpretação, já que a decisão fala só em "fonte uniforme CRLF/LF/CR".
+
+**Código.** `29 REPLACEMENT_EOL_MISMATCH` (livre em `scripts/`, confirmado por grep — mesma prática de 26/27/28). Não colide com o `16` do botão nem com os códigos do lote.
+
+**Testes.** A §5 item (15) foi reescrita: os antigos casos que esperavam `OK` com `replacementEolMismatch=true` passam a exigir `29`; somam-se CRLF+LF, LF+CRLF, CR+LF, **CR-sobre-CRLF**, `Replacement` misto sobre CRLF, no-newline OK, same-EOL OK, `InsertAfter`, `Replace` e `-ApplyToAllOccurrences` (arquivo byte-idêntico em apply e dry-run).
+
 ## 1. Objetivo e escopo
 
 Motor `scripts/Edit-GeneXusXmlSurgical.ps1` (núcleo `scripts/GeneXusXmlSurgicalEditSupport.ps1`): edição textual cirúrgica de XML GeneXus.

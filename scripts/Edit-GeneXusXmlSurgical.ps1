@@ -14,6 +14,11 @@
     tem de permanecer identico fora da uniao dos intervalos mutados — verificado
     na memoria (dry-run) e no arquivo lido de volta (apply).
 
+    EOL: o motor nao normaliza. Quando a fonte tem EOL uniforme (CRLF/LF/CR) e o
+    Replacement traz quebra diferente da dominante (ou EOL misto dentro dele), a
+    rodada falha com 29 REPLACEMENT_EOL_MISMATCH sem gravar (apply e dry-run);
+    fonte Mixed segue diagnostico (replacementEolMismatch=null) e grava.
+
     Limite declarado: o motor nao detecta BOM na entrada; a leitura consome um
     BOM eventual e a gravacao e sempre UTF-8 sem BOM (padrao do repo).
 
@@ -24,7 +29,7 @@
       17 EXPECTED_ANCHOR_COUNT_INVALID  18 AMBIGUOUS_APPLY_SCOPE
       19 SELFCHECK_MUTATION_MISMATCH    26 NOOP_REPLACEMENT
       27 ANCHOR_EMPTY                   28 LASTUPDATE_TARGET_MOVED
-      90 INTERNAL_ERROR
+      29 REPLACEMENT_EOL_MISMATCH       90 INTERNAL_ERROR
 
 .PARAMETER InputPath
     Caminho do XML fonte.
@@ -40,6 +45,8 @@
 .PARAMETER Replacement
     Texto substituto (Replace) ou texto inserido após a ancora (InsertAfter).
     Vazio é permitido: em Replace, remove a ancora; em InsertAfter, é no-op (26).
+    Com fonte de EOL uniforme, a(s) quebra(s) do Replacement têm de casar com a
+    dominante (ou o Replacement não pode ter quebra); senão → 29.
 
 .PARAMETER EditMode
     Replace ou InsertAfter.
@@ -126,7 +133,8 @@ function Get-SurgicalCatchMapping {
         @{ Prefix = 'SELFCHECK_MUTATION_MISMATCH:'; Code = 'SELFCHECK_MUTATION_MISMATCH'; ExitCode = 19 },
         @{ Prefix = 'NOOP_REPLACEMENT:'; Code = 'NOOP_REPLACEMENT'; ExitCode = 26 },
         @{ Prefix = 'ANCHOR_EMPTY:'; Code = 'ANCHOR_EMPTY'; ExitCode = 27 },
-        @{ Prefix = 'LASTUPDATE_TARGET_MOVED:'; Code = 'LASTUPDATE_TARGET_MOVED'; ExitCode = 28 }
+        @{ Prefix = 'LASTUPDATE_TARGET_MOVED:'; Code = 'LASTUPDATE_TARGET_MOVED'; ExitCode = 28 },
+        @{ Prefix = 'REPLACEMENT_EOL_MISMATCH:'; Code = 'REPLACEMENT_EOL_MISMATCH'; ExitCode = 29 }
     )
 
     foreach ($entry in $map) {

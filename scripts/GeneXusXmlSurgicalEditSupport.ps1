@@ -667,6 +667,26 @@ function Invoke-GeneXusXmlSurgicalEditCore {
         return (New-GeneXusXmlSurgicalError -Code 'NOOP_REPLACEMENT' -Message 'NOOP_REPLACEMENT: a operacao nao altera o texto.' -ExitCode 26)
     }
 
+    # 7.5) EOL do Replacement — endurecido por decisao humana de 2026-09-29.
+    # Fonte uniforme (CRLF/LF/CR) + Replacement com quebra divergente OU EOL
+    # misto dentro do proprio Replacement -> erro, nada gravado (apply e
+    # dry-run). Fonte Mixed/NONE segue diagnostico (null/false) e grava. O
+    # motor NAO normaliza nada. Vem depois do NOOP (26) porque um no-op genuino
+    # nao tem patch a validar, e antes do patch por ser validacao de entrada.
+    $sourceProfile = Get-GeneXusTextEolProfile -Text $sourceText
+    $detectedEol = Get-GeneXusEolToken -Profile $sourceProfile
+    $replacementEolMismatch = Get-GeneXusReplacementEolMismatch -Replacement $Replacement -SourceToken $detectedEol
+    if ($replacementEolMismatch -eq $true) {
+        $replProfile = Get-GeneXusTextEolProfile -Text $Replacement
+        $eolDetails = [pscustomobject]@{
+            detectedEol       = $detectedEol
+            replacementEol    = (Get-GeneXusEolToken -Profile $replProfile)
+            sourceCounts      = [pscustomobject]@{ crlf = $sourceProfile.CrLfCount; loneLf = $sourceProfile.LoneLfCount; loneCr = $sourceProfile.LoneCrCount }
+            replacementCounts = [pscustomobject]@{ crlf = $replProfile.CrLfCount; loneLf = $replProfile.LoneLfCount; loneCr = $replProfile.LoneCrCount }
+        }
+        return (New-GeneXusXmlSurgicalError -Code 'REPLACEMENT_EOL_MISMATCH' -Message "REPLACEMENT_EOL_MISMATCH: fonte $detectedEol e Replacement com EOL divergente; reconstrua o Replacement com o EOL do arquivo (o motor nao normaliza)." -ExitCode 29 -Details $eolDetails)
+    }
+
     # 8) Patch indexado.
     $patch = Invoke-GeneXusXmlIndexedPatch -Text $sourceText -Anchor $Anchor -Replacement $Replacement -EditMode $EditMode -Indexes $scopedIndexes
     $patchedText = $patch.Text
@@ -865,10 +885,7 @@ function Invoke-GeneXusXmlSurgicalEditCore {
         }
     }
 
-    # EOL (diagnostico).
-    $sourceProfile = Get-GeneXusTextEolProfile -Text $sourceText
-    $detectedEol = Get-GeneXusEolToken -Profile $sourceProfile
-    $replacementEolMismatch = Get-GeneXusReplacementEolMismatch -Replacement $Replacement -SourceToken $detectedEol
+    # EOL (diagnostico) — ja calculado no passo 7.5.
 
     return [pscustomobject]@{
         Status                  = 'OK'
