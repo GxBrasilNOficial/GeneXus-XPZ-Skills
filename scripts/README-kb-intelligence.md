@@ -189,7 +189,7 @@ Filtro de origem (`--origin` no Python, `-Origin` no wrapper; choices `kb-author
 
 - `list-by-type` lista só `kb-authored` por padrão; `--include-imported` remove esse filtro.
 - `search-objects` por nome não filtra origem por padrão; `--origin` filtra e `--include-imported` é no-op. Busca só por `--instance-key` lista apenas autorais por padrão; `--include-imported` remove esse filtro.
-- `css-classes` conserva sua regra: sem lookup nominal e sem origem explícita lista só autorais; lookup por nome não filtra origem.
+- `css-classes` conserva sua regra: sem lookup nominal e sem origem explícita lista só autorais, e `--include-imported` remove esse filtro autoral; lookup por nome não filtra origem.
 - `object-info`, `who-uses`, `what-uses` e `show-evidence` não recebem filtro de origem.
 - O wrapper PowerShell define `PYTHONIOENCODING` com a codificação de saída do console apenas durante a chamada ao Python e restaura o valor anterior; assim JSON/texto mantêm Unicode ao atravessar o processo nativo.
 

@@ -18,7 +18,7 @@ Este bloco é **posterior ao congelamento** e existe porque o corpo abaixo não 
 
 ## Nota aditiva de 2026-09-29 — endurecimento do EOL do Replacement
 
-Decisão humana de 2026-09-29, **posterior ao congelamento**. O corpo abaixo (v6) não muda; esta nota registra a alteração de contrato e prevalece sobre a §4.4/§4.6 onde houver divergência.
+Decisão humana de 2026-09-29, **posterior ao congelamento**. O corpo abaixo (v6) não muda; esta nota registra a alteração de contrato e prevalece sobre as §4.3/§4.4/§4.5/§4.6 e a §5 item (15) onde houver divergência — em particular, a lista de prefixos do `catch` da §4.5 passa a incluir `REPLACEMENT_EOL_MISMATCH:` (→ 29) e a tabela de códigos da §4.6 passa a incluir `29`.
 
 **O que mudou.** A §4.4 fixava o EOL divergente do `Replacement` como **só diagnóstico** (`replacementEolMismatch=true` sobre fonte uniforme, com gravação). Passa a ser **erro estruturado** `29 REPLACEMENT_EOL_MISMATCH`:
 

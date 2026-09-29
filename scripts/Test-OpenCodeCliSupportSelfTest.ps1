@@ -31,6 +31,18 @@ if ($args.Count -ge 1 -and $args[0] -eq '--version') {
     Write-Output '9.8.7-test'
     exit 0
 }
+if ($args.Count -ge 1 -and $args[0] -eq 'models') {
+    Write-Output 'acme/alpha'
+    Write-Output '{'
+    Write-Output '  "variants": {'
+    Write-Output '    "low": { "reasoning": "low" },'
+    Write-Output '    "high": { "reasoning": "high" }'
+    Write-Output '  }'
+    Write-Output '}'
+    Write-Output 'acme/beta'
+    Write-Output '{ "variants": {} }'
+    exit 0
+}
 exit 0
 '@ | Set-Content -LiteralPath $fakeReader -Encoding utf8
 
@@ -44,6 +56,15 @@ exit /b %errorlevel%
     $resolvedOverride = Resolve-OpenCodeExe -Override $fakeCmd
     Assert-True ($resolvedOverride -eq $fakeCmd) 'override explicito resolve o fake-opencode.cmd'
     Assert-True ((Get-OpenCodeExeVersion -ExePath $fakeCmd) -eq '9.8.7-test') 'Get-OpenCodeExeVersion le --version'
+
+    $variantsAlpha = Get-OpenCodeModelVariantNames -ExePath $fakeCmd -Model 'acme/alpha'
+    Assert-True ($variantsAlpha.ok -and (@($variantsAlpha.variants) -contains 'low') -and (@($variantsAlpha.variants) -contains 'high')) 'Get-OpenCodeModelVariantNames le variantes declaradas e para no proximo cabecalho'
+    $variantsBeta = Get-OpenCodeModelVariantNames -ExePath $fakeCmd -Model 'acme/beta'
+    Assert-True ($variantsBeta.ok -and @($variantsBeta.variants).Count -eq 0) 'modelo sem variantes declaradas -> ok com lista vazia'
+    $variantsMissing = Get-OpenCodeModelVariantNames -ExePath $fakeCmd -Model 'acme/missing'
+    Assert-True (-not $variantsMissing.ok) 'modelo ausente do catalogo -> ok=false'
+    $variantsNoProvider = Get-OpenCodeModelVariantNames -ExePath $fakeCmd -Model 'noslash'
+    Assert-True (-not $variantsNoProvider.ok) 'modelo sem provider -> ok=false'
 
     $oldPath = $env:PATH
     try {
