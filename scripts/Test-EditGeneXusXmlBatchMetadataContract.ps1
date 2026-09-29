@@ -309,6 +309,34 @@ try {
     Assert-BlockCode -Case 'Caso 1b (payload CR solto)' -Report $result.Report -Expected 'PAYLOAD_EOL_INVALID'
 
     # ----------------------------------------------------------------------
+    # Caso 1c - remocao: new.documentation = null usa o primitivo com
+    # Replacement vazio (regressao do consumidor apos a v6 do cirurgico).
+    # ----------------------------------------------------------------------
+    $sandbox = New-Sandbox -Name 'caso01c-remocao'
+    $guid = '11111111-1111-1111-1111-1111111111c1'
+    $text = New-ObjectXmlText -Name 'SdtDoc' -Guid $guid -TypeGuid $sdtTypeGuid -Documentation 'ZZDOCPARAREMOVER'
+    Write-TextFile -Path (Join-Path $sandbox.Front 'SDT\SdtDoc.xml') -Text $text
+    Write-TextFile -Path (Join-Path $sandbox.Acervo 'SDT\SdtDoc.xml') -Text $text
+    $manifestPath = Join-Path $sandbox.Root 'manifesto.json'
+    $removeOperation = [ordered]@{
+        id          = 'op-remover'
+        op          = 'setDocumentation'
+        objectState = 'existing'
+        target      = [ordered]@{ guid = $guid; expectedType = 'SDT'; expectedName = 'SdtDoc'; xmlPath = 'SDT/SdtDoc.xml' }
+        expected    = [ordered]@{ documentation = 'ZZDOCPARAREMOVER' }
+        new         = [ordered]@{ documentation = $null }
+    }
+    Write-Manifest -Path $manifestPath -Operations @($removeOperation)
+    $result = Invoke-Engine -ManifestPath $manifestPath -FrontFolder $sandbox.Front -Apply
+    if ($result.Report.status -eq 'blocked') {
+        throw "Caso 1c (remocao): bloqueado indevidamente [$((Get-BlockCodes -Report $result.Report) -join ', ')]."
+    }
+    $finalDoc = [System.IO.File]::ReadAllText((Join-Path $sandbox.Front 'SDT\SdtDoc.xml'))
+    if ($finalDoc.Contains('ZZDOCPARAREMOVER') -or $finalDoc.Contains('<InnerHtml')) {
+        throw 'Caso 1c (remocao): documentacao nao foi removida.'
+    }
+
+    # ----------------------------------------------------------------------
     # Caso 2 - adversarial: '>' em valor de atributo e <Object> dentro de CDATA
     # ----------------------------------------------------------------------
     $sandbox = New-Sandbox -Name 'caso02'

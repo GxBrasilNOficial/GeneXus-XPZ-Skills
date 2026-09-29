@@ -59,3 +59,10 @@ $anchorRule = 'Default(CampoExemplo,procExemplo());'
 # 4) Dependencia reenviada sem mudanca funcional: patch proibido na prática;
 #    se algum ajuste textual for inevitavel, preservar lastUpdate explicitamente:
 # & $enginePath -InputPath $workingXml -Anchor '...' -Replacement '...' -EditMode Replace -PreserveLastUpdate -AsJson
+
+# 5) Ancora que se repete: -ExpectedAnchorCount apenas valida; para aplicar em
+#    TODAS as ocorrências é obrigatório -ApplyToAllOccurrences (sem ele → 18).
+# & $enginePath -InputPath $workingXml -Anchor '<trecho repetido>' -Replacement '<novo>' -EditMode Replace -ExpectedAnchorCount 2 -ApplyToAllOccurrences -AsJson
+
+# 6) Remocao funcional: Replacement vazio em Replace (nao confundir com no-op).
+# & $enginePath -InputPath $workingXml -Anchor '<trecho a remover>' -Replacement '' -EditMode Replace -AsJson

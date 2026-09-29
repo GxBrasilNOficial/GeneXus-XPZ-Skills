@@ -159,6 +159,21 @@ try {
     if (Test-Path -LiteralPath $f7 -PathType Leaf) { Remove-Item -LiteralPath $f7 -Force }
 }
 
+# --- 8) unicidade da celula ancora (Get-AnchorOccurrenceCount) -------------------
+$dupCell = '<cell><textblock controlName="TBAnchor" caption="Ancora" /></cell>'
+$fixtureXmlDup = $fixtureXml.Replace($dupCell, $dupCell + $dupCell)
+$f8 = Join-Path ([System.IO.Path]::GetTempPath()) ("add-btn-dup-{0}.xml" -f ([guid]::NewGuid().ToString('N')))
+try {
+    [System.IO.File]::WriteAllText($f8, $fixtureXmlDup, (Get-Utf8NoBomEncoding))
+    $r = Invoke-AddButton -ArgList @('-InputPath', $f8, '-AfterControlName', 'TBAnchor', '-ButtonControlName', 'BtnDup', '-EventName', 'EvDup', '-Caption', 'D', '-AsJson')
+    Assert-That ($r.ExitCode -eq 25) "celula ancora duplicada: exit 25 (obtido: $($r.ExitCode))"
+    Assert-That (($null -ne $r.Json) -and ($r.Json.Code -eq 'ANCHOR_NOT_UNIQUE')) 'celula ancora duplicada: ANCHOR_NOT_UNIQUE'
+    $unchanged = [System.IO.File]::ReadAllText($f8)
+    Assert-That ($unchanged -eq $fixtureXmlDup) 'celula ancora duplicada: arquivo nao foi alterado'
+} finally {
+    if (Test-Path -LiteralPath $f8 -PathType Leaf) { Remove-Item -LiteralPath $f8 -Force }
+}
+
 if ($script:failures -gt 0) {
     throw "Contrato Add-GeneXusButton: $($script:failures) assercao(oes) falharam."
 }

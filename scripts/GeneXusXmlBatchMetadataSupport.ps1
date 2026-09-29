@@ -108,52 +108,9 @@ function Get-GeneXusJsonPropertyNames {
 # EOL (secao 5.0)
 # ---------------------------------------------------------------------------
 
-function Get-GeneXusTextEolProfile {
-    param(
-        [Parameter(Mandatory = $true)]
-        [AllowEmptyString()]
-        [string]$Text
-    )
-
-    $crlf = 0
-    $loneLf = 0
-    $loneCr = 0
-    $length = $Text.Length
-    $i = 0
-    while ($i -lt $length) {
-        $current = $Text[$i]
-        if ($current -eq "`r") {
-            if (($i + 1) -lt $length -and $Text[$i + 1] -eq "`n") {
-                $crlf++
-                $i += 2
-                continue
-            }
-            $loneCr++
-        } elseif ($current -eq "`n") {
-            $loneLf++
-        }
-        $i++
-    }
-
-    $mixed = $false
-    if ($crlf -gt 0 -and ($loneLf -gt 0 -or $loneCr -gt 0)) { $mixed = $true }
-    if ($loneLf -gt 0 -and $loneCr -gt 0) { $mixed = $true }
-
-    $eol = "`n"
-    if ($crlf -gt 0) {
-        $eol = "`r`n"
-    } elseif ($loneCr -gt 0 -and $loneLf -eq 0) {
-        $eol = "`r"
-    }
-
-    return [pscustomobject]@{
-        Eol        = $eol
-        Mixed      = $mixed
-        CrLfCount  = $crlf
-        LoneLfCount = $loneLf
-        LoneCrCount = $loneCr
-    }
-}
+# Get-GeneXusTextEolProfile foi descida para GeneXusXmlSurgicalEditSupport.ps1
+# (dot-sourceado acima), com o contrato identico — { Eol; Mixed; CrLfCount;
+# LoneLfCount; LoneCrCount }. Consumida aqui em :2853-2855 e :2971 sem mudanca.
 
 function ConvertTo-GeneXusPayloadWithEol {
     <#
@@ -1735,28 +1692,12 @@ function Add-GeneXusMutation {
     return $entry
 }
 
-function Remove-GeneXusIntervals {
-    param(
-        [Parameter(Mandatory = $true)][string]$Text,
-        [Parameter(Mandatory = $true)][AllowEmptyCollection()][object[]]$Intervals
-    )
-
-    $ordered = @($Intervals | Sort-Object -Property Start)
-    $builder = [System.Text.StringBuilder]::new()
-    $cursor = 0
-    foreach ($interval in $ordered) {
-        if ($interval.Start -gt $cursor) {
-            [void]$builder.Append($Text.Substring($cursor, $interval.Start - $cursor))
-        }
-        $next = $interval.Start + $interval.Length
-        if ($next -gt $cursor) { $cursor = $next }
-    }
-    if ($cursor -lt $Text.Length) {
-        [void]$builder.Append($Text.Substring($cursor))
-    }
-    return $builder.ToString()
-}
-
+# Remove-GeneXusIntervals foi descida para GeneXusXmlSurgicalEditSupport.ps1
+# (dot-sourceado acima); a implementacao de cursor vive la. Este motor
+# preserva o nome historico Test-GeneXusByteIdentityOutsideMutations por
+# compatibilidade de leitura. Apesar do nome, a comparacao e de CARACTERES
+# (strings), Ordinal — nao de bytes —; o adaptador se limita a projetar
+# Tracker.Mutations em { Start; Length } e delegar ao "char" do suporte.
 function Test-GeneXusByteIdentityOutsideMutations {
     param(
         [Parameter(Mandatory = $true)][string]$OriginalText,
@@ -1771,9 +1712,7 @@ function Test-GeneXusByteIdentityOutsideMutations {
         $finalIntervals += [pscustomobject]@{ Start = $mutation.FinalStart; Length = $mutation.FinalLength }
     }
 
-    $strippedOriginal = Remove-GeneXusIntervals -Text $OriginalText -Intervals $originalIntervals
-    $strippedFinal = Remove-GeneXusIntervals -Text $FinalText -Intervals $finalIntervals
-    return [string]::Equals($strippedOriginal, $strippedFinal, [StringComparison]::Ordinal)
+    return (Test-GeneXusXmlCharIdentityOutsideMutations -OriginalText $OriginalText -FinalText $FinalText -OriginalIntervals $originalIntervals -FinalIntervals $finalIntervals)
 }
 
 # ---------------------------------------------------------------------------

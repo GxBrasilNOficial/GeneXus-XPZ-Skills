@@ -3234,3 +3234,31 @@ As contagens são de **arquivos que mencionam o token**, não de parâmetros exc
 **Decisões em aberto.** Onde a função mora (`GeneXusXmlSurgicalEditSupport.ps1` já é o suporte que hospeda `Get-NewGeneXusLastUpdateValueFromEngine`, mas o dono da fórmula é o motor); se `Get-GeneXusXpzLastUpdate.ps1` passa a aceitar mais de um `-BaselineXmlPath` como caminho alternativo; e quem migra além do motor em lote (`Set-GeneXusXmlLastUpdate.ps1` e `Add-GeneXusButton.ps1` seguem com um baseline só, e não precisam da composição).
 
 **Relacionado.** `edit-genexus-xml-batch-metadata-design.md` §2.1 e a nota aditiva de estado no topo do mesmo documento; `Edit-GeneXusXmlBatchMetadata.ps1` (o baseline sintético é a quarta classe de artefato do `-WorkDir`).
+
+## Motor cirúrgico — `-LineNumber`/`-ExpectedLineText` e o switch `-NormalizeAnchorEol`
+
+- **Importância** — baixa (a âncora literal cobre os casos reais; a linha simplificaria o chamador, mas o motor já devolve diagnóstico suficiente).
+- **Maturidade** — ideia (direção identificada; decisões de design em aberto).
+
+**O que ficou de fora da v6.** A especificação congelada (`edit-genexus-xml-surgical-design.md` §1/§3.8) retirou do escopo da correção dois recursos anteriores: `-LineNumber`/`-ExpectedLineText` e o switch `-NormalizeAnchorEol`.
+
+**Gaps conhecidos do `-LineNumber`.** A resolução de linha do `Search-GeneXusXmlSourceBlock.ps1` distingue `xmlLine` (linha no XML materializado) de `blockLine` (linha dentro do `Source`/`CDATA`) — ver `Search-GeneXusXmlSourceBlock.ps1:211-212`. Um parâmetro de linha no cirúrgico teria de escolher entre as duas e, a cada patch, **reindexar** as linhas posteriores. Sem essa reindexação, uma sequência de edições por linha trabalha sobre coordenadas velhas e grava no lugar errado.
+
+**Tensão de EOL do switch `-NormalizeAnchorEol`.** O motor cirúrgico hoje **não** normaliza EOL por desenho (só diagnostica `detectedEol`/`replacementEolMismatch`); o irmão em lote recusa EOL misto (`EOL_MIXED`) e payload com CR solto (`PAYLOAD_EOL_INVALID`). Um switch de normalização no cirúrgico contradiria a proibição de normalização silenciosa do irmão e precisa decidir: normalizar o `Replacement` para o EOL do alvo, recusar, ou apenas reportar — sem inventar comportamento que o lote rejeita.
+
+**Relacionado.** `edit-genexus-xml-surgical-design.md` §1/§3.8; `scripts/Search-GeneXusXmlSourceBlock.ps1`; `edit-genexus-xml-batch-metadata-design.md` §5.0; `scripts/Edit-GeneXusXmlSurgical.ps1`.
+
+## Modo lote por manifesto para `Source`/`Rules` (análogo ao lote de metadados)
+
+- **Importância** — média (gap real: hoje uma edição textual repetida em muitos XMLs da frente volta ao script ad-hoc ou à repetição do cirúrgico arquivo a arquivo).
+- **Maturidade** — ideia (direção ancorada no motor de manifesto existente; decisões de design em aberto).
+
+**O que é.** Um modo lote, dirigido por manifesto, que aplique o mesmo delta textual de `Source`/`Rules` a muitos XMLs da frente na mesma rodada — análogo ao `Edit-GeneXusXmlBatchMetadata.ps1`, mas para conteúdo, não metadados.
+
+**Por que não reusar o manifesto de metadados.** O `Kind=xpz-batch-metadata-manifest` é contrato fechado de `setDocumentation`/`setParent`/`renameDomain`; reusá-lo para conteúdo misturaria vocabulários e quebraria consumidores. Um modo novo precisa de **`Kind`/`SchemaVersion` próprios** (e da própria tabela de códigos).
+
+**Por que a atomicidade/rollback é o ponto, não a conveniência.** O motivo técnico é a **reindexação**: aplicar N trocas por arquivo exige recalcular intervalos a cada mutação (o que a pós-condição por mutação do cirúrgico já faz para uma chamada) e, entre arquivos, exigir journal + `.bak` + rollback em ordem inversa, como o irmão de metadados. As ~30 trocas que motivaram a ideia foram classificadas individualmente em uma frente real; a classificação (quais são textuais, quais são metadados) é pré-requisito do manifesto.
+
+**Decisões em aberto.** Escopo do delta (só `Replace`? `InsertAfter`?); se a declaração por operação carrega precondição (`expected`) como o irmão; se o modo compõe com o lote de metadados no mesmo manifesto ou em rodada separada; e onde mora o motor (script próprio × ampliar `Edit-GeneXusXmlBatchMetadata.ps1`).
+
+**Relacionado.** `edit-genexus-xml-batch-metadata-design.md`; `scripts/Edit-GeneXusXmlBatchMetadata.ps1`; `scripts/GeneXusXmlBatchMetadataSupport.ps1`; `edit-genexus-xml-surgical-design.md`.

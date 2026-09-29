@@ -107,7 +107,7 @@ Generated-code shape: `Default(...)` and an assignment rule targeting the same a
 
 Diagnosis path: after import OK and generated `.cs` is available, first resolve the `.cs` path with `scripts/Resolve-GeneXusGeneratedCsPath.ps1` (or the local `Resolve-*KbGeneratedCsPath.ps1` wrapper) using `kb_environment_web_dirs` from `kb-source-metadata.md`. If the metadata does not cover the target environment, block and reconcile setup; do not infer by folder name or scan the native KB. Then run `scripts/Find-CsAttributeAssignments.ps1` with the resolved absolute `-CsPath`, `-Attribute`, and `-AsJson`. `tripletPattern.cascadeOrder=override-then-default-then-fallback` means the default branch is ahead of the fallback rule branch and can shadow it. `override-then-fallback-then-default` is the expected order after the textual reordering fix.
 
-Correction path: if the approved fix is textual `Rules` reordering, edit only the front XML with `scripts/Edit-GeneXusXmlSurgical.ps1` using `-DryRun`, a literal anchor, `-ExpectedAnchorCount`, and `lastUpdate` baseline when available. Do not reserialize the whole `Transaction`. Re-import/build and re-read the generated `.cs` before closing.
+Correction path: if the approved fix is textual `Rules` reordering, edit only the front XML with `scripts/Edit-GeneXusXmlSurgical.ps1` using `-DryRun`, a literal anchor, `-ExpectedAnchorCount` (with `-ApplyToAllOccurrences` when the anchor repeats), and `lastUpdate` baseline when available. Do not reserialize the whole `Transaction`. Re-import/build and re-read the generated `.cs` before closing.
 
 Evidence labels: `confirmado-acervo` in the XPZ trail (`VendaPedido` in a parallel KB after sync) plus `confirmado-build` by reproducible before/after inspection of generated `.cs`.
 

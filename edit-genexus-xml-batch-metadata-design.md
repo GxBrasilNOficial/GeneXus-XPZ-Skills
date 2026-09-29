@@ -109,6 +109,14 @@ padrão **dentro** da correção que o tabulava:
 | P1-4 | o payload de documentação vem de JSON com `\n` e criaria, em arquivo CRLF, o EOL misto que a ferramenta recusa | §5.0 / §6 |
 | P1-5 | a varredura léxica contava `<Object` dentro de `CDATA` — **confirmado vivo em 2 arquivos reais** | §6.0 |
 
+**Reconciliação de 2026-09-28 — correção do motor cirúrgico irmão.** A frente que congelou a v6 de `Edit-GeneXusXmlSurgical.ps1` mudou o suporte compartilhado; este documento registra o efeito sem reabrir o corpo congelado:
+
+- **Dono das funções descidas.** `Get-GeneXusTextEolProfile` e `Remove-GeneXusIntervals` passaram a viver em `GeneXusXmlSurgicalEditSupport.ps1` (dot-sourceado por este motor em `GeneXusXmlBatchMetadataSupport.ps1`); o contrato é idêntico e o lote segue consumindo `{ Eol; Mixed; CrLfCount; LoneLfCount; LoneCrCount }` e os intervalos `{ Start; Length }` sem mudança. `Test-GeneXusByteIdentityOutsideMutations` permanece como adaptador fino sobre o `Test-GeneXusXmlCharIdentityOutsideMutations` do suporte (apesar do nome, a comparação é de caracteres, Ordinal).
+- **A regra da §7 sobre `Get-AnchorOccurrenceCount` continua válida.** A v6 do irmão tornou o contador literal-Ordinal (antes regex escapado), mas **não** case-insensitive; o scanner case-insensitive da §7 (linha «Não reusar `Get-AnchorOccurrenceCount`») segue correto.
+- **`28 LASTUPDATE_TARGET_MOVED` é o análogo cirúrgico de `LASTUPDATE_TARGET_OUTSIDE_ROOT`.** No cirúrgico, o alvo do bump tem de continuar sendo a primeira ocorrência de `lastUpdate="`; no lote, o alvo é validado contra o intervalo da tag raiz. São códigos de scripts distintos: não unificar nem comparar por número.
+
+Desenho congelado do irmão: `edit-genexus-xml-surgical-design.md`.
+
 ---
 
 ## 1. Tese (inalterada)
