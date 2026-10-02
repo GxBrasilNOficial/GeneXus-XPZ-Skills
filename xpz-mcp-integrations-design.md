@@ -1,4 +1,4 @@
-# xpz-mcp-integrations — design da skill (v12)
+# xpz-mcp-integrations — design da skill (v13)
 
 ## Papel do documento
 
@@ -6,7 +6,7 @@ Design **vivo** (não congelado) da skill `xpz-mcp-integrations`, com decisões 
 evidência empírica coletada.
 
 - **v2** pré-análise · **v3** F0-1 (4 titulares) · **v4–v8** refinos opencode (segundas opiniões) ·
-  **v9–v11** validações caras · **v12** 4ª validação cara (`openai/gpt-5.6-terra` via codex).
+  **v9–v12** validações caras · **v13** 5ª validação cara (`openai/gpt-5.6-terra` via codex).
 
 **Autor e diversidade:** `authorFamily=deepseek`. Revisores de famílias distintas da do autor; as
 rodadas opencode (meta+deepseek) são **segundas opiniões**. **Liberação** exige **≥2 Criadores
@@ -159,19 +159,19 @@ autor + ≥1 voz fora do harness afetado.
   anterior. **Sem junction/symlink** (hazard de `historico/...20260622-20260922.md:48`).
 - **Semântica de rede (3 contextos):** (1) instalador/vendorizador: sem registro fora de install/update;
   (2) launcher/MCP: só o endpoint; (3) teste isolado (abaixo).
-- **Contenção de rede — UMA implementação para o F1 (executável), com alvo próprio:** o `npm ci`
-  **não** instala um `node.exe` dentro do `vendor-<versao>`; o executável é o **Node da máquina**. Como
-  `New-NetFirewallRule` filtra **por programa, não por PID**, aplicar a regra ao Node da máquina
-  afetaria **todas** as instâncias dele na janela. Solução: o teste isolado roda com um **runtime Node
-  dedicado**, **copiado para um caminho gerenciado** (`%LOCALAPPDATA%\xpz-mcp-integrations\test-runtime\<hash>\`),
-  com **hash verificado** e usado **exclusivamente** por esse teste; a **regra de firewall de saída**
-  (`New-NetFirewallRule`) bloqueia **não-loopback (e DNS/UDP-TCP 53)** **para esse executável copiado**
-  (caminho sem outros usuários). **Requisição de elevação** declarada. **Controle positivo:** um
-  processo do teste **tenta** egressar e **deve** ser detectado como bloqueado (não basta "não
-  conectou"). **Evidência:** a regra + a tentativa bloqueada + ausência de resolução DNS. **Limpeza:**
-  `Remove-NetFirewallRule` + remoção do runtime dedicado. **Alternativa equivalente:** ambiente
-  descartável isolado. **Fail-closed:** sem elevação/contensão disponível, o teste **não passa** e o
-  **F1 fica bloqueado**.
+- **Contenção de rede — bloqueio de TODA a árvore de processos (não só de um exe):** o filtro
+  `New-NetFirewallRule` é **por programa**, então não contém um `dist` que lance **outro executável**
+  com rede; o Job Object só encerra depois. A re-verificação roda num **ambiente verdadeiramente
+  isolado de rede e descartável**:
+  - **Primário:** **Windows Sandbox** com `<Networking>Disable</Networking>` — rede desabilitada para o
+    sandbox inteiro (**incluindo filhos**), descartável.
+  - **Alternativa (máquina sem Windows Sandbox):** **AppContainer sem `internetClient`**, que nega rede
+    à **árvore de processos** do container.
+  - **Fail-closed:** sem nenhum dos dois, o teste **não passa** e o **F1 fica bloqueado**.
+  - **Controle positivo:** tentar egresso **por um processo filho** do teste e confirmar que foi
+    bloqueado (não basta testar o Node copiado).
+  - O **runtime Node dedicado** (cópia verificada) permanece como **alvo controlado**; a **contenção é
+    do ambiente**. **Evidência + limpeza** declaradas.
 - **Caminhos/segurança:** todo caminho gerenciado sob `%LOCALAPPDATA%\xpz-mcp-integrations` após
   **canonicalização**, **rejeitando reparse points** e raízes de outro drive; **ACL antes de persistir**;
   escrita atômica.
@@ -322,7 +322,7 @@ Cinco modos. **Wire = hipótese** até as fixtures (Apêndice). **Credencial por
 
 ## Fases
 
-- **F0** — design + revisão (F0-1..F0-10; faltam **painel de liberação**).
+- **F0** — design + revisão (F0-1..F0-11; faltam **painel de liberação**).
 - **F1-pre** (frente própria; painel ≥2 Criadores distintos do autor + ≥1 fora do harness afetado) —
   criar `OpenCodeJsoncSupport.ps1` + golden + fixtures + **matriz de migração** + self-tests + inventário
   de consumidores na raiz.
@@ -360,6 +360,7 @@ Cinco modos. **Wire = hipótese** até as fixtures (Apêndice). **Credencial por
 | F0-8 (cara) | `…-f0-codex-gpt-v9` (v9) | v10 | openai/gpt-5.6-terra (codex) | 1× revisa |
 | F0-9 (cara) | `…-f0-codex-gpt-v10` (v10) | v11 | openai/gpt-5.6-terra (codex) | 1× revisa |
 | F0-10 (cara) | `…-f0-codex-gpt-v11` (v11) | v12 | openai/gpt-5.6-terra (codex) | 1× gap bloqueante |
+| F0-11 (cara) | `…-f0-codex-gpt-v12` (v12) | v13 | openai/gpt-5.6-terra (codex) | 1× gap bloqueante |
 
 - **Recibo F0-1** (via `xpz-llm-delegate`): `preferenceSource=orchestrator`; `attemptRole=primary`,
   `countsForDiversity=true`; `closeoutReady=false` (`vnext-pending-resubmission`).
