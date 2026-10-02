@@ -1,4 +1,4 @@
-# xpz-mcp-integrations — design da skill (v19)
+# xpz-mcp-integrations — design da skill (v20)
 
 ## Papel do documento
 
@@ -6,7 +6,7 @@ Design **vivo** (não congelado) da skill `xpz-mcp-integrations`, com decisões 
 evidência empírica coletada.
 
 - **v2** pré-análise · **v3** F0-1 (4 titulares) · **v4–v8** refinos opencode (segundas opiniões) ·
-  **v9–v18** validações caras · **v19** 11ª validação cara (`openai/gpt-5.6-terra` via codex).
+  **v9–v19** validações caras · **v20** 12ª validação cara (`openai/gpt-5.6-terra` via codex).
 
 **Autor e diversidade:** `authorFamily=deepseek`. Revisores de famílias distintas da do autor; as
 rodadas opencode (meta+deepseek) são **segundas opiniões**. **Liberação** exige **≥2 Criadores
@@ -226,7 +226,12 @@ autor + ≥1 voz fora do harness afetado.
 ### Detecção de pré-requisitos
 
 Espelhar `GeneXusPythonPrerequisite.ps1`/`Test-XpzPowerShellRuntime.ps1`: **executável utilizável de
-verdade** (rejeitar stub `WindowsApps`/alias da Store) para `node`/`npm`/`pwsh`.
+verdade** (rejeitar stub `WindowsApps`/alias da Store) para `node`/`npm`/`pwsh`. **Escopo do manifesto
+× runtime Node:** o `manifest.sha256` cobre **`node_modules/**`** apenas (produção do npm), **invariante**
+entre versões aceitas de Node; a **versão de Node/npm** usada na liberação é **fixada no catálogo** e
+**gated** (`>= 22`) — divergência de Node é **bloqueante** se `< 22`, senão reportada. O **runtime
+dedicado do teste isolado** é uma **cópia do Node da máquina** com **versão e hash registrados**,
+vinculada ao catálogo; o launcher de produção usa o Node **absoluto** resolvido no install (mesmo gate).
 
 ## Fornecedor
 
@@ -276,10 +281,12 @@ Cinco modos. **Wire = hipótese** até as fixtures (Apêndice). **Credencial por
 
 ## Adaptadores de cliente (v1)
 
-- **OpenCode — descoberta:** enumerar **todos** os candidatos (`opencode.json` e `opencode.jsonc`),
-  **relatar**, declarar a regra observada do cliente/versão; em **ambiguidade real** (ambos presentes,
-  sem precedência comprovada) → **bloquear sem escrever** e pedir escolha. Serializar para o formato
-  efetivo (`.json` → JSON válido; `.jsonc` → localizador estrutural). `mcp.jev` (`type: local`,
+- **OpenCode — descoberta (algoritmo):** raiz gerenciada na v1 = **global** `~/.config/opencode/`;
+  candidatos **`opencode.json` e `opencode.jsonc`** nessa pasta; **projeto-local (`.opencode/`) fora do
+  escopo da v1** (declarado). **Precedência:** resolver `opencode.json` → `opencode.jsonc` (espelha o
+  motor atual); **sem precedência comprovada** se ambos existirem → `entrada_em_conflito` (bloquear sem
+  escrever). **Fixtures** para cada caso. Serializar para o formato efetivo (`.json` → JSON válido;
+  `.jsonc` → localizador estrutural). `mcp.jev` (`type: local`,
   `command: ["pwsh","-NoProfile","-File","<launcher>"]`, campo **`environment`**, não `env`). Merge
   transacional; idempotente. **Shape = fato externo** + fixture sanitizada no F1.
 - **Codex** — `~/.codex/config.toml`, `[mcp_servers.jev]` (**F2**). **Biblioteca TOML vendorizada**
@@ -355,7 +362,7 @@ Cinco modos. **Wire = hipótese** até as fixtures (Apêndice). **Credencial por
 
 ## Fases
 
-- **F0** — design + revisão (F0-1..F0-17; faltam **painel de liberação**).
+- **F0** — design + revisão (F0-1..F0-18; faltam **painel de liberação**).
 - **F1-pre** (frente própria; painel ≥2 Criadores distintos do autor + ≥1 fora do harness afetado) —
   criar `OpenCodeJsoncSupport.ps1` + golden + fixtures + **matriz de migração** + self-tests + inventário
   de consumidores na raiz.
@@ -402,6 +409,7 @@ Cinco modos. **Wire = hipótese** até as fixtures (Apêndice). **Credencial por
 | F0-15 (cara) | `…-f0-codex-gpt-v16` (v16) | v17 | openai/gpt-5.6-terra (codex) | 4× gap bloqueante |
 | F0-16 (cara) | `…-f0-codex-gpt-v17` (v17) | v18 | openai/gpt-5.6-terra (codex) | 1× gap bloqueante |
 | F0-17 (cara) | `…-f0-codex-gpt-v18` (v18) | v19 | openai/gpt-5.6-terra (codex) | 3× gap bloqueante |
+| F0-18 (cara) | `…-f0-codex-gpt-v19` (v19) | v20 | openai/gpt-5.6-terra (codex) | 2× gap bloqueante |
 
 - **Recibo F0-1** (via `xpz-llm-delegate`): `preferenceSource=orchestrator`; `attemptRole=primary`,
   `countsForDiversity=true`; `closeoutReady=false` (`vnext-pending-resubmission`).
