@@ -1,4 +1,4 @@
-# xpz-mcp-integrations — design da skill (v15)
+# xpz-mcp-integrations — design da skill (v16)
 
 ## Papel do documento
 
@@ -6,7 +6,7 @@ Design **vivo** (não congelado) da skill `xpz-mcp-integrations`, com decisões 
 evidência empírica coletada.
 
 - **v2** pré-análise · **v3** F0-1 (4 titulares) · **v4–v8** refinos opencode (segundas opiniões) ·
-  **v9–v14** validações caras · **v15** 7ª validação cara (`openai/gpt-5.6-terra` via codex).
+  **v9–v15** validações caras · **v16** 8ª validação cara (`openai/gpt-5.6-terra` via codex).
 
 **Autor e diversidade:** `authorFamily=deepseek`. Revisores de famílias distintas da do autor; as
 rodadas opencode (meta+deepseek) são **segundas opiniões**. **Liberação** exige **≥2 Criadores
@@ -167,7 +167,12 @@ autor + ≥1 voz fora do harness afetado.
   (fail-closed). **AppContainer** fica **adiado** (frente futura) até ter mecanismo de criação/
   lançamento e prova de que a árvore está no container **especificados e testados**. **Controle
   positivo:** tentar egresso **por um processo filho** e confirmar bloqueio. O **runtime Node dedicado**
-  (cópia verificada) permanece como **alvo controlado**. **Evidência + limpeza** declaradas.
+  (cópia verificada) permanece como **alvo controlado**. **Topologia executável (protocolo):** (1)
+  mapear a **árvore vendorizada** e o **runtime Node verificado** numa pasta **somente leitura** para o
+  Sandbox; (2) rodar um **harness identificado por hash** dentro do Sandbox (rede desabilitada); (3)
+  gravar o **recibo em pasta de saída separada**; (4) no **host**, verificar os **hashes**, a
+  **identidade do Node**, o resultado do `initialize` e a **falha do egresso do processo filho** —
+  **só então** liberar o artefato. **Evidência + limpeza** declaradas.
 - **Caminhos/segurança:** todo caminho gerenciado sob `%LOCALAPPDATA%\xpz-mcp-integrations` após
   **canonicalização**, **rejeitando reparse points** e raízes de outro drive; **ACL antes de persistir**;
   escrita atômica.
@@ -327,13 +332,14 @@ Cinco modos. **Wire = hipótese** até as fixtures (Apêndice). **Credencial por
 
 ## Fases
 
-- **F0** — design + revisão (F0-1..F0-13; faltam **painel de liberação**).
+- **F0** — design + revisão (F0-1..F0-14; faltam **painel de liberação**).
 - **F1-pre** (frente própria; painel ≥2 Criadores distintos do autor + ≥1 fora do harness afetado) —
   criar `OpenCodeJsoncSupport.ps1` + golden + fixtures + **matriz de migração** + self-tests + inventário
   de consumidores na raiz.
-- **F1** — skill (OpenCode + núcleo) + descritor Jev + launcher (`ProcessStartInfo` + Job Object) +
-  cofre/DPAPI + vendorizador (baselines + manifesto + ferramenta versionada) + evidência sanitizada do
-  `dist` + re-verificação **contida** gating + self-tests + docs. **F1 ≠ v1.**
+- **F1** — skill (OpenCode + núcleo) + descritor Jev + launcher (**`CreateProcessW` suspenso + Job
+  Object + `ResumeThread`**, rota única) + cofre/DPAPI + vendorizador (baselines + manifesto + ferramenta
+  versionada) + evidência sanitizada do `dist` + re-verificação **contida** gating + self-tests + docs.
+  **F1 ≠ v1.**
 - **F2** — Codex (biblioteca TOML vendorizada, round-trip + env mínimo) + self-tests TOML + auditoria de
   versão/drift + update/rollback. **Completa a v1.**
 - **F3** — Cursor + Claude Code (coordenar com `Install-CursorGlobalInstructionsMcp.ps1`).
@@ -368,6 +374,7 @@ Cinco modos. **Wire = hipótese** até as fixtures (Apêndice). **Credencial por
 | F0-11 (cara) | `…-f0-codex-gpt-v12` (v12) | v13 | openai/gpt-5.6-terra (codex) | 1× gap bloqueante |
 | F0-12 (cara) | `…-f0-codex-gpt-v13` (v13) | v14 | openai/gpt-5.6-terra (codex) | 4× gap bloqueante |
 | F0-13 (cara) | `…-f0-codex-gpt-v14` (v14) | v15 | openai/gpt-5.6-terra (codex) | 2× gap bloqueante |
+| F0-14 (cara) | `…-f0-codex-gpt-v15` (v15) | v16 | openai/gpt-5.6-terra (codex) | 2× gap bloqueante |
 
 - **Recibo F0-1** (via `xpz-llm-delegate`): `preferenceSource=orchestrator`; `attemptRole=primary`,
   `countsForDiversity=true`; `closeoutReady=false` (`vnext-pending-resubmission`).
