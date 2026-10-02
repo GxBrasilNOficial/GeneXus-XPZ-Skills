@@ -1,4 +1,4 @@
-# xpz-mcp-integrations — design da skill (v16)
+# xpz-mcp-integrations — design da skill (v17)
 
 ## Papel do documento
 
@@ -6,7 +6,7 @@ Design **vivo** (não congelado) da skill `xpz-mcp-integrations`, com decisões 
 evidência empírica coletada.
 
 - **v2** pré-análise · **v3** F0-1 (4 titulares) · **v4–v8** refinos opencode (segundas opiniões) ·
-  **v9–v15** validações caras · **v16** 8ª validação cara (`openai/gpt-5.6-terra` via codex).
+  **v9–v16** validações caras · **v17** 9ª validação cara (`openai/gpt-5.6-terra` via codex).
 
 **Autor e diversidade:** `authorFamily=deepseek`. Revisores de famílias distintas da do autor; as
 rodadas opencode (meta+deepseek) são **segundas opiniões**. **Liberação** exige **≥2 Criadores
@@ -122,7 +122,11 @@ trailing-comma e comentário/string passando por **cada rota real**):
 | `Test-OpenCodeReviewerRoSelfTest.ps1` + `Test-LlmDelegateCapabilityManifestSelfTest.ps1` | fixtures insufficientes | fixtures negativas novas |
 | Futuros consumidores | — | biblioteca única |
 
-**Golden de paridade** old-vs-new (inclui string com `, }`); **ordem:** núcleo+instalador primeiro,
+**Golden dividido:** **paridade** só para entradas **já suportadas** pelo motor antigo; **regressão com
+divergência esperada** para strings/comentários/trailing comma (o `ConvertFrom-JsoncText` antigo corrompe
+`, }` dentro de string — divergir é o **objetivo**). **Chaves duplicadas:** o tokenizador detecta
+duplicidade em cada objeto; duplicidade em qualquer segmento do caminho-alvo ou na chave-alvo →
+`entrada_em_conflito` e **recusa** a escrita. **Ordem:** núcleo+instalador primeiro,
 **manifesto por último** com **pin de fallback**; **passo de maior risco = a extração**. **Lockstep
 corrigido:** inventário/self-test de consumidores **na raiz**; **não** ampliar a auditoria de
 `xpz-kb-parallel-setup` (o lockstep do `AGENTS.md` é para motor quebrado consumido por wrappers de KB
@@ -154,6 +158,11 @@ autor + ≥1 voz fora do harness afetado.
   pré-compilado. O teste prova que `dist/index.js` existe e o servidor sobe **sem** rodar `prepare`.
 - **Vendor:** `npm ci --ignore-scripts --no-audit --no-fund` em
   `%LOCALAPPDATA%\xpz-mcp-integrations\vendor-<versao>\`; comparação contra o manifesto esperado.
+  **Projeto de instalação (bootstrap executável):** `xpz-mcp-integrations/vendor/` contém o
+  **`package.json` (pin exato) + `package-lock.json`** versionados; o installer **cria
+  `vendor-<versao>\`, copia os dois para lá** e **só então** roda `npm ci`. O `manifest.sha256` cobre a
+  **árvore `node_modules\*\*`**; os dois arquivos do projeto são cobertos pelos hashes commitados de
+  `package.json`/lock (não pelo manifesto de árvore).
   **Sem indireção mutável**: launcher versionado por path absoluto; comando do cliente aponta para o
   launcher daquela versão. Update = instalar + launcher + re-emitir config; rollback = re-emitir config
   anterior. **Sem junction/symlink** (hazard de `historico/...20260622-20260922.md:48`).
@@ -332,7 +341,7 @@ Cinco modos. **Wire = hipótese** até as fixtures (Apêndice). **Credencial por
 
 ## Fases
 
-- **F0** — design + revisão (F0-1..F0-14; faltam **painel de liberação**).
+- **F0** — design + revisão (F0-1..F0-15; faltam **painel de liberação**).
 - **F1-pre** (frente própria; painel ≥2 Criadores distintos do autor + ≥1 fora do harness afetado) —
   criar `OpenCodeJsoncSupport.ps1` + golden + fixtures + **matriz de migração** + self-tests + inventário
   de consumidores na raiz.
@@ -347,7 +356,8 @@ Cinco modos. **Wire = hipótese** até as fixtures (Apêndice). **Credencial por
 
 ## Riscos e decisões em aberto
 
-- **Launcher stdio** — `ProcessStartInfo` + Job Object; invariante mecanizada; cancel/órfão.
+- **Launcher stdio** — `CreateProcessW` suspenso + Job Object + `ResumeThread` (rota **única**);
+  invariante mecanizada; cancel/órfão.
 - **Biblioteca TOML (Codex)** — vendorizada sob rigor; round-trip; fixture.
 - **`dist`** — evidência sanitizada + re-verificação **contida** (gating; sem contenção, bloqueia).
 - **Fatos externos a re-verificar no F1/F2:** sha512 do tarball; `engines.node`; tabela dos 5 modos;
@@ -375,6 +385,7 @@ Cinco modos. **Wire = hipótese** até as fixtures (Apêndice). **Credencial por
 | F0-12 (cara) | `…-f0-codex-gpt-v13` (v13) | v14 | openai/gpt-5.6-terra (codex) | 4× gap bloqueante |
 | F0-13 (cara) | `…-f0-codex-gpt-v14` (v14) | v15 | openai/gpt-5.6-terra (codex) | 2× gap bloqueante |
 | F0-14 (cara) | `…-f0-codex-gpt-v15` (v15) | v16 | openai/gpt-5.6-terra (codex) | 2× gap bloqueante |
+| F0-15 (cara) | `…-f0-codex-gpt-v16` (v16) | v17 | openai/gpt-5.6-terra (codex) | 4× gap bloqueante |
 
 - **Recibo F0-1** (via `xpz-llm-delegate`): `preferenceSource=orchestrator`; `attemptRole=primary`,
   `countsForDiversity=true`; `closeoutReady=false` (`vnext-pending-resubmission`).
