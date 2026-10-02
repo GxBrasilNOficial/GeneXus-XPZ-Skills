@@ -3264,3 +3264,18 @@ As contagens são de **arquivos que mencionam o token**, não de parâmetros exc
 **Decisões em aberto.** Escopo do delta (só `Replace`? `InsertAfter`?); se a declaração por operação carrega precondição (`expected`) como o irmão; se o modo compõe com o lote de metadados no mesmo manifesto ou em rodada separada; e onde mora o motor (script próprio × ampliar `Edit-GeneXusXmlBatchMetadata.ps1`).
 
 **Relacionado.** `edit-genexus-xml-batch-metadata-design.md`; `scripts/Edit-GeneXusXmlBatchMetadata.ps1`; `scripts/GeneXusXmlBatchMetadataSupport.ps1`; `edit-genexus-xml-surgical-design.md`.
+
+## Skill `xpz-mcp-integrations` — componente MCP externo opcional (Jev/System One)
+
+- **Importância** — média (gap real: hoje só existe configuração manual, e o caminho validado está amarrado à máquina de referência — path pessoal + `npx` flutuante; falta um caminho gerenciado e portátil para a comunidade).
+- **Maturidade** — pronta para implementar (caso concreto e decisões fechadas em 2026-10-02; falta a F0 — revisão por pares do design — e a execução; ver `xpz-mcp-integrations-design.md`).
+
+**O que é.** Skill nova dedicada a instalar, auditar, reparar, atualizar e remover **componentes MCP externos opcionais** nos clientes de agente; o 1º componente é o **Jev/System One** (modelo de decisão do TypeSafe) via `@jkudish/jev-mcp`. Motor genérico dirigido por descritor; a v1 cobre **OpenCode e Codex**.
+
+**Por que não na `xpz-skills-setup`.** A skill de setup registra skills XPZ, instrucionais globais, `nexa`/`gam`, bootstrap git e o MCP **interno** do Cursor; não gerencia MCP de terceiros. A nova skill nasce separada, com fronteira explícita e regra de merge que preserva entradas de outros donos nos mesmos arquivos de cliente.
+
+**Decisões travadas (2026-10-02).** Nome `xpz-mcp-integrations`; pacote **vendorizado** e pinado (`0.13.0`, integridade sha512 + tag `v0.13.0`), **sem `npx`** no início; Node é pré-requisito opcional (detectar e **oferecer** instalar via `winget`, com aprovação); credencial em **cofre neutro** da skill (env como override; `auth.json` do OpenCode só importação opcional); fornecedor configurável (presets do pacote + modo `compatible` informado na hora; Command Code como preset validado); **sem fork** na v1; público comunitário.
+
+**Adiado.** Fork/espelho do artefato; Cursor e Claude Code; backend Python alternativo (`typesafe-mcp` no PyPI, outra superfície e não validado contra o Command Code).
+
+**Relacionado.** `xpz-mcp-integrations-design.md`; `xpz-skills-setup/SKILL.md` (fronteira); `xpz-llm-delegate/SKILL.md` e `15-revisao-por-pares.md` (o `commandcode/*` ali é catálogo de vozes do painel — não confundir com o endpoint do Jev).
