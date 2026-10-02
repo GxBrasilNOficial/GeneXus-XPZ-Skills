@@ -62,12 +62,12 @@ Use este ramo somente quando a pergunta for **triagem técnica** sobre atributos
 1. escolher a consulta mínima conforme `xpz-index-triage` (**QUERY PARAMETER REFERENCE**):
    - `attribute-info` — um atributo; sinais **leves** (`Formula`, `idBasedOn`, etc.)
    - `who-uses` / `what-uses` em `Domain` — impacto técnico direto via `based_on_domain` (extrator 13: origens no escopo, Domains importados resolvidos por FQFN como alvos-only); não confundir com consumo de atributo no corpo (`references_attribute` ainda pendente)
-   - `transaction-attributes` ou `transaction-writable-attributes` — uma Transaction; classificação **materializada** no índice (`schema_version>=2`), com paridade contra `Test-GeneXusTransactionWritability.ps1`
-2. registrar o comando, o objeto e os sinais retornados como **evidencia direta**
+   - `transaction-attributes` ou `transaction-writable-attributes` — uma Transaction; classificação automática materializada por ocorrência, com identidade completa. O gate valida assinatura/formato atuais e cobertura/contagens; a própria consulta de gravabilidade também exige `schema_version=5` e regra de gravabilidade `3`.
+2. registrar comando, objeto, identidade da ocorrência, classificação, cobertura, motivos e `writability_coverage`/contagens como **evidência direta**. `GATE_OK` confirma validade técnica do índice; cobertura `partial`/`invalid` limita a conclusão e nenhum desses sinais autoriza atribuição.
 3. declarar explicitamente o **tipo de consulta**:
    - `attribute-info`: leve; **não** substitui classificação completa de gravabilidade
-   - `transaction-writable-attributes`: classificação completa materializada; **não** substitui empacote nem blocos `New` em `Procedure` (`Test-GeneXusNewWritableTargets.ps1`)
-4. se a pergunta evoluir para geração de atribuicao em `Rules`, `Events`, `New` ou empacotamento, **parar a triagem** e encaminhar para `xpz-builder` com `Test-GeneXusTransactionWritability.ps1` ou `Test-GeneXusNewWritableTargets.ps1` (fachadas sobre `GeneXusTransactionWritabilityCore.py`)
+   - `transaction-writable-attributes`: classificação automática materializada; não lê manifestos nem apresenta efeito humano aplicado. Não substitui empacote nem análise de blocos `New` em `Procedure`.
+4. se a pergunta evoluir para geração de atribuição em `Rules`, `Events`, `New` ou empacotamento, **parar a triagem** e encaminhar para `xpz-builder`: 9-TXW/`Test-GeneXusTransactionWritability.ps1` ou 9-PNW/`Test-GeneXusNewWritableTargets.ps1`, sobre `GeneXusWritabilityOperational.py` e o classificador automático `GeneXusTransactionWritabilityCore.py`. Solicitação (`RequestPath`) e decisão (`DecisionPath`) são entradas separadas; só decisão `applied`, revalidada junto com suas provas e dependências, pode formar contexto efetivo. Para `New`, exigir `effectiveCanAssignInNew=true` na ocorrência exata antes de gerar a atribuição.
 
 ### Ramo: objetos gerados por Pattern × autorais (triagem via índice)
 

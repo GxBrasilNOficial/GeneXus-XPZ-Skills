@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "files": [
+    "scripts/Build-KbIntelligenceIndex.py",
+    "scripts/GeneXusCanonicalJson.py",
+    "scripts/GeneXusKbIntelligenceExtractorSignature.py",
+    "scripts/GeneXusObjectTypeCatalogCore.py",
+    "scripts/GeneXusTransactionWritabilityCore.py",
+    "scripts/Query-KbIntelligenceIndex.py",
+    "scripts/gx-legacy-export-element-registry.json",
+    "scripts/gx-object-type-catalog.json"
+  ]
+}

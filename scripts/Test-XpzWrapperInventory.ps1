@@ -306,6 +306,20 @@ foreach ($exampleFile in Get-ChildItem -LiteralPath $SkillsExamplesPath -Filter 
             }
         }
 
+        if ($baseName -ieq 'Test-KbSetupAudit') {
+            $localText = [System.IO.File]::ReadAllText($standardPath)
+            $directGateStatusConsumer = $localText -match '\$gateRaw' -and $localText -match '\bGATE_OK\b'
+            if ($directGateStatusConsumer) {
+                $hasCoverageContract = $localText -match 'WRITABILITY_COVERAGE_CONTRACT_V1' -and
+                    $localText -match 'writability_coverage'
+                if (-not $hasCoverageContract) {
+                    $customized.Add(('{0}(reason=WRITABILITY_CONSUMER_CONTRACT_STALE)' -f $standardLocalName))
+                }
+            } elseif ($localText -match '\$gateRaw|\bGATE_OK\b|GateWrapperPath') {
+                $engineDiagnostics.Add(('{0}(reason=writability_consumer_contract_unclassified)' -f $standardLocalName))
+            }
+        }
+
         if ($baseName -ieq 'Update-KbFromXpz') {
             $exampleText = [System.IO.File]::ReadAllText($examplePath)
             $localText = [System.IO.File]::ReadAllText($standardPath)

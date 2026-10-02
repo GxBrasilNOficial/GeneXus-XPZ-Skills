@@ -9,7 +9,9 @@ import json
 import re
 import sqlite3
 import sys
+import uuid
 from pathlib import Path
+from pathlib import PurePosixPath
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
 if str(_SCRIPT_DIR) not in sys.path:
@@ -19,6 +21,13 @@ from GeneXusObjectTypeCatalogCore import (  # noqa: E402
     CatalogOverrideDiagnosticError,
     resolve_effective_object_type_catalog_for_query,
 )
+from GeneXusCanonicalJson import CanonicalJsonError, loads_strict  # noqa: E402
+from GeneXusKbIntelligenceExtractorSignature import (  # noqa: E402
+    EXTRACTOR_SIGNATURE_FORMAT,
+    EXTRACTOR_SIGNATURE_VERSION,
+    compute_signature,
+)
+from GeneXusTransactionWritabilityCore import WRITABILITY_RULE_VERSION  # noqa: E402
 
 
 EXPECTED_SCHEMA_VERSION = "5"
@@ -41,7 +50,14 @@ SEMANTIC_QUERIES = frozenset(
 )
 EXIT_QUERY_NOT_SEMANTIC_FOR_TYPE = 11
 EXIT_CATALOG_OVERRIDE_BLOCKED = 2
+EXIT_WRITABILITY_INDEX_BLOCKED = 12
 _CATALOG_TYPES_CACHE: dict[tuple[str | None, str | None, str], dict[str, dict[str, object]]] = {}
+
+
+class WritabilityIndexError(ValueError):
+    def __init__(self, reason: str, message: str):
+        super().__init__(message)
+        self.reason = reason
 
 
 def _catalog_cache_key(
@@ -451,66 +467,252 @@ def nullable_bool_from_sqlite(value: object) -> bool | None:
     return bool(int(value))
 
 
+def validate_materialized_writability_contract(conn: sqlite3.Connection) -> dict[str, str]:
+    metadata = metadata_map(conn)
+    required = (
+        "schema_version", "writability_rule_version", "extractor_signature_version",
+        "extractor_signature_hash", "extractor_signature_format", "writability_rows_expected",
+        "writability_rows_written", "writability_rows_lost",
+    )
+    missing = [key for key in required if not metadata.get(key)]
+    if missing:
+        raise WritabilityIndexError(
+            "writability-metadata-missing",
+            "Índice legado ou incompleto para consultas de gravabilidade; faltam metadata "
+            + ", ".join(missing) + ". Regenere o índice.",
+        )
+    if metadata["schema_version"] != EXPECTED_SCHEMA_VERSION:
+        raise WritabilityIndexError("writability-schema-stale", "Schema de gravabilidade defasado; regenere o índice.")
+    if metadata["writability_rule_version"] != WRITABILITY_RULE_VERSION:
+        raise WritabilityIndexError("writability-rule-stale", "Regra de gravabilidade defasada; regenere o índice.")
+    if metadata["extractor_signature_format"] != EXTRACTOR_SIGNATURE_FORMAT:
+        raise WritabilityIndexError("writability-signature-format-stale", "Formato da assinatura do extrator defasado; regenere o índice.")
+    try:
+        expected = compute_signature(Path(__file__).resolve().parent.parent)
+    except (ValueError, OSError) as exc:
+        raise WritabilityIndexError("writability-signature-unavailable", f"Não foi possível validar o extrator atual: {exc}") from exc
+    if (metadata["extractor_signature_version"] != expected["extractor_signature_version"]
+            or metadata["extractor_signature_hash"] != expected["extractor_signature_hash"]):
+        raise WritabilityIndexError("writability-extractor-stale", "Assinatura do extrator defasada; regenere o índice.")
+    try:
+        expected_rows = int(metadata["writability_rows_expected"])
+        written_rows = int(metadata["writability_rows_written"])
+        lost_rows = int(metadata["writability_rows_lost"])
+        actual_rows = int(conn.execute("SELECT COUNT(*) FROM transaction_attribute_writability").fetchone()[0])
+    except (ValueError, TypeError, sqlite3.Error) as exc:
+        raise WritabilityIndexError("writability-row-count-invalid", "Contagem/tabela de gravabilidade inválida; regenere o índice.") from exc
+    if lost_rows != 0 or expected_rows != written_rows or written_rows != actual_rows:
+        raise WritabilityIndexError(
+            "writability-occurrences-lost",
+            f"Materialização incompleta de gravabilidade (esperadas={expected_rows}, gravadas={written_rows}, "
+            f"presentes={actual_rows}, perdas={lost_rows}); regenere o índice.",
+        )
+    return metadata
+
+
+def _resolve_transaction_object(conn: sqlite3.Connection, transaction_name: str) -> dict[str, object] | None:
+    rows = fetch_all(conn, "SELECT * FROM objects WHERE type = 'Transaction'", ())
+    matches = [row for row in rows if str(row.get("name", "")).casefold() == transaction_name.casefold()]
+    if len(matches) > 1:
+        candidates = [{"guid": row.get("guid"), "name": row.get("name"), "file_path": row.get("file_path")}
+                      for row in matches]
+        raise WritabilityIndexError(
+            "transaction-name-ambiguous",
+            "Nome de Transaction ambíguo no índice; use GUID/identidade única. Candidatas: "
+            + json.dumps(candidates, ensure_ascii=False, separators=(",", ":")),
+        )
+    return matches[0] if matches else None
+
+
+def _identity_sort_key(row: dict[str, object]) -> tuple[object, ...]:
+    identity = row["identity"]
+    assert isinstance(identity, dict)
+    transaction = identity["transaction"]
+    level = identity["level"]
+    attribute = identity["attribute"]
+    assert isinstance(transaction, dict) and isinstance(level, dict) and isinstance(attribute, dict)
+    return (str(transaction.get("path", "")).casefold(), str(row.get("partType", "")).casefold(),
+            tuple(level.get("pathOrdinals", [])), str(attribute.get("guid") or "").casefold(),
+            str(attribute.get("name", "")).casefold(), int(row.get("writabilityId", 0)))
+
+
 def fetch_materialized_writability_rows(
     conn: sqlite3.Connection,
-    transaction_name: str,
+    transaction_object: dict[str, object],
 ) -> list[dict[str, object]]:
-    materialized = fetch_all(
-        conn,
-        """
-        SELECT
-            w.transaction_name,
-            w.level_name,
-            w.attribute_name,
-            w.key_in_level,
-            w.is_redundant,
-            w.classification,
-            w.writable,
-            w.can_assign_in_new,
-            w.reason,
-            w.evidence,
-            w.writability_rule_version,
-            o.file_path AS attribute_file
-        FROM transaction_attribute_writability w
-        JOIN objects o_tx ON o_tx.object_id = w.transaction_object_id
-        LEFT JOIN objects o ON o.type = 'Attribute' AND LOWER(o.name) = LOWER(w.attribute_name)
-        WHERE LOWER(o_tx.name) = LOWER(?)
-        ORDER BY w.level_name, w.attribute_name
-        """,
-        (transaction_name,),
-    )
+    materialized = fetch_all(conn, """
+        SELECT writability_id, transaction_name, level_name, attribute_name, key_in_level,
+               is_redundant, classification, writable, can_assign_in_new, reason, evidence,
+               writability_rule_version
+        FROM transaction_attribute_writability
+        WHERE transaction_object_id = ?
+        """, (int(transaction_object["object_id"]),))
     rows: list[dict[str, object]] = []
     for row in materialized:
-        attr_name = str(row["attribute_name"])
-        attr_payload = attribute_info(conn, attr_name)
-        is_formula = bool(attr_payload.get("isFormula")) if attr_payload.get("found") else None
+        try:
+            envelope = loads_strict(str(row["evidence"]))
+        except (CanonicalJsonError, TypeError) as exc:
+            raise WritabilityIndexError(
+                "writability-evidence-invalid",
+                f"Envelope de evidência inválido na ocorrência #{row.get('writability_id')}; regenere o índice.",
+            ) from exc
+        expected_fields = {"kind", "schemaVersion", "ruleVersion", "identity", "basis", "coverage",
+                           "reasonCodes", "provenance", "evidenceSummary"}
+        if not isinstance(envelope, dict) or set(envelope) != expected_fields:
+            raise WritabilityIndexError("writability-evidence-invalid", "Envelope de evidência incompatível; regenere o índice.")
+        if (envelope.get("kind") != "gx-writability-evidence" or envelope.get("schemaVersion") != 1
+                or envelope.get("ruleVersion") != WRITABILITY_RULE_VERSION
+                or row.get("writability_rule_version") != WRITABILITY_RULE_VERSION):
+            raise WritabilityIndexError("writability-evidence-stale", "Envelope/regra de gravabilidade incompatível; regenere o índice.")
+        identity = envelope.get("identity")
+        if not isinstance(identity, dict) or set(identity) != {"transaction", "partType", "level", "attribute"}:
+            raise WritabilityIndexError("writability-identity-invalid", "Identidade da ocorrência inválida; regenere o índice.")
+        tx_identity = identity["transaction"]
+        level_identity = identity["level"]
+        attribute_identity = identity["attribute"]
+        if (not isinstance(tx_identity, dict) or not isinstance(level_identity, dict)
+                or not isinstance(attribute_identity, dict)
+                or set(tx_identity) != {"type", "guid", "name", "path", "rootKind"}
+                or set(level_identity) != {"guid", "pathOrdinals"}
+                or set(attribute_identity) != {"type", "guid", "name", "path", "rootKind"}
+                or tx_identity.get("type") != "Transaction"
+                or attribute_identity.get("type") != "Attribute"
+                or not isinstance(tx_identity.get("path"), str)
+                or not isinstance(tx_identity.get("name"), str)
+                or not isinstance(attribute_identity.get("name"), str)
+                or not isinstance(identity.get("partType"), str)
+                or not isinstance(level_identity.get("pathOrdinals"), list)
+                or any(type(ordinal) is not int or ordinal < 0 for ordinal in level_identity["pathOrdinals"])
+                or not isinstance(envelope.get("basis"), str)
+                or envelope.get("coverage") not in {"complete-in-model", "partial", "invalid"}
+                or not isinstance(envelope.get("reasonCodes"), list)
+                or any(not isinstance(code, str) for code in envelope["reasonCodes"])
+                or not isinstance(envelope.get("provenance"), dict)
+                or not isinstance(envelope.get("evidenceSummary"), str)):
+            raise WritabilityIndexError("writability-identity-invalid", "Identidade/campos da ocorrência inválidos; regenere o índice.")
+        for object_identity in (tx_identity, attribute_identity):
+            guid = object_identity.get("guid")
+            if guid is not None and not _valid_uuid(guid):
+                raise WritabilityIndexError("writability-identity-invalid", "GUID da evidência inválido; regenere o índice.")
+            root_kind = object_identity.get("rootKind")
+            if root_kind not in {"corpus", "delta", None}:
+                raise WritabilityIndexError("writability-identity-invalid", "rootKind da evidência inválido; regenere o índice.")
+            evidence_path = object_identity.get("path")
+            if evidence_path is not None:
+                path_parts = evidence_path.split("/") if isinstance(evidence_path, str) else []
+                pure_path = PurePosixPath(evidence_path) if isinstance(evidence_path, str) else PurePosixPath(".")
+                if (not isinstance(evidence_path, str) or not evidence_path or pure_path.is_absolute()
+                        or "\\" in evidence_path or any(part in {"", ".", ".."} for part in path_parts)):
+                    raise WritabilityIndexError("writability-identity-invalid", "Caminho da evidência não é relativo; regenere o índice.")
+        if not _valid_writability_provenance(envelope["provenance"]):
+            raise WritabilityIndexError("writability-evidence-invalid", "Proveniência do envelope inválida; regenere o índice.")
+        if envelope["reasonCodes"] != sorted(set(envelope["reasonCodes"])):
+            raise WritabilityIndexError("writability-evidence-invalid", "reasonCodes do envelope não são um conjunto ordenado; regenere o índice.")
+        if (str(tx_identity.get("guid") or "").casefold() != str(transaction_object.get("guid") or "").casefold()
+                or str(tx_identity.get("name") or "").casefold() != str(transaction_object.get("name") or "").casefold()
+                or str(attribute_identity.get("name") or "").casefold() != str(row["attribute_name"]).casefold()
+                or str(row.get("reason") or "") == ""
+                or not isinstance(row.get("classification"), str)):
+            raise WritabilityIndexError("writability-identity-conflict", "Identidade materializada diverge das linhas; regenere o índice.")
         writable = nullable_bool_from_sqlite(row.get("writable"))
         rows.append(
             {
                 "transaction": row["transaction_name"],
                 "levelName": row["level_name"],
-                "attribute": attr_name,
+                "partType": identity.get("partType"),
+                "attribute": row["attribute_name"],
                 "key": bool(row["key_in_level"]),
                 "isRedundant": bool(row["is_redundant"]),
-                "isFormula": is_formula,
-                "formulaExpression": attr_payload.get("formulaExpression"),
                 "classification": row["classification"],
                 "writable": writable,
                 "canAssignInNew": nullable_bool_from_sqlite(row.get("can_assign_in_new")),
                 "reason": row["reason"],
-                "evidence": row["evidence"],
+                "reasonCodes": envelope["reasonCodes"],
+                "basis": envelope["basis"],
+                "coverage": envelope["coverage"],
+                "identity": identity,
+                "provenance": envelope["provenance"],
+                "evidence": envelope,
                 "writabilityRuleVersion": row["writability_rule_version"],
-                "attributeFile": row.get("attribute_file"),
+                "attributeFile": identity.get("attribute", {}).get("path"),
+                "decisionState": "not-requested",
+                "contextualAnalysis": None,
+                "pendingDecisions": [],
+                "writabilityId": row["writability_id"],
             }
         )
-    return rows
+    return sorted(rows, key=_identity_sort_key)
+
+
+def _valid_writability_provenance(value: object) -> bool:
+    if not isinstance(value, dict):
+        return False
+    allowed = {"attributePath", "subtypeChain", "tableCandidates", "levelType",
+               "associationStatus", "relationAnalysis"}
+    if set(value) - allowed:
+        return False
+    if "attributePath" in value and (not isinstance(value["attributePath"], str) or not value["attributePath"]):
+        return False
+    if "subtypeChain" in value and (not isinstance(value["subtypeChain"], list)
+            or not value["subtypeChain"] or any(not isinstance(item, str) or not item for item in value["subtypeChain"])):
+        return False
+    if "levelType" in value and not isinstance(value["levelType"], str):
+        return False
+    valid_associations = {"resolved-level-type-and-table-key", "table-binding-proposed", "table-binding-ambiguous",
+                          "table-key-unresolved", "key-identity-incomplete", "level-type-key-conflict"}
+    if "associationStatus" in value and value["associationStatus"] not in valid_associations:
+        return False
+    if "tableCandidates" in value:
+        candidates = value["tableCandidates"]
+        if not isinstance(candidates, list):
+            return False
+        for candidate in candidates:
+            if not isinstance(candidate, dict) or set(candidate) - {"guid", "name", "path", "keyGuids", "keyMismatch"}:
+                return False
+            if not {"guid", "name", "path", "keyGuids"} <= set(candidate):
+                return False
+            if candidate["guid"] is not None:
+                try:
+                    uuid.UUID(str(candidate["guid"]))
+                except ValueError:
+                    return False
+            if (not isinstance(candidate["name"], str) or not isinstance(candidate["path"], str)
+                    or not isinstance(candidate["keyGuids"], list)
+                    or any(item is not None and not _valid_uuid(item) for item in candidate["keyGuids"])
+                    or ("keyMismatch" in candidate and not isinstance(candidate["keyMismatch"], bool))):
+                return False
+    if "relationAnalysis" in value:
+        analysis = value["relationAnalysis"]
+        expected = {"positives", "unknown", "indexedMember", "visitedTableGuids", "inspectedEdges", "maxDepth", "maxEdges"}
+        if not isinstance(analysis, dict) or set(analysis) != expected:
+            return False
+        if (not isinstance(analysis["positives"], list) or any(not isinstance(item, str) for item in analysis["positives"])
+                or not isinstance(analysis["unknown"], list) or any(not isinstance(item, str) for item in analysis["unknown"])
+                or not isinstance(analysis["indexedMember"], bool)
+                or not isinstance(analysis["visitedTableGuids"], list)
+                or any(not _valid_uuid(item) for item in analysis["visitedTableGuids"])
+                or any(type(analysis[key]) is not int or analysis[key] < 0
+                       for key in ("inspectedEdges", "maxDepth", "maxEdges"))):
+            return False
+    return True
+
+
+def _valid_uuid(value: object) -> bool:
+    if not isinstance(value, str):
+        return False
+    try:
+        uuid.UUID(value)
+    except ValueError:
+        return False
+    return True
 
 
 def transaction_attribute_rows(conn: sqlite3.Connection, transaction_name: str) -> tuple[dict[str, object] | None, list[dict[str, object]]]:
-    obj = fetch_object(conn, "Transaction", transaction_name)
+    validate_materialized_writability_contract(conn)
+    obj = _resolve_transaction_object(conn, transaction_name)
     if obj is None:
         return None, []
-    rows = fetch_materialized_writability_rows(conn, transaction_name)
+    rows = fetch_materialized_writability_rows(conn, obj)
     if rows:
         return obj, rows
     return obj, []
@@ -531,6 +733,12 @@ def transaction_attributes(conn: sqlite3.Connection, transaction_name: str) -> d
         "total": len(rows),
         "results": rows,
     }
+
+
+def writability_blocked_result(query: str, transaction_name: str, error: WritabilityIndexError) -> dict[str, object]:
+    return {"query": query, "transaction": transaction_name, "found": False,
+            "status": "blocked", "reason": error.reason, "message": str(error),
+            "notice": "Consulta de gravabilidade indisponível; regenere o índice."}
 
 
 def transaction_writable_attributes(conn: sqlite3.Connection, transaction_name: str) -> dict[str, object]:
@@ -1289,7 +1497,9 @@ def format_text(result: dict[str, object]) -> str:
                     continue
                 lines.append(
                     f"- [{row.get('levelName')}] {row.get('attribute')} "
-                    f"classification={row.get('classification')} writable={row.get('writable')} reason={row.get('reason')}"
+                    f"classification={row.get('classification')} writable={row.get('writable')} "
+                    f"coverage={row.get('coverage')} reason={row.get('reason')} "
+                    f"reasonCodes={row.get('reasonCodes')}"
                 )
         return "\n".join(lines)
 
@@ -1552,11 +1762,27 @@ def main() -> int:
         elif args.query == "transaction-attributes":
             if not args.object_name:
                 raise SystemExit("transaction-attributes requires --object-name.")
-            result = transaction_attributes(conn, args.object_name)
+            try:
+                result = transaction_attributes(conn, args.object_name)
+            except WritabilityIndexError as exc:
+                blocked = writability_blocked_result(args.query, args.object_name, exc)
+                if args.format == "text":
+                    print(f"{args.query}: BLOCKED ({exc.reason})\n{exc}")
+                else:
+                    print(json.dumps(blocked, indent=2, ensure_ascii=False))
+                return EXIT_WRITABILITY_INDEX_BLOCKED
         elif args.query == "transaction-writable-attributes":
             if not args.object_name:
                 raise SystemExit("transaction-writable-attributes requires --object-name.")
-            result = transaction_writable_attributes(conn, args.object_name)
+            try:
+                result = transaction_writable_attributes(conn, args.object_name)
+            except WritabilityIndexError as exc:
+                blocked = writability_blocked_result(args.query, args.object_name, exc)
+                if args.format == "text":
+                    print(f"{args.query}: BLOCKED ({exc.reason})\n{exc}")
+                else:
+                    print(json.dumps(blocked, indent=2, ensure_ascii=False))
+                return EXIT_WRITABILITY_INDEX_BLOCKED
         elif args.query == "who-uses":
             if not args.object_type or not args.object_name:
                 raise SystemExit("who-uses requires --object-type and --object-name.")

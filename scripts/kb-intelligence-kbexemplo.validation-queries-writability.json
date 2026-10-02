@@ -52,7 +52,7 @@
       "expected_writable": {
         "OrdemDeProducaoData": true
       },
-      "expectation": "transaction-writable-attributes must expose materialized writability (KBExemplo); rebuild indice v4 antes de validar"
+      "expectation": "transaction-writable-attributes must expose materialized writability (KBExemplo); rebuild indice schema v5 antes de validar"
     }
   ]
 }

@@ -11,10 +11,12 @@ caminhos locais e repassando -AsJson. Simetrico ao molde de auditoria de setup
 
 Contrato de saida herdado do motor:
 - Default (texto): emite GATE_OK no sucesso, lanca `BLOCK: <motivo>` no bloqueio.
-  Retrocompativel com o consumo por grep (Test-XpzSetupAudit / agentes).
-- -AsJson: { status: OK|BLOCK, reason, extractor_signature_*, ... }. Sob -AsJson
-  nunca lanca; bloqueio vira { status: BLOCK, reason } + exit 1. Consumido pelo
-  gate K9 do orquestrador Invoke-XpzKbParallelPrePushPhase1.ps1.
+  Inclui `writability_coverage` e, para `partial`/`invalid`, um aviso explícito;
+  `GATE_OK` certifica validade técnica do índice, não gravabilidade nem autorização.
+- -AsJson: { status: OK|BLOCK, reason, extractor_signature_*, writabilityCoverage,
+  writabilityCoverageWarning, ... }. Sob -AsJson nunca lanca; bloqueio vira
+  { status: BLOCK, reason } + exit 1. Consumido pelo gate K9 do orquestrador
+  Invoke-XpzKbParallelPrePushPhase1.ps1.
 
 IMPORTANTE: este e um molde. Ao materializar o wrapper local final, ajustar
 `SharedSkillsRoot` para o caminho real da base compartilhada e, se a KB usar nomes

@@ -215,9 +215,21 @@ $lastMaterialization = Normalize-Value (Get-MetadataField -Lines $metadataLines 
 $gateRaw = $null
 $gateStatus = $null
 $inventorySemanticStatus = $null
+# WRITABILITY_COVERAGE_CONTRACT_V1: GATE_OK só é aceito junto com writability_coverage.
+$writabilityCoverage = 'unknown'
+$writabilityCoverageWarning = 'Gate de indice sem campo writability_coverage; nao afirmar cobertura de gravabilidade.'
 try {
     $gateRaw = Invoke-WrapperText -Path $GateWrapperPath
-    $gateStatus = if ($gateRaw -match '\bGATE_OK\b') { 'OK' } else { 'PENDENTE' }
+    $coverageMatch = [regex]::Match($gateRaw, 'writability_coverage\s*[:=]\s*(?<value>\S+)')
+    if ($coverageMatch.Success -and $coverageMatch.Groups['value'].Value -in @('complete-in-model', 'partial', 'invalid')) {
+        $writabilityCoverage = $coverageMatch.Groups['value'].Value
+        $warningMatch = [regex]::Match($gateRaw, 'writability_coverage_warning\s*[:=]\s*(?<value>.+)')
+        if ($warningMatch.Success) { $writabilityCoverageWarning = $warningMatch.Groups['value'].Value.Trim() }
+        else { $writabilityCoverageWarning = $null }
+        $gateStatus = if ($gateRaw -match '\bGATE_OK\b') { 'OK' } else { 'PENDENTE' }
+    } else {
+        $gateStatus = 'PENDENTE'
+    }
 } catch {
     $gateRaw = $_.Exception.Message.Trim()
     $gateStatus = 'BLOCK'
@@ -421,6 +433,10 @@ Emit-Line -Key 'naming/objetos-da-kb' -Value $namingStatus
 Emit-Line -Key 'naming/objetos-da-kb.evidencia' -Value $(if ($namingRaw) { $namingRaw.Replace([Environment]::NewLine, ' | ') } else { '(sem saida)' })
 Emit-Line -Key 'indice/gate' -Value $gateStatus
 Emit-Line -Key 'indice/gate.evidencia' -Value $(if ($gateRaw) { $gateRaw.Replace([Environment]::NewLine, ' | ') } else { '(sem saida)' })
+Emit-Line -Key 'indice/gravabilidade.cobertura' -Value $writabilityCoverage
+if (-not [string]::IsNullOrWhiteSpace($writabilityCoverageWarning)) {
+    Emit-Line -Key 'indice/gravabilidade.aviso' -Value $writabilityCoverageWarning
+}
 Emit-Line -Key 'indice/semantica' -Value $inventorySemanticStatus
 Emit-Line -Key 'indice/semantica.evidencia' -Value $(if ($gateRaw) { $gateRaw.Replace([Environment]::NewLine, ' | ') } else { '(sem saida)' })
 Emit-Line -Key 'metadata wrapper' -Value $metadataWrapperStatus

@@ -13,16 +13,20 @@ if (-not (Test-Path -LiteralPath $contractPath -PathType Leaf)) {
 . $contractPath
 
 $expected = Get-GeneXusKbIntelligenceExpectedExtractorSignature
-if ([string]::IsNullOrWhiteSpace($expected.extractor_signature_version)) {
-    throw 'Versao esperada do extrator vazia'
+if ($expected.extractor_signature_version -ne '16') {
+    throw "Vetor fixo de versao divergente: esperado 16, obtido $($expected.extractor_signature_version)"
 }
-if ($expected.extractor_signature_hash.Length -ne 64) {
-    throw "Hash esperado deve ter 64 hex chars; obtido: $($expected.extractor_signature_hash.Length)"
+if ($expected.extractor_signature_hash -ne 'e46b53b895974602af1f60ccf05a13524674be02b882f691e83b5fe53319e97f') {
+    throw "Vetor fixo de hash divergente: $($expected.extractor_signature_hash)"
+}
+if ($expected.extractor_signature_format -ne 'manifest-lf-v1') {
+    throw "Formato inesperado: $($expected.extractor_signature_format)"
 }
 
 $okResult = Test-GeneXusKbIntelligenceExtractorSignatureFromMetadata -Metadata @{
     extractor_signature_version = $expected.extractor_signature_version
     extractor_signature_hash    = $expected.extractor_signature_hash
+    extractor_signature_format  = $expected.extractor_signature_format
 }
 if (-not $okResult.ok) {
     throw "Assinatura esperada deveria passar: $($okResult.summary)"
@@ -39,9 +43,19 @@ if ($missingResult.reason -ne 'indice_sem_assinatura_extrator') {
 $versionResult = Test-GeneXusKbIntelligenceExtractorSignatureFromMetadata -Metadata @{
     extractor_signature_version = '0'
     extractor_signature_hash    = $expected.extractor_signature_hash
+    extractor_signature_format  = $expected.extractor_signature_format
 }
 if ($versionResult.ok -or $versionResult.reason -ne 'extrator_version_defasada') {
     throw 'Versao defasada deveria falhar com extrator_version_defasada'
+}
+
+$formatResult = Test-GeneXusKbIntelligenceExtractorSignatureFromMetadata -Metadata @{
+    extractor_signature_version = $expected.extractor_signature_version
+    extractor_signature_hash    = $expected.extractor_signature_hash
+    extractor_signature_format  = 'legacy-raw-file-v0'
+}
+if ($formatResult.ok -or $formatResult.reason -ne 'extrator_format_defasado') {
+    throw 'Formato defasado deveria falhar com extrator_format_defasado'
 }
 
 Write-Output 'KB_INTELLIGENCE_EXTRACTOR_SIGNATURE_SELFTEST_OK'

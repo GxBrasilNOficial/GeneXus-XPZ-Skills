@@ -1,5 +1,5 @@
 {
-  "description": "Paridade de gravabilidade materializada — wsEducacaoSpTeste (rebuild indice v4 antes de Test-KbIntelligenceQueries).",
+  "description": "Paridade de gravabilidade materializada — wsEducacaoSpTeste (rebuild indice schema v5 antes de Test-KbIntelligenceQueries).",
   "cases": [
     {
       "id": "wseducacao-transaction-writable-guia-ped-formula-attribute",

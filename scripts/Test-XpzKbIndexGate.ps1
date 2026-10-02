@@ -3,7 +3,7 @@
 .SYNOPSIS
   Motor compartilhado do gate de indice KbIntelligence (gate K9 da skill
   xpz-kb-parallel-pre-push): valida estrutura, frescor, inventario semantico e
-  assinatura do extrator do indice derivado de uma pasta paralela de KB.
+  assinatura do extrator e cobertura de gravabilidade do indice derivado de uma pasta paralela de KB.
 
 .DESCRIPTION
   Promovido a motor compartilhado (antes vivia inline no molde local), simetrico
@@ -18,8 +18,9 @@
     5. kb-source-metadata.md com last_xpz_materialization_run_at;
     6. frescor: last_index_build_run_at >= last_xpz_materialization_run_at;
     7. inventory_validation_status literalmente OK;
-    8. assinatura do extrator (version/hash na metadata do SQLite) contra o motor
-       atual via GeneXusKbIntelligenceExtractorContract.ps1.
+    8. assinatura do extrator (version/hash/format na metadata do SQLite) contra o motor
+       atual via GeneXusKbIntelligenceExtractorContract.ps1;
+    9. cobertura e contagem das occurrences de gravabilidade, separadas da validade tecnica.
 
   CONTRATO DE SAIDA:
     - Default (texto): retrocompativel -- emite as linhas de assinatura,
@@ -28,6 +29,7 @@
       Test-XpzSetupAudit e por agentes).
     - -AsJson: contrato estruturado -- objeto { status: OK|BLOCK, reason,
       extractor_signature_version, extractor_signature_hash,
+      extractor_signature_format, writabilityCoverage, writabilityCoverageWarning,
       inventory_validation_status, last_index_build_run_at,
       last_xpz_materialization_run_at }. NUNCA lanca sob -AsJson: bloqueio vira
       { status: BLOCK, reason } + exit 1. Consumido pelo orquestrador K9.
@@ -139,6 +141,29 @@ $inventoryStatusMatch = [regex]::Match($indexMetadataText, 'inventory_validation
 if (-not $inventoryStatusMatch.Success) { Fail-Gate 'index-metadata sem valor parseavel de inventory_validation_status' }
 if ($inventoryStatusMatch.Groups['value'].Value -ne 'OK') { Fail-Gate 'indice com inventario semantico invalido ou pendente' }
 
+# A cobertura descreve certeza da classificação automática; não autoriza assignments.
+$writabilityCoverageMatch = [regex]::Match($indexMetadataText, 'writability_coverage\s*[:=]\s*(?<value>\S+)')
+if (-not $writabilityCoverageMatch.Success) { Fail-Gate 'index-metadata sem writability_coverage; regenere o indice' }
+$writabilityCoverage = $writabilityCoverageMatch.Groups['value'].Value
+if ($writabilityCoverage -notin @('complete-in-model', 'partial', 'invalid')) {
+  Fail-Gate "writability_coverage invalida: $writabilityCoverage"
+}
+$expectedRowsMatch = [regex]::Match($indexMetadataText, 'writability_rows_expected\s*[:=]\s*(?<value>\d+)')
+$writtenRowsMatch = [regex]::Match($indexMetadataText, 'writability_rows_written\s*[:=]\s*(?<value>\d+)')
+$lostRowsMatch = [regex]::Match($indexMetadataText, 'writability_rows_lost\s*[:=]\s*(?<value>\d+)')
+if (-not $expectedRowsMatch.Success -or -not $writtenRowsMatch.Success -or -not $lostRowsMatch.Success) {
+  Fail-Gate 'metadata de contagem de occurrences de gravabilidade incompleta; regenere o indice'
+}
+if ([int]$expectedRowsMatch.Groups['value'].Value -ne [int]$writtenRowsMatch.Groups['value'].Value -or
+    [int]$lostRowsMatch.Groups['value'].Value -ne 0) {
+  Fail-Gate 'materializacao de gravabilidade perdeu occurrences; regenere o indice'
+}
+$writabilityCoverageWarning = if ($writabilityCoverage -eq 'complete-in-model') {
+  $null
+} else {
+  "Classificacao automatica com cobertura $writabilityCoverage; GATE_OK confirma validade tecnica do indice, nao gravabilidade nem autorizacao de assignment."
+}
+
 # 8. assinatura do extrator
 if (-not (Test-Path -LiteralPath $ExtractorContractPath -PathType Leaf)) { Fail-Gate "contrato de assinatura do extrator ausente: $ExtractorContractPath" }
 . $ExtractorContractPath
@@ -148,6 +173,9 @@ if (-not $extractorCheck.ok) { Fail-Gate $extractorCheck.summary }
 
 $out['extractor_signature_version'] = $extractorCheck.stored.extractor_signature_version
 $out['extractor_signature_hash'] = $extractorCheck.stored.extractor_signature_hash
+$out['extractor_signature_format'] = $extractorCheck.stored.extractor_signature_format
+$out['writabilityCoverage'] = $writabilityCoverage
+$out['writabilityCoverageWarning'] = $writabilityCoverageWarning
 $out['inventory_validation_status'] = 'OK'
 
 if ($AsJson) {
@@ -155,6 +183,9 @@ if ($AsJson) {
 } else {
   ('extractor_signature_version: {0}' -f $extractorCheck.stored.extractor_signature_version)
   ('extractor_signature_hash: {0}' -f $extractorCheck.stored.extractor_signature_hash)
+  ('extractor_signature_format: {0}' -f $extractorCheck.stored.extractor_signature_format)
+  ('writability_coverage: {0}' -f $writabilityCoverage)
+  if ($writabilityCoverageWarning) { ('writability_coverage_warning: {0}' -f $writabilityCoverageWarning) }
   'inventory_validation_status: OK'
   'GATE_OK'
 }

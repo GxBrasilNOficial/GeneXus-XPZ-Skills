@@ -164,7 +164,7 @@ O gate `Test-*KbIndexGate.ps1` (molde em `xpz-kb-parallel-setup/examples/Test-Kb
 
 ## Schema e versionamento
 
-O índice armazena `schema_version` na tabela `metadata`. O valor atual e `"5"` (inclui a tabela `transaction_attribute_writability` com `writability_rule_version`, a tabela `css_class` do catalogo de classes CSS, os marcadores de Pattern e `origin TEXT NOT NULL` na tabela `objects`). O motor atual usa `EXTRACTOR_SIGNATURE_VERSION="13"`.
+O índice armazena `schema_version` na tabela `metadata`. O valor atual e `"5"` (inclui a tabela `transaction_attribute_writability` com `writability_rule_version`, a tabela `css_class` do catalogo de classes CSS, os marcadores de Pattern e `origin TEXT NOT NULL` na tabela `objects`). O motor atual usa `EXTRACTOR_SIGNATURE_VERSION="16"`.
 
 O design e deliberado: o índice e artefato derivado e sempre regeneravel. Por isso não existe caminho de migracao de schema — qualquer mudanca estrutural no motor exige rebuild completo.
 
@@ -310,7 +310,7 @@ Para consulta leve de atributo, sem varrer XMLs em massa:
   -Format text
 ```
 
-Para listar atributos de uma Transaction com classificação **materializada** de gravabilidade (paridade com o gate; exige índice `schema_version>=2`):
+Para listar atributos de uma Transaction com classificação **automática materializada** de gravabilidade (paridade com o gate; exige índice compatível: `schema_version=5`, `writability_rule_version=3`, assinatura atual do extrator e contagens de ocorrências coerentes):
 
 ```powershell
 .\scripts\Query-KbIntelligenceIndex.ps1 `
@@ -320,13 +320,13 @@ Para listar atributos de uma Transaction com classificação **materializada** d
   -Format text
 ```
 
-As consultas `transaction-attributes` e `transaction-writable-attributes` leem a classificação **materializada** no build (`transaction_attribute_writability`), com paridade obrigatória contra `Test-GeneXusTransactionWritability.ps1` (`Test-GeneXusKbIntelligenceWritabilityParity.ps1`). Esse gate e `Test-GeneXusNewWritableTargets.ps1` são fachadas PowerShell que delegam ao nucleo canonico `GeneXusTransactionWritabilityCore.py` via `GeneXusTransactionWritabilitySupport.ps1`. Atributos `unclassified-*` (`writable=null`) exigem leitura adicional do XML antes de `New` ou atribuicoes. Para validar assignments dentro de blocos `New` em `Procedure`, use `Test-GeneXusNewWritableTargets.ps1`.
+As consultas `transaction-attributes` e `transaction-writable-attributes` leem somente a classificação **automática** materializada no build (`transaction_attribute_writability`); não aplicam manifestos nem decisões humanas. A paridade por identidade de ocorrência é exigida por `Test-GeneXusKbIntelligenceWritabilityParity.ps1`. `Test-GeneXusTransactionWritability.ps1` (9-TXW) e `Test-GeneXusNewWritableTargets.ps1` (9-PNW) são fachadas PowerShell sobre `GeneXusWritabilityOperational.py`, que preserva `GeneXusTransactionWritabilityCore.py` como dono da classificação automática. Com `-RequestPath`, a fachada publica a solicitação legível; `-DecisionPath` valida um manifesto local com ator, recibo, escopo, provas e predecessoras revalidados. Apenas decisão `applied` pode fornecer contexto efetivo, e só `effectiveWritable=true` autoriza a atribuição. `unclassified-*` e pendência inferencial exigem resolução ou bloqueiam a atribuição. Para analisar atribuições dentro de blocos `New` em `Procedure`, use 9-PNW; uma seleção humana de Table não altera a classificação automática.
 
 As consultas `attribute-info`, `transaction-attributes` e `transaction-writable-attributes` dependem do `source_root` gravado no `index-metadata` e leem no disco os XMLs apontados pelo índice. Se o snapshot materializado foi movido, apagado ou regenerado fora desse caminho, a consulta pode falhar com `Indexed XML file not found`; nesse caso, restaurar o snapshot no caminho esperado ou regenerar o índice a partir do `ObjetosDaKbEmXml` atual antes de repetir a consulta.
 
 ## Validar consultas de atributo e gravabilidade transacional
 
-Depois de gerar ou localizar um índice SQLite com `source_root` valido, snapshot materializado no caminho esperado e `schema_version>=2`, valide `attribute-info` (leve), `transaction-attributes` e `transaction-writable-attributes` (materializadas) com:
+Depois de gerar ou localizar um índice SQLite com `source_root` valido, snapshot materializado no caminho esperado e contrato compatível (`schema_version=5`, regra de gravabilidade `3`, assinatura atual e contagens de ocorrências coerentes), valide `attribute-info` (leve), `transaction-attributes` e `transaction-writable-attributes` (classificação automática materializada) com:
 
 ```powershell
 .\scripts\Test-KbIntelligenceQueries.ps1 `
@@ -336,9 +336,11 @@ Depois de gerar ou localizar um índice SQLite com `source_root` valido, snapsho
   -FailOnValidationFailure
 ```
 
-Esses casos conferem dispatch, inexistencia e leitura file-backed pontual. `attribute-info` não substitui gates de gravabilidade. `transaction-writable-attributes` reflete classificação materializada com paridade ao gate, mas blocos `New` em `Procedure` ainda exigem `Test-GeneXusNewWritableTargets.ps1` antes de empacotar.
+Esses casos conferem dispatch, inexistencia e leitura file-backed pontual. `attribute-info` não substitui gates de gravabilidade. `transaction-writable-attributes` reflete a classificação automática materializada com paridade ao gate; nem `GATE_OK` do índice nem a consulta autorizam atribuições. Blocos `New` em `Procedure` ainda exigem `Test-GeneXusNewWritableTargets.ps1` antes de empacotar, e uma decisão humana só vale quando o resultado efetivo mostra `decisionState=applied` e `effectiveCanAssignInNew=true`.
 
 Como esses casos validam consultas e trazem `query`, eles pertencem ao executor `Test-KbIntelligenceQueries.ps1`, não ao fluxo de regeneracao via `Build-KbIntelligenceIndex.ps1`.
+
+Uma decisão `resolve-inferred-relation` aplicada pode tornar contextual a classificação de um membro FK inferido: com a relação exata confirmada, busca completa e nenhum outro impedimento, `contextualAnalysis` retorna `extended-fk-key`/`writable=true`. A classificação automática continua `unclassified-relation-pending`/`null`; a consulta do índice não lê nem aplica essa decisão.
 
 ## Consultar quem usa um objeto
 

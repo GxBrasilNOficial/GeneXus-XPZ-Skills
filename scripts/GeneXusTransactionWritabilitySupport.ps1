@@ -41,6 +41,44 @@ function Invoke-GeneXusTransactionWritabilityCore {
     return $jsonText | ConvertFrom-Json
 }
 
+function Invoke-GeneXusWritabilityOperational {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$Arguments
+    )
+
+    $scriptDir = $PSScriptRoot
+    . (Join-Path $scriptDir 'GeneXusPythonPrerequisite.ps1')
+    $operationalPath = Join-Path $scriptDir 'GeneXusWritabilityOperational.py'
+    if (-not (Test-Path -LiteralPath $operationalPath -PathType Leaf)) {
+        throw "Motor operacional de gravabilidade nao encontrado: $operationalPath"
+    }
+
+    $python = Get-GeneXusPythonExecutable
+    if ($null -eq $python) {
+        throw (Get-GeneXusPythonPrerequisiteErrorMessage)
+    }
+
+    $output = @(& $python.Source -B $operationalPath @Arguments 2>&1)
+    if ($LASTEXITCODE -ne 0) {
+        $detail = (($output | ForEach-Object { $_.ToString() }) -join [Environment]::NewLine).Trim()
+        if ([string]::IsNullOrWhiteSpace($detail)) {
+            $detail = '(sem saida capturada do motor operacional Python)'
+        }
+        throw "GeneXusWritabilityOperational falhou (exit $LASTEXITCODE).`n$detail"
+    }
+
+    $jsonText = (($output | ForEach-Object { $_.ToString() }) -join [Environment]::NewLine).Trim()
+    if ([string]::IsNullOrWhiteSpace($jsonText)) {
+        throw 'GeneXusWritabilityOperational retornou JSON vazio.'
+    }
+    try {
+        return $jsonText | ConvertFrom-Json -Depth 100
+    } catch {
+        throw "GeneXusWritabilityOperational retornou JSON invalido: $($_.Exception.Message)"
+    }
+}
+
 function Invoke-GeneXusTransactionWritabilityClassify {
     param(
         [Parameter(Mandatory = $true)]

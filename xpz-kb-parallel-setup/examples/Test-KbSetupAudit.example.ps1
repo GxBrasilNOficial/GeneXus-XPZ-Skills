@@ -12,6 +12,10 @@ pasta paralela: `powershell/runtime`, `sync/materializacao`,
 `estado_operacional_sugerido`. A dimensao `naming/objetos-da-kb` delega ao
 wrapper local `Test-KbObjetosDaKbNaming.ps1` quando disponível.
 
+A saída também preserva `indice/gravabilidade.cobertura` e, quando aplicável,
+`indice/gravabilidade.aviso`. `GATE_OK` informa validade técnica do índice;
+cobertura `partial`/`invalid` limita conclusões de gravabilidade e não autoriza atribuições.
+
 Este wrapper não substitui os gates específicos. Ele apenas centraliza a
 execução deles para handoff e diagnostico curto em `modo_atualizacao`.
 

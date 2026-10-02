@@ -23,6 +23,11 @@ function Assert-True([bool]$Condition, [string]$Message) {
     if (-not $Condition) { throw "ASSERT: $Message" }
 }
 
+. (Join-Path $PSScriptRoot 'GeneXusKbIntelligenceExtractorContract.ps1')
+$expectedSignature = Get-GeneXusKbIntelligenceExpectedExtractorSignature
+Assert-True ($expectedSignature.extractor_signature_version -eq '16') `
+    "versao do extrator deve refletir o incremento planejado 15->16; obtido $($expectedSignature.extractor_signature_version)"
+
 function Get-BasedOnDomainRows([string]$SqlitePath) {
     $outJson = Join-Path ([System.IO.Path]::GetTempPath()) ('kb-idb-rows-{0}.json' -f ([guid]::NewGuid().ToString('N')))
     $pyPath = Join-Path ([System.IO.Path]::GetTempPath()) ('kb-idb-rows-{0}.py' -f ([guid]::NewGuid().ToString('N')))
@@ -599,7 +604,8 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 $metaVersion = & python -c "import sqlite3,sys; c=sqlite3.connect(sys.argv[1]); print(c.execute(""SELECT value FROM metadata WHERE key='extractor_signature_version'"").fetchone()[0])" $sqlitePath
-Assert-True ($metaVersion -eq '13') "extractor_signature_version esperado 13; obtido $metaVersion"
+Assert-True ($metaVersion -eq $expectedSignature.extractor_signature_version) `
+    "extractor_signature_version deve coincidir com o dono normativo $($expectedSignature.extractor_signature_version); obtido $metaVersion"
 
 function Invoke-IndexQuery {
     param([Parameter(Mandatory)][string[]]$QueryArgs)

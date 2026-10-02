@@ -43,8 +43,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable
 
-# Incrementar quando a cobertura ou regras do indexador mudarem de forma material (nao em refator inerte).
-EXTRACTOR_SIGNATURE_VERSION = "13"
+from GeneXusKbIntelligenceExtractorSignature import (
+    EXTRACTOR_SIGNATURE_FORMAT,
+    EXTRACTOR_SIGNATURE_VERSION,
+    compute_signature,
+)
+from GeneXusCanonicalJson import canonical_text
 
 # Origens do extrator generalizado idBasedOn -> Domain (relation_scope + Attribute; fora: Panel/Stencil/PackagedModule).
 IDBASEDON_DOMAIN_SOURCE_TYPES = (
@@ -63,8 +67,8 @@ IDBASEDON_DOMAIN_SOURCE_TYPES = (
 
 
 def compute_extractor_signature_hash() -> str:
-    script_path = Path(__file__).resolve()
-    return hashlib.sha256(script_path.read_bytes()).hexdigest()
+    repo_root = Path(__file__).resolve().parent.parent
+    return str(compute_signature(repo_root)["extractor_signature_hash"])
 
 
 SOURCE_RE = re.compile(r"<Source(?:\s[^>]*)?>(?P<body>.*?)</Source>", re.IGNORECASE | re.DOTALL)
@@ -2751,15 +2755,31 @@ def create_schema(conn: sqlite3.Connection) -> None:
 def resolve_transaction_object_id(
     object_ids: dict[tuple[str, str], int],
     transaction_objects: dict[str, ObjectInfo],
+    transaction_guid: str | None,
     transaction_name: str,
-) -> int | None:
-    direct = object_ids.get(("Transaction", transaction_name))
-    if direct is not None:
-        return direct
-    for obj in transaction_objects.values():
-        if obj.name.lower() == transaction_name.lower():
-            return object_ids.get(("Transaction", obj.name))
-    return None
+    transaction_path: str | None,
+) -> tuple[int | None, str]:
+    normalized_path = transaction_path.replace("\\", "/").casefold() if transaction_path else None
+    if transaction_guid:
+        guid_key = transaction_guid.strip().strip("{}").casefold()
+        matches = [obj for obj in transaction_objects.values()
+                   if obj.guid and obj.guid.strip().strip("{}").casefold() == guid_key]
+        if len(matches) != 1:
+            return None, "transaction-guid-not-unique-in-index"
+        obj = matches[0]
+        if obj.name.casefold() != transaction_name.casefold():
+            return None, "transaction-guid-name-conflict"
+        if normalized_path and obj.rel_path.replace("\\", "/").casefold() != normalized_path:
+            return None, "transaction-guid-path-conflict"
+        return object_ids.get(("Transaction", obj.name)), "guid"
+
+    name_matches = [obj for obj in transaction_objects.values() if obj.name.casefold() == transaction_name.casefold()]
+    if len(name_matches) != 1:
+        return None, "transaction-reduced-name-not-unique"
+    obj = name_matches[0]
+    if normalized_path and obj.rel_path.replace("\\", "/").casefold() != normalized_path:
+        return None, "transaction-reduced-name-path-conflict"
+    return object_ids.get(("Transaction", obj.name)), "reduced-identity"
 
 
 def insert_corpus_writability(
@@ -2767,18 +2787,33 @@ def insert_corpus_writability(
     source_root: Path,
     object_ids: dict[tuple[str, str], int],
     transaction_objects: dict[str, ObjectInfo],
-) -> int:
+) -> dict[str, object]:
     transaction_type_guid = get_transaction_type_guid(GX_TYPE_CATALOG_BY_NAME)
     writability_rows = build_corpus_writability(source_root, transaction_type_guid)
     inserted = 0
+    losses: dict[str, int] = {}
+    status_counts = {"complete-in-model": 0, "partial": 0, "invalid": 0}
+    reason_counts: dict[str, int] = {}
+    transaction_rows: dict[str, list[object]] = {}
     for row in writability_rows:
-        transaction_object_id = resolve_transaction_object_id(
+        if row.coverage in status_counts:
+            status_counts[row.coverage] += 1
+        else:
+            status_counts["partial"] += 1
+        for reason_code in row.reason_codes:
+            reason_counts[reason_code] = reason_counts.get(reason_code, 0) + 1
+        tx_identity = row.identity.get("transaction", {}) if isinstance(row.identity, dict) else {}
+        transaction_object_id, resolution = resolve_transaction_object_id(
             object_ids,
             transaction_objects,
+            row.transaction_guid,
             row.transaction_name,
+            str(tx_identity.get("path")) if isinstance(tx_identity, dict) and tx_identity.get("path") else None,
         )
         if transaction_object_id is None:
+            losses[resolution] = losses.get(resolution, 0) + 1
             continue
+        transaction_rows.setdefault(str(transaction_object_id), []).append(row)
         writable_value: int | None
         if row.writable is None:
             writable_value = None
@@ -2818,12 +2853,29 @@ def insert_corpus_writability(
                 writable_value,
                 can_assign_value,
                 row.reason,
-                row.evidence,
+                canonical_text(row.evidence_envelope()),
                 WRITABILITY_RULE_VERSION,
             ),
         )
         inserted += 1
-    return inserted
+    coverage_rank = {"complete-in-model": 0, "partial": 1, "invalid": 2}
+    worst_coverage = max((row.coverage for row in writability_rows),
+                         key=lambda state: coverage_rank.get(state, 1), default="complete-in-model")
+    return {
+        "expected": len(writability_rows),
+        "persisted": inserted,
+        "lost": len(writability_rows) - inserted,
+        "losses": dict(sorted(losses.items())),
+        "coverage": worst_coverage,
+        "statusCounts": status_counts,
+        "reasonCounts": dict(sorted(reason_counts.items())),
+        "transactionCount": len(transaction_rows),
+        "transactionCoverage": {
+            key: max((row.coverage for row in rows), key=lambda state: coverage_rank.get(state, 1),
+                     default="complete-in-model")
+            for key, rows in transaction_rows.items()
+        },
+    }
 
 
 def write_index(
@@ -2855,6 +2907,7 @@ def write_index(
                 ("writability_rule_version", WRITABILITY_RULE_VERSION),
                 ("extractor_signature_version", EXTRACTOR_SIGNATURE_VERSION),
                 ("extractor_signature_hash", extractor_signature_hash),
+                ("extractor_signature_format", EXTRACTOR_SIGNATURE_FORMAT),
                 ("scope", ",".join(sorted(set(obj.object_type for obj in objects)))),
                 ("inventory_catalog_version", str(inventory_semantics["catalog_version"])),
                 ("inventory_validation_status", str(inventory_semantics["status"])),
@@ -2927,15 +2980,29 @@ def write_index(
         transaction_objects = {
             obj.name: obj for obj in objects if obj.object_type == "Transaction"
         }
-        writability_written = insert_corpus_writability(
+        writability_summary = insert_corpus_writability(
             conn,
             source_root.resolve(),
             object_ids,
             transaction_objects,
         )
-        conn.execute(
+        conn.executemany(
             "INSERT INTO metadata(key, value) VALUES (?, ?)",
-            ("writability_rows_written", str(writability_written)),
+            [
+                ("writability_rows_expected", str(writability_summary["expected"])),
+                ("writability_rows_written", str(writability_summary["persisted"])),
+                ("writability_rows_lost", str(writability_summary["lost"])),
+                ("writability_identity_losses", json.dumps(writability_summary["losses"],
+                                                             ensure_ascii=False, sort_keys=True,
+                                                             separators=(",", ":"))),
+                ("writability_coverage", str(writability_summary["coverage"])),
+                ("writability_status_counts", json.dumps(writability_summary["statusCounts"],
+                                                           ensure_ascii=False, sort_keys=True,
+                                                           separators=(",", ":"))),
+                ("writability_reason_counts", json.dumps(writability_summary["reasonCounts"],
+                                                           ensure_ascii=False, sort_keys=True,
+                                                           separators=(",", ":"))),
+            ],
         )
 
         css_classes_written = 0

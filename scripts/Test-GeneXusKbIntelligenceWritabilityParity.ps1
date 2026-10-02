@@ -44,6 +44,40 @@ if ($MaxTransactions -gt 0) {
 $failures = [System.Collections.Generic.List[string]]::new()
 $checked = 0
 
+function Get-OccurrenceKey {
+    param([Parameter(Mandatory = $true)]$Row)
+
+    $identity = $Row.identity
+    if ($null -eq $identity -or $null -eq $identity.transaction -or
+        $null -eq $identity.level -or $null -eq $identity.attribute -or
+        $null -eq $identity.level.pathOrdinals) {
+        throw 'Ocorrência sem identidade completa no resultado de gravabilidade.'
+    }
+    $keyObject = [ordered]@{
+        transaction = [ordered]@{
+            type = [string]$identity.transaction.type
+            guid = $identity.transaction.guid
+            name = [string]$identity.transaction.name
+            path = [string]$identity.transaction.path
+            rootKind = $identity.transaction.rootKind
+        }
+        partType = [string]$identity.partType
+        level = [ordered]@{
+            guid = $identity.level.guid
+            pathOrdinals = @($identity.level.pathOrdinals)
+        }
+        attribute = [ordered]@{
+            type = [string]$identity.attribute.type
+            guid = $identity.attribute.guid
+            name = [string]$identity.attribute.name
+            path = [string]$identity.attribute.path
+            rootKind = $identity.attribute.rootKind
+        }
+    }
+    $json = ConvertTo-Json -InputObject $keyObject -Depth 8 -Compress
+    return [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($json))
+}
+
 foreach ($txFile in $txFiles) {
     $gateJson = & $writabilityScript -TransactionPath $txFile.FullName -CorpusFolder $corpusFolder -AsJson | ConvertFrom-Json
     if ($gateJson.status -ne 'pass') {
@@ -71,17 +105,38 @@ foreach ($txFile in $txFiles) {
         continue
     }
 
-    $indexMap = @{}
+    $indexMap = [System.Collections.Generic.Dictionary[string, object]]::new(
+        [System.StringComparer]::Ordinal
+    )
     foreach ($row in @($indexJson.results)) {
-        $key = ("{0}`0{1}" -f $row.levelName, $row.attribute)
-        $indexMap[$key] = $row
+        try {
+            $key = Get-OccurrenceKey -Row $row
+        } catch {
+            $failures.Add("Indice sem identidade completa para ${txName}: $($_.Exception.Message)")
+            continue
+        }
+        if ($indexMap.ContainsKey($key)) {
+            $failures.Add("Indice duplicou a identidade de ocorrência em $txName")
+            continue
+        }
+        $indexMap.Add($key, $row)
     }
 
+    $gateKeys = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
     foreach ($gateRow in @($gateJson.levelAttributes)) {
         $checked++
-        $key = ("{0}`0{1}" -f $gateRow.levelName, $gateRow.attributeName)
+        try {
+            $key = Get-OccurrenceKey -Row $gateRow
+        } catch {
+            $failures.Add("Gate sem identidade completa para ${txName}: $($_.Exception.Message)")
+            continue
+        }
+        if (-not $gateKeys.Add($key)) {
+            $failures.Add("Gate duplicou a identidade de ocorrência em $txName")
+            continue
+        }
         if (-not $indexMap.ContainsKey($key)) {
-            $failures.Add("Indice sem linha para $txName :: $key")
+            $failures.Add("Indice sem ocorrência correspondente para $txName :: $($gateRow.attributeName)")
             continue
         }
         $indexRow = $indexMap[$key]
@@ -103,6 +158,28 @@ foreach ($txFile in $txFiles) {
                 "writable divergente em $txName [$($gateRow.attributeName)]: gate=$gateWritable index=$indexWritable"
             )
         }
+        $gateCanAssign = $gateRow.canAssignInNew
+        $indexCanAssign = $indexRow.canAssignInNew
+        if (($null -eq $gateCanAssign) -ne ($null -eq $indexCanAssign) -or
+            ($null -ne $gateCanAssign -and [bool]$gateCanAssign -ne [bool]$indexCanAssign)) {
+            $failures.Add(
+                "canAssignInNew divergente em $txName [$($gateRow.attributeName)]: gate=$gateCanAssign index=$indexCanAssign"
+            )
+        }
+        if ([string]$gateRow.coverage -ne [string]$indexRow.coverage) {
+            $failures.Add("coverage divergente em $txName [$($gateRow.attributeName)]")
+        }
+        if ([string]$gateJson.writabilityRuleVersion -ne [string]$indexRow.writabilityRuleVersion) {
+            $failures.Add("writabilityRuleVersion divergente em $txName [$($gateRow.attributeName)]")
+        }
+        $gateReasons = ConvertTo-Json -InputObject @($gateRow.reasonCodes) -Depth 4 -Compress
+        $indexReasons = ConvertTo-Json -InputObject @($indexRow.reasonCodes) -Depth 4 -Compress
+        if ($gateReasons -cne $indexReasons) {
+            $failures.Add("reasonCodes divergentes em $txName [$($gateRow.attributeName)]")
+        }
+    }
+    if ($gateKeys.Count -ne $indexMap.Count) {
+        $failures.Add("Contagem de ocorrências divergente em ${txName}: gate=$($gateKeys.Count) indice=$($indexMap.Count)")
     }
 }
 

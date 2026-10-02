@@ -1,0 +1,184 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://genexus-xpz-skills.local/schemas/gx-writability-decision-manifest.schema.json",
+  "title": "GeneXus writability front decisions",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kind", "schemaVersion", "frontId", "corpusRoot", "deltaRoot", "ruleVersion", "decisions"],
+  "properties": {
+    "kind": {"const": "gx-writability-front-decisions"},
+    "schemaVersion": {"const": 1},
+    "frontId": {"type": "string", "minLength": 1},
+    "corpusRoot": {"type": "string", "minLength": 1},
+    "deltaRoot": {"type": ["string", "null"]},
+    "ruleVersion": {"type": "string", "minLength": 1},
+    "decisions": {"type": "array", "items": {"$ref": "#/$defs/decision"}}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "relativePath": {"type": "string", "minLength": 1, "not": {"pattern": "(^/|^[A-Za-z]:|(^|/)\\.\\.(/|$)|\\\\)"}},
+    "objectRef": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "guid", "name", "path", "rootKind"],
+      "properties": {
+        "type": {"type": "string", "enum": ["Transaction", "Attribute", "Table", "Procedure"]},
+        "guid": {"type": ["string", "null"], "format": "uuid"},
+        "name": {"type": "string", "minLength": 1},
+        "path": {"$ref": "#/$defs/relativePath"},
+        "rootKind": {"type": "string", "enum": ["corpus", "delta"]}
+      }
+    },
+    "levelRef": {
+      "type": "object", "additionalProperties": false,
+      "required": ["guid", "pathOrdinals"],
+      "properties": {
+        "guid": {"type": ["string", "null"], "format": "uuid"},
+        "pathOrdinals": {"type": "array", "items": {"type": "integer", "minimum": 0}}
+      }
+    },
+    "occurrenceRef": {
+      "type": "object", "additionalProperties": false,
+      "required": ["transaction", "partType", "level", "attribute"],
+      "properties": {
+        "transaction": {"$ref": "#/$defs/objectRef"},
+        "partType": {"type": "string", "minLength": 1},
+        "level": {"$ref": "#/$defs/levelRef"},
+        "attribute": {"$ref": "#/$defs/objectRef"}
+      }
+    },
+    "assignmentRef": {
+      "type": "object", "additionalProperties": false,
+      "required": ["object", "partType", "sourceSha256", "start", "end", "snippetSha256", "attribute", "operation"],
+      "properties": {
+        "object": {"$ref": "#/$defs/objectRef"},
+        "partType": {"type": "string", "minLength": 1},
+        "sourceSha256": {"$ref": "#/$defs/sha256"},
+        "start": {"type": "integer", "minimum": 0},
+        "end": {"type": "integer", "minimum": 1},
+        "snippetSha256": {"$ref": "#/$defs/sha256"},
+        "attribute": {"$ref": "#/$defs/objectRef"},
+        "operation": {"type": "string", "enum": ["new-assign", "rule-assign", "event-assign"]},
+        "blockStart": {"type": "integer", "minimum": 0},
+        "blockEnd": {"type": "integer", "minimum": 1},
+        "blockSha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "newBlockRef": {
+      "type": "object", "additionalProperties": false,
+      "required": ["object", "partType", "sourceSha256", "start", "end", "snippetSha256"],
+      "properties": {
+        "object": {"$ref": "#/$defs/objectRef"},
+        "partType": {"type": "string", "minLength": 1},
+        "sourceSha256": {"$ref": "#/$defs/sha256"},
+        "start": {"type": "integer", "minimum": 0},
+        "end": {"type": "integer", "minimum": 1},
+        "snippetSha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "viewRef": {
+      "type": "object", "additionalProperties": false,
+      "required": ["transaction", "partType", "level"],
+      "properties": {
+        "transaction": {"$ref": "#/$defs/objectRef"},
+        "partType": {"type": "string", "minLength": 1},
+        "level": {"$ref": "#/$defs/levelRef"}
+      }
+    },
+    "assignmentTarget": {
+      "type": "object", "additionalProperties": false,
+      "required": ["assignment", "occurrence"],
+      "properties": {
+        "assignment": {"$ref": "#/$defs/assignmentRef"},
+        "occurrence": {"$ref": "#/$defs/occurrenceRef"}
+      }
+    },
+    "newTargetRef": {
+      "type": "object", "additionalProperties": false,
+      "required": ["block", "table", "views", "assignmentTargets"],
+      "properties": {
+        "block": {"$ref": "#/$defs/newBlockRef"},
+        "table": {"$ref": "#/$defs/objectRef"},
+        "views": {"type": "array", "items": {"$ref": "#/$defs/viewRef"}, "uniqueItems": true},
+        "assignmentTargets": {"type": "array", "items": {"$ref": "#/$defs/assignmentTarget"}, "uniqueItems": true}
+      }
+    },
+    "tableBinding": {
+      "type": "object", "additionalProperties": false,
+      "required": ["transaction", "partType", "level", "table", "views"],
+      "properties": {
+        "transaction": {"$ref": "#/$defs/objectRef"},
+        "partType": {"type": "string", "minLength": 1},
+        "level": {"$ref": "#/$defs/levelRef"},
+        "table": {"$ref": "#/$defs/objectRef"},
+        "views": {"type": "array", "items": {"$ref": "#/$defs/viewRef"}, "uniqueItems": true}
+      }
+    },
+    "relationRef": {
+      "type": "object", "additionalProperties": false,
+      "required": ["sourceTable", "sourceView", "targetTable", "targetView", "indexIdentity", "mapping"],
+      "properties": {
+        "sourceTable": {"$ref": "#/$defs/objectRef"},
+        "sourceView": {"$ref": "#/$defs/viewRef"},
+        "targetTable": {"$ref": "#/$defs/objectRef"},
+        "targetView": {"$ref": "#/$defs/viewRef"},
+        "indexIdentity": {"type": "string", "minLength": 1},
+        "mapping": {"type": "array", "items": {"type": "object", "additionalProperties": false,
+          "required": ["sourceAttribute", "targetAttribute"], "properties": {
+            "sourceAttribute": {"$ref": "#/$defs/objectRef"}, "targetAttribute": {"$ref": "#/$defs/objectRef"}
+          }}}
+      }
+    },
+    "evidenceReference": {
+      "type": "object", "additionalProperties": false,
+      "required": ["rootKind", "path", "objectRef", "reasonCode"],
+      "properties": {
+        "rootKind": {"type": "string", "enum": ["corpus", "delta"]},
+        "path": {"$ref": "#/$defs/relativePath"},
+        "objectRef": {"$ref": "#/$defs/objectRef"},
+        "reasonCode": {"type": "string", "minLength": 1}
+      }
+    },
+    "proofFile": {
+      "type": "object", "additionalProperties": false,
+      "required": ["rootKind", "path", "sha256"],
+      "properties": {
+        "rootKind": {"type": "string", "enum": ["corpus", "delta"]},
+        "path": {"$ref": "#/$defs/relativePath"},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "scope": {
+      "type": "object", "additionalProperties": false,
+      "required": ["targets", "assignments", "tableBindings", "relations", "newTargets"],
+      "properties": {
+        "targets": {"type": "array", "items": {"$ref": "#/$defs/occurrenceRef"}, "uniqueItems": true},
+        "assignments": {"type": "array", "items": {"$ref": "#/$defs/assignmentRef"}, "uniqueItems": true},
+        "tableBindings": {"type": "array", "items": {"$ref": "#/$defs/tableBinding"}, "uniqueItems": true},
+        "relations": {"type": "array", "items": {"$ref": "#/$defs/relationRef"}, "uniqueItems": true},
+        "newTargets": {"type": "array", "items": {"$ref": "#/$defs/newTargetRef"}, "uniqueItems": true}
+      }
+    },
+    "decision": {
+      "type": "object", "additionalProperties": false,
+      "required": ["decisionId", "type", "actor", "approvedAt", "approvalReceipt", "justification",
+        "evidenceReferences", "reasonCodes", "dependsOnDecisionIds", "scope", "inventoryDigest", "proofFiles", "proofDigest", "deltaDigest"],
+      "properties": {
+        "decisionId": {"type": "string", "minLength": 1},
+        "type": {"type": "string", "enum": ["bind-table-group", "select-new-target", "resolve-inferred-relation", "reject-inferred-relation", "affirm-writable-target"]},
+        "actor": {"type": "string", "minLength": 1},
+        "approvedAt": {"type": "string", "format": "date-time", "minLength": 1},
+        "approvalReceipt": {"type": "object", "additionalProperties": false, "required": ["reference", "text"],
+          "properties": {"reference": {"type": "string", "minLength": 1}, "text": {"type": "string", "minLength": 1}}},
+        "justification": {"type": "string", "minLength": 1},
+        "evidenceReferences": {"type": "array", "items": {"$ref": "#/$defs/evidenceReference"}, "uniqueItems": true},
+        "reasonCodes": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+        "dependsOnDecisionIds": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+        "scope": {"$ref": "#/$defs/scope"},
+        "inventoryDigest": {"$ref": "#/$defs/sha256"},
+        "proofFiles": {"type": "array", "items": {"$ref": "#/$defs/proofFile"}, "uniqueItems": true},
+        "proofDigest": {"$ref": "#/$defs/sha256"},
+        "deltaDigest": {"$ref": "#/$defs/sha256"}
+      }
+    }
+  }
+}

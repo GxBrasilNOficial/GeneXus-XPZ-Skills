@@ -1,51 +1,50 @@
 #requires -Version 7.4
 <#
 .SYNOPSIS
-    Contrato de assinatura do extrator KbIntelligence (motor compartilhado).
-
-.DESCRIPTION
-    Fonte canônica da versão: EXTRACTOR_SIGNATURE_VERSION em Build-KbIntelligenceIndex.py.
-    Hash: SHA-256 dos bytes de Build-KbIntelligenceIndex.py no repositório ativo.
-    Índices sem extractor_signature_* na metadata são tratados como gerados por motor antigo.
+    Contrato de assinatura do extrator KbIntelligence, calculado pelo dono Python.
 #>
 
 Set-StrictMode -Version Latest
 
-function Get-GeneXusKbIntelligenceExtractorScriptPath {
-    return (Join-Path $PSScriptRoot 'Build-KbIntelligenceIndex.py')
-}
-
-function Get-GeneXusKbIntelligenceExtractorSignatureVersionFromSource {
-    $scriptPath = Get-GeneXusKbIntelligenceExtractorScriptPath
-    if (-not (Test-Path -LiteralPath $scriptPath -PathType Leaf)) {
-        throw "Build-KbIntelligenceIndex.py nao encontrado: $scriptPath"
-    }
-
-    $content = [System.IO.File]::ReadAllText($scriptPath)
-    $match = [regex]::Match(
-        $content,
-        'EXTRACTOR_SIGNATURE_VERSION\s*=\s*"(?<version>[^"]+)"'
-    )
-    if (-not $match.Success) {
-        throw 'EXTRACTOR_SIGNATURE_VERSION ausente em Build-KbIntelligenceIndex.py'
-    }
-
-    return $match.Groups['version'].Value
-}
-
 function Get-GeneXusKbIntelligenceExpectedExtractorSignature {
-    $scriptPath = Get-GeneXusKbIntelligenceExtractorScriptPath
-    if (-not (Test-Path -LiteralPath $scriptPath -PathType Leaf)) {
-        throw "Build-KbIntelligenceIndex.py nao encontrado: $scriptPath"
+    $scriptDir = $PSScriptRoot
+    . (Join-Path $scriptDir 'GeneXusPythonPrerequisite.ps1')
+    $signaturePath = Join-Path $scriptDir 'GeneXusKbIntelligenceExtractorSignature.py'
+    if (-not (Test-Path -LiteralPath $signaturePath -PathType Leaf)) {
+        throw "GeneXusKbIntelligenceExtractorSignature.py nao encontrado: $signaturePath"
+    }
+    $repoRoot = Split-Path -Parent $scriptDir
+    $python = Get-GeneXusPythonExecutable
+    if ($null -eq $python) {
+        throw (Get-GeneXusPythonPrerequisiteErrorMessage)
     }
 
-    $bytes = [System.IO.File]::ReadAllBytes($scriptPath)
-    $hash = [System.Security.Cryptography.SHA256]::Create().ComputeHash($bytes)
-    $hex = -join ($hash | ForEach-Object { $_.ToString('x2') })
-
+    $output = @(& $python.Source -B $signaturePath '--repo-root' $repoRoot 2>&1)
+    if ($LASTEXITCODE -ne 0) {
+        $detail = (($output | ForEach-Object { $_.ToString() }) -join [Environment]::NewLine).Trim()
+        if ([string]::IsNullOrWhiteSpace($detail)) { $detail = '(sem saida capturada do calculador Python)' }
+        throw "Nao foi possivel calcular a assinatura canonica do extrator (exit $LASTEXITCODE).`n$detail"
+    }
+    $jsonText = (($output | ForEach-Object { $_.ToString() }) -join [Environment]::NewLine).Trim()
+    try {
+        $payload = $jsonText | ConvertFrom-Json -AsHashtable
+    } catch {
+        throw "Calculador Python retornou JSON invalido: $($_.Exception.Message)"
+    }
+    $invalidPayload = $payload -isnot [System.Collections.IDictionary]
+    if (-not $invalidPayload) {
+        $invalidPayload = [string]::IsNullOrWhiteSpace([string]$payload.extractor_signature_version)
+        if (-not $invalidPayload) { $invalidPayload = [string]::IsNullOrWhiteSpace([string]$payload.extractor_signature_hash) }
+        if (-not $invalidPayload) { $invalidPayload = [string]$payload.extractor_signature_hash -notmatch '^[0-9a-f]{64}$' }
+        if (-not $invalidPayload) { $invalidPayload = [string]$payload.extractor_signature_format -ne 'manifest-lf-v1' }
+    }
+    if ($invalidPayload) {
+        throw 'Calculador Python retornou contrato de assinatura incompleto ou invalido.'
+    }
     return [ordered]@{
-        extractor_signature_version = (Get-GeneXusKbIntelligenceExtractorSignatureVersionFromSource)
-        extractor_signature_hash    = $hex
+        extractor_signature_version = [string]$payload.extractor_signature_version
+        extractor_signature_hash    = [string]$payload.extractor_signature_hash
+        extractor_signature_format  = [string]$payload.extractor_signature_format
     }
 }
 
@@ -58,55 +57,62 @@ function Test-GeneXusKbIntelligenceExtractorSignatureFromMetadata {
     $expected = Get-GeneXusKbIntelligenceExpectedExtractorSignature
     $storedVersion = $Metadata['extractor_signature_version']
     $storedHash = $Metadata['extractor_signature_hash']
-
-    if ([string]::IsNullOrWhiteSpace($storedVersion) -or [string]::IsNullOrWhiteSpace($storedHash)) {
+    $storedFormat = $Metadata['extractor_signature_format']
+    $missingSignature = [string]::IsNullOrWhiteSpace($storedVersion)
+    if (-not $missingSignature) { $missingSignature = [string]::IsNullOrWhiteSpace($storedHash) }
+    if (-not $missingSignature) { $missingSignature = [string]::IsNullOrWhiteSpace($storedFormat) }
+    if ($missingSignature) {
         return [ordered]@{
-            ok      = $false
-            reason  = 'indice_sem_assinatura_extrator'
-            summary = 'Indice gerado por motor antigo (metadata sem extractor_signature_version/hash) — regenerar com Build-KbIntelligenceIndex.py atual.'
+            ok = $false
+            reason = 'indice_sem_assinatura_extrator'
+            summary = 'Indice legado sem versao/hash/formato da assinatura do extrator — regenerar.'
             expected = $expected
-            stored   = [ordered]@{
-                extractor_signature_version = $storedVersion
-                extractor_signature_hash    = $storedHash
-            }
+            stored = [ordered]@{ extractor_signature_version = $storedVersion
+                                 extractor_signature_hash = $storedHash
+                                 extractor_signature_format = $storedFormat }
         }
     }
-
     if ($storedVersion -ne $expected.extractor_signature_version) {
         return [ordered]@{
-            ok      = $false
-            reason  = 'extrator_version_defasada'
-            summary = ('Assinatura do extrator defasada (versao indexada {0}, motor atual {1}) — regenerar indice.' -f $storedVersion, $expected.extractor_signature_version)
+            ok = $false
+            reason = 'extrator_version_defasada'
+            summary = ('Versao do extrator indexada {0}, atual {1} — regenerar indice.' -f $storedVersion, $expected.extractor_signature_version)
             expected = $expected
-            stored   = [ordered]@{
-                extractor_signature_version = $storedVersion
-                extractor_signature_hash    = $storedHash
-            }
+            stored = [ordered]@{ extractor_signature_version = $storedVersion
+                                 extractor_signature_hash = $storedHash
+                                 extractor_signature_format = $storedFormat }
         }
     }
-
+    if ($storedFormat -ne $expected.extractor_signature_format) {
+        return [ordered]@{
+            ok = $false
+            reason = 'extrator_format_defasado'
+            summary = 'Formato da assinatura do extrator incompatível — regenerar índice.'
+            expected = $expected
+            stored = [ordered]@{ extractor_signature_version = $storedVersion
+                                 extractor_signature_hash = $storedHash
+                                 extractor_signature_format = $storedFormat }
+        }
+    }
     if ($storedHash -ne $expected.extractor_signature_hash) {
         return [ordered]@{
-            ok      = $false
-            reason  = 'extrator_hash_defasado'
-            summary = 'Indice gerado por build do extrator diferente do motor compartilhado atual — regenerar indice.'
+            ok = $false
+            reason = 'extrator_hash_defasado'
+            summary = 'Assinatura do extrator difere dos arquivos automáticos atuais — regenerar índice.'
             expected = $expected
-            stored   = [ordered]@{
-                extractor_signature_version = $storedVersion
-                extractor_signature_hash    = $storedHash
-            }
+            stored = [ordered]@{ extractor_signature_version = $storedVersion
+                                 extractor_signature_hash = $storedHash
+                                 extractor_signature_format = $storedFormat }
         }
     }
-
     return [ordered]@{
-        ok      = $true
-        reason  = $null
+        ok = $true
+        reason = $null
         summary = $null
         expected = $expected
-        stored   = [ordered]@{
-            extractor_signature_version = $storedVersion
-            extractor_signature_hash    = $storedHash
-        }
+        stored = [ordered]@{ extractor_signature_version = $storedVersion
+                             extractor_signature_hash = $storedHash
+                             extractor_signature_format = $storedFormat }
     }
 }
 
@@ -122,6 +128,5 @@ function Get-GeneXusKbIntelligenceExtractorSignatureFromIndexMetadataText {
             $metadata[$Matches.key] = $Matches.value.Trim()
         }
     }
-
     return $metadata
 }
