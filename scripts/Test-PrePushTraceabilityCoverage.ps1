@@ -94,6 +94,26 @@ function Get-GitFileTextAtRef {
     return $result.Text
 }
 
+function Get-ExtractorSignatureVersionFromSources {
+    param(
+        [AllowNull()]
+        [string]$PrimarySource,
+
+        [AllowNull()]
+        [string]$FallbackSource
+    )
+
+    foreach ($source in @($PrimarySource, $FallbackSource)) {
+        if ([string]::IsNullOrWhiteSpace($source)) { continue }
+        $versionMatch = [regex]::Match($source, 'EXTRACTOR_SIGNATURE_VERSION\s*=\s*"(?<version>[^"]+)"')
+        if ($versionMatch.Success) {
+            return $versionMatch.Groups['version'].Value
+        }
+    }
+
+    return $null
+}
+
 $resolvedRoot = (Resolve-Path -LiteralPath $RootPath).Path
 $normalizedChangedFiles = @($ChangedFiles | ForEach-Object { Normalize-RepoPath -Path $_ } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Sort-Object -Unique)
 if ($normalizedChangedFiles.Count -eq 0) {
@@ -231,36 +251,39 @@ $queryPyPath = Join-Path $resolvedRoot 'scripts/Query-KbIntelligenceIndex.py'
 $buildPs1Path = Join-Path $resolvedRoot 'scripts/Build-KbIntelligenceIndex.ps1'
 $queryPs1Path = Join-Path $resolvedRoot 'scripts/Query-KbIntelligenceIndex.ps1'
 $buildPyRelativePath = 'scripts/Build-KbIntelligenceIndex.py'
-if ($normalizedChangedFiles -contains $buildPyRelativePath) {
+$signaturePyRelativePath = 'scripts/GeneXusKbIntelligenceExtractorSignature.py'
+if ($normalizedChangedFiles -contains $buildPyRelativePath -or $normalizedChangedFiles -contains $signaturePyRelativePath) {
     $buildPyPath = Join-Path $resolvedRoot $buildPyRelativePath
     if (Test-Path -LiteralPath $buildPyPath -PathType Leaf) {
         $buildPyCurrentText = [System.IO.File]::ReadAllText($buildPyPath)
-        $buildPyBaseText = Get-GitFileTextAtRef -RepositoryRoot $resolvedRoot -Ref $BaseRef -Path $buildPyRelativePath
-        $currentVersionMatch = [regex]::Match($buildPyCurrentText, 'EXTRACTOR_SIGNATURE_VERSION\s*=\s*"(?<version>[^"]+)"')
-        $baseVersionMatch = if ($null -ne $buildPyBaseText) {
-            [regex]::Match($buildPyBaseText, 'EXTRACTOR_SIGNATURE_VERSION\s*=\s*"(?<version>[^"]+)"')
+        $signaturePyPath = Join-Path $resolvedRoot $signaturePyRelativePath
+        $signaturePyCurrentText = if (Test-Path -LiteralPath $signaturePyPath -PathType Leaf) {
+            [System.IO.File]::ReadAllText($signaturePyPath)
         } else {
-            [System.Text.RegularExpressions.Match]::Empty
+            $null
         }
+        $buildPyBaseText = Get-GitFileTextAtRef -RepositoryRoot $resolvedRoot -Ref $BaseRef -Path $buildPyRelativePath
+        $signaturePyBaseText = Get-GitFileTextAtRef -RepositoryRoot $resolvedRoot -Ref $BaseRef -Path $signaturePyRelativePath
+        $currentExtractorVersion = Get-ExtractorSignatureVersionFromSources -PrimarySource $signaturePyCurrentText -FallbackSource $buildPyCurrentText
+        $baseExtractorVersion = Get-ExtractorSignatureVersionFromSources -PrimarySource $signaturePyBaseText -FallbackSource $buildPyBaseText
 
-        if ($currentVersionMatch.Success -and $baseVersionMatch.Success) {
-            $currentExtractorVersion = $currentVersionMatch.Groups['version'].Value
-            $baseExtractorVersion = $baseVersionMatch.Groups['version'].Value
-            if ($currentExtractorVersion -ne $baseExtractorVersion) {
-                $staleExtractorPattern = [regex]::new(
-                    ('(?i)\b(?:extrator|extractor)(?:\s+\w+){{0,4}}\s+`?{0}`?\b' -f [regex]::Escape($baseExtractorVersion))
-                )
-                $docFiles = @(Get-ChildItem -LiteralPath $resolvedRoot -Recurse -File -Filter '*.md' -ErrorAction SilentlyContinue |
-                    Where-Object {
-                        (Normalize-RepoPath -Path ([System.IO.Path]::GetRelativePath($resolvedRoot, $_.FullName))) -notmatch '^(historico|\.git)/'
-                    })
-                foreach ($docFile in $docFiles) {
-                    $relativeDocPath = Normalize-RepoPath -Path ([System.IO.Path]::GetRelativePath($resolvedRoot, $docFile.FullName))
-                    $docText = [System.IO.File]::ReadAllText($docFile.FullName)
-                    $staleMatches = @($staleExtractorPattern.Matches($docText))
-                    if ($staleMatches.Count -gt 0) {
-                        Add-Finding -Target $findings -Code 'EXTRACTOR_SIGNATURE_STALE_DOC_REF' -Path $relativeDocPath -Message ("Build-KbIntelligenceIndex.py mudou EXTRACTOR_SIGNATURE_VERSION de {0} para {1}, mas {2} ainda contem referencia textual a extrator/extractor {0}; revisar se e historico justificado ou gap documental." -f $baseExtractorVersion, $currentExtractorVersion, $relativeDocPath)
-                    }
+        if ([string]::IsNullOrWhiteSpace($currentExtractorVersion) -or
+            [string]::IsNullOrWhiteSpace($baseExtractorVersion)) {
+            Add-Finding -Target $findings -Code 'EXTRACTOR_SIGNATURE_VERSION_UNRESOLVED' -Path $buildPyRelativePath -Message ("Nao foi possivel resolver a assinatura do extrator no estado atual ou em {0}; revisar as fontes da versao antes de considerar a cobertura documental valida." -f $BaseRef)
+        } elseif ($currentExtractorVersion -ne $baseExtractorVersion) {
+            $staleExtractorPattern = [regex]::new(
+                ('(?i)\b(?:extrator|extractor)(?:\s+\w+){{0,4}}\s+`?{0}`?\b' -f [regex]::Escape($baseExtractorVersion))
+            )
+            $docFiles = @(Get-ChildItem -LiteralPath $resolvedRoot -Recurse -File -Filter '*.md' -ErrorAction SilentlyContinue |
+                Where-Object {
+                    (Normalize-RepoPath -Path ([System.IO.Path]::GetRelativePath($resolvedRoot, $_.FullName))) -notmatch '^(historico|\.git)/'
+                })
+            foreach ($docFile in $docFiles) {
+                $relativeDocPath = Normalize-RepoPath -Path ([System.IO.Path]::GetRelativePath($resolvedRoot, $docFile.FullName))
+                $docText = [System.IO.File]::ReadAllText($docFile.FullName)
+                $staleMatches = @($staleExtractorPattern.Matches($docText))
+                if ($staleMatches.Count -gt 0) {
+                    Add-Finding -Target $findings -Code 'EXTRACTOR_SIGNATURE_STALE_DOC_REF' -Path $relativeDocPath -Message ("A assinatura do extrator mudou de {0} para {1}, mas {2} ainda contem referencia textual a extrator/extractor {0}; revisar se e historico justificado ou gap documental." -f $baseExtractorVersion, $currentExtractorVersion, $relativeDocPath)
                 }
             }
         }

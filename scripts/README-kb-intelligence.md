@@ -177,7 +177,7 @@ Consequencias operacionais:
 
 ## Domains em `PackagedModule` e origem dos objetos
 
-O extrator 13 lê somente os filhos `<Object>` diretos de `ExportFile/Objects` no Part `ed1b7b1c-2aaf-46eb-9ec5-db348f6fa3fc` de um `PackagedModule`, filtrando o GUID de `Domain`. Não há recursão nem FQFN sintetizado: sem atributo `fullyQualifiedName` qualificado, o filho é ignorado e registrado em `packaged_domain_skips`.
+O extrator lê somente os filhos `<Object>` diretos de `ExportFile/Objects` no Part `ed1b7b1c-2aaf-46eb-9ec5-db348f6fa3fc` de um `PackagedModule`, filtrando o GUID de `Domain`. Não há recursão nem FQFN sintetizado: sem atributo `fullyQualifiedName` qualificado, o filho é ignorado e registrado em `packaged_domain_skips`.
 
 - Domain empacotado usa `name=fullyQualifiedName`, `origin=packaged-module`, GUID e `lastUpdate` do filho quando existem e caminho/hash do XML contêiner; Pattern fica `0/null`.
 - Só Domains autorais e empacotados vencedores são inseridos. FQFN autoral tem prioridade; colisões posteriores de FQFN são ignoradas em ordem determinística (`PackagedModule` por `rel_path`, filhos por ordem XML). A consulta `idBasedOn` com módulo resolve apenas o FQFN exato; sem módulo, o mapa curto continua autoral.
@@ -558,7 +558,7 @@ Self-test local (não depende de pasta paralela real) para o sinal determinísti
 .\scripts\Test-KbIntelligenceGeneratedObjectExtractionSelfTest.ps1
 ```
 
-Self-test local (não depende de pasta paralela real) para `idBasedOn`→`Domain` (`based_on_domain`, extrator 13): escopo além de `Attribute`, resolução de Domain em `PackagedModule` pelo FQFN, prioridade authored, skips auditáveis, filtros de origem, sugestões literais, avisos target-only, máscara CDATA/comentário em passagem única e dedup:
+Self-test local (não depende de pasta paralela real) para `idBasedOn`→`Domain` (`based_on_domain`, funcionalidade introduzida no extrator 13): escopo além de `Attribute`, resolução de Domain em `PackagedModule` pelo FQFN, prioridade authored, skips auditáveis, filtros de origem, sugestões literais, avisos target-only, máscara CDATA/comentário em passagem única e dedup:
 
 ```powershell
 .\scripts\Test-KbIntelligenceIdBasedOnDomainSelfTest.ps1

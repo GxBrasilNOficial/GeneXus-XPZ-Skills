@@ -61,7 +61,7 @@ Use este ramo somente quando a pergunta for **triagem técnica** sobre atributos
 
 1. escolher a consulta mínima conforme `xpz-index-triage` (**QUERY PARAMETER REFERENCE**):
    - `attribute-info` — um atributo; sinais **leves** (`Formula`, `idBasedOn`, etc.)
-   - `who-uses` / `what-uses` em `Domain` — impacto técnico direto via `based_on_domain` (extrator 13: origens no escopo, Domains importados resolvidos por FQFN como alvos-only); não confundir com consumo de atributo no corpo (`references_attribute` ainda pendente)
+   - `who-uses` / `what-uses` em `Domain` — impacto técnico direto via `based_on_domain` (funcionalidade introduzida no extrator 13: origens no escopo, Domains importados resolvidos por FQFN como alvos-only); não confundir com consumo de atributo no corpo (`references_attribute` ainda pendente)
    - `transaction-attributes` ou `transaction-writable-attributes` — uma Transaction; classificação automática materializada por ocorrência, com identidade completa. O gate valida assinatura/formato atuais e cobertura/contagens; a própria consulta de gravabilidade também exige `schema_version=5` e regra de gravabilidade `3`.
 2. registrar comando, objeto, identidade da ocorrência, classificação, cobertura, motivos e `writability_coverage`/contagens como **evidência direta**. `GATE_OK` confirma validade técnica do índice; cobertura `partial`/`invalid` limita a conclusão e nenhum desses sinais autoriza atribuição.
 3. declarar explicitamente o **tipo de consulta**:

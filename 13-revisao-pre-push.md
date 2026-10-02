@@ -69,7 +69,7 @@ Identificar termos, scripts, wrappers, parâmetros, estados, caminhos e regras o
 
 Buscar esses mesmos termos no repositório inteiro (não parar no primeiro arquivo que contém o termo).
 
-Quando a frente altera motor com versão, assinatura, código de evidência, regra de extração ou nome de estado, buscar também os **termos antigos** que ficaram para trás. Exemplo: se `Build-KbIntelligenceIndex.py` muda `EXTRACTOR_SIGNATURE_VERSION` de `N` para `N+1`, procurar referências à versão textual anterior (`extrator N`, `extractor N`, `extrator atual N`, `signature_version N` e variações equivalentes) nos Markdown operacionais; ocorrência residual em documento normativo é gap, salvo justificativa explícita de histórico.
+Quando a frente altera motor com versão, assinatura, código de evidência, regra de extração ou nome de estado, buscar também os **termos antigos** que ficaram para trás. Exemplo: se a assinatura do extrator muda de `N` para `N+1` — esteja a constante no script principal ou em módulo de assinatura —, procurar referências à versão textual anterior (`extrator N`, `extractor N`, `extrator atual N`, `signature_version N` e variações equivalentes) nos Markdown operacionais; ocorrência residual em documento normativo é gap, salvo justificativa explícita de histórico.
 
 Simetricamente, quando a frente **adiciona** parâmetro, alias, flag, estado ou opção a um contrato, buscar o **termo novo** em todas as menções da mesma operação e confirmar propagação completa — não basta confirmar que o termo antigo não ficou para trás. Exemplo: se um wrapper passa a aceitar `-ObjectList` ao lado de `-ObjectNames`/`-ObjectGuids`, procurar todas as descrições dessa operação (`README.md`, `02`, `08`, `09`, skills, checklists e exemplos `*.example.ps1`) e confirmar que cada menção pré-existente equivalente recebeu o termo novo; menção que ficou só com o conjunto antigo é gap, salvo justificativa explícita.
 
@@ -126,7 +126,8 @@ Quando a frente introduzir ou alterar regra que cite **motor por nome** (ex.: «
 - Doc diz «catálogo efetivo» (base + `gx-object-type-catalog.override.json`), mas o motor usa só `gx-object-type-catalog.json` fixo ao lado do script.
 - `Build-KbIntelligenceIndex.ps1` expõe `-ParallelKbRoot` e `Query-KbIntelligenceIndex.ps1` não.
 - Selftest da frente não exercita override quando a doc promete catálogo efetivo no query.
-- `Build-KbIntelligenceIndex.py` incrementa `EXTRACTOR_SIGNATURE_VERSION`, mas documento operacional ainda menciona a versão antiga do extrator.
+- A assinatura do extrator muda de `N` para `N+1`, mas documento operacional ainda menciona a versão antiga do extrator.
+- O verificador acionado por essa mudança não consegue resolver a versão atual ou a versão em `BaseRef`; tratar como cobertura documental não verificada, nunca como ausência de referências antigas.
 - Tipo `queryableByKbIntelligence=true` ganha nova aresta ou regra de extração, mas `02-regras-operacionais-e-runtime.md` não explica o que o índice materializa e o que ainda exige leitura XML.
 
 **Gate novo exige enumerar os eixos vizinhos (obrigatório).** Quando a frente introduz bloqueio, recusa ou validação — `Stop-WithReason` com motivo novo, `throw "BLOCK: …"`, `ValidateSet`/`ValidateRange` novo, predicado de recusa —, não basta confirmar que o caminho corrigido ficou fechado. Listar explicitamente por quais **outros caminhos** o mesmo defeito ainda é alcançável e dar **veredito por eixo**: fechado, deixado aberto com justificativa, ou registrado como residual. Eixos que se repetem na prática:
