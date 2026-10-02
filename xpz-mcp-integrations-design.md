@@ -1,4 +1,4 @@
-# xpz-mcp-integrations — design da skill (v18)
+# xpz-mcp-integrations — design da skill (v19)
 
 ## Papel do documento
 
@@ -6,7 +6,7 @@ Design **vivo** (não congelado) da skill `xpz-mcp-integrations`, com decisões 
 evidência empírica coletada.
 
 - **v2** pré-análise · **v3** F0-1 (4 titulares) · **v4–v8** refinos opencode (segundas opiniões) ·
-  **v9–v17** validações caras · **v18** 10ª validação cara (`openai/gpt-5.6-terra` via codex).
+  **v9–v18** validações caras · **v19** 11ª validação cara (`openai/gpt-5.6-terra` via codex).
 
 **Autor e diversidade:** `authorFamily=deepseek`. Revisores de famílias distintas da do autor; as
 rodadas opencode (meta+deepseek) são **segundas opiniões**. **Liberação** exige **≥2 Criadores
@@ -77,7 +77,8 @@ artefatos externos, com rótulo próprio.
 - **Arquivos de cliente compartilhados — escrita serializada + transacional:**
   - **Alvo:** config do cliente, lock, temporário e backup devem ser **arquivos regulares**, **sem
     reparse point** (symlink/junction), **sem diretório/arquivo especial** — validado por
-    `GetAttributes` (não só no diretório gerenciado da skill, também nos caminhos de config).
+    `GetAttributes` **em todos os componentes do caminho até uma raiz confiável** (não só na folha),
+    **revalidado imediatamente antes da promoção**.
   - **Lock:** `<arquivo>.xpz-mcp.lock` (create-new / `FileShare.None`); falha → **recusar**.
   - **Ramos separados:** **criação exclusiva** (`FileMode.CreateNew`) e **substituição**
     (`File.Replace` com backup). Antes da promoção, **revalidar identidade/atributos** (tamanho, mtime,
@@ -162,7 +163,12 @@ autor + ≥1 voz fora do harness afetado.
   **`package.json` (pin exato) + `package-lock.json`** versionados; o installer **cria
   `vendor-<versao>\`, copia os dois para lá** e **só então** roda `npm ci`. O `manifest.sha256` cobre a
   **árvore `node_modules\*\*`**; os dois arquivos do projeto são cobertos pelos hashes commitados de
-  `package.json`/lock (não pelo manifesto de árvore).
+  `package.json`/lock (não pelo manifesto de árvore). **Catálogo de bundles aprovados:**
+  `xpz-mcp-integrations/vendor/catalog.json` versionado — cada entrada com descriptor, lockfile,
+  integridade do tarball, manifesto de árvore e template/hash de launcher. Update/rollback **só**
+  consomem entradas do catálogo; `-CheckUpdates` **apenas informa** (nunca instala). Obter um bundle
+  novo = **atualizar o repositório/skill** (novo catálogo). Rollback re-emite a partir do bundle
+  aprovado anterior, com **retenção explícita** das versões instaladas.
   **Sem indireção mutável**: launcher versionado por path absoluto; comando do cliente aponta para o
   launcher daquela versão. Update = instalar + launcher + re-emitir config; rollback = re-emitir config
   anterior. **Sem junction/symlink** (hazard de `historico/...20260622-20260922.md:48`).
@@ -183,8 +189,8 @@ autor + ≥1 voz fora do harness afetado.
   **identidade do Node**, o resultado do `initialize` e a **falha do egresso do processo filho** —
   **só então** liberar o artefato. **Evidência + limpeza** declaradas.
 - **Caminhos/segurança:** todo caminho gerenciado sob `%LOCALAPPDATA%\xpz-mcp-integrations` após
-  **canonicalização**, **rejeitando reparse points** e raízes de outro drive; **ACL antes de persistir**;
-  escrita atômica.
+  **canonicalização**, **rejeitando reparse points em toda a ancestralidade** (não só na folha) e
+  raízes de outro drive; **ACL antes de persistir**; escrita atômica.
 
 ### Launcher portátil (molde gerado pela skill)
 
@@ -193,6 +199,10 @@ autor + ≥1 voz fora do harness afetado.
   ambiente construído explicitamente**; associa o handle ao **Job Object** e só então chama
   `ResumeThread`. **`ProcessStartInfo` foi DESCARTADO** (não expõe criação suspensa; `Process.Start()`
   já inicia o processo) e **`& node` DESCARTADO** (exigiria expor a chave no ambiente do launcher).
+  **Falha pós-criação/pré-retomada:** se `AssignProcessToJobObject`, a criação dos pipes ou uma
+  revalidação falhar, **bloco de limpeza obrigatório** — fechar handles de I/O, `TerminateProcess`,
+  aguardar a terminação, liberar handles — e **só então** devolver erro; self-test que **força** a falha
+  de associação ao Job.
 - **Ambiente do filho = limpo + allowlist do descritor (não herda):** o launcher monta o bloco com
   **(a)** a **variável secreta do modo**;   **(b)** as **variáveis públicas permitidas daquele modo**, **lidas do `config.json`**
   (`JEV_API_BASE_URL`/`JEV_MCP_MODEL` no `compatible`; `JEV_OPENROUTER_BASE_URL`; `CLOUDFLARE_ACCOUNT_ID`;
@@ -345,7 +355,7 @@ Cinco modos. **Wire = hipótese** até as fixtures (Apêndice). **Credencial por
 
 ## Fases
 
-- **F0** — design + revisão (F0-1..F0-16; faltam **painel de liberação**).
+- **F0** — design + revisão (F0-1..F0-17; faltam **painel de liberação**).
 - **F1-pre** (frente própria; painel ≥2 Criadores distintos do autor + ≥1 fora do harness afetado) —
   criar `OpenCodeJsoncSupport.ps1` + golden + fixtures + **matriz de migração** + self-tests + inventário
   de consumidores na raiz.
@@ -391,6 +401,7 @@ Cinco modos. **Wire = hipótese** até as fixtures (Apêndice). **Credencial por
 | F0-14 (cara) | `…-f0-codex-gpt-v15` (v15) | v16 | openai/gpt-5.6-terra (codex) | 2× gap bloqueante |
 | F0-15 (cara) | `…-f0-codex-gpt-v16` (v16) | v17 | openai/gpt-5.6-terra (codex) | 4× gap bloqueante |
 | F0-16 (cara) | `…-f0-codex-gpt-v17` (v17) | v18 | openai/gpt-5.6-terra (codex) | 1× gap bloqueante |
+| F0-17 (cara) | `…-f0-codex-gpt-v18` (v18) | v19 | openai/gpt-5.6-terra (codex) | 3× gap bloqueante |
 
 - **Recibo F0-1** (via `xpz-llm-delegate`): `preferenceSource=orchestrator`; `attemptRole=primary`,
   `countsForDiversity=true`; `closeoutReady=false` (`vnext-pending-resubmission`).
