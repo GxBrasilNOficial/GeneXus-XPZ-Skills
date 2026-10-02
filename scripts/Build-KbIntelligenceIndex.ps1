@@ -60,7 +60,7 @@ if (-not (Test-Path -LiteralPath $enginePath)) {
 
 $python = Get-GeneXusPythonExecutable
 if ($null -eq $python) {
-    Write-Host (Get-GeneXusPythonPrerequisiteErrorMessage) -ForegroundColor Red
+    Write-Host (Get-GeneXusPythonPrerequisiteErrorMessage -Operation 'index-rebuild') -ForegroundColor Red
     exit 8
 }
 

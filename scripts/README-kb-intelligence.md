@@ -87,6 +87,7 @@ Eles não substituem o acervo XML em `ObjetosDaKbEmXml` e não provam comportame
 
 - rebuild do índice exige **Python 3.x utilizavel** no `PATH` (resolucao em `scripts/GeneXusPythonPrerequisite.ps1`, chamado por `Build-KbIntelligenceIndex.ps1`)
 - stub `WindowsApps` da Microsoft Store não conta; ausencia retorna exit `8` com mensagem `PREREQUISITO AUSENTE`
+- ao chegar à etapa de assinatura, o gate `Test-*KbIndexGate.ps1` também exige Python 3 para executar `GeneXusKbIntelligenceExtractorSignature.py` via `GeneXusKbIntelligenceExtractorContract.ps1`; sem Python, bloqueia (`BLOCK:`; com `-AsJson`, `status=BLOCK` e exit `1`), mesmo que o índice exista. Exit `8` pertence ao rebuild
 - falha do motor Python em `Build-KbIntelligenceIndex.ps1` repassa a saída capturada e preserva o exit code do `.py` (incluindo exit `2` para override de catálogo inválido/bloqueado)
 - **rigor**: sync XPZ/XML oficial **não** termina sem índice regenerado — a materialização em `ObjetosDaKbEmXml` pode já ter concluido; declarar **fluxo incompleto**, não sync OK nem falha do pacote exportado; não autorizar triagem ampla sem índice; ver `README.md`, `08-guia-para-agente-gpt.md` e `xpz-sync`
 
@@ -128,8 +129,8 @@ O índice só deve ser usado para triagem ampla quando estiver em dia com a últ
 - `inventory_validation_status` fica na tabela `metadata` do SQLite e deve estar `OK`
 - `generated_at` não faz mais parte do contrato operacional do índice; se aparecer em artefato antigo, trate esse índice como legado/incompativel e regenere
 - todo processamento bem-sucedido de `XPZ` exportado pela IDE que materialize ou atualize XMLs em `ObjetosDaKbEmXml` deve chamar a regeneracao/validacao do índice logo depois
-- se `last_index_build_run_at >= last_xpz_materialization_run_at`, `inventory_validation_status=OK` e `extractor_signature_version`/`extractor_signature_hash` na metadata coincidirem com o motor atual em `scripts/Build-KbIntelligenceIndex.py` (via `scripts/GeneXusKbIntelligenceExtractorContract.ps1`), o índice está apto para triagem inicial
-- ausencia de `extractor_signature_version` ou `extractor_signature_hash` na metadata, ou divergencia em relacao ao motor compartilhado, significa índice gerado por extrator antigo mesmo quando os timestamps parecem frescos — `Test-*KbIndexGate.ps1` bloqueia com `BLOCK:` e a resposta correta e rebuild do índice
+- se `last_index_build_run_at >= last_xpz_materialization_run_at`, `inventory_validation_status=OK` e `extractor_signature_version`/`extractor_signature_hash`/`extractor_signature_format` na metadata coincidirem com a assinatura atual calculada por `scripts/GeneXusKbIntelligenceExtractorSignature.py` via `scripts/GeneXusKbIntelligenceExtractorContract.ps1`, o índice está apto para triagem inicial
+- ausencia de qualquer um dos três campos de assinatura na metadata, ou divergencia em relacao à assinatura atual, significa índice gerado por contrato antigo/incompatível mesmo quando os timestamps parecem frescos — `Test-*KbIndexGate.ps1` bloqueia com `BLOCK:` e a resposta correta e rebuild do índice
 - se o índice estiver ausente, sem metadado, mais antigo que a última materialização ou se `kb-source-metadata.md` não expuser literalmente `last_xpz_materialization_run_at`, o agente não deve consultar o acervo oficial de objetos para responder pergunta de negocio, nem por varredura ampla nem por caminho pontual deduzido, e também não deve gerar objetos para importação na KB pela IDE
 - se `inventory_validation_status` estiver ausente, `BLOCK` ou diferente de `OK`, tratar o índice como semanticamente incompativel com o snapshot oficial e oferecer rebuild/atualizacao antes da triagem ampla
 - nesse estado defasado, o agente deve tratar a situacao como exceção operacional, oferecer regeneracao/validacao do índice ao usuário e não seguir para varredura ampla, triagem substantiva, caminho pontual deduzido, leitura de XML oficial de objeto ou geração
@@ -156,15 +157,18 @@ Quando a validação do índice for parte relevante da resposta ou handoff, regi
 O motor `Build-KbIntelligenceIndex.py` grava na tabela `metadata`:
 
 - `extractor_signature_version` — incrementada quando a cobertura ou regras do indexador mudam de forma material
-- `extractor_signature_hash` — SHA-256 dos bytes do próprio `Build-KbIntelligenceIndex.py` usado no build
+- `extractor_signature_hash` — SHA-256 dos dados canônicos do manifesto `kb-intelligence-extractor-files.json` e dos conteúdos dos arquivos listados, normalizados para LF (`manifest-lf-v1`); não é o hash isolado de `Build-KbIntelligenceIndex.py`
+- `extractor_signature_format` — formato de canonicalização usado para calcular o hash; o valor atual é `manifest-lf-v1`
 
-Contrato compartilhado: `scripts/GeneXusKbIntelligenceExtractorContract.ps1`. Verificacao: `scripts/Test-GeneXusKbIntelligenceExtractorSignatureSelfTest.ps1` (sentinela `KB_INTELLIGENCE_EXTRACTOR_SIGNATURE_SELFTEST_OK`).
+`scripts/GeneXusKbIntelligenceExtractorSignature.py` define a versão e o formato, lê o manifesto e calcula a assinatura. `Build-KbIntelligenceIndex.py` importa esses valores e grava os três campos. O hash cobre o conjunto versionado do manifesto, não apenas o arquivo principal do extrator.
 
-O gate `Test-*KbIndexGate.ps1` (molde em `xpz-kb-parallel-setup/examples/Test-KbIndexGate.example.ps1`) compara a metadata do índice com o motor do repositório ativo. Índices antigos sem esses campos passam no teste de timestamp mas falham neste passo — comportamento esperado após evolucoes como ampliacao de `INDEXED_SOURCE_TYPES`.
+Contrato compartilhado: `scripts/GeneXusKbIntelligenceExtractorContract.ps1`; ele executa o calculador Python e exige Python 3 utilizável no `PATH`. Verificacao: `scripts/Test-GeneXusKbIntelligenceExtractorSignatureSelfTest.ps1` (sentinela `KB_INTELLIGENCE_EXTRACTOR_SIGNATURE_SELFTEST_OK`).
+
+O gate `Test-*KbIndexGate.ps1` (molde em `xpz-kb-parallel-setup/examples/Test-KbIndexGate.example.ps1`) compara os três campos da metadata com a assinatura atual. Índices antigos sem qualquer desses campos passam no teste de timestamp mas falham neste passo — comportamento esperado após evolucoes como ampliacao de `INDEXED_SOURCE_TYPES`. Se Python estiver ausente quando o gate chegar à etapa da assinatura, ele bloqueia: `BLOCK:` no modo texto e `status=BLOCK` + exit `1` sob `-AsJson`; exit `8` é reservado ao rebuild.
 
 ## Schema e versionamento
 
-O índice armazena `schema_version` na tabela `metadata`. O valor atual e `"5"` (inclui a tabela `transaction_attribute_writability` com `writability_rule_version`, a tabela `css_class` do catalogo de classes CSS, os marcadores de Pattern e `origin TEXT NOT NULL` na tabela `objects`). O motor atual usa `EXTRACTOR_SIGNATURE_VERSION="16"`.
+O índice armazena `schema_version` na tabela `metadata`. O valor atual e `"5"` (inclui a tabela `transaction_attribute_writability` com `writability_rule_version`, a tabela `css_class` do catalogo de classes CSS, os marcadores de Pattern e `origin TEXT NOT NULL` na tabela `objects`). A assinatura atual usa `EXTRACTOR_SIGNATURE_VERSION="16"` e `EXTRACTOR_SIGNATURE_FORMAT="manifest-lf-v1"`.
 
 O design e deliberado: o índice e artefato derivado e sempre regeneravel. Por isso não existe caminho de migracao de schema — qualquer mudanca estrutural no motor exige rebuild completo.
 

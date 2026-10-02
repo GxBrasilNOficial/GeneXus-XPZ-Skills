@@ -11,6 +11,23 @@ if (-not (Test-Path -LiteralPath $contractPath -PathType Leaf)) {
     throw "GeneXusKbIntelligenceExtractorContract.ps1 nao encontrado: $contractPath"
 }
 . $contractPath
+. (Join-Path $PSScriptRoot 'GeneXusPythonPrerequisite.ps1')
+
+$indexRebuildPrerequisiteMessage = Get-GeneXusPythonPrerequisiteErrorMessage -Operation 'index-rebuild'
+if ($indexRebuildPrerequisiteMessage -notmatch 'rebuild do indice KbIntelligence nao foi concluido') {
+    throw 'Mensagem do pre-requisito de rebuild nao identifica a atualizacao incompleta do indice'
+}
+
+$signaturePrerequisiteMessage = Get-GeneXusPythonPrerequisiteErrorMessage -Operation 'extractor-signature'
+if ($signaturePrerequisiteMessage -notmatch 'assinatura atual do extrator nao pode ser calculada' -or
+    $signaturePrerequisiteMessage -match 'apenas o indice KbIntelligence nao foi gerado') {
+    throw 'Mensagem do pre-requisito de assinatura deve identificar a validacao incompleta sem afirmar que o indice nao existe'
+}
+
+$writabilityPrerequisiteMessage = Get-GeneXusPythonPrerequisiteErrorMessage -Operation 'transaction-writability'
+if ($writabilityPrerequisiteMessage -notmatch 'classificacao automatica de gravabilidade nao pode ser concluida') {
+    throw 'Mensagem do pre-requisito de gravabilidade nao identifica a operacao incompleta'
+}
 
 $expected = Get-GeneXusKbIntelligenceExpectedExtractorSignature
 if ($expected.extractor_signature_version -ne '16') {

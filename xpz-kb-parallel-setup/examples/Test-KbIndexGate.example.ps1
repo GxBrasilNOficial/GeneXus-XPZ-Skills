@@ -17,6 +17,10 @@ Contrato de saida herdado do motor:
   writabilityCoverageWarning, ... }. Sob -AsJson nunca lanca; bloqueio vira
   { status: BLOCK, reason } + exit 1. Consumido pelo gate K9 do orquestrador
   Invoke-XpzKbParallelPrePushPhase1.ps1.
+- A validacao da assinatura atual (version/hash/format) executa o calculador
+  `scripts/GeneXusKbIntelligenceExtractorSignature.py` via Python 3. Python
+  utilizavel no PATH e pre-requisito do gate; sem ele, o gate bloqueia (`BLOCK:`
+  ou, sob -AsJson, `status=BLOCK` + exit 1), mesmo sem rebuild em andamento.
 
 IMPORTANTE: este e um molde. Ao materializar o wrapper local final, ajustar
 `SharedSkillsRoot` para o caminho real da base compartilhada e, se a KB usar nomes

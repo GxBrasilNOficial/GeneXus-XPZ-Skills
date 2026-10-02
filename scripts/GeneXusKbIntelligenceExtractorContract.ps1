@@ -16,7 +16,7 @@ function Get-GeneXusKbIntelligenceExpectedExtractorSignature {
     $repoRoot = Split-Path -Parent $scriptDir
     $python = Get-GeneXusPythonExecutable
     if ($null -eq $python) {
-        throw (Get-GeneXusPythonPrerequisiteErrorMessage)
+        throw (Get-GeneXusPythonPrerequisiteErrorMessage -Operation 'extractor-signature')
     }
 
     $output = @(& $python.Source -B $signaturePath '--repo-root' $repoRoot 2>&1)

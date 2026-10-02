@@ -74,10 +74,23 @@ function Get-GeneXusPythonExecutable {
 }
 
 function Get-GeneXusPythonPrerequisiteErrorMessage {
+    param(
+        [ValidateSet('index-rebuild', 'extractor-signature', 'transaction-writability')]
+        [string]$Operation = 'index-rebuild'
+    )
+
+    if ($Operation -eq 'index-rebuild') {
+        $operationMessage = 'A materializacao XPZ/XML pode ter concluido; o rebuild do indice KbIntelligence nao foi concluido.'
+    } elseif ($Operation -eq 'extractor-signature') {
+        $operationMessage = 'A assinatura atual do extrator nao pode ser calculada; a validacao do contrato de assinatura nao foi concluida.'
+    } else {
+        $operationMessage = 'A operacao de classificacao automatica de gravabilidade nao pode ser concluida.'
+    }
+
     return @(
         'PREREQUISITO AUSENTE: Python 3 utilizavel nao encontrado no PATH.'
         'Instale Python 3.x (https://www.python.org/downloads/) e adicione ao PATH.'
         'No Windows, ignore o stub em Microsoft Store (WindowsApps) se ele nao executar de verdade.'
-        'A materializacao XPZ/XML pode ter concluido; apenas o indice KbIntelligence nao foi gerado.'
+        $operationMessage
     ) -join ' '
 }

@@ -22,7 +22,7 @@ function Invoke-GeneXusTransactionWritabilityCore {
 
     $python = Get-GeneXusPythonExecutable
     if ($null -eq $python) {
-        throw (Get-GeneXusPythonPrerequisiteErrorMessage)
+        throw (Get-GeneXusPythonPrerequisiteErrorMessage -Operation 'transaction-writability')
     }
 
     $output = @(& $python.Source $corePath @Arguments 2>&1)
@@ -56,7 +56,7 @@ function Invoke-GeneXusWritabilityOperational {
 
     $python = Get-GeneXusPythonExecutable
     if ($null -eq $python) {
-        throw (Get-GeneXusPythonPrerequisiteErrorMessage)
+        throw (Get-GeneXusPythonPrerequisiteErrorMessage -Operation 'transaction-writability')
     }
 
     $output = @(& $python.Source -B $operationalPath @Arguments 2>&1)
