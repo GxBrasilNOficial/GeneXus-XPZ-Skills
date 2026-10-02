@@ -3274,7 +3274,7 @@ As contagens são de **arquivos que mencionam o token**, não de parâmetros exc
 ## Skill `xpz-mcp-integrations` — componente MCP externo opcional (Jev/System One)
 
 - **Importância** — média (gap real: hoje só existe configuração manual, e o caminho validado está amarrado à máquina de referência — path pessoal + dependência de rede/cache em runtime; falta um caminho gerenciado e portátil para a comunidade).
-- **Maturidade** — em refino (decisões fechadas em 2026-10-02; F0 em andamento — rodada de 4 titulares + rodadas de refino via opencode; faltam o refinamento final e a execução; ver `xpz-mcp-integrations-design.md`).
+- **Maturidade** — em refino (decisões fechadas em 2026-10-02; F0 em andamento — rodada de 4 titulares + rodadas de refino via opencode, todas **segundas opiniões** por `authorFamily=deepseek`; faltam a validação com modelo mais caro (**insumo, sem poder decisório**), o **painel de liberação** com ≥2 criadores distintos do autor e a execução; ver `xpz-mcp-integrations-design.md`).
 
 **O que é.** Skill nova dedicada a instalar, auditar, reparar, atualizar e remover **componentes MCP externos opcionais** nos clientes de agente; o 1º componente é o **Jev/System One** (modelo de decisão do TypeSafe) via `@jkudish/jev-mcp`. Motor genérico dirigido por descritor; a v1 cobre **OpenCode e Codex**.
 
