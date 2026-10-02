@@ -1,4 +1,4 @@
-# xpz-mcp-integrations — design da skill (v14)
+# xpz-mcp-integrations — design da skill (v15)
 
 ## Papel do documento
 
@@ -6,7 +6,7 @@ Design **vivo** (não congelado) da skill `xpz-mcp-integrations`, com decisões 
 evidência empírica coletada.
 
 - **v2** pré-análise · **v3** F0-1 (4 titulares) · **v4–v8** refinos opencode (segundas opiniões) ·
-  **v9–v13** validações caras · **v14** 6ª validação cara (`openai/gpt-5.6-terra` via codex).
+  **v9–v14** validações caras · **v15** 7ª validação cara (`openai/gpt-5.6-terra` via codex).
 
 **Autor e diversidade:** `authorFamily=deepseek`. Revisores de famílias distintas da do autor; as
 rodadas opencode (meta+deepseek) são **segundas opiniões**. **Liberação** exige **≥2 Criadores
@@ -175,10 +175,16 @@ autor + ≥1 voz fora do harness afetado.
 ### Launcher portátil (molde gerado pela skill)
 
 - **Comando = launcher PowerShell** (`["pwsh","-NoProfile","-File","<launcher-<versao>.ps1"]`).
-- **Rota travada = `ProcessStartInfo`** (`UseShellExecute=$false`): define o **ambiente por-filho**
-  (**só a variável de credencial do modo**; a chave **não** entra no ambiente do launcher) e faz
-  **proxy de bytes** de stdin/stdout/stderr. **`& node` DESCARTADO** (exigiria expor a chave no
-  ambiente do launcher).
+- **Rota travada = API nativa `CreateProcessW`** com **`CREATE_SUSPENDED`**, pipes e **bloco de
+  ambiente construído explicitamente**; associa o handle ao **Job Object** e só então chama
+  `ResumeThread`. **`ProcessStartInfo` foi DESCARTADO** (não expõe criação suspensa; `Process.Start()`
+  já inicia o processo) e **`& node` DESCARTADO** (exigiria expor a chave no ambiente do launcher).
+- **Ambiente do filho = limpo + allowlist do descritor (não herda):** o launcher monta o bloco com
+  **(a)** a **variável secreta do modo**; **(b)** as **variáveis públicas permitidas daquele modo**
+  (`JEV_API_BASE_URL`/`JEV_MCP_MODEL` no `compatible`; `JEV_OPENROUTER_BASE_URL`; `CLOUDFLARE_ACCOUNT_ID`;
+  etc.); **(c)** o **mínimo de sistema/runtime** (`SystemRoot`, `SystemDrive`, `TEMP`/`TMP`, `PATHEXT`,
+  `COMSPEC`, `PATH` mínimo). **Não** propaga variáveis de fornecedor **não selecionado** nem o ambiente
+  inteiro.
 - **Terminação/árvore (fechando a janela de órfão):** o filho é criado **suspenso** por API nativa
   (`CreateProcess` com `CREATE_SUSPENDED`), **associado ao Job Object**
   (`AssignProcessToJobObject`, `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`) **e só então retomado**
@@ -321,7 +327,7 @@ Cinco modos. **Wire = hipótese** até as fixtures (Apêndice). **Credencial por
 
 ## Fases
 
-- **F0** — design + revisão (F0-1..F0-12; faltam **painel de liberação**).
+- **F0** — design + revisão (F0-1..F0-13; faltam **painel de liberação**).
 - **F1-pre** (frente própria; painel ≥2 Criadores distintos do autor + ≥1 fora do harness afetado) —
   criar `OpenCodeJsoncSupport.ps1` + golden + fixtures + **matriz de migração** + self-tests + inventário
   de consumidores na raiz.
@@ -361,6 +367,7 @@ Cinco modos. **Wire = hipótese** até as fixtures (Apêndice). **Credencial por
 | F0-10 (cara) | `…-f0-codex-gpt-v11` (v11) | v12 | openai/gpt-5.6-terra (codex) | 1× gap bloqueante |
 | F0-11 (cara) | `…-f0-codex-gpt-v12` (v12) | v13 | openai/gpt-5.6-terra (codex) | 1× gap bloqueante |
 | F0-12 (cara) | `…-f0-codex-gpt-v13` (v13) | v14 | openai/gpt-5.6-terra (codex) | 4× gap bloqueante |
+| F0-13 (cara) | `…-f0-codex-gpt-v14` (v14) | v15 | openai/gpt-5.6-terra (codex) | 2× gap bloqueante |
 
 - **Recibo F0-1** (via `xpz-llm-delegate`): `preferenceSource=orchestrator`; `attemptRole=primary`,
   `countsForDiversity=true`; `closeoutReady=false` (`vnext-pending-resubmission`).
