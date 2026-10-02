@@ -3273,14 +3273,14 @@ As contagens são de **arquivos que mencionam o token**, não de parâmetros exc
 
 ## Skill `xpz-mcp-integrations` — componente MCP externo opcional (Jev/System One)
 
-- **Importância** — média (gap real: hoje só existe configuração manual, e o caminho validado está amarrado à máquina de referência — path pessoal + `npx` flutuante; falta um caminho gerenciado e portátil para a comunidade).
-- **Maturidade** — pronta para implementar (caso concreto e decisões fechadas em 2026-10-02; falta a F0 — revisão por pares do design — e a execução; ver `xpz-mcp-integrations-design.md`).
+- **Importância** — média (gap real: hoje só existe configuração manual, e o caminho validado está amarrado à máquina de referência — path pessoal + dependência de rede/cache em runtime; falta um caminho gerenciado e portátil para a comunidade).
+- **Maturidade** — em refino (decisões fechadas em 2026-10-02; F0 em andamento — rodada de 4 titulares + rodadas de refino via opencode; faltam o refinamento final e a execução; ver `xpz-mcp-integrations-design.md`).
 
 **O que é.** Skill nova dedicada a instalar, auditar, reparar, atualizar e remover **componentes MCP externos opcionais** nos clientes de agente; o 1º componente é o **Jev/System One** (modelo de decisão do TypeSafe) via `@jkudish/jev-mcp`. Motor genérico dirigido por descritor; a v1 cobre **OpenCode e Codex**.
 
 **Por que não na `xpz-skills-setup`.** A skill de setup registra skills XPZ, instrucionais globais, `nexa`/`gam`, bootstrap git e o MCP **interno** do Cursor; não gerencia MCP de terceiros. A nova skill nasce separada, com fronteira explícita e regra de merge que preserva entradas de outros donos nos mesmos arquivos de cliente.
 
-**Decisões travadas (2026-10-02).** Nome `xpz-mcp-integrations`; pacote **vendorizado** e pinado (`0.13.0`, integridade sha512 + tag `v0.13.0`), **sem `npx`** no início; Node é pré-requisito opcional (detectar e **oferecer** instalar via `winget`, com aprovação); credencial em **cofre neutro** da skill (env como override; `auth.json` do OpenCode só importação opcional); fornecedor configurável (presets do pacote + modo `compatible` informado na hora; Command Code como preset validado); **sem fork** na v1; público comunitário.
+**Decisões travadas (2026-10-02).** Nome `xpz-mcp-integrations`; pacote **vendorizado** e pinado (`0.13.0`, integridade sha512 + tag `v0.13.0`), **sem `npx`** no início; Node é **dependência de runtime** (detectar ausência e versão `< 22`; **oferecer** instalar via `winget` com aprovação); credencial em **cofre neutro** da skill com **DPAPI** (env como override; `auth.json` do OpenCode só importação opcional); fornecedor: os **5 modos** do pacote, sendo `compatible`/Command Code **parcial** (não validado E2E) e os outros 4 **experimental opt-in**; **sem fork** na v1; público comunitário.
 
 **Adiado.** Fork/espelho do artefato; Cursor e Claude Code; backend Python alternativo (`typesafe-mcp` no PyPI, outra superfície e não validado contra o Command Code).
 
