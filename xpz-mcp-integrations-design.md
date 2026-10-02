@@ -1,4 +1,4 @@
-# xpz-mcp-integrations — design da skill (v17)
+# xpz-mcp-integrations — design da skill (v18)
 
 ## Papel do documento
 
@@ -6,7 +6,7 @@ Design **vivo** (não congelado) da skill `xpz-mcp-integrations`, com decisões 
 evidência empírica coletada.
 
 - **v2** pré-análise · **v3** F0-1 (4 titulares) · **v4–v8** refinos opencode (segundas opiniões) ·
-  **v9–v16** validações caras · **v17** 9ª validação cara (`openai/gpt-5.6-terra` via codex).
+  **v9–v17** validações caras · **v18** 10ª validação cara (`openai/gpt-5.6-terra` via codex).
 
 **Autor e diversidade:** `authorFamily=deepseek`. Revisores de famílias distintas da do autor; as
 rodadas opencode (meta+deepseek) são **segundas opiniões**. **Liberação** exige **≥2 Criadores
@@ -194,7 +194,7 @@ autor + ≥1 voz fora do harness afetado.
   `ResumeThread`. **`ProcessStartInfo` foi DESCARTADO** (não expõe criação suspensa; `Process.Start()`
   já inicia o processo) e **`& node` DESCARTADO** (exigiria expor a chave no ambiente do launcher).
 - **Ambiente do filho = limpo + allowlist do descritor (não herda):** o launcher monta o bloco com
-  **(a)** a **variável secreta do modo**; **(b)** as **variáveis públicas permitidas daquele modo**
+  **(a)** a **variável secreta do modo**;   **(b)** as **variáveis públicas permitidas daquele modo**, **lidas do `config.json`**
   (`JEV_API_BASE_URL`/`JEV_MCP_MODEL` no `compatible`; `JEV_OPENROUTER_BASE_URL`; `CLOUDFLARE_ACCOUNT_ID`;
   etc.); **(c)** o **mínimo de sistema/runtime** (`SystemRoot`, `SystemDrive`, `TEMP`/`TMP`, `PATHEXT`,
   `COMSPEC`, `PATH` mínimo). **Não** propaga variáveis de fornecedor **não selecionado** nem o ambiente
@@ -234,11 +234,14 @@ Cinco modos. **Wire = hipótese** até as fixtures (Apêndice). **Credencial por
 - `compatible` exige o contrato System One/Jev; URL vai como veio; `cloudflare`/`vercel` não
   intercambiáveis. **`auto`:** com múltiplas famílias de env setadas, exigir `JEV_PROVIDER` explícito.
 - **`endpoint_nao_verificado` — regra única:** presets fechados = **blocking** se host divergir;
-  `compatible` de terceiro = **`warn` + confirmação explícita**. **Registro de autorização sem
-  segredo** em `%LOCALAPPDATA%\xpz-mcp-integrations\endpoints.json` (schema: `endpointHash`, `mode`,
-  `model`, `confirmedAt`, `confirmedBy`), **consultado** por auditor/update/re-emissão e **invalidado**
-  se `endpointHash`/`mode`/`model` mudarem; **nunca** contém a chave. Host/caminho **redigidos** antes
-  da confirmação.
+  `compatible` de terceiro = **`warn` + confirmação explícita**. **Registro de configuração não
+  secreto** `%LOCALAPPDATA%\xpz-mcp-integrations\config.json` (ACL só-dono; UTF-8 sem BOM; schema
+  versionado): `{provider, model, publicEnv{...}, endpoint{hash, confirmedAt, confirmedBy}}`; **origem/
+  override** por parâmetro do mutador; **validado contra o descritor** (só as vars públicas permitidas do
+  modo). **Consumido** por launcher/auditor/reparo/re-emissão — é **dele** que o launcher reconstrói as
+  variáveis públicas obrigatórias (inclusive o **endpoint completo** do `compatible`). **Nunca** contém
+  a chave. `endpointHash` vincula a autorização; mudar provider/mode/model/URL **invalida**. Host/caminho
+  **redigidos** antes da confirmação.
 - **Cofre e tipo de credencial:** o cofre guarda o **modo ativo** + metadados do **tipo** (qual
   `secretEnvVar`), **sem** registrar o segredo em claro; trocar de modo exige re-entrada.
 - **`compatible` = parcial** (handshake, não E2E). **Command Code** = preset sugerido. **Experimental
@@ -316,7 +319,8 @@ Cinco modos. **Wire = hipótese** até as fixtures (Apêndice). **Credencial por
   recuperação); backup+restore; rollback; schema do descritor; **round-trip DPAPI**; **re-emissão de
   launcher por versão**; **launcher** com filho falso (stdio binário, zero bytes fora do filho, exit
   code = do filho, sem deadlock; **cancel/órfão/stderr intenso**); **contenção de rede**
-  (**Windows Sandbox sem rede**; egresso por **filho**; firewall só diagnóstico); **comparação contra o manifesto esperado**.
+  (**Windows Sandbox sem rede**; egresso por **filho**; firewall só diagnóstico); **re-execução sem
+  ambiente herdado** (fonte = `config.json`); **comparação contra o manifesto esperado**.
 - **Não são rodados pelo orquestrador de pré-push**; a skill declara cada comando e registra em `09`.
   Self-tests de **TOML** no **F2**.
 - **E2E** com `jev_classify` = validação manual opt-in; pré-requisito de `handshakeConfirmed`.
@@ -341,7 +345,7 @@ Cinco modos. **Wire = hipótese** até as fixtures (Apêndice). **Credencial por
 
 ## Fases
 
-- **F0** — design + revisão (F0-1..F0-15; faltam **painel de liberação**).
+- **F0** — design + revisão (F0-1..F0-16; faltam **painel de liberação**).
 - **F1-pre** (frente própria; painel ≥2 Criadores distintos do autor + ≥1 fora do harness afetado) —
   criar `OpenCodeJsoncSupport.ps1` + golden + fixtures + **matriz de migração** + self-tests + inventário
   de consumidores na raiz.
@@ -386,6 +390,7 @@ Cinco modos. **Wire = hipótese** até as fixtures (Apêndice). **Credencial por
 | F0-13 (cara) | `…-f0-codex-gpt-v14` (v14) | v15 | openai/gpt-5.6-terra (codex) | 2× gap bloqueante |
 | F0-14 (cara) | `…-f0-codex-gpt-v15` (v15) | v16 | openai/gpt-5.6-terra (codex) | 2× gap bloqueante |
 | F0-15 (cara) | `…-f0-codex-gpt-v16` (v16) | v17 | openai/gpt-5.6-terra (codex) | 4× gap bloqueante |
+| F0-16 (cara) | `…-f0-codex-gpt-v17` (v17) | v18 | openai/gpt-5.6-terra (codex) | 1× gap bloqueante |
 
 - **Recibo F0-1** (via `xpz-llm-delegate`): `preferenceSource=orchestrator`; `attemptRole=primary`,
   `countsForDiversity=true`; `closeoutReady=false` (`vnext-pending-resubmission`).
