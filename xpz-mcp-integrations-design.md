@@ -1,4 +1,4 @@
-# xpz-mcp-integrations — design da skill (v13)
+# xpz-mcp-integrations — design da skill (v14)
 
 ## Papel do documento
 
@@ -6,7 +6,7 @@ Design **vivo** (não congelado) da skill `xpz-mcp-integrations`, com decisões 
 evidência empírica coletada.
 
 - **v2** pré-análise · **v3** F0-1 (4 titulares) · **v4–v8** refinos opencode (segundas opiniões) ·
-  **v9–v12** validações caras · **v13** 5ª validação cara (`openai/gpt-5.6-terra` via codex).
+  **v9–v13** validações caras · **v14** 6ª validação cara (`openai/gpt-5.6-terra` via codex).
 
 **Autor e diversidade:** `authorFamily=deepseek`. Revisores de famílias distintas da do autor; as
 rodadas opencode (meta+deepseek) são **segundas opiniões**. **Liberação** exige **≥2 Criadores
@@ -159,19 +159,15 @@ autor + ≥1 voz fora do harness afetado.
   anterior. **Sem junction/symlink** (hazard de `historico/...20260622-20260922.md:48`).
 - **Semântica de rede (3 contextos):** (1) instalador/vendorizador: sem registro fora de install/update;
   (2) launcher/MCP: só o endpoint; (3) teste isolado (abaixo).
-- **Contenção de rede — bloqueio de TODA a árvore de processos (não só de um exe):** o filtro
-  `New-NetFirewallRule` é **por programa**, então não contém um `dist` que lance **outro executável**
-  com rede; o Job Object só encerra depois. A re-verificação roda num **ambiente verdadeiramente
-  isolado de rede e descartável**:
-  - **Primário:** **Windows Sandbox** com `<Networking>Disable</Networking>` — rede desabilitada para o
-    sandbox inteiro (**incluindo filhos**), descartável.
-  - **Alternativa (máquina sem Windows Sandbox):** **AppContainer sem `internetClient`**, que nega rede
-    à **árvore de processos** do container.
-  - **Fail-closed:** sem nenhum dos dois, o teste **não passa** e o **F1 fica bloqueado**.
-  - **Controle positivo:** tentar egresso **por um processo filho** do teste e confirmar que foi
-    bloqueado (não basta testar o Node copiado).
-  - O **runtime Node dedicado** (cópia verificada) permanece como **alvo controlado**; a **contenção é
-    do ambiente**. **Evidência + limpeza** declaradas.
+- **Contenção de rede — bloqueio de TODA a árvore, com pré-requisito explícito:** o filtro
+  `New-NetFirewallRule` é **por programa** e **não** contém a árvore → **nunca** é critério de
+  aprovação (só **diagnóstico**). A re-verificação isolada roda em **Windows Sandbox com
+  `<Networking>Disable</Networking>`** (rede desabilitada para o sandbox inteiro, **incluindo filhos**;
+  descartável). **Windows Sandbox é pré-requisito explícito do F1; máquina sem ele → F1 bloqueado**
+  (fail-closed). **AppContainer** fica **adiado** (frente futura) até ter mecanismo de criação/
+  lançamento e prova de que a árvore está no container **especificados e testados**. **Controle
+  positivo:** tentar egresso **por um processo filho** e confirmar bloqueio. O **runtime Node dedicado**
+  (cópia verificada) permanece como **alvo controlado**. **Evidência + limpeza** declaradas.
 - **Caminhos/segurança:** todo caminho gerenciado sob `%LOCALAPPDATA%\xpz-mcp-integrations` após
   **canonicalização**, **rejeitando reparse points** e raízes de outro drive; **ACL antes de persistir**;
   escrita atômica.
@@ -183,11 +179,12 @@ autor + ≥1 voz fora do harness afetado.
   (**só a variável de credencial do modo**; a chave **não** entra no ambiente do launcher) e faz
   **proxy de bytes** de stdin/stdout/stderr. **`& node` DESCARTADO** (exigiria expor a chave no
   ambiente do launcher).
-- **Terminação/árvore:** o filho roda num **Job Object** com
-  `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`; política: **EOF/cancelamento** → fechar streams, prazo curto,
-  **encerrar a árvore**; **filho inesperado/orfão** → fechar todos os pipes e propagar estado. Garante
-  que `node` não sobreviva com a chave no ambiente. Self-tests: **cancelamento, órfão, stderr intenso,
-  término durante tráfego bidirecional**.
+- **Terminação/árvore (fechando a janela de órfão):** o filho é criado **suspenso** por API nativa
+  (`CreateProcess` com `CREATE_SUSPENDED`), **associado ao Job Object**
+  (`AssignProcessToJobObject`, `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`) **e só então retomado**
+  (`ResumeThread`) — assim nenhum filho nasce fora do Job. Política: **EOF/cancelamento** → fechar
+  streams, prazo curto, **encerrar a árvore**; **filho inesperado/orfão** → fechar pipes e propagar
+  estado. Self-tests: cancelamento, órfão, stderr intenso, término em tráfego bidirecional.
 - **Invariante mecanizada:** silenciar preferences; **nenhum `Write-*`** para stdout (scan estático);
   logs só em stderr/arquivo; sem chave em log; **exit code = do filho**, propagado como última
   instrução; provar **payload binário grande** (sem re-encode/deadlock) e **zero bytes** fora do filho;
@@ -217,9 +214,11 @@ Cinco modos. **Wire = hipótese** até as fixtures (Apêndice). **Credencial por
 - `compatible` exige o contrato System One/Jev; URL vai como veio; `cloudflare`/`vercel` não
   intercambiáveis. **`auto`:** com múltiplas famílias de env setadas, exigir `JEV_PROVIDER` explícito.
 - **`endpoint_nao_verificado` — regra única:** presets fechados = **blocking** se host divergir;
-  `compatible` de terceiro = **`warn` + confirmação explícita** **amarrada a** `hash(URL do endpoint) +
-  modo + modelo + data` (invalidada se algum mudar), com **host/caminho redigidos** antes da
-  confirmação; a chave **nunca** é persistida junto da autorização.
+  `compatible` de terceiro = **`warn` + confirmação explícita**. **Registro de autorização sem
+  segredo** em `%LOCALAPPDATA%\xpz-mcp-integrations\endpoints.json` (schema: `endpointHash`, `mode`,
+  `model`, `confirmedAt`, `confirmedBy`), **consultado** por auditor/update/re-emissão e **invalidado**
+  se `endpointHash`/`mode`/`model` mudarem; **nunca** contém a chave. Host/caminho **redigidos** antes
+  da confirmação.
 - **Cofre e tipo de credencial:** o cofre guarda o **modo ativo** + metadados do **tipo** (qual
   `secretEnvVar`), **sem** registrar o segredo em claro; trocar de modo exige re-entrada.
 - **`compatible` = parcial** (handshake, não E2E). **Command Code** = preset sugerido. **Experimental
@@ -296,8 +295,8 @@ Cinco modos. **Wire = hipótese** até as fixtures (Apêndice). **Credencial por
   serializada/transacional** (create×replace, corrida → recusa, arquivo especial → recusa,
   recuperação); backup+restore; rollback; schema do descritor; **round-trip DPAPI**; **re-emissão de
   launcher por versão**; **launcher** com filho falso (stdio binário, zero bytes fora do filho, exit
-  code = do filho, sem deadlock; **cancel/órfão/stderr intenso**); **contenção de rede** (firewall +
-  **controle positivo**); **comparação contra o manifesto esperado**.
+  code = do filho, sem deadlock; **cancel/órfão/stderr intenso**); **contenção de rede**
+  (**Windows Sandbox sem rede**; egresso por **filho**; firewall só diagnóstico); **comparação contra o manifesto esperado**.
 - **Não são rodados pelo orquestrador de pré-push**; a skill declara cada comando e registra em `09`.
   Self-tests de **TOML** no **F2**.
 - **E2E** com `jev_classify` = validação manual opt-in; pré-requisito de `handshakeConfirmed`.
@@ -322,7 +321,7 @@ Cinco modos. **Wire = hipótese** até as fixtures (Apêndice). **Credencial por
 
 ## Fases
 
-- **F0** — design + revisão (F0-1..F0-11; faltam **painel de liberação**).
+- **F0** — design + revisão (F0-1..F0-12; faltam **painel de liberação**).
 - **F1-pre** (frente própria; painel ≥2 Criadores distintos do autor + ≥1 fora do harness afetado) —
   criar `OpenCodeJsoncSupport.ps1` + golden + fixtures + **matriz de migração** + self-tests + inventário
   de consumidores na raiz.
@@ -361,6 +360,7 @@ Cinco modos. **Wire = hipótese** até as fixtures (Apêndice). **Credencial por
 | F0-9 (cara) | `…-f0-codex-gpt-v10` (v10) | v11 | openai/gpt-5.6-terra (codex) | 1× revisa |
 | F0-10 (cara) | `…-f0-codex-gpt-v11` (v11) | v12 | openai/gpt-5.6-terra (codex) | 1× gap bloqueante |
 | F0-11 (cara) | `…-f0-codex-gpt-v12` (v12) | v13 | openai/gpt-5.6-terra (codex) | 1× gap bloqueante |
+| F0-12 (cara) | `…-f0-codex-gpt-v13` (v13) | v14 | openai/gpt-5.6-terra (codex) | 4× gap bloqueante |
 
 - **Recibo F0-1** (via `xpz-llm-delegate`): `preferenceSource=orchestrator`; `attemptRole=primary`,
   `countsForDiversity=true`; `closeoutReady=false` (`vnext-pending-resubmission`).
