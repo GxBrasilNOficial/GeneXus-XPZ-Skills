@@ -101,33 +101,6 @@ function Invoke-GeneXusTransactionWritabilityClassify {
     return Invoke-GeneXusTransactionWritabilityCore -Arguments $arguments
 }
 
-function ConvertFrom-GeneXusWritabilityBatchPayload {
-    param(
-        [Parameter(Mandatory = $true)]
-        [psobject]$Payload
-    )
-
-    $maps = @{}
-    foreach ($txProp in $Payload.transactions.PSObject.Properties) {
-        $txPayload = $txProp.Value
-        $attrMap = @{}
-        foreach ($attrProp in $txPayload.attributes.PSObject.Properties) {
-            $row = $attrProp.Value
-            $attrMap[$attrProp.Name] = [pscustomobject]@{
-                attributeName  = [string]$row.attributeName
-                levelName      = [string]$row.levelName
-                key            = [bool]$row.key
-                isRedundant    = [bool]$row.isRedundant
-                classification = [string]$row.classification
-                writable       = $row.writable
-                evidence       = [string]$row.evidence
-            }
-        }
-        $maps[$txProp.Name] = $attrMap
-    }
-    return $maps
-}
-
 function Invoke-GeneXusTransactionWritabilityBatch {
     param(
         [Parameter(Mandatory = $true)]

@@ -8,6 +8,8 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 ### Unreleased
 
+- **Retirada do conversor legado de gravabilidade em lote (2026-10-03):** removida a função `ConvertFrom-GeneXusWritabilityBatchPayload` de `GeneXusTransactionWritabilitySupport.ps1`, sem consumidores encontrados no repositório. Ela esperava `transactions.<nome>.attributes` e reduzia ocorrências a mapas por nome, incompatíveis com a saída atual. `Invoke-GeneXusTransactionWritabilityBatch` continua devolvendo o resultado estruturado do motor, com `transactions[]`, `levelAttributes` e a identidade completa das ocorrências.
+
 - **Diagnóstico do pré-requisito Python do KbIntelligence (2026-10-02):** nesta frente, a validação da assinatura do gate passou a calcular a assinatura atual do extrator com Python 3. As mensagens de ausência de Python agora identificam se a operação incompleta é o rebuild do índice, o cálculo da assinatura do extrator ou a classificação automática de gravabilidade; sem Python, a validação bloqueia mesmo quando o índice existe.
 
 - **Formas documentais da versão do extrator na pré-push (2026-10-03):** a detecção aceita crases e aspas nas afirmações de versão corrente, reconhece `EXTRACTOR_SIGNATURE_VERSION` nos contextos operacionais documentados e o contrato `schema_version / extrator` com verbo de indexação. O self-test inclui as seis formas normativas antes não detectadas, versões corretas e menções históricas com crases ou constantes isoladas, que não devem disparar. A detecção desconsidera o contrato `schema_version / extrator` quando introduzido por `Registro de AAAA-MM-DD:` e citações delimitadas após `O manual antigo dizia`. Os testes preservam avisos sobre afirmações vigentes antes ou depois desses trechos, inclusive na mesma frase; essa cobertura é específica, não uma interpretação geral de conteúdo histórico.
@@ -355,6 +357,8 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 ### Unreleased
 
+- **Retirada del conversor heredado de capacidad de escritura por lote (2026-10-03):** eliminada la función `ConvertFrom-GeneXusWritabilityBatchPayload` de `GeneXusTransactionWritabilitySupport.ps1`, sin consumidores encontrados en el repositorio. Esperaba `transactions.<nombre>.attributes` y reducía las ocurrencias a mapas por nombre, incompatibles con la salida actual. `Invoke-GeneXusTransactionWritabilityBatch` sigue devolviendo el resultado estructurado del motor, con `transactions[]`, `levelAttributes` y la identidad completa de las ocurrencias.
+
 - **Diagnóstico del prerrequisito de Python de KbIntelligence (2026-10-02):** en esta entrega, la validación de la firma del gate pasó a calcular la firma actual del extractor con Python 3. Los mensajes por falta de Python ahora identifican si la operación incompleta es la reconstrucción del índice, el cálculo de la firma del extractor o la clasificación automática de capacidad de escritura; sin Python, esa validación se bloquea aunque el índice exista.
 
 - **Formas documentales de la versión del extractor en pre-push (2026-10-03):** la detección acepta acentos graves y comillas en las afirmaciones de versión vigente, reconoce `EXTRACTOR_SIGNATURE_VERSION` en los contextos operativos documentados y el contrato `schema_version / extractor` con verbo de indexación. El self-test incluye las seis formas normativas antes no detectadas, versiones correctas y menciones históricas con acentos graves o constantes aisladas, que no deben activar el aviso. La detección descarta el contrato `schema_version / extractor` introducido por `Registro de AAAA-MM-DD:` y citas delimitadas después de `El manual antiguo decía`. Los tests conservan los avisos sobre afirmaciones vigentes antes o después de esos fragmentos, incluso en la misma frase; esta cobertura es específica, no una interpretación general de contenido histórico.
@@ -694,6 +698,8 @@ All relevant changes to this repository will be recorded here from this adoption
 The format keeps an `Unreleased` section for changes not yet published in a formal version. This repository does not yet use public semantic versioning; when that changes, future sections should record the corresponding tag.
 
 ### Unreleased
+
+- **Legacy batch writability converter removal (2026-10-03):** removed `ConvertFrom-GeneXusWritabilityBatchPayload` from `GeneXusTransactionWritabilitySupport.ps1`; no consumers were found in the repository. It expected `transactions.<name>.attributes` and reduced occurrences to maps keyed by name, incompatible with the current output. `Invoke-GeneXusTransactionWritabilityBatch` continues returning the engine's structured result, including `transactions[]`, `levelAttributes`, and complete occurrence identity.
 
 - **KbIntelligence Python prerequisite diagnostics (2026-10-02):** in this unreleased batch, gate signature validation now calculates the current extractor signature with Python 3. Missing-Python messages identify whether the incomplete operation is index rebuild, signature calculation, or automatic writability classification; without Python, validation blocks even when the index exists.
 
