@@ -324,11 +324,91 @@ def _test_new_applies_transaction_binding_context() -> None:
                 "invalidated Transaction context must be removed from New results before emitting effectives")
 
 
+def _test_flat_front_model_overlays() -> None:
+    with tempfile.TemporaryDirectory(prefix="gx-writability-flat-front-selftest-") as temp:
+        root = Path(temp)
+        corpus = root / "corpus"
+        delta = root / "front"
+        corpus_procedure = _create_corpus(corpus)
+        delta.mkdir()
+
+        transaction = ET.fromstring((corpus / "Transaction" / "Customer.xml").read_bytes())
+        level = next(node for node in transaction.iter()
+                     if node.tag.rsplit("}", 1)[-1].casefold() == "level")
+        redundant = next(node for node in level
+                         if node.tag.rsplit("}", 1)[-1].casefold() == "attribute"
+                         and (node.text or "").strip() == "CustomerName")
+        redundant.set("isRedundant", "True")
+        flat_transaction = delta / "CustomerDelta.xml"
+        _write_xml(flat_transaction, transaction)
+
+        transaction_overlay = root / "transaction-overlay"
+        transaction_overlay.mkdir()
+        transaction_origins = operational._overlay_model_corpus(corpus, delta, transaction_overlay)
+        transaction_overlay_path = "Transaction/CustomerDelta.xml"
+        _assert(transaction_origins.get(transaction_overlay_path) == "delta"
+                and transaction_origins.source_paths_by_overlay_path.get(transaction_overlay_path)
+                == "CustomerDelta.xml",
+                "a flat Transaction delta must be indexed by type while retaining its physical front path")
+        transaction_result = operational.analyze_transaction(
+            transaction_overlay / transaction_overlay_path, corpus, front_id="flat-transaction-front",
+            delta_root=delta, model_root=transaction_overlay, root_kinds_by_path=transaction_origins,
+            source_roots={"corpus": corpus, "delta": delta}, display_path=flat_transaction)
+        redundant_row = next(item for item in transaction_result["levelAttributes"]
+                             if item["attributeName"] == "CustomerName")
+        _assert(redundant_row["isRedundant"] is True and redundant_row["effectiveWritable"] is False
+                and redundant_row["identity"]["transaction"]["path"] == "CustomerDelta.xml"
+                and transaction_result["transactionPath"] == str(flat_transaction.resolve()),
+                "9-TXW must analyze the flat front Transaction and report its real path and redundant blocker")
+
+        proof_model = operational.automatic._load_writability_model(transaction_overlay)
+        operational._apply_overlay_source_paths(proof_model, transaction_origins)
+        proof_model.source_roots = {"corpus": corpus, "delta": delta}
+        proof_level = next(item for item in proof_model.levels
+                           if item.transaction.get("path") == "CustomerDelta.xml")
+        proof_files = operational._transaction_proof_files(proof_model, proof_level)
+        _assert(any(item["rootKind"] == "delta" and item["path"] == "CustomerDelta.xml"
+                    and (delta / item["path"]).is_file() for item in proof_files),
+                "9-TXW proof paths for a flat delta must resolve to the original front file")
+
+        formula_attribute = ET.fromstring((corpus / "Attribute" / "CustomerName.xml").read_bytes())
+        properties = ET.SubElement(formula_attribute, "Properties")
+        formula = ET.SubElement(properties, "Property")
+        ET.SubElement(formula, "Name").text = "Formula"
+        ET.SubElement(formula, "Value").text = "&ComputedValue"
+        _write_xml(delta / "CustomerName.xml", formula_attribute)
+        flat_procedure = delta / corpus_procedure.name
+        flat_procedure.write_bytes(corpus_procedure.read_bytes())
+
+        procedure_overlay = root / "procedure-overlay"
+        procedure_overlay.mkdir()
+        procedure_origins = operational._overlay_model_corpus(corpus, delta, procedure_overlay)
+        procedure_result = operational.analyze_procedure(
+            flat_procedure, corpus, delta, model_root=procedure_overlay,
+            root_kinds_by_path=procedure_origins)
+        formula_occurrences = [
+            occurrence
+            for block in procedure_result["newBlocks"]
+            for candidate in block["candidates"]
+            for target in candidate["assignmentTargets"]
+            if target["assignment"].get("attribute", {}).get("guid") == ATTRIBUTE_IDS["CustomerName"]
+            for occurrence in target["occurrences"]
+        ]
+        _assert(formula_occurrences and all(
+            item["classification"] == "formula" and item["writable"] is False
+            and item["effectiveCanAssignInNew"] is False
+            and item["occurrence"]["attribute"]["rootKind"] == "delta"
+            and item["occurrence"]["attribute"]["path"] == "CustomerName.xml"
+            for item in formula_occurrences),
+            "9-PNW must honor a flat formula Attribute delta and preserve its physical source identity")
+
+
 def main() -> int:
     _test_unique_fk_key_confirmation()
     _test_materialized_writability_parity()
     _test_new_selection_eligibility()
     _test_new_applies_transaction_binding_context()
+    _test_flat_front_model_overlays()
     cycle_fixture = [
         {"decisionId": "cycle-a", "dependsOnDecisionIds": ["cycle-b"]},
         {"decisionId": "cycle-b", "dependsOnDecisionIds": ["cycle-a"]},

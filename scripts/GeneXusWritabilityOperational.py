@@ -37,6 +37,14 @@ class OperationalError(ValueError):
     pass
 
 
+class _OverlayOrigins(dict[str, str]):
+    """Root kinds plus source-relative paths for normalized overlay objects."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.source_paths_by_overlay_path: dict[str, str] = {}
+
+
 class DecisionIssue(OperationalError):
     def __init__(self, status: str, reason_code: str, detail: str):
         super().__init__(detail)
@@ -268,10 +276,41 @@ def _strict_xml(path: Path) -> ElementTree.Element:
 
 
 def _overlay_model_corpus(corpus_root: Path, delta_root: Path,
-                          overlay_root: Path) -> dict[str, str]:
+                          overlay_root: Path) -> _OverlayOrigins:
     """Build a disposable XML-only corpus overlay; source roots remain untouched."""
-    origins: dict[str, str] = {}
+    origins = _OverlayOrigins()
     modeled_folders = ("Attribute", "Table", "Transaction", "SubTypeGroup")
+    catalog_types = automatic._catalog_types()
+    modeled_type_folders: dict[str, str] = {}
+    for folder in modeled_folders:
+        type_guid = automatic._type_guid(catalog_types, folder)
+        normalized_guid = _xml_guid(type_guid) if type_guid else None
+        if folder != "Attribute" and normalized_guid is None:
+            raise OperationalError(f"model object type is unavailable in catalog: {folder}")
+        if normalized_guid:
+            modeled_type_folders[normalized_guid] = folder
+
+    flat_delta_sources: dict[str, list[tuple[Path, Path]]] = {folder: [] for folder in modeled_folders}
+    for source in sorted(delta_root.glob("*.xml"), key=lambda item: item.name.casefold()):
+        try:
+            source.resolve(strict=True).relative_to(delta_root.resolve(strict=True))
+        except (OSError, ValueError) as exc:
+            raise OperationalError(f"delta model path escapes its root: {source}") from exc
+        try:
+            node = _strict_xml(source)
+        except OperationalError as exc:
+            raise OperationalError(f"delta root XML cannot be classified for model overlay: {source}: {exc}") from exc
+        root_name = _local(node.tag).casefold()
+        if root_name == "attribute":
+            folder = "Attribute"
+        elif root_name == "object":
+            raw_type_guid = next((value for key, value in node.attrib.items() if key.casefold() == "type"), "")
+            folder = modeled_type_folders.get(_xml_guid(raw_type_guid) or "")
+        else:
+            folder = None
+        if folder:
+            flat_delta_sources[folder].append((source, Path(source.name)))
+
     for folder in modeled_folders:
         source_folder = corpus_root / folder
         target_folder = overlay_root / folder
@@ -289,8 +328,6 @@ def _overlay_model_corpus(corpus_root: Path, delta_root: Path,
 
     for folder in modeled_folders:
         delta_folder = delta_root / folder
-        if not delta_folder.is_dir():
-            continue
         existing_by_guid: dict[str, list[Path]] = {}
         target_folder = overlay_root / folder
         target_folder.mkdir(parents=True, exist_ok=True)
@@ -303,7 +340,11 @@ def _overlay_model_corpus(corpus_root: Path, delta_root: Path,
             if guid:
                 existing_by_guid.setdefault(guid, []).append(existing)
         seen_delta_guids: set[str] = set()
-        for source in sorted(delta_folder.rglob("*.xml"), key=lambda item: item.relative_to(delta_root).as_posix()):
+        delta_sources = [(source, source.relative_to(delta_folder))
+                         for source in delta_folder.rglob("*.xml")] if delta_folder.is_dir() else []
+        delta_sources.extend(flat_delta_sources[folder])
+        for source, relative_in_folder in sorted(
+                delta_sources, key=lambda item: item[0].relative_to(delta_root).as_posix()):
             try:
                 source.resolve(strict=True).relative_to(delta_root.resolve(strict=True))
             except (OSError, ValueError) as exc:
@@ -317,7 +358,6 @@ def _overlay_model_corpus(corpus_root: Path, delta_root: Path,
                 raise OperationalError(f"delta model repeats object GUID {guid}: {folder}")
             if guid:
                 seen_delta_guids.add(guid)
-            relative_in_folder = source.relative_to(delta_folder)
             path_match = next((item for item in target_folder.rglob("*.xml")
                                if item.relative_to(target_folder).as_posix().casefold()
                                == relative_in_folder.as_posix().casefold()), None)
@@ -329,6 +369,7 @@ def _overlay_model_corpus(corpus_root: Path, delta_root: Path,
                 old_rel = replace_path.relative_to(overlay_root).as_posix()
                 replace_path.unlink()
                 origins.pop(old_rel, None)
+                origins.source_paths_by_overlay_path.pop(old_rel, None)
             destination = target_folder / relative_in_folder
             destination.parent.mkdir(parents=True, exist_ok=True)
             if destination.exists():
@@ -336,8 +377,57 @@ def _overlay_model_corpus(corpus_root: Path, delta_root: Path,
                     raise OperationalError(f"delta path collides with a different base object: {destination}")
                 destination.unlink()
             shutil.copyfile(source, destination)
-            origins[destination.relative_to(overlay_root).as_posix()] = "delta"
+            overlay_relative = destination.relative_to(overlay_root).as_posix()
+            origins[overlay_relative] = "delta"
+            origins.source_paths_by_overlay_path[overlay_relative] = source.relative_to(delta_root).as_posix()
     return origins
+
+
+def _apply_overlay_source_paths(model: Any, origins: dict[str, str] | None) -> dict[str, str]:
+    """Make model identities/proofs use paths that exist under their source roots."""
+    origin_map = origins or {}
+    source_paths = getattr(origin_map, "source_paths_by_overlay_path", {})
+    root_kinds_by_source_path: dict[str, str] = {}
+
+    def remap(path: str) -> str:
+        source_path = source_paths.get(path, path)
+        kind = origin_map.get(path, "corpus")
+        existing_kind = root_kinds_by_source_path.get(source_path)
+        if existing_kind is not None and existing_kind != kind:
+            raise OperationalError(f"overlay source path has conflicting origins: {source_path}")
+        root_kinds_by_source_path[source_path] = kind
+        return source_path
+
+    for transaction in model.transactions:
+        original_path = str(transaction.get("path", ""))
+        transaction["path"] = remap(original_path)
+        transaction["rootKind"] = origin_map.get(original_path, "corpus")
+    for attribute in model.attributes:
+        attribute.path = remap(attribute.path)
+    for table in model.tables:
+        table.path = remap(table.path)
+    model.root_kinds_by_path = root_kinds_by_source_path
+    return source_paths
+
+
+def _apply_overlay_source_paths_to_rows(rows: list[Any], origins: dict[str, str] | None) -> None:
+    """Keep the independently computed automatic rows keyed to source paths."""
+    origin_map = origins or {}
+    source_paths = getattr(origin_map, "source_paths_by_overlay_path", {})
+    for row in rows:
+        identity = getattr(row, "identity", None)
+        if not isinstance(identity, dict):
+            continue
+        for key in ("transaction", "attribute"):
+            object_identity = identity.get(key)
+            if not isinstance(object_identity, dict):
+                continue
+            path = object_identity.get("path")
+            if not isinstance(path, str):
+                continue
+            object_identity["path"] = source_paths.get(path, path)
+            if path in origin_map:
+                object_identity["rootKind"] = origin_map[path]
 
 
 def _local(tag: str) -> str:
@@ -933,8 +1023,7 @@ def _transaction_snapshot(transaction_path: Path, corpus_root: Path, *,
                           source_roots: dict[str, Path] | None = None) -> tuple[Any, Any, list[Any], list[Any]]:
     """Load automatic and isolated contextual copies for one Transaction snapshot."""
     model = automatic._load_writability_model(corpus_root)
-    model.root_kinds_by_path = {str(path).replace("\\", "/"): kind
-                                for path, kind in (root_kinds_by_path or {}).items()}
+    _apply_overlay_source_paths(model, root_kinds_by_path)
     model.source_roots = source_roots or {"corpus": corpus_root.resolve(strict=True)}
     for item in model.transactions:
         item["rootKind"] = _model_root_kind(model, str(item["path"]))
@@ -2407,10 +2496,14 @@ def _candidate_groups(source_root: Path, procedure_path: Path, source_sha: str,
                       delta_root: Path | None = None,
                       corpus_reference_root: Path | None = None,
                       root_kinds_by_path: dict[str, str] | None = None) -> dict[str, object]:
-    model = automatic._load_writability_model(source_root)
+    corpus_reference_root = corpus_reference_root or source_root
     root_kinds_by_path = root_kinds_by_path or {}
+    model = automatic._load_writability_model(source_root)
+    _apply_overlay_source_paths(model, root_kinds_by_path)
+    model.source_roots = {"corpus": corpus_reference_root.resolve(strict=True),
+                          **({"delta": delta_root.resolve(strict=True)} if delta_root else {})}
     for transaction in model.transactions:
-        transaction["rootKind"] = root_kinds_by_path.get(str(transaction.get("path", "")), "corpus")
+        transaction["rootKind"] = _model_root_kind(model, str(transaction.get("path", "")))
     relations, table_views = automatic._table_relation_index(model)
     attrs_by_guid: dict[str, list[automatic._AttributeObject]] = {}
     attrs_by_name: dict[str, list[automatic._AttributeObject]] = {}
@@ -2422,11 +2515,11 @@ def _candidate_groups(source_root: Path, procedure_path: Path, source_sha: str,
     tables_by_guid = {table.guid: table for table in model.tables if table.guid}
     automatic_rows = automatic.build_corpus_writability(source_root,
                                                           automatic._type_guid(automatic._catalog_types(), "Transaction") or "")
+    _apply_overlay_source_paths_to_rows(automatic_rows, root_kinds_by_path)
     rows_by_key = {_row_identity_key(row): row for row in automatic_rows}
     procedure_root, procedure_guid, _ = _procedure_source(procedure_path)
     procedure_name = _property_name(procedure_root) or procedure_path.stem
     procedure_absolute = procedure_path.resolve(strict=True)
-    corpus_reference_root = corpus_reference_root or source_root
     try:
         procedure_relative = procedure_absolute.relative_to(corpus_reference_root.resolve(strict=True)).as_posix()
         procedure_root_kind = "corpus"
@@ -2464,7 +2557,7 @@ def _candidate_groups(source_root: Path, procedure_path: Path, source_sha: str,
                 "object": procedure_ref, "partType": SOURCE_PART_TYPE_GUID,
                 "sourceSha256": source_sha, "start": assignment.start, "end": assignment.end,
                 "snippetSha256": _sha256(lhs_text),
-                "attribute": (_object_ref(root_kinds_by_path.get(attribute.path, "corpus"),
+                "attribute": (_object_ref(_model_root_kind(model, attribute.path),
                                            attribute.path, "Attribute", attribute.guid, attribute.name)
                               if attribute else None),
                 "operation": "new-assign", "blockStart": block.start, "blockEnd": block.end,
@@ -2515,7 +2608,7 @@ def _candidate_groups(source_root: Path, procedure_path: Path, source_sha: str,
                                 "partType": occurrence_level.part_type,
                                 "level": {"guid": occurrence_level.guid,
                                           "pathOrdinals": list(occurrence_level.path_ordinals)},
-                                "attribute": _object_ref(root_kinds_by_path.get(attribute_candidates[0].path, "corpus"),
+                                "attribute": _object_ref(_model_root_kind(model, attribute_candidates[0].path),
                                                           attribute_candidates[0].path, "Attribute",
                                                           attr_guid, attribute_candidates[0].name),
                             }
@@ -2536,7 +2629,7 @@ def _candidate_groups(source_root: Path, procedure_path: Path, source_sha: str,
                                 "pendingDecisions": [],
                                 "provenance": auto_row.provenance if auto_row else {},
                                 "relatedProofRefs": ([
-                                    _object_ref(root_kinds_by_path.get(tables_by_guid[guid].path, "corpus"),
+                                    _object_ref(_model_root_kind(model, tables_by_guid[guid].path),
                                                 tables_by_guid[guid].path, "Table", guid,
                                                 tables_by_guid[guid].name)
                                     for guid in auto_row.provenance.get("relationAnalysis", {}).get("visitedTableGuids", [])
@@ -2565,7 +2658,7 @@ def _candidate_groups(source_root: Path, procedure_path: Path, source_sha: str,
                                                                           item.part_type, item.path_ordinals))]
                 selection_eligible, selection_issues = _selection_eligibility(group_views, per_assignment)
                 group_by_guid[table.guid] = {
-                    "table": _object_ref(root_kinds_by_path.get(table.path, "corpus"),
+                    "table": _object_ref(_model_root_kind(model, table.path),
                                           table.path, "Table", table.guid, table.name),
                     "views": group_views,
                     "assignmentTargets": per_assignment,
@@ -2735,7 +2828,8 @@ def main() -> int:
                     relative = candidate_path.relative_to(overlay_root).as_posix()
                     root_kind = origins.get(relative, "corpus")
                     display_root = delta_root if root_kind == "delta" else corpus_root
-                    display_path = display_root / relative
+                    source_relative = origins.source_paths_by_overlay_path.get(relative, relative)
+                    display_path = display_root / source_relative
                     result = analyze_transaction(
                         candidate_path, corpus_root, model_root=overlay_root, front_id=args.front_id,
                         decision_raw=decision_raw, include_request=args.request_path is not None,

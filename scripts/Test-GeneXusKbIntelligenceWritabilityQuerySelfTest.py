@@ -115,6 +115,35 @@ def main() -> int:
         conn.execute("UPDATE transaction_attribute_writability SET evidence=? WHERE writability_id=1",
                      (_envelope(rows[0]["identity"]),))
 
+        bad_level_identity = dict(rows[0]["identity"])
+        bad_level_identity["level"] = {**bad_level_identity["level"], "guid": "not-a-uuid"}
+        conn.execute("UPDATE transaction_attribute_writability SET evidence=? WHERE writability_id=1",
+                     (_envelope(bad_level_identity),))
+        try:
+            engine.transaction_attributes(conn, "Customer")
+        except engine.WritabilityIndexError as exc:
+            if exc.reason != "writability-identity-invalid":
+                raise AssertionError(f"unexpected invalid-Level-GUID reason: {exc.reason}") from exc
+        else:
+            raise AssertionError("malformed non-null Level GUID must fail closed")
+        conn.execute("UPDATE transaction_attribute_writability SET evidence=? WHERE writability_id=1",
+                     (_envelope(rows[0]["identity"]),))
+
+        bad_transaction_identity = dict(rows[0]["identity"])
+        bad_transaction_identity["transaction"] = {
+            **bad_transaction_identity["transaction"], "path": "Transaction/Other.xml"}
+        conn.execute("UPDATE transaction_attribute_writability SET evidence=? WHERE writability_id=1",
+                     (_envelope(bad_transaction_identity),))
+        try:
+            engine.transaction_attributes(conn, "Customer")
+        except engine.WritabilityIndexError as exc:
+            if exc.reason != "writability-identity-conflict":
+                raise AssertionError(f"unexpected Transaction-path-conflict reason: {exc.reason}") from exc
+        else:
+            raise AssertionError("Transaction evidence path must match objects.file_path")
+        conn.execute("UPDATE transaction_attribute_writability SET evidence=? WHERE writability_id=1",
+                     (_envelope(rows[0]["identity"]),))
+
         conn.execute("DELETE FROM metadata WHERE key='extractor_signature_format'")
         try:
             engine.transaction_writable_attributes(conn, "Customer")

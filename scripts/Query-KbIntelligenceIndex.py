@@ -590,6 +590,9 @@ def fetch_materialized_writability_rows(
                 or not isinstance(envelope.get("provenance"), dict)
                 or not isinstance(envelope.get("evidenceSummary"), str)):
             raise WritabilityIndexError("writability-identity-invalid", "Identidade/campos da ocorrência inválidos; regenere o índice.")
+        level_guid = level_identity.get("guid")
+        if level_guid is not None and not _valid_uuid(level_guid):
+            raise WritabilityIndexError("writability-identity-invalid", "GUID do Level na evidência é inválido; regenere o índice.")
         for object_identity in (tx_identity, attribute_identity):
             guid = object_identity.get("guid")
             if guid is not None and not _valid_uuid(guid):
@@ -610,10 +613,12 @@ def fetch_materialized_writability_rows(
             raise WritabilityIndexError("writability-evidence-invalid", "reasonCodes do envelope não são um conjunto ordenado; regenere o índice.")
         if (str(tx_identity.get("guid") or "").casefold() != str(transaction_object.get("guid") or "").casefold()
                 or str(tx_identity.get("name") or "").casefold() != str(transaction_object.get("name") or "").casefold()
+                or str(tx_identity.get("path") or "").casefold()
+                != str(transaction_object.get("file_path") or "").replace("\\", "/").casefold()
                 or str(attribute_identity.get("name") or "").casefold() != str(row["attribute_name"]).casefold()
                 or str(row.get("reason") or "") == ""
                 or not isinstance(row.get("classification"), str)):
-            raise WritabilityIndexError("writability-identity-conflict", "Identidade materializada diverge das linhas; regenere o índice.")
+            raise WritabilityIndexError("writability-identity-conflict", "Identidade materializada diverge das linhas/arquivo do objeto; regenere o índice.")
         writable = nullable_bool_from_sqlite(row.get("writable"))
         rows.append(
             {
