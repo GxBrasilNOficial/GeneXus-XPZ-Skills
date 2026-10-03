@@ -5,7 +5,10 @@
 
 .DESCRIPTION
     Checagem consultiva para apontar zonas de risco que a fase semantica deve
-    justificar. Não tenta provar cobertura documental completa.
+    justificar. Não tenta provar cobertura documental completa. A busca por versão antiga
+    examina Markdown rastreado ou não ignorado pelo Git e só sinaliza afirmações explícitas
+    de versão corrente ou de próximo bump já consumido; menções históricas isoladas não
+    geram esse finding.
 #>
 
 [CmdletBinding()]
@@ -271,19 +274,58 @@ if ($normalizedChangedFiles -contains $buildPyRelativePath -or $normalizedChange
             [string]::IsNullOrWhiteSpace($baseExtractorVersion)) {
             Add-Finding -Target $findings -Code 'EXTRACTOR_SIGNATURE_VERSION_UNRESOLVED' -Path $buildPyRelativePath -Message ("Nao foi possivel resolver a assinatura do extrator no estado atual ou em {0}; revisar as fontes da versao antes de considerar a cobertura documental valida." -f $BaseRef)
         } elseif ($currentExtractorVersion -ne $baseExtractorVersion) {
-            $staleExtractorPattern = [regex]::new(
-                ('(?i)\b(?:extrator|extractor)(?:\s+\w+){{0,4}}\s+`?{0}`?\b' -f [regex]::Escape($baseExtractorVersion))
+            $currentExtractorVersionClaimPatterns = @(
+                [regex]::new('(?ix)\b(?:extrator|extractor)\s+(?<version>\d+)\s+(?:é|es|is)\s+(?:(?:o|a|el|la|the)\s+)?(?:(?:current|latest)\s+(?:version|contract)|(?:vers[aã]o|versión|version|contrato)\s+(?:atual|actual|corrente|vigente|em\s+vigor|en\s+vigor|current|latest)|(?:atual|actual|corrente|vigente|em\s+vigor|en\s+vigor|current|latest))\b'),
+                [regex]::new('(?ix)\b(?:extrator|extractor)\s+(?<version>\d+)\s+(?:continua(?:\s+sendo)?|segue(?:\s+sendo)?|permanece(?:\s+sendo)?|continues?\s+to\s+be|remains)\s+(?:(?:o|a|el|la|the)\s+)?(?:one\s+)?(?:currently\s+)?(?:used|usado|utilizado)\s+(?:today|hoje|atualmente|actualmente)\b'),
+                [regex]::new('(?ix)\b(?:(?:current|latest|actual)\s+(?:extractor|extrator)\s+(?:(?:signature\s+)?version)|(?:vers[aã]o|versión)\s+(?:atual|actual|corrente|vigente)\s+(?:do|del)\s+(?:extrator|extractor))\s*(?:is|es|é|=|:)?\s*(?<version>\d+)\b'),
+                [regex]::new('(?ix)\b(?:no\s+índice\s+atual|en\s+el\s+índice\s+actual|in\s+the\s+current\s+index)\b.{0,60}\b(?:extrator|extractor)\s+(?:é|es|is|=|:)?\s*(?<version>\d+)\b')
             )
-            $docFiles = @(Get-ChildItem -LiteralPath $resolvedRoot -Recurse -File -Filter '*.md' -ErrorAction SilentlyContinue |
+            $extractorSignatureContextPattern = [regex]::new('(?i)\bEXTRACTOR_SIGNATURE_VERSION\b|\bassinatura\s+(?:única\s+)?do\s+(?:extrator|extractor)\b|\b(?:extrator|extractor)\s+signature\b')
+            $nextBumpVersionPattern = [regex]::new('(?i)\b(?:pr[oó]xim[oa]\s+(?:bump|vers[aã]o|versión)|next\s+(?:bump|version))\b[^\r\n]{0,120}\b(?:hoje|today|atualmente|actualmente|currently)\s*(?:[:=]\s*)?(?<version>\d+)\b')
+            $currentVersionNumber = 0
+            $hasNumericCurrentVersion = [int]::TryParse($currentExtractorVersion, [ref]$currentVersionNumber)
+            $docPathsResult = Invoke-RepoGit -RepositoryRoot $resolvedRoot -Arguments @('ls-files', '--cached', '--others', '--exclude-standard', '--', '*.md')
+            if ($docPathsResult.ExitCode -ne 0) {
+                throw ("Falha ao listar documentos Markdown versionados ou nao ignorados: {0}" -f $docPathsResult.Text)
+            }
+            $docPaths = @($docPathsResult.Lines |
+                ForEach-Object { Normalize-RepoPath -Path $_ } |
                 Where-Object {
-                    (Normalize-RepoPath -Path ([System.IO.Path]::GetRelativePath($resolvedRoot, $_.FullName))) -notmatch '^(historico|\.git)/'
+                    -not [string]::IsNullOrWhiteSpace($_) -and
+                    $_ -match '(?i)\.md$' -and
+                    $_ -notmatch '^(historico|\.git)/'
                 })
-            foreach ($docFile in $docFiles) {
-                $relativeDocPath = Normalize-RepoPath -Path ([System.IO.Path]::GetRelativePath($resolvedRoot, $docFile.FullName))
-                $docText = [System.IO.File]::ReadAllText($docFile.FullName)
-                $staleMatches = @($staleExtractorPattern.Matches($docText))
-                if ($staleMatches.Count -gt 0) {
-                    Add-Finding -Target $findings -Code 'EXTRACTOR_SIGNATURE_STALE_DOC_REF' -Path $relativeDocPath -Message ("A assinatura do extrator mudou de {0} para {1}, mas {2} ainda contem referencia textual a extrator/extractor {0}; revisar se e historico justificado ou gap documental." -f $baseExtractorVersion, $currentExtractorVersion, $relativeDocPath)
+            foreach ($relativeDocPath in $docPaths) {
+                $docPath = Join-Path $resolvedRoot $relativeDocPath
+                if (-not (Test-Path -LiteralPath $docPath -PathType Leaf)) { continue }
+                $docText = [System.IO.File]::ReadAllText($docPath)
+                $hasStaleVersionClaim = $false
+                foreach ($lineText in ($docText -split '\r?\n')) {
+                    foreach ($claimPattern in $currentExtractorVersionClaimPatterns) {
+                        foreach ($claimMatch in $claimPattern.Matches($lineText)) {
+                            if ($claimMatch.Groups['version'].Value -cne $currentExtractorVersion) {
+                                $hasStaleVersionClaim = $true
+                                break
+                            }
+                        }
+                        if ($hasStaleVersionClaim) { break }
+                    }
+                    if ($hasStaleVersionClaim) { break }
+
+                    if ($hasNumericCurrentVersion -and $extractorSignatureContextPattern.IsMatch($lineText)) {
+                        foreach ($bumpMatch in $nextBumpVersionPattern.Matches($lineText)) {
+                            $documentedBumpVersion = 0
+                            if ([int]::TryParse($bumpMatch.Groups['version'].Value, [ref]$documentedBumpVersion) -and
+                                $documentedBumpVersion -le $currentVersionNumber) {
+                                $hasStaleVersionClaim = $true
+                                break
+                            }
+                        }
+                    }
+                    if ($hasStaleVersionClaim) { break }
+                }
+                if ($hasStaleVersionClaim) {
+                    Add-Finding -Target $findings -Code 'EXTRACTOR_SIGNATURE_STALE_DOC_REF' -Path $relativeDocPath -Message ("A assinatura do extrator mudou de {0} para {1}, e {2} ainda contém uma afirmação explícita de versão corrente ou de próximo bump incompatível com o estado atual; revisar o contrato documental." -f $baseExtractorVersion, $currentExtractorVersion, $relativeDocPath)
                 }
             }
         }

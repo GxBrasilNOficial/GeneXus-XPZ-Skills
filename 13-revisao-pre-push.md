@@ -220,7 +220,7 @@ Ver `10-base-operacional-msbuild-headless.md` e gate `Test-PrePushMsBuildProbeDo
 | `scripts/Invoke-PrePushMechanicalChecks.ps1` | Orquestrador mecânico (git, parse, avisos) |
 | `scripts/Build-PrePushReviewDossier.ps1` | Monta o dossiê (Seção A git bruto + Seção B `-AsJson`) para o revisor **semantic-only** da reforçada (ver «Modo assistido por dossiê»); dono normativo do modo = este `13`, política de painel = `14` |
 | `scripts/Test-PyScriptsParse.ps1` | Parse AST de `scripts/*.py` sem gerar bytecode |
-| `scripts/Test-PrePushTraceabilityCoverage.ps1` | Rastreabilidade editorial + paridade motor/doc; trava `PUBLIC_TRACEABILITY_VERBOSE_LINE` do índice de ponteiros do `09` (consultivo) |
+| `scripts/Test-PrePushTraceabilityCoverage.ps1` | Rastreabilidade editorial e paridade motor/doc; identifica afirmações explícitas de versão corrente incompatível ou próximo bump numérico já consumido em Markdown visível ao Git; menção histórica isolada ou atualidade ligada a outro fato não basta; trava `PUBLIC_TRACEABILITY_VERBOSE_LINE` do índice de ponteiros do `09` (consultivo) |
 | `scripts/Test-PrePushMsBuildProbeDocParity.ps1` | Paridade MSBuild probe (quando aplicável) |
 | `scripts/Test-GeneXusUnexpectedCharacter.ps1` | Caracteres Unicode inesperados em .md/.ps1 (consultivo) |
 | `scripts/Test-PrePushNewTokenPropagation.ps1` | Propagação de termo novo introduzido no diff por transição co-localizada (consultivo) |
