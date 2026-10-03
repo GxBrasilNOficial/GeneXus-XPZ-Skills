@@ -193,13 +193,15 @@ exit 0
 
 } catch {
   # Excecao fora dos Fail-Gate conhecidos. Sob -AsJson honra o contrato (nunca
-  # lanca): emite { status: BLOCK, reason } + exit 1. Em texto, re-lanca (default
-  # retrocompativel, preserva o "BLOCK: <motivo>").
+  # lanca): emite { status: BLOCK, reason } + exit 1. Em texto, preserva um
+  # prefixo BLOCK existente e adiciona-o quando a excecao nao o trouxe.
   if ($AsJson) {
     $out['status'] = 'BLOCK'
     $out['reason'] = ($_.Exception.Message -replace '^BLOCK:\s*', '')
     [pscustomobject]$out | ConvertTo-Json -Depth 4
     exit 1
   }
-  throw
+  $errorMessage = [string]$_.Exception.Message
+  if ($errorMessage -cmatch '^BLOCK:\s*') { throw }
+  throw ('BLOCK: {0}' -f $errorMessage)
 }
