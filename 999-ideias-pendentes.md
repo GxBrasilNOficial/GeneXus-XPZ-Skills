@@ -3280,19 +3280,34 @@ As contagens são de **arquivos que mencionam o token**, não de parâmetros exc
 ## Skill `xpz-mcp-integrations` — componente MCP externo opcional (Jev/System One)
 
 - **Importância** — média (gap real: hoje só existe configuração manual, e o caminho validado está amarrado à máquina de referência — path pessoal + dependência de rede/cache em runtime; falta um caminho gerenciado e portátil para a comunidade).
-- **Maturidade** — em refino (decisões fechadas em 2026-10-02; F0: rodada de 4 titulares + refinos via opencode (segundas opiniões; `authorFamily=deepseek`) + **validações com `openai/gpt-5.6-terra` via codex (insumo, sem poder decisório)**; faltam o **painel de liberação** com ≥2 criadores distintos do autor e a execução; ver `xpz-mcp-integrations-design.md`).
+- **Maturidade** — em refino (decisões fechadas em 2026-10-02 e **escopo reduzido na v22 em 2026-10-03**; F0: rodada de 4 titulares + refinos via opencode (segundas opiniões; `authorFamily=deepseek`) + **validações com `openai/gpt-5.6-terra` via codex (insumo, sem poder decisório)**; faltam o **painel de liberação** com ≥2 criadores distintos do autor — instruído a avaliar se a v1 é a **menor** que preserva as propriedades essenciais, sem acrescentar endurecimento — e a execução; ver `xpz-mcp-integrations-design.md`).
 
 **O que é.** Skill nova dedicada a instalar, auditar, reparar, atualizar e remover **componentes MCP externos opcionais** nos clientes de agente; o 1º componente é o **Jev/System One** (modelo de decisão do TypeSafe) via `@jkudish/jev-mcp`. Motor genérico dirigido por descritor; a v1 cobre **OpenCode e Codex**.
 
 **Por que não na `xpz-skills-setup`.** A skill de setup registra skills XPZ, instrucionais globais, `nexa`/`gam`, bootstrap git e o MCP **interno** do Cursor; não gerencia MCP de terceiros. A nova skill nasce separada, com fronteira explícita e regra de merge que preserva entradas de outros donos nos mesmos arquivos de cliente.
 
-**Decisões travadas (2026-10-02).** Nome `xpz-mcp-integrations`; pacote **vendorizado** e pinado (`0.13.0`; **identidade = sha512 do tarball** no lockfile; hash de commit como **proveniência** — valores a re-verificar no F1), **sem `npx`** no início; Node é **dependência de runtime** (detectar ausência e versão `< 22`; **oferecer** instalar via `winget` com aprovação); credencial em **cofre neutro** da skill com **DPAPI** (env como override; `auth.json` do OpenCode só importação opcional); fornecedor: os **5 modos** do pacote, sendo `compatible`/Command Code **parcial** (não validado E2E) e os outros 4 **experimental opt-in**; **sem fork** na v1; público comunitário.
+**Decisões travadas (2026-10-02).** Nome `xpz-mcp-integrations`; pacote **vendorizado** e pinado (`0.13.0`; **identidade = sha512 do tarball** no lockfile; hash de commit como **proveniência** — valores a re-verificar no F1), **sem `npx`** no início; Node é **dependência de runtime** (detectar ausência e versão `< 22`; **oferecer** instalar via `winget` com aprovação); credencial em **cofre neutro** da skill com **DPAPI** (env como override; `auth.json` do OpenCode só importação opcional); fornecedor: o descritor declara os **5 modos** do pacote, mas a v1 **implementa e testa só `compatible`** com preset Command Code (**parcial**, não validado E2E) — os outros 4 vão para o F4 (revisto na v22); **sem fork** na v1; público comunitário.
 
-**Adiado.** Fork/espelho do artefato; Cursor e Claude Code; backend Python alternativo (`typesafe-mcp` no PyPI, outra superfície e não validado contra o Command Code).
+**Adiado.** Fork/espelho do artefato; Cursor e Claude Code; backend Python alternativo (`typesafe-mcp` no PyPI, outra superfície e não validado contra o Command Code); os **endurecimentos do Anexo B** do design (v22).
 
 **Refino (2026-10-02).** Design reorganizado em **v21**: o corpo ficou com as **decisões**; o **Anexo A** reúne as **obrigações de implementação** (a provar por self-test no F1-pre/F1/F2); há a seção **Adiado / escopo-futuro**. Único corte de escopo: o **teste de egresso de rede contido (Windows Sandbox)** deixou de ser gate do F1 e virou **endurecimento opt-in** — o gate do F1 passou a ser **revisão estática do `dist` + boot sem chave** (protocolo do Sandbox preservado no Anexo A.4.6; risco aceito declarado nos Riscos). Ver `xpz-mcp-integrations-design.md` (v21, Anexo A e «Adiado»).
 
-**Relacionado.** `xpz-mcp-integrations-design.md`; `xpz-skills-setup/SKILL.md` (fronteira); `xpz-llm-delegate/SKILL.md` e `15-revisao-por-pares.md` (o `commandcode/*` ali é catálogo de vozes do painel — não confundir com o endpoint do Jev).
+**Redução (2026-10-03).** Parecer externo (chat web, insumo fora do painel) apontou que o plano cresceu além do problema — as rodadas F0-7..F0-18 tiveram um único revisor adversarial e cada gap virou camada nova. Decisão humana: **v22** com a **menor v1 que preserva as propriedades essenciais** (sem `npx`; pin por integridade; `npm ci --ignore-scripts`; chave só no cofre DPAPI; backup antes de gravar; nada gravado sem aprovação). Cortes, todos **movidos para o Anexo B** do design (não apagados): biblioteca JSONC única e o F1-pre (a v1 reaproveita o mecanismo do `reviewer-ro` com validação pós-edição fail-closed); launcher nativo `CreateProcessW` + Job Object (a v1 usa `ProcessStartInfo` com stdio herdado); manifesto de árvore e catálogo de bundles; biblioteca TOML (o Codex entra no F1 com bloco entre marcadores); backup do cofre; 4 fornecedores. **F1 passa a ser a v1 completa**; F2 = endurecimentos por decisão própria.
+
+**Relacionado.** `xpz-mcp-integrations-design.md`; `xpz-skills-setup/SKILL.md` (fronteira); `xpz-llm-delegate/SKILL.md` e `15-revisao-por-pares.md` (o `commandcode/*` ali é catálogo de vozes do painel — não confundir com o endpoint do Jev); entrada «JSONC do OpenCode — biblioteca única e migração dos consumidores» (abaixo).
+
+## JSONC do OpenCode — biblioteca única e migração dos consumidores
+
+- **Importância** — baixa a média (os motores JSONC atuais têm limites conhecidos; o caso mais visível, em `Install-OpenCodeReviewerRoAgent.ps1:252`, aparenta **falhar fechado** — bloqueia em vez de corromper —, mas isso ainda **não foi testado**).
+- **Maturidade** — desenho pronto (origem: F1-pre do `xpz-mcp-integrations`, retirado daquela frente na v22; texto preservado em `xpz-mcp-integrations-design.md`, **Anexo B.3**); falta testar a hipótese do bug, revisar e executar.
+
+**O que é.** Criar uma biblioteca única (`OpenCodeJsoncSupport.ps1`, a criar) com *localizador estrutural* — tokenizador, busca por caminho estrutural, operações sobre spans que nunca recaem em comentário/string, preservação de encoding/BOM/EOL — e migrar os consumidores: `Install-OpenCodeReviewerRoAgent.ps1` (`Find-JsoncMatchingBrace`/`Find-JsoncKeyValueSpan`), `OpenCodeReviewerRoGuard.ps1` (`ConvertFrom-Jsonc`, sem trailing comma), `Build-LlmDelegateCapabilityManifest.ps1` (`ConvertFrom-JsoncText`, regex não string-safe) e o futuro `xpz-mcp-integrations`.
+
+**Hipótese a testar primeiro.** Quando o bloco `agent` existe vazio, a inserção do `reviewer-ro` (`Install-OpenCodeReviewerRoAgent.ps1:235`) parece deixar vírgula final, que o `ConvertFrom-Jsonc` da validação (`:252`) não aceita → `BLOCK` sem gravar. Confirmar com fixture antes de dimensionar a frente.
+
+**Por que separado.** Melhoria legítima do pacote, mas maior que a integração do Jev; mantê-la como pré-requisito bloqueava a entrega por um defeito anterior e independente.
+
+**Relacionado.** `xpz-mcp-integrations-design.md` (Anexo B.3 e A.3); `xpz-llm-delegate/SKILL.md` (dono-doc dos motores JSONC); entrada «Skill `xpz-mcp-integrations`» (acima).
 
 ## Pré-requisito Python — dispatch explícito de `-Operation`
 

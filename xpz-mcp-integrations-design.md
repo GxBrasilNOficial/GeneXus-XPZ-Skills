@@ -1,17 +1,26 @@
-# xpz-mcp-integrations — design da skill (v21)
+# xpz-mcp-integrations — design da skill (v22)
 
 ## Papel do documento
 
-Design **vivo** (não congelado) da skill `xpz-mcp-integrations`, com decisões de **2026-10-02** e a
-evidência empírica coletada.
+Design **vivo** (não congelado) da skill `xpz-mcp-integrations`, com decisões de **2026-10-02**,
+redução de escopo de **2026-10-03** e a evidência empírica coletada.
 
 - **v2** pré-análise · **v3** F0-1 (4 titulares) · **v4–v8** refinos opencode (segundas opiniões) ·
   **v9–v20** validações caras · **v21** **reorganização editorial** (separa DECISÃO de OBRIGAÇÃO DE
-  IMPLEMENTAÇÃO; marca o ADIADO). A v21 não reabre decisões.
+  IMPLEMENTAÇÃO; marca o ADIADO) · **v22** **redução de escopo** (decisão humana de 2026-10-03, a
+  partir de parecer externo). **A v22 reabre decisões explicitamente:** a v1 passa a ser a **menor
+  versão que preserva as propriedades de segurança essenciais**; os endurecimentos saem para o
+  **Anexo B** (movidos, não apagados).
 
 **Estrutura:** o **corpo** carrega decisão, escopo, fronteira, contrato mínimo, fases e riscos. O
-**Anexo A** carrega o detalhe técnico já decidido, a provar por self-test no F1-pre/F1/F2. A seção
-**Adiado / escopo-futuro** carrega o que sai da v1.
+**Anexo A** carrega o detalhe técnico da **v1**, a provar por self-test no F1. O **Anexo B** preserva
+os **endurecimentos adiados** (texto das v2–v21). A seção **Adiado / escopo-futuro** carrega o que sai
+da v1.
+
+**Propriedades essenciais da v1 (não cortáveis):** sem `npx` em runtime; pin por **integridade**
+(lockfile); `npm ci --ignore-scripts`; chave **só** no cofre DPAPI, nunca no config do cliente; backup
+antes de gravar config de cliente; **nada gravado sem aprovação**; ciclo instalar/auditar/reparar/
+remover.
 
 **Autor e diversidade:** `authorFamily=deepseek`. Revisores de famílias distintas da do autor; as
 rodadas opencode (meta+deepseek) são **segundas opiniões**. **Liberação** exige **≥2 Criadores
@@ -31,14 +40,15 @@ instalar/auditar/reparar/atualizar/remover esse componente MCP. A configuração
 - **Componente:** Jev/System One via `@jkudish/jev-mcp`. **Clientes:** OpenCode e Codex.
 - **Plataforma:** **Windows** (KB/IDE do usuário típico). **Exceção:** cofre DPAPI **sem roaming**.
 - **Ciclo:** detectar → instalar → auditar → reparar → atualizar → remover. **Credencial:** cofre
-  neutro. **Público:** comunidade. **A v1 (OpenCode + Codex) completa no F2**; F1 ≠ v1.
+  neutro. **Público:** comunidade. **A v1 (OpenCode + Codex mínimo) completa no F1** (v22).
+- **Fornecedor:** só `compatible` com preset **Command Code** (v22).
 
 ## Não-escopo da v1
 
 Fork; Cursor e Claude Code; macOS/Linux; instalar ferramentas; criar conta; `skills/jev/`; uso
 automático; MCPs sem descritor; vender fornecedores não provados como validados.
 
-## Decisões travadas (2026-10-02)
+## Decisões travadas (2026-10-02; revisadas na v22 em 2026-10-03)
 
 | # | Decisão | Escolha |
 |---|---|---|
@@ -46,11 +56,12 @@ automático; MCPs sem descritor; vender fornecedores não provados como validado
 | 2 | Runtime | pacote **vendorizado** e pinado; **sem `npx`** |
 | 3 | Node | ausência **e** `< 22`; `winget` id `OpenJS.NodeJS.LTS` com aprovação; com `nvm`/`fnm`/`volta`, **relatar**; node sem npm = corrompido → relatar |
 | 4 | Plataforma | **Windows** (cofre sem roaming) |
-| 5 | Escopo v1 | **OpenCode + Codex** (completa no F2) |
+| 5 | Escopo v1 | **OpenCode + Codex mínimo** (completa no F1 — v22) |
 | 6 | Credencial | **cofre** DPAPI, **vault-first**; env = **override explícito**; `auth.json` só import opcional |
-| 7 | Fornecedor | 5 modos; `compatible`/Command Code **parcial**; outros 4 **experimental opt-in** |
+| 7 | Fornecedor | descritor declara os 5 modos como **dado**; a v1 **implementa e testa só `compatible`** com preset **Command Code** (**parcial**); os outros 4 → **F4** (v22) |
 | 8 | Fork | **não** na v1 |
 | 9 | Público | comunidade |
+| 10 | Tamanho da v1 | **v1 mínima** que preserva as propriedades essenciais; endurecimentos → **Anexo B** (v22) |
 
 ## Arquitetura — decisões
 
@@ -65,11 +76,13 @@ a **exceção de endpoint** do modo `compatible` é campo explícito. Detalhe: *
 
 | Classe | Contrato |
 |---|---|
-| **Biblioteca dot-source** (`OpenCodeJsoncSupport.ps1`) | sem JSON de stdout, sem `-InputPath`, sem `ShouldProcess`; fail-closed se ausente |
 | **Diagnóstico read-only** (auditor) | JSON de máquina, `overall`, tabela estado→`exitCode`/classe, `-InputPath`; sem `-WhatIf` |
 | **Mutador** (instalar/reparar/remover/atualizar/vendorizar) | JSON de máquina, `-WhatIf`, `exitCode`, backup transacional |
 
-**Faixa de `exitCode` reservada no F1-pre** (não-colisão com `msbuild-exit-codes.catalog.json`; tabela
+A classe **biblioteca dot-source** (`OpenCodeJsoncSupport.ps1`) saiu da v1 na v22 (ver
+`999` — «JSONC do OpenCode — biblioteca única e migração dos consumidores»).
+
+**Faixa de `exitCode` reservada no F1** (não-colisão com `msbuild-exit-codes.catalog.json`; tabela
 antes do motor). Motores com `-InputPath` entram na lista de `Test-XpzParameterNamingContract.ps1`
 (`02:972/977`). **Vocabulário de evidência:** o `02` é centrado em XML → **declarar extensão** para
 artefatos externos, com rótulo próprio.
@@ -85,127 +98,139 @@ artefatos externos, com rótulo próprio.
   `xpz-skills-setup`. **`AGENTS.md`/`README.md`:** **reconciliar** as listas (três seções do README +
   enumeração vigente do AGENTS), **adicionando só o que faltar** (`xpz-codex-apply-patch-alternative`
   já aparece em `AGENTS.md:11`; conferir a enumeração `:49` sem assumir).
-- **Aresta de dependência:** `OpenCodeJsoncSupport.ps1` (a **criar**; dono-doc proposto
-  `xpz-llm-delegate/SKILL.md`) ganha consumidor novo; registrada nos dois donos.
+- **Aresta de dependência:** a v1 **reaproveita** o mecanismo JSONC já usado por
+  `Install-OpenCodeReviewerRoAgent.ps1`/`OpenCodeReviewerRoGuard.ps1` (dono-doc
+  `xpz-llm-delegate/SKILL.md`), **sem** migrar consumidores; a aresta é registrada nos dois donos. A
+  biblioteca única é frente própria no `999`.
 - **Rastreabilidade privada:** fixtures sanitizadas de `dist` são molde publicável → avaliar
   `GeneXus-XPZ-PrivateMap`; reconciliar `README.md:107` × `AGENTS.md:92-96`. **Licença:** cópia
   integral MIT + atribuição.
 
-### Suporte JSONC compartilhado — frente própria (F1-pre)
+### OpenCode — reaproveitar o mecanismo JSONC existente (v22)
 
-Os motores JSONC hoje espalhados na raiz são insuficientes e há **bug vivo** em
-`Install-OpenCodeReviewerRoAgent.ps1:252`. **Decisão:** criar **uma biblioteca única** —
-`OpenCodeJsoncSupport.ps1`, arquivo **a criar** — implementando um ***localizador estrutural***
-(tokenizador + busca por caminho estrutural + operações sobre spans que nunca recaem em
-comentário/string), e **migrar todos os consumidores** para ela. O F1-pre é frente própria, com painel
-de ≥2 Criadores distintos do autor + ≥1 voz fora do harness afetado.
+O `opencode.jsonc` real tem comentários (o `reviewer-ro` já grava nele), então recusar JSONC
+inviabilizaria a v1. **Decisão (v22):** a v1 **reaproveita** o mecanismo já em uso pelo `reviewer-ro`
+— **inserção textual** + **validação pós-edição por parse completo** + checagem de que `mcp.jev` ficou
+na forma esperada. Qualquer falha → **nada é gravado**, estado `edicao_manual_necessaria` e o trecho
+pronto para o usuário colar. **Sem** criar biblioteca nova e **sem** migrar outros consumidores.
 
-Diagnóstico verificado, matriz de migração, golden dividido, fixtures negativas, política de chaves
-duplicadas e ordem de execução: **Anexo A.3**.
+A biblioteca única com *localizador estrutural* e a matriz de migração viraram **frente própria** no
+`999` (desenho preservado no **Anexo B.3**); quando ela existir, este consumidor migra junto. Detalhe
+da v1: **Anexo A.3**.
 
 ### Execução do MCP — vendorização
 
 - **Pacote:** `@jkudish/jev-mcp`; **versão `0.13.0`**.
 - **Identidade do artefato = `integrity` sha512 do tarball** no **lockfile comitado**; o **commit Git é
-  proveniência**, não âncora.
-- **Manifesto de árvore esperado, comitado**, gerado em release controlada; o installer compara a
-  árvore instalada e **rejeita** divergência.
+  proveniência**, não âncora. O `npm ci` já confere o `integrity` de cada pacote contra o lockfile.
 - **`npm ci --ignore-scripts`** (o pacote declara `prepare`; usamos o `dist` pré-compilado) em
   `%LOCALAPPDATA%\xpz-mcp-integrations\vendor-<versao>\`.
-- **Catálogo de bundles aprovados** versionado: update/rollback **só** consomem entradas do catálogo;
-  `-CheckUpdates` **apenas informa**. Obter bundle novo = **atualizar o repositório/skill**.
+- **Atualizar** = novo `package.json`/lockfile no repositório + reinstalar + re-emitir config.
+  **Rollback** = versão anterior do repositório + backup do config. `-CheckUpdates` **apenas informa**.
 - **Sem indireção mutável**: launcher versionado por path absoluto; **sem junction/symlink** (hazard de
   `historico/...20260622-20260922.md:48`).
-- **Evidência sanitizada do `dist`, commitada com proveniência, é pré-condição de qualquer motor.** Até
-  lá, a tabela de Fornecedor é **hipótese**.
-- **Semântica de rede (3 contextos):** (1) instalador/vendorizador: sem registro fora de install/update;
-  (2) launcher/MCP: só o endpoint; (3) teste isolado — **rebaixado a endurecimento opt-in** (ver
-  **Adiado**).
+- **Evidência sanitizada do `dist`, commitada com proveniência, é pré-condição de qualquer motor** —
+  na v1, restrita ao modo `compatible` + `engines.node` + `prepare` + boot + licença.
+- **Semântica de rede (2 contextos na v1):** (1) instalador/vendorizador: sem registro fora de
+  install/update; (2) launcher/MCP: só o endpoint. O teste isolado de egresso está no **Anexo B.4.6**.
 - **Caminhos/segurança:** todo caminho gerenciado sob `%LOCALAPPDATA%\xpz-mcp-integrations` após
-  **canonicalização**, **rejeitando reparse points em toda a ancestralidade**; **ACL antes de
-  persistir**; escrita atômica.
+  **canonicalização**; **ACL antes de persistir**; escrita atômica.
+- **Adiado para o Anexo B (v22):** manifesto de árvore `manifest.sha256` (sha256 por arquivo),
+  catálogo de bundles aprovados, rollback por bundle com retenção, rejeição de reparse points em toda
+  a ancestralidade.
 
-Identidade/cadeia, campos do manifesto e do catálogo, bootstrap executável, retenção e rollback:
-**Anexo A.4**.
+Bootstrap executável e evidência do `dist`: **Anexo A.4**.
 
 ### Launcher portátil (molde gerado pela skill)
 
 - **Comando = launcher PowerShell** (`["pwsh","-NoProfile","-File","<launcher-<versao>.ps1"]`).
-- **Rota travada = API nativa `CreateProcessW`** com **`CREATE_SUSPENDED`** + **Job Object** +
-  `ResumeThread` (rota **única**). **`ProcessStartInfo` DESCARTADO**; **`& node` DESCARTADO**.
+- **Rota da v1 (v22) = `ProcessStartInfo`** com `UseShellExecute=false` e **sem redirecionar o
+  stdio**: o `node` **herda os handles** do cliente (sem re-encode, sem cópia de bytes pelo launcher).
+  O launcher espera o filho e devolve o **exit code do filho**.
 - **Ambiente do filho = limpo + allowlist do descritor** (não herda): só a variável secreta do modo, as
-  vars públicas permitidas daquele modo lidas do `config.json`, e o mínimo de sistema/runtime.
-- **Invariante mecanizada:** nenhum byte fora do filho em stdout; **exit code = do filho**; sem chave em
+  vars públicas permitidas lidas do `config.json`, e o mínimo de sistema/runtime.
+- **Encerramento:** confia no **fim do stdin** — o cliente fecha o pipe e o servidor MCP sai. Prova no
+  self-test de boot. Órfão se o cliente não fechar o stdin = **risco aceito** (ver *Riscos*).
+- **Por que o `ProcessStartInfo` volta:** nas v2–v21 ele foi descartado por não permitir criação
+  suspensa (necessária só para o Job Object, agora adiado). O `& node` segue fora porque herdaria o
+  ambiente inteiro do launcher; o `ProcessStartInfo` monta o ambiente limpo do filho. O *Limite
+  honesto* da Credencial já aceita que DPAPI não protege contra processo do mesmo usuário.
+- **Invariante mecanizada:** nenhum byte do launcher em stdout; **exit code = do filho**; sem chave em
   log.
 - **Runtime:** exige `pwsh` (7.4+). **Staleness do `node`:** reparo = re-resolver e re-emitir launcher.
 - **Marcador de propriedade:** sentinela + manifesto; uninstall remove só se sentinela **e** path no
   manifesto; órfão = reportar.
+- **Adiado para o Anexo B.1 (v22):** `CreateProcessW` + `CREATE_SUSPENDED` + Job Object +
+  `ResumeThread`, limpeza pós-criação, política de árvore, testes de cancelamento/órfão/stderr
+  intenso/payload binário grande.
 
-Sequência nativa completa, limpeza em falha pós-criação, política de terminação/árvore e lista de
-invariantes a mecanizar: **Anexo A.1**.
+Detalhe da v1: **Anexo A.1**.
 
 ### Detecção de pré-requisitos
 
 Espelhar `GeneXusPythonPrerequisite.ps1`/`Test-XpzPowerShellRuntime.ps1`: **executável utilizável de
-verdade** (rejeitar stub `WindowsApps`/alias da Store) para `node`/`npm`/`pwsh`. A **versão de Node/npm**
-usada na liberação é **fixada no catálogo** e **gated** (`>= 22`): `< 22` é bloqueante, acima disso é
-reportada. Escopo do manifesto × runtime Node: **Anexo A.5**.
+verdade** (rejeitar stub `WindowsApps`/alias da Store) para `node`/`npm`/`pwsh`. Node **gated**
+(`>= 22`): `< 22` é bloqueante, acima disso é reportada. Detalhe: **Anexo A.5**.
 
 ## Fornecedor
 
-Cinco modos. **Wire = hipótese** até as fixtures (Apêndice). O launcher injeta **só** a var do modo
-selecionado:
+O descritor declara cinco modos como **dado**; a **v1 implementa e testa só `compatible`** (v22). **Wire
+= hipótese** até as fixtures (Apêndice). O launcher injeta **só** a var do modo selecionado:
 
 | Modo | `secretEnvVar` | Vars públicas / obrigatórias | Status |
 |---|---|---|---|
-| `typesafe` | `TYPESAFE_API_KEY` | `JEV_MCP_MODEL` (default `jev-latest`) | experimental opt-in |
-| `openrouter` | `OPENROUTER_API_KEY` | `JEV_OPENROUTER_BASE_URL` | experimental opt-in |
-| `cloudflare` | `CLOUDFLARE_API_TOKEN` (ou `JEV_CLOUDFLARE_API_TOKEN`) | `CLOUDFLARE_ACCOUNT_ID` (**não-secreta**), `JEV_CLOUDFLARE_BASE_URL` | experimental opt-in |
-| `vercel` | `AI_GATEWAY_API_KEY` | — | experimental opt-in |
-| `compatible` | `JEV_API_KEY` | `JEV_API_BASE_URL` (**URL completa**), `JEV_MCP_MODEL` | **parcial** |
+| `typesafe` | `TYPESAFE_API_KEY` | `JEV_MCP_MODEL` (default `jev-latest`) | F4 — não implementado na v1 |
+| `openrouter` | `OPENROUTER_API_KEY` | `JEV_OPENROUTER_BASE_URL` | F4 — não implementado na v1 |
+| `cloudflare` | `CLOUDFLARE_API_TOKEN` (ou `JEV_CLOUDFLARE_API_TOKEN`) | `CLOUDFLARE_ACCOUNT_ID` (**não-secreta**), `JEV_CLOUDFLARE_BASE_URL` | F4 — não implementado na v1 |
+| `vercel` | `AI_GATEWAY_API_KEY` | — | F4 — não implementado na v1 |
+| `compatible` | `JEV_API_KEY` | `JEV_API_BASE_URL` (**URL completa**), `JEV_MCP_MODEL` | **parcial** (v1) |
 
-- `compatible` exige o contrato System One/Jev; URL vai como veio; `cloudflare`/`vercel` não
-  intercambiáveis. **`auto`:** com múltiplas famílias de env setadas, exigir `JEV_PROVIDER` explícito.
-- **`endpoint_nao_verificado` — regra única:** presets fechados = **blocking** se host divergir;
-  `compatible` de terceiro = **`warn` + confirmação explícita**. Host/caminho **redigidos** antes da
+- `compatible` exige o contrato System One/Jev; URL vai como veio. Com modo único na v1, a regra
+  `auto`/`JEV_PROVIDER` não se aplica (volta no F4).
+- **`endpoint_nao_confirmado` — regra da v1:** host igual ao do preset **Command Code** = OK; host
+  diferente = **aviso + confirmação explícita** do usuário. Host/caminho **redigidos** antes da
   confirmação.
 - **Registro de configuração não secreto** `%LOCALAPPDATA%\xpz-mcp-integrations\config.json` (ACL
   só-dono; UTF-8 sem BOM; schema versionado) é a **fonte persistente das variáveis públicas** — é dele
-  que o launcher reconstrói o ambiente do filho. **Nunca** contém a chave. Schema e regras de
-  invalidação: **Anexo A.6**.
-- **Cofre e tipo de credencial:** o cofre guarda o **modo ativo** + metadados do **tipo** (qual
-  `secretEnvVar`), **sem** registrar o segredo em claro; trocar de modo exige re-entrada.
-- **`compatible` = parcial** (handshake, não E2E). **Command Code** = preset sugerido. **Experimental
-  opt-in:** 4 não provados fora do caminho feliz e dos self-tests do F1. **Import `auth.json`:**
-  opcional, com ressalva (credencial `commandcode/*` do OpenCode é de gateway LLM).
+  que o launcher reconstrói o ambiente do filho. **Nunca** contém a chave. Schema: **Anexo A.6**.
+- **Cofre:** guarda a chave do modo `compatible`, **sem** registrar o segredo em claro.
+- **`compatible` = parcial** (handshake, não E2E). **Command Code** = preset sugerido. **Import
+  `auth.json`:** opcional, com ressalva (credencial `commandcode/*` do OpenCode é de gateway LLM).
 
 ## Credencial
 
 - **Cofre neutro** em `%LOCALAPPDATA%\xpz-mcp-integrations\vault\`, blob **DPAPI `CurrentUser`**,
   **vault-first**; env só com `-CredentialSource env`.
 - `credencial_divergente_env_vs_cofre` é **blocking** quando **não** houve override.
-- **`acl_nao_aplicavel` bloqueia mutadores de blob**, salvo modo inseguro explicitamente autorizado e
-  rotulado.
-- **Restore inter-máquina = re-inserir a chave** (DPAPI não roaming).
+- **`acl_nao_aplicavel` bloqueia mutadores de blob** (v22: sem «modo inseguro»).
+- **Recuperar = re-inserir a chave** (DPAPI não roaming); a v1 **não** mantém backup/retenção do
+  cofre (v22).
 - **Limite honesto:** DPAPI protege em repouso; não contra processo do mesmo usuário, inspeção do env do
   filho, nem roaming. **Fronteira:** pacote + transitivas + endpoint. Chave nunca
   impressa/logada/copiada.
 
-Formato do blob, entrada não-eco, ACL, backup/retenção/restore e os três eventos (rotação, remoção,
-incidente): **Anexo A.7**.
+Formato do blob, entrada não-eco, ACL e os três eventos (rotação, remoção, incidente): **Anexo A.7**.
 
 ## Adaptadores de cliente (v1)
 
 - **OpenCode (F1):** raiz gerenciada na v1 = **global** `~/.config/opencode/`; **projeto-local
   (`.opencode/`) fora do escopo da v1**. Entrada `mcp.jev` (`type: local`, `command: ["pwsh",...]`,
-  campo **`environment`**, não `env`). Merge transacional, idempotente. **Shape = fato externo** +
-  fixture sanitizada no F1.
-- **Codex (F2):** `~/.codex/config.toml`, `[mcp_servers.jev]`, com **biblioteca TOML vendorizada** no
-  mesmo rigor do `jev-mcp`; o "subconjunto próprio" foi **descartado**. `env_vars` filtra o herdado →
-  launcher define **conjunto mínimo explícito**. Fixture sanitizada do `config.toml` no F2.
+  campo **`environment`**, não `env`). Edição pelo mecanismo JSONC existente + validação pós-edição
+  (ver *OpenCode — reaproveitar o mecanismo JSONC existente*); transacional, idempotente. **Shape =
+  fato externo** + fixture sanitizada no F1.
+- **Codex (F1, mínimo — v22):** `~/.codex/config.toml`, bloco `[mcp_servers.jev]` gravado **entre
+  marcadores de comentário próprios da skill**, **sem biblioteca TOML**:
+  - bloco ausente → **acrescenta** ao fim;
+  - bloco com marcadores e byte-idêntico ao que seria emitido → OK;
+  - `[mcp_servers.jev]` sem marcadores, ou bloco alterado → `entrada_em_conflito`; **não toca** e mostra
+    o trecho;
+  - remover = apagar **só** o bloco entre os marcadores.
 
-Algoritmo de descoberta/precedência, casos de `entrada_em_conflito` e prova de round-trip TOML:
-**Anexo A.8**.
+  Que variáveis de ambiente o Codex repassa ao launcher (`env_vars` filtra o herdado) é **fato a
+  verificar** com filho falso no F1. Fixture sanitizada do `config.toml` no F1. A biblioteca TOML
+  vendorizada com round-trip está no **Anexo B.8**.
+
+Algoritmo de descoberta/precedência e casos de `entrada_em_conflito`: **Anexo A.8**.
 
 ## Auditoria (estados e contrato)
 
@@ -225,21 +250,22 @@ Lista completa de estados offline, classes (`blocking`/`warn`), tabela estado→
 - **Reconciliação obrigatória:** antes de limpar/reparar, **ler as configs reais de cada cliente** e
   cruzar com o manifesto (o manifesto não é autoridade sobre a config viva); **plano/diff** + aprovação
   explícita por escrita/remoção material.
-- **Atualizar:** consciente (release notes, breaking changes, backup, instalar + launcher + re-emitir
-  config, teste, rollback por re-emissão). Nunca por existir versão nova.
+- **Atualizar:** consciente (release notes, breaking changes, backup, novo lockfile no repositório,
+  instalar + launcher + re-emitir config, teste; rollback = versão anterior do repositório + backup do
+  config). Nunca por existir versão nova.
 - **Remover:** manifesto registra referências por cliente; launcher só sai quando **não restar
   referência**; exige **sentinela E** path no manifesto; órfão = reportar. Preservar cofre, `auth.json`,
   fornecedor e demais MCPs; no Codex, `enabled=false` quando manter a config.
 
 ## Testes — nível de decisão
 
-- **Self-tests offline** cobrem detecção, JSONC, idempotência, escrita serializada/transacional,
-  backup/restore/rollback, schema do descritor, round-trip DPAPI, re-emissão de launcher por versão e
-  launcher com filho falso. Inventário executável: **Anexo A.10**.
+- **Self-tests offline (v1)** cobrem detecção, edição JSONC com validação pós-edição, bloco com
+  marcadores do Codex, idempotência, escrita transacional, backup/restore, schema do descritor,
+  round-trip DPAPI, re-emissão de launcher por versão, launcher com filho falso e encerramento por fim
+  do stdin. Inventário executável: **Anexo A.10**.
 - **O gate do `dist` no F1 é revisão estática do `dist` + boot sem chave.** O teste de egresso de rede
   contido **não** é gate (ver **Adiado**).
 - **Não são rodados pelo orquestrador de pré-push**; a skill declara cada comando e registra em `09`.
-  Self-tests de **TOML** no **F2**.
 - **E2E** com `jev_classify` = validação manual opt-in; pré-requisito de `handshakeConfirmed`.
 
 ## Documentação e paridade
@@ -262,46 +288,58 @@ Lista completa de estados offline, classes (`blocking`/`warn`), tabela estado→
 
 ## Fases
 
-- **F0** — design + revisão (F0-1..F0-18; falta **painel de liberação**).
-- **F1-pre** (frente própria; painel ≥2 Criadores distintos do autor + ≥1 fora do harness afetado) —
-  criar `OpenCodeJsoncSupport.ps1` + golden + fixtures + **matriz de migração** + self-tests + inventário
-  de consumidores na raiz; **reservar a faixa de `exitCode`**.
-- **F1** — skill (OpenCode + núcleo) + descritor Jev + launcher (**`CreateProcessW` suspenso + Job
-  Object + `ResumeThread`**, rota única) + cofre/DPAPI + vendorizador (baselines + manifesto + catálogo +
-  ferramenta versionada) + **evidência sanitizada do `dist` com proveniência** + **revisão estática do
-  `dist` + boot sem chave** (gate) + self-tests + docs. **F1 ≠ v1.**
-- **F2** — Codex (biblioteca TOML vendorizada, round-trip + env mínimo) + self-tests TOML + auditoria de
-  versão/drift + update/rollback. **Completa a v1.**
+- **F0** — design + revisão (F0-1..F0-18; v22 reduzida; falta **painel de liberação**).
+- **F1 = v1 completa (v22)** — **reservar a faixa de `exitCode`** + skill + descritor Jev (só
+  `compatible`) + launcher `ProcessStartInfo` + cofre/DPAPI + vendorizador (lockfile + `npm ci
+  --ignore-scripts`) + **evidência sanitizada do `dist` com proveniência** + **revisão estática do
+  `dist` + boot sem chave** (gate) + OpenCode (mecanismo JSONC existente) + Codex mínimo (bloco com
+  marcadores) + auditoria + atualizar/remover + self-tests + docs.
+- **F2** — endurecimentos do **Anexo B**, **só quando houver motivo concreto** (cada um entra por
+  decisão própria).
 - **F3** — Cursor + Claude Code (coordenar com `Install-CursorGlobalInstructionsMcp.ps1`).
-- **F4** — opcionais: fornecedores experimentais; backend Python; fork/espelho.
+- **F4** — opcionais: os outros 4 fornecedores; backend Python; fork/espelho.
+- O antigo **F1-pre** (biblioteca JSONC) saiu desta frente e virou entrada própria no `999`.
 
 ## Riscos e decisões em aberto
 
-- **Launcher stdio** — `CreateProcessW` suspenso + Job Object + `ResumeThread` (rota **única**);
-  invariante mecanizada; cancel/órfão.
-- **Biblioteca TOML (Codex)** — vendorizada sob rigor; round-trip; fixture.
+- **Launcher stdio** — `ProcessStartInfo` com stdio herdado; invariante mecanizada; encerramento por
+  fim do stdin.
 - **`dist`** — evidência sanitizada + **revisão estática + boot sem chave** como gate do F1; sem a
   evidência commitada, bloqueia.
-- **Fatos externos a re-verificar no F1/F2:** sha512 do tarball; `engines.node`; tabela dos 5 modos;
-  boot; shape do `opencode.json`/`.jsonc`; semântica TOML do Codex.
-- **Fornecedores experimentais** só sob opt-in. **Node/pwsh/npm** são dependências de runtime.
+- **Fatos externos a re-verificar no F1:** sha512 do tarball; `engines.node`; modo `compatible`; boot;
+  saída do servidor no fim do stdin; shape do `opencode.json`/`.jsonc`; env repassado pelo Codex ao
+  launcher.
+- **Node/pwsh/npm** são dependências de runtime.
+- **Riscos aceitos da v22 (redução de escopo):**
+  - **órfão** se o cliente não fechar o stdin (sem Job Object);
+  - **arquivo da árvore vendorizada adulterado depois da instalação não é detectado** (sem manifesto
+    por arquivo; a integridade vale no momento do `npm ci`);
+  - **limites conhecidos do motor JSONC existente** — mitigados pela validação pós-edição fail-closed
+    e pelo trecho manual;
+  - **edição manual dentro do bloco do Codex** vira `entrada_em_conflito` (a skill não sobrescreve).
 - **Risco aceito da contenção opt-in:** sem o teste de egresso contido, a garantia de que a árvore
   vendorizada não fala com a rede fora do endpoint permanece **argumentativa** (código estático + boot),
   não **demonstrada**. Decisão consciente para não travar o F1 em pré-requisito de máquina.
 
 ## Adiado / escopo-futuro
 
+- **Endurecimentos da v22 → Anexo B** (texto preservado, entram no F2 por decisão própria): launcher
+  nativo com Job Object (**B.1**); validação de atributos em toda a ancestralidade e registro de
+  recuperação de escrita interrompida (**B.2**); biblioteca JSONC única + matriz de migração (**B.3**,
+  e entrada própria no `999`); manifesto de árvore e catálogo de bundles com rollback por bundle
+  (**B.4.2**, **B.4.4**); runtime Node dedicado hash-registrado (**B.5**); biblioteca TOML vendorizada
+  com round-trip (**B.8**); backup/retenção do cofre e «modo inseguro» de ACL.
 - **Teste de egresso de rede contido (Windows Sandbox) — rebaixado a endurecimento opt-in, NÃO é gate
   do F1.** Motivo: exigir **Windows Sandbox** como pré-requisito explícito travava o F1 em máquina que
   não o tem (fail-closed por ambiente, não por defeito do artefato). O **gate do F1 passa a ser revisão
-  estática do `dist` + boot sem chave**. Quem quiser o endurecimento roda o protocolo do **Anexo A.4.6**
+  estática do `dist` + boot sem chave**. Quem quiser o endurecimento roda o protocolo do **Anexo B.4.6**
   (topologia executável em Sandbox com `<Networking>Disable</Networking>`, controle positivo por
   processo filho, recibo verificado no host). O filtro `New-NetFirewallRule` permanece **só
   diagnóstico** — é por programa e **não** contém a árvore; **nunca** critério de aprovação.
 - **AppContainer** — frente futura, até ter mecanismo de criação/lançamento e prova de que a árvore
   está no container **especificados e testados**.
 - **F3** — Cursor e Claude Code.
-- **F4** — fornecedores experimentais promovidos a validados; backend **Python** (`typesafe-mcp` no
+- **F4** — os outros 4 fornecedores (implementar e validar); backend **Python** (`typesafe-mcp` no
   PyPI); fork/espelho do pacote.
 - **Projeto-local do OpenCode** (`.opencode/`) — fora da v1.
 - **macOS/Linux**; instalar ferramentas de terceiros; criar conta; `skills/jev/`; uso automático; MCPs
@@ -336,15 +374,251 @@ Lista completa de estados offline, classes (`blocking`/`warn`), tabela estado→
 - **Recibo F0-1** (via `xpz-llm-delegate`): `preferenceSource=orchestrator`; `attemptRole=primary`,
   `countsForDiversity=true`; `closeoutReady=false` (`vnext-pending-resubmission`).
 - Alternativa **Python** (`typesafe-mcp` no PyPI) — opção de F4.
+- **Parecer externo (chat web, 2026-10-03) — insumo, fora do painel:** plano tecnicamente sólido, mas
+  cresceu além do problema (biblioteca JSONC como projeto paralelo, launcher nativo, vendorização em
+  nível corporativo, 5 fornecedores). Motivou a **v22**. Diagnóstico do orquestrador: as rodadas
+  F0-7..F0-18 tiveram **um único revisor** adversarial, e cada gap corrigido virou camada nova sem
+  pergunta de proporção. **Próxima rodada:** instruir os revisores a avaliar se a v1 é a **menor** que
+  preserva as propriedades essenciais, **sem** acrescentar endurecimento.
 
 ---
 
-## Anexo A — Obrigações de implementação (a provar por self-test no F1-pre/F1/F2)
+## Anexo A — Obrigações de implementação da v1 (a provar por self-test no F1)
 
-Tudo neste anexo já foi **decidido** no corpo nas versões v2–v20. Nada aqui é requisito novo; é o
-detalhe que a implementação deve honrar e o self-test deve demonstrar.
+Detalhe que a implementação da **v1** deve honrar e o self-test deve demonstrar. Reescrito na **v22**
+para o escopo reduzido; o detalhe dos endurecimentos adiados está no **Anexo B**.
 
-### A.1 Launcher — sequência nativa, ambiente e terminação
+### A.1 Launcher — `ProcessStartInfo`, ambiente e encerramento
+
+**Rota da v1:** `ProcessStartInfo` com `UseShellExecute=false`, **sem** `RedirectStandard*` — o `node`
+herda os handles de stdio do launcher (que são os do cliente). O launcher chama `WaitForExit()` e
+termina com o **exit code do filho**. `& node` segue fora (herdaria o ambiente inteiro do launcher).
+
+**Ambiente do filho = limpo + allowlist do descritor (não herda):** o launcher **limpa** o
+`Environment` do `ProcessStartInfo` e monta com **(a)** `JEV_API_KEY` lida do cofre; **(b)** as
+**variáveis públicas do `compatible`, lidas do `config.json`** (`JEV_API_BASE_URL`, `JEV_MCP_MODEL`);
+**(c)** o **mínimo de sistema/runtime** (`SystemRoot`, `SystemDrive`, `TEMP`/`TMP`, `PATHEXT`,
+`COMSPEC`, `PATH` mínimo). **Não** propaga o ambiente inteiro.
+
+**Encerramento:** o servidor MCP sai no **fim do stdin** (cliente fecha o pipe); o launcher apenas
+espera. Self-test de boot prova a saída no fim do stdin. Órfão se o cliente não fechar o stdin = risco
+aceito (corpo, *Riscos*).
+
+**Invariante mecanizada:** silenciar preferences; **nenhum `Write-*`** para stdout (scan estático);
+logs só em stderr/arquivo; sem chave em log; **exit code = do filho**, propagado como última instrução;
+**negativos pré-filho** (cofre ausente, `config.json` inválido, Node ausente) com exit code próprio e
+**zero bytes** em stdout.
+
+**Descritor — credencial por modo:** o descritor declara, para cada fornecedor, `secretEnvVar`, vars
+públicas permitidas, campos obrigatórios e regras de exclusividade; a exceção de endpoint do
+`compatible` é campo explícito. Schema **fail-closed** + self-test.
+
+### A.2 Caminhos, atributos/ACL e escrita serializada e transacional
+
+- **Alvo:** config do cliente, lock, temporário e backup devem ser **arquivos regulares**, **sem
+  reparse point** (symlink/junction) **no próprio arquivo** (folha), **sem diretório/arquivo
+  especial**. A validação de toda a ancestralidade está no **Anexo B.2**.
+- **Lock:** `<arquivo>.xpz-mcp.lock` (create-new / `FileShare.None`); falha → **recusar**.
+- **Ramos separados:** **criação exclusiva** (`FileMode.CreateNew`) e **substituição** (`File.Replace`
+  com backup). Antes da promoção, **revalidar identidade/atributos** (tamanho, mtime, hash)
+  **imediatamente**.
+- **Sequência:** ler+hash → calcular novo conteúdo → temp na mesma pasta → re-hash → **recusar se
+  mudou** → backup imutável → check final (create×replace) → promoção atômica → idempotência por
+  conteúdo.
+- **Honestidade:** o lock serializa **esta skill**; contra terceiro que ignore o lock, a detecção é
+  **best-effort** (re-hash + `File.Replace`). **Recuperação:** lock preso → instruir; temporário
+  órfão → remover na re-execução; destino inexistente → criação.
+- **Caminhos gerenciados:** tudo sob `%LOCALAPPDATA%\xpz-mcp-integrations` após **canonicalização**;
+  **ACL aplicada antes de persistir**; escrita atômica.
+
+### A.3 OpenCode — edição JSONC pelo mecanismo existente
+
+- **Mecanismo:** o mesmo do `reviewer-ro` — localizar/inserir por texto (`Find-JsoncMatchingBrace`/
+  `Find-JsoncKeyValueSpan`, hoje dentro de `Install-OpenCodeReviewerRoAgent.ps1`) e validar com o
+  parse completo ciente de comentários (`ConvertFrom-Jsonc`, hoje em `OpenCodeReviewerRoGuard.ps1`).
+  **Reaproveitar sem migrar consumidores**; a forma de reuso (dot-source ou cópia rastreada) é decidida
+  na implementação e registrada nos dois donos.
+- **Validação pós-edição obrigatória (fail-closed):** o texto resultante precisa (1) parsear por
+  inteiro e (2) conter `mcp.jev` exatamente na forma emitida. Falha em qualquer um → **nada é
+  gravado**, estado `edicao_manual_necessaria` e o trecho pronto para colar.
+- **Chave duplicada / forma inesperada** no caminho `mcp.jev` → `entrada_em_conflito`, sem escrita.
+- **Limites conhecidos** do motor (cego a comentário ao casar chaves; trailing comma) estão
+  registrados no **Anexo B.3** e na entrada própria do `999`; a validação pós-edição é a mitigação da
+  v1.
+- **Fixtures da v1:** arquivo com comentários; `mcp` ausente; `mcp` com outros servidores; `mcp.jev`
+  idêntico (idempotência); `mcp.jev` divergente; caso que o motor não suporta → `edicao_manual_necessaria`.
+
+### A.4 Vendorização — identidade, bootstrap e evidência do `dist`
+
+Manifesto de árvore (A.4.2), catálogo de bundles (A.4.4) e contenção de rede (A.4.6) foram movidos
+para o **Anexo B** na v22; a numeração A.4.n restante foi mantida para não quebrar referências.
+
+#### A.4.1 Identidade e cadeia verificável
+
+A **identidade do artefato = o `integrity` sha512 do tarball** registrado no **lockfile comitado**
+(`resolved`+`integrity`); o **commit Git é proveniência**, não âncora (evita afirmar
+`commit == tarball`). Se houver archive Git aprovado, a equivalência commit→tarball é **registrada e
+verificada** explicitamente (sha512, conteúdo extraído, data, procedimento). O `npm ci` confere o
+`integrity` de cada pacote contra o lockfile no momento da instalação.
+
+#### A.4.3 Bootstrap executável e `npm ci`
+
+- `npm ci --ignore-scripts --no-audit --no-fund` em
+  `%LOCALAPPDATA%\xpz-mcp-integrations\vendor-<versao>\`; conferir depois que a versão instalada
+  (`node_modules/@jkudish/jev-mcp/package.json`) é a do pin.
+- **`--ignore-scripts` justificado e testado:** o pacote declara `prepare`; usamos o `dist`
+  pré-compilado. O teste prova que `dist/index.js` existe e o servidor sobe **sem** rodar `prepare`.
+- `xpz-mcp-integrations/vendor/` contém o **`package.json` (pin exato) + `package-lock.json`**
+  versionados; o installer **cria `vendor-<versao>\`, copia os dois para lá** e **só então** roda
+  `npm ci`.
+- **Sem indireção mutável:** launcher versionado por path absoluto; comando do cliente aponta para o
+  launcher daquela versão. Update = novo lockfile no repositório + instalar + launcher + re-emitir
+  config; rollback = versão anterior do repositório + backup do config. **Sem junction/symlink**
+  (hazard de `historico/...20260622-20260922.md:48`).
+
+#### A.4.5 Evidência commitada do `dist` (pré-condição de qualquer motor)
+
+Em `xpz-mcp-integrations/fixtures/` (rastreada): trechos **sanitizados** de `provider.ts`/`provider.js`
+(**modo `compatible`** + vars — v22), `engines.node` (**≥ 22**), `prepare` do `package.json`, boot
+`initialize`, saída no fim do stdin, **+ licença
+MIT integral + atribuição**. **Proveniência por fixture:** `commit`, origem, hash, **data de captura**,
+escopo — **sem** usar o README da `main` como prova da `0.13.0`. Até então, a tabela de Fornecedor é
+**hipótese**.
+
+**Gate do F1:** **revisão estática do `dist` + boot sem chave**.
+
+#### A.4.7 Semântica de rede (2 contextos na v1)
+
+(1) instalador/vendorizador: sem registro fora de install/update; (2) launcher/MCP: só o endpoint. O
+teste isolado opt-in está no **Anexo B.4.6**.
+
+### A.5 Pré-requisitos — Node, npm e pwsh
+
+Espelhar `GeneXusPythonPrerequisite.ps1`/`Test-XpzPowerShellRuntime.ps1`: **executável utilizável de
+verdade** (rejeitar stub `WindowsApps`/alias da Store) para `node`/`npm`/`pwsh`. Node **gated**
+(`>= 22`): `< 22` é bloqueante, acima disso é reportada. O launcher usa o Node **absoluto** resolvido
+no install; reparo re-resolve e re-emite. Manifesto × catálogo e runtime dedicado: **Anexo B.5**.
+
+### A.6 `config.json` — schema, origem e consumo
+
+`%LOCALAPPDATA%\xpz-mcp-integrations\config.json` — **registro de configuração não secreto**, ACL
+só-dono, UTF-8 sem BOM, **schema versionado** (reduzido na v22):
+
+```
+{ schemaVersion, provider: "compatible", baseUrl, model, endpointConfirmed }
+```
+
+- **Origem/override** por parâmetro do mutador; **validado contra o descritor**.
+- **Consumido** por launcher/auditor/reparo/re-emissão — é **dele** que o launcher reconstrói
+  `JEV_API_BASE_URL` (URL completa) e `JEV_MCP_MODEL`.
+- **Nunca** contém a chave.
+- `endpointConfirmed` vale só para o `baseUrl` gravado: mudar a URL **invalida** e exige nova
+  confirmação quando o host diferir do preset Command Code. Host/caminho **redigidos** antes da
+  confirmação.
+
+### A.7 Cofre — blob, entrada e eventos
+
+- **Local:** `%LOCALAPPDATA%\xpz-mcp-integrations\vault\`.
+- **Blob:** DPAPI `CurrentUser`, **sem entropia adicional**, **campo `version`**, e metadado do modo
+  (`compatible` / `JEV_API_KEY`) — **sem** o metadado misturado ao valor.
+- **Fonte:** vault-first; env só com `-CredentialSource env`; auditor sinaliza
+  `credencial_divergente_env_vs_cofre` (**blocking**) só quando **não** houve override.
+- **Entrada:** `Read-Host -AsSecureString`; sem transcript/history; não-eco; **ACL antes de persistir**.
+- **`acl_nao_aplicavel` — bloqueia mutadores de blob** (criação/import/rotação), sem exceção na v1.
+- **Recuperar** = **re-inserir a chave** (DPAPI não roaming; sem backup do cofre na v1 — **Anexo B.7**).
+- **Três eventos:** rotação (re-inserir e re-cifrar), remoção (preservar, salvo pedido), incidente
+  (apagar blob + orientar revogação no provedor + restart do cliente).
+
+### A.8 Adaptadores — descoberta, precedência e bloco do Codex
+
+**OpenCode — algoritmo de descoberta:** raiz gerenciada na v1 = **global** `~/.config/opencode/`;
+candidatos **`opencode.json` e `opencode.jsonc`** nessa pasta; **projeto-local (`.opencode/`) fora do
+escopo da v1** (declarado). **Precedência:** resolver `opencode.json` → `opencode.jsonc` (espelha o motor
+atual); **sem precedência comprovada** se ambos existirem → `entrada_em_conflito` (bloquear sem
+escrever). **Fixtures** para cada caso. Edição em ambos os formatos pelo mecanismo do **A.3**
+(inserção textual + validação pós-edição). Entrada `mcp.jev` (`type: local`,
+`command: ["pwsh","-NoProfile","-File","<launcher>"]`, campo **`environment`**, não `env`). Escrita
+transacional (A.2); idempotente. **Shape = fato externo** + fixture sanitizada no F1.
+
+**Codex (F1, mínimo — v22):** `~/.codex/config.toml`. O bloco `[mcp_servers.jev]` é emitido pela skill
+entre **marcadores de comentário fixos** (ex.: `# >>> xpz-mcp-integrations:jev` /
+`# <<< xpz-mcp-integrations:jev`), em texto canônico gerado pela própria skill. **Sem biblioteca TOML.**
+
+| Situação no arquivo | Ação |
+|---|---|
+| Sem `[mcp_servers.jev]` e sem marcadores | **acrescentar** o bloco ao fim (com quebra de linha separadora) |
+| Marcadores presentes, conteúdo byte-idêntico ao canônico | OK (idempotente) |
+| Marcadores presentes, conteúdo diferente | `entrada_em_conflito`; **não toca**; mostrar o diff |
+| `[mcp_servers.jev]` fora dos marcadores, ou marcadores desbalanceados/duplicados | `entrada_em_conflito`; **não toca**; mostrar o trecho |
+| Remover | apagar **só** o bloco entre os marcadores (com aprovação) |
+
+- **Detecção de `[mcp_servers.jev]`** fora dos marcadores: varredura por linha de cabeçalho de tabela
+  (`[mcp_servers.jev]` / `[mcp_servers."jev"]`, com espaços); falso positivo leva a conflito, nunca a
+  escrita.
+- **Env repassado ao launcher:** `env_vars` filtra o herdado; o conjunto que o launcher precisa
+  (`LOCALAPPDATA`, `USERPROFILE`, `SystemRoot` etc., para achar cofre/`config.json` e para a DPAPI) é
+  **fato a verificar** com filho falso no F1 e, se preciso, declarado no bloco.
+- Fixture sanitizada do `config.toml` no F1. Biblioteca TOML com round-trip: **Anexo B.8**.
+
+### A.9 Auditoria — estados, classes e precedência
+
+- **Agregado:** `overall = INTEGRATIONS_OK | INTEGRATIONS_GAPS`. **Tabela estado → `exitCode`/classe por
+  motor** (faixa reservada no F1). **`vendor_divergente`** na v1 = versão instalada
+  (`node_modules/@jkudish/jev-mcp/package.json`) ≠ pin do descritor.
+- **Estado por cliente:** `notConfigured` | `written` | `reloadPending` | `handshakeConfirmed` |
+  `e2eOptInConfirmed`; `overall` **não** promove `written` a sucesso operacional; a skill informa a
+  **ação de recarga/reinício** necessária.
+- **Offline (v1):** `OK`; `ausente`; `entrada_quebrada`/`entrada_divergente`/`entrada_em_conflito`;
+  `edicao_manual_necessaria`; `vendor_ausente`/`vendor_divergente`; `launcher_ausente`/
+  `launcher_divergente`; `node_ausente`/`node_incompativel`/`node_path_nao_resolve`; `pwsh_ausente`;
+  `config_ausente`/`config_invalido`; `credencial_ausente`; `credencial_divergente_env_vs_cofre`
+  (**blocking** salvo override); `endpoint_nao_confirmado` (**warn** + confirmação, host fora do preset);
+  `acl_nao_aplicavel` (**warn** na auditoria; **blocking** nos mutadores de blob).
+- **Online opt-in** (`-CheckUpdates`): `atualizacao_disponivel` — informa, nunca auto-atualiza.
+  Canonicalização de path antes de `entrada_divergente`.
+
+### A.10 Self-tests — inventário executável
+
+**Offline (F1 = v1):** detecção (rejeitar stub); **JSONC** — fixtures do A.3 com validação pós-edição
+(falha → `edicao_manual_necessaria`, arquivo intacto); **Codex** — cada linha da tabela do A.8
+(acrescentar, idempotência, divergente, conflito, marcadores desbalanceados, remover só o bloco);
+idempotência; **escrita transacional** (create×replace, corrida → recusa, arquivo especial → recusa,
+temporário órfão); backup+restore do config; schema do descritor e do `config.json`; **round-trip
+DPAPI**; **re-emissão de launcher por versão**; **launcher** com filho falso (exit code = do filho,
+zero bytes do launcher em stdout, ambiente limpo = só a allowlist, negativos pré-filho);
+**encerramento no fim do stdin** com o servidor real; **revisão estática do `dist` + boot sem chave**
+(gate do F1).
+
+**Endurecimentos adiados** (Job Object, manifesto de árvore, TOML, contenção de rede): self-tests
+descritos no **Anexo B**, só quando o item voltar.
+
+**Não são rodados pelo orquestrador de pré-push**; a skill declara cada comando e registra em `09`.
+**E2E** com `jev_classify` = validação manual opt-in; pré-requisito de `handshakeConfirmed`.
+
+### A.11 Paridade documental mecânica
+
+- `README.md` trilíngue (duas listas por língua ×3); `CHANGELOG.md` trilíngue; **`SECURITY.md`
+  trilíngue** (seção do cofre nas três).
+- `09` com `Dono:` + `Validação:`/`Tokens:`/`Exit:`; `02` com contrato + vocabulário (declarar a
+  **extensão** do vocabulário de evidência para artefatos externos); `08` nomear seções ou retirar.
+- **`AGENTS.md`/`README.md`:** reconciliar listas **adicionando só o que faltar** (`AGENTS.md:11`
+  já tem `xpz-codex-apply-patch-alternative`; conferir `:49`).
+- `README.md:107` × `AGENTS.md:92-96` para a rastreabilidade privada das fixtures.
+- **`999`:** `:3283` com pin por commit/sha512 e preset **parcial**; `:3277` **alinhado**. **Consultar o
+  `998`** (`998:919-923`).
+- Conformidade: `#requires -Version 7.4`; UTF-8 sem BOM (preservando BOM preexistente do arquivo do
+  usuário); molde `.example.ps1`; `Test-XpzParameterNamingContract.ps1` **não** é gate geral; não
+  enumerar ≥2 gates numa linha.
+- **Ledger:** efêmero/gitignored em `Temp/revisao-por-pares/<RoundId>/`; **não versionar**.
+
+---
+
+## Anexo B — Endurecimentos adiados (preservados da v21; não são obrigação da v1)
+
+Texto **movido sem alteração de conteúdo** do Anexo A da v21 na redução de escopo da **v22**. Cada item
+só volta (F2) por **decisão própria**, com motivo concreto. A numeração B.n espelha a A.n de origem.
+
+### B.1 Launcher — sequência nativa, ambiente e terminação (origem: A.1 da v21)
 
 **Sequência nativa (rota única):**
 
@@ -360,47 +634,24 @@ revalidação falhar, **bloco de limpeza obrigatório** — fechar handles de I/
 aguardar a terminação, liberar handles — e **só então** devolver erro. Self-test que **força** a falha de
 associação ao Job.
 
-**Ambiente do filho = limpo + allowlist do descritor (não herda):** o launcher monta o bloco com
-**(a)** a **variável secreta do modo**; **(b)** as **variáveis públicas permitidas daquele modo, lidas do
-`config.json`** (`JEV_API_BASE_URL`/`JEV_MCP_MODEL` no `compatible`; `JEV_OPENROUTER_BASE_URL`;
-`CLOUDFLARE_ACCOUNT_ID`; etc.); **(c)** o **mínimo de sistema/runtime** (`SystemRoot`, `SystemDrive`,
-`TEMP`/`TMP`, `PATHEXT`, `COMSPEC`, `PATH` mínimo). **Não** propaga variáveis de fornecedor **não
-selecionado** nem o ambiente inteiro.
-
 **Terminação/árvore:** **EOF/cancelamento** → fechar streams, prazo curto, **encerrar a árvore**;
 **filho inesperado/órfão** → fechar pipes e propagar estado. Self-tests: cancelamento, órfão, stderr
 intenso, término em tráfego bidirecional.
 
-**Invariante mecanizada:** silenciar preferences; **nenhum `Write-*`** para stdout (scan estático);
-logs só em stderr/arquivo; sem chave em log; **exit code = do filho**, propagado como última instrução;
-provar **payload binário grande** (sem re-encode/deadlock) e **zero bytes** fora do filho; **negativos
-pré-filho** com exit code próprio.
+**Invariante mecanizada (parte nativa):** provar **payload binário grande** (sem re-encode/deadlock) e
+**zero bytes** fora do filho.
 
-**Descritor — credencial por modo:** o descritor declara, para cada fornecedor, `secretEnvVar`, vars
-públicas permitidas, campos obrigatórios e regras de exclusividade; a exceção de endpoint do
-`compatible` é campo explícito. Schema **fail-closed** + self-test.
-
-### A.2 Caminhos, atributos/ACL e escrita serializada e transacional
+### B.2 Escrita — ancestralidade e recuperação (origem: A.2 da v21)
 
 - **Alvo:** config do cliente, lock, temporário e backup devem ser **arquivos regulares**, **sem
   reparse point** (symlink/junction), **sem diretório/arquivo especial** — validado por `GetAttributes`
   **em todos os componentes do caminho até uma raiz confiável** (não só na folha), **revalidado
   imediatamente antes da promoção**.
-- **Lock:** `<arquivo>.xpz-mcp.lock` (create-new / `FileShare.None`); falha → **recusar**.
-- **Ramos separados:** **criação exclusiva** (`FileMode.CreateNew`) e **substituição** (`File.Replace`
-  com backup). Antes da promoção, **revalidar identidade/atributos** (tamanho, mtime, hash)
-  **imediatamente**.
-- **Sequência:** ler+hash → calcular novo conteúdo → temp na mesma pasta → re-hash → **recusar se
-  mudou** → backup imutável → check final (create×replace) → promoção atômica → idempotência por
-  conteúdo.
-- **Honestidade:** o lock serializa **esta skill**; contra terceiro que ignore o lock, a detecção é
-  **best-effort** (re-hash + `File.Replace`). **Recuperação:** lock preso → instruir; crash →
-  temp+journal limpos na re-execução; destino inexistente → criação.
-- **Caminhos gerenciados:** tudo sob `%LOCALAPPDATA%\xpz-mcp-integrations` após **canonicalização**,
-  **rejeitando reparse points em toda a ancestralidade** (não só na folha) e raízes de outro drive;
-  **ACL aplicada antes de persistir**; escrita atômica.
+- **Recuperação:** crash → temp+journal limpos na re-execução.
+- **Caminhos gerenciados:** **rejeitando reparse points em toda a ancestralidade** (não só na folha) e
+  raízes de outro drive.
 
-### A.3 JSONC — localizador estrutural, migração e fixtures
+### B.3 JSONC — localizador estrutural, migração e fixtures (origem: A.3 da v21)
 
 **Diagnóstico verificado (motivação, não requisito novo):** `Find-JsoncMatchingBrace` ciente de
 string/cego a comentário; `Find-JsoncKeyValueSpan` acha por `IndexOf` (comentário promete heurística de
@@ -444,39 +695,17 @@ paralela — não este caso).
 
 **Revisão do F1-pre:** painel com ≥2 Criadores distintos do autor + ≥1 voz fora do harness afetado.
 
-### A.4 Vendorização — identidade, manifesto, bootstrap e catálogo
-
-#### A.4.1 Identidade e cadeia verificável
-
-A **identidade do artefato = o `integrity` sha512 do tarball** registrado no **lockfile comitado**
-(`resolved`+`integrity`); o **commit Git é proveniência**, não âncora (evita afirmar
-`commit == tarball`). Se houver archive Git aprovado, a equivalência commit→tarball é **registrada e
-verificada** explicitamente (sha512, conteúdo extraído, data, procedimento).
-
-#### A.4.2 Manifesto de árvore esperado
+### B.4.2 Manifesto de árvore esperado (origem: A.4.2 da v21)
 
 `vendor/manifest.sha256`, **comitado**, **gerado em release controlada**, com metadados: **commit**,
 **versão de npm e Node usadas**, **sha512 do tarball**, **sha256 por arquivo**, **data de captura**,
 escopo. O installer **compara a árvore instalada** contra esse baseline e **rejeita**: arquivos
 **ausentes ou excedentes**, **caminhos duplicados** após normalização, **reparse points**. Divergência de
-**ferramenta** (npm/Node) é reportada **separada** da divergência do **pacote**.
+**ferramenta** (npm/Node) é reportada **separada** da divergência do **pacote**. O manifesto cobre a
+**árvore `node_modules\*\*`**; os dois arquivos do projeto são cobertos pelos hashes commitados de
+`package.json`/lock.
 
-#### A.4.3 Bootstrap executável e `npm ci`
-
-- `npm ci --ignore-scripts --no-audit --no-fund` em
-  `%LOCALAPPDATA%\xpz-mcp-integrations\vendor-<versao>\`; comparação contra o manifesto esperado.
-- **`--ignore-scripts` justificado e testado:** o pacote declara `prepare`; usamos o `dist`
-  pré-compilado. O teste prova que `dist/index.js` existe e o servidor sobe **sem** rodar `prepare`.
-- `xpz-mcp-integrations/vendor/` contém o **`package.json` (pin exato) + `package-lock.json`**
-  versionados; o installer **cria `vendor-<versao>\`, copia os dois para lá** e **só então** roda
-  `npm ci`.
-- O `manifest.sha256` cobre a **árvore `node_modules\*\*`**; os dois arquivos do projeto são cobertos
-  pelos hashes commitados de `package.json`/lock (não pelo manifesto de árvore).
-- **Sem indireção mutável:** launcher versionado por path absoluto; comando do cliente aponta para o
-  launcher daquela versão. Update = instalar + launcher + re-emitir config; rollback = re-emitir config
-  anterior. **Sem junction/symlink** (hazard de `historico/...20260622-20260922.md:48`).
-
-#### A.4.4 Catálogo de bundles aprovados
+### B.4.4 Catálogo de bundles aprovados (origem: A.4.4 da v21)
 
 `xpz-mcp-integrations/vendor/catalog.json` versionado — cada entrada com **descriptor, lockfile,
 integridade do tarball, manifesto de árvore e template/hash de launcher**. Update/rollback **só**
@@ -484,17 +713,7 @@ consomem entradas do catálogo; `-CheckUpdates` **apenas informa** (nunca instal
 **atualizar o repositório/skill** (novo catálogo). Rollback re-emite a partir do bundle aprovado
 anterior, com **retenção explícita** das versões instaladas.
 
-#### A.4.5 Evidência commitada do `dist` (pré-condição de qualquer motor)
-
-Em `xpz-mcp-integrations/fixtures/` (rastreada): trechos **sanitizados** de `provider.ts`/`provider.js`
-(5 modos + vars), `engines.node` (**≥ 22**), `prepare` do `package.json`, boot `initialize`, **+ licença
-MIT integral + atribuição**. **Proveniência por fixture:** `commit`, origem, hash, **data de captura**,
-escopo — **sem** usar o README da `main` como prova da `0.13.0`. Até então, a tabela de Fornecedor é
-**hipótese**.
-
-**Gate do F1:** **revisão estática do `dist` + boot sem chave**.
-
-#### A.4.6 Contenção de rede — protocolo de endurecimento **opt-in** (não é gate)
+### B.4.6 Contenção de rede — protocolo de endurecimento **opt-in** (origem: A.4.6 da v21)
 
 Preservado como procedimento disponível; **rebaixado** na v21 (ver **Adiado**).
 
@@ -511,15 +730,7 @@ Preservado como procedimento disponível; **rebaixado** na v21 (ver **Adiado**).
   **falha do egresso do processo filho**. **Evidência + limpeza** declaradas.
 - **AppContainer:** adiado (ver **Adiado**).
 
-#### A.4.7 Semântica de rede (3 contextos)
-
-(1) instalador/vendorizador: sem registro fora de install/update; (2) launcher/MCP: só o endpoint;
-(3) teste isolado: **A.4.6**, opt-in.
-
-### A.5 Pré-requisitos — escopo do manifesto × runtime Node
-
-Espelhar `GeneXusPythonPrerequisite.ps1`/`Test-XpzPowerShellRuntime.ps1`: **executável utilizável de
-verdade** (rejeitar stub `WindowsApps`/alias da Store) para `node`/`npm`/`pwsh`.
+### B.5 Runtime Node — manifesto × catálogo e cópia dedicada (origem: A.5 da v21)
 
 O `manifest.sha256` cobre **`node_modules/**`** apenas (produção do npm), **invariante** entre versões
 aceitas de Node; a **versão de Node/npm** usada na liberação é **fixada no catálogo** e **gated**
@@ -527,48 +738,13 @@ aceitas de Node; a **versão de Node/npm** usada na liberação é **fixada no c
 teste isolado** é uma **cópia do Node da máquina** com **versão e hash registrados**, vinculada ao
 catálogo; o launcher de produção usa o Node **absoluto** resolvido no install (mesmo gate).
 
-### A.6 `config.json` — schema, origem e consumo
+### B.7 Cofre — backup, retenção e modo inseguro (origem: A.7 da v21)
 
-`%LOCALAPPDATA%\xpz-mcp-integrations\config.json` — **registro de configuração não secreto**, ACL
-só-dono, UTF-8 sem BOM, **schema versionado**:
-
-```
-{ provider, model, publicEnv{...}, endpoint{ hash, confirmedAt, confirmedBy } }
-```
-
-- **Origem/override** por parâmetro do mutador; **validado contra o descritor** (só as vars públicas
-  permitidas do modo).
-- **Consumido** por launcher/auditor/reparo/re-emissão — é **dele** que o launcher reconstrói as
-  variáveis públicas obrigatórias (inclusive o **endpoint completo** do `compatible`).
-- **Nunca** contém a chave.
-- `endpointHash` vincula a autorização; mudar provider/mode/model/URL **invalida**. Host/caminho
-  **redigidos** antes da confirmação.
-
-### A.7 Cofre — blob, entrada, backup e eventos
-
-- **Local:** `%LOCALAPPDATA%\xpz-mcp-integrations\vault\`.
-- **Blob:** DPAPI `CurrentUser`, **sem entropia adicional**, **campo `version`**, e **metadados do tipo**
-  (modo + `secretEnvVar`) — **sem** o tipo misturado ao valor.
-- **Tabela fonte × modo × comportamento:** vault-first; env só com `-CredentialSource env`; auditor
-  sinaliza `credencial_divergente_env_vs_cofre` (**blocking**) só quando **não** houve override.
-- **Entrada:** `Read-Host -AsSecureString`; sem transcript/history; não-eco; **ACL antes de persistir**.
 - **`acl_nao_aplicavel` — bloqueia mutadores de blob** (criação/import/rotação/restore), salvo modo
   inseguro explicitamente autorizado e rotulado.
-- **Backup do cofre:** local, retenção, mesma ACL, restore. **Restore inter-máquina** = **re-inserir a
-  chave** (DPAPI não roaming).
-- **Três eventos:** rotação (re-cifrar), remoção (preservar), incidente (apagar blob + revogar no
-  provedor + orientar restart).
+- **Backup do cofre:** local, retenção, mesma ACL, restore.
 
-### A.8 Adaptadores — descoberta, precedência e round-trip
-
-**OpenCode — algoritmo de descoberta:** raiz gerenciada na v1 = **global** `~/.config/opencode/`;
-candidatos **`opencode.json` e `opencode.jsonc`** nessa pasta; **projeto-local (`.opencode/`) fora do
-escopo da v1** (declarado). **Precedência:** resolver `opencode.json` → `opencode.jsonc` (espelha o motor
-atual); **sem precedência comprovada** se ambos existirem → `entrada_em_conflito` (bloquear sem
-escrever). **Fixtures** para cada caso. Serializar para o formato efetivo (`.json` → JSON válido;
-`.jsonc` → localizador estrutural). Entrada `mcp.jev` (`type: local`,
-`command: ["pwsh","-NoProfile","-File","<launcher>"]`, campo **`environment`**, não `env`). Merge
-transacional; idempotente. **Shape = fato externo** + fixture sanitizada no F1.
+### B.8 Codex — biblioteca TOML vendorizada (origem: A.8 da v21)
 
 **Codex (F2):** `~/.codex/config.toml`, `[mcp_servers.jev]`. **Biblioteca TOML vendorizada** (pin pelo
 commit do **próprio** lockfile + integridade + licença + re-verificação), no rigor do `jev-mcp`; o
@@ -578,60 +754,6 @@ possivelmente multiline). Prova de **round-trip** das formas reais (`command`, `
 herdado** → launcher define **conjunto mínimo explícito provado com filho falso** (`SystemRoot`,
 `SystemDrive`, `TEMP`/`TMP`, `PATHEXT`, `COMSPEC`, `PATH` mínimo). Fixture sanitizada do `config.toml` no
 F2.
-
-### A.9 Auditoria — estados, classes e precedência
-
-- **Agregado:** `overall = INTEGRATIONS_OK | INTEGRATIONS_GAPS`. **Tabela estado → `exitCode`/classe por
-  motor** (faixa reservada no F1-pre). **Precedência:** `versao_defasada` (pin do descritor) antes de
-  `vendor_divergente` (manifesto).
-- **Estado por cliente:** `notConfigured` | `written` | `reloadPending` | `handshakeConfirmed` |
-  `e2eOptInConfirmed`; `overall` **não** promove `written` a sucesso operacional; a skill informa a
-  **ação de recarga/reinício** necessária.
-- **Offline:** `OK`; `ausente`; `entrada_quebrada`/`entrada_divergente`/`entrada_em_conflito`;
-  `versao_defasada`; `vendor_ausente`/`vendor_divergente`/`vendor_sem_launcher`;
-  `launcher_ausente`/`launcher_divergente`; `node_ausente`/`node_incompativel`/`node_path_nao_resolve`;
-  `pwsh_ausente`; `fornecedor_ausente`/`fornecedor_nao_validado` (**warn**); `credencial_ausente`;
-  `credencial_divergente_env_vs_cofre` (**blocking** salvo override); `endpoint_nao_verificado`
-  (**blocking** preset; **warn**+confirmação `compatible`); `acl_nao_aplicavel` (**warn** na auditoria;
-  **blocking** nos mutadores de blob).
-- **Online opt-in** (`-CheckUpdates`): `atualizacao_disponivel` — informa, nunca auto-atualiza.
-  Canonicalização de path antes de `entrada_divergente`.
-
-### A.10 Self-tests — inventário executável
-
-**Offline (F1-pre/F1):** detecção (rejeitar stub); JSONC — **localizador estrutural** (edição fora de
-comentário/string; **byte-diff** fora dos spans; **não-ASCII**; encoding/BOM/EOL preservados), fixtures
-negativas, **golden de paridade**, **matriz de migração** por rota; idempotência; **escrita
-serializada/transacional** (create×replace, corrida → recusa, arquivo especial → recusa, recuperação);
-backup+restore; rollback; schema do descritor; **round-trip DPAPI**; **re-emissão de launcher por
-versão**; **launcher** com filho falso (stdio binário, zero bytes fora do filho, exit code = do filho,
-sem deadlock; **cancel/órfão/stderr intenso**; falha forçada de associação ao Job); **re-execução sem
-ambiente herdado** (fonte = `config.json`); **comparação contra o manifesto esperado**; **revisão
-estática do `dist` + boot sem chave** (gate do F1).
-
-**Opt-in (não gate):** **contenção de rede** — Windows Sandbox sem rede; egresso por **filho**; firewall
-só diagnóstico (A.4.6).
-
-**F2:** self-tests de **TOML** (round-trip das formas reais; env mínimo com filho falso).
-
-**Não são rodados pelo orquestrador de pré-push**; a skill declara cada comando e registra em `09`.
-**E2E** com `jev_classify` = validação manual opt-in; pré-requisito de `handshakeConfirmed`.
-
-### A.11 Paridade documental mecânica
-
-- `README.md` trilíngue (duas listas por língua ×3); `CHANGELOG.md` trilíngue; **`SECURITY.md`
-  trilíngue** (seção do cofre nas três).
-- `09` com `Dono:` + `Validação:`/`Tokens:`/`Exit:`; `02` com contrato + vocabulário (declarar a
-  **extensão** do vocabulário de evidência para artefatos externos); `08` nomear seções ou retirar.
-- **`AGENTS.md`/`README.md`:** reconciliar listas **adicionando só o que faltar** (`AGENTS.md:11`
-  já tem `xpz-codex-apply-patch-alternative`; conferir `:49`).
-- `README.md:107` × `AGENTS.md:92-96` para a rastreabilidade privada das fixtures.
-- **`999`:** `:3283` com pin por commit/sha512 e preset **parcial**; `:3277` **alinhado**. **Consultar o
-  `998`** (`998:919-923`).
-- Conformidade: `#requires -Version 7.4`; UTF-8 sem BOM (preservando BOM preexistente do arquivo do
-  usuário); molde `.example.ps1`; `Test-XpzParameterNamingContract.ps1` **não** é gate geral; não
-  enumerar ≥2 gates numa linha.
-- **Ledger:** efêmero/gitignored em `Temp/revisao-por-pares/<RoundId>/`; **não versionar**.
 
 ---
 
@@ -649,7 +771,29 @@ só diagnóstico (A.4.6).
 - `xpz-skills-setup/SKILL.md`; `15-revisao-por-pares.md`, `xpz-llm-delegate/SKILL.md` — `commandcode/*`
   como **catálogo de vozes** (não confundir com o endpoint do Jev).
 
-## CHANGELOG desta reorganização
+## CHANGELOG da v22 — redução de escopo (2026-10-03)
+
+Decisão humana, a partir de parecer externo (ver *Evidência coletada*). **Reabre decisões** da v21 de
+forma explícita; nada foi apagado — o detalhe cortado foi **movido** para o **Anexo B**.
+
+- **Corpo:** título v22; novo bloco **Propriedades essenciais da v1**; Decisões travadas linha 7
+  (só `compatible` implementado) e nova linha 10 (v1 mínima); classe biblioteca JSONC retirada;
+  seção JSONC F1-pre substituída por **reaproveitar o mecanismo existente**; vendorização sem
+  manifesto/catálogo; launcher `ProcessStartInfo` com stdio herdado; Fornecedor com 4 modos em F4 e
+  regra `endpoint_nao_confirmado`; Credencial sem backup do cofre nem «modo inseguro»; **Codex no F1
+  com bloco entre marcadores** (sem biblioteca TOML); Fases (F1 = v1; F2 = endurecimentos; F1-pre
+  extinto); Riscos aceitos da v22; Adiado aponta para o Anexo B.
+- **Anexo A:** reescrito para a v1 (A.1 launcher, A.2 sem ancestralidade/journal, A.3 mecanismo JSONC
+  existente, A.4 sem A.4.2/A.4.4/A.4.6, A.5, A.6 schema reduzido, A.7, A.8 tabela do bloco do Codex,
+  A.9 estados da v1, A.10 self-tests da v1).
+- **Anexo B (novo):** B.1 launcher nativo; B.2 ancestralidade/recuperação; B.3 JSONC estrutural +
+  matriz de migração; B.4.2 manifesto; B.4.4 catálogo; B.4.6 contenção de rede; B.5 runtime Node
+  dedicado; B.7 backup do cofre/modo inseguro; B.8 biblioteca TOML.
+- **`999`:** entrada do `xpz-mcp-integrations` atualizada; nova entrada «JSONC do OpenCode —
+  biblioteca única e migração dos consumidores».
+- As seções abaixo (CHANGELOG da v21) citam a numeração A.n **da v21**.
+
+## CHANGELOG da reorganização da v21
 
 **Foi para o Anexo A (movido, não deletado):**
 
