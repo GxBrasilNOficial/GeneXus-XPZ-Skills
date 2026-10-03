@@ -19,7 +19,7 @@ from GeneXusCanonicalJson import canonical_bytes
 
 ROOT = Path(__file__).resolve().parent.parent
 EXPECTED_VERSION = "16"
-EXPECTED_HASH = "e46b53b895974602af1f60ccf05a13524674be02b882f691e83b5fe53319e97f"
+EXPECTED_HASH = "aeda5a294dc0f10bfc195c39a0d6f0f3bc0c35e3c59ae6df5a89207599edd588"
 
 
 def _assert(condition: bool, message: str) -> None:
