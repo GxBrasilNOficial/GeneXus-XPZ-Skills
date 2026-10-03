@@ -1,4 +1,4 @@
-# xpz-mcp-integrations — design da skill (v23)
+# xpz-mcp-integrations — design da skill (v23.1)
 
 ## Papel do documento
 
@@ -13,7 +13,7 @@ redução de escopo de **2026-10-03** e a evidência empírica coletada.
   **Anexo B** (movidos, não apagados) · **v23** **correção de gaps da v22** (segunda opinião de
   subagente + observação de outro agente, **conferidas pelo orquestrador**; ver *Evidência coletada*):
   ciclo de atualização/remoção nos dois clientes, migração da entrada manual, validação do Codex por
-  `tomllib`, chave só do cofre na v1.
+  `tomllib`, chave só do cofre na v1 · **v23.1** quatro clarificações de texto (ver CHANGELOG).
 
 **Estrutura:** o **corpo** carrega decisão, escopo, fronteira, contrato mínimo, fases e riscos. O
 **Anexo A** carrega o detalhe técnico da **v1**, a provar por self-test no F1. O **Anexo B** preserva
@@ -23,7 +23,7 @@ da v1.
 **Propriedades essenciais da v1 (não cortáveis):** sem `npx` em runtime; pin por **integridade**
 (lockfile); `npm ci --ignore-scripts`; chave **só** no cofre DPAPI, nunca no config do cliente; backup
 antes de gravar config de cliente; **nada gravado sem aprovação**; ciclo instalar/auditar/reparar/
-remover.
+atualizar/remover.
 
 **Autor e diversidade:** `authorFamily=deepseek`. Revisores de famílias distintas da do autor; as
 rodadas opencode (meta+deepseek) são **segundas opiniões**. **Liberação** exige **≥2 Criadores
@@ -201,6 +201,8 @@ O descritor declara cinco modos como **dado**; a **v1 implementa e testa só `co
 - **Cofre:** guarda a chave do modo `compatible`, **sem** registrar o segredo em claro.
 - **`compatible` = parcial** (handshake, não E2E). **Command Code** = preset sugerido. **Import
   `auth.json`:** opcional, com ressalva (credencial `commandcode/*` do OpenCode é de gateway LLM).
+  É uma operação **única de bootstrap/migração para o cofre** (v23.1): o launcher **nunca** lê o
+  `auth.json` em runtime, e a importação **não altera** o `auth.json`.
 
 ## Credencial
 
@@ -241,6 +243,8 @@ Formato do blob, entrada não-eco, ACL e os três eventos (rotação, remoção,
   mão — caso do usuário de referência — recebe o diff e, **com aprovação explícita**, a substituição
   (backup antes). Valores públicos (`JEV_API_BASE_URL`, `JEV_MCP_MODEL`) vão para o `config.json`; se
   houver chave no config do cliente, ela é **oferecida** para importação no cofre e sai do config.
+  **Ordem (v23.1):** gravar o blob DPAPI, conferir que ele descriptografa de volta para o mesmo valor
+  e **só então** retirar a chave do config. Se o cofre falhar, o config do cliente fica **intocado**.
 
 Que variáveis de ambiente o Codex repassa ao launcher (`env_vars` filtra o herdado) é **fato a
 verificar** com filho falso no F1. Fixture sanitizada do `config.toml` no F1. A biblioteca TOML
@@ -283,7 +287,8 @@ Lista completa de estados offline, classes (`blocking`/`warn`), tabela estado→
 - **O gate do `dist` no F1 é revisão estática do `dist` + boot sem chave.** O teste de egresso de rede
   contido **não** é gate (ver **Adiado**).
 - **Não são rodados pelo orquestrador de pré-push**; a skill declara cada comando e registra em `09`.
-- **E2E** com `jev_classify` = validação manual opt-in; pré-requisito de `e2eOptInConfirmed`.
+- **E2E** com `jev_classify` = validação manual opt-in; um E2E aprovado **promove** o cliente de
+  `handshakeConfirmed` para `e2eOptInConfirmed`.
 
 ## Documentação e paridade
 
@@ -656,7 +661,8 @@ zero bytes do launcher em stdout, ambiente limpo = só a allowlist, negativos pr
 descritos no **Anexo B**, só quando o item voltar.
 
 **Não são rodados pelo orquestrador de pré-push**; a skill declara cada comando e registra em `09`.
-**E2E** com `jev_classify` = validação manual opt-in; pré-requisito de `e2eOptInConfirmed`.
+**E2E** com `jev_classify` = validação manual opt-in; um E2E aprovado **promove** o cliente de
+`handshakeConfirmed` para `e2eOptInConfirmed`.
 
 ### A.11 Paridade documental mecânica
 
@@ -857,6 +863,14 @@ F2.
 - `https://github.com/jkudish/jev-mcp` (MIT); `https://docs.typesafe.ai`.
 - `xpz-skills-setup/SKILL.md`; `15-revisao-por-pares.md`, `xpz-llm-delegate/SKILL.md` — `commandcode/*`
   como **catálogo de vozes** (não confundir com o endpoint do Jev).
+
+## CHANGELOG da v23.1 — clarificações (2026-10-03)
+
+Insumo: observação de agente externo sobre a v23, avaliada pelo orquestrador. Quatro frases, sem
+mecanismo novo: «atualizar» incluído nas propriedades essenciais; E2E aprovado **promove**
+`handshakeConfirmed` → `e2eOptInConfirmed` (corpo e A.10); migração de chave do config do cliente
+grava e confere o cofre **antes** de retirar a chave; import do `auth.json` é bootstrap único para o
+cofre, nunca fonte em runtime, sem alterar o `auth.json`.
 
 ## CHANGELOG da v23 — correção de gaps da v22 (2026-10-03)
 
