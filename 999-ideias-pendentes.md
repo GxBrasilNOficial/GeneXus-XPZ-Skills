@@ -3293,3 +3293,14 @@ As contagens são de **arquivos que mencionam o token**, não de parâmetros exc
 **Refino (2026-10-02).** Design reorganizado em **v21**: o corpo ficou com as **decisões**; o **Anexo A** reúne as **obrigações de implementação** (a provar por self-test no F1-pre/F1/F2); há a seção **Adiado / escopo-futuro**. Único corte de escopo: o **teste de egresso de rede contido (Windows Sandbox)** deixou de ser gate do F1 e virou **endurecimento opt-in** — o gate do F1 passou a ser **revisão estática do `dist` + boot sem chave** (protocolo do Sandbox preservado no Anexo A.4.6; risco aceito declarado nos Riscos). Ver `xpz-mcp-integrations-design.md` (v21, Anexo A e «Adiado»).
 
 **Relacionado.** `xpz-mcp-integrations-design.md`; `xpz-skills-setup/SKILL.md` (fronteira); `xpz-llm-delegate/SKILL.md` e `15-revisao-por-pares.md` (o `commandcode/*` ali é catálogo de vozes do painel — não confundir com o endpoint do Jev).
+
+## Pré-requisito Python — dispatch explícito de `-Operation`
+
+- **Importância** — baixa (as três operações aceitas são mapeadas corretamente hoje; o risco é uma opção futura cair no `else` e receber silenciosamente a mensagem de gravabilidade).
+- **Maturidade** — pronta para implementar (o comportamento esperado está definido: dispatch explícito, erro para operação sem mensagem e cobertura do valor padrão).
+
+`Get-GeneXusPythonPrerequisiteErrorMessage` em `scripts/GeneXusPythonPrerequisite.ps1` aceita `index-rebuild`, `extractor-signature` e `transaction-writability`, com `index-rebuild` como padrão. O `else` atual representa implicitamente `transaction-writability`; se uma operação for adicionada ao `ValidateSet` sem ramo próprio, ela herdará a mensagem errada. `Test-GeneXusKbIntelligenceExtractorSignatureSelfTest.ps1` verifica as três opções explícitas, mas não confirma que omitir `-Operation` preserva a mensagem de rebuild.
+
+**Melhoria pendente.** Tornar os três casos explícitos e falhar se uma operação aceita não tiver mensagem mapeada; acrescentar ao self-test a equivalência entre a chamada sem parâmetro e `-Operation 'index-rebuild'`. Não é defeito atual nem bloqueio de uso.
+
+**Relacionado.** `scripts/GeneXusPythonPrerequisite.ps1`; `scripts/Test-GeneXusKbIntelligenceExtractorSignatureSelfTest.ps1`; `scripts/README-kb-intelligence.md`.

@@ -23,6 +23,7 @@ Catalogo técnico canonico de tipos:
 - `queryableByKbIntelligence=true`: consultas semânticas do índice (`who-uses`, `what-uses`, `impact-basic`, `functional-trace-basic`) são **aptas** para o tipo com o extrator atual — o grafo tende a refletir dependencias tecnicas reais no acervo.
 - `queryableByKbIntelligence=false`: o objeto pode estar no inventario, mas **não** usar as consultas semânticas acima como prova de impacto ou dependencia; o motor atual não extrai relacoes desse tipo (respostas vazias parecem “sem impacto”). Preferir `object-info`, `search-objects` ou leitura pontual do XML. Lista canônica: cada entrada em `scripts/gx-object-type-catalog.json` (amostra multi-KB: `scripts/Invoke-ParallelKbEnvelopeScan.ps1`; grafo zero: consulta a `kb-intelligence.sqlite`).
 - `Query-KbIntelligenceIndex.py` recusa `who-uses`, `what-uses`, `impact-basic` e `functional-trace-basic` quando o tipo tem `queryableByKbIntelligence=false` no **catalogo efetivo** (base + override): JSON com `blocked=true`, `reason=QUERY_NOT_SEMANTIC_FOR_TYPE`, exit `11`; se o override bloquear a resolução do catálogo efetivo, JSON com `status=INVALID_OVERRIDE_SHAPE`/`OVERRIDE_RESOLUTION_BLOCKED` e exit `2`. Wrappers devem repassar `-ParallelKbRoot` / `-CatalogOverridePath` como no build.
+- `transaction-attributes` e `transaction-writable-attributes` devolvem `BLOCKED` (texto) ou resultado JSON bloqueado e exit `12` quando a pré-checagem de contrato, cobertura ou identidade do índice de gravabilidade falha; isso não equivale a uma consulta válida sem atributos graváveis.
 
 ### Tipos com grafo assimétrico (`queryableByKbIntelligence=true`)
 
@@ -567,6 +568,22 @@ Self-test local (não depende de pasta paralela real) para `idBasedOn`→`Domain
 
 ```powershell
 .\scripts\Test-KbIntelligenceIdBasedOnDomainSelfTest.ps1
+```
+
+Self-tests Python locais para a assinatura do extrator e a gravabilidade do KbIntelligence:
+
+- `Test-GeneXusKbIntelligenceExtractorSignatureSelfTest.py` — fixa vetores de versão, formato e hash e valida o contrato da assinatura.
+- `Test-GeneXusKbIntelligenceWritabilityQuerySelfTest.py` — cobre as consultas de gravabilidade e seus bloqueios fail-closed.
+- `Test-GeneXusTransactionWritabilitySelfTest.py` — cobre classificação automática por ocorrência e contexto de gravabilidade.
+- `Test-GeneXusWritabilityOperationalSelfTest.py` — cobre operações, provas, decisões e integração das fachadas 9-TXW/9-PNW.
+
+Cada teste requer Python 3 utilizável. O teste operacional também requer PowerShell 7.4 (`pwsh`) para executar a integração das fachadas.
+
+```powershell
+python .\scripts\Test-GeneXusKbIntelligenceExtractorSignatureSelfTest.py
+python .\scripts\Test-GeneXusKbIntelligenceWritabilityQuerySelfTest.py
+python .\scripts\Test-GeneXusTransactionWritabilitySelfTest.py
+python .\scripts\Test-GeneXusWritabilityOperationalSelfTest.py
 ```
 
 Casos positivos de `Property Formula` em KBs de producao ficam catalogados em `kb-intelligence-kbexemplo.validation-extraction-semantic.json` (ids `phase5-case-65..68`, como catálogo compartilhado) e em baterias dedicadas por KB: `kb-intelligence-fabricabrasil.validation-extraction-attribute-formula.json`, `kb-intelligence-wseducacaospteste.validation-extraction-attribute-formula.json`. Validar cada bateria no rebuild da pasta paralela correspondente — não no path genérico dos exemplos.
