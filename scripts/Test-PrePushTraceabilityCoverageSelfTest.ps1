@@ -157,13 +157,45 @@ try {
         'used-today-claim.md' = 'O motor do extrator 13 continua sendo o usado hoje.'
         'stale-next-bump.md' = 'EXTRACTOR_SIGNATURE_VERSION — atualização 2026-09-25: o valor "13" foi consumido; usar próximo bump material disponível (hoje 14).'
         'introduced-feature.md' = 'A funcionalidade foi introduzida no extrator 13.'
+        'quoted-index.md' = 'no índice atual (schema_version=5, extrator `13`; classificação materializada)'
+        'index-constant.md' = 'o índice usa `schema_version=5` e `EXTRACTOR_SIGNATURE_VERSION=13`'
+        'current-constant.md' = '`EXTRACTOR_SIGNATURE_VERSION` atual `13`'
+        'schema-contract.md' = 'schema_version=5 / extrator `13` indexa Domains.'
+        'signature-constant.md' = 'A assinatura atual usa `EXTRACTOR_SIGNATURE_VERSION="13"`'
+        'quoted-version.md' = 'versão atual do extrator: `13`'
+        'quoted-in-force.md' = 'O extrator "13" é o atual.'
+        'single-quoted-current.md' = "Current extractor version: '13'."
+        'historical-quoted.md' = 'A funcionalidade foi introduzida no extrator `13`.'
+        'historical-constant.md' = 'Em 2026-09-25, a assinatura usava `EXTRACTOR_SIGNATURE_VERSION="13"`; Domains atualmente indexados.'
+        'isolated-constant.md' = '`EXTRACTOR_SIGNATURE_VERSION=13`'
+        'dated-schema-record.md' = 'Registro de 2026-09-25: schema_version=5 / extrator 13 indexa Domains.'
+        'old-manual-quotation.md' = 'O manual antigo dizia "versão atual do extrator: 13"; essa afirmação foi substituída pela versão 16.'
+        'old-manual-backticks.md' = 'O manual antigo dizia `EXTRACTOR_SIGNATURE_VERSION atual 13`; essa afirmação foi substituída pela versão 16.'
+        'mixed-dated-current.md' = 'Registro de 2026-09-25: schema_version=5 / extrator 13 indexa Domains. Hoje o extrator 13 é o atual.'
+        'mixed-dated-same-sentence.md' = 'Registro de 2026-09-25: schema_version=5 / extrator 13 indexa Domains, mas hoje o extrator 13 é o atual.'
+        'mixed-quoted-current.md' = 'O manual antigo dizia "versão atual do extrator: 13"; hoje o extrator 13 é o atual.'
+        'mixed-current-before-history.md' = 'O extrator 13 é o atual. Registro de 2026-09-25: schema_version=5 / extrator 13 indexa Domains.'
+        'mixed-quoted-correct.md' = 'O manual antigo dizia "versão atual do extrator: 13"; versão atual do extrator: `16`.'
+        'correct-current.md' = @'
+no índice atual (schema_version=5, extrator `16`; classificação materializada)
+o índice usa `schema_version=5` e `EXTRACTOR_SIGNATURE_VERSION=16`
+`EXTRACTOR_SIGNATURE_VERSION` atual `16`
+schema_version=5 / extrator `16` indexa Domains.
+A assinatura atual usa `EXTRACTOR_SIGNATURE_VERSION="16"`
+versão atual do extrator: `16`
+'@
         'CHANGELOG.md' = '- KbIntelligence / extrator 13 (2026-09-25): Domains atualmente indexados por fullyQualifiedName.'
     }
     New-SignatureFixtureRepository -RepositoryRoot $signatureRoot -BuildSource '# synthetic build module' -SignatureSource 'EXTRACTOR_SIGNATURE_VERSION = "13"' -Documents $signatureDocuments -IgnoreTemp
     $fixtureScripts = Join-Path $signatureRoot 'scripts'
     [System.IO.File]::WriteAllText((Join-Path $fixtureScripts 'GeneXusKbIntelligenceExtractorSignature.py'), 'EXTRACTOR_SIGNATURE_VERSION = "16"' + [Environment]::NewLine, $utf8NoBom)
     $signatureGateResult = Invoke-SignatureFixtureGate -RepositoryRoot $signatureRoot -ChangedFile 'scripts/GeneXusKbIntelligenceExtractorSignature.py'
-    Assert-SignatureStalePaths -Result $signatureGateResult -ExpectedPaths @('current-version.md', 'in-force-claim.md', 'stale-next-bump.md', 'untracked-current-version.md', 'used-today-claim.md') -Scenario 'cenario 3'
+    Assert-SignatureStalePaths -Result $signatureGateResult -ExpectedPaths @(
+        'current-version.md', 'in-force-claim.md', 'stale-next-bump.md', 'untracked-current-version.md', 'used-today-claim.md',
+        'quoted-index.md', 'index-constant.md', 'current-constant.md', 'schema-contract.md',
+        'signature-constant.md', 'quoted-version.md', 'quoted-in-force.md', 'single-quoted-current.md',
+        'mixed-dated-current.md', 'mixed-dated-same-sentence.md', 'mixed-quoted-current.md', 'mixed-current-before-history.md'
+    ) -Scenario 'cenario 3'
 
     # Cenario 4: a fonte legada em Build-KbIntelligenceIndex.py continua suportada.
     $legacyRoot = Join-Path $tempRoot 'legacy-signature-fixture'

@@ -18,4 +18,5 @@ O self-test cobre a fonte de assinatura no módulo atual, a fonte legada em `Bui
 
 ### Rastreabilidade
 
+- Commit material: `d4dca9f` (Refina avisos de versão do extrator e amplia testes de rastreabilidade).
 - Arquivos materiais: `scripts/Test-PrePushTraceabilityCoverage.ps1`, `scripts/Test-PrePushTraceabilityCoverageSelfTest.ps1`, `08-guia-para-agente-gpt.md`, `09-inventario-e-rastreabilidade-publica.md`, `13-revisao-pre-push.md`, `CHANGELOG.md` e `999-ideias-pendentes.md`.

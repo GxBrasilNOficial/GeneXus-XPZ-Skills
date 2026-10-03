@@ -278,12 +278,19 @@ if ($normalizedChangedFiles -contains $buildPyRelativePath -or $normalizedChange
                 [regex]::new('(?ix)\b(?:extrator|extractor)\s+(?<version>\d+)\s+(?:é|es|is)\s+(?:(?:o|a|el|la|the)\s+)?(?:(?:current|latest)\s+(?:version|contract)|(?:vers[aã]o|versión|version|contrato)\s+(?:atual|actual|corrente|vigente|em\s+vigor|en\s+vigor|current|latest)|(?:atual|actual|corrente|vigente|em\s+vigor|en\s+vigor|current|latest))\b'),
                 [regex]::new('(?ix)\b(?:extrator|extractor)\s+(?<version>\d+)\s+(?:continua(?:\s+sendo)?|segue(?:\s+sendo)?|permanece(?:\s+sendo)?|continues?\s+to\s+be|remains)\s+(?:(?:o|a|el|la|the)\s+)?(?:one\s+)?(?:currently\s+)?(?:used|usado|utilizado)\s+(?:today|hoje|atualmente|actualmente)\b'),
                 [regex]::new('(?ix)\b(?:(?:current|latest|actual)\s+(?:extractor|extrator)\s+(?:(?:signature\s+)?version)|(?:vers[aã]o|versión)\s+(?:atual|actual|corrente|vigente)\s+(?:do|del)\s+(?:extrator|extractor))\s*(?:is|es|é|=|:)?\s*(?<version>\d+)\b'),
-                [regex]::new('(?ix)\b(?:no\s+índice\s+atual|en\s+el\s+índice\s+actual|in\s+the\s+current\s+index)\b.{0,60}\b(?:extrator|extractor)\s+(?:é|es|is|=|:)?\s*(?<version>\d+)\b')
+                [regex]::new('(?ix)\b(?:no\s+índice\s+atual|en\s+el\s+índice\s+actual|in\s+the\s+current\s+index)\b.{0,60}\b(?:extrator|extractor)\s+(?:é|es|is|=|:)?\s*(?<version>\d+)\b'),
+                [regex]::new('(?ix)\bEXTRACTOR_SIGNATURE_VERSION\s+(?:atual|actual|corrente|vigente|current|latest)\s*(?:=|:)?\s*(?<version>\d+)\b'),
+                [regex]::new('(?ix)\b(?:a\s+assinatura\s+atual\s+usa|o\s+índice\s+usa|no\s+índice\s+atual|la\s+firma\s+actual\s+usa|el\s+índice\s+usa|en\s+el\s+índice\s+actual|the\s+current\s+signature\s+uses|the\s+index\s+uses|in\s+the\s+current\s+index)\b.{0,100}\bEXTRACTOR_SIGNATURE_VERSION\s*(?:=|:)\s*(?<version>\d+)\b'),
+                [regex]::new('(?ix)\bschema_version\s*=\s*\d+\s*/\s*(?:extrator|extractor)\s+(?<version>\d+)\s+(?:indexa|indexes)\b')
             )
             $extractorSignatureContextPattern = [regex]::new('(?i)\bEXTRACTOR_SIGNATURE_VERSION\b|\bassinatura\s+(?:única\s+)?do\s+(?:extrator|extractor)\b|\b(?:extrator|extractor)\s+signature\b')
             $nextBumpVersionPattern = [regex]::new('(?i)\b(?:pr[oó]xim[oa]\s+(?:bump|vers[aã]o|versión)|next\s+(?:bump|version))\b[^\r\n]{0,120}\b(?:hoje|today|atualmente|actualmente|currently)\s*(?:[:=]\s*)?(?<version>\d+)\b')
             $currentVersionNumber = 0
             $hasNumericCurrentVersion = [int]::TryParse($currentExtractorVersion, [ref]$currentVersionNumber)
+            # Excluir trechos historicos delimitados antes de remover aspas/crases.
+            # Nao excluir a linha inteira: ela pode conter outra afirmacao vigente.
+            $datedSchemaRecordPattern = [regex]::new('(?ix)\b(?:registro\s+de|record\s+of)\s+\d{4}-\d{2}-\d{2}\s*:\s*`?schema_version\s*=\s*\d+`?\s*/\s*(?:extrator|extractor)\s+[`"'']?\d+[`"'']?\s+(?:indexa|indexes)\b')
+            $historicalQuotationPattern = [regex]::new('(?ix)\b(?:o\s+manual\s+antigo\s+dizia|el\s+manual\s+antiguo\s+decía|the\s+old\s+manual\s+said)\s*(?:"[^"\r\n]*"|''[^''\r\n]*''|`[^`\r\n]*`)')
             $docPathsResult = Invoke-RepoGit -RepositoryRoot $resolvedRoot -Arguments @('ls-files', '--cached', '--others', '--exclude-standard', '--', '*.md')
             if ($docPathsResult.ExitCode -ne 0) {
                 throw ("Falha ao listar documentos Markdown versionados ou nao ignorados: {0}" -f $docPathsResult.Text)
@@ -301,8 +308,13 @@ if ($normalizedChangedFiles -contains $buildPyRelativePath -or $normalizedChange
                 $docText = [System.IO.File]::ReadAllText($docPath)
                 $hasStaleVersionClaim = $false
                 foreach ($lineText in ($docText -split '\r?\n')) {
+                    # Delimitadores de codigo Markdown e aspas nao mudam a afirmacao.
+                    # O contexto corrente continua obrigatorio; nao buscar constantes isoladas.
+                    $claimText = $historicalQuotationPattern.Replace($lineText, ' ')
+                    $claimText = $datedSchemaRecordPattern.Replace($claimText, ' ')
+                    $claimText = $claimText.Replace('`', '').Replace('"', '').Replace("'", '')
                     foreach ($claimPattern in $currentExtractorVersionClaimPatterns) {
-                        foreach ($claimMatch in $claimPattern.Matches($lineText)) {
+                        foreach ($claimMatch in $claimPattern.Matches($claimText)) {
                             if ($claimMatch.Groups['version'].Value -cne $currentExtractorVersion) {
                                 $hasStaleVersionClaim = $true
                                 break
@@ -312,8 +324,8 @@ if ($normalizedChangedFiles -contains $buildPyRelativePath -or $normalizedChange
                     }
                     if ($hasStaleVersionClaim) { break }
 
-                    if ($hasNumericCurrentVersion -and $extractorSignatureContextPattern.IsMatch($lineText)) {
-                        foreach ($bumpMatch in $nextBumpVersionPattern.Matches($lineText)) {
+                    if ($hasNumericCurrentVersion -and $extractorSignatureContextPattern.IsMatch($claimText)) {
+                        foreach ($bumpMatch in $nextBumpVersionPattern.Matches($claimText)) {
                             $documentedBumpVersion = 0
                             if ([int]::TryParse($bumpMatch.Groups['version'].Value, [ref]$documentedBumpVersion) -and
                                 $documentedBumpVersion -le $currentVersionNumber) {
