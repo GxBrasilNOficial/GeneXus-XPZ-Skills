@@ -1,4 +1,4 @@
-# xpz-mcp-integrations — design da skill (v22)
+# xpz-mcp-integrations — design da skill (v23)
 
 ## Papel do documento
 
@@ -10,7 +10,10 @@ redução de escopo de **2026-10-03** e a evidência empírica coletada.
   IMPLEMENTAÇÃO; marca o ADIADO) · **v22** **redução de escopo** (decisão humana de 2026-10-03, a
   partir de parecer externo). **A v22 reabre decisões explicitamente:** a v1 passa a ser a **menor
   versão que preserva as propriedades de segurança essenciais**; os endurecimentos saem para o
-  **Anexo B** (movidos, não apagados).
+  **Anexo B** (movidos, não apagados) · **v23** **correção de gaps da v22** (segunda opinião de
+  subagente + observação de outro agente, **conferidas pelo orquestrador**; ver *Evidência coletada*):
+  ciclo de atualização/remoção nos dois clientes, migração da entrada manual, validação do Codex por
+  `tomllib`, chave só do cofre na v1.
 
 **Estrutura:** o **corpo** carrega decisão, escopo, fronteira, contrato mínimo, fases e riscos. O
 **Anexo A** carrega o detalhe técnico da **v1**, a provar por self-test no F1. O **Anexo B** preserva
@@ -57,7 +60,7 @@ automático; MCPs sem descritor; vender fornecedores não provados como validado
 | 3 | Node | ausência **e** `< 22`; `winget` id `OpenJS.NodeJS.LTS` com aprovação; com `nvm`/`fnm`/`volta`, **relatar**; node sem npm = corrompido → relatar |
 | 4 | Plataforma | **Windows** (cofre sem roaming) |
 | 5 | Escopo v1 | **OpenCode + Codex mínimo** (completa no F1 — v22) |
-| 6 | Credencial | **cofre** DPAPI, **vault-first**; env = **override explícito**; `auth.json` só import opcional |
+| 6 | Credencial | **cofre** DPAPI; na v1 a chave vem **só do cofre** (override por env → **Anexo B.7**, v23); `auth.json` só import opcional |
 | 7 | Fornecedor | descritor declara os 5 modos como **dado**; a v1 **implementa e testa só `compatible`** com preset **Command Code** (**parcial**); os outros 4 → **F4** (v22) |
 | 8 | Fork | **não** na v1 |
 | 9 | Público | comunidade |
@@ -92,7 +95,7 @@ artefatos externos, com rótulo próprio.
 - `xpz-mcp-integrations`: MCP externos opcionais; `xpz-skills-setup`: skills, instrucionais,
   `nexa`/`gam`, bootstrap git, MCP interno do Cursor.
 - **Arquivos de cliente compartilhados:** escrita **serializada + transacional**, com lock próprio,
-  validação de atributos em toda a ancestralidade e promoção atômica. O lock serializa **esta skill**;
+  validação de atributos do arquivo-alvo e promoção atômica (ancestralidade inteira → **Anexo B.2**). O lock serializa **esta skill**;
   contra terceiro que o ignore, a detecção é **best-effort**. Protocolo completo: **Anexo A.2**.
 - Ponteiro **documental** na setup (fora do recibo; anti-padrão `reviewer-ro`). Dono do registro =
   `xpz-skills-setup`. **`AGENTS.md`/`README.md`:** **reconciliar** as listas (três seções do README +
@@ -158,8 +161,8 @@ Bootstrap executável e evidência do `dist`: **Anexo A.4**.
 - **Invariante mecanizada:** nenhum byte do launcher em stdout; **exit code = do filho**; sem chave em
   log.
 - **Runtime:** exige `pwsh` (7.4+). **Staleness do `node`:** reparo = re-resolver e re-emitir launcher.
-- **Marcador de propriedade:** sentinela + manifesto; uninstall remove só se sentinela **e** path no
-  manifesto; órfão = reportar.
+- **Marcador de propriedade:** sentinela + manifesto de instalação (A.12); uninstall remove só se
+  sentinela **e** path no manifesto; órfão = reportar.
 - **Adiado para o Anexo B.1 (v22):** `CreateProcessW` + `CREATE_SUSPENDED` + Job Object +
   `ResumeThread`, limpeza pós-criação, política de árvore, testes de cancelamento/órfão/stderr
   intenso/payload binário grande.
@@ -170,7 +173,9 @@ Detalhe da v1: **Anexo A.1**.
 
 Espelhar `GeneXusPythonPrerequisite.ps1`/`Test-XpzPowerShellRuntime.ps1`: **executável utilizável de
 verdade** (rejeitar stub `WindowsApps`/alias da Store) para `node`/`npm`/`pwsh`. Node **gated**
-(`>= 22`): `< 22` é bloqueante, acima disso é reportada. Detalhe: **Anexo A.5**.
+(`>= 22`): `< 22` é bloqueante, acima disso é reportada. **Python 3.11+** é **opcional** (v23): só o
+adaptador do Codex o usa, para validar o `config.toml`; ausente → Codex em `edicao_manual_necessaria`,
+o resto da skill segue. Detalhe: **Anexo A.5**.
 
 ## Fornecedor
 
@@ -200,8 +205,10 @@ O descritor declara cinco modos como **dado**; a **v1 implementa e testa só `co
 ## Credencial
 
 - **Cofre neutro** em `%LOCALAPPDATA%\xpz-mcp-integrations\vault\`, blob **DPAPI `CurrentUser`**,
-  **vault-first**; env só com `-CredentialSource env`.
-- `credencial_divergente_env_vs_cofre` é **blocking** quando **não** houve override.
+  **única fonte da chave na v1** (v23): o launcher lê do cofre e não aceita chave por variável de
+  ambiente. O override por env (`-CredentialSource env`) e o estado
+  `credencial_divergente_env_vs_cofre` foram para o **Anexo B.7** — fazê-los funcionar exigiria
+  levar a escolha até o launcher e passar a variável pelo filtro de env do Codex.
 - **`acl_nao_aplicavel` bloqueia mutadores de blob** (v22: sem «modo inseguro»).
 - **Recuperar = re-inserir a chave** (DPAPI não roaming); a v1 **não** mantém backup/retenção do
   cofre (v22).
@@ -218,17 +225,26 @@ Formato do blob, entrada não-eco, ACL e os três eventos (rotação, remoção,
   campo **`environment`**, não `env`). Edição pelo mecanismo JSONC existente + validação pós-edição
   (ver *OpenCode — reaproveitar o mecanismo JSONC existente*); transacional, idempotente. **Shape =
   fato externo** + fixture sanitizada no F1.
-- **Codex (F1, mínimo — v22):** `~/.codex/config.toml`, bloco `[mcp_servers.jev]` gravado **entre
-  marcadores de comentário próprios da skill**, **sem biblioteca TOML**:
-  - bloco ausente → **acrescenta** ao fim;
-  - bloco com marcadores e byte-idêntico ao que seria emitido → OK;
-  - `[mcp_servers.jev]` sem marcadores, ou bloco alterado → `entrada_em_conflito`; **não toca** e mostra
-    o trecho;
-  - remover = apagar **só** o bloco entre os marcadores.
+- **Codex (F1, mínimo — v22/v23):** `~/.codex/config.toml`, bloco `[mcp_servers.jev]` gravado **entre
+  marcadores de comentário próprios da skill**, **sem biblioteca TOML de edição**. A **detecção e a
+  validação** usam o `tomllib` da biblioteca padrão do Python 3.11+ (só leitura): antes de gravar, o
+  arquivo original precisa ser lido sem erro; depois de montado, o texto novo precisa ser lido sem erro
+  e conter `mcp_servers.jev` exatamente como emitido. Isso pega **qualquer grafia** equivalente
+  (`[mcp_servers.'jev']`, chave pontilhada, tabela inline, `jev.*` dentro de `[mcp_servers]`), que
+  uma busca por linha não pegaria e que tornaria o arquivo inválido por declaração duplicada. **Sem
+  Python 3.11+** → `edicao_manual_necessaria` com o trecho pronto.
+- **Entrada que a skill reconhece (v23):** uma entrada só é tratada como da skill se for
+  **byte-idêntica** a um bloco/entrada que a skill emitiu, com o hash registrado no **manifesto de
+  instalação** (Anexo A.12). Só essas a skill substitui (atualizar/reparar) ou remove, sempre com diff
+  e aprovação. Qualquer outra coisa → `entrada_em_conflito`, sem tocar.
+- **Migração da entrada manual (v23):** quem já tem `mcp.jev` (ou `[mcp_servers.jev]`) configurado à
+  mão — caso do usuário de referência — recebe o diff e, **com aprovação explícita**, a substituição
+  (backup antes). Valores públicos (`JEV_API_BASE_URL`, `JEV_MCP_MODEL`) vão para o `config.json`; se
+  houver chave no config do cliente, ela é **oferecida** para importação no cofre e sai do config.
 
-  Que variáveis de ambiente o Codex repassa ao launcher (`env_vars` filtra o herdado) é **fato a
-  verificar** com filho falso no F1. Fixture sanitizada do `config.toml` no F1. A biblioteca TOML
-  vendorizada com round-trip está no **Anexo B.8**.
+Que variáveis de ambiente o Codex repassa ao launcher (`env_vars` filtra o herdado) é **fato a
+verificar** com filho falso no F1. Fixture sanitizada do `config.toml` no F1. A biblioteca TOML
+vendorizada com round-trip está no **Anexo B.8**.
 
 Algoritmo de descoberta/precedência e casos de `entrada_em_conflito`: **Anexo A.8**.
 
@@ -248,14 +264,15 @@ Lista completa de estados offline, classes (`blocking`/`warn`), tabela estado→
 ## Atualizar e remover
 
 - **Reconciliação obrigatória:** antes de limpar/reparar, **ler as configs reais de cada cliente** e
-  cruzar com o manifesto (o manifesto não é autoridade sobre a config viva); **plano/diff** + aprovação
-  explícita por escrita/remoção material.
+  cruzar com o **manifesto de instalação** (A.12; ele não é autoridade sobre a config viva);
+  **plano/diff** + aprovação explícita por escrita/remoção material.
 - **Atualizar:** consciente (release notes, breaking changes, backup, novo lockfile no repositório,
   instalar + launcher + re-emitir config, teste; rollback = versão anterior do repositório + backup do
   config). Nunca por existir versão nova.
-- **Remover:** manifesto registra referências por cliente; launcher só sai quando **não restar
-  referência**; exige **sentinela E** path no manifesto; órfão = reportar. Preservar cofre, `auth.json`,
-  fornecedor e demais MCPs; no Codex, `enabled=false` quando manter a config.
+- **Remover:** o manifesto de instalação registra referências por cliente; launcher só sai quando
+  **não restar referência**; exige **sentinela E** path no manifesto; órfão = reportar. Preservar
+  cofre, `auth.json`, fornecedor e demais MCPs. Na v1, remover significa **retirar a entrada**; não
+  há estado «desabilitado» (`enabled=false`), que exigiria uma segunda forma canônica (v23).
 
 ## Testes — nível de decisão
 
@@ -266,7 +283,7 @@ Lista completa de estados offline, classes (`blocking`/`warn`), tabela estado→
 - **O gate do `dist` no F1 é revisão estática do `dist` + boot sem chave.** O teste de egresso de rede
   contido **não** é gate (ver **Adiado**).
 - **Não são rodados pelo orquestrador de pré-push**; a skill declara cada comando e registra em `09`.
-- **E2E** com `jev_classify` = validação manual opt-in; pré-requisito de `handshakeConfirmed`.
+- **E2E** com `jev_classify` = validação manual opt-in; pré-requisito de `e2eOptInConfirmed`.
 
 ## Documentação e paridade
 
@@ -317,6 +334,11 @@ Lista completa de estados offline, classes (`blocking`/`warn`), tabela estado→
   - **limites conhecidos do motor JSONC existente** — mitigados pela validação pós-edição fail-closed
     e pelo trecho manual;
   - **edição manual dentro do bloco do Codex** vira `entrada_em_conflito` (a skill não sobrescreve).
+- **Risco aceito da v23 — reescrita do `config.toml` pelo próprio Codex:** se o Codex gravar uma
+  tabela nova e ela cair entre os marcadores (hipótese **não testada**, deduzida do comportamento de
+  editores TOML que mantêm o comentário final no fim do arquivo), o bloco deixa de ser byte-idêntico e
+  vira `entrada_em_conflito`. Resultado: resolução manual, **sem perda de dados** (a skill não remove
+  nem substitui o que não reconhece). Comportamento a verificar no F1.
 - **Risco aceito da contenção opt-in:** sem o teste de egresso contido, a garantia de que a árvore
   vendorizada não fala com a rede fora do endpoint permanece **argumentativa** (código estático + boot),
   não **demonstrada**. Decisão consciente para não travar o F1 em pré-requisito de máquina.
@@ -380,6 +402,20 @@ Lista completa de estados offline, classes (`blocking`/`warn`), tabela estado→
   F0-7..F0-18 tiveram **um único revisor** adversarial, e cada gap corrigido virou camada nova sem
   pergunta de proporção. **Próxima rodada:** instruir os revisores a avaliar se a v1 é a **menor** que
   preserva as propriedades essenciais, **sem** acrescentar endurecimento.
+- **Segunda opinião sobre a v22 (2026-10-03, subagente do orquestrador; parecer solo, não revisão por
+  pares)** — instruída a apontar só gaps em que a v1 não funciona, quebra propriedade essencial,
+  contradiz a si mesma ou arrisca dados; 10 gaps. **Observação de outro agente** (3 pontos, 2
+  coincidentes). O orquestrador **conferiu cada claim** antes de aceitar:
+  - `tomllib` (Python 3.14): `[mcp_servers.'jev']`, `mcp_servers.jev.command`, `jev.command` dentro de
+    `[mcp_servers]`, tabela inline e cabeçalho com espaços + o bloco da skill → **todos inválidos**
+    («Cannot declare ('mcp_servers', 'jev') twice»). O descarte desse caso pelo subagente estava errado.
+  - `opencode.jsonc` real: `mcp.jev` manual com `type`, `command`, `environment`
+    (`JEV_PROVIDER`/`JEV_API_BASE_URL`/`JEV_MCP_MODEL`, sem chave) e `enabled` → a migração é o caso real.
+  - `Install-OpenCodeReviewerRoAgent.ps1` executa código no nível do script → dot-source grava.
+  - pwsh 7.6.6: `ConvertFrom-Json` aceita vírgula final e devolve o último valor em chave duplicada;
+    o `ConvertFrom-Jsonc` do Guard só tira comentários e chama `ConvertFrom-Json` → a «hipótese do bug
+    da linha 252» **não se reproduz no 7.6** (7.4 não testado).
+  - Deslocamento do marcador pelo editor do Codex: **dedução**, não testada (ver *Riscos*).
 
 ---
 
@@ -436,17 +472,27 @@ públicas permitidas, campos obrigatórios e regras de exclusividade; a exceçã
 - **Mecanismo:** o mesmo do `reviewer-ro` — localizar/inserir por texto (`Find-JsoncMatchingBrace`/
   `Find-JsoncKeyValueSpan`, hoje dentro de `Install-OpenCodeReviewerRoAgent.ps1`) e validar com o
   parse completo ciente de comentários (`ConvertFrom-Jsonc`, hoje em `OpenCodeReviewerRoGuard.ps1`).
-  **Reaproveitar sem migrar consumidores**; a forma de reuso (dot-source ou cópia rastreada) é decidida
-  na implementação e registrada nos dois donos.
-- **Validação pós-edição obrigatória (fail-closed):** o texto resultante precisa (1) parsear por
-  inteiro e (2) conter `mcp.jev` exatamente na forma emitida. Falha em qualquer um → **nada é
-  gravado**, estado `edicao_manual_necessaria` e o trecho pronto para colar.
-- **Chave duplicada / forma inesperada** no caminho `mcp.jev` → `entrada_em_conflito`, sem escrita.
-- **Limites conhecidos** do motor (cego a comentário ao casar chaves; trailing comma) estão
-  registrados no **Anexo B.3** e na entrada própria do `999`; a validação pós-edição é a mitigação da
-  v1.
+  **Reaproveitar sem migrar consumidores.** Forma de reuso (v23): as funções do **instalador** entram
+  **só por cópia rastreada** — dar dot-source em `Install-OpenCodeReviewerRoAgent.ps1` **executa** o
+  script (código no nível do script) e grava o `reviewer-ro` sem backup nem aprovação. O **Guard** só
+  define funções e pode ser carregado por dot-source. Registrar nos dois donos.
+- **Operações (v23):** **inserir** (`mcp.jev` ausente), **substituir** (entrada reconhecida pelo
+  manifesto de instalação, ou migração da entrada manual com aprovação — corpo, *Adaptadores*) e
+  **remover** (apagar o trecho `"jev": {…}` e a vírgula vizinha; só entrada reconhecida).
+- **Validação pós-edição obrigatória (fail-closed), por comparação de objetos parseados:** o texto
+  resultante precisa parsear por inteiro e o objeto resultante precisa ser **igual ao original** com
+  exatamente uma diferença — `mcp.jev` acrescentado (inserir), trocado pela forma emitida (substituir)
+  ou ausente (remover). Qualquer outra diferença, ou falha de parse → **nada é gravado**, estado
+  `edicao_manual_necessaria` e o trecho pronto para colar.
+- **Chave duplicada:** o parser devolve o **último** valor sem erro (pwsh 7.6: `ConvertFrom-Json`), então
+  não há detecção explícita na v1. Uma edição que caia no objeto «sombreado» não aparece no objeto
+  parseado e falha na comparação acima → `edicao_manual_necessaria`. Detecção explícita: **Anexo B.3**.
+- **Limites conhecidos** do motor (cego a comentário ao casar chaves) estão registrados no **Anexo
+  B.3** e na entrada própria do `999`; a validação por comparação é a mitigação da v1.
 - **Fixtures da v1:** arquivo com comentários; `mcp` ausente; `mcp` com outros servidores; `mcp.jev`
-  idêntico (idempotência); `mcp.jev` divergente; caso que o motor não suporta → `edicao_manual_necessaria`.
+  idêntico (idempotência); `mcp.jev` emitido por versão anterior (substituir); `mcp.jev` manual
+  (migração com aprovação); `mcp.jev` desconhecido (`entrada_em_conflito`); remover; chave `mcp`
+  duplicada; caso que o motor não suporta → `edicao_manual_necessaria`.
 
 ### A.4 Vendorização — identidade, bootstrap e evidência do `dist`
 
@@ -492,12 +538,16 @@ escopo — **sem** usar o README da `main` como prova da `0.13.0`. Até então, 
 (1) instalador/vendorizador: sem registro fora de install/update; (2) launcher/MCP: só o endpoint. O
 teste isolado opt-in está no **Anexo B.4.6**.
 
-### A.5 Pré-requisitos — Node, npm e pwsh
+### A.5 Pré-requisitos — Node, npm, pwsh e Python opcional
 
 Espelhar `GeneXusPythonPrerequisite.ps1`/`Test-XpzPowerShellRuntime.ps1`: **executável utilizável de
 verdade** (rejeitar stub `WindowsApps`/alias da Store) para `node`/`npm`/`pwsh`. Node **gated**
 (`>= 22`): `< 22` é bloqueante, acima disso é reportada. O launcher usa o Node **absoluto** resolvido
 no install; reparo re-resolve e re-emite. Manifesto × catálogo e runtime dedicado: **Anexo B.5**.
+
+**Python 3.11+ (opcional, v23):** resolvido por `GeneXusPythonPrerequisite.ps1` com checagem de
+versão ≥ 3.11 (para o `tomllib`). Usado **só** pelo adaptador do Codex (A.8). Ausente ou antigo →
+`python_indisponivel` (**warn**) e o Codex cai em `edicao_manual_necessaria`.
 
 ### A.6 `config.json` — schema, origem e consumo
 
@@ -521,8 +571,8 @@ só-dono, UTF-8 sem BOM, **schema versionado** (reduzido na v22):
 - **Local:** `%LOCALAPPDATA%\xpz-mcp-integrations\vault\`.
 - **Blob:** DPAPI `CurrentUser`, **sem entropia adicional**, **campo `version`**, e metadado do modo
   (`compatible` / `JEV_API_KEY`) — **sem** o metadado misturado ao valor.
-- **Fonte:** vault-first; env só com `-CredentialSource env`; auditor sinaliza
-  `credencial_divergente_env_vs_cofre` (**blocking**) só quando **não** houve override.
+- **Fonte:** **só o cofre** na v1 (v23). O launcher não lê chave do ambiente; override por env e o
+  estado `credencial_divergente_env_vs_cofre`: **Anexo B.7**.
 - **Entrada:** `Read-Host -AsSecureString`; sem transcript/history; não-eco; **ACL antes de persistir**.
 - **`acl_nao_aplicavel` — bloqueia mutadores de blob** (criação/import/rotação), sem exceção na v1.
 - **Recuperar** = **re-inserir a chave** (DPAPI não roaming; sem backup do cofre na v1 — **Anexo B.7**).
@@ -540,21 +590,29 @@ escrever). **Fixtures** para cada caso. Edição em ambos os formatos pelo mecan
 `command: ["pwsh","-NoProfile","-File","<launcher>"]`, campo **`environment`**, não `env`). Escrita
 transacional (A.2); idempotente. **Shape = fato externo** + fixture sanitizada no F1.
 
-**Codex (F1, mínimo — v22):** `~/.codex/config.toml`. O bloco `[mcp_servers.jev]` é emitido pela skill
-entre **marcadores de comentário fixos** (ex.: `# >>> xpz-mcp-integrations:jev` /
-`# <<< xpz-mcp-integrations:jev`), em texto canônico gerado pela própria skill. **Sem biblioteca TOML.**
+**Codex (F1, mínimo — v22/v23):** `~/.codex/config.toml`. O bloco `[mcp_servers.jev]` é emitido pela
+skill entre **marcadores de comentário fixos** (ex.: `# >>> xpz-mcp-integrations:jev` /
+`# <<< xpz-mcp-integrations:jev`), em texto canônico gerado pela própria skill. **Sem biblioteca TOML
+de edição**; detecção e validação pelo **`tomllib`** (Python 3.11+, só leitura — A.5).
+
+**Pré-checagem (antes de qualquer decisão):** o original precisa ser lido pelo `tomllib` sem erro
+(senão `entrada_quebrada`, sem escrita); o `tomllib` informa se `mcp_servers.jev` existe **em qualquer
+grafia**. Os marcadores precisam estar balanceados e únicos.
 
 | Situação no arquivo | Ação |
 |---|---|
-| Sem `[mcp_servers.jev]` e sem marcadores | **acrescentar** o bloco ao fim (com quebra de linha separadora) |
-| Marcadores presentes, conteúdo byte-idêntico ao canônico | OK (idempotente) |
-| Marcadores presentes, conteúdo diferente | `entrada_em_conflito`; **não toca**; mostrar o diff |
-| `[mcp_servers.jev]` fora dos marcadores, ou marcadores desbalanceados/duplicados | `entrada_em_conflito`; **não toca**; mostrar o trecho |
-| Remover | apagar **só** o bloco entre os marcadores (com aprovação) |
+| `mcp_servers.jev` inexistente e sem marcadores | **acrescentar** o bloco ao fim (com quebra de linha separadora) |
+| Marcadores presentes, conteúdo byte-idêntico ao bloco canônico atual | OK (idempotente) |
+| Marcadores presentes, conteúdo byte-idêntico a um bloco **emitido antes** (hash no manifesto de instalação, A.12) | **substituir** entre os marcadores, com diff e aprovação (atualizar/reparar) |
+| Marcadores presentes, conteúdo diferente de qualquer bloco emitido (editado à mão, ou tabela alheia que caiu entre eles) | `entrada_em_conflito`; **não toca**; mostrar o diff |
+| `mcp_servers.jev` existe fora dos marcadores (entrada manual, qualquer grafia) | migração: mostrar diff e, **com aprovação explícita**, substituir — só quando for um único cabeçalho `[mcp_servers.jev]` cujo trecho vai até o próximo cabeçalho que não seja `[mcp_servers.jev.*]`; outras grafias → `entrada_em_conflito` com instrução para remover à mão |
+| Marcadores desbalanceados/duplicados | `entrada_em_conflito`; **não toca** |
+| Remover | apagar o bloco entre os marcadores **só** se o conteúdo for byte-idêntico a um bloco emitido (atual ou anterior), com aprovação; senão `entrada_em_conflito` |
 
-- **Detecção de `[mcp_servers.jev]`** fora dos marcadores: varredura por linha de cabeçalho de tabela
-  (`[mcp_servers.jev]` / `[mcp_servers."jev"]`, com espaços); falso positivo leva a conflito, nunca a
-  escrita.
+- **Pós-validação (fail-closed):** o texto montado precisa ser lido pelo `tomllib` e o objeto
+  resultante precisa ser **igual ao original** com exatamente uma diferença em `mcp_servers.jev`
+  (acrescentado, trocado pela forma emitida ou ausente). Qualquer outra diferença → nada é gravado,
+  `edicao_manual_necessaria`.
 - **Env repassado ao launcher:** `env_vars` filtra o herdado; o conjunto que o launcher precisa
   (`LOCALAPPDATA`, `USERPROFILE`, `SystemRoot` etc., para achar cofre/`config.json` e para a DPAPI) é
   **fato a verificar** com filho falso no F1 e, se preciso, declarado no bloco.
@@ -571,8 +629,8 @@ entre **marcadores de comentário fixos** (ex.: `# >>> xpz-mcp-integrations:jev`
 - **Offline (v1):** `OK`; `ausente`; `entrada_quebrada`/`entrada_divergente`/`entrada_em_conflito`;
   `edicao_manual_necessaria`; `vendor_ausente`/`vendor_divergente`; `launcher_ausente`/
   `launcher_divergente`; `node_ausente`/`node_incompativel`/`node_path_nao_resolve`; `pwsh_ausente`;
-  `config_ausente`/`config_invalido`; `credencial_ausente`; `credencial_divergente_env_vs_cofre`
-  (**blocking** salvo override); `endpoint_nao_confirmado` (**warn** + confirmação, host fora do preset);
+  `config_ausente`/`config_invalido`; `python_indisponivel` (**warn**, só afeta o Codex);
+  `credencial_ausente`; `endpoint_nao_confirmado` (**warn** + confirmação, host fora do preset);
   `acl_nao_aplicavel` (**warn** na auditoria; **blocking** nos mutadores de blob).
 - **Online opt-in** (`-CheckUpdates`): `atualizacao_disponivel` — informa, nunca auto-atualiza.
   Canonicalização de path antes de `entrada_divergente`.
@@ -580,8 +638,13 @@ entre **marcadores de comentário fixos** (ex.: `# >>> xpz-mcp-integrations:jev`
 ### A.10 Self-tests — inventário executável
 
 **Offline (F1 = v1):** detecção (rejeitar stub); **JSONC** — fixtures do A.3 com validação pós-edição
-(falha → `edicao_manual_necessaria`, arquivo intacto); **Codex** — cada linha da tabela do A.8
-(acrescentar, idempotência, divergente, conflito, marcadores desbalanceados, remover só o bloco);
+(falha → `edicao_manual_necessaria`, arquivo intacto), incluindo inserir/substituir/remover com a
+comparação de objetos; **Codex** — cada linha da tabela do A.8 (acrescentar, idempotência, substituir
+bloco emitido antes, divergente, migração da entrada manual, marcadores desbalanceados, remover só
+bloco reconhecido), **cada grafia equivalente** de `mcp_servers.jev` (aspas simples, chave
+pontilhada, tabela inline, `jev.*` dentro de `[mcp_servers]`, cabeçalho com espaços) detectada sem
+escrita, **tabela alheia entre os marcadores** → conflito sem remover, e Python ausente →
+`edicao_manual_necessaria`; **manifesto de instalação** (hash do bloco emitido gravado e reconhecido);
 idempotência; **escrita transacional** (create×replace, corrida → recusa, arquivo especial → recusa,
 temporário órfão); backup+restore do config; schema do descritor e do `config.json`; **round-trip
 DPAPI**; **re-emissão de launcher por versão**; **launcher** com filho falso (exit code = do filho,
@@ -593,7 +656,7 @@ zero bytes do launcher em stdout, ambiente limpo = só a allowlist, negativos pr
 descritos no **Anexo B**, só quando o item voltar.
 
 **Não são rodados pelo orquestrador de pré-push**; a skill declara cada comando e registra em `09`.
-**E2E** com `jev_classify` = validação manual opt-in; pré-requisito de `handshakeConfirmed`.
+**E2E** com `jev_classify` = validação manual opt-in; pré-requisito de `e2eOptInConfirmed`.
 
 ### A.11 Paridade documental mecânica
 
@@ -610,6 +673,21 @@ descritos no **Anexo B**, só quando o item voltar.
   usuário); molde `.example.ps1`; `Test-XpzParameterNamingContract.ps1` **não** é gate geral; não
   enumerar ≥2 gates numa linha.
 - **Ledger:** efêmero/gitignored em `Temp/revisao-por-pares/<RoundId>/`; **não versionar**.
+
+### A.12 Manifesto de instalação (v23)
+
+Não confundir com o `manifest.sha256` de árvore (adiado, **Anexo B.4.2**).
+
+- **Local:** `%LOCALAPPDATA%\xpz-mcp-integrations\install-manifest.json`; ACL só-dono; UTF-8 sem BOM;
+  `schemaVersion`; escrita atômica (A.2). **Nunca** contém a chave.
+- **Campos:** versão instalada do pacote; caminho absoluto do launcher de cada versão instalada e sua
+  sentinela; por cliente (`opencode`, `codex`): caminho do arquivo de config, **hashes de todas as
+  formas que a skill já emitiu** para a entrada (atual + anteriores) e data da última escrita.
+- **Uso:** reconhecer uma entrada como «da skill» (substituir/remover só se byte-idêntica a um hash
+  registrado — A.3, A.8); saber se ainda há referência a um launcher antes de removê-lo.
+- **Não é autoridade sobre a config viva:** a auditoria sempre lê o arquivo real do cliente. Manifesto
+  ausente ou corrompido → nenhuma entrada é reconhecida (tudo vira conflito ou migração com
+  aprovação), nunca remoção cega.
 
 ---
 
@@ -652,6 +730,10 @@ intenso, término em tráfego bidirecional.
   raízes de outro drive.
 
 ### B.3 JSONC — localizador estrutural, migração e fixtures (origem: A.3 da v21)
+
+> **Nota da v23:** no pwsh 7.6.6, `ConvertFrom-Json` aceita vírgula final, e o `ConvertFrom-Jsonc` do
+> Guard só remove comentários antes de chamá-lo. As menções abaixo a «sem trailing comma» e ao «bug
+> vivo» da linha 252 **não se reproduzem no 7.6** (7.4 não testado). O texto segue como na v21.
 
 **Diagnóstico verificado (motivação, não requisito novo):** `Find-JsoncMatchingBrace` ciente de
 string/cego a comentário; `Find-JsoncKeyValueSpan` acha por `IndexOf` (comentário promete heurística de
@@ -743,6 +825,11 @@ catálogo; o launcher de produção usa o Node **absoluto** resolvido no install
 - **`acl_nao_aplicavel` — bloqueia mutadores de blob** (criação/import/rotação/restore), salvo modo
   inseguro explicitamente autorizado e rotulado.
 - **Backup do cofre:** local, retenção, mesma ACL, restore.
+- **Override da chave por variável de ambiente** (movido na **v23**, origem: A.7 da v22): «vault-first;
+  env só com `-CredentialSource env`; auditor sinaliza `credencial_divergente_env_vs_cofre`
+  (**blocking**) só quando **não** houve override». Para voltar, falta especificar como a escolha
+  chega ao launcher (por exemplo, gravada no `config.json`) e como a variável passa pelo filtro
+  `env_vars` do Codex.
 
 ### B.8 Codex — biblioteca TOML vendorizada (origem: A.8 da v21)
 
@@ -770,6 +857,25 @@ F2.
 - `https://github.com/jkudish/jev-mcp` (MIT); `https://docs.typesafe.ai`.
 - `xpz-skills-setup/SKILL.md`; `15-revisao-por-pares.md`, `xpz-llm-delegate/SKILL.md` — `commandcode/*`
   como **catálogo de vozes** (não confundir com o endpoint do Jev).
+
+## CHANGELOG da v23 — correção de gaps da v22 (2026-10-03)
+
+Insumo: segunda opinião de subagente (10 gaps) e observação de outro agente (3 pontos). Cada claim
+foi **conferido pelo orquestrador** (ver *Evidência coletada*); um descarte do subagente (grafias
+equivalentes do TOML) foi revertido após teste. Decisão humana inclui a mudança da decisão nº 6.
+
+- **Codex:** detecção e pós-validação pelo `tomllib` (Python 3.11+ opcional), cobrindo qualquer grafia
+  de `mcp_servers.jev`; substituir/remover só bloco byte-idêntico a um emitido (atual ou anterior);
+  migração da entrada manual com aprovação; tabela do A.8 refeita; risco aceito do deslocamento do
+  marcador pelo editor do Codex.
+- **OpenCode (A.3):** operações inserir/substituir/remover; validação por comparação de objetos
+  parseados; reuso do instalador só por cópia rastreada (dot-source executa o script); chave
+  duplicada cai na comparação.
+- **Novo A.12 — manifesto de instalação** (distinto do `manifest.sha256` adiado).
+- **Credencial:** chave só do cofre na v1; override por env → **B.7** (decisão nº 6 alterada).
+- **Correções de texto:** ancestralidade no corpo (→ B.2); `enabled=false` retirado; E2E é
+  pré-requisito de `e2eOptInConfirmed`; estado `python_indisponivel`; nota no B.3 sobre a hipótese
+  do bug JSONC não reproduzida no 7.6.
 
 ## CHANGELOG da v22 — redução de escopo (2026-10-03)
 
