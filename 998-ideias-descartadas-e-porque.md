@@ -1744,3 +1744,31 @@ composição do painel segue a curadoria e o gate. Ver seção BACKENDS da skill
 
 **Não reavaliar salvo** assinatura ou via de auth Gemini funcional nesta máquina (Code Assist
 elegível, API Key ou Vertex) com intenção explícita de reativar o backend #5 no painel.
+
+---
+
+## Pré-requisito Python nas skills consumidoras — flags G3–G5 (2026-10-03)
+
+**Origem:** triagem de flags de revisão sobre ausência de menção explícita a Python em
+`xpz-kb-parallel-pre-push`, `xpz-reader` e `kb-intelligence-guia-metodologico-agente.md`.
+
+**O que foi proposto:** repetir o pré-requisito Python nas três skills/guias porque os gates de
+índice ou as fachadas 9-TXW/9-PNW podem bloquear antes de concluir a operação.
+
+**Por que foi descartado:**
+
+- **G3 — `xpz-kb-parallel-pre-push`:** a skill consome o resultado estruturado do wrapper e
+  encaminha o `status`/`reason`; o bloqueio por Python ausente chega identificado como
+  `PREREQUISITO AUSENTE`. O orquestrador não precisa enumerar cada causa específica de bloqueio
+  para reportar corretamente o resultado.
+- **G4 — `xpz-reader`:** a menção às fachadas 9-TXW/9-PNW é um encaminhamento explícito para
+  `xpz-builder`, que é o dono das instruções operacionais e do pré-requisito Python. `xpz-reader`
+  não instrui a invocação direta dessas fachadas.
+- **G5 — `kb-intelligence-guia-metodologico-agente.md`:** os trechos apontados também encaminham
+  a execução das fachadas para `xpz-builder`; repetir ali o pré-requisito criaria uma cópia
+  normativa sujeita a drift.
+
+**Reabrir somente se** o wrapper deixar de preservar a causa do bloqueio no resultado consumido
+pela pré-push, ou se `xpz-reader`/o guia metodológico passar a instruir a execução direta das
+fachadas sem encaminhamento para o dono normativo. Se o próprio `xpz-builder` perder o pré-requisito,
+corrigir o dono, não duplicar a regra nos consumidores.
