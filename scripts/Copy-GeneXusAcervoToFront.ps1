@@ -59,10 +59,18 @@
     objeto já existe na frente, alvo explicito pode sobrescrever a copia mais nova
     para reconstrução textual deliberada.
 
+    Nome simples vazio ou composto apenas por espaços, ou tipo/nome vazio ou
+    composto apenas por espaços em entrada tipada, gera selector-invalid/status=fail,
+    com exit 0. O filtro permanece ativo e pedidos válidos continuam sendo processados;
+    omissão e array vazio preservam a seleção normal, sem aparar nomes válidos.
+
 .PARAMETER ObjectNames
     Seleção literal por nome simples, sem interpretar Tipo:Nome; mantida
     por retrocompatibilidade. Itens informados por -ObjectNames e -ObjectList são
     combinados.
+    Nome vazio ou composto apenas por espaços gera selector-invalid/status=fail,
+    com exit 0. O filtro permanece ativo e pedidos válidos continuam sendo processados;
+    omissão e array vazio preservam a seleção normal, sem aparar nomes válidos.
 
 .PARAMETER ObjectGuids
     GUIDs de objetos a copiar (opcional). Quando omitido, copia todos com drift.
