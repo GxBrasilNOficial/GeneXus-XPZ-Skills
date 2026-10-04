@@ -103,6 +103,12 @@ Assert-CanonicalParameter -ScriptFileName 'Invoke-GeneXusXpzExport.ps1' `
 Assert-CanonicalParameter -ScriptFileName 'Copy-GeneXusAcervoToFront.ps1' `
     -ParameterName 'ObjectList' -ExpectedType 'String[]'
 $null = Get-ScriptParameter -ScriptFileName 'Copy-GeneXusAcervoToFront.ps1' -ParameterName 'ObjectNames'
+Assert-CanonicalParameter -ScriptFileName 'Copy-GeneXusAcervoToFront.ps1' -ParameterName 'ParallelKbRoot' -ExpectedType 'String'
+Assert-CanonicalParameter -ScriptFileName 'Copy-GeneXusAcervoToFront.ps1' -ParameterName 'CatalogOverridePath' -ExpectedType 'String'
+$copyMolde = Get-Command (Join-Path $scriptDir '../xpz-kb-parallel-setup/examples/Copy-KbAcervoToFront.example.ps1')
+foreach ($parameter in @('ObjectList', 'ObjectNames', 'ObjectGuids')) {
+    if ($copyMolde.Parameters[$parameter].ParameterType -ne [string[]]) { throw "Molde Copy: contrato inválido de $parameter." }
+}
 
 # 2. Entrada primaria simples: -InputPath com alias -Path.
 $inputPathWithPathAlias = @(

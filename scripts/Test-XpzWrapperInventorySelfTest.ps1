@@ -643,6 +643,48 @@ param(
     Assert-NotContains -Text 'INVENTORY_SURFACE_ADVISORY: X(reason=validateset_reduced: -Query [a, b])' -Pattern $blockRegex -Message 'REGRESSAO: regex de pendencia NAO pode casar INVENTORY_SURFACE_ADVISORY'
     Assert-NotContains -Text 'INVENTORY_ENGINE_DIAGNOSTIC: X(reason=engine_unresolved_or_unparseable: Y)' -Pattern $blockRegex -Message 'REGRESSAO: regex de pendencia NAO pode casar INVENTORY_ENGINE_DIAGNOSTIC'
 
+    # Detector Copy dirigido: molde legado, splat renomeado e negativos reais.
+    $legacyCopy = @'
+#requires -Version 7.4
+param([string]$FrontName,[string[]]$ObjectList)
+$engine = Join-Path $SharedSkillsRoot 'scripts/Copy-GeneXusAcervoToFront.ps1'
+$trimmed = @($ObjectList | ForEach-Object {
+    $item = [string]$_
+    if ($item -match '^[^:]+:(?<name>.+)$') { $Matches['name'] } else { $item }
+})
+$forward = @{}
+$forward.ObjectNames = @($forward.ObjectNames) + $trimmed
+& $engine @forward
+'@
+    $copyMoldePath = Join-Path $scriptDir '../xpz-kb-parallel-setup/examples/Copy-KbAcervoToFront.example.ps1'
+    Assert-NotContains -Text ([string](Test-XpzCopyObjectListTypeLoss $copyMoldePath)) -Pattern 'True' -Message 'molde corrigido não perde tipo'
+    $legacyPath = New-SurfaceFixture $tempRoot $legacyCopy
+    if (-not (Test-XpzCopyObjectListTypeLoss $legacyPath)) { throw 'ASSERT_FAILED: legado Copy não reconhecido' }
+    $renamed = $legacyCopy.Replace('$forward', '$renamedSplat').Replace('@forward', '@renamedSplat').Replace('$trimmed', '$renamedNames').Replace('.ObjectNames =', "['ObjectNames'] =")
+    $renamedPath = New-SurfaceFixture $tempRoot $renamed
+    if (-not (Test-XpzCopyObjectListTypeLoss $renamedPath)) { throw 'ASSERT_FAILED: splat/variáveis renomeadas não reconhecidos' }
+    foreach ($negative in @(
+        $legacyCopy.Replace('& $engine @forward', '& $engine -ObjectList $ObjectList'),
+        $legacyCopy.Replace('Copy-GeneXusAcervoToFront.ps1', 'Invoke-GeneXusXpzExport.ps1'),
+        $legacyCopy.Replace('^[^:]+:(?<name>.+)$', '^(?=.+:)(?<name>.+)$'),
+        $legacyCopy.Replace("$" + "Matches['name']", "$" + "Matches['0']"),
+        $legacyCopy.Replace('& $engine @forward', '$forward.ObjectNames = $ObjectList' + "`n" + '& $engine @forward'),
+        $legacyCopy.Replace("$" + "Matches['name']", '"$($Matches[''type'']):$($Matches[''name''])"'),
+        ("# comentário: " + $legacyCopy.Replace("`n", "`n# ")),
+        $legacyCopy.Replace('$forward.ObjectNames = @($forward.ObjectNames) + $trimmed', '$forward.ObjectList = $ObjectList')
+    )) {
+        $negativePath = New-SurfaceFixture $tempRoot $negative
+        if (Test-XpzCopyObjectListTypeLoss $negativePath) { throw "ASSERT_FAILED: falso positivo Copy: $negative" }
+    }
+    # Inventário end-to-end usa o reason e dispensa mudança no agregador.
+    Copy-Item $copyMoldePath (Join-Path $examplesPath 'Copy-KbAcervoToFront.example.ps1') -Force
+    [IO.File]::WriteAllText((Join-Path $scriptsPath 'Copy-DemoKbAcervoToFront.ps1'), $legacyCopy, (Get-Utf8NoBomEncoding))
+    $output = (& $inventoryScriptPath -KbParallelRoot $kbRoot -SkillsExamplesPath $examplesPath) -join ' '
+    Assert-Contains $output 'INVENTORY_CUSTOMIZED:.*copy_objectlist_type_loss' 'inventário legado Copy'
+    Copy-Item $copyMoldePath (Join-Path $scriptsPath 'Copy-DemoKbAcervoToFront.ps1') -Force
+    $output = (& $inventoryScriptPath -KbParallelRoot $kbRoot -SkillsExamplesPath $examplesPath) -join ' '
+    Assert-NotContains $output 'copy_objectlist_type_loss' 'inventário Copy corrigido'
+    Assert-Contains 'INVENTORY_CUSTOMIZED: Copy(reason=copy_objectlist_type_loss)' $blockRegex 'agregador reconhece Copy'
     Write-Output 'WRAPPER_INVENTORY_SELFTEST_OK'
 } finally {
     if ($tempRoot.StartsWith([System.IO.Path]::GetTempPath(), [System.StringComparison]::OrdinalIgnoreCase) -and

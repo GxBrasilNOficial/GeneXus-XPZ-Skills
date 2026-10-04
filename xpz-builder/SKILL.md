@@ -15,6 +15,10 @@ Generate or clone GeneXus XPZ objects only from comparable structural templates.
 
 If the flow depends on a KB parallel folder structure and that structure is not yet mounted or validated, stop and use `xpz-kb-parallel-setup` first.
 
+## CORPUS-TO-FRONT COPY
+
+For corpus-to-front copying, follow `02-regras-operacionais-e-runtime.md`, section “Cópia segura do acervo para a frente”: `Copy-GeneXusAcervoToFront.ps1` preserves typed `-ObjectList Tipo:Nome`; `-ObjectNames` remains literal. Typed selection uses canonical catalog names/unique folder aliases, never Export labels. Pass `-ParallelKbRoot` for a local override or `-CatalogOverridePath` explicitly; the canonical local Copy wrapper forwards its root. GUID pairing, incomplete identity, duplicate GUIDs and physical destination collisions must be checked before copying. Unlike informational duplicate-GUID findings in 9-FD, Copy blocks ambiguous writes. Simple requests already represented by the front finish through existing-object processing; typed requests require the same type. Copy retains its own findings contract; migration to common 9-FD fields remains deferred in `999`.
+
 ## PATH RESOLUTION
 
 - This `SKILL.md` lives inside a skill subfolder under the repository root.

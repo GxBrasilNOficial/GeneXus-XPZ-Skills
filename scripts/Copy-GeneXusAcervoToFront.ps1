@@ -5,8 +5,8 @@
     Copia XMLs do acervo para a frente, com bump de lastUpdate.
 
 .DESCRIPTION
-    Para cada XML de objeto na pasta da frente que tem homonimo no acervo com lastUpdate
-    mais recente, copia o arquivo do acervo sobre o da frente e bumpa o lastUpdate para
+    Para cada XML de objeto na pasta da frente com contraparte única por GUID no acervo
+    e lastUpdate elegível, copia o arquivo do acervo sobre o da frente e bumpa lastUpdate para
     garantir que o novo arquivo fique estritamente mais novo que o acervo. Quando alvo
     explicito e informado (-ObjectList/-ObjectNames/-ObjectGuids), tambem permite
     reconstruir a copia a partir do acervo mesmo se a frente ja estiver mais nova; isso
@@ -52,14 +52,15 @@
 
 .PARAMETER ObjectList
     Nome canonico do contrato de selecao de objeto por nome. Aceita nomes simples
-    ou entradas `Tipo:Nome`; o script usa apenas o nome para localizar o XML no
-    acervo. Quando omitido (junto com -ObjectNames/-ObjectGuids), copia todos com
+    ou entradas `Tipo:Nome`; o tipo é resolvido no catálogo efetivo e conferido
+    por Object/@type, sem rótulos Export ou interpretação FQN. Quando omitido
+    (junto com -ObjectNames/-ObjectGuids), copia todos com
     drift. Para seed inicial, deve identificar um único XML no acervo. Quando o
     objeto já existe na frente, alvo explicito pode sobrescrever a copia mais nova
     para reconstrução textual deliberada.
 
 .PARAMETER ObjectNames
-    Sinonimo aceito de -ObjectList (mesma semantica de selecao por nome); mantido
+    Seleção literal por nome simples, sem interpretar Tipo:Nome; mantida
     por retrocompatibilidade. Itens informados por -ObjectNames e -ObjectList são
     combinados.
 
@@ -71,6 +72,14 @@
 
 .PARAMETER FreshnessMarginSeconds
     Margem em segundos aplicada sobre o lastUpdate do acervo ao bumpar. Default: 60.
+
+.PARAMETER ParallelKbRoot
+    Raiz para derivar scripts/gx-object-type-catalog.override.json em pedidos tipados.
+    Sem raiz/override explícito, somente o catálogo-base é usado.
+
+.PARAMETER CatalogOverridePath
+    Override explícito, com precedência sobre ParallelKbRoot. Nomes/GUIDs puros não
+    carregam catálogo. Override bloqueado gera finding; falha da base é infraestrutura.
 
 .PARAMETER DryRun
     Mostra o que seria copiado sem gravar. Útil para preview.
@@ -102,6 +111,10 @@ param(
 
     [string[]]$ObjectGuids,
 
+    [string]$ParallelKbRoot,
+
+    [string]$CatalogOverridePath,
+
     [ValidateRange(1, 3600)]
     [int]$FreshnessMarginSeconds = 60,
 
@@ -122,14 +135,6 @@ if (-not (Test-Path -LiteralPath $objectTypeDriftSupportPath -PathType Leaf)) {
     throw "Object type drift support script not found: $objectTypeDriftSupportPath"
 }
 . $objectTypeDriftSupportPath
-
-if ($null -ne $ObjectList -and $ObjectList.Count -gt 0) {
-    $objectListNames = @($ObjectList | ForEach-Object {
-        $item = [string]$_
-        if ($item -match '^[^:]+:(?<name>.+)$') { $Matches['name'] } else { $item }
-    })
-    $ObjectNames = @($ObjectNames) + $objectListNames
-}
 
 function Format-GeneXusLastUpdate {
     param([Parameter(Mandatory = $true)][DateTime]$Value)
@@ -209,6 +214,7 @@ function Get-ObjectMetadata {
     return [pscustomobject]@{
         Path       = $XmlPath
         Name       = $objName
+        AttributeName = $root.GetAttribute('name')
         TypeGuid   = $objType
         Guid       = $objGuid
         Fqn        = $objFqn
@@ -216,57 +222,51 @@ function Get-ObjectMetadata {
     }
 }
 
+# Cache local por execução; nomes explícitos conservam o critério de arquivo-folha.
 function Find-AcervoObjectXmlByExplicitTarget {
-    param(
-        [Parameter(Mandatory = $true)][string]$RootPath,
-        [string]$ObjectName,
-        [string]$ObjectGuid
-    )
-    if (-not (Test-Path -LiteralPath $RootPath -PathType Container)) {
-        return [pscustomobject]@{ Status = 'not-found'; Meta = $null; Candidates = @() }
-    }
+    param([string]$ObjectName, [string]$ObjectGuid, [string]$TypeGuid)
+    $matches = @($acervoMetas | Where-Object {
+        if (-not [string]::IsNullOrWhiteSpace($ObjectGuid)) {
+            (Normalize-GeneXusObjectTypeDriftValue $_.Guid) -eq $ObjectGuid
+        } else {
+            [System.IO.Path]::GetFileName($_.Path) -like "$ObjectName.xml" -and
+                $_.Name -eq $ObjectName -and
+                ([string]::IsNullOrEmpty($TypeGuid) -or (Normalize-GeneXusObjectTypeDriftValue $_.TypeGuid) -eq $TypeGuid)
+        }
+    })
+    $state = 'not-found'
+    $meta = $null
+    if ($matches.Count -eq 1) { $state = 'found'; $meta = $matches[0] }
+    if ($matches.Count -gt 1) { $state = 'ambiguous' }
+    [pscustomobject]@{ Status = $state; Meta = $meta; Candidates = $matches }
+}
 
-    $candidateFiles = [System.Collections.Generic.List[System.IO.FileInfo]]::new()
-    if (-not [string]::IsNullOrWhiteSpace($ObjectName)) {
-        $found = @(Get-ChildItem -LiteralPath $RootPath -Recurse -File -Filter "$ObjectName.xml" -ErrorAction SilentlyContinue)
-        foreach ($f in $found) {
-            $candidateFiles.Add($f) | Out-Null
-        }
+# Contrato próprio do Copy mantido; migração dos campos comuns do 9-FD continua no 999.
+function Add-CopyBlock {
+    param([string]$Code, [string]$Message, [object]$Meta, [string]$Name = '', [string]$Guid = '', [object]$AcervoMeta)
+    $file = ''
+    if ($null -ne $Meta) { $Name = $Meta.Name; $Guid = $Meta.Guid; $file = [System.IO.Path]::GetFileName($Meta.Path) }
+    $acervoFile = ''
+    $frontDate = ''
+    $acervoDate = ''
+    if ($null -ne $Meta -and $null -ne $Meta.LastUpdate) { $frontDate = Format-GeneXusLastUpdate $Meta.LastUpdate }
+    if ($null -ne $AcervoMeta) {
+        $acervoFile = [IO.Path]::GetRelativePath($AcervoFolder, $AcervoMeta.Path)
+        if ($null -ne $AcervoMeta.LastUpdate) { $acervoDate = Format-GeneXusLastUpdate $AcervoMeta.LastUpdate }
     }
-    if (-not [string]::IsNullOrWhiteSpace($ObjectGuid)) {
-        $guidHits = @(Get-ChildItem -LiteralPath $RootPath -Recurse -File -Filter '*.xml' -ErrorAction SilentlyContinue |
-            Select-String -SimpleMatch $ObjectGuid |
-            ForEach-Object { $_.Path } |
-            Sort-Object -Unique |
-            ForEach-Object { Get-Item -LiteralPath $_ })
-        foreach ($f in $guidHits) {
-            $candidateFiles.Add($f) | Out-Null
-        }
-    }
+    $script:findings += New-Finding -Severity 'fail' -Code $Code -Message $Message -ObjectName $Name -ObjectGuid $Guid -ObjectFile $file -AcervoFile $acervoFile -Action 'skip' -FrontLastUpdateBefore $frontDate -AcervoLastUpdate $acervoDate
+}
 
-    $matches = @()
-    foreach ($file in @($candidateFiles | Sort-Object FullName -Unique)) {
-        $meta = Get-ObjectMetadata $file.FullName
-        if ($null -eq $meta) { continue }
-        $matched = $false
-        if (-not [string]::IsNullOrWhiteSpace($ObjectGuid) -and $meta.Guid -eq $ObjectGuid) {
-            $matched = $true
-        }
-        if (-not $matched -and -not [string]::IsNullOrWhiteSpace($ObjectName) -and $meta.Name -eq $ObjectName) {
-            $matched = $true
-        }
-        if ($matched) {
-            $matches += $meta
-        }
-    }
+function Test-CopyIdentity {
+    param([object]$Meta)
+    return (-not [string]::IsNullOrWhiteSpace($Meta.Guid) -and -not [string]::IsNullOrWhiteSpace($Meta.TypeGuid))
+}
 
-    if ($matches.Count -eq 0) {
-        return [pscustomobject]@{ Status = 'not-found'; Meta = $null; Candidates = @() }
-    }
-    if ($matches.Count -gt 1) {
-        return [pscustomobject]@{ Status = 'ambiguous'; Meta = $null; Candidates = $matches }
-    }
-    return [pscustomobject]@{ Status = 'found'; Meta = $matches[0]; Candidates = $matches }
+function Test-NameRequest {
+    param([object]$Request, [object]$Meta, [switch]$IncludeType)
+    return ($Request.Name -eq $Meta.Name -and
+        (-not $IncludeType -or [string]::IsNullOrEmpty($Request.TypeGuid) -or
+            $Request.TypeGuid -eq (Normalize-GeneXusObjectTypeDriftValue $Meta.TypeGuid)))
 }
 
 function Copy-AcervoMetaToFront {
@@ -331,283 +331,199 @@ function Copy-AcervoMetaToFront {
         -FrontLastUpdateBefore $FrontLastUpdateBefore -AcervoLastUpdate $aLastStr -FrontLastUpdateAfter $newLastUpdate
 }
 
-function Find-AcervoObjectXml {
-    param(
-        [Parameter(Mandatory = $true)][string]$RootPath,
-        [Parameter(Mandatory = $true)][pscustomobject]$FrontMeta
-    )
-    if (-not (Test-Path -LiteralPath $RootPath -PathType Container)) {
-        return $null
-    }
-    $candidateFiles = [System.Collections.Generic.List[System.IO.FileInfo]]::new()
-    foreach ($attrName in @('fullyQualifiedName', 'name')) {
-        $value = $null
-        if ($attrName -eq 'fullyQualifiedName') { $value = $FrontMeta.Fqn }
-        elseif ($attrName -eq 'name') { $value = $FrontMeta.Name }
-        if ([string]::IsNullOrWhiteSpace($value)) { continue }
-        $leaf = "$value.xml"
-        $found = @(Get-ChildItem -LiteralPath $RootPath -Recurse -File -Filter $leaf -ErrorAction SilentlyContinue)
-        foreach ($f in $found) {
-            $candidateFiles.Add($f) | Out-Null
-        }
-    }
-    if ($candidateFiles.Count -eq 0 -and -not [string]::IsNullOrWhiteSpace($FrontMeta.Guid)) {
-        $guidHits = @(Get-ChildItem -LiteralPath $RootPath -Recurse -File -Filter '*.xml' -ErrorAction SilentlyContinue |
-            Select-String -SimpleMatch $FrontMeta.Guid |
-            ForEach-Object { $_.Path } |
-            Sort-Object -Unique |
-            ForEach-Object { Get-Item -LiteralPath $_ })
-        foreach ($f in $guidHits) {
-            $candidateFiles.Add($f) | Out-Null
-        }
-    }
-    foreach ($file in @($candidateFiles | Sort-Object FullName -Unique)) {
-        try {
-            [xml]$doc = Get-Content -LiteralPath $file.FullName -Raw -Encoding UTF8
-        } catch {
-            continue
-        }
-        $baseRoot = $doc.DocumentElement
-        if ($null -eq $baseRoot -or $baseRoot.LocalName -ne 'Object') { continue }
-        $matched = $false
-        $baseGuid = $baseRoot.GetAttribute('guid')
-        if (-not [string]::IsNullOrWhiteSpace($FrontMeta.Guid) -and $FrontMeta.Guid -eq $baseGuid) {
-            $matched = $true
-        }
-        if (-not $matched) {
-            $baseFqn = $baseRoot.GetAttribute('fullyQualifiedName')
-            if (-not [string]::IsNullOrWhiteSpace($FrontMeta.Fqn) -and $FrontMeta.Fqn -eq $baseFqn) {
-                $matched = $true
-            }
-        }
-        if (-not $matched) {
-            $baseName = $baseRoot.GetAttribute('name')
-            if (-not [string]::IsNullOrWhiteSpace($FrontMeta.Name) -and $FrontMeta.Name -eq $baseName) {
-                $matched = $true
-            }
-        }
-        if ($matched) {
-            $baseMeta = Get-ObjectMetadata $file.FullName
-            if ($null -ne $baseMeta) {
-                return $baseMeta
-            }
-        }
-    }
-    return $null
-}
-
-# Validar parâmetros
+# Validar parâmetros sem criar uma frente.
 if (-not (Test-Path -LiteralPath $FrontFolder -PathType Container)) {
     throw "FRENTE_NAO_ABERTA: FrontFolder nao encontrado ou nao e diretorio: $FrontFolder. A frente deve ser aberta/retomada por New-GeneXusXpzFront.ps1 (wrapper local New-*KbFront.ps1) com -ReuseIfExists antes de popular; nao crie a pasta manualmente."
 }
 if (-not (Test-Path -LiteralPath $AcervoFolder -PathType Container)) {
     throw "AcervoFolder nao encontrado ou nao e diretorio: $AcervoFolder"
 }
-$FrontFolder  = (Resolve-Path -LiteralPath $FrontFolder).Path
+$FrontFolder = (Resolve-Path -LiteralPath $FrontFolder).Path
 $AcervoFolder = (Resolve-Path -LiteralPath $AcervoFolder).Path
-
-# Sem dependencia de motor externo: o bump de lastUpdate e feito inline por
-# Format-GeneXusLastUpdate / max(UtcNow + margin, acervoLastUpdate + margin)
-
-# 1. Enumerar XMLs na pasta da frente
 $findings = @()
-$nameFilter = $null
-if ($null -ne $ObjectNames -and $ObjectNames.Count -gt 0) {
-    $nameFilter = @($ObjectNames | ForEach-Object { $_.ToLowerInvariant() })
+$nameRequestsProvided = ($null -ne $ObjectNames -and $ObjectNames.Count -gt 0) -or ($null -ne $ObjectList -and $ObjectList.Count -gt 0)
+$guidRequests = @($ObjectGuids | ForEach-Object { Normalize-GeneXusObjectTypeDriftValue $_ } | Where-Object { $_ })
+$explicitTargetsProvided = $nameRequestsProvided -or $guidRequests.Count -gt 0
+$requests = @()
+$catalog = $null
+$catalogAttempted = $false
+$catalogBlocked = $false
+foreach ($source in @('ObjectNames', 'ObjectList')) {
+    $items = $ObjectNames
+    if ($source -eq 'ObjectList') { $items = $ObjectList }
+    foreach ($item in $items) {
+        $name = [string]$item
+        $typeGuid = ''
+        if ($source -eq 'ObjectList' -and $name.Contains(':')) {
+            $parts = $name.Split(':', 2)
+            $typeName = $parts[0]
+            $name = $parts[1]
+            if ([string]::IsNullOrWhiteSpace($typeName) -or [string]::IsNullOrWhiteSpace($name)) {
+                Add-CopyBlock 'selector-invalid' "Entrada tipada inválida: '$item'." -Name $name
+                continue
+            }
+            if (-not $catalogAttempted) {
+                $catalogAttempted = $true
+                . (Join-Path $PSScriptRoot 'GeneXusObjectTypeCatalogSupport.ps1')
+                # Falha da base é infraestrutura: não a mascarar como falha de override.
+                $base = Read-GeneXusObjectTypeCatalogFile (Get-GeneXusObjectTypeCatalogDefaultBasePath)
+                if ($base -isnot [pscustomobject] -or
+                    $null -eq $base.PSObject.Properties['types'] -or
+                    $base.types -isnot [pscustomobject]) {
+                    throw 'CATALOGO_BASE_INVALIDO: a base e types devem ser objetos JSON.'
+                }
+                try {
+                    $catalog = (Resolve-GeneXusObjectTypeCatalogPaths -ParallelKbRoot $ParallelKbRoot -CatalogOverridePath $CatalogOverridePath).MergedCatalog
+                } catch {
+                    if ($_.Exception.Message -notlike 'OVERRIDE_RESOLUTION_BLOCKED:*') { throw }
+                    $catalogBlocked = $true
+                    Add-CopyBlock 'selector-catalog-override-blocked' $_.Exception.Message
+                }
+            }
+            if ($catalogBlocked) { continue }
+            $entries = @($catalog.types.PSObject.Properties | Where-Object { $_.Name -eq $typeName })
+            if ($entries.Count -eq 0) {
+                $entries = @($catalog.types.PSObject.Properties | Where-Object {
+                    (Get-GeneXusCatalogEntryValue $_.Value 'folderName') -eq $typeName
+                })
+            }
+            if ($entries.Count -ne 1) {
+                Add-CopyBlock 'selector-type-unknown' "Tipo desconhecido ou alias de pasta ambíguo: '$typeName'." -Name $name
+                continue
+            }
+            $entry = $entries[0].Value
+            $typeGuid = Normalize-GeneXusObjectTypeDriftValue (Get-GeneXusCatalogEntryValue $entry 'objectTypeGuid')
+            if (-not $typeGuid -or (Get-GeneXusCatalogEntryValue $entry 'rootKind') -ne 'Object') {
+                Add-CopyBlock 'selector-type-unsupported' "Tipo não suportado pelo Copy: '$typeName'." -Name $name
+                continue
+            }
+        }
+        if ([string]::IsNullOrWhiteSpace($name)) { continue }
+        $requests += [pscustomobject]@{ Name = $name; TypeGuid = $typeGuid }
+    }
 }
-$guidFilter = $null
-if ($null -ne $ObjectGuids -and $ObjectGuids.Count -gt 0) {
-    $guidFilter = @($ObjectGuids | ForEach-Object { $_.ToLowerInvariant() })
-}
-$explicitTargetsProvided = ($null -ne $nameFilter -and $nameFilter.Count -gt 0) -or ($null -ne $guidFilter -and $guidFilter.Count -gt 0)
-$seededKeys = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+
 $frontXmls = @(Get-ChildItem -LiteralPath $FrontFolder -File -Filter '*.xml')
-$frontMetas = @()
-foreach ($xml in $frontXmls) {
-    $meta = Get-ObjectMetadata $xml.FullName
-    if ($null -ne $meta -and -not [string]::IsNullOrWhiteSpace($meta.Name)) {
-        $frontMetas += $meta
-    }
+$frontMetas = @($frontXmls | ForEach-Object { Get-ObjectMetadata $_.FullName } | Where-Object { $null -ne $_ })
+# Ocupação física independe da leitura XML. Reserva em DryRun e execução é a mesma.
+$reservedDestinations = [System.Collections.Generic.Dictionary[string,string]]::new([StringComparer]::OrdinalIgnoreCase)
+foreach ($file in $frontXmls) { $reservedDestinations[$file.FullName] = 'physical' }
+$existingFrontGuids = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+foreach ($meta in $frontMetas) {
+    $key = Normalize-GeneXusObjectTypeDriftValue $meta.Guid
+    if ($key) { [void]$existingFrontGuids.Add($key) }
+}
+$acervoMetas = @()
+if (($frontMetas.Count -gt 0 -and -not $explicitTargetsProvided) -or $requests.Count -gt 0 -or $guidRequests.Count -gt 0) {
+    $acervoMetas = @(Get-ChildItem -LiteralPath $AcervoFolder -Recurse -File -Filter '*.xml' |
+        Sort-Object FullName | ForEach-Object { Get-ObjectMetadata $_.FullName } | Where-Object { $null -ne $_ })
 }
 
-if ($frontMetas.Count -eq 0 -and $frontXmls.Count -eq 0) {
-    $status = 'not-applicable'
-} else {
-    # 2. Para cada objeto da frente, buscar homonimo no acervo e copiar se mais recente
-    foreach ($fMeta in $frontMetas) {
-        # Aplicar filtros de nome/GUID se fornecidos
-        if ($null -ne $nameFilter -and -not $nameFilter.Contains($fMeta.Name.ToLowerInvariant())) {
-            continue
-        }
-        if ($null -ne $guidFilter -and -not $guidFilter.Contains($fMeta.Guid.ToLowerInvariant())) {
-            continue
-        }
-
-        $fRel = [System.IO.Path]::GetRelativePath($FrontFolder, $fMeta.Path)
-        $aMeta = Find-AcervoObjectXml -RootPath $AcervoFolder -FrontMeta $fMeta
-
-        if ($null -eq $aMeta) {
-            # Objeto novo, sem homonimo no acervo
-            continue
-        }
-
-        $objectGuidNormalized = Normalize-GeneXusObjectTypeDriftValue -Value $fMeta.Guid
-        $acervoGuidNormalized = Normalize-GeneXusObjectTypeDriftValue -Value $aMeta.Guid
-        $frontTypeNormalized = Normalize-GeneXusObjectTypeDriftValue -Value $fMeta.TypeGuid
-        $acervoTypeNormalized = Normalize-GeneXusObjectTypeDriftValue -Value $aMeta.TypeGuid
-        if (
-            -not [string]::IsNullOrWhiteSpace($objectGuidNormalized) -and
-            $objectGuidNormalized -eq $acervoGuidNormalized -and
-            -not [string]::IsNullOrWhiteSpace($frontTypeNormalized) -and
-            -not [string]::IsNullOrWhiteSpace($acervoTypeNormalized) -and
-            $frontTypeNormalized -ne $acervoTypeNormalized
-        ) {
-            $findings += New-Finding -Severity 'fail' -Code 'front-object-type-drift-skip' `
-                -Message "Objeto '$($fMeta.Name)' tem mesmo guid na frente e no acervo, mas Object/@type diverge (frente='$($fMeta.TypeGuid)', acervo='$($aMeta.TypeGuid)'). Copia automatica bloqueada; decisao humana requerida." `
-                -ObjectName $fMeta.Name -ObjectGuid $fMeta.Guid `
-                -ObjectFile $fRel -AcervoFile ([System.IO.Path]::GetRelativePath($AcervoFolder, $aMeta.Path)) `
-                -Action 'skip' `
-                -FrontLastUpdateBefore $(if ($null -ne $fMeta.LastUpdate) { Format-GeneXusLastUpdate $fMeta.LastUpdate } else { '' }) `
-                -AcervoLastUpdate $(if ($null -ne $aMeta.LastUpdate) { Format-GeneXusLastUpdate $aMeta.LastUpdate } else { '' }) `
-                -FrontLastUpdateAfter ''
-            continue
-        }
-
-        if ($null -eq $fMeta.LastUpdate -or $null -eq $aMeta.LastUpdate) {
-            # lastUpdate não parseavel em um dos lados
-            $findings += New-Finding -Severity 'warn' -Code 'lastupdate-unparseable-skip' `
-                -Message "Objeto '$($fMeta.Name)' com lastUpdate nao parseavel; copia manual necessaria." `
-                -ObjectName $fMeta.Name -ObjectGuid $fMeta.Guid `
-                -ObjectFile $fRel -AcervoFile ([System.IO.Path]::GetRelativePath($AcervoFolder, $aMeta.Path)) `
-                -Action 'skip' `
-                -FrontLastUpdateBefore $(if ($null -ne $fMeta.LastUpdate) { Format-GeneXusLastUpdate $fMeta.LastUpdate } else { '' }) `
-                -AcervoLastUpdate $(if ($null -ne $aMeta.LastUpdate) { Format-GeneXusLastUpdate $aMeta.LastUpdate } else { '' }) `
-                -FrontLastUpdateAfter ''
-            continue
-        }
-
-        if ($fMeta.LastUpdate -gt $aMeta.LastUpdate -and -not $explicitTargetsProvided) {
-            # Frente já e mais recente; sem alvo explicito, nao sobrescrever delta funcional por varredura.
-            continue
-        }
-
-        # Frente mais antiga/igual, ou alvo explicito para reconstrução textual: copiar do acervo e bumpar lastUpdate
-        $fLastStr = Format-GeneXusLastUpdate $fMeta.LastUpdate
-        $aLastStr = Format-GeneXusLastUpdate $aMeta.LastUpdate
-        $aRel = [System.IO.Path]::GetRelativePath($AcervoFolder, $aMeta.Path)
-
-        Copy-AcervoMetaToFront `
-            -AcervoMeta $aMeta `
-            -DestinationPath $fMeta.Path `
-            -ActionCode 'copied-and-bumped' `
-            -DryRunCode 'dry-run-copy' `
-            -MessagePrefix 'copiado do acervo' `
-            -FrontLastUpdateBefore $fLastStr
+foreach ($fMeta in $frontMetas) {
+    if ($nameRequestsProvided -and @($requests | Where-Object { Test-NameRequest $_ $fMeta }).Count -eq 0) { continue }
+    $key = Normalize-GeneXusObjectTypeDriftValue $fMeta.Guid
+    if ($guidRequests.Count -gt 0 -and $key -notin $guidRequests) { continue }
+    $matches = @()
+    if ($key) { $matches = @($acervoMetas | Where-Object { (Normalize-GeneXusObjectTypeDriftValue $_.Guid) -eq $key }) }
+    if ($matches.Count -gt 1) {
+        Add-CopyBlock 'front-acervo-guid-ambiguous-skip' "GUID duplicado no acervo; nenhuma contraparte escolhida: '$key'." $fMeta
+        continue
     }
+    $aMeta = $null
+    if ($matches.Count -eq 1) {
+        $aMeta = $matches[0]
+        if (-not (Test-CopyIdentity $fMeta) -or -not (Test-CopyIdentity $aMeta)) {
+            Add-CopyBlock 'copy-identity-incomplete-skip' 'Identidade incompleta impede sobrescrita.' $fMeta
+            continue
+        }
+        if ((Normalize-GeneXusObjectTypeDriftValue $fMeta.TypeGuid) -ne (Normalize-GeneXusObjectTypeDriftValue $aMeta.TypeGuid)) {
+            Add-CopyBlock 'front-object-type-drift-skip' "Mesmo GUID com Object/@type divergente (frente='$($fMeta.TypeGuid)', acervo='$($aMeta.TypeGuid)'); decisão humana requerida." $fMeta -AcervoMeta $aMeta
+            continue
+        }
+    }
+    # Tipo restringe TODOS os existentes, mas nunca apaga um bloqueio por identidade.
+    if ($nameRequestsProvided -and @($requests | Where-Object { Test-NameRequest $_ $fMeta -IncludeType }).Count -eq 0) { continue }
+    if ($null -eq $aMeta) {
+        # Classificação legada: arquivo-folha + atributo name/FQN, não nome efetivo do seed.
+        $homonyms = @($acervoMetas | Where-Object {
+            ([System.IO.Path]::GetFileName($_.Path) -like "$($fMeta.Name).xml" -or
+                ($fMeta.Fqn -and [System.IO.Path]::GetFileName($_.Path) -like "$($fMeta.Fqn).xml")) -and
+            ($_.AttributeName -eq $fMeta.Name -or ($fMeta.Fqn -and $_.Fqn -eq $fMeta.Fqn))
+        })
+        if (-not (Test-CopyIdentity $fMeta)) {
+            if ($explicitTargetsProvided -or $homonyms.Count -gt 0) { Add-CopyBlock 'copy-identity-incomplete-skip' 'Identidade da frente incompleta; preservar.' $fMeta }
+            continue
+        }
+        $sameType = @($homonyms | Where-Object { (Normalize-GeneXusObjectTypeDriftValue $_.TypeGuid) -eq (Normalize-GeneXusObjectTypeDriftValue $fMeta.TypeGuid) })
+        if ($sameType.Count -gt 0) {
+            Add-CopyBlock 'front-object-identity-conflict-skip' 'Homônimo do mesmo tipo com outro GUID; preservar.' $fMeta
+        } elseif (@($homonyms | Where-Object { -not (Test-CopyIdentity $_) }).Count -gt 0) {
+            Add-CopyBlock 'copy-identity-incomplete-skip' 'Homônimo com identidade incompleta; preservar.' $fMeta
+        }
+        continue
+    }
+    if ($null -eq $fMeta.LastUpdate -or $null -eq $aMeta.LastUpdate) {
+        $findings += New-Finding -Severity 'warn' -Code 'lastupdate-unparseable-skip' -Message 'lastUpdate não parseável; cópia manual necessária.' -ObjectName $fMeta.Name -ObjectGuid $fMeta.Guid -Action 'skip'
+        continue
+    }
+    if ($fMeta.LastUpdate -gt $aMeta.LastUpdate -and -not $explicitTargetsProvided) { continue }
+    Copy-AcervoMetaToFront -AcervoMeta $aMeta -DestinationPath $fMeta.Path -ActionCode 'copied-and-bumped' -DryRunCode 'dry-run-copy' -MessagePrefix 'copiado do acervo' -FrontLastUpdateBefore (Format-GeneXusLastUpdate $fMeta.LastUpdate)
 }
 
-# 3. Seed inicial para alvos explicitos que ainda não existem na frente
-if ($explicitTargetsProvided) {
-    $existingFrontNames = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
-    $existingFrontGuids = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
-    foreach ($fMeta in $frontMetas) {
-        if (-not [string]::IsNullOrWhiteSpace($fMeta.Name)) { [void]$existingFrontNames.Add($fMeta.Name) }
-        if (-not [string]::IsNullOrWhiteSpace($fMeta.Guid)) { [void]$existingFrontGuids.Add($fMeta.Guid) }
+# Pedido simples atendido por nome efetivo; tipado atendido só por nome E tipo.
+# Atendimento precede interseção por GUID. Presença por GUID é independente do nome.
+$seedRequests = @()
+foreach ($request in $requests) {
+    if (@($frontMetas | Where-Object { Test-NameRequest $request $_ -IncludeType }).Count -gt 0) { continue }
+    $seedRequests += [pscustomobject]@{ Name = $request.Name; Guid = ''; TypeGuid = $request.TypeGuid }
+}
+foreach ($guid in $guidRequests) {
+    if ($existingFrontGuids.Contains($guid)) { continue }
+    $seedRequests += [pscustomobject]@{ Name = ''; Guid = $guid; TypeGuid = '' }
+}
+$seededKeys = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+foreach ($request in $seedRequests) {
+    $lookup = Find-AcervoObjectXmlByExplicitTarget -ObjectName $request.Name -ObjectGuid $request.Guid -TypeGuid $request.TypeGuid
+    if ($lookup.Status -ne 'found') {
+        $code = 'seed-target-not-found'
+        if ($lookup.Status -eq 'ambiguous') { $code = 'seed-target-ambiguous' }
+        $paths = @($lookup.Candidates | ForEach-Object { [System.IO.Path]::GetRelativePath($AcervoFolder, $_.Path) })
+        Add-CopyBlock $code "Alvo '$($request.Name)$($request.Guid)': $($lookup.Status). $($paths -join ', ')" -Name $request.Name -Guid $request.Guid
+        continue
     }
-
-    foreach ($objectName in @($ObjectNames)) {
-        if ([string]::IsNullOrWhiteSpace($objectName) -or $existingFrontNames.Contains($objectName)) { continue }
-        $seedLookup = Find-AcervoObjectXmlByExplicitTarget -RootPath $AcervoFolder -ObjectName $objectName
-        if ($seedLookup.Status -eq 'not-found') {
-            $findings += New-Finding -Severity 'fail' -Code 'seed-target-not-found' `
-                -Message "Seed solicitado para '$objectName', mas nenhum XML correspondente foi encontrado no acervo." `
-                -ObjectName $objectName -ObjectGuid '' -ObjectFile '' -AcervoFile '' -Action 'seed-skip' `
-                -FrontLastUpdateBefore '' -AcervoLastUpdate '' -FrontLastUpdateAfter ''
-            continue
-        }
-        if ($seedLookup.Status -eq 'ambiguous') {
-            $candidates = @($seedLookup.Candidates | ForEach-Object { [System.IO.Path]::GetRelativePath($AcervoFolder, $_.Path) })
-            $findings += New-Finding -Severity 'fail' -Code 'seed-target-ambiguous' `
-                -Message "Seed solicitado para '$objectName', mas o alvo e ambiguo no acervo: $($candidates -join ', ')." `
-                -ObjectName $objectName -ObjectGuid '' -ObjectFile '' -AcervoFile '' -Action 'seed-skip' `
-                -FrontLastUpdateBefore '' -AcervoLastUpdate '' -FrontLastUpdateAfter ''
-            continue
-        }
-        $seedMeta = $seedLookup.Meta
-        $seedKey = if (-not [string]::IsNullOrWhiteSpace($seedMeta.Guid)) { $seedMeta.Guid } else { $seedMeta.Name }
-        if (-not $seededKeys.Add($seedKey)) { continue }
-        $destinationPath = Join-Path $FrontFolder ([System.IO.Path]::GetFileName($seedMeta.Path))
-        if (Test-Path -LiteralPath $destinationPath -PathType Leaf) {
-            $findings += New-Finding -Severity 'fail' -Code 'seed-destination-exists' `
-                -Message "Seed solicitado para '$($seedMeta.Name)', mas o destino ja existe: $destinationPath." `
-                -ObjectName $seedMeta.Name -ObjectGuid $seedMeta.Guid -ObjectFile ([System.IO.Path]::GetFileName($destinationPath)) `
-                -AcervoFile ([System.IO.Path]::GetRelativePath($AcervoFolder, $seedMeta.Path)) -Action 'seed-skip' `
-                -FrontLastUpdateBefore '' -AcervoLastUpdate '' -FrontLastUpdateAfter ''
-            continue
-        }
-        Copy-AcervoMetaToFront `
-            -AcervoMeta $seedMeta `
-            -DestinationPath $destinationPath `
-            -ActionCode 'seeded-and-bumped' `
-            -DryRunCode 'dry-run-seed' `
-            -MessagePrefix 'semeado do acervo'
+    $seedMeta = $lookup.Meta
+    $key = Normalize-GeneXusObjectTypeDriftValue $seedMeta.Guid
+    if ($key -and $existingFrontGuids.Contains($key)) { continue }
+    if (-not (Test-CopyIdentity $seedMeta)) {
+        Add-CopyBlock 'copy-identity-incomplete-skip' 'Identidade do acervo incompleta; seed bloqueado.' $seedMeta
+        continue
     }
-
-    foreach ($objectGuid in @($ObjectGuids)) {
-        if ([string]::IsNullOrWhiteSpace($objectGuid) -or $existingFrontGuids.Contains($objectGuid)) { continue }
-        $seedLookup = Find-AcervoObjectXmlByExplicitTarget -RootPath $AcervoFolder -ObjectGuid $objectGuid
-        if ($seedLookup.Status -eq 'not-found') {
-            $findings += New-Finding -Severity 'fail' -Code 'seed-target-not-found' `
-                -Message "Seed solicitado para GUID '$objectGuid', mas nenhum XML correspondente foi encontrado no acervo." `
-                -ObjectName '' -ObjectGuid $objectGuid -ObjectFile '' -AcervoFile '' -Action 'seed-skip' `
-                -FrontLastUpdateBefore '' -AcervoLastUpdate '' -FrontLastUpdateAfter ''
-            continue
-        }
-        if ($seedLookup.Status -eq 'ambiguous') {
-            $candidates = @($seedLookup.Candidates | ForEach-Object { [System.IO.Path]::GetRelativePath($AcervoFolder, $_.Path) })
-            $findings += New-Finding -Severity 'fail' -Code 'seed-target-ambiguous' `
-                -Message "Seed solicitado para GUID '$objectGuid', mas o alvo e ambiguo no acervo: $($candidates -join ', ')." `
-                -ObjectName '' -ObjectGuid $objectGuid -ObjectFile '' -AcervoFile '' -Action 'seed-skip' `
-                -FrontLastUpdateBefore '' -AcervoLastUpdate '' -FrontLastUpdateAfter ''
-            continue
-        }
-        $seedMeta = $seedLookup.Meta
-        $seedKey = if (-not [string]::IsNullOrWhiteSpace($seedMeta.Guid)) { $seedMeta.Guid } else { $seedMeta.Name }
-        if (-not $seededKeys.Add($seedKey)) { continue }
-        $destinationPath = Join-Path $FrontFolder ([System.IO.Path]::GetFileName($seedMeta.Path))
-        if (Test-Path -LiteralPath $destinationPath -PathType Leaf) {
-            $findings += New-Finding -Severity 'fail' -Code 'seed-destination-exists' `
-                -Message "Seed solicitado para '$($seedMeta.Name)', mas o destino ja existe: $destinationPath." `
-                -ObjectName $seedMeta.Name -ObjectGuid $seedMeta.Guid -ObjectFile ([System.IO.Path]::GetFileName($destinationPath)) `
-                -AcervoFile ([System.IO.Path]::GetRelativePath($AcervoFolder, $seedMeta.Path)) -Action 'seed-skip' `
-                -FrontLastUpdateBefore '' -AcervoLastUpdate '' -FrontLastUpdateAfter ''
-            continue
-        }
-        Copy-AcervoMetaToFront `
-            -AcervoMeta $seedMeta `
-            -DestinationPath $destinationPath `
-            -ActionCode 'seeded-and-bumped' `
-            -DryRunCode 'dry-run-seed' `
-            -MessagePrefix 'semeado do acervo'
+    if (@($acervoMetas | Where-Object { (Normalize-GeneXusObjectTypeDriftValue $_.Guid) -eq $key }).Count -gt 1) {
+        Add-CopyBlock 'seed-target-ambiguous' "GUID do alvo duplicado no acervo: '$key'." $seedMeta
+        continue
     }
+    # Diagnósticos de cada pedido precedem deduplicação de ações.
+    if ($seededKeys.Contains($key)) { continue }
+    $destination = [System.IO.Path]::GetFullPath((Join-Path $FrontFolder ([System.IO.Path]::GetFileName($seedMeta.Path))))
+    if ($reservedDestinations.ContainsKey($destination) -or (Test-Path -LiteralPath $destination)) {
+        Add-CopyBlock 'seed-destination-exists' "Destino ocupado/reservado: '$destination'." $seedMeta
+        continue
+    }
+    if ($null -ne $seedMeta.LastUpdate) {
+        $reservedDestinations[$destination] = $key
+        [void]$seededKeys.Add($key)
+    }
+    Copy-AcervoMetaToFront -AcervoMeta $seedMeta -DestinationPath $destination -ActionCode 'seeded-and-bumped' -DryRunCode 'dry-run-seed' -MessagePrefix 'semeado do acervo'
 }
 
-# 4. Status agregado
-if ($findings.Count -eq 0 -and $frontMetas.Count -eq 0 -and $frontXmls.Count -eq 0 -and -not $explicitTargetsProvided) {
-    $status = 'not-applicable'
-} else {
-    $hasFail = $findings | Where-Object { $_.severity -eq 'fail' } | Select-Object -First 1
-    if ($hasFail) { $status = 'fail' } else { $status = 'pass' }
-}
-
-# 5. Emitir resultado
-$result = [pscustomobject]@{
-    status          = $status
-    frontFolder     = $FrontFolder
-    acervoFolder    = $AcervoFolder
-    dryRun          = $DryRun.IsPresent
-    objectsScanned  = $frontMetas.Count
-    findings        = $findings
-}
-
-$result | ConvertTo-Json -Depth 10
+$status = 'pass'
+if (@($findings | Where-Object { $_.severity -eq 'fail' }).Count -gt 0) { $status = 'fail' }
+elseif ($frontXmls.Count -eq 0 -and -not $explicitTargetsProvided) { $status = 'not-applicable' }
+[pscustomobject]@{
+    status = $status
+    frontFolder = $FrontFolder
+    acervoFolder = $AcervoFolder
+    dryRun = $DryRun.IsPresent
+    objectsScanned = $frontMetas.Count
+    findings = @($findings)
+} | ConvertTo-Json -Depth 10

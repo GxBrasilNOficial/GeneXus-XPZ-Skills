@@ -25,13 +25,15 @@ retomar); este wrapper apenas popula uma frente existente, não cria a pasta.
 
 .PARAMETER ObjectList
 Nome canonico da selecao de objeto por nome. Aceita nomes simples ou entradas
-`Tipo:Nome`; o wrapper repassa apenas o nome ao motor de copia. Quando omitido
+`Tipo:Nome`; o wrapper repassa ObjectList intacto ao motor de cópia. Tipo é
+resolvido no catálogo efetivo por nome canônico/alias de pasta, sem rótulo Export.
+ParallelKbRoot é repassado para considerar override local. Quando omitido
 (junto com -ObjectNames/-ObjectGuids), copia todos com drift. Para seed inicial,
 deve identificar um único XML no acervo. Para objeto já existente/editado na
 frente, alvo explicito pode sobrescrever a copia local para reconstrução textual.
 
 .PARAMETER ObjectNames
-Sinonimo aceito de -ObjectList (mesma semantica de selecao por nome), mantido por
+Seleção literal por nome simples (sem interpretar Tipo:Nome), mantida por
 retrocompatibilidade. Itens de -ObjectNames e -ObjectList são combinados.
 
 .PARAMETER ObjectGuids
@@ -95,6 +97,7 @@ $acervoFolder = Join-Path $repoRoot "ObjetosDaKbEmXml"
 $argsForScript = @{
     FrontFolder = $frontFolder
     AcervoFolder = $acervoFolder
+    ParallelKbRoot = $repoRoot
 }
 
 if ($DryRun) {
@@ -106,11 +109,7 @@ if ($null -ne $ObjectNames -and $ObjectNames.Count -gt 0) {
 }
 
 if ($null -ne $ObjectList -and $ObjectList.Count -gt 0) {
-    $objectListNames = @($ObjectList | ForEach-Object {
-        $item = [string]$_
-        if ($item -match '^[^:]+:(?<name>.+)$') { $Matches['name'] } else { $item }
-    })
-    $argsForScript.ObjectNames = @($argsForScript.ObjectNames) + $objectListNames
+    $argsForScript.ObjectList = $ObjectList
 }
 
 if ($null -ne $ObjectGuids -and $ObjectGuids.Count -gt 0) {

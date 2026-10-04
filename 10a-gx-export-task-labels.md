@@ -6,6 +6,8 @@ Documento de divergências entre o vocabulário aceito pela task MSBuild `Export
 
 ## Regra operacional
 
+Esta tabela não se aplica a `Copy-GeneXusAcervoToFront.ps1`: seus pedidos `-ObjectList Tipo:Nome` usam nome canônico do catálogo efetivo, depois `folderName` não ambíguo, sem `exportTaskLabel`. No Copy, `WorkWith` é mobile, `WorkWithForWeb` é web e `WorkWithDevices` é desconhecido; `-ParallelKbRoot`/`-CatalogOverridePath` informam override local. Ver `02`, «Cópia segura do acervo para a frente».
+
 - Montar `-ObjectList` com o **rótulo da task Export**, não com o nome do tipo no catálogo ou no índice, quando existir divergência documentada abaixo.
 - Consultar `exportTaskLabel` em `scripts/gx-object-type-catalog.json` quando o consumidor montar lista a partir do catálogo ou de `search-objects` / `list-by-type`.
 - `exportTaskLabel` é vocabulário textual da task MSBuild; o GUID do tipo não o substitui. Ensaios com os dois GUIDs de Work With foram rejeitados como tipo inválido e só produziram objeto por fallback nominal, portanto são Categoria B e não exportações confiáveis.

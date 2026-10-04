@@ -1,14 +1,17 @@
 #requires -Version 7.4
 <#
 .SYNOPSIS
-  Suporte (dot-source) para dois checks do inventario de wrappers locais
+  Suporte (dot-source) para três checks do inventario de wrappers locais
   (Test-XpzWrapperInventory.ps1): (1) forwards_unknown_engine_param — repasse a motor
   compartilhado advanced de parametro nao-declarado (direcao wrapper->motor); (2) diff de
   superficie wrapper-local vs molde — surface_mismatch (bloqueio) e INVENTORY_SURFACE_ADVISORY
-  (aviso), ver bloco proprio no fim do arquivo (direcao wrapper->molde).
+  (aviso), ver bloco proprio no fim do arquivo (direcao wrapper->molde);
+  (3) perda dirigida de tipo em ObjectList consumido pelo Copy.
 
 .DESCRIPTION
-  Este arquivo hospeda DOIS checks do inventario. Esta secao .DESCRIPTION e os LIMITES
+  Este arquivo hospeda três checks do inventario; o terceiro é o detector dirigido
+  copy_objectlist_type_loss, documentado em Test-XpzCopyObjectListTypeLoss.
+  Esta secao .DESCRIPTION e os LIMITES
   CONHECIDOS abaixo cobrem o check (1) forwards_unknown_engine_param (direcao wrapper->motor);
   o check (2) diff de superficie wrapper->molde (`surface_mismatch`/`INVENTORY_SURFACE_ADVISORY`,
   helpers Get-XpzScriptParamSurface/Get-XpzWrapperSurfaceFinding) tem documentacao propria no
@@ -49,6 +52,105 @@
 #>
 
 Set-StrictMode -Version Latest
+
+function Test-XpzCopyObjectListTypeLoss {
+    <#
+      Detector dirigido do fluxo legado ObjectList -> extração Matches -> ObjectNames
+      numa chamada efetiva ao Copy. Prova somente a regex/captura canônica do
+      molde legado; outra regex, mesmo contendo dois-pontos, não prova perda.
+      Usa o resolvedor AST de motor deste helper.
+      Não prova conformidade: fluxo multi-hop, reatribuições, funções auxiliares,
+      extrações por outro algoritmo e chaves dinâmicas ficam fora desta prova.
+    #>
+    param([string]$WrapperPath)
+    $errors = $null
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile($WrapperPath, [ref]$null, [ref]$errors)
+    if ($errors.Count -gt 0) { return $false }
+    $assigns = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.AssignmentStatementAst] }, $true))
+    $stripped = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach ($a in $assigns) {
+        if ($a.Left -isnot [System.Management.Automation.Language.VariableExpressionAst]) { continue }
+        if (@($assigns | Where-Object {
+            $_.Left -is [System.Management.Automation.Language.VariableExpressionAst] -and
+            $_.Left.VariablePath.UserPath -ieq $a.Left.VariablePath.UserPath
+        }).Count -ne 1) { continue }
+        $vars = @($a.Right.FindAll({ param($n) $n -is [System.Management.Automation.Language.VariableExpressionAst] }, $true))
+        $extract = @($a.Right.FindAll({
+            param($n)
+            # Matches dentro de string reconstruída não prova remoção do tipo.
+            $ancestor = $n.Parent
+            while ($null -ne $ancestor -and $ancestor -ne $a.Right) {
+                if ($ancestor -is [System.Management.Automation.Language.ExpandableStringExpressionAst]) { return $false }
+                $ancestor = $ancestor.Parent
+            }
+            $n -is [System.Management.Automation.Language.IndexExpressionAst] -and
+            $n.Target -is [System.Management.Automation.Language.VariableExpressionAst] -and
+            $n.Target.VariablePath.UserPath -ieq 'Matches' -and
+            $n.Index -is [System.Management.Automation.Language.StringConstantExpressionAst] -and
+            $n.Index.Value -ieq 'name' -and
+            $n.Parent -is [System.Management.Automation.Language.CommandExpressionAst]
+        }, $true))
+        $typedMatch = @($a.Right.FindAll({
+            param($n)
+            $n -is [System.Management.Automation.Language.BinaryExpressionAst] -and
+            $n.Operator -eq 'Imatch' -and
+            $n.Right -is [System.Management.Automation.Language.StringConstantExpressionAst] -and
+            $n.Right.Value -ceq '^[^:]+:(?<name>.+)$'
+        }, $true))
+        if (@($vars | Where-Object { $_.VariablePath.UserPath -ieq 'ObjectList' }).Count -gt 0 -and $extract.Count -gt 0 -and $typedMatch.Count -gt 0) {
+            [void]$stripped.Add($a.Left.VariablePath.UserPath)
+        }
+    }
+    if ($stripped.Count -eq 0) { return $false }
+    $calls = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] -and $n.InvocationOperator -eq 'Ampersand' }, $true))
+    foreach ($call in $calls) {
+        $target = Resolve-XpzEngineTarget -TargetAst $call.CommandElements[0] -RootAst $ast
+        if ($target.Kind -ne 'shared' -or $target.Leaf -ine 'Copy-GeneXusAcervoToFront.ps1') { continue }
+        $elements = @($call.CommandElements)
+        for ($i = 1; $i -lt $elements.Count; $i++) {
+            $el = $elements[$i]
+            if ($el -is [System.Management.Automation.Language.CommandParameterAst] -and $el.ParameterName -ieq 'ObjectNames' -and $i + 1 -lt $elements.Count) {
+                $value = $elements[$i + 1]
+                if ($value -is [System.Management.Automation.Language.VariableExpressionAst] -and $stripped.Contains($value.VariablePath.UserPath)) { return $true }
+            }
+            if ($el -isnot [System.Management.Automation.Language.VariableExpressionAst] -or -not $el.Splatted) { continue }
+            $splat = $el.VariablePath.UserPath
+            if (Test-XpzSplatVarMutated -SplatVarName $splat -RootAst $ast) { continue }
+            # Reatribuição da chave/hashtable não prova qual ramo foi consumido.
+            $nameWrites = @($assigns | Where-Object {
+                $_.Extent.EndOffset -lt $call.Extent.StartOffset -and
+                ($_.Left -is [System.Management.Automation.Language.MemberExpressionAst] -or
+                    $_.Left -is [System.Management.Automation.Language.IndexExpressionAst]) -and
+                $_.Left.Extent.Text -match ('^\$' + [regex]::Escape($splat) + '(\.ObjectNames|\[[''"]ObjectNames[''"]\])$')
+            })
+            if ($nameWrites.Count -gt 1) { continue }
+            foreach ($a in $assigns) {
+                if ($a.Extent.EndOffset -gt $call.Extent.StartOffset) { continue }
+                $left = $a.Left
+                $isNames = $false
+                if ($left -is [System.Management.Automation.Language.MemberExpressionAst] -and $left.Expression -is [System.Management.Automation.Language.VariableExpressionAst]) {
+                    $isNames = $left.Expression.VariablePath.UserPath -ieq $splat -and $left.Member -is [System.Management.Automation.Language.StringConstantExpressionAst] -and $left.Member.Value -ieq 'ObjectNames'
+                } elseif ($left -is [System.Management.Automation.Language.IndexExpressionAst] -and $left.Target -is [System.Management.Automation.Language.VariableExpressionAst]) {
+                    $isNames = $left.Target.VariablePath.UserPath -ieq $splat -and $left.Index -is [System.Management.Automation.Language.StringConstantExpressionAst] -and $left.Index.Value -ieq 'ObjectNames'
+                }
+                if ($isNames) {
+                    $refs = @($a.Right.FindAll({ param($n) $n -is [System.Management.Automation.Language.VariableExpressionAst] }, $true))
+                    if (@($refs | Where-Object { $stripped.Contains($_.VariablePath.UserPath) }).Count -gt 0) { return $true }
+                }
+                if ($left -is [System.Management.Automation.Language.VariableExpressionAst] -and $left.VariablePath.UserPath -ieq $splat) {
+                    foreach ($table in @($a.Right.FindAll({ param($n) $n -is [System.Management.Automation.Language.HashtableAst] }, $true))) {
+                        foreach ($pair in $table.KeyValuePairs) {
+                            if ($pair.Item1 -isnot [System.Management.Automation.Language.StringConstantExpressionAst] -or $pair.Item1.Value -ine 'ObjectNames') { continue }
+                            $refs = @($pair.Item2.FindAll({ param($n) $n -is [System.Management.Automation.Language.VariableExpressionAst] }, $true))
+                            if (@($refs | Where-Object { $stripped.Contains($_.VariablePath.UserPath) }).Count -gt 0) { return $true }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return $false
+}
 
 # CommonParameters que so coexistem em funcoes/scripts ADVANCED (injetados pelo runtime).
 # Subconjunto estavel entre versoes do PowerShell 7.x usado como discriminador.

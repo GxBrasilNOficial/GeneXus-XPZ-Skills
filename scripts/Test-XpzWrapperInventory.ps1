@@ -24,7 +24,9 @@
                                             (mandatory ausente/rebaixado, no_param_block com molde
                                             obrigatorio) — diff de superficie param()/ValidateSet;
                                             unsafe_last_exitcode_after_ps1_engine quando wrapper auditado
-                                            chama motor PowerShell por variavel e ainda sai por exit $LASTEXITCODE)
+                                            chama motor PowerShell por variavel e ainda sai por exit $LASTEXITCODE;
+                                            copy_objectlist_type_loss quando AST comprova extração de Tipo
+                                            de ObjectList e consumo como ObjectNames pelo motor Copy)
       INVENTORY_ENGINE_DIAGNOSTIC: <lista> - diagnostico brando (motor canonico ausente/parse-broken,
                                             engine_unresolved_or_unparseable); NAO bloqueia o estado de
                                             setup (rotulo fora dos tokens de pendencia do agregador)
@@ -318,6 +320,10 @@ foreach ($exampleFile in Get-ChildItem -LiteralPath $SkillsExamplesPath -Filter 
             } elseif ($localText -match '\$gateRaw|\bGATE_OK\b|GateWrapperPath') {
                 $engineDiagnostics.Add(('{0}(reason=writability_consumer_contract_unclassified)' -f $standardLocalName))
             }
+        }
+
+        if ($baseName -ieq 'Copy-KbAcervoToFront' -and (Test-XpzCopyObjectListTypeLoss -WrapperPath $standardPath)) {
+            $customized.Add(('{0}(reason=copy_objectlist_type_loss)' -f $standardLocalName))
         }
 
         if ($baseName -ieq 'Update-KbFromXpz') {

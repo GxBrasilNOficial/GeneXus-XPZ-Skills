@@ -3,6 +3,8 @@
 ## Papel do documento
 operacional
 
+Na cópia acervo → frente, seguir o contrato «Cópia segura do acervo para a frente» do `02`: `Copy-GeneXusAcervoToFront.ps1` preserva `-ObjectList Tipo:Nome`, mantém `-ObjectNames` literal e usa `-ParallelKbRoot`/`-CatalogOverridePath` somente na resolução tipada. Rótulos Export não se aplicam. Nome simples já atendido pela frente não gera seed de homônimo; pedido tipado exige tipo correspondente. GUID duplicado, identidade incompleta e colisão física bloqueiam escrita, inclusive em DryRun; ler JSON/status e exit separadamente. Wrapper legado detectado como `INVENTORY_CUSTOMIZED(reason=copy_objectlist_type_loss)` deve ser corrigido pelo agente na pasta paralela via setup e reauditoria, sem confundir ausência desse sinal dirigido com conformidade geral.
+
 ## Nível de confianca predominante
 medio
 
