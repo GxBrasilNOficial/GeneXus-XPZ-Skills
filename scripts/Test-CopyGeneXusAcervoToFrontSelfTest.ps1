@@ -312,14 +312,61 @@ Assert-Matrix ($r.status -eq 'fail' -and @($r.findings | Where-Object code -eq '
 Assert-Code $r 'seeded-and-bumped'
 Assert-Matrix (Test-Path -LiteralPath (Join-Path $c.Front 'X.xml') -PathType Leaf) 'nome ausente semeia apesar do GUID inválido'
 
-# Omitido e array vazio mantêm a varredura normal em fixtures elegíveis independentes.
-foreach ($selection in @(@{}, @{ ObjectGuids = @() })) {
+# Nomes vazios são diagnosticados sem liberar seleção geral, em ambos os modos.
+foreach ($parameterName in @('ObjectNames', 'ObjectList')) {
+    foreach ($invalidName in @('', ' ')) {
+        foreach ($dry in @($true, $false)) {
+            $c = New-CopyCase
+            $null = Set-CopyXml $c.Acervo 'X.xml' X $g1
+            $null = Set-CopyXml $c.Acervo 'Y.xml' Y $g2
+            $p = Set-CopyXml $c.Front 'X.xml' X $g1
+            $beforeHash = (Get-FileHash -LiteralPath $p).Hash
+            $selection = @{ $parameterName = @($invalidName) }
+            $r = Invoke-CopyCase $c $selection -DryRun:$dry
+            Assert-Matrix ($r.status -eq 'fail') "$parameterName vazio conserva falha"
+            Assert-Code $r 'selector-invalid'
+            Assert-Matrix (@($r.findings | Where-Object { $_.code -in $copyActionCodes }).Count -eq 0) 'nome vazio não libera ações'
+            Assert-Matrix ((Get-FileHash -LiteralPath $p).Hash -eq $beforeHash -and @(Get-ChildItem $c.Front -File).Count -eq 1) 'nome vazio preserva existente e não semeia outros'
+        }
+    }
+    foreach ($dry in @($true, $false)) {
+        $c = New-CopyCase
+        $null = Set-CopyXml $c.Acervo 'X.xml' X $g1
+        $null = Set-CopyXml $c.Acervo 'Y.xml' Y $g2
+        $null = Set-CopyXml $c.Front 'X.xml' X $g1
+        $selection = @{ $parameterName = @(' ', 'X', 'Y') }
+        $r = Invoke-CopyCase $c $selection -DryRun:$dry
+        Assert-Matrix ($r.status -eq 'fail') 'pedido válido não apaga diagnóstico de nome vazio'
+        Assert-Code $r 'selector-invalid'
+        if ($dry) {
+            Assert-Code $r 'dry-run-copy'
+            Assert-Code $r 'dry-run-seed'
+            Assert-Matrix (@(Get-ChildItem $c.Front -File).Count -eq 1) 'simulação nominal mista não semeia'
+        } else {
+            Assert-Code $r 'copied-and-bumped'
+            Assert-Code $r 'seeded-and-bumped'
+            Assert-Matrix (@(Get-ChildItem $c.Front -File).Count -eq 2) 'pedidos nominais válidos continuam em execução parcial'
+        }
+    }
+    $c = New-CopyCase
+    $null = Set-CopyXml $c.Acervo 'X.xml' X $g1
+    $r = Invoke-CopyCase $c @{ $parameterName = @('') }
+    Assert-Matrix ($r.status -eq 'fail') 'frente vazia com nome vazio não é not-applicable'
+    Assert-Code $r 'selector-invalid'
+    Assert-Matrix (@(Get-ChildItem $c.Front -File).Count -eq 0) 'nome vazio não semeia em frente vazia'
+    $r = & pwsh -NoProfile -File $scriptPath -FrontFolder $c.Front -AcervoFolder $c.Acervo "-$parameterName" ' ' -DryRun | ConvertFrom-Json
+    Assert-Matrix ($LASTEXITCODE -eq 0 -and $r.status -eq 'fail') 'nome vazio: JSON fail com exit 0 em processo filho'
+    Assert-Code $r 'selector-invalid'
+}
+
+# Omitido e arrays vazios mantêm a varredura normal em fixtures elegíveis independentes.
+foreach ($selection in @(@{}, @{ ObjectGuids = @() }, @{ ObjectNames = @() }, @{ ObjectList = @() })) {
     $c = New-CopyCase
     $null = Set-CopyXml $c.Acervo 'X.xml' X $g1
     $p = Set-CopyXml $c.Front 'X.xml' X $g1
     $beforeHash = (Get-FileHash -LiteralPath $p).Hash
     $r = Invoke-CopyCase $c $selection
-    Assert-Matrix ($r.status -eq 'pass') 'GUID omitido/array vazio mantém varredura normal'
+    Assert-Matrix ($r.status -eq 'pass') 'seletor omitido/array vazio mantém varredura normal'
     Assert-Code $r 'selector-invalid' 0
     Assert-Code $r 'copied-and-bumped'
     Assert-Matrix ((Get-FileHash -LiteralPath $p).Hash -ne $beforeHash) 'varredura normal altera existente elegível'

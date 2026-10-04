@@ -410,7 +410,10 @@ foreach ($source in @('ObjectNames', 'ObjectList')) {
                 continue
             }
         }
-        if ([string]::IsNullOrWhiteSpace($name)) { continue }
+        if ([string]::IsNullOrWhiteSpace($name)) {
+            Add-CopyBlock 'selector-invalid' "Entrada de $source com nome vazio ou composto apenas por espaços." -Name $name
+            continue
+        }
         $requests += [pscustomobject]@{ Name = $name; TypeGuid = $typeGuid }
     }
 }
