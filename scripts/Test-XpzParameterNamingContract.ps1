@@ -8,8 +8,10 @@
     que os wrappers/motores compartilhados expoem os nomes canonicos e aliases
     acordados:
 
-      - Selecao de objeto: nome canonico -ObjectList; -ObjectNames aceito como
-        sinonimo. No motor de export, -ObjectList e [string[]] com alias ObjectNames.
+      - Seleção de objeto: nome canônico -ObjectList. No motor de export,
+        -ObjectList é [string[]] com alias ObjectNames. No motor Copy,
+        -ObjectList e -ObjectNames são parâmetros distintos: -ObjectList interpreta
+        Tipo:Nome; -ObjectNames mantém o nome literal, sem interpretação tipada.
       - Entrada primaria: nome canonico -InputPath, com alias -Path.
       - Familia de import (entrada e um .xpz): -InputPath com aliases -XpzPath e -Path.
       - Regra de direcao: no export, o .xpz e SAIDA e mantem o nome por papel
