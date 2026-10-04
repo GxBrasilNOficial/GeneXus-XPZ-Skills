@@ -66,6 +66,8 @@
 
 .PARAMETER ObjectGuids
     GUIDs de objetos a copiar (opcional). Quando omitido, copia todos com drift.
+    Entrada fornecida mas vazia após normalização gera selector-invalid e mantém
+    o filtro ativo; não equivale à omissão.
     Para seed inicial, deve identificar um único XML no acervo. Quando o objeto já
     existe na frente, alvo explicito pode sobrescrever a copia mais nova para
     reconstrução textual deliberada.
@@ -342,8 +344,18 @@ $FrontFolder = (Resolve-Path -LiteralPath $FrontFolder).Path
 $AcervoFolder = (Resolve-Path -LiteralPath $AcervoFolder).Path
 $findings = @()
 $nameRequestsProvided = ($null -ne $ObjectNames -and $ObjectNames.Count -gt 0) -or ($null -ne $ObjectList -and $ObjectList.Count -gt 0)
-$guidRequests = @($ObjectGuids | ForEach-Object { Normalize-GeneXusObjectTypeDriftValue $_ } | Where-Object { $_ })
-$explicitTargetsProvided = $nameRequestsProvided -or $guidRequests.Count -gt 0
+# Presença do filtro é independente da existência de pedidos normalizados válidos.
+$guidRequestsProvided = ($null -ne $ObjectGuids -and $ObjectGuids.Count -gt 0)
+$guidRequests = @()
+foreach ($item in $ObjectGuids) {
+    $guid = Normalize-GeneXusObjectTypeDriftValue $item
+    if (-not $guid) {
+        Add-CopyBlock 'selector-invalid' 'Entrada de ObjectGuids vazia após normalização.'
+        continue
+    }
+    $guidRequests += $guid
+}
+$explicitTargetsProvided = $nameRequestsProvided -or $guidRequestsProvided
 $requests = @()
 $catalog = $null
 $catalogAttempted = $false
@@ -422,7 +434,7 @@ if (($frontMetas.Count -gt 0 -and -not $explicitTargetsProvided) -or $requests.C
 foreach ($fMeta in $frontMetas) {
     if ($nameRequestsProvided -and @($requests | Where-Object { Test-NameRequest $_ $fMeta }).Count -eq 0) { continue }
     $key = Normalize-GeneXusObjectTypeDriftValue $fMeta.Guid
-    if ($guidRequests.Count -gt 0 -and $key -notin $guidRequests) { continue }
+    if ($guidRequestsProvided -and $key -notin $guidRequests) { continue }
     $matches = @()
     if ($key) { $matches = @($acervoMetas | Where-Object { (Normalize-GeneXusObjectTypeDriftValue $_.Guid) -eq $key }) }
     if ($matches.Count -gt 1) {

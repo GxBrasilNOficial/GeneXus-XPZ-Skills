@@ -244,6 +244,97 @@ $g1 = 'aaaaaaaa-1111-1111-1111-111111111111'
 $g2 = 'bbbbbbbb-2222-2222-2222-222222222222'
 $g3 = 'cccccccc-3333-3333-3333-333333333333'
 
+# GUID fornecido mas vazio mantém a seleção: nenhuma cópia ou semeadura implícita.
+$copyActionCodes = @('dry-run-copy', 'copied-and-bumped', 'dry-run-seed', 'seeded-and-bumped')
+foreach ($dry in @($true, $false)) {
+    foreach ($invalidGuid in @('', ' ')) {
+        $c = New-CopyCase
+        $beforeHashes = @{}
+        foreach ($fixture in @(
+            @{ Name = 'X'; Guid = $g1; Date = '2025-12-01T00:00:00Z' },
+            @{ Name = 'Y'; Guid = $g2; Date = '2026-01-01T00:00:00Z' },
+            @{ Name = 'Z'; Guid = $g3; Date = '2026-03-01T00:00:00Z' }
+        )) {
+            $null = Set-CopyXml $c.Acervo "$($fixture.Name).xml" $fixture.Name $fixture.Guid
+            $p = Set-CopyXml $c.Front "$($fixture.Name).xml" $fixture.Name $fixture.Guid -Date $fixture.Date
+            $beforeHashes[$p] = (Get-FileHash -LiteralPath $p).Hash
+        }
+        $r = Invoke-CopyCase $c @{ ObjectGuids = @($invalidGuid) } -DryRun:$dry
+        Assert-Matrix ($r.status -eq 'fail' -and @($r.findings | Where-Object code -eq 'selector-invalid').Count -gt 0) 'GUID vazio falha sem perder dimensão'
+        Assert-Matrix (@($r.findings | Where-Object { $_.code -in $copyActionCodes }).Count -eq 0) 'GUID vazio não libera ações'
+        foreach ($p in $beforeHashes.Keys) {
+            Assert-Matrix ((Get-FileHash -LiteralPath $p).Hash -eq $beforeHashes[$p]) 'GUID vazio preserva antigas, iguais e mais novas'
+        }
+        Assert-Matrix (@(Get-ChildItem $c.Front -File).Count -eq $beforeHashes.Count) 'GUID vazio não semeia outros arquivos'
+    }
+
+    # Mistura mantém execução parcial e preserva o existente não solicitado elegível.
+    $c = New-CopyCase
+    $null = Set-CopyXml $c.Acervo 'X.xml' X $g1
+    $null = Set-CopyXml $c.Acervo 'Y.xml' Y $g2
+    $selectedPath = Set-CopyXml $c.Front 'X.xml' X $g1
+    $unlistedPath = Set-CopyXml $c.Front 'Y.xml' Y $g2
+    $selectedHash = (Get-FileHash -LiteralPath $selectedPath).Hash
+    $unlistedHash = (Get-FileHash -LiteralPath $unlistedPath).Hash
+    $r = Invoke-CopyCase $c @{ ObjectGuids = @($g1, '') } -DryRun:$dry
+    Assert-Matrix ($r.status -eq 'fail' -and @($r.findings | Where-Object code -eq 'selector-invalid').Count -gt 0) 'mistura válido e vazio conserva fail'
+    $action = 'copied-and-bumped'
+    if ($dry) { $action = 'dry-run-copy' }
+    Assert-Code $r $action
+    Assert-Matrix (@($r.findings | Where-Object { $_.code -in $copyActionCodes -and $_.objectGuid -ne $g1 }).Count -eq 0) 'mistura só processa o GUID válido'
+    Assert-Matrix ((Get-FileHash -LiteralPath $unlistedPath).Hash -eq $unlistedHash) 'mistura preserva não solicitado'
+    Assert-Matrix (((Get-FileHash -LiteralPath $selectedPath).Hash -eq $selectedHash) -eq $dry) 'mistura respeita escrita e DryRun do selecionado'
+}
+
+$c = New-CopyCase
+$null = Set-CopyXml $c.Acervo 'X.xml' X $g1
+$r = Invoke-CopyCase $c @{ ObjectGuids = @('') }
+Assert-Matrix ($r.status -eq 'fail' -and @($r.findings | Where-Object code -eq 'selector-invalid').Count -gt 0) 'frente vazia com GUID vazio não é not-applicable'
+Assert-Matrix (@($r.findings | Where-Object { $_.code -in $copyActionCodes }).Count -eq 0 -and @(Get-ChildItem $c.Front).Count -eq 0) 'frente vazia não recebe seed implícito'
+
+# Nome simples/tipado de existente não contorna a interseção vazia pelo seed.
+foreach ($selection in @(@{ ObjectNames = 'X'; ObjectGuids = @(' ') }, @{ ObjectList = 'Transaction:X'; ObjectGuids = @('') })) {
+    $c = New-CopyCase
+    $null = Set-CopyXml $c.Acervo 'X.xml' X $g1
+    $p = Set-CopyXml $c.Front 'X.xml' X $g1 -Date '2026-03-01T00:00:00Z'
+    $beforeHash = (Get-FileHash -LiteralPath $p).Hash
+    $r = Invoke-CopyCase $c $selection
+    Assert-Matrix ($r.status -eq 'fail' -and @($r.findings | Where-Object code -eq 'selector-invalid').Count -gt 0) 'nome com GUID vazio conserva fail'
+    Assert-Matrix (@($r.findings | Where-Object { $_.code -in $copyActionCodes }).Count -eq 0) 'nome existente não contorna filtro GUID vazio'
+    Assert-Matrix ((Get-FileHash -LiteralPath $p).Hash -eq $beforeHash -and @(Get-ChildItem $c.Front -File).Count -eq 1) 'interseção vazia preserva existente mais novo'
+}
+
+# Nome realmente ausente continua válido pela união de pedidos para semeadura.
+$c = New-CopyCase
+$null = Set-CopyXml $c.Acervo 'X.xml' X $g1
+$r = Invoke-CopyCase $c @{ ObjectNames = 'X'; ObjectGuids = @(' ') }
+Assert-Matrix ($r.status -eq 'fail' -and @($r.findings | Where-Object code -eq 'selector-invalid').Count -gt 0) 'seed parcial conserva fail'
+Assert-Code $r 'seeded-and-bumped'
+Assert-Matrix (Test-Path -LiteralPath (Join-Path $c.Front 'X.xml') -PathType Leaf) 'nome ausente semeia apesar do GUID inválido'
+
+# Omitido e array vazio mantêm a varredura normal em fixtures elegíveis independentes.
+foreach ($selection in @(@{}, @{ ObjectGuids = @() })) {
+    $c = New-CopyCase
+    $null = Set-CopyXml $c.Acervo 'X.xml' X $g1
+    $p = Set-CopyXml $c.Front 'X.xml' X $g1
+    $beforeHash = (Get-FileHash -LiteralPath $p).Hash
+    $r = Invoke-CopyCase $c $selection
+    Assert-Matrix ($r.status -eq 'pass') 'GUID omitido/array vazio mantém varredura normal'
+    Assert-Code $r 'selector-invalid' 0
+    Assert-Code $r 'copied-and-bumped'
+    Assert-Matrix ((Get-FileHash -LiteralPath $p).Hash -ne $beforeHash) 'varredura normal altera existente elegível'
+}
+
+# Espaço em processo filho: falha estruturada permanece distinta do exit de infraestrutura.
+$c = New-CopyCase
+$null = Set-CopyXml $c.Acervo 'X.xml' X $g1
+$p = Set-CopyXml $c.Front 'X.xml' X $g1
+$beforeHash = (Get-FileHash -LiteralPath $p).Hash
+$r = & pwsh -NoProfile -File $scriptPath -FrontFolder $c.Front -AcervoFolder $c.Acervo -ObjectGuids ' ' -DryRun | ConvertFrom-Json
+Assert-Matrix ($LASTEXITCODE -eq 0 -and $r.status -eq 'fail') 'GUID vazio: JSON fail com exit 0'
+Assert-Matrix (@($r.findings | Where-Object code -eq 'selector-invalid').Count -gt 0) 'processo filho diagnostica GUID vazio'
+Assert-Matrix (@($r.findings | Where-Object { $_.code -in $copyActionCodes }).Count -eq 0 -and (Get-FileHash -LiteralPath $p).Hash -eq $beforeHash) 'processo filho não libera cópia'
+
 # Todos os quatro caminhos originais em processo filho: JSON e exit medidos separadamente.
 foreach ($selection in @(@{ ObjectList = 'Transaction:X' }, @{ ObjectNames = 'X' }, @{ ObjectGuids = " $($g1.ToUpperInvariant()) " }, @{ ObjectList = 'Transaction:X'; ObjectNames = 'X' })) {
     $c = New-CopyCase
