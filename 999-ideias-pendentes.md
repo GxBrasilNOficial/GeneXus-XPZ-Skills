@@ -235,6 +235,26 @@ Follow-ups vivos:
 
 Derivada da frente do contrato JSON do `Sync-GeneXusXpzToXml.ps1` (ver `CHANGELOG`). A propagação aos clones deve passar pela skill `xpz-kb-parallel-setup`. Sub-ideia relacionada: um **checador de conformidade portátil** ("o wrapper local emite JSON conformante no stdout?") com casa natural na `xpz-kb-parallel-pre-push`, para um agente confirmar a conformidade do clone local após a migração. Caveat de gate: trabalhar dentro de uma pasta paralela aciona `xpz-kb-parallel-setup`.
 
+## Listas de «ação por motivo» do `INVENTORY_CUSTOMIZED` sem os motivos com seção própria
+
+- **Importância** — baixa (falso-negativo de leitura, sem dano mecânico: o inventário continua emitindo o motivo e a ação existe no `SKILL.md`, só não na lista que o agente consulta para montar a tabela de correções).
+- **Maturidade** — pronta para implementar (correção textual curta; falta só decidir a forma).
+
+**O gap.** Em `xpz-kb-parallel-setup/SKILL.md`, as listas «quando o motivo for X, a ação é Y» que alimentam a tabela de scripts da 8.h e as regras finais (hoje no parágrafo que começa com «Scripts presentes em `INVENTORY_CUSTOMIZED` devem aparecer na tabela» e na regra «NUNCA ignorar `INVENTORY_CUSTOMIZED`») enumeram `requires_version_mismatch`, `missing_AsJson_passthrough`, `consumes_legacy_text_stdout`, `unsafe_last_exitcode_after_ps1_engine`, `forwards_unknown_engine_param`, `shared_engine_unresolved` e `surface_mismatch`, mas **não** `WRITABILITY_CONSUMER_CONTRACT_STALE` nem `copy_objectlist_type_loss`. Esses dois têm seção própria logo após a regra geral de `INVENTORY_CUSTOMIZED` (com a ação de correção pelo agente na pasta paralela e reauditoria). Um agente que monte o plano de correções só pelas listas encontra o motivo no relatório do inventário e não acha a ação ao lado dos demais.
+
+**Por que ficou assim.** Os dois motivos mais recentes seguiram o padrão de seção dedicada, sem atualizar as enumerações antigas. A pré-push de 2026-10-04 (frente da cópia tipada acervo → frente) apontou a lacuna e a classificou como padrão pré-existente, não gap da frente.
+
+**Direção.** Acrescentar uma linha curta por motivo nas duas listas, apontando para a seção própria (sem duplicar o contrato). Avaliar converter as listas em ponteiro único para evitar a mesma defasagem no próximo motivo — mesma lógica da entrada de centralização de enumerações acima. Cuidado de contrato: `xpz-kb-parallel-setup/SKILL.md` está no manifesto de setup; a edição muda a assinatura e dispara `AUDIT_REQUIRED` nas pastas paralelas.
+
+## Avaliar rastreabilidade privada do molde `Copy-KbAcervoToFront.example.ps1`
+
+- **Importância** — baixa (pendência de fechamento metodológico, sem efeito no comportamento dos scripts públicos).
+- **Maturidade** — ideia (falta confirmar se o `GeneXus-XPZ-PrivateMap` rastreia moldes de wrapper ou só moldes XML sanitizados).
+
+**O que mudou.** Na frente de 2026-10-04 o molde público `xpz-kb-parallel-setup/examples/Copy-KbAcervoToFront.example.ps1` passou a repassar `ObjectList` intacto (antes descartava o `Tipo:` de `Tipo:Nome`) e a enviar `ParallelKbRoot=$repoRoot` ao motor. O `xpz-kb-parallel-setup/SKILL.md` (seção «Cópia acervo → frente e detector dirigido») pede avaliar a rastreabilidade privada do molde no fechamento, e o `AGENTS.md` (seção «Rastreabilidade privada de moldes sanitizados») exige essa avaliação quando uma frente altera molde sanitizado publicável.
+
+**Decisão em aberto.** Se o `GeneXus-XPZ-PrivateMap` acompanha moldes `.example.ps1` de wrapper, registrar lá a mudança de contrato; se só acompanha moldes XML sanitizados, registrar aqui a conclusão e retirar a entrada. A leitura e eventual edição do repositório privado é troca de contexto operacional e exige confirmação humana antes.
+
 ## Trava contra o agente reduzir o painel de revisão por pares por conta própria (oferecer ≠ decidir)
 
 - **Importância** — média (gap de governança real). A régua (`15-revisao-por-pares.md`/`14-revisao-pre-push-reforcada.md`/`xpz-llm-delegate`) diz "não descartar revisor preferido em silêncio" e que reduzir o painel exige **decisão humana explícita**, mas **não há trava** que impeça o agente de declarar suficiência no **piso** (≥2 famílias) e **recomendar convergência/push** por conta própria. Incidente real (2026-06-20, pré-push reforçada da frente do contrato JSON do sync): o agente rodou só 2 revisores, declarou "piso atingido" e recomendou o push; o usuário corrigiu — o agente pode **oferecer** painel menor, nunca **decidir** reduzi-lo. Parar no piso e recomendar push é justamente o que o guardrail do `14`/`15` proíbe.
@@ -622,6 +642,15 @@ São **três criadores distintos** (MiniMax, Z.ai/GLM, NVIDIA Nemotron). O fix i
 - **Maturidade** — ideia (direção clara, calibração em aberto). Direções possíveis: exigir **prefixo** comum (não sufixo), elevar o limiar, ou manter sufixo só quando ele não for sufixo de tipo conhecido (lista curta: `Path`, `Name`, `List`, `Json`, `Sec`). Qualquer calibração precisa ser confrontada contra o exemplo canônico do `13-revisao-pre-push.md` (passo 2), que casa por **prefixo** e é exatamente o que o gate existe para pegar — não pode ser perdido. O self-test já tem fixture desse caso, então a regressão é detectável. Manter consultivo (`warn`).
 - **Relação com a entrada anterior** — são eixos **distintos** e independentes: aquela trata de token que **já existia** em `origin/main` (`model`/`mode`, 116 candidatas na mesma medição, com `--model` já presente em `origin/main`); esta trata de token **genuinamente novo** (`ReceiptPath`/`ScratchPath` ausentes em `origin/main`) pareado com token de **outro** conjunto. Corrigir uma não corrige a outra.
 - **Origem** — fase semântica da pré-push de 2026-08-24, ao explicar o volume de candidatas do intervalo do perfil Antigravity `public-review`. A primeira leitura atribuiu o ruído a tokens genéricos pré-existentes (`Cd`, `Force`, `Recurse`); a inspeção dos pares reais mostrou que esses nem viram par — o filtro de morfema os descarta —, e que o gerador dominante era o sufixo `Path`.
+
+## `Test-PrePushSharedScriptSkillCoverage`: varredura do disco inclui cópias ignoradas pelo git (`.claude/worktrees/`)
+
+- **Importância** — média (consultivo, não bloqueia; mas o gate passa a produzir avisos falsos de forma sistemática enquanto houver worktree residual na máquina, o que treina o revisor a descartá-lo em lote — e um aviso legítimo pode ser descartado junto).
+- **Maturidade** — pronta para implementar (direção clara e já usada por outro gate).
+
+**O defeito.** O gate monta a lista de `SKILL.md`/`quality-checklist.md` com `Get-ChildItem -Recurse` sobre a raiz, excluindo só `.git/` e `historico/`. Com isso lê cópias de skills em pastas ignoradas pelo git, em especial os worktrees que o Claude Code cria em `.claude/worktrees/<nome>/`. Medido na pré-push de 2026-10-04: os **6** avisos `SHARED_SCRIPT_SKILL_DOC_NOT_IN_DIFF` apontavam para `.claude/worktrees/peaceful-lumiere-300946/...` — cópias antigas das mesmas skills que estavam no diff e tinham sido atualizadas. Nenhum aviso real.
+
+**Direção.** Enumerar os documentos-alvo por `git ls-files` (arquivos versionados), como o `Test-PrePushNewTokenPropagation.ps1` já faz para não inflar candidatas com rascunho ignorado. Self-test com fixture de cópia não versionada que não pode gerar finding. Conferir na mesma frente se outros gates consultivos do orquestrador também varrem o disco em vez do índice do git (eixo vizinho, conforme o §5 do `13`). Manter consultivo (`warn`).
 
 ## Maturar a Fase 2b da rotina pré-push de pasta paralela de KB (Fase 2b da skill `xpz-kb-parallel-pre-push`, hoje classificador documental)
 
