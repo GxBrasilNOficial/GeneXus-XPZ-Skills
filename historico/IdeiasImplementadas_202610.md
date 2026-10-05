@@ -60,7 +60,7 @@ Limite: a conclusão se apoia na finalidade documentada do PrivateMap, não em i
 
 ### Rastreabilidade
 
-- Avaliação documental, sem commit material de código: retirada do `999` no mesmo commit que cria este registro.
+- Avaliação documental, sem commit material de código: `e7b884c` (Conclui avaliação de rastreabilidade privada do molde Copy), que retira a entrada do `999` e cria este registro.
 - Arquivos: `999-ideias-pendentes.md` e este histórico.
 
 ## Divergência de `observedContext.ActiveEnvironment` após `SetActiveEnvironment`
@@ -81,5 +81,5 @@ Os self-tests de ponta a ponta dos dois wrappers cobrem a troca bem-sucedida, a 
 
 ### Rastreabilidade
 
-- Commit material: o mesmo que retira a entrada do `999` e cria este registro.
+- Commit material: `be24ecd` (Corrige o environment efetivo reportado pelo BuildAll e pelo SpecifyGenerate), que também retira a entrada do `999` e cria este registro.
 - Arquivos materiais: `scripts/Invoke-GeneXusKbBuildAll.ps1`, `scripts/Invoke-GeneXusKbSpecifyGenerate.ps1`, `scripts/GeneXusKbDeploymentEnvironmentSupport.ps1`, `scripts/Test-GeneXusMsBuildBuildAllEndToEndSelfTest.ps1`, `scripts/Test-GeneXusMsBuildSpecifyGenerateEndToEndSelfTest.ps1`, `scripts/Test-GeneXusKbDeploymentEnvironmentContextSelfTest.ps1`, `xpz-msbuild-build/SKILL.md`, `09-inventario-e-rastreabilidade-publica.md`, `CHANGELOG.md` e `999-ideias-pendentes.md`.
