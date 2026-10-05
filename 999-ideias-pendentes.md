@@ -13,6 +13,87 @@ Entradas legadas sem avaliação carregam `FALTA AVALIAR` em ambos os campos at�
 
 **Editar a substância de um gap já registrado (neste arquivo ou no `998-ideias-descartadas-e-porque.md`) exige justificativa no corpo do commit.** Enfraquecer, reprecisar ou descartar a severidade de uma afirmação — não apenas corrigir redação, adicionar contexto ou reorganizar — precisa dizer **por que**: nova evidência medida, releitura do código, ou correção de erro anterior. Motivo: uma edição que suaviza um gap sem dizer por que **parece resolvido** para quem lê depois, e é pior do que o gap não ter sido achado — quem lê para de investigar. Caso real (2026-08-17): um commit sem corpo trocou «não é citado em lugar nenhum» por «não era coberto na documentação normativa»; a formulação nova era defensável à primeira vista, mas escondia que a única outra menção ao símbolo no repositório era uma cópia **defasada** num self-test — a frase sugeria mitigação onde havia agravante. Só foi achado porque outra sessão foi verificar; sem corpo no commit, não havia como saber se a mudança vinha de leitura nova ou só de estilo.
 
+<a id="xpz-relato-20261005-avisos"></a>
+
+## Qualidade dos avisos de coerência de Transaction e sanidade de Source — relato 2026-10-05
+
+- **Importância** — média (falsos avisos demonstrados reduzem a confiança na revisão; conferência manual permite distinguir os casos).
+- **Maturidade** — ideia (causa do falso atributo ausente identificada; tratamento de controles e recorte dos predicados ainda precisam ser fechados).
+
+**Origem e evidência.** Itens A2/C1 do prompt de uma sessão na pasta paralela FabricaBrasil18, avaliado em 2026-10-05. Registro de origem: `C:\Dev\Prod\Gx_FabricaBrasil\Temp\handoff-observacoes-skills-xpz.md`, consultado somente para leitura. Na execução de `Test-GeneXusTransactionCoherence.ps1` sobre `Transaction/TabelaDeRendimento.xml`, atributos presentes em `Level/Attribute` receberam `property-on-unknown-attribute`: o XML guarda o nome no texto do elemento, mas `Build-ClassificationData` lê apenas `@name`. No mesmo objeto, `Test-GeneXusSourceSanity.ps1` produziu quatro avisos `call-in-condition` envolvendo `IsEmpty()`/`IsNull()`, além de uma chamada distinta a `IsAuthorized`.
+
+**Recorte e direção.** Corrigir a leitura da estrutura real dos atributos, considerando formas comparáveis e níveis aninhados; definir separadamente como reconhecer controles de formulário. Tratar os predicados nativos reconhecidos sem suprimir outras chamadas presentes na mesma condição, nem autorizar chamadas por simples semelhança de nome. Cobrir ambos os casos nos respectivos self-tests, com controles negativos para atributo ausente e chamada ainda relevante.
+
+**Urgência e retomada.** Não urgente; implementação adiada por decisão humana em 2026-10-05. A próxima sessão desta frente deve fechar o recorte, apresentar as correções e obter aprovação antes de escrever. Não confundir correção de falso aviso com comparação relativa ao baseline: [Baseline conhecido no sanity e na revisão de objeto legado](#baseline-conhecido-no-sanity-e-na-revisao-de-objeto-legado) trata de outra pergunta. As pendências de `GenerateObject=False` e `procedural-in-conditions` também permanecem separadas, mesmo compartilhando scripts.
+
+**Arquivos candidatos.** `scripts/Test-GeneXusTransactionCoherence.ps1`, `scripts/Test-GeneXusTransactionCoherenceSelfTest.ps1`, `scripts/Test-GeneXusSourceSanity.ps1`, `scripts/Test-GeneXusSourceSanitySelfTest.ps1`; instruções e checklist de `xpz-builder` quando o contrato mudar.
+
+<a id="xpz-relato-20261005-datas"></a>
+
+## lastUpdate em edições sucessivas e preservação do formato no consumidor — relato 2026-10-05
+
+- **Importância** — média (edições sucessivas podem gerar data rejeitada pelo empacotador; existe contorno por baseline oficial para objetos existentes).
+- **Maturidade** — ideia (mecanismo identificado; distinção entre objeto novo, frente já importada e baseline oficial ainda exige decisão).
+
+**Origem e evidência.** Itens B1/A3 do mesmo relato. `Edit-GeneXusXmlSurgical.ps1`, sem `-LastUpdateBaselinePath`, usa o próprio arquivo como baseline; o suporte chama o gerador que calcula `max(UtcNow + 60s, baseline + 60s)`. Rodadas próximas podem acumular margem até ultrapassar os 120 segundos aceitos por `Build-GeneXusImportFileEnvelope.ps1` para objeto sem baseline oficial. O acúmulo foi confirmado por leitura do código, sem executar uma sequência de gravações nesta avaliação.
+
+**Formato: defeito não reproduzido na emissão.** O motor `Get-GeneXusXpzLastUpdate.ps1` e o wrapper local consultado emitiram `.0000000Z` corretamente. Em PowerShell 7.6.6, a passagem dessa saída por `ConvertFrom-Json` e depois `ConvertTo-Json` converteu a string em `DateTime` e removeu as frações zeradas. É uma explicação possível para A3, não prova do que o agente original fez; investigar o consumidor antes de alterar o gerador.
+
+**Recorte e direção.** Definir o recarimbo para edições de objeto novo sem acumular margem artificial, preservando a necessidade de superar o objeto vivo em rodadas após importação. Não aplicar indiscriminadamente `max(UtcNow + margem, próprio lastUpdate)` nem usar baseline antigo de outro objeto. Verificar os consumidores do suporte compartilhado e testar edições próximas, baseline oficial futuro e rodada posterior a importação. A correção funcional não deve depender da refatoração de baixa importância [Expor a composição do lastUpdate como função dot-sourceável do motor](#expor-a-composição-do-lastupdate-como-função-dot-sourceável-do-motor).
+
+**Urgência e retomada.** Não urgente; implementação adiada em 2026-10-05. É a primeira frente recomendada para retomada, pois pode bloquear o empacotamento. Para objeto existente, passar o baseline oficial do mesmo objeto; para novo, fechar a política antes de recomendar contorno. Não há evidência nesta avaliação de perda de trabalho ou importação incorreta.
+
+**Arquivos candidatos.** `scripts/GeneXusXmlSurgicalEditSupport.ps1`, `scripts/Edit-GeneXusXmlSurgical.ps1`, os testes de edição e lastUpdate, `xpz-builder/SKILL.md` e `xpz-builder/quality-checklist.md`; examinar `Set-GeneXusXmlLastUpdate.ps1` e o editor de metadados em lote como consumidores, sem ampliar automaticamente a alteração.
+
+<a id="xpz-relato-20261005-entradas"></a>
+
+## Entrada por arquivos no editor cirúrgico e orientação de contratos JSON — relato 2026-10-05
+
+- **Importância** — média (texto multilinha na chamada e contratos mistos causam atrito recorrente, com caminhos existentes de execução).
+- **Maturidade** — ideia (extensão pequena identificada; parâmetros exclusivos, encoding e comportamento de EOL por decidir).
+
+**Origem e evidência.** Itens B2/C3 do mesmo relato. O editor recebe `-Anchor` e `-Replacement` como strings, sem `-AnchorPath`/`-ReplacementPath`; o registro descreve erros de interpolação e scripts envoltórios criados pelo agente. A mistura entre motores com JSON por padrão e motores com `-AsJson` também foi confirmada. Parte dessa diferença é deliberada, não parâmetro ausente por acidente.
+
+**Recorte e direção.** Avaliar entrada UTF-8 por arquivos como alternativa mutuamente exclusiva à string, mantendo contagem de âncoras, simulação e verificação do resultado. Preservar a recusa de quebra divergente (`REPLACEMENT_EOL_MISMATCH`); não normalizar EOL silenciosamente. A orientação de chamada deve aproveitar [Eliminar globalmente o uso de -AsJson](#eliminar-globalmente-o-uso-de--asjson), sem executar uma migração global nem aceitar o switch como opção sem efeito por automatismo.
+
+**Relações sem duplicação.** [Motor cirúrgico — LineNumber/ExpectedLineText e NormalizeAnchorEol](#motor-cirúrgico---linenumber-expectedlinetext-e-o-switch--normalizeanchoreol) mantém as decisões sobre coordenadas e quebras; entrada por arquivo não as resolve. [Modo lote por manifesto para Source/Rules](#modo-lote-por-manifesto-para-sourcerules-análogo-ao-lote-de-metadados) já trata de várias edições cumulativas e atomicidade; não incorporar essa implementação à extensão por arquivos.
+
+**Urgência e retomada.** Não urgente; implementação adiada em 2026-10-05. Fechar a interface mínima e um exemplo confiável antes de alterar o motor. Conferir exemplos de wrappers ao tratar C3; não alterar arquivos da pasta paralela nesta frente sem escopo aprovado próprio.
+
+**Arquivos candidatos.** `scripts/Edit-GeneXusXmlSurgical.ps1`, `scripts/GeneXusXmlSurgicalEditSupport.ps1`, `scripts/Test-EditGeneXusXmlSurgicalContract.ps1`, `xpz-builder/examples/Edit-GeneXusXmlSurgical.example.ps1`, `xpz-builder/SKILL.md` e seu checklist.
+
+<a id="xpz-relato-20261005-criacao"></a>
+
+## Procedimento de clonagem e entrega em etapas da mesma frente — relato 2026-10-05
+
+- **Importância** — média (procedimentos existentes permitem trabalhar, mas falta orientação integrada e exemplo reutilizável).
+- **Maturidade** — ideia (decidir primeiro a suficiência da documentação; motor genérico não aprovado).
+
+**Origem e evidência.** Itens B3/B4 do mesmo relato. Não foi localizado motor dedicado à criação de objeto novo por molde com identidade, Source, Rules e Variables; `xpz-builder` já exige clonagem conservadora e classificação de resíduos. Para etapas, o 9-IDO apresenta camadas e o empacotador direto aceita `-ObjectXmlPaths`, mas falta ligar claramente seleção por camada, execução e validação de cada pacote. O wrapper por frente não oferece filtro de objetos.
+
+**Recorte e direção.** Primeiro definir um exemplo de clonagem que preserve a estrutura comparável, confira identidade expandida e classifique resíduos. Documentar a entrega por etapa com lista explícita de XMLs, template comparável, objetos modificados, validações, inventário e confirmação da sequência de importação. A rota direta não cobre a proteção de remoção forte de whitespace do 9-FD; não apresentar a seleção por etapa como autorização para dispensar verificações da frente. Importação e build continuam camadas separadas de prova.
+
+**Relações sem dependência artificial.** Ligar ao [Catálogo semântico de operações em xpz-builder](#catálogo-semântico-de-operações-em-xpz-builder-alternativa-a-edição-xml-livre) e ao [Gate de dependências GeneXus no empacotamento de delta](#gate-de-dependências-genexus-no-empacotamento-de-delta). Nenhuma dessas implementações é pré-requisito para esclarecer a clonagem ou documentar etapas com ferramentas existentes. Não ampliar agora o wrapper com `-ObjectList` nem criar motor universal de clonagem.
+
+**Urgência e retomada.** Não urgente; implementação adiada em 2026-10-05. Se o exemplo não eliminar a necessidade recorrente de gerador descartável, elaborar uma proposta própria de motor com tipos suportados, preservação textual e limites explícitos. Avaliar rastreabilidade privada caso a execução futura produza novo molde sanitizado; este registro não cria molde.
+
+**Arquivos candidatos.** `xpz-builder/SKILL.md` (clonagem, 9-IDO e empacotamento), `xpz-builder/quality-checklist.md` e exemplo a definir sob `xpz-builder/examples/`. Motores existentes são referências para a documentação, não alterações já aprovadas.
+
+<a id="xpz-relato-20261005-comparacao-bc"></a>
+
+## Investigar comparação de BC com Default, GetOldValue e escala decimal em ToJson — relato 2026-10-05
+
+- **Importância** — média, provisória (o relato descreve falsas detecções de mudança; extensão e causa ainda não confirmadas nesta base).
+- **Maturidade** — ideia (requer código gerado e caso mínimo antes de propor regra).
+
+**Origem e limites da evidência.** Itens D1/D2 do prompt externo, não detalhados no registro bruto indicado. O agente relata que `Default` inicializou o valor antigo interno de um atributo e que `GetOldValue()` gerou falsas mudanças; relata também diferenças textuais entre zero decimal com e sem casas em `ToJson()`. Esses comportamentos não foram reproduzidos na avaliação de 2026-10-05. A referência de BC da `nexa`, consultada pelo caminho publicado na sessão, não estabelece proibição geral de `GetOldValue()` com `Default`.
+
+**Recorte e direção.** Inspecionar o C# efetivamente gerado e construir caso mínimo que distinga inicialização, Load, alteração em memória e valor persistido. Para JSON, distinguir igualdade numérica de representação textual e preservar a semântica de nulo; comparar strings ou apagar marcas de nulidade não prova igualdade funcional. A alternativa de comparar por `ToJson()` em D1 deve ser avaliada junto com a limitação relatada em D2, não prescrita isoladamente.
+
+**Destino e retomada.** Não urgente; investigação adiada em 2026-10-05. Consultar `nexa` e documentação oficial antes de propor conhecimento de linguagem/runtime. Registrar na base XPZ apenas o que for pertinente à preparação e revisão dos objetos, com contexto e nível de evidência; não criar anti-padrão universal a partir do relato. Não depende da pendência geral de migração de memória pessoal: a origem aqui é um prompt fornecido pelo usuário.
+
+**Fora das cinco frentes.** A1 (environment efetivo) já foi corrigido em `be24ecd` nos motores BuildAll/SpecifyGenerate; o self-test de contexto passou nesta avaliação, sem novo build real. D3 (BC em For each) já tem precaução documentada e pendência própria de detector abaixo. C2 (tempo das validações) não foi medido novamente; o orquestrador único permanece descartado em `998-ideias-descartadas-e-porque.md`, seção "Preflight único". Resumo de resultados tem relação com "Manifesto semântico de pacote", mas não prova ganho de desempenho nem autoriza reabrir o runner.
+
 ## Detector consultivo de construção de BC dentro de For each — PostgreSQL/.NET
 
 - **Importância** — média (risco de falha em execução, com alternativa manual já documentada).
@@ -1021,6 +1102,8 @@ Fazer uma frente separada para inventariar todos os `-AsJson` restantes e decidi
 - Se `-HumanReadable` vale a complexidade ou se JSON sempre é suficiente.
 - Ordem de migração para scripts MSBuild, gates de setup, diagnósticos de runtime e helpers de edição XML.
 
+**Evidência adicional (2026-10-05).** O relato B2/C3 confirmou erros de primeira chamada pela mistura de contratos; ver [Entrada por arquivos no editor cirúrgico e orientação de contratos JSON](#xpz-relato-20261005-entradas). A sessão focal pode melhorar exemplos e orientação sem implementar esta migração global. Aceitar `-AsJson` como opção sem efeito nos motores JSON-por-padrão não foi aprovado e contraria a direção aqui registrada.
+
 ## LlamaIndex / LangChain + vector store como alternativa ao indice SQLite atual
 
 **Importância:** FALTA AVALIAR
@@ -1102,6 +1185,8 @@ Essa camada nao substituiria `xmlWellFormed`, `sourceSanityStatus` nem os gates 
 - O que exatamente conta como `official baseline` em cada fluxo: XML oficial atual em `ObjetosDaKbEmXml`, ultimo delta aceito, ou outro marco explicitamente documentado?
 - A comparacao deve nascer primeiro como regra metodologica de handoff/revisao, ou ja como evolucao automatizada do `Test-GeneXusSourceSanity.ps1`?
 - Como impedir que baseline ruim vire permissao implicita para aceitar piora nova?
+
+**Relação com o relato de 2026-10-05.** [Qualidade dos avisos de coerência de Transaction e sanidade de Source](#xpz-relato-20261005-avisos) registra falsos avisos reproduzidos no próprio baseline. Corrigir a leitura de atributo ou o recorte de predicado é frente distinta desta camada comparativa; não concluir que um aviso é correto apenas porque já existe no XML oficial, nem exigir esta camada para corrigir o detector.
 
 ## Rename de `kb-source-metadata.md` para `kb-parallel-state.md`
 
@@ -1912,6 +1997,8 @@ Ambas consomem a mesma grade de dependências, mas com semânticas diferentes. M
 ### Limiar para implementar
 
 Implementar quando houver: (a) confirmação empírica de que o SQLite atual cobre (ou pode cobrir com custo aceitável) a grade de referências entre objetos com granularidade suficiente, e (b) caso real recente de empacotamento que deixou dependente importante de fora e contaminou KB de destino, para calibrar a política do gate.
+
+**Relação com o relato de 2026-10-05.** [Procedimento de clonagem e entrega em etapas da mesma frente](#xpz-relato-20261005-criacao) propõe documentar o caminho já disponível com 9-IDO e `-ObjectXmlPaths`, incluindo validações e inventário por etapa. Ordenar objetos do lote não resolve por si só quais dependentes externos devem entrar; esclarecer o procedimento existente não depende de implementar este novo gate.
 
 ## Drift de tipagem entre delta empacotado e snapshot oficial
 
@@ -2845,6 +2932,7 @@ Para `xpz-builder`, isso significaria expor um vocabulário de operações de al
 - `xpz-builder/SKILL.md` e `xpz-builder/responsibilities-by-type/`
 - `01a-catalogo-e-padroes-empiricos.md` (fonte de validação dos padrões)
 - `01e-moldes-sanitizados-core.md` a `01h-moldes-sanitizados-metadados-e-artefatos.md` (insumo)
+- [Procedimento de clonagem e entrega em etapas da mesma frente — relato 2026-10-05](#xpz-relato-20261005-criacao): avaliar primeiro exemplo e procedimento conservador; o relato não aprova motor universal de clonagem nem exige implementar este catálogo para documentar a rota existente.
 
 ## Reclassificar `queryableByKbIntelligence` de `SmartDevicesApplication` após medição de grafo
 
@@ -3267,6 +3355,8 @@ As contagens são de **arquivos que mencionam o token**, não de parâmetros exc
 
 **Relacionado.** `edit-genexus-xml-batch-metadata-design.md` §2.1 e a nota aditiva de estado no topo do mesmo documento; `Edit-GeneXusXmlBatchMetadata.ps1` (o baseline sintético é a quarta classe de artefato do `-WorkDir`).
 
+**Distinção funcional (2026-10-05).** [lastUpdate em edições sucessivas e preservação do formato no consumidor](#xpz-relato-20261005-datas) registra o acúmulo da margem pelo próprio arquivo e a hipótese de transformação de formato pelo consumidor. É frente de correção/investigação, não apenas higiene de transporte; não depende desta extração de função e não altera sua importância baixa nem a medição de custo acima.
+
 ## Motor cirúrgico — `-LineNumber`/`-ExpectedLineText` e o switch `-NormalizeAnchorEol`
 
 - **Importância** — baixa (a âncora literal cobre os casos reais; a linha simplificaria o chamador, mas o motor já devolve diagnóstico suficiente).
@@ -3282,6 +3372,8 @@ As contagens são de **arquivos que mencionam o token**, não de parâmetros exc
 
 **Relacionado.** `edit-genexus-xml-surgical-design.md` §1/§3.8; `scripts/Search-GeneXusXmlSourceBlock.ps1`; `edit-genexus-xml-batch-metadata-design.md` §5.0; `scripts/Edit-GeneXusXmlSurgical.ps1`.
 
+**Relação com o relato de 2026-10-05.** [Entrada por arquivos no editor cirúrgico e orientação de contratos JSON](#xpz-relato-20261005-entradas) propõe avaliar `-AnchorPath`/`-ReplacementPath`. Arquivo de entrada não implica normalização: preservar a recusa de quebra divergente e as decisões deste verbete. Coordenadas por linha continuam fora do recorte daquela extensão.
+
 ## Modo lote por manifesto para `Source`/`Rules` (análogo ao lote de metadados)
 
 - **Importância** — média (gap real: editar N trechos **distintos** de um `Source` grande hoje volta ao script ad-hoc ou a N chamadas do cirúrgico com reindexação manual entre elas).
@@ -3296,6 +3388,8 @@ As contagens são de **arquivos que mencionam o token**, não de parâmetros exc
 **Decisões em aberto.** Escopo do delta (só `Replace`? `InsertAfter`?); se a declaração por operação carrega precondição (`expected`) como o irmão; se o modo compõe com o lote de metadados no mesmo manifesto ou em rodada separada; e onde mora o motor (script próprio × ampliar `Edit-GeneXusXmlBatchMetadata.ps1`).
 
 **Relacionado.** `edit-genexus-xml-batch-metadata-design.md`; `scripts/Edit-GeneXusXmlBatchMetadata.ps1`; `scripts/GeneXusXmlBatchMetadataSupport.ps1`; `edit-genexus-xml-surgical-design.md`.
+
+**Evidência adicional (2026-10-05).** O relato B2 acrescenta atrito com strings multilinha e scripts envoltórios por frente; ver [Entrada por arquivos no editor cirúrgico e orientação de contratos JSON](#xpz-relato-20261005-entradas). A extensão mínima por arquivos não oferece múltiplas edições atômicas e pode ser avaliada separadamente; atomicidade, manifesto e reindexação permanecem nesta frente, sem duplicação de implementação.
 
 ## Skill `xpz-mcp-integrations` — componente MCP externo opcional (Jev/System One)
 
