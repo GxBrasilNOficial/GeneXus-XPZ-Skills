@@ -48,6 +48,8 @@ When changing a `Procedure`, run a minimum semantic pre-packaging gate on the `P
 - If the `Source` builds the collection with `For each <Transaction>` over a real Transaction/base table, describe the mechanism as `For each` navigation over that Transaction/base table. Do not describe it as "via BC" unless the Procedure declares and uses a variable with `ATTCUSTOMTYPE=bc:<Transaction>`.
 - For every attribute copied from the `For each` navigation into the response SDT, confirm that the attribute exists in the target KB/corpus and that the SDT item shape matches the published API data contract.
 
+- If collection construction instantiates BC variables inside `For each`, apply the shared PostgreSQL/.NET precaution in [../SKILL.md](../SKILL.md#bc-construction-inside-for-each--postgresqlnet-precaution), section "BC construction inside For each — PostgreSQL/.NET precaution".
+
 ### Collection operations, Sub control flow, and parameter hygiene
 
 - **Collection sorting**: `.Sort()` on GeneXus collections supports both ascending and descending criteria (ref: skill `nexa`, `references/common-collections.md` and production usage in `FabricaBrasil18`):

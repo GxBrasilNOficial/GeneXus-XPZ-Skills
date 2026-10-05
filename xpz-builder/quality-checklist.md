@@ -54,6 +54,7 @@ The checklist below is the consolidated end-to-end verification for any packagin
 - [ ] Root type of every active XML was classified before package serialization
 - [ ] No top-level `Attribute` was placed under `<Objects>`
 - [ ] For each object type present in the batch, the corresponding satellite under `responsibilities-by-type/` was loaded and its Quality Checklist was satisfied end-to-end
+- [ ] For PostgreSQL/.NET targets, new or modified `For each` code that instantiates BCs was reviewed against the shared [BC-construction precaution](SKILL.md#bc-construction-inside-for-each--postgresqlnet-precaution), including changes that remove visible database access. This was a manual review; 9-BC does not validate cursor behavior.
 - [ ] When an `API` or `Procedure` returns an SDT collection, the cross-type `AttCollection=True` rule in `SKILL.md` and the type-specific checklists in `api.md`/`procedure.md` were both satisfied; this checklist does not replace those satellites
 - [ ] UTF-8 BOM hygiene was checked on every active XML
 - [ ] Generated package name followed the preferred `NomeCurto_GUID_YYYYMMDD_nn.import_file.xml` pattern when applicable

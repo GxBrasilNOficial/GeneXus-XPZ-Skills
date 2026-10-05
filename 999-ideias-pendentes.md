@@ -13,6 +13,19 @@ Entradas legadas sem avaliação carregam `FALTA AVALIAR` em ambos os campos at�
 
 **Editar a substância de um gap já registrado (neste arquivo ou no `998-ideias-descartadas-e-porque.md`) exige justificativa no corpo do commit.** Enfraquecer, reprecisar ou descartar a severidade de uma afirmação — não apenas corrigir redação, adicionar contexto ou reorganizar — precisa dizer **por que**: nova evidência medida, releitura do código, ou correção de erro anterior. Motivo: uma edição que suaviza um gap sem dizer por que **parece resolvido** para quem lê depois, e é pior do que o gap não ter sido achado — quem lê para de investigar. Caso real (2026-08-17): um commit sem corpo trocou «não é citado em lugar nenhum» por «não era coberto na documentação normativa»; a formulação nova era defensável à primeira vista, mas escondia que a única outra menção ao símbolo no repositório era uma cópia **defasada** num self-test — a frase sugeria mitigação onde havia agravante. Só foi achado porque outra sessão foi verificar; sem corpo no commit, não havia como saber se a mudança vinha de leitura nova ou só de estilo.
 
+## Detector consultivo de construção de BC dentro de For each — PostgreSQL/.NET
+
+- **Importância** — média (risco de falha em execução, com alternativa manual já documentada).
+- **Maturidade** — ideia (sinal candidato definido; cobertura, falsos positivos e contrato ainda não resolvidos).
+
+**Origem e decisão (2026-10-05).** Em caso observado de GeneXus 18 .NET com PostgreSQL/Npgsql 8.0.3, `new()` de BC dentro de `For each`, sem acesso ao banco visível no corpo, disparou consulta na inicialização do BC com o leitor da navegação ainda aberto. A precaução manual está em [xpz-builder/SKILL.md](xpz-builder/SKILL.md#bc-construction-inside-for-each--postgresqlnet-precaution). O usuário aprovou manter a eventual validação mecânica apenas como ideia; não há detector implementado nem novo bloqueio de empacotamento nesta frente.
+
+**Direção candidata.** Detectar `new()` de variável declarada como `bc:` dentro de `For each`, sem acesso ao banco reconhecível no corpo, incluindo alterações que removam esse acesso de um laço existente. A análise deve abranger `Source` e `Events`, conforme o tipo de objeto, e declarar o contexto PostgreSQL/.NET. Não generalizar a falha para outros provedores ou geradores nem refatorar laços funcionais `new()` + `Load()` apenas por esse sinal.
+
+**Limites e custo.** Uma busca por regex não basta: é necessário resolver a tipagem da variável, ignorar comentários e literais, delimitar laços aninhados e avaliar chamadas de procedures e sub-rotinas. A presença textual de uma chamada não prova acesso ao banco nem proteção do cursor. O comportamento de buffering com `hasNested=true` foi confirmado no runtime inspecionado; a regra interna de detecção do gerador permanece inferência. Custo estimado qualitativamente: moderado para alerta com cobertura limitada e explícita; maior para uma validação bloqueante que pretenda provar segurança.
+
+**Decisões pendentes.** Definir reconhecimento de acessos diretos e indiretos, tratamento de extração incompleta e contexto de destino desconhecido, recorte pelo delta e casos de teste que distingam BC de SDT comum, laços aninhados e chamadas sem acesso ao banco. Se retomada, a recomendação inicial é um detector consultivo separado, sem ampliar o contrato de 9-BC (`Test-GeneXusBCDependency.ps1`), que hoje verifica dependências e habilitação como BC, não comportamento de cursores.
+
 ## URGENTE — Gate consultivo de eixos vizinhos para bloqueio/validação nova
 
 - **Importância** — alta (o modo de falha se materializou **três vezes numa única frente**, em 2026-09-04, e as três passaram pela pré-push formal sem serem vistas; as três foram achadas por revisão externa depois).

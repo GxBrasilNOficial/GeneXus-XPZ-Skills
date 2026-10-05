@@ -166,6 +166,14 @@ If the main need is to prepare or validate the initial folder structure around t
   - when the object already has a clear local form in `Source`, prefer following that form as a weak readability heuristic, not as a hard methodological rule
 - When the candidate batch contains 2 or more distinct objects, run the Import Dependency Ordering gate (9-IDO) after all other object-level gates: detect structural dependencies between batch objects, assign each object to a topological layer, alert when ordering risk exists across 2 or more layers, and ABORT when circular dependencies are found
 
+### BC construction inside For each — PostgreSQL/.NET precaution
+
+- In PostgreSQL/.NET targets, do not instantiate a Business Component with `new()` inside a `For each` when its body has no database access visible to the generator. Collect the required identifiers first, finish that `For each`, and instantiate the BCs afterwards, preserving the original filters, ordering, and required key context.
+- BC initialization can execute database queries before any explicit `Load()`. In the observed GeneXus 18 .NET case with Npgsql 8.0.3, this conflicted with an open `For each` reader.
+- The inspected runtime buffers the cursor rows and closes the underlying reader when `hasNested=true`. Visible database access in the loop body correlated with that flag in the inspected generated code; the generator's internal detection rule remains an inference, not a universal guarantee.
+- Do not refactor existing working `new()` + `Load()` loops solely because of this precaution, or add an unnecessary `Load()` just to influence cursor generation. Removing visible database access from such a loop requires reassessing this risk.
+- Apply this precaution to `For each` code in `Source` or `Events`, regardless of object type. The failure was observed in a `Procedure`; other object types, database providers, and generators were not independently tested.
+
 ---
 
 ## COMMUNICATION
