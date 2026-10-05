@@ -235,17 +235,6 @@ Follow-ups vivos:
 
 Derivada da frente do contrato JSON do `Sync-GeneXusXpzToXml.ps1` (ver `CHANGELOG`). A propagação aos clones deve passar pela skill `xpz-kb-parallel-setup`. Sub-ideia relacionada: um **checador de conformidade portátil** ("o wrapper local emite JSON conformante no stdout?") com casa natural na `xpz-kb-parallel-pre-push`, para um agente confirmar a conformidade do clone local após a migração. Caveat de gate: trabalhar dentro de uma pasta paralela aciona `xpz-kb-parallel-setup`.
 
-## Listas de «ação por motivo» do `INVENTORY_CUSTOMIZED` sem os motivos com seção própria
-
-- **Importância** — baixa (falso-negativo de leitura, sem dano mecânico: o inventário continua emitindo o motivo e a ação existe no `SKILL.md`, só não na lista que o agente consulta para montar a tabela de correções).
-- **Maturidade** — pronta para implementar (correção textual curta; falta só decidir a forma).
-
-**O gap.** Em `xpz-kb-parallel-setup/SKILL.md`, as listas «quando o motivo for X, a ação é Y» que alimentam a tabela de scripts da 8.h e as regras finais (hoje no parágrafo que começa com «Scripts presentes em `INVENTORY_CUSTOMIZED` devem aparecer na tabela» e na regra «NUNCA ignorar `INVENTORY_CUSTOMIZED`») enumeram `requires_version_mismatch`, `missing_AsJson_passthrough`, `consumes_legacy_text_stdout`, `unsafe_last_exitcode_after_ps1_engine`, `forwards_unknown_engine_param`, `shared_engine_unresolved` e `surface_mismatch`, mas **não** `WRITABILITY_CONSUMER_CONTRACT_STALE` nem `copy_objectlist_type_loss`. Esses dois têm seção própria logo após a regra geral de `INVENTORY_CUSTOMIZED` (com a ação de correção pelo agente na pasta paralela e reauditoria). Um agente que monte o plano de correções só pelas listas encontra o motivo no relatório do inventário e não acha a ação ao lado dos demais.
-
-**Por que ficou assim.** Os dois motivos mais recentes seguiram o padrão de seção dedicada, sem atualizar as enumerações antigas. A pré-push de 2026-10-04 (frente da cópia tipada acervo → frente) apontou a lacuna e a classificou como padrão pré-existente, não gap da frente.
-
-**Direção.** Acrescentar uma linha curta por motivo nas duas listas, apontando para a seção própria (sem duplicar o contrato). Avaliar converter as listas em ponteiro único para evitar a mesma defasagem no próximo motivo — mesma lógica da entrada de centralização de enumerações acima. Cuidado de contrato: `xpz-kb-parallel-setup/SKILL.md` está no manifesto de setup; a edição muda a assinatura e dispara `AUDIT_REQUIRED` nas pastas paralelas.
-
 ## Avaliar rastreabilidade privada do molde `Copy-KbAcervoToFront.example.ps1`
 
 - **Importância** — baixa (pendência de fechamento metodológico, sem efeito no comportamento dos scripts públicos).

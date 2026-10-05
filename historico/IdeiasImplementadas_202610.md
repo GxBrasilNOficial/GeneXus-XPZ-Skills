@@ -23,3 +23,21 @@ O complemento material de `4693d33` aceita números entre crases ou aspas nas af
 - Commit material: `d4dca9f` (Refina avisos de versão do extrator e amplia testes de rastreabilidade).
 - Commit material: `4693d33` (Corrige detecção de versões documentais e citações históricas do extrator).
 - Arquivos materiais: `scripts/Test-PrePushTraceabilityCoverage.ps1`, `scripts/Test-PrePushTraceabilityCoverageSelfTest.ps1`, `08-guia-para-agente-gpt.md`, `09-inventario-e-rastreabilidade-publica.md`, `13-revisao-pre-push.md`, `CHANGELOG.md` e `999-ideias-pendentes.md`.
+
+## Listas de «ação por motivo» do `INVENTORY_CUSTOMIZED` sem os motivos com seção própria
+
+### Registro de origem
+
+- **Importância** — baixa (falso-negativo de leitura, sem dano mecânico: o inventário continuava emitindo o motivo e a ação existia no `SKILL.md`, só não na lista que o agente consulta para montar a tabela de correções).
+- **Maturidade** — pronta para implementar.
+- **Gap** — em `xpz-kb-parallel-setup/SKILL.md`, as listas «quando o motivo for X, a ação é Y» da tabela de 8.h e da regra «NUNCA ignorar `INVENTORY_CUSTOMIZED`» não citavam `copy_objectlist_type_loss` nem `WRITABILITY_CONSUMER_CONTRACT_STALE`, que tinham apenas seção própria.
+- **Origem** — pré-push de 2026-10-04 da frente da cópia tipada acervo → frente. A entrada foi registrada no `999` pelo commit `e4ef1c0` com atribuição incorreta: tratou os dois motivos como padrão pré-existente. A atribuição correta separa os casos: a omissão de `WRITABILITY_CONSUMER_CONTRACT_STALE` era anterior; `copy_objectlist_type_loss` foi introduzido na própria frente (`fa1aa1c`) e, pelo §2 do `13-revisao-pre-push.md` (conjunto enumerado), deveria ter entrado nas listas na mesma frente. Revisão externa apontou as duas falhas.
+
+### Resultado da implementação
+
+Implementado em 2026-10-04, ainda dentro da mesma frente e antes do push, para não gerar uma segunda mudança de assinatura de setup nas pastas paralelas. As duas listas receberam uma ação curta para cada motivo, com ponteiro para a seção própria: realinhar `Copy-*KbAcervoToFront.ps1` ao molde para repassar `ObjectList` intacto e `ParallelKbRoot`, com reauditoria; atualizar `Test-*KbSetupAudit.ps1` para `WRITABILITY_COVERAGE_CONTRACT_V1`. A sugestão de converter as listas em ponteiro único não foi adotada nesta correção; reavaliar se a defasagem se repetir no próximo motivo.
+
+### Rastreabilidade
+
+- Commit material: `d545496` (Inclui motivos com seção própria nas listas de ação do inventário).
+- Arquivos materiais: `xpz-kb-parallel-setup/SKILL.md` e `999-ideias-pendentes.md`.
