@@ -235,15 +235,6 @@ Follow-ups vivos:
 
 Derivada da frente do contrato JSON do `Sync-GeneXusXpzToXml.ps1` (ver `CHANGELOG`). A propagação aos clones deve passar pela skill `xpz-kb-parallel-setup`. Sub-ideia relacionada: um **checador de conformidade portátil** ("o wrapper local emite JSON conformante no stdout?") com casa natural na `xpz-kb-parallel-pre-push`, para um agente confirmar a conformidade do clone local após a migração. Caveat de gate: trabalhar dentro de uma pasta paralela aciona `xpz-kb-parallel-setup`.
 
-## Avaliar rastreabilidade privada do molde `Copy-KbAcervoToFront.example.ps1`
-
-- **Importância** — baixa (pendência de fechamento metodológico, sem efeito no comportamento dos scripts públicos).
-- **Maturidade** — ideia (falta confirmar se o `GeneXus-XPZ-PrivateMap` rastreia moldes de wrapper ou só moldes XML sanitizados).
-
-**O que mudou.** Na frente de 2026-10-04 o molde público `xpz-kb-parallel-setup/examples/Copy-KbAcervoToFront.example.ps1` passou a repassar `ObjectList` intacto (antes descartava o `Tipo:` de `Tipo:Nome`) e a enviar `ParallelKbRoot=$repoRoot` ao motor. O `xpz-kb-parallel-setup/SKILL.md` (seção «Cópia acervo → frente e detector dirigido») pede avaliar a rastreabilidade privada do molde no fechamento, e o `AGENTS.md` (seção «Rastreabilidade privada de moldes sanitizados») exige essa avaliação quando uma frente altera molde sanitizado publicável.
-
-**Decisão em aberto.** Se o `GeneXus-XPZ-PrivateMap` acompanha moldes `.example.ps1` de wrapper, registrar lá a mudança de contrato; se só acompanha moldes XML sanitizados, registrar aqui a conclusão e retirar a entrada. A leitura e eventual edição do repositório privado é troca de contexto operacional e exige confirmação humana antes.
-
 ## Trava contra o agente reduzir o painel de revisão por pares por conta própria (oferecer ≠ decidir)
 
 - **Importância** — média (gap de governança real). A régua (`15-revisao-por-pares.md`/`14-revisao-pre-push-reforcada.md`/`xpz-llm-delegate`) diz "não descartar revisor preferido em silêncio" e que reduzir o painel exige **decisão humana explícita**, mas **não há trava** que impeça o agente de declarar suficiência no **piso** (≥2 famílias) e **recomendar convergência/push** por conta própria. Incidente real (2026-06-20, pré-push reforçada da frente do contrato JSON do sync): o agente rodou só 2 revisores, declarou "piso atingido" e recomendou o push; o usuário corrigiu — o agente pode **oferecer** painel menor, nunca **decidir** reduzi-lo. Parar no piso e recomendar push é justamente o que o guardrail do `14`/`15` proíbe.

@@ -41,3 +41,24 @@ Implementado em 2026-10-04, ainda dentro da mesma frente e antes do push, para n
 
 - Commit material: `d545496` (Inclui motivos com seção própria nas listas de ação do inventário).
 - Arquivos materiais: `xpz-kb-parallel-setup/SKILL.md` e `999-ideias-pendentes.md`.
+
+## Avaliar rastreabilidade privada do molde `Copy-KbAcervoToFront.example.ps1`
+
+### Registro de origem
+
+- **Importância** — baixa (pendência de fechamento metodológico, sem efeito no comportamento dos scripts públicos).
+- **Maturidade** — ideia (faltava confirmar se o `GeneXus-XPZ-PrivateMap` rastreia moldes de wrapper ou só exemplos sanitizados).
+- **Contexto** — na frente de 2026-10-04 o molde `xpz-kb-parallel-setup/examples/Copy-KbAcervoToFront.example.ps1` passou a repassar `ObjectList` intacto e a enviar `ParallelKbRoot=$repoRoot` ao motor. O `xpz-kb-parallel-setup/SKILL.md` (seção «Cópia acervo → frente e detector dirigido») pede avaliar a rastreabilidade privada do molde no fechamento, e o `AGENTS.md` (seção «Rastreabilidade privada de moldes sanitizados») exige essa avaliação. A entrada foi registrada no `999` pelo commit `e4ef1c0`.
+
+### Resultado da avaliação
+
+Avaliação concluída em 2026-10-04 pela documentação pública, sem leitura do repositório privado: não há anotação a registrar no `GeneXus-XPZ-PrivateMap`. O `README.md` define o PrivateMap como rastreabilidade editorial privada entre aliases públicos e artefatos reais, e exige anotação para todo **novo exemplo sanitizado** incorporado à base pública; `09` e `02` descrevem a mesma separação. O diff da frente no molde alterou apenas a lógica de repasse e o texto de ajuda; não incorporou nome de objeto, frente ou pacote real novo — os exemplos de chamada já existentes permaneceram inalterados.
+
+Correção de regra: a entrada original afirmava que até a **leitura** do repositório privado exigia confirmação humana. As regras aplicáveis exigem aviso de troca de contexto (e necessidade concreta) para leitura fora da pasta de trabalho, e confirmação explícita para **edição** (`AGENTS.md` global, «Contexto de repositório»; `AGENTS.md` local, «Rastreabilidade privada de moldes sanitizados»). A exigência adicional não tinha fundamento e não foi mantida. Apontado por revisão externa.
+
+Limite: a conclusão se apoia na finalidade documentada do PrivateMap, não em inspeção do seu conteúdo. Se uma frente futura constatar que ele também acompanha moldes `.example.ps1`, reabrir a avaliação.
+
+### Rastreabilidade
+
+- Avaliação documental, sem commit material de código: retirada do `999` no mesmo commit que cria este registro.
+- Arquivos: `999-ideias-pendentes.md` e este histórico.
