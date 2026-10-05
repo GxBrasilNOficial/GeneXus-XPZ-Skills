@@ -83,7 +83,7 @@ Entradas legadas sem avaliação carregam `FALTA AVALIAR` em ambos os campos at�
 
 ## Investigar comparação de BC com Default, GetOldValue e escala decimal em ToJson — relato 2026-10-05
 
-- **Importância** — média, provisória (o relato descreve falsas detecções de mudança; extensão e causa ainda não confirmadas nesta base).
+- **Importância** — média (provisória: o relato descreve falsas detecções de mudança; extensão e causa ainda não confirmadas nesta base).
 - **Maturidade** — ideia (requer código gerado e caso mínimo antes de propor regra).
 
 **Origem e limites da evidência.** Itens D1/D2 do prompt externo. Na leitura inicial, os detalhes não estavam em `Temp/handoff-observacoes-skills-xpz.md`; o agente posteriormente acrescentou ali o ponteiro para `C:\Dev\Prod\Gx_FabricaBrasil\Temp\handoff-FabricaBrasilPG.md`, seção "Carga de Tabela de Rendimento — pacotes preparados (2026-10-03)". Essa seção foi consultada em 2026-10-05 e fornece o histórico do diagnóstico e das correções descritas abaixo. O C# citado não foi inspecionado diretamente nesta avaliação e os comportamentos não foram reproduzidos independentemente. A referência de BC da `nexa`, consultada pelo caminho publicado na sessão, não estabelece proibição geral de `GetOldValue()` com `Default`.
