@@ -47,7 +47,6 @@ When changing a `Procedure`, run a minimum semantic pre-packaging gate on the `P
 - When a `Procedure` returns a list as `parm(out:&<Collection>)`, verify the `Rules/parm` and `Variables` blocks together: the output variable must exist, use `ATTCUSTOMTYPE=sdt:<ItemSdt>`, and carry `AttCollection=True`; the item/helper variable should use the same `ATTCUSTOMTYPE` without `AttCollection=True` unless a nested collection shape is explicitly intended.
 - If the `Source` builds the collection with `For each <Transaction>` over a real Transaction/base table, describe the mechanism as `For each` navigation over that Transaction/base table. Do not describe it as "via BC" unless the Procedure declares and uses a variable with `ATTCUSTOMTYPE=bc:<Transaction>`.
 - For every attribute copied from the `For each` navigation into the response SDT, confirm that the attribute exists in the target KB/corpus and that the SDT item shape matches the published API data contract.
-
 - If collection construction instantiates BC variables inside `For each`, apply the shared PostgreSQL/.NET precaution in [../SKILL.md](../SKILL.md#bc-construction-inside-for-each--postgresqlnet-precaution), section "BC construction inside For each — PostgreSQL/.NET precaution".
 
 ### Collection operations, Sub control flow, and parameter hygiene

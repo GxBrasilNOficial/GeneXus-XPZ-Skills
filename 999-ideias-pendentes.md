@@ -429,7 +429,7 @@ Smoke test retornou `HEAD` correto em ~13 s; a falha no painel foi **modo de inv
 2. **`$ContentionKeys` e dispatcher** — relaxar ou perfilar as chaves bloqueadas do `claude-code`; injetar `-Tools default -PermissionMode dontAsk` só quando o perfil estiver ativo; manter fail-closed como default.
 3. **Transporte** — decidir se git-capable in-panel usa rota assíncrona existente (`Invoke-ClaudeCodeAsync.ps1`) com defaults condicionais, rota síncrona dedicada no dispatcher, ou continua **fora** do painel (workaround documentado).
 4. **Paridade doc↔motor** — `xpz-llm-delegate/SKILL.md`, `14-revisao-pre-push-reforcada.md`, `02-regras-operacionais-e-runtime.md`, matriz operacional do `14` (§ *Matriz operacional — capacidade × transporte*).
-5. **Testes e revisão de segurança** — self-tests do dispatcher, AST Guard dos 5 mapas, cenário adversarial de Bash no cwd; comparar com contenção já feita no opencode (`reviewer-ro`) e no Codex (`read-only`).
+5. **Testes e revisão de segurança** — self-tests do dispatcher, AST Guard dos 5 mapas, cenário adversarial de Bash no cwd; comparar com contenção já feita no opencode (`reviewer-ro`), no Codex (`read-only`) e no Antigravity (`public-review`: perfil explícito, `--mode plan`, pasta temporária fora de repositórios e recusa de `-Cd`; referência de isolamento do contexto de trabalho, sem constituir sandbox de segurança).
 
 **Workaround vigente (sem implementar esta frente).**
 
