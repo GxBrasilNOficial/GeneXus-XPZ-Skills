@@ -62,3 +62,24 @@ Limite: a conclusão se apoia na finalidade documentada do PrivateMap, não em i
 
 - Avaliação documental, sem commit material de código: retirada do `999` no mesmo commit que cria este registro.
 - Arquivos: `999-ideias-pendentes.md` e este histórico.
+
+## Divergência de `observedContext.ActiveEnvironment` após `SetActiveEnvironment`
+
+### Registro de origem
+
+- **Importância** — média (não mascarou erro nem bloqueou a aceitação do PR #2, mas enfraquecia a rastreabilidade em KB multi-environment e podia induzir diagnóstico errado de validação deploy).
+- **Maturidade** — pesquisa feita (caso real em builds headless de duas KBs multi-environment; faltava isolar se o problema era comportamento do GeneXus/MSBuild, timing do wrapper ou leitura de contexto após a troca de environment).
+- **Contexto** — na revisão do PR #2 (`fix: refine build post-processing classification`), builds com `-EnvironmentName` explícito registraram `observedContext.ActiveEnvironment` divergente do environment solicitado/resolvido. A direção registrada era montar um repro, comparar o stdout bruto de `GetActiveEnvironment` com o JSON final e decidir quando capturar o environment ativo.
+
+### Resultado da implementação
+
+Causa isolada em 2026-10-04 no wrapper, não no GeneXus/MSBuild. O commit `4a40bbb` (maio de 2026) moveu `GetActiveVersion`/`GetActiveEnvironment` para antes de `SetActiveVersion`/`SetActiveEnvironment` no `.msbuild` do `Invoke-GeneXusKbBuildAll.ps1`. O objetivo era citar, no bloqueio de `Set` falho, o contexto ativo na abertura; o efeito colateral foi que esse valor de abertura passou a ser reportado como contexto do build. Caso real: `-EnvironmentName NETPostgreSQL` na KB FabricaBrasil18, aberta em `.Net Environment`. O stdout do MSBuild mostrava `The active environment is '.Net Environment'` antes de `Set Active Environment Sucesso`, e o build de fato foi para `NETPostgreSQL`. O wrapper, porém, registrou `.Net Environment`, emitiu aviso falso de divergência e classificou os eventos pós-build com os hashes registrados do outro environment. As linhas do `PostBuild-Gx.bat` do NETPostgreSQL, embora registradas, saíram como não registradas, e o status caiu para `operacao concluida, pendente de confirmacao funcional`. O mesmo valor era o padrão de environment do `Register-GeneXusKbPostBuildEvents.ps1`. O `Invoke-GeneXusKbSpecifyGenerate.ps1` lia só depois do `Set`: o valor efetivo estava certo, mas o bloqueio de `Set` falho citava `(desconhecido)`.
+
+Os dois wrappers agora leem o contexto antes e depois dos `Set`. `Resolve-GeneXusKbActiveContextReadings` (`GeneXusKbDeploymentEnvironmentSupport.ps1`) usa a primeira leitura como abertura e a última como efetiva. Com uma leitura só, ela vale como efetiva apenas quando nenhuma troca foi pedida ou quando o `Set` falhou; caso contrário, o efetivo fica nulo, com aviso. `observedContext.ActiveEnvironment`/`ActiveVersion` passam a ser o efetivo, e `ActiveEnvironmentAtOpen`/`ActiveVersionAtOpen` registram a abertura.
+
+Os self-tests de ponta a ponta dos dois wrappers cobrem a troca bem-sucedida, a troca sem leitura posterior, o `Set` falho e a ordem das tasks no `.msbuild` gerado. Rodados contra os wrappers anteriores, falham com o sintoma real. O self-test do suporte cobre a função isolada. A correção não foi validada em novo build real na KB; a evidência é o stdout do build de 2026-10-04 mais os testes com MSBuild falso.
+
+### Rastreabilidade
+
+- Commit material: o mesmo que retira a entrada do `999` e cria este registro.
+- Arquivos materiais: `scripts/Invoke-GeneXusKbBuildAll.ps1`, `scripts/Invoke-GeneXusKbSpecifyGenerate.ps1`, `scripts/GeneXusKbDeploymentEnvironmentSupport.ps1`, `scripts/Test-GeneXusMsBuildBuildAllEndToEndSelfTest.ps1`, `scripts/Test-GeneXusMsBuildSpecifyGenerateEndToEndSelfTest.ps1`, `scripts/Test-GeneXusKbDeploymentEnvironmentContextSelfTest.ps1`, `xpz-msbuild-build/SKILL.md`, `09-inventario-e-rastreabilidade-publica.md`, `CHANGELOG.md` e `999-ideias-pendentes.md`.

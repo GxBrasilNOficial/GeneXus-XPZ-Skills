@@ -161,6 +161,11 @@ Do NOT use esta skill para:
     environment que serve a aplicação (campo `deployment_environment_name` no metadata, ou
     parâmetro). Conferir `observedContext.ActiveEnvironment` no JSON — deve coincidir com o
     environment de validação resolvido (`deploymentEnvironmentContext` no JSON).
+    `ActiveEnvironment`/`ActiveVersion` são lidos **depois** de `SetActiveEnvironment`/`SetActiveVersion`
+    (contexto efetivo da operação, usado também na classificação do pós-build e no registro de
+    eventos pós-build). O valor que a KB tinha antes da troca fica à parte, em
+    `ActiveEnvironmentAtOpen`/`ActiveVersionAtOpen`, e é o citado no bloqueio quando o `Set` falha.
+    Troca pedida sem leitura posterior deixa `ActiveEnvironment` nulo, com aviso explícito.
   - **B:** quando a frente exigir fechamento em mais de um generator ativo — **opt-in**, não
     gate pós-import automático. Prática usual: após A no environment de deploy, **Build na IDE**
     nos demais environments que a frente ainda cobre (consultar `kb_environment_names` no metadata);

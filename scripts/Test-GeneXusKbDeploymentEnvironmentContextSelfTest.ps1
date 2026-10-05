@@ -40,4 +40,21 @@ foreach ($wrapperName in @('Invoke-GeneXusKbBuildAll.ps1', 'Invoke-GeneXusKbSpec
     }
 }
 
+$environmentPattern = "The active environment is '([^']+)'"
+$switchedText = "The active environment is '.Net Environment'`n> Set Active Environment Sucesso`nThe active environment is 'NETPostgreSQL'`n"
+$singleReadingText = "The active environment is '.Net Environment'`n"
+$readingCases = @(
+    @{ Name = 'troca com leitura posterior'; Text = $switchedText; Requested = 'NETPostgreSQL'; SetFailed = $false; AtOpen = '.Net Environment'; Effective = 'NETPostgreSQL'; Count = 2 },
+    @{ Name = 'sem troca pedida'; Text = $singleReadingText; Requested = ''; SetFailed = $false; AtOpen = '.Net Environment'; Effective = '.Net Environment'; Count = 1 },
+    @{ Name = 'troca pedida sem leitura posterior'; Text = $singleReadingText; Requested = 'NETPostgreSQL'; SetFailed = $false; AtOpen = '.Net Environment'; Effective = $null; Count = 1 },
+    @{ Name = 'Set falhou'; Text = $singleReadingText; Requested = 'Inexistente'; SetFailed = $true; AtOpen = '.Net Environment'; Effective = '.Net Environment'; Count = 1 },
+    @{ Name = 'stdout vazio'; Text = ''; Requested = 'NETPostgreSQL'; SetFailed = $false; AtOpen = $null; Effective = $null; Count = 0 }
+)
+foreach ($case in $readingCases) {
+    $readings = Resolve-GeneXusKbActiveContextReadings -Text $case.Text -Pattern $environmentPattern -RequestedName $case.Requested -SetFailed $case.SetFailed
+    if ($readings.AtOpen -ne $case.AtOpen -or $readings.Effective -ne $case.Effective -or $readings.ReadingCount -ne $case.Count) {
+        throw ("Resolve-GeneXusKbActiveContextReadings ({0}): esperado AtOpen='{1}' Effective='{2}' Count={3}; recebeu AtOpen='{4}' Effective='{5}' Count={6}." -f $case.Name, $case.AtOpen, $case.Effective, $case.Count, $readings.AtOpen, $readings.Effective, $readings.ReadingCount)
+    }
+}
+
 'GENEXUS_KB_DEPLOYMENT_ENVIRONMENT_CONTEXT_SELFTEST_OK'

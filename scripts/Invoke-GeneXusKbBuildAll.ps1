@@ -490,14 +490,20 @@ function New-MsBuildProjectContent {
     </OpenKnowledgeBase>
     <Message Text="__KB_OPEN__=true" Importance="High" />
     <GetActiveVersion CaptureOutput="true">
+      <Output TaskParameter="TaskOutput" PropertyName="ActiveVersionAtOpenOutput" />
+    </GetActiveVersion>
+    <GetActiveEnvironment CaptureOutput="true">
+      <Output TaskParameter="TaskOutput" PropertyName="ActiveEnvironmentAtOpenOutput" />
+    </GetActiveEnvironment>
+    <SetActiveVersion Condition="'`$(KBVersion)' != ''" VersionName="`$(KBVersion)" />
+    <SetActiveEnvironment Condition="'`$(KBEnvironment)' != ''" EnvironmentName="`$(KBEnvironment)" />
+    <SetConfiguration Condition="'`$(KBConfiguration)' != ''" Configuration="`$(KBConfiguration)" />
+    <GetActiveVersion CaptureOutput="true">
       <Output TaskParameter="TaskOutput" PropertyName="ActiveVersionOutput" />
     </GetActiveVersion>
     <GetActiveEnvironment CaptureOutput="true">
       <Output TaskParameter="TaskOutput" PropertyName="ActiveEnvironmentOutput" />
     </GetActiveEnvironment>
-    <SetActiveVersion Condition="'`$(KBVersion)' != ''" VersionName="`$(KBVersion)" />
-    <SetActiveEnvironment Condition="'`$(KBEnvironment)' != ''" EnvironmentName="`$(KBEnvironment)" />
-    <SetConfiguration Condition="'`$(KBConfiguration)' != ''" Configuration="`$(KBConfiguration)" />
     <BuildAll
         ForceRebuild="`$(ForceRebuild)"
         CompileMains="`$(CompileMains)"
@@ -1762,26 +1768,31 @@ try {
     $setVersionFailed = [bool]($stdOutText -match 'Set Active Version falhou')
     $setEnvironmentFailed = [bool]($stdOutText -match 'Set Active Environment falhou')
 
-    $activeVersionOutput     = Get-RegexValue -Text $stdOutText -Pattern "The active version is '([^']+)'"
-    $activeEnvironmentOutput = Get-RegexValue -Text $stdOutText -Pattern "The active environment is '([^']+)'"
+    # O .msbuild le versao/environment antes dos Set (abertura) e depois deles (efetivo do build).
+    $versionReadings = Resolve-GeneXusKbActiveContextReadings -Text $stdOutText -Pattern "The active version is '([^']+)'" -RequestedName $VersionName -SetFailed $setVersionFailed
+    $environmentReadings = Resolve-GeneXusKbActiveContextReadings -Text $stdOutText -Pattern "The active environment is '([^']+)'" -RequestedName $EnvironmentName -SetFailed $setEnvironmentFailed
+    $activeVersionAtOpen     = $versionReadings.AtOpen
+    $activeEnvironmentAtOpen = $environmentReadings.AtOpen
+    $activeVersionOutput     = $versionReadings.Effective
+    $activeEnvironmentOutput = $environmentReadings.Effective
     $missingEnvironmentOutput = Get-RegexValue -Text $stdOutText -Pattern "Ambiente '([^']+)' n[aã]o existe"
 
     if ($setVersionFailed) {
-        $actualVersion = if (-not [string]::IsNullOrWhiteSpace($activeVersionOutput)) { $activeVersionOutput } else { '(desconhecida)' }
+        $actualVersion = if (-not [string]::IsNullOrWhiteSpace($activeVersionAtOpen)) { $activeVersionAtOpen } else { '(desconhecida)' }
         Add-BlockingReason -Reason ("SetActiveVersion falhou — a versao '{0}' nao existe nesta KB. A versao ativa no momento da abertura era '{1}'. Para usar a versao ativa, omita o parametro -VersionName." -f $VersionName, $actualVersion)
     }
 
     if ($setEnvironmentFailed) {
-        $actualEnvironment = if (-not [string]::IsNullOrWhiteSpace($activeEnvironmentOutput)) { $activeEnvironmentOutput } else { '(desconhecido)' }
+        $actualEnvironment = if (-not [string]::IsNullOrWhiteSpace($activeEnvironmentAtOpen)) { $activeEnvironmentAtOpen } else { '(desconhecido)' }
         $requestedEnvironment = if (-not [string]::IsNullOrWhiteSpace($missingEnvironmentOutput)) { $missingEnvironmentOutput } else { $EnvironmentName }
         Add-BlockingReason -Reason ("SetActiveEnvironment falhou — o Environment '{0}' nao existe nesta KB. O Environment ativo no momento da abertura era '{1}'. Para usar o Environment ativo, omita o parametro -EnvironmentName." -f $requestedEnvironment, $actualEnvironment)
     }
 
     if (-not [string]::IsNullOrWhiteSpace($VersionName) -and [string]::IsNullOrWhiteSpace($activeVersionOutput) -and -not $setVersionFailed) {
-        Add-WarningMessage -Message 'Versao solicitada, mas o retorno de GetActiveVersion veio vazio.'
+        Add-WarningMessage -Message 'Versao solicitada, mas nenhuma leitura de GetActiveVersion posterior a SetActiveVersion foi observada.'
     }
     if (-not [string]::IsNullOrWhiteSpace($EnvironmentName) -and [string]::IsNullOrWhiteSpace($activeEnvironmentOutput) -and -not $setEnvironmentFailed) {
-        Add-WarningMessage -Message 'Environment solicitado, mas o retorno de GetActiveEnvironment veio vazio.'
+        Add-WarningMessage -Message 'Environment solicitado, mas nenhuma leitura de GetActiveEnvironment posterior a SetActiveEnvironment foi observada.'
     }
 
     $buildStatus = Resolve-BuildStatus `
@@ -2115,6 +2126,8 @@ try {
         observedContext  = [ordered]@{
             ActiveVersion     = $activeVersionOutput
             ActiveEnvironment = $activeEnvironmentOutput
+            ActiveVersionAtOpen     = $activeVersionAtOpen
+            ActiveEnvironmentAtOpen = $activeEnvironmentAtOpen
             KbOpen            = $kbOpen
             BuildAllDone      = $buildAllDone
             ReorgDetected     = $reorgDetected

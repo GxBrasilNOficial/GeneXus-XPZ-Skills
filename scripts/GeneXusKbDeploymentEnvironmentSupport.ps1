@@ -457,6 +457,51 @@ function Test-GeneXusKbActiveEnvironmentMatchesValidation {
     return ($ActiveEnvironment.Trim() -ieq $resolved.Trim())
 }
 
+function Resolve-GeneXusKbActiveContextReadings {
+    <#
+    .SYNOPSIS
+        Separa a leitura de abertura e a leitura efetiva de GetActiveVersion/GetActiveEnvironment no stdout do MSBuild.
+    .DESCRIPTION
+        Os wrappers de build leem o contexto ativo antes de SetActiveVersion/SetActiveEnvironment (para citar,
+        em caso de falha do Set, o contexto que estava ativo na abertura) e de novo depois dos Set (contexto
+        efetivo da operacao). A primeira leitura e a de abertura; a ultima, a efetiva. Com uma unica leitura,
+        ela so vale como efetiva quando nenhuma troca foi pedida ou quando o Set correspondente falhou
+        (o contexto nao mudou); caso contrario a troca pode ter ocorrido sem leitura posterior e o efetivo
+        fica nulo, para nao reportar o contexto anterior a troca como se fosse o da operacao.
+    #>
+    param(
+        [AllowNull()][string]$Text,
+        [string]$Pattern,
+        [AllowNull()][string]$RequestedName,
+        [bool]$SetFailed = $false
+    )
+
+    $readings = New-Object System.Collections.Generic.List[string]
+    if (-not [string]::IsNullOrEmpty($Text)) {
+        foreach ($match in [regex]::Matches($Text, $Pattern, [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)) {
+            $readings.Add($match.Groups[1].Value.Trim()) | Out-Null
+        }
+    }
+
+    $atOpen = $null
+    $effective = $null
+    if ($readings.Count -gt 0) {
+        $atOpen = $readings[0]
+    }
+    if ($readings.Count -ge 2) {
+        $effective = $readings[$readings.Count - 1]
+    }
+    elseif ($readings.Count -eq 1 -and ([string]::IsNullOrWhiteSpace($RequestedName) -or $SetFailed)) {
+        $effective = $readings[0]
+    }
+
+    return [pscustomobject][ordered]@{
+        AtOpen       = $atOpen
+        Effective    = $effective
+        ReadingCount = $readings.Count
+    }
+}
+
 function Get-GeneXusKbDeploymentContextValue {
     param(
         [AllowNull()][object]$DeploymentEnvironmentContext,

@@ -143,17 +143,6 @@ Follow-ups antes de promover:
 - decidir se o wrapper deve ser apenas exemplo opcional ou entrar como wrapper recomendado no inventário de setup;
 - se virar script compartilhado, atualizar `09`, `CHANGELOG`, self-tests e paridade com `xpz-builder`/`xpz-kb-parallel-setup`.
 
-## Investigar divergência de `observedContext.ActiveEnvironment` após `SetActiveEnvironment`
-
-- **Importância** — média (não mascarou erro nem bloqueou a aceitação do PR #2, mas enfraquece a rastreabilidade em KB multi-environment e pode induzir diagnóstico errado de validação deploy).
-- **Maturidade** — pesquisa feita (caso real observado em builds headless de duas KBs multi-environment; falta isolar se é comportamento do GeneXus/MSBuild, timing do wrapper ou leitura de contexto após troca de environment).
-
-Durante a revisão do PR #2 (`fix: refine build post-processing classification`), builds reais com `-EnvironmentName` explícito em KBs multi-environment registraram `observedContext.ActiveEnvironment` divergente do environment solicitado/resolvido em alguns JSONs. O MSBuild respeitou a execução e o PR não mascarou erro real; por isso o achado não bloqueou a aceitação do PR. Ainda assim, o campo é usado como evidência operacional e merece frente própria.
-
-Premissa relacionada em `998-ideias-descartadas-e-porque.md`: a entrada `CreateEnvironment` registra que `SetActiveEnvironment` via `-EnvironmentName` e `GetActiveEnvironment` cobrem o fluxo existente. O achado atual não reabre `CreateEnvironment`; ele pede revalidar a fidelidade do diagnóstico `observedContext.ActiveEnvironment` após troca de environment em KB multi-environment.
-
-Direção: montar repro mínimo com dois environments, registrar requested/resolved/observed antes e depois de `BuildAll`/`SpecifyGenerate`, comparar stdout bruto do `GetActiveEnvironment` com o JSON final e decidir se o wrapper deve capturar o active environment em outro momento, manter ambos os valores ou rebaixar a confiança desse campo.
-
 ## Drift de tipagem entre delta empacotado e snapshot oficial — fases residuais
 
 - **Importância** — alta para o falso-negativo original; Fase 1 implementada para `Object/@type` por `guid`, mas a assinatura funcional ampla ainda tem gaps.

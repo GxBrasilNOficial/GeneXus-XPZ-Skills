@@ -52,7 +52,13 @@ function Remove-WrapperArtifactDirectory {
 function Invoke-BuildAllScenario {
     param(
         [string]$ScenarioRoot,
-        [string[]]$StdErrLines
+        [string[]]$StdErrLines,
+        # Leituras de GetActiveEnvironment na ordem do .msbuild: abertura (antes dos Set) e efetiva (depois).
+        [string[]]$ContextLines = @(
+            "echo The active environment is 'TestEnvironment'",
+            "echo The active environment is 'TestEnvironment'"
+        ),
+        [int]$FakeExitCode = 0
     )
 
     $fakeGeneXusDirectory = Join-Path $ScenarioRoot 'GeneXus'
@@ -72,16 +78,20 @@ function Invoke-BuildAllScenario {
 
     $cmdLines = @(
         '@echo off',
-        'echo __KB_OPEN__=true',
-        "echo The active environment is 'TestEnvironment'",
-        'echo ^> Build All Task Sucesso',
-        'echo ========== Build All Task terminado ==========',
-        'echo __BUILDALL_DONE__=true'
+        'echo __KB_OPEN__=true'
     )
+    $cmdLines += $ContextLines
+    if ($FakeExitCode -eq 0) {
+        $cmdLines += @(
+            'echo ^> Build All Task Sucesso',
+            'echo ========== Build All Task terminado ==========',
+            'echo __BUILDALL_DONE__=true'
+        )
+    }
     foreach ($line in $StdErrLines) {
         $cmdLines += ('1>&2 echo ' + $line)
     }
-    $cmdLines += 'exit /b 0'
+    $cmdLines += ('exit /b {0}' -f $FakeExitCode)
     [System.IO.File]::WriteAllText(
         $fakeMsBuildPath,
         ($cmdLines -join "`r`n") + "`r`n",
@@ -139,6 +149,52 @@ try {
     Assert-True -Condition ($mixed.Diagnostic.postProcessingFailed -eq $false) -Message 'Stderr misto nao deveria causar falha de pos-processamento.'
     Assert-True -Condition ($mixed.Diagnostic.status -eq 'operacao concluida, pendente de confirmacao funcional') -Message 'Stderr misto deveria rebaixar a classificacao conforme o contrato do wrapper.'
     Assert-True -Condition ($mixed.Diagnostic.exitCode -eq 0 -and -not $mixed.Diagnostic.msBuildCategoryBBlocked) -Message 'Stderr misto deveria manter exit 0 sem declarar sucesso limpo.'
+
+    # Troca de environment bem-sucedida: o efetivo e a leitura posterior ao SetActiveEnvironment,
+    # nao a de abertura (caso real: build em NETPostgreSQL relatado como '.Net Environment').
+    $switched = Invoke-BuildAllScenario -ScenarioRoot (Join-Path $testRoot 'environment-switch') -StdErrLines @() -ContextLines @(
+        "echo The active environment is '.Net Environment'",
+        'echo ^> Set Active Environment Sucesso',
+        "echo The active environment is 'TestEnvironment'"
+    )
+    $artifactDirectories.Add([string]$switched.Diagnostic.artifacts.MsBuildFilePath)
+
+    Assert-True -Condition ($switched.ExitCode -eq 0) -Message ("Troca de environment deveria encerrar com exit 0; recebeu exit {0}, status '{1}'." -f $switched.ExitCode, $switched.Diagnostic.status)
+    Assert-True -Condition ([string]$switched.Diagnostic.observedContext.ActiveEnvironment -eq 'TestEnvironment') -Message ("ActiveEnvironment deveria ser o environment efetivo apos SetActiveEnvironment; recebeu '{0}'." -f $switched.Diagnostic.observedContext.ActiveEnvironment)
+    Assert-True -Condition ([string]$switched.Diagnostic.observedContext.ActiveEnvironmentAtOpen -eq '.Net Environment') -Message ("ActiveEnvironmentAtOpen deveria preservar o environment de abertura; recebeu '{0}'." -f $switched.Diagnostic.observedContext.ActiveEnvironmentAtOpen)
+    Assert-True -Condition (@($switched.Diagnostic.warnings | Where-Object { [string]$_ -match 'GetActiveEnvironment' }).Count -eq 0) -Message 'Troca bem-sucedida com leitura posterior nao deveria gerar aviso de leitura ausente.'
+    Assert-True -Condition ($switched.Diagnostic.status -eq 'compilou limpo') -Message ("Troca de environment bem-sucedida nao deveria rebaixar o status; recebeu '{0}'." -f $switched.Diagnostic.status)
+
+    # O .msbuild gerado precisa ler o environment antes e depois do SetActiveEnvironment, e so entao compilar.
+    $msBuildText = [System.IO.File]::ReadAllText([string]$switched.Diagnostic.artifacts.MsBuildFilePath)
+    $firstGetEnvironment = $msBuildText.IndexOf('<GetActiveEnvironment', [System.StringComparison]::Ordinal)
+    $setEnvironment = $msBuildText.IndexOf('<SetActiveEnvironment', [System.StringComparison]::Ordinal)
+    $lastGetEnvironment = $msBuildText.LastIndexOf('<GetActiveEnvironment', [System.StringComparison]::Ordinal)
+    $buildAll = $msBuildText.IndexOf('<BuildAll', [System.StringComparison]::Ordinal)
+    Assert-True -Condition ($firstGetEnvironment -ge 0 -and $firstGetEnvironment -lt $setEnvironment -and $setEnvironment -lt $lastGetEnvironment -and $lastGetEnvironment -lt $buildAll) -Message 'O .msbuild deveria ter GetActiveEnvironment antes e depois de SetActiveEnvironment, ambos antes de BuildAll.'
+
+    # Troca pedida sem leitura posterior: nao reportar o environment de abertura como efetivo.
+    $unconfirmed = Invoke-BuildAllScenario -ScenarioRoot (Join-Path $testRoot 'environment-unconfirmed') -StdErrLines @() -ContextLines @(
+        "echo The active environment is '.Net Environment'"
+    )
+    $artifactDirectories.Add([string]$unconfirmed.Diagnostic.artifacts.MsBuildFilePath)
+
+    Assert-True -Condition ($null -eq $unconfirmed.Diagnostic.observedContext.ActiveEnvironment) -Message ("Sem leitura posterior ao Set, ActiveEnvironment deveria ficar nulo; recebeu '{0}'." -f $unconfirmed.Diagnostic.observedContext.ActiveEnvironment)
+    Assert-True -Condition ([string]$unconfirmed.Diagnostic.observedContext.ActiveEnvironmentAtOpen -eq '.Net Environment') -Message 'ActiveEnvironmentAtOpen deveria registrar a leitura de abertura.'
+    Assert-True -Condition (@($unconfirmed.Diagnostic.warnings | Where-Object { [string]$_ -match 'posterior a SetActiveEnvironment' }).Count -eq 1) -Message 'Sem leitura posterior ao Set, o wrapper deveria avisar que o environment efetivo nao foi observado.'
+
+    # SetActiveEnvironment falhou: o bloqueio cita o environment de abertura, que segue ativo.
+    $setFailed = Invoke-BuildAllScenario -ScenarioRoot (Join-Path $testRoot 'environment-set-failed') -StdErrLines @() -FakeExitCode 1 -ContextLines @(
+        "echo The active environment is '.Net Environment'",
+        "echo Ambiente 'TestEnvironment' nao existe",
+        'echo Set Active Environment falhou'
+    )
+    $artifactDirectories.Add([string]$setFailed.Diagnostic.artifacts.MsBuildFilePath)
+
+    $setFailedReason = @($setFailed.Diagnostic.blockingReasons | Where-Object { [string]$_ -match '^SetActiveEnvironment falhou' })
+    Assert-True -Condition ($setFailedReason.Count -eq 1) -Message 'Falha de SetActiveEnvironment deveria gerar um blockingReason especifico.'
+    Assert-True -Condition ([string]$setFailedReason[0] -match "momento da abertura era '\.Net Environment'") -Message ("O blockingReason deveria citar o environment de abertura; recebeu '{0}'." -f $setFailedReason[0])
+    Assert-True -Condition ([string]$setFailed.Diagnostic.observedContext.ActiveEnvironment -eq '.Net Environment') -Message 'Com SetActiveEnvironment falho, o environment efetivo continua sendo o de abertura.'
 }
 finally {
     foreach ($msBuildFilePath in $artifactDirectories) {
