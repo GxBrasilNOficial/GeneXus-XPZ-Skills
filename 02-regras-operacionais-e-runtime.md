@@ -311,6 +311,13 @@ Regras de uso:
 - `Regra operacional`: não exigir busca ampla no acervo inteiro da KB como padrão para validar um `Source`; se a base metodologica já cobrir o padrão, ela prevalece.
 - `Regra operacional`: quando a cobertura vier apenas de melhor esforco, declarar explicitamente que a compatibilidade não está garantida e elevar o risco metodologico.
 
+### Construção de BC dentro de `For each` — precaução PostgreSQL/.NET
+
+- `Regra operacional`: ao preparar alterações de `Source` ou `Events` para PostgreSQL/.NET, em qualquer tipo de objeto, não criar BC com `new()` dentro de `For each` sem acesso ao banco visível ao gerador no corpo. Nessa situação, coletar primeiro os identificadores necessários, fechar esse `For each` e criar os BCs depois, preservando filtros, ordenação e contexto de chave. Regra canônica e limites: [xpz-builder/SKILL.md](xpz-builder/SKILL.md#bc-construction-inside-for-each--postgresqlnet-precaution).
+- `Evidência delimitada`: no caso observado em GeneXus 18 .NET com PostgreSQL/Npgsql 8.0.3, a inicialização do BC executou consulta com o leitor da navegação ainda aberto. O runtime inspecionado materializa as linhas e fecha o leitor real quando `hasNested=true`; o critério interno pelo qual o gerador atribui essa marca permanece inferência. Outros tipos de objeto, provedores e geradores não foram testados independentemente.
+- `Regra operacional`: preservar laços funcionais `new()` + `Load()`; não refatorá-los apenas por essa precaução nem acrescentar `Load()` desnecessário para influenciar o gerador. Remover acesso visível ao banco de um laço desses exige reavaliar o risco.
+- `Limite de validação`: a conferência é manual no `xpz-builder`; 9-BC (`Test-GeneXusBCDependency.ps1`) valida dependências e habilitação como BC, não comportamento de cursores. O detector mecânico permanece apenas como ideia no [999-ideias-pendentes.md](999-ideias-pendentes.md#detector-consultivo-de-construção-de-bc-dentro-de-for-each--postgresqlnet).
+
 ### Gramatica operacional para `Procedure` de relatório
 
 - `Regra operacional`: em `Procedure` de relatório simples, o fluxo primario deve partir de molde sanitizado documentado da trilha antes de escalar para XML real comparavel.
