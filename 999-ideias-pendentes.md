@@ -104,6 +104,21 @@ Pendências deliberadas: levar detector textual para `Build-GeneXusImportFileEnv
 
 Pendências deliberadamente fora da implementação do plano v17: avaliar `-AllowRedundant` no `Register-GeneXusObjectTypeCatalogOverride.ps1` somente se surgir caso real justificável; e implementar detector em `Test-XpzWrapperInventory.ps1` para apontar wrappers locais que ainda tratam qualquer override como `REMINDER_REQUIRED` ou não leem `noticeRequired`/listas `redundantTypeNames`/`divergentTypeNames`.
 
+## Contexto de abertura e classificação de saída nos demais wrappers MSBuild (Export, Import, Preview, OpenHeadless)
+
+- **Importância** — média (nenhum dos dois defeitos produz falso sucesso nem afeta a KB; ambos dão diagnóstico errado de causa num caminho que já é de falha. A armadilha do item 2 transforma uma correção ingênua do item 1 em regressão silenciosa de código de saída).
+- **Maturidade** — pronta para implementar nos itens 1 e 2 (desenho e função já existem desde o commit `be24ecd`); pesquisa feita no item 3 (falta evidência empírica de como o GeneXus escreve falhas de `Get*`/`CloseKnowledgeBase` no stdout).
+
+**Origem.** Na frente de 2026-10-04 (commit `be24ecd`), `Invoke-GeneXusKbBuildAll.ps1` e `Invoke-GeneXusKbSpecifyGenerate.ps1` passaram a ler o contexto antes e depois de `SetActiveVersion`/`SetActiveEnvironment`, e `Resolve-GeneXusKbActiveContextReadings` (`GeneXusKbDeploymentEnvironmentSupport.ps1`) passou a separar abertura de efetivo. Os quatro wrappers abaixo ficaram de fora por decisão humana, para não inflar aquela frente.
+
+1. **Mensagem de `Set` falho cita "(desconhecido)".** `Invoke-GeneXusXpzExport.ps1`, `Invoke-GeneXusXpzImport.ps1`, `Test-GeneXusXpzImportPreview.ps1` e `Open-GeneXusKbHeadless.ps1` geram o `.msbuild` com `Set*` antes de `Get*`. O valor efetivo de `observedContext.ActiveEnvironment`/`ActiveVersion` está correto. Quando o `Set` falha, porém, o MSBuild para antes do `Get`, e o `blockingReason` diz que o ativo na abertura era `(desconhecido)`/`(desconhecida)`. Correção: mesmo padrão do BuildAll, com `Get*` antes dos `Set*` (propriedades `Active*AtOpenOutput`), `Get*` mantido depois, parse pela função compartilhada e campos `ActiveEnvironmentAtOpen`/`ActiveVersionAtOpen` no JSON. Avaliar mover a função para um suporte próprio (ex.: `GeneXusMsBuildActiveContextSupport.ps1`), para que Export/Import não precisem carregar o suporte de deploy, que traz junto `GeneXusKbHostingKindSupport.ps1`.
+2. **ARMADILHA — `Get-OperationExitCode` do `Open-GeneXusKbHeadless.ps1` classifica pelo nome da task em qualquer parte do log.** Com MSBuild não-zero, procura `GetActiveEnvironment` (24), `GetActiveVersion` (23), `SetActiveEnvironment` (22), `SetActiveVersion` (21) e `CloseKnowledgeBase` (25), nessa ordem, sobre stdout+stderr inteiros. O log de task bem-sucedida também contém o nome (`> GetActiveEnvironment Sucesso`, `========== GetActiveEnvironment terminado`). Por isso, aplicar o item 1 sozinho faria `Set Active Environment falhou` sair como **24** em vez de **22**. Pré-requisito do item 1 neste wrapper: testar antes as marcas explícitas `Set Active Version falhou` (21) e `Set Active Environment falhou` (22), já usadas pelos outros wrappers, com um teste de código de saída para `Set` falho.
+3. **Defeito pré-existente da mesma função.** Hoje, qualquer falha **posterior** aos `Get*` bem-sucedidos (ex.: em `CloseKnowledgeBase`) já sai como 24 (`falha em GetActiveEnvironment`, segundo `scripts/msbuild-exit-codes.catalog.json`). Corrigir de verdade exige classificar pela linha de falha, não por qualquer menção à task; antes, coletar o formato real das falhas de `Get*`/`Close` no GeneXus 18.
+
+**Fora do escopo:** `Test-GeneXusKbConsistency.ps1` também lê só depois do `Set`, mas não detecta `Set` falho nem emite essa mensagem; incluí-lo exigiria primeiro decidir se ele deve bloquear nesse caso.
+
+**Testes esperados:** verificação estrutural da ordem `Get`→`Set`→`Get`→task principal nos seis wrappers e do uso da função compartilhada; teste de código de saída do OpenHeadless para `Set` falho (22, não 24); paridade de `09`/CHANGELOG.
+
 ## Avaliar contrato v2/finalizador compartilhado para wrappers MSBuild GeneXus
 
 - **Importância** — média (risco real de regressão e duplicação em pós-processamento de wrappers, mas a Fase 0 cobre a dor atual sem precisar desta arquitetura).
