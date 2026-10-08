@@ -12,7 +12,7 @@
     Cobre (do design):
       (b) fail-closed com MOTIVO distinguido: estatico (frontmatter divergente) / versao nao-testada
           / agent list falho (SQLite transitorio) / allow-set divergente;
-      (c) allow-set resolvido EXATAMENTE {read,grep,glob,list} — trava por AUSENCIA e por EXCESSO
+      (c) allow-set {read,glob,list}, read por mapa e grep deny — AUSENCIA/EXCESSO
           (ex.: bash reaparecendo);
       (d) external_directory padrao '*' resolvendo 'allow' => BLOCK (confinamento de leitura ao cwd);
       (e) pos-check le/varre o warning de fallback silencioso;
@@ -134,14 +134,14 @@ exit /b %errorlevel%
 
     $env:FAKE_OC_ARGV_FILE = ''
 
-    # ── (c)+(f) allow-set EXATO {read,grep,glob,list}; edit/webfetch NAO no allow-set ──
+    # ── (c)+(f) allow-set EXATO {read,glob,list}; grep/edit/webfetch negados ──
     $env:FAKE_OC_VERSION = $testedVersion
     $env:FAKE_OC_AGENTLIST = $sampleAgentList
     $env:FAKE_OC_AGENTLIST_EXIT = ''
     $pc = Test-OpenCodeReviewerRoPrecheck -Exe $fakeCmd -WorkingDirectory $repoRoot
-    Assert-True ($pc.pass) "(c) allow-set exato {read,grep,glob,list} + versao ok => pre-check PASSA (detail: $($pc.detail))"
+    Assert-True ($pc.pass) "(c) allow-set exato {read,glob,list} + versao ok => pre-check PASSA (detail: $($pc.detail))"
     $al = Get-OpenCodeReviewerRoAllowSetFromExe -Exe $fakeCmd
-    Assert-True ($al.ok -and (@($al.allowSet | Sort-Object) -join ',') -eq 'glob,grep,list,read') "(c) allowSet resolvido = {glob,grep,list,read}"
+    Assert-True ($al.ok -and $al.policyOk -and (@($al.allowSet | Sort-Object) -join ',') -eq 'glob,list,read') "(c) mapa read canonico; allowSet = {glob,list,read}"
     Assert-True (@($al.allowSet) -notcontains 'edit' -and @($al.allowSet) -notcontains 'webfetch') "(f) regressao: edit/webfetch fora do allow-set"
 
     # ── (c-excesso) bash reaparece como allow => BLOCK allowset ──
@@ -265,8 +265,8 @@ sem mode
     # ── (B5) global-only e project-local resolvem o mesmo allow-set least-privilege (fixture medido) ──
     $mergeGlobal = Resolve-OpenCodeReviewerRoAllowSet -Rules (Get-OpenCodeReviewerRoBlockFromAgentList -Lines @(Get-Content -LiteralPath $mergeFixture -Encoding utf8) -Name 'reviewer-ro')
     $mergeProject = Resolve-OpenCodeReviewerRoAllowSet -Rules (Get-OpenCodeReviewerRoBlockFromAgentList -Lines @(Get-Content -LiteralPath $sampleAgentList -Encoding utf8) -Name 'reviewer-ro')
-    Assert-True (@($mergeGlobal.allowSet) -notcontains '*' -and (@($mergeGlobal.allowSet | Sort-Object) -join ',') -eq 'glob,grep,list,read') "(B5) so-global resolve '*'=deny + allow-set {read,grep,glob,list}"
-    Assert-True (@($mergeProject.allowSet) -notcontains '*' -and (@($mergeProject.allowSet | Sort-Object) -join ',') -eq 'glob,grep,list,read') "(B5) com project-local resolve '*'=deny + allow-set {read,grep,glob,list}"
+    Assert-True ($mergeGlobal.policyOk -and (@($mergeGlobal.allowSet | Sort-Object) -join ',') -eq 'glob,list,read') "(B5) so-global: bloco canonico + {read,glob,list}"
+    Assert-True ($mergeProject.policyOk -and (@($mergeProject.allowSet | Sort-Object) -join ',') -eq 'glob,list,read') "(B5) project-local: bloco canonico + {read,glob,list}"
 
     # ── (e) pos-check: warning de fallback detectado; texto limpo nao ──
     $fbText = Get-Content -LiteralPath $fallbackFixture -Raw -Encoding utf8
@@ -323,7 +323,7 @@ sem mode
     & $installer -JsoncPath $g3 -AgentMarkdownPath $agentMd | Out-Null
     Assert-True (Test-Path -LiteralPath $g3) "(g3) arquivo novo criado"
     $g3parsed = ConvertFrom-Jsonc -Raw (Get-Content -LiteralPath $g3 -Raw -Encoding utf8)
-    Assert-True ([string]$g3parsed.agent.'reviewer-ro'.permission.'read' -eq 'allow') "(g3) arquivo novo com reviewer-ro valido"
+    Assert-True ([string]$g3parsed.agent.'reviewer-ro'.permission.read.'*.env' -eq 'deny') "(g3) arquivo novo com mapa read valido"
 
     # (g4) chave `reviewer-ro` HOMONIMA fora de `agent` (em metadata) + agent sem reviewer-ro:
     # o instalador deve escopar ao bloco agent (inserir agent.reviewer-ro) SEM tocar o homonimo.
@@ -337,12 +337,57 @@ sem mode
   }
 }
 '@ | Set-Content -LiteralPath $g4 -Encoding utf8
-    & $installer -JsoncPath $g4 -AgentMarkdownPath $agentMd | Out-Null
-    $g4raw = Get-Content -LiteralPath $g4 -Raw -Encoding utf8
-    $g4parsed = ConvertFrom-Jsonc -Raw $g4raw
-    Assert-True ([string]$g4parsed.agent.'reviewer-ro'.permission.'*' -eq 'deny') "(g4) reviewer-ro inserido DENTRO de agent (nao no homonimo)"
-    Assert-True ([string]$g4parsed.metadata.'reviewer-ro'.note -eq 'homonimo fora de agent — nao tocar') "(g4) metadata.reviewer-ro homonimo preservado intacto"
-    Assert-True ($null -ne $g4parsed.agent.PSObject.Properties['helper']) "(g4) agent.helper preservado"
+    $g4before = Get-Content -LiteralPath $g4 -Raw
+    $refused = $false
+    try { & $installer -JsoncPath $g4 -AgentMarkdownPath $agentMd | Out-Null } catch { $refused = $true }
+    Assert-True ($refused -and (Get-Content -LiteralPath $g4 -Raw) -ceq $g4before) "(g4) homonimo recusado antes da escrita; bytes intactos"
+
+    # Global-only novo e local encontrado INVALIDO nunca cai no global valido.
+    $globalStatic = Test-OpenCodeReviewerRoStatic -WorkingDirectory $emptyWd -GlobalJsoncPath $g3
+    Assert-True ($globalStatic.ok) 'global-only canonico passa'
+    $badMd = Join-Path $badWd '.opencode/agent/reviewer-ro.md'
+    Set-Content -LiteralPath $badMd -Value 'sem frontmatter' -Encoding utf8
+    $localInvalid = Test-OpenCodeReviewerRoStatic -WorkingDirectory $badWd -GlobalJsoncPath $g3
+    Assert-True (-not $localInvalid.ok -and $localInvalid.source -eq $badMd) 'local invalido nao cai no global'
+    $canonicalText = Get-Content -LiteralPath $agentMd -Raw
+    foreach ($text in @(
+        $canonicalText.Replace('  grep: deny', "  grep: deny`n  grep: deny"),
+        $canonicalText.Replace('    "*.env": deny', '    "*.env": ask'),
+        $canonicalText.Replace('    "*.env": deny', '      "*.env": deny'),
+        $canonicalText.Replace('    "*.env": deny', "    `"*.env`": deny`n    `"*.env`": deny"),
+        $canonicalText.Replace('    "*.env": deny', '    "*.env": invalid'),
+        $canonicalText.Replace('    "*.env": deny', "`t`"*.env`": deny"),
+        $canonicalText.Replace('mode: all', "mode: all`nmode: all")
+    )) {
+        Set-Content -LiteralPath $badMd -Value $text -Encoding utf8
+        $st = Test-OpenCodeReviewerRoStatic -WorkingDirectory $badWd -GlobalJsoncPath $g3
+        Assert-True (-not $st.ok) 'Markdown ambiguo/duplicado/acao/indentacao invalida bloqueia'
+    }
+    foreach ($text in @(
+        '{"agent":{"reviewer-ro":{"mode":"all","permission":{"*":"deny","read":{"*":"allow","*":"deny"}}}}}',
+        '{"agent":{"reviewer-ro":{"mode":"all","permission":{"*":"deny","read":{"*":{"deep":"allow"}}}}}}'
+    )) {
+        $invalidJson = Join-Path $tempRoot 'invalid.jsonc'
+        Set-Content -LiteralPath $invalidJson -Value $text -Encoding utf8
+        $st = Test-OpenCodeReviewerRoStatic -WorkingDirectory $emptyWd -GlobalJsoncPath $invalidJson
+        Assert-True (-not $st.ok) 'JSONC duplicado/profundo bloqueia'
+    }
+    foreach ($text in @('{ /* "agent": {} */ "instructions":[] }', '{"metadata":{"agent":{}},"agent":{}}', '{"agent":{"reviewer-ro":{},"reviewer-ro":{}}}')) {
+        $ambiguous = Join-Path $tempRoot 'ambiguous.jsonc'
+        Set-Content -LiteralPath $ambiguous -Value $text -Encoding utf8
+        $beforeAmbiguous = Get-Content -LiteralPath $ambiguous -Raw
+        $refused = $false
+        try { & $installer -JsoncPath $ambiguous -AgentMarkdownPath $agentMd | Out-Null } catch { $refused = $true }
+        Assert-True ($refused -and (Get-Content -LiteralPath $ambiguous -Raw) -ceq $beforeAmbiguous) 'instalador recusa ambiguidade sem escrita'
+    }
+
+    foreach ($permission in @('read','grep','*','r*','*read','gre?')) {
+        foreach ($action in @('allow','ask')) {
+            $late = $sampleRules + [pscustomobject]@{permission=$permission;pattern='secrets/producao.env';action=$action}
+            $check = Test-OpenCodeReviewerRoEffectiveRules -Rules $late
+            Assert-True (-not $check.ok) "reabertura tardia $permission / $action bloqueia"
+        }
+    }
 
     # ── (a)+(b-adapter) INTEGRACAO com os adapters (D1+D2) ──────────────────────
     # Push-Location na raiz do repo: o pre-check descobre o project-local subindo do cwd herdado.
@@ -401,6 +446,40 @@ sem mode
         while (-not (Test-Path -LiteralPath $argvAsync) -and $waited -lt 15) { Start-Sleep -Milliseconds 300; $waited++ }
         $argvAsyncText = if (Test-Path -LiteralPath $argvAsync) { Get-Content -LiteralPath $argvAsync -Raw } else { '' }
         Assert-True ($argvAsyncText -match '--agent reviewer-ro') "(a-async) default -Agent reviewer-ro no argv do spawn (got: $argvAsyncText)"
+
+        # Mesmo enforce para reviewer-ro EXPLICITO nos dois adapters.
+        $ansExplicit = & $invoke -OpenCodeExe $fakeCmd -Agent reviewer-ro -MessagePath $prompt -Model 'fake/model' -TimeoutSec 30
+        Assert-True ([string]$ansExplicit -match 'OK-ADAPTER') 'sync reviewer-ro explicito passa com politica final'
+        $argvExplicit = Join-Path $tempRoot 'argv-explicit.txt'
+        $env:FAKE_OC_ARGV_FILE = $argvExplicit
+        $explicitJob = & $start -OpenCodeExe $fakeCmd -Agent reviewer-ro -MessagePath $prompt -Model 'fake/model' -NoWatcher -TempDir (Join-Path $tempRoot 'explicit-jobs')
+        $waited = 0
+        while (-not (Test-Path -LiteralPath $argvExplicit) -and $waited -lt 15) { Start-Sleep -Milliseconds 300; $waited++ }
+        Assert-True ((Test-Path -LiteralPath $argvExplicit) -and (Get-Content -LiteralPath $argvExplicit -Raw) -match '--agent reviewer-ro') 'async reviewer-ro explicito passa e chega ao run'
+
+        foreach ($latePermission in @('read','r*')) {
+            foreach ($lateAction in @('allow','ask')) {
+                # Nome de arquivo nao recebe curinga da permissao.
+                $variant = Join-Path $tempRoot ([guid]::NewGuid().ToString('N') + '.txt')
+                Write-AgentListVariant -Rules ($sampleRules + [pscustomobject]@{permission=$latePermission;pattern='secrets/producao.env';action=$lateAction}) -Path $variant
+                $env:FAKE_OC_AGENTLIST = $variant
+                foreach ($explicit in @($false,$true)) {
+                    $opts = @{OpenCodeExe=$fakeCmd;MessagePath=$prompt;Model='fake/model'}
+                    if ($explicit) { $opts.Agent = 'reviewer-ro' }
+                    foreach ($adapter in @($invoke,$start)) {
+                        $argvDenied = Join-Path $tempRoot ([guid]::NewGuid().ToString('N') + '.argv')
+                        $env:FAKE_OC_ARGV_FILE = $argvDenied
+                        $blocked = $false
+                        try {
+                            if ($adapter -eq $invoke) { & $adapter @opts -TimeoutSec 30 | Out-Null }
+                            else { & $adapter @opts -NoWatcher -TempDir (Join-Path $tempRoot 'denied-jobs') | Out-Null }
+                        } catch { $blocked = $_.Exception.Message -match 'guard reviewer-ro fail-closed' }
+                        Assert-True ($blocked -and -not (Test-Path -LiteralPath $argvDenied)) "reabertura $latePermission/$lateAction; explicito=$explicit; $([IO.Path]::GetFileName($adapter)): bloqueia antes de run/spawn"
+                    }
+                }
+            }
+        }
+        $env:FAKE_OC_AGENTLIST = $sampleAgentList
 
         # (b-adapter-async) Start-OpenCodeJob com allow-set divergente => BLOCK ANTES do Start-Process
         # (o pre-check no spawn e a barreira do assincrono; o job NAO deve spawnar).

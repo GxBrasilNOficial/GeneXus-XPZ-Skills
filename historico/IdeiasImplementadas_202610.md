@@ -2,6 +2,44 @@
 
 Registro de ideias que saíram de `999-ideias-pendentes.md` por terem sido implementadas ou incorporadas ao contrato metodológico vigente.
 
+## Proteção mínima de conteúdo .env no reviewer-ro
+
+Implementação local validada em 2026-10-08; publicação Git depende de autorização própria.
+Recorte aprovado: read com mapa ordenado * allow / *.env deny / *.env.* deny /
+.env.example allow / */.env.example allow; grep deny integral.
+Catch-all * deny, mode all e contenção de execução/escrita/rede preservados.
+
+Guard e instalador usam validação canônica comum; mapas/ordem preservados;
+definição local inválida não cai no global. Parser restrito, duplicatas/ações/indentação/
+profundidade inválidas e reaberturas tardias bloqueiam. JSONC ambíguo é recusado antes da escrita.
+Nenhuma configuração global foi instalada nem alterada.
+
+Provas: self-test com fake-exe (adapters default/explícito sync/async e instalador);
+33 sondas debug agent em Markdown/JSONC, incluindo cwd em subpasta Git; captura real
+run com commandcode/deepseek/deepseek-v4.1-flash: quatro read, dois erros de permissão,
+fonte/exemplo legíveis, token protegido ausente. Fixtures completos recapturados
+na política final e VERSION promovido para 1.18.33; diagnóstico instalado compatible.
+Go respondeu usage limit; openai estava indisponível; essas tentativas não contam como prova.
+Design congelado anterior preservado. Não houve nova convergência de plano nesta sessão.
+
+### Diagnóstico anterior preservado
+
+As linhas abaixo registram o estado anterior, substituído neste recorte pela nova prova:
+
+- **Maturidade** — pronta para implementar para o recorte `.env`; pesquisa/ideia para o restante do eixo de leitura. O bloqueio padrão de leitura fora do cwd **HERDADO** já está **ATIVO** (o reviewer-ro fixa `external_directory: deny`, medido nos fixtures ativos em 1.18.30), sem proteger segredos dentro do próprio cwd; falta **mecanizar cwd-seguro**, **blindar `.env`/segredos locais dentro do cwd** e **liberar `kb-sensitive`**.
+- **Urgente — `.env` dentro do cwd:** a captura ativa **1.18.30** (e a medição anterior em 1.17.20) mostra que o OpenCode traz regras nativas `read "*.env" -> ask` e `read "*.env.*" -> ask`; o bloco posterior do `reviewer-ro` adiciona `read "*" -> allow`. **Confirmado por medição em 2026-08-16 — não é mais hipótese:** resolvendo o bloco do `reviewer-ro` com `Resolve-OpenCodeReviewerRoAllowSet`, a **última** regra que casa um caminho `.env` é `read "*" -> allow` (posição **[51]** de 62 no opencode **1.17.20**), **depois** de `*.env -> ask` em **[47]** e `*.env.* -> ask` em **[48]**; por `last-match-wins`, a proteção nativa **é anulada**. O mesmo padrão, nas mesmas posições relativas, apareceu no fork `mimo` 0.1.12 (**[103]** e **[99]** de 204) — ou seja, é traço **estrutural herdado do upstream**, não acidente de uma versão; o fork em si foi descartado (`998-ideias-descartadas-e-porque.md`), mas a medição vale como confirmação independente. Arquivos `.env` normalmente guardam segredos locais (`DATABASE_URL`, `API_KEY`, `OPENAI_API_KEY`, `JWT_SECRET`, senhas SMTP etc.) e são justamente o tipo de arquivo que não deve ser lido por um revisor externo. Frente curta a implementar: decidir se o `reviewer-ro` deve preservar/bloquear `*.env`/`*.env.*` (mantendo `.env.example` legível), ajustar frontmatter/guard/fixtures/self-test, documentar a decisão e recapturar evidência. Até lá, tratar revisão opencode em cwd com `.env` como risco alto.
+
+### Residuais
+
+Cwd-seguro, links/aliases, outros formatos de segredo, nomes visíveis, dados no prompt/dossiê,
+instruções automáticas, liberação kb-sensitive/pasta paralela e instalação global via
+xpz-skills-setup seguem abertos no 999, sem serem requisitos novos desta frente.
+A exceção .env.example exige conteúdo sanitizado pelo operador; .env~/.env-example
+ficam fora dos padrões e diretório com .env. pode ser negado conservadoramente.
+
+Dono normativo e provas: xpz-llm-delegate/SKILL.md e fixtures/opencode-reviewer-ro/README.md.
+O 999 retém a entrada pelo título com os residuais; o recorte concluído está registrado aqui.
+
 ## Cobertura da assinatura do extrator no gate de rastreabilidade
 
 ### Registro de origem

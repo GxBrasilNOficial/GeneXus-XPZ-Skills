@@ -41,7 +41,8 @@ if ($allow -and $allow.ok) {
     $expected = @($script:OpenCodeReviewerRoExpectedAllowSet | Sort-Object)
     $got = @($allow.allowSet | Sort-Object)
     $allowSetOk = ($null -eq (Compare-Object -ReferenceObject $expected -DifferenceObject $got))
-    $externalDirectoryOk = ($allow.externalDirStar -ne 'allow')
+    $allowSetOk = $allowSetOk -and $allow.policyOk
+    $externalDirectoryOk = ($allow.externalDirStar -eq 'deny')
 }
 
 $blockingReasons = [System.Collections.Generic.List[string]]::new()

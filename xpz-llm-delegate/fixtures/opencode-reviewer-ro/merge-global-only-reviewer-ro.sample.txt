@@ -1,5 +1,5 @@
 reviewer-ro (all)
-  [
+[
   {
     "permission": "*",
     "action": "allow",
@@ -23,261 +23,6 @@ reviewer-ro (all)
   {
     "permission": "external_directory",
     "pattern": "<SANITIZED_OPENCODE_TEMP_DIR>\\*",
-    "action": "allow"
-  },
-  {
-    "permission": "external_directory",
-    "pattern": "<SANITIZED_SKILL_DIR>\\*",
-    "action": "allow"
-  },
-  {
-    "permission": "external_directory",
-    "pattern": "<SANITIZED_SKILL_DIR>\\*",
-    "action": "allow"
-  },
-  {
-    "permission": "external_directory",
-    "pattern": "<SANITIZED_SKILL_DIR>\\*",
-    "action": "allow"
-  },
-  {
-    "permission": "external_directory",
-    "pattern": "<SANITIZED_SKILL_DIR>\\*",
-    "action": "allow"
-  },
-  {
-    "permission": "external_directory",
-    "pattern": "<SANITIZED_SKILL_DIR>\\*",
-    "action": "allow"
-  },
-  {
-    "permission": "external_directory",
-    "pattern": "<SANITIZED_SKILL_DIR>\\*",
-    "action": "allow"
-  },
-  {
-    "permission": "external_directory",
-    "pattern": "<SANITIZED_SKILL_DIR>\\*",
-    "action": "allow"
-  },
-  {
-    "permission": "external_directory",
-    "pattern": "<SANITIZED_SKILL_DIR>\\*",
-    "action": "allow"
-  },
-  {
-    "permission": "external_directory",
-    "pattern": "<SANITIZED_SKILL_DIR>\\*",
-    "action": "allow"
-  },
-  {
-    "permission": "external_directory",
-    "pattern": "<SANITIZED_SKILL_DIR>\\*",
-    "action": "allow"
-  },
-  {
-    "permission": "external_directory",
-    "pattern": "<SANITIZED_SKILL_DIR>\\*",
-    "action": "allow"
-  },
-  {
-    "permission": "external_directory",
-    "pattern": "<SANITIZED_SKILL_DIR>\\*",
-    "action": "allow"
-  },
-  {
-    "permission": "external_directory",
-    "pattern": "<SANITIZED_SKILL_DIR>\\*",
-    "action": "allow"
-  },
-  {
-    "permission": "external_directory",
-    "pattern": "<SANITIZED_SKILL_DIR>\\*",
-    "action": "allow"
-  },
-  {
-    "permission": "external_directory",
-    "pattern": "<SANITIZED_SKILL_DIR>\\*",
-    "action": "allow"
-  },
-  {
-    "permission": "external_directory",
-    "pattern": "<SANITIZED_SKILL_DIR>\\*",
-    "action": "allow"
-  },
-  {
-    "permission": "external_directory",
-    "pattern": "<SANITIZED_SKILL_DIR>\\*",
-    "action": "allow"
-  },
-  {
-    "permission": "external_directory",
-    "pattern": "<SANITIZED_SKILL_DIR>\\*",
-    "action": "allow"
-  },
-  {
-    "permission": "external_directory",
-    "pattern": "<SANITIZED_SKILL_DIR>\\*",
-    "action": "allow"
-  },
-  {
-    "permission": "external_directory",
-    "pattern": "<SANITIZED_SKILL_DIR>\\*",
-    "action": "allow"
-  },
-  {
-    "permission": "external_directory",
-    "pattern": "<SANITIZED_SKILL_DIR>\\*",
-    "action": "allow"
-  },
-  {
-    "permission": "external_directory",
-    "pattern": "<SANITIZED_SKILL_DIR>\\*",
-    "action": "allow"
-  },
-  {
-    "permission": "external_directory",
-    "pattern": "<SANITIZED_SKILL_DIR>\\*",
-    "action": "allow"
-  },
-  {
-    "permission": "external_directory",
-    "pattern": "<SANITIZED_SKILL_DIR>\\*",
-    "action": "allow"
-  },
-  {
-    "permission": "external_directory",
-    "pattern": "<SANITIZED_SKILL_DIR>\\*",
-    "action": "allow"
-  },
-  {
-    "permission": "external_directory",
-    "pattern": "<SANITIZED_SKILL_DIR>\\*",
-    "action": "allow"
-  },
-  {
-    "permission": "external_directory",
-    "pattern": "<SANITIZED_SKILL_DIR>\\*",
-    "action": "allow"
-  },
-  {
-    "permission": "external_directory",
-    "pattern": "<SANITIZED_SKILL_DIR>\\*",
-    "action": "allow"
-  },
-  {
-    "permission": "external_directory",
-    "pattern": "<SANITIZED_SKILL_DIR>\\*",
-    "action": "allow"
-  },
-  {
-    "permission": "external_directory",
-    "pattern": "<SANITIZED_SKILL_DIR>\\*",
-    "action": "allow"
-  },
-  {
-    "permission": "external_directory",
-    "pattern": "<SANITIZED_SKILL_DIR>\\*",
-    "action": "allow"
-  },
-  {
-    "permission": "external_directory",
-    "pattern": "<SANITIZED_SKILL_DIR>\\*",
-    "action": "allow"
-  },
-  {
-    "permission": "external_directory",
-    "pattern": "<SANITIZED_SKILL_DIR>\\*",
-    "action": "allow"
-  },
-  {
-    "permission": "external_directory",
-    "pattern": "<SANITIZED_SKILL_DIR>\\*",
-    "action": "allow"
-  },
-  {
-    "permission": "external_directory",
-    "pattern": "<SANITIZED_SKILL_DIR>\\*",
-    "action": "allow"
-  },
-  {
-    "permission": "external_directory",
-    "pattern": "<SANITIZED_SKILL_DIR>\\*",
-    "action": "allow"
-  },
-  {
-    "permission": "external_directory",
-    "pattern": "<SANITIZED_SKILL_DIR>\\*",
-    "action": "allow"
-  },
-  {
-    "permission": "external_directory",
-    "pattern": "<SANITIZED_SKILL_DIR>\\*",
-    "action": "allow"
-  },
-  {
-    "permission": "external_directory",
-    "pattern": "<SANITIZED_SKILL_DIR>\\*",
-    "action": "allow"
-  },
-  {
-    "permission": "external_directory",
-    "pattern": "<SANITIZED_SKILL_DIR>\\*",
-    "action": "allow"
-  },
-  {
-    "permission": "external_directory",
-    "pattern": "<SANITIZED_SKILL_DIR>\\*",
-    "action": "allow"
-  },
-  {
-    "permission": "external_directory",
-    "pattern": "<SANITIZED_SKILL_DIR>\\*",
-    "action": "allow"
-  },
-  {
-    "permission": "external_directory",
-    "pattern": "<SANITIZED_SKILL_DIR>\\*",
-    "action": "allow"
-  },
-  {
-    "permission": "external_directory",
-    "pattern": "<SANITIZED_SKILL_DIR>\\*",
-    "action": "allow"
-  },
-  {
-    "permission": "external_directory",
-    "pattern": "<SANITIZED_SKILL_DIR>\\*",
-    "action": "allow"
-  },
-  {
-    "permission": "external_directory",
-    "pattern": "<SANITIZED_SKILL_DIR>\\*",
-    "action": "allow"
-  },
-  {
-    "permission": "external_directory",
-    "pattern": "<SANITIZED_SKILL_DIR>\\*",
-    "action": "allow"
-  },
-  {
-    "permission": "external_directory",
-    "pattern": "<SANITIZED_SKILL_DIR>\\*",
-    "action": "allow"
-  },
-  {
-    "permission": "external_directory",
-    "pattern": "<SANITIZED_SKILL_DIR>\\*",
-    "action": "allow"
-  },
-  {
-    "permission": "external_directory",
-    "pattern": "<SANITIZED_SKILL_DIR>\\*",
-    "action": "allow"
-  },
-  {
-    "permission": "external_directory",
-    "pattern": "<SANITIZED_SKILL_DIR>\\*",
     "action": "allow"
   },
   {
@@ -322,12 +67,32 @@ reviewer-ro (all)
   },
   {
     "permission": "read",
-    "action": "allow",
-    "pattern": "*"
+    "pattern": "*",
+    "action": "allow"
+  },
+  {
+    "permission": "read",
+    "pattern": "*.env",
+    "action": "deny"
+  },
+  {
+    "permission": "read",
+    "pattern": "*.env.*",
+    "action": "deny"
+  },
+  {
+    "permission": "read",
+    "pattern": ".env.example",
+    "action": "allow"
+  },
+  {
+    "permission": "read",
+    "pattern": "*/.env.example",
+    "action": "allow"
   },
   {
     "permission": "grep",
-    "action": "allow",
+    "action": "deny",
     "pattern": "*"
   },
   {

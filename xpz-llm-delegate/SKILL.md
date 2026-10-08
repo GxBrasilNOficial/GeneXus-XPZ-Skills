@@ -954,14 +954,14 @@ segurança no **próprio adapter**, de forma inseparável (nunca "default sem gu
 
 - **Default `-Agent reviewer-ro` escopado ao caminho revisor.** Sem `-Agent` explícito, o agente
   efetivo é `reviewer-ro` (forma `permission` com default-deny curinga `"*": deny` + allowlist
-  `{read, grep, glob, list}`; `edit`/`bash`/`webfetch`/`websearch`/`task` negados). O painel bloqueia
+  `{read, glob, list}`; `read` por mapa ordenado, `grep`/`edit`/`bash`/`webfetch`/`websearch`/`task` negados). O painel bloqueia
   a chave `agent` → o revisor **sempre** cai no `reviewer-ro`. `-Agent <x>` **explícito com `x ≠
   reviewer-ro`** = opt-out consciente (uso agêntico fora do painel; o chamador assume a postura de
   segurança), mas o pré-check confirma que `<x>` **resolve** (evita o fallback silencioso ao `build`
   full-access). `-Agent reviewer-ro` **explícito** não é opt-out: recai no **enforce** completo, igual
   ao default (o caminho revisor é reconhecido por `$Agent -eq 'reviewer-ro'`, seja default ou explícito).
 - **Guard fail-closed (pré-check ANTES do run/spawn).** Estático (frontmatter do reviewer-ro) +
-  `opencode agent list` confirmando o **allow-set resolvido EXATAMENTE `{read, grep, glob, list}`**
+  `opencode agent list` confirmando o **allow-set EXATAMENTE `{read, glob, list}` e o mapa `read` canônico**
   (trava divergência por ausência E por excesso — ex.: `bash` reaparecendo por regra tardia da
   global) + versão do opencode testada. O `agent list` faz **retry curto** (até 3 tentativas com
   pausa breve) para tolerar a falha transitória de SQLite antes de desistir. Qualquer falha ⇒
@@ -976,22 +976,47 @@ segurança no **próprio adapter**, de forma inseparável (nunca "default sem gu
   `scripts/Install-OpenCodeReviewerRoAgent.ps1` (global, dono desta skill). Gate de processo/CI:
   `scripts/Test-OpenCodeReviewerRoSelfTest.ps1` (`OPENCODE_REVIEWER_RO_SELFTEST_OK`) e
   `scripts/Test-OpenCodeCliSupportSelfTest.ps1` para a descoberta do CLI.
-- **Eixo de LEITURA — premissa INVERTIDA (medido em opencode 1.18.30; ver `fixtures/opencode-reviewer-ro/VERSION.txt`).** A doc anterior afirmava que a
+- **Eixo de LEITURA — premissa INVERTIDA (histórico 1.18.30, revalidado em 1.18.33; ver `fixtures/opencode-reviewer-ro/VERSION.txt`).** A doc anterior afirmava que a
   tool `read` lê **qualquer arquivo** da máquina; a **medição refuta**: o opencode tem a dimensão
   nativa `external_directory` (base `ask`, auto-rejeitada em `opencode run` headless) que gateia
   leituras **fora** do workspace do cwd. O reviewer-ro fixa `external_directory: deny` explícito → o
-  padrão `external_directory[*]` fica bloqueado independente do modo; fixtures 1.18.30
+  padrão `external_directory[*]` fica bloqueado independente do modo; os fixtures atuais
   ainda mostram exceções `allow` para diretórios internos do opencode, então isso não deve ser
   descrito como proibição absoluta de todo path externo específico. O D-min fecha
   execução/escrita e as **ferramentas** de rede (`webfetch`/`websearch`); **não** fecha o canal do
   próprio parecer ao provider (residual aceito em `public`, inerente a qualquer revisor externo).
-- **cwd-seguro é OPERACIONAL (nota de operador).** O D-min **não** mecaniza "o cwd é seguro": o
+- **Conteúdo `.env`/variantes (recorte mínimo).** A política ordenada de `read` é
+  `'*': allow`, `'*.env': deny`, `'*.env.*': deny`, `'.env.example': allow`,
+  `'*/.env.example': allow`. `grep` é negado integralmente: sua permissão pela expressão
+  não aplica o mapa de `read` aos arquivos retornados. `.env.example` exato na raiz/subpastas
+  exige conteúdo sanitizado pelo operador; `service.env.example` e `.env.example.local`
+  ficam negados. No Windows, o CLI ignora caixa e `*` atravessa separadores. Os padrões
+  se aplicam ao caminho inteiro e podem negar conservadoramente diretório com `.env.`.
+  `.env~`/`.env-example`, outros segredos, links/aliases, conteúdo já no prompt/dossiê e
+  instruções carregadas automaticamente ficam fora do recorte. `glob` e `read` de diretório
+  podem mostrar nomes; `list` tem permissão, mas não apareceu na sonda 1.18.33.
+- **Validação estrutural compartilhada.** Guard e instalador exigem a definição canônica
+  exata, incluindo ordem; o parser Markdown aceita escalares/mapa de um nível, sem YAML
+  geral. Duplicatas, profundidade, indentação ou ações inválidas bloqueiam. JSONC preserva
+  mapas/ordem e rejeita duplicatas. Local encontrado inválido bloqueia sem cair no global.
+  Em `agent list`, o bloco começa no último `*/* deny`: sequência canônica completa,
+  seguida apenas da exceção interna tool-output já medida e também presente antes da âncora.
+  Qualquer reabertura tardia (`read`, `grep`, `*` ou curinga de ferramenta) bloqueia.
+  Isso não reimplementa caminhos/wildcards do CLI nem amplia exceções externas.
+  O instalador serializa mapas, valida antes/depois e pode recusar comentários/homônimos
+  ambíguos antes da escrita; instalação global continua exigindo autorização própria.
+- **Provas e promoção.** `Test-OpenCodeReviewerRoContentProtection.ps1` usa arquivos
+  sintéticos e `opencode debug agent`, sem modelo, registrando negação por erro de permissão
+  (exit 1 sozinho não prova). Exercita Markdown/JSONC, barras, caixa, absoluto/relativo e
+  cwd em subdiretório Git: a permissão `read` usa caminho relativo a `instance.worktree`,
+  que pode diferir do cwd. Essas provas debug não substituem a captura real `run` exigida
+  pelos fixtures; a equivalência fora dos casos medidos continua premissa, não isolamento
+  demonstrado. Só promover `VERSION.txt` após revalidar todo o conjunto do README fixtures.
+- **cwd-seguro é OPERACIONAL (nota de operador).** O recorte **não** mecaniza "o cwd é seguro": o
   bloqueio padrão é relativo ao cwd HERDADO (o adapter opencode não recebe `-Cd`), mas **quem dispara** é
-  responsável por escolher um cwd sem segredos não-versionados. Se o cwd contiver `.env` local,
-  logs ou cache com segredos, o revisor pode lê-los; iscas de self-test não substituem revisar
-  segredos reais no diretório. Em 1.18.30 há proteção nativa `read "*.env" -> ask`, mas o bloco
-  posterior do `reviewer-ro` tende a anulá-la com `read "*" -> allow`; esse recorte é alta
-  prioridade no `999`. Mecanizar cwd-seguro + liberar opencode em `kb-sensitive`/pasta paralela
+  responsável por escolher um cwd sem segredos não-versionados fora dos padrões protegidos.
+  Logs ou cache com segredos ainda podem ser lidos; iscas não comprovam segurança de dados reais.
+  Mecanizar cwd-seguro + liberar opencode em `kb-sensitive`/pasta paralela
   ficou **ADIADO** (`999-ideias-pendentes.md`, entrada do eixo de leitura).
 - **O gate de confidencialidade continua ortogonal.** `Resolve-LlmDelegateAuthorization.ps1` governa
   **se o dado sai** (destino/sensibilidade), **não** a capacidade de executar/ler local — é o guard

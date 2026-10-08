@@ -79,6 +79,15 @@ Guia operacional e metodologico da trilha KB Intelligence. Contratos de fases en
 - `xpz-skills-setup`: auditoria e manutenção do registro global das skills XPZ nas ferramentas de agente instaladas na máquina; inclui o bootstrap de uma pasta baixada como ZIP do GitHub — instalar o Git quando ausente e ligá-la ao repositório oficial; também valida e registra a skill externa gerenciada `nexa`, clonando seu repositório oficial (`GxBrasilNOficial/genexus-skills-from-zip`) em `GeneXus-Skills-From-Zip` quando ausente
 - `xpz-codex-apply-patch-alternative`: backup auditável por motor PowerShell para aplicar patch Git textual aprovado no Codex, em um repositório alvo informado por `-RepositoryRoot`, quando a rota nativa `apply_patch` estiver indisponível, falhar antes de escrita local ou for solicitada explicitamente
 
+### Proteção de conteúdo no revisor OpenCode
+
+O `reviewer-ro` mantém `"*": deny`, permite `read` por mapa ordenado e `glob`/`list`,
+e nega `grep` integralmente. `read` nega `*.env`/`*.env.*`, exceto `.env.example` exato
+na raiz/subpastas, sanitizado pelo operador. Nomes podem aparecer; outros segredos,
+links/aliases e dados já no prompt/dossiê ficam fora do recorte. Versão só é promovida
+com todo o conjunto de fixtures recapturado. Contrato, provas e limites:
+[`xpz-llm-delegate`](xpz-llm-delegate/SKILL.md), seção do revisor least-privilege.
+
 ### Leitura recomendada para humanos
 
 Se você quer entender a base rapidamente:
@@ -326,6 +335,15 @@ Guía operacional y metodológica de la trilha KB Intelligence. Los contratos de
 - `xpz-skills-setup`: auditoría y mantenimiento del registro global de las skills XPZ en las herramientas de agente instaladas en la máquina; incluye el bootstrap de una carpeta descargada como ZIP de GitHub — instalar Git cuando falte y vincularla al repositorio oficial; también valida y registra la skill externa gestionada `nexa`, clonando su repositorio oficial (`GxBrasilNOficial/genexus-skills-from-zip`) en `GeneXus-Skills-From-Zip` cuando falte
 - `xpz-codex-apply-patch-alternative`: backup auditable mediante motor PowerShell para aplicar parches Git textuales aprobados en Codex, en un repositorio objetivo informado por `-RepositoryRoot`, cuando la ruta nativa `apply_patch` no esté disponible, falle antes de escribir localmente o sea solicitada explícitamente
 
+### Protección de contenido en el revisor OpenCode
+
+`reviewer-ro` mantiene `"*": deny`, permite `read` mediante un mapa ordenado y `glob`/`list`,
+y deniega `grep` por completo. `read` deniega `*.env`/`*.env.*`, salvo `.env.example` exacto
+en la raíz/subcarpetas, sanitizado por el operador. Los nombres pueden aparecer; otros secretos,
+enlaces/alias y datos ya incluidos en el prompt/dossier quedan fuera del alcance. La versión solo
+se promueve tras recapturar todos los fixtures. Contrato, pruebas y límites:
+[`xpz-llm-delegate`](xpz-llm-delegate/SKILL.md), sección del revisor least-privilege.
+
 ### Lectura recomendada para humanos
 
 Si quieres entender la base rápidamente:
@@ -572,6 +590,15 @@ Operational and methodological guide for the KB Intelligence workstream. Closed 
 - `xpz-llm-delegate`: delegation of smaller tasks or second opinion to a secondary LLM via opencode (panel reviewer: default `-Agent reviewer-ro` least-privilege "no execution/write"; see `opencode-reviewer-ro-least-privilege-design.md`; models in `provider/model` format, including known cloud providers such as `ollama-cloud/*` and `opencode-go/*`), Codex (`codex exec`), Claude Code (`claude -p`, Opus 4.8), GitHub Copilot CLI (`copilot -p`), Gemini CLI (`gemini -p`), or Antigravity CLI (`agy -p`, fixed `public-review` profile only, public semantic-only, never git-capable), with deterministic local/external classification and per-KB confidentiality gate (destination key, never the adapter); preferred-reviewer curation outside the repository in `%LOCALAPPDATA%\xpz-llm-delegate\` with cascade `preferred-reviewers.<orchestrator>.json` → `preferred-reviewers.json` (machine, schema 3); CLI holders and native subagent (`orchestrator-native-subagent`, route A — participation via the Creator of `targetModelKey`, not via the adapter harness); always human-triggered (includes running multi-model peer review, see `15-revisao-por-pares.md`)
 - `xpz-skills-setup`: auditing and maintaining the global registration of XPZ skills in the installed agent tools on the machine; includes bootstrapping a folder downloaded as a ZIP from GitHub — installing Git when missing and linking it to the official repository; it also validates and registers the managed external skill `nexa`, cloning its official repository (`GxBrasilNOficial/genexus-skills-from-zip`) into `GeneXus-Skills-From-Zip` when missing
 - `xpz-codex-apply-patch-alternative`: auditable PowerShell backup for applying approved textual Git patches in Codex, in a target repository provided through `-RepositoryRoot`, when the native `apply_patch` route is unavailable, fails before any local write, or is explicitly requested
+
+### Content protection in the OpenCode reviewer
+
+`reviewer-ro` keeps `"*": deny`, allows `read` through an ordered map and `glob`/`list`,
+and denies `grep` entirely. `read` denies `*.env`/`*.env.*`, except the exact `.env.example`
+name at the root/in subdirectories, sanitized by the operator. Names may appear; other secrets,
+links/aliases and data already in the prompt/dossier remain outside this scope. The version is
+promoted only after recapturing the complete fixture set. Contract, evidence and limits:
+[`xpz-llm-delegate`](xpz-llm-delegate/SKILL.md), least-privilege reviewer section.
 
 ### Recommended reading for humans
 

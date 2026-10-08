@@ -11,79 +11,71 @@ Consumidos por `scripts/OpenCodeReviewerRoGuard.ps1` (pré-check runtime) e por
 
 ## Versão medida
 
-`VERSION.txt` = **1.18.30**. O pré-check compara `opencode --version` contra este valor
-(cláusula de validade). Versão diferente ⇒ BLOCK com motivo `version` — os claims de resolução
-podem não valer. Antes de concluir falha operacional, rode
-`scripts/Test-OpenCodeReviewerRoInstalledCompatibility.ps1 -AsJson` a partir da raiz do repo:
-`needsFixtureRecapture` significa que a estrutura local está OK, mas os fixtures empíricos ainda
-não foram promovidos para a versão instalada; `blocked` indica problema estrutural a corrigir.
+`VERSION.txt` = **1.18.33**, promovida em 2026-10-08 após revalidar o conjunto
+obrigatório: project-local/global-only com política FINAL, equivalência permission/tools,
+warning de fallback e prova behavioral real `run`. A suíte de conteúdo `debug agent`
+também passou (33 casos). Histórico 1.18.30 não foi renomeado como prova nova.
 
-O set inteiro abaixo foi **re-medido** nesta versão (agent list project-local e global-only,
-equivalência permission/tools, warning de fallback, e captura behavioral D4).
+Versão diferente ⇒ BLOCK `version`. O diagnóstico
+`scripts/Test-OpenCodeReviewerRoInstalledCompatibility.ps1 -AsJson` separa
+`needsFixtureRecapture` de bloqueio estrutural; não substitui recaptura completa.
+Self-test determinístico/fake-exe não prova sozinho o comportamento de uma versão nova.
 
 ## Arquivos
 
-- `VERSION.txt` — versão do opencode contra a qual os claims foram medidos.
-- `fallback-warning.txt` — warning **verbatim do stderr** que o opencode emite em
-  `run --agent <ausente>` (cai silenciosamente no agente default, hoje `build` full-access). Em
-  1.18.30 a captura traz **sequências ANSI SGR** (`ESC[93m`, `ESC[1m`, `ESC[0m`, …) em volta do
-  `!`; **após remover os escapes**, o texto renderizado começa com o prefixo `!  ` antes de
-  `agent "..." not found...`. O pós-check varre o stderr pelo padrão lógico exposto por
-  `Get-OpenCodeReviewerRoFallbackWarningPattern` (não exige o prefixo nem a coloração). No
-  contrato v2 do watcher esse mesmo valor alimenta `fallbackDetail.stderrPattern` sem copiar o
-  literal em outros produtores/consumidores. Na re-captura: **preservar** os bytes ANSI emitidos
-  — não sanitizar para ASCII puro.
-- `agentlist-reviewer-ro.sample.txt` — bloco canônico (sanitizado) do `opencode agent list` para o
-  `reviewer-ro` na forma `permission`. Os caminhos reais de `external_directory` (dirs de skills da
-  máquina) foram substituídos por `<SANITIZED_SKILL_DIR>`; as regras de ferramenta são as reais.
-  Base do parser e do fake-exe do self-test.
-- `equiv-permission-vs-tools.sample.txt` — **equivalência `permission: deny` ≡ `tools: false`**
-  (re-medida em 1.18.30): dois agentes-probe que negam a MESMA tool (`webfetch`), um pela forma
-  `permission: { webfetch: deny }`, outro pela forma `tools: { webfetch: false }`, resolvem
-  **idêntico** no `agent list` — ambos `webfetch → deny`.
-- `merge-global-only-reviewer-ro.sample.txt` — resolução do `reviewer-ro` quando **só** o global
-  provisionado aplica (cwd sem `.opencode/`). Em 1.18.30 a captura sanitizada resolve o mesmo
-  contrato least-privilege do project-local: `*` final `deny` + allow-set `{read,grep,glob,list}`.
-  Nesta promoção a captura global-only ficou byte-equivalente ao project-local sanitizado; isso
-  **não** prova, sozinho, semântica de merge/substituição campo a campo — só o contrato efetivo
-  resolvido no `agent list`.
-- `read-outside-cwd-blocked.sample.txt` — **captura behavioral** (design D4 «leitura fora do cwd
-  bloqueada headless»): reviewer-ro (com `openai/gpt-5.6-luna`) pedido para `read` de arquivo FORA
-  do cwd → **sem leak** do sentinela; houve tool-call `read` com `status=error` (rede mecânica
-  `external_directory[*]=deny`, não só auto-censura). Golden/documental (o self-test determinístico
-  não re-executa o modelo real; a asserção CI vive no caso (d)).
+- `VERSION.txt` — versão legitimamente promovida; comparar com `opencode --version`.
+- `agentlist-reviewer-ro.sample.txt` — bloco real project-local em workspace Git sintético,
+  com Markdown FINAL e runtime do filho redirecionado; paths internos sanitizados.
+- `merge-global-only-reviewer-ro.sample.txt` — bloco real JSONC global-only sintético,
+  produzido pelo instalador; descoberta project-local desabilitada só nesta captura.
+  Mesmo contrato efetivo do Markdown; não prova merge/substituição campo a campo.
+- `equiv-permission-vs-tools.sample.txt` — probes reais `probe-perm`/`probe-tools`:
+  `permission: { webfetch: deny }` e `tools: { webfetch: false }` resolvem webfetch deny.
+  Esses probes não são agentes reviewer-ro válidos.
+- `fallback-warning.txt` — linha verbatim do stderr de `run --agent fixture-agent-missing`,
+  capturada antes do erro intencional de modelo inexistente (sem modelo chamado).
+  Nesta captura 1.18.33 não houve ANSI; não adicionar nem remover escapes emitidos.
+  O accessor `Get-OpenCodeReviewerRoFallbackWarningPattern` permanece a fonte do padrão
+  lógico usado pelos adapters/watcher; não exige prefixo ou coloração.
+- `read-outside-cwd-blocked.sample.txt` — captura real `opencode run` com
+  `commandcode/deepseek/deepseek-v4.1-flash`, configuração normal sem edição global,
+  workspace sintético e Markdown FINAL: quatro read, dois erros por permissão,
+  fonte comum/exemplo legíveis, token protegido ausente. Inclui .env interno e arquivo
+  externo ordinary.txt (fora das exceções internas); não é sonda debug nem autocensura.
+- `content-protection.sample.txt` — recibo sanitizado dos 33 casos reais
+  `opencode debug agent`, sem modelo; Markdown/JSONC, caminhos e cwd em subpasta Git.
+  Erro de permissão comprova deny; exit 1 sozinho não prova. Debug deixa ask passar,
+  portanto não usar esta sonda para afirmar comportamento ask headless.
 
-## Resolução efetiva medida (1.18.30) — `agent list`, last-match-wins
+## Resolução efetiva medida (1.18.33) — bloco estrutural canônico
 
-Excluindo `external_directory` e os gates internos (`doom_loop`, `question`, `plan_enter`,
-`plan_exit`):
+A âncora é o último `permission: "*", pattern: "*", action: "deny"`.
+Depois dela o guard exige a sequência canônica completa, sem regras extras,
+seguida somente da exceção tool-output interna já medida e presente antes da âncora.
+Reaberturas tardias read/grep, `*` e curingas de nome de ferramenta bloqueiam.
+Não basta encontrar cinco pares em qualquer posição; o guard não emula caminhos/wildcards.
 
-| permission | ação efetiva |
-|------------|--------------|
-| `*`        | **deny** (curinga default-deny; o bloco project-local aparece por último e sobrepõe o `* allow` global) |
-| `read`     | allow |
-| `grep`     | allow |
-| `glob`     | allow |
-| `list`     | allow |
-| `edit`     | deny |
-| `bash`     | deny |
-| `webfetch` | deny |
-| `websearch`| deny |
-| `task`     | deny |
+| permission | contrato após a âncora |
+| --- | --- |
+| `*` | deny |
+| `read` | mapa ordenado abaixo |
+| `grep` | deny |
+| `glob` / `list` | allow |
+| `edit` / `bash` / `webfetch` / `websearch` / `task` | deny |
+| `external_directory` padrão `*` | deny |
 
-**allow-set resolvido = `{read, grep, glob, list}`** (o pré-check assere o CONJUNTO exato — trava
-divergência por ausência E por excesso, ex.: `bash` reaparecendo por regra tardia da global).
+Mapa read, em ordem: `* allow`, `*.env deny`, `*.env.* deny`,
+`.env.example allow`, `*/.env.example allow`. Disponíveis `{read,glob,list}`;
+read não é reduzido à ação da última exceção. A exceção exige nome exato e conteúdo
+sanitizado pelo operador: service.env.example e .env.example.local ficam negados.
+No Windows o CLI ignora caixa e `*` cruza separadores; regras contra caminho inteiro
+podem negar diretório com .env. conservadoramente. .env~/.env-example não são protegidos.
+`glob` e leitura de diretório mostram nomes; `list` não apareceu na sonda 1.18.33.
 
-`external_directory` padrão `*` resolve **deny**. Os fixtures 1.18.30 também trazem exceções
-`allow` para diretórios internos do opencode (`<SANITIZED_OPENCODE_TOOL_OUTPUT_DIR>`,
-`<SANITIZED_OPENCODE_TEMP_DIR>`, skills); o guard atual verifica o padrão `*`, não uma proibição
-absoluta de todo path externo específico. Em 1.18.30 há ainda um `allow` de tool-output **depois**
-do `*` deny (last-match-wins por padrão específico); a sentinela D4 foi colocada fora desses allows.
-
-Risco residual urgente: os fixtures 1.18.30 continuam a mostrar regras nativas `read "*.env" -> ask`
-e `read "*.env.*" -> ask` antes do bloco final do `reviewer-ro`, que volta a permitir `read "*"`.
-Pela regra `last-match-wins`, isso tende a deixar `.env` legível dentro do cwd; o recorte está
-registrado em `999-ideias-pendentes.md` como alta prioridade.
+Exceções internas de `external_directory` não provam isolamento absoluto;
+não foram ampliadas. Links/aliases, outros segredos, prompt/dossiê e carregamento
+automático de instruções seguem fora do recorte. Provas debug e run são distintas;
+fora dos casos medidos, equivalência é premissa, não garantia de isolamento.
 
 ## Como re-capturar (refresh após upgrade do opencode)
 
@@ -102,6 +94,7 @@ Atualizar o set re-medido completo (sanitizando paths de `external_directory` on
 4. `equiv-permission-vs-tools.sample.txt`
 5. `fallback-warning.txt` (stderr verbatim de `run --agent <ausente>`; manter ANSI se houver)
 6. `read-outside-cwd-blocked.sample.txt` (captura behavioral D4; token real → `<SENTINELA>`)
+7. `content-protection.sample.txt` (política final em Markdown/JSONC; suíte sintética sem modelo)
 
 Re-rodar `scripts/Test-OpenCodeReviewerRoSelfTest.ps1` até verde antes de reativar o default
 `-Agent reviewer-ro`. O diagnóstico estrutural

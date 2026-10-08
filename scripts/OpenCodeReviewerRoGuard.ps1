@@ -10,7 +10,8 @@
       1. estatico   -> frontmatter do reviewer-ro (project-local .md ou bloco global do jsonc)
                        confere a forma `permission` esperada (deterministico, nao toca o DB);
       2. agent list -> `opencode agent list` confirma que o allow-set RESOLVIDO (last-match-wins,
-                       excluindo `external_directory`) e EXATAMENTE {read,grep,glob,list} e que
+                       excluindo `external_directory`) e EXATAMENTE {read,glob,list}, com mapa
+                       read canonico e grep deny, e que
                        `external_directory` para o padrao `*` NAO resolve `allow` (confinamento de
                        leitura ao cwd); assere o CONJUNTO -> trava divergencia por ausencia E por
                        excesso (ex.: `bash` reaparecendo por regra tardia da config global);
@@ -37,10 +38,48 @@
 Set-StrictMode -Version Latest
 
 # Allow-set esperado do reviewer-ro (last-match-wins, excluindo `external_directory`).
-$script:OpenCodeReviewerRoExpectedAllowSet = @('read', 'grep', 'glob', 'list')
+$script:OpenCodeReviewerRoExpectedAllowSet = @('read', 'glob', 'list')
 
 # Denies nominais esperados no frontmatter (reforco documental; `*: deny` ja cobre).
-$script:OpenCodeReviewerRoExpectedDeny = @('edit', 'bash', 'webfetch', 'websearch', 'task', 'external_directory')
+$script:OpenCodeReviewerRoExpectedDeny = @('grep', 'edit', 'bash', 'webfetch', 'websearch', 'task', 'external_directory')
+
+function Get-OpenCodeReviewerRoCanonicalPermission {
+    # Ordem faz parte do contrato; nao emula paths/wildcards do CLI.
+    return [ordered]@{
+        '*' = 'deny'
+        read = [ordered]@{ '*' = 'allow'; '*.env' = 'deny'; '*.env.*' = 'deny'; '.env.example' = 'allow'; '*/.env.example' = 'allow' }
+        grep = 'deny'; glob = 'allow'; list = 'allow'; edit = 'deny'; bash = 'deny'
+        webfetch = 'deny'; websearch = 'deny'; task = 'deny'; external_directory = 'deny'
+    }
+}
+
+function Test-OpenCodeReviewerRoDefinition {
+    param($Definition)
+    if ($null -eq $Definition -or $Definition.mode -cne 'all') {
+        return @{ ok = $false; detail = "mode obrigatorio: all / definicao invalida" }
+    }
+    $want = Get-OpenCodeReviewerRoCanonicalPermission
+    $got = $Definition.permission
+    if ($got -isnot [System.Collections.IDictionary] -or (@($got.Keys) -join "`n") -cne (@($want.Keys) -join "`n")) {
+        return @{ ok = $false; detail = 'permission: chaves/ordem divergentes do contrato canonico' }
+    }
+    foreach ($key in $want.Keys) {
+        if ($want[$key] -is [System.Collections.IDictionary]) {
+            $map = $got[$key]
+            if ($map -isnot [System.Collections.IDictionary] -or (@($map.Keys) -join "`n") -cne (@($want[$key].Keys) -join "`n")) {
+                return @{ ok = $false; detail = "mapa ${key}: chaves/ordem divergentes" }
+            }
+            foreach ($pattern in $want[$key].Keys) {
+                if ($map[$pattern] -isnot [string] -or $map[$pattern] -cne $want[$key][$pattern]) {
+                    return @{ ok = $false; detail = "mapa ${key}: acao divergente para $pattern" }
+                }
+            }
+        } elseif ($got[$key] -isnot [string] -or $got[$key] -cne $want[$key]) {
+            return @{ ok = $false; detail = "permission ${key}: acao divergente" }
+        }
+    }
+    return @{ ok = $true; detail = 'definicao canonica OK' }
+}
 
 function Get-OpenCodeReviewerRoFixtureDir {
     <# Resolve xpz-llm-delegate/fixtures/opencode-reviewer-ro relativo a este script. #>
@@ -94,12 +133,30 @@ function ConvertFrom-Jsonc {
         if ($ch -eq '/' -and $i + 1 -lt $n -and $Raw[$i + 1] -eq '*') {
             $i += 2
             while ($i + 1 -lt $n -and -not ($Raw[$i] -eq '*' -and $Raw[$i + 1] -eq '/')) { $i++ }
+            if ($i + 1 -ge $n) { throw 'JSONC: comentario de bloco nao fechado' }
+            [void]$sb.Append(' ')
             $i += 2
             continue
         }
         [void]$sb.Append($ch)
         $i++
     }
+    # JsonDocument enumera duplicatas que ConvertFrom-Json sobrescreveria silenciosamente.
+    $options = [System.Text.Json.JsonDocumentOptions]::new()
+    $options.AllowTrailingCommas = $true
+    $doc = [System.Text.Json.JsonDocument]::Parse($sb.ToString(), $options)
+    function Assert-UniqueJsonKeys($Element) {
+        if ($Element.ValueKind -eq [System.Text.Json.JsonValueKind]::Object) {
+            $seen = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+            foreach ($prop in $Element.EnumerateObject()) {
+                if (-not $seen.Add($prop.Name)) { throw "JSONC: chave duplicada/ambigua '$($prop.Name)'" }
+                Assert-UniqueJsonKeys $prop.Value
+            }
+        } elseif ($Element.ValueKind -eq [System.Text.Json.JsonValueKind]::Array) {
+            foreach ($item in $Element.EnumerateArray()) { Assert-UniqueJsonKeys $item }
+        }
+    }
+    try { Assert-UniqueJsonKeys $doc.RootElement } finally { $doc.Dispose() }
     return ($sb.ToString() | ConvertFrom-Json)
 }
 
@@ -118,27 +175,44 @@ function Get-OpenCodeReviewerRoPermissionFromMarkdown {
 
     $mode = $null
     $perm = [ordered]@{}
-    $inPermission = $false
+    $top = [ordered]@{}
+    $section = ''
+    $mapKey = $null
+    $closed = $false
     for ($idx = 1; $idx -lt $lines.Count; $idx++) {
         $line = $lines[$idx]
-        if ($line.Trim() -eq '---') { break }
-
-        # dentro do bloco permission: linhas indentadas `  key: value`
-        if ($inPermission) {
-            if ($line -match '^\s+("?)(?<k>[^":]+)\1\s*:\s*(?<v>\S+)\s*$') {
-                $k = $Matches['k'].Trim().Trim('"')
-                $perm[$k] = $Matches['v'].Trim()
-                continue
-            }
-            # linha nao-indentada (ou vazia com conteudo top-level) encerra o bloco
-            if ($line -match '^\S') { $inPermission = $false }
-            else { continue }
+        if ($line -ceq '---') { $closed = $true; break }
+        if ([string]::IsNullOrWhiteSpace($line)) { continue }
+        if ($line.Contains("`t")) { throw 'Markdown: tab/indentacao invalida' }
+        if ($line -cmatch '^(?<k>[a-z_]+):\s*(?<v>.*)$') {
+            $section = $Matches.k; $value = $Matches.v
+            if ($top.Contains($section)) { throw "Markdown: chave duplicada $section" }
+            $top[$section] = $value
+            if ($section -eq 'mode') { $mode = $value }
+            elseif ($section -eq 'permission' -and $value -ne '') { throw 'Markdown: permission deve ser mapa' }
+            elseif ($section -notin @('description', 'mode', 'permission')) { throw "Markdown: chave fora do parser restrito $section" }
+            $mapKey = $null
+            continue
         }
-
-        if ($line -match '^\s*mode\s*:\s*(?<v>\S+)\s*$') { $mode = $Matches['v'].Trim(); continue }
-        if ($line -match '^\s*permission\s*:\s*$') { $inPermission = $true; continue }
+        if ($section -eq 'description' -and $top['description'] -in @('>-', '>', '|', '|-') -and $line -match '^  \S') { continue }
+        if ($section -ne 'permission' -or $line -cnotmatch '^(?<indent> {2}| {4})(?<token>"[^"\r\n]+"|''[^''\r\n]+''|[a-z_]+):\s*(?<v>allow|deny|ask)?\s*$') {
+            throw "Markdown: linha invalida/ambigua ou profundidade nao suportada ($($idx + 1))"
+        }
+        $indent = $Matches.indent.Length
+        $key = $Matches.token.Trim('"', "'")
+        $value = $Matches['v']
+        if ($indent -eq 2) {
+            if ($perm.Contains($key)) { throw "Markdown: permission duplicada $key" }
+            $mapKey = $null
+            if ([string]::IsNullOrEmpty($value)) { $perm[$key] = [ordered]@{}; $mapKey = $key }
+            else { $perm[$key] = $value }
+        } else {
+            if ($null -eq $mapKey -or [string]::IsNullOrEmpty($value)) { throw 'Markdown: mapa/acao invalida' }
+            if ($perm[$mapKey].Contains($key)) { throw "Markdown: padrao duplicado $key" }
+            $perm[$mapKey][$key] = $value
+        }
     }
-
+    if (-not $closed) { throw 'Markdown: frontmatter nao fechado' }
     return @{ mode = $mode; permission = $perm }
 }
 
@@ -158,12 +232,19 @@ function Get-OpenCodeReviewerRoPermissionFromJsonc {
     $agent = $obj.agent
     if ($null -eq $agent.PSObject.Properties['reviewer-ro']) { return $null }
     $rro = $agent.'reviewer-ro'
+    if ($rro.PSObject.Properties['tools']) { throw 'JSONC: tools ambiguo com contrato permission; migre pelo instalador' }
 
     $mode = if ($rro.PSObject.Properties['mode']) { [string]$rro.mode } else { $null }
     $permission = [ordered]@{}
     $tools = [ordered]@{}
     if ($rro.PSObject.Properties['permission']) {
-        foreach ($p in $rro.permission.PSObject.Properties) { $permission[$p.Name] = [string]$p.Value }
+        foreach ($p in $rro.permission.PSObject.Properties) {
+            if ($p.Value -is [pscustomobject]) {
+                $map = [ordered]@{}
+                foreach ($child in $p.Value.PSObject.Properties) { $map[$child.Name] = $child.Value }
+                $permission[$p.Name] = $map
+            } else { $permission[$p.Name] = $p.Value }
+        }
     }
     if ($rro.PSObject.Properties['tools']) {
         foreach ($p in $rro.tools.PSObject.Properties) { $tools[$p.Name] = $p.Value }
@@ -175,7 +256,7 @@ function Test-OpenCodeReviewerRoStatic {
     <#
         Check ESTATICO (barato/deterministico) da definicao do reviewer-ro. Prefere o project-local
         .opencode/agent/reviewer-ro.md relativo a -WorkingDirectory; se ausente, o bloco global do
-        opencode.jsonc. Valida a forma `permission`: "*"=deny, read/grep/glob/list=allow,
+        opencode.jsonc. Valida a forma canonica: "*"=deny, read=mapa, glob/list=allow, grep=deny,
         edit/bash/webfetch/websearch/task/external_directory=deny, mode=all.
         Devolve @{ ok = $bool; reason = <str>; source = <path/descricao> }.
     #>
@@ -202,15 +283,20 @@ function Test-OpenCodeReviewerRoStatic {
     }
     $def = $null
     $source = $null
+    try {
     if ($projectLocal) {
-        $def = Get-OpenCodeReviewerRoPermissionFromMarkdown -Path $projectLocal
         $source = $projectLocal
+        $def = Get-OpenCodeReviewerRoPermissionFromMarkdown -Path $projectLocal
     }
-    if ($null -eq $def) {
-        $def = Get-OpenCodeReviewerRoPermissionFromJsonc -Path $GlobalJsoncPath
+    else {
         $source = "global:$GlobalJsoncPath"
+        $def = Get-OpenCodeReviewerRoPermissionFromJsonc -Path $GlobalJsoncPath
+    }
+    } catch {
+        return @{ ok = $false; reason = 'static'; source = $source; detail = "definicao invalida: $($_.Exception.Message)" }
     }
     if ($null -eq $def) {
+        if ($projectLocal) { return @{ ok = $false; reason = 'static'; source = $source; detail = 'definicao local encontrada invalida; sem fallback global' } }
         return @{ ok = $false; reason = 'static'; source = $source
             detail = "definicao do reviewer-ro ausente (nem project-local .opencode/agent/reviewer-ro.md subindo de '$WorkingDirectory' nem global $GlobalJsoncPath). Rode scripts/Install-OpenCodeReviewerRoAgent.ps1 e/ou versione .opencode/agent/reviewer-ro.md." }
     }
@@ -221,28 +307,47 @@ function Test-OpenCodeReviewerRoStatic {
             detail = "reviewer-ro sem bloco 'permission' (forma antiga 'tools:'? migre com o instalador). Fonte: $source." }
     }
 
-    $problems = [System.Collections.Generic.List[string]]::new()
-    # `mode: all` e OBRIGATORIO (design D3: garante selecao por --agent em headless). Ausente
-    # tambem e divergencia — nao basta "se presente, ser all".
-    if ($def.mode -ne 'all') { $problems.Add("mode='$($def.mode)' (esperado 'all'; obrigatorio)") }
-
-    $star = if ($perm.Contains('*')) { $perm['*'] } else { $null }
-    if ($star -ne 'deny') { $problems.Add("'*'='$star' (esperado 'deny')") }
-
-    foreach ($a in $script:OpenCodeReviewerRoExpectedAllowSet) {
-        $v = if ($perm.Contains($a)) { $perm[$a] } else { $null }
-        if ($v -ne 'allow') { $problems.Add("'$a'='$v' (esperado 'allow')") }
+    $validation = Test-OpenCodeReviewerRoDefinition -Definition $def
+    if (-not $validation.ok) {
+        return @{ ok = $false; reason = 'static'; source = $source; detail = $validation.detail }
     }
-    foreach ($d in $script:OpenCodeReviewerRoExpectedDeny) {
-        $v = if ($perm.Contains($d)) { $perm[$d] } else { $null }
-        if ($v -ne 'deny') { $problems.Add("'$d'='$v' (esperado 'deny')") }
-    }
+    return @{ ok = $true; reason = $null; source = $source; detail = $validation.detail }
+}
 
-    if ($problems.Count -gt 0) {
-        return @{ ok = $false; reason = 'static'; source = $source
-            detail = "frontmatter do reviewer-ro divergente: $($problems -join '; '). Fonte: $source." }
+function Test-OpenCodeReviewerRoEffectiveRules {
+    # Ancora no catch-all final; todo o sufixo deve ter a forma canonica medida.
+    param([Parameter(Mandatory)] $Rules)
+    $rows = @($Rules)
+    $anchor = -1
+    for ($i = 0; $i -lt $rows.Count; $i++) {
+        if ($rows[$i].permission -ceq '*' -and $rows[$i].pattern -ceq '*') { $anchor = $i }
     }
-    return @{ ok = $true; reason = $null; source = $source; detail = 'frontmatter OK' }
+    if ($anchor -lt 0 -or $rows[$anchor].action -cne 'deny') { return @{ ok = $false; detail = 'catch-all final ausente/divergente' } }
+    $canonical = Get-OpenCodeReviewerRoCanonicalPermission
+    $offset = $anchor
+    foreach ($key in $canonical.Keys) {
+        $patterns = [ordered]@{ '*' = $canonical[$key] }
+        if ($canonical[$key] -is [System.Collections.IDictionary]) { $patterns = $canonical[$key] }
+        foreach ($pattern in $patterns.Keys) {
+            if ($offset -ge $rows.Count -or $rows[$offset].permission -cne $key -or $rows[$offset].pattern -cne $pattern -or $rows[$offset].action -cne $patterns[$pattern]) {
+                return @{ ok = $false; detail = "bloco efetivo divergente: esperado $key / $pattern / $($patterns[$pattern]) na posicao $offset" }
+            }
+            $offset++
+        }
+    }
+    # Unica excecao tardia medida: tool-output interno. Deve coincidir com a regra
+    # nativa ANTERIOR a ancora e com o diretorio interno conhecido; nao ampliar allows.
+    for ($i = $offset; $i -lt $rows.Count; $i++) {
+        $r = $rows[$i]
+        $native = @($rows | Select-Object -First $anchor | Where-Object {
+            $_.permission -ceq 'external_directory' -and $_.action -ceq 'allow' -and $_.pattern -ceq $r.pattern
+        })
+        if ($r.permission -cne 'external_directory' -or $r.action -cne 'allow' -or $native.Count -eq 0 -or
+            $r.pattern -notmatch '(?:^<SANITIZED_OPENCODE_TOOL_OUTPUT_DIR>|[\\/]opencode[\\/]tool-output)[\\/]\*$') {
+            return @{ ok = $false; detail = "regra tardia fora do contrato: $($r.permission) / $($r.pattern) / $($r.action)" }
+        }
+    }
+    return @{ ok = $true; detail = 'bloco efetivo canonico e excecoes internas OK' }
 }
 
 function Get-OpenCodeReviewerRoBlockFromAgentList {
@@ -295,6 +400,7 @@ function Resolve-OpenCodeReviewerRoAllowSet {
 
     $eff = [ordered]@{}
     $extStar = $null
+    $readRules = @($Rules | Where-Object { $_.permission -ceq 'read' })
     foreach ($r in $Rules) {
         $p = [string]$r.permission
         $a = [string]$r.action
@@ -302,10 +408,14 @@ function Resolve-OpenCodeReviewerRoAllowSet {
             if ([string]$r.pattern -eq '*') { $extStar = $a }
             continue
         }
-        $eff[$p] = $a
+        if ($p -cne 'read') { $eff[$p] = $a }
     }
+    # Read e mapa, nunca a acao da ultima excecao. So o bloco estrutural canonico
+    # pode promovê-lo ao conjunto de ferramentas disponiveis.
+    $policy = Test-OpenCodeReviewerRoEffectiveRules -Rules $Rules
+    if ($policy.ok) { $eff['read'] = 'allow' }
     $allow = @($eff.Keys | Where-Object { $eff[$_] -eq 'allow' } | Sort-Object)
-    return @{ allowSet = $allow; externalDirStar = $extStar; effective = $eff }
+    return @{ allowSet = $allow; externalDirStar = $extStar; effective = $eff; readRules = $readRules; policyOk = $policy.ok; policyDetail = $policy.detail }
 }
 
 function Get-OpenCodeAgentListLines {
@@ -368,7 +478,7 @@ function Get-OpenCodeReviewerRoAllowSetFromExe {
         return @{ ok = $false; error = "agente '$Name' nao encontrado / bloco ilegivel na saida de 'opencode agent list'." }
     }
     $resolved = Resolve-OpenCodeReviewerRoAllowSet -Rules $rules
-    return @{ ok = $true; allowSet = $resolved.allowSet; externalDirStar = $resolved.externalDirStar; error = $null }
+    return @{ ok = $true; allowSet = $resolved.allowSet; externalDirStar = $resolved.externalDirStar; policyOk = $resolved.policyOk; policyDetail = $resolved.policyDetail; error = $null }
 }
 
 function Get-OpenCodeVersionFromExe {
@@ -429,6 +539,9 @@ function Test-OpenCodeReviewerRoPrecheck {
     if (-not $al.ok) {
         return @{ pass = $false; reason = 'agentlist'; detail = $al.error }
     }
+    if (-not $al.policyOk) {
+        return @{ pass = $false; reason = 'allowset'; detail = $al.policyDetail }
+    }
     $expected = @($script:OpenCodeReviewerRoExpectedAllowSet | Sort-Object)
     $got = @($al.allowSet)
     $diff = Compare-Object -ReferenceObject $expected -DifferenceObject $got
@@ -436,7 +549,7 @@ function Test-OpenCodeReviewerRoPrecheck {
         return @{ pass = $false; reason = 'allowset'
             detail = "allow-set resolvido = {$($got -join ',')} != esperado {$($expected -join ',')}. Regra tardia da config global pode ter mudado a resolucao (ex.: bash reaparecendo)." }
     }
-    if ($al.externalDirStar -eq 'allow') {
+    if ($al.externalDirStar -ne 'deny') {
         return @{ pass = $false; reason = 'allowset'
             detail = "external_directory padrao '*' resolveu 'allow' — leitura NAO confinada ao cwd; confinamento quebrado." }
     }

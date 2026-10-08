@@ -1,0 +1,24 @@
+# Prova sintética — opencode debug agent, política FINAL, 1.18.33
+
+2026-10-08, Windows; Test-OpenCodeReviewerRoContentProtection.ps1. Sem chamada
+a modelo ou credencial real. Runtime do filho redirecionado ao temporário;
+isso não constitui isolamento absoluto (metadados de skills podem ser descobertos).
+33/33 casos passaram; Markdown project-local e JSONC global-only sintético.
+
+Em AMBAS as formas:
+- read negado por erro de permissão, sem conteúdo: .env, sub/.env.local,
+  service.env.production, .ENV, .env.example.local, service.env.example,
+  caminho absoluto de .env, sub/../.env, sub\.env.local e ordinary.txt externo.
+- read permitido com conteúdo: .env.example, sub/.env.example, README.md.
+- grep negado: stderr "Tool grep is disabled"; sem conteúdo.
+
+Cwd em subpasta de repositório Git (instance.worktree diferente do cwd):
+- ../.env negado; ../.env.example permitido.
+
+Nomes: glob e read de diretório exibiram .env. list: "Tool list not found";
+a permissão list permanece allow, sem construir substituto.
+
+Detector de negação usa "The user has specified a rule which prevents" ou
+desabilitação da ferramenta. Exit 1 sozinho não comprova bloqueio; ask não foi
+testado como comportamento headless por debug agent (a sonda deixa ask passar).
+Prova real run separada: read-outside-cwd-blocked.sample.txt.

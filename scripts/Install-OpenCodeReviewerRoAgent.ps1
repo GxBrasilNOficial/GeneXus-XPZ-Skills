@@ -152,11 +152,12 @@ function Build-ReviewerRoFragment {
         $key = $keys[$n]
         $val = $Permission[$key]
         $comma = if ($n -lt $keys.Count - 1) { ',' } else { '' }
-        [void]$sb.AppendLine("$i3`"$key`": `"$val`"$comma")
+        $jsonValue = ConvertTo-Json -InputObject $val -Depth 4 -Compress
+        [void]$sb.AppendLine("$i3`"$key`": $jsonValue$comma")
     }
     [void]$sb.AppendLine("$i2}")
     [void]$sb.Append("$Indent}")
-    return $sb.ToString()
+    return $sb.ToString().Replace("`r`n", $nl)
 }
 
 # ── Resolucao de caminhos ──────────────────────────────────────────────────────
@@ -175,10 +176,12 @@ $def = Get-OpenCodeReviewerRoPermissionFromMarkdown -Path $AgentMarkdownPath
 if ($null -eq $def -or $null -eq $def.permission -or $def.permission.Count -eq 0) {
     throw "BLOCK: nao foi possivel derivar o bloco `permission` do markdown: $AgentMarkdownPath"
 }
-$mode = if ($def.mode) { $def.mode } else { 'all' }
+$validation = Test-OpenCodeReviewerRoDefinition -Definition $def
+if (-not $validation.ok) { throw "BLOCK: fonte canonica invalida: $($validation.detail)" }
+$mode = $def.mode
 $desc = Get-AgentMarkdownDescription -Path $AgentMarkdownPath
 if ([string]::IsNullOrWhiteSpace($desc)) {
-    $desc = 'Revisor por pares sem execucao/escrita: le fontes (read/grep/glob/list) e emite um parecer.'
+    $desc = 'Revisor por pares sem execucao/escrita: le fontes (read/glob/list) e emite um parecer; grep negado.'
 }
 
 # Guarda de deriva: a definicao derivada tem de bater com a forma esperada (mesma do static check).
@@ -192,9 +195,23 @@ $existed = Test-Path -LiteralPath $JsoncPath -PathType Leaf
 $nl = "`n"
 if ($existed) {
     $raw = Get-Content -LiteralPath $JsoncPath -Raw -Encoding utf8
-    if ($raw -match "`r`n") { $nl = "`r`n" }
+    if ($raw.Contains("`r`n")) { $nl = "`r`n" }
 } else {
     $raw = ''
+}
+
+if (-not [string]::IsNullOrWhiteSpace($raw)) {
+    # O localizador e propositalmente restrito. Recusa comentarios com chaves,
+    # homonimos ou chaves escapadas antes da escrita, sem motor JSONC geral.
+    $existing = ConvertFrom-Jsonc -Raw $raw
+    foreach ($key in @('agent', 'reviewer-ro')) {
+        $count = ([regex]::Matches($raw, ('"' + [regex]::Escape($key) + '"\s*:'))).Count
+        $expectedCount = 0
+        if ($key -eq 'agent' -and $existing.PSObject.Properties['agent']) { $expectedCount = 1 }
+        if ($key -eq 'reviewer-ro' -and $existing.PSObject.Properties['agent'] -and $existing.agent.PSObject.Properties['reviewer-ro']) { $expectedCount = 1 }
+        if ($count -ne $expectedCount) { throw "BLOCK: chave aparente/homonima/escapada '$key'; localizacao ambigua." }
+    }
+    if ($raw -match '(?s)/\*(?:(?!\*/).)*[{}](?:(?!\*/).)*\*/|(?m)//[^\r\n]*[{}]') { throw 'BLOCK: comentario com chaves; localizacao ambigua.' }
 }
 
 $action = 'atualizar'
@@ -253,13 +270,16 @@ try { $parsed = ConvertFrom-Jsonc -Raw $new } catch { throw "BLOCK: JSONC result
 if ($null -eq $parsed.PSObject.Properties['agent'] -or $null -eq $parsed.agent.PSObject.Properties['reviewer-ro']) {
     throw 'BLOCK: apos a edicao o agent.reviewer-ro nao esta presente/parseavel.'
 }
-$rroPerm = $parsed.agent.'reviewer-ro'.permission
-if ($null -eq $rroPerm -or [string]$rroPerm.'*' -ne 'deny') {
-    throw "BLOCK: apos a edicao o reviewer-ro.permission['*'] nao resolveu 'deny'."
+$rroPerm = [ordered]@{}
+foreach ($p in $parsed.agent.'reviewer-ro'.permission.PSObject.Properties) {
+    if ($p.Value -is [pscustomobject]) {
+        $map = [ordered]@{}
+        foreach ($child in $p.Value.PSObject.Properties) { $map[$child.Name] = $child.Value }
+        $rroPerm[$p.Name] = $map
+    } else { $rroPerm[$p.Name] = $p.Value }
 }
-foreach ($a in @('read', 'grep', 'glob', 'list')) {
-    if ([string]$rroPerm.$a -ne 'allow') { throw "BLOCK: reviewer-ro.permission['$a'] != 'allow' apos edicao." }
-}
+$validation = Test-OpenCodeReviewerRoDefinition -Definition @{ mode = $parsed.agent.'reviewer-ro'.mode; permission = $rroPerm }
+if (-not $validation.ok) { throw "BLOCK: apos edicao: $($validation.detail)" }
 
 # ── Escrita ────────────────────────────────────────────────────────────────────
 if ($PSCmdlet.ShouldProcess($JsoncPath, "Instalar/atualizar agente global reviewer-ro ($action)")) {
@@ -269,6 +289,6 @@ if ($PSCmdlet.ShouldProcess($JsoncPath, "Instalar/atualizar agente global review
     }
     [System.IO.File]::WriteAllText($JsoncPath, $new, (Get-Utf8NoBomEncoding))
     Write-Output "OK: reviewer-ro global $action em $JsoncPath"
-    Write-Output "OK: derivado de $AgentMarkdownPath (mode=$mode; allow-set {read,grep,glob,list})"
+    Write-Output "OK: derivado de $AgentMarkdownPath (mode=$mode; read por mapa; allow-set {read,glob,list}; grep deny)"
     Write-Output "NEXT: valide com 'opencode agent list' (bloco reviewer-ro) e rode scripts/Test-OpenCodeReviewerRoSelfTest.ps1."
 }
