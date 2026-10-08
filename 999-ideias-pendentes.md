@@ -132,6 +132,10 @@ Entradas legadas sem avaliação carregam `FALTA AVALIAR` em ambos os campos at�
 
 **Registro da regra (já feito):** `13-revisao-pre-push.md` §5 e espelho no `08-guia-para-agente-gpt.md`. Este item é a mecanização dela.
 
+**Adendo — lembrete implementado em 2026-10-08, detector pendente.** O orquestrador agora inclui uma instrução fixa em `agentSemanticChecklist` que destaca a obrigação manual do `13` §5; não detecta irmãos, valida o relato ou demonstra eficácia. Os três incidentes acima antecedem o registro da regra em `dc85f04`; sua primeira aplicação encontrou três adapters irmãos sem faixa de `TimeoutSec` (ver `historico/IdeiasImplementadas_202609.md`, «Primeira aplicacao da regra de eixos vizinhos na pre-push»). Nas evidências consultadas nesta frente, não foi demonstrada falha posterior dessa regra manual. O caso histórico de projeção de `recoveredAfterTimeout` não ganha cobertura específica pelo lembrete quando a correção é isolada de projeção; se a frente também introduzir bloqueio, recusa ou validação, aplica-se o gatilho vigente, incluindo os caminhos de sensibilidade pertinentes. Regra inaplicável admite indicação sucinta; regra aplicável sem irmão encontrado exige conclusão justificada após análise.
+
+O detector continua não implementado e pendente como hipótese adiada a nova evidência, com as decisões acima em aberto. Preservam-se título, importância (impacto histórico) e maturidade; recalibração desses campos exige decisão humana separada. O adendo contextualiza a cronologia e delimita o lembrete, sem encerrar a pendência. Omissão comprovada apesar do lembrete ou ruído recorrente pode motivar nova discussão do detector com evidências dos relatos normais de frentes reais, sem métricas automáticas nem compromisso de implementação.
+
 ## Centralizar a fonte de verdade do conjunto de backends/adapters (três níveis)
 
 - **Importância** — média (o modo de falha já se materializou **nove vezes numa única frente**, em três classes distintas, e é invisível para os gates atuais).

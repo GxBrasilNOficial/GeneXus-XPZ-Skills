@@ -794,6 +794,7 @@ $nonProseModelDiversityThreshold = 5
 $agentSemanticChecklist = [System.Collections.Generic.List[string]]::new()
 [void]$agentSemanticChecklist.Add('Fase semantica: seguir integralmente 13-revisao-pre-push.md na raiz (fonte autoritativa; AGENTS.md resume).')
 [void]$agentSemanticChecklist.Add('Nao tratar exit 0 deste passo mecanico como pre-push concluida.')
+[void]$agentSemanticChecklist.Add('Eixos vizinhos: aplicar a regra do 13 §5 e registrar no relatório os caminhos examinados, as evidências e o resultado por eixo; quando não se aplicar, indicar isso sucintamente.')
 if ($nonProseVerdictRequired.Count -gt 0) {
     [void]$agentSemanticChecklist.Add(
         ("{0} candidata(s) NAO-PROSA do gate de propagacao exigem VEREDITO INDIVIDUAL (livro-razao item a item: cada uma com arquivo:linha, a lista/tabela/exemplo gemeo no outro documento e veredito gap|justificado). Proibida justificativa coletiva. Lista completa em nonProseVerdictRequired." -f $nonProseVerdictRequired.Count)
