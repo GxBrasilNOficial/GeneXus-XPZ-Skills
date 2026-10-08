@@ -1123,7 +1123,7 @@ o opencode **não** tem `-Cd` (a contenção é pelo cwd herdado).
 **Workaround (materializar dir plano):** rodar o opencode de um cwd **fora de worktree**. Para
 revisar o estado de um worktree sem o gitlink, materialize-o num diretório plano curto e rode de
 lá (o dossiê vai por **stdin**, então independe do cwd; o cwd só precisa conter os arquivos para o
-`read`/`grep`/`glob` do `reviewer-ro`):
+`read`/`glob` do `reviewer-ro`):
 
 ```powershell
 # 1) materializa o HEAD do worktree num dir plano (sem .git)

@@ -326,7 +326,7 @@ sem mode
     Assert-True ([string]$g3parsed.agent.'reviewer-ro'.permission.read.'*.env' -eq 'deny') "(g3) arquivo novo com mapa read valido"
 
     # (g4) chave `reviewer-ro` HOMONIMA fora de `agent` (em metadata) + agent sem reviewer-ro:
-    # o instalador deve escopar ao bloco agent (inserir agent.reviewer-ro) SEM tocar o homonimo.
+    # o instalador deve recusar a homonimia antes da escrita, preservando o arquivo intacto.
     $g4 = Join-Path $tempRoot 'g4-homonimo.jsonc'
     @'
 {

@@ -219,8 +219,8 @@ function Get-OpenCodeReviewerRoPermissionFromMarkdown {
 function Get-OpenCodeReviewerRoPermissionFromJsonc {
     <#
         Le o bloco agent.reviewer-ro do opencode.jsonc global e devolve
-        @{ mode; permission = @{...} }. Tolera a forma antiga `tools:` (interino) devolvendo
-        tools em vez de permission (o chamador decide). Devolve $null se ausente.
+        @{ mode; permission = @{...} }, preservando mapas e ordem. Rejeita a forma antiga
+        `tools:` (interino); migre pelo instalador. Devolve $null se ausente.
     #>
     param([Parameter(Mandatory)] [string] $Path)
 
