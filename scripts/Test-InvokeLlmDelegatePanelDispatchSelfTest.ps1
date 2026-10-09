@@ -59,6 +59,7 @@ $env:XPZ_CODEX_DISABLE_KEEPDAYS = '1'
 # Guard D1/D2: versao testada dos fixtures (o fake-opencode a devolve em --version p/ o pre-check)
 $repoRoot = Split-Path -Parent $scriptsDir
 $env:PANEL_FAKE_OC_VERSION = ((Get-Content -LiteralPath (Join-Path $repoRoot 'xpz-llm-delegate\fixtures\opencode-reviewer-ro\VERSION.txt') -Raw -Encoding utf8).Trim())
+$env:PANEL_FAKE_OC_AGENTLIST = Join-Path $repoRoot 'xpz-llm-delegate\fixtures\opencode-reviewer-ro\agentlist-reviewer-ro.sample.txt'
 
 # cwd deterministica na raiz do repo: o pre-check do opencode (default reviewer-ro) descobre o
 # project-local .opencode/agent/reviewer-ro.md subindo do cwd herdado (harness in-process E filho).
@@ -78,20 +79,8 @@ $a = @($args)
 # pre-check (--version + agent list). Responder ANTES de ler stdin/model, sem consumir stdin.
 if ($a -contains '--version') { $env:PANEL_FAKE_OC_VERSION; exit 0 }
 if ($a.Count -ge 2 -and $a[0] -eq 'agent' -and $a[1] -eq 'list') {
-    'reviewer-ro (all)'
-    '['
-    '{"permission":"*","action":"deny","pattern":"*"},'
-    '{"permission":"read","action":"allow","pattern":"*"},'
-    '{"permission":"grep","action":"allow","pattern":"*"},'
-    '{"permission":"glob","action":"allow","pattern":"*"},'
-    '{"permission":"list","action":"allow","pattern":"*"},'
-    '{"permission":"edit","action":"deny","pattern":"*"},'
-    '{"permission":"bash","action":"deny","pattern":"*"},'
-    '{"permission":"webfetch","action":"deny","pattern":"*"},'
-    '{"permission":"websearch","action":"deny","pattern":"*"},'
-    '{"permission":"task","action":"deny","pattern":"*"},'
-    '{"permission":"external_directory","action":"deny","pattern":"*"}'
-    ']'
+    # Usa a captura versionada da politica efetiva, sem duplicar o contrato no fake.
+    Get-Content -LiteralPath $env:PANEL_FAKE_OC_AGENTLIST -Encoding utf8
     exit 0
 }
 # Catalogo (`models <provider> --verbose`): cabecalho com a chave + JSON do modelo. Modelos com
@@ -1305,6 +1294,7 @@ finally {
     Remove-Item Env:\PANEL_FAKE_LOG -ErrorAction SilentlyContinue
     Remove-Item Env:\PANEL_FAKE_MUTEX -ErrorAction SilentlyContinue
     Remove-Item Env:\PANEL_FAKE_OC_VERSION -ErrorAction SilentlyContinue
+    Remove-Item Env:\PANEL_FAKE_OC_AGENTLIST -ErrorAction SilentlyContinue
     if ($null -eq $script:prevCodexDisableKeepDays) {
         Remove-Item Env:\XPZ_CODEX_DISABLE_KEEPDAYS -ErrorAction SilentlyContinue
     } else {
