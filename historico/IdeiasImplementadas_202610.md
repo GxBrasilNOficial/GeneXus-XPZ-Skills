@@ -47,7 +47,7 @@ Entrada original no 999 (Importância média; Maturidade pronta para implementar
 
 ### Residuais
 
-A fiação do instalador na `xpz-skills-setup` (detectar a deriva na auditoria pós-`git pull` e oferecer a reinstalação com confirmação) continua aberta na entrada própria do 999 (fechada no mesmo dia; ver a entrada `xpz-skills-setup` oferecer instalar o agente `reviewer-ro` acima). O gate pré-push só lembra quem faz o push; outras máquinas que puxarem o contrato novo dependem dessa fiação ou de reinstalação manual.
+Quando esta frente foi registrada, a fiação do instalador na `xpz-skills-setup` (detectar a deriva na auditoria pós-`git pull` e oferecer a reinstalação com confirmação) ficou aberta numa entrada própria do 999. Ela foi concluída no mesmo dia, em `8b6c0a0` e `775b6a1`; ver [`xpz-skills-setup` oferecer instalar o agente `reviewer-ro` do OpenCode](#xpz-skills-setup-oferecer-instalar-o-agente-reviewer-ro-do-opencode-resolução-ativa-do-gap). O gate pré-push só lembra quem faz o push; outra máquina que puxar o contrato novo é avisada pela auditoria da `xpz-skills-setup`, se alguém a rodar, ou, sem ela, só no despacho pelo guard fail-closed.
 
 ### Rastreabilidade
 
