@@ -54,31 +54,53 @@ function Get-OpenCodeReviewerRoCanonicalPermission {
 }
 
 function Test-OpenCodeReviewerRoDefinition {
+    <# Acumula TODAS as divergencias (nao para na primeira) para o diagnostico mostrar o reparo
+       inteiro; qualquer divergencia mantem ok=$false (fail-closed inalterado). Devolve
+       @{ ok; detail = divergencias unidas por '; '; divergences = @(...) }. #>
     param($Definition)
-    if ($null -eq $Definition -or $Definition.mode -cne 'all') {
-        return @{ ok = $false; detail = "mode obrigatorio: all / definicao invalida" }
+    $div = [System.Collections.Generic.List[string]]::new()
+    if ($null -eq $Definition) {
+        return @{ ok = $false; detail = 'mode obrigatorio: all / definicao invalida'; divergences = @('mode obrigatorio: all / definicao invalida') }
     }
+    if ($Definition.mode -cne 'all') { $div.Add('mode obrigatorio: all / definicao invalida') }
     $want = Get-OpenCodeReviewerRoCanonicalPermission
     $got = $Definition.permission
-    if ($got -isnot [System.Collections.IDictionary] -or (@($got.Keys) -join "`n") -cne (@($want.Keys) -join "`n")) {
-        return @{ ok = $false; detail = 'permission: chaves/ordem divergentes do contrato canonico' }
-    }
-    foreach ($key in $want.Keys) {
-        if ($want[$key] -is [System.Collections.IDictionary]) {
-            $map = $got[$key]
-            if ($map -isnot [System.Collections.IDictionary] -or (@($map.Keys) -join "`n") -cne (@($want[$key].Keys) -join "`n")) {
-                return @{ ok = $false; detail = "mapa ${key}: chaves/ordem divergentes" }
-            }
-            foreach ($pattern in $want[$key].Keys) {
-                if ($map[$pattern] -isnot [string] -or $map[$pattern] -cne $want[$key][$pattern]) {
-                    return @{ ok = $false; detail = "mapa ${key}: acao divergente para $pattern" }
+    if ($got -isnot [System.Collections.IDictionary]) {
+        $div.Add('permission: ausente ou nao e mapa')
+    } else {
+        $gotKeys = @($got.Keys)
+        if (($gotKeys -join "`n") -cne (@($want.Keys) -join "`n")) {
+            $missing = @($want.Keys | Where-Object { $gotKeys -cnotcontains $_ })
+            $extra = @($gotKeys | Where-Object { @($want.Keys) -cnotcontains $_ })
+            $msg = 'permission: chaves/ordem divergentes do contrato canonico'
+            if ($missing.Count -gt 0) { $msg += " (ausentes: $($missing -join ','))" }
+            if ($extra.Count -gt 0) { $msg += " (extras: $($extra -join ','))" }
+            $div.Add($msg)
+        }
+        foreach ($key in $want.Keys) {
+            if (-not $got.Contains($key)) { continue }
+            if ($want[$key] -is [System.Collections.IDictionary]) {
+                $map = $got[$key]
+                if ($map -isnot [System.Collections.IDictionary]) {
+                    $div.Add("mapa ${key}: chaves/ordem divergentes (esperado mapa, encontrado escalar '$map')")
+                    continue
                 }
+                if ((@($map.Keys) -join "`n") -cne (@($want[$key].Keys) -join "`n")) {
+                    $div.Add("mapa ${key}: chaves/ordem divergentes")
+                }
+                foreach ($pattern in $want[$key].Keys) {
+                    if (-not $map.Contains($pattern)) { continue }
+                    if ($map[$pattern] -isnot [string] -or $map[$pattern] -cne $want[$key][$pattern]) {
+                        $div.Add("mapa ${key}: acao divergente para $pattern")
+                    }
+                }
+            } elseif ($got[$key] -isnot [string] -or $got[$key] -cne $want[$key]) {
+                $div.Add("permission ${key}: acao divergente")
             }
-        } elseif ($got[$key] -isnot [string] -or $got[$key] -cne $want[$key]) {
-            return @{ ok = $false; detail = "permission ${key}: acao divergente" }
         }
     }
-    return @{ ok = $true; detail = 'definicao canonica OK' }
+    if ($div.Count -gt 0) { return @{ ok = $false; detail = ($div -join '; '); divergences = @($div) } }
+    return @{ ok = $true; detail = 'definicao canonica OK'; divergences = @() }
 }
 
 function Get-OpenCodeReviewerRoFixtureDir {
@@ -258,7 +280,8 @@ function Test-OpenCodeReviewerRoStatic {
         .opencode/agent/reviewer-ro.md relativo a -WorkingDirectory; se ausente, o bloco global do
         opencode.jsonc. Valida a forma canonica: "*"=deny, read=mapa, glob/list=allow, grep=deny,
         edit/bash/webfetch/websearch/task/external_directory=deny, mode=all.
-        Devolve @{ ok = $bool; reason = <str>; source = <path/descricao> }.
+        Devolve @{ ok = $bool; reason = <str>; source = <path/descricao>; detail = <str> } e, quando a
+        definicao foi lida e comparada, `divergences` (lista completa; vazia se canonica).
     #>
     param(
         [string] $WorkingDirectory = (Get-Location).Path,
@@ -309,9 +332,9 @@ function Test-OpenCodeReviewerRoStatic {
 
     $validation = Test-OpenCodeReviewerRoDefinition -Definition $def
     if (-not $validation.ok) {
-        return @{ ok = $false; reason = 'static'; source = $source; detail = $validation.detail }
+        return @{ ok = $false; reason = 'static'; source = $source; detail = $validation.detail; divergences = $validation.divergences }
     }
-    return @{ ok = $true; reason = $null; source = $source; detail = $validation.detail }
+    return @{ ok = $true; reason = $null; source = $source; detail = $validation.detail; divergences = @() }
 }
 
 function Test-OpenCodeReviewerRoEffectiveRules {

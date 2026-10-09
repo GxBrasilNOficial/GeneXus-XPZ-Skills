@@ -384,6 +384,12 @@ $historyCommitGate = [ordered]@{
     findings = @()
 }
 
+$reviewerRoDriftGate = [ordered]@{
+    script   = 'scripts/Test-PrePushOpenCodeReviewerRoDrift.ps1'
+    status   = 'skipped'
+    findings = @()
+}
+
 $gateEnumParityGate = [ordered]@{
     script   = 'scripts/Test-PrePushGateEnumerationParity.ps1'
     status   = 'skipped'
@@ -615,6 +621,30 @@ if (Test-Path -LiteralPath $historyCommitScript -PathType Leaf) {
     }
 }
 
+$reviewerRoDriftScript = Join-Path $PSScriptRoot 'Test-PrePushOpenCodeReviewerRoDrift.ps1'
+if (Test-Path -LiteralPath $reviewerRoDriftScript -PathType Leaf) {
+    $reviewerRoDriftOutput = & $reviewerRoDriftScript -RootPath $resolvedRoot -BaseRef $effectiveBaseRef -ChangedFiles $changedFiles -AsJson 2>&1
+    $reviewerRoDriftExitCode = $LASTEXITCODE
+    $reviewerRoDriftJsonText = ($reviewerRoDriftOutput | ForEach-Object { $_.ToString() }) -join [Environment]::NewLine
+    $reviewerRoDriftObject = $null
+    if (-not [string]::IsNullOrWhiteSpace($reviewerRoDriftJsonText)) {
+        $reviewerRoDriftObject = $reviewerRoDriftJsonText | ConvertFrom-Json
+    }
+
+    if ($reviewerRoDriftExitCode -eq 0 -and $null -ne $reviewerRoDriftObject) {
+        $reviewerRoDriftGate.status = $reviewerRoDriftObject.status
+        $reviewerRoDriftGate.findings = @($reviewerRoDriftObject.findings)
+    } else {
+        $reviewerRoDriftGate.status = 'warn'
+        $reviewerRoDriftGate.findings = @([pscustomobject][ordered]@{
+            code     = 'OPENCODE_REVIEWER_RO_DRIFT_SCRIPT_ERROR'
+            severity = 'warn'
+            path     = 'scripts/Test-PrePushOpenCodeReviewerRoDrift.ps1'
+            message  = "Falha consultiva ao executar Test-PrePushOpenCodeReviewerRoDrift.ps1: $reviewerRoDriftJsonText"
+        })
+    }
+}
+
 $gateEnumParityScript = Join-Path $PSScriptRoot 'Test-PrePushGateEnumerationParity.ps1'
 if (Test-Path -LiteralPath $gateEnumParityScript -PathType Leaf) {
     $gateEnumOutput = & $gateEnumParityScript -RootPath $resolvedRoot -BaseRef $effectiveBaseRef -ChangedFiles $changedFiles -AsJson 2>&1
@@ -763,6 +793,11 @@ foreach ($historyCommitFinding in @($historyCommitGate.findings)) {
         ("Placeholder de rastreabilidade em historico (candidata consultiva) ({0}): {1} [{2}]" -f $historyCommitFinding.code, $historyCommitFinding.message, $historyCommitFinding.path)
     )
 }
+foreach ($reviewerRoDriftFinding in @($reviewerRoDriftGate.findings)) {
+    [void]$agentWarnings.Add(
+        ("Deriva do reviewer-ro global (aviso consultivo) ({0}): {1} [{2}]" -f $reviewerRoDriftFinding.code, $reviewerRoDriftFinding.message, $reviewerRoDriftFinding.path)
+    )
+}
 foreach ($gateEnumFinding in @($gateEnumParityGate.findings)) {
     [void]$agentWarnings.Add(
         ("Enumeracao de gates defasada na doc (candidata consultiva) ({0}): {1} [{2}]" -f $gateEnumFinding.code, $gateEnumFinding.message, $gateEnumFinding.path)
@@ -846,6 +881,7 @@ $result = [ordered]@{
         newTokenPropagation  = $newTokenPropagationGate
         sharedScriptSkillCoverage = $sharedScriptSkillGate
         historyCommitPlaceholder = $historyCommitGate
+        openCodeReviewerRoDrift = $reviewerRoDriftGate
         gateEnumerationParity = $gateEnumParityGate
         backendEnumerationParity = $backendEnumParityGate
     }
@@ -948,6 +984,11 @@ if ($AsJson) {
     Write-Output ("HISTORY_COMMIT_PLACEHOLDER_GATE={0}" -f $historyCommitGate.status)
     foreach ($finding in @($historyCommitGate.findings)) {
         Write-Output ("HISTORY_COMMIT_FIELD_PLACEHOLDER: {0}: {1}" -f $finding.path, $finding.message)
+    }
+
+    Write-Output ("OPENCODE_REVIEWER_RO_DRIFT_GATE={0}" -f $reviewerRoDriftGate.status)
+    foreach ($finding in @($reviewerRoDriftGate.findings)) {
+        Write-Output ("OPENCODE_REVIEWER_RO_CONTRACT_CHANGED: {0}: {1}" -f $finding.path, $finding.message)
     }
 
     Write-Output ("GATE_ENUMERATION_PARITY_GATE={0}" -f $gateEnumParityGate.status)

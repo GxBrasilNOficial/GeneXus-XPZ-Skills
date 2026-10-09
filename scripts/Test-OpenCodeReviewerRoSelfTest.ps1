@@ -18,7 +18,9 @@
       (e) pos-check le/varre o warning de fallback silencioso;
       (f) regressao: reviewer-ro NAO habilita edit/webfetch (deny na resolucao);
       (g) instalador global preserva comentarios/formatacao/demais chaves do opencode.jsonc
-          (migracao tools:->permission; insercao; arquivo novo).
+          (migracao tools:->permission; insercao; arquivo novo), faz backup identico ao original
+          antes de gravar, e idempotente (ja canonico => sem gravacao nem backup) e respeita -WhatIf;
+      (multi-divergencia) a validacao estatica lista TODAS as divergencias, sem afrouxar o bloqueio.
 
     (a) default `-Agent reviewer-ro` no argv (sincrono E assincrono), o BLOCK do adapter ANTES do
     run/Start-Process, o opt-out (`-Agent <x>`) e o pos-check sincrono end-to-end tambem sao
@@ -295,11 +297,39 @@ sem mode
   } /* fim */
 }
 '@ | Set-Content -LiteralPath $g1 -Encoding utf8
-    & $installer -JsoncPath $g1 -AgentMarkdownPath $agentMd | Out-Null
+    $g1beforeBytes = [System.IO.File]::ReadAllBytes($g1)
+    $g1out = @(& $installer -JsoncPath $g1 -AgentMarkdownPath $agentMd)
     $g1raw = Get-Content -LiteralPath $g1 -Raw -Encoding utf8
     $g1parsed = ConvertFrom-Jsonc -Raw $g1raw
     Assert-True (($g1raw -match '// topo preservar') -and ($g1raw -match '/\* fim \*/') -and ($g1raw -match '"instructions"')) "(g1) migracao preserva comentarios + demais chaves"
     Assert-True ([string]$g1parsed.agent.'reviewer-ro'.permission.'*' -eq 'deny' -and $null -eq $g1parsed.agent.'reviewer-ro'.PSObject.Properties['tools']) "(g1) tools: removido; permission '*'=deny"
+
+    # (g1-backup) gravacao sobre arquivo existente => exatamente 1 backup na MESMA pasta, bytes
+    # identicos ao original, caminho no stdout.
+    $g1backups = @(Get-ChildItem -LiteralPath $tempRoot -File -Filter 'g1.jsonc.rro-backup-*')
+    Assert-True ($g1backups.Count -eq 1) "(g1-backup) exatamente 1 backup criado na mesma pasta (got: $($g1backups.Count))"
+    if ($g1backups.Count -eq 1) {
+        $g1backupBytes = [System.IO.File]::ReadAllBytes($g1backups[0].FullName)
+        Assert-True ([System.Linq.Enumerable]::SequenceEqual([byte[]]$g1backupBytes, [byte[]]$g1beforeBytes)) "(g1-backup) backup byte a byte identico ao original"
+        Assert-True ($g1backups[0].Name -match '^g1\.jsonc\.rro-backup-\d{8}-\d{6}-[0-9a-f]{8}$') "(g1-backup) nome com timestamp + sufixo curto, sem extensao .json/.jsonc (got: $($g1backups[0].Name))"
+        Assert-True ((@($g1out) -join "`n").Contains($g1backups[0].FullName)) "(g1-backup) caminho do backup informado no stdout"
+    }
+
+    # (g1-idempotente) segunda execucao sobre conteudo ja canonico => sem gravacao e sem backup novo.
+    $g1afterBytes = [System.IO.File]::ReadAllBytes($g1)
+    $g1mtime = (Get-Item -LiteralPath $g1).LastWriteTimeUtc
+    $g1again = @(& $installer -JsoncPath $g1 -AgentMarkdownPath $agentMd)
+    Assert-True ((@($g1again) -join "`n") -match 'ja canonico') "(g1-idempotente) instalador reporta 'ja canonico' (got: $(@($g1again) -join ' | '))"
+    Assert-True ([System.Linq.Enumerable]::SequenceEqual([byte[]][System.IO.File]::ReadAllBytes($g1), [byte[]]$g1afterBytes) -and (Get-Item -LiteralPath $g1).LastWriteTimeUtc -eq $g1mtime) "(g1-idempotente) arquivo nao regravado"
+    Assert-True (@(Get-ChildItem -LiteralPath $tempRoot -File -Filter 'g1.jsonc.rro-backup-*').Count -eq 1) "(g1-idempotente) nenhum backup novo"
+
+    # (g1-whatif) -WhatIf sobre arquivo divergente => nem gravacao nem backup.
+    $gw = Join-Path $tempRoot 'gw.jsonc'
+    '{ "agent": { "reviewer-ro": { "mode": "all", "permission": { "*": "deny", "read": "allow" } } } }' | Set-Content -LiteralPath $gw -Encoding utf8
+    $gwBefore = [System.IO.File]::ReadAllBytes($gw)
+    & $installer -JsoncPath $gw -AgentMarkdownPath $agentMd -WhatIf | Out-Null
+    Assert-True ([System.Linq.Enumerable]::SequenceEqual([byte[]][System.IO.File]::ReadAllBytes($gw), [byte[]]$gwBefore)) "(g1-whatif) -WhatIf nao grava"
+    Assert-True (@(Get-ChildItem -LiteralPath $tempRoot -File -Filter 'gw.jsonc.rro-backup-*').Count -eq 0) "(g1-whatif) -WhatIf nao cria backup"
 
     # (g2) insercao em agent existente sem reviewer-ro
     $g2 = Join-Path $tempRoot 'g2.jsonc'
@@ -324,6 +354,25 @@ sem mode
     Assert-True (Test-Path -LiteralPath $g3) "(g3) arquivo novo criado"
     $g3parsed = ConvertFrom-Jsonc -Raw (Get-Content -LiteralPath $g3 -Raw -Encoding utf8)
     Assert-True ([string]$g3parsed.agent.'reviewer-ro'.permission.read.'*.env' -eq 'deny') "(g3) arquivo novo com mapa read valido"
+    Assert-True (@(Get-ChildItem -LiteralPath $tempRoot -File -Filter 'g3-novo.jsonc.rro-backup-*').Count -eq 0) "(g3) arquivo novo => sem backup (nada a preservar)"
+
+    # (multi-divergencia) forma anterior ao contrato de 2026-10-08 (read escalar + grep allow): a
+    # validacao lista AS DUAS divergencias, nao so a primeira, e continua bloqueando.
+    $oldForm = [ordered]@{
+        '*' = 'deny'; read = 'allow'; grep = 'allow'; glob = 'allow'; list = 'allow'; edit = 'deny'; bash = 'deny'
+        webfetch = 'deny'; websearch = 'deny'; task = 'deny'; external_directory = 'deny'
+    }
+    $md = Test-OpenCodeReviewerRoDefinition -Definition @{ mode = 'all'; permission = $oldForm }
+    Assert-True ((-not $md.ok) -and @($md.divergences).Count -eq 2) "(multi-divergencia) 2 divergencias acumuladas (got: $(@($md.divergences).Count): $($md.detail))"
+    Assert-True (($md.detail -match 'mapa read') -and ($md.detail -match 'permission grep: acao divergente')) "(multi-divergencia) detail cita read E grep"
+    $mdMode = Test-OpenCodeReviewerRoDefinition -Definition @{ mode = 'primary'; permission = $oldForm }
+    Assert-True ((-not $mdMode.ok) -and @($mdMode.divergences).Count -eq 3 -and $mdMode.detail -match 'mode') "(multi-divergencia) mode divergente soma as demais (got: $(@($mdMode.divergences).Count))"
+    $mdOk = Test-OpenCodeReviewerRoDefinition -Definition @{ mode = 'all'; permission = (Get-OpenCodeReviewerRoCanonicalPermission) }
+    Assert-True ($mdOk.ok -and @($mdOk.divergences).Count -eq 0) "(multi-divergencia) controle: canonico => ok sem divergencias"
+    $gOld = Join-Path $tempRoot 'g-old-form.jsonc'
+    '{ "agent": { "reviewer-ro": { "description": "x", "mode": "all", "permission": { "*": "deny", "read": "allow", "grep": "allow", "glob": "allow", "list": "allow", "edit": "deny", "bash": "deny", "webfetch": "deny", "websearch": "deny", "task": "deny", "external_directory": "deny" } } } }' | Set-Content -LiteralPath $gOld -Encoding utf8
+    $stOld = Test-OpenCodeReviewerRoStatic -WorkingDirectory $emptyWd -GlobalJsoncPath $gOld
+    Assert-True ((-not $stOld.ok) -and $stOld.reason -eq 'static' -and @($stOld.divergences).Count -eq 2) "(multi-divergencia) static global repassa a lista completa (got: $($stOld.detail))"
 
     # (g4) chave `reviewer-ro` HOMONIMA fora de `agent` (em metadata) + agent sem reviewer-ro:
     # o instalador deve recusar a homonimia antes da escrita, preservando o arquivo intacto.

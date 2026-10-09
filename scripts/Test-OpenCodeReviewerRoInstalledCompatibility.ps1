@@ -10,6 +10,10 @@
     Este script e diagnostico: uma versao nova com allow-set OK retorna status
     needsFixtureRecapture, nao compatible. Para promover a versao, recapture os fixtures
     empiricos exigidos pela xpz-llm-delegate e atualize a versao testada.
+
+    Com bloqueio `static`, `static.divergences` lista TODAS as divergencias e `nextAction` aponta o
+    reparo: o instalador (Install-OpenCodeReviewerRoAgent.ps1) quando a fonte e o opencode.jsonc
+    global; a correcao do markdown quando a fonte e um project-local.
 #>
 [CmdletBinding()]
 param(
@@ -53,7 +57,15 @@ if ($allow -and $allow.ok -and -not $externalDirectoryOk) { $blockingReasons.Add
 
 $status = 'blocked'
 $nextAction = 'Corrigir os bloqueios estruturais antes de usar reviewer-ro.'
-if ($blockingReasons.Count -eq 0) {
+if (-not $static.ok) {
+    if ([string]$static.source -like 'global:*') {
+        # Definicao global ausente/divergente: o reparo e o instalador (faz backup; -WhatIf antes).
+        $installerPath = Join-Path $PSScriptRoot 'Install-OpenCodeReviewerRoAgent.ps1'
+        $nextAction = "Reinstalar o reviewer-ro global: pwsh -NoProfile -File `"$installerPath`" -WhatIf; depois sem -WhatIf (faz backup do opencode.jsonc). Em seguida, rodar este diagnostico de novo."
+    } else {
+        $nextAction = "Corrigir a definicao project-local $($static.source) para o contrato canonico (.opencode/agent/reviewer-ro.md do repositorio GeneXus-XPZ-Skills); o instalador global nao a substitui."
+    }
+} elseif ($blockingReasons.Count -eq 0) {
     if ($versionKnown) {
         $status = 'compatible'
         $nextAction = 'Pode usar reviewer-ro com esta versao testada.'

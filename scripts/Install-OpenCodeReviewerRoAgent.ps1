@@ -16,6 +16,11 @@
         ConvertTo-Json). NAO reusa Read-McpRoot (hardcoded p/ mcpServers).
       - MIGRACAO: se o reviewer-ro global estiver na forma antiga `tools: { edit:false, ... }`
         (interino), substitui pela forma `permission` (default-deny curinga + allowlist).
+      - IDEMPOTENCIA: se o texto resultante for identico (byte a byte, apos leitura UTF-8) ao atual,
+        nao grava nem faz backup; reporta "ja canonico".
+      - BACKUP: antes de gravar sobre arquivo existente, copia-o na MESMA pasta como
+        `<arquivo>.rro-backup-<yyyyMMdd-HHmmss>-<guid8>` (Copy sem sobrescrever) e imprime o caminho,
+        nunca o conteudo. -WhatIf nao grava nem faz backup.
 
     Espelha convencoes de scripts/Install-CursorGlobalInstructionsMcp.ps1 (Get-ProfileRoot,
     UTF-8 sem BOM, SupportsShouldProcess).
@@ -281,14 +286,32 @@ foreach ($p in $parsed.agent.'reviewer-ro'.permission.PSObject.Properties) {
 $validation = Test-OpenCodeReviewerRoDefinition -Definition @{ mode = $parsed.agent.'reviewer-ro'.mode; permission = $rroPerm }
 if (-not $validation.ok) { throw "BLOCK: apos edicao: $($validation.detail)" }
 
+# ── Idempotencia: resultado identico ao atual => nada a gravar, sem backup ─────
+if ($existed -and $new -ceq $raw) {
+    Write-Output "OK: reviewer-ro global ja canonico em $JsoncPath (nada gravado, sem backup)"
+    return
+}
+
 # ── Escrita ────────────────────────────────────────────────────────────────────
 if ($PSCmdlet.ShouldProcess($JsoncPath, "Instalar/atualizar agente global reviewer-ro ($action)")) {
     $dir = Split-Path -Parent $JsoncPath
     if (-not (Test-Path -LiteralPath $dir -PathType Container)) {
         New-Item -ItemType Directory -Path $dir -Force | Out-Null
     }
+    # Backup do arquivo preexistente ANTES de gravar (padrao de Install-ClaudeCodePreToolUseSafeAllow.ps1):
+    # mesma pasta (o opencode.jsonc pode ter chaves de provedor; a copia nao sai dali e o conteudo
+    # nunca e impresso), timestamp + sufixo GUID curto, Copy sem sobrescrever. O sufixo nao termina em
+    # .json/.jsonc, entao o opencode nao o carrega como configuracao.
+    $backup = $null
+    if ($existed) {
+        $stamp = (Get-Date).ToString('yyyyMMdd-HHmmss')
+        $suffix = [System.Guid]::NewGuid().ToString('N').Substring(0, 8)
+        $backup = "$JsoncPath.rro-backup-$stamp-$suffix"
+        [System.IO.File]::Copy($JsoncPath, $backup, $false)
+    }
     [System.IO.File]::WriteAllText($JsoncPath, $new, (Get-Utf8NoBomEncoding))
     Write-Output "OK: reviewer-ro global $action em $JsoncPath"
+    if ($backup) { Write-Output "OK: backup do arquivo anterior em $backup" }
     Write-Output "OK: derivado de $AgentMarkdownPath (mode=$mode; read por mapa; allow-set {read,glob,list}; grep deny)"
     Write-Output "NEXT: valide com 'opencode agent list' (bloco reviewer-ro) e rode scripts/Test-OpenCodeReviewerRoSelfTest.ps1."
 }
