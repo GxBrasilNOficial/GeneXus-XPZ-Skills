@@ -236,6 +236,10 @@ D2/D3.
   `#1+#2` em `historico/IdeiasImplementadas_202607.md`; nota `:484` no `999`.
 - **Parcial:** `xpz-skills-setup/SKILL.md` — só ponteiro de dependência (`:63-64`); fiação ativa
   pendente (`999:491-497`).
+  > **Atualização 2026-10-09:** a fiação ativa foi implementada — a `xpz-skills-setup` audita o
+  > `reviewer-ro` global e oferece o instalador com confirmação (passo 10 do `WORKFLOW`); a entrada
+  > do `999` citada acima foi retirada. Registro em
+  > [`historico/IdeiasImplementadas_202610.md`](historico/IdeiasImplementadas_202610.md).
 - **Adiado (esperado):** eixo de leitura/`kb-sensitive` (`999:479-488`).
 - **README trilíngue:** entrada `xpz-llm-delegate` cita default `-Agent reviewer-ro`.
 

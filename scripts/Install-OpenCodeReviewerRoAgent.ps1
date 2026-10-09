@@ -305,5 +305,7 @@ if ($PSCmdlet.ShouldProcess($JsoncPath, "Instalar/atualizar agente global review
     Write-Output "OK: reviewer-ro global $action em $JsoncPath"
     if ($backup) { Write-Output "OK: backup do arquivo anterior em $backup" }
     Write-Output "OK: derivado de $AgentMarkdownPath (mode=$mode; read por mapa; allow-set {read,glob,list}; grep deny)"
-    Write-Output "NEXT: valide com 'opencode agent list' (bloco reviewer-ro) e rode scripts/Test-OpenCodeReviewerRoSelfTest.ps1."
+    # Da raiz do repo, `opencode agent list` mede o project-local, e o SelfTest usa exe simulado:
+    # nenhum dos dois prova a instalacao GLOBAL. O diagnostico com -ExpectGlobal recusa pasta nao neutra.
+    Write-Output "NEXT: valide a instalacao GLOBAL com scripts/Test-OpenCodeReviewerRoInstalledCompatibility.ps1 -WorkingDirectory <pasta vazia fora de repositorio git> -ExpectGlobal -AsJson (nao da raiz deste repositorio)."
 }
