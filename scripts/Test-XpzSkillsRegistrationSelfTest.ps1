@@ -344,6 +344,15 @@ try {
 
     $c = Invoke-RroCase -Name 'invalido' -Jsonc '{ "agent": '
     Assert-Equal 'reviewer-ro: JSONC invalido => NOT_AUTOFIXABLE' 'REVIEWER_RO_NOT_AUTOFIXABLE' ([string]$c.report.opencodeReviewerRo.label)
+
+    # Raiz que nao e objeto: ConvertFrom-Json desembrulharia `[{...}]` e o canonico dentro da lista
+    # passaria por OK; null derrubava a auditoria inteira. Todos => NOT_AUTOFIXABLE, sem cair.
+    $rootCases = [ordered]@{ 'raiz-lista-vazia' = '[]'; 'raiz-null' = 'null'; 'raiz-escalar' = '"x"'; 'raiz-lista-canonica' = ('[' + $canonRaw.Trim() + ']') }
+    foreach ($rootName in $rootCases.Keys) {
+        $c = Invoke-RroCase -Name $rootName -Jsonc $rootCases[$rootName]
+        Assert-Equal "reviewer-ro: $rootName => NOT_AUTOFIXABLE" 'REVIEWER_RO_NOT_AUTOFIXABLE' ([string]$c.report.opencodeReviewerRo.label)
+        Assert-Equal "reviewer-ro: $rootName marca gap" 'REGISTRATION_GAPS' ([string]$c.report.overall)
+    }
 }
 finally {
     $env:PATH = $originalPath

@@ -472,6 +472,22 @@ sem mode
     Assert-True (-not (Test-OpenCodeReviewerRoJsoncEditable -Raw '{"agent":').ok) "(h2) JSONC que nao parseia: nao editavel"
     Assert-True ((Test-OpenCodeReviewerRoJsoncEditable -Raw (Get-Content -LiteralPath $gOld -Raw)).ok) "(h2) forma anterior sem ambiguidade: editavel"
     Assert-True ((Test-OpenCodeReviewerRoJsoncEditable -Raw '').ok) "(h2) vazio: editavel (criacao minima)"
+    # Raiz que nao e objeto: o instalador gravava `[{ "agent": ... }]` e o static aprovava (desembrulho
+    # do ConvertFrom-Json). Agora: nao editavel, instalador recusa sem escrita/backup, static nao OK.
+    $canonText = (Get-Content -LiteralPath $g3 -Raw -Encoding utf8).Trim()
+    $rootCases = [ordered]@{ 'lista-vazia' = '[]'; 'lista-obj' = '[{}]'; 'lista-agent' = '[{"agent":{}}]'; 'escalar' = '"x"'; 'numero' = '1'; 'null' = 'null'; 'lista-canonica' = "[$canonText]" }
+    foreach ($rootName in $rootCases.Keys) {
+        $rootRaw = $rootCases[$rootName]
+        $rootPath = Join-Path $tempRoot "h-root-$rootName.jsonc"
+        [System.IO.File]::WriteAllText($rootPath, $rootRaw, (New-Object System.Text.UTF8Encoding($false)))
+        Assert-True (-not (Test-OpenCodeReviewerRoJsoncEditable -Raw $rootRaw).ok) "(h2) raiz $($rootName): nao editavel"
+        $refusedRoot = $false
+        try { & $installer -JsoncPath $rootPath -AgentMarkdownPath $agentMd | Out-Null } catch { $refusedRoot = $true }
+        $rootBackups = @(Get-ChildItem -LiteralPath $tempRoot -Filter "h-root-$rootName.jsonc.rro-backup-*" -ErrorAction SilentlyContinue)
+        Assert-True ($refusedRoot -and ([System.IO.File]::ReadAllText($rootPath) -ceq $rootRaw) -and $rootBackups.Count -eq 0) "(h2) raiz $($rootName): instalador (sem -WhatIf) recusa sem escrita nem backup"
+        $stRoot = Test-OpenCodeReviewerRoStatic -WorkingDirectory $emptyWd -GlobalJsoncPath $rootPath -GlobalOnly
+        Assert-True (-not $stRoot.ok) "(h2) raiz $($rootName): static nao OK"
+    }
 
     # (h3) agent list roda na pasta pedida e devolve a pasta original, inclusive com erro.
     $hWd = Join-Path $tempRoot 'h-wd'

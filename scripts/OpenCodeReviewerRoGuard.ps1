@@ -136,6 +136,9 @@ function ConvertFrom-Jsonc {
         (//...) e de bloco (/* ... */) FORA de strings, depois ConvertFrom-Json. Usado para ler o
         opencode.jsonc global. NAO preserva a formatacao (so leitura); a ESCRITA localizada que
         preserva comentarios vive no instalador.
+        Exige raiz OBJETO (o opencode.jsonc e um objeto): lista, escalar ou null lancam. Sem isso,
+        ConvertFrom-Json desembrulha `[{...}]` no objeto interno e `$obj.agent` acharia o agent
+        dentro da lista, aprovando (e o instalador gravando) configuracao invalida.
     #>
     param([Parameter(Mandatory)] [string] $Raw)
 
@@ -185,7 +188,12 @@ function ConvertFrom-Jsonc {
             foreach ($item in $Element.EnumerateArray()) { Assert-UniqueJsonKeys $item }
         }
     }
-    try { Assert-UniqueJsonKeys $doc.RootElement } finally { $doc.Dispose() }
+    try {
+        if ($doc.RootElement.ValueKind -ne [System.Text.Json.JsonValueKind]::Object) {
+            throw "JSONC: raiz nao e objeto ($($doc.RootElement.ValueKind))"
+        }
+        Assert-UniqueJsonKeys $doc.RootElement
+    } finally { $doc.Dispose() }
     return ($sb.ToString() | ConvertFrom-Json)
 }
 
@@ -285,7 +293,8 @@ function Test-OpenCodeReviewerRoJsoncEditable {
     <#
         Pre-checagem da edicao LOCALIZADA do instalador (Install-OpenCodeReviewerRoAgent.ps1), exposta
         aqui para a auditoria de setup usar a MESMA regra: o que esta funcao recusa, o instalador
-        recusa. O localizador e propositalmente restrito: recusa JSONC que nao parseia, chave
+        recusa. O localizador e propositalmente restrito: recusa JSONC que nao parseia ou cuja raiz
+        nao e objeto, chave
         aparente/homonima/escapada `agent`/`reviewer-ro` e comentario com chaves, sem motor JSONC geral.
         Conteudo vazio/so espaco e editavel (o instalador cria o minimo).
         Devolve @{ ok = $bool; detail = <str> }; o detail nunca contem o conteudo do arquivo.
@@ -294,7 +303,7 @@ function Test-OpenCodeReviewerRoJsoncEditable {
 
     if ([string]::IsNullOrWhiteSpace($Raw)) { return @{ ok = $true; detail = 'vazio: criacao minima' } }
     try { $existing = ConvertFrom-Jsonc -Raw $Raw }
-    catch { return @{ ok = $false; detail = "JSONC nao parseia: $($_.Exception.Message)" } }
+    catch { return @{ ok = $false; detail = "JSONC invalido: $($_.Exception.Message)" } }
     foreach ($key in @('agent', 'reviewer-ro')) {
         $count = ([regex]::Matches($Raw, ('"' + [regex]::Escape($key) + '"\s*:'))).Count
         $expectedCount = 0

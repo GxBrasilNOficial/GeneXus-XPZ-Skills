@@ -981,7 +981,8 @@ segurança no **próprio adapter**, de forma inseparável (nunca "default sem gu
   o push (a pré-push avisa via `Test-PrePushOpenCodeReviewerRoDrift.ps1`). Em cada máquina, a
   `xpz-skills-setup` é a dona operacional da instalação global: o passo 10 do `WORKFLOW` dela
   detecta ausência/defasagem e oferece este instalador com confirmação. A recusa de arquivo
-  ambíguo do instalador (JSONC que não parseia, chave homônima, comentário com chaves) vive no guard
+  ambíguo do instalador (JSONC que não parseia ou com raiz que não é objeto, chave homônima,
+  comentário com chaves) vive no guard
   como `Test-OpenCodeReviewerRoJsoncEditable`, para a auditoria da `xpz-skills-setup` usar a mesma
   regra; o guard também expõe `Test-OpenCodeReviewerRoStatic -GlobalOnly` (lê só o bloco global,
   sem descoberta project-local), que os adapters não usam. Gate de processo/CI:
