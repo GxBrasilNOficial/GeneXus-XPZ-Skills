@@ -40,6 +40,10 @@ ficam fora dos padrões e diretório com .env. pode ser negado conservadoramente
 Dono normativo e provas: xpz-llm-delegate/SKILL.md e fixtures/opencode-reviewer-ro/README.md.
 O 999 retém a entrada pelo título com os residuais; o recorte concluído está registrado aqui.
 
+### Rastreabilidade
+
+- Commit material: `8f61c28` (Protege conteúdo .env no revisor OpenCode).
+
 ## Cobertura da assinatura do extrator no gate de rastreabilidade
 
 ### Registro de origem

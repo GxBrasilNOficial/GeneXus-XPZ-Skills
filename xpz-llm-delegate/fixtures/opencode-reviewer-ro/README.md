@@ -34,7 +34,7 @@ Self-test determinístico/fake-exe não prova sozinho o comportamento de uma ver
   Esses probes não são agentes reviewer-ro válidos.
 - `fallback-warning.txt` — linha verbatim do stderr de `run --agent fixture-agent-missing`,
   capturada antes do erro intencional de modelo inexistente (sem modelo chamado).
-  Nesta captura 1.18.33 não houve ANSI; não adicionar nem remover escapes emitidos.
+  Esta captura 1.18.33 contém sequências ANSI; preservar os escapes emitidos.
   O accessor `Get-OpenCodeReviewerRoFallbackWarningPattern` permanece a fonte do padrão
   lógico usado pelos adapters/watcher; não exige prefixo ou coloração.
 - `read-outside-cwd-blocked.sample.txt` — captura real `opencode run` com
