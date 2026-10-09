@@ -2,6 +2,10 @@
 
 > Documento de especificação (papel) para implementação. Fecha os defeitos 1 e 2, com os gaps das rodadas v1–v5 incorporados. Decisão do humano (2026-09-28): **congelar o design** e transferir a prova para a implementação + self-tests (`15-revisao-por-pares.md`, «Quando o design estabiliza»).
 
+## Adendo de 2026-10-09 — lastUpdate v5
+
+Implementado `-NewObjectNotImported` (novo nunca importado, gerador sem baseline), conflitos `LASTUPDATE_CONTEXT_CONFLICT/30` e identidade mínima de baseline explícito `LASTUPDATE_BASELINE_IDENTITY_MISMATCH/31` (mesma raiz Object/Attribute, GUID válido não zero igual, leitura apenas da raiz). Defaults/PreserveLastUpdate preservados. Recarimbo final e referência renovada após importação são normativos em `xpz-builder/SKILL.md`; provas sintéticas em `scripts/Test-GeneXusLastUpdateConsumerContract.ps1`. O corpo congelado abaixo registra o contrato histórico, não incorpora automaticamente esses acréscimos. Gerador, tolerâncias e Add-GeneXusButton intactos; sem prova de IDE/import/build/runtime.
+
 ## Estado da implementação — nota aditiva de 2026-09-28
 
 Este bloco é **posterior ao congelamento** e existe porque o corpo abaixo não muda: ele foi escrito antes da implementação e continua sendo o registro do que se decidiu. Quem precisa do estado atual lê aqui.

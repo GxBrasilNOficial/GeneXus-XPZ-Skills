@@ -80,3 +80,27 @@ $newline = if ($targetText.Contains("`r`n")) { "`r`n" } elseif ($targetText.Cont
 #    devolve 29 REPLACEMENT_EOL_MISMATCH e NADA e gravado — por isso $newline e
 #    derivado do proprio arquivo acima. Fonte de EOL misto segue diagnostico
 #    (replacementEolMismatch=null) e grava; o motor nunca normaliza.
+
+# 8) Novo NUNCA importado: declaração explícita, não inferida pela ausência no
+#    acervo. Substituir o baseline da chamada pelo switch (não combinar ambos).
+# & $enginePath -InputPath $workingXml -Anchor '...' -Replacement '...' -EditMode Replace -NewObjectNotImported -DryRun -AsJson
+# Conflito com baseline não vazio/PreserveLastUpdate -> LASTUPDATE_CONTEXT_CONFLICT/30.
+# Baseline explícito com bump: mesma raiz Object/Attribute + GUID válido não
+# zero igual; sem isso -> LASTUPDATE_BASELINE_IDENTITY_MISMATCH/31, sem escrita.
+
+# 9) Recarimbo final de preparação ainda não importada com acúmulo:
+# $setter = Join-Path $SharedSkillsRoot 'scripts\Set-GeneXusXmlLastUpdate.ps1'
+# Existente: referência oficial ATUAL do mesmo objeto; renová-la após importação.
+# & $setter -InputPath $workingXml -BaselineXmlPath $acervoXml -AsJson
+# Novo nunca importado (apenas sob essa precondição):
+# & $setter -InputPath $workingXml -NewObjectNotImported -AsJson
+# Default prova avanço somente sobre o arquivo, não KB viva/aceite do envelope.
+# Lote: -NewObjectsNotImported só afeta objectState=new; existing permanece
+# acumulativo. Add-GeneXusButton também requer essa conferência final.
+
+# 10) Valor literal do JSON sem coerção de data (compatível com mínimo 7.4):
+# $rawJson = & $setter -InputPath $workingXml -BaselineXmlPath $acervoXml -DryRun -AsJson
+# $doc = [System.Text.Json.JsonDocument]::Parse([string]$rawJson)
+# try { $literal = $doc.RootElement.GetProperty('lastUpdateAfter').GetString() }
+# finally { $doc.Dispose() }
+# Alternativas: saída textual do gerador ou atributo salvo no XML (.0000000Z).

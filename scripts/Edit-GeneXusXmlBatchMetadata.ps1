@@ -36,6 +36,13 @@
 .PARAMETER Apply
     Aplica o plano. Sem ele, so planeja.
 
+.PARAMETER NewObjectsNotImported
+    Declara que todos os itens objectState=new nunca foram importados. Apenas
+    eles usam UtcNow + 60s sem baseline após validar os valores presentes.
+    Existing e defaults preservados; manifesto/schema não mudam. Relatório
+    e journal registram o booleano, e baselineSource=new-not-imported por
+    arquivo afetado. ReportPath pedido continua permitido em falhas.
+
 .PARAMETER ReportPath
     Caminho absoluto .json para gravar o relatorio. O JSON de maquina sai no
     stdout por padrao, SEMPRE - inclusive quando a gravacao aqui falhar.
@@ -81,6 +88,8 @@ param(
 
     [switch]$Apply,
 
+    [switch]$NewObjectsNotImported,
+
     [string]$ReportPath,
 
     [switch]$AcknowledgeReferences,
@@ -117,6 +126,7 @@ try {
         -AcervoPath $AcervoPath `
         -WorkDir $WorkDir `
         -Apply:$Apply.IsPresent `
+        -NewObjectsNotImported:$NewObjectsNotImported.IsPresent `
         -ReportPath $ReportPath `
         -AcknowledgeReferences:$AcknowledgeReferences.IsPresent `
         -RequireHeadWitness:$RequireHeadWitness.IsPresent `
@@ -125,6 +135,7 @@ try {
     $report = [ordered]@{
         Kind          = 'xpz-batch-metadata-report'
         SchemaVersion = 1
+        newObjectsNotImported = [bool]$NewObjectsNotImported.IsPresent
         runId         = $null
         status        = 'internalError'
         phase         = 'unknown'

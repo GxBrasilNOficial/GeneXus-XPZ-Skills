@@ -4,6 +4,10 @@
 os self-tests. Congelamento decidido pelo humano em 2026-09-13, após o parecer sobre a v9
 concluir que *"a revisão de papel parou de render"* — não por abandono do ciclo.
 
+## Adendo de 2026-10-09 — lastUpdate v5
+
+`-NewObjectsNotImported` declara nunca importados somente os itens `objectState=new`. Após validar valores presentes, seleciona `NO_BASELINE`/`new-not-imported` (Status/Source/Verbatim/Instant presentes, Instant=null), antes de aviso/previsão. Planejamento/aplicação usam a mesma decisão com relógio fresco e reconferência final. Relatório (`Extra`) e journal desde a primeira gravação incluem `newObjectsNotImported` booleano; arquivo afetado reporta `baselineSource=new-not-imported`. Manifesto/schema, margem do wrapper (60s), existing/defaults e demais guardas permanecem; `ReportPath` pedido segue permitido em falha. Lote existing permanece acumulativo: recarimbo final com referência oficial atual do mesmo objeto, renovada após importação, conforme `xpz-builder/SKILL.md`. Provas sintéticas em `scripts/Test-GeneXusLastUpdateConsumerContract.ps1`; sem IDE/import/build/runtime reais. O corpo congelado abaixo é histórico e permanece preservado.
+
 ## Estado da implementação — nota aditiva de 2026-09-14
 
 Este bloco é **posterior ao congelamento** e existe porque o corpo abaixo não muda: ele foi

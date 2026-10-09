@@ -272,6 +272,48 @@ function Get-NewGeneXusLastUpdateValueFromEngine {
     return [string]$timestamp
 }
 
+function Test-GeneXusLastUpdateBaselineIdentity {
+    # Ler somente a raiz: o corpo da entrada pode ser reparado pelo patch.
+    param([string]$SourceText, [string]$BaselineXmlPath)
+
+    $roots = @()
+    foreach ($side in @('input', 'baseline')) {
+        $reader = $null
+        $textReader = $null
+        try {
+            $settings = [System.Xml.XmlReaderSettings]::new()
+            $settings.DtdProcessing = [System.Xml.DtdProcessing]::Prohibit
+            $settings.XmlResolver = $null
+            if ($side -eq 'input') {
+                $textReader = [System.IO.StringReader]::new($SourceText)
+                $reader = [System.Xml.XmlReader]::Create($textReader, $settings)
+            } else {
+                $reader = [System.Xml.XmlReader]::Create($BaselineXmlPath, $settings)
+            }
+            [void]$reader.MoveToContent()
+            if ($reader.NodeType -ne [System.Xml.XmlNodeType]::Element -or
+                $reader.LocalName -cnotin @('Object', 'Attribute')) {
+                throw 'raiz deve ser Object ou Attribute'
+            }
+            $guid = [Guid]::Empty
+            if (-not [Guid]::TryParse($reader.GetAttribute('guid'), [ref]$guid) -or $guid -eq [Guid]::Empty) {
+                throw 'guid ausente, inválido ou zero'
+            }
+            $roots += [pscustomobject]@{ Name = $reader.LocalName; Guid = $guid }
+        } catch {
+            return [pscustomobject]@{ Ok = $false; Message = "LASTUPDATE_BASELINE_IDENTITY_MISMATCH: $side`: $($_.Exception.Message)" }
+        } finally {
+            if ($null -ne $reader) { $reader.Dispose() }
+            if ($null -ne $textReader) { $textReader.Dispose() }
+        }
+    }
+    if (-not [string]::Equals($roots[0].Name, $roots[1].Name, [StringComparison]::Ordinal) -or
+        $roots[0].Guid -ne $roots[1].Guid) {
+        return [pscustomobject]@{ Ok = $false; Message = 'LASTUPDATE_BASELINE_IDENTITY_MISMATCH: raiz ou GUID divergente entre input e baseline.' }
+    }
+    return [pscustomobject]@{ Ok = $true; Message = $null }
+}
+
 function Set-FirstObjectLastUpdateInText {
     param(
         [Parameter(Mandatory = $true)]
@@ -605,6 +647,8 @@ function Invoke-GeneXusXmlSurgicalEditCore {
 
         [switch]$PreserveLastUpdate,
 
+        [switch]$NewObjectNotImported,
+
         [string]$LastUpdateBaselinePath,
 
         [switch]$DryRun,
@@ -624,6 +668,10 @@ function Invoke-GeneXusXmlSurgicalEditCore {
             return (New-GeneXusXmlSurgicalError -Code 'OUTPUT_DIR_MISSING' -Message "OUTPUT_DIR_MISSING: diretorio nao existe: $outputParent" -ExitCode 15)
         }
         $resolvedOutput = [System.IO.Path]::GetFullPath($OutputPath)
+    }
+
+    if ($NewObjectNotImported.IsPresent -and ($PreserveLastUpdate.IsPresent -or -not [string]::IsNullOrWhiteSpace($LastUpdateBaselinePath))) {
+        return (New-GeneXusXmlSurgicalError -Code 'LASTUPDATE_CONTEXT_CONFLICT' -Message 'LASTUPDATE_CONTEXT_CONFLICT: NewObjectNotImported não aceita baseline explícito nem PreserveLastUpdate.' -ExitCode 30)
     }
 
     # 1) Le o texto.
@@ -773,7 +821,11 @@ function Invoke-GeneXusXmlSurgicalEditCore {
                 return (New-GeneXusXmlSurgicalError -Code 'BASELINE_NOT_FOUND' -Message "BASELINE_NOT_FOUND: baseline nao encontrado: $LastUpdateBaselinePath" -ExitCode 16 -Details ([pscustomobject]@{ baselinePath = $LastUpdateBaselinePath }))
             }
             $baselinePathUsed = (Resolve-Path -LiteralPath $LastUpdateBaselinePath).Path
-        } else {
+            $identity = Test-GeneXusLastUpdateBaselineIdentity -SourceText $sourceText -BaselineXmlPath $baselinePathUsed
+            if (-not $identity.Ok) {
+                return (New-GeneXusXmlSurgicalError -Code 'LASTUPDATE_BASELINE_IDENTITY_MISMATCH' -Message $identity.Message -ExitCode 31)
+            }
+        } elseif (-not $NewObjectNotImported.IsPresent) {
             $baselinePathUsed = $resolvedInput
         }
     }
@@ -907,6 +959,7 @@ function Invoke-GeneXusXmlSurgicalEditCore {
         LastUpdateBefore        = $lastUpdateBefore
         LastUpdateAfter         = $lastUpdateAfter
         PreserveLastUpdate      = [bool]$PreserveLastUpdate.IsPresent
+        NewObjectNotImported    = [bool]$NewObjectNotImported.IsPresent
         WillBumpLastUpdate      = $willBump
         LastUpdateBaselinePath  = $baselinePathUsed
         DetectedEol             = $detectedEol

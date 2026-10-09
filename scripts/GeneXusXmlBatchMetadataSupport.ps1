@@ -1450,7 +1450,8 @@ function New-GeneXusBatchJournal {
     param(
         [Parameter(Mandatory = $true)][string]$Path,
         [Parameter(Mandatory = $true)][string]$RunId,
-        [Parameter(Mandatory = $true)][string]$WorkDir
+        [Parameter(Mandatory = $true)][string]$WorkDir,
+        [switch]$NewObjectsNotImported
     )
 
     $document = [ordered]@{
@@ -1459,6 +1460,7 @@ function New-GeneXusBatchJournal {
         runId         = $RunId
         startedAtUtc  = [DateTime]::UtcNow.ToString('o')
         workDir       = $WorkDir
+        newObjectsNotImported = [bool]$NewObjectsNotImported.IsPresent
         steps         = @()
     }
     $journal = [pscustomobject]@{
@@ -2543,6 +2545,7 @@ function Invoke-GeneXusXmlBatchMetadataCore {
         [string]$AcervoPath,
         [string]$WorkDir,
         [switch]$Apply,
+        [switch]$NewObjectsNotImported,
         [string]$ReportPath,
         [switch]$AcknowledgeReferences,
         [switch]$RequireHeadWitness,
@@ -2554,7 +2557,7 @@ function Invoke-GeneXusXmlBatchMetadataCore {
     $blocks = [System.Collections.Generic.List[object]]::new()
     $warnings = [System.Collections.Generic.List[object]]::new()
     $filesReport = [System.Collections.Generic.List[object]]::new()
-    $extra = @{}
+    $extra = @{ newObjectsNotImported = [bool]$NewObjectsNotImported.IsPresent }
     $lockPath = $null
     $journal = $null
     $workDirCreated = $false
@@ -2566,18 +2569,18 @@ function Invoke-GeneXusXmlBatchMetadataCore {
         # ------------------------------------------------------------------
         if (-not (Test-Path -LiteralPath $FrontFolder -PathType Container)) {
             [void]$blocks.Add((New-GeneXusBatchBlock -Code 'FRONT_NOT_CANONICAL' -Message "frente nao encontrada: $FrontFolder" -Path $FrontFolder))
-            return (New-GeneXusBatchMetadataReport -RunId $runId -Status 'blocked' -Phase 'phase0' -Blocks $blocks)
+            return (New-GeneXusBatchMetadataReport -RunId $runId -Status 'blocked' -Phase 'phase0' -Blocks $blocks -Extra $extra)
         }
         $frontFull = Get-XpzCanonicalPath -Path $FrontFolder
         $frontParent = [System.IO.Directory]::GetParent($frontFull)
         if ($null -eq $frontParent -or -not [string]::Equals($frontParent.Name, (Get-GeneXusFrontCanonicalContainerName), [StringComparison]::OrdinalIgnoreCase)) {
             [void]$blocks.Add((New-GeneXusBatchBlock -Code 'FRONT_NOT_CANONICAL' -Message "a frente precisa estar sob $(Get-GeneXusFrontCanonicalContainerName): $frontFull" -Path $frontFull))
-            return (New-GeneXusBatchMetadataReport -RunId $runId -Status 'blocked' -Phase 'phase0' -Blocks $blocks)
+            return (New-GeneXusBatchMetadataReport -RunId $runId -Status 'blocked' -Phase 'phase0' -Blocks $blocks -Extra $extra)
         }
         $reparse = Get-XpzReparsePointInPath -Path $frontFull
         if ($null -ne $reparse) {
             [void]$blocks.Add((New-GeneXusBatchBlock -Code 'FRONT_NOT_CANONICAL' -Message "ponto de reanalise no caminho da frente: $reparse" -Path $frontFull))
-            return (New-GeneXusBatchMetadataReport -RunId $runId -Status 'blocked' -Phase 'phase0' -Blocks $blocks)
+            return (New-GeneXusBatchMetadataReport -RunId $runId -Status 'blocked' -Phase 'phase0' -Blocks $blocks -Extra $extra)
         }
 
         $repoRoot = $frontParent.Parent.FullName
@@ -2590,11 +2593,11 @@ function Invoke-GeneXusXmlBatchMetadataCore {
         $protected = Test-XpzProtectedArea -Candidate $workDirFull -RepoRoot $repoRoot
         if ($protected.blocked) {
             [void]$blocks.Add((New-GeneXusBatchBlock -Code 'PROTECTED_AREA' -Message "-WorkDir em area protegida: $($protected.reason)" -Path $workDirFull))
-            return (New-GeneXusBatchMetadataReport -RunId $runId -Status 'blocked' -Phase 'phase0' -Blocks $blocks)
+            return (New-GeneXusBatchMetadataReport -RunId $runId -Status 'blocked' -Phase 'phase0' -Blocks $blocks -Extra $extra)
         }
         if (Test-XpzPathEqualOrUnder -Candidate $workDirFull -Base $frontFull) {
             [void]$blocks.Add((New-GeneXusBatchBlock -Code 'ARTIFACT_PATH_COLLISION' -Message "-WorkDir nao pode ficar dentro da frente: $workDirFull" -Path $workDirFull))
-            return (New-GeneXusBatchMetadataReport -RunId $runId -Status 'blocked' -Phase 'phase0' -Blocks $blocks)
+            return (New-GeneXusBatchMetadataReport -RunId $runId -Status 'blocked' -Phase 'phase0' -Blocks $blocks -Extra $extra)
         }
         # Mesmo eixo do -ReportPath e da frente: um ponto de reanalise no
         # caminho do -WorkDir manda journal, .bak e baseline para outro lugar.
@@ -2603,7 +2606,7 @@ function Invoke-GeneXusXmlBatchMetadataCore {
         $workDirReparse = Get-XpzReparsePointInPath -Path $workDirFull
         if ($null -ne $workDirReparse) {
             [void]$blocks.Add((New-GeneXusBatchBlock -Code 'PROTECTED_AREA' -Message "ponto de reanalise no caminho do -WorkDir: $workDirReparse" -Path $workDirFull))
-            return (New-GeneXusBatchMetadataReport -RunId $runId -Status 'blocked' -Phase 'phase0' -Blocks $blocks)
+            return (New-GeneXusBatchMetadataReport -RunId $runId -Status 'blocked' -Phase 'phase0' -Blocks $blocks -Extra $extra)
         }
         if (-not (Test-Path -LiteralPath $workDirFull -PathType Container)) {
             [void](New-Item -ItemType Directory -Path $workDirFull -Force)
@@ -2665,7 +2668,7 @@ function Invoke-GeneXusXmlBatchMetadataCore {
         $lock = Request-GeneXusBatchRunLock -WorkDir $workDirFull -RunId $runId
         if (-not $lock.Acquired) {
             [void]$blocks.Add((New-GeneXusBatchBlock -Code 'RUN_LOCKED' -Message $lock.Reason -Path $lock.Path))
-            return (New-GeneXusBatchMetadataReport -RunId $runId -Status 'blocked' -Phase 'phase0' -Blocks $blocks)
+            return (New-GeneXusBatchMetadataReport -RunId $runId -Status 'blocked' -Phase 'phase0' -Blocks $blocks -Extra $extra)
         }
         $lockPath = $lock.Path
         if ($null -ne $lock.StaleReclaimed) {
@@ -2675,14 +2678,14 @@ function Invoke-GeneXusXmlBatchMetadataCore {
         $manifestResult = Read-GeneXusBatchManifest -Path $InputPath
         if (-not $manifestResult.Valid) {
             foreach ($block in $manifestResult.Blocks) { [void]$blocks.Add($block) }
-            return (New-GeneXusBatchMetadataReport -RunId $runId -Status 'blocked' -Phase 'phase0' -Blocks $blocks -Warnings $warnings)
+            return (New-GeneXusBatchMetadataReport -RunId $runId -Status 'blocked' -Phase 'phase0' -Blocks $blocks -Warnings $warnings -Extra $extra)
         }
 
         $catalog = Read-GeneXusObjectTypeCatalogFile -Path (Get-GeneXusObjectTypeCatalogDefaultBasePath)
         $schema = Test-GeneXusBatchManifestOperations -Manifest $manifestResult.Manifest -Catalog $catalog -AllowDegradedAccentsSwitch:$AllowDegradedAccents.IsPresent
         foreach ($block in $schema.Blocks) { [void]$blocks.Add($block) }
         if ($blocks.Count -gt 0) {
-            return (New-GeneXusBatchMetadataReport -RunId $runId -Status 'blocked' -Phase 'phase0' -Blocks $blocks -Warnings $warnings)
+            return (New-GeneXusBatchMetadataReport -RunId $runId -Status 'blocked' -Phase 'phase0' -Blocks $blocks -Warnings $warnings -Extra $extra)
         }
         $operations = @($schema.Operations)
         if ($operations.Count -eq 0) {
@@ -2720,7 +2723,7 @@ function Invoke-GeneXusXmlBatchMetadataCore {
         $extra['headWitness'] = $headContext.State
         if ($headContext.State -ne 'available' -and $RequireHeadWitness.IsPresent) {
             [void]$blocks.Add((New-GeneXusBatchBlock -Code 'HEAD_DIVERGENCE' -Message "testemunha de HEAD indisponivel ($($headContext.State)) e -RequireHeadWitness foi passado." -Path $acervoFull))
-            return (New-GeneXusBatchMetadataReport -RunId $runId -Status 'blocked' -Phase 'phase1a' -Blocks $blocks -Warnings $warnings)
+            return (New-GeneXusBatchMetadataReport -RunId $runId -Status 'blocked' -Phase 'phase1a' -Blocks $blocks -Warnings $warnings -Extra $extra)
         }
 
         $needsReferenceScan = @($operations | Where-Object { $_.Op -eq 'renameDomain' }).Count -gt 0
@@ -3034,6 +3037,9 @@ function Invoke-GeneXusXmlBatchMetadataCore {
                 [void]$blocks.Add((New-GeneXusBatchBlock -Code 'LASTUPDATE_UNREADABLE' -Message "lastUpdate presente porem nao parseavel na fonte '$($baseline.Source)': '$($baseline.Verbatim)'." -OpId $first.Id -Path $relativePath))
                 continue
             }
+            if ($first.ObjectState -eq 'new' -and $NewObjectsNotImported.IsPresent) {
+                $baseline = [pscustomobject]@{ Status = 'NO_BASELINE'; Source = 'new-not-imported'; Verbatim = $null; Instant = $null }
+            }
             if ($baseline.Status -eq 'OK' -and $null -ne $baseline.Instant) {
                 $anomalyThreshold = [DateTimeOffset]::UtcNow.AddSeconds($futureTolerance)
                 if ($baseline.Instant -gt $anomalyThreshold) {
@@ -3134,7 +3140,7 @@ function Invoke-GeneXusXmlBatchMetadataCore {
         # Fase 1b - materializacao da recuperacao
         # ------------------------------------------------------------------
         $journalPath = Join-Path $workDirFull "$runId.journal.json"
-        $journal = New-GeneXusBatchJournal -Path $journalPath -RunId $runId -WorkDir $workDirFull
+        $journal = New-GeneXusBatchJournal -Path $journalPath -RunId $runId -WorkDir $workDirFull -NewObjectsNotImported:$NewObjectsNotImported.IsPresent
         $extra['journalPath'] = $journalPath
 
         foreach ($plan in $plans) {

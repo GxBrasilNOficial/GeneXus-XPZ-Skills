@@ -10,6 +10,10 @@
 
 ## Português (BR)
 
+### `lastUpdate` em edições sucessivas
+
+Editor cirúrgico e setter aceitam `-NewObjectNotImported` para declaração explícita de novo nunca importado, gerando `UtcNow + 60s` sem acumular a frente. O lote aceita `-NewObjectsNotImported` apenas para `objectState=new`, com rastro no relatório/journal; defaults e existentes permanecem. Baseline explícito com recarimbo exige mesma raiz Object/Attribute e GUID válido não zero igual; conflito de contexto e identidade são erros estruturados 30/31, sem escrita/backup. Antes de empacotar preparação ainda não importada com acúmulo, recarimbar existente com referência oficial atual do mesmo objeto, ou novo nunca importado no modo explícito; após importação, renovar a referência. Default pelo arquivo não prova avanço sobre KB viva nem aceite do envelope; Attribute de topo do Build não recebe validação temporal. Formato `.0000000Z` deve ser lido como texto/XML ou JSON sem coerção de datas. Contrato e limites: [xpz-builder](xpz-builder/SKILL.md), seção de recarimbo final. Provas são sintéticas, sem import/build/runtime reais.
+
 ### Observabilidade do empacotamento XPZ
 
 `scripts/New-XpzImportPackage.ps1` aceita `-ReportPath <caminho-absoluto.json>` como observabilidade opt-in. O relatório `Kind=xpz-package-execution-report`, `SchemaVersion=1` é publicado atomicamente em UTF-8 sem BOM, separa `executionState`, `packageState` e `inventoryDecision`, e registra o handoff entre PowerShell, gate de drift, motor Python e inventário. `candidate`, `unknown` ou `running` não significam pacote aceito; `running` após interrupção é execução incompleta/órfã. Caminho inválido bloqueia antes de criar pacote ou relatório. Com `-ReportPath` válido, o pós-inventário do wrapper liga fail-closed (`FailOnDeltaMismatch` + `FailOnUnknownTypes`); se o inventário devolver exit ≠ 0, o stdout pode sair `status=bloqueado` e o exit do empacotamento muda — sem `-ReportPath`, o inventário corre em modo informativo e não promove esse exit. Esse arquivo não prova importação real, build, IDE ou comportamento funcional.
@@ -268,6 +272,10 @@ Se você quer entender a base rapidamente:
 
 ## Español
 
+### `lastUpdate` en ediciones sucesivas
+
+El editor quirúrgico y el setter aceptan `-NewObjectNotImported` como declaración explícita de objeto nuevo nunca importado, generando `UtcNow + 60s` sin acumular el frente. El lote acepta `-NewObjectsNotImported` sólo para `objectState=new`, con registro en informe/journal; valores por defecto y existentes permanecen. Un baseline explícito con recálculo exige la misma raíz Object/Attribute y un GUID válido no cero igual; conflictos de contexto e identidad son errores estructurados 30/31, sin escritura/backup. Antes de empaquetar una preparación aún no importada con acumulación, recalcular existentes con referencia oficial actual del mismo objeto, o nuevos nunca importados en modo explícito; tras importar, renovar la referencia. El valor por defecto basado en el archivo no prueba avance sobre la KB viva ni aceptación del sobre; Attribute de nivel superior del Build no recibe validación temporal. Leer `.0000000Z` como texto/XML o JSON sin coerción de fechas. Contrato y límites: [xpz-builder](xpz-builder/SKILL.md), sección de recálculo final. Pruebas sintéticas, sin import/build/runtime reales.
+
 ### Observabilidad del empaquetado XPZ
 
 `scripts/New-XpzImportPackage.ps1` acepta `-ReportPath <ruta-absoluta.json>` como observabilidad opt-in. El informe `Kind=xpz-package-execution-report`, `SchemaVersion=1` se publica atómicamente en UTF-8 sin BOM, separa `executionState`, `packageState` e `inventoryDecision`, y registra el handoff entre PowerShell, gate de drift, motor Python e inventario. `candidate`, `unknown` o `running` no significan paquete aceptado; `running` tras una interrupción es una ejecución incompleta/huérfana. Una ruta inválida bloquea antes de crear paquete o informe. Con `-ReportPath` válido, el post-inventario del wrapper activa fail-closed (`FailOnDeltaMismatch` + `FailOnUnknownTypes`); si el inventario devuelve exit ≠ 0, el stdout puede salir `status=bloqueado` y cambia el exit del empaquetado — sin `-ReportPath`, el inventario corre en modo informativo y no promueve ese exit. Este archivo no prueba importación real, build, IDE ni comportamiento funcional.
@@ -523,6 +531,10 @@ Si quieres entender la base rápidamente:
 ---
 
 ## English
+
+### `lastUpdate` across successive edits
+
+The surgical editor and setter accept `-NewObjectNotImported` as an explicit declaration of a new never-imported object, generating `UtcNow + 60s` without accumulating the front timestamp. Batch accepts `-NewObjectsNotImported` only for `objectState=new`, with report/journal traces; defaults and existing objects remain unchanged. An explicit baseline with re-stamping requires the same Object/Attribute root and an equal valid nonzero GUID; context and identity conflicts are structured errors 30/31, without writes/backups. Before packaging accumulated preparation that has not yet been imported, re-stamp existing objects with the current official same-object reference, or new never-imported objects in explicit mode; renew the reference after import. Default self-baseline does not prove advancement over the live KB or envelope acceptance; Build's top-level Attribute inputs have no temporal validation. Read `.0000000Z` as text/XML or JSON without date coercion. Contract and limits: [xpz-builder](xpz-builder/SKILL.md), final re-stamping section. Evidence is synthetic, without real import/build/runtime.
 
 ### XPZ packaging observability
 

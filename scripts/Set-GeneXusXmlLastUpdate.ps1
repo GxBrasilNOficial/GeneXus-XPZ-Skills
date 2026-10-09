@@ -14,10 +14,15 @@
     Caso de uso principal: re-bumpar um arquivo da frente já editado (rodada 2+)
     sem sobrescrever a edicao. Sem -BaselineXmlPath, o baseline e o próprio
     arquivo; como o GeneXus preserva o lastUpdate importado como Modified Date,
-    bumpar acima do próprio valor anterior garante lastUpdate maior que o objeto
-    vivo na KB em rodadas subsequentes. Para garantir acima do acervo, passar
+    bumpar acima do próprio valor anterior garante avanço apenas sobre esse
+    arquivo, sem provar a versão viva nem o aceite do envelope. Passar
     -BaselineXmlPath apontando para o XML oficial do mesmo objeto em
     ObjetosDaKbEmXml.
+
+    Antes de empacotar uma frente ainda não importada com margem acumulada,
+    re-carimbar existente com referência oficial atual do mesmo objeto; novo
+    nunca importado com -NewObjectNotImported. Após importação, renovar a
+    referência oficial. Baseline velho não garante avanço sobre a KB viva.
 
 .PARAMETER InputPath
     Caminho do XML a re-carimbar.
@@ -30,6 +35,15 @@
 
 .PARAMETER FreshnessMarginSeconds
     Margem aplicada sobre UtcNow e sobre o baseline. Default: 60.
+    Margem maior que a tolerância do envelope pode continuar bloqueando.
+
+.PARAMETER NewObjectNotImported
+    Declara explicitamente objeto novo nunca importado. Usa UtcNow + margem,
+    sem baseline, podendo reduzir acúmulo local. Com baseline explícito não
+    vazio: LASTUPDATE_CONTEXT_CONFLICT/30. Baseline explícito no modo normal
+    exige raiz Object/Attribute igual e GUID válido não zero igual (31);
+    XML legado com GUID vazio é recusado. Checagem só da raiz, DTD proibido;
+    não amplia o contrato de encoding do gerador.
 
 .PARAMETER DryRun
     Simula sem gravar nem criar backup.
@@ -50,6 +64,8 @@ param(
     [string]$OutputPath,
 
     [string]$BaselineXmlPath,
+
+    [switch]$NewObjectNotImported,
 
     [ValidateRange(1, 3600)]
     [int]$FreshnessMarginSeconds = 60,
@@ -89,6 +105,7 @@ function Invoke-LastUpdateBumpCore {
         [Parameter(Mandatory = $true)][string]$InputPath,
         [string]$OutputPath,
         [string]$BaselineXmlPath,
+        [switch]$NewObjectNotImported,
         [int]$FreshnessMarginSeconds,
         [switch]$DryRun,
         [bool]$AssertWellFormedAfter
@@ -108,6 +125,10 @@ function Invoke-LastUpdateBumpCore {
         $resolvedOutput = [System.IO.Path]::GetFullPath($OutputPath)
     }
 
+    if ($NewObjectNotImported.IsPresent -and -not [string]::IsNullOrWhiteSpace($BaselineXmlPath)) {
+        return (New-BumpError -Code 'LASTUPDATE_CONTEXT_CONFLICT' -Message 'LASTUPDATE_CONTEXT_CONFLICT: NewObjectNotImported não aceita baseline explícito.' -ExitCode 30)
+    }
+
     $sourceText = [System.IO.File]::ReadAllText($resolvedInput)
     $bytesBefore = [System.Text.Encoding]::UTF8.GetByteCount($sourceText)
 
@@ -122,6 +143,12 @@ function Invoke-LastUpdateBumpCore {
             return (New-BumpError -Code 'BASELINE_NOT_FOUND' -Message "BASELINE_NOT_FOUND: baseline nao encontrado: $BaselineXmlPath" -ExitCode 16)
         }
         $baselinePathUsed = (Resolve-Path -LiteralPath $BaselineXmlPath).Path
+        $identity = Test-GeneXusLastUpdateBaselineIdentity -SourceText $sourceText -BaselineXmlPath $baselinePathUsed
+        if (-not $identity.Ok) {
+            return (New-BumpError -Code 'LASTUPDATE_BASELINE_IDENTITY_MISMATCH' -Message $identity.Message -ExitCode 31)
+        }
+    } elseif ($NewObjectNotImported.IsPresent) {
+        $baselinePathUsed = $null
     } else {
         $baselinePathUsed = $resolvedInput
     }
@@ -176,6 +203,7 @@ function Invoke-LastUpdateBumpCore {
         Message                = 'BUMP_OK'
         ExitCode               = 0
         DryRun                 = [bool]$DryRun.IsPresent
+        NewObjectNotImported   = [bool]$NewObjectNotImported.IsPresent
         InputPath              = $resolvedInput
         OutputPath             = $resolvedOutput
         BytesBefore            = $bytesBefore
@@ -200,6 +228,7 @@ function Write-BumpHumanOutput {
     Write-Output ("  input         : {0}" -f $Result.InputPath)
     Write-Output ("  output        : {0}" -f $Result.OutputPath)
     Write-Output ("  dryRun        : {0}" -f $Result.DryRun)
+    Write-Output ("  newObjectNotImported: {0}" -f $Result.NewObjectNotImported)
     Write-Output ("  lastUpdate    : {0} -> {1}" -f $Result.LastUpdateBefore, $Result.LastUpdateAfter)
     Write-Output ("  baseline      : {0}" -f $Result.LastUpdateBaselinePath)
     if ($null -ne $Result.WellFormed) {
@@ -214,12 +243,14 @@ function ConvertTo-BumpJsonOutput {
             status  = 'ERROR'
             code    = $Result.Code
             message = $Result.Message
+            exitCode = $Result.ExitCode
         }
     }
     return [pscustomobject]@{
         status                 = 'OK'
         code                   = $Result.Code
         dryRun                 = $Result.DryRun
+        newObjectNotImported   = $Result.NewObjectNotImported
         inputPath              = $Result.InputPath
         outputPath             = $Result.OutputPath
         bytesBefore            = $Result.BytesBefore
@@ -239,6 +270,7 @@ try {
         -InputPath $InputPath `
         -OutputPath $OutputPath `
         -BaselineXmlPath $BaselineXmlPath `
+        -NewObjectNotImported:$NewObjectNotImported.IsPresent `
         -FreshnessMarginSeconds $FreshnessMarginSeconds `
         -DryRun:$DryRun.IsPresent `
         -AssertWellFormedAfter $AssertWellFormedAfter

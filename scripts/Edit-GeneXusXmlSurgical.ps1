@@ -29,7 +29,8 @@
       17 EXPECTED_ANCHOR_COUNT_INVALID  18 AMBIGUOUS_APPLY_SCOPE
       19 SELFCHECK_MUTATION_MISMATCH    26 NOOP_REPLACEMENT
       27 ANCHOR_EMPTY                   28 LASTUPDATE_TARGET_MOVED
-      29 REPLACEMENT_EOL_MISMATCH       90 INTERNAL_ERROR
+      29 REPLACEMENT_EOL_MISMATCH       30 LASTUPDATE_CONTEXT_CONFLICT
+      31 LASTUPDATE_BASELINE_IDENTITY_MISMATCH  90 INTERNAL_ERROR
 
 .PARAMETER InputPath
     Caminho do XML fonte.
@@ -67,6 +68,15 @@
 .PARAMETER LastUpdateBaselinePath
     XML usado como baseline para o bump. Quando omitido, usa InputPath. Exigido
     apenas quando ha bump: caminho inexistente (ou diretorio) devolve 16.
+    Explícito com bump: mesma raiz Object/Attribute e GUID válido não zero
+    igual, senão LASTUPDATE_BASELINE_IDENTITY_MISMATCH/31 (inclusive legado
+    com GUID vazio). Lê só a raiz, proíbe DTD e não antecipa parse do corpo.
+
+.PARAMETER NewObjectNotImported
+    Declara objeto novo nunca importado: gera UtcNow + 60s sem acumular a
+    frente. Não inferir pela ausência no acervo. Com baseline não vazio ou
+    PreserveLastUpdate: LASTUPDATE_CONTEXT_CONFLICT/30, após 14/15 e antes
+    de âncora/no-op/EOL. Sem escrita nem backup, inclusive em DryRun.
 
 .PARAMETER DryRun
     Simula o apply sem gravar nem criar backup.
@@ -104,6 +114,8 @@ param(
 
     [switch]$PreserveLastUpdate,
 
+    [switch]$NewObjectNotImported,
+
     [string]$LastUpdateBaselinePath,
 
     [switch]$DryRun,
@@ -134,7 +146,9 @@ function Get-SurgicalCatchMapping {
         @{ Prefix = 'NOOP_REPLACEMENT:'; Code = 'NOOP_REPLACEMENT'; ExitCode = 26 },
         @{ Prefix = 'ANCHOR_EMPTY:'; Code = 'ANCHOR_EMPTY'; ExitCode = 27 },
         @{ Prefix = 'LASTUPDATE_TARGET_MOVED:'; Code = 'LASTUPDATE_TARGET_MOVED'; ExitCode = 28 },
-        @{ Prefix = 'REPLACEMENT_EOL_MISMATCH:'; Code = 'REPLACEMENT_EOL_MISMATCH'; ExitCode = 29 }
+        @{ Prefix = 'REPLACEMENT_EOL_MISMATCH:'; Code = 'REPLACEMENT_EOL_MISMATCH'; ExitCode = 29 },
+        @{ Prefix = 'LASTUPDATE_CONTEXT_CONFLICT:'; Code = 'LASTUPDATE_CONTEXT_CONFLICT'; ExitCode = 30 },
+        @{ Prefix = 'LASTUPDATE_BASELINE_IDENTITY_MISMATCH:'; Code = 'LASTUPDATE_BASELINE_IDENTITY_MISMATCH'; ExitCode = 31 }
     )
 
     foreach ($entry in $map) {
@@ -161,6 +175,7 @@ function Write-SurgicalHumanOutput {
     Write-Output ("  output                 : {0}" -f $Result.OutputPath)
     Write-Output ("  editMode               : {0}" -f $Result.EditMode)
     Write-Output ("  dryRun                 : {0}" -f $Result.DryRun)
+    Write-Output ("  newObjectNotImported   : {0}" -f $Result.NewObjectNotImported)
     Write-Output ("  anchor_count           : {0} (expected {1})" -f $Result.AnchorCount, $Result.ExpectedAnchorCount)
     Write-Output ("  replacements_applied   : {0}" -f $Result.ReplacementsApplied)
     Write-Output ("  post_patch_anchor_count: {0}" -f $Result.PostPatchAnchorCount)
@@ -225,6 +240,7 @@ function ConvertTo-SurgicalJsonOutput {
         lastUpdateBefore       = $Result.LastUpdateBefore
         lastUpdateAfter        = $Result.LastUpdateAfter
         preserveLastUpdate     = $Result.PreserveLastUpdate
+        newObjectNotImported   = $Result.NewObjectNotImported
         willBumpLastUpdate     = $Result.WillBumpLastUpdate
         lastUpdateBaselinePath = $Result.LastUpdateBaselinePath
         detectedEol            = $Result.DetectedEol
@@ -255,6 +271,7 @@ try {
         -ExpectedAnchorCount $ExpectedAnchorCount `
         -ApplyToAllOccurrences:$ApplyToAllOccurrences.IsPresent `
         -PreserveLastUpdate:$PreserveLastUpdate.IsPresent `
+        -NewObjectNotImported:$NewObjectNotImported.IsPresent `
         -LastUpdateBaselinePath $LastUpdateBaselinePath `
         -DryRun:$DryRun.IsPresent `
         -AssertWellFormedAfter $AssertWellFormedAfter
