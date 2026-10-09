@@ -973,8 +973,9 @@ segurança no **próprio adapter**, de forma inseparável (nunca "default sem gu
   `needsFixtureRecapture`, o próximo passo é recapturar os fixtures empíricos da versão instalada
   antes de promover o `reviewer-ro`; se for `blocked`, corrigir o motivo estrutural.
   Provisionamento: `.opencode/agent/reviewer-ro.md` (project-local versionado) +
-  `scripts/Install-OpenCodeReviewerRoAgent.ps1` (global, dono desta skill; idempotente — conteúdo
-  já canônico não é regravado — e, antes de gravar sobre arquivo existente, faz backup
+  `scripts/Install-OpenCodeReviewerRoAgent.ps1` (global, dono desta skill; idempotente — texto já
+  idêntico ao que o instalador produziria não é regravado; bloco com as mesmas permissões, mas
+  formatado de outro jeito, é regravado — e, antes de gravar sobre arquivo existente, faz backup
   `<opencode.jsonc>.rro-backup-<timestamp>-<sufixo>` na mesma pasta; rodar com `-WhatIf` antes).
   Mudança no markdown canônico não chega sozinha à cópia global de cada máquina: reinstalar após
   o push (a pré-push avisa via `Test-PrePushOpenCodeReviewerRoDrift.ps1`). Em cada máquina, a
