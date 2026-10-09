@@ -205,19 +205,11 @@ if ($existed) {
     $raw = ''
 }
 
-if (-not [string]::IsNullOrWhiteSpace($raw)) {
-    # O localizador e propositalmente restrito. Recusa comentarios com chaves,
-    # homonimos ou chaves escapadas antes da escrita, sem motor JSONC geral.
-    $existing = ConvertFrom-Jsonc -Raw $raw
-    foreach ($key in @('agent', 'reviewer-ro')) {
-        $count = ([regex]::Matches($raw, ('"' + [regex]::Escape($key) + '"\s*:'))).Count
-        $expectedCount = 0
-        if ($key -eq 'agent' -and $existing.PSObject.Properties['agent']) { $expectedCount = 1 }
-        if ($key -eq 'reviewer-ro' -and $existing.PSObject.Properties['agent'] -and $existing.agent.PSObject.Properties['reviewer-ro']) { $expectedCount = 1 }
-        if ($count -ne $expectedCount) { throw "BLOCK: chave aparente/homonima/escapada '$key'; localizacao ambigua." }
-    }
-    if ($raw -match '(?s)/\*(?:(?!\*/).)*[{}](?:(?!\*/).)*\*/|(?m)//[^\r\n]*[{}]') { throw 'BLOCK: comentario com chaves; localizacao ambigua.' }
-}
+# O localizador e propositalmente restrito. Recusa comentarios com chaves,
+# homonimos ou chaves escapadas antes da escrita, sem motor JSONC geral. A regra vive no guard
+# (Test-OpenCodeReviewerRoJsoncEditable) para a auditoria da xpz-skills-setup usar a mesma.
+$editable = Test-OpenCodeReviewerRoJsoncEditable -Raw $raw
+if (-not $editable.ok) { throw "BLOCK: $($editable.detail)" }
 
 $action = 'atualizar'
 if (-not $existed -or [string]::IsNullOrWhiteSpace($raw)) {

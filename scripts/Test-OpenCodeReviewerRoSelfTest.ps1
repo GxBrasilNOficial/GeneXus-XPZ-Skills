@@ -20,7 +20,10 @@
       (g) instalador global preserva comentarios/formatacao/demais chaves do opencode.jsonc
           (migracao tools:->permission; insercao; arquivo novo), faz backup identico ao original
           antes de gravar, e idempotente (ja canonico => sem gravacao nem backup) e respeita -WhatIf;
-      (multi-divergencia) a validacao estatica lista TODAS as divergencias, sem afrouxar o bloqueio.
+      (multi-divergencia) a validacao estatica lista TODAS as divergencias, sem afrouxar o bloqueio;
+      (h) auditoria da instalacao GLOBAL: -GlobalOnly no static; pre-checagem do instalador compartilhada
+          (Test-OpenCodeReviewerRoJsoncEditable); agent list na pasta pedida com restauracao da pasta
+          original (inclusive com erro); diagnostico -ExpectGlobal recusando pasta nao neutra.
 
     (a) default `-Agent reviewer-ro` no argv (sincrono E assincrono), o BLOCK do adapter ANTES do
     run/Start-Process, o opt-out (`-Agent <x>`) e o pos-check sincrono end-to-end tambem sao
@@ -67,7 +70,8 @@ $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('gx-oc-rro-selftest-' +
 [System.IO.Directory]::CreateDirectory($tempRoot) | Out-Null
 
 # variaveis de ambiente do fake-exe (limpas no finally)
-$fakeEnv = @('FAKE_OC_VERSION', 'FAKE_OC_AGENTLIST', 'FAKE_OC_AGENTLIST_EXIT', 'FAKE_OC_RUN_STREAM', 'FAKE_OC_RUN_STDERR', 'FAKE_OC_ARGV_FILE', 'FAKE_OC_AGENTLIST_FAIL_UNTIL', 'FAKE_OC_AGENTLIST_FAILCOUNTER')
+$fakeEnv = @('FAKE_OC_VERSION', 'FAKE_OC_AGENTLIST', 'FAKE_OC_AGENTLIST_EXIT', 'FAKE_OC_RUN_STREAM', 'FAKE_OC_RUN_STDERR', 'FAKE_OC_ARGV_FILE', 'FAKE_OC_AGENTLIST_FAIL_UNTIL', 'FAKE_OC_AGENTLIST_FAILCOUNTER', 'FAKE_OC_CWD_FILE')
+$originalProfile = $env:USERPROFILE
 
 try {
     # ── fake-exe: leitor pwsh + wrapper .cmd ───────────────────────────────────
@@ -76,6 +80,8 @@ try {
 $a = @($args)
 if ($a.Count -ge 1 -and $a[0] -eq '--version') { Write-Output $env:FAKE_OC_VERSION; exit 0 }
 if ($a.Count -ge 2 -and $a[0] -eq 'agent' -and $a[1] -eq 'list') {
+    # registra a pasta em que o agent list rodou (prova do -WorkingDirectory), antes de qualquer falha
+    if ($env:FAKE_OC_CWD_FILE) { Set-Content -LiteralPath $env:FAKE_OC_CWD_FILE -Value (Get-Location).Path -Encoding utf8 -NoNewline }
     # falha transitoria simulada: exit 1 nas primeiras FAIL_UNTIL tentativas (conta em arquivo)
     if ($env:FAKE_OC_AGENTLIST_FAIL_UNTIL -and $env:FAKE_OC_AGENTLIST_FAILCOUNTER) {
         $n = 0
@@ -438,6 +444,98 @@ sem mode
         }
     }
 
+    # ── (h) auditoria da instalacao GLOBAL (xpz-skills-setup) ────────────────────
+    # (h1) -GlobalOnly ignora o project-local (mesmo invalido) e le so o bloco global.
+    $stGo = Test-OpenCodeReviewerRoStatic -WorkingDirectory $badWd -GlobalJsoncPath $g3 -GlobalOnly
+    Assert-True ($stGo.ok -and ([string]$stGo.source).StartsWith('global:')) "(h1) -GlobalOnly le so o global, ignorando o project-local (got: $($stGo.source))"
+    $stGoOld = Test-OpenCodeReviewerRoStatic -WorkingDirectory $repoRoot -GlobalJsoncPath $gOld -GlobalOnly
+    Assert-True ((-not $stGoOld.ok) -and @($stGoOld.divergences).Count -eq 2 -and ([string]$stGoOld.source).StartsWith('global:')) "(h1) -GlobalOnly na raiz do repo ve a defasagem global (2 divergencias)"
+
+    # (h2) pre-checagem compartilhada: o que Test-OpenCodeReviewerRoJsoncEditable recusa, o instalador recusa.
+    $braceStale = Join-Path $tempRoot 'h-brace-stale.jsonc'
+    "{`n  // nota {nao mexer}`n" + ((Get-Content -LiteralPath $gOld -Raw).Trim().TrimStart('{')) + "`n" | Set-Content -LiteralPath $braceStale -Encoding utf8
+    $braceRaw = Get-Content -LiteralPath $braceStale -Raw
+    $stBrace = Test-OpenCodeReviewerRoStatic -WorkingDirectory $emptyWd -GlobalJsoncPath $braceStale -GlobalOnly
+    Assert-True ((-not $stBrace.ok) -and @($stBrace.divergences).Count -eq 2) "(h2) comentario com chaves: o guard le e ve a defasagem (2 divergencias)"
+    Assert-True (-not (Test-OpenCodeReviewerRoJsoncEditable -Raw $braceRaw).ok) "(h2) comentario com chaves: nao editavel pelo instalador"
+    $refusedBrace = $false
+    try { & $installer -JsoncPath $braceStale -AgentMarkdownPath $agentMd -WhatIf | Out-Null } catch { $refusedBrace = $true }
+    Assert-True ($refusedBrace -and (Get-Content -LiteralPath $braceStale -Raw) -ceq $braceRaw) "(h2) instalador recusa o mesmo arquivo, sem escrita"
+    Assert-True (-not (Test-OpenCodeReviewerRoJsoncEditable -Raw (Get-Content -LiteralPath $g4 -Raw)).ok) "(h2) homonimo: nao editavel"
+    Assert-True (-not (Test-OpenCodeReviewerRoJsoncEditable -Raw '{"agent":').ok) "(h2) JSONC que nao parseia: nao editavel"
+    Assert-True ((Test-OpenCodeReviewerRoJsoncEditable -Raw (Get-Content -LiteralPath $gOld -Raw)).ok) "(h2) forma anterior sem ambiguidade: editavel"
+    Assert-True ((Test-OpenCodeReviewerRoJsoncEditable -Raw '').ok) "(h2) vazio: editavel (criacao minima)"
+
+    # (h3) agent list roda na pasta pedida e devolve a pasta original, inclusive com erro.
+    $hWd = Join-Path $tempRoot 'h-wd'
+    New-Item -ItemType Directory -Path $hWd -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $hWd 'h-marker.txt') -Value 'x' -Encoding utf8
+    Set-Content -LiteralPath (Join-Path $emptyWd 'empty-marker.txt') -Value 'x' -Encoding utf8
+    $cwdFile = Join-Path $tempRoot 'agentlist-cwd.txt'
+    $env:FAKE_OC_CWD_FILE = $cwdFile
+    $env:FAKE_OC_AGENTLIST = $sampleAgentList
+    $env:FAKE_OC_AGENTLIST_EXIT = ''
+    $locBefore = (Get-Location).Path
+    $alWd = Get-OpenCodeReviewerRoAllowSetFromExe -Exe $fakeCmd -WorkingDirectory $hWd -RetryDelayMs 0
+    $recorded = Get-Content -LiteralPath $cwdFile -Raw
+    Assert-True ($alWd.ok -and (Test-Path -LiteralPath (Join-Path $recorded 'h-marker.txt'))) "(h3) agent list rodou na pasta pedida (got: $recorded)"
+    Assert-True ((Get-Location).Path -eq $locBefore) "(h3) pasta original restaurada apos sucesso"
+    Remove-Item -LiteralPath $cwdFile -Force
+    $env:FAKE_OC_AGENTLIST_EXIT = '1'
+    $alFail = Get-OpenCodeReviewerRoAllowSetFromExe -Exe $fakeCmd -WorkingDirectory $hWd -RetryDelayMs 0
+    $recordedFail = Get-Content -LiteralPath $cwdFile -Raw
+    Assert-True ((-not $alFail.ok) -and (Test-Path -LiteralPath (Join-Path $recordedFail 'h-marker.txt')) -and (Get-Location).Path -eq $locBefore) "(h3) com falha do agent list: rodou na pasta pedida e a pasta original foi restaurada"
+    $env:FAKE_OC_AGENTLIST_EXIT = ''
+    $alMissing = Get-OpenCodeReviewerRoAllowSetFromExe -Exe $fakeCmd -WorkingDirectory (Join-Path $tempRoot 'nao-existe-wd') -Retries 0
+    Assert-True ((-not $alMissing.ok) -and (Get-Location).Path -eq $locBefore) "(h3) pasta inexistente: falha sem mudar a pasta atual"
+    Push-Location -LiteralPath $emptyWd
+    try {
+        $null = Get-OpenCodeReviewerRoAllowSetFromExe -Exe $fakeCmd -RetryDelayMs 0
+        $recordedDefault = Get-Content -LiteralPath $cwdFile -Raw
+        Assert-True (Test-Path -LiteralPath (Join-Path $recordedDefault 'empty-marker.txt')) "(h3) sem -WorkingDirectory (adapters): agent list roda na pasta atual"
+    }
+    finally { Pop-Location }
+
+    # (h4) diagnostico -ExpectGlobal: mede a configuracao global de uma pasta neutra; recusa pasta nao neutra.
+    $diag = Join-Path $scriptsDir 'Test-OpenCodeReviewerRoInstalledCompatibility.ps1'
+    $hProfile = Join-Path $tempRoot 'h-profile'
+    $hJsonc = Join-Path $hProfile '.config\opencode\opencode.jsonc'
+    New-Item -ItemType Directory -Path (Split-Path -Parent $hJsonc) -Force | Out-Null
+    Copy-Item -LiteralPath $gOld -Destination $hJsonc -Force
+    $env:USERPROFILE = $hProfile
+    try {
+        $dOld = (& $diag -OpenCodeExe $fakeCmd -WorkingDirectory $hWd -ExpectGlobal -AsJson) -join "`n" | ConvertFrom-Json
+        $dOldExit = $LASTEXITCODE
+        Assert-True ($dOld.status -eq 'blocked' -and $dOldExit -eq 20 -and $dOld.sourceKind -eq 'global' -and $dOld.vantage.ok -and @($dOld.static.divergences).Count -eq 2 -and $dOld.nextAction -match 'Install-OpenCodeReviewerRoAgent') "(h4) global defasado de pasta neutra => blocked, fonte global, 2 divergencias, aponta o instalador (got: $($dOld.status)/$dOldExit)"
+
+        Copy-Item -LiteralPath $g3 -Destination $hJsonc -Force
+        Remove-Item -LiteralPath $cwdFile -Force -ErrorAction SilentlyContinue
+        $dOk = (& $diag -OpenCodeExe $fakeCmd -WorkingDirectory $hWd -ExpectGlobal -AsJson) -join "`n" | ConvertFrom-Json
+        $dOkExit = $LASTEXITCODE
+        $recordedDiag = if (Test-Path -LiteralPath $cwdFile) { Get-Content -LiteralPath $cwdFile -Raw } else { '' }
+        Assert-True ($dOk.status -eq 'compatible' -and $dOkExit -eq 0 -and $dOk.sourceKind -eq 'global' -and $dOk.allowSetOk -and $dOk.externalDirectoryOk) "(h4) global canonico de pasta neutra => compatible (got: $($dOk.status)/$dOkExit)"
+        Assert-True ($recordedDiag -and (Test-Path -LiteralPath (Join-Path $recordedDiag 'h-marker.txt'))) "(h4) o diagnostico rodou o agent list na pasta pedida (got: $recordedDiag)"
+
+        $hLocal = Join-Path $tempRoot 'h-local'
+        New-Item -ItemType Directory -Path (Join-Path $hLocal '.opencode\agent') -Force | Out-Null
+        Copy-Item -LiteralPath $agentMd -Destination (Join-Path $hLocal '.opencode\agent\reviewer-ro.md') -Force
+        Remove-Item -LiteralPath $cwdFile -Force -ErrorAction SilentlyContinue
+        $dLocal = (& $diag -OpenCodeExe $fakeCmd -WorkingDirectory $hLocal -ExpectGlobal -AsJson) -join "`n" | ConvertFrom-Json
+        $dLocalExit = $LASTEXITCODE
+        Assert-True ($dLocal.status -eq 'invalidVantage' -and $dLocalExit -eq 21 -and $dLocal.sourceKind -eq 'project-local' -and $null -eq $dLocal.agentList -and -not (Test-Path -LiteralPath $cwdFile)) "(h4) project-local acima da pasta => invalidVantage, sem agent list (got: $($dLocal.status)/$dLocalExit)"
+
+        $hGit = Join-Path $tempRoot 'h-git'
+        New-Item -ItemType Directory -Path (Join-Path $hGit '.git') -Force | Out-Null
+        $dGit = (& $diag -OpenCodeExe $fakeCmd -WorkingDirectory $hGit -ExpectGlobal -AsJson) -join "`n" | ConvertFrom-Json
+        $dGitExit = $LASTEXITCODE
+        Assert-True ($dGit.status -eq 'invalidVantage' -and $dGitExit -eq 21 -and $dGit.vantage.insideGitRepo) "(h4) pasta dentro de repositorio git => invalidVantage (got: $($dGit.status)/$dGitExit)"
+
+        $dNoExpect = (& $diag -OpenCodeExe $fakeCmd -WorkingDirectory $hLocal -AsJson) -join "`n" | ConvertFrom-Json
+        Assert-True ($dNoExpect.status -eq 'compatible' -and $dNoExpect.sourceKind -eq 'project-local' -and $null -eq $dNoExpect.vantage) "(h4) sem -ExpectGlobal o comportamento anterior continua (project-local aceito)"
+    }
+    finally { $env:USERPROFILE = $originalProfile }
+    $env:FAKE_OC_CWD_FILE = ''
+
     # ── (a)+(b-adapter) INTEGRACAO com os adapters (D1+D2) ──────────────────────
     # Push-Location na raiz do repo: o pre-check descobre o project-local subindo do cwd herdado.
     $invoke = Join-Path $scriptsDir 'Invoke-OpenCode.ps1'
@@ -569,6 +667,7 @@ sem mode
     finally { Pop-Location -ErrorAction SilentlyContinue }
 }
 finally {
+    $env:USERPROFILE = $originalProfile
     foreach ($e in $fakeEnv) { Remove-Item "Env:$e" -ErrorAction SilentlyContinue }
     if (Test-Path -LiteralPath $tempRoot) { Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue }
 }

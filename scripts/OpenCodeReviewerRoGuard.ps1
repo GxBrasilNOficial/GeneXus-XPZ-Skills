@@ -274,6 +274,31 @@ function Get-OpenCodeReviewerRoPermissionFromJsonc {
     return @{ mode = $mode; permission = $permission; tools = $tools }
 }
 
+function Test-OpenCodeReviewerRoJsoncEditable {
+    <#
+        Pre-checagem da edicao LOCALIZADA do instalador (Install-OpenCodeReviewerRoAgent.ps1), exposta
+        aqui para a auditoria de setup usar a MESMA regra: o que esta funcao recusa, o instalador
+        recusa. O localizador e propositalmente restrito: recusa JSONC que nao parseia, chave
+        aparente/homonima/escapada `agent`/`reviewer-ro` e comentario com chaves, sem motor JSONC geral.
+        Conteudo vazio/so espaco e editavel (o instalador cria o minimo).
+        Devolve @{ ok = $bool; detail = <str> }; o detail nunca contem o conteudo do arquivo.
+    #>
+    param([AllowEmptyString()] [string] $Raw)
+
+    if ([string]::IsNullOrWhiteSpace($Raw)) { return @{ ok = $true; detail = 'vazio: criacao minima' } }
+    try { $existing = ConvertFrom-Jsonc -Raw $Raw }
+    catch { return @{ ok = $false; detail = "JSONC nao parseia: $($_.Exception.Message)" } }
+    foreach ($key in @('agent', 'reviewer-ro')) {
+        $count = ([regex]::Matches($Raw, ('"' + [regex]::Escape($key) + '"\s*:'))).Count
+        $expectedCount = 0
+        if ($key -eq 'agent' -and $existing.PSObject.Properties['agent']) { $expectedCount = 1 }
+        if ($key -eq 'reviewer-ro' -and $existing.PSObject.Properties['agent'] -and $existing.agent.PSObject.Properties['reviewer-ro']) { $expectedCount = 1 }
+        if ($count -ne $expectedCount) { return @{ ok = $false; detail = "chave aparente/homonima/escapada '$key'; localizacao ambigua." } }
+    }
+    if ($Raw -match '(?s)/\*(?:(?!\*/).)*[{}](?:(?!\*/).)*\*/|(?m)//[^\r\n]*[{}]') { return @{ ok = $false; detail = 'comentario com chaves; localizacao ambigua.' } }
+    return @{ ok = $true; detail = 'editavel pelo instalador' }
+}
+
 function Test-OpenCodeReviewerRoStatic {
     <#
         Check ESTATICO (barato/deterministico) da definicao do reviewer-ro. Prefere o project-local
@@ -282,10 +307,13 @@ function Test-OpenCodeReviewerRoStatic {
         edit/bash/webfetch/websearch/task/external_directory=deny, mode=all.
         Devolve @{ ok = $bool; reason = <str>; source = <path/descricao>; detail = <str> } e, quando a
         definicao foi lida e comparada, `divergences` (lista completa; vazia se canonica).
+        -GlobalOnly pula a descoberta project-local e le so o bloco global (auditoria de setup: a
+        instalacao global e o alvo, independentemente do cwd). Os adapters NAO usam -GlobalOnly.
     #>
     param(
         [string] $WorkingDirectory = (Get-Location).Path,
-        [string] $GlobalJsoncPath
+        [string] $GlobalJsoncPath,
+        [switch] $GlobalOnly
     )
 
     if (-not $GlobalJsoncPath) {
@@ -296,7 +324,7 @@ function Test-OpenCodeReviewerRoStatic {
     # .opencode/agent/reviewer-ro.md (mesma semantica do opencode, que descobre o project-local
     # subindo ate a raiz). Assim o static nao e fragil a subdiretorios do cwd.
     $projectLocal = $null
-    $dir = $WorkingDirectory
+    $dir = if ($GlobalOnly) { $null } else { $WorkingDirectory }
     while (-not [string]::IsNullOrEmpty($dir)) {
         $candidate = Join-Path $dir '.opencode\agent\reviewer-ro.md'
         if (Test-Path -LiteralPath $candidate -PathType Leaf) { $projectLocal = $candidate; break }
@@ -449,11 +477,15 @@ function Get-OpenCodeAgentListLines {
         que o bloco procurado nao apareca) NAO e transitorio e nao retenta. Devolve
         @{ ok; lines; error }. -Retries = tentativas EXTRAS (default 2 => ate 3 execucoes);
         -RetryDelayMs = pausa entre tentativas (0 nos self-tests).
+        -WorkingDirectory (opcional): pasta em que o `agent list` roda — o opencode descobre o
+        project-local a partir dela. Sem o parametro, roda na pasta atual (comportamento dos adapters).
+        A pasta original e restaurada em try/finally, mesmo com erro.
     #>
     param(
         [Parameter(Mandatory)] [string] $Exe,
         [int] $Retries = 2,
-        [int] $RetryDelayMs = 250
+        [int] $RetryDelayMs = 250,
+        [string] $WorkingDirectory
     )
     $attempts = [Math]::Max(1, $Retries + 1)
     $lastErr = $null
@@ -462,7 +494,13 @@ function Get-OpenCodeAgentListLines {
         $stdout = $null
         try {
             $prev = if (Test-Path Variable:LASTEXITCODE) { $LASTEXITCODE } else { 0 }
-            $stdout = & $Exe agent list 2>$null
+            if ([string]::IsNullOrEmpty($WorkingDirectory)) {
+                $stdout = & $Exe agent list 2>$null
+            } else {
+                Push-Location -LiteralPath $WorkingDirectory
+                try { $stdout = & $Exe agent list 2>$null }
+                finally { Pop-Location }
+            }
             $code = $LASTEXITCODE
             $global:LASTEXITCODE = $prev
             if ($code -ne 0) {
@@ -489,10 +527,11 @@ function Get-OpenCodeReviewerRoAllowSetFromExe {
         [Parameter(Mandatory)] [string] $Exe,
         [string] $Name = 'reviewer-ro',
         [int] $Retries = 2,
-        [int] $RetryDelayMs = 250
+        [int] $RetryDelayMs = 250,
+        [string] $WorkingDirectory
     )
 
-    $al = Get-OpenCodeAgentListLines -Exe $Exe -Retries $Retries -RetryDelayMs $RetryDelayMs
+    $al = Get-OpenCodeAgentListLines -Exe $Exe -Retries $Retries -RetryDelayMs $RetryDelayMs -WorkingDirectory $WorkingDirectory
     if (-not $al.ok) {
         return @{ ok = $false; error = $al.error }
     }
