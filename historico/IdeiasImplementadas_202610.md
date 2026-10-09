@@ -2,6 +2,30 @@
 
 Registro de ideias que saíram de `999-ideias-pendentes.md` por terem sido implementadas ou incorporadas ao contrato metodológico vigente.
 
+## Instalador e diagnóstico do `reviewer-ro` — backup, idempotência e deriva pós-contrato
+
+Entrada original no 999 (Importância média; Maturidade pronta para implementar), implementada em 2026-10-09.
+
+**Origem e evidência (preservada do 999).** O commit `8f61c28` (2026-10-08) endureceu o contrato do `reviewer-ro` (`read` por mapa com proteção `.env`, `grep: deny`), mas o `agent.reviewer-ro` do `~/.config/opencode/opencode.jsonc` desta máquina ficou na forma anterior (`read: "allow"`, `grep: "allow"`). Em 2026-10-09, um painel de revisão por pares disparado de `C:\Dev\Prod\MCP_FabricaBrasil18` perdeu os 3 revisores opencode por `BLOCK ... motivo=static`, antes de chegar ao modelo. O diagnóstico `Test-OpenCodeReviewerRoInstalledCompatibility.ps1` reportou só `mapa read: chaves/ordem divergentes`; a divergência de `grep` não apareceu porque `Test-OpenCodeReviewerRoDefinition` retornava na primeira diferença.
+
+**Recorte implementado (itens 1–5 do 999).**
+
+1. **Backup no instalador** — antes de gravar sobre arquivo existente, `Install-OpenCodeReviewerRoAgent.ps1` copia o `opencode.jsonc` na mesma pasta como `<arquivo>.rro-backup-<yyyyMMdd-HHmmss>-<guid8>` (`File.Copy` sem sobrescrever; padrão de `Install-ClaudeCodePreToolUseSafeAllow.ps1`) e imprime só o caminho. O sufixo não termina em `.json`/`.jsonc`. Arquivo novo não gera backup.
+2. **Idempotência** — texto resultante idêntico ao atual (comparação ordinal após leitura UTF-8) não é regravado nem gera backup; o instalador reporta «já canônico». `-WhatIf` não grava nem faz backup.
+3. **`nextAction` acionável** — com bloqueio `static` vindo do `opencode.jsonc` global, o diagnóstico aponta o comando do instalador (com `-WhatIf` antes); vindo de um project-local, aponta a correção do markdown, porque o instalador global não o substitui.
+4. **Todas as divergências** — `Test-OpenCodeReviewerRoDefinition` acumula `mode`, chaves/ordem (com ausentes/extras), mapa escalar no lugar de mapa e ação por chave e por padrão; devolve `divergences` e `detail` unido por `; `. `ok` continua `$false` com qualquer divergência. `Test-OpenCodeReviewerRoStatic` repassa a lista. Os consumidores de `.detail` (adapters, instalador, pré-check) só o interpolam em mensagem, sem casar texto.
+5. **Aviso de deriva pós-contrato** — gate consultivo novo `scripts/Test-PrePushOpenCodeReviewerRoDrift.ps1`, chamado pelo orquestrador: quando o intervalo `BaseRef..HEAD` altera `.opencode/agent/reviewer-ro.md`, emite `OPENCODE_REVIEWER_RO_CONTRACT_CHANGED` em `agentWarnings` (severity `warn`, não falha o mecânico). Não lê a configuração da máquina. O 999 previa caso «no self-test do orquestrador», que não existe; por decisão do usuário (opção a), o aviso virou gate com self-test próprio, no padrão dos demais `Test-PrePush*`.
+
+**Provas.** `Test-OpenCodeReviewerRoSelfTest.ps1` ganhou na seção (g): backup único na mesma pasta, byte a byte idêntico ao original e informado no stdout; segunda execução «já canônico» sem regravar nem criar backup; `-WhatIf` sem gravação nem backup; arquivo novo sem backup; e o caso de múltiplas divergências (forma anterior com `read` escalar + `grep: allow` → 2 divergências; com `mode` divergente → 3; controle canônico → 0; `static` global repassa a lista). `Test-PrePushOpenCodeReviewerRoDriftSelfTest.ps1` cobre intervalo com e sem o contrato, outro agente na mesma pasta, `-ChangedFiles` com barra invertida e caixa diferente. Nenhum LLM, painel ou `opencode run` foi disparado. Dono normativo: `xpz-llm-delegate/SKILL.md` (instalador e diagnóstico) e `13-revisao-pre-push.md` (gate); ponteiros no `09`, resumo no `08`, `CHANGELOG` trilíngue.
+
+### Residuais
+
+A fiação do instalador na `xpz-skills-setup` (detectar a deriva na auditoria pós-`git pull` e oferecer a reinstalação com confirmação) continua aberta na entrada própria do 999. O gate pré-push só lembra quem faz o push; outras máquinas que puxarem o contrato novo dependem dessa fiação ou de reinstalação manual.
+
+### Rastreabilidade
+
+- Commit material: `bfd2d93` (Torna o instalador do reviewer-ro idempotente e com backup).
+
 ## lastUpdate em edições sucessivas — recorte v5
 
 Implementação validada em 2026-10-09 com fixtures sintéticas dos consumidores reais. Editor cirúrgico e setter recebem `-NewObjectNotImported` para novo nunca importado, sem acumular baseline; conflitos de contexto retornam 30 e baseline explícito com recarimbo exige mesma raiz Object/Attribute e GUID válido não zero igual (31). Lote recebe `-NewObjectsNotImported` apenas para `objectState=new`, após validar valores presentes, com rastro aditivo no relatório/journal e fonte `new-not-imported`, sem mudar manifesto.
