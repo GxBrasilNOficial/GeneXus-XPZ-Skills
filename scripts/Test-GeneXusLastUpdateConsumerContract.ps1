@@ -3,12 +3,15 @@
 .SYNOPSIS
     Provas sintéticas da v5: consumidores reais, sem KB/IDE/import/build.
     SkipGate isola somente a prova temporal do Build; não é receita operacional.
+    Após sucesso, remove somente a pasta temporária criada nesta execução.
+    Em falha, preserva os artefatos restantes e informa o caminho para diagnóstico.
 #>
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'GeneXusXmlSurgicalEditSupport.ps1')
 $testRoot = Join-Path ([IO.Path]::GetTempPath()) ('lastupdate-consumers-' + [Guid]::NewGuid().ToString('N'))
 [void][IO.Directory]::CreateDirectory($testRoot)
+try {
 $utf8 = Get-Utf8NoBomEncoding
 $guid = 'bbbbbbbb-0000-0000-0000-000000000001'
 $type = '447527b5-9210-4523-898b-5dccb17be60a'
@@ -255,4 +258,17 @@ $journalPath = Join-Path $testRoot 'primeiro.journal.json'
 $j = New-GeneXusBatchJournal -Path $journalPath -RunId 'sintetico' -WorkDir $testRoot -NewObjectsNotImported
 $firstJournal = [IO.File]::ReadAllText($journalPath) | ConvertFrom-Json
 Assert-True ($firstJournal.newObjectsNotImported -and @($firstJournal.steps).Count -eq 0) 'primeira materialização do journal'
-Write-Output "LASTUPDATE_CONSUMER_CONTRACT_OK: $script:checks verificações; fixtures=$testRoot"
+# Antes da remoção recursiva, confirmar o filho direto e o nome gerado nesta execução.
+$cleanupRoot = [IO.Path]::GetFullPath($testRoot)
+$cleanupParent = [IO.Path]::GetDirectoryName($cleanupRoot)
+$expectedParent = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
+if (-not [string]::Equals($cleanupParent, $expectedParent, [StringComparison]::OrdinalIgnoreCase) -or
+    [IO.Path]::GetFileName($cleanupRoot) -cnotmatch '^lastupdate-consumers-[0-9a-f]{32}$') {
+    throw "Caminho temporário inesperado; limpeza recusada: $cleanupRoot"
+}
+Remove-Item -LiteralPath $cleanupRoot -Recurse -Force -ErrorAction Stop
+Write-Output "LASTUPDATE_CONSUMER_CONTRACT_OK: $script:checks verificações; fixtures removidas=$testRoot"
+} catch {
+    Write-Warning "Falha na bateria; artefatos restantes preservados para diagnóstico: $testRoot"
+    throw
+}

@@ -2,6 +2,22 @@
 
 Registro de ideias que saíram de `999-ideias-pendentes.md` por terem sido implementadas ou incorporadas ao contrato metodológico vigente.
 
+## lastUpdate em edições sucessivas — recorte v5
+
+Implementação validada em 2026-10-09 com fixtures sintéticas dos consumidores reais. Editor cirúrgico e setter recebem `-NewObjectNotImported` para novo nunca importado, sem acumular baseline; conflitos de contexto retornam 30 e baseline explícito com recarimbo exige mesma raiz Object/Attribute e GUID válido não zero igual (31). Lote recebe `-NewObjectsNotImported` apenas para `objectState=new`, após validar valores presentes, com rastro aditivo no relatório/journal e fonte `new-not-imported`, sem mudar manifesto.
+
+Defaults, existing, Preserve fora do modo novo, gerador/formato `.0000000Z` e tolerâncias permanecem. Recarimbo final de preparação acumulada usa referência oficial atual do mesmo objeto para existente, ou modo explícito para novo nunca importado; renovar a referência após importação. Documentado também o consumo de JSON sem coerção de datas. Dono normativo: `xpz-builder/SKILL.md`, seção de recarimbo final; regras em 02/08, checklist e exemplo cirúrgico, ponteiros no 09, notas aditivas nos desenhos congelados e README/CHANGELOG trilíngues.
+
+Provas: 372 verificações integradas em `scripts/Test-GeneXusLastUpdateConsumerContract.ps1`, além das baterias pertinentes de editor, setter, baseline opcional, lote, envelope e botão. `SkipGate` na prova isola a validação temporal, sem ser contorno operacional. Não houve IDE/import/build/runtime reais; o envelope decide pelo acervo fornecido, não pela KB viva, e não valida temporalmente Attribute de topo. Não houve molde derivado de KB real ou necessidade de atualização do PrivateMap.
+
+### Residuais
+
+A [entrada original no 999](../999-ideias-pendentes.md#xpz-relato-20261005-datas) permanece com os residuais. `Add-GeneXusButton.ps1` continua acumulativo e sem comparar a identidade do baseline explícito com o objeto editado; recarimbo final não substitui essa validação. Alteração de GUID pelo patch, aviso temporal novo de existing, alerta lastUpdateRegressed e refatoração dot-sourceável seguem fora do recorte implementado. O relato de formato não identifica consumidor externo específico nem comprova defeito na emissão do gerador.
+
+### Rastreabilidade
+
+- Commit material: `c73b1a8` (Corrige lastUpdate em edições sucessivas de objetos nunca importados).
+
 ## Proteção mínima de conteúdo .env no reviewer-ro
 
 Implementação local validada em 2026-10-08; publicação Git depende de autorização própria.
