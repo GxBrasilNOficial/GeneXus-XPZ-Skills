@@ -977,7 +977,9 @@ segurança no **próprio adapter**, de forma inseparável (nunca "default sem gu
   já canônico não é regravado — e, antes de gravar sobre arquivo existente, faz backup
   `<opencode.jsonc>.rro-backup-<timestamp>-<sufixo>` na mesma pasta; rodar com `-WhatIf` antes).
   Mudança no markdown canônico não chega sozinha à cópia global de cada máquina: reinstalar após
-  o push (a pré-push avisa via `Test-PrePushOpenCodeReviewerRoDrift.ps1`). A recusa de arquivo
+  o push (a pré-push avisa via `Test-PrePushOpenCodeReviewerRoDrift.ps1`). Em cada máquina, a
+  `xpz-skills-setup` é a dona operacional da instalação global: o passo 10 do `WORKFLOW` dela
+  detecta ausência/defasagem e oferece este instalador com confirmação. A recusa de arquivo
   ambíguo do instalador (JSONC que não parseia, chave homônima, comentário com chaves) vive no guard
   como `Test-OpenCodeReviewerRoJsoncEditable`, para a auditoria da `xpz-skills-setup` usar a mesma
   regra; o guard também expõe `Test-OpenCodeReviewerRoStatic -GlobalOnly` (lê só o bloco global,

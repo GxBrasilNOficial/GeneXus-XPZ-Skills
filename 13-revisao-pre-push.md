@@ -228,7 +228,7 @@ Ver `10-base-operacional-msbuild-headless.md` e gate `Test-PrePushMsBuildProbeDo
 | `scripts/Test-PrePushNewTokenPropagation.ps1` | Propagação de termo novo introduzido no diff por transição co-localizada (consultivo) |
 | `scripts/Test-PrePushSharedScriptSkillCoverage.ps1` | Script compartilhado alterado documentado em SKILL.md/quality-checklist.md fora do diff (consultivo) |
 | `scripts/Test-PrePushHistoryCommitPlaceholder.ps1` | Placeholder genérico em campo `Commit:`/`PR:` de `historico/` no diff (consultivo) |
-| `scripts/Test-PrePushOpenCodeReviewerRoDrift.ps1` | Contrato canônico do `reviewer-ro` (`.opencode/agent/reviewer-ro.md`) alterado no intervalo: lembra de reinstalar a cópia global de cada máquina com `Install-OpenCodeReviewerRoAgent.ps1` após o push (consultivo) |
+| `scripts/Test-PrePushOpenCodeReviewerRoDrift.ps1` | Contrato canônico do `reviewer-ro` (`.opencode/agent/reviewer-ro.md`) alterado no intervalo: lembra de reinstalar a cópia global de cada máquina com `Install-OpenCodeReviewerRoAgent.ps1` após o push, pelo passo 10 da `xpz-skills-setup` ou diretamente (consultivo) |
 | `scripts/Test-PrePushGateEnumerationParity.ps1` | Enumeração de gates na doc que ficou subconjunto próprio do que o orquestrador executa (consultivo) |
 | `scripts/Test-PrePushBackendEnumerationParity.ps1` | Enumeração de backends de delegação na doc que ficou subconjunto próprio de `$AdapterScript` no dispatcher (consultivo) |
 

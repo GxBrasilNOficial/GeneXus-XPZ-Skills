@@ -13,6 +13,9 @@
     Cobre: OK, ausente, quebrada, coberta_por_compatibilidade e orfa.
     Casos isolados adicionais: compat do Cursor sozinho marca REGISTRATION_GAPS;
     vinculo nativo em ~/.cursor/skills produz Cursor OK e REGISTRATION_OK.
+    reviewer-ro global do OpenCode, com opencode.jsonc SINTETICO no perfil falso: nao aplicavel,
+    ausente (sem gap), defasado, forma interina tools:, canonico, comentario com chaves (defasado e
+    canonico), homonimo e JSONC invalido; e a prova de que o conteudo do arquivo nao e impresso.
 #>
 
 [CmdletBinding()]
@@ -251,6 +254,102 @@ finally {
     $env:USERPROFILE = $originalProfile
     $env:LOCALAPPDATA = $originalLocalAppData
     foreach ($p in @($nativeProfile, $nativeRepo, $nativeLocal)) {
+        if (Test-Path -LiteralPath $p) {
+            Get-ChildItem -LiteralPath $p -Recurse -Force -ErrorAction SilentlyContinue |
+                ForEach-Object { try { $_.Attributes = 'Normal' } catch { } }
+            Remove-Item -LiteralPath $p -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
+# Casos isolados: reviewer-ro GLOBAL do OpenCode (opencodeReviewerRo), com opencode.jsonc SINTETICO
+# num perfil falso. Uma skill com vinculo nativo do OpenCode deixa o overall dependente so do reviewer-ro.
+$rroRepo = New-TempDir
+$rroLocal = New-TempDir
+$rroWork = New-TempDir
+$rroProfiles = [System.Collections.Generic.List[string]]::new()
+$installerRro = Join-Path $PSScriptRoot 'Install-OpenCodeReviewerRoAgent.ps1'
+$sentinel = 'sk-SENTINELA-NAO-IMPRIMIR-7781'
+try {
+    $env:LOCALAPPDATA = $rroLocal
+    New-FakeSkill -SkillRepoRoot $rroRepo -Name 'skill-only' | Out-Null
+
+    # Canonico gerado pelo proprio instalador num caminho temporario (nunca a configuracao real).
+    $canonPath = Join-Path $rroWork 'canonico.jsonc'
+    & $installerRro -JsoncPath $canonPath | Out-Null
+    $canonRaw = Get-Content -LiteralPath $canonPath -Raw -Encoding utf8
+    $oldForm = '{ "provider": { "x": { "options": { "apiKey": "' + $sentinel + '" } } }, "agent": { "reviewer-ro": { "description": "x", "mode": "all", "permission": { "*": "deny", "read": "allow", "grep": "allow", "glob": "allow", "list": "allow", "edit": "deny", "bash": "deny", "webfetch": "deny", "websearch": "deny", "task": "deny", "external_directory": "deny" } } } }'
+
+    function Invoke-RroCase {
+        param([string]$Name, [AllowNull()][string]$Jsonc, [switch]$NoOpenCode, [switch]$JsonOnly)
+        $prof = New-TempDir
+        $script:rroProfiles.Add($prof)
+        if (-not $NoOpenCode) {
+            New-Junction -LinkDir (Join-Path $prof '.config\opencode\skills') -Name 'skill-only' -Target (Join-Path $rroRepo 'skill-only')
+            if ($JsonOnly) { Set-Content -LiteralPath (Join-Path $prof '.config\opencode\opencode.json') -Value '{}' -Encoding utf8 }
+            if ($null -ne $Jsonc) { [System.IO.File]::WriteAllText((Join-Path $prof '.config\opencode\opencode.jsonc'), $Jsonc, (New-Object System.Text.UTF8Encoding($false))) }
+        }
+        $env:PATH = ''
+        $env:USERPROFILE = $prof
+        try {
+            $jsonOut = & $scriptUnderTest -RepoRoot $rroRepo -AsJson | Out-String
+            $textOut = & $scriptUnderTest -RepoRoot $rroRepo | Out-String
+        }
+        finally {
+            $env:PATH = $originalPath
+            $env:USERPROFILE = $originalProfile
+        }
+        return [pscustomobject]@{ report = ($jsonOut | ConvertFrom-Json); json = $jsonOut; text = $textOut }
+    }
+
+    $c = Invoke-RroCase -Name 'na' -Jsonc $null -NoOpenCode
+    Assert-Equal 'reviewer-ro: OpenCode nao instalado => NOT_APPLICABLE' 'REVIEWER_RO_NOT_APPLICABLE' ([string]$c.report.opencodeReviewerRo.label)
+
+    $c = Invoke-RroCase -Name 'missing' -Jsonc $null -JsonOnly
+    Assert-Equal 'reviewer-ro: jsonc ausente => MISSING' 'REVIEWER_RO_MISSING' ([string]$c.report.opencodeReviewerRo.label)
+    Assert-Equal 'reviewer-ro: MISSING nao marca gap' 'REGISTRATION_OK' ([string]$c.report.overall)
+    Assert-Equal 'reviewer-ro: opencode.json presente reportado' 'True' ([string]$c.report.opencodeReviewerRo.opencodeJsonPresent)
+
+    $c = Invoke-RroCase -Name 'missing-agent' -Jsonc '{ "agent": { "helper": { "mode": "all" } } }'
+    Assert-Equal 'reviewer-ro: agent sem reviewer-ro => MISSING' 'REVIEWER_RO_MISSING' ([string]$c.report.opencodeReviewerRo.label)
+
+    $c = Invoke-RroCase -Name 'stale' -Jsonc $oldForm
+    Assert-Equal 'reviewer-ro: forma anterior (read escalar + grep allow) => STALE' 'REVIEWER_RO_STALE' ([string]$c.report.opencodeReviewerRo.label)
+    Assert-Equal 'reviewer-ro: STALE marca gap' 'REGISTRATION_GAPS' ([string]$c.report.overall)
+    Assert-Equal 'reviewer-ro: STALE lista 2 divergencias' '2' ([string]@($c.report.opencodeReviewerRo.divergences).Count)
+    Assert-Equal 'reviewer-ro: STALE corrigivel pelo instalador' 'True' ([string]$c.report.opencodeReviewerRo.autoFixable)
+    Assert-Equal 'reviewer-ro: fonte global' 'True' ([string]([string]$c.report.opencodeReviewerRo.source).StartsWith('global:'))
+    Assert-Equal 'reviewer-ro: conteudo do jsonc nao aparece no JSON nem no texto' 'False' ([string]($c.json.Contains($sentinel) -or $c.text.Contains($sentinel)))
+    Assert-Equal 'reviewer-ro: summary espelha o label' 'REVIEWER_RO_STALE' ([string]$c.report.summary.opencodeReviewerRo)
+
+    $c = Invoke-RroCase -Name 'tools' -Jsonc '{ "agent": { "reviewer-ro": { "mode": "primary", "tools": { "edit": false, "bash": false } } } }'
+    Assert-Equal 'reviewer-ro: forma interina tools: => STALE' 'REVIEWER_RO_STALE' ([string]$c.report.opencodeReviewerRo.label)
+
+    $c = Invoke-RroCase -Name 'ok' -Jsonc $canonRaw
+    Assert-Equal 'reviewer-ro: canonico => OK' 'REVIEWER_RO_OK' ([string]$c.report.opencodeReviewerRo.label)
+    Assert-Equal 'reviewer-ro: canonico nao marca gap' 'REGISTRATION_OK' ([string]$c.report.overall)
+
+    $braceStale = $oldForm.Replace('{ "provider"', "{`n  // nota {nao mexer}`n  `"provider`"")
+    $c = Invoke-RroCase -Name 'brace-stale' -Jsonc $braceStale
+    Assert-Equal 'reviewer-ro: comentario com chaves + defasado => NOT_AUTOFIXABLE' 'REVIEWER_RO_NOT_AUTOFIXABLE' ([string]$c.report.opencodeReviewerRo.label)
+    Assert-Equal 'reviewer-ro: NOT_AUTOFIXABLE marca gap' 'REGISTRATION_GAPS' ([string]$c.report.overall)
+    Assert-Equal 'reviewer-ro: NOT_AUTOFIXABLE ainda lista as divergencias' '2' ([string]@($c.report.opencodeReviewerRo.divergences).Count)
+
+    $braceOk = $canonRaw.Replace('"$schema"', "// nota {nao mexer}`n  `"`$schema`"")
+    $c = Invoke-RroCase -Name 'brace-ok' -Jsonc $braceOk
+    Assert-Equal 'reviewer-ro: comentario com chaves + canonico => OK' 'REVIEWER_RO_OK' ([string]$c.report.opencodeReviewerRo.label)
+
+    $c = Invoke-RroCase -Name 'homonimo' -Jsonc '{ "metadata": { "reviewer-ro": { "note": "x" } }, "agent": { "helper": { "mode": "all" } } }'
+    Assert-Equal 'reviewer-ro: homonimo fora de agent => NOT_AUTOFIXABLE' 'REVIEWER_RO_NOT_AUTOFIXABLE' ([string]$c.report.opencodeReviewerRo.label)
+
+    $c = Invoke-RroCase -Name 'invalido' -Jsonc '{ "agent": '
+    Assert-Equal 'reviewer-ro: JSONC invalido => NOT_AUTOFIXABLE' 'REVIEWER_RO_NOT_AUTOFIXABLE' ([string]$c.report.opencodeReviewerRo.label)
+}
+finally {
+    $env:PATH = $originalPath
+    $env:USERPROFILE = $originalProfile
+    $env:LOCALAPPDATA = $originalLocalAppData
+    foreach ($p in @(@($rroProfiles) + @($rroRepo, $rroLocal, $rroWork))) {
         if (Test-Path -LiteralPath $p) {
             Get-ChildItem -LiteralPath $p -Recurse -Force -ErrorAction SilentlyContinue |
                 ForEach-Object { try { $_.Attributes = 'Normal' } catch { } }

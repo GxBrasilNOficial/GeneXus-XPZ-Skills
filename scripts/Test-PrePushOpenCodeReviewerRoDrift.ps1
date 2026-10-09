@@ -110,7 +110,7 @@ if ($contractChanged) {
         code     = 'OPENCODE_REVIEWER_RO_CONTRACT_CHANGED'
         severity = 'warn'
         path     = $contractPath
-        message  = 'contrato canonico do reviewer-ro alterado no intervalo: a copia global (agent.reviewer-ro em ~/.config/opencode/opencode.jsonc) de cada maquina fica defasada e o guard bloqueia com motivo static fora do repositorio. Apos o push, reinstalar com scripts/Install-OpenCodeReviewerRoAgent.ps1 (-WhatIf antes; faz backup) e conferir com scripts/Test-OpenCodeReviewerRoInstalledCompatibility.ps1 -AsJson a partir de um cwd fora do repositorio.'
+        message  = 'contrato canonico do reviewer-ro alterado no intervalo: a copia global (agent.reviewer-ro em ~/.config/opencode/opencode.jsonc) de cada maquina fica defasada e o guard bloqueia com motivo static fora do repositorio. Apos o push, reinstalar pelo passo 10 da xpz-skills-setup ou com scripts/Install-OpenCodeReviewerRoAgent.ps1 (-WhatIf antes; faz backup) e conferir com scripts/Test-OpenCodeReviewerRoInstalledCompatibility.ps1 -WorkingDirectory <pasta neutra> -ExpectGlobal -AsJson.'
     })
 }
 

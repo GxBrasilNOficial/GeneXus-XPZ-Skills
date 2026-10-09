@@ -60,39 +60,35 @@ de um novo usuário.
 - Não alterar configurações gerais das ferramentas fora do âmbito desta skill;
   **exceção explícita:** instrucionais globais cobertos pelo passo 9 do `WORKFLOW`
   (incluindo instalação do MCP Cursor via
-  `scripts/Install-CursorGlobalInstructionsMcp.ps1`), apenas **após confirmação
-  explícita** do usuário e **sem edição silenciosa**
-- **Agente custom `reviewer-ro` do OpenCode (só ponteiro de dependência; auditoria e
-  instalação = frente própria):** o agente `reviewer-ro` least-privilege do OpenCode
-  (revisor «sem execução/escrita») tem **instalador próprio**
-  `scripts/Install-OpenCodeReviewerRoAgent.ps1` (dono do **script**:
-  `xpz-llm-delegate`; alvo `~/.config/opencode/opencode.jsonc`, além do project-local
-  versionado `.opencode/agent/reviewer-ro.md`). Hoje o `agentsPath` que esta skill
-  resolve é do **MCP do Cursor** e **não** cobre o bloco `agent` do `opencode.jsonc`.
-  **Escopo atual (só documental):** esta seção **cita** o instalador como dependência
-  de setup — a `xpz-skills-setup` **ainda não tem motor** que detecte/audite o
-  `reviewer-ro` no `opencode.jsonc`/project-local (grep confirma: nenhum `.ps1` da
-  skill referencia `reviewer-ro`). Tanto a **auditoria read-only em código** (detectar
-  presença/deriva) quanto a **oferta de resolver** (invocar o instalador após
-  confirmação, no padrão «audita → oferece resolver» desta skill, para a instalação
-  global do `reviewer-ro` passar a ser trabalho da `xpz-skills-setup`) são **frente
-  própria** — ver `999-ideias-pendentes.md`. Nesta frente **nada** é instalado nem
-  auditado em código aqui. **Gate de ativação (rastreabilidade, não enforcement):** o
-  `reviewer-ro` só é considerado ativo quando `scripts/Test-OpenCodeReviewerRoSelfTest.ps1`
-  passa na versão-alvo (token `OPENCODE_REVIEWER_RO_SELFTEST_OK`); quando a auditoria
-  em código existir, conferir esse gate faz parte dela.
-  **Anti-padrão (obrigatório enquanto não houver motor nesta skill):**
-  - Em auditoria/setup **completo** ou parcial desta skill: **não** abrir secção
-    «o que é o `reviewer-ro`», **não** reportar status/integridade, **não** correr
-    pre-check/`Test-OpenCodeReviewerRoInstalledCompatibility`/`Install-…` — o ponteiro
-    acima **não** é item do recibo.
-  - **Não** amarrar `reviewer-ro` à calibração/edição de **revisores preferidos**
-    (lista do painel ≠ agente least-privilege do OpenCode). São frentes distintas;
-    se o usuário pedir as duas na mesma mensagem, cumprir em **recibos separados**
-    (ou secções claramente independentes), sem um único «ok» misturado.
-  - Exceções: pedido **explícito** do usuário sobre `reviewer-ro`; ou iminência de
-    despacho opencode via `xpz-llm-delegate` (aí o guard/adapters daquela skill
-    mandam — não esta).
+  `scripts/Install-CursorGlobalInstructionsMcp.ps1`) e o bloco `agent.reviewer-ro` do
+  `opencode.jsonc` coberto pelo passo 10 (só pelo instalador, nunca à mão), apenas
+  **após confirmação explícita** do usuário e **sem edição silenciosa**
+- **Agente custom `reviewer-ro` do OpenCode (instalação global = trabalho desta skill):**
+  o agente `reviewer-ro` least-privilege do OpenCode (revisor «sem execução/escrita») tem
+  duas instalações: a project-local versionada `.opencode/agent/reviewer-ro.md` (só vale
+  com o opencode rodando dentro deste repositório) e a **global**, o bloco `agent.reviewer-ro`
+  em `~/.config/opencode/opencode.jsonc`, que vale em qualquer outra pasta. Esta skill audita
+  e oferece resolver **a global** (passo 10 do `WORKFLOW`); o instalador
+  `scripts/Install-OpenCodeReviewerRoAgent.ps1`, o diagnóstico e o guard continuam com dono
+  `xpz-llm-delegate` — esta skill só os **invoca**, sem reimplementar o contrato. Mudança no
+  markdown canônico (ex.: após `git pull`) não chega sozinha à cópia global: é essa defasagem
+  que o passo 10 detecta.
+  - **Medir a global, não a local:** da raiz deste repositório, o opencode e o diagnóstico
+    usam o project-local, que já está correto, e a defasagem global não aparece. Por isso o
+    motor lê só o bloco global (`-GlobalOnly`) e a confirmação efetiva roda numa **pasta
+    neutra** com `-ExpectGlobal` (ver passo 10).
+  - **Gate de ativação:** o `reviewer-ro` global só conta como ativo quando o motor dá
+    `REVIEWER_RO_OK` **e** o diagnóstico na pasta neutra dá `vantage.ok=true`,
+    `sourceKind=global`, `agentList.ok=true`, `allowSetOk=true` e `externalDirectoryOk=true`.
+    `status=needsFixtureRecapture` (versão do opencode ainda sem fixtures) é informação para a
+    `xpz-llm-delegate`, não gap desta skill. O self-test `Test-OpenCodeReviewerRoSelfTest.ps1`
+    usa executável simulado e **não** prova a instalação real.
+  - **Não** amarrar `reviewer-ro` à calibração/edição de **revisores preferidos** (lista do
+    painel ≠ agente least-privilege do OpenCode). São frentes distintas; se o usuário pedir as
+    duas na mesma mensagem, cumprir em **recibos separados** (ou seções claramente
+    independentes), sem um único «ok» misturado.
+  - O passo 10 prova que o perfil instalado é válido; **não** prova acesso aos modelos nem que
+    um parecer vai chegar.
 - Verificar existência de diretórios com `Test-Path` individual por ferramenta — nunca
   agrupar em hashtable ou bloco de verificação coletiva
 - Quando o usuário pedir auditoria ou setup **completo** (ex.: após `git pull`,
@@ -101,8 +97,9 @@ de um novo usuário.
   **ofertar correção assistida** onde houver lacuna (espelha o espírito dos
   passos 6–7: nada gravado sem confirmação explícita) — não substituir esse passo
   por oferta genérica do tipo "na próxima mensagem posso auditar", que confunde
-  quem espera um relatório fechado nesta execução
-- **Opcional (não-bloqueante): calibração de revisores preferidos.** No setup de máquina, oferecer (sem cobrar) calibrar a lista de **revisores preferidos** para a revisão por pares, executando `Set-LlmDelegatePreferredReviewers.ps1` da skill `xpz-llm-delegate` (dona do arquivo) — esta skill apenas **oferece rodar** o script, não é dona do contrato. **Antes de oferecer scope:** rodar `Resolve-LlmDelegatePreferredReviewers.ps1 -Orchestrator <harness da sessão>` e mostrar `preferenceSource` / `effectivePreferredPath` / se já existe ficheiro do orquestrador. Não vender machine como «a» lista se `cascadeOrchestratorExists=true` — perguntar: (a) lista **deste harness** (`-Scope orchestrator`) ou (b) lista **machine** (fallback quando não há ficheiro do orquestrador). Oferta de 1º uso **sem** ficheiro de orquestrador ainda pode gravar machine; se o harness já tem `preferred-reviewers.<orch>.json`, a calibração desta sessão deve ir para orchestrator salvo o usuário pedir machine. **Titular de subagente nativo não cabe em machine-scope** — o script recusa (`native-machine-scope-forbidden`), porque o nativo pertence ao harness que o executa; se a calibração incluir um nativo, ele vai em `-Scope orchestrator` na sessão daquela ferramenta. Nunca grava sem confirmação. **Não** incluir checagem/instalação/`reviewer-ro` neste passo (ver anti-padrão no bullet do `reviewer-ro`).
+  quem espera um relatório fechado nesta execução. O mesmo vale para o passo 10
+  (`reviewer-ro` global) quando o OpenCode estiver instalado
+- **Opcional (não-bloqueante): calibração de revisores preferidos.** No setup de máquina, oferecer (sem cobrar) calibrar a lista de **revisores preferidos** para a revisão por pares, executando `Set-LlmDelegatePreferredReviewers.ps1` da skill `xpz-llm-delegate` (dona do arquivo) — esta skill apenas **oferece rodar** o script, não é dona do contrato. **Antes de oferecer scope:** rodar `Resolve-LlmDelegatePreferredReviewers.ps1 -Orchestrator <harness da sessão>` e mostrar `preferenceSource` / `effectivePreferredPath` / se já existe ficheiro do orquestrador. Não vender machine como «a» lista se `cascadeOrchestratorExists=true` — perguntar: (a) lista **deste harness** (`-Scope orchestrator`) ou (b) lista **machine** (fallback quando não há ficheiro do orquestrador). Oferta de 1º uso **sem** ficheiro de orquestrador ainda pode gravar machine; se o harness já tem `preferred-reviewers.<orch>.json`, a calibração desta sessão deve ir para orchestrator salvo o usuário pedir machine. **Titular de subagente nativo não cabe em machine-scope** — o script recusa (`native-machine-scope-forbidden`), porque o nativo pertence ao harness que o executa; se a calibração incluir um nativo, ele vai em `-Scope orchestrator` na sessão daquela ferramenta. Nunca grava sem confirmação. **Não** incluir checagem/instalação/`reviewer-ro` neste passo: o `reviewer-ro` é o passo 10 do `WORKFLOW`, em seção própria do recibo (ver o bullet do `reviewer-ro`).
 
 ## CAMINHOS DE SKILLS POR FERRAMENTA
 
@@ -456,6 +453,9 @@ Use esta skill para:
 - Verificar se as instruções globais do usuário (AGENTS.md, CLAUDE.md ou
   equivalente por ferramenta) contêm as práticas recomendadas para uso das
   skills XPZ
+- Detectar ausência ou defasagem do agente `reviewer-ro` **global** do OpenCode
+  (ex.: após `git pull` que alterou o contrato) e oferecer reinstalá-lo com backup
+  (passo 10 do `WORKFLOW`)
 
 Do NOT use this skill para:
 - Instalar Codex, Claude Code, Cursor, OpenCode ou Antigravity na máquina
@@ -640,9 +640,11 @@ detecta o `server.py` defasado comparando o hash instalado com o canônico do re
    - `overall` → `REGISTRATION_OK` (registro íntegro) ou `REGISTRATION_GAPS`
      (há ausências, quebradas, órfãs, **`coberta_por_compatibilidade` no Cursor**
      quando instalado sem nativo em `~/.cursor/skills/`, e/ou o MCP do Cursor
-     defasado/inválido — `MCP_SERVER_STALE`/`MCP_CONFIG_INVALID`). `MCP_NOT_INSTALLED`
-     **não** marca `REGISTRATION_GAPS` (pode ser intencional), mas é tratado no
-     passo 9 como gatilho de oferta de instalação do MCP
+     defasado/inválido — `MCP_SERVER_STALE`/`MCP_CONFIG_INVALID`, e/ou o `reviewer-ro`
+     global defasado ou não corrigível — `REVIEWER_RO_STALE`/`REVIEWER_RO_NOT_AUTOFIXABLE`).
+     `MCP_NOT_INSTALLED` e `REVIEWER_RO_MISSING` **não** marcam `REGISTRATION_GAPS` (podem
+     ser intencionais), mas são tratados nos passos 9 e 10 como gatilho de oferta de
+     instalação
    - Nas externas, o mesmo status de Cursor sem nativo marca `EXTERNAL_SKILLS_GAPS`
      (independente de `overall`)
    - `tools[].skills[]` traz o status por skill; `orphans[]` os vínculos que
@@ -759,6 +761,35 @@ detecta o `server.py` defasado comparando o hash instalado com o canônico do re
      sandbox), declarar o bloqueio e repetir a oferta quando o usuário reexecutar
      com permissões adequadas — copiar-colar manual permanece **fallback**, não o
      fluxo principal quando o agente pode editar após autorização
+10. **Agente `reviewer-ro` global do OpenCode** (só quando o OpenCode estiver instalado;
+    seção própria do recibo, separada dos revisores preferidos):
+    - Ler `opencodeReviewerRo` no resultado do motor do passo 2 (checagem só estática do
+      bloco global, sem chamar o CLI; nunca imprime o arquivo). Reportar `label`, `source`,
+      `divergences` e `autoFixable`; se `opencodeJsonPresent=true`, avisar que o motor não lê
+      o `opencode.json` e que o diagnóstico abaixo é quem mostra a configuração que vale.
+    - `REVIEWER_RO_NOT_APPLICABLE` → nada a fazer.
+    - `REVIEWER_RO_OK` → confirmar o efeito real com o diagnóstico na **pasta neutra** (abaixo).
+    - `REVIEWER_RO_MISSING` / `REVIEWER_RO_STALE` → **ofertar** reinstalar, explicando o
+      efeito: o revisor opencode passa a valer em qualquer pasta, deixa de ler `*.env` e
+      `*.env.*` (exceto `.env.example` exato) e deixa de usar `grep`; fora do bloco
+      `agent.reviewer-ro`, o `opencode.jsonc` fica intacto. Antes de pedir confirmação,
+      rodar o instalador com `-WhatIf` e mostrar a saída. Só com **confirmação explícita**
+      rodar sem `-WhatIf` e informar ao usuário o caminho do backup (linha
+      `OK: backup do arquivo anterior em …`).
+    - `REVIEWER_RO_NOT_AUTOFIXABLE` → **não** oferecer o instalador (ele recusaria o arquivo,
+      ver `editableDetail`) e **não** editar o `opencode.jsonc` à mão: reportar o motivo e
+      deixar a correção para o usuário.
+    - **Pasta neutra:** pasta vazia criada para isso (ex.: no `%TEMP%`), fora de repositório
+      git e sem `.opencode/agent/reviewer-ro.md` nas pastas acima. Rodar
+      `scripts/Test-OpenCodeReviewerRoInstalledCompatibility.ps1 -WorkingDirectory <pasta>
+      -ExpectGlobal -AsJson`. `status=invalidVantage` (exit `21`) significa que a pasta não mede
+      a global: escolher outra, não aceitar o resultado. Aplicar o **gate de ativação** do
+      bullet do `reviewer-ro` em `## GUIDELINE` e reportar `static`, `agentList`, `allowSetOk`,
+      `externalDirectoryOk` e a versão separadamente.
+    - Depois de instalar, rodar o motor e o diagnóstico de novo: o motor deve dar
+      `REVIEWER_RO_OK` e o instalador com `-WhatIf` deve responder «já canônico»
+      (idempotência).
 
 Exceção: se o usuário limitar explicitamente o pedido (ex.: "só inventário de
-skills, sem AGENTS"), omitir o passo 9 e declarar esse recorte no relatório.
+skills, sem AGENTS"), omitir os passos 9 e/ou 10 conforme o recorte e declarar esse
+recorte no relatório.

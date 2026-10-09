@@ -44,6 +44,13 @@
     Freshness do MCP do Cursor (Candidato B): compara o server.py instalado com o
     canonico do repositório e valida config.json/registro em mcp.json.
 
+    Agente reviewer-ro GLOBAL do OpenCode (opencodeReviewerRo): checagem estatica do bloco
+    agent.reviewer-ro em ~/.config/opencode/opencode.jsonc, com as funcoes do guard da
+    xpz-llm-delegate (-GlobalOnly). Labels: REVIEWER_RO_NOT_APPLICABLE (OpenCode nao instalado),
+    REVIEWER_RO_OK, REVIEWER_RO_MISSING (nao marca gap; oferta), REVIEWER_RO_STALE (gap; o
+    instalador corrige) e REVIEWER_RO_NOT_AUTOFIXABLE (gap; o instalador recusaria o arquivo).
+    Nao chama o CLI e nunca imprime o conteudo do arquivo.
+
 .OUTPUTS
     Texto legivel por padrão; objeto JSON com -AsJson. Campos "overall" e os
     "label" são destinados a interpretacao por agente.
@@ -685,6 +692,69 @@ function Get-CursorMcpReport {
 
 $cursorMcp = Get-CursorMcpReport -ProfileRoot $profileRoot -RepoRoot $root
 
+# --- Agente reviewer-ro GLOBAL do OpenCode -------------------------------------
+# So leitura e so estatico: le o bloco agent.reviewer-ro do opencode.jsonc global com as funcoes do
+# guard da xpz-llm-delegate (-GlobalOnly: independe do cwd, que da raiz deste repositorio cairia no
+# project-local). Nao chama o CLI; o allow-set efetivo (`agent list`) e conferido pelo WORKFLOW com
+# Test-OpenCodeReviewerRoInstalledCompatibility.ps1 -ExpectGlobal numa pasta neutra. Nunca imprime o
+# conteudo do opencode.jsonc (pode conter chaves de provedor).
+. (Join-Path $PSScriptRoot 'OpenCodeReviewerRoGuard.ps1')
+
+function Get-OpenCodeReviewerRoReport {
+    param([string]$ProfileRoot, [bool]$OpenCodeInstalled)
+
+    $configDir = Join-Path $ProfileRoot '.config\opencode'
+    $jsoncPath = Join-Path $configDir 'opencode.jsonc'
+    $report = [ordered]@{
+        label               = 'REVIEWER_RO_NOT_APPLICABLE'
+        jsoncPath           = $jsoncPath
+        jsoncExists         = $false
+        opencodeJsonPresent = (Test-Path -LiteralPath (Join-Path $configDir 'opencode.json') -PathType Leaf)
+        source              = ''
+        detail              = ''
+        divergences         = @()
+        autoFixable         = $false
+        editableDetail      = ''
+        installerPath       = (Join-Path $PSScriptRoot 'Install-OpenCodeReviewerRoAgent.ps1')
+        diagnosticPath      = (Join-Path $PSScriptRoot 'Test-OpenCodeReviewerRoInstalledCompatibility.ps1')
+    }
+    if (-not $OpenCodeInstalled) { return $report }
+
+    $report.jsoncExists = Test-Path -LiteralPath $jsoncPath -PathType Leaf
+    $raw = ''
+    if ($report.jsoncExists) { $raw = Get-Content -LiteralPath $jsoncPath -Raw -Encoding utf8 }
+    if ($null -eq $raw) { $raw = '' }
+
+    # Mesma regra de recusa do instalador: o que nao e editavel, o instalador nao corrige.
+    $editable = Test-OpenCodeReviewerRoJsoncEditable -Raw $raw
+    $report.autoFixable = [bool]$editable.ok
+    $report.editableDetail = [string]$editable.detail
+
+    $static = Test-OpenCodeReviewerRoStatic -GlobalOnly -GlobalJsoncPath $jsoncPath
+    $report.source = [string]$static.source
+    $report.detail = [string]$static.detail
+    if ($static.Contains('divergences')) { $report.divergences = @($static.divergences) }
+
+    # Ausente = arquivo inexistente/vazio ou sem agent.reviewer-ro (o leitor devolve $null).
+    $absent = $false
+    if (-not $report.jsoncExists -or [string]::IsNullOrWhiteSpace($raw)) {
+        $absent = $true
+    }
+    else {
+        try { $absent = ($null -eq (Get-OpenCodeReviewerRoPermissionFromJsonc -Path $jsoncPath)) }
+        catch { $absent = $false }   # forma antiga `tools:` ou JSONC invalido: presente, nao canonico
+    }
+
+    if ($static.ok) { $report.label = 'REVIEWER_RO_OK' }
+    elseif (-not $editable.ok) { $report.label = 'REVIEWER_RO_NOT_AUTOFIXABLE' }
+    elseif ($absent) { $report.label = 'REVIEWER_RO_MISSING' }
+    else { $report.label = 'REVIEWER_RO_STALE' }
+    return $report
+}
+
+$openCodeInstalled = [bool](@($toolsReport | Where-Object { $_.name -eq 'OpenCode' -and $_.installed }).Count -gt 0)
+$opencodeReviewerRo = Get-OpenCodeReviewerRoReport -ProfileRoot $profileRoot -OpenCodeInstalled $openCodeInstalled
+
 # --- Skills externas gerenciadas (nexa + gam) ---------------------------------
 # nexa: From-Zip comunitário e/ou payload GeneXus for Agents (fonte preferida = mais nova).
 # gam: somente payload GeneXus for Agents.
@@ -882,9 +952,12 @@ if ($anyExtHasGap) { $externalOverall = 'EXTERNAL_SKILLS_GAPS' } else { $externa
 
 # --- Veredito -----------------------------------------------------------------
 $mcpIsGap = @('MCP_SERVER_STALE', 'MCP_CONFIG_INVALID') -contains $cursorMcp.label
+# reviewer-ro global presente e fora do contrato bloqueia os revisores opencode fora do repositorio:
+# gap. Ausente (REVIEWER_RO_MISSING) nao e gap (pode ser intencional), mas gera a oferta no WORKFLOW.
+$reviewerRoIsGap = @('REVIEWER_RO_STALE', 'REVIEWER_RO_NOT_AUTOFIXABLE') -contains $opencodeReviewerRo.label
 # coberta_por_compatibilidade no Cursor (falta ~/.cursor/skills) conta como gap —
 # registro nativo em ~/.cursor/skills e obrigatorio quando o Cursor esta instalado.
-$hasGaps = ($sumMissing -gt 0) -or ($sumBroken -gt 0) -or ($sumCompat -gt 0) -or (@($orphans).Count -gt 0) -or $mcpIsGap
+$hasGaps = ($sumMissing -gt 0) -or ($sumBroken -gt 0) -or ($sumCompat -gt 0) -or (@($orphans).Count -gt 0) -or $mcpIsGap -or $reviewerRoIsGap
 if ($hasGaps) { $overall = 'REGISTRATION_GAPS' } else { $overall = 'REGISTRATION_OK' }
 
 $result = [ordered]@{
@@ -897,6 +970,7 @@ $result = [ordered]@{
     orphans         = @($orphans)
     externalSkills  = @($externalSkills)
     cursorMcp       = $cursorMcp
+    opencodeReviewerRo = $opencodeReviewerRo
     summary         = [ordered]@{
         ok              = $sumOk
         coveredByCompat = $sumCompat
@@ -904,6 +978,7 @@ $result = [ordered]@{
         broken          = $sumBroken
         orphans         = @($orphans).Count
         cursorMcp       = $cursorMcp.label
+        opencodeReviewerRo = $opencodeReviewerRo.label
         externalOverall = $externalOverall
     }
 }
@@ -942,6 +1017,9 @@ else {
 }
 Write-Output ("MCP Cursor: {0} (server atualizado={1}; registrado={2}; agentsPath valido={3})" -f `
         $cursorMcp.label, $cursorMcp.serverHashMatches, $cursorMcp.registeredInMcpJson, $cursorMcp.agentsPathValid)
+Write-Output ("reviewer-ro global (OpenCode): {0} (fonte={1}; corrigivel pelo instalador={2})" -f `
+        $opencodeReviewerRo.label, $opencodeReviewerRo.source, $opencodeReviewerRo.autoFixable)
+foreach ($d in @($opencodeReviewerRo.divergences)) { Write-Output ("    divergencia: {0}" -f $d) }
 Write-Output ''
 Write-Output ("Skills externas gerenciadas: {0}" -f $externalOverall)
 foreach ($ext in $externalSkills) {
