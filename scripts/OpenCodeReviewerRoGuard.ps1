@@ -58,6 +58,13 @@ function Test-OpenCodeReviewerRoDefinition {
        inteiro; qualquer divergencia mantem ok=$false (fail-closed inalterado). Devolve
        @{ ok; detail = divergencias unidas por '; '; divergences = @(...) }. #>
     param($Definition)
+    # Descreve o valor encontrado sem ecoar texto arbitrario do arquivo: so as acoes conhecidas
+    # aparecem literalmente; qualquer outra coisa vira 'outro valor'/'mapa'.
+    function Format-ReviewerRoFoundAction($Value) {
+        if ($Value -is [string] -and @('allow', 'deny', 'ask') -ccontains $Value) { return "'$Value'" }
+        if ($Value -is [System.Collections.IDictionary]) { return 'mapa' }
+        return 'outro valor'
+    }
     $div = [System.Collections.Generic.List[string]]::new()
     if ($null -eq $Definition) {
         return @{ ok = $false; detail = 'mode obrigatorio: all / definicao invalida'; divergences = @('mode obrigatorio: all / definicao invalida') }
@@ -82,7 +89,7 @@ function Test-OpenCodeReviewerRoDefinition {
             if ($want[$key] -is [System.Collections.IDictionary]) {
                 $map = $got[$key]
                 if ($map -isnot [System.Collections.IDictionary]) {
-                    $div.Add("mapa ${key}: chaves/ordem divergentes (esperado mapa, encontrado escalar '$map')")
+                    $div.Add("mapa ${key}: chaves/ordem divergentes (esperado mapa, encontrado escalar $(Format-ReviewerRoFoundAction $map))")
                     continue
                 }
                 if ((@($map.Keys) -join "`n") -cne (@($want[$key].Keys) -join "`n")) {
@@ -91,11 +98,11 @@ function Test-OpenCodeReviewerRoDefinition {
                 foreach ($pattern in $want[$key].Keys) {
                     if (-not $map.Contains($pattern)) { continue }
                     if ($map[$pattern] -isnot [string] -or $map[$pattern] -cne $want[$key][$pattern]) {
-                        $div.Add("mapa ${key}: acao divergente para $pattern")
+                        $div.Add("mapa ${key}: acao divergente para $pattern (encontrado $(Format-ReviewerRoFoundAction $map[$pattern]), esperado '$($want[$key][$pattern])')")
                     }
                 }
             } elseif ($got[$key] -isnot [string] -or $got[$key] -cne $want[$key]) {
-                $div.Add("permission ${key}: acao divergente")
+                $div.Add("permission ${key}: acao divergente (encontrado $(Format-ReviewerRoFoundAction $got[$key]), esperado '$($want[$key])')")
             }
         }
     }

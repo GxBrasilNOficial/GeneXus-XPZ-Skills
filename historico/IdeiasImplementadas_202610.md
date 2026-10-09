@@ -2,6 +2,33 @@
 
 Registro de ideias que saíram de `999-ideias-pendentes.md` por terem sido implementadas ou incorporadas ao contrato metodológico vigente.
 
+## `xpz-skills-setup` oferecer instalar o agente `reviewer-ro` do OpenCode (resolução ativa do gap)
+
+Entrada original no 999 (Importância média; Maturidade ideia), implementada em 2026-10-09.
+
+**Origem (preservada do 999).** Decisão do usuário em 2026-07-04 (opção B): a `xpz-skills-setup` é a dona operacional da instalação **global** do `reviewer-ro`, não só quem a cita. Até esta frente, a skill só apontava o instalador `scripts/Install-OpenCodeReviewerRoAgent.ps1` (dono `xpz-llm-delegate`) e um anti-padrão **proibia** auditar, reportar status ou rodar o diagnóstico/instalador enquanto não houvesse motor. O `reviewer-ro` só estava garantido **project-local** na raiz do repositório; de outras pastas, o guard caía em fail-closed `static` até o `opencode.jsonc` global ser migrado.
+
+**Evidência real (preservada do 999).** O commit `8f61c28` (2026-10-08) endureceu o contrato (`read` por mapa com proteção `.env`, `grep: deny`), mas o `agent.reviewer-ro` do `~/.config/opencode/opencode.jsonc` desta máquina continuou na forma anterior (`read: "allow"`, `grep: "allow"`). Em 2026-10-09, um painel de revisão por pares disparado de `C:\Dev\Prod\MCP_FabricaBrasil18` perdeu os 3 revisores opencode por `BLOCK ... motivo=static` antes de chegar ao modelo e caiu para `insufficientDiversity`. O guard fail-closed funcionou, mas a deriva só apareceu no despacho.
+
+**Armadilhas encontradas na avaliação do plano.** (1) O diagnóstico usava a pasta atual: da raiz deste repositório, tanto a checagem estática quanto o `opencode agent list` (que roda na pasta do processo) mediam o project-local, já canônico, e a defasagem global não aparecia. (2) A checagem estática do bloco do `.jsonc` pode dar OK falso; só o `agent list` mostra a configuração efetiva. (3) Arquivo com comentário contendo chaves é lido pelo guard (que descarta comentários) e recusado pelo instalador; sem rótulo próprio, a auditoria ofereceria uma correção que falharia. (4) A pasta "neutra" precisa ser comprovada: a busca do project-local sobe pelas pastas acima, e um `%TEMP%` fica dentro do perfil do usuário.
+
+**Recorte implementado.**
+
+1. **Guard e diagnóstico (dono `xpz-llm-delegate`, commit `bf98785`).** `Test-OpenCodeReviewerRoStatic -GlobalOnly` lê só o bloco global; o `agent list` aceita pasta opcional, com a pasta original restaurada em `try/finally` (os adapters seguem sem o parâmetro); a pré-checagem de ambiguidade do instalador foi levada ao guard como `Test-OpenCodeReviewerRoJsoncEditable`, sem mudança de comportamento, para auditoria e instalador nunca divergirem. `Test-OpenCodeReviewerRoInstalledCompatibility.ps1` ganha `-WorkingDirectory` (estático e `agent list`) e `-ExpectGlobal`, que recusa com `status=invalidVantage` (exit `21`, sem rodar o `agent list`) pasta dentro de repositório git ou com project-local acima, e expõe `sourceKind`/`vantage`.
+2. **Motor e skill (dono `xpz-skills-setup`, commit `8b6c0a0`).** `Test-XpzSkillsRegistration.ps1` ganha a seção `opencodeReviewerRo`, só leitura e só estática (sem CLI, sem imprimir o arquivo): `REVIEWER_RO_NOT_APPLICABLE`, `REVIEWER_RO_OK`, `REVIEWER_RO_MISSING` (sem gap; oferta), `REVIEWER_RO_STALE` e `REVIEWER_RO_NOT_AUTOFIXABLE` (marcam `REGISTRATION_GAPS`). O `SKILL.md` troca o anti-padrão pelo contrato novo, com gate de ativação que exige o diagnóstico `-ExpectGlobal` numa pasta neutra (o self-test com executável simulado deixa de contar como prova), e ganha o passo 10 do `WORKFLOW`: efeito, `-WhatIf`, confirmação explícita, backup, confirmação na pasta neutra e idempotência. Separação dos revisores preferidos mantida.
+3. **Mensagem de divergência (fechamento).** As divergências de ação passam a dizer o valor encontrado e o esperado (ex.: `permission grep: acao divergente (encontrado 'allow', esperado 'deny')`); valor fora de `allow`/`deny`/`ask` não é ecoado. Motivo: no teste de aceitação, o agente só conseguiu dizer que o `grep` tinha «valor diferente do esperado».
+
+**Provas.** `Test-OpenCodeReviewerRoSelfTest.ps1` seção (h) e casos de mensagem na multi-divergência (seção (g) intacta); `Test-XpzSkillsRegistrationSelfTest.ps1` com `opencode.jsonc` sintético em perfil falso (não aplicável, ausente, defasado, forma `tools:`, canônico, comentário com chaves defasado e canônico, homônimo, JSONC inválido e sentinela de chave de provedor que não pode aparecer na saída), 44/44. **Teste de aceitação real**, conduzido por uma sessão nova que só recebeu `/xpz-skills-setup auditoria completa`, sem dicas: detectou `REVIEWER_RO_STALE` com as duas divergências, mediu numa pasta vazia fora de repositório (`blocked`), rodou `-WhatIf`, explicou o efeito, instalou só após aprovação humana e informou o backup `opencode.jsonc.rro-backup-20261009-131554-870864b9`; depois, `REGISTRATION_OK`/`REVIEWER_RO_OK`, diagnóstico `compatible` na pasta neutra e instalador «já canônico». Verificação independente nesta frente, sem mostrar o conteúdo: fora do bloco, o arquivo é idêntico ao backup (151 e 1.730 caracteres), sem BOM, só LF, sem quebra final, como o original; um único backup; de `C:\Dev\Prod\MCP_FabricaBrasil18`, sem flag (visão dos adapters) `compatible` com fonte global, allow-set `{glob,list,read}`, `external_directory` negado e versão 1.18.33 = testada; com `-ExpectGlobal`, `invalidVantage` por ser repositório git. Isso prova o perfil válido; não prova acesso aos modelos nem que um parecer vai chegar. Nenhum LLM, painel ou `opencode run` foi disparado.
+
+### Residuais
+
+Outras camadas de configuração do opencode (`opencode.json` ao lado do `.jsonc`, `OPENCODE_CONFIG`, agentes em markdown no diretório global) não são lidas pelo motor estático; ele informa `opencodeJsonPresent` e o passo 10 delega a palavra final ao diagnóstico na pasta neutra. O passo 10 só roda quando alguém executa a auditoria de setup; outra máquina que puxar um contrato novo sem rodar a `xpz-skills-setup` continua sendo avisada só no despacho, pelo guard fail-closed.
+
+### Rastreabilidade
+
+- Commit material: `bf98785` (Mede o reviewer-ro global a partir de pasta neutra).
+- Commit material: `8b6c0a0` (Faz a xpz-skills-setup auditar e oferecer reinstalar o reviewer-ro global).
+
 ## Instalador e diagnóstico do `reviewer-ro` — backup, idempotência e deriva pós-contrato
 
 Entrada original no 999 (Importância média; Maturidade pronta para implementar), implementada em 2026-10-09.
@@ -20,7 +47,7 @@ Entrada original no 999 (Importância média; Maturidade pronta para implementar
 
 ### Residuais
 
-A fiação do instalador na `xpz-skills-setup` (detectar a deriva na auditoria pós-`git pull` e oferecer a reinstalação com confirmação) continua aberta na entrada própria do 999. O gate pré-push só lembra quem faz o push; outras máquinas que puxarem o contrato novo dependem dessa fiação ou de reinstalação manual.
+A fiação do instalador na `xpz-skills-setup` (detectar a deriva na auditoria pós-`git pull` e oferecer a reinstalação com confirmação) continua aberta na entrada própria do 999 (fechada no mesmo dia; ver a entrada `xpz-skills-setup` oferecer instalar o agente `reviewer-ro` acima). O gate pré-push só lembra quem faz o push; outras máquinas que puxarem o contrato novo dependem dessa fiação ou de reinstalação manual.
 
 ### Rastreabilidade
 

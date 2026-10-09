@@ -371,6 +371,13 @@ sem mode
     $md = Test-OpenCodeReviewerRoDefinition -Definition @{ mode = 'all'; permission = $oldForm }
     Assert-True ((-not $md.ok) -and @($md.divergences).Count -eq 2) "(multi-divergencia) 2 divergencias acumuladas (got: $(@($md.divergences).Count): $($md.detail))"
     Assert-True (($md.detail -match 'mapa read') -and ($md.detail -match 'permission grep: acao divergente')) "(multi-divergencia) detail cita read E grep"
+    Assert-True ($md.detail.Contains("permission grep: acao divergente (encontrado 'allow', esperado 'deny')") -and $md.detail.Contains("encontrado escalar 'allow'")) "(multi-divergencia) detail diz o valor encontrado e o esperado (got: $($md.detail))"
+    $mapAction = Get-OpenCodeReviewerRoCanonicalPermission
+    $mapAction.read['*.env'] = 'allow'
+    $mapAction.bash = 'sk-NAO-ECOAR'
+    $mdMap = Test-OpenCodeReviewerRoDefinition -Definition @{ mode = 'all'; permission = $mapAction }
+    Assert-True ($mdMap.detail.Contains("mapa read: acao divergente para *.env (encontrado 'allow', esperado 'deny')")) "(multi-divergencia) acao divergente dentro do mapa diz encontrado/esperado (got: $($mdMap.detail))"
+    Assert-True ($mdMap.detail.Contains("permission bash: acao divergente (encontrado outro valor, esperado 'deny')") -and -not $mdMap.detail.Contains('sk-NAO-ECOAR')) "(multi-divergencia) valor fora de allow/deny/ask nao e ecoado"
     $mdMode = Test-OpenCodeReviewerRoDefinition -Definition @{ mode = 'primary'; permission = $oldForm }
     Assert-True ((-not $mdMode.ok) -and @($mdMode.divergences).Count -eq 3 -and $mdMode.detail -match 'mode') "(multi-divergencia) mode divergente soma as demais (got: $(@($mdMode.divergences).Count))"
     $mdOk = Test-OpenCodeReviewerRoDefinition -Definition @{ mode = 'all'; permission = (Get-OpenCodeReviewerRoCanonicalPermission) }
