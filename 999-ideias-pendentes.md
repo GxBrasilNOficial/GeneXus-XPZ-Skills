@@ -270,14 +270,16 @@ Follow-ups antes de promover:
 
 ## Drift de tipagem entre delta empacotado e snapshot oficial — fases residuais
 
-- **Importância** — alta para o falso-negativo original; Fase 1 implementada para `Object/@type` por `guid`, mas a assinatura funcional ampla ainda tem gaps.
-- **Maturidade** — pesquisa feita (Fase 1 executada; fases residuais dependem de desenho próprio e novos self-tests).
+- **Importância** — alta para o falso-negativo original; Fase 1 (`Object/@type`) e Fase 2 parcial (`Attribute`) implementadas, com cobertura funcional ainda incompleta.
+- **Maturidade** — Fase 1 e o recorte de Attribute da Fase 2 implementados e cobertos por self-tests; Domain, SDT/Item e Variable continuam pendentes.
 
 Fase 1 implementada: proteção determinística contra delta de frente que tenha o mesmo `guid` do acervo oficial, ambos com `Object/@type` não vazio após `Trim()`, mas tipos normalizados divergentes. O contrato público novo usa `objectGuid` normalizado, `acervoPath`/`candidateAcervoPaths`, `acervoObjectType*` e `message`; acervo com GUID duplicado gera `front-object-type-drift-ambiguous-acervo` informativo.
 
+Fase 2 parcial implementada para `Attribute` top-level: o 9-FD compara, por GUID único, `ATTCUSTOMTYPE`, `idBasedOn`, `Length`, `Decimals`, `AttMaxLen`, `AttAvgLen`, `AttCollection`, `Signed` e `idDATEFORMAT`. Mudança de tipo ou outro campo estrutural, redução de `Length`/`AttMaxLen` e aumento sem solicitação explícita do usuário nessa execução bloqueiam antes do motor Python. Aumento só é aceito com a tupla exata `-ApprovedAttributeSizeGrowth <GUID>|<campo>|<valor-acervo>|<valor-frente>`; o finding autorizado é informativo, e aprovações inválidas ou sem correspondência também bloqueiam. XML sob `Attribute` no acervo que seja ilegível, tenha raiz inesperada ou não tenha GUID gera `front-attribute-acervo-unreadable`, bloqueia e lista `untrustedAcervoPaths`. `front-only-new-attribute` sem GUID correspondente no acervo é reportado como novo, sem comparação de baseline. Os self-tests simulam bas:Numeric → bas:VarChar e confirmam o bloqueio antes do empacotamento.
+
 Fica pendente:
 
-- Fase 2: assinatura de tipo funcional para `Attribute`, `Domain`, `SDT/Item` e `Variable`.
+- Fase 2 residual: assinatura de tipo funcional para `Domain`, `SDT/Item` e `Variable`.
 - Fase 3: drift interno/intra-pacote e `parm(...)` versus variáveis/assinaturas.
 - Endurecer chamada direta a `New-XpzImportPackage.py`, se varredura de consumidores diretos indicar que a quebra de compatibilidade é aceitável.
 - Avaliar se o finding `front-object-type-drift-skip` em `Copy-GeneXusAcervoToFront.ps1` deve aderir ao contrato público novo de drift de tipo (`acervoPath`/`candidateAcervoPaths`/`message`) ou permanecer com contrato próprio do fluxo de cópia temporal/seed. Hoje ele bloqueia autocópia corretamente; a pendência é de consistência de contrato e diagnóstico, não de segurança imediata da Fase 1.
@@ -2011,7 +2013,7 @@ Implementar quando houver: (a) confirmação empírica de que o SQLite atual cob
 ## Drift de tipagem entre delta empacotado e snapshot oficial
 
 **Importância:** alta
-**Maturidade:** ideia
+**Maturidade original:** ideia; a implementação parcial atual está resumida na entrada “fases residuais” acima.
 
 **Origem:** avaliação de prompt externo em 2026-05-11.
 
@@ -2034,7 +2036,7 @@ Variações estruturais do mesmo problema:
 - DataProvider no delta retornando shape que não bate com SDT consumidor já existente no snapshot
 - Procedure no delta com parâmetro de tipo X, callers no snapshot chamando com tipo Y
 
-Hoje `xpz-builder` valida XML bem-formado e sanity absoluto do `Source` do delta, mas não compara o tipo do que entra contra o tipo do que já está no snapshot. Há ponto cego entre "`import_file.xml` válido" e "`import_file.xml` coerente com o snapshot oficial da KB que vai recebê-lo".
+Na origem desta ideia, `xpz-builder` validava XML bem-formado e sanity absoluto do `Source`, mas não comparava o delta com o snapshot. Hoje há cobertura parcial determinística para `Object/@type` e para a assinatura funcional de `Attribute` por GUID; permanecem sem cobertura os tipos de `Domain`, `SDT/Item` e `Variable`, além de drift entre objetos e assinaturas de parâmetros.
 
 ### Direção técnica proposta
 
@@ -2068,7 +2070,7 @@ Mantidas separadas porque os limiares de implementação podem divergir; se uma 
 
 ### Limiar para implementar
 
-Implementar quando houver: (a) caso real recente de drift de tipagem detectado tarde demais (no build ou em runtime) que tenha gerado dano efetivo, para calibrar a classificação de risco, e (b) decisão fechada se a frente vai junto com o gate de dependências (1.2) ou separada — depende de quanto da infraestrutura de leitura estrutural é compartilhada entre as duas.
+Este era o limiar original para implementar a comparação ampla. O recorte determinístico de `Object/@type` e `Attribute` foi autorizado para testar a proteção contra um erro hipotético de agente; isso não conclui as fases restantes nem decide se a comparação ampla compartilhará infraestrutura com o gate de dependências (1.2).
 
 ## Parsing estruturado de log de build — agrupamento, classificação e resumo de impacto
 

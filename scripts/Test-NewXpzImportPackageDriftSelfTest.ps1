@@ -4,16 +4,9 @@
     Self-test do contrato fail-closed de drift frente-vs-acervo em New-XpzImportPackage.ps1.
 
 .DESCRIPTION
-    Cobre os tres caminhos da resolucao de acervo, todos saindo ANTES do motor
-    Python (sem dependencia de python no ambiente):
-      1. Sem -AcervoPath e sem acervo canonico -> bloqueado, footgun nomeado,
-         acervoResolvedBy=null.
-      2. Sem -AcervoPath, acervo canonico <RepoRoot>/ObjetosDaKbEmXml presente com
-         objeto mais novo que a frente -> bloqueado por drift, acervoResolvedBy=convention.
-      3. -AcervoPath explicito com objeto mais novo que a frente -> bloqueado por
-         drift, acervoResolvedBy=explicit.
-      4. -AcervoPath explicito com mesmo guid e Object/@type divergente -> bloqueado
-         antes do motor Python, com campos estruturados preservados em driftFindings.
+    Cobre os caminhos da resolucao de acervo e confirma que divergencias de
+    assinatura funcional de tipo de Attribute bloqueiam o pacote no gate PowerShell,
+    antes do motor Python, sem dependencia de Python para esse caminho.
 #>
 
 Set-StrictMode -Version Latest
@@ -105,6 +98,39 @@ function New-AcervoWithObject {
     [void](New-Item -ItemType Directory -Path $procedureDir -Force)
     $xml = New-FixtureObjectXml -Name $Name -Guid $Guid -LastUpdate $LastUpdate -TypeGuid $TypeGuid
     [System.IO.File]::WriteAllText((Join-Path $procedureDir "$Name.xml"), $xml, (Get-Utf8NoBomEncoding))
+}
+
+function New-FixtureAttributeXml {
+    param(
+        [Parameter(Mandatory = $true)][string]$Name,
+        [Parameter(Mandatory = $true)][string]$Guid,
+        [Parameter(Mandatory = $true)][string]$TypeValue,
+        [string]$Length = '10',
+        [string]$MaxLength = '10'
+    )
+    return @"
+<Attribute name="$Name" fullyQualifiedName="$Name" guid="$Guid">
+  <Properties>
+    <Property><Name>Name</Name><Value>$Name</Value></Property>
+    <Property><Name>ATTCUSTOMTYPE</Name><Value>$TypeValue</Value></Property>
+    <Property><Name>Length</Name><Value>$Length</Value></Property>
+    <Property><Name>AttMaxLen</Name><Value>$MaxLength</Value></Property>
+  </Properties>
+</Attribute>
+"@
+}
+
+function Write-FixtureAttribute {
+    param(
+        [Parameter(Mandatory = $true)][string]$Folder,
+        [Parameter(Mandatory = $true)][string]$Name,
+        [Parameter(Mandatory = $true)][string]$Guid,
+        [Parameter(Mandatory = $true)][string]$TypeValue,
+        [string]$Length = '10',
+        [string]$MaxLength = '10'
+    )
+    [void](New-Item -ItemType Directory -Path $Folder -Force)
+    [System.IO.File]::WriteAllText((Join-Path $Folder "$Name.xml"), (New-FixtureAttributeXml -Name $Name -Guid $Guid -TypeValue $TypeValue -Length $Length -MaxLength $MaxLength), (Get-Utf8NoBomEncoding))
 }
 
 $scriptPath = Join-Path $PSScriptRoot 'New-XpzImportPackage.ps1'
@@ -242,6 +268,73 @@ if ($textFinding5.Count -ne 1) {
 }
 if ((@($r5.blockingReasons) -join ' ') -notmatch 'trailing whitespace') {
     throw "Caso 5: blockingReasons deveria citar trailing whitespace; obtido '$(@($r5.blockingReasons) -join ' ')'."
+}
+
+# Caso 6: Attribute com assinatura Numeric/VarChar divergente bloqueia antes do motor Python
+$repo6 = Join-Path $tempRoot 'repo6'
+$front6Dir = New-FrontWithObject -RepoRoot $repo6 -FrontName $frontName -Name $objName -Guid $objGuid -LastUpdate $newStamp
+$attributeName6 = 'attrTipoTeste'
+$attributeGuid6 = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
+Write-FixtureAttribute -Folder $front6Dir -Name $attributeName6 -Guid $attributeGuid6 -TypeValue 'bas:VarChar'
+$acervo6 = Join-Path $tempRoot 'acervo6'
+New-AcervoWithObject -AcervoRoot $acervo6 -Name $objName -Guid $objGuid -LastUpdate $oldStamp
+Write-FixtureAttribute -Folder (Join-Path $acervo6 'Attribute') -Name $attributeName6 -Guid $attributeGuid6 -TypeValue 'bas:Numeric'
+$r6 = & $scriptPath -RepoRoot $repo6 -FrontName $frontName -AcervoPath $acervo6 | ConvertFrom-Json
+$code6 = $LASTEXITCODE
+if ($r6.status -ne 'bloqueado') {
+    throw "Caso 6: status deveria ser 'bloqueado'; obtido '$($r6.status)'."
+}
+if ($code6 -ne 20) {
+    throw "Caso 6: exitCode deveria ser 20; obtido '$code6'."
+}
+if ($r6.stage -ne 'front-acervo-drift' -or $r6.driftStatus -ne 'fail') {
+    throw "Caso 6: pacote deveria parar no gate front-acervo-drift; stage='$($r6.stage)', driftStatus='$($r6.driftStatus)'."
+}
+if ($r6.driftAttributesScanned -ne 1) {
+    throw "Caso 6: driftAttributesScanned deveria ser 1; obtido '$($r6.driftAttributesScanned)'."
+}
+$attributeFinding6 = @($r6.driftFindings | Where-Object { $_.code -eq 'front-attribute-type-signature-drift' } | Select-Object -First 1)
+if ($attributeFinding6.Count -ne 1) {
+    throw 'Caso 6: driftFindings deveria preservar front-attribute-type-signature-drift.'
+}
+if ($attributeFinding6[0].signatureDifferences[0].fieldName -ne 'ATTCUSTOMTYPE') {
+    throw "Caso 6: campo divergente inesperado: '$($attributeFinding6[0].signatureDifferences[0].fieldName)'."
+}
+if ($null -ne $r6.PSObject.Properties['packageInventory']) {
+    throw 'Caso 6: gate deveria bloquear antes de produzir inventario do pacote.'
+}
+
+# Caso 7: crescimento de tamanho sem solicitação explícita bloqueia o wrapper
+$repo7 = Join-Path $tempRoot 'repo7'
+$front7Dir = New-FrontWithObject -RepoRoot $repo7 -FrontName $frontName -Name $objName -Guid $objGuid -LastUpdate $newStamp
+Write-FixtureAttribute -Folder $front7Dir -Name 'attrCrescimento' -Guid $attributeGuid6 -TypeValue 'bas:Numeric' -Length '12' -MaxLength '10'
+$acervo7 = Join-Path $tempRoot 'acervo7'
+New-AcervoWithObject -AcervoRoot $acervo7 -Name $objName -Guid $objGuid -LastUpdate $oldStamp
+Write-FixtureAttribute -Folder (Join-Path $acervo7 'Attribute') -Name 'attrCrescimento' -Guid $attributeGuid6 -TypeValue 'bas:Numeric' -Length '10' -MaxLength '10'
+$r7 = & $scriptPath -RepoRoot $repo7 -FrontName $frontName -AcervoPath $acervo7 | ConvertFrom-Json
+$code7 = $LASTEXITCODE
+if ($r7.status -ne 'bloqueado' -or $code7 -ne 20 -or $r7.stage -ne 'front-acervo-drift') {
+    throw "Caso 7: crescimento sem solicitação explícita deveria bloquear no gate; status='$($r7.status)' exit='$code7' stage='$($r7.stage)'."
+}
+$growthFinding7 = @($r7.driftFindings | Where-Object { $_.code -eq 'front-attribute-size-growth-requires-user-request' } | Select-Object -First 1)
+if ($growthFinding7.Count -ne 1 -or $growthFinding7[0].requiredApproval -ne "$attributeGuid6|Length|10|12") {
+    throw 'Caso 7: gate deveria reportar a autorização exata necessária para o crescimento.'
+}
+
+# Caso 8: o wrapper repassa a entrada de autorização e continua bloqueando entrada malformada
+$repo8 = Join-Path $tempRoot 'repo8'
+$front8Dir = New-FrontWithObject -RepoRoot $repo8 -FrontName $frontName -Name $objName -Guid $objGuid -LastUpdate $newStamp
+Write-FixtureAttribute -Folder $front8Dir -Name 'attrCrescimento' -Guid $attributeGuid6 -TypeValue 'bas:Numeric' -Length '12' -MaxLength '10'
+$acervo8 = Join-Path $tempRoot 'acervo8'
+New-AcervoWithObject -AcervoRoot $acervo8 -Name $objName -Guid $objGuid -LastUpdate $oldStamp
+Write-FixtureAttribute -Folder (Join-Path $acervo8 'Attribute') -Name 'attrCrescimento' -Guid $attributeGuid6 -TypeValue 'bas:Numeric' -Length '10' -MaxLength '10'
+$r8 = & $scriptPath -RepoRoot $repo8 -FrontName $frontName -AcervoPath $acervo8 -ApprovedAttributeSizeGrowth 'invalid' | ConvertFrom-Json
+$code8 = $LASTEXITCODE
+if ($r8.status -ne 'bloqueado' -or $code8 -ne 20 -or $r8.stage -ne 'front-acervo-drift') {
+    throw "Caso 8: autorização malformada deveria bloquear no gate; status='$($r8.status)' exit='$code8' stage='$($r8.stage)'."
+}
+if (@($r8.driftFindings | Where-Object { $_.code -eq 'front-attribute-size-approval-invalid' }).Count -ne 1) {
+    throw 'Caso 8: wrapper não repassou ou gate não identificou a autorização malformada.'
 }
 
 Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue

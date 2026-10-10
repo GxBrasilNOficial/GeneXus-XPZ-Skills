@@ -2,34 +2,41 @@
 
 <#
 .SYNOPSIS
-    Compara cada XML da frente contra o homonimo no acervo e emite findings de drift.
+    Compara XMLs Object e Attribute da frente contra o acervo e emite findings de drift.
 
 .DESCRIPTION
     Para cada <Object> na pasta da frente, busca o XML correspondente no acervo
-    (ObjetosDaKbEmXml) por GUID ou por nome, e compara:
-      - lastUpdate: se o acervo e mais recente que a frente, emite finding.
-      - Object/@type: se frente e acervo compartilham o mesmo guid e têm tipos
-        GeneXus divergentes, emite front-object-type-drift fatal.
-      - fidelidade textual: se frente e acervo compartilham GUID unico, bloqueia
-        remocao forte de trailing whitespace herdado contra baseline.
-      - presenca no acervo: se o objeto da frente não existe no acervo, classifica
-        como objeto novo presumido. O gate não enumera objetos do acervo ausentes
-        da frente, porque a frente e o escopo operacional do empacotamento.
+    (ObjetosDaKbEmXml) por GUID ou por nome, e compara lastUpdate, Object/@type e
+    fidelidade textual parcial. XMLs Object ausentes no acervo são presumidos novos.
+    O gate não enumera objetos do acervo ausentes da frente, porque a frente é o
+    escopo operacional do empacotamento.
+
+    Para cada <Attribute> top-level na frente, compara por GUID a assinatura
+    funcional contra XMLs Attribute do acervo: ATTCUSTOMTYPE, idBasedOn, Length,
+    Decimals, AttMaxLen, AttAvgLen, AttCollection, Signed e idDATEFORMAT. Drift,
+    identidade sem GUID, GUID duplicado no acervo ou propriedade de assinatura
+    duplicada bloqueiam. Mudança de tipo e redução de Length/AttMaxLen sempre
+    bloqueiam. Aumento desses campos só passa com -ApprovedAttributeSizeGrowth,
+    vinculado a GUID, campo e valores exatos, após solicitação explícita do
+    usuário na sessão. Attribute sem GUID correspondente no acervo é tratado
+    como novo e não tem baseline comparável.
 
     Código de severidade por finding:
-      info    — não ha bloqueio (frente mais recente que acervo, ou objeto só existe
-                 na frente = objeto novo)
-      warn    — revisao obrigatória antes de empacotar (frente com mesmo lastUpdate
-                 do acervo, ou lastUpdate não parseavel)
-      fail    — frente com lastUpdate mais antigo que acervo, mesmo guid com
-                 Object/@type divergente (front-object-type-drift), ou remoção
-                 forte de trailing whitespace herdado
-
+      info    — sem bloqueio (frente mais nova, objeto/Attribute novo no acervo)
+      warn    — revisão obrigatória (lastUpdate igual ao acervo ou não parseável)
+      fail    — bloqueio por lastUpdate antigo, Object/@type divergente, assinatura
+                 de Attribute divergente/inválida/ambígua ou remoção forte de
+                 trailing whitespace herdado
 .PARAMETER FrontFolder
     Caminho da pasta da frente (ObjetosGeradosParaImportacaoNaKbNoGenexus/<NomeCurto_GUID_YYYYMMDD>).
 
 .PARAMETER AcervoFolder
     Caminho da pasta do acervo oficial (ObjetosDaKbEmXml).
+
+.PARAMETER ApprovedAttributeSizeGrowth
+    Exceção pontual para aumento numérico de Length ou AttMaxLen, no formato
+    '<GUID>|<campo>|<valor-no-acervo>|<valor-na-frente>'. Só informar após
+    solicitação explícita do usuário para essa mudança exata. Pode ser repetido.
 
 .PARAMETER AsJson
     Emite resultado estruturado em JSON.
@@ -45,6 +52,8 @@ param(
 
     [Parameter(Mandatory = $true)]
     [string]$AcervoFolder,
+
+    [string[]]$ApprovedAttributeSizeGrowth = @(),
 
     [switch]$AsJson
 )
@@ -396,6 +405,180 @@ function Get-ObjectMetadata {
     }
 }
 
+$attributeTypeSignaturePropertyNames = @(
+    'ATTCUSTOMTYPE',
+    'idBasedOn',
+    'Length',
+    'Decimals',
+    'AttMaxLen',
+    'AttAvgLen',
+    'AttCollection',
+    'Signed',
+    'idDATEFORMAT'
+)
+
+function Normalize-GeneXusAttributeSignatureValue {
+    param([AllowNull()][string]$Value)
+
+    if ([string]::IsNullOrWhiteSpace($Value)) {
+        return ''
+    }
+
+    return $Value.Trim().ToLowerInvariant()
+}
+
+$attributeSizeFieldNames = @('Length', 'AttMaxLen')
+
+function ConvertTo-GeneXusAttributeSizeNumber {
+    param([AllowNull()][string]$Value)
+
+    if ([string]::IsNullOrWhiteSpace($Value)) { return $null }
+    $parsed = [decimal]0
+    $style = [System.Globalization.NumberStyles]::Number
+    $culture = [System.Globalization.CultureInfo]::InvariantCulture
+    if ([decimal]::TryParse($Value.Trim(), $style, $culture, [ref]$parsed)) { return $parsed }
+    return $null
+}
+
+function Get-GeneXusAttributeSizeApprovalKey {
+    param(
+        [string]$Guid,
+        [string]$FieldName,
+        [string]$AcervoValue,
+        [string]$FrontValue
+    )
+
+    return ('{0}|{1}|{2}|{3}' -f $Guid.Trim().ToLowerInvariant(), $FieldName.Trim().ToLowerInvariant(), $AcervoValue.Trim(), $FrontValue.Trim())
+}
+
+function Get-AttributeMetadata {
+    param([string]$XmlPath)
+
+    try {
+        [xml]$doc = Get-Content -LiteralPath $XmlPath -Raw -Encoding UTF8
+    } catch {
+        return $null
+    }
+
+    $root = $doc.DocumentElement
+    if ($null -eq $root -or $root.LocalName -ne 'Attribute') { return $null }
+
+    $valuesByName = [System.Collections.Generic.Dictionary[string, System.Collections.Generic.List[string]]]::new(
+        [System.StringComparer]::OrdinalIgnoreCase
+    )
+    foreach ($property in $root.SelectNodes('./Properties/Property')) {
+        $nameNode = $property.SelectSingleNode('./Name')
+        if ($null -eq $nameNode) { continue }
+        $propertyName = [string]$nameNode.InnerText
+        if ($propertyName -notin $attributeTypeSignaturePropertyNames) { continue }
+
+        $valueNode = $property.SelectSingleNode('./Value')
+        $propertyValue = if ($null -eq $valueNode) { '' } else { [string]$valueNode.InnerText }
+        if (-not $valuesByName.ContainsKey($propertyName)) {
+            $valuesByName[$propertyName] = [System.Collections.Generic.List[string]]::new()
+        }
+        $valuesByName[$propertyName].Add($propertyValue) | Out-Null
+    }
+
+    $signature = [ordered]@{}
+    $normalizedSignature = [ordered]@{}
+    $duplicateSignatureFields = [System.Collections.Generic.List[string]]::new()
+    foreach ($fieldName in $attributeTypeSignaturePropertyNames) {
+        $rawValue = ''
+        if ($valuesByName.ContainsKey($fieldName)) {
+            $fieldValues = $valuesByName[$fieldName]
+            if ($fieldValues.Count -gt 1) {
+                $duplicateSignatureFields.Add($fieldName) | Out-Null
+            }
+            if ($fieldValues.Count -gt 0) {
+                $rawValue = $fieldValues[0]
+            }
+        }
+        $signature[$fieldName] = $rawValue.Trim()
+        $normalizedSignature[$fieldName] = Normalize-GeneXusAttributeSignatureValue -Value $rawValue
+    }
+
+    return [pscustomobject]@{
+        Path = $XmlPath
+        Name = $root.GetAttribute('name')
+        Guid = $root.GetAttribute('guid')
+        Fqn = $root.GetAttribute('fullyQualifiedName')
+        Signature = $signature
+        NormalizedSignature = $normalizedSignature
+        DuplicateSignatureFields = @($duplicateSignatureFields.ToArray())
+    }
+}
+
+function New-GeneXusAttributeGuidIndex {
+    param([Parameter(Mandatory = $true)][string]$RootPath)
+
+    $index = [System.Collections.Generic.Dictionary[string, System.Collections.Generic.List[object]]]::new(
+        [System.StringComparer]::OrdinalIgnoreCase
+    )
+    $untrustedFiles = [System.Collections.Generic.List[string]]::new()
+    $attributeRoot = Join-Path $RootPath 'Attribute'
+    if (-not (Test-Path -LiteralPath $attributeRoot -PathType Container)) {
+        return [pscustomobject]@{ ByGuid = $index; UntrustedFiles = @() }
+    }
+
+    $attributeFiles = @()
+    try {
+        $attributeFiles = @(Get-ChildItem -LiteralPath $attributeRoot -Recurse -File -Filter '*.xml' -ErrorAction Stop)
+    } catch {
+        $untrustedFiles.Add([System.IO.Path]::GetRelativePath($RootPath, $attributeRoot).Replace('\', '/')) | Out-Null
+        return [pscustomobject]@{ ByGuid = $index; UntrustedFiles = @($untrustedFiles.ToArray()) }
+    }
+
+    foreach ($file in $attributeFiles) {
+        $acervoPath = [System.IO.Path]::GetRelativePath($RootPath, $file.FullName).Replace('\', '/')
+        try {
+            [xml]$doc = Get-Content -LiteralPath $file.FullName -Raw -Encoding UTF8
+        } catch {
+            $untrustedFiles.Add($acervoPath) | Out-Null
+            continue
+        }
+
+        $root = $doc.DocumentElement
+        if ($null -eq $root -or $root.LocalName -ne 'Attribute') {
+            $untrustedFiles.Add($acervoPath) | Out-Null
+            continue
+        }
+        $guidNormalized = Normalize-GeneXusAttributeSignatureValue -Value $root.GetAttribute('guid')
+        if ([string]::IsNullOrWhiteSpace($guidNormalized)) {
+            $untrustedFiles.Add($acervoPath) | Out-Null
+            continue
+        }
+
+        if (-not $index.ContainsKey($guidNormalized)) {
+            $index[$guidNormalized] = [System.Collections.Generic.List[object]]::new()
+        }
+        $index[$guidNormalized].Add([pscustomobject]@{
+            FullPath = $file.FullName
+            AcervoPath = $acervoPath
+        }) | Out-Null
+    }
+
+    return [pscustomobject]@{
+        ByGuid = $index
+        UntrustedFiles = @($untrustedFiles.ToArray() | Sort-Object -Unique)
+    }
+}
+
+function Get-GeneXusAttributeGuidIndexMatches {
+    param(
+        [Parameter(Mandatory = $true)]$Index,
+        [AllowNull()][string]$Guid
+    )
+
+    $guidNormalized = Normalize-GeneXusAttributeSignatureValue -Value $Guid
+    $guidIndex = $Index.ByGuid
+    if ([string]::IsNullOrWhiteSpace($guidNormalized) -or -not $guidIndex.ContainsKey($guidNormalized)) {
+        return @()
+    }
+
+    return @($guidIndex[$guidNormalized].ToArray() | Sort-Object AcervoPath)
+}
+
 function Find-AcervoObjectXml {
     param(
         [Parameter(Mandatory = $true)][string]$RootPath,
@@ -483,18 +666,67 @@ $objectTypeGuidIndex = New-GeneXusObjectTypeGuidIndex -RootPath $AcervoFolder
 
 # 1. Enumerar XMLs na pasta da frente
 $findings = @()
+$approvedAttributeSizeGrowthKeys = @{}
+$usedAttributeSizeGrowthKeys = [System.Collections.Generic.HashSet[string]]::new()
+foreach ($approvalEntry in @($ApprovedAttributeSizeGrowth)) {
+    $parts = @($approvalEntry.Split([char]'|'))
+    $approvalProblem = ''
+    if ($parts.Count -ne 4) {
+        $approvalProblem = 'formato esperado: <GUID>|<campo>|<valor-no-acervo>|<valor-na-frente>'
+    } else {
+        $approvalGuidValue = [guid]::Empty
+        if (-not [guid]::TryParse($parts[0].Trim(), [ref]$approvalGuidValue)) {
+            $approvalProblem = 'GUID invalido'
+        } else {
+            $approvalField = @($attributeSizeFieldNames | Where-Object { $_ -ieq $parts[1].Trim() } | Select-Object -First 1)
+            if ($approvalField.Count -eq 0) {
+                $approvalProblem = "campo nao autorizavel; campos aceitos: $($attributeSizeFieldNames -join ', ')"
+            } else {
+                $oldSize = ConvertTo-GeneXusAttributeSizeNumber -Value $parts[2]
+                $newSize = ConvertTo-GeneXusAttributeSizeNumber -Value $parts[3]
+                if ($null -eq $oldSize -or $null -eq $newSize -or $oldSize -lt 0 -or $newSize -le $oldSize) {
+                    $approvalProblem = 'a autorizacao precisa descrever aumento numerico, nao negativo, do valor do acervo para o valor da frente'
+                } else {
+                    $key = Get-GeneXusAttributeSizeApprovalKey -Guid $approvalGuidValue.ToString('D') -FieldName $approvalField[0] -AcervoValue $parts[2] -FrontValue $parts[3]
+                    if ($approvedAttributeSizeGrowthKeys.ContainsKey($key)) {
+                        $approvalProblem = 'autorizacao duplicada'
+                    } else {
+                        $approvedAttributeSizeGrowthKeys[$key] = $approvalEntry
+                    }
+                }
+            }
+        }
+    }
+    if (-not [string]::IsNullOrWhiteSpace($approvalProblem)) {
+        $findings += New-Finding -Severity 'fail' -Code 'front-attribute-size-approval-invalid' -Message "Autorizacao de aumento de tamanho de Attribute invalida: $approvalProblem." -ObjectName '' -ObjectGuid '' -ObjectFile '' -AcervoFile '' -AcervoPath '' -FrontLastUpdate '' -AcervoLastUpdate '' -MatchBasis 'attribute-size-approval' -ExtraFields @{ suppliedApproval = $approvalEntry }
+    }
+}
 $frontXmls = @(Get-ChildItem -LiteralPath $FrontFolder -File -Filter '*.xml')
 $frontMetas = @()
+$frontAttributeMetas = @()
 foreach ($xml in $frontXmls) {
     $meta = Get-ObjectMetadata $xml.FullName
     if ($null -ne $meta -and -not [string]::IsNullOrWhiteSpace($meta.Name)) {
         $frontMetas += $meta
+        continue
+    }
+
+    $attributeMeta = Get-AttributeMetadata $xml.FullName
+    if ($null -ne $attributeMeta) {
+        $frontAttributeMetas += $attributeMeta
     }
 }
 
 $objectsScanned = $frontMetas.Count
+$attributesScanned = $frontAttributeMetas.Count
+$attributeGuidIndex = $null
+$attributeAcervoUntrustedPaths = @()
+if ($attributesScanned -gt 0) {
+    $attributeGuidIndex = New-GeneXusAttributeGuidIndex -RootPath $AcervoFolder
+    $attributeAcervoUntrustedPaths = @($attributeGuidIndex.UntrustedFiles)
+}
 
-if ($objectsScanned -eq 0 -and $frontXmls.Count -eq 0) {
+if ($objectsScanned -eq 0 -and $attributesScanned -eq 0 -and $frontXmls.Count -eq 0 -and $findings.Count -eq 0) {
     $status = 'not-applicable'
 } else {
     # 2. Para cada objeto da frente, buscar homonimo no acervo e comparar
@@ -621,7 +853,109 @@ if ($objectsScanned -eq 0 -and $frontXmls.Count -eq 0) {
         }
     }
 
-    # 3. Status agregado
+    # 3. Para cada Attribute top-level, comparar assinatura funcional por GUID.
+    foreach ($fAttribute in $frontAttributeMetas) {
+        $fRel = [System.IO.Path]::GetRelativePath($FrontFolder, $fAttribute.Path)
+        $frontGuidNorm = Normalize-GeneXusAttributeSignatureValue -Value $fAttribute.Guid
+        if ([string]::IsNullOrWhiteSpace($frontGuidNorm)) {
+            $findings += New-Finding -Severity 'fail' -Code 'front-attribute-identity-incomplete' -Message "Attribute '$($fAttribute.Name)' nao tem GUID; a assinatura de tipo nao pode ser reconciliada com o acervo antes de empacotar." -ObjectName $fAttribute.Name -ObjectGuid '' -ObjectFile $fRel -AcervoFile '' -AcervoPath '' -FrontLastUpdate '' -AcervoLastUpdate '' -MatchBasis 'guid-missing' -ExtraFields @{ reason = 'attribute-guid-missing' }
+            continue
+        }
+
+        if ($attributeAcervoUntrustedPaths.Count -gt 0) {
+            $firstUntrustedPath = [string]$attributeAcervoUntrustedPaths[0]
+            $findings += New-Finding -Severity 'fail' -Code 'front-attribute-acervo-unreadable' -Message "Acervo Attribute contem XML(s) ilegivel(is), sem raiz Attribute ou sem GUID; a comparacao de baseline nao e confiavel. Requer revisao manual antes de classificar '$($fAttribute.Name)' como novo ou comparar sua assinatura." -ObjectName $fAttribute.Name -ObjectGuid $frontGuidNorm -ObjectFile $fRel -AcervoFile $firstUntrustedPath -AcervoPath $firstUntrustedPath -FrontLastUpdate '' -AcervoLastUpdate '' -MatchBasis 'guid' -ExtraFields @{ untrustedAcervoPaths = @($attributeAcervoUntrustedPaths) }
+            continue
+        }
+
+        $guidMatches = @(Get-GeneXusAttributeGuidIndexMatches -Index $attributeGuidIndex -Guid $frontGuidNorm)
+        if ($guidMatches.Count -eq 0) {
+            $findings += New-Finding -Severity 'info' -Code 'front-only-new-attribute' -Message "Attribute '$($fAttribute.Name)' nao tem Attribute correspondente por GUID no acervo; tratado como novo, sem baseline de assinatura comparavel." -ObjectName $fAttribute.Name -ObjectGuid $frontGuidNorm -ObjectFile $fRel -AcervoFile '' -AcervoPath '' -FrontLastUpdate '' -AcervoLastUpdate '' -MatchBasis 'guid-not-found'
+            continue
+        }
+
+        $candidateAcervoPaths = @($guidMatches | ForEach-Object { $_.AcervoPath })
+        if ($guidMatches.Count -gt 1) {
+            $findings += New-Finding -Severity 'fail' -Code 'front-attribute-type-signature-ambiguous-acervo' -Message "Attribute '$($fAttribute.Name)' tem GUID presente em mais de um XML Attribute do acervo; a assinatura funcional nao pode ser escolhida com seguranca." -ObjectName $fAttribute.Name -ObjectGuid $frontGuidNorm -ObjectFile $fRel -AcervoFile '' -AcervoPath '' -FrontLastUpdate '' -AcervoLastUpdate '' -MatchBasis 'guid-ambiguous' -CandidateAcervoPaths $candidateAcervoPaths
+            continue
+        }
+
+        $aAttribute = Get-AttributeMetadata $guidMatches[0].FullPath
+        if ($null -eq $aAttribute) {
+            $findings += New-Finding -Severity 'fail' -Code 'front-attribute-acervo-unreadable' -Message "Attribute '$($fAttribute.Name)' tem GUID localizado no acervo, mas o XML oficial nao pode ser lido como Attribute." -ObjectName $fAttribute.Name -ObjectGuid $frontGuidNorm -ObjectFile $fRel -AcervoFile '' -AcervoPath $guidMatches[0].AcervoPath -FrontLastUpdate '' -AcervoLastUpdate '' -MatchBasis 'guid'
+            continue
+        }
+
+        if ($fAttribute.DuplicateSignatureFields.Count -gt 0 -or $aAttribute.DuplicateSignatureFields.Count -gt 0) {
+            $findings += New-Finding -Severity 'fail' -Code 'front-attribute-type-signature-invalid' -Message "Attribute '$($fAttribute.Name)' tem propriedade(s) de assinatura de tipo duplicada(s) na frente ou no acervo; revisao manual necessaria." -ObjectName $fAttribute.Name -ObjectGuid $frontGuidNorm -ObjectFile $fRel -AcervoFile '' -AcervoPath $guidMatches[0].AcervoPath -FrontLastUpdate '' -AcervoLastUpdate '' -MatchBasis 'guid' -ExtraFields @{ frontDuplicateSignatureFields = @($fAttribute.DuplicateSignatureFields); acervoDuplicateSignatureFields = @($aAttribute.DuplicateSignatureFields) }
+            continue
+        }
+
+        $signatureDifferences = @()
+        foreach ($fieldName in $attributeTypeSignaturePropertyNames) {
+            $frontValue = [string]$fAttribute.Signature[$fieldName]
+            $acervoValue = [string]$aAttribute.Signature[$fieldName]
+            if ($fAttribute.NormalizedSignature[$fieldName] -ne $aAttribute.NormalizedSignature[$fieldName]) {
+                $signatureDifferences += [pscustomobject]@{
+                    fieldName = $fieldName
+                    frontValue = $frontValue
+                    acervoValue = $acervoValue
+                }
+            }
+        }
+
+        $typeSignatureDifferences = @()
+        $sizeReductions = @()
+        $sizeGrowth = @()
+        foreach ($difference in $signatureDifferences) {
+            if ($difference.fieldName -notin $attributeSizeFieldNames) {
+                $typeSignatureDifferences += $difference
+                continue
+            }
+            $acervoSize = ConvertTo-GeneXusAttributeSizeNumber -Value $difference.acervoValue
+            $frontSize = ConvertTo-GeneXusAttributeSizeNumber -Value $difference.frontValue
+            if ($null -eq $acervoSize -or $null -eq $frontSize -or $acervoSize -eq $frontSize) {
+                $typeSignatureDifferences += $difference
+            } elseif ($frontSize -lt $acervoSize) {
+                $sizeReductions += $difference
+            } else {
+                $sizeGrowth += $difference
+            }
+        }
+
+        if ($typeSignatureDifferences.Count -gt 0) {
+            $differenceSummary = @($typeSignatureDifferences | ForEach-Object {
+                $frontValueText = if ([string]::IsNullOrWhiteSpace($_.frontValue)) { '(ausente/vazio)' } else { $_.frontValue }
+                $acervoValueText = if ([string]::IsNullOrWhiteSpace($_.acervoValue)) { '(ausente/vazio)' } else { $_.acervoValue }
+                "$($_.fieldName): frente='$frontValueText', acervo='$acervoValueText'"
+            }) -join '; '
+            $findings += New-Finding -Severity 'fail' -Code 'front-attribute-type-signature-drift' -Message "Attribute '$($fAttribute.Name)' tem tipo ou propriedade funcional divergente do acervo ($differenceSummary). Mudancas desse tipo sao sempre bloqueadas pelo pacote; corrigir pela IDE GeneXus e reexportar." -ObjectName $fAttribute.Name -ObjectGuid $frontGuidNorm -ObjectFile $fRel -AcervoFile '' -AcervoPath $guidMatches[0].AcervoPath -FrontLastUpdate '' -AcervoLastUpdate '' -MatchBasis 'guid' -ExtraFields @{ signatureDifferences = @($typeSignatureDifferences) }
+        }
+
+        if ($sizeReductions.Count -gt 0) {
+            $differenceSummary = @($sizeReductions | ForEach-Object { "$($_.fieldName): $($_.acervoValue) -> $($_.frontValue)" }) -join '; '
+            $findings += New-Finding -Severity 'fail' -Code 'front-attribute-size-reduction' -Message "Attribute '$($fAttribute.Name)' reduz tamanho definido no acervo ($differenceSummary); reducoes sao sempre bloqueadas pelo pacote." -ObjectName $fAttribute.Name -ObjectGuid $frontGuidNorm -ObjectFile $fRel -AcervoFile '' -AcervoPath $guidMatches[0].AcervoPath -FrontLastUpdate '' -AcervoLastUpdate '' -MatchBasis 'guid' -ExtraFields @{ signatureDifferences = @($sizeReductions) }
+        }
+
+        foreach ($growth in $sizeGrowth) {
+            $approvalKey = Get-GeneXusAttributeSizeApprovalKey -Guid $frontGuidNorm -FieldName $growth.fieldName -AcervoValue $growth.acervoValue -FrontValue $growth.frontValue
+            $requiredApproval = '{0}|{1}|{2}|{3}' -f $frontGuidNorm, $growth.fieldName, $growth.acervoValue, $growth.frontValue
+            if ($approvedAttributeSizeGrowthKeys.ContainsKey($approvalKey)) {
+                [void]$usedAttributeSizeGrowthKeys.Add($approvalKey)
+                $findings += New-Finding -Severity 'info' -Code 'front-attribute-size-growth-authorized' -Message "Aumento de $($growth.fieldName) em Attribute '$($fAttribute.Name)' corresponde a autorizacao explicita e pontual recebida na chamada do gate ($($growth.acervoValue) -> $($growth.frontValue))." -ObjectName $fAttribute.Name -ObjectGuid $frontGuidNorm -ObjectFile $fRel -AcervoFile '' -AcervoPath $guidMatches[0].AcervoPath -FrontLastUpdate '' -AcervoLastUpdate '' -MatchBasis 'guid' -ExtraFields @{ signatureDifferences = @($growth); approvalTuple = $requiredApproval }
+            } else {
+                $findings += New-Finding -Severity 'fail' -Code 'front-attribute-size-growth-requires-user-request' -Message "Aumento de $($growth.fieldName) em Attribute '$($fAttribute.Name)' ($($growth.acervoValue) -> $($growth.frontValue)) exige solicitacao explicita do usuario para essa mudanca exata antes de empacotar." -ObjectName $fAttribute.Name -ObjectGuid $frontGuidNorm -ObjectFile $fRel -AcervoFile '' -AcervoPath $guidMatches[0].AcervoPath -FrontLastUpdate '' -AcervoLastUpdate '' -MatchBasis 'guid' -ExtraFields @{ signatureDifferences = @($growth); requiredApproval = $requiredApproval }
+            }
+        }
+    }
+
+    foreach ($approvalKey in @($approvedAttributeSizeGrowthKeys.Keys)) {
+        if (-not $usedAttributeSizeGrowthKeys.Contains([string]$approvalKey)) {
+            $approvalEntry = [string]$approvedAttributeSizeGrowthKeys[$approvalKey]
+            $findings += New-Finding -Severity 'fail' -Code 'front-attribute-size-approval-unmatched' -Message 'A autorizacao de aumento informada nao corresponde a uma divergencia exata de GUID, campo e valores nesta frente; o pacote continua bloqueado.' -ObjectName '' -ObjectGuid '' -ObjectFile '' -AcervoFile '' -AcervoPath '' -FrontLastUpdate '' -AcervoLastUpdate '' -MatchBasis 'attribute-size-approval' -ExtraFields @{ suppliedApproval = $approvalEntry }
+        }
+    }
+    # 4. Status agregado
     $hasFail = $findings | Where-Object { $_.severity -eq 'fail' } | Select-Object -First 1
     $hasWarn  = $findings | Where-Object { $_.severity -eq 'warn' } | Select-Object -First 1
     if ($hasFail) { $status = 'fail' }
@@ -635,6 +969,7 @@ $result = [pscustomobject]@{
     frontFolder     = $FrontFolder
     acervoFolder    = $AcervoFolder
     objectsScanned  = $objectsScanned
+    attributesScanned = $attributesScanned
     findings        = $findings
 }
 
@@ -645,6 +980,7 @@ if ($AsJson) {
     Write-Output "frontFolder: $FrontFolder"
     Write-Output "acervoFolder: $AcervoFolder"
     Write-Output "objectsScanned: $objectsScanned"
+    Write-Output "attributesScanned: $attributesScanned"
     if ($findings.Count -eq 0) {
         Write-Output "findings: (none)"
     } else {

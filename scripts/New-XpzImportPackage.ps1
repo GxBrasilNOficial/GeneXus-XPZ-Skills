@@ -27,6 +27,11 @@
     Caminho para a pasta do acervo oficial. Quando omitido, resolve
     <RepoRoot>\ObjetosDaKbEmXml.
 
+.PARAMETER ApprovedAttributeSizeGrowth
+    Excecao pontual para aumento de Length ou AttMaxLen, no formato
+    '<GUID>|<campo>|<valor-no-acervo>|<valor-na-frente>'. Só informar depois
+    de solicitacao explicita do usuario para cada mudanca exata.
+
 .PARAMETER ReportPath
     Caminho absoluto, novo e terminado em .json para o relatorio de execucao.
     A pasta pai deve existir e nao pode ser area de fonte, acervo, script,
@@ -51,6 +56,8 @@ param(
     [string]$TemplatePackagePath,
 
     [string]$AcervoPath,
+
+    [string[]]$ApprovedAttributeSizeGrowth = @(),
 
     [string]$ReportPath
 )
@@ -335,7 +342,12 @@ if (-not (Test-Path -LiteralPath $driftGatePath -PathType Leaf)) {
 
 if ($null -ne $script:reportContext) { Update-XpzExecutionReport -Context $script:reportContext -Stage 'front-acervo-drift' -Writer 'powershell' -Note 'executando gate de drift' }
 $pwshCommand = Get-Command pwsh -ErrorAction Stop
-$driftArgs = @('-NoProfile', '-File', $driftGatePath, '-FrontFolder', $frontDir, '-AcervoFolder', $acervoEffective, '-AsJson')
+$driftArgs = @('-NoProfile', '-File', $driftGatePath, '-FrontFolder', $frontDir, '-AcervoFolder', $acervoEffective)
+if ($ApprovedAttributeSizeGrowth.Count -gt 0) {
+    $driftArgs += '-ApprovedAttributeSizeGrowth'
+    $driftArgs += $ApprovedAttributeSizeGrowth
+}
+$driftArgs += '-AsJson'
 $driftChild = Invoke-XpzChildProcess -FileName $pwshCommand.Source -Arguments $driftArgs -OnHeartbeat {
     if ($null -ne $script:reportContext) { Set-XpzExecutionReportHeartbeat -Context $script:reportContext -Stage 'front-acervo-drift' -Writer 'powershell' -Progress 'gate de drift ainda em execucao' }
 }
@@ -348,12 +360,12 @@ catch { Write-XpzPackageJsonAndExit -InputObject ([ordered]@{ status = 'erro'; e
 if ($driftResult.status -eq 'fail') {
     $failFindings = @((Get-XpzPropertyValue -InputObject $driftResult -Name 'findings' -Default @()) | Where-Object { $_.severity -eq 'fail' })
     $blockMsgs = @($failFindings | ForEach-Object { $_.message })
-    Write-XpzPackageJsonAndExit -InputObject ([ordered]@{ status = 'bloqueado'; exitCode = 20; stage = 'front-acervo-drift'; repoRoot = $RepoRoot; frontName = $FrontName; acervoResolvedBy = $acervoResolvedBy; driftStatus = $driftResult.status; driftFindings = $driftResult.findings; driftObjectsScanned = $driftResult.objectsScanned; blockingReasons = @("gate de drift frente-vs-acervo falhou ($($blockMsgs.Count) finding(s) fatal(is)): $($blockMsgs -join '; ')"); warnings = @() }) -ExitCode 20 -ProcessExitCode $driftChild.exitCode
+    Write-XpzPackageJsonAndExit -InputObject ([ordered]@{ status = 'bloqueado'; exitCode = 20; stage = 'front-acervo-drift'; repoRoot = $RepoRoot; frontName = $FrontName; acervoResolvedBy = $acervoResolvedBy; driftStatus = $driftResult.status; driftFindings = $driftResult.findings; driftObjectsScanned = $driftResult.objectsScanned; driftAttributesScanned = $driftResult.attributesScanned; blockingReasons = @("gate de drift frente-vs-acervo falhou ($($blockMsgs.Count) finding(s) fatal(is)): $($blockMsgs -join '; ')"); warnings = @() }) -ExitCode 20 -ProcessExitCode $driftChild.exitCode
 }
 if ($driftResult.status -eq 'alert') {
     $warnFindings = @((Get-XpzPropertyValue -InputObject $driftResult -Name 'findings' -Default @()) | Where-Object { $_.severity -eq 'warn' })
     $warnMsgs = @($warnFindings | ForEach-Object { $_.message })
-    Write-XpzPackageJsonAndExit -InputObject ([ordered]@{ status = 'bloqueado'; exitCode = 20; stage = 'front-acervo-drift'; repoRoot = $RepoRoot; frontName = $FrontName; acervoResolvedBy = $acervoResolvedBy; driftStatus = $driftResult.status; driftFindings = $driftResult.findings; driftObjectsScanned = $driftResult.objectsScanned; blockingReasons = @("gate de drift frente-vs-acervo retornou alerta ($($warnMsgs.Count) finding(s) warn): confirmacao explicita ou resolucao manual requerida antes de empacotar. $($warnMsgs -join '; ')"); warnings = @($warnMsgs) }) -ExitCode 20 -ProcessExitCode $driftChild.exitCode
+    Write-XpzPackageJsonAndExit -InputObject ([ordered]@{ status = 'bloqueado'; exitCode = 20; stage = 'front-acervo-drift'; repoRoot = $RepoRoot; frontName = $FrontName; acervoResolvedBy = $acervoResolvedBy; driftStatus = $driftResult.status; driftFindings = $driftResult.findings; driftObjectsScanned = $driftResult.objectsScanned; driftAttributesScanned = $driftResult.attributesScanned; blockingReasons = @("gate de drift frente-vs-acervo retornou alerta ($($warnMsgs.Count) finding(s) warn): confirmacao explicita ou resolucao manual requerida antes de empacotar. $($warnMsgs -join '; ')"); warnings = @($warnMsgs) }) -ExitCode 20 -ProcessExitCode $driftChild.exitCode
 }
 
 $pythonCommand = Get-Command python -ErrorAction SilentlyContinue
@@ -447,6 +459,7 @@ if ($null -ne $driftResult) {
     $result | Add-Member -NotePropertyName driftStatus -NotePropertyValue $driftResult.status -Force
     $result | Add-Member -NotePropertyName driftFindings -NotePropertyValue $driftResult.findings -Force
     $result | Add-Member -NotePropertyName driftObjectsScanned -NotePropertyValue $driftResult.objectsScanned -Force
+$result | Add-Member -NotePropertyName driftAttributesScanned -NotePropertyValue $driftResult.attributesScanned -Force
 }
 $finalExitCode = [int](Get-XpzPropertyValue -InputObject $result -Name 'exitCode' -Default 0)
 if ($finalExitCode -ne 0) { Write-XpzPackageJsonAndExit -InputObject $result -ExitCode $finalExitCode -ProcessExitCode $engineExitCode }

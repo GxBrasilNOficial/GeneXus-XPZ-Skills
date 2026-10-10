@@ -4,9 +4,9 @@
     Self-test do gate 9-FD para drift frente-vs-acervo e fidelidade textual parcial.
 
 .DESCRIPTION
-    Cobre lastUpdate, Object/@type, GUID ambiguo e a protecao textual parcial contra
-    remocao forte de trailing whitespace herdado, incluindo o finding informativo de
-    falha de leitura/decodificacao UTF-8 comparavel.
+    Cobre lastUpdate, Object/@type, assinatura funcional de tipo de Attribute por
+    GUID e a protecao textual parcial contra remocao forte de trailing whitespace
+    herdado, incluindo o finding informativo de falha de leitura UTF-8 comparavel.
 #>
 
 Set-StrictMode -Version Latest
@@ -129,6 +129,41 @@ function New-TextualFidelityFixtureObjectXml {
     $lines.Add('  <Source><![CDATA[]]></Source>') | Out-Null
     $lines.Add('</Object>') | Out-Null
     return ($lines -join "`n") + "`n"
+}
+
+function New-FixtureAttributeXml {
+    param(
+        [Parameter(Mandatory = $true)][string]$Name,
+        [Parameter(Mandatory = $true)][string]$Guid,
+        [Parameter(Mandatory = $true)][string]$TypeValue,
+        [string]$Length = '10',
+        [string]$MaxLength = '10'
+    )
+
+    return @"
+<Attribute name="$Name" fullyQualifiedName="$Name" guid="$Guid">
+  <Properties>
+    <Property><Name>Name</Name><Value>$Name</Value></Property>
+    <Property><Name>ATTCUSTOMTYPE</Name><Value>$TypeValue</Value></Property>
+    <Property><Name>Length</Name><Value>$Length</Value></Property>
+    <Property><Name>AttMaxLen</Name><Value>$MaxLength</Value></Property>
+  </Properties>
+</Attribute>
+"@
+}
+
+function Write-FixtureAttribute {
+    param(
+        [Parameter(Mandatory = $true)][string]$Folder,
+        [Parameter(Mandatory = $true)][string]$Name,
+        [Parameter(Mandatory = $true)][string]$Guid,
+        [Parameter(Mandatory = $true)][string]$TypeValue,
+        [string]$Length = '10',
+        [string]$MaxLength = '10'
+    )
+
+    [void](New-Item -ItemType Directory -Path $Folder -Force)
+    Write-Utf8NoBomText -Path (Join-Path $Folder "$Name.xml") -Content (New-FixtureAttributeXml -Name $Name -Guid $Guid -TypeValue $TypeValue -Length $Length -MaxLength $MaxLength)
 }
 
 function Write-FixtureObjectContent {
@@ -317,6 +352,91 @@ try {
     Assert-True ($infoFinding10[0].classification -eq 'not-applicable') "Caso 10: classification inesperado: $($infoFinding10[0].classification)"
     Assert-True ([string]$infoFinding10[0].reason -match 'acervo=utf-16-le-bom') "Caso 10: reason deveria registrar acervo=utf-16-le-bom; obtido $($infoFinding10[0].reason)"
     Assert-True (@($r10.findings | Where-Object { $_.code -eq 'front-textual-fidelity-trim-removal-churn' }).Count -eq 0) 'Caso 10: info textual nao deve emitir bloqueio de trim churn.'
+
+    $attributeName = 'AttrGuard'
+    $attributeGuid = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
+    $front11 = Join-Path $tempRoot 'case11-front'
+    $acervo11 = Join-Path $tempRoot 'case11-acervo'
+    Write-FixtureAttribute -Folder $front11 -Name $attributeName -Guid $attributeGuid -TypeValue ' bas:numeric '
+    Write-FixtureAttribute -Folder (Join-Path $acervo11 'Attribute') -Name $attributeName -Guid $attributeGuid -TypeValue 'bas:Numeric'
+    $r11 = & $gateScript -FrontFolder $front11 -AcervoFolder $acervo11 -AsJson | ConvertFrom-Json
+    Assert-True ($r11.attributesScanned -eq 1) "Caso 11: attributesScanned esperado 1; obtido $($r11.attributesScanned)"
+    Assert-True ($r11.status -eq 'pass') "Caso 11: valores normalizados da assinatura deveriam passar; obtido $($r11.status)"
+    Assert-True (@($r11.findings | Where-Object { $_.code -eq 'front-attribute-type-signature-drift' }).Count -eq 0) 'Caso 11: tipo igual ignorando caixa e espacos externos nao deveria gerar drift.'
+
+    $front12 = Join-Path $tempRoot 'case12-front'
+    $acervo12 = Join-Path $tempRoot 'case12-acervo'
+    Write-FixtureAttribute -Folder $front12 -Name $attributeName -Guid $attributeGuid -TypeValue 'bas:VarChar'
+    Write-FixtureAttribute -Folder (Join-Path $acervo12 'Attribute') -Name $attributeName -Guid $attributeGuid -TypeValue 'bas:Numeric'
+    $r12 = & $gateScript -FrontFolder $front12 -AcervoFolder $acervo12 -AsJson | ConvertFrom-Json
+    Assert-True ($r12.attributesScanned -eq 1) "Caso 12: attributesScanned esperado 1; obtido $($r12.attributesScanned)"
+    Assert-True ($r12.status -eq 'fail') "Caso 12: divergencia Numeric/VarChar deveria falhar; obtido $($r12.status)"
+    $attributeFinding12 = @($r12.findings | Where-Object { $_.code -eq 'front-attribute-type-signature-drift' } | Select-Object -First 1)
+    Assert-True ($attributeFinding12.Count -eq 1) 'Caso 12: finding front-attribute-type-signature-drift ausente.'
+    Assert-True ($attributeFinding12[0].matchBasis -eq 'guid') "Caso 12: matchBasis deveria ser guid; obtido $($attributeFinding12[0].matchBasis)"
+    Assert-True ($attributeFinding12[0].objectGuid -eq $attributeGuid) "Caso 12: GUID normalizado inesperado: $($attributeFinding12[0].objectGuid)"
+    Assert-True ($attributeFinding12[0].acervoPath -eq 'Attribute/AttrGuard.xml') "Caso 12: acervoPath inesperado: $($attributeFinding12[0].acervoPath)"
+    Assert-True (@($attributeFinding12[0].signatureDifferences | Where-Object { $_.fieldName -eq 'ATTCUSTOMTYPE' -and $_.frontValue -eq 'bas:VarChar' -and $_.acervoValue -eq 'bas:Numeric' }).Count -eq 1) 'Caso 12: diferenca de ATTCUSTOMTYPE nao foi preservada no finding.'
+
+    $front13 = Join-Path $tempRoot 'case13-front'
+    $acervo13 = Join-Path $tempRoot 'case13-acervo'
+    Write-FixtureAttribute -Folder $front13 -Name $attributeName -Guid $attributeGuid -TypeValue 'bas:VarChar'
+    $brokenAttributeFolder13 = Join-Path $acervo13 'Attribute'
+    [void](New-Item -ItemType Directory -Path $brokenAttributeFolder13 -Force)
+    Write-Utf8NoBomText -Path (Join-Path $brokenAttributeFolder13 'Broken.xml') -Content '<Attribute name="Broken"'
+    $r13 = & $gateScript -FrontFolder $front13 -AcervoFolder $acervo13 -AsJson | ConvertFrom-Json
+    Assert-True ($r13.status -eq 'fail') "Caso 13: acervo Attribute ilegivel deveria falhar; obtido $($r13.status)"
+    $unreadableFinding13 = @($r13.findings | Where-Object { $_.code -eq 'front-attribute-acervo-unreadable' })
+    Assert-True ($unreadableFinding13.Count -eq 1) 'Caso 13: front-attribute-acervo-unreadable ausente.'
+    Assert-True (@($unreadableFinding13[0].untrustedAcervoPaths) -contains 'Attribute/Broken.xml') 'Caso 13: caminho do XML ilegivel nao foi preservado.'
+    Assert-True (@($r13.findings | Where-Object { $_.code -eq 'front-only-new-attribute' }).Count -eq 0) 'Caso 13: acervo invalido nao pode fazer Attribute parecer novo.'
+
+    $front14 = Join-Path $tempRoot 'case14-front'
+    $acervo14 = Join-Path $tempRoot 'case14-acervo'
+    Write-FixtureAttribute -Folder $front14 -Name $attributeName -Guid $attributeGuid -TypeValue 'bas:Numeric' -Length '12' -MaxLength '10'
+    Write-FixtureAttribute -Folder (Join-Path $acervo14 'Attribute') -Name $attributeName -Guid $attributeGuid -TypeValue 'bas:Numeric' -Length '10' -MaxLength '10'
+    $r14 = & $gateScript -FrontFolder $front14 -AcervoFolder $acervo14 -AsJson | ConvertFrom-Json
+    Assert-True ($r14.status -eq 'fail') "Caso 14: aumento sem solicitacao explicita deveria falhar; obtido $($r14.status)"
+    $growthFinding14 = @($r14.findings | Where-Object { $_.code -eq 'front-attribute-size-growth-requires-user-request' } | Select-Object -First 1)
+    Assert-True ($growthFinding14.Count -eq 1) 'Caso 14: finding de solicitacao explicita ausente.'
+    Assert-True ($growthFinding14[0].requiredApproval -eq "$attributeGuid|Length|10|12") "Caso 14: autorizacao exata inesperada: $($growthFinding14[0].requiredApproval)"
+
+    $front15 = Join-Path $tempRoot 'case15-front'
+    $acervo15 = Join-Path $tempRoot 'case15-acervo'
+    Write-FixtureAttribute -Folder $front15 -Name $attributeName -Guid $attributeGuid -TypeValue 'bas:Numeric' -Length '12' -MaxLength '10'
+    Write-FixtureAttribute -Folder (Join-Path $acervo15 'Attribute') -Name $attributeName -Guid $attributeGuid -TypeValue 'bas:Numeric' -Length '10' -MaxLength '10'
+    $approval15 = "$attributeGuid|Length|10|12"
+    $r15 = & $gateScript -FrontFolder $front15 -AcervoFolder $acervo15 -ApprovedAttributeSizeGrowth $approval15 -AsJson | ConvertFrom-Json
+    Assert-True ($r15.status -eq 'pass') "Caso 15: aumento exato explicitamente autorizado deveria passar; obtido $($r15.status)"
+    $approvedFinding15 = @($r15.findings | Where-Object { $_.code -eq 'front-attribute-size-growth-authorized' } | Select-Object -First 1)
+    Assert-True ($approvedFinding15.Count -eq 1) 'Caso 15: finding informativo de aumento autorizado ausente.'
+
+    $front16 = Join-Path $tempRoot 'case16-front'
+    $acervo16 = Join-Path $tempRoot 'case16-acervo'
+    Write-FixtureAttribute -Folder $front16 -Name $attributeName -Guid $attributeGuid -TypeValue 'bas:Numeric' -Length '8' -MaxLength '10'
+    Write-FixtureAttribute -Folder (Join-Path $acervo16 'Attribute') -Name $attributeName -Guid $attributeGuid -TypeValue 'bas:Numeric' -Length '10' -MaxLength '10'
+    $r16 = & $gateScript -FrontFolder $front16 -AcervoFolder $acervo16 -AsJson | ConvertFrom-Json
+    Assert-True ($r16.status -eq 'fail') "Caso 16: reducao de tamanho deveria falhar; obtido $($r16.status)"
+    Assert-True (@($r16.findings | Where-Object { $_.code -eq 'front-attribute-size-reduction' }).Count -eq 1) 'Caso 16: finding de reducao ausente.'
+
+    $front17 = Join-Path $tempRoot 'case17-front'
+    $acervo17 = Join-Path $tempRoot 'case17-acervo'
+    Write-FixtureAttribute -Folder $front17 -Name $attributeName -Guid $attributeGuid -TypeValue 'bas:VarChar' -Length '12' -MaxLength '10'
+    Write-FixtureAttribute -Folder (Join-Path $acervo17 'Attribute') -Name $attributeName -Guid $attributeGuid -TypeValue 'bas:Numeric' -Length '10' -MaxLength '10'
+    $approval17 = "$attributeGuid|Length|10|12"
+    $r17 = & $gateScript -FrontFolder $front17 -AcervoFolder $acervo17 -ApprovedAttributeSizeGrowth $approval17 -AsJson | ConvertFrom-Json
+    Assert-True ($r17.status -eq 'fail') "Caso 17: autorizacao de aumento nao pode liberar mudanca de tipo; obtido $($r17.status)"
+    Assert-True (@($r17.findings | Where-Object { $_.code -eq 'front-attribute-type-signature-drift' }).Count -eq 1) 'Caso 17: bloqueio de mudanca de tipo ausente.'
+
+    $front18 = Join-Path $tempRoot 'case18-front'
+    $acervo18 = Join-Path $tempRoot 'case18-acervo'
+    Write-FixtureAttribute -Folder $front18 -Name $attributeName -Guid $attributeGuid -TypeValue 'bas:Numeric' -Length '12' -MaxLength '10'
+    Write-FixtureAttribute -Folder (Join-Path $acervo18 'Attribute') -Name $attributeName -Guid $attributeGuid -TypeValue 'bas:Numeric' -Length '10' -MaxLength '10'
+    $wrongApproval18 = "$attributeGuid|Length|10|13"
+    $r18 = & $gateScript -FrontFolder $front18 -AcervoFolder $acervo18 -ApprovedAttributeSizeGrowth $wrongApproval18 -AsJson | ConvertFrom-Json
+    Assert-True ($r18.status -eq 'fail') "Caso 18: autorizacao de valores diferentes nao pode liberar aumento; obtido $($r18.status)"
+    Assert-True (@($r18.findings | Where-Object { $_.code -eq 'front-attribute-size-approval-unmatched' }).Count -eq 1) 'Caso 18: autorizacao nao correspondente deveria falhar.'
+    Assert-True (@($r18.findings | Where-Object { $_.code -eq 'front-attribute-size-growth-requires-user-request' }).Count -eq 1) 'Caso 18: aumento real continuou sem autorizacao exata.'
 
     Write-Output 'GENEXUS_FRONT_ACERVO_DRIFT_SELFTEST_OK'
 } finally {
