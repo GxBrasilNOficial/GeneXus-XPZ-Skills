@@ -543,7 +543,14 @@ try {
     $script:cases++
     $ap = Join-Path $tempRoot 'âncora [literal].txt'
     $rp = Join-Path $tempRoot 'substituição literal.txt'
-    foreach ($eol in @("`r`n", "`n", "`r", '', "`r`n" + "`n")) {
+    $eolCases = @("`r`n", "`n", "`r", '', ("`r`n" + "`n"))
+    Assert-Eq 5 $eolCases.Count 'payload matriz com cinco perfis EOL'
+    foreach ($eol in $eolCases) {
+        $expectedEol = if ($eol -eq "`r`n") { 'CRLF' }
+            elseif ($eol -eq "`n") { 'LF' }
+            elseif ($eol -eq "`r") { 'CR' }
+            elseif ($eol -eq '') { 'NONE' }
+            else { 'MIXED' }
         $a = '  ação $x = "literal";' + "`t" + $eol
         $b = '  órgão $y = ''valor'';' + "`t" + $eol
         foreach ($mode in @('Replace', 'InsertAfter')) {
@@ -561,6 +568,11 @@ try {
                     if ($combo -band 2) { $args.ReplacementPath = $rp } else { $args.Replacement = $b }
                     $r = Invoke-Surgical $args
                     Assert-Eq 0 $r.ExitCode "payload combo=$combo mode=$mode bom=$bom eol=$($eol.Length)"
+                    Assert-Eq $expectedEol $r.Json.detectedEol 'payload perfil EOL exercitado'
+                    Assert-Eq ($expectedEol -eq 'MIXED') $r.Json.sourceEolMixed 'payload diagnóstico de fonte mista'
+                    if ($expectedEol -eq 'MIXED') {
+                        Assert-True ($null -eq $r.Json.replacementEolMismatch) 'payload misto mantém mismatch indeterminado'
+                    }
                     $expected = $original.Replace($a, $(if ($mode -eq 'Replace') { $b } else { $a + $b }))
                     Assert-Eq $expected ([System.IO.File]::ReadAllText($f)) 'payload identidade fora do delta'
                     Assert-Eq $a ([System.IO.File]::ReadAllText($ap)) 'auxiliar anchor preservado'
