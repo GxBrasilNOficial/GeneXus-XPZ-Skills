@@ -29,6 +29,7 @@ if (-not (Test-Path -LiteralPath $enginePath -PathType Leaf)) {
 $workingXml = 'C:\CAMINHO\PARA\KbParalela\ObjetosGeradosParaImportacaoNaKbNoGenexus\MinhaFrente\MeuObjeto.xml'
 $acervoXml  = 'C:\CAMINHO\PARA\KbParalela\ObjetosDaKbEmXml\MeuObjeto.xml'
 $anchorRule = 'Default(CampoExemplo,procExemplo());'
+$payloadTemp = 'C:\CAMINHO\PARA\KbParalela\Temp'
 
 # Deriva a quebra de linha a partir do ALVO (mesma regra do motor: qualquer
 # CRLF vence; senao CR solto; senao LF), para nao cair no erro 29. O motor NAO
@@ -36,33 +37,52 @@ $anchorRule = 'Default(CampoExemplo,procExemplo());'
 $targetText = [System.IO.File]::ReadAllText($workingXml)
 $newline = if ($targetText.Contains("`r`n")) { "`r`n" } elseif ($targetText.Contains("`r")) { "`r" } else { "`n" }
 
-# 1) Simular antes de gravar
-& $enginePath `
+# Preparar os auxiliares antes da chamada, fora da frente empacotável.
+# A pasta Temp deve existir. UTF-8 sem BOM, sem newline adicional involuntária.
+# Manter caminhos distintos do destino efetivo e seu .bak, inclusive por links
+# ou aliases: o núcleo pode sobrescrevê-los/removê-los se houver colisão.
+$anchorPath = Join-Path $payloadTemp 'edicao-anchor.txt'
+$replacementPath = Join-Path $payloadTemp 'edicao-replacement.txt'
+$replacementRule = "Default(CampoExemplo,procExemplo());{0}{0}// nova rule aprovada na frente" -f $newline
+$utf8 = [System.Text.UTF8Encoding]::new($false)
+[System.IO.File]::WriteAllText($anchorPath, $anchorRule, $utf8)
+[System.IO.File]::WriteAllText($replacementPath, $replacementRule, $utf8)
+
+# 1) Simular e conferir o resultado antes de gravar o XML.
+$raw = & $enginePath `
     -InputPath $workingXml `
-    -Anchor $anchorRule `
-    -Replacement ("Default(CampoExemplo,procExemplo());{0}{0}// nova rule aprovada na frente" -f $newline) `
+    -AnchorPath $anchorPath `
+    -ReplacementPath $replacementPath `
     -EditMode Replace `
     -LastUpdateBaselinePath $acervoXml `
     -DryRun `
     -AsJson
+$simulationExit = $LASTEXITCODE
+if ($simulationExit -ne 0) { throw "Simulação recusada (exit $simulationExit): $raw" }
+try { $simulation = $raw | ConvertFrom-Json -ErrorAction Stop }
+catch { throw 'Simulação não retornou JSON válido; aplicação cancelada.' }
+if ($simulation.status -ne 'OK' -or $simulation.wellFormed -ne $true) {
+    throw 'Simulação sem status OK e wellFormed=true; aplicação cancelada.'
+}
+# DryRun atual pode responder OK/exit 0 com wellFormed=false.
+# Reutilizar os mesmos conteúdos aprovados; não há hash/lock entre as etapas.
 
 # 2) Apply real (bump automático de lastUpdate; baseline = acervo oficial)
 & $enginePath `
     -InputPath $workingXml `
-    -Anchor $anchorRule `
-    -Replacement ("Default(CampoExemplo,procExemplo());{0}{0}// nova rule aprovada na frente" -f $newline) `
+    -AnchorPath $anchorPath `
+    -ReplacementPath $replacementPath `
     -EditMode Replace `
     -LastUpdateBaselinePath $acervoXml `
     -AsJson
+if ($LASTEXITCODE -ne 0) { throw 'Aplicação recusada; conferir o JSON acima.' }
 
-# 3) Inserir após ancora sem remover o trecho ancora (InsertAfter)
-& $enginePath `
-    -InputPath $workingXml `
-    -Anchor $anchorRule `
-    -Replacement ("{0}// comentario de rastreio da frente" -f $newline) `
-    -EditMode InsertAfter `
-    -LastUpdateBaselinePath $acervoXml `
-    -AsJson
+# 3) Alternativa por strings (simular e conferir como acima antes de aplicar):
+# & $enginePath -InputPath $workingXml -Anchor $anchorRule -Replacement $replacementRule -EditMode Replace -LastUpdateBaselinePath $acervoXml -DryRun -AsJson
+# InsertAfter mantém a âncora; as quatro combinações string/arquivo são válidas.
+# Exatamente uma origem por conteúdo; use nomes completos, pois -Anc/-Rep são
+# ambíguos. Arquivo vazio/só BOM: âncora -> ANCHOR_EMPTY; substituição -> remoção
+# em Replace ou NOOP_REPLACEMENT em InsertAfter. O editor não normaliza EOL.
 
 # 4) Dependencia reenviada sem mudanca funcional: patch proibido na prática;
 #    se algum ajuste textual for inevitavel, preservar lastUpdate explicitamente:
@@ -104,3 +124,10 @@ $newline = if ($targetText.Contains("`r`n")) { "`r`n" } elseif ($targetText.Cont
 # try { $literal = $doc.RootElement.GetProperty('lastUpdateAfter').GetString() }
 # finally { $doc.Dispose() }
 # Alternativas: saída textual do gerador ou atributo salvo no XML (.0000000Z).
+
+# 11) Conferir a interface efetiva antes de montar chamadas:
+# Editor e Set-GeneXusXmlLastUpdate usam -AsJson. Os motores abaixo já emitem
+# JSON por padrão, sem -AsJson: Build-GeneXusImportFileEnvelope,
+# New-XpzImportPackage, Copy-GeneXusAcervoToFront,
+# Get-GeneXusImportPackageObjectInventory e Test-GeneXusSourceSanity.
+# Uma flag -AsJson aceita por um gate filho não pertence automaticamente ao pai.

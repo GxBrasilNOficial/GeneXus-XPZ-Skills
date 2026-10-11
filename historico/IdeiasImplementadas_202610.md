@@ -2,6 +2,18 @@
 
 Registro de ideias que saíram de `999-ideias-pendentes.md` por terem sido implementadas ou incorporadas ao contrato metodológico vigente.
 
+## Entrada por arquivos no editor cirúrgico e orientação de contratos JSON
+
+Implementado em 2026-10-11 conforme plano v4 autorizado. Origem: itens B2/C3 do relato de 2026-10-05, que registravam atrito com strings multilinha, CRLF/tabs, interpolação e scripts envoltórios por frente, além de tentativas de usar `-AsJson` em motores com JSON por padrão. O relato não provava defeito no patch literal existente.
+
+`scripts/Edit-GeneXusXmlSurgical.ps1` ganhou `AnchorPath`/`ReplacementPath` opcionais, exatamente uma origem por conteúdo, UTF-8 estrito com/sem BOM (remove somente um inicial), leitura literal de texto/EOL e erros estruturados 32–36 com details antes do núcleo. Nomes completos e posições existentes preservados; `-Anc`/`-Rep` passam a ser ambíguos. Strings vazias/$null coagido mantêm a semântica. O núcleo `GeneXusXmlSurgicalEditSupport.ps1`, citado como candidato no registro original, não precisou mudar: leitor e resolução ficaram locais ao wrapper, sem utilitário compartilhado novo.
+
+Contrato e limites em `xpz-builder/SKILL.md`, checklist e exemplo `xpz-builder/examples/Edit-GeneXusXmlSurgical.example.ps1`; alinhamentos 02/08/09, adendo no desenho congelado e CHANGELOG trilíngue. Exemplo prepara auxiliares fora da frente e só aplica após exit zero, JSON válido, status=OK e wellFormed=true. Preservação dos auxiliares exige caminhos distintos do destino efetivo e seu .bak, inclusive por links/aliases; não há bloqueio novo de colisão. Sem assinatura não há heurística de codificação (41 00 42 00 permanece UTF-8 válido literal).
+
+Validações sintéticas: `Test-PsScriptsParse.ps1` (367 arquivos, zero erros), `Test-EditGeneXusXmlSurgicalContract.ps1` (47 casos, incluindo matrizes e exemplo em processo filho), `Test-GeneXusLastUpdateConsumerContract.ps1` (372 verificações) e `Test-XpzParameterNamingContract.ps1`; `git diff --check`. Sem importação/build/runtime de IDE, KB real, commit ou push nesta execução. Exemplos/fixtures são sintéticos; não há molde derivado de KB real a registrar no PrivateMap.
+
+Permanecem independentes no 999: migração global de AsJson, LineNumber/ExpectedLineText, NormalizeAnchorEol e lote de Source/Rules. A extensão por arquivos não normaliza quebras nem fornece atomicidade entre várias edições.
+
 ## Proteção determinística contra drift — Object/@type, Attribute e Domain
 
 Recortes implementados em 2026-10-10 e 2026-10-11 da entrada «Drift de tipagem entre delta empacotado e snapshot oficial». O objetivo é impedir que XML gerado incorretamente por um agente siga para empacotamento sem uma comparação determinística com o acervo oficial; a execução da verificação local não depende de LLM nem consome tokens.

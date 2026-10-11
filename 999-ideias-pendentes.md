@@ -51,23 +51,6 @@ Entradas legadas sem avaliação carregam `FALTA AVALIAR` em ambos os campos at�
 
 **Residuais explicitamente abertos.** `Add-GeneXusButton.ps1` permanece acumulativo, com recarimbo final documentado. Também não compara a identidade do baseline explícito com o objeto editado: um baseline de outro objeto com lastUpdate válido pode ser usado, sem a recusa `LASTUPDATE_BASELINE_IDENTITY_MISMATCH` dos consumidores editor/setter. Esse caminho vizinho preexistente permanece aberto; o recarimbo final não substitui a validação de identidade. Alteração do GUID pelo próprio patch, aviso temporal novo de existing e alerta lastUpdateRegressed ficam fora da v5. Nenhum consumidor externo específico foi identificado como causa do relato de formato; o fenômeno de coerção JSON foi reproduzido, sem defeito comprovado na emissão do gerador. A [refatoração dot-sourceável](#expor-a-composição-do-lastupdate-como-função-dot-sourceável-do-motor) permanece independente. Esta entrada mantém os residuais para priorização humana; não reabre caminhos irmãos/proteção `.env`, nem autoriza commit/push ou encerramento automático. Recorte concluído registrado em [histórico de outubro](historico/IdeiasImplementadas_202610.md#lastupdate-em-edições-sucessivas--recorte-v5).
 
-<a id="xpz-relato-20261005-entradas"></a>
-
-## Entrada por arquivos no editor cirúrgico e orientação de contratos JSON — relato 2026-10-05
-
-- **Importância** — média (texto multilinha na chamada e contratos mistos causam atrito recorrente, com caminhos existentes de execução).
-- **Maturidade** — ideia (extensão pequena identificada; parâmetros exclusivos, encoding e comportamento de EOL por decidir).
-
-**Origem e evidência.** Itens B2/C3 do mesmo relato. O editor recebe `-Anchor` e `-Replacement` como strings, sem `-AnchorPath`/`-ReplacementPath`; o registro descreve erros de interpolação e scripts envoltórios criados pelo agente. A mistura entre motores com JSON por padrão e motores com `-AsJson` também foi confirmada. Parte dessa diferença é deliberada, não parâmetro ausente por acidente.
-
-**Recorte e direção.** Avaliar entrada UTF-8 por arquivos como alternativa mutuamente exclusiva à string, mantendo contagem de âncoras, simulação e verificação do resultado. Preservar a recusa de quebra divergente (`REPLACEMENT_EOL_MISMATCH`); não normalizar EOL silenciosamente. A orientação de chamada deve aproveitar [Eliminar globalmente o uso de -AsJson](#eliminar-globalmente-o-uso-de--asjson), sem executar uma migração global nem aceitar o switch como opção sem efeito por automatismo.
-
-**Relações sem duplicação.** [Motor cirúrgico — LineNumber/ExpectedLineText e NormalizeAnchorEol](#motor-cirúrgico---linenumber-expectedlinetext-e-o-switch--normalizeanchoreol) mantém as decisões sobre coordenadas e quebras; entrada por arquivo não as resolve. [Modo lote por manifesto para Source/Rules](#modo-lote-por-manifesto-para-sourcerules-análogo-ao-lote-de-metadados) já trata de várias edições cumulativas e atomicidade; não incorporar essa implementação à extensão por arquivos.
-
-**Urgência e retomada.** Não urgente; implementação adiada em 2026-10-05. Fechar a interface mínima e um exemplo confiável antes de alterar o motor. Conferir exemplos de wrappers ao tratar C3; não alterar arquivos da pasta paralela nesta frente sem escopo aprovado próprio.
-
-**Arquivos candidatos.** `scripts/Edit-GeneXusXmlSurgical.ps1`, `scripts/GeneXusXmlSurgicalEditSupport.ps1`, `scripts/Test-EditGeneXusXmlSurgicalContract.ps1`, `xpz-builder/examples/Edit-GeneXusXmlSurgical.example.ps1`, `xpz-builder/SKILL.md` e seu checklist.
-
 <a id="xpz-relato-20261005-criacao"></a>
 
 ## Procedimento de clonagem e entrega em etapas da mesma frente — relato 2026-10-05
@@ -1114,7 +1097,7 @@ Fazer uma frente separada para inventariar todos os `-AsJson` restantes e decidi
 - Se `-HumanReadable` vale a complexidade ou se JSON sempre é suficiente.
 - Ordem de migração para scripts MSBuild, gates de setup, diagnósticos de runtime e helpers de edição XML.
 
-**Evidência adicional (2026-10-05).** O relato B2/C3 confirmou erros de primeira chamada pela mistura de contratos; ver [Entrada por arquivos no editor cirúrgico e orientação de contratos JSON](#xpz-relato-20261005-entradas). A sessão focal pode melhorar exemplos e orientação sem implementar esta migração global. Aceitar `-AsJson` como opção sem efeito nos motores JSON-por-padrão não foi aprovado e contraria a direção aqui registrada.
+**Evidência adicional (2026-10-05).** O relato B2/C3 confirmou erros de primeira chamada pela mistura de contratos; ver [Entrada por arquivos no editor cirúrgico e orientação de contratos JSON](historico/IdeiasImplementadas_202610.md#entrada-por-arquivos-no-editor-cirúrgico-e-orientação-de-contratos-json), implementada em 2026-10-11 com exemplos e orientação, sem executar esta migração global. Aceitar `-AsJson` como opção sem efeito nos motores JSON-por-padrão não foi aprovado e contraria a direção aqui registrada.
 
 ## LlamaIndex / LangChain + vector store como alternativa ao indice SQLite atual
 
@@ -3384,7 +3367,7 @@ As contagens são de **arquivos que mencionam o token**, não de parâmetros exc
 
 **Relacionado.** `edit-genexus-xml-surgical-design.md` §1/§3.8; `scripts/Search-GeneXusXmlSourceBlock.ps1`; `edit-genexus-xml-batch-metadata-design.md` §5.0; `scripts/Edit-GeneXusXmlSurgical.ps1`.
 
-**Relação com o relato de 2026-10-05.** [Entrada por arquivos no editor cirúrgico e orientação de contratos JSON](#xpz-relato-20261005-entradas) propõe avaliar `-AnchorPath`/`-ReplacementPath`. Arquivo de entrada não implica normalização: preservar a recusa de quebra divergente e as decisões deste verbete. Coordenadas por linha continuam fora do recorte daquela extensão.
+**Relação com o relato de 2026-10-05.** [Entrada por arquivos no editor cirúrgico e orientação de contratos JSON](historico/IdeiasImplementadas_202610.md#entrada-por-arquivos-no-editor-cirúrgico-e-orientação-de-contratos-json) foi implementada em 2026-10-11 com `-AnchorPath`/`-ReplacementPath`. Arquivo de entrada não implica normalização: preservar a recusa de quebra divergente e as decisões deste verbete. Coordenadas por linha continuam fora do recorte daquela extensão.
 
 ## Modo lote por manifesto para `Source`/`Rules` (análogo ao lote de metadados)
 
@@ -3401,7 +3384,7 @@ As contagens são de **arquivos que mencionam o token**, não de parâmetros exc
 
 **Relacionado.** `edit-genexus-xml-batch-metadata-design.md`; `scripts/Edit-GeneXusXmlBatchMetadata.ps1`; `scripts/GeneXusXmlBatchMetadataSupport.ps1`; `edit-genexus-xml-surgical-design.md`.
 
-**Evidência adicional (2026-10-05).** O relato B2 acrescenta atrito com strings multilinha e scripts envoltórios por frente; ver [Entrada por arquivos no editor cirúrgico e orientação de contratos JSON](#xpz-relato-20261005-entradas). A extensão mínima por arquivos não oferece múltiplas edições atômicas e pode ser avaliada separadamente; atomicidade, manifesto e reindexação permanecem nesta frente, sem duplicação de implementação.
+**Evidência adicional (2026-10-05).** O relato B2 acrescenta atrito com strings multilinha e scripts envoltórios por frente; ver [Entrada por arquivos no editor cirúrgico e orientação de contratos JSON](historico/IdeiasImplementadas_202610.md#entrada-por-arquivos-no-editor-cirúrgico-e-orientação-de-contratos-json), implementada em 2026-10-11. A extensão mínima por arquivos não oferece múltiplas edições atômicas; atomicidade, manifesto e reindexação permanecem nesta frente, sem duplicação de implementação.
 
 ## Skill `xpz-mcp-integrations` — componente MCP externo opcional (Jev/System One)
 

@@ -538,6 +538,226 @@ try {
     $text = [System.IO.File]::ReadAllText($f)
     Assert-Eq 2 (Get-AnchorOccurrenceCount -Text $text -Anchor $anchor) 'c33 contador unicidade (Add-GeneXusButton)'
     Assert-Eq 2 ([int[]]@(Get-GeneXusXmlAnchorOccurrenceIndexes -Text $text -Anchor $anchor)).Count 'c33 enumerador'
+
+    # ==== 34) entrada por arquivos: equivalência literal e EOL ===============
+    $script:cases++
+    $ap = Join-Path $tempRoot 'âncora [literal].txt'
+    $rp = Join-Path $tempRoot 'substituição literal.txt'
+    foreach ($eol in @("`r`n", "`n", "`r", '', "`r`n" + "`n")) {
+        $a = '  ação $x = "literal";' + "`t" + $eol
+        $b = '  órgão $y = ''valor'';' + "`t" + $eol
+        foreach ($mode in @('Replace', 'InsertAfter')) {
+            foreach ($bom in @($false, $true)) {
+                [System.IO.File]::WriteAllText($ap, $a, [System.Text.UTF8Encoding]::new($bom))
+                [System.IO.File]::WriteAllText($rp, $b, [System.Text.UTF8Encoding]::new($bom))
+                foreach ($combo in 0..3) {
+                    $f = New-CaseFile -Name 'payload-equivalence' -Body $a
+                    # Fonte NONE real; os demais preservam o EOL escolhido.
+                    $original = (New-Xml -Body $a).Replace("`r`n", $eol)
+                    if ($eol -eq "`r`n`n") { $original = New-Xml -Body $a }
+                    [System.IO.File]::WriteAllText($f, $original, $utf8)
+                    $args = @{ InputPath = $f; EditMode = $mode; PreserveLastUpdate = $true }
+                    if ($combo -band 1) { $args.AnchorPath = $ap } else { $args.Anchor = $a }
+                    if ($combo -band 2) { $args.ReplacementPath = $rp } else { $args.Replacement = $b }
+                    $r = Invoke-Surgical $args
+                    Assert-Eq 0 $r.ExitCode "payload combo=$combo mode=$mode bom=$bom eol=$($eol.Length)"
+                    $expected = $original.Replace($a, $(if ($mode -eq 'Replace') { $b } else { $a + $b }))
+                    Assert-Eq $expected ([System.IO.File]::ReadAllText($f)) 'payload identidade fora do delta'
+                    Assert-Eq $a ([System.IO.File]::ReadAllText($ap)) 'auxiliar anchor preservado'
+                    Assert-Eq $b ([System.IO.File]::ReadAllText($rp)) 'auxiliar replacement preservado'
+                }
+            }
+        }
+    }
+
+    # ==== 35) origens, precedência e ausência de efeitos colaterais ===========
+    $script:cases++
+    $f = New-CaseFile -Name 'payload-errors' -Body $loneBody
+    $out = Join-Path $tempRoot 'payload-out.xml'
+    [System.IO.File]::WriteAllText($out, 'sentinela output', $utf8)
+    [System.IO.File]::WriteAllText(($out + '.bak'), 'sentinela backup', $utf8)
+    $original = [System.IO.File]::ReadAllText($f)
+    $errorCases = @(
+        @{ Delta = @{}; Exit = 32; Role = 'Anchor' },
+        @{ Delta = @{ Anchor = '' ; AnchorPath = $ap }; Exit = 33; Role = 'Anchor' },
+        @{ Delta = @{ AnchorPath = 'inexistente' }; Exit = 32; Role = 'Replacement' },
+        @{ Delta = @{ AnchorPath = 'inexistente'; Replacement = ''; ReplacementPath = $rp }; Exit = 33; Role = 'Replacement' }
+    )
+    foreach ($role in @('Anchor', 'Replacement')) {
+        foreach ($badPath in @('', '   ', $null, (Join-Path $tempRoot 'inexistente'), $tempRoot, 'Env:PATH')) {
+            $d = @{ Anchor = $anchor; Replacement = 'Q' }
+            $d.Remove($role)
+            $d["${role}Path"] = $badPath
+            $errorCases += @{ Delta = $d; Exit = 34; Role = $role }
+        }
+    }
+    foreach ($case in $errorCases) {
+        foreach ($dry in @($false, $true)) {
+            foreach ($invalidCore in @($false, $true)) {
+                $args = @{ InputPath = $f; OutputPath = $out; EditMode = 'Replace'; DryRun = $dry; NewObjectNotImported = $true; PreserveLastUpdate = $true }
+                if ($invalidCore) { $args.InputPath = 'input-inexistente'; $args.OutputPath = 'diretorio-inexistente/out.xml' }
+                foreach ($key in $case.Delta.Keys) { $args[$key] = $case.Delta[$key] }
+                $r = Invoke-Surgical $args
+                Assert-Eq $case.Exit $r.ExitCode 'precedência erro de payload'
+                Assert-Eq 'ERROR' $r.Json.status 'payload status'
+                Assert-Eq $case.Exit $r.Json.exitCode 'payload JSON exit'
+                Assert-Eq $case.Role $r.Json.details.role 'payload details role'
+                Assert-Eq $original ([System.IO.File]::ReadAllText($f)) 'recusa input intacto'
+                Assert-Eq 'sentinela output' ([System.IO.File]::ReadAllText($out)) 'recusa output intacto'
+                Assert-Eq 'sentinela backup' ([System.IO.File]::ReadAllText(($out + '.bak'))) 'recusa backup intacto'
+                Assert-True (-not (Test-Path -LiteralPath ($f + '.bak'))) 'recusa sem backup novo'
+            }
+        }
+    }
+    $human = & $scriptPath -InputPath $f -EditMode Replace
+    Assert-True (([string]$human).StartsWith('PAYLOAD_SOURCE_MISSING:')) 'erro humano acionável'
+    $r = Invoke-Surgical @{ InputPath = $f; Anchor = $null; Replacement = 'Q'; EditMode = 'Replace' }
+    Assert-Eq 27 $r.ExitCode 'null anchor via splat equivale a vazio'
+    $r = Invoke-Surgical @{ InputPath = $f; Anchor = $anchor; Replacement = $null; EditMode = 'InsertAfter' }
+    Assert-Eq 26 $r.ExitCode 'null replacement InsertAfter via splat'
+    $r = Invoke-Surgical @{ InputPath = $f; Anchor = $anchor; Replacement = $null; EditMode = 'Replace'; PreserveLastUpdate = $true }
+    Assert-Eq 0 $r.ExitCode 'null replacement Replace via splat remove'
+
+    # ==== 36) UTF-8 estrito, BOM único, vazios e limite sem assinatura =========
+    $script:cases++
+    $encodings = @(
+        @{ Bytes = [byte[]](0xFF,0xFE,0,0,65,0,0,0); Signature = 'UTF-32LE' },
+        @{ Bytes = [byte[]](0,0,0xFE,0xFF,0,0,0,65); Signature = 'UTF-32BE' },
+        @{ Bytes = [byte[]](0xFF,0xFE,65,0); Signature = 'UTF-16LE' },
+        @{ Bytes = [byte[]](0xFE,0xFF,0,65); Signature = 'UTF-16BE' },
+        @{ Bytes = [byte[]](0xC3,0x28); Signature = $null }
+    )
+    foreach ($role in @('Anchor', 'Replacement')) {
+        foreach ($encoding in $encodings) {
+            [System.IO.File]::WriteAllBytes($rp, $encoding.Bytes)
+            $args = @{ InputPath = 'inexistente'; OutputPath = 'inexistente/out.xml'; EditMode = 'Replace'; Anchor = $anchor; Replacement = 'Q'; NewObjectNotImported = $true; PreserveLastUpdate = $true }
+            $args.Remove($role)
+            $args["${role}Path"] = $rp
+            $r = Invoke-Surgical $args
+            Assert-Eq 36 $r.ExitCode 'encoding precede núcleo'
+            Assert-Eq 'PAYLOAD_ENCODING_INVALID' $r.Json.code 'encoding code'
+            Assert-Eq $role $r.Json.details.role 'encoding role'
+            Assert-Eq $rp $r.Json.details.path 'encoding path'
+            if ($null -ne $encoding.Signature) { Assert-Eq $encoding.Signature $r.Json.details.signature 'ordem das assinaturas' }
+        }
+    }
+    foreach ($emptyBytes in @(@{ Bytes = [byte[]]@() }, @{ Bytes = [byte[]](0xEF,0xBB,0xBF) })) {
+        [System.IO.File]::WriteAllBytes($rp, $emptyBytes.Bytes)
+        $f = New-CaseFile -Name 'payload-empty' -Body $loneBody
+        $r = Invoke-Surgical @{ InputPath = $f; AnchorPath = $rp; Replacement = 'Q'; EditMode = 'Replace' }
+        Assert-Eq 27 $r.ExitCode 'arquivo vazio/só BOM anchor'
+        $r = Invoke-Surgical @{ InputPath = $f; Anchor = $anchor; ReplacementPath = $rp; EditMode = 'InsertAfter' }
+        Assert-Eq 26 $r.ExitCode 'arquivo vazio/só BOM InsertAfter'
+        $r = Invoke-Surgical @{ InputPath = $f; Anchor = $anchor; ReplacementPath = $rp; EditMode = 'Replace'; PreserveLastUpdate = $true }
+        Assert-Eq 0 $r.ExitCode 'arquivo vazio/só BOM remoção'
+    }
+    $literal = [string][char]0xFEFF + 'A' + [char]0xFEFF + 'B'
+    [System.IO.File]::WriteAllBytes($rp, ([byte[]](0xEF,0xBB,0xBF) + $utf8.GetBytes($literal)))
+    $f = New-CaseFile -Name 'payload-second-bom' -Body ($literal + "`r`n")
+    $r = Invoke-Surgical @{ InputPath = $f; AnchorPath = $rp; Replacement = 'Q'; EditMode = 'Replace'; PreserveLastUpdate = $true }
+    Assert-Eq 0 $r.ExitCode 'segundo BOM e FEFF no meio preservados'
+    [System.IO.File]::WriteAllBytes($rp, [byte[]](65,0,66,0))
+    $f = New-CaseFile -Name 'payload-no-signature' -Body ('A' + [char]0 + 'B' + [char]0)
+    $r = Invoke-Surgical @{ InputPath = $f; AnchorPath = $rp; Replacement = 'Q'; EditMode = 'Replace'; PreserveLastUpdate = $true }
+    Assert-Eq 0 $r.ExitCode 'UTF-16 sem BOM com bytes UTF-8 válidos interpretado literalmente'
+
+    # ==== 37) caminhos relativos, leitura bloqueada e limite de colisão =======
+    $script:cases++
+    [System.IO.File]::WriteAllText($rp, 'Q', $utf8)
+    $locked = [System.IO.File]::Open($rp, [System.IO.FileMode]::Open, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None)
+    try {
+        $r = Invoke-Surgical @{ InputPath = $f; Anchor = $anchor; ReplacementPath = $rp; EditMode = 'Replace' }
+        Assert-Eq 35 $r.ExitCode 'arquivo reconhecido mas ilegível'
+        Assert-Eq 'PAYLOAD_READ_FAILED' $r.Json.code 'read code'
+    } finally { $locked.Dispose() }
+    [System.IO.File]::WriteAllText($ap, $anchor, $utf8)
+    Push-Location -LiteralPath $tempRoot
+    try {
+        $f = New-CaseFile -Name 'payload-relative' -Body $loneBody
+        $r = Invoke-Surgical @{ InputPath = $f; AnchorPath = (Split-Path $ap -Leaf); ReplacementPath = (Split-Path $rp -Leaf); EditMode = 'Replace'; PreserveLastUpdate = $true; DryRun = $true }
+        Assert-Eq 0 $r.ExitCode 'caminho literal relativo a PWD (com colchetes)'
+        Assert-Eq (New-Xml -Body $loneBody) ([System.IO.File]::ReadAllText($f)) 'DryRun intacto'
+        Assert-True (-not (Test-Path -LiteralPath ($f + '.bak'))) 'DryRun sem backup'
+    } finally { Pop-Location }
+    foreach ($collision in @('output', 'backup')) {
+        $f = New-CaseFile -Name 'payload-collision' -Body $loneBody
+        $collisionOutput = Join-Path $tempRoot 'collision-out.xml'
+        $aux = $collisionOutput
+        if ($collision -eq 'backup') { $aux += '.bak' }
+        [System.IO.File]::WriteAllText($aux, 'Q', $utf8)
+        $r = Invoke-Surgical @{ InputPath = $f; OutputPath = $collisionOutput; Anchor = $anchor; ReplacementPath = $aux; EditMode = 'Replace'; PreserveLastUpdate = $true }
+        Assert-Eq 0 $r.ExitCode 'colisão não ganha guarda nova'
+        Assert-True (-not (Test-Path -LiteralPath $aux) -or [System.IO.File]::ReadAllText($aux) -ne 'Q') 'limite: auxiliar no destino/bak não preservado'
+    }
+
+    # ==== 38) superfície, posições existentes, abreviações e múltiplas =========
+    $script:cases++
+    $metadata = Get-Command $scriptPath
+    $oldOrder = @('InputPath','OutputPath','Anchor','Replacement','EditMode','ExpectedAnchorCount','ApplyToAllOccurrences','PreserveLastUpdate','NewObjectNotImported','LastUpdateBaselinePath','DryRun','AssertWellFormedAfter','AsJson','AnchorPath','ReplacementPath')
+    $position = 0
+    for ($i = 0; $i -lt $oldOrder.Count; $i++) {
+        $p = $metadata.Parameters[$oldOrder[$i]]
+        $attr = @($p.Attributes | Where-Object { $_ -is [System.Management.Automation.ParameterAttribute] })[0]
+        if ($p.ParameterType -eq [switch]) {
+            Assert-Eq ([int]::MinValue) $attr.Position ('switch sem posição ' + $oldOrder[$i])
+        } else {
+            Assert-Eq $position $attr.Position ('posição ' + $oldOrder[$i])
+            $position++
+        }
+    }
+    foreach ($name in @('AnchorPath','ReplacementPath')) {
+        Assert-Eq ([string]) $metadata.Parameters[$name].ParameterType 'tipo path'
+        Assert-Eq 0 $metadata.Parameters[$name].Aliases.Count 'sem alias novo'
+    }
+    $f = New-CaseFile -Name 'payload-positional' -Body $loneBody
+    $raw = & $scriptPath $f $out $anchor 'Q' Replace -PreserveLastUpdate -DryRun -AsJson
+    Assert-Eq 'OK' ($raw | ConvertFrom-Json).status 'chamada posicional antiga'
+    foreach ($abbr in @('Anc','Rep')) {
+        $args = @{ InputPath = $f; EditMode = 'Replace'; $abbr = 'x' }
+        if ($abbr -eq 'Anc') { $args.Replacement = 'Q' } else { $args.Anchor = $anchor }
+        $r = Invoke-Surgical $args
+        Assert-True ($null -eq $r.Json -and $r.Raw -match '(?i)amb[ií]g') 'abreviação ambígua fora do JSON'
+    }
+    $f = New-CaseFile -Name 'payload-multiple' -Body $dupBody
+    [System.IO.File]::WriteAllText($ap, $anchor, $utf8)
+    [System.IO.File]::WriteAllText($rp, 'Q', $utf8)
+    $r = Invoke-Surgical @{ InputPath = $f; AnchorPath = $ap; ReplacementPath = $rp; EditMode = 'Replace'; ExpectedAnchorCount = 2; PreserveLastUpdate = $true }
+    Assert-Eq 18 $r.ExitCode 'arquivo múltiplas sem apply-all'
+    $r = Invoke-Surgical @{ InputPath = $f; AnchorPath = $ap; ReplacementPath = $rp; EditMode = 'Replace'; ExpectedAnchorCount = 2; ApplyToAllOccurrences = $true; PreserveLastUpdate = $true }
+    Assert-Eq 2 $r.Json.replacementsApplied 'arquivo múltiplas com apply-all'
+    $f = New-CaseFile -Name 'payload-eol' -Body $loneBody
+    [System.IO.File]::WriteAllText($rp, "A`nB", $utf8)
+    $r = Invoke-Surgical @{ InputPath = $f; AnchorPath = $ap; ReplacementPath = $rp; EditMode = 'Replace' }
+    Assert-Eq 29 $r.ExitCode 'arquivo EOL divergente mantém proteção'
+    [System.IO.File]::WriteAllText($ap, ($anchor + "`n"), $utf8)
+    $r = Invoke-Surgical @{ InputPath = $f; AnchorPath = $ap; Replacement = 'Q'; EditMode = 'Replace' }
+    Assert-Eq 11 $r.ExitCode 'âncora com EOL divergente não casa'
+
+    # ==== 39) exemplo canônico real em processo filho =========================
+    $script:cases++
+    $example = [System.IO.File]::ReadAllText((Join-Path (Split-Path $scriptDir -Parent) 'xpz-builder/examples/Edit-GeneXusXmlSurgical.example.ps1'))
+    foreach ($broken in @($false, $true)) {
+        $f = New-CaseFile -Name 'example-working' -Body ('Default(CampoExemplo,procExemplo());' + "`r`n")
+        $baseline = Join-Path $tempRoot 'example-baseline.xml'
+        [System.IO.File]::WriteAllText($baseline, [System.IO.File]::ReadAllText($f), $utf8)
+        $before = [System.IO.File]::ReadAllText($f)
+        $copy = $example.Replace('C:\CAMINHO\PARA\KbParalela\ObjetosGeradosParaImportacaoNaKbNoGenexus\MinhaFrente\MeuObjeto.xml', $f.Replace("'", "''")).Replace('C:\CAMINHO\PARA\KbParalela\ObjetosDaKbEmXml\MeuObjeto.xml', $baseline.Replace("'", "''")).Replace('C:\CAMINHO\PARA\KbParalela\Temp', $tempRoot.Replace("'", "''"))
+        if ($broken) { $copy = $copy.Replace('// nova rule aprovada na frente', ']]>') }
+        $examplePath = Join-Path $tempRoot 'example-child.ps1'
+        [System.IO.File]::WriteAllText($examplePath, $copy, $utf8)
+        $childOutput = & (Get-Process -Id $PID).Path -NoProfile -File $examplePath -SharedSkillsRoot (Split-Path $scriptDir -Parent) 2>&1 | Out-String
+        $childExit = $LASTEXITCODE
+        if ($broken) {
+            Assert-True ($childExit -ne 0) 'exemplo bloqueia wellFormed=false'
+            Assert-True ($childOutput -match 'wellFormed=true') 'exemplo explica recusa'
+            Assert-Eq $before ([System.IO.File]::ReadAllText($f)) 'exemplo malformado não aplica'
+            Assert-True (-not (Test-Path -LiteralPath ($f + '.bak'))) 'exemplo recusado sem bak'
+        } else {
+            Assert-Eq 0 $childExit 'exemplo filho sucesso'
+            Assert-Eq 'OK' ($childOutput | ConvertFrom-Json).status 'exemplo JSON final'
+            Assert-True ([System.IO.File]::ReadAllText($f).Contains('// nova rule aprovada na frente')) 'exemplo aplicou delta'
+        }
+    }
 }
 finally {
     if (Test-Path -LiteralPath $tempRoot -PathType Container) {

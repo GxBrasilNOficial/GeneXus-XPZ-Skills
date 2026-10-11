@@ -31,6 +31,14 @@
       27 ANCHOR_EMPTY                   28 LASTUPDATE_TARGET_MOVED
       29 REPLACEMENT_EOL_MISMATCH       30 LASTUPDATE_CONTEXT_CONFLICT
       31 LASTUPDATE_BASELINE_IDENTITY_MISMATCH  90 INTERNAL_ERROR
+      32 PAYLOAD_SOURCE_MISSING         33 PAYLOAD_SOURCE_CONFLICT
+      34 PAYLOAD_PATH_INVALID           35 PAYLOAD_READ_FAILED
+      36 PAYLOAD_ENCODING_INVALID
+
+    Exatamente uma origem por conteúdo: Anchor ou AnchorPath; Replacement ou
+    ReplacementPath. Omissões agora geram erro estruturado (32), não do binder.
+    Nomes completos e posições existentes preservados; -Anc/-Rep passam a ser
+    ambíguos. Use -Anchor/-Replacement completos. Sem aliases novos.
 
 .PARAMETER InputPath
     Caminho do XML fonte.
@@ -39,12 +47,14 @@
     Destino opcional. Quando omitido, edita in-place em InputPath.
 
 .PARAMETER Anchor
-    Substring literal a localizar (multi-linha permitida; escapes do chamador).
+    Substring literal a localizar, alternativa exclusiva a AnchorPath.
+    Multi-linha permitida; escapes do chamador.
     A contagem usa ocorrências literais NAO sobrepostas, esquerda->direita,
     comparacao Ordinal.
 
 .PARAMETER Replacement
-    Texto substituto (Replace) ou texto inserido após a ancora (InsertAfter).
+    Texto substituto (Replace) ou inserido após a ancora (InsertAfter),
+    alternativa exclusiva a ReplacementPath.
     Vazio é permitido: em Replace, remove a ancora; em InsertAfter, é no-op (26).
     Com fonte de EOL uniforme, a(s) quebra(s) do Replacement têm de casar com a
     dominante (ou o Replacement não pode ter quebra); senão → 29.
@@ -86,6 +96,19 @@
 
 .PARAMETER AsJson
     Saida estruturada JSON.
+
+.PARAMETER AnchorPath
+    Arquivo auxiliar FileSystem UTF-8 estrito com ou sem BOM; remove somente
+    um BOM inicial, preserva texto/EOL. Vazio resulta em ANCHOR_EMPTY.
+
+.PARAMETER ReplacementPath
+    Mesma leitura de AnchorPath. Vazio remove em Replace; InsertAfter é no-op.
+    Assinaturas UTF-16/32 são recusadas; sem assinatura não há heurística
+    (41 00 42 00 é UTF-8 válido). Não muda a leitura do XML-fonte.
+    Auxiliares devem ser distintos do destino efetivo e seu .bak, inclusive
+    por links/aliases, para preservação. Não há guarda de identidade física.
+    Escolhas de origem, leitura de AnchorPath e depois ReplacementPath
+    precedem as validações do núcleo (14/15/30). DryRun não cria auxiliares.
 #>
 
 [CmdletBinding()]
@@ -96,11 +119,9 @@ param(
 
     [string]$OutputPath,
 
-    [Parameter(Mandatory = $true)]
     [AllowEmptyString()]
     [string]$Anchor,
 
-    [Parameter(Mandatory = $true)]
     [AllowEmptyString()]
     [string]$Replacement,
 
@@ -122,11 +143,56 @@ param(
 
     [bool]$AssertWellFormedAfter = $true,
 
-    [switch]$AsJson
+    [switch]$AsJson,
+
+    [AllowEmptyString()]
+    [string]$AnchorPath,
+
+    [AllowEmptyString()]
+    [string]$ReplacementPath
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+
+function Read-SurgicalPayloadText {
+    param([string]$LiteralPath, [string]$Role)
+
+    $details = [pscustomobject]@{ role = $Role; parameter = "${Role}Path"; path = $LiteralPath }
+    try {
+        if ([string]::IsNullOrWhiteSpace($LiteralPath)) { throw 'Informe um caminho não vazio.' }
+        $resolved = Resolve-Path -LiteralPath $LiteralPath -ErrorAction Stop
+        if ($resolved.Provider.Name -ne 'FileSystem' -or
+            -not (Test-Path -LiteralPath $LiteralPath -PathType Leaf -ErrorAction Stop)) {
+            throw 'Informe um arquivo do provedor FileSystem.'
+        }
+    } catch {
+        return [pscustomobject]@{ Text = $null; Error = (New-GeneXusXmlSurgicalError -Code 'PAYLOAD_PATH_INVALID' -ExitCode 34 -Message "PAYLOAD_PATH_INVALID: $($details.parameter): informe um arquivo FileSystem existente, não um diretório." -Details $details) }
+    }
+    try {
+        $bytes = [System.IO.File]::ReadAllBytes($resolved.ProviderPath)
+    } catch {
+        return [pscustomobject]@{ Text = $null; Error = (New-GeneXusXmlSurgicalError -Code 'PAYLOAD_READ_FAILED' -ExitCode 35 -Message "PAYLOAD_READ_FAILED: não foi possível ler $($details.parameter); confira acesso ao arquivo." -Details $details) }
+    }
+    try {
+        # UTF-32 antes de UTF-16: FF FE 00 00 também tem prefixo UTF-16LE.
+        $signature = $null
+        if ($bytes.Length -ge 4 -and $bytes[0] -eq 0xFF -and $bytes[1] -eq 0xFE -and $bytes[2] -eq 0 -and $bytes[3] -eq 0) { $signature = 'UTF-32LE' }
+        elseif ($bytes.Length -ge 4 -and $bytes[0] -eq 0 -and $bytes[1] -eq 0 -and $bytes[2] -eq 0xFE -and $bytes[3] -eq 0xFF) { $signature = 'UTF-32BE' }
+        elseif ($bytes.Length -ge 2 -and $bytes[0] -eq 0xFF -and $bytes[1] -eq 0xFE) { $signature = 'UTF-16LE' }
+        elseif ($bytes.Length -ge 2 -and $bytes[0] -eq 0xFE -and $bytes[1] -eq 0xFF) { $signature = 'UTF-16BE' }
+        if ($null -ne $signature) {
+            $details | Add-Member -NotePropertyName signature -NotePropertyValue $signature
+            throw 'Assinatura não UTF-8.'
+        }
+        $offset = 0
+        if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) { $offset = 3 }
+        $text = [System.Text.UTF8Encoding]::new($false, $true).GetString($bytes, $offset, $bytes.Length - $offset)
+        return [pscustomobject]@{ Text = $text; Error = $null }
+    } catch {
+        return [pscustomobject]@{ Text = $null; Error = (New-GeneXusXmlSurgicalError -Code 'PAYLOAD_ENCODING_INVALID' -ExitCode 36 -Message "PAYLOAD_ENCODING_INVALID: $($details.parameter) exige UTF-8 válido, com ou sem BOM." -Details $details) }
+    }
+}
 
 function Get-SurgicalCatchMapping {
     param(
@@ -262,7 +328,33 @@ try {
 
     . $supportPath
 
-    $coreResult = Invoke-GeneXusXmlSurgicalEditCore `
+    $coreResult = $null
+    foreach ($role in @('Anchor', 'Replacement')) {
+        $hasString = $PSBoundParameters.ContainsKey($role)
+        $hasPath = $PSBoundParameters.ContainsKey("${role}Path")
+        $details = [pscustomobject]@{ role = $role; parameter = $role; pathParameter = "${role}Path" }
+        if ($hasPath) { $details | Add-Member -NotePropertyName path -NotePropertyValue $PSBoundParameters["${role}Path"] }
+        if (-not $hasString -and -not $hasPath) {
+            $coreResult = New-GeneXusXmlSurgicalError -Code 'PAYLOAD_SOURCE_MISSING' -ExitCode 32 -Message "PAYLOAD_SOURCE_MISSING: informe -$role ou -${role}Path." -Details $details
+            break
+        }
+        if ($hasString -and $hasPath) {
+            $coreResult = New-GeneXusXmlSurgicalError -Code 'PAYLOAD_SOURCE_CONFLICT' -ExitCode 33 -Message "PAYLOAD_SOURCE_CONFLICT: use somente -$role ou -${role}Path." -Details $details
+            break
+        }
+    }
+    if ($null -eq $coreResult -and $PSBoundParameters.ContainsKey('AnchorPath')) {
+        $payload = Read-SurgicalPayloadText -LiteralPath $AnchorPath -Role Anchor
+        $coreResult = $payload.Error
+        $Anchor = $payload.Text
+    }
+    if ($null -eq $coreResult -and $PSBoundParameters.ContainsKey('ReplacementPath')) {
+        $payload = Read-SurgicalPayloadText -LiteralPath $ReplacementPath -Role Replacement
+        $coreResult = $payload.Error
+        $Replacement = $payload.Text
+    }
+    if ($null -eq $coreResult) {
+        $coreResult = Invoke-GeneXusXmlSurgicalEditCore `
         -InputPath $InputPath `
         -OutputPath $OutputPath `
         -Anchor $Anchor `
@@ -275,6 +367,7 @@ try {
         -LastUpdateBaselinePath $LastUpdateBaselinePath `
         -DryRun:$DryRun.IsPresent `
         -AssertWellFormedAfter $AssertWellFormedAfter
+    }
 
     if ($AsJson) {
         ConvertTo-SurgicalJsonOutput -Result $coreResult | ConvertTo-Json -Depth 6 -Compress
