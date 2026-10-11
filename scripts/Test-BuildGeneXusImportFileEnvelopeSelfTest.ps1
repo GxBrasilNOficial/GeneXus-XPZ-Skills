@@ -58,6 +58,34 @@ function Assert-PropertyAbsent {
     Assert-True ($null -eq $Object.PSObject.Properties[$PropertyName]) $Message
 }
 
+function New-DomainXml {
+    param(
+        [Parameter(Mandatory = $true)][string]$Name,
+        [Parameter(Mandatory = $true)][string]$Guid,
+        [Parameter(Mandatory = $true)][string]$Description,
+        [Parameter(Mandatory = $true)][string]$LastUpdate
+    )
+    return @"
+<Object type="00972a17-9975-449e-aab1-d26165d51393" name="$Name" fullyQualifiedName="$Name" guid="$Guid" lastUpdate="$LastUpdate">
+  <Properties>
+    <Property><Name>Name</Name><Value>$Name</Value></Property>
+    <Property><Name>Description</Name><Value>$Description</Value></Property>
+  </Properties>
+</Object>
+"@
+}
+
+function Write-DomainBaseline {
+    param(
+        [Parameter(Mandatory = $true)][string]$AcervoRoot,
+        [Parameter(Mandatory = $true)][string]$Name,
+        [Parameter(Mandatory = $true)][string]$Xml
+    )
+    $domainDir = Join-Path $AcervoRoot 'Domain'
+    [void](New-Item -ItemType Directory -Path $domainDir -Force)
+    Write-Utf8NoBomText -Path (Join-Path $domainDir "$Name.xml") -Content $Xml
+}
+
 function Assert-BuilderBlocksPath {
     param(
         [Parameter(Mandatory = $true)][scriptblock]$Invocation,
@@ -92,6 +120,7 @@ try {
     $webPanelTypeGuid = '7a7686a8-90de-4598-9406-014bcbcf3d82'
     $objectGuid = '11111111-1111-1111-1111-111111111111'
     $attributeGuid = '22222222-2222-2222-2222-222222222222'
+    $domainTypeGuid = '00972a17-9975-449e-aab1-d26165d51393'
 
     $templateXml = @"
 <?xml version="1.0" encoding="utf-8"?>
@@ -147,6 +176,14 @@ try {
     Write-Utf8NoBomText -Path $attributePath -Content $attributeXml
     Write-Utf8NoBomText -Path $attributeReferencePath -Content $attributeXml
     Write-Utf8NoBomText -Path $baselinePath -Content $objectBaselineXml
+
+    $domainName = 'DomainEnvelopeTeste'
+    $domainGuid = 'bbbbbbbb-1111-2222-3333-444444444444'
+    $domainBaseXml = New-DomainXml -Name $domainName -Guid $domainGuid -Description 'descrição antiga' -LastUpdate '2026-01-01T00:00:00.0000000Z'
+    $domainFrontXml = New-DomainXml -Name $domainName -Guid $domainGuid -Description 'descrição nova' -LastUpdate '2026-02-01T00:00:00.0000000Z'
+    $domainFrontPath = Join-Path $tempRoot "$domainName.xml"
+    Write-Utf8NoBomText -Path $domainFrontPath -Content $domainFrontXml
+    Write-DomainBaseline -AcervoRoot $acervoDir -Name $domainName -Xml $domainBaseXml
 
     Assert-BuilderBlocksPath -ExpectedRole 'ObjectXml' -Invocation {
         & $builderScript `
@@ -224,6 +261,93 @@ try {
         Assert-PropertyAbsent -Object $typeDrift.frontObjectTypeDrift.blockingDetails[0] -PropertyName $legacyName -Message "blockingDetails de type drift nao deve emitir $legacyName."
     }
     Assert-True (-not (Test-Path -LiteralPath $typeDriftOutputPath -PathType Leaf)) 'pacote nao deveria ser gravado quando ha drift de tipo.'
+
+    # Domain pré-gate continua ativo com -SkipGate e preserva envelope existente sob -Force.
+    $domainOutputPath = Join-Path $outDir 'Front_00000000000000000000000000000000_20260604_05.import_file.xml'
+    $sentinelText = 'envelope anterior que deve permanecer byte a byte'
+    Write-Utf8NoBomText -Path $domainOutputPath -Content $sentinelText
+    $sentinelBefore = [System.Convert]::ToHexString([System.IO.File]::ReadAllBytes($domainOutputPath))
+    $domainBlockRaw = & pwsh -NoProfile -File $builderScript `
+        -ObjectXmlPaths $domainFrontPath `
+        -TemplatePackagePath $templatePath `
+        -OutputPath $domainOutputPath `
+        -AcervoPath $acervoDir `
+        -ModifiedObjectNames $domainName `
+        -SkipGate `
+        -Force 2>&1
+    $domainBlockExitCode = $LASTEXITCODE
+    $domainBlock = (($domainBlockRaw | Out-String).Trim()) | ConvertFrom-Json
+    $sentinelAfter = [System.Convert]::ToHexString([System.IO.File]::ReadAllBytes($domainOutputPath))
+    Assert-True ($domainBlockExitCode -eq 20 -and $domainBlock.status -eq 'bloqueado') 'Domain condicional sem aprovação deveria bloquear o envelope.'
+    Assert-True ($domainBlock.stage -eq 'front-domain-drift') "stage Domain inesperado: '$($domainBlock.stage)'."
+    Assert-True ($domainBlock.domainsScanned -eq 1 -and $domainBlock.domainDrift.domainsScanned -eq 1) "bloqueio deveria expor domainsScanned=1; topo='$($domainBlock.domainsScanned)' domínio='$($domainBlock.domainDrift.domainsScanned)' findings='$(@($domainBlock.domainDrift.findings | ForEach-Object { $_.code }) -join ',')' raw='$($domainBlockRaw | Out-String)'."
+    Assert-True (@($domainBlock.domainDrift.findings | Where-Object { $_.code -eq 'domain-change-requires-confirmation' }).Count -eq 1) 'bloqueio deveria expor a diferença condicional de Domain.'
+    Assert-True ($sentinelAfter -ceq $sentinelBefore) 'pré-gate Domain alterou bytes do envelope existente.'
+
+    # Aprovação exata libera o pré-gate e o envelope expõe somente a superfície pública necessária.
+    $approval = [ordered]@{
+        kind = 'domain-drift-approvals'
+        schemaVersion = 1
+        approvals = @([ordered]@{
+            objectGuid = $domainGuid
+            field = 'Description'
+            locationKind = 'property'
+            container = 'Object/Properties'
+            partType = ''
+            component = 'value'
+            enumStoredValue = ''
+            oldState = 'value'
+            oldValue = 'descrição antiga'
+            newState = 'value'
+            newValue = 'descrição nova'
+        })
+    }
+    $approvalPath = Join-Path $tempRoot 'domain-approval.json'
+    Write-Utf8NoBomText -Path $approvalPath -Content (ConvertTo-Json -InputObject $approval -Depth 8)
+    $approvedOutputPath = Join-Path $outDir 'Front_00000000000000000000000000000000_20260604_06.import_file.xml'
+    $approved = (& $builderScript `
+        -ObjectXmlPaths $domainFrontPath `
+        -TemplatePackagePath $templatePath `
+        -OutputPath $approvedOutputPath `
+        -AcervoPath $acervoDir `
+        -ApprovedDomainChangesPath $approvalPath `
+        -ModifiedObjectNames $domainName `
+        -SkipGate `
+        -Force | ConvertFrom-Json)
+    Assert-True ($approved.status -eq 'apto para prosseguir') "aprovação exata deveria liberar o envelope; status='$($approved.status)'."
+    Assert-True ($approved.domainDrift.status -eq 'pass' -and $approved.domainDrift.domainsScanned -eq 1 -and $approved.domainsScanned -eq 1) 'resultado aprovado deveria preservar status e contagem Domain.'
+    Assert-True (@($approved.domainDrift.findings | Where-Object { $_.code -eq 'domain-change-approved' }).Count -eq 1) 'resultado deveria expor a aprovação exata reconhecida.'
+    Assert-PropertyAbsent -Object $approved.domainDrift -PropertyName 'byPath' -Message 'domainDrift público não deve expor o mapa interno por caminho absoluto.'
+    Assert-True (Test-Path -LiteralPath $approvedOutputPath -PathType Leaf) 'envelope aprovado deveria ter sido gravado.'
+
+    # ExportFile aninhado com Domain também bloqueia antes da escrita do envelope.
+    $nestedDomainPath = Join-Path $tempRoot 'nested-domain.import_file.xml'
+    $nestedDomainXml = "<ExportFile><Objects>$domainFrontXml</Objects></ExportFile>"
+    Write-Utf8NoBomText -Path $nestedDomainPath -Content $nestedDomainXml
+    $nestedOutputPath = Join-Path $outDir 'Front_00000000000000000000000000000000_20260604_07.import_file.xml'
+    $nestedRaw = & pwsh -NoProfile -File $builderScript `
+        -ObjectXmlPaths $nestedDomainPath `
+        -TemplatePackagePath $templatePath `
+        -OutputPath $nestedOutputPath `
+        -AcervoPath $acervoDir `
+        -SkipGate `
+        -Force 2>&1
+    $nestedExitCode = $LASTEXITCODE
+    $nestedResult = (($nestedRaw | Out-String).Trim()) | ConvertFrom-Json
+    Assert-True ($nestedExitCode -eq 20 -and $nestedResult.stage -eq 'front-domain-drift') 'Domain dentro de ExportFile deveria bloquear na etapa de pré-gate.'
+    Assert-True (@($nestedResult.domainDrift.findings | Where-Object { $_.code -eq 'domain-nested-root-unsupported' }).Count -eq 1) "ExportFile aninhado deveria bloquear a raiz Domain não autônoma; codes='$(@($nestedResult.domainDrift.findings | ForEach-Object { $_.code }) -join ',')'."
+    Assert-True (-not (Test-Path -LiteralPath $nestedOutputPath -PathType Leaf)) 'ExportFile aninhado bloqueado não deveria produzir envelope.'
+
+    # ExportFile com Object não-Domain aninhado não cria finding Domain.
+    $nonDomainNestedPath = Join-Path $tempRoot 'nested-procedure.import_file.xml'
+    $nonDomainNestedXml = "<ExportFile><Objects>$objectFreshXml</Objects></ExportFile>"
+    Write-Utf8NoBomText -Path $nonDomainNestedPath -Content $nonDomainNestedXml
+    $nonDomainNested = (& (Join-Path $scriptDir 'Test-GeneXusFrontAcervoDrift.ps1') `
+        -ObjectXmlPaths $nonDomainNestedPath `
+        -AcervoFolder $acervoDir `
+        -AsJson | ConvertFrom-Json)
+    Assert-True ($nonDomainNested.status -eq 'pass' -and $nonDomainNested.domainsScanned -eq 0) 'ExportFile com apenas Object não-Domain não deve contar Domain.'
+    Assert-True (@($nonDomainNested.findings | Where-Object { $_.code -like '*domain*' }).Count -eq 0) 'Object não-Domain aninhado não deve criar finding Domain.'
 
     Write-Output 'BUILD_GENEXUS_IMPORT_FILE_ENVELOPE_SELFTEST_OK'
 } finally {

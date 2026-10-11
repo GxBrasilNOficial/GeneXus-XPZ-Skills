@@ -270,16 +270,18 @@ Follow-ups antes de promover:
 
 ## Drift de tipagem entre delta empacotado e snapshot oficial — fases residuais
 
-- **Importância** — alta para o falso-negativo original; Fase 1 (`Object/@type`) e Fase 2 parcial (`Attribute`) implementadas, com cobertura funcional ainda incompleta.
-- **Maturidade** — Fase 1 e o recorte de Attribute da Fase 2 implementados e cobertos por self-tests; Domain, SDT/Item e Variable continuam pendentes.
+- **Importância** — alta para o falso-negativo original; Fase 1 (`Object/@type`) e recortes da Fase 2 (`Attribute` e `Domain`) implementados, com cobertura funcional ainda incompleta.
+- **Maturidade** — Fase 1, o recorte de Attribute e a comparação estrutural de Domain implementados e cobertos por self-tests; SDT/Item, Variable e drift entre objetos continuam pendentes.
 
 Fase 1 implementada: proteção determinística contra delta de frente que tenha o mesmo `guid` do acervo oficial, ambos com `Object/@type` não vazio após `Trim()`, mas tipos normalizados divergentes. O contrato público novo usa `objectGuid` normalizado, `acervoPath`/`candidateAcervoPaths`, `acervoObjectType*` e `message`; acervo com GUID duplicado gera `front-object-type-drift-ambiguous-acervo` informativo.
 
 Fase 2 parcial implementada para `Attribute` top-level: o 9-FD compara, por GUID único, `ATTCUSTOMTYPE`, `idBasedOn`, `Length`, `Decimals`, `AttMaxLen`, `AttAvgLen`, `AttCollection`, `Signed` e `idDATEFORMAT`. Mudança de tipo ou outro campo estrutural, redução de `Length`/`AttMaxLen` e aumento sem solicitação explícita do usuário nessa execução bloqueiam antes do motor Python. Aumento só é aceito com a tupla exata `-ApprovedAttributeSizeGrowth <GUID>|<campo>|<valor-acervo>|<valor-frente>`; o finding autorizado é informativo, e aprovações inválidas ou sem correspondência também bloqueiam. XML sob `Attribute` no acervo que seja ilegível, tenha raiz inesperada ou não tenha GUID gera `front-attribute-acervo-unreadable`, bloqueia e lista `untrustedAcervoPaths`. `front-only-new-attribute` sem GUID correspondente no acervo é reportado como novo, sem comparação de baseline. Os self-tests simulam bas:Numeric → bas:VarChar e confirmam o bloqueio antes do empacotamento.
 
+Fase 2 também cobre `Domain` autônomo: o 9-FD compara atributos de raiz e propriedades em `Object/Properties` e `Object/Part/Properties` contra o mesmo GUID na pasta direta `Domain/`, preservando os estados ausente/vazio/valor e `Part/@type`. Campos condicionais e enumerações só passam com aprovação exata em `-ApprovedDomainChangesPath` (JSON UTF-8 sem BOM, `kind=domain-drift-approvals`, `schemaVersion=1`); reduções de `Length`/`AttMaxLen`, campos destrutivos, identidade ambígua e varredura incompleta bloqueiam. `New-XpzImportPackage.ps1` executa o gate antes do motor Python, e `Build-GeneXusImportFileEnvelope.ps1` faz o pré-gate antes de tocar no envelope existente, inclusive com `-SkipGate`/`-Force`. A aprovação corresponde ao delta XML; não prova referências, SQL/DBMS, importação, Rebuild All, build ou runtime. A cobertura é sintética e não representa importação real.
+
 Fica pendente:
 
-- Fase 2 residual: assinatura de tipo funcional para `Domain`, `SDT/Item` e `Variable`.
+- Fase 2 residual: assinatura de tipo funcional para `SDT/Item` e `Variable`.
 - Fase 3: drift interno/intra-pacote e `parm(...)` versus variáveis/assinaturas.
 - Endurecer chamada direta a `New-XpzImportPackage.py`, se varredura de consumidores diretos indicar que a quebra de compatibilidade é aceitável.
 - Avaliar se o finding `front-object-type-drift-skip` em `Copy-GeneXusAcervoToFront.ps1` deve aderir ao contrato público novo de drift de tipo (`acervoPath`/`candidateAcervoPaths`/`message`) ou permanecer com contrato próprio do fluxo de cópia temporal/seed. Hoje ele bloqueia autocópia corretamente; a pendência é de consistência de contrato e diagnóstico, não de segurança imediata da Fase 1.
@@ -2036,7 +2038,7 @@ Variações estruturais do mesmo problema:
 - DataProvider no delta retornando shape que não bate com SDT consumidor já existente no snapshot
 - Procedure no delta com parâmetro de tipo X, callers no snapshot chamando com tipo Y
 
-Na origem desta ideia, `xpz-builder` validava XML bem-formado e sanity absoluto do `Source`, mas não comparava o delta com o snapshot. Hoje há cobertura parcial determinística para `Object/@type` e para a assinatura funcional de `Attribute` por GUID; permanecem sem cobertura os tipos de `Domain`, `SDT/Item` e `Variable`, além de drift entre objetos e assinaturas de parâmetros.
+Na origem desta ideia, `xpz-builder` validava XML bem-formado e sanity absoluto do `Source`, mas não comparava o delta com o snapshot. Hoje há cobertura parcial determinística para `Object/@type` e para a assinatura funcional de `Attribute` por GUID; `Domain` também tem gate estrutural próprio frente-vs-acervo. Permanecem sem cobertura `SDT/Item`, `Variable`, drift entre objetos e assinaturas de parâmetros.
 
 ### Direção técnica proposta
 

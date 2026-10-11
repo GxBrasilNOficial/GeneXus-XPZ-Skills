@@ -38,6 +38,34 @@ function New-FixtureObjectXml {
 "@
 }
 
+function New-FixtureDomainXml {
+    param(
+        [Parameter(Mandatory = $true)][string]$Name,
+        [Parameter(Mandatory = $true)][string]$Guid,
+        [Parameter(Mandatory = $true)][string]$Description,
+        [Parameter(Mandatory = $true)][string]$LastUpdate
+    )
+    return @"
+<Object type="00972a17-9975-449e-aab1-d26165d51393" name="$Name" fullyQualifiedName="$Name" guid="$Guid" lastUpdate="$LastUpdate">
+  <Properties>
+    <Property><Name>Name</Name><Value>$Name</Value></Property>
+    <Property><Name>Description</Name><Value>$Description</Value></Property>
+  </Properties>
+</Object>
+"@
+}
+
+function Write-FixtureDomain {
+    param(
+        [Parameter(Mandatory = $true)][string]$AcervoRoot,
+        [Parameter(Mandatory = $true)][string]$Name,
+        [Parameter(Mandatory = $true)][string]$Xml
+    )
+    $domainDir = Join-Path $AcervoRoot 'Domain'
+    [void](New-Item -ItemType Directory -Path $domainDir -Force)
+    [System.IO.File]::WriteAllText((Join-Path $domainDir "$Name.xml"), $Xml, (Get-Utf8NoBomEncoding))
+}
+
 function New-TextualFidelityFixtureObjectXml {
     param(
         [Parameter(Mandatory = $true)][string]$Name,
@@ -335,6 +363,74 @@ if ($r8.status -ne 'bloqueado' -or $code8 -ne 20 -or $r8.stage -ne 'front-acervo
 }
 if (@($r8.driftFindings | Where-Object { $_.code -eq 'front-attribute-size-approval-invalid' }).Count -ne 1) {
     throw 'Caso 8: wrapper não repassou ou gate não identificou a autorização malformada.'
+}
+
+# Caso 9: mudança condicional Domain bloqueia no gate PowerShell e expõe contagem/findings
+$repo9 = Join-Path $tempRoot 'repo9'
+$front9Dir = New-FrontWithObject -RepoRoot $repo9 -FrontName $frontName -Name $objName -Guid $objGuid -LastUpdate $newStamp
+$domainGuid9 = 'bbbbbbbb-1111-2222-3333-444444444444'
+$domainName9 = 'DomainWrapperTeste'
+$domainFront9 = New-FixtureDomainXml -Name $domainName9 -Guid $domainGuid9 -Description 'descrição nova' -LastUpdate $newStamp
+$domainBase9 = New-FixtureDomainXml -Name $domainName9 -Guid $domainGuid9 -Description 'descrição antiga' -LastUpdate $oldStamp
+[System.IO.File]::WriteAllText((Join-Path $front9Dir "$domainName9.xml"), $domainFront9, (Get-Utf8NoBomEncoding))
+$acervo9 = Join-Path $tempRoot 'acervo9'
+New-AcervoWithObject -AcervoRoot $acervo9 -Name $objName -Guid $objGuid -LastUpdate $oldStamp
+Write-FixtureDomain -AcervoRoot $acervo9 -Name $domainName9 -Xml $domainBase9
+$r9 = & $scriptPath -RepoRoot $repo9 -FrontName $frontName -AcervoPath $acervo9 | ConvertFrom-Json
+$code9 = $LASTEXITCODE
+if ($r9.status -ne 'bloqueado' -or $code9 -ne 20 -or $r9.stage -ne 'front-acervo-drift') {
+    throw "Caso 9: mudança Domain sem aprovação deveria bloquear no gate; status='$($r9.status)' exit='$code9' stage='$($r9.stage)'."
+}
+if ($r9.driftDomainsScanned -ne 1) {
+    throw "Caso 9: driftDomainsScanned deveria ser 1; obtido '$($r9.driftDomainsScanned)'."
+}
+if (@($r9.driftFindings | Where-Object { $_.code -eq 'domain-change-requires-confirmation' }).Count -ne 1) {
+    throw "Caso 9: driftFindings deveria expor a confirmação condicional de Domain; codes='$(@($r9.driftFindings | ForEach-Object { $_.code }) -join ',')'."
+}
+if ($null -ne $r9.PSObject.Properties['packageInventory']) {
+    throw 'Caso 9: gate Domain deveria bloquear antes de executar o motor Python.'
+}
+
+# Caso 10: aprovação exata é repassada; o gate passa e o resultado preserva contagem/evidência
+$repo10 = Join-Path $tempRoot 'repo10'
+$front10Dir = New-FrontWithObject -RepoRoot $repo10 -FrontName $frontName -Name $objName -Guid $objGuid -LastUpdate $newStamp
+$domainGuid10 = 'cccccccc-1111-2222-3333-444444444444'
+$domainName10 = 'DomainWrapperAprovado'
+$domainFront10 = New-FixtureDomainXml -Name $domainName10 -Guid $domainGuid10 -Description 'descrição nova' -LastUpdate $newStamp
+$domainBase10 = New-FixtureDomainXml -Name $domainName10 -Guid $domainGuid10 -Description 'descrição antiga' -LastUpdate $oldStamp
+[System.IO.File]::WriteAllText((Join-Path $front10Dir "$domainName10.xml"), $domainFront10, (Get-Utf8NoBomEncoding))
+$acervo10 = Join-Path $tempRoot 'acervo10'
+New-AcervoWithObject -AcervoRoot $acervo10 -Name $objName -Guid $objGuid -LastUpdate $oldStamp
+Write-FixtureDomain -AcervoRoot $acervo10 -Name $domainName10 -Xml $domainBase10
+$approval10 = [ordered]@{
+    kind = 'domain-drift-approvals'
+    schemaVersion = 1
+    approvals = @([ordered]@{
+        objectGuid = $domainGuid10
+        field = 'Description'
+        locationKind = 'property'
+        container = 'Object/Properties'
+        partType = ''
+        component = 'value'
+        enumStoredValue = ''
+        oldState = 'value'
+        oldValue = 'descrição antiga'
+        newState = 'value'
+        newValue = 'descrição nova'
+    })
+}
+$approvalPath10 = Join-Path $tempRoot 'domain-approval-exact.json'
+[System.IO.File]::WriteAllText($approvalPath10, (ConvertTo-Json -InputObject $approval10 -Depth 8), (Get-Utf8NoBomEncoding))
+$r10 = & $scriptPath -RepoRoot $repo10 -FrontName $frontName -AcervoPath $acervo10 -ApprovedDomainChangesPath $approvalPath10 | ConvertFrom-Json
+$code10 = $LASTEXITCODE
+if ($r10.driftStatus -ne 'pass' -or $r10.driftDomainsScanned -ne 1) {
+    throw "Caso 10: aprovação exata deveria liberar o gate e preservar a contagem Domain; driftStatus='$($r10.driftStatus)' domains='$($r10.driftDomainsScanned)'."
+}
+if (@($r10.driftFindings | Where-Object { $_.code -eq 'domain-change-approved' }).Count -ne 1) {
+    throw 'Caso 10: driftFindings deveria preservar a aprovação exata reconhecida pelo gate.'
+}
+if ($code10 -eq 20 -and $r10.stage -eq 'front-acervo-drift') {
+    throw 'Caso 10: gate do wrapper não pode bloquear uma mudança Domain coberta pela aprovação exata.'
 }
 
 Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue

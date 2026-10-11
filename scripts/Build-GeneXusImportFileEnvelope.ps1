@@ -9,11 +9,16 @@
     comparavel. Executa o gate canonico de envelope por padrão; para Panel, usa
     TemplatePackagePath como referencia comparavel e propaga no resultado
     information para panel-level-layout-confirmed, ou warnings quando o par
-    level/layout não puder ser confirmado.
+    level/layout não puder ser confirmado. Também executa o pré-gate de drift
+    Domain antes de remover ou substituir OutputPath, mesmo com -SkipGate/-Force.
 
 .PARAMETER TemplatePackagePath
     Pacote XML ou XPZ comparavel usado como template do envelope e, para Panel,
     como referencia do par level id/layout id no gate final.
+
+.PARAMETER ApprovedDomainChangesPath
+    Caminho para JSON UTF-8 sem BOM com aprovações pontuais exatas de mudanças
+    condicionais em Domain, validado pelo pré-gate antes de tocar em OutputPath.
 
 #>
 
@@ -32,6 +37,8 @@ param(
 
     [Parameter(Mandatory = $true)]
     [string]$AcervoPath,
+
+    [string]$ApprovedDomainChangesPath,
 
     [string[]]$ModifiedObjectNames,
 
@@ -573,6 +580,46 @@ if (-not $Force) {
     }
 }
 
+# O pré-gate Domain roda antes de remover qualquer envelope existente. -SkipGate
+# continua afetando somente a validação posterior do arquivo montado.
+$domainDriftScript = Join-Path $PSScriptRoot 'Test-GeneXusFrontAcervoDrift.ps1'
+if (-not (Test-Path -LiteralPath $domainDriftScript -PathType Leaf)) {
+    throw "Gate Domain não encontrado em '$domainDriftScript'."
+}
+$domainGateParameters = @{
+    ObjectXmlPaths = @($ObjectXmlPaths)
+    AcervoFolder = $AcervoPath
+    AsJson = $true
+}
+if ($PSBoundParameters.ContainsKey('ApprovedDomainChangesPath')) {
+    $domainGateParameters['ApprovedDomainChangesPath'] = $ApprovedDomainChangesPath
+}
+$domainGateOutput = & $domainDriftScript @domainGateParameters
+$domainGateJson = ($domainGateOutput | Out-String).Trim()
+try {
+    $domainDriftResult = $domainGateJson | ConvertFrom-Json
+} catch {
+    throw "BLOCK: gate Domain retornou saída não JSON antes de gravar o envelope: $domainGateJson"
+}
+$domainDriftPublic = [ordered]@{
+    status = [string]$domainDriftResult.status
+    domainsScanned = [int]$domainDriftResult.domainsScanned
+    findings = @($domainDriftResult.findings)
+}
+if ($domainDriftResult.status -eq 'fail') {
+    $domainFailFindings = @($domainDriftResult.findings | Where-Object { $_.severity -eq 'fail' })
+    $domainBlockReasons = @($domainFailFindings | ForEach-Object { $_.message })
+    Write-BuildEnvelopeJsonAndExit -InputObject ([ordered]@{
+        status = 'bloqueado'
+        exitCode = 20
+        stage = 'front-domain-drift'
+        domainDrift = $domainDriftPublic
+        domainsScanned = $domainDriftResult.domainsScanned
+        blockingReasons = $domainBlockReasons
+        warnings = @()
+    }) -ExitCode 20
+}
+
 if (Test-Path -LiteralPath $OutputPath) {
     if (-not $Force) {
         throw "OutputPath ja existe: '$OutputPath'. Use -Force para sobrescrever."
@@ -726,6 +773,8 @@ $buildResult = [ordered]@{
     topLevelAttrSource = $topLevelAttrSource
     lastUpdateFreshness = $lastUpdateFreshness
     frontObjectTypeDrift = $frontObjectTypeDrift
+    domainDrift = $domainDriftPublic
+    domainsScanned = $domainDriftResult.domainsScanned
     gateStatus        = $null
     gateInvoked       = (-not $SkipGate.IsPresent)
     blockingReasons   = @()

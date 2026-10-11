@@ -1256,6 +1256,12 @@ Tabela atômica com chave composta (Código + Fase + Contexto); fonte canônica 
 - o agente não deve afirmar “sem erro de importação”; deve afirmar apenas que seguiu a especificacao mais conservadora disponível
 - ha evidência direta de importação bem-sucedida para um caso mínimo de `Procedure`; isso ajuda a validar o envelope normal, mas não autoriza generalizacao irrestrita para todos os tipos
 
+### Proteção de `Domain` no gate 9-FD
+
+- O gate de drift 9-FD compara `Domain` autônomo da frente com `Domain/` do acervo, por GUID, e bloqueia identidade duplicada/incompleta, colisões de nome/FQN e varreduras incompletas. Usa o tipo do catálogo compartilhado ou o GUID canônico aprovado quando a entrada do catálogo está ausente ou inválida; GUID válido divergente bloqueia.
+- A comparação cobre atributos de raiz e propriedades em `Object/Properties` e `Object/Part/Properties`, distinguindo ausência, vazio e valor. Mudanças condicionais exigem aprovação pontual em `-ApprovedDomainChangesPath` (JSON UTF-8 sem BOM, `kind=domain-drift-approvals`, `schemaVersion=1`); enumerações inválidas/ambíguas, redução de tamanho e mudanças destrutivas continuam bloqueadas.
+- O wrapper `New-XpzImportPackage.ps1` executa 9-FD antes do motor Python. O construtor direto `Build-GeneXusImportFileEnvelope.ps1` executa o pré-gate antes de tocar em `OutputPath`, também com `-SkipGate` ou `-Force`, e bloqueia Domain aninhado em `ExportFile`. Seu JSON publica `domainDrift.status`, `domainDrift.domainsScanned` e `domainDrift.findings`. Aprovação do XML não prova compatibilidade de referências, SQL/DBMS, importação, Rebuild All, build ou runtime.
+
 ## Regras de fonte
 
 - Fonte valida: XML bruto de objeto
