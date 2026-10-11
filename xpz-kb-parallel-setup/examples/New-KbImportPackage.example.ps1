@@ -33,6 +33,8 @@ detecta introducao de trailing whitespace novo e nao e detector completo de
 whitespace, reindentacao ou EOL. Acervo ambiguo por guid gera diagnostico informativo
 front-object-type-drift-ambiguous-acervo, sem escolher tipo automaticamente.
 
+O gate 9-FD também compara assinaturas funcionais de Attribute e Domains autônomos. -ApprovedAttributeSizeGrowth encaminha ao motor cada tupla exata <GUID>|<campo>|<valor-acervo>|<valor-frente>, após solicitação explícita do usuário nesta execução. -ApprovedDomainChangesPath encaminha o arquivo JSON UTF-8 sem BOM kind=domain-drift-approvals/schemaVersion=1; cada autorização deve corresponder exatamente a um finding. Identidade inválida ou ambígua, colisões, leitura incompleta, Domain aninhado, campos destrutivos, redução de tamanho e autorizações inválidas ou sem correspondência continuam bloqueando.
+
 .PARAMETER FrontName
 Nome da subpasta da frente no formato `NomeCurto_GUID_YYYYMMDD`.
 
@@ -57,6 +59,12 @@ ou remocao forte de trailing whitespace herdado
 (front-textual-fidelity-trim-removal-churn), o empacotamento e abortado.
 Ambiguidade por guid no acervo e diagnostico informativo, reportado como
 front-object-type-drift-ambiguous-acervo.
+
+.PARAMETER ApprovedAttributeSizeGrowth
+Uma ou mais tuplas exatas <GUID>|<campo>|<valor-acervo>|<valor-frente>, solicitadas explicitamente pelo usuário nesta execução. O wrapper encaminha os valores sem transformação ao gate 9-FD.
+
+.PARAMETER ApprovedDomainChangesPath
+Caminho do JSON UTF-8 sem BOM de aprovações exatas, com kind=domain-drift-approvals e schemaVersion=1. O wrapper encaminha o caminho ao motor compartilhado, que valida a correspondência integral com os findings.
 
 .PARAMETER ReportPath
 Caminho absoluto, novo e terminado em `.json`, preferencialmente sob `Temp`.
@@ -85,6 +93,10 @@ param(
     [string]$AcervoPath,
 
     [string]$ReportPath,
+
+    [string[]]$ApprovedAttributeSizeGrowth = @(),
+
+    [string]$ApprovedDomainChangesPath,
 
     [string]$SharedSkillsRoot = "C:\CAMINHO\PARA\GeneXus-XPZ-Skills"
 )
@@ -115,6 +127,14 @@ if (-not [string]::IsNullOrWhiteSpace($AcervoPath)) {
 
 if (-not [string]::IsNullOrWhiteSpace($ReportPath)) {
     $argsForEngine.ReportPath = $ReportPath
+}
+
+if ($ApprovedAttributeSizeGrowth.Count -gt 0) {
+    $argsForEngine.ApprovedAttributeSizeGrowth = $ApprovedAttributeSizeGrowth
+}
+
+if (-not [string]::IsNullOrWhiteSpace($ApprovedDomainChangesPath)) {
+    $argsForEngine.ApprovedDomainChangesPath = $ApprovedDomainChangesPath
 }
 
 & $enginePath @argsForEngine
