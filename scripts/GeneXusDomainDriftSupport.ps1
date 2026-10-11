@@ -889,14 +889,10 @@ function Invoke-GeneXusDomainDriftClassifier {
         $findings.Add((New-GeneXusDomainFinding -Code 'domain-approval-envelope-invalid' -Message "Arquivo de aprovações Domain inválido: $($approvalRead.reason)." -ObjectName '' -ObjectGuid '' -ObjectFile '' -ExtraFields @{ approvalPath = $ApprovedDomainChangesPath })) | Out-Null
     }
 
-    $uniquePaths = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    $uniqueDomainPaths = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
     foreach ($inputPath in $ObjectXmlPaths) {
         if ([string]::IsNullOrWhiteSpace($inputPath)) { continue }
         $fullPath = [System.IO.Path]::GetFullPath($inputPath)
-        if (-not $uniquePaths.Add($fullPath)) {
-            $findings.Add((New-GeneXusDomainFinding -Code 'domain-input-duplicate-path' -Message "O mesmo XML foi informado mais de uma vez na entrada Domain: $fullPath." -ObjectName '' -ObjectGuid '' -ObjectFile $fullPath)) | Out-Null
-            continue
-        }
         $read = Read-GeneXusDomainXml -Path $fullPath
         if ($null -eq $read.document) { continue }
         $root = $read.document.DocumentElement
@@ -914,6 +910,10 @@ function Invoke-GeneXusDomainDriftClassifier {
             continue
         }
         if (-not (Test-GeneXusDomainTypeGuid -Value $root.GetAttribute('type') -Identity $identity)) { continue }
+        if (-not $uniqueDomainPaths.Add($fullPath)) {
+            $findings.Add((New-GeneXusDomainFinding -Code 'domain-input-duplicate-path' -Message "O mesmo XML Domain foi informado mais de uma vez na entrada: $fullPath." -ObjectName '' -ObjectGuid '' -ObjectFile $fullPath)) | Out-Null
+            continue
+        }
         $model = Get-GeneXusDomainObjectModel -Document $read.document -Path $fullPath -RootPath $(if (-not [string]::IsNullOrWhiteSpace($FrontRootPath)) { $FrontRootPath } else { Split-Path -Parent $fullPath })
         $domainCandidates.Add($model) | Out-Null
     }

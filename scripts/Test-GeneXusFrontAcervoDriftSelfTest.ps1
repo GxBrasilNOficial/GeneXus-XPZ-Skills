@@ -925,6 +925,13 @@ try {
     $r58 = & $gateScript -FrontFolder $emptyFront -AcervoFolder $emptyAcervo -AsJson | ConvertFrom-Json
     Assert-True ($r58.status -eq 'not-applicable' -and $r58.objectsScanned -eq 0 -and $r58.attributesScanned -eq 0 -and $r58.domainsScanned -eq 0 -and @($r58.findings).Count -eq 0) 'Caso 58: frente sem XML retorna not-applicable sem findings.'
 
+    $nonDomainDuplicateExplicit = & $gateScript -ObjectXmlPaths @($nonDomainCase.frontFile, $nonDomainCase.frontFile) -AcervoFolder $nonDomainCase.acervo -AsJson | ConvertFrom-Json
+    Assert-True ($nonDomainDuplicateExplicit.status -eq 'pass' -and $nonDomainDuplicateExplicit.domainsScanned -eq 0 -and @($nonDomainDuplicateExplicit.findings | Where-Object { $_.code -eq 'domain-input-duplicate-path' }).Count -eq 0) 'Caso 59: caminho duplicado de objeto não-Domain na entrada explícita não cria finding Domain.'
+
+    $explicitDomainDuplicateCase = New-DomainGateCase -CaseName 'domain-case60-explicit-domain-duplicate-path' -FrontXml (New-FixtureDomainXml -Name 'DomainExplicitDuplicate' -Guid 'c2123456-aaaa-bbbb-cccc-123456789abc' -LastUpdate $domainNewStamp) -BaselineXml $null
+    $explicitDomainDuplicate = & $gateScript -ObjectXmlPaths @($explicitDomainDuplicateCase.frontFile, $explicitDomainDuplicateCase.frontFile) -AcervoFolder $explicitDomainDuplicateCase.acervo -AsJson | ConvertFrom-Json
+    Assert-True ($explicitDomainDuplicate.status -eq 'fail' -and $explicitDomainDuplicate.domainsScanned -eq 1 -and @($explicitDomainDuplicate.findings | Where-Object { $_.code -eq 'domain-input-duplicate-path' }).Count -eq 1) 'Caso 60: caminho duplicado de Domain continua bloqueado na entrada explícita.'
+
     Write-Output 'GENEXUS_FRONT_ACERVO_DRIFT_SELFTEST_OK'
 } finally {
     if (Test-Path -LiteralPath $tempRoot) {
