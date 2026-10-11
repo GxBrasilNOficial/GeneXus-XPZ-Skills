@@ -1933,10 +1933,12 @@ Implementar quando houver: (a) caso real de mojibake detectado em pacote do port
 
 ## Gate de dependências GeneXus no empacotamento de delta
 
-**Importância:** alta
+**Importância:** baixa (reclassificada pelo mantenedor em 2026-10-11; ver justificativa abaixo)
 **Maturidade:** ideia
 
 **Origem:** avaliação de prompt externo em 2026-05-11.
+
+**Reavaliação de prioridade (2026-10-11).** O mantenedor considera que problemas de dependências desse cenário geram erro na importação pelo GeneXus e determinou reduzir a importância para baixa. A proposta permanece como melhoria auxiliar de preparação do pacote, sem prioridade alta de segurança. Os cenários abaixo preservam a motivação original; não demonstram, por si, falha que escape à validação da importação. Esta reclassificação registra a avaliação operacional do mantenedor, sem nova prova de importação nesta sessão.
 
 ### Problema concreto que motiva a ideia
 
