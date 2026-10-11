@@ -349,6 +349,26 @@ try {
     Assert-True ($nonDomainNested.status -eq 'pass' -and $nonDomainNested.domainsScanned -eq 0) 'ExportFile com apenas Object não-Domain não deve contar Domain.'
     Assert-True (@($nonDomainNested.findings | Where-Object { $_.code -like '*domain*' }).Count -eq 0) 'Object não-Domain aninhado não deve criar finding Domain.'
 
+    # GUID de Domain embutido no formato real de PackagedModule bloqueia a classificação incorreta como novo.
+    $embeddedDomainGuid = 'f0123456-1111-2222-3333-444444444444'
+    $embeddedDomainName = 'DomainSomenteEmPacote'
+    $embeddedDomainXml = New-DomainXml -Name $embeddedDomainName -Guid $embeddedDomainGuid -Description 'Domain importado' -LastUpdate '2026-01-01T00:00:00.0000000Z'
+    $embeddedDomainPath = Join-Path $tempRoot "$embeddedDomainName.xml"
+    Write-Utf8NoBomText -Path $embeddedDomainPath -Content $embeddedDomainXml
+    $packagedModuleXml = '<Object type="c88fffcd-b6f8-0000-8fec-00b5497e2117" name="Package" guid="e0123456-aaaa-bbbb-cccc-123456789abc"><Part type="ed1b7b1c-2aaf-46eb-9ec5-db348f6fa3fc"><ExportFile><Objects>' +
+        $embeddedDomainXml +
+        '</Objects></ExportFile></Part></Object>'
+    $packagedModuleDir = Join-Path $acervoDir 'PackagedModule'
+    [void](New-Item -ItemType Directory -Path $packagedModuleDir -Force)
+    Write-Utf8NoBomText -Path (Join-Path $packagedModuleDir 'Package.xml') -Content $packagedModuleXml
+    $embeddedOutputPath = Join-Path $outDir 'Front_00000000000000000000000000000000_20260604_08.import_file.xml'
+    $embeddedRaw = & pwsh -NoProfile -File $builderScript -ObjectXmlPaths $embeddedDomainPath -TemplatePackagePath $templatePath -OutputPath $embeddedOutputPath -AcervoPath $acervoDir -SkipGate -Force 2>&1
+    $embeddedExitCode = $LASTEXITCODE
+    $embeddedResult = (($embeddedRaw | Out-String).Trim()) | ConvertFrom-Json
+    Assert-True ($embeddedExitCode -eq 20 -and $embeddedResult.stage -eq 'front-domain-drift') 'GUID de Domain encontrado em PackagedModule deveria bloquear o pré-gate do envelope.'
+    Assert-True (@($embeddedResult.domainDrift.findings | Where-Object { $_.code -eq 'front-domain-packagedmodule-identity-collision' }).Count -eq 1) 'Envelope deveria expor a colisão de GUID de Domain embutido.'
+    Assert-True (-not (Test-Path -LiteralPath $embeddedOutputPath -PathType Leaf)) 'Domain bloqueado por colisão embutida não deveria produzir envelope.'
+
     Write-Output 'BUILD_GENEXUS_IMPORT_FILE_ENVELOPE_SELFTEST_OK'
 } finally {
     if (Test-Path -LiteralPath $tempRoot) {

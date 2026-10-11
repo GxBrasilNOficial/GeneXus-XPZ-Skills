@@ -271,6 +271,14 @@ function New-FixtureDomainXml {
     return $document.OuterXml
 }
 
+function New-FixturePackagedModuleXml {
+    param([Parameter(Mandatory = $true)][string]$EmbeddedObjectsXml)
+
+    return '<Object type="c88fffcd-b6f8-0000-8fec-00b5497e2117" name="Package" guid="d0123456-aaaa-bbbb-cccc-123456789abc"><Part type="ed1b7b1c-2aaf-46eb-9ec5-db348f6fa3fc"><ExportFile><Objects>' +
+        $EmbeddedObjectsXml +
+        '</Objects></ExportFile></Part></Object>'
+}
+
 function New-DomainGateCase {
     param(
         [Parameter(Mandatory = $true)][string]$CaseName,
@@ -809,12 +817,15 @@ try {
 
     $embeddedGuid = '78901234-aaaa-bbbb-cccc-123456789abc'
     $embeddedCase = New-DomainGateCase -CaseName 'domain-case44-embedded-guid' -FrontXml (New-FixtureDomainXml -Name 'DomainEmbedded' -Guid $embeddedGuid -LastUpdate $domainNewStamp) -BaselineXml $null
-    Write-FixtureObjectContent -Folder (Join-Path $embeddedCase.acervo 'PackagedModule') -Name 'Package' -Content "<PackagedModule><Objects>$(New-FixtureDomainXml -Name 'DomainEmbedded' -Guid $embeddedGuid -LastUpdate $domainOldStamp)</Objects></PackagedModule>"
+    $embeddedPackageXml = New-FixturePackagedModuleXml -EmbeddedObjectsXml (New-FixtureDomainXml -Name 'DomainEmbedded' -Guid $embeddedGuid -LastUpdate $domainOldStamp)
+    Write-FixtureObjectContent -Folder (Join-Path $embeddedCase.acervo 'PackagedModule') -Name 'Package' -Content $embeddedPackageXml
     $r44 = Invoke-DomainGateCase -Case $embeddedCase
     Assert-True ($r44.status -eq 'fail' -and @($r44.findings | Where-Object { $_.code -eq 'front-domain-packagedmodule-identity-collision' }).Count -eq 1) 'Caso 44: GUID encontrado somente em PackagedModule impede falso Domain novo.'
+    $r44Explicit = & $gateScript -ObjectXmlPaths @($embeddedCase.frontFile) -AcervoFolder $embeddedCase.acervo -AsJson | ConvertFrom-Json
+    Assert-True ($r44Explicit.status -eq 'fail' -and @($r44Explicit.findings | Where-Object { $_.code -eq 'front-domain-packagedmodule-identity-collision' }).Count -eq 1) 'Caso 44: rota explícita deve bloquear GUID encontrado somente em PackagedModule.'
 
     $embeddedInvalid = New-DomainGateCase -CaseName 'domain-case45-embedded-invalid' -FrontXml (New-FixtureDomainXml -Name 'DomainEmbeddedInvalid' -Guid '89012345-aaaa-bbbb-cccc-123456789abc' -LastUpdate $domainNewStamp) -BaselineXml $null
-    $invalidEmbeddedXml = "<PackagedModule><Objects>$(New-FixtureDomainXml -Name 'EmbeddedWithoutGuid' -Guid 'bad-guid' -LastUpdate $domainOldStamp)</Objects></PackagedModule>"
+    $invalidEmbeddedXml = New-FixturePackagedModuleXml -EmbeddedObjectsXml (New-FixtureDomainXml -Name 'EmbeddedWithoutGuid' -Guid 'bad-guid' -LastUpdate $domainOldStamp)
     Write-FixtureObjectContent -Folder (Join-Path $embeddedInvalid.acervo 'PackagedModule') -Name 'Package' -Content $invalidEmbeddedXml
     $r45 = Invoke-DomainGateCase -Case $embeddedInvalid
     Assert-True ($r45.status -eq 'fail' -and @($r45.findings | Where-Object { $_.code -eq 'domain-embedded-scan-incomplete' }).Count -eq 1) 'Caso 45: Domain embutido sem GUID torna incompleta a prova de Domain novo.'

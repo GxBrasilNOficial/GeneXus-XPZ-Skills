@@ -458,6 +458,34 @@ if (@($authorizedFindings11 | ForEach-Object { $_.objectGuid } | Sort-Object -Un
     throw 'Caso 11: o gate não preservou as duas identidades Attribute aprovadas.'
 }
 
+# Caso 12: GUID de Domain no PackagedModule com estrutura real bloqueia antes do motor Python.
+$repo12 = Join-Path $tempRoot 'repo12'
+$front12Dir = New-FrontWithObject -RepoRoot $repo12 -FrontName $frontName -Name $objName -Guid $objGuid -LastUpdate $newStamp
+$domainGuid12 = 'f0123456-1111-2222-3333-444444444444'
+$domainName12 = 'DomainWrapperEmbutido'
+$domainFront12 = New-FixtureDomainXml -Name $domainName12 -Guid $domainGuid12 -Description 'Domain autônomo' -LastUpdate $newStamp
+[System.IO.File]::WriteAllText((Join-Path $front12Dir "$domainName12.xml"), $domainFront12, (Get-Utf8NoBomEncoding))
+$acervo12 = Join-Path $tempRoot 'acervo12'
+New-AcervoWithObject -AcervoRoot $acervo12 -Name $objName -Guid $objGuid -LastUpdate $oldStamp
+[void](New-Item -ItemType Directory -Path (Join-Path $acervo12 'Domain') -Force)
+$packagedModuleXml12 = '<Object type="c88fffcd-b6f8-0000-8fec-00b5497e2117" name="Package" guid="e0123456-aaaa-bbbb-cccc-123456789abc"><Part type="ed1b7b1c-2aaf-46eb-9ec5-db348f6fa3fc"><ExportFile><Objects>' +
+    $domainFront12 +
+    '</Objects></ExportFile></Part></Object>'
+$packagedModuleDir12 = Join-Path $acervo12 'PackagedModule'
+[void](New-Item -ItemType Directory -Path $packagedModuleDir12 -Force)
+[System.IO.File]::WriteAllText((Join-Path $packagedModuleDir12 'Package.xml'), $packagedModuleXml12, (Get-Utf8NoBomEncoding))
+$r12 = & $scriptPath -RepoRoot $repo12 -FrontName $frontName -AcervoPath $acervo12 | ConvertFrom-Json
+$code12 = $LASTEXITCODE
+if ($r12.status -ne 'bloqueado' -or $code12 -ne 20 -or $r12.stage -ne 'front-acervo-drift' -or $r12.driftStatus -ne 'fail') {
+    throw "Caso 12: GUID Domain embutido deveria bloquear no gate; status='$($r12.status)' exit='$code12' stage='$($r12.stage)' driftStatus='$($r12.driftStatus)'."
+}
+if ($r12.driftDomainsScanned -ne 1 -or @($r12.driftFindings | Where-Object { $_.code -eq 'front-domain-packagedmodule-identity-collision' }).Count -ne 1) {
+    throw 'Caso 12: wrapper deveria expor a contagem Domain e a colisão encontrada no PackagedModule.'
+}
+if ($null -ne $r12.PSObject.Properties['packageInventory']) {
+    throw 'Caso 12: colisão Domain embutida deveria bloquear antes de executar o motor Python.'
+}
+
 Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
 
 Write-Output 'OK: Test-NewXpzImportPackageDriftSelfTest.ps1'

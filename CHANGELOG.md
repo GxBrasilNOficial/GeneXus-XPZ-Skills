@@ -8,6 +8,8 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 ### Unreleased
 
+- **Correção da identidade Domain em `PackagedModule` (2026-10-11):** o gate lê os GUIDs dos Domains embutidos na estrutura real `Object/Part/ExportFile/Objects`; a colisão bloqueia a classificação de um Domain autônomo como novo. Os GUIDs embutidos servem apenas para identidade, sem comparar propriedades. Testes sintéticos no classificador, envelope e wrapper; sem importação na IDE, build ou runtime.
+
 - **Correções do gate 9-FD (2026-10-11):** colisão por nome/FQN também bloqueia renomeio de Domain aprovado quando a identidade final conflita; o wrapper transmite múltiplas aprovações exatas de crescimento de Attribute ao gate; frente vazia retorna `not-applicable`; na entrada explícita, XMLs `Object` válidos de outros tipos deixam de gerar `domain-input-duplicate-path` quando repetidos; XMLs Domain duplicados continuam bloqueando. Self-tests sintéticos; sem importação na IDE, build ou runtime real.
 
 - **Gate determinístico de drift de Domain (2026-10-11):** o gate 9-FD compara Domains autônomos da frente com baselines diretos do acervo antes de substituir OutputPath ou gravar o pacote. Mudanças condicionais exigem autorização exata em JSON (kind=domain-drift-approvals, schemaVersion=1) via -ApprovedDomainChangesPath; identidade inválida ou ambígua, colisões, leitura incompleta, Domain aninhado em ExportFile, campos destrutivos, redução de tamanho e aprovações inválidas ou sem correspondência bloqueiam. Self-tests cobrem o classificador, o envelope e o wrapper. Prova sintética, sem importação na IDE, build ou runtime.
@@ -385,6 +387,8 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 ### Unreleased
 
+- **Corrección de identidad de Domain en `PackagedModule` (2026-10-11):** el gate lee los GUID de los Domains embebidos en la estructura real `Object/Part/ExportFile/Objects`; la colisión impide clasificar un Domain autónomo como nuevo. Los GUID embebidos se usan solo para identidad, sin comparar propiedades. Self-tests sintéticos del clasificador, el envelope y el wrapper; sin importación en la IDE, build ni runtime.
+
 - **Control determinista de drift de Domain (2026-10-11):** 9-FD compara los Domains autónomos de la frente con baselines directos del acervo antes de sustituir OutputPath o escribir el paquete. Los cambios condicionales requieren autorización exacta en JSON (kind=domain-drift-approvals, schemaVersion=1) mediante -ApprovedDomainChangesPath; identidad inválida o ambigua, colisiones, lectura incompleta, Domain anidado en ExportFile, campos destructivos, reducción de tamaño y aprobaciones inválidas o sin correspondencia bloquean. Los self-tests cubren el clasificador, el envelope y el wrapper. Prueba sintética, sin importación en la IDE, build ni runtime.
 
 - **Correcciones del gate 9-FD (2026-10-11):** una colisión por nombre/FQN también bloquea el renombrado aprobado de un Domain cuando la identidad resultante entra en conflicto con un Domain existente; el wrapper transmite varias aprobaciones exactas de crecimiento de Attribute al gate; una frente vacía devuelve `not-applicable`; en la entrada explícita, los XML `Object` válidos de otros tipos dejan de generar `domain-input-duplicate-path` cuando se repiten; los XML Domain duplicados siguen bloqueando. Self-tests sintéticos; sin importación en la IDE, build ni runtime real.
@@ -754,6 +758,8 @@ All relevant changes to this repository will be recorded here from this adoption
 The format keeps an `Unreleased` section for changes not yet published in a formal version. This repository does not yet use public semantic versioning; when that changes, future sections should record the corresponding tag.
 
 ### Unreleased
+
+- **Domain identity fix for `PackagedModule` (2026-10-11):** the gate reads embedded Domain GUIDs from the real `Object/Part/ExportFile/Objects` structure; a collision prevents an autonomous Domain from being classified as new. Embedded GUIDs are used only for identity, with no comparison of their properties. Synthetic self-tests cover the classifier, envelope, and wrapper; no IDE import, build, or runtime was performed.
 
 - **Deterministic Domain drift gate (2026-10-11):** 9-FD compares autonomous front Domains with direct acervo baselines before replacing OutputPath or writing the package. Conditional changes require exact JSON authorization (kind=domain-drift-approvals, schemaVersion=1) through -ApprovedDomainChangesPath; invalid or ambiguous identity, collisions, incomplete scans, nested Domains in ExportFile, destructive fields, size reductions, and invalid or unmatched approvals block. Self-tests cover the classifier, envelope, and wrapper. Synthetic evidence only, with no IDE import, build, or runtime.
 

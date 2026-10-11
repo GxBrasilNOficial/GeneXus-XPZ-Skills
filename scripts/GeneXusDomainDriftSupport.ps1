@@ -3,6 +3,8 @@
 Set-StrictMode -Version Latest
 
 $script:GeneXusDomainCanonicalTypeGuid = '00972a17-9975-449e-aab1-d26165d51393'
+$script:GeneXusPackagedModuleCanonicalTypeGuid = 'c88fffcd-b6f8-0000-8fec-00b5497e2117'
+$script:GeneXusPackagedModuleExportPartGuid = 'ed1b7b1c-2aaf-46eb-9ec5-db348f6fa3fc'
 $script:GeneXusDomainConditionalFields = @(
     'AUTONUMBER', 'AUTONUMBER_FORREPLICATION', 'AUTONUMBER_START', 'AUTONUMBER_STEP',
     'AddEmptyItem', 'ATT_PICTURE', 'AttAvgLen', 'AttCollection', 'ControlType',
@@ -76,6 +78,37 @@ function Resolve-GeneXusDomainTypeIdentity {
             return [pscustomobject]@{ typeGuid = $catalogGuid; source = 'catalog'; usable = $false; inconsistent = $true; reason = 'catalog-domain-guid-diverges-from-canonical' }
         }
         return [pscustomobject]@{ typeGuid = $canonical; source = 'catalog'; usable = $true; inconsistent = $false; reason = '' }
+    } finally {
+        $document.Dispose()
+    }
+}
+
+function Resolve-GeneXusDomainPackagedModuleTypeGuid {
+    param([Parameter(Mandatory = $true)][string]$CatalogPath)
+
+    $fallback = $script:GeneXusPackagedModuleCanonicalTypeGuid
+    if (-not (Test-Path -LiteralPath $CatalogPath -PathType Leaf)) { return $fallback }
+
+    try {
+        $bytes = [System.IO.File]::ReadAllBytes($CatalogPath)
+        $utf8 = [System.Text.UTF8Encoding]::new($false, $true)
+        $document = [System.Text.Json.JsonDocument]::Parse($utf8.GetString($bytes))
+    } catch {
+        return $fallback
+    }
+
+    try {
+        $root = $document.RootElement
+        if ($root.ValueKind -ne [System.Text.Json.JsonValueKind]::Object) { return $fallback }
+        $typesEntries = @($root.EnumerateObject() | Where-Object { $_.Name -ceq 'types' })
+        if ($typesEntries.Count -ne 1 -or $typesEntries[0].Value.ValueKind -ne [System.Text.Json.JsonValueKind]::Object) { return $fallback }
+        $moduleEntries = @($typesEntries[0].Value.EnumerateObject() | Where-Object { $_.Name -ceq 'PackagedModule' })
+        if ($moduleEntries.Count -ne 1 -or $moduleEntries[0].Value.ValueKind -ne [System.Text.Json.JsonValueKind]::Object) { return $fallback }
+        $guidProperties = @($moduleEntries[0].Value.EnumerateObject() | Where-Object { $_.Name -ceq 'objectTypeGuid' })
+        if ($guidProperties.Count -ne 1 -or $guidProperties[0].Value.ValueKind -ne [System.Text.Json.JsonValueKind]::String) { return $fallback }
+        $catalogGuid = ConvertTo-GeneXusDomainGuid -Value $guidProperties[0].Value.GetString()
+        if ([string]::IsNullOrWhiteSpace($catalogGuid)) { return $fallback }
+        return $catalogGuid
     } finally {
         $document.Dispose()
     }
@@ -984,6 +1017,7 @@ function Invoke-GeneXusDomainDriftClassifier {
     $embeddedIssues = [System.Collections.Generic.List[string]]::new()
     $globalByGuid = [System.Collections.Generic.Dictionary[string, System.Collections.Generic.List[object]]]::new([System.StringComparer]::Ordinal)
     $embeddedDomainGuids = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+    $packagedModuleTypeGuid = Resolve-GeneXusDomainPackagedModuleTypeGuid -CatalogPath $CatalogPath
     try {
         $globalFiles = @(Get-ChildItem -LiteralPath $AcervoRootPath -Recurse -File -Filter '*.xml' -ErrorAction Stop | Sort-Object FullName)
     } catch {
@@ -1014,15 +1048,32 @@ function Invoke-GeneXusDomainDriftClassifier {
                 typeGuid = ConvertTo-GeneXusDomainGuid -Value $root.GetAttribute('type')
                 typeRaw = $root.GetAttribute('type')
             }) | Out-Null
-        } elseif ($root.LocalName -ceq 'PackagedModule') {
-            foreach ($nestedRoot in @($read.document.SelectNodes("//*[local-name()='Object']"))) {
-                if (-not (Test-GeneXusDomainTypeGuid -Value $nestedRoot.GetAttribute('type') -Identity $identity)) { continue }
-                $guid = ConvertTo-GeneXusDomainGuid -Value $nestedRoot.GetAttribute('guid')
-                if (-not [string]::IsNullOrWhiteSpace($guid)) {
-                    [void]$embeddedDomainGuids.Add($guid)
-                } else {
-                    $embeddedComplete = $false
-                    $embeddedIssues.Add("Domain embutido sem GUID válido em PackagedModule: $([System.IO.Path]::GetRelativePath($AcervoRootPath, $file.FullName).Replace('\', '/'))") | Out-Null
+            if ((ConvertTo-GeneXusDomainGuid -Value $root.GetAttribute('type')) -ceq $packagedModuleTypeGuid) {
+                foreach ($part in @($root.ChildNodes | Where-Object {
+                    $_.NodeType -eq [System.Xml.XmlNodeType]::Element -and
+                    $_.LocalName -ceq 'Part' -and
+                    (ConvertTo-GeneXusDomainGuid -Value $_.GetAttribute('type')) -ceq $script:GeneXusPackagedModuleExportPartGuid
+                })) {
+                    foreach ($exportFile in @($part.ChildNodes | Where-Object {
+                        $_.NodeType -eq [System.Xml.XmlNodeType]::Element -and $_.LocalName -ceq 'ExportFile'
+                    })) {
+                        foreach ($objects in @($exportFile.ChildNodes | Where-Object {
+                            $_.NodeType -eq [System.Xml.XmlNodeType]::Element -and $_.LocalName -ceq 'Objects'
+                        })) {
+                            foreach ($nestedRoot in @($objects.ChildNodes | Where-Object {
+                                $_.NodeType -eq [System.Xml.XmlNodeType]::Element -and $_.LocalName -ceq 'Object'
+                            })) {
+                                if (-not (Test-GeneXusDomainTypeGuid -Value $nestedRoot.GetAttribute('type') -Identity $identity)) { continue }
+                                $embeddedGuid = ConvertTo-GeneXusDomainGuid -Value $nestedRoot.GetAttribute('guid')
+                                if (-not [string]::IsNullOrWhiteSpace($embeddedGuid)) {
+                                    [void]$embeddedDomainGuids.Add($embeddedGuid)
+                                } else {
+                                    $embeddedComplete = $false
+                                    $embeddedIssues.Add("Domain embutido sem GUID válido em PackagedModule: $([System.IO.Path]::GetRelativePath($AcervoRootPath, $file.FullName).Replace('\', '/'))") | Out-Null
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
