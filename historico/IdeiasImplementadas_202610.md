@@ -2,6 +2,29 @@
 
 Registro de ideias que saíram de `999-ideias-pendentes.md` por terem sido implementadas ou incorporadas ao contrato metodológico vigente.
 
+## Proteção determinística contra drift — Object/@type, Attribute e Domain
+
+Recortes implementados em 2026-10-10 e 2026-10-11 da entrada «Drift de tipagem entre delta empacotado e snapshot oficial». O objetivo é impedir que XML gerado incorretamente por um agente siga para empacotamento sem uma comparação determinística com o acervo oficial; a execução da verificação local não depende de LLM nem consome tokens.
+
+### Recorte implementado
+
+- A Fase 1 compara `Object/@type` entre frente e acervo para o mesmo GUID. O recorte de `Attribute` top-level compara por GUID único a assinatura funcional; mudança de tipo/estrutura e redução de `Length`/`AttMaxLen` bloqueiam. Aumento exige solicitação explícita do usuário para a mudança exata, transmitida em `-ApprovedAttributeSizeGrowth`.
+- O recorte de `Domain` autônomo compara atributos de raiz e propriedades por container com a pasta direta `Domain/` do acervo. Mudanças condicionais exigem aprovação JSON exata em `-ApprovedDomainChangesPath`; mudanças destrutivas, reduções de tamanho, identidade ambígua e varreduras incompletas bloqueiam. Os GUIDs dos Domains embutidos em `PackagedModule`, lidos de `Object/Part/ExportFile/Objects`, servem apenas para impedir classificação incorreta como novo; suas propriedades não são comparadas.
+- `New-XpzImportPackage.ps1` executa o 9-FD antes do motor Python. `Build-GeneXusImportFileEnvelope.ps1` executa o pré-gate de Domain antes de remover/substituir `OutputPath`, inclusive com `-SkipGate` e `-Force`; essa rota continua sem comparação de assinatura de Attribute e sem proteção contra remoção textual global forte.
+
+### Evidências e rastreabilidade
+
+- `39b04cc`: bloqueio de drift de tipo e tamanho de Attribute.
+- `e0fb283`: proteção de Domain no empacotamento; `30743fc`: alinhamento documental.
+- `1dc429d` e `a37d582`: correções de colisões de identidade, transmissão de aprovações e entradas duplicadas; `4c8f94c`: leitura de Domains embutidos na estrutura real de PackagedModule.
+- Self-tests sintéticos: `Test-GeneXusFrontAcervoDriftSelfTest.ps1`, `Test-NewXpzImportPackageDriftSelfTest.ps1` e `Test-BuildGeneXusImportFileEnvelopeSelfTest.ps1`. Na conferência de `4c8f94c`, as três baterias passaram e a reprodução independente bloqueou a colisão embutida nos modos por pasta e por lista explícita.
+
+### Limites e pendências preservadas
+
+As provas são locais e sintéticas: não demonstram importação pela IDE, build, runtime, referências ou compatibilidade de SQL/DBMS. Uma aprovação correspondente ao XML não comprova, por si, autorização humana nem essas evidências externas. A chamada direta ao motor Python não executa as proteções do wrapper. Não foi criado molde publicável derivado de KB real neste recorte; não há atualização correspondente a registrar no PrivateMap por esta consolidação documental.
+
+Permanecem no [999](../999-ideias-pendentes.md#drift-de-tipagem-entre-delta-empacotado-e-snapshot-oficial--fases-residuais) as fases residuais: SDT/Item, Variable, drift entre objetos e `parm(...)`, além dos pontos de sanidade, contratos e endurecimento de rotas ali listados. Este registro não encerra a comparação ampla.
+
 ## `xpz-skills-setup` oferecer instalar o agente `reviewer-ro` do OpenCode (resolução ativa do gap)
 
 Entrada original no 999 (Importância média; Maturidade ideia), implementada em 2026-10-09.
