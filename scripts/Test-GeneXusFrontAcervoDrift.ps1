@@ -58,6 +58,9 @@ param(
 
     [string[]]$ApprovedAttributeSizeGrowth = @(),
 
+    [Parameter(DontShow = $true)]
+    [string]$ApprovedAttributeSizeGrowthPayload,
+
     [string]$ApprovedDomainChangesPath,
 
     [switch]$AsJson
@@ -709,9 +712,31 @@ $objectTypeGuidIndex = New-GeneXusObjectTypeGuidIndex -RootPath $AcervoFolder
 $frontXmls = @(Get-ChildItem -LiteralPath $FrontFolder -File -Filter '*.xml')
 $domainDriftResult = Invoke-GeneXusDomainDriftClassifier -ObjectXmlPaths @($frontXmls | ForEach-Object { $_.FullName }) -AcervoRootPath $AcervoFolder -FrontRootPath $FrontFolder -ApprovedDomainChangesPath $ApprovedDomainChangesPath -ApprovedDomainChangesPathSupplied $domainApprovalPathSupplied -CatalogPath $catalogPath
 $findings = @($domainDriftResult.findings)
+$attributeSizeGrowthEntries = @($ApprovedAttributeSizeGrowth)
+if ($PSBoundParameters.ContainsKey('ApprovedAttributeSizeGrowthPayload')) {
+    $payloadProblem = ''
+    if ($ApprovedAttributeSizeGrowth.Count -gt 0) {
+        $payloadProblem = 'não combine o payload interno com -ApprovedAttributeSizeGrowth'
+    } else {
+        try {
+            $payloadEntries = ConvertFrom-Json -InputObject $ApprovedAttributeSizeGrowthPayload -NoEnumerate -ErrorAction Stop
+            if ($payloadEntries -isnot [System.Array]) { throw 'o payload deve ser um array JSON de strings' }
+            foreach ($payloadEntry in $payloadEntries) {
+                if ($payloadEntry -isnot [string]) { throw 'cada entrada do payload deve ser uma string' }
+            }
+            $attributeSizeGrowthEntries = @($payloadEntries)
+        } catch {
+            $payloadProblem = $_.Exception.Message
+        }
+    }
+    if (-not [string]::IsNullOrWhiteSpace($payloadProblem)) {
+        $findings += New-Finding -Severity 'fail' -Code 'front-attribute-size-approval-invalid' -Message "Payload interno de aprovações de tamanho de Attribute inválido: $payloadProblem." -ObjectName '' -ObjectGuid '' -ObjectFile '' -AcervoFile '' -AcervoPath '' -FrontLastUpdate '' -AcervoLastUpdate '' -MatchBasis 'attribute-size-approval' -ExtraFields @{ suppliedApprovalPayload = $ApprovedAttributeSizeGrowthPayload }
+        $attributeSizeGrowthEntries = @()
+    }
+}
 $approvedAttributeSizeGrowthKeys = @{}
 $usedAttributeSizeGrowthKeys = [System.Collections.Generic.HashSet[string]]::new()
-foreach ($approvalEntry in @($ApprovedAttributeSizeGrowth)) {
+foreach ($approvalEntry in @($attributeSizeGrowthEntries)) {
     $parts = @($approvalEntry.Split([char]'|'))
     $approvalProblem = ''
     if ($parts.Count -ne 4) {

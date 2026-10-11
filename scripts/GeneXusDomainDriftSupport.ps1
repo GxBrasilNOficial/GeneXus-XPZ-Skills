@@ -862,7 +862,7 @@ function Compare-GeneXusDomainPair {
 
 function Invoke-GeneXusDomainDriftClassifier {
     param(
-        [Parameter(Mandatory = $true)][string[]]$ObjectXmlPaths,
+        [Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]]$ObjectXmlPaths,
         [Parameter(Mandatory = $true)][string]$AcervoRootPath,
         [AllowNull()][string]$FrontRootPath,
         [AllowNull()][string]$ApprovedDomainChangesPath,
@@ -1099,23 +1099,43 @@ function Invoke-GeneXusDomainDriftClassifier {
             }
         }
 
-        if ($baseMatches.Count -eq 0) {
+        $candidateName = [string]$candidate.root.GetAttribute('name')
+        $candidateFqn = [string]$candidate.root.GetAttribute('fullyQualifiedName')
+        $matchedBaseline = if ($baseMatches.Count -eq 1) { $baseMatches[0] } else { $null }
+        $identityChanged = $null -eq $matchedBaseline -or
+            $candidateName -cne [string]$matchedBaseline.root.GetAttribute('name') -or
+            $candidateFqn -cne [string]$matchedBaseline.root.GetAttribute('fullyQualifiedName')
+        if ($identityChanged) {
             $conflicts = [System.Collections.Generic.List[object]]::new()
-            $candidateName = [string]$candidate.root.GetAttribute('name')
-            $candidateFqn = [string]$candidate.root.GetAttribute('fullyQualifiedName')
             foreach ($baseModel in $directModels) {
                 if ($baseModel.guidNormalized -ceq $candidate.guidNormalized) { continue }
-                $baseName = [string]$baseModel.root.GetAttribute('name')
-                $baseFqn = [string]$baseModel.root.GetAttribute('fullyQualifiedName')
-                $sameName = -not [string]::IsNullOrWhiteSpace($candidateName) -and -not [string]::IsNullOrWhiteSpace($baseName) -and $candidateName -ieq $baseName
-                $sameFqn = -not [string]::IsNullOrWhiteSpace($candidateFqn) -and -not [string]::IsNullOrWhiteSpace($baseFqn) -and $candidateFqn -ieq $baseFqn
-                if ($sameName -or $sameFqn) { $conflicts.Add([pscustomobject]@{ guid = $baseModel.guidNormalized; name = $baseName; fullyQualifiedName = $baseFqn; path = $baseModel.relativePath }) | Out-Null }
+                $peerName = [string]$baseModel.root.GetAttribute('name')
+                $peerFqn = [string]$baseModel.root.GetAttribute('fullyQualifiedName')
+                if ($frontByGuid.ContainsKey($baseModel.guidNormalized) -and $frontByGuid[$baseModel.guidNormalized].Count -eq 1) {
+                    $frontPeer = $frontByGuid[$baseModel.guidNormalized][0]
+                    $peerName = [string]$frontPeer.root.GetAttribute('name')
+                    $peerFqn = [string]$frontPeer.root.GetAttribute('fullyQualifiedName')
+                }
+                $sameName = -not [string]::IsNullOrWhiteSpace($candidateName) -and -not [string]::IsNullOrWhiteSpace($peerName) -and $candidateName -ieq $peerName
+                $sameFqn = -not [string]::IsNullOrWhiteSpace($candidateFqn) -and -not [string]::IsNullOrWhiteSpace($peerFqn) -and $candidateFqn -ieq $peerFqn
+                if ($sameName -or $sameFqn) { $conflicts.Add([pscustomobject]@{ guid = $baseModel.guidNormalized; name = $peerName; fullyQualifiedName = $peerFqn; path = $baseModel.relativePath }) | Out-Null }
+            }
+            foreach ($frontPeer in $domainCandidates) {
+                if ($frontPeer.guidNormalized -ceq $candidate.guidNormalized -or $directByGuid.ContainsKey($frontPeer.guidNormalized)) { continue }
+                $peerName = [string]$frontPeer.root.GetAttribute('name')
+                $peerFqn = [string]$frontPeer.root.GetAttribute('fullyQualifiedName')
+                $sameName = -not [string]::IsNullOrWhiteSpace($candidateName) -and -not [string]::IsNullOrWhiteSpace($peerName) -and $candidateName -ieq $peerName
+                $sameFqn = -not [string]::IsNullOrWhiteSpace($candidateFqn) -and -not [string]::IsNullOrWhiteSpace($peerFqn) -and $candidateFqn -ieq $peerFqn
+                if ($sameName -or $sameFqn) { $conflicts.Add([pscustomobject]@{ guid = $frontPeer.guidNormalized; name = $peerName; fullyQualifiedName = $peerFqn; path = $frontPeer.relativePath }) | Out-Null }
             }
             if ($conflicts.Count -gt 0) {
-                $findings.Add((New-GeneXusDomainFinding -Code 'front-domain-name-collision' -Message "Domain '$($candidate.name)' tem homônimo ou fullyQualifiedName conflitante com GUID diferente no acervo; não pode ser classificado como novo." -ObjectName $candidate.name -ObjectGuid $candidate.guidNormalized -ObjectFile $candidateRelative -ExtraFields @{ conflictingObjects = @($conflicts.ToArray()) })) | Out-Null
+                $findings.Add((New-GeneXusDomainFinding -Code 'front-domain-name-collision' -Message "Domain '$($candidate.name)' tem homônimo ou fullyQualifiedName conflitante com GUID diferente no conjunto final da frente e do acervo; a preparação permanece bloqueada." -ObjectName $candidate.name -ObjectGuid $candidate.guidNormalized -ObjectFile $candidateRelative -ExtraFields @{ conflictingObjects = @($conflicts.ToArray()) })) | Out-Null
                 $byPath[$candidateKey] = $candidateState
                 continue
             }
+        }
+
+        if ($baseMatches.Count -eq 0) {
             if ($embeddedDomainGuids.Contains($candidate.guidNormalized)) {
                 $findings.Add((New-GeneXusDomainFinding -Code 'front-domain-packagedmodule-identity-collision' -Message "GUID do Domain '$($candidate.name)' existe somente embutido em PackagedModule; identidade não comparável bloqueia a classificação como novo." -ObjectName $candidate.name -ObjectGuid $candidate.guidNormalized -ObjectFile $candidateRelative)) | Out-Null
                 $byPath[$candidateKey] = $candidateState

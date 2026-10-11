@@ -433,6 +433,31 @@ if ($code10 -eq 20 -and $r10.stage -eq 'front-acervo-drift') {
     throw 'Caso 10: gate do wrapper não pode bloquear uma mudança Domain coberta pela aprovação exata.'
 }
 
+# Caso 11: duas aprovações exatas de tamanho atravessam o wrapper pelo payload escalar.
+$repo11 = Join-Path $tempRoot 'repo11'
+$front11Dir = New-FrontWithObject -RepoRoot $repo11 -FrontName $frontName -Name $objName -Guid $objGuid -LastUpdate $newStamp
+$attributeName11A = 'attrCrescimentoA'
+$attributeGuid11A = 'dddddddd-bbbb-cccc-dddd-eeeeeeeeeeee'
+$attributeName11B = 'attrCrescimentoB'
+$attributeGuid11B = 'eeeeeeee-bbbb-cccc-dddd-ffffffffffff'
+Write-FixtureAttribute -Folder $front11Dir -Name $attributeName11A -Guid $attributeGuid11A -TypeValue 'bas:Numeric' -Length '12' -MaxLength '10'
+Write-FixtureAttribute -Folder $front11Dir -Name $attributeName11B -Guid $attributeGuid11B -TypeValue 'bas:Numeric' -Length '10' -MaxLength '24'
+$acervo11 = Join-Path $tempRoot 'acervo11'
+New-AcervoWithObject -AcervoRoot $acervo11 -Name $objName -Guid $objGuid -LastUpdate $oldStamp
+Write-FixtureAttribute -Folder (Join-Path $acervo11 'Attribute') -Name $attributeName11A -Guid $attributeGuid11A -TypeValue 'bas:Numeric' -Length '10' -MaxLength '10'
+Write-FixtureAttribute -Folder (Join-Path $acervo11 'Attribute') -Name $attributeName11B -Guid $attributeGuid11B -TypeValue 'bas:Numeric' -Length '10' -MaxLength '20'
+$approval11A = "$attributeGuid11A|Length|10|12"
+$approval11B = "$attributeGuid11B|AttMaxLen|20|24"
+$r11 = & $scriptPath -RepoRoot $repo11 -FrontName $frontName -AcervoPath $acervo11 -ApprovedAttributeSizeGrowth @($approval11A, $approval11B) | ConvertFrom-Json
+$code11 = $LASTEXITCODE
+$authorizedFindings11 = @($r11.driftFindings | Where-Object { $_.code -eq 'front-attribute-size-growth-authorized' })
+if ($r11.driftStatus -ne 'pass' -or $r11.stage -eq 'front-acervo-drift' -or $authorizedFindings11.Count -ne 2) {
+    throw "Caso 11: duas aprovações exatas deveriam passar pelo wrapper; status='$($r11.status)' driftStatus='$($r11.driftStatus)' exit='$code11' aprovações aceitas='$($authorizedFindings11.Count)'."
+}
+if (@($authorizedFindings11 | ForEach-Object { $_.objectGuid } | Sort-Object -Unique).Count -ne 2) {
+    throw 'Caso 11: o gate não preservou as duas identidades Attribute aprovadas.'
+}
+
 Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
 
 Write-Output 'OK: Test-NewXpzImportPackageDriftSelfTest.ps1'

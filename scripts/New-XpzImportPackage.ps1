@@ -359,8 +359,8 @@ if ($null -ne $script:reportContext) { Update-XpzExecutionReport -Context $scrip
 $pwshCommand = Get-Command pwsh -ErrorAction Stop
 $driftArgs = @('-NoProfile', '-File', $driftGatePath, '-FrontFolder', $frontDir, '-AcervoFolder', $acervoEffective)
 if ($ApprovedAttributeSizeGrowth.Count -gt 0) {
-    $driftArgs += '-ApprovedAttributeSizeGrowth'
-    $driftArgs += $ApprovedAttributeSizeGrowth
+    $driftArgs += '-ApprovedAttributeSizeGrowthPayload'
+    $driftArgs += (ConvertTo-Json -InputObject ([object[]]@($ApprovedAttributeSizeGrowth)) -Compress)
 }
 if ($PSBoundParameters.ContainsKey('ApprovedDomainChangesPath')) {
     $driftArgs += '-ApprovedDomainChangesPath'

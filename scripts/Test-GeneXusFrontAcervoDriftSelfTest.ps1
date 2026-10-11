@@ -895,6 +895,36 @@ try {
     $r55 = Invoke-DomainGateCase -Case $nonDomainCase
     Assert-True ($r55.status -ne 'fail' -and $r55.domainsScanned -eq 0 -and @($r55.findings | Where-Object { $_.code -like 'domain-*' }).Count -eq 0) 'Caso 55: entrada não-Domain conserva seu tratamento sem findings Domain.'
 
+    $renameGuid = 'a1123456-aaaa-bbbb-cccc-123456789abc'
+    $occupiedGuid = 'b1123456-aaaa-bbbb-cccc-123456789abc'
+    $renameBaseline = New-FixtureDomainXml -Name 'DomainOriginal' -Guid $renameGuid -LastUpdate $domainOldStamp -RootAttributes @{ fullyQualifiedName = 'Módulo.DomainOriginal' }
+    $renameFront = New-FixtureDomainXml -Name 'DomainOcupado' -Guid $renameGuid -LastUpdate $domainNewStamp -RootAttributes @{ fullyQualifiedName = 'Módulo.DomainOcupado' }
+    $renameCase = New-DomainGateCase -CaseName 'domain-case56-renamed-into-existing-identity' -FrontXml $renameFront -BaselineXml $renameBaseline
+    $occupiedBaseline = New-FixtureDomainXml -Name 'DomainOcupado' -Guid $occupiedGuid -LastUpdate $domainOldStamp -RootAttributes @{ fullyQualifiedName = 'Módulo.DomainOcupado' }
+    Write-FixtureObjectContent -Folder (Join-Path $renameCase.acervo 'Domain') -Name 'DomainOcupado' -Content $occupiedBaseline
+    $renameApprovals = @(
+        [ordered]@{ objectGuid = $renameGuid; field = 'name'; locationKind = 'rootAttribute'; container = 'Object'; partType = ''; component = 'value'; enumStoredValue = ''; oldState = 'value'; oldValue = 'DomainOriginal'; newState = 'value'; newValue = 'DomainOcupado' },
+        [ordered]@{ objectGuid = $renameGuid; field = 'fullyQualifiedName'; locationKind = 'rootAttribute'; container = 'Object'; partType = ''; component = 'value'; enumStoredValue = ''; oldState = 'value'; oldValue = 'Módulo.DomainOriginal'; newState = 'value'; newValue = 'Módulo.DomainOcupado' },
+        [ordered]@{ objectGuid = $renameGuid; field = 'Name'; locationKind = 'property'; container = 'Object/Properties'; partType = ''; component = 'value'; enumStoredValue = ''; oldState = 'value'; oldValue = 'DomainOriginal'; newState = 'value'; newValue = 'DomainOcupado' }
+    )
+    $renameApprovalPath = Join-Path $renameCase.root 'approved-rename.json'
+    Write-DomainApprovalFile -Path $renameApprovalPath -Approvals $renameApprovals
+    $r56 = Invoke-DomainGateCase -Case $renameCase -ApprovedPath $renameApprovalPath
+    Assert-True ($r56.status -eq 'fail' -and @($r56.findings | Where-Object { $_.code -eq 'front-domain-name-collision' }).Count -eq 1) 'Caso 56: aprovação exata não pode liberar renomeio que colide com outro Domain no conjunto final.'
+
+    $noncollidingRenameCase = New-DomainGateCase -CaseName 'domain-case57-approved-rename-without-collision' -FrontXml $renameFront -BaselineXml $renameBaseline
+    $noncollidingRenameApprovalPath = Join-Path $noncollidingRenameCase.root 'approved-rename.json'
+    Write-DomainApprovalFile -Path $noncollidingRenameApprovalPath -Approvals $renameApprovals
+    $r57 = Invoke-DomainGateCase -Case $noncollidingRenameCase -ApprovedPath $noncollidingRenameApprovalPath
+    Assert-True ($r57.status -eq 'pass' -and @($r57.findings | Where-Object { $_.code -eq 'front-domain-name-collision' }).Count -eq 0 -and @($r57.findings | Where-Object { $_.code -eq 'domain-change-approved' }).Count -eq 3) 'Caso 57: renomeio sem colisão conserva a liberação por três aprovações exatas.'
+
+    $emptyFront = Join-Path $tempRoot 'front-empty-case58'
+    $emptyAcervo = Join-Path $tempRoot 'acervo-empty-case58'
+    [void](New-Item -ItemType Directory -Path $emptyFront -Force)
+    [void](New-Item -ItemType Directory -Path (Join-Path $emptyAcervo 'Domain') -Force)
+    $r58 = & $gateScript -FrontFolder $emptyFront -AcervoFolder $emptyAcervo -AsJson | ConvertFrom-Json
+    Assert-True ($r58.status -eq 'not-applicable' -and $r58.objectsScanned -eq 0 -and $r58.attributesScanned -eq 0 -and $r58.domainsScanned -eq 0 -and @($r58.findings).Count -eq 0) 'Caso 58: frente sem XML retorna not-applicable sem findings.'
+
     Write-Output 'GENEXUS_FRONT_ACERVO_DRIFT_SELFTEST_OK'
 } finally {
     if (Test-Path -LiteralPath $tempRoot) {
