@@ -256,6 +256,8 @@ Implementado em 2026-10-12, conforme plano aprovado e estabilizado (revisão por
 
 **Paridade e limites.** `10-base-operacional-msbuild-headless.md`, `09-inventario-e-rastreabilidade-publica.md`, `scripts/msbuild-exit-codes.catalog.json`, `CHANGELOG.md` (3 línguas) e `xpz-msbuild-import-export/SKILL.md`. Provas sintéticas (fake MSBuild + assembly sintética), sem import/build/runtime reais. O closeout da revisão por pares (declínio de re-submissão da vN+1) ficou pendente em conversa dedicada (registrado no `999`).
 
+**Eixo vizinho deixado aberto.** `Test-GeneXusKbConsistency.ps1` também abre a KB e lê o contexto só após os `Set` (template `Set` -> `Get`, sem `Get` de abertura), **não** detecta `Set` falho nem emite essa mensagem, e faz o parse com `Get-RegexValue` local (sem `*AtOpen`/`Resolve-GeneXusKbActiveContextReadings`) — o mesmo padrão corrigido nos 4 alvos desta frente. Foi **deixado fora do escopo**; incluí-lo exige antes decidir se o script deve bloquear em `Set` falho. Decisão registrada como pendente no `999`.
+
 ### Rastreabilidade
 
 - Commit material: `c6053ad` (Corrige contexto de abertura e classificacao de saida nos wrappers MSBuild).
