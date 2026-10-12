@@ -2337,7 +2337,7 @@ Funcionar como resumo decisório sem esconder os limites da evidência.
 - não remover `Part` recorrente nem trocar a ordem dos blocos
 - alterar apenas campos textuais, nomes e trechos internos que tenham paralelo claro em outros `Transaction` da mesma familia
 - validar antes do empacotamento que cada atributo declarado em `Level` exista de fato na KB alvo
-- validar que `DescriptionAttribute` e `AttributeProperties` continuem apontando para atributos presentes no mesmo objeto
+- validar que cada nome nominal selecionado por `DescriptionAttribute` corresponda a atributo direto do mesmo `Level` e que `AttributeProperties` continue apontando para atributos presentes no mesmo objeto; descritor ausente, vazio/só espaços ou `(None)` (sem distinção de caixa, após remover espaços externos) representa ausência de seleção e dispensa correspondência de atributo
 - validar explicitamente `Context`, `TrnContext` e `TrnContextAtt` quando existirem, incluindo seus `ATTCUSTOMTYPE`
 - se um atributo do no `<Object>` não existir no molde usado, não inventar esse atributo no clone
 - se o caso exigir inventar atributo, `sdt:Context`, `sdt:TransactionContext` ou `sdt:TransactionContext.Attribute` inexistentes no destino, abortar
@@ -2349,7 +2349,7 @@ Funcionar como resumo decisório sem esconder os limites da evidência.
 - `Inferência forte`: nos casos minimos validados, a aceitacao do `Level` dependeu tanto da disponibilidade real dos atributos quanto da preservacao do shape estrutural do `Part` onde o `Level` foi inserido.
 - Regra operacional: `Attribute` inline em `Level` não substitui `Attribute` top-level no pacote.
 - Regra operacional: se os atributos do `Level` não existirem previamente na KB de destino, a composicao mínima segura e inclui-los como `Attribute` top-level no mesmo pacote da `Transaction`.
-- Regra operacional: `DescriptionAttribute` e opcional no caso mínimo, mas quando presente deve apontar para atributo do mesmo `Level`.
+- Regra operacional: `DescriptionAttribute` é opcional no caso mínimo; quando selecionar um nome nominal, deve apontar para atributo direto do mesmo `Level`. Ausente, vazio/só espaços e `(None)` (sem distinção de caixa, após remover espaços externos) representam ausência de seleção e dispensam correspondência de atributo.
 - Regra operacional: `AttributeProperties` e opcional no caso mínimo e já foi validado tanto isoladamente quanto combinado com `DescriptionAttribute`.
 - Regra operacional: para primeiro pacote mínimo de `Transaction`, continuar preferindo validar antes a variante mais enxuta, e só depois enriquecer com `DescriptionAttribute`, `AttributeProperties` ou contexto adicional.
 

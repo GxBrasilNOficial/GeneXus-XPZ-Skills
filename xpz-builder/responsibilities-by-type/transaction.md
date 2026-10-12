@@ -136,7 +136,7 @@ Cross-reference: this map answers **where** a rule assignment lives in generated
 
 - [ ] For `Transaction`, every `Level/Attribute@guid` exists in `<Attributes>/Attribute@guid`
 - [ ] For `Transaction`, every `Level/Attribute` name exists in `<Attributes>/Attribute@name`
-- [ ] For `Transaction`, every `DescriptionAttribute` present exists in the same `Level` and also in `<Attributes>`
+- [ ] For `Transaction`, every nominal name selected by `DescriptionAttribute` exists among the direct attributes of the same `Level` and also in `<Attributes>`; absent, empty/whitespace and `(None)` (case-insensitive, after trimming) mean no selection and do not require an attribute match
 - [ ] For `Transaction`, no required `Attribute` was serialized as `Domain` or other object type under `<Objects>`
 - [ ] For `Transaction`, the primary edit block was declared before editing, any block transition was justified explicitly, and intended scope via web editing vs BC was stated when relevant
 - [ ] When the delta involves `Rules` or `Events` with attribute assignments, 9-TXW completed for each affected Transaction with usable Python 3.x on `PATH` (the `WindowsApps` stub does not count). `PREREQUISITO AUSENTE` means the gate did not complete and packaging remains blocked. Every generated assignment maps to its exact occurrence with `effectiveWritable=true`; when a decision was required, its `decisionState=applied` and current proof/dependency receipt were verified. KbIntelligence parity may corroborate automatic rows but does not replace the operational façade; `GATE_OK` and `transaction-writable-attributes` are not authorization. No `writable=false`, unresolved `writable=null`, partial/invalid coverage, or technical cause was overridden before packaging

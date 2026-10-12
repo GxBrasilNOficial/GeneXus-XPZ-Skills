@@ -76,7 +76,7 @@ Permitir escolha repetivel de template interno real, reduzindo risco de vazament
 - 1 `Level` principal
 - sem subnivel
 - poucos `AttributeProperties`
-- `DescriptionAttribute` pode existir ou não, mas quando existe aponta para atributo do mesmo nível
+- `DescriptionAttribute` pode existir ou não; quando selecionar um nome nominal, aponta para atributo direto do mesmo nível. Ausente, vazio/só espaços e `(None)` (sem distinção de caixa, após remover espaços externos) representam ausência de seleção e dispensam correspondência de atributo
 
 ### Edicao e preservacao
 
@@ -135,7 +135,7 @@ Permitir escolha repetivel de template interno real, reduzindo risco de vazament
 
 - Regra operacional: `Attribute` inline em `Level` não substitui `Attribute` top-level no pacote.
 - Regra operacional: quando os atributos do `Level` não existirem previamente na KB de destino, a composicao mínima segura e inclui-los como `Attribute` top-level no mesmo pacote da `Transaction`.
-- Regra operacional: `DescriptionAttribute` e opcional no caso mínimo, mas quando presente deve apontar para atributo do mesmo `Level`.
+- Regra operacional: `DescriptionAttribute` é opcional no caso mínimo; quando selecionar um nome nominal, deve apontar para atributo direto do mesmo `Level`. Ausente, vazio/só espaços e `(None)` (sem distinção de caixa, após remover espaços externos) representam ausência de seleção e dispensam correspondência de atributo.
 - Regra operacional: `AttributeProperties` e opcional no caso mínimo e já foi validado tanto isoladamente quanto combinado com `DescriptionAttribute`.
 - Inferencia forte: no caso mínimo expandido, a aceitacao do `Level` dependeu tanto da disponibilidade real dos atributos quanto da preservacao do shape estrutural do `Part` principal.
 
@@ -152,7 +152,7 @@ Permitir escolha repetivel de template interno real, reduzindo risco de vazament
 - Regra operacional: `TransactionOrObject`, quando aparecer em export comparavel, pode coexistir como auxiliar em `<Objects>`, mas não substitui a obrigatoriedade de `<Attributes>`.
 - Hard gate: cada `Level/Attribute@guid` deve existir em `<Attributes>/Attribute@guid`.
 - Hard gate: cada `Level/Attribute` por nome deve existir em `<Attributes>/Attribute@name`.
-- Hard gate: `DescriptionAttribute`, quando presente, deve apontar para atributo do mesmo `Level` e esse atributo também deve existir em `<Attributes>`.
+- Hard gate: quando `DescriptionAttribute` selecionar um nome nominal, deve apontar para atributo direto do mesmo `Level` e esse atributo também deve existir em `<Attributes>`. Ausente, vazio/só espaços e `(None)` (sem distinção de caixa, após remover espaços externos) representam ausência de seleção e dispensam correspondência de atributo.
 - Hard gate: se qualquer item acima falhar, abortar o pacote antes da tentativa de importação.
 
 ### Erros de importação que este pacote mínimo evita
@@ -331,7 +331,7 @@ Permitir escolha repetivel de template interno real, reduzindo risco de vazament
 - escolher a familia estrutural correta antes de qualquer edicao nominal
 - listar todos os atributos declarados em cada `Level`
 - confirmar que cada atributo do `Level` existe de fato na KB alvo
-- confirmar que cada `DescriptionAttribute` aponta para atributo do mesmo nível
+- confirmar que cada nome nominal selecionado por `DescriptionAttribute` corresponda a atributo direto do mesmo nível; ausente, vazio/só espaços e `(None)` (sem distinção de caixa, após remover espaços externos) representam ausência de seleção e dispensam correspondência de atributo
 - confirmar que cada nome citado em `AttributeProperties` corresponde a atributo realmente presente no `Level`
 - confirmar se existem variáveis `Context`, `TrnContext` e `TrnContextAtt`
 - se existirem, validar os `ATTCUSTOMTYPE` correspondentes no alvo
@@ -355,7 +355,7 @@ Permitir escolha repetivel de template interno real, reduzindo risco de vazament
 - os 8 `Part type` recorrentes devem permanecer presentes
 - o nome de cada `Level` deve estar coerente com a estrutura final
 - todo `<Attribute ...>` dentro de `Level` deve manter nome interno preenchido e coerente com o restante do objeto
-- todo `DescriptionAttribute` deve apontar para atributo existente no mesmo nível
+- todo nome nominal selecionado por `DescriptionAttribute` deve corresponder a atributo direto do mesmo nível; ausente, vazio/só espaços e `(None)` (sem distinção de caixa, após remover espaços externos) representam ausência de seleção e dispensam correspondência de atributo
 - todo atributo citado em `AttributeProperties` deve existir de fato no XML da estrutura
 - se houver variáveis `Context`, `TrnContext` ou `TrnContextAtt`, seus `ATTCUSTOMTYPE` devem apontar para tipos realmente existentes no destino
 - não pode sobrar nome residual do template original

@@ -1138,7 +1138,7 @@ Tabela atômica com chave composta (Código + Fase + Contexto); fonte canônica 
 - antes de empacotar `Transaction` nova, validar coerência cruzada obrigatória entre `Level` e `<Attributes>`
 - cada `Level/Attribute@guid` deve existir em `<Attributes>/Attribute@guid`
 - cada `Level/Attribute` por nome deve existir em `<Attributes>/Attribute@name`
-- `DescriptionAttribute`, quando presente, deve apontar para atributo existente no mesmo `Level` e também presente em `<Attributes>`
+- quando `DescriptionAttribute` selecionar um nome nominal, ele deve corresponder a atributo direto do mesmo `Level` e também presente em `<Attributes>`; ausente, vazio/só espaços e `(None)` (sem distinção de caixa, após remover espaços externos) representam ausência de seleção e dispensam correspondência de atributo
 - se qualquer item acima falhar, abortar antes do pacote final com mensagem objetiva
 - pacote mínimo canonico para `Transaction` nova:
   - `<Objects>` = `Transaction`

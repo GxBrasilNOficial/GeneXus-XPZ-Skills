@@ -583,7 +583,7 @@ Reference files and when to load them:
    - For `Transaction`, run a semantic pre-import gate before final packaging:
      - each `Level/Attribute@guid` must exist in `<Attributes>/Attribute@guid`
      - each `Level/Attribute` name must exist in `<Attributes>/Attribute@name`
-     - each `DescriptionAttribute`, when present, must exist in the same `Level` and also in `<Attributes>`
+     - each nominal name selected by `DescriptionAttribute` must exist among the direct attributes of the same `Level` and also in `<Attributes>`; absent, empty/whitespace and `(None)` (case-insensitive, after trimming) mean no selection and do not require an attribute match
      - if any of these checks fails → **ABORT** with an objective error message before generating the final package
    - Treat the following pre-import errors as hard blockers that require rebuilding the package, not as recoverable warnings:
      - `Cannot convert Domain to Attribute`
