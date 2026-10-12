@@ -9,8 +9,10 @@
   Os moldes sao, por definicao, corretos: um sinal forwards_unknown_engine_param sobre eles
   e falso-positivo do extrator. Alem de "zero sinais", assevera COBERTURA EXATA (constante
   nomeada derivada do inventario de sites) para o "zero sinais" nao passar por vacuidade, e
-  cobertura por molde (prova as formas reais: var intermediaria, Join-Path aninhado, splat
-  com chaves condicionais, redirecionamento 2>&1, forma -Param:$v).
+  cobertura por molde (prova as formas reais: var intermediaria, Join-Path aninhado, splat com
+  chaves condicionais, redirecionamento 2>&1, forma -Param:$v). Aplica tambem
+  Get-XpzHelpSurfaceFinding sobre os moldes (recorrencia): ajuda visivel e 0 orfao no .EXAMPLE,
+  com PISO de cobertura (medido: 20) contra vacuidade.
   Sentinela final: XPZ_WRAPPER_ENGINE_PARAM_MOLDES_OK.
 #>
 
@@ -71,6 +73,34 @@ foreach ($name in $ExpectedAuditedByMolde.Keys) {
     if ($got -ne [int]$ExpectedAuditedByMolde[$name]) {
         throw "ASSERT_FAILED: molde $name esperava $($ExpectedAuditedByMolde[$name]) site(s) auditado(s); obtido=$got"
     }
+}
+
+# 4. Comment-based help dos moldes (recorrencia): todo molde com invocacao do proprio nome no
+# .EXAMPLE tem ajuda visivel e 0 achado (flag orfa, .PARAMETER orfao, ajuda invisivel). Anti-vacuidade
+# por PISO de cobertura (medido: 20), tolerante a novos moldes.
+$helpFindings = [System.Collections.Generic.List[string]]::new()
+$moldesWithExampleSelf = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+foreach ($molde in (Get-ChildItem -LiteralPath $examplesDir -Filter '*.example.ps1' -File | Sort-Object Name)) {
+    $base = $molde.Name -replace '\.example\.ps1$', ''
+    $r = Get-XpzHelpSurfaceFinding -WrapperPath $molde.FullName -AlternateSelfLeaf @("$base.ps1")
+    foreach ($x in @(@($r.Blocking) + @($r.Advisory) + @($r.EngineDiagnostics))) {
+        $helpFindings.Add(('{0}: {1}' -f $molde.Name, $x.Reason))
+    }
+    $body = Get-XpzHelpCommentBody -Text ([System.IO.File]::ReadAllText($molde.FullName))
+    if ($null -ne $body) {
+        foreach ($sec in (Get-XpzHelpSections -Body $body -Keyword 'EXAMPLE')) {
+            $raw = Get-XpzHelpSectionRaw -Section $sec
+            if (($raw -match [regex]::Escape($molde.Name)) -or ($raw -match [regex]::Escape("$base.ps1"))) {
+                [void]$moldesWithExampleSelf.Add($molde.Name)
+            }
+        }
+    }
+}
+if ($helpFindings.Count -gt 0) {
+    throw "ASSERT_FAILED: moldes nao podem ter achados de comment-based help; obtidos=$($helpFindings -join ' | ')"
+}
+if ($moldesWithExampleSelf.Count -lt 20) {
+    throw "ASSERT_FAILED: cobertura de .EXAMPLE com invocacao do proprio nome=$($moldesWithExampleSelf.Count) abaixo do piso 20 (recorrencia de help seria vacua)"
 }
 
 Write-Output 'XPZ_WRAPPER_ENGINE_PARAM_MOLDES_OK'

@@ -27,9 +27,15 @@
                                             unsafe_last_exitcode_after_ps1_engine quando wrapper auditado
                                             chama motor PowerShell por variavel e ainda sai por exit $LASTEXITCODE;
                                             copy_objectlist_type_loss quando AST comprova extração de Tipo
-                                            de ObjectList e consumo como ObjectNames pelo motor Copy)
+                                            de ObjectList e consumo como ObjectNames pelo motor Copy;
+                                            help_example_undeclared_param:-<flag> quando o comment-based help
+                                            do wrapper invoca o proprio script num .EXAMPLE com uma flag que o
+                                            binder advanced rejeitaria — so em script advanced com param()
+                                            de topo)
       INVENTORY_ENGINE_DIAGNOSTIC: <lista> - diagnostico brando (motor canonico ausente/parse-broken,
-                                            engine_unresolved_or_unparseable); NAO bloqueia o estado de
+                                            engine_unresolved_or_unparseable; help_query_failed ou
+                                            help_molde_<...> quando a consulta de Get-Help falha ou o molde
+                                            de paridade tem defeito); NAO bloqueia o estado de
                                             setup (rotulo fora dos tokens de pendencia do agregador)
       INVENTORY_SURFACE_ADVISORY: <lista>  - aviso de superficie: wrapper local defasado do molde por
                                             REDUCAO opcional (optional_param_missing,
@@ -37,6 +43,13 @@
                                             extra_mandatory_added, no_param_block com molde so-opcional);
                                             NAO bloqueia (rotulo fora dos tokens de pendencia do
                                             agregador); perda de obrigatorio sai em INVENTORY_CUSTOMIZED
+      INVENTORY_HELP_ADVISORY: <lista>     - aviso de comment-based help: help_invisible (tem .SYNOPSIS
+                                            mas Get-Help -Full nao devolve o texto), help_parameter_orphan:-<x>
+                                            (.PARAMETER sem $x declarado) ou
+                                            help_example_unknown_flag_simple_script:-<flag> (flag desconhecida
+                                            no .EXAMPLE de script simple); NAO bloqueia (rotulo fora dos
+                                            tokens de pendencia do agregador); flag orfa em .EXAMPLE de script
+                                            advanced sai em INVENTORY_CUSTOMIZED (reason=help_example_undeclared_param)
       INVENTORY_RECOMMENDED_MISSING: <lista> - wrappers recomendados ausentes por sinais objetivos
       INVENTORY_LEGACY_ORPHANS: <lista>    - scripts legados lado a lado com canonicos atuais
       INVENTORY_UNKNOWN: <motivo>         - não foi possível determinar o estado
@@ -54,6 +67,7 @@
     "INVENTORY_CUSTOMIZED: <nomes e motivos>",
     "INVENTORY_ENGINE_DIAGNOSTIC: <nomes e motivos>",
     "INVENTORY_SURFACE_ADVISORY: <nomes e motivos>",
+    "INVENTORY_HELP_ADVISORY: <nomes e motivos>",
     "INVENTORY_LEGACY_ORPHANS: <canonico(legacy=antigo)>",
     "INVENTORY_RECOMMENDED_MISSING: <nomes recomendados>", ou
     "INVENTORY_UNKNOWN: <motivo>"
@@ -232,6 +246,7 @@ $recommendedMissing = [System.Collections.Generic.List[string]]::new()
 $legacyOrphans = [System.Collections.Generic.List[string]]::new()
 $engineDiagnostics = [System.Collections.Generic.List[string]]::new()
 $surfaceAdvisory = [System.Collections.Generic.List[string]]::new()
+$helpAdvisory = [System.Collections.Generic.List[string]]::new()
 $optionalBaseNames = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
 [void]$optionalBaseNames.Add('New-KbImportPackage')
 [void]$optionalBaseNames.Add('New-KbFront')
@@ -389,6 +404,23 @@ foreach ($exampleFile in Get-ChildItem -LiteralPath $SkillsExamplesPath -Filter 
             $advBody = if ($a.Detail) { '{0}: {1}' -f $a.Reason, $a.Detail } else { [string]$a.Reason }
             $surfaceAdvisory.Add(('{0}(reason={1})' -f $standardLocalName, $advBody))
         }
+
+        # Comment-based help do wrapper local (helper Get-XpzHelpSurfaceFinding, direcao wrapper->ajuda).
+        # Flag orfa no .EXAMPLE de script advanced -> INVENTORY_CUSTOMIZED reason=help_example_undeclared_param
+        # (capturado pelo agregador). Ajuda invisivel / .PARAMETER orfao / flag desconhecida em script
+        # simple -> INVENTORY_HELP_ADVISORY (rotulo proprio, FORA do regex de pendencia do agregador ->
+        # nao bloqueia). Get-Help indisponivel ou defeito no molde de paridade -> INVENTORY_ENGINE_DIAGNOSTIC.
+        # A paridade por molde suprime so o bloqueio identico achado num molde sadio.
+        $helpFinding = Get-XpzHelpSurfaceFinding -WrapperPath $standardPath -AlternateSelfLeaf @("$baseName.ps1") -MoldePath $examplePath
+        foreach ($b in $helpFinding.Blocking) {
+            $customized.Add(('{0}(reason={1})' -f $standardLocalName, $b.Reason))
+        }
+        foreach ($a in $helpFinding.Advisory) {
+            $helpAdvisory.Add(('{0}(reason={1})' -f $standardLocalName, $a.Reason))
+        }
+        foreach ($d in $helpFinding.EngineDiagnostics) {
+            $engineDiagnostics.Add(('{0}(reason={1})' -f $standardLocalName, $d.Reason))
+        }
     } elseif ($shortExists) {
         $shortNaming.Add($standardLocalName)
     } elseif ($optionalBaseNames.Contains($baseName)) {
@@ -445,11 +477,18 @@ if ($engineDiagnostics.Count -gt 0) {
     $statusParts.Add("INVENTORY_ENGINE_DIAGNOSTIC: $($engineDiagnostics -join ', ')")
 }
 if ($surfaceAdvisory.Count -gt 0) {
-    # Canal de aviso de superficie: rotulo deliberadamente FORA dos 4 tokens do regex de
-    # pendencia do agregador (Test-XpzSetupAudit.ps1) -> nao bloqueia o estado de pasta paralela.
+    # Canal de aviso de superficie: rotulo deliberadamente FORA dos 4 tokens de pendencia do
+    # agregador (Test-XpzSetupAudit.ps1) -> nao bloqueia o estado de pasta paralela.
     # So reducao opcional/ValidateSet/no_param_block-opcional; a perda de contrato obrigatorio ja
     # saiu em INVENTORY_CUSTOMIZED (reason=surface_mismatch) acima.
     $statusParts.Add("INVENTORY_SURFACE_ADVISORY: $($surfaceAdvisory -join ', ')")
+}
+if ($helpAdvisory.Count -gt 0) {
+    # Canal de aviso de comment-based help: rotulo deliberadamente FORA dos 4 tokens de pendencia do
+    # agregador (Test-XpzSetupAudit.ps1) -> nao bloqueia o estado de pasta paralela. So ajuda invisivel,
+    # .PARAMETER orfao e flag desconhecida em script simple; a flag orfa em script advanced ja saiu em
+    # INVENTORY_CUSTOMIZED (reason=help_example_undeclared_param) acima.
+    $statusParts.Add("INVENTORY_HELP_ADVISORY: $($helpAdvisory -join ', ')")
 }
 
 if ($statusParts.Count -eq 0) {

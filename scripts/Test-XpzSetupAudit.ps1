@@ -402,9 +402,11 @@ if (Test-Path -LiteralPath $inventoryScriptPath -PathType Leaf) {
 
 # Regex de pendencia metodologica do inventario: SO estes 4 tokens bloqueiam o estado de setup.
 # Deliberadamente FORA daqui (por construcao, nao por acaso): INVENTORY_ENGINE_DIAGNOSTIC (infra do
-# repo de skills) e INVENTORY_SURFACE_ADVISORY (reducao opcional/ValidateSet do diff de superficie) —
-# ambos sao avisos consultivos que NAO bloqueiam. A perda de contrato obrigatorio do diff de
-# superficie ja chega aqui via INVENTORY_CUSTOMIZED (reason=surface_mismatch). NAO adicionar os
+# repo de skills), INVENTORY_SURFACE_ADVISORY (reducao opcional/ValidateSet do diff de superficie) e
+# INVENTORY_HELP_ADVISORY (comment-based help: ajuda invisivel, .PARAMETER orfao, flag desconhecida
+# em script simple) — todos sao avisos consultivos que NAO bloqueiam. A perda de contrato obrigatorio
+# do diff de superficie e a flag orfa no .EXAMPLE de script advanced ja chegam aqui via
+# INVENTORY_CUSTOMIZED (reasons surface_mismatch / help_example_undeclared_param). NAO adicionar os
 # rotulos de aviso a este regex (guarda-regressao: Test-XpzWrapperInventorySelfTest.ps1).
 $hasInventoryMethodologyPendencies = $inventoryStatus -match '\b(INVENTORY_GAPS|INVENTORY_SHORT_NAMING|INVENTORY_CUSTOMIZED|INVENTORY_LEGACY_ORPHANS)\b'
 $hasMetadataWrapperPendencies = $metadataWrapperStatus -ne 'OK'

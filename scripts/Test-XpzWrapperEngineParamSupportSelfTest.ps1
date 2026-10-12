@@ -2,14 +2,17 @@
 
 <#
 .SYNOPSIS
-  Self-test do helper XpzWrapperEngineParamSupport.ps1 — check forwards_unknown_engine_param.
-  (O segundo check hospedado pelo helper, o diff de superficie wrapper->molde
-  `surface_mismatch`/`INVENTORY_SURFACE_ADVISORY`, e coberto por Test-XpzWrapperInventorySelfTest.ps1.)
+  Self-test do helper XpzWrapperEngineParamSupport.ps1 — check forwards_unknown_engine_param +
+  comment-based help (Get-XpzHelpSurfaceFinding). (O check de diff de superficie wrapper->molde
+  `surface_mismatch`/`INVENTORY_SURFACE_ADVISORY` e coberto por Test-XpzWrapperInventorySelfTest.ps1.)
 
 .DESCRIPTION
   Cria wrappers de fixture (apenas PARSEADOS, nunca executados) e os confronta com:
     - motores REAIS do repo (Sync-GeneXusXpzToXml.ps1) via EnginesRoot = scripts/ do auditor;
     - motores SINTETICOS (simple/advanced/parse-broken/adversarial) numa pasta temp.
+  Inclui casos de UNIDADE do comment-based help (H1..H15): flag orfa em advanced, alias, prefixo
+  ambiguo/nao-ambiguo, CommonParameters, outro script, simple, sem param()/dynamicparam, formas de
+  parse, Join-Path, .PARAMETER orfao, ajuda invisivel, -AlternateSelfLeaf e paridade de molde.
   Sentinela final: XPZ_WRAPPER_ENGINE_PARAM_SELFTEST_OK.
 #>
 
@@ -188,6 +191,234 @@ $e = Join-Path $S 'scripts\BrokenEngine.ps1'
     $diag = @($r.EngineDiagnostics | Where-Object { $_.Reason -eq 'engine_unresolved_or_unparseable' -and $_.Detail -eq 'BrokenEngine.ps1' })
     if ($diag.Count -eq 0) { throw "ASSERT_FAILED: motor parse-broken deve gerar engine_unresolved_or_unparseable" }
     Assert-NoSignalReason $r 'forwards_unknown_engine_param' 'motor quebrado nao pode gerar sinal de parametro'
+
+    # --- Comment-based help (Get-XpzHelpSurfaceFinding) ---
+    function Get-HelpReasons { param($Items) return ((@($Items | ForEach-Object { [string]$_.Reason }) -join ',')) }
+    function Assert-HelpFinding {
+        param([object]$Finding, [string]$Block, [string]$Adv, [string]$Message)
+        $b = Get-HelpReasons $Finding.Blocking
+        $a = Get-HelpReasons $Finding.Advisory
+        if ($b -ne $Block) { throw "ASSERT_FAILED: $Message | blocking esperado=[$Block] obtido=[$b]" }
+        if ($a -ne $Adv) { throw "ASSERT_FAILED: $Message | advisory esperado=[$Adv] obtido=[$a]" }
+    }
+
+    # H1 flag orfa em script advanced -> bloqueio
+    $f = New-Fixture $wrapDir 'h1.ps1' @'
+#requires -Version 7.4
+
+<#
+.SYNOPSIS
+H1 unica.
+.EXAMPLE
+.\h1.ps1 -AsJson
+#>
+[CmdletBinding()]
+param([string]$InputPath)
+'@
+    Assert-HelpFinding (Get-XpzHelpSurfaceFinding -WrapperPath $f) 'help_example_undeclared_param:-AsJson' '' 'H1 flag orfa advanced'
+
+    # H2 [Alias] usado no .EXAMPLE -> nao acusa
+    $f = New-Fixture $wrapDir 'h2.ps1' @'
+<#
+.SYNOPSIS
+H2 unica.
+.EXAMPLE
+.\h2.ps1 -Foo value
+#>
+[CmdletBinding()]
+param([Alias('Foo')][string]$Bar)
+'@
+    Assert-HelpFinding (Get-XpzHelpSurfaceFinding -WrapperPath $f) '' '' 'H2 alias aceito'
+
+    # H3 prefixo nao-ambiguo aceito; prefixo ambiguo acusa
+    $f = New-Fixture $wrapDir 'h3.ps1' @'
+<#
+.SYNOPSIS
+H3 unica.
+.EXAMPLE
+.\h3.ps1 -Alf x
+.\h3.ps1 -Al x
+#>
+[CmdletBinding()]
+param([string]$Alfa, [string]$Alto)
+'@
+    Assert-HelpFinding (Get-XpzHelpSurfaceFinding -WrapperPath $f) 'help_example_undeclared_param:-Al' '' 'H3 prefixo ambiguo acusa, nao-ambiguo nao'
+
+    # H4 CommonParameters aceitos
+    $f = New-Fixture $wrapDir 'h4.ps1' @'
+<#
+.SYNOPSIS
+H4 unica.
+.EXAMPLE
+.\h4.ps1 -Verbose -ErrorVariable ev
+#>
+[CmdletBinding()]
+param([string]$X)
+'@
+    Assert-HelpFinding (Get-XpzHelpSurfaceFinding -WrapperPath $f) '' '' 'H4 common params aceitos'
+
+    # H5 invocacao de OUTRO script nao acusa
+    $f = New-Fixture $wrapDir 'h5.ps1' @'
+<#
+.SYNOPSIS
+H5 unica.
+.EXAMPLE
+.\Other-Script.ps1 -AsJson
+#>
+[CmdletBinding()]
+param([string]$X)
+'@
+    Assert-HelpFinding (Get-XpzHelpSurfaceFinding -WrapperPath $f) '' '' 'H5 outro script ignorado'
+
+    # H6 script simple com flag desconhecida -> advisory, nao bloqueio
+    $f = New-Fixture $wrapDir 'h6.ps1' @'
+<#
+.SYNOPSIS
+H6 unica.
+.EXAMPLE
+.\h6.ps1 -Whatever
+#>
+param([string]$InputPath)
+'@
+    Assert-HelpFinding (Get-XpzHelpSurfaceFinding -WrapperPath $f) '' 'help_example_unknown_flag_simple_script:-Whatever' 'H6 simple -> advisory'
+
+    # H7 sem param() de topo -> exemplo pulado
+    $f = New-Fixture $wrapDir 'h7.ps1' @'
+<#
+.SYNOPSIS
+H7 unica.
+.EXAMPLE
+.\h7.ps1 -X
+#>
+Write-Output 'x'
+'@
+    Assert-HelpFinding (Get-XpzHelpSurfaceFinding -WrapperPath $f) '' '' 'H7 sem param() de topo pulado'
+
+    # H8 dynamicparam -> exemplo pulado
+    $f = New-Fixture $wrapDir 'h8.ps1' @'
+<#
+.SYNOPSIS
+H8 unica.
+.EXAMPLE
+.\h8.ps1 -X
+#>
+[CmdletBinding()]
+param([string]$Y)
+dynamicparam { }
+'@
+    Assert-HelpFinding (Get-XpzHelpSurfaceFinding -WrapperPath $f) '' '' 'H8 dynamicparam pulado'
+
+    # H9 formas de parse: ; crase -Param:$v comentario # Tipo:Nome
+    $f = New-Fixture $wrapDir 'h9.ps1' @'
+<#
+.SYNOPSIS
+H9 unica.
+.EXAMPLE
+.\h9.ps1 -Good1:$v
+.\h9.ps1 -Good2 a -Good3 b; .\h9.ps1 -Bad1
+# comentario aqui
+.\h9.ps1 -Good4 'Proc:X'
+.\h9.ps1 `
+    -Good5 x
+.\h9.ps1 -Bad2
+#>
+[CmdletBinding()]
+param([string]$Good1,[string]$Good2,[string]$Good3,[string]$Good4,[string]$Good5)
+'@
+    Assert-HelpFinding (Get-XpzHelpSurfaceFinding -WrapperPath $f) 'help_example_undeclared_param:-Bad1,help_example_undeclared_param:-Bad2' '' 'H9 parse de .EXAMPLE'
+
+    # H10 invocacao via & (Join-Path ... '<leaf>.ps1')
+    $f = New-Fixture $wrapDir 'h10.ps1' @'
+<#
+.SYNOPSIS
+H10 unica.
+.EXAMPLE
+& (Join-Path $PSScriptRoot 'h10.ps1') -BogusJoin
+#>
+[CmdletBinding()]
+param([string]$X)
+'@
+    Assert-HelpFinding (Get-XpzHelpSurfaceFinding -WrapperPath $f) 'help_example_undeclared_param:-BogusJoin' '' 'H10 Join-Path self'
+
+    # H11 .PARAMETER sem $x -> help_parameter_orphan
+    $f = New-Fixture $wrapDir 'h11.ps1' @'
+<#
+.SYNOPSIS
+H11 unica.
+.PARAMETER Ghost
+Descreve ghost.
+.EXAMPLE
+.\h11.ps1 -Ok x
+#>
+[CmdletBinding()]
+param([string]$Ok)
+'@
+    Assert-HelpFinding (Get-XpzHelpSurfaceFinding -WrapperPath $f) '' 'help_parameter_orphan:-Ghost' 'H11 param orphan'
+
+    # H12 ajuda invisivel (#requires colado) -> help_invisible
+    $f = New-Fixture $wrapDir 'h12.ps1' @'
+#requires -Version 7.4
+<#
+.SYNOPSIS
+H12 invisivel unica.
+#>
+[CmdletBinding()]
+param([string]$Ok)
+'@
+    Assert-HelpFinding (Get-XpzHelpSurfaceFinding -WrapperPath $f) '' 'help_invisible' 'H12 ajuda invisivel'
+
+    # H13 -AlternateSelfLeaf reconhece o nome generico do molde; terceiro script continua fora
+    $f = New-Fixture $wrapDir 'h13.ps1' @'
+<#
+.SYNOPSIS
+H13 unica.
+.EXAMPLE
+.\Generic-Molde.ps1 -BogusAlt
+.\Third-Party.ps1 -AlsoBogus
+#>
+[CmdletBinding()]
+param([string]$Ok)
+'@
+    Assert-HelpFinding (Get-XpzHelpSurfaceFinding -WrapperPath $f -AlternateSelfLeaf @('Generic-Molde.ps1')) 'help_example_undeclared_param:-BogusAlt' '' 'H13 alternate self leaf'
+
+    # H14 sinopse com crase -> nao falsear invisibilidade (guarda IndexOf vs -like)
+    $f = New-Fixture $wrapDir 'h14.ps1' @'
+<#
+.SYNOPSIS
+H14 sinopse com `crase` unica.
+.EXAMPLE
+.\h14.ps1 -Ok x
+#>
+[CmdletBinding()]
+param([string]$Ok)
+'@
+    Assert-HelpFinding (Get-XpzHelpSurfaceFinding -WrapperPath $f) '' '' 'H14 crase na sinopse'
+
+    # H15 paridade de molde: suprime bloqueio identico e reporta o defeito do molde como diagnostico
+    $molde = New-Fixture $wrapDir 'h15.example.ps1' @'
+<#
+.SYNOPSIS
+H15 molde unica.
+.EXAMPLE
+.\h15.ps1 -AsJson
+#>
+[CmdletBinding()]
+param([string]$Ok)
+'@
+    $local = New-Fixture $wrapDir 'h15.ps1' @'
+<#
+.SYNOPSIS
+H15 unica.
+.EXAMPLE
+.\h15.ps1 -AsJson
+#>
+[CmdletBinding()]
+param([string]$Ok)
+'@
+    $r = Get-XpzHelpSurfaceFinding -WrapperPath $local -MoldePath $molde -AlternateSelfLeaf @('h15.ps1')
+    Assert-HelpFinding $r '' '' 'H15 paridade suprime bloqueio identico'
+    $diag = @($r.EngineDiagnostics | Where-Object { $_.Reason -eq 'help_molde_help_example_undeclared_param:-AsJson' })
+    if ($diag.Count -eq 0) { throw 'ASSERT_FAILED: H15 defeito do molde deve virar INVENTORY_ENGINE_DIAGNOSTIC help_molde_...' }
 
     Write-Output 'XPZ_WRAPPER_ENGINE_PARAM_SELFTEST_OK'
 } finally {

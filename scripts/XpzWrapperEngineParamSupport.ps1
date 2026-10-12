@@ -2,21 +2,24 @@
 
 <#
 .SYNOPSIS
-  Suporte (dot-source) para três checks do inventario de wrappers locais
+  Suporte (dot-source) para quatro checks do inventario de wrappers locais
   (Test-XpzWrapperInventory.ps1): (1) forwards_unknown_engine_param — repasse a motor
   compartilhado advanced de parametro nao-declarado (direcao wrapper->motor); (2) diff de
   superficie wrapper-local vs molde — surface_mismatch (bloqueio) e INVENTORY_SURFACE_ADVISORY
   (aviso), ver bloco proprio no fim do arquivo (direcao wrapper->molde);
-  (3) perda dirigida de tipo em ObjectList consumido pelo Copy.
+  (3) perda dirigida de tipo em ObjectList consumido pelo Copy; (4) comment-based help —
+  help_example_undeclared_param (bloqueio) e INVENTORY_HELP_ADVISORY (aviso), ver bloco
+  proprio no fim do arquivo (direcao wrapper->ajuda).
 
 .DESCRIPTION
-  Este arquivo hospeda três checks do inventario; o terceiro é o detector dirigido
+  Este arquivo hospeda quatro checks do inventario; o terceiro é o detector dirigido
   copy_objectlist_type_loss, documentado em Test-XpzCopyObjectListTypeLoss.
   Esta secao .DESCRIPTION e os LIMITES
   CONHECIDOS abaixo cobrem o check (1) forwards_unknown_engine_param (direcao wrapper->motor);
   o check (2) diff de superficie wrapper->molde (`surface_mismatch`/`INVENTORY_SURFACE_ADVISORY`,
-  helpers Get-XpzScriptParamSurface/Get-XpzWrapperSurfaceFinding) tem documentacao propria no
-  bloco de comentario no fim do arquivo.
+  helpers Get-XpzScriptParamSurface/Get-XpzWrapperSurfaceFinding) e o check (4) comment-based
+  help (`help_example_undeclared_param`/`INVENTORY_HELP_ADVISORY`, helper Get-XpzHelpSurfaceFinding)
+  tem documentacao propria no bloco de comentario no fim do arquivo.
 
   Check (1): verifica, por AST + Get-Command (sem executar o motor, sem KB), que todo parametro
   que um wrapper local REPASSA a um motor compartilhado ADVANCED de fato EXISTE no motor (nome
@@ -741,4 +744,256 @@ function Get-XpzWrapperSurfaceFinding {
     }
 
     return [pscustomobject]@{ Blocking = @($blocking); Advisory = @($advisory) }
+}
+
+# ============================================================================
+# Comment-based help do wrapper (check help_example_undeclared_param /
+# INVENTORY_HELP_ADVISORY / INVENTORY_ENGINE_DIAGNOSTIC)
+#
+# Audita o comment-based help do wrapper LOCAL (entry `Get-XpzHelpSurfaceFinding`):
+#   BLOQUEIA `help_example_undeclared_param:-<flag>` quando um `.EXAMPLE` invoca o PROPRIO
+#     script (leaf real do arquivo OU `-AlternateSelfLeaf`, ex.: nome-base do molde) com uma
+#     flag que o binder ADVANCED rejeitaria (fora de param()/alias/CommonParameters/prefixo
+#     nao-ambiguo de um unico parametro). So em script advanced com `param()` de topo.
+#   AVISA (`help_invisible`, `help_parameter_orphan`, `help_example_unknown_flag_simple_script`)
+#     -> canal INVENTORY_HELP_ADVISORY (fora do regex de 4 tokens do agregador).
+#   INFRA (`help_query_failed`, `help_molde_<...>`) -> INVENTORY_ENGINE_DIAGNOSTIC.
+#   Paridade (-MoldePath): suprime SO o bloqueio (motivo+flag) IDENTICO achado num molde
+#   sadio; achado no molde vira diagnostico (defeito da referencia), nunca desvio local.
+#
+# Discriminador de tipo de comando no `.EXAMPLE`: prefixo `.\<leaf>.ps1` literal, ou
+# `& (Join-Path ... '<leaf>.ps1')` (reusa `Get-XpzAstJoinPathLeaf`). Alvo `$var`, splat,
+# `pwsh -File` e pipeline ficam FORA de escopo (falso-negativo consciente). Nomes de flag
+# comparados OrdinalIgnoreCase; texto de ajuda comparado por `IndexOf(..., OrdinalIgnoreCase)`
+# (NUNCA `-like`: crase e escape de curinga). Prototipo: juntar linhas do `.EXAMPLE` por
+# NEWLINE para o parse (comentario `#` inline engole o comando seguinte se juntado por espaco).
+# LIMITES: nao resolve fluxo de dados nem prefixo KB; `.EXAMPLE` que nao parseia e pulado.
+# ============================================================================
+
+function Get-XpzHelpCommentBody {
+    <# Devolve o corpo interno do PRIMEIRO bloco de comentario que contem keywords de ajuda. #>
+    param([string]$Text)
+    $rx = [regex]'(?s)<#(.*?)#>'
+    foreach ($m in $rx.Matches($Text)) {
+        $body = $m.Groups[1].Value
+        if ($body -match '(?m)^\s*\.(SYNOPSIS|DESCRIPTION|EXAMPLE|PARAMETER)\b') { return $body }
+    }
+    return $null
+}
+
+function Get-XpzHelpSections {
+    <# Extrai as secoes de um keyword (ex.: EXAMPLE) de um corpo de ajuda. #>
+    param([string]$Body, [string]$Keyword)
+    $sections = [System.Collections.Generic.List[object]]::new()
+    $lines = @($Body -split "`r?`n")
+    $current = $null
+    $inline = ''
+    $kwRx = '^\s*\.' + [regex]::Escape($Keyword) + '\b(?<inline>.*)$'
+    foreach ($line in $lines) {
+        $m = [regex]::Match($line, $kwRx)
+        if ($m.Success) {
+            if ($null -ne $current) { $sections.Add([pscustomobject]@{ Inline = $inline; Lines = @($current) }) }
+            $current = [System.Collections.Generic.List[string]]::new()
+            $inline = $m.Groups['inline'].Value.Trim()
+            continue
+        }
+        if ($line -match '^\s*\.[A-Za-z]') {
+            if ($null -ne $current) { $sections.Add([pscustomobject]@{ Inline = $inline; Lines = @($current) }); $current = $null; $inline = '' }
+            continue
+        }
+        if ($null -ne $current) { $current.Add($line) }
+    }
+    if ($null -ne $current) { $sections.Add([pscustomobject]@{ Inline = $inline; Lines = @($current) }) }
+    return ,$sections
+}
+
+function Get-XpzHelpSectionRaw {
+    <# Reconstitui o texto CRU de uma secao (inline + linhas) com NEWLINE (para parse). #>
+    param($Section)
+    $parts = [System.Collections.Generic.List[string]]::new()
+    if ($Section.Inline) { $parts.Add([string]$Section.Inline) }
+    foreach ($l in @($Section.Lines)) { $parts.Add([string]$l) }
+    return ([string]::Join("`n", $parts))
+}
+
+function Get-XpzHelpSectionText {
+    <# Texto normalizado (espacos colapsados) de uma secao (para comparacao de visibilidade). #>
+    param($Section)
+    $raw = Get-XpzHelpSectionRaw -Section $Section
+    return (($raw -replace '\s+', ' ').Trim())
+}
+
+function Test-XpzHelpFlagAccepted {
+    <# Flag aceita sse nome/alias exato OU prefixo nao-ambiguo de UM unico parametro distinto. #>
+    param([string]$Flag, $Accepted, [string[]]$Canon)
+    if ($null -ne $Accepted -and $Accepted.Contains($Flag)) { return $true }
+    $hit = @($Canon | Where-Object { $_.StartsWith($Flag, [System.StringComparison]::OrdinalIgnoreCase) })
+    return ($hit.Count -eq 1)
+}
+
+function Get-XpzHelpExampleSelfFlag {
+    <# Flags de invocacoes do PROPRIO script (leaf em $SelfLeaves) dentro de uma secao `.EXAMPLE`. #>
+    param($Section, [string[]]$SelfLeaves)
+    $text = Get-XpzHelpSectionRaw -Section $Section
+    $tokens = $null; $errs = $null
+    $ast = [System.Management.Automation.Language.Parser]::ParseInput($text, [ref]$tokens, [ref]$errs)
+    $flags = [System.Collections.Generic.List[string]]::new()
+    foreach ($cmd in @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] }, $true))) {
+        $els = @($cmd.CommandElements)
+        if ($els.Count -lt 1) { continue }
+        $leaf = $null
+        $e0 = $els[0]
+        if ($e0 -is [System.Management.Automation.Language.StringConstantExpressionAst]) {
+            $v = [string]$e0.Value
+            if ($v -match '\.ps1$') { $leaf = @($v -split '[\\/]')[-1] }
+        } elseif ($cmd.InvocationOperator -eq [System.Management.Automation.Language.TokenKind]::Ampersand) {
+            $jp = Get-XpzAstJoinPathLeaf -Ast $e0
+            if ($null -ne $jp -and $jp.Leaf) { $leaf = $jp.Leaf }
+        }
+        if (-not $leaf) { continue }
+        $isSelf = $false
+        foreach ($sl in $SelfLeaves) { if ($leaf -ieq $sl) { $isSelf = $true; break } }
+        if (-not $isSelf) { continue }
+        for ($i = 1; $i -lt $els.Count; $i++) {
+            $el = $els[$i]
+            if ($el -is [System.Management.Automation.Language.CommandParameterAst]) {
+                $flags.Add([string]$el.ParameterName)
+            }
+        }
+    }
+    return ,$flags
+}
+
+function Get-XpzHelpSurfaceForFile {
+    <# Achados de help de UM arquivo (Blocking/Advisory/EngineDiagnostics). #>
+    param([Parameter(Mandatory)][string]$Path, [string[]]$SelfLeaves, [string[]]$AlternateSelfLeaf)
+    $blocking = [System.Collections.Generic.List[object]]::new()
+    $advisory = [System.Collections.Generic.List[object]]::new()
+    $diagnostics = [System.Collections.Generic.List[object]]::new()
+
+    $text = [System.IO.File]::ReadAllText($Path)
+    $body = Get-XpzHelpCommentBody -Text $text
+
+    $perrs = $null
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile($Path, [ref]$null, [ref]$perrs)
+    $hasParamBlock = ($null -ne $ast) -and ($null -ne $ast.ParamBlock)
+
+    $cmd = $null
+    try { $cmd = Get-Command -Name $Path -ErrorAction Stop } catch { $cmd = $null }
+
+    if ($null -eq $body) {
+        return [pscustomobject]@{ Blocking = @($blocking); Advisory = @($advisory); EngineDiagnostics = @($diagnostics) }
+    }
+
+    if ($hasParamBlock) {
+        # .PARAMETER orfao: nome nao declarado em param() (nem alias). Sem param() de topo -> pulado.
+        $declared = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+        if ($null -ne $cmd -and $null -ne $cmd.Parameters) {
+            foreach ($k in $cmd.Parameters.Keys) {
+                [void]$declared.Add([string]$k)
+                foreach ($al in @($cmd.Parameters[$k].Aliases)) { [void]$declared.Add([string]$al) }
+            }
+        } else {
+            foreach ($p in $ast.ParamBlock.Parameters) { [void]$declared.Add([string]$p.Name.VariablePath.UserPath) }
+        }
+        foreach ($sec in (Get-XpzHelpSections -Body $body -Keyword 'PARAMETER')) {
+            $name = (Get-XpzHelpSectionText -Section $sec).Split(' ')[0]
+            if ($name -and -not $declared.Contains($name)) {
+                $advisory.Add(@{ Reason = ('help_parameter_orphan:-{0}' -f $name); Detail = '' })
+            }
+        }
+
+        # .EXAMPLE: flags em invocacoes do proprio script.
+        $eng = Get-XpzEngineAcceptedParam -EngineFullPath $Path
+        $canon = @()
+        if ($null -ne $cmd -and $null -ne $cmd.Parameters) { $canon = @($cmd.Parameters.Keys) }
+        $selfSeq = [System.Collections.Generic.List[string]]::new()
+        foreach ($sl in @($SelfLeaves)) { $selfSeq.Add([string]$sl) }
+        foreach ($al in @($AlternateSelfLeaf)) { if ($al) { $selfSeq.Add([string]$al) } }
+        if ($eng.Status -eq 'advanced' -or $eng.Status -eq 'simple') {
+            foreach ($sec in (Get-XpzHelpSections -Body $body -Keyword 'EXAMPLE')) {
+                foreach ($flag in (Get-XpzHelpExampleSelfFlag -Section $sec -SelfLeaves @($selfSeq))) {
+                    if (Test-XpzHelpFlagAccepted -Flag $flag -Accepted $eng.Accepted -Canon $canon) { continue }
+                    if ($eng.Status -eq 'advanced') {
+                        $blocking.Add(@{ Reason = ('help_example_undeclared_param:-{0}' -f $flag); Detail = '' })
+                    } else {
+                        $advisory.Add(@{ Reason = ('help_example_unknown_flag_simple_script:-{0}' -f $flag); Detail = '' })
+                    }
+                }
+            }
+        }
+    }
+
+    # Visibilidade: so quando ha .SYNOPSIS; compara o texto da fonte com a sinopse runtime.
+    $srcSyn = ''
+    foreach ($sec in (Get-XpzHelpSections -Body $body -Keyword 'SYNOPSIS')) { $srcSyn = Get-XpzHelpSectionText -Section $sec; break }
+    if ($srcSyn) {
+        $helpObj = $null
+        try { $helpObj = Get-Help -Full -Name $Path -ErrorAction Stop } catch { $helpObj = $null }
+        if ($null -eq $helpObj) {
+            $diagnostics.Add(@{ Reason = 'help_query_failed'; Detail = '' })
+        } else {
+            $rt = (([string]$helpObj.Synopsis) -replace '\s+', ' ').Trim()
+            if ($rt.IndexOf($srcSyn, [System.StringComparison]::OrdinalIgnoreCase) -lt 0) {
+                $advisory.Add(@{ Reason = 'help_invisible'; Detail = '' })
+            }
+        }
+    }
+
+    return [pscustomobject]@{ Blocking = @($blocking); Advisory = @($advisory); EngineDiagnostics = @($diagnostics) }
+}
+
+function Get-XpzHelpSurfaceFinding {
+    <#
+      Ponto de entrada. Audita o comment-based help do wrapper LOCAL contra o molde opcional.
+        [pscustomobject]@{
+          Blocking          = @( @{ Reason; Detail } )  # -> INVENTORY_CUSTOMIZED(reason=...)
+          Advisory          = @( @{ Reason; Detail } )  # -> INVENTORY_HELP_ADVISORY(reason=...)
+          EngineDiagnostics = @( @{ Reason; Detail } )  # -> INVENTORY_ENGINE_DIAGNOSTIC(reason=...)
+        }
+      AlternateSelfLeaf = nomes alternativos que contam como "o proprio script" (ex.: nome-base
+      do molde). MoldePath habilita paridade (suprime bloqueio identico achado no molde).
+    #>
+    param(
+        [Parameter(Mandatory)][string]$WrapperPath,
+        [string[]]$AlternateSelfLeaf = @(),
+        [string]$MoldePath
+    )
+
+    $blocking = [System.Collections.Generic.List[object]]::new()
+    $advisory = [System.Collections.Generic.List[object]]::new()
+    $diagnostics = [System.Collections.Generic.List[object]]::new()
+
+    $wrapperLeaf = [System.IO.Path]::GetFileName($WrapperPath)
+    $local = Get-XpzHelpSurfaceForFile -Path $WrapperPath -SelfLeaves @($wrapperLeaf) -AlternateSelfLeaf $AlternateSelfLeaf
+
+    $moldeBlockingKeys = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    $moldeSuppress = $false
+    if ($MoldePath -and (Test-Path -LiteralPath $MoldePath -PathType Leaf)) {
+        $moldeLeaf = [System.IO.Path]::GetFileName($MoldePath)
+        $moldeAlt = $moldeLeaf -replace '\.example\.ps1$', '.ps1'
+        $molde = Get-XpzHelpSurfaceForFile -Path $MoldePath -SelfLeaves @($moldeLeaf) -AlternateSelfLeaf @($moldeAlt)
+        $moldeUnhealthy = @($molde.Advisory | Where-Object { $_.Reason -eq 'help_invisible' }).Count -gt 0 -or
+                          @($molde.EngineDiagnostics | Where-Object { $_.Reason -eq 'help_query_failed' }).Count -gt 0
+        if (-not $moldeUnhealthy) {
+            $moldeSuppress = $true
+            foreach ($b in $molde.Blocking) { [void]$moldeBlockingKeys.Add([string]$b.Reason) }
+        }
+        foreach ($b in $molde.Blocking) { $diagnostics.Add(@{ Reason = ('help_molde_{0}' -f $b.Reason); Detail = '' }) }
+        foreach ($a in $molde.Advisory) { $diagnostics.Add(@{ Reason = ('help_molde_{0}' -f $a.Reason); Detail = '' }) }
+        foreach ($d in $molde.EngineDiagnostics) { $diagnostics.Add(@{ Reason = ('help_molde_{0}' -f $d.Reason); Detail = '' }) }
+    }
+
+    foreach ($b in $local.Blocking) {
+        if ($moldeSuppress -and $moldeBlockingKeys.Contains([string]$b.Reason)) { continue }
+        $blocking.Add($b)
+    }
+    foreach ($a in $local.Advisory) { $advisory.Add($a) }
+    foreach ($d in $local.EngineDiagnostics) { $diagnostics.Add($d) }
+
+    return [pscustomobject]@{
+        Blocking          = @($blocking)
+        Advisory          = @($advisory)
+        EngineDiagnostics = @($diagnostics)
+    }
 }

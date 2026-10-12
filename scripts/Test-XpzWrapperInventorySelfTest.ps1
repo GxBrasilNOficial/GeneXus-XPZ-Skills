@@ -15,7 +15,9 @@
     (repasse a motor compartilhado advanced de parametro nao-declarado; caso end-to-end).
     Valida ainda o diff de superficie wrapper-vs-molde (surface_mismatch -> INVENTORY_CUSTOMIZED;
     reducoes opcionais/ValidateSet -> INVENTORY_SURFACE_ADVISORY) em casos de unidade + end-to-end,
-    mais a guarda-regressao que localiza por conteudo o regex de pendencia do agregador
+    e o comment-based help (flag orfa no .EXAMPLE de script advanced -> INVENTORY_CUSTOMIZED
+    reason=help_example_undeclared_param; ajuda invisivel -> INVENTORY_HELP_ADVISORY), mais a
+    guarda-regressao que localiza por conteudo o regex de pendencia do agregador
     (Test-XpzSetupAudit.ps1) e falha se ele casar os rotulos de aviso.
 #>
 
@@ -628,6 +630,61 @@ param(
     Assert-Contains -Text $output -Pattern 'Query-DemoKbIntelligence\.ps1\(reason=surface_mismatch: mandatory_param_missing -Query\)' -Message 'E2E-3 surface_mismatch coexiste com o check por-token (redundancia aceita)'
 
     # ============================================================================
+    # Comment-based help: flag orfa no .EXAMPLE (bloqueio) e ajuda invisivel (advisory)
+    # ============================================================================
+    # E2E-4: .EXAMPLE invoca o nome generico do molde (-AlternateSelfLeaf) com flag inexistente -> CUSTOMIZED
+    @'
+#requires -Version 7.4
+param(
+    [string]$KbRoot
+)
+'@ | Set-Content -LiteralPath (Join-Path $examplesPath 'Rebuild-KbIntelligenceIndex.example.ps1') -Encoding utf8NoBOM
+    @'
+#requires -Version 7.4
+
+<#
+.SYNOPSIS
+Rebuild consultivo.
+.DESCRIPTION
+d.
+.EXAMPLE
+.\Rebuild-KbIntelligenceIndex.ps1 -BogusHelpFlag
+#>
+[CmdletBinding()]
+param(
+    [string]$KbRoot
+)
+'@ | Set-Content -LiteralPath (Join-Path $scriptsPath 'Rebuild-DemoKbIntelligenceIndex.ps1') -Encoding utf8NoBOM
+
+    # E2E-5: #requires colado ao <# -> ajuda invisivel -> apenas INVENTORY_HELP_ADVISORY
+    @'
+#requires -Version 7.4
+param(
+    [string]$KbRoot
+)
+'@ | Set-Content -LiteralPath (Join-Path $examplesPath 'Test-KbStructure.example.ps1') -Encoding utf8NoBOM
+    @'
+#requires -Version 7.4
+<#
+.SYNOPSIS
+Test structure consultivo.
+.DESCRIPTION
+d.
+#>
+[CmdletBinding()]
+param(
+    [string]$KbRoot
+)
+'@ | Set-Content -LiteralPath (Join-Path $scriptsPath 'Test-DemoKbStructure.ps1') -Encoding utf8NoBOM
+
+    $output = (& $inventoryScriptPath -KbParallelRoot $kbRoot -SkillsExamplesPath $examplesPath 2>&1 |
+        ForEach-Object { $_.ToString() }) -join ' '
+
+    Assert-Contains -Text $output -Pattern 'INVENTORY_CUSTOMIZED:.*Rebuild-DemoKbIntelligenceIndex\.ps1\(reason=help_example_undeclared_param:-BogusHelpFlag\)' -Message 'E2E-4 flag orfa no .EXAMPLE deve bloquear via INVENTORY_CUSTOMIZED'
+    Assert-Contains -Text $output -Pattern 'INVENTORY_HELP_ADVISORY:.*Test-DemoKbStructure\.ps1\(reason=help_invisible\)' -Message 'E2E-5 ajuda invisivel deve sair como INVENTORY_HELP_ADVISORY'
+    Assert-NotContains -Text $output -Pattern 'Test-DemoKbStructure\.ps1\(reason=(?!help_invisible)' -Message 'E2E-5 wrapper so com ajuda invisivel nao pode ter outro motivo'
+
+    # ============================================================================
     # GUARDA anti-regressao: o regex de pendencia do agregador (Test-XpzSetupAudit.ps1) casa
     # INVENTORY_CUSTOMIZED mas NAO os rotulos de aviso/diagnostico. Localizado POR CONTEUDO
     # (nao por numero de linha) para sobreviver a drift.
@@ -643,6 +700,8 @@ param(
     Assert-Contains -Text 'INVENTORY_CUSTOMIZED: X(reason=surface_mismatch: mandatory_param_missing -Query)' -Pattern $blockRegex -Message 'regex de pendencia DEVE casar INVENTORY_CUSTOMIZED (surface_mismatch bloqueia via CUSTOMIZED)'
     Assert-NotContains -Text 'INVENTORY_SURFACE_ADVISORY: X(reason=validateset_reduced: -Query [a, b])' -Pattern $blockRegex -Message 'REGRESSAO: regex de pendencia NAO pode casar INVENTORY_SURFACE_ADVISORY'
     Assert-NotContains -Text 'INVENTORY_ENGINE_DIAGNOSTIC: X(reason=engine_unresolved_or_unparseable: Y)' -Pattern $blockRegex -Message 'REGRESSAO: regex de pendencia NAO pode casar INVENTORY_ENGINE_DIAGNOSTIC'
+    Assert-NotContains -Text 'INVENTORY_HELP_ADVISORY: X(reason=help_invisible)' -Pattern $blockRegex -Message 'REGRESSAO: regex de pendencia NAO pode casar INVENTORY_HELP_ADVISORY'
+    Assert-Contains -Text 'INVENTORY_CUSTOMIZED: X(reason=help_example_undeclared_param:-AsJson)' -Pattern $blockRegex -Message 'regex de pendencia DEVE casar help_example_undeclared_param (bloqueia via CUSTOMIZED)'
 
     # Detector Copy dirigido: molde legado, splat renomeado e negativos reais.
     $legacyCopy = @'
