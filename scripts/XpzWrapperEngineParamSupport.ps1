@@ -943,6 +943,17 @@ function Get-XpzHelpSurfaceForFile {
     return [pscustomobject]@{ Blocking = @($blocking); Advisory = @($advisory); EngineDiagnostics = @($diagnostics) }
 }
 
+function Select-XpzHelpUnique {
+    <# Deduplica achados de help por Reason (OrdinalIgnoreCase), preservando a ordem de primeira ocorrencia. #>
+    param($Items)
+    $seen = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    $out = [System.Collections.Generic.List[object]]::new()
+    foreach ($it in @($Items)) {
+        if ($seen.Add([string]$it.Reason)) { $out.Add($it) }
+    }
+    return @($out)
+}
+
 function Get-XpzHelpSurfaceFinding {
     <#
       Ponto de entrada. Audita o comment-based help do wrapper LOCAL contra o molde opcional.
@@ -992,8 +1003,8 @@ function Get-XpzHelpSurfaceFinding {
     foreach ($d in $local.EngineDiagnostics) { $diagnostics.Add($d) }
 
     return [pscustomobject]@{
-        Blocking          = @($blocking)
-        Advisory          = @($advisory)
-        EngineDiagnostics = @($diagnostics)
+        Blocking          = @(Select-XpzHelpUnique -Items $blocking)
+        Advisory          = @(Select-XpzHelpUnique -Items $advisory)
+        EngineDiagnostics = @(Select-XpzHelpUnique -Items $diagnostics)
     }
 }

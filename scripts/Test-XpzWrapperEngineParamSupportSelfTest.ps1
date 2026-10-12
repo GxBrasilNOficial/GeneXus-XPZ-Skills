@@ -10,9 +10,9 @@
   Cria wrappers de fixture (apenas PARSEADOS, nunca executados) e os confronta com:
     - motores REAIS do repo (Sync-GeneXusXpzToXml.ps1) via EnginesRoot = scripts/ do auditor;
     - motores SINTETICOS (simple/advanced/parse-broken/adversarial) numa pasta temp.
-  Inclui casos de UNIDADE do comment-based help (H1..H15): flag orfa em advanced, alias, prefixo
+  Inclui casos de UNIDADE do comment-based help (H1..H16): flag orfa em advanced, alias, prefixo
   ambiguo/nao-ambiguo, CommonParameters, outro script, simple, sem param()/dynamicparam, formas de
-  parse, Join-Path, .PARAMETER orfao, ajuda invisivel, -AlternateSelfLeaf e paridade de molde.
+  parse, Join-Path, .PARAMETER orfao, ajuda invisivel, -AlternateSelfLeaf, paridade de molde e dedup.
   Sentinela final: XPZ_WRAPPER_ENGINE_PARAM_SELFTEST_OK.
 #>
 
@@ -419,6 +419,22 @@ param([string]$Ok)
     Assert-HelpFinding $r '' '' 'H15 paridade suprime bloqueio identico'
     $diag = @($r.EngineDiagnostics | Where-Object { $_.Reason -eq 'help_molde_help_example_undeclared_param:-AsJson' })
     if ($diag.Count -eq 0) { throw 'ASSERT_FAILED: H15 defeito do molde deve virar INVENTORY_ENGINE_DIAGNOSTIC help_molde_...' }
+
+    # H16 dedup: a MESMA flag orfa em dois .EXAMPLE nao pode duplicar o achado
+    $f = New-Fixture $wrapDir 'h16.ps1' @'
+<#
+.SYNOPSIS
+H16 unica.
+.EXAMPLE
+.\h16.ps1 -AsJson
+.EXAMPLE
+.\h16.ps1 -AsJson -Verbose
+#>
+[CmdletBinding()]
+param([string]$Ok)
+'@
+    $r = Get-XpzHelpSurfaceFinding -WrapperPath $f
+    if (@($r.Blocking).Count -ne 1) { throw ("ASSERT_FAILED: H16 dedup esperado 1 blocking; obtido={0} ({1})" -f @($r.Blocking).Count, (Get-HelpReasons $r.Blocking)) }
 
     Write-Output 'XPZ_WRAPPER_ENGINE_PARAM_SELFTEST_OK'
 } finally {
