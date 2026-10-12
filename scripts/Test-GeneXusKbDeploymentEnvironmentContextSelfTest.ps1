@@ -7,6 +7,9 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 . (Join-Path $PSScriptRoot 'GeneXusKbDeploymentEnvironmentSupport.ps1')
+# Resolve-GeneXusKbActiveContextReadings foi movida para a folha; carregar direto tambem
+# (o suporte de deploy ja a carrega, mas o self-test nao depende da transitividade).
+. (Join-Path $PSScriptRoot 'GeneXusMsBuildActiveContextSupport.ps1')
 
 $dictionaryContext = [ordered]@{
     validationEnvironmentResolved = 'Prototipo_18U13'

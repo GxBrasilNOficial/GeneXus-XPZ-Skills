@@ -1,6 +1,7 @@
 {
   "schemaVersion": 1,
-  "lastUpdated": "2026-06-14",
+  "lastUpdated": "2026-10-12",
+  "corpusDate": "2026-10-12",
   "legend": {
     "exitCode": "Valor classificado pelo wrapper GeneXus XPZ; e tambem o exit code do processo PowerShell.",
     "executionEvidence.msBuildExitCode": "Codigo bruto retornado pela invocacao MSBuild/task GeneXus; nao substitui exitCode quando o wrapper reclassifica (ex.: 48, 32, 41-45).",
@@ -76,37 +77,43 @@
     {
       "exit": 20,
       "category": "msbuild",
-      "summary": "OpenKnowledgeBase headless: falha MSBuild generica (sem padrao SetActive/Close mapeado).",
+      "status": "emitido",
+      "summary": "OpenKnowledgeBase headless: falha de Open Knowledge Base (marcador error) ou formato de falha nao mapeado. Classificador por cadeia de prioridade (Open -> SetVersion -> SetEnvironment -> Close); ver scripts/GeneXusMsBuildActiveContextSupport.ps1.",
       "wrappers": ["Open-GeneXusKbHeadless.ps1"]
     },
     {
       "exit": 21,
       "category": "msbuild",
-      "summary": "OpenKnowledgeBase headless: falha em SetActiveVersion.",
+      "status": "emitido",
+      "summary": "OpenKnowledgeBase headless: falha em Set Active Version (marcador error; nunca o nome PascalCase da task).",
       "wrappers": ["Open-GeneXusKbHeadless.ps1"]
     },
     {
       "exit": 22,
       "category": "msbuild",
-      "summary": "OpenKnowledgeBase headless: falha em SetActiveEnvironment.",
+      "status": "emitido",
+      "summary": "OpenKnowledgeBase headless: falha em Set Active Environment (marcador error).",
       "wrappers": ["Open-GeneXusKbHeadless.ps1"]
     },
     {
       "exit": 23,
       "category": "msbuild",
-      "summary": "OpenKnowledgeBase headless: falha em GetActiveVersion.",
+      "status": "reservado",
+      "summary": "RESERVADO-SEM-RAMO: sem evidencia empirica de marcador de falha proprio de GetActiveVersion. O classificador por cadeia nunca emite 23. Ver 999-ideias-pendentes.md (entrada do contexto de abertura), corpus de 2026-10-12.",
       "wrappers": ["Open-GeneXusKbHeadless.ps1"]
     },
     {
       "exit": 24,
       "category": "msbuild",
-      "summary": "OpenKnowledgeBase headless: falha em GetActiveEnvironment.",
+      "status": "reservado",
+      "summary": "RESERVADO-SEM-RAMO: sem evidencia empirica de marcador de falha proprio de GetActiveEnvironment. O classificador por cadeia nunca emite 24. Ver 999-ideias-pendentes.md (entrada do contexto de abertura), corpus de 2026-10-12.",
       "wrappers": ["Open-GeneXusKbHeadless.ps1"]
     },
     {
       "exit": 25,
       "category": "msbuild",
-      "summary": "OpenKnowledgeBase headless: falha em CloseKnowledgeBase.",
+      "status": "emitido-por-inferencia",
+      "summary": "OpenKnowledgeBase headless: falha em Close Knowledge Base como error primario (sem error anterior de Open/Set). Emitido por inferencia estrutural: CloseOnError usa ContinueOnError=WarnAndContinue, o Run usa CloseKnowledgeBase sem isso.",
       "wrappers": ["Open-GeneXusKbHeadless.ps1"]
     },
     {

@@ -129,6 +129,53 @@ try {
         throw "Contador knownStdOutNoise inesperado no export: $($exportSignals.counts.knownStdOutNoise)"
     }
 
+    # Contexto informado: separa efetivo (pos-Set) de abertura e ecoa contextQuality.
+    $contextStdoutText = @(
+        "The active environment is '.Net Environment'"
+        '> Set Active Environment Sucesso'
+        "The active environment is 'TestEnvironment'"
+        'Import Task Success'
+    ) -join [Environment]::NewLine
+    [System.IO.File]::WriteAllText($stdoutPath, $contextStdoutText, (Get-Utf8NoBomEncoding))
+
+    $contextJsonText = (& $readerPath -StdOutPath $stdoutPath -StdErrPath $stderrPath -RequestedEnvironmentName 'TestEnvironment' -SetEnvironmentFailed:$false -Stage 'classifier-self-test' -AsJson) -join [Environment]::NewLine
+    $contextSignals = $contextJsonText | ConvertFrom-Json
+    if ($contextSignals.activeEnvironment -ne 'TestEnvironment') {
+        throw "activeEnvironment (efetivo) inesperado: $($contextSignals.activeEnvironment)"
+    }
+    if ($contextSignals.activeEnvironmentAtOpen -ne '.Net Environment') {
+        throw "activeEnvironmentAtOpen inesperado: $($contextSignals.activeEnvironmentAtOpen)"
+    }
+    if ($contextSignals.contextQuality -ne 'complete') {
+        throw "contextQuality inesperado: $($contextSignals.contextQuality)"
+    }
+
+    # Troca pedida sem leitura posterior => efetivo nulo (contexto parcial: so o nome).
+    $singleReadText = @(
+        "The active environment is '.Net Environment'"
+        'Import Task Success'
+    ) -join [Environment]::NewLine
+    [System.IO.File]::WriteAllText($stdoutPath, $singleReadText, (Get-Utf8NoBomEncoding))
+    $singleJsonText = (& $readerPath -StdOutPath $stdoutPath -StdErrPath $stderrPath -RequestedEnvironmentName 'TestEnvironment' -Stage 'classifier-self-test' -AsJson) -join [Environment]::NewLine
+    $singleSignals = $singleJsonText | ConvertFrom-Json
+    if ($null -ne $singleSignals.activeEnvironment) {
+        throw "Efetivo deveria ser nulo sem leitura posterior; recebeu '$($singleSignals.activeEnvironment)'."
+    }
+    if ($singleSignals.activeEnvironmentAtOpen -ne '.Net Environment') {
+        throw "activeEnvironmentAtOpen inesperado: $($singleSignals.activeEnvironmentAtOpen)"
+    }
+    if ($singleSignals.contextQuality -ne 'partial') {
+        throw "contextQuality (so o nome) deveria ser partial: $($singleSignals.contextQuality)"
+    }
+
+    # Modo legado (sem contexto): AtOpen nulo e contextQuality=legacy.
+    if ($null -ne $aliasSignals.activeEnvironmentAtOpen) {
+        throw 'Legado deveria ter activeEnvironmentAtOpen nulo.'
+    }
+    if ($aliasSignals.contextQuality -ne 'legacy') {
+        throw "Legado deveria ter contextQuality=legacy: $($aliasSignals.contextQuality)"
+    }
+
     'TEST_MsBuildImportSignalsClassifier=PASS'
 }
 finally {

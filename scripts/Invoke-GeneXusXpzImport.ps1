@@ -173,6 +173,12 @@ if (-not (Test-Path -LiteralPath $stderrNoiseSupportPath -PathType Leaf)) {
 }
 . $stderrNoiseSupportPath
 
+$activeContextSupportPath = Join-Path (Split-Path -Parent $PSCommandPath) 'GeneXusMsBuildActiveContextSupport.ps1'
+if (-not (Test-Path -LiteralPath $activeContextSupportPath -PathType Leaf)) {
+    throw "Active context support script not found: $activeContextSupportPath"
+}
+. $activeContextSupportPath
+
 $logPathGateSupportPath = Join-Path (Split-Path -Parent $PSCommandPath) 'GeneXusMsBuildLogPathSupport.ps1'
 if (-not (Test-Path -LiteralPath $logPathGateSupportPath -PathType Leaf)) {
     throw "LogPath gate support script not found: $logPathGateSupportPath"
@@ -554,6 +560,12 @@ function New-MsBuildProjectContent {
     <OpenKnowledgeBase Directory="`$(KBPath)" CaptureOutput="true">
       <Output TaskParameter="TaskOutput" PropertyName="OpenOutput" />
     </OpenKnowledgeBase>
+    <GetActiveVersion CaptureOutput="true">
+      <Output TaskParameter="TaskOutput" PropertyName="ActiveVersionAtOpenOutput" />
+    </GetActiveVersion>
+    <GetActiveEnvironment CaptureOutput="true">
+      <Output TaskParameter="TaskOutput" PropertyName="ActiveEnvironmentAtOpenOutput" />
+    </GetActiveEnvironment>
     <SetActiveVersion Condition="'`$(KBVersion)' != ''" VersionName="`$(KBVersion)" />
     <SetActiveEnvironment Condition="'`$(KBEnvironment)' != ''" EnvironmentName="`$(KBEnvironment)" />
     <GetActiveVersion CaptureOutput="true">
@@ -963,6 +975,8 @@ try {
             observedContext = [ordered]@{
                 ActiveVersion = $null
                 ActiveEnvironment = $null
+                ActiveVersionAtOpen = $null
+                ActiveEnvironmentAtOpen = $null
                 pathEnrichment = $script:PathEnrichment
             }
             resolvedPaths = [ordered]@{
@@ -1092,6 +1106,14 @@ try {
     $knownStdOutNoise   = @()
     $gxImportLogReadStatus = 'ok'
     $gxImportLogReadError = $null
+    $activeVersionOutput     = $null
+    $activeEnvironmentOutput = $null
+    $activeVersionAtOpen     = $null
+    $activeEnvironmentAtOpen = $null
+    $setVersionFailed        = $false
+    $setEnvironmentFailed    = $false
+    $diagnosticSource        = $null
+    $failureMarkers          = $null
 
     try {
         $stdOutText = Read-TextFileSafe -PathValue $stdOutPath
@@ -1101,6 +1123,18 @@ try {
         $stdErrFiltered = $stdErrNoiseClassification.FilteredText
         $importedItems      = @(Get-MatchingLines -Text $stdOutText -Prefix '__IMPORTED_ITEM__=')
         $importWarningLines = @([regex]::Matches($stdOutText, '(?m)[^\r\n]*\(\d+,\d+\)\s*:\s*warning\s*:[^\r\n]*') | ForEach-Object { $_.Value.Trim() })
+
+        $diagnosticSource = Resolve-GeneXusMsBuildDiagnosticSource -StdOutText $stdOutText -StdErrFilteredText $stdErrFiltered
+        $failureMarkers = Resolve-GeneXusMsBuildFailureMarker -Text $diagnosticSource.SelectedText
+        $setVersionFailed = $failureMarkers['SetVersion'].Loose
+        $setEnvironmentFailed = $failureMarkers['SetEnvironment'].Loose
+
+        $versionReadings = Resolve-GeneXusKbActiveContextReadings -Text $stdOutText -Pattern "The active version is '([^']+)'" -RequestedName $VersionName -SetFailed $setVersionFailed
+        $environmentReadings = Resolve-GeneXusKbActiveContextReadings -Text $stdOutText -Pattern "The active environment is '([^']+)'" -RequestedName $EnvironmentName -SetFailed $setEnvironmentFailed
+        $activeVersionAtOpen     = $versionReadings.AtOpen
+        $activeEnvironmentAtOpen = $environmentReadings.AtOpen
+        $activeVersionOutput     = $versionReadings.Effective
+        $activeEnvironmentOutput = $environmentReadings.Effective
     }
     catch {
         $postProcessingFailed = $true
@@ -1116,7 +1150,7 @@ try {
     $signalsScript = Join-Path $PSScriptRoot 'Read-MsBuildImportSignals.ps1'
     try {
         if (Test-Path -LiteralPath $signalsScript -PathType Leaf) {
-            $signalsJson = & $signalsScript -StdOutPath $stdOutPath -StdErrPath $stdErrPath -ExpectedItems ($includeItemsArray -join ';') -Stage 'import-real' -OutputPath $signalsPath -AsJson
+            $signalsJson = & $signalsScript -StdOutPath $stdOutPath -StdErrPath $stdErrPath -ExpectedItems ($includeItemsArray -join ';') -RequestedVersionName $VersionName -RequestedEnvironmentName $EnvironmentName -SetVersionFailed:$setVersionFailed -SetEnvironmentFailed:$setEnvironmentFailed -Stage 'import-real' -OutputPath $signalsPath -AsJson
             $signalsJsonText = $signalsJson | Out-String
             if (-not [string]::IsNullOrWhiteSpace($signalsJsonText)) {
                 $importSignals = $signalsJsonText | ConvertFrom-Json
@@ -1153,22 +1187,31 @@ try {
         Add-StrategyTrace -Message $diagnosticDegradedReason
     }
 
-    $setVersionFailed     = [bool]($stdOutText -match 'Set Active Version falhou')
-    $setEnvironmentFailed = [bool]($stdOutText -match 'Set Active Environment falhou')
-
-    $activeVersionOutput      = Get-RegexValue -Text $stdOutText -Pattern "The active version is '([^']+)'"
-    $activeEnvironmentOutput  = Get-RegexValue -Text $stdOutText -Pattern "The active environment is '([^']+)'"
-    $missingEnvironmentOutput = Get-RegexValue -Text $stdOutText -Pattern "Ambiente '([^']+)' n[aã]o existe"
+    $contextSourceText = if ($null -ne $diagnosticSource) { $diagnosticSource.SelectedText } else { $stdOutText }
+    $missingEnvironmentOutput = Get-RegexValue -Text $contextSourceText -Pattern "Ambiente '([^']+)' n[aã]o existe"
 
     if ($setVersionFailed) {
-        $actualVersion = if (-not [string]::IsNullOrWhiteSpace($activeVersionOutput)) { $activeVersionOutput } else { '(desconhecida)' }
+        $actualVersion = if (-not [string]::IsNullOrWhiteSpace($activeVersionAtOpen)) { $activeVersionAtOpen } else { '(desconhecida)' }
         Add-BlockingReason -Reason ("SetActiveVersion falhou — a versao '{0}' nao existe nesta KB. A versao ativa no momento da abertura era '{1}'. Para usar a versao ativa, omita o parametro -VersionName." -f $VersionName, $actualVersion)
+        if ([string]::IsNullOrWhiteSpace($activeVersionAtOpen)) {
+            Add-WarningMessage -Message 'SetActiveVersion falhou, mas nenhuma leitura de GetActiveVersion na abertura foi observada; o contexto de abertura nao pode ser citado.'
+        }
     }
 
     if ($setEnvironmentFailed) {
-        $actualEnvironment = if (-not [string]::IsNullOrWhiteSpace($activeEnvironmentOutput)) { $activeEnvironmentOutput } else { '(desconhecido)' }
+        $actualEnvironment = if (-not [string]::IsNullOrWhiteSpace($activeEnvironmentAtOpen)) { $activeEnvironmentAtOpen } else { '(desconhecido)' }
         $requestedEnvironment = if (-not [string]::IsNullOrWhiteSpace($missingEnvironmentOutput)) { $missingEnvironmentOutput } else { $EnvironmentName }
         Add-BlockingReason -Reason ("SetActiveEnvironment falhou — o Environment '{0}' nao existe nesta KB. O Environment ativo no momento da abertura era '{1}'. Para usar o Environment ativo, omita o parametro -EnvironmentName." -f $requestedEnvironment, $actualEnvironment)
+        if ([string]::IsNullOrWhiteSpace($activeEnvironmentAtOpen)) {
+            Add-WarningMessage -Message 'SetActiveEnvironment falhou, mas nenhuma leitura de GetActiveEnvironment na abertura foi observada; o contexto de abertura nao pode ser citado.'
+        }
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($VersionName) -and [string]::IsNullOrWhiteSpace($activeVersionOutput) -and -not $setVersionFailed) {
+        Add-WarningMessage -Message 'Versão solicitada, mas nenhuma leitura de GetActiveVersion posterior a SetActiveVersion foi observada.'
+    }
+    if (-not [string]::IsNullOrWhiteSpace($EnvironmentName) -and [string]::IsNullOrWhiteSpace($activeEnvironmentOutput) -and -not $setEnvironmentFailed) {
+        Add-WarningMessage -Message 'Environment solicitado, mas nenhuma leitura de GetActiveEnvironment posterior a SetActiveEnvironment foi observada.'
     }
 
     if ($importErrors.Count -gt 0) {
@@ -1256,6 +1299,8 @@ try {
         observedContext = [ordered]@{
             ActiveVersion = $activeVersionOutput
             ActiveEnvironment = $activeEnvironmentOutput
+            ActiveVersionAtOpen = $activeVersionAtOpen
+            ActiveEnvironmentAtOpen = $activeEnvironmentAtOpen
             OpenOutput = (Get-MarkerValue -Text $stdOutText -Marker '__OPEN_OUTPUT__=')
             pathEnrichment = $script:PathEnrichment
         }

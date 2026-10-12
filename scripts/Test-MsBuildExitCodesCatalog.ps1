@@ -91,6 +91,21 @@ else {
             if ([int]$entry.exit -eq 48 -and [string]::IsNullOrWhiteSpace($entry.summary)) {
                 Add-Finding -Code 'CATALOG_48' -Message 'exit 48 deve ter summary.'
             }
+
+            # Distincao reservado vs emitido (contexto de abertura do OpenHeadless).
+            $statusProperty = $entry.PSObject.Properties['status']
+            $entryStatus = if ($null -ne $statusProperty) { [string]$statusProperty.Value } else { $null }
+            if ($null -ne $entryStatus) {
+                if (@('emitido', 'emitido-por-inferencia', 'reservado') -notcontains $entryStatus) {
+                    Add-Finding -Code 'CATALOG_STATUS' -Message ("status invalido em exit {0}: '{1}'." -f [int]$entry.exit, $entryStatus)
+                }
+                if ($entryStatus -eq 'reservado' -and [int]$entry.exit -notin @(23, 24)) {
+                    Add-Finding -Code 'CATALOG_STATUS' -Message ("exit {0} marcado 'reservado' fora do conjunto esperado (23/24)." -f [int]$entry.exit)
+                }
+            }
+            if ([int]$entry.exit -in @(23, 24) -and $entryStatus -ne 'reservado') {
+                Add-Finding -Code 'CATALOG_STATUS' -Message ("exit {0} deve ter status 'reservado'." -f [int]$entry.exit)
+            }
         }
 
         if (-not $catalogExits.Contains(48)) {
@@ -137,6 +152,24 @@ else {
                 }
                 if (-not $catalogExits.Contains($code)) {
                     Add-Finding -Code 'EXIT_UNDOCUMENTED' -Message "exit $code em $wrapperName nao consta em codes[]."
+                }
+            }
+        }
+
+        # Invariante reservado: 23/24 nao podem ser devolvidos como return pelo classificador
+        # do OpenHeadless nem pela folha de suporte (nao ha ramo para eles).
+        $returnPattern = [regex]::new('(?<![A-Za-z])return\s+(\d+)\b')
+        foreach ($classifierTarget in @('Open-GeneXusKbHeadless.ps1', 'GeneXusMsBuildActiveContextSupport.ps1')) {
+            $classifierPath = Join-Path $PSScriptRoot $classifierTarget
+            if (-not (Test-Path -LiteralPath $classifierPath -PathType Leaf)) {
+                Add-Finding -Code 'WRAPPER_MISSING' -Message "Classificador ausente: $classifierTarget"
+                continue
+            }
+            $classifierText = [System.IO.File]::ReadAllText($classifierPath)
+            foreach ($m in $returnPattern.Matches($classifierText)) {
+                $value = [int]$m.Groups[1].Value
+                if ($value -in @(23, 24)) {
+                    Add-Finding -Code 'RESERVED_RETURN' -Message ("$classifierTarget devolve return $value (reservado sem ramo).")
                 }
             }
         }

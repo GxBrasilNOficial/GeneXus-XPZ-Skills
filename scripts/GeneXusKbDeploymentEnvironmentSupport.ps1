@@ -7,6 +7,10 @@
 .DESCRIPTION
     Inventario de environments da KB nativa ocorre somente via xpz-kb-parallel-setup
     (Set-XpzKbSourceMetadataDeployment.ps1 com -KbEnvironmentNames e -KbEnvironmentOutputDirs declarados pelo usuário). Build/import/diagnostico de .cs apenas leem o metadata gravado.
+
+    Carrega a folha GeneXusMsBuildActiveContextSupport.ps1, que hospeda
+    Resolve-GeneXusKbActiveContextReadings (movida para ela) e mantem a funcao disponivel a
+    BuildAll/SpecifyGenerate e demais consumidores do suporte de deploy.
 #>
 
 Set-StrictMode -Version Latest
@@ -15,6 +19,11 @@ Set-StrictMode -Version Latest
 # deployment_hosting_kind no diagnostico de consistencia (Test-GeneXusKbDeploymentMetadataConsistency).
 # O registro e standalone (nao dot-source este arquivo) — sem ciclo.
 . (Join-Path $PSScriptRoot 'GeneXusKbHostingKindSupport.ps1')
+
+# Suporte folha compartilhado: Resolve-GeneXusKbActiveContextReadings vive em
+# GeneXusMsBuildActiveContextSupport.ps1, para que Export/Import/Preview/OpenHeadless carreguem
+# so o leve, sem puxar o suporte de deploy inteiro (que traz junto GeneXusKbHostingKindSupport).
+. (Join-Path $PSScriptRoot 'GeneXusMsBuildActiveContextSupport.ps1')
 
 function Get-GeneXusKbSourceMetadataDirectField {
     param(
@@ -456,51 +465,6 @@ function Test-GeneXusKbActiveEnvironmentMatchesValidation {
     }
 
     return ($ActiveEnvironment.Trim() -ieq $resolved.Trim())
-}
-
-function Resolve-GeneXusKbActiveContextReadings {
-    <#
-    .SYNOPSIS
-        Separa a leitura de abertura e a leitura efetiva de GetActiveVersion/GetActiveEnvironment no stdout do MSBuild.
-    .DESCRIPTION
-        Os wrappers de build leem o contexto ativo antes de SetActiveVersion/SetActiveEnvironment (para citar,
-        em caso de falha do Set, o contexto que estava ativo na abertura) e de novo depois dos Set (contexto
-        efetivo da operacao). A primeira leitura e a de abertura; a ultima, a efetiva. Com uma unica leitura,
-        ela so vale como efetiva quando nenhuma troca foi pedida ou quando o Set correspondente falhou
-        (o contexto nao mudou); caso contrario a troca pode ter ocorrido sem leitura posterior e o efetivo
-        fica nulo, para nao reportar o contexto anterior a troca como se fosse o da operacao.
-    #>
-    param(
-        [AllowNull()][string]$Text,
-        [string]$Pattern,
-        [AllowNull()][string]$RequestedName,
-        [bool]$SetFailed = $false
-    )
-
-    $readings = New-Object System.Collections.Generic.List[string]
-    if (-not [string]::IsNullOrEmpty($Text)) {
-        foreach ($match in [regex]::Matches($Text, $Pattern, [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)) {
-            $readings.Add($match.Groups[1].Value.Trim()) | Out-Null
-        }
-    }
-
-    $atOpen = $null
-    $effective = $null
-    if ($readings.Count -gt 0) {
-        $atOpen = $readings[0]
-    }
-    if ($readings.Count -ge 2) {
-        $effective = $readings[$readings.Count - 1]
-    }
-    elseif ($readings.Count -eq 1 -and ([string]::IsNullOrWhiteSpace($RequestedName) -or $SetFailed)) {
-        $effective = $readings[0]
-    }
-
-    return [pscustomobject][ordered]@{
-        AtOpen       = $atOpen
-        Effective    = $effective
-        ReadingCount = $readings.Count
-    }
 }
 
 function Get-GeneXusKbDeploymentContextValue {

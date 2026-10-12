@@ -822,13 +822,14 @@ Saídas esperadas dos scripts:
 
 ### Catálogo canônico de códigos de saída
 
-- **Fonte machine-readable:** `scripts/msbuild-exit-codes.catalog.json` (`schemaVersion`, `legend`, `codes[]`, `families.probe`, `families.headlessKbOpen`).
+- **Fonte machine-readable:** `scripts/msbuild-exit-codes.catalog.json` (`schemaVersion`, `lastUpdated`, `corpusDate`, `legend`, `codes[]` com `status` `emitido`/`emitido-por-inferencia`/`reservado`, `families.probe`, `families.headlessKbOpen`).
 - **Esta base (`10-base`)** mantém regras de interpretação (`exitCode` classificado vs `executionEvidence.msBuildExitCode`, pós-processamento, Categorias A/B) e o contrato completo do probe `Test-GeneXusMsBuildSetup.ps1` (códigos `10`–`16`) — **não** duplicar a tabela inteira de exits aqui.
 - **`02` e `08`:** ponteiro operacional curto; **`09`:** rastreabilidade pública; skills `xpz-msbuild-build` / `xpz-msbuild-import-export`: subconjunto operacional + link para o JSON.
 - **Exit `46`:** `disambiguationRequired=true` no catálogo — políticas distintas (watcher, wide rebuild, reorg). Ler `summary`, `blockingReasons`, `requestedContext` e `causes[]` no JSON; **não** inferir causa só pelo número no terminal. Nesta versão, apenas a causa watcher emite `causeId` no `causes[]` (`'watcher-sem-monitor-log'`); as demais causas do exit 46 não emitem `causeId` (ver `jsonHints` da causa no catálogo `scripts/msbuild-exit-codes.catalog.json`).
 - **Exit `48`:** Categoria B — ver secção anterior; detalhe de campos no catálogo (`jsonHints`).
 - **Exit `50`:** gate fail-fast de `-LogPath` (categoria `parametro-invalido`) — o `-LogPath` resolvido aponta para um **diretório existente**. O wrapper bloqueia **cedo** (antes de abrir a KB / registrar tarefa) emitindo o bloco **só no stdout**, em vez de rodar a operação inteira e só falhar na gravação final do JSON, mascarando o resultado como `exit 90` («falha operacional») quando a operação concluiu. Motor compartilhado `scripts/GeneXusMsBuildLogPathSupport.ps1`; condição `Test-Path -PathType Container` (não bloqueia arquivo-a-criar com pai válido). Informe um caminho de **arquivo** de log.
 - **Build/specify:** códigos `40`–`45` e `status` rico (`compilou limpo`, `reorg necessaria detectada`, …) estão no catálogo; quando `exitCode` e `status` divergirem em importância, priorizar o JSON completo do wrapper.
+- **Headless open (`Open-GeneXusKbHeadless.ps1`, exits `20`–`25`):** o wrapper abre a KB, lê o contexto antes dos `Set` (`Get` -> `Set` -> `Get`) e classifica o exit por **cadeia de prioridade** sobre marcadores com severidade `error` — `Open`(20) → `SetVersion`(21) → `SetEnvironment`(22) → `Close`(25); formato de falha não mapeado também é `20`. Os nomes PascalCase das tasks (`GetActiveEnvironment` etc.) **nunca** classificam; a linha de sucesso de `Get` não vira `23`/`24`. `23`/`24` (falha de `GetActiveVersion`/`GetActiveEnvironment`) ficam **`reservado`-sem-ramo** (sem evidência empírica de marcador próprio; nunca emitidos); `25` é `emitido-por-inferencia` (o `Run` usa `<CloseKnowledgeBase />`, enquanto `CloseOnError` usa `ContinueOnError="WarnAndContinue"`). Motor da folha: `scripts/GeneXusMsBuildActiveContextSupport.ps1`; `status`/`corpusDate` no catálogo. Excluídos do escopo: `Export`/`Import`/`Preview` mantêm `41`/`31`/`32`.
 
 ### Contrato Transversal De Diagnóstico JSON Dos Wrappers MSBuild
 
@@ -868,6 +869,7 @@ Este contrato aplica-se aos wrappers que já chamaram `MSBuild` ou processaram s
 - `observedContext`
   - registra contexto técnico observado pelo wrapper, como versão ativa, `Environment` ativo, `OpenOutput`, `pathEnrichment` e, em wrappers de build, campos legados como `MsBuildExitCode`
   - `observedContext.pathEnrichment` registra o enriquecimento preventivo de `PATH` (`applied`, `subdirsAdded`, `subdirsSkipped`) quando o wrapper aplica essa política
+  - `observedContext.ActiveVersion`/`ActiveEnvironment` são a leitura **efetiva** (posterior ao `Set`); `observedContext.ActiveVersionAtOpen`/`ActiveEnvironmentAtOpen` registram a leitura de **abertura** (antes dos `Set`) e são o valor citado no bloqueio quando o `Set` falha. Nos wrappers export/import/preview e na abertura headless, o `.msbuild` lê o contexto antes e depois dos `Set` (`Get` -> `Set` -> `Get`); uma troca pedida sem leitura posterior deixa o efetivo nulo, com aviso. O parse usa `Resolve-GeneXusKbActiveContextReadings` (`scripts/GeneXusMsBuildActiveContextSupport.ps1`).
 
 ### Contrato Inicial De `Test-GeneXusMsBuildSetup.ps1`
 

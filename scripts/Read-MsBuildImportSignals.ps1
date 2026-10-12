@@ -17,6 +17,21 @@ Caminho explicito para msbuild.stdout.log.
 .PARAMETER StdErrPath
 Caminho explicito para msbuild.stderr.log.
 
+.PARAMETER RequestedVersionName
+Nome de versao solicitado pelo wrapper (contexto). Quando informado (junto das flags), o leitor
+usa a funcao compartilhada de leitura de contexto e separa activeVersion (efetivo) de
+activeVersionAtOpen. Omitido => modo legado.
+
+.PARAMETER RequestedEnvironmentName
+Nome de Environment solicitado pelo wrapper (contexto). Mesmo contrato de -RequestedVersionName.
+
+.PARAMETER SetVersionFailed
+Flag explicita de falha de SetActiveVersion. Distingue omitido de $false explicito; quando
+informada, permite decidir o contexto efetivo com uma unica leitura.
+
+.PARAMETER SetEnvironmentFailed
+Flag explicita de falha de SetActiveEnvironment. Mesmo contrato de -SetVersionFailed.
+
 .PARAMETER Stage
 Nome livre da etapa consumidora, por exemplo import-preview ou import-real.
 
@@ -33,6 +48,10 @@ param(
     [string]$StdOutPath,
     [string]$StdErrPath,
     [string]$ExpectedItems,
+    [string]$RequestedVersionName,
+    [string]$RequestedEnvironmentName,
+    [switch]$SetVersionFailed,
+    [switch]$SetEnvironmentFailed,
     [string]$Stage = 'import',
     [string]$OutputPath,
     [switch]$AsJson
@@ -46,6 +65,12 @@ if (-not (Test-Path -LiteralPath $utf8NoBomEncodingSupportPath -PathType Leaf)) 
     throw "UTF-8 no-BOM encoding support script not found: $utf8NoBomEncodingSupportPath"
 }
 . $utf8NoBomEncodingSupportPath
+
+$activeContextSupportPath = Join-Path (Split-Path -Parent $PSCommandPath) 'GeneXusMsBuildActiveContextSupport.ps1'
+if (-not (Test-Path -LiteralPath $activeContextSupportPath -PathType Leaf)) {
+    throw "Active context support script not found: $activeContextSupportPath"
+}
+. $activeContextSupportPath
 
 
 function Read-TextFileSafe {
@@ -331,6 +356,40 @@ if ([string]::IsNullOrWhiteSpace($StdOutPath) -and [string]::IsNullOrWhiteSpace(
 $stdOutText = Read-TextFileSafe -FilePath $StdOutPath
 $stdErrText = Read-TextFileSafe -FilePath $StdErrPath
 
+# Contexto ativo: com contexto informado pelo wrapper, usa a funcao compartilhada
+# (AtOpen/Effective); sem contexto (chamada direta/legado), best-effort com a 1a leitura e
+# AtOpen nulo. Omitido vs nome vazio vs flag $false explicita sao distinguidos via
+# $PSBoundParameters e refletidos em contextQuality (legacy|partial|complete).
+$versionPattern = "The active version is '([^']+)'"
+$environmentPattern = "The active environment is '([^']+)'"
+$requestedProvided = $PSBoundParameters.ContainsKey('RequestedVersionName') -or $PSBoundParameters.ContainsKey('RequestedEnvironmentName')
+$flagsProvided = $PSBoundParameters.ContainsKey('SetVersionFailed') -or $PSBoundParameters.ContainsKey('SetEnvironmentFailed')
+$contextProvided = $requestedProvided -or $flagsProvided
+
+$activeContextFields = [ordered]@{
+    activeVersion           = $null
+    activeEnvironment       = $null
+    activeVersionAtOpen     = $null
+    activeEnvironmentAtOpen = $null
+    contextQuality          = $null
+}
+
+if (-not $contextProvided) {
+    $activeContextFields.contextQuality = 'legacy'
+    $activeContextFields.activeVersion = Get-RegexValue -Text $stdOutText -Pattern $versionPattern
+    $activeContextFields.activeEnvironment = Get-RegexValue -Text $stdOutText -Pattern $environmentPattern
+}
+else {
+    $contextQuality = if ($requestedProvided -and $flagsProvided) { 'complete' } else { 'partial' }
+    $activeContextFields.contextQuality = $contextQuality
+    $versionReadings = Resolve-GeneXusKbActiveContextReadings -Text $stdOutText -Pattern $versionPattern -RequestedName $RequestedVersionName -SetFailed $SetVersionFailed.IsPresent
+    $environmentReadings = Resolve-GeneXusKbActiveContextReadings -Text $stdOutText -Pattern $environmentPattern -RequestedName $RequestedEnvironmentName -SetFailed $SetEnvironmentFailed.IsPresent
+    $activeContextFields.activeVersion = $versionReadings.Effective
+    $activeContextFields.activeEnvironment = $environmentReadings.Effective
+    $activeContextFields.activeVersionAtOpen = $versionReadings.AtOpen
+    $activeContextFields.activeEnvironmentAtOpen = $environmentReadings.AtOpen
+}
+
 if ($Stage -eq 'export') {
     $exportErrors = @()
     $exportErrors += @(Get-ErrorLines -Text $stdOutText)
@@ -348,8 +407,11 @@ if ($Stage -eq 'export') {
         knownStdOutNoise = @($knownStdOutNoise)
         exportMarkerFound = ($stdOutText -match '__EXPORTED_FILE__=')
         exportTaskSuccess = ($stdOutText -match 'Export (Sucesso|Success)')
-        activeVersion = (Get-RegexValue -Text $stdOutText -Pattern "The active version is '([^']+)'")
-        activeEnvironment = (Get-RegexValue -Text $stdOutText -Pattern "The active environment is '([^']+)'")
+        activeVersion = $activeContextFields.activeVersion
+        activeEnvironment = $activeContextFields.activeEnvironment
+        activeVersionAtOpen = $activeContextFields.activeVersionAtOpen
+        activeEnvironmentAtOpen = $activeContextFields.activeEnvironmentAtOpen
+        contextQuality = $activeContextFields.contextQuality
         counts = [ordered]@{
             exportErrors = $exportErrors.Count
             invalidTypesRejected = $invalidTypesRejected.Count
@@ -390,8 +452,11 @@ if ($Stage -eq 'export') {
         gxImportLogReadStatus = $gxImportLogReadSignal.status
         gxImportLogReadError = $gxImportLogReadSignal.error
         diagnosticDegraded = $gxImportLogReadSignal.diagnosticDegraded
-        activeVersion = (Get-RegexValue -Text $stdOutText -Pattern "The active version is '([^']+)'")
-        activeEnvironment = (Get-RegexValue -Text $stdOutText -Pattern "The active environment is '([^']+)'")
+        activeVersion = $activeContextFields.activeVersion
+        activeEnvironment = $activeContextFields.activeEnvironment
+        activeVersionAtOpen = $activeContextFields.activeVersionAtOpen
+        activeEnvironmentAtOpen = $activeContextFields.activeEnvironmentAtOpen
+        contextQuality = $activeContextFields.contextQuality
         importTaskSuccess = ($stdOutText -match 'Import Task (Sucesso|Success)')
         layoutWarnings = $layoutWarnings
         counts = [ordered]@{
