@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
 Wrapper local sanitizado para copiar XMLs do acervo para a frente, com bump de lastUpdate.

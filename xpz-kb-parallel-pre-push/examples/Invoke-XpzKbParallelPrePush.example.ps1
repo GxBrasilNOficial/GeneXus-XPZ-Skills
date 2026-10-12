@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
 Molde do wrapper LOCAL da rotina pre-push de uma pasta paralela de KB.

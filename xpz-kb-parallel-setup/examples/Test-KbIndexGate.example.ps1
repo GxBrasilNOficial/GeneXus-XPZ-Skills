@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
 Molde do wrapper LOCAL do gate de indice KbIntelligence de uma pasta paralela de KB.

@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Exemplo sanitizado de edicao cirurgica de XML GeneXus via motor compartilhado.

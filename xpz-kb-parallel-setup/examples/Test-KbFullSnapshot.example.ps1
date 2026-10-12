@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
 Wrapper local sanitizado para conferência completa de um export full da KB.

@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
 Wrapper local para verificar frescor do setup da pasta paralela da KB em relacao ao contrato de setup XPZ.

@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
 Wrapper local para gravar campos de environment/deploy em kb-source-metadata.md.

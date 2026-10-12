@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
 Wrapper local para registrar os eventos pos-build conhecidos de um environment em kb-source-metadata.md.

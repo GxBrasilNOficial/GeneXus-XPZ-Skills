@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
 Wrapper local sanitizado para auditar o naming de ObjetosDaKbEmXml.

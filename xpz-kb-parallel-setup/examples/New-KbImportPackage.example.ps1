@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
 Wrapper local sanitizado para criar pacote import_file.xml de uma frente da KB.
