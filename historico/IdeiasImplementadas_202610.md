@@ -279,5 +279,5 @@ O defeito original era duplo: (1) um wrapper local com uma flag órfã no `.EXAM
 
 ### Rastreabilidade
 
-- Commit material: pendente — frente em revisão pré-push, sem commit nesta execução.
+- Commit material: `6772a94` (Detecta comment-based help inconsistente no inventário de wrappers).
 - Arquivos materiais: `scripts/XpzWrapperEngineParamSupport.ps1`, `scripts/Test-XpzWrapperInventory.ps1`, `scripts/Test-XpzSetupAudit.ps1`, `scripts/Test-XpzWrapperInventorySelfTest.ps1`, `scripts/Test-XpzWrapperEngineParamSupportSelfTest.ps1`, `scripts/Test-XpzWrapperEngineParamMoldesSelfTest.ps1`, `xpz-kb-parallel-setup/SKILL.md`, `09-inventario-e-rastreabilidade-publica.md`, `02-regras-operacionais-e-runtime.md`, `CHANGELOG.md`, `999-ideias-pendentes.md`.
