@@ -258,5 +258,5 @@ Implementado em 2026-10-12, conforme plano aprovado e estabilizado (revisão por
 
 ### Rastreabilidade
 
-- Commit material: pendente (sem commit nesta rodada; a frente aguarda fechamento do usuário).
+- Commit material: `c6053ad` (Corrige contexto de abertura e classificacao de saida nos wrappers MSBuild).
 - Arquivos materiais: `scripts/GeneXusMsBuildActiveContextSupport.ps1`, `scripts/Invoke-GeneXusXpzExport.ps1`, `scripts/Invoke-GeneXusXpzImport.ps1`, `scripts/Test-GeneXusXpzImportPreview.ps1`, `scripts/Open-GeneXusKbHeadless.ps1`, `scripts/Read-MsBuildImportSignals.ps1`, `scripts/GeneXusKbDeploymentEnvironmentSupport.ps1`, `scripts/msbuild-exit-codes.catalog.json`, `scripts/Test-GeneXusMsBuildActiveContextSupportSelfTest.ps1`, `scripts/Test-OpenGeneXusKbHeadlessEndToEndSelfTest.ps1`, `scripts/Test-GeneXusMsBuildActiveContextWrappersEndToEndSelfTest.ps1`, `scripts/Test-MsBuildImportSignalsClassifier.ps1`, `scripts/Test-MsBuildExitCodesCatalog.ps1`, `scripts/Test-GeneXusKbDeploymentEnvironmentContextSelfTest.ps1`, `scripts/fixtures/msbuild-e2e/SyntheticGeneXusMsBuildTasks.cs`, `10-base-operacional-msbuild-headless.md`, `09-inventario-e-rastreabilidade-publica.md`, `CHANGELOG.md`, `xpz-msbuild-import-export/SKILL.md`, `999-ideias-pendentes.md`.
