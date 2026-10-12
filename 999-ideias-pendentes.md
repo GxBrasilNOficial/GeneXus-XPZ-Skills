@@ -3436,3 +3436,14 @@ As contagens são de **arquivos que mencionam o token**, não de parâmetros exc
 **Melhoria pendente.** Tornar os três casos explícitos e falhar se uma operação aceita não tiver mensagem mapeada; acrescentar ao self-test a equivalência entre a chamada sem parâmetro e `-Operation 'index-rebuild'`. Não é defeito atual nem bloqueio de uso.
 
 **Relacionado.** `scripts/GeneXusPythonPrerequisite.ps1`; `scripts/Test-GeneXusKbIntelligenceExtractorSignatureSelfTest.ps1`; `scripts/README-kb-intelligence.md`.
+
+## Política de local dos documentos de desenho/plano da raiz (revisão de organização)
+
+- **Importância** — baixa-média (atrito de navegação; não há dano — nenhum desses docs é fonte normativa executável e quase todos são citados por `09`/`CHANGELOG`/scripts, então mexer neles pode quebrar referências).
+- **Maturidade** — ideia (sem política decidida; três direções em aberto).
+
+**Contexto medido (2026-10-12).** A raiz mantém, rastreados no Git, ao menos 10 documentos de desenho/plano/checklist por frente — `claude-code-pretooluse-auto-allow-design.md`, `claude-code-pretooluse-daemon-design.md`, `claude-code-pretooluse-implementacao-v1-plan.md`, `edit-genexus-xml-surgical-design.md`, `edit-genexus-xml-batch-metadata-design.md`, `java-tomcat-fase3-replano.md`, `java-tomcat-fase3-checklist-implementacao.md`, `java-tomcat-paridade-gerador-design.md`, `opencode-reviewer-ro-least-privilege-design.md`, `xpz-mcp-integrations-design.md` — além de outros sem esse sufixo no nome (`java-tomcat-pos-v1-frentes-futuras.md`, `evidence-catalog-java-tomcat.md`). A maioria é **referenciada** (5–10 refs) pelo `09-inventario-e-rastreabilidade-publica.md` (como «Dono:»), pelo `CHANGELOG.md`, pelo próprio `999` e por scripts; o `README.md` admite explicitamente «documentação operacional complementar de frentes ativas» na raiz. Dois subgrupos destoam por idade/fraca referência: os `java-tomcat-*` (último commit 2026-07) e `xpz-mcp-integrations-design.md` (1 única referência, o `999`).
+
+**O que revisar.** Decidir uma política de local — (a) manter na raiz como está; (b) mover para subpasta dedicada (ex.: `design/`/`docs/`); (c) arquivar em `historico/<frente>/` quando a frente encerrar. A revisão é **doc-a-doc** (idade, referências, frente encerrada?), com atualização dos ponteiros do `09`/`CHANGELOG` e aprovação explícita; nunca em lote cego. Motivação de origem: sensação de documento «largado indevidamente» na raiz, não confirmada como abandono (quase todos são referenciados).
+
+**Relacionado.** `README.md` («documentação operacional complementar de frentes ativas»); `09-inventario-e-rastreabilidade-publica.md`; `CHANGELOG.md`; `AGENTS.md`.
