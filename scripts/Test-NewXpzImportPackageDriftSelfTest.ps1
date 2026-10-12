@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Self-test do contrato fail-closed de drift frente-vs-acervo em New-XpzImportPackage.ps1.

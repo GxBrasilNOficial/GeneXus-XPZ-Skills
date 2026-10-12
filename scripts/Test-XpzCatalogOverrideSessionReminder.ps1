@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Emite lembrete de sessao quando gx-object-type-catalog.override.json estiver ativo.

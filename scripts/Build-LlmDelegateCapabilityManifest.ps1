@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Sonda os backends de LLM da skill xpz-llm-delegate instalados na maquina e grava um

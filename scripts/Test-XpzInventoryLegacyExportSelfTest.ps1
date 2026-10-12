@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Self-test ponta-a-ponta do ramo legado de Get-GeneXusImportPackageObjectInventory.ps1.

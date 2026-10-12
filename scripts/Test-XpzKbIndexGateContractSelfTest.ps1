@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
   Self-test do CONTRATO -AsJson do motor Test-XpzKbIndexGate.ps1 (gate K9 da

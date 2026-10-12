@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Re-carimba (bump) o lastUpdate de um XML GeneXus já editado, no próprio arquivo,

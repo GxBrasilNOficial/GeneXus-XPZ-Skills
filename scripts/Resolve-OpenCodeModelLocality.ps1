@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Classifica, de forma deterministica, se um modelo do opencode roda LOCAL (na maquina)

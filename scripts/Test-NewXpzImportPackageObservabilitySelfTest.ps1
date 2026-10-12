@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Autoteste do relatorio de execucao do empacotamento XPZ.

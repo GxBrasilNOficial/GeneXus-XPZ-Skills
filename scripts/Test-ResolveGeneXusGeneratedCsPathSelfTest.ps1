@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Regressao mínima do resolvedor de .cs gerado via kb-source-metadata.md.

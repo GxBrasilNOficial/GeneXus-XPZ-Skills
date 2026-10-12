@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Self-test da guarda de familia (Eixo C) em Test-GeneXusRuntimeFreshness.ps1 (Fase 2 Java/Tomcat).

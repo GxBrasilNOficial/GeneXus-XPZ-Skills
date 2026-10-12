@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Bateria mínima para Get-GeneXusImportPackageObjectInventory.ps1 (XML e .xpz sintetico).

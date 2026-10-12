@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Chama o opencode (one-shot, sincrono) e devolve a resposta em texto.

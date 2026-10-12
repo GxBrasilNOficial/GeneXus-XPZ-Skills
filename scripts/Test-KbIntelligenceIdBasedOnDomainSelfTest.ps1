@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Self-test G.2 da frente idBasedOn -> Domain (extrator 13): fixtures nao-vacuos e evidencia persistida.

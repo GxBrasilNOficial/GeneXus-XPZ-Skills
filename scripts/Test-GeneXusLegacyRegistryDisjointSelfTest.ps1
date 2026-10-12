@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Disjuncao registro x catalogo: nome de orphan, typeToken e materializedFolderName

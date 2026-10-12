@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
 Self-test do Passo B3 (identidade do daemon PreToolUse auto-allow do Claude Code):

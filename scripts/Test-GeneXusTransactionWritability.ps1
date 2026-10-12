@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Gate de gravabilidade por Transaction (fachada do nucleo canonico Python).

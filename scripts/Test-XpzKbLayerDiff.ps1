@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
   Gates K3 e K4 da rotina pre-push de pasta paralela de KB (skill

@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Edicao em lote de metadados de XML GeneXus dirigida por manifesto, com

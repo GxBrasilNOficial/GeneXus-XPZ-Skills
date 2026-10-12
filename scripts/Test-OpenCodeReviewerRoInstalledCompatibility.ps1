@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Diagnostica a compatibilidade local do opencode reviewer-ro instalado.

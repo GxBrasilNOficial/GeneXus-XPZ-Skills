@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Classifica a localidade de um destino orchestrator-native (subagente nativo).

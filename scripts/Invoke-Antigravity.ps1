@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Chama o Antigravity CLI (agy) no perfil fixo public-review e devolve a resposta final.

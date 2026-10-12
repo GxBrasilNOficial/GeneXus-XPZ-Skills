@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
   Self-test do helper XpzWrapperEngineParamSupport.ps1 — check forwards_unknown_engine_param.

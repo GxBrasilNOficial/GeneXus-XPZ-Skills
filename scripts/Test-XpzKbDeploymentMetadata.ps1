@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Valida plausibilidade semantica dos campos de environment/deploy em kb-source-metadata.md.

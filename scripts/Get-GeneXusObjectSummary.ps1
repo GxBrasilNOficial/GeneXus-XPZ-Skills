@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
 Resume um objeto GeneXus XML/XPZ sem despejar CDATA extenso.

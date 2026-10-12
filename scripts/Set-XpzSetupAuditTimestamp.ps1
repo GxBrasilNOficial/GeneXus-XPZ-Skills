@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Grava last_setup_audit_run_at e a assinatura do contrato de setup em kb-source-metadata.md.

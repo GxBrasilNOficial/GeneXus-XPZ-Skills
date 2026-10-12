@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
 Audita o naming dos diretórios imediatos de ObjetosDaKbEmXml.

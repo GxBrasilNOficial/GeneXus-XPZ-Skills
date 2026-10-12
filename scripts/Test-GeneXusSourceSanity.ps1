@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Gate de sanidade estrutural de Source em XML GeneXus/XPZ.

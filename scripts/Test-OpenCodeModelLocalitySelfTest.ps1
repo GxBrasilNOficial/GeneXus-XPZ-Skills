@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Self-test de contrato de Resolve-OpenCodeModelLocality.ps1 (skill xpz-llm-delegate).

@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Guard fail-closed do agente opencode `reviewer-ro` (least-privilege, "sem execucao/escrita").

@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Monitor incremental de execução headless de MSBuild/GeneXus.

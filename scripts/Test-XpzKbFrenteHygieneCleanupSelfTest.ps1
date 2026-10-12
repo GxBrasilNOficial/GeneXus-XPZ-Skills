@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
   Self-test do executor Remove-XpzKbFrenteHygieneFindings.ps1 (faxina fail-safe da Fase 2a).

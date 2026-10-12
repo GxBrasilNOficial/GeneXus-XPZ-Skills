@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Calcula a assinatura deterministica do contrato de setup de pasta paralela da KB.

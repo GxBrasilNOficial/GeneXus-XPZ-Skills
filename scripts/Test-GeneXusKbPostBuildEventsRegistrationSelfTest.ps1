@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Round-trip do registro de eventos pos-build: registrar -> ler -> classificar.

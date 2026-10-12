@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Self-test da extracao de objetos gerados por Pattern (IsGeneratedObject / PatternObjectId /

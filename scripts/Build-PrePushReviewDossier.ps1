@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Monta o dossie pre-push para revisor semantic-only (git BRUTO + diagnostico mecanico).

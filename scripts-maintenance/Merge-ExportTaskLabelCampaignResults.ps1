@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Consolida resultados da campanha exportTaskLabel no catálogo e gera relatório para 10a.

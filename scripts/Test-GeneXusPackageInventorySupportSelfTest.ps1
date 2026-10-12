@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Valida contrato de packageInventory resumido (nominalInventoryAt, extrasFullListAt).

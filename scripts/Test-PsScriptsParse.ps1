@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Parses repository PowerShell scripts and reports syntax errors.

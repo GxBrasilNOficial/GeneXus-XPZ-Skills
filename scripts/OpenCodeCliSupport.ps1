@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Funcoes compartilhadas para descobrir e validar o opencode CLI.

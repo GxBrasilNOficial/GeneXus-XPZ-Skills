@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
   Self-test do motor Compare-XpzChecksums.ps1 (filtro F1 da Fase 2b da rotina

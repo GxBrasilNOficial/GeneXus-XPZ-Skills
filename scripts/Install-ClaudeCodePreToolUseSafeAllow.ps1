@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
 Instalador (DEPLOY) do daemon+cliente PreToolUse (auto-allow) do Claude Code. PASSO G / G2.1.

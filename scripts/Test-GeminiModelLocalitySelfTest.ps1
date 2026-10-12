@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Self-test deterministico do resolvedor Gemini da xpz-llm-delegate.

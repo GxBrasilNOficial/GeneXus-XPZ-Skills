@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Adiciona um botao a um WebPanel GeneXus de forma cirurgica e fail-closed.

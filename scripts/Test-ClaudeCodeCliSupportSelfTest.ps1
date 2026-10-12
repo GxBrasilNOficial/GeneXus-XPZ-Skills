@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Self-test das funcoes de ClaudeCodeCliSupport.ps1 e da montagem de argumentos dos adapters.

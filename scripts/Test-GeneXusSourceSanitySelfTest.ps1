@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Self-test do gate Test-GeneXusSourceSanity.ps1: regra type-aware

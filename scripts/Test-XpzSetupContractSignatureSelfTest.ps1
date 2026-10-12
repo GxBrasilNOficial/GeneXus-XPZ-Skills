@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Valida o contrato de assinatura usado pelo freshness de setup.

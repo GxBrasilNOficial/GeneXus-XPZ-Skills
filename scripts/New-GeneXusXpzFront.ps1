@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Abre uma frente de trabalho XPZ em pasta paralela de KB GeneXus.

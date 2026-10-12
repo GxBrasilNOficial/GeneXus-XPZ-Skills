@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Gate mecanico de paridade documental da frente MSBuild probe (pre-push).

@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Funções compartilhadas para catálogo de tipos GeneXus (base + override local).

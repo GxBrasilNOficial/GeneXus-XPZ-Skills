@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Resolve o caminho efetivo do arquivo de politica de delegacao a LLM na raiz de uma

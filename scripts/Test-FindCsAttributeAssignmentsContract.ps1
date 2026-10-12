@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Regressao mínima do contrato Find-CsAttributeAssignments.ps1.

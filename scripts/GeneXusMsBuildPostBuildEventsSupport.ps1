@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Extracao de eventos pos-build do stdout MSBuild GeneXus.

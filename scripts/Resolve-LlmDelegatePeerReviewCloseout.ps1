@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Verifica, de forma deterministica, se uma rodada de revisao por pares pode ser encerrada

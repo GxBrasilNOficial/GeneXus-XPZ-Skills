@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Funções compartilhadas para matriz exportTaskLabel (P5).

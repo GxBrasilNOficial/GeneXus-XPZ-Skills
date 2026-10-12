@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
   Self-test do motor Test-XpzKbFrenteHygiene.ps1 (Fase 2a estrutural da rotina

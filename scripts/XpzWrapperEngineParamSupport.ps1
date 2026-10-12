@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
   Suporte (dot-source) para três checks do inventario de wrappers locais

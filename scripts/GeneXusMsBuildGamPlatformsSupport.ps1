@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Filtro de ruido GAM/NetCore em stdout e hints consultivos de remediacao NTFS.

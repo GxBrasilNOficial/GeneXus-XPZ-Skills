@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Funcoes compartilhadas do backend codex da skill xpz-llm-delegate: descoberta do

@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Self-test minimo para extracao de formas de chamada de Procedure no KbIntelligence.

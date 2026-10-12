@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
 Self-test do gerador do buildContractPin (scripts/Generate-ClaudeCodePtuBuildPin.ps1), Passo B do
@@ -13,7 +14,7 @@ Parte A (gerador isolado, via fixtures passados como -CsPath/-GeneratorPath/-Tar
   - sensibilidade: mudar QUALQUER chunk (cs, gerador, targets, cada uma das 3 props) -> pin MUDA.
 Parte B (§5l via caminho MSBuild REAL, projeto fixture temporario isolado): build -> BuildPin.g.cs
   gerado; editar SO o .targets -> rebuild -> pin MUDA e o .g.cs e reescrito (prova que mudanca no
-  .targets nao deixa o .g.cs stale por incrementalidade).
+  O .targets nao deixa o .g.cs stale por incrementalidade).
 Tudo em diretorio temporario, limpo no fim. Nao toca arquivos versionados do repo.
 #>
 [CmdletBinding()]

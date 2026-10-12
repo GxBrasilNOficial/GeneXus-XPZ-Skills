@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Avalia, de forma CONSULTIVA, se um conjunto de candidatos a revisor (com seus vereditos

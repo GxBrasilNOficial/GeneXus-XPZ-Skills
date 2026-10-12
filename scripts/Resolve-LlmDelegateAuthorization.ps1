@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Gate de confidencialidade da skill xpz-llm-delegate: decide se um payload pode ser

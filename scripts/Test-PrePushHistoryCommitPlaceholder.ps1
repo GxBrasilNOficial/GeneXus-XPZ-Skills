@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Gate consultivo: campo de rastreabilidade (Commit:/PR:) com placeholder

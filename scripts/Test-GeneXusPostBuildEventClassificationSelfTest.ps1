@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Regressao da classificação de eventos pos-build (Get-GeneXusPostBuildEventClassification).

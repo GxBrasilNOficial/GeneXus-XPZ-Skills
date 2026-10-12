@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Monitor incremental de um job assincrono do Codex (disparado por Start-CodexJob.ps1).

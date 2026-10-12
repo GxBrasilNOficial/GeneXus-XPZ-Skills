@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Diagnostico somente leitura de frescor da publicacao do environment de deploy (Eixo A), por familia

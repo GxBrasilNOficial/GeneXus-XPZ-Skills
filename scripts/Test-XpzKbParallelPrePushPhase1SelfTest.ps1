@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
   Self-test do orquestrador Invoke-XpzKbParallelPrePushPhase1.ps1 (Fase 1 mecanica

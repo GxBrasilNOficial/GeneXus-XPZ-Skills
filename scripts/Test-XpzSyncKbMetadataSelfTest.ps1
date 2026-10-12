@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Valida que Update-XpzKbSourceMetadataFromSync preserva last_setup_audit_run_at, setup_contract_signature_* e EOL LF.

@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Mutacao cirurgica de kb-source-metadata.md sob autoridade do xpz-sync.

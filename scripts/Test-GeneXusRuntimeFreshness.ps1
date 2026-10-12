@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Diagnostica se o runtime GeneXus .NET reflete a versão mais recente de um objeto importado.

@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Suporte ao parsing e materializacao de pacotes ExportFile legados GeneXus 9

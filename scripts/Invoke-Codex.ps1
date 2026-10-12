@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Chama o Codex CLI (codex exec, sincrono) e devolve a resposta final em texto.

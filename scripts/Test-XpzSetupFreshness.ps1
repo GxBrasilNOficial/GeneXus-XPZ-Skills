@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Verifica se o setup da pasta paralela da KB está fresco em relacao ao contrato de setup XPZ.

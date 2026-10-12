@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
 Gera o BuildPin.g.cs com o buildContractPin do Passo B do daemon PreToolUse (auto-allow) do

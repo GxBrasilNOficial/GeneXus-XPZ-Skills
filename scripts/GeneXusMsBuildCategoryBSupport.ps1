@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Barragem estrutural (Categoria B) para wrappers MSBuild GeneXus.

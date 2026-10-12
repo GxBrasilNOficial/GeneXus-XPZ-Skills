@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
 Inventaria objetos efetivamente presentes em import_file.xml ou pacote .xpz GeneXus.

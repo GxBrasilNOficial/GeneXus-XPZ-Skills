@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
   Gate K11 da rotina pre-push de pasta paralela de KB (skill

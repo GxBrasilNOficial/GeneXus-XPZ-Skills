@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Gerador da fixture de export legado GeneXus 9 (iso-8859-1) para self-tests.

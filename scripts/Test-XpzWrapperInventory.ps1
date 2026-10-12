@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Compara os wrappers locais da pasta paralela com os exemplos canonicos do repositório de skills.

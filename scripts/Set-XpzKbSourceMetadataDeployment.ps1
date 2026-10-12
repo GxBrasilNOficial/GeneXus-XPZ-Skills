@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Grava campos de environment/deploy em kb-source-metadata.md (autoridade: xpz-kb-parallel-setup).

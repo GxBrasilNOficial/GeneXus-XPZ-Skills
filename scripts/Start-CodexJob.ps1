@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Dispara um job assincrono (nao-bloqueante) do Codex CLI e abre o watcher.

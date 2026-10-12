@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Grava a lista CURADA de revisores preferidos (schema 3), por escopo machine ou orchestrator.

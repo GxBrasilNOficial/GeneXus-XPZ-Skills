@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Regressao do resolvedor tipado de limite de uso/taxa do provider no log do opencode.

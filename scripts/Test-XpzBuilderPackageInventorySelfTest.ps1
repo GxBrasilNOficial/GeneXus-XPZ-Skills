@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Valida packageInventory embutido no fluxo xpz-builder (suporte compartilhado).

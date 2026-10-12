@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Gate consultivo: script compartilhado alterado no diff cujo contrato e

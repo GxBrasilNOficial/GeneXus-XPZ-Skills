@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Autoteste do resolvedor Resolve-AntigravityModelLocality.ps1.

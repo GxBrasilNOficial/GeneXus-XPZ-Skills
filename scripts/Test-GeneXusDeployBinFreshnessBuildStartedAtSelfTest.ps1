@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Regressao da resolucao de -BuildStartedAt no script avulso Test-GeneXusDeployBinFreshness.ps1.

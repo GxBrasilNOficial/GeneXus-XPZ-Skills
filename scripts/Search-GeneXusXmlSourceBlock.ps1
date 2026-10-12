@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Busca texto em blocos Source de XML GeneXus sem despejar CDATA extenso.

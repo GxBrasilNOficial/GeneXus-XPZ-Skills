@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Checagem pos-build de frescor da publicacao do environment de deploy (Ponto 2), por familia
@@ -7,7 +8,7 @@
 .DESCRIPTION
     Le deployment_hosting_kind e kb_environment_web_dirs (e, para Java, kb_environment_servlet_dirs/
     _app_package) do metadata. Test-GeneXusKbDeployBinFreshnessCore e DISPATCHER por familia (Fase 3):
-      .NET (...CoreDotNet): gate por publicacao em web\bin — object *.dll (exceto runtime GeneXus/
+      Contexto .NET (...CoreDotNet): gate por publicacao em web\bin — object *.dll (exceto runtime GeneXus/
         System/Microsoft) ou *.config; dotnet-core-self-host: GxNetCoreStartup.dll só complementar
         (warning se velho).
       Java/Tomcat (...CoreJava): co-gate por CONJUNTO DE ARTEFATOS do objeto (max mtime dos <obj>*.java

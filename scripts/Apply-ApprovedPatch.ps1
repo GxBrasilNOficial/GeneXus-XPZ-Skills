@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Stages and applies an approved textual Git patch without Codex apply_patch.

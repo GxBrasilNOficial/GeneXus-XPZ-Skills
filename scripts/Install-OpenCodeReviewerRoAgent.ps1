@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Instala/atualiza o agente global `reviewer-ro` do opencode (least-privilege, "sem

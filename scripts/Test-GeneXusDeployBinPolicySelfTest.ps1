@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Regressao da politica de execução do gate de deploy bin (Resolve-GeneXusKbDeployBinCheckPolicy).

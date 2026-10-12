@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Gera prompt copiavel para o mantenedor da base GeneXus-XPZ-Skills.

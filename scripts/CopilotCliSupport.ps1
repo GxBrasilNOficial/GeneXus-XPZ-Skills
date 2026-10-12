@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Funcoes compartilhadas do backend copilot da skill xpz-llm-delegate.

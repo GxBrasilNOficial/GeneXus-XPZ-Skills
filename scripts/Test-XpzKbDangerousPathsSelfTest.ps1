@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
   Self-test do motor Test-XpzKbDangerousPaths.ps1 (gates K1/K2 da rotina pre-push

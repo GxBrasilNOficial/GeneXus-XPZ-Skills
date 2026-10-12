@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Self-test mínimo para Test-XpzPackageCollision.ps1.

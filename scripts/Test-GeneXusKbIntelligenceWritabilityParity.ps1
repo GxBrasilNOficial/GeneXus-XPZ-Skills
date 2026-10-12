@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Exige paridade entre Test-GeneXusTransactionWritability.ps1 e consultas do índice materializado.

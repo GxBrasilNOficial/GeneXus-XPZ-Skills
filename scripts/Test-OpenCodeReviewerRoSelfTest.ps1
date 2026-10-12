@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Self-test do guard/least-privilege do agente opencode `reviewer-ro` (skill xpz-llm-delegate).

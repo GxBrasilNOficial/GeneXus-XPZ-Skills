@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Prova sintetica repetivel de read/grep via opencode debug agent, sem modelo.

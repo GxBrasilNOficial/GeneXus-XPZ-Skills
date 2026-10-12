@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Inventario de environments GeneXus via MSBuild (SetActiveEnvironment) sobre lista explicita.

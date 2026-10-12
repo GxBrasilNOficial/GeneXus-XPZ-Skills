@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Self-test: Test-XpzObjetosDaKbNaming classifica elemento legado orfao por typeToken, nao como

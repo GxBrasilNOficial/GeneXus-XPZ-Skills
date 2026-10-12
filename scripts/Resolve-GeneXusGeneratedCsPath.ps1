@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Resolve o caminho direto do .cs gerado por objeto GeneXus a partir do metadata da pasta paralela.

@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Guardas de caminho compartilhados das skills XPZ (areas protegidas,

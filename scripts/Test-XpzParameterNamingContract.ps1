@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Trava deterministica do contrato de nomenclatura de parâmetros das skills XPZ.

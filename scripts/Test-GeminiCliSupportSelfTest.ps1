@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Self-test das funcoes puras de GeminiCliSupport.ps1.

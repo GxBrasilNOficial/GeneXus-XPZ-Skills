@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Suporte para localizar atribuicoes de atributo Transaction em .cs gerado GeneXus (camada web).

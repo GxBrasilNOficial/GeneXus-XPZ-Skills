@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Resolve o Criador do Modelo (familia estrutural de fundacao) para avaliacao do piso de diversidade.

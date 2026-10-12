@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Self-test de roteamento por hosting kind no gate de deploy-bin (Fase 3 da paridade Java/Tomcat).

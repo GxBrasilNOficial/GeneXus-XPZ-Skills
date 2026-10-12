@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Bateria de contrato de Edit-GeneXusXmlSurgical.ps1 (secao 5 da v6 congelada).

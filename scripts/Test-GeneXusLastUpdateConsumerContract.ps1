@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Provas sintéticas da v5: consumidores reais, sem KB/IDE/import/build.

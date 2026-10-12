@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Escrita atomica de arquivo de texto com temporario em diretorio declarado.

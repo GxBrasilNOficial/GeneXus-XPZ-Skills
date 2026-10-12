@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Le a lista curada de revisores preferidos (schema 3) em cascata orchestrator->machine

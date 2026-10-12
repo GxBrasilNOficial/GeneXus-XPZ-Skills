@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Bateria mínima para descoberta de tipos desconhecidos e override de catalogo.

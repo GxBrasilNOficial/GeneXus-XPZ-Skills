@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Classifica uma invocacao do Claude Code como destino externo Anthropic e devolve a

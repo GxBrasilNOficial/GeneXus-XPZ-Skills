@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Contrato de assinatura do extrator KbIntelligence, calculado pelo dono Python.

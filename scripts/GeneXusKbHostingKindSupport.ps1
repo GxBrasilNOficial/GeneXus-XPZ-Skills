@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Registro-fonte unico dos hosting kinds de deploy reconhecidos pelas skills XPZ.

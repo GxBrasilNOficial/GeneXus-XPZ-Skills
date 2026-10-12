@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Funções compartilhadas de parsing do stream JSON do opencode (skill xpz-llm-delegate).

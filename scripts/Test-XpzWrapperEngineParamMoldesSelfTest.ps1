@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
   Self-test de SEGURANCA: roda o check forwards_unknown_engine_param sobre TODOS os moldes

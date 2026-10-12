@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Invoca GeneXusTransactionWritabilityCore.py (classificador canonico de gravabilidade).

@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Sugere metadata Java/Tomcat para kb-source-metadata.md sem gravar arquivo.

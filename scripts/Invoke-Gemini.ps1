@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Chama o Gemini CLI (sincrono) e devolve a resposta final em texto.

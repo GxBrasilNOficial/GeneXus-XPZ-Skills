@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
   Filtro F1 da Fase 2b da rotina pre-push de pasta paralela de KB (skill

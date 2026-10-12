@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Mostra whitespace, encoding e EOL de um arquivo em formato legivel.

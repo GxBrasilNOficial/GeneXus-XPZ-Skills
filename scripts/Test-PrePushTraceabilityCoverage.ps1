@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Detecta riscos objetivos de rastreabilidade editorial na rotina pre-push.

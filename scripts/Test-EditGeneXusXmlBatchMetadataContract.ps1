@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Bateria de contrato de Edit-GeneXusXmlBatchMetadata.ps1 (secao 13 do

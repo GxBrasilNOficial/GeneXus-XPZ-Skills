@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Governanca de inventario e operationalSubState para export MSBuild (Invoke-GeneXusXpzExport.ps1).

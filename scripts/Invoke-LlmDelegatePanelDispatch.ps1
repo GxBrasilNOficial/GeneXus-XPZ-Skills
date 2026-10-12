@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Harness MECANICO de despacho+coleta de um painel de revisores da skill xpz-llm-delegate:

@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Diagnostica variáveis GeneXus em XML de objeto, com foco em variáveis tocadas pelo delta.

@@ -58,7 +58,7 @@ Caminho explicito para kb-source-metadata.md; prevalece sobre -ParallelKbRoot.
 
 .PARAMETER PostImportDeployValidation
 Quando presente, ativa gate de validação deploy pos-import por familia de deployment_hosting_kind:
-.NET checa o web\bin resolvido por kb_environment_web_dirs; java-tomcat roda o co-gate Java no
+O contexto .NET checa o web\bin resolvido por kb_environment_web_dirs; java-tomcat roda o co-gate Java no
 WEB-INF\classes externo (kb_environment_servlet_dirs/_app_package) — exit 49 se desatualizado.
 Metadata sem o mapeamento bloqueia a resolucao (status unknown); reconciliar via xpz-kb-parallel-setup.
 

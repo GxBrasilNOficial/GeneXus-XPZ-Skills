@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Inventaria environments GeneXus registrados na KB via MSBuild (somente leitura).

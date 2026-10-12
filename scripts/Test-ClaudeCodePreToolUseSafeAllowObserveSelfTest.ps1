@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
 Self-test do MODO MEDICAO (--observe / Fase 3) do cliente NativeAOT do hook PreToolUse (auto-allow) do

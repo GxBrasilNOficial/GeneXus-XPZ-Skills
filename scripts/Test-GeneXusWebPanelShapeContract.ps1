@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Regressao mínima do ramo WebPanel de Get-GeneXusObjectSummary.ps1.

@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
   Self-test do motor Test-XpzKbLayerDiff.ps1 (gates K3/K4 da rotina pre-push de

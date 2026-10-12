@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Self-test da deteccao de DIVERGENCIA DE ORIGEM (dataSource) cross-fluxo moderno<->legado

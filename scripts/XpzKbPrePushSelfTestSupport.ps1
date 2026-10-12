@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
   Suporte (dot-source) para os self-tests da rotina pre-push de pasta paralela de

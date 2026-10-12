@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Autoteste do modulo AntigravityCliSupport.ps1 e prova comportamental de Invoke-Antigravity.ps1.

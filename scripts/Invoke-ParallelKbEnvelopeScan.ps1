@@ -1,4 +1,5 @@
 #Requires -Version 7.4
+
 <#
 .SYNOPSIS
   Amostra envelope XML (Properties vs Part) por tipo em pastas paralelas ObjetosDaKbEmXml.

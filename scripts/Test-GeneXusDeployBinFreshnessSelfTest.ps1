@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Regressao mínima da resolucao de web\bin via kb_environment_web_dirs.

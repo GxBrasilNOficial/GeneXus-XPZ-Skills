@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Normalizacao de nome base de arquivo para materializacao de objetos GeneXus (fonte unica).
@@ -14,6 +15,7 @@
     por '_' e remove ponto(s) final(is) com TrimEnd('.'). Comportamento preservado byte a byte da
     implementacao historica interna ao Sync.
 #>
+
 
 function Normalize-FileBaseName {
     param([string]$LogicalName)

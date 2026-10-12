@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Carrega gx-platform-objects.json e detecta objetos de plataforma/SDK no inventario de pacote.

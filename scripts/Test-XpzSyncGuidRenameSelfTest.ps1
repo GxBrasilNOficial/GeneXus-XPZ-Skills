@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Self-test da reconciliacao GUID-aware de rename em Sync-GeneXusXpzToXml.ps1.

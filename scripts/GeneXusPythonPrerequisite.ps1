@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Resolve um executavel Python utilizavel para motores GeneXus-XPZ-Skills (ex.: KbIntelligence).

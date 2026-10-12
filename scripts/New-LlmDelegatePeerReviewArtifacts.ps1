@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Prepara, de forma transacional, os artefatos de uma rodada de revisao por pares:

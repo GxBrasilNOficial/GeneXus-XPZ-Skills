@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Self-test do gate 9-FD para drift frente-vs-acervo e fidelidade textual parcial.

@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Pureza do catalogo moderno gx-object-type-catalog.json: objectTypeGuid null

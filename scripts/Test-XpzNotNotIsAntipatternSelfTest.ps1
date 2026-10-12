@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
   Self-test do motor Test-XpzNotNotIsAntipattern.ps1 (gate K11 da rotina pre-push

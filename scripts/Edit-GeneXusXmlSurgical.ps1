@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Edicao cirurgica de XML GeneXus preservando conteúdo fora do delta aprovado.

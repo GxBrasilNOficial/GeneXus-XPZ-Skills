@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
 GATE de seguranca canonico (§8) do daemon+cliente PreToolUse (auto-allow) do Claude Code. PASSO E

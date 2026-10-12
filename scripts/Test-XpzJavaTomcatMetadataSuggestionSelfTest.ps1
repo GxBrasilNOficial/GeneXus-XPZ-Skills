@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Self-test do assistente opt-in de metadata Java/Tomcat do setup.

@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Registra entrada paliativa em gx-object-type-catalog.override.json (com upstream pendente).

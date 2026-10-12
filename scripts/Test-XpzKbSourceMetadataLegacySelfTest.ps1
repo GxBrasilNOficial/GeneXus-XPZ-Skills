@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Self-test do ramo legado de XpzKbSourceMetadataEditSupport.ps1 (-IsLegacyExport).

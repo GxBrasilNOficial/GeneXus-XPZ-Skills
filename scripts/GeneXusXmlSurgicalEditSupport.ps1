@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Funções compartilhadas para edicao cirurgica de XML GeneXus em modo raw.

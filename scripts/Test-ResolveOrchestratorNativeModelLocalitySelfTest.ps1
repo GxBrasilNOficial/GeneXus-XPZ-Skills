@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Self-test de Resolve-OrchestratorNativeModelLocality.ps1 e do gate com Backend orchestrator-native.

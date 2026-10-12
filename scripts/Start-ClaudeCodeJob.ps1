@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Dispara um job assincrono do Claude Code CLI e abre um watcher.

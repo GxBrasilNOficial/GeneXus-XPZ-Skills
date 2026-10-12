@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
   Fase 2a parcial (mecanicamente verificavel) da rotina pre-push de pasta paralela

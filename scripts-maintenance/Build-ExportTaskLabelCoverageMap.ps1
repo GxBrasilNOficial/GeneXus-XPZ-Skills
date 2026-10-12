@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Mapa de cobertura exportTaskLabel: tipo do catálogo x instância por KB paralela.

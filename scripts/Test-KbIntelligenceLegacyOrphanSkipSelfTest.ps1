@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Self-test: o indexador KbIntelligence e registry-aware para elementos legados orfaos.

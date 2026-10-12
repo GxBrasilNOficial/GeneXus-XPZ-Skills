@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Regressao do classificador pos-build de deploy bin (Invoke-GeneXusKbDeployBinPostBuildClassification),

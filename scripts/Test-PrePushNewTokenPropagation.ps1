@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Gate consultivo: detecta termo de contrato introduzido no diff e mencoes

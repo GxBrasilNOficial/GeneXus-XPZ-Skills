@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
   Orquestrador da Fase 1 (mecanica) da rotina pre-push de pasta paralela de KB

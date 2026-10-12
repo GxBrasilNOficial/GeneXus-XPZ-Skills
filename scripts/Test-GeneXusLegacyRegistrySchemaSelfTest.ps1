@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Forma intra-registro de gx-legacy-export-element-registry.json: schemaVersion,

@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Executa checagens mecanicas iniciais da rotina pre-push.

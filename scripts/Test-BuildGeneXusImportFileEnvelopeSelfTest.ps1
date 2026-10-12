@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Regression test for Build-GeneXusImportFileEnvelope.ps1 package-input guards.

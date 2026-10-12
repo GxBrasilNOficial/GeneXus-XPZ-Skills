@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Classifica o destino de uma chamada ao GitHub Copilot CLI.

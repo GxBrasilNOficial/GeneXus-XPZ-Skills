@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Valida scripts/msbuild-exit-codes.catalog.json e paridade com exits nos wrappers MSBuild.

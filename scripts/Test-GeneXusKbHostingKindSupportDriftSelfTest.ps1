@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Self-test de drift do registro de hosting kinds (GeneXusKbHostingKindSupport.ps1).

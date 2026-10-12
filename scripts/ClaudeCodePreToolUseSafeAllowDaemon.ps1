@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
 Daemon persistente do hook PreToolUse (auto-allow) do Claude Code. PASSO C

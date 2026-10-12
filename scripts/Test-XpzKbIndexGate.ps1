@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
   Motor compartilhado do gate de indice KbIntelligence (gate K9 da skill

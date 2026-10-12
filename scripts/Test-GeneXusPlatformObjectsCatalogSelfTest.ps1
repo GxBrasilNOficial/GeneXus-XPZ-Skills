@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Valida gx-platform-objects.json e Get-SystemObjectsPresent (paridade com listas .txt legadas).

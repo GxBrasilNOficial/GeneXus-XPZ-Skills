@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Self-test da captura duravel Codex (TempDir, KeepDays, sentinelas, Watch, kb-sensitive).

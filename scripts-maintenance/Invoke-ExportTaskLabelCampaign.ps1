@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Campanha P5: matriz exportTaskLabel para todos os tipos com espécime no mapa de cobertura.

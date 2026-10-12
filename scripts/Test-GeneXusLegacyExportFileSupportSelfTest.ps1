@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Self-test do motor de export legado GeneXus 9 (GeneXusLegacyExportFileSupport.ps1), isolado.

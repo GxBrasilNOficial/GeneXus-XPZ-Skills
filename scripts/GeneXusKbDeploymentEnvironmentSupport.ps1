@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Leitura de campos de environment/output em kb-source-metadata.md e resolucao de -EnvironmentName para wrappers MSBuild.

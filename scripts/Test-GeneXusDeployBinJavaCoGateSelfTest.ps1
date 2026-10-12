@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Self-test do co-gate de deploy-bin Java/Tomcat (Eixo A) — Fase 3 (v-bis/v-ter). Ancorado no
@@ -12,7 +13,7 @@
 
     Cobre: validacao de topologia externa; resolucao de com\<kb>; 4 quadrantes (fresh/stale/no-evidence/
     unexpected-publication); stub-only (mudanca de assinatura); skew BIDIRECIONAL (Tomcat-adiantado ->
-    .class do futuro excluido de Pf, NUNCA falso-fresh; Tomcat-atrasado -> distinguir "abaixo da janela"
+    Arquivos .class do futuro excluido de Pf, NUNCA falso-fresh; Tomcat-atrasado -> distinguir "abaixo da janela"
     de "ausente"); Pf\Lf informativo; strip condicional a/b/c/d; servletFlavor per-env not-audited;
     aliasing (arrays Java != .NET); validacao cruzada do contrato publicationTargets.
 

@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Corrige a degradacao de acentuacao pt-BR INEQUIVOCA (palavras cuja forma sem

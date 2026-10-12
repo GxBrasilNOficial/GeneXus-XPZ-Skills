@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Gate consultivo: o intervalo da pré-push altera o contrato canônico do

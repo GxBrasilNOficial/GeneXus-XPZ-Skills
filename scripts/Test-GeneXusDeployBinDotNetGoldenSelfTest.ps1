@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Golden de regressao .NET + roteamento por familia (.NET web\bin / co-gate Java) do diagnostico de deploy-bin (fachada Test-GeneXusDeployBinFreshness.ps1).

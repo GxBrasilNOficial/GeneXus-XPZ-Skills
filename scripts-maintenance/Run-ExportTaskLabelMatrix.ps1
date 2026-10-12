@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Executa matriz de candidatos exportTaskLabel para um tipo e espécime em uma KB nativa.

@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
 Extrai um objeto GeneXus de XML/XPZ sem imprimir o pacote inteiro.

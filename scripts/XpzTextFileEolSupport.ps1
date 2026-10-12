@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Leitura e escrita de arquivos de texto preservando EOL e newline final.

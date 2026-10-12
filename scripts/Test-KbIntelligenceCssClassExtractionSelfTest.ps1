@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Self-test do catalogo (camada 1) e do rastreamento de uso (camada 2) de classes CSS no KbIntelligence.

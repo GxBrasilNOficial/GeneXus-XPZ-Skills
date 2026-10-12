@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Self-test mínimo para extracao de chamadas de método em ExternalObject no KbIntelligence.

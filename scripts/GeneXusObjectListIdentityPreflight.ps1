@@ -1,4 +1,5 @@
 #requires -Version 7.4
+
 <#
 .SYNOPSIS
     Pré-validação de identidade Tipo:Nome contra índice KbIntelligence antes de export/import seletivo MSBuild.
