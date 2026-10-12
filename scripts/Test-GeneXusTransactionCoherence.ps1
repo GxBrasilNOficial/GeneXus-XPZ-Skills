@@ -136,6 +136,13 @@ function Test-OrphanWwpScreenCode {
     return $findings
 }
 
+function Get-LevelAttributeName {
+    param([System.Xml.XmlElement]$AttributeNode)
+    $name = $AttributeNode.InnerText.Trim()
+    if ([string]::IsNullOrWhiteSpace($name)) { $name = $AttributeNode.GetAttribute('name').Trim() }
+    return $name
+}
+
 function Build-ClassificationData {
     param(
         [System.Xml.XmlElement]$ObjectNode,
@@ -147,7 +154,7 @@ function Build-ClassificationData {
     $formulaSet = @{}
 
     foreach ($attNode in $ObjectNode.SelectNodes(".//Level/Attribute")) {
-        $name = $attNode.GetAttribute("name")
+        $name = Get-LevelAttributeName -AttributeNode $attNode
         if ([string]::IsNullOrEmpty($name)) { continue }
         $knownNames.Add($name) | Out-Null
         if ($attNode.GetAttribute("isRedundant") -eq "True") {
@@ -182,9 +189,16 @@ function Check-LevelIntegrity {
                 -LineNumber 0 -LinePreview "")) | Out-Null
         }
 
-        $descAtt = $levelNode.GetAttribute("DescriptionAttribute")
-        if (-not [string]::IsNullOrEmpty($descAtt)) {
-            if ($null -eq $levelNode.SelectSingleNode("Attribute[@name='$descAtt']")) {
+        $descNode = $levelNode.SelectSingleNode('./DescriptionAttribute')
+        $descAtt = ''
+        if ($null -ne $descNode) { $descAtt = $descNode.InnerText.Trim() }
+        if ([string]::IsNullOrWhiteSpace($descAtt)) { $descAtt = $levelNode.GetAttribute('DescriptionAttribute').Trim() }
+        if (-not [string]::IsNullOrWhiteSpace($descAtt) -and $descAtt -ine '(None)') {
+            $levelNames = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+            foreach ($attNode in $levelNode.SelectNodes('./Attribute')) {
+                [void]$levelNames.Add((Get-LevelAttributeName -AttributeNode $attNode))
+            }
+            if (-not $levelNames.Contains($descAtt)) {
                 $findings.Add((New-Finding -Severity "fail" -Code "description-attribute-not-in-level" `
                     -Message "Transaction '$ObjectName': DescriptionAttribute '$descAtt' nao encontrado como Attribute do mesmo Level." `
                     -LineNumber 0 -LinePreview "")) | Out-Null

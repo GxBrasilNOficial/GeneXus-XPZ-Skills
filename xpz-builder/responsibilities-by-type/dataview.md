@@ -92,7 +92,7 @@ Observed in GX 18 U13 (KB `FabricaBrasil18`, XPZ exported by the IDE). Confidenc
 ## Related rules in main SKILL.md WORKFLOW
 
 - Risk assessment before proceeding: `03-risco-e-decisao-por-tipo.md` — `DataView` is `StructuralRisk: alto` (see recalibration note 2026-08-17)
-- Source sanity before packaging: `Test-GeneXusSourceSanity.ps1` — `call-in-condition` excludes variable-receiver methods (`&var.Metodo()`) and indexations (`&col(1)`), but flags global procedures, built-in functions and module-qualified calls
+- Source sanity before packaging: `Test-GeneXusSourceSanity.ps1` — `call-in-condition` excludes variable-receiver methods (`&var.Metodo()`) and indexations (`&col(1)`) without hiding calls in their arguments, but examines remaining global procedures, built-in functions and module-qualified calls. The new known-attribute IsEmpty/IsNull exception applies only to Transaction, not DataView. Only this finding uses a per-Source string/comment mask, with fallback to the old detector when inconclusive; other diagnostics retain their previous text/rules (see `02`, Source sanity section).
 - Envelope and `lastUpdate` rules: `02-regras-operacionais-e-runtime.md`
 - Part-type matrix and sanitized molds: `01b-matriz-part-types-por-tipo.md` and `01e-moldes-sanitizados-core.md`
 

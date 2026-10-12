@@ -15,18 +15,18 @@ Entradas legadas sem avaliação carregam `FALTA AVALIAR` em ambos os campos at�
 
 <a id="xpz-relato-20261005-avisos"></a>
 
-## Qualidade dos avisos de coerência de Transaction e sanidade de Source — relato 2026-10-05
+## Qualidade dos avisos de coerência de Transaction e sanidade de Source — resíduo de controles
 
 - **Importância** — média (falsos avisos demonstrados reduzem a confiança na revisão; conferência manual permite distinguir os casos).
-- **Maturidade** — ideia (causa do falso atributo ausente identificada; tratamento de controles e recorte dos predicados ainda precisam ser fechados).
+- **Maturidade** — ideia (reconhecimento de controles de formulário ainda precisa ser definido; leitura de atributos e recorte de predicados implementados).
 
-**Origem e evidência.** Itens A2/C1 do prompt de uma sessão na pasta paralela FabricaBrasil18, avaliado em 2026-10-05. Registro de origem: `C:\Dev\Prod\Gx_FabricaBrasil\Temp\handoff-observacoes-skills-xpz.md`, consultado somente para leitura. Na execução de `Test-GeneXusTransactionCoherence.ps1` sobre `Transaction/TabelaDeRendimento.xml`, atributos presentes em `Level/Attribute` receberam `property-on-unknown-attribute`: o XML guarda o nome no texto do elemento, mas `Build-ClassificationData` lê apenas `@name`. No mesmo objeto, `Test-GeneXusSourceSanity.ps1` produziu quatro avisos `call-in-condition` envolvendo `IsEmpty()`/`IsNull()`, além de uma chamada distinta a `IsAuthorized`.
+**Origem e parte resolvida.** Itens A2/C1 do relato de 2026-10-05, com origem em `C:\Dev\Prod\Gx_FabricaBrasil\Temp\handoff-observacoes-skills-xpz.md`, consultado somente para leitura. A correção dos nomes XML/descritores e o recorte de IsEmpty/IsNull com máscara lexical foram implementados e validados em 2026-10-11 conforme v2 autorizada; evidências, limites e origem preservados em [histórico mensal](historico/IdeiasImplementadas_202610.md#qualidade-dos-avisos-de-coerência-de-transaction-e-sanidade-de-source--recorte-v2). A redução medida na referência oficial não encerra o resíduo: Coherence ainda avisa sobre `btn_Enter.Caption` e `btn_Enter.TooltipText` como atributos desconhecidos.
 
-**Recorte e direção.** Corrigir a leitura da estrutura real dos atributos, considerando formas comparáveis e níveis aninhados; definir separadamente como reconhecer controles de formulário. Tratar os predicados nativos reconhecidos sem suprimir outras chamadas presentes na mesma condição, nem autorizar chamadas por simples semelhança de nome. Cobrir ambos os casos nos respectivos self-tests, com controles negativos para atributo ausente e chamada ainda relevante.
+**Recorte residual.** Definir separadamente como reconhecer controles de formulário por evidência estrutural, sem liberação por prefixo `btn_*` ou semelhança de nome. O plano v2 não autorizou esse reconhecimento. A correção de nomes/predicados já validada não implica cobertura de controles nem autorização de outras funções.
 
-**Urgência e retomada.** Não urgente; implementação adiada por decisão humana em 2026-10-05. A próxima sessão desta frente deve fechar o recorte, apresentar as correções e obter aprovação antes de escrever. Não confundir correção de falso aviso com comparação relativa ao baseline: [Baseline conhecido no sanity e na revisão de objeto legado](#baseline-conhecido-no-sanity-e-na-revisao-de-objeto-legado) trata de outra pergunta. As pendências de `GenerateObject=False` e `procedural-in-conditions` também permanecem separadas, mesmo compartilhando scripts.
+**Urgência e retomada.** Não urgente; o resíduo exige análise, plano e aprovação próprios antes de escrever. Não confundir correção de falso aviso com comparação relativa ao baseline: [Baseline conhecido no sanity e na revisão de objeto legado](#baseline-conhecido-no-sanity-e-na-revisao-de-objeto-legado) trata de outra pergunta. As pendências de `GenerateObject=False` e `procedural-in-conditions` também permanecem separadas, mesmo compartilhando scripts.
 
-**Arquivos candidatos.** `scripts/Test-GeneXusTransactionCoherence.ps1`, `scripts/Test-GeneXusTransactionCoherenceSelfTest.ps1`, `scripts/Test-GeneXusSourceSanity.ps1`, `scripts/Test-GeneXusSourceSanitySelfTest.ps1`; instruções e checklist de `xpz-builder` quando o contrato mudar.
+**Arquivos candidatos do resíduo.** `scripts/Test-GeneXusTransactionCoherence.ps1`, `scripts/Test-GeneXusTransactionCoherenceSelfTest.ps1`; instruções e checklist de `xpz-builder` quando o contrato mudar.
 
 <a id="xpz-relato-20261005-datas"></a>
 

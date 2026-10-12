@@ -170,13 +170,71 @@ function Get-CloseTokenKind {
     return $null
 }
 
+function Get-CallConditionMask {
+    # Varredura local por Source, seguindo lex_source: aspas duplicadas e comentarios.
+    # So call-in-condition usa a mascara; os demais diagnosticos mantem o texto antigo.
+    param([string]$SourceText)
+    $chars = $SourceText.ToCharArray()
+    $state = 'code'
+    $quote = [char]0
+    for ($i = 0; $i -lt $chars.Length; $i++) {
+        $c = $SourceText[$i]
+        $next = [char]0
+        if ($i + 1 -lt $chars.Length) { $next = $SourceText[$i + 1] }
+        $newline = $c -eq "`r" -or $c -eq "`n"
+        if ($state -eq 'line') {
+            if ($newline) { $state = 'code' } else { $chars[$i] = ' ' }
+        } elseif ($state -eq 'block') {
+            if (-not $newline) { $chars[$i] = ' ' }
+            if ($c -eq '*' -and $next -eq '/') {
+                $chars[++$i] = ' '
+                $state = 'code'
+            }
+        } elseif ($state -eq 'string') {
+            if ($c -eq '\' -and $next -eq $quote) {
+                return [pscustomobject]@{ conclusive = $false; text = $SourceText }
+            }
+            if (-not $newline) { $chars[$i] = ' ' }
+            if ($c -eq $quote) {
+                if ($next -eq $quote) { $chars[++$i] = ' ' } else { $state = 'code' }
+            }
+        } elseif ($c -eq '/' -and ($next -eq '/' -or $next -eq '*')) {
+            if ($next -eq '/') { $state = 'line' } else { $state = 'block' }
+            $chars[$i] = ' '
+            $chars[++$i] = ' '
+        } elseif ($c -eq "'" -or $c -eq '"') {
+            $quote = $c
+            $state = 'string'
+            # Mesmo '' ocupa o argumento; # nao forma identificador seguido de (.
+            $chars[$i] = '#'
+        }
+    }
+    return [pscustomobject]@{ conclusive = ($state -eq 'code' -or $state -eq 'line'); text = (-join $chars) }
+}
+
+function Get-TransactionAttributeNames {
+    param([System.Xml.XmlElement]$ObjectNode)
+    $names = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    if ($ObjectNode.GetAttribute('type') -eq $script:TransactionObjectType) {
+        foreach ($att in $ObjectNode.SelectNodes('.//Level/Attribute')) {
+            $name = $att.InnerText.Trim()
+            if ([string]::IsNullOrWhiteSpace($name)) { $name = $att.GetAttribute('name').Trim() }
+            if (-not [string]::IsNullOrWhiteSpace($name)) { [void]$names.Add($name) }
+        }
+    }
+    return ,$names
+}
+
 function Test-SourceTextSanity {
     param(
         [string]$SourceText,
-        [string]$SourceLabel
+        [string]$SourceLabel,
+        [System.Collections.Generic.HashSet[string]]$KnownAttributeNames = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
     )
 
-    $lines = ($SourceText -split "`r?`n")
+    $lines = @($SourceText -split "`r?`n")
+    $mask = Get-CallConditionMask -SourceText $SourceText
+    $callLines = @($mask.text -split "`r?`n")
     $stack = New-Object System.Collections.Generic.List[object]
     $findings = New-Object System.Collections.Generic.List[object]
 
@@ -224,7 +282,26 @@ function Test-SourceTextSanity {
                 $findings.Add((New-Finding -Severity "warn" -Code "dense-condition" -Message "${SourceLabel}: condicao potencialmente densa; revisar se o delta pode ser reescrito em forma mais conservadora." -LineNumber $lineNumber -LinePreview $preview)) | Out-Null
             }
 
-            $conditionBody = $lineWithoutComment -replace '^(?i)\s*(if|elseif)\b', ''
+        }
+
+        $callLine = $lineWithoutComment
+        if ($mask.conclusive) { $callLine = $callLines[$index] }
+        # Mascara inconclusiva: detector anterior inteiro nesta parte, sem novas exclusoes.
+        if ($callLine -match '^(?i)\s*(if|elseif)\b') {
+            $conditionBody = $callLine -replace '^(?i)\s*(if|elseif)\b', ''
+            if ($mask.conclusive -and $KnownAttributeNames.Count -gt 0) {
+                # Consome a cadeia completa: Outro.AttrA nao vira o sufixo AttrA.
+                # Colisao entre nome de atributo e modulo fica fora da resolucao semantica.
+                $predicatePattern = '(?i)(?<![a-z0-9_&.])(?<receiver>[a-z_][a-z0-9_]*(?:\s*\.\s*[a-z_][a-z0-9_]*)*)\s*\.\s*(IsEmpty|IsNull)\s*\(\s*\)'
+                $conditionBody = [regex]::Replace($conditionBody, $predicatePattern, [System.Text.RegularExpressions.MatchEvaluator]{
+                    param($match)
+                    $before = $match.Index - 1
+                    while ($before -ge 0 -and [char]::IsWhiteSpace($conditionBody[$before])) { $before-- }
+                    if ($before -ge 0 -and $conditionBody[$before] -in @('.', '&')) { return $match.Value }
+                    if ($KnownAttributeNames.Contains($match.Groups['receiver'].Value.Trim())) { return ' ' }
+                    return $match.Value
+                })
+            }
             $stripped = $conditionBody -replace '(?i)\b(and|or|not)\s*\(', '('
             $stripped = $stripped -replace '(?i)\biif\s*\(', '('
             $stripped = $stripped -replace '(?i)&[a-z_][a-z0-9_]*(\.[a-z_][a-z0-9_]*)*\s*\(', ''
@@ -311,6 +388,7 @@ if ($root.LocalName -eq "ExportFile") {
     foreach ($objectNode in $objectNodes) {
         $objectName = $objectNode.GetAttribute("name")
         $objectType = $objectNode.GetAttribute("type")
+        $knownAttributeNames = Get-TransactionAttributeNames -ObjectNode $objectNode
         $partSources = Get-ObjectSourceParts -ObjectNode $objectNode
         foreach ($partSource in $partSources) {
             $sourceTargets.Add([pscustomobject]@{
@@ -319,11 +397,13 @@ if ($root.LocalName -eq "ExportFile") {
                 partType    = $partSource.partType
                 sourceLabel = "Object:$objectName Part:$($partSource.partType)"
                 sourceText  = $partSource.sourceText
+                knownAttributeNames = $knownAttributeNames
             }) | Out-Null
         }
     }
     $result.objectCount = $objectNodes.Count
 } elseif ($root.LocalName -eq "Object") {
+    $knownAttributeNames = Get-TransactionAttributeNames -ObjectNode $root
     $partSources = Get-ObjectSourceParts -ObjectNode $root
     foreach ($partSource in $partSources) {
         $sourceTargets.Add([pscustomobject]@{
@@ -332,6 +412,7 @@ if ($root.LocalName -eq "ExportFile") {
             partType    = $partSource.partType
             sourceLabel = "Object:$($root.GetAttribute("name")) Part:$($partSource.partType)"
             sourceText  = $partSource.sourceText
+            knownAttributeNames = $knownAttributeNames
         }) | Out-Null
     }
     $result.objectCount = 1
@@ -353,7 +434,7 @@ foreach ($sourceTarget in $sourceTargets) {
         continue
     }
 
-    $findings = Test-SourceTextSanity -SourceText $sourceTarget.sourceText -SourceLabel $sourceTarget.sourceLabel
+    $findings = Test-SourceTextSanity -SourceText $sourceTarget.sourceText -SourceLabel $sourceTarget.sourceLabel -KnownAttributeNames $sourceTarget.knownAttributeNames
 
     # Modo declarativo: neste par (Object type, Part type) o Source e declarativo;
     # suprime so os findings de balanceamento procedural, preserva os avisos.

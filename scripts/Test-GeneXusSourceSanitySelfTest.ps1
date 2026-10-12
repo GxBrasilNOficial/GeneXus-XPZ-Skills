@@ -3,7 +3,8 @@
 .SYNOPSIS
     Self-test do gate Test-GeneXusSourceSanity.ps1: regra type-aware
     procedural-in-conditions (Procedure + parte Conditions nao-vazia) e modo
-    declarativo da parte Rules de Transaction.
+    declarativo da parte Rules de Transaction; predicados conhecidos e mascara
+    lexical limitada a call-in-condition, com fallback conservador.
 
 .DESCRIPTION
     Cobre:
@@ -241,7 +242,77 @@ if ((Get-FindingCount $r15 'call-in-condition') -ne 0) { throw "Caso 15: 'If (&a
 $r16 = Invoke-Gate (New-SinglePartObjectXml -ObjectType $procType -Name 'procIsEmpty' -PartType $mainPart -Source "If &x.IsEmpty()`nEndif")
 if ((Get-FindingCount $r16 'call-in-condition') -ne 0) { throw "Caso 16: 'If &x.IsEmpty()' nao deveria disparar call-in-condition (metodo de tipo basico)." }
 
-Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
+function New-PredicateObjectXml {
+    param([string]$Source, [string]$Names = '<Attribute>AttrA</Attribute>', [string]$Type = $trnType, [string]$Name = 'Predicates')
+    $obj = New-SinglePartObjectXml -ObjectType $Type -Name $Name -PartType $mainPart -Source $Source
+    return $obj.Replace('</Object>', "<Part><Level>$Names</Level></Part></Object>")
+}
+
+function Assert-Calls {
+    param([string]$Source, [int]$Count, [string]$Type = $trnType, [string]$Names = '<Attribute>AttrA</Attribute>')
+    $r = Invoke-Gate (New-PredicateObjectXml -Source $Source -Type $Type -Names $Names)
+    $actual = Get-FindingCount $r 'call-in-condition'
+    if ($actual -ne $Count) { throw "call-in-condition esperado $Count, obtido $actual : $Source" }
+    return $r
+}
+
+foreach ($condition in @('AttrA.IsEmpty()', ' aTTrA . iSnUlL ( )', 'AttrA.IsEmpty(/* comentario */)', 'not (AttrA.IsNull())', '&x.Trim()', '&col(1)', 'iif(&x, 1, 2) = 1')) {
+    $null = Assert-Calls "If $condition`nEndif" 0
+}
+foreach ($condition in @('Unknown.IsEmpty()', 'AttrA.IsEmpty() and IsAuthorized(&PgmName)', 'IsEmpty(AttrA)', 'Modulo.IsEmpty()', 'MeuIsEmpty()', 'Outro.AttrA.IsEmpty()', 'Outro . AttrA . IsEmpty ( )', "AttrA.IsEmpty('x')", "AttrA.IsEmpty('')", 'AttrA.IsEmpty(&x)', 'AttrA.Trim()', 'AttrA.ToUpper()', 'AttrA.Count()', '&x.Metodo(MinhaProc())', '&col(MinhaProc())', 'iif(MinhaProc(), 1, 2) = 1', 'AttrA.IsEmpty() and Outro(MinhaProc())')) {
+    $null = Assert-Calls "If $condition`nEndif" 1
+}
+$null = Assert-Calls "If AttrA.IsEmpty()`nEndif" 1 -Type $procType
+$null = Assert-Calls "If AttrA.IsEmpty()`nEndif" 0 -Names '<Attribute name="Ignored"> AttrA </Attribute>'
+$null = Assert-Calls "If Ignored.IsEmpty()`nEndif" 1 -Names '<Attribute name="Ignored"> AttrA </Attribute>'
+$null = Assert-Calls "If AttrA.IsEmpty()`nEndif" 0 -Names '<Level><Attribute name=" AttrA "> </Attribute></Level>'
+$a = New-PredicateObjectXml "If AttrA.IsEmpty()`nEndif" -Name 'A'
+$b = New-PredicateObjectXml "If AttrA.IsEmpty()`nEndif" -Names '<Attribute>AttrB</Attribute>' -Name 'B'
+$r = Invoke-Gate ('<ExportFile><Objects>' + $a + $b + '</Objects></ExportFile>')
+if ((Get-FindingCount $r 'call-in-condition') -ne 1 -or @($r.findings | Where-Object { $_.code -eq 'call-in-condition' -and $_.message -like 'Object:B *' }).Count -ne 1) { throw 'Nomes vazaram entre objetos.' }
+
+# Strings e comentarios sao mascarados em uma unica varredura; argumentos nao somem.
+foreach ($condition in @("&x = 'MinhaProc()'", '&x = "MinhaProc()"', "&x = !'MinhaProc()'", "&x = 'a''MinhaProc()'", '&x = "a""MinhaProc()"', "&x = 'https://MinhaProc()/*'", 'AttrA.IsEmpty(/* " aspas ignoradas */)', "/* ' */ AttrA.IsEmpty()", "AttrA.IsEmpty() // 'MinhaProc()")) {
+    $null = Assert-Calls "If $condition`nEndif" 0
+}
+foreach ($condition in @("&x = 'https://local' and MinhaProc()", "/* ' */ MinhaProc()", 'AttrA.IsEmpty(/* fim */) and MinhaProc()', 'AttrA.IsEmpty("")')) {
+    $null = Assert-Calls "If $condition`nEndif" 1
+}
+$r = Assert-Calls "/* comentario`nIf MinhaProc()`nEndif`n*/`nIf AttrA.IsEmpty() and RealProc()`nEndif" 1
+$call = @($r.findings | Where-Object code -eq 'call-in-condition')[0]
+if ($call.lineNumber -ne 5 -or $call.linePreview -cne 'If AttrA.IsEmpty() and RealProc()') { throw 'Linhas/previews alterados.' }
+$null = Assert-Calls "&s = 'primeira`nIf MinhaProc()`nultima'`nIf AttrA.IsNull()`nEndif" 0
+$null = Assert-Calls "If AttrA.IsEmpty()`r`nEndif" 0
+
+# Fallback por parte: string/bloco nao fechado ou escape sem precedente.
+foreach ($source in @("If AttrA.IsEmpty()`nEndif`n&s = 'aberta", "If AttrA.IsEmpty()`nEndif`n/* aberto", "If &x = 'MinhaProc()")) {
+    $null = Assert-Calls $source 1
+}
+$escaped = @'
+If &x = 'a\' and MinhaProc()'
+Endif
+'@
+$null = Assert-Calls $escaped 1
+$first = New-SinglePartObjectXml -ObjectType $trnType -Name 'Reset' -PartType $mainPart -Source "/* aberto"
+$secondPart = '<Part><Source><![CDATA[If AttrA.IsEmpty()' + "`nEndif" + ']]></Source></Part><Part><Level><Attribute>AttrA</Attribute></Level></Part>'
+$r = Invoke-Gate ($first.Replace('</Object>', $secondPart + '</Object>'))
+if ((Get-FindingCount $r 'call-in-condition') -ne 0) { throw 'Estado lexical vazou entre partes.' }
+
+# Os outros findings continuam usando o texto antigo, inclusive falsos em comentarios/literais.
+$r = Assert-Calls "/*`nIf MinhaProc() and &a and &b and &c and &d`n*/" 0
+if ((Get-FindingCount $r 'dense-condition') -ne 1 -or -not (Test-HasBalanceFinding $r)) { throw 'Dense/balanceamento mudaram fora do recorte.' }
+$r = Assert-Calls "If &x = 'elseif iif(MinhaProc()) and or not and'`nEndif" 0
+foreach ($code in @('elseif', 'iif', 'dense-condition')) {
+    if ((Get-FindingCount $r $code) -ne 1) { throw "Finding $code deixou de usar texto antigo." }
+}
+# Dense-condition preserva seu gatilho antigo mesmo quando // dentro de literal o truncava.
+$r = Assert-Calls "If &x = 'https://local' and &a and &b and &c and &d and MinhaProc()`nEndif" 1
+if ((Get-FindingCount $r 'dense-condition') -ne 0) { throw 'Gatilho de dense-condition alterado.' }
+
+$resolvedTempRoot = [System.IO.Path]::GetFullPath($tempRoot)
+if (-not $resolvedTempRoot.StartsWith([System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath()), [System.StringComparison]::OrdinalIgnoreCase) -or
+    (Split-Path $resolvedTempRoot -Leaf) -notlike 'sourcesanity-selftest-*') { throw 'Pasta temporaria fora do recorte.' }
+Remove-Item -LiteralPath $resolvedTempRoot -Recurse -Force -ErrorAction SilentlyContinue
 
 Write-Output 'OK: Test-GeneXusSourceSanitySelfTest.ps1'
 exit 0

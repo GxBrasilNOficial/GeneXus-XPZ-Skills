@@ -1,8 +1,8 @@
 #requires -Version 7.4
 <#
 .SYNOPSIS
-    Self-test do gate Test-GeneXusTransactionCoherence.ps1, foco na regra
-    wwp-screen-code-on-non-generated-transaction (Frente D).
+    Self-test do gate Test-GeneXusTransactionCoherence.ps1: regra WWP,
+    nomes XML, integridade local de Level e classificacoes existentes.
 
 .DESCRIPTION
     Cobre:
@@ -101,7 +101,72 @@ if (Test-HasWwpFinding $r2) { throw 'Caso 2: Events limpos nao deveriam disparar
 $r3 = Invoke-Gate (New-TrnXml -EventsSource $eventsDirty -GenerateObjectFalse $false -ApplyWwp $false)
 if (Test-HasWwpFinding $r3) { throw 'Caso 3: GenerateObject default (True) nao deveria disparar a regra WWP.' }
 
-Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
+# Nomes textuais prevalecem; fallback @name e comparacao sem caixa/espacos.
+function New-IntegrityXml {
+    param([string]$Levels, [string]$Events = '', [string]$Rules = '')
+    return @"
+<Object type="1db606f2-af09-4cf9-a3b5-b481519d28f6" name="Integrity">
+<Part><Level>$Levels</Level></Part>
+<Part><Source><![CDATA[$Events]]></Source></Part>
+<Part><Source><![CDATA[$Rules]]></Source></Part>
+</Object>
+"@
+}
+
+function Assert-FindingCount {
+    param($Result, [string]$Code, [int]$Count)
+    $actual = @($Result.findings | Where-Object code -eq $Code).Count
+    if ($actual -ne $Count) { throw "Coherence $Code : esperado $Count, obtido $actual." }
+}
+
+$attributes = '<Attribute key="True" name="Ignored"> AttrA </Attribute><Attribute name=" AttrB "> </Attribute>'
+$known = Invoke-Gate (New-IntegrityXml $attributes "Event Start`nATTRA.Visible = True`nAttrB = 1`nIgnored.Visible = True`nMissing = 1`nEndEvent" "AttrB.Visible = True;`nMissing.Visible = True;")
+Assert-FindingCount $known 'property-on-unknown-attribute' 2
+Assert-FindingCount $known 'assignment-to-unknown-name' 1
+if (@($known.findings | Where-Object { $_.message -match "'ATTRA\.|'AttrB" }).Count -ne 0) { throw 'Atributos conhecidos receberam aviso.' }
+
+foreach ($descriptor in @('', '<DescriptionAttribute/>', '<DescriptionAttribute> </DescriptionAttribute>', '<DescriptionAttribute> (nOnE) </DescriptionAttribute>', '<DescriptionAttribute> attra </DescriptionAttribute>')) {
+    $r = Invoke-Gate (New-IntegrityXml ($attributes + $descriptor))
+    Assert-FindingCount $r 'description-attribute-not-in-level' 0
+    if ($r.sourceSanityStatus -ne 'pass') { throw 'Descritor valido deveria passar.' }
+}
+foreach ($level in @(
+    ('<Level DescriptionAttribute=" AttrB ">' + $attributes + '</Level>'),
+    ('<Level DescriptionAttribute="Missing">' + $attributes + '<DescriptionAttribute>AttrA</DescriptionAttribute></Level>'),
+    ('<Level DescriptionAttribute="Missing">' + $attributes + '<DescriptionAttribute>(None)</DescriptionAttribute></Level>'),
+    ('<Level DescriptionAttribute="AttrB">' + $attributes + '<DescriptionAttribute> </DescriptionAttribute></Level>')
+)) {
+    # Parenteses evitam precedencia de virgula/concatenacao no PowerShell.
+    $r = Invoke-Gate (New-IntegrityXml ('<Attribute key="True">Root</Attribute>' + $level))
+    Assert-FindingCount $r 'description-attribute-not-in-level' 0
+}
+foreach ($descriptor in @('<DescriptionAttribute>Missing</DescriptionAttribute>', '<DescriptionAttribute>A&apos;B</DescriptionAttribute>')) {
+    $r = Invoke-Gate (New-IntegrityXml ($attributes + $descriptor))
+    Assert-FindingCount $r 'description-attribute-not-in-level' 1
+    if ($r.probablyImportable) { throw 'Descritor invalido deve continuar fail.' }
+}
+$child = '<Level><Attribute key="True">Child</Attribute><DescriptionAttribute>Child</DescriptionAttribute></Level>'
+$r = Invoke-Gate (New-IntegrityXml ($attributes + $child))
+Assert-FindingCount $r 'description-attribute-not-in-level' 0
+$r = Invoke-Gate (New-IntegrityXml ($attributes + '<DescriptionAttribute>Child</DescriptionAttribute>' + $child))
+Assert-FindingCount $r 'description-attribute-not-in-level' 1
+$r = Invoke-Gate (New-IntegrityXml ($attributes + '<Level><Attribute key="True">Child</Attribute><DescriptionAttribute>AttrA</DescriptionAttribute></Level>'))
+Assert-FindingCount $r 'description-attribute-not-in-level' 1
+$r = Invoke-Gate (New-IntegrityXml ('<Attribute>Root</Attribute>' + $child))
+Assert-FindingCount $r 'level-no-key' 1
+
+$classified = New-IntegrityXml ($attributes + '<Attribute isRedundant="True"> Redundant </Attribute><Attribute>FormulaAtt</Attribute>') "Event Start`nRedundant = 1`nFormulaAtt = 2`nRedundant.Visible = True`nFormulaAtt.Visible = True`nEndEvent" "Redundant.Visible = True;`nFormulaAtt.Visible = True;"
+$r = Invoke-Gate ('<ExportFile><Objects>' + $classified + '</Objects><Attributes><Attribute name="FormulaAtt"><Properties><Property><Name>Formula</Name><Value>1</Value></Property></Properties></Attribute></Attributes></ExportFile>')
+Assert-FindingCount $r 'assignment-to-non-writable-attribute' 2
+Assert-FindingCount $r 'property-on-non-writable-attribute' 4
+Assert-FindingCount $r 'assignment-to-unknown-name' 0
+Assert-FindingCount $r 'property-on-unknown-attribute' 0
+if (@($r.findings | Where-Object { $_.message -match "classificado como 'formula'" }).Count -ne 3) { throw 'Formula deve manter sua classificacao.' }
+
+$resolvedTempRoot = [System.IO.Path]::GetFullPath($tempRoot)
+if (-not $resolvedTempRoot.StartsWith([System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath()), [System.StringComparison]::OrdinalIgnoreCase) -or
+    (Split-Path $resolvedTempRoot -Leaf) -notlike 'trncoherence-selftest-*') { throw 'Pasta temporaria fora do recorte.' }
+Remove-Item -LiteralPath $resolvedTempRoot -Recurse -Force -ErrorAction SilentlyContinue
 
 Write-Output 'OK: Test-GeneXusTransactionCoherenceSelfTest.ps1'
 exit 0
