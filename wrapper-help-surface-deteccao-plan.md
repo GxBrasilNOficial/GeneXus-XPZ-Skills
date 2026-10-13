@@ -2,7 +2,7 @@
 
 - **Skill alvo:** `xpz-kb-parallel-setup`.
 - **Repositório:** `C:\Dev\Knowledge\GeneXus-XPZ-Skills` (branch `main`).
-- **Estado:** **implementado** em 2026-10-12 — commits materiais `6772a94` (motor + self-tests + docs) e `7538e62` (dedup de achados), correções doc `91a6e1b`/`2e4b92a` e registro no `999` em `d70a3fc`. Plano **congelado** que guiou a execução; mantido na raiz como registro da frente (§10).
+- **Estado:** **implementado** em 2026-10-12 — commits materiais `6772a94` (motor + self-tests + docs) e `7538e62` (dedup de achados), correções doc `91a6e1b`/`2e4b92a`, correção material `6d360b5` (dois falsos positivos de bloqueio) e registro no `999` em `d70a3fc`. Plano **congelado** que guiou a execução; mantido na raiz como registro da frente (§10).
 - **Fechamento:** pré-push executada (mecânica + semântica) **sem push**; `VEREDICTO: nenhum gap confirmado`. Nota de rollout: alterar os dois motores muda a assinatura de setup → pastas paralelas entram em `AUDIT_REQUIRED`, e wrapper com o defeito-alvo flipa para não-limpo até correção (§6).
 - **Origem:** defeito apontado por revisor externo numa pasta paralela real; plano validado por revisão por pares multi-modelo (recibo na §9).
 - **Para a nova sessão:** ler `README.md` e `AGENTS.md` da raiz antes de agir; manter tudo em `main`; apresentar o que será alterado e aguardar aprovação antes de gravar (a execução foi pré-aprovada em bloco, mas confirmar escopo com o usuário no início da sessão).
@@ -13,7 +13,7 @@
 
 O motor `scripts/Test-XpzWrapperInventory.ps1` audita wrappers locais de uma pasta paralela de KB contra os moldes canônicos `xpz-kb-parallel-setup/examples/*.example.ps1`. Ele valida a superfície `param()`/`ValidateSet`, o motor compartilhado chamado, a diretiva `#requires` e alguns sinais textuais — **mas não interpreta o comment-based help**. Consequências observadas:
 
-1. Um wrapper local tinha, no bloco `.EXAMPLE`, uma flag (`-AsJson`) que **não existe** no seu `param()`; copiar o exemplo lança «A parameter cannot be found that matches parameter name 'AsJson'». A autoditoria classificou o wrapper como conforme e **não** sinalizou.
+1. Um wrapper local tinha, no bloco `.EXAMPLE`, uma flag (`-AsJson`) que **não existe** no seu `param()`; copiar o exemplo lança «A parameter cannot be found that matches parameter name 'AsJson'». A autoauditoria classificou o wrapper como conforme e **não** sinalizou.
 2. `#requires -Version 7.4` **colado** ao `<#` (sem linha em branco) torna o bloco de ajuda invisível ao `Get-Help`. Medido numa pasta paralela real: **22 de 24** wrappers invisíveis, 1 visível, 1 sem `.SYNOPSIS`.
 
 Os moldes canônicos foram corrigidos (linha em branco após `#requires`) em 2026-10-12, mas os wrappers **já materializados** nas pastas paralelas **não** foram propagados.
@@ -24,7 +24,7 @@ Os moldes canônicos foram corrigidos (linha em branco após `#requires`) em 202
 
 ## 2. Objetivo
 
-Fazer a autoditoria completa (`Test-XpzWrapperInventory.ps1`, via `Test-XpzSetupAudit.ps1`) detectar essa classe de defeito em vez de classificá-la como conforme, **sem quebrar wrappers conformes** e **sem sobre-engenharia**.
+Fazer a autoauditoria completa (`Test-XpzWrapperInventory.ps1`, via `Test-XpzSetupAudit.ps1`) detectar essa classe de defeito em vez de classificá-la como conforme, **sem quebrar wrappers conformes** e **sem sobre-engenharia**.
 
 ---
 
@@ -197,6 +197,6 @@ Descrever na `SKILL.md` um passo **opcional** de normalização dos wrappers **j
 8. Conferir paridade motor↔doc (referência `13-revisao-pre-push.md`) e que nenhum texto antigo contradiz a nova regra.
 9. Rodar a rotina pré-push do repo (mecânica + fase semântica) antes de commit; só commitar com aprovação explícita.
 
-**Critério de aceite:** autoditoria sobre estado equivalente ao da pasta paralela descrita produz achado explícito para (a) `-AsJson` órfão **bloqueante** e (b) ajuda invisível **advisory**; (c) o caso `-AlternateSelfLeaf` reconhece o exemplo de **nome genérico** num wrapper prefixado (senão o gate é vácuo no bootstrap); sem quebrar wrappers conformes (`Test-…KbPowerShellRuntime` permanece conforme) e com a linha `INVENTORY_HELP_ADVISORY:` **reproduzida no handoff**.
+**Critério de aceite:** autoauditoria sobre estado equivalente ao da pasta paralela descrita produz achado explícito para (a) `-AsJson` órfão **bloqueante** e (b) ajuda invisível **advisory**; (c) o caso `-AlternateSelfLeaf` reconhece o exemplo de **nome genérico** num wrapper prefixado (senão o gate é vácuo no bootstrap); sem quebrar wrappers conformes (`Test-…KbPowerShellRuntime` permanece conforme) e com a linha `INVENTORY_HELP_ADVISORY:` **reproduzida no handoff**.
 
 **Fora de escopo:** corrigir a pasta paralela a partir deste repo; alterar os moldes (já corretos); eliminar globalmente o uso de `-AsJson` (frente própria no `999`).
