@@ -170,7 +170,7 @@ Descrever na `SKILL.md` um passo **opcional** de normalização dos wrappers **j
 
 ## 9. Recibo da revisão por pares
 
-**Metodologia:** `xpz-llm-delegate/SKILL.md` + `15-revisao-por-pares.md`. **Painel (curadoria opencode):** `commandcode/meta/muse-spark-1.3-contributor` (meta), `openai/gpt-6.1-sol` (openai), `commandcode/stealth/space-bunny-alpha` (stealth, **error** — não conta), `anthropic/claude-opus-5-5` (`skippedByHumanDecision` — Opus ignorado a pedido). **Piso:** `panelReady` (meta + openai = 2 famílias). Payload `public`.
+**Metodologia:** `xpz-llm-delegate/SKILL.md` + `15-revisao-por-pares.md`. **Painel (curadoria opencode):** `commandcode/meta/muse-spark-1.3-contributor` (meta), `openai/gpt-6.1-sol` (openai), `commandcode/stealth/space-bunny-alpha` (stealth, **error** — não conta), `anthropic/claude-opus-5-5` (`skippedByHumanDecision` — Opus ignorado a pedido). **Piso:** `panelReady` (meta + openai = 2 famílias). Payload `public`. <!-- backend-parity: ignore -->
 
 | Rodada | RoundId | Vereditos | Fechamento |
 |---|---|---|---|
