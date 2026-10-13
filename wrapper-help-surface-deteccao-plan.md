@@ -118,6 +118,8 @@ Get-XpzHelpSurfaceFinding -WrapperPath <path> [-AlternateSelfLeaf <string[]>] [-
 - `.EXAMPLE` com flag inexistente em script advanced → `help_example_undeclared_param`.
 - `[Alias]` usado no `.EXAMPLE` → **não** acusa.
 - Prefixo não-ambíguo (`-Pref`) de um único parâmetro → **não** acusa; prefixo ambíguo entre **dois parâmetros distintos** → acusa.
+- Prefixo de **alias** (`-Fo` para o alias `Foo`) → **não** acusa: o PowerShell liga prefixo de alias e o prefixo casa qualquer grafia do **mesmo** parâmetro (aliases do mesmo parâmetro não contam como ambiguidade).
+- Seção `.EXAMPLE` que **não parseia** → **pulada**, sem finding (conservador).
 - Common parameter (`-Verbose`/`-ErrorVariable`) → **não** acusa (fonte `Get-Command.Parameters`).
 - Invocação de **outro** script no `.EXAMPLE` → não acusa.
 - Script **simple** com flag desconhecida → advisory, **não** blocking.

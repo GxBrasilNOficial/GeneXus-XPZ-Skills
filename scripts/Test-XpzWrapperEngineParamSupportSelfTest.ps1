@@ -10,9 +10,10 @@
   Cria wrappers de fixture (apenas PARSEADOS, nunca executados) e os confronta com:
     - motores REAIS do repo (Sync-GeneXusXpzToXml.ps1) via EnginesRoot = scripts/ do auditor;
     - motores SINTETICOS (simple/advanced/parse-broken/adversarial) numa pasta temp.
-  Inclui casos de UNIDADE do comment-based help (H1..H16): flag orfa em advanced, alias, prefixo
-  ambiguo/nao-ambiguo, CommonParameters, outro script, simple, sem param()/dynamicparam, formas de
-  parse, Join-Path, .PARAMETER orfao, ajuda invisivel, -AlternateSelfLeaf, paridade de molde e dedup.
+  Inclui casos de UNIDADE do comment-based help (H1..H18): flag orfa em advanced, alias, prefixo
+  ambiguo/nao-ambiguo (de nome E de alias), CommonParameters, outro script, simple, sem param()/dynamicparam,
+  formas de parse, Join-Path, .PARAMETER orfao, ajuda invisivel, -AlternateSelfLeaf, paridade de molde,
+  dedup e secao .EXAMPLE que nao parseia (pulada, sem finding).
   Sentinela final: XPZ_WRAPPER_ENGINE_PARAM_SELFTEST_OK.
 #>
 
@@ -435,6 +436,32 @@ param([string]$Ok)
 '@
     $r = Get-XpzHelpSurfaceFinding -WrapperPath $f
     if (@($r.Blocking).Count -ne 1) { throw ("ASSERT_FAILED: H16 dedup esperado 1 blocking; obtido={0} ({1})" -f @($r.Blocking).Count, (Get-HelpReasons $r.Blocking)) }
+
+    # H17 alias por PREFIXO: -Fo para o alias Foo nao pode bloquear (PowerShell liga prefixo de alias)
+    $f = New-Fixture $wrapDir 'h17.ps1' @'
+<#
+.SYNOPSIS
+H17 unica.
+.EXAMPLE
+.\h17.ps1 -Fo value
+#>
+[CmdletBinding()]
+param([Alias('Foo')][string]$Bar)
+'@
+    Assert-HelpFinding (Get-XpzHelpSurfaceFinding -WrapperPath $f) '' '' 'H17 prefixo de alias aceito'
+
+    # H18 secao .EXAMPLE que NAO parseia -> pulada (sem finding), conforme o plano (conservador)
+    $f = New-Fixture $wrapDir 'h18.ps1' @'
+<#
+.SYNOPSIS
+H18 unica.
+.EXAMPLE
+.\h18.ps1 -Bogus (
+#>
+[CmdletBinding()]
+param([string]$Ok)
+'@
+    Assert-HelpFinding (Get-XpzHelpSurfaceFinding -WrapperPath $f) '' '' 'H18 secao que nao parseia e pulada'
 
     Write-Output 'XPZ_WRAPPER_ENGINE_PARAM_SELFTEST_OK'
 } finally {

@@ -824,11 +824,21 @@ function Get-XpzHelpSectionText {
 }
 
 function Test-XpzHelpFlagAccepted {
-    <# Flag aceita sse nome/alias exato OU prefixo nao-ambiguo de UM unico parametro distinto. #>
-    param([string]$Flag, $Accepted, [string[]]$Canon)
-    if ($null -ne $Accepted -and $Accepted.Contains($Flag)) { return $true }
-    $hit = @($Canon | Where-Object { $_.StartsWith($Flag, [System.StringComparison]::OrdinalIgnoreCase) })
-    return ($hit.Count -eq 1)
+    <# Flag aceita sse alguma grafia (nome OU alias) for exata, OU prefixo nao-ambiguo de UM unico
+       parametro distinto. $ParamSpellings = lista de grafias por parametro (cada item = array de
+       nome+aliases do MESMO parametro; varias grafias do mesmo parametro nao contam como ambiguidade). #>
+    param([string]$Flag, $ParamSpellings)
+    $prefixParams = 0
+    foreach ($spellings in @($ParamSpellings)) {
+        $hasPrefix = $false
+        foreach ($s in @($spellings)) {
+            $sv = [string]$s
+            if ($sv -ieq $Flag) { return $true }
+            if ($sv.StartsWith($Flag, [System.StringComparison]::OrdinalIgnoreCase)) { $hasPrefix = $true }
+        }
+        if ($hasPrefix) { $prefixParams++ }
+    }
+    return ($prefixParams -eq 1)
 }
 
 function Get-XpzHelpExampleSelfFlag {
@@ -838,6 +848,8 @@ function Get-XpzHelpExampleSelfFlag {
     $tokens = $null; $errs = $null
     $ast = [System.Management.Automation.Language.Parser]::ParseInput($text, [ref]$tokens, [ref]$errs)
     $flags = [System.Collections.Generic.List[string]]::new()
+    # Secao que NAO parseia -> pulada (conservador): AST parcial nao prova flag orfa; evita falso bloqueio.
+    if (@($errs).Count -gt 0) { return ,$flags }
     foreach ($cmd in @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] }, $true))) {
         $els = @($cmd.CommandElements)
         if ($els.Count -lt 1) { continue }
@@ -904,16 +916,31 @@ function Get-XpzHelpSurfaceForFile {
         }
 
         # .EXAMPLE: flags em invocacoes do proprio script.
+        # Grafias por parametro (nome + aliases; inclui CommonParameters quando advanced): o prefixo
+        # nao-ambiguo pode casar QUALQUER grafia, nao so o nome canonico (o PowerShell liga alias por prefixo).
+        $paramSpellings = [System.Collections.Generic.List[object]]::new()
+        if ($null -ne $cmd -and $null -ne $cmd.Parameters) {
+            foreach ($k in $cmd.Parameters.Keys) {
+                $grafias = [System.Collections.Generic.List[string]]::new()
+                $grafias.Add([string]$k)
+                foreach ($al in @($cmd.Parameters[$k].Aliases)) { $grafias.Add([string]$al) }
+                $paramSpellings.Add($grafias)
+            }
+        } else {
+            foreach ($p in $ast.ParamBlock.Parameters) {
+                $grafias = [System.Collections.Generic.List[string]]::new()
+                $grafias.Add([string]$p.Name.VariablePath.UserPath)
+                $paramSpellings.Add($grafias)
+            }
+        }
         $eng = Get-XpzEngineAcceptedParam -EngineFullPath $Path
-        $canon = @()
-        if ($null -ne $cmd -and $null -ne $cmd.Parameters) { $canon = @($cmd.Parameters.Keys) }
         $selfSeq = [System.Collections.Generic.List[string]]::new()
         foreach ($sl in @($SelfLeaves)) { $selfSeq.Add([string]$sl) }
         foreach ($al in @($AlternateSelfLeaf)) { if ($al) { $selfSeq.Add([string]$al) } }
         if ($eng.Status -eq 'advanced' -or $eng.Status -eq 'simple') {
             foreach ($sec in (Get-XpzHelpSections -Body $body -Keyword 'EXAMPLE')) {
                 foreach ($flag in (Get-XpzHelpExampleSelfFlag -Section $sec -SelfLeaves @($selfSeq))) {
-                    if (Test-XpzHelpFlagAccepted -Flag $flag -Accepted $eng.Accepted -Canon $canon) { continue }
+                    if (Test-XpzHelpFlagAccepted -Flag $flag -ParamSpellings $paramSpellings) { continue }
                     if ($eng.Status -eq 'advanced') {
                         $blocking.Add(@{ Reason = ('help_example_undeclared_param:-{0}' -f $flag); Detail = '' })
                     } else {
