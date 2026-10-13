@@ -99,14 +99,14 @@
       "exit": 23,
       "category": "msbuild",
       "status": "reservado",
-      "summary": "RESERVADO-SEM-RAMO: sem evidencia empirica de marcador de falha proprio de GetActiveVersion. O classificador por cadeia nunca emite 23. Ver 999-ideias-pendentes.md (entrada do contexto de abertura), corpus de 2026-10-12.",
+      "summary": "RESERVADO-SEM-RAMO: sem evidencia empirica de marcador de falha proprio de GetActiveVersion. O classificador por cadeia nunca emite 23. Ver 10-base-operacional-msbuild-headless.md (Catalogo canonico de codigos de saida), corpus de 2026-10-12.",
       "wrappers": ["Open-GeneXusKbHeadless.ps1"]
     },
     {
       "exit": 24,
       "category": "msbuild",
       "status": "reservado",
-      "summary": "RESERVADO-SEM-RAMO: sem evidencia empirica de marcador de falha proprio de GetActiveEnvironment. O classificador por cadeia nunca emite 24. Ver 999-ideias-pendentes.md (entrada do contexto de abertura), corpus de 2026-10-12.",
+      "summary": "RESERVADO-SEM-RAMO: sem evidencia empirica de marcador de falha proprio de GetActiveEnvironment. O classificador por cadeia nunca emite 24. Ver 10-base-operacional-msbuild-headless.md (Catalogo canonico de codigos de saida), corpus de 2026-10-12.",
       "wrappers": ["Open-GeneXusKbHeadless.ps1"]
     },
     {
