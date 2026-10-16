@@ -382,9 +382,9 @@ Padrão transversal (não é uma familia do snapshot, e sim uma forma de carga o
 
 ### `<cell cellClass>` e `class`
 
-- `Recorte medido`: 0 `<cell class=`, 1.752 `<cell cellClass=`, 1.155 `<table class=>` e 5.877 ocorrências totais de `class=`. O acervo sustenta que `cellClass` é a forma observada nas células; não demonstra que `class` em `<cell>` seja descartado na importação.
-- `Ressalva de evidência`: “o import descarta `class` em `<cell>`” é uma afirmação do mantenedor ainda não verificada por importação comparativa. Para estilização de coluna, a direção operacional disponível é classe na tabela ancestral e seletor descendente, sem tratar isso como prova do comportamento de `class` na célula.
-- `Limite do extrator`: `scripts/Build-KbIntelligenceIndex.py` reconhece `class`, `cellClass`, `rowClass` e `formClass` pelo nome do atributo, sem exigir um elemento XML específico. Portanto, se `<cell class=...>` existir, o extrator pode contá-lo como classe; isso não comprova persistência nem comportamento visual após importação.
+- `Recorte medido`: 0 `<cell class=`, 1.752 `<cell cellClass=`, 1.155 `<table class=>` e 5.877 ocorrências totais de `class=`.
+- `Confirmado por round-trip e por DOM` (KB de teste `wsEducacaoSpTeste`, GX18, 2026-10-16): `<cell>` retém apenas atributos previstos — `cellClass` persiste; `class` e qualquer atributo não previsto (ex.: `fooBar`) são descartados no round-trip import→build→re-export. `class` em `<table controlName=...>` é preservado. No DOM de Responsive (`GxMultiForm`) não há `<table>`/`<td>`: o layout é grade de `<div>`; `cellClass` aterrissa no `div.col-xs-12` da célula e a `class` da tabela aterrissa no `div` da tabela (ex.: `div#MAINTABLE`). Para a célula, usar `cellClass`; para coluna, classe na tabela ancestral + seletor descendente.
+- `Limite do extrator`: `scripts/Build-KbIntelligenceIndex.py` reconhece `class`, `cellClass`, `rowClass` e `formClass` pelo nome do atributo, sem exigir um elemento XML específico. Se `<cell class=...>` existir, o extrator pode contá-lo como classe — mas esse atributo não sobrevive ao round-trip (acima), então a leitura do extrator não é prova de persistência.
 
 ## Quando abortar
 
