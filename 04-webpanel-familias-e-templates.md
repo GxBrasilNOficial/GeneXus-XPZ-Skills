@@ -371,6 +371,21 @@ Padrão transversal (não é uma familia do snapshot, e sim uma forma de carga o
 - Inferencia forte: nunca generalizar `WebPanel` como tipo homogeneo; a familia estrutural deve ser decidida antes da clonagem.
 - Hipotese: se dois templates possíveis parecerem próximos, preferir o de menor complexidade que ainda contenha todos os sinais necessários do alvo.
 
+## Views de `WorkWithForWeb` e classes de layout
+
+### Views geradas e mecanismos de chamada/embutimento
+
+- `Evidência direta` (recorte GX18): 184 XMLs `View*.xml` referenciam `ViewWebForm/ViewRules/ViewEvents.dkt`; 183 não têm `<Source>`, e a única exceção observada é uma View customizada. A View gerada não materializa corpo próprio no XML e não tem `WEB_COMP`; no mesmo recorte, os `*General` e `*WC` observados têm `WEB_COMP=Yes`.
+- `Regra operacional`: a assinatura da View usa as chaves do nível base da Transaction, na ordem declarada, seguidas pelo `code` da aba como `string`; não inclui chaves de níveis filhos. Use `""` para a aba default e `code` para selecionar outra aba, não `name` ou `wcname`.
+- `Ressalva de compatibilidade`: no C# de Views mais antigas, a aba default era comparada com `"General"`; em Views regeneradas a partir de aproximadamente 2026-08-30, houve comparação com `"Geral"`, embora não exista `code="Geral"`. Não passe esses literais para a aba default: use `""`; para outra aba, use o `code` efetivo. É um quirk datado do gerador, não um contrato para usar o `name`.
+- `Regra operacional`: acesse a View por URL; não a atribua a `<component>`. No corpus inspecionado, `<component>` usava `.Object = <Obj>.Create(...)` para Web Components, `<embeddedpage>` usava `.Source = <Obj>.Link(...)` para outros objetos embutíveis, e a forma separada `webObject="..."` apareceu apenas em GAM. O caso de View dentro de `<component>` foi recusado por `spc0045` em build GX18 concluído. Ver `01j-workwithweb-cdata-padroes.md` e o satélite `xpz-builder/responsibilities-by-type/workwithforweb.md`.
+
+### `<cell cellClass>` e `class`
+
+- `Recorte medido`: 0 `<cell class=`, 1.752 `<cell cellClass=`, 1.155 `<table class=>` e 5.877 ocorrências totais de `class=`. O acervo sustenta que `cellClass` é a forma observada nas células; não demonstra que `class` em `<cell>` seja descartado na importação.
+- `Ressalva de evidência`: “o import descarta `class` em `<cell>`” é uma afirmação do mantenedor ainda não verificada por importação comparativa. Para estilização de coluna, a direção operacional disponível é classe na tabela ancestral e seletor descendente, sem tratar isso como prova do comportamento de `class` na célula.
+- `Limite do extrator`: `scripts/Build-KbIntelligenceIndex.py` reconhece `class`, `cellClass`, `rowClass` e `formClass` pelo nome do atributo, sem exigir um elemento XML específico. Portanto, se `<cell class=...>` existir, o extrator pode contá-lo como classe; isso não comprova persistência nem comportamento visual após importação.
+
 ## Quando abortar
 
 - Inferencia forte: abortar quando não houver familia claramente identificavel.

@@ -156,6 +156,7 @@ Pre-varredura obrigatória antes de sync full ou primeira materialização longa
 ## Regra de leitura para runtime
 
 - quando a pergunta envolver `Base Table`, `Extended Table`, navegacao, `For each`, `Load`, `Refresh`, `Refresh Grid` ou risco de performance, consultar primeiro `02-regras-operacionais-e-runtime.md`
+- ao investigar a regressão GX18 U14→U15 de condições anuláveis, comparar contagens de `IS NULL` por `.cs` de builds concluídos, separar `AddWhere` de `CursorDef` e incluir cada Web Component `*WC`; ver `02-regras-operacionais-e-runtime.md` e o diagnóstico em `xpz-msbuild-build/SKILL.md`
 - quando a pergunta envolver apenas estrutura XML observada, priorizar `01-base-empirica-geral.md` como índice e descer ao arquivo empirico mais aderente da serie `01`
 - quando a pergunta misturar estrutura e comportamento provavel, responder separando explicitamente `Evidência direta`, `Regra documentada`, `Inferência forte` e `Hipótese`
 - quando a pergunta envolver `sync` ou wrappers locais da pasta paralela da KB, distinguir explicitamente:
@@ -298,6 +299,8 @@ Tabela atômica com chave composta (Código + Fase + Contexto); fonte canônica 
 | `CS2001` | Build (C#) | `right()`/`left()` inexistentes → `udp("right")` órfão | usar `.Substring`, `.PadLeft`, `.ToString` |
 
 `src0294` aparece em dois contextos (chave composta): "Trn estrutural" já coberto na base (Catalog 3 do `transaction.md`); "escalar `.IsNull`" é entrada nova — código repetido não é prova de cobertura. `src0216` é a primeira entrada da base.
+
+`spc0024` é warning do Specifier, não erro, quando o log de build concluído o registra como aviso; isso não prova o default usado para um argumento omitido. Para fasear um novo `in`, consulte a subseção **Warnings do Specifier que não bloqueiam** em `02-regras-operacionais-e-runtime.md` e os limites em `xpz-builder/SKILL.md`.
 
 ### Regra adicional para `Procedure` de relatório
 
@@ -805,6 +808,7 @@ Tabela atômica com chave composta (Código + Fase + Contexto); fonte canônica 
 - parar a expansao quando a hipotese já estiver sustentada; não reabrir o `WorkWithForWeb` inteiro por reflexo
 - usar `Transaction binding` como bloco inicial para `parent`, `parentGuid`, `parentType`, `Transaction` associada, acoplamento estrutural e suspeita de WW ligado ao pai errado
 - usar `Pattern structure and navigation` como bloco inicial para `selection`, abas, `view`, filtros, navegacao e shape funcional interno do pattern
+- para Views geradas, usar URL com as chaves do nível base da Transaction e o `code` final; chaves filhas não entram, `""` seleciona a aba default, e `name`/`wcname` não são seletores. A View não é `WEB_COMP` e não deve ser embutida em `<component>` (`spc0045`); ver `02` e `01j-workwithweb-cdata-padroes.md`, inclusive a linha agregada das 14 exceções de `wcname`
 - usar `Actions, links and prompts` como bloco inicial para action, botao, item de menu, `gxobject`, link, prompt e abertura explicita de outro objeto
 - usar `Attribute references and data contract` como bloco inicial para atributo exibido, filtro por atributo, coluna, aba dependente de atributo, referencia quebrada e convenio estrutural `adbb33c9-0906-4971-833c-998de27e0676-NomeDoAtributo`
 - usar `Identity and container` como bloco inicial para `name`, `fullyQualifiedName`, `guid`, `moduleGuid`, contêiner, origem estrutural e risco de confundir a instancia alvo
@@ -1099,6 +1103,7 @@ Tabela atômica com chave composta (Código + Fase + Contexto); fonte canônica 
 - Evidência direta: o agente não deve materializar objeto final a partir de resumo textual sem XML completo
 - Regra operacional: antes de empacotar, classificar cada XML ativo como `alterado na rodada` ou `reenviado sem mudanca por dependencia obrigatoria`
 - Regra operacional: se o objeto foi realmente alterado na rodada, o `lastUpdate` deve ser calculado por procedimento mecanico: `max(UtcNow + 60s, lastUpdate do acervo oficial + 60s)` quando houver baseline oficial, ou `UtcNow + 60s` quando for objeto novo sem baseline
+- Regra operacional: em rodadas sucessivas do mesmo objeto antes do próximo XPZ oficial, semear o working copy com o XML da rodada anterior e manter o pacote como delta; isso não dispensa o 9-FD frente×acervo nem altera a regra existente de recálculo de `lastUpdate` em `xpz-builder/SKILL.md`
 - Regra operacional: se o objeto entrou apenas por dependencia obrigatória ou composicao mínima do pacote, o `lastUpdate` oficial anterior deve ser preservado
 - Regra operacional: o agente deve abortar o empacotamento quando houver divergencia entre a classificação do item e o `lastUpdate` materializado
 - Regra operacional: antes de serializar o pacote, classificar as raizes top-level em `Object`, `Attribute` ou `outro tipo`

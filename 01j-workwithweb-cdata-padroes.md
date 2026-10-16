@@ -111,6 +111,24 @@ Atenção: o CDATA principal pode conter blocos `<![CDATA[...]]>` internos dentr
 </instance>
 ```
 
+## Chamadas de `View` e `wcname`
+
+A cadeia observada de geração é `WorkWithWeb<Trn>` → `WW<Trn>` (Selection) → `View<Trn>` → `<Trn>General` (Web Component Tabular) e `<Trn><Code>WC` (Web Components Grid). Uma `View` padrão gerada pelo pattern não tem corpo materializado no XML e é acessada por URL; sua assinatura de chamada é formada pelas chaves da Transaction base na ordem declarada, seguidas por um `string` final `code`. Chaves de níveis filhos ficam de fora; passe `""` para solicitar a aba default.
+
+`Ressalva de compatibilidade`: em Views geradas até 2026-07-01, o C# observado comparava a aba default com `"General"`; em Views regeneradas a partir de aproximadamente 2026-08-30, houve comparação com `"Geral"`, embora não exista aba com `code="Geral"`. Não use nenhum desses literais para solicitar a aba default: passe `""`. Para uma aba não default, use o `code` efetivo; a divergência é um quirk datado do código gerado, não um contrato para substituir `code` por `name`.
+
+| Campo da aba | Papel no fluxo gerado |
+|---|---|
+| `code` | Identificador interno da aba e seletor da URL; use este valor para selecionar a aba |
+| `name` | Nome de exibição; não o use como seletor da URL |
+| `wcname` | Nome do Web Component gerado associado à aba; não é o seletor da URL |
+
+| Exceção de `wcname` | Contagem | Regra |
+|---|---:|---|
+| Em abas Grid, `wcname` acompanha a Transaction referenciada, não o `code` da aba | 14 | Continue usando `code` como seletor; a exceção não altera a assinatura da View |
+
+Para a distinção de componentes, o caso `spc0045` e a evidência de `WEB_COMP`, consulte [02-regras-operacionais-e-runtime.md](02-regras-operacionais-e-runtime.md) e [xpz-builder/responsibilities-by-type/workwithforweb.md](xpz-builder/responsibilities-by-type/workwithforweb.md).
+
 ---
 
 ## Elementos que aparecem em múltiplos níveis

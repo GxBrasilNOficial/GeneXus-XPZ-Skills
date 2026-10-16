@@ -69,6 +69,7 @@ If the main need is to prepare or validate the initial folder structure around t
 - Classify each package candidate by content delta as `requested change`, `necessary auxiliary change`, or `extra unrequested change` before packaging
 - Require explicit signaling before packaging when a candidate item remains as `extra unrequested change`, including metadata, reserialization, or known noise that is not strictly required
 - Generate valid GeneXus `lastUpdate` timestamp by mechanical rule, not by literal guess: for a modified object use `max(UtcNow + 60s, official-corpus lastUpdate + 60s)` and then reread the saved XML to confirm the persisted value
+- In successive rounds over the same front, seed the working copy from the previous round's XML so earlier unimported edits are retained; the package remains a delta containing only changed objects and necessary dependencies. This does not bypass 9-FD against the official corpus. Follow the existing `lastUpdate` rule above and the section on successive edits below; do not duplicate or weaken that contract
 - Preserve the official `lastUpdate` only for objects that are intentionally reenviados sem mudanca as dependency or package-composition closure
 - Treat `lastUpdate` equal to or older than the official corpus as a blocking defect when the object was modified in the round
 - Treat manually rounded timestamps, copied timestamps from another file, copied baseline `lastUpdate` on a modified object, or arbitrary future values as invalid `lastUpdate` generation
@@ -638,6 +639,7 @@ The end-to-end Quality Checklist for any packaging round lives in the satellite 
 - NEVER affirm import or build success — state "requires external IDE validation"
 - NEVER treat `runtime`, `Import File Load`, `Import`, and `Specification` as interchangeable evidence
 - NEVER interpret `Import File Load` success as confirmation that an object was imported into the KB; it is a listing and preview step only — actual import requires explicit user confirmation in the subsequent `Import` step
+- Treat `spc0024` as a non-blocking Specifier warning only when the completed-build log records it as a warning; that does not prove the value used for an omitted argument. When phasing a new `in` parameter, place it last, require no `out` parameters, and confirm that its type default is safe for old callers before relying on unmodified call sites; see `02-regras-operacionais-e-runtime.md`.
 - NEVER use an integer value for `ObjectIdentity/@Type`; always derive it from `Object/@parentType` in the source XML of the object being packaged; an integer causes `Guid should contain 32 digits with 4 dashes` during Import File Load
 - NEVER promote a Module/Folder (`parentType="00000000-0000-0000-0000-000000000008"`) container name into `fullyQualifiedName` by analogy or by string concatenation alone
 - NEVER propose a business filter over status, authorization, cancellation, invoicing, balance, availability, or similar functional meaning if the chosen field is still semantically justified only by its name or UI label

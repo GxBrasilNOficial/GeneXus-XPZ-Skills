@@ -1772,3 +1772,15 @@ elegível, API Key ou Vertex) com intenção explícita de reativar o backend #5
 pela pré-push, ou se `xpz-reader`/o guia metodológico passar a instruir a execução direta das
 fachadas sem encaminhamento para o dono normativo. Se o próprio `xpz-builder` perder o pré-requisito,
 corrigir o dono, não duplicar a regra nos consumidores.
+
+---
+
+## Renomear `Attribute` por reimport XPZ como prática normal (2026-10-16)
+
+**Origem:** avaliação de caso real de reimport com o mesmo GUID, feito antes da primeira reorg.
+
+**Proposta avaliada:** tratar o rename de um `Attribute` por XPZ como procedimento reutilizável para KB existente.
+
+**Por que foi descartada como prática geral:** a janela observada é anterior à materialização da coluna no banco. Depois da primeira reorg, o rename é uma operação perigosa e não deve virar playbook para agente ou usuário. No caso coberto, a `Transaction` que referencia o atributo também precisou acompanhar o mesmo pacote e GUID; o sucesso desse caso não generaliza para atributos já materializados. A cautela permanece no `02`; 9-FD continua verificando drift de assinatura.
+
+**Reabrir somente se** surgir uma forma de rename suportada após reorg, validada na IDE e documentada como operação segura. A nota atual não autoriza rename XPZ fora da janela pré-primeiro-reorg.

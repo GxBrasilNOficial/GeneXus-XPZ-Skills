@@ -3469,3 +3469,14 @@ As contagens são de **arquivos que mencionam o token**, não de parâmetros exc
 **O que revisar.** Decidir uma política de local — (a) manter na raiz como está; (b) mover para subpasta dedicada (ex.: `design/`/`docs/`); (c) arquivar em `historico/<frente>/` quando a frente encerrar. A revisão é **doc-a-doc** (idade, referências, frente encerrada?), com atualização dos ponteiros do `09`/`CHANGELOG` e aprovação explícita; nunca em lote cego. Motivação de origem: sensação de documento «largado indevidamente» na raiz, não confirmada como abandono (quase todos são referenciados).
 
 **Relacionado.** `README.md` («documentação operacional complementar de frentes ativas»); `09-inventario-e-rastreabilidade-publica.md`; `CHANGELOG.md`; `AGENTS.md`.
+
+## Combo em `Attribute` de `Transaction` — observação de tela/runtime estacionada (6b)
+
+- **Importância** — baixa (registro de um caso localizado, sem mudança imediata da regra operacional).
+- **Maturidade** — estacionada como observação; não há recomendação geral de modelagem aprovada.
+
+**Observação sanitizada (2026-06-20).** Em um caso específico, um atributo com `Dynamic Combo Box` foi alterado para `Edit` com `Prompt` filtrado pelo cliente; o resultado foi validado no navegador. Também houve uma tentativa separada com `Combo Box` de itens fixos. Isso registra uma solução local para obter filtro por prompt, não uma falha geral de combos.
+
+**Limite de conclusão.** `Dynamic Combo Box` continua sendo um controle válido e há um uso observado em outro atributo de `Transaction`. Não concluir que `Combo Box` ou `Dynamic Combo Box` não funcionam com base nesta observação, nem generalizar o timing ou o comportamento de tela sem reproduzir no caso concreto. O erro `spc0023` de tipo de argumento está registrado separadamente na tabela atômica do `02`.
+
+**Relacionado.** `02-regras-operacionais-e-runtime.md` (tabela atômica de erros de source, `spc0023`).

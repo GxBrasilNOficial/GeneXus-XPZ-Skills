@@ -1199,6 +1199,7 @@ Vocabulario canonico dos parâmetros dos wrappers e motores compartilhados XPZ. 
 
 - `Regra operacional`: pacote mínimo deve ser a referencia padrão; se uma frente alterou apenas alguns objetos, não reenviar XMLs não tocados apenas para "completar" a rodada.
 - `Regra operacional`: `lastUpdate` novo deve existir só no objeto realmente alterado; objeto reenviado sem mudanca precisa conservar o `lastUpdate` original do XML da KB.
+- `Regra operacional`: em uma frente com várias rodadas sobre o mesmo objeto, semear cada working copy a partir do XML da rodada anterior, não do acervo oficial ainda não atualizado. O pacote final continua delta — só objetos realmente modificados e dependências necessárias — e o gate 9-FD frente×acervo continua obrigatório; para recalcular `lastUpdate`, seguir a regra já documentada de edições sucessivas em `xpz-builder/SKILL.md`.
 - `Regra operacional`: ao embutir XMLs em `import_file.xml`, remover declaracao `<?xml ...?>` interna do objeto e manter a declaracao apenas no topo do pacote.
 - `Regra operacional`: quando o pacote envolver `WorkWithForWeb`, validar o `CDATA` interno do `Data` como XML completo, porque erros de fechamento de `selection`, `tab`, `view` ou `variable` costumam aparecer só no `Load`.
 - `Regra operacional`: ao alterar `WorkWithForWeb`, desencorajar substituicoes textuais amplas em tags repetidas, especialmente `<actions>`; localizar estruturalmente a `Selection` alvo dentro do XML interno antes de inserir, remover ou alterar uma action.
@@ -1328,7 +1329,9 @@ Tabela única de "erro → causa → correção" com chave composta (`Código` +
 
 | Código | Fase | Contexto | Causa | Correção |
 |---|---|---|---|---|
+| `spc0023` | Especificação | argumento de tipo incompatível em chamada | `Parameter X (...) calling Y has wrong type (expecting Z)`; o tipo do argumento não corresponde ao esperado (`confirmado-build`, caso observado) | alinhar o argumento ao tipo esperado; o código, por si só, não caracteriza falha de um tipo de controle |
 | `spc0031` | Especificação | DataView sem Associated table | o DataView sozinho não forma tabela base para `For Each` | criar `Transaction` estrutural + propriedade `DVAssocTable` |
+| `spc0045` | Especificação | `<component>` aponta para View de `WorkWithForWeb` | o componente referenciado precisa ser um Web Component; a View não tem `WEB_COMP` (`confirmado-acervo`) e o build observou a recusa (`confirmado-build`) | não embutir `View<Trn>` como componente; acessar a View por URL conforme a assinatura documentada na revisão de `WorkWithForWeb` |
 | `src0013` | Import | `For each` no Event Start | leitura no evento de tela, não em Procedure | mover a leitura para `Procedure` |
 | `src0051` | Import | método sobre retorno de proc | `proc(x).ToUpper()` — método sobre chamada de procedure | atribuir a variável primeiro |
 | `src0054` | Import | método sobre parênteses | `(&a-&b).ToString()` — método sobre expressão entre parênteses | atribuir a variável primeiro |
@@ -1343,6 +1346,12 @@ Notas de reconciliação:
 
 - **`src0294` tem dois contextos na tabela (chave composta obrigatória).** O contexto "Trn estrutural" (linha acima, com `src0246`) já estava coberto na base; o contexto "escalar `.IsNull`" **não** estava: `src0294` constava no `02` para re-bind de SDT em Tab aninhada (`ToJSonString`/`FromJSonString`, seção `WebPanel, Tab aninhada e re-bind de SDT`), fenômeno distinto. Código de erro repetido não é prova de cobertura.
 - **`src0216` é a primeira entrada da base** (o levantamento da frente mediu zero ocorrências na base e na skill `nexa`); registro observado na frente GamAuditoria, correção conforme o padrão do objeto.
+
+#### Warnings do Specifier que não bloqueiam
+
+- `confirmado-build`: em logs de Build All concluídos, `spc0024` apareceu como `warning`, com as formas `Not enough parameters linking/calling <objeto>` e `Not enough parameters in Web component <objeto>`. O warning registra argumentos ausentes na chamada durante a Specification; sua presença não impediu a conclusão dos builds observados. Isso não prova o valor usado em runtime para cada parâmetro omitido.
+- `padrao-gx-nao-verificado`: a afirmação de que parâmetros `in` finais omitidos recebem o default do tipo — por exemplo, `Boolean=false` — não foi demonstrada pelos logs nem pela leitura do C# gerado disponível. Só considere fasear a inclusão de um parâmetro `in` quando ele for o último, o objeto chamado não tiver `out` e o default for confirmado como correto para os chamadores antigos; a ausência de `spc0024` não substitui essa verificação.
+- `SPC_WARNINGS_DISABLED` foi observado como metadado de objeto com uma lista de códigos em XML sanitizado (exemplo em `04-webpanel-familias-e-templates.md`). A lista do exemplo não contém `spc0024`, e o material disponível não comprova o efeito de supressão para esse warning específico; confira a configuração e o resultado no objeto-alvo antes de interpretar a ausência do aviso.
 
 #### Falso alarme conhecido do Impact Analysis (heurística tríplice qualificada)
 
@@ -1446,6 +1455,12 @@ Notas de reconciliação:
 - `Regra operacional`: ao investigar código de evento que parece não executar, sempre identificar PRIMEIRO se o caso eh (a) ou (b) antes de mexer no source — a ação corretiva eh diferente em cada caso.
 - `Regra operacional`: para `Transaction` com sintoma de atributo que não reflete na UI após import OK e geração disponível, resolver primeiro o `.cs` web por `scripts/Resolve-GeneXusGeneratedCsPath.ps1` (ou wrapper local) a partir de `kb_environment_web_dirs`; em seguida mapear atribuicoes com `scripts/Find-CsAttributeAssignments.ps1` (`-CsPath` absoluto resolvido, `-Attribute`, `-AsJson`) antes de concluir que a rule foi eliminada; distinguir copias sem `AssignAttri` no mesmo método e padrão triplet do Specifier (`cascadeOrder` em `if/else if` mutuamente exclusivos). Não substitui busca por nome de evento/handler em `WebPanel` (mecanismo b).
 - `Regra operacional` (quarentena XPZ para `Transaction`): `tripletPattern.cascadeOrder` em `Find-CsAttributeAssignments.ps1` é evidencia de ordem efetiva no `.cs` gerado, não catalogo geral de modelagem GeneXus. Para o anti-padrao nomeado e a correcao por inversao textual de `Rules`, ver `transaction-attribute-rule-shadowed-by-default-in-cascade` na seção **Anti-padroes nomeados (`Transaction` — motor XPZ)**.
+
+### Regressões conhecidas do gerador GeneXus
+
+- `Evidência direta` (GX18, regressão datada U14→U15; campanha de builds concluídos em 2026-07): em condições geradas por `AddWhere`, atributos anuláveis perderam o ramo `IS NULL` nas formas `X.IsEmpty()`, `not X.IsEmpty()` e `X = false`. O impacto observado ficou nos ramos de valor vazio/`false`; igualdade simples `campo = proc()` não caracteriza este caso.
+- `Regra operacional`: o contorno observado é explicitar `.IsNull()` na condição. Ao comparar gerações, contar ocorrências de `<Atributo> IS NULL` por arquivo `.cs` entre builds concluídos; não deduplicar com `sort -u`, pois a contagem por arquivo importa. Separar `AddWhere` de `CursorDef` (código de carga, onde `IsNull()` pode estar comentado de propósito) e incluir cada grid embutido, cujo Web Component gera seu próprio `*WC.cs`.
+- `Regra operacional`: classificar o sintoma como regressão versionada do gerador, não como defeito do XPZ. A busca deve se limitar aos `.cs` efetivamente produzidos por build concluído; ver o procedimento de diagnóstico em `xpz-msbuild-build/SKILL.md`.
 
 ### Diagnostico de código gerado truncado por falha de generation
 
@@ -1571,6 +1586,7 @@ Não confundir `src0056` em `Transaction` `Rules` com o playbook de `Procedure` 
 - `Regra operacional`: quando o nome lógico do objeto ou atributo contiver caractere invalido para o filesystem alvo, aplicar normalizacao mínima, deterministica e rastreavel apenas no nome do arquivo em disco, preservando o `name` interno do XML sem alteracao.
 - `Regra operacional`: na auditoria de completude entre o XML total e o acervo extraido, comparar por `tipo + nome logico` e considerar explicitamente a camada de normalizacao de filename quando houver caractere invalido para o filesystem.
 - `Regra operacional`: a reconciliação do sync em `-FullSnapshot` (`scripts/Sync-GeneXusXpzToXml.ps1`) usa a identidade estável `guid` do nó raiz, não só `tipo + nome logico`: quando o mesmo `guid` aparece no acervo sob nome diferente, o motor trata como rename e renomeia o arquivo no acervo (`Move-Item` antigo → novo), preservando um arquivo só e o histórico git por similaridade; cobre `Attribute` e `Object`. Em `-VerifyOnly`, apenas classifica o resíduo de rename no relatório (`RenameResidualsDetected`), sem tocar o disco. Resíduo de nome antigo removido por rename reconhecido por `guid` não é deleção cega do acervo.
+- `Regra operacional` (cautela de modelagem): não tratar reimportar um `Attribute` com nome novo como procedimento normal de rename. A única janela tolerável registrada é antes da primeira reorg que materialize a coluna no banco; mesmo nesse caso, preservar o `guid` e incluir no mesmo pacote a `Transaction` que referencia esse GUID. Fora dessa janela, considerar a operação perigosa e não recomendar. O gate 9-FD continua verificando drift de assinatura; `front-only-new-attribute` permanece informativo.
 
 ### Politica para `Theme`
 
@@ -2166,6 +2182,8 @@ Este guia é operacional, mas conservador.
 - Nível de confianca atual da clonagem: baixo.
 - Evidência direta: Part type mais recorrentes: a51ced48-7bee-0001-ab12-04e9e32123d1; babf62c5-0111-49e9-a1c3-cc004d90900a.
 - Evidência direta: objetos com parent: 183/183; com pattern: 183/183.
+- `Evidência direta` (recorte GX18): a View padrão gerada de `WorkWithForWeb` não materializa corpo próprio no XML; 183/184 Views medidas não tinham `<Source>`, com uma exceção customizada. A assinatura observada usa as chaves do nível base da `Transaction`, na ordem declarada, e um `string` final para o `code` da aba. Chaves de níveis filhos não entram; `""` solicita a aba default.
+- `Regra operacional`: ao chamar uma View gerada, usar `code` como seletor de aba e `""` para a aba default; não substituir por `name` nem por `wcname`. Variações datadas na comparação do default entre `"General"` e `"Geral"` não alteram esse contrato; ver a ressalva em `01j-workwithweb-cdata-padroes.md`. A View não é `WEB_COMP` e não deve ser embutida como `<component>`; acessá-la por URL. O caso de `<component>` foi recusado com `spc0045` (`confirmado-build`); ver `xpz-builder/responsibilities-by-type/workwithforweb.md` para os mecanismos de chamada e a ressalva agregada de `wcname`.
 
 
 

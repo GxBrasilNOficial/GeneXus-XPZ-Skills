@@ -314,6 +314,10 @@ A rule pode estar presente nesses métodos e ainda assim ficar "escondida" em ru
 
 **Regressão:** `scripts/Test-FindCsAttributeAssignmentsContract.ps1` (sentinela `FIND_CS_ATTRIBUTE_ASSIGNMENTS_CONTRACT_OK`).
 
+### Regressão de `AddWhere` para condições anuláveis (GX18 U14→U15)
+
+`Find-CsAttributeAssignments.ps1` não automatiza este diagnóstico: ele mapeia atribuições de atributos em métodos da Transaction. Para a regressão versionada de `AddWhere`, compare a contagem de `<Atributo> IS NULL` por arquivo `.cs` entre builds concluídos; separe `AddWhere` de `CursorDef`, inclua cada grid embutido e seu `*WC.cs`, e não deduplique com `sort -u`. Igualdade simples `campo = proc()` não caracteriza o caso. O contorno observado e os limites estão em [02-regras-operacionais-e-runtime.md](../02-regras-operacionais-e-runtime.md), seção **Regressões conhecidas do gerador GeneXus**.
+
 ### Invoke-GeneXusKbSpecifyGenerate.ps1
 
 Executa `SpecifyAll` seguido de `GenerateOnly`. Sem compilação explícita. Mais rápido
