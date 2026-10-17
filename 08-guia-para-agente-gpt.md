@@ -295,7 +295,9 @@ Tabela atômica com chave composta (Código + Fase + Contexto); fonte canônica 
 | `src0216` | Import | condition órfã em WorkWith | incluir o atributo ou remover a condition |
 | `src0294` / `src0246` | Import | Trn estrutural (`GenerateObject=False`) | remover `Events`/`Rules` WWP e `Apply:<wwp>` |
 | `src0294` | Import | `.IsNull()` em escalar | usar `.IsEmpty()` (só atributo/BC tem `IsNull`) |
+| `src0294` | Import | `Clear`/`AddItem` em `Event` com `ControlType = Edit` | usar `ControlType = Combo Box` (ou operar na variável/controle combo) |
 | `src0229` | Import | `.SetNull()` em escalar | usar `.SetEmpty()` (só atributo/BC tem `SetNull`) |
+| `src0229` | Import | nome ambíguo attribute × control | qualificar `att:X` ou renomear o controle |
 | `CS2001` | Build (C#) | `right()`/`left()` inexistentes → `udp("right")` órfão | usar `.Substring`, `.PadLeft`, `.ToString` |
 
 `src0294` aparece em **três** contextos (chave composta): "Trn estrutural" (Catalog 3 do `transaction.md`), "escalar `.IsNull`" e "`Clear`/`AddItem` em `Event` com `ControlType = Edit`"; `src0229` tem dois: "`.SetNull()` em escalar" e "nome ambíguo attribute × control". `src0216` é a primeira entrada da base — código repetido não é prova de cobertura.
