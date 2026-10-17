@@ -8,6 +8,8 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 ### Unreleased
 
+- **Import parcial propagado e rastreabilidade normalizada (2026-10-17):** a regra «omitir `Part` não apaga; o Specifier valida os `Events` da KB» passa a constar também em `xpz-msbuild-import-export/SKILL.md` (footgun), `08` e `xpz-builder/quality-checklist.md`; a entrada de outubro do `historico` lista `09` e `dataview.md` e registra as duas rodadas de revisão; notas antigas de `confirmado-import` (`src0056`/`src0239`) ficam anotadas como anteriores à exigência de `stage=import-real`.
+
 - **Definição de `confirmado-import` alinhada à evidência rastreável e fechamento de enumerações (2026-10-17):** `02` e `transaction.md` definem a evidência como mensagem + resultado da tarefa de uma importação **real** (`stage=import-real`; `PreviewMode`/`import-preview` não valem; `importTaskSuccess`; `exitCode` do wrapper quando preservado); as citações do combo registram `importTaskSuccess=false` (rejeição) e `true` (rodada aceita); a enumeração do satélite `dataview.md` foi completada e o `09` atualizado.
 
 - **Correção do rótulo de evidência de `src0229`/`src0294` no combo (2026-10-17):** o rótulo estava `confirmado-build`, mas o log primário (`import-real.msbuild`, 2026-10-16, KB de teste `wsEducacaoSpTeste`) mostra a rejeição no **import** (`Importando Transaction … Falhou` + `src0229`/`src0294`) e a aceitação da variante corrigida no mesmo passo (`Import Task Sucesso`); `02` (linhas atômicas de `Clear`/`AddItem` e ambiguidade) e o Catalog 3 do `transaction.md` passam a `confirmado-import`, alinhados ao sintoma "Import fails".
@@ -419,6 +421,8 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 ### Unreleased
 
+- **Importación parcial propagada y rastreabilidad normalizada (2026-10-17):** la regla «omitir una `Part` no borra; el Specifier valida los `Events` de la KB» pasa a constar también en `xpz-msbuild-import-export/SKILL.md` (footgun), `08` y `xpz-builder/quality-checklist.md`; la entrada de octubre del `historico` lista `09` y `dataview.md` y registra las dos rondas de revisión; notas antiguas de `confirmado-import` (`src0056`/`src0239`) quedan anotadas como anteriores al requisito de `stage=import-real`.
+
 - **Definición de `confirmado-import` alineada a la evidencia rastreable y cierre de enumeraciones (2026-10-17):** `02` y `transaction.md` definen la evidencia como mensaje + resultado de la tarea de una importación **real** (`stage=import-real`; `PreviewMode`/`import-preview` no valen; `importTaskSuccess`; `exitCode` del wrapper cuando se preserva); las citas del combo registran `importTaskSuccess=false` (rechazo) y `true` (corrida aceptada); la enumeración del satélite `dataview.md` quedó completa y el `09` actualizado.
 
 - **Corrección de la etiqueta de evidencia de `src0229`/`src0294` en el combo (2026-10-17):** la etiqueta estaba en `confirmado-build`, pero el log primario (`import-real.msbuild`, 2026-10-16, KB de prueba `wsEducacaoSpTeste`) muestra el rechazo en el **import** (`Importando Transaction … Falhou` + `src0229`/`src0294`) y la aceptación de la variante corregida en el mismo paso (`Import Task Sucesso`); el `02` (filas atómicas de `Clear`/`AddItem` y ambigüedad) y el Catálogo 3 del `transaction.md` pasan a `confirmado-import`, alineados con el síntoma "Import fails".
@@ -827,6 +831,8 @@ All relevant changes to this repository will be recorded here from this adoption
 The format keeps an `Unreleased` section for changes not yet published in a formal version. This repository does not yet use public semantic versioning; when that changes, future sections should record the corresponding tag.
 
 ### Unreleased
+
+- **Partial import propagated and traceability normalized (2026-10-17):** the rule "omitting a Part does not delete it; the Specifier validates the KB's Events" now also appears in `xpz-msbuild-import-export/SKILL.md` (footgun), `08` and `xpz-builder/quality-checklist.md`; the October `historico` entry lists `09` and `dataview.md` and records the two review rounds; older `confirmado-import` notes (`src0056`/`src0239`) are annotated as predating the `stage=import-real` requirement.
 
 - **`confirmado-import` definition aligned with traceable evidence; enumerations closed (2026-10-17):** `02` and `transaction.md` now define the evidence as message + task result from a **real** import (`stage=import-real`; `PreviewMode`/`import-preview` do not qualify; `importTaskSuccess`; wrapper `exitCode` when preserved); the combo citations record `importTaskSuccess=false` (rejection) and `true` (accepted round); the `dataview.md` satellite enumeration was completed and `09` updated.
 

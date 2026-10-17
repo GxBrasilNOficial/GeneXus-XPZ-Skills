@@ -307,6 +307,8 @@ Tabela atômica com chave composta (Código + Fase + Contexto); fonte canônica 
 
 `spc0024` é warning do Specifier, não erro, quando o log de build concluído o registra como aviso; a presença/ausência do warning, por si só, não prova o default usado para um argumento omitido — o valor foi **medido separadamente** (ver `02`). Para fasear um novo `in`, consulte a subseção **Warnings do Specifier que não bloqueiam** em `02-regras-operacionais-e-runtime.md` e os limites em `xpz-builder/SKILL.md`.
 
+`Part` omitida no XML submetido **não é apagada**: o objeto mantém a `Part` anterior e o Specifier valida os `Events` correntes da KB, não só o que veio no pacote (KB de teste `wsEducacaoSpTeste`, 2026-10-16). Para limpar, enviar a `Part` com conteúdo vazio — método não medido; o medido é que omitir não limpa. Ver a nota sob a tabela atômica do `02`.
+
 ### Regra adicional para `Procedure` de relatório
 
 - em relatório simples, `Source` deve ser validado junto com a camada onde cada sintoma nasceu: `Source`, `Rules` ou layout

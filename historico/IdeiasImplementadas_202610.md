@@ -292,7 +292,7 @@ Implementado em 2026-10-16/17 a partir de handoff com sete aprendizados e de med
 
 Fechamento de 2026-10-17: rótulos de evidência do Catalog 3 alinhados à importação observada (`src0229`/`src0294` → `confirmado-import`; a definição dos rótulos passa a exigir importação **real** (`stage=import-real`; preview excluído) com resultado da tarefa rastreável (`importTaskSuccess`/`exitCode` do wrapper)), enumeração do satélite `dataview.md` completada e `09` atualizado.
 
-**Validação.** Passo mecânico (`Invoke-PrePushMechanicalChecks.ps1`): 13 commits à frente, árvore limpa, 0 atrás; fase semântica com 1 gap confirmado (enumeração do satélite DataView) e ajustes de rastreabilidade (`09`, nota de import parcial, citações de evidência) fechados na mesma rodada.
+**Validação.** Passo mecânico (`Invoke-PrePushMechanicalChecks.ps1`) sobre o intervalo pendente: árvore limpa, 0 atrás, parse sem erros; fase semântica em duas rodadas de revisão — enumeração do satélite `dataview.md` (gap confirmado) e exigência de `stage=import-real` na definição de `confirmado-import` —, ambas corrigidas e re-verificadas antes do fechamento.
 
 ### Rastreabilidade
 
@@ -302,4 +302,4 @@ Fechamento de 2026-10-17: rótulos de evidência do Catalog 3 alinhados à impor
 - Commit material: `febc791` (Corrige a pré-condição de `out` do faseamento e pina os dois códigos da View).
 - Commit material: `e85ab07` (Mede o combo em Attribute de Transaction e registra import parcial).
 - Commit material: `d5f9ff5` (Alinha coerência pós-pré-push: prova do default e embed autenticado).
-- Arquivos materiais: `01j-workwithweb-cdata-padroes.md`, `02-regras-operacionais-e-runtime.md`, `04-webpanel-familias-e-templates.md`, `08-guia-para-agente-gpt.md`, `998-ideias-descartadas-e-porque.md`, `999-ideias-pendentes.md`, `CHANGELOG.md`, `xpz-builder/SKILL.md`, `xpz-builder/quality-checklist.md`, `xpz-builder/responsibilities-by-type/transaction.md`, `xpz-builder/responsibilities-by-type/workwithforweb.md`, `xpz-msbuild-build/SKILL.md`.
+- Arquivos materiais: `01j-workwithweb-cdata-padroes.md`, `02-regras-operacionais-e-runtime.md`, `04-webpanel-familias-e-templates.md`, `08-guia-para-agente-gpt.md`, `998-ideias-descartadas-e-porque.md`, `999-ideias-pendentes.md`, `CHANGELOG.md`, `xpz-builder/SKILL.md`, `xpz-builder/quality-checklist.md`, `xpz-builder/responsibilities-by-type/transaction.md`, `xpz-builder/responsibilities-by-type/workwithforweb.md`, `xpz-builder/responsibilities-by-type/dataview.md`, `xpz-msbuild-build/SKILL.md`, `09-inventario-e-rastreabilidade-publica.md`.

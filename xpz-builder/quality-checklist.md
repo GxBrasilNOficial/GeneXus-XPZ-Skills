@@ -45,6 +45,7 @@ The checklist below is the consolidated end-to-end verification for any packagin
 - [ ] Every modified object XML was reread after writing and its saved `lastUpdate` was confirmed strictly fresher than the current official same-object baseline by the declared freshness margin (default 60s), or within the UtcNow + margin window for an explicitly declared new never-imported object
 - [ ] Every unchanged object reused only for dependency closure preserved the official `lastUpdate`
 - [ ] Embedded objects in `import_file.xml` were checked for correct `lastUpdate` handling before delivery
+- [ ] If the round intended to remove or clear the content of a Part (e.g. `Events`), the Part was sent with empty content rather than omitted — omission preserves the KB's current Part, and the following Specification validates it (see the note under the atomic table in `02-regras-operacionais-e-runtime.md`; measured in the test KB `wsEducacaoSpTeste`, 2026-10-16)
 - [ ] `ObjetosDaKbEmXml` was treated as read-only official snapshot
 - [ ] Current front folder `NomeCurto_GUID_YYYYMMDD` was created or reused explicitly
 - [ ] Successive micro-adjustments in the same active front reused the same front folder; no new front subfolder was created just for another attempt, visual adjustment, or reimport
