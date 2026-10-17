@@ -127,7 +127,7 @@ A cadeia observada de geração é `WorkWithWeb<Trn>` → `WW<Trn>` (Selection) 
 |---|---:|---|
 | Em abas Grid, `wcname` acompanha a Transaction referenciada, não o `code` da aba | 14 | Continue usando `code` como seletor; a exceção não altera a assinatura da View |
 
-Para a distinção de componentes, o caso `spc0045` e a evidência de `WEB_COMP`, consulte [02-regras-operacionais-e-runtime.md](02-regras-operacionais-e-runtime.md) e [xpz-builder/responsibilities-by-type/workwithforweb.md](xpz-builder/responsibilities-by-type/workwithforweb.md).
+Para a distinção de componentes, os casos `spc0045` (por controle) e `spc0012` (função de criação `.Create()`) e a evidência de `WEB_COMP`, consulte [02-regras-operacionais-e-runtime.md](02-regras-operacionais-e-runtime.md) e [xpz-builder/responsibilities-by-type/workwithforweb.md](xpz-builder/responsibilities-by-type/workwithforweb.md).
 
 ---
 

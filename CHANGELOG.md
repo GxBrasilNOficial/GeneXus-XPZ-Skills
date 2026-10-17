@@ -8,6 +8,8 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 ### Unreleased
 
+- **Paridade pós-pré-push: catálogo do tipo `Transaction` e tabela do `08` (2026-10-17):** o Catalog 3 de `xpz-builder/responsibilities-by-type/transaction.md` ganha `src0229` (nome ambíguo attribute × control) e `src0294` (`Clear`/`AddItem` em `Event` com `ControlType = Edit`), com nota de escopo remetendo o comportamento de tela do combo ao `999`; a tabela-síntese do `08` recebe `spc0012`, `spc0023` e `spc0045`, e as citações da View em `08`/`02`/`01j` passam a distinguir `spc0045` (por controle) de `spc0012` (`.Create()`).
+
 - **Ajustes de coerência pós-pré-push (2026-10-17):** `02`/`xpz-builder` deixam explícito que a presença/ausência do `spc0024`, por si só, **não prova** o valor do argumento omitido — o valor foi medido separadamente. `04`/`workwithforweb` registram a nuance do embed por URL: com sessão GAM autenticada o iframe renderiza a tela da View; sem sessão cai no `wplogin`.
 
 - **Combo em `Attribute` de `Transaction` medido; ambiguidade e import parcial (2026-10-17):** na KB de teste `wsEducacaoSpTeste`, `Combo Box` no `Attribute` + `AddItem` no `Event Start` lista, persiste no Insert e mostra o valor no UPD (o "vazio" anterior era artefato de harness); `ControlType` propaga a todos os usos (a coluna da Selection não foi medida); `Dynamic Combo Box` num `Attribute` falha no import por `ItemDescriptions` (válido em variável de WebPanel). `02` ganha `src0229` (ambíguo attribute × control, dica `src0292`), `src0294` (`Clear`/`AddItem` em `Event` com `ControlType = Edit`) e a regra de import parcial (`Part` omitida não é apagada; o Specifier valida os `Events` da KB). `999` registra o medido.
@@ -411,6 +413,8 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 ### Unreleased
 
+- **Paridad post-pre-push: catálogo del tipo `Transaction` y tabla del `08` (2026-10-17):** el Catálogo 3 de `xpz-builder/responsibilities-by-type/transaction.md` suma `src0229` (nombre ambiguo attribute × control) y `src0294` (`Clear`/`AddItem` en `Event` con `ControlType = Edit`), con nota de alcance que remite el comportamiento de pantalla del combo al `999`; la tabla de síntesis del `08` recibe `spc0012`, `spc0023` y `spc0045`, y las citas de la View en `08`/`02`/`01j` pasan a distinguir `spc0045` (por control) de `spc0012` (`.Create()`).
+
 - **Ajustes de coherencia post-pre-push (2026-10-17):** `02`/`xpz-builder` dejan explícito que la presencia/ausencia del `spc0024`, por sí sola, **no prueba** el valor del argumento omitido — el valor se midió por separado. `04`/`workwithforweb` registran el matiz del embed por URL: con sesión GAM autenticada el iframe renderiza la pantalla de la View; sin sesión cae en `wplogin`.
 
 - **Combo en `Attribute` de `Transaction` medido; ambigüedad e importación parcial (2026-10-17):** en la KB de prueba `wsEducacaoSpTeste`, `Combo Box` en el `Attribute` + `AddItem` en el `Event Start` lista, persiste en el Insert y muestra el valor en el UPD (el "vacío" anterior era artefacto de harness); `ControlType` se propaga a todos los usos (la columna de la Selection no se midió); `Dynamic Combo Box` en un `Attribute` falla en el import por `ItemDescriptions` (válido en variable de WebPanel). `02` gana `src0229` (ambiguo attribute × control, pista `src0292`), `src0294` (`Clear`/`AddItem` en `Event` con `ControlType = Edit`) y la regla de import parcial (`Part` omitida no se borra; el Specifier valida los `Events` de la KB). `999` registra lo medido.
@@ -811,6 +815,8 @@ All relevant changes to this repository will be recorded here from this adoption
 The format keeps an `Unreleased` section for changes not yet published in a formal version. This repository does not yet use public semantic versioning; when that changes, future sections should record the corresponding tag.
 
 ### Unreleased
+
+- **Post-pre-push parity: `Transaction` type catalog and `08` table (2026-10-17):** Catalog 3 in `xpz-builder/responsibilities-by-type/transaction.md` gains `src0229` (ambiguous attribute × control name) and `src0294` (`Clear`/`AddItem` in an `Event` with `ControlType = Edit`), with a scope note pointing combo screen behavior to `999`; the `08` synthesis table gains `spc0012`, `spc0023` and `spc0045`, and the View citations in `08`/`02`/`01j` now distinguish `spc0045` (via control) from `spc0012` (`.Create()`).
 
 - **Post-pre-push consistency fixes (2026-10-17):** `02`/`xpz-builder` now state explicitly that the `spc0024` warning's presence or absence does not, by itself, **prove** the omitted argument's value — the value was measured separately. `04`/`workwithforweb` record the URL-embed nuance: with an authenticated GAM session the iframe renders the View screen; without a session it falls back to `wplogin`.
 

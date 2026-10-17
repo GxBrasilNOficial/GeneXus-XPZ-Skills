@@ -287,7 +287,10 @@ Tabela atômica com chave composta (Código + Fase + Contexto); fonte canônica 
 
 | Código | Fase | Contexto | Correção |
 |---|---|---|---|
+| `spc0012` | Especificação | função de criação aponta para View de `WorkWithForWeb` | não embutir a View; usar URL |
+| `spc0023` | Especificação | argumento de tipo incompatível em chamada | alinhar o argumento ao tipo esperado |
 | `spc0031` | Especificação | DataView sem Associated table | criar `Transaction` estrutural + `DVAssocTable` |
+| `spc0045` | Especificação | `<component>` referencia a View por controle | não embutir a View; usar URL |
 | `src0013` | Import | `For each` no Event Start | mover a leitura para `Procedure` |
 | `src0051` | Import | método sobre retorno de proc | atribuir a variável primeiro |
 | `src0054` | Import | método sobre parênteses | atribuir a variável primeiro |
@@ -810,7 +813,7 @@ Tabela atômica com chave composta (Código + Fase + Contexto); fonte canônica 
 - parar a expansao quando a hipotese já estiver sustentada; não reabrir o `WorkWithForWeb` inteiro por reflexo
 - usar `Transaction binding` como bloco inicial para `parent`, `parentGuid`, `parentType`, `Transaction` associada, acoplamento estrutural e suspeita de WW ligado ao pai errado
 - usar `Pattern structure and navigation` como bloco inicial para `selection`, abas, `view`, filtros, navegacao e shape funcional interno do pattern
-- para Views geradas, usar URL com as chaves do nível base da Transaction e o `code` final; chaves filhas não entram, `""` seleciona a aba default, e `name`/`wcname` não são seletores. A View não é `WEB_COMP` e não deve ser embutida em `<component>` (`spc0045`); ver `02` e `01j-workwithweb-cdata-padroes.md`, inclusive a linha agregada das 14 exceções de `wcname`
+- para Views geradas, usar URL com as chaves do nível base da Transaction e o `code` final; chaves filhas não entram, `""` seleciona a aba default, e `name`/`wcname` não são seletores. A View não é `WEB_COMP` e não deve ser embutida em `<component>` (`spc0045` por controle; `spc0012` em `.Create()`); ver `02` e `01j-workwithweb-cdata-padroes.md`, inclusive a linha agregada das 14 exceções de `wcname`
 - usar `Actions, links and prompts` como bloco inicial para action, botao, item de menu, `gxobject`, link, prompt e abertura explicita de outro objeto
 - usar `Attribute references and data contract` como bloco inicial para atributo exibido, filtro por atributo, coluna, aba dependente de atributo, referencia quebrada e convenio estrutural `adbb33c9-0906-4971-833c-998de27e0676-NomeDoAtributo`
 - usar `Identity and container` como bloco inicial para `name`, `fullyQualifiedName`, `guid`, `moduleGuid`, contêiner, origem estrutural e risco de confundir a instancia alvo
