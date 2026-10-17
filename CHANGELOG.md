@@ -8,6 +8,8 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 ### Unreleased
 
+- **Residuais do experimento medido na KB de teste (2026-10-16):** (B2) a pré-condição "o objeto chamado não pode ter `out`" **não se confirmou** — omitir o `in` final com `out` presente gerou só `spc0024` e o default aplicou em runtime (medido `Numeric=0`); `Boolean=false` medido direto. (C1b) o `spc0045` "by control" foi reproduzido (`<component ... webObject="<typeGuid>-View…">`), pinando os dois códigos com o `spc0012` do `.Create()`. Atualiza `02`, `xpz-builder/SKILL.md` e `quality-checklist.md`.
+
 - **Incertezas medidas na KB de teste `wsEducacaoSpTeste` (2026-10-16):** (Arm B) o `spc0024` é warning não bloqueante e o parâmetro `in` final omitido recebe o **default do tipo** em runtime (medido `Numeric=0`; `Boolean` não medido direto; sub-caso com `out` não medido). (Arm C) embutir a View gerada **por URL funciona** (`<embeddedpage>` + `.Source = <View>.Link(...)` → `<IFRAME src="View…">`); a recusa via `<component>` sai como `spc0045` (por controle) ou `spc0012` (função de criação `.Create()`). Atualiza `02`, `04` e `xpz-builder/responsibilities-by-type/workwithforweb.md`.
 
 - **`class` em `<cell>` confirmado por round-trip e por DOM (2026-10-16):** o `04` deixa de marcar como "não verificado" o descarte de `class` em `<cell>`. Experimento controlado na KB de teste `wsEducacaoSpTeste`: `<cell>` retém apenas atributos previstos — `cellClass` persiste; `class` e atributo não previsto (ex.: `fooBar`) são descartados no round-trip import→build→re-export. `class` em `<table controlName=...>` é preservado. No DOM de Responsive (`GxMultiForm`) não há `<table>`/`<td>`; `cellClass` aterrissa no `div.col-xs-12` da célula e a `class` da tabela no `div` da tabela. Doc: `04-webpanel-familias-e-templates.md`.
@@ -405,6 +407,8 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 ### Unreleased
 
+- **Residuales del experimento medido en la KB de prueba (2026-10-16):** (B2) la precondición "el objeto llamado no puede tener `out`" **no se confirmó** — omitir el `in` final con `out` presente generó solo `spc0024` y el default se aplicó en runtime (medido `Numeric=0`); `Boolean=false` medido directo. (C1b) se reprodujo el `spc0045` "by control" (`<component ... webObject="<typeGuid>-View…">`), fijando los dos códigos junto con el `spc0012` del `.Create()`. Actualiza `02`, `xpz-builder/SKILL.md` y `quality-checklist.md`.
+
 - **Incertezas medidas en la KB de prueba `wsEducacaoSpTeste` (2026-10-16):** (Arm B) `spc0024` es warning no bloqueante y el parámetro `in` final omitido recibe el **default del tipo** en runtime (medido `Numeric=0`; `Boolean` no medido directo; sub-caso con `out` no medido). (Arm C) embeber la View generada **por URL funciona** (`<embeddedpage>` + `.Source = <View>.Link(...)` → `<IFRAME src="View…">`); el rechazo vía `<component>` sale como `spc0045` (por control) o `spc0012` (función de creación `.Create()`). Actualiza `02`, `04` y `xpz-builder/responsibilities-by-type/workwithforweb.md`.
 
 - **`class` en `<cell>` confirmado por round-trip y por DOM (2026-10-16):** el `04` deja de marcar como "no verificado" el descarte de `class` en `<cell>`. Experimento controlado en la KB de prueba `wsEducacaoSpTeste`: `<cell>` conserva solo atributos previstos — `cellClass` persiste; `class` y atributos no previstos (ej.: `fooBar`) se descartan en el round-trip import→build→re-export. `class` en `<table controlName=...>` se preserva. En el DOM de Responsive (`GxMultiForm`) no hay `<table>`/`<td>`; `cellClass` aterriza en el `div.col-xs-12` de la celda y la `class` de la tabla en el `div` de la tabla. Doc: `04-webpanel-familias-e-templates.md`.
@@ -794,6 +798,8 @@ All relevant changes to this repository will be recorded here from this adoption
 The format keeps an `Unreleased` section for changes not yet published in a formal version. This repository does not yet use public semantic versioning; when that changes, future sections should record the corresponding tag.
 
 ### Unreleased
+
+- **Residuals of the measured experiment in the test KB (2026-10-16):** (B2) the precondition "the called object must not have `out`" was **not confirmed** — omitting the trailing `in` with `out` present produced only `spc0024` and the default applied at runtime (measured `Numeric=0`); `Boolean=false` measured directly. (C1b) the "by control" `spc0045` was reproduced (`<component ... webObject="<typeGuid>-View…">`), pinning both codes with the `.Create()` `spc0012`. Updates `02`, `xpz-builder/SKILL.md`, and `quality-checklist.md`.
 
 - **Uncertainties measured in the test KB `wsEducacaoSpTeste` (2026-10-16):** (Arm B) `spc0024` is a non-blocking warning and the omitted trailing `in` receives the **type default** at runtime (measured `Numeric=0`; `Boolean` not measured directly; `out` sub-case not measured). (Arm C) embedding the generated View **by URL works** (`<embeddedpage>` + `.Source = <View>.Link(...)` → `<IFRAME src="View…">`); the `<component>` refusal comes as `spc0045` (by control) or `spc0012` (create function `.Create()`). Updates `02`, `04`, and `xpz-builder/responsibilities-by-type/workwithforweb.md`.
 
