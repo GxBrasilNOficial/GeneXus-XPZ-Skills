@@ -8,6 +8,8 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 ### Unreleased
 
+- **Método de limpeza da `Part` `Events` marcado como não validado no checklist (2026-10-17):** o item do `xpz-builder/quality-checklist.md` passa a exigir que o núcleo verificado seja não omitir (omissão preserva o conteúdo retido) e trata enviar `Events` vazio como **tentativa não validada**, a verificar em KB de teste antes de confiar.
+
 - **Escopo do import parcial: medido em `Events`, generalização marcada como inferência (2026-10-17):** `02`, `08`, `xpz-msbuild-import-export/SKILL.md` e `xpz-builder/quality-checklist.md` passam a restringir o caso medido à `Part` `Events` e a marcar a generalização para outras `Part`s como inferência não medida.
 
 - **Resíduos de fechamento: footgun do import parcial, qualificadores no Catalog 3 e lista de commits do histórico (2026-10-17):** o footgun do `xpz-msbuild-import-export/SKILL.md` passa a refletir a medição (o import com a `Part` omitida não deu erro; a Specification seguinte falhou por código retido); as linhas de `src0056`/`src0239` no `transaction.md` ganham o qualificador de registro anterior a `stage=import-real`; a lista de commits materiais do `historico` incorpora os commits de docs normativos da frente.
@@ -425,6 +427,8 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 ### Unreleased
 
+- **Método de limpieza de la `Part` `Events` marcado como no validado en el checklist (2026-10-17):** el ítem de `xpz-builder/quality-checklist.md` pasa a exigir que el núcleo verificado sea no omitir (la omisión preserva el contenido retenido) y trata enviar `Events` vacío como **intento no validado**, a verificar en una KB de prueba antes de confiar.
+
 - **Alcance de la importación parcial: medido en `Events`, generalización marcada como inferencia (2026-10-17):** `02`, `08`, `xpz-msbuild-import-export/SKILL.md` y `xpz-builder/quality-checklist.md` pasan a restringir el caso medido a la `Part` `Events` y a marcar la generalización a otras `Part`s como inferencia no medida.
 
 - **Residuos de cierre: footgun de la importación parcial, calificadores en el Catálogo 3 y lista de commits del histórico (2026-10-17):** el footgun de `xpz-msbuild-import-export/SKILL.md` pasa a reflejar la medición (el import con la `Part` omitida no dio error; la Specification siguiente falló por código retenido); las filas de `src0056`/`src0239` en `transaction.md` reciben el calificador de registro anterior a `stage=import-real`; la lista de commits materiales del `historico` incorpora los commits de docs normativos de la frente.
@@ -839,6 +843,8 @@ All relevant changes to this repository will be recorded here from this adoption
 The format keeps an `Unreleased` section for changes not yet published in a formal version. This repository does not yet use public semantic versioning; when that changes, future sections should record the corresponding tag.
 
 ### Unreleased
+
+- **`Events`-part clearing method marked as unvalidated in the checklist (2026-10-17):** the `xpz-builder/quality-checklist.md` item now requires the verified core to be "do not omit" (omission preserves the retained content) and treats sending an empty `Events` as an **unvalidated attempt**, to be verified in a test KB before relying on it.
 
 - **Partial-import scope: measured on `Events`, generalisation marked as inference (2026-10-17):** `02`, `08`, `xpz-msbuild-import-export/SKILL.md` and `xpz-builder/quality-checklist.md` now restrict the measured case to the `Events` part and mark generalisation to other parts as unmeasured inference.
 
