@@ -1524,6 +1524,7 @@ Regras de uso:
 - `Regra operacional`: mensagens de erro do Specifier com texto literal estavel (ex.: `src0056: Missed ';' at the end of the rule`, `spc0150: Cannot update database`) podem constar com `confirmado-import` ou `confirmado-build` **sem** hospedar o XML da `Transaction` neste repositório — a evidencia é o contrato motor + classificação MSBuild, não o objeto de negocio.
 - `Regra operacional`: citacoes por nome de arquivo (ex.: `Animal.xml`, `VendaPedidoItens.xml`) com `confirmado-acervo` devem indicar que o artefato está na **pasta paralela da KB** (`ObjetosDaKbEmXml/...` após sync), salvo quando o exemplo for **molde sanitizado** em `01*` com rastreabilidade em `09`/`GeneXus-XPZ-PrivateMap`; não tratar esses paths como arquivos desta raiz `GeneXus-XPZ-Skills`.
 - `Regra operacional`: completude aparente de catalogo é risco operacional — listas longas sem rotulo honesto induzem o agente a tentar sintaxe não validada; preferir catalogo menor e rotulado a checklist aparentemente exaustiva.
+- `Regra operacional`: registros anteriores a 2026-10-17 não citam `stage=import-real`; a exigência vale para linhas novas ou atualizadas, e as linhas com qualificador inline permanecem como exemplos de referência.
 
 #### Anti-padroes nomeados (`Transaction` — motor XPZ)
 

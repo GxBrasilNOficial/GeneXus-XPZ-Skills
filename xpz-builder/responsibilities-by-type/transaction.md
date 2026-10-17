@@ -54,6 +54,7 @@ Operational rules:
 - Stable Specifier messages (e.g. `src0056`, `spc0150` with full text) may be documented under `confirmado-import` / `confirmado-build` without copying business `Transaction` XML into this repository.
 - File-name examples (`Animal.xml`, etc.) with `confirmado-acervo` must state **parallel KB folder** (`ObjetosDaKbEmXml/...`) unless the example is a sanitized template in `01*`.
 - Other skills must cross-reference this catalog section instead of duplicating it; see [02-regras-operacionais-e-runtime.md](../../02-regras-operacionais-e-runtime.md) for repository scope (XPZ motor rejections vs GeneXus language documentation such as **nexa**).
+- **Temporal scope:** records dated before 2026-10-17 do not cite `stage=import-real`; the requirement binds new or updated rows. Rows carrying an inline qualifier remain the reference examples.
 
 ## Catalog: `on <event>` clauses in declarative `Rules` and `Events` restrictions
 

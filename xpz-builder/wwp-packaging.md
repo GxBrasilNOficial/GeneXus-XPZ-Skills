@@ -59,7 +59,7 @@ Caso **inverso** ao da "Regra central" acima. Lá o risco é o pacote `COM_WWP` 
 - a propriedade `Apply:<wwp-guid>=True` no nível Object;
 - a `PatternInstance WorkWithPlus*` e os derivados (`*WW`, `*WWDS`, `*General`, `*Prompt`, `*View`) no mesmo pacote.
 
-Como a tela da própria Transaction **não é gerada**, esse código referencia runtime inexistente e o **import falha** (`confirmado-import`, GeneXus 18 U13 + WorkWithPlus_Web 16.0.3.1):
+Como a tela da própria Transaction **não é gerada**, esse código referencia runtime inexistente e o **import falha** (`confirmado-import`; registro anterior à exigência de `stage=import-real`, GeneXus 18 U13 + WorkWithPlus_Web 16.0.3.1):
 
 ```
 src0246: Call to non-defined object 'LoadWWPContext' (Transaction '<Trn>' Events)

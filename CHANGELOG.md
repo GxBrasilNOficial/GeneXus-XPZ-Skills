@@ -8,6 +8,8 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 ### Unreleased
 
+- **Escopo temporal dos registros legados e rastreabilidade à prova de drift (2026-10-17):** as seções de política de `transaction.md` e `02` passam a declarar que registros anteriores a 2026-10-17 não citam `stage=import-real` (a exigência vale para linhas novas ou atualizadas); `wwp-packaging.md` ganha o qualificador inline; a validação do `historico` deixa de contar rodadas e aponta as entradas do `CHANGELOG`.
+
 - **Envio de `Events` vazio uniformizado como tentativa não validada (2026-10-17):** `02` e `08` passam a apresentar o envio da `Part` com conteúdo vazio como tentativa não validada de limpeza (método não medido; confirmar em KB de teste), alinhados ao checklist e ao footgun da skill de importação/exportação.
 
 - **Método de limpeza da `Part` `Events` marcado como não validado no checklist (2026-10-17):** o item do `xpz-builder/quality-checklist.md` passa a exigir que o núcleo verificado seja não omitir (omissão preserva o conteúdo retido) e trata enviar `Events` vazio como **tentativa não validada**, a verificar em KB de teste antes de confiar.
@@ -16,7 +18,7 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 - **Resíduos de fechamento: footgun do import parcial, qualificadores no Catalog 3 e lista de commits do histórico (2026-10-17):** o footgun do `xpz-msbuild-import-export/SKILL.md` passa a refletir a medição (o import com a `Part` omitida não deu erro; a Specification seguinte falhou por código retido); as linhas de `src0056`/`src0239` no `transaction.md` ganham o qualificador de registro anterior a `stage=import-real`; a lista de commits materiais do `historico` incorpora os commits de docs normativos da frente.
 
-- **Import parcial propagado e rastreabilidade normalizada (2026-10-17):** a regra «omitir `Part` não apaga; o Specifier valida os `Events` da KB» passa a constar também em `xpz-msbuild-import-export/SKILL.md` (footgun), `08` e `xpz-builder/quality-checklist.md`; a entrada de outubro do `historico` lista `09` e `dataview.md` e registra as duas rodadas de revisão; notas antigas de `confirmado-import` (`src0056`/`src0239`) ficam anotadas como anteriores à exigência de `stage=import-real`.
+- **Import parcial propagado e rastreabilidade normalizada (2026-10-17):** a regra «omitir `Part` não apaga; o Specifier valida os `Events` da KB» passa a constar também em `xpz-msbuild-import-export/SKILL.md` (footgun), `08` e `xpz-builder/quality-checklist.md`; a entrada de outubro do `historico` lista `09` e `dataview.md` e registra as rodadas de revisão; notas antigas de `confirmado-import` (`src0056`/`src0239`) ficam anotadas como anteriores à exigência de `stage=import-real`.
 
 - **Definição de `confirmado-import` alinhada à evidência rastreável e fechamento de enumerações (2026-10-17):** `02` e `transaction.md` definem a evidência como mensagem + resultado da tarefa de uma importação **real** (`stage=import-real`; `PreviewMode`/`import-preview` não valem; `importTaskSuccess`; `exitCode` do wrapper quando preservado); as citações do combo registram `importTaskSuccess=false` (rejeição) e `true` (rodada aceita); a enumeração do satélite `dataview.md` foi completada e o `09` atualizado.
 
@@ -429,6 +431,8 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 ### Unreleased
 
+- **Alcance temporal de los registros legados y rastreabilidad a prueba de drift (2026-10-17):** las secciones de política de `transaction.md` y `02` pasan a declarar que los registros anteriores al 2026-10-17 no citan `stage=import-real` (el requisito vale para filas nuevas o actualizadas); `wwp-packaging.md` recibe el calificador inline; la validación del `historico` deja de contar rondas y remite a las entradas del `CHANGELOG`.
+
 - **Envío de `Events` vacío uniformado como intento no validado (2026-10-17):** `02` y `08` pasan a presentar el envío de la `Part` con contenido vacío como intento no validado de limpieza (método no medido; confirmar en una KB de prueba), alineados con el checklist y el footgun de la skill de importación/exportación.
 
 - **Método de limpieza de la `Part` `Events` marcado como no validado en el checklist (2026-10-17):** el ítem de `xpz-builder/quality-checklist.md` pasa a exigir que el núcleo verificado sea no omitir (la omisión preserva el contenido retenido) y trata enviar `Events` vacío como **intento no validado**, a verificar en una KB de prueba antes de confiar.
@@ -437,7 +441,7 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 - **Residuos de cierre: footgun de la importación parcial, calificadores en el Catálogo 3 y lista de commits del histórico (2026-10-17):** el footgun de `xpz-msbuild-import-export/SKILL.md` pasa a reflejar la medición (el import con la `Part` omitida no dio error; la Specification siguiente falló por código retenido); las filas de `src0056`/`src0239` en `transaction.md` reciben el calificador de registro anterior a `stage=import-real`; la lista de commits materiales del `historico` incorpora los commits de docs normativos de la frente.
 
-- **Importación parcial propagada y rastreabilidad normalizada (2026-10-17):** la regla «omitir una `Part` no borra; el Specifier valida los `Events` de la KB» pasa a constar también en `xpz-msbuild-import-export/SKILL.md` (footgun), `08` y `xpz-builder/quality-checklist.md`; la entrada de octubre del `historico` lista `09` y `dataview.md` y registra las dos rondas de revisión; notas antiguas de `confirmado-import` (`src0056`/`src0239`) quedan anotadas como anteriores al requisito de `stage=import-real`.
+- **Importación parcial propagada y rastreabilidad normalizada (2026-10-17):** la regla «omitir una `Part` no borra; el Specifier valida los `Events` de la KB» pasa a constar también en `xpz-msbuild-import-export/SKILL.md` (footgun), `08` y `xpz-builder/quality-checklist.md`; la entrada de octubre del `historico` lista `09` y `dataview.md` y registra las rondas de revisión; notas antiguas de `confirmado-import` (`src0056`/`src0239`) quedan anotadas como anteriores al requisito de `stage=import-real`.
 
 - **Definición de `confirmado-import` alineada a la evidencia rastreable y cierre de enumeraciones (2026-10-17):** `02` y `transaction.md` definen la evidencia como mensaje + resultado de la tarea de una importación **real** (`stage=import-real`; `PreviewMode`/`import-preview` no valen; `importTaskSuccess`; `exitCode` del wrapper cuando se preserva); las citas del combo registran `importTaskSuccess=false` (rechazo) y `true` (corrida aceptada); la enumeración del satélite `dataview.md` quedó completa y el `09` actualizado.
 
@@ -848,6 +852,8 @@ The format keeps an `Unreleased` section for changes not yet published in a form
 
 ### Unreleased
 
+- **Temporal scope for legacy records and drift-proof traceability (2026-10-17):** the policy sections of `transaction.md` and `02` now state that records predating 2026-10-17 do not cite `stage=import-real` (the requirement binds new or updated rows); `wwp-packaging.md` gains the inline qualifier; the `historico` validation no longer counts rounds and points to the `CHANGELOG` entries.
+
 - **Empty-`Events` sending normalised as an unvalidated attempt (2026-10-17):** `02` and `08` now present sending the part with empty content as an unvalidated clearing attempt (method unmeasured; verify in a test KB), aligned with the checklist and the import/export skill footgun.
 
 - **`Events`-part clearing method marked as unvalidated in the checklist (2026-10-17):** the `xpz-builder/quality-checklist.md` item now requires the verified core to be "do not omit" (omission preserves the retained content) and treats sending an empty `Events` as an **unvalidated attempt**, to be verified in a test KB before relying on it.
@@ -856,7 +862,7 @@ The format keeps an `Unreleased` section for changes not yet published in a form
 
 - **Closing residues: partial-import footgun, Catalog 3 qualifiers and historico commit list (2026-10-17):** the `xpz-msbuild-import-export/SKILL.md` footgun now reflects the measurement (the import with the omitted `Part` did not error; the following Specification failed on retained code); the `src0056`/`src0239` rows in `transaction.md` gain the pre-`stage=import-real` record qualifier; the `historico` material-commit list now includes the frente's normative-doc commits.
 
-- **Partial import propagated and traceability normalized (2026-10-17):** the rule "omitting a Part does not delete it; the Specifier validates the KB's Events" now also appears in `xpz-msbuild-import-export/SKILL.md` (footgun), `08` and `xpz-builder/quality-checklist.md`; the October `historico` entry lists `09` and `dataview.md` and records the two review rounds; older `confirmado-import` notes (`src0056`/`src0239`) are annotated as predating the `stage=import-real` requirement.
+- **Partial import propagated and traceability normalized (2026-10-17):** the rule "omitting a Part does not delete it; the Specifier validates the KB's Events" now also appears in `xpz-msbuild-import-export/SKILL.md` (footgun), `08` and `xpz-builder/quality-checklist.md`; the October `historico` entry lists `09` and `dataview.md` and records the review rounds; older `confirmado-import` notes (`src0056`/`src0239`) are annotated as predating the `stage=import-real` requirement.
 
 - **`confirmado-import` definition aligned with traceable evidence; enumerations closed (2026-10-17):** `02` and `transaction.md` now define the evidence as message + task result from a **real** import (`stage=import-real`; `PreviewMode`/`import-preview` do not qualify; `importTaskSuccess`; wrapper `exitCode` when preserved); the combo citations record `importTaskSuccess=false` (rejection) and `true` (accepted round); the `dataview.md` satellite enumeration was completed and `09` updated.
 

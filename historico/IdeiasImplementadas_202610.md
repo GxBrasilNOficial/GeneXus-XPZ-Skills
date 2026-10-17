@@ -292,7 +292,7 @@ Implementado em 2026-10-16/17 a partir de handoff com sete aprendizados e de med
 
 Fechamento de 2026-10-17: rótulos de evidência do Catalog 3 alinhados à importação observada (`src0229`/`src0294` → `confirmado-import`; a definição dos rótulos passa a exigir importação **real** (`stage=import-real`; preview excluído) com resultado da tarefa rastreável (`importTaskSuccess`/`exitCode` do wrapper)), enumeração do satélite `dataview.md` completada e `09` atualizado.
 
-**Validação.** Passo mecânico (`Invoke-PrePushMechanicalChecks.ps1`) sobre o intervalo pendente: árvore limpa, 0 atrás, parse sem erros; fase semântica em duas rodadas de revisão — enumeração do satélite `dataview.md` (gap confirmado) e exigência de `stage=import-real` na definição de `confirmado-import` —, ambas corrigidas e re-verificadas antes do fechamento.
+**Validação.** Passo mecânico (`Invoke-PrePushMechanicalChecks.ps1`) sobre o intervalo pendente: árvore limpa, 0 atrás, parse sem erros; fase semântica com as correções de 2026-10-17 registradas nas entradas correspondentes do `CHANGELOG`, todas re-verificadas.
 
 ### Rastreabilidade
 
