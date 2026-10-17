@@ -8,6 +8,8 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 ### Unreleased
 
+- **Envio de `Events` vazio uniformizado como tentativa não validada (2026-10-17):** `02` e `08` passam a apresentar o envio da `Part` com conteúdo vazio como tentativa não validada de limpeza (método não medido; confirmar em KB de teste), alinhados ao checklist e ao footgun da skill de importação/exportação.
+
 - **Método de limpeza da `Part` `Events` marcado como não validado no checklist (2026-10-17):** o item do `xpz-builder/quality-checklist.md` passa a exigir que o núcleo verificado seja não omitir (omissão preserva o conteúdo retido) e trata enviar `Events` vazio como **tentativa não validada**, a verificar em KB de teste antes de confiar.
 
 - **Escopo do import parcial: medido em `Events`, generalização marcada como inferência (2026-10-17):** `02`, `08`, `xpz-msbuild-import-export/SKILL.md` e `xpz-builder/quality-checklist.md` passam a restringir o caso medido à `Part` `Events` e a marcar a generalização para outras `Part`s como inferência não medida.
@@ -427,6 +429,8 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 ### Unreleased
 
+- **Envío de `Events` vacío uniformado como intento no validado (2026-10-17):** `02` y `08` pasan a presentar el envío de la `Part` con contenido vacío como intento no validado de limpieza (método no medido; confirmar en una KB de prueba), alineados con el checklist y el footgun de la skill de importación/exportación.
+
 - **Método de limpieza de la `Part` `Events` marcado como no validado en el checklist (2026-10-17):** el ítem de `xpz-builder/quality-checklist.md` pasa a exigir que el núcleo verificado sea no omitir (la omisión preserva el contenido retenido) y trata enviar `Events` vacío como **intento no validado**, a verificar en una KB de prueba antes de confiar.
 
 - **Alcance de la importación parcial: medido en `Events`, generalización marcada como inferencia (2026-10-17):** `02`, `08`, `xpz-msbuild-import-export/SKILL.md` y `xpz-builder/quality-checklist.md` pasan a restringir el caso medido a la `Part` `Events` y a marcar la generalización a otras `Part`s como inferencia no medida.
@@ -843,6 +847,8 @@ All relevant changes to this repository will be recorded here from this adoption
 The format keeps an `Unreleased` section for changes not yet published in a formal version. This repository does not yet use public semantic versioning; when that changes, future sections should record the corresponding tag.
 
 ### Unreleased
+
+- **Empty-`Events` sending normalised as an unvalidated attempt (2026-10-17):** `02` and `08` now present sending the part with empty content as an unvalidated clearing attempt (method unmeasured; verify in a test KB), aligned with the checklist and the import/export skill footgun.
 
 - **`Events`-part clearing method marked as unvalidated in the checklist (2026-10-17):** the `xpz-builder/quality-checklist.md` item now requires the verified core to be "do not omit" (omission preserves the retained content) and treats sending an empty `Events` as an **unvalidated attempt**, to be verified in a test KB before relying on it.
 
