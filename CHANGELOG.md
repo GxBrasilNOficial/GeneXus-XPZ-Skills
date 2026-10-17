@@ -8,6 +8,8 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 ### Unreleased
 
+- **Specification que avalia os `Events` retidos explicitada (2026-10-17):** `02` passa de «validou» para «avaliou … e falhou neles», e o checklist troca «validates» por «checks», removendo a leitura de aprovação; o medido é a falha da Specification sobre a referência retida.
+
 - **Qualificador de registro anterior na linha `on BeforeInsert` (2026-10-17):** a linha atualizada em `transaction.md` passa a declarar que o registro antecede a exigência de `stage=import-real`, fechando o regime aplicado a linhas atualizadas.
 
 - **Rótulo único por linha nos catálogos do tipo `Transaction` (2026-10-17):** as políticas de `transaction.md` e `02` ganham a regra de precedência de classes de evidência; a linha de `on BeforeInsert` fica só com `confirmado-import` (corroboração do corpus movida para Notes) e a de `Event Start`/`Event After Trn` passa a um único token.
@@ -435,6 +437,8 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 ### Unreleased
 
+- **Specification que evalúa los `Events` retenidos explicitada (2026-10-17):** `02` pasa de «validó» a «evaluó … y falló en ellos», y el checklist cambia «validates» por «checks», quitando la lectura de aprobación; lo medido es el fallo de la Specification sobre la referencia retenida.
+
 - **Calificador de registro anterior en la fila `on BeforeInsert` (2026-10-17):** la fila actualizada en `transaction.md` pasa a declarar que el registro precede al requisito de `stage=import-real`, cerrando el régimen aplicado a filas actualizadas.
 
 - **Etiqueta única por fila en los catálogos del tipo `Transaction` (2026-10-17):** las políticas de `transaction.md` y `02` reciben la regla de precedencia de clases de evidencia; la fila de `on BeforeInsert` queda solo con `confirmado-import` (corroboración del corpus movida a Notes) y la de `Event Start`/`Event After Trn` pasa a un único token.
@@ -859,6 +863,8 @@ All relevant changes to this repository will be recorded here from this adoption
 The format keeps an `Unreleased` section for changes not yet published in a formal version. This repository does not yet use public semantic versioning; when that changes, future sections should record the corresponding tag.
 
 ### Unreleased
+
+- **Specification that evaluates the retained `Events` made explicit (2026-10-17):** `02` changes "validou" to "avaliou … e falhou neles", and the checklist changes "validates" to "checks", removing the approval reading; the measured outcome is the Specification failing on the retained reference.
 
 - **Pre-`stage=import-real` qualifier on the `on BeforeInsert` row (2026-10-17):** the updated `transaction.md` row now states that the record predates the `stage=import-real` requirement, closing the regime that binds updated rows.
 
