@@ -298,9 +298,9 @@ Tabela atômica com chave composta (Código + Fase + Contexto); fonte canônica 
 | `src0229` | Import | `.SetNull()` em escalar | usar `.SetEmpty()` (só atributo/BC tem `SetNull`) |
 | `CS2001` | Build (C#) | `right()`/`left()` inexistentes → `udp("right")` órfão | usar `.Substring`, `.PadLeft`, `.ToString` |
 
-`src0294` aparece em dois contextos (chave composta): "Trn estrutural" já coberto na base (Catalog 3 do `transaction.md`); "escalar `.IsNull`" é entrada nova — código repetido não é prova de cobertura. `src0216` é a primeira entrada da base.
+`src0294` aparece em **três** contextos (chave composta): "Trn estrutural" (Catalog 3 do `transaction.md`), "escalar `.IsNull`" e "`Clear`/`AddItem` em `Event` com `ControlType = Edit`"; `src0229` tem dois: "`.SetNull()` em escalar" e "nome ambíguo attribute × control". `src0216` é a primeira entrada da base — código repetido não é prova de cobertura.
 
-`spc0024` é warning do Specifier, não erro, quando o log de build concluído o registra como aviso; isso não prova o default usado para um argumento omitido. Para fasear um novo `in`, consulte a subseção **Warnings do Specifier que não bloqueiam** em `02-regras-operacionais-e-runtime.md` e os limites em `xpz-builder/SKILL.md`.
+`spc0024` é warning do Specifier, não erro, quando o log de build concluído o registra como aviso; a presença/ausência do warning, por si só, não prova o default usado para um argumento omitido — o valor foi **medido separadamente** (ver `02`). Para fasear um novo `in`, consulte a subseção **Warnings do Specifier que não bloqueiam** em `02-regras-operacionais-e-runtime.md` e os limites em `xpz-builder/SKILL.md`.
 
 ### Regra adicional para `Procedure` de relatório
 

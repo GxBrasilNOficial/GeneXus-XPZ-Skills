@@ -1347,7 +1347,7 @@ Tabela única de "erro → causa → correção" com chave composta (`Código` +
 
 Notas de reconciliação:
 
-- **`src0294` tem dois contextos na tabela (chave composta obrigatória).** O contexto "Trn estrutural" (linha acima, com `src0246`) já estava coberto na base; o contexto "escalar `.IsNull`" **não** estava: `src0294` constava no `02` para re-bind de SDT em Tab aninhada (`ToJSonString`/`FromJSonString`, seção `WebPanel, Tab aninhada e re-bind de SDT`), fenômeno distinto. Código de erro repetido não é prova de cobertura.
+- **`src0294` tem três contextos na tabela (chave composta obrigatória).** O contexto "Trn estrutural" (linha acima, com `src0246`) já estava coberto na base; o contexto "escalar `.IsNull`" **não** estava: `src0294` constava no `02` para re-bind de SDT em Tab aninhada (`ToJSonString`/`FromJSonString`, seção `WebPanel, Tab aninhada e re-bind de SDT`), fenômeno distinto. O terceiro contexto — `Clear`/`AddItem` em `Event` com `ControlType = Edit` — foi medido na KB de teste (2026-10-16). Código de erro repetido não é prova de cobertura.
 - **`src0216` é a primeira entrada da base** (o levantamento da frente mediu zero ocorrências na base e na skill `nexa`); registro observado na frente GamAuditoria, correção conforme o padrão do objeto.
 - `Regra operacional` (import parcial): uma `Part` omitida no XML submetido **não é apagada**; o objeto mantém a `Part` anterior e o Specifier valida os `Events` correntes da KB, não só o que veio no pacote. Remover a `Part` `Events` do XML **não** limpa os eventos; para limpar, enviar a `Part` com conteúdo vazio (método de limpeza não medido; o medido é que omitir não limpa). `confirmado-build`/import, KB de teste `wsEducacaoSpTeste`, 2026-10-16.
 
