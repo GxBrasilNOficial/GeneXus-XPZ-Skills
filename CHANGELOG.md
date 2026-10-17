@@ -8,6 +8,8 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 ### Unreleased
 
+- **Rótulos de evidência no Catalog 3 de `transaction.md` (2026-10-17):** as sete linhas do catálogo sintoma→causa que estavam sem rótulo passam a declarar exatamente um, espelhando o canônico do `02` — `confirmado-import` em `src0056`/`src0239`; `confirmado-build` em `spc0150`, na ambiguidade `src0229`, em `Clear`/`AddItem` (`src0294`) e nas duas linhas de diagnóstico da cascata; exigência do checklist de qualidade e da política de evidência do próprio satélite.
+
 - **Paridade pós-pré-push: catálogo do tipo `Transaction` e tabela do `08` (2026-10-17):** o Catalog 3 de `xpz-builder/responsibilities-by-type/transaction.md` ganha `src0229` (nome ambíguo attribute × control) e `src0294` (`Clear`/`AddItem` em `Event` com `ControlType = Edit`), com nota de escopo remetendo o comportamento de tela do combo ao `999`; a tabela-síntese do `08` recebe `spc0012`, `spc0023` e `spc0045`, e as citações da View em `08`/`02`/`01j` passam a distinguir `spc0045` (por controle) de `spc0012` (`.Create()`).
 
 - **Ajustes de coerência pós-pré-push (2026-10-17):** `02`/`xpz-builder` deixam explícito que a presença/ausência do `spc0024`, por si só, **não prova** o valor do argumento omitido — o valor foi medido separadamente. `04`/`workwithforweb` registram a nuance do embed por URL: com sessão GAM autenticada o iframe renderiza a tela da View; sem sessão cai no `wplogin`.
@@ -413,6 +415,8 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 ### Unreleased
 
+- **Etiquetas de evidencia en el Catálogo 3 de `transaction.md` (2026-10-17):** las siete filas del catálogo síntoma→causa que estaban sin etiqueta pasan a declarar exactamente una, reflejando el canónico del `02` — `confirmado-import` en `src0056`/`src0239`; `confirmado-build` en `spc0150`, en la ambigüedad `src0229`, en `Clear`/`AddItem` (`src0294`) y en las dos filas de diagnóstico de la cascada; requisito del checklist de calidad y de la política de evidencia del propio satélite.
+
 - **Paridad post-pre-push: catálogo del tipo `Transaction` y tabla del `08` (2026-10-17):** el Catálogo 3 de `xpz-builder/responsibilities-by-type/transaction.md` suma `src0229` (nombre ambiguo attribute × control) y `src0294` (`Clear`/`AddItem` en `Event` con `ControlType = Edit`), con nota de alcance que remite el comportamiento de pantalla del combo al `999`; la tabla de síntesis del `08` recibe `spc0012`, `spc0023` y `spc0045`, y las citas de la View en `08`/`02`/`01j` pasan a distinguir `spc0045` (por control) de `spc0012` (`.Create()`).
 
 - **Ajustes de coherencia post-pre-push (2026-10-17):** `02`/`xpz-builder` dejan explícito que la presencia/ausencia del `spc0024`, por sí sola, **no prueba** el valor del argumento omitido — el valor se midió por separado. `04`/`workwithforweb` registran el matiz del embed por URL: con sesión GAM autenticada el iframe renderiza la pantalla de la View; sin sesión cae en `wplogin`.
@@ -815,6 +819,8 @@ All relevant changes to this repository will be recorded here from this adoption
 The format keeps an `Unreleased` section for changes not yet published in a formal version. This repository does not yet use public semantic versioning; when that changes, future sections should record the corresponding tag.
 
 ### Unreleased
+
+- **Evidence labels in `transaction.md` Catalog 3 (2026-10-17):** the seven symptom→cause rows that lacked a label now declare exactly one, mirroring the `02` canonical records — `confirmado-import` on `src0056`/`src0239`; `confirmado-build` on `spc0150`, the `src0229` ambiguity, `Clear`/`AddItem` (`src0294`) and the two cascade diagnostic rows; required by the satellite's own quality checklist and evidence policy.
 
 - **Post-pre-push parity: `Transaction` type catalog and `08` table (2026-10-17):** Catalog 3 in `xpz-builder/responsibilities-by-type/transaction.md` gains `src0229` (ambiguous attribute × control name) and `src0294` (`Clear`/`AddItem` in an `Event` with `ControlType = Edit`), with a scope note pointing combo screen behavior to `999`; the `08` synthesis table gains `spc0012`, `spc0023` and `spc0045`, and the View citations in `08`/`02`/`01j` now distinguish `spc0045` (via control) from `spc0012` (`.Create()`).
 
