@@ -8,6 +8,8 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 ### Unreleased
 
+- **Escopo do import parcial: medido em `Events`, generalização marcada como inferência (2026-10-17):** `02`, `08`, `xpz-msbuild-import-export/SKILL.md` e `xpz-builder/quality-checklist.md` passam a restringir o caso medido à `Part` `Events` e a marcar a generalização para outras `Part`s como inferência não medida.
+
 - **Resíduos de fechamento: footgun do import parcial, qualificadores no Catalog 3 e lista de commits do histórico (2026-10-17):** o footgun do `xpz-msbuild-import-export/SKILL.md` passa a refletir a medição (o import com a `Part` omitida não deu erro; a Specification seguinte falhou por código retido); as linhas de `src0056`/`src0239` no `transaction.md` ganham o qualificador de registro anterior a `stage=import-real`; a lista de commits materiais do `historico` incorpora os commits de docs normativos da frente.
 
 - **Import parcial propagado e rastreabilidade normalizada (2026-10-17):** a regra «omitir `Part` não apaga; o Specifier valida os `Events` da KB» passa a constar também em `xpz-msbuild-import-export/SKILL.md` (footgun), `08` e `xpz-builder/quality-checklist.md`; a entrada de outubro do `historico` lista `09` e `dataview.md` e registra as duas rodadas de revisão; notas antigas de `confirmado-import` (`src0056`/`src0239`) ficam anotadas como anteriores à exigência de `stage=import-real`.
@@ -423,6 +425,8 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 ### Unreleased
 
+- **Alcance de la importación parcial: medido en `Events`, generalización marcada como inferencia (2026-10-17):** `02`, `08`, `xpz-msbuild-import-export/SKILL.md` y `xpz-builder/quality-checklist.md` pasan a restringir el caso medido a la `Part` `Events` y a marcar la generalización a otras `Part`s como inferencia no medida.
+
 - **Residuos de cierre: footgun de la importación parcial, calificadores en el Catálogo 3 y lista de commits del histórico (2026-10-17):** el footgun de `xpz-msbuild-import-export/SKILL.md` pasa a reflejar la medición (el import con la `Part` omitida no dio error; la Specification siguiente falló por código retenido); las filas de `src0056`/`src0239` en `transaction.md` reciben el calificador de registro anterior a `stage=import-real`; la lista de commits materiales del `historico` incorpora los commits de docs normativos de la frente.
 
 - **Importación parcial propagada y rastreabilidad normalizada (2026-10-17):** la regla «omitir una `Part` no borra; el Specifier valida los `Events` de la KB» pasa a constar también en `xpz-msbuild-import-export/SKILL.md` (footgun), `08` y `xpz-builder/quality-checklist.md`; la entrada de octubre del `historico` lista `09` y `dataview.md` y registra las dos rondas de revisión; notas antiguas de `confirmado-import` (`src0056`/`src0239`) quedan anotadas como anteriores al requisito de `stage=import-real`.
@@ -835,6 +839,8 @@ All relevant changes to this repository will be recorded here from this adoption
 The format keeps an `Unreleased` section for changes not yet published in a formal version. This repository does not yet use public semantic versioning; when that changes, future sections should record the corresponding tag.
 
 ### Unreleased
+
+- **Partial-import scope: measured on `Events`, generalisation marked as inference (2026-10-17):** `02`, `08`, `xpz-msbuild-import-export/SKILL.md` and `xpz-builder/quality-checklist.md` now restrict the measured case to the `Events` part and mark generalisation to other parts as unmeasured inference.
 
 - **Closing residues: partial-import footgun, Catalog 3 qualifiers and historico commit list (2026-10-17):** the `xpz-msbuild-import-export/SKILL.md` footgun now reflects the measurement (the import with the omitted `Part` did not error; the following Specification failed on retained code); the `src0056`/`src0239` rows in `transaction.md` gain the pre-`stage=import-real` record qualifier; the `historico` material-commit list now includes the frente's normative-doc commits.
 
