@@ -432,7 +432,7 @@ A frase «sinalizar sem rebaixar `exitCode`» aplica-se **somente** à Categoria
 
 ### Footgun (nomeado): `Part` omitida não apaga o conteúdo da KB
 
-- **Sintoma:** remover uma `Part` (por exemplo `Events`) do XML submetido **não** limpa o conteúdo: o objeto mantém a `Part` anterior e o Specifier valida os `Events` **correntes da KB**, não só o que veio no pacote — o import pode falhar por código que nem está no pacote. O medido nesta base é que omitir não limpa; o método de limpeza não foi medido (candidato: enviar a `Part` com conteúdo vazio). Ver a nota sob a tabela atômica em `02-regras-operacionais-e-runtime.md` (KB de teste `wsEducacaoSpTeste`, 2026-10-16).
+- **Sintoma:** remover uma `Part` (por exemplo `Events`) do XML submetido **não** limpa o conteúdo: o objeto mantém a `Part` anterior e o Specifier valida os `Events` **correntes da KB**, não só o que veio no pacote. Na medição desta base, o import com a `Part` omitida **não deu erro**; a Specification seguinte é que falhou, por referência presente nos `Events` retidos e ausente no pacote. O método de limpeza não foi medido (candidato: enviar a `Part` com conteúdo vazio). Ver a nota sob a tabela atômica em `02-regras-operacionais-e-runtime.md` (KB de teste `wsEducacaoSpTeste`, 2026-10-16).
 
 ### Exportação headless e alinhamento ao pedido
 
