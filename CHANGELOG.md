@@ -8,6 +8,8 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 ### Unreleased
 
+- **Definição de `confirmado-import` alinhada à evidência rastreável e fechamento de enumerações (2026-10-17):** `02` e `transaction.md` definem a evidência como mensagem + resultado da tarefa (`importTaskSuccess`; `exitCode` do wrapper quando preservado); as citações do combo registram `importTaskSuccess=false` (rejeição) e `true` (rodada aceita); a enumeração do satélite `dataview.md` foi completada e o `09` atualizado.
+
 - **Correção do rótulo de evidência de `src0229`/`src0294` no combo (2026-10-17):** o rótulo estava `confirmado-build`, mas o log primário (`import-real.msbuild`, 2026-10-16, KB de teste `wsEducacaoSpTeste`) mostra a rejeição no **import** (`Importando Transaction … Falhou` + `src0229`/`src0294`) e a aceitação da variante corrigida no mesmo passo (`Import Task Sucesso`); `02` (linhas atômicas de `Clear`/`AddItem` e ambiguidade) e o Catalog 3 do `transaction.md` passam a `confirmado-import`, alinhados ao sintoma "Import fails".
 
 - **Rótulos de evidência no Catalog 3 de `transaction.md` (2026-10-17):** as sete linhas do catálogo sintoma→causa que estavam sem rótulo passam a declarar exatamente um, espelhando o canônico do `02` — `confirmado-import` em `src0056`/`src0239`; `confirmado-build` em `spc0150`, na ambiguidade `src0229`, em `Clear`/`AddItem` (`src0294`) e nas duas linhas de diagnóstico da cascata; exigência do checklist de qualidade e da política de evidência do próprio satélite.
@@ -417,6 +419,8 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 ### Unreleased
 
+- **Definición de `confirmado-import` alineada a la evidencia rastreable y cierre de enumeraciones (2026-10-17):** `02` y `transaction.md` definen la evidencia como mensaje + resultado de la tarea (`importTaskSuccess`; `exitCode` del wrapper cuando se preserva); las citas del combo registran `importTaskSuccess=false` (rechazo) y `true` (corrida aceptada); la enumeración del satélite `dataview.md` quedó completa y el `09` actualizado.
+
 - **Corrección de la etiqueta de evidencia de `src0229`/`src0294` en el combo (2026-10-17):** la etiqueta estaba en `confirmado-build`, pero el log primario (`import-real.msbuild`, 2026-10-16, KB de prueba `wsEducacaoSpTeste`) muestra el rechazo en el **import** (`Importando Transaction … Falhou` + `src0229`/`src0294`) y la aceptación de la variante corregida en el mismo paso (`Import Task Sucesso`); el `02` (filas atómicas de `Clear`/`AddItem` y ambigüedad) y el Catálogo 3 del `transaction.md` pasan a `confirmado-import`, alineados con el síntoma "Import fails".
 
 - **Etiquetas de evidencia en el Catálogo 3 de `transaction.md` (2026-10-17):** las siete filas del catálogo síntoma→causa que estaban sin etiqueta pasan a declarar exactamente una, reflejando el canónico del `02` — `confirmado-import` en `src0056`/`src0239`; `confirmado-build` en `spc0150`, en la ambigüedad `src0229`, en `Clear`/`AddItem` (`src0294`) y en las dos filas de diagnóstico de la cascada; requisito del checklist de calidad y de la política de evidencia del propio satélite.
@@ -823,6 +827,8 @@ All relevant changes to this repository will be recorded here from this adoption
 The format keeps an `Unreleased` section for changes not yet published in a formal version. This repository does not yet use public semantic versioning; when that changes, future sections should record the corresponding tag.
 
 ### Unreleased
+
+- **`confirmado-import` definition aligned with traceable evidence; enumerations closed (2026-10-17):** `02` and `transaction.md` now define the evidence as message + task result (`importTaskSuccess`; wrapper `exitCode` when preserved); the combo citations record `importTaskSuccess=false` (rejection) and `true` (accepted round); the `dataview.md` satellite enumeration was completed and `09` updated.
 
 - **Evidence-label correction for `src0229`/`src0294` in the combo case (2026-10-17):** the label read `confirmado-build`, but the primary log (`import-real.msbuild`, 2026-10-16, test KB `wsEducacaoSpTeste`) shows the rejection at **import** (`Importando Transaction … Falhou` + `src0229`/`src0294`) and the fixed variant accepted in the same step (`Import Task Sucesso`); `02` (atomic `Clear`/`AddItem` and ambiguity rows) and `transaction.md` Catalog 3 move to `confirmado-import`, aligned with the "Import fails" symptom.
 

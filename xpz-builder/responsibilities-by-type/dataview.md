@@ -99,6 +99,6 @@ Observed in GX 18 U13 (KB `FabricaBrasil18`, XPZ exported by the IDE). Confidenc
 ## Related references
 
 - `03-risco-e-decisao-por-tipo.md` — risk table, `## DataView` section and recalibration note
-- `02-regras-operacionais-e-runtime.md` — source error table (`spc0031`, `src0013`, `src0051`, `src0054`, `src0065`, `src0216`, `src0294`/`src0246`, `src0294` scalar `.IsNull`, `src0229` scalar `.SetNull`, `CS2001` `right()`/`left()`) and Impact Analysis heuristic
+- `02-regras-operacionais-e-runtime.md` — source error table (`spc0012`, `spc0023`, `spc0031`, `spc0045`, `src0013`, `src0051`, `src0054`, `src0065`, `src0216`, `src0294`/`src0246`, `src0294` scalar `.IsNull`, `src0294` `Clear`/`AddItem` com `ControlType = Edit`, `src0229` scalar `.SetNull`, `src0229` nome ambíguo attribute × control, `CS2001` `right()`/`left()`) and Impact Analysis heuristic
 - `04-webpanel-familias-e-templates.md` — grid by SDT without base table (Event Grid.Load with `For &Item in &Itens ... Load ... EndFor`)
 - `08-guia-para-agente-gpt.md` — quick DataView synthesis and source error table

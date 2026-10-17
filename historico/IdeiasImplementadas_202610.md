@@ -285,3 +285,21 @@ O defeito original era duplo: (1) um wrapper local com uma flag órfã no `.EXAM
 - Commit material (dedup de achados): `7538e62` (Evita duplicação de achados de comment-based help no inventário).
 - Commit material (correção): `6d360b5` (Corrige dois falsos positivos de bloqueio no check de comment-based help).
 - Arquivos materiais: `scripts/XpzWrapperEngineParamSupport.ps1`, `scripts/Test-XpzWrapperInventory.ps1`, `scripts/Test-XpzSetupAudit.ps1`, `scripts/Test-XpzWrapperInventorySelfTest.ps1`, `scripts/Test-XpzWrapperEngineParamSupportSelfTest.ps1`, `scripts/Test-XpzWrapperEngineParamMoldesSelfTest.ps1`, `xpz-kb-parallel-setup/SKILL.md`, `09-inventario-e-rastreabilidade-publica.md`, `02-regras-operacionais-e-runtime.md`, `CHANGELOG.md`, `999-ideias-pendentes.md`.
+
+## Aprendizados de GeneXus 18 medidos e paridade do fechamento pré-push
+
+Implementado em 2026-10-16/17 a partir de handoff com sete aprendizados e de medições na KB de teste `wsEducacaoSpTeste` (GX18): `spc0024` como warning não bloqueante, com o `in` final omitido recebendo o default do tipo e a pré-condição "sem `out`" refutada; renome de `Attribute` por reimport restrito à janela pré-primeira-reorg (cautela no `02`, proposta descartada no `998`); Views do `WorkWithForWeb` (recusas `spc0045` por controle e `spc0012` em `.Create()`, mecanismos de chamada, embed por URL com nuance `wplogin`, exceções agregadas de `wcname`); frente cumulativa (semear a working copy da rodada anterior, sem enfraquecer o 9-FD); `class` em `<cell>` descartada no round-trip (usar `cellClass`); combo em `Attribute` de `Transaction` medido (resíduo no `999`); regressão `AddWhere` U14→U15.
+
+Fechamento de 2026-10-17: rótulos de evidência do Catalog 3 alinhados à importação observada (`src0229`/`src0294` → `confirmado-import`; a definição dos rótulos passa a citar o resultado da tarefa rastreável, `importTaskSuccess`/`exitCode` do wrapper), enumeração do satélite `dataview.md` completada e `09` atualizado.
+
+**Validação.** Passo mecânico (`Invoke-PrePushMechanicalChecks.ps1`): 13 commits à frente, árvore limpa, 0 atrás; fase semântica com 1 gap confirmado (enumeração do satélite DataView) e ajustes de rastreabilidade (`09`, nota de import parcial, citações de evidência) fechados na mesma rodada.
+
+### Rastreabilidade
+
+- Commit material: `61a9546` (Documenta aprendizados recentes de GeneXus 18).
+- Commit material: `f844af6` (Confirma `class` em `<cell>` por round-trip e DOM).
+- Commit material: `5645a3f` (Mede em KB de teste as incertezas de `in` omitido e embed de View).
+- Commit material: `febc791` (Corrige a pré-condição de `out` do faseamento e pina os dois códigos da View).
+- Commit material: `e85ab07` (Mede o combo em Attribute de Transaction e registra import parcial).
+- Commit material: `d5f9ff5` (Alinha coerência pós-pré-push: prova do default e embed autenticado).
+- Arquivos materiais: `01j-workwithweb-cdata-padroes.md`, `02-regras-operacionais-e-runtime.md`, `04-webpanel-familias-e-templates.md`, `08-guia-para-agente-gpt.md`, `998-ideias-descartadas-e-porque.md`, `999-ideias-pendentes.md`, `CHANGELOG.md`, `xpz-builder/SKILL.md`, `xpz-builder/quality-checklist.md`, `xpz-builder/responsibilities-by-type/transaction.md`, `xpz-builder/responsibilities-by-type/workwithforweb.md`, `xpz-msbuild-build/SKILL.md`.

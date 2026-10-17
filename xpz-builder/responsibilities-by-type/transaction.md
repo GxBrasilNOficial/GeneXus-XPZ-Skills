@@ -41,7 +41,7 @@ Every row in a consultable catalog here (`on <event>`, `Event` types, symptom→
 
 | Label | Meaning | Generation permission |
 |-------|---------|-----------------------|
-| `confirmado-import` | Rejection/acceptance observed on MSBuild import with traceable message and `exitCode` | Rejected syntax: do not generate. Accepted syntax: may generate after remaining gates |
+| `confirmado-import` | Rejection/acceptance observed on MSBuild import with a traceable message and task result (`importTaskSuccess`; wrapper `exitCode` when preserved) | Rejected syntax: do not generate. Accepted syntax: may generate after remaining gates |
 | `confirmado-build` | Observed on `BuildAll`/`SpecifyGenerate` (e.g. `spc0150`) | Same |
 | `confirmado-acervo` | Real use in parallel KB XML (`ObjetosDaKbEmXml/...` after sync) or reproducible sanitized template in `01*` | May generate, subject to writability and coherence gates |
 | `padrao-gx-nao-verificado` | GeneXus convention/docs not tested in this base or parallel corpus in session | **Do not use as generation premise** — separate subsection only |
