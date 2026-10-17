@@ -8,6 +8,8 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 ### Unreleased
 
+- **Rótulo único por linha nos catálogos do tipo `Transaction` (2026-10-17):** as políticas de `transaction.md` e `02` ganham a regra de precedência de classes de evidência; a linha de `on BeforeInsert` fica só com `confirmado-import` (corroboração do corpus movida para Notes) e a de `Event Start`/`Event After Trn` passa a um único token.
+
 - **Escopo temporal dos registros legados e rastreabilidade à prova de drift (2026-10-17):** as seções de política de `transaction.md` e `02` passam a declarar que registros anteriores a 2026-10-17 não citam `stage=import-real` (a exigência vale para linhas novas ou atualizadas); `wwp-packaging.md` ganha o qualificador inline; a validação do `historico` deixa de contar rodadas e aponta as entradas do `CHANGELOG`.
 
 - **Envio de `Events` vazio uniformizado como tentativa não validada (2026-10-17):** `02` e `08` passam a apresentar o envio da `Part` com conteúdo vazio como tentativa não validada de limpeza (método não medido; confirmar em KB de teste), alinhados ao checklist e ao footgun da skill de importação/exportação.
@@ -431,6 +433,8 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 ### Unreleased
 
+- **Etiqueta única por fila en los catálogos del tipo `Transaction` (2026-10-17):** las políticas de `transaction.md` y `02` reciben la regla de precedencia de clases de evidencia; la fila de `on BeforeInsert` queda solo con `confirmado-import` (corroboración del corpus movida a Notes) y la de `Event Start`/`Event After Trn` pasa a un único token.
+
 - **Alcance temporal de los registros legados y rastreabilidad a prueba de drift (2026-10-17):** las secciones de política de `transaction.md` y `02` pasan a declarar que los registros anteriores al 2026-10-17 no citan `stage=import-real` (el requisito vale para filas nuevas o actualizadas); `wwp-packaging.md` recibe el calificador inline; la validación del `historico` deja de contar rondas y remite a las entradas del `CHANGELOG`.
 
 - **Envío de `Events` vacío uniformado como intento no validado (2026-10-17):** `02` y `08` pasan a presentar el envío de la `Part` con contenido vacío como intento no validado de limpieza (método no medido; confirmar en una KB de prueba), alineados con el checklist y el footgun de la skill de importación/exportación.
@@ -851,6 +855,8 @@ All relevant changes to this repository will be recorded here from this adoption
 The format keeps an `Unreleased` section for changes not yet published in a formal version. This repository does not yet use public semantic versioning; when that changes, future sections should record the corresponding tag.
 
 ### Unreleased
+
+- **Single label per row in the `Transaction` type catalogs (2026-10-17):** the `transaction.md` and `02` policies gain the evidence-class precedence rule; the `on BeforeInsert` row keeps only `confirmado-import` (corpus corroboration moved to Notes) and the `Event Start`/`Event After Trn` row moves to a single token.
 
 - **Temporal scope for legacy records and drift-proof traceability (2026-10-17):** the policy sections of `transaction.md` and `02` now state that records predating 2026-10-17 do not cite `stage=import-real` (the requirement binds new or updated rows); `wwp-packaging.md` gains the inline qualifier; the `historico` validation no longer counts rounds and points to the `CHANGELOG` entries.
 

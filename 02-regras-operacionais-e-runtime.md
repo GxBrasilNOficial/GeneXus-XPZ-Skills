@@ -1525,6 +1525,7 @@ Regras de uso:
 - `Regra operacional`: citacoes por nome de arquivo (ex.: `Animal.xml`, `VendaPedidoItens.xml`) com `confirmado-acervo` devem indicar que o artefato está na **pasta paralela da KB** (`ObjetosDaKbEmXml/...` após sync), salvo quando o exemplo for **molde sanitizado** em `01*` com rastreabilidade em `09`/`GeneXus-XPZ-PrivateMap`; não tratar esses paths como arquivos desta raiz `GeneXus-XPZ-Skills`.
 - `Regra operacional`: completude aparente de catalogo é risco operacional — listas longas sem rotulo honesto induzem o agente a tentar sintaxe não validada; preferir catalogo menor e rotulado a checklist aparentemente exaustiva.
 - `Regra operacional`: registros anteriores a 2026-10-17 não citam `stage=import-real`; a exigência vale para linhas novas ou atualizadas, e as linhas com qualificador inline permanecem como exemplos de referência.
+- `Regra operacional` (classes de evidência): quando mais de uma classe de evidência se aplicar à mesma linha, o rotulo é a mais forte — `confirmado-import`/`confirmado-build` > `confirmado-acervo` > `padrao-gx-nao-verificado`; as demais podem ser descritas em prosa, sem o token reservado.
 
 #### Anti-padroes nomeados (`Transaction` — motor XPZ)
 

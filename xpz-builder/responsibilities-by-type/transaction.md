@@ -55,6 +55,7 @@ Operational rules:
 - File-name examples (`Animal.xml`, etc.) with `confirmado-acervo` must state **parallel KB folder** (`ObjetosDaKbEmXml/...`) unless the example is a sanitized template in `01*`.
 - Other skills must cross-reference this catalog section instead of duplicating it; see [02-regras-operacionais-e-runtime.md](../../02-regras-operacionais-e-runtime.md) for repository scope (XPZ motor rejections vs GeneXus language documentation such as **nexa**).
 - **Temporal scope:** records dated before 2026-10-17 do not cite `stage=import-real`; the requirement binds new or updated rows. Rows carrying an inline qualifier remain the reference examples.
+- **Multiple evidence classes:** when more than one class applies to the same row, the label is the strongest one (precedence: `confirmado-import`/`confirmado-build` > `confirmado-acervo` > `padrao-gx-nao-verificado`); other classes may be described in the Notes column without the reserved token.
 
 ## Catalog: `on <event>` clauses in declarative `Rules` and `Events` restrictions
 
@@ -66,7 +67,7 @@ Consult **before** generating or editing `Rules` or `Events` in a `Transaction` 
 |-----------|--------|---------------------------|---------------|
 | `on AfterValidate(<Attribute>)` or any `on <event>(<parameter>)` | **Rejected** | `confirmado-import` — `src0056: Missed ';' at the end of the rule. (Transaction '<name>' Rules, Line: <n>)` on MSBuild import (GeneXus 18) | `AttrB = expr if cond on AfterValidate(AttrA);` — **do not generate** |
 | `on AfterValidate` (no parameters) | **Accepted** | `confirmado-acervo` — real use in parallel KB XML after sync (e.g. `Animal.xml`, `Carga.xml`, `PedidoCompraProdutoItem.xml` under `ObjetosDaKbEmXml/...`) | Level validation timing on commit path — **not** a per-field leave hook |
-| `on BeforeInsert` | **Accepted** | `confirmado-import` on controlled trail; `confirmado-acervo` in parallel corpus | `Attr = expr on BeforeInsert;` |
+| `on BeforeInsert` | **Accepted** | `confirmado-import` on controlled trail (same frente as the parameterized rejection) | `Attr = expr on BeforeInsert;` — also present in the parallel corpus (`ObjetosDaKbEmXml/...`) |
 | `on BeforeUpdate` | **Accepted** | `confirmado-import` on controlled trail (same frente as parameterized rejection) | `Attr = expr on BeforeUpdate;` |
 
 #### GeneXus standard — not verified in this base (`padrao-gx-nao-verificado`)
@@ -79,7 +80,7 @@ Do **not** generate from this list without **confirmado-import**, **confirmado-b
 
 | Construct / action | Status | Specifier / motor evidence | Notes |
 |--------------------|--------|---------------------------|--------|
-| `Event Start`, `Event After Trn` | **Listed** | `padrao-gx-nao-verificado` until `confirmado-acervo` in parallel corpus for your KB | Confirm in `ObjetosDaKbEmXml/...` before first use in a generated delta |
+| `Event Start`, `Event After Trn` | **Listed** | `padrao-gx-nao-verificado` — promote to a confirmed label after verifying in your KB's parallel corpus | Confirm in `ObjetosDaKbEmXml/...` before first use in a generated delta |
 | `Event <Attribute>.ControlValueChanged` `[web]` | **Accepted pattern** | `confirmado-acervo` — parallel corpus examples adjust **control** surface (e.g. `.Caption`, `.Visible`, `.Enabled`), `SetFocus()`, not transaction attribute assignment | Do not copy as license to assign another attribute’s value |
 | Assign to **transaction attribute** inside `Event` (`<Attribute> = <value>`) | **Rejected** | `confirmado-build` — `spc0150: Cannot update database. Changes to database are only allowed in procedures. (Transaction '<name>' Events, Line: <n>)` | Put persisted values in declarative `Rules`; use `Events` for UI, variables, `msg`/`Error`, external proc calls |
 | Control UI properties, `&var`, `msg`/`Error`, proc `.execute()`, `SetFocus` / `SetEmpty` on variables | **Allowed class** | `confirmado-acervo` for UI-only `ControlValueChanged` bodies in parallel corpus | Still run **9-TXW** if any assignment touches level attributes in `Rules` |
