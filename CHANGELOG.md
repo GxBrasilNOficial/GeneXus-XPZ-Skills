@@ -8,6 +8,8 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 ### Unreleased
 
+- **Correção do rótulo de evidência de `src0229`/`src0294` no combo (2026-10-17):** o rótulo estava `confirmado-build`, mas o log primário (`import-real.msbuild`, 2026-10-16, KB de teste `wsEducacaoSpTeste`) mostra a rejeição no **import** (`Importando Transaction … Falhou` + `src0229`/`src0294`) e a aceitação da variante corrigida no mesmo passo (`Import Task Sucesso`); `02` (linhas atômicas de `Clear`/`AddItem` e ambiguidade) e o Catalog 3 do `transaction.md` passam a `confirmado-import`, alinhados ao sintoma "Import fails".
+
 - **Rótulos de evidência no Catalog 3 de `transaction.md` (2026-10-17):** as sete linhas do catálogo sintoma→causa que estavam sem rótulo passam a declarar exatamente um, espelhando o canônico do `02` — `confirmado-import` em `src0056`/`src0239`; `confirmado-build` em `spc0150`, na ambiguidade `src0229`, em `Clear`/`AddItem` (`src0294`) e nas duas linhas de diagnóstico da cascata; exigência do checklist de qualidade e da política de evidência do próprio satélite.
 
 - **Paridade pós-pré-push: catálogo do tipo `Transaction` e tabela do `08` (2026-10-17):** o Catalog 3 de `xpz-builder/responsibilities-by-type/transaction.md` ganha `src0229` (nome ambíguo attribute × control) e `src0294` (`Clear`/`AddItem` em `Event` com `ControlType = Edit`), com nota de escopo remetendo o comportamento de tela do combo ao `999`; a tabela-síntese do `08` recebe `spc0012`, `spc0023` e `spc0045`, e as citações da View em `08`/`02`/`01j` passam a distinguir `spc0045` (por controle) de `spc0012` (`.Create()`).
@@ -415,6 +417,8 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 ### Unreleased
 
+- **Corrección de la etiqueta de evidencia de `src0229`/`src0294` en el combo (2026-10-17):** la etiqueta estaba en `confirmado-build`, pero el log primario (`import-real.msbuild`, 2026-10-16, KB de prueba `wsEducacaoSpTeste`) muestra el rechazo en el **import** (`Importando Transaction … Falhou` + `src0229`/`src0294`) y la aceptación de la variante corregida en el mismo paso (`Import Task Sucesso`); el `02` (filas atómicas de `Clear`/`AddItem` y ambigüedad) y el Catálogo 3 del `transaction.md` pasan a `confirmado-import`, alineados con el síntoma "Import fails".
+
 - **Etiquetas de evidencia en el Catálogo 3 de `transaction.md` (2026-10-17):** las siete filas del catálogo síntoma→causa que estaban sin etiqueta pasan a declarar exactamente una, reflejando el canónico del `02` — `confirmado-import` en `src0056`/`src0239`; `confirmado-build` en `spc0150`, en la ambigüedad `src0229`, en `Clear`/`AddItem` (`src0294`) y en las dos filas de diagnóstico de la cascada; requisito del checklist de calidad y de la política de evidencia del propio satélite.
 
 - **Paridad post-pre-push: catálogo del tipo `Transaction` y tabla del `08` (2026-10-17):** el Catálogo 3 de `xpz-builder/responsibilities-by-type/transaction.md` suma `src0229` (nombre ambiguo attribute × control) y `src0294` (`Clear`/`AddItem` en `Event` con `ControlType = Edit`), con nota de alcance que remite el comportamiento de pantalla del combo al `999`; la tabla de síntesis del `08` recibe `spc0012`, `spc0023` y `spc0045`, y las citas de la View en `08`/`02`/`01j` pasan a distinguir `spc0045` (por control) de `spc0012` (`.Create()`).
@@ -819,6 +823,8 @@ All relevant changes to this repository will be recorded here from this adoption
 The format keeps an `Unreleased` section for changes not yet published in a formal version. This repository does not yet use public semantic versioning; when that changes, future sections should record the corresponding tag.
 
 ### Unreleased
+
+- **Evidence-label correction for `src0229`/`src0294` in the combo case (2026-10-17):** the label read `confirmado-build`, but the primary log (`import-real.msbuild`, 2026-10-16, test KB `wsEducacaoSpTeste`) shows the rejection at **import** (`Importando Transaction … Falhou` + `src0229`/`src0294`) and the fixed variant accepted in the same step (`Import Task Sucesso`); `02` (atomic `Clear`/`AddItem` and ambiguity rows) and `transaction.md` Catalog 3 move to `confirmado-import`, aligned with the "Import fails" symptom.
 
 - **Evidence labels in `transaction.md` Catalog 3 (2026-10-17):** the seven symptom→cause rows that lacked a label now declare exactly one, mirroring the `02` canonical records — `confirmado-import` on `src0056`/`src0239`; `confirmado-build` on `spc0150`, the `src0229` ambiguity, `Clear`/`AddItem` (`src0294`) and the two cascade diagnostic rows; required by the satellite's own quality checklist and evidence policy.
 
