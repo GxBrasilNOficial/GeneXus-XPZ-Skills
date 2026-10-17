@@ -8,6 +8,8 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 ### Unreleased
 
+- **Qualificador de registro anterior na linha `on BeforeInsert` (2026-10-17):** a linha atualizada em `transaction.md` passa a declarar que o registro antecede a exigência de `stage=import-real`, fechando o regime aplicado a linhas atualizadas.
+
 - **Rótulo único por linha nos catálogos do tipo `Transaction` (2026-10-17):** as políticas de `transaction.md` e `02` ganham a regra de precedência de classes de evidência; a linha de `on BeforeInsert` fica só com `confirmado-import` (corroboração do corpus movida para Notes) e a de `Event Start`/`Event After Trn` passa a um único token.
 
 - **Escopo temporal dos registros legados e rastreabilidade à prova de drift (2026-10-17):** as seções de política de `transaction.md` e `02` passam a declarar que registros anteriores a 2026-10-17 não citam `stage=import-real` (a exigência vale para linhas novas ou atualizadas); `wwp-packaging.md` ganha o qualificador inline; a validação do `historico` deixa de contar rodadas e aponta as entradas do `CHANGELOG`.
@@ -433,6 +435,8 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 ### Unreleased
 
+- **Calificador de registro anterior en la fila `on BeforeInsert` (2026-10-17):** la fila actualizada en `transaction.md` pasa a declarar que el registro precede al requisito de `stage=import-real`, cerrando el régimen aplicado a filas actualizadas.
+
 - **Etiqueta única por fila en los catálogos del tipo `Transaction` (2026-10-17):** las políticas de `transaction.md` y `02` reciben la regla de precedencia de clases de evidencia; la fila de `on BeforeInsert` queda solo con `confirmado-import` (corroboración del corpus movida a Notes) y la de `Event Start`/`Event After Trn` pasa a un único token.
 
 - **Alcance temporal de los registros legados y rastreabilidad a prueba de drift (2026-10-17):** las secciones de política de `transaction.md` y `02` pasan a declarar que los registros anteriores al 2026-10-17 no citan `stage=import-real` (el requisito vale para filas nuevas o actualizadas); `wwp-packaging.md` recibe el calificador inline; la validación del `historico` deja de contar rondas y remite a las entradas del `CHANGELOG`.
@@ -855,6 +859,8 @@ All relevant changes to this repository will be recorded here from this adoption
 The format keeps an `Unreleased` section for changes not yet published in a formal version. This repository does not yet use public semantic versioning; when that changes, future sections should record the corresponding tag.
 
 ### Unreleased
+
+- **Pre-`stage=import-real` qualifier on the `on BeforeInsert` row (2026-10-17):** the updated `transaction.md` row now states that the record predates the `stage=import-real` requirement, closing the regime that binds updated rows.
 
 - **Single label per row in the `Transaction` type catalogs (2026-10-17):** the `transaction.md` and `02` policies gain the evidence-class precedence rule; the `on BeforeInsert` row keeps only `confirmado-import` (corpus corroboration moved to Notes) and the `Event Start`/`Event After Trn` row moves to a single token.
 

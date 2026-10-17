@@ -67,7 +67,7 @@ Consult **before** generating or editing `Rules` or `Events` in a `Transaction` 
 |-----------|--------|---------------------------|---------------|
 | `on AfterValidate(<Attribute>)` or any `on <event>(<parameter>)` | **Rejected** | `confirmado-import` — `src0056: Missed ';' at the end of the rule. (Transaction '<name>' Rules, Line: <n>)` on MSBuild import (GeneXus 18) | `AttrB = expr if cond on AfterValidate(AttrA);` — **do not generate** |
 | `on AfterValidate` (no parameters) | **Accepted** | `confirmado-acervo` — real use in parallel KB XML after sync (e.g. `Animal.xml`, `Carga.xml`, `PedidoCompraProdutoItem.xml` under `ObjetosDaKbEmXml/...`) | Level validation timing on commit path — **not** a per-field leave hook |
-| `on BeforeInsert` | **Accepted** | `confirmado-import` on controlled trail (same frente as the parameterized rejection) | `Attr = expr on BeforeInsert;` — also present in the parallel corpus (`ObjetosDaKbEmXml/...`) |
+| `on BeforeInsert` | **Accepted** | `confirmado-import` on controlled trail (same frente as the parameterized rejection; record predates the `stage=import-real` requirement) | `Attr = expr on BeforeInsert;` — also present in the parallel corpus (`ObjetosDaKbEmXml/...`) |
 | `on BeforeUpdate` | **Accepted** | `confirmado-import` on controlled trail (same frente as parameterized rejection) | `Attr = expr on BeforeUpdate;` |
 
 #### GeneXus standard — not verified in this base (`padrao-gx-nao-verificado`)
