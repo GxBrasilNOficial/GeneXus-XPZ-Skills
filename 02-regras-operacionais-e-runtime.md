@@ -1340,13 +1340,16 @@ Tabela única de "erro → causa → correção" com chave composta (`Código` +
 | `src0216` | Import | condition órfã em WorkWith | `Atributo.Visible` sobre atributo fora de `<attributes>` | incluir o atributo ou remover a condition |
 | `src0294` / `src0246` | Import | Trn estrutural (`GenerateObject=False`) | `Call("LoadWWPContext")`/`Call("<Trn>WW")` — código de tela WorkWithPlus (DVelop) em Transaction sem tela gerada | remover `Events`/`Rules` WWP e `Apply:<wwp>`; reconciliado com Catalog 3 do `transaction.md` (caught por `Test-GeneXusTransactionCoherence.ps1`, `wwp-screen-code-on-non-generated-transaction`) |
 | `src0294` | Import | `.IsNull()` em escalar | `.IsNull()`/`Unknown function` sobre **variável** simples (estilo dominante em procedimentos da KB) | usar `.IsEmpty()`; `IsNull` só em atributo/BC |
+| `src0294` | Import | `Atributo.Clear()`/`.AddItem()` em `Event` de Transaction com `ControlType = Edit` | o nome nu é ambíguo entre attribute e control (`src0229`/`src0292`); `Clear`/`AddItem` existem no controle combo, não no attribute → `Unknown function`; o mesmo trecho passa com `ControlType = Combo Box` (`confirmado-build`) | usar `ControlType = Combo Box` e referenciar o controle, ou operar sobre a variável/controle combo; não chamar `Clear`/`AddItem` no attribute |
 | `src0229` | Import | `.SetNull()` em escalar | `.SetNull()` sobre **variável** simples | usar `.SetEmpty()`; `SetNull` só em atributo/BC |
+| `src0229` | Import | nome ambíguo attribute × control | `'<Atributo>' is ambiguous` quando atributo e controle têm o mesmo nome no evento; o Specifier dica `src0292` (prefixo `att:` para attributes, `dom:` para domains) | qualificar (`att:X`) ou renomear o controle (`confirmado-build`) |
 | `CS2001` | Build (C#) | `right()`/`left()` | não existem no GeneXus; viram `udp("right")` órfão — o specify passa e o C# quebra depois | usar `.Substring`, `.PadLeft`, `.ToString` |
 
 Notas de reconciliação:
 
 - **`src0294` tem dois contextos na tabela (chave composta obrigatória).** O contexto "Trn estrutural" (linha acima, com `src0246`) já estava coberto na base; o contexto "escalar `.IsNull`" **não** estava: `src0294` constava no `02` para re-bind de SDT em Tab aninhada (`ToJSonString`/`FromJSonString`, seção `WebPanel, Tab aninhada e re-bind de SDT`), fenômeno distinto. Código de erro repetido não é prova de cobertura.
 - **`src0216` é a primeira entrada da base** (o levantamento da frente mediu zero ocorrências na base e na skill `nexa`); registro observado na frente GamAuditoria, correção conforme o padrão do objeto.
+- `Regra operacional` (import parcial): uma `Part` omitida no XML submetido **não é apagada**; o objeto mantém a `Part` anterior e o Specifier valida os `Events` correntes da KB, não só o que veio no pacote. Remover a `Part` `Events` do XML **não** limpa os eventos; para limpar, enviar a `Part` com conteúdo vazio (método de limpeza não medido; o medido é que omitir não limpa). `confirmado-build`/import, KB de teste `wsEducacaoSpTeste`, 2026-10-16.
 
 #### Warnings do Specifier que não bloqueiam
 

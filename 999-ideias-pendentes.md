@@ -3470,13 +3470,18 @@ As contagens são de **arquivos que mencionam o token**, não de parâmetros exc
 
 **Relacionado.** `README.md` («documentação operacional complementar de frentes ativas»); `09-inventario-e-rastreabilidade-publica.md`; `CHANGELOG.md`; `AGENTS.md`.
 
-## Combo em `Attribute` de `Transaction` — observação de tela/runtime estacionada (6b)
+## Combo em `Attribute` de `Transaction` — medido (KB de teste, 2026-10-16)
 
-- **Importância** — baixa (registro de um caso localizado, sem mudança imediata da regra operacional).
-- **Maturidade** — estacionada como observação; não há recomendação geral de modelagem aprovada.
+- **Importância** — baixa (registro de um caso medido; não muda a regra operacional).
+- **Maturidade** — medido; resta **não medido** o efeito específico na coluna da Selection.
 
-**Observação sanitizada (2026-06-20).** Em um caso específico, um atributo com `Dynamic Combo Box` foi alterado para `Edit` com `Prompt` filtrado pelo cliente; o resultado foi validado no navegador. Também houve uma tentativa separada com `Combo Box` de itens fixos. Isso registra uma solução local para obter filtro por prompt, não uma falha geral de combos.
+**Medido (KB `wsEducacaoSpTeste`, GX18, 2026-10-16, navegador).**
+- `ControlType = Combo Box` num `Attribute` de `Transaction` + `AddItem` no `Event Start`: **lista as opções**, persiste no Insert e **mostra o valor atual no UPD** (não fica vazio). Os ciclos anteriores que davam "vazio" eram artefato de harness (`selectOption` que não commitava); a seleção por teclado confirmou.
+- `ControlType` é propriedade do `Attribute` e **propaga a todos os usos**: a chave da própria transação passou a renderizar como combo (vazio sem `AddItem`). **Não medido:** o efeito específico na coluna da Selection.
+- `ControlType = Dynamic Combo Box` num `Attribute` de `Transaction` **falha no import**: `A value is required for the property 'ItemDescriptions'`; suprir pelo XML do atributo não resolve (é propriedade do controle/form). No acervo, `Dynamic Combo Box` só aparece em **variáveis de WebPanel** (`ControlItemDescription=att:NN` via `PATTERN_ELEMENT_CUSTOM_PROPERTIES`). **Não** é "Dynamic não funciona"; é limitação no nível de Attribute em Transaction.
+- `AddItem("1", …)` em atributo numérico → `spc0023`; `For each <tabela>` no `Event Start` → `src0013` — ambos na tabela atômica do `02`.
+- O caso `Edit` + `Prompt` (P-053, 2026-06-20) permanece como **solução para filtro por prompt** — não porque o combo falhe.
 
-**Limite de conclusão.** `Dynamic Combo Box` continua sendo um controle válido e há um uso observado em outro atributo de `Transaction`. Não concluir que `Combo Box` ou `Dynamic Combo Box` não funcionam com base nesta observação, nem generalizar o timing ou o comportamento de tela sem reproduzir no caso concreto. O erro `spc0023` de tipo de argumento está registrado separadamente na tabela atômica do `02`.
+**Limite de conclusão.** `Dynamic Combo Box` continua válido (em variável de WebPanel). Não generalizar o comportamento do UPD/timing sem reproduzir no caso concreto; a coluna da Selection não foi medida.
 
-**Relacionado.** `02-regras-operacionais-e-runtime.md` (tabela atômica de erros de source, `spc0023`).
+**Relacionado.** `02-regras-operacionais-e-runtime.md` (tabela atômica: `spc0023`, `src0013`, `src0229` e `src0294`).
