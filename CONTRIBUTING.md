@@ -65,7 +65,7 @@ Durante esa revisión, evalúa también si el cambio debe registrarse en `CHANGE
 
 Hueco de script, sugerencia, diagnóstico y prompt de agente sobre la metodología pública van a https://github.com/GxBrasilNOficial/GeneXus-XPZ-Skills/issues.
 
-Antes de abrir, quite credencial, dato de cliente, nombre sensible de KB y artefacto no autorizado. Un reporte de vulnerabilidad, filtración o riesgo operativo sensible va a `SECURITY.md`, no a la issue pública.
+Antes de abrir, quita credencial, dato de cliente, nombre sensible de KB y artefacto no autorizado. Un reporte de vulnerabilidad, filtración o riesgo operativo sensible va a `SECURITY.md`, no a la issue pública.
 
 La issue describe:
 
