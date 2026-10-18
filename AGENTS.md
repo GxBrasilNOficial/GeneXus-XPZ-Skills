@@ -53,6 +53,22 @@
 - Neste repositório (desenvolvimento das skills XPZ; conversa setada **fora** de qualquer pasta paralela), consultar uma pasta paralela de KB real (ex.: `Gx_FabricaBrasil/ObjetosDaKbEmXml`) como **corpus de amostras** — estudar a estrutura real de objetos para construir/validar scripts e documentação — é **consulta de fora**: leitura de referência permitida, sem invocar `xpz-kb-parallel-setup` (ver a distinção trabalhar-vs-consultar no `AGENTS.md` global). O setup só seria exigido se a frente passasse a **escrever** na pasta paralela.
 - Ao avaliar mudanças em uma skill, verificar o contexto de uso para o qual ela foi projetada. Exemplo: conteúdo embutido em `xpz-skills-setup` pode parecer desatualizado em relação ao ambiente do mantenedor, mas ser correto para quem está configurando um ambiente do zero — os dois contextos coexistem.
 - Antes de pesquisar uma task, abordagem ou ideia nova relacionada às skills XPZ, consultar `999-ideias-pendentes.md` e `998-ideias-descartadas-e-porque.md`. O que já foi avaliado está registrado lá — não repetir a pesquisa.
+- Ao usar ou contornar os scripts desta base, seguir a seção `Scripts das skills XPZ`.
+
+## Scripts das skills XPZ
+
+Os scripts em `scripts/` desta base e os wrappers locais previstos pelo setup e conformes ao contrato oficial são o caminho validado. Quando a tarefa couber num desses scripts, chamá-lo é obrigatório. Ignorar um script pronto e criar outro no lugar não é opção. Um `.ps1` novo que apenas encadeia motores oficiais também é criação.
+
+Preferir `Temp` para log, payload ou relatório não autoriza um `.ps1` novo. Se nenhum script pronto cobrir a situação, parar e falar com o usuário antes de criar `.ps1`. Sem essa conversa, não criar `.ps1` novo, nem em `Temp`, nem na pasta paralela, nem nesta base.
+
+Sem aceitação explícita de `.ps1` novo ou de outro contorno, a saída é redigir uma issue em https://github.com/GxBrasilNOficial/GeneXus-XPZ-Skills/issues e só abri-la com o ok do usuário. Antes de abrir, tirar credencial, dado de cliente, nome sensível de KB e artefato não autorizado, conforme `CONTRIBUTING.md`. Relato de vulnerabilidade, vazamento ou risco operacional sensível vai para o `SECURITY.md`, não para a issue pública. O agente não abre a issue sozinho.
+
+A conversa pode, além disso, aceitar de forma explícita:
+
+- um contorno temporário, explícito e limitado àquela rodada, com ou sem `.ps1`
+- um script permanente nesta base, ou um wrapper local copiado de exemplo oficial pelo `xpz-kb-parallel-setup`, quando esse wrapper ficar conforme ao contrato oficial
+
+Sem essa aceitação, não se cria `.ps1`. A issue e a criação podem coexistir. Uma não substitui a outra. Chamar o script pronto, ou o wrapper local já conforme, continua sendo o caminho quando a tarefa couber nele.
 
 ## Edição segura de Markdown
 

@@ -66,6 +66,8 @@ ou do `README.md` local.
 
 ## Wrappers locais
 
+Os scripts da base compartilhada e os wrappers locais previstos pelo setup e conformes ao contrato oficial são o caminho validado. Ignorar um script pronto e criar outro no lugar não é opção. A regra completa está na seção `Scripts das skills XPZ` do `AGENTS.md` da base compartilhada.
+
 Os wrappers em `scripts` usam a base compartilhada:
 
 ```text

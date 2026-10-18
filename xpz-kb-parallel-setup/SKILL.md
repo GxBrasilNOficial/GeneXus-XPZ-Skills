@@ -13,6 +13,8 @@ Define e valida a estrutura inicial da pasta paralela da KB usada ao redor de um
 
 Esta skill e de invocacao obrigatória antes de qualquer ação de consulta, triagem, leitura de XML ou geração de objeto em pasta que contenha `ObjetosDaKbEmXml/` ou `KbIntelligence/`. Nenhuma outra skill de KB (`xpz-index-triage`, `xpz-reader`, `xpz-builder`, `xpz-sync`, `nexa`) pode ser iniciada nessa pasta enquanto esta skill não tiver sido executada na sessao corrente.
 
+Ao usar ou contornar os scripts da base compartilhada, seguir a seção `Scripts das skills XPZ` do `AGENTS.md` dessa base. Ignorar um script pronto e criar outro no lugar não é opção, nem em `Temp`. Se nenhum script pronto cobrir, parar e falar com o usuário antes de criar `.ps1`.
+
 **PRE-CONDICAO OBRIGATÓRIA AO SER INVOCADA PELO GATILHO GLOBAL** (não se aplica quando o usuário pede explicitamente setup, atualizacao ou auditoria — nesses casos ir direto ao WORKFLOW passo 1):
 
 Esta pre-condicao e o caminho leve de seguranca para tarefas normais do usuário na KB. Ela deve executar apenas runtime, freshness e gate de índice enquanto o freshness retornar `GATE_ONLY` e o índice retornar `GATE_OK`; não carregar nem aplicar o corpo completo do WORKFLOW nesse caminho curto. `AUDIT_REQUIRED` por assinatura de contrato de setup ausente, invalida ou defasada e comportamento deliberado: após `git pull` da base metodologica, a pasta paralela precisa ser conferida quando a superficie de contrato de `xpz-kb-parallel-setup` mudou, para saber se deve incorporar wrappers, gates, metadata ou regras locais novas. Commits em outras frentes do repositório que não alterem essa superficie não devem, por si só, disparar auditoria completa.

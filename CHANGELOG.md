@@ -8,6 +8,8 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 ### Unreleased
 
+- **Scripts prontos e issues no lugar de mensagem privada (2026-10-18):** a base proíbe criar `.ps1` novo no lugar de um script pronto, em `Temp`, na pasta paralela e nesta raiz. O `CONTRIBUTING.md` deixa de oferecer e-mail e mensagem privada para contribuição e passa a orientar issue; relato sensível continua no `SECURITY.md`.
+
 - **Verbo do Specifier uniformizado como «avalia» (2026-10-17):** `02`, `08` e a skill de importação/exportação passam de «valida» para «avalia» (o checklist já usava «checks»), e as citações do CHANGELOG acompanham; a leitura de aprovação fica eliminada em todas as superfícies.
 
 - **Specification que avalia os `Events` retidos explicitada (2026-10-17):** `02` passa de «validou» para «avaliou … e falhou neles», e o checklist troca «validates» por «checks», removendo a leitura de aprovação; o medido é a falha da Specification sobre a referência retida.
@@ -439,6 +441,8 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 ### Unreleased
 
+- **Scripts listos e issues en lugar de mensaje privado (2026-10-18):** la base prohíbe crear un `.ps1` nuevo en lugar de un script listo, en `Temp`, en la carpeta paralela y en esta raíz. `CONTRIBUTING.md` deja de ofrecer correo y mensaje privado para contribución y pasa a orientar issue; el reporte sensible sigue en `SECURITY.md`.
+
 - **Verbo del Specifier uniformado como «evalúa» (2026-10-17):** `02`, `08` y la skill de importación/exportación pasan de «valida» a «evalúa» (el checklist ya usaba «checks»), y las citas del CHANGELOG acompañan; la lectura de aprobación queda eliminada en todas las superficies.
 
 - **Specification que evalúa los `Events` retenidos explicitada (2026-10-17):** `02` pasa de «validó» a «evaluó … y falló en ellos», y el checklist cambia «validates» por «checks», quitando la lectura de aprobación; lo medido es el fallo de la Specification sobre la referencia retenida.
@@ -867,6 +871,8 @@ All relevant changes to this repository will be recorded here from this adoption
 The format keeps an `Unreleased` section for changes not yet published in a formal version. This repository does not yet use public semantic versioning; when that changes, future sections should record the corresponding tag.
 
 ### Unreleased
+
+- **Ready scripts and issues instead of private messages (2026-10-18):** the base forbids creating a new `.ps1` in place of a ready script, in `Temp`, in a parallel folder, and in this root. `CONTRIBUTING.md` no longer offers email or a private message for contributions and points to issues; a sensitive report stays in `SECURITY.md`.
 
 - **Specifier verb normalised to "evaluates" (2026-10-17):** `02`, `08` and the import/export skill change from "validates" to "evaluates" (the checklist already used "checks"), and the CHANGELOG quotes follow; the approval reading is removed from every surface.
 
