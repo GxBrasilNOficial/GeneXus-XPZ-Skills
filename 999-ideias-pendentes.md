@@ -3485,3 +3485,16 @@ As contagens são de **arquivos que mencionam o token**, não de parâmetros exc
 **Limite de conclusão.** `Dynamic Combo Box` continua válido (em variável de WebPanel). Não generalizar o comportamento do UPD/timing sem reproduzir no caso concreto; a coluna da Selection não foi medida.
 
 **Relacionado.** `02-regras-operacionais-e-runtime.md` (tabela atômica: `spc0023`, `src0013`, `src0229` e `src0294`).
+
+## Gate de enumeração de backends: frase de tratamento especial gera falso positivo recorrente (2026-10-17)
+
+- **Importância** — baixa (ruído de revisão, não gap de conteúdo).
+- **Maturidade** — ideia; nenhuma implementação iniciada.
+
+**O que é.** `scripts/Test-PrePushBackendEnumerationParity.ps1` (aviso `BACKEND_ENUMERATION_SUBSET`) dispara quando uma frase cita 2 ou mais backends sem citar todos os 6. Ele não distingue enumeração de conjunto de frase que apenas trata um caso especial. Caso motivador: `xpz-llm-delegate/SKILL.md:446`, que cita `claude-code` (tratamento do Claude Code no painel) e `codex` (nome do diretório `xpz-llm-panel-codex`). Não é gap; o aviso reaparece em toda pré-push e precisa ser descartado com justificativa a cada rodada.
+
+**Direção proposta.** Avaliar duas formas de reduzir o ruído sem perder a detecção de enumerações reais: (a) reconhecer como exceção o padrão de caminho de diretório por backend (ex.: `xpz-llm-panel-<backend>`); (b) reconhecer frases que tratam um backend por nome próprio de adapter (ex.: `Invoke-ClaudeCodeAsync.ps1`). Antes de implementar, medir falso negativo: cada exceção não pode esconder uma enumeração que omitiu um backend.
+
+**Alternativa descartada por ora.** Marcador `<!-- backend-parity: ignore -->` na linha afetada: o `13` reserva esse marcador para conteúdo fechado, e este trecho é contrato vivo.
+
+**Relacionado.** `scripts/Test-PrePushBackendEnumerationParity.ps1`; `13-revisao-pre-push.md` (uso do marcador e triagem de enumerações); `xpz-llm-delegate/SKILL.md:446`.
