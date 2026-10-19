@@ -729,17 +729,17 @@ function Invoke-EnumerationGate {
     }
 
     foreach ($fileState in $gateObject.files) {
-        if ($null -eq $fileState.PSObject.Properties['file'] -or $fileState.file -isnot [string] -or
+        if ($null -eq $fileState -or $null -eq $fileState.PSObject.Properties['file'] -or $fileState.file -isnot [string] -or
             $null -eq $fileState.PSObject.Properties['complete'] -or $fileState.complete -isnot [bool]) {
-            return (New-EnumerationGateFailure -ScriptRel $ScriptRel -Code 'GATE_CONTRACT_INVALID' -Message 'Estado por arquivo sem file/completion booleano válido.' -ExitCode $exitCode)
+            return (New-EnumerationGateFailure -ScriptRel $ScriptRel -Code 'GATE_CONTRACT_INVALID' -Message 'Estado por arquivo nulo ou sem file/completion booleano válido.' -ExitCode $exitCode)
         }
     }
     foreach ($finding in $gateObject.findings) {
-        if ($null -eq $finding.PSObject.Properties['file'] -or $finding.file -isnot [string] -or
+        if ($null -eq $finding -or $null -eq $finding.PSObject.Properties['file'] -or $finding.file -isnot [string] -or
             $null -eq $finding.PSObject.Properties['code'] -or $finding.code -isnot [string] -or
             $null -eq $finding.PSObject.Properties['unitHash'] -or [string]$finding.unitHash -notmatch '^[0-9a-f]{64}$' -or
             $null -eq $finding.PSObject.Properties['listedMembers'] -or $finding.listedMembers -isnot [array]) {
-            return (New-EnumerationGateFailure -ScriptRel $ScriptRel -Code 'GATE_CONTRACT_INVALID' -Message 'Achado sem file/code/unitHash/listedMembers válidos.' -ExitCode $exitCode)
+            return (New-EnumerationGateFailure -ScriptRel $ScriptRel -Code 'GATE_CONTRACT_INVALID' -Message 'Achado nulo ou sem file/code/unitHash/listedMembers válidos.' -ExitCode $exitCode)
         }
     }
     if ($gateObject.candidateCount -isnot [int] -and $gateObject.candidateCount -isnot [long]) {

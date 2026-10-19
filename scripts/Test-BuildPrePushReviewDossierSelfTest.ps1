@@ -549,6 +549,26 @@ function Invoke-EnumerationGateFailureCase {
                 $invalidContractJson = '{"status":"pass","scanComplete":true,"scanIssues":[],"canonicalMembers":[],"files":[],"candidateCount":null,"displayTruncated":false,"findings":[]}'
                 Set-RepoFile -Root $caseRoot -RelativePath 'scripts/Test-PrePushGateEnumerationParity.ps1' -Content ("Write-Output '{0}'`nexit 0`n" -f $invalidContractJson)
             }
+            'null-file-state' {
+                $baselineDossier = Invoke-EnumerationFixtureBuilder -Root $caseRoot
+                $baselineMechanical = Get-MechanicalPayloadFromDossier -Dossier $baselineDossier
+                $baselineFinding = @($baselineMechanical.gates.gateEnumerationParity.findings)[0]
+                if ($null -eq $baselineFinding) { throw 'A fixture deveria produzir uma candidata de gate antes de simular estado por arquivo nulo.' }
+                $staleEntry = New-TriageEntry -Finding $baselineFinding -Kind 'closed' -CanonicalMembers @() -Reason 'Triagem de regressão para cobertura de órfãos.'
+                Write-TriageCatalog -Root $caseRoot -Entries @($staleEntry)
+                $invalidContractJson = '{"status":"pass","scanComplete":true,"scanIssues":[],"canonicalMembers":[],"files":[null],"candidateCount":0,"displayTruncated":false,"findings":[]}'
+                Set-RepoFile -Root $caseRoot -RelativePath 'scripts/Test-PrePushGateEnumerationParity.ps1' -Content ("Write-Output '{0}'`nexit 0`n" -f $invalidContractJson)
+            }
+            'null-finding' {
+                $baselineDossier = Invoke-EnumerationFixtureBuilder -Root $caseRoot
+                $baselineMechanical = Get-MechanicalPayloadFromDossier -Dossier $baselineDossier
+                $baselineFinding = @($baselineMechanical.gates.gateEnumerationParity.findings)[0]
+                if ($null -eq $baselineFinding) { throw 'A fixture deveria produzir uma candidata de gate antes de simular achado nulo.' }
+                $staleEntry = New-TriageEntry -Finding $baselineFinding -Kind 'closed' -CanonicalMembers @() -Reason 'Triagem de regressão para cobertura de órfãos.'
+                Write-TriageCatalog -Root $caseRoot -Entries @($staleEntry)
+                $invalidContractJson = '{"status":"pass","scanComplete":true,"scanIssues":[],"canonicalMembers":[],"files":[],"candidateCount":1,"displayTruncated":false,"findings":[null]}'
+                Set-RepoFile -Root $caseRoot -RelativePath 'scripts/Test-PrePushGateEnumerationParity.ps1' -Content ("Write-Output '{0}'`nexit 0`n" -f $invalidContractJson)
+            }
             'complete-with-scan-issues' {
                 $baselineDossier = Invoke-EnumerationFixtureBuilder -Root $caseRoot
                 $baselineMechanical = Get-MechanicalPayloadFromDossier -Dossier $baselineDossier
@@ -585,6 +605,10 @@ function Invoke-EnumerationGateFailureCase {
         if ($Mode -eq 'null-candidate-count') {
             Assert-True -CaseName 'r null-candidate-count: triagem não é classificada como órfã' -Condition (@($mechanical.enumerationTriage.orphanedEntries).Count -eq 0)
         }
+        if ($Mode -eq 'null-file-state' -or $Mode -eq 'null-finding') {
+            Assert-True -CaseName "r ${Mode}: contrato inválido permanece consultivo" -Condition ($gate.invocationExitCode -eq 0 -and $gate.status -eq 'warn')
+            Assert-True -CaseName "r ${Mode}: triagem incompleta não declara entrada órfã" -Condition (@($mechanical.enumerationTriage.orphanedEntries).Count -eq 0)
+        }
         if ($Mode -eq 'complete-with-scan-issues' -or $Mode -eq 'complete-with-incomplete-file') {
             Assert-True -CaseName "r ${Mode}: diagnóstico torna o gate consultivo incompleto" -Condition ($gate.status -eq 'warn' -and @($gate.scanIssues | Where-Object { $_.code -eq 'GATE_CONTRACT_INVALID' }).Count -eq 1)
             Assert-True -CaseName "r ${Mode}: contradição não declara triagem órfã" -Condition (@($mechanical.enumerationTriage.orphanedEntries).Count -eq 0)
@@ -598,6 +622,8 @@ Invoke-EnumerationGateFailureCase -Mode 'throw' -ExpectedIssue 'GATE_NONZERO_EXI
 Invoke-EnumerationGateFailureCase -Mode 'nonzero-json' -ExpectedIssue 'GATE_NONZERO_EXIT'
 Invoke-EnumerationGateFailureCase -Mode 'valid-json-stderr' -ExpectedIssue 'GATE_STDERR_NONEMPTY'
 Invoke-EnumerationGateFailureCase -Mode 'null-candidate-count' -ExpectedIssue 'GATE_CONTRACT_INVALID'
+Invoke-EnumerationGateFailureCase -Mode 'null-file-state' -ExpectedIssue 'GATE_CONTRACT_INVALID'
+Invoke-EnumerationGateFailureCase -Mode 'null-finding' -ExpectedIssue 'GATE_CONTRACT_INVALID'
 Invoke-EnumerationGateFailureCase -Mode 'complete-with-scan-issues' -ExpectedIssue 'GATE_CONTRACT_INVALID'
 Invoke-EnumerationGateFailureCase -Mode 'complete-with-incomplete-file' -ExpectedIssue 'GATE_CONTRACT_INVALID'
 Invoke-EnumerationGateFailureCase -Mode 'invalid-json' -ExpectedIssue 'GATE_INVALID_JSON'
