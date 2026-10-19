@@ -471,6 +471,15 @@ try {
     Assert-EnumerationMechanicalPass -Name 'q3d raiz JSON nula' -Dossier $nullCatalogDossier -Mechanical $nullCatalogMechanical
     Assert-True -CaseName 'q3d: raiz JSON nula mantém candidatos novos' -Condition (-not $nullCatalogMechanical.enumerationTriage.catalog.valid -and $nullCatalogMechanical.enumerationTriage.counts.new -eq 2 -and @($nullCatalogMechanical.enumerationTriage.catalog.problems | Where-Object { $_.code -eq 'TRIAGE_CATALOG_SCHEMA_INVALID' }).Count -eq 1)
 
+    $manyInvalidEntries = @(foreach ($number in 1..55) { [pscustomobject]@{ code = "INVALID_$number" } })
+    Write-TriageCatalog -Root $tmp -Entries $manyInvalidEntries
+    $manyProblemsDossier = Invoke-EnumerationFixtureBuilder -Root $tmp
+    $manyProblemsMechanical = Get-MechanicalPayloadFromDossier -Dossier $manyProblemsDossier
+    Assert-EnumerationMechanicalPass -Name 'q3e problemas integrais do catálogo' -Dossier $manyProblemsDossier -Mechanical $manyProblemsMechanical
+    Assert-True -CaseName 'q3e: 55 problemas permanecem visíveis e candidatos seguem novos' -Condition (-not $manyProblemsMechanical.enumerationTriage.catalog.valid -and @($manyProblemsMechanical.enumerationTriage.catalog.problems).Count -eq 55 -and $manyProblemsMechanical.enumerationTriage.counts.new -eq 2)
+    Assert-True -CaseName 'q3e: problemas integrais não contam como truncamento' -Condition (-not $manyProblemsMechanical.enumerationTriage.displayTruncated -and $manyProblemsMechanical.enumerationTriage.displayTruncatedCount -eq 0)
+    Assert-True -CaseName 'q3e: não avisa omissão quando todos os itens são apresentados' -Condition (@($manyProblemsMechanical.agentWarnings | Where-Object { $_ -like '*fora dos limites de apresentação por grupo*' }).Count -eq 0)
+
     Write-TriageCatalog -Root $tmp -Entries @($gateEntry, $gateEntry, $backendEntry)
     $duplicateDossier = Invoke-EnumerationFixtureBuilder -Root $tmp
     $duplicateMechanical = Get-MechanicalPayloadFromDossier -Dossier $duplicateDossier
@@ -515,6 +524,15 @@ try {
     $cappedMechanical = Get-MechanicalPayloadFromDossier -Dossier $cappedDossier
     Assert-EnumerationMechanicalPass -Name 'q8 limite de apresentação' -Dossier $cappedDossier -Mechanical $cappedMechanical
     Assert-True -CaseName 'q8: classificação completa antes do teto 50' -Condition ($cappedMechanical.enumerationTriage.counts.new -eq 55 -and @($cappedMechanical.enumerationTriage.newFindings).Count -eq 50 -and $cappedMechanical.enumerationTriage.displayTruncated -and $cappedMechanical.enumerationTriage.displayTruncatedCount -eq 5)
+
+    # Neste cenário, as 55 candidatas são somente as linhas de gates do README.
+    Set-RepoFile -Root $tmp -RelativePath 'xpz-llm-delegate/SKILL.md' -Content "# Fixture sem enumeração de backends`n"
+    Write-TriageCatalog -Root $tmp -Entries $manyInvalidEntries
+    $mixedCappedDossier = Invoke-EnumerationFixtureBuilder -Root $tmp
+    $mixedCappedMechanical = Get-MechanicalPayloadFromDossier -Dossier $mixedCappedDossier
+    Assert-EnumerationMechanicalPass -Name 'q8b candidatos truncados e problemas integrais' -Dossier $mixedCappedDossier -Mechanical $mixedCappedMechanical
+    Assert-True -CaseName 'q8b: todos os problemas do catálogo continuam visíveis' -Condition (@($mixedCappedMechanical.enumerationTriage.catalog.problems).Count -eq 55)
+    Assert-True -CaseName 'q8b: somente os cinco candidatos omitidos entram na contagem' -Condition ($mixedCappedMechanical.enumerationTriage.counts.new -eq 55 -and @($mixedCappedMechanical.enumerationTriage.newFindings).Count -eq 50 -and $mixedCappedMechanical.enumerationTriage.displayTruncated -and $mixedCappedMechanical.enumerationTriage.displayTruncatedCount -eq 5)
 }
 finally { Remove-TempDir -Path $tmp }
 

@@ -8,6 +8,8 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 ### Unreleased
 
+- **Contagem de itens omitidos na triagem pré-push (2026-10-19):** `displayTruncated` e `displayTruncatedCount` consideram somente os cinco grupos sujeitos ao limite de apresentação. Os problemas do cadastro continuam integrais em `catalog.problems`, sem gerar aviso de omissão indevido acima de 50 diagnósticos. O self-test do dossiê cobre esse caso isolado e combinado com candidatas realmente omitidas. O `13` e o `999` também esclarecem a triagem posterior das ocorrências da medição inicial.
+
 - **Acionamento do painel e aptidão para push (2026-10-19):** o pedido simples «execute a rotina pre push, sem push» aciona só a passada do harness atual; painel, subagente ou CLI externo exigem acionamento humano explícito. O `13` separa o veredito semântico da aptidão para push e a mantém não estabelecida enquanto a cegueira por harness/modo estiver pendente; o `14` preserva o bloqueio de `push-ready` nesse estado.
 
 - **Escopo da rota cega Codex na pré-push (2026-10-19):** `scripts/Invoke-Codex.ps1 -BlindReview` cobre a sessão desktop do Codex que já mostra `MEMORY_SUMMARY` ou histórico anterior; o processo filho não dispara outra chamada. Isso não proíbe um orquestrador de outro harness de despachar Codex como revisor delegado na revisão por pares/pré-push reforçada, conforme `14` e `xpz-llm-delegate`. A posição não cobre a memória/histórico dos demais harnesses nem do Codex CLI/delegate; avaliação por ferramenta/modo está pendente em `999`.
@@ -465,6 +467,8 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 ### Unreleased
 
+- **Recuento de elementos omitidos en el triaje pre-push (2026-10-19):** `displayTruncated` y `displayTruncatedCount` consideran solo los cinco grupos sujetos al límite de presentación. Los problemas del catálogo siguen completos en `catalog.problems`, sin generar un aviso de omisión incorrecto al superar 50 diagnósticos. El self-test del dosier cubre este caso aislado y combinado con candidatos realmente omitidos. El `13` y el `999` también aclaran el triaje posterior de las ocurrencias de la medición inicial.
+
 - **Activación del panel y aptitud para push (2026-10-19):** la solicitud simple «execute a rotina pre push, sem push» activa solo la pasada del harness actual; un panel, subagente o CLI externo requiere activación humana explícita. El `13` separa el veredicto semántico de la aptitud para push y la mantiene sin establecer mientras la ceguera por harness/modo siga pendiente; el `14` conserva el bloqueo de `push-ready` en ese estado.
 
 - **Alcance de la ruta ciega de Codex en pre-push (2026-10-19):** `scripts/Invoke-Codex.ps1 -BlindReview` cubre la sesión de escritorio de Codex que ya muestra `MEMORY_SUMMARY` o historial anterior; el proceso hijo no dispara otra llamada. Esto no prohíbe que un orquestador de otro harness despache Codex como revisor delegado en la revisión por pares/pre-push reforzada, según `14` y `xpz-llm-delegate`. Esta posición no cubre la memoria/historial de los demás harnesses ni de Codex CLI/delegate; la evaluación por herramienta/modo está pendiente en `999`.
@@ -919,6 +923,8 @@ All relevant changes to this repository will be recorded here from this adoption
 The format keeps an `Unreleased` section for changes not yet published in a formal version. This repository does not yet use public semantic versioning; when that changes, future sections should record the corresponding tag.
 
 ### Unreleased
+
+- **Omitted-item counts in pre-push triage (2026-10-19):** `displayTruncated` and `displayTruncatedCount` consider only the five groups subject to the display limit. Catalog problems remain complete in `catalog.problems`, without an incorrect omission warning above 50 diagnostics. The dossier self-test covers this case alone and alongside genuinely omitted candidates. Documents `13` and `999` also clarify the subsequent triage of the initial measurement's occurrences.
 
 - **Panel activation and push readiness (2026-10-19):** the simple request `execute a rotina pre push, sem push` activates only the current harness's pass; a panel, subagent, or external CLI requires explicit human activation. Document `13` separates the semantic verdict from push readiness and leaves readiness unestablished while blindness by harness/mode remains unresolved; document `14` keeps `push-ready` blocked in that state.
 

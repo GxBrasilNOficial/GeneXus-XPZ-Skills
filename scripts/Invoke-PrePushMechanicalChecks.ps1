@@ -1018,8 +1018,8 @@ function Invoke-EnumerationTriage {
         expiredEntries = @($expired | Select-Object -First $limit)
         orphanedEntries = @($orphaned | Select-Object -First $limit)
         ambiguousFindings = @($ambiguous | Select-Object -First $limit)
-        displayTruncated = (($new.Count -gt $limit) -or ($triaged.Count -gt $limit) -or ($expired.Count -gt $limit) -or ($orphaned.Count -gt $limit) -or ($ambiguous.Count -gt $limit) -or ($catalogProblems.Count -gt $limit))
-        displayTruncatedCount = [Math]::Max(0, $new.Count - $limit) + [Math]::Max(0, $triaged.Count - $limit) + [Math]::Max(0, $expired.Count - $limit) + [Math]::Max(0, $orphaned.Count - $limit) + [Math]::Max(0, $ambiguous.Count - $limit) + [Math]::Max(0, $catalogProblems.Count - $limit)
+        displayTruncated = (($new.Count -gt $limit) -or ($triaged.Count -gt $limit) -or ($expired.Count -gt $limit) -or ($orphaned.Count -gt $limit) -or ($ambiguous.Count -gt $limit))
+        displayTruncatedCount = [Math]::Max(0, $new.Count - $limit) + [Math]::Max(0, $triaged.Count - $limit) + [Math]::Max(0, $expired.Count - $limit) + [Math]::Max(0, $orphaned.Count - $limit) + [Math]::Max(0, $ambiguous.Count - $limit)
     }
     return [pscustomobject]$projection
 }
