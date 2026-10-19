@@ -10,6 +10,8 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 - **Enumerações da pré-push com âncoras e triagem versionada (2026-10-18):** os scanners passam a expor achados completos, estado de varredura e âncoras de texto; `Invoke-PrePushMechanicalChecks.ps1` classifica candidatas com `scripts/PrePushEnumerationTriage.json` a partir de decisões semânticas registradas, expira contratos vivos quando o conjunto canônico muda e não declara órfãos em varredura incompleta. Falhas consultivas continuam fora dos bloqueios mecânicos.
 
+- **Decisão explícita sobre candidatas da triagem da pré-push (2026-10-18):** quando os scanners de enumeração terminam completos e a revisão semântica descarta novas candidatas, o relatório apresenta âncoras, recomendações `closed`/`live-contract` e justificativas, explica a recorrência e oferece escolhas explícitas de cadastro. Nenhuma entrada é gravada antes da aprovação do usuário.
+
 - **Scripts prontos e issues no lugar de mensagem privada (2026-10-18):** a base proíbe criar `.ps1` novo no lugar de um script pronto, em `Temp`, na pasta paralela e nesta raiz. O `CONTRIBUTING.md` deixa de oferecer e-mail e mensagem privada para contribuição e passa a orientar issue; relato sensível continua no `SECURITY.md`.
 
 - **Verbo do Specifier uniformizado como «avalia» (2026-10-17):** `02`, `08` e a skill de importação/exportação passam de «valida» para «avalia» (o checklist já usava «checks»), e as citações do CHANGELOG acompanham; a leitura de aprovação fica eliminada em todas as superfícies.
@@ -445,6 +447,8 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 - **Enumeraciones de pre-push con anclas y triaje versionado (2026-10-18):** los analizadores exponen los hallazgos completos, el estado del escaneo y anclas de texto; `Invoke-PrePushMechanicalChecks.ps1` clasifica candidatos con `scripts/PrePushEnumerationTriage.json` a partir de decisiones semánticas registradas, vence los contratos vivos cuando cambia el conjunto canónico y no declara huérfanos si el escaneo está incompleto. Los errores consultivos siguen fuera de los bloqueos mecánicos.
 
+- **Decisión explícita sobre candidatos del triaje de pre-push (2026-10-18):** cuando los analizadores de enumeración terminan completos y la revisión semántica descarta candidatos nuevos, el informe presenta anclas, recomendaciones `closed`/`live-contract` y motivos, explica la recurrencia y ofrece opciones explícitas de registro. No se guarda ninguna entrada antes de la aprobación del usuario.
+
 - **Scripts listos e issues en lugar de mensaje privado (2026-10-18):** la base prohíbe crear un `.ps1` nuevo en lugar de un script listo, en `Temp`, en la carpeta paralela y en esta raíz. `CONTRIBUTING.md` deja de ofrecer correo y mensaje privado para contribución y pasa a orientar issue; el reporte sensible sigue en `SECURITY.md`.
 
 - **Verbo del Specifier uniformado como «evalúa» (2026-10-17):** `02`, `08` y la skill de importación/exportación pasan de «valida» a «evalúa» (el checklist ya usaba «checks»), y las citas del CHANGELOG acompañan; la lectura de aprobación queda eliminada en todas las superficies.
@@ -877,6 +881,8 @@ The format keeps an `Unreleased` section for changes not yet published in a form
 ### Unreleased
 
 - **Pre-push enumerations with anchors and versioned triage (2026-10-18):** the scanners expose complete findings, scan state, and text anchors; `Invoke-PrePushMechanicalChecks.ps1` classifies candidates through `scripts/PrePushEnumerationTriage.json` using recorded semantic decisions, expires live contracts when the canonical set changes, and makes no orphan claims when a scan is incomplete. Consultive failures remain outside mechanical blockers.
+
+- **Explicit decision on pre-push triage candidates (2026-10-18):** when both enumeration scanners complete and semantic review dismisses new candidates, the report provides anchors, `closed`/`live-contract` recommendations and reasons, explains recurrence, and offers explicit registration choices. No entry is written before user approval.
 
 - **Ready scripts and issues instead of private messages (2026-10-18):** the base forbids creating a new `.ps1` in place of a ready script, in `Temp`, in a parallel folder, and in this root. `CONTRIBUTING.md` no longer offers email or a private message for contributions and points to issues; a sensitive report stays in `SECURITY.md`.
 
