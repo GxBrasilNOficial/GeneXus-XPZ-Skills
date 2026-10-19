@@ -182,7 +182,7 @@ Reportar separadamente:
 
 Categoria adicional de relato (**não** conta no `VEREDICTO`): **lacuna candidata**. Quando a busca encontrar motor, self-test ou evidência **tocado ou criado pela frente** mas ausente do `09` (ou de outro documento de rastreabilidade), reportá-lo separando explicitamente **atribuição** (ausência pré-existente não bloqueia a push) de **mérito** (cobertura que pode valer registrar). Não tratar «não é desta frente» como motivo automático de descarte: corrigir lacuna pré-existente adjacente é decisão do usuário, e deve ser apresentada de forma neutra, sem enviesar para o descarte.
 
-**Decisão sobre novas candidatas não-gap da triagem versionada.** Quando ambos os scanners terminarem com `scanComplete=true` e `enumerationTriage.newFindings` incluir candidatas que a revisão semântica julgou `non-gap`, o relatório deve abrir um bloco **Decisão sobre registro de triagem**. A análise e o juízo semântico são responsabilidade do agente: não encerrar apenas com «flags descartadas; decisões não registradas» nem deixar para o usuário inferir que pode pedir o cadastro. Para cada candidata — ou grupo somente quando as âncoras, o tipo e a justificativa forem apresentados individualmente —, listar `code`, `file`, âncora exata e `listedMembers`; recomendar `closed` ou `live-contract`; e apresentar a `reason` proposta. Para cada recomendação `live-contract`, mostrar também a lista completa de `canonicalMembers` que seria gravada, não apenas a quantidade. Explicar que, sem registro, a candidata pode voltar como nova na próxima execução; registrada, só suprime a âncora e os membros correspondentes, e `live-contract` expira se mudar o conjunto canônico. Encerrar o bloco pedindo uma escolha explícita: aprovar todas as recomendações, registrar somente um subconjunto identificado pelas âncoras, ajustar o tipo ou a justificativa de candidatas específicas, ou manter o cadastro sem mudança. Não basta oferecer uma análise futura: o agente deve trazer a recomendação concreta junto com o relatório.
+**Decisão sobre novas candidatas não-gap da triagem versionada.** Quando ambos os scanners terminarem com `scanComplete=true` e `enumerationTriage.newFindings` incluir candidatas que a revisão semântica julgou `non-gap`, o relatório deve abrir um bloco **Decisão sobre registro de triagem**. A análise e o juízo semântico são responsabilidade do agente: não encerrar apenas com «flags descartadas; decisões não registradas» nem deixar para o usuário inferir que pode pedir o cadastro. Para cada candidata — ou grupo somente quando as âncoras, o tipo e a justificativa forem apresentados individualmente —, listar `code`, `file` e o `unitHash` completo, que identificam a âncora exata `(code, file, unitHash)`, além de `listedMembers`, que deve coincidir com a ocorrência; a linha pode aparecer como localizador adicional, mas nem a linha nem o número da tabela substituem essa identidade. Recomendar `closed` ou `live-contract` e apresentar a `reason` proposta. Para cada recomendação `live-contract`, mostrar também a lista completa de `canonicalMembers` que seria gravada, não apenas a quantidade. Explicar que, sem registro, a candidata pode voltar como nova na próxima execução; registrada, só suprime a âncora e os membros correspondentes, e `live-contract` expira se mudar o conjunto canônico. Oferecer escolhas explícitas: aprovar todas as recomendações, registrar somente um subconjunto identificado pelas âncoras exatas, ajustar o tipo ou a justificativa de candidatas específicas, ou manter o cadastro sem mudança. Não basta oferecer uma análise futura: o agente deve trazer a recomendação concreta junto com o relatório. Depois da linha obrigatória `VEREDICTO` definida na §9, a apresentação deve terminar com uma pergunta direta, por exemplo: «Você concorda com as classificações e justificativas propostas e autoriza registrar todas as entradas, ou quer ajustar algum item, escolher só um subconjunto pelas âncoras exatas ou manter o cadastro sem mudanças?» Não acrescentar conteúdo depois dessa pergunta.
 
 A oferta não autoriza gravar. O agente deve parar após o relatório e aguardar aprovação explícita; depois dela, registrar somente os itens aprovados. Não propor entradas `non-gap` para gaps confirmados nem com varredura incompleta. Se não houver candidatas novas julgadas `non-gap`, este bloco não se aplica.
 
@@ -203,7 +203,7 @@ Se o agente encontrar gaps durante a busca semântica:
 
 ### 9. Veredicto
 
-Encerrar com linha fixa:
+Fechar o relatório técnico com uma das linhas fixas:
 
 `VEREDICTO: nenhum gap confirmado`
 
@@ -211,7 +211,7 @@ ou
 
 `VEREDICTO: N gap(s) confirmado(s)`
 
-(`N` = contagem de gaps confirmados). Avisos descartados e áreas não cobertas **não** contam como gap. A linha é obrigatória mesmo quando o mecânico passou; ausência significa pré-push não concluída.
+(`N` = contagem de gaps confirmados). Avisos descartados e áreas não cobertas **não** contam como gap. A linha é obrigatória mesmo quando o mecânico passou; ausência significa pré-push não concluída. Quando o bloco de decisão sobre triagem da §8 se aplicar, manter essa linha exatamente e acrescentar depois dela a pergunta direta exigida naquela seção; a pergunta será o último conteúdo da apresentação. Nos demais casos, a linha de veredito continua sendo o fechamento.
 
 ## Conclusão
 

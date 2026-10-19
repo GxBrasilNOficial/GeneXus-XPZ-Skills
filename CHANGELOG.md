@@ -8,6 +8,8 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 ### Unreleased
 
+- **Âncora exata e pergunta final na decisão de triagem da pré-push (2026-10-19):** o relatório passa a exibir `code`, `file`, `unitHash` completo e `listedMembers` por candidata; a linha fica apenas como localizador. Quando houver decisões de triagem, a apresentação termina, após o `VEREDICTO`, perguntando diretamente se o usuário concorda com as classificações e autoriza o registro ou quer ajustar algo.
+
 - **Schema estrito do cadastro de triagem da pré-push (2026-10-18):** `schemaVersion` precisa ser um inteiro JSON sem coerção; schema incompatível ou raiz que não seja objeto gera diagnóstico estruturado e mantém candidatas como novas. O self-test do dossiê cobre schema não numérico, tipo booleano e raiz nula (`107/107`). A ideia já implementada foi retirada de `999` e registrada no histórico mensal.
 
 - **Enumerações da pré-push com âncoras e triagem versionada (2026-10-18):** os scanners passam a expor achados completos, estado de varredura e âncoras de texto; `Invoke-PrePushMechanicalChecks.ps1` classifica candidatas com `scripts/PrePushEnumerationTriage.json` a partir de decisões semânticas registradas, expira contratos vivos quando o conjunto canônico muda e não declara órfãos em varredura incompleta. Falhas consultivas continuam fora dos bloqueios mecânicos.
@@ -449,6 +451,8 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 ### Unreleased
 
+- **Ancla exacta y pregunta final en la decisión del triaje de pre-push (2026-10-19):** el informe muestra `code`, `file`, el `unitHash` completo y `listedMembers` para cada candidato; la línea solo sirve como localizador. Cuando haya decisiones de triaje, la presentación termina, después del `VEREDICTO`, preguntando directamente si el usuario está de acuerdo con las clasificaciones y autoriza el registro o quiere ajustar algo.
+
 - **Esquema estricto del registro de triaje de pre-push (2026-10-18):** `schemaVersion` debe ser un entero JSON sin coerción; un esquema incompatible o una raíz que no sea objeto genera un diagnóstico estructurado y mantiene los candidatos como nuevos. El self-test del dossier cubre un esquema no numérico, el tipo booleano y la raíz nula (`107/107`). La idea ya implementada se retiró de `999` y se registró en el historial mensual.
 
 - **Enumeraciones de pre-push con anclas y triaje versionado (2026-10-18):** los analizadores exponen los hallazgos completos, el estado del escaneo y anclas de texto; `Invoke-PrePushMechanicalChecks.ps1` clasifica candidatos con `scripts/PrePushEnumerationTriage.json` a partir de decisiones semánticas registradas, vence los contratos vivos cuando cambia el conjunto canónico y no declara huérfanos si el escaneo está incompleto. Los errores consultivos siguen fuera de los bloqueos mecánicos.
@@ -887,6 +891,8 @@ All relevant changes to this repository will be recorded here from this adoption
 The format keeps an `Unreleased` section for changes not yet published in a formal version. This repository does not yet use public semantic versioning; when that changes, future sections should record the corresponding tag.
 
 ### Unreleased
+
+- **Exact anchors and final question for pre-push triage decisions (2026-10-19):** the report shows each candidate's `code`, `file`, full `unitHash`, and `listedMembers`; the line is only a locator. When triage decisions apply, the presentation ends after the `VEREDICTO` with a direct question asking whether the user agrees with the classifications and authorizes registration or wants any item adjusted.
 
 - **Strict schema validation for pre-push triage (2026-10-18):** `schemaVersion` must be a JSON integer with no coercion; an incompatible schema or non-object root produces a structured diagnostic and keeps candidates new. The dossier self-test covers a nonnumeric schema value, a boolean, and a null root (`107/107`). The completed idea was removed from `999` and recorded in the monthly history.
 
