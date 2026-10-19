@@ -5,11 +5,14 @@
     Gate consultivo: enumerações documentais de backends fora do conjunto do dispatcher.
 
 .DESCRIPTION
-    Deriva o conjunto canônico de $AdapterScript por AST, percorre integralmente
-    Markdown da raiz e xpz-llm-delegate/, e identifica subconjuntos por unidade
-    lógica. Qualquer falha de extração, enumeração, leitura ou processamento deixa
+    Deriva o conjunto canônico de $AdapterScript por AST e identifica subconjuntos
+    por unidade lógica. A coleta examina arquivos Markdown diretamente na raiz do
+    repositório e, recursivamente, em xpz-llm-delegate/; não percorre outras pastas
+    da raiz. Exclui CHANGELOG.md e 998-ideias-descartadas-e-porque.md em ambos os
+    escopos, além das subárvores historico/, temp/ e tempo/ em xpz-llm-delegate/.
+    Qualquer falha de extração, enumeração, leitura ou processamento deixa
     scanComplete=false. O limite controla apenas displayFindings; findings sempre
-    contém a coleta integral.
+    contém a coleta integral dentro desse escopo.
 #>
 
 [CmdletBinding()]
@@ -205,7 +208,8 @@ if ($sourceComplete) {
 
 foreach ($docFile in $docFiles) {
     $relPath = ([System.IO.Path]::GetRelativePath($resolvedRoot, $docFile.FullName) -replace '\\', '/')
-    if ($relPath -match '^historico/' -or $relPath -match '^(?:temp|tempo)/' -or $docFile.Name -in $excludedFileNames) { continue }
+    $relativeDirectory = [System.IO.Path]::GetDirectoryName($relPath) -replace '\\', '/'
+    if ($relativeDirectory -match '(?:^|/)(?:historico|temp|tempo)(?:/|$)' -or $docFile.Name -in $excludedFileNames) { continue }
     $fileIssues = [System.Collections.Generic.List[string]]::new()
     try {
         $units = @(Parse-MarkdownLogicalUnits $docFile.FullName)

@@ -5,7 +5,7 @@
     Self-test de Test-PrePushBackendEnumerationParity.ps1 (Nivel 3).
 
 .DESCRIPTION
-    Valida os 9 cenarios metodologicos do gate consultivo de paridade de backends:
+    Valida cenários metodológicos do gate consultivo de paridade de backends:
       1. Extracao fiel da fonte de verdade do dispatcher ($AdapterScript via AST).
       2. Enumeracao completa em linha unica (pass, sem finding).
       3. Enumeracao completa quebrada em multiplas linhas por wrap de paragrafo (pass).
@@ -15,6 +15,8 @@
       7. Respeito ao marcador inline (<!-- backend-parity: ignore --> / # backend-parity: ignore).
       8. Saida estruturada em JSON e conformidade com contrato comum de gates.
       9. Simulacao de novo backend adicionado ao dispatcher sem atualizacao na doc (deteccao).
+      10-14. Âncoras, fonte dinâmica, falhas de enumeração/leitura e teto de exibição.
+      15. Escopo da coleta: arquivos da raiz e da árvore delegate, com exclusões.
 
     Sentinela de sucesso: OK: Test-PrePushBackendEnumerationParitySelfTest.ps1
 #>
@@ -216,6 +218,27 @@ $AdapterScript = @{
         throw "Cenario 14: coleta integral/teto pós-classificação incorretos (count=$($cappedResult.candidateCount), displayed=$(@($cappedResult.displayFindings).Count))."
     }
 
+    # Cenario 15: escopo da coleta e exclusoes documentadas.
+    $scopeCandidate = 'Este recorte cita opencode e codex.'
+    Write-TempFile -RelativePath 'doc-test.md' -Content ''
+    Write-TempFile -RelativePath 'root-current.md' -Content $scopeCandidate
+    Write-TempFile -RelativePath 'CHANGELOG.md' -Content $scopeCandidate
+    Write-TempFile -RelativePath '998-ideias-descartadas-e-porque.md' -Content $scopeCandidate
+    Write-TempFile -RelativePath 'other-root-folder/ignored.md' -Content $scopeCandidate
+    Write-TempFile -RelativePath 'historico/ignored.md' -Content $scopeCandidate
+    Write-TempFile -RelativePath 'xpz-llm-delegate/fixtures/current.md' -Content $scopeCandidate
+    Write-TempFile -RelativePath 'xpz-llm-delegate/fixtures/CHANGELOG.md' -Content $scopeCandidate
+    Write-TempFile -RelativePath 'xpz-llm-delegate/fixtures/998-ideias-descartadas-e-porque.md' -Content $scopeCandidate
+    Write-TempFile -RelativePath 'xpz-llm-delegate/fixtures/historico/ignored.md' -Content $scopeCandidate
+    Write-TempFile -RelativePath 'xpz-llm-delegate/fixtures/Temp/ignored.md' -Content $scopeCandidate
+    Write-TempFile -RelativePath 'xpz-llm-delegate/fixtures/Tempo/ignored.md' -Content $scopeCandidate
+    $scopeResult = Invoke-BackendGate
+    $expectedScopeFiles = @('root-current.md', 'xpz-llm-delegate/fixtures/current.md')
+    $actualScopeFiles = @($scopeResult.findings | ForEach-Object { [string]$_.file } | Sort-Object)
+    if (-not $scopeResult.scanComplete -or ($actualScopeFiles -join '|') -ne ($expectedScopeFiles -join '|')) {
+        throw "Cenario 15: escopo/exclusoes incorretos; scanComplete=$($scopeResult.scanComplete), findings=$(($actualScopeFiles) -join ', ')."
+    }
+
     # -----------------------------------------------------------------------------------
     # Cenario 9: Simulacao de novo backend no dispatcher sem atualizacao na doc
     # -----------------------------------------------------------------------------------
@@ -231,6 +254,11 @@ $AdapterScript = @{
 }
 '@
     Write-TempFile -RelativePath 'scripts/Invoke-LlmDelegatePanelDispatch.ps1' -Content $dispatcherWithNew
+
+    # Mantem as fixtures do cenario 15 completas apos a inclusao do novo backend.
+    $completeSetWithFuture = 'Os backends suportados sao opencode, codex, claude-code, copilot, gemini, antigravity e future-llm.'
+    Write-TempFile -RelativePath 'root-current.md' -Content $completeSetWithFuture
+    Write-TempFile -RelativePath 'xpz-llm-delegate/fixtures/current.md' -Content $completeSetWithFuture
 
     # Doc que anteriormente tinha os 6 (completa) agora tem 6 de 7 -> deve virar finding!
     $docWith6 = @'
