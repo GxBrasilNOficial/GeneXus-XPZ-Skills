@@ -455,6 +455,8 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 ### Unreleased
 
+- **Coherencia del estado de las enumeraciones de pre-push (2026-10-19):** el orquestador rechaza el estado completo cuando `scanComplete=true` viene acompañado de elementos en `scanIssues` o de algún estado de archivo con `complete=false`; fuerza el escaneo incompleto, conserva los hallazgos válidos e impide declarar triajes huérfanos. El self-test del dossier cubre ambas contradicciones.
+
 - **Triaje conservador de las enumeraciones de pre-push (2026-10-19):** el analizador de backends deja de suprimir unidades por mencionar `Cursor`; los recortes cerrados pueden seguir marcándose explícitamente con `<!-- backend-parity: ignore -->`. El documento `13` aclara que cualquier contenido distinto de whitespace en `stderr`, incluso con exit cero y JSON/contrato válidos, genera `GATE_STDERR_NONEMPTY`, marca el escaneo como incompleto y mantiene la incidencia fuera de `mechanicalFailures`. Los self-tests cubren ambos comportamientos.
 
 - **Ancla exacta y pregunta final en la decisión del triaje de pre-push (2026-10-19):** el informe muestra `code`, `file`, el `unitHash` completo y `listedMembers` para cada candidato; la línea solo sirve como localizador. Cuando haya decisiones de triaje, la presentación termina, después del `VEREDICTO`, preguntando directamente si el usuario está de acuerdo con las clasificaciones y autoriza el registro o quiere ajustar algo.
@@ -897,6 +899,8 @@ All relevant changes to this repository will be recorded here from this adoption
 The format keeps an `Unreleased` section for changes not yet published in a formal version. This repository does not yet use public semantic versioning; when that changes, future sections should record the corresponding tag.
 
 ### Unreleased
+
+- **Consistent state for pre-push enumerations (2026-10-19):** the orchestrator rejects a scan as complete if `scanComplete=true` is accompanied by entries in `scanIssues` or any file state has `complete=false`; it marks the scan incomplete, preserves valid findings, and prevents orphaned triage entries from being declared. The dossier self-test covers both contradictions.
 
 - **Conservative triage of pre-push enumerations (2026-10-19):** the backend scanner no longer suppresses units merely because they mention `Cursor`; closed excerpts can still be explicitly marked with `<!-- backend-parity: ignore -->`. Document `13` clarifies that any non-whitespace content on `stderr`, even with exit zero and valid JSON/contract, produces `GATE_STDERR_NONEMPTY`, marks the scan incomplete, and keeps the issue outside `mechanicalFailures`. Self-tests cover both behaviors.
 

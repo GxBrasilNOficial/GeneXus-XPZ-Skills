@@ -3464,14 +3464,14 @@ As contagens são de **arquivos que mencionam o token**, não de parâmetros exc
 
 **Relacionado.** `02-regras-operacionais-e-runtime.md` (tabela atômica: `spc0023`, `src0013`, `src0229` e `src0294`).
 
-## Gate de enumeração de backends: frase de tratamento especial gera falso positivo recorrente (2026-10-17)
+## Gate de enumeração de backends: unidade lógica que menciona tratamento especial gera falso positivo recorrente (2026-10-17)
 
 - **Importância** — baixa (ruído de revisão, não gap de conteúdo).
 - **Maturidade** — pendente; a triagem versionada geral foi implementada em 2026-10-18, mas nenhuma ocorrência deste item recebeu veredito semântico ou entrada no cadastro.
 
-**O que é.** `scripts/Test-PrePushBackendEnumerationParity.ps1` (aviso `BACKEND_ENUMERATION_SUBSET`) dispara quando uma frase cita 2 ou mais backends sem citar todos os 6. Ele não distingue enumeração de conjunto de frase que apenas trata um caso especial. Caso motivador: `xpz-llm-delegate/SKILL.md:446`, que cita `claude-code` (tratamento do Claude Code no painel) e `codex` (nome do diretório `xpz-llm-panel-codex`). Sem uma decisão semântica e entrada exata no cadastro versionado, o aviso permanece candidato para veredito em cada rodada.
+**O que é.** `scripts/Test-PrePushBackendEnumerationParity.ps1` (aviso `BACKEND_ENUMERATION_SUBSET`) dispara quando uma unidade lógica de Markdown — por exemplo, um parágrafo ou item de lista — contém menções a 2 ou mais backends sem citar todos os 6. As linhas da unidade são combinadas antes da detecção, então menções em frases diferentes da mesma unidade podem gerar um único candidato. O scanner não distingue uma enumeração de conjunto de uma unidade que apenas trata um caso especial. Caso motivador: `xpz-llm-delegate/SKILL.md:446`, cuja unidade cita `claude-code` (tratamento do Claude Code no painel) e `codex` (nome do diretório `xpz-llm-panel-codex`). Sem uma decisão semântica e entrada exata no cadastro versionado, o aviso permanece candidato para veredito em cada rodada.
 
-**Direção proposta.** As duas heurísticas específicas seguem pendentes: (a) reconhecer como exceção o padrão de caminho de diretório por backend (ex.: `xpz-llm-panel-<backend>`); (b) reconhecer frases que tratam um backend por nome próprio de adapter (ex.: `Invoke-ClaudeCodeAsync.ps1`). Antes de implementar qualquer heurística, medir falso negativo para confirmar que ela não esconde enumerações incompletas. A triagem versionada geral resolve apenas a recorrência após uma decisão semântica registrada; não classifica frases automaticamente.
+**Direção proposta.** As duas heurísticas específicas seguem pendentes: (a) reconhecer como exceção o padrão de caminho de diretório por backend (ex.: `xpz-llm-panel-<backend>`); (b) reconhecer unidades que tratam um backend por nome próprio de adapter (ex.: `Invoke-ClaudeCodeAsync.ps1`). Antes de implementar qualquer heurística, medir falso negativo para confirmar que ela não esconde enumerações incompletas. A triagem versionada geral resolve apenas a recorrência após uma decisão semântica registrada; não classifica unidades automaticamente.
 
 **Alternativa descartada por ora.** Marcador `<!-- backend-parity: ignore -->` na linha afetada: o `13` reserva esse marcador para conteúdo fechado, e este trecho é contrato vivo.
 
