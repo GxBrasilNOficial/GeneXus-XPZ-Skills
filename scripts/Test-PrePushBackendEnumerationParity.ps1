@@ -2,71 +2,59 @@
 
 <#
 .SYNOPSIS
-    Gate consultivo: enumeracao de backends/adapters de delegacao na documentacao
-    que ficou como subconjunto proprio do conjunto canonico do dispatcher.
+    Gate consultivo: enumerações documentais de backends fora do conjunto do dispatcher.
 
 .DESCRIPTION
-    Conserto da causa-raiz de um gap metodologico (Nivel 3): ao adicionar backends
-    novos ao dispatcher (scripts/Invoke-LlmDelegatePanelDispatch.ps1), enumeracoes
-    fechadas em prosa nos documentos Markdown podem permanecer com o conjunto
-    antigo/incompleto sem citar o termo novo.
-
-    Este gate extrai a VERDADE do codigo: deriva o conjunto canonico de backends
-    a partir de $AdapterScript no AST do dispatcher real. Depois varre os arquivos
-    *.md da raiz + xpz-llm-delegate/**/*.md (excluindo historico/ e arquivos
-    congelados) e sinaliza qualquer unidade logica/sentenca que cite >= 2 backends
-    formando um subconjunto proprio do conjunto canonico (2 <= n < total).
-
-    Delimitacao de Dominio: sentencas/blocos contendo o token \bCursor\b (case-
-    insensitive) sao ignorados por pertencerem ao Dominio B (Ferramentas de Agente
-    gerenciadas), nao a backends de delegacao LLM (Dominio A).
-
-    Marcador de Excecao: suporta <!-- backend-parity: ignore --> ou
-    # backend-parity: ignore em comentarios para recortes intencionais por eixo.
-
-.PARAMETER RootPath
-    Raiz do repositorio. Default: pai de scripts/.
-
-.PARAMETER BaseRef
-    Aceito para o contrato comum dos gates; este gate e invariante (nao usa diff).
-
-.PARAMETER ChangedFiles
-    Aceito para o contrato comum dos gates; nao usado (verificacao e repo-wide).
-
-.PARAMETER MaxFindings
-    Teto de candidatas reportadas. Default: 50.
-
-.PARAMETER AsJson
-    Emite diagnostico estruturado em JSON.
+    Deriva o conjunto canônico de $AdapterScript por AST, percorre integralmente
+    Markdown da raiz e xpz-llm-delegate/, e identifica subconjuntos por unidade
+    lógica. Qualquer falha de extração, enumeração, leitura ou processamento deixa
+    scanComplete=false. O limite controla apenas displayFindings; findings sempre
+    contém a coleta integral.
 #>
 
 [CmdletBinding()]
 param(
     [string]$RootPath = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path,
-
     [string]$BaseRef = 'origin/main',
-
-    [AllowEmptyCollection()]
-    [string[]]$ChangedFiles = @(),
-
-    [ValidateRange(1, 500)]
-    [int]$MaxFindings = 50,
-
+    [AllowEmptyCollection()][string[]]$ChangedFiles = @(),
+    [ValidateRange(1, 500)][int]$MaxFindings = 50,
     [switch]$AsJson
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 
 $resolvedRoot = (Resolve-Path -LiteralPath $RootPath).Path
-
 $dispatcherRel = 'scripts/Invoke-LlmDelegatePanelDispatch.ps1'
 $dispatcherPath = Join-Path $resolvedRoot $dispatcherRel
-
 $findings = [System.Collections.Generic.List[object]]::new()
-$truncated = $false
-$canonicalBackends = @()
+$scanIssues = [System.Collections.Generic.List[object]]::new()
+$fileStates = [System.Collections.Generic.List[object]]::new()
+$canonicalBackends = [System.Collections.Generic.List[string]]::new()
 $ignoredCount = 0
+$sourceComplete = $false
+$utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+
+function Add-ScanIssue {
+    param([string]$Code, [string]$Path, [string]$Message)
+    $scanIssues.Add([pscustomobject][ordered]@{ code = $Code; path = $Path; message = $Message })
+}
+
+function Get-Sha256Hex {
+    param([Parameter(Mandatory = $true)][string]$Text)
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try { $bytes = $sha.ComputeHash($utf8NoBom.GetBytes($Text)) } finally { $sha.Dispose() }
+    return (([System.BitConverter]::ToString($bytes)) -replace '-', '').ToLowerInvariant()
+}
+
+function Get-OrdinalSortedStrings {
+    param([string[]]$Values)
+    $result = [System.Collections.Generic.List[string]]::new()
+    foreach ($value in $Values) { $result.Add($value) }
+    $result.Sort([System.StringComparer]::Ordinal)
+    return @($result.ToArray())
+}
 
 function Get-BackendRegex {
     param([string]$Backend)
@@ -83,10 +71,8 @@ function Get-BackendRegex {
 
 function Parse-MarkdownLogicalUnits {
     param([string]$FilePath)
-
     $lines = @([System.IO.File]::ReadAllLines($FilePath))
     $units = [System.Collections.Generic.List[object]]::new()
-
     $inCodeBlock = $false
     $currentBlockLines = [System.Collections.Generic.List[string]]::new()
     $startLineNum = 1
@@ -94,219 +80,202 @@ function Parse-MarkdownLogicalUnits {
     for ($i = 0; $i -lt $lines.Count; $i++) {
         $lineNum = $i + 1
         $line = $lines[$i]
-
         if ($line -match '^\s*```') {
-            if ($inCodeBlock) {
-                $inCodeBlock = $false
-                continue
-            } else {
-                if ($currentBlockLines.Count -gt 0) {
-                    $units.Add([pscustomobject]@{
-                        StartLine = $startLineNum
-                        EndLine   = $lineNum - 1
-                        RawLines  = @($currentBlockLines)
-                    })
-                    $currentBlockLines.Clear()
-                }
-                $inCodeBlock = $true
-                continue
+            if ($inCodeBlock) { $inCodeBlock = $false; continue }
+            if ($currentBlockLines.Count -gt 0) {
+                $units.Add([pscustomobject]@{ StartLine = $startLineNum; EndLine = $lineNum - 1; RawLines = @($currentBlockLines) })
+                $currentBlockLines.Clear()
             }
+            $inCodeBlock = $true
+            continue
         }
-
         if ($inCodeBlock) { continue }
-
         if ([string]::IsNullOrWhiteSpace($line)) {
             if ($currentBlockLines.Count -gt 0) {
-                $units.Add([pscustomobject]@{
-                    StartLine = $startLineNum
-                    EndLine   = $lineNum - 1
-                    RawLines  = @($currentBlockLines)
-                })
+                $units.Add([pscustomobject]@{ StartLine = $startLineNum; EndLine = $lineNum - 1; RawLines = @($currentBlockLines) })
                 $currentBlockLines.Clear()
             }
             continue
         }
-
         if ($line -match '^\s*#{1,6}\s+' -or $line -match '^\s*\|.*\|\s*$') {
             if ($currentBlockLines.Count -gt 0) {
-                $units.Add([pscustomobject]@{
-                    StartLine = $startLineNum
-                    EndLine   = $lineNum - 1
-                    RawLines  = @($currentBlockLines)
-                })
+                $units.Add([pscustomobject]@{ StartLine = $startLineNum; EndLine = $lineNum - 1; RawLines = @($currentBlockLines) })
                 $currentBlockLines.Clear()
             }
-            $units.Add([pscustomobject]@{
-                StartLine = $lineNum
-                EndLine   = $lineNum
-                RawLines  = @($line)
-            })
+            $units.Add([pscustomobject]@{ StartLine = $lineNum; EndLine = $lineNum; RawLines = @($line) })
             continue
         }
-
         if ($line -match '^\s*[-*+]\s+' -or $line -match '^\s*\d+\.\s+') {
             if ($currentBlockLines.Count -gt 0) {
-                $units.Add([pscustomobject]@{
-                    StartLine = $startLineNum
-                    EndLine   = $lineNum - 1
-                    RawLines  = @($currentBlockLines)
-                })
+                $units.Add([pscustomobject]@{ StartLine = $startLineNum; EndLine = $lineNum - 1; RawLines = @($currentBlockLines) })
                 $currentBlockLines.Clear()
             }
             $startLineNum = $lineNum
             $currentBlockLines.Add($line)
             continue
         }
-
-        if ($currentBlockLines.Count -eq 0) {
-            $startLineNum = $lineNum
-        }
+        if ($currentBlockLines.Count -eq 0) { $startLineNum = $lineNum }
         $currentBlockLines.Add($line)
     }
-
     if ($currentBlockLines.Count -gt 0) {
-        $units.Add([pscustomobject]@{
-            StartLine = $startLineNum
-            EndLine   = $lines.Count
-            RawLines  = @($currentBlockLines)
-        })
+        $units.Add([pscustomobject]@{ StartLine = $startLineNum; EndLine = $lines.Count; RawLines = @($currentBlockLines) })
     }
-
     return @($units)
 }
 
-if (Test-Path -LiteralPath $dispatcherPath -PathType Leaf) {
-    $tokens = $null
-    $parserErrors = $null
-    $dispatcherAst = [System.Management.Automation.Language.Parser]::ParseFile($dispatcherPath, [ref]$tokens, [ref]$parserErrors)
-
-    if (@($parserErrors).Count -eq 0) {
-        $assign = @($dispatcherAst.FindAll({
-            param($node)
-            $node -is [System.Management.Automation.Language.AssignmentStatementAst] -and
-            $node.Left.Extent.Text.Trim() -eq '$AdapterScript'
-        }, $true))[0]
-
-        if ($null -ne $assign) {
-            $ht = if ($assign.Right -is [System.Management.Automation.Language.HashtableAst]) {
-                $assign.Right
+# A fonte é válida apenas quando existe uma única atribuição direta e todos os
+# membros são chaves literais, distintas e não vazias.
+try {
+    if (-not (Test-Path -LiteralPath $dispatcherPath -PathType Leaf)) {
+        Add-ScanIssue 'CANONICAL_SOURCE_MISSING' $dispatcherRel 'Dispatcher ausente.'
+    } else {
+        $tokens = $null
+        $parserErrors = $null
+        $dispatcherAst = [System.Management.Automation.Language.Parser]::ParseFile($dispatcherPath, [ref]$tokens, [ref]$parserErrors)
+        if (@($parserErrors).Count -gt 0) {
+            Add-ScanIssue 'CANONICAL_SOURCE_PARSE_ERROR' $dispatcherRel ((@($parserErrors | ForEach-Object { $_.Message }) -join '; '))
+        } else {
+            $assignments = @($dispatcherAst.FindAll({
+                param($node)
+                $node -is [System.Management.Automation.Language.AssignmentStatementAst] -and
+                $node.Left -is [System.Management.Automation.Language.VariableExpressionAst] -and
+                $node.Left.VariablePath.UserPath -eq 'AdapterScript'
+            }, $true))
+            $rightAst = $null
+            if ($assignments.Count -eq 1) {
+                $rightAst = $assignments[0].Right
+                if ($rightAst -is [System.Management.Automation.Language.CommandExpressionAst] -and $rightAst.Redirections.Count -eq 0) {
+                    $rightAst = $rightAst.Expression
+                } elseif ($rightAst -is [System.Management.Automation.Language.PipelineAst] -and
+                    $rightAst.PipelineElements.Count -eq 1 -and
+                    $rightAst.PipelineElements[0] -is [System.Management.Automation.Language.CommandExpressionAst] -and
+                    $rightAst.PipelineElements[0].Redirections.Count -eq 0) {
+                    $rightAst = $rightAst.PipelineElements[0].Expression
+                }
+            }
+            if ($assignments.Count -ne 1 -or $rightAst -isnot [System.Management.Automation.Language.HashtableAst]) {
+                Add-ScanIssue 'CANONICAL_SOURCE_UNSUPPORTED' $dispatcherRel 'Esperada uma única atribuição direta de $AdapterScript para uma hashtable literal.'
             } else {
-                @($assign.Right.FindAll({ param($node) $node -is [System.Management.Automation.Language.HashtableAst] }, $true))[0]
-            }
-
-            if ($null -ne $ht) {
-                $extracted = [System.Collections.Generic.List[string]]::new()
-                foreach ($pair in $ht.KeyValuePairs) {
-                    $extracted.Add($pair.Item1.Extent.Text.Trim("'", '"', ' '))
+                $seen = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+                $valid = $true
+                foreach ($pair in $rightAst.KeyValuePairs) {
+                    if ($pair.Item1 -isnot [System.Management.Automation.Language.StringConstantExpressionAst]) {
+                        Add-ScanIssue 'CANONICAL_KEY_NOT_LITERAL' $dispatcherRel 'Chave dinâmica ou expressão não suportada em $AdapterScript.'
+                        $valid = $false
+                        continue
+                    }
+                    $key = [string]$pair.Item1.Value
+                    if ([string]::IsNullOrWhiteSpace($key) -or -not $seen.Add($key)) {
+                        Add-ScanIssue 'CANONICAL_KEY_INVALID' $dispatcherRel 'Chave vazia ou duplicada em $AdapterScript.'
+                        $valid = $false
+                        continue
+                    }
+                    $canonicalBackends.Add($key)
                 }
-                $canonicalBackends = @($extracted)
+                if ($valid -and $canonicalBackends.Count -ge 2) { $sourceComplete = $true }
+                elseif ($valid) { Add-ScanIssue 'CANONICAL_SET_TOO_SMALL' $dispatcherRel 'O conjunto canônico precisa conter ao menos dois backends.' }
             }
         }
+    }
+} catch {
+    Add-ScanIssue 'CANONICAL_SOURCE_ERROR' $dispatcherRel $_.Exception.Message
+}
+
+$excludedFileNames = @('CHANGELOG.md', '998-ideias-descartadas-e-porque.md')
+$docFiles = [System.Collections.Generic.List[System.IO.FileInfo]]::new()
+try {
+    foreach ($file in @(Get-ChildItem -LiteralPath $resolvedRoot -File -Filter '*.md' -ErrorAction Stop | Sort-Object FullName)) { $docFiles.Add($file) }
+} catch { Add-ScanIssue 'ROOT_ENUMERATION_ERROR' '.' $_.Exception.Message }
+
+$llmDelegateDir = Join-Path $resolvedRoot 'xpz-llm-delegate'
+if (Test-Path -LiteralPath $llmDelegateDir) {
+    if (-not (Test-Path -LiteralPath $llmDelegateDir -PathType Container)) {
+        Add-ScanIssue 'SUBTREE_NOT_DIRECTORY' 'xpz-llm-delegate' 'O caminho xpz-llm-delegate existe e não é diretório.'
+    } else {
+        try {
+            foreach ($file in @(Get-ChildItem -LiteralPath $llmDelegateDir -Recurse -File -Filter '*.md' -ErrorAction Stop | Sort-Object FullName)) { $docFiles.Add($file) }
+        } catch { Add-ScanIssue 'SUBTREE_ENUMERATION_ERROR' 'xpz-llm-delegate' $_.Exception.Message }
     }
 }
 
-if ($canonicalBackends.Count -ge 2) {
-    $backendPatterns = [ordered]@{}
-    foreach ($b in $canonicalBackends) {
-        $backendPatterns[$b] = Get-BackendRegex $b
-    }
+$backendPatterns = [ordered]@{}
+if ($sourceComplete) {
+    foreach ($backend in $canonicalBackends) { $backendPatterns[$backend] = Get-BackendRegex $backend }
+}
 
-    $excludedFileNames = @('CHANGELOG.md', '998-ideias-descartadas-e-porque.md')
-
-    $docFiles = [System.Collections.Generic.List[System.IO.FileInfo]]::new()
-    foreach ($f in @(Get-ChildItem -LiteralPath $resolvedRoot -File -Filter '*.md' -ErrorAction SilentlyContinue)) {
-        $docFiles.Add($f)
-    }
-    $llmDelegateDir = Join-Path $resolvedRoot 'xpz-llm-delegate'
-    if (Test-Path -LiteralPath $llmDelegateDir -PathType Container) {
-        foreach ($f in @(Get-ChildItem -LiteralPath $llmDelegateDir -Recurse -File -Filter '*.md' -ErrorAction SilentlyContinue)) {
-            $docFiles.Add($f)
-        }
-    }
-
-    foreach ($docFile in $docFiles) {
-        if ($truncated) { break }
-
-        $relPath = ([System.IO.Path]::GetRelativePath($resolvedRoot, $docFile.FullName) -replace '\\', '/')
-        if ($relPath -match '^historico/' -or $relPath -match '^(?:temp|tempo)/' -or $docFile.Name -in $excludedFileNames) {
-            continue
-        }
-
-        $units = Parse-MarkdownLogicalUnits $docFile.FullName
-
-        foreach ($u in $units) {
-            if ($truncated) { break }
-
-            $hasIgnore = $false
-            foreach ($l in $u.RawLines) {
-                if ($l -match '<!--\s*backend-parity:\s*ignore\s*-->' -or $l -match '#\s*backend-parity:\s*ignore') {
-                    $hasIgnore = $true
-                    break
+foreach ($docFile in $docFiles) {
+    $relPath = ([System.IO.Path]::GetRelativePath($resolvedRoot, $docFile.FullName) -replace '\\', '/')
+    if ($relPath -match '^historico/' -or $relPath -match '^(?:temp|tempo)/' -or $docFile.Name -in $excludedFileNames) { continue }
+    $fileIssues = [System.Collections.Generic.List[string]]::new()
+    try {
+        $units = @(Parse-MarkdownLogicalUnits $docFile.FullName)
+        if ($sourceComplete) {
+            foreach ($unit in $units) {
+                $hasIgnore = $false
+                foreach ($line in $unit.RawLines) {
+                    if ($line -match '<!--\s*backend-parity:\s*ignore\s*-->' -or $line -match '#\s*backend-parity:\s*ignore') { $hasIgnore = $true; break }
                 }
+                if ($hasIgnore) { $ignoredCount++; continue }
+                $flatText = ($unit.RawLines -join ' ')
+                if ($flatText -match '(?i)\bcursor\b') { continue }
+                $onUnit = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+                foreach ($backend in $canonicalBackends) { if ($backendPatterns[$backend].IsMatch($flatText)) { [void]$onUnit.Add($backend) } }
+                if ($onUnit.Count -lt 2 -or $onUnit.Count -ge $canonicalBackends.Count) { continue }
+                $listed = Get-OrdinalSortedStrings @($onUnit)
+                $missing = @(Get-OrdinalSortedStrings @($canonicalBackends | Where-Object { -not $onUnit.Contains($_) }))
+                $unitText = ($unit.RawLines -join "`n")
+                $findings.Add([pscustomobject][ordered]@{
+                    code = 'BACKEND_ENUMERATION_SUBSET'
+                    severity = 'warn'
+                    file = $relPath
+                    line = [int]$unit.StartLine
+                    path = ('{0}:{1}' -f $relPath, $unit.StartLine)
+                    unitHash = (Get-Sha256Hex $unitText)
+                    listedMembers = @($listed)
+                    message = ("enumera {0} de {1} backends canônicos ({2}); se o bloco descreve o conjunto de backends, confirmar se está completo — ausente(s): {3}" -f $onUnit.Count, $canonicalBackends.Count, ($listed -join ', '), ($missing -join ', '))
+                })
             }
-            if ($hasIgnore) {
-                $ignoredCount++
-                continue
-            }
-
-            $flatText = ($u.RawLines -join ' ')
-            if ($flatText -match '(?i)\bcursor\b') {
-                continue
-            }
-
-            $onUnit = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
-            foreach ($b in $canonicalBackends) {
-                if ($backendPatterns[$b].IsMatch($flatText)) {
-                    [void]$onUnit.Add($b)
-                }
-            }
-
-            if ($onUnit.Count -lt 2) { continue }
-            if ($onUnit.Count -ge $canonicalBackends.Count) { continue }
-
-            if ($findings.Count -ge $MaxFindings) {
-                $truncated = $true
-                break
-            }
-
-            $listed = @($onUnit | Sort-Object)
-            $missing = @($canonicalBackends | Where-Object { -not $onUnit.Contains($_) })
-
-            $findings.Add([pscustomobject][ordered]@{
-                code     = 'BACKEND_ENUMERATION_SUBSET'
-                severity = 'warn'
-                path     = ('{0}:{1}' -f $relPath, $u.StartLine)
-                message  = ("enumera {0} de {1} backends canonicos ({2}); se o bloco descreve o conjunto de backends, confirmar se esta completo — ausente(s): {3}" -f $onUnit.Count, $canonicalBackends.Count, ($listed -join ', '), ($missing -join ', '))
-            })
         }
+        $fileStates.Add([pscustomobject][ordered]@{ file = $relPath; complete = $true; status = 'complete'; issues = @() })
+    } catch {
+        $message = $_.Exception.Message
+        $fileIssues.Add($message)
+        Add-ScanIssue 'FILE_PROCESSING_ERROR' $relPath $message
+        $fileStates.Add([pscustomobject][ordered]@{ file = $relPath; complete = $false; status = 'error'; issues = @($fileIssues) })
     }
 }
 
-$status = if ($findings.Count -gt 0) { 'warn' } else { 'pass' }
-
+$scanComplete = ($sourceComplete -and $scanIssues.Count -eq 0)
+$allFindings = @($findings)
+$displayFindings = @($allFindings | Select-Object -First $MaxFindings)
+$displayTruncated = ($allFindings.Count -gt $MaxFindings)
+$status = if ($allFindings.Count -gt 0 -or -not $scanComplete) { 'warn' } else { 'pass' }
 $result = [ordered]@{
-    status            = $status
-    dispatcher        = $dispatcherRel
-    canonicalBackends = @($canonicalBackends)
-    candidateCount    = $findings.Count
-    ignoredCount      = $ignoredCount
-    truncated         = $truncated
-    findings          = @($findings)
+    status = $status
+    dispatcher = $dispatcherRel
+    canonicalMembers = @(Get-OrdinalSortedStrings @($canonicalBackends))
+    canonicalBackends = @(Get-OrdinalSortedStrings @($canonicalBackends))
+    scanComplete = $scanComplete
+    scanIssues = @($scanIssues)
+    files = @($fileStates)
+    candidateCount = $allFindings.Count
+    ignoredCount = $ignoredCount
+    displayTruncated = $displayTruncated
+    findings = $allFindings
+    displayFindings = $displayFindings
 }
 
 if ($AsJson) {
-    [pscustomobject]$result | ConvertTo-Json -Depth 6
+    [pscustomobject]$result | ConvertTo-Json -Depth 8
 } else {
     Write-Output ("STATUS={0}" -f $status)
-    Write-Output ("CANONICAL_BACKENDS={0}" -f ($canonicalBackends -join ', '))
-    Write-Output ("CANDIDATE_COUNT={0}" -f $findings.Count)
+    Write-Output ("SCAN_COMPLETE={0}" -f $scanComplete.ToString().ToLowerInvariant())
+    Write-Output ("CANONICAL_BACKENDS={0}" -f (@($result.canonicalMembers) -join ', '))
+    Write-Output ("CANDIDATE_COUNT={0}" -f $allFindings.Count)
     Write-Output ("IGNORED_COUNT={0}" -f $ignoredCount)
-    foreach ($finding in @($findings)) {
-        Write-Output ("BACKEND_ENUMERATION_SUBSET: {0}: {1}" -f $finding.path, $finding.message)
-    }
-    if ($truncated) {
-        Write-Output 'CANDIDATES_TRUNCATED=true'
-    }
+    foreach ($issue in $scanIssues) { Write-Output ("SCAN_ISSUE: {0} [{1}] {2}" -f $issue.code, $issue.path, $issue.message) }
+    foreach ($finding in $displayFindings) { Write-Output ("BACKEND_ENUMERATION_SUBSET: {0}: {1}" -f $finding.path, $finding.message) }
+    if ($displayTruncated) { Write-Output ("DISPLAY_TRUNCATED={0}" -f ($allFindings.Count - $MaxFindings)) }
 }
 
 exit 0

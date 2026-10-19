@@ -117,6 +117,109 @@ function Assert-True {
     }
 }
 
+function Copy-EnumerationFixtureScripts {
+    param([string]$Root)
+    foreach ($name in @(
+        'Invoke-PrePushMechanicalChecks.ps1',
+        'Test-PsScriptsParse.ps1',
+        'Test-PyScriptsParse.ps1',
+        'Test-PrePushGateEnumerationParity.ps1',
+        'Test-PrePushBackendEnumerationParity.ps1',
+        'Invoke-LlmDelegatePanelDispatch.ps1'
+    )) {
+        Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination (Join-Path $Root "scripts/$name") -Force
+    }
+}
+
+function Initialize-EnumerationFixtureRepo {
+    param([string]$Root)
+    [void](New-Item -ItemType Directory -Path $Root -Force)
+    [void](New-Item -ItemType Directory -Path (Join-Path $Root 'scripts') -Force)
+    [void](New-Item -ItemType Directory -Path (Join-Path $Root 'xpz-llm-delegate') -Force)
+    Copy-EnumerationFixtureScripts -Root $Root
+    Set-RepoFile -Root $Root -RelativePath 'scripts/valid.py' -Content "x = 1`n"
+    Set-RepoFile -Root $Root -RelativePath 'README.md' -Content @'
+# Fixture de enumeração
+
+Os gates consultivos cobrem `Test-PrePushTraceabilityCoverage.ps1` e `Test-PrePushMsBuildProbeDocParity.ps1`.
+'@
+    Set-RepoFile -Root $Root -RelativePath 'xpz-llm-delegate/SKILL.md' -Content @'
+# Dispatcher
+
+Backends documentados: OpenCode, Codex e Claude Code.
+Menção de teste ao backend future-llm, ainda não canônico.
+'@
+
+    & git -C $Root init -b main *> $null
+    & git -C $Root config user.email 'selftest@example.com' *> $null
+    & git -C $Root config user.name 'Self Test' *> $null
+    & git -C $Root add -A *> $null
+    & git -C $Root commit -m 'base' *> $null
+    $baseSha = (& git -C $Root rev-parse HEAD).Trim()
+    & git -C $Root update-ref refs/remotes/origin/main $baseSha *> $null
+    Set-RepoFile -Root $Root -RelativePath 'feature.md' -Content "# feature`n"
+    & git -C $Root add -A *> $null
+    & git -C $Root commit -m 'feature' *> $null
+    return $baseSha
+}
+
+function Get-MechanicalPayloadFromDossier {
+    param($Dossier)
+    $text = [string]$Dossier.dossierText
+    $header = '=== SEÇÃO B — DIAGNÓSTICO MECÂNICO DO ORQUESTRADOR (candidatas a verificar, NÃO verdade) ==='
+    $headerIndex = $text.IndexOf($header, [System.StringComparison]::Ordinal)
+    $headIndex = $text.LastIndexOf("`nHEAD: ", [System.StringComparison]::Ordinal)
+    if ($headerIndex -lt 0 -or $headIndex -le $headerIndex) {
+        throw 'Não foi possível localizar o JSON mecânico na Seção B do dossiê.'
+    }
+    $jsonStart = $headerIndex + $header.Length
+    $jsonText = $text.Substring($jsonStart, $headIndex - $jsonStart).Trim()
+    return ($jsonText | ConvertFrom-Json -ErrorAction Stop)
+}
+
+function New-TriageEntry {
+    param($Finding, [string]$Kind, [string[]]$CanonicalMembers, [string]$Reason)
+    $entry = [ordered]@{
+        code = [string]$Finding.code
+        file = [string]$Finding.file
+        unitHash = [string]$Finding.unitHash
+        listedMembers = @($Finding.listedMembers | ForEach-Object { [string]$_ })
+        verdict = 'non-gap'
+        reason = $Reason
+        triagedAt = '2026-10-18'
+        triagedBy = 'selftest'
+        kind = $Kind
+        excerpt = ''
+    }
+    if ($Kind -eq 'live-contract') { $entry.canonicalMembers = @($CanonicalMembers) }
+    return $entry
+}
+
+function Write-TriageCatalog {
+    param([string]$Root, [object[]]$Entries, [string]$RawJson)
+    $catalogPath = Join-Path $Root 'scripts/PrePushEnumerationTriage.json'
+    if ($PSBoundParameters.ContainsKey('RawJson')) {
+        Set-RepoFile -Root $Root -RelativePath 'scripts/PrePushEnumerationTriage.json' -Content $RawJson
+        return
+    }
+    $catalog = [ordered]@{ schemaVersion = 1; entries = @($Entries) }
+    Set-RepoFile -Root $Root -RelativePath 'scripts/PrePushEnumerationTriage.json' -Content (($catalog | ConvertTo-Json -Depth 8) + "`n")
+}
+
+function Invoke-EnumerationFixtureBuilder {
+    param([string]$Root)
+    $mechanicalPath = Join-Path $Root 'scripts/Invoke-PrePushMechanicalChecks.ps1'
+    $jsonText = Invoke-Builder -BuilderArgs @('-RootPath', $Root, '-MechanicalScriptPath', $mechanicalPath, '-AsJson')
+    return ($jsonText | ConvertFrom-Json -ErrorAction Stop)
+}
+
+function Assert-EnumerationMechanicalPass {
+    param([string]$Name, $Dossier, $Mechanical)
+    Assert-True -CaseName "${Name}: dossier mechanicalStatus=passed" -Condition ($Dossier.mechanicalStatus -eq 'passed') -Detail ("mechanicalStatus={0}" -f $Dossier.mechanicalStatus)
+    Assert-True -CaseName "${Name}: mechanical status pass" -Condition ($Mechanical.status -eq 'pass') -Detail ("status={0}" -f $Mechanical.status)
+    Assert-True -CaseName "${Name}: mechanicalFailures vazias" -Condition (@($Dossier.mechanicalFailures).Count -eq 0) -Detail ("mechanicalFailures={0}" -f (@($Dossier.mechanicalFailures) -join ', '))
+}
+
 # ---------------------------------------------------------------------------
 # Caso (a): dossie completo + recomputo do sha256 do corpo
 # ---------------------------------------------------------------------------
@@ -308,6 +411,128 @@ try {
     Assert-True -CaseName 'p: notReadyReason=head-unresolved' -Condition ($json.notReadyReason -eq 'head-unresolved') -Detail ("reason={0}" -f $json.notReadyReason)
 }
 finally { Remove-TempDir -Path $tmp }
+
+# ---------------------------------------------------------------------------
+# Caso (q): triagem versionada, varredura completa e invocacao real pelo builder
+# ---------------------------------------------------------------------------
+$tmp = New-TempDir
+try {
+    [void](Initialize-EnumerationFixtureRepo -Root $tmp)
+    $dispatcherPath = Join-Path $tmp 'scripts/Invoke-LlmDelegatePanelDispatch.ps1'
+    $dispatcherOriginal = [System.IO.File]::ReadAllText($dispatcherPath)
+    $initialReadme = [System.IO.File]::ReadAllText((Join-Path $tmp 'README.md'))
+
+    $firstDossier = Invoke-EnumerationFixtureBuilder -Root $tmp
+    $firstMechanical = Get-MechanicalPayloadFromDossier -Dossier $firstDossier
+    Assert-EnumerationMechanicalPass -Name 'q1 initial' -Dossier $firstDossier -Mechanical $firstMechanical
+    Assert-True -CaseName 'q1: catálogo resolvido sob RootPath' -Condition ($firstMechanical.enumerationTriage.catalog.path -eq 'scripts/PrePushEnumerationTriage.json')
+    Assert-True -CaseName 'q1: ausência do catálogo registrada' -Condition (@($firstMechanical.enumerationTriage.catalog.problems | Where-Object { $_.code -eq 'TRIAGE_CATALOG_MISSING' }).Count -eq 1)
+    Assert-True -CaseName 'q1: ambas as varreduras completas' -Condition ($firstMechanical.enumerationTriage.scanComplete -and $firstMechanical.gates.gateEnumerationParity.scanComplete -and $firstMechanical.gates.backendEnumerationParity.scanComplete)
+
+    $gateFinding = @($firstMechanical.gates.gateEnumerationParity.findings | Where-Object { $_.code -eq 'GATE_ENUMERATION_SUBSET' })[0]
+    $backendFinding = @($firstMechanical.gates.backendEnumerationParity.findings | Where-Object { $_.code -eq 'BACKEND_ENUMERATION_SUBSET' })[0]
+    if ($null -eq $gateFinding -or $null -eq $backendFinding) {
+        throw 'A fixture deveria produzir uma candidata de gate e uma candidata de backend.'
+    }
+    Assert-True -CaseName 'q1: candidatos gate/backend novos' -Condition (@($firstMechanical.enumerationTriage.newFindings).Count -eq 2)
+    $gateEntry = New-TriageEntry -Finding $gateFinding -Kind 'closed' -CanonicalMembers @() -Reason 'Recorte de exemplo nao declara o conjunto integral.'
+    $backendCanonical = @($firstMechanical.gates.backendEnumerationParity.canonicalMembers | ForEach-Object { [string]$_ })
+    $backendEntry = New-TriageEntry -Finding $backendFinding -Kind 'live-contract' -CanonicalMembers $backendCanonical -Reason 'A frase descreve um recorte documentado.'
+    $validEntries = @($gateEntry, $backendEntry)
+
+    Write-TriageCatalog -Root $tmp -Entries $validEntries
+    $triagedDossier = Invoke-EnumerationFixtureBuilder -Root $tmp
+    $triagedMechanical = Get-MechanicalPayloadFromDossier -Dossier $triagedDossier
+    Assert-EnumerationMechanicalPass -Name 'q2 catalogo valido' -Dossier $triagedDossier -Mechanical $triagedMechanical
+    Assert-True -CaseName 'q2: catálogo válido e duas triagens' -Condition ($triagedMechanical.enumerationTriage.catalog.valid -and $triagedMechanical.enumerationTriage.counts.triaged -eq 2 -and $triagedMechanical.enumerationTriage.counts.new -eq 0)
+    Assert-True -CaseName 'q2: motivo de triagem visível' -Condition (@($triagedMechanical.enumerationTriage.triagedFindings | Where-Object { $_.reason -eq 'A frase descreve um recorte documentado.' }).Count -eq 1)
+
+    Write-TriageCatalog -Root $tmp -Entries @() -RawJson '{ JSON invalido'
+    $invalidDossier = Invoke-EnumerationFixtureBuilder -Root $tmp
+    $invalidMechanical = Get-MechanicalPayloadFromDossier -Dossier $invalidDossier
+    Assert-EnumerationMechanicalPass -Name 'q3 catalogo invalido' -Dossier $invalidDossier -Mechanical $invalidMechanical
+    Assert-True -CaseName 'q3: JSON inválido não suprime candidatos' -Condition (-not $invalidMechanical.enumerationTriage.catalog.valid -and $invalidMechanical.enumerationTriage.counts.new -eq 2 -and @($invalidMechanical.enumerationTriage.catalog.problems | Where-Object { $_.code -eq 'TRIAGE_CATALOG_INVALID_JSON' }).Count -eq 1)
+
+    Write-TriageCatalog -Root $tmp -Entries @($gateEntry, $gateEntry, $backendEntry)
+    $duplicateDossier = Invoke-EnumerationFixtureBuilder -Root $tmp
+    $duplicateMechanical = Get-MechanicalPayloadFromDossier -Dossier $duplicateDossier
+    Assert-EnumerationMechanicalPass -Name 'q4 ancora duplicada' -Dossier $duplicateDossier -Mechanical $duplicateMechanical
+    Assert-True -CaseName 'q4: âncora duplicada segue nova e outra triagem funciona' -Condition ($duplicateMechanical.enumerationTriage.catalog.valid -and $duplicateMechanical.enumerationTriage.counts.new -eq 1 -and $duplicateMechanical.enumerationTriage.counts.triaged -eq 1 -and @($duplicateMechanical.enumerationTriage.catalog.problems | Where-Object { $_.code -eq 'TRIAGE_ENTRY_DUPLICATE' }).Count -eq 1)
+
+    Write-TriageCatalog -Root $tmp -Entries $validEntries
+    $needle = "    'antigravity' = 'Invoke-Antigravity.ps1'"
+    if (-not $dispatcherOriginal.Contains($needle, [System.StringComparison]::Ordinal)) { throw 'Não achei a linha canônica antigravity na fixture do dispatcher.' }
+    $dispatcherExpanded = $dispatcherOriginal.Replace($needle, $needle + [Environment]::NewLine + "    'future-llm'  = 'Invoke-FutureLlm.ps1'")
+    [System.IO.File]::WriteAllText($dispatcherPath, $dispatcherExpanded, [System.Text.UTF8Encoding]::new($false))
+    $expiredDossier = Invoke-EnumerationFixtureBuilder -Root $tmp
+    $expiredMechanical = Get-MechanicalPayloadFromDossier -Dossier $expiredDossier
+    Assert-EnumerationMechanicalPass -Name 'q5 contrato vivo alterado' -Dossier $expiredDossier -Mechanical $expiredMechanical
+    $changedBackendFinding = @($expiredMechanical.enumerationTriage.newFindings | Where-Object { $_.code -eq 'BACKEND_ENUMERATION_SUBSET' })[0]
+    Assert-True -CaseName 'q5: conjunto canônico novo expira contrato vivo' -Condition (@($expiredMechanical.enumerationTriage.expiredEntries | Where-Object { $_.entry.code -eq 'BACKEND_ENUMERATION_SUBSET' }).Count -eq 1 -and $null -ne $changedBackendFinding -and @($changedBackendFinding.listedMembers | Where-Object { $_ -eq 'future-llm' }).Count -eq 1)
+    [System.IO.File]::WriteAllText($dispatcherPath, $dispatcherOriginal, [System.Text.UTF8Encoding]::new($false))
+
+    Write-TriageCatalog -Root $tmp -Entries $validEntries
+    $editedReadme = $initialReadme.Replace('gates consultivos cobrem', 'gates consultivos incluem')
+    Set-RepoFile -Root $tmp -RelativePath 'README.md' -Content $editedReadme
+    $orphanDossier = Invoke-EnumerationFixtureBuilder -Root $tmp
+    $orphanMechanical = Get-MechanicalPayloadFromDossier -Dossier $orphanDossier
+    Assert-EnumerationMechanicalPass -Name 'q6 texto editado' -Dossier $orphanDossier -Mechanical $orphanMechanical
+    Assert-True -CaseName 'q6: edição invalida âncora e ocorrência antiga fica órfã' -Condition (@($orphanMechanical.enumerationTriage.newFindings | Where-Object { $_.code -eq 'GATE_ENUMERATION_SUBSET' }).Count -eq 1 -and @($orphanMechanical.enumerationTriage.orphanedEntries | Where-Object { $_.entry.code -eq $gateEntry.code -and $_.entry.unitHash -eq $gateEntry.unitHash }).Count -eq 1)
+
+    Write-TriageCatalog -Root $tmp -Entries $validEntries
+    Remove-Item -LiteralPath $dispatcherPath -Force
+    $incompleteDossier = Invoke-EnumerationFixtureBuilder -Root $tmp
+    $incompleteMechanical = Get-MechanicalPayloadFromDossier -Dossier $incompleteDossier
+    Assert-EnumerationMechanicalPass -Name 'q7 varredura incompleta' -Dossier $incompleteDossier -Mechanical $incompleteMechanical
+    Assert-True -CaseName 'q7: scanner incompleto impede declarar órfãos' -Condition (-not $incompleteMechanical.enumerationTriage.scanComplete -and @($incompleteMechanical.enumerationTriage.scanIssues).Count -gt 0 -and @($incompleteMechanical.enumerationTriage.orphanedEntries).Count -eq 0)
+
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Invoke-LlmDelegatePanelDispatch.ps1') -Destination $dispatcherPath -Force
+    Write-TriageCatalog -Root $tmp -Entries $validEntries
+    $manyGateLines = [System.Collections.Generic.List[string]]::new()
+    for ($number = 1; $number -le 55; $number++) {
+        $manyGateLines.Add(("Recorte {0:D2}: `{1}` e `{2}` são citados." -f $number, $gateEntry.listedMembers[0], $gateEntry.listedMembers[1]))
+    }
+    Set-RepoFile -Root $tmp -RelativePath 'README.md' -Content ('# Fixture de enumeração' + "`n`n" + ($manyGateLines -join "`n"))
+    $cappedDossier = Invoke-EnumerationFixtureBuilder -Root $tmp
+    $cappedMechanical = Get-MechanicalPayloadFromDossier -Dossier $cappedDossier
+    Assert-EnumerationMechanicalPass -Name 'q8 limite de apresentação' -Dossier $cappedDossier -Mechanical $cappedMechanical
+    Assert-True -CaseName 'q8: classificação completa antes do teto 50' -Condition ($cappedMechanical.enumerationTriage.counts.new -eq 55 -and @($cappedMechanical.enumerationTriage.newFindings).Count -eq 50 -and $cappedMechanical.enumerationTriage.displayTruncated -and $cappedMechanical.enumerationTriage.displayTruncatedCount -eq 5)
+}
+finally { Remove-TempDir -Path $tmp }
+
+# ---------------------------------------------------------------------------
+# Caso (r): falhas consultivas do gate permanecem estruturadas e nao mecanicas
+# ---------------------------------------------------------------------------
+function Invoke-EnumerationGateFailureCase {
+    param([string]$Mode, [string]$ExpectedIssue)
+    $caseRoot = New-TempDir
+    try {
+        [void](Initialize-EnumerationFixtureRepo -Root $caseRoot)
+        $gatePath = Join-Path $caseRoot 'scripts/Test-PrePushGateEnumerationParity.ps1'
+        switch ($Mode) {
+            'missing' { Remove-Item -LiteralPath $gatePath -Force }
+            'throw' { Set-RepoFile -Root $caseRoot -RelativePath 'scripts/Test-PrePushGateEnumerationParity.ps1' -Content "throw 'synthetic gate exception'`n" }
+            'nonzero-json' {
+                $validJson = '{"status":"pass","scanComplete":true,"scanIssues":[],"canonicalMembers":[],"files":[],"candidateCount":0,"displayTruncated":false,"findings":[]}'
+                Set-RepoFile -Root $caseRoot -RelativePath 'scripts/Test-PrePushGateEnumerationParity.ps1' -Content ("Write-Output '{0}'`nexit 7`n" -f $validJson)
+            }
+            'invalid-json' { Set-RepoFile -Root $caseRoot -RelativePath 'scripts/Test-PrePushGateEnumerationParity.ps1' -Content "Write-Output '{ not-json'`nexit 0`n" }
+            default { throw "Modo de falha não reconhecido: $Mode" }
+        }
+        $dossier = Invoke-EnumerationFixtureBuilder -Root $caseRoot
+        $mechanical = Get-MechanicalPayloadFromDossier -Dossier $dossier
+        $gate = $mechanical.gates.gateEnumerationParity
+        Assert-EnumerationMechanicalPass -Name "r $Mode" -Dossier $dossier -Mechanical $mechanical
+        Assert-True -CaseName "r ${Mode}: triagem declara varredura incompleta" -Condition (-not $mechanical.enumerationTriage.scanComplete -and -not $gate.scanComplete)
+        Assert-True -CaseName "r ${Mode}: código de falha estruturado" -Condition (@($gate.scanIssues | Where-Object { $_.code -eq $ExpectedIssue }).Count -eq 1) -Detail ("issues={0}" -f (@($gate.scanIssues | ForEach-Object { $_.code }) -join ', '))
+    }
+    finally { Remove-TempDir -Path $caseRoot }
+}
+
+Invoke-EnumerationGateFailureCase -Mode 'missing' -ExpectedIssue 'GATE_SCRIPT_MISSING'
+Invoke-EnumerationGateFailureCase -Mode 'throw' -ExpectedIssue 'GATE_NONZERO_EXIT'
+Invoke-EnumerationGateFailureCase -Mode 'nonzero-json' -ExpectedIssue 'GATE_NONZERO_EXIT'
+Invoke-EnumerationGateFailureCase -Mode 'invalid-json' -ExpectedIssue 'GATE_INVALID_JSON'
 
 Write-Output '---'
 if ($failures -eq 0) {

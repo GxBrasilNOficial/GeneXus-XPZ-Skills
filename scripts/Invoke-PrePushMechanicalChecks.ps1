@@ -646,53 +646,350 @@ if (Test-Path -LiteralPath $reviewerRoDriftScript -PathType Leaf) {
     }
 }
 
-$gateEnumParityScript = Join-Path $PSScriptRoot 'Test-PrePushGateEnumerationParity.ps1'
-if (Test-Path -LiteralPath $gateEnumParityScript -PathType Leaf) {
-    $gateEnumOutput = & $gateEnumParityScript -RootPath $resolvedRoot -BaseRef $effectiveBaseRef -ChangedFiles $changedFiles -AsJson 2>&1
-    $gateEnumExitCode = $LASTEXITCODE
-    $gateEnumJsonText = ($gateEnumOutput | ForEach-Object { $_.ToString() }) -join [Environment]::NewLine
-    $gateEnumObject = $null
-    if (-not [string]::IsNullOrWhiteSpace($gateEnumJsonText)) {
-        $gateEnumObject = $gateEnumJsonText | ConvertFrom-Json
-    }
-
-    if ($gateEnumExitCode -eq 0 -and $null -ne $gateEnumObject) {
-        $gateEnumParityGate.status = $gateEnumObject.status
-        $gateEnumParityGate.findings = @($gateEnumObject.findings)
-    } else {
-        $gateEnumParityGate.status = 'warn'
-        $gateEnumParityGate.findings = @([pscustomobject][ordered]@{
-            code     = 'GATE_ENUMERATION_PARITY_SCRIPT_ERROR'
-            severity = 'warn'
-            path     = 'scripts/Test-PrePushGateEnumerationParity.ps1'
-            message  = "Falha consultiva ao executar Test-PrePushGateEnumerationParity.ps1: $gateEnumJsonText"
-        })
+function New-EnumerationGateFailure {
+    param([string]$ScriptRel, [string]$Code, [string]$Message, [int]$ExitCode = -1)
+    return [pscustomobject][ordered]@{
+        script = $ScriptRel
+        status = 'warn'
+        scanComplete = $false
+        scanIssues = @([pscustomobject][ordered]@{ code = $Code; path = $ScriptRel; message = $Message })
+        canonicalMembers = @()
+        files = @()
+        candidateCount = 0
+        displayTruncated = $false
+        findings = @()
+        displayFindings = @()
+        invocationExitCode = $ExitCode
     }
 }
+
+function Invoke-EnumerationGate {
+    param([string]$ScriptRel)
+
+    $scriptPath = Join-Path $PSScriptRoot (Split-Path -Leaf $ScriptRel)
+    if (-not (Test-Path -LiteralPath $scriptPath -PathType Leaf)) {
+        return (New-EnumerationGateFailure -ScriptRel $ScriptRel -Code 'GATE_SCRIPT_MISSING' -Message 'Script do gate ausente ao lado do orquestrador.')
+    }
+
+    $process = $null
+    try {
+        $pwshPath = (Get-Process -Id $PID).Path
+        $startInfo = [System.Diagnostics.ProcessStartInfo]::new($pwshPath)
+        $startInfo.UseShellExecute = $false
+        $startInfo.CreateNoWindow = $true
+        $startInfo.RedirectStandardOutput = $true
+        $startInfo.RedirectStandardError = $true
+        $startInfo.StandardOutputEncoding = [System.Text.UTF8Encoding]::new($false)
+        $startInfo.StandardErrorEncoding = [System.Text.UTF8Encoding]::new($false)
+        foreach ($argument in @('-NoProfile', '-File', $scriptPath, '-RootPath', $resolvedRoot, '-BaseRef', $effectiveBaseRef, '-MaxFindings', '500', '-AsJson')) {
+            [void]$startInfo.ArgumentList.Add($argument)
+        }
+        $process = [System.Diagnostics.Process]::new()
+        $process.StartInfo = $startInfo
+        if (-not $process.Start()) { throw 'Não foi possível iniciar pwsh para o gate consultivo.' }
+        $stdoutTask = $process.StandardOutput.ReadToEndAsync()
+        $stderrTask = $process.StandardError.ReadToEndAsync()
+        $process.WaitForExit()
+        $stdout = $stdoutTask.GetAwaiter().GetResult()
+        $stderr = $stderrTask.GetAwaiter().GetResult()
+        $exitCode = $process.ExitCode
+    } catch {
+        if ($null -ne $process) { $process.Dispose() }
+        return (New-EnumerationGateFailure -ScriptRel $ScriptRel -Code 'GATE_INVOCATION_EXCEPTION' -Message $_.Exception.Message)
+    } finally {
+        if ($null -ne $process) { $process.Dispose() }
+    }
+
+    if ($exitCode -ne 0) {
+        $detail = @("exit=$exitCode", $stderr.Trim(), $stdout.Trim() | Select-Object -First 1) -join ' | '
+        return (New-EnumerationGateFailure -ScriptRel $ScriptRel -Code 'GATE_NONZERO_EXIT' -Message $detail -ExitCode $exitCode)
+    }
+    if ([string]::IsNullOrWhiteSpace($stdout)) {
+        $emptyOutputMessage = 'O gate não emitiu JSON em stdout.'
+        if (-not [string]::IsNullOrWhiteSpace($stderr)) { $emptyOutputMessage = $stderr.Trim() }
+        return (New-EnumerationGateFailure -ScriptRel $ScriptRel -Code 'GATE_EMPTY_OUTPUT' -Message $emptyOutputMessage -ExitCode $exitCode)
+    }
+
+    try {
+        $gateObject = $stdout | ConvertFrom-Json -ErrorAction Stop
+    } catch {
+        $detail = "JSON inválido em stdout: $($_.Exception.Message)"
+        if (-not [string]::IsNullOrWhiteSpace($stderr)) { $detail += "; stderr: $($stderr.Trim())" }
+        return (New-EnumerationGateFailure -ScriptRel $ScriptRel -Code 'GATE_INVALID_JSON' -Message $detail -ExitCode $exitCode)
+    }
+
+    $requiredProperties = @('status', 'scanComplete', 'scanIssues', 'canonicalMembers', 'files', 'candidateCount', 'displayTruncated', 'findings')
+    foreach ($propertyName in $requiredProperties) {
+        if ($null -eq $gateObject.PSObject.Properties[$propertyName]) {
+            return (New-EnumerationGateFailure -ScriptRel $ScriptRel -Code 'GATE_CONTRACT_INVALID' -Message ("Campo obrigatório ausente no JSON do gate: {0}." -f $propertyName) -ExitCode $exitCode)
+        }
+    }
+    if ($gateObject.scanComplete -isnot [bool] -or $gateObject.canonicalMembers -isnot [array] -or $gateObject.files -isnot [array] -or $gateObject.findings -isnot [array] -or $gateObject.scanIssues -isnot [array]) {
+        return (New-EnumerationGateFailure -ScriptRel $ScriptRel -Code 'GATE_CONTRACT_INVALID' -Message 'Tipos inválidos nos campos scanComplete, canonicalMembers, files, findings ou scanIssues.' -ExitCode $exitCode)
+    }
+
+    foreach ($fileState in $gateObject.files) {
+        if ($null -eq $fileState.PSObject.Properties['file'] -or $fileState.file -isnot [string] -or
+            $null -eq $fileState.PSObject.Properties['complete'] -or $fileState.complete -isnot [bool]) {
+            return (New-EnumerationGateFailure -ScriptRel $ScriptRel -Code 'GATE_CONTRACT_INVALID' -Message 'Estado por arquivo sem file/completion booleano válido.' -ExitCode $exitCode)
+        }
+    }
+    foreach ($finding in $gateObject.findings) {
+        if ($null -eq $finding.PSObject.Properties['file'] -or $finding.file -isnot [string] -or
+            $null -eq $finding.PSObject.Properties['code'] -or $finding.code -isnot [string] -or
+            $null -eq $finding.PSObject.Properties['unitHash'] -or [string]$finding.unitHash -notmatch '^[0-9a-f]{64}$' -or
+            $null -eq $finding.PSObject.Properties['listedMembers'] -or $finding.listedMembers -isnot [array]) {
+            return (New-EnumerationGateFailure -ScriptRel $ScriptRel -Code 'GATE_CONTRACT_INVALID' -Message 'Achado sem file/code/unitHash/listedMembers válidos.' -ExitCode $exitCode)
+        }
+    }
+    if ([int]$gateObject.candidateCount -ne @($gateObject.findings).Count) {
+        return (New-EnumerationGateFailure -ScriptRel $ScriptRel -Code 'GATE_CONTRACT_INVALID' -Message 'candidateCount não corresponde à coleta integral em findings.' -ExitCode $exitCode)
+    }
+
+    $gateObject | Add-Member -NotePropertyName 'invocationExitCode' -NotePropertyValue $exitCode -Force
+    if (-not [string]::IsNullOrWhiteSpace($stderr)) {
+        $gateObject.scanIssues = @($gateObject.scanIssues) + [pscustomobject][ordered]@{
+            code = 'GATE_STDERR_NONEMPTY'
+            path = $ScriptRel
+            message = $stderr.Trim()
+        }
+        $gateObject.scanComplete = $false
+        $gateObject.status = 'warn'
+    }
+    return $gateObject
+}
+
+function Test-StringArray {
+    param($Value)
+    if ($Value -isnot [array]) { return $false }
+    foreach ($item in $Value) { if ($item -isnot [string] -or [string]::IsNullOrWhiteSpace($item)) { return $false } }
+    return $true
+}
+
+function Test-OrdinalMemberSetEqual {
+    param([string[]]$Left, [string[]]$Right)
+    if ($Left.Count -ne $Right.Count) { return $false }
+    $set = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+    foreach ($item in $Left) { [void]$set.Add($item) }
+    foreach ($item in $Right) { if (-not $set.Remove($item)) { return $false } }
+    return ($set.Count -eq 0)
+}
+
+function Get-EnumerationAnchorKey {
+    param([string]$Code, [string]$File, [string]$UnitHash)
+    return ("{0}`0{1}`0{2}" -f $Code, $File, $UnitHash)
+}
+
+function Read-EnumerationTriageCatalog {
+    $catalogPath = Join-Path $resolvedRoot 'scripts/PrePushEnumerationTriage.json'
+    $problems = [System.Collections.Generic.List[object]]::new()
+    $entries = [System.Collections.Generic.List[object]]::new()
+    $valid = $true
+    if (-not (Test-Path -LiteralPath $catalogPath -PathType Leaf)) {
+        $valid = $false
+        $problems.Add([pscustomobject][ordered]@{ code = 'TRIAGE_CATALOG_MISSING'; path = 'scripts/PrePushEnumerationTriage.json'; message = 'Cadastro ausente; nenhuma triagem pode ser aplicada.' })
+        return [pscustomobject]@{ path = 'scripts/PrePushEnumerationTriage.json'; valid = $false; entries = @(); problems = @($problems); duplicateKeys = @() }
+    }
+    try {
+        $catalog = [System.IO.File]::ReadAllText($catalogPath, [System.Text.UTF8Encoding]::new($false, $true)) | ConvertFrom-Json -ErrorAction Stop
+    } catch {
+        $valid = $false
+        $problems.Add([pscustomobject][ordered]@{ code = 'TRIAGE_CATALOG_INVALID_JSON'; path = 'scripts/PrePushEnumerationTriage.json'; message = $_.Exception.Message })
+        return [pscustomobject]@{ path = 'scripts/PrePushEnumerationTriage.json'; valid = $false; entries = @(); problems = @($problems); duplicateKeys = @() }
+    }
+    if ($null -eq $catalog.PSObject.Properties['schemaVersion'] -or [int]$catalog.schemaVersion -ne 1 -or
+        $null -eq $catalog.PSObject.Properties['entries'] -or $catalog.entries -isnot [array]) {
+        $valid = $false
+        $problems.Add([pscustomobject][ordered]@{ code = 'TRIAGE_CATALOG_SCHEMA_INVALID'; path = 'scripts/PrePushEnumerationTriage.json'; message = 'Esperados schemaVersion=1 e entries como array.' })
+        return [pscustomobject]@{ path = 'scripts/PrePushEnumerationTriage.json'; valid = $false; entries = @(); problems = @($problems); duplicateKeys = @() }
+    }
+
+    $seen = [System.Collections.Generic.Dictionary[string, int]]::new([System.StringComparer]::Ordinal)
+    $duplicateKeys = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+    foreach ($entry in $catalog.entries) {
+        $code = [string](Get-PropOrDefault $entry 'code' '')
+        $file = [string](Get-PropOrDefault $entry 'file' '')
+        $unitHash = [string](Get-PropOrDefault $entry 'unitHash' '')
+        $listedMembers = Get-PropOrDefault $entry 'listedMembers' $null
+        $kind = [string](Get-PropOrDefault $entry 'kind' '')
+        $canonicalMembers = Get-PropOrDefault $entry 'canonicalMembers' $null
+        $entryValid = ($code -in @('BACKEND_ENUMERATION_SUBSET', 'GATE_ENUMERATION_SUBSET')) -and
+            ($file -match '^(?!/)(?!.*(?:^|/)\.\.(?:/|$))[^\\]+(?:/[^\\]+)*$') -and
+            ($unitHash -match '^[0-9a-f]{64}$') -and
+            (Test-StringArray $listedMembers) -and
+            ([string](Get-PropOrDefault $entry 'verdict' '') -eq 'non-gap') -and
+            (-not [string]::IsNullOrWhiteSpace([string](Get-PropOrDefault $entry 'reason' ''))) -and
+            (-not [string]::IsNullOrWhiteSpace([string](Get-PropOrDefault $entry 'triagedAt' ''))) -and
+            (-not [string]::IsNullOrWhiteSpace([string](Get-PropOrDefault $entry 'triagedBy' ''))) -and
+            ($kind -in @('closed', 'live-contract')) -and
+            ($null -ne $entry.PSObject.Properties['excerpt'] -and $entry.excerpt -is [string])
+        if ($kind -eq 'live-contract' -and -not (Test-StringArray $canonicalMembers)) { $entryValid = $false }
+        if (-not $entryValid) {
+            $valid = $false
+            $problems.Add([pscustomobject][ordered]@{ code = 'TRIAGE_ENTRY_INVALID'; path = 'scripts/PrePushEnumerationTriage.json'; message = 'Uma entrada não cumpre o contrato de âncora, campos ou listas.' })
+            continue
+        }
+        $entries.Add($entry)
+        $key = Get-EnumerationAnchorKey -Code $code -File $file -UnitHash $unitHash
+        if ($seen.ContainsKey($key)) {
+            [void]$duplicateKeys.Add($key)
+            $problems.Add([pscustomobject][ordered]@{ code = 'TRIAGE_ENTRY_DUPLICATE'; path = $file; message = ("Âncora duplicada no cadastro: {0}." -f $code) })
+        } else { $seen[$key] = 1 }
+    }
+    return [pscustomobject]@{ path = 'scripts/PrePushEnumerationTriage.json'; valid = $valid; entries = @($entries); problems = @($problems); duplicateKeys = @($duplicateKeys) }
+}
+
+function Invoke-EnumerationTriage {
+    param($GateEnum, $BackendEnum)
+    $catalog = Read-EnumerationTriageCatalog
+    $catalogProblems = [System.Collections.Generic.List[object]]::new()
+    foreach ($problem in $catalog.problems) { $catalogProblems.Add($problem) }
+    $scanIssues = [System.Collections.Generic.List[object]]::new()
+    foreach ($gate in @($GateEnum, $BackendEnum)) { foreach ($issue in @($gate.scanIssues)) { $scanIssues.Add($issue) } }
+    $new = [System.Collections.Generic.List[object]]::new()
+    $triaged = [System.Collections.Generic.List[object]]::new()
+    $expired = [System.Collections.Generic.List[object]]::new()
+    $ambiguous = [System.Collections.Generic.List[object]]::new()
+    $orphaned = [System.Collections.Generic.List[object]]::new()
+    $usedEntryKeys = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+    $presentAnchorKeys = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+    $entriesByKey = [System.Collections.Generic.Dictionary[string, object]]::new([System.StringComparer]::Ordinal)
+    foreach ($entry in $catalog.entries) {
+        $key = Get-EnumerationAnchorKey -Code $entry.code -File $entry.file -UnitHash $entry.unitHash
+        if (-not $entriesByKey.ContainsKey($key)) { $entriesByKey[$key] = $entry }
+    }
+    $duplicateSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+    foreach ($key in $catalog.duplicateKeys) { [void]$duplicateSet.Add([string]$key) }
+
+    foreach ($gate in @($GateEnum, $BackendEnum)) {
+        $members = @($gate.canonicalMembers | ForEach-Object { [string]$_ })
+        $fileStates = [System.Collections.Generic.Dictionary[string, object]]::new([System.StringComparer]::Ordinal)
+        foreach ($state in @($gate.files)) { $fileStates[[string]$state.file] = $state }
+        $candidateGroups = [System.Collections.Generic.Dictionary[string, System.Collections.Generic.List[object]]]::new([System.StringComparer]::Ordinal)
+        foreach ($finding in @($gate.findings)) {
+            $key = Get-EnumerationAnchorKey -Code ([string]$finding.code) -File ([string]$finding.file) -UnitHash ([string]$finding.unitHash)
+            [void]$presentAnchorKeys.Add($key)
+            if (-not $candidateGroups.ContainsKey($key)) { $candidateGroups[$key] = [System.Collections.Generic.List[object]]::new() }
+            $candidateGroups[$key].Add($finding)
+        }
+        foreach ($key in $candidateGroups.Keys) {
+            $candidateList = $candidateGroups[$key]
+            foreach ($candidate in $candidateList) {
+                $fileComplete = $false
+                if ($fileStates.ContainsKey([string]$candidate.file)) { $fileComplete = [bool]$fileStates[[string]$candidate.file].complete }
+                $view = [ordered]@{
+                    code = [string]$candidate.code
+                    file = [string]$candidate.file
+                    line = [int](Get-PropOrDefault $candidate 'line' 0)
+                    path = [string](Get-PropOrDefault $candidate 'path' $candidate.file)
+                    unitHash = [string]$candidate.unitHash
+                    listedMembers = @($candidate.listedMembers)
+                    message = [string](Get-PropOrDefault $candidate 'message' '')
+                    classification = 'new'
+                    reason = ''
+                    kind = $null
+                }
+                if ($candidateList.Count -gt 1) {
+                    $view.classification = 'ambiguous'
+                    $view.reason = 'A mesma âncora ocorre mais de uma vez no arquivo; a triagem não foi reutilizada.'
+                    $ambiguous.Add([pscustomobject]$view)
+                    [void]$usedEntryKeys.Add($key)
+                    continue
+                }
+                if (-not $fileComplete) {
+                    $view.reason = 'O arquivo não foi processado integralmente; confirmar a ocorrência manualmente.'
+                    $new.Add([pscustomobject]$view)
+                    continue
+                }
+                if (-not $catalog.valid) {
+                    $view.reason = 'Cadastro ausente ou inválido; candidatos permanecem novos.'
+                    $new.Add([pscustomobject]$view)
+                    continue
+                }
+                if ($duplicateSet.Contains($key)) {
+                    $view.reason = 'Âncora duplicada no cadastro; triagem afetada não foi reutilizada.'
+                    $new.Add([pscustomobject]$view)
+                    continue
+                }
+                if (-not $entriesByKey.ContainsKey($key)) {
+                    $view.reason = 'Sem triagem vigente para esta âncora.'
+                    $new.Add([pscustomobject]$view)
+                    continue
+                }
+                $entry = $entriesByKey[$key]
+                if ($entry.kind -eq 'live-contract' -and -not (Test-OrdinalMemberSetEqual -Left @($entry.canonicalMembers) -Right $members)) {
+                    $view.reason = 'Contrato vivo expirou porque o conjunto canônico mudou.'
+                    $view.classification = 'expired'
+                    $expired.Add([pscustomobject]@{ entry = $entry; reason = $view.reason })
+                    $newView = [ordered]@{}
+                    foreach ($viewKey in $view.Keys) { $newView[$viewKey] = $view[$viewKey] }
+                    $newView.classification = 'new'
+                    $newView.reason = 'Triagem de contrato vivo expirada; confirmar novamente.'
+                    $new.Add([pscustomobject]$newView)
+                    [void]$usedEntryKeys.Add($key)
+                    continue
+                }
+                if (-not (Test-OrdinalMemberSetEqual -Left @($entry.listedMembers) -Right @($candidate.listedMembers))) {
+                    $view.reason = 'Os membros reconhecidos diferem do cadastro; confirmar como ocorrência nova.'
+                    $new.Add([pscustomobject]$view)
+                    continue
+                }
+                $view.classification = 'triaged'
+                $view.reason = [string]$entry.reason
+                $view.kind = [string]$entry.kind
+                $triaged.Add([pscustomobject]$view)
+                [void]$usedEntryKeys.Add($key)
+            }
+        }
+    }
+
+    $bothScansComplete = ([bool]$GateEnum.scanComplete -and [bool]$BackendEnum.scanComplete)
+    $catalogNoDuplicates = ($catalog.duplicateKeys.Count -eq 0)
+    if ($catalog.valid -and $catalogNoDuplicates -and $bothScansComplete) {
+        foreach ($entry in $catalog.entries) {
+            $key = Get-EnumerationAnchorKey -Code $entry.code -File $entry.file -UnitHash $entry.unitHash
+            if ($usedEntryKeys.Contains($key) -or $presentAnchorKeys.Contains($key)) { continue }
+            if ($entry.kind -eq 'live-contract') {
+                $currentMembers = @()
+                if ($entry.code -eq 'BACKEND_ENUMERATION_SUBSET') { $currentMembers = @($BackendEnum.canonicalMembers) }
+                if ($entry.code -eq 'GATE_ENUMERATION_SUBSET') { $currentMembers = @($GateEnum.canonicalMembers) }
+                if (-not (Test-OrdinalMemberSetEqual -Left @($entry.canonicalMembers) -Right $currentMembers)) {
+                    $expired.Add([pscustomobject]@{ entry = $entry; reason = 'Contrato vivo expirou porque o conjunto canônico mudou.' })
+                    continue
+                }
+            }
+            $orphaned.Add([pscustomobject]@{ entry = $entry; reason = 'Nenhuma ocorrência com esta âncora foi encontrada em varredura completa.' })
+        }
+    }
+
+    $limit = 50
+    $projection = [ordered]@{
+        status = if ($bothScansComplete) { 'complete' } else { 'incomplete' }
+        scanComplete = $bothScansComplete
+        scanIssues = @($scanIssues)
+        catalog = [ordered]@{ path = $catalog.path; valid = $catalog.valid; problems = @($catalogProblems) }
+        counts = [ordered]@{ new = $new.Count; triaged = $triaged.Count; expired = $expired.Count; orphaned = $orphaned.Count; ambiguous = $ambiguous.Count }
+        displayLimitPerGroup = $limit
+        newFindings = @($new | Select-Object -First $limit)
+        triagedFindings = @($triaged | Select-Object -First $limit)
+        expiredEntries = @($expired | Select-Object -First $limit)
+        orphanedEntries = @($orphaned | Select-Object -First $limit)
+        ambiguousFindings = @($ambiguous | Select-Object -First $limit)
+        displayTruncated = (($new.Count -gt $limit) -or ($triaged.Count -gt $limit) -or ($expired.Count -gt $limit) -or ($orphaned.Count -gt $limit) -or ($ambiguous.Count -gt $limit) -or ($catalogProblems.Count -gt $limit))
+        displayTruncatedCount = [Math]::Max(0, $new.Count - $limit) + [Math]::Max(0, $triaged.Count - $limit) + [Math]::Max(0, $expired.Count - $limit) + [Math]::Max(0, $orphaned.Count - $limit) + [Math]::Max(0, $ambiguous.Count - $limit) + [Math]::Max(0, $catalogProblems.Count - $limit)
+    }
+    return [pscustomobject]$projection
+}
+
+$gateEnumParityScript = Join-Path $PSScriptRoot 'Test-PrePushGateEnumerationParity.ps1'
+$gateEnumParityGate = Invoke-EnumerationGate -ScriptRel 'scripts/Test-PrePushGateEnumerationParity.ps1'
+$gateEnumParityGate | Add-Member -NotePropertyName 'script' -NotePropertyValue 'scripts/Test-PrePushGateEnumerationParity.ps1' -Force
 
 $backendEnumParityScript = Join-Path $PSScriptRoot 'Test-PrePushBackendEnumerationParity.ps1'
-if (Test-Path -LiteralPath $backendEnumParityScript -PathType Leaf) {
-    $backendEnumOutput = & $backendEnumParityScript -RootPath $resolvedRoot -BaseRef $effectiveBaseRef -ChangedFiles $changedFiles -AsJson 2>&1
-    $backendEnumExitCode = $LASTEXITCODE
-    $backendEnumJsonText = ($backendEnumOutput | ForEach-Object { $_.ToString() }) -join [Environment]::NewLine
-    $backendEnumObject = $null
-    if (-not [string]::IsNullOrWhiteSpace($backendEnumJsonText)) {
-        $backendEnumObject = $backendEnumJsonText | ConvertFrom-Json
-    }
+$backendEnumParityGate = Invoke-EnumerationGate -ScriptRel 'scripts/Test-PrePushBackendEnumerationParity.ps1'
+$backendEnumParityGate | Add-Member -NotePropertyName 'script' -NotePropertyValue 'scripts/Test-PrePushBackendEnumerationParity.ps1' -Force
 
-    if ($backendEnumExitCode -eq 0 -and $null -ne $backendEnumObject) {
-        $backendEnumParityGate.status = $backendEnumObject.status
-        $backendEnumParityGate.findings = @($backendEnumObject.findings)
-    } else {
-        $backendEnumParityGate.status = 'warn'
-        $backendEnumParityGate.findings = @([pscustomobject][ordered]@{
-            code     = 'BACKEND_ENUMERATION_PARITY_SCRIPT_ERROR'
-            severity = 'warn'
-            path     = 'scripts/Test-PrePushBackendEnumerationParity.ps1'
-            message  = "Falha consultiva ao executar Test-PrePushBackendEnumerationParity.ps1: $backendEnumJsonText"
-        })
-    }
-}
+$enumerationTriage = Invoke-EnumerationTriage -GateEnum $gateEnumParityGate -BackendEnum $backendEnumParityGate
 
 $overallStatus = if ($mechanicalFailures.Count -eq 0) { 'pass' } else { 'fail' }
 
@@ -799,14 +1096,44 @@ foreach ($reviewerRoDriftFinding in @($reviewerRoDriftGate.findings)) {
         ("Deriva do reviewer-ro global (aviso consultivo) ({0}): {1} [{2}]" -f $reviewerRoDriftFinding.code, $reviewerRoDriftFinding.message, $reviewerRoDriftFinding.path)
     )
 }
-foreach ($gateEnumFinding in @($gateEnumParityGate.findings)) {
+if (-not $enumerationTriage.scanComplete) {
     [void]$agentWarnings.Add(
-        ("Enumeracao de gates defasada na doc (candidata consultiva) ({0}): {1} [{2}]" -f $gateEnumFinding.code, $gateEnumFinding.message, $gateEnumFinding.path)
+        ("Triagem de enumerações incompleta: {0} questão(ões) de varredura; não considerar ausências de órfãos como resultado. Ver enumerationTriage.scanIssues." -f @($enumerationTriage.scanIssues).Count)
     )
 }
-foreach ($backendEnumFinding in @($backendEnumParityGate.findings)) {
+foreach ($problem in @($enumerationTriage.catalog.problems)) {
     [void]$agentWarnings.Add(
-        ("Enumeracao de backends defasada na doc (candidata consultiva) ({0}): {1} [{2}]" -f $backendEnumFinding.code, $backendEnumFinding.message, $backendEnumFinding.path)
+        ("Cadastro de triagem ({0}): {1} [{2}]" -f $problem.code, $problem.message, $problem.path)
+    )
+}
+foreach ($finding in @($enumerationTriage.newFindings)) {
+    [void]$agentWarnings.Add(
+        ("NOVA enumeração para veredito semântico ({0}): {1} — {2}; âncora={3}|{4}|{5}" -f $finding.code, $finding.message, $finding.reason, $finding.file, $finding.code, $finding.unitHash)
+    )
+}
+foreach ($finding in @($enumerationTriage.triagedFindings)) {
+    [void]$agentWarnings.Add(
+        ("Enumeração triada ({0}): {1}; motivo: {2}; âncora={3}|{4}|{5}" -f $finding.code, $finding.path, $finding.reason, $finding.file, $finding.code, $finding.unitHash)
+    )
+}
+foreach ($entry in @($enumerationTriage.expiredEntries)) {
+    [void]$agentWarnings.Add(
+        ("Triagem expirada ({0}): {1}; motivo: {2}" -f $entry.entry.code, $entry.entry.file, $entry.reason)
+    )
+}
+foreach ($entry in @($enumerationTriage.orphanedEntries)) {
+    [void]$agentWarnings.Add(
+        ("Triagem órfã ({0}): {1}; motivo: {2}" -f $entry.entry.code, $entry.entry.file, $entry.reason)
+    )
+}
+foreach ($finding in @($enumerationTriage.ambiguousFindings)) {
+    [void]$agentWarnings.Add(
+        ("Enumeração ambígua ({0}): {1}; motivo: {2}" -f $finding.code, $finding.path, $finding.reason)
+    )
+}
+if ($enumerationTriage.displayTruncated) {
+    [void]$agentWarnings.Add(
+        ("Triagem de enumerações: {0} item(ns) ficaram fora dos limites de apresentação por grupo; as contagens totais estão em enumerationTriage.counts." -f $enumerationTriage.displayTruncatedCount)
     )
 }
 
@@ -831,6 +1158,10 @@ $agentSemanticChecklist = [System.Collections.Generic.List[string]]::new()
 [void]$agentSemanticChecklist.Add('Fase semantica: seguir integralmente 13-revisao-pre-push.md na raiz (fonte autoritativa; AGENTS.md resume).')
 [void]$agentSemanticChecklist.Add('Nao tratar exit 0 deste passo mecanico como pre-push concluida.')
 [void]$agentSemanticChecklist.Add('Eixos vizinhos: aplicar a regra do 13 §5 e registrar no relatório os caminhos examinados, as evidências e o resultado por eixo; quando não se aplicar, indicar isso sucintamente.')
+[void]$agentSemanticChecklist.Add('Enumerações consultivas: examinar primeiro enumerationTriage.newFindings; conferir triadas e seus motivos em triagedFindings. Marcador permanente e triagem versionada são mecanismos distintos.')
+if (-not $enumerationTriage.scanComplete) {
+    [void]$agentSemanticChecklist.Add('Enumerações: varredura incompleta; não declarar triagens órfãs. Conferir enumerationTriage.scanIssues e tratar ausências como não demonstradas.')
+}
 if ($nonProseVerdictRequired.Count -gt 0) {
     [void]$agentSemanticChecklist.Add(
         ("{0} candidata(s) NAO-PROSA do gate de propagacao exigem VEREDITO INDIVIDUAL (livro-razao item a item: cada uma com arquivo:linha, a lista/tabela/exemplo gemeo no outro documento e veredito gap|justificado). Proibida justificativa coletiva. Lista completa em nonProseVerdictRequired." -f $nonProseVerdictRequired.Count)
@@ -887,6 +1218,7 @@ $result = [ordered]@{
         backendEnumerationParity = $backendEnumParityGate
     }
     mechanicalFailures       = @($mechanicalFailures)
+    enumerationTriage        = $enumerationTriage
     agentOperationalReminders = @($agentOperationalReminders)
     agentWarnings             = @($agentWarnings)
     agentSemanticChecklist   = @($agentSemanticChecklist)
@@ -992,15 +1324,40 @@ if ($AsJson) {
         Write-Output ("OPENCODE_REVIEWER_RO_CONTRACT_CHANGED: {0}: {1}" -f $finding.path, $finding.message)
     }
 
-    Write-Output ("GATE_ENUMERATION_PARITY_GATE={0}" -f $gateEnumParityGate.status)
-    foreach ($finding in @($gateEnumParityGate.findings)) {
-        Write-Output ("GATE_ENUMERATION_SUBSET: {0}: {1}" -f $finding.path, $finding.message)
+    Write-Output 'ENUMERATION_TRIAGE:'
+    Write-Output ("  SCAN_COMPLETE={0}; CATALOG_VALID={1}" -f $enumerationTriage.scanComplete, $enumerationTriage.catalog.valid)
+    Write-Output ("  COUNTS new={0} triaged={1} expired={2} orphaned={3} ambiguous={4}" -f $enumerationTriage.counts.new, $enumerationTriage.counts.triaged, $enumerationTriage.counts.expired, $enumerationTriage.counts.orphaned, $enumerationTriage.counts.ambiguous)
+    Write-Output '  NEW (veredito semântico):'
+    foreach ($finding in @($enumerationTriage.newFindings)) {
+        Write-Output ("    - {0} [{1}] {2}; motivo: {3}" -f $finding.path, $finding.code, $finding.message, $finding.reason)
     }
-
-    Write-Output ("BACKEND_ENUMERATION_PARITY_GATE={0}" -f $backendEnumParityGate.status)
-    foreach ($finding in @($backendEnumParityGate.findings)) {
-        Write-Output ("BACKEND_ENUMERATION_SUBSET: {0}: {1}" -f $finding.path, $finding.message)
+    Write-Output '  TRIAGED (motivo visível):'
+    foreach ($finding in @($enumerationTriage.triagedFindings)) {
+        Write-Output ("    - {0} [{1}] motivo: {2}" -f $finding.path, $finding.code, $finding.reason)
     }
+    Write-Output '  EXPIRED:'
+    foreach ($entry in @($enumerationTriage.expiredEntries)) {
+        Write-Output ("    - {0} [{1}] motivo: {2}" -f $entry.entry.file, $entry.entry.code, $entry.reason)
+    }
+    Write-Output '  ORPHANED:'
+    foreach ($entry in @($enumerationTriage.orphanedEntries)) {
+        Write-Output ("    - {0} [{1}] motivo: {2}" -f $entry.entry.file, $entry.entry.code, $entry.reason)
+    }
+    Write-Output '  AMBIGUOUS:'
+    foreach ($finding in @($enumerationTriage.ambiguousFindings)) {
+        Write-Output ("    - {0} [{1}] motivo: {2}" -f $finding.path, $finding.code, $finding.reason)
+    }
+    foreach ($problem in @($enumerationTriage.catalog.problems)) {
+        Write-Output ("  CATALOG_PROBLEM: {0} [{1}] {2}" -f $problem.code, $problem.path, $problem.message)
+    }
+    foreach ($issue in @($enumerationTriage.scanIssues)) {
+        Write-Output ("  SCAN_ISSUE: {0} [{1}] {2}" -f $issue.code, $issue.path, $issue.message)
+    }
+    if ($enumerationTriage.displayTruncated) {
+        Write-Output ("  DISPLAY_TRUNCATED={0}" -f $enumerationTriage.displayTruncatedCount)
+    }
+    Write-Output ("GATE_ENUMERATION_PARITY_GATE={0}; SCAN_COMPLETE={1}; CANDIDATES={2}" -f $gateEnumParityGate.status, $gateEnumParityGate.scanComplete, $gateEnumParityGate.candidateCount)
+    Write-Output ("BACKEND_ENUMERATION_PARITY_GATE={0}; SCAN_COMPLETE={1}; CANDIDATES={2}" -f $backendEnumParityGate.status, $backendEnumParityGate.scanComplete, $backendEnumParityGate.candidateCount)
 
     if ($changedFiles.Count -gt 0) {
         Write-Output 'CHANGED_FILES_BY_KIND:'

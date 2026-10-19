@@ -47,6 +47,15 @@ function Write-TempFile {
     [System.IO.File]::WriteAllText($full, $Content, $utf8NoBom)
 }
 
+function Invoke-BackendGate {
+    param([int]$MaxFindings = 50)
+    $output = & pwsh -NoProfile -File $scriptPath -RootPath $tempRoot -MaxFindings $MaxFindings -AsJson
+    $exitCode = $LASTEXITCODE
+    $jsonText = ($output | Out-String).Trim()
+    if ($exitCode -ne 0) { throw "Gate retornou exit ${exitCode}: $jsonText" }
+    return ($jsonText | ConvertFrom-Json -ErrorAction Stop)
+}
+
 try {
     # -----------------------------------------------------------------------------------
     # Fixture: Dispatcher sintetico com 6 backends canonicos
@@ -106,6 +115,9 @@ Recorte por eixo stdin-based: apenas opencode, codex e claude-code.
     if ($result.status -ne 'warn') {
         throw "Cenario 8: status deveria ser 'warn'; obtido '$($result.status)'. Saida: $jsonText"
     }
+    if (-not $result.scanComplete) {
+        throw "Cenario 10: a fixture válida deveria ter scanComplete=true. Issues: $(@($result.scanIssues | ForEach-Object { $_.message }) -join ' | ')"
+    }
 
     # Cenario 1: Extracao fiel
     $extractedBackends = @($result.canonicalBackends | Sort-Object)
@@ -136,6 +148,72 @@ Recorte por eixo stdin-based: apenas opencode, codex e claude-code.
     $f2 = $result.findings[1]
     if ($f2.message -notmatch 'opencode' -or $f2.message -notmatch 'copilot' -or $f2.message -notmatch 'gemini') {
         throw "Cenario 5: finding 2 deveria listar opencode, copilot e gemini; got $($f2.message)"
+    }
+
+    # Cenário 10: âncora por texto, EOL e deslocamento; editar o texto invalida o hash.
+    $docOriginal = [System.IO.File]::ReadAllText((Join-Path $tempRoot 'doc-test.md'))
+    $anchorBefore = [string]$f1.unitHash
+    if ($f1.file -ne 'doc-test.md' -or $anchorBefore -notmatch '^[0-9a-f]{64}$' -or @($f1.listedMembers).Count -ne 3 -or @($result.canonicalMembers).Count -ne 6) {
+        throw 'Cenario 10: contrato file/unitHash/listedMembers/canonicalMembers incompleto.'
+    }
+    $shiftedCrLf = "`r`n`r`n" + ($docOriginal -replace "`r?`n", "`r`n")
+    Write-TempFile -RelativePath 'doc-test.md' -Content $shiftedCrLf
+    $shiftedResult = Invoke-BackendGate
+    $shiftedFinding = @($shiftedResult.findings | Where-Object { $_.unitHash -eq $anchorBefore })[0]
+    if ($null -eq $shiftedFinding -or [int]$shiftedFinding.line -le [int]$f1.line) {
+        throw 'Cenario 10: deslocamento e troca LF/CRLF deveriam preservar hash e alterar apenas a linha exibida.'
+    }
+    $editedDoc = [System.IO.File]::ReadAllText((Join-Path $tempRoot 'doc-test.md')).Replace('avaliados inicialmente', 'analisados inicialmente')
+    Write-TempFile -RelativePath 'doc-test.md' -Content $editedDoc
+    $editedResult = Invoke-BackendGate
+    if (@($editedResult.findings | Where-Object { $_.unitHash -eq $anchorBefore }).Count -ne 0) {
+        throw 'Cenario 10: edição de texto não deveria preservar a âncora.'
+    }
+
+    # Cenário 11: atribuição com chave dinâmica torna a extração incompleta.
+    $dynamicDispatcher = @'
+$backendKey = 'opencode'
+$AdapterScript = @{
+    $backendKey = 'Invoke-OpenCode.ps1'
+    'codex' = 'Invoke-Codex.ps1'
+    'claude-code' = 'Invoke-ClaudeCodeAsync.ps1'
+}
+'@
+    Write-TempFile -RelativePath 'scripts/Invoke-LlmDelegatePanelDispatch.ps1' -Content $dynamicDispatcher
+    $dynamicResult = Invoke-BackendGate
+    if ($dynamicResult.scanComplete -or @($dynamicResult.scanIssues | Where-Object { $_.code -eq 'CANONICAL_KEY_NOT_LITERAL' }).Count -eq 0) {
+        throw 'Cenario 11: chave dinâmica deveria deixar a varredura incompleta.'
+    }
+    Write-TempFile -RelativePath 'scripts/Invoke-LlmDelegatePanelDispatch.ps1' -Content $dispatcher
+
+    # Cenário 12: caminho configurado como arquivo em vez de diretório não pode parecer scan completo.
+    Remove-Item -LiteralPath (Join-Path $tempRoot 'xpz-llm-delegate') -Recurse -Force
+    Write-TempFile -RelativePath 'xpz-llm-delegate' -Content 'not-a-directory'
+    $enumerationResult = Invoke-BackendGate
+    if ($enumerationResult.scanComplete -or @($enumerationResult.scanIssues | Where-Object { $_.code -eq 'SUBTREE_NOT_DIRECTORY' }).Count -eq 0) {
+        throw 'Cenario 12: subtree inválida deveria aparecer como falha de enumeração/escopo.'
+    }
+    Remove-Item -LiteralPath (Join-Path $tempRoot 'xpz-llm-delegate') -Force
+    [void](New-Item -ItemType Directory -Path (Join-Path $tempRoot 'xpz-llm-delegate') -Force)
+
+    # Cenário 13: falha de leitura de um arquivo deixa scanComplete=false.
+    $lockedPath = Join-Path $tempRoot 'doc-test.md'
+    $lockedFile = [System.IO.File]::Open($lockedPath, [System.IO.FileMode]::Open, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None)
+    try {
+        $readErrorResult = Invoke-BackendGate
+    } finally { $lockedFile.Dispose() }
+    if ($readErrorResult.scanComplete -or @($readErrorResult.files | Where-Object { $_.file -eq 'doc-test.md' -and -not $_.complete }).Count -ne 1) {
+        throw 'Cenario 13: erro de leitura deveria marcar o arquivo e a varredura como incompletos.'
+    }
+
+    # Cenário 14: MaxFindings limita somente a exibição depois da coleta integral.
+    $subsetLines = [System.Collections.Generic.List[string]]::new()
+    for ($number = 1; $number -le 5; $number++) { $subsetLines.Add("Subset numerado $number cita opencode e codex.") }
+    $manyCandidates = "# Teto de exibição`n`n" + ($subsetLines -join "`n`n")
+    Write-TempFile -RelativePath 'doc-test.md' -Content $manyCandidates
+    $cappedResult = Invoke-BackendGate -MaxFindings 1
+    if ([int]$cappedResult.candidateCount -ne 5 -or @($cappedResult.findings).Count -ne 5 -or @($cappedResult.displayFindings).Count -ne 1 -or -not $cappedResult.displayTruncated) {
+        throw "Cenario 14: coleta integral/teto pós-classificação incorretos (count=$($cappedResult.candidateCount), displayed=$(@($cappedResult.displayFindings).Count))."
     }
 
     # -----------------------------------------------------------------------------------
