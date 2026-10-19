@@ -1,4 +1,21 @@
 {
   "schemaVersion": 1,
-  "entries": []
+  "entries": [
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "999-ideias-pendentes.md",
+      "unitHash": "fa066c24855716d995923ba4cddd15df5aba27966e9eb0d602c5452bb83d34a1",
+      "listedMembers": [
+        "claude-code",
+        "codex",
+        "opencode"
+      ],
+      "verdict": "non-gap",
+      "reason": "H1 — contexto histórico: a ideia foi registrada em 2026-05-17, quando a xpz-skills-setup ainda enumerava Claude Code, Codex, Cursor e OpenCode; o suporte ao Antigravity foi adicionado em 2026-08-03. A enumeração é correta para a data de origem e não pretende listar todos os backends atuais de delegação.",
+      "triagedAt": "2026-10-19",
+      "triagedBy": "Codex, com autorização do usuário",
+      "kind": "closed",
+      "excerpt": "A skill `xpz-skills-setup` já audita o registro de skills XPZ cross-tool (Claude/Codex/Cursor/OpenCode) e oferece resolução de gaps."
+    }
+  ]
 }
