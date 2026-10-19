@@ -16,6 +16,565 @@
       "triagedBy": "Codex, com autorização do usuário",
       "kind": "closed",
       "excerpt": "A skill `xpz-skills-setup` já audita o registro de skills XPZ cross-tool (Claude/Codex/Cursor/OpenCode) e oferece resolução de gaps."
+    },
+    {
+      "code": "GATE_ENUMERATION_SUBSET",
+      "file": "13-revisao-pre-push.md",
+      "unitHash": "731a0ba5070fce888fbc54e6af6ca26d6c72a79c7d66132153668fa463aa3a06",
+      "listedMembers": [
+        "Test-PrePushBackendEnumerationParity.ps1",
+        "Test-PrePushGateEnumerationParity.ps1"
+      ],
+      "verdict": "non-gap",
+      "reason": "Esta linha lista especificamente os dois scanners de enumeração, não o conjunto completo de gates.",
+      "triagedAt": "2026-10-19",
+      "triagedBy": "Codex, com autorização do usuário",
+      "kind": "closed",
+      "excerpt": "Para o conjunto de **gates da pré-push**, há suporte mecânico em `scripts/Test-PrePushGateEnumerationParity.ps1`; para o conjunto de **backends de delegação**, em `scripts/Test-PrePushBackendEnumerationParity.ps1`. Ambos…"
+    },
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "09-inventario-e-rastreabilidade-publica.md",
+      "unitHash": "045d60b1dcfdc1e0a08a86f572b5abd9151e7265c5659663bd73d538333ccf18",
+      "listedMembers": [
+        "antigravity",
+        "claude-code",
+        "codex",
+        "opencode"
+      ],
+      "verdict": "non-gap",
+      "reason": "A passagem lista ferramentas de registro de skills; esse conjunto é distinto dos backends de delegação.",
+      "triagedAt": "2026-10-19",
+      "triagedBy": "Codex, com autorização do usuário",
+      "kind": "closed",
+      "excerpt": "- `scripts/Test-XpzSkillsRegistration.ps1` (motor) — auditoria read-only do registro de cada skill × ferramenta (Codex, Claude Code, Cursor, OpenCode, Antigravity: `OK`/`coberta_por_compatibilidade`/`ausente`/`orfa`/`que…"
+    },
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "09-inventario-e-rastreabilidade-publica.md",
+      "unitHash": "73d2c9c4c257b7ef719314b014065b46477c4b521d6491354126446cdfd81b6a",
+      "listedMembers": [
+        "antigravity",
+        "claude-code",
+        "opencode"
+      ],
+      "verdict": "non-gap",
+      "reason": "A passagem resume comportamentos específicos de fontes globais, não enumera todas as ferramentas.",
+      "triagedAt": "2026-10-19",
+      "triagedBy": "Codex, com autorização do usuário",
+      "kind": "closed",
+      "excerpt": "- `scripts/Test-XpzGlobalInstructions.ps1` (motor) — auditoria dos instrucionais globais por ferramenta (segue precedência de fontes e vínculo de arquivo/conteúdo no Antigravity, '@<caminho>' no Claude Code/OpenCode, 'in…"
+    },
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "09-inventario-e-rastreabilidade-publica.md",
+      "unitHash": "7298a8421140b17d3e6390dccf526e3924ebccf1c4d9b2bbdac517aac9c28d78",
+      "listedMembers": [
+        "claude-code",
+        "codex",
+        "opencode"
+      ],
+      "verdict": "non-gap",
+      "reason": "A passagem compara especificamente o hook de Claude Code.",
+      "triagedAt": "2026-10-19",
+      "triagedBy": "Codex, com autorização do usuário",
+      "kind": "closed",
+      "excerpt": "- `Evidência direta`: hook `PreToolUse` de **auto-aprovação** (auto-allow) do **Claude Code** — exclusivo desta ferramenta (depende de `permissionDecision`, sem equivalente em Codex/Cursor/OpenCode), Windows x64, fio máq…"
+    },
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "13-revisao-pre-push.md",
+      "unitHash": "5c95b7ca9df80ce0045d6ed8efd14d8c3004f6478bca8d054a043d64108d8ede",
+      "listedMembers": [
+        "antigravity",
+        "claude-code",
+        "copilot",
+        "gemini",
+        "opencode"
+      ],
+      "verdict": "non-gap",
+      "reason": "A passagem identifica os adapters sem rota cega documentada; reavaliar se o conjunto de adapters mudar.",
+      "triagedAt": "2026-10-19",
+      "triagedBy": "Codex, com autorização do usuário",
+      "kind": "live-contract",
+      "excerpt": "| OpenCode, Claude Code, Copilot, Gemini e Antigravity via adapters XPZ | Nenhuma rota cega pré-push comprovada/documentada nesta base | Perfil `plan`, somente leitura, scratch descartável, ferramentas desativadas ou aus…",
+      "canonicalMembers": [
+        "antigravity",
+        "claude-code",
+        "codex",
+        "copilot",
+        "gemini",
+        "opencode"
+      ]
+    },
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "15-revisao-por-pares.md",
+      "unitHash": "8615f2e770e0caa70a0a5f15396bc8bd02839c8712a5046ff14b9a41bde25705",
+      "listedMembers": [
+        "claude-code",
+        "codex",
+        "opencode"
+      ],
+      "verdict": "non-gap",
+      "reason": "A passagem enumera IDs de orquestradores preferidos, domínio diferente do conjunto de backends.",
+      "triagedAt": "2026-10-19",
+      "triagedBy": "Codex, com autorização do usuário",
+      "kind": "closed",
+      "excerpt": "**Editar a lista preferida = editar o ficheiro que este harness resolve.** Antes de gravar, o orquestrador corre `Resolve-LlmDelegatePreferredReviewers.ps1` e lê `preferenceSource` / `effectivePreferredPath` / `cascadeOr…"
+    },
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "999-ideias-pendentes.md",
+      "unitHash": "37f10e9dd740d0c8097c1ed8ca273e7efb18e8577bcab7bd7b5b45b18ed2f3c5",
+      "listedMembers": [
+        "antigravity",
+        "gemini"
+      ],
+      "verdict": "non-gap",
+      "reason": "A passagem registra uma decisão local sobre a família Gemini/Antigravity.",
+      "triagedAt": "2026-10-19",
+      "triagedBy": "Codex, com autorização do usuário",
+      "kind": "closed",
+      "excerpt": "- A entrada «Registro de backend novo na `xpz-llm-delegate`» (invariante dos mapas + nota de `$ContentionKeys`). O destino operacional do Gemini CLI (#5) nesta máquina foi descartado em `998-ideias-descartadas-e-porque.m…"
+    },
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "999-ideias-pendentes.md",
+      "unitHash": "580c44fd9e470d63f6ca6aa60f21ecf0c02258a266eb5553ee9aa7de07ac7189",
+      "listedMembers": [
+        "claude-code",
+        "codex",
+        "opencode"
+      ],
+      "verdict": "non-gap",
+      "reason": "A passagem compara especificamente o hook de Claude Code.",
+      "triagedAt": "2026-10-19",
+      "triagedBy": "Codex, com autorização do usuário",
+      "kind": "closed",
+      "excerpt": "- **Escopo: Claude Code apenas.** Depende do hook `PreToolUse` + `permissionDecision: allow`, recurso que **não existe** em Codex/Cursor/OpenCode — não viaja transversalmente para os outros agentes (só o classificador é …"
+    },
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "999-ideias-pendentes.md",
+      "unitHash": "8cce674324853dfe2efa8420b5392cc0a3fff4945cd18b97224e4f0ffd0a3217",
+      "listedMembers": [
+        "antigravity",
+        "codex",
+        "opencode"
+      ],
+      "verdict": "non-gap",
+      "reason": "A passagem registra exemplos selecionados de mecanismos prévios, não um inventário integral.",
+      "triagedAt": "2026-10-19",
+      "triagedBy": "Codex, com autorização do usuário",
+      "kind": "closed",
+      "excerpt": "5. **Testes e revisão de segurança** — self-tests do dispatcher, AST Guard dos 5 mapas, cenário adversarial de Bash no cwd; comparar com contenção já feita no opencode (`reviewer-ro`), no Codex (`read-only`) e no Antigra…"
+    },
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "999-ideias-pendentes.md",
+      "unitHash": "8a660d976a7f2d195ef9f3b30b94672ca21490d3e094ed85b7bdf67404d09379",
+      "listedMembers": [
+        "claude-code",
+        "codex"
+      ],
+      "verdict": "non-gap",
+      "reason": "A passagem registra os revisores efetivamente usados naquela rodada.",
+      "triagedAt": "2026-10-19",
+      "triagedBy": "Codex, com autorização do usuário",
+      "kind": "closed",
+      "excerpt": "Isso casa com `scripts/Invoke-PrePushMechanicalChecks.ps1` **deste** repositório de skills (`-RootPath`/`-BaseRef` existem). O checker local do Open API Builder só declara `-AsJson` (e `-Fetch`); a chamada explode com `A…"
+    },
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "999-ideias-pendentes.md",
+      "unitHash": "111b7a3da2e4391d189c1c0ef0c51aafaa3a3438682261cef7f5c16eefa62800",
+      "listedMembers": [
+        "claude-code",
+        "codex"
+      ],
+      "verdict": "non-gap",
+      "reason": "A passagem é um registro histórico de ferramentas testadas.",
+      "triagedAt": "2026-10-19",
+      "triagedBy": "Codex, com autorização do usuário",
+      "kind": "closed",
+      "excerpt": "**Origem:** conversa em 2026-05-22. Testes com Codex, Claude e Cursor no mesmo intervalo (22 commits): o orquestrador alinhou fatos (git, parse, `PUSH_READINESS`), mas gaps documentais divergiram (1 vs 5) conforme a prof…"
+    },
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "999-ideias-pendentes.md",
+      "unitHash": "4d4f5f3e019fc85ee4bca7c5d04f727787fa8afe601a8cbf36224318fd8371e8",
+      "listedMembers": [
+        "claude-code",
+        "codex",
+        "opencode"
+      ],
+      "verdict": "non-gap",
+      "reason": "A passagem enumera harnesses de autoria naquele contexto, não backends de delegação.",
+      "triagedAt": "2026-10-19",
+      "triagedBy": "Codex, com autorização do usuário",
+      "kind": "closed",
+      "excerpt": "**Origem:** 2026-06-19. Este é um repositório de skills feitas para rodar em N harnesses (Claude Code, Codex, Cursor, OpenCode) e N máquinas; a memória pessoal de um agente **não viaja com a skill**. Conhecimento de skil…"
+    },
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "999-ideias-pendentes.md",
+      "unitHash": "8777f0bebfa0bfbb7af8c564e5159805eac724e5817b5db200b6774a80964c61",
+      "listedMembers": [
+        "codex",
+        "opencode"
+      ],
+      "verdict": "non-gap",
+      "reason": "A passagem registra participantes de uma rodada.",
+      "triagedAt": "2026-10-19",
+      "triagedBy": "Codex, com autorização do usuário",
+      "kind": "closed",
+      "excerpt": "- **Maturidade** — em refino (decisões fechadas em 2026-10-02, **escopo reduzido na v22** e **gaps corrigidos na v23**, ambos em 2026-10-03; F0: rodada de 4 titulares + refinos via opencode (segundas opiniões; `authorFam…"
+    },
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "999-ideias-pendentes.md",
+      "unitHash": "2bd6eab4841f44c856450a134adbbb5fcbf6d6e27514a8c38454c16207f135aa",
+      "listedMembers": [
+        "codex",
+        "opencode"
+      ],
+      "verdict": "non-gap",
+      "reason": "A passagem registra o escopo intencional da versão 1 do desenho, não o inventário atual de backends.",
+      "triagedAt": "2026-10-19",
+      "triagedBy": "Codex, com autorização do usuário",
+      "kind": "closed",
+      "excerpt": "**O que é.** Skill nova dedicada a instalar, auditar, reparar, atualizar e remover **componentes MCP externos opcionais** nos clientes de agente; o 1º componente é o **Jev/System One** (modelo de decisão do TypeSafe) via…"
+    },
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "999-ideias-pendentes.md",
+      "unitHash": "afa1991c80e21690174de8a3450cf03c0fe85a6ef9e0c14c083e0e1ff4d92bc2",
+      "listedMembers": [
+        "claude-code",
+        "codex"
+      ],
+      "verdict": "non-gap",
+      "reason": "A passagem é um exemplo específico de tratamento no dispatcher.",
+      "triagedAt": "2026-10-19",
+      "triagedBy": "Codex, com autorização do usuário",
+      "kind": "closed",
+      "excerpt": "**O que é.** `scripts/Test-PrePushBackendEnumerationParity.ps1` (aviso `BACKEND_ENUMERATION_SUBSET`) dispara quando uma unidade lógica de Markdown — por exemplo, um parágrafo ou item de lista — contém menções a 2 ou mais…"
+    },
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "AGENTS.md",
+      "unitHash": "1abacf1a6ccad59f7e465b90d0bd1771659f9ad95b3c6a7ccabde735fa2d99c6",
+      "listedMembers": [
+        "claude-code",
+        "codex",
+        "opencode"
+      ],
+      "verdict": "non-gap",
+      "reason": "A passagem define a convenção para harnesses que invocam comandos, não para todos os backends.",
+      "triagedAt": "2026-10-19",
+      "triagedBy": "Codex, com autorização do usuário",
+      "kind": "closed",
+      "excerpt": "Convenção canônica (aplica a **todos** os agentes que atuam neste repo — Claude Code, Codex, Cursor, OpenCode):"
+    },
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "claude-code-pretooluse-auto-allow-design.md",
+      "unitHash": "c32d2a8fb674039a27914d337e2f8190e9b6c3eb06cb67322e67f2268aa1942d",
+      "listedMembers": [
+        "claude-code",
+        "codex",
+        "opencode"
+      ],
+      "verdict": "non-gap",
+      "reason": "A passagem trata de capacidade específica de Claude Code e de uma comparação técnica delimitada.",
+      "triagedAt": "2026-10-19",
+      "triagedBy": "Codex, com autorização do usuário",
+      "kind": "closed",
+      "excerpt": "> **ESCOPO — Claude Code apenas.** Esta solução é **exclusiva do Claude Code**: depende do hook"
+    },
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "claude-code-pretooluse-daemon-design.md",
+      "unitHash": "95508c9c96e3addba67b7b8bebe666681c61385cbc73accab1125845d529fa65",
+      "listedMembers": [
+        "claude-code",
+        "codex",
+        "opencode"
+      ],
+      "verdict": "non-gap",
+      "reason": "A passagem é um registro histórico de revisão.",
+      "triagedAt": "2026-10-19",
+      "triagedBy": "Codex, com autorização do usuário",
+      "kind": "closed",
+      "excerpt": "> **STATUS: CONGELADO (v4) — congelado em 2026-06-27 por Antonio José (antonio@frigobyte.com).** Esta v4 incorpora **quatro rodadas** de revisão"
+    },
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "edit-genexus-xml-batch-metadata-design.md",
+      "unitHash": "011db8c0ca40ece764fc35768f7a317e44dfd58eadc79787b2b425bd162dbd7e",
+      "listedMembers": [
+        "claude-code",
+        "opencode"
+      ],
+      "verdict": "non-gap",
+      "reason": "A passagem é um registro histórico de pareceres.",
+      "triagedAt": "2026-10-19",
+      "triagedBy": "Codex, com autorização do usuário",
+      "kind": "closed",
+      "excerpt": "Consolidada após **dez pareceres de quatro famílias**: três sobre a v1 (openai/gpt-5.6-luna,"
+    },
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "edit-genexus-xml-surgical-design.md",
+      "unitHash": "1a501b799d6523b2f391b4dd3649e8a5f35c2897bb78766e6f69d7399d2c620f",
+      "listedMembers": [
+        "claude-code",
+        "opencode"
+      ],
+      "verdict": "non-gap",
+      "reason": "A passagem é um registro histórico de uma rodada.",
+      "triagedAt": "2026-10-19",
+      "triagedBy": "Codex, com autorização do usuário",
+      "kind": "closed",
+      "excerpt": "Decisão humana de 2026-09-28: encerrar o ciclo de papel (v1–v5, revisores: opencode `meta`/`stealth`, Claude Code `claude-opus-5`; GPT indisponível por limite de uso) e **transferir a prova para a implementação + self-te…"
+    },
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "xpz-mcp-integrations-design.md",
+      "unitHash": "91ed0340d34bdaaf5fb05dc1c51e83946486fa8f2f9d4fa51561d780a15b7833",
+      "listedMembers": [
+        "codex",
+        "opencode"
+      ],
+      "verdict": "non-gap",
+      "reason": "A passagem registra rodadas do desenho.",
+      "triagedAt": "2026-10-19",
+      "triagedBy": "Codex, com autorização do usuário",
+      "kind": "closed",
+      "excerpt": "- **v2** pré-análise · **v3** F0-1 (4 titulares) · **v4–v8** refinos opencode (segundas opiniões) ·"
+    },
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "xpz-mcp-integrations-design.md",
+      "unitHash": "aeffab088d1879b2c38dba8244499376566ae1aa71bcf218d8247127aef88e39",
+      "listedMembers": [
+        "codex",
+        "opencode"
+      ],
+      "verdict": "non-gap",
+      "reason": "A passagem delimita intencionalmente os clientes da versão 1.",
+      "triagedAt": "2026-10-19",
+      "triagedBy": "Codex, com autorização do usuário",
+      "kind": "closed",
+      "excerpt": "- **Componente:** Jev/System One via `@jkudish/jev-mcp`. **Clientes:** OpenCode e Codex."
+    },
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "xpz-mcp-integrations-design.md",
+      "unitHash": "22ed1993314d3d560ddfeddad34465b696c40a3899379f484256765982ee6ae6",
+      "listedMembers": [
+        "codex",
+        "opencode"
+      ],
+      "verdict": "non-gap",
+      "reason": "A passagem descreve o suporte mínimo planejado para a versão 1.",
+      "triagedAt": "2026-10-19",
+      "triagedBy": "Codex, com autorização do usuário",
+      "kind": "closed",
+      "excerpt": "- **Ciclo:** detectar → instalar → auditar → reparar → atualizar → remover. **Credencial:** cofre"
+    },
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "xpz-mcp-integrations-design.md",
+      "unitHash": "fb7850040a6b7255a6c1fbe0128d0839ce5bdd19b0dbfa50670ea68315249445",
+      "listedMembers": [
+        "codex",
+        "opencode"
+      ],
+      "verdict": "non-gap",
+      "reason": "A passagem é uma tabela de escopo da versão 1.",
+      "triagedAt": "2026-10-19",
+      "triagedBy": "Codex, com autorização do usuário",
+      "kind": "closed",
+      "excerpt": "| 5 | Escopo v1 | **OpenCode + Codex mínimo** (completa no F1 — v22) |"
+    },
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "xpz-mcp-integrations-design.md",
+      "unitHash": "1733c99ba10ed7370767914a9fe656372c52365941ff79f574d3e9e2015fa6bd",
+      "listedMembers": [
+        "codex",
+        "opencode"
+      ],
+      "verdict": "non-gap",
+      "reason": "A passagem é o plano da fase F1, limitado aos clientes definidos.",
+      "triagedAt": "2026-10-19",
+      "triagedBy": "Codex, com autorização do usuário",
+      "kind": "closed",
+      "excerpt": "- **F1 = v1 completa (v22)** — **reservar a faixa de `exitCode`** + skill + descritor Jev (só"
+    },
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "xpz-mcp-integrations-design.md",
+      "unitHash": "06617cd726ee95d2957503ad44f3986f38ad3c5ccb27c577d088a70d564c1049",
+      "listedMembers": [
+        "codex",
+        "opencode"
+      ],
+      "verdict": "non-gap",
+      "reason": "A passagem registra fatos do desenho para os dois clientes.",
+      "triagedAt": "2026-10-19",
+      "triagedBy": "Codex, com autorização do usuário",
+      "kind": "closed",
+      "excerpt": "- **Fatos externos a re-verificar no F1:** sha512 do tarball; `engines.node`; modo `compatible`; boot;"
+    },
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "xpz-mcp-integrations-design.md",
+      "unitHash": "843a662b8fe9aba2604b8d54d627a7ce5ac1193456dfec27f3ab43d8091f5773",
+      "listedMembers": [
+        "codex",
+        "opencode"
+      ],
+      "verdict": "non-gap",
+      "reason": "A passagem enumera os clientes do manifesto de instalação v1.",
+      "triagedAt": "2026-10-19",
+      "triagedBy": "Codex, com autorização do usuário",
+      "kind": "closed",
+      "excerpt": "- **Campos:** versão instalada do pacote; caminho absoluto do launcher de cada versão instalada e sua"
+    },
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "xpz-mcp-integrations-design.md",
+      "unitHash": "09f1aa9f47a216df8e67e89523caacc7b0f04cab208ed09305a40c269a1baa70",
+      "listedMembers": [
+        "codex",
+        "opencode"
+      ],
+      "verdict": "non-gap",
+      "reason": "A passagem descreve o algoritmo para os dois clientes.",
+      "triagedAt": "2026-10-19",
+      "triagedBy": "Codex, com autorização do usuário",
+      "kind": "closed",
+      "excerpt": "- **A.8** — algoritmo de descoberta/precedência do OpenCode com `entrada_em_conflito`; detalhe da"
+    },
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "xpz-mcp-integrations-design.md",
+      "unitHash": "e883a311d2dde7c5a0177f25654c11e3295b04aecfbeddbab0ecab4106adc082",
+      "listedMembers": [
+        "claude-code",
+        "opencode"
+      ],
+      "verdict": "non-gap",
+      "reason": "A passagem delimita fases futuras e escopo adiado no desenho.",
+      "triagedAt": "2026-10-19",
+      "triagedBy": "Codex, com autorização do usuário",
+      "kind": "closed",
+      "excerpt": "- **Teste de egresso de rede contido + Windows Sandbox como pré-requisito/gate obrigatório do F1** →"
+    },
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "xpz-llm-delegate/SKILL.md",
+      "unitHash": "dbdcc771f746acaa6aabd0a9827c13b47b92a99594d48f13495939645890d321",
+      "listedMembers": [
+        "claude-code",
+        "codex",
+        "opencode"
+      ],
+      "verdict": "non-gap",
+      "reason": "A passagem lista IDs de orquestradores, distintos dos backends.",
+      "triagedAt": "2026-10-19",
+      "triagedBy": "Codex, com autorização do usuário",
+      "kind": "closed",
+      "excerpt": "2. Resolver a lista de revisores preferidos rodando `Resolve-LlmDelegatePreferredReviewers.ps1` com `-Orchestrator` do harness atual (`cursor|claude-code|codex|opencode`). A curadoria vive **fora do repositório** em `%LO…"
+    },
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "xpz-llm-delegate/SKILL.md",
+      "unitHash": "c02d987bd5be0c9ff39258548d4f8b91ad7c37573bd6fb4ca346f7e67e86cb05",
+      "listedMembers": [
+        "copilot",
+        "opencode"
+      ],
+      "verdict": "non-gap",
+      "reason": "A passagem trata de uma falha específica do OpenCode, com menção incidental a uma nota do Copilot.",
+      "triagedAt": "2026-10-19",
+      "triagedBy": "Codex, com autorização do usuário",
+      "kind": "closed",
+      "excerpt": "> **`opencode models` LISTA ≠ o endpoint ACEITA (medido 2026-08-24).** O catálogo do opencode"
+    },
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "xpz-llm-delegate/SKILL.md",
+      "unitHash": "b9ca61643bdda6f8639c95c3ec28398b44d7ce751997d30a332d61ba0ea2639a",
+      "listedMembers": [
+        "claude-code",
+        "codex",
+        "opencode"
+      ],
+      "verdict": "non-gap",
+      "reason": "A passagem lista comandos de orquestradores, não todos os adapters.",
+      "triagedAt": "2026-10-19",
+      "triagedBy": "Codex, com autorização do usuário",
+      "kind": "closed",
+      "excerpt": "- `Set-LlmDelegatePreferredReviewers.ps1 -ReviewersJson <json> -Orchestrator <cursor|claude-code|codex|opencode> -Scope <machine|orchestrator> [-PreferredRoot <dir>] [-OutputPath <json>] [-Preview] [-Overwrite]` — persis…"
+    },
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "xpz-llm-delegate/SKILL.md",
+      "unitHash": "f0a0c094ce9e7c7e47daac81c899d8e6fc9654fc874696daef80d80cfc94051d",
+      "listedMembers": [
+        "claude-code",
+        "codex",
+        "opencode"
+      ],
+      "verdict": "non-gap",
+      "reason": "A passagem define o contrato de invocação dos orquestradores.",
+      "triagedAt": "2026-10-19",
+      "triagedBy": "Codex, com autorização do usuário",
+      "kind": "closed",
+      "excerpt": "- `Resolve-LlmDelegatePreferredReviewers.ps1 -Orchestrator <cursor|claude-code|codex|opencode> [-PreferredRoot <dir>] [-PreferredPath <json>] [-CapabilitiesPath <json>]` — cascata orchestrator→machine **schema 3 only** (…"
+    },
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "xpz-llm-delegate/SKILL.md",
+      "unitHash": "eced0a663b98d0fdb103fa2f030eb94449b5fd28e36b2913b695ea9ba55940ac",
+      "listedMembers": [
+        "claude-code",
+        "codex"
+      ],
+      "verdict": "non-gap",
+      "reason": "A passagem descreve dois tratamentos especiais, não o conjunto completo de backends.",
+      "triagedAt": "2026-10-19",
+      "triagedBy": "Codex, com autorização do usuário",
+      "kind": "closed",
+      "excerpt": "- `Invoke-LlmDelegatePanelDispatch.ps1 (-ManuscriptPath <arq> | -ManuscriptText <texto>) -ReviewersJson <arq|inline> -PayloadSensitivity <public|kb-sensitive> [-RoundId <id seguro>] [-Cd <dir>] [-ParallelKbRoot <dir>] [-…"
+    },
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "xpz-llm-delegate/SKILL.md",
+      "unitHash": "19f32a0dbc989fd14ad5411ecd826edca8c64d0d6d5dc1d67ea04809b4108f2e",
+      "listedMembers": [
+        "claude-code",
+        "codex",
+        "opencode"
+      ],
+      "verdict": "non-gap",
+      "reason": "A passagem lista quais backends têm jobs assíncronos implementados; reavaliar se o conjunto de adapters mudar.",
+      "triagedAt": "2026-10-19",
+      "triagedBy": "Codex, com autorização do usuário",
+      "kind": "live-contract",
+      "excerpt": "A allowlist do harness (Claude Code, Codex, OpenCode, Cursor) casa comandos **atômicos**, não comandos compostos. Cada variante de forma exige uma entrada de allowlist distinta — deriva que, além de incomodar, gera promp…",
+      "canonicalMembers": [
+        "antigravity",
+        "claude-code",
+        "codex",
+        "copilot",
+        "gemini",
+        "opencode"
+      ]
     }
   ]
 }
