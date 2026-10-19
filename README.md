@@ -59,9 +59,9 @@ Os arquivos `10-matriz-part-types-por-tipo.md`, `11-campos-estaveis-vs-variaveis
 
 - `CHANGELOG.md`: registro de mudanças relevantes a partir da adoção do changelog.
 - `CONTRIBUTING.md`: guia para contribuições, revisão pré-push e cuidado com dados reais.
-- `13-revisao-pre-push.md`: rotina autoritativa da pré-push; ao reconhecer o pedido, bloqueia consulta a memória e sessões anteriores. Os harnesses que não são o Codex fazem a passada semântica na sessão atual e não chamam o CLI do Codex. Resultados externos só são comparados depois de selar a classificação independente.
+- `13-revisao-pre-push.md`: rotina autoritativa da pré-push; ao reconhecer o pedido, bloqueia consulta a memória e sessões anteriores. A avaliação de memória/histórico dos harnesses além do caso Codex desktop e o efeito na convergência estão pendentes por ferramenta/modo em `999`; a sessão atual não prova isolamento. Em revisão por pares/pré-push reforçada, um orquestrador pode despachar Codex como revisor via CLI conforme `14` e `xpz-llm-delegate`; isso não substitui a passada própria nem limpa o contexto do orquestrador.
 - `SECURITY.md`: política para reporte privado de vulnerabilidades, vazamentos e riscos operacionais sensíveis.
-- No Codex, quando a sessão desktop já mostra `MEMORY_SUMMARY` ou histórico anterior, `scripts/Invoke-Codex.ps1 -BlindReview` oferece a fronteira isolada de `codex exec --ephemeral`, com controles de memória desativados por chamada e recibo verificável; o processo filho não dispara outro `-BlindReview`. Os demais harnesses não usam essa chamada na pré-push; ver `13`.
+- No Codex, quando a sessão desktop já mostra `MEMORY_SUMMARY` ou histórico anterior, `scripts/Invoke-Codex.ps1 -BlindReview` oferece a fronteira isolada de `codex exec --ephemeral`, com controles de memória desativados por chamada e recibo verificável; o processo filho não dispara outro `-BlindReview`. Essa posição cobre o caso Codex desktop documentado; Codex CLI/delegate e os demais harnesses ainda precisam de avaliação individual em `999`.
 - `CODE_OF_CONDUCT.md`: código de conduta para interações ligadas ao projeto.
 
 ### Documentação operacional KB Intelligence
@@ -323,9 +323,9 @@ Los archivos `10-matriz-part-types-por-tipo.md`, `11-campos-estaveis-vs-variavei
 
 - `CHANGELOG.md`: registro de cambios relevantes desde la adopción del changelog.
 - `CONTRIBUTING.md`: guía para contribuciones, revisión previa al push y cuidado con datos reales.
-- `13-revisao-pre-push.md`: rutina autoritativa previa al push; al reconocer la solicitud, bloquea las consultas a memoria y sesiones anteriores. Los harnesses que no son Codex hacen la pasada semántica en la sesión actual y no llaman al CLI de Codex. Los resultados externos solo se comparan después de cerrar la clasificación independiente.
+- `13-revisao-pre-push.md`: rutina autoritativa previa al push; al reconocer la solicitud, bloquea las consultas a memoria y sesiones anteriores. La evaluación de memoria/historial de los harnesses más allá del caso Codex de escritorio y su efecto en la convergencia están pendientes por herramienta/modo en `999`; la sesión actual no demuestra aislamiento. En una revisión por pares/pre-push reforzada, un orquestador puede despachar Codex como revisor por CLI según `14` y `xpz-llm-delegate`; eso no sustituye la pasada propia ni limpia el contexto del orquestador.
 - `SECURITY.md`: política para reporte privado de vulnerabilidades, filtraciones y riesgos operativos sensibles.
-- En Codex, cuando la sesión de escritorio ya muestra `MEMORY_SUMMARY` o historial anterior, `scripts/Invoke-Codex.ps1 -BlindReview` ofrece la frontera aislada de `codex exec --ephemeral`, con controles de memoria desactivados por llamada y recibo verificable; el proceso hijo no dispara otro `-BlindReview`. Los demás harnesses no usan esa llamada en el pre-push; ver `13`.
+- En Codex, cuando la sesión de escritorio ya muestra `MEMORY_SUMMARY` o historial anterior, `scripts/Invoke-Codex.ps1 -BlindReview` ofrece la frontera aislada de `codex exec --ephemeral`, con controles de memoria desactivados por llamada y recibo verificable; el proceso hijo no dispara otro `-BlindReview`. Esta posición cubre el caso Codex de escritorio documentado; Codex CLI/delegate y los demás harnesses aún requieren evaluación individual en `999`.
 - `CODE_OF_CONDUCT.md`: código de conducta para interacciones vinculadas al proyecto.
 
 ### Documentacion operacional KB Intelligence
@@ -587,9 +587,9 @@ The files `10-matriz-part-types-por-tipo.md`, `11-campos-estaveis-vs-variaveis.m
 
 - `CHANGELOG.md`: record of relevant changes from the changelog adoption onward.
 - `CONTRIBUTING.md`: guide for contributions, pre-push review, and care with real data.
-- `13-revisao-pre-push.md`: authoritative pre-push routine; on recognizing the request, it blocks memory and prior-session lookups. Harnesses other than Codex run the semantic pass in the current session and do not call the Codex CLI. External results are compared only after the independent classification is sealed.
+- `13-revisao-pre-push.md`: authoritative pre-push routine; on recognizing the request, it blocks memory and prior-session lookups. Memory/history behavior beyond the documented Codex desktop case, and its effect on convergence, remains pending by tool/mode in `999`; the current session does not prove isolation. In peer-review/reinforced pre-push, an orchestrator may dispatch Codex as a CLI reviewer under `14` and `xpz-llm-delegate`; this does not replace its own pass or clear the orchestrator's context.
 - `SECURITY.md`: policy for private reporting of vulnerabilities, leaks, and sensitive operational risks.
-- In Codex, when the desktop session already shows `MEMORY_SUMMARY` or prior history, `scripts/Invoke-Codex.ps1 -BlindReview` provides an isolated `codex exec --ephemeral` boundary, with per-invocation memory controls disabled and a verifiable receipt; the child process does not start another `-BlindReview`. Other harnesses do not use that call for pre-push; see `13`.
+- In Codex, when the desktop session already shows `MEMORY_SUMMARY` or prior history, `scripts/Invoke-Codex.ps1 -BlindReview` provides an isolated `codex exec --ephemeral` boundary, with per-invocation memory controls disabled and a verifiable receipt; the child process does not start another `-BlindReview`. This position covers the documented Codex desktop case; Codex CLI/delegate and other harnesses still need individual assessment in `999`.
 - `CODE_OF_CONDUCT.md`: code of conduct for project-related interactions.
 
 ### KB Intelligence operational documentation
