@@ -221,7 +221,6 @@ foreach ($docFile in $docFiles) {
                 }
                 if ($hasIgnore) { $ignoredCount++; continue }
                 $flatText = ($unit.RawLines -join ' ')
-                if ($flatText -match '(?i)\bcursor\b') { continue }
                 $onUnit = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
                 foreach ($backend in $canonicalBackends) { if ($backendPatterns[$backend].IsMatch($flatText)) { [void]$onUnit.Add($backend) } }
                 if ($onUnit.Count -lt 2 -or $onUnit.Count -ge $canonicalBackends.Count) { continue }

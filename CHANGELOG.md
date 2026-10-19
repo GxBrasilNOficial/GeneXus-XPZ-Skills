@@ -8,6 +8,8 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 ### Unreleased
 
+- **Triagem conservadora das enumerações pré-push (2026-10-19):** o scanner de backends deixa de suprimir unidades por mencionarem `Cursor`; recortes fechados podem continuar explicitamente marcados com `<!-- backend-parity: ignore -->`. O `13` documenta que conteúdo além de whitespace no `stderr`, mesmo após exit zero e JSON/contrato válidos, gera `GATE_STDERR_NONEMPTY`, marca a varredura incompleta e mantém a questão fora de `mechanicalFailures`. Os self-tests cobrem ambos os comportamentos.
+
 - **Âncora exata e pergunta final na decisão de triagem da pré-push (2026-10-19):** o relatório passa a exibir `code`, `file`, `unitHash` completo e `listedMembers` por candidata; a linha fica apenas como localizador. Quando houver decisões de triagem, a apresentação termina, após o `VEREDICTO`, perguntando diretamente se o usuário concorda com as classificações e autoriza o registro ou quer ajustar algo.
 
 - **Schema estrito do cadastro de triagem da pré-push (2026-10-18):** `schemaVersion` precisa ser um inteiro JSON sem coerção; schema incompatível ou raiz que não seja objeto gera diagnóstico estruturado e mantém candidatas como novas. O self-test do dossiê cobre schema não numérico, tipo booleano e raiz nula (`107/107`). A ideia já implementada foi retirada de `999` e registrada no histórico mensal.
@@ -451,6 +453,8 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 ### Unreleased
 
+- **Triaje conservador de las enumeraciones de pre-push (2026-10-19):** el analizador de backends deja de suprimir unidades por mencionar `Cursor`; los recortes cerrados pueden seguir marcándose explícitamente con `<!-- backend-parity: ignore -->`. El documento `13` aclara que cualquier contenido distinto de whitespace en `stderr`, incluso con exit cero y JSON/contrato válidos, genera `GATE_STDERR_NONEMPTY`, marca el escaneo como incompleto y mantiene la incidencia fuera de `mechanicalFailures`. Los self-tests cubren ambos comportamientos.
+
 - **Ancla exacta y pregunta final en la decisión del triaje de pre-push (2026-10-19):** el informe muestra `code`, `file`, el `unitHash` completo y `listedMembers` para cada candidato; la línea solo sirve como localizador. Cuando haya decisiones de triaje, la presentación termina, después del `VEREDICTO`, preguntando directamente si el usuario está de acuerdo con las clasificaciones y autoriza el registro o quiere ajustar algo.
 
 - **Esquema estricto del registro de triaje de pre-push (2026-10-18):** `schemaVersion` debe ser un entero JSON sin coerción; un esquema incompatible o una raíz que no sea objeto genera un diagnóstico estructurado y mantiene los candidatos como nuevos. El self-test del dossier cubre un esquema no numérico, el tipo booleano y la raíz nula (`107/107`). La idea ya implementada se retiró de `999` y se registró en el historial mensual.
@@ -891,6 +895,8 @@ All relevant changes to this repository will be recorded here from this adoption
 The format keeps an `Unreleased` section for changes not yet published in a formal version. This repository does not yet use public semantic versioning; when that changes, future sections should record the corresponding tag.
 
 ### Unreleased
+
+- **Conservative triage of pre-push enumerations (2026-10-19):** the backend scanner no longer suppresses units merely because they mention `Cursor`; closed excerpts can still be explicitly marked with `<!-- backend-parity: ignore -->`. Document `13` clarifies that any non-whitespace content on `stderr`, even with exit zero and valid JSON/contract, produces `GATE_STDERR_NONEMPTY`, marks the scan incomplete, and keeps the issue outside `mechanicalFailures`. Self-tests cover both behaviors.
 
 - **Exact anchors and final question for pre-push triage decisions (2026-10-19):** the report shows each candidate's `code`, `file`, full `unitHash`, and `listedMembers`; the line is only a locator. When triage decisions apply, the presentation ends after the `VEREDICTO` with a direct question asking whether the user agrees with the classifications and authorizes registration or wants any item adjusted.
 

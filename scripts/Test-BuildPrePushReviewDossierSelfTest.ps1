@@ -519,7 +519,8 @@ try {
 finally { Remove-TempDir -Path $tmp }
 
 # ---------------------------------------------------------------------------
-# Caso (r): falhas consultivas do gate permanecem estruturadas e nao mecanicas
+# Caso (r): falhas consultivas do gate permanecem estruturadas e nao mecanicas,
+# inclusive exit zero + JSON/contrato validos com stderr nao vazio.
 # ---------------------------------------------------------------------------
 function Invoke-EnumerationGateFailureCase {
     param([string]$Mode, [string]$ExpectedIssue)
@@ -533,6 +534,10 @@ function Invoke-EnumerationGateFailureCase {
             'nonzero-json' {
                 $validJson = '{"status":"pass","scanComplete":true,"scanIssues":[],"canonicalMembers":[],"files":[],"candidateCount":0,"displayTruncated":false,"findings":[]}'
                 Set-RepoFile -Root $caseRoot -RelativePath 'scripts/Test-PrePushGateEnumerationParity.ps1' -Content ("Write-Output '{0}'`nexit 7`n" -f $validJson)
+            }
+            'valid-json-stderr' {
+                $validJson = '{"status":"pass","scanComplete":true,"scanIssues":[],"canonicalMembers":[],"files":[],"candidateCount":0,"displayTruncated":false,"findings":[]}'
+                Set-RepoFile -Root $caseRoot -RelativePath 'scripts/Test-PrePushGateEnumerationParity.ps1' -Content ("Write-Output '{0}'`n[Console]::Error.WriteLine('synthetic advisory stderr')`nexit 0`n" -f $validJson)
             }
             'null-candidate-count' {
                 $baselineDossier = Invoke-EnumerationFixtureBuilder -Root $caseRoot
@@ -553,6 +558,10 @@ function Invoke-EnumerationGateFailureCase {
         Assert-EnumerationMechanicalPass -Name "r $Mode" -Dossier $dossier -Mechanical $mechanical
         Assert-True -CaseName "r ${Mode}: triagem declara varredura incompleta" -Condition (-not $mechanical.enumerationTriage.scanComplete -and -not $gate.scanComplete)
         Assert-True -CaseName "r ${Mode}: código de falha estruturado" -Condition (@($gate.scanIssues | Where-Object { $_.code -eq $ExpectedIssue }).Count -eq 1) -Detail ("issues={0}" -f (@($gate.scanIssues | ForEach-Object { $_.code }) -join ', '))
+        if ($Mode -eq 'valid-json-stderr') {
+            Assert-True -CaseName 'r valid-json-stderr: exit zero mantem status do gate em warn' -Condition ($gate.invocationExitCode -eq 0 -and $gate.status -eq 'warn')
+            Assert-True -CaseName 'r valid-json-stderr: stderr preservado no diagnóstico estruturado' -Condition (@($gate.scanIssues | Where-Object { $_.code -eq 'GATE_STDERR_NONEMPTY' -and $_.message -eq 'synthetic advisory stderr' }).Count -eq 1)
+        }
         if ($Mode -eq 'null-candidate-count') {
             Assert-True -CaseName 'r null-candidate-count: triagem não é classificada como órfã' -Condition (@($mechanical.enumerationTriage.orphanedEntries).Count -eq 0)
         }
@@ -563,6 +572,7 @@ function Invoke-EnumerationGateFailureCase {
 Invoke-EnumerationGateFailureCase -Mode 'missing' -ExpectedIssue 'GATE_SCRIPT_MISSING'
 Invoke-EnumerationGateFailureCase -Mode 'throw' -ExpectedIssue 'GATE_NONZERO_EXIT'
 Invoke-EnumerationGateFailureCase -Mode 'nonzero-json' -ExpectedIssue 'GATE_NONZERO_EXIT'
+Invoke-EnumerationGateFailureCase -Mode 'valid-json-stderr' -ExpectedIssue 'GATE_STDERR_NONEMPTY'
 Invoke-EnumerationGateFailureCase -Mode 'null-candidate-count' -ExpectedIssue 'GATE_CONTRACT_INVALID'
 Invoke-EnumerationGateFailureCase -Mode 'invalid-json' -ExpectedIssue 'GATE_INVALID_JSON'
 

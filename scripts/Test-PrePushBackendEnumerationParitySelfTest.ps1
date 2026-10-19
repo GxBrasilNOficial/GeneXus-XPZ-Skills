@@ -11,7 +11,7 @@
       3. Enumeracao completa quebrada em multiplas linhas por wrap de paragrafo (pass).
       4. Subconjunto proprio em linha unica e multi-linha (warn / finding).
       5. Casamento tolerante a formatacao Markdown (negrito, crases, links, pontuacao).
-      6. Respeito a fronteira de dominio (sentencas com \bCursor\b ignoradas).
+      6. Mencao incidental a Cursor nao suprime uma candidata de backends.
       7. Respeito ao marcador inline (<!-- backend-parity: ignore --> / # backend-parity: ignore).
       8. Saida estruturada em JSON e conformidade com contrato comum de gates.
       9. Simulacao de novo backend adicionado ao dispatcher sem atualizacao na doc (deteccao).
@@ -93,8 +93,8 @@ Os backends avaliados inicialmente foram `opencode`, `codex` e `claude-code`.
 ## Cenario 5: Formatacao complexa em subconjunto proprio
 Comparando **[OpenCode](https://example.com)** contra _Copilot_ e `Gemini`.
 
-## Cenario 6: Dominio B (Cursor presente -> deve ser ignorado)
-Ferramentas de agente instaladas: Cursor, Claude Code, Codex, Copilot, Gemini e Antigravity.
+## Cenario 6: Mencao a Cursor nao suprime a candidata
+O recorte comparado com Cursor incluiu opencode, codex e claude-code.
 
 ## Cenario 7: Marcador de excecao inline (deve ser ignorado)
 <!-- backend-parity: ignore -->
@@ -133,9 +133,9 @@ Recorte por eixo stdin-based: apenas opencode, codex e claude-code.
         throw "Cenario 7: ignoredCount deveria ser 1; obtido $($result.ignoredCount)"
     }
 
-    # Cenarios 2, 3, 4, 5, 6: Contagem de findings (apenas Cenarios 4 e 5 devem gerar finding)
-    if ([int]$result.candidateCount -ne 2) {
-        throw "Cenarios 2-6: esperados exatamente 2 findings (Cenarios 4 e 5); obtido $($result.candidateCount). Findings: $(@($result.findings | ForEach-Object { $_.message }) -join ' | ')"
+    # Cenarios 2, 3, 4, 5, 6: apenas Cenarios 4, 5 e 6 devem gerar finding.
+    if ([int]$result.candidateCount -ne 3) {
+        throw "Cenarios 2-6: esperados exatamente 3 findings (Cenarios 4, 5 e 6); obtido $($result.candidateCount). Findings: $(@($result.findings | ForEach-Object { $_.message }) -join ' | ')"
     }
 
     # Validacao das mensagens dos findings
@@ -150,6 +150,11 @@ Recorte por eixo stdin-based: apenas opencode, codex e claude-code.
     $f2 = $result.findings[1]
     if ($f2.message -notmatch 'opencode' -or $f2.message -notmatch 'copilot' -or $f2.message -notmatch 'gemini') {
         throw "Cenario 5: finding 2 deveria listar opencode, copilot e gemini; got $($f2.message)"
+    }
+
+    $f3 = $result.findings[2]
+    if ($f3.message -notmatch 'opencode' -or $f3.message -notmatch 'codex' -or $f3.message -notmatch 'claude-code') {
+        throw "Cenario 6: mencao incidental a Cursor nao deveria suprimir finding; got $($f3.message)"
     }
 
     # Cenário 10: âncora por texto, EOL e deslocamento; editar o texto invalida o hash.
