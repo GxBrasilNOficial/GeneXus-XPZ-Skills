@@ -8,6 +8,8 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 ### Unreleased
 
+- **Acionamento do painel e aptidão para push (2026-10-19):** o pedido simples «execute a rotina pre push, sem push» aciona só a passada do harness atual; painel, subagente ou CLI externo exigem acionamento humano explícito. O `13` separa o veredito semântico da aptidão para push e a mantém não estabelecida enquanto a cegueira por harness/modo estiver pendente; o `14` preserva o bloqueio de `push-ready` nesse estado.
+
 - **Escopo da rota cega Codex na pré-push (2026-10-19):** `scripts/Invoke-Codex.ps1 -BlindReview` cobre a sessão desktop do Codex que já mostra `MEMORY_SUMMARY` ou histórico anterior; o processo filho não dispara outra chamada. Isso não proíbe um orquestrador de outro harness de despachar Codex como revisor delegado na revisão por pares/pré-push reforçada, conforme `14` e `xpz-llm-delegate`. A posição não cobre a memória/histórico dos demais harnesses nem do Codex CLI/delegate; avaliação por ferramenta/modo está pendente em `999`.
 
 - **Rota Codex para passada cega pré-push (2026-10-19):** `scripts/Invoke-Codex.ps1 -BlindReview` inicia `codex exec --ephemeral`, aplica overrides de memória somente à invocação, mantém sandbox `read-only` e registra os controles no recibo. O `13`, `14`, `AGENTS.md` e os resumos operacionais passam a orientar e verificar essa fronteira sem alterar a configuração global do Codex.
@@ -463,6 +465,8 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 ### Unreleased
 
+- **Activación del panel y aptitud para push (2026-10-19):** la solicitud simple «execute a rotina pre push, sem push» activa solo la pasada del harness actual; un panel, subagente o CLI externo requiere activación humana explícita. El `13` separa el veredicto semántico de la aptitud para push y la mantiene sin establecer mientras la ceguera por harness/modo siga pendiente; el `14` conserva el bloqueo de `push-ready` en ese estado.
+
 - **Alcance de la ruta ciega de Codex en pre-push (2026-10-19):** `scripts/Invoke-Codex.ps1 -BlindReview` cubre la sesión de escritorio de Codex que ya muestra `MEMORY_SUMMARY` o historial anterior; el proceso hijo no dispara otra llamada. Esto no prohíbe que un orquestador de otro harness despache Codex como revisor delegado en la revisión por pares/pre-push reforzada, según `14` y `xpz-llm-delegate`. Esta posición no cubre la memoria/historial de los demás harnesses ni de Codex CLI/delegate; la evaluación por herramienta/modo está pendiente en `999`.
 
 - **Ruta Codex para una primera pasada ciega de pre-push (2026-10-19):** `scripts/Invoke-Codex.ps1 -BlindReview` inicia `codex exec --ephemeral`, aplica overrides de memoria solo a esa llamada, mantiene el sandbox `read-only` y registra los controles en el recibo. Los documentos `13`, `14`, `AGENTS.md` y los resúmenes operativos orientan y verifican esta frontera sin cambiar la configuración global de Codex.
@@ -915,6 +919,8 @@ All relevant changes to this repository will be recorded here from this adoption
 The format keeps an `Unreleased` section for changes not yet published in a formal version. This repository does not yet use public semantic versioning; when that changes, future sections should record the corresponding tag.
 
 ### Unreleased
+
+- **Panel activation and push readiness (2026-10-19):** the simple request `execute a rotina pre push, sem push` activates only the current harness's pass; a panel, subagent, or external CLI requires explicit human activation. Document `13` separates the semantic verdict from push readiness and leaves readiness unestablished while blindness by harness/mode remains unresolved; document `14` keeps `push-ready` blocked in that state.
 
 - **Scope of the Codex blind route in pre-push (2026-10-19):** `scripts/Invoke-Codex.ps1 -BlindReview` covers a Codex desktop session that already shows `MEMORY_SUMMARY` or prior history; the child process does not start another call. This does not prohibit an orchestrator in another harness from dispatching Codex as a delegated reviewer in peer review/reinforced pre-push under `14` and `xpz-llm-delegate`. This position does not cover memory/history in other harnesses or Codex CLI/delegate; assessment by tool/mode is pending in `999`.
 
