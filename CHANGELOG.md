@@ -8,6 +8,8 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 ### Unreleased
 
+- **Coerência do estado das enumerações pré-push (2026-10-19):** o orquestrador rejeita como completa uma saída com `scanComplete=true` e `scanIssues` não vazio ou estado `files[].complete=false`; força a varredura incompleta, preserva achados válidos e impede declarar triagens órfãs. O self-test do dossiê cobre as duas contradições.
+
 - **Triagem conservadora das enumerações pré-push (2026-10-19):** o scanner de backends deixa de suprimir unidades por mencionarem `Cursor`; recortes fechados podem continuar explicitamente marcados com `<!-- backend-parity: ignore -->`. O `13` documenta que conteúdo além de whitespace no `stderr`, mesmo após exit zero e JSON/contrato válidos, gera `GATE_STDERR_NONEMPTY`, marca a varredura incompleta e mantém a questão fora de `mechanicalFailures`. Os self-tests cobrem ambos os comportamentos.
 
 - **Âncora exata e pergunta final na decisão de triagem da pré-push (2026-10-19):** o relatório passa a exibir `code`, `file`, `unitHash` completo e `listedMembers` por candidata; a linha fica apenas como localizador. Quando houver decisões de triagem, a apresentação termina, após o `VEREDICTO`, perguntando diretamente se o usuário concorda com as classificações e autoriza o registro ou quer ajustar algo.

@@ -752,6 +752,21 @@ function Invoke-EnumerationGate {
         return (New-EnumerationGateFailure -ScriptRel $ScriptRel -Code 'GATE_CONTRACT_INVALID' -Message 'candidateCount não corresponde à coleta integral em findings.' -ExitCode $exitCode)
     }
 
+    $incompleteFileStates = @($gateObject.files | Where-Object { -not $_.complete })
+    $declaredIssueCount = @($gateObject.scanIssues).Count
+    if ($gateObject.scanComplete -and ($declaredIssueCount -gt 0 -or $incompleteFileStates.Count -gt 0)) {
+        $contradictions = [System.Collections.Generic.List[string]]::new()
+        if ($declaredIssueCount -gt 0) { $contradictions.Add(("scanIssues contém {0} item(ns)" -f $declaredIssueCount)) }
+        if ($incompleteFileStates.Count -gt 0) { $contradictions.Add(("files contém {0} estado(s) com complete=false" -f $incompleteFileStates.Count)) }
+        $gateObject.scanIssues = @($gateObject.scanIssues) + [pscustomobject][ordered]@{
+            code = 'GATE_CONTRACT_INVALID'
+            path = $ScriptRel
+            message = ("scanComplete=true contradiz {0}; a varredura foi tratada como incompleta." -f ($contradictions -join ' e '))
+        }
+        $gateObject.scanComplete = $false
+        $gateObject.status = 'warn'
+    }
+
     $gateObject | Add-Member -NotePropertyName 'invocationExitCode' -NotePropertyValue $exitCode -Force
     if (-not [string]::IsNullOrWhiteSpace($stderr)) {
         $gateObject.scanIssues = @($gateObject.scanIssues) + [pscustomobject][ordered]@{
