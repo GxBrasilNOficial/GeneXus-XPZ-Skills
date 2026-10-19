@@ -61,6 +61,7 @@ Os arquivos `10-matriz-part-types-por-tipo.md`, `11-campos-estaveis-vs-variaveis
 - `CONTRIBUTING.md`: guia para contribuições, revisão pré-push e cuidado com dados reais.
 - `13-revisao-pre-push.md`: rotina autoritativa da pré-push; ao reconhecer o pedido, bloqueia consulta a memória e sessões anteriores e só permite a passada semântica em fronteira de execução verificável. Conteúdo anterior já visível/injetado invalida o contexto e não se corrige prometendo ignorá-lo; nova sessão, tarefa, fork ou subagente no mesmo aplicativo/runtime não prova isolamento, e CLI/backend separado também exige inicialização/configuração verificáveis. Se não houver rota comprovada, a revisão fica incompleta; resultados externos só são comparados depois de selar a classificação independente.
 - `SECURITY.md`: política para reporte privado de vulnerabilidades, vazamentos e riscos operacionais sensíveis.
+- No Codex, `scripts/Invoke-Codex.ps1 -BlindReview` oferece a fronteira isolada de `codex exec --ephemeral`, com controles de memória desativados por chamada e recibo verificável; ver `13`.
 - `CODE_OF_CONDUCT.md`: código de conduta para interações ligadas ao projeto.
 
 ### Documentação operacional KB Intelligence
@@ -324,6 +325,7 @@ Los archivos `10-matriz-part-types-por-tipo.md`, `11-campos-estaveis-vs-variavei
 - `CONTRIBUTING.md`: guía para contribuciones, revisión previa al push y cuidado con datos reales.
 - `13-revisao-pre-push.md`: rutina autoritativa previa al push; al reconocer la solicitud, bloquea las consultas a memoria y sesiones anteriores y permite la pasada semántica solo en una frontera de ejecución verificable. El contenido anterior ya visible o inyectado invalida el contexto y no se corrige prometiendo ignorarlo; una nueva sesión, tarea, fork o subagente en la misma aplicación/runtime no demuestra aislamiento, y un CLI/backend separado también requiere una inicialización/configuración verificable. Si no hay una ruta comprobada, la revisión queda incompleta; los resultados externos solo se comparan después de cerrar la clasificación independiente.
 - `SECURITY.md`: política para reporte privado de vulnerabilidades, filtraciones y riesgos operativos sensibles.
+- En Codex, `scripts/Invoke-Codex.ps1 -BlindReview` ofrece la frontera aislada de `codex exec --ephemeral`, con controles de memoria desactivados por llamada y recibo verificable; ver `13`.
 - `CODE_OF_CONDUCT.md`: código de conducta para interacciones vinculadas al proyecto.
 
 ### Documentacion operacional KB Intelligence
@@ -587,6 +589,7 @@ The files `10-matriz-part-types-por-tipo.md`, `11-campos-estaveis-vs-variaveis.m
 - `CONTRIBUTING.md`: guide for contributions, pre-push review, and care with real data.
 - `13-revisao-pre-push.md`: authoritative pre-push routine; on recognizing the request, it blocks memory and prior-session lookups and permits the semantic pass only through a verifiable execution boundary. Prior content already visible or injected invalidates the context and cannot be repaired by promising to ignore it; a new session, task, fork, or subagent in the same application/runtime does not prove isolation, and a separate CLI/backend also requires verifiable initialization/configuration. Without a proven route, the review remains incomplete; external results are compared only after the independent classification is sealed.
 - `SECURITY.md`: policy for private reporting of vulnerabilities, leaks, and sensitive operational risks.
+- In Codex, `scripts/Invoke-Codex.ps1 -BlindReview` provides an isolated `codex exec --ephemeral` boundary, with per-invocation memory controls disabled and a verifiable receipt; see `13`.
 - `CODE_OF_CONDUCT.md`: code of conduct for project-related interactions.
 
 ### KB Intelligence operational documentation

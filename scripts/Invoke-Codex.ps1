@@ -19,6 +19,11 @@
     exec e agentico e PODE ler o filesystem do workspace; isso NAO contorna o gate de
     confidencialidade.
 
+    -BlindReview inicia um codex exec novo e descartavel (--ephemeral), desativa a feature
+    de memorias e o uso/geracao de memorias por overrides desta invocacao, e registra esses
+    controles no request.json. Nao altera a configuracao global do Codex nem recebe historico
+    da conversa chamadora.
+
     CONFIDENCIALIDADE: este script NAO decide para onde o dado pode ir. Antes de enviar
     payload sensivel (conteudo de pasta paralela de KB) a um modelo, o chamador deve passar
     pelo gate Resolve-LlmDelegateAuthorization.ps1 (use -Backend codex), conforme a skill.
@@ -45,6 +50,10 @@
     Profile da config do Codex (codex exec -p <id>).
 .PARAMETER Cd
     Diretorio de trabalho do agente (codex exec -C <dir>).
+.PARAMETER BlindReview
+    Cria uma execucao independente e descartavel para revisao cega: --ephemeral e overrides
+    por invocacao para features.memories, memories.use_memories e memories.generate_memories,
+    todos false. O sandbox continua read-only. Registra os controles no request.json.
 .PARAMETER ReasoningEffort
     Nivel de esforco de raciocinio (codex exec -c model_reasoning_effort=<nivel>). Opcional;
     quando omitido, vale o model_reasoning_effort do config.toml/profile.
@@ -79,6 +88,7 @@ param(
     [ValidateSet('ollama', 'lmstudio')] [string] $LocalProvider,
     [string] $Profile,
     [string] $Cd,
+    [switch] $BlindReview,
     [string] $CodexExe,
     [ValidateRange(1, 3600)] [int] $TimeoutSec = 1200,
     [string] $TempDir,
@@ -124,6 +134,16 @@ $invokeOut   = "$base.invoke-out.txt"
 $invokeErr   = "$base.invoke-err.txt"
 
 $startedAt = Format-CodexUtcTimestamp -Value (Get-Date).ToUniversalTime()
+$memoryOverrides = $null
+$executionMode = 'normal'
+if ($BlindReview) {
+    $executionMode = 'ephemeral-blind-review'
+    $memoryOverrides = [ordered]@{
+        'features.memories' = $false
+        'memories.use_memories' = $false
+        'memories.generate_memories' = $false
+    }
+}
 $requestObj = [ordered]@{
     schemaVersion = 1
     source        = 'invoke-sync'
@@ -131,6 +151,10 @@ $requestObj = [ordered]@{
     model         = if ($Model) { $Model } else { $null }
     startedAt     = $startedAt
     lastMsgPath   = $lastMsgPath
+    blindReview   = [bool]$BlindReview
+    ephemeral     = [bool]$BlindReview
+    executionMode = $executionMode
+    memoryOverrides = $memoryOverrides
 }
 Write-CodexJsonAtomic -Object $requestObj -Path $reqPath
 
@@ -148,6 +172,12 @@ if ($LocalProvider) { $arguments += @('--local-provider', $LocalProvider) }
 if ($Profile) { $arguments += @('-p', $Profile) }
 if ($Cd) { $arguments += @('-C', $Cd) }
 if ($ReasoningEffort) { $arguments += @('-c', "model_reasoning_effort=$ReasoningEffort") }
+if ($BlindReview) {
+    $arguments += '--ephemeral'
+    foreach ($key in @('features.memories', 'memories.use_memories', 'memories.generate_memories')) {
+        $arguments += @('-c', "$key=false")
+    }
+}
 $arguments += '-'
 
 $script:captureOutcome = 'success'
@@ -299,6 +329,9 @@ finally {
     try {
         [Console]::Error.WriteLine("XPZ_CODEX_LASTMSG=$lastMsgPath")
         [Console]::Error.WriteLine("XPZ_CODEX_REQUEST=$reqPath")
+        if ($BlindReview) {
+            [Console]::Error.WriteLine('XPZ_CODEX_BLIND_REVIEW=ephemeral;features.memories=false;memories.use_memories=false;memories.generate_memories=false')
+        }
         if ($script:recoveredAfterTimeout) {
             [Console]::Error.WriteLine('XPZ_CODEX_RECOVERED_AFTER_TIMEOUT=1')
         }
