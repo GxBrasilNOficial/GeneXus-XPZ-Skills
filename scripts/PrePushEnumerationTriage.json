@@ -83,32 +83,6 @@
     },
     {
       "code": "BACKEND_ENUMERATION_SUBSET",
-      "file": "13-revisao-pre-push.md",
-      "unitHash": "5c95b7ca9df80ce0045d6ed8efd14d8c3004f6478bca8d054a043d64108d8ede",
-      "listedMembers": [
-        "antigravity",
-        "claude-code",
-        "copilot",
-        "gemini",
-        "opencode"
-      ],
-      "verdict": "non-gap",
-      "reason": "A passagem identifica os adapters sem rota cega documentada; reavaliar se o conjunto de adapters mudar.",
-      "triagedAt": "2026-10-19",
-      "triagedBy": "Codex, com autorização do usuário",
-      "kind": "live-contract",
-      "excerpt": "| OpenCode, Claude Code, Copilot, Gemini e Antigravity via adapters XPZ | Nenhuma rota cega pré-push comprovada/documentada nesta base | Perfil `plan`, somente leitura, scratch descartável, ferramentas desativadas ou aus…",
-      "canonicalMembers": [
-        "antigravity",
-        "claude-code",
-        "codex",
-        "copilot",
-        "gemini",
-        "opencode"
-      ]
-    },
-    {
-      "code": "BACKEND_ENUMERATION_SUBSET",
       "file": "15-revisao-por-pares.md",
       "unitHash": "8615f2e770e0caa70a0a5f15396bc8bd02839c8712a5046ff14b9a41bde25705",
       "listedMembers": [
