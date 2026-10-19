@@ -20,7 +20,7 @@ A primeira leitura de contexto deve ficar restrita ao pedido atual e aos documen
 
 Conteúdo de outra sessão que já esteja visível no contexto — incluindo memória ou resumo injetado pelo sistema antes da primeira ação do agente — conta como **exposição**, mesmo que o agente não o abra deliberadamente ou prometa ignorá-lo. Esse contexto não pode ser purificado por uma declaração de desuso. Uma nova tarefa, sessão, fork ou subagente no mesmo aplicativo/runtime não prova isolamento: `MEMORY_SUMMARY` pode ser injetado novamente. Se isso ocorrer, não repita a tentativa nesse runtime. Só retome em outra fronteira de execução que receba entrada controlada, sem histórico da conversa, e cuja inicialização permita verificar que a memória não foi injetada; o revisor ainda precisa acessar o `HEAD`/dossiê fixado e as instruções versionadas necessárias. A existência de um CLI ou backend separado não prova a condição por si só: verifique as instruções e configurações que ele carrega. Se não houver uma rota assim comprovada e autorizada, encerre como `VEREDICTO: revisão cega não verificada; pré-push incompleta`. Não use o contexto contaminado para classificar semanticamente, escolher entre interpretações ou reconciliar pareceres.
 
-### Fronteira cega disponível no Codex
+### Rotas cegas verificáveis por harness
 
 Quando o contexto do Codex desktop já mostrar `MEMORY_SUMMARY` ou conteúdo de sessão anterior, não tente continuar a passada semântica nele. Esta base oferece a fronteira `scripts/Invoke-Codex.ps1 -BlindReview`: ela inicia um `codex exec` novo, sem identificador/histórico da conversa chamadora, com `--ephemeral`, sandbox `read-only` e overrides desta invocação para `features.memories=false`, `memories.use_memories=false` e `memories.generate_memories=false`. A configuração global do Codex permanece intacta.
 
@@ -33,6 +33,17 @@ pwsh -NoProfile -File scripts/Invoke-Codex.ps1 -MessagePath "<prompt.txt>" -Blin
 Se a comparação exigir o remoto atual, o chamador pode executar `git fetch origin` antes de iniciar o processo isolado e informar somente esse fato operacional no prompt; o revisor inicia sua leitura pelos `README.md` e `AGENTS.md` versionados e executa o passo mecânico sobre as refs já atualizadas. Use `-RetentionMode public` para manter o recibo verificável. Antes de aceitar o parecer, confira o stderr `XPZ_CODEX_BLIND_REVIEW=...` e o `request.json` apontado por `XPZ_CODEX_REQUEST=`: `blindReview=true`, `ephemeral=true`, `executionMode=ephemeral-blind-review` e os três overrides precisam estar como `false`. O revisor também verifica seu contexto inicial; se memória, `MEMORY_SUMMARY` ou histórico da conversa chamadora estiver visível, ele para e declara cegueira não verificada. O coordenador contaminado só pode repassar o parecer, sem classificá-lo nem reconciliá-lo.
 
 Essa rota prova a configuração solicitada ao processo e a ausência de continuidade de conversa; não transforme a simples existência de outro CLI em prova. Falha do adapter, ausência de recibo, override divergente ou conteúdo anterior visível mantém a rotina incompleta.
+
+**Estado atual das rotas por harness:**
+
+| Harness/rota | Estado nesta base | Evidência exigida nesta execução |
+| --- | --- | --- |
+| Codex via `scripts/Invoke-Codex.ps1 -BlindReview` | Rota implementada, com controles e recibo definidos | Conferir sentinela e `request.json` conforme acima; o revisor deve confirmar que não recebeu memória, resumo ou histórico anterior no contexto inicial. |
+| Cursor, sessão interativa | Nenhuma rota cega comprovada/documentada nesta base | Abrir outra sessão, tarefa ou agente no Cursor não basta. Sem evidência específica de inicialização sem memória/histórico, não classificar semanticamente. |
+| OpenCode, Claude Code, Copilot, Gemini e Antigravity via adapters XPZ | Nenhuma rota cega pré-push comprovada/documentada nesta base | Perfil `plan`, somente leitura, scratch descartável, ferramentas desativadas ou ausência de persistência não provam isolamento de memória/histórico. Exigir configuração e recibo próprios antes de classificar. |
+| Outro harness ou backend | Não presumido | Avaliar a rota concreta; não inferir isolamento por ser outro processo, CLI, provedor ou aplicativo. |
+
+Uma rota nova só passa a contar depois que sua documentação identifica como o processo/sessão é iniciado sem histórico, memória ou contexto injetado; mostra um recibo observável da versão, configuração e controles efetivamente aplicados; inclui teste de regressão do adapter para argumentos/recibo; e exige que o revisor declare o estado do contexto inicial antes do primeiro veredito. O teste do adapter prova o que ele enviou, não o conteúdo interno ou oculto do contexto do modelo. Preserve também o acesso ao `HEAD`/dossiê fixado e o gate de confidencialidade. Até essa evidência existir e ser conferida na execução, use `VEREDICTO: revisão cega não verificada; pré-push incompleta`.
 
 ## Passo mecânico inicial
 

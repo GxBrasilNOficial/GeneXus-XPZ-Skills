@@ -2,9 +2,10 @@
 
 <#
 .SYNOPSIS
-    Self-test da captura duravel Codex (TempDir, KeepDays, sentinelas, Watch, kb-sensitive).
+    Self-test da captura duravel Codex e dos controles enviados por -BlindReview.
 .DESCRIPTION
     Deterministico com fake-exe. Nunca toca %TEMP%\codex-jobs real do utilizador.
+    Verifica argumentos e recibo do adapter; nao comprova o contexto interno do modelo.
     Sentinela: OK: Test-CodexDurableCaptureSelfTest.ps1
 #>
 [CmdletBinding()]
@@ -32,6 +33,7 @@ $jobs = Join-Path $tmp 'jobs'
 $prevDisable = $env:XPZ_CODEX_DISABLE_KEEPDAYS
 $env:XPZ_CODEX_DISABLE_KEEPDAYS = '1'
 $prevJobsDir = $env:XPZ_CODEX_JOBS_DIR
+$prevArgsCapture = $env:XPZ_TEST_CODEX_ARGS_CAPTURE
 
 try {
     # --- fake readers ---
@@ -40,6 +42,10 @@ try {
 $o = $null
 for ($i = 0; $i -lt $args.Count; $i++) { if ($args[$i] -eq '-o') { $o = $args[$i + 1]; break } }
 $s = [Console]::In.ReadToEnd()
+if ($env:XPZ_TEST_CODEX_ARGS_CAPTURE) {
+    $argsJson = ConvertTo-Json -InputObject @($args) -Compress
+    [IO.File]::WriteAllText($env:XPZ_TEST_CODEX_ARGS_CAPTURE, $argsJson, [Text.UTF8Encoding]::new($false))
+}
 if ($o) { Set-Content -LiteralPath $o -Value ('OPINION=' + $s.Length) -Encoding utf8 -NoNewline }
 exit 0
 '@ | Set-Content -LiteralPath $okReader -Encoding utf8
@@ -87,7 +93,10 @@ exit 0
 
     # ===== 1 sucesso in-process public =====
     $j1 = Join-Path $jobs 't1'
+    $argsCapture1 = Join-Path $tmp '1-args.json'
+    $env:XPZ_TEST_CODEX_ARGS_CAPTURE = $argsCapture1
     $ans = [string](& $invoke -CodexExe $okCmd -MessagePath $prompt -TempDir $j1 -TimeoutSec 60 -RetentionMode public)
+    Remove-Item Env:\XPZ_TEST_CODEX_ARGS_CAPTURE -ErrorAction SilentlyContinue
     Assert-True ($ans -eq 'OPINION=13') "1: stdout so parecer; got '$ans'"
     $files1 = @(Get-ChildItem -LiteralPath $j1 -File)
     Assert-True ($null -eq (@($files1 | Where-Object { $_.Name -like '*.invoke-*' }) | Select-Object -First 1)) '1: invoke-* apagados'
@@ -95,6 +104,13 @@ exit 0
     $req1File = @($files1 | Where-Object { $_.Name -like '*.request.json' })[0]
     $req1 = Get-Content -LiteralPath $req1File.FullName -Raw | ConvertFrom-Json
     Assert-True ($req1.captureOutcome -eq 'success') '1: captureOutcome=success'
+    Assert-True ($req1.blindReview -eq $false -and $req1.ephemeral -eq $false) '1: invocacao normal nao marcada cega/efemera'
+    Assert-True ($req1.executionMode -eq 'normal' -and $null -eq $req1.memoryOverrides) '1: invocacao normal sem overrides de memoria'
+    $args1 = @(Get-Content -LiteralPath $argsCapture1 -Raw | ConvertFrom-Json)
+    Assert-True ($args1 -notcontains '--ephemeral') '1: invocacao normal sem --ephemeral'
+    Assert-True ($args1 -notcontains 'features.memories=false') '1: invocacao normal sem override features.memories'
+    Assert-True ($args1 -notcontains 'memories.use_memories=false') '1: invocacao normal sem override memories.use_memories'
+    Assert-True ($args1 -notcontains 'memories.generate_memories=false') '1: invocacao normal sem override memories.generate_memories'
     Write-Host 'PASS 1 sucesso public' -ForegroundColor Green
     # 12k: mesmo caminho de sucesso — finally nao lanca; parecer via successText
     Assert-True ($ans.Length -gt 0) '12k: texto devolvido sem throw'
@@ -118,6 +134,39 @@ exit 0
     Assert-True ($err1b -match 'XPZ_CODEX_REQUEST=') '1b: sentinela REQUEST em stderr'
     Assert-True ($out1b -notmatch 'XPZ_CODEX_') '1b: stdout sem sentinela'
     Write-Host 'PASS 1b out-of-process' -ForegroundColor Green
+
+    # ===== 1c blind review: argumentos, recibo e sentinela =====
+    $j1c = Join-Path $jobs 't1c-blind'
+    $argsCapture1c = Join-Path $tmp '1c-args.json'
+    $env:XPZ_TEST_CODEX_ARGS_CAPTURE = $argsCapture1c
+    $stdout1c = Join-Path $tmp '1c-out.txt'
+    $stderr1c = Join-Path $tmp '1c-err.txt'
+    $p1c = Start-Process -FilePath pwsh -ArgumentList @(
+        '-NoProfile', '-File', $invoke,
+        '-CodexExe', $okCmd, '-MessagePath', $prompt, '-TempDir', $j1c,
+        '-TimeoutSec', '60', '-RetentionMode', 'public', '-BlindReview'
+    ) -Wait -PassThru -NoNewWindow -RedirectStandardOutput $stdout1c -RedirectStandardError $stderr1c
+    Remove-Item Env:\XPZ_TEST_CODEX_ARGS_CAPTURE -ErrorAction SilentlyContinue
+    Assert-True ($p1c.ExitCode -eq 0) "1c: exit 0 got $($p1c.ExitCode)"
+    $out1c = (Get-Content -LiteralPath $stdout1c -Raw).Trim()
+    $err1c = Get-Content -LiteralPath $stderr1c -Raw -ErrorAction SilentlyContinue
+    Assert-True ($out1c -eq 'OPINION=13') "1c: stdout so parecer; got '$out1c'"
+    Assert-True ($err1c -match 'XPZ_CODEX_BLIND_REVIEW=ephemeral;features\.memories=false;memories\.use_memories=false;memories\.generate_memories=false') '1c: recibo de blind review em stderr'
+    $req1cPath = @(Get-ChildItem -LiteralPath $j1c -Filter '*.request.json')[0].FullName
+    $req1c = Get-Content -LiteralPath $req1cPath -Raw | ConvertFrom-Json
+    Assert-True ($req1c.blindReview -eq $true -and $req1c.ephemeral -eq $true) '1c: recibo blindReview/ephemeral true'
+    Assert-True ($req1c.executionMode -eq 'ephemeral-blind-review') '1c: executionMode correto'
+    Assert-True ($req1c.memoryOverrides.PSObject.Properties['features.memories'].Value -eq $false) '1c: features.memories=false no recibo'
+    Assert-True ($req1c.memoryOverrides.PSObject.Properties['memories.use_memories'].Value -eq $false) '1c: memories.use_memories=false no recibo'
+    Assert-True ($req1c.memoryOverrides.PSObject.Properties['memories.generate_memories'].Value -eq $false) '1c: memories.generate_memories=false no recibo'
+    $args1c = @(Get-Content -LiteralPath $argsCapture1c -Raw | ConvertFrom-Json)
+    Assert-True ($args1c -contains '--ephemeral') '1c: --ephemeral passado ao processo'
+    Assert-True ($args1c -contains 'features.memories=false') '1c: override features.memories passado ao processo'
+    Assert-True ($args1c -contains 'memories.use_memories=false') '1c: override memories.use_memories passado ao processo'
+    Assert-True ($args1c -contains 'memories.generate_memories=false') '1c: override memories.generate_memories passado ao processo'
+    Assert-True ($err1c -match 'XPZ_CODEX_REQUEST=') '1c: caminho do recibo indicado em stderr'
+    Assert-True ($out1c -notmatch 'XPZ_CODEX_') '1c: stdout sem sentinelas'
+    Write-Host 'PASS 1c blind review argv/recibo' -ForegroundColor Green
 
     # ===== 2a timeout com bytes, RetentionMode=public =====
     $j2a = Join-Path $jobs 't2a'
@@ -623,6 +672,11 @@ finally {
         Remove-Item Env:\XPZ_CODEX_JOBS_DIR -ErrorAction SilentlyContinue
     } else {
         $env:XPZ_CODEX_JOBS_DIR = $prevJobsDir
+    }
+    if ($null -eq $prevArgsCapture) {
+        Remove-Item Env:\XPZ_TEST_CODEX_ARGS_CAPTURE -ErrorAction SilentlyContinue
+    } else {
+        $env:XPZ_TEST_CODEX_ARGS_CAPTURE = $prevArgsCapture
     }
     Remove-Item Env:\XPZ_TEST_CODEX_START_FAIL_SPAWN -ErrorAction SilentlyContinue
     Remove-Item Env:\XPZ_TEST_CODEX_START_FAIL_REQUEST_REWRITE -ErrorAction SilentlyContinue
