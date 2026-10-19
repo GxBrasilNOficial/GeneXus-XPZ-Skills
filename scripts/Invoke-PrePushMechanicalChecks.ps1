@@ -742,7 +742,13 @@ function Invoke-EnumerationGate {
             return (New-EnumerationGateFailure -ScriptRel $ScriptRel -Code 'GATE_CONTRACT_INVALID' -Message 'Achado sem file/code/unitHash/listedMembers válidos.' -ExitCode $exitCode)
         }
     }
-    if ([int]$gateObject.candidateCount -ne @($gateObject.findings).Count) {
+    if ($gateObject.candidateCount -isnot [int] -and $gateObject.candidateCount -isnot [long]) {
+        return (New-EnumerationGateFailure -ScriptRel $ScriptRel -Code 'GATE_CONTRACT_INVALID' -Message 'candidateCount deve ser um inteiro JSON não negativo.' -ExitCode $exitCode)
+    }
+    if ($gateObject.candidateCount -lt 0) {
+        return (New-EnumerationGateFailure -ScriptRel $ScriptRel -Code 'GATE_CONTRACT_INVALID' -Message 'candidateCount deve ser um inteiro JSON não negativo.' -ExitCode $exitCode)
+    }
+    if ($gateObject.candidateCount -ne @($gateObject.findings).Count) {
         return (New-EnumerationGateFailure -ScriptRel $ScriptRel -Code 'GATE_CONTRACT_INVALID' -Message 'candidateCount não corresponde à coleta integral em findings.' -ExitCode $exitCode)
     }
 

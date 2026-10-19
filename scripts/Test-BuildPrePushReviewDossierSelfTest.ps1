@@ -516,6 +516,16 @@ function Invoke-EnumerationGateFailureCase {
                 $validJson = '{"status":"pass","scanComplete":true,"scanIssues":[],"canonicalMembers":[],"files":[],"candidateCount":0,"displayTruncated":false,"findings":[]}'
                 Set-RepoFile -Root $caseRoot -RelativePath 'scripts/Test-PrePushGateEnumerationParity.ps1' -Content ("Write-Output '{0}'`nexit 7`n" -f $validJson)
             }
+            'null-candidate-count' {
+                $baselineDossier = Invoke-EnumerationFixtureBuilder -Root $caseRoot
+                $baselineMechanical = Get-MechanicalPayloadFromDossier -Dossier $baselineDossier
+                $baselineFinding = @($baselineMechanical.gates.gateEnumerationParity.findings)[0]
+                if ($null -eq $baselineFinding) { throw 'A fixture deveria produzir uma candidata de gate antes de simular candidateCount nulo.' }
+                $staleEntry = New-TriageEntry -Finding $baselineFinding -Kind 'closed' -CanonicalMembers @() -Reason 'Triagem de regressão para cobertura de órfãos.'
+                Write-TriageCatalog -Root $caseRoot -Entries @($staleEntry)
+                $invalidContractJson = '{"status":"pass","scanComplete":true,"scanIssues":[],"canonicalMembers":[],"files":[],"candidateCount":null,"displayTruncated":false,"findings":[]}'
+                Set-RepoFile -Root $caseRoot -RelativePath 'scripts/Test-PrePushGateEnumerationParity.ps1' -Content ("Write-Output '{0}'`nexit 0`n" -f $invalidContractJson)
+            }
             'invalid-json' { Set-RepoFile -Root $caseRoot -RelativePath 'scripts/Test-PrePushGateEnumerationParity.ps1' -Content "Write-Output '{ not-json'`nexit 0`n" }
             default { throw "Modo de falha não reconhecido: $Mode" }
         }
@@ -525,6 +535,9 @@ function Invoke-EnumerationGateFailureCase {
         Assert-EnumerationMechanicalPass -Name "r $Mode" -Dossier $dossier -Mechanical $mechanical
         Assert-True -CaseName "r ${Mode}: triagem declara varredura incompleta" -Condition (-not $mechanical.enumerationTriage.scanComplete -and -not $gate.scanComplete)
         Assert-True -CaseName "r ${Mode}: código de falha estruturado" -Condition (@($gate.scanIssues | Where-Object { $_.code -eq $ExpectedIssue }).Count -eq 1) -Detail ("issues={0}" -f (@($gate.scanIssues | ForEach-Object { $_.code }) -join ', '))
+        if ($Mode -eq 'null-candidate-count') {
+            Assert-True -CaseName 'r null-candidate-count: triagem não é classificada como órfã' -Condition (@($mechanical.enumerationTriage.orphanedEntries).Count -eq 0)
+        }
     }
     finally { Remove-TempDir -Path $caseRoot }
 }
@@ -532,6 +545,7 @@ function Invoke-EnumerationGateFailureCase {
 Invoke-EnumerationGateFailureCase -Mode 'missing' -ExpectedIssue 'GATE_SCRIPT_MISSING'
 Invoke-EnumerationGateFailureCase -Mode 'throw' -ExpectedIssue 'GATE_NONZERO_EXIT'
 Invoke-EnumerationGateFailureCase -Mode 'nonzero-json' -ExpectedIssue 'GATE_NONZERO_EXIT'
+Invoke-EnumerationGateFailureCase -Mode 'null-candidate-count' -ExpectedIssue 'GATE_CONTRACT_INVALID'
 Invoke-EnumerationGateFailureCase -Mode 'invalid-json' -ExpectedIssue 'GATE_INVALID_JSON'
 
 Write-Output '---'
