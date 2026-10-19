@@ -562,7 +562,7 @@
         "opencode"
       ],
       "verdict": "non-gap",
-      "reason": "A passagem lista quais backends têm jobs assíncronos implementados; reavaliar se o conjunto de adapters mudar.",
+      "reason": "A passagem descreve a allowlist de harnesses e as formas canônicas de invocação dos adapters, não o inventário completo de backends; reavaliar se essa allowlist ou o conjunto canônico de backends mudar.",
       "triagedAt": "2026-10-19",
       "triagedBy": "Codex, com autorização do usuário",
       "kind": "live-contract",
