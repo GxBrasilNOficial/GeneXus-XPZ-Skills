@@ -59,7 +59,7 @@ Os arquivos `10-matriz-part-types-por-tipo.md`, `11-campos-estaveis-vs-variaveis
 
 - `CHANGELOG.md`: registro de mudanças relevantes a partir da adoção do changelog.
 - `CONTRIBUTING.md`: guia para contribuições, revisão pré-push e cuidado com dados reais.
-- `13-revisao-pre-push.md`: rotina autoritativa da pré-push; exige passada semântica inicial em contexto isolado, sem memória de outras sessões nem resultados de revisão externos ao `HEAD`, e só os compara depois de selar a classificação independente.
+- `13-revisao-pre-push.md`: rotina autoritativa da pré-push; ao reconhecer o pedido, bloqueia consulta a memória e sessões anteriores e só permite a passada semântica em contexto verificavelmente limpo. Conteúdo anterior já visível/injetado invalida o contexto e não se corrige prometendo ignorá-lo; resultados externos só são comparados depois de selar a classificação independente.
 - `SECURITY.md`: política para reporte privado de vulnerabilidades, vazamentos e riscos operacionais sensíveis.
 - `CODE_OF_CONDUCT.md`: código de conduta para interações ligadas ao projeto.
 
@@ -322,7 +322,7 @@ Los archivos `10-matriz-part-types-por-tipo.md`, `11-campos-estaveis-vs-variavei
 
 - `CHANGELOG.md`: registro de cambios relevantes desde la adopción del changelog.
 - `CONTRIBUTING.md`: guía para contribuciones, revisión previa al push y cuidado con datos reales.
-- `13-revisao-pre-push.md`: rutina autoritativa previa al push; exige una primera pasada semántica en un contexto aislado, sin memoria de otras sesiones ni resultados de revisión externos al `HEAD`, y solo los compara después de cerrar la clasificación independiente.
+- `13-revisao-pre-push.md`: rutina autoritativa previa al push; al reconocer la solicitud, bloquea la consulta de memoria y sesiones anteriores y solo permite la pasada semántica en un contexto cuya limpieza pueda verificarse. El contenido anterior ya visible o inyectado invalida el contexto y no se corrige prometiendo ignorarlo; los resultados externos solo se comparan después de cerrar la clasificación independiente.
 - `SECURITY.md`: política para reporte privado de vulnerabilidades, filtraciones y riesgos operativos sensibles.
 - `CODE_OF_CONDUCT.md`: código de conducta para interacciones vinculadas al proyecto.
 
@@ -585,7 +585,7 @@ The files `10-matriz-part-types-por-tipo.md`, `11-campos-estaveis-vs-variaveis.m
 
 - `CHANGELOG.md`: record of relevant changes from the changelog adoption onward.
 - `CONTRIBUTING.md`: guide for contributions, pre-push review, and care with real data.
-- `13-revisao-pre-push.md`: authoritative pre-push routine; requires an initial semantic pass in an isolated context without cross-session memory or review results outside the `HEAD`, and compares them only after the independent classification is sealed.
+- `13-revisao-pre-push.md`: authoritative pre-push routine; on recognizing the request, it blocks memory and prior-session lookups and permits the semantic pass only in a verifiably clean context. Prior content already visible or injected invalidates that context and cannot be repaired by promising to ignore it; external results are compared only after the independent classification is sealed.
 - `SECURITY.md`: policy for private reporting of vulnerabilities, leaks, and sensitive operational risks.
 - `CODE_OF_CONDUCT.md`: code of conduct for project-related interactions.
 

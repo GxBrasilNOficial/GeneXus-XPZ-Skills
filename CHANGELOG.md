@@ -8,7 +8,7 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 ### Unreleased
 
-- **Passada cega na revisão pré-push (2026-10-19):** o `13` exige que a primeira classificação semântica use contexto isolado, sem memória de outras sessões nem resultados de revisão externos ao `HEAD`; resultados externos só podem ser comparados depois de selada a avaliação independente. Se o isolamento não puder ser confirmado, a pré-push fica incompleta. O `14` aplica a mesma cegueira por revisor e exclui pareceres não verificados da convergência.
+- **Passada cega na revisão pré-push (2026-10-19):** o `13` bloqueia consultas a memória e sessões anteriores já no acionamento e exige contexto verificavelmente limpo para a primeira classificação semântica. Memória, resumo ou histórico anterior já visível/injetado invalida o contexto, mesmo sem leitura; prometer ignorá-lo não restaura a cegueira. Sem isolamento verificável, a pré-push fica incompleta. Resultados externos só podem ser comparados depois de selada a classificação independente. O `14` aplica a mesma barreira ao orquestrador e a cada revisor e exclui pareceres não verificados da convergência.
 
 - **Coerência do estado das enumerações pré-push (2026-10-19):** o orquestrador rejeita como completa uma saída com `scanComplete=true` e `scanIssues` não vazio ou estado `files[].complete=false`; força a varredura incompleta, preserva achados válidos e impede declarar triagens órfãs. O self-test do dossiê cobre as duas contradições.
 
@@ -457,7 +457,7 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 ### Unreleased
 
-- **Primera pasada ciega en la revisión pre-push (2026-10-19):** el documento `13` exige que la primera clasificación semántica use un contexto aislado, sin memoria de otras sesiones ni resultados de revisión externos al `HEAD`; los resultados externos solo pueden compararse después de cerrar la evaluación independiente. Si no se puede confirmar el aislamiento, la revisión pre-push queda incompleta. El `14` aplica la misma ceguera a cada revisor y excluye los dictámenes no verificados de la convergencia.
+- **Primera pasada ciega en la revisión pre-push (2026-10-19):** el documento `13` bloquea las consultas a memoria y sesiones anteriores desde que se recibe la solicitud y exige un contexto cuya limpieza pueda verificarse para la primera clasificación semántica. La memoria, los resúmenes o el historial anterior ya visibles o inyectados invalidan el contexto, aunque no se hayan leído; prometer ignorarlos no restaura la ceguera. Sin aislamiento verificable, la revisión pre-push queda incompleta. Los resultados externos solo pueden compararse después de cerrar la clasificación independiente. El `14` aplica la misma barrera al orquestador y a cada revisor, y excluye los dictámenes no verificados de la convergencia.
 
 - **Coherencia del estado de las enumeraciones de pre-push (2026-10-19):** el orquestador rechaza el estado completo cuando `scanComplete=true` viene acompañado de elementos en `scanIssues` o de algún estado de archivo con `complete=false`; fuerza el escaneo incompleto, conserva los hallazgos válidos e impide declarar triajes huérfanos. El self-test del dossier cubre ambas contradicciones.
 
@@ -904,7 +904,7 @@ The format keeps an `Unreleased` section for changes not yet published in a form
 
 ### Unreleased
 
-- **Blind first pass in pre-push review (2026-10-19):** document `13` requires the initial semantic classification to use an isolated context without cross-session memory or review results outside the `HEAD`; those results may be compared only after the independent assessment is sealed. If isolation cannot be verified, pre-push remains incomplete. Document `14` applies the same blindness per reviewer and excludes unverified opinions from convergence.
+- **Blind first pass in pre-push review (2026-10-19):** document `13` blocks memory and prior-session lookups as soon as the request is recognized and requires a verifiably clean context for the initial semantic classification. Prior memory, summaries, or history already visible or injected invalidate the context even if unread; promising to ignore them does not restore blindness. Without verifiable isolation, pre-push remains incomplete. External results may be compared only after the independent classification is sealed. Document `14` applies the same barrier to the coordinator and every reviewer and excludes unverified opinions from convergence.
 
 - **Consistent state for pre-push enumerations (2026-10-19):** the orchestrator rejects a scan as complete if `scanComplete=true` is accompanied by entries in `scanIssues` or any file state has `complete=false`; it marks the scan incomplete, preserves valid findings, and prevents orphaned triage entries from being declared. The dossier self-test covers both contradictions.
 
