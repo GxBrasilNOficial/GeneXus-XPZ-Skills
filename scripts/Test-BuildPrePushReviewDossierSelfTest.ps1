@@ -453,6 +453,24 @@ try {
     Assert-EnumerationMechanicalPass -Name 'q3 catalogo invalido' -Dossier $invalidDossier -Mechanical $invalidMechanical
     Assert-True -CaseName 'q3: JSON inválido não suprime candidatos' -Condition (-not $invalidMechanical.enumerationTriage.catalog.valid -and $invalidMechanical.enumerationTriage.counts.new -eq 2 -and @($invalidMechanical.enumerationTriage.catalog.problems | Where-Object { $_.code -eq 'TRIAGE_CATALOG_INVALID_JSON' }).Count -eq 1)
 
+    Write-TriageCatalog -Root $tmp -Entries @() -RawJson '{"schemaVersion":"not-a-number","entries":[]}'
+    $invalidSchemaDossier = Invoke-EnumerationFixtureBuilder -Root $tmp
+    $invalidSchemaMechanical = Get-MechanicalPayloadFromDossier -Dossier $invalidSchemaDossier
+    Assert-EnumerationMechanicalPass -Name 'q3b schemaVersion nao numerico' -Dossier $invalidSchemaDossier -Mechanical $invalidSchemaMechanical
+    Assert-True -CaseName 'q3b: schemaVersion não numérico mantém candidatos novos' -Condition (-not $invalidSchemaMechanical.enumerationTriage.catalog.valid -and $invalidSchemaMechanical.enumerationTriage.counts.new -eq 2 -and @($invalidSchemaMechanical.enumerationTriage.catalog.problems | Where-Object { $_.code -eq 'TRIAGE_CATALOG_SCHEMA_INVALID' }).Count -eq 1)
+
+    Write-TriageCatalog -Root $tmp -Entries @() -RawJson '{"schemaVersion":true,"entries":[]}'
+    $coercibleSchemaDossier = Invoke-EnumerationFixtureBuilder -Root $tmp
+    $coercibleSchemaMechanical = Get-MechanicalPayloadFromDossier -Dossier $coercibleSchemaDossier
+    Assert-EnumerationMechanicalPass -Name 'q3c schemaVersion booleano' -Dossier $coercibleSchemaDossier -Mechanical $coercibleSchemaMechanical
+    Assert-True -CaseName 'q3c: schemaVersion booleano não é aceito por coerção' -Condition (-not $coercibleSchemaMechanical.enumerationTriage.catalog.valid -and $coercibleSchemaMechanical.enumerationTriage.counts.new -eq 2 -and @($coercibleSchemaMechanical.enumerationTriage.catalog.problems | Where-Object { $_.code -eq 'TRIAGE_CATALOG_SCHEMA_INVALID' }).Count -eq 1)
+
+    Write-TriageCatalog -Root $tmp -Entries @() -RawJson 'null'
+    $nullCatalogDossier = Invoke-EnumerationFixtureBuilder -Root $tmp
+    $nullCatalogMechanical = Get-MechanicalPayloadFromDossier -Dossier $nullCatalogDossier
+    Assert-EnumerationMechanicalPass -Name 'q3d raiz JSON nula' -Dossier $nullCatalogDossier -Mechanical $nullCatalogMechanical
+    Assert-True -CaseName 'q3d: raiz JSON nula mantém candidatos novos' -Condition (-not $nullCatalogMechanical.enumerationTriage.catalog.valid -and $nullCatalogMechanical.enumerationTriage.counts.new -eq 2 -and @($nullCatalogMechanical.enumerationTriage.catalog.problems | Where-Object { $_.code -eq 'TRIAGE_CATALOG_SCHEMA_INVALID' }).Count -eq 1)
+
     Write-TriageCatalog -Root $tmp -Entries @($gateEntry, $gateEntry, $backendEntry)
     $duplicateDossier = Invoke-EnumerationFixtureBuilder -Root $tmp
     $duplicateMechanical = Get-MechanicalPayloadFromDossier -Dossier $duplicateDossier

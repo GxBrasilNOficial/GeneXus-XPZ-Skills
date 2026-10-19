@@ -2,6 +2,18 @@
 
 Registro de ideias que saíram de `999-ideias-pendentes.md` por terem sido implementadas ou incorporadas ao contrato metodológico vigente.
 
+## Registro versionado de triagem para os gates de enumeração — implementação concluída
+
+A ideia foi implementada em 2026-10-18 e movida de `999-ideias-pendentes.md` para este histórico. A entrada original registrava a recorrência de avisos consultivos de enumeração que escondia candidatas novas entre ocorrências já avaliadas.
+
+**Problema e desenho preservados.** Os scanners de gates e backends percorrem o repositório inteiro, inclusive texto fora do diff atual. Em 2026-10-12, 18 avisos recorrentes (1 de gates e 17 de backends) foram julgados não-gap; a revisão manual precisava repetir decisões sem um registro versionado. Marcar as ocorrências em lote ou limitar a busca ao diff perderia justificativas ou o caso de uma frase antiga que fica desatualizada após outro arquivo mudar.
+
+**Implementação.** `scripts/PrePushEnumerationTriage.json` registra decisões semânticas por âncora `(code, file, unitHash)`, `listedMembers`, veredito, motivo, autor/data, trecho e tipo `closed` ou `live-contract`. `scripts/Invoke-PrePushMechanicalChecks.ps1` projeta candidatas novas e triadas, expira `live-contract` quando muda o conjunto canônico e só declara entradas órfãs quando ambos os scanners e o cadastro permitem provar a ausência. Cadastro ausente ou inválido deixa candidatas como novas. Os contratos e escolhas para o relatório semântico estão em `13-revisao-pre-push.md`; o ponteiro está em `09-inventario-e-rastreabilidade-publica.md`.
+
+**Correção de robustez (2026-10-19).** O leitor do cadastro passou a validar o tipo inteiro de `schemaVersion` antes de comparar o valor, sem conversão que possa lançar erro, e rejeita raízes JSON que não sejam objeto. Schema incompatível — inclusive texto não numérico, booleano ou raiz nula — agora produz `TRIAGE_CATALOG_SCHEMA_INVALID` e preserva as candidatas como novas. `Test-BuildPrePushReviewDossierSelfTest.ps1` cobre esses casos e passou com 107/107 asserts nesta correção.
+
+**Residual.** Heurísticas específicas para reduzir falsos positivos do scanner de backends não foram implementadas por esta ideia; continuam como frente separada em `999-ideias-pendentes.md`, na entrada sobre frase de tratamento especial.
+
 ## Qualidade dos avisos de coerência de Transaction e sanidade de Source — recorte v2
 
 Implementado e validado localmente em 2026-10-11, conforme plano v2 congelado e execução autorizada. Origem: itens A2/C1 do relato de 2026-10-05 ([resíduo de controles no 999](../999-ideias-pendentes.md#xpz-relato-20261005-avisos)). O relato registrava nomes textuais em Level/Attribute tratados como desconhecidos e quatro avisos de IsEmpty/IsNull na referência oficial, além de IsAuthorized.

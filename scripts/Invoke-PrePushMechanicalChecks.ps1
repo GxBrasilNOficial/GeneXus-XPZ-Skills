@@ -803,7 +803,29 @@ function Read-EnumerationTriageCatalog {
         $problems.Add([pscustomobject][ordered]@{ code = 'TRIAGE_CATALOG_INVALID_JSON'; path = 'scripts/PrePushEnumerationTriage.json'; message = $_.Exception.Message })
         return [pscustomobject]@{ path = 'scripts/PrePushEnumerationTriage.json'; valid = $false; entries = @(); problems = @($problems); duplicateKeys = @() }
     }
-    if ($null -eq $catalog.PSObject.Properties['schemaVersion'] -or [int]$catalog.schemaVersion -ne 1 -or
+    if ($catalog -isnot [pscustomobject]) {
+        $valid = $false
+        $problems.Add([pscustomobject][ordered]@{ code = 'TRIAGE_CATALOG_SCHEMA_INVALID'; path = 'scripts/PrePushEnumerationTriage.json'; message = 'Esperado um objeto JSON com schemaVersion=1 e entries como array.' })
+        return [pscustomobject]@{ path = 'scripts/PrePushEnumerationTriage.json'; valid = $false; entries = @(); problems = @($problems); duplicateKeys = @() }
+    }
+
+    $schemaVersionProperty = $catalog.PSObject.Properties['schemaVersion']
+    $schemaVersionValue = $null
+    $schemaVersionIsInteger = $false
+    if ($null -ne $schemaVersionProperty) {
+        $schemaVersionValue = $schemaVersionProperty.Value
+        $schemaVersionIsInteger = (
+            $schemaVersionValue -is [System.Byte] -or
+            $schemaVersionValue -is [System.SByte] -or
+            $schemaVersionValue -is [System.Int16] -or
+            $schemaVersionValue -is [System.UInt16] -or
+            $schemaVersionValue -is [System.Int32] -or
+            $schemaVersionValue -is [System.UInt32] -or
+            $schemaVersionValue -is [System.Int64] -or
+            $schemaVersionValue -is [System.UInt64]
+        )
+    }
+    if (-not $schemaVersionIsInteger -or $schemaVersionValue -ne 1 -or
         $null -eq $catalog.PSObject.Properties['entries'] -or $catalog.entries -isnot [array]) {
         $valid = $false
         $problems.Add([pscustomobject][ordered]@{ code = 'TRIAGE_CATALOG_SCHEMA_INVALID'; path = 'scripts/PrePushEnumerationTriage.json'; message = 'Esperados schemaVersion=1 e entries como array.' })

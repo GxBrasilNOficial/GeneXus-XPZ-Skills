@@ -181,28 +181,6 @@ Ambas se somam à causa já registrada (truncar a linha em N chars para triar r�
 - `scripts/Test-PrePushNewTokenPropagation.ps1` (o gate cego a este caso)
 - A entrada «Registro de backend novo na `xpz-llm-delegate`» (invariante dos mapas + nota de `$ContentionKeys`). O destino operacional do Gemini CLI (#5) nesta máquina foi descartado em `998-ideias-descartadas-e-porque.md` (família `google` via Antigravity). Isso **não** é gap da skill ainda listar o #5 no inventário.
 
-## Registro versionado de triagem para os gates de enumeração (ruído recorrente esconde sinal novo)
-
-- **Importância** — média (nenhum gap atual; o risco é o aviso legítimo de uma enumeração realmente defasada se perder no meio de avisos recorrentes já triados).
-- **Maturidade** — ideia com diagnóstico feito; desenho e implementação pendentes, em frente dedicada.
-
-**Diagnóstico (2026-10-12).** Os dois gates consultivos de enumeração varrem o repositório inteiro e disparam as mesmas linhas a cada rodada da pré-push, mesmo quando o intervalo não toca nelas. Na rodada de 2026-10-12 foram 18 avisos (1 de gates, 17 de backends), todos triados linha a linha como **não-gap**: registros datados ou históricos (quem foi consultado numa rodada, escopo de uma versão de desenho), comparações pontuais, nota de inventário já justificada e um contrato vivo conferido contra o código. Atualizar essas linhas para listar o conjunto inteiro as tornaria **falsas**. O gate de backends nasceu com saldo zero no baseline (2026-08-19, entrada acima); o saldo cresceu porque texto novo fechado por natureza foi escrito sem marcador. A triagem é refeita de cabeça a cada rodada, e o aviso novo legítimo (ex.: frase de contrato defasada quando surgir um membro novo no conjunto) apareceria como mais uma linha de uma lista que se aprendeu a ignorar.
-
-Gates afetados:
-
-- `scripts/Test-PrePushGateEnumerationParity.ps1` (não tem marcador de exceção)
-- `scripts/Test-PrePushBackendEnumerationParity.ps1` (tem o marcador `backend-parity: ignore`, permanente e invisível para quem lê depois)
-
-**Direção proposta (opção B).** Arquivo JSON versionado de triagem com, por aviso: arquivo, trecho ou âncora textual estável, código do aviso, veredito, motivo, data e quem triou. Os gates (ou o orquestrador) passam a separar **avisos novos** (destacados, no topo de `agentWarnings`) de **já triados** (listados à parte, com o motivo visível). Se o texto da linha triada mudar, a triagem perde validade e o aviso volta como novo. Nada é silenciado: a decisão fica auditável num lugar só e revisável pelo git. Não substitui a regra do `13` de não marcar contrato vivo — contrato vivo continua fora do registro ou com veredito que expira a cada mudança do conjunto.
-
-**Opções avaliadas e descartadas nesta análise:**
-
-- **Marcar em lote com o marcador de exceção** — esconde a justificativa linha a linha e é permanente; o próprio `13` manda triar em vez de marcar na dúvida.
-- **Detector mais esperto (só frases com forma de enumeração, ignorar linhas datadas)** — heurística; pode deixar passar caso real redigido de outro jeito.
-- **Restringir ao diff do intervalo** — perde exatamente o caso que motivou os gates: a frase antiga, não tocada, que ficou defasada quando outro arquivo ganhou o membro novo.
-
-**Escopo previsto:** os dois gates, `scripts/Invoke-PrePushMechanicalChecks.ps1` (projeção novos vs triados), self-tests de cada gate, `13-revisao-pre-push.md` (regra de uso do registro) e `09` (ponteiro do arquivo novo). Antes de implementar, decidir a âncora estável do aviso (número de linha não serve: muda a cada edição no arquivo).
-
 ## Evolução futura de fidelidade textual em XML GeneXus antes do empacotamento
 
 - **Importância** — média (a primeira proteção bloqueia o churn global forte observado, mas ainda há falsos negativos conscientes).
