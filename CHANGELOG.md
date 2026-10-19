@@ -8,6 +8,8 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 ### Unreleased
 
+- **Passada cega na revisão pré-push (2026-10-19):** o `13` exige que a primeira classificação semântica use contexto isolado, sem memória de outras sessões nem resultados de revisão externos ao `HEAD`; resultados externos só podem ser comparados depois de selada a avaliação independente. Se o isolamento não puder ser confirmado, a pré-push fica incompleta. O `14` aplica a mesma cegueira por revisor e exclui pareceres não verificados da convergência.
+
 - **Coerência do estado das enumerações pré-push (2026-10-19):** o orquestrador rejeita como completa uma saída com `scanComplete=true` e `scanIssues` não vazio ou estado `files[].complete=false`; força a varredura incompleta, preserva achados válidos e impede declarar triagens órfãs. O self-test do dossiê cobre as duas contradições.
 
 - **Triagem conservadora das enumerações pré-push (2026-10-19):** o scanner de backends deixa de suprimir unidades por mencionarem `Cursor`; recortes fechados podem continuar explicitamente marcados com `<!-- backend-parity: ignore -->`. O `13` documenta que conteúdo além de whitespace no `stderr`, mesmo após exit zero e JSON/contrato válidos, gera `GATE_STDERR_NONEMPTY`, marca a varredura incompleta e mantém a questão fora de `mechanicalFailures`. Os self-tests cobrem ambos os comportamentos.
@@ -455,6 +457,8 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 ### Unreleased
 
+- **Primera pasada ciega en la revisión pre-push (2026-10-19):** el documento `13` exige que la primera clasificación semántica use un contexto aislado, sin memoria de otras sesiones ni resultados de revisión externos al `HEAD`; los resultados externos solo pueden compararse después de cerrar la evaluación independiente. Si no se puede confirmar el aislamiento, la revisión pre-push queda incompleta. El `14` aplica la misma ceguera a cada revisor y excluye los dictámenes no verificados de la convergencia.
+
 - **Coherencia del estado de las enumeraciones de pre-push (2026-10-19):** el orquestador rechaza el estado completo cuando `scanComplete=true` viene acompañado de elementos en `scanIssues` o de algún estado de archivo con `complete=false`; fuerza el escaneo incompleto, conserva los hallazgos válidos e impide declarar triajes huérfanos. El self-test del dossier cubre ambas contradicciones.
 
 - **Triaje conservador de las enumeraciones de pre-push (2026-10-19):** el analizador de backends deja de suprimir unidades por mencionar `Cursor`; los recortes cerrados pueden seguir marcándose explícitamente con `<!-- backend-parity: ignore -->`. El documento `13` aclara que cualquier contenido distinto de whitespace en `stderr`, incluso con exit cero y JSON/contrato válidos, genera `GATE_STDERR_NONEMPTY`, marca el escaneo como incompleto y mantiene la incidencia fuera de `mechanicalFailures`. Los self-tests cubren ambos comportamientos.
@@ -899,6 +903,8 @@ All relevant changes to this repository will be recorded here from this adoption
 The format keeps an `Unreleased` section for changes not yet published in a formal version. This repository does not yet use public semantic versioning; when that changes, future sections should record the corresponding tag.
 
 ### Unreleased
+
+- **Blind first pass in pre-push review (2026-10-19):** document `13` requires the initial semantic classification to use an isolated context without cross-session memory or review results outside the `HEAD`; those results may be compared only after the independent assessment is sealed. If isolation cannot be verified, pre-push remains incomplete. Document `14` applies the same blindness per reviewer and excludes unverified opinions from convergence.
 
 - **Consistent state for pre-push enumerations (2026-10-19):** the orchestrator rejects a scan as complete if `scanComplete=true` is accompanied by entries in `scanIssues` or any file state has `complete=false`; it marks the scan incomplete, preserves valid findings, and prevents orphaned triage entries from being declared. The dossier self-test covers both contradictions.
 

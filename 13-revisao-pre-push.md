@@ -61,6 +61,16 @@ A **política de painel** (invariante git-capable, piso de diversidade, serial p
 
 ## Fase semântica — por frente alterada
 
+### Passada inicial cega a resultados externos ao `HEAD`
+
+A primeira classificação semântica deve ser independente de resultados de revisão mantidos fora do `HEAD` avaliado. Antes de começar, fixe o `HEAD` e o intervalo analisado. Até registrar o primeiro veredito para esse estado, não consulte nem forneça ao revisor memória de outras sessões, arquivos de sessões ou conversas anteriores, relatórios semânticos ou classificações que não façam parte do estado versionado revisado. Pedir ao modelo que «ignore» um resultado já exposto não restaura a cegueira.
+
+Se o contexto atual já recebeu resultados externos ao `HEAD` — inclusive por memória carregada automaticamente —, não faça a passada inicial nele. Use um contexto novo e isolado, sem turnos nem memória de outras sessões ou resultados externos ao `HEAD`. Se não for possível confirmar esse isolamento, marque a cegueira como **não verificada**; não apresente a revisão como concluída nem como cega. A revisão deve ser retomada em contexto isolado antes de fechar a pré-push.
+
+O revisor pode consultar o estado versionado do repositório no `HEAD` fixado, pois esse é o objeto da revisão. Registros versionados de triagem fazem parte desse estado e continuam valendo para a triagem mecânica conforme o contrato próprio; eles não substituem a avaliação semântica das candidatas que o scanner apresentar. Não use memória ou resultados externos ao `HEAD` para excluir ou reclassificar uma candidata atual. Depois de registrar a primeira classificação, o agente pode comparar resultados externos anteriores em separado; divergências devem ser relatadas, sem alterar retroativamente o veredito independente. Se a comparação levar a uma nova conclusão, submeta-a a uma nova passada cega.
+
+O relatório deve identificar o `HEAD` revisado, declarar `cegueira: verificada` ou `cegueira: não verificada` e informar se algum resultado de revisão externo ao `HEAD` foi exposto antes do primeiro veredito. Com cegueira não verificada, use `VEREDICTO: revisão cega não verificada; pré-push incompleta` e não conclua ausência de gaps nem prontidão para push.
+
 ### 1. Inventário da frente
 
 Identificar termos, scripts, wrappers, parâmetros, estados, caminhos e regras operacionais introduzidos ou modificados.
@@ -176,6 +186,7 @@ Confirmar se há:
 
 Reportar separadamente:
 
+- estado da passada cega, `HEAD` revisado e eventual exposição de resultados anteriores
 - gaps confirmados
 - flags descartados, com justificativa
 - áreas não cobertas pela busca
@@ -210,6 +221,10 @@ Fechar o relatório técnico com uma das linhas fixas:
 ou
 
 `VEREDICTO: N gap(s) confirmado(s)`
+
+ou, somente quando não houver como verificar a cegueira:
+
+`VEREDICTO: revisão cega não verificada; pré-push incompleta`
 
 (`N` = contagem de gaps confirmados). Avisos descartados e áreas não cobertas **não** contam como gap. A linha é obrigatória mesmo quando o mecânico passou; ausência significa pré-push não concluída. Quando o bloco de decisão sobre triagem da §8 se aplicar, manter essa linha exatamente e acrescentar depois dela a pergunta direta exigida naquela seção; a pergunta será o último conteúdo da apresentação. Nos demais casos, a linha de veredito continua sendo o fechamento.
 
