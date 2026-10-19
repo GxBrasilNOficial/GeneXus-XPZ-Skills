@@ -28,7 +28,7 @@ Preservar rastreabilidade da consolidacao, inventario documental, inventario bru
 
 ## Nota sobre documentos de governança pública
 
-- `Evidência direta`: `13-revisao-pre-push.md` mantém a matriz do suporte cego por harness; nesta base, só `scripts/Invoke-Codex.ps1 -BlindReview` tem uma rota implementada/documentada. `scripts/Test-CodexDurableCaptureSelfTest.ps1` verifica os argumentos, overrides e recibo emitidos, mas não prova o contexto interno do modelo.
+- `Evidência direta`: `13-revisao-pre-push.md` reserva `scripts/Invoke-Codex.ps1 -BlindReview` à sessão Codex já contaminada por memória ou histórico anterior; os demais harnesses não chamam esse CLI na pré-push. `scripts/Test-CodexDurableCaptureSelfTest.ps1` verifica os argumentos, overrides e recibo emitidos, mas não prova o contexto interno do modelo.
 - `Evidência direta`: `CHANGELOG.md` registra mudanças relevantes a partir da adoção do changelog, sem reconstruir retroativamente versões antigas.
 - `Evidência direta`: `CONTRIBUTING.md` orienta contribuições humanas, revisão pré-push, cuidado com dados reais e avaliação de atualização do changelog quando houver impacto público.
 - `Evidência direta`: `SECURITY.md` define o fluxo privado para reportar vulnerabilidades, vazamentos e riscos operacionais sensíveis.
