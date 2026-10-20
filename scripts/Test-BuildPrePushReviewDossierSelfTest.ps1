@@ -556,7 +556,7 @@ finally { Remove-TempDir -Path $tmp }
 # inclusive exit zero + JSON/contrato validos com stderr nao vazio.
 # ---------------------------------------------------------------------------
 function Invoke-EnumerationGateFailureCase {
-    param([string]$Mode, [string]$ExpectedIssue, [string]$RootJson)
+    param([string]$Mode, [string]$ExpectedIssue, [string]$RootJson, [switch]$CheckTextOutput)
     $caseRoot = New-TempDir
     try {
         [void](Initialize-EnumerationFixtureRepo -Root $caseRoot)
@@ -564,11 +564,11 @@ function Invoke-EnumerationGateFailureCase {
         switch ($Mode) {
             'missing' { Remove-Item -LiteralPath $gatePath -Force }
             'throw' { Set-RepoFile -Root $caseRoot -RelativePath 'scripts/Test-PrePushGateEnumerationParity.ps1' -Content "throw 'synthetic gate exception'`n" }
-            { $_ -like 'root-*' } {
+            { $_ -like 'root-*' -or $_ -like 'issue-*' } {
                 $baselineDossier = Invoke-EnumerationFixtureBuilder -Root $caseRoot
                 $baselineMechanical = Get-MechanicalPayloadFromDossier -Dossier $baselineDossier
                 $baselineFinding = @($baselineMechanical.gates.gateEnumerationParity.findings)[0]
-                if ($null -eq $baselineFinding) { throw 'A fixture deveria produzir uma candidata antes de simular raiz JSON inválida.' }
+                if ($null -eq $baselineFinding) { throw 'A fixture deveria produzir uma candidata antes de simular a resposta do scanner.' }
                 $staleEntry = New-TriageEntry -Finding $baselineFinding -Kind 'closed' -CanonicalMembers @() -Reason 'Triagem de regressão para cobertura de órfãos.'
                 Write-TriageCatalog -Root $caseRoot -Entries @($staleEntry)
                 Set-RepoFile -Root $caseRoot -RelativePath 'scripts/Test-PrePushGateEnumerationParity.ps1' -Content ("Write-Output '{0}'`nexit 0`n" -f $RootJson)
@@ -647,9 +647,20 @@ function Invoke-EnumerationGateFailureCase {
         if ($Mode -eq 'null-candidate-count') {
             Assert-True -CaseName 'r null-candidate-count: triagem não é classificada como órfã' -Condition (@($mechanical.enumerationTriage.orphanedEntries).Count -eq 0)
         }
-        if ($Mode -eq 'null-file-state' -or $Mode -eq 'null-finding' -or $Mode -like 'root-*') {
-            Assert-True -CaseName "r ${Mode}: contrato inválido permanece consultivo" -Condition ($gate.invocationExitCode -eq 0 -and $gate.status -eq 'warn')
+        if ($Mode -eq 'null-file-state' -or $Mode -eq 'null-finding' -or $Mode -like 'root-*' -or $Mode -like 'issue-*') {
+            Assert-True -CaseName "r ${Mode}: diagnóstico permanece consultivo" -Condition ($gate.invocationExitCode -eq 0 -and $gate.status -eq 'warn')
             Assert-True -CaseName "r ${Mode}: triagem incompleta não declara entrada órfã" -Condition (@($mechanical.enumerationTriage.orphanedEntries).Count -eq 0)
+        }
+        if ($Mode -eq 'issue-valid') {
+            Assert-True -CaseName 'r issue-valid: diagnóstico válido preservado no JSON' -Condition (@($gate.scanIssues).Count -eq 1 -and $gate.scanIssues[0].path -eq 'README.md' -and $gate.scanIssues[0].message -eq 'synthetic issue')
+        }
+        if ($CheckTextOutput) {
+            $mechanicalPath = Join-Path $caseRoot 'scripts/Invoke-PrePushMechanicalChecks.ps1'
+            $textOutput = & pwsh -NoProfile -File $mechanicalPath -RootPath $caseRoot 2>&1 | Out-String
+            $textExitCode = $LASTEXITCODE
+            Assert-True -CaseName "r ${Mode}: projeção textual termina com exit zero" -Condition ($textExitCode -eq 0) -Detail $textOutput
+            Assert-True -CaseName "r ${Mode}: diagnóstico estruturado visível no texto" -Condition ($textOutput.Contains("SCAN_ISSUE: $ExpectedIssue ["))
+            Assert-True -CaseName "r ${Mode}: texto mantém varredura incompleta sem órfãos" -Condition ($textOutput -match 'SCAN_COMPLETE=false' -and $textOutput -match 'orphaned=0')
         }
         if ($Mode -eq 'complete-with-scan-issues' -or $Mode -eq 'complete-with-incomplete-file') {
             Assert-True -CaseName "r ${Mode}: diagnóstico torna o gate consultivo incompleto" -Condition ($gate.status -eq 'warn' -and @($gate.scanIssues | Where-Object { $_.code -eq 'GATE_CONTRACT_INVALID' }).Count -eq 1)
@@ -680,6 +691,28 @@ $invalidGateRoots = [ordered]@{
 }
 foreach ($rootKind in $invalidGateRoots.Keys) {
     Invoke-EnumerationGateFailureCase -Mode "root-$rootKind" -ExpectedIssue 'GATE_CONTRACT_INVALID' -RootJson $invalidGateRoots[$rootKind]
+}
+
+$scanIssueCases = [ordered]@{
+    'null' = '[null]'
+    'null-complete' = '[null]'
+    'empty-object' = '[{}]'
+    'scalar' = '[42]'
+    'missing-path' = '[{"code":"TEST_SCAN_ISSUE","message":"synthetic issue"}]'
+    'missing-message' = '[{"code":"TEST_SCAN_ISSUE","path":"README.md"}]'
+    'code-type' = '[{"code":42,"path":"README.md","message":"synthetic issue"}]'
+    'path-type' = '[{"code":"TEST_SCAN_ISSUE","path":null,"message":"synthetic issue"}]'
+    'message-type' = '[{"code":"TEST_SCAN_ISSUE","path":"README.md","message":[]}]'
+    'valid' = '[{"code":"TEST_SCAN_ISSUE","path":"README.md","message":"synthetic issue"}]'
+}
+foreach ($issueCase in $scanIssueCases.Keys) {
+    $completeJson = 'false'
+    if ($issueCase -eq 'null-complete') { $completeJson = 'true' }
+    $issuePayload = '{"status":"warn","scanComplete":' + $completeJson + ',"scanIssues":' + $scanIssueCases[$issueCase] + ',"canonicalMembers":[],"files":[],"candidateCount":0,"displayTruncated":false,"findings":[]}'
+    $expectedIssue = 'GATE_CONTRACT_INVALID'
+    if ($issueCase -eq 'valid') { $expectedIssue = 'TEST_SCAN_ISSUE' }
+    $checkText = $issueCase -in @('null', 'null-complete', 'empty-object', 'valid')
+    Invoke-EnumerationGateFailureCase -Mode "issue-$issueCase" -ExpectedIssue $expectedIssue -RootJson $issuePayload -CheckTextOutput:$checkText
 }
 
 Write-Output '---'

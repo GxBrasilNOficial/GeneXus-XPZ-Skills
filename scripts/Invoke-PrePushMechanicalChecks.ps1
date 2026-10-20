@@ -732,6 +732,14 @@ function Invoke-EnumerationGate {
         return (New-EnumerationGateFailure -ScriptRel $ScriptRel -Code 'GATE_CONTRACT_INVALID' -Message 'Tipos inválidos nos campos scanComplete, canonicalMembers, files, findings ou scanIssues.' -ExitCode $exitCode)
     }
 
+    foreach ($issue in $gateObject.scanIssues) {
+        if ($issue -isnot [pscustomobject] -or
+            $null -eq $issue.PSObject.Properties['code'] -or $issue.code -isnot [string] -or
+            $null -eq $issue.PSObject.Properties['path'] -or $issue.path -isnot [string] -or
+            $null -eq $issue.PSObject.Properties['message'] -or $issue.message -isnot [string]) {
+            return (New-EnumerationGateFailure -ScriptRel $ScriptRel -Code 'GATE_CONTRACT_INVALID' -Message 'Elemento de scanIssues deve ser um objeto não nulo com code/path/message textuais.' -ExitCode $exitCode)
+        }
+    }
     foreach ($fileState in $gateObject.files) {
         if ($null -eq $fileState -or $null -eq $fileState.PSObject.Properties['file'] -or $fileState.file -isnot [string] -or
             $null -eq $fileState.PSObject.Properties['complete'] -or $fileState.complete -isnot [bool]) {

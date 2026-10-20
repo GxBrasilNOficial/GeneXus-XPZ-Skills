@@ -8,6 +8,8 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 ### Unreleased
 
+- **Diagnósticos estruturados da varredura pré-push (2026-10-20):** o orquestrador valida cada elemento de `scanIssues` antes de agregá-lo: exige objeto não nulo com `code`, `path` e `message` textuais. Conteúdo incompatível gera `GATE_CONTRACT_INVALID`, mantém a falha consultiva e impede declarar órfãos. O autoteste existente do dossiê usa scanner sintético para conferir as apresentações JSON e textual, inclusive um diagnóstico válido como controle.
+
 - **Raiz JSON e contrato vivo na triagem pré-push (2026-10-19):** o orquestrador preserva o formato da raiz JSON e exige um objeto tanto nas respostas dos scanners quanto no cadastro; raízes nulas, arrays ou valores escalares geram diagnósticos estruturados, sem abortar o passo mecânico. O self-test do dossiê cobre esses formatos e impede declarar órfãos sob resposta inválida. A triagem da descrição operacional do dispatcher passa de `closed` para `live-contract`, com os seis membros canônicos, conforme a definição já documentada no `13` e no `999`.
 
 - **Contagem de itens omitidos na triagem pré-push (2026-10-19):** `displayTruncated` e `displayTruncatedCount` consideram somente os cinco grupos sujeitos ao limite de apresentação. Os problemas do cadastro continuam integrais em `catalog.problems`, sem gerar aviso de omissão indevido acima de 50 diagnósticos. O self-test do dossiê cobre esse caso isolado e combinado com candidatas realmente omitidas. O `13` e o `999` também esclarecem a triagem posterior das ocorrências da medição inicial.
@@ -469,6 +471,8 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 ### Unreleased
 
+- **Diagnósticos estructurados del escaneo pre-push (2026-10-20):** el orquestador valida cada elemento de `scanIssues` antes de agregarlo: exige un objeto no nulo con `code`, `path` y `message` de tipo string. El contenido incompatible genera `GATE_CONTRACT_INVALID`, mantiene el fallo consultivo e impide declarar huérfanos. El autotest existente del dosier usa un analizador sintético para comprobar las presentaciones JSON y textual, incluido un diagnóstico válido como control.
+
 - **Raíz JSON y contrato vivo en el triaje pre-push (2026-10-19):** el orquestador conserva el formato de la raíz JSON y exige un objeto tanto en las respuestas de los analizadores como en el catálogo; raíces nulas, arrays o valores escalares generan diagnósticos estructurados sin abortar el paso mecánico. El self-test del dosier cubre estos formatos e impide declarar huérfanos ante una respuesta inválida. El triaje de la descripción operativa del dispatcher cambia de `closed` a `live-contract`, con los seis miembros canónicos, según la definición ya documentada en el `13` y el `999`.
 
 - **Recuento de elementos omitidos en el triaje pre-push (2026-10-19):** `displayTruncated` y `displayTruncatedCount` consideran solo los cinco grupos sujetos al límite de presentación. Los problemas del catálogo siguen completos en `catalog.problems`, sin generar un aviso de omisión incorrecto al superar 50 diagnósticos. El self-test del dosier cubre este caso aislado y combinado con candidatos realmente omitidos. El `13` y el `999` también aclaran el triaje posterior de las ocurrencias de la medición inicial.
@@ -927,6 +931,8 @@ All relevant changes to this repository will be recorded here from this adoption
 The format keeps an `Unreleased` section for changes not yet published in a formal version. This repository does not yet use public semantic versioning; when that changes, future sections should record the corresponding tag.
 
 ### Unreleased
+
+- **Structured diagnostics for pre-push scans (2026-10-20):** the orchestrator validates each `scanIssues` element before aggregation: it requires a non-null object with string fields `code`, `path`, and `message`. Incompatible content produces `GATE_CONTRACT_INVALID`, remains consultative, and prevents orphan declarations. The existing dossier self-test uses a synthetic scanner to check JSON and text presentations, including a valid diagnostic as a control.
 
 - **JSON roots and live contracts in pre-push triage (2026-10-19):** the orchestrator preserves the JSON root's shape and requires an object in both scanner responses and the catalog; null roots, arrays, or scalar values produce structured diagnostics without aborting the mechanical step. The dossier self-test covers these shapes and prevents orphan declarations after an invalid response. Triage for the dispatcher's operational description changes from `closed` to `live-contract`, with all six canonical members, following the definition already documented in `13` and `999`.
 
