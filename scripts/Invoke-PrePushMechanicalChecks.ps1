@@ -711,11 +711,15 @@ function Invoke-EnumerationGate {
     }
 
     try {
-        $gateObject = $stdout | ConvertFrom-Json -ErrorAction Stop
+        $gateObject = $stdout | ConvertFrom-Json -NoEnumerate -ErrorAction Stop
     } catch {
         $detail = "JSON inválido em stdout: $($_.Exception.Message)"
         if (-not [string]::IsNullOrWhiteSpace($stderr)) { $detail += "; stderr: $($stderr.Trim())" }
         return (New-EnumerationGateFailure -ScriptRel $ScriptRel -Code 'GATE_INVALID_JSON' -Message $detail -ExitCode $exitCode)
+    }
+
+    if ($gateObject -isnot [pscustomobject]) {
+        return (New-EnumerationGateFailure -ScriptRel $ScriptRel -Code 'GATE_CONTRACT_INVALID' -Message 'Esperado um objeto JSON como raiz da resposta do gate.' -ExitCode $exitCode)
     }
 
     $requiredProperties = @('status', 'scanComplete', 'scanIssues', 'canonicalMembers', 'files', 'candidateCount', 'displayTruncated', 'findings')
@@ -812,7 +816,7 @@ function Read-EnumerationTriageCatalog {
         return [pscustomobject]@{ path = 'scripts/PrePushEnumerationTriage.json'; valid = $false; entries = @(); problems = @($problems); duplicateKeys = @() }
     }
     try {
-        $catalog = [System.IO.File]::ReadAllText($catalogPath, [System.Text.UTF8Encoding]::new($false, $true)) | ConvertFrom-Json -ErrorAction Stop
+        $catalog = [System.IO.File]::ReadAllText($catalogPath, [System.Text.UTF8Encoding]::new($false, $true)) | ConvertFrom-Json -NoEnumerate -ErrorAction Stop
     } catch {
         $valid = $false
         $problems.Add([pscustomobject][ordered]@{ code = 'TRIAGE_CATALOG_INVALID_JSON'; path = 'scripts/PrePushEnumerationTriage.json'; message = $_.Exception.Message })

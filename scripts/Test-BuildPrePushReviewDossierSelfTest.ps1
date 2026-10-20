@@ -471,6 +471,21 @@ try {
     Assert-EnumerationMechanicalPass -Name 'q3d raiz JSON nula' -Dossier $nullCatalogDossier -Mechanical $nullCatalogMechanical
     Assert-True -CaseName 'q3d: raiz JSON nula mantém candidatos novos' -Condition (-not $nullCatalogMechanical.enumerationTriage.catalog.valid -and $nullCatalogMechanical.enumerationTriage.counts.new -eq 2 -and @($nullCatalogMechanical.enumerationTriage.catalog.problems | Where-Object { $_.code -eq 'TRIAGE_CATALOG_SCHEMA_INVALID' }).Count -eq 1)
 
+    $validCatalogJson = [ordered]@{ schemaVersion = 1; entries = $validEntries } | ConvertTo-Json -Depth 8 -Compress
+    $invalidCatalogRoots = [ordered]@{
+        'empty-array' = '[]'
+        'null-array' = '[null]'
+        'object-array' = ('[' + $validCatalogJson + ']')
+        'scalar' = '42'
+    }
+    foreach ($rootKind in $invalidCatalogRoots.Keys) {
+        Write-TriageCatalog -Root $tmp -Entries @() -RawJson $invalidCatalogRoots[$rootKind]
+        $rootDossier = Invoke-EnumerationFixtureBuilder -Root $tmp
+        $rootMechanical = Get-MechanicalPayloadFromDossier -Dossier $rootDossier
+        Assert-EnumerationMechanicalPass -Name "q3root $rootKind" -Dossier $rootDossier -Mechanical $rootMechanical
+        Assert-True -CaseName "q3root ${rootKind}: raiz inválida não suprime candidatos" -Condition (-not $rootMechanical.enumerationTriage.catalog.valid -and $rootMechanical.enumerationTriage.counts.new -eq 2 -and @($rootMechanical.enumerationTriage.catalog.problems | Where-Object { $_.code -eq 'TRIAGE_CATALOG_SCHEMA_INVALID' }).Count -eq 1)
+    }
+
     $manyInvalidEntries = @(foreach ($number in 1..55) { [pscustomobject]@{ code = "INVALID_$number" } })
     Write-TriageCatalog -Root $tmp -Entries $manyInvalidEntries
     $manyProblemsDossier = Invoke-EnumerationFixtureBuilder -Root $tmp
@@ -541,7 +556,7 @@ finally { Remove-TempDir -Path $tmp }
 # inclusive exit zero + JSON/contrato validos com stderr nao vazio.
 # ---------------------------------------------------------------------------
 function Invoke-EnumerationGateFailureCase {
-    param([string]$Mode, [string]$ExpectedIssue)
+    param([string]$Mode, [string]$ExpectedIssue, [string]$RootJson)
     $caseRoot = New-TempDir
     try {
         [void](Initialize-EnumerationFixtureRepo -Root $caseRoot)
@@ -549,6 +564,15 @@ function Invoke-EnumerationGateFailureCase {
         switch ($Mode) {
             'missing' { Remove-Item -LiteralPath $gatePath -Force }
             'throw' { Set-RepoFile -Root $caseRoot -RelativePath 'scripts/Test-PrePushGateEnumerationParity.ps1' -Content "throw 'synthetic gate exception'`n" }
+            { $_ -like 'root-*' } {
+                $baselineDossier = Invoke-EnumerationFixtureBuilder -Root $caseRoot
+                $baselineMechanical = Get-MechanicalPayloadFromDossier -Dossier $baselineDossier
+                $baselineFinding = @($baselineMechanical.gates.gateEnumerationParity.findings)[0]
+                if ($null -eq $baselineFinding) { throw 'A fixture deveria produzir uma candidata antes de simular raiz JSON inválida.' }
+                $staleEntry = New-TriageEntry -Finding $baselineFinding -Kind 'closed' -CanonicalMembers @() -Reason 'Triagem de regressão para cobertura de órfãos.'
+                Write-TriageCatalog -Root $caseRoot -Entries @($staleEntry)
+                Set-RepoFile -Root $caseRoot -RelativePath 'scripts/Test-PrePushGateEnumerationParity.ps1' -Content ("Write-Output '{0}'`nexit 0`n" -f $RootJson)
+            }
             'nonzero-json' {
                 $validJson = '{"status":"pass","scanComplete":true,"scanIssues":[],"canonicalMembers":[],"files":[],"candidateCount":0,"displayTruncated":false,"findings":[]}'
                 Set-RepoFile -Root $caseRoot -RelativePath 'scripts/Test-PrePushGateEnumerationParity.ps1' -Content ("Write-Output '{0}'`nexit 7`n" -f $validJson)
@@ -623,7 +647,7 @@ function Invoke-EnumerationGateFailureCase {
         if ($Mode -eq 'null-candidate-count') {
             Assert-True -CaseName 'r null-candidate-count: triagem não é classificada como órfã' -Condition (@($mechanical.enumerationTriage.orphanedEntries).Count -eq 0)
         }
-        if ($Mode -eq 'null-file-state' -or $Mode -eq 'null-finding') {
+        if ($Mode -eq 'null-file-state' -or $Mode -eq 'null-finding' -or $Mode -like 'root-*') {
             Assert-True -CaseName "r ${Mode}: contrato inválido permanece consultivo" -Condition ($gate.invocationExitCode -eq 0 -and $gate.status -eq 'warn')
             Assert-True -CaseName "r ${Mode}: triagem incompleta não declara entrada órfã" -Condition (@($mechanical.enumerationTriage.orphanedEntries).Count -eq 0)
         }
@@ -645,6 +669,18 @@ Invoke-EnumerationGateFailureCase -Mode 'null-finding' -ExpectedIssue 'GATE_CONT
 Invoke-EnumerationGateFailureCase -Mode 'complete-with-scan-issues' -ExpectedIssue 'GATE_CONTRACT_INVALID'
 Invoke-EnumerationGateFailureCase -Mode 'complete-with-incomplete-file' -ExpectedIssue 'GATE_CONTRACT_INVALID'
 Invoke-EnumerationGateFailureCase -Mode 'invalid-json' -ExpectedIssue 'GATE_INVALID_JSON'
+
+$validGateRoot = '{"status":"pass","scanComplete":true,"scanIssues":[],"canonicalMembers":[],"files":[],"candidateCount":0,"displayTruncated":false,"findings":[]}'
+$invalidGateRoots = [ordered]@{
+    'null' = 'null'
+    'null-array' = '[null]'
+    'empty-array' = '[]'
+    'object-array' = ('[' + $validGateRoot + ']')
+    'scalar' = '42'
+}
+foreach ($rootKind in $invalidGateRoots.Keys) {
+    Invoke-EnumerationGateFailureCase -Mode "root-$rootKind" -ExpectedIssue 'GATE_CONTRACT_INVALID' -RootJson $invalidGateRoots[$rootKind]
+}
 
 Write-Output '---'
 if ($failures -eq 0) {

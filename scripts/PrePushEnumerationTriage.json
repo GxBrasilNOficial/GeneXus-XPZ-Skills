@@ -520,11 +520,19 @@
         "codex"
       ],
       "verdict": "non-gap",
-      "reason": "A passagem descreve dois tratamentos especiais, não o conjunto completo de backends.",
+      "reason": "A passagem descreve tratamentos operacionais específicos do dispatcher, não o conjunto completo de backends. É contrato vivo; reavaliar esse recorte quando o conjunto canônico mudar.",
       "triagedAt": "2026-10-19",
       "triagedBy": "Codex, com autorização do usuário",
-      "kind": "closed",
-      "excerpt": "- `Invoke-LlmDelegatePanelDispatch.ps1 (-ManuscriptPath <arq> | -ManuscriptText <texto>) -ReviewersJson <arq|inline> -PayloadSensitivity <public|kb-sensitive> [-RoundId <id seguro>] [-Cd <dir>] [-ParallelKbRoot <dir>] [-…"
+      "kind": "live-contract",
+      "excerpt": "- `Invoke-LlmDelegatePanelDispatch.ps1 (-ManuscriptPath <arq> | -ManuscriptText <texto>) -ReviewersJson <arq|inline> -PayloadSensitivity <public|kb-sensitive> [-RoundId <id seguro>] [-Cd <dir>] [-ParallelKbRoot <dir>] [-…",
+      "canonicalMembers": [
+        "antigravity",
+        "claude-code",
+        "codex",
+        "copilot",
+        "gemini",
+        "opencode"
+      ]
     },
     {
       "code": "BACKEND_ENUMERATION_SUBSET",

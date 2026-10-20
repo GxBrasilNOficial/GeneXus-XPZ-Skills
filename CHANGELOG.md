@@ -8,6 +8,8 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 ### Unreleased
 
+- **Raiz JSON e contrato vivo na triagem pré-push (2026-10-19):** o orquestrador preserva o formato da raiz JSON e exige um objeto tanto nas respostas dos scanners quanto no cadastro; raízes nulas, arrays ou valores escalares geram diagnósticos estruturados, sem abortar o passo mecânico. O self-test do dossiê cobre esses formatos e impede declarar órfãos sob resposta inválida. A triagem da descrição operacional do dispatcher passa de `closed` para `live-contract`, com os seis membros canônicos, conforme a definição já documentada no `13` e no `999`.
+
 - **Contagem de itens omitidos na triagem pré-push (2026-10-19):** `displayTruncated` e `displayTruncatedCount` consideram somente os cinco grupos sujeitos ao limite de apresentação. Os problemas do cadastro continuam integrais em `catalog.problems`, sem gerar aviso de omissão indevido acima de 50 diagnósticos. O self-test do dossiê cobre esse caso isolado e combinado com candidatas realmente omitidas. O `13` e o `999` também esclarecem a triagem posterior das ocorrências da medição inicial.
 
 - **Acionamento do painel e aptidão para push (2026-10-19):** o pedido simples «execute a rotina pre push, sem push» aciona só a passada do harness atual; painel, subagente ou CLI externo exigem acionamento humano explícito. O `13` separa o veredito semântico da aptidão para push e a mantém não estabelecida enquanto a cegueira por harness/modo estiver pendente; o `14` preserva o bloqueio de `push-ready` nesse estado.
@@ -467,6 +469,8 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 ### Unreleased
 
+- **Raíz JSON y contrato vivo en el triaje pre-push (2026-10-19):** el orquestador conserva el formato de la raíz JSON y exige un objeto tanto en las respuestas de los analizadores como en el catálogo; raíces nulas, arrays o valores escalares generan diagnósticos estructurados sin abortar el paso mecánico. El self-test del dosier cubre estos formatos e impide declarar huérfanos ante una respuesta inválida. El triaje de la descripción operativa del dispatcher cambia de `closed` a `live-contract`, con los seis miembros canónicos, según la definición ya documentada en el `13` y el `999`.
+
 - **Recuento de elementos omitidos en el triaje pre-push (2026-10-19):** `displayTruncated` y `displayTruncatedCount` consideran solo los cinco grupos sujetos al límite de presentación. Los problemas del catálogo siguen completos en `catalog.problems`, sin generar un aviso de omisión incorrecto al superar 50 diagnósticos. El self-test del dosier cubre este caso aislado y combinado con candidatos realmente omitidos. El `13` y el `999` también aclaran el triaje posterior de las ocurrencias de la medición inicial.
 
 - **Activación del panel y aptitud para push (2026-10-19):** la solicitud simple «execute a rotina pre push, sem push» activa solo la pasada del harness actual; un panel, subagente o CLI externo requiere activación humana explícita. El `13` separa el veredicto semántico de la aptitud para push y la mantiene sin establecer mientras la ceguera por harness/modo siga pendiente; el `14` conserva el bloqueo de `push-ready` en ese estado.
@@ -923,6 +927,8 @@ All relevant changes to this repository will be recorded here from this adoption
 The format keeps an `Unreleased` section for changes not yet published in a formal version. This repository does not yet use public semantic versioning; when that changes, future sections should record the corresponding tag.
 
 ### Unreleased
+
+- **JSON roots and live contracts in pre-push triage (2026-10-19):** the orchestrator preserves the JSON root's shape and requires an object in both scanner responses and the catalog; null roots, arrays, or scalar values produce structured diagnostics without aborting the mechanical step. The dossier self-test covers these shapes and prevents orphan declarations after an invalid response. Triage for the dispatcher's operational description changes from `closed` to `live-contract`, with all six canonical members, following the definition already documented in `13` and `999`.
 
 - **Omitted-item counts in pre-push triage (2026-10-19):** `displayTruncated` and `displayTruncatedCount` consider only the five groups subject to the display limit. Catalog problems remain complete in `catalog.problems`, without an incorrect omission warning above 50 diagnostics. The dossier self-test covers this case alone and alongside genuinely omitted candidates. Documents `13` and `999` also clarify the subsequent triage of the initial measurement's occurrences.
 
