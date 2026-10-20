@@ -753,6 +753,14 @@ function Invoke-EnumerationGate {
             $null -eq $finding.PSObject.Properties['listedMembers'] -or $finding.listedMembers -isnot [array]) {
             return (New-EnumerationGateFailure -ScriptRel $ScriptRel -Code 'GATE_CONTRACT_INVALID' -Message 'Achado nulo ou sem file/code/unitHash/listedMembers válidos.' -ExitCode $exitCode)
         }
+        $lineProperty = $finding.PSObject.Properties['line']
+        if ($null -ne $lineProperty -and $null -ne $lineProperty.Value) {
+            $lineValue = $lineProperty.Value
+            if (($lineValue -isnot [int] -and $lineValue -isnot [long]) -or
+                $lineValue -lt 0 -or $lineValue -gt [int]::MaxValue) {
+                return (New-EnumerationGateFailure -ScriptRel $ScriptRel -Code 'GATE_CONTRACT_INVALID' -Message 'findings.line deve ser um inteiro JSON entre 0 e Int32.MaxValue, ou ausente/nulo.' -ExitCode $exitCode)
+            }
+        }
     }
     if ($gateObject.candidateCount -isnot [int] -and $gateObject.candidateCount -isnot [long]) {
         return (New-EnumerationGateFailure -ScriptRel $ScriptRel -Code 'GATE_CONTRACT_INVALID' -Message 'candidateCount deve ser um inteiro JSON não negativo.' -ExitCode $exitCode)

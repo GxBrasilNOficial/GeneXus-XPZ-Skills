@@ -715,6 +715,67 @@ foreach ($issueCase in $scanIssueCases.Keys) {
     Invoke-EnumerationGateFailureCase -Mode "issue-$issueCase" -ExpectedIssue $expectedIssue -RootJson $issuePayload -CheckTextOutput:$checkText
 }
 
+# Caso (s): localização opcional do achado, validada antes da conversão para Int32.
+# O mesmo scanner sintético passa pelas apresentações JSON e textual reais.
+$lineCaseRoot = New-TempDir
+try {
+    [void](Initialize-EnumerationFixtureRepo -Root $lineCaseRoot)
+    $lineBaseline = Get-MechanicalPayloadFromDossier -Dossier (Invoke-EnumerationFixtureBuilder -Root $lineCaseRoot)
+    $lineFinding = @($lineBaseline.gates.gateEnumerationParity.findings)[0]
+    if ($null -eq $lineFinding) { throw 'A fixture deveria produzir uma candidata para validar findings.line.' }
+    Write-TriageCatalog -Root $lineCaseRoot -Entries @((New-TriageEntry -Finding $lineFinding -Kind 'closed' -CanonicalMembers @() -Reason 'Controle da localização opcional.'))
+    $lineCases = @(
+        @{ name = 'missing'; valid = $true; expected = 0 },
+        @{ name = 'null'; value = $null; valid = $true; expected = 0 },
+        @{ name = 'zero'; value = 0; valid = $true; expected = 0 },
+        @{ name = 'positive'; value = 42; valid = $true; expected = 42 },
+        @{ name = 'maximum'; value = [int]::MaxValue; valid = $true; expected = [int]::MaxValue },
+        @{ name = 'invalid-text'; value = 'not-a-number'; valid = $false },
+        @{ name = 'numeric-text'; value = '42'; valid = $false },
+        @{ name = 'negative'; value = -1; valid = $false },
+        @{ name = 'overflow'; value = [long]2147483648; valid = $false },
+        @{ name = 'boolean'; value = $true; valid = $false },
+        @{ name = 'fraction'; value = 1.5; valid = $false },
+        @{ name = 'array'; value = @(42); valid = $false },
+        @{ name = 'object'; value = @{ number = 42 }; valid = $false }
+    )
+    $lineMechanicalPath = Join-Path $lineCaseRoot 'scripts/Invoke-PrePushMechanicalChecks.ps1'
+    foreach ($lineCase in $lineCases) {
+        $lineCandidate = $lineFinding | ConvertTo-Json -Depth 20 | ConvertFrom-Json
+        $lineCandidate.PSObject.Properties.Remove('line')
+        if ($lineCase.name -ne 'missing') {
+            $lineCandidate | Add-Member -NotePropertyName 'line' -NotePropertyValue $lineCase.value
+        }
+        $linePayload = [ordered]@{
+            status = 'pass'; scanComplete = $true; scanIssues = @()
+            canonicalMembers = @($lineBaseline.gates.gateEnumerationParity.canonicalMembers)
+            files = @(@{ file = $lineFinding.file; complete = $true })
+            candidateCount = 1; displayTruncated = $false; findings = @($lineCandidate)
+        } | ConvertTo-Json -Depth 20 -Compress
+        Set-RepoFile -Root $lineCaseRoot -RelativePath 'scripts/Test-PrePushGateEnumerationParity.ps1' -Content ("Write-Output '{0}'`nexit 0`n" -f $linePayload.Replace("'", "''"))
+        $lineJson = & pwsh -NoProfile -File $lineMechanicalPath -RootPath $lineCaseRoot -AsJson | Out-String
+        $lineJsonExit = $LASTEXITCODE
+        Assert-True -CaseName "s $($lineCase.name): JSON termina com exit zero" -Condition ($lineJsonExit -eq 0) -Detail $lineJson
+        $lineMechanical = $lineJson | ConvertFrom-Json -Depth 50
+        $lineGate = $lineMechanical.gates.gateEnumerationParity
+        Assert-True -CaseName "s $($lineCase.name): resultado permanece consultivo" -Condition ($lineMechanical.status -eq 'pass' -and @($lineMechanical.mechanicalFailures).Count -eq 0 -and $lineGate.invocationExitCode -eq 0)
+        $lineText = & pwsh -NoProfile -File $lineMechanicalPath -RootPath $lineCaseRoot 2>&1 | Out-String
+        $lineTextExit = $LASTEXITCODE
+        Assert-True -CaseName "s $($lineCase.name): texto termina com exit zero" -Condition ($lineTextExit -eq 0) -Detail $lineText
+        if ($lineCase.valid) {
+            Assert-True -CaseName "s $($lineCase.name): scanner completo sem diagnóstico de contrato" -Condition ($lineGate.scanComplete -and $lineMechanical.enumerationTriage.scanComplete -and @($lineGate.scanIssues).Count -eq 0)
+            $lineViews = @($lineMechanical.enumerationTriage.triagedFindings | Where-Object { $_.unitHash -eq $lineFinding.unitHash })
+            Assert-True -CaseName "s $($lineCase.name): localização preservada na triagem JSON" -Condition ($lineViews.Count -eq 1 -and $lineViews[0].line -eq $lineCase.expected)
+            Assert-True -CaseName "s $($lineCase.name): texto mantém varredura completa" -Condition ($lineText -match 'SCAN_COMPLETE=true' -and -not $lineText.Contains('SCAN_ISSUE: GATE_CONTRACT_INVALID ['))
+        } else {
+            Assert-True -CaseName "s $($lineCase.name): contrato inválido deixa varredura incompleta" -Condition (-not $lineGate.scanComplete -and -not $lineMechanical.enumerationTriage.scanComplete -and $lineGate.status -eq 'warn' -and @($lineGate.scanIssues | Where-Object { $_.code -eq 'GATE_CONTRACT_INVALID' }).Count -eq 1)
+            Assert-True -CaseName "s $($lineCase.name): sem achados inválidos ou órfãos" -Condition (@($lineGate.findings).Count -eq 0 -and @($lineMechanical.enumerationTriage.orphanedEntries).Count -eq 0)
+            Assert-True -CaseName "s $($lineCase.name): texto informa contrato inválido sem órfãos" -Condition ($lineText.Contains('SCAN_ISSUE: GATE_CONTRACT_INVALID [') -and $lineText -match 'SCAN_COMPLETE=false' -and $lineText -match 'orphaned=0')
+        }
+    }
+}
+finally { Remove-TempDir -Path $lineCaseRoot }
+
 Write-Output '---'
 if ($failures -eq 0) {
     Write-Output ("SELFTEST_OK: {0}/{0} asserts passaram" -f $cases)

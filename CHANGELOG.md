@@ -8,6 +8,8 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 ### Unreleased
 
+- **Localização dos achados pré-push (2026-10-20):** o orquestrador valida `findings.line` antes da conversão para inteiro: aceita inteiro JSON entre zero e `Int32.MaxValue`; campo ausente/nulo mantém o localizador zero. Valores incompatíveis geram `GATE_CONTRACT_INVALID`, sem interromper a agregação ou declarar órfãos. O autoteste existente cobre valores inválidos e controles válidos nas apresentações JSON e textual.
+
 - **Diagnósticos estruturados da varredura pré-push (2026-10-20):** o orquestrador valida cada elemento de `scanIssues` antes de agregá-lo: exige objeto não nulo com `code`, `path` e `message` textuais. Conteúdo incompatível gera `GATE_CONTRACT_INVALID`, mantém a falha consultiva e impede declarar órfãos. O autoteste existente do dossiê usa scanner sintético para conferir as apresentações JSON e textual, inclusive um diagnóstico válido como controle.
 
 - **Raiz JSON e contrato vivo na triagem pré-push (2026-10-19):** o orquestrador preserva o formato da raiz JSON e exige um objeto tanto nas respostas dos scanners quanto no cadastro; raízes nulas, arrays ou valores escalares geram diagnósticos estruturados, sem abortar o passo mecânico. O self-test do dossiê cobre esses formatos e impede declarar órfãos sob resposta inválida. A triagem da descrição operacional do dispatcher passa de `closed` para `live-contract`, com os seis membros canônicos, conforme a definição já documentada no `13` e no `999`.
@@ -471,6 +473,8 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 ### Unreleased
 
+- **Localización de hallazgos pre-push (2026-10-20):** el orquestador valida `findings.line` antes de convertirlo a entero: acepta un entero JSON entre cero e `Int32.MaxValue`; un campo ausente/nulo conserva el localizador cero. Los valores incompatibles generan `GATE_CONTRACT_INVALID`, sin interrumpir la agregación ni declarar huérfanos. El autotest existente cubre valores inválidos y controles válidos en las presentaciones JSON y textual.
+
 - **Diagnósticos estructurados del escaneo pre-push (2026-10-20):** el orquestador valida cada elemento de `scanIssues` antes de agregarlo: exige un objeto no nulo con `code`, `path` y `message` de tipo string. El contenido incompatible genera `GATE_CONTRACT_INVALID`, mantiene el fallo consultivo e impide declarar huérfanos. El autotest existente del dosier usa un analizador sintético para comprobar las presentaciones JSON y textual, incluido un diagnóstico válido como control.
 
 - **Raíz JSON y contrato vivo en el triaje pre-push (2026-10-19):** el orquestador conserva el formato de la raíz JSON y exige un objeto tanto en las respuestas de los analizadores como en el catálogo; raíces nulas, arrays o valores escalares generan diagnósticos estructurados sin abortar el paso mecánico. El self-test del dosier cubre estos formatos e impide declarar huérfanos ante una respuesta inválida. El triaje de la descripción operativa del dispatcher cambia de `closed` a `live-contract`, con los seis miembros canónicos, según la definición ya documentada en el `13` y el `999`.
@@ -931,6 +935,8 @@ All relevant changes to this repository will be recorded here from this adoption
 The format keeps an `Unreleased` section for changes not yet published in a formal version. This repository does not yet use public semantic versioning; when that changes, future sections should record the corresponding tag.
 
 ### Unreleased
+
+- **Pre-push finding locations (2026-10-20):** the orchestrator validates `findings.line` before integer conversion: it accepts a JSON integer from zero through `Int32.MaxValue`; a missing/null field retains location zero. Incompatible values produce `GATE_CONTRACT_INVALID`, without interrupting aggregation or declaring orphans. The existing self-test covers invalid values and valid controls in JSON and text presentations.
 
 - **Structured diagnostics for pre-push scans (2026-10-20):** the orchestrator validates each `scanIssues` element before aggregation: it requires a non-null object with string fields `code`, `path`, and `message`. Incompatible content produces `GATE_CONTRACT_INVALID`, remains consultative, and prevents orphan declarations. The existing dossier self-test uses a synthetic scanner to check JSON and text presentations, including a valid diagnostic as a control.
 
