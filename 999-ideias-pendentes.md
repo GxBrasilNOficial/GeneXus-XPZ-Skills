@@ -3502,3 +3502,18 @@ As contagens são de **arquivos que mencionam o token**, não de parâmetros exc
 **Relacionado.** `scripts/Test-PrePushBackendEnumerationParity.ps1`; `13-revisao-pre-push.md` (uso do marcador e triagem de enumerações); `xpz-llm-delegate/SKILL.md`, seção `### Harness de disparo do painel`, entrada `Invoke-LlmDelegatePanelDispatch.ps1`.
 
 **Adendo — triagem versionada geral (2026-10-18), atualizado em 2026-10-19.** O orquestrador lê `scripts/PrePushEnumerationTriage.json` sob o `RootPath` e projeta candidatos por âncora `(code, file, unitHash)` e conjunto de membros; `live-contract` expira quando o conjunto canônico muda. O cadastro começou vazio, mas recebeu decisões semânticas posteriores em `296e11c`, inclusive a unidade do dispatcher que motivou este item. A reconciliação das 18 candidatas da medição inicial está em `13-revisao-pre-push.md`, «Medição inicial e triagem posterior»; esse total histórico não representa candidatas atuais sem decisão. O cadastro e a varredura completa determinam quais decisões continuam aplicáveis. A avaliação das duas heurísticas específicas segue pendente; não depende de repetir o julgamento das âncoras cuja triagem permanece válida.
+
+## Paralelismo no rebuild do índice SQLite (`Build-KbIntelligenceIndex`)
+
+- **Importância** — média (rebuild sequencial atrasa sync/triagem em KB grande; contorno = esperar o processo single-thread).
+- **Maturidade** — ideia (estudar abordagem; decisões de desenho em aberto).
+
+**O que é.** Estudar como fazer `scripts/Build-KbIntelligenceIndex.py` (e o wrapper `scripts/Build-KbIntelligenceIndex.ps1`) usar paralelismo de processador na varredura/extração dos XMLs do acervo, para reduzir o tempo de rebuild do `kb-intelligence.sqlite`.
+
+**Recorte e direção.** Separar o que pode correr em paralelo (parse/extração por arquivo) do que permanece serializado (escrita no SQLite, montagem de assinatura/frescor, inventário final). Qualquer desenho precisa preservar o contrato atual de assinatura do extrator, gates de frescor e saída consumida por sync/wrappers `Update-*KbFromXpz`. Não implementar nesta frente — só pesquisa de desenho e, se fizer sentido, proposta com limites explícitos.
+
+**Urgência e retomada.** Não urgente; registrada em 2026-10-17 a pedido humano. Retomar quando o tempo de rebuild em KB real for o gargalo motivador.
+
+**Arquivos candidatos.** `scripts/Build-KbIntelligenceIndex.py`, `scripts/Build-KbIntelligenceIndex.ps1`; documentação em `scripts/README-kb-intelligence.md` e skills consumidoras (`xpz-sync`, `xpz-index-triage`) se o contrato de invocação mudar.
+
+**Relacionado.** `scripts/README-kb-intelligence.md`; entrada «Pré-requisito Python — dispatch explícito de `-Operation`» (mesmo eixo KbIntelligence, frente distinta).
