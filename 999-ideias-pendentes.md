@@ -3517,3 +3517,20 @@ As contagens são de **arquivos que mencionam o token**, não de parâmetros exc
 **Arquivos candidatos.** `scripts/Build-KbIntelligenceIndex.py`, `scripts/Build-KbIntelligenceIndex.ps1`; documentação em `scripts/README-kb-intelligence.md` e skills consumidoras (`xpz-sync`, `xpz-index-triage`) se o contrato de invocação mudar.
 
 **Relacionado.** `scripts/README-kb-intelligence.md`; entrada «Pré-requisito Python — dispatch explícito de `-Operation`» (mesmo eixo KbIntelligence, frente distinta).
+
+## Dados vazios GeneXus no PostgreSQL — repensar antes de implementar
+
+- **Importância** — média (consultas de diagnóstico com `NULL` manual geram contagens erradas e levam a conclusões erradas sobre o banco).
+- **Maturidade** — ideia (o fato está observado; o local e a forma de documentar estão em aberto).
+
+**O que é.** Nos bancos PostgreSQL de KBs GeneXus, um atributo `Date` "vazio" para o GeneXus costuma ficar gravado como `0001-01-01`, e não como `NULL`. `NULL` aparece só em parte das linhas. O `IsEmpty()` do código GeneXus cobre os dois casos, mas SQL escrito à mão não.
+
+**Caso observado.** Uma contagem de registros "com data preenchida" (`coluna is not null`) apontou 5.470 registros, quando 5.469 eram a data sentinela `0001-01-01` e só um tinha data real. O número errado foi reportado antes de a distribuição ser olhada.
+
+**O que está em aberto antes de implementar.**
+- Onde documentar: em `02` (regras operacionais), em `xpz-builder`, em uma seção de diagnóstico de dados ou em outro arquivo. Não é óbvio, e a escolha deve considerar quem consulta.
+- Forma da regra de diagnóstico: `coluna is null or coluna = '0001-01-01'`, com a observação de que o valor sentinela pode variar por banco. Confirmar esse ponto antes de escrever como regra.
+- Antes de afirmar qualquer contagem baseada em data, olhar a distribuição (nulo, sentinela, data real).
+- Não citar nomes de bancos de clientes nem de KBs específicas; o exemplo deve ficar sanitizado.
+
+**Relacionado.** Regras de nulabilidade do GeneXus (`IsEmpty` × `IsNull`, em `DECISOES-ARQUITETURA-DA-KB.md` da pasta paralela); `02` (regras operacionais).
