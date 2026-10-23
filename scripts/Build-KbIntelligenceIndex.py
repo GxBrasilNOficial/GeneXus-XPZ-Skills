@@ -885,15 +885,15 @@ class _DirectCallMatch:
 
 
 class _IdentifierDirectCallMatcher:
-    """Token ASCII de chamada direta, com devolução à alternância por chamada.
+    """Token ASCII de chamada direta, com devolução à alternância pelo texto de ``finditer``.
 
     O grupo ``name`` devolve o texto do Source. Um nome fora de
     ``[A-Za-z_][A-Za-z0-9_]*`` não usa este caminho: ``direct_call_pattern``
     devolve a alternância do conjunto inteiro. Com nomes ASCII, ``finditer``
-    usa a alternância quando o texto daquela chamada contém U+0130, U+0131,
+    usa a alternância quando o texto passado a ele contém U+0130, U+0131,
     U+017F ou U+212A; senão usa o token ASCII e ``lower()``. A alternância é
-    compilada na primeira chamada que precisa dela e reutilizada. A escolha
-    continua por chamada.
+    compilada na primeira vez que um texto precisa dela e reutilizada. A
+    escolha é por texto de ``finditer``, não por cada invocação de Procedure.
     """
 
     def __init__(self, names: set[str]) -> None:

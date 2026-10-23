@@ -80,7 +80,7 @@ Escopo de extracao de relacoes atual:
 
 A extracao básica cobre `DataProvider` como origem e como destino de chamada direta, `Procedure.Link(...)` e `<WebPanel>.Create(...)` em `Source` efetivo, actions de `WorkWithForWeb` com `gxobject` resolvido para `Procedure` ou `WebPanel`, parametros de action `WorkWithForWeb` com `Procedure.Link(...)`, vinculacao explicita de `WorkWithForWeb` para `Transaction`, links e prompts explicitos de `WorkWithForWeb` para `WebPanel`, condições por tag e atributo de `WorkWithForWeb` chamando `Procedure`, e `ATTCUSTOMTYPE` como `CustomType` literal. Ela não cobre semantica completa de `Transaction`, semantica de `WorkWithForWeb` além dos recortes já cobertos. A extracao semantica ampliou `for each`, `.Load(...)`, resolucao de `CustomType` para `SDT`, `Domain` e `ExternalObject`, e chamada efetiva de método em variável `exo:<ExternalObject>`.
 
-As formas de chamada de `Procedure` são resolvidas pelo inventario real, sem depender de prefixos de nomenclatura locais. Chamadas dinamicas como `Call(&Nome)`, `Call(ATT:Att)` ou nome de programa entre aspas permanecem fora do grafo nominal. No casador de chamada direta com nomes ASCII, a devolução à alternância é por chamada.
+As formas de chamada de `Procedure` são resolvidas pelo inventario real, sem depender de prefixos de nomenclatura locais. Chamadas dinamicas como `Call(&Nome)`, `Call(ATT:Att)` ou nome de programa entre aspas permanecem fora do grafo nominal. No casador de chamada direta com nomes ASCII, a devolução à alternância é pelo texto passado a `finditer`.
 
 Eles não substituem o acervo XML em `ObjetosDaKbEmXml` e não provam comportamento runtime.
 
@@ -573,7 +573,7 @@ Self-test local (não depende de pasta paralela real) para `idBasedOn`→`Domain
 Self-tests Python locais do extrator, da assinatura e da gravabilidade do KbIntelligence:
 
 - `Test-GeneXusKbIntelligenceExtractorSignatureSelfTest.py` — fixa vetores de versão, formato e hash e valida o contrato da assinatura.
-- `Test-KbIntelligenceDirectCallMatcherSelfTest.py` — compara o casador de chamada direta com a alternância, inclusive a devolução por chamada.
+- `Test-KbIntelligenceDirectCallMatcherSelfTest.py` — compara o casador de chamada direta com a alternância, inclusive a devolução pelo texto passado a `finditer`.
 - `Test-GeneXusKbIntelligenceWritabilityQuerySelfTest.py` — cobre as consultas de gravabilidade e seus bloqueios fail-closed.
 - `Test-GeneXusTransactionWritabilitySelfTest.py` — cobre classificação automática por ocorrência e contexto de gravabilidade.
 - `Test-GeneXusWritabilityOperationalSelfTest.py` — cobre operações, provas, decisões e integração das fachadas 9-TXW/9-PNW.

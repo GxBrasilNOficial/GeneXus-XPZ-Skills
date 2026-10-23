@@ -33,7 +33,7 @@ $expected = Get-GeneXusKbIntelligenceExpectedExtractorSignature
 if ($expected.extractor_signature_version -ne '16') {
     throw "Vetor fixo de versao divergente: esperado 16, obtido $($expected.extractor_signature_version)"
 }
-if ($expected.extractor_signature_hash -ne 'a52f192a077743900be0827403fd4e35a0716163c5797290c0b4f8b55e88c68b') {
+if ($expected.extractor_signature_hash -ne '9ce9797570ae7d374f9b305d4b7d8a858275b6c8ea3be555ede5bdeced22f3ee') {
     throw "Vetor fixo de hash divergente: $($expected.extractor_signature_hash)"
 }
 if ($expected.extractor_signature_format -ne 'manifest-lf-v1') {
