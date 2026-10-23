@@ -80,7 +80,7 @@ Escopo de extracao de relacoes atual:
 
 A extracao básica cobre `DataProvider` como origem e como destino de chamada direta, `Procedure.Link(...)` e `<WebPanel>.Create(...)` em `Source` efetivo, actions de `WorkWithForWeb` com `gxobject` resolvido para `Procedure` ou `WebPanel`, parametros de action `WorkWithForWeb` com `Procedure.Link(...)`, vinculacao explicita de `WorkWithForWeb` para `Transaction`, links e prompts explicitos de `WorkWithForWeb` para `WebPanel`, condições por tag e atributo de `WorkWithForWeb` chamando `Procedure`, e `ATTCUSTOMTYPE` como `CustomType` literal. Ela não cobre semantica completa de `Transaction`, semantica de `WorkWithForWeb` além dos recortes já cobertos. A extracao semantica ampliou `for each`, `.Load(...)`, resolucao de `CustomType` para `SDT`, `Domain` e `ExternalObject`, e chamada efetiva de método em variável `exo:<ExternalObject>`.
 
-As formas de chamada de `Procedure` são resolvidas pelo inventario real, sem depender de prefixos de nomenclatura locais. Chamadas dinamicas como `Call(&Nome)`, `Call(ATT:Att)` ou nome de programa entre aspas permanecem fora do grafo nominal. No casador de chamada direta com nomes ASCII, a devolução à alternância é pelo texto passado a `finditer`.
+As formas de chamada de `Procedure` são resolvidas pelo inventario real, sem depender de prefixos de nomenclatura locais. Chamadas dinamicas como `Call(&Nome)`, `Call(ATT:Att)` ou nome de programa entre aspas permanecem fora do grafo nominal. No casador de chamada direta, quando todos os nomes são identificadores ASCII (`[A-Za-z_][A-Za-z0-9_]*`), a devolução à alternância é pelo texto passado a `finditer`.
 
 Eles não substituem o acervo XML em `ObjetosDaKbEmXml` e não provam comportamento runtime.
 

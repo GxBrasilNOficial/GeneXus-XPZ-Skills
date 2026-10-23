@@ -8,7 +8,7 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 ### Unreleased
 
-- **Casador de chamada direta no índice KbIntelligence (2026-10-23):** com nomes ASCII, o texto passado a `finditer` usa o token e `lower()`; se esse texto contém U+0130, U+0131, U+017F ou U+212A, ele volta inteiro à alternância. A versão do extrator permanece `16` porque a evidência continua a da alternância já publicada. O hash do extrator muda e as pastas paralelas pedem rebuild.
+- **Casador de chamada direta no índice KbIntelligence (2026-10-23):** quando todos os nomes são identificadores ASCII (`[A-Za-z_][A-Za-z0-9_]*`), o texto passado a `finditer` usa o token e `lower()`; se esse texto contém U+0130, U+0131, U+017F ou U+212A, ele volta inteiro à alternância. A versão do extrator permanece `16` porque a evidência continua a da alternância já publicada. O hash do extrator muda e as pastas paralelas pedem rebuild.
 
 - **Localização dos achados pré-push (2026-10-20):** o orquestrador valida `findings.line` antes da conversão para inteiro: aceita inteiro JSON entre zero e `Int32.MaxValue`; campo ausente/nulo mantém o localizador zero. Valores incompatíveis geram `GATE_CONTRACT_INVALID`, sem interromper a agregação ou declarar órfãos. O autoteste existente cobre valores inválidos e controles válidos nas apresentações JSON e textual.
 
@@ -475,7 +475,7 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 ### Unreleased
 
-- **Casador de llamada directa en el índice KbIntelligence (2026-10-23):** con nombres ASCII, el texto pasado a `finditer` usa el token y `lower()`; si ese texto contiene U+0130, U+0131, U+017F o U+212A, vuelve entero a la alternancia. La versión del extractor permanece `16` porque la evidencia sigue siendo la de la alternancia ya publicada. El hash del extractor cambia y las carpetas paralelas piden rebuild.
+- **Casador de llamada directa en el índice KbIntelligence (2026-10-23):** cuando todos los nombres son identificadores ASCII (`[A-Za-z_][A-Za-z0-9_]*`), el texto pasado a `finditer` usa el token y `lower()`; si ese texto contiene U+0130, U+0131, U+017F o U+212A, vuelve entero a la alternancia. La versión del extractor permanece `16` porque la evidencia sigue siendo la de la alternancia ya publicada. El hash del extractor cambia y las carpetas paralelas piden rebuild.
 
 - **Localización de hallazgos pre-push (2026-10-20):** el orquestador valida `findings.line` antes de convertirlo a entero: acepta un entero JSON entre cero e `Int32.MaxValue`; un campo ausente/nulo conserva el localizador cero. Los valores incompatibles generan `GATE_CONTRACT_INVALID`, sin interrumpir la agregación ni declarar huérfanos. El autotest existente cubre valores inválidos y controles válidos en las presentaciones JSON y textual.
 
@@ -940,7 +940,7 @@ The format keeps an `Unreleased` section for changes not yet published in a form
 
 ### Unreleased
 
-- **Direct-call matcher in the KbIntelligence index (2026-10-23):** with ASCII names, the text passed to `finditer` uses the token and `lower()`; if that text contains U+0130, U+0131, U+017F, or U+212A, the whole text returns to the alternation. The extractor version stays `16` because the evidence remains that of the already published alternation. The extractor hash changes and parallel folders need a rebuild.
+- **Direct-call matcher in the KbIntelligence index (2026-10-23):** when every name is an ASCII identifier (`[A-Za-z_][A-Za-z0-9_]*`), the text passed to `finditer` uses the token and `lower()`; if that text contains U+0130, U+0131, U+017F, or U+212A, the whole text returns to the alternation. The extractor version stays `16` because the evidence remains that of the already published alternation. The extractor hash changes and parallel folders need a rebuild.
 
 - **Pre-push finding locations (2026-10-20):** the orchestrator validates `findings.line` before integer conversion: it accepts a JSON integer from zero through `Int32.MaxValue`; a missing/null field retains location zero. Incompatible values produce `GATE_CONTRACT_INVALID`, without interrupting aggregation or declaring orphans. The existing self-test covers invalid values and valid controls in JSON and text presentations.
 
