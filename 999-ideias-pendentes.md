@@ -3506,17 +3506,21 @@ As contagens são de **arquivos que mencionam o token**, não de parâmetros exc
 ## Paralelismo no rebuild do índice SQLite (`Build-KbIntelligenceIndex`)
 
 - **Importância** — média (rebuild sequencial atrasa sync/triagem em KB grande; contorno = esperar o processo single-thread).
-- **Maturidade** — ideia (estudar abordagem; decisões de desenho em aberto).
+- **Maturidade** — pesquisa feita (medição de 2026-10-23 fechou o pool imediato; o resíduo abaixo continua aberto).
 
-**O que é.** Estudar como fazer `scripts/Build-KbIntelligenceIndex.py` (e o wrapper `scripts/Build-KbIntelligenceIndex.ps1`) usar paralelismo de processador na varredura/extração dos XMLs do acervo, para reduzir o tempo de rebuild do `kb-intelligence.sqlite`.
+**O que é.** Reduzir o tempo de rebuild de `kb-intelligence.sqlite` em `scripts/Build-KbIntelligenceIndex.py`. O pedido original era paralelismo de processador na varredura e na extração. A medição apontou outro gargalo primeiro.
 
-**Recorte e direção.** Separar o que pode correr em paralelo (parse/extração por arquivo) do que permanece serializado (escrita no SQLite, montagem de assinatura/frescor, inventário final). Qualquer desenho precisa preservar o contrato atual de assinatura do extrator, gates de frescor e saída consumida por sync/wrappers `Update-*KbFromXpz`. Não implementar nesta frente — só pesquisa de desenho e, se fizer sentido, proposta com limites explícitos.
+**Medição de 2026-10-23, máquina ociosa, KB de referência grande.** Números de sessão, não benchmark versionado. A passagem fria de inventário gastou cerca de 105 s de relógio e cerca de 10 s de CPU; a segunda passagem, quente, cerca de 5 s. Leituras frias em paralelo não foram medidas, então não há teto de CPU estabelecido para o inventário. `extract_evidence`, antes do casador novo, gastou cerca de 55 s, dos quais cerca de 45 s eram o casamento da alternância gigante de nomes (cerca de 319 mil linhas de Source e cerca de 25 mil acertos). O casador por token e `lower()` fez o mesmo conjunto de acertos em cerca de 1,1 s. A escrita SQLite ficou em cerca de 1,5 s. Os cerca de 21 s atribuídos à gravabilidade são a reconstrução do modelo (Attribute, Table, Transaction e SubTypeGroup) dentro de `write_index`, por `insert_corpus_writability` chamando `build_corpus_writability`, não a escrita. Um pool de 4, 8 e 16 workers sobre o casador antigo baixou `extract_evidence` para cerca de 16 s, 11 s e 8,8 s; 8 workers foi o joelho daquele casador antigo. Depois do casador experimental, `extract_evidence` serial ficou em cerca de 9,8 s. Esse serial novo não se compara com os 11 s do pool antigo.
 
-**Urgência e retomada.** Não urgente; registrada em 2026-10-17 a pedido humano. Retomar quando o tempo de rebuild em KB real for o gargalo motivador.
+**Recorte já feito (commit `6368048`).** Com nomes ASCII, cada chamada usa token e `lower()`. Se o texto daquela chamada contém U+0130, U+0131, U+017F ou U+212A, essa chamada volta à alternância com `re.IGNORECASE`, compilada na primeira vez. `EXTRACTOR_SIGNATURE_VERSION` permanece `"16"` porque a evidência continua a da alternância já publicada. O hash muda e as pastas paralelas pedem rebuild. Isso não é paralelismo.
 
-**Arquivos candidatos.** `scripts/Build-KbIntelligenceIndex.py`, `scripts/Build-KbIntelligenceIndex.ps1`; documentação em `scripts/README-kb-intelligence.md` e skills consumidoras (`xpz-sync`, `xpz-index-triage`) se o contrato de invocação mudar.
+**Resíduo explicitamente aberto.** Pool de processos só depois de uma leitura por arquivo que alimente todos os extratores. Paralelizar só `extract_evidence` congelaria releituras do mesmo arquivo. A escrita SQLite permanece serial com a medição atual. Içar `build_corpus_writability` para fora de `write_index` é outra frente, se alguém a abrir. A passagem fria do inventário não está caracterizada como limite de CPU.
 
-**Relacionado.** `scripts/README-kb-intelligence.md`; entrada «Pré-requisito Python — dispatch explícito de `-Operation`» (mesmo eixo KbIntelligence, frente distinta).
+**Urgência e retomada.** Não urgente. Registrada em 2026-10-17 a pedido humano. Retomar o pool quando uma leitura única por arquivo existir e a CPU da extração ainda sobrar.
+
+**Arquivos candidatos do resíduo.** `scripts/Build-KbIntelligenceIndex.py`. O wrapper `scripts/Build-KbIntelligenceIndex.ps1` e as skills `xpz-sync` e `xpz-index-triage` só entram se o contrato de invocação mudar.
+
+**Relacionado.** `scripts/README-kb-intelligence.md`; `CHANGELOG.md` (Unreleased, casador de chamada direta, 2026-10-23); entrada «Pré-requisito Python — dispatch explícito de `-Operation`» (mesmo eixo KbIntelligence, frente distinta).
 
 ## Dados vazios GeneXus no PostgreSQL — repensar antes de implementar
 
