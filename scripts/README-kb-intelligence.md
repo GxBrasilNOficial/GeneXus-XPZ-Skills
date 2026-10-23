@@ -80,7 +80,7 @@ Escopo de extracao de relacoes atual:
 
 A extracao básica cobre `DataProvider` como origem e como destino de chamada direta, `Procedure.Link(...)` e `<WebPanel>.Create(...)` em `Source` efetivo, actions de `WorkWithForWeb` com `gxobject` resolvido para `Procedure` ou `WebPanel`, parametros de action `WorkWithForWeb` com `Procedure.Link(...)`, vinculacao explicita de `WorkWithForWeb` para `Transaction`, links e prompts explicitos de `WorkWithForWeb` para `WebPanel`, condições por tag e atributo de `WorkWithForWeb` chamando `Procedure`, e `ATTCUSTOMTYPE` como `CustomType` literal. Ela não cobre semantica completa de `Transaction`, semantica de `WorkWithForWeb` além dos recortes já cobertos. A extracao semantica ampliou `for each`, `.Load(...)`, resolucao de `CustomType` para `SDT`, `Domain` e `ExternalObject`, e chamada efetiva de método em variável `exo:<ExternalObject>`.
 
-As formas de chamada de `Procedure` são resolvidas pelo inventario real, sem depender de prefixos de nomenclatura locais. Chamadas dinamicas como `Call(&Nome)`, `Call(ATT:Att)` ou nome de programa entre aspas permanecem fora do grafo nominal.
+As formas de chamada de `Procedure` são resolvidas pelo inventario real, sem depender de prefixos de nomenclatura locais. Chamadas dinamicas como `Call(&Nome)`, `Call(ATT:Att)` ou nome de programa entre aspas permanecem fora do grafo nominal. No casador de chamada direta com nomes ASCII, a devolução à alternância é por chamada.
 
 Eles não substituem o acervo XML em `ObjetosDaKbEmXml` e não provam comportamento runtime.
 
@@ -162,7 +162,7 @@ O motor `Build-KbIntelligenceIndex.py` grava na tabela `metadata`:
 - `extractor_signature_hash` — SHA-256 dos dados canônicos do manifesto `kb-intelligence-extractor-files.json` e dos conteúdos dos arquivos listados, normalizados para LF (`manifest-lf-v1`); não é o hash isolado de `Build-KbIntelligenceIndex.py`
 - `extractor_signature_format` — formato de canonicalização usado para calcular o hash; o valor atual é `manifest-lf-v1`
 
-`scripts/GeneXusKbIntelligenceExtractorSignature.py` define a versão e o formato, lê o manifesto e calcula a assinatura. `Build-KbIntelligenceIndex.py` importa esses valores e grava os três campos. O hash cobre o conjunto versionado do manifesto, não apenas o arquivo principal do extrator.
+`scripts/GeneXusKbIntelligenceExtractorSignature.py` define a versão e o formato, lê o manifesto e calcula a assinatura. `Build-KbIntelligenceIndex.py` importa esses valores e grava os três campos. O hash cobre o conjunto versionado do manifesto, não apenas o arquivo principal do extrator. A versão permanece quando a evidência continua a da versão já publicada. O hash muda com o conteúdo dos arquivos do manifesto, e o gate pede rebuild mesmo sem incremento de versão.
 
 Contrato compartilhado: `scripts/GeneXusKbIntelligenceExtractorContract.ps1`; ele executa o calculador Python e exige Python 3 utilizável no `PATH`. Verificacao: `scripts/Test-GeneXusKbIntelligenceExtractorSignatureSelfTest.ps1` (sentinela `KB_INTELLIGENCE_EXTRACTOR_SIGNATURE_SELFTEST_OK`).
 
@@ -570,9 +570,10 @@ Self-test local (não depende de pasta paralela real) para `idBasedOn`→`Domain
 .\scripts\Test-KbIntelligenceIdBasedOnDomainSelfTest.ps1
 ```
 
-Self-tests Python locais para a assinatura do extrator e a gravabilidade do KbIntelligence:
+Self-tests Python locais do extrator, da assinatura e da gravabilidade do KbIntelligence:
 
 - `Test-GeneXusKbIntelligenceExtractorSignatureSelfTest.py` — fixa vetores de versão, formato e hash e valida o contrato da assinatura.
+- `Test-KbIntelligenceDirectCallMatcherSelfTest.py` — compara o casador de chamada direta com a alternância, inclusive a devolução por chamada.
 - `Test-GeneXusKbIntelligenceWritabilityQuerySelfTest.py` — cobre as consultas de gravabilidade e seus bloqueios fail-closed.
 - `Test-GeneXusTransactionWritabilitySelfTest.py` — cobre classificação automática por ocorrência e contexto de gravabilidade.
 - `Test-GeneXusWritabilityOperationalSelfTest.py` — cobre operações, provas, decisões e integração das fachadas 9-TXW/9-PNW.
@@ -581,6 +582,7 @@ Cada teste requer Python 3 utilizável. O teste operacional também requer Power
 
 ```powershell
 python .\scripts\Test-GeneXusKbIntelligenceExtractorSignatureSelfTest.py
+python .\scripts\Test-KbIntelligenceDirectCallMatcherSelfTest.py
 python .\scripts\Test-GeneXusKbIntelligenceWritabilityQuerySelfTest.py
 python .\scripts\Test-GeneXusTransactionWritabilitySelfTest.py
 python .\scripts\Test-GeneXusWritabilityOperationalSelfTest.py

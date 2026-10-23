@@ -861,11 +861,75 @@ def case_insensitive_lookup(names: set[str], object_type: str) -> dict[str, str]
     return {key: values[0] for key, values in grouped.items()}
 
 
-def direct_call_pattern(names: set[str]) -> re.Pattern[str] | None:
-    if not names:
-        return None
+_IDENTIFIER_NAME_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
+_DIRECT_CALL_TOKEN_RE = re.compile(r"(?<![&.])\b(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*\(")
+_DIRECT_CALL_ALTERNATION_CODEPOINTS = frozenset("\u0130\u0131\u017f\u212a")
+
+
+class _DirectCallMatch:
+    __slots__ = ("_name", "_start")
+
+    def __init__(self, name: str, start: int) -> None:
+        self._name = name
+        self._start = start
+
+    def group(self, name: str) -> str:
+        if name != "name":
+            raise IndexError(name)
+        return self._name
+
+    def start(self, name: str) -> int:
+        if name != "name":
+            raise IndexError(name)
+        return self._start
+
+
+class _IdentifierDirectCallMatcher:
+    """Token ASCII de chamada direta, com devolução à alternância por chamada.
+
+    O grupo ``name`` devolve o texto do Source. Um nome fora de
+    ``[A-Za-z_][A-Za-z0-9_]*`` não usa este caminho: ``direct_call_pattern``
+    devolve a alternância do conjunto inteiro. Com nomes ASCII, ``finditer``
+    usa a alternância quando o texto daquela chamada contém U+0130, U+0131,
+    U+017F ou U+212A; senão usa o token ASCII e ``lower()``. A alternância é
+    compilada na primeira chamada que precisa dela e reutilizada. A escolha
+    continua por chamada.
+    """
+
+    def __init__(self, names: set[str]) -> None:
+        self._names = set(names)
+        self._folded = {name.lower() for name in self._names}
+        self._alternation: re.Pattern[str] | None = None
+
+    def _compiled_alternation(self) -> re.Pattern[str]:
+        compiled = self._alternation
+        if compiled is None:
+            compiled = _legacy_direct_call_pattern(self._names)
+            self._alternation = compiled
+        return compiled
+
+    def finditer(self, text: str) -> Iterable[_DirectCallMatch]:
+        if any(codepoint in text for codepoint in _DIRECT_CALL_ALTERNATION_CODEPOINTS):
+            for match in self._compiled_alternation().finditer(text):
+                yield _DirectCallMatch(match.group("name"), match.start("name"))
+            return
+        for match in _DIRECT_CALL_TOKEN_RE.finditer(text):
+            token = match.group("name")
+            if token.lower() in self._folded:
+                yield _DirectCallMatch(token, match.start("name"))
+
+
+def _legacy_direct_call_pattern(names: set[str]) -> re.Pattern[str]:
     alternatives = "|".join(re.escape(name) for name in sorted(names, key=len, reverse=True))
     return re.compile(rf"(?<![&.])\b(?P<name>{alternatives})\s*\(", re.IGNORECASE)
+
+
+def direct_call_pattern(names: set[str]) -> _IdentifierDirectCallMatcher | re.Pattern[str] | None:
+    if not names:
+        return None
+    if all(_IDENTIFIER_NAME_RE.fullmatch(name) for name in names):
+        return _IdentifierDirectCallMatcher(names)
+    return _legacy_direct_call_pattern(names)
 
 
 def append_call_evidences_from_expression(
@@ -879,8 +943,8 @@ def append_call_evidences_from_expression(
     procedure_lookup: dict[str, str],
     webpanel_lookup: dict[str, str],
     data_provider_lookup: dict[str, str],
-    data_provider_direct_re: re.Pattern[str] | None,
-    procedure_direct_re: re.Pattern[str] | None,
+    data_provider_direct_re: _IdentifierDirectCallMatcher | re.Pattern[str] | None,
+    procedure_direct_re: _IdentifierDirectCallMatcher | re.Pattern[str] | None,
     relation_kind_procedure: str,
     relation_kind_webpanel_link: str,
     relation_kind_webpanel_create: str,

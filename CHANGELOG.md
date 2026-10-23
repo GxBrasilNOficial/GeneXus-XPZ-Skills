@@ -8,6 +8,8 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 ### Unreleased
 
+- **Casador de chamada direta no índice KbIntelligence (2026-10-23):** com nomes ASCII, cada chamada usa o token e `lower()`; se o texto daquela chamada contém U+0130, U+0131, U+017F ou U+212A, essa chamada volta à alternância. A versão do extrator permanece `16` porque a evidência continua a da alternância já publicada. O hash do extrator muda e as pastas paralelas pedem rebuild.
+
 - **Localização dos achados pré-push (2026-10-20):** o orquestrador valida `findings.line` antes da conversão para inteiro: aceita inteiro JSON entre zero e `Int32.MaxValue`; campo ausente/nulo mantém o localizador zero. Valores incompatíveis geram `GATE_CONTRACT_INVALID`, sem interromper a agregação ou declarar órfãos. O autoteste existente cobre valores inválidos e controles válidos nas apresentações JSON e textual.
 
 - **Diagnósticos estruturados da varredura pré-push (2026-10-20):** o orquestrador valida cada elemento de `scanIssues` antes de agregá-lo: exige objeto não nulo com `code`, `path` e `message` textuais. Conteúdo incompatível gera `GATE_CONTRACT_INVALID`, mantém a falha consultiva e impede declarar órfãos. O autoteste existente do dossiê usa scanner sintético para conferir as apresentações JSON e textual, inclusive um diagnóstico válido como controle.
@@ -473,6 +475,8 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 ### Unreleased
 
+- **Casador de llamada directa en el índice KbIntelligence (2026-10-23):** con nombres ASCII, cada llamada usa el token y `lower()`; si el texto de esa llamada contiene U+0130, U+0131, U+017F o U+212A, esa llamada vuelve a la alternancia. La versión del extractor permanece `16` porque la evidencia sigue siendo la de la alternancia ya publicada. El hash del extractor cambia y las carpetas paralelas piden rebuild.
+
 - **Localización de hallazgos pre-push (2026-10-20):** el orquestador valida `findings.line` antes de convertirlo a entero: acepta un entero JSON entre cero e `Int32.MaxValue`; un campo ausente/nulo conserva el localizador cero. Los valores incompatibles generan `GATE_CONTRACT_INVALID`, sin interrumpir la agregación ni declarar huérfanos. El autotest existente cubre valores inválidos y controles válidos en las presentaciones JSON y textual.
 
 - **Diagnósticos estructurados del escaneo pre-push (2026-10-20):** el orquestador valida cada elemento de `scanIssues` antes de agregarlo: exige un objeto no nulo con `code`, `path` y `message` de tipo string. El contenido incompatible genera `GATE_CONTRACT_INVALID`, mantiene el fallo consultivo e impide declarar huérfanos. El autotest existente del dosier usa un analizador sintético para comprobar las presentaciones JSON y textual, incluido un diagnóstico válido como control.
@@ -935,6 +939,8 @@ All relevant changes to this repository will be recorded here from this adoption
 The format keeps an `Unreleased` section for changes not yet published in a formal version. This repository does not yet use public semantic versioning; when that changes, future sections should record the corresponding tag.
 
 ### Unreleased
+
+- **Direct-call matcher in the KbIntelligence index (2026-10-23):** with ASCII names, each call uses the token and `lower()`; if that call's text contains U+0130, U+0131, U+017F, or U+212A, that call returns to the alternation. The extractor version stays `16` because the evidence remains that of the already published alternation. The extractor hash changes and parallel folders need a rebuild.
 
 - **Pre-push finding locations (2026-10-20):** the orchestrator validates `findings.line` before integer conversion: it accepts a JSON integer from zero through `Int32.MaxValue`; a missing/null field retains location zero. Incompatible values produce `GATE_CONTRACT_INVALID`, without interrupting aggregation or declaring orphans. The existing self-test covers invalid values and valid controls in JSON and text presentations.
 

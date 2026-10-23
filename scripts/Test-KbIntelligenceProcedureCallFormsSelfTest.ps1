@@ -41,7 +41,11 @@ $procedureTargets = @(
     @{ Name = 'PLinkTargetFake'; Guid = '22222222-2222-2222-2222-222222222207' },
     @{ Name = 'PActionLinkTargetAFake'; Guid = '22222222-2222-2222-2222-222222222208' },
     @{ Name = 'PActionLinkTargetBFake'; Guid = '22222222-2222-2222-2222-222222222209' },
-    @{ Name = 'PWrapperFake'; Guid = '22222222-2222-2222-2222-222222222210' }
+    @{ Name = 'PWrapperFake'; Guid = '22222222-2222-2222-2222-222222222210' },
+    @{ Name = 'PPrefixFake'; Guid = '22222222-2222-2222-2222-222222222211' },
+    @{ Name = 'PPrefixFakeExtra'; Guid = '22222222-2222-2222-2222-222222222212' },
+    @{ Name = 'KProcFake'; Guid = '22222222-2222-2222-2222-222222222213' },
+    @{ Name = 'SProcFake'; Guid = '22222222-2222-2222-2222-222222222214' }
 )
 foreach ($target in $procedureTargets) {
     $xml = @"
@@ -56,6 +60,9 @@ $callerXml = @"
 <Object type="$procedureGuid" name="PUsesCallFormsFake" guid="22222222-2222-2222-2222-222222222206">
   <Source><![CDATA[
 PStaticNoPrefixFake()
+PPrefixFakeExtra()
+$([char]0x212A)ProcFake()
+$([char]0x017F)ProcFake()
 Call(PCommandNoPrefixFake, &sdtLog)
 &val = udp(PValueNoPrefixFake, 0)
 &other = PMethodNoPrefixFake.Udp("C")
@@ -126,6 +133,10 @@ $workWithMobileXml = $workWithXml.Replace($workWithForWebGuid, $workWithGuid).Re
 
 $cases = @(
     @{ id = 'source-static-no-prefix'; source = 'Procedure:PUsesCallFormsFake'; target = 'Procedure:PStaticNoPrefixFake'; expected_rule = 'procedure_direct_call'; should_exist = $true },
+    @{ id = 'source-prefix-keeps-longer-name'; source = 'Procedure:PUsesCallFormsFake'; target = 'Procedure:PPrefixFakeExtra'; expected_rule = 'procedure_direct_call'; should_exist = $true },
+    @{ id = 'source-prefix-does-not-match-shorter-name'; source = 'Procedure:PUsesCallFormsFake'; target = 'Procedure:PPrefixFake'; expected_rule = 'procedure_direct_call'; should_exist = $false },
+    @{ id = 'source-kelvin-sign-matches-ascii-name'; source = 'Procedure:PUsesCallFormsFake'; target = 'Procedure:KProcFake'; expected_rule = 'procedure_direct_call'; should_exist = $true },
+    @{ id = 'source-long-s-does-not-emit-evidence'; source = 'Procedure:PUsesCallFormsFake'; target = 'Procedure:SProcFake'; expected_rule = 'procedure_direct_call'; should_exist = $false },
     @{ id = 'source-call-command'; source = 'Procedure:PUsesCallFormsFake'; target = 'Procedure:PCommandNoPrefixFake'; expected_rule = 'procedure_call_command'; should_exist = $true },
     @{ id = 'source-udp-function'; source = 'Procedure:PUsesCallFormsFake'; target = 'Procedure:PValueNoPrefixFake'; expected_rule = 'procedure_udp_func'; should_exist = $true },
     @{ id = 'source-dot-udp'; source = 'Procedure:PUsesCallFormsFake'; target = 'Procedure:PMethodNoPrefixFake'; expected_rule = 'procedure_dot_udp'; should_exist = $true },
