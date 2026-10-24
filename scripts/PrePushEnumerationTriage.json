@@ -514,17 +514,17 @@
     {
       "code": "BACKEND_ENUMERATION_SUBSET",
       "file": "xpz-llm-delegate/SKILL.md",
-      "unitHash": "eced0a663b98d0fdb103fa2f030eb94449b5fd28e36b2913b695ea9ba55940ac",
+      "unitHash": "e21aea557cfa333147f1baa2f34493f842e6dda62c836226059491383a775a01",
       "listedMembers": [
         "claude-code",
         "codex"
       ],
       "verdict": "non-gap",
       "reason": "A passagem descreve tratamentos operacionais específicos do dispatcher, não o conjunto completo de backends. É contrato vivo; reavaliar esse recorte quando o conjunto canônico mudar.",
-      "triagedAt": "2026-10-19",
+      "triagedAt": "2026-10-24",
       "triagedBy": "Codex, com autorização do usuário",
       "kind": "live-contract",
-      "excerpt": "- `Invoke-LlmDelegatePanelDispatch.ps1 (-ManuscriptPath <arq> | -ManuscriptText <texto>) -ReviewersJson <arq|inline> -PayloadSensitivity <public|kb-sensitive> [-RoundId <id seguro>] [-Cd <dir>] [-ParallelKbRoot <dir>] [-…",
+      "excerpt": "- `Invoke-LlmDelegatePanelDispatch.ps1 (-ManuscriptPath <arq> | -ManuscriptText <texto>) -ReviewersJson <arq|inline> -PayloadSensitivity <public|kb-sensitive> [-BlindReview] [-RoundId <id seguro>] [-C…",
       "canonicalMembers": [
         "antigravity",
         "claude-code",
@@ -557,24 +557,6 @@
         "gemini",
         "opencode"
       ]
-    },
-    {
-      "code": "BACKEND_ENUMERATION_SUBSET",
-      "file": "999-ideias-pendentes.md",
-      "unitHash": "04ed0a1191dc76639fda9000a1de692bea84a4d439de4a9a022f46e3f9b5926f",
-      "listedMembers": [
-        "antigravity",
-        "claude-code",
-        "copilot",
-        "gemini",
-        "opencode"
-      ],
-      "verdict": "non-gap",
-      "reason": "A frase só delimita a medição de 2026-10-23 e lista os harnesses aos quais ela não se estende; o Codex fica de fora porque é o objeto medido.",
-      "triagedAt": "2026-10-23",
-      "triagedBy": "Cursor, com autorização do usuário",
-      "kind": "closed",
-      "excerpt": "Não estender esta medição a Cursor, Claude Code, OpenCode, Copilot, Gemini, Antigravity nem ao subagente nativo."
     }
   ]
 }

@@ -640,7 +640,7 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
     Assert-True (@($r.json.reviewers | Where-Object { $_.dispatchAttempted -eq $true }).Count -eq 0) 'blind fallback incompatível: cadeia toda deve ficar sem adapters'
     Assert-True (@($r.json.reviewers | Where-Object { $_.reason -eq 'blindReviewUnsupported' }).Count -eq 2) 'blind fallback incompatível: ambos os registros indicam suporte indisponível'
 
-    # A falha de resposta do Codex mantém o fallback auditável e sem recibo cego.
+    # Sucesso do Codex deixa o fallback pulado com pedido preservado e recibo desconhecido.
     $r = Invoke-Harness -Reviewers @(@{
             backend = 'codex'; invokeArgs = @{ model = 'gpt-5.5' }
             fallbackChain = @(@{ backend = 'codex'; targetModelKey = 'openai/gpt-5.5'; invokeArgs = @{ model = 'gpt-5.5' } })
