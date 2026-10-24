@@ -2,6 +2,20 @@
 
 Registro de ideias que saíram de `999-ideias-pendentes.md` por terem sido implementadas ou incorporadas ao contrato metodológico vigente.
 
+## Dispatcher do modo cego opcional no painel — implementação concluída
+
+Implementado em 2026-10-24 conforme o plano v3 aprovado. Origem: «Painel Codex não abre a sessão limpa e a pré-push semântica para», removida de `999-ideias-pendentes.md` após a implementação.
+
+**Incidente e evidência preservados.** Em 2026-10-23, no orquestrador Cursor com conteúdo público, as rodadas `prepush-aa120e0-luna` e `prepush-b32e091-sol` pararam quando o Codex tentou iniciar uma fronteira cega aninhada dentro do sandbox do painel. O segundo caso usou `HEAD b32e091559df2a2ef9e29f331bc6503f798b0821`; uma terceira chamada ao Luna foi interrompida após a cota do Sol voltar e não prova falha de memória. A chamada direta ao adapter gravou o prompt antes de executar `codex exec --ephemeral` com `features.memories=false`, `memories.use_memories=false` e `memories.generate_memories=false`; o recibo do job `b9cb99adfd31474594ccd0674043918d` registrou os campos esperados. Esse recibo prova a configuração da invocação, não o contexto visível ao modelo.
+
+**Decisão e implementação.** A pré-push normal continua aceitando o contexto do harness, sem prova genérica de cegueira. O modo cego exige pedido explícito e só é suportado por Codex delegado com sensibilidade `public`. `scripts/Invoke-LlmDelegatePanelDispatch.ps1` recebe `-BlindReview` como switch, propaga somente esse token ao fallback e verifica a resposta Codex por arquivo de captura e `request.json` correlacionados ao job, tipos e valores dos campos, modo de execução e três overrides de memória. Recibo ausente, inválido ou divergente torna a resposta indisponível (`blindReviewReceiptInvalid`), com verificação falsa e sem contagem para diversidade. Backend ou sensibilidade sem suporte é barrado antes do despacho (`blindReviewUnsupported`) e é a única situação nova que permite tentar o fallback; falha técnica mantém a classificação anterior. Os resultados expõem `blindReviewRequested` e `blindReviewReceiptVerified` sem alterar o schema 3; no modo normal o estado é `false`/`null`.
+
+**Matriz e limite da medição local.** A matriz de `xpz-llm-delegate/SKILL.md` registra versões e ajuda local consultadas em 2026-10-24: OpenCode 1.18.33, Codex 0.164.0-alpha.11.1, Claude Code 2.1.296, GitHub Copilot CLI 1.0.86, Gemini CLI 0.54.0 e Antigravity CLI 1.3.2. Entre os seis, somente Codex tem rota cega implementada aqui; os demais permanecem semantic-only e sem suporte ao switch. Os modos normais de CLI podem ter suas próprias instruções ou memória; a matriz de flags não demonstra o contexto interno do modelo. Pesquisa de rotas cegas adicionais continua em `999`, sem bloquear a rotina normal.
+
+**Alinhamento e validação.** Contratos alinhados em `13`, `14`, `15`, `xpz-llm-delegate/SKILL.md`, `AGENTS.md`, `README.md` trilíngue, `02`, `08`, `09` e `CHANGELOG.md` trilíngue. `Test-InvokeLlmDelegatePanelDispatchSelfTest.ps1` passou (`OK`) cobrindo modo normal, Codex suportado, cinco combinações sem suporte, conteúdo sensível, fallback, recibos válido/ausente/inválido/divergente e caminhos de autorização negada. `Test-PsScriptsParse.ps1` passou com `FILES=371; ERRORS=0`; `git diff --check` não apontou problemas. Nenhum `.ps1` novo, molde sanitizado ou atualização de PrivateMap foi necessário.
+
+**Fechamento e limite.** O dispatcher faz a verificação final de suporte e recibo, mas não calcula diversidade, autoriza painel ou substitui o orquestrador. A verificação do recibo confirma a configuração e a correlação do processo; não afirma que o agente inspecionou o contexto inicial visível. Sem importação/build/runtime de IDE, alteração de KB/corpus, commit ou push.
+
 ## Registro versionado de triagem para os gates de enumeração — implementação concluída
 
 A ideia foi implementada em 2026-10-18 e movida de `999-ideias-pendentes.md` para este histórico. A entrada original registrava a recorrência de avisos consultivos de enumeração que escondia candidatas novas entre ocorrências já avaliadas.

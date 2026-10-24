@@ -148,7 +148,20 @@ for ($i = 0; $i -lt $args.Count; $i++) {
     if ($args[$i] -eq '-c') { $cfg = [string]$args[$i + 1] }
 }
 $null = [Console]::In.ReadToEnd()
-if ($o) { Set-Content -LiteralPath $o -Value ("CD=$cd MODEL=$m CFG=$cfg revisão") -Encoding utf8 -NoNewline }
+if ($o) {
+    $req = $o -replace '\.lastmsg\.txt$', '.request.json'
+    $receiptMode = [string]$env:PANEL_FAKE_CODEX_RECEIPT_MODE
+    if ($receiptMode -eq 'missing') {
+        Remove-Item -LiteralPath $req -Force -ErrorAction SilentlyContinue
+    } elseif ($receiptMode -eq 'invalid' -or $receiptMode -eq 'divergent') {
+        $request = Get-Content -LiteralPath $req -Raw -Encoding utf8 | ConvertFrom-Json
+        if ($receiptMode -eq 'invalid') { $request.blindReview = $false }
+        if ($receiptMode -eq 'divergent') { $request.lastMsgPath = "$o.other" }
+        $request | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $req -Encoding utf8
+    }
+    $argSummary = [string]::Join('|', [string[]]$args)
+    Set-Content -LiteralPath $o -Value ("CD=$cd MODEL=$m CFG=$cfg ARGV=$argSummary revisão") -Encoding utf8 -NoNewline
+}
 exit 0
 '@ | Set-Content -LiteralPath $fakeCxReader -Encoding utf8
 
@@ -307,6 +320,11 @@ model = "gpt-5.5"
 { "schemaVersion": 1, "defaultExternal": "ask", "models": { "antigravity/*": "allow-external" } }
 '@ | Set-Content -LiteralPath $polAntigravity -Encoding utf8
 
+    $polDeny = Join-Path $tmp 'llm-delegation-policy-deny.json'
+    @'
+{ "schemaVersion": 1, "defaultExternal": "deny-external", "models": { "anthropic/*": "deny-external" } }
+'@ | Set-Content -LiteralPath $polDeny -Encoding utf8
+
     # manuscrito (acentos)
     $manuscript = Join-Path $tmp 'manuscrito.md'
     @'
@@ -325,6 +343,7 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
             [string] $Sensitivity = 'public',
             [hashtable] $Extra = @{},
             [switch] $NoRoundId,
+            [switch] $BlindReview,
             [switch] $NoExeMap,
             [switch] $UseManuscriptText,
             [switch] $OmitManuscriptSource,
@@ -353,6 +372,7 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
             $argList += @('-ManuscriptPath', $manuscript)
         }
         if (-not $NoRoundId) { $argList += @('-RoundId', $rid) }
+        if ($BlindReview) { $argList += '-BlindReview' }
         if (-not $NoExeMap) { $argList += @('-BackendExeMap', $exeMapFile) }
         if (-not $Extra.ContainsKey('ClaudeCircuitStateRoot')) { $argList += @('-ClaudeCircuitStateRoot', $defaultClaudeCircuitRoot) }
         foreach ($k in $Extra.Keys) { $argList += @("-$k", [string]$Extra[$k]) }
@@ -399,6 +419,8 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
     Assert-True ($rv.effectiveModel -eq 'gpt-5.5') "codex sem model+config: effectiveModel deveria ser 'gpt-5.5' (nu); got '$($rv.effectiveModel)'"
     Assert-True ($rv.targetModelKey -eq 'openai/gpt-5.5') "codex sem model+config: targetModelKey deveria ser 'openai/gpt-5.5'; got '$($rv.targetModelKey)'"
     Assert-True ($rv.state -eq 'gateAsk') "codex sem model+config kb-sensitive sem politica: esperado gateAsk; got $($rv.state)"
+    Assert-True ($rv.dispatchAttempted -eq $false -and [int]$rv.attempts -eq 0) 'gateAsk Codex: adapter não deve receber prompt'
+    Assert-True ($rv.blindReviewRequested -eq $false -and $null -eq $rv.blindReviewReceiptVerified) 'gateAsk Codex normal: blind fields ficam false/null'
 
     # codex sem model SEM config -> error fail-closed
     $r = Invoke-Harness -Reviewers @(@{ backend = 'codex'; invokeArgs = @{} }) `
@@ -431,6 +453,14 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
     $r = Invoke-Harness -Reviewers @(@{ backend = 'claude-code'; invokeArgs = @{ model = 'claude-opus-4-8' } }) -Sensitivity 'kb-sensitive'
     $rv = Get-Reviewer $r.json 0
     Assert-True ($rv.state -eq 'gateAsk') "claude-code kb-sensitive sem politica: esperado gateAsk; got $($rv.state)"
+    Assert-True ($rv.dispatchAttempted -eq $false -and [int]$rv.attempts -eq 0) 'gateAsk Claude: adapter não deve receber prompt'
+
+    # deny-external preserva gateDeny e também não envia o prompt.
+    $r = Invoke-Harness -Reviewers @(@{ backend = 'claude-code'; invokeArgs = @{ model = 'claude-opus-4-8' } }) `
+        -Sensitivity 'kb-sensitive' -Extra @{ PolicyPath = $polDeny }
+    $rv = Get-Reviewer $r.json 0
+    Assert-True ($rv.state -eq 'gateDeny' -and $rv.gateVerdict -eq 'deny') "gateDeny Claude: esperado deny; got $($rv.state)/$($rv.gateVerdict)"
+    Assert-True ($rv.dispatchAttempted -eq $false -and [int]$rv.attempts -eq 0) 'gateDeny Claude: adapter não deve receber prompt'
 
     # gate que LANÇA: -ParallelKbRoot inexistente faz o resolvedor de politica lançar (gate nao captura)
     $ghost = Join-Path $tmp 'pasta-inexistente-xyz'
@@ -550,6 +580,95 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
     Assert-True (@(Get-ChildItem -LiteralPath $r.ledgerDir -Filter '*.request.json' -File -ErrorAction SilentlyContinue).Count -eq 0) 'codex durable: request.json NAO fica no ledger (so verdict/error)'
     $cap = (Get-Content -LiteralPath $boundReqs[0].FullName -Raw -Encoding utf8 | ConvertFrom-Json).captureOutcome
     Assert-True ($cap -eq 'success') "codex durable: captureOutcome=success; got '$cap'"
+    Assert-True ($rv.blindReviewRequested -eq $false -and $null -eq $rv.blindReviewReceiptVerified) 'codex normal: blindReviewRequested=false e recibo cego null'
+
+    # =======================================================================================
+    # 5c) POSTURA CEGA OPT-IN: Codex public, recibo, suporte, fallback e recusas
+    # =======================================================================================
+    $r = Invoke-Harness -Reviewers @(@{ backend = 'codex'; invokeArgs = @{ model = 'gpt-5.5' } }) `
+        -Sensitivity 'public' -BlindReview -Extra @{ CodexConfigPath = $cxCfg }
+    $rv = Get-Reviewer $r.json 0
+    Assert-True ($rv.state -eq 'responded') "blind Codex public: esperado responded; got $($rv.state) reason=$($rv.reason)"
+    Assert-True ($rv.blindReviewRequested -eq $true -and $rv.blindReviewReceiptVerified -eq $true) 'blind Codex public: pedido e recibo devem ser true'
+    Assert-True ($rv.droppedArgs -notcontains 'blindReview') 'blind flag de dispatcher nao deve virar invokeArgs/droppedArgs'
+    $blindCaptureDir = Join-Path (Join-Path (Join-Path ([IO.Path]::GetTempPath()) 'xpz-llm-panel-codex') ([string]$r.json.roundId)) '00'
+    $blindArgv = Get-Content -LiteralPath $rv.verdictPath -Raw -Encoding utf8
+    Assert-True ($blindArgv -match 'ARGV=.*--ephemeral') 'blind Codex: adapter deve enviar --ephemeral ao CLI'
+    foreach ($override in @('features.memories=false', 'memories.use_memories=false', 'memories.generate_memories=false')) {
+        Assert-True ($blindArgv -match ([regex]::Escape("-c|$override"))) "blind Codex: argv deve incluir -c $override"
+    }
+    $blindReqs = @(Get-ChildItem -LiteralPath $blindCaptureDir -Filter '*.request.json' -File -ErrorAction SilentlyContinue)
+    Assert-True ($blindReqs.Count -eq 1) "blind Codex: esperava um recibo no capture dir; got $($blindReqs.Count)"
+    $blindRequest = Get-Content -LiteralPath $blindReqs[0].FullName -Raw -Encoding utf8 | ConvertFrom-Json
+    Assert-True ($blindRequest.blindReview -eq $true -and $blindRequest.ephemeral -eq $true -and $blindRequest.executionMode -ceq 'ephemeral-blind-review') 'blind Codex: campos principais do recibo'
+    foreach ($override in @('features.memories', 'memories.use_memories', 'memories.generate_memories')) {
+        Assert-True ($blindRequest.memoryOverrides.PSObject.Properties[$override].Value -eq $false) "blind Codex: recibo deve declarar $override=false"
+    }
+
+    # Modos não suportados e sensibilidade confidencial bloqueiam antes de qualquer adapter.
+    foreach ($backend in @('opencode', 'claude-code', 'copilot', 'gemini', 'antigravity')) {
+        $r = Invoke-Harness -Reviewers @(@{ backend = $backend; targetModelKey = 'openai/test'; invokeArgs = @{ model = 'model-test' } }) `
+            -Sensitivity 'public' -BlindReview
+        $unsupported = Get-Reviewer $r.json 0
+        Assert-True ($unsupported.state -eq 'unavailable' -and $unsupported.reason -eq 'blindReviewUnsupported') "blind backend ${backend}: esperado unavailable/blindReviewUnsupported; got $($unsupported.state)/$($unsupported.reason)"
+        Assert-True ($unsupported.dispatchAttempted -eq $false -and $unsupported.preDispatchBlocked -eq $true) "blind backend ${backend}: não deve executar adapter"
+        Assert-True ($unsupported.blindReviewRequested -eq $true -and $null -eq $unsupported.blindReviewReceiptVerified) "blind backend ${backend}: requested true e recibo null"
+    }
+    $r = Invoke-Harness -Reviewers @(@{ backend = 'codex'; invokeArgs = @{ model = 'gpt-5.5' } }) `
+        -Sensitivity 'kb-sensitive' -BlindReview -Extra @{ CodexConfigPath = $cxCfg }
+    $unsupportedSensitive = Get-Reviewer $r.json 0
+    Assert-True ($unsupportedSensitive.state -eq 'unavailable' -and $unsupportedSensitive.reason -eq 'blindReviewUnsupported') 'blind Codex kb-sensitive: deve bloquear antes do gate/adapter'
+    Assert-True ($unsupportedSensitive.dispatchAttempted -eq $false -and $null -eq $unsupportedSensitive.blindReviewReceiptVerified) 'blind Codex kb-sensitive: sem envio nem recibo'
+    $unsupportedSensitiveCaptureDir = Join-Path (Join-Path ([IO.Path]::GetTempPath()) 'xpz-llm-panel-codex') ([string]$r.json.roundId)
+    Assert-True (-not (Test-Path -LiteralPath $unsupportedSensitiveCaptureDir)) 'blind Codex kb-sensitive: não deve criar grupo de captura nem alterar retenção'
+
+    # Pre-dispatch bloqueado por suporte cego ainda permite uma cadeia compatível; filhos herdam a flag.
+    $r = Invoke-Harness -Reviewers @(@{
+            backend = 'opencode'; targetModelKey = 'openai/primary'; invokeArgs = @{}
+            fallbackChain = @(@{ backend = 'codex'; targetModelKey = 'openai/gpt-5.5'; invokeArgs = @{ model = 'gpt-5.5' } })
+        }) -Sensitivity 'public' -BlindReview -Extra @{ CodexConfigPath = $cxCfg }
+    $blindPrimary = Get-Reviewer $r.json 0
+    $blindFallback = Get-Reviewer $r.json 1
+    Assert-True ($blindPrimary.reason -eq 'blindReviewUnsupported' -and $blindPrimary.state -eq 'unavailable') 'blind fallback: primário incompatível fica indisponível'
+    Assert-True ($blindFallback.attemptRole -eq 'fallback' -and $blindFallback.state -eq 'responded') 'blind fallback: Codex compatível deve responder'
+    Assert-True ($blindFallback.blindReviewRequested -eq $true -and $blindFallback.blindReviewReceiptVerified -eq $true) 'blind fallback: filho recebe flag e valida recibo'
+
+    $r = Invoke-Harness -Reviewers @(@{
+            backend = 'opencode'; targetModelKey = 'openai/primary'; invokeArgs = @{}
+            fallbackChain = @(@{ backend = 'gemini'; targetModelKey = 'google/model-test'; invokeArgs = @{ model = 'model-test' } })
+        }) -Sensitivity 'public' -BlindReview
+    Assert-True (@($r.json.reviewers | Where-Object { $_.dispatchAttempted -eq $true }).Count -eq 0) 'blind fallback incompatível: cadeia toda deve ficar sem adapters'
+    Assert-True (@($r.json.reviewers | Where-Object { $_.reason -eq 'blindReviewUnsupported' }).Count -eq 2) 'blind fallback incompatível: ambos os registros indicam suporte indisponível'
+
+    # A falha de resposta do Codex mantém o fallback auditável e sem recibo cego.
+    $r = Invoke-Harness -Reviewers @(@{
+            backend = 'codex'; invokeArgs = @{ model = 'gpt-5.5' }
+            fallbackChain = @(@{ backend = 'codex'; targetModelKey = 'openai/gpt-5.5'; invokeArgs = @{ model = 'gpt-5.5' } })
+        }) -Sensitivity 'public' -BlindReview -Extra @{ CodexConfigPath = $cxCfg }
+    $blindSkipped = Get-Reviewer $r.json 1
+    Assert-True ($blindSkipped.state -eq 'skippedAfterSuccess' -and $blindSkipped.blindReviewRequested -eq $true -and $null -eq $blindSkipped.blindReviewReceiptVerified) 'blind fallback skip: requested true, recibo null'
+
+    # O fake altera ou remove o request.json; o adapter falha a regravação final de forma controlada
+    # para que o dispatcher veja o arquivo depois do finally exatamente como foi deixado pelo fake.
+    $prevReceiptMode = $env:PANEL_FAKE_CODEX_RECEIPT_MODE
+    $prevRewriteFail = $env:XPZ_TEST_CODEX_INVOKE_FAIL_REWRITE
+    try {
+        $env:XPZ_TEST_CODEX_INVOKE_FAIL_REWRITE = '1'
+        foreach ($receiptMode in @('invalid', 'missing', 'divergent')) {
+            $env:PANEL_FAKE_CODEX_RECEIPT_MODE = $receiptMode
+            $r = Invoke-Harness -Reviewers @(@{ backend = 'codex'; invokeArgs = @{ model = 'gpt-5.5' } }) `
+                -Sensitivity 'public' -BlindReview -Extra @{ CodexConfigPath = $cxCfg }
+            $invalidReceipt = Get-Reviewer $r.json 0
+            Assert-True ($invalidReceipt.state -eq 'unavailable' -and $invalidReceipt.reason -eq 'blindReviewReceiptInvalid') "blind recibo ${receiptMode}: deve invalidar resposta; got $($invalidReceipt.state)/$($invalidReceipt.reason)"
+            Assert-True ($invalidReceipt.blindReviewRequested -eq $true -and $invalidReceipt.blindReviewReceiptVerified -eq $false) "blind recibo ${receiptMode}: requested true e receipt false"
+            Assert-True ($invalidReceipt.countsForDiversity -eq $false) "blind recibo ${receiptMode}: unavailable não conta diversidade"
+        }
+    } finally {
+        if ($null -eq $prevReceiptMode) { Remove-Item Env:\PANEL_FAKE_CODEX_RECEIPT_MODE -ErrorAction SilentlyContinue }
+        else { $env:PANEL_FAKE_CODEX_RECEIPT_MODE = $prevReceiptMode }
+        if ($null -eq $prevRewriteFail) { Remove-Item Env:\XPZ_TEST_CODEX_INVOKE_FAIL_REWRITE -ErrorAction SilentlyContinue }
+        else { $env:XPZ_TEST_CODEX_INVOKE_FAIL_REWRITE = $prevRewriteFail }
+    }
 
     # (c) strip XPZ_CODEX_ no Parallel: path/RoundId com 429 nas sentinelas NAO vira quota
     $prevForceTimeout = $env:XPZ_TEST_CODEX_FORCE_TIMEOUT

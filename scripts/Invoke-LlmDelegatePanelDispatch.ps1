@@ -62,6 +62,10 @@
     -> state=error fail-closed.
 .PARAMETER PayloadSensitivity
     Classe do payload: 'public' ou 'kb-sensitive'. Repassado ao gate por revisor.
+.PARAMETER BlindReview
+    Solicita a postura cega suportada nesta entrega: somente backend codex com payload public.
+    Outros backends e kb-sensitive terminam em unavailable antes do gate/adapter; sem switch,
+    a invocacao normal permanece inalterada.
 .PARAMETER RoundId
     Identificador da rodada (subpasta do ledger). Default: [guid]::NewGuid().ToString('N').
 .PARAMETER Cd
@@ -101,6 +105,7 @@ param(
     [string] $PolicyPath,
     [string] $TempDir,
     [ValidateRange(1, 16)] [int] $OllamaConcurrency = 3,
+    [switch] $BlindReview,
     # --- SO TESTE ---
     [string] $OpenCodeConfigPath,
     [string] $CodexConfigPath,
@@ -342,6 +347,8 @@ function Add-SkippedFallbackRecords {
                 quotaCircuitDecision = $null
                 quotaCircuitVariantDecisions = @()
                 fallbackSuppressedReason = $FallbackSuppressedReason
+                blindReviewRequested = [bool]$BlindReview
+                blindReviewReceiptVerified = $null
                 effortRequested    = Get-ReviewerEffortRequested -Reviewer $fb
                 effortApplied      = Get-InitialEffortApplied -EffortRequested (Get-ReviewerEffortRequested -Reviewer $fb)
                 effortDetail       = $null
@@ -855,6 +862,8 @@ for ($i = 0; $i -lt $reviewers.Count; $i++) {
         cleanupIssues = @()
         keyringIsolation = $null
         recoveredAfterTimeout = $null
+        blindReviewRequested = [bool]$BlindReview
+        blindReviewReceiptVerified = $null
         effortRequested = $effortRequested
         effortApplied = Get-InitialEffortApplied -EffortRequested $effortRequested
         effortDetail = $null
@@ -895,6 +904,17 @@ for ($i = 0; $i -lt $reviewers.Count; $i++) {
     if (-not $AdapterScript.ContainsKey($backend)) {
         $rec.state = 'error'
         $rec.reason = "backend desconhecido: '$backend'"
+        $records.Add($rec); continue
+    }
+
+    # A postura cega da delegacao existe apenas para Codex + payload publico nesta entrega.
+    # Esta verificacao final e anterior ao gate e ao adapter; o orquestrador ainda deve filtrar
+    # candidatos pela matriz de suporte antes de compor o painel e pedir autorizacao.
+    if ($BlindReview -and ($backend -ne 'codex' -or $PayloadSensitivity -ne 'public')) {
+        $rec.state = 'unavailable'
+        $rec.reason = 'blindReviewUnsupported'
+        $rec.preDispatchBlocked = $true
+        if (-not $rec.family -and $inputKey) { $rec.family = Get-LlmDelegateTargetFamily -TargetModelKey $inputKey }
         $records.Add($rec); continue
     }
 
@@ -1127,6 +1147,7 @@ for ($i = 0; $i -lt $reviewers.Count; $i++) {
         [void][System.IO.Directory]::CreateDirectory($codexCaptureDir)
         $splat['RetentionMode'] = $PayloadSensitivity
         $splat['TempDir'] = $codexCaptureDir
+        if ($BlindReview) { $splat['BlindReview'] = $true }
     }
     elseif ($backend -eq 'antigravity') {
         $receiptPath = Join-Path $ledgerDir ('{0:D2}-antigravity-public-review.receipt.json' -f $i)
@@ -1300,6 +1321,11 @@ try {
 
                 # GAP-3: projetar recoveredAfterTimeout do request.json Codex (pareamento por lastmsg).
                 $recoveredAfterTimeout = $null
+                $blindReviewReceiptVerified = $null
+                $blindReviewRequested = $false
+                if ($null -ne $item.splat -and $item.splat.ContainsKey('BlindReview')) {
+                    $blindReviewRequested = [bool]$item.splat['BlindReview']
+                }
                 # Em kb-sensitive o proprio adapter apaga lastmsg + request.json no caminho de
                 # SUCESSO — e recuperacao pos-timeout e sucesso. Sem esses ficheiros nao ha
                 # pareamento possivel, entao o campo fica $null (desconhecido) em vez de $false:
@@ -1339,6 +1365,61 @@ try {
                     }
                 }
 
+                # -BlindReview so aceita texto com recibo persistente que prove os controles
+                # solicitados. O adapter ja concluiu seu finally antes de retornar a resposta.
+                # O pareamento e unico por texto, caminho e jobId dentro do TempDir do revisor.
+                if ($blindReviewRequested -and $state -eq 'responded' -and
+                    $item.backend -eq 'codex' -and $codexRetention -eq 'public') {
+                    $blindReviewReceiptVerified = $false
+                    try {
+                        $codexTd = [string]$item.splat['TempDir']
+                        $want = $textOut.TrimEnd("`r", "`n")
+                        $matchingLastMsgs = @()
+                        if (-not [string]::IsNullOrWhiteSpace($codexTd) -and
+                            (Test-Path -LiteralPath $codexTd -PathType Container)) {
+                            foreach ($lm in @(Get-ChildItem -LiteralPath $codexTd -Filter '*.lastmsg.txt' -File -ErrorAction SilentlyContinue)) {
+                                $body = Get-Content -LiteralPath $lm.FullName -Raw -Encoding utf8 -ErrorAction SilentlyContinue
+                                if ($null -ne $body -and $body.TrimEnd("`r", "`n") -ceq $want) { $matchingLastMsgs += $lm }
+                            }
+                        }
+                        if ($matchingLastMsgs.Count -eq 1) {
+                            $lm = $matchingLastMsgs[0]
+                            $reqSibling = $lm.FullName -replace '\.lastmsg\.txt$', '.request.json'
+                            if (Test-Path -LiteralPath $reqSibling -PathType Leaf) {
+                                $ro = Get-Content -LiteralPath $reqSibling -Raw -Encoding utf8 | ConvertFrom-Json
+                                $overrides = $null
+                                if ($null -ne $ro.PSObject.Properties['memoryOverrides']) { $overrides = $ro.memoryOverrides }
+                                $jobFromPath = $lm.Name -replace '\.lastmsg\.txt$', ''
+                                $reportedPath = [System.IO.Path]::GetFullPath([string]$ro.lastMsgPath)
+                                $expectedPath = [System.IO.Path]::GetFullPath($lm.FullName)
+                                $pathMatches = [string]::Equals($reportedPath, $expectedPath, [System.StringComparison]::OrdinalIgnoreCase)
+                                $blindOk = $ro.PSObject.Properties['blindReview'] -and $ro.blindReview -is [bool] -and $ro.blindReview -eq $true
+                                $ephemeralOk = $ro.PSObject.Properties['ephemeral'] -and $ro.ephemeral -is [bool] -and $ro.ephemeral -eq $true
+                                $modeOk = $ro.PSObject.Properties['executionMode'] -and $ro.executionMode -is [string] -and $ro.executionMode -ceq 'ephemeral-blind-review'
+                                $jobOk = $ro.PSObject.Properties['jobId'] -and $ro.jobId -is [string] -and $ro.jobId -ceq $jobFromPath
+                                $overridesOk = $null -ne $overrides
+                                foreach ($overrideName in @('features.memories', 'memories.use_memories', 'memories.generate_memories')) {
+                                    $overrideProperty = $null
+                                    if ($null -ne $overrides) { $overrideProperty = $overrides.PSObject.Properties[$overrideName] }
+                                    if ($null -eq $overrideProperty -or $overrideProperty.Value -isnot [bool] -or $overrideProperty.Value -ne $false) {
+                                        $overridesOk = $false
+                                    }
+                                }
+                                if ($pathMatches -and $jobOk -and $blindOk -and $ephemeralOk -and $modeOk -and $overridesOk) {
+                                    $blindReviewReceiptVerified = $true
+                                }
+                            }
+                        }
+                    } catch {
+                        $blindReviewReceiptVerified = $false
+                    }
+                    if (-not $blindReviewReceiptVerified) {
+                        $state = 'unavailable'
+                        $textOut = $null
+                        $errText = 'blindReviewReceiptInvalid'
+                    }
+                }
+
                 $result = [pscustomobject]@{
                     index      = $item.index
                     backend    = $item.backend
@@ -1352,6 +1433,8 @@ try {
                     sidecarPath = $item.sidecarPath
                     adapterReceiptPath = $item.adapterReceiptPath
                     recoveredAfterTimeout = $recoveredAfterTimeout
+                    blindReviewReceiptVerified = $blindReviewReceiptVerified
+                    reason     = if ($blindReviewRequested -and $state -eq 'unavailable' -and $errText -eq 'blindReviewReceiptInvalid') { 'blindReviewReceiptInvalid' } else { $null }
                 }
             } catch {
                 # Defesa em profundidade: qualquer excecao inesperada no runspace (ex.: Wait,
@@ -1369,6 +1452,8 @@ try {
                     sidecarPath = $item.sidecarPath
                     adapterReceiptPath = $item.adapterReceiptPath
                     recoveredAfterTimeout = $null
+                    blindReviewReceiptVerified = $null
+                    reason     = $null
                 }
             } finally {
                 # [void]: SemaphoreSlim.Release() devolve o contador anterior (int); sem o [void]
@@ -1493,6 +1578,12 @@ foreach ($res in $collected) {
     if ($null -ne (Get-Prop $res 'recoveredAfterTimeout')) {
         $rec.recoveredAfterTimeout = [bool](Get-Prop $res 'recoveredAfterTimeout')
     }
+    if ($null -ne (Get-Prop $res 'blindReviewReceiptVerified')) {
+        $rec.blindReviewReceiptVerified = [bool](Get-Prop $res 'blindReviewReceiptVerified')
+    }
+    if (-not [string]::IsNullOrWhiteSpace([string](Get-Prop $res 'reason'))) {
+        $rec.reason = [string](Get-Prop $res 'reason')
+    }
     if ([string]::IsNullOrWhiteSpace([string]$rec.reason) -and -not [string]::IsNullOrWhiteSpace([string]$res.errorText)) {
         $rec.reason = [string]$res.errorText
     }
@@ -1529,7 +1620,7 @@ foreach ($rec in $originalRecords) {
             -State 'skippedByPolicy' -Reason "fallback nao tentado por erro de validacao pre-despacho: $($rec.reason)" -BaseRank ([int]$rec.rank) -EntryIndex ([int]$rec.entryIndex)
         continue
     }
-    if ([bool]$rec.preDispatchBlocked) {
+    if ([bool]$rec.preDispatchBlocked -and [string]$rec.reason -ne 'blindReviewUnsupported') {
         $rec.fallbackSuppressedReason = 'pre-dispatch-block-not-fallback-safe'
         Add-SkippedFallbackRecords -Records $records -FallbackItems $fallbackItems -FallbackOf ([string]$rec.targetModelKey) `
             -State 'skippedByPolicy' -Reason "fallback nao tentado porque o primario foi bloqueado antes de enviar prompt: $($rec.reason)" `
@@ -1573,6 +1664,7 @@ foreach ($rec in $originalRecords) {
             TempDir            = $tempRoot
             OllamaConcurrency  = $OllamaConcurrency
         }
+        if ($BlindReview) { $fbArgs['BlindReview'] = $true }
         if ($Cd) { $fbArgs['Cd'] = $Cd }
         if ($ParallelKbRoot) { $fbArgs['ParallelKbRoot'] = $ParallelKbRoot }
         if ($PolicyPath) { $fbArgs['PolicyPath'] = $PolicyPath }
@@ -1594,6 +1686,7 @@ foreach ($rec in $originalRecords) {
                 '-TempDir', $fbArgs.TempDir,
                 '-OllamaConcurrency', ([string]$fbArgs.OllamaConcurrency)
             )
+            if ($BlindReview) { $argList += '-BlindReview' }
             foreach ($optionalKey in @('Cd', 'ParallelKbRoot', 'PolicyPath', 'OpenCodeConfigPath', 'CodexConfigPath', 'BackendExeMap', 'ClaudeCircuitStateRoot')) {
                 if ($fbArgs.ContainsKey($optionalKey)) { $argList += @("-$optionalKey", [string]$fbArgs[$optionalKey]) }
             }
@@ -1629,6 +1722,8 @@ foreach ($rec in $originalRecords) {
                 state          = $fallbackState
                 reason         = "fallback dispatcher falhou: $($_.Exception.Message)"
                 attempts       = 0
+                blindReviewRequested = [bool]$BlindReview
+                blindReviewReceiptVerified = $null
             }
         }
         $newIdx = $records.Count
@@ -1678,6 +1773,8 @@ foreach ($rec in $originalRecords) {
                 quotaCircuitDecision = [string](Get-Prop $fbRecord 'quotaCircuitDecision')
                 quotaCircuitVariantDecisions = @(Get-Prop $fbRecord 'quotaCircuitVariantDecisions')
                 fallbackSuppressedReason = [string](Get-Prop $fbRecord 'fallbackSuppressedReason')
+                blindReviewRequested = if ($null -ne (Get-Prop $fbRecord 'blindReviewRequested')) { [bool](Get-Prop $fbRecord 'blindReviewRequested') } else { [bool]$BlindReview }
+                blindReviewReceiptVerified = Get-Prop $fbRecord 'blindReviewReceiptVerified'
                 effortRequested    = if ($null -ne (Get-Prop $fbRecord 'effortRequested')) { [string](Get-Prop $fbRecord 'effortRequested') } else { Get-ReviewerEffortRequested -Reviewer $fb }
                 effortApplied      = if ($null -ne (Get-Prop $fbRecord 'effortApplied')) { [string](Get-Prop $fbRecord 'effortApplied') } else { Get-InitialEffortApplied -EffortRequested (Get-ReviewerEffortRequested -Reviewer $fb) }
                 effortDetail       = Get-Prop $fbRecord 'effortDetail'
