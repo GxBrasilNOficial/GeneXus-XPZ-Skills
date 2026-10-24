@@ -9,7 +9,8 @@
     self-test da v11: modelo efetivo + fail-closeds; gate codex com oss; gate geral (fixture,
     fail-closed kb-sensitive, gate que LANÇA); opencode kb-sensitive -> unavailable; splat +
     contenção; captura durável Codex no painel (TempDir/RetentionMode Bound, invokeArgs.tempdir→droppedArgs,
-    strip XPZ_CODEX_ com 429 no path); paralelismo (ocupação <= OllamaConcurrency p/ ollama-cloud, outros livres, bloco
+    strip XPZ_CODEX_ com 429 no path); recibo cego Codex e recoveredAfterTimeout sem pareamento ambíguo;
+    paralelismo (ocupação <= OllamaConcurrency p/ ollama-cloud, outros livres, bloco
     que lança não aborta os demais, OllamaConcurrency=0 -> validação, Dispose após captura);
     sem single-flight (fake NÃO re-invocado + concurrencySaturationWarning); classificação
     mecânica (responded mesmo off-task); -Cd (precedência + fail-closed); contrato (stdout 1 linha
@@ -160,7 +161,14 @@ if ($o) {
         $request | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $req -Encoding utf8
     }
     $argSummary = [string]::Join('|', [string[]]$args)
-    Set-Content -LiteralPath $o -Value ("CD=$cd MODEL=$m CFG=$cfg ARGV=$argSummary revisão") -Encoding utf8 -NoNewline
+    $response = "CD=$cd MODEL=$m CFG=$cfg ARGV=$argSummary revisão"
+    if ($receiptMode -eq 'ambiguous') {
+        $staleLastMsg = Join-Path (Split-Path -Parent $o) '00000000-stale.lastmsg.txt'
+        $staleRequest = $staleLastMsg -replace '\.lastmsg\.txt$', '.request.json'
+        Set-Content -LiteralPath $staleLastMsg -Value $response -Encoding utf8 -NoNewline
+        @{ recoveredAfterTimeout = $true } | ConvertTo-Json | Set-Content -LiteralPath $staleRequest -Encoding utf8
+    }
+    Set-Content -LiteralPath $o -Value $response -Encoding utf8 -NoNewline
 }
 exit 0
 '@ | Set-Content -LiteralPath $fakeCxReader -Encoding utf8
@@ -663,6 +671,28 @@ Conteúdo com acentuação pt-BR: revisão, dedução, ação. Avalie e emita pa
             Assert-True ($invalidReceipt.blindReviewRequested -eq $true -and $invalidReceipt.blindReviewReceiptVerified -eq $false) "blind recibo ${receiptMode}: requested true e receipt false"
             Assert-True ($invalidReceipt.countsForDiversity -eq $false) "blind recibo ${receiptMode}: unavailable não conta diversidade"
         }
+
+        # Duas capturas com o mesmo texto invalidam o recibo cego e deixam a recuperação desconhecida.
+        $env:XPZ_TEST_CODEX_INVOKE_FAIL_REWRITE = '0'
+        $env:PANEL_FAKE_CODEX_RECEIPT_MODE = 'ambiguous'
+        $r = Invoke-Harness -Reviewers @(@{ backend = 'codex'; invokeArgs = @{ model = 'gpt-5.5' } }) `
+            -Sensitivity 'public' -BlindReview -Extra @{ CodexConfigPath = $cxCfg }
+        $ambiguousBlind = Get-Reviewer $r.json 0
+        Assert-True ($ambiguousBlind.state -eq 'unavailable' -and $ambiguousBlind.reason -eq 'blindReviewReceiptInvalid') 'blind recibo ambíguo: deve invalidar a resposta'
+        Assert-True ($ambiguousBlind.blindReviewReceiptVerified -eq $false) 'blind recibo ambíguo: recibo deve ficar false'
+        Assert-True ($ambiguousBlind.countsForDiversity -eq $false) 'blind recibo ambíguo: indisponível não conta diversidade'
+        Assert-True ($null -eq $ambiguousBlind.recoveredAfterTimeout) 'blind recibo ambíguo: recuperação não pode vir de captura arbitrária'
+        $ambiguousRoundDir = Join-Path (Join-Path ([IO.Path]::GetTempPath()) 'xpz-llm-panel-codex') ([string]$r.json.roundId)
+        if (Test-Path -LiteralPath $ambiguousRoundDir) { Remove-Item -LiteralPath $ambiguousRoundDir -Recurse -Force }
+
+        # No modo normal, uma captura antiga igual também não pode definir recoveredAfterTimeout.
+        $r = Invoke-Harness -Reviewers @(@{ backend = 'codex'; invokeArgs = @{ model = 'gpt-5.5' } }) `
+            -Sensitivity 'public' -Extra @{ CodexConfigPath = $cxCfg }
+        $ambiguousRecovery = Get-Reviewer $r.json 0
+        Assert-True ($ambiguousRecovery.state -eq 'responded') 'recuperação ambígua: parecer normal continua respondido'
+        Assert-True ($null -eq $ambiguousRecovery.recoveredAfterTimeout) 'recuperação ambígua: recoveredAfterTimeout deve ficar desconhecido'
+        $ambiguousRoundDir = Join-Path (Join-Path ([IO.Path]::GetTempPath()) 'xpz-llm-panel-codex') ([string]$r.json.roundId)
+        if (Test-Path -LiteralPath $ambiguousRoundDir) { Remove-Item -LiteralPath $ambiguousRoundDir -Recurse -Force }
     } finally {
         if ($null -eq $prevReceiptMode) { Remove-Item Env:\PANEL_FAKE_CODEX_RECEIPT_MODE -ErrorAction SilentlyContinue }
         else { $env:PANEL_FAKE_CODEX_RECEIPT_MODE = $prevReceiptMode }

@@ -1347,17 +1347,25 @@ try {
                         }
                         if (-not [string]::IsNullOrWhiteSpace($codexTd) -and (Test-Path -LiteralPath $codexTd -PathType Container)) {
                             $want = $textOut.TrimEnd("`r", "`n")
+                            $matchingRecoveryLastMsgs = @()
                             foreach ($lm in @(Get-ChildItem -LiteralPath $codexTd -Filter '*.lastmsg.txt' -File -ErrorAction SilentlyContinue)) {
                                 $body = Get-Content -LiteralPath $lm.FullName -Raw -Encoding utf8 -ErrorAction SilentlyContinue
                                 if ($null -eq $body) { continue }
                                 if ($body.TrimEnd("`r", "`n") -ne $want) { continue }
+                                $matchingRecoveryLastMsgs += $lm
+                            }
+                            if ($matchingRecoveryLastMsgs.Count -eq 1) {
+                                $lm = $matchingRecoveryLastMsgs[0]
                                 $reqSibling = $lm.FullName -replace '\.lastmsg\.txt$', '.request.json'
-                                if (-not (Test-Path -LiteralPath $reqSibling -PathType Leaf)) { break }
-                                $ro = Get-Content -LiteralPath $reqSibling -Raw -Encoding utf8 | ConvertFrom-Json
-                                if ($null -ne $ro -and $ro.PSObject.Properties['recoveredAfterTimeout'] -and [bool]$ro.recoveredAfterTimeout) {
-                                    $recoveredAfterTimeout = $true
+                                if (Test-Path -LiteralPath $reqSibling -PathType Leaf) {
+                                    $ro = Get-Content -LiteralPath $reqSibling -Raw -Encoding utf8 | ConvertFrom-Json
+                                    if ($null -ne $ro -and $ro.PSObject.Properties['recoveredAfterTimeout'] -and [bool]$ro.recoveredAfterTimeout) {
+                                        $recoveredAfterTimeout = $true
+                                    }
                                 }
-                                break
+                            } elseif ($matchingRecoveryLastMsgs.Count -gt 1) {
+                                # Capturas iguais em rodadas repetidas nao permitem atribuir o request.json.
+                                $recoveredAfterTimeout = $null
                             }
                         }
                     } catch {
