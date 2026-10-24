@@ -24,15 +24,17 @@ Uma chamada delegada nova não recebe automaticamente o transcript da conversa c
 
 ### Modo cego opcional no Codex
 
-Só ofereça ou use modo cego quando o usuário o pedir explicitamente. A matriz de suporte e limites fica em [`xpz-llm-delegate/SKILL.md`](xpz-llm-delegate/SKILL.md): nesta entrega, a chamada delegada cega é suportada apenas por Codex com payload `public`. O dispatcher exige recibo válido; para outro backend ou `kb-sensitive`, o modo fica `unavailable` antes do gate e do adapter. Não troque automaticamente a revisão principal por uma chamada Codex nem inicie painel para satisfazer o pedido simples.
+O agente pode oferecer o modo cego quando útil ou quando o usuário o solicitar; só o ativa mediante pedido ou concordância explícita. Sem escolha, segue em modo normal, sem pergunta obrigatória. A matriz de suporte e limites fica em [`xpz-llm-delegate/SKILL.md`](xpz-llm-delegate/SKILL.md): nesta entrega, a chamada delegada cega é suportada apenas por Codex com payload `public`. O dispatcher exige recibo válido; para outro backend ou `kb-sensitive`, o modo fica `unavailable` antes do gate e do adapter. Não troque automaticamente a revisão principal por uma chamada Codex nem inicie painel para satisfazer o pedido simples.
 
-Quando o usuário pedir explicitamente uma chamada Codex cega, use prompt com o pedido e os fatos operacionais necessários, e confira o recibo após o adapter:
+Quando o usuário pedir ou aceitar explicitamente uma chamada Codex cega, use prompt com o pedido e os fatos operacionais necessários, e confira o recibo após o adapter:
 
 ```powershell
 pwsh -NoProfile -File scripts/Invoke-Codex.ps1 -MessagePath "<prompt.txt>" -BlindReview -RetentionMode public -TimeoutSec 3600
 ```
 
-O recibo `request.json` deve correlacionar unicamente com a resposta e declarar `blindReview=true`, `ephemeral=true`, `executionMode=ephemeral-blind-review` e os três overrides de memória como `false`. Isso comprova a configuração solicitada ao processo; não comprova que o modelo não recebeu instruções ou contexto persistente do próprio ambiente. Se o pedido cego explícito não puder ser atendido ou o recibo for inválido, registre somente esse modo cego como incompleto; a rotina normal continua definida separadamente.
+O recibo `request.json` deve correlacionar unicamente com a resposta e declarar `blindReview=true`, `ephemeral=true`, `executionMode=ephemeral-blind-review` e os três overrides de memória como `false`. Isso comprova a configuração solicitada ao processo; não comprova que o modelo não recebeu instruções ou contexto persistente do próprio ambiente. Se o modo cego escolhido não puder ser atendido ou o recibo for inválido, registre somente esse modo cego como incompleto; a rotina normal continua definida separadamente.
+
+A escolha de modo acompanha o ciclo autorizado, incluindo novas versões e substitutos, até o usuário alterá-la; ver a regra geral no [`15`](15-revisao-por-pares.md), «Composição do painel».
 
 ## Passo mecânico inicial
 
@@ -89,7 +91,7 @@ Antes da primeira classificação, fixe o `HEAD` e o intervalo analisado. Não u
 
 O revisor pode consultar o estado versionado do repositório no `HEAD` fixado, pois esse é o objeto da revisão. Registros versionados de triagem fazem parte desse estado e continuam valendo para a triagem mecânica conforme o contrato próprio; eles não substituem a avaliação semântica das candidatas que o scanner apresentar. Depois de registrar a primeira classificação, resultados externos anteriores podem ser comparados em separado; divergências devem ser relatadas sem alterar retroativamente o primeiro veredito. Uma nova conclusão exige nova classificação, sem usar o parecer anterior como premissa. Um revisor externo só pode ser despachado depois de acionamento humano explícito do painel previsto no `14`.
 
-No relatório normal, identificar o `HEAD` revisado e informar `modo: normal`; não declarar cegueira verificada/não verificada nem considerar essa ausência um bloqueio de aptidão para push. Se o usuário pediu explicitamente modo cego, identificar `modo: cego solicitado` e declarar a execução incompleta somente quando o suporte ou o recibo exigido pelo modo não se confirmar. Em ambos os modos, separar o veredito semântico da aptidão para push: `VEREDICTO: nenhum gap confirmado` significa que não foram encontrados gaps semânticos, não que os gates mecânicos e demais condições de push estejam liberados.
+No relatório normal, identificar o `HEAD` revisado e informar `modo: normal`; não declarar cegueira verificada/não verificada nem considerar essa ausência um bloqueio de aptidão para push. Se o usuário escolheu explicitamente modo cego, identificar `modo: cego solicitado` e declarar a execução incompleta somente quando o suporte ou o recibo exigido pelo modo não se confirmar. Em ambos os modos, separar o veredito semântico da aptidão para push: `VEREDICTO: nenhum gap confirmado` significa que não foram encontrados gaps semânticos, não que os gates mecânicos e demais condições de push estejam liberados.
 
 ### 1. Inventário da frente
 
@@ -214,7 +216,7 @@ Confirmar se há:
 
 Reportar separadamente:
 
-- modo executado, `HEAD` revisado e eventual exposição de resultados de revisão anteriores; informar suporte e validação do recibo somente quando o modo cego tiver sido pedido explicitamente
+- modo executado, `HEAD` revisado e eventual exposição de resultados de revisão anteriores; informar suporte e validação do recibo somente quando o modo cego tiver sido escolhido explicitamente
 - gaps confirmados
 - flags descartados, com justificativa
 - áreas não cobertas pela busca
@@ -250,7 +252,7 @@ ou
 
 `VEREDICTO: N gap(s) confirmado(s)`
 
-ou, somente quando o usuário pediu explicitamente o modo cego e a chamada Codex ou seu recibo não se confirmou:
+ou, somente quando o usuário escolheu explicitamente o modo cego e a chamada Codex ou seu recibo não se confirmou:
 
 `VEREDICTO: revisão cega não verificada; pré-push incompleta`
 

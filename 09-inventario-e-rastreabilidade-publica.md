@@ -28,7 +28,7 @@ Preservar rastreabilidade da consolidacao, inventario documental, inventario bru
 
 ## Nota sobre documentos de governança pública
 
-- `Evidência direta`: `13-revisao-pre-push.md` estabelece modo normal por padrão, sem prova genérica de cegueira nem bloqueio de aptidão por esse motivo. O modo cego opcional do dispatcher exige pedido explícito e só aceita Codex delegado com sensibilidade `public`; o self-test confere encaminhamento do switch, recibo válido, rejeições e fallback. O recibo comprova os campos da invocação e a correlação com o job, não o contexto interno do modelo.
+- `Evidência direta`: `13-revisao-pre-push.md` estabelece modo normal por padrão, sem prova genérica de cegueira nem bloqueio de aptidão por esse motivo. O modo cego opcional do dispatcher exige pedido ou concordância explícita e só aceita Codex delegado com sensibilidade `public`; o self-test confere encaminhamento do switch, recibo válido, rejeições e fallback. O recibo comprova os campos da invocação e a correlação com o job, não o contexto interno do modelo.
 - `Evidência direta`: `CHANGELOG.md` registra mudanças relevantes a partir da adoção do changelog, sem reconstruir retroativamente versões antigas.
 - `Evidência direta`: `CONTRIBUTING.md` orienta contribuições humanas, revisão pré-push, cuidado com dados reais e avaliação de atualização do changelog quando houver impacto público.
 - `Evidência direta`: `SECURITY.md` define o fluxo privado para reportar vulnerabilidades, vazamentos e riscos operacionais sensíveis.
