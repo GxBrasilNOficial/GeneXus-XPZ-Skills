@@ -16,6 +16,14 @@ Implementado em 2026-10-24 conforme o plano v3 aprovado. Origem: «Painel Codex 
 
 **Fechamento e limite.** O dispatcher faz a verificação final de suporte e recibo, mas não calcula diversidade, autoriza painel ou substitui o orquestrador. A verificação do recibo confirma a configuração e a correlação do processo; não afirma que o agente inspecionou o contexto inicial visível. Sem importação/build/runtime de IDE, alteração de KB/corpus, commit ou push.
 
+### Rastreabilidade
+
+- Commit material: `dadfe16` (Adiciona modo cego opcional ao dispatcher do painel).
+- Commit material (docs normativos): `21ec80e` (Alinha o relatório pré-push ao modo normal).
+- Commit material (docs normativos): `ffc3eb7` (Esclarece a oferta e a continuidade do modo de revisão).
+- Commit material (contrato e inventário): `bda18aa` (Alinha inventários e triagem do dispatcher do painel).
+- Commit material: `16f0272` (Rejeita capturas Codex ambíguas no dispatcher).
+
 ## Registro versionado de triagem para os gates de enumeração — implementação concluída
 
 A ideia foi implementada em 2026-10-18 e movida de `999-ideias-pendentes.md` para este histórico. A entrada original registrava a recorrência de avisos consultivos de enumeração que escondia candidatas novas entre ocorrências já avaliadas.
