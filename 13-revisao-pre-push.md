@@ -214,7 +214,7 @@ Confirmar se há:
 
 Reportar separadamente:
 
-- estado da passada cega, `HEAD` revisado e eventual exposição de resultados anteriores
+- modo executado, `HEAD` revisado e eventual exposição de resultados de revisão anteriores; informar suporte e validação do recibo somente quando o modo cego tiver sido pedido explicitamente
 - gaps confirmados
 - flags descartados, com justificativa
 - áreas não cobertas pela busca
