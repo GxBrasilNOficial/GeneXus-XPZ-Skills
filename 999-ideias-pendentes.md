@@ -220,6 +220,21 @@ Adendo de retomada (2026-07-23, revisão do PR #2 `fix: refine build post-proces
 
 Detalhes e critérios para retomada: [`msbuild-result-contract-v2-finalizador-compartilhado.md`](msbuild-result-contract-v2-finalizador-compartilhado.md).
 
+## Deploy disparado pelo pós-build mesmo com falha de compilação — opção B (tirar o deploy do pós-build)
+
+- **Importância** — alta (risco de dano efetivo: o `.bat` de deploy é lançado pelo `PostBuild-Gx.bat` dentro do pós-build, antes de o wrapper classificar o resultado do BuildAll; em 2026-10-24 houve duas falhas reais de compilação com o argumento de deploy presente).
+- **Maturidade** — ideia (decisão de desenho em aberto: onde disparar o deploy; mexe nos Build Events dos ambientes e no fluxo de deploy do usuário, por isso é frente própria).
+
+**Contexto.** Na frente de Categoria B de 2026-10-25, a opção A foi adotada: o fluxo do pós-build foi mantido e o risco foi registrado. Esta entrada guarda a opção B como pendência.
+
+**Opção B.** Remover o argumento de deploy do Build Event de cada ambiente e disparar o deploy por passo separado, somente depois da classificação do wrapper (`compilou limpo` ou dispensa da Categoria B). Efeito: o deploy deixa de depender do resultado do pós-build.
+
+**Evidência.** `Build.2026-10-24.log` do IDE, em torno das linhas 78-91 e 154-167: falha de compilação (`error CS0019` em um `.cs` gerado, seguido de `Failed: DeveloperMenu Compilation` e `Failed: Build All`), e logo depois `Fix-GxNegativeDomainKeys` e `Verify-GxJs` com `invalidos: 0`, e `call PostBuild-Gx.bat` com o `.bat` de deploy como terceiro argumento. Não foi possível confirmar pelos arquivos locais se a cópia para a pasta de deploy ocorreu; a conclusão depende dessa confirmação.
+
+**Alternativa descartada para esta frente.** Fazer o `.bat` de deploy esperar, com tempo limite, um arquivo gravado pelo wrapper. Foi considerada e não recomendada: depende de tempo limite e de o wrapper sempre gravar o arquivo.
+
+**Retomada.** Decidir a opção B em sessão própria, com o responsável pelo deploy, antes de qualquer mudança nos Build Events ou no `.bat` de deploy. Nenhuma ação automática.
+
 ## Registrar evidência detalhada do ruído `g_service_worker`/`obj`
 
 - **Importância** — média (o filtro já é fechado e preserva pares cruzados, mas a documentação não deve tratar o par como empiricamente provado sem registrar KB, versão, data e ocorrência observada).
