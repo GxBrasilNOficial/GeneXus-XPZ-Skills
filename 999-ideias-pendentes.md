@@ -3551,3 +3551,28 @@ As contagens são de **arquivos que mencionam o token**, não de parâmetros exc
 - Não citar nomes de bancos de clientes nem de KBs específicas; o exemplo deve ficar sanitizado.
 
 **Relacionado.** Regras de nulabilidade do GeneXus (`IsEmpty` × `IsNull`, em `DECISOES-ARQUITETURA-DA-KB.md` da pasta paralela); `02` (regras operacionais).
+
+## Gate de envelope e drift aceitam `lastUpdate` fora do formato ISO
+
+- **Importância** — alta: um `lastUpdate` mal formatado pode chegar a uma importação com aparência de pacote apto. O efeito real na importação não foi testado.
+- **Maturidade** — ideia (falta decidir a severidade depois de teste em KB de ensaio).
+
+**Contexto.** Registrado em 2026-10-25, na frente de menu lateral (pacote `MenuColetaHead`, rodada 01). Ao regravar o `lastUpdate` a partir de um valor que tinha passado por `ConvertFrom-Json`, o valor virou `DateTime` e foi gravado como `10/25/2026 11:48:14`, em vez de `2026-10-25T11:48:14.0000000Z`. O pacote foi gerado assim e o `Test-GeneXusImportFileEnvelope.ps1` retornou `apto para prosseguir`. O problema foi visto na leitura manual do XML. O pacote não foi importado: foi regenerado e o anterior foi removido.
+
+**Estado observado (leitura do código).**
+- `scripts/Test-GeneXusImportFileEnvelope.ps1` não lê `lastUpdate` em nenhum ponto. Não há check de formato.
+- `scripts/Test-GeneXusFrontAcervoDrift.ps1`, função que lê o `lastUpdate` (linha ~95): usa `[DateTimeOffset]::TryParse` com `InvariantCulture` e `AssumeUniversal`. Por isso aceita `10/25/2026 11:48:14`. Quando não consegue ler, emite só `warn lastupdate-unparseable` (linha ~868), sem bloquear.
+
+**Efeito.** Um `lastUpdate` mal formatado passa pelo envelope e pelo drift como válido. Não foi testado como o GeneXus trata esse valor. O risco de o objeto ser ignorado na importação (padrão de `lastUpdate` velho descrito em `xpz-msbuild-import-export`) é hipótese, não observação.
+
+**Ideia de solução.**
+1. Envelope: validar o `lastUpdate` de todo `<Object>` e `<Attribute>` contra o formato canônico `yyyy-MM-ddTHH:mm:ss.fffffffZ`, com regex estrita. Fora do formato, `não apto para prosseguir`, com motivo nominal (`lastupdate-invalid-format:<tipo>:<nome>`).
+2. Drift: trocar o `TryParse` permissivo por `ParseExact` com o formato canônico. Valor não parseável passa a bloquear, em vez de emitir warn.
+3. Self-test com duas fixtures: um pacote com `lastUpdate` canônico, que deve passar, e outro com a forma `MM/dd/yyyy HH:mm:ss`, que deve ser bloqueado.
+4. Lado do agente: não regravar `lastUpdate` a partir de objeto já convertido por `ConvertFrom-Json`, que converte para `DateTime` sem aviso. Usar o helper de timestamp da base (`Get-GeneXusXpzLastUpdate.ps1`) ou leitura do texto bruto.
+
+**Decisões em aberto.**
+- Como o GeneXus importa um `lastUpdate` mal formatado. Testar em KB de ensaio antes de definir a severidade do bloqueio.
+- Se o bloqueio fica só no envelope ou também no empacotamento (`New-XpzImportPackage`, gate 9-FD).
+
+**Retomada.** Depois do teste de importação em KB de ensaio. Nenhuma ação automática.
