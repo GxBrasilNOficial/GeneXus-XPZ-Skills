@@ -404,7 +404,7 @@
     {
       "exit": 48,
       "category": "classificado-build",
-      "summary": "Categoria B: MSBuild exit 0 aparente mas log traz error:/tipos rejeitados — artefato so para inspecao.",
+      "summary": "Categoria B: MSBuild exit 0 aparente mas log traz error:/tipos rejeitados fora do caso conhecido do compressor de estaticos no BuildAll — artefato so para inspecao. O caso conhecido fica em staticCompressorKnownCase e nao usa este exit.",
       "wrappers": [
         "Invoke-GeneXusXpzExport.ps1",
         "Invoke-GeneXusXpzImport.ps1",
@@ -421,7 +421,8 @@
         "buildErrors",
         "specifyErrors",
         "invalidTypesRejected",
-        "executionEvidence.msBuildExitCode"
+        "executionEvidence.msBuildExitCode",
+        "staticCompressorKnownCase"
       ]
     },
     {
