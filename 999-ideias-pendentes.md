@@ -3631,26 +3631,38 @@ As contagens são de **arquivos que mencionam o token**, não de parâmetros exc
 
 **Retomada.** Depois do teste de importação em KB de ensaio. Nenhuma ação automática.
 
-## Linha `[APLICADO]` do contorno do compressor conta como evento pós-build não registrado a cada build
+## Linhas do pós-build com contagens variáveis contam como evento não registrado a cada build
 
-- **Importância** — baixa-média: não produz resultado limpo indevido; deixa o status `pendente` mesmo quando a dispensa da Categoria B vale, e exige leitura manual para confirmar o build. O gate de deploy não depende disso (decide por `exit 0` e build concluído).
-- **Maturidade** — ideia (decisão de desenho em aberto: normalizar a forma da linha mantendo as contagens como evidência, ou aceitar a linha como conhecida quando a dispensa do compressor valer).
+- **Importância** — média: não produz resultado limpo indevido, mas deixa o status `pendente` em build bom e obriga leitura manual; o contorno disponível (registrar a linha literal) se desfaz no build seguinte em que a contagem mudar. O gate de deploy não depende disso (decide por `exit 0` e build concluído).
+- **Maturidade** — ideia (decisão de desenho em aberto: qual rota de normalização e qual o recorte das linhas aceitas).
 
-**Contexto.** Registrado em 2026-10-26, na revisão da frente de Categoria B, depois da dispensa do compressor (commit `1f68037`). Nos builds de 2026-10-25, a linha `[APLICADO] .js varridos=2966 | arquivos com chave negativa em gx.domain=1 | chaves corrigidas=1` apareceu como "Evento pos-build NAO registrado" e foi lançada como aviso. Nos builds anteriores, `chaves corrigidas` era 0, então a linha muda de um build para o outro.
+**Contexto.** Registrado em 2026-10-26, na revisão da frente de Categoria B, depois da dispensa do compressor (commit `1f68037`), inicialmente só para a linha `[APLICADO]`. Ampliado no mesmo dia, depois da frente do `wpRelatoriosDeTitulos` em `Gx_FabricaBrasil`: o mesmo efeito aparece em mais três linhas de saída do pós-build, todas com números que mudam de um build para outro.
+
+**Linhas afetadas (saída do `PostBuild-Gx.bat` no `NETPostgreSQL`).**
+- `[APLICADO] .js varridos=<n> | arquivos com chave negativa em gx.domain=<n> | chaves corrigidas=<n>` (`Fix-GxNegativeDomainKeys`): muda com cada `.js` novo na pasta `web` e quando aparece chave negativa.
+- `<arquivo>.js -> <n> chave(s)`: só aparece quando o `Fix-GxNegativeDomainKeys` corrige alguma chave; o nome do arquivo e a contagem variam. Visto como `wprelatoriosdetitulos.js -> 1 chave(s)` nos builds de 2026-10-25.
+- `Verify-GxJs: verificados <n> .js (modulos pulados: <n> | placeholders pulados: <n>) | invalidos: 0 | tempo: <n> ms`: hoje só o `tempo` é normalizado; as contagens entram na impressão digital.
+- `CommonRspHealth: OK - GeneXus.Programs.Common.csproj ok (<n> itens, <n> dominios); genexus.programs.common.bld ok (<n> itens, <n> dominios); <n> gxdomain*.cs no disco`: muda quando entra domínio novo.
 
 **Estado observado (leitura do código).**
-- `scripts/GeneXusMsBuildPostBuildEventsSupport.ps1`, linhas 178–179: a única normalização é o trecho `tempo: <n> ms` da linha `Verify-GxJs` com `invalidos: 0`. A linha `[APLICADO]` não é normalizada.
-- `Get-GeneXusPostBuildEventClassification` (linha 246) marca `shouldDowngrade` quando há evento inesperado. `Invoke-GeneXusKbBuildAll.ps1`, linha 1900, só rebaixa o status `compilou limpo`.
+- `scripts/GeneXusMsBuildPostBuildEventsSupport.ps1`, `Get-GeneXusPostBuildEventNormalizedHash` (linhas 177–180): a única normalização além de trim/espaços/caixa é o trecho `tempo: <n> ms` da linha `Verify-GxJs` com `invalidos: 0`.
+- `Get-GeneXusPostBuildEventClassification` marca `shouldDowngrade` quando há evento inesperado. `Invoke-GeneXusKbBuildAll.ps1` só rebaixa o status `compilou limpo`.
 
-**Efeito esperado.** Pelo código, o status fica `operacao concluida, pendente de confirmacao funcional` com `exit 0` quando a dispensa vale. Ainda não observei isso em build real com a versão nova. Não há falso sucesso por causa disso.
+**Evidência em build real (2026-10-25 e 2026-10-26, `Gx_FabricaBrasil`, `NETPostgreSQL`).**
+- 2026-10-25: nos builds das rodadas do `wpRelatoriosDeTitulos`, as linhas `[APLICADO] … chaves corrigidas=1`, `wprelatoriosdetitulos.js -> 1 chave(s)`, `Verify-GxJs: verificados 2176 …` e `CommonRspHealth: OK …` saíram como "Evento pos-build NAO registrado".
+- 2026-10-26: Build All incremental com `exit 0`, sem reorg, `deployBinFreshness=fresh`, `Verify-GxJs` com `invalidos: 0` e `Build All Task Sucesso`. Mesmo assim, o status ficou `operação concluída, pendente de confirmação funcional`, porque três dessas linhas não tinham impressão digital registrada (relatório em `Temp/xpz-build-relatorios-titulos-recheck-20261026-1447/build-all.json`).
+- Contorno aplicado: `Register-FabricaBrasilKbPostBuildEvents.ps1` regravou o registro do `NETPostgreSQL` em `kb-source-metadata.md` com os 10 eventos do build; a reclassificação deu `unexpected=[]` e `shouldDowngrade=false`.
+- O contorno não dura. O registro anterior já guardava `.js varridos=2974` e `verificados 2184`; o novo guarda `2966` e `2176`. Basta um `.js` ou um domínio a mais para a linha deixar de bater e o status voltar a `pendente`.
 
 **Ideia de solução.**
-1. Quando a dispensa do compressor for reconhecida, tratar a linha `[APLICADO]` como evento conhecido, comparando a forma da linha e não as contagens. As contagens continuam no diagnóstico como evidência.
-2. Alternativa: o registro de evento pós-build aceitar padrão com contagens variáveis, em vez de fingerprint fixo.
-3. Teste: fixture com `chaves corrigidas=0` e `=1`, que devem produzir a mesma classificação.
+1. Tratar como evento conhecido, comparando a forma e não as contagens, apenas as famílias de linha conhecidas acima (lista fechada de padrões, por exemplo `^\[aplicado\] \.js varridos=\d+ \| …`, `^\S+\.js -> \d+ chave\(s\)$`, `verify-gxjs: verificados \d+ …`, `commonrsphealth: ok - …`). As contagens continuam no diagnóstico como evidência.
+2. Alternativa: o registro de evento pós-build aceitar padrão com contagens variáveis em vez de impressão digital fixa.
+3. Não substituir números de forma genérica em qualquer linha: isso esconderia mudanças reais em comandos e caminhos (por exemplo, um `.bat` de deploy diferente).
+4. Condicionar a aceitação a sinais de saúde já presentes nas próprias linhas: `invalidos: 0` no `Verify-GxJs` e `OK` no `CommonRspHealth`. Linha com `invalidos` diferente de zero ou `CommonRspHealth` diferente de `OK` continua inesperada.
+5. Teste: fixtures com contagens diferentes (`chaves corrigidas=0` e `=1`, `verificados 2176` e `2184`, com e sem a linha por arquivo) devem produzir a mesma classificação; `invalidos: 1` e `CommonRspHealth: FALHA` devem continuar rebaixando.
 
-**Decisões em aberto.** Qual das duas rotas; se a linha conhecida vale só com a dispensa do compressor ou também isolada.
+**Decisões em aberto.** Rota 1 (lista fechada de formas no motor) ou rota 2 (padrão no registro); se a linha `[APLICADO]` e a linha por arquivo valem só com a dispensa do compressor reconhecida ou também isoladas; se o registro literal já gravado deve ser migrado ou só tolerado.
 
-**Relacionado.** A leitura de sinais que pode dar resultado limpo por falha (entrada anterior) tem prioridade maior que este item.
+**Relacionado.** A leitura de sinais que pode dar resultado limpo por falha (entrada «Falha ao ler os sinais do BuildAll deixa o resultado como limpo (falso “roundtrip ok”)») tem prioridade maior que este item.
 
-**Retomada.** Depois do primeiro build real com a dispensa ativa, para ver o status na prática. Nenhuma ação automática.
+**Retomada.** A condição original ("primeiro build real com a dispensa ativa") foi atendida em 2026-10-26: o status ficou `pendente` na prática, conforme a evidência acima. Falta decidir a rota. Nenhuma ação automática.
