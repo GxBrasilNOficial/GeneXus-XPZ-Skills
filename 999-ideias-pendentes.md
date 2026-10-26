@@ -275,6 +275,15 @@ Detalhes e critérios para retomada: [`msbuild-result-contract-v2-finalizador-co
 
 **Retomada.** Em sessão própria: decidir entre fixture com processo filho dublê (sem import real) ou smoke controlado com KB de teste; cobrir pelo menos exit 0 + status pendente do compressor → status de roundtrip “pendente de confirmação”, e exit 0 + “compilou limpo” → “roundtrip ok”. Nenhuma ação automática nesta frente.
 
+## Falha ao ler os sinais do BuildAll deixa o resultado como limpo (falso “roundtrip ok”)
+
+- **Importância** — média (falso negativo de Categoria B: se a leitura dos sinais do log falhar, o wrapper só registra aviso e pode seguir sem erros contados; com MSBuild exit 0, o status pode ficar “compilou limpo” e a rota import+BuildAll pode emitir “roundtrip ok”).
+- **Maturidade** — ideia (comportamento já existente no HEAD; a frente do compressor de estáticos não corrige).
+
+**Contexto.** Registrado em 2026-10-25/26, na revisão da frente de Categoria B. Em `scripts/Invoke-GeneXusKbBuildAll.ps1`, o bloco que chama `Read-MsBuildImportSignals.ps1` captura exceção e só adiciona aviso (`Falha ao classificar sinais build-all para Categoria B`). Se `$buildErrors` permanece vazio, a dispensa do compressor nem é avaliada (só corre quando há erro contado), e o caminho feliz pode classificar como limpo.
+
+**Retomada.** Sessão própria: decidir se falha na leitura dos sinais deve ser fail-closed (bloquear / não promover a limpo) ou degradar para status pendente explícito; cobrir com self-test. Nenhuma ação automática nesta frente.
+
 ## Registrar evidência detalhada do ruído `g_service_worker`/`obj`
 
 - **Importância** — média (o filtro já é fechado e preserva pares cruzados, mas a documentação não deve tratar o par como empiricamente provado sem registrar KB, versão, data e ocorrência observada).
