@@ -32,7 +32,7 @@ Quando o usuário pedir ou aceitar explicitamente uma chamada Codex cega, use pr
 pwsh -NoProfile -File scripts/Invoke-Codex.ps1 -MessagePath "<prompt.txt>" -BlindReview -RetentionMode public -TimeoutSec 3600
 ```
 
-O recibo `request.json` deve correlacionar unicamente com a resposta e declarar `blindReview=true`, `ephemeral=true`, `executionMode=ephemeral-blind-review` e os três overrides de memória como `false`. Isso comprova a configuração solicitada ao processo; não comprova que o modelo não recebeu instruções ou contexto persistente do próprio ambiente. Se o modo cego escolhido não puder ser atendido ou o recibo for inválido, registre somente esse modo cego como incompleto; a rotina normal continua definida separadamente.
+O recibo `request.json` deve correlacionar unicamente com a resposta e declarar `blindReview=true`, `ephemeral=true`, `executionMode=ephemeral-blind-review` e os três overrides de memória como `false`. Isso comprova a configuração solicitada ao processo; não comprova que o modelo não recebeu instruções ou contexto persistente do próprio ambiente. A chamada direta também recusa `-BlindReview` com `-RetentionMode kb-sensitive` antes de ler o prompt, gravar recibo ou iniciar o processo. Se o modo cego escolhido não puder ser atendido ou o recibo for inválido, registre somente esse modo cego como incompleto; a rotina normal continua definida separadamente.
 
 A escolha de modo acompanha o ciclo autorizado, incluindo novas versões e substitutos, até o usuário alterá-la; ver a regra geral no [`15`](15-revisao-por-pares.md), «Composição do painel».
 

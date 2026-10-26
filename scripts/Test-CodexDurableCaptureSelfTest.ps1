@@ -168,6 +168,29 @@ exit 0
     Assert-True ($out1c -notmatch 'XPZ_CODEX_') '1c: stdout sem sentinelas'
     Write-Host 'PASS 1c blind review argv/recibo' -ForegroundColor Green
 
+    # ===== 1d blind review + kb-sensitive: recusa antes de ler o prompt =====
+    $j1d = Join-Path $jobs 't1d-blind-sensitive'
+    [IO.Directory]::CreateDirectory($j1d) | Out-Null
+    $missingPrompt = Join-Path $tmp 'prompt-que-nao-existe.txt'
+    $argsCapture1d = Join-Path $tmp '1d-args.json'
+    $env:XPZ_TEST_CODEX_ARGS_CAPTURE = $argsCapture1d
+    $threw1d = $false
+    $msg1d = $null
+    try {
+        & $invoke -CodexExe $okCmd -MessagePath $missingPrompt -TempDir $j1d -TimeoutSec 60 -RetentionMode 'kb-sensitive' -BlindReview | Out-Null
+    } catch {
+        $threw1d = $true
+        $msg1d = [string]$_.Exception.Message
+    }
+    Remove-Item Env:\XPZ_TEST_CODEX_ARGS_CAPTURE -ErrorAction SilentlyContinue
+    Assert-True $threw1d '1d: deveria recusar'
+    Assert-True ($msg1d -match 'BLOCK: -BlindReview so aceita -RetentionMode public\.') "1d: mensagem de recusa; got '$msg1d'"
+    Assert-True ($msg1d -notmatch 'nao encontrado') '1d: a recusa precede a leitura do -MessagePath'
+    Assert-True (-not (Test-Path -LiteralPath $missingPrompt)) '1d: prompt ausente continua ausente'
+    Assert-True (@(Get-ChildItem -LiteralPath $j1d -Force -ErrorAction SilentlyContinue).Count -eq 0) '1d: nenhum arquivo de job'
+    Assert-True (-not (Test-Path -LiteralPath $argsCapture1d)) '1d: processo nao foi iniciado'
+    Write-Host 'PASS 1d blind review kb-sensitive recusado' -ForegroundColor Green
+
     # ===== 2a timeout com bytes, RetentionMode=public =====
     $j2a = Join-Path $jobs 't2a'
     $threw2a = $false; $msg2a = $null

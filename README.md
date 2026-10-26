@@ -61,7 +61,7 @@ Os arquivos `10-matriz-part-types-por-tipo.md`, `11-campos-estaveis-vs-variaveis
 - `CONTRIBUTING.md`: guia para contribuições, revisão pré-push e cuidado com dados reais.
 - `13-revisao-pre-push.md`: rotina autoritativa da pré-push; o modo normal aceita o contexto do harness e não exige prova genérica de cegueira. O pedido simples «execute a rotina pre push, sem push» aciona apenas a passada do harness atual e não autoriza painel, subagente ou CLI externo; revisão por pares/pré-push reforçada exige acionamento humano explícito. O modo cego opcional pode ser oferecido quando útil e só é ativado mediante pedido ou concordância explícita e, nesta entrega, está disponível somente para Codex delegado com sensibilidade `public`; a matriz, o recibo e os campos de resultado estão em `xpz-llm-delegate/SKILL.md`.
 - `SECURITY.md`: política para reporte privado de vulnerabilidades, vazamentos e riscos operacionais sensíveis.
-- O dispatcher oferece `-BlindReview` somente para o revisor Codex delegado em conteúdo `public`; valida o recibo antes de contar a resposta para diversidade. Solicitação sem suporte é reportada antes do despacho e pode seguir para um revisor elegível configurado como fallback.
+- O dispatcher oferece `-BlindReview` somente para o revisor Codex delegado em conteúdo `public`; valida o recibo antes de contar a resposta para diversidade. Solicitação sem suporte é reportada antes do despacho e pode seguir para um revisor elegível configurado como fallback. A chamada direta a `scripts/Invoke-Codex.ps1` recusa `-BlindReview` com `-RetentionMode kb-sensitive` antes de ler o prompt.
 - `CODE_OF_CONDUCT.md`: código de conduta para interações ligadas ao projeto.
 
 ### Documentação operacional KB Intelligence
@@ -325,7 +325,7 @@ Los archivos `10-matriz-part-types-por-tipo.md`, `11-campos-estaveis-vs-variavei
 - `CONTRIBUTING.md`: guía para contribuciones, revisión previa al push y cuidado con datos reales.
 - `13-revisao-pre-push.md`: rutina autoritativa previa al push; el modo normal acepta el contexto del harness y no exige una prueba genérica de ceguera. La solicitud simple «execute a rotina pre push, sem push» activa solo la pasada del harness actual y no autoriza un panel, subagente ni CLI externo; la revisión por pares/pre-push reforzada requiere activación humana explícita. El modo ciego opcional puede ofrecerse cuando resulte útil y solo se activa mediante solicitud o aceptación explícita y, en esta entrega, está disponible solo para Codex delegado con sensibilidad `public`; la matriz, el recibo y los campos del resultado están en `xpz-llm-delegate/SKILL.md`.
 - `SECURITY.md`: política para reporte privado de vulnerabilidades, filtraciones y riesgos operativos sensibles.
-- El dispatcher ofrece `-BlindReview` solo para el revisor Codex delegado en contenido `public`; valida el recibo antes de contar la respuesta para diversidad. Una solicitud sin soporte se informa antes del despacho y puede continuar con un revisor elegible configurado como fallback.
+- El dispatcher ofrece `-BlindReview` solo para el revisor Codex delegado en contenido `public`; valida el recibo antes de contar la respuesta para diversidad. Una solicitud sin soporte se informa antes del despacho y puede continuar con un revisor elegible configurado como fallback. La llamada directa a `scripts/Invoke-Codex.ps1` rechaza `-BlindReview` con `-RetentionMode kb-sensitive` antes de leer el prompt.
 - `CODE_OF_CONDUCT.md`: código de conducta para interacciones vinculadas al proyecto.
 
 ### Documentacion operacional KB Intelligence
@@ -589,7 +589,7 @@ The files `10-matriz-part-types-por-tipo.md`, `11-campos-estaveis-vs-variaveis.m
 - `CONTRIBUTING.md`: guide for contributions, pre-push review, and care with real data.
 - `13-revisao-pre-push.md`: authoritative pre-push routine; normal mode accepts the harness context and requires no generic proof of blindness. The simple request `execute a rotina pre push, sem push` activates only the current harness's pass and does not authorize a panel, subagent, or external CLI; peer review/reinforced pre-push requires explicit human activation. Optional blind mode may be offered when useful and is activated only by an explicit request or agreement and, in this delivery, is available only for delegated Codex with `public` sensitivity; the support matrix, receipt, and result fields are in `xpz-llm-delegate/SKILL.md`.
 - `SECURITY.md`: policy for private reporting of vulnerabilities, leaks, and sensitive operational risks.
-- The dispatcher offers `-BlindReview` only for the delegated Codex reviewer on `public` content; it validates the receipt before counting the response toward diversity. An unsupported request is reported before dispatch and can continue to an eligible configured fallback reviewer.
+- The dispatcher offers `-BlindReview` only for the delegated Codex reviewer on `public` content; it validates the receipt before counting the response toward diversity. An unsupported request is reported before dispatch and can continue to an eligible configured fallback reviewer. A direct call to `scripts/Invoke-Codex.ps1` refuses `-BlindReview` with `-RetentionMode kb-sensitive` before reading the prompt.
 - `CODE_OF_CONDUCT.md`: code of conduct for project-related interactions.
 
 ### KB Intelligence operational documentation

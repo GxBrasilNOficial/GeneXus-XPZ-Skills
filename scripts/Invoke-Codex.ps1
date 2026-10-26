@@ -22,7 +22,8 @@
     -BlindReview inicia um codex exec novo e descartavel (--ephemeral), desativa a feature
     de memorias e o uso/geracao de memorias por overrides desta invocacao, e registra esses
     controles no request.json. Nao altera a configuracao global do Codex nem recebe historico
-    da conversa chamadora.
+    da conversa chamadora. Com -RetentionMode kb-sensitive, recusa antes de ler o prompt,
+    gravar recibo ou subir o processo: o modo cego desta entrega exige -RetentionMode public.
 
     CONFIDENCIALIDADE: este script NAO decide para onde o dado pode ir. Antes de enviar
     payload sensivel (conteudo de pasta paralela de KB) a um modelo, o chamador deve passar
@@ -54,6 +55,7 @@
     Cria uma execucao independente e descartavel para revisao cega: --ephemeral e overrides
     por invocacao para features.memories, memories.use_memories e memories.generate_memories,
     todos false. O sandbox continua read-only. Registra os controles no request.json.
+    Exige -RetentionMode public; com kb-sensitive, recusa antes de qualquer leitura ou processo.
 .PARAMETER ReasoningEffort
     Nivel de esforco de raciocinio (codex exec -c model_reasoning_effort=<nivel>). Opcional;
     quando omitido, vale o model_reasoning_effort do config.toml/profile.
@@ -71,7 +73,8 @@
 .PARAMETER RetentionMode
     public (default): lastmsg/request permanecem no disco; so invoke-* e apagado apos
     rewrite de captureOutcome. kb-sensitive: apaga lastmsg/invoke-* e o request apos
-    rewrite; em falha de execucao copia o lastmsg para a Exception.Message.
+    rewrite; em falha de execucao copia o lastmsg para a Exception.Message. Nao combina
+    com -BlindReview: essa dupla e recusada antes de ler o prompt.
 .EXAMPLE
     .\Invoke-Codex.ps1 "resuma este log"
 .EXAMPLE
@@ -101,6 +104,10 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 try { [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false) } catch { }
+
+if ($BlindReview -and $RetentionMode -eq 'kb-sensitive') {
+    throw 'BLOCK: -BlindReview so aceita -RetentionMode public.'
+}
 
 . (Join-Path $PSScriptRoot 'CodexCliSupport.ps1')
 
