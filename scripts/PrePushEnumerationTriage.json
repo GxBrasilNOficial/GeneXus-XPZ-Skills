@@ -18,21 +18,6 @@
       "excerpt": "A skill `xpz-skills-setup` já audita o registro de skills XPZ cross-tool (Claude/Codex/Cursor/OpenCode) e oferece resolução de gaps."
     },
     {
-      "code": "GATE_ENUMERATION_SUBSET",
-      "file": "13-revisao-pre-push.md",
-      "unitHash": "731a0ba5070fce888fbc54e6af6ca26d6c72a79c7d66132153668fa463aa3a06",
-      "listedMembers": [
-        "Test-PrePushBackendEnumerationParity.ps1",
-        "Test-PrePushGateEnumerationParity.ps1"
-      ],
-      "verdict": "non-gap",
-      "reason": "Esta linha lista especificamente os dois scanners de enumeração, não o conjunto completo de gates.",
-      "triagedAt": "2026-10-19",
-      "triagedBy": "Codex, com autorização do usuário",
-      "kind": "closed",
-      "excerpt": "Para o conjunto de **gates da pré-push**, há suporte mecânico em `scripts/Test-PrePushGateEnumerationParity.ps1`; para o conjunto de **backends de delegação**, em `scripts/Test-PrePushBackendEnumerationParity.ps1`. Ambos…"
-    },
-    {
       "code": "BACKEND_ENUMERATION_SUBSET",
       "file": "09-inventario-e-rastreabilidade-publica.md",
       "unitHash": "045d60b1dcfdc1e0a08a86f572b5abd9151e7265c5659663bd73d538333ccf18",
