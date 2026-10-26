@@ -3636,11 +3636,11 @@ As contagens são de **arquivos que mencionam o token**, não de parâmetros exc
 - **Importância** — média: não produz resultado limpo indevido, mas deixa o status `pendente` em build bom e obriga leitura manual; o contorno disponível (registrar a linha literal) se desfaz no build seguinte em que a contagem mudar. O gate de deploy não depende disso (decide por `exit 0` e build concluído).
 - **Maturidade** — ideia (decisão de desenho em aberto: qual rota de normalização e qual o recorte das linhas aceitas).
 
-**Contexto.** Registrado em 2026-10-26, na revisão da frente de Categoria B, depois da dispensa do compressor (commit `1f68037`), inicialmente só para a linha `[APLICADO]`. Ampliado no mesmo dia, depois da frente do `wpRelatoriosDeTitulos` em `Gx_FabricaBrasil`: o mesmo efeito aparece em mais três linhas de saída do pós-build, todas com números que mudam de um build para outro.
+**Contexto.** Registrado em 2026-10-26, na revisão da frente de Categoria B, depois da dispensa do compressor (commit `1f68037`), inicialmente só para a linha `[APLICADO]`. Ampliado no mesmo dia, depois de uma frente de WebPanel de relatório em KB de produção (pasta paralela): o mesmo efeito aparece em mais três linhas de saída do pós-build, todas com números que mudam de um build para outro.
 
-**Linhas afetadas (saída do `PostBuild-Gx.bat` no `NETPostgreSQL`).**
+**Linhas afetadas (saída do `PostBuild-Gx.bat` em environment .NET Core + PostgreSQL).**
 - `[APLICADO] .js varridos=<n> | arquivos com chave negativa em gx.domain=<n> | chaves corrigidas=<n>` (`Fix-GxNegativeDomainKeys`): muda com cada `.js` novo na pasta `web` e quando aparece chave negativa.
-- `<arquivo>.js -> <n> chave(s)`: só aparece quando o `Fix-GxNegativeDomainKeys` corrige alguma chave; o nome do arquivo e a contagem variam. Visto como `wprelatoriosdetitulos.js -> 1 chave(s)` nos builds de 2026-10-25.
+- `<arquivo>.js -> <n> chave(s)`: só aparece quando o `Fix-GxNegativeDomainKeys` corrige alguma chave; o nome do arquivo e a contagem variam. Visto como `<objeto>.js -> 1 chave(s)` nos builds de 2026-10-25.
 - `Verify-GxJs: verificados <n> .js (modulos pulados: <n> | placeholders pulados: <n>) | invalidos: 0 | tempo: <n> ms`: hoje só o `tempo` é normalizado; as contagens entram na impressão digital.
 - `CommonRspHealth: OK - GeneXus.Programs.Common.csproj ok (<n> itens, <n> dominios); genexus.programs.common.bld ok (<n> itens, <n> dominios); <n> gxdomain*.cs no disco`: muda quando entra domínio novo.
 
@@ -3648,10 +3648,10 @@ As contagens são de **arquivos que mencionam o token**, não de parâmetros exc
 - `scripts/GeneXusMsBuildPostBuildEventsSupport.ps1`, `Get-GeneXusPostBuildEventNormalizedHash` (linhas 177–180): a única normalização além de trim/espaços/caixa é o trecho `tempo: <n> ms` da linha `Verify-GxJs` com `invalidos: 0`.
 - `Get-GeneXusPostBuildEventClassification` marca `shouldDowngrade` quando há evento inesperado. `Invoke-GeneXusKbBuildAll.ps1` só rebaixa o status `compilou limpo`.
 
-**Evidência em build real (2026-10-25 e 2026-10-26, `Gx_FabricaBrasil`, `NETPostgreSQL`).**
-- 2026-10-25: nos builds das rodadas do `wpRelatoriosDeTitulos`, as linhas `[APLICADO] … chaves corrigidas=1`, `wprelatoriosdetitulos.js -> 1 chave(s)`, `Verify-GxJs: verificados 2176 …` e `CommonRspHealth: OK …` saíram como "Evento pos-build NAO registrado".
-- 2026-10-26: Build All incremental com `exit 0`, sem reorg, `deployBinFreshness=fresh`, `Verify-GxJs` com `invalidos: 0` e `Build All Task Sucesso`. Mesmo assim, o status ficou `operação concluída, pendente de confirmação funcional`, porque três dessas linhas não tinham impressão digital registrada (relatório em `Temp/xpz-build-relatorios-titulos-recheck-20261026-1447/build-all.json`).
-- Contorno aplicado: `Register-FabricaBrasilKbPostBuildEvents.ps1` regravou o registro do `NETPostgreSQL` em `kb-source-metadata.md` com os 10 eventos do build; a reclassificação deu `unexpected=[]` e `shouldDowngrade=false`.
+**Evidência em build real (2026-10-25 e 2026-10-26, KB de produção, environment .NET Core + PostgreSQL).**
+- 2026-10-25: nos builds das rodadas do WebPanel de relatório, as linhas `[APLICADO] … chaves corrigidas=1`, `<objeto>.js -> 1 chave(s)`, `Verify-GxJs: verificados 2176 …` e `CommonRspHealth: OK …` saíram como "Evento pos-build NAO registrado".
+- 2026-10-26: Build All incremental com `exit 0`, sem reorg, `deployBinFreshness=fresh`, `Verify-GxJs` com `invalidos: 0` e `Build All Task Sucesso`. Mesmo assim, o status ficou `operação concluída, pendente de confirmação funcional`, porque três dessas linhas não tinham impressão digital registrada (relatório JSON do BuildAll sob `Temp/` da pasta paralela).
+- Contorno aplicado: wrapper local `Register-*KbPostBuildEvents.ps1` regravou o registro do environment em `kb-source-metadata.md` com os 10 eventos do build; a reclassificação deu `unexpected=[]` e `shouldDowngrade=false`.
 - O contorno não dura. O registro anterior já guardava `.js varridos=2974` e `verificados 2184`; o novo guarda `2966` e `2176`. Basta um `.js` ou um domínio a mais para a linha deixar de bater e o status voltar a `pendente`.
 
 **Ideia de solução.**
