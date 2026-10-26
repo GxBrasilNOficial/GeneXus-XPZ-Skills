@@ -710,6 +710,7 @@ $postProcessingFailed = $false
 $postProcessingError = $null
 $buildStatus = $null
 $msBuildCategoryBBlocked = $false
+$script:StaticCompressorKnownCase = $null
 $operationalSubStateBuild = $null
 
 $resolvedLogPath = Get-FullPathSafe -PathValue $LogPath
@@ -1953,6 +1954,72 @@ try {
     $script:BuildSignals['Complete'] = $true
 
     if ($msBuildExitCode -eq 0 -and $buildStatus.ExitCode -eq 0) {
+        # Caso conhecido do compressor de estaticos: dispensa a Categoria B somente com as evidencias
+        # do log (Test-GeneXusStaticCompressorKnownCase). Fora dele, o fluxo abaixo fica igual.
+        # Qualquer excecao na avaliacao deixa o caso como nao reconhecido, para o exit 48 continuar valendo.
+        # So e avaliado quando o classificador contou algum erro: sem erro contado, nao ha o que dispensar.
+        $staticCase = $null
+        if (@($buildErrors).Count -gt 0) {
+            try {
+                $staticCompressorMetadataPath = $null
+                if ($null -ne $script:DeploymentEnvironmentContext) {
+                    $staticCompressorMetadataPath = Get-GeneXusKbDeploymentContextValue -DeploymentEnvironmentContext $script:DeploymentEnvironmentContext -Name 'kbSourceMetadataPath'
+                }
+                $staticCompressorMetadataPresent = (-not [string]::IsNullOrWhiteSpace($staticCompressorMetadataPath)) -and (Test-Path -LiteralPath $staticCompressorMetadataPath -PathType Leaf)
+                $staticCompressorEnvironment = Resolve-GeneXusValidationEnvironmentName `
+                    -EnvironmentName $EnvironmentName `
+                    -DeploymentEnvironmentContext $script:DeploymentEnvironmentContext `
+                    -ActiveEnvironment $activeEnvironmentOutput
+                $staticCompressorWebDir = $null
+                if (-not [string]::IsNullOrWhiteSpace($staticCompressorEnvironment)) {
+                    $staticCompressorWebDir = @(Get-GeneXusKbDeployBinPaths -KbPath $resolvedKbPath -EnvironmentName $staticCompressorEnvironment -MetadataPath $staticCompressorMetadataPath)[0].environmentWebPath
+                }
+                $staticCompressorStdErrLines = @($stdErrText -split "`r?`n")
+                $knownStdOutNoiseLines = @(
+                    @($knownStdOutNoiseBuild) |
+                        ForEach-Object {
+                            if ($null -ne $_ -and $null -ne $_.PSObject.Properties['line'] -and $null -ne $_.line) {
+                                [string]$_.line
+                            }
+                        }
+                )
+                $staticCompressorGamNoise = @(
+                    @($stdOutNoiseLines) +
+                    @($knownStdOutNoiseLines) +
+                    @($staticCompressorStdErrLines | Where-Object { $_ -and (Test-GamPlatformsStdoutNoiseLine -Line $_) })
+                )
+                $staticCase = Test-GeneXusStaticCompressorKnownCase `
+                    -StdOutLines $stdOutLines `
+                    -StdErrLines $staticCompressorStdErrLines `
+                    -GamNoiseLines $staticCompressorGamNoise `
+                    -MsBuildExitCode $msBuildExitCode `
+                    -KbOpen $kbOpen `
+                    -TimedOut $timedOut `
+                    -BuildAllDone $buildAllDone `
+                    -DetectedBlockingPattern $detectedBlockingPattern `
+                    -BlockingReasonCount @($script:BlockingReasons).Count `
+                    -ClassifierErrorCount @($buildErrors).Count `
+                    -KbRoot $resolvedKbPath `
+                    -MetadataPresent $staticCompressorMetadataPresent `
+                    -ExpectedWebDir $staticCompressorWebDir
+            }
+            catch {
+                $staticCase = Get-GeneXusStaticCompressorCaseRefusal -Reason ('falha interna ao avaliar o caso conhecido: {0}' -f $_.Exception.Message)
+            }
+        }
+        $script:StaticCompressorKnownCase = $staticCase
+        if ($null -ne $staticCase -and $staticCase.recognized) {
+            $staticCompressorFileNames = @($staticCase.files | ForEach-Object { $_.fileName }) -join ', '
+            $staticCompressorText = ("O compressor de estaticos reportou chave negativa em {0}; o contorno do pos-build corrigiu e o Verify-GxJs confirmou zero invalidos. A rodada nao e classificada como Categoria B; so o wrapper dispensa, e o campo staticCompressorKnownCase registra a evidencia." -f $staticCompressorFileNames)
+            $buildErrors = @()
+            $buildStatus = [ordered]@{
+                Status   = 'operacao concluida, pendente de confirmacao funcional'
+                Summary  = (("{0} {1}" -f $buildStatus.Summary, $staticCompressorText).Trim())
+                ExitCode = 0
+            }
+            Add-WarningMessage -Message 'O compressor de estaticos nao comprimiu um ou mais arquivos (Some files could not be compressed). Os .js afetados foram corrigidos pelo contorno e verificados, mas nao passaram pela compressao.'
+        }
+
         $categoryBExit = Resolve-GeneXusMsBuildCategoryBExitCode `
             -BaseExitCode $buildStatus.ExitCode `
             -MsBuildExitCode $msBuildExitCode `
@@ -2013,16 +2080,10 @@ try {
 
     $script:DeployBinClassification = $null
     if ($null -ne $buildStatus -and $msBuildExitCode -eq 0) {
-        $validationEnvForDeployBin = $EnvironmentName
-        if ($null -ne $script:DeploymentEnvironmentContext) {
-            $ctxResolvedDeploy = Get-GeneXusKbDeploymentContextValue -DeploymentEnvironmentContext $script:DeploymentEnvironmentContext -Name 'validationEnvironmentResolved'
-            if (-not [string]::IsNullOrWhiteSpace($ctxResolvedDeploy)) {
-                $validationEnvForDeployBin = $ctxResolvedDeploy
-            }
-        }
-        if ([string]::IsNullOrWhiteSpace($validationEnvForDeployBin)) {
-            $validationEnvForDeployBin = $activeEnvironmentOutput
-        }
+        $validationEnvForDeployBin = Resolve-GeneXusValidationEnvironmentName `
+            -EnvironmentName $EnvironmentName `
+            -DeploymentEnvironmentContext $script:DeploymentEnvironmentContext `
+            -ActiveEnvironment $activeEnvironmentOutput
 
         $buildStartedAtDeploy = [DateTimeOffset]::UtcNow
         if ($script:TimingLog.Contains('msbuildStart') -and -not [string]::IsNullOrWhiteSpace($script:TimingLog['msbuildStart'])) {
@@ -2155,6 +2216,7 @@ try {
         knownStdOutNoise     = @($knownStdOutNoiseBuild)
         operationalSubState  = $operationalSubStateBuild
         msBuildCategoryBBlocked = $msBuildCategoryBBlocked
+        staticCompressorKnownCase = $script:StaticCompressorKnownCase
         stdoutSignals        = [ordered]@{
             blockingPattern = $detectedBlockingPattern
             postBuildEvents = $postBuildEventLines
@@ -2191,7 +2253,8 @@ try {
         $postProcessingFailed = $true
         $postProcessingError  = ('Falha ao serializar diagnostico apos MSBuild: {0}' -f $_.Exception.Message)
         Add-StrategyTrace -Message $postProcessingError
-        if (($buildStatus.ExitCode -eq 0) -and ($msBuildExitCode -eq 0)) {
+        # So promove a 'compilou limpo' quando o status anterior ja era limpo: nao apaga um pendente ou degradado.
+        if (($buildStatus.ExitCode -eq 0) -and ($msBuildExitCode -eq 0) -and ($buildStatus.Status -eq 'compilou limpo')) {
             $buildStatus = [ordered]@{
                 Status   = 'compilou limpo'
                 Summary  = 'BuildAll concluiu sem erro de MSBuild, mas a serializacao do diagnostico falhou. Evidencias primarias preservadas no log bruto.'
@@ -2212,6 +2275,7 @@ try {
             postProcessingFailed = $true
             postProcessingError  = $postProcessingError
             stage                = 'build-all'
+            staticCompressorKnownCase = $script:StaticCompressorKnownCase
             buildSignals         = $script:BuildSignals
             artifacts            = [ordered]@{
                 MsBuildStdoutLogPath = $stdOutPath
@@ -2318,6 +2382,7 @@ catch {
             postProcessingFailed = $true
             postProcessingError  = $postProcessingError
             stage                = 'build-all'
+            staticCompressorKnownCase = $script:StaticCompressorKnownCase
             observedContext      = [ordered]@{
                 KbOpen       = $recoveryKbOpen
                 BuildAllDone = $recoveryBuildAllDone

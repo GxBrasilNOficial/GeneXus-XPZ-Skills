@@ -375,6 +375,19 @@ foreach ($exampleFile in Get-ChildItem -LiteralPath $SkillsExamplesPath -Filter 
             $customized.Add(('{0}(reason=unsafe_last_exitcode_after_ps1_engine)' -f $standardLocalName))
         }
 
+        # Contrato de consumo do Invoke-GeneXusXpzImportThenBuild: exit 0 com status pendente
+        # NAO e roundtrip-ok. Heuristica textual (mesmo estilo de consumes_legacy_text_stdout):
+        # se o wrapper menciona o motor e nao menciona roundtripStatus, sinaliza drift.
+        # LIMITE CONHECIDO: nao prova AST de caminho de sucesso; nao detecta leitura indireta
+        # do JSON (so a ausencia do token roundtripStatus); wrappers que so repassam o JSON
+        # opaco sem inspecionar tambem sao sinalizados (conservador).
+        if (
+            $localTextForEngineExit -match 'Invoke-GeneXusXpzImportThenBuild' -and
+            $localTextForEngineExit -notmatch '\broundtripStatus\b'
+        ) {
+            $customized.Add(('{0}(reason=roundtrip_exit_only_without_status)' -f $standardLocalName))
+        }
+
         # Check generico: parametro repassado a motor compartilhado advanced que o motor nao
         # declara (forwards_unknown_engine_param), caminho de motor inexistente
         # (shared_engine_unresolved) -> desvios-de-wrapper, viram INVENTORY_CUSTOMIZED (capturado

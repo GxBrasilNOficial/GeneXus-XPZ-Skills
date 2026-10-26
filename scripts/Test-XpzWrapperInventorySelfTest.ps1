@@ -745,6 +745,36 @@ $forward.ObjectNames = @($forward.ObjectNames) + $trimmed
     $output = (& $inventoryScriptPath -KbParallelRoot $kbRoot -SkillsExamplesPath $examplesPath) -join ' '
     Assert-NotContains $output 'copy_objectlist_type_loss' 'inventário Copy corrigido'
     Assert-Contains 'INVENTORY_CUSTOMIZED: Copy(reason=copy_objectlist_type_loss)' $blockRegex 'agregador reconhece Copy'
+
+    # D14: wrapper que chama ImportThenBuild sem ler roundtripStatus.
+    @'
+#requires -Version 7.4
+param([string]$InputPath)
+& (Join-Path $SharedSkillsRoot 'scripts/Invoke-GeneXusXpzImportThenBuild.ps1') -InputPath $InputPath
+if ($LASTEXITCODE -eq 0) { Write-Output 'ok' }
+'@ | Set-Content -LiteralPath (Join-Path $examplesPath 'Update-KbFromXpz.example.ps1') -Encoding utf8NoBOM
+    $updateRoundtripPath = Join-Path $scriptsPath 'Update-DemoKbFromXpz.ps1'
+    @'
+#requires -Version 7.4
+param([string]$InputPath)
+& (Join-Path $SharedSkillsRoot 'scripts/Invoke-GeneXusXpzImportThenBuild.ps1') -InputPath $InputPath
+if ($LASTEXITCODE -eq 0) { Write-Output 'ok' }
+'@ | Set-Content -LiteralPath $updateRoundtripPath -Encoding utf8NoBOM
+    $output = (& $inventoryScriptPath -KbParallelRoot $kbRoot -SkillsExamplesPath $examplesPath 2>&1 |
+        ForEach-Object { $_.ToString() }) -join ' '
+    Assert-Contains -Text $output -Pattern 'Update-DemoKbFromXpz\.ps1\(reason=roundtrip_exit_only_without_status\)' -Message 'wrapper ImportThenBuild sem roundtripStatus deve ser sinalizado'
+
+    @'
+#requires -Version 7.4
+param([string]$InputPath)
+$raw = & (Join-Path $SharedSkillsRoot 'scripts/Invoke-GeneXusXpzImportThenBuild.ps1') -InputPath $InputPath
+$json = $raw | ConvertFrom-Json
+if ($json.roundtripStatus -eq 'roundtrip-ok') { Write-Output 'ok' }
+'@ | Set-Content -LiteralPath $updateRoundtripPath -Encoding utf8NoBOM
+    $output = (& $inventoryScriptPath -KbParallelRoot $kbRoot -SkillsExamplesPath $examplesPath 2>&1 |
+        ForEach-Object { $_.ToString() }) -join ' '
+    Assert-NotContains -Text $output -Pattern 'Update-DemoKbFromXpz\.ps1\(reason=roundtrip_exit_only_without_status\)' -Message 'wrapper que le roundtripStatus nao pode ser sinalizado por esse motivo'
+
     Write-Output 'WRAPPER_INVENTORY_SELFTEST_OK'
 } finally {
     if ($tempRoot.StartsWith([System.IO.Path]::GetTempPath(), [System.StringComparison]::OrdinalIgnoreCase) -and

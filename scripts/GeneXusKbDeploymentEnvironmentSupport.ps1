@@ -267,6 +267,31 @@ function Get-GeneXusRegisteredPostBuildEventHashesForEnvironment {
     return @()
 }
 
+function Resolve-GeneXusValidationEnvironmentName {
+    <#
+      Precedencia do environment validado (mesma do gate de deploy-bin no BuildAll):
+      EnvironmentName -> validationEnvironmentResolved (contexto) -> ActiveEnvironment.
+      Nao resolve metadata; so escolhe o nome a partir dos tres insumos ja conhecidos.
+    #>
+    param(
+        [AllowNull()][string]$EnvironmentName,
+        [AllowNull()]$DeploymentEnvironmentContext,
+        [AllowNull()][string]$ActiveEnvironment
+    )
+
+    $resolved = $EnvironmentName
+    if ($null -ne $DeploymentEnvironmentContext) {
+        $ctxResolved = Get-GeneXusKbDeploymentContextValue -DeploymentEnvironmentContext $DeploymentEnvironmentContext -Name 'validationEnvironmentResolved'
+        if (-not [string]::IsNullOrWhiteSpace($ctxResolved)) {
+            $resolved = $ctxResolved
+        }
+    }
+    if ([string]::IsNullOrWhiteSpace($resolved)) {
+        $resolved = $ActiveEnvironment
+    }
+    return $resolved
+}
+
 function Resolve-GeneXusKbValidationEnvironment {
     param(
         [string]$EnvironmentName,

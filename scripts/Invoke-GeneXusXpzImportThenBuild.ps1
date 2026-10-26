@@ -134,6 +134,12 @@ if (-not (Test-Path -LiteralPath $logPathGateSupportPath -PathType Leaf)) {
 }
 . $logPathGateSupportPath
 
+$categoryBSupportPath = Join-Path (Split-Path -Parent $PSCommandPath) 'GeneXusMsBuildCategoryBSupport.ps1'
+if (-not (Test-Path -LiteralPath $categoryBSupportPath -PathType Leaf)) {
+    throw "Category B support script not found: $categoryBSupportPath"
+}
+. $categoryBSupportPath
+
 $script:StrategyTrace = @()
 $script:Warnings = @()
 $script:BlockingReasons = @()
@@ -577,11 +583,12 @@ try {
         $buildProcess = Invoke-RoundtripChildScript -ScriptPath $buildScriptPath -ScriptArguments $buildArguments -StdOutPath $buildStdOutPath -StdErrPath $buildStdErrPath
         $buildJsonRead = Read-JsonFileSafe -PathValue $buildLogPath
         $exitCode = [int]$buildProcess.exitCode
-        $roundtripStatus = if ($exitCode -eq 0) { 'roundtrip-ok' } else { 'build-failed-or-blocked' }
+        $roundtripStatus = Get-GeneXusRoundtripStatus -ExitCode $exitCode -BuildJsonOk $buildJsonRead.ok -BuildJson $buildJsonRead.value
     }
 
     $summary = switch ($roundtripStatus) {
-        'roundtrip-ok' { 'Importação real concluída e BuildAll pós-import concluído.' }
+        'roundtrip-ok' { 'Importação real concluída e BuildAll pós-import concluído com build limpo.' }
+        'roundtrip-pendente-confirmacao' { 'Importação real concluída com exit 0, mas sem confirmação de build limpo (status do BuildAll diferente de compilou limpo, ou diagnóstico ilegível). Não tratar como validado; conferir o diagnóstico do BuildAll.' }
         'build-failed-or-blocked' { 'Importação real apta, mas BuildAll pós-import falhou ou bloqueou.' }
         default { 'BuildAll pós-import não foi executado porque a importação não ficou apta para build.' }
     }
