@@ -266,14 +266,19 @@ Detalhes e critérios para retomada: [`msbuild-result-contract-v2-finalizador-co
 
 **Retomada.** Sessão própria: identificar o principal (conta do processo MSBuild/agente, ACL da pasta de plataformas GAM, política de UAC/antivirus) e testar um contorno permanente (permissão, exclusão de pasta de build intermediária, ou outro meio seguro). Enquanto isso não existir, manter o tratamento como ruído conhecido. Nenhuma ação automática nesta frente.
 
-## Teste de integração automatizado da rota import+BuildAll (`Invoke-GeneXusXpzImportThenBuild.ps1`)
+## Teste de integração automatizado da rota import+BuildAll (`Invoke-GeneXusXpzImportThenBuild.ps1`) e inventário de quem lê só o exit do BuildAll
 
-- **Importância** — média (a frente de Categoria B altera o significado de “roundtrip ok” quando o BuildAll sai com exit 0 e status pendente; quem lê só o exit code vê sucesso).
-- **Maturidade** — ideia (hoje há testes unitários da regra de classificação; não há teste automatizado do script completo).
+- **Importância** — média (a frente de Categoria B altera o significado de “roundtrip ok” quando o BuildAll sai com exit 0 e status pendente; quem lê só o exit code vê sucesso — na rota import+build e em chamada direta ao BuildAll).
+- **Maturidade** — ideia (há testes unitários da regra de classificação e o inventário já sinaliza `roundtrip_exit_only_without_status` para quem cita `Invoke-GeneXusXpzImportThenBuild` sem `roundtripStatus`; faltam o teste automatizado do script completo e a heurística simétrica para quem chama só `Invoke-GeneXusKbBuildAll`).
 
-**Contexto.** Registrado em 2026-10-25, na revisão da mesma frente. O mantenedor aceitou seguir sem o teste de integração nesta frente (exigiria import real ou dublê de processo filho). A lacuna fica anotada para cuidado futuro.
+**Contexto.** Registrado em 2026-10-25, na revisão da mesma frente. O mantenedor aceitou seguir sem o teste de integração nesta frente (exigiria import real ou dublê de processo filho). Em 2026-10-26, painel pré-push reforçado (Haiku) apontou o eixo de lockstep ainda aberto: o check de inventário cobre o consumidor canônico `ImportThenBuild`, mas **não** há molde/heurística para scripts locais que invocam `Invoke-GeneXusKbBuildAll.ps1` e tratam sucesso só pelo exit (sem ler `status`/JSON equivalente). Não houve consumidor auditável real apontado naquela rodada — a lacuna é de cobertura do gate, não de wrapper defasado já visto.
 
-**Retomada.** Em sessão própria: decidir entre fixture com processo filho dublê (sem import real) ou smoke controlado com KB de teste; cobrir pelo menos exit 0 + status pendente do compressor → status de roundtrip “pendente de confirmação”, e exit 0 + “compilou limpo” → “roundtrip ok”. Nenhuma ação automática nesta frente.
+**Retomada.** Em sessão própria, dois eixos (podem andar juntos ou separados):
+
+1. **Teste de integração** do `Invoke-GeneXusXpzImportThenBuild.ps1`: decidir entre fixture com processo filho dublê (sem import real) ou smoke controlado com KB de teste; cobrir pelo menos exit 0 + status pendente do compressor → status de roundtrip “pendente de confirmação”, e exit 0 + “compilou limpo” → “roundtrip ok”.
+2. **Inventário / lockstep**: avaliar heurística em `Test-XpzWrapperInventory.ps1` (mesmo espírito de `roundtrip_exit_only_without_status`) para texto local que chama `Invoke-GeneXusKbBuildAll` e só olha exit/`LASTEXITCODE` sem token de `status` (ou campo equivalente do JSON). Se não houver molde canônico nem caso real em pasta paralela, registrar explicitamente o adiamento até surgir consumidor/molde — não inventar wrapper hipotético só para fechar o check. Remissão: [Follow-up: versão-de-contrato confrontável + gate consultivo de lockstep](#follow-up-versão-de-contrato-confrontável--gate-consultivo-de-lockstep-etapa-2-da-auditoria-de-drift-de-consumo).
+
+Nenhuma ação automática nesta frente.
 
 ## Falha ao ler os sinais do BuildAll deixa o resultado como limpo (falso “roundtrip ok”)
 
