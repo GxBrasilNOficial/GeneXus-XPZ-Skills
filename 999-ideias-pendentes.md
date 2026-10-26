@@ -3625,3 +3625,27 @@ As contagens são de **arquivos que mencionam o token**, não de parâmetros exc
 - Se o bloqueio fica só no envelope ou também no empacotamento (`New-XpzImportPackage`, gate 9-FD).
 
 **Retomada.** Depois do teste de importação em KB de ensaio. Nenhuma ação automática.
+
+## Linha `[APLICADO]` do contorno do compressor conta como evento pós-build não registrado a cada build
+
+- **Importância** — baixa-média: não produz resultado limpo indevido; deixa o status `pendente` mesmo quando a dispensa da Categoria B vale, e exige leitura manual para confirmar o build. O gate de deploy não depende disso (decide por `exit 0` e build concluído).
+- **Maturidade** — ideia (decisão de desenho em aberto: normalizar a forma da linha mantendo as contagens como evidência, ou aceitar a linha como conhecida quando a dispensa do compressor valer).
+
+**Contexto.** Registrado em 2026-10-26, na revisão da frente de Categoria B, depois da dispensa do compressor (commit `1f68037`). Nos builds de 2026-10-25, a linha `[APLICADO] .js varridos=2966 | arquivos com chave negativa em gx.domain=1 | chaves corrigidas=1` apareceu como "Evento pos-build NAO registrado" e foi lançada como aviso. Nos builds anteriores, `chaves corrigidas` era 0, então a linha muda de um build para o outro.
+
+**Estado observado (leitura do código).**
+- `scripts/GeneXusMsBuildPostBuildEventsSupport.ps1`, linhas 178–179: a única normalização é o trecho `tempo: <n> ms` da linha `Verify-GxJs` com `invalidos: 0`. A linha `[APLICADO]` não é normalizada.
+- `Get-GeneXusPostBuildEventClassification` (linha 246) marca `shouldDowngrade` quando há evento inesperado. `Invoke-GeneXusKbBuildAll.ps1`, linha 1900, só rebaixa o status `compilou limpo`.
+
+**Efeito esperado.** Pelo código, o status fica `operacao concluida, pendente de confirmacao funcional` com `exit 0` quando a dispensa vale. Ainda não observei isso em build real com a versão nova. Não há falso sucesso por causa disso.
+
+**Ideia de solução.**
+1. Quando a dispensa do compressor for reconhecida, tratar a linha `[APLICADO]` como evento conhecido, comparando a forma da linha e não as contagens. As contagens continuam no diagnóstico como evidência.
+2. Alternativa: o registro de evento pós-build aceitar padrão com contagens variáveis, em vez de fingerprint fixo.
+3. Teste: fixture com `chaves corrigidas=0` e `=1`, que devem produzir a mesma classificação.
+
+**Decisões em aberto.** Qual das duas rotas; se a linha conhecida vale só com a dispensa do compressor ou também isolada.
+
+**Relacionado.** A leitura de sinais que pode dar resultado limpo por falha (entrada anterior) tem prioridade maior que este item.
+
+**Retomada.** Depois do primeiro build real com a dispensa ativa, para ver o status na prática. Nenhuma ação automática.
