@@ -588,7 +588,7 @@ try {
 
     $summary = switch ($roundtripStatus) {
         'roundtrip-ok' { 'Importação real concluída e BuildAll pós-import concluído com build limpo.' }
-        'roundtrip-pendente-confirmacao' { 'Importação real concluída com exit 0, mas sem confirmação de build limpo (status do BuildAll diferente de compilou limpo, ou diagnóstico ilegível). Não tratar como validado; conferir o diagnóstico do BuildAll.' }
+        'roundtrip-pendente-confirmacao' { 'Importação real concluída com exit 0, mas sem confirmação de build limpo (status do BuildAll diferente de compilou limpo, ou postProcessingFailed/msBuildCategoryBBlocked verdadeiros, ou diagnóstico ilegível). Não tratar como validado; conferir o diagnóstico do BuildAll.' }
         'build-failed-or-blocked' { 'Importação real apta, mas BuildAll pós-import falhou ou bloqueou.' }
         default { 'BuildAll pós-import não foi executado porque a importação não ficou apta para build.' }
     }

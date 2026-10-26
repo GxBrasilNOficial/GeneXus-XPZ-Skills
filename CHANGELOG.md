@@ -8,6 +8,8 @@ O formato segue a ideia de manter uma seção `Unreleased` para mudanças ainda 
 
 ### Unreleased
 
+- **Summary de roundtrip pendente alinhado às causas reais (2026-10-26):** em `scripts/Invoke-GeneXusXpzImportThenBuild.ps1`, o `summary` de `roundtrip-pendente-confirmacao` passa a citar também `postProcessingFailed` e `msBuildCategoryBBlocked` verdadeiros, além de status diferente de `compilou limpo` ou diagnóstico ilegível — o `roundtripStatus` estruturado já cobria esses casos.
+
 - **Recusa da revisão cega Codex com conteúdo sensível (2026-10-26):** `scripts/Invoke-Codex.ps1` recusa `-BlindReview` junto com `-RetentionMode kb-sensitive` antes de ler o prompt, gravar recibo ou iniciar o processo. O dispatcher já barrava essa combinação. O modo cego continua apenas para Codex com retenção `public`.
 
 - **Dispensa do caso conhecido do compressor de estáticos no BuildAll (2026-10-26):** só o wrapper dispensa a Categoria B quando as linhas contadas como erro são exclusivamente `<arquivo>.js(N): Syntax error : }` do compressor, uma por arquivo, com o contorno do pós-build, `invalidos: 0`, BuildAll concluído e `node --check`. Nesse caso o exit é 0, o status fica `operacao concluida, pendente de confirmacao funcional`, `buildErrors` fica vazio e `staticCompressorKnownCase.recognized=true`. O exit 48 permanece para as rodadas que não se enquadram. O agente nunca converte um exit 48 em sucesso. A promoção para `compilou limpo` na serialização de fallback deixa de promover um status pendente com exit 0. O `roundtripStatus` do import-then-build só é `roundtrip-ok` com exit 0, status `compilou limpo` e sem `postProcessingFailed` nem `msBuildCategoryBBlocked`; outro exit 0 é `roundtrip-pendente-confirmacao`. O inventário de wrappers passa a sinalizar `roundtrip_exit_only_without_status` quando o texto cita `Invoke-GeneXusXpzImportThenBuild` e não cita `roundtripStatus`.
@@ -481,6 +483,8 @@ El formato mantiene una sección `Unreleased` para cambios aún no publicados en
 
 ### Unreleased
 
+- **Summary de roundtrip pendiente alineado a las causas reales (2026-10-26):** en `scripts/Invoke-GeneXusXpzImportThenBuild.ps1`, el `summary` de `roundtrip-pendente-confirmacao` también cita `postProcessingFailed` y `msBuildCategoryBBlocked` verdaderos, además de estado distinto de `compilou limpo` o diagnóstico ilegible — el `roundtripStatus` estructurado ya cubría esos casos.
+
 - **Rechazo de la revisión ciega Codex con contenido sensible (2026-10-26):** `scripts/Invoke-Codex.ps1` rechaza `-BlindReview` junto con `-RetentionMode kb-sensitive` antes de leer el prompt, grabar el recibo o iniciar el proceso. El dispatcher ya bloqueaba esa combinación. El modo ciego sigue limitado a Codex con retención `public`.
 
 - **Dispensa del caso conocido del compresor de estáticos en BuildAll (2026-10-26):** solo el wrapper dispensa la Categoría B cuando las líneas contadas como error son exclusivamente `<archivo>.js(N): Syntax error : }` del compresor, una por archivo, con el contorno del post-build, `invalidos: 0`, BuildAll concluido y `node --check`. En ese caso el exit es 0, el estado queda `operacao concluida, pendente de confirmacao funcional`, `buildErrors` queda vacío y `staticCompressorKnownCase.recognized=true`. El exit 48 permanece para las rondas que no encajan. El agente nunca convierte un exit 48 en éxito. La promoción a `compilou limpo` en la serialización de fallback deja de promover un estado pendiente con exit 0. El `roundtripStatus` del import-then-build solo es `roundtrip-ok` con exit 0, estado `compilou limpo` y sin `postProcessingFailed` ni `msBuildCategoryBBlocked`; otro exit 0 es `roundtrip-pendente-confirmacao`. El inventario de wrappers pasa a señalar `roundtrip_exit_only_without_status` cuando el texto cita `Invoke-GeneXusXpzImportThenBuild` y no cita `roundtripStatus`.
@@ -951,6 +955,8 @@ All relevant changes to this repository will be recorded here from this adoption
 The format keeps an `Unreleased` section for changes not yet published in a formal version. This repository does not yet use public semantic versioning; when that changes, future sections should record the corresponding tag.
 
 ### Unreleased
+
+- **Pending roundtrip summary aligned with real causes (2026-10-26):** in `scripts/Invoke-GeneXusXpzImportThenBuild.ps1`, the `summary` for `roundtrip-pendente-confirmacao` also cites true `postProcessingFailed` and `msBuildCategoryBBlocked`, besides BuildAll status other than `compilou limpo` or an unreadable diagnostic — the structured `roundtripStatus` already covered those cases.
 
 - **Refusal of Codex blind review with sensitive content (2026-10-26):** `scripts/Invoke-Codex.ps1` refuses `-BlindReview` together with `-RetentionMode kb-sensitive` before reading the prompt, writing the receipt, or starting the process. The dispatcher already blocked that combination. Blind mode remains limited to Codex with `public` retention.
 
