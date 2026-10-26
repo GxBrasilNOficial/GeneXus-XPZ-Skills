@@ -235,17 +235,17 @@ Detalhes e critérios para retomada: [`msbuild-result-contract-v2-finalizador-co
 
 **Retomada.** Decidir a opção B em sessão própria, com o responsável pelo deploy, antes de qualquer mudança nos Build Events ou no `.bat` de deploy. Nenhuma ação automática.
 
-## Classificador MSBuild do BuildAll lê só `error :` no stdout bruto — erros com código e ruído GAM
+## Classificador MSBuild do BuildAll lê só `error :` no stdout/stderr — erros com código e ruído GAM
 
 - **Importância** — média (falso positivo possível: `NuGet.targets(...): error :` sob a pasta de plataformas GAM, que é ruído conhecido, conta como erro e pode produzir exit 48; falso negativo: `error CSxxxx:` e `error MSBxxxx:` não são contados. O `msBuildExitCode` diferente de zero cobre a maioria das falhas reais, por isso o efeito é limitado).
 - **Maturidade** — ideia (decisão de desenho em aberto: corrigir o classificador geral, que também serve export, import e preview, ou só o caminho do BuildAll; qualquer correção geral exige testes nas quatro rotas).
 
-**Contexto.** Registrado em 2026-10-25, durante a frente de Categoria B. Foi adotada a opção de só registrar: o classificador não foi alterado nessa frente.
+**Contexto.** Registrado em 2026-10-25, durante a frente de Categoria B. Foi adotada a opção de só registrar: o classificador não foi alterado nessa frente. Em 2026-10-26 a redação foi alinhada ao código (escopo stdout+stderr e interação com a dispensa do compressor).
 
 **Estado observado (leitura do código, não de log).**
 
 - `scripts/Read-MsBuildImportSignals.ps1`, função `Get-ErrorLines`, conta apenas linhas que casam com `error\s*:`. Linhas com código de erro, como `error CS0019:` ou `error MSB3491:`, não casam.
-- `scripts/Invoke-GeneXusKbBuildAll.ps1` aplica o classificador ao stdout bruto. O filtro de ruído GAM (`scripts/GeneXusMsBuildGamPlatformsSupport.ps1`) só limpa a exibição, não a classificação.
+- No estágio de build/import/preview, o mesmo script aplica `Get-ErrorLines` a **stdout e stderr**; `Invoke-GeneXusKbBuildAll.ps1` consome essa lista como `buildErrors`. O filtro de ruído GAM (`scripts/GeneXusMsBuildGamPlatformsSupport.ps1`) só limpa a exibição, não a classificação.
 - A mesma função serve export, import e preview. Uma correção geral muda o resultado dessas três rotas, além do BuildAll.
 
 **Efeitos.**
@@ -253,7 +253,7 @@ Detalhes e critérios para retomada: [`msbuild-result-contract-v2-finalizador-co
 - Falso positivo possível: uma linha `NuGet.targets(...): error :` sob a pasta de plataformas GAM, que é ruído conhecido, conta como erro e pode produzir exit 48. Não foi observada em log nesta frente.
 - Falso negativo: erros com código não contam. A classificação só ocorre com `msBuildExitCode` igual a zero, então o efeito é limitado, mas não é zero.
 
-**Fora do caminho da dispensa da Categoria B.** A regra de dispensa usa função própria, com regex ampliada e exclusão do ruído GAM. Este gap não bloqueia a dispensa.
+**Interação com a dispensa da Categoria B (compressor).** A regra de dispensa usa função própria (regex ampliada + exclusão do ruído GAM estrutural, p.ex. `MSB3491` sem o formato `error :`). Isso **não** isola a dispensa do classificador: se `NuGet.targets(...): error :` sob GAM entrar em `buildErrors`, a contagem deixa de bater só com as linhas de sintaxe do `.js` e a dispensa é **recusada** (exit 48). Corrigir o classificador (ou filtrar esse falso positivo antes da contagem) continua sendo retomada desta ideia; não confundir com o caso `MSB3491` já tratado como ruído.
 
 **Retomada.** Decidir entre corrigir o classificador geral, com testes de BuildAll, export, import e preview, ou corrigir só o caminho do BuildAll. Nenhuma ação automática.
 
