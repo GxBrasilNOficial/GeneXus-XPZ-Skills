@@ -235,6 +235,46 @@ Detalhes e critérios para retomada: [`msbuild-result-contract-v2-finalizador-co
 
 **Retomada.** Decidir a opção B em sessão própria, com o responsável pelo deploy, antes de qualquer mudança nos Build Events ou no `.bat` de deploy. Nenhuma ação automática.
 
+## Classificador MSBuild do BuildAll lê só `error :` no stdout bruto — erros com código e ruído GAM
+
+- **Importância** — média (falso positivo possível: `NuGet.targets(...): error :` sob a pasta de plataformas GAM, que é ruído conhecido, conta como erro e pode produzir exit 48; falso negativo: `error CSxxxx:` e `error MSBxxxx:` não são contados. O `msBuildExitCode` diferente de zero cobre a maioria das falhas reais, por isso o efeito é limitado).
+- **Maturidade** — ideia (decisão de desenho em aberto: corrigir o classificador geral, que também serve export, import e preview, ou só o caminho do BuildAll; qualquer correção geral exige testes nas quatro rotas).
+
+**Contexto.** Registrado em 2026-10-25, durante a frente de Categoria B. Foi adotada a opção de só registrar: o classificador não foi alterado nessa frente.
+
+**Estado observado (leitura do código, não de log).**
+
+- `scripts/Read-MsBuildImportSignals.ps1`, função `Get-ErrorLines`, conta apenas linhas que casam com `error\s*:`. Linhas com código de erro, como `error CS0019:` ou `error MSB3491:`, não casam.
+- `scripts/Invoke-GeneXusKbBuildAll.ps1` aplica o classificador ao stdout bruto. O filtro de ruído GAM (`scripts/GeneXusMsBuildGamPlatformsSupport.ps1`) só limpa a exibição, não a classificação.
+- A mesma função serve export, import e preview. Uma correção geral muda o resultado dessas três rotas, além do BuildAll.
+
+**Efeitos.**
+
+- Falso positivo possível: uma linha `NuGet.targets(...): error :` sob a pasta de plataformas GAM, que é ruído conhecido, conta como erro e pode produzir exit 48. Não foi observada em log nesta frente.
+- Falso negativo: erros com código não contam. A classificação só ocorre com `msBuildExitCode` igual a zero, então o efeito é limitado, mas não é zero.
+
+**Fora do caminho da dispensa da Categoria B.** A regra de dispensa usa função própria, com regex ampliada e exclusão do ruído GAM. Este gap não bloqueia a dispensa.
+
+**Retomada.** Decidir entre corrigir o classificador geral, com testes de BuildAll, export, import e preview, ou corrigir só o caminho do BuildAll. Nenhuma ação automática.
+
+## Acesso negado ao gravar sob a pasta de plataformas GAM no BuildAll — tentar vencer a autorização de cópia
+
+- **Importância** — baixa para a classificação do BuildAll (já tratado como ruído conhecido e sem perigo); média se a meta for eliminar o ruído na origem.
+- **Maturidade** — ideia (investigação de causa já feita: falta de autorização de acesso para copiar/gravar sob a pasta de plataformas GAM da instalação GeneXus; não é falha funcional do GAM a reabrir nesta frente).
+
+**Contexto.** Registrado em 2026-10-25, na revisão da frente de Categoria B / compressor de estáticos. Nos logs do wrapper (ambiente .NET Core + PostgreSQL) aparece linha de erro MSBuild de acesso negado ao gravar sob `Library\GAM\Platforms\...`. O filtro de ruído GAM e a regra de dispensa do compressor tratam essa linha como ruído estrutural. O mantenedor confirmou: não investigar de novo o GAM por suspeita de problema interno; no máximo, em sessão dedicada futura, tentar resolver de vez a falta de autorização de cópia/gravação.
+
+**Retomada.** Sessão própria: identificar o principal (conta do processo MSBuild/agente, ACL da pasta de plataformas GAM, política de UAC/antivirus) e testar um contorno permanente (permissão, exclusão de pasta de build intermediária, ou outro meio seguro). Enquanto isso não existir, manter o tratamento como ruído conhecido. Nenhuma ação automática nesta frente.
+
+## Teste de integração automatizado da rota import+BuildAll (`Invoke-GeneXusXpzImportThenBuild.ps1`)
+
+- **Importância** — média (a frente de Categoria B altera o significado de “roundtrip ok” quando o BuildAll sai com exit 0 e status pendente; quem lê só o exit code vê sucesso).
+- **Maturidade** — ideia (hoje há testes unitários da regra de classificação; não há teste automatizado do script completo).
+
+**Contexto.** Registrado em 2026-10-25, na revisão da mesma frente. O mantenedor aceitou seguir sem o teste de integração nesta frente (exigiria import real ou dublê de processo filho). A lacuna fica anotada para cuidado futuro.
+
+**Retomada.** Em sessão própria: decidir entre fixture com processo filho dublê (sem import real) ou smoke controlado com KB de teste; cobrir pelo menos exit 0 + status pendente do compressor → status de roundtrip “pendente de confirmação”, e exit 0 + “compilou limpo” → “roundtrip ok”. Nenhuma ação automática nesta frente.
+
 ## Registrar evidência detalhada do ruído `g_service_worker`/`obj`
 
 - **Importância** — média (o filtro já é fechado e preserva pares cruzados, mas a documentação não deve tratar o par como empiricamente provado sem registrar KB, versão, data e ocorrência observada).
