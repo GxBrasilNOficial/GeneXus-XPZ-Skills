@@ -627,11 +627,11 @@ parecer recorrente ou se ele confirmar explicitamente.
 
 O modo normal é o padrão e aceita o contexto próprio de cada harness sem exigir prova de ausência de memória. O agente pode oferecer o modo cego quando útil; sua ativação exige pedido ou concordância explícita do usuário. Sem escolha, segue em modo normal, sem pergunta obrigatória. Esta é a matriz normativa única para filtrar titulares e fallbacks antes da composição do painel e antes de pedir autorização para envio. As colunas de papel no painel, transporte do prompt e modo cego são eixos separados.
 
-Versões locais abaixo foram lidas em 2026-10-24 com `--version` e ajuda do CLI; a medição da ajuda identifica opções observadas, mas não prova isolamento geral de memória/histórico.
+Todas as versões locais abaixo foram lidas em 2026-10-24 com `--version` e ajuda do CLI, exceto OpenCode, revalidado em 2026-11-03. A medição da ajuda identifica opções observadas, mas não prova isolamento geral de memória/histórico.
 
-| Backend | Papel no painel | Transporte do prompt | Despacho normal | Modo cego delegado nesta entrega | CLI local medido em 2026-10-24 |
+| Backend | Papel no painel | Transporte do prompt | Despacho normal | Modo cego delegado nesta entrega | CLI local medido |
 |---|---|---|---|---|---|
-| opencode | semantic-only (`reviewer-ro`) | stdin | disponível | indisponível | `2.2.5`; ajuda mostra continuação/sessão/fork, sem rota cega documentada |
+| opencode | semantic-only (`reviewer-ro`) | stdin | disponível | indisponível | `2.2.5`; `run --help` lista `--continue`, `--session` e `--fork`; `session --help` lista gerenciamento de sessões; nenhuma rota cega nas ajudas consultadas |
 | Codex | git-capable | stdin | disponível | disponível somente para `public` | `codex-cli 0.164.0-alpha.11.1`; `codex exec --help` mostra `--ephemeral` e overrides `-c` usados pelo adapter |
 | Claude Code | semantic-only no painel | stdin | disponível | indisponível | `2.1.296`; `--no-session-persistence` trata persistência, não comprova cegueira |
 | GitHub Copilot CLI | semantic-only | argv (limite ~30000 caracteres) | disponível | indisponível | `1.0.86`; `--enable-memory` não comprova isolamento por chamada |
