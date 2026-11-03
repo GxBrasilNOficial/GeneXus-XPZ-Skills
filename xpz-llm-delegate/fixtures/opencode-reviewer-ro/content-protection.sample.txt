@@ -4,7 +4,7 @@
 Modelo explícito: `opencode-go/deepseek-v4.1-flash`; CLI: 2.2.5. Workspace sintético mínimo e descartável;
 nenhuma configuração global, modelo padrão ou shim foi alterado.
 
-31/31 casos comportamentais passaram; 2/2 casos estruturais (`grep * deny`) confirmados.
+32/32 casos comportamentais passaram; 2/2 casos estruturais (`grep * deny`) confirmados.
 Cada caso comportamental exige evento `tool_use`; `toolNotObserved` não conta como aprovação.
 
 | caso | perfil | classe | evento | resultado |
@@ -37,15 +37,16 @@ Cada caso comportamental exige evento `tool_use`; `toolNotObserved` não conta c
 | global-uppercase | global | behavioral | read/error | PASS |
 | global-outside | global | behavioral | read/error | PASS |
 | subcwd-env | local | behavioral | read/error | PASS |
+| subcwd-example-project-local | local | behavioral | read/completed | PASS |
 | subcwd-example | global | behavioral | read/error | PASS |
 | names-read | local | behavioral | read/completed | PASS |
 | names-list | local | behavioral | read/completed | PASS |
 | local-grep | local | structural | sem evento | PASS |
 | global-grep | global | structural | sem evento | PASS |
 
-- `subcwd-example`: `../.env.example` é negado por `external_directory` no perfil global-only;
-  no perfil project-local o caminho permanece dentro do git worktree e é permitido. A diferença
-  é medida e registrada.
+- `subcwd-example-project-local`: `../.env.example` foi lido no perfil project-local quando o
+  caminho permanece dentro do git worktree; `subcwd-example` foi negado por `external_directory`
+  no perfil global-only. Os dois resultados foram medidos separadamente.
 - `grep`: a regra efetiva `grep * deny` é a prova estrutural; a ausência de evento em `run` é
   registrada, mas não é usada como prova da negação.
 - `names-glob`: o verificador exige `glob`; `names-read` exige `read` de diretório. `names-list`

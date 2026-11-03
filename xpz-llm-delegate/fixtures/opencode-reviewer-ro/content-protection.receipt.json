@@ -4,7 +4,7 @@
   "cliVersion": "2.2.5",
   "model": "opencode-go/deepseek-v4.1-flash",
   "mechanism": "opencode run --format json + opencode debug agents",
-  "generatedAt": "2026-11-03T17:51:07.0374215Z",
+  "generatedAt": "2026-11-03T21:16:13.9795269Z",
   "workspaceRoot": "<SANITIZED_WORKSPACE_ROOT>",
   "cases": [
     {
@@ -484,6 +484,23 @@
       "evidence": "subcwd-env.jsonl"
     },
     {
+      "name": "subcwd-example-project-local",
+      "profile": "local",
+      "class": "behavioral",
+      "expected": "read-allow",
+      "event": {
+        "tool": "read",
+        "status": "completed",
+        "inputPath": "../.env.example",
+        "hasSentinel": true,
+        "error": ""
+      },
+      "pass": true,
+      "reason": null,
+      "exitCode": 0,
+      "evidence": "subcwd-example-project-local.jsonl"
+    },
+    {
       "name": "subcwd-example",
       "profile": "global",
       "class": "behavioral",
@@ -562,8 +579,8 @@
     }
   ],
   "behavioral": {
-    "total": 31,
-    "pass": 31,
+    "total": 32,
+    "pass": 32,
     "fail": 0
   },
   "structural": {
@@ -572,9 +589,9 @@
   },
   "pass": true,
   "notes": [
-    "subcwd-example: ../.env.example e negado por external_directory na 2.2.5 (mais restritivo que 1.18.33).",
+    "subcwd-example-project-local: ../.env.example e permitido quando permanece dentro do git worktree; subcwd-example global-only e negado por external_directory.",
     "grep: prova estrutural pela regra efetiva grep * deny; ausencia de evento em run nao e prova da negacao.",
     "toolNotObserved nao conta como aprovacao comportamental.",
-    "31 casos comportamentais + 2 estruturais = 33."
+    "32 casos comportamentais + 2 estruturais = 34."
   ]
 }

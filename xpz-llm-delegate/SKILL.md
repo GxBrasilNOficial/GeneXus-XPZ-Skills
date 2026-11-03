@@ -1054,14 +1054,15 @@ segurança no **próprio adapter**, de forma inseparável (nunca "default sem gu
   O instalador serializa mapas, valida antes/depois e pode recusar comentários/homônimos
   ambíguos antes da escrita; instalação global continua exigindo autorização própria.
 - **Provas e promoção.** `Test-OpenCodeReviewerRoContentProtection.ps1` executa a matriz
-  comportamental de 31 casos via `opencode run --format json`, com modelo explícito e workspace
+  comportamental de 32 casos via `opencode run --format json`, com modelo explícito e workspace
   sintético mínimo, e prova os 2 casos `grep` estruturalmente por `grep * deny` no
   `opencode debug agents`. Cada caso comportamental exige evento `tool_use`; ausência de evento é
   inconclusiva, nunca aprovação. `names-glob` exige evento `glob` com nomes visíveis;
   `names-read` exige `read` de diretório; `names-list` aceita um evento de enumeração
-  `read`, `glob` ou `list` com nomes visíveis (na captura atual, `read`). `subcwd-example`
-  (`../.env.example` a partir de subpasta) é negado por `external_directory` no perfil
-  global-only; no perfil project-local o caminho permanece dentro do git worktree e é permitido.
+  `read`, `glob` ou `list` com nomes visíveis (na captura atual, `read`).
+  `subcwd-example-project-local` comprova a leitura permitida de `../.env.example` a partir da
+  subpasta quando o caminho permanece dentro do git worktree; `subcwd-example` mede o mesmo
+  caminho no perfil global-only e é negado por `external_directory`.
   A matriz é a prova comportamental real da versão e não exige uma segunda rodada `run`. As
   capturas 1.18.33 ficam no histórico do Git; a equivalência fora dos casos medidos continua
   premissa, não isolamento demonstrado. Só promover `VERSION.txt` após a matriz, os dois

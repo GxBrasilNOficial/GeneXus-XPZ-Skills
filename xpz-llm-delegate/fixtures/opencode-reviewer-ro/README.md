@@ -14,7 +14,7 @@ Consumidos por `scripts/OpenCodeReviewerRoGuard.ps1` (pré-check runtime), por
 
 `VERSION.txt` = **2.2.5**, promovida em 2026-11-03 após revalidar o conjunto obrigatório:
 descoberta por `opencode debug agents`, perfis project-local (36 regras) e global-only (21),
-equivalência `permission`/`tools`, aviso de fallback, matriz de 31 casos comportamentais com
+equivalência `permission`/`tools`, aviso de fallback, matriz de 32 casos comportamentais com
 modelo explícito + 2 casos `grep` estruturais, e os self-tests existentes. A matriz usou
 `opencode run --format json` e o modelo explícito
 `opencode-go/deepseek-v4.1-flash`; o recibo está em `content-protection.receipt.json` e o resumo
@@ -50,7 +50,7 @@ Self-test determinístico/fake-exe não prova sozinho o comportamento de uma ver
 - `read-outside-cwd-blocked.sample.txt` — recibo sanitizado do caso `outside` da matriz
   comportamental 2.2.5: leitura de arquivo fora do cwd negada por `external_directory`,
   sentinela ausente.
-- `content-protection.sample.txt` — resumo dos 33 casos (31 comportamentais + 2 estruturais).
+- `content-protection.sample.txt` — resumo dos 34 casos (32 comportamentais + 2 estruturais).
 - `content-protection.receipt.json` — recibo máquina-legível com nome, perfil, classe,
   arquivo de evidência, evento, resultado esperado/obtido e veredito de cada caso, além de
   versão e modelo.
@@ -60,8 +60,8 @@ Self-test determinístico/fake-exe não prova sozinho o comportamento de uma ver
 Use `pwsh -NoProfile -File scripts/Test-OpenCodeReviewerRoContentProtection.ps1 -EvidenceDirectory <diretorio-da-captura>`
 para revalidar sem executar `opencode run`. Se a captura usar outro modelo além do default, passe
 `-Model` com o id registrado no recibo. A captura deve conter `receipt.json` e `evidence/`, com os
-33 JSONL dos casos e `debug-agents-local.json`/`debug-agents-global.json`. O script confere a versão
-instalada, o modelo, os 33 casos esperados, classes, `exitCode`, aprovação e arquivos não vazios;
+34 JSONL dos casos e `debug-agents-local.json`/`debug-agents-global.json`. O script confere a versão
+instalada, o modelo, os 34 casos esperados, classes, `exitCode`, aprovação e arquivos não vazios;
 divergências bloqueiam antes de qualquer execução de modelo.
 
 O recibo regenerado registra `evidenceSource` na raiz e `toolEventCount` por caso. No início, o script também verifica que seu parser rejeita uma linha JSONL malformada.
@@ -100,9 +100,10 @@ apenas `* deny`. Qualquer regra adicional depois do bloco (incluindo um `allow` 
 `glob` e `read` de diretório podem mostrar nomes; `list` tem permissão, mas a enumeração
 observada veio por `read` de diretório, não por uma ferramenta `list` separada.
 
-`subcwd-example` (`../.env.example` a partir da subpasta) é **negado por `external_directory`**
-no perfil global-only. No perfil project-local, quando o caminho permanece dentro do git worktree
-do cwd, a leitura é permitida; a diferença é medida e registrada, não presumida.
+`subcwd-example-project-local` mede a leitura de `../.env.example` a partir da subpasta no perfil
+project-local: é permitida quando o caminho permanece dentro do git worktree do cwd.
+`subcwd-example` mede o mesmo caminho no perfil global-only e é **negado por
+`external_directory`**. Os dois resultados são medidos separadamente, não presumidos.
 
 Exceções internas de `external_directory` não provam isolamento absoluto; não foram ampliadas.
 Links/aliases, outros segredos, prompt/dossiê e carregamento automático de instruções seguem fora
@@ -120,8 +121,8 @@ Em workspace sintético mínimo (não em `C:\Dev`), com o shim `opencode.cmd` re
   reviewer-ro` (sem variante), `.exitcode.txt` = 0, stream com `text` e `step_finish` e stderr
   vazio; o processo filho encerrou.
 
-Essas provas são de integração do adapter; a matriz de conteúdo é a prova comportamental dos
-33 casos.
+Essas provas são de integração do adapter; a matriz de conteúdo tem 32 casos comportamentais e
+2 casos estruturais.
 
 ## Como re-capturar (refresh após upgrade do opencode)
 
@@ -158,7 +159,7 @@ pwsh -NoProfile -File scripts/Test-OpenCodeReviewerRoContentProtection.ps1 `
   -OutputDirectory <pasta-nova> -Model opencode-go/deepseek-v4.1-flash
 ```
 
-Ela monta workspace sintético mínimo e descartável, roda 31 casos com `opencode run --format json`
+Ela monta workspace sintético mínimo e descartável, roda 32 casos com `opencode run --format json`
 (exigindo evento `tool_use` em cada um) e confirma os 2 casos `grep` por `grep * deny` em
 `opencode debug agents`. Ausência de evento comportamental é inconclusiva e bloqueia a promoção;
 não contar `toolNotObserved` como aprovação. `names-glob` exige evento `glob` e `names-read`

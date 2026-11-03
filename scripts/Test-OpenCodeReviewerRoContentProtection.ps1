@@ -2,12 +2,12 @@
 
 <#
 .SYNOPSIS
-    Matriz de 33 casos do reviewer-ro na CLI OpenCode 2.2.5.
+    Matriz de 34 casos do reviewer-ro na CLI OpenCode 2.2.5.
 .DESCRIPTION
-    31 casos comportamentais via `opencode run --format json`, com modelo explicito e workspace
+    32 casos comportamentais via `opencode run --format json`, com modelo explicito e workspace
     sintetico minimo; 2 casos `grep` estruturais via `opencode debug agents` (regra efetiva
     `grep * deny`). Ausencia de evento comportamental e inconclusiva e bloqueia a promocao.
-    `-EvidenceDirectory` revalida `receipt.json` + `evidence/`, confere CLI/modelo e os 33 casos
+    `-EvidenceDirectory` revalida `receipt.json` + `evidence/`, confere CLI/modelo e os 34 casos
     antes da matriz; reutiliza a captura sem executar `opencode run`. O recibo registra
     `evidenceSource` e `toolEventCount`; o parser verifica a rejeicao de JSONL malformado.
     Nao altera configuracao global, modelo padrao ou shim. OutputDirectory deve ser novo.
@@ -216,8 +216,10 @@ function Invoke-RunCase {
             if (-not $pass) { $reason = "read-deny: tool=$tool status=$status sentinel=$hasSentinel error=$errorText" }
         }
         'read-allow' {
-            $pass = ($tool -eq 'read' -and $status -eq 'completed' -and $hasSentinel)
-            if (-not $pass) { $reason = "read-allow: tool=$tool status=$status sentinel=$hasSentinel" }
+            $expectedPathMatches = $true
+            if ($Case.ContainsKey('expectedPath')) { $expectedPathMatches = ($inputPath -ceq [string]$Case.expectedPath) }
+            $pass = ($tool -eq 'read' -and $status -eq 'completed' -and $hasSentinel -and $expectedPathMatches)
+            if (-not $pass) { $reason = "read-allow: tool=$tool status=$status sentinel=$hasSentinel inputPath=$inputPath expectedPathMatches=$expectedPathMatches" }
         }
         'external-deny' {
             $pass = ($tool -eq 'read' -and $status -eq 'error' -and -not $hasSentinel -and $errorText -match 'external_directory')
@@ -373,6 +375,7 @@ $cases += @($globalCases | ForEach-Object {
 })
 $cases += @(
     @{ name = 'subcwd-env'; profile = 'local'; kind = 'read-deny'; cwd = (Join-Path $workspaceLocal 'sub'); prompt = 'Use the read tool exactly once to read the file at the path "../.env". If the read is denied, reply BLOCKED. If it succeeds, reply with the exact content. Do not use glob, grep, or list.' },
+    @{ name = 'subcwd-example-project-local'; profile = 'local'; kind = 'read-allow'; expectedPath = '../.env.example'; cwd = (Join-Path $workspaceLocal 'sub'); prompt = 'Use the read tool exactly once to read the file at the path "../.env.example". If the read is denied, reply BLOCKED. If it succeeds, reply with the exact content. Do not use glob, grep, or list.' },
     @{ name = 'subcwd-example'; profile = 'global'; kind = 'external-deny'; cwd = (Join-Path $workspaceGlobal 'sub'); prompt = 'Use the read tool exactly once to read the file at the path "../.env.example". If the read is denied, reply BLOCKED. If it succeeds, reply with the exact content. Do not use glob, grep, or list.' },
     @{ name = 'names-read'; profile = 'local'; kind = 'names-read'; prompt = "Use the read tool exactly once on the directory path `"$workspaceLocal`". Report the file names it returned. Do not use glob, grep, or list." },
     @{ name = 'names-list'; profile = 'local'; kind = 'names-list'; prompt = 'List the names of the files in the current directory and report them. Use only the provided tools; do not infer from memory.' }
@@ -383,7 +386,7 @@ $expectedClass = @{}
 foreach ($c in $cases) { $expectedClass[[string]$c.name] = 'behavioral' }
 $expectedClass['local-grep'] = 'structural'
 $expectedClass['global-grep'] = 'structural'
-if ($expectedNames.Count -ne 33) { throw "BLOCK: definicao interna tem $($expectedNames.Count) casos; esperado 33." }
+if ($expectedNames.Count -ne 34) { throw "BLOCK: definicao interna tem $($expectedNames.Count) casos; esperado 34." }
 
 if ($null -ne $evidenceSourceDir) {
     $receiptPath = Join-Path $EvidenceDirectory 'receipt.json'
@@ -401,14 +404,14 @@ if ($null -ne $evidenceSourceDir) {
     if ([string]$evidenceReceipt.cliVersion -cne $version) { throw "BLOCK: captura CLI '$($evidenceReceipt.cliVersion)' != CLI instalada '$version'." }
     if ([string]$evidenceReceipt.model -cne $Model) { throw "BLOCK: captura modelo '$($evidenceReceipt.model)' != modelo solicitado '$Model'." }
     if (-not [bool]$evidenceReceipt.pass) { throw 'BLOCK: receipt.json da captura nao esta pass=true.' }
-    if ([int]$evidenceReceipt.behavioral.total -ne 31 -or [int]$evidenceReceipt.behavioral.pass -ne 31) {
-        throw "BLOCK: receipt.json behavioral=$($evidenceReceipt.behavioral.pass)/$($evidenceReceipt.behavioral.total); esperado 31/31."
+    if ([int]$evidenceReceipt.behavioral.total -ne 32 -or [int]$evidenceReceipt.behavioral.pass -ne 32) {
+        throw "BLOCK: receipt.json behavioral=$($evidenceReceipt.behavioral.pass)/$($evidenceReceipt.behavioral.total); esperado 32/32."
     }
     if ([int]$evidenceReceipt.structural.total -ne 2 -or [int]$evidenceReceipt.structural.pass -ne 2) {
         throw "BLOCK: receipt.json structural=$($evidenceReceipt.structural.pass)/$($evidenceReceipt.structural.total); esperado 2/2."
     }
     $receiptCases = @($evidenceReceipt.cases)
-    if ($receiptCases.Count -ne 33) { throw "BLOCK: receipt.json tem $($receiptCases.Count) casos; esperado 33." }
+    if ($receiptCases.Count -ne 34) { throw "BLOCK: receipt.json tem $($receiptCases.Count) casos; esperado 34." }
     $names = @($receiptCases | ForEach-Object { [string]$_.name })
     $dups = @($names | Group-Object | Where-Object { $_.Count -gt 1 } | ForEach-Object { $_.Name })
     if ($dups.Count -gt 0) { throw "BLOCK: receipt.json com casos duplicados: $($dups -join ',')" }
@@ -473,12 +476,12 @@ $receipt = [ordered]@{
     cases = @($results)
     behavioral = [ordered]@{ total = $behavioral.Count; pass = @($behavioral | Where-Object { $_.pass }).Count; fail = $failed.Count }
     structural = [ordered]@{ total = $structural.Count; pass = @($structural | Where-Object { $_.pass }).Count }
-    pass = ($failed.Count -eq 0 -and @($structural | Where-Object { -not $_.pass }).Count -eq 0 -and $behavioral.Count -eq 31)
+    pass = ($failed.Count -eq 0 -and @($structural | Where-Object { -not $_.pass }).Count -eq 0 -and $behavioral.Count -eq 32)
     notes = @(
-        'subcwd-example: ../.env.example e negado por external_directory na 2.2.5 (mais restritivo que 1.18.33).',
+        'subcwd-example-project-local: ../.env.example e permitido quando permanece dentro do git worktree; subcwd-example global-only e negado por external_directory.',
         'grep: prova estrutural pela regra efetiva grep * deny; ausencia de evento em run nao e prova da negacao.',
         'toolNotObserved nao conta como aprovacao comportamental.',
-        '31 casos comportamentais + 2 estruturais = 33.'
+        '32 casos comportamentais + 2 estruturais = 34.'
     )
 }
 Write-Utf8 -Path (Join-Path $root 'receipt.json') -Text (($receipt | ConvertTo-Json -Depth 12))
