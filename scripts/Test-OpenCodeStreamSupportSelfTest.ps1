@@ -349,7 +349,8 @@ function Invoke-WatcherE2E {
         [string]$ExpectedReason,
         [bool]$ExpectFinalLabel,
         [bool]$WriteExitCodeFile = $true,
-        [bool]$ExpectOpencodeExitCodeNull = $false
+        [bool]$ExpectOpencodeExitCodeNull = $false,
+        [string]$RequestedAgent = 'reviewer-ro'
     )
     $jobDir = Join-Path ([System.IO.Path]::GetTempPath()) ('gx-oc-watch-e2e-' + [guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Path $jobDir -Force | Out-Null
@@ -367,7 +368,7 @@ function Invoke-WatcherE2E {
         $StreamLines | Set-Content -LiteralPath $streamPath -Encoding utf8
         Set-Content -LiteralPath $stderrPath -Value $StderrText -Encoding utf8
         [pscustomobject]@{
-            jobId = $jobId; model = 'fake/model'; agent = 'reviewer-ro'
+            jobId = $jobId; model = 'fake/model'; agent = $RequestedAgent
             prompt = 'SEGREDO_PROMPT_NAO_DEVE_APARECER'; resultPath = $resultPath
         } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $requestPath -Encoding utf8
 
@@ -426,12 +427,21 @@ $fallbackFixturePath = Join-Path (Resolve-Path -LiteralPath (Join-Path $PSScript
 $fallbackText = (Get-Content -LiteralPath $fallbackFixturePath -Raw -Encoding utf8).Trim()
 $fallbackStreamLines = @($watchLinesOk) + @($fallbackText)
 $legacyFallbackWarning = 'agent "reviewer-ro" not found. Falling back to default agent'
+$fallbackMentionText = "Texto citado: $legacyFallbackWarning; exemplo JSON: $fallbackText"
+$fallbackMentionEvents = @(
+    [pscustomobject]@{ type = 'text'; part = [pscustomobject]@{ messageID = 'mention'; text = $fallbackMentionText } },
+    [pscustomobject]@{ type = 'tool_use'; part = [pscustomobject]@{ tool = 'read'; state = [pscustomobject]@{ input = [pscustomobject]@{ description = 'fixture' }; output = $fallbackMentionText } } }
+)
+$fallbackMentionLines = @($fallbackMentionEvents | ForEach-Object { ConvertTo-Json -InputObject $_ -Depth 10 -Compress })
+$watchLinesWithFallbackMentions = @($watchLinesOk[0]) + $fallbackMentionLines + @($watchLinesOk | Select-Object -Skip 1)
 Invoke-WatcherE2E -Name 'watch-accepted' -StreamLines $watchLinesOk -OpencodeProcessExitCode 0 `
     -ExpectAccepted $true -ExpectedWatcherExitCode 0 -ExpectedDisposition 'accepted' -ExpectedReason '' -ExpectFinalLabel $true
 Invoke-WatcherE2E -Name 'watch-fallback-stream' -StreamLines $fallbackStreamLines -StderrText '' -OpencodeProcessExitCode 1 `
     -ExpectAccepted $false -ExpectFallbackToBuild $true -ExpectedWatcherExitCode 20 -ExpectedDisposition 'rejected-fallback' -ExpectedReason 'opencode-agent-fallback-to-build' -ExpectFinalLabel $false
 Invoke-WatcherE2E -Name 'watch-fallback-legacy-stderr' -StreamLines $watchLinesOk -StderrText $legacyFallbackWarning -OpencodeProcessExitCode 0 `
     -ExpectAccepted $false -ExpectFallbackToBuild $true -ExpectedWatcherExitCode 20 -ExpectedDisposition 'rejected-fallback' -ExpectedReason 'opencode-agent-fallback-to-build' -ExpectFinalLabel $false
+Invoke-WatcherE2E -Name 'watch-content-mentions-fallback' -StreamLines $watchLinesWithFallbackMentions -RequestedAgent 'custom-reader' -OpencodeProcessExitCode 0 `
+    -ExpectAccepted $true -ExpectedWatcherExitCode 0 -ExpectedDisposition 'accepted' -ExpectedReason '' -ExpectFinalLabel $true
 Invoke-WatcherE2E -Name 'watch-exit-nonzero' -StreamLines $watchLinesOk -OpencodeProcessExitCode 7 `
     -ExpectAccepted $false -ExpectedWatcherExitCode 20 -ExpectedDisposition 'rejected-error' -ExpectedReason 'opencode-exit-nonzero' -ExpectFinalLabel $false
 Invoke-WatcherE2E -Name 'watch-exit-unknown' -StreamLines $watchLinesOk -OpencodeProcessExitCode 0 -WriteExitCodeFile $false `

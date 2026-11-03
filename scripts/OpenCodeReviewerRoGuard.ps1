@@ -26,9 +26,9 @@
                      `PRAGMA wal_checkpoint`; transitorio -> retentar).
 
     Pos-check (defesa-em-profundidade, NAO a barreira do spawn): Test-OpenCodeReviewerRoFallbackWarning
-    varre o stdout pelo JSON de erro de agente ausente (`{"type":"error","error":{"message":"Agent not found: ..."}}`)
-    ou o stderr pelo warning de fallback legado (`agent "..." not found. Falling back to default agent`),
-    que o opencode emite quando `--agent <ausente>` cai no agente default.
+    reconhece no stdout apenas eventos JSONL `type=error` cuja mensagem comece por `Agent not found:`;
+    no stderr, reconhece o aviso legado `agent "..." not found. Falling back to default agent`.
+    Texto comum do modelo ou de ferramentas nao e tratado como fallback.
 
     Claims empiricos medidos na versao em
     xpz-llm-delegate/fixtures/opencode-reviewer-ro/VERSION.txt. Se um claim nao reproduzir na
@@ -728,18 +728,38 @@ function Test-OpenCodeAgentResolves {
 
 function Test-OpenCodeReviewerRoFallbackWarning {
     <#
-        Pos-check (defesa-em-profundidade): $true se o texto contiver o warning de agente nao
-        encontrado. Detecta dois formatos:
-          - Legado (< 2.2.5): `agent "..." not found. Falling back to default agent` no stderr.
-          - 2.2.5+: JSON de erro no stdout `{"type":"error","error":{"message":"Agent not found: ..."}}`.
-        O padrao logico e exposto por Get-OpenCodeReviewerRoFallbackWarningPattern.
+        Pos-check (defesa-em-profundidade): inspeciona os canais separadamente. O stdout e JSONL;
+        so um evento type=error com error.message iniciado por `Agent not found:` conta como fallback.
+        O aviso legado e procurado apenas no stderr. Conteudo textual do modelo/ferramenta nao conta.
     #>
-    param([string] $Text)
-    if ([string]::IsNullOrEmpty($Text)) { return $false }
-    return ($Text -match (Get-OpenCodeReviewerRoFallbackWarningPattern))
+    param(
+        [string[]] $StdoutLines = @(),
+        [string] $StderrText = ''
+    )
+    if (-not [string]::IsNullOrEmpty($StderrText) -and $StderrText -match (Get-OpenCodeReviewerRoFallbackWarningPattern)) {
+        return $true
+    }
+    foreach ($line in @($StdoutLines)) {
+        if ([string]::IsNullOrWhiteSpace($line)) { continue }
+        try {
+            $event = ConvertFrom-Json -InputObject $line -ErrorAction Stop
+        } catch {
+            continue
+        }
+        if ($event -isnot [System.Management.Automation.PSCustomObject]) { continue }
+        $typeProperty = $event.PSObject.Properties['type']
+        $errorProperty = $event.PSObject.Properties['error']
+        if ($null -eq $typeProperty -or $typeProperty.Value -cne 'error' -or $null -eq $errorProperty) { continue }
+        $errorObject = $errorProperty.Value
+        if ($errorObject -isnot [System.Management.Automation.PSCustomObject]) { continue }
+        $messageProperty = $errorObject.PSObject.Properties['message']
+        if ($null -eq $messageProperty -or $messageProperty.Value -isnot [string]) { continue }
+        if ($messageProperty.Value.StartsWith('Agent not found:', [System.StringComparison]::Ordinal)) { return $true }
+    }
+    return $false
 }
 
 function Get-OpenCodeReviewerRoFallbackWarningPattern {
-    <# Padrao logico unificado do warning de agente nao encontrado (legacy stderr + 2.2.5 JSON stdout). #>
-    return '(?:not found\. Falling back to default agent|"message"\s*:\s*"Agent not found:)'
+    <# Padrao exclusivo do aviso legado no stderr; o JSONL stdout e validado estruturalmente. #>
+    return 'not found\. Falling back to default agent'
 }

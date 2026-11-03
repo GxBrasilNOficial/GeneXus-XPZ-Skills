@@ -296,13 +296,24 @@ sem mode
 
     # ── (e) pos-check: warning de fallback detectado; texto limpo nao ──
     $fbText = Get-Content -LiteralPath $fallbackFixture -Raw -Encoding utf8
+    $fbLines = @(Get-Content -LiteralPath $fallbackFixture -Encoding utf8)
     $pattern1 = Get-OpenCodeReviewerRoFallbackWarningPattern
     $pattern2 = Get-OpenCodeReviewerRoFallbackWarningPattern
     Assert-True (-not [string]::IsNullOrWhiteSpace($pattern1) -and $pattern1 -eq $pattern2) "(e) accessor Get-OpenCodeReviewerRoFallbackWarningPattern retorna padrao estavel nao vazio"
-    Assert-True ($fbText -match $pattern1) "(e) fixture real casa com o padrao logico unico do fallback"
-    Assert-True (Test-OpenCodeReviewerRoFallbackWarning -Text $fbText) "(e) pos-check detecta warning de fallback do fixture"
-    Assert-True (Test-OpenCodeReviewerRoFallbackWarning -Text ("ruido antes`n" + $fbText + "`nruido depois")) "(e) pos-check detecta warning com ruido antes/depois"
-    Assert-True (-not (Test-OpenCodeReviewerRoFallbackWarning -Text "stderr limpo sem warning")) "(e) pos-check nao dispara em stderr limpo"
+    Assert-True ($fbText -notmatch $pattern1) "(e) fixture JSON do stdout nao casa com o padrao exclusivo do stderr legado"
+    Assert-True (Test-OpenCodeReviewerRoFallbackWarning -StdoutLines $fbLines -StderrText '') "(e) pos-check reconhece o evento JSON de fallback no stdout"
+    Assert-True (Test-OpenCodeReviewerRoFallbackWarning -StdoutLines (@('ruido antes') + $fbLines + @('ruido depois')) -StderrText '') "(e) pos-check reconhece o JSON entre linhas de ruido"
+    Assert-True (-not (Test-OpenCodeReviewerRoFallbackWarning -StdoutLines @('{"type":"error"}', 'linha nao JSON') -StderrText '')) "(e) evento de erro incompleto e linha invalida nao geram excecao nem fallback"
+    $legacyFallbackWarning = 'agent "reviewer-ro" not found. Falling back to default agent'
+    Assert-True (Test-OpenCodeReviewerRoFallbackWarning -StdoutLines @() -StderrText $legacyFallbackWarning) "(e) pos-check reconhece o aviso legado somente no stderr"
+    Assert-True (-not (Test-OpenCodeReviewerRoFallbackWarning -StdoutLines @() -StderrText 'stderr limpo sem warning')) "(e) pos-check nao dispara em stderr limpo"
+    $quotedFallbackJson = $fbText.Trim()
+    $fallbackMention = "Texto comum cita: $legacyFallbackWarning; exemplo JSON: $quotedFallbackJson"
+    $normalContentLines = @(
+        ([pscustomobject]@{ type = 'text'; part = [pscustomobject]@{ messageID = 'mention'; text = $fallbackMention } }),
+        ([pscustomobject]@{ type = 'tool_use'; part = [pscustomobject]@{ tool = 'read'; state = [pscustomobject]@{ output = $fallbackMention } } })
+    ) | ForEach-Object { ConvertTo-Json -InputObject $_ -Depth 10 -Compress }
+    Assert-True (-not (Test-OpenCodeReviewerRoFallbackWarning -StdoutLines @($normalContentLines) -StderrText '')) "(e) texto comum e saida de ferramenta podem citar ambos os formatos sem acionar fallback"
 
     # ── (g) instalador preserva comentarios/formatacao/demais chaves ──
     # (g1) migracao tools:->permission
@@ -644,6 +655,24 @@ sem mode
         catch { $threwPc = $true; $msgPc = $_.Exception.Message }
         Assert-True ($threwPc -and $msgPc -match 'pos-check reviewer-ro') "(e-adapter-stderr-legado) aviso antigo no stderr => adapter lanca BLOCK pos-check (got: $msgPc)"
         $env:FAKE_OC_RUN_STDERR = ''
+
+        # (e-adapter-content) texto do modelo e saida de read podem citar os dois formatos sem serem erro.
+        $legacyFallbackWarning = 'agent "reviewer-ro" not found. Falling back to default agent'
+        $quotedFallbackJson = (Get-Content -LiteralPath $fallbackFixture -Raw -Encoding utf8).Trim()
+        $fallbackMention = "Texto citado: $legacyFallbackWarning; exemplo JSON: $quotedFallbackJson"
+        $contentStream = Join-Path $tempRoot 'run-stream-fallback-mentions.jsonl'
+        $contentEvents = @(
+            [pscustomobject]@{ type = 'text'; part = [pscustomobject]@{ messageID = 'm1'; text = $fallbackMention } },
+            [pscustomobject]@{ type = 'tool_use'; part = [pscustomobject]@{ tool = 'read'; state = [pscustomobject]@{ output = $fallbackMention } } },
+            [pscustomobject]@{ type = 'text'; part = [pscustomobject]@{ messageID = 'm2'; text = 'OK-ADAPTER' } },
+            [pscustomobject]@{ type = 'step_finish'; part = [pscustomobject]@{ reason = 'stop' } }
+        )
+        $contentLines = @($contentEvents | ForEach-Object { ConvertTo-Json -InputObject $_ -Depth 10 -Compress })
+        Set-Content -LiteralPath $contentStream -Value $contentLines -Encoding utf8
+        $env:FAKE_OC_RUN_STREAM = $contentStream
+        $env:FAKE_OC_RUN_EXIT = '0'
+        $ansWithMentions = & $invoke -OpenCodeExe $fakeCmd -MessagePath $prompt -Model 'fake/model' -TimeoutSec 30
+        Assert-True ([string]$ansWithMentions -match 'OK-ADAPTER') '(e-adapter-content) adapter preserva resposta que cita os avisos em texto/read'
 
         # (b-adapter) allow-set divergente => BLOCK ANTES do run (argv do run NAO e escrito)
         $argvBlock = Join-Path $tempRoot 'argv-block.txt'

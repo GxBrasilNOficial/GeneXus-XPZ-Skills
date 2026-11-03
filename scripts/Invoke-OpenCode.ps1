@@ -194,11 +194,10 @@ try {
         $lines = @(Get-Content -LiteralPath $out -Encoding utf8 -ErrorAction SilentlyContinue)
         $errText = [string](Get-Content -LiteralPath $err -Raw -Encoding utf8 -ErrorAction SilentlyContinue)
 
-        # Pos-check (DEFESA-EM-PROFUNDIDADE, nao a barreira): no caminho revisor, le o CONTEUDO
-        # de stdout e stderr ANTES do Remove-Item. A CLI 2.2.5 devolve o agente ausente como
-        # `{"type":"error","error":{"message":"Agent not found: ..."}}` no stdout (exit 1);
-        # o aviso legado vem no stderr. Se qualquer um aparecer, a saida e descartada.
-        if ($isReviewerPath -and (Test-OpenCodeReviewerRoFallbackWarning -Text (($lines -join "`n") + "`n" + $errText))) {
+        # Pos-check (DEFESA-EM-PROFUNDIDADE, nao a barreira): examina stdout JSONL e stderr
+        # separadamente. So o evento JSON de erro conhecido no stdout ou o aviso legado no stderr
+        # invalida a resposta; texto do modelo/ferramenta que cite essas frases continua sendo conteudo.
+        if ($isReviewerPath -and (Test-OpenCodeReviewerRoFallbackWarning -StdoutLines $lines -StderrText $errText)) {
             throw "BLOCK: pos-check reviewer-ro: erro de agente nao encontrado/fallback detectado na saida do CLI (o --agent nao resolveu no runtime apesar do pre-check). Saida descartada por seguranca."
         }
 

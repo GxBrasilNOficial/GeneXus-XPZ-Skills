@@ -44,9 +44,11 @@ Self-test determinístico/fake-exe não prova sozinho o comportamento de uma ver
   Esses probes não são agentes reviewer-ro válidos.
 - `fallback-warning.txt` — linha JSON de erro do stdout de
   `opencode run --agent fixture-agent-missing` na 2.2.5 (timestamp e sessionID sanitizados);
-  nessa versão o stderr fica vazio e o exit é 1. O accessor
-  `Get-OpenCodeReviewerRoFallbackWarningPattern` também aceita o aviso legado
-  `agent "..." not found. Falling back to default agent` no stderr.
+  nessa versão o stderr fica vazio e o exit é 1. O pós-check reconhece esse erro pelo evento
+  JSONL `type=error` e pela mensagem `error.message` iniciada por `Agent not found:`. O accessor
+  `Get-OpenCodeReviewerRoFallbackWarningPattern` cobre somente o aviso legado
+  `agent "..." not found. Falling back to default agent` no stderr; texto comum no stdout que
+  cite qualquer formato não conta como fallback.
 - `read-outside-cwd-blocked.sample.txt` — recibo sanitizado do caso `outside` da matriz
   comportamental 2.2.5: leitura de arquivo fora do cwd negada por `external_directory`,
   sentinela ausente.
