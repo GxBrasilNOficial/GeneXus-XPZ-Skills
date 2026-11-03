@@ -7,6 +7,9 @@
     31 casos comportamentais via `opencode run --format json`, com modelo explicito e workspace
     sintetico minimo; 2 casos `grep` estruturais via `opencode debug agents` (regra efetiva
     `grep * deny`). Ausencia de evento comportamental e inconclusiva e bloqueia a promocao.
+    `-EvidenceDirectory` revalida `receipt.json` + `evidence/`, confere CLI/modelo e os 33 casos
+    antes da matriz; reutiliza a captura sem executar `opencode run`. O recibo registra
+    `evidenceSource` e `toolEventCount`; o parser verifica a rejeicao de JSONL malformado.
     Nao altera configuracao global, modelo padrao ou shim. OutputDirectory deve ser novo.
     Provas debug/estruturais nao substituem os self-tests deterministicos.
 #>

@@ -71,7 +71,7 @@ $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('gx-oc-rro-selftest-' +
 [System.IO.Directory]::CreateDirectory($tempRoot) | Out-Null
 
 # variaveis de ambiente do fake-exe (limpas no finally)
-$fakeEnv = @('FAKE_OC_VERSION', 'FAKE_OC_DEBUG_AGENTS', 'FAKE_OC_DEBUG_AGENTS_EXIT', 'FAKE_OC_RUN_STREAM', 'FAKE_OC_RUN_STDERR', 'FAKE_OC_ARGV_FILE', 'FAKE_OC_DEBUG_AGENTS_FAIL_UNTIL', 'FAKE_OC_DEBUG_AGENTS_FAILCOUNTER', 'FAKE_OC_CWD_FILE')
+$fakeEnv = @('FAKE_OC_VERSION', 'FAKE_OC_DEBUG_AGENTS', 'FAKE_OC_DEBUG_AGENTS_EXIT', 'FAKE_OC_RUN_STREAM', 'FAKE_OC_RUN_STDERR', 'FAKE_OC_RUN_EXIT', 'FAKE_OC_MODEL_DEFAULT_MODE', 'FAKE_OC_ARGV_FILE', 'FAKE_OC_DEBUG_AGENTS_FAIL_UNTIL', 'FAKE_OC_DEBUG_AGENTS_FAILCOUNTER', 'FAKE_OC_CWD_FILE')
 $originalProfile = $env:USERPROFILE
 
 try {
@@ -80,6 +80,11 @@ try {
     @'
 $a = @($args)
 if ($a.Count -ge 1 -and $a[0] -eq '--version') { Write-Output $env:FAKE_OC_VERSION; exit 0 }
+if ($a.Count -ge 2 -and $a[0] -eq 'api' -and $a[1] -eq 'model.default') {
+    if ($env:FAKE_OC_MODEL_DEFAULT_MODE -eq 'invalid') { Write-Output '{"location":{}}'; exit 0 }
+    Write-Output '{"location":{},"data":{"id":"alpha","providerID":"acme"}}'
+    exit 0
+}
 if ($a.Count -ge 2 -and $a[0] -eq 'debug' -and $a[1] -eq 'agents') {
     # registra a pasta em que o debug agents rodou (prova do -WorkingDirectory), antes de qualquer falha
     if ($env:FAKE_OC_CWD_FILE) { Set-Content -LiteralPath $env:FAKE_OC_CWD_FILE -Value (Get-Location).Path -Encoding utf8 -NoNewline }
@@ -100,6 +105,7 @@ if ($a.Count -ge 1 -and $a[0] -eq 'run') {
     [void][Console]::In.ReadToEnd()
     if ($env:FAKE_OC_RUN_STDERR) { [Console]::Error.WriteLine($env:FAKE_OC_RUN_STDERR) }
     if ($env:FAKE_OC_RUN_STREAM) { Get-Content -LiteralPath $env:FAKE_OC_RUN_STREAM -Encoding utf8 }
+    if ($env:FAKE_OC_RUN_EXIT) { exit ([int]$env:FAKE_OC_RUN_EXIT) }
     exit 0
 }
 exit 0
@@ -588,6 +594,8 @@ sem mode
     $env:FAKE_OC_DEBUG_AGENTS_EXIT = ''
     $env:FAKE_OC_RUN_STREAM = $runStream
     $env:FAKE_OC_RUN_STDERR = ''
+    $env:FAKE_OC_RUN_EXIT = '0'
+    $env:FAKE_OC_MODEL_DEFAULT_MODE = ''
 
     Push-Location $repoRoot
     try {
@@ -599,13 +607,42 @@ sem mode
         $argvSyncText = if (Test-Path -LiteralPath $argvSync) { Get-Content -LiteralPath $argvSync -Raw } else { '' }
         Assert-True ($argvSyncText -match '--agent reviewer-ro') "(a-sync) default -Agent reviewer-ro no argv do run (got: $argvSyncText)"
 
-        # (e-adapter) pos-check SINCRONO end-to-end: exit 0 mas o stderr tem o warning de fallback =>
-        # o adapter (caminho revisor) le $err cru e lanca BLOCK: pos-check, descartando a saida.
-        $env:FAKE_OC_RUN_STDERR = (Get-Content -LiteralPath $fallbackFixture -Raw -Encoding utf8).Trim()
+        # (variant-default) sem -Model: consulta model.default e monta provider/model#variant.
+        $argvVariantDefault = Join-Path $tempRoot 'argv-variant-default.txt'
+        $env:FAKE_OC_ARGV_FILE = $argvVariantDefault
+        $ansVariantDefault = & $invoke -OpenCodeExe $fakeCmd -MessagePath $prompt -Variant 'high' -TimeoutSec 30
+        $argvVariantDefaultText = if (Test-Path -LiteralPath $argvVariantDefault) { Get-Content -LiteralPath $argvVariantDefault -Raw } else { '' }
+        Assert-True (([string]$ansVariantDefault) -match 'OK-ADAPTER') '(variant-default) modelo padrão válido permite resposta do adapter'
+        Assert-True ($argvVariantDefaultText -match '--model acme/alpha#high') "(variant-default) argv usa o default e a variante (got: $argvVariantDefaultText)"
+
+        # (variant-default-invalid) resposta inválida bloqueia antes de run; argv de run não é criado.
+        $argvVariantInvalid = Join-Path $tempRoot 'argv-variant-default-invalid.txt'
+        $env:FAKE_OC_ARGV_FILE = $argvVariantInvalid
+        $env:FAKE_OC_MODEL_DEFAULT_MODE = 'invalid'
+        $threwVariantDefault = $false; $msgVariantDefault = ''
+        try { & $invoke -OpenCodeExe $fakeCmd -MessagePath $prompt -Variant 'high' -TimeoutSec 30 | Out-Null }
+        catch { $threwVariantDefault = $true; $msgVariantDefault = $_.Exception.Message }
+        Assert-True ($threwVariantDefault -and $msgVariantDefault -match 'model\.default') "(variant-default-invalid) api model.default inválida bloqueia (got: $msgVariantDefault)"
+        Assert-True (-not (Test-Path -LiteralPath $argvVariantInvalid)) '(variant-default-invalid) bloqueio ocorre antes de run'
+        $env:FAKE_OC_MODEL_DEFAULT_MODE = ''
+
+        # (e-adapter-stdout) forma 2.2.5: JSON de erro no stdout, stderr vazio e exit 1.
+        # O pos-check precisa reconhecer o fallback antes do tratamento generico do exit nao-zero.
+        $env:FAKE_OC_RUN_STREAM = $fallbackFixture
+        $env:FAKE_OC_RUN_EXIT = '1'
         $threwPc = $false; $msgPc = ''
         try { & $invoke -OpenCodeExe $fakeCmd -MessagePath $prompt -Model 'fake/model' -TimeoutSec 30 | Out-Null }
         catch { $threwPc = $true; $msgPc = $_.Exception.Message }
-        Assert-True ($threwPc -and $msgPc -match 'pos-check reviewer-ro') "(e-adapter) warning de fallback no stderr => adapter lanca BLOCK pos-check (got: $msgPc)"
+        Assert-True ($threwPc -and $msgPc -match 'pos-check reviewer-ro') "(e-adapter-stdout) JSON de fallback no stdout => adapter lanca BLOCK pos-check (got: $msgPc)"
+
+        # (e-adapter-stderr-legado) formato anterior continua detectado no canal stderr.
+        $env:FAKE_OC_RUN_STREAM = $runStream
+        $env:FAKE_OC_RUN_EXIT = '0'
+        $env:FAKE_OC_RUN_STDERR = 'agent "reviewer-ro" not found. Falling back to default agent'
+        $threwPc = $false; $msgPc = ''
+        try { & $invoke -OpenCodeExe $fakeCmd -MessagePath $prompt -Model 'fake/model' -TimeoutSec 30 | Out-Null }
+        catch { $threwPc = $true; $msgPc = $_.Exception.Message }
+        Assert-True ($threwPc -and $msgPc -match 'pos-check reviewer-ro') "(e-adapter-stderr-legado) aviso antigo no stderr => adapter lanca BLOCK pos-check (got: $msgPc)"
         $env:FAKE_OC_RUN_STDERR = ''
 
         # (b-adapter) allow-set divergente => BLOCK ANTES do run (argv do run NAO e escrito)

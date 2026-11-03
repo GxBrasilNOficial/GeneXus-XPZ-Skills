@@ -343,6 +343,7 @@ function Invoke-WatcherE2E {
         [string]$StderrText = '',
         [int]$OpencodeProcessExitCode = 0,
         [bool]$ExpectAccepted,
+        [bool]$ExpectFallbackToBuild = $false,
         [int]$ExpectedWatcherExitCode,
         [string]$ExpectedDisposition,
         [string]$ExpectedReason,
@@ -399,6 +400,7 @@ function Invoke-WatcherE2E {
             Assert-Eq "$Name e2e: opencodeExitCode" $json.opencodeExitCode $OpencodeProcessExitCode
         }
         Assert-Eq "$Name e2e: accepted" $json.resultAccepted $ExpectAccepted
+        Assert-Eq "$Name e2e: fallbackToBuild" $json.fallbackToBuild $ExpectFallbackToBuild
         Assert-Eq "$Name e2e: disposition" $json.finalTextDisposition $ExpectedDisposition
         Assert-Eq "$Name e2e: reason" $json.rejectionReason $ExpectedReason
         Assert-Eq "$Name e2e: helper" (Get-OpenCodeAcceptedResult -Path $resultPath).accepted $ExpectAccepted
@@ -421,11 +423,15 @@ $watchLinesOk = @(
     '{"type":"step_finish","part":{"reason":"stop","cost":0.01,"tokens":{"total":12}}}'
 )
 $fallbackFixturePath = Join-Path (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path 'xpz-llm-delegate\fixtures\opencode-reviewer-ro\fallback-warning.txt'
-$fallbackText = Get-Content -LiteralPath $fallbackFixturePath -Raw -Encoding utf8
+$fallbackText = (Get-Content -LiteralPath $fallbackFixturePath -Raw -Encoding utf8).Trim()
+$fallbackStreamLines = @($watchLinesOk) + @($fallbackText)
+$legacyFallbackWarning = 'agent "reviewer-ro" not found. Falling back to default agent'
 Invoke-WatcherE2E -Name 'watch-accepted' -StreamLines $watchLinesOk -OpencodeProcessExitCode 0 `
     -ExpectAccepted $true -ExpectedWatcherExitCode 0 -ExpectedDisposition 'accepted' -ExpectedReason '' -ExpectFinalLabel $true
-Invoke-WatcherE2E -Name 'watch-fallback' -StreamLines $watchLinesOk -StderrText $fallbackText -OpencodeProcessExitCode 0 `
-    -ExpectAccepted $false -ExpectedWatcherExitCode 20 -ExpectedDisposition 'rejected-fallback' -ExpectedReason 'opencode-agent-fallback-to-build' -ExpectFinalLabel $false
+Invoke-WatcherE2E -Name 'watch-fallback-stream' -StreamLines $fallbackStreamLines -StderrText '' -OpencodeProcessExitCode 1 `
+    -ExpectAccepted $false -ExpectFallbackToBuild $true -ExpectedWatcherExitCode 20 -ExpectedDisposition 'rejected-fallback' -ExpectedReason 'opencode-agent-fallback-to-build' -ExpectFinalLabel $false
+Invoke-WatcherE2E -Name 'watch-fallback-legacy-stderr' -StreamLines $watchLinesOk -StderrText $legacyFallbackWarning -OpencodeProcessExitCode 0 `
+    -ExpectAccepted $false -ExpectFallbackToBuild $true -ExpectedWatcherExitCode 20 -ExpectedDisposition 'rejected-fallback' -ExpectedReason 'opencode-agent-fallback-to-build' -ExpectFinalLabel $false
 Invoke-WatcherE2E -Name 'watch-exit-nonzero' -StreamLines $watchLinesOk -OpencodeProcessExitCode 7 `
     -ExpectAccepted $false -ExpectedWatcherExitCode 20 -ExpectedDisposition 'rejected-error' -ExpectedReason 'opencode-exit-nonzero' -ExpectFinalLabel $false
 Invoke-WatcherE2E -Name 'watch-exit-unknown' -StreamLines $watchLinesOk -OpencodeProcessExitCode 0 -WriteExitCodeFile $false `

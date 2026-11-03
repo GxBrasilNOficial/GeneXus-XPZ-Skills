@@ -63,6 +63,7 @@ $repoRoot = Split-Path -Parent $scriptsDir
 $env:PANEL_FAKE_OC_VERSION = ((Get-Content -LiteralPath (Join-Path $repoRoot 'xpz-llm-delegate\fixtures\opencode-reviewer-ro\VERSION.txt') -Raw -Encoding utf8).Trim())
 $env:PANEL_FAKE_OC_DEBUG_AGENTS = Join-Path $repoRoot 'xpz-llm-delegate\fixtures\opencode-reviewer-ro\debug-agents-project-local.sample.json'
 
+$env:PANEL_FAKE_OC_MODEL_LIST_MODE = ''
 # cwd deterministica na raiz do repo: o pre-check do opencode (default reviewer-ro) descobre o
 # project-local .opencode/agent/reviewer-ro.md subindo do cwd herdado (harness in-process E filho).
 Push-Location $repoRoot
@@ -1294,6 +1295,21 @@ $($timeoutAst.Extent.Text)
     Assert-True ($e5.effortRequested -eq 'unset' -and $e5.effortApplied -eq 'unset') "sem reasoningEffort: esperado unset/unset; got $($e5.effortRequested)/$($e5.effortApplied)"
     Assert-True ((Get-Content -LiteralPath $e5.verdictPath -Raw -Encoding utf8) -match 'effort= ') 'sem reasoningEffort: --effort NAO deveria ser enviado'
 
+    # Catálogo indisponível: o dispatch continua, mas registra unsupported e não envia variante.
+    $env:PANEL_FAKE_OC_MODEL_LIST_MODE = 'fail'
+    try {
+        $rCatalogFail = Invoke-Harness -Reviewers @(
+            @{ backend = 'opencode'; reasoningEffort = 'high'; targetModelKey = 'ollama-cloud/variants-model'; invokeArgs = @{ model = 'ollama-cloud/variants-model' } }
+        ) -Sensitivity 'public' -Extra @{ Cd = $tmp; OpenCodeConfigPath = $ocCfg; CodexConfigPath = $cxCfg }
+    } finally {
+        $env:PANEL_FAKE_OC_MODEL_LIST_MODE = ''
+    }
+    $eCatalogFail = Get-Reviewer $rCatalogFail.json 0
+    Assert-True ($eCatalogFail.state -eq 'responded' -and $eCatalogFail.dispatchAttempted -eq $true) 'catálogo OpenCode falhou: despacho ainda responde'
+    Assert-True ($eCatalogFail.effortRequested -eq 'high' -and $eCatalogFail.effortApplied -eq 'unsupported') "catálogo OpenCode falhou: esperado high/unsupported; got $($eCatalogFail.effortRequested)/$($eCatalogFail.effortApplied)"
+    Assert-True ([string]$eCatalogFail.effortDetail -match 'catalogo do opencode indisponivel' -and [string]$eCatalogFail.effortDetail -match 'model\.list') "catálogo OpenCode falhou: recibo deve explicar a falha do catálogo (got '$($eCatalogFail.effortDetail)')"
+    Assert-True ((Get-Content -LiteralPath $eCatalogFail.verdictPath -Raw -Encoding utf8) -match 'VARIANT= ') 'catálogo OpenCode falhou: adapter não recebe variante'
+
     # reasoningEffort fora do enum -> error fail-closed, sem despacho; pedido valido barrado no gate -> notDispatched
     $r = Invoke-Harness -Reviewers @(
         @{ backend = 'claude-code'; reasoningEffort = 'ultra'; invokeArgs = @{ model = 'claude-opus-4-8' } },
@@ -1446,6 +1462,7 @@ finally {
     Remove-Item Env:\PANEL_FAKE_MUTEX -ErrorAction SilentlyContinue
     Remove-Item Env:\PANEL_FAKE_OC_VERSION -ErrorAction SilentlyContinue
     Remove-Item Env:\PANEL_FAKE_OC_DEBUG_AGENTS -ErrorAction SilentlyContinue
+    Remove-Item Env:PANEL_FAKE_OC_MODEL_LIST_MODE -ErrorAction SilentlyContinue
     if ($null -eq $script:prevCodexDisableKeepDays) {
         Remove-Item Env:\XPZ_CODEX_DISABLE_KEEPDAYS -ErrorAction SilentlyContinue
     } else {
