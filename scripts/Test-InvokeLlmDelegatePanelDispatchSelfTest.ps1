@@ -61,7 +61,7 @@ $env:XPZ_CODEX_DISABLE_KEEPDAYS = '1'
 # Guard D1/D2: versao testada dos fixtures (o fake-opencode a devolve em --version p/ o pre-check)
 $repoRoot = Split-Path -Parent $scriptsDir
 $env:PANEL_FAKE_OC_VERSION = ((Get-Content -LiteralPath (Join-Path $repoRoot 'xpz-llm-delegate\fixtures\opencode-reviewer-ro\VERSION.txt') -Raw -Encoding utf8).Trim())
-$env:PANEL_FAKE_OC_AGENTLIST = Join-Path $repoRoot 'xpz-llm-delegate\fixtures\opencode-reviewer-ro\agentlist-reviewer-ro.sample.txt'
+$env:PANEL_FAKE_OC_DEBUG_AGENTS = Join-Path $repoRoot 'xpz-llm-delegate\fixtures\opencode-reviewer-ro\debug-agents-project-local.sample.json'
 
 # cwd deterministica na raiz do repo: o pre-check do opencode (default reviewer-ro) descobre o
 # project-local .opencode/agent/reviewer-ro.md subindo do cwd herdado (harness in-process E filho).
@@ -78,31 +78,32 @@ try {
     @'
 $a = @($args)
 # Guard D1/D2: o painel usa o default reviewer-ro (bloqueia a chave agent), entao o adapter roda o
-# pre-check (--version + agent list). Responder ANTES de ler stdin/model, sem consumir stdin.
+# pre-check (--version + debug agents). Responder ANTES de ler stdin/model, sem consumir stdin.
 if ($a -contains '--version') { $env:PANEL_FAKE_OC_VERSION; exit 0 }
-if ($a.Count -ge 2 -and $a[0] -eq 'agent' -and $a[1] -eq 'list') {
+if ($a.Count -ge 2 -and $a[0] -eq 'debug' -and $a[1] -eq 'agents') {
     # Usa a captura versionada da politica efetiva, sem duplicar o contrato no fake.
-    Get-Content -LiteralPath $env:PANEL_FAKE_OC_AGENTLIST -Encoding utf8
+    Get-Content -LiteralPath $env:PANEL_FAKE_OC_DEBUG_AGENTS -Encoding utf8
     exit 0
 }
-# Catalogo (`models <provider> --verbose`): cabecalho com a chave + JSON do modelo. Modelos com
-# 'variants' no nome declaram low/medium/high; os demais declaram variants vazio. Sem ler stdin.
-if ($a.Count -ge 2 -and $a[0] -eq 'models') {
-    $prov = [string]$a[1]
-    foreach ($name in @('variants-model', 'plain-model')) {
-        "$prov/$name"
-        if ($name -match 'variants') {
-            '{ "id": "' + $name + '", "variants": { "low": { "reasoningEffort": "low" }, "medium": { "reasoningEffort": "medium" }, "high": { "reasoningEffort": "high" } } }'
-        } else {
-            '{ "id": "' + $name + '", "variants": {} }'
-        }
-    }
+# Catalogo (`api model.list`): JSON com data[]. Modelos com 'variants' no id declaram
+# low/medium/high; os demais declaram variants vazio. Sem ler stdin.
+if ($a.Count -ge 2 -and $a[0] -eq 'api' -and $a[1] -eq 'model.list') {
+    if ($env:PANEL_FAKE_OC_MODEL_LIST_MODE -eq 'fail') { exit 1 }
+    $data = @(
+        [ordered]@{ id = 'variants-model'; providerID = 'ollama-cloud'; variants = @([ordered]@{ id = 'low' }, [ordered]@{ id = 'medium' }, [ordered]@{ id = 'high' }) },
+        [ordered]@{ id = 'plain-model'; providerID = 'ollama-cloud'; variants = @() }
+    )
+    [ordered]@{ location = [ordered]@{}; data = $data } | ConvertTo-Json -Depth 8 -Compress
     exit 0
 }
 $model = ''
 for ($i = 0; $i -lt $args.Count; $i++) { if ($args[$i] -eq '--model') { $model = [string]$args[$i + 1]; break } }
 $variant = ''
-for ($i = 0; $i -lt $args.Count; $i++) { if ($args[$i] -eq '--variant') { $variant = [string]$args[$i + 1]; break } }
+if ($model -match '#') {
+    $parts = @($model -split '#', 2)
+    $model = $parts[0]
+    $variant = $parts[1]
+}
 $null = [Console]::In.ReadToEnd()
 $fam = @($model -split '/', 2)[0]
 $log = $env:PANEL_FAKE_LOG
@@ -1254,7 +1255,7 @@ $($timeoutAst.Extent.Text)
 
     # =======================================================================================
     # 8f) ESFORÇO DE RACIOCÍNIO: reasoningEffort chega ao CLI (claude --effort, codex -c
-    #     model_reasoning_effort, opencode --variant só se declarada); registro effortApplied.
+    #     model_reasoning_effort, opencode provider/model#variant só se declarada); registro effortApplied.
     # =======================================================================================
     $r = Invoke-Harness -Reviewers @(
         @{ backend = 'claude-code'; reasoningEffort = 'high';   invokeArgs = @{ model = 'claude-opus-5-5' } },
@@ -1278,12 +1279,12 @@ $($timeoutAst.Extent.Text)
     $e2 = Get-Reviewer $r.json 2
     Assert-True ($e2.state -eq 'responded') "esforço opencode com variante: esperado responded; got $($e2.state) reason=$($e2.reason)"
     Assert-True ($e2.effortApplied -eq 'applied') "esforço opencode com variante: esperado applied; got $($e2.effortApplied) detail=$($e2.effortDetail)"
-    Assert-True ((Get-Content -LiteralPath $e2.verdictPath -Raw -Encoding utf8) -match 'VARIANT=high') 'esforço opencode: --variant high deveria chegar ao CLI'
+    Assert-True ((Get-Content -LiteralPath $e2.verdictPath -Raw -Encoding utf8) -match 'VARIANT=high') 'esforço opencode: provider/model#high deveria chegar ao CLI'
 
     $e3 = Get-Reviewer $r.json 3
     Assert-True ($e3.state -eq 'responded') "esforço opencode sem variante: esperado responded; got $($e3.state) reason=$($e3.reason)"
     Assert-True ($e3.effortApplied -eq 'notDeclaredByModel') "esforço opencode sem variante: esperado notDeclaredByModel; got $($e3.effortApplied)"
-    Assert-True ((Get-Content -LiteralPath $e3.verdictPath -Raw -Encoding utf8) -match 'VARIANT= ') 'esforço opencode sem variante: --variant NAO deveria ser enviado'
+    Assert-True ((Get-Content -LiteralPath $e3.verdictPath -Raw -Encoding utf8) -match 'VARIANT= ') 'esforço opencode sem variante: sufixo #variant NAO deveria ser enviado'
 
     $e4 = Get-Reviewer $r.json 4
     Assert-True ($e4.state -eq 'responded') "esforço copilot: esperado responded; got $($e4.state)"
@@ -1444,7 +1445,7 @@ finally {
     Remove-Item Env:\PANEL_FAKE_LOG -ErrorAction SilentlyContinue
     Remove-Item Env:\PANEL_FAKE_MUTEX -ErrorAction SilentlyContinue
     Remove-Item Env:\PANEL_FAKE_OC_VERSION -ErrorAction SilentlyContinue
-    Remove-Item Env:\PANEL_FAKE_OC_AGENTLIST -ErrorAction SilentlyContinue
+    Remove-Item Env:\PANEL_FAKE_OC_DEBUG_AGENTS -ErrorAction SilentlyContinue
     if ($null -eq $script:prevCodexDisableKeepDays) {
         Remove-Item Env:\XPZ_CODEX_DISABLE_KEEPDAYS -ErrorAction SilentlyContinue
     } else {

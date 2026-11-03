@@ -10,7 +10,7 @@
 
       1. estatico   -> frontmatter do reviewer-ro (project-local .md ou bloco global do jsonc)
                        confere a forma `permission` esperada (deterministico, nao toca o DB);
-      2. agent list -> `opencode agent list` confirma que o allow-set RESOLVIDO (last-match-wins,
+      2. debug agents -> `opencode debug agents` confirma que o allow-set RESOLVIDO (last-match-wins,
                        excluindo `external_directory`) e EXATAMENTE {read,glob,list}, com mapa
                        read canonico e grep deny, e que
                        `external_directory` para o padrao `*` NAO resolve `allow` (confinamento de
@@ -22,12 +22,13 @@
       - 'static'   = provisionamento quebrado (consertar o reviewer-ro / rodar o instalador);
       - 'version'  = versao do opencode nao testada (revisitar D2/D3 antes de ativar);
       - 'allowset' = allow-set resolvido divergente (regra tardia da global mudou a resolucao);
-      - 'agentlist'= `opencode agent list` falhou/timeout/erro (INTERMITENTE — SQLite
+      - 'agentlist'= `opencode debug agents` falhou/timeout/erro (INTERMITENTE — SQLite
                      `PRAGMA wal_checkpoint`; transitorio -> retentar).
 
     Pos-check (defesa-em-profundidade, NAO a barreira do spawn): Test-OpenCodeReviewerRoFallbackWarning
-    varre stderr pelo warning generico de fallback silencioso (`agent "..." not found. Falling back to
-    default agent`), que o opencode emite quando `--agent <ausente>` cai no agente default.
+    varre o stdout pelo JSON de erro de agente ausente (`{"type":"error","error":{"message":"Agent not found: ..."}}`)
+    ou o stderr pelo warning de fallback legado (`agent "..." not found. Falling back to default agent`),
+    que o opencode emite quando `--agent <ausente>` cai no agente default.
 
     Claims empiricos medidos na versao em
     xpz-llm-delegate/fixtures/opencode-reviewer-ro/VERSION.txt. Se um claim nao reproduzir na
@@ -51,6 +52,21 @@ function Get-OpenCodeReviewerRoCanonicalPermission {
         read = [ordered]@{ '*' = 'allow'; '*.env' = 'deny'; '*.env.*' = 'deny'; '.env.example' = 'allow'; '*/.env.example' = 'allow' }
         grep = 'deny'; glob = 'allow'; list = 'allow'; edit = 'deny'; bash = 'deny'
         webfetch = 'deny'; websearch = 'deny'; task = 'deny'; external_directory = 'deny'
+    }
+}
+
+function Get-OpenCodeReviewerRoCanonicalEffectivePermission {
+    # Bloco efetivo medido no `opencode debug agents` da 2.2.5. A ancora e o ultimo
+    # `* / * / deny` e o sufixo abaixo e comparado na ordem. `shell` e `subagent` sao os
+    # nomes efetivos das ferramentas `bash`/`task`; `browser` e `skill/browser` sao denies
+    # nativos observados no mesmo sufixo. Nao emula paths/wildcards.
+    return [ordered]@{
+        '*' = 'deny'
+        read = [ordered]@{ '*' = 'allow'; '*.env' = 'deny'; '*.env.*' = 'deny'; '.env.example' = 'allow'; '*/.env.example' = 'allow' }
+        grep = 'deny'; glob = 'allow'; list = 'allow'; edit = 'deny'; bash = 'deny'
+        webfetch = 'deny'; websearch = 'deny'; task = 'deny'; external_directory = 'deny'
+        browser = 'deny'
+        skill = [ordered]@{ browser = 'deny' }
     }
 }
 
@@ -383,7 +399,10 @@ function Test-OpenCodeReviewerRoStatic {
 }
 
 function Test-OpenCodeReviewerRoEffectiveRules {
-    # Ancora no catch-all final; todo o sufixo deve ter a forma canonica medida.
+    # Ancora no ULTIMO catch-all `* / * / deny`; valida o sufixo efetivo ordenado e
+    # exige que ele termine exatamente no contrato medido. Qualquer regra adicional
+    # depois do bloco bloqueia (reabertura/regra desconhecida). Regras antes da ancora
+    # podem variar: a ancora existe justamente para isolar o sufixo efetivo.
     param([Parameter(Mandatory)] $Rules)
     $rows = @($Rules)
     $anchor = -1
@@ -391,7 +410,7 @@ function Test-OpenCodeReviewerRoEffectiveRules {
         if ($rows[$i].permission -ceq '*' -and $rows[$i].pattern -ceq '*') { $anchor = $i }
     }
     if ($anchor -lt 0 -or $rows[$anchor].action -cne 'deny') { return @{ ok = $false; detail = 'catch-all final ausente/divergente' } }
-    $canonical = Get-OpenCodeReviewerRoCanonicalPermission
+    $canonical = Get-OpenCodeReviewerRoCanonicalEffectivePermission
     $offset = $anchor
     foreach ($key in $canonical.Keys) {
         $patterns = [ordered]@{ '*' = $canonical[$key] }
@@ -403,59 +422,11 @@ function Test-OpenCodeReviewerRoEffectiveRules {
             $offset++
         }
     }
-    # Unica excecao tardia medida: tool-output interno. Deve coincidir com a regra
-    # nativa ANTERIOR a ancora e com o diretorio interno conhecido; nao ampliar allows.
-    for ($i = $offset; $i -lt $rows.Count; $i++) {
-        $r = $rows[$i]
-        $native = @($rows | Select-Object -First $anchor | Where-Object {
-            $_.permission -ceq 'external_directory' -and $_.action -ceq 'allow' -and $_.pattern -ceq $r.pattern
-        })
-        if ($r.permission -cne 'external_directory' -or $r.action -cne 'allow' -or $native.Count -eq 0 -or
-            $r.pattern -notmatch '(?:^<SANITIZED_OPENCODE_TOOL_OUTPUT_DIR>|[\\/]opencode[\\/]tool-output)[\\/]\*$') {
-            return @{ ok = $false; detail = "regra tardia fora do contrato: $($r.permission) / $($r.pattern) / $($r.action)" }
-        }
+    if ($offset -ne $rows.Count) {
+        $r = $rows[$offset]
+        return @{ ok = $false; detail = "regra efetiva adicional apos o bloco canonico: $($r.permission) / $($r.pattern) / $($r.action) na posicao $offset" }
     }
-    return @{ ok = $true; detail = 'bloco efetivo canonico e excecoes internas OK' }
-}
-
-function Get-OpenCodeReviewerRoBlockFromAgentList {
-    <#
-        Extrai o array JSON de regras do agente <Name> da saida textual de `opencode agent list`.
-        A saida intercala varios agentes (cabecalho `nome (modo)` + array JSON pretty). Localiza o
-        cabecalho e acumula linhas ate a profundidade de colchetes voltar a zero. Devolve o array de
-        objetos (@{permission;action;pattern}) ou $null se o agente nao aparecer.
-    #>
-    param(
-        [Parameter(Mandatory)] [string[]] $Lines,
-        [string] $Name = 'reviewer-ro'
-    )
-
-    $start = -1
-    for ($i = 0; $i -lt $Lines.Count; $i++) {
-        if ($Lines[$i] -match ("^" + [regex]::Escape($Name) + "\s*\(")) { $start = $i; break }
-    }
-    if ($start -lt 0) { return $null }
-
-    $buf = [System.Collections.Generic.List[string]]::new()
-    $depth = 0
-    $started = $false
-    for ($i = $start + 1; $i -lt $Lines.Count; $i++) {
-        $s = $Lines[$i]
-        # novo cabecalho de agente antes de abrir o array => bloco vazio/inesperado
-        if (-not $started -and $s -match '^\S.*\(.*\)\s*$') { break }
-        $buf.Add($s)
-        $open = ([regex]::Matches($s, '\[')).Count
-        $close = ([regex]::Matches($s, '\]')).Count
-        $depth += ($open - $close)
-        if ($open -gt 0) { $started = $true }
-        if ($started -and $depth -le 0) { break }
-    }
-    if (-not $started) { return $null }
-    try {
-        return ($buf -join "`n" | ConvertFrom-Json)
-    } catch {
-        return $null
-    }
+    return @{ ok = $true; detail = 'bloco efetivo canonico ordenado OK' }
 }
 
 function Resolve-OpenCodeReviewerRoAllowSet {
@@ -486,15 +457,16 @@ function Resolve-OpenCodeReviewerRoAllowSet {
     return @{ allowSet = $allow; externalDirStar = $extStar; effective = $eff; readRules = $readRules; policyOk = $policy.ok; policyDetail = $policy.detail }
 }
 
-function Get-OpenCodeAgentListLines {
+function Get-OpenCodeDebugAgentsJson {
     <#
-        Roda `opencode agent list` com RETRY CURTO (design D2 `:73`: "retry curto, senao BLOCK") para
-        tolerar a falha transitoria de SQLite (`PRAGMA wal_checkpoint`) medida em campo. Retenta so
-        em falha TRANSITORIA (exit!=0 ou excecao), com um sleep breve entre tentativas; exit 0 (mesmo
-        que o bloco procurado nao apareca) NAO e transitorio e nao retenta. Devolve
-        @{ ok; lines; error }. -Retries = tentativas EXTRAS (default 2 => ate 3 execucoes);
+        Roda `opencode debug agents` com RETRY CURTO (design D2 `:73`: "retry curto, senao BLOCK")
+        para tolerar a falha transitoria de SQLite (`PRAGMA wal_checkpoint`) medida em campo.
+        Retenta SOMENTE quando o stderr capturado contiver a string `PRAGMA wal_checkpoint` (nao
+        qualquer exit!=0 — outros erros sao terminais). O stderr e capturado em arquivo temporario
+        e removido em finally. Devolve @{ ok; json; error }.
+        -Retries = tentativas EXTRAS (default 2 => ate 3 execucoes);
         -RetryDelayMs = pausa entre tentativas (0 nos self-tests).
-        -WorkingDirectory (opcional): pasta em que o `agent list` roda — o opencode descobre o
+        -WorkingDirectory (opcional): pasta em que o `debug agents` roda — o opencode descobre o
         project-local a partir dela. Sem o parametro, roda na pasta atual (comportamento dos adapters).
         A pasta original e restaurada em try/finally, mesmo com erro.
     #>
@@ -505,40 +477,123 @@ function Get-OpenCodeAgentListLines {
         [string] $WorkingDirectory
     )
     $attempts = [Math]::Max(1, $Retries + 1)
-    $lastErr = $null
-    for ($i = 1; $i -le $attempts; $i++) {
-        $failed = $false
-        $stdout = $null
-        try {
-            $prev = if (Test-Path Variable:LASTEXITCODE) { $LASTEXITCODE } else { 0 }
-            if ([string]::IsNullOrEmpty($WorkingDirectory)) {
-                $stdout = & $Exe agent list 2>$null
-            } else {
-                Push-Location -LiteralPath $WorkingDirectory
-                try { $stdout = & $Exe agent list 2>$null }
-                finally { Pop-Location }
+    $lastErr = "falha desconhecida ao executar 'opencode debug agents'."
+    $stderrFile = [System.IO.Path]::GetTempFileName()
+    try {
+        for ($i = 1; $i -le $attempts; $i++) {
+            $failed = $false
+            $stdout = $null
+            $stderrText = ''
+            try {
+                $prev = if (Test-Path Variable:LASTEXITCODE) { $LASTEXITCODE } else { 0 }
+                if ([string]::IsNullOrEmpty($WorkingDirectory)) {
+                    $stdout = & $Exe debug agents 2>$stderrFile
+                } else {
+                    Push-Location -LiteralPath $WorkingDirectory
+                    try { $stdout = & $Exe debug agents 2>$stderrFile }
+                    finally { Pop-Location }
+                }
+                $code = $LASTEXITCODE
+                $global:LASTEXITCODE = $prev
+                if (Test-Path -LiteralPath $stderrFile) {
+                    $rawStderr = Get-Content -LiteralPath $stderrFile -Raw -Encoding utf8 -ErrorAction SilentlyContinue
+                    if ($null -ne $rawStderr) { $stderrText = [string]$rawStderr }
+                }
+                if ($code -ne 0) {
+                    if ($stderrText -match 'PRAGMA wal_checkpoint') {
+                        $failed = $true
+                        $lastErr = "'opencode debug agents' falhou com o marcador transitorio SQLite (PRAGMA wal_checkpoint; tentativa $i/$attempts)."
+                    } else {
+                        # Erro nao-transitorio: nao retentar e nao ecoar o stderr bruto.
+                        return @{ ok = $false; json = $null; error = "'opencode debug agents' saiu com codigo $code (erro terminal; tentativa $i/$attempts)." }
+                    }
+                }
+            } catch {
+                $stderrText = ''
+                if (Test-Path -LiteralPath $stderrFile) {
+                    $rawStderr = Get-Content -LiteralPath $stderrFile -Raw -Encoding utf8 -ErrorAction SilentlyContinue
+                    if ($null -ne $rawStderr) { $stderrText = [string]$rawStderr }
+                }
+                if ($stderrText -match 'PRAGMA wal_checkpoint') {
+                    $failed = $true
+                    $lastErr = "excecao transitoria ao executar 'opencode debug agents' (PRAGMA wal_checkpoint; tentativa $i/$attempts)."
+                } else {
+                    return @{ ok = $false; json = $null; error = "excecao ao executar 'opencode debug agents' (tentativa $i/$attempts)." }
+                }
             }
-            $code = $LASTEXITCODE
-            $global:LASTEXITCODE = $prev
-            if ($code -ne 0) {
-                $failed = $true
-                $lastErr = "'opencode agent list' saiu com codigo $code (INTERMITENTE — SQLite PRAGMA wal_checkpoint transitorio; tentativa $i/$attempts)."
-            }
-        } catch {
-            $failed = $true
-            $lastErr = "excecao ao rodar 'opencode agent list' (tentativa $i/$attempts): $($_.Exception.Message)"
+            if (-not $failed) { return @{ ok = $true; json = ($stdout -join "`n"); error = $null } }
+            if ($i -lt $attempts -and $RetryDelayMs -gt 0) { Start-Sleep -Milliseconds $RetryDelayMs }
         }
-        if (-not $failed) { return @{ ok = $true; lines = @($stdout); error = $null } }
-        if ($i -lt $attempts -and $RetryDelayMs -gt 0) { Start-Sleep -Milliseconds $RetryDelayMs }
+    } finally {
+        if (Test-Path -LiteralPath $stderrFile) { Remove-Item -LiteralPath $stderrFile -Force -ErrorAction SilentlyContinue }
     }
-    return @{ ok = $false; lines = @(); error = $lastErr }
+    return @{ ok = $false; json = $null; error = $lastErr }
+}
+
+function Get-OpenCodeReviewerRoBlockFromDebugAgents {
+    <#
+        Extrai o array de regras do agente <Name> do JSON devolvido por `opencode debug agents`.
+        O JSON e um array de objetos com campos id, mode, permissions[]{action,resource,effect}.
+        Converte cada permissao para o modelo interno {permission, action, pattern}:
+          - permission = item.action  (tipo de ferramenta: read, glob, *, ...)
+          - pattern    = item.resource (padrao de caminho: *, *.env, ...)
+          - action     = item.effect   (resultado: allow, deny, ask)
+        Devolve @{ rules = @(...); mode = <str> } ou $null se agente nao encontrado/JSON invalido.
+    #>
+    param(
+        [Parameter(Mandatory)] [AllowEmptyString()] [string] $Json,
+        [string] $Name = 'reviewer-ro'
+    )
+    if ([string]::IsNullOrWhiteSpace($Json)) { return $null }
+    try {
+        $agents = $Json | ConvertFrom-Json
+    } catch {
+        return $null
+    }
+    if ($null -eq $agents) { return $null }
+    $found = @()
+    foreach ($a in @($agents)) {
+        if ($null -eq $a) { continue }
+        $idProp = $a.PSObject.Properties['id']
+        if ($null -ne $idProp -and [string]$idProp.Value -ceq $Name) { $found += $a }
+    }
+    if ($found.Count -ne 1) { return $null }   # ausente ou ambiguo (duplicado) => bloqueia
+    $agentObj = $found[0]
+    $modeProp = $agentObj.PSObject.Properties['mode']
+    if ($null -eq $modeProp) { return $null }
+    $mode = [string]$modeProp.Value
+    if ($mode -cnotin @('subagent', 'primary', 'all')) { return $null }
+    $permProp = $agentObj.PSObject.Properties['permissions']
+    if ($null -eq $permProp -or $null -eq $permProp.Value) { return $null }
+    $actionMap = @{ 'shell' = 'bash'; 'subagent' = 'task' }
+    $rules = [System.Collections.Generic.List[pscustomobject]]::new()
+    foreach ($p in @($permProp.Value)) {
+        if ($null -eq $p) { return $null }
+        $actionProp = $p.PSObject.Properties['action']
+        $resourceProp = $p.PSObject.Properties['resource']
+        $effectProp = $p.PSObject.Properties['effect']
+        if ($null -eq $actionProp -or $null -eq $resourceProp -or $null -eq $effectProp) { return $null }
+        $action = [string]$actionProp.Value
+        $resource = [string]$resourceProp.Value
+        $effect = [string]$effectProp.Value
+        if ([string]::IsNullOrWhiteSpace($action) -or [string]::IsNullOrWhiteSpace($resource)) { return $null }
+        if ($effect -cnotin @('allow', 'deny', 'ask')) { return $null }
+        $permission = if ($actionMap.ContainsKey($action)) { [string]$actionMap[$action] } else { $action }
+        $rules.Add([pscustomobject]@{
+            permission = $permission
+            pattern    = $resource
+            action     = $effect
+        })
+    }
+    return @{ rules = @($rules); mode = $mode }
 }
 
 function Get-OpenCodeReviewerRoAllowSetFromExe {
     <#
-        Roda `opencode agent list` (com retry curto) e devolve @{ ok; allowSet; externalDirStar;
+        Roda `opencode debug agents` (com retry curto) e devolve @{ ok; allowSet; externalDirStar;
         error }. ok=$false em qualquer falha (exit!=0 apos retries, excecao, agente ausente) — o
         chamador trata como BLOCK (transitorio-SQLite vs agente-ausente distinguidos na `error`).
+        Exige mode=all para o reviewer-ro (modo obrigatorio do design).
     #>
     param(
         [Parameter(Mandatory)] [string] $Exe,
@@ -548,15 +603,18 @@ function Get-OpenCodeReviewerRoAllowSetFromExe {
         [string] $WorkingDirectory
     )
 
-    $al = Get-OpenCodeAgentListLines -Exe $Exe -Retries $Retries -RetryDelayMs $RetryDelayMs -WorkingDirectory $WorkingDirectory
-    if (-not $al.ok) {
-        return @{ ok = $false; error = $al.error }
+    $da = Get-OpenCodeDebugAgentsJson -Exe $Exe -Retries $Retries -RetryDelayMs $RetryDelayMs -WorkingDirectory $WorkingDirectory
+    if (-not $da.ok) {
+        return @{ ok = $false; error = $da.error }
     }
-    $rules = Get-OpenCodeReviewerRoBlockFromAgentList -Lines $al.lines -Name $Name
-    if ($null -eq $rules) {
-        return @{ ok = $false; error = "agente '$Name' nao encontrado / bloco ilegivel na saida de 'opencode agent list'." }
+    $block = Get-OpenCodeReviewerRoBlockFromDebugAgents -Json $da.json -Name $Name
+    if ($null -eq $block) {
+        return @{ ok = $false; error = "agente '$Name' nao encontrado / JSON invalido na saida de 'opencode debug agents'." }
     }
-    $resolved = Resolve-OpenCodeReviewerRoAllowSet -Rules $rules
+    if ($Name -eq 'reviewer-ro' -and $block.mode -cne 'all') {
+        return @{ ok = $false; error = "agente '$Name' tem mode='$($block.mode)' — mode obrigatorio para reviewer-ro e 'all'." }
+    }
+    $resolved = Resolve-OpenCodeReviewerRoAllowSet -Rules $block.rules
     return @{ ok = $true; allowSet = $resolved.allowSet; externalDirStar = $resolved.externalDirStar; policyOk = $resolved.policyOk; policyDetail = $resolved.policyDetail; error = $null }
 }
 
@@ -568,6 +626,9 @@ function Get-OpenCodeVersionFromExe {
         $global:LASTEXITCODE = $prev
         $v = ([string]($out | Select-Object -First 1)).Trim()
         if ([string]::IsNullOrWhiteSpace($v)) { return $null }
+        # A CLI 2.2.5 imprime "opencode v2.2.5"; VERSION.txt guarda a versao semantica
+        # (2.2.5). Extrai o primeiro semver da linha, preservando sufixos de prerelease.
+        if ($v -match '(?<semver>\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?)') { return [string]$Matches.semver }
         return $v
     } catch {
         return $null
@@ -578,7 +639,7 @@ function Test-OpenCodeReviewerRoPrecheck {
     <#
         Orquestra o pre-check fail-closed (D2). Devolve @{ pass = $bool; reason; detail }.
         A ORDEM prioriza o motivo mais barato/deterministico (static) e distingue transitorio
-        (agentlist) de estrutural (static/allowset/version) no recibo.
+        (agentlist, falha de `debug agents`) de estrutural (static/allowset/version) no recibo.
     #>
     param(
         [Parameter(Mandatory)] [string] $Exe,
@@ -613,8 +674,8 @@ function Test-OpenCodeReviewerRoPrecheck {
             detail = "opencode $installed != versao testada dos fixtures ($ExpectedVersion). Os claims de resolucao podem nao valer; antes de desistir, rode scripts/Test-OpenCodeReviewerRoInstalledCompatibility.ps1 -AsJson para diagnostico estrutural. Se a estrutura estiver OK, re-capture os fixtures empiricos do reviewer-ro para esta versao antes de ativar." }
     }
 
-    # 3) agent list -> allow-set exato + external_directory nao-allow
-    $al = Get-OpenCodeReviewerRoAllowSetFromExe -Exe $Exe -Name $AgentName -Retries $Retries -RetryDelayMs $RetryDelayMs
+    # 3) debug agents -> allow-set exato + external_directory nao-allow
+    $al = Get-OpenCodeReviewerRoAllowSetFromExe -Exe $Exe -Name $AgentName -Retries $Retries -RetryDelayMs $RetryDelayMs -WorkingDirectory $WorkingDirectory
     if (-not $al.ok) {
         return @{ pass = $false; reason = 'agentlist'; detail = $al.error }
     }
@@ -641,8 +702,9 @@ function Test-OpenCodeAgentResolves {
     <#
         Opt-out check (D1, fold-in G2): quando o chamador passa -Agent <x> EXPLICITO (uso agentico
         fora do painel), o enforce read-only NAO se aplica, mas confirma-se que <x> RESOLVE (aparece
-        em `opencode agent list`) — senao o opencode cairia SILENCIOSAMENTE no `build` full-access
-        (`--agent <ausente>` nao falha). Devolve @{ ok = $bool; detail }.
+        em `opencode debug agents`) — senao o opencode cairia SILENCIOSAMENTE no `build` full-access
+        (`--agent <ausente>` nao falha). Exige mode=primary ou mode=all (agente disponivel em run).
+        Devolve @{ ok = $bool; detail }.
     #>
     param(
         [Parameter(Mandatory)] [string] $Exe,
@@ -650,23 +712,27 @@ function Test-OpenCodeAgentResolves {
         [int] $Retries = 2,
         [int] $RetryDelayMs = 250
     )
-    $al = Get-OpenCodeAgentListLines -Exe $Exe -Retries $Retries -RetryDelayMs $RetryDelayMs
-    if (-not $al.ok) {
-        return @{ ok = $false; detail = $al.error }
+    $da = Get-OpenCodeDebugAgentsJson -Exe $Exe -Retries $Retries -RetryDelayMs $RetryDelayMs
+    if (-not $da.ok) {
+        return @{ ok = $false; detail = $da.error }
     }
-    $rules = Get-OpenCodeReviewerRoBlockFromAgentList -Lines $al.lines -Name $Name
-    if ($null -eq $rules) {
-        return @{ ok = $false; detail = "agente '$Name' nao resolve em 'opencode agent list' — cairia no fallback silencioso ao 'build' full-access." }
+    $block = Get-OpenCodeReviewerRoBlockFromDebugAgents -Json $da.json -Name $Name
+    if ($null -eq $block) {
+        return @{ ok = $false; detail = "agente '$Name' nao resolve em 'opencode debug agents' — cairia no fallback silencioso ao 'build' full-access." }
     }
-    return @{ ok = $true; detail = "agente '$Name' resolve." }
+    if ($block.mode -cne 'primary' -and $block.mode -cne 'all') {
+        return @{ ok = $false; detail = "agente '$Name' tem mode='$($block.mode)' — apenas primary/all sao validos para uso em run." }
+    }
+    return @{ ok = $true; detail = "agente '$Name' resolve (mode=$($block.mode))." }
 }
 
 function Test-OpenCodeReviewerRoFallbackWarning {
     <#
-        Pos-check (defesa-em-profundidade): $true se o texto contiver o warning generico de
-        fallback silencioso do opencode (`agent "..." not found. Falling back to default agent`),
-        sinal de que o `--agent` caiu no agente default. O padrao logico e exposto por
-        Get-OpenCodeReviewerRoFallbackWarningPattern.
+        Pos-check (defesa-em-profundidade): $true se o texto contiver o warning de agente nao
+        encontrado. Detecta dois formatos:
+          - Legado (< 2.2.5): `agent "..." not found. Falling back to default agent` no stderr.
+          - 2.2.5+: JSON de erro no stdout `{"type":"error","error":{"message":"Agent not found: ..."}}`.
+        O padrao logico e exposto por Get-OpenCodeReviewerRoFallbackWarningPattern.
     #>
     param([string] $Text)
     if ([string]::IsNullOrEmpty($Text)) { return $false }
@@ -674,6 +740,6 @@ function Test-OpenCodeReviewerRoFallbackWarning {
 }
 
 function Get-OpenCodeReviewerRoFallbackWarningPattern {
-    <# Padrao logico unico do warning de fallback silencioso emitido pelo opencode. #>
-    return 'not found\. Falling back to default agent'
+    <# Padrao logico unificado do warning de agente nao encontrado (legacy stderr + 2.2.5 JSON stdout). #>
+    return '(?:not found\. Falling back to default agent|"message"\s*:\s*"Agent not found:)'
 }

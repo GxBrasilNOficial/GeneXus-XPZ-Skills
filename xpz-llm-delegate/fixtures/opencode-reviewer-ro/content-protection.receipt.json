@@ -1,0 +1,580 @@
+{
+  "kind": "xpz-opencode-reviewer-ro-matrix-receipt",
+  "schemaVersion": 1,
+  "cliVersion": "2.2.5",
+  "model": "opencode-go/deepseek-v4.1-flash",
+  "mechanism": "opencode run --format json + opencode debug agents",
+  "generatedAt": "2026-11-03T17:51:07.0374215Z",
+  "workspaceRoot": "<SANITIZED_WORKSPACE_ROOT>",
+  "cases": [
+    {
+      "name": "names-glob",
+      "profile": "local",
+      "class": "behavioral",
+      "expected": "names",
+      "event": {
+        "tool": "glob",
+        "status": "completed",
+        "inputPath": "**/*",
+        "hasSentinel": false,
+        "error": ""
+      },
+      "pass": true,
+      "reason": null,
+      "exitCode": 0,
+      "evidence": "names-glob.jsonl"
+    },
+    {
+      "name": "local-env",
+      "profile": "local",
+      "class": "behavioral",
+      "expected": "read-deny",
+      "event": {
+        "tool": "read",
+        "status": "error",
+        "inputPath": ".env",
+        "hasSentinel": false,
+        "error": "Permission denied: read"
+      },
+      "pass": true,
+      "reason": null,
+      "exitCode": 0,
+      "evidence": "local-env.jsonl"
+    },
+    {
+      "name": "local-env-local",
+      "profile": "local",
+      "class": "behavioral",
+      "expected": "read-deny",
+      "event": {
+        "tool": "read",
+        "status": "error",
+        "inputPath": ".env.local",
+        "hasSentinel": false,
+        "error": "Permission denied: read"
+      },
+      "pass": true,
+      "reason": null,
+      "exitCode": 0,
+      "evidence": "local-env-local.jsonl"
+    },
+    {
+      "name": "local-service",
+      "profile": "local",
+      "class": "behavioral",
+      "expected": "read-deny",
+      "event": {
+        "tool": "read",
+        "status": "error",
+        "inputPath": "service.env",
+        "hasSentinel": false,
+        "error": "Permission denied: read"
+      },
+      "pass": true,
+      "reason": null,
+      "exitCode": 0,
+      "evidence": "local-service.jsonl"
+    },
+    {
+      "name": "local-service-production",
+      "profile": "local",
+      "class": "behavioral",
+      "expected": "read-deny",
+      "event": {
+        "tool": "read",
+        "status": "error",
+        "inputPath": "service.env.production",
+        "hasSentinel": false,
+        "error": "Permission denied: read"
+      },
+      "pass": true,
+      "reason": null,
+      "exitCode": 0,
+      "evidence": "local-service-production.jsonl"
+    },
+    {
+      "name": "local-example",
+      "profile": "local",
+      "class": "behavioral",
+      "expected": "read-allow",
+      "event": {
+        "tool": "read",
+        "status": "completed",
+        "inputPath": "<WORKSPACE_LOCAL>\\.env.example",
+        "hasSentinel": true,
+        "error": ""
+      },
+      "pass": true,
+      "reason": null,
+      "exitCode": 0,
+      "evidence": "local-example.jsonl"
+    },
+    {
+      "name": "local-example-local",
+      "profile": "local",
+      "class": "behavioral",
+      "expected": "read-deny",
+      "event": {
+        "tool": "read",
+        "status": "error",
+        "inputPath": ".env.example.local",
+        "hasSentinel": false,
+        "error": "Permission denied: read"
+      },
+      "pass": true,
+      "reason": null,
+      "exitCode": 0,
+      "evidence": "local-example-local.jsonl"
+    },
+    {
+      "name": "local-service-example",
+      "profile": "local",
+      "class": "behavioral",
+      "expected": "read-deny",
+      "event": {
+        "tool": "read",
+        "status": "error",
+        "inputPath": "service.env.example",
+        "hasSentinel": false,
+        "error": "Permission denied: read"
+      },
+      "pass": true,
+      "reason": null,
+      "exitCode": 0,
+      "evidence": "local-service-example.jsonl"
+    },
+    {
+      "name": "local-source",
+      "profile": "local",
+      "class": "behavioral",
+      "expected": "read-allow",
+      "event": {
+        "tool": "read",
+        "status": "completed",
+        "inputPath": "README.md",
+        "hasSentinel": true,
+        "error": ""
+      },
+      "pass": true,
+      "reason": null,
+      "exitCode": 0,
+      "evidence": "local-source.jsonl"
+    },
+    {
+      "name": "local-absolute",
+      "profile": "local",
+      "class": "behavioral",
+      "expected": "read-deny",
+      "event": {
+        "tool": "read",
+        "status": "error",
+        "inputPath": "<WORKSPACE_LOCAL>\\.env",
+        "hasSentinel": false,
+        "error": "Permission denied: read"
+      },
+      "pass": true,
+      "reason": null,
+      "exitCode": 0,
+      "evidence": "local-absolute.jsonl"
+    },
+    {
+      "name": "local-dotdot",
+      "profile": "local",
+      "class": "behavioral",
+      "expected": "read-deny",
+      "event": {
+        "tool": "read",
+        "status": "error",
+        "inputPath": "sub/../.env",
+        "hasSentinel": false,
+        "error": "Permission denied: read"
+      },
+      "pass": true,
+      "reason": null,
+      "exitCode": 0,
+      "evidence": "local-dotdot.jsonl"
+    },
+    {
+      "name": "local-backslash",
+      "profile": "local",
+      "class": "behavioral",
+      "expected": "read-deny",
+      "event": {
+        "tool": "read",
+        "status": "error",
+        "inputPath": "sub\\.env.local",
+        "hasSentinel": false,
+        "error": "Permission denied: read"
+      },
+      "pass": true,
+      "reason": null,
+      "exitCode": 0,
+      "evidence": "local-backslash.jsonl"
+    },
+    {
+      "name": "local-uppercase",
+      "profile": "local",
+      "class": "behavioral",
+      "expected": "read-deny",
+      "event": {
+        "tool": "read",
+        "status": "error",
+        "inputPath": ".ENV",
+        "hasSentinel": false,
+        "error": "Permission denied: read"
+      },
+      "pass": true,
+      "reason": null,
+      "exitCode": 0,
+      "evidence": "local-uppercase.jsonl"
+    },
+    {
+      "name": "local-outside",
+      "profile": "local",
+      "class": "behavioral",
+      "expected": "external-deny",
+      "event": {
+        "tool": "read",
+        "status": "error",
+        "inputPath": "<OUTSIDE>\\ordinary.txt",
+        "hasSentinel": false,
+        "error": "Permission denied: external_directory"
+      },
+      "pass": true,
+      "reason": null,
+      "exitCode": 0,
+      "evidence": "local-outside.jsonl"
+    },
+    {
+      "name": "global-env",
+      "profile": "global",
+      "class": "behavioral",
+      "expected": "read-deny",
+      "event": {
+        "tool": "read",
+        "status": "error",
+        "inputPath": ".env",
+        "hasSentinel": false,
+        "error": "Permission denied: read"
+      },
+      "pass": true,
+      "reason": null,
+      "exitCode": 0,
+      "evidence": "global-env.jsonl"
+    },
+    {
+      "name": "global-env-local",
+      "profile": "global",
+      "class": "behavioral",
+      "expected": "read-deny",
+      "event": {
+        "tool": "read",
+        "status": "error",
+        "inputPath": ".env.local",
+        "hasSentinel": false,
+        "error": "Permission denied: read"
+      },
+      "pass": true,
+      "reason": null,
+      "exitCode": 0,
+      "evidence": "global-env-local.jsonl"
+    },
+    {
+      "name": "global-service",
+      "profile": "global",
+      "class": "behavioral",
+      "expected": "read-deny",
+      "event": {
+        "tool": "read",
+        "status": "error",
+        "inputPath": "service.env",
+        "hasSentinel": false,
+        "error": "Permission denied: read"
+      },
+      "pass": true,
+      "reason": null,
+      "exitCode": 0,
+      "evidence": "global-service.jsonl"
+    },
+    {
+      "name": "global-service-production",
+      "profile": "global",
+      "class": "behavioral",
+      "expected": "read-deny",
+      "event": {
+        "tool": "read",
+        "status": "error",
+        "inputPath": "service.env.production",
+        "hasSentinel": false,
+        "error": "Permission denied: read"
+      },
+      "pass": true,
+      "reason": null,
+      "exitCode": 0,
+      "evidence": "global-service-production.jsonl"
+    },
+    {
+      "name": "global-example",
+      "profile": "global",
+      "class": "behavioral",
+      "expected": "read-allow",
+      "event": {
+        "tool": "read",
+        "status": "completed",
+        "inputPath": ".env.example",
+        "hasSentinel": true,
+        "error": ""
+      },
+      "pass": true,
+      "reason": null,
+      "exitCode": 0,
+      "evidence": "global-example.jsonl"
+    },
+    {
+      "name": "global-example-local",
+      "profile": "global",
+      "class": "behavioral",
+      "expected": "read-deny",
+      "event": {
+        "tool": "read",
+        "status": "error",
+        "inputPath": ".env.example.local",
+        "hasSentinel": false,
+        "error": "Permission denied: read"
+      },
+      "pass": true,
+      "reason": null,
+      "exitCode": 0,
+      "evidence": "global-example-local.jsonl"
+    },
+    {
+      "name": "global-service-example",
+      "profile": "global",
+      "class": "behavioral",
+      "expected": "read-deny",
+      "event": {
+        "tool": "read",
+        "status": "error",
+        "inputPath": "service.env.example",
+        "hasSentinel": false,
+        "error": "Permission denied: read"
+      },
+      "pass": true,
+      "reason": null,
+      "exitCode": 0,
+      "evidence": "global-service-example.jsonl"
+    },
+    {
+      "name": "global-source",
+      "profile": "global",
+      "class": "behavioral",
+      "expected": "read-allow",
+      "event": {
+        "tool": "read",
+        "status": "completed",
+        "inputPath": "README.md",
+        "hasSentinel": true,
+        "error": ""
+      },
+      "pass": true,
+      "reason": null,
+      "exitCode": 0,
+      "evidence": "global-source.jsonl"
+    },
+    {
+      "name": "global-absolute",
+      "profile": "global",
+      "class": "behavioral",
+      "expected": "read-deny",
+      "event": {
+        "tool": "read",
+        "status": "error",
+        "inputPath": "<WORKSPACE_GLOBAL>\\.env",
+        "hasSentinel": false,
+        "error": "Permission denied: read"
+      },
+      "pass": true,
+      "reason": null,
+      "exitCode": 0,
+      "evidence": "global-absolute.jsonl"
+    },
+    {
+      "name": "global-dotdot",
+      "profile": "global",
+      "class": "behavioral",
+      "expected": "read-deny",
+      "event": {
+        "tool": "read",
+        "status": "error",
+        "inputPath": "<WORKSPACE_GLOBAL>\\sub\\..\\.env",
+        "hasSentinel": false,
+        "error": "Permission denied: read"
+      },
+      "pass": true,
+      "reason": null,
+      "exitCode": 0,
+      "evidence": "global-dotdot.jsonl"
+    },
+    {
+      "name": "global-backslash",
+      "profile": "global",
+      "class": "behavioral",
+      "expected": "read-deny",
+      "event": {
+        "tool": "read",
+        "status": "error",
+        "inputPath": "sub\\.env.local",
+        "hasSentinel": false,
+        "error": "Permission denied: read"
+      },
+      "pass": true,
+      "reason": null,
+      "exitCode": 0,
+      "evidence": "global-backslash.jsonl"
+    },
+    {
+      "name": "global-uppercase",
+      "profile": "global",
+      "class": "behavioral",
+      "expected": "read-deny",
+      "event": {
+        "tool": "read",
+        "status": "error",
+        "inputPath": ".ENV",
+        "hasSentinel": false,
+        "error": "Permission denied: read"
+      },
+      "pass": true,
+      "reason": null,
+      "exitCode": 0,
+      "evidence": "global-uppercase.jsonl"
+    },
+    {
+      "name": "global-outside",
+      "profile": "global",
+      "class": "behavioral",
+      "expected": "external-deny",
+      "event": {
+        "tool": "read",
+        "status": "error",
+        "inputPath": "<OUTSIDE>\\ordinary.txt",
+        "hasSentinel": false,
+        "error": "Permission denied: external_directory"
+      },
+      "pass": true,
+      "reason": null,
+      "exitCode": 0,
+      "evidence": "global-outside.jsonl"
+    },
+    {
+      "name": "subcwd-env",
+      "profile": "local",
+      "class": "behavioral",
+      "expected": "read-deny",
+      "event": {
+        "tool": "read",
+        "status": "error",
+        "inputPath": "../.env",
+        "hasSentinel": false,
+        "error": "Permission denied: read"
+      },
+      "pass": true,
+      "reason": null,
+      "exitCode": 0,
+      "evidence": "subcwd-env.jsonl"
+    },
+    {
+      "name": "subcwd-example",
+      "profile": "global",
+      "class": "behavioral",
+      "expected": "external-deny",
+      "event": {
+        "tool": "read",
+        "status": "error",
+        "inputPath": "../.env.example",
+        "hasSentinel": false,
+        "error": "Permission denied: external_directory"
+      },
+      "pass": true,
+      "reason": null,
+      "exitCode": 0,
+      "evidence": "subcwd-example.jsonl"
+    },
+    {
+      "name": "names-read",
+      "profile": "local",
+      "class": "behavioral",
+      "expected": "names",
+      "event": {
+        "tool": "read",
+        "status": "completed",
+        "inputPath": "<WORKSPACE_LOCAL>",
+        "hasSentinel": false,
+        "error": ""
+      },
+      "pass": true,
+      "reason": null,
+      "exitCode": 0,
+      "evidence": "names-read.jsonl"
+    },
+    {
+      "name": "names-list",
+      "profile": "local",
+      "class": "behavioral",
+      "expected": "names",
+      "event": {
+        "tool": "read",
+        "status": "completed",
+        "inputPath": "<WORKSPACE_LOCAL>",
+        "hasSentinel": false,
+        "error": ""
+      },
+      "pass": true,
+      "reason": null,
+      "exitCode": 0,
+      "evidence": "names-list.jsonl"
+    },
+    {
+      "name": "local-grep",
+      "profile": "local",
+      "class": "structural",
+      "expected": "grep * deny",
+      "event": "sem evento",
+      "toolEventCount": 0,
+      "pass": true,
+      "reason": "ausencia de evento registrada; prova estrutural pela regra grep * deny",
+      "exitCode": 0,
+      "evidence": "local-grep.jsonl",
+      "ruleEvidence": "debug-agents-local.json"
+    },
+    {
+      "name": "global-grep",
+      "profile": "global",
+      "class": "structural",
+      "expected": "grep * deny",
+      "event": "sem evento",
+      "toolEventCount": 0,
+      "pass": true,
+      "reason": "ausencia de evento registrada; prova estrutural pela regra grep * deny",
+      "exitCode": 0,
+      "evidence": "global-grep.jsonl",
+      "ruleEvidence": "debug-agents-global.json"
+    }
+  ],
+  "behavioral": {
+    "total": 31,
+    "pass": 31,
+    "fail": 0
+  },
+  "structural": {
+    "total": 2,
+    "pass": 2
+  },
+  "pass": true,
+  "notes": [
+    "subcwd-example: ../.env.example e negado por external_directory na 2.2.5 (mais restritivo que 1.18.33).",
+    "grep: prova estrutural pela regra efetiva grep * deny; ausencia de evento em run nao e prova da negacao.",
+    "toolNotObserved nao conta como aprovacao comportamental.",
+    "31 casos comportamentais + 2 estruturais = 33."
+  ]
+}

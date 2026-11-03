@@ -1,1 +1,1 @@
-[93m[1m! [0m agent "fixture-agent-missing" not found. Falling back to default agent
+{"type":"error","timestamp":0,"sessionID":"sanitized","error":{"type":"unknown","message":"Agent not found: \"fixture-agent-missing\""}}

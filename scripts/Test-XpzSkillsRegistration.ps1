@@ -695,7 +695,7 @@ $cursorMcp = Get-CursorMcpReport -ProfileRoot $profileRoot -RepoRoot $root
 # --- Agente reviewer-ro GLOBAL do OpenCode -------------------------------------
 # So leitura e so estatico: le o bloco agent.reviewer-ro do opencode.jsonc global com as funcoes do
 # guard da xpz-llm-delegate (-GlobalOnly: independe do cwd, que da raiz deste repositorio cairia no
-# project-local). Nao chama o CLI; o allow-set efetivo (`agent list`) e conferido pelo WORKFLOW com
+# project-local). Nao chama o CLI; o allow-set efetivo (`debug agents`) e conferido pelo WORKFLOW com
 # Test-OpenCodeReviewerRoInstalledCompatibility.ps1 -ExpectGlobal numa pasta neutra. Nunca imprime o
 # conteudo do opencode.jsonc (pode conter chaves de provedor).
 . (Join-Path $PSScriptRoot 'OpenCodeReviewerRoGuard.ps1')

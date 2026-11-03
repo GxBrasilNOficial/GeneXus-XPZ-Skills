@@ -32,16 +32,15 @@ if ($args.Count -ge 1 -and $args[0] -eq '--version') {
     Write-Output '9.8.7-test'
     exit 0
 }
-if ($args.Count -ge 1 -and $args[0] -eq 'models') {
-    Write-Output 'acme/alpha'
-    Write-Output '{'
-    Write-Output '  "variants": {'
-    Write-Output '    "low": { "reasoning": "low" },'
-    Write-Output '    "high": { "reasoning": "high" }'
-    Write-Output '  }'
-    Write-Output '}'
-    Write-Output 'acme/beta'
-    Write-Output '{ "variants": {} }'
+if ($args.Count -ge 2 -and $args[0] -eq 'api' -and $args[1] -eq 'model.list') {
+    if ($env:FAKE_OC_MODEL_LIST_MODE -eq 'invalid') { Write-Output 'not-json'; exit 0 }
+    if ($env:FAKE_OC_MODEL_LIST_MODE -eq 'nodata') { Write-Output '{"location":{}}'; exit 0 }
+    Write-Output '{"location":{},"data":[{"id":"alpha","providerID":"acme","variants":[{"id":"low"},{"id":"high"}]},{"id":"beta","providerID":"acme","variants":[]},{"id":"gamma","providerID":"other","variants":[{"id":"Medium"}]}]}'
+    exit 0
+}
+if ($args.Count -ge 2 -and $args[0] -eq 'api' -and $args[1] -eq 'model.default') {
+    if ($env:FAKE_OC_MODEL_DEFAULT_MODE -eq 'invalid') { Write-Output '{"location":{}}'; exit 0 }
+    Write-Output '{"location":{},"data":{"id":"alpha","providerID":"acme"}}'
     exit 0
 }
 exit 0
@@ -59,13 +58,29 @@ exit /b %errorlevel%
     Assert-True ((Get-OpenCodeExeVersion -ExePath $fakeCmd) -eq '9.8.7-test') 'Get-OpenCodeExeVersion le --version'
 
     $variantsAlpha = Get-OpenCodeModelVariantNames -ExePath $fakeCmd -Model 'acme/alpha'
-    Assert-True ($variantsAlpha.ok -and (@($variantsAlpha.variants) -contains 'low') -and (@($variantsAlpha.variants) -contains 'high')) 'Get-OpenCodeModelVariantNames le variantes declaradas e para no proximo cabecalho'
+    Assert-True ($variantsAlpha.ok -and (@($variantsAlpha.variants) -contains 'low') -and (@($variantsAlpha.variants) -contains 'high')) 'Get-OpenCodeModelVariantNames le variantes de api model.list'
     $variantsBeta = Get-OpenCodeModelVariantNames -ExePath $fakeCmd -Model 'acme/beta'
     Assert-True ($variantsBeta.ok -and @($variantsBeta.variants).Count -eq 0) 'modelo sem variantes declaradas -> ok com lista vazia'
     $variantsMissing = Get-OpenCodeModelVariantNames -ExePath $fakeCmd -Model 'acme/missing'
     Assert-True (-not $variantsMissing.ok) 'modelo ausente do catalogo -> ok=false'
     $variantsNoProvider = Get-OpenCodeModelVariantNames -ExePath $fakeCmd -Model 'noslash'
     Assert-True (-not $variantsNoProvider.ok) 'modelo sem provider -> ok=false'
+    $variantsWrongProvider = Get-OpenCodeModelVariantNames -ExePath $fakeCmd -Model 'other/alpha'
+    Assert-True (-not $variantsWrongProvider.ok) 'provider/model comparados exatamente (provider errado -> ok=false)'
+    $variantsGamma = Get-OpenCodeModelVariantNames -ExePath $fakeCmd -Model 'other/gamma'
+    Assert-True ($variantsGamma.ok -and (@($variantsGamma.variants) -contains 'Medium')) 'nome canonico da variante preserva a caixa do catalogo'
+    $env:FAKE_OC_MODEL_LIST_MODE = 'invalid'
+    $variantsInvalid = Get-OpenCodeModelVariantNames -ExePath $fakeCmd -Model 'acme/alpha'
+    $env:FAKE_OC_MODEL_LIST_MODE = 'nodata'
+    $variantsNoData = Get-OpenCodeModelVariantNames -ExePath $fakeCmd -Model 'acme/alpha'
+    Remove-Item Env:FAKE_OC_MODEL_LIST_MODE -ErrorAction SilentlyContinue
+    Assert-True (-not $variantsInvalid.ok -and -not $variantsNoData.ok) 'JSON invalido/sem data -> ok=false'
+    $defaultModel = Get-OpenCodeDefaultModelId -ExePath $fakeCmd
+    Assert-True ($defaultModel -eq 'acme/alpha') 'Get-OpenCodeDefaultModelId le api model.default'
+    $env:FAKE_OC_MODEL_DEFAULT_MODE = 'invalid'
+    $defaultInvalid = Get-OpenCodeDefaultModelId -ExePath $fakeCmd
+    Remove-Item Env:FAKE_OC_MODEL_DEFAULT_MODE -ErrorAction SilentlyContinue
+    Assert-True ($null -eq $defaultInvalid) 'api model.default ausente/invalida -> $null'
 
     $oldPath = $env:PATH
     try {

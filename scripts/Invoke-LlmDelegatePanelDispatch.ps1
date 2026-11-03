@@ -1179,7 +1179,8 @@ for ($i = 0; $i -lt $reviewers.Count; $i++) {
                 $rec.effortApplied = 'applied'
             }
             'opencode' {
-                # --variant so vale para variantes declaradas no catalogo do modelo.
+                # A variante so vale para nomes declarados no catalogo; o adapter monta
+                # --model provider/model#variant (a CLI 2.2.5 nao aceita --variant).
                 $variantInfo = $null
                 try {
                     $ocExeOverride = $null

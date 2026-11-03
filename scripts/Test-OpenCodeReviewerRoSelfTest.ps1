@@ -6,13 +6,13 @@
 .DESCRIPTION
     GATE DE PROCESSO/CI dos claims empiricos do design congelado
     (opencode-reviewer-ro-least-privilege-design.md). Deterministico: um fake-exe REAL (.cmd ->
-    leitor pwsh) injetado via -Exe simula `opencode --version` e `opencode agent list` (a partir de
+    leitor pwsh) injetado via -Exe simula `opencode --version` e `opencode debug agents` (a partir de
     fixtures versionados), sem rodar modelo nem rede — espelha o padrao fake-exe dos demais
     Test-OpenCode*SelfTest.ps1.
 
     Cobre (do design):
       (b) fail-closed com MOTIVO distinguido: estatico (frontmatter divergente) / versao nao-testada
-          / agent list falho (SQLite transitorio) / allow-set divergente;
+          / debug agents falho (SQLite transitorio) / allow-set divergente;
       (c) allow-set {read,glob,list}, read por mapa e grep deny — AUSENCIA/EXCESSO
           (ex.: bash reaparecendo);
       (d) external_directory padrao '*' resolvendo 'allow' => BLOCK (confinamento de leitura ao cwd);
@@ -23,7 +23,7 @@
           antes de gravar, e idempotente (ja canonico => sem gravacao nem backup) e respeita -WhatIf;
       (multi-divergencia) a validacao estatica lista TODAS as divergencias, sem afrouxar o bloqueio;
       (h) auditoria da instalacao GLOBAL: -GlobalOnly no static; pre-checagem do instalador compartilhada
-          (Test-OpenCodeReviewerRoJsoncEditable); agent list na pasta pedida com restauracao da pasta
+          (Test-OpenCodeReviewerRoJsoncEditable); debug agents na pasta pedida com restauracao da pasta
           original (inclusive com erro); diagnostico -ExpectGlobal recusando pasta nao neutra.
 
     (a) default `-Agent reviewer-ro` no argv (sincrono E assincrono), o BLOCK do adapter ANTES do
@@ -44,14 +44,14 @@ $guard = Join-Path $scriptsDir 'OpenCodeReviewerRoGuard.ps1'
 $installer = Join-Path $scriptsDir 'Install-OpenCodeReviewerRoAgent.ps1'
 $repoRoot = (Resolve-Path -LiteralPath (Join-Path $scriptsDir '..')).Path
 $fixtureDir = Join-Path $repoRoot 'xpz-llm-delegate\fixtures\opencode-reviewer-ro'
-$sampleAgentList = Join-Path $fixtureDir 'agentlist-reviewer-ro.sample.txt'
+$sampleDebugAgents = Join-Path $fixtureDir 'debug-agents-project-local.sample.json'
 $fallbackFixture = Join-Path $fixtureDir 'fallback-warning.txt'
-$equivFixture = Join-Path $fixtureDir 'equiv-permission-vs-tools.sample.txt'
-$mergeFixture = Join-Path $fixtureDir 'merge-global-only-reviewer-ro.sample.txt'
+$equivDebugAgents = Join-Path $fixtureDir 'equiv-permission-vs-tools.sample.json'
+$mergeDebugAgents = Join-Path $fixtureDir 'debug-agents-global-only.sample.json'
 $readOutsideFixture = Join-Path $fixtureDir 'read-outside-cwd-blocked.sample.txt'
 $agentMd = Join-Path $repoRoot '.opencode\agent\reviewer-ro.md'
 
-foreach ($p in @($guard, $installer, $sampleAgentList, $fallbackFixture, $equivFixture, $mergeFixture, $readOutsideFixture, $agentMd)) {
+foreach ($p in @($guard, $installer, $sampleDebugAgents, $fallbackFixture, $equivDebugAgents, $mergeDebugAgents, $readOutsideFixture, $agentMd)) {
     if (-not (Test-Path -LiteralPath $p)) { throw "BLOCK: artefato ausente: $p" }
 }
 
@@ -71,7 +71,7 @@ $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('gx-oc-rro-selftest-' +
 [System.IO.Directory]::CreateDirectory($tempRoot) | Out-Null
 
 # variaveis de ambiente do fake-exe (limpas no finally)
-$fakeEnv = @('FAKE_OC_VERSION', 'FAKE_OC_AGENTLIST', 'FAKE_OC_AGENTLIST_EXIT', 'FAKE_OC_RUN_STREAM', 'FAKE_OC_RUN_STDERR', 'FAKE_OC_ARGV_FILE', 'FAKE_OC_AGENTLIST_FAIL_UNTIL', 'FAKE_OC_AGENTLIST_FAILCOUNTER', 'FAKE_OC_CWD_FILE')
+$fakeEnv = @('FAKE_OC_VERSION', 'FAKE_OC_DEBUG_AGENTS', 'FAKE_OC_DEBUG_AGENTS_EXIT', 'FAKE_OC_RUN_STREAM', 'FAKE_OC_RUN_STDERR', 'FAKE_OC_ARGV_FILE', 'FAKE_OC_DEBUG_AGENTS_FAIL_UNTIL', 'FAKE_OC_DEBUG_AGENTS_FAILCOUNTER', 'FAKE_OC_CWD_FILE')
 $originalProfile = $env:USERPROFILE
 
 try {
@@ -80,19 +80,19 @@ try {
     @'
 $a = @($args)
 if ($a.Count -ge 1 -and $a[0] -eq '--version') { Write-Output $env:FAKE_OC_VERSION; exit 0 }
-if ($a.Count -ge 2 -and $a[0] -eq 'agent' -and $a[1] -eq 'list') {
-    # registra a pasta em que o agent list rodou (prova do -WorkingDirectory), antes de qualquer falha
+if ($a.Count -ge 2 -and $a[0] -eq 'debug' -and $a[1] -eq 'agents') {
+    # registra a pasta em que o debug agents rodou (prova do -WorkingDirectory), antes de qualquer falha
     if ($env:FAKE_OC_CWD_FILE) { Set-Content -LiteralPath $env:FAKE_OC_CWD_FILE -Value (Get-Location).Path -Encoding utf8 -NoNewline }
     # falha transitoria simulada: exit 1 nas primeiras FAIL_UNTIL tentativas (conta em arquivo)
-    if ($env:FAKE_OC_AGENTLIST_FAIL_UNTIL -and $env:FAKE_OC_AGENTLIST_FAILCOUNTER) {
+    if ($env:FAKE_OC_DEBUG_AGENTS_FAIL_UNTIL -and $env:FAKE_OC_DEBUG_AGENTS_FAILCOUNTER) {
         $n = 0
-        if (Test-Path -LiteralPath $env:FAKE_OC_AGENTLIST_FAILCOUNTER) { $n = [int](Get-Content -LiteralPath $env:FAKE_OC_AGENTLIST_FAILCOUNTER -Raw) }
+        if (Test-Path -LiteralPath $env:FAKE_OC_DEBUG_AGENTS_FAILCOUNTER) { $n = [int](Get-Content -LiteralPath $env:FAKE_OC_DEBUG_AGENTS_FAILCOUNTER -Raw) }
         $n++
-        Set-Content -LiteralPath $env:FAKE_OC_AGENTLIST_FAILCOUNTER -Value $n -Encoding ascii -NoNewline
-        if ($n -le [int]$env:FAKE_OC_AGENTLIST_FAIL_UNTIL) { exit 1 }
+        Set-Content -LiteralPath $env:FAKE_OC_DEBUG_AGENTS_FAILCOUNTER -Value $n -Encoding ascii -NoNewline
+        if ($n -le [int]$env:FAKE_OC_DEBUG_AGENTS_FAIL_UNTIL) { [Console]::Error.WriteLine('PRAGMA wal_checkpoint'); exit 1 }
     }
-    if ($env:FAKE_OC_AGENTLIST_EXIT -and [int]$env:FAKE_OC_AGENTLIST_EXIT -ne 0) { exit ([int]$env:FAKE_OC_AGENTLIST_EXIT) }
-    Get-Content -LiteralPath $env:FAKE_OC_AGENTLIST -Encoding utf8
+    if ($env:FAKE_OC_DEBUG_AGENTS_EXIT -and [int]$env:FAKE_OC_DEBUG_AGENTS_EXIT -ne 0) { exit ([int]$env:FAKE_OC_DEBUG_AGENTS_EXIT) }
+    Get-Content -LiteralPath $env:FAKE_OC_DEBUG_AGENTS -Encoding utf8
     exit 0
 }
 if ($a.Count -ge 1 -and $a[0] -eq 'run') {
@@ -112,41 +112,46 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File "%~dp0fake-reader.ps1" %*
 exit /b %errorlevel%
 '@ | Set-Content -LiteralPath $fakeCmd -Encoding ascii
 
-    # variantes de agent list geradas PROGRAMATICAMENTE (parse do sample -> muta o array ->
-    # re-serializa como bloco `reviewer-ro (all)` + JSON). Robusto (sem regex sobre texto).
-    $sampleRules = @(Get-OpenCodeReviewerRoBlockFromAgentList -Lines @(Get-Content -LiteralPath $sampleAgentList -Encoding utf8) -Name 'reviewer-ro')
-    if ($sampleRules.Count -eq 0) { throw 'BLOCK: fixture-sample nao parseou no self-test.' }
-    function Write-AgentListVariant {
+    # variantes de `debug agents` geradas PROGRAMATICAMENTE (parse do sample -> muta o array ->
+    # re-serializa o array JSON). Robusto (sem regex sobre texto).
+    $sampleBlock = Get-OpenCodeReviewerRoBlockFromDebugAgents -Json (Get-Content -LiteralPath $sampleDebugAgents -Raw -Encoding utf8) -Name 'reviewer-ro'
+    if ($null -eq $sampleBlock -or $sampleBlock.mode -cne 'all') { throw 'BLOCK: fixture-sample nao parseou no self-test.' }
+    $sampleRules = @($sampleBlock.rules)
+    function Write-DebugAgentsVariant {
         param([Parameter(Mandatory)] $Rules, [Parameter(Mandatory)] [string] $Path)
-        $json = ($Rules | ConvertTo-Json -Depth 6)
-        # ConvertTo-Json de 1 elemento nao vira array; forcar colchetes
-        if (@($Rules).Count -eq 1) { $json = "[`n$json`n]" }
-        Set-Content -LiteralPath $Path -Value ("reviewer-ro (all)`n" + $json) -Encoding utf8
+        $reverse = @{ 'bash' = 'shell'; 'task' = 'subagent' }
+        $permissions = @($Rules | ForEach-Object {
+            $permission = [string]$_.permission
+            $observed = if ($reverse.ContainsKey($permission)) { [string]$reverse[$permission] } else { $permission }
+            [ordered]@{ action = $observed; resource = [string]$_.pattern; effect = [string]$_.action }
+        })
+        $json = @([ordered]@{ id = 'reviewer-ro'; name = 'reviewer-ro'; mode = 'all'; hidden = $false; permissions = $permissions }) | ConvertTo-Json -Depth 8
+        Set-Content -LiteralPath $Path -Value $json -Encoding utf8
     }
     # excesso: bash:allow ao final (regra tardia)
-    $excessPath = Join-Path $tempRoot 'agentlist-excess.txt'
-    Write-AgentListVariant -Rules ($sampleRules + [pscustomobject]@{ permission = 'bash'; action = 'allow'; pattern = '*' }) -Path $excessPath
+    $excessPath = Join-Path $tempRoot 'debug-agents-excess.json'
+    Write-DebugAgentsVariant -Rules ($sampleRules + [pscustomobject]@{ permission = 'bash'; action = 'allow'; pattern = '*' }) -Path $excessPath
     # ausencia: renomeia todos os 'read' -> nome inerte (read some do allow-set)
     $absenceRules = foreach ($r in $sampleRules) {
         if ($r.permission -eq 'read') { [pscustomobject]@{ permission = 'zzz_inerte'; action = $r.action; pattern = $r.pattern } }
         else { $r }
     }
-    $absencePath = Join-Path $tempRoot 'agentlist-absence.txt'
-    Write-AgentListVariant -Rules $absenceRules -Path $absencePath
+    $absencePath = Join-Path $tempRoot 'debug-agents-absence.json'
+    Write-DebugAgentsVariant -Rules $absenceRules -Path $absencePath
     # external_directory '*' -> allow (confinamento quebrado)
     $extAllowRules = foreach ($r in $sampleRules) {
         if ($r.permission -eq 'external_directory' -and $r.action -eq 'deny') { [pscustomobject]@{ permission = 'external_directory'; action = 'allow'; pattern = $r.pattern } }
         else { $r }
     }
-    $extAllowPath = Join-Path $tempRoot 'agentlist-extallow.txt'
-    Write-AgentListVariant -Rules $extAllowRules -Path $extAllowPath
+    $extAllowPath = Join-Path $tempRoot 'debug-agents-extallow.json'
+    Write-DebugAgentsVariant -Rules $extAllowRules -Path $extAllowPath
 
     $env:FAKE_OC_ARGV_FILE = ''
 
     # ── (c)+(f) allow-set EXATO {read,glob,list}; grep/edit/webfetch negados ──
     $env:FAKE_OC_VERSION = $testedVersion
-    $env:FAKE_OC_AGENTLIST = $sampleAgentList
-    $env:FAKE_OC_AGENTLIST_EXIT = ''
+    $env:FAKE_OC_DEBUG_AGENTS = $sampleDebugAgents
+    $env:FAKE_OC_DEBUG_AGENTS_EXIT = ''
     $pc = Test-OpenCodeReviewerRoPrecheck -Exe $fakeCmd -WorkingDirectory $repoRoot
     Assert-True ($pc.pass) "(c) allow-set exato {read,glob,list} + versao ok => pre-check PASSA (detail: $($pc.detail))"
     $al = Get-OpenCodeReviewerRoAllowSetFromExe -Exe $fakeCmd
@@ -154,17 +159,17 @@ exit /b %errorlevel%
     Assert-True (@($al.allowSet) -notcontains 'edit' -and @($al.allowSet) -notcontains 'webfetch') "(f) regressao: edit/webfetch fora do allow-set"
 
     # ── (c-excesso) bash reaparece como allow => BLOCK allowset ──
-    $env:FAKE_OC_AGENTLIST = $excessPath
+    $env:FAKE_OC_DEBUG_AGENTS = $excessPath
     $pcx = Test-OpenCodeReviewerRoPrecheck -Exe $fakeCmd -WorkingDirectory $repoRoot
     Assert-True ((-not $pcx.pass) -and $pcx.reason -eq 'allowset') "(c) EXCESSO (bash:allow) => BLOCK reason=allowset (got: $($pcx.reason))"
 
     # ── (c-ausencia) read some do allow-set => BLOCK allowset ──
-    $env:FAKE_OC_AGENTLIST = $absencePath
+    $env:FAKE_OC_DEBUG_AGENTS = $absencePath
     $pca = Test-OpenCodeReviewerRoPrecheck -Exe $fakeCmd -WorkingDirectory $repoRoot
     Assert-True ((-not $pca.pass) -and $pca.reason -eq 'allowset') "(c) AUSENCIA (read fora) => BLOCK reason=allowset (got: $($pca.reason))"
 
     # ── (d) external_directory '*' => allow => BLOCK allowset (confinamento quebrado) ──
-    $env:FAKE_OC_AGENTLIST = $extAllowPath
+    $env:FAKE_OC_DEBUG_AGENTS = $extAllowPath
     $pce = Test-OpenCodeReviewerRoPrecheck -Exe $fakeCmd -WorkingDirectory $repoRoot
     Assert-True ((-not $pce.pass) -and $pce.reason -eq 'allowset' -and $pce.detail -match 'external_directory') "(d) external_directory[*]=allow => BLOCK (nao confinado)"
 
@@ -176,28 +181,28 @@ exit /b %errorlevel%
     Assert-True (($roText -match 'SEM LEAK') -and ($roText -match 'external_directory') -and ($roText -match '<SENTINELA>')) "(d-behavioral) fixture documenta leitura-fora-do-cwd bloqueada (sem-leak, sentinela sanitizada)"
 
     # ── (b-versao) versao instalada != testada => BLOCK version ──
-    $env:FAKE_OC_AGENTLIST = $sampleAgentList
+    $env:FAKE_OC_DEBUG_AGENTS = $sampleDebugAgents
     $env:FAKE_OC_VERSION = '9.9.9-nao-testada'
     $pcv = Test-OpenCodeReviewerRoPrecheck -Exe $fakeCmd -WorkingDirectory $repoRoot
     Assert-True ((-not $pcv.pass) -and $pcv.reason -eq 'version') "(b) versao nao-testada => BLOCK reason=version (got: $($pcv.reason))"
     $env:FAKE_OC_VERSION = $testedVersion
 
-    # ── (b-agentlist) agent list falha SEMPRE (exit!=0) => BLOCK agentlist apos retries ──
-    $env:FAKE_OC_AGENTLIST_EXIT = '1'
+    # ── (b-agentlist) debug agents falha SEMPRE (exit!=0) => BLOCK agentlist apos retries ──
+    $env:FAKE_OC_DEBUG_AGENTS_EXIT = '1'
     $pcg = Test-OpenCodeReviewerRoPrecheck -Exe $fakeCmd -WorkingDirectory $repoRoot -RetryDelayMs 0
-    Assert-True ((-not $pcg.pass) -and $pcg.reason -eq 'agentlist') "(b) agent list exit!=0 (sempre) => BLOCK reason=agentlist apos retries (got: $($pcg.reason))"
-    $env:FAKE_OC_AGENTLIST_EXIT = ''
+    Assert-True ((-not $pcg.pass) -and $pcg.reason -eq 'agentlist') "(b) debug agents exit!=0 (sempre) => BLOCK reason=agentlist apos retries (got: $($pcg.reason))"
+    $env:FAKE_OC_DEBUG_AGENTS_EXIT = ''
 
-    # ── (retry) agent list falha TRANSITORIA (1a tentativa) + sucesso (2a) => PASSA (design :73) ──
+    # ── (retry) debug agents falha TRANSITORIA (1a tentativa) + sucesso (2a) => PASSA (design :73) ──
     $failCounter = Join-Path $tempRoot 'agentlist-failcounter.txt'
     Set-Content -LiteralPath $failCounter -Value '0' -Encoding ascii -NoNewline
-    $env:FAKE_OC_AGENTLIST_FAILCOUNTER = $failCounter
-    $env:FAKE_OC_AGENTLIST_FAIL_UNTIL = '1'   # falha so na 1a tentativa, sucesso na 2a
+    $env:FAKE_OC_DEBUG_AGENTS_FAILCOUNTER = $failCounter
+    $env:FAKE_OC_DEBUG_AGENTS_FAIL_UNTIL = '1'   # falha so na 1a tentativa, sucesso na 2a
     $pcr = Test-OpenCodeReviewerRoPrecheck -Exe $fakeCmd -WorkingDirectory $repoRoot -RetryDelayMs 0
-    Assert-True ($pcr.pass) "(retry) agent list transitorio (falha 1a, ok 2a) => retry curto RECUPERA => PASSA (detail: $($pcr.detail))"
-    Assert-True ([int](Get-Content -LiteralPath $failCounter -Raw) -ge 2) "(retry) o retry re-executou o agent list (contador >= 2)"
-    $env:FAKE_OC_AGENTLIST_FAIL_UNTIL = ''
-    $env:FAKE_OC_AGENTLIST_FAILCOUNTER = ''
+    Assert-True ($pcr.pass) "(retry) debug agents transitorio (falha 1a, ok 2a) => retry curto RECUPERA => PASSA (detail: $($pcr.detail))"
+    Assert-True ([int](Get-Content -LiteralPath $failCounter -Raw) -ge 2) "(retry) o retry re-executou o debug agents (contador >= 2)"
+    $env:FAKE_OC_DEBUG_AGENTS_FAIL_UNTIL = ''
+    $env:FAKE_OC_DEBUG_AGENTS_FAILCOUNTER = ''
 
     # ── (b-version-inobtivel) opencode --version vazio => BLOCK version (distinto de divergente) ──
     $env:FAKE_OC_VERSION = ''
@@ -255,25 +260,31 @@ sem mode
     $pcm = Test-OpenCodeReviewerRoPrecheck -Exe $fakeCmd -WorkingDirectory $noModeWd
     Assert-True ((-not $pcm.pass) -and $pcm.reason -eq 'static' -and $pcm.detail -match 'mode') "(b) mode ausente => BLOCK reason=static (obrigatorio) (got: $($pcm.reason))"
 
-    # ── (b-agente-ausente) agent list VALIDO (exit 0) porem SEM o bloco reviewer-ro => BLOCK ──
-    # distinto do SQLite-transitorio: aqui o `agent list` funcionou, mas o agente nao resolve
+    # ── (b-agente-ausente) debug agents VALIDO (exit 0) porem SEM o registro reviewer-ro => BLOCK ──
+    # distinto do SQLite-transitorio: aqui o `debug agents` funcionou, mas o agente nao resolve
     # (provisionamento nao carregado); a detail cita "nao encontrado", nao "codigo N".
-    $absentPath = Join-Path $tempRoot 'agentlist-agente-ausente.txt'
-    Set-Content -LiteralPath $absentPath -Value ("build (primary)`n[`n{`"permission`":`"*`",`"action`":`"allow`",`"pattern`":`"*`"}`n]") -Encoding utf8
-    $env:FAKE_OC_AGENTLIST = $absentPath
+    $absentPath = Join-Path $tempRoot 'debug-agents-agente-ausente.json'
+    '[{"id":"build","name":"Build","mode":"primary","hidden":false,"permissions":[{"action":"*","resource":"*","effect":"allow"}]}]' | Set-Content -LiteralPath $absentPath -Encoding utf8
+    $env:FAKE_OC_DEBUG_AGENTS = $absentPath
     $pcaa = Test-OpenCodeReviewerRoPrecheck -Exe $fakeCmd -WorkingDirectory $repoRoot
-    Assert-True ((-not $pcaa.pass) -and $pcaa.reason -eq 'agentlist' -and $pcaa.detail -match 'nao encontrado') "(b) agente ausente (agent list valido sem reviewer-ro) => BLOCK reason=agentlist detail 'nao encontrado' (got: $($pcaa.reason))"
-    $env:FAKE_OC_AGENTLIST = $sampleAgentList
+    Assert-True ((-not $pcaa.pass) -and $pcaa.reason -eq 'agentlist' -and $pcaa.detail -match 'nao encontrado') "(b) agente ausente (debug agents valido sem reviewer-ro) => BLOCK reason=agentlist detail 'nao encontrado' (got: $($pcaa.reason))"
+    $env:FAKE_OC_DEBUG_AGENTS = $sampleDebugAgents
 
     # ── (B4) equivalencia permission:deny == tools:false (fixture medido; ver VERSION.txt) ──
-    $equivLines = @(Get-Content -LiteralPath $equivFixture -Encoding utf8)
-    $permBlock = Resolve-OpenCodeReviewerRoAllowSet -Rules (Get-OpenCodeReviewerRoBlockFromAgentList -Lines $equivLines -Name 'probe-perm')
-    $toolsBlock = Resolve-OpenCodeReviewerRoAllowSet -Rules (Get-OpenCodeReviewerRoBlockFromAgentList -Lines $equivLines -Name 'probe-tools')
+    $equivJson = Get-Content -LiteralPath $equivDebugAgents -Raw -Encoding utf8
+    $permAgent = Get-OpenCodeReviewerRoBlockFromDebugAgents -Json $equivJson -Name 'probe-perm'
+    $toolsAgent = Get-OpenCodeReviewerRoBlockFromDebugAgents -Json $equivJson -Name 'probe-tools'
+    if ($null -eq $permAgent -or $null -eq $toolsAgent) { throw 'BLOCK: fixture de equivalencia nao parseou no self-test.' }
+    $permBlock = Resolve-OpenCodeReviewerRoAllowSet -Rules $permAgent.rules
+    $toolsBlock = Resolve-OpenCodeReviewerRoAllowSet -Rules $toolsAgent.rules
     Assert-True ([string]$permBlock.effective['webfetch'] -eq 'deny' -and [string]$toolsBlock.effective['webfetch'] -eq 'deny') "(B4) permission:deny E tools:false resolvem webfetch=deny (equivalencia)"
 
     # ── (B5) global-only e project-local resolvem o mesmo allow-set least-privilege (fixture medido) ──
-    $mergeGlobal = Resolve-OpenCodeReviewerRoAllowSet -Rules (Get-OpenCodeReviewerRoBlockFromAgentList -Lines @(Get-Content -LiteralPath $mergeFixture -Encoding utf8) -Name 'reviewer-ro')
-    $mergeProject = Resolve-OpenCodeReviewerRoAllowSet -Rules (Get-OpenCodeReviewerRoBlockFromAgentList -Lines @(Get-Content -LiteralPath $sampleAgentList -Encoding utf8) -Name 'reviewer-ro')
+    $mergeGlobalBlock = Get-OpenCodeReviewerRoBlockFromDebugAgents -Json (Get-Content -LiteralPath $mergeDebugAgents -Raw -Encoding utf8) -Name 'reviewer-ro'
+    $mergeProjectBlock = Get-OpenCodeReviewerRoBlockFromDebugAgents -Json (Get-Content -LiteralPath $sampleDebugAgents -Raw -Encoding utf8) -Name 'reviewer-ro'
+    if ($null -eq $mergeGlobalBlock -or $null -eq $mergeProjectBlock) { throw 'BLOCK: fixtures de merge nao parsearam no self-test.' }
+    $mergeGlobal = Resolve-OpenCodeReviewerRoAllowSet -Rules $mergeGlobalBlock.rules
+    $mergeProject = Resolve-OpenCodeReviewerRoAllowSet -Rules $mergeProjectBlock.rules
     Assert-True ($mergeGlobal.policyOk -and (@($mergeGlobal.allowSet | Sort-Object) -join ',') -eq 'glob,list,read') "(B5) so-global: bloco canonico + {read,glob,list}"
     Assert-True ($mergeProject.policyOk -and (@($mergeProject.allowSet | Sort-Object) -join ',') -eq 'glob,list,read') "(B5) project-local: bloco canonico + {read,glob,list}"
 
@@ -490,33 +501,33 @@ sem mode
         Assert-True (-not $stRoot.ok) "(h2) raiz $($rootName): static nao OK"
     }
 
-    # (h3) agent list roda na pasta pedida e devolve a pasta original, inclusive com erro.
+    # (h3) debug agents roda na pasta pedida e devolve a pasta original, inclusive com erro.
     $hWd = Join-Path $tempRoot 'h-wd'
     New-Item -ItemType Directory -Path $hWd -Force | Out-Null
     Set-Content -LiteralPath (Join-Path $hWd 'h-marker.txt') -Value 'x' -Encoding utf8
     Set-Content -LiteralPath (Join-Path $emptyWd 'empty-marker.txt') -Value 'x' -Encoding utf8
     $cwdFile = Join-Path $tempRoot 'agentlist-cwd.txt'
     $env:FAKE_OC_CWD_FILE = $cwdFile
-    $env:FAKE_OC_AGENTLIST = $sampleAgentList
-    $env:FAKE_OC_AGENTLIST_EXIT = ''
+    $env:FAKE_OC_DEBUG_AGENTS = $sampleDebugAgents
+    $env:FAKE_OC_DEBUG_AGENTS_EXIT = ''
     $locBefore = (Get-Location).Path
     $alWd = Get-OpenCodeReviewerRoAllowSetFromExe -Exe $fakeCmd -WorkingDirectory $hWd -RetryDelayMs 0
     $recorded = Get-Content -LiteralPath $cwdFile -Raw
-    Assert-True ($alWd.ok -and (Test-Path -LiteralPath (Join-Path $recorded 'h-marker.txt'))) "(h3) agent list rodou na pasta pedida (got: $recorded)"
+    Assert-True ($alWd.ok -and (Test-Path -LiteralPath (Join-Path $recorded 'h-marker.txt'))) "(h3) debug agents rodou na pasta pedida (got: $recorded)"
     Assert-True ((Get-Location).Path -eq $locBefore) "(h3) pasta original restaurada apos sucesso"
     Remove-Item -LiteralPath $cwdFile -Force
-    $env:FAKE_OC_AGENTLIST_EXIT = '1'
+    $env:FAKE_OC_DEBUG_AGENTS_EXIT = '1'
     $alFail = Get-OpenCodeReviewerRoAllowSetFromExe -Exe $fakeCmd -WorkingDirectory $hWd -RetryDelayMs 0
     $recordedFail = Get-Content -LiteralPath $cwdFile -Raw
-    Assert-True ((-not $alFail.ok) -and (Test-Path -LiteralPath (Join-Path $recordedFail 'h-marker.txt')) -and (Get-Location).Path -eq $locBefore) "(h3) com falha do agent list: rodou na pasta pedida e a pasta original foi restaurada"
-    $env:FAKE_OC_AGENTLIST_EXIT = ''
+    Assert-True ((-not $alFail.ok) -and (Test-Path -LiteralPath (Join-Path $recordedFail 'h-marker.txt')) -and (Get-Location).Path -eq $locBefore) "(h3) com falha do debug agents: rodou na pasta pedida e a pasta original foi restaurada"
+    $env:FAKE_OC_DEBUG_AGENTS_EXIT = ''
     $alMissing = Get-OpenCodeReviewerRoAllowSetFromExe -Exe $fakeCmd -WorkingDirectory (Join-Path $tempRoot 'nao-existe-wd') -Retries 0
     Assert-True ((-not $alMissing.ok) -and (Get-Location).Path -eq $locBefore) "(h3) pasta inexistente: falha sem mudar a pasta atual"
     Push-Location -LiteralPath $emptyWd
     try {
         $null = Get-OpenCodeReviewerRoAllowSetFromExe -Exe $fakeCmd -RetryDelayMs 0
         $recordedDefault = Get-Content -LiteralPath $cwdFile -Raw
-        Assert-True (Test-Path -LiteralPath (Join-Path $recordedDefault 'empty-marker.txt')) "(h3) sem -WorkingDirectory (adapters): agent list roda na pasta atual"
+        Assert-True (Test-Path -LiteralPath (Join-Path $recordedDefault 'empty-marker.txt')) "(h3) sem -WorkingDirectory (adapters): debug agents roda na pasta atual"
     }
     finally { Pop-Location }
 
@@ -538,7 +549,7 @@ sem mode
         $dOkExit = $LASTEXITCODE
         $recordedDiag = if (Test-Path -LiteralPath $cwdFile) { Get-Content -LiteralPath $cwdFile -Raw } else { '' }
         Assert-True ($dOk.status -eq 'compatible' -and $dOkExit -eq 0 -and $dOk.sourceKind -eq 'global' -and $dOk.allowSetOk -and $dOk.externalDirectoryOk) "(h4) global canonico de pasta neutra => compatible (got: $($dOk.status)/$dOkExit)"
-        Assert-True ($recordedDiag -and (Test-Path -LiteralPath (Join-Path $recordedDiag 'h-marker.txt'))) "(h4) o diagnostico rodou o agent list na pasta pedida (got: $recordedDiag)"
+        Assert-True ($recordedDiag -and (Test-Path -LiteralPath (Join-Path $recordedDiag 'h-marker.txt'))) "(h4) o diagnostico rodou o debug agents na pasta pedida (got: $recordedDiag)"
 
         $hLocal = Join-Path $tempRoot 'h-local'
         New-Item -ItemType Directory -Path (Join-Path $hLocal '.opencode\agent') -Force | Out-Null
@@ -546,7 +557,7 @@ sem mode
         Remove-Item -LiteralPath $cwdFile -Force -ErrorAction SilentlyContinue
         $dLocal = (& $diag -OpenCodeExe $fakeCmd -WorkingDirectory $hLocal -ExpectGlobal -AsJson) -join "`n" | ConvertFrom-Json
         $dLocalExit = $LASTEXITCODE
-        Assert-True ($dLocal.status -eq 'invalidVantage' -and $dLocalExit -eq 21 -and $dLocal.sourceKind -eq 'project-local' -and $null -eq $dLocal.agentList -and -not (Test-Path -LiteralPath $cwdFile)) "(h4) project-local acima da pasta => invalidVantage, sem agent list (got: $($dLocal.status)/$dLocalExit)"
+        Assert-True ($dLocal.status -eq 'invalidVantage' -and $dLocalExit -eq 21 -and $dLocal.sourceKind -eq 'project-local' -and $null -eq $dLocal.agentList -and -not (Test-Path -LiteralPath $cwdFile)) "(h4) project-local acima da pasta => invalidVantage, sem debug agents (got: $($dLocal.status)/$dLocalExit)"
 
         $hGit = Join-Path $tempRoot 'h-git'
         New-Item -ItemType Directory -Path (Join-Path $hGit '.git') -Force | Out-Null
@@ -573,8 +584,8 @@ sem mode
     ) | Set-Content -LiteralPath $runStream -Encoding utf8
 
     $env:FAKE_OC_VERSION = $testedVersion
-    $env:FAKE_OC_AGENTLIST = $sampleAgentList
-    $env:FAKE_OC_AGENTLIST_EXIT = ''
+    $env:FAKE_OC_DEBUG_AGENTS = $sampleDebugAgents
+    $env:FAKE_OC_DEBUG_AGENTS_EXIT = ''
     $env:FAKE_OC_RUN_STREAM = $runStream
     $env:FAKE_OC_RUN_STDERR = ''
 
@@ -600,13 +611,13 @@ sem mode
         # (b-adapter) allow-set divergente => BLOCK ANTES do run (argv do run NAO e escrito)
         $argvBlock = Join-Path $tempRoot 'argv-block.txt'
         $env:FAKE_OC_ARGV_FILE = $argvBlock
-        $env:FAKE_OC_AGENTLIST = $excessPath
+        $env:FAKE_OC_DEBUG_AGENTS = $excessPath
         $threw = $false; $msg = ''
         try { & $invoke -OpenCodeExe $fakeCmd -MessagePath $prompt -Model 'fake/model' -TimeoutSec 30 | Out-Null }
         catch { $threw = $true; $msg = $_.Exception.Message }
         Assert-True ($threw -and $msg -match 'guard reviewer-ro fail-closed') "(b-adapter) allow-set divergente => BLOCK do adapter (got: $msg)"
         Assert-True (-not (Test-Path -LiteralPath $argvBlock)) "(b-adapter) BLOCK ANTES do run: argv do run nao foi escrito"
-        $env:FAKE_OC_AGENTLIST = $sampleAgentList
+        $env:FAKE_OC_DEBUG_AGENTS = $sampleDebugAgents
 
         # (a-async) Start-OpenCodeJob sem -Agent => default reviewer-ro no argv (spawn e a barreira)
         $argvAsync = Join-Path $tempRoot 'argv-async.txt'
@@ -632,8 +643,8 @@ sem mode
             foreach ($lateAction in @('allow','ask')) {
                 # Nome de arquivo nao recebe curinga da permissao.
                 $variant = Join-Path $tempRoot ([guid]::NewGuid().ToString('N') + '.txt')
-                Write-AgentListVariant -Rules ($sampleRules + [pscustomobject]@{permission=$latePermission;pattern='secrets/producao.env';action=$lateAction}) -Path $variant
-                $env:FAKE_OC_AGENTLIST = $variant
+                Write-DebugAgentsVariant -Rules ($sampleRules + [pscustomobject]@{permission=$latePermission;pattern='secrets/producao.env';action=$lateAction}) -Path $variant
+                $env:FAKE_OC_DEBUG_AGENTS = $variant
                 foreach ($explicit in @($false,$true)) {
                     $opts = @{OpenCodeExe=$fakeCmd;MessagePath=$prompt;Model='fake/model'}
                     if ($explicit) { $opts.Agent = 'reviewer-ro' }
@@ -650,43 +661,43 @@ sem mode
                 }
             }
         }
-        $env:FAKE_OC_AGENTLIST = $sampleAgentList
+        $env:FAKE_OC_DEBUG_AGENTS = $sampleDebugAgents
 
         # (b-adapter-async) Start-OpenCodeJob com allow-set divergente => BLOCK ANTES do Start-Process
         # (o pre-check no spawn e a barreira do assincrono; o job NAO deve spawnar).
         $argvAsyncBlock = Join-Path $tempRoot 'argv-async-block.txt'
         $env:FAKE_OC_ARGV_FILE = $argvAsyncBlock
-        $env:FAKE_OC_AGENTLIST = $excessPath
+        $env:FAKE_OC_DEBUG_AGENTS = $excessPath
         $threwA = $false; $msgA = ''
         try { & $start -OpenCodeExe $fakeCmd -MessagePath $prompt -Model 'fake/model' -NoWatcher -TempDir (Join-Path $tempRoot 'jobs-block') | Out-Null }
         catch { $threwA = $true; $msgA = $_.Exception.Message }
         Start-Sleep -Milliseconds 500
         Assert-True ($threwA -and $msgA -match 'guard reviewer-ro fail-closed') "(b-adapter-async) allow-set divergente => BLOCK do Start-OpenCodeJob (got: $msgA)"
         Assert-True (-not (Test-Path -LiteralPath $argvAsyncBlock)) "(b-adapter-async) BLOCK ANTES do spawn: argv do job nao foi escrito (nao spawnou)"
-        $env:FAKE_OC_AGENTLIST = $sampleAgentList
+        $env:FAKE_OC_DEBUG_AGENTS = $sampleDebugAgents
 
         # (opt-out) -Agent <x> explicito (x != reviewer-ro): opt-out consciente. So confirma que <x>
         # RESOLVE (Test-OpenCodeAgentResolves), sem enforce read-only. Caso resolve => despacha.
         $argvOpt = Join-Path $tempRoot 'argv-optout.txt'
         $env:FAKE_OC_ARGV_FILE = $argvOpt
-        $optList = Join-Path $tempRoot 'agentlist-optout.txt'
-        Set-Content -LiteralPath $optList -Value ("reviewer-fake (all)`n[`n{`"permission`":`"*`",`"action`":`"allow`",`"pattern`":`"*`"}`n]") -Encoding utf8
-        $env:FAKE_OC_AGENTLIST = $optList
+        $optList = Join-Path $tempRoot 'debug-agents-optout.json'
+        '[{"id":"reviewer-fake","name":"reviewer-fake","mode":"all","hidden":false,"permissions":[{"action":"*","resource":"*","effect":"allow"}]}]' | Set-Content -LiteralPath $optList -Encoding utf8
+        $env:FAKE_OC_DEBUG_AGENTS = $optList
         $ansOpt = & $invoke -OpenCodeExe $fakeCmd -Agent 'reviewer-fake' -MessagePath $prompt -Model 'fake/model' -TimeoutSec 30
         Assert-True (([string]$ansOpt) -match 'OK-ADAPTER') "(opt-out) -Agent <x> que resolve => despacha (sem enforce reviewer-ro)"
         $argvOptText = if (Test-Path -LiteralPath $argvOpt) { Get-Content -LiteralPath $argvOpt -Raw } else { '' }
         Assert-True ($argvOptText -match '--agent reviewer-fake') "(opt-out) argv usa o agente explicito (nao reviewer-ro) (got: $argvOptText)"
 
-        # (opt-out) -Agent <x> que NAO resolve (ausente do agent list) => BLOCK antes do run
+        # (opt-out) -Agent <x> que NAO resolve (ausente do debug agents) => BLOCK antes do run
         $argvOptBlk = Join-Path $tempRoot 'argv-optout-block.txt'
         $env:FAKE_OC_ARGV_FILE = $argvOptBlk
-        $env:FAKE_OC_AGENTLIST = $sampleAgentList   # so tem reviewer-ro, nao 'agente-nao-existe'
+        $env:FAKE_OC_DEBUG_AGENTS = $sampleDebugAgents   # so tem reviewer-ro, nao 'agente-nao-existe'
         $threwO = $false; $msgO = ''
         try { & $invoke -OpenCodeExe $fakeCmd -Agent 'agente-nao-existe' -MessagePath $prompt -Model 'fake/model' -TimeoutSec 30 | Out-Null }
         catch { $threwO = $true; $msgO = $_.Exception.Message }
         Assert-True ($threwO -and $msgO -match 'nao resolve') "(opt-out) -Agent <x> que NAO resolve => BLOCK (evita fallback ao build) (got: $msgO)"
         Assert-True (-not (Test-Path -LiteralPath $argvOptBlk)) "(opt-out) BLOCK antes do run: argv nao foi escrito"
-        $env:FAKE_OC_AGENTLIST = $sampleAgentList
+        $env:FAKE_OC_DEBUG_AGENTS = $sampleDebugAgents
     }
     finally { Pop-Location -ErrorAction SilentlyContinue }
 }

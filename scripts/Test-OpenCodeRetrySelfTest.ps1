@@ -45,22 +45,14 @@ try {
     $fakeReader = Join-Path $tempRoot 'fake-reader.ps1'
     @'
 $a = @($args)
-# Guard D1/D2: o adapter chama `agent list` (opt-out -Agent reviewer-fake -> so confirma que
+# Guard D1/D2: o adapter chama `debug agents` (opt-out -Agent reviewer-fake -> so confirma que
 # resolve). Responder ANTES da logica de contador (nao consome tentativa) e sem ler stdin.
 if ($a.Count -ge 1 -and $a[0] -eq '--version') {
     '1.0.0-fake'
     exit 0
 }
-if ($a.Count -ge 2 -and $a[0] -eq 'agent' -and $a[1] -eq 'list') {
-    'reviewer-fake (all)'
-    '['
-    '{"permission":"*","action":"deny","pattern":"*"},'
-    '{"permission":"read","action":"allow","pattern":"*"},'
-    '{"permission":"grep","action":"allow","pattern":"*"},'
-    '{"permission":"glob","action":"allow","pattern":"*"},'
-    '{"permission":"list","action":"allow","pattern":"*"},'
-    '{"permission":"external_directory","action":"deny","pattern":"*"}'
-    ']'
+if ($a.Count -ge 2 -and $a[0] -eq 'debug' -and $a[1] -eq 'agents') {
+    '[{"id":"reviewer-fake","name":"reviewer-fake","mode":"all","hidden":false,"permissions":[{"action":"read","resource":"*","effect":"allow"}]}]'
     exit 0
 }
 $counterFile = $env:FAKE_COUNTER

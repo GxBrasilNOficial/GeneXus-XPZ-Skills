@@ -6,7 +6,7 @@
 .DESCRIPTION
     Nao chama modelo nem rede. Resolve o opencode.exe, verifica a definicao estatica do
     reviewer-ro, compara a versao instalada com os fixtures versionados e confere o allow-set
-    efetivo de `opencode agent list`.
+    efetivo de `opencode debug agents`.
 
     Este script e diagnostico: uma versao nova com allow-set OK retorna status
     needsFixtureRecapture, nao compatible. Para promover a versao, recapture os fixtures
@@ -16,11 +16,11 @@
     reparo: o instalador (Install-OpenCodeReviewerRoAgent.ps1) quando a fonte e o opencode.jsonc
     global; a correcao do markdown quando a fonte e um project-local.
 
-    -WorkingDirectory define a pasta usada pela checagem estatica E pelo `opencode agent list` (o
+    -WorkingDirectory define a pasta usada pela checagem estatica E pelo `opencode debug agents` (o
     opencode descobre o project-local a partir dela). Default: a pasta atual.
 
     -ExpectGlobal (auditoria da instalacao GLOBAL, ex.: xpz-skills-setup): exige que a pasta seja
-    neutra. Recusa (status invalidVantage, exit 21, sem rodar o agent list) quando a pasta esta dentro
+    neutra. Recusa (status invalidVantage, exit 21, sem rodar o debug agents) quando a pasta esta dentro
     de um repositorio git ou quando a busca subindo pelas pastas acha um project-local — nesses casos
     o resultado nao mediria a configuracao global. Nunca imprime o conteudo do opencode.jsonc.
 #>

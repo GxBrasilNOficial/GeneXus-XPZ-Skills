@@ -390,7 +390,9 @@ try {
     $streamErrors = @(Get-OpenCodeStreamErrorCandidates -Lines $rawStream)
     $limitHit = Resolve-OpenCodeProviderLimitHit -StreamErrors $streamErrors -StderrText $errText -SinceTime $t0
     $requestedAgent = Get-OpenCodeRequestedAgent -RequestPath $reqPath
-    $fallbackToBuild = Test-OpenCodeReviewerRoFallbackWarning -Text $errText
+    # A CLI 2.2.5 devolve o agente ausente no stdout/stream (JSON de erro); o aviso legado
+    # vem no stderr. O pos-check assincrono varre os dois.
+    $fallbackToBuild = Test-OpenCodeReviewerRoFallbackWarning -Text (($rawStream -join "`n") + "`n" + $errText)
     $fallbackPattern = Get-OpenCodeReviewerRoFallbackWarningPattern
     $signal = Get-OpenCodeCompletionSignal -Events @($script:events)
     $wrSplat = @{

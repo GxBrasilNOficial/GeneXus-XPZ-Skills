@@ -54,9 +54,12 @@
     tentativa, nem 'empty' (conclusão limpa sem texto). Não tem efeito com -Raw (que devolve a 1ª execução).
     Cada re-tentativa emite, em stderr, uma linha 'OPENCODE_RETRY: attempt=N status=... reason=...'.
 .PARAMETER Variant
-    Variante do modelo (esforco de raciocinio especifico do provider, ex.: low, high, max),
-    repassada como --variant. So tem efeito se o catalogo do opencode declarar a variante para o
-    modelo (ver Get-OpenCodeModelVariantNames em OpenCodeCliSupport.ps1); o painel so a envia nesse caso.
+    Variante do modelo (esforco de raciocinio especifico do provider, ex.: low, high, max).
+    A CLI 2.2.5 nao aceita --variant: o adapter monta --model provider/model#variant. So tem
+    efeito se o catalogo do opencode declarar a variante para o modelo (ver
+    Get-OpenCodeModelVariantNames em OpenCodeCliSupport.ps1); o painel so a envia nesse caso.
+    Com -Variant e sem -Model, o identificador vem de `opencode api model.default`; resposta
+    ausente/invalida bloqueia antes do prompt.
 .EXAMPLE
     .\Invoke-OpenCode.ps1 "oi"
 .EXAMPLE
@@ -104,6 +107,23 @@ if ($PSCmdlet.ParameterSetName -eq 'FromFile') {
 # 1) Resolve o opencode.exe: override explicito, PATH (WinGet/Scoop/binario direto) ou npm legado.
 $exe = Resolve-OpenCodeExe -Override $OpenCodeExe
 
+# 1a) Variante: a CLI 2.2.5 usa --model provider/model#variant (nao aceita --variant).
+#     -Variant sem -Model consulta api model.default SO para obter o identificador de montagem;
+#     resposta ausente/invalida bloqueia. Nunca altera o modelo padrao.
+$effectiveModel = $Model
+if (-not [string]::IsNullOrWhiteSpace($Variant)) {
+    if ([string]::IsNullOrWhiteSpace($Model)) {
+        $Model = Get-OpenCodeDefaultModelId -ExePath $exe
+        if ([string]::IsNullOrWhiteSpace($Model)) {
+            throw "BLOCK: -Variant exige -Model ou um identificador valido em 'opencode api model.default'."
+        }
+    }
+    if ($Model.Contains('#')) {
+        throw "BLOCK: -Model ja inclui variante ('#'); nao combine com -Variant."
+    }
+    $effectiveModel = "$Model#$Variant"
+}
+
 # 1b) D1/D2: postura de seguranca no ADAPTER (design congelado). Default -Agent reviewer-ro
 #     ESCOPADO ao caminho revisor: sem -Agent explicito, o agente efetivo e reviewer-ro e o
 #     enforce read-only fail-closed (pre-check) se aplica. Com -Agent <x> EXPLICITO, o chamador
@@ -134,9 +154,8 @@ if ($isReviewerPath) {
 #    posicional de 'run' e omitido; -RedirectStandardInput entrega o arquivo e da EOF ao final
 #    (anti-hang headless preservado: o CLI nao fica preso lendo um stdin herdado sem fim).
 $ocArgs = @('run', '--format', 'json')
-if (-not [string]::IsNullOrWhiteSpace($Model)) { $ocArgs += @('--model', $Model) }
+if (-not [string]::IsNullOrWhiteSpace($effectiveModel)) { $ocArgs += @('--model', $effectiveModel) }
 if (-not [string]::IsNullOrWhiteSpace($Agent)) { $ocArgs += @('--agent', $Agent) }
-if (-not [string]::IsNullOrWhiteSpace($Variant)) { $ocArgs += @('--variant', $Variant) }
 
 $in  = (New-TemporaryFile).FullName
 Set-Content -LiteralPath $in -Value $Message -Encoding utf8 -NoNewline
@@ -172,27 +191,26 @@ try {
             }
             throw "BLOCK: opencode excedeu ${TimeoutSec}s e foi encerrado."
         }
+        $lines = @(Get-Content -LiteralPath $out -Encoding utf8 -ErrorAction SilentlyContinue)
+        $errText = [string](Get-Content -LiteralPath $err -Raw -Encoding utf8 -ErrorAction SilentlyContinue)
+
+        # Pos-check (DEFESA-EM-PROFUNDIDADE, nao a barreira): no caminho revisor, le o CONTEUDO
+        # de stdout e stderr ANTES do Remove-Item. A CLI 2.2.5 devolve o agente ausente como
+        # `{"type":"error","error":{"message":"Agent not found: ..."}}` no stdout (exit 1);
+        # o aviso legado vem no stderr. Se qualquer um aparecer, a saida e descartada.
+        if ($isReviewerPath -and (Test-OpenCodeReviewerRoFallbackWarning -Text (($lines -join "`n") + "`n" + $errText))) {
+            throw "BLOCK: pos-check reviewer-ro: erro de agente nao encontrado/fallback detectado na saida do CLI (o --agent nao resolveu no runtime apesar do pre-check). Saida descartada por seguranca."
+        }
+
         if ($p.ExitCode -ne 0) {
             if (-not $Raw) {
-                $limitHit = Resolve-OpenCodeProviderLimitHit -StreamErrors @(Get-OpenCodeStreamErrorCandidates -Lines @(Get-Content -LiteralPath $out -Encoding utf8 -ErrorAction SilentlyContinue)) -StderrText ([string](Get-Content -LiteralPath $err -Raw -Encoding utf8 -ErrorAction SilentlyContinue)) -SinceTime $startedAt
+                $limitHit = Resolve-OpenCodeProviderLimitHit -StreamErrors @(Get-OpenCodeStreamErrorCandidates -Lines @($lines)) -StderrText $errText -SinceTime $startedAt
                 if ($null -ne $limitHit) {
                     throw (Format-OpenCodeLimitBlock -Kind ([string](Get-OcProp $limitHit 'kind')) -Message ([string](Get-OcProp $limitHit 'message')))
                 }
             }
-            throw "BLOCK: opencode saiu com codigo $($p.ExitCode).`nstderr:`n$(Get-Content -LiteralPath $err -Raw -ErrorAction SilentlyContinue)"
+            throw "BLOCK: opencode saiu com codigo $($p.ExitCode).`nstderr:`n$errText"
         }
-
-        # Pos-check (DEFESA-EM-PROFUNDIDADE, nao a barreira): no caminho revisor, le o CONTEUDO de
-        # $err (descartado no finally) ANTES do Remove-Item e varre o warning de fallback silencioso.
-        # Se aparecer, o --agent nao resolveu no runtime apesar do pre-check -> descartar a saida.
-        if ($isReviewerPath) {
-            $errText = Get-Content -LiteralPath $err -Raw -Encoding utf8 -ErrorAction SilentlyContinue
-            if (Test-OpenCodeReviewerRoFallbackWarning -Text $errText) {
-                throw "BLOCK: pos-check reviewer-ro: warning de fallback ao 'build' detectado no stderr (o --agent nao resolveu no runtime apesar do pre-check). Saida descartada por seguranca."
-            }
-        }
-
-        $lines = Get-Content -LiteralPath $out -Encoding utf8
         # -Raw: stream literal da 1a execucao, SEM retry (o chamador quer o stream cru de uma chamada).
         if ($Raw) { return $lines }
 

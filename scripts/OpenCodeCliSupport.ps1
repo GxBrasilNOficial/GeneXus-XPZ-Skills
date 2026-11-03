@@ -24,49 +24,77 @@ function Get-OpenCodeExeVersion {
 }
 
 # Variantes (nomes de esforco de raciocinio, ex.: low/medium/high/max) que o catalogo do opencode
-# declara para o modelo <provider>/<modelo>. Le `opencode models <provider> --verbose`, cujo formato
-# e: uma linha de cabecalho com a chave completa do modelo, seguida do objeto JSON do modelo. So o
-# que o catalogo declara e aplicavel via --variant; modelo sem variantes -> ok=$true, variants vazio.
-# Falha de leitura/parse -> ok=$false (o chamador nao aplica o esforco e registra o motivo).
+# declara para o modelo <provider>/<modelo>. Le `opencode api model.list`, cujo formato e:
+# {"location":{...},"data":[{"id":"...","providerID":"...","variants":[{"id":"..."},...]},...]}
+# A chave do modelo e providerID + "/" + id (comparacao exata case-sensitive). Variantes sao
+# comparadas case-insensitively; o nome canonico retornado e o `id` como declarado no catalogo.
+# Modelo sem variantes -> ok=$true, variants vazio. Falha de leitura/parse/modelo-ausente -> ok=$false
+# (o chamador nao aplica o esforco e registra o motivo).
 function Get-OpenCodeModelVariantNames {
     param(
         [Parameter(Mandatory)] [string] $ExePath,
         [Parameter(Mandatory)] [string] $Model
     )
     $key = $Model.Trim()
-    $provider = @($key -split '/', 2)[0]
-    if ([string]::IsNullOrWhiteSpace($provider) -or $key -notmatch '/') {
+    if ($key -notmatch '/') {
         return [pscustomobject]@{ ok = $false; variants = @(); reason = "modelo sem provider: '$key'" }
     }
+    $parts = @($key -split '/', 2)
+    $providerID = $parts[0]
+    $modelId = $parts[1]
+    if ([string]::IsNullOrWhiteSpace($providerID) -or [string]::IsNullOrWhiteSpace($modelId)) {
+        return [pscustomobject]@{ ok = $false; variants = @(); reason = "modelo com provider ou id vazio: '$key'" }
+    }
     try {
-        $raw = @(& $ExePath models $provider --verbose 2>$null)
+        $raw = @(& $ExePath api model.list 2>$null)
     } catch {
-        return [pscustomobject]@{ ok = $false; variants = @(); reason = "opencode models falhou: $($_.Exception.Message)" }
+        return [pscustomobject]@{ ok = $false; variants = @(); reason = "opencode api model.list falhou: $($_.Exception.Message)" }
     }
-    $lines = @($raw | ForEach-Object { [string]$_ })
-    $start = -1
-    for ($i = 0; $i -lt $lines.Count; $i++) {
-        if ($lines[$i].Trim().Equals($key, [System.StringComparison]::OrdinalIgnoreCase)) { $start = $i + 1; break }
+    try {
+        $parsed = ($raw -join "`n") | ConvertFrom-Json
+    } catch {
+        return [pscustomobject]@{ ok = $false; variants = @(); reason = "JSON de 'opencode api model.list' invalido" }
     }
-    if ($start -lt 0) {
+    if ($null -eq $parsed -or $null -eq $parsed.PSObject.Properties['data']) {
+        return [pscustomobject]@{ ok = $false; variants = @(); reason = "resposta de 'opencode api model.list' sem campo 'data'" }
+    }
+    $modelObj = $null
+    foreach ($m in @($parsed.data)) {
+        if ([string]$m.providerID -ceq $providerID -and [string]$m.id -ceq $modelId) {
+            $modelObj = $m; break
+        }
+    }
+    if ($null -eq $modelObj) {
         return [pscustomobject]@{ ok = $false; variants = @(); reason = "modelo '$key' ausente do catalogo do opencode" }
     }
-    $block = [System.Collections.Generic.List[string]]::new()
-    for ($j = $start; $j -lt $lines.Count; $j++) {
-        # proximo cabecalho: linha sem indentacao que nao abre nem fecha objeto JSON
-        if ($block.Count -gt 0 -and $lines[$j] -match '^[^\s{}\[\]]\S*$') { break }
-        $block.Add($lines[$j])
-    }
-    try {
-        $obj = ($block -join "`n") | ConvertFrom-Json
-    } catch {
-        return [pscustomobject]@{ ok = $false; variants = @(); reason = "JSON do modelo '$key' ilegivel no catalogo" }
-    }
     $names = @()
-    if ($null -ne $obj -and $obj.PSObject.Properties['variants'] -and $null -ne $obj.variants) {
-        $names = @($obj.variants.PSObject.Properties | ForEach-Object { $_.Name })
+    if ($null -ne $modelObj.PSObject.Properties['variants'] -and $null -ne $modelObj.variants) {
+        $names = @($modelObj.variants | ForEach-Object { [string]$_.id })
     }
     return [pscustomobject]@{ ok = $true; variants = $names; reason = $null }
+}
+
+# Retorna o modelo padrao do opencode no formato "providerID/id" consultando `opencode api model.default`.
+# Devolve $null se o comando falhar ou a resposta for invalida.
+function Get-OpenCodeDefaultModelId {
+    param([Parameter(Mandatory)] [string] $ExePath)
+    try {
+        $raw = @(& $ExePath api model.default 2>$null)
+    } catch {
+        return $null
+    }
+    try {
+        $parsed = ($raw -join "`n") | ConvertFrom-Json
+    } catch {
+        return $null
+    }
+    if ($null -eq $parsed -or $null -eq $parsed.PSObject.Properties['data']) { return $null }
+    $d = $parsed.data
+    if ($null -eq $d) { return $null }
+    $pid2 = if ($d.PSObject.Properties['providerID']) { [string]$d.providerID } else { $null }
+    $mid2 = if ($d.PSObject.Properties['id']) { [string]$d.id } else { $null }
+    if ([string]::IsNullOrWhiteSpace($pid2) -or [string]::IsNullOrWhiteSpace($mid2)) { return $null }
+    return "$pid2/$mid2"
 }
 
 function Resolve-OpenCodeExe {

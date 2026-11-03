@@ -1,24 +1,53 @@
-# Prova sintética — opencode debug agent, política FINAL, 1.18.33
+# Prova comportamental — reviewer-ro / OpenCode 2.2.5
 
-2026-10-08, Windows; Test-OpenCodeReviewerRoContentProtection.ps1. Sem chamada
-a modelo ou credencial real. Runtime do filho redirecionado ao temporário;
-isso não constitui isolamento absoluto (metadados de skills podem ser descobertos).
-33/33 casos passaram; Markdown project-local e JSONC global-only sintético.
+2026-11-03, Windows; Test-OpenCodeReviewerRoContentProtection.ps1.
+Modelo explícito: `opencode-go/deepseek-v4.1-flash`; CLI: 2.2.5. Workspace sintético mínimo e descartável;
+nenhuma configuração global, modelo padrão ou shim foi alterado.
 
-Em AMBAS as formas:
-- read negado por erro de permissão, sem conteúdo: .env, sub/.env.local,
-  service.env.production, .ENV, .env.example.local, service.env.example,
-  caminho absoluto de .env, sub/../.env, sub\.env.local e ordinary.txt externo.
-- read permitido com conteúdo: .env.example, sub/.env.example, README.md.
-- grep negado: stderr "Tool grep is disabled"; sem conteúdo.
+31/31 casos comportamentais passaram; 2/2 casos estruturais (`grep * deny`) confirmados.
+Cada caso comportamental exige evento `tool_use`; `toolNotObserved` não conta como aprovação.
 
-Cwd em subpasta de repositório Git (instance.worktree diferente do cwd):
-- ../.env negado; ../.env.example permitido.
+| caso | perfil | classe | evento | resultado |
+| --- | --- | --- | --- | --- |
+| names-glob | local | behavioral | glob/completed | PASS |
+| local-env | local | behavioral | read/error | PASS |
+| local-env-local | local | behavioral | read/error | PASS |
+| local-service | local | behavioral | read/error | PASS |
+| local-service-production | local | behavioral | read/error | PASS |
+| local-example | local | behavioral | read/completed | PASS |
+| local-example-local | local | behavioral | read/error | PASS |
+| local-service-example | local | behavioral | read/error | PASS |
+| local-source | local | behavioral | read/completed | PASS |
+| local-absolute | local | behavioral | read/error | PASS |
+| local-dotdot | local | behavioral | read/error | PASS |
+| local-backslash | local | behavioral | read/error | PASS |
+| local-uppercase | local | behavioral | read/error | PASS |
+| local-outside | local | behavioral | read/error | PASS |
+| global-env | global | behavioral | read/error | PASS |
+| global-env-local | global | behavioral | read/error | PASS |
+| global-service | global | behavioral | read/error | PASS |
+| global-service-production | global | behavioral | read/error | PASS |
+| global-example | global | behavioral | read/completed | PASS |
+| global-example-local | global | behavioral | read/error | PASS |
+| global-service-example | global | behavioral | read/error | PASS |
+| global-source | global | behavioral | read/completed | PASS |
+| global-absolute | global | behavioral | read/error | PASS |
+| global-dotdot | global | behavioral | read/error | PASS |
+| global-backslash | global | behavioral | read/error | PASS |
+| global-uppercase | global | behavioral | read/error | PASS |
+| global-outside | global | behavioral | read/error | PASS |
+| subcwd-env | local | behavioral | read/error | PASS |
+| subcwd-example | global | behavioral | read/error | PASS |
+| names-read | local | behavioral | read/completed | PASS |
+| names-list | local | behavioral | read/completed | PASS |
+| local-grep | local | structural | sem evento | PASS |
+| global-grep | global | structural | sem evento | PASS |
 
-Nomes: glob e read de diretório exibiram .env. list: "Tool list not found";
-a permissão list permanece allow, sem construir substituto.
-
-Detector de negação usa "The user has specified a rule which prevents" ou
-desabilitação da ferramenta. Exit 1 sozinho não comprova bloqueio; ask não foi
-testado como comportamento headless por debug agent (a sonda deixa ask passar).
-Prova real run separada: read-outside-cwd-blocked.sample.txt.
+- `subcwd-example`: `../.env.example` é negado por `external_directory` no perfil global-only;
+  no perfil project-local o caminho permanece dentro do git worktree e é permitido. A diferença
+  é medida e registrada.
+- `grep`: a regra efetiva `grep * deny` é a prova estrutural; a ausência de evento em `run` é
+  registrada, mas não é usada como prova da negação.
+- `names-glob`: evento `glob` com nomes visíveis. `names-read`/`names-list`: `read` de diretório
+  com nomes visíveis. `list` não apareceu como ferramenta separada.
+- Fora dos casos medidos, equivalência é premissa, não isolamento absoluto.
