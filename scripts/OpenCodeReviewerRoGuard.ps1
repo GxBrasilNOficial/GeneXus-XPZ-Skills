@@ -732,6 +732,7 @@ function Test-OpenCodeReviewerRoFallbackWarning {
         so um evento type=error com error.message iniciado por `Agent not found:` conta como fallback.
         O aviso legado e procurado apenas no stderr. Conteudo textual do modelo/ferramenta nao conta.
     #>
+    [CmdletBinding()]
     param(
         [string[]] $StdoutLines = @(),
         [string] $StderrText = ''

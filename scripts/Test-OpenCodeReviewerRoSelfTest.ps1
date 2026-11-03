@@ -304,6 +304,10 @@ sem mode
     Assert-True (Test-OpenCodeReviewerRoFallbackWarning -StdoutLines $fbLines -StderrText '') "(e) pos-check reconhece o evento JSON de fallback no stdout"
     Assert-True (Test-OpenCodeReviewerRoFallbackWarning -StdoutLines (@('ruido antes') + $fbLines + @('ruido depois')) -StderrText '') "(e) pos-check reconhece o JSON entre linhas de ruido"
     Assert-True (-not (Test-OpenCodeReviewerRoFallbackWarning -StdoutLines @('{"type":"error"}', 'linha nao JSON') -StderrText '')) "(e) evento de erro incompleto e linha invalida nao geram excecao nem fallback"
+    $staleParameterRejected = $false
+    try { $null = Test-OpenCodeReviewerRoFallbackWarning -Text 'chamada legada' }
+    catch { $staleParameterRejected = $_.FullyQualifiedErrorId -like 'NamedParameterNotFound,*' }
+    Assert-True $staleParameterRejected "(e) parametro legado -Text e rejeitado explicitamente"
     $legacyFallbackWarning = 'agent "reviewer-ro" not found. Falling back to default agent'
     Assert-True (Test-OpenCodeReviewerRoFallbackWarning -StdoutLines @() -StderrText $legacyFallbackWarning) "(e) pos-check reconhece o aviso legado somente no stderr"
     Assert-True (-not (Test-OpenCodeReviewerRoFallbackWarning -StdoutLines @() -StderrText 'stderr limpo sem warning')) "(e) pos-check nao dispara em stderr limpo"
