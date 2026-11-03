@@ -161,8 +161,10 @@ pwsh -NoProfile -File scripts/Test-OpenCodeReviewerRoContentProtection.ps1 `
 Ela monta workspace sintético mínimo e descartável, roda 31 casos com `opencode run --format json`
 (exigindo evento `tool_use` em cada um) e confirma os 2 casos `grep` por `grep * deny` em
 `opencode debug agents`. Ausência de evento comportamental é inconclusiva e bloqueia a promoção;
-não contar `toolNotObserved` como aprovação. `names-glob` exige evento `glob` com nomes visíveis.
-A CLI 2.2.5 não oferece mais `opencode debug agent --tool`; não usar essa interface antiga.
+não contar `toolNotObserved` como aprovação. `names-glob` exige evento `glob` e `names-read`
+exige `read` de diretório, ambos com nomes visíveis. `names-list` aceita evento `read`, `glob`
+ou `list` com nomes visíveis; a captura atual usou `read`. A CLI 2.2.5 não oferece mais
+`opencode debug agent --tool`; não usar essa interface antiga.
 
 Re-rodar `scripts/Test-OpenCodeReviewerRoSelfTest.ps1` e os demais self-tests até verde antes de
 reativar o default `-Agent reviewer-ro`. O diagnóstico estrutural

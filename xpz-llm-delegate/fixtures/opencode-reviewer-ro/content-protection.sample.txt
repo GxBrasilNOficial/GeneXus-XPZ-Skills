@@ -48,6 +48,7 @@ Cada caso comportamental exige evento `tool_use`; `toolNotObserved` não conta c
   é medida e registrada.
 - `grep`: a regra efetiva `grep * deny` é a prova estrutural; a ausência de evento em `run` é
   registrada, mas não é usada como prova da negação.
-- `names-glob`: evento `glob` com nomes visíveis. `names-read`/`names-list`: `read` de diretório
-  com nomes visíveis. `list` não apareceu como ferramenta separada.
+- `names-glob`: o verificador exige `glob`; `names-read` exige `read` de diretório. `names-list`
+  aceita `read`, `glob` ou `list`; a captura atual usou `read`. `list` não apareceu como
+  ferramenta separada.
 - Fora dos casos medidos, equivalência é premissa, não isolamento absoluto.

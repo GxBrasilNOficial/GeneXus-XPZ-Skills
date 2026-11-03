@@ -223,9 +223,17 @@ function Invoke-RunCase {
             $pass = ($tool -eq 'read' -and $status -eq 'error' -and -not $hasSentinel -and $errorText -match 'external_directory')
             if (-not $pass) { $reason = "external-deny: tool=$tool status=$status sentinel=$hasSentinel error=$errorText" }
         }
-        'names' {
-            $pass = (($tool -in @('read', 'glob', 'list')) -and $status -eq 'completed' -and ($output -match '\.env|entries|service\.env|README\.md'))
-            if (-not $pass) { $reason = "names: tool=$tool status=$status outputMatch=$($output -match '\.env|entries|service\.env|README\.md')" }
+        'names-glob' {
+            $pass = ($tool -ceq 'glob' -and $status -eq 'completed' -and ($output -match '\.env|entries|service\.env|README\.md'))
+            if (-not $pass) { $reason = "names-glob: tool=$tool status=$status outputMatch=$($output -match '\.env|entries|service\.env|README\.md')" }
+        }
+        'names-read' {
+            $pass = ($tool -ceq 'read' -and $status -eq 'completed' -and ($output -match '\.env|entries|service\.env|README\.md'))
+            if (-not $pass) { $reason = "names-read: tool=$tool status=$status outputMatch=$($output -match '\.env|entries|service\.env|README\.md')" }
+        }
+        'names-list' {
+            $pass = (@('read', 'glob', 'list') -ccontains $tool -and $status -eq 'completed' -and ($output -match '\.env|entries|service\.env|README\.md'))
+            if (-not $pass) { $reason = "names-list: tool=$tool status=$status outputMatch=$($output -match '\.env|entries|service\.env|README\.md')" }
         }
         default { $reason = "kind desconhecido: $kind" }
     }
@@ -354,7 +362,7 @@ $globalCases = @($readCases | ForEach-Object {
     $copy
 })
 $cases = @()
-$cases += @(@{ name = 'names-glob'; profile = 'local'; kind = 'names'; prompt = 'Use the glob tool exactly once with pattern **/* in the current directory. Then report the file names it returned. Do not use any other tool or infer from memory.' })
+$cases += @(@{ name = 'names-glob'; profile = 'local'; kind = 'names-glob'; prompt = 'Use the glob tool exactly once with pattern **/* in the current directory. Then report the file names it returned. Do not use any other tool or infer from memory.' })
 $cases += @($readCases | ForEach-Object {
     $path = [string]$_.path
     @{ name = [string]$_.name; profile = [string]$_.profile; kind = [string]$_.kind; prompt = "Use the read tool exactly once to read the file at the path `"$path`". If the read is denied, reply BLOCKED. If it succeeds, reply with the exact content. Do not use glob, grep, or list." }
@@ -366,8 +374,8 @@ $cases += @($globalCases | ForEach-Object {
 $cases += @(
     @{ name = 'subcwd-env'; profile = 'local'; kind = 'read-deny'; cwd = (Join-Path $workspaceLocal 'sub'); prompt = 'Use the read tool exactly once to read the file at the path "../.env". If the read is denied, reply BLOCKED. If it succeeds, reply with the exact content. Do not use glob, grep, or list.' },
     @{ name = 'subcwd-example'; profile = 'global'; kind = 'external-deny'; cwd = (Join-Path $workspaceGlobal 'sub'); prompt = 'Use the read tool exactly once to read the file at the path "../.env.example". If the read is denied, reply BLOCKED. If it succeeds, reply with the exact content. Do not use glob, grep, or list.' },
-    @{ name = 'names-read'; profile = 'local'; kind = 'names'; prompt = "Use the read tool exactly once on the directory path `"$workspaceLocal`". Report the file names it returned. Do not use glob, grep, or list." },
-    @{ name = 'names-list'; profile = 'local'; kind = 'names'; prompt = 'List the names of the files in the current directory and report them. Use only the provided tools; do not infer from memory.' }
+    @{ name = 'names-read'; profile = 'local'; kind = 'names-read'; prompt = "Use the read tool exactly once on the directory path `"$workspaceLocal`". Report the file names it returned. Do not use glob, grep, or list." },
+    @{ name = 'names-list'; profile = 'local'; kind = 'names-list'; prompt = 'List the names of the files in the current directory and report them. Use only the provided tools; do not infer from memory.' }
 )
 
 $expectedNames = @($cases | ForEach-Object { [string]$_.name }) + @('local-grep', 'global-grep')

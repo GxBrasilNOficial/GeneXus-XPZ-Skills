@@ -1058,7 +1058,8 @@ segurança no **próprio adapter**, de forma inseparável (nunca "default sem gu
   sintético mínimo, e prova os 2 casos `grep` estruturalmente por `grep * deny` no
   `opencode debug agents`. Cada caso comportamental exige evento `tool_use`; ausência de evento é
   inconclusiva, nunca aprovação. `names-glob` exige evento `glob` com nomes visíveis;
-  `names-read`/`names-list` aceitam `read`/`glob` de diretório. `subcwd-example`
+  `names-read` exige `read` de diretório; `names-list` aceita um evento de enumeração
+  `read`, `glob` ou `list` com nomes visíveis (na captura atual, `read`). `subcwd-example`
   (`../.env.example` a partir de subpasta) é negado por `external_directory` no perfil
   global-only; no perfil project-local o caminho permanece dentro do git worktree e é permitido.
   A matriz é a prova comportamental real da versão e não exige uma segunda rodada `run`. As

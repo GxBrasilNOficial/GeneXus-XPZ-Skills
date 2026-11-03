@@ -11,7 +11,7 @@
       "name": "names-glob",
       "profile": "local",
       "class": "behavioral",
-      "expected": "names",
+      "expected": "names-glob",
       "event": {
         "tool": "glob",
         "status": "completed",
@@ -504,7 +504,7 @@
       "name": "names-read",
       "profile": "local",
       "class": "behavioral",
-      "expected": "names",
+      "expected": "names-read",
       "event": {
         "tool": "read",
         "status": "completed",
@@ -521,7 +521,7 @@
       "name": "names-list",
       "profile": "local",
       "class": "behavioral",
-      "expected": "names",
+      "expected": "names-list",
       "event": {
         "tool": "read",
         "status": "completed",
