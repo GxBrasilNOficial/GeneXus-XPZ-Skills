@@ -15,7 +15,8 @@ param(
     [string] $OpenCodeExe,
     [string] $OutputDirectory,
     [string] $Model = 'opencode-go/deepseek-v4.1-flash',
-    [string[]] $Only
+    [string[]] $Only,
+    [string] $EvidenceDirectory
 )
 
 Set-StrictMode -Version Latest
@@ -39,6 +40,13 @@ $workspaceLocal = Join-Path $root 'workspace-local'
 $workspaceGlobal = Join-Path $root 'workspace-global'
 $outsideDir = Join-Path $root 'outside'
 $evidenceDir = Join-Path $root 'evidence'
+$evidenceSourceDir = $null
+$evidenceExitCodes = @{}
+if (-not [string]::IsNullOrWhiteSpace($EvidenceDirectory)) {
+    if (-not (Test-Path -LiteralPath $EvidenceDirectory -PathType Container)) { throw "BLOCK: EvidenceDirectory inexistente: $EvidenceDirectory" }
+    $evidenceSourceDir = Join-Path $EvidenceDirectory 'evidence'
+    if (-not (Test-Path -LiteralPath $evidenceSourceDir -PathType Container)) { throw "BLOCK: EvidenceDirectory sem subpasta evidence: $EvidenceDirectory" }
+}
 foreach ($dir in @($workspaceLocal, $workspaceGlobal, $outsideDir, $evidenceDir, (Join-Path $workspaceLocal '.opencode\agent'), (Join-Path $workspaceLocal 'sub'), (Join-Path $workspaceGlobal 'sub'))) {
     [void][System.IO.Directory]::CreateDirectory($dir)
 }
@@ -66,7 +74,14 @@ function Get-ProfileEffective {
     try {
         if ($Profile -eq 'global') { $env:OPENCODE_DISABLE_PROJECT_CONFIG = 'true' }
         else { Remove-Item Env:OPENCODE_DISABLE_PROJECT_CONFIG -ErrorAction SilentlyContinue }
-        $da = Get-OpenCodeDebugAgentsJson -Exe $exe -Retries 2 -RetryDelayMs 250 -WorkingDirectory $cwd
+        $sourceDebug = $null
+        if ($null -ne $evidenceSourceDir) { $sourceDebug = Join-Path $evidenceSourceDir "debug-agents-$Profile.json" }
+        if ($null -ne $sourceDebug) {
+            if (-not (Test-Path -LiteralPath $sourceDebug -PathType Leaf)) { throw "BLOCK: evidencia de debug agents ausente: $sourceDebug" }
+            $da = @{ ok = $true; json = (Get-Content -LiteralPath $sourceDebug -Raw -Encoding utf8); error = $null }
+        } else {
+            $da = Get-OpenCodeDebugAgentsJson -Exe $exe -Retries 2 -RetryDelayMs 250 -WorkingDirectory $cwd
+        }
         if (-not $da.ok) { throw "BLOCK: debug agents ($Profile): $($da.error)" }
         Write-Utf8 -Path (Join-Path $evidenceDir "debug-agents-$Profile.json") -Text $da.json
         $block = Get-OpenCodeReviewerRoBlockFromDebugAgents -Json $da.json -Name 'reviewer-ro'
@@ -106,33 +121,56 @@ function Invoke-RunCase {
     $promptPath = Join-Path $evidenceDir "$name.prompt.txt"
     $streamPath = Join-Path $evidenceDir "$name.jsonl"
     $stderrPath = Join-Path $evidenceDir "$name.stderr.txt"
-    Write-Utf8 -Path $promptPath -Text ([string]$Case.prompt)
-    $prev = $env:OPENCODE_DISABLE_PROJECT_CONFIG
-    try {
-        if ($profile -eq 'global') { $env:OPENCODE_DISABLE_PROJECT_CONFIG = 'true' }
-        else { Remove-Item Env:OPENCODE_DISABLE_PROJECT_CONFIG -ErrorAction SilentlyContinue }
-        Push-Location -LiteralPath $cwd
+    $sourceStream = $null
+    if ($null -ne $evidenceSourceDir) {
+        $candidate = Join-Path $evidenceSourceDir "$name.jsonl"
+        if (Test-Path -LiteralPath $candidate -PathType Leaf) { $sourceStream = $candidate }
+    }
+    $exitCode = $null
+    if ($null -ne $evidenceSourceDir) {
+        if ($null -eq $sourceStream) { throw "BLOCK: evidencia JSONL ausente para '$name'." }
+        if (-not $script:evidenceExitCodes.ContainsKey($name)) { throw "BLOCK: exitCode ausente no receipt.json para '$name'." }
+        $exitCode = [int]$script:evidenceExitCodes[$name]
+    }
+    if ($null -ne $sourceStream) {
+        Copy-Item -LiteralPath $sourceStream -Destination $streamPath -Force
+    } elseif ($null -ne $evidenceSourceDir) {
+        throw "BLOCK: modo de evidencia sem JSONL para '$name'; opencode run proibido."
+    } else {
+        Write-Utf8 -Path $promptPath -Text ([string]$Case.prompt)
+        $prev = $env:OPENCODE_DISABLE_PROJECT_CONFIG
         try {
-            $p = Start-Process -FilePath $exe -ArgumentList @('run', '--format', 'json', '--agent', 'reviewer-ro', '--model', $Model) `
-                -NoNewWindow -PassThru -RedirectStandardInput $promptPath -RedirectStandardOutput $streamPath -RedirectStandardError $stderrPath -Wait
-        } finally { Pop-Location }
-    } finally {
-        if ($null -ne $prev) { $env:OPENCODE_DISABLE_PROJECT_CONFIG = $prev }
-        else { Remove-Item Env:OPENCODE_DISABLE_PROJECT_CONFIG -ErrorAction SilentlyContinue }
+            if ($profile -eq 'global') { $env:OPENCODE_DISABLE_PROJECT_CONFIG = 'true' }
+            else { Remove-Item Env:OPENCODE_DISABLE_PROJECT_CONFIG -ErrorAction SilentlyContinue }
+            Push-Location -LiteralPath $cwd
+            try {
+                $p = Start-Process -FilePath $exe -ArgumentList @('run', '--format', 'json', '--agent', 'reviewer-ro', '--model', $Model) `
+                    -NoNewWindow -PassThru -RedirectStandardInput $promptPath -RedirectStandardOutput $streamPath -RedirectStandardError $stderrPath -Wait
+                $exitCode = $p.ExitCode
+            } finally { Pop-Location }
+        } finally {
+            if ($null -ne $prev) { $env:OPENCODE_DISABLE_PROJECT_CONFIG = $prev }
+            else { Remove-Item Env:OPENCODE_DISABLE_PROJECT_CONFIG -ErrorAction SilentlyContinue }
+        }
     }
     $raw = Get-Content -LiteralPath $streamPath -Raw -Encoding utf8 -ErrorAction SilentlyContinue
     if ([string]::IsNullOrWhiteSpace($raw)) {
-        return [ordered]@{ name = $name; profile = $profile; class = 'behavioral'; expected = [string]$Case.kind; event = 'none'; pass = $false; reason = 'emptyStream'; exitCode = $p.ExitCode; evidence = $streamPath }
+        return [ordered]@{ name = $name; profile = $profile; class = 'behavioral'; expected = [string]$Case.kind; event = 'none'; pass = $false; reason = 'emptyStream'; exitCode = $exitCode; evidence = $streamPath; toolEventCount = 0 }
     }
     $providerError = [regex]::Match($raw, '"type":"error".*?"message":"([^"]+)"')
     if ($providerError.Success) {
-        return [ordered]@{ name = $name; profile = $profile; class = 'behavioral'; expected = [string]$Case.kind; event = 'provider-error'; pass = $false; reason = $providerError.Groups[1].Value; exitCode = $p.ExitCode; evidence = $streamPath }
+        return [ordered]@{ name = $name; profile = $profile; class = 'behavioral'; expected = [string]$Case.kind; event = 'provider-error'; pass = $false; reason = $providerError.Groups[1].Value; exitCode = $exitCode; evidence = $streamPath; toolEventCount = 0 }
     }
     $toolEvents = @(Get-ToolEvents -Path $streamPath)
-    $first = if ($toolEvents.Count -gt 0) { $toolEvents[0] } else { $null }
-    if ($null -eq $first) {
-        return [ordered]@{ name = $name; profile = $profile; class = 'behavioral'; expected = [string]$Case.kind; event = 'none'; pass = $false; reason = 'noToolEvent'; exitCode = $p.ExitCode; evidence = $streamPath }
+    $toolEventCount = $toolEvents.Count
+    if ($toolEventCount -eq 0) {
+        return [ordered]@{ name = $name; profile = $profile; class = 'behavioral'; expected = [string]$Case.kind; event = 'none'; pass = $false; reason = 'noToolEvent'; exitCode = $exitCode; evidence = $streamPath; toolEventCount = 0 }
     }
+    if ($toolEventCount -ne 1) {
+        $tools = @($toolEvents | ForEach-Object { [string]$_.part.tool }) -join ','
+        return [ordered]@{ name = $name; profile = $profile; class = 'behavioral'; expected = [string]$Case.kind; event = 'multiple'; pass = $false; reason = "toolEventCount=$toolEventCount; esperado 1 (eventos: $tools)"; exitCode = $exitCode; evidence = $streamPath; toolEventCount = $toolEventCount }
+    }
+    $first = $toolEvents[0]
     $tool = [string]$first.part.tool
     $state = $first.part.state
     $status = [string]$state.status
@@ -171,7 +209,7 @@ function Invoke-RunCase {
     }
     return [ordered]@{
         name = $name; profile = $profile; class = 'behavioral'; expected = $kind; event = $event;
-        pass = [bool]$pass; reason = $reason; exitCode = $p.ExitCode; evidence = $streamPath
+        pass = [bool]$pass; reason = $reason; exitCode = $exitCode; evidence = $streamPath; toolEventCount = 1
     }
 }
 
@@ -186,32 +224,90 @@ function Invoke-GrepStructuralCase {
     $promptPath = Join-Path $evidenceDir "$Name.prompt.txt"
     $streamPath = Join-Path $evidenceDir "$Name.jsonl"
     $stderrPath = Join-Path $evidenceDir "$Name.stderr.txt"
-    Write-Utf8 -Path $promptPath -Text 'Use the grep tool exactly once to search for SYNTHETIC_SENTINEL__ in the current directory. If the grep tool is not available, reply BLOCKED and do not use any other tool.'
-    $prev = $env:OPENCODE_DISABLE_PROJECT_CONFIG
-    try {
-        if ($Profile -eq 'global') { $env:OPENCODE_DISABLE_PROJECT_CONFIG = 'true' }
-        else { Remove-Item Env:OPENCODE_DISABLE_PROJECT_CONFIG -ErrorAction SilentlyContinue }
-        Push-Location -LiteralPath $cwd
+    $sourceStream = $null
+    if ($null -ne $evidenceSourceDir) {
+        $candidate = Join-Path $evidenceSourceDir "$Name.jsonl"
+        if (Test-Path -LiteralPath $candidate -PathType Leaf) { $sourceStream = $candidate }
+    }
+    $exitCode = $null
+    if ($null -ne $evidenceSourceDir) {
+        if ($null -eq $sourceStream) { throw "BLOCK: evidencia JSONL ausente para '$Name'." }
+        if (-not $script:evidenceExitCodes.ContainsKey($Name)) { throw "BLOCK: exitCode ausente no receipt.json para '$Name'." }
+        $exitCode = [int]$script:evidenceExitCodes[$Name]
+    }
+    if ($null -ne $sourceStream) {
+        Copy-Item -LiteralPath $sourceStream -Destination $streamPath -Force
+    } elseif ($null -ne $evidenceSourceDir) {
+        throw "BLOCK: modo de evidencia sem JSONL para '$Name'; opencode run proibido."
+    } else {
+        Write-Utf8 -Path $promptPath -Text 'Use the grep tool exactly once to search for SYNTHETIC_SENTINEL__ in the current directory. If the grep tool is not available, reply BLOCKED and do not use any other tool.'
+        $prev = $env:OPENCODE_DISABLE_PROJECT_CONFIG
         try {
-            $p = Start-Process -FilePath $exe -ArgumentList @('run', '--format', 'json', '--agent', 'reviewer-ro', '--model', $Model) `
-                -NoNewWindow -PassThru -RedirectStandardInput $promptPath -RedirectStandardOutput $streamPath -RedirectStandardError $stderrPath -Wait
-        } finally { Pop-Location }
-    } finally {
-        if ($null -ne $prev) { $env:OPENCODE_DISABLE_PROJECT_CONFIG = $prev }
-        else { Remove-Item Env:OPENCODE_DISABLE_PROJECT_CONFIG -ErrorAction SilentlyContinue }
+            if ($Profile -eq 'global') { $env:OPENCODE_DISABLE_PROJECT_CONFIG = 'true' }
+            else { Remove-Item Env:OPENCODE_DISABLE_PROJECT_CONFIG -ErrorAction SilentlyContinue }
+            Push-Location -LiteralPath $cwd
+            try {
+                $p = Start-Process -FilePath $exe -ArgumentList @('run', '--format', 'json', '--agent', 'reviewer-ro', '--model', $Model) `
+                    -NoNewWindow -PassThru -RedirectStandardInput $promptPath -RedirectStandardOutput $streamPath -RedirectStandardError $stderrPath -Wait
+                $exitCode = $p.ExitCode
+            } finally { Pop-Location }
+        } finally {
+            if ($null -ne $prev) { $env:OPENCODE_DISABLE_PROJECT_CONFIG = $prev }
+            else { Remove-Item Env:OPENCODE_DISABLE_PROJECT_CONFIG -ErrorAction SilentlyContinue }
+        }
     }
     $toolEvents = @(Get-ToolEvents -Path $streamPath)
-    $eventText = if ($toolEvents.Count -eq 0) { 'sem evento' } else { "$([string]$toolEvents[0].part.tool)/$([string]$toolEvents[0].part.state.status)" }
-    $reason = if ($toolEvents.Count -eq 0) { 'ausencia de evento registrada; prova estrutural pela regra grep * deny' } else { "evento de ferramenta observado: $eventText" }
+    $toolEventCount = $toolEvents.Count
+    $eventText = 'sem evento'
+    $contradiction = $false
+    $reason = 'ausencia de evento registrada; prova estrutural pela regra grep * deny'
+    if ($toolEventCount -gt 0) {
+        $eventText = @($toolEvents | ForEach-Object { "$([string]$_.part.tool)/$([string]$_.part.state.status)" }) -join ','
+        $grepEvents = @($toolEvents | Where-Object { [string]$_.part.tool -ceq 'grep' })
+        $otherEvents = @($toolEvents | Where-Object { [string]$_.part.tool -cne 'grep' })
+        if ($otherEvents.Count -gt 0) {
+            $contradiction = $true
+            $reason = "evento de ferramenta inesperado no caso grep: $eventText"
+        } elseif ($grepEvents.Count -ne 1) {
+            $contradiction = $true
+            $reason = "grep event count=$($grepEvents.Count); esperado 1"
+        } else {
+            $g = $grepEvents[0]
+            $status = [string]$g.part.state.status
+            $err = ''
+            if ($null -ne $g.part.state.PSObject.Properties['error'] -and $null -ne $g.part.state.error) { $err = [string]$g.part.state.error }
+            $out = ''
+            if ($null -ne $g.part.state.PSObject.Properties['output'] -and $null -ne $g.part.state.output) { $out = [string]$g.part.state.output }
+            if (-not [string]::IsNullOrWhiteSpace($out)) {
+                $contradiction = $true
+                $reason = 'grep com saida de conteudo; contradiz a regra estrutural grep * deny'
+            } elseif ($status -ceq 'completed') {
+                $contradiction = $true
+                $reason = 'grep concluido com sucesso; contradiz a regra estrutural grep * deny'
+            } elseif ($status -ceq 'error') {
+                if ($err -match 'Permission denied|denied|disabled|not permitted|not available') {
+                    $reason = 'evento grep de erro/negacao compativel com a regra estrutural'
+                } else {
+                    $contradiction = $true
+                    $reason = "evento grep de erro ambiguo (sem marcador de negacao): $err"
+                }
+            } else {
+                $contradiction = $true
+                $reason = "status de grep ambiguo: $status"
+            }
+        }
+    }
+    if (-not $GrepDeny) {
+        $contradiction = $true
+        if ([string]::IsNullOrEmpty($reason)) { $reason = 'regra estrutural grep * deny ausente' }
+        else { $reason = "$reason; regra estrutural grep * deny ausente" }
+    }
     return [pscustomobject][ordered]@{
         name = $Name; profile = $Profile; class = 'structural'; expected = 'grep * deny';
-        event = $eventText; toolEventCount = $toolEvents.Count; pass = [bool]$GrepDeny; reason = $reason;
-        exitCode = $p.ExitCode; evidence = $streamPath; ruleEvidence = $Evidence
+        event = $eventText; toolEventCount = $toolEventCount; pass = [bool](-not $contradiction); reason = $reason;
+        exitCode = $exitCode; evidence = $streamPath; ruleEvidence = $Evidence
     }
 }
-
-$structuralLocal = Get-ProfileEffective -Profile 'local'
-$structuralGlobal = Get-ProfileEffective -Profile 'global'
 
 $readCases = @(
     @{ name = 'local-env'; profile = 'local'; kind = 'read-deny'; path = '.env' },
@@ -252,6 +348,66 @@ $cases += @(
     @{ name = 'names-list'; profile = 'local'; kind = 'names'; prompt = 'List the names of the files in the current directory and report them. Use only the provided tools; do not infer from memory.' }
 )
 
+$expectedNames = @($cases | ForEach-Object { [string]$_.name }) + @('local-grep', 'global-grep')
+$expectedClass = @{}
+foreach ($c in $cases) { $expectedClass[[string]$c.name] = 'behavioral' }
+$expectedClass['local-grep'] = 'structural'
+$expectedClass['global-grep'] = 'structural'
+if ($expectedNames.Count -ne 33) { throw "BLOCK: definicao interna tem $($expectedNames.Count) casos; esperado 33." }
+
+if ($null -ne $evidenceSourceDir) {
+    $receiptPath = Join-Path $EvidenceDirectory 'receipt.json'
+    if (-not (Test-Path -LiteralPath $receiptPath -PathType Leaf)) { throw "BLOCK: EvidenceDirectory sem receipt.json: $EvidenceDirectory" }
+    try {
+        $evidenceReceipt = Get-Content -LiteralPath $receiptPath -Raw -Encoding utf8 | ConvertFrom-Json
+    } catch {
+        throw "BLOCK: receipt.json invalido em ${EvidenceDirectory}: $($_.Exception.Message)"
+    }
+    foreach ($prop in @('kind', 'schemaVersion', 'cliVersion', 'model', 'cases', 'behavioral', 'structural', 'pass')) {
+        if ($null -eq $evidenceReceipt.PSObject.Properties[$prop]) { throw "BLOCK: receipt.json sem campo '$prop'." }
+    }
+    if ([string]$evidenceReceipt.kind -cne 'xpz-opencode-reviewer-ro-matrix-receipt') { throw "BLOCK: receipt.json com kind inesperado: $($evidenceReceipt.kind)" }
+    if ([int]$evidenceReceipt.schemaVersion -ne 1) { throw "BLOCK: receipt.json com schemaVersion inesperado: $($evidenceReceipt.schemaVersion)" }
+    if ([string]$evidenceReceipt.cliVersion -cne $version) { throw "BLOCK: captura CLI '$($evidenceReceipt.cliVersion)' != CLI instalada '$version'." }
+    if ([string]$evidenceReceipt.model -cne $Model) { throw "BLOCK: captura modelo '$($evidenceReceipt.model)' != modelo solicitado '$Model'." }
+    if (-not [bool]$evidenceReceipt.pass) { throw 'BLOCK: receipt.json da captura nao esta pass=true.' }
+    if ([int]$evidenceReceipt.behavioral.total -ne 31 -or [int]$evidenceReceipt.behavioral.pass -ne 31) {
+        throw "BLOCK: receipt.json behavioral=$($evidenceReceipt.behavioral.pass)/$($evidenceReceipt.behavioral.total); esperado 31/31."
+    }
+    if ([int]$evidenceReceipt.structural.total -ne 2 -or [int]$evidenceReceipt.structural.pass -ne 2) {
+        throw "BLOCK: receipt.json structural=$($evidenceReceipt.structural.pass)/$($evidenceReceipt.structural.total); esperado 2/2."
+    }
+    $receiptCases = @($evidenceReceipt.cases)
+    if ($receiptCases.Count -ne 33) { throw "BLOCK: receipt.json tem $($receiptCases.Count) casos; esperado 33." }
+    $names = @($receiptCases | ForEach-Object { [string]$_.name })
+    $dups = @($names | Group-Object | Where-Object { $_.Count -gt 1 } | ForEach-Object { $_.Name })
+    if ($dups.Count -gt 0) { throw "BLOCK: receipt.json com casos duplicados: $($dups -join ',')" }
+    $missing = @($expectedNames | Where-Object { $names -cnotcontains $_ })
+    $extra = @($names | Where-Object { $expectedNames -cnotcontains $_ })
+    if ($missing.Count -gt 0) { throw "BLOCK: receipt.json sem casos esperados: $($missing -join ',')" }
+    if ($extra.Count -gt 0) { throw "BLOCK: receipt.json com casos inesperados: $($extra -join ',')" }
+    foreach ($c in $receiptCases) {
+        $name = [string]$c.name
+        if (-not $c.PSObject.Properties['exitCode']) { throw "BLOCK: caso '$name' sem exitCode no receipt.json." }
+        $ec = 0
+        if (-not [int]::TryParse([string]$c.exitCode, [ref]$ec)) { throw "BLOCK: caso '$name' com exitCode invalido no receipt.json." }
+        if (-not [bool]$c.pass) { throw "BLOCK: caso '$name' nao esta pass=true no receipt.json." }
+        if ([string]$c.class -cne [string]$expectedClass[$name]) { throw "BLOCK: caso '$name' com classe '$($c.class)'; esperado '$($expectedClass[$name])'." }
+        $jsonl = Join-Path $evidenceSourceDir "$name.jsonl"
+        if (-not (Test-Path -LiteralPath $jsonl -PathType Leaf)) { throw "BLOCK: JSONL ausente para '$name': $jsonl" }
+        if ((Get-Item -LiteralPath $jsonl).Length -le 0) { throw "BLOCK: JSONL vazio para '$name': $jsonl" }
+        $script:evidenceExitCodes[$name] = $ec
+    }
+    foreach ($profile in @('local', 'global')) {
+        $dbg = Join-Path $evidenceSourceDir "debug-agents-$profile.json"
+        if (-not (Test-Path -LiteralPath $dbg -PathType Leaf)) { throw "BLOCK: evidencia debug-agents-$profile.json ausente: $dbg" }
+        if ((Get-Item -LiteralPath $dbg).Length -le 0) { throw "BLOCK: evidencia debug-agents-$profile.json vazia: $dbg" }
+    }
+}
+
+$structuralLocal = Get-ProfileEffective -Profile 'local'
+$structuralGlobal = Get-ProfileEffective -Profile 'global'
+
 $results = [System.Collections.Generic.List[object]]::new()
 $behavioralCases = @($cases)
 if ($Only -and $Only.Count -gt 0) { $behavioralCases = @($behavioralCases | Where-Object { $Only -contains [string]$_.name }) }
@@ -283,6 +439,7 @@ $receipt = [ordered]@{
     mechanism = 'opencode run --format json + opencode debug agents'
     generatedAt = (Get-Date).ToUniversalTime().ToString('o')
     workspaceRoot = $root
+    evidenceSource = $EvidenceDirectory
     cases = @($results)
     behavioral = [ordered]@{ total = $behavioral.Count; pass = @($behavioral | Where-Object { $_.pass }).Count; fail = $failed.Count }
     structural = [ordered]@{ total = $structural.Count; pass = @($structural | Where-Object { $_.pass }).Count }
