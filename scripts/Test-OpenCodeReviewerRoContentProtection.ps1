@@ -105,12 +105,31 @@ function Get-ProfileEffective {
 function Get-ToolEvents {
     param([Parameter(Mandatory)] [string] $Path)
     $events = [System.Collections.Generic.List[object]]::new()
-    foreach ($line in @(Get-Content -LiteralPath $Path -Encoding utf8 -ErrorAction SilentlyContinue)) {
+    $lineNumber = 0
+    foreach ($line in @(Get-Content -LiteralPath $Path -Encoding utf8 -ErrorAction Stop)) {
+        $lineNumber++
         if ([string]::IsNullOrWhiteSpace($line)) { continue }
-        try { $events.Add(($line | ConvertFrom-Json)) } catch { continue }
+        try { $events.Add(($line | ConvertFrom-Json -ErrorAction Stop)) }
+        catch { throw "BLOCK: JSONL invalido em '$Path', linha $lineNumber." }
     }
     return @($events | Where-Object { $null -ne $_.PSObject.Properties['type'] -and [string]$_.type -eq 'tool_use' })
 }
+
+function Assert-ToolEventParserRejectsMalformedLine {
+    param([Parameter(Mandatory)] [string] $Directory)
+    $probePath = Join-Path $Directory "parser-invalid-probe-$([guid]::NewGuid().ToString('N')).jsonl"
+    $validEvent = '{"type":"tool_use","part":{"tool":"read","state":{"status":"completed"}}}'
+    try {
+        [System.IO.File]::WriteAllText($probePath, "$validEvent`n`nnot-json`n", $utf8)
+        $rejected = $false
+        try { $null = @(Get-ToolEvents -Path $probePath) }
+        catch { $rejected = $_.Exception.Message -match 'BLOCK: JSONL invalido.*linha 3' }
+        if (-not $rejected) { throw 'BLOCK: parser aceitou JSONL com evento valido seguido de linha invalida.' }
+    } finally {
+        if (Test-Path -LiteralPath $probePath -PathType Leaf) { Remove-Item -LiteralPath $probePath -Force }
+    }
+}
+Assert-ToolEventParserRejectsMalformedLine -Directory ([System.IO.Path]::GetTempPath())
 
 function Invoke-RunCase {
     param([Parameter(Mandatory)] $Case)
