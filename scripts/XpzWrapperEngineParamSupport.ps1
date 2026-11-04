@@ -1082,12 +1082,18 @@ function Get-XpzWritabilityConsumerFinding {
                 }, $true))
 
         $setupSites = [System.Collections.Generic.List[object]]::new()
+        $hasUnresolvedSetupCall = $false
         foreach ($site in $callSites) {
             $elements = @($site.CommandElements)
             if ($elements.Count -lt 1) { continue }
             $target = Resolve-XpzEngineTarget -TargetAst $elements[0] -RootAst $ast
             if ($target.Kind -eq 'shared' -and $target.Leaf -ieq 'Test-XpzSetupAudit.ps1') {
                 $setupSites.Add([pscustomobject]@{ Site = $site; Target = $target })
+            } elseif ($target.Kind -eq 'unresolved' -and
+                $site.Extent.Text -match 'Test-XpzSetupAudit\.ps1') {
+                # Chamada ao motor por caminho interpolado/dinamico: nao e delegador
+                # reconhecido, mas tambem nao pode sair como not-consumer sem finding.
+                $hasUnresolvedSetupCall = $true
             }
         }
 
@@ -1171,6 +1177,11 @@ function Get-XpzWritabilityConsumerFinding {
             }
             return New-Result -Classification 'delegated-engine-without-contract' -Channel 'engine-diagnostic' `
                 -Reason 'writability_consumer_contract_engine_without_contract' -Detail 'engine-contract-missing' -EmitFinding $true
+        }
+
+        if ($hasUnresolvedSetupCall) {
+            return New-Result -Classification 'unclassified' -Channel 'engine-diagnostic' `
+                -Reason 'writability_consumer_contract_unclassified' -Detail 'unresolved-setup-call' -EmitFinding $true
         }
 
         if ($hasGateRaw -or $hasGateOk -or $hasGateWrapperPath) {

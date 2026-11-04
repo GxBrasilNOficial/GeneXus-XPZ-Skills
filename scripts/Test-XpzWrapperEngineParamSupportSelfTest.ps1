@@ -14,11 +14,11 @@
   ambiguo/nao-ambiguo (de nome E de alias), CommonParameters, outro script, simple, sem param()/dynamicparam,
   formas de parse, Join-Path, .PARAMETER orfao, ajuda invisivel, -AlternateSelfLeaf, paridade de molde,
   dedup e secao .EXAMPLE que nao parseia (pulada, sem finding).
-  Inclui H19..H39 do consumidor de gravabilidade (Get-XpzWritabilityConsumerFinding): delegador
+  Inclui H19..H40 do consumidor de gravabilidade (Get-XpzWritabilityConsumerFinding): delegador
   com/sem contrato, motor ausente/parse-error, direto stale/compliant, gateRaw/GATE_OK parciais,
   raiz diferente, redirecionamento (>/*>/1>&2/2>&1), atribuicao, pipeline, copia local, wrapper
-  parse-error, comentario/ajuda, not-consumer, escopo da deduplicacao de engine-unavailable e
-  verificacao do contrato no motor real do repositorio.
+  parse-error, comentario/ajuda, not-consumer, caminho interpolado sem gate, escopo da
+  deduplicacao de engine-unavailable e verificacao do contrato no motor real do repositorio.
   Sentinela final: XPZ_WRAPPER_ENGINE_PARAM_SELFTEST_OK.
 #>
 
@@ -492,7 +492,7 @@ param([string]$Ok)
     Assert-HelpFinding (Get-XpzHelpSurfaceFinding -WrapperPath $f) '' '' 'H18 secao que nao parseia e pulada'
 
     # ============================================================================
-    # H19..H39 consumidor do contrato de cobertura de gravabilidade
+    # H19..H40 consumidor do contrato de cobertura de gravabilidade
     # ============================================================================
     $consumerCall = '& $enginePath -KbRoot $KbRoot -GateWrapperPath $GateWrapperPath'
     $consumerWrapper = @'
@@ -630,6 +630,14 @@ Write-Output $X
         $realEngineText -notmatch 'writability_coverage') {
         throw 'ASSERT_FAILED: H39 motor real perdeu o contrato de cobertura'
     }
+
+    # H40 chamada ao motor por caminho interpolado, sem gate, nao pode sair limpa.
+    $f = New-Fixture $wrapDir 'h40.ps1' @'
+#requires -Version 7.4
+param([string]$KbRoot)
+& "$SharedSkillsRoot\scripts\Test-XpzSetupAudit.ps1" -KbRoot $KbRoot
+'@
+    Assert-Consumer (Get-XpzWritabilityConsumerFinding -WrapperPath $f -EnginesRoot $synthEngines) 'unclassified' 'engine-diagnostic' 'writability_consumer_contract_unclassified' $true 'H40 caminho interpolado sem gate'
 
     Write-Output 'XPZ_WRAPPER_ENGINE_PARAM_SELFTEST_OK'
 } finally {
