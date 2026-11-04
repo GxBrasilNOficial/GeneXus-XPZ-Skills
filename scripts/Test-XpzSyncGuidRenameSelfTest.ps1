@@ -11,9 +11,11 @@
       B. Conferencia (-VerifyOnly): nao toca o disco; classifica o residuo
          (RenameResidualsDetected = 1, Action 'detected'). A conferencia ainda
          acusa o acervo desatualizado (exit nao-zero), mas o relatorio, gravado
-         antes do throw, ja explica que e um rename.
+         antes do throw, ja explica que e um rename. Com metadata pre-existente,
+         o arquivo permanece byte a byte identico e KbMetadataStatus=not-requested.
       C. Zero renames (Apply): acervo ja sincronizado -> exit 0, sem erro
-         (regressao StrictMode quando a lista de renames vinha vazia).
+         (regressao StrictMode quando a lista de renames vinha vazia). Com
+         metadata pre-existente, o modo normal atualiza o timestamp.
       D. Orfao de materializacao anterior: nome antigo e nome novo existem com
          mesmo GUID -> remove o nome antigo e preserva o alvo.
       E. Colisao de GUID (Apply): o nome novo ja pertence a OUTRO objeto (GUID
@@ -21,6 +23,9 @@
          o de nome antigo sao preservados (sem perda de dado).
       F. Rename so de caixa (Apply): mesmo GUID, nome diferente apenas na caixa ->
          o arquivo no disco passa a ter o nome com a caixa nova.
+      C2. Conferencia de acervo sincronizado (-VerifyOnly, exit 0): com metadata
+          pre-existente, o arquivo permanece byte a byte identico e o relatorio
+          registra KbMetadataStatus=not-requested.
 #>
 
 Set-StrictMode -Version Latest
@@ -60,6 +65,49 @@ function New-Package {
     Write-Utf8 -Path $Path -Content $xml
 }
 
+function New-ValidMetadata {
+    param([string]$Path)
+    $lines = @(
+        '---'
+        'name: KB Source Metadata'
+        'description: fixture de self-test'
+        'updated: 2026-01-01T00:00:00.0000000+00:00'
+        'last_xpz_materialization_run_at: 2026-01-01T00:00:00.0000000+00:00'
+        'source_xpz: C:\Old\Package.xpz'
+        'source_refresh_status: complete'
+        '---'
+        ''
+        '## KMW'
+        ''
+        '| Campo | Valor |'
+        '|---|---|'
+        '| MajorVersion | 18 |'
+        '| MinorVersion | 1 |'
+        '| Build | 200 |'
+        ''
+        '## Source'
+        ''
+        '| Campo | Valor |'
+        '|---|---|'
+        '| kb (GUID) | {33333333-3333-3333-3333-333333333333} |'
+        '| username | olduser |'
+        '| UNCPath | \\old\share |'
+        ''
+        '## Source/Version'
+        ''
+        '| Campo | Valor |'
+        '|---|---|'
+        '| guid | {44444444-4444-4444-4444-444444444444} |'
+        '| name | OldVersion |'
+        ''
+        '## Uso'
+        ''
+        'Texto auxiliar preservado pelo self-test.'
+    )
+    $content = ($lines -join "`n") + "`n"
+    [System.IO.File]::WriteAllText($Path, $content, $utf8NoBom)
+}
+
 function New-CaseDir {
     param([string]$Name)
     $acervo = Join-Path (Join-Path $tempRoot $Name) 'ObjetosDaKbEmXml'
@@ -69,11 +117,12 @@ function New-CaseDir {
 }
 
 function Invoke-Sync {
-    param([string]$Pkg, [string]$Acervo, [switch]$VerifyOnly, [string]$ReportPath, [string[]]$ExpectedItems)
+    param([string]$Pkg, [string]$Acervo, [switch]$VerifyOnly, [string]$ReportPath, [string[]]$ExpectedItems, [string]$KbMetadataPath)
     $psArgs = @('-NoProfile', '-File', $scriptPath, '-InputPath', $Pkg, '-DestinationRoot', $Acervo, '-FullSnapshot')
     if ($VerifyOnly) { $psArgs += '-VerifyOnly' }
     if ($ReportPath) { $psArgs += @('-ReportPath', $ReportPath, '-KeepReport') }
     if ($ExpectedItems) { $psArgs += @('-ExpectedItems', ($ExpectedItems -join ',')) }
+    if ($KbMetadataPath) { $psArgs += @('-KbMetadataPath', $KbMetadataPath) }
     # stdout e stderr capturados SEPARADAMENTE: o contrato exige stdout = JSON puro de uma
     # linha, com todo texto humano no stderr. 2>$errFile isola os dois streams do filho.
     $errFile = [System.IO.Path]::GetTempFileName()
@@ -141,12 +190,21 @@ try {
     New-AttrFile -Path (Join-Path $b.AttrDir 'DistribuidoraNome.xml') -Guid $guid1 -Name 'DistribuidoraNome' -LastUpdate '2020-01-01T00:00:00.0000000Z'
     $pkgB = Join-Path $b.Root 'pacote.xml'
     New-Package -Path $pkgB -Guid $guid1 -Name 'DistribuidoraNomeTeste' -LastUpdate '2026-01-01T00:00:00.0000000Z'
+    $metaB = Join-Path $b.Root 'kb-source-metadata.md'
+    New-ValidMetadata -Path $metaB
+    $hashBeforeB = (Get-FileHash -LiteralPath $metaB -Algorithm SHA256).Hash
     $repB = Join-Path $b.Root 'report.json'
-    $rB = Invoke-Sync -Pkg $pkgB -Acervo $b.Acervo -VerifyOnly -ReportPath $repB
+    $rB = Invoke-Sync -Pkg $pkgB -Acervo $b.Acervo -VerifyOnly -ReportPath $repB -KbMetadataPath $metaB
     if (-not (Test-Path -LiteralPath (Join-Path $b.AttrDir 'DistribuidoraNome.xml'))) { throw "B: VerifyOnly nao deveria tocar o disco (antigo)" }
     if (Test-Path -LiteralPath (Join-Path $b.AttrDir 'DistribuidoraNomeTeste.xml')) { throw "B: VerifyOnly nao deveria criar o novo" }
     if (-not (Test-Path -LiteralPath $repB)) { throw "B: relatorio deveria ter sido gravado antes do throw (exit=$($rB.ExitCode))" }
+    $hashAfterB = (Get-FileHash -LiteralPath $metaB -Algorithm SHA256).Hash
+    if ($hashBeforeB -ne $hashAfterB) { throw "B: metadata nao deveria ser alterada em VerifyOnly" }
+    if ($rB.StdErr -match 'KbMetadataPath atualizado') { throw "B: stderr nao deveria conter 'KbMetadataPath atualizado' em VerifyOnly" }
     $repBObj = Get-Content -LiteralPath $repB -Raw | ConvertFrom-Json
+    if ($repBObj.Summary.VerifyOnly -ne $true) { throw "B: relatorio deveria registrar VerifyOnly=true" }
+    if ($repBObj.KbMetadataStatus -ne 'not-requested') { throw "B: KbMetadataStatus deveria ser 'not-requested'; obtido '$($repBObj.KbMetadataStatus)'" }
+    if ($null -ne $repBObj.KbMetadataSourceComplete) { throw "B: KbMetadataSourceComplete deveria ser null em VerifyOnly" }
     if ($repBObj.Summary.RenameResidualsDetected -ne 1) { throw "B: RenameResidualsDetected deveria ser 1; obtido $($repBObj.Summary.RenameResidualsDetected)" }
     if ($repBObj.Summary.RenamedByGuid -ne 0) { throw "B: RenamedByGuid deveria ser 0 em VerifyOnly; obtido $($repBObj.Summary.RenamedByGuid)" }
     # Contrato: o JSON e emitido ANTES do throw de verificacao, entao o stdout tem JSON
@@ -164,12 +222,37 @@ try {
     New-AttrFile -Path (Join-Path $c.AttrDir 'Alpha.xml') -Guid $guid1 -Name 'Alpha' -LastUpdate '2020-01-01T00:00:00.0000000Z'
     $pkgC = Join-Path $c.Root 'pacote.xml'
     New-Package -Path $pkgC -Guid $guid1 -Name 'Alpha' -LastUpdate '2020-01-01T00:00:00.0000000Z'
+    $metaC = Join-Path $c.Root 'kb-source-metadata.md'
+    New-ValidMetadata -Path $metaC
     $repC = Join-Path $c.Root 'report.json'
-    $rC = Invoke-Sync -Pkg $pkgC -Acervo $c.Acervo -ReportPath $repC
+    $rC = Invoke-Sync -Pkg $pkgC -Acervo $c.Acervo -ReportPath $repC -KbMetadataPath $metaC
     if ($rC.ExitCode -ne 0) { throw "C: FullSnapshot sem renames deveria sair com exit 0; obtido $($rC.ExitCode). Saida: $($rC.Output)" }
+    $metaCText = Get-Content -LiteralPath $metaC -Raw
+    if ($metaCText -match [regex]::Escape('last_xpz_materialization_run_at: 2026-01-01T00:00:00.0000000+00:00')) { throw 'C: modo normal deveria atualizar o timestamp da metadata' }
     $repCObj = Get-Content -LiteralPath $repC -Raw | ConvertFrom-Json
+    if ($repCObj.KbMetadataStatus -notin @('complete', 'partial-preserved', 'partial-new')) { throw "C: KbMetadataStatus inesperado no modo normal: '$($repCObj.KbMetadataStatus)'" }
     if ($repCObj.Summary.RenamedByGuid -ne 0) { throw "C: RenamedByGuid deveria ser 0; obtido $($repCObj.Summary.RenamedByGuid)" }
     if ($repCObj.Summary.RenameResidualsDetected -ne 0) { throw "C: RenameResidualsDetected deveria ser 0; obtido $($repCObj.Summary.RenameResidualsDetected)" }
+
+    # --- C2: conferencia de acervo sincronizado (sucesso) nao grava metadata ---
+    $c2 = New-CaseDir -Name 'verify-success'
+    New-AttrFile -Path (Join-Path $c2.AttrDir 'Alpha.xml') -Guid $guid1 -Name 'Alpha' -LastUpdate '2020-01-01T00:00:00.0000000Z'
+    $pkgC2 = Join-Path $c2.Root 'pacote.xml'
+    New-Package -Path $pkgC2 -Guid $guid1 -Name 'Alpha' -LastUpdate '2020-01-01T00:00:00.0000000Z'
+    $metaC2 = Join-Path $c2.Root 'kb-source-metadata.md'
+    New-ValidMetadata -Path $metaC2
+    $hashBeforeC2 = (Get-FileHash -LiteralPath $metaC2 -Algorithm SHA256).Hash
+    $repC2 = Join-Path $c2.Root 'report.json'
+    $rC2 = Invoke-Sync -Pkg $pkgC2 -Acervo $c2.Acervo -VerifyOnly -ReportPath $repC2 -KbMetadataPath $metaC2
+    if ($rC2.ExitCode -ne 0) { throw "C2: conferencia de acervo sincronizado deveria sair com exit 0; obtido $($rC2.ExitCode). Saida: $($rC2.Output)" }
+    $hashAfterC2 = (Get-FileHash -LiteralPath $metaC2 -Algorithm SHA256).Hash
+    if ($hashBeforeC2 -ne $hashAfterC2) { throw 'C2: metadata nao deveria ser alterada em VerifyOnly' }
+    if ($rC2.StdErr -match 'KbMetadataPath atualizado') { throw "C2: stderr nao deveria conter 'KbMetadataPath atualizado' em VerifyOnly" }
+    $c2Obj = Assert-StdoutIsPureJson -Case 'C2' -Result $rC2
+    if ($c2Obj.VerifyOnly -ne $true) { throw 'C2: stdout deveria registrar VerifyOnly=true' }
+    $repC2Obj = Get-Content -LiteralPath $repC2 -Raw | ConvertFrom-Json
+    if ($repC2Obj.KbMetadataStatus -ne 'not-requested') { throw "C2: KbMetadataStatus deveria ser 'not-requested'; obtido '$($repC2Obj.KbMetadataStatus)'" }
+    if ($null -ne $repC2Obj.KbMetadataSourceComplete) { throw 'C2: KbMetadataSourceComplete deveria ser null em VerifyOnly' }
 
     # --- D: orfao de materializacao anterior (nome novo ja existe com o mesmo GUID) ---
     $d = New-CaseDir -Name 'orphan'

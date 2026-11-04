@@ -76,7 +76,7 @@ O repositório deve conter em `<repo_root>\scripts\` dois wrappers:
 | Propósito | Quando usar |
 |---|---|
 | **Atualização diária** — extrai e materializa XMLs no acervo a partir de um XPZ parcial | XPZ do dia a dia exportado pela IDE |
-| **Conferência full** — verifica completude do acervo contra um export completo da KB, sem regravar nada | Novo export full da KB |
+| **Conferência full** — verifica completude do acervo contra um export completo da KB, sem regravar o acervo nem `kb-source-metadata.md`; relatórios solicitados podem ser gravados | Novo export full da KB |
 
 Os nomes exatos dos wrappers são definidos por cada repositório. Consulte o `README.md` local para identificá-los.
 
@@ -149,7 +149,7 @@ Os wrappers seguem esta convenção de parâmetros:
 
 ### Wrapper de atualização diária
 - `-InputPath` *(obrigatório)* — caminho para `.xpz`, XML ou pasta contendo o XML
-- `-VerifyOnly` *(switch)* — só confere, não regrava
+- `-VerifyOnly` *(switch)* — só confere, não regrava XMLs no destino nem `kb-source-metadata.md`; relatórios solicitados podem ser gravados
 - `-FullSnapshot` *(switch)* — compara snapshot completo do acervo
 - sob `-FullSnapshot`, o motor reconcilia o acervo pela identidade estável do nó raiz (`guid`), não só pelo nome lógico: quando o mesmo `guid` aparece no acervo sob nome de arquivo diferente, trata como **rename** e renomeia o arquivo existente (`Move-Item` antigo → novo) em vez de criar-novo + abandonar-antigo; o resultado é um arquivo só (nome novo) e o git detecta rename por similaridade. Cobre `Attribute` e `Object`. Em `-VerifyOnly`, o motor apenas **classifica** o resíduo de rename no relatório (`RenameResidualsDetected`), sem tocar o disco
 - `XPZ` full define apenas o insumo; não define, por si só, o modo de verificação
@@ -182,8 +182,8 @@ Os wrappers seguem esta convenção de parâmetros:
 - `-KbMetadataPath` *(opcional)* — salva metadados da KB em formato Markdown
 - `-ParallelKbRoot` *(opcional)* — raiz da pasta paralela; resolve `scripts/gx-object-type-catalog.override.json`
 - `-CatalogOverridePath` / `-DiscoveryReportPath` *(opcionais)* — override local e relatório JSON quando o pacote tiver GUID não mapeado
-- se esse parâmetro estiver ativo no wrapper local, `kb-source-metadata.md` faz parte normal do fluxo; o motor `scripts/Sync-GeneXusXpzToXml.ps1` (via `scripts/XpzKbSourceMetadataEditSupport.ps1`) atualiza **cirurgicamente** somente campos de materialização (`updated`, `last_xpz_materialization_run_at`, `source_xpz`, `source_refresh_status` e tabelas `KMW`/`Source`/`Source/Version`), preservando `last_setup_audit_run_at`, `setup_contract_signature_*`, demais frontmatter e seções fora do escopo, com EOL dominante via `scripts/XpzTextFileEolSupport.ps1`
-- quando `kb-source-metadata.md` for atualizado pelo sync, ele deve registrar `last_xpz_materialization_run_at` como horário do processamento XPZ/XML solicitado, mesmo quando nenhum XML tiver mudança material
+- se esse parâmetro estiver ativo no wrapper local, `kb-source-metadata.md` faz parte normal do fluxo de materialização; o motor `scripts/Sync-GeneXusXpzToXml.ps1` (via `scripts/XpzKbSourceMetadataEditSupport.ps1`) atualiza **cirurgicamente** somente campos de materialização (`updated`, `last_xpz_materialization_run_at`, `source_xpz`, `source_refresh_status` e tabelas `KMW`/`Source`/`Source/Version`), preservando `last_setup_audit_run_at`, `setup_contract_signature_*`, demais frontmatter e seções fora do escopo, com EOL dominante via `scripts/XpzTextFileEolSupport.ps1`. Em `-VerifyOnly` o arquivo não é tocado: a conferência não é materialização.
+- quando `kb-source-metadata.md` for atualizado por uma materialização, ele deve registrar `last_xpz_materialization_run_at` como horário do processamento XPZ/XML solicitado, mesmo quando nenhum XML tiver mudança material. A conferência `-VerifyOnly` não atualiza esse campo nem o arquivo
 - se o `XPZ` vier com `Source` vazio, incompleto ou ausente, o wrapper deve preservar valores estáveis conhecidos e emitir warning de refresh parcial; isso não invalida o sync de objetos
 - depois de materialização XPZ/XML bem-sucedida em `ObjetosDaKbEmXml`, o wrapper local deve acionar compulsoriamente a regeneração/validação do índice derivado por wrapper local de `KbIntelligence`
 - rebuild do índice via `scripts/Build-KbIntelligenceIndex.ps1` exige **Python 3.x utilizável** no `PATH` (`scripts/GeneXusPythonPrerequisite.ps1`; stub da Microsoft Store em `WindowsApps` não conta). Ausência bloqueia o refresh com exit `8` e mensagem `PREREQUISITO AUSENTE` — **rigor**: sync normal **não** terminou; a materialização XPZ/XML pode já ter concluído, mas isso **não** equivale a sucesso do fluxo oficial nem autoriza triagem ampla sem índice. Não tratar como falha do pacote exportado; instalar Python 3.x e rerodar o rebuild (`Rebuild-*KbIntelligenceIndex.ps1`). Ver `README.md`, `02-regras-operacionais-e-runtime.md` e molde `Update-KbFromXpz.example.ps1`
@@ -284,7 +284,7 @@ Os wrappers seguem esta convenção de parâmetros:
     - explicar que um item pode aparecer como `unchanged` no sync porque o arquivo local já está igual ao conteúdo vindo do `XPZ`, mesmo que esse mesmo arquivo ainda tenha diff pendente no Git contra o último commit
     - **Detecção cross-fluxo de origem (`dataSource`):** o motor detecta, antes de gravar metadata/XML, quando um item entrante colide no acervo (`FolderType|NormalizedName`) com um arquivo de **origem diferente** — caso central moderno (sem `dataSource`) ↔ legado (`dataSource="gx-legacy-export"`). Postura padrão **fail-soft**: campo aditivo `CrossFlowCollisions` (array; `[]` quando vazio) no resultado do stdout + booleano `Writes[].CrossFlowCollision` no `$report` (`-ReportPath`); cada colisão também sai por **stderr** em JSONL com prefixo `CROSSFLOW_COLLISION:` (e warnings de parse em `CROSSFLOW_WARNING:`), para não se perder nos caminhos que abortam antes do stdout. `SchemaVersion` permanece `1` (campos aditivos). **Decisão E.2:** quando o arquivo existente não tem `dataSource`, o filho direto `<GxLegacyPayload>` é o sinal de legado; `guid=""` só corrobora.
     - **`-BlockCrossFlowDataSource` (bloqueio opt-in):** aborta o sync (terminating error `ErrorId=CrossFlowDataSourceCollisionBlocked`, precedido da linha estável `CROSSFLOW_BLOCKED_ERRORID:` no stderr) **antes** de gravar qualquer metadata ou XML, em vez do fail-soft. Separado do fail-closed de pacote misto. Para um XML existente **não-parseável** (Decisão G): a detecção não gera colisão nem bloqueia (nem sob o switch), só um warning — mas **não garante a sobrescrita**; o sync pode falhar adiante ao processar um arquivo existente corrompido (estágios de parse preexistentes, fora do escopo desta frente).
-    - **Ordering e atomicidade (mudança de comportamento intencional):** a detecção roda **pré-rename**, após `$items` e **antes** da metadata, em ambos os ramos. No ramo **moderno** isso reordenou o fluxo para `catálogo → tipo-desconhecido → Convert → detecção → metadata`: os fail-closed de **tipo desconhecido** e de **colisão intra-pacote** passam a abortar **antes** da gravação de `kb-source-metadata.md` (antes a metadata era gravada e só então falhavam). **Assimetria:** o fail-closed de **rename** sob `-FullSnapshot` (`Resolve-GuidAwareRenames`) continua abortando **após** a metadata (preexistente, fora do escopo) — sob `-FullSnapshot`, esse caminho pode deixar a metadata gravada sem writes.
+    - **Ordering e atomicidade (mudança de comportamento intencional):** a detecção roda **pré-rename**, após `$items` e **antes** da metadata, em ambos os ramos. No ramo **moderno** isso reordenou o fluxo para `catálogo → tipo-desconhecido → Convert → detecção → metadata`: os fail-closed de **tipo desconhecido** e de **colisão intra-pacote** passam a abortar **antes** da gravação de `kb-source-metadata.md` (antes a metadata era gravada e só então falhavam). **Assimetria:** o fail-closed de **rename** sob `-FullSnapshot` (`Resolve-GuidAwareRenames`) continua abortando **após** a metadata (preexistente, fora do escopo) — sob `-FullSnapshot` sem `-VerifyOnly`, esse caminho pode deixar a metadata gravada sem writes. Em `-VerifyOnly`, a metadata não é gravada em nenhum ponto; a assimetria vale apenas para materialização real.
     - quando houver resumo Git, apresentar essa camada separadamente como comparação do worktree contra o commit atual, sem reclassificar o resultado do sync
     - se o mesmo `XPZ` tiver sido reprocessado após atualização do arquivo, deixar explícito que a comparação relevante é com o conteúdo do insumo reprocessado e com o estado atual do acervo, não com o relatório antigo
     - se `kb-source-metadata.md` tiver sido atualizado cirurgicamente pelo wrapper (campos de materialização), tratar isso como artefato normal do fluxo, não como evidência automática de mudança funcional na frente
@@ -352,15 +352,20 @@ PastaParalelaDaKb/
 
 O arquivo `kb-source-metadata.md`, quando exposto pelo wrapper local via
 `-KbMetadataPath`, é artefato normal de processamento e recebe atualizacao
-cirurgica em cada sync (não regeneracao total do arquivo). O motor preserva
+cirurgica em cada materialização (não regeneracao total do arquivo). O motor preserva
 `last_setup_audit_run_at` (autoridade de `xpz-kb-parallel-setup`), demais
 frontmatter fora do escopo do sync e seções extras; atualiza valores estaveis de
 `Source`/`KMW` quando o `XPZ` atual vier com metadados vazios ou parciais.
 
+Em `-VerifyOnly`, o motor não escreve o arquivo; o relatório registra
+`VerifyOnly=true` e `KbMetadataStatus=not-requested` (quando o caminho foi
+informado), sem alterar a proveniência da última materialização.
+
 Esse arquivo também é o local esperado de `last_xpz_materialization_run_at`
 (autoridade desta skill).
 Esse horário representa a última solicitação/processamento de materialização
-XPZ/XML, não apenas a última mudança material detectada nos XMLs.
+XPZ/XML, não apenas a última mudança material detectada nos XMLs, e não a última
+conferência (`-VerifyOnly`).
 
 ---
 

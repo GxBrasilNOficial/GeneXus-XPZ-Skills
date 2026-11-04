@@ -866,6 +866,12 @@ try {
         throw "BLOCK: pacote de export MISTO (elementos legados <GXObject> e modernos <Objects>/<Attributes> no mesmo ExportFile); fora de escopo do motor de export legado. Exporte os formatos separadamente. Nenhum metadata foi gravado."
     }
 
+    # Em -VerifyOnly o motor nao grava no destino nem em kb-source-metadata.md.
+    # No modo normal a metadata e gravada antes das escritas para que uma falha
+    # parcial avance o timestamp e force o rebuild do indice; a conferencia nao
+    # materializa, entao esse sinal nao se aplica.
+    $shouldWriteKbMetadata = (-not [bool]$VerifyOnly) -and [bool]$KbMetadataPath
+
     if (Test-GeneXusLegacyExportFilePackage -XmlDocument $packageXml) {
         # ===== RAMO LEGADO (export GeneXus 9) =====
         # Ordem (v2.8.5 secao 4.1): resolver catalogo -> construir/validar itens (fail-closed
@@ -880,7 +886,7 @@ try {
         # Deteccao cross-fluxo: pos-$items, ANTES da metadata e do rename (snapshot pre-rename).
         $crossFlowCollisions = Invoke-GeneXusCrossFlowDetection -Items $items -Root $DestinationRoot -Warnings $warnings -Block:$BlockCrossFlowDataSource
 
-        if ($KbMetadataPath) {
+        if ($shouldWriteKbMetadata) {
             # GRAVACAO DE METADATA (legado): pos-catalogo/itens. Mutuamente exclusiva com a
             # gravacao do ramo moderno abaixo (apos a classificacao de perfil) — nunca ambas
             # numa mesma execucao, pois os ramos legado/moderno sao disjuntos por perfil [R6-b].
@@ -920,7 +926,7 @@ try {
         # Deteccao cross-fluxo: pos-$items, ANTES da metadata e do rename (snapshot pre-rename).
         $crossFlowCollisions = Invoke-GeneXusCrossFlowDetection -Items $items -Root $DestinationRoot -Warnings $warnings -Block:$BlockCrossFlowDataSource
 
-        if ($KbMetadataPath) {
+        if ($shouldWriteKbMetadata) {
             # GRAVACAO DE METADATA (moderno): agora pos-catalogo/unknown/Convert/deteccao.
             # Mutuamente exclusiva com a gravacao do ramo legado acima [R6-b].
             $metadataResult = Update-XpzKbSourceMetadataFromSync -XmlDocument $packageXml -SourceXpzPath $InputPath -MetadataPath $KbMetadataPath

@@ -15,7 +15,9 @@
     - sentinela x data real -> skipped-older-lastUpdate (conservador);
     - pacote MISTO -> throw e kb-source-metadata.md NAO criado;
     - tag legada fora do registro + KbMetadataPath -> throw e kb-source-metadata.md
-      NAO criado nem alterado (fail-closed antes da gravacao de metadata).
+      NAO criado nem alterado (fail-closed antes da gravacao de metadata);
+    - -VerifyOnly legado com metadata pre-existente -> arquivo permanece byte a
+      byte identico (a conferencia nao grava metadata de materializacao).
     Token de sucesso no stdout + exit 0.
 #>
 
@@ -97,6 +99,13 @@ try {
     if (-not (Test-Path -LiteralPath $meta)) { throw 'Caso1: kb-source-metadata.md deveria ter sido criado.' }
     $metaText = Get-Content -LiteralPath $meta -Raw
     if ($metaText -notmatch '(?m)^\|\s*Build\s*\|\s*2601\s*\|') { throw 'Caso1: Build=2601 (MaxGxBuildSaved) nao gravado no metadata.' }
+
+    # Caso 1b — -VerifyOnly legado nao altera a metadata
+    $hashBeforeVerify = (Get-FileHash -LiteralPath $meta -Algorithm SHA256).Hash
+    $verifySummary = Invoke-SyncJson -SyncArgs @('-InputPath', $fixture, '-DestinationRoot', $dest, '-FullSnapshot', '-VerifyOnly', '-KbMetadataPath', $meta)
+    $hashAfterVerify = (Get-FileHash -LiteralPath $meta -Algorithm SHA256).Hash
+    if ($hashBeforeVerify -ne $hashAfterVerify) { throw 'Caso1b: metadata nao deveria ser alterada em -VerifyOnly.' }
+    if ($verifySummary.VerifyOnly -ne $true) { throw 'Caso1b: summary deveria registrar VerifyOnly=true.' }
 } finally {
     if (Test-Path -LiteralPath $work1) { Remove-Item -LiteralPath $work1 -Recurse -Force }
 }
