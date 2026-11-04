@@ -1010,13 +1010,17 @@ function Get-XpzWritabilityConsumerFinding {
 
       Precedencia: direct-* antes de delegated. AST so para $gateRaw/GATE_OK; os
       marcadores WRITABILITY_COVERAGE_CONTRACT_V1/writability_coverage sao textuais
-      (o motor canonico tem o marcador em comentario).
+      (o motor canonico tem o marcador em comentario). Um consumidor direto so e
+      compliant quando o AST tambem mostra extracao da cobertura e fallback do gate
+      para PENDENTE quando o campo/valor nao e aceito.
 
       LIMITES: nao prova fluxo principal, repasse de parametros obrigatorios,
       repasse de stdout, `[void](& ...)` nem `& $engine; exit 0`. Raiz diferente
       de $SharedSkillsRoot, copia local do motor e caminho dinamico/interpolado
       resultam em unclassified; chamada dinamica ao mesmo motor tambem resulta
-      em unclassified, e outras chamadas dinamicas sao ignoradas.
+      em unclassified, e outras chamadas dinamicas sao ignoradas. Dot-source ao
+      mesmo motor resulta em unclassified (dot-sourced-setup-call); dot-source a
+      outro destino nao classifica o wrapper como consumidor.
     #>
     param(
         [Parameter(Mandatory)][string]$WrapperPath,
@@ -1060,12 +1064,29 @@ function Get-XpzWritabilityConsumerFinding {
         $localText = [System.IO.File]::ReadAllText($WrapperPath)
         $hasGateWrapperPath = $localText -match 'GateWrapperPath'
 
+        $hasCoverageExtraction = @($ast.FindAll({
+                    param($n) $n -is [System.Management.Automation.Language.AssignmentStatementAst] -and
+                    $n.Left -is [System.Management.Automation.Language.VariableExpressionAst] -and
+                    $n.Left.VariablePath.UserPath -ieq 'coverageMatch' -and
+                    $n.Right.Extent.Text -match '(?is)^\[regex\]::Match\s*\(\s*\$gateRaw\s*,.*writability_coverage.*\)\s*$'
+                }, $true)).Count -gt 0
+        $coverageValidationPattern = '(?is)^\s*if\s*\(\s*\$coverageMatch\.Success\s+-and\s+\$coverageMatch\.Groups\[''value''\]\.Value\s+-in\s+@\(\s*''complete-in-model''\s*,\s*''partial''\s*,\s*''invalid''\s*\)\s*\)\s*\{.*?\}\s*else\s*\{[^}]*\$gateStatus\s*=\s*''PENDENTE''[^}]*\}\s*$'
+        $hasCoverageInvalidFallback = @($ast.FindAll({
+                    param($n) $n -is [System.Management.Automation.Language.IfStatementAst] -and
+                    $n.Extent.Text -match $coverageValidationPattern
+                }, $true)).Count -gt 0
+        $hasCoverageBehavior = $hasCoverageExtraction -and $hasCoverageInvalidFallback
+
         if ($hasGateRaw -and $hasGateOk) {
             $hasCoverageContract = $localText -match 'WRITABILITY_COVERAGE_CONTRACT_V1' -and
                 $localText -match 'writability_coverage'
             if ($hasCoverageContract) {
-                return New-Result -Classification 'direct-compliant' -Channel 'none' `
-                    -Reason $null -Detail $null -EmitFinding $false
+                if ($hasCoverageBehavior) {
+                    return New-Result -Classification 'direct-compliant' -Channel 'none' `
+                        -Reason $null -Detail $null -EmitFinding $false
+                }
+                return New-Result -Classification 'unclassified' -Channel 'engine-diagnostic' `
+                    -Reason 'writability_consumer_contract_unclassified' -Detail 'direct-coverage-behavior-unproven' -EmitFinding $true
             }
             return New-Result -Classification 'direct-stale' -Channel 'customized' `
                 -Reason 'WRITABILITY_CONSUMER_CONTRACT_STALE' -Detail $null -EmitFinding $true
@@ -1079,15 +1100,25 @@ function Get-XpzWritabilityConsumerFinding {
 
         $callSites = @($ast.FindAll({
                     param($n) $n -is [System.Management.Automation.Language.CommandAst] -and
-                    $n.InvocationOperator -eq [System.Management.Automation.Language.TokenKind]::Ampersand
+                    $n.InvocationOperator -in @(
+                        [System.Management.Automation.Language.TokenKind]::Ampersand,
+                        [System.Management.Automation.Language.TokenKind]::Dot)
                 }, $true))
 
         $setupSites = [System.Collections.Generic.List[object]]::new()
         $hasUnresolvedSetupCall = $false
+        $hasDotSourcedSetupCall = $false
         foreach ($site in $callSites) {
             $elements = @($site.CommandElements)
             if ($elements.Count -lt 1) { continue }
             $target = Resolve-XpzEngineTarget -TargetAst $elements[0] -RootAst $ast
+            if ($site.InvocationOperator -eq [System.Management.Automation.Language.TokenKind]::Dot) {
+                if (($null -ne $target.Leaf -and $target.Leaf -ieq 'Test-XpzSetupAudit.ps1') -or
+                    ($target.Kind -eq 'unresolved' -and $site.Extent.Text -match 'Test-XpzSetupAudit\.ps1')) {
+                    $hasDotSourcedSetupCall = $true
+                }
+                continue
+            }
             if ($target.Kind -eq 'shared' -and $target.Leaf -ieq 'Test-XpzSetupAudit.ps1') {
                 $setupSites.Add([pscustomobject]@{ Site = $site; Target = $target })
             } elseif ($target.Kind -eq 'unresolved' -and
@@ -1096,6 +1127,11 @@ function Get-XpzWritabilityConsumerFinding {
                 # reconhecido, mas tambem nao pode sair como not-consumer sem finding.
                 $hasUnresolvedSetupCall = $true
             }
+        }
+
+        if ($hasDotSourcedSetupCall) {
+            return New-Result -Classification 'unclassified' -Channel 'engine-diagnostic' `
+                -Reason 'writability_consumer_contract_unclassified' -Detail 'dot-sourced-setup-call' -EmitFinding $true
         }
 
         if ($hasUnresolvedSetupCall) {

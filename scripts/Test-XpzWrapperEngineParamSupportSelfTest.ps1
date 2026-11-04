@@ -14,12 +14,12 @@
   ambiguo/nao-ambiguo (de nome E de alias), CommonParameters, outro script, simple, sem param()/dynamicparam,
   formas de parse, Join-Path, .PARAMETER orfao, ajuda invisivel, -AlternateSelfLeaf, paridade de molde,
   dedup e secao .EXAMPLE que nao parseia (pulada, sem finding).
-  Inclui H19..H41 do consumidor de gravabilidade (Get-XpzWritabilityConsumerFinding): delegador
+  Inclui H19..H44 do consumidor de gravabilidade (Get-XpzWritabilityConsumerFinding): delegador
   com/sem contrato, motor ausente/parse-error, direto stale/compliant, gateRaw/GATE_OK parciais,
   raiz diferente, redirecionamento (>/*>/1>&2/2>&1), atribuicao, pipeline, copia local, wrapper
   parse-error, comentario/ajuda, not-consumer, caminho interpolado sem gate, chamada dinamica
-  extra ao mesmo motor, escopo da deduplicacao de engine-unavailable e verificacao do contrato
-  no motor real do repositorio.
+  extra ao mesmo motor, dot-source ao mesmo motor/outro destino, escopo da deduplicacao de
+  engine-unavailable e verificacao do contrato no motor real do repositorio.
   Sentinela final: XPZ_WRAPPER_ENGINE_PARAM_SELFTEST_OK.
 #>
 
@@ -493,7 +493,7 @@ param([string]$Ok)
     Assert-HelpFinding (Get-XpzHelpSurfaceFinding -WrapperPath $f) '' '' 'H18 secao que nao parseia e pulada'
 
     # ============================================================================
-    # H19..H41 consumidor do contrato de cobertura de gravabilidade
+    # H19..H44 consumidor do contrato de cobertura de gravabilidade
     # ============================================================================
     $consumerCall = '& $enginePath -KbRoot $KbRoot -GateWrapperPath $GateWrapperPath'
     $consumerWrapper = @'
@@ -529,8 +529,22 @@ param()
     $f = New-Fixture $wrapDir 'h23.ps1' ($consumerWrapper + "`n`$gateRaw = 'GATE_OK'`n")
     Assert-Consumer (Get-XpzWritabilityConsumerFinding -WrapperPath $f -EnginesRoot $synthEngines) 'direct-stale' 'customized' 'WRITABILITY_CONSUMER_CONTRACT_STALE' $true 'H23 hibrido com delegacao continua direto'
 
-    $f = New-Fixture $wrapDir 'h24.ps1' ("# WRITABILITY_COVERAGE_CONTRACT_V1`n# writability_coverage`n" + $consumerWrapper + "`n`$gateRaw = 'GATE_OK'`n")
+    $f = New-Fixture $wrapDir 'h24.ps1' @'
+# WRITABILITY_COVERAGE_CONTRACT_V1
+param([string]$gateRaw)
+$coverageMatch = [regex]::Match($gateRaw, 'writability_coverage\s*[:=]\s*(?<value>\S+)')
+$writabilityCoverage = 'unknown'
+$gateStatus = if ($gateRaw -match '\bGATE_OK\b') { 'OK' } else { 'PENDENTE' }
+if ($coverageMatch.Success -and $coverageMatch.Groups['value'].Value -in @('complete-in-model', 'partial', 'invalid')) {
+    $writabilityCoverage = $coverageMatch.Groups['value'].Value
+} else {
+    $gateStatus = 'PENDENTE'
+}
+'@
     Assert-Consumer (Get-XpzWritabilityConsumerFinding -WrapperPath $f -EnginesRoot $synthEngines) 'direct-compliant' 'none' '' $false 'H24 consumidor direto com contrato'
+
+    $f = New-Fixture $wrapDir 'h42.ps1' ("# WRITABILITY_COVERAGE_CONTRACT_V1`n# writability_coverage`n" + $consumerWrapper + "`n`$gateRaw = 'GATE_OK'`n")
+    Assert-Consumer (Get-XpzWritabilityConsumerFinding -WrapperPath $f -EnginesRoot $synthEngines) 'unclassified' 'engine-diagnostic' 'writability_consumer_contract_unclassified' $true 'H42 marcadores apenas em comentarios nao provam consumo direto'
 
     $f = New-Fixture $wrapDir 'h25.ps1' ($consumerWrapper + "`n`$gateRaw = 'x'`n")
     Assert-Consumer (Get-XpzWritabilityConsumerFinding -WrapperPath $f -EnginesRoot $synthEngines) 'unclassified' 'engine-diagnostic' 'writability_consumer_contract_unclassified' $true 'H25 gateRaw sozinho'
@@ -649,6 +663,25 @@ $enginePath = Join-Path $SharedSkillsRoot 'scripts\Test-XpzSetupAudit.ps1'
 & "$SharedSkillsRoot\scripts\Test-XpzSetupAudit.ps1" -KbRoot $KbRoot > $null
 '@
     Assert-Consumer (Get-XpzWritabilityConsumerFinding -WrapperPath $f -EnginesRoot $synthEngines) 'unclassified' 'engine-diagnostic' 'writability_consumer_contract_unclassified' $true 'H41 chamada dinamica extra ao mesmo motor'
+
+    # H43 dot-source ao mesmo motor, sem gate, nao pode sair como not-consumer.
+    $f = New-Fixture $wrapDir 'h43.ps1' @'
+#requires -Version 7.4
+param([string]$KbRoot)
+. (Join-Path $SharedSkillsRoot 'scripts\Test-XpzSetupAudit.ps1') -KbRoot $KbRoot
+'@
+    $finding = Get-XpzWritabilityConsumerFinding -WrapperPath $f -EnginesRoot $synthEngines
+    Assert-Consumer $finding 'unclassified' 'engine-diagnostic' 'writability_consumer_contract_unclassified' $true 'H43 dot-source ao mesmo motor'
+    if ([string]$finding.Detail -ne 'dot-sourced-setup-call') {
+        throw "ASSERT_FAILED: H43 dot-source ao mesmo motor | Detail esperado=dot-sourced-setup-call obtido=$($finding.Detail)"
+    }
+
+    # H44 dot-source a outro destino nao torna o wrapper consumidor do motor.
+    $f = New-Fixture $wrapDir 'h44.ps1' @'
+#requires -Version 7.4
+. (Join-Path $PSScriptRoot 'Common.ps1')
+'@
+    Assert-Consumer (Get-XpzWritabilityConsumerFinding -WrapperPath $f -EnginesRoot $synthEngines) 'not-consumer' 'none' '' $false 'H44 dot-source a outro destino'
 
     Write-Output 'XPZ_WRAPPER_ENGINE_PARAM_SELFTEST_OK'
 } finally {
