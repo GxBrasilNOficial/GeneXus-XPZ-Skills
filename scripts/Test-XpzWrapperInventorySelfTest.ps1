@@ -793,6 +793,8 @@ if ($json.roundtripStatus -eq 'roundtrip-ok') { Write-Output 'ok' }
         ForEach-Object { $_.ToString() }) -join ' '
     Assert-NotContains -Text $output -Pattern 'Test-DemoKbSetupAudit\.ps1\(reason=writability_consumer_contract_unclassified' -Message 'molde real nao pode ser unclassified'
     Assert-NotContains -Text $output -Pattern 'Test-DemoKbSetupAudit\.ps1\(reason=WRITABILITY_CONSUMER_CONTRACT_STALE\)' -Message 'molde real nao pode ser stale'
+    Assert-NotContains -Text $output -Pattern 'Test-DemoKbSetupAudit\.ps1\(reason=writability_consumer_contract_engine_without_contract' -Message 'molde real nao pode acusar motor sem contrato'
+    Assert-NotContains -Text $output -Pattern 'Test-DemoKbSetupAudit\.ps1\(reason=writability_consumer_contract_engine_unavailable' -Message 'molde real nao pode acusar motor indisponivel'
 
     $canonicalSetupAudit = @'
 #requires -Version 7.4

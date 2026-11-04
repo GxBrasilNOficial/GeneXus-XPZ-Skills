@@ -14,10 +14,11 @@
   ambiguo/nao-ambiguo (de nome E de alias), CommonParameters, outro script, simple, sem param()/dynamicparam,
   formas de parse, Join-Path, .PARAMETER orfao, ajuda invisivel, -AlternateSelfLeaf, paridade de molde,
   dedup e secao .EXAMPLE que nao parseia (pulada, sem finding).
-  Inclui H19..H37 do consumidor de gravabilidade (Get-XpzWritabilityConsumerFinding): delegador
+  Inclui H19..H39 do consumidor de gravabilidade (Get-XpzWritabilityConsumerFinding): delegador
   com/sem contrato, motor ausente/parse-error, direto stale/compliant, gateRaw/GATE_OK parciais,
-  raiz diferente, redirecionamento, atribuicao, pipeline, copia local, wrapper parse-error,
-  comentario/ajuda, not-consumer e escopo da deduplicacao de engine-unavailable.
+  raiz diferente, redirecionamento (>/*>/1>&2/2>&1), atribuicao, pipeline, copia local, wrapper
+  parse-error, comentario/ajuda, not-consumer, escopo da deduplicacao de engine-unavailable e
+  verificacao do contrato no motor real do repositorio.
   Sentinela final: XPZ_WRAPPER_ENGINE_PARAM_SELFTEST_OK.
 #>
 
@@ -491,7 +492,7 @@ param([string]$Ok)
     Assert-HelpFinding (Get-XpzHelpSurfaceFinding -WrapperPath $f) '' '' 'H18 secao que nao parseia e pulada'
 
     # ============================================================================
-    # H19..H37 consumidor do contrato de cobertura de gravabilidade
+    # H19..H39 consumidor do contrato de cobertura de gravabilidade
     # ============================================================================
     $consumerCall = '& $enginePath -KbRoot $KbRoot -GateWrapperPath $GateWrapperPath'
     $consumerWrapper = @'
@@ -616,6 +617,18 @@ Write-Output $X
     }
     if (Test-XpzWritabilityEngineSignalForSetup -EngineParamFinding $null) {
         throw 'ASSERT_FAILED: H37 ausencia de finding nao pode suprimir engine-unavailable'
+    }
+
+    # H38 1>&2 redireciona stdout para stderr -> nao pode ser delegado conforme.
+    $f = New-Fixture $wrapDir 'h38.ps1' $consumerWrapper.Replace($consumerCall, $consumerCall + ' 1>&2')
+    Assert-Consumer (Get-XpzWritabilityConsumerFinding -WrapperPath $f -EnginesRoot $synthEngines) 'unclassified' 'engine-diagnostic' 'writability_consumer_contract_unclassified' $true 'H38 1>&2 rejeitado'
+
+    # H39 o motor real do repositorio ainda contem o contrato de cobertura.
+    $realEnginePath = Join-Path $scriptDir 'Test-XpzSetupAudit.ps1'
+    $realEngineText = [System.IO.File]::ReadAllText($realEnginePath)
+    if ($realEngineText -notmatch 'WRITABILITY_COVERAGE_CONTRACT_V1' -or
+        $realEngineText -notmatch 'writability_coverage') {
+        throw 'ASSERT_FAILED: H39 motor real perdeu o contrato de cobertura'
     }
 
     Write-Output 'XPZ_WRAPPER_ENGINE_PARAM_SELFTEST_OK'
