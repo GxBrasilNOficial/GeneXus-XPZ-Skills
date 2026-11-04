@@ -101,10 +101,11 @@ A linha 3 é a decisiva: no `AC` do UPDATE, o valor anterior foi 31/10/2026 e o 
 - Correlação `BU`↔`AC`: sem timestamp por linha nem id de operação; a conclusão depende de as duas linhas pertencerem ao mesmo UPDATE. Mesma `<key>`, linhas adjacentes, um só `BU` observado — correlação por ordem e chave.
 - Posição de uso: o valor medido foi passado como **argumento de chamada** a uma procedure externa. Uso em atribuição de variável, comparação ou `msg` não foi medido; o `O<nn>` pode ser artefato do marshalling da chamada.
 - Unicidade: o `.cs` tem **dois** pontos de chamada (`EndLevel045` e um `XC_*`); não se sabe qual gerou o `AC` medido nem qual fluxo alcança o segundo. n=1.
-- Não testado: INSERT e DELETE como objeto de medição; atributo que não muda; valor anterior nulo; transições nulo↔valor; atributo com `Default`; atributo-chave; `Transaction` com 2+ níveis; via `[BC]`; outros geradores/DBMS; concorrência; environment sem integridade transacional; `Old()` (mediu-se `GetOldValue()`).
+- Não testado: INSERT e DELETE como objeto de medição; atributo que não muda; valor anterior nulo em UPDATE; transições nulo↔valor em UPDATE; atributo com `Default`; atributo-chave; `Transaction` com 2+ níveis; via `[BC]`; outros geradores/DBMS; concorrência; environment sem integridade transacional; `Old()` (mediu-se `GetOldValue()`).
 - Metadados não informados: versão/build do GeneXus, versão do gerador, estado da integridade transacional, nível de isolamento.
 - Instrumento: a procedure de sondagem compilou e rodou no build da medição; o `spc0010` veio de iterações anteriores da mesma procedure e foi resolvido antes. Numa rodada anterior, com sink em atributo da própria `Transaction`, a chamada constava do código e nada foi gravado; a causa não foi isolada. Corolário: **ausência de linha no log não é observação negativa**.
 - Linha 4 do log: `o = c` na mesma chave, sem `BU` imediatamente antes; a ação que a gerou não foi identificada. Nada da conclusão principal depende dela.
+- Linha 1 do log: criação da origem, com `o` vazio; não conta como teste de valor anterior nulo em UPDATE nem cobre INSERT como objeto de medição.
 
 **Perguntas abertas (exigem sessão na KB, não redação).**
 
@@ -136,7 +137,7 @@ spc0010: Type mismatch in assignment: &Line = ... (Numeric=Character).
 
 **Causa atribuída (hipótese).** O nome resolve para a função nativa `Line` (numérica), não para a variável; a atribuição de texto vira `Numeric=Character`. Alternativas não descartadas: colisão com atributo/domínio de mesmo nome no escopo (análogo a `src0229`), ou outro símbolo `Line` visível. Renomear para `ProbeLogLine` resolveu e o build passou.
 
-**Por que não entra na tabela atômica de erros do `02`.** `spc0010` é código genérico de incompatibilidade de tipo; a causa aqui é atribuída, não provada, e o caso é de `Procedure`, não de `Transaction`. Entra na tabela no dia em que houver prova da causa e mensagem literal estável de um caso reproduzido nesta base.
+**Por que não entra na tabela atômica de erros do `02`.** `spc0010` é código genérico de incompatibilidade de tipo; a causa aqui é atribuída, não provada. Entra na tabela no dia em que houver prova da causa e mensagem literal estável de um caso reproduzido nesta base.
 
 **Próximo passo.** Teste mínimo: mesmo corpo com `Line` vs `LinhaX`; verificar se há outro símbolo `Line` no escopo; confirmar a função nativa na `nexa`/documentação.
 
