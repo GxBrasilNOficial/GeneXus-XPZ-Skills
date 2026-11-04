@@ -76,6 +76,8 @@ Do **not** generate from this list without **confirmado-import**, **confirmado-b
 
 `on BeforeDelete`, `on AfterDelete`, `on BeforeValidate`, `on BeforeComplete`, `on AfterInsert`, `on AfterUpdate`, `on AfterComplete`, and other lifecycle triggers described in GeneXus product documentation or **nexa** (`common-rules.md` TRIGGERS, including `AfterLevel [level <attribute>]` for level-scoped timing — distinct from `on AfterValidate(<Attribute>)`).
 
+Runtime note (2026-11-03, delegated, web editing): `on AfterComplete` fired and `GetOldValue()` returned the previous value in one measured UPDATE. The generated `.cs` places the call after `CommitDataStores` **without** re-checking `AnyError`, so the code does not prove a post-commit guard, and the measurement does not authorise generation. `on AfterComplete` stays `padrao-gx-nao-verificado`. Review rule, limits and open questions: `02-regras-operacionais-e-runtime.md`, section **Regra de revisão: Old e GetOldValue em on AfterComplete**, and `999-ideias-pendentes.md`, entry **Old e GetOldValue em on AfterComplete — medição web 2026-11-03**.
+
 ### Catalog 2 — `Events` in `Transaction` (web scope unless noted)
 
 | Construct / action | Status | Specifier / motor evidence | Notes |
@@ -151,6 +153,7 @@ Cross-reference: this map answers **where** a rule assignment lives in generated
 - [ ] Any new or updated catalog row in this file uses exactly one evidence label (`confirmado-import`, `confirmado-build`, `confirmado-acervo`, `padrao-gx-nao-verificado`); nothing was promoted to `confirmado-*` without import/build, parallel corpus XML, or sanitized template evidence
 - [ ] `padrao-gx-nao-verificado` items, if any, live in a clearly titled subsection separate from confirmed rows; no syntax was generated from unverified items alone
 - [ ] Before editing `Rules` or `Events`, the agent consulted **Catalog: `on <event>` clauses…** above and did not generate Catalog 1 rejected forms or Catalog 2 attribute assignments in `Events`
+- [ ] When a `Rules`/`Events` delta uses `Old()`/`GetOldValue()` in `on AfterComplete`, the review rule in `02-regras-operacionais-e-runtime.md` (section **Regra de revisão: Old e GetOldValue em on AfterComplete**) was read; the old value was not treated as a generation premise, as commit control, or as proof of persistence
 - [ ] If the Transaction has `GenerateObject=False` (structure/BC only), it does not carry WorkWithPlus (DVelop) screen baggage — no `Call("LoadWWPContext")`/`Call("<Trn>WW")` in `Events`/`Rules`, no `Apply:<wwp-guid>` property, no `WorkWithPlus*` PatternInstance/derivatives in the package; closed with `Test-GeneXusTransactionCoherence.ps1` (finding `wwp-screen-code-on-non-generated-transaction`). The native Work With (`Apply:78cecefe`) is not in scope of this check
 
 ## Related gates and WORKFLOW links

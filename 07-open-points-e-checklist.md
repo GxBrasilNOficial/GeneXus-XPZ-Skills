@@ -85,6 +85,7 @@ Servir como local único para conflitos não resolvidos silenciosamente.
 - `Inferência forte`: `Theme`, `PatternSettings`, `Transaction`, `Attribute`, `Folder`, `Design System`, `Deployment Unit`, `Data Selector` e `Work With for Web` deixam de ser pendencias estruturais abertas nesta trilha.
 - `Inferência forte`: a fronteira principal remanescente se concentra na camada física `Table/Index`; `API` fica encerrada por ora como estudo de caso único, sem base para generalizacao adicional.
 - `Calibração (from-spec, 2026-07-01)`: o "encerrada como estudo de caso único, sem base para generalização" acima refere-se ao perfil **cadeia-grande**. A Fase 0 (frente `API` from-spec + GAM) abriu um perfil **from-spec autocontido** (tríade `API`->`Procedure`->`SDT`, validada por importação real), esse generalizável; ver `03-risco-e-decisao-por-tipo.md` (`API (cadeia)` vs `API (from-spec)`) e `xpz-builder/responsibilities-by-type/api.md`.
+- `Calibração (decisão provisória, 2026-11-03)`: evidência de runtime delegada não entra na `02` como log nem como nível de confiança; a `02` recebe apenas a regra negativa de revisão e o detalhe fica no `999`. Reavaliar quando a `nexa` ou a documentação de produto cobrir `Old()`/`GetOldValue()` em `on AfterComplete`.
 
 ## Próximas frentes recomendadas
 

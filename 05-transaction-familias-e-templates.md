@@ -337,6 +337,7 @@ Permitir escolha repetivel de template interno real, reduzindo risco de vazament
 - se existirem, validar os `ATTCUSTOMTYPE` correspondentes no alvo
 - revisar eventos, regras e defaults apenas depois que a camada de atributos e contexto estiver coerente
 - ao editar `Rules` ou `Events` no XPZ (não apenas estrutura/familia), consultar antes o catalogo motor em `xpz-builder/responsibilities-by-type/transaction.md` (seção **Catalog: `on <event>` clauses…**) e anti-padroes em `02-regras-operacionais-e-runtime.md`; linguagem GeneXus correta: skill **nexa**
+- quando a rule usar `Old()`/`GetOldValue()` em `on AfterComplete`, ler também a **Regra de revisão: Old e GetOldValue em on AfterComplete** em `02-regras-operacionais-e-runtime.md`; não é permissão de geração
 
 ## Diagnostico operacional do erro
 

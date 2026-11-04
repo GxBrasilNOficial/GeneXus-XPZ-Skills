@@ -1568,6 +1568,14 @@ Não confundir `src0056` em `Transaction` `Rules` com o playbook de `Procedure` 
 - **Correcao idiomatica**: não tratar como erro generico de sintaxe. Manter o `Default(...)` **incondicional** e, quando a intencao for atribuir condicionalmente, mover a condicao para uma **rule de assignment** separada (`<Atributo> = <expressão> if <condição>;`). **Atencao (sem equivalencia de runtime)**: as duas formas **não** são equivalentes — `Default` da valor inicial quando o atributo esta vazio; a assignment avalia a rule sob seu proprio gatilho. Documentar como forma idiomatica que passa no import, **sem** afirmar equivalencia semantica; a escolha correta entre `Default` e assignment condicional e conhecimento de modelagem GeneXus (fronteira **nexa**), como nas irmãs.
 - **Relacao com a cascata**: tema relacionado mas **mecanismo distinto** da entrada `transaction-attribute-rule-shadowed-by-default-in-cascade` (acima neste `02`; detalhada na seção «Cascade ordering» do satelite `transaction.md`): `src0239` e **rejeicao no import** (o Specifier barra antes de gerar); a cascata e **sombreamento em runtime** com import/build limpos. **Não confundir** nem fundir.
 
+#### Regra de revisão: Old e GetOldValue em on AfterComplete
+
+- `Regra operacional`: ao revisar `Rules` de `Transaction` que usem `Old()`/`GetOldValue()` em `on AfterComplete`, **não usar a execução da rule como prova de que o commit foi confirmado**. A documentação de produto diz que o gatilho roda após a LUW confirmada, mas o `.cs` medido (2026-11-03) não re-checa o resultado do commit; se a ação exigir commit confirmado, re-verificar em vez de assumir.
+- `Regra operacional`: **não tratar o valor anterior como garantido** nesse ponto. O valor anterior foi observado uma vez, em edição web, sem prova do mecanismo (campo em memória vs releitura); validar na KB alvo antes de depender dele.
+- `Regra operacional`: **não usar** `on AfterComplete` para controlar commit/rollback nem o valor anterior como prova de persistência.
+- `Regra operacional`: esta regra **não autoriza gerar** `on AfterComplete`. O item continua `padrao-gx-nao-verificado` no catálogo do tipo; gerar segue exigindo `confirmado-import`, `confirmado-build` ou `confirmado-acervo`.
+- `Nota de escopo`: isto não documenta a linguagem GeneXus (fronteira de `00:142` e `02:1535`); é cautela de revisão no escopo XPZ, com evidência delegada e não reproduzida aqui. A evidência, os limites e as perguntas abertas estão no `999`, entrada **Old e GetOldValue em on AfterComplete — medição web 2026-11-03**. Remover ou migrar quando `nexa`/produto cobrir o caso. Este critério é mais fraco que o de `transaction-attribute-rule-shadowed-by-default-in-cascade` e **não** autoriza outras quarentenas de conhecimento de produto.
+
 ### Politica para `API`
 
 - `Evidência direta`: a base observa apenas `1` `API` real nesta KB.

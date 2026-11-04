@@ -68,6 +68,78 @@ Entradas legadas sem avaliação carregam `FALTA AVALIAR` em ambos os campos at�
 
 **Arquivos candidatos.** `xpz-builder/SKILL.md` (clonagem, 9-IDO e empacotamento), `xpz-builder/quality-checklist.md` e exemplo a definir sob `xpz-builder/examples/`. Motores existentes são referências para a documentação, não alterações já aprovadas.
 
+<a id="getoldvalue-aftercomplete-web-20261103"></a>
+
+## Old e GetOldValue em on AfterComplete — medição web 2026-11-03
+
+- **Importância** — média (a decisão de revisar/gerar `on AfterComplete` depende de não assumir commit nem valor anterior; o achado é positivo, mas n=1 e delegado).
+- **Maturidade** — pesquisa feita (medição existe; restam as perguntas abertas abaixo, que exigem sessão na KB, não redação).
+
+**Origem e proveniência.** Sessão delegada de 2026-11-03, autorizada pelo operador, em KB de teste (alias público no `GeneXus-XPZ-PrivateMap`, `maps/kb-alias-map.csv`), environment .NET Framework + SQL Server. Log, `.cs` e identificação da KB ficam em `GeneXus-XPZ-PrivateMap/notes/runtime-evidence-20261103.md`. **Não reproduzido nesta base**; não é `confirmado-import`, `confirmado-build` nem `confirmado-acervo`.
+
+**O que foi medido.** UPDATE via edição web de um atributo de data, anulável, não-chave, de 31/10/2026 para 02/11/2026. Log literal (sanitizado; a procedure de sondagem fez append em arquivo):
+
+```text
+<probe>|AC|<key>|o=  /  /  |c=31/10/26
+<probe>|BU|<key>|o=31/10/26|c=02/11/26
+<probe>|AC|<key>|o=31/10/26|c=02/11/26
+<probe>|AC|<key>|o=02/11/26|c=02/11/26
+```
+
+A linha 3 é a decisiva: no `AC` do UPDATE, o valor anterior foi 31/10/2026 e o corrente 02/11/2026. O `BU` devolveu o mesmo par. A persistência do valor novo foi verificada pela tela de lista, **não** por consulta ao banco.
+
+**Código gerado.** No `.cs` do mesmo build, a chamada é emitida dentro do ramo que contém o commit, **depois** de `CommitDataStores`; o `if (AnyError == 0)` externo é avaliado **antes** do commit e **não** há re-checagem depois. O argumento `GetOldValue()` foi gerado como o campo `O<nn><AttrNaoChave>`. Consequência: o trecho **não prova** "só roda se a LUW foi confirmada"; isso é o que a documentação afirma, não o que o código mostra.
+
+**O que a documentação diz.** Artigo oficial "AfterComplete Triggering event" (wiki GeneXus, válido para GeneXus 18 e anteriores): com integridade transacional, as rules de `AfterComplete` rodam depois da LUW concluída e só se ela for confirmada; sem integridade, o gatilho equivale a `AfterInsert`/`AfterUpdate`/`AfterDelete`.
+
+**O que não foi localizado.** Em 2026-11-03, nas fontes consultadas (`nexa`, seções de funções e de triggers, e o artigo acima), nada diz o que `Old()`/`GetOldValue()` devolve nesse ponto. Ausência nas fontes consultadas, não prova de ausência na documentação.
+
+**Limites (não provado).**
+
+- Estado do commit: não provado pelo código, não testado em execução (nenhuma falha de commit foi medida).
+- Origem do valor antigo: campo `O<nn>` em memória vs releitura do banco. A hipótese de que seja a imagem carregada no início da operação é **hipótese**; essa imagem não é necessariamente o último valor confirmado no banco (concorrência).
+- Correlação `BU`↔`AC`: sem timestamp por linha nem id de operação; a conclusão depende de as duas linhas pertencerem ao mesmo UPDATE. Mesma `<key>`, linhas adjacentes, um só `BU` observado — correlação por ordem e chave.
+- Posição de uso: o valor medido foi passado como **argumento de chamada** a uma procedure externa. Uso em atribuição de variável, comparação ou `msg` não foi medido; o `O<nn>` pode ser artefato do marshalling da chamada.
+- Unicidade: o `.cs` tem **dois** pontos de chamada (`EndLevel045` e um `XC_*`); não se sabe qual gerou o `AC` medido nem qual fluxo alcança o segundo. n=1.
+- Não testado: INSERT e DELETE como objeto de medição; atributo que não muda; valor anterior nulo; transições nulo↔valor; atributo com `Default`; atributo-chave; `Transaction` com 2+ níveis; via `[BC]`; outros geradores/DBMS; concorrência; environment sem integridade transacional; `Old()` (mediu-se `GetOldValue()`).
+- Metadados não informados: versão/build do GeneXus, versão do gerador, estado da integridade transacional, nível de isolamento.
+- Instrumento: a procedure de sondagem compilou e rodou no build da medição; o `spc0010` veio de iterações anteriores da mesma procedure e foi resolvido antes. Numa rodada anterior, com sink em atributo da própria `Transaction`, a chamada constava do código e nada foi gravado; a causa não foi isolada. Corolário: **ausência de linha no log não é observação negativa**.
+- Linha 4 do log: `o = c` na mesma chave, sem `BU` imediatamente antes; a ação que a gerou não foi identificada. Nada da conclusão principal depende dela.
+
+**Perguntas abertas (exigem sessão na KB, não redação).**
+
+1. Versão/build do GeneXus, gerador e estado da integridade transacional.
+2. Qual dos dois pontos de chamada disparou o `AC`.
+3. O que gerou a linha 4 (operação sem alteração, reprocessamento ou o ponto `XC_*`).
+4. Corpo de `ConfirmValues040` e dependência de `Commit on Exit`.
+5. Caminho de falha de commit: a rule roda ou não.
+
+**Relação com a entrada D1/D2.** Contexto distinto: aqui é **edição web**, não BC; e `GetOldValue()` sem `Default`. **Não resolve D1/D2** e não deve ser lido como extensão daquele diagnóstico.
+
+**Uso na base.** A cautela operacional derivada está na `02`, seção **Regra de revisão: Old e GetOldValue em on AfterComplete**. Este registro é a evidência; a `02` é a regra.
+
+**Destino e retomada.** Não urgente. Respondidas as perguntas abertas, promover, corrigir ou descartar o registro. Se `nexa` ou a documentação de produto cobrir a interação, remover a regra da `02` e esta entrada.
+
+<a id="spc0010-procedure-variavel-line-20261103"></a>
+
+## spc0010 em Procedure: variável com nome de função nativa (Line) — 2026-11-03
+
+- **Importância** — baixa (contorno trivial: renomear a variável).
+- **Maturidade** — ideia (mensagem e correção observadas; causa atribuída, não provada).
+
+**Origem.** Sessão delegada de 2026-11-03, ao compilar uma `Procedure` de sondagem com variável chamada `Line`. Três builds falharam com:
+
+```text
+spc0010: Type mismatch in assignment: &Line = ... (Numeric=Character).
+(Procedure '<proc>' Source, Linha: 1)
+```
+
+**Causa atribuída (hipótese).** O nome resolve para a função nativa `Line` (numérica), não para a variável; a atribuição de texto vira `Numeric=Character`. Alternativas não descartadas: colisão com atributo/domínio de mesmo nome no escopo (análogo a `src0229`), ou outro símbolo `Line` visível. Renomear para `ProbeLogLine` resolveu e o build passou.
+
+**Por que não entra na tabela atômica de erros do `02`.** `spc0010` é código genérico de incompatibilidade de tipo; a causa aqui é atribuída, não provada, e o caso é de `Procedure`, não de `Transaction`. Entra na tabela no dia em que houver prova da causa e mensagem literal estável de um caso reproduzido nesta base.
+
+**Próximo passo.** Teste mínimo: mesmo corpo com `Line` vs `LinhaX`; verificar se há outro símbolo `Line` no escopo; confirmar a função nativa na `nexa`/documentação.
+
 <a id="xpz-relato-20261005-comparacao-bc"></a>
 
 ## Investigar comparação de BC com Default, GetOldValue e escala decimal em ToJson — relato 2026-10-05
@@ -86,6 +158,8 @@ Entradas legadas sem avaliação carregam `FALTA AVALIAR` em ambos os campos at�
 **Recorte e direção.** Inspecionar o C# efetivamente gerado nos dois casos e construir caso mínimo que distinga inicialização, Load, alteração em memória, valor persistido e contexto da chamada de `GetOldValue()`. Para JSON, distinguir igualdade numérica de representação textual e preservar a semântica de nulo; comparar strings ou apagar marcas de nulidade não prova igualdade funcional. A alternativa de comparar por `ToJson()` em D1 deve ser avaliada junto com a limitação relatada em D2, não prescrita isoladamente.
 
 **Destino e retomada.** Não urgente; investigação adiada em 2026-10-05. Consultar `nexa` e documentação oficial antes de propor conhecimento de linguagem/runtime. Registrar na base XPZ apenas o que for pertinente à preparação e revisão dos objetos, com contexto e nível de evidência; não criar anti-padrão universal a partir do relato. Não depende da pendência geral de migração de memória pessoal: a origem aqui é um prompt fornecido pelo usuário.
+
+Contexto distinto, já medido: `Old()`/`GetOldValue()` em `on AfterComplete` via edição web (entrada **Old e GetOldValue em on AfterComplete — medição web 2026-11-03**). É web, não BC, e **não resolve** D1/D2.
 
 **Fora das cinco frentes.** A1 (environment efetivo) já foi corrigido em `be24ecd` nos motores BuildAll/SpecifyGenerate; o self-test de contexto passou nesta avaliação, sem novo build real. D3 (BC em For each) já tem precaução documentada e pendência própria de detector abaixo. C2 (tempo das validações) não foi medido novamente; o orquestrador único permanece descartado em `998-ideias-descartadas-e-porque.md`, seção "Preflight único". Resumo de resultados tem relação com "Manifesto semântico de pacote", mas não prova ganho de desempenho nem autoriza reabrir o runner.
 
