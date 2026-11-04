@@ -531,7 +531,7 @@ Referencia rápida para decidir o peso operacional da ausencia de cada wrapper. 
 - Exemplos em comentario ou blocos de ajuda, como `.EXAMPLE`, não bloqueiam o bootstrap apenas por conterem caminhos ilustrativos; se forem mantidos, não podem ser citados como evidencia de configuração local validada.
 - Os exemplos sanitizados de wrappers incorporam uma trilha real de pasta paralela da KB com:
   - metadados da KB gravados em `kb-source-metadata.md`
-  - `last_xpz_materialization_run_at` atualizado a cada processamento XPZ/XML solicitado
+  - `last_xpz_materialization_run_at` atualizado a cada processamento de materialização XPZ/XML solicitado; a conferência `-VerifyOnly` não atualiza o campo
   - refresh compulsorio do índice derivado após materialização XPZ/XML bem-sucedida
   - resumo Git limitado ao acervo oficial quando houver mudanca material
   - limpeza localizada de residuos de objeto renomeado por `guid`, preservando o XML com nome atual e `lastUpdate` mais confiavel
