@@ -15,10 +15,12 @@
     (repasse a motor compartilhado advanced de parametro nao-declarado; caso end-to-end).
     Valida ainda o diff de superficie wrapper-vs-molde (surface_mismatch -> INVENTORY_CUSTOMIZED;
     reducoes opcionais/ValidateSet -> INVENTORY_SURFACE_ADVISORY) em casos de unidade + end-to-end,
-    e o comment-based help (flag orfa no .EXAMPLE de script advanced -> INVENTORY_CUSTOMIZED
-    reason=help_example_undeclared_param; ajuda invisivel -> INVENTORY_HELP_ADVISORY), mais a
-    guarda-regressao que localiza por conteudo o regex de pendencia do agregador
-    (Test-XpzSetupAudit.ps1) e falha se ele casar os rotulos de aviso.
+    o comment-based help (flag orfa no .EXAMPLE de script advanced -> INVENTORY_CUSTOMIZED
+    reason=help_example_undeclared_param; ajuda invisivel -> INVENTORY_HELP_ADVISORY), o consumidor
+    do contrato de cobertura de gravabilidade (molde real, delegador puro, raiz diferente,
+    redirecionamento de stdout, copia local e hibrido) e a guarda-regressao que localiza por
+    conteudo o regex de pendencia do agregador (Test-XpzSetupAudit.ps1) e falha se ele casar os
+    rotulos de aviso.
 #>
 
 [CmdletBinding()]
@@ -700,6 +702,8 @@ param(
     Assert-Contains -Text 'INVENTORY_CUSTOMIZED: X(reason=surface_mismatch: mandatory_param_missing -Query)' -Pattern $blockRegex -Message 'regex de pendencia DEVE casar INVENTORY_CUSTOMIZED (surface_mismatch bloqueia via CUSTOMIZED)'
     Assert-NotContains -Text 'INVENTORY_SURFACE_ADVISORY: X(reason=validateset_reduced: -Query [a, b])' -Pattern $blockRegex -Message 'REGRESSAO: regex de pendencia NAO pode casar INVENTORY_SURFACE_ADVISORY'
     Assert-NotContains -Text 'INVENTORY_ENGINE_DIAGNOSTIC: X(reason=engine_unresolved_or_unparseable: Y)' -Pattern $blockRegex -Message 'REGRESSAO: regex de pendencia NAO pode casar INVENTORY_ENGINE_DIAGNOSTIC'
+    Assert-NotContains -Text 'INVENTORY_ENGINE_DIAGNOSTIC: X(reason=writability_consumer_contract_engine_without_contract: Y)' -Pattern $blockRegex -Message 'REGRESSAO: regex de pendencia NAO pode casar engine_without_contract'
+    Assert-NotContains -Text 'INVENTORY_ENGINE_DIAGNOSTIC: X(reason=writability_consumer_contract_engine_unavailable: Y)' -Pattern $blockRegex -Message 'REGRESSAO: regex de pendencia NAO pode casar engine_unavailable'
     Assert-NotContains -Text 'INVENTORY_HELP_ADVISORY: X(reason=help_invisible)' -Pattern $blockRegex -Message 'REGRESSAO: regex de pendencia NAO pode casar INVENTORY_HELP_ADVISORY'
     Assert-Contains -Text 'INVENTORY_CUSTOMIZED: X(reason=help_example_undeclared_param:-AsJson)' -Pattern $blockRegex -Message 'regex de pendencia DEVE casar help_example_undeclared_param (bloqueia via CUSTOMIZED)'
 
@@ -774,6 +778,92 @@ if ($json.roundtripStatus -eq 'roundtrip-ok') { Write-Output 'ok' }
     $output = (& $inventoryScriptPath -KbParallelRoot $kbRoot -SkillsExamplesPath $examplesPath 2>&1 |
         ForEach-Object { $_.ToString() }) -join ' '
     Assert-NotContains -Text $output -Pattern 'Update-DemoKbFromXpz\.ps1\(reason=roundtrip_exit_only_without_status\)' -Message 'wrapper que le roundtripStatus nao pode ser sinalizado por esse motivo'
+
+    # ============================================================================
+    # Consumidor do contrato de cobertura de gravabilidade: ancora no molde real,
+    # delegador puro, raiz diferente, redirecionamento de stdout, copia local,
+    # hibrido e ajuda/comentario.
+    # ============================================================================
+    $realSetupMold = Join-Path $scriptDir '../xpz-kb-parallel-setup/examples/Test-KbSetupAudit.example.ps1'
+    $moldText = [System.IO.File]::ReadAllText($realSetupMold)
+    Copy-Item -LiteralPath $realSetupMold -Destination (Join-Path $examplesPath 'Test-KbSetupAudit.example.ps1') -Force
+    Copy-Item -LiteralPath $realSetupMold -Destination $setupAuditStandardPath -Force
+
+    $output = (& $inventoryScriptPath -KbParallelRoot $kbRoot -SkillsExamplesPath $examplesPath 2>&1 |
+        ForEach-Object { $_.ToString() }) -join ' '
+    Assert-NotContains -Text $output -Pattern 'Test-DemoKbSetupAudit\.ps1\(reason=writability_consumer_contract_unclassified' -Message 'molde real nao pode ser unclassified'
+    Assert-NotContains -Text $output -Pattern 'Test-DemoKbSetupAudit\.ps1\(reason=WRITABILITY_CONSUMER_CONTRACT_STALE\)' -Message 'molde real nao pode ser stale'
+
+    $canonicalSetupAudit = @'
+#requires -Version 7.4
+param(
+    [string]$KbRoot,
+    [string]$GateWrapperPath,
+    [string]$MetadataWrapperTestPath,
+    [string]$SharedSkillsRoot = 'C:\Skills',
+    [switch]$AsJson
+)
+$enginePath = Join-Path $SharedSkillsRoot 'scripts\Test-XpzSetupAudit.ps1'
+& $enginePath -KbRoot $KbRoot -GateWrapperPath $GateWrapperPath -MetadataWrapperTestPath $MetadataWrapperTestPath -AsJson:$AsJson
+'@
+
+    Set-Content -LiteralPath (Join-Path $examplesPath 'Test-KbSetupAudit.example.ps1') -Value $canonicalSetupAudit -Encoding utf8NoBOM
+    Set-Content -LiteralPath $setupAuditStandardPath -Value $canonicalSetupAudit -Encoding utf8NoBOM
+
+    $output = (& $inventoryScriptPath -KbParallelRoot $kbRoot -SkillsExamplesPath $examplesPath 2>&1 |
+        ForEach-Object { $_.ToString() }) -join ' '
+    Assert-NotContains -Text $output -Pattern 'Test-DemoKbSetupAudit\.ps1\(reason=writability_consumer_contract_unclassified' -Message 'delegador canonico nao pode ser unclassified'
+    Assert-NotContains -Text $output -Pattern 'Test-DemoKbSetupAudit\.ps1\(reason=WRITABILITY_CONSUMER_CONTRACT_STALE\)' -Message 'delegador canonico nao pode ser stale'
+
+    # Raiz diferente de $SharedSkillsRoot -> unclassified.
+    $rootVariant = $canonicalSetupAudit.Replace('$enginePath = Join-Path $SharedSkillsRoot', '$enginePath = Join-Path $outraRaiz')
+    Set-Content -LiteralPath $setupAuditStandardPath -Value $rootVariant -Encoding utf8NoBOM
+    $output = (& $inventoryScriptPath -KbParallelRoot $kbRoot -SkillsExamplesPath $examplesPath 2>&1 |
+        ForEach-Object { $_.ToString() }) -join ' '
+    Assert-Contains -Text $output -Pattern 'Test-DemoKbSetupAudit\.ps1\(reason=writability_consumer_contract_unclassified' -Message 'raiz diferente deve ser unclassified'
+
+    # Redirecionamento de stdout: > e *> descartam; 2>&1 e permitido.
+    $callLine = '& $enginePath -KbRoot $KbRoot -GateWrapperPath $GateWrapperPath -MetadataWrapperTestPath $MetadataWrapperTestPath -AsJson:$AsJson'
+    foreach ($redirection in @(' > $null', ' *> $null')) {
+        $variant = $canonicalSetupAudit.Replace($callLine, $callLine + $redirection)
+        Set-Content -LiteralPath $setupAuditStandardPath -Value $variant -Encoding utf8NoBOM
+        $output = (& $inventoryScriptPath -KbParallelRoot $kbRoot -SkillsExamplesPath $examplesPath 2>&1 |
+            ForEach-Object { $_.ToString() }) -join ' '
+        Assert-Contains -Text $output -Pattern 'Test-DemoKbSetupAudit\.ps1\(reason=writability_consumer_contract_unclassified' -Message "redirecionamento $redirection deve ser unclassified"
+    }
+
+    $variant = $canonicalSetupAudit.Replace($callLine, $callLine + ' 2>&1')
+    Set-Content -LiteralPath $setupAuditStandardPath -Value $variant -Encoding utf8NoBOM
+    $output = (& $inventoryScriptPath -KbParallelRoot $kbRoot -SkillsExamplesPath $examplesPath 2>&1 |
+        ForEach-Object { $_.ToString() }) -join ' '
+    Assert-NotContains -Text $output -Pattern 'Test-DemoKbSetupAudit\.ps1\(reason=writability_consumer_contract_unclassified' -Message '2>&1 nao pode ser unclassified'
+
+    # Copia local do motor na pasta scripts do wrapper -> unclassified.
+    Set-Content -LiteralPath $setupAuditStandardPath -Value $canonicalSetupAudit -Encoding utf8NoBOM
+    $localEngine = Join-Path $scriptsPath 'Test-XpzSetupAudit.ps1'
+    Set-Content -LiteralPath $localEngine -Value '# fixture local' -Encoding utf8NoBOM
+    $output = (& $inventoryScriptPath -KbParallelRoot $kbRoot -SkillsExamplesPath $examplesPath 2>&1 |
+        ForEach-Object { $_.ToString() }) -join ' '
+    Assert-Contains -Text $output -Pattern 'Test-DemoKbSetupAudit\.ps1\(reason=writability_consumer_contract_unclassified' -Message 'copia local do motor deve ser unclassified'
+    Remove-Item -LiteralPath $localEngine -Force
+
+    # Hibrido com delegacao valida continua direto (stale sem contrato).
+    Set-Content -LiteralPath $setupAuditStandardPath -Value ($canonicalSetupAudit + "`n`$gateRaw = 'GATE_OK'`n") -Encoding utf8NoBOM
+    $output = (& $inventoryScriptPath -KbParallelRoot $kbRoot -SkillsExamplesPath $examplesPath 2>&1 |
+        ForEach-Object { $_.ToString() }) -join ' '
+    Assert-Contains -Text $output -Pattern 'Test-DemoKbSetupAudit\.ps1\(reason=WRITABILITY_CONSUMER_CONTRACT_STALE\)' -Message 'hibrido com delegacao deve continuar stale'
+    Assert-NotContains -Text $output -Pattern 'Test-DemoKbSetupAudit\.ps1\(reason=writability_consumer_contract_unclassified' -Message 'hibrido nao pode virar unclassified'
+
+    # $gateRaw em comentario + GATE_OK na ajuda nao e consumo direto.
+    $commentVariant = $moldText.Replace(
+        '$enginePath = Join-Path $SharedSkillsRoot',
+        "# `$gateRaw aparece apenas em comentario.`n`$enginePath = Join-Path `$SharedSkillsRoot")
+    Set-Content -LiteralPath (Join-Path $examplesPath 'Test-KbSetupAudit.example.ps1') -Value $commentVariant -Encoding utf8NoBOM
+    Set-Content -LiteralPath $setupAuditStandardPath -Value $commentVariant -Encoding utf8NoBOM
+    $output = (& $inventoryScriptPath -KbParallelRoot $kbRoot -SkillsExamplesPath $examplesPath 2>&1 |
+        ForEach-Object { $_.ToString() }) -join ' '
+    Assert-NotContains -Text $output -Pattern 'Test-DemoKbSetupAudit\.ps1\(reason=WRITABILITY_CONSUMER_CONTRACT_STALE\)' -Message 'gateRaw em comentario nao pode ser stale'
+    Assert-NotContains -Text $output -Pattern 'Test-DemoKbSetupAudit\.ps1\(reason=writability_consumer_contract_unclassified' -Message 'gateRaw em comentario nao pode ser unclassified'
 
     Write-Output 'WRAPPER_INVENTORY_SELFTEST_OK'
 } finally {

@@ -31,12 +31,19 @@
                                             help_example_undeclared_param:-<flag> quando o comment-based help
                                             do wrapper invoca o proprio script num .EXAMPLE com uma flag que o
                                             binder advanced rejeitaria — so em script advanced com param()
-                                            de topo)
+                                            de topo;
+                                            WRITABILITY_CONSUMER_CONTRACT_STALE quando o consumidor direto
+                                            reduz o gate a GATE_OK sem ler writability_coverage)
       INVENTORY_ENGINE_DIAGNOSTIC: <lista> - diagnostico brando (motor canonico ausente/parse-broken,
                                             engine_unresolved_or_unparseable; help_query_failed ou
                                             help_molde_<...> quando a consulta de Get-Help falha ou o molde
-                                            de paridade tem defeito); NAO bloqueia o estado de
-                                            setup (rotulo fora dos tokens de pendencia do agregador)
+                                            de paridade tem defeito; writability_consumer_contract_unclassified
+                                            quando o consumidor nao e reconhecido;
+                                            writability_consumer_contract_engine_without_contract quando o
+                                            motor canônico nao expoe o contrato;
+                                            writability_consumer_contract_engine_unavailable quando o motor
+                                            canônico esta ausente, ilegivel ou com parse-error); NAO bloqueia
+                                            o estado de setup (rotulo fora dos tokens de pendencia do agregador)
       INVENTORY_SURFACE_ADVISORY: <lista>  - aviso de superficie: wrapper local defasado do molde por
                                             REDUCAO opcional (optional_param_missing,
                                             validateset_reduced, optional_promoted_to_mandatory,
@@ -324,17 +331,36 @@ foreach ($exampleFile in Get-ChildItem -LiteralPath $SkillsExamplesPath -Filter 
             }
         }
 
+        # Check generico: parametro repassado a motor compartilhado advanced que o motor nao
+        # declara (forwards_unknown_engine_param), caminho de motor inexistente
+        # (shared_engine_unresolved) -> desvios-de-wrapper, viram INVENTORY_CUSTOMIZED (capturado
+        # pelo agregador). Motor canonico irresolvel/parse-broken -> INVENTORY_ENGINE_DIAGNOSTIC
+        # (infra do repo de skills; nao bloqueia estado de pasta paralela).
+        # Calculado antes do consumidor de gravabilidade para permitir a deduplicacao de
+        # engine-unavailable contra os sinais de infraestrutura ja emitidos.
+        $engineParamFinding = Get-XpzWrapperEngineParamFinding -WrapperPath $standardPath -EnginesRoot $PSScriptRoot
+
         if ($baseName -ieq 'Test-KbSetupAudit') {
-            $localText = [System.IO.File]::ReadAllText($standardPath)
-            $directGateStatusConsumer = $localText -match '\$gateRaw' -and $localText -match '\bGATE_OK\b'
-            if ($directGateStatusConsumer) {
-                $hasCoverageContract = $localText -match 'WRITABILITY_COVERAGE_CONTRACT_V1' -and
-                    $localText -match 'writability_coverage'
-                if (-not $hasCoverageContract) {
-                    $customized.Add(('{0}(reason=WRITABILITY_CONSUMER_CONTRACT_STALE)' -f $standardLocalName))
+            $consumerFinding = Get-XpzWritabilityConsumerFinding -WrapperPath $standardPath -EnginesRoot $PSScriptRoot
+            if ($consumerFinding.EmitFinding) {
+                if ($consumerFinding.Channel -eq 'customized') {
+                    $customized.Add(('{0}(reason={1})' -f $standardLocalName, $consumerFinding.Reason))
+                } elseif ($consumerFinding.Channel -eq 'engine-diagnostic') {
+                    $emitEngineDiagnostic = $true
+                    if ($consumerFinding.Classification -eq 'engine-unavailable') {
+                        $existingEngineSignal = @($engineParamFinding.Signals | Where-Object {
+                                $_.Reason -in @('shared_engine_unresolved', 'engine_unresolved_or_unparseable')
+                            }).Count -gt 0
+                        $existingEngineDiag = @($engineParamFinding.EngineDiagnostics | Where-Object {
+                                $_.Reason -in @('shared_engine_unresolved', 'engine_unresolved_or_unparseable')
+                            }).Count -gt 0
+                        if ($existingEngineSignal -or $existingEngineDiag) { $emitEngineDiagnostic = $false }
+                    }
+                    if ($emitEngineDiagnostic) {
+                        $detail = if ($consumerFinding.Detail) { ': ' + $consumerFinding.Detail } else { '' }
+                        $engineDiagnostics.Add(('{0}(reason={1}{2})' -f $standardLocalName, $consumerFinding.Reason, $detail))
+                    }
                 }
-            } elseif ($localText -match '\$gateRaw|\bGATE_OK\b|GateWrapperPath') {
-                $engineDiagnostics.Add(('{0}(reason=writability_consumer_contract_unclassified)' -f $standardLocalName))
             }
         }
 
@@ -388,12 +414,6 @@ foreach ($exampleFile in Get-ChildItem -LiteralPath $SkillsExamplesPath -Filter 
             $customized.Add(('{0}(reason=roundtrip_exit_only_without_status)' -f $standardLocalName))
         }
 
-        # Check generico: parametro repassado a motor compartilhado advanced que o motor nao
-        # declara (forwards_unknown_engine_param), caminho de motor inexistente
-        # (shared_engine_unresolved) -> desvios-de-wrapper, viram INVENTORY_CUSTOMIZED (capturado
-        # pelo agregador). Motor canonico irresoluvel/parse-broken -> INVENTORY_ENGINE_DIAGNOSTIC
-        # (infra do repo de skills; nao bloqueia estado de pasta paralela).
-        $engineParamFinding = Get-XpzWrapperEngineParamFinding -WrapperPath $standardPath -EnginesRoot $PSScriptRoot
         foreach ($sig in $engineParamFinding.Signals) {
             $customized.Add(('{0}(reason={1}: {2})' -f $standardLocalName, $sig.Reason, $sig.Detail))
         }

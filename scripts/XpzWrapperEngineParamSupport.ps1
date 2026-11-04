@@ -2,24 +2,26 @@
 
 <#
 .SYNOPSIS
-  Suporte (dot-source) para quatro checks do inventario de wrappers locais
+  Suporte (dot-source) para cinco checks do inventario de wrappers locais
   (Test-XpzWrapperInventory.ps1): (1) forwards_unknown_engine_param — repasse a motor
   compartilhado advanced de parametro nao-declarado (direcao wrapper->motor); (2) diff de
   superficie wrapper-local vs molde — surface_mismatch (bloqueio) e INVENTORY_SURFACE_ADVISORY
   (aviso), ver bloco proprio no fim do arquivo (direcao wrapper->molde);
   (3) perda dirigida de tipo em ObjectList consumido pelo Copy; (4) comment-based help —
   help_example_undeclared_param (bloqueio) e INVENTORY_HELP_ADVISORY (aviso), ver bloco
-  proprio no fim do arquivo (direcao wrapper->ajuda).
+  proprio no fim do arquivo (direcao wrapper->ajuda); (5) consumidor do contrato de
+  cobertura de gravabilidade — direto/delegado/engine sem contrato/indisponivel.
 
 .DESCRIPTION
-  Este arquivo hospeda quatro checks do inventario; o terceiro é o detector dirigido
+  Este arquivo hospeda cinco checks do inventario; o terceiro é o detector dirigido
   copy_objectlist_type_loss, documentado em Test-XpzCopyObjectListTypeLoss.
   Esta secao .DESCRIPTION e os LIMITES
   CONHECIDOS abaixo cobrem o check (1) forwards_unknown_engine_param (direcao wrapper->motor);
   o check (2) diff de superficie wrapper->molde (`surface_mismatch`/`INVENTORY_SURFACE_ADVISORY`,
-  helpers Get-XpzScriptParamSurface/Get-XpzWrapperSurfaceFinding) e o check (4) comment-based
+  helpers Get-XpzScriptParamSurface/Get-XpzWrapperSurfaceFinding), o check (4) comment-based
   help (`help_example_undeclared_param`/`INVENTORY_HELP_ADVISORY`, helper Get-XpzHelpSurfaceFinding)
-  tem documentacao propria no bloco de comentario no fim do arquivo.
+  e o check (5) consumidor de gravabilidade (helper Get-XpzWritabilityConsumerFinding)
+  tem documentacao propria no bloco de comentario do respectivo helper.
 
   Check (1): verifica, por AST + Get-Command (sem executar o motor, sem KB), que todo parametro
   que um wrapper local REPASSA a um motor compartilhado ADVANCED de fato EXISTE no motor (nome
@@ -193,6 +195,7 @@ function Get-XpzAstJoinPathLeaf {
 
     # Coletar literais string desta chamada + de Join-Path aninhados nos argumentos.
     $literals = [System.Collections.Generic.List[string]]::new()
+    $rootVariable = $null
     for ($ei = 1; $ei -lt $elements.Count; $ei++) {
         $el = $elements[$ei]
         if ($el -is [System.Management.Automation.Language.StringConstantExpressionAst]) {
@@ -200,12 +203,23 @@ function Get-XpzAstJoinPathLeaf {
         } elseif ($el -is [System.Management.Automation.Language.ExpandableStringExpressionAst]) {
             # string interpolada (ex.: "scripts\$leaf") -> nao-resoluvel a literal seguro
             return $null
+        } elseif ($el -is [System.Management.Automation.Language.VariableExpressionAst]) {
+            # A primeira variavel de topo e a raiz candidata. O discriminador de escopo
+            # continua sendo forma+leaf; a raiz so e usada pelo check de consumidor.
+            if (-not $rootVariable) { $rootVariable = $el.VariablePath.UserPath }
         } elseif ($el -is [System.Management.Automation.Language.ParenExpressionAst] -or
                   $el -is [System.Management.Automation.Language.CommandExpressionAst] -or
                   $el -is [System.Management.Automation.Language.PipelineAst]) {
             $nested = Get-XpzAstJoinPathLeaf -Ast $el
             if ($null -ne $nested) {
-                if ($nested.HasScriptsSegment) { return $nested }
+                if (-not $rootVariable -and $nested.RootVariable) { $rootVariable = $nested.RootVariable }
+                if ($nested.HasScriptsSegment) {
+                    return [pscustomobject]@{
+                        HasScriptsSegment = $true
+                        Leaf = $nested.Leaf
+                        RootVariable = $rootVariable
+                    }
+                }
                 # aninhado resolveu mas sem 'scripts' -> agrega seus segmentos via leaf
                 if ($nested.Leaf) { $literals.Add([string]$nested.Leaf) }
             }
@@ -232,7 +246,7 @@ function Get-XpzAstJoinPathLeaf {
     }
 
     if ($null -eq $leaf) { return $null }
-    return [pscustomobject]@{ HasScriptsSegment = $hasScripts; Leaf = $leaf }
+    return [pscustomobject]@{ HasScriptsSegment = $hasScripts; Leaf = $leaf; RootVariable = $rootVariable }
 }
 
 function Resolve-XpzEngineTarget {
@@ -251,13 +265,15 @@ function Resolve-XpzEngineTarget {
     # Caso 1: alvo e a propria expressao Join-Path (ex.: & (Join-Path ...) -P) — defensivo.
     $direct = Get-XpzAstJoinPathLeaf -Ast $TargetAst
     if ($null -ne $direct) {
-        if ($direct.HasScriptsSegment) { return [pscustomobject]@{ Kind = 'shared'; Leaf = $direct.Leaf } }
-        return [pscustomobject]@{ Kind = 'local'; Leaf = $direct.Leaf }
+        if ($direct.HasScriptsSegment) {
+            return [pscustomobject]@{ Kind = 'shared'; Leaf = $direct.Leaf; RootVariable = $direct.RootVariable }
+        }
+        return [pscustomobject]@{ Kind = 'local'; Leaf = $direct.Leaf; RootVariable = $direct.RootVariable }
     }
 
     # Caso 2: alvo e uma variavel -> resolver a UNICA atribuicao literal no escopo.
     if (-not ($TargetAst -is [System.Management.Automation.Language.VariableExpressionAst])) {
-        return [pscustomobject]@{ Kind = 'unresolved'; Leaf = $null }
+        return [pscustomobject]@{ Kind = 'unresolved'; Leaf = $null; RootVariable = $null }
     }
     $varName = $TargetAst.VariablePath.UserPath
 
@@ -269,13 +285,15 @@ function Resolve-XpzEngineTarget {
 
     if ($assignments.Count -ne 1) {
         # nenhuma, ou multiplas (reatribuicao) -> nao-rastreavel
-        return [pscustomobject]@{ Kind = 'unresolved'; Leaf = $null }
+        return [pscustomobject]@{ Kind = 'unresolved'; Leaf = $null; RootVariable = $null }
     }
 
     $resolved = Get-XpzAstJoinPathLeaf -Ast $assignments[0].Right
-    if ($null -eq $resolved) { return [pscustomobject]@{ Kind = 'unresolved'; Leaf = $null } }
-    if ($resolved.HasScriptsSegment) { return [pscustomobject]@{ Kind = 'shared'; Leaf = $resolved.Leaf } }
-    return [pscustomobject]@{ Kind = 'local'; Leaf = $resolved.Leaf }
+    if ($null -eq $resolved) { return [pscustomobject]@{ Kind = 'unresolved'; Leaf = $null; RootVariable = $null } }
+    if ($resolved.HasScriptsSegment) {
+        return [pscustomobject]@{ Kind = 'shared'; Leaf = $resolved.Leaf; RootVariable = $resolved.RootVariable }
+    }
+    return [pscustomobject]@{ Kind = 'local'; Leaf = $resolved.Leaf; RootVariable = $resolved.RootVariable }
 }
 
 function Get-XpzForwardedParamName {
@@ -979,6 +997,193 @@ function Select-XpzHelpUnique {
         if ($seen.Add([string]$it.Reason)) { $out.Add($it) }
     }
     return @($out)
+}
+
+function Get-XpzWritabilityConsumerFinding {
+    <#
+      Classifica o consumo do contrato de cobertura de gravabilidade por um wrapper
+      Test-*KbSetupAudit.ps1. O consumidor real do contrato e o motor
+      Test-XpzSetupAudit.ps1; o wrapper local pode ser um delegador puro.
+
+      Retorna Classification/Channel/Reason/Detail/EmitFinding. O inventario mapeia
+      Channel+EmitFinding para INVENTORY_CUSTOMIZED ou INVENTORY_ENGINE_DIAGNOSTIC.
+
+      Precedencia: direct-* antes de delegated. AST so para $gateRaw/GATE_OK; os
+      marcadores WRITABILITY_COVERAGE_CONTRACT_V1/writability_coverage sao textuais
+      (o motor canonico tem o marcador em comentario).
+
+      LIMITES: nao prova fluxo principal, repasse de parametros obrigatorios,
+      repasse de stdout, `[void](& ...)` nem `& $engine; exit 0`. Raiz diferente
+      de $SharedSkillsRoot, copia local do motor e caminho dinamico/interpolado
+      resultam em unclassified; chamada dinamica adicional e ignorada.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$WrapperPath,
+        [Parameter(Mandatory)][string]$EnginesRoot
+    )
+
+    function New-Result {
+        param(
+            [string]$Classification,
+            [string]$Channel,
+            [string]$Reason,
+            [string]$Detail,
+            [bool]$EmitFinding
+        )
+        return [pscustomobject]@{
+            Classification = $Classification
+            Channel        = $Channel
+            Reason         = $Reason
+            Detail         = $Detail
+            EmitFinding    = $EmitFinding
+        }
+    }
+
+    try {
+        $parseErrors = $null
+        $ast = [System.Management.Automation.Language.Parser]::ParseFile($WrapperPath, [ref]$null, [ref]$parseErrors)
+        if ($null -eq $ast -or @($parseErrors).Count -gt 0) {
+            return New-Result -Classification 'unclassified' -Channel 'engine-diagnostic' `
+                -Reason 'writability_consumer_contract_unclassified' -Detail 'wrapper-parse-error' -EmitFinding $true
+        }
+
+        $hasGateRaw = @($ast.FindAll({
+                    param($n) $n -is [System.Management.Automation.Language.VariableExpressionAst] -and
+                    $n.VariablePath.UserPath -ieq 'gateRaw'
+                }, $true)).Count -gt 0
+        $hasGateOk = @($ast.FindAll({
+                    param($n) ($n -is [System.Management.Automation.Language.StringConstantExpressionAst] -or
+                        $n -is [System.Management.Automation.Language.ExpandableStringExpressionAst]) -and
+                    $n.Extent.Text -match 'GATE_OK'
+                }, $true)).Count -gt 0
+        $localText = [System.IO.File]::ReadAllText($WrapperPath)
+        $hasGateWrapperPath = $localText -match 'GateWrapperPath'
+
+        if ($hasGateRaw -and $hasGateOk) {
+            $hasCoverageContract = $localText -match 'WRITABILITY_COVERAGE_CONTRACT_V1' -and
+                $localText -match 'writability_coverage'
+            if ($hasCoverageContract) {
+                return New-Result -Classification 'direct-compliant' -Channel 'none' `
+                    -Reason $null -Detail $null -EmitFinding $false
+            }
+            return New-Result -Classification 'direct-stale' -Channel 'customized' `
+                -Reason 'WRITABILITY_CONSUMER_CONTRACT_STALE' -Detail $null -EmitFinding $true
+        }
+
+        # Consumidor parcial (so $gateRaw ou so GATE_OK) nao e direto nem delegador puro.
+        if ($hasGateRaw -or $hasGateOk) {
+            return New-Result -Classification 'unclassified' -Channel 'engine-diagnostic' `
+                -Reason 'writability_consumer_contract_unclassified' -Detail 'partial-gate-consumer' -EmitFinding $true
+        }
+
+        $callSites = @($ast.FindAll({
+                    param($n) $n -is [System.Management.Automation.Language.CommandAst] -and
+                    $n.InvocationOperator -eq [System.Management.Automation.Language.TokenKind]::Ampersand
+                }, $true))
+
+        $setupSites = [System.Collections.Generic.List[object]]::new()
+        foreach ($site in $callSites) {
+            $elements = @($site.CommandElements)
+            if ($elements.Count -lt 1) { continue }
+            $target = Resolve-XpzEngineTarget -TargetAst $elements[0] -RootAst $ast
+            if ($target.Kind -eq 'shared' -and $target.Leaf -ieq 'Test-XpzSetupAudit.ps1') {
+                $setupSites.Add([pscustomobject]@{ Site = $site; Target = $target })
+            }
+        }
+
+        if ($setupSites.Count -gt 0) {
+            $invalidSetupSite = $false
+            foreach ($entry in $setupSites) {
+                $site = $entry.Site
+                $target = $entry.Target
+
+                if ($target.RootVariable -ine 'SharedSkillsRoot') {
+                    $invalidSetupSite = $true
+                    continue
+                }
+
+                $ancestor = $site.Parent
+                while ($null -ne $ancestor) {
+                    if ($ancestor -is [System.Management.Automation.Language.AssignmentStatementAst]) {
+                        $invalidSetupSite = $true
+                        break
+                    }
+                    $ancestor = $ancestor.Parent
+                }
+                if ($invalidSetupSite) { continue }
+
+                if ($site.Parent -is [System.Management.Automation.Language.PipelineAst] -and
+                    @($site.Parent.PipelineElements).Count -gt 1) {
+                    $invalidSetupSite = $true
+                    continue
+                }
+
+                foreach ($redirection in @($site.Redirections)) {
+                    if ($redirection -is [System.Management.Automation.Language.FileRedirectionAst] -and
+                        ($redirection.FromStream -eq 'Output' -or $redirection.FromStream -eq 'All')) {
+                        $invalidSetupSite = $true
+                        break
+                    }
+                    if ($redirection -is [System.Management.Automation.Language.MergingRedirectionAst] -and
+                        $redirection.FromStream -eq 'Output') {
+                        $invalidSetupSite = $true
+                        break
+                    }
+                }
+                if ($invalidSetupSite) { continue }
+            }
+
+            $wrapperDir = Split-Path -Parent $WrapperPath
+            if (Test-Path -LiteralPath (Join-Path $wrapperDir 'Test-XpzSetupAudit.ps1') -PathType Leaf) {
+                return New-Result -Classification 'unclassified' -Channel 'engine-diagnostic' `
+                    -Reason 'writability_consumer_contract_unclassified' -Detail 'local-engine-copy' -EmitFinding $true
+            }
+
+            if ($invalidSetupSite) {
+                return New-Result -Classification 'unclassified' -Channel 'engine-diagnostic' `
+                    -Reason 'writability_consumer_contract_unclassified' -Detail 'setup-call-invalid' -EmitFinding $true
+            }
+
+            $enginePath = Join-Path $EnginesRoot 'Test-XpzSetupAudit.ps1'
+            if (-not (Test-Path -LiteralPath $enginePath -PathType Leaf)) {
+                return New-Result -Classification 'engine-unavailable' -Channel 'engine-diagnostic' `
+                    -Reason 'writability_consumer_contract_engine_unavailable' -Detail 'absent' -EmitFinding $true
+            }
+
+            $engineErrors = $null
+            $engineAst = [System.Management.Automation.Language.Parser]::ParseFile($enginePath, [ref]$null, [ref]$engineErrors)
+            if ($null -eq $engineAst -or @($engineErrors).Count -gt 0) {
+                return New-Result -Classification 'engine-unavailable' -Channel 'engine-diagnostic' `
+                    -Reason 'writability_consumer_contract_engine_unavailable' -Detail 'parse-error' -EmitFinding $true
+            }
+
+            try {
+                $engineText = [System.IO.File]::ReadAllText($enginePath)
+            } catch {
+                return New-Result -Classification 'engine-unavailable' -Channel 'engine-diagnostic' `
+                    -Reason 'writability_consumer_contract_engine_unavailable' -Detail 'unreadable' -EmitFinding $true
+            }
+
+            if ($engineText -match 'WRITABILITY_COVERAGE_CONTRACT_V1' -and
+                $engineText -match 'writability_coverage') {
+                return New-Result -Classification 'delegated-compliant' -Channel 'none' `
+                    -Reason $null -Detail $null -EmitFinding $false
+            }
+            return New-Result -Classification 'delegated-engine-without-contract' -Channel 'engine-diagnostic' `
+                -Reason 'writability_consumer_contract_engine_without_contract' -Detail 'engine-contract-missing' -EmitFinding $true
+        }
+
+        if ($hasGateRaw -or $hasGateOk -or $hasGateWrapperPath) {
+            return New-Result -Classification 'unclassified' -Channel 'engine-diagnostic' `
+                -Reason 'writability_consumer_contract_unclassified' -Detail 'consumer-unclassified' -EmitFinding $true
+        }
+
+        return New-Result -Classification 'not-consumer' -Channel 'none' `
+            -Reason $null -Detail $null -EmitFinding $false
+    } catch {
+        return New-Result -Classification 'unclassified' -Channel 'engine-diagnostic' `
+            -Reason 'writability_consumer_contract_unclassified' -Detail ('helper-error: ' + $_.Exception.Message) -EmitFinding $true
+    }
 }
 
 function Get-XpzHelpSurfaceFinding {

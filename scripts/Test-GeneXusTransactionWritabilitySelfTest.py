@@ -181,6 +181,8 @@ def main() -> int:
         alias_description = next(row for row in alias_rows if row.attribute_name == "Description")
         _assert(alias_description.classification == "unclassified-relation-pending" and alias_description.writable is None,
                 "a PK-only alias association must remain pending until the Table group is bound")
+        _assert(alias_description.coverage == "partial" and "table-binding-proposed" in alias_description.reason_codes,
+                "a PK-only alias association must stay partial for the table-binding reason")
         prefix_rows = core.classify_transaction_attributes(prefix_path, root, type_guid)
         _assert(all(row.writable is None for row in prefix_rows), "a key prefix must not match a complete Table.Key")
         broken_rows = core.classify_transaction_attributes(broken_path, root, type_guid)

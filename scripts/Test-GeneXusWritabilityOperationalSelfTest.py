@@ -519,6 +519,9 @@ def main() -> int:
                 and applied_row["decisionState"] == "applied"
                 and applied_row["contextualAnalysis"]["classification"] == "own-physical",
                 "Transaction façade data should preserve automatic and contextual writability separately")
+        _assert(transaction_applied["coverage"] == "partial"
+                and operational.automatic._coverage_from_rows(automatic_rows) == "partial",
+                "an applied contextual decision must not promote the automatic coverage")
         pwsh = shutil.which("pwsh")
         _assert(pwsh is not None, "PowerShell 7 is required for the Transaction façade integration check")
         facade_path = Path(operational.__file__).with_name("Test-GeneXusTransactionWritability.ps1")

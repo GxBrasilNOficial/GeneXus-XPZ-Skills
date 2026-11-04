@@ -14,6 +14,10 @@
   ambiguo/nao-ambiguo (de nome E de alias), CommonParameters, outro script, simple, sem param()/dynamicparam,
   formas de parse, Join-Path, .PARAMETER orfao, ajuda invisivel, -AlternateSelfLeaf, paridade de molde,
   dedup e secao .EXAMPLE que nao parseia (pulada, sem finding).
+  Inclui H19..H36 do consumidor de gravabilidade (Get-XpzWritabilityConsumerFinding): delegador
+  com/sem contrato, motor ausente/parse-error, direto stale/compliant, gateRaw/GATE_OK parciais,
+  raiz diferente, redirecionamento, atribuicao, pipeline, copia local, wrapper parse-error,
+  comentario/ajuda e not-consumer.
   Sentinela final: XPZ_WRAPPER_ENGINE_PARAM_SELFTEST_OK.
 #>
 
@@ -61,6 +65,29 @@ function Assert-NoSignalReason {
 function Assert-Eq {
     param([object]$Actual, [object]$Expected, [string]$Message)
     if ([string]$Actual -ne [string]$Expected) { throw "ASSERT_FAILED: $Message | esperado=$Expected obtido=$Actual" }
+}
+
+function Assert-Consumer {
+    param(
+        [object]$Finding,
+        [string]$Classification,
+        [string]$Channel,
+        [string]$Reason,
+        [bool]$EmitFinding,
+        [string]$Message
+    )
+    if ([string]$Finding.Classification -ne $Classification) {
+        throw "ASSERT_FAILED: $Message | Classification esperado=$Classification obtido=$($Finding.Classification)"
+    }
+    if ([string]$Finding.Channel -ne $Channel) {
+        throw "ASSERT_FAILED: $Message | Channel esperado=$Channel obtido=$($Finding.Channel)"
+    }
+    if ([string]$Finding.Reason -ne $Reason) {
+        throw "ASSERT_FAILED: $Message | Reason esperado=$Reason obtido=$($Finding.Reason)"
+    }
+    if ([bool]$Finding.EmitFinding -ne $EmitFinding) {
+        throw "ASSERT_FAILED: $Message | EmitFinding esperado=$EmitFinding obtido=$($Finding.EmitFinding)"
+    }
 }
 
 try {
@@ -462,6 +489,101 @@ H18 unica.
 param([string]$Ok)
 '@
     Assert-HelpFinding (Get-XpzHelpSurfaceFinding -WrapperPath $f) '' '' 'H18 secao que nao parseia e pulada'
+
+    # ============================================================================
+    # H19..H36 consumidor do contrato de cobertura de gravabilidade
+    # ============================================================================
+    $consumerCall = '& $enginePath -KbRoot $KbRoot -GateWrapperPath $GateWrapperPath'
+    $consumerWrapper = @'
+#requires -Version 7.4
+param([string]$KbRoot, [string]$GateWrapperPath)
+$enginePath = Join-Path $SharedSkillsRoot 'scripts\Test-XpzSetupAudit.ps1'
+& $enginePath -KbRoot $KbRoot -GateWrapperPath $GateWrapperPath
+'@
+    $engineWithContract = @'
+# WRITABILITY_COVERAGE_CONTRACT_V1
+param()
+# writability_coverage
+'@
+    $engineWithoutContract = @'
+param()
+'@
+    $engineFixture = New-Fixture $synthEngines 'Test-XpzSetupAudit.ps1' $engineWithContract
+
+    $f = New-Fixture $wrapDir 'h19.ps1' $consumerWrapper
+    Assert-Consumer (Get-XpzWritabilityConsumerFinding -WrapperPath $f -EnginesRoot $synthEngines) 'delegated-compliant' 'none' '' $false 'H19 delegador com contrato'
+
+    $engineFixture = New-Fixture $synthEngines 'Test-XpzSetupAudit.ps1' $engineWithoutContract
+    Assert-Consumer (Get-XpzWritabilityConsumerFinding -WrapperPath $f -EnginesRoot $synthEngines) 'delegated-engine-without-contract' 'engine-diagnostic' 'writability_consumer_contract_engine_without_contract' $true 'H20 motor sem contrato'
+
+    Remove-Item -LiteralPath $engineFixture -Force
+    Assert-Consumer (Get-XpzWritabilityConsumerFinding -WrapperPath $f -EnginesRoot $synthEngines) 'engine-unavailable' 'engine-diagnostic' 'writability_consumer_contract_engine_unavailable' $true 'H21 motor ausente'
+
+    $engineFixture = New-Fixture $synthEngines 'Test-XpzSetupAudit.ps1' 'param('
+    Assert-Consumer (Get-XpzWritabilityConsumerFinding -WrapperPath $f -EnginesRoot $synthEngines) 'engine-unavailable' 'engine-diagnostic' 'writability_consumer_contract_engine_unavailable' $true 'H22 motor com parse-error'
+
+    $engineFixture = New-Fixture $synthEngines 'Test-XpzSetupAudit.ps1' $engineWithContract
+
+    $f = New-Fixture $wrapDir 'h23.ps1' ($consumerWrapper + "`n`$gateRaw = 'GATE_OK'`n")
+    Assert-Consumer (Get-XpzWritabilityConsumerFinding -WrapperPath $f -EnginesRoot $synthEngines) 'direct-stale' 'customized' 'WRITABILITY_CONSUMER_CONTRACT_STALE' $true 'H23 hibrido com delegacao continua direto'
+
+    $f = New-Fixture $wrapDir 'h24.ps1' ("# WRITABILITY_COVERAGE_CONTRACT_V1`n# writability_coverage`n" + $consumerWrapper + "`n`$gateRaw = 'GATE_OK'`n")
+    Assert-Consumer (Get-XpzWritabilityConsumerFinding -WrapperPath $f -EnginesRoot $synthEngines) 'direct-compliant' 'none' '' $false 'H24 consumidor direto com contrato'
+
+    $f = New-Fixture $wrapDir 'h25.ps1' ($consumerWrapper + "`n`$gateRaw = 'x'`n")
+    Assert-Consumer (Get-XpzWritabilityConsumerFinding -WrapperPath $f -EnginesRoot $synthEngines) 'unclassified' 'engine-diagnostic' 'writability_consumer_contract_unclassified' $true 'H25 gateRaw sozinho'
+
+    $f = New-Fixture $wrapDir 'h26.ps1' ($consumerWrapper + "`n`$gateOk = 'GATE_OK'`n")
+    Assert-Consumer (Get-XpzWritabilityConsumerFinding -WrapperPath $f -EnginesRoot $synthEngines) 'unclassified' 'engine-diagnostic' 'writability_consumer_contract_unclassified' $true 'H26 GATE_OK sozinho'
+
+    $f = New-Fixture $wrapDir 'h27.ps1' $consumerWrapper.Replace('$SharedSkillsRoot', '$outraRaiz')
+    Assert-Consumer (Get-XpzWritabilityConsumerFinding -WrapperPath $f -EnginesRoot $synthEngines) 'unclassified' 'engine-diagnostic' 'writability_consumer_contract_unclassified' $true 'H27 raiz diferente'
+
+    $f = New-Fixture $wrapDir 'h28.ps1' $consumerWrapper.Replace($consumerCall, $consumerCall + ' > $null')
+    Assert-Consumer (Get-XpzWritabilityConsumerFinding -WrapperPath $f -EnginesRoot $synthEngines) 'unclassified' 'engine-diagnostic' 'writability_consumer_contract_unclassified' $true 'H28 stdout > null'
+
+    $f = New-Fixture $wrapDir 'h29.ps1' $consumerWrapper.Replace($consumerCall, $consumerCall + ' *> $null')
+    Assert-Consumer (Get-XpzWritabilityConsumerFinding -WrapperPath $f -EnginesRoot $synthEngines) 'unclassified' 'engine-diagnostic' 'writability_consumer_contract_unclassified' $true 'H29 stdout *> null'
+
+    $f = New-Fixture $wrapDir 'h30.ps1' $consumerWrapper.Replace($consumerCall, $consumerCall + ' 2>&1')
+    Assert-Consumer (Get-XpzWritabilityConsumerFinding -WrapperPath $f -EnginesRoot $synthEngines) 'delegated-compliant' 'none' '' $false 'H30 2>&1 permitido'
+
+    $f = New-Fixture $wrapDir 'h31.ps1' $consumerWrapper.Replace($consumerCall, '$x = ' + $consumerCall)
+    Assert-Consumer (Get-XpzWritabilityConsumerFinding -WrapperPath $f -EnginesRoot $synthEngines) 'unclassified' 'engine-diagnostic' 'writability_consumer_contract_unclassified' $true 'H31 atribuicao'
+
+    $f = New-Fixture $wrapDir 'h32.ps1' $consumerWrapper.Replace($consumerCall, $consumerCall + ' | Out-Null')
+    Assert-Consumer (Get-XpzWritabilityConsumerFinding -WrapperPath $f -EnginesRoot $synthEngines) 'unclassified' 'engine-diagnostic' 'writability_consumer_contract_unclassified' $true 'H32 pipeline'
+
+    $localCopy = New-Fixture $wrapDir 'Test-XpzSetupAudit.ps1' $engineWithContract
+    $f = New-Fixture $wrapDir 'h33.ps1' $consumerWrapper
+    Assert-Consumer (Get-XpzWritabilityConsumerFinding -WrapperPath $f -EnginesRoot $synthEngines) 'unclassified' 'engine-diagnostic' 'writability_consumer_contract_unclassified' $true 'H33 copia local'
+    Remove-Item -LiteralPath $localCopy -Force
+
+    $f = New-Fixture $wrapDir 'h34.ps1' 'param('
+    Assert-Consumer (Get-XpzWritabilityConsumerFinding -WrapperPath $f -EnginesRoot $synthEngines) 'unclassified' 'engine-diagnostic' 'writability_consumer_contract_unclassified' $true 'H34 wrapper parse-error'
+
+    $f = New-Fixture $wrapDir 'h35.ps1' @'
+#requires -Version 7.4
+<#
+.SYNOPSIS
+H35 delegador com GATE_OK apenas na ajuda.
+.EXAMPLE
+.\h35.ps1 -GateWrapperPath x
+GATE_OK
+#>
+param([string]$KbRoot, [string]$GateWrapperPath)
+# $gateRaw aparece apenas em comentario.
+$enginePath = Join-Path $SharedSkillsRoot 'scripts\Test-XpzSetupAudit.ps1'
+& $enginePath -KbRoot $KbRoot -GateWrapperPath $GateWrapperPath
+'@
+    Assert-Consumer (Get-XpzWritabilityConsumerFinding -WrapperPath $f -EnginesRoot $synthEngines) 'delegated-compliant' 'none' '' $false 'H35 ajuda nao e codigo'
+
+    $f = New-Fixture $wrapDir 'h36.ps1' @'
+#requires -Version 7.4
+param([string]$X)
+Write-Output $X
+'@
+    Assert-Consumer (Get-XpzWritabilityConsumerFinding -WrapperPath $f -EnginesRoot $synthEngines) 'not-consumer' 'none' '' $false 'H36 sem sinal'
 
     Write-Output 'XPZ_WRAPPER_ENGINE_PARAM_SELFTEST_OK'
 } finally {
