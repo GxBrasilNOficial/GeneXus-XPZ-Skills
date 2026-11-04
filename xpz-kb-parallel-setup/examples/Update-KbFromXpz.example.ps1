@@ -13,7 +13,8 @@ Caminho para um .xpz, para o XML do pacote exportado ou para a pasta que contém
 esse XML.
 
 .PARAMETER VerifyOnly
-Executa apenas conferência, sem regravar arquivos no destino.
+Executa apenas conferência, sem regravar arquivos no destino nem
+`kb-source-metadata.md`.
 
 .PARAMETER FullSnapshot
 Além da conferência do pacote atual, compara o snapshot inteiro do destino com o
@@ -28,9 +29,11 @@ Mantém o relatório JSON mesmo quando a execução termina sem erro.
 .PARAMETER KbMetadataPath
 Caminho opcional para salvar metadados da KB em Markdown.
 Quando omitido, o wrapper usa `kb-source-metadata.md` na raiz da pasta
-paralela da KB. Com `-KbMetadataPath` ativo, o motor compartilhado faz
-atualizacao **cirurgica** dos campos de materialização, preservando
-`last_setup_audit_run_at`, `setup_contract_signature_*` e o frontmatter fora do escopo.
+paralela da KB. Com `-KbMetadataPath` ativo e sem `-VerifyOnly`, o motor
+compartilhado faz atualizacao **cirurgica** dos campos de materialização,
+preservando `last_setup_audit_run_at`, `setup_contract_signature_*` e o
+frontmatter fora do escopo. Em `-VerifyOnly`, o caminho é aceito, mas o
+arquivo não é tocado.
 
 .PARAMETER IndexUpdateScriptPath
 Caminho opcional do wrapper local que regenera o índice derivado após
