@@ -399,9 +399,11 @@ No ramo legado o motor (`scripts/GeneXusLegacyExportFileSupport.ps1`) consome o 
 
 Sinais no JSON de resultado: `LegacyFormatDetected=true` e
 `MaterializationInterpretation`/`PackageInterpretation`=`legacy-export-adapted`. Quando
-`-KbMetadataPath` é informado, a metadata recebe `-IsLegacyExport`: o `Build` vem de
+`-KbMetadataPath` é informado **e o sync materializa**, a metadata recebe
+`-IsLegacyExport`: o `Build` vem de
 `KMW/MaxGxBuildSaved` (o export legado não traz `KMW/Build` nem bloco `<Source>`), com um
-hint dedicado no lugar do warning genérico de `Source` ausente. A leitura é encoding-aware
+hint dedicado no lugar do warning genérico de `Source` ausente. Em `-VerifyOnly`, a
+metadata não é gravada. A leitura é encoding-aware
 (export GX9 é iso-8859-1, lido por `XmlDocument.Load`). Ver `01k`, `02` e `xpz-reader/SKILL.md`.
 
 ---

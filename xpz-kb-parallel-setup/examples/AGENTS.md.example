@@ -87,9 +87,10 @@ Wrappers esperados:
   completa + gate tiverem passado.
 - `Update-<NomeKb>KbFromXpz.ps1`: materializa XPZ/XML em `ObjetosDaKbEmXml`,
   atualiza **cirurgicamente** campos de materializacao em `kb-source-metadata.md`
-  (motor `Sync-GeneXusXpzToXml.ps1` via `XpzKbSourceMetadataEditSupport.ps1`),
-  preservando `last_setup_audit_run_at` e `setup_contract_signature_*`, e chama o refresh do indice quando nao estiver
-  em `VerifyOnly`. Deve repassar `-ParallelKbRoot` ao motor `Sync-GeneXusXpzToXml.ps1`
+  **quando nao estiver em `VerifyOnly`** (motor `Sync-GeneXusXpzToXml.ps1` via
+  `XpzKbSourceMetadataEditSupport.ps1`), preservando `last_setup_audit_run_at` e
+  `setup_contract_signature_*`; em `VerifyOnly` a metadata tambem nao e tocada e o
+  refresh do indice nao roda. Deve repassar `-ParallelKbRoot` ao motor `Sync-GeneXusXpzToXml.ps1`
   (catalogo efetivo com override local), executar lembrete de override por sessao
   e pre-varredura com `-FailOnUnknownTypes` antes de materializar (ver secao abaixo).
 - `Test-<NomeKb>KbFullSnapshot.ps1`: conferencia full em modo somente verificacao.
