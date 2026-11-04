@@ -1011,10 +1011,12 @@ function Get-XpzWritabilityConsumerFinding {
       Precedencia: direct-* antes de delegated. AST so para $gateRaw/GATE_OK; os
       marcadores WRITABILITY_COVERAGE_CONTRACT_V1/writability_coverage sao textuais
       (o motor canonico tem o marcador em comentario). Um consumidor direto so e
-      compliant quando o AST tambem mostra extracao da cobertura e fallback do gate
-      para PENDENTE quando o campo/valor nao e aceito. A prova do consumidor direto
-      e estrutural: nao verifica alcancabilidade nem se o status decidido alimenta
-      a saida; codigo inerte com a mesma forma ainda passa.
+      compliant quando o AST tambem mostra a extracao por regex sobre $gateRaw, com
+      os tres valores aceitos, e o fallback do gate para PENDENTE; o nome da
+      variavel do match nao importa. Outras formas de extracao/validacao (switch,
+      -notin, JSON) ficam em unclassified para revisao humana. A prova do consumidor
+      direto e estrutural: nao verifica alcancabilidade nem se o status decidido
+      alimenta a saida; codigo inerte com a mesma forma ainda passa.
 
       LIMITES: nao prova fluxo principal, repasse de parametros obrigatorios,
       repasse de stdout, `[void](& ...)` nem `& $engine; exit 0`. Raiz diferente
@@ -1071,10 +1073,9 @@ function Get-XpzWritabilityConsumerFinding {
         $hasCoverageExtraction = @($ast.FindAll({
                     param($n) $n -is [System.Management.Automation.Language.AssignmentStatementAst] -and
                     $n.Left -is [System.Management.Automation.Language.VariableExpressionAst] -and
-                    $n.Left.VariablePath.UserPath -ieq 'coverageMatch' -and
                     $n.Right.Extent.Text -match '(?is)^\[regex\]::Match\s*\(\s*\$gateRaw\s*,.*writability_coverage.*\)\s*$'
                 }, $true)).Count -gt 0
-        $coverageValidationPattern = '(?is)^\s*if\s*\(\s*\$coverageMatch\.Success\s+-and\s+\$coverageMatch\.Groups\[''value''\]\.Value\s+-in\s+@\(\s*''complete-in-model''\s*,\s*''partial''\s*,\s*''invalid''\s*\)\s*\)\s*\{.*?\}\s*else\s*\{[^}]*\$gateStatus\s*=\s*''PENDENTE''[^}]*\}\s*$'
+        $coverageValidationPattern = '(?is)^\s*if\s*\(\s*\$[A-Za-z_][A-Za-z0-9_]*\.Success\s+-and\s+\$[A-Za-z_][A-Za-z0-9_]*\.Groups\[''value''\]\.Value\s+-in\s+@\(\s*''complete-in-model''\s*,\s*''partial''\s*,\s*''invalid''\s*\)\s*\)\s*\{.*?\}\s*else\s*\{[^}]*\$gateStatus\s*=\s*''PENDENTE''[^}]*\}\s*$'
         $hasCoverageInvalidFallback = @($ast.FindAll({
                     param($n) $n -is [System.Management.Automation.Language.IfStatementAst] -and
                     $n.Extent.Text -match $coverageValidationPattern
