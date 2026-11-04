@@ -66,7 +66,12 @@ para revalidar sem executar `opencode run`. Se a captura usar outro modelo além
 instalada, o modelo, os 34 casos esperados, classes, `exitCode`, aprovação e arquivos não vazios;
 divergências bloqueiam antes de qualquer execução de modelo.
 
-O recibo regenerado registra `evidenceSource` na raiz e `toolEventCount` por caso. No início, o script também verifica que seu parser rejeita uma linha JSONL malformada.
+O recibo regenerado registra `evidenceSource` na raiz e `toolEventCount` por caso. No início, o
+script também verifica que seu parser rejeita uma linha JSONL malformada.
+O self-test sintético de caminhos também roda antes da matriz; `-PathValidationSelfTestOnly`
+executa só esse self-test, sem chamar o OpenCode.
+
+Nos casos `read-deny`, `read-allow` e `external-deny`, o verificador exige que `input.path` corresponda ao caminho esperado. Aceita a forma relativa pedida ou a forma lexical absoluta baseada no cwd do caso; normaliza apenas `/` e `\` e preserva segmentos `.`/`..`.
 
 ## Resolução efetiva medida (2.2.5) — bloco estrutural canônico
 

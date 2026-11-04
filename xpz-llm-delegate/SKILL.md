@@ -1057,7 +1057,11 @@ segurança no **próprio adapter**, de forma inseparável (nunca "default sem gu
   comportamental de 32 casos via `opencode run --format json`, com modelo explícito e workspace
   sintético mínimo, e prova os 2 casos `grep` estruturalmente por `grep * deny` no
   `opencode debug agents`. Cada caso comportamental exige evento `tool_use`; ausência de evento é
-  inconclusiva, nunca aprovação. `names-glob` exige evento `glob` com nomes visíveis;
+  inconclusiva, nunca aprovação. Nos casos `read-deny`, `read-allow` e `external-deny`, o evento
+  também precisa conter o caminho esperado; a verificação aceita a forma relativa ou a forma lexical
+  absoluta baseada no cwd, preservando segmentos `.`/`..`.
+  O self-test sintético de caminhos roda antes da matriz e rejeita eventos com caminho divergente.
+  `names-glob` exige evento `glob` com nomes visíveis;
   `names-read` exige `read` de diretório; `names-list` aceita um evento de enumeração
   `read`, `glob` ou `list` com nomes visíveis (na captura atual, `read`).
   `subcwd-example-project-local` comprova a leitura permitida de `../.env.example` a partir da

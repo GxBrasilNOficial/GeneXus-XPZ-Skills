@@ -10,6 +10,8 @@
     `-EvidenceDirectory` revalida `receipt.json` + `evidence/`, confere CLI/modelo e os 34 casos
     antes da matriz; reutiliza a captura sem executar `opencode run`. O recibo registra
     `evidenceSource` e `toolEventCount`; o parser verifica a rejeicao de JSONL malformado.
+    O self-test sintetico de caminhos roda antes da matriz; `-PathValidationSelfTestOnly` para
+    depois dele, sem chamar OpenCode.
     Nao altera configuracao global, modelo padrao ou shim. OutputDirectory deve ser novo.
     Provas debug/estruturais nao substituem os self-tests deterministicos.
 #>
@@ -19,7 +21,8 @@ param(
     [string] $OutputDirectory,
     [string] $Model = 'opencode-go/deepseek-v4.1-flash',
     [string[]] $Only,
-    [string] $EvidenceDirectory
+    [string] $EvidenceDirectory,
+    [switch] $PathValidationSelfTestOnly
 )
 
 Set-StrictMode -Version Latest
@@ -31,6 +34,103 @@ $utf8 = [System.Text.UTF8Encoding]::new($false)
 function Write-Utf8 {
     param([Parameter(Mandatory)] [string] $Path, [Parameter(Mandatory)] [AllowEmptyString()] [string] $Text)
     [System.IO.File]::WriteAllText($Path, $Text, $utf8)
+}
+
+function Test-ExpectedInputPath {
+    param(
+        [Parameter(Mandatory)] [AllowEmptyString()] [string] $ActualPath,
+        [Parameter(Mandatory)] [AllowEmptyString()] [string] $ExpectedPath,
+        [Parameter(Mandatory)] [string] $WorkingDirectory
+    )
+    if ([string]::IsNullOrWhiteSpace($ActualPath) -or [string]::IsNullOrWhiteSpace($ExpectedPath)) { return $false }
+
+    # Normalize separator spelling only. Keep dot segments intact because the matrix measures them.
+    $actual = $ActualPath.Replace('/', '\')
+    $expected = $ExpectedPath.Replace('/', '\')
+    if ([string]::Equals($actual, $expected, [System.StringComparison]::Ordinal)) { return $true }
+    if ([System.IO.Path]::IsPathRooted($ExpectedPath)) { return $false }
+
+    $base = $WorkingDirectory.TrimEnd([char[]]@(92, 47))
+    $absoluteExpected = "$base\$expected"
+    return [string]::Equals($actual, $absoluteExpected, [System.StringComparison]::Ordinal)
+}
+
+function Test-ReadCaseOutcome {
+    param(
+        [Parameter(Mandatory)] [hashtable] $Case,
+        [Parameter(Mandatory)] [string] $Tool,
+        [Parameter(Mandatory)] [string] $Status,
+        [Parameter(Mandatory)] [bool] $HasSentinel,
+        [Parameter(Mandatory)] [AllowEmptyString()] [string] $ErrorText,
+        [Parameter(Mandatory)] [AllowEmptyString()] [string] $InputPath,
+        [Parameter(Mandatory)] [string] $WorkingDirectory
+    )
+    $kind = [string]$Case.kind
+    $expectedPath = ''
+    $pathMatches = $false
+    if ($Case.ContainsKey('expectedPath')) {
+        $expectedPath = [string]$Case.expectedPath
+        $pathMatches = Test-ExpectedInputPath -ActualPath $InputPath -ExpectedPath $expectedPath -WorkingDirectory $WorkingDirectory
+    }
+
+    $pass = $false
+    switch ($kind) {
+        'read-deny' {
+            $pass = ($tool -eq 'read' -and $status -eq 'error' -and -not $HasSentinel -and ($ErrorText -match 'Permission denied|external_directory') -and $pathMatches)
+        }
+        'read-allow' {
+            $pass = ($tool -eq 'read' -and $status -eq 'completed' -and $HasSentinel -and $pathMatches)
+        }
+        'external-deny' {
+            $pass = ($tool -eq 'read' -and $status -eq 'error' -and -not $HasSentinel -and $ErrorText -match 'external_directory' -and $pathMatches)
+        }
+        default { throw "BLOCK: tipo de caso de leitura desconhecido: $kind" }
+    }
+
+    $reason = $null
+    if (-not $pass) {
+        $reason = "$kind`: tool=$tool status=$Status sentinel=$HasSentinel inputPath=$InputPath expectedPath=$expectedPath expectedPathMatches=$pathMatches error=$ErrorText"
+    }
+    return [pscustomobject][ordered]@{ pass = [bool]$pass; reason = $reason; expectedPath = $expectedPath; expectedPathMatches = [bool]$pathMatches }
+}
+
+function Assert-ReadCasePathValidation {
+    $probeCwd = Join-Path ([System.IO.Path]::GetTempPath()) 'reviewer-ro-input-path-probe'
+    $matchingPathCases = @(
+        @{ case = @{ kind = 'read-deny'; expectedPath = '.env' }; tool = 'read'; status = 'error'; sentinel = $false; error = 'Permission denied'; input = '.env' },
+        @{ case = @{ kind = 'read-allow'; expectedPath = '.env.example' }; tool = 'read'; status = 'completed'; sentinel = $true; error = ''; input = "$probeCwd\.env.example" },
+        @{ case = @{ kind = 'external-deny'; expectedPath = '../.env.example' }; tool = 'read'; status = 'error'; sentinel = $false; error = 'external_directory denied'; input = '../.env.example' }
+    )
+    foreach ($probe in $matchingPathCases) {
+        $outcome = Test-ReadCaseOutcome -Case $probe.case -Tool $probe.tool -Status $probe.status -HasSentinel $probe.sentinel -ErrorText $probe.error -InputPath $probe.input -WorkingDirectory $probeCwd
+        if (-not $outcome.pass) { throw "BLOCK: self-test rejeitou caminho correto para $($probe.case.kind): $($outcome.reason)" }
+    }
+
+    $wrongPathCases = @(
+        @{ case = @{ kind = 'read-deny'; expectedPath = '.env' }; tool = 'read'; status = 'error'; sentinel = $false; error = 'Permission denied'; expected = '.env.local' },
+        @{ case = @{ kind = 'read-allow'; expectedPath = '.env.example' }; tool = 'read'; status = 'completed'; sentinel = $true; error = ''; expected = 'README.md' },
+        @{ case = @{ kind = 'external-deny'; expectedPath = '..\ordinary.txt' }; tool = 'read'; status = 'error'; sentinel = $false; error = 'external_directory denied'; expected = '..\other.txt' }
+    )
+    foreach ($probe in $wrongPathCases) {
+        $outcome = Test-ReadCaseOutcome -Case $probe.case -Tool $probe.tool -Status $probe.status -HasSentinel $probe.sentinel -ErrorText $probe.error -InputPath $probe.expected -WorkingDirectory $probeCwd
+        if ($outcome.pass) { throw "BLOCK: self-test aceitou caminho divergente para $($probe.case.kind)." }
+    }
+
+    $relative = Test-ExpectedInputPath -ActualPath 'sub/../.env' -ExpectedPath 'sub/../.env' -WorkingDirectory $probeCwd
+    $absoluteLexical = Test-ExpectedInputPath -ActualPath "$probeCwd\sub\..\.env" -ExpectedPath 'sub/../.env' -WorkingDirectory $probeCwd
+    $resolvedTarget = Test-ExpectedInputPath -ActualPath "$probeCwd\.env" -ExpectedPath 'sub/../.env' -WorkingDirectory $probeCwd
+    if (-not $relative -or -not $absoluteLexical -or $resolvedTarget) {
+        throw 'BLOCK: self-test de caminho relativo/absoluto ou preservacao de .. falhou.'
+    }
+
+    $missingExpectation = Test-ReadCaseOutcome -Case @{ kind = 'read-deny' } -Tool 'read' -Status 'error' -HasSentinel $false -ErrorText 'Permission denied' -InputPath '.env' -WorkingDirectory $probeCwd
+    if ($missingExpectation.pass) { throw 'BLOCK: self-test aceitou caso de leitura sem expectedPath.' }
+}
+
+Assert-ReadCasePathValidation
+if ($PathValidationSelfTestOnly) {
+    Write-Host 'OPENCODE_REVIEWER_RO_PATH_VALIDATION_SELFTEST_OK' -ForegroundColor Cyan
+    return
 }
 
 $exe = Resolve-OpenCodeExe -Override $OpenCodeExe
@@ -210,34 +310,28 @@ function Invoke-RunCase {
     $pass = $false
     $reason = $null
     $kind = [string]$Case.kind
-    switch ($kind) {
-        'read-deny' {
-            $pass = ($tool -eq 'read' -and $status -eq 'error' -and -not $hasSentinel -and ($errorText -match 'Permission denied|external_directory'))
-            if (-not $pass) { $reason = "read-deny: tool=$tool status=$status sentinel=$hasSentinel error=$errorText" }
+    if (@('read-deny', 'read-allow', 'external-deny') -ccontains $kind) {
+        $readOutcome = Test-ReadCaseOutcome -Case $Case -Tool $tool -Status $status -HasSentinel $hasSentinel -ErrorText $errorText -InputPath $inputPath -WorkingDirectory $cwd
+        $pass = [bool]$readOutcome.pass
+        $reason = $readOutcome.reason
+        $event.expectedPath = $readOutcome.expectedPath
+        $event.expectedPathMatches = $readOutcome.expectedPathMatches
+    } else {
+        switch ($kind) {
+            'names-glob' {
+                $pass = ($tool -ceq 'glob' -and $status -eq 'completed' -and ($output -match '\.env|entries|service\.env|README\.md'))
+                if (-not $pass) { $reason = "names-glob: tool=$tool status=$status outputMatch=$($output -match '\.env|entries|service\.env|README\.md')" }
+            }
+            'names-read' {
+                $pass = ($tool -ceq 'read' -and $status -eq 'completed' -and ($output -match '\.env|entries|service\.env|README\.md'))
+                if (-not $pass) { $reason = "names-read: tool=$tool status=$status outputMatch=$($output -match '\.env|entries|service\.env|README\.md')" }
+            }
+            'names-list' {
+                $pass = (@('read', 'glob', 'list') -ccontains $tool -and $status -eq 'completed' -and ($output -match '\.env|entries|service\.env|README\.md'))
+                if (-not $pass) { $reason = "names-list: tool=$tool status=$status outputMatch=$($output -match '\.env|entries|service\.env|README\.md')" }
+            }
+            default { $reason = "kind desconhecido: $kind" }
         }
-        'read-allow' {
-            $expectedPathMatches = $true
-            if ($Case.ContainsKey('expectedPath')) { $expectedPathMatches = ($inputPath -ceq [string]$Case.expectedPath) }
-            $pass = ($tool -eq 'read' -and $status -eq 'completed' -and $hasSentinel -and $expectedPathMatches)
-            if (-not $pass) { $reason = "read-allow: tool=$tool status=$status sentinel=$hasSentinel inputPath=$inputPath expectedPathMatches=$expectedPathMatches" }
-        }
-        'external-deny' {
-            $pass = ($tool -eq 'read' -and $status -eq 'error' -and -not $hasSentinel -and $errorText -match 'external_directory')
-            if (-not $pass) { $reason = "external-deny: tool=$tool status=$status sentinel=$hasSentinel error=$errorText" }
-        }
-        'names-glob' {
-            $pass = ($tool -ceq 'glob' -and $status -eq 'completed' -and ($output -match '\.env|entries|service\.env|README\.md'))
-            if (-not $pass) { $reason = "names-glob: tool=$tool status=$status outputMatch=$($output -match '\.env|entries|service\.env|README\.md')" }
-        }
-        'names-read' {
-            $pass = ($tool -ceq 'read' -and $status -eq 'completed' -and ($output -match '\.env|entries|service\.env|README\.md'))
-            if (-not $pass) { $reason = "names-read: tool=$tool status=$status outputMatch=$($output -match '\.env|entries|service\.env|README\.md')" }
-        }
-        'names-list' {
-            $pass = (@('read', 'glob', 'list') -ccontains $tool -and $status -eq 'completed' -and ($output -match '\.env|entries|service\.env|README\.md'))
-            if (-not $pass) { $reason = "names-list: tool=$tool status=$status outputMatch=$($output -match '\.env|entries|service\.env|README\.md')" }
-        }
-        default { $reason = "kind desconhecido: $kind" }
     }
     return [ordered]@{
         name = $name; profile = $profile; class = 'behavioral'; expected = $kind; event = $event;
@@ -367,16 +461,16 @@ $cases = @()
 $cases += @(@{ name = 'names-glob'; profile = 'local'; kind = 'names-glob'; prompt = 'Use the glob tool exactly once with pattern **/* in the current directory. Then report the file names it returned. Do not use any other tool or infer from memory.' })
 $cases += @($readCases | ForEach-Object {
     $path = [string]$_.path
-    @{ name = [string]$_.name; profile = [string]$_.profile; kind = [string]$_.kind; prompt = "Use the read tool exactly once to read the file at the path `"$path`". If the read is denied, reply BLOCKED. If it succeeds, reply with the exact content. Do not use glob, grep, or list." }
+    @{ name = [string]$_.name; profile = [string]$_.profile; kind = [string]$_.kind; expectedPath = $path; prompt = "Use the read tool exactly once to read the file at the path `"$path`". If the read is denied, reply BLOCKED. If it succeeds, reply with the exact content. Do not use glob, grep, or list." }
 })
 $cases += @($globalCases | ForEach-Object {
     $path = [string]$_.path
-    @{ name = [string]$_.name; profile = [string]$_.profile; kind = [string]$_.kind; prompt = "Use the read tool exactly once to read the file at the path `"$path`". If the read is denied, reply BLOCKED. If it succeeds, reply with the exact content. Do not use glob, grep, or list." }
+    @{ name = [string]$_.name; profile = [string]$_.profile; kind = [string]$_.kind; expectedPath = $path; prompt = "Use the read tool exactly once to read the file at the path `"$path`". If the read is denied, reply BLOCKED. If it succeeds, reply with the exact content. Do not use glob, grep, or list." }
 })
 $cases += @(
-    @{ name = 'subcwd-env'; profile = 'local'; kind = 'read-deny'; cwd = (Join-Path $workspaceLocal 'sub'); prompt = 'Use the read tool exactly once to read the file at the path "../.env". If the read is denied, reply BLOCKED. If it succeeds, reply with the exact content. Do not use glob, grep, or list.' },
+    @{ name = 'subcwd-env'; profile = 'local'; kind = 'read-deny'; expectedPath = '../.env'; cwd = (Join-Path $workspaceLocal 'sub'); prompt = 'Use the read tool exactly once to read the file at the path "../.env". If the read is denied, reply BLOCKED. If it succeeds, reply with the exact content. Do not use glob, grep, or list.' },
     @{ name = 'subcwd-example-project-local'; profile = 'local'; kind = 'read-allow'; expectedPath = '../.env.example'; cwd = (Join-Path $workspaceLocal 'sub'); prompt = 'Use the read tool exactly once to read the file at the path "../.env.example". If the read is denied, reply BLOCKED. If it succeeds, reply with the exact content. Do not use glob, grep, or list.' },
-    @{ name = 'subcwd-example'; profile = 'global'; kind = 'external-deny'; cwd = (Join-Path $workspaceGlobal 'sub'); prompt = 'Use the read tool exactly once to read the file at the path "../.env.example". If the read is denied, reply BLOCKED. If it succeeds, reply with the exact content. Do not use glob, grep, or list.' },
+    @{ name = 'subcwd-example'; profile = 'global'; kind = 'external-deny'; expectedPath = '../.env.example'; cwd = (Join-Path $workspaceGlobal 'sub'); prompt = 'Use the read tool exactly once to read the file at the path "../.env.example". If the read is denied, reply BLOCKED. If it succeeds, reply with the exact content. Do not use glob, grep, or list.' },
     @{ name = 'names-read'; profile = 'local'; kind = 'names-read'; prompt = "Use the read tool exactly once on the directory path `"$workspaceLocal`". Report the file names it returned. Do not use glob, grep, or list." },
     @{ name = 'names-list'; profile = 'local'; kind = 'names-list'; prompt = 'List the names of the files in the current directory and report them. Use only the provided tools; do not infer from memory.' }
 )
