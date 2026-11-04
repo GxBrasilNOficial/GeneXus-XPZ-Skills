@@ -826,7 +826,7 @@ $enginePath = Join-Path $SharedSkillsRoot 'scripts\Test-XpzSetupAudit.ps1'
 
     # Redirecionamento de stdout: > e *> descartam; 2>&1 e permitido.
     $callLine = '& $enginePath -KbRoot $KbRoot -GateWrapperPath $GateWrapperPath -MetadataWrapperTestPath $MetadataWrapperTestPath -AsJson:$AsJson'
-    foreach ($redirection in @(' > $null', ' *> $null')) {
+    foreach ($redirection in @(' > $null', ' *> $null', ' 1>&2')) {
         $variant = $canonicalSetupAudit.Replace($callLine, $callLine + $redirection)
         Set-Content -LiteralPath $setupAuditStandardPath -Value $variant -Encoding utf8NoBOM
         $output = (& $inventoryScriptPath -KbParallelRoot $kbRoot -SkillsExamplesPath $examplesPath 2>&1 |
