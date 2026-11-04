@@ -542,6 +542,36 @@
         "gemini",
         "opencode"
       ]
+    },
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "14-revisao-pre-push-reforcada.md",
+      "unitHash": "587188fcb9c95018748f91f3b57dd27a1d321854c9b0de89b11d16e21cf1a20f",
+      "listedMembers": [
+        "claude-code",
+        "codex"
+      ],
+      "verdict": "non-gap",
+      "reason": "A passagem descreve o split de papéis no painel (git-capable vs semantic-only com Bash sob plan no Claude Code); não é inventário dos backends de delegação.",
+      "triagedAt": "2026-11-04",
+      "triagedBy": "Cursor, com autorização do usuário",
+      "kind": "closed",
+      "excerpt": "- **Prompt mínimo por CAPACIDADE (não persona):** … **git-capable** (âncora … Codex-delegate, subagente nativo) … **semantic-only** (… Bash sob plan, como Claude Code no painel) …"
+    },
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "AGENTS.md",
+      "unitHash": "a4fbf0323985949f4d1c582000caab20d32c5e795665732893de8b0141010ce0",
+      "listedMembers": [
+        "claude-code",
+        "codex"
+      ],
+      "verdict": "non-gap",
+      "reason": "A passagem resume o modo dossiê e os papéis semantic-only vs git-capable; não enumera o conjunto completo de backends.",
+      "triagedAt": "2026-11-04",
+      "triagedBy": "Cursor, com autorização do usuário",
+      "kind": "closed",
+      "excerpt": "- **Modo assistido por dossiê (reforçada):** o revisor **semantic-only** (papel: dossiê + fase semântica; **não** âncora; Claude no painel pode ter Bash sob plan e ainda assim é semantic-only por papel) … O revisor **git-capable** (Codex-delegate, subagente nativo) é inalterado…"
     }
   ]
 }
