@@ -27,7 +27,8 @@
       - classifica invokeArgs por allowlist PER-BACKEND; contencao (permissionMode/tools/maxTurns,
         agent, approvalMode!=plan) e chaves internas do adapter sao RECUSADAS (securityBlockedArgs)
         e NAO repassadas ao adapter:
-        o despacho segue com os defaults seguros do adapter (decisao de seguranca, Posicao B);
+        o despacho segue com os defaults do adapter (Posicao B; no Claude Code, Bash sob plan
+        nao e sandbox — allowlist de forma pode permitir mutacao);
       - resolve -Cd (precedencia + fail-closed; opencode nunca recebe -Cd; Antigravity
         public-review cria scratch proprio e recusa cwd herdado).
 
