@@ -348,13 +348,9 @@ foreach ($exampleFile in Get-ChildItem -LiteralPath $SkillsExamplesPath -Filter 
                 } elseif ($consumerFinding.Channel -eq 'engine-diagnostic') {
                     $emitEngineDiagnostic = $true
                     if ($consumerFinding.Classification -eq 'engine-unavailable') {
-                        $existingEngineSignal = @($engineParamFinding.Signals | Where-Object {
-                                $_.Reason -in @('shared_engine_unresolved', 'engine_unresolved_or_unparseable')
-                            }).Count -gt 0
-                        $existingEngineDiag = @($engineParamFinding.EngineDiagnostics | Where-Object {
-                                $_.Reason -in @('shared_engine_unresolved', 'engine_unresolved_or_unparseable')
-                            }).Count -gt 0
-                        if ($existingEngineSignal -or $existingEngineDiag) { $emitEngineDiagnostic = $false }
+                        if (Test-XpzWritabilityEngineSignalForSetup -EngineParamFinding $engineParamFinding) {
+                            $emitEngineDiagnostic = $false
+                        }
                     }
                     if ($emitEngineDiagnostic) {
                         $detail = if ($consumerFinding.Detail) { ': ' + $consumerFinding.Detail } else { '' }

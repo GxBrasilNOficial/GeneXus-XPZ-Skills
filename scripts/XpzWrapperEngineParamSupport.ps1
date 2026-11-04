@@ -1186,6 +1186,38 @@ function Get-XpzWritabilityConsumerFinding {
     }
 }
 
+function Test-XpzWritabilityEngineSignalForSetup {
+    <#
+      Indica se o resultado de Get-XpzWrapperEngineParamFinding ja contem um sinal
+      de infraestrutura para o motor de setup Test-XpzSetupAudit.ps1. Usado para
+      deduplicar writability_consumer_contract_engine_unavailable sem deixar que
+      um sinal de OUTRO motor suprima o diagnostico do motor de setup.
+    #>
+    param(
+        $EngineParamFinding,
+        [string]$SetupLeaf = 'Test-XpzSetupAudit.ps1'
+    )
+
+    if ($null -eq $EngineParamFinding) { return $false }
+    try {
+        foreach ($signal in @($EngineParamFinding.Signals)) {
+            if ($signal.Reason -eq 'shared_engine_unresolved' -and
+                [string]$signal.Detail -like "*$SetupLeaf*") {
+                return $true
+            }
+        }
+        foreach ($diagnostic in @($EngineParamFinding.EngineDiagnostics)) {
+            if ($diagnostic.Reason -eq 'engine_unresolved_or_unparseable' -and
+                [string]$diagnostic.Detail -like "*$SetupLeaf*") {
+                return $true
+            }
+        }
+    } catch {
+        return $false
+    }
+    return $false
+}
+
 function Get-XpzHelpSurfaceFinding {
     <#
       Ponto de entrada. Audita o comment-based help do wrapper LOCAL contra o molde opcional.

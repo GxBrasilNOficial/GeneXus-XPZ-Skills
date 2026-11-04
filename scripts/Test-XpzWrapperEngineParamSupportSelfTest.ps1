@@ -14,10 +14,10 @@
   ambiguo/nao-ambiguo (de nome E de alias), CommonParameters, outro script, simple, sem param()/dynamicparam,
   formas de parse, Join-Path, .PARAMETER orfao, ajuda invisivel, -AlternateSelfLeaf, paridade de molde,
   dedup e secao .EXAMPLE que nao parseia (pulada, sem finding).
-  Inclui H19..H36 do consumidor de gravabilidade (Get-XpzWritabilityConsumerFinding): delegador
+  Inclui H19..H37 do consumidor de gravabilidade (Get-XpzWritabilityConsumerFinding): delegador
   com/sem contrato, motor ausente/parse-error, direto stale/compliant, gateRaw/GATE_OK parciais,
   raiz diferente, redirecionamento, atribuicao, pipeline, copia local, wrapper parse-error,
-  comentario/ajuda e not-consumer.
+  comentario/ajuda, not-consumer e escopo da deduplicacao de engine-unavailable.
   Sentinela final: XPZ_WRAPPER_ENGINE_PARAM_SELFTEST_OK.
 #>
 
@@ -491,7 +491,7 @@ param([string]$Ok)
     Assert-HelpFinding (Get-XpzHelpSurfaceFinding -WrapperPath $f) '' '' 'H18 secao que nao parseia e pulada'
 
     # ============================================================================
-    # H19..H36 consumidor do contrato de cobertura de gravabilidade
+    # H19..H37 consumidor do contrato de cobertura de gravabilidade
     # ============================================================================
     $consumerCall = '& $enginePath -KbRoot $KbRoot -GateWrapperPath $GateWrapperPath'
     $consumerWrapper = @'
@@ -584,6 +584,39 @@ param([string]$X)
 Write-Output $X
 '@
     Assert-Consumer (Get-XpzWritabilityConsumerFinding -WrapperPath $f -EnginesRoot $synthEngines) 'not-consumer' 'none' '' $false 'H36 sem sinal'
+
+    # H37 dedup de engine-unavailable: so o sinal do leaf de setup suprime.
+    $otherSignal = [pscustomobject]@{
+        Signals = @(@{ Reason = 'shared_engine_unresolved'; Detail = 'Other.ps1' })
+        EngineDiagnostics = @()
+    }
+    if (Test-XpzWritabilityEngineSignalForSetup -EngineParamFinding $otherSignal) {
+        throw 'ASSERT_FAILED: H37 sinal de outro motor nao pode suprimir engine-unavailable'
+    }
+    $setupSignal = [pscustomobject]@{
+        Signals = @(@{ Reason = 'shared_engine_unresolved'; Detail = 'Test-XpzSetupAudit.ps1' })
+        EngineDiagnostics = @()
+    }
+    if (-not (Test-XpzWritabilityEngineSignalForSetup -EngineParamFinding $setupSignal)) {
+        throw 'ASSERT_FAILED: H37 sinal do motor de setup deve permitir a deduplicacao'
+    }
+    $otherDiag = [pscustomobject]@{
+        Signals = @()
+        EngineDiagnostics = @(@{ Reason = 'engine_unresolved_or_unparseable'; Detail = 'Other.ps1' })
+    }
+    if (Test-XpzWritabilityEngineSignalForSetup -EngineParamFinding $otherDiag) {
+        throw 'ASSERT_FAILED: H37 diagnostico de outro motor nao pode suprimir engine-unavailable'
+    }
+    $setupDiag = [pscustomobject]@{
+        Signals = @()
+        EngineDiagnostics = @(@{ Reason = 'engine_unresolved_or_unparseable'; Detail = 'Test-XpzSetupAudit.ps1' })
+    }
+    if (-not (Test-XpzWritabilityEngineSignalForSetup -EngineParamFinding $setupDiag)) {
+        throw 'ASSERT_FAILED: H37 diagnostico do motor de setup deve permitir a deduplicacao'
+    }
+    if (Test-XpzWritabilityEngineSignalForSetup -EngineParamFinding $null) {
+        throw 'ASSERT_FAILED: H37 ausencia de finding nao pode suprimir engine-unavailable'
+    }
 
     Write-Output 'XPZ_WRAPPER_ENGINE_PARAM_SELFTEST_OK'
 } finally {
