@@ -1012,15 +1012,19 @@ function Get-XpzWritabilityConsumerFinding {
       marcadores WRITABILITY_COVERAGE_CONTRACT_V1/writability_coverage sao textuais
       (o motor canonico tem o marcador em comentario). Um consumidor direto so e
       compliant quando o AST tambem mostra extracao da cobertura e fallback do gate
-      para PENDENTE quando o campo/valor nao e aceito.
+      para PENDENTE quando o campo/valor nao e aceito. A prova do consumidor direto
+      e estrutural: nao verifica alcancabilidade nem se o status decidido alimenta
+      a saida; codigo inerte com a mesma forma ainda passa.
 
       LIMITES: nao prova fluxo principal, repasse de parametros obrigatorios,
       repasse de stdout, `[void](& ...)` nem `& $engine; exit 0`. Raiz diferente
       de $SharedSkillsRoot, copia local do motor e caminho dinamico/interpolado
       resultam em unclassified; chamada dinamica ao mesmo motor tambem resulta
       em unclassified, e outras chamadas dinamicas sao ignoradas. Dot-source ao
-      mesmo motor resulta em unclassified (dot-sourced-setup-call); dot-source a
-      outro destino nao classifica o wrapper como consumidor.
+      mesmo motor com caminho resolvido por Join-Path ou nome literal no proprio
+      site resulta em unclassified (dot-sourced-setup-call); montagem por
+      concatenacao em variavel intermediaria nao e detectada. Dot-source a outro
+      destino nao classifica o wrapper como consumidor.
     #>
     param(
         [Parameter(Mandatory)][string]$WrapperPath,
@@ -1240,6 +1244,10 @@ function Test-XpzWritabilityEngineSignalForSetup {
       de infraestrutura para o motor de setup Test-XpzSetupAudit.ps1. Usado para
       deduplicar writability_consumer_contract_engine_unavailable sem deixar que
       um sinal de OUTRO motor suprima o diagnostico do motor de setup.
+
+      Quando o sinal generico shared_engine_unresolved do setup existe, ele
+      prevalece no inventario como INVENTORY_CUSTOMIZED (bloqueante) e suprime o
+      diagnostico writability_consumer_contract_engine_unavailable.
     #>
     param(
         $EngineParamFinding,

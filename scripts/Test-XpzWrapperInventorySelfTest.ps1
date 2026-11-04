@@ -353,13 +353,21 @@ param([switch]$AsJson)
 # WRITABILITY_COVERAGE_CONTRACT_V1
 & $enginePath -AsJson:$AsJson
 $gateRaw = 'writability_coverage: partial GATE_OK'
-$coverage = [regex]::Match($gateRaw, 'writability_coverage\s*[:=]\s*(?<value>\S+)').Groups['value'].Value
-$gateStatus = if ($gateRaw -match '\bGATE_OK\b' -and $coverage) { 'OK' } else { 'PENDENTE' }
+$coverageMatch = [regex]::Match($gateRaw, 'writability_coverage\s*[:=]\s*(?<value>\S+)')
+$writabilityCoverage = 'unknown'
+$gateStatus = if ($gateRaw -match '\bGATE_OK\b') { 'OK' } else { 'PENDENTE' }
+if ($coverageMatch.Success -and $coverageMatch.Groups['value'].Value -in @('complete-in-model', 'partial', 'invalid')) {
+    $writabilityCoverage = $coverageMatch.Groups['value'].Value
+} else {
+    $gateStatus = 'PENDENTE'
+}
 '@ | Set-Content -LiteralPath $setupAuditStandardPath -Encoding utf8NoBOM
 
     $output = (& $inventoryScriptPath -KbParallelRoot $kbRoot -SkillsExamplesPath $examplesPath 2>&1 |
         ForEach-Object { $_.ToString() }) -join ' '
     Assert-NotContains -Text $output -Pattern 'WRITABILITY_CONSUMER_CONTRACT_STALE' -Message 'consumidor com marcador e cobertura nao pode ser stale'
+    Assert-NotContains -Text $output -Pattern 'Test-DemoKbSetupAudit\.ps1\(reason=writability_consumer_contract_unclassified' -Message 'consumidor direto com prova AST nao pode ser unclassified'
+    Assert-NotContains -Text $output -Pattern 'Test-DemoKbSetupAudit\.ps1\(reason=' -Message 'consumidor direto com prova AST nao pode receber finding do setup'
 
     # Migracao parcial: declara [switch]$AsJson mas NAO repassa ao motor -> deve ser
     # sinalizado (a checagem detecta o repasse, nao a mera mencao do termo).
