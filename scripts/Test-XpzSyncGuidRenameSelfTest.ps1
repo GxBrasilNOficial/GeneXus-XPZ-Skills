@@ -26,6 +26,8 @@
       C2. Conferencia de acervo sincronizado (-VerifyOnly, exit 0): com metadata
           pre-existente, o arquivo permanece byte a byte identico e o relatorio
           registra KbMetadataStatus=not-requested.
+      C3. Conferencia com metadata ausente (-VerifyOnly, exit 0): o arquivo nao
+          e criado e o relatorio registra KbMetadataStatus=not-requested.
 #>
 
 Set-StrictMode -Version Latest
@@ -253,6 +255,23 @@ try {
     $repC2Obj = Get-Content -LiteralPath $repC2 -Raw | ConvertFrom-Json
     if ($repC2Obj.KbMetadataStatus -ne 'not-requested') { throw "C2: KbMetadataStatus deveria ser 'not-requested'; obtido '$($repC2Obj.KbMetadataStatus)'" }
     if ($null -ne $repC2Obj.KbMetadataSourceComplete) { throw 'C2: KbMetadataSourceComplete deveria ser null em VerifyOnly' }
+
+    # --- C3: conferencia com metadata ausente nao cria o arquivo ---
+    $c3 = New-CaseDir -Name 'verify-absent-metadata'
+    New-AttrFile -Path (Join-Path $c3.AttrDir 'Alpha.xml') -Guid $guid1 -Name 'Alpha' -LastUpdate '2020-01-01T00:00:00.0000000Z'
+    $pkgC3 = Join-Path $c3.Root 'pacote.xml'
+    New-Package -Path $pkgC3 -Guid $guid1 -Name 'Alpha' -LastUpdate '2020-01-01T00:00:00.0000000Z'
+    $metaC3 = Join-Path $c3.Root 'kb-source-metadata.md'
+    $repC3 = Join-Path $c3.Root 'report.json'
+    $rC3 = Invoke-Sync -Pkg $pkgC3 -Acervo $c3.Acervo -VerifyOnly -ReportPath $repC3 -KbMetadataPath $metaC3
+    if ($rC3.ExitCode -ne 0) { throw "C3: conferencia com metadata ausente deveria sair com exit 0; obtido $($rC3.ExitCode). Saida: $($rC3.Output)" }
+    if (Test-Path -LiteralPath $metaC3) { throw 'C3: metadata ausente nao deveria ser criada em VerifyOnly' }
+    if ($rC3.StdErr -match 'KbMetadataPath atualizado') { throw "C3: stderr nao deveria conter 'KbMetadataPath atualizado' em VerifyOnly" }
+    $c3Obj = Assert-StdoutIsPureJson -Case 'C3' -Result $rC3
+    if ($c3Obj.VerifyOnly -ne $true) { throw 'C3: stdout deveria registrar VerifyOnly=true' }
+    $repC3Obj = Get-Content -LiteralPath $repC3 -Raw | ConvertFrom-Json
+    if ($repC3Obj.KbMetadataStatus -ne 'not-requested') { throw "C3: KbMetadataStatus deveria ser 'not-requested'; obtido '$($repC3Obj.KbMetadataStatus)'" }
+    if ($null -ne $repC3Obj.KbMetadataSourceComplete) { throw 'C3: KbMetadataSourceComplete deveria ser null em VerifyOnly' }
 
     # --- D: orfao de materializacao anterior (nome novo ja existe com o mesmo GUID) ---
     $d = New-CaseDir -Name 'orphan'
