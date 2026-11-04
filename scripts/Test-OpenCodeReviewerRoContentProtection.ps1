@@ -8,7 +8,8 @@
     sintetico minimo; 2 casos `grep` estruturais via `opencode debug agents` (regra efetiva
     `grep * deny`). Ausencia de evento comportamental e inconclusiva e bloqueia a promocao.
     `-EvidenceDirectory` revalida `receipt.json` + `evidence/`, confere CLI/modelo e os 34 casos
-    antes da matriz; reutiliza a captura sem executar `opencode run`. O recibo registra
+    antes da matriz; reutiliza a captura sem executar `opencode run`. Usa `workspaceRoot` absoluto
+    do recibo bruto para comparar os caminhos da captura apesar da nova raiz temporaria. O recibo registra
     `evidenceSource` e `toolEventCount`; o parser verifica a rejeicao de JSONL malformado.
     O self-test sintetico de caminhos roda antes da matriz; `-PathValidationSelfTestOnly` para
     depois dele, sem chamar OpenCode.
@@ -53,6 +54,33 @@ function Test-ExpectedInputPath {
     $base = $WorkingDirectory.TrimEnd([char[]]@(92, 47))
     $absoluteExpected = "$base\$expected"
     return [string]::Equals($actual, $absoluteExpected, [System.StringComparison]::Ordinal)
+}
+
+function Convert-CasePathToEvidenceRoot {
+    param(
+        [Parameter(Mandatory)] [string] $Path,
+        [Parameter(Mandatory)] [string] $CurrentWorkspaceRoot,
+        [Parameter(Mandatory)] [string] $CaptureWorkspaceRoot
+    )
+    if ([string]::IsNullOrWhiteSpace($Path)) { return $Path }
+    $normalizedPath = $Path.Replace('/', '\')
+    if (-not [System.IO.Path]::IsPathRooted($Path)) { return $Path }
+
+    $currentRoot = $CurrentWorkspaceRoot.Replace('/', '\')
+    $captureRoot = $CaptureWorkspaceRoot.Replace('/', '\')
+    $currentVolumeRoot = [System.IO.Path]::GetPathRoot($currentRoot)
+    $captureVolumeRoot = [System.IO.Path]::GetPathRoot($captureRoot)
+    if ($currentRoot.Length -gt $currentVolumeRoot.Length) { $currentRoot = $currentRoot.TrimEnd([char[]]@(92, 47)) }
+    if ($captureRoot.Length -gt $captureVolumeRoot.Length) { $captureRoot = $captureRoot.TrimEnd([char[]]@(92, 47)) }
+
+    if ([string]::Equals($normalizedPath, $currentRoot, [System.StringComparison]::Ordinal)) { return $captureRoot }
+    $prefix = if ($currentRoot.EndsWith('\')) { $currentRoot } else { "$currentRoot\" }
+    if (-not $normalizedPath.StartsWith($prefix, [System.StringComparison]::Ordinal)) {
+        throw "BLOCK: caminho absoluto do caso fora da raiz sintetica: $Path"
+    }
+    $suffix = $normalizedPath.Substring($currentRoot.Length)
+    if ($captureRoot.EndsWith('\') -or $suffix.StartsWith('\')) { return "$captureRoot$suffix" }
+    return "$captureRoot\$suffix"
 }
 
 function Test-ReadCaseOutcome {
@@ -123,6 +151,24 @@ function Assert-ReadCasePathValidation {
         throw 'BLOCK: self-test de caminho relativo/absoluto ou preservacao de .. falhou.'
     }
 
+    $captureRoot = Join-Path ([System.IO.Path]::GetTempPath()) 'reviewer-ro-capture-root'
+    $replayRoot = Join-Path ([System.IO.Path]::GetTempPath()) 'reviewer-ro-replay-root'
+    $replayCwd = Join-Path $replayRoot 'workspace-global'
+    $captureCwd = Convert-CasePathToEvidenceRoot -Path $replayCwd -CurrentWorkspaceRoot $replayRoot -CaptureWorkspaceRoot $captureRoot
+    $capturedDotDotPath = "$captureCwd\sub\..\.env"
+    $replayedDotDot = Test-ReadCaseOutcome -Case @{ kind = 'read-deny'; expectedPath = 'sub/../.env' } -Tool 'read' -Status 'error' -HasSentinel $false -ErrorText 'Permission denied' -InputPath $capturedDotDotPath -WorkingDirectory $captureCwd
+    if (-not $replayedDotDot.pass) { throw "BLOCK: self-test falhou ao revalidar caminho absoluto da raiz original: $($replayedDotDot.reason)" }
+
+    $replayAbsolutePath = Join-Path $replayRoot 'workspace-local/.env'
+    $captureAbsolutePath = Convert-CasePathToEvidenceRoot -Path $replayAbsolutePath -CurrentWorkspaceRoot $replayRoot -CaptureWorkspaceRoot $captureRoot
+    $replayedAbsolute = Test-ReadCaseOutcome -Case @{ kind = 'read-allow'; expectedPath = $captureAbsolutePath } -Tool 'read' -Status 'completed' -HasSentinel $true -ErrorText '' -InputPath $captureAbsolutePath -WorkingDirectory (Join-Path $captureRoot 'workspace-local')
+    if (-not $replayedAbsolute.pass) { throw "BLOCK: self-test falhou ao remapear caminho absoluto da captura: $($replayedAbsolute.reason)" }
+
+    $wrongCaptureRoot = Join-Path ([System.IO.Path]::GetTempPath()) 'reviewer-ro-other-capture-root'
+    $wrongCapturePath = Join-Path $wrongCaptureRoot 'workspace-local/.env'
+    $wrongRootOutcome = Test-ReadCaseOutcome -Case @{ kind = 'read-allow'; expectedPath = $captureAbsolutePath } -Tool 'read' -Status 'completed' -HasSentinel $true -ErrorText '' -InputPath $wrongCapturePath -WorkingDirectory (Join-Path $captureRoot 'workspace-local')
+    if ($wrongRootOutcome.pass) { throw 'BLOCK: self-test aceitou caminho absoluto de outra raiz de captura.' }
+
     $missingExpectation = Test-ReadCaseOutcome -Case @{ kind = 'read-deny' } -Tool 'read' -Status 'error' -HasSentinel $false -ErrorText 'Permission denied' -InputPath '.env' -WorkingDirectory $probeCwd
     if ($missingExpectation.pass) { throw 'BLOCK: self-test aceitou caso de leitura sem expectedPath.' }
 }
@@ -145,6 +191,7 @@ $outsideDir = Join-Path $root 'outside'
 $evidenceDir = Join-Path $root 'evidence'
 $evidenceSourceDir = $null
 $evidenceExitCodes = @{}
+$script:evidenceWorkspaceRoot = $null
 if (-not [string]::IsNullOrWhiteSpace($EvidenceDirectory)) {
     if (-not (Test-Path -LiteralPath $EvidenceDirectory -PathType Container)) { throw "BLOCK: EvidenceDirectory inexistente: $EvidenceDirectory" }
     $evidenceSourceDir = Join-Path $EvidenceDirectory 'evidence'
@@ -240,6 +287,15 @@ function Invoke-RunCase {
     $profile = [string]$Case.profile
     $cwd = if ($profile -eq 'local') { $workspaceLocal } else { $workspaceGlobal }
     if ($Case.ContainsKey('cwd') -and -not [string]::IsNullOrWhiteSpace([string]$Case['cwd'])) { $cwd = [string]$Case['cwd'] }
+    $pathCase = $Case
+    $pathWorkingDirectory = $cwd
+    if ($null -ne $evidenceSourceDir) {
+        $pathWorkingDirectory = Convert-CasePathToEvidenceRoot -Path $cwd -CurrentWorkspaceRoot $root -CaptureWorkspaceRoot $script:evidenceWorkspaceRoot
+        if ($Case.ContainsKey('expectedPath')) {
+            $pathCase = @{} + $Case
+            $pathCase.expectedPath = Convert-CasePathToEvidenceRoot -Path ([string]$Case.expectedPath) -CurrentWorkspaceRoot $root -CaptureWorkspaceRoot $script:evidenceWorkspaceRoot
+        }
+    }
     $promptPath = Join-Path $evidenceDir "$name.prompt.txt"
     $streamPath = Join-Path $evidenceDir "$name.jsonl"
     $stderrPath = Join-Path $evidenceDir "$name.stderr.txt"
@@ -311,7 +367,7 @@ function Invoke-RunCase {
     $reason = $null
     $kind = [string]$Case.kind
     if (@('read-deny', 'read-allow', 'external-deny') -ccontains $kind) {
-        $readOutcome = Test-ReadCaseOutcome -Case $Case -Tool $tool -Status $status -HasSentinel $hasSentinel -ErrorText $errorText -InputPath $inputPath -WorkingDirectory $cwd
+        $readOutcome = Test-ReadCaseOutcome -Case $pathCase -Tool $tool -Status $status -HasSentinel $hasSentinel -ErrorText $errorText -InputPath $inputPath -WorkingDirectory $pathWorkingDirectory
         $pass = [bool]$readOutcome.pass
         $reason = $readOutcome.reason
         $event.expectedPath = $readOutcome.expectedPath
@@ -490,8 +546,12 @@ if ($null -ne $evidenceSourceDir) {
     } catch {
         throw "BLOCK: receipt.json invalido em ${EvidenceDirectory}: $($_.Exception.Message)"
     }
-    foreach ($prop in @('kind', 'schemaVersion', 'cliVersion', 'model', 'cases', 'behavioral', 'structural', 'pass')) {
+    foreach ($prop in @('kind', 'schemaVersion', 'cliVersion', 'model', 'workspaceRoot', 'cases', 'behavioral', 'structural', 'pass')) {
         if ($null -eq $evidenceReceipt.PSObject.Properties[$prop]) { throw "BLOCK: receipt.json sem campo '$prop'." }
+    }
+    $script:evidenceWorkspaceRoot = [string]$evidenceReceipt.workspaceRoot
+    if ([string]::IsNullOrWhiteSpace($script:evidenceWorkspaceRoot) -or -not [System.IO.Path]::IsPathRooted($script:evidenceWorkspaceRoot)) {
+        throw "BLOCK: workspaceRoot invalida no receipt.json: $script:evidenceWorkspaceRoot"
     }
     if ([string]$evidenceReceipt.kind -cne 'xpz-opencode-reviewer-ro-matrix-receipt') { throw "BLOCK: receipt.json com kind inesperado: $($evidenceReceipt.kind)" }
     if ([int]$evidenceReceipt.schemaVersion -ne 1) { throw "BLOCK: receipt.json com schemaVersion inesperado: $($evidenceReceipt.schemaVersion)" }
@@ -558,6 +618,8 @@ foreach ($sr in $structuralResults) { $results.Add($sr) }
 $behavioral = @($results | Where-Object { $_.class -eq 'behavioral' })
 $structural = @($results | Where-Object { $_.class -eq 'structural' })
 $failed = @($behavioral | Where-Object { -not $_.pass })
+$receiptWorkspaceRoot = $root
+if ($null -ne $evidenceSourceDir) { $receiptWorkspaceRoot = $script:evidenceWorkspaceRoot }
 $receipt = [ordered]@{
     kind = 'xpz-opencode-reviewer-ro-matrix-receipt'
     schemaVersion = 1
@@ -565,7 +627,7 @@ $receipt = [ordered]@{
     model = $Model
     mechanism = 'opencode run --format json + opencode debug agents'
     generatedAt = (Get-Date).ToUniversalTime().ToString('o')
-    workspaceRoot = $root
+    workspaceRoot = $receiptWorkspaceRoot
     evidenceSource = $EvidenceDirectory
     cases = @($results)
     behavioral = [ordered]@{ total = $behavioral.Count; pass = @($behavioral | Where-Object { $_.pass }).Count; fail = $failed.Count }

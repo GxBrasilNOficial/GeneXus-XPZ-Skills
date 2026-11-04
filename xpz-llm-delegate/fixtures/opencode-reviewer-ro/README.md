@@ -64,7 +64,8 @@ para revalidar sem executar `opencode run`. Se a captura usar outro modelo além
 `-Model` com o id registrado no recibo. A captura deve conter `receipt.json` e `evidence/`, com os
 34 JSONL dos casos e `debug-agents-local.json`/`debug-agents-global.json`. O script confere a versão
 instalada, o modelo, os 34 casos esperados, classes, `exitCode`, aprovação e arquivos não vazios;
-divergências bloqueiam antes de qualquer execução de modelo.
+divergências bloqueiam antes de qualquer execução de modelo. O `receipt.json` bruto precisa conter
+`workspaceRoot` absoluto da captura; recibos sanitizados do repositório não substituem esse arquivo.
 
 O recibo regenerado registra `evidenceSource` na raiz e `toolEventCount` por caso. No início, o
 script também verifica que seu parser rejeita uma linha JSONL malformada.
@@ -72,6 +73,9 @@ O self-test sintético de caminhos também roda antes da matriz; `-PathValidatio
 executa só esse self-test, sem chamar o OpenCode.
 
 Nos casos `read-deny`, `read-allow` e `external-deny`, o verificador exige que `input.path` corresponda ao caminho esperado. Aceita a forma relativa pedida ou a forma lexical absoluta baseada no cwd do caso; normaliza apenas `/` e `\` e preserva segmentos `.`/`..`.
+
+Na revalidação, a raiz temporária nova é remapeada para `workspaceRoot` da captura ao comparar cwd e
+caminhos absolutos. Isso preserva a prova original sem resolver segmentos `.`/`..`.
 
 ## Resolução efetiva medida (2.2.5) — bloco estrutural canônico
 

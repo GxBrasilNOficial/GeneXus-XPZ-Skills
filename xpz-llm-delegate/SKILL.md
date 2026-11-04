@@ -1061,6 +1061,9 @@ segurança no **próprio adapter**, de forma inseparável (nunca "default sem gu
   também precisa conter o caminho esperado; a verificação aceita a forma relativa ou a forma lexical
   absoluta baseada no cwd, preservando segmentos `.`/`..`.
   O self-test sintético de caminhos roda antes da matriz e rejeita eventos com caminho divergente.
+  `-EvidenceDirectory` exige `workspaceRoot` absoluto no recibo bruto e usa a raiz da captura para
+  validar caminhos absolutos durante a revalidação, mesmo quando o replay cria outra raiz temporária;
+  segmentos `.`/`..` permanecem lexicais. Recibo sanitizado não substitui a captura bruta.
   `names-glob` exige evento `glob` com nomes visíveis;
   `names-read` exige `read` de diretório; `names-list` aceita um evento de enumeração
   `read`, `glob` ou `list` com nomes visíveis (na captura atual, `read`).
