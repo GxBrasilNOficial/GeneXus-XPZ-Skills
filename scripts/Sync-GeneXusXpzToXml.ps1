@@ -18,7 +18,8 @@ esse XML.
 Raiz da árvore de XMLs individualizados por tipo.
 
 .PARAMETER VerifyOnly
-Executa apenas conferência, sem regravar arquivos no destino.
+Executa apenas conferência, sem regravar arquivos no destino nem
+`kb-source-metadata.md`.
 
 .PARAMETER FullSnapshot
 Além da conferência do pacote atual, compara o snapshot inteiro do destino com o
@@ -36,6 +37,7 @@ no formato `Tipo:Nome`.
 
 .PARAMETER KbMetadataPath
 Caminho opcional para kb-source-metadata.md da pasta paralela.
+Atualizado apenas quando o sync materializa; ignorado em `-VerifyOnly`.
 
 .PARAMETER CatalogPath
 Caminho opcional para gx-object-type-catalog.json (padrão: scripts/ da base compartilhada).
