@@ -1074,19 +1074,32 @@ function Get-XpzWritabilityConsumerFinding {
         foreach ($node in $ast.FindAll({
                     param($n) $n -is [System.Management.Automation.Language.AssignmentStatementAst] -and
                     $n.Left -is [System.Management.Automation.Language.VariableExpressionAst] -and
-                    $n.Right.Extent.Text -match '(?is)^\[regex\]::Match\s*\(\s*\$gateRaw\s*,.*writability_coverage.*\)\s*$'
+                    $n.Right.Extent.Text -match '(?is)^\[regex\]::Match\s*\(\s*\$gateRaw\s*,.*writability_coverage(?![A-Za-z0-9_]).*\)\s*$'
                 }, $true)) {
             [void]$coverageExtractionVars.Add([string]$node.Left.VariablePath.UserPath)
         }
 
         $hasCoverageInvalidFallback = $false
         if ($coverageExtractionVars.Count -gt 0) {
-            $coverageValidationPattern = '(?is)^\s*if\s*\(\s*\$(?<coverageVar>[A-Za-z_][A-Za-z0-9_]*)\.Success\s+-and\s+\$\k<coverageVar>\.Groups\[''value''\]\.Value\s+-in\s+@\(\s*''complete-in-model''\s*,\s*''partial''\s*,\s*''invalid''\s*\)\s*\)\s*\{.*?\}\s*else\s*\{[^}]*\$gateStatus\s*=\s*''PENDENTE''[^}]*\}\s*$'
+            $coverageValidationPattern = '(?is)^\s*if\s*\(\s*\$(?<coverageVar>[A-Za-z_][A-Za-z0-9_]*)\.Success\s+-and\s+\$\k<coverageVar>\.Groups\[''value''\]\.Value\s+-in\s+@\(\s*''complete-in-model''\s*,\s*''partial''\s*,\s*''invalid''\s*\)\s*\)\s*\{.*?\}\s*else\s*\{.*\}\s*$'
             foreach ($node in $ast.FindAll({
                         param($n) $n -is [System.Management.Automation.Language.IfStatementAst]
                     }, $true)) {
                 $validationMatch = [regex]::Match($node.Extent.Text, $coverageValidationPattern)
-                if ($validationMatch.Success -and
+                if (-not $validationMatch.Success -or $null -eq $node.ElseClause) { continue }
+                $hasPendingAssignment = $false
+                foreach ($stmt in $node.ElseClause.FindAll({
+                            param($x) $x -is [System.Management.Automation.Language.AssignmentStatementAst] -and
+                            $x.Left -is [System.Management.Automation.Language.VariableExpressionAst] -and
+                            $x.Left.VariablePath.UserPath -ieq 'gateStatus' -and
+                            $x.Right -is [System.Management.Automation.Language.CommandExpressionAst] -and
+                            $x.Right.Expression -is [System.Management.Automation.Language.StringConstantExpressionAst] -and
+                            $x.Right.Expression.Value -eq 'PENDENTE'
+                        }, $true)) {
+                    $hasPendingAssignment = $true
+                    break
+                }
+                if ($hasPendingAssignment -and
                     $coverageExtractionVars.Contains($validationMatch.Groups['coverageVar'].Value)) {
                     $hasCoverageInvalidFallback = $true
                     break
