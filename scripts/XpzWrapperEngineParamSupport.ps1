@@ -1070,17 +1070,30 @@ function Get-XpzWritabilityConsumerFinding {
         $localText = [System.IO.File]::ReadAllText($WrapperPath)
         $hasGateWrapperPath = $localText -match 'GateWrapperPath'
 
-        $hasCoverageExtraction = @($ast.FindAll({
+        $coverageExtractionVars = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+        foreach ($node in $ast.FindAll({
                     param($n) $n -is [System.Management.Automation.Language.AssignmentStatementAst] -and
                     $n.Left -is [System.Management.Automation.Language.VariableExpressionAst] -and
                     $n.Right.Extent.Text -match '(?is)^\[regex\]::Match\s*\(\s*\$gateRaw\s*,.*writability_coverage.*\)\s*$'
-                }, $true)).Count -gt 0
-        $coverageValidationPattern = '(?is)^\s*if\s*\(\s*\$[A-Za-z_][A-Za-z0-9_]*\.Success\s+-and\s+\$[A-Za-z_][A-Za-z0-9_]*\.Groups\[''value''\]\.Value\s+-in\s+@\(\s*''complete-in-model''\s*,\s*''partial''\s*,\s*''invalid''\s*\)\s*\)\s*\{.*?\}\s*else\s*\{[^}]*\$gateStatus\s*=\s*''PENDENTE''[^}]*\}\s*$'
-        $hasCoverageInvalidFallback = @($ast.FindAll({
-                    param($n) $n -is [System.Management.Automation.Language.IfStatementAst] -and
-                    $n.Extent.Text -match $coverageValidationPattern
-                }, $true)).Count -gt 0
-        $hasCoverageBehavior = $hasCoverageExtraction -and $hasCoverageInvalidFallback
+                }, $true)) {
+            [void]$coverageExtractionVars.Add([string]$node.Left.VariablePath.UserPath)
+        }
+
+        $hasCoverageInvalidFallback = $false
+        if ($coverageExtractionVars.Count -gt 0) {
+            $coverageValidationPattern = '(?is)^\s*if\s*\(\s*\$(?<coverageVar>[A-Za-z_][A-Za-z0-9_]*)\.Success\s+-and\s+\$\k<coverageVar>\.Groups\[''value''\]\.Value\s+-in\s+@\(\s*''complete-in-model''\s*,\s*''partial''\s*,\s*''invalid''\s*\)\s*\)\s*\{.*?\}\s*else\s*\{[^}]*\$gateStatus\s*=\s*''PENDENTE''[^}]*\}\s*$'
+            foreach ($node in $ast.FindAll({
+                        param($n) $n -is [System.Management.Automation.Language.IfStatementAst]
+                    }, $true)) {
+                $validationMatch = [regex]::Match($node.Extent.Text, $coverageValidationPattern)
+                if ($validationMatch.Success -and
+                    $coverageExtractionVars.Contains($validationMatch.Groups['coverageVar'].Value)) {
+                    $hasCoverageInvalidFallback = $true
+                    break
+                }
+            }
+        }
+        $hasCoverageBehavior = $coverageExtractionVars.Count -gt 0 -and $hasCoverageInvalidFallback
 
         if ($hasGateRaw -and $hasGateOk) {
             $hasCoverageContract = $localText -match 'WRITABILITY_COVERAGE_CONTRACT_V1' -and

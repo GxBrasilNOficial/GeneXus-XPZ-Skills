@@ -14,13 +14,14 @@
   ambiguo/nao-ambiguo (de nome E de alias), CommonParameters, outro script, simple, sem param()/dynamicparam,
   formas de parse, Join-Path, .PARAMETER orfao, ajuda invisivel, -AlternateSelfLeaf, paridade de molde,
   dedup e secao .EXAMPLE que nao parseia (pulada, sem finding).
-  Inclui H19..H48 do consumidor de gravabilidade (Get-XpzWritabilityConsumerFinding): delegador
+  Inclui H19..H50 do consumidor de gravabilidade (Get-XpzWritabilityConsumerFinding): delegador
   com/sem contrato, motor ausente/parse-error, direto stale/compliant, gateRaw/GATE_OK parciais,
   raiz diferente, redirecionamento (>/*>/1>&2/2>&1), atribuicao, pipeline, copia local, wrapper
   parse-error, comentario/ajuda, not-consumer, caminho interpolado sem gate, chamada dinamica
   extra ao mesmo motor, dot-source ao mesmo motor/outro destino (literal e por variavel), escopo
   da deduplicacao de engine-unavailable, molde real, forma parcial de cobertura, variavel de match
-  alternativa e verificacao do contrato no motor real do repositorio.
+  alternativa, variavel divergente no fallback, comentario puro e verificacao do contrato no motor
+  real do repositorio.
   Sentinela final: XPZ_WRAPPER_ENGINE_PARAM_SELFTEST_OK.
 #>
 
@@ -494,7 +495,7 @@ param([string]$Ok)
     Assert-HelpFinding (Get-XpzHelpSurfaceFinding -WrapperPath $f) '' '' 'H18 secao que nao parseia e pulada'
 
     # ============================================================================
-    # H19..H48 consumidor do contrato de cobertura de gravabilidade
+    # H19..H50 consumidor do contrato de cobertura de gravabilidade
     # ============================================================================
     $consumerCall = '& $enginePath -KbRoot $KbRoot -GateWrapperPath $GateWrapperPath'
     $consumerWrapper = @'
@@ -724,6 +725,24 @@ if ($writabilityCoverageMatch.Success -and $writabilityCoverageMatch.Groups['val
 }
 '@
     Assert-Consumer (Get-XpzWritabilityConsumerFinding -WrapperPath $f -EnginesRoot $synthEngines) 'direct-compliant' 'none' '' $false 'H48 variavel de match alternativa'
+
+    # H49 extracao e fallback com variaveis diferentes nao provam consumo direto.
+    $f = New-Fixture $wrapDir 'h49.ps1' @'
+# WRITABILITY_COVERAGE_CONTRACT_V1
+param([string]$gateRaw)
+$raw = 'GATE_OK'
+$m = [regex]::Match($gateRaw, 'writability_coverage\s*[:=]\s*(?<value>\S+)')
+$gateStatus = 'OK'
+if ($outro.Success -and $outro.Groups['value'].Value -in @('complete-in-model', 'partial', 'invalid')) { } else { $gateStatus = 'PENDENTE' }
+'@
+    Assert-Consumer (Get-XpzWritabilityConsumerFinding -WrapperPath $f -EnginesRoot $synthEngines) 'unclassified' 'engine-diagnostic' 'writability_consumer_contract_unclassified' $true 'H49 variavel divergente no fallback'
+
+    # H50 arquivo so com marcadores em comentario nao e consumidor.
+    $f = New-Fixture $wrapDir 'h50.ps1' @'
+# WRITABILITY_COVERAGE_CONTRACT_V1
+# writability_coverage
+'@
+    Assert-Consumer (Get-XpzWritabilityConsumerFinding -WrapperPath $f -EnginesRoot $synthEngines) 'not-consumer' 'none' '' $false 'H50 comentario puro nao e consumidor'
 
     Write-Output 'XPZ_WRAPPER_ENGINE_PARAM_SELFTEST_OK'
 } finally {
