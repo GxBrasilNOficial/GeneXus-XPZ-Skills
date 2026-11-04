@@ -1015,7 +1015,8 @@ function Get-XpzWritabilityConsumerFinding {
       LIMITES: nao prova fluxo principal, repasse de parametros obrigatorios,
       repasse de stdout, `[void](& ...)` nem `& $engine; exit 0`. Raiz diferente
       de $SharedSkillsRoot, copia local do motor e caminho dinamico/interpolado
-      resultam em unclassified; chamada dinamica adicional e ignorada.
+      resultam em unclassified; chamada dinamica ao mesmo motor tambem resulta
+      em unclassified, e outras chamadas dinamicas sao ignoradas.
     #>
     param(
         [Parameter(Mandatory)][string]$WrapperPath,
@@ -1095,6 +1096,11 @@ function Get-XpzWritabilityConsumerFinding {
                 # reconhecido, mas tambem nao pode sair como not-consumer sem finding.
                 $hasUnresolvedSetupCall = $true
             }
+        }
+
+        if ($hasUnresolvedSetupCall) {
+            return New-Result -Classification 'unclassified' -Channel 'engine-diagnostic' `
+                -Reason 'writability_consumer_contract_unclassified' -Detail 'unresolved-setup-call' -EmitFinding $true
         }
 
         if ($setupSites.Count -gt 0) {
@@ -1177,11 +1183,6 @@ function Get-XpzWritabilityConsumerFinding {
             }
             return New-Result -Classification 'delegated-engine-without-contract' -Channel 'engine-diagnostic' `
                 -Reason 'writability_consumer_contract_engine_without_contract' -Detail 'engine-contract-missing' -EmitFinding $true
-        }
-
-        if ($hasUnresolvedSetupCall) {
-            return New-Result -Classification 'unclassified' -Channel 'engine-diagnostic' `
-                -Reason 'writability_consumer_contract_unclassified' -Detail 'unresolved-setup-call' -EmitFinding $true
         }
 
         if ($hasGateRaw -or $hasGateOk -or $hasGateWrapperPath) {
