@@ -649,13 +649,14 @@ Critério para retomar: caso real em que a ausência do cache Codex prejudique a
 - **Importância** — média (gap real com workaround manual: o adapter síncrono direto **já** funciona fora do painel; dentro do painel, Claude permanece semantic-only e a pré-push reforçada (`14`) não converge se o revisor preferido for esperado como git-capable no despacho paralelo).
 - **Maturidade** — ideia (Posição B deliberada e documentada; mudança exige decisões de segurança, não só ligar um flag).
 
-**Estado medido (dogfooding pré-push reforçada schema 3, 2026-08-28).** No painel (`Invoke-LlmDelegatePanelDispatch.ps1`), Claude Code CLI entra como **semantic-only** por contenção de segurança, não por falta de capacidade do modelo:
+**Estado medido (atualizado 2026-11-04, decisão humana A).** No painel (`Invoke-LlmDelegatePanelDispatch.ps1`), Claude Code CLI entra como **semantic-only por papel** (dossiê / fase semântica / **não** âncora), **não** porque «não tem shell»:
 
-1. `$ContentionKeys['claude-code']` bloqueia `permissionMode`, `tools` e afins no `invokeArgs` do preferido (`securityBlockedArgs` no despacho).
-2. `Invoke-ClaudeCodeAsync.ps1` fixa `PermissionMode=plan` e `Tools=Read,Glob,Grep` — **sem Bash**.
-3. `bypassPermissions` permanece proibido em toda a delegação XPZ.
+1. `$ContentionKeys['claude-code']` bloqueia `permissionMode`, `tools` e afins no `invokeArgs` (Posição B) — painel **herda** o default do adapter.
+2. Default dos adapters: `PermissionMode=plan` e `Tools=Bash,Read,Glob,Grep` (Bash sob `plan`). Consulta restrita = `-Tools Read,Glob,Grep` **fora** do painel.
+3. `bypassPermissions` permanece proibido. Bash **≠** sandbox Codex: `permissions.allow` casa **forma** (máquina/projeto), não conteúdo — residual declarado (scripts allowlistados e outras entradas `allow` podem mutar se o modelo for induzido).
+4. Gate 2026-11-04: RO (`git` + `Test-*KbSetupFreshness`) OK sob `plan`+Bash na KB teste; escritas sem efeito (modelo frequentemente não emite `tool_use` de escrita sob `plan`). Em `kb-sensitive`, stream some — higiene pós = efeito observado (`git status` antes/depois), não «olho no ledger».
 
-Papel desejado **no painel**: ler o dossiê e opinar (semantic-only), não executar comandos arbitrários no cwd. Isso contrasta com Codex no painel, que entra com sandbox `read-only` explícito.
+**Ainda aberto:** promover Claude a **âncora git-capable in-panel** (mecânico sob `plan` sem hook contaminante; perfil/`dontAsk`+`default`). Esta frente **não** fecha isso.
 
 **Fora do painel**, git-capable **já funciona** via adapter síncrono direto — medido na mesma sessão:
 

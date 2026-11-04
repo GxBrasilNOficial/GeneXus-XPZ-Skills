@@ -22,9 +22,9 @@
 .PARAMETER PermissionMode
     Modo de permissao do Claude Code. Default: plan. bypassPermissions e recusado.
 .PARAMETER Tools
-    Lista de ferramentas disponiveis. Default: Read,Glob,Grep. Use "" para desabilitar todas
-    (vira --tools "" na CLI) ou "default" para liberar o conjunto padrao completo da CLI.
-    Mesmo contrato do adapter sincrono Invoke-ClaudeCode.ps1.
+    Lista de ferramentas disponiveis. Default: Bash,Read,Glob,Grep. Use "" para desabilitar todas
+    (vira --tools "" na CLI), "Read,Glob,Grep" para consulta restrita, ou "default" para o
+    conjunto completo da CLI. Mesmo contrato do adapter sincrono Invoke-ClaudeCode.ps1.
 .PARAMETER Cd
     Diretorio de trabalho do processo Claude Code. Default: diretorio atual do chamador.
 .PARAMETER ClaudeExe
@@ -46,7 +46,7 @@ param(
     [Parameter(Mandatory, ParameterSetName = 'FromFile')] [string] $MessagePath,
     [string] $Model = 'claude-opus-4-8',
     [ValidateSet('default', 'acceptEdits', 'plan', 'auto', 'dontAsk', 'bypassPermissions')] [string] $PermissionMode = 'plan',
-    [string] $Tools = 'Read,Glob,Grep',
+    [string] $Tools = 'Bash,Read,Glob,Grep',
     [string] $Cd,
     [string] $ClaudeExe,
     [switch] $NoWatcher,

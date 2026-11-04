@@ -6,9 +6,11 @@
 .DESCRIPTION
     Backend claude-code da skill xpz-llm-delegate. Envia o prompt por stdin para evitar
     payload em argumento de processo, usa `claude -p` e captura stdout. Por padrao roda em
-    modo de consulta curta restrita: sem persistencia de sessao, permission-mode plan e
-    ferramentas somente leitura. Nao limita turnos agenticos: a CLI 2.1.215 removeu
-    `--max-turns` do `--help` e o adapter nao tem como negociar esse limite (ver CHANGELOG).
+    modo padrao: sem persistencia de sessao, permission-mode plan e tools
+    Bash,Read,Glob,Grep (Bash sob plan; nao e sandbox RO — allowlist de forma da maquina/
+    projeto pode permitir mutacao). Consulta restrita: passar -Tools Read,Glob,Grep.
+    Nao limita turnos agenticos: a CLI 2.1.215 removeu `--max-turns` do `--help` e o
+    adapter nao tem como negociar esse limite (ver CHANGELOG).
 
     CONFIDENCIALIDADE: este script NAO decide se o payload pode ir para Anthropic. Antes de
     enviar payload sensivel, passe por Resolve-LlmDelegateAuthorization.ps1 -Backend
@@ -25,8 +27,9 @@
 .PARAMETER PermissionMode
     Modo de permissao do Claude Code. Default: plan.
 .PARAMETER Tools
-    Lista de ferramentas disponiveis. Default: Read,Glob,Grep. Use "" para desabilitar todas
-    (vira --tools "" na CLI) ou "default" para liberar o conjunto padrao completo da CLI.
+    Lista de ferramentas disponiveis. Default: Bash,Read,Glob,Grep. Use "" para desabilitar todas
+    (vira --tools "" na CLI), "Read,Glob,Grep" para consulta restrita, ou "default" para o
+    conjunto completo da CLI.
 .PARAMETER Cd
     Diretorio de trabalho do processo Claude Code. Default: diretorio atual do chamador.
 .PARAMETER ClaudeExe
@@ -42,7 +45,7 @@ param(
     [Parameter(Mandatory, ParameterSetName = 'FromFile')] [string] $MessagePath,
     [string] $Model = 'claude-opus-4-8',
     [ValidateSet('default', 'acceptEdits', 'plan', 'auto', 'dontAsk', 'bypassPermissions')] [string] $PermissionMode = 'plan',
-    [string] $Tools = 'Read,Glob,Grep',
+    [string] $Tools = 'Bash,Read,Glob,Grep',
     [string] $Cd,
     [string] $ClaudeExe,
     [ValidateRange(1, 3600)] [int] $TimeoutSec = 1200,

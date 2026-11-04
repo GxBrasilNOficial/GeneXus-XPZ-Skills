@@ -16,7 +16,7 @@ param(
     [Parameter(Mandatory)] [string] $SidecarPath,
     [string] $Model = 'claude-opus-4-8',
     [ValidateSet('default', 'acceptEdits', 'plan', 'auto', 'dontAsk', 'bypassPermissions')] [string] $PermissionMode = 'plan',
-    [string] $Tools = 'Read,Glob,Grep',
+    [string] $Tools = 'Bash,Read,Glob,Grep',
     [string] $Cd,
     [string] $ClaudeExe,
     [ValidateRange(1, 3600)] [int] $TimeoutSec = 300,

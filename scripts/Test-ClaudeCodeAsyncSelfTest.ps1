@@ -264,6 +264,8 @@ try {
     Assert-True ($ok.sidecar.promptTransmission -eq 'stdin-file') 'sidecar: promptTransmission deveria ser stdin-file.'
     Assert-True ($ok.sidecar.processCreated -eq $true) 'sidecar: processCreated=true esperado.'
     Assert-True ($ok.sidecar.quotaCircuitDecision -eq 'closed') 'sidecar: circuito sem estado deveria ser closed.'
+    $okArgs = Get-Content -LiteralPath $fake.ArgsFile -Raw -Encoding utf8
+    Assert-True ($okArgs -match '--tools Bash,Read,Glob,Grep') 'async default deveria passar --tools Bash,Read,Glob,Grep.'
 
     $newline = Invoke-AdapterCase -TempRoot $tmp -Mode 'success-newline' -ClaudeExe $fake.Exe `
         -CircuitRoot (Join-Path $tmp 'circuit-newline')

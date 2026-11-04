@@ -9,7 +9,7 @@
     a entrega inline no prompt ao revisor semantic-only e decisao do ORQUESTRADOR (stdin
     nos stdin-dossier-capable como opencode/Claude Code; argv nos argv-limited Copilot/
     Gemini/Antigravity, se couber — ver 13/14). O revisor semantic-only nao roda o passo mecanico do
-    13 (nega bash/shell). O dossie tem duas secoes rotuladas:
+    13 — papel semantic-only / nao ancora; nao implica ausencia universal de shell). O dossie tem duas secoes rotuladas:
 
       - SECAO A - git BRUTO (fato): rev-parse HEAD, log origin/main..HEAD,
         diff origin/main..HEAD, status --porcelain.
