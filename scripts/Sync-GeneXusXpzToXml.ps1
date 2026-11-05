@@ -37,7 +37,11 @@ no formato `Tipo:Nome`.
 
 .PARAMETER KbMetadataPath
 Caminho opcional para kb-source-metadata.md da pasta paralela.
-Atualizado apenas quando o sync materializa; ignorado em `-VerifyOnly`.
+A gravação da metadata é tentada quando este caminho é informado e a execução
+está fora de `-VerifyOnly`, depois das validações e bloqueios que a precedem e
+antes do rename por GUID (com `-FullSnapshot`) e das escritas de itens no
+acervo; uma execução sem item criado ou atualizado também tenta gravar, e uma
+falha posterior não desfaz a gravação.
 
 .PARAMETER CatalogPath
 Caminho opcional para gx-object-type-catalog.json (padrão: scripts/ da base compartilhada).
@@ -869,9 +873,10 @@ try {
     }
 
     # Em -VerifyOnly o motor nao grava no destino nem em kb-source-metadata.md.
-    # No modo normal a metadata e gravada antes das escritas para que uma falha
-    # parcial avance o timestamp e force o rebuild do indice; a conferencia nao
-    # materializa, entao esse sinal nao se aplica.
+    # No modo normal a metadata e gravada antes do rename por GUID (com
+    # -FullSnapshot) e das escritas de itens para que uma falha parcial avance
+    # o timestamp e force o rebuild do indice; a conferencia nao materializa,
+    # entao esse sinal nao se aplica.
     $shouldWriteKbMetadata = (-not [bool]$VerifyOnly) -and [bool]$KbMetadataPath
 
     if (Test-GeneXusLegacyExportFilePackage -XmlDocument $packageXml) {

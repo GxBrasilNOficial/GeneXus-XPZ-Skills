@@ -351,8 +351,11 @@ PastaParalelaDaKb/
 ```
 
 O arquivo `kb-source-metadata.md`, quando exposto pelo wrapper local via
-`-KbMetadataPath`, é artefato normal de processamento e recebe atualizacao
-cirurgica em cada materialização (não regeneracao total do arquivo). O motor preserva
+`-KbMetadataPath`, é artefato normal de processamento. A gravação é tentada
+fora de `-VerifyOnly`, sem exigir item criado ou atualizado, e não depende de
+mudança material nos XMLs. Quando o arquivo já existe, a atualização é
+cirúrgica, sem regeneracao total; quando não existe, ele é criado a partir do
+template. O motor preserva
 `last_setup_audit_run_at` (autoridade de `xpz-kb-parallel-setup`), demais
 frontmatter fora do escopo do sync e seções extras; atualiza valores estaveis de
 `Source`/`KMW` quando o `XPZ` atual vier com metadados vazios ou parciais.
@@ -399,8 +402,8 @@ No ramo legado o motor (`scripts/GeneXusLegacyExportFileSupport.ps1`) consome o 
 
 Sinais no JSON de resultado: `LegacyFormatDetected=true` e
 `MaterializationInterpretation`/`PackageInterpretation`=`legacy-export-adapted`. Quando
-`-KbMetadataPath` é informado **e o sync materializa**, a metadata recebe
-`-IsLegacyExport`: o `Build` vem de
+`-KbMetadataPath` é informado e a gravação da metadata é tentada fora de
+`-VerifyOnly`, a atualização é chamada com `-IsLegacyExport`: o `Build` vem de
 `KMW/MaxGxBuildSaved` (o export legado não traz `KMW/Build` nem bloco `<Source>`), com um
 hint dedicado no lugar do warning genérico de `Source` ausente. Em `-VerifyOnly`, a
 metadata não é gravada. A leitura é encoding-aware
