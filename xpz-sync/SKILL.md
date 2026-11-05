@@ -366,9 +366,10 @@ informado), sem alterar a proveniência da última materialização.
 
 Esse arquivo também é o local esperado de `last_xpz_materialization_run_at`
 (autoridade desta skill).
-Esse horário representa a última solicitação/processamento de materialização
-XPZ/XML, não apenas a última mudança material detectada nos XMLs, e não a última
-conferência (`-VerifyOnly`).
+Esse horário representa o último processamento de materialização XPZ/XML que
+chegou à gravação da metadata, mesmo sem mudança material nos XMLs. Aborto
+anterior à gravação, falha na própria gravação e a conferência (`-VerifyOnly`)
+não atualizam esse campo.
 
 ---
 
