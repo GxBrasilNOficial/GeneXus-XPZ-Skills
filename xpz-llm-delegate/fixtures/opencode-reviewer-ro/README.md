@@ -42,6 +42,8 @@ Self-test determinístico/fake-exe não prova sozinho o comportamento de uma ver
 - `equiv-permission-vs-tools.sample.json` — probes reais `probe-perm`/`probe-tools` em config
   JSONC sintética carregada com `opencode --standalone debug agents`:
   `permission: { webfetch: deny }` e `tools: { webfetch: false }` resolvem `webfetch * deny`.
+  Na captura 2.2.6 limpa os dois probes têm 7 regras estruturalmente simétricas (prefixo
+  duplicado no sample anterior era artefato de captura, não comportamento da CLI).
   Esses probes não são agentes reviewer-ro válidos.
 - `fallback-warning.txt` — linha JSON de erro do stdout de
   `opencode run --agent fixture-agent-missing` na 2.2.6 (timestamp e sessionID sanitizados);
