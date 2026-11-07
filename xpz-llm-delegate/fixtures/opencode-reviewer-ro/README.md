@@ -176,7 +176,7 @@ Ela monta workspace sintético mínimo e descartável, roda 32 casos com `openco
 `opencode debug agents`. Ausência de evento comportamental é inconclusiva e bloqueia a promoção;
 não contar `toolNotObserved` como aprovação. `names-glob` exige evento `glob` e `names-read`
 exige `read` de diretório, ambos com nomes visíveis. `names-list` aceita evento `read`, `glob`
-ou `list` com nomes visíveis; a captura atual usou `read`. A CLI 2.2.5 não oferece mais
+ou `list` com nomes visíveis; a captura atual usou `read`. A CLI corrente não oferece mais
 `opencode debug agent --tool`; não usar essa interface antiga.
 
 Re-rodar `scripts/Test-OpenCodeReviewerRoSelfTest.ps1` e os demais self-tests até verde antes de

@@ -22,7 +22,7 @@
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\names-glob.jsonl",
+      "evidence": "names-glob.jsonl",
       "toolEventCount": 1
     },
     {
@@ -42,7 +42,7 @@
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\local-env.jsonl",
+      "evidence": "local-env.jsonl",
       "toolEventCount": 1
     },
     {
@@ -62,7 +62,7 @@
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\local-env-local.jsonl",
+      "evidence": "local-env-local.jsonl",
       "toolEventCount": 1
     },
     {
@@ -82,7 +82,7 @@
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\local-service.jsonl",
+      "evidence": "local-service.jsonl",
       "toolEventCount": 1
     },
     {
@@ -102,7 +102,7 @@
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\local-service-production.jsonl",
+      "evidence": "local-service-production.jsonl",
       "toolEventCount": 1
     },
     {
@@ -122,7 +122,7 @@
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\local-example.jsonl",
+      "evidence": "local-example.jsonl",
       "toolEventCount": 1
     },
     {
@@ -142,7 +142,7 @@
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\local-example-local.jsonl",
+      "evidence": "local-example-local.jsonl",
       "toolEventCount": 1
     },
     {
@@ -162,7 +162,7 @@
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\local-service-example.jsonl",
+      "evidence": "local-service-example.jsonl",
       "toolEventCount": 1
     },
     {
@@ -182,7 +182,7 @@
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\local-source.jsonl",
+      "evidence": "local-source.jsonl",
       "toolEventCount": 1
     },
     {
@@ -193,16 +193,16 @@
       "event": {
         "tool": "read",
         "status": "error",
-        "inputPath": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\workspace-local\\.env",
+        "inputPath": "<WORKSPACE_LOCAL>\\.env",
         "hasSentinel": false,
         "error": "Permission denied: read",
-        "expectedPath": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\workspace-local\\.env",
+        "expectedPath": "<WORKSPACE_LOCAL>\\.env",
         "expectedPathMatches": true
       },
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\local-absolute.jsonl",
+      "evidence": "local-absolute.jsonl",
       "toolEventCount": 1
     },
     {
@@ -222,7 +222,7 @@
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\local-dotdot.jsonl",
+      "evidence": "local-dotdot.jsonl",
       "toolEventCount": 1
     },
     {
@@ -242,7 +242,7 @@
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\local-backslash.jsonl",
+      "evidence": "local-backslash.jsonl",
       "toolEventCount": 1
     },
     {
@@ -262,7 +262,7 @@
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\local-uppercase.jsonl",
+      "evidence": "local-uppercase.jsonl",
       "toolEventCount": 1
     },
     {
@@ -273,16 +273,16 @@
       "event": {
         "tool": "read",
         "status": "error",
-        "inputPath": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\outside\\ordinary.txt",
+        "inputPath": "<OUTSIDE>\\ordinary.txt",
         "hasSentinel": false,
         "error": "Permission denied: external_directory",
-        "expectedPath": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\outside\\ordinary.txt",
+        "expectedPath": "<OUTSIDE>\\ordinary.txt",
         "expectedPathMatches": true
       },
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\local-outside.jsonl",
+      "evidence": "local-outside.jsonl",
       "toolEventCount": 1
     },
     {
@@ -302,7 +302,7 @@
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\global-env.jsonl",
+      "evidence": "global-env.jsonl",
       "toolEventCount": 1
     },
     {
@@ -322,7 +322,7 @@
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\global-env-local.jsonl",
+      "evidence": "global-env-local.jsonl",
       "toolEventCount": 1
     },
     {
@@ -342,7 +342,7 @@
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\global-service.jsonl",
+      "evidence": "global-service.jsonl",
       "toolEventCount": 1
     },
     {
@@ -362,7 +362,7 @@
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\global-service-production.jsonl",
+      "evidence": "global-service-production.jsonl",
       "toolEventCount": 1
     },
     {
@@ -382,7 +382,7 @@
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\global-example.jsonl",
+      "evidence": "global-example.jsonl",
       "toolEventCount": 1
     },
     {
@@ -402,7 +402,7 @@
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\global-example-local.jsonl",
+      "evidence": "global-example-local.jsonl",
       "toolEventCount": 1
     },
     {
@@ -422,7 +422,7 @@
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\global-service-example.jsonl",
+      "evidence": "global-service-example.jsonl",
       "toolEventCount": 1
     },
     {
@@ -442,7 +442,7 @@
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\global-source.jsonl",
+      "evidence": "global-source.jsonl",
       "toolEventCount": 1
     },
     {
@@ -453,16 +453,16 @@
       "event": {
         "tool": "read",
         "status": "error",
-        "inputPath": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\workspace-global\\.env",
+        "inputPath": "<WORKSPACE_GLOBAL>\\.env",
         "hasSentinel": false,
         "error": "Permission denied: read",
-        "expectedPath": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\workspace-global\\.env",
+        "expectedPath": "<WORKSPACE_GLOBAL>\\.env",
         "expectedPathMatches": true
       },
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\global-absolute.jsonl",
+      "evidence": "global-absolute.jsonl",
       "toolEventCount": 1
     },
     {
@@ -482,7 +482,7 @@
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\global-dotdot.jsonl",
+      "evidence": "global-dotdot.jsonl",
       "toolEventCount": 1
     },
     {
@@ -502,7 +502,7 @@
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\global-backslash.jsonl",
+      "evidence": "global-backslash.jsonl",
       "toolEventCount": 1
     },
     {
@@ -522,7 +522,7 @@
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\global-uppercase.jsonl",
+      "evidence": "global-uppercase.jsonl",
       "toolEventCount": 1
     },
     {
@@ -533,16 +533,16 @@
       "event": {
         "tool": "read",
         "status": "error",
-        "inputPath": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\outside\\ordinary.txt",
+        "inputPath": "<OUTSIDE>\\ordinary.txt",
         "hasSentinel": false,
         "error": "Permission denied: external_directory",
-        "expectedPath": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\outside\\ordinary.txt",
+        "expectedPath": "<OUTSIDE>\\ordinary.txt",
         "expectedPathMatches": true
       },
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\global-outside.jsonl",
+      "evidence": "global-outside.jsonl",
       "toolEventCount": 1
     },
     {
@@ -562,7 +562,7 @@
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\subcwd-env.jsonl",
+      "evidence": "subcwd-env.jsonl",
       "toolEventCount": 1
     },
     {
@@ -582,7 +582,7 @@
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\subcwd-example-project-local.jsonl",
+      "evidence": "subcwd-example-project-local.jsonl",
       "toolEventCount": 1
     },
     {
@@ -602,7 +602,7 @@
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\subcwd-example.jsonl",
+      "evidence": "subcwd-example.jsonl",
       "toolEventCount": 1
     },
     {
@@ -613,14 +613,14 @@
       "event": {
         "tool": "read",
         "status": "completed",
-        "inputPath": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\workspace-local",
+        "inputPath": "<WORKSPACE_LOCAL>",
         "hasSentinel": false,
         "error": ""
       },
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\names-read.jsonl",
+      "evidence": "names-read.jsonl",
       "toolEventCount": 1
     },
     {
@@ -631,14 +631,14 @@
       "event": {
         "tool": "read",
         "status": "completed",
-        "inputPath": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\workspace-local",
+        "inputPath": "<WORKSPACE_LOCAL>",
         "hasSentinel": false,
         "error": ""
       },
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\names-list.jsonl",
+      "evidence": "names-list.jsonl",
       "toolEventCount": 1
     },
     {
@@ -650,7 +650,7 @@
       "pass": true,
       "reason": "ausencia de evento registrada; prova estrutural pela regra grep * deny",
       "exitCode": 0,
-      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\local-grep.jsonl",
+      "evidence": "local-grep.jsonl",
       "toolEventCount": 0
     },
     {
@@ -662,7 +662,7 @@
       "pass": true,
       "reason": "ausencia de evento registrada; prova estrutural pela regra grep * deny",
       "exitCode": 1,
-      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\global-grep.jsonl",
+      "evidence": "global-grep.jsonl",
       "toolEventCount": 0
     }
   ],
