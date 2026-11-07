@@ -12,13 +12,14 @@ Consumidos por `scripts/OpenCodeReviewerRoGuard.ps1` (pré-check runtime), por
 
 ## Versão medida
 
-`VERSION.txt` = **2.2.5**, promovida em 2026-11-03 após revalidar o conjunto obrigatório:
+`VERSION.txt` = **2.2.6**, promovida em 2026-11-07 após revalidar o conjunto obrigatório:
 descoberta por `opencode debug agents`, perfis project-local (36 regras) e global-only (21),
 equivalência `permission`/`tools`, aviso de fallback, matriz de 32 casos comportamentais com
 modelo explícito + 2 casos `grep` estruturais, e os self-tests existentes. A matriz usou
 `opencode run --format json` e o modelo explícito
 `opencode-go/deepseek-v4.1-flash`; o recibo está em `content-protection.receipt.json` e o resumo
-em `content-protection.sample.txt`.
+em `content-protection.sample.txt`. As regras efetivas do `reviewer-ro` permaneceram idênticas
+às medidas na 2.2.5 (36 project-local / 21 global-only).
 
 A captura 1.18.33 anterior permanece recuperável pelo histórico do Git; não há diretório de
 compatibilidade simultânea.
@@ -31,7 +32,7 @@ Self-test determinístico/fake-exe não prova sozinho o comportamento de uma ver
 ## Arquivos
 
 - `VERSION.txt` — versão legitimamente promovida; comparar com o semver de `opencode --version`
-  (a CLI 2.2.5 imprime `opencode v2.2.5`; o guard normaliza para `2.2.5`).
+  (a CLI 2.2.6 imprime `opencode v2.2.6`; o guard normaliza para `2.2.6`).
 - `debug-agents-project-local.sample.json` — captura real de `opencode debug agents` na raiz
   deste repositório (project-local `reviewer-ro` + global), com 36 regras. Campos `system` e
   `description` foram omitidos; `id`, `name`, `mode`, `hidden` e `permissions` são verbatim.
@@ -43,14 +44,14 @@ Self-test determinístico/fake-exe não prova sozinho o comportamento de uma ver
   `permission: { webfetch: deny }` e `tools: { webfetch: false }` resolvem `webfetch * deny`.
   Esses probes não são agentes reviewer-ro válidos.
 - `fallback-warning.txt` — linha JSON de erro do stdout de
-  `opencode run --agent fixture-agent-missing` na 2.2.5 (timestamp e sessionID sanitizados);
+  `opencode run --agent fixture-agent-missing` na 2.2.6 (timestamp e sessionID sanitizados);
   nessa versão o stderr fica vazio e o exit é 1. O pós-check reconhece esse erro pelo evento
   JSONL `type=error` e pela mensagem `error.message` iniciada por `Agent not found:`. O accessor
   `Get-OpenCodeReviewerRoFallbackWarningPattern` cobre somente o aviso legado
   `agent "..." not found. Falling back to default agent` no stderr; texto comum no stdout que
   cite qualquer formato não conta como fallback.
 - `read-outside-cwd-blocked.sample.txt` — recibo sanitizado do caso `outside` da matriz
-  comportamental 2.2.5: leitura de arquivo fora do cwd negada por `external_directory`,
+  comportamental 2.2.6: leitura de arquivo fora do cwd negada por `external_directory`,
   sentinela ausente.
 - `content-protection.sample.txt` — resumo dos 34 casos (32 comportamentais + 2 estruturais).
 - `content-protection.receipt.json` — recibo máquina-legível com nome, perfil, classe,
@@ -77,7 +78,7 @@ Nos casos `read-deny`, `read-allow` e `external-deny`, o verificador exige que `
 Na revalidação, a raiz temporária nova é remapeada para `workspaceRoot` da captura ao comparar cwd e
 caminhos absolutos. Isso preserva a prova original sem resolver segmentos `.`/`..`.
 
-## Resolução efetiva medida (2.2.5) — bloco estrutural canônico
+## Resolução efetiva medida (2.2.6) — bloco estrutural canônico
 
 A âncora é o último `permission: "*", pattern: "*", action: "deny"`. Depois dela o guard exige a
 sequência canônica completa, na ordem, sem regras extras. Regras anteriores à âncora podem
@@ -106,7 +107,7 @@ exceção. A exceção exige nome exato e conteúdo sanitizado pelo operador: `s
 contra caminho inteiro podem negar diretório com `.env.` conservadoramente.
 `.env~`/`.env-example` não são protegidos.
 
-Na 2.2.5 o sufixo medido **não** contém exceção `allow` de tool-output: `external_directory` é
+Na 2.2.6 o sufixo medido **não** contém exceção `allow` de tool-output: `external_directory` é
 apenas `* deny`. Qualquer regra adicional depois do bloco (incluindo um `allow` tardio) bloqueia.
 `glob` e `read` de diretório podem mostrar nomes; `list` tem permissão, mas a enumeração
 observada veio por `read` de diretório, não por uma ferramenta `list` separada.
@@ -121,7 +122,7 @@ Links/aliases, outros segredos, prompt/dossiê e carregamento automático de ins
 do recorte. Provas comportamentais e estruturais são distintas; fora dos casos medidos,
 equivalência é premissa, não garantia de isolamento.
 
-## Prova dos adapters (2.2.5)
+## Prova dos adapters (2.2.6)
 
 Em workspace sintético mínimo (não em `C:\Dev`), com o shim `opencode.cmd` resolvido pela máquina:
 
@@ -157,7 +158,7 @@ Atualizar o set re-medido completo (sanitizando paths/IDs onde couber):
 3. `debug-agents-global-only.sample.json`
 4. `equiv-permission-vs-tools.sample.json` — config JSONC sintética com `probe-perm` e
    `probe-tools`, carregada via `opencode --standalone debug agents`
-5. `fallback-warning.txt` — stdout verbatim de `run --agent <ausente>`; na 2.2.5 é JSON de erro
+5. `fallback-warning.txt` — stdout verbatim de `run --agent <ausente>`; na 2.2.6 é JSON de erro
    no stdout, com exit 1 e stderr vazio. Sanitizar timestamp/sessionID.
 6. `read-outside-cwd-blocked.sample.txt` e `content-protection.sample.txt` — derivados da matriz
    comportamental; tokens reais → `<SENTINELA>`

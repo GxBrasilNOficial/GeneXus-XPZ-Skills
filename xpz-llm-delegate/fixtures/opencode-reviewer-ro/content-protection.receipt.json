@@ -1,10 +1,10 @@
 {
   "kind": "xpz-opencode-reviewer-ro-matrix-receipt",
   "schemaVersion": 1,
-  "cliVersion": "2.2.5",
+  "cliVersion": "2.2.6",
   "model": "opencode-go/deepseek-v4.1-flash",
   "mechanism": "opencode run --format json + opencode debug agents",
-  "generatedAt": "2026-11-03T21:16:13.9795269Z",
+  "generatedAt": "2026-11-07T04:36:57.4393764Z",
   "workspaceRoot": "<SANITIZED_WORKSPACE_ROOT>",
   "cases": [
     {
@@ -22,7 +22,8 @@
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "names-glob.jsonl"
+      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\names-glob.jsonl",
+      "toolEventCount": 1
     },
     {
       "name": "local-env",
@@ -34,12 +35,15 @@
         "status": "error",
         "inputPath": ".env",
         "hasSentinel": false,
-        "error": "Permission denied: read"
+        "error": "Permission denied: read",
+        "expectedPath": ".env",
+        "expectedPathMatches": true
       },
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "local-env.jsonl"
+      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\local-env.jsonl",
+      "toolEventCount": 1
     },
     {
       "name": "local-env-local",
@@ -51,12 +55,15 @@
         "status": "error",
         "inputPath": ".env.local",
         "hasSentinel": false,
-        "error": "Permission denied: read"
+        "error": "Permission denied: read",
+        "expectedPath": ".env.local",
+        "expectedPathMatches": true
       },
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "local-env-local.jsonl"
+      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\local-env-local.jsonl",
+      "toolEventCount": 1
     },
     {
       "name": "local-service",
@@ -68,12 +75,15 @@
         "status": "error",
         "inputPath": "service.env",
         "hasSentinel": false,
-        "error": "Permission denied: read"
+        "error": "Permission denied: read",
+        "expectedPath": "service.env",
+        "expectedPathMatches": true
       },
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "local-service.jsonl"
+      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\local-service.jsonl",
+      "toolEventCount": 1
     },
     {
       "name": "local-service-production",
@@ -85,12 +95,15 @@
         "status": "error",
         "inputPath": "service.env.production",
         "hasSentinel": false,
-        "error": "Permission denied: read"
+        "error": "Permission denied: read",
+        "expectedPath": "service.env.production",
+        "expectedPathMatches": true
       },
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "local-service-production.jsonl"
+      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\local-service-production.jsonl",
+      "toolEventCount": 1
     },
     {
       "name": "local-example",
@@ -100,14 +113,17 @@
       "event": {
         "tool": "read",
         "status": "completed",
-        "inputPath": "<WORKSPACE_LOCAL>\\.env.example",
+        "inputPath": ".env.example",
         "hasSentinel": true,
-        "error": ""
+        "error": "",
+        "expectedPath": ".env.example",
+        "expectedPathMatches": true
       },
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "local-example.jsonl"
+      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\local-example.jsonl",
+      "toolEventCount": 1
     },
     {
       "name": "local-example-local",
@@ -119,12 +135,15 @@
         "status": "error",
         "inputPath": ".env.example.local",
         "hasSentinel": false,
-        "error": "Permission denied: read"
+        "error": "Permission denied: read",
+        "expectedPath": ".env.example.local",
+        "expectedPathMatches": true
       },
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "local-example-local.jsonl"
+      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\local-example-local.jsonl",
+      "toolEventCount": 1
     },
     {
       "name": "local-service-example",
@@ -136,12 +155,15 @@
         "status": "error",
         "inputPath": "service.env.example",
         "hasSentinel": false,
-        "error": "Permission denied: read"
+        "error": "Permission denied: read",
+        "expectedPath": "service.env.example",
+        "expectedPathMatches": true
       },
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "local-service-example.jsonl"
+      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\local-service-example.jsonl",
+      "toolEventCount": 1
     },
     {
       "name": "local-source",
@@ -153,12 +175,15 @@
         "status": "completed",
         "inputPath": "README.md",
         "hasSentinel": true,
-        "error": ""
+        "error": "",
+        "expectedPath": "README.md",
+        "expectedPathMatches": true
       },
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "local-source.jsonl"
+      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\local-source.jsonl",
+      "toolEventCount": 1
     },
     {
       "name": "local-absolute",
@@ -168,14 +193,17 @@
       "event": {
         "tool": "read",
         "status": "error",
-        "inputPath": "<WORKSPACE_LOCAL>\\.env",
+        "inputPath": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\workspace-local\\.env",
         "hasSentinel": false,
-        "error": "Permission denied: read"
+        "error": "Permission denied: read",
+        "expectedPath": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\workspace-local\\.env",
+        "expectedPathMatches": true
       },
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "local-absolute.jsonl"
+      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\local-absolute.jsonl",
+      "toolEventCount": 1
     },
     {
       "name": "local-dotdot",
@@ -187,12 +215,15 @@
         "status": "error",
         "inputPath": "sub/../.env",
         "hasSentinel": false,
-        "error": "Permission denied: read"
+        "error": "Permission denied: read",
+        "expectedPath": "sub/../.env",
+        "expectedPathMatches": true
       },
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "local-dotdot.jsonl"
+      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\local-dotdot.jsonl",
+      "toolEventCount": 1
     },
     {
       "name": "local-backslash",
@@ -204,12 +235,15 @@
         "status": "error",
         "inputPath": "sub\\.env.local",
         "hasSentinel": false,
-        "error": "Permission denied: read"
+        "error": "Permission denied: read",
+        "expectedPath": "sub\\.env.local",
+        "expectedPathMatches": true
       },
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "local-backslash.jsonl"
+      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\local-backslash.jsonl",
+      "toolEventCount": 1
     },
     {
       "name": "local-uppercase",
@@ -221,12 +255,15 @@
         "status": "error",
         "inputPath": ".ENV",
         "hasSentinel": false,
-        "error": "Permission denied: read"
+        "error": "Permission denied: read",
+        "expectedPath": ".ENV",
+        "expectedPathMatches": true
       },
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "local-uppercase.jsonl"
+      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\local-uppercase.jsonl",
+      "toolEventCount": 1
     },
     {
       "name": "local-outside",
@@ -236,14 +273,17 @@
       "event": {
         "tool": "read",
         "status": "error",
-        "inputPath": "<OUTSIDE>\\ordinary.txt",
+        "inputPath": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\outside\\ordinary.txt",
         "hasSentinel": false,
-        "error": "Permission denied: external_directory"
+        "error": "Permission denied: external_directory",
+        "expectedPath": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\outside\\ordinary.txt",
+        "expectedPathMatches": true
       },
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "local-outside.jsonl"
+      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\local-outside.jsonl",
+      "toolEventCount": 1
     },
     {
       "name": "global-env",
@@ -255,12 +295,15 @@
         "status": "error",
         "inputPath": ".env",
         "hasSentinel": false,
-        "error": "Permission denied: read"
+        "error": "Permission denied: read",
+        "expectedPath": ".env",
+        "expectedPathMatches": true
       },
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "global-env.jsonl"
+      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\global-env.jsonl",
+      "toolEventCount": 1
     },
     {
       "name": "global-env-local",
@@ -272,12 +315,15 @@
         "status": "error",
         "inputPath": ".env.local",
         "hasSentinel": false,
-        "error": "Permission denied: read"
+        "error": "Permission denied: read",
+        "expectedPath": ".env.local",
+        "expectedPathMatches": true
       },
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "global-env-local.jsonl"
+      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\global-env-local.jsonl",
+      "toolEventCount": 1
     },
     {
       "name": "global-service",
@@ -289,12 +335,15 @@
         "status": "error",
         "inputPath": "service.env",
         "hasSentinel": false,
-        "error": "Permission denied: read"
+        "error": "Permission denied: read",
+        "expectedPath": "service.env",
+        "expectedPathMatches": true
       },
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "global-service.jsonl"
+      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\global-service.jsonl",
+      "toolEventCount": 1
     },
     {
       "name": "global-service-production",
@@ -306,12 +355,15 @@
         "status": "error",
         "inputPath": "service.env.production",
         "hasSentinel": false,
-        "error": "Permission denied: read"
+        "error": "Permission denied: read",
+        "expectedPath": "service.env.production",
+        "expectedPathMatches": true
       },
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "global-service-production.jsonl"
+      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\global-service-production.jsonl",
+      "toolEventCount": 1
     },
     {
       "name": "global-example",
@@ -323,12 +375,15 @@
         "status": "completed",
         "inputPath": ".env.example",
         "hasSentinel": true,
-        "error": ""
+        "error": "",
+        "expectedPath": ".env.example",
+        "expectedPathMatches": true
       },
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "global-example.jsonl"
+      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\global-example.jsonl",
+      "toolEventCount": 1
     },
     {
       "name": "global-example-local",
@@ -340,12 +395,15 @@
         "status": "error",
         "inputPath": ".env.example.local",
         "hasSentinel": false,
-        "error": "Permission denied: read"
+        "error": "Permission denied: read",
+        "expectedPath": ".env.example.local",
+        "expectedPathMatches": true
       },
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "global-example-local.jsonl"
+      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\global-example-local.jsonl",
+      "toolEventCount": 1
     },
     {
       "name": "global-service-example",
@@ -357,12 +415,15 @@
         "status": "error",
         "inputPath": "service.env.example",
         "hasSentinel": false,
-        "error": "Permission denied: read"
+        "error": "Permission denied: read",
+        "expectedPath": "service.env.example",
+        "expectedPathMatches": true
       },
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "global-service-example.jsonl"
+      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\global-service-example.jsonl",
+      "toolEventCount": 1
     },
     {
       "name": "global-source",
@@ -374,12 +435,15 @@
         "status": "completed",
         "inputPath": "README.md",
         "hasSentinel": true,
-        "error": ""
+        "error": "",
+        "expectedPath": "README.md",
+        "expectedPathMatches": true
       },
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "global-source.jsonl"
+      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\global-source.jsonl",
+      "toolEventCount": 1
     },
     {
       "name": "global-absolute",
@@ -389,14 +453,17 @@
       "event": {
         "tool": "read",
         "status": "error",
-        "inputPath": "<WORKSPACE_GLOBAL>\\.env",
+        "inputPath": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\workspace-global\\.env",
         "hasSentinel": false,
-        "error": "Permission denied: read"
+        "error": "Permission denied: read",
+        "expectedPath": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\workspace-global\\.env",
+        "expectedPathMatches": true
       },
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "global-absolute.jsonl"
+      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\global-absolute.jsonl",
+      "toolEventCount": 1
     },
     {
       "name": "global-dotdot",
@@ -406,14 +473,17 @@
       "event": {
         "tool": "read",
         "status": "error",
-        "inputPath": "<WORKSPACE_GLOBAL>\\sub\\..\\.env",
+        "inputPath": "sub/../.env",
         "hasSentinel": false,
-        "error": "Permission denied: read"
+        "error": "Permission denied: read",
+        "expectedPath": "sub/../.env",
+        "expectedPathMatches": true
       },
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "global-dotdot.jsonl"
+      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\global-dotdot.jsonl",
+      "toolEventCount": 1
     },
     {
       "name": "global-backslash",
@@ -425,12 +495,15 @@
         "status": "error",
         "inputPath": "sub\\.env.local",
         "hasSentinel": false,
-        "error": "Permission denied: read"
+        "error": "Permission denied: read",
+        "expectedPath": "sub\\.env.local",
+        "expectedPathMatches": true
       },
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "global-backslash.jsonl"
+      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\global-backslash.jsonl",
+      "toolEventCount": 1
     },
     {
       "name": "global-uppercase",
@@ -442,12 +515,15 @@
         "status": "error",
         "inputPath": ".ENV",
         "hasSentinel": false,
-        "error": "Permission denied: read"
+        "error": "Permission denied: read",
+        "expectedPath": ".ENV",
+        "expectedPathMatches": true
       },
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "global-uppercase.jsonl"
+      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\global-uppercase.jsonl",
+      "toolEventCount": 1
     },
     {
       "name": "global-outside",
@@ -457,14 +533,17 @@
       "event": {
         "tool": "read",
         "status": "error",
-        "inputPath": "<OUTSIDE>\\ordinary.txt",
+        "inputPath": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\outside\\ordinary.txt",
         "hasSentinel": false,
-        "error": "Permission denied: external_directory"
+        "error": "Permission denied: external_directory",
+        "expectedPath": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\outside\\ordinary.txt",
+        "expectedPathMatches": true
       },
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "global-outside.jsonl"
+      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\global-outside.jsonl",
+      "toolEventCount": 1
     },
     {
       "name": "subcwd-env",
@@ -476,12 +555,15 @@
         "status": "error",
         "inputPath": "../.env",
         "hasSentinel": false,
-        "error": "Permission denied: read"
+        "error": "Permission denied: read",
+        "expectedPath": "../.env",
+        "expectedPathMatches": true
       },
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "subcwd-env.jsonl"
+      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\subcwd-env.jsonl",
+      "toolEventCount": 1
     },
     {
       "name": "subcwd-example-project-local",
@@ -493,12 +575,15 @@
         "status": "completed",
         "inputPath": "../.env.example",
         "hasSentinel": true,
-        "error": ""
+        "error": "",
+        "expectedPath": "../.env.example",
+        "expectedPathMatches": true
       },
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "subcwd-example-project-local.jsonl"
+      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\subcwd-example-project-local.jsonl",
+      "toolEventCount": 1
     },
     {
       "name": "subcwd-example",
@@ -510,12 +595,15 @@
         "status": "error",
         "inputPath": "../.env.example",
         "hasSentinel": false,
-        "error": "Permission denied: external_directory"
+        "error": "Permission denied: external_directory",
+        "expectedPath": "../.env.example",
+        "expectedPathMatches": true
       },
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "subcwd-example.jsonl"
+      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\subcwd-example.jsonl",
+      "toolEventCount": 1
     },
     {
       "name": "names-read",
@@ -525,14 +613,15 @@
       "event": {
         "tool": "read",
         "status": "completed",
-        "inputPath": "<WORKSPACE_LOCAL>",
+        "inputPath": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\workspace-local",
         "hasSentinel": false,
         "error": ""
       },
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "names-read.jsonl"
+      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\names-read.jsonl",
+      "toolEventCount": 1
     },
     {
       "name": "names-list",
@@ -542,14 +631,15 @@
       "event": {
         "tool": "read",
         "status": "completed",
-        "inputPath": "<WORKSPACE_LOCAL>",
+        "inputPath": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\workspace-local",
         "hasSentinel": false,
         "error": ""
       },
       "pass": true,
       "reason": null,
       "exitCode": 0,
-      "evidence": "names-list.jsonl"
+      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\names-list.jsonl",
+      "toolEventCount": 1
     },
     {
       "name": "local-grep",
@@ -557,12 +647,11 @@
       "class": "structural",
       "expected": "grep * deny",
       "event": "sem evento",
-      "toolEventCount": 0,
       "pass": true,
       "reason": "ausencia de evento registrada; prova estrutural pela regra grep * deny",
       "exitCode": 0,
-      "evidence": "local-grep.jsonl",
-      "ruleEvidence": "debug-agents-local.json"
+      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\local-grep.jsonl",
+      "toolEventCount": 0
     },
     {
       "name": "global-grep",
@@ -570,12 +659,11 @@
       "class": "structural",
       "expected": "grep * deny",
       "event": "sem evento",
-      "toolEventCount": 0,
       "pass": true,
       "reason": "ausencia de evento registrada; prova estrutural pela regra grep * deny",
-      "exitCode": 0,
-      "evidence": "global-grep.jsonl",
-      "ruleEvidence": "debug-agents-global.json"
+      "exitCode": 1,
+      "evidence": "C:\\Users\\ANTONIOJOSE\\AppData\\Local\\Temp\\opencode-reviewer-ro-2.2.6-capture\\evidence\\global-grep.jsonl",
+      "toolEventCount": 0
     }
   ],
   "behavioral": {
