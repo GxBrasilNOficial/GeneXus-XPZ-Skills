@@ -651,6 +651,7 @@
       "reason": "ausencia de evento registrada; prova estrutural pela regra grep * deny",
       "exitCode": 0,
       "evidence": "local-grep.jsonl",
+      "ruleEvidence": "debug-agents-local.json",
       "toolEventCount": 0
     },
     {
@@ -663,6 +664,7 @@
       "reason": "ausencia de evento registrada; prova estrutural pela regra grep * deny",
       "exitCode": 1,
       "evidence": "global-grep.jsonl",
+      "ruleEvidence": "debug-agents-global.json",
       "toolEventCount": 0
     }
   ],
