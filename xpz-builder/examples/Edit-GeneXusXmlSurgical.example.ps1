@@ -6,10 +6,16 @@
 
 .DESCRIPTION
     Delega a scripts/Edit-GeneXusXmlSurgical.ps1 na base GeneXus-XPZ-Skills.
-    Ajuste SharedSkillsRoot, caminhos da frente, a ancora e o Replacement antes
-    de executar. As quebras do Replacement sao derivadas do EOL do proprio
-    arquivo-alvo ($newline): o motor nao normaliza EOL e bloqueia com
-    REPLACEMENT_EOL_MISMATCH/29 um Replacement cuja quebra divirja da dominante.
+    Exemplo de REFERENCIA, nao "copie e rode": os caminhos abaixo sao marcadores;
+    transcreva as chamadas na sessao. Use Paths + WriteAllText e derive $newline
+    do alvo; nao use heredoc/here-string para o payload do motor e nao crie .ps1
+    descartavel na rodada (nem copie este example como orquestrador em Temp ou na
+    frente). Apply-ApprovedPatch atende o fluxo de patch aprovado e nao substitui
+    este motor na edicao de XML GeneXus. Ajuste SharedSkillsRoot, caminhos da
+    frente, a ancora e o Replacement antes de executar. As quebras do Replacement
+    sao derivadas do EOL do proprio arquivo-alvo ($newline): o motor nao normaliza
+    EOL e bloqueia com REPLACEMENT_EOL_MISMATCH/29 um Replacement cuja quebra
+    divirja da dominante.
 
 .PARAMETER SharedSkillsRoot
     Raiz local da base compartilhada GeneXus-XPZ-Skills.
