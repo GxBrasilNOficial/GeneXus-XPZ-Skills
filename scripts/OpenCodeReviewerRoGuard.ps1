@@ -56,10 +56,11 @@ function Get-OpenCodeReviewerRoCanonicalPermission {
 }
 
 function Get-OpenCodeReviewerRoCanonicalEffectivePermission {
-    # Bloco efetivo medido no `opencode debug agents` da 2.2.5. A ancora e o ultimo
-    # `* / * / deny` e o sufixo abaixo e comparado na ordem. `shell` e `subagent` sao os
-    # nomes efetivos das ferramentas `bash`/`task`; `browser` e `skill/browser` sao denies
-    # nativos observados no mesmo sufixo. Nao emula paths/wildcards.
+    # Bloco efetivo medido no `opencode debug agents` da 2.2.5; revalidado idêntico na 2.2.6
+    # (VERSION.txt). A ancora e o ultimo `* / * / deny` e o sufixo abaixo e comparado na
+    # ordem. `shell` e `subagent` sao os nomes efetivos das ferramentas `bash`/`task`;
+    # `browser` e `skill/browser` sao denies nativos observados no mesmo sufixo. Nao emula
+    # paths/wildcards.
     return [ordered]@{
         '*' = 'deny'
         read = [ordered]@{ '*' = 'allow'; '*.env' = 'deny'; '*.env.*' = 'deny'; '.env.example' = 'allow'; '*/.env.example' = 'allow' }
@@ -626,8 +627,9 @@ function Get-OpenCodeVersionFromExe {
         $global:LASTEXITCODE = $prev
         $v = ([string]($out | Select-Object -First 1)).Trim()
         if ([string]::IsNullOrWhiteSpace($v)) { return $null }
-        # A CLI 2.2.5 imprime "opencode v2.2.5"; VERSION.txt guarda a versao semantica
-        # (2.2.5). Extrai o primeiro semver da linha, preservando sufixos de prerelease.
+        # A CLI imprime "opencode vX.Y.Z"; VERSION.txt guarda a versao semantica medida
+        # (fixtures correntes: 2.2.6). Extrai o primeiro semver da linha, preservando
+        # sufixos de prerelease.
         if ($v -match '(?<semver>\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?)') { return [string]$Matches.semver }
         return $v
     } catch {
