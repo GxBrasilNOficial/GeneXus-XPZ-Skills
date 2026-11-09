@@ -54,3 +54,4 @@ Implementado em 2026-11-09 conforme o design v24.2 congelado por decisão humana
 ### Rastreabilidade
 
 - Commit material: `a643071` — Adiciona a skill xpz-mcp-integrations-setup e o ciclo de MCPs externos.
+- Commit material: `59b7073` — Corrige o exit 69 dos motores e alinha o catalogo de exit codes.
