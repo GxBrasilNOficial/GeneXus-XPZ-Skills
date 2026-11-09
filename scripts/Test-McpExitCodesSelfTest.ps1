@@ -41,6 +41,46 @@ $msbuildCodes = @($msbuild.codes | ForEach-Object { [int]$_.exit })
 $collisions = @($codes | Where-Object { $_ -ne 0 -and $msbuildCodes -contains $_ })
 Assert-True ($collisions.Count -eq 0) "(catalog) sem colisao com msbuild: $($collisions -join ',')"
 
+$precedence = @($catalog.precedence | ForEach-Object { [int]$_ })
+$expectedPrecedence = @(67, 66, 61, 62, 63, 64, 65, 60)
+Assert-True (($precedence -join ',') -eq ($expectedPrecedence -join ',')) "(catalog) precedence esperada; obtido $($precedence -join ',')"
+Assert-True ($precedence -notcontains 69) '(catalog) 69 fora da precedencia'
+foreach ($code in @(66, 61, 62, 63, 64, 65, 60)) {
+    Assert-True ($precedence -contains $code) "(catalog) $code na precedencia"
+}
+$rank67 = Get-McpExitCodeRank -Code 67
+$rank60 = Get-McpExitCodeRank -Code 60
+$rank69 = Get-McpExitCodeRank -Code 69
+Assert-True ($rank67 -lt $rank60) '(precedence) 67 antes de 60'
+Assert-True ($rank69 -gt $rank60) '(precedence) 69 fora e depois de 60'
+
+$precedenceSet = @(
+    (New-McpFinding -Code 'edicao_manual_necessaria' -Class 'blocking' -Message 'x'),
+    (New-McpFinding -Code 'entrada_em_conflito' -Class 'blocking' -Message 'x'),
+    (New-McpFinding -Code 'credencial_ausente' -Class 'blocking' -Message 'x'),
+    (New-McpFinding -Code 'config_ausente' -Class 'blocking' -Message 'x'),
+    (New-McpFinding -Code 'node_ausente' -Class 'blocking' -Message 'x'),
+    (New-McpFinding -Code 'vendor_ausente' -Class 'blocking' -Message 'x'),
+    (New-McpFinding -Code 'launcher_ausente' -Class 'blocking' -Message 'x'),
+    (New-McpFinding -Code 'descriptor_invalido' -Class 'blocking' -Message 'x')
+)
+$orders = @(
+    @(0, 1, 2, 3, 4, 5, 6, 7),
+    @(7, 6, 5, 4, 3, 2, 1, 0),
+    @(3, 0, 6, 2, 5, 1, 7, 4),
+    @(4, 7, 2, 5, 0, 3, 6, 1),
+    @(1, 2, 3, 4, 5, 6, 7, 0)
+)
+foreach ($order in $orders) {
+    $shuffled = @($order | ForEach-Object { $precedenceSet[$_] })
+    $observed = Get-McpExitCodeForFindings -Findings $shuffled
+    Assert-True ($observed -eq 67) "(precedence) ordem $($order -join ',') -> 67; obtido $observed"
+}
+$without67 = @($precedenceSet | Where-Object { $_.code -ne 'edicao_manual_necessaria' })
+Assert-True ((Get-McpExitCodeForFindings -Findings @($without67[5], $without67[2], $without67[1], $without67[0])) -eq 66) '(precedence) sem 67 -> 66'
+$without6667 = @($without67 | Where-Object { $_.code -ne 'entrada_em_conflito' })
+Assert-True ((Get-McpExitCodeForFindings -Findings @($without6667[4], $without6667[1], $without6667[0])) -eq 61) '(precedence) sem 67/66 -> 61'
+
 # Contrato de emissores: o catalogo precisa apontar motores reais e cobrir a
 # matriz observada pelos self-tests de integracao. Se um motor passar a emitir
 # um codigo novo, atualize a matriz e o catalogo juntos.

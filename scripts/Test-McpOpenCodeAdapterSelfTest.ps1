@@ -89,6 +89,11 @@ try {
     $manual = Update-McpOpenCodeConfig -Path $legacy -LauncherPath $launcher -BaseUrl $baseUrl -Model $model -ManifestHashes @() -Action install
     Assert-True ($manual.status -eq 'manual') "(legacy) esperado manual; obtido $($manual.status)"
     Assert-True ((Read-Text -Path $legacy) -ceq $before) '(legacy) arquivo intacto sem aprovacao'
+    Copy-Item -LiteralPath $legacy -Destination $canonicalTarget -Force
+    $legacyState = Get-McpOpenCodeState -LauncherPath $launcher -BaseUrl $baseUrl -Model $model -ManifestHashes @()
+    Assert-True (@($legacyState.findings | Where-Object { $_.code -eq 'edicao_manual_necessaria' }).Count -eq 1) '(legacy-state) edicao_manual_necessaria'
+    Assert-True ($legacyState.form -eq 'legacy' -and $legacyState.migration -eq 'MigrateLegacy') '(legacy-state) form/migration'
+    Remove-Item -LiteralPath $canonicalTarget -Force
 
     # 3. Forma legada com migracao: canonica, legada ausente, demais chaves preservadas.
     $legacy2 = New-Fixture -Name 'legacy.jsonc'
@@ -107,6 +112,10 @@ try {
     $bothResult = Update-McpOpenCodeConfig -Path $both -LauncherPath $launcher -BaseUrl $baseUrl -Model $model -ManifestHashes @() -Action install
     Assert-True ($bothResult.status -eq 'entrada_em_conflito') "(both) esperado entrada_em_conflito; obtido $($bothResult.status)"
     Assert-True ((Read-Text -Path $both) -ceq $before) '(both) arquivo intacto'
+    Copy-Item -LiteralPath $both -Destination $canonicalTarget -Force
+    $bothState = Get-McpOpenCodeState -LauncherPath $launcher -BaseUrl $baseUrl -Model $model -ManifestHashes @()
+    Assert-True (@($bothState.findings | Where-Object { $_.code -eq 'entrada_em_conflito' }).Count -eq 1) '(both-state) entrada_em_conflito'
+    Remove-Item -LiteralPath $canonicalTarget -Force
 
     # 5. disabled canonico e enabled:false legado sao reconhecidos.
     $disabled = New-Fixture -Name 'disabled-canonical.jsonc'

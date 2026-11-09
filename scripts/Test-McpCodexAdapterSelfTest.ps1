@@ -81,6 +81,14 @@ try {
     $migrateAgain = Update-McpCodexConfig -Path $manual -LauncherPath $launcher -BaseUrl $baseUrl -Model $model -ManifestHashes @($migrate.entryHash) -Action install
     Assert-True ($migrateAgain.status -eq 'unchanged') '(manual-migrate) idempotente'
 
+    $stateTarget = Join-Path $codexDir 'config.toml'
+    $manualStateSource = New-Fixture -Name 'manual-canonical.toml'
+    Copy-Item -LiteralPath $manualStateSource -Destination $stateTarget -Force
+    $manualState = Get-McpCodexState -LauncherPath $launcher -BaseUrl $baseUrl -Model $model -ManifestHashes @()
+    Assert-True (@($manualState.findings | Where-Object { $_.code -eq 'edicao_manual_necessaria' }).Count -eq 1) '(manual-state) edicao_manual_necessaria'
+    Assert-True ($manualState.form -eq 'manual' -and $manualState.migration -eq 'MigrateLegacy') '(manual-state) form/migration'
+    Remove-Item -LiteralPath $stateTarget -Force
+
     # 3. Grafias equivalentes que a migracao recusa.
     foreach ($fixture in @('manual-quoted.toml', 'manual-dotted.toml', 'manual-inline.toml', 'manual-subtable.toml', 'manual-spaced-header.toml')) {
         $path = New-Fixture -Name $fixture
@@ -89,6 +97,11 @@ try {
         Assert-True ($result.status -eq 'entrada_em_conflito') "($fixture) esperado entrada_em_conflito; obtido $($result.status)"
         Assert-True ((Read-Text -Path $path) -ceq $before) "($fixture) arquivo intacto"
     }
+    $dotted = New-Fixture -Name 'manual-dotted.toml'
+    Copy-Item -LiteralPath $dotted -Destination $stateTarget -Force
+    $dottedState = Get-McpCodexState -LauncherPath $launcher -BaseUrl $baseUrl -Model $model -ManifestHashes @()
+    Assert-True (@($dottedState.findings | Where-Object { $_.code -eq 'entrada_em_conflito' }).Count -eq 1) '(dotted-state) entrada_em_conflito'
+    Remove-Item -LiteralPath $stateTarget -Force
 
     # 4. Bloco entre marcadores reconhecido.
     $balanced = New-Fixture -Name 'markers-balanced.toml'

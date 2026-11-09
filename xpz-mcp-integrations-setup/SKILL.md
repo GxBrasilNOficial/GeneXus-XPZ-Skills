@@ -53,7 +53,11 @@ preserva o restante do arquivo. A ponte documental entre as duas fica na
 - **Plataforma:** Windows. Cofre DPAPI `CurrentUser`, sem roaming.
 - **Ciclo:** detectar, instalar, auditar, reparar, atualizar, remover.
 - **Credencial:** cofre neutro; importacao unica de `opencode auth export`
-  (preferido) ou `auth.json` (reserva).
+  (preferido) ou `auth.json` (reserva). A reserva procura
+  `.local\share\opencode\auth.json` (OpenCode V2) e depois
+  `.config\opencode\auth.json` (legado), aceitando `type=key` e `type=api`;
+  a selecao continua restrita a `commandcode` e o resultado diagnostica
+  caminhos tentados e provedores encontrados, sem valores de chave.
 - **Fornecedor:** somente `compatible` com preset Command Code; os outros quatro
   modos ficam no F4.
 
@@ -171,6 +175,11 @@ bloqueiam. O descritor e validado no F1 e no self-test.
   (nao `env`), `disabled` como desligamento.
 - **Forma legada:** `mcp.jev` reconhecida para leitura; migracao so com
   `-MigrateLegacy` e diff aprovado. Se as duas coexistirem, conflito.
+- **Auditoria da forma legada:** `mcp.jev` unico e migravel →
+  `edicao_manual_necessaria` (exit 67) com
+  `Install-McpIntegration.ps1 -Client opencode -MigrateLegacy` no
+  `nextActions`; canonico editado, duas formas coexistindo ou grafia nao
+  migravel → `entrada_em_conflito` (exit 66).
 - **Edicao:** mecanismo JSONC ja usado pelo `reviewer-ro` (insercao textual +
   `ConvertFrom-Jsonc` + comparacao pos-edicao). Qualquer falha → nada gravado,
   `edicao_manual_necessaria` e trecho pronto.
@@ -186,6 +195,10 @@ bloqueiam. O descritor e validado no F1 e no self-test.
   `edicao_manual_necessaria` com o trecho pronto; o resto da skill segue.
 - **Migracao manual:** so quando houver um unico cabecalho `[mcp_servers.jev]` e
   `-MigrateLegacy`; outras grafias → conflito com instrucao para remover a mao.
+  A auditoria classifica o caso migravel como `edicao_manual_necessaria`
+  (exit 67) e o `nextActions` inclui
+  `Install-McpIntegration.ps1 -Client codex -MigrateLegacy`; as demais
+  grafias continuam `entrada_em_conflito` (exit 66).
 - **Encerramento:** o bloco emitido e o unico trecho que a skill substitui ou
   remove; o restante do TOML e preservado.
 
@@ -199,6 +212,10 @@ Estados por cliente, **um valor so**, na ordem:
 - **Offline:** os achados (`ausente`, `entrada_*`, `vendor_*`, `launcher_*`,
   `node_*`, `config_*`, `credencial_ausente`) sao diagnosticos, nao estados
   concorrentes.
+- **Precedencia de exit code:** com mais de um achado `blocking`, vence o
+  primeiro codigo presente em `precedence` no `exit-codes.catalog.json`:
+  `67 > 66 > 61 > 62 > 63 > 64 > 65 > 60`. `nextActions` segue a mesma ordem.
+  `69` fica fora (falha interna do trap); `68` e warn-only.
 - **`boot_ok`:** so prova que o servidor sobe; o boot sai `0` ate com chave
   invalida. Use `-CheckBoot` (local, opt-in) para medir.
 - **`credencial_verificada`:** so por `-CheckCredential` (online opt-in, uma
@@ -222,7 +239,7 @@ Faixa reservada de exit codes: **60-69** (tabela completa em
 | 64 | vendor ausente/divergente ou `npm ci` falhou |
 | 65 | launcher ausente/divergente |
 | 66 | entrada quebrada/divergente/em conflito |
-| 67 | acao manual, ACL, lock, corrida ou credencial ambigua |
+| 67 | edicao manual, ACL, lock, corrida ou credencial ambigua |
 | 68 | Python 3.11+ indisponivel (warn; Codex manual) |
 | 69 | falha interna do launcher/motor |
 
@@ -265,9 +282,17 @@ pwsh -NoProfile -File scripts/Test-McpIntegrationsSelfTest.ps1
 Gate do `dist` (exige vendor real instalado em um managed root descartavel):
 
 ```powershell
+$root = Join-Path $env:TEMP ('xpz-mcp-dist-' + [guid]::NewGuid().ToString('N'))
+$env:LOCALAPPDATA = $root
+$env:USERPROFILE = $root
 pwsh -NoProfile -File scripts/Invoke-McpVendor.ps1
-pwsh -NoProfile -File scripts/Test-McpDistEvidenceSelfTest.ps1 -ManagedRoot <...>\xpz-mcp-integrations
+pwsh -NoProfile -File scripts/Test-McpDistEvidenceSelfTest.ps1 -ManagedRoot (Join-Path $root 'xpz-mcp-integrations')
+# nunca aponte para o root de producao
 ```
+
+O gate recusa `-ManagedRoot` que ja contenha `install-manifest.json`, `config.json`,
+`vault\` ou `launcher-*.ps1`; o root deve ter apenas o `vendor-0.13.0` necessario.
+O que o teste criar e removido no `finally`.
 
 Tokens: `XPZ_MCP_OPENCODE_ADAPTER_SELFTEST_OK`,
 `XPZ_MCP_CODEX_ADAPTER_SELFTEST_OK`, `XPZ_MCP_LAUNCHER_SELFTEST_OK`,

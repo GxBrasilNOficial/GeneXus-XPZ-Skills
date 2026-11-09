@@ -153,7 +153,46 @@ try {
     Assert-True (-not (Test-Path -LiteralPath $vendorDir)) '(remove-data) vendor removido'
     Assert-True (Test-McpVaultExists) '(remove-data) cofre preservado'
 
-    # 7. Gate do dist real, quando informado.
+    # 7. Auditoria de entrada manual migravel: edicao_manual_necessaria e
+    # nextAction -MigrateLegacy, com exit 67 pela precedencia.
+    $legacyRoot = Join-Path $tempRoot 'legacy-profile'
+    $legacyOc = Join-Path $legacyRoot '.config\opencode'
+    [System.IO.Directory]::CreateDirectory($legacyOc) | Out-Null
+    $legacyJsonc = @"
+{
+  "mcp": {
+    "jev": {
+      "type": "local",
+      "command": ["node", "legacy.js"],
+      "enabled": true
+    }
+  }
+}
+"@
+    [System.IO.File]::WriteAllText((Join-Path $legacyOc 'opencode.jsonc'), $legacyJsonc, [System.Text.UTF8Encoding]::new($false))
+    $legacyInput = Join-Path $legacyRoot 'audit-input.json'
+    [System.IO.File]::WriteAllText($legacyInput, (@{ userProfile = $legacyRoot; localAppData = $legacyRoot } | ConvertTo-Json), [System.Text.UTF8Encoding]::new($false))
+    $legacyOutput = @(& (Get-Command pwsh).Source -NoProfile -File (Join-Path $scriptDir 'Test-McpIntegrations.ps1') -InputPath $legacyInput 2>&1)
+    $legacyExit = $LASTEXITCODE
+    $legacyText = (($legacyOutput | ForEach-Object { [string]$_ }) -join "`n")
+    $legacyAudit = $null
+    try { $legacyAudit = $legacyText | ConvertFrom-Json -AsHashtable } catch { }
+    Assert-True ($legacyExit -eq 67) "(legacy) exit 67; obtido $legacyExit"
+    Assert-True ($null -ne $legacyAudit -and [string]$legacyAudit.clients.opencode.form -eq 'legacy') '(legacy) form legacy'
+    Assert-True ($null -ne $legacyAudit -and @($legacyAudit.findings | Where-Object { $_.code -eq 'edicao_manual_necessaria' }).Count -eq 1) '(legacy) achado edicao_manual_necessaria'
+    Assert-True ($null -ne $legacyAudit -and [string](@($legacyAudit.nextActions)[0]) -like '*opencode*MigrateLegacy*') '(legacy) nextAction MigrateLegacy'
+
+    # 8. Guarda do gate do dist: root com manifesto nao pode ganhar cofre falso.
+    $guardRoot = Join-Path $tempRoot 'dist-guard'
+    [System.IO.Directory]::CreateDirectory($guardRoot) | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $guardRoot 'install-manifest.json'), '{}', [System.Text.UTF8Encoding]::new($false))
+    $guardOutput = @(& (Get-Command pwsh).Source -NoProfile -File (Join-Path $scriptDir 'Test-McpDistEvidenceSelfTest.ps1') -ManagedRoot $guardRoot 2>&1)
+    $guardExit = $LASTEXITCODE
+    Assert-True ($guardExit -ne 0) "(dist guard) root com manifesto recusado; obtido exit $guardExit"
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $guardRoot 'vault\credential.blob'))) '(dist guard) nenhum cofre criado'
+    Assert-True (($guardOutput -join "`n").Contains('NOT_DISPOSABLE')) '(dist guard) motivo explicito'
+
+    # 9. Gate do dist real, quando informado.
     if (-not [string]::IsNullOrWhiteSpace($DistManagedRoot)) {
         $distOutput = & (Get-Command pwsh).Source -NoProfile -File (Join-Path $scriptDir 'Test-McpDistEvidenceSelfTest.ps1') -ManagedRoot $DistManagedRoot 2>&1
         $distExit = $LASTEXITCODE

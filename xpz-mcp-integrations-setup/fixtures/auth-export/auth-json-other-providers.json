@@ -1,0 +1,10 @@
+{
+  "nvidia2": {
+    "type": "api",
+    "key": "fixture-nvidia2"
+  },
+  "opencode-go": {
+    "type": "api",
+    "key": "fixture-opencode-go"
+  }
+}

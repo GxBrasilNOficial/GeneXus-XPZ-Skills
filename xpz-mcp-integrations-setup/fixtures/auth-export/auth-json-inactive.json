@@ -1,6 +1,6 @@
 {
   "commandcode": {
-    "type": "key",
+    "type": "api",
     "key": "test-key-inactive",
     "active": false
   }

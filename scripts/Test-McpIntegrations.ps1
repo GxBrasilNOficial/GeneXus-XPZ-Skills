@@ -183,7 +183,11 @@ function New-McpCredentialProbe {
 
 
 $findings = [System.Collections.Generic.List[object]]::new()
-$nextActions = [System.Collections.Generic.List[string]]::new()
+$nextActions = [System.Collections.Generic.List[object]]::new()
+function Add-McpNextAction {
+    param([int]$Code, [string]$Text)
+    $nextActions.Add([pscustomobject]@{ Code = $Code; Text = $Text }) | Out-Null
+}
 $descriptor = $null
 $component = $null
 $compatible = $null
@@ -202,7 +206,7 @@ foreach ($finding in @(Get-McpPrerequisiteFindings -Prerequisites $prerequisites
     $findings.Add($finding) | Out-Null
 }
 if (-not $prerequisites.NodeCompatible -and $prerequisites.Winget.Present) {
-    $nextActions.Add('winget install --id OpenJS.NodeJS.LTS -e (instalar Node >= 22 com aprovacao)') | Out-Null
+    Add-McpNextAction -Code 63 -Text 'winget install --id OpenJS.NodeJS.LTS -e (instalar Node >= 22 com aprovacao)'
 }
 if ($prerequisites.VersionManagers.Count -gt 0) {
     $findings.Add((New-McpFinding -Code 'version_manager_presente' -Class 'warn' -Message ('gerenciador de versao detectado: ' + ($prerequisites.VersionManagers -join ', ')))) | Out-Null
@@ -224,13 +228,13 @@ if ($null -ne $config.Value) {
 }
 if (-not $config.Exists) {
     $findings.Add((New-McpFinding -Code 'config_ausente' -Class 'blocking' -Message 'config.json nao existe; execute a instalacao')) | Out-Null
-    $nextActions.Add('Install-McpIntegration.ps1 -Action install') | Out-Null
+    Add-McpNextAction -Code 62 -Text 'Install-McpIntegration.ps1 -Action install'
 } elseif ($null -eq $config.Value) {
     $findings.Add((New-McpFinding -Code 'config_invalido' -Class 'blocking' -Message $config.Error)) | Out-Null
-    $nextActions.Add('Install-McpIntegration.ps1 -Action repair') | Out-Null
+    Add-McpNextAction -Code 62 -Text 'Install-McpIntegration.ps1 -Action repair'
 } elseif (-not $endpointMatchesPreset -and $config.Value.endpointConfirmed -ne $true) {
     $findings.Add((New-McpFinding -Code 'endpoint_nao_confirmado' -Class 'blocking' -Message "host $baseUrlHost difere do preset Command Code; confirme o endpoint")) | Out-Null
-    $nextActions.Add('Install-McpIntegration.ps1 -Action repair -ConfirmEndpoint') | Out-Null
+    Add-McpNextAction -Code 62 -Text 'Install-McpIntegration.ps1 -Action repair -ConfirmEndpoint'
 }
 
 $vendor = $null
@@ -241,20 +245,20 @@ if ($null -ne $descriptor) {
     if ($vendor.state -ne 'ok') {
         $class = 'blocking'
         $findings.Add((New-McpFinding -Code $vendor.state -Class $class -Message "vendor: $($vendor.state)")) | Out-Null
-        $nextActions.Add('Invoke-McpVendor.ps1') | Out-Null
+        Add-McpNextAction -Code 64 -Text 'Invoke-McpVendor.ps1'
     }
     $launcherResult = Test-McpLauncher -Version $pin.Version -Manifest $manifest.Value
     $launcher = $launcherResult
     if ($launcherResult.state -ne 'ok') {
         $findings.Add((New-McpFinding -Code $launcherResult.state -Class 'blocking' -Message "launcher: $($launcherResult.state)")) | Out-Null
-        $nextActions.Add('Install-McpIntegration.ps1 -Action repair') | Out-Null
+        Add-McpNextAction -Code 65 -Text 'Install-McpIntegration.ps1 -Action repair'
     }
 }
 
 $credentialExists = Test-McpVaultExists
 if (-not $credentialExists) {
     $findings.Add((New-McpFinding -Code 'credencial_ausente' -Class 'blocking' -Message 'cofre DPAPI ausente')) | Out-Null
-    $nextActions.Add('Set-McpCredential.ps1 -Action set') | Out-Null
+    Add-McpNextAction -Code 61 -Text 'Set-McpCredential.ps1 -Action set'
 }
 
 $clients = [ordered]@{}
@@ -272,6 +276,8 @@ foreach ($client in $clientOrder) {
     $clientFindings = @()
     $state = 'nao_configurado'
     $clientPath = $null
+    $clientForm = $null
+    $clientMigration = $null
     if ($null -ne $descriptor -and $null -ne $manifest) {
         $pin = Get-McpVendorPin
         $launcherPath = Get-McpLauncherPath -Version $pin.Version
@@ -290,6 +296,8 @@ foreach ($client in $clientOrder) {
         $state = $result.state
         $clientPath = $result.path
         $clientFindings = @($result.findings)
+        if ($result.PSObject.Properties['form']) { $clientForm = [string]$result.form }
+        if ($result.PSObject.Properties['migration']) { $clientMigration = [string]$result.migration }
         foreach ($finding in $clientFindings) {
             $findings.Add($finding) | Out-Null
         }
@@ -298,14 +306,21 @@ foreach ($client in $clientOrder) {
         installed = $true
         state     = $state
         path      = $clientPath
+        form      = $clientForm
+        migration = $clientMigration
         findings  = $clientFindings
     }
 }
+foreach ($clientName in $clientOrder) {
+    if (@($clients[$clientName].findings | Where-Object { $_.code -eq 'edicao_manual_necessaria' }).Count -gt 0) {
+        Add-McpNextAction -Code 67 -Text ("Install-McpIntegration.ps1 -Client $clientName -MigrateLegacy")
+    }
+}
 if ($clients['opencode'].installed -and $clients['opencode'].state -eq 'nao_configurado') {
-    $nextActions.Add('Install-McpIntegration.ps1 -Client opencode') | Out-Null
+    Add-McpNextAction -Code 60 -Text 'Install-McpIntegration.ps1 -Client opencode'
 }
 if ($clients['codex'].installed -and $clients['codex'].state -eq 'nao_configurado') {
-    $nextActions.Add('Install-McpIntegration.ps1 -Client codex') | Out-Null
+    Add-McpNextAction -Code 60 -Text 'Install-McpIntegration.ps1 -Client codex'
 }
 
 $boot = $null
@@ -385,6 +400,9 @@ if ($blocking.Count -eq 0 -and $allClientsWritten) {
     $overall = 'INTEGRATIONS_OK'
 }
 $exitCode = if ($overall -eq 'INTEGRATIONS_OK') { 0 } else { Get-McpExitCodeForFindings -Findings @($findings) }
+$orderedNextActions = @($nextActions |
+    Sort-Object -Property @{ Expression = { Get-McpExitCodeRank -Code $_.Code } }, @{ Expression = { $_.Text } } |
+    Select-Object -ExpandProperty Text -Unique)
 
 $result = [ordered]@{
     schemaVersion  = 1
@@ -426,7 +444,7 @@ $result = [ordered]@{
     } else { $null }
     clients        = $clients
     findings       = @($findings)
-    nextActions    = @($nextActions | Select-Object -Unique)
+    nextActions    = @($orderedNextActions)
 }
 
 $env:USERPROFILE = $originalProfile

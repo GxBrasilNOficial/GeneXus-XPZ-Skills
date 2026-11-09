@@ -920,6 +920,18 @@ function Get-McpOpenCodeState {
     }
     $recognized = ($info.hash -eq $info.expectedHash) -or ($ManifestHashes -contains $info.hash)
     if (-not $recognized) {
+        if ($info.form -eq 'legacy') {
+            $findings.Add((New-McpFinding -Code 'edicao_manual_necessaria' -Class 'blocking' -Message 'entrada manual mcp.jev; use -MigrateLegacy para migrar com diff e aprovacao' -Client 'opencode')) | Out-Null
+            return [pscustomobject]@{
+                client    = 'opencode'
+                state     = 'nao_configurado'
+                path      = $target.path
+                findings  = @($findings)
+                form      = 'legacy'
+                migration = 'MigrateLegacy'
+                hash      = $info.hash
+            }
+        }
         $findings.Add((New-McpFinding -Code 'entrada_em_conflito' -Class 'blocking' -Message 'entrada jev nao reconhecida pelo manifesto' -Client 'opencode')) | Out-Null
         return [pscustomobject]@{
             client   = 'opencode'

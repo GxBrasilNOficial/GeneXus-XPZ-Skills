@@ -728,6 +728,10 @@ só-dono, UTF-8 sem BOM, **schema versionado** (reduzido na v22):
 candidatos **`opencode.json` e `opencode.jsonc`** nessa pasta; **projeto-local (`.opencode/`) fora do
 escopo da v1** (declarado). **Precedência:** se **um só** dos arquivos existir, ele é o alvo; se
 **ambos** existirem, **não há precedência comprovada** → `entrada_em_conflito` (bloquear sem escrever).
+
+**Correção pós-v24.2 (2026-11-09):** a auditoria distingue a entrada manual
+migrável (`edicao_manual_necessaria`, exit 67, com `-MigrateLegacy` no
+`nextActions`) do conflito real (`entrada_em_conflito`, exit 66).
 **Fixtures** para cada caso. Edição em ambos os formatos pelo mecanismo do **A.3**
 (inserção textual + validação pós-edição). Entrada canônica **`mcp.servers.jev`** (`type: local`,
 `command: ["pwsh","-NoProfile","-File","<launcher>"]`, campo **`environment`**, não `env`, `disabled`
@@ -775,7 +779,7 @@ grafia**. Os marcadores precisam estar balanceados e únicos.
   ou melhor) **e** ausência de achado `blocking` (vendor, launcher, config, entrada, pré-requisito).
   `boot_ok`/`endpoint_alcancavel`/`credencial_verificada` são **eixos separados** e não mudam o
   agregado; credencial ausente ou não verificada é reportada como diagnóstico, não como GAPS.
-  **Tabela estado → `exitCode`/classe é entregável do F1** (faixa reservada); a v24.1 não fixa números.
+  **Tabela estado → `exitCode`/classe é entregável do F1** (faixa reservada); a v24.1 não fixa números. **Correção pós-v24.2 (2026-11-09):** a implementação fixa `precedence` no `exit-codes.catalog.json` (`67 > 66 > 61 > 62 > 63 > 64 > 65 > 60`) e ordena o `nextActions` pela mesma precedência.
   **`vendor_divergente`** na v1 = versão instalada (`node_modules/@jkudish/jev-mcp/package.json`) ≠ pin
   do descritor.
 - **Estado por cliente (v24.1):** **um valor só**, na ordem de precedência

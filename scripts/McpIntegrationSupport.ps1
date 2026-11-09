@@ -21,6 +21,7 @@ $ErrorActionPreference = 'Stop'
 $script:McpDescriptorRelativePath = 'xpz-mcp-integrations-setup/components/jev.json'
 $script:McpLauncherTemplateRelativePath = 'xpz-mcp-integrations-setup/templates/launcher.ps1'
 $script:McpExitCodesRelativePath = 'xpz-mcp-integrations-setup/exit-codes.catalog.json'
+$script:McpExitCodePrecedenceCache = $null
 
 function Resolve-McpFullPath {
     param([Parameter(Mandatory = $true)][string]$Path)
@@ -1207,6 +1208,30 @@ function Write-McpInternalFailure {
     exit 69
 }
 
+function Get-McpExitCodePrecedence {
+    param([string]$RepoRoot = (Get-McpRepoRoot))
+    if ($null -ne $script:McpExitCodePrecedenceCache) {
+        return @($script:McpExitCodePrecedenceCache)
+    }
+    $catalog = Get-McpExitCodeCatalog -RepoRoot $RepoRoot
+    $precedence = @($catalog.precedence | ForEach-Object { [int]$_ })
+    if ($precedence.Count -eq 0) {
+        throw 'XPZ_MCP_EXIT_PRECEDENCE_MISSING: campo precedence ausente ou vazio'
+    }
+    $script:McpExitCodePrecedenceCache = $precedence
+    return @($precedence)
+}
+
+function Get-McpExitCodeRank {
+    param([Parameter(Mandatory = $true)][int]$Code)
+    $precedence = @(Get-McpExitCodePrecedence)
+    $index = [Array]::IndexOf($precedence, $Code)
+    if ($index -lt 0) {
+        return $precedence.Count + 1
+    }
+    return $index
+}
+
 function Get-McpExitCodeForFindings {
     param([object[]]$Findings = @())
     $blocking = @($Findings | Where-Object { $_.class -eq 'blocking' })
@@ -1244,9 +1269,24 @@ function Get-McpExitCodeForFindings {
         acao_invalida             = 67
         python_indisponivel       = 68
     }
+    $codes = @()
     foreach ($finding in $blocking) {
         if ($map.ContainsKey([string]$finding.code)) {
-            return [int]$map[[string]$finding.code]
+            $codes += [int]$map[[string]$finding.code]
+        } else {
+            $codes += 60
+        }
+    }
+    $precedence = @(Get-McpExitCodePrecedence)
+    foreach ($code in $precedence) {
+        if ($codes -contains $code) {
+            return $code
+        }
+    }
+    # Codigo blocking fora da precedencia (ex.: 68 se algum dia virar blocking).
+    foreach ($code in $codes) {
+        if ($code -ne 0) {
+            return $code
         }
     }
     return 60

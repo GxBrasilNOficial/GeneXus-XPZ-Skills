@@ -99,7 +99,16 @@ function New-McpMutationResult {
 }
 
 $findings = [System.Collections.Generic.List[object]]::new()
-$nextActions = [System.Collections.Generic.List[string]]::new()
+$nextActions = [System.Collections.Generic.List[object]]::new()
+function Add-McpNextAction {
+    param([int]$Code, [string]$Text)
+    $nextActions.Add([pscustomobject]@{ Code = $Code; Text = $Text }) | Out-Null
+}
+function Get-McpNextActionText {
+    return @($nextActions |
+        Sort-Object -Property @{ Expression = { Get-McpExitCodeRank -Code $_.Code } }, @{ Expression = { $_.Text } } |
+        Select-Object -ExpandProperty Text -Unique)
+}
 $clientsResult = [ordered]@{}
 $changed = $false
 $planned = [bool]$WhatIfPreference
@@ -107,14 +116,14 @@ $planned = [bool]$WhatIfPreference
 if ($Action -eq 'record-e2e') {
     if ($Client -eq 'all') {
         $findings.Add((New-McpFinding -Code 'client_obrigatorio' -Class 'blocking' -Message 'record-e2e exige -Client opencode ou codex')) | Out-Null
-        $result = New-McpMutationResult -ActionName $Action -Overall 'INTEGRATIONS_GAPS' -ExitCode 67 -Changed $false -Planned $planned -Findings $findings -Clients $clientsResult -Vendor $null -Launcher $null -Config $null -Credential $null -NextActions $nextActions
+        $result = New-McpMutationResult -ActionName $Action -Overall 'INTEGRATIONS_GAPS' -ExitCode 67 -Changed $false -Planned $planned -Findings $findings -Clients $clientsResult -Vendor $null -Launcher $null -Config $null -Credential $null -NextActions (Get-McpNextActionText)
         [pscustomobject]$result | ConvertTo-Json -Depth 30
         exit 67
     }
     $manifest = Get-McpManifest
     if ($manifest.Corrupt) {
         $findings.Add((New-McpFinding -Code 'manifesto_corrompido' -Class 'blocking' -Message $manifest.Error)) | Out-Null
-        $result = New-McpMutationResult -ActionName $Action -Overall 'INTEGRATIONS_GAPS' -ExitCode 67 -Changed $false -Planned $planned -Findings $findings -Clients $clientsResult -Vendor $null -Launcher $null -Config $null -Credential $null -NextActions $nextActions
+        $result = New-McpMutationResult -ActionName $Action -Overall 'INTEGRATIONS_GAPS' -ExitCode 67 -Changed $false -Planned $planned -Findings $findings -Clients $clientsResult -Vendor $null -Launcher $null -Config $null -Credential $null -NextActions (Get-McpNextActionText)
         [pscustomobject]$result | ConvertTo-Json -Depth 30
         exit 67
     }
@@ -130,14 +139,14 @@ if ($Action -eq 'record-e2e') {
         $changed = $true
     }
     $clientsResult[$Client] = [ordered]@{ state = 'e2e_opt_in_confirmado'; recorded = -not $planned }
-    $result = New-McpMutationResult -ActionName $Action -Overall 'INTEGRATIONS_OK' -ExitCode 0 -Changed $changed -Planned $planned -Findings $findings -Clients $clientsResult -Vendor $null -Launcher $null -Config $null -Credential $null -NextActions $nextActions
+    $result = New-McpMutationResult -ActionName $Action -Overall 'INTEGRATIONS_OK' -ExitCode 0 -Changed $changed -Planned $planned -Findings $findings -Clients $clientsResult -Vendor $null -Launcher $null -Config $null -Credential $null -NextActions (Get-McpNextActionText)
     [pscustomobject]$result | ConvertTo-Json -Depth 30
     exit 0
 }
 
 if ($Action -eq 'update' -and -not $AllowUpdate) {
     $findings.Add((New-McpFinding -Code 'atualizacao_sem_aprovacao' -Class 'blocking' -Message 'Action update exige -AllowUpdate; nao ha atualizacao automatica')) | Out-Null
-    $result = New-McpMutationResult -ActionName $Action -Overall 'INTEGRATIONS_GAPS' -ExitCode 67 -Changed $false -Planned $planned -Findings $findings -Clients $clientsResult -Vendor $null -Launcher $null -Config $null -Credential $null -NextActions $nextActions
+    $result = New-McpMutationResult -ActionName $Action -Overall 'INTEGRATIONS_GAPS' -ExitCode 67 -Changed $false -Planned $planned -Findings $findings -Clients $clientsResult -Vendor $null -Launcher $null -Config $null -Credential $null -NextActions (Get-McpNextActionText)
     [pscustomobject]$result | ConvertTo-Json -Depth 30
     exit 67
 }
@@ -149,7 +158,7 @@ try {
     $findings.Add((New-McpFinding -Code 'descriptor_invalido' -Class 'blocking' -Message $_.Exception.Message)) | Out-Null
 }
 if ($null -eq $descriptor) {
-    $result = New-McpMutationResult -ActionName $Action -Overall 'INTEGRATIONS_GAPS' -ExitCode 60 -Changed $false -Planned $planned -Findings $findings -Clients $clientsResult -Vendor $null -Launcher $null -Config $null -Credential $null -NextActions $nextActions
+    $result = New-McpMutationResult -ActionName $Action -Overall 'INTEGRATIONS_GAPS' -ExitCode 60 -Changed $false -Planned $planned -Findings $findings -Clients $clientsResult -Vendor $null -Launcher $null -Config $null -Credential $null -NextActions (Get-McpNextActionText)
     [pscustomobject]$result | ConvertTo-Json -Depth 30
     exit 60
 }
@@ -189,7 +198,7 @@ foreach ($finding in $prereqFindings) {
     }
 }
 if (-not $prerequisites.NodeCompatible -and $prerequisites.Winget.Present) {
-    $nextActions.Add('winget install --id OpenJS.NodeJS.LTS -e') | Out-Null
+    Add-McpNextAction -Code 63 -Text 'winget install --id OpenJS.NodeJS.LTS -e'
 }
 
 $blockingBeforeInstall = @($findings | Where-Object { $_.class -eq 'blocking' })
@@ -199,12 +208,12 @@ $config = $null
 $credential = [ordered]@{ exists = (Test-McpVaultExists); source = 'vault-dpapi' }
 if ($Action -in @('install', 'update') -and -not $credential.exists) {
     $findings.Add((New-McpFinding -Code 'credencial_ausente' -Class 'blocking' -Message 'cofre DPAPI ausente; importe/defina a chave antes de instalar')) | Out-Null
-    $nextActions.Add('Set-McpCredential.ps1 -Action import -ImportFromOpenCode') | Out-Null
-    $nextActions.Add('Set-McpCredential.ps1 -Action set') | Out-Null
+    Add-McpNextAction -Code 61 -Text 'Set-McpCredential.ps1 -Action import -ImportFromOpenCode'
+    Add-McpNextAction -Code 61 -Text 'Set-McpCredential.ps1 -Action set'
 }
 
 if ($blockingBeforeInstall.Count -gt 0) {
-    $result = New-McpMutationResult -ActionName $Action -Overall 'INTEGRATIONS_GAPS' -ExitCode (Get-McpExitCodeForFindings -Findings @($findings)) -Changed $false -Planned $planned -Findings $findings -Clients $clientsResult -Vendor $null -Launcher $null -Config $null -Credential $credential -NextActions $nextActions
+    $result = New-McpMutationResult -ActionName $Action -Overall 'INTEGRATIONS_GAPS' -ExitCode (Get-McpExitCodeForFindings -Findings @($findings)) -Changed $false -Planned $planned -Findings $findings -Clients $clientsResult -Vendor $null -Launcher $null -Config $null -Credential $credential -NextActions (Get-McpNextActionText)
     [pscustomobject]$result | ConvertTo-Json -Depth 30
     exit ([int]$result.exitCode)
 }
@@ -218,7 +227,7 @@ if ($WhatIfPreference) {
         $null = Set-McpAcl -Path $managedRoot -Directory
     } catch {
         $findings.Add((New-McpFinding -Code 'acl_nao_aplicavel' -Class 'blocking' -Message $_.Exception.Message)) | Out-Null
-        $result = New-McpMutationResult -ActionName $Action -Overall 'INTEGRATIONS_GAPS' -ExitCode 67 -Changed $false -Planned $planned -Findings $findings -Clients $clientsResult -Vendor $null -Launcher $null -Config $null -Credential $credential -NextActions $nextActions
+        $result = New-McpMutationResult -ActionName $Action -Overall 'INTEGRATIONS_GAPS' -ExitCode 67 -Changed $false -Planned $planned -Findings $findings -Clients $clientsResult -Vendor $null -Launcher $null -Config $null -Credential $credential -NextActions (Get-McpNextActionText)
         [pscustomobject]$result | ConvertTo-Json -Depth 30
         exit 67
     }
@@ -233,7 +242,7 @@ if ($vendor.state -ne 'ok') {
         $vendorInstall = Invoke-McpVendorInstall
         if ($vendorInstall.status -notin @('ok', 'unchanged')) {
             $findings.Add((New-McpFinding -Code 'vendor_falhou' -Class 'blocking' -Message ('vendor: ' + [string]$vendorInstall.status))) | Out-Null
-            $result = New-McpMutationResult -ActionName $Action -Overall 'INTEGRATIONS_GAPS' -ExitCode 64 -Changed $false -Planned $planned -Findings $findings -Clients $clientsResult -Vendor $vendorInstall -Launcher $null -Config $null -Credential $credential -NextActions $nextActions
+            $result = New-McpMutationResult -ActionName $Action -Overall 'INTEGRATIONS_GAPS' -ExitCode 64 -Changed $false -Planned $planned -Findings $findings -Clients $clientsResult -Vendor $vendorInstall -Launcher $null -Config $null -Credential $credential -NextActions (Get-McpNextActionText)
             [pscustomobject]$result | ConvertTo-Json -Depth 30
             exit 64
         }
@@ -248,7 +257,7 @@ if ($vendor.state -eq 'vendor_divergente') {
 $nodePath = Get-McpNodePath
 if ([string]::IsNullOrWhiteSpace($nodePath)) {
     $findings.Add((New-McpFinding -Code 'node_incompativel' -Class 'blocking' -Message 'node >= 22 nao resolvido em caminho absoluto')) | Out-Null
-    $result = New-McpMutationResult -ActionName $Action -Overall 'INTEGRATIONS_GAPS' -ExitCode 63 -Changed $false -Planned $planned -Findings $findings -Clients $clientsResult -Vendor $vendor -Launcher $null -Config $null -Credential $credential -NextActions $nextActions
+    $result = New-McpMutationResult -ActionName $Action -Overall 'INTEGRATIONS_GAPS' -ExitCode 63 -Changed $false -Planned $planned -Findings $findings -Clients $clientsResult -Vendor $vendor -Launcher $null -Config $null -Credential $credential -NextActions (Get-McpNextActionText)
     [pscustomobject]$result | ConvertTo-Json -Depth 30
     exit 63
 }
@@ -267,7 +276,7 @@ if ($config.Status -eq 'written') { $changed = $true }
 $manifest = Get-McpManifest
 if ($manifest.Corrupt) {
     $findings.Add((New-McpFinding -Code 'manifesto_corrompido' -Class 'blocking' -Message $manifest.Error)) | Out-Null
-    $result = New-McpMutationResult -ActionName $Action -Overall 'INTEGRATIONS_GAPS' -ExitCode 67 -Changed $changed -Planned $planned -Findings $findings -Clients $clientsResult -Vendor $vendor -Launcher $launcher -Config $config -Credential $credential -NextActions $nextActions
+    $result = New-McpMutationResult -ActionName $Action -Overall 'INTEGRATIONS_GAPS' -ExitCode 67 -Changed $changed -Planned $planned -Findings $findings -Clients $clientsResult -Vendor $vendor -Launcher $launcher -Config $config -Credential $credential -NextActions (Get-McpNextActionText)
     [pscustomobject]$result | ConvertTo-Json -Depth 30
     exit 67
 }
@@ -327,6 +336,9 @@ foreach ($clientName in $selectedClients) {
         if ($update.status -in @('manual', 'entrada_em_conflito', 'conflict')) {
             $findings.Add((New-McpFinding -Code $(if ($update.status -eq 'manual') { 'edicao_manual_necessaria' } else { 'entrada_em_conflito' }) -Class 'blocking' -Message ([string]$update.reason) -Client 'opencode')) | Out-Null
         }
+        if ($update.status -eq 'manual') {
+            Add-McpNextAction -Code 67 -Text 'Install-McpIntegration.ps1 -Client opencode -MigrateLegacy'
+        }
         if ($update.status -eq 'written' -and -not [string]::IsNullOrWhiteSpace([string]$update.entryHash) -and -not $WhatIfPreference) {
             $manifest.Value = Add-McpManifestClientHash -Manifest $manifest.Value -Client 'opencode' -Path $target.path -Hash ([string]$update.entryHash)
             $changed = $true
@@ -364,6 +376,9 @@ foreach ($clientName in $selectedClients) {
             $class = if ($update.status -eq 'python_indisponivel') { 'warn' } else { 'blocking' }
             $findings.Add((New-McpFinding -Code $code -Class $class -Message ([string]$update.reason) -Client 'codex')) | Out-Null
         }
+        if ($update.status -eq 'manual') {
+            Add-McpNextAction -Code 67 -Text 'Install-McpIntegration.ps1 -Client codex -MigrateLegacy'
+        }
         if ($update.status -eq 'written' -and -not [string]::IsNullOrWhiteSpace([string]$update.entryHash) -and -not $WhatIfPreference) {
             $manifest.Value = Add-McpManifestClientHash -Manifest $manifest.Value -Client 'codex' -Path $codexPath -Hash ([string]$update.entryHash)
             $changed = $true
@@ -383,7 +398,7 @@ $blocking = @($findings | Where-Object { $_.class -eq 'blocking' })
 $overall = if ($blocking.Count -eq 0) { 'INTEGRATIONS_OK' } else { 'INTEGRATIONS_GAPS' }
 $exitCode = if ($overall -eq 'INTEGRATIONS_OK') { 0 } else { Get-McpExitCodeForFindings -Findings @($findings) }
 if ($overall -eq 'INTEGRATIONS_OK') {
-    $nextActions.Add('Recarregar/reiniciar o cliente para a entrada jev valer') | Out-Null
+    Add-McpNextAction -Code 0 -Text 'Recarregar/reiniciar o cliente para a entrada jev valer'
 }
 $launcherResult = if ($null -ne $launcher) {
     [ordered]@{ status = [string]$launcher.Status; path = [string]$launcher.Path; hash = [string]$launcher.Hash }
@@ -391,6 +406,6 @@ $launcherResult = if ($null -ne $launcher) {
 $configResult = if ($null -ne $config) {
     [ordered]@{ status = [string]$config.Status; path = [string]$config.Path; hash = [string]$config.Hash; backupPath = [string]$config.BackupPath }
 } else { $null }
-$result = New-McpMutationResult -ActionName $Action -Overall $overall -ExitCode $exitCode -Changed $changed -Planned $planned -Findings $findings -Clients $clientsResult -Vendor $vendor -Launcher $launcherResult -Config $configResult -Credential $credential -NextActions ($nextActions | Select-Object -Unique)
+$result = New-McpMutationResult -ActionName $Action -Overall $overall -ExitCode $exitCode -Changed $changed -Planned $planned -Findings $findings -Clients $clientsResult -Vendor $vendor -Launcher $launcherResult -Config $configResult -Credential $credential -NextActions (Get-McpNextActionText)
 [pscustomobject]$result | ConvertTo-Json -Depth 30
 exit $exitCode

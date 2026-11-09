@@ -29,6 +29,11 @@ $repoRoot = Get-McpRepoRoot
 $fixtureDir = Join-Path $repoRoot 'xpz-mcp-integrations-setup/fixtures/dist/0.13.0'
 $originalProfile = $env:USERPROFILE
 $originalLocalAppData = $env:LOCALAPPDATA
+$resolvedManagedRoot = $null
+$launcherPath = $null
+$createdConfig = $false
+$createdVault = $false
+$createdLauncher = $false
 $failures = [System.Collections.Generic.List[string]]::new()
 $assertCount = 0
 
@@ -99,8 +104,22 @@ try {
         throw 'XPZ_MCP_DIST_EVIDENCE_MANAGED_ROOT_REQUIRED: informe -ManagedRoot de uma instalacao descartavel com vendor-0.13.0'
     }
     $managedRoot = Resolve-McpFullPath -Path $ManagedRoot
+    $resolvedManagedRoot = $managedRoot
     if (-not (Test-Path -LiteralPath $managedRoot -PathType Container)) {
         throw "XPZ_MCP_DIST_EVIDENCE_MANAGED_ROOT_MISSING: $managedRoot"
+    }
+    $guardPaths = @(
+        (Join-Path $managedRoot 'install-manifest.json'),
+        (Join-Path $managedRoot 'config.json'),
+        (Join-Path $managedRoot 'vault')
+    )
+    $guardHits = @($guardPaths | Where-Object { Test-Path -LiteralPath $_ })
+    $guardLaunchers = @(Get-ChildItem -LiteralPath $managedRoot -Filter 'launcher-*.ps1' -File -ErrorAction SilentlyContinue)
+    if ($guardLaunchers.Count -gt 0) {
+        $guardHits += @($guardLaunchers.FullName)
+    }
+    if ($guardHits.Count -gt 0) {
+        throw "XPZ_MCP_DIST_EVIDENCE_MANAGED_ROOT_NOT_DISPOSABLE: $managedRoot contem $($guardHits -join ', '); use um root limpo so com vendor-0.13.0"
     }
     $env:LOCALAPPDATA = Split-Path -Parent $managedRoot
     $env:USERPROFILE = Split-Path -Parent $managedRoot
@@ -114,12 +133,15 @@ try {
     if (-not (Test-Path -LiteralPath $launcherPath)) {
         $launcher = Install-McpLauncher -Version '0.13.0' -NodePath (Get-Command node).Source -EntryPath $vendor.entryPath -VendorDir $vendor.vendorDir
         $launcherPath = $launcher.Path
+        $createdLauncher = $true
     }
     if (-not (Test-Path -LiteralPath (Get-McpConfigPath))) {
         $null = Set-McpConfig -BaseUrl 'https://api.commandcode.ai/provider/v1/systemone' -Model 'typesafe/jev' -EndpointConfirmed $true
+        $createdConfig = $true
     }
     if (-not (Test-McpVaultExists)) {
         $null = Write-McpVault -SecureSecret (ConvertTo-SecureString 'boot-without-key' -AsPlainText -Force)
+        $createdVault = $true
     }
     $boot = Start-BootProbe -LauncherPath $launcherPath
     Assert-True (-not $boot.TimedOut) '(boot) sem timeout'
@@ -127,6 +149,15 @@ try {
     Assert-True ($boot.Stdout -match 'serverInfo' -and $boot.Stdout -match 'jev-mcp') '(boot) resposta initialize com jev-mcp'
     Assert-True ($boot.Stderr -match '\[jev-mcp\] ready') '(boot) stderr ready'
 } finally {
+    if ($createdLauncher -and -not [string]::IsNullOrWhiteSpace($launcherPath) -and (Test-Path -LiteralPath $launcherPath)) {
+        Remove-Item -LiteralPath $launcherPath -Force -ErrorAction SilentlyContinue
+    }
+    if ($createdConfig -and -not [string]::IsNullOrWhiteSpace($resolvedManagedRoot)) {
+        Remove-Item -LiteralPath (Join-Path $resolvedManagedRoot 'config.json') -Force -ErrorAction SilentlyContinue
+    }
+    if ($createdVault -and -not [string]::IsNullOrWhiteSpace($resolvedManagedRoot)) {
+        Remove-Item -LiteralPath (Join-Path $resolvedManagedRoot 'vault') -Recurse -Force -ErrorAction SilentlyContinue
+    }
     $env:USERPROFILE = $originalProfile
     $env:LOCALAPPDATA = $originalLocalAppData
 }

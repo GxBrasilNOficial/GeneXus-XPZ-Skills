@@ -54,20 +54,24 @@ function New-McpCredentialResult {
         $Findings,
         [bool]$Exists,
         [string]$Source,
-        $NextActions
+        $NextActions,
+        [string]$CredentialSource = $null,
+        $ImportInfo = $null
     )
     return [ordered]@{
-        schemaVersion  = 1
-        kind           = 'xpz-mcp-integrations-setup-credential'
-        generatedAtUtc = [DateTime]::UtcNow.ToString('o')
-        action         = $ActionName
-        status         = $Status
-        exitCode       = $ExitCode
-        written        = $Written
-        planned        = $Planned
-        credential     = [ordered]@{ exists = $Exists; source = $Source }
-        findings       = @($Findings)
-        nextActions    = @($NextActions)
+        schemaVersion    = 1
+        kind             = 'xpz-mcp-integrations-setup-credential'
+        generatedAtUtc   = [DateTime]::UtcNow.ToString('o')
+        action           = $ActionName
+        status           = $Status
+        exitCode         = $ExitCode
+        written          = $Written
+        planned          = $Planned
+        credential       = [ordered]@{ exists = $Exists; source = $Source }
+        credentialSource = $CredentialSource
+        import           = $ImportInfo
+        findings         = @($Findings)
+        nextActions      = @($NextActions)
     }
 }
 
@@ -114,8 +118,9 @@ if ($Action -eq 'test') {
 
 $secureSecret = $null
 $source = 'secure-input'
+$importInfo = $null
 if ($planned -and $Action -eq 'set') {
-    $result = New-McpCredentialResult -ActionName $Action -Status 'planned' -ExitCode 0 -Written $false -Planned $true -Findings $findings -Exists (Test-McpVaultExists) -Source 'vault-dpapi' -NextActions $nextActions
+    $result = New-McpCredentialResult -ActionName $Action -Status 'planned' -ExitCode 0 -Written $false -Planned $true -Findings $findings -Exists (Test-McpVaultExists) -Source 'vault-dpapi' -NextActions $nextActions -CredentialSource $source
     [pscustomobject]$result | ConvertTo-Json -Depth 10
     exit 0
 }
@@ -127,9 +132,36 @@ if ($Action -eq 'import') {
         exit 67
     }
     $import = Get-McpOpenCodeCredential
+    $importPath = $null
+    if ($import.PSObject.Properties['Path']) { $importPath = [string]$import.Path }
+    $importProviders = @()
+    if ($import.PSObject.Properties['Providers']) { $importProviders = @($import.Providers) }
+    $importAttempted = @()
+    if ($import.PSObject.Properties['AttemptedPaths']) { $importAttempted = @($import.AttemptedPaths) }
+    $reserveSource = $null
+    if ($import.PSObject.Properties['FallbackSource']) { $reserveSource = [string]$import.FallbackSource }
+    $reservePath = $null
+    if ($import.PSObject.Properties['FallbackPath']) { $reservePath = [string]$import.FallbackPath }
+    $reserveProviders = @()
+    if ($import.PSObject.Properties['FallbackProviders']) { $reserveProviders = @($import.FallbackProviders) }
+    $reserveAttempted = @()
+    if ($import.PSObject.Properties['FallbackAttemptedPaths']) { $reserveAttempted = @($import.FallbackAttemptedPaths) }
+    $importInfo = [ordered]@{
+        status         = [string]$import.Status
+        source         = [string]$import.Source
+        path           = $importPath
+        providers      = @($importProviders)
+        attemptedPaths = @($importAttempted)
+        reserve        = [ordered]@{
+            source         = $reserveSource
+            path           = $reservePath
+            providers      = @($reserveProviders)
+            attemptedPaths = @($reserveAttempted)
+        }
+    }
     if ($import.Status -eq 'ambiguous') {
         $findings.Add((New-McpFinding -Code 'credencial_ambigua' -Class 'blocking' -Message 'mais de uma credencial ativa para commandcode; nada foi gravado')) | Out-Null
-        $result = New-McpCredentialResult -ActionName $Action -Status 'credencial_ambigua' -ExitCode 67 -Written $false -Planned $planned -Findings $findings -Exists (Test-McpVaultExists) -Source 'vault-dpapi' -NextActions $nextActions
+        $result = New-McpCredentialResult -ActionName $Action -Status 'credencial_ambigua' -ExitCode 67 -Written $false -Planned $planned -Findings $findings -Exists (Test-McpVaultExists) -Source 'vault-dpapi' -NextActions $nextActions -CredentialSource ([string]$import.Source) -ImportInfo $importInfo
         [pscustomobject]$result | ConvertTo-Json -Depth 10
         exit 67
     }
@@ -137,7 +169,7 @@ if ($Action -eq 'import') {
         $code = if ($import.Status -eq 'invalid') { 'credencial_invalida' } else { 'credencial_ausente' }
         $findings.Add((New-McpFinding -Code $code -Class 'blocking' -Message "importacao nao encontrou credencial commandcode utilizavel ($($import.Status))")) | Out-Null
         $nextActions.Add('Set-McpCredential.ps1 -Action set') | Out-Null
-        $result = New-McpCredentialResult -ActionName $Action -Status $code -ExitCode 61 -Written $false -Planned $planned -Findings $findings -Exists (Test-McpVaultExists) -Source 'vault-dpapi' -NextActions $nextActions
+        $result = New-McpCredentialResult -ActionName $Action -Status $code -ExitCode 61 -Written $false -Planned $planned -Findings $findings -Exists (Test-McpVaultExists) -Source 'vault-dpapi' -NextActions $nextActions -CredentialSource ([string]$import.Source) -ImportInfo $importInfo
         [pscustomobject]$result | ConvertTo-Json -Depth 10
         exit 61
     }
@@ -153,7 +185,7 @@ if ($Action -eq 'import') {
 }
 
 if ($planned) {
-    $result = New-McpCredentialResult -ActionName $Action -Status 'planned' -ExitCode 0 -Written $false -Planned $true -Findings $findings -Exists (Test-McpVaultExists) -Source 'vault-dpapi' -NextActions $nextActions
+    $result = New-McpCredentialResult -ActionName $Action -Status 'planned' -ExitCode 0 -Written $false -Planned $true -Findings $findings -Exists (Test-McpVaultExists) -Source 'vault-dpapi' -NextActions $nextActions -CredentialSource $source -ImportInfo $importInfo
     [pscustomobject]$result | ConvertTo-Json -Depth 10
     exit 0
 }
@@ -172,7 +204,6 @@ try {
     $secureSecret = $null
 }
 
-$result = New-McpCredentialResult -ActionName $Action -Status $write.Status -ExitCode 0 -Written ($write.Status -eq 'written') -Planned $false -Findings $findings -Exists (Test-McpVaultExists) -Source 'vault-dpapi' -NextActions $nextActions
-$result['credentialSource'] = $source
+$result = New-McpCredentialResult -ActionName $Action -Status $write.Status -ExitCode 0 -Written ($write.Status -eq 'written') -Planned $false -Findings $findings -Exists (Test-McpVaultExists) -Source 'vault-dpapi' -NextActions $nextActions -CredentialSource $source -ImportInfo $importInfo
 [pscustomobject]$result | ConvertTo-Json -Depth 10
 exit 0

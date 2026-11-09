@@ -411,33 +411,107 @@ function Get-McpCredentialFromEntries {
     return [pscustomobject]@{ Status = 'ok'; Secret = $matches[0].Secret; Source = $Source }
 }
 
+function Get-McpCredentialProviderNames {
+    param([AllowNull()]$Root)
+    if ($null -eq $Root) {
+        return @()
+    }
+    if ($Root -is [System.Collections.IDictionary]) {
+        return @($Root.Keys | ForEach-Object { [string]$_ })
+    }
+    if ($Root -is [System.Management.Automation.PSCustomObject]) {
+        return @($Root.PSObject.Properties.Name)
+    }
+    return @()
+}
+
 function Get-McpAuthJsonCredential {
-    $path = Join-Path (Get-McpProfileRoot) '.config\opencode\auth.json'
-    if (-not (Test-McpRegularFile -Path $path)) {
-        return [pscustomobject]@{ Status = 'absent'; Secret = $null; Source = 'auth.json'; Path = $path }
+    $profileRoot = Get-McpProfileRoot
+    $paths = @(
+        (Join-Path $profileRoot '.local\share\opencode\auth.json'),
+        (Join-Path $profileRoot '.config\opencode\auth.json')
+    )
+    $attemptedPaths = @()
+    $existingPaths = @()
+    $providers = @()
+    $lastError = $null
+    foreach ($path in $paths) {
+        $attemptedPaths += $path
+        if (-not (Test-McpRegularFile -Path $path)) {
+            continue
+        }
+        $existingPaths += $path
+        try {
+            $root = Get-McpJsonFile -Path $path
+        } catch {
+            $lastError = $_.Exception.Message
+            continue
+        }
+        if ($null -eq $root) {
+            continue
+        }
+        $providers = @($providers + @(Get-McpCredentialProviderNames -Root $root) | Select-Object -Unique)
+        $candidate = Get-McpDictionaryValue -Object $root -Key 'commandcode'
+        if ($null -eq $candidate) {
+            continue
+        }
+        $record = ConvertTo-McpOrdered -Value $candidate
+        if ($record -isnot [System.Collections.IDictionary]) {
+            continue
+        }
+        $kind = [string]$record['type']
+        $secret = $null
+        if ($record.Contains('key')) {
+            $secret = [string]$record['key']
+        } elseif ($record.Contains('value') -and $record['value'] -is [string]) {
+            $secret = [string]$record['value']
+        }
+        if ($null -ne $record['value'] -and $record['value'] -isnot [string]) {
+            $valueOrdered = ConvertTo-McpOrdered -Value $record['value']
+            if ([string]::IsNullOrWhiteSpace($kind) -and $valueOrdered.Contains('type')) {
+                $kind = [string]$valueOrdered['type']
+            }
+            if ([string]::IsNullOrWhiteSpace($secret) -and $valueOrdered.Contains('key')) {
+                $secret = [string]$valueOrdered['key']
+            }
+        }
+        if ($record.Contains('active') -and $record['active'] -eq $false) {
+            continue
+        }
+        if ($kind -notin @('key', 'api') -or [string]::IsNullOrWhiteSpace($secret)) {
+            continue
+        }
+        return [pscustomobject]@{
+            Status         = 'ok'
+            Secret         = $secret
+            Source         = 'auth.json'
+            Path           = $path
+            AttemptedPaths = @($attemptedPaths)
+            ExistingPaths  = @($existingPaths)
+            Providers      = @($providers)
+        }
     }
-    try {
-        $root = Get-McpJsonFile -Path $path
-    } catch {
-        return [pscustomobject]@{ Status = 'invalid'; Secret = $null; Source = 'auth.json'; Path = $path; Error = $_.Exception.Message }
+    if ($lastError) {
+        return [pscustomobject]@{
+            Status         = 'invalid'
+            Secret         = $null
+            Source         = 'auth.json'
+            Path           = $(if ($existingPaths.Count -gt 0) { $existingPaths[-1] } else { $paths[0] })
+            AttemptedPaths = @($attemptedPaths)
+            ExistingPaths  = @($existingPaths)
+            Providers      = @($providers)
+            Error          = $lastError
+        }
     }
-    if ($null -eq $root) {
-        return [pscustomobject]@{ Status = 'absent'; Secret = $null; Source = 'auth.json'; Path = $path }
+    return [pscustomobject]@{
+        Status         = 'absent'
+        Secret         = $null
+        Source         = 'auth.json'
+        Path           = $(if ($existingPaths.Count -gt 0) { $existingPaths[-1] } else { $paths[0] })
+        AttemptedPaths = @($attemptedPaths)
+        ExistingPaths  = @($existingPaths)
+        Providers      = @($providers)
     }
-    $candidate = Get-McpDictionaryValue -Object $root -Key 'commandcode'
-    if ($null -eq $candidate) {
-        return [pscustomobject]@{ Status = 'absent'; Secret = $null; Source = 'auth.json'; Path = $path }
-    }
-    $record = ConvertTo-McpOrdered -Value $candidate
-    $kind = [string]($record['type'])
-    $secret = [string]($record['key'] ?? $record['value'])
-    if ($record.Contains('active') -and $record['active'] -eq $false) {
-        return [pscustomobject]@{ Status = 'absent'; Secret = $null; Source = 'auth.json'; Path = $path }
-    }
-    if ($kind -ne 'key' -or [string]::IsNullOrWhiteSpace($secret)) {
-        return [pscustomobject]@{ Status = 'absent'; Secret = $null; Source = 'auth.json'; Path = $path }
-    }
-    return [pscustomobject]@{ Status = 'ok'; Secret = $secret; Source = 'auth.json'; Path = $path }
 }
 
 function Get-McpOpenCodeCredential {
@@ -478,23 +552,33 @@ function Get-McpOpenCodeCredential {
         }
     }
 
-    if ($export.Status -eq 'ok') {
-        return $export
-    }
-    if ($export.Status -eq 'ambiguous') {
-        return $export
+    if ($export.Status -in @('ok', 'ambiguous')) {
+        return [pscustomobject]@{
+            Status         = $export.Status
+            Secret         = $export.Secret
+            Source         = $export.Source
+            Path           = $null
+            AttemptedPaths = @()
+            ExistingPaths  = @()
+            Providers      = @()
+        }
     }
     $authJson = Get-McpAuthJsonCredential
-    if ($authJson.Status -eq 'ok') {
-        return $authJson
-    }
-    if ($authJson.Status -eq 'invalid') {
+    if ($authJson.Status -in @('ok', 'invalid')) {
         return $authJson
     }
     return [pscustomobject]@{
-        Status = $export.Status
-        Secret = $null
-        Source = $export.Source
-        FallbackSource = $authJson.Source
+        Status                 = $export.Status
+        Secret                 = $null
+        Source                 = $export.Source
+        Path                   = $authJson.Path
+        AttemptedPaths         = @($authJson.AttemptedPaths)
+        ExistingPaths          = @($authJson.ExistingPaths)
+        Providers              = @($authJson.Providers)
+        FallbackSource         = $authJson.Source
+        FallbackPath           = $authJson.Path
+        FallbackAttemptedPaths = @($authJson.AttemptedPaths)
+        FallbackExistingPaths  = @($authJson.ExistingPaths)
+        FallbackProviders      = @($authJson.Providers)
     }
 }

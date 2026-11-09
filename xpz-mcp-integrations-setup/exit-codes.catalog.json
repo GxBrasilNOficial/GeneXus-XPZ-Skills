@@ -6,11 +6,13 @@
     "min": 60,
     "max": 69
   },
+  "precedence": [67, 66, 61, 62, 63, 64, 65, 60],
   "nonCollisionWith": "scripts/msbuild-exit-codes.catalog.json",
   "legend": {
     "exitCode": "Valor emitido pelo motor xpz-mcp-integrations-setup; tambem e o exit code do processo PowerShell.",
     "overall": "INTEGRATIONS_OK exige entrada reconhecida em cada cliente gerenciado e nenhum achado blocking; credencial verificada e eixo separado.",
-    "childExit": "O launcher devolve o exit code do filho; codigos 60-69 do filho nao sao reinterpretados pela skill."
+    "childExit": "O launcher devolve o exit code do filho; codigos 60-69 do filho nao sao reinterpretados pela skill.",
+    "precedence": "Ordem de desempate quando ha mais de um achado blocking: o primeiro codigo presente vence. 69 fica fora (falha interna do trap); 68 e warn-only e so entra se um achado blocking usar esse codigo."
   },
   "codes": [
     {

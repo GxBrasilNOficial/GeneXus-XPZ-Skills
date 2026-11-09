@@ -621,7 +621,12 @@ function Get-McpCodexState {
         return [pscustomobject]@{ client = 'codex'; state = $state; path = $path; findings = @($findings); form = 'block'; hash = $block.contentHash }
     }
     if ($probe.HasJev) {
-        $findings.Add((New-McpFinding -Code 'entrada_em_conflito' -Class 'blocking' -Message 'mcp_servers.jev existe fora dos marcadores' -Client 'codex')) | Out-Null
+        $scan = Get-McpCodexHeaderScan -Text $document.Text
+        if ($scan.ExactHeaders.Count -eq 1 -and $scan.OtherHeaders.Count -eq 0) {
+            $findings.Add((New-McpFinding -Code 'edicao_manual_necessaria' -Class 'blocking' -Message 'entrada manual [mcp_servers.jev] fora dos marcadores; use -MigrateLegacy para migrar com diff e aprovacao' -Client 'codex')) | Out-Null
+            return [pscustomobject]@{ client = 'codex'; state = 'nao_configurado'; path = $path; findings = @($findings); form = 'manual'; migration = 'MigrateLegacy' }
+        }
+        $findings.Add((New-McpFinding -Code 'entrada_em_conflito' -Class 'blocking' -Message 'mcp_servers.jev existe fora dos marcadores em grafia nao migravel' -Client 'codex')) | Out-Null
         return [pscustomobject]@{ client = 'codex'; state = 'nao_configurado'; path = $path; findings = @($findings); form = 'manual' }
     }
     return [pscustomobject]@{ client = 'codex'; state = 'nao_configurado'; path = $path; findings = @($findings); form = 'absent' }

@@ -37,7 +37,11 @@ marcadores desbalanceados, tabela alheia entre marcadores e TOML invalido.
 ## `auth-export/`
 
 Fixtures sanitizadas de `opencode auth export` e `auth.json`: uma credencial,
-varias, duplicada, ausente (`[]`), ativa e inativa.
+varias, duplicada, ausente (`[]`), ativa e inativa. `auth-json-one.json` e
+`auth-json-inactive.json` usam o formato real do OpenCode V2 (`type: api` em
+`.local\share\opencode\auth.json`); `auth-json-key.json` cobre o legado
+`type: key` em `.config\opencode\auth.json`; `auth-json-other-providers.json`
+cobre o diagnostico de provedores sem `commandcode`.
 
 ## Rastreabilidade privada
 
