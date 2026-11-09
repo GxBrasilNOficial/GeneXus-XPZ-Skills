@@ -1,4 +1,4 @@
-# xpz-mcp-integrations — design da skill (v23.1)
+# xpz-mcp-integrations — design da skill (v24.1)
 
 ## Papel do documento
 
@@ -13,7 +13,13 @@ redução de escopo de **2026-10-03** e a evidência empírica coletada.
   **Anexo B** (movidos, não apagados) · **v23** **correção de gaps da v22** (segunda opinião de
   subagente + observação de outro agente, **conferidas pelo orquestrador**; ver *Evidência coletada*):
   ciclo de atualização/remoção nos dois clientes, migração da entrada manual, validação do Codex por
-  `tomllib`, chave só do cofre na v1 · **v23.1** quatro clarificações de texto (ver CHANGELOG).
+  `tomllib`, chave só do cofre na v1 · **v23.1** quatro clarificações de texto (ver CHANGELOG) ·
+  **v24** incorpora a primeira consulta a três famílias de 2026-11-09 (ver *Evidência coletada*) e os
+  fatos medidos na máquina de referência: verificação de credencial separada do boot, forma canônica do
+  OpenCode, desenho do Claude Code e dois cortes (divergência cofre × export e resolução por API .NET) ·
+  **v24.1** aplica a **segunda consulta** (3/3 pediram Claude fora da v1): v1 volta a **OpenCode + Codex**,
+  Claude vira o primeiro item do F2, verificação de credencial vira online opt-in e ficam definidos
+  `INTEGRATIONS_OK`, composição de estados e critério de `answers`.
 
 **Estrutura:** o **corpo** carrega decisão, escopo, fronteira, contrato mínimo, fases e riscos. O
 **Anexo A** carrega o detalhe técnico da **v1**, a provar por self-test no F1. O **Anexo B** preserva
@@ -29,7 +35,8 @@ atualizar/remover.
 rodadas opencode (meta+deepseek) são **segundas opiniões**. **Liberação** exige **≥2 Criadores
 distintos do autor** + **≥1 voz fora do harness dominante** (endurecimento desta frente). Alternativa
 auditada: humano **congela** (`resubmissionDeclinedByHuman` + quem + motivo + `RoundId`). Até lá,
-`vNextState=pendingResubmission`; nada é implementado.
+`vNextState=pendingResubmission`; nada é implementado. **Consulta de 2026-11-09** (openai, anthropic e
+meta; **não** é liberação): ver *Evidência coletada* — o gate de liberação continua aberto.
 
 ## Problema
 
@@ -40,15 +47,16 @@ instalar/auditar/reparar/atualizar/remover esse componente MCP. A configuração
 
 ## Escopo da v1
 
-- **Componente:** Jev/System One via `@jkudish/jev-mcp`. **Clientes:** OpenCode e Codex.
+- **Componente:** Jev/System One via `@jkudish/jev-mcp`. **Clientes da v1:** OpenCode e Codex.
+  **Claude Code** fica no **F2** (primeiro item), com o desenho do A.13 preservado (v24.1).
 - **Plataforma:** **Windows** (KB/IDE do usuário típico). **Exceção:** cofre DPAPI **sem roaming**.
 - **Ciclo:** detectar → instalar → auditar → reparar → atualizar → remover. **Credencial:** cofre
-  neutro. **Público:** comunidade. **A v1 (OpenCode + Codex mínimo) completa no F1** (v22).
+  neutro. **Público:** comunidade. **A v1 (OpenCode + Codex) completa no F1** (v24.1).
 - **Fornecedor:** só `compatible` com preset **Command Code** (v22).
 
 ## Não-escopo da v1
 
-Fork; Cursor e Claude Code; macOS/Linux; instalar ferramentas; criar conta; `skills/jev/`; uso
+Fork; Cursor; macOS/Linux; instalar ferramentas; criar conta; `skills/jev/`; uso
 automático; MCPs sem descritor; vender fornecedores não provados como validados.
 
 ## Decisões travadas (2026-10-02; revisadas na v22 em 2026-10-03)
@@ -59,12 +67,15 @@ automático; MCPs sem descritor; vender fornecedores não provados como validado
 | 2 | Runtime | pacote **vendorizado** e pinado; **sem `npx`** |
 | 3 | Node | ausência **e** `< 22`; `winget` id `OpenJS.NodeJS.LTS` com aprovação; com `nvm`/`fnm`/`volta`, **relatar**; node sem npm = corrompido → relatar |
 | 4 | Plataforma | **Windows** (cofre sem roaming) |
-| 5 | Escopo v1 | **OpenCode + Codex mínimo** (completa no F1 — v22) |
-| 6 | Credencial | **cofre** DPAPI; na v1 a chave vem **só do cofre** (override por env → **Anexo B.7**, v23); `auth.json` só import opcional |
+| 5 | Escopo v1 | **OpenCode + Codex**; **Claude Code no F2** (primeiro item — v24.1, após 3/3 na consulta de 2026-11-09) |
+| 6 | Credencial | **cofre** DPAPI; na v1 a chave vem **só do cofre** (override por env → **Anexo B.7**, v23); import único de `opencode auth export` (v24), `auth.json` só reserva |
 | 7 | Fornecedor | descritor declara os 5 modos como **dado**; a v1 **implementa e testa só `compatible`** com preset **Command Code** (**parcial**); os outros 4 → **F4** (v22) |
 | 8 | Fork | **não** na v1 |
 | 9 | Público | comunidade |
 | 10 | Tamanho da v1 | **v1 mínima** que preserva as propriedades essenciais; endurecimentos → **Anexo B** (v22) |
+| 11 | Forma canônica do OpenCode | escrita em `mcp.servers.jev`; `mcp.jev` legado só leitura/migração (v24) |
+| 12 | Verificação de credencial | só por **chamada autenticada opt-in**; boot/handshake **não** promovem saúde (v24) |
+| 13 | Divergência cofre × export | **adiada ao F2** (auditoria não descriptografa o cofre na v1 — v24) |
 
 ## Arquitetura — decisões
 
@@ -87,8 +98,8 @@ A classe **biblioteca dot-source** (`OpenCodeJsoncSupport.ps1`) saiu da v1 na v2
 
 **Faixa de `exitCode` reservada no F1** (não-colisão com `msbuild-exit-codes.catalog.json`; tabela
 antes do motor). Motores com `-InputPath` entram na lista de `Test-XpzParameterNamingContract.ps1`
-(`02:972/977`). **Vocabulário de evidência:** o `02` é centrado em XML → **declarar extensão** para
-artefatos externos, com rótulo próprio.
+(seção de contratos de parâmetro do `02`). **Vocabulário de evidência:** o `02` é centrado em XML →
+**declarar extensão** para artefatos externos, com rótulo próprio.
 
 ### Fronteira com `xpz-skills-setup` e aresta de dependência
 
@@ -106,16 +117,23 @@ artefatos externos, com rótulo próprio.
   `xpz-llm-delegate/SKILL.md`), **sem** migrar consumidores; a aresta é registrada nos dois donos. A
   biblioteca única é frente própria no `999`.
 - **Rastreabilidade privada:** fixtures sanitizadas de `dist` são molde publicável → avaliar
-  `GeneXus-XPZ-PrivateMap`; reconciliar `README.md:107` × `AGENTS.md:92-96`. **Licença:** cópia
-  integral MIT + atribuição.
+  `GeneXus-XPZ-PrivateMap`; reconciliar a seção de rastreabilidade privada do `README` com a do
+  `AGENTS.md`. **Licença:** cópia integral MIT + atribuição.
 
 ### OpenCode — reaproveitar o mecanismo JSONC existente (v22)
 
 O `opencode.jsonc` real tem comentários (o `reviewer-ro` já grava nele), então recusar JSONC
 inviabilizaria a v1. **Decisão (v22):** a v1 **reaproveita** o mecanismo já em uso pelo `reviewer-ro`
-— **inserção textual** + **validação pós-edição por parse completo** + checagem de que `mcp.jev` ficou
+— **inserção textual** + **validação pós-edição por parse completo** + checagem de que a entrada ficou
 na forma esperada. Qualquer falha → **nada é gravado**, estado `edicao_manual_necessaria` e o trecho
 pronto para o usuário colar. **Sem** criar biblioteca nova e **sem** migrar outros consumidores.
+
+**Forma canônica (v24).** A escrita passa a ser em **`mcp.servers.jev`** (docs do OpenCode V2); a forma
+legada **`mcp.jev`** é reconhecida para **leitura, auditoria e migração com aprovação**. As duas formas
+são aceitas pela 2.2.6 (medido em 2026-11-09), mas só a canônica é emitida. Se **as duas coexistirem**
+no mesmo arquivo, a entrada é tratada como `entrada_em_conflito` e nada é gravado — a skill não escolhe
+sozinha qual delas vale. `disabled: true` é o campo canônico; `enabled: false` legado é reconhecido.
+Fixtures: canônica, legada, ambas presentes, `disabled` e `enabled:false`.
 
 A biblioteca única com *localizador estrutural* e a matriz de migração viraram **frente própria** no
 `999` (desenho preservado no **Anexo B.3**); quando ela existir, este consumidor migra junto. Detalhe
@@ -126,6 +144,9 @@ da v1: **Anexo A.3**.
 - **Pacote:** `@jkudish/jev-mcp`; **versão `0.13.0`**.
 - **Identidade do artefato = `integrity` sha512 do tarball** no **lockfile comitado**; o **commit Git é
   proveniência**, não âncora. O `npm ci` já confere o `integrity` de cada pacote contra o lockfile.
+  **Medido em 2026-11-09:** `sha512-0fFOAJwlsntMdHu4+t40H4BObOowfqVsZdMnU1tbqIHojbWotRia8quh8/SjEtwpC0CbemZF9TpBDbFNBhnRGw==`,
+  lock com 9 pacotes, árvore de 15,46 MB, `npm ci --ignore-scripts` em 2 s, `dist/index.js` e `LICENSE`
+  (MIT) presentes no tarball.
 - **`npm ci --ignore-scripts`** (o pacote declara `prepare`; usamos o `dist` pré-compilado) em
   `%LOCALAPPDATA%\xpz-mcp-integrations\vendor-<versao>\`.
 - **Atualizar** = novo `package.json`/lockfile no repositório + reinstalar + re-emitir config.
@@ -163,6 +184,10 @@ Bootstrap executável e evidência do `dist`: **Anexo A.4**.
 - **Runtime:** exige `pwsh` (7.4+). **Staleness do `node`:** reparo = re-resolver e re-emitir launcher.
 - **Marcador de propriedade:** sentinela + manifesto de instalação (A.12); uninstall remove só se
   sentinela **e** path no manifesto; órfão = reportar.
+- **Fonte e cópia (v24):** o molde canônico fica versionado em
+  `xpz-mcp-integrations/templates/launcher.ps1`; o instalador emite a cópia em
+  `%LOCALAPPDATA%\xpz-mcp-integrations\launcher-<versao>.ps1`, com sentinela e hash no manifesto. O
+  cliente aponta para a cópia emitida; o repositório é a fonte revisável.
 - **Adiado para o Anexo B.1 (v22):** `CreateProcessW` + `CREATE_SUSPENDED` + Job Object +
   `ResumeThread`, limpeza pós-criação, política de árvore, testes de cancelamento/órfão/stderr
   intenso/payload binário grande.
@@ -180,7 +205,8 @@ o resto da skill segue. Detalhe: **Anexo A.5**.
 ## Fornecedor
 
 O descritor declara cinco modos como **dado**; a **v1 implementa e testa só `compatible`** (v22). **Wire
-= hipótese** até as fixtures (Apêndice). O launcher injeta **só** a var do modo selecionado:
+= hipótese** até as fixtures (Apêndice); **host e modelo do preset são fato medido** (v24). O launcher
+injeta **só** a var do modo selecionado:
 
 | Modo | `secretEnvVar` | Vars públicas / obrigatórias | Status |
 |---|---|---|---|
@@ -191,7 +217,12 @@ O descritor declara cinco modos como **dado**; a **v1 implementa e testa só `co
 | `compatible` | `JEV_API_KEY` | `JEV_API_BASE_URL` (**URL completa**), `JEV_MCP_MODEL` | **parcial** (v1) |
 
 - `compatible` exige o contrato System One/Jev; URL vai como veio. Com modo único na v1, a regra
-  `auto`/`JEV_PROVIDER` não se aplica (volta no F4).
+  `auto`/`JEV_PROVIDER` não se aplica (volta no F4). **Medido em 2026-11-09:** sem `JEV_PROVIDER` o
+  servidor sobe normalmente, então a allowlist de ambiente não precisa dela.
+- **Preset Command Code (v24):** `baseUrl = https://api.commandcode.ai/provider/v1/systemone` e
+  `model = typesafe/jev`. O host respondeu `200` com chamada autenticada; `jev-latest` é **alias aceito**
+  (a resposta normaliza para `typesafe/jev`), mas o preset fixa o valor explícito. O que segue
+  **hipótese** é o wire do modo `compatible`, não o host.
 - **`endpoint_nao_confirmado` — regra da v1:** host igual ao do preset **Command Code** = OK; host
   diferente = **aviso + confirmação explícita** do usuário. Host/caminho **redigidos** antes da
   confirmação.
@@ -199,10 +230,16 @@ O descritor declara cinco modos como **dado**; a **v1 implementa e testa só `co
   só-dono; UTF-8 sem BOM; schema versionado) é a **fonte persistente das variáveis públicas** — é dele
   que o launcher reconstrói o ambiente do filho. **Nunca** contém a chave. Schema: **Anexo A.6**.
 - **Cofre:** guarda a chave do modo `compatible`, **sem** registrar o segredo em claro.
-- **`compatible` = parcial** (handshake, não E2E). **Command Code** = preset sugerido. **Import
-  `auth.json`:** opcional, com ressalva (credencial `commandcode/*` do OpenCode é de gateway LLM).
-  É uma operação **única de bootstrap/migração para o cofre** (v23.1): o launcher **nunca** lê o
-  `auth.json` em runtime, e a importação **não altera** o `auth.json`.
+- **`compatible` = parcial** (handshake, não E2E). **Command Code** = preset sugerido. **Import da
+  credencial (v24):** bootstrap **único** a partir de `opencode auth export` (preferido) ou do
+  `auth.json` legado como reserva; o launcher **nunca** lê qualquer dos dois em runtime, e a importação
+  **não altera** o `auth.json`. Seleção explícita: entrada
+  com `integrationID = commandcode`, `value.type = key`, `active != false`; saída `[]` significa
+  **ausente**, não erro; parse só em memória, sem log. **Múltiplas entradas:** vence a marcada como
+  `active` (o export não traz data); empate → `credencial_ambigua` e **nada é gravado**. O `auth.json`
+  de reserva usa a mesma seleção por provedor. **A importação exige aprovação explícita** (nada gravado
+  sem aprovação) e tem **fixture sanitizada** do export no F1. Precedência documentada: **cofre > export
+  (import) > `auth.json` (reserva)**.
 
 ## Credencial
 
@@ -212,6 +249,9 @@ O descritor declara cinco modos como **dado**; a **v1 implementa e testa só `co
   `credencial_divergente_env_vs_cofre` foram para o **Anexo B.7** — fazê-los funcionar exigiria
   levar a escolha até o launcher e passar a variável pelo filtro de env do Codex.
 - **`acl_nao_aplicavel` bloqueia mutadores de blob** (v22: sem «modo inseguro»).
+- **Divergência cofre × export (v24):** o estado `credencial_divergente` foi **adiado ao F2**
+  (**B.9**). Na v1 a auditoria **não descriptografa** o cofre; comparar exigiria ler o segredo em modo
+  de auditoria e mapear campo a campo entre a credencial de gateway e `JEV_API_KEY`.
 - **Recuperar = re-inserir a chave** (DPAPI não roaming); a v1 **não** mantém backup/retenção do
   cofre (v22).
 - **Limite honesto:** DPAPI protege em repouso; não contra processo do mesmo usuário, inspeção do env do
@@ -223,10 +263,11 @@ Formato do blob, entrada não-eco, ACL e os três eventos (rotação, remoção,
 ## Adaptadores de cliente (v1)
 
 - **OpenCode (F1):** raiz gerenciada na v1 = **global** `~/.config/opencode/`; **projeto-local
-  (`.opencode/`) fora do escopo da v1**. Entrada `mcp.jev` (`type: local`, `command: ["pwsh",...]`,
-  campo **`environment`**, não `env`). Edição pelo mecanismo JSONC existente + validação pós-edição
-  (ver *OpenCode — reaproveitar o mecanismo JSONC existente*); transacional, idempotente. **Shape =
-  fato externo** + fixture sanitizada no F1.
+  (`.opencode/`) fora do escopo da v1**. Entrada canônica **`mcp.servers.jev`** (`type: local`,
+  `command: ["pwsh",...]`, campo **`environment`**, não `env`, `disabled` como desligamento); a forma
+  legada `mcp.jev` é reconhecida para leitura/migração (v24). Edição pelo mecanismo JSONC existente +
+  validação pós-edição (ver *OpenCode — reaproveitar o mecanismo JSONC existente*); transacional,
+  idempotente. **Shape = fato externo** + fixtures das duas formas no F1.
 - **Codex (F1, mínimo — v22/v23):** `~/.codex/config.toml`, bloco `[mcp_servers.jev]` gravado **entre
   marcadores de comentário próprios da skill**, **sem biblioteca TOML de edição**. A **detecção e a
   validação** usam o `tomllib` da biblioteca padrão do Python 3.11+ (só leitura): antes de gravar, o
@@ -235,6 +276,12 @@ Formato do blob, entrada não-eco, ACL e os três eventos (rotação, remoção,
   (`[mcp_servers.'jev']`, chave pontilhada, tabela inline, `jev.*` dentro de `[mcp_servers]`), que
   uma busca por linha não pegaria e que tornaria o arquivo inválido por declaração duplicada. **Sem
   Python 3.11+** → `edicao_manual_necessaria` com o trecho pronto.
+- **Claude Code (F2, primeiro item — v24.1):** `~/.claude.json`, escopo **user**. Caminho primário =
+  `claude mcp add-json -s user jev <json>` / `claude mcp remove -s user jev` (o arquivo tem ~143 KB de
+  estado e é reescrito pelo cliente); **sem fallback de edição direta na v1**. **Escopo de projeto exige
+  aprovação humana** (medido), então não serve para instalação gerenciada. Auditoria por
+  `claude mcp get jev`, **nunca** `claude mcp list` (que sobe todos os servidores). **Gate (F2):**
+  protocolo de concorrência repetível com o cliente aberto. Detalhe: **A.13**.
 - **Entrada que a skill reconhece (v23):** uma entrada só é tratada como da skill se for
   **byte-idêntica** a um bloco/entrada que a skill emitiu, com o hash registrado no **manifesto de
   instalação** (Anexo A.12). Só essas a skill substitui (atualizar/reparar) ou remove, sempre com diff
@@ -246,24 +293,36 @@ Formato do blob, entrada não-eco, ACL e os três eventos (rotação, remoção,
   **Ordem (v23.1):** gravar o blob DPAPI, conferir que ele descriptografa de volta para o mesmo valor
   e **só então** retirar a chave do config. Se o cofre falhar, o config do cliente fica **intocado**.
 
-Que variáveis de ambiente o Codex repassa ao launcher (`env_vars` filtra o herdado) é **fato a
-verificar** com filho falso no F1. Fixture sanitizada do `config.toml` no F1. A biblioteca TOML
-vendorizada com round-trip está no **Anexo B.8**.
+**Env medido (v24):** o Codex repassa ao filho MCP um conjunto filtrado de 20 variáveis, incluindo
+`LOCALAPPDATA`, `USERPROFILE`, `APPDATA`, `SystemRoot`, `TEMP`, `COMSPEC`, `PATHEXT` e `PATH`, **sem**
+`JEV_API_KEY`; o Claude Code repassa 83 variáveis, incluindo `LOCALAPPDATA`, também sem a chave. O
+launcher consegue resolver cofre e `config.json` nos dois; a resolução por API .NET fica como reforço
+opcional, fora da v1. Fixture sanitizada do `config.toml` no F1 e do `~/.claude.json` no F2. A
+biblioteca TOML vendorizada com round-trip está no **Anexo B.8**.
 
 Algoritmo de descoberta/precedência e casos de `entrada_em_conflito`: **Anexo A.8**.
 
 ## Auditoria (estados e contrato)
 
-- **Agregado:** `overall = INTEGRATIONS_OK | INTEGRATIONS_GAPS`.
-- **Estado por cliente:** `notConfigured` | `written` | `reloadPending` | `handshakeConfirmed` |
-  `e2eOptInConfirmed`; `overall` **não** promove `written` a sucesso operacional; a skill informa a
-  **ação de recarga/reinício** necessária.
+- **Agregado (v24.1):** `overall = INTEGRATIONS_OK | INTEGRATIONS_GAPS`. `INTEGRATIONS_OK` é
+  **estrutural** — entrada reconhecida em cada cliente gerenciado e nenhum achado `blocking` — e **não**
+  depende de credencial verificada.
+- **Estado por cliente (v24.1, snake_case):** **um valor só** — `nao_configurado` | `escrito` |
+  `recarga_pendente` | `boot_ok` | `endpoint_alcancavel` | `credencial_verificada` |
+  `e2e_opt_in_confirmado`; achados offline são **diagnósticos** e não estados concorrentes. `overall`
+  **não** promove `escrito` nem `boot_ok` a sucesso operacional; a skill informa a **ação de
+  recarga/reinício** necessária.
+- **Verificação de credencial (v24.1):** `boot_ok` só prova que o servidor sobe; o boot do `jev-mcp` sai
+  `0` até com chave inválida, URL inalcançável ou modelo inexistente (medido em 2026-11-09). Só
+  `credencial_verificada` — chamada **autenticada opt-in**, com critério objetivo de `answers`
+  (**A.9**) — promove saúde. `endpoint_alcancavel` é diagnóstico separado e não implica credencial.
 - **Nada gravado sem confirmação:** a auditoria reporta estados e **oferece** a ação; a escrita depende
   de aprovação explícita.
-- **Online opt-in** (`-CheckUpdates`): `atualizacao_disponivel` — informa, nunca auto-atualiza.
+- **Online opt-in:** `-CheckCredential` (v1) segue o critério do A.9 e exige autorização por execução;
+  `-CheckUpdates` foi para o F2 — informa, nunca auto-atualiza.
 
-Lista completa de estados offline, classes (`blocking`/`warn`), tabela estado→`exitCode` e precedência:
-**Anexo A.9**.
+Lista completa de estados offline, classes (`blocking`/`warn`) e precedência: **Anexo A.9**; a tabela
+estado→`exitCode` é **entregável do F1** (faixa reservada), não fixada neste documento.
 
 ## Atualizar e remover
 
@@ -275,33 +334,37 @@ Lista completa de estados offline, classes (`blocking`/`warn`), tabela estado→
   config). Nunca por existir versão nova.
 - **Remover:** o manifesto de instalação registra referências por cliente; launcher só sai quando
   **não restar referência**; exige **sentinela E** path no manifesto; órfão = reportar. Preservar
-  cofre, `auth.json`, fornecedor e demais MCPs. Na v1, remover significa **retirar a entrada**; não
-  há estado «desabilitado» (`enabled=false`), que exigiria uma segunda forma canônica (v23).
+  cofre, `auth.json`, fornecedor e demais MCPs. Na v1, remover significa **retirar a entrada**;
+  `disabled` é **reconhecido na leitura**, mas a skill não o usa como estado próprio — desligar é
+  remover.
 
 ## Testes — nível de decisão
 
-- **Self-tests offline (v1)** cobrem detecção, edição JSONC com validação pós-edição, bloco com
-  marcadores do Codex, idempotência, escrita transacional, backup/restore, schema do descritor,
-  round-trip DPAPI, re-emissão de launcher por versão, launcher com filho falso e encerramento por fim
-  do stdin. Inventário executável: **Anexo A.10**.
-- **O gate do `dist` no F1 é revisão estática do `dist` + boot sem chave.** O teste de egresso de rede
-  contido **não** é gate (ver **Adiado**).
+- **Self-tests offline (v1)** cobrem detecção, edição JSONC com validação pós-edição (nas duas formas),
+  bloco com marcadores do Codex, adaptador do Claude Code (CLI, fallback, concorrência), idempotência,
+  escrita transacional, backup/restore, schema do descritor, round-trip DPAPI, re-emissão de launcher
+  por versão, launcher com filho falso, encerramento por fim do stdin e **verificação autenticada de
+  credencial**. Inventário executável: **Anexo A.10**.
+- **O gate do `dist` no F1 é revisão estática do `dist` + boot sem chave.** Ele **não** valida
+  credencial nem endpoint (v24); o teste de egresso de rede contido **não** é gate (ver **Adiado**).
 - **Não são rodados pelo orquestrador de pré-push**; a skill declara cada comando e registra em `09`.
 - **E2E** com `jev_classify` = validação manual opt-in; um E2E aprovado **promove** o cliente de
-  `handshakeConfirmed` para `e2eOptInConfirmed`.
+  `credencial_verificada` para `e2e_opt_in_confirmado`.
 
 ## Documentação e paridade
 
 - `README.md` trilíngue (duas listas por língua ×3); `CHANGELOG.md` trilíngue; **`SECURITY.md`
-  trilíngue** (seção do cofre nas três).
+  trilíngue** (seção do cofre nas três, e **declaração de que a contenção de rede não foi demonstrada**
+  nesta máquina — Sandbox indisponível em 2026-11-09).
 - `09` (`Dono:` + `Validação:`/`Tokens:`/`Exit:`); `02` (contrato + vocabulário); `08` (nomear seções ou
   retirar).
 - **`AGENTS.md`/`README.md`:** **reconciliar** listas, **adicionando só o que faltar** (não assumir par
   fixo). Ponteiro documental na setup (fora do recibo); `xpz-llm-delegate/SKILL.md` (dono do JSONC +
   aresta).
-- **`999`:** `:3283` com pin por commit/sha512 e preset **parcial**; `:3277` **alinhado** (validações
-  caras feitas como **insumo**; falta o **painel de liberação** e a execução). **Consultar o `998`**
-  (lição de exit-code `998:919-923`).
+- **`999`:** entrada **«Skill `xpz-mcp-integrations`»** com pin por commit/sha512 e preset **parcial**;
+  estado **alinhado** (validações caras como **insumo**; falta o **painel de liberação** e a execução).
+  **Consultar o `998`** (lição de exit-code, entrada sobre padrão de string matching sem ExitCode).
+  **Âncoras por nome de seção, não por número de linha** (v24).
 - Conformidade: `#requires -Version 7.4`; UTF-8 sem BOM (preservando BOM preexistente do arquivo do
   usuário); molde `.example.ps1`; `Test-XpzParameterNamingContract.ps1` **não** é gate geral; não
   enumerar ≥2 gates numa linha.
@@ -310,15 +373,17 @@ Lista completa de estados offline, classes (`blocking`/`warn`), tabela estado→
 
 ## Fases
 
-- **F0** — design + revisão (F0-1..F0-18; v22 reduzida; falta **painel de liberação**).
-- **F1 = v1 completa (v22)** — **reservar a faixa de `exitCode`** + skill + descritor Jev (só
-  `compatible`) + launcher `ProcessStartInfo` + cofre/DPAPI + vendorizador (lockfile + `npm ci
-  --ignore-scripts`) + **evidência sanitizada do `dist` com proveniência** + **revisão estática do
-  `dist` + boot sem chave** (gate) + OpenCode (mecanismo JSONC existente) + Codex mínimo (bloco com
-  marcadores) + auditoria + atualizar/remover + self-tests + docs.
+- **F0** — design + revisão (F0-1..F0-18; v22 reduzida; **duas consultas a três famílias em
+  2026-11-09**; falta o **painel de liberação**).
+- **F1 = v1 completa (v22; escopo de clientes revisto na v24.1)** — **reservar a faixa de `exitCode`** +
+  skill + descritor Jev (só `compatible`) + launcher `ProcessStartInfo` + cofre/DPAPI + vendorizador
+  (lockfile + `npm ci --ignore-scripts`) + **evidência sanitizada do `dist` com proveniência** +
+  **revisão estática do `dist` + boot sem chave** (gate) + OpenCode (mecanismo JSONC existente, forma
+  canônica) + Codex mínimo (bloco com marcadores) + auditoria + atualizar/remover + self-tests + docs.
 - **F2** — endurecimentos do **Anexo B**, **só quando houver motivo concreto** (cada um entra por
-  decisão própria).
-- **F3** — Cursor + Claude Code (coordenar com `Install-CursorGlobalInstructionsMcp.ps1`).
+  decisão própria), incluindo **Claude Code (A.13, primeiro item)** e **B.9 (divergência cofre ×
+  export)**.
+- **F3** — Cursor (coordenar com `Install-CursorGlobalInstructionsMcp.ps1`).
 - **F4** — opcionais: os outros 4 fornecedores; backend Python; fork/espelho.
 - O antigo **F1-pre** (biblioteca JSONC) saiu desta frente e virou entrada própria no `999`.
 
@@ -328,9 +393,14 @@ Lista completa de estados offline, classes (`blocking`/`warn`), tabela estado→
   fim do stdin.
 - **`dist`** — evidência sanitizada + **revisão estática + boot sem chave** como gate do F1; sem a
   evidência commitada, bloqueia.
-- **Fatos externos a re-verificar no F1:** sha512 do tarball; `engines.node`; modo `compatible`; boot;
-  saída do servidor no fim do stdin; shape do `opencode.json`/`.jsonc`; env repassado pelo Codex ao
-  launcher.
+- **Fatos externos medidos em 2026-11-09 (não re-verificar sem motivo):** sha512 do tarball, árvore de
+  9 pacotes, `engines.node`, boot, saída no fim do stdin, `mcp.servers`/`mcp.jev` aceitos, env do Codex
+  e do Claude Code. **Seguem a verificar no F1:** wire do modo `compatible`, deslocamento de marcador
+  pelo editor do Codex e **concorrência do `~/.claude.json` com o cliente aberto**.
+- **Concorrência do Claude Code (F2):** `~/.claude.json` é reescrito pelo cliente em execução. O lock
+  do A.2 só serializa esta skill; a reintrodução exige protocolo de concorrência repetível (N ciclos
+  com o cliente aberto, diff de chaves alheias preservadas, critério passa/falha). Por isso o Claude
+  ficou fora da v1 (v24.1).
 - **Node/pwsh/npm** são dependências de runtime.
 - **Riscos aceitos da v22 (redução de escopo):**
   - **órfão** se o cliente não fechar o stdin (sem Job Object);
@@ -356,6 +426,10 @@ Lista completa de estados offline, classes (`blocking`/`warn`), tabela estado→
   e entrada própria no `999`); manifesto de árvore e catálogo de bundles com rollback por bundle
   (**B.4.2**, **B.4.4**); runtime Node dedicado hash-registrado (**B.5**); biblioteca TOML vendorizada
   com round-trip (**B.8**); backup/retenção do cofre e «modo inseguro» de ACL.
+- **Divergência cofre × export (v24) → B.9.** Auditoria não descriptografa o cofre na v1; a detecção de
+  rotação volta no F2 com o mapeamento de campo definido.
+- **Resolução de caminho por API .NET (v24).** Não entra na v1: a medição mostra que Codex e Claude Code
+  repassam `LOCALAPPDATA`; fica como reforço opcional para o F2.
 - **Teste de egresso de rede contido (Windows Sandbox) — rebaixado a endurecimento opt-in, NÃO é gate
   do F1.** Motivo: exigir **Windows Sandbox** como pré-requisito explícito travava o F1 em máquina que
   não o tem (fail-closed por ambiente, não por defeito do artefato). O **gate do F1 passa a ser revisão
@@ -365,7 +439,7 @@ Lista completa de estados offline, classes (`blocking`/`warn`), tabela estado→
   diagnóstico** — é por programa e **não** contém a árvore; **nunca** critério de aprovação.
 - **AppContainer** — frente futura, até ter mecanismo de criação/lançamento e prova de que a árvore
   está no container **especificados e testados**.
-- **F3** — Cursor e Claude Code.
+- **F3** — Cursor.
 - **F4** — os outros 4 fornecedores (implementar e validar); backend **Python** (`typesafe-mcp` no
   PyPI); fork/espelho do pacote.
 - **Projeto-local do OpenCode** (`.opencode/`) — fora da v1.
@@ -422,6 +496,21 @@ Lista completa de estados offline, classes (`blocking`/`warn`), tabela estado→
     da linha 252» **não se reproduz no 7.6** (7.4 não testado).
   - Deslocamento do marcador pelo editor do Codex: **dedução**, não testada (ver *Riscos*).
 
+- **Consultas a três famílias (2026-11-09, via `xpz-llm-delegate`; insumo, não liberação):**
+  - **Rodada 1 — v23.1, `roundId=mcp-int-v24-consulta-20261109`**, 3/3 `responded`, gate `allow`:
+    openai/`gpt-6-luna` (`reasoningEffort=high`) **aprova com ressalvas**; anthropic/`claude-haiku-5-5`
+    **não aprova como está**; meta/`muse-spark-1.3-contributor` **não aprova com três clientes**.
+    Resultado: v24.
+  - **Rodada 2 — v24, `roundId=mcp-int-v24-consulta2-20261109`**, 3/3 `responded`: openai «não aprovo
+    ainda» (wire, `INTEGRATIONS_OK`, Claude); anthropic «não aprova como está» (contradição de
+    `disabled`, verificação offline, import sem fixture/aprovação); meta «não aprova» (env, estados,
+    Claude). Resultado: **v24.1**.
+  - **Decisões do orquestrador na v24.1:** aceitos Claude no F2 (3/3), verificação online separada,
+    `INTEGRATIONS_OK` estrutural, composição de estados, correção de `disabled` e do env, fixture e
+    aprovação no import, hierarquia de conflito e A.12 com hash vigente + histórico crescente.
+    **Mantidos:** OpenCode + Codex na v1.
+  - **Sem closeout e sem recibo de liberação.**
+
 ---
 
 ## Anexo A — Obrigações de implementação da v1 (a provar por self-test no F1)
@@ -439,11 +528,21 @@ termina com o **exit code do filho**. `& node` segue fora (herdaria o ambiente i
 `Environment` do `ProcessStartInfo` e monta com **(a)** `JEV_API_KEY` lida do cofre; **(b)** as
 **variáveis públicas do `compatible`, lidas do `config.json`** (`JEV_API_BASE_URL`, `JEV_MCP_MODEL`);
 **(c)** o **mínimo de sistema/runtime** (`SystemRoot`, `SystemDrive`, `TEMP`/`TMP`, `PATHEXT`,
-`COMSPEC`, `PATH` mínimo). **Não** propaga o ambiente inteiro.
+`COMSPEC`, `PATH` mínimo, **`LOCALAPPDATA`**, **`USERPROFILE`**, **`APPDATA`** — os três últimos são
+necessários para achar cofre/`config.json` e para a DPAPI; v24.1). **Não** propaga o ambiente inteiro.
 
 **Encerramento:** o servidor MCP sai no **fim do stdin** (cliente fecha o pipe); o launcher apenas
-espera. Self-test de boot prova a saída no fim do stdin. Órfão se o cliente não fechar o stdin = risco
-aceito (corpo, *Riscos*).
+espera. **Medido em 2026-11-09:** EOF em 3 s → saída em 24 ms, `exit 0`; stdin aberto → processo vivo
+após 20 s, confirmando o órfão como risco aceito. Self-test de boot prova a saída no fim do stdin.
+
+**Fonte do launcher (v24):** o molde fica versionado em `xpz-mcp-integrations/templates/launcher.ps1`;
+o instalador emite a cópia por versão em `%LOCALAPPDATA%` com sentinela e hash no manifesto. O comando
+emitido no cliente aponta para a cópia emitida, nunca para o molde.
+
+**Ambiente medido (v24):** Codex entrega 20 variáveis ao filho (inclui `LOCALAPPDATA`, `USERPROFILE`,
+`APPDATA`, `SystemRoot`, `TEMP`, `COMSPEC`, `PATHEXT`, `PATH`, sem `JEV_API_KEY`); Claude Code entrega
+83 (inclui `LOCALAPPDATA`, também sem a chave). O conjunto mínimo do item (c) continua sendo o que o
+launcher **define**, não o que ele herda.
 
 **Invariante mecanizada:** silenciar preferences; **nenhum `Write-*`** para stdout (scan estático);
 logs só em stderr/arquivo; sem chave em log; **exit code = do filho**, propagado como última instrução;
@@ -471,6 +570,9 @@ públicas permitidas, campos obrigatórios e regras de exclusividade; a exceçã
   órfão → remover na re-execução; destino inexistente → criação.
 - **Caminhos gerenciados:** tudo sob `%LOCALAPPDATA%\xpz-mcp-integrations` após **canonicalização**;
   **ACL aplicada antes de persistir**; escrita atômica.
+- **ACL concreta (v24):** `DirectorySecurity`/`FileSecurity` com `SetAccessRuleProtection($true, $false)`,
+  `FileSystemAccessRule` só para o SID do usuário atual, herança removida e acesso negado a
+  `Users`/`Everyone`. O self-test prova leitura/escrita pelo dono e negação para um SID de teste.
 
 ### A.3 OpenCode — edição JSONC pelo mecanismo existente
 
@@ -481,23 +583,26 @@ públicas permitidas, campos obrigatórios e regras de exclusividade; a exceçã
   **só por cópia rastreada** — dar dot-source em `Install-OpenCodeReviewerRoAgent.ps1` **executa** o
   script (código no nível do script) e grava o `reviewer-ro` sem backup nem aprovação. O **Guard** só
   define funções e pode ser carregado por dot-source. Registrar nos dois donos.
-- **Operações (v23):** **inserir** (`mcp.jev` ausente), **substituir** (entrada reconhecida pelo
-  manifesto de instalação, ou migração da entrada manual com aprovação — corpo, *Adaptadores*) e
-  **remover** (apagar o trecho `"jev": {…}` e a vírgula vizinha; só entrada reconhecida).
+- **Operações (v23; forma canônica na v24):** **inserir** em `mcp.servers.jev` (ausente), **substituir**
+  (entrada reconhecida pelo manifesto de instalação, ou migração da entrada manual `mcp.jev` com
+  aprovação — corpo, *Adaptadores*) e **remover** (apagar o trecho `"jev": {…}` e a vírgula vizinha; só
+  entrada reconhecida). **Se `mcp.jev` e `mcp.servers.jev` coexistirem**, nada é gravado:
+  `entrada_em_conflito`.
 - **Validação pós-edição obrigatória (fail-closed), por comparação de objetos parseados:** o texto
   resultante precisa parsear por inteiro e o objeto resultante precisa ser **igual ao original** com
-  exatamente uma diferença — `mcp.jev` acrescentado (inserir), trocado pela forma emitida (substituir)
-  ou ausente (remover). Qualquer outra diferença, ou falha de parse → **nada é gravado**, estado
-  `edicao_manual_necessaria` e o trecho pronto para colar.
+  exatamente uma diferença — `mcp.servers.jev` acrescentado (inserir), trocado pela forma emitida
+  (substituir) ou ausente (remover). Qualquer outra diferença, ou falha de parse → **nada é gravado**,
+  estado `edicao_manual_necessaria` e o trecho pronto para colar.
 - **Chave duplicada:** o parser devolve o **último** valor sem erro (pwsh 7.6: `ConvertFrom-Json`), então
   não há detecção explícita na v1. Uma edição que caia no objeto «sombreado» não aparece no objeto
   parseado e falha na comparação acima → `edicao_manual_necessaria`. Detecção explícita: **Anexo B.3**.
 - **Limites conhecidos** do motor (cego a comentário ao casar chaves) estão registrados no **Anexo
   B.3** e na entrada própria do `999`; a validação por comparação é a mitigação da v1.
-- **Fixtures da v1:** arquivo com comentários; `mcp` ausente; `mcp` com outros servidores; `mcp.jev`
-  idêntico (idempotência); `mcp.jev` emitido por versão anterior (substituir); `mcp.jev` manual
-  (migração com aprovação); `mcp.jev` desconhecido (`entrada_em_conflito`); remover; chave `mcp`
-  duplicada; caso que o motor não suporta → `edicao_manual_necessaria`.
+- **Fixtures da v1:** arquivo com comentários; `mcp` ausente; `mcp` com outros servidores; entrada
+  canônica idêntica (idempotência); entrada emitida por versão anterior (substituir); `mcp.jev` manual
+  (migração com aprovação); entrada desconhecida (`entrada_em_conflito`); **as duas formas coexistindo**
+  (`entrada_em_conflito`); `disabled` e `enabled:false`; remover; chave `mcp` duplicada; caso que o
+  motor não suporta → `edicao_manual_necessaria`.
 
 ### A.4 Vendorização — identidade, bootstrap e evidência do `dist`
 
@@ -536,7 +641,8 @@ MIT integral + atribuição**. **Proveniência por fixture:** `commit`, origem, 
 escopo — **sem** usar o README da `main` como prova da `0.13.0`. Até então, a tabela de Fornecedor é
 **hipótese**.
 
-**Gate do F1:** **revisão estática do `dist` + boot sem chave**.
+**Gate do F1:** **revisão estática do `dist` + boot sem chave** — prova que o pacote sobe sem a chave;
+**não** valida credencial, endpoint nem modelo (v24).
 
 #### A.4.7 Semântica de rede (2 contextos na v1)
 
@@ -553,6 +659,10 @@ no install; reparo re-resolve e re-emite. Manifesto × catálogo e runtime dedic
 **Python 3.11+ (opcional, v23):** resolvido por `GeneXusPythonPrerequisite.ps1` com checagem de
 versão ≥ 3.11 (para o `tomllib`). Usado **só** pelo adaptador do Codex (A.8). Ausente ou antigo →
 `python_indisponivel` (**warn**) e o Codex cai em `edicao_manual_necessaria`.
+
+**Medido em 2026-11-09 (máquina de referência):** Node `v24.18.0`, npm `11.18.0`, Python `3.14.2`,
+pwsh `7.6.9`. Todos atendem aos gates; a detecção continua obrigatória porque a máquina do usuário
+não é a de referência.
 
 ### A.6 `config.json` — schema, origem e consumo
 
@@ -591,9 +701,13 @@ candidatos **`opencode.json` e `opencode.jsonc`** nessa pasta; **projeto-local (
 escopo da v1** (declarado). **Precedência:** resolver `opencode.json` → `opencode.jsonc` (espelha o motor
 atual); **sem precedência comprovada** se ambos existirem → `entrada_em_conflito` (bloquear sem
 escrever). **Fixtures** para cada caso. Edição em ambos os formatos pelo mecanismo do **A.3**
-(inserção textual + validação pós-edição). Entrada `mcp.jev` (`type: local`,
-`command: ["pwsh","-NoProfile","-File","<launcher>"]`, campo **`environment`**, não `env`). Escrita
-transacional (A.2); idempotente. **Shape = fato externo** + fixture sanitizada no F1.
+(inserção textual + validação pós-edição). Entrada canônica **`mcp.servers.jev`** (`type: local`,
+`command: ["pwsh","-NoProfile","-File","<launcher>"]`, campo **`environment`**, não `env`, `disabled`
+para desligar); forma legada `mcp.jev` reconhecida para leitura/migração. **As duas convivendo →
+`entrada_em_conflito`.** **Hierarquia de conflito (v24.1):** primeiro entre arquivos
+(`opencode.json` × `opencode.jsonc`), depois entre formas (`mcp` × `mcp.servers`); **uma única ação de
+migração por execução**, nunca as duas. Escrita transacional (A.2); idempotente. **Shape = fato
+externo** + fixtures das duas formas no F1.
 
 **Codex (F1, mínimo — v22/v23):** `~/.codex/config.toml`. O bloco `[mcp_servers.jev]` é emitido pela
 skill entre **marcadores de comentário fixos** (ex.: `# >>> xpz-mcp-integrations:jev` /
@@ -618,51 +732,80 @@ grafia**. Os marcadores precisam estar balanceados e únicos.
   resultante precisa ser **igual ao original** com exatamente uma diferença em `mcp_servers.jev`
   (acrescentado, trocado pela forma emitida ou ausente). Qualquer outra diferença → nada é gravado,
   `edicao_manual_necessaria`.
-- **Env repassado ao launcher:** `env_vars` filtra o herdado; o conjunto que o launcher precisa
-  (`LOCALAPPDATA`, `USERPROFILE`, `SystemRoot` etc., para achar cofre/`config.json` e para a DPAPI) é
-  **fato a verificar** com filho falso no F1 e, se preciso, declarado no bloco.
+- **Env repassado ao launcher (v24, medido):** `env_vars` filtra o herdado; o Codex entrega 20
+  variáveis ao filho, incluindo `LOCALAPPDATA`, `USERPROFILE`, `APPDATA`, `SystemRoot`, `TEMP`,
+  `COMSPEC`, `PATHEXT` e `PATH`, **sem** `JEV_API_KEY`. O conjunto que o launcher **define** continua
+  sendo a allowlist do descritor.
 - Fixture sanitizada do `config.toml` no F1. Biblioteca TOML com round-trip: **Anexo B.8**.
+
+**Claude Code (F2, primeiro item — v24.1):** ver **A.13**.
 
 ### A.9 Auditoria — estados, classes e precedência
 
-- **Agregado:** `overall = INTEGRATIONS_OK | INTEGRATIONS_GAPS`. **Tabela estado → `exitCode`/classe por
-  motor** (faixa reservada no F1). **`vendor_divergente`** na v1 = versão instalada
-  (`node_modules/@jkudish/jev-mcp/package.json`) ≠ pin do descritor.
-- **Estado por cliente:** `notConfigured` | `written` | `reloadPending` | `handshakeConfirmed` |
-  `e2eOptInConfirmed`; `overall` **não** promove `written` a sucesso operacional; a skill informa a
-  **ação de recarga/reinício** necessária.
+- **Agregado (v24.1):** `overall = INTEGRATIONS_OK | INTEGRATIONS_GAPS`. **`INTEGRATIONS_OK` é
+  estrutural**, não de credencial: exige, para cada cliente gerenciado, entrada reconhecida (`escrito`
+  ou melhor) **e** ausência de achado `blocking` (vendor, launcher, config, entrada, pré-requisito).
+  `boot_ok`/`endpoint_alcancavel`/`credencial_verificada` são **eixos separados** e não mudam o
+  agregado; credencial ausente ou não verificada é reportada como diagnóstico, não como GAPS.
+  **Tabela estado → `exitCode`/classe é entregável do F1** (faixa reservada); a v24.1 não fixa números.
+  **`vendor_divergente`** na v1 = versão instalada (`node_modules/@jkudish/jev-mcp/package.json`) ≠ pin
+  do descritor.
+- **Estado por cliente (v24.1):** **um valor só**, na ordem de precedência
+  `nao_configurado` → `escrito` → `recarga_pendente` → `boot_ok` → `endpoint_alcancavel` →
+  `credencial_verificada` → `e2e_opt_in_confirmado`. Achados offline (`ausente`, `entrada_*`,
+  `vendor_*`, `launcher_*`, `node_*`, `pwsh_ausente`, `config_*`, `credencial_ausente`) são
+  **diagnósticos**, não estados concorrentes; um cliente tem um estado e zero ou mais achados.
+- **Verificação de credencial (v24.1):** `boot_ok` só prova que o servidor sobe — sai `0` com chave
+  inválida, URL inalcançável ou modelo inexistente (medido). `endpoint_alcancavel` é diagnóstico e não
+  implica credencial. Só `credencial_verificada`, por chamada autenticada opt-in, promove saúde.
+  **Critério de `answers` válido:** resposta `200` com objeto `answers` contendo a chave da pergunta de
+  teste e valor `noul` numérico em `[0,1]` (ou `choice` com rótulo válido); qualquer outra forma não
+  promove. Request canônico: preset do `config.json`, uma pergunta `noul`, `state` mínimo; sem chave e
+  sem corpo em log. Exige autorização explícita por execução.
 - **Offline (v1):** `OK`; `ausente`; `entrada_quebrada`/`entrada_divergente`/`entrada_em_conflito`;
   `edicao_manual_necessaria`; `vendor_ausente`/`vendor_divergente`; `launcher_ausente`/
   `launcher_divergente`; `node_ausente`/`node_incompativel`/`node_path_nao_resolve`; `pwsh_ausente`;
   `config_ausente`/`config_invalido`; `python_indisponivel` (**warn**, só afeta o Codex);
   `credencial_ausente`; `endpoint_nao_confirmado` (**warn** + confirmação, host fora do preset);
   `acl_nao_aplicavel` (**warn** na auditoria; **blocking** nos mutadores de blob).
-- **Online opt-in** (`-CheckUpdates`): `atualizacao_disponivel` — informa, nunca auto-atualiza.
-  Canonicalização de path antes de `entrada_divergente`.
+- **Adiado ao F2:** `credencial_divergente` (cofre × export) — B.9.
+- **Online opt-in:** `-CheckUpdates` (F2) informa atualização, nunca auto-atualiza; `-CheckCredential`
+  (v1) segue o critério acima. Canonicalização de path antes de `entrada_divergente`.
 
 ### A.10 Self-tests — inventário executável
 
 **Offline (F1 = v1):** detecção (rejeitar stub); **JSONC** — fixtures do A.3 com validação pós-edição
 (falha → `edicao_manual_necessaria`, arquivo intacto), incluindo inserir/substituir/remover com a
-comparação de objetos; **Codex** — cada linha da tabela do A.8 (acrescentar, idempotência, substituir
-bloco emitido antes, divergente, migração da entrada manual, marcadores desbalanceados, remover só
-bloco reconhecido), **cada grafia equivalente** de `mcp_servers.jev` (aspas simples, chave
-pontilhada, tabela inline, `jev.*` dentro de `[mcp_servers]`, cabeçalho com espaços) detectada sem
-escrita, **tabela alheia entre os marcadores** → conflito sem remover, e Python ausente →
-`edicao_manual_necessaria`; **manifesto de instalação** (hash do bloco emitido gravado e reconhecido);
-idempotência; **escrita transacional** (create×replace, corrida → recusa, arquivo especial → recusa,
-temporário órfão); backup+restore do config; schema do descritor e do `config.json`; **round-trip
-DPAPI**; **re-emissão de launcher por versão**; **launcher** com filho falso (exit code = do filho,
-zero bytes do launcher em stdout, ambiente limpo = só a allowlist, negativos pré-filho);
-**encerramento no fim do stdin** com o servidor real; **revisão estática do `dist` + boot sem chave**
-(gate do F1).
+comparação de objetos e **as duas formas coexistindo**; **Codex** — cada linha da tabela do A.8
+(acrescentar, idempotência, substituir bloco emitido antes, divergente, migração da entrada manual,
+marcadores desbalanceados, remover só bloco reconhecido), **cada grafia equivalente** de
+`mcp_servers.jev` (aspas simples, chave pontilhada, tabela inline, `jev.*` dentro de `[mcp_servers]`,
+cabeçalho com espaços) detectada sem escrita, **tabela alheia entre os marcadores** → conflito sem
+remover, e Python ausente → `edicao_manual_necessaria`; **fixture sanitizada do `opencode auth
+export`** (uma credencial, várias, duplicadas, `[]`); **manifesto de instalação** (hash do bloco
+emitido gravado e reconhecido); idempotência; **escrita transacional** (create×replace, corrida →
+recusa, arquivo especial → recusa, temporário órfão); backup+restore do config; schema do descritor e
+do `config.json`; **round-trip DPAPI**; **re-emissão de launcher por versão**; **launcher** com filho
+falso (exit code = do filho, zero bytes do launcher em stdout, ambiente limpo = só a allowlist,
+negativos pré-filho); **encerramento no fim do stdin** com o servidor real; **revisão estática do
+`dist` + boot sem chave** (gate do F1, que **não** valida credencial).
 
-**Endurecimentos adiados** (Job Object, manifesto de árvore, TOML, contenção de rede): self-tests
-descritos no **Anexo B**, só quando o item voltar.
+**Online opt-in (fora do gate e fora do offline):** `-CheckCredential` faz **uma** chamada autenticada
+ao endpoint do preset, com o modelo do `config.json`, e promove `credencial_verificada` só se a
+resposta for `200` com objeto `answers` contendo a chave da pergunta de teste e valor `noul` numérico
+em `[0,1]` (ou `choice` com rótulo válido); `401`/`403`/timeout/`answers` ausente **não** promovem.
+Request canônico, modelo e forma de log (sem chave e sem corpo) ficam no A.9. Exige autorização
+explícita do usuário a cada execução.
+
+**F2 — Claude Code:** CLI `add-json`/`remove`, escopo de projeto recusado, `get` como auditoria,
+protocolo de concorrência repetível e fixture do `~/.claude.json`. Sem fallback de edição direta.
+
+**Endurecimentos adiados** (Job Object, manifesto de árvore, TOML, contenção de rede, divergência de
+credencial): self-tests descritos no **Anexo B**, só quando o item voltar.
 
 **Não são rodados pelo orquestrador de pré-push**; a skill declara cada comando e registra em `09`.
 **E2E** com `jev_classify` = validação manual opt-in; um E2E aprovado **promove** o cliente de
-`handshakeConfirmed` para `e2eOptInConfirmed`.
+`credencial_verificada` para `e2e_opt_in_confirmado`.
 
 ### A.11 Paridade documental mecânica
 
@@ -670,11 +813,14 @@ descritos no **Anexo B**, só quando o item voltar.
   trilíngue** (seção do cofre nas três).
 - `09` com `Dono:` + `Validação:`/`Tokens:`/`Exit:`; `02` com contrato + vocabulário (declarar a
   **extensão** do vocabulário de evidência para artefatos externos); `08` nomear seções ou retirar.
-- **`AGENTS.md`/`README.md`:** reconciliar listas **adicionando só o que faltar** (`AGENTS.md:11`
-  já tem `xpz-codex-apply-patch-alternative`; conferir `:49`).
-- `README.md:107` × `AGENTS.md:92-96` para a rastreabilidade privada das fixtures.
-- **`999`:** `:3283` com pin por commit/sha512 e preset **parcial**; `:3277` **alinhado**. **Consultar o
-  `998`** (`998:919-923`).
+- **`AGENTS.md`/`README.md`:** reconciliar listas **adicionando só o que faltar**; conferir a
+  enumeração de skills do `AGENTS.md` sem presumir posição (`xpz-codex-apply-patch-alternative` já
+  aparece; `xpz-mcp-integrations` ainda não).
+- Rastreabilidade privada das fixtures: reconciliação já descrita no corpo (*Fronteira com
+  `xpz-skills-setup`*), sem âncora por número de linha.
+- **`999`:** entrada **«Skill `xpz-mcp-integrations`»** com pin por commit/sha512 e preset **parcial**;
+  estado **alinhado**. **Consultar o `998`** (lição de exit-code, entrada sobre padrão de string
+  matching sem ExitCode). Âncoras por nome de seção, não por linha (v24).
 - Conformidade: `#requires -Version 7.4`; UTF-8 sem BOM (preservando BOM preexistente do arquivo do
   usuário); molde `.example.ps1`; `Test-XpzParameterNamingContract.ps1` **não** é gate geral; não
   enumerar ≥2 gates numa linha.
@@ -687,13 +833,31 @@ Não confundir com o `manifest.sha256` de árvore (adiado, **Anexo B.4.2**).
 - **Local:** `%LOCALAPPDATA%\xpz-mcp-integrations\install-manifest.json`; ACL só-dono; UTF-8 sem BOM;
   `schemaVersion`; escrita atômica (A.2). **Nunca** contém a chave.
 - **Campos:** versão instalada do pacote; caminho absoluto do launcher de cada versão instalada e sua
-  sentinela; por cliente (`opencode`, `codex`): caminho do arquivo de config, **hashes de todas as
-  formas que a skill já emitiu** para a entrada (atual + anteriores) e data da última escrita.
+  sentinela; por cliente (`opencode`, `codex`): caminho do arquivo de config, **hash da forma vigente e
+  as anteriores emitidas por esta instalação** (na v1, uma só; cresce a cada atualização) e data da
+  última escrita.
 - **Uso:** reconhecer uma entrada como «da skill» (substituir/remover só se byte-idêntica a um hash
   registrado — A.3, A.8); saber se ainda há referência a um launcher antes de removê-lo.
 - **Não é autoridade sobre a config viva:** a auditoria sempre lê o arquivo real do cliente. Manifesto
   ausente ou corrompido → nenhuma entrada é reconhecida (tudo vira conflito ou migração com
   aprovação), nunca remoção cega.
+
+### A.13 Claude Code — adaptador (F2; desenho da v24.1)
+
+- **Arquivo:** `~/.claude.json`, raiz `mcpServers` (escopo user). Tem ~143 KB de estado e é reescrito
+  pelo cliente; por isso o caminho primário é o CLI, não a edição direta.
+- **Escrita:** `claude mcp add-json -s user jev <json>`; remoção: `claude mcp remove -s user jev`.
+  **Sem fallback de edição direta**: se o CLI falhar ou não existir, a skill emite
+  `edicao_manual_necessaria` com o JSON pronto e não toca no arquivo.
+- **Escopo:** `user` é o único gerenciado; `project` exige aprovação humana (medido: `⏸ Pending
+  approval`) e fica fora.
+- **Auditoria:** `claude mcp get jev` (health-check de um servidor). **Nunca** `claude mcp list`, que
+  sobe todos os servidores configurados.
+- **Env medido:** o filho recebe ~83 variáveis, incluindo `LOCALAPPDATA`, e **não** recebe `JEV_API_KEY`.
+- **Gate de concorrência (F2):** protocolo repetível — N ciclos de `add-json`/`remove` com o cliente
+  aberto, diff de `projects` e demais chaves alheias preservadas, backup e restauração por hash;
+  critério passa/falha declarado antes da execução.
+- **Fixture sanitizada** do `~/.claude.json` no F2, sem dado pessoal.
 
 ---
 
@@ -848,21 +1012,81 @@ herdado** → launcher define **conjunto mínimo explícito provado com filho fa
 `SystemDrive`, `TEMP`/`TMP`, `PATHEXT`, `COMSPEC`, `PATH` mínimo). Fixture sanitizada do `config.toml` no
 F2.
 
+### B.9 Divergência cofre × export (origem: v24)
+
+Adiado do F1. Comparar a chave do cofre com a credencial de `opencode auth export` exigiria
+**descriptografar o blob em modo de auditoria** e mapear campo a campo (`integrationID=commandcode`,
+`value.type=key`, `active != false`) contra `JEV_API_KEY`; `[]` é **ausência**, não divergência. Quando
+voltar: estado `credencial_divergente` como **warn** (nunca `blocking`), comparação só em memória, sem
+log. O export **não traz data**, então o B.9 detecta **diferença**, não antiguidade; inferir rotação
+exige fonte com timestamp.
+
 ---
 
-## Apêndice — tabela de fornecedor (HIPÓTESE, não spec)
+## Apêndice — tabela de fornecedor (HIPÓTESE de wire; host medido na v24)
 
 `typesafe` (`TYPESAFE_API_KEY`, transport do SDK, `jev-latest`); `openrouter` (`OPENROUTER_API_KEY`,
 `…/alpha/decisions`, headers, `jev-latest`→`jev-1.13`); `cloudflare` (`CLOUDFLARE_API_TOKEN` +
 `CLOUDFLARE_ACCOUNT_ID`, `/accounts/<id>/ai/run`); `vercel` (`AI_GATEWAY_API_KEY`, transport do SDK);
 `compatible` (`JEV_API_KEY`, POST na URL completa, `{model,state,questions}` → `{answers,usage?}`;
-**parcial**).
+**parcial**). **Medido em 2026-11-09:** o host do preset Command Code
+(`https://api.commandcode.ai/provider/v1/systemone`) respondeu `200` a uma chamada autenticada, com
+`typesafe/jev` e `jev-latest` normalizando para `typesafe/jev`; o que segue hipótese é o **wire** do
+modo `compatible`, não o host.
 
 ## Referências
 
 - `https://github.com/jkudish/jev-mcp` (MIT); `https://docs.typesafe.ai`.
 - `xpz-skills-setup/SKILL.md`; `15-revisao-por-pares.md`, `xpz-llm-delegate/SKILL.md` — `commandcode/*`
   como **catálogo de vozes** (não confundir com o endpoint do Jev).
+
+## CHANGELOG da v24.1 — segunda consulta (2026-11-09)
+
+Segunda rodada com as mesmas três famílias, agora sobre a v24. Vereditos: openai/`gpt-6-luna` — «não
+aprovo ainda»; anthropic/`claude-haiku-5-5` — «não aprova como está»; meta/`muse-spark-1.3-contributor`
+— «não aprova». Convergências aplicadas:
+
+- **Claude Code sai da v1** e vira o primeiro item do F2 (3/3). A.13 mantido como desenho; sem fallback
+  de edição direta; gate de concorrência com N ciclos e critério declarado.
+- **Verificação de credencial** sai do rol offline e vira `-CheckCredential` online opt-in, com critério
+  objetivo de `answers` e autorização por execução (A.9/A.10).
+- **`INTEGRATIONS_OK` definido**: estrutural (entrada reconhecida + nenhum achado `blocking`); credencial
+  é eixo separado. Tabela estado→`exitCode` fica como entregável do F1.
+- **Estado por cliente** com valor único; achados offline são **diagnósticos** (regra de composição).
+- **`disabled`**: contradição corrigida — reconhecido na leitura, não é estado da skill.
+- **Env do launcher** inclui `LOCALAPPDATA`/`USERPROFILE`/`APPDATA` (o launcher limpa e precisa
+  redefinir).
+- **Import:** fixture do `auth export`, regra de múltiplas entradas (`credencial_ambigua`), paridade de
+  seleção no `auth.json` e aprovação explícita.
+- **A.8:** hierarquia de conflito (arquivo × forma) e uma única migração por execução.
+- **A.12:** hash vigente + anteriores emitidas por esta instalação (na v1, uma só).
+- **B.9:** detecta diferença, não antiguidade (o export não traz data).
+
+**Pendente:** o painel formal de liberação.
+
+## CHANGELOG da v24 — consulta a pares e fatos medidos (2026-11-09)
+
+Insumo: medições na máquina de referência (OpenCode 2.2.6, `jev-mcp` 0.13.0, Codex e Claude Code) e
+consulta a três famílias via `xpz-llm-delegate` (openai/`gpt-6-luna` high, anthropic/`claude-haiku-5-5`,
+meta/`muse-spark-1.3-contributor`). **Consulta, não liberação**: o painel de liberação segue pendente.
+
+- **Escopo (revogado na v24.1):** v1 passou a OpenCode + Codex + Claude Code; Claude por último, com
+  gate de concorrência do `~/.claude.json` (A.13). Cursor volta ao F3.
+- **Credencial:** import único por `opencode auth export` (seleção por `integrationID`/tipo/ativo; `[]` =
+  ausente), `auth.json` só reserva; o launcher nunca lê nenhum dos dois em runtime.
+  `credencial_divergente` adiada ao F2 (B.9).
+- **Auditoria:** estados em snake_case; `boot_ok` ≠ saúde; `credencial_verificada` só por chamada
+  autenticada opt-in; `endpoint_alcancavel` separado. O gate «boot sem chave» não valida credencial.
+- **OpenCode:** escrita canônica em `mcp.servers.jev`; `mcp.jev` legado reconhecido; coexistência →
+  `entrada_em_conflito`; `disabled` canônico, `enabled:false` legado.
+- **Fornecedor:** preset fixa `baseUrl` e `model = typesafe/jev`; host medido, wire segue hipótese.
+- **Launcher:** molde versionado no repositório + cópia emitida com sentinela e hash.
+- **Evidência:** integrity sha512, 9 pacotes, 15,46 MB, licença MIT, Node/npm/Python/pwsh medidos, env do
+  Codex (20 vars) e do Claude (83 vars), EOF em 24 ms e órfão confirmado.
+- **Âncoras:** números de linha substituídos por nome de seção.
+- **Cortes aceitos na consulta:** divergência de credencial e resolução .NET; **mantidos na v24** os
+  três clientes e o histórico de hashes do A.12, contra a recomendação de dois revisores. A **v24.1**
+  reverteu o escopo de clientes (3/3 na segunda rodada).
 
 ## CHANGELOG da v23.1 — clarificações (2026-10-03)
 
