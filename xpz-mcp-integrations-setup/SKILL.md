@@ -216,6 +216,11 @@ Estados por cliente, **um valor so**, na ordem:
   primeiro codigo presente em `precedence` no `exit-codes.catalog.json`:
   `67 > 66 > 61 > 62 > 63 > 64 > 65 > 60`. `nextActions` segue a mesma ordem.
   `69` fica fora (falha interna do trap); `68` e warn-only.
+- **`nextActions` e menu:** a lista e de **acoes possiveis**, nao de uma
+  sequencia de execucao. O primeiro item casa com o exit code, mas pode
+  depender de outro: a migracao manual exige cofre
+  (`Set-McpCredential.ps1`) antes de
+  `Install-McpIntegration.ps1 -MigrateLegacy`.
 - **`boot_ok`:** so prova que o servidor sobe; o boot sai `0` ate com chave
   invalida. Use `-CheckBoot` (local, opt-in) para medir.
 - **`credencial_verificada`:** so por `-CheckCredential` (online opt-in, uma

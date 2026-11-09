@@ -38,12 +38,12 @@ Implementado em 2026-11-09 conforme o design v24.2 congelado por decisão humana
 - `Test-McpLauncherSelfTest.ps1` — 45 asserts (descritor, manifesto, transação, DPAPI, launcher, filho falso, negativos pré-filho), token `XPZ_MCP_LAUNCHER_SELFTEST_OK`.
 - `Test-McpCredentialSelfTest.ps1` — 19 asserts, token `XPZ_MCP_CREDENTIAL_SELFTEST_OK`.
 - `Test-McpExitCodesSelfTest.ps1` — 166 asserts, token `XPZ_MCP_EXIT_CODES_SELFTEST_OK`.
-- `Test-McpIntegrationsSelfTest.ps1` — 52 asserts sem o gate do dist e 53 com ele (inclui ponta-a-ponta instalar/auditar/reparar/remover com vendor falso, auditoria de entrada manual e guarda do dist), token `XPZ_MCP_INTEGRATIONS_SELFTEST_OK`.
+- `Test-McpIntegrationsSelfTest.ps1` — 53 asserts sem o gate do dist e 54 com ele (inclui ponta-a-ponta instalar/auditar/reparar/remover com vendor falso, auditoria de entrada manual e guarda do dist), token `XPZ_MCP_INTEGRATIONS_SELFTEST_OK`.
 - `Test-McpDistEvidenceSelfTest.ps1` — 24 asserts (gate do F1 com vendor real, revisão estática e boot sem chave), token `XPZ_MCP_DIST_EVIDENCE_SELFTEST_OK`.
 
 **Correção pós-pré-push (2026-11-09).** O exit 69, prometido no catálogo para os motores, passou a ser emitido pelos cinco motores por captura de erro no nível do script; o catálogo foi alinhado aos emissores reais de 60-65 e o self-test de exit codes passou a validar a matriz de emissores e a provar o 69 em cada motor.
 
-**Correção pós-revisão por pares (2026-11-09).** A reserva `auth.json` passou a cobrir OpenCode V2 (`.local\share`) e legado (`.config`), aceitando `type=key`/`type=api` e diagnosticando caminhos/provedores; a auditoria separa entrada manual migrável (`edicao_manual_necessaria`, `nextAction -MigrateLegacy`) de conflito; o exit code segue a `precedence` do catálogo e o `nextActions` a mesma ordem; o gate do `dist` recusa root com manifesto/config/vault/launcher e limpa o que criar; o `import -WhatIf` expõe `credentialSource` e `import`.
+**Correção pós-revisão por pares (2026-11-09).** A reserva `auth.json` passou a cobrir OpenCode V2 (`.local\share`) e legado (`.config`), aceitando `type=key`/`type=api` e diagnosticando caminhos/provedores; a auditoria separa entrada manual migrável (`edicao_manual_necessaria`, `nextAction -MigrateLegacy`) de conflito; o exit code segue a `precedence` do catálogo e o `nextActions` a mesma ordem, agora rotulado como `possible-actions` (menu, não sequência); o gate do `dist` recusa root com manifesto/config/vault/launcher e limpa o que criar; o `import -WhatIf` expõe `credentialSource` e `import`; o design marca `-CheckUpdates` como F2.
 - `Test-XpzParameterNamingContract.ps1` — `XPZ_PARAMETER_NAMING_CONTRACT_OK`.
 - Boot real medido: `initialize` respondido por `jev-mcp 0.13.0`, exit 0; EOF encerra; stdin aberto deixa o processo vivo (órfão é risco aceito sem Job Object).
 

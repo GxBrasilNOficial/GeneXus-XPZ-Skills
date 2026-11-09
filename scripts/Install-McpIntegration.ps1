@@ -95,6 +95,8 @@ function New-McpMutationResult {
         config         = $Config
         credential     = $Credential
         nextActions    = @($NextActions)
+        nextActionsMode = 'possible-actions'
+        nextActionsNote = 'Lista de acoes possiveis ordenada pela precedencia do exit code; nao e uma sequencia de execucao. A migracao manual exige cofre (Set-McpCredential) antes do install.'
     }
 }
 

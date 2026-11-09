@@ -181,6 +181,7 @@ try {
     Assert-True ($null -ne $legacyAudit -and [string]$legacyAudit.clients.opencode.form -eq 'legacy') '(legacy) form legacy'
     Assert-True ($null -ne $legacyAudit -and @($legacyAudit.findings | Where-Object { $_.code -eq 'edicao_manual_necessaria' }).Count -eq 1) '(legacy) achado edicao_manual_necessaria'
     Assert-True ($null -ne $legacyAudit -and [string](@($legacyAudit.nextActions)[0]) -like '*opencode*MigrateLegacy*') '(legacy) nextAction MigrateLegacy'
+    Assert-True ($null -ne $legacyAudit -and [string]$legacyAudit.nextActionsMode -eq 'possible-actions') '(legacy) nextActions como menu'
 
     # 8. Guarda do gate do dist: root com manifesto nao pode ganhar cofre falso.
     $guardRoot = Join-Path $tempRoot 'dist-guard'

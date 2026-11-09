@@ -173,7 +173,7 @@ da v1: **Anexo A.3**.
 - **`npm ci --ignore-scripts`** (o pacote declara `prepare`; usamos o `dist` pré-compilado) em
   `%LOCALAPPDATA%\xpz-mcp-integrations\vendor-<versao>\`.
 - **Atualizar** = novo `package.json`/lockfile no repositório + reinstalar + re-emitir config.
-  **Rollback** = versão anterior do repositório + backup do config. `-CheckUpdates` **apenas informa**.
+  **Rollback** = versão anterior do repositório + backup do config. `-CheckUpdates` (F2) **apenas informa**.
 - **Sem indireção mutável**: launcher versionado por path absoluto; **sem junction/symlink** (hazard de
   `historico/...20260622-20260922.md:48`).
 - **Evidência sanitizada do `dist`, commitada com proveniência, é pré-condição de qualquer motor** —

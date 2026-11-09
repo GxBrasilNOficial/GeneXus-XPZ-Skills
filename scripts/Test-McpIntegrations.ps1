@@ -442,9 +442,11 @@ $result = [ordered]@{
     credentialProbe = if ($null -ne $credentialProbe) {
         [ordered]@{ endpointReachable = $credentialProbe.endpointReachable; credentialVerified = $credentialProbe.credentialVerified; status = $credentialProbe.status; reason = $credentialProbe.reason }
     } else { $null }
-    clients        = $clients
-    findings       = @($findings)
-    nextActions    = @($orderedNextActions)
+    clients         = $clients
+    findings        = @($findings)
+    nextActions     = @($orderedNextActions)
+    nextActionsMode = 'possible-actions'
+    nextActionsNote = 'Lista de acoes possiveis ordenada pela precedencia do exit code; nao e uma sequencia de execucao. A migracao manual exige cofre (Set-McpCredential) antes do install.'
 }
 
 $env:USERPROFILE = $originalProfile
