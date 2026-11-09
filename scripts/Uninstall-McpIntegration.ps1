@@ -24,6 +24,22 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+trap {
+    $mcpInternalMessage = [string]$_.Exception.Message
+    if (Get-Command Write-McpInternalFailure -ErrorAction SilentlyContinue) {
+        Write-McpInternalFailure -Message $mcpInternalMessage -Kind 'mutation' -ActionName 'uninstall'
+    }
+    [pscustomobject][ordered]@{
+        schemaVersion  = 1
+        kind           = 'xpz-mcp-integrations-setup-internal-error'
+        generatedAtUtc = [DateTime]::UtcNow.ToString('o')
+        overall        = 'INTEGRATIONS_GAPS'
+        exitCode       = 69
+        findings       = @([ordered]@{ code = 'erro_interno'; class = 'blocking'; message = $mcpInternalMessage })
+    } | ConvertTo-Json -Depth 10
+    exit 69
+}
+
 $scriptDir = $PSScriptRoot
 . (Join-Path $scriptDir 'McpIntegrationSupport.ps1')
 . (Join-Path $scriptDir 'McpVaultSupport.ps1')

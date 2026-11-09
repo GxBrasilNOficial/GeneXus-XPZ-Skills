@@ -23,37 +23,37 @@
       "exit": 60,
       "category": "integracao",
       "summary": "INTEGRATIONS_GAPS sem codigo especifico (achado blocking nao mapeado).",
-      "engines": ["Test-McpIntegrations.ps1"]
+      "engines": ["Test-McpIntegrations.ps1", "Install-McpIntegration.ps1"]
     },
     {
       "exit": 61,
       "category": "credencial",
       "summary": "credencial_ausente/credencial_ilegivel: cofre DPAPI ausente, ilegivel ou importacao sem credencial utilizavel.",
-      "engines": ["Test-McpIntegrations.ps1", "Set-McpCredential.ps1", "launcher"]
+      "engines": ["Test-McpIntegrations.ps1", "Install-McpIntegration.ps1", "Set-McpCredential.ps1", "launcher"]
     },
     {
       "exit": 62,
       "category": "configuracao",
       "summary": "config_ausente/config_invalido/endpoint_nao_confirmado/endpoint_invalido: config.json ausente/invalido, host fora do preset sem confirmacao ou URL invalida.",
-      "engines": ["Test-McpIntegrations.ps1", "launcher"]
+      "engines": ["Test-McpIntegrations.ps1", "Install-McpIntegration.ps1", "launcher"]
     },
     {
       "exit": 63,
       "category": "pre-requisito",
       "summary": "node_ausente/node_incompativel/node_path_nao_resolve/node_npm_ausente/pwsh_ausente: runtime insuficiente.",
-      "engines": ["Test-McpIntegrations.ps1", "Install-McpIntegration.ps1", "launcher"]
+      "engines": ["Test-McpIntegrations.ps1", "Install-McpIntegration.ps1", "Invoke-McpVendor.ps1", "launcher"]
     },
     {
       "exit": 64,
       "category": "vendor",
       "summary": "vendor_ausente/vendor_divergente/vendor_falhou ou npm ci falhou: arvore vendorizada ausente, divergente ou nao instalavel.",
-      "engines": ["Invoke-McpVendor.ps1", "Install-McpIntegration.ps1", "launcher"]
+      "engines": ["Test-McpIntegrations.ps1", "Invoke-McpVendor.ps1", "Install-McpIntegration.ps1", "launcher"]
     },
     {
       "exit": 65,
       "category": "launcher",
       "summary": "launcher_ausente/launcher_divergente: copia emitida ausente, sem sentinela ou com hash divergente do manifesto.",
-      "engines": ["Test-McpIntegrations.ps1", "Install-McpIntegration.ps1"]
+      "engines": ["Test-McpIntegrations.ps1"]
     },
     {
       "exit": 66,

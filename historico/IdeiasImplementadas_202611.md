@@ -37,9 +37,11 @@ Implementado em 2026-11-09 conforme o design v24.2 congelado por decisão humana
 - `Test-McpCodexAdapterSelfTest.ps1` — 41 asserts, token `XPZ_MCP_CODEX_ADAPTER_SELFTEST_OK`.
 - `Test-McpLauncherSelfTest.ps1` — 45 asserts (descritor, manifesto, transação, DPAPI, launcher, filho falso, negativos pré-filho), token `XPZ_MCP_LAUNCHER_SELFTEST_OK`.
 - `Test-McpCredentialSelfTest.ps1` — 7 asserts, token `XPZ_MCP_CREDENTIAL_SELFTEST_OK`.
-- `Test-McpExitCodesSelfTest.ps1` — 24 asserts, token `XPZ_MCP_EXIT_CODES_SELFTEST_OK`.
+- `Test-McpExitCodesSelfTest.ps1` — 148 asserts, token `XPZ_MCP_EXIT_CODES_SELFTEST_OK`.
 - `Test-McpIntegrationsSelfTest.ps1` — 45 asserts sem o gate do dist e 46 com ele (inclui ponta-a-ponta instalar/auditar/reparar/remover com vendor falso), token `XPZ_MCP_INTEGRATIONS_SELFTEST_OK`.
 - `Test-McpDistEvidenceSelfTest.ps1` — 24 asserts (gate do F1 com vendor real, revisão estática e boot sem chave), token `XPZ_MCP_DIST_EVIDENCE_SELFTEST_OK`.
+
+**Correção pós-pré-push (2026-11-09).** O exit 69, prometido no catálogo para os motores, passou a ser emitido pelos cinco motores por captura de erro no nível do script; o catálogo foi alinhado aos emissores reais de 60-65 e o self-test de exit codes passou a validar a matriz de emissores e a provar o 69 em cada motor.
 - `Test-XpzParameterNamingContract.ps1` — `XPZ_PARAMETER_NAMING_CONTRACT_OK`.
 - Boot real medido: `initialize` respondido por `jev-mcp 0.13.0`, exit 0; EOF encerra; stdin aberto deixa o processo vivo (órfão é risco aceito sem Job Object).
 

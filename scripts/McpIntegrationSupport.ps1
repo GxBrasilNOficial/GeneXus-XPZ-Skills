@@ -1153,6 +1153,60 @@ function New-McpFinding {
     }
 }
 
+function Write-McpInternalFailure {
+    param(
+        [Parameter(Mandatory = $true)][AllowEmptyString()][string]$Message,
+        [ValidateSet('audit', 'mutation', 'vendor', 'credential')][string]$Kind = 'mutation',
+        [string]$ActionName = 'internal-error'
+    )
+    $finding = [ordered]@{ code = 'erro_interno'; class = 'blocking'; message = $Message }
+    $result = [ordered]@{
+        schemaVersion  = 1
+        kind           = "xpz-mcp-integrations-setup-$Kind"
+        generatedAtUtc = [DateTime]::UtcNow.ToString('o')
+        exitCode       = 69
+        findings       = @($finding)
+    }
+    switch ($Kind) {
+        'audit' {
+            $result.overall = 'INTEGRATIONS_GAPS'
+            $result.nextActions = @('Reporte o erro interno; nenhum diagnostico completo foi produzido.')
+        }
+        'mutation' {
+            $result.action = $ActionName
+            $result.overall = 'INTEGRATIONS_GAPS'
+            $result.changed = $false
+            $result.planned = $false
+            $result.clients = [ordered]@{}
+            $result.vendor = $null
+            $result.launcher = $null
+            $result.config = $null
+            $result.credential = $null
+            $result.nextActions = @('Reporte o erro interno; nenhuma alteracao foi confirmada.')
+        }
+        'vendor' {
+            $result.status = 'internal_error'
+            $result.version = $null
+            $result.vendorDir = $null
+            $result.entryPath = $null
+            $result.integrity = $null
+            $result.logPath = $null
+            $result.npmExitCode = $null
+            $result.blockingReasons = @($Message)
+        }
+        'credential' {
+            $result.action = $ActionName
+            $result.status = 'failed'
+            $result.written = $false
+            $result.planned = $false
+            $result.credential = [ordered]@{ exists = $false; source = 'vault-dpapi' }
+            $result.nextActions = @('Reporte o erro interno; a credencial nao foi alterada.')
+        }
+    }
+    [pscustomobject]$result | ConvertTo-Json -Depth 20
+    exit 69
+}
+
 function Get-McpExitCodeForFindings {
     param([object[]]$Findings = @())
     $blocking = @($Findings | Where-Object { $_.class -eq 'blocking' })

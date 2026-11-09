@@ -226,6 +226,13 @@ Faixa reservada de exit codes: **60-69** (tabela completa em
 | 68 | Python 3.11+ indisponivel (warn; Codex manual) |
 | 69 | falha interna do launcher/motor |
 
+Os cinco motores (`Test-McpIntegrations`, `Install-McpIntegration`,
+`Uninstall-McpIntegration`, `Invoke-McpVendor` e `Set-McpCredential`) capturam
+falha interna no nivel do script e emitem JSON com `exitCode=69` e achado
+`erro_interno`; o launcher tambem usa 69 para falha interna. Se a falha ocorrer
+antes do carregamento da biblioteca de suporte, o JSON de contingencia usa
+`kind=xpz-mcp-integrations-setup-internal-error`.
+
 ## SEGURANCA E LIMITES
 
 - **Cofre:** DPAPI `CurrentUser`, sem entropia adicional; ACL so-dono no diretorio
