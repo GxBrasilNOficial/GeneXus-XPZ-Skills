@@ -1,4 +1,4 @@
-# xpz-mcp-integrations — design da skill (v24.1)
+# xpz-mcp-integrations — design da skill (v24.2)
 
 ## Papel do documento
 
@@ -19,7 +19,8 @@ redução de escopo de **2026-10-03** e a evidência empírica coletada.
   OpenCode, desenho do Claude Code e dois cortes (divergência cofre × export e resolução por API .NET) ·
   **v24.1** aplica a **segunda consulta** (3/3 pediram Claude fora da v1): v1 volta a **OpenCode + Codex**,
   Claude vira o primeiro item do F2, verificação de credencial vira online opt-in e ficam definidos
-  `INTEGRATIONS_OK`, composição de estados e critério de `answers`.
+  `INTEGRATIONS_OK`, composição de estados e critério de `answers` · **v24.2** corrige os resíduos de
+  texto da **terceira consulta** (3/3 aprovaram tecnicamente; gate formal segue pendente).
 
 **Estrutura:** o **corpo** carrega decisão, escopo, fronteira, contrato mínimo, fases e riscos. O
 **Anexo A** carrega o detalhe técnico da **v1**, a provar por self-test no F1. O **Anexo B** preserva
@@ -34,9 +35,21 @@ atualizar/remover.
 **Autor e diversidade:** `authorFamily=deepseek`. Revisores de famílias distintas da do autor; as
 rodadas opencode (meta+deepseek) são **segundas opiniões**. **Liberação** exige **≥2 Criadores
 distintos do autor** + **≥1 voz fora do harness dominante** (endurecimento desta frente). Alternativa
-auditada: humano **congela** (`resubmissionDeclinedByHuman` + quem + motivo + `RoundId`). Até lá,
-`vNextState=pendingResubmission`; nada é implementado. **Consulta de 2026-11-09** (openai, anthropic e
-meta; **não** é liberação): ver *Evidência coletada* — o gate de liberação continua aberto.
+auditada: humano **congela** (`resubmissionDeclinedByHuman` + quem + motivo + `RoundId`) — foi o que
+ocorreu em 2026-11-09 (ver *Liberação*). As consultas de 2026-11-09 (openai, anthropic e meta) são
+**insumo**, não liberação: ver *Evidência coletada*.
+
+## Liberação — congelamento humano (2026-11-09)
+
+O gate de liberação foi fechado pela **alternativa auditada**, não pelo painel:
+
+- **Estado:** `resubmissionDeclinedByHuman`.
+- **Quem:** Antonio José Rodrigues Silva (decisão humana desta sessão).
+- **Motivo:** plano considerado suficiente após três consultas a três famílias, com 3/3 sem bloqueador
+  técnico; a execução fica para sessão posterior.
+- **`RoundId`:** `mcp-int-v24-freeze-20261109`.
+- **Efeito:** o **F1 está autorizado a iniciar**; o painel formal não é mais pré-requisito. Nenhuma
+  linha de código da skill foi escrita até aqui.
 
 ## Problema
 
@@ -341,10 +354,10 @@ estado→`exitCode` é **entregável do F1** (faixa reservada), não fixada nest
 ## Testes — nível de decisão
 
 - **Self-tests offline (v1)** cobrem detecção, edição JSONC com validação pós-edição (nas duas formas),
-  bloco com marcadores do Codex, adaptador do Claude Code (CLI, fallback, concorrência), idempotência,
-  escrita transacional, backup/restore, schema do descritor, round-trip DPAPI, re-emissão de launcher
-  por versão, launcher com filho falso, encerramento por fim do stdin e **verificação autenticada de
-  credencial**. Inventário executável: **Anexo A.10**.
+  bloco com marcadores do Codex, idempotência, escrita transacional, backup/restore, schema do
+  descritor, round-trip DPAPI, re-emissão de launcher por versão, launcher com filho falso e
+  encerramento por fim do stdin. Inventário executável: **Anexo A.10**. Claude Code e
+  `-CheckCredential` **não** entram nessa lista (F2 e online opt-in, respectivamente).
 - **O gate do `dist` no F1 é revisão estática do `dist` + boot sem chave.** Ele **não** valida
   credencial nem endpoint (v24); o teste de egresso de rede contido **não** é gate (ver **Adiado**).
 - **Não são rodados pelo orquestrador de pré-push**; a skill declara cada comando e registra em `09`.
@@ -373,8 +386,9 @@ estado→`exitCode` é **entregável do F1** (faixa reservada), não fixada nest
 
 ## Fases
 
-- **F0** — design + revisão (F0-1..F0-18; v22 reduzida; **duas consultas a três famílias em
-  2026-11-09**; falta o **painel de liberação**).
+- **F0** — design + revisão (F0-1..F0-18; v22 reduzida; **três consultas a três famílias em
+  2026-11-09**). **Fechado em 2026-11-09 por congelamento humano** (`resubmissionDeclinedByHuman`;
+  ver *Liberação*).
 - **F1 = v1 completa (v22; escopo de clientes revisto na v24.1)** — **reservar a faixa de `exitCode`** +
   skill + descritor Jev (só `compatible`) + launcher `ProcessStartInfo` + cofre/DPAPI + vendorizador
   (lockfile + `npm ci --ignore-scripts`) + **evidência sanitizada do `dist` com proveniência** +
@@ -395,8 +409,8 @@ estado→`exitCode` é **entregável do F1** (faixa reservada), não fixada nest
   evidência commitada, bloqueia.
 - **Fatos externos medidos em 2026-11-09 (não re-verificar sem motivo):** sha512 do tarball, árvore de
   9 pacotes, `engines.node`, boot, saída no fim do stdin, `mcp.servers`/`mcp.jev` aceitos, env do Codex
-  e do Claude Code. **Seguem a verificar no F1:** wire do modo `compatible`, deslocamento de marcador
-  pelo editor do Codex e **concorrência do `~/.claude.json` com o cliente aberto**.
+  e do Claude Code. **Seguem a verificar no F1:** wire do modo `compatible` e deslocamento de marcador
+  pelo editor do Codex. A concorrência do `~/.claude.json` pertence ao **F2** (item abaixo).
 - **Concorrência do Claude Code (F2):** `~/.claude.json` é reescrito pelo cliente em execução. O lock
   do A.2 só serializa esta skill; a reintrodução exige protocolo de concorrência repetível (N ciclos
   com o cliente aberto, diff de chaves alheias preservadas, critério passa/falha). Por isso o Claude
@@ -505,11 +519,15 @@ estado→`exitCode` é **entregável do F1** (faixa reservada), não fixada nest
     ainda» (wire, `INTEGRATIONS_OK`, Claude); anthropic «não aprova como está» (contradição de
     `disabled`, verificação offline, import sem fixture/aprovação); meta «não aprova» (env, estados,
     Claude). Resultado: **v24.1**.
+  - **Rodada 3 — v24.1, `roundId=mcp-int-v241-consulta3-20261109`**, 3/3 `responded`: openai «aprova
+    com ressalva» (gate formal); anthropic «aprova com ressalvas» (três resíduos de texto); meta
+    «aprova». Sem bloqueador técnico. Resultado: **v24.2**.
   - **Decisões do orquestrador na v24.1:** aceitos Claude no F2 (3/3), verificação online separada,
     `INTEGRATIONS_OK` estrutural, composição de estados, correção de `disabled` e do env, fixture e
     aprovação no import, hierarquia de conflito e A.12 com hash vigente + histórico crescente.
     **Mantidos:** OpenCode + Codex na v1.
-  - **Sem closeout e sem recibo de liberação.**
+  - **Sem closeout e sem recibo de liberação.** A liberação veio por **congelamento humano** em
+    2026-11-09 (ver *Liberação*).
 
 ---
 
@@ -698,9 +716,9 @@ só-dono, UTF-8 sem BOM, **schema versionado** (reduzido na v22):
 
 **OpenCode — algoritmo de descoberta:** raiz gerenciada na v1 = **global** `~/.config/opencode/`;
 candidatos **`opencode.json` e `opencode.jsonc`** nessa pasta; **projeto-local (`.opencode/`) fora do
-escopo da v1** (declarado). **Precedência:** resolver `opencode.json` → `opencode.jsonc` (espelha o motor
-atual); **sem precedência comprovada** se ambos existirem → `entrada_em_conflito` (bloquear sem
-escrever). **Fixtures** para cada caso. Edição em ambos os formatos pelo mecanismo do **A.3**
+escopo da v1** (declarado). **Precedência:** se **um só** dos arquivos existir, ele é o alvo; se
+**ambos** existirem, **não há precedência comprovada** → `entrada_em_conflito` (bloquear sem escrever).
+**Fixtures** para cada caso. Edição em ambos os formatos pelo mecanismo do **A.3**
 (inserção textual + validação pós-edição). Entrada canônica **`mcp.servers.jev`** (`type: local`,
 `command: ["pwsh","-NoProfile","-File","<launcher>"]`, campo **`environment`**, não `env`, `disabled`
 para desligar); forma legada `mcp.jev` reconhecida para leitura/migração. **As duas convivendo →
@@ -759,7 +777,7 @@ grafia**. Os marcadores precisam estar balanceados e únicos.
   inválida, URL inalcançável ou modelo inexistente (medido). `endpoint_alcancavel` é diagnóstico e não
   implica credencial. Só `credencial_verificada`, por chamada autenticada opt-in, promove saúde.
   **Critério de `answers` válido:** resposta `200` com objeto `answers` contendo a chave da pergunta de
-  teste e valor `noul` numérico em `[0,1]` (ou `choice` com rótulo válido); qualquer outra forma não
+  teste e valor `noul` numérico em `[0,1]`; `choice` não é usado no probe da v1. Qualquer outra forma não
   promove. Request canônico: preset do `config.json`, uma pergunta `noul`, `state` mínimo; sem chave e
   sem corpo em log. Exige autorização explícita por execução.
 - **Offline (v1):** `OK`; `ausente`; `entrada_quebrada`/`entrada_divergente`/`entrada_em_conflito`;
@@ -793,7 +811,7 @@ negativos pré-filho); **encerramento no fim do stdin** com o servidor real; **r
 **Online opt-in (fora do gate e fora do offline):** `-CheckCredential` faz **uma** chamada autenticada
 ao endpoint do preset, com o modelo do `config.json`, e promove `credencial_verificada` só se a
 resposta for `200` com objeto `answers` contendo a chave da pergunta de teste e valor `noul` numérico
-em `[0,1]` (ou `choice` com rótulo válido); `401`/`403`/timeout/`answers` ausente **não** promovem.
+em `[0,1]`; `choice` não é usado no probe da v1; `401`/`403`/timeout/`answers` ausente **não** promovem.
 Request canônico, modelo e forma de log (sem chave e sem corpo) ficam no A.9. Exige autorização
 explícita do usuário a cada execução.
 
@@ -1039,6 +1057,21 @@ modo `compatible`, não o host.
 - `https://github.com/jkudish/jev-mcp` (MIT); `https://docs.typesafe.ai`.
 - `xpz-skills-setup/SKILL.md`; `15-revisao-por-pares.md`, `xpz-llm-delegate/SKILL.md` — `commandcode/*`
   como **catálogo de vozes** (não confundir com o endpoint do Jev).
+
+## CHANGELOG da v24.2 — resíduos da terceira consulta (2026-11-09)
+
+Terceira rodada com as mesmas três famílias, sobre a v24.1: openai/`gpt-6-luna` — **aprova com ressalva**
+(gate formal); anthropic/`claude-haiku-5-5` — **aprova com ressalvas** (três resíduos de texto);
+meta/`muse-spark-1.3-contributor` — **aprova**. Correções aplicadas:
+
+- **Testes (corpo):** removidos o adaptador do Claude Code e a verificação de credencial do rol
+  offline da v1; ficam F2 e online opt-in, respectivamente.
+- **A.8:** precedência sem ambiguidade — um arquivo só é o alvo; os dois presentes = conflito.
+- **Riscos:** concorrência do `~/.claude.json` movida explicitamente ao F2, fora dos itens do F1.
+- **`-CheckCredential`:** o probe usa só `noul`; `choice` fica fora do critério da v1.
+
+**Liberação:** gate fechado em 2026-11-09 por **congelamento humano**
+(`resubmissionDeclinedByHuman`, `RoundId=mcp-int-v24-freeze-20261109`); F1 autorizado a iniciar.
 
 ## CHANGELOG da v24.1 — segunda consulta (2026-11-09)
 
