@@ -1,0 +1,19 @@
+{
+  "name": "@jkudish/jev-mcp",
+  "version": "0.13.0",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "prepare": "npm run build",
+  "bin": {
+    "jev-mcp": "dist/index.js"
+  },
+  "dependencies": {
+    "@jkudish/jev-agent-tools": "^0.1.4",
+    "@modelcontextprotocol/node": "^2.1.0",
+    "@modelcontextprotocol/server": "^2.2.0",
+    "@typesafe-ai/sdk": "^0.6.0",
+    "zod": "^4.6.5"
+  }
+}

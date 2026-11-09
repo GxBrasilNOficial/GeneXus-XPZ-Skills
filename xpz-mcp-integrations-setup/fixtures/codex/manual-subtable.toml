@@ -1,0 +1,6 @@
+# grafia equivalente: jev.* dentro de [mcp_servers]
+model = "gpt-5"
+
+[mcp_servers]
+jev.command = "pwsh"
+jev.args = ["-NoProfile", "-File", "__LAUNCHER__"]

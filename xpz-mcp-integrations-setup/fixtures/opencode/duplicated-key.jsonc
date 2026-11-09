@@ -1,0 +1,14 @@
+{
+  // Chave mcp duplicada: parser fail-closed da skill deve recusar.
+  "mcp": {
+    "servers": {}
+  },
+  "mcp": {
+    "servers": {
+      "jev": {
+        "type": "local",
+        "command": ["pwsh", "-NoProfile", "-File", "__LAUNCHER__"]
+      }
+    }
+  }
+}

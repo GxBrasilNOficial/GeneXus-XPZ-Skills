@@ -1,0 +1,24 @@
+{
+  // As duas formas coexistem: a skill trata como entrada_em_conflito.
+  "mcp": {
+    "jev": {
+      "type": "local",
+      "command": ["pwsh", "-NoProfile", "-File", "__LAUNCHER__"],
+      "environment": {
+        "JEV_API_BASE_URL": "__BASE_URL__",
+        "JEV_MCP_MODEL": "__MODEL__"
+      }
+    },
+    "servers": {
+      "jev": {
+        "type": "local",
+        "command": ["pwsh", "-NoProfile", "-File", "__LAUNCHER__"],
+        "environment": {
+          "JEV_API_BASE_URL": "__BASE_URL__",
+          "JEV_MCP_MODEL": "__MODEL__"
+        },
+        "disabled": false
+      }
+    }
+  }
+}

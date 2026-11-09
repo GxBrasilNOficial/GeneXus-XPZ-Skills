@@ -1,0 +1,18 @@
+[
+  {
+    "integrationID": "commandcode",
+    "value": {
+      "type": "key",
+      "key": "test-key-a"
+    },
+    "active": true
+  },
+  {
+    "integrationID": "commandcode",
+    "value": {
+      "type": "key",
+      "key": "test-key-b"
+    },
+    "active": true
+  }
+]

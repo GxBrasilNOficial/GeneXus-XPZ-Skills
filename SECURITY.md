@@ -24,6 +24,14 @@ São relevantes para esta política:
 
 Relatos de bug comum, erro de documentação sem impacto sensível ou sugestão de melhoria podem seguir o fluxo normal de issues ou pull requests.
 
+### Cofre do `xpz-mcp-integrations-setup`
+
+- A chave do componente MCP externo opcional fica em blob **DPAPI `CurrentUser`** sob `%LOCALAPPDATA%\xpz-mcp-integrations\vault\`, com ACL só-dono e **sem roaming**.
+- A chave nunca é gravada no config do cliente, em log, prompt ou mensagem. O launcher lê do cofre e monta o ambiente do filho por allowlist.
+- A importação de `opencode auth export`/`auth.json` é bootstrap único e **não altera** o `auth.json`.
+- A contenção de rede do componente vendorizado **não foi demonstrada** nesta máquina (Windows Sandbox indisponível em 2026-11-09); o gate do F1 é revisão estática do `dist` + boot sem chave.
+- Relatos de exposição de chave, leitura indevida do cofre ou gravação em config de cliente seguem o canal privado desta política.
+
 ## Español
 
 Este repositorio contiene documentación, scripts y ejemplos metodológicos para trabajar con XPZ/XML de GeneXus. Los reportes de seguridad deben proteger personas, clientes, KBs reales y artefactos privados.
@@ -48,6 +56,14 @@ Son relevantes para esta política:
 
 Reportes de bugs comunes, errores de documentación sin impacto sensible o sugerencias de mejora pueden seguir el flujo normal de issues o pull requests.
 
+### Cofre de `xpz-mcp-integrations-setup`
+
+- La clave del componente MCP externo opcional vive en un blob **DPAPI `CurrentUser`** bajo `%LOCALAPPDATA%\xpz-mcp-integrations\vault\`, con ACL solo-dueño y **sin roaming**.
+- La clave nunca se escribe en la config del cliente, en logs, prompts ni mensajes. El launcher la lee del cofre y arma el ambiente del hijo por allowlist.
+- La importación de `opencode auth export`/`auth.json` es bootstrap único y **no modifica** el `auth.json`.
+- La contención de red del componente vendorizado **no fue demostrada** en esta máquina (Windows Sandbox no disponible en 2026-11-09); el gate del F1 es revisión estática del `dist` + boot sin clave.
+- Reportes de exposición de clave, lectura indebida del cofre o escritura en config de cliente siguen el canal privado de esta política.
+
 ## English
 
 This repository contains documentation, scripts, and methodological examples for working with GeneXus XPZ/XML. Security reports should protect people, clients, real KBs, and private artifacts.
@@ -71,3 +87,11 @@ This policy covers:
 - failures that allow critical false positives in operational safety validations.
 
 Common bug reports, documentation errors without sensitive impact, or improvement suggestions may follow the regular issue or pull request flow.
+
+### `xpz-mcp-integrations-setup` vault
+
+- The optional external MCP component key lives in a **DPAPI `CurrentUser`** blob under `%LOCALAPPDATA%\xpz-mcp-integrations\vault\`, with an owner-only ACL and **no roaming**.
+- The key is never written to client config, logs, prompts, or messages. The launcher reads it from the vault and builds the child environment by allowlist.
+- Import from `opencode auth export`/`auth.json` is a one-time bootstrap and **does not modify** `auth.json`.
+- Network containment of the vendored component was **not demonstrated** on this machine (Windows Sandbox unavailable on 2026-11-09); the F1 gate is static review of `dist` + boot without a key.
+- Key exposure, improper vault reads, or writes to client config are handled through this policy's private channel.

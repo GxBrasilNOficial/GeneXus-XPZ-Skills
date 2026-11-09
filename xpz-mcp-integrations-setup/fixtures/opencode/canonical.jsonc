@@ -1,0 +1,23 @@
+{
+  // Config global de referencia do OpenCode com a entrada canonica da skill.
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": ["AGENTS.md"],
+  "mcp": {
+    "servers": {
+      "jev": {
+        "type": "local",
+        "command": [
+          "pwsh",
+          "-NoProfile",
+          "-File",
+          "__LAUNCHER__"
+        ],
+        "environment": {
+          "JEV_API_BASE_URL": "__BASE_URL__",
+          "JEV_MCP_MODEL": "__MODEL__"
+        },
+        "disabled": false
+      }
+    }
+  }
+}

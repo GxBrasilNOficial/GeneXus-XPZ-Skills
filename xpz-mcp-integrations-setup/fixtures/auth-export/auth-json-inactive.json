@@ -1,0 +1,7 @@
+{
+  "commandcode": {
+    "type": "key",
+    "key": "test-key-inactive",
+    "active": false
+  }
+}

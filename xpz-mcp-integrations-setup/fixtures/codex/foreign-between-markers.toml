@@ -1,0 +1,10 @@
+# tabela alheia caiu entre os marcadores: conflito sem remocao
+model = "gpt-5"
+
+# >>> xpz-mcp-integrations-setup:jev >>>
+[mcp_servers.jev]
+command = "pwsh"
+
+[mcp_servers.outro]
+command = "outro"
+# <<< xpz-mcp-integrations-setup:jev <<<

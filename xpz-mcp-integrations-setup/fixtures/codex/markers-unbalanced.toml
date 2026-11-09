@@ -1,0 +1,6 @@
+# marcador de abertura sem fechamento
+model = "gpt-5"
+
+# >>> xpz-mcp-integrations-setup:jev >>>
+[mcp_servers.jev]
+command = "pwsh"

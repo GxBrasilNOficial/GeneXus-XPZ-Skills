@@ -1,0 +1,9 @@
+{
+  "name": "xpz-mcp-integrations-setup-vendor",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Pin vendorizado do componente Jev/System One usado pela skill xpz-mcp-integrations-setup",
+  "dependencies": {
+    "@jkudish/jev-mcp": "0.13.0"
+  }
+}

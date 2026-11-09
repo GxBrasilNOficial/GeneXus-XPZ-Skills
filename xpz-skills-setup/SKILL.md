@@ -57,6 +57,11 @@ de um novo usuário.
   nomeadas: `nexa` e `gam`** (ver `## SKILL EXTERNA GERENCIADA: NEXA` e
   `## SKILL EXTERNA GERENCIADA: GAM`). Demais skills de outros repositórios
   ficam fora de escopo
+- **MCP externo de terceiros fica fora desta skill.** Componentes MCP externos
+  opcionais (hoje o Jev/System One em OpenCode/Codex) são da skill
+  `xpz-mcp-integrations-setup`, com cofre DPAPI, vendorização e config de cliente
+  próprios. Esta skill continua dona do registro de skills, dos instrucionais
+  globais, de `nexa`/`gam`, do bootstrap git e do MCP interno do Cursor
 - Não alterar configurações gerais das ferramentas fora do âmbito desta skill;
   **exceção explícita:** instrucionais globais cobertos pelo passo 9 do `WORKFLOW`
   (incluindo instalação do MCP Cursor via
@@ -459,6 +464,7 @@ Use esta skill para:
 
 Do NOT use this skill para:
 - Instalar Codex, Claude Code, Cursor, OpenCode ou Antigravity na máquina
+- Instalar, auditar ou remover MCP externo de terceiros (use `xpz-mcp-integrations-setup`; esta skill só mantém o MCP interno do Cursor)
 - Registrar skills de outros repositórios **além de `nexa` e `gam`**. Essas duas
   são exceções gerenciadas nomeadas — ver as seções correspondentes
 - Preparar ou auditar a pasta paralela de uma KB GeneXus (use `xpz-kb-parallel-setup`)

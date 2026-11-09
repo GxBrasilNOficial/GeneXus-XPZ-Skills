@@ -1,0 +1,4 @@
+# grafia equivalente: chave pontilhada mcp_servers.jev.command
+model = "gpt-5"
+mcp_servers.jev.command = "pwsh"
+mcp_servers.jev.args = ["-NoProfile", "-File", "__LAUNCHER__"]

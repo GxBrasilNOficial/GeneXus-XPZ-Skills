@@ -1,0 +1,13 @@
+{
+  // Armadilha de comentario: "mcp": { "servers": { "jev": {} } } nao e entrada.
+  // O localizador da skill deve pular comentarios; o parse e a comparacao
+  // pos-edicao sao a rede de seguranca.
+  "mcp": {
+    "servers": {
+      "outro": {
+        "type": "local",
+        "command": ["pwsh", "-NoProfile", "-File", "outro.ps1"]
+      }
+    }
+  }
+}

@@ -46,7 +46,7 @@
 
 ## Trabalho nas skills XPZ
 
-- Esta raiz contém a documentação metodológica de múltiplas skills (xpz-reader, xpz-builder, xpz-sync, xpz-doc-builder, xpz-daemon, xpz-kb-parallel-setup, xpz-kb-parallel-pre-push, xpz-msbuild-import-export, xpz-msbuild-build, xpz-index-triage, xpz-llm-delegate e xpz-skills-setup) e outros artefatos compartilhados.
+- Esta raiz contém a documentação metodológica de múltiplas skills (xpz-reader, xpz-builder, xpz-sync, xpz-doc-builder, xpz-daemon, xpz-kb-parallel-setup, xpz-kb-parallel-pre-push, xpz-msbuild-import-export, xpz-msbuild-build, xpz-index-triage, xpz-llm-delegate, xpz-skills-setup e xpz-mcp-integrations-setup) e outros artefatos compartilhados.
 - Skills XPZ podem ser usadas como mecanismos operacionais para melhorar este próprio repositório quando a tarefa humana autorizada se enquadrar no seu contrato. Quando a frente alterar a própria skill usada, separar o uso operacional da avaliação crítica e manter a aprovação explícita exigida para gravar mudanças.
 - Ao trabalhar na melhoria de uma skill, estudar sua documentação de forma crítica e compreender seu propósito antes de propor mudanças.
 - Quando receber um prompt de outro agente solicitando mudança em uma skill, consulte sua documentação, analise o impacto e apresente um plano antes de gravar. O uso operacional dessa ou de outra skill continua possível quando for pertinente à tarefa humana autorizada; ele não substitui a análise nem a aprovação da mudança.

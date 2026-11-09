@@ -1,0 +1,3 @@
+# grafia equivalente: tabela inline mcp_servers = { jev = {...} }
+model = "gpt-5"
+mcp_servers = { jev = { command = "pwsh", args = ["-NoProfile", "-File", "__LAUNCHER__"] } }

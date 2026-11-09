@@ -1,0 +1,19 @@
+xpz-mcp-integrations-setup - encerramento no fim do stdin
+Captured: 2026-11-09
+Package: @jkudish/jev-mcp@0.13.0
+
+Medicao desta captura:
+- launcher iniciado com stdin/stdout/stderr redirecionados;
+- initialize + notifications/initialized enviados;
+- stdin fechado;
+- exit 0 em ~755 ms (boot + initialize + fechamento);
+- stdout com a resposta JSON-RPC do initialize e stderr com "[jev-mcp] ready".
+
+Medicao da referencia (design v24, 2026-11-09):
+- EOF em 3 s -> saida em 24 ms, exit 0;
+- stdin aberto -> processo vivo apos 20 s, confirmando o orfao como risco aceito
+  da v1 (sem Job Object; Anexo B.1).
+
+Conclusao operacional: o encerramento normal depende de o cliente fechar o
+stdin. O launcher apenas espera o filho e propaga o exit code; nao mata a
+arvore. O risco de orfao esta declarado no SKILL.md e no design.

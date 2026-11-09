@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "fixtureSet": "jev-mcp-0.13.0",
+  "package": "@jkudish/jev-mcp",
+  "version": "0.13.0",
+  "tarballIntegrity": "sha512-0fFOAJwlsntMdHu4+t40H4BObOowfqVsZdMnU1tbqIHojbWotRia8quh8/SjEtwpC0CbemZF9TpBDbFNBhnRGw==",
+  "origin": "https://registry.npmjs.org/@jkudish/jev-mcp/-/jev-mcp-0.13.0.tgz",
+  "gitRepository": "https://github.com/jkudish/jev-mcp.git",
+  "gitTag": "v0.13.0",
+  "gitTagCommitUnverifiedEquivalence": "5e0ca5cacd1556dc0b8c227648843d3ebf5bdc93",
+  "captureDate": "2026-11-09",
+  "scope": [
+    "dist/provider.js: resolve(env) e transporte compatible",
+    "dist/index.js: boot stdio e ausencia de HTTP por padrao",
+    "package.json: name/version/license/engines.node/scripts.prepare/bin",
+    "LICENSE MIT integral",
+    "boot initialize sem chave",
+    "encerramento no fim do stdin"
+  ],
+  "sanitization": [
+    "sem caminho de perfil, nome de usuario ou chave",
+    "sem conteudo de KB ou dado de cliente",
+    "transcricao de boot com caminho do launcher omitido"
+  ],
+  "limits": [
+    "A equivalencia commit Git x tarball NAO foi demonstrada; a identidade operacional e o integrity sha512 do lockfile.",
+    "O wire do modo compatible segue hipotese; o host Command Code foi medido em 2026-11-09.",
+    "A contencao de rede nao foi demonstrada nesta maquina (Windows Sandbox indisponivel)."
+  ]
+}

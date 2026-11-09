@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "lastUpdated": "2026-11-09",
+  "skill": "xpz-mcp-integrations-setup",
+  "reservedRange": {
+    "min": 60,
+    "max": 69
+  },
+  "nonCollisionWith": "scripts/msbuild-exit-codes.catalog.json",
+  "legend": {
+    "exitCode": "Valor emitido pelo motor xpz-mcp-integrations-setup; tambem e o exit code do processo PowerShell.",
+    "overall": "INTEGRATIONS_OK exige entrada reconhecida em cada cliente gerenciado e nenhum achado blocking; credencial verificada e eixo separado.",
+    "childExit": "O launcher devolve o exit code do filho; codigos 60-69 do filho nao sao reinterpretados pela skill."
+  },
+  "codes": [
+    {
+      "exit": 0,
+      "category": "sucesso",
+      "summary": "Operacao estruturalmente completa ou auditoria INTEGRATIONS_OK.",
+      "engines": ["*"]
+    },
+    {
+      "exit": 60,
+      "category": "integracao",
+      "summary": "INTEGRATIONS_GAPS sem codigo especifico (achado blocking nao mapeado).",
+      "engines": ["Test-McpIntegrations.ps1"]
+    },
+    {
+      "exit": 61,
+      "category": "credencial",
+      "summary": "credencial_ausente/credencial_ilegivel: cofre DPAPI ausente, ilegivel ou importacao sem credencial utilizavel.",
+      "engines": ["Test-McpIntegrations.ps1", "Set-McpCredential.ps1", "launcher"]
+    },
+    {
+      "exit": 62,
+      "category": "configuracao",
+      "summary": "config_ausente/config_invalido/endpoint_nao_confirmado/endpoint_invalido: config.json ausente/invalido, host fora do preset sem confirmacao ou URL invalida.",
+      "engines": ["Test-McpIntegrations.ps1", "launcher"]
+    },
+    {
+      "exit": 63,
+      "category": "pre-requisito",
+      "summary": "node_ausente/node_incompativel/node_path_nao_resolve/node_npm_ausente/pwsh_ausente: runtime insuficiente.",
+      "engines": ["Test-McpIntegrations.ps1", "Install-McpIntegration.ps1", "launcher"]
+    },
+    {
+      "exit": 64,
+      "category": "vendor",
+      "summary": "vendor_ausente/vendor_divergente/vendor_falhou ou npm ci falhou: arvore vendorizada ausente, divergente ou nao instalavel.",
+      "engines": ["Invoke-McpVendor.ps1", "Install-McpIntegration.ps1", "launcher"]
+    },
+    {
+      "exit": 65,
+      "category": "launcher",
+      "summary": "launcher_ausente/launcher_divergente: copia emitida ausente, sem sentinela ou com hash divergente do manifesto.",
+      "engines": ["Test-McpIntegrations.ps1", "Install-McpIntegration.ps1"]
+    },
+    {
+      "exit": 66,
+      "category": "entrada",
+      "summary": "entrada_quebrada/entrada_divergente/entrada_em_conflito: JSONC/TOML invalido, entrada desconhecida ou as duas formas de OpenCode coexistindo.",
+      "engines": ["Test-McpIntegrations.ps1", "Install-McpIntegration.ps1", "Uninstall-McpIntegration.ps1"]
+    },
+    {
+      "exit": 67,
+      "category": "acao-manual",
+      "summary": "edicao_manual_necessaria/acl_nao_aplicavel/credencial_ambigua/lock/race/manifesto_corrompido/atualizacao_sem_aprovacao/client_obrigatorio/acao_invalida: escrita recusada sem perda de dados.",
+      "engines": ["*"]
+    },
+    {
+      "exit": 68,
+      "category": "python",
+      "summary": "python_indisponivel: sem Python 3.11+ o adaptador Codex cai em edicao_manual_necessaria; nao bloqueia o restante da skill.",
+      "engines": ["Test-McpIntegrations.ps1", "Install-McpIntegration.ps1"]
+    },
+    {
+      "exit": 69,
+      "category": "ferramenta",
+      "summary": "Falha interna do launcher ou de um motor antes do diagnostico completo.",
+      "engines": ["launcher", "*"]
+    }
+  ]
+}

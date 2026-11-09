@@ -1,0 +1,5 @@
+# config de referencia do Codex, sem mcp_servers.jev
+model = "gpt-5"
+
+[shell_environment_policy]
+inherit = "all"

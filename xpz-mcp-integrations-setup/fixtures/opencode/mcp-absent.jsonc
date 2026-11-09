@@ -1,0 +1,5 @@
+{
+  // Sem bloco mcp: insercao deve criar mcp.servers.jev.
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": ["AGENTS.md"]
+}

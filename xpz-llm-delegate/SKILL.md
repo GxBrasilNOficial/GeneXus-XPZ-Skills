@@ -1056,6 +1056,13 @@ segurança no **próprio adapter**, de forma inseparável (nunca "default sem gu
   exceções externas.
   O instalador serializa mapas, valida antes/depois e pode recusar comentários/homônimos
   ambíguos antes da escrita; instalação global continua exigindo autorização própria.
+- **Aresta com `xpz-mcp-integrations-setup`.** A skill `xpz-mcp-integrations-setup` reaproveita este
+  mecanismo JSONC **sem migrar consumidores**: as funções
+  `Find-JsoncMatchingBrace`/`Find-JsoncKeyValueSpan` entram por **cópia rastreada** (dar
+  dot-source no instalador executaria o script) e `ConvertFrom-Jsonc` entra por dot-source do
+  `OpenCodeReviewerRoGuard.ps1` (que só define funções). O dono-doc do mecanismo continua esta
+  skill; a biblioteca única e a migração dos consumidores seguem na entrada própria do `999`.
+  O contrato da v1 está em `xpz-mcp-integrations-setup/SKILL.md`, seção OpenCode.
 - **Provas e promoção.** `Test-OpenCodeReviewerRoContentProtection.ps1` executa a matriz
   comportamental de 32 casos via `opencode run --format json`, com modelo explícito e workspace
   sintético mínimo, e prova os 2 casos `grep` estruturalmente por `grep * deny` no

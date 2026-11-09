@@ -1,0 +1,7 @@
+# entrada manual no unico cabecalho [mcp_servers.jev]
+model = "gpt-5"
+
+[mcp_servers.jev]
+command = "pwsh"
+args = ["-NoProfile", "-File", "__LAUNCHER__"]
+env = { JEV_API_BASE_URL = "__BASE_URL__", JEV_MCP_MODEL = "__MODEL__" }

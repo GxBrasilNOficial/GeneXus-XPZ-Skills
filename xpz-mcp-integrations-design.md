@@ -1,5 +1,11 @@
 # xpz-mcp-integrations — design da skill (v24.2)
 
+> **Nome histórico (2026-11-09):** este desenho usa `xpz-mcp-integrations`. A skill foi
+> renomeada para `xpz-mcp-integrations-setup` antes do primeiro commit; o texto preserva o
+> nome histórico. Na implementação, o marcador do bloco Codex e a sentinela do launcher
+> também passaram a usar `xpz-mcp-integrations-setup`. O diretório de dados de runtime
+> permanece `%LOCALAPPDATA%\xpz-mcp-integrations`.
+
 ## Papel do documento
 
 Design **vivo** (não congelado) da skill `xpz-mcp-integrations`, com decisões de **2026-10-02**,
@@ -50,6 +56,10 @@ O gate de liberação foi fechado pela **alternativa auditada**, não pelo paine
 - **`RoundId`:** `mcp-int-v24-freeze-20261109`.
 - **Efeito:** o **F1 está autorizado a iniciar**; o painel formal não é mais pré-requisito. Nenhuma
   linha de código da skill foi escrita até aqui.
+- **Execução (2026-11-09):** o F1 foi implementado na mesma data; a skill, os motores, o descritor,
+  o launcher, as fixtures e os self-tests estão na working tree, com o registro em
+  `historico/IdeiasImplementadas_202611.md`. O design permanece como fonte das decisões; o estado
+  de implementação vive no histórico e no `SKILL.md`.
 
 ## Problema
 

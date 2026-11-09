@@ -1,0 +1,19 @@
+xpz-mcp-integrations-setup - boot sem chave (initialize + EOF)
+Captured: 2026-11-09
+Package: @jkudish/jev-mcp@0.13.0
+Launcher: launcher-0.13.0.ps1 (copia emitida; caminho absoluto omitido)
+
+REQUEST initialize:
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"xpz-mcp-integrations-setup","version":"1.0"}}}
+REQUEST notifications/initialized:
+{"jsonrpc":"2.0","method":"notifications/initialized"}
+
+STDOUT:
+{"result":{"protocolVersion":"2025-06-18","capabilities":{"tools":{"listChanged":false}},"serverInfo":{"name":"jev-mcp","version":"0.13.0"}},"jsonrpc":"2.0","id":1}
+
+STDERR:
+[jev-mcp] ready ÔÇö model typesafe/jev
+
+EXIT: 0
+ELAPSED_MS: 755
+NOTE: config/vault de teste; a chave nao e usada no boot.

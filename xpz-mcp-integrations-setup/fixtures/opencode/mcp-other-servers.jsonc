@@ -1,0 +1,11 @@
+{
+  // mcp existe com outro servidor; a insercao nao pode remover nem reordenar.
+  "mcp": {
+    "servers": {
+      "outro": {
+        "type": "local",
+        "command": ["pwsh", "-NoProfile", "-File", "outro.ps1"]
+      }
+    }
+  }
+}

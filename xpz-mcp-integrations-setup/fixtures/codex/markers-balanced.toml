@@ -1,0 +1,9 @@
+# bloco emitido pela skill entre marcadores
+model = "gpt-5"
+
+# >>> xpz-mcp-integrations-setup:jev >>>
+[mcp_servers.jev]
+command = "pwsh"
+args = ["-NoProfile", "-File", "__LAUNCHER__"]
+env = { JEV_API_BASE_URL = "__BASE_URL__", JEV_MCP_MODEL = "__MODEL__" }
+# <<< xpz-mcp-integrations-setup:jev <<<

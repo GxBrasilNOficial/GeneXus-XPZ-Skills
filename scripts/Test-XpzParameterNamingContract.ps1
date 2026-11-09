@@ -129,7 +129,10 @@ $inputPathWithPathAlias = @(
     # Ressalva semantica registrada: aqui a entrada primaria e um manifesto
     # JSON, nao um XML. -Path entra por consistencia de familia (os dois irmaos
     # mais proximos deste motor ja o expoem), nao por ser descritivo.
-    'Edit-GeneXusXmlBatchMetadata.ps1'
+    'Edit-GeneXusXmlBatchMetadata.ps1',
+    # Auditor MCP: -InputPath e um JSON opcional de raizes de fixture
+    # (userProfile/localAppData); o caminho real e resolvido pelo ambiente.
+    'Test-McpIntegrations.ps1'
 )
 foreach ($scriptFile in $inputPathWithPathAlias) {
     Assert-CanonicalParameter -ScriptFileName $scriptFile -ParameterName 'InputPath' -RequiredAliases @('Path')

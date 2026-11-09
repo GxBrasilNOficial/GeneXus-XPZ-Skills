@@ -1,0 +1,16 @@
+{
+  // Entrada jev desconhecida: nao e byte-identica a nada que a skill emitiu.
+  "mcp": {
+    "servers": {
+      "jev": {
+        "type": "local",
+        "command": ["pwsh", "-NoProfile", "-File", "manual.ps1"],
+        "environment": {
+          "JEV_API_BASE_URL": "https://exemplo.invalid",
+          "JEV_MCP_MODEL": "manual"
+        },
+        "disabled": false
+      }
+    }
+  }
+}

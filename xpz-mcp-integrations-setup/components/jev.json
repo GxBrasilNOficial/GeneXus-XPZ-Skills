@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 1,
+  "component": {
+    "id": "jev",
+    "displayName": "Jev/System One",
+    "package": "@jkudish/jev-mcp",
+    "version": "0.13.0",
+    "tarballIntegrity": "sha512-0fFOAJwlsntMdHu4+t40H4BObOowfqVsZdMnU1tbqIHojbWotRia8quh8/SjEtwpC0CbemZF9TpBDbFNBhnRGw==",
+    "distEntry": "dist/index.js",
+    "license": "MIT",
+    "engines": {
+      "node": ">=22"
+    }
+  },
+  "defaultMode": "compatible",
+  "presets": {
+    "command-code": {
+      "displayName": "Command Code",
+      "baseUrl": "https://api.commandcode.ai/provider/v1/systemone",
+      "model": "typesafe/jev"
+    }
+  },
+  "modes": {
+    "typesafe": {
+      "secretEnvVar": "TYPESAFE_API_KEY",
+      "publicEnvVars": [
+        "JEV_MCP_MODEL"
+      ],
+      "requiredFields": [],
+      "exclusiveEnvVars": [
+        "TYPESAFE_API_KEY"
+      ],
+      "implemented": false,
+      "preset": null,
+      "endpointRule": "sdk"
+    },
+    "openrouter": {
+      "secretEnvVar": "OPENROUTER_API_KEY",
+      "publicEnvVars": [
+        "JEV_OPENROUTER_BASE_URL"
+      ],
+      "requiredFields": [],
+      "exclusiveEnvVars": [
+        "OPENROUTER_API_KEY"
+      ],
+      "implemented": false,
+      "preset": null,
+      "endpointRule": "sdk"
+    },
+    "cloudflare": {
+      "secretEnvVar": "CLOUDFLARE_API_TOKEN",
+      "publicEnvVars": [
+        "CLOUDFLARE_ACCOUNT_ID",
+        "JEV_CLOUDFLARE_BASE_URL"
+      ],
+      "requiredFields": [
+        "accountId"
+      ],
+      "exclusiveEnvVars": [
+        "CLOUDFLARE_API_TOKEN",
+        "JEV_CLOUDFLARE_API_TOKEN"
+      ],
+      "implemented": false,
+      "preset": null,
+      "endpointRule": "sdk"
+    },
+    "vercel": {
+      "secretEnvVar": "AI_GATEWAY_API_KEY",
+      "publicEnvVars": [],
+      "requiredFields": [],
+      "exclusiveEnvVars": [
+        "AI_GATEWAY_API_KEY"
+      ],
+      "implemented": false,
+      "preset": null,
+      "endpointRule": "sdk"
+    },
+    "compatible": {
+      "secretEnvVar": "JEV_API_KEY",
+      "publicEnvVars": [
+        "JEV_API_BASE_URL",
+        "JEV_MCP_MODEL"
+      ],
+      "requiredFields": [
+        "baseUrl",
+        "model"
+      ],
+      "exclusiveEnvVars": [
+        "JEV_API_KEY"
+      ],
+      "implemented": true,
+      "preset": "command-code",
+      "endpointRule": "explicit-url"
+    }
+  }
+}
