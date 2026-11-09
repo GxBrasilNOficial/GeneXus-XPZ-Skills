@@ -58,3 +58,4 @@ Implementado em 2026-11-09 conforme o design v24.2 congelado por decisão humana
 - Commit material: `a643071` — Adiciona a skill xpz-mcp-integrations-setup e o ciclo de MCPs externos.
 - Commit material: `59b7073` — Corrige o exit 69 dos motores e alinha o catalogo de exit codes.
 - Commit material: `70ac932` — Corrige reserva de credencial, auditoria manual e precedencia de exit.
+- Commit material: `084f3d5` — Rotula nextActions como menu e corrige -CheckUpdates no design.
