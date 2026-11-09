@@ -51,4 +51,4 @@ Implementado em 2026-11-09 conforme o design v24.2 congelado por decisão humana
 
 ### Rastreabilidade
 
-- Sem commit material nesta sessão: a frente está na working tree, aguardando a decisão humana de fechamento. Quando o commit for autorizado, registrar aqui o hash e a mensagem curta do commit que materializou a skill, os motores, o descritor, o launcher, as fixtures e a documentação normativa da mesma frente.
+- Commit material: `a643071` — Adiciona a skill xpz-mcp-integrations-setup e o ciclo de MCPs externos.
