@@ -804,6 +804,10 @@ grafia**. Os marcadores precisam estar balanceados e únicos.
 - **Online opt-in:** `-CheckUpdates` (F2) informa atualização, nunca auto-atualiza; `-CheckCredential`
   (v1) segue o critério acima. Canonicalização de path antes de `entrada_divergente`.
 
+**Atualização pós-execução (2026-11-09):** o critério de `answers` e o E2E
+foram exercitados na execução real; a hipótese histórica de wire permanece
+registrada no Apêndice.
+
 ### A.10 Self-tests — inventário executável
 
 **Offline (F1 = v1):** detecção (rejeitar stub); **JSONC** — fixtures do A.3 com validação pós-edição
@@ -1058,14 +1062,19 @@ exige fonte com timestamp.
 
 ## Apêndice — tabela de fornecedor (HIPÓTESE de wire; host medido na v24)
 
+**Atualização pós-execução (2026-11-09):** o wire do modo `compatible` foi
+exercitado no E2E da execução real (`-CheckCredential` 200/`answers_ok` e
+`jev_find` nos dois clientes); a tabela abaixo permanece como registro
+histórico da hipótese de projeto (v24.2).
+
 `typesafe` (`TYPESAFE_API_KEY`, transport do SDK, `jev-latest`); `openrouter` (`OPENROUTER_API_KEY`,
 `…/alpha/decisions`, headers, `jev-latest`→`jev-1.13`); `cloudflare` (`CLOUDFLARE_API_TOKEN` +
 `CLOUDFLARE_ACCOUNT_ID`, `/accounts/<id>/ai/run`); `vercel` (`AI_GATEWAY_API_KEY`, transport do SDK);
 `compatible` (`JEV_API_KEY`, POST na URL completa, `{model,state,questions}` → `{answers,usage?}`;
 **parcial**). **Medido em 2026-11-09:** o host do preset Command Code
 (`https://api.commandcode.ai/provider/v1/systemone`) respondeu `200` a uma chamada autenticada, com
-`typesafe/jev` e `jev-latest` normalizando para `typesafe/jev`; o que segue hipótese é o **wire** do
-modo `compatible`, não o host.
+`typesafe/jev` e `jev-latest` normalizando para `typesafe/jev`; o **wire** do modo `compatible` era
+hipótese de projeto e foi exercitado no E2E de 2026-11-09 (nota acima); o host foi medido.
 
 ## Referências
 
@@ -1127,7 +1136,7 @@ meta/`muse-spark-1.3-contributor`). **Consulta, não liberação**: o painel de 
   autenticada opt-in; `endpoint_alcancavel` separado. O gate «boot sem chave» não valida credencial.
 - **OpenCode:** escrita canônica em `mcp.servers.jev`; `mcp.jev` legado reconhecido; coexistência →
   `entrada_em_conflito`; `disabled` canônico, `enabled:false` legado.
-- **Fornecedor:** preset fixa `baseUrl` e `model = typesafe/jev`; host medido, wire segue hipótese.
+- **Fornecedor:** preset fixa `baseUrl` e `model = typesafe/jev`; host medido; o wire, hipótese histórica, foi exercitado no E2E de 2026-11-09.
 - **Launcher:** molde versionado no repositório + cópia emitida com sentinela e hash.
 - **Evidência:** integrity sha512, 9 pacotes, 15,46 MB, licença MIT, Node/npm/Python/pwsh medidos, env do
   Codex (20 vars) e do Claude (83 vars), EOF em 24 ms e órfão confirmado.
