@@ -624,21 +624,6 @@
     {
       "code": "BACKEND_ENUMERATION_SUBSET",
       "file": "xpz-mcp-integrations-design.md",
-      "unitHash": "215ec50376a9480916e32f0dac5cd5570714bded0bbce7c5264818483ab154cd",
-      "listedMembers": [
-        "claude-code",
-        "codex"
-      ],
-      "verdict": "non-gap",
-      "reason": "Enumeração de clientes MCP (OpenCode/Codex/Claude Code) ou de ferramentas de medição em contexto de integração, não do conjunto canônico de backends de delegação da xpz-llm-delegate; o scanner dispara pelos tokens, mas o contrato é distinto.",
-      "triagedAt": "2026-11-09",
-      "triagedBy": "OpenCode, com autorização do usuário",
-      "kind": "closed",
-      "excerpt": "- **Fatos externos medidos em 2026-11-09 (não re-verificar sem motivo):** sha512 do tarball, árvore de"
-    },
-    {
-      "code": "BACKEND_ENUMERATION_SUBSET",
-      "file": "xpz-mcp-integrations-design.md",
       "unitHash": "7c093226e6b3043e439fba7ee454ef1ca1bbb4ee428e8d6d02b09cce930aa101",
       "listedMembers": [
         "claude-code",
@@ -758,6 +743,21 @@
       "triagedBy": "OpenCode, com autorização do usuário",
       "kind": "closed",
       "excerpt": "- **Evidência:** integrity sha512, 9 pacotes, 15,46 MB, licença MIT, Node/npm/Python/pwsh medidos, env do"
+    },
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "xpz-mcp-integrations-design.md",
+      "unitHash": "8091cbfbdc801fc60aed226321ca7e929f41b2d228669131dfad6b3d4dafd2e1",
+      "listedMembers": [
+        "claude-code",
+        "codex"
+      ],
+      "verdict": "non-gap",
+      "reason": "A passagem lista as fontes de ambiente medidas (Codex e Claude Code) na secao de fatos externos, nao o conjunto canonico de backends de delegacao; a ancora mudou apenas porque o texto do wire foi movido para os fatos medidos.",
+      "triagedAt": "2026-11-09",
+      "triagedBy": "OpenCode, com autorizacao do usuario",
+      "kind": "closed",
+      "excerpt": "- **Fatos externos medidos em 2026-11-09 (não re-verificar sem motivo):** sha512 do tarball, árvore de"
     }
   ]
 }
