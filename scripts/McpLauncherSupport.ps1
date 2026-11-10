@@ -154,6 +154,7 @@ function Install-McpLauncher {
         -ExpectedHash $expectedHash `
         -ExpectedLength $expectedLength `
         -ExpectedLastWriteTimeUtc $expectedMtime `
+        -CreateExclusive:($null -eq $existing) `
         -WhatIf:$WhatIf
     return [pscustomobject]@{
         Status      = $writeResult.Status

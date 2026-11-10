@@ -260,8 +260,9 @@ function Write-McpVault {
         cipherText   = $cipherText
     }
     $json = (($blob | ConvertTo-Json -Depth 6) -replace "`r`n", "`n") + "`n"
+    $pathExisted = Test-Path -LiteralPath $blobPath
     $existing = $null
-    if (Test-Path -LiteralPath $blobPath) {
+    if ($pathExisted) {
         try {
             $existing = Read-McpTextDocument -Path $blobPath
         } catch {
@@ -283,6 +284,7 @@ function Write-McpVault {
         -ExpectedHash $expectedHash `
         -ExpectedLength $expectedLength `
         -ExpectedLastWriteTimeUtc $expectedMtime `
+        -CreateExclusive:(-not $pathExisted) `
         -WhatIf:$WhatIf
     if ($WhatIf) {
         return [pscustomobject]@{ Status = 'planned'; Path = $blobPath; Verified = $false }

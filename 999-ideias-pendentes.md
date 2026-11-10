@@ -37,6 +37,21 @@ Entradas legadas sem avaliação carregam `FALTA AVALIAR` em ambos os campos at�
 
 **Relacionado.** `xpz-mcp-integrations-setup/SKILL.md`; `xpz-mcp-integrations-design.md` (não-escopo / F2); `historico/IdeiasImplementadas_202611.md` (entrega v1); instruções globais — seções de pasta paralela e MCP; eventual biblioteca JSONC no 999 (outra frente).
 
+<a id="gate-mecanico-bom-utf8-diff-20261109"></a>
+
+## Gate mecânico anti-BOM UTF-8 no diff da pré-push — 2026-11-09
+
+- **Importância** — média (BOM em `.ps1`/`.md` já passou self-test/parse e só caiu na âncora Codex da pré-push reforçada, custando rodada extra; disciplina manual existe no `AGENTS.md` e falhou nesta sessão).
+- **Maturidade** — ideia (direção clara; falta decidir escopo exato do gate e se entra no orquestrador ou em script satélite).
+
+**Origem.** Na correção do predicado ACL só-dono do vault MCP (`e37bbd7`), a ferramenta `StrReplace` regravou `scripts/Test-McpLauncherSelfTest.ps1` com BOM UTF-8 (`EF BB BF`). O pai do commit não tinha BOM; no mesmo commit `McpVaultSupport.ps1` e o JSON de triagem ficaram limpos. Self-test/parse verdes; o passo mecânico atual não barra BOM; Codex `gpt-6-luna` apontou o gap na remonte da reforçada (`3952a3fe…`). Removido em `a48c178`.
+
+**Proposta (não implementar nesta frente).** Em `scripts/Invoke-PrePushMechanicalChecks.ps1` (ou helper chamado por ele), falhar se algum arquivo do intervalo `BaseRef..HEAD` (e/ou working tree staged) começar com `EF BB BF`, pelo menos para `.ps1` e `.md` deste repositório. Complementa — não substitui — a disciplina de `Show-FileWhitespace.ps1 -Mode encoding` após edição.
+
+**Fora de escopo agora.** Não alterar o orquestrador nesta rodada; a frente MCP segue na corrida create×replace e no painel reforçado.
+
+**Relacionado.** `AGENTS.md` (UTF-8 sem BOM; `Show-FileWhitespace`); `13-revisao-pre-push.md`; `scripts/Invoke-PrePushMechanicalChecks.ps1`; `scripts/Show-FileWhitespace.ps1`.
+
 <a id="xpz-relato-20261005-avisos"></a>
 
 ## Qualidade dos avisos de coerência de Transaction e sanidade de Source — resíduo de controles

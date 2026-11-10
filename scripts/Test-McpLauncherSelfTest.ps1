@@ -129,7 +129,7 @@ try {
     $null = Set-McpConfig -BaseUrl $baseUrl -Model $model -EndpointConfirmed $true
 
     $file = Join-Path $tempRoot 'transactional.txt'
-    $write1 = Write-McpTextTransactional -Path $file -Text "one`n" -EncodingKind 'utf8-nobom'
+    $write1 = Write-McpTextTransactional -Path $file -Text "one`n" -EncodingKind 'utf8-nobom' -CreateExclusive
     Assert-True ($write1.Status -eq 'written') '(tx) criacao'
     $doc = Read-McpTextDocument -Path $file
     $write2 = Write-McpTextTransactional -Path $file -Text "two`n" -EncodingKind 'utf8-nobom' -ExpectedHash $doc.Hash -ExpectedLength $doc.Length -ExpectedLastWriteTimeUtc $doc.LastWriteTimeUtc
@@ -137,6 +137,14 @@ try {
     Assert-True (-not [string]::IsNullOrWhiteSpace([string]$write2.BackupPath) -and (Test-Path -LiteralPath $write2.BackupPath)) '(tx) backup criado'
     Assert-True (([System.IO.File]::ReadAllText($write2.BackupPath)) -eq "one`n") '(tx) backup preserva o conteudo anterior'
     Assert-ThrowsLike -Action { Write-McpTextTransactional -Path $file -Text "three`n" -EncodingKind 'utf8-nobom' -ExpectedHash 'deadbeef' } -Pattern 'XPZ_MCP_RACE' -Message '(tx) corrida detectada'
+    # Corrida create→replace: chamador pediu criacao exclusiva, mas a folha ja existe
+    # (terceiro criou entre a sondagem e a entrada do escritor) — nao pode substituir.
+    $raceCreate = Join-Path $tempRoot 'race-create.txt'
+    [System.IO.File]::WriteAllText($raceCreate, "intruder`n", [System.Text.UTF8Encoding]::new($false))
+    Assert-ThrowsLike -Action {
+        Write-McpTextTransactional -Path $raceCreate -Text "mine`n" -EncodingKind 'utf8-nobom' -CreateExclusive
+    } -Pattern 'XPZ_MCP_RACE' -Message '(tx) criacao exclusiva recusa folha preexistente'
+    Assert-True (([System.IO.File]::ReadAllText($raceCreate)) -eq "intruder`n") '(tx) criacao exclusiva nao sobrescreve intruso'
     $directoryTarget = Join-Path $tempRoot 'target-directory'
     [System.IO.Directory]::CreateDirectory($directoryTarget) | Out-Null
     Assert-ThrowsLike -Action { Write-McpTextTransactional -Path $directoryTarget -Text 'x' -EncodingKind 'utf8-nobom' } -Pattern 'XPZ_MCP_TARGET_NOT_REGULAR' -Message '(tx) diretorio recusado'

@@ -591,7 +591,10 @@ públicas permitidas, campos obrigatórios e regras de exclusividade; a exceçã
 - **Lock:** `<arquivo>.xpz-mcp.lock` (create-new / `FileShare.None`); falha → **recusar**.
 - **Ramos separados:** **criação exclusiva** (`FileMode.CreateNew`) e **substituição** (`File.Replace`
   com backup). Antes da promoção, **revalidar identidade/atributos** (tamanho, mtime, hash)
-  **imediatamente**.
+  **imediatamente**. Chamadores que sondaram ausência passam `-CreateExclusive` em
+  `Write-McpTextTransactional` para **não** degradar criação em substituição quando um terceiro
+  cria a folha entre a sondagem e a entrada do escritor (`XPZ_MCP_RACE`; conteúdo do intruso
+  permanece).
 - **Sequência:** ler+hash → calcular novo conteúdo → temp na mesma pasta → re-hash → **recusar se
   mudou** → backup imutável → check final (create×replace) → promoção atômica → idempotência por
   conteúdo.

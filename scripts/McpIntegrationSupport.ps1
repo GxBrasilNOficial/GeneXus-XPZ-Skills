@@ -226,7 +226,10 @@ function Write-McpTextTransactional {
     .DESCRIPTION
         Valida folha regular (sem reparse point), adquire lock create-new,
         revalida identidade, grava temporario na mesma pasta, confere hash e
-        promove com File.Replace/Move. Devolve status, hash e backup.
+        promove com File.Replace (substituicao) ou FileMode.CreateNew (criacao
+        exclusiva). -CreateExclusive recusa se a folha ja existir — fecha a
+        corrida em que o chamador sondou ausencia, passou expectedHash nulo e
+        um terceiro criou o arquivo antes desta entrada. Devolve status, hash e backup.
     #>
     param(
         [Parameter(Mandatory = $true)][string]$Path,
@@ -236,6 +239,7 @@ function Write-McpTextTransactional {
         [Nullable[long]]$ExpectedLength = $null,
         [Nullable[datetime]]$ExpectedLastWriteTimeUtc = $null,
         [switch]$RequireExisting,
+        [switch]$CreateExclusive,
         [switch]$WhatIf
     )
 
@@ -244,6 +248,9 @@ function Write-McpTextTransactional {
     if ([string]::IsNullOrWhiteSpace($parent) -or -not (Test-Path -LiteralPath $parent -PathType Container)) {
         throw "XPZ_MCP_PARENT_MISSING: pasta pai nao existe: $parent"
     }
+    if ($CreateExclusive -and $RequireExisting) {
+        throw 'XPZ_MCP_INVALID_ARGS: CreateExclusive e RequireExisting sao mutuamente exclusivos'
+    }
 
     $exists = Test-Path -LiteralPath $fullPath
     if ($exists -and -not (Test-McpRegularFile -Path $fullPath)) {
@@ -251,6 +258,9 @@ function Write-McpTextTransactional {
     }
     if (-not $exists -and $RequireExisting) {
         throw "XPZ_MCP_TARGET_MISSING: $fullPath"
+    }
+    if ($CreateExclusive -and $exists) {
+        throw "XPZ_MCP_RACE: destino surgiu antes da criacao exclusiva: $fullPath"
     }
     if ($exists) {
         $identity = Get-McpFileIdentity -Path $fullPath
@@ -300,6 +310,7 @@ function Write-McpTextTransactional {
     $tempPath = $null
     $backupPath = $null
     $promoted = $false
+    $createExclusive = [bool]$CreateExclusive -or (-not $exists)
     try {
         $lockStream = [System.IO.File]::Open(
             $lockPath,
@@ -311,7 +322,17 @@ function Write-McpTextTransactional {
         $lockStream.Write($lockPayload, 0, $lockPayload.Length)
         $lockStream.Flush($true)
 
-        if ($exists) {
+        if ($createExclusive) {
+            if (Test-Path -LiteralPath $fullPath) {
+                throw "XPZ_MCP_RACE: destino surgiu antes da criacao exclusiva: $fullPath"
+            }
+        } else {
+            if (-not (Test-Path -LiteralPath $fullPath)) {
+                throw "XPZ_MCP_RACE: destino sumiu durante a substituicao: $fullPath"
+            }
+            if (-not (Test-McpRegularFile -Path $fullPath)) {
+                throw "XPZ_MCP_TARGET_NOT_REGULAR: $fullPath"
+            }
             $lockedIdentity = Get-McpFileIdentity -Path $fullPath
             if (-not [string]::IsNullOrWhiteSpace($ExpectedHash) -and $lockedIdentity.Hash -ne $ExpectedHash) {
                 throw "XPZ_MCP_RACE: conteudo de $fullPath mudou durante a escrita"
@@ -343,12 +364,36 @@ function Write-McpTextTransactional {
             throw "XPZ_MCP_TEMP_VERIFY_FAILED: hash do temporario diverge do conteudo montado"
         }
 
-        if ($exists) {
+        if ($createExclusive) {
+            if (Test-Path -LiteralPath $fullPath) {
+                throw "XPZ_MCP_RACE: destino surgiu antes da criacao exclusiva: $fullPath"
+            }
+            $destStream = $null
+            try {
+                try {
+                    $destStream = [System.IO.File]::Open(
+                        $fullPath,
+                        [System.IO.FileMode]::CreateNew,
+                        [System.IO.FileAccess]::Write,
+                        [System.IO.FileShare]::None
+                    )
+                } catch [System.IO.IOException] {
+                    throw "XPZ_MCP_RACE: falha na criacao exclusiva de $fullPath :: $($_.Exception.Message)"
+                }
+                $destStream.Write($newBytes, 0, $newBytes.Length)
+                $destStream.Flush($true)
+            } finally {
+                if ($null -ne $destStream) {
+                    $destStream.Dispose()
+                }
+            }
+            Remove-Item -LiteralPath $tempPath -Force -ErrorAction SilentlyContinue
+            $tempPath = $null
+        } else {
             $stamp = [DateTime]::UtcNow.ToString('yyyyMMddHHmmssfff')
             $backupPath = $fullPath + '.xpz-mcp.bak-' + $stamp
             [System.IO.File]::Replace($tempPath, $fullPath, $backupPath, $true)
-        } else {
-            [System.IO.File]::Move($tempPath, $fullPath)
+            $tempPath = $null
         }
         $promoted = $true
 
@@ -562,8 +607,9 @@ function Write-McpJsonFile {
     if (-not $json.EndsWith("`n")) {
         $json += "`n"
     }
+    $pathExisted = Test-Path -LiteralPath $Path
     $existing = $null
-    if (Test-Path -LiteralPath $Path) {
+    if ($pathExisted) {
         $existing = Read-McpTextDocument -Path $Path
     }
     $expectedHash = $null
@@ -581,6 +627,7 @@ function Write-McpJsonFile {
         -ExpectedHash $expectedHash `
         -ExpectedLength $expectedLength `
         -ExpectedLastWriteTimeUtc $expectedMtime `
+        -CreateExclusive:(-not $pathExisted) `
         -WhatIf:$WhatIf
 }
 
