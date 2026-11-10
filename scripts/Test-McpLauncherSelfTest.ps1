@@ -1,4 +1,4 @@
-#requires -Version 7.4
+﻿#requires -Version 7.4
 
 <#
 .SYNOPSIS
@@ -159,6 +159,34 @@ try {
     $vaultAcl = Get-Acl -LiteralPath (Get-McpVaultBlobPath)
     $broadRules = @($vaultAcl.Access | Where-Object { [string]$_.IdentityReference -match 'Everyone|BUILTIN\\Users' })
     Assert-True ($broadRules.Count -eq 0) '(vault) sem regra para Everyone/Users'
+    # Predicado SID+FullControl: nao adulterar a ACL em disco com regra hostil — Set-Acl
+    # subsequente pode exigir SeSecurityPrivilege neste ambiente. O caminho 'already' e o
+    # predicado cobrem o gap do Test-McpAcl frouxo sem autoexclusao.
+    $alreadyAcl = Set-McpAcl -Path (Get-McpVaultBlobPath)
+    Assert-True ($alreadyAcl.Status -eq 'already') '(vault) Set-McpAcl idempotente com ACL correta'
+    $currentSid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User
+    $readOnlyRule = [System.Security.AccessControl.FileSystemAccessRule]::new(
+        $currentSid,
+        [System.Security.AccessControl.FileSystemRights]::Read,
+        [System.Security.AccessControl.AccessControlType]::Allow
+    )
+    Assert-True (-not (Test-McpAclOwnerFullControlRule -Rule $readOnlyRule -ExpectedSid $currentSid)) '(vault) predicado rejeita Read'
+    $ownerFullRule = [System.Security.AccessControl.FileSystemAccessRule]::new(
+        $currentSid,
+        [System.Security.AccessControl.FileSystemRights]::FullControl,
+        [System.Security.AccessControl.AccessControlType]::Allow
+    )
+    Assert-True (Test-McpAclOwnerFullControlRule -Rule $ownerFullRule -ExpectedSid $currentSid) '(vault) predicado aceita FullControl do dono'
+    $worldSid = [System.Security.Principal.SecurityIdentifier]::new(
+        [System.Security.Principal.WellKnownSidType]::WorldSid,
+        $null
+    )
+    $worldFullRule = [System.Security.AccessControl.FileSystemAccessRule]::new(
+        $worldSid,
+        [System.Security.AccessControl.FileSystemRights]::FullControl,
+        [System.Security.AccessControl.AccessControlType]::Allow
+    )
+    Assert-True (-not (Test-McpAclOwnerFullControlRule -Rule $worldFullRule -ExpectedSid $currentSid)) '(vault) predicado rejeita SID alheio'
     $vaultWrite2 = Write-McpVault -SecureSecret (ConvertTo-SecureString 'second-secret' -AsPlainText -Force)
     Assert-True ($vaultWrite2.Status -eq 'written' -and (Read-McpVault) -ceq 'second-secret') '(vault) rotacao'
     $vaultWrite3 = Write-McpVault -SecureSecret $secure

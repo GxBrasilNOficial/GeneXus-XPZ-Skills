@@ -758,6 +758,21 @@
       "triagedBy": "OpenCode, com autorizacao do usuario",
       "kind": "closed",
       "excerpt": "- **Fatos externos medidos em 2026-11-09 (não re-verificar sem motivo):** sha512 do tarball, árvore de"
+    },
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "999-ideias-pendentes.md",
+      "unitHash": "bd48cbe81fffb4952a12ea173191a89119722ad6f52470cc78d69475a96da94f",
+      "listedMembers": [
+        "codex",
+        "opencode"
+      ],
+      "verdict": "non-gap",
+      "reason": "O trecho descreve a disponibilidade do Jev nos clientes cobertos pela v1 (OpenCode/Codex), não o conjunto canônico de backends de delegação da xpz-llm-delegate.",
+      "triagedAt": "2026-11-09",
+      "triagedBy": "Codex, com autorização do usuário",
+      "kind": "closed",
+      "excerpt": "**Origem.** Conversa de 2026-11-09 após a entrega da v1 de `xpz-mcp-integrations-setup` e a pré-push sem push. Ficou claro que a skill cobre **ciclo de vida** (instalar/auditar/reparar/atualizar/remover), não “quando o agente deve chamar o Jev”. Em sessão nova no OpenCode/Codex as tools podem aparecer via MCP, mas uso espontâneo sem menção ao Jev não é garantido nem foi medido como contrato."
     }
   ]
 }

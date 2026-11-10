@@ -28,6 +28,42 @@ function Get-McpVaultBlobPath {
     return (Join-Path (Get-McpVaultDir) 'credential.blob')
 }
 
+function Get-McpCurrentUserSid {
+    $sid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User
+    if ($null -eq $sid) {
+        throw 'SID do usuario atual indisponivel'
+    }
+    return $sid
+}
+
+function ConvertTo-McpSecurityIdentifier {
+    param([Parameter(Mandatory = $true)]$IdentityReference)
+    if ($IdentityReference -is [System.Security.Principal.SecurityIdentifier]) {
+        return [System.Security.Principal.SecurityIdentifier]$IdentityReference
+    }
+    return $IdentityReference.Translate([System.Security.Principal.SecurityIdentifier])
+}
+
+function Test-McpAclOwnerFullControlRule {
+    param(
+        [Parameter(Mandatory = $true)]$Rule,
+        [Parameter(Mandatory = $true)][System.Security.Principal.SecurityIdentifier]$ExpectedSid
+    )
+    if ([string]$Rule.AccessControlType -ne 'Allow') {
+        return $false
+    }
+    try {
+        $ruleSid = ConvertTo-McpSecurityIdentifier -IdentityReference $Rule.IdentityReference
+    } catch {
+        return $false
+    }
+    if ($ruleSid.Value -ne $ExpectedSid.Value) {
+        return $false
+    }
+    $fullControl = [System.Security.AccessControl.FileSystemRights]::FullControl
+    return (($Rule.FileSystemRights -band $fullControl) -eq $fullControl)
+}
+
 function Test-McpAcl {
     param([Parameter(Mandatory = $true)][string]$Path)
     try {
@@ -39,7 +75,7 @@ function Test-McpAcl {
         if ($rules.Count -ne 1) {
             return $false
         }
-        return ([string]$rules[0].AccessControlType -eq 'Allow')
+        return (Test-McpAclOwnerFullControlRule -Rule $rules[0] -ExpectedSid (Get-McpCurrentUserSid))
     } catch {
         return $false
     }
@@ -79,10 +115,7 @@ function Set-McpAcl {
         }
     }
     try {
-        $sid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User
-        if ($null -eq $sid) {
-            throw 'SID do usuario atual indisponivel'
-        }
+        $sid = Get-McpCurrentUserSid
         if ($Directory) {
             $acl = [System.Security.AccessControl.DirectorySecurity]::new()
             $acl.SetAccessRuleProtection($true, $false)
@@ -119,8 +152,8 @@ function Set-McpAcl {
     if ($rules.Count -ne 1) {
         throw "XPZ_MCP_ACL_NAO_APLICAVEL: esperada uma regra de acesso em $Path; encontradas $($rules.Count)"
     }
-    if ([string]$rules[0].AccessControlType -ne 'Allow') {
-        throw "XPZ_MCP_ACL_NAO_APLICAVEL: regra de acesso nao e Allow em $Path"
+    if (-not (Test-McpAclOwnerFullControlRule -Rule $rules[0] -ExpectedSid $sid)) {
+        throw "XPZ_MCP_ACL_NAO_APLICAVEL: regra final nao e Allow FullControl do usuario atual em $Path"
     }
     return [pscustomobject]@{
         Path      = $Path
