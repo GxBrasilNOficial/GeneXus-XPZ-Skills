@@ -384,8 +384,8 @@ estado→`exitCode` é **entregável do F1** (faixa reservada), não fixada nest
 - **`AGENTS.md`/`README.md`:** **reconciliar** listas, **adicionando só o que faltar** (não assumir par
   fixo). Ponteiro documental na setup (fora do recibo); `xpz-llm-delegate/SKILL.md` (dono do JSONC +
   aresta).
-- **`999`:** entrada **«Skill `xpz-mcp-integrations`»** com pin por commit/sha512 e preset **parcial**;
-  estado **alinhado** (validações caras como **insumo**; falta o **painel de liberação** e a execução).
+- **`999`/histórico:** a entrada **«Skill `xpz-mcp-integrations`»** foi **movida** para
+  `historico/IdeiasImplementadas_202611.md` após a implementação (2026-11-09); o `999` não a mantém.
   **Consultar o `998`** (lição de exit-code, entrada sobre padrão de string matching sem ExitCode).
   **Âncoras por nome de seção, não por número de linha** (v24).
 - Conformidade: `#requires -Version 7.4`; UTF-8 sem BOM (preservando BOM preexistente do arquivo do
@@ -850,9 +850,10 @@ credencial): self-tests descritos no **Anexo B**, só quando o item voltar.
   aparece; `xpz-mcp-integrations` ainda não).
 - Rastreabilidade privada das fixtures: reconciliação já descrita no corpo (*Fronteira com
   `xpz-skills-setup`*), sem âncora por número de linha.
-- **`999`:** entrada **«Skill `xpz-mcp-integrations`»** com pin por commit/sha512 e preset **parcial**;
-  estado **alinhado**. **Consultar o `998`** (lição de exit-code, entrada sobre padrão de string
-  matching sem ExitCode). Âncoras por nome de seção, não por linha (v24).
+- **`999`/histórico:** a entrada **«Skill `xpz-mcp-integrations`»** foi movida para
+  `historico/IdeiasImplementadas_202611.md` após a implementação; o `999` não a mantém. **Consultar o
+  `998`** (lição de exit-code, entrada sobre padrão de string matching sem ExitCode). Âncoras por nome
+  de seção, não por linha (v24).
 - Conformidade: `#requires -Version 7.4`; UTF-8 sem BOM (preservando BOM preexistente do arquivo do
   usuário); molde `.example.ps1`; `Test-XpzParameterNamingContract.ps1` **não** é gate geral; não
   enumerar ≥2 gates numa linha.
