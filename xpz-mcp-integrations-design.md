@@ -420,8 +420,9 @@ estado→`exitCode` é **entregável do F1** (faixa reservada), não fixada nest
   evidência commitada, bloqueia.
 - **Fatos externos medidos em 2026-11-09 (não re-verificar sem motivo):** sha512 do tarball, árvore de
   9 pacotes, `engines.node`, boot, saída no fim do stdin, `mcp.servers`/`mcp.jev` aceitos, env do Codex
-  e do Claude Code. **Seguem a verificar no F1:** wire do modo `compatible` e deslocamento de marcador
-  pelo editor do Codex. A concorrência do `~/.claude.json` pertence ao **F2** (item abaixo).
+  e do Claude Code, wire do modo `compatible` exercitado no E2E de 2026-11-09 (`-CheckCredential`
+  200/`answers_ok` e `jev_find` nos dois clientes). **Segue a verificar no F1:** deslocamento de
+  marcador pelo editor do Codex. A concorrência do `~/.claude.json` pertence ao **F2** (item abaixo).
 - **Concorrência do Claude Code (F2):** `~/.claude.json` é reescrito pelo cliente em execução. O lock
   do A.2 só serializa esta skill; a reintrodução exige protocolo de concorrência repetível (N ciclos
   com o cliente aberto, diff de chaves alheias preservadas, critério passa/falha). Por isso o Claude
@@ -1061,7 +1062,7 @@ exige fonte com timestamp.
 
 ---
 
-## Apêndice — tabela de fornecedor (HIPÓTESE de wire; host medido na v24)
+## Apêndice — tabela de fornecedor (HIPÓTESE histórica de wire; host medido na v24)
 
 **Atualização pós-execução (2026-11-09):** o wire do modo `compatible` foi
 exercitado no E2E da execução real (`-CheckCredential` 200/`answers_ok` e
