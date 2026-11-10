@@ -13,6 +13,30 @@ Entradas legadas sem avaliação carregam `FALTA AVALIAR` em ambos os campos at�
 
 **Editar a substância de um gap já registrado (neste arquivo ou no `998-ideias-descartadas-e-porque.md`) exige justificativa no corpo do commit.** Enfraquecer, reprecisar ou descartar a severidade de uma afirmação — não apenas corrigir redação, adicionar contexto ou reorganizar — precisa dizer **por que**: nova evidência medida, releitura do código, ou correção de erro anterior. Motivo: uma edição que suaviza um gap sem dizer por que **parece resolvido** para quem lê depois, e é pior do que o gap não ter sido achado — quem lê para de investigar. Caso real (2026-08-17): um commit sem corpo trocou «não é citado em lugar nenhum» por «não era coberto na documentação normativa»; a formulação nova era defensável à primeira vista, mas escondia que a única outra menção ao símbolo no repositório era uma cópia **defasada** num self-test — a frase sugeria mitigação onde havia agravante. Só foi achado porque outra sessão foi verificar; sem corpo no commit, não havia como saber se a mudança vinha de leitura nova ou só de estilo.
 
+<a id="jev-uso-eventual-orientacao-20261109"></a>
+
+## Orientação de uso eventual do Jev quando disponível (pasta paralela e demais sessões) — 2026-11-09
+
+- **Importância** — baixa (workaround imediato: o usuário nomeia o Jev na sessão; sem isso, o agente não deve presumir uso).
+- **Maturidade** — ideia (direção identificada; estudo calmo e cuidadoso reservado a dia/sessão dedicados; decisões de dono documental e redação em aberto).
+
+**Origem.** Conversa de 2026-11-09 após a entrega da v1 de `xpz-mcp-integrations-setup` e a pré-push sem push. Ficou claro que a skill cobre **ciclo de vida** (instalar/auditar/reparar/atualizar/remover), não “quando o agente deve chamar o Jev”. Em sessão nova no OpenCode/Codex as tools podem aparecer via MCP, mas uso espontâneo sem menção ao Jev não é garantido nem foi medido como contrato.
+
+**Pergunta a estudar.** Onde e como anotar, com calma, que o agente **pode** usar o Jev **se** as tools estiverem disponíveis — em especial quando a sessão estiver em **pasta paralela de KB GeneXus** — sem confundir com MCP GeneXus (`genexus` / `genexus18mcp`) nem com a trilha `xpz-*`.
+
+**Âncoras já existentes (não reabrir na v1 da skill).**
+
+- `xpz-mcp-integrations-setup/SKILL.md` e `xpz-mcp-integrations-design.md` listam `skills/jev/` e **uso automático** no **não-escopo** da v1.
+- Instruções globais (`AGENTS.md` da máquina): em pasta paralela, MCP GeneXus fica restrito; **outro MCP** só entra quando o usuário o **nomeia** na conversa. Hoje o Jev cai nessa regra.
+
+**Decisão provisória até o estudo.** Testes com o Jev serão feitos **mencionando o Jev na sessão**. Não alterar agora instruções globais, `AGENTS.md` local de pasta paralela, `08`, nem criar `skills/jev/`.
+
+**Candidatos de dono (a escolher na sessão dedicada).** `999` (esta entrada) só guarda a pendência; possíveis casas futuras: instruções globais (efeito operacional imediato), `skills/jev/` (orientação de produto), nota no design/F2, e/ou `AGENTS.md` local só se a política for por KB. `xpz-mcp-integrations-setup` permanece dona do ciclo de vida, não do “quando usar”.
+
+**Urgência e retomada.** Não urgente. Retomar em **sessão nova** e dia mais tranquilo; não misturar com push da frente MCP nem com correção mecânica da skill.
+
+**Relacionado.** `xpz-mcp-integrations-setup/SKILL.md`; `xpz-mcp-integrations-design.md` (não-escopo / F2); `historico/IdeiasImplementadas_202611.md` (entrega v1); instruções globais — seções de pasta paralela e MCP; eventual biblioteca JSONC no 999 (outra frente).
+
 <a id="xpz-relato-20261005-avisos"></a>
 
 ## Qualidade dos avisos de coerência de Transaction e sanidade de Source — resíduo de controles
