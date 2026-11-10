@@ -244,8 +244,9 @@ injeta **só** a var do modo selecionado:
   servidor sobe normalmente, então a allowlist de ambiente não precisa dela.
 - **Preset Command Code (v24):** `baseUrl = https://api.commandcode.ai/provider/v1/systemone` e
   `model = typesafe/jev`. O host respondeu `200` com chamada autenticada; `jev-latest` é **alias aceito**
-  (a resposta normaliza para `typesafe/jev`), mas o preset fixa o valor explícito. O que segue
-  **hipótese** é o wire do modo `compatible`, não o host.
+  (a resposta normaliza para `typesafe/jev`), mas o preset fixa o valor explícito. O wire do modo
+  `compatible` era **hipótese de projeto** e foi exercitado no E2E de 2026-11-09 (ver Apêndice); o host
+  foi medido.
 - **`endpoint_nao_confirmado` — regra da v1:** host igual ao do preset **Command Code** = OK; host
   diferente = **aviso + confirmação explícita** do usuário. Host/caminho **redigidos** antes da
   confirmação.
@@ -666,8 +667,8 @@ Em `xpz-mcp-integrations/fixtures/` (rastreada): trechos **sanitizados** de `pro
 (**modo `compatible`** + vars — v22), `engines.node` (**≥ 22**), `prepare` do `package.json`, boot
 `initialize`, saída no fim do stdin, **+ licença
 MIT integral + atribuição**. **Proveniência por fixture:** `commit`, origem, hash, **data de captura**,
-escopo — **sem** usar o README da `main` como prova da `0.13.0`. Até então, a tabela de Fornecedor é
-**hipótese**.
+escopo — **sem** usar o README da `main` como prova da `0.13.0`. Até a execução real de 2026-11-09, a
+tabela de Fornecedor era **hipótese**; o wire do `compatible` foi exercitado no E2E (ver Apêndice).
 
 **Gate do F1:** **revisão estática do `dist` + boot sem chave** — prova que o pacote sobe sem a chave;
 **não** valida credencial, endpoint nem modelo (v24).
