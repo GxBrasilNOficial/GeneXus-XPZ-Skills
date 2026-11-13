@@ -3777,7 +3777,7 @@ As contagens são de **arquivos que mencionam o token**, não de parâmetros exc
 2. `git * | pwsh *` e `git * | Select-String *` — canalizam saída para um interpretador; na prática, execução arbitrária aprovada automaticamente.
 3. `Bash(for *)`, `Bash(while *)`, `Bash(if *)` — estruturas de controle cujo corpo é comando arbitrário.
 4. `Bash(sed -i *)` — edição de arquivo sem prompt.
-5. `Edit(C:/Dev/**)` — edição aprovada automaticamente em toda a árvore de projetos, incluindo repositórios de produção e pastas de KB que o contrato trata como somente leitura para agentes.
+5. `Edit(<arvore-local-de-projetos>/**)` — edição aprovada automaticamente em toda a árvore de projetos, incluindo repositórios de produção e pastas de KB que o contrato trata como somente leitura para agentes.
 6. `Bash(cp *)` e `Bash(mkdir *)` — efeitos de escrita amplos, sem restrição de destino.
 
 **Atenuantes não avaliados.** Existe um hook `PreToolUse` de Bash que pode revisar comandos antes da execução, e o modo padrão está configurado como `auto`; o efeito real de ambos sobre esses padrões não foi medido nesta rodada.

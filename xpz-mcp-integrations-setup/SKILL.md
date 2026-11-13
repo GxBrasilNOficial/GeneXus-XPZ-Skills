@@ -161,9 +161,9 @@ bloqueiam. O descritor e validado no F1 e no self-test.
    pwsh -NoProfile -File scripts/Uninstall-McpIntegration.ps1 -Client all
    ```
 
-   Preserva cofre, `auth.json`, fornecedor e demais MCPs. O launcher so sai
-   quando nao resta referencia. `-RemoveSkillData` remove launcher/vendor/config/
-   manifesto; `-RemoveVault` remove o cofre, ambos explicitos.
+   Preserva cofre, `auth.json`, fornecedor e demais MCPs. Launcher, vendor,
+   config e manifesto so saem com `-RemoveSkillData`; `-RemoveVault` remove o
+   cofre. Ambos explicitos.
 
 ## OPENCODE
 

@@ -7,8 +7,8 @@
 .DESCRIPTION
     Remove somente entrada reconhecida pelo install-manifest.json (hash
     byte-identico ao bloco emitido). Preserva cofre DPAPI, auth.json, demais
-    MCPs e o restante de cada config de cliente. O launcher so sai quando nao
-    resta referencia; o vendor so sai com -RemoveSkillData.
+    MCPs e o restante de cada config de cliente. Launcher, vendor, config.json
+    e manifesto so saem com -RemoveSkillData; o cofre so com -RemoveVault.
 #>
 
 [CmdletBinding(SupportsShouldProcess = $true)]

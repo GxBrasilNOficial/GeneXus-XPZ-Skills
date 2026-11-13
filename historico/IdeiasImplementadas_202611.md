@@ -64,3 +64,7 @@ Implementado em 2026-11-09 conforme o design v24.2 congelado por decisão humana
 - Commit material: `e37bbd7` — Predicado ACL so-dono (SID+FullControl) no vault MCP.
 - Commit material: `46c7bdb` — CreateExclusive na escrita transacional MCP.
 - Commit material: `34619c8` — Warn `acl_nao_aplicavel` na auditoria offline (A.9).
+- Commit material: `a321ded` — Credencial antes de gravar, piso 60 em GAPS, manifesto clients vazio.
+- Commit material: `58eb33c` — Corrige portugues residual na entrada espanhola do CHANGELOG MCP.
+
+**Correção pós-painel reforçada (2026-11-13).** Além do warn ACL e do CreateExclusive: install barra `credencial_ausente` antes de qualquer escrita; `Resolve-McpGapsExitCode` impede exit 0 com `INTEGRATIONS_GAPS`; install/uninstall exigem clientes pedidos tratados para `INTEGRATIONS_OK`; uninstall persiste `clients` vazio; integrity/fixture de boot alinhados.

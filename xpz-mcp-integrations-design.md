@@ -784,8 +784,10 @@ grafia**. Os marcadores precisam estar balanceados e únicos.
   estrutural**, não de credencial: exige, para cada cliente gerenciado, entrada reconhecida (`escrito`
   ou melhor) **e** ausência de achado `blocking` (vendor, launcher, config, entrada, pré-requisito).
   `boot_ok`/`endpoint_alcancavel`/`credencial_verificada` são **eixos separados** e não mudam o
-  agregado; credencial ausente ou não verificada é reportada como diagnóstico, não como GAPS.
-  **Tabela estado → `exitCode`/classe é entregável do F1** (faixa reservada); a v24.1 não fixa números. **Correção pós-v24.2 (2026-11-09):** a implementação fixa `precedence` no `exit-codes.catalog.json` (`67 > 66 > 61 > 62 > 63 > 64 > 65 > 60`) e ordena o `nextActions` pela mesma precedência.
+  agregado. **Correção pós-painel (2026-11-13):** na implementação F1, `credencial_ausente` e
+  `endpoint_nao_confirmado` são achados **blocking** na auditoria (exit 61/62) e derrubam
+  `INTEGRATIONS_OK`; «credencial não verificada» (eixo `-CheckCredential` não exercitado) continua
+  diagnóstico separado, sem virar GAPS sozinho. **Tabela estado → `exitCode`/classe é entregável do F1** (faixa reservada); a v24.1 não fixa números. **Correção pós-v24.2 (2026-11-09):** a implementação fixa `precedence` no `exit-codes.catalog.json` (`67 > 66 > 61 > 62 > 63 > 64 > 65 > 60`) e ordena o `nextActions` pela mesma precedência.
   **`vendor_divergente`** na v1 = versão instalada (`node_modules/@jkudish/jev-mcp/package.json`) ≠ pin
   do descritor.
 - **Estado por cliente (v24.1):** **um valor só**, na ordem de precedência
@@ -804,7 +806,9 @@ grafia**. Os marcadores precisam estar balanceados e únicos.
   `edicao_manual_necessaria`; `vendor_ausente`/`vendor_divergente`; `launcher_ausente`/
   `launcher_divergente`; `node_ausente`/`node_incompativel`/`node_path_nao_resolve`; `pwsh_ausente`;
   `config_ausente`/`config_invalido`; `python_indisponivel` (**warn**, só afeta o Codex);
-  `credencial_ausente`; `endpoint_nao_confirmado` (**warn** + confirmação, host fora do preset);
+  `credencial_ausente` (**blocking** na auditoria/install); `endpoint_nao_confirmado`
+  (**blocking** na auditoria quando o host difere do preset sem confirmação; mutadores pedem
+  `-ConfirmEndpoint`);
   `acl_nao_aplicavel` (**warn** na auditoria; **blocking** nos mutadores de blob). Na auditoria,
   o warn observa ACL so-dono nos paths existentes: raiz gerenciada, `config.json`,
   `install-manifest.json`, pasta `vault\` e blob do cofre (`Test-McpAcl`); não promove exit

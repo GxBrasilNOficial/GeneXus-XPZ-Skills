@@ -121,7 +121,7 @@ foreach ($name in $scriptNames) {
 }
 
 $requiredEmitters = @{
-    60 = @('Test-McpIntegrations.ps1', 'Install-McpIntegration.ps1')
+    60 = @('Test-McpIntegrations.ps1', 'Install-McpIntegration.ps1', 'Uninstall-McpIntegration.ps1')
     61 = @('Test-McpIntegrations.ps1', 'Install-McpIntegration.ps1', 'Set-McpCredential.ps1', 'launcher')
     62 = @('Test-McpIntegrations.ps1', 'Install-McpIntegration.ps1', 'launcher')
     63 = @('Test-McpIntegrations.ps1', 'Install-McpIntegration.ps1', 'Invoke-McpVendor.ps1', 'launcher')

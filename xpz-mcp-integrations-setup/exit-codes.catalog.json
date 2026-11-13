@@ -24,8 +24,8 @@
     {
       "exit": 60,
       "category": "integracao",
-      "summary": "INTEGRATIONS_GAPS sem codigo especifico (achado blocking nao mapeado).",
-      "engines": ["Test-McpIntegrations.ps1", "Install-McpIntegration.ps1"]
+      "summary": "INTEGRATIONS_GAPS sem codigo especifico (piso quando so ha warn ou achado nao mapeado).",
+      "engines": ["Test-McpIntegrations.ps1", "Install-McpIntegration.ps1", "Uninstall-McpIntegration.ps1"]
     },
     {
       "exit": 61,

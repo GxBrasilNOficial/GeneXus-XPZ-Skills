@@ -97,7 +97,7 @@ try {
     $eofFixture = [System.IO.File]::ReadAllText((Join-Path $fixtureDir 'eof-exit.txt'))
     Assert-True ($eofFixture.Contains('exit 0')) '(eof fixture) exit 0'
     $staticReview = [System.IO.File]::ReadAllText((Join-Path $fixtureDir 'STATIC-REVIEW.md'))
-    Assert-True ($staticReview.Contains('boot') -and $staticReview.Contains('network') -or $staticReview.Contains('rede')) '(static review) boot e limite de rede'
+    Assert-True ($staticReview.Contains('boot') -and ($staticReview.Contains('network') -or $staticReview.Contains('rede'))) '(static review) boot e limite de rede'
 
     # 2. Arvore vendorizada real.
     if ([string]::IsNullOrWhiteSpace($ManagedRoot)) {
