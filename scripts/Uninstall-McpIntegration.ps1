@@ -1,4 +1,4 @@
-﻿#requires -Version 7.4
+#requires -Version 7.4
 
 <#
 .SYNOPSIS
@@ -151,7 +151,10 @@ $liveJevHolders = [System.Collections.Generic.List[string]]::new()
 $probeBaseUrl = 'https://api.commandcode.ai/provider/v1/systemone'
 $probeModel = 'typesafe/jev'
 $ocLiveTarget = Get-McpOpenCodeConfigTarget
-if ($ocLiveTarget.status -eq 'ok') {
+if ($ocLiveTarget.status -eq 'conflict') {
+    # Sem precedencia json/jsonc: nao da para provar ausencia de jev.
+    $liveJevHolders.Add('opencode') | Out-Null
+} elseif ($ocLiveTarget.status -eq 'ok') {
     $ocLiveInfo = Get-McpOpenCodeEntryInfo -Path $ocLiveTarget.path -LauncherPath $launcherPath -BaseUrl $probeBaseUrl -Model $probeModel
     if ($ocLiveInfo.status -eq 'ok') {
         if ([string]$ocLiveInfo.form -ne 'absent') {
@@ -167,9 +170,11 @@ if (Test-McpRegularFile -Path $codexLivePath) {
     $codexLiveDoc = Read-McpTextDocument -Path $codexLivePath
     $codexLiveBlock = Get-McpCodexBlockInfo -Text $codexLiveDoc.Text
     $codexLiveProbe = Invoke-McpTomlProbe -Text $codexLiveDoc.Text
+    # Inclui python_indisponivel: sem tomllib, heuristica textual cobre entrada manual.
+    $codexTextLooksLikeJev = [bool]($codexLiveDoc.Text -match 'mcp_servers\.jev|mcp_servers\s*\.\s*jev')
     $codexHolds = ($codexLiveBlock.state -eq 'present') -or
         ($codexLiveProbe.Ok -and [bool]$codexLiveProbe.HasJev) -or
-        (-not $codexLiveProbe.Ok -and $codexLiveProbe.Status -ne 'python_indisponivel' -and ($codexLiveDoc.Text -match 'mcp_servers\.jev|mcp_servers\s*\.\s*jev'))
+        (-not $codexLiveProbe.Ok -and $codexTextLooksLikeJev)
     if ($codexHolds) {
         $liveJevHolders.Add('codex') | Out-Null
     }

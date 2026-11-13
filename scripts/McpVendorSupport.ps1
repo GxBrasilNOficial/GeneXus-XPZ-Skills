@@ -160,17 +160,20 @@ function Invoke-McpVendorInstall {
             $findings.Add($finding) | Out-Null
         }
     }
+    $vendorDir = Get-McpVendorDir -Version $pin.Version
+    $entryPath = Get-McpVendorEntryPath -Version $pin.Version -Package $pin.Package -DistEntry $pin.DistEntry
     if ($findings.Count -gt 0) {
         return [pscustomobject]@{
             status          = 'blocked'
             exitCode        = Get-McpExitCodeForFindings -Findings @($findings)
             version         = $pin.Version
+            vendorDir       = $vendorDir
+            entryPath       = $entryPath
             findings        = @($findings)
             blockingReasons = @($findings | ForEach-Object { $_.message })
         }
     }
 
-    $vendorDir = Get-McpVendorDir -Version $pin.Version
     $current = Test-McpVendor -Pin $pin
     if (-not $Force -and $current.state -eq 'ok') {
         return [pscustomobject]@{
@@ -189,7 +192,7 @@ function Invoke-McpVendorInstall {
             exitCode        = 0
             version         = $pin.Version
             vendorDir       = $vendorDir
-            entryPath       = (Get-McpVendorEntryPath -Version $pin.Version -Package $pin.Package -DistEntry $pin.DistEntry)
+            entryPath       = $entryPath
             packageJsonPath = $pin.PackageJsonPath
             lockPath        = $pin.LockPath
             integrity       = $pin.TarballIntegrity
@@ -222,6 +225,7 @@ function Invoke-McpVendorInstall {
             exitCode        = 64
             version         = $pin.Version
             vendorDir       = $vendorDir
+            entryPath       = $entryPath
             logPath         = $logPath
             npmExitCode     = $npmExitCode
             blockingReasons = @("npm ci falhou com exit $npmExitCode; ver $logPath")

@@ -209,8 +209,46 @@ try {
     Assert-True (Test-Path -LiteralPath $launcherPath) '(shared-hold) launcher preservado'
     Assert-True (Test-Path -LiteralPath $vendorDir) '(shared-hold) vendor preservado'
     Assert-True (Test-Path -LiteralPath $configPath) '(shared-hold) config preservado'
-    # Reancora codex no manifesto para o restante do fluxo (remove all / remove-data).
+    # 4f. Conflito opencode.json+jsonc: -RemoveSkillData fail-closed (nao prova ausencia).
     $null = & (Join-Path $scriptDir 'Install-McpIntegration.ps1') -Action install -Client all 2>&1
+    [System.IO.File]::WriteAllText((Join-Path $oc 'opencode.json'), "{`n  `"mcp`": {}`n}`n", [System.Text.UTF8Encoding]::new($false))
+    $manifestConflict = Get-McpManifest
+    $manifestConflict.Value = Remove-McpManifestClient -Manifest $manifestConflict.Value -Client 'opencode'
+    $manifestConflict.Value = Remove-McpManifestClient -Manifest $manifestConflict.Value -Client 'codex'
+    $null = Set-McpManifest -Value $manifestConflict.Value
+    $conflictHoldOutput = @(& (Join-Path $scriptDir 'Uninstall-McpIntegration.ps1') -Client codex -RemoveSkillData 2>&1)
+    $conflictHoldExit = $LASTEXITCODE
+    $conflictHoldText = (($conflictHoldOutput | ForEach-Object { [string]$_ }) -join "`n")
+    $conflictHold = $null
+    try { $conflictHold = $conflictHoldText | ConvertFrom-Json -AsHashtable } catch { }
+    Assert-True ($conflictHoldExit -ne 0) "(conflict-hold) exit != 0; obtido $conflictHoldExit"
+    Assert-True ($null -ne $conflictHold -and @($conflictHold.findings | Where-Object { $_.code -eq 'dados_compartilhados_em_uso' }).Count -eq 1) '(conflict-hold) dados_compartilhados_em_uso'
+    Assert-True (Test-Path -LiteralPath $launcherPath) '(conflict-hold) launcher preservado'
+    Remove-Item -LiteralPath (Join-Path $oc 'opencode.json') -Force
+    # Reancora para o restante do fluxo (remove all / remove-data).
+    $null = & (Join-Path $scriptDir 'Install-McpIntegration.ps1') -Action install -Client all 2>&1
+
+    # 4g. Vendor bloqueado por prereq: shape completo e exit 63 (nao 69).
+    . (Join-Path $scriptDir 'McpVendorSupport.ps1')
+    $savedPathForVendor = $env:PATH
+    try {
+        $env:PATH = ''
+        $blockedVendor = Invoke-McpVendorInstall -WhatIf
+        Assert-True ([string]$blockedVendor.status -eq 'blocked') "(vendor-blocked) status blocked; obtido $($blockedVendor.status)"
+        Assert-True ($blockedVendor.PSObject.Properties['vendorDir'] -and $null -ne $blockedVendor.vendorDir) '(vendor-blocked) vendorDir presente'
+        Assert-True ($blockedVendor.PSObject.Properties['entryPath'] -and $null -ne $blockedVendor.entryPath) '(vendor-blocked) entryPath presente'
+        Assert-True ([int]$blockedVendor.exitCode -eq 63) "(vendor-blocked) exit 63; obtido $($blockedVendor.exitCode)"
+        $vendorScriptOut = @(& (Join-Path $scriptDir 'Invoke-McpVendor.ps1') -WhatIf 2>&1)
+        $vendorScriptExit = $LASTEXITCODE
+        $vendorScriptText = (($vendorScriptOut | ForEach-Object { [string]$_ }) -join "`n")
+        $vendorScriptJson = $null
+        try { $vendorScriptJson = $vendorScriptText | ConvertFrom-Json -AsHashtable } catch { }
+        Assert-True ($vendorScriptExit -eq 63) "(vendor-script) exit 63; obtido $vendorScriptExit"
+        Assert-True ($null -ne $vendorScriptJson -and [int]$vendorScriptJson.exitCode -eq 63) '(vendor-script) JSON exitCode 63'
+        Assert-True ($null -ne $vendorScriptJson -and [string]$vendorScriptJson.status -eq 'blocked') '(vendor-script) status blocked'
+    } finally {
+        $env:PATH = $savedPathForVendor
+    }
 
     # 5. Remover entradas: preserva cofre/config.
     $removeOutput = & (Join-Path $scriptDir 'Uninstall-McpIntegration.ps1') -Client all 2>&1
