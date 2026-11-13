@@ -3765,30 +3765,13 @@ As contagens são de **arquivos que mencionam o token**, não de parâmetros exc
 
 **Retomada.** A condição original ("primeiro build real com a dispensa ativa") foi atendida em 2026-10-26: o status ficou `pendente` na prática, conforme a evidência acima. Falta decidir a rota. Nenhuma ação automática.
 
-## Allowlist de permissões com curinga antes de opções — execução e escrita sem prompt
+## Allowlist de permissões com curinga antes de opções — higiene local
 
-- **Importância** — alta (o gate humano de aprovação é contornado; um comando destrutivo pode rodar sem o usuário ver).
-- **Maturidade** — aberta; é correção de configuração local do cliente, sem código novo neste repositório.
+- **Importância** — alta (gate humano de aprovação pode ser contornado na máquina do operador).
+- **Maturidade** — aberta; correção só na configuração local do cliente de agente, sem código novo neste repositório.
 
-**Origem.** Aviso emitido pelo próprio Claude Code em 2026-11-09, durante a coleta de dados de uma frente de MCP nesta base: ao carregar a allowlist do `settings.json` do usuário, o cliente apontou regra com curinga **antes** das opções, que aprova qualquer opção inserida naquele ponto.
+**Resumo público.** Em 2026-11-09, durante coleta de dados de uma frente MCP, o cliente avisou regras de allowlist com curinga **antes** de opções (aprovação automática ampla demais). É **configuração local**, não vulnerabilidade deste repositório — não cabe issue pública nem `SECURITY.md`; a correção é auditar/restringir a allowlist no cliente (evitar curingas que atravessem opções ou interpretadores; restringir `Edit` a repositórios nomeados).
 
-**Padrões de risco observados na mesma allowlist** (classes, sem reproduzir caminhos ou regras da máquina):
-1. `git -C <caminho> <subcomando> *` — o `*` depois do subcomando aceita opções inseridas; em subcomandos que gravam saída, isso vira escrita em caminho arbitrário (`--output=<arquivo>` e equivalentes).
-2. `git * | pwsh *` e `git * | Select-String *` — canalizam saída para um interpretador; na prática, execução arbitrária aprovada automaticamente.
-3. `Bash(for *)`, `Bash(while *)`, `Bash(if *)` — estruturas de controle cujo corpo é comando arbitrário.
-4. `Bash(sed -i *)` — edição de arquivo sem prompt.
-5. `Edit(<arvore-local-de-projetos>/**)` — edição aprovada automaticamente em toda a árvore de projetos, incluindo repositórios de produção e pastas de KB que o contrato trata como somente leitura para agentes.
-6. `Bash(cp *)` e `Bash(mkdir *)` — efeitos de escrita amplos, sem restrição de destino.
+**Inventário detalhado de padrões.** Fora deste repositório público (acompanhamento local do mantenedor), para não versionar um mapa de bypass útil a terceiros.
 
-**Atenuantes não avaliados.** Existe um hook `PreToolUse` de Bash que pode revisar comandos antes da execução, e o modo padrão está configurado como `auto`; o efeito real de ambos sobre esses padrões não foi medido nesta rodada.
-
-**Risco.** Conteúdo malicioso lido por um agente (página, resultado de ferramenta, arquivo de terceiro) ou simples erro do modelo consegue executar comando ou gravar arquivo **sem** aprovação do usuário. É configuração local, não vulnerabilidade deste repositório — não cabe issue pública nem entrada no `SECURITY.md`; a correção é no cliente.
-
-**Correção sugerida.**
-1. Remover entradas de estrutura de controle (`for`/`while`/`if`) e de pipe para interpretador (`| pwsh`, `| Select-String`).
-2. Trocar `<subcomando> *` por conjunto explícito de opções seguras, aceitando só leitura e negando opções que gravam.
-3. Restringir `Edit` a repositórios nomeados, em vez de toda a árvore de projetos.
-4. Auditar a allowlist inteira com o mesmo critério: curinga antes de opção e curinga que atravessa separador de comando.
-5. Considerar `deny` explícito para as opções de escrita dos subcomandos Git usados.
-
-**Relacionado.** Sem vínculo com `xpz-mcp-integrations-setup`; o achado apareceu durante a coleta de dados daquela frente e vale por si.
+**Relacionado.** Sem vínculo com `xpz-mcp-integrations-setup`; o achado apareceu naquela frente e vale por si.

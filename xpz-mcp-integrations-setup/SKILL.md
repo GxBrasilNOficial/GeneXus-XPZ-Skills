@@ -254,7 +254,7 @@ Faixa reservada de exit codes: **60-69** (tabela completa em
 | 65 | launcher ausente/divergente |
 | 66 | entrada quebrada/divergente/em conflito |
 | 67 | edicao manual, ACL, lock, corrida ou credencial ambigua |
-| 68 | Python 3.11+ indisponivel (warn; Codex manual) |
+| 68 | reservado na v1 (python_indisponivel e warn; GAPS so com warn → piso 60) |
 | 69 | falha interna do launcher/motor |
 
 Os cinco motores (`Test-McpIntegrations`, `Install-McpIntegration`,

@@ -103,6 +103,11 @@ foreach ($entry in @($catalog.codes)) {
     }
 }
 
+$code68 = @($catalog.codes | Where-Object { [int]$_.exit -eq 68 })
+Assert-True ($code68.Count -eq 1) '(catalog) exit 68 unico'
+if ($code68.Count -eq 1) {
+    Assert-True (@($code68[0].engines).Count -eq 0) '(catalog) exit 68 reservado sem engines na v1'
+}
 $code69 = @($catalog.codes | Where-Object { [int]$_.exit -eq 69 })
 Assert-True ($code69.Count -eq 1) '(catalog) exit 69 unico'
 if ($code69.Count -eq 1) {

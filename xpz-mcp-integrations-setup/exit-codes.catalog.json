@@ -12,7 +12,7 @@
     "exitCode": "Valor emitido pelo motor xpz-mcp-integrations-setup; tambem e o exit code do processo PowerShell.",
     "overall": "INTEGRATIONS_OK exige entrada reconhecida em cada cliente gerenciado e nenhum achado blocking; credencial verificada e eixo separado.",
     "childExit": "O launcher devolve o exit code do filho; codigos 60-69 do filho nao sao reinterpretados pela skill.",
-    "precedence": "Ordem de desempate quando ha mais de um achado blocking: o primeiro codigo presente vence. 69 fica fora (falha interna do trap); 68 e warn-only e so entra se um achado blocking usar esse codigo."
+    "precedence": "Ordem de desempate quando ha mais de um achado blocking: o primeiro codigo presente vence. 69 fica fora (falha interna do trap); 68 e reservado/warn-only na v1 (python_indisponivel nao promove exit de processo — GAPS so com warn usa o piso 60)."
   },
   "codes": [
     {
@@ -72,8 +72,8 @@
     {
       "exit": 68,
       "category": "python",
-      "summary": "python_indisponivel: sem Python 3.11+ o adaptador Codex cai em edicao_manual_necessaria; nao bloqueia o restante da skill.",
-      "engines": ["Test-McpIntegrations.ps1", "Install-McpIntegration.ps1"]
+      "summary": "Reservado na v1. python_indisponivel e achado warn (Codex cai em edicao_manual_necessaria); nao e emitido como exitCode de processo — GAPS so com warn usa o piso 60.",
+      "engines": []
     },
     {
       "exit": 69,
