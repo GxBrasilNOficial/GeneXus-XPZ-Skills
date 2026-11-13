@@ -1,4 +1,4 @@
-#requires -Version 7.4
+﻿#requires -Version 7.4
 
 <#
 .SYNOPSIS
@@ -382,22 +382,25 @@ function Update-McpCodexConfig {
         } else {
             $scan = Get-McpCodexHeaderScan -Text $document.Text
             if ($originalProbe.HasJev) {
+                # Grafia nao migravel (ex.: mcp_servers.jev.command) antes de
+                # sugerir -MigrateLegacy — paridade com Get-McpCodexState.
+                $migratable = ($scan.ExactHeaders.Count -eq 1 -and $scan.OtherHeaders.Count -eq 0)
+                if (-not $migratable) {
+                    return [pscustomobject]@{
+                        status  = 'entrada_em_conflito'
+                        path    = $Path
+                        action  = 'migrate'
+                        reason  = 'entrada manual em grafia diferente de um unico [mcp_servers.jev]; remova a mao'
+                        written = $false
+                        snippet = $snippet
+                    }
+                }
                 if (-not $MigrateLegacy -and $Action -ne 'migrate') {
                     return [pscustomobject]@{
                         status  = 'manual'
                         path    = $Path
                         action  = 'migrate'
                         reason  = 'entrada manual mcp_servers.jev exige aprovacao explicita para migrar'
-                        written = $false
-                        snippet = $snippet
-                    }
-                }
-                if ($scan.ExactHeaders.Count -ne 1 -or $scan.OtherHeaders.Count -gt 0) {
-                    return [pscustomobject]@{
-                        status  = 'entrada_em_conflito'
-                        path    = $Path
-                        action  = 'migrate'
-                        reason  = 'entrada manual em grafia diferente de um unico [mcp_servers.jev]; remova a mao'
                         written = $false
                         snippet = $snippet
                     }

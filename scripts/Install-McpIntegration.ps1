@@ -371,9 +371,17 @@ foreach ($clientName in $selectedClients) {
         if ($update.status -eq 'manual') {
             Add-McpNextAction -Code 67 -Text 'Install-McpIntegration.ps1 -Client opencode -MigrateLegacy'
         }
-        if ($update.status -eq 'written' -and -not [string]::IsNullOrWhiteSpace([string]$update.entryHash) -and -not $WhatIfPreference) {
-            $manifest.Value = Add-McpManifestClientHash -Manifest $manifest.Value -Client 'opencode' -Path $target.path -Hash ([string]$update.entryHash)
-            $changed = $true
+        # written e unchanged: apos manifesto perdido, reinstall idempotente
+        # precisa reancorar hashes; senao -RemoveSkillData apaga shared ainda em uso.
+        # So chama Add-* quando falta ancora (evita mudar lastWriteUtcTicks no repair).
+        if ($update.status -in @('written', 'unchanged') -and -not [string]::IsNullOrWhiteSpace([string]$update.entryHash) -and -not $WhatIfPreference) {
+            $existingRecord = Get-McpManifestClient -Manifest $manifest.Value -Client 'opencode'
+            $existingHashes = @()
+            if ($null -ne $existingRecord -and $null -ne $existingRecord.hashes) { $existingHashes = @($existingRecord.hashes) }
+            if ($null -eq $existingRecord -or $existingHashes -notcontains [string]$update.entryHash) {
+                $manifest.Value = Add-McpManifestClientHash -Manifest $manifest.Value -Client 'opencode' -Path $target.path -Hash ([string]$update.entryHash)
+                $changed = $true
+            }
         }
         continue
     }
@@ -419,9 +427,14 @@ foreach ($clientName in $selectedClients) {
         if ($update.status -eq 'manual') {
             Add-McpNextAction -Code 67 -Text 'Install-McpIntegration.ps1 -Client codex -MigrateLegacy'
         }
-        if ($update.status -eq 'written' -and -not [string]::IsNullOrWhiteSpace([string]$update.entryHash) -and -not $WhatIfPreference) {
-            $manifest.Value = Add-McpManifestClientHash -Manifest $manifest.Value -Client 'codex' -Path $codexPath -Hash ([string]$update.entryHash)
-            $changed = $true
+        if ($update.status -in @('written', 'unchanged') -and -not [string]::IsNullOrWhiteSpace([string]$update.entryHash) -and -not $WhatIfPreference) {
+            $existingRecord = Get-McpManifestClient -Manifest $manifest.Value -Client 'codex'
+            $existingHashes = @()
+            if ($null -ne $existingRecord -and $null -ne $existingRecord.hashes) { $existingHashes = @($existingRecord.hashes) }
+            if ($null -eq $existingRecord -or $existingHashes -notcontains [string]$update.entryHash) {
+                $manifest.Value = Add-McpManifestClientHash -Manifest $manifest.Value -Client 'codex' -Path $codexPath -Hash ([string]$update.entryHash)
+                $changed = $true
+            }
         }
     }
 }

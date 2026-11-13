@@ -1,4 +1,4 @@
-#requires -Version 7.4
+﻿#requires -Version 7.4
 
 <#
 .SYNOPSIS
@@ -145,8 +145,41 @@ $manifestRefsRemaining = @($manifest.Value.clients.Keys)
 $launcherRemoved = $false
 $vendorRemoved = $false
 $dataRemoved = $false
+# Guarda live: manifesto vazio nao basta — outro cliente pode ainda ter jev
+# (ex.: manifesto perdido e so um cliente reancorado).
+$liveJevHolders = [System.Collections.Generic.List[string]]::new()
+$probeBaseUrl = 'https://api.commandcode.ai/provider/v1/systemone'
+$probeModel = 'typesafe/jev'
+$ocLiveTarget = Get-McpOpenCodeConfigTarget
+if ($ocLiveTarget.status -eq 'ok') {
+    $ocLiveInfo = Get-McpOpenCodeEntryInfo -Path $ocLiveTarget.path -LauncherPath $launcherPath -BaseUrl $probeBaseUrl -Model $probeModel
+    if ($ocLiveInfo.status -eq 'ok') {
+        if ([string]$ocLiveInfo.form -ne 'absent') {
+            $liveJevHolders.Add('opencode') | Out-Null
+        }
+    } elseif ($ocLiveInfo.status -in @('entrada_em_conflito', 'entrada_quebrada')) {
+        # Fail-closed: config ambigua/ilegivel nao autoriza apagar shared.
+        $liveJevHolders.Add('opencode') | Out-Null
+    }
+}
+$codexLivePath = Get-McpCodexConfigPath
+if (Test-McpRegularFile -Path $codexLivePath) {
+    $codexLiveDoc = Read-McpTextDocument -Path $codexLivePath
+    $codexLiveBlock = Get-McpCodexBlockInfo -Text $codexLiveDoc.Text
+    $codexLiveProbe = Invoke-McpTomlProbe -Text $codexLiveDoc.Text
+    $codexHolds = ($codexLiveBlock.state -eq 'present') -or
+        ($codexLiveProbe.Ok -and [bool]$codexLiveProbe.HasJev) -or
+        (-not $codexLiveProbe.Ok -and $codexLiveProbe.Status -ne 'python_indisponivel' -and ($codexLiveDoc.Text -match 'mcp_servers\.jev|mcp_servers\s*\.\s*jev'))
+    if ($codexHolds) {
+        $liveJevHolders.Add('codex') | Out-Null
+    }
+}
 if ($RemoveSkillData -and $blocking.Count -eq 0 -and $manifestRefsRemaining.Count -eq 0) {
-    if (-not $WhatIfPreference) {
+    if ($liveJevHolders.Count -gt 0) {
+        $holdersLabel = ($liveJevHolders -join ', ')
+        $findings.Add((New-McpFinding -Code 'dados_compartilhados_em_uso' -Class 'blocking' -Message ("launcher/vendor ainda referenciados por entrada jev live ($holdersLabel); remova esses clientes antes de -RemoveSkillData"))) | Out-Null
+        $blocking = @($findings | Where-Object { $_.class -eq 'blocking' })
+    } elseif (-not $WhatIfPreference) {
         $managedRoot = Get-McpManagedRoot
         $launcherRecords = @($manifest.Value.launchers)
         if ($launcherRecords.Count -eq 0) {
@@ -187,8 +220,10 @@ if ($RemoveSkillData -and $blocking.Count -eq 0 -and $manifestRefsRemaining.Coun
             Remove-Item -LiteralPath $manifestPath -Force
             $dataRemoved = $true
         }
+        $changed = $true
+    } else {
+        $changed = $true
     }
-    $changed = $true
 }
 
 if ($RemoveVault) {

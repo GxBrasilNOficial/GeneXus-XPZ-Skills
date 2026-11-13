@@ -1426,6 +1426,7 @@ function Get-McpExitCodeForFindings {
         atualizacao_sem_aprovacao = 67
         client_obrigatorio        = 67
         acao_invalida             = 67
+        dados_compartilhados_em_uso = 67
         python_indisponivel       = 68
     }
     $codes = @()

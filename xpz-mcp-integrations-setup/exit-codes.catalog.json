@@ -66,7 +66,7 @@
     {
       "exit": 67,
       "category": "acao-manual",
-      "summary": "edicao_manual_necessaria/acl_nao_aplicavel/credencial_ambigua/lock/race/manifesto_corrompido/atualizacao_sem_aprovacao/client_obrigatorio/acao_invalida: escrita recusada sem perda de dados.",
+      "summary": "edicao_manual_necessaria/acl_nao_aplicavel/credencial_ambigua/lock/race/manifesto_corrompido/atualizacao_sem_aprovacao/client_obrigatorio/acao_invalida/dados_compartilhados_em_uso: escrita recusada sem perda de dados.",
       "engines": ["*"]
     },
     {

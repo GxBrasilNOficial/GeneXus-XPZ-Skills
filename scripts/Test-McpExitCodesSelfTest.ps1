@@ -203,6 +203,7 @@ $expected = @{
     launcher_ausente        = 65
     entrada_em_conflito     = 66
     edicao_manual_necessaria = 67
+    dados_compartilhados_em_uso = 67
     python_indisponivel     = 68
 }
 foreach ($code in $expected.Keys) {

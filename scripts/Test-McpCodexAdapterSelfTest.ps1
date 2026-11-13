@@ -1,4 +1,4 @@
-#requires -Version 7.4
+﻿#requires -Version 7.4
 
 <#
 .SYNOPSIS
@@ -93,6 +93,11 @@ try {
     foreach ($fixture in @('manual-quoted.toml', 'manual-dotted.toml', 'manual-inline.toml', 'manual-subtable.toml', 'manual-spaced-header.toml')) {
         $path = New-Fixture -Name $fixture
         $before = Read-Text -Path $path
+        # Sem -MigrateLegacy: conflito direto — nao status manual (que sugere -MigrateLegacy).
+        $withoutMigrate = Update-McpCodexConfig -Path $path -LauncherPath $launcher -BaseUrl $baseUrl -Model $model -ManifestHashes @() -Action install
+        Assert-True ($withoutMigrate.status -eq 'entrada_em_conflito') "($fixture/no-migrate) esperado entrada_em_conflito; obtido $($withoutMigrate.status)"
+        Assert-True (([string]$withoutMigrate.reason) -match 'grafia|remova a mao') "($fixture/no-migrate) razao nao-migravel; obtido $($withoutMigrate.reason)"
+        Assert-True ((Read-Text -Path $path) -ceq $before) "($fixture/no-migrate) arquivo intacto"
         $result = Update-McpCodexConfig -Path $path -LauncherPath $launcher -BaseUrl $baseUrl -Model $model -ManifestHashes @() -Action install -MigrateLegacy
         Assert-True ($result.status -eq 'entrada_em_conflito') "($fixture) esperado entrada_em_conflito; obtido $($result.status)"
         Assert-True ((Read-Text -Path $path) -ceq $before) "($fixture) arquivo intacto"

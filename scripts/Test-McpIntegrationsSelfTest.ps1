@@ -181,6 +181,37 @@ try {
     Assert-True ($null -ne $dupUninstall -and @($dupUninstall.findings | Where-Object { $_.code -eq 'entrada_quebrada' -and $_.client -eq 'opencode' }).Count -eq 1) '(dup-uninstall) achado entrada_quebrada com client'
     [System.IO.File]::WriteAllText($ocPath, $ocBeforeDup, [System.Text.UTF8Encoding]::new($false))
 
+    # 4d. Manifesto perdido: reinstall reancora hashes de entradas unchanged.
+    $manifestPathForAnchor = Get-McpManifestPath
+    Remove-Item -LiteralPath $manifestPathForAnchor -Force
+    Assert-True (-not (Test-Path -LiteralPath $manifestPathForAnchor)) '(reanchor) manifesto ausente'
+    $reanchorOutput = & (Join-Path $scriptDir 'Install-McpIntegration.ps1') -Action install -Client all 2>&1
+    $reanchorExit = $LASTEXITCODE
+    Assert-True ($reanchorExit -eq 0) "(reanchor) exit 0; obtido $reanchorExit"
+    $reanchorManifest = Get-McpManifest
+    Assert-True ($reanchorManifest.Exists -and -not $reanchorManifest.Corrupt) '(reanchor) manifesto recriado'
+    $reanchorOc = Get-McpManifestClient -Manifest $reanchorManifest.Value -Client 'opencode'
+    $reanchorCx = Get-McpManifestClient -Manifest $reanchorManifest.Value -Client 'codex'
+    Assert-True ($null -ne $reanchorOc -and @($reanchorOc.hashes).Count -ge 1) '(reanchor) hash opencode'
+    Assert-True ($null -ne $reanchorCx -and @($reanchorCx.hashes).Count -ge 1) '(reanchor) hash codex'
+
+    # 4e. -RemoveSkillData recusa apagar shared se outro cliente ainda tem jev live.
+    $manifestAfterAnchor = Get-McpManifest
+    $manifestAfterAnchor.Value = Remove-McpManifestClient -Manifest $manifestAfterAnchor.Value -Client 'codex'
+    $null = Set-McpManifest -Value $manifestAfterAnchor.Value
+    $sharedHoldOutput = @(& (Join-Path $scriptDir 'Uninstall-McpIntegration.ps1') -Client opencode -RemoveSkillData 2>&1)
+    $sharedHoldExit = $LASTEXITCODE
+    $sharedHoldText = (($sharedHoldOutput | ForEach-Object { [string]$_ }) -join "`n")
+    $sharedHold = $null
+    try { $sharedHold = $sharedHoldText | ConvertFrom-Json -AsHashtable } catch { }
+    Assert-True ($sharedHoldExit -ne 0) "(shared-hold) exit != 0; obtido $sharedHoldExit"
+    Assert-True ($null -ne $sharedHold -and @($sharedHold.findings | Where-Object { $_.code -eq 'dados_compartilhados_em_uso' }).Count -eq 1) '(shared-hold) achado dados_compartilhados_em_uso'
+    Assert-True (Test-Path -LiteralPath $launcherPath) '(shared-hold) launcher preservado'
+    Assert-True (Test-Path -LiteralPath $vendorDir) '(shared-hold) vendor preservado'
+    Assert-True (Test-Path -LiteralPath $configPath) '(shared-hold) config preservado'
+    # Reancora codex no manifesto para o restante do fluxo (remove all / remove-data).
+    $null = & (Join-Path $scriptDir 'Install-McpIntegration.ps1') -Action install -Client all 2>&1
+
     # 5. Remover entradas: preserva cofre/config.
     $removeOutput = & (Join-Path $scriptDir 'Uninstall-McpIntegration.ps1') -Client all 2>&1
     $removeExit = $LASTEXITCODE

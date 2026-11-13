@@ -169,7 +169,11 @@ bloqueiam. O descritor e validado no F1 e no self-test.
 
    Preserva cofre, `auth.json`, fornecedor e demais MCPs. Launcher, vendor,
    config e manifesto so saem com `-RemoveSkillData`; `-RemoveVault` remove o
-   cofre. Ambos explicitos.
+   cofre. Ambos explicitos. `-RemoveSkillData` exige manifesto sem clientes **e**
+   nenhuma entrada jev live restante (OpenCode/Codex); se ainda houver,
+   `dados_compartilhados_em_uso` (exit 67) e o shared permanece. Install em
+   `unchanged` reancora hash no manifesto quando a ancora falta (ex.: manifesto
+   perdido).
 
 ## OPENCODE
 
@@ -202,12 +206,13 @@ bloqueiam. O descritor e validado no F1 e no self-test.
 - **Deteccao/validacao:** `tomllib` do Python 3.11+ (somente leitura), cobrindo
   qualquer grafia equivalente. Sem Python 3.11+, o Codex cai em
   `edicao_manual_necessaria` com o trecho pronto; o resto da skill segue.
-- **Migracao manual:** so quando houver um unico cabecalho `[mcp_servers.jev]` e
-  `-MigrateLegacy`; outras grafias → conflito com instrucao para remover a mao.
+- **Migracao manual:** a grafia e classificada **antes** de sugerir
+  `-MigrateLegacy`. So um unico cabecalho `[mcp_servers.jev]` e migravel (com
+  `-MigrateLegacy`); outras grafias (ex.: `mcp_servers.jev.command`) →
+  `entrada_em_conflito` (exit 66) direto, sem `manual`/`nextActions` de migrate.
   A auditoria classifica o caso migravel como `edicao_manual_necessaria`
   (exit 67) e o `nextActions` inclui
-  `Install-McpIntegration.ps1 -Client codex -MigrateLegacy`; as demais
-  grafias continuam `entrada_em_conflito` (exit 66).
+  `Install-McpIntegration.ps1 -Client codex -MigrateLegacy`.
 - **Encerramento:** o bloco emitido e o unico trecho que a skill substitui ou
   remove; o restante do TOML e preservado.
 
