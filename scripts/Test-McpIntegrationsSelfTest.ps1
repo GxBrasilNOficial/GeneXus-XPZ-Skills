@@ -141,6 +141,32 @@ try {
     Assert-True ($manifestBeforeRepair -ceq $manifestAfterRepair) "(repair) manifesto intacto; diff=$manifestDiff"
     Assert-True (Test-McpAcl -Path $manifestPath) '(repair) ACL do manifesto reaplicada em unchanged'
 
+    # 4b. Uninstall -WhatIf: planned conta como tratado (INTEGRATIONS_OK / exit 0).
+    $whatIfRemoveOutput = @(& (Join-Path $scriptDir 'Uninstall-McpIntegration.ps1') -Client all -WhatIf 2>&1)
+    $whatIfRemoveExit = $LASTEXITCODE
+    $whatIfRemoveText = (($whatIfRemoveOutput | ForEach-Object { [string]$_ }) -join "`n")
+    $whatIfRemove = $null
+    try { $whatIfRemove = $whatIfRemoveText | ConvertFrom-Json -AsHashtable } catch { }
+    Assert-True ($whatIfRemoveExit -eq 0) "(uninstall-whatif) exit 0; obtido $whatIfRemoveExit"
+    Assert-True ($null -ne $whatIfRemove -and [string]$whatIfRemove.overall -eq 'INTEGRATIONS_OK') "(uninstall-whatif) overall OK; obtido $($whatIfRemove.overall)"
+    Assert-True ($null -ne $whatIfRemove -and [bool]$whatIfRemove.planned -eq $true) '(uninstall-whatif) planned=true'
+    Assert-True ([System.IO.File]::ReadAllText((Join-Path $oc 'opencode.jsonc')) -match '"jev"') '(uninstall-whatif) opencode intacto'
+    Assert-True ([System.IO.File]::ReadAllText((Join-Path $cx 'config.toml')) -match '\[mcp_servers\.jev\]') '(uninstall-whatif) codex intacto'
+
+    # 4c. Uninstall OpenCode com chave duplicada: finding entrada_quebrada (exit 66).
+    $ocPath = Join-Path $oc 'opencode.jsonc'
+    $ocBeforeDup = [System.IO.File]::ReadAllText($ocPath)
+    $dupFixture = Join-Path (Get-McpRepoRoot) 'xpz-mcp-integrations-setup\fixtures\opencode\duplicated-key.jsonc'
+    [System.IO.File]::Copy($dupFixture, $ocPath, $true)
+    $dupUninstallOutput = @(& (Join-Path $scriptDir 'Uninstall-McpIntegration.ps1') -Client opencode 2>&1)
+    $dupUninstallExit = $LASTEXITCODE
+    $dupUninstallText = (($dupUninstallOutput | ForEach-Object { [string]$_ }) -join "`n")
+    $dupUninstall = $null
+    try { $dupUninstall = $dupUninstallText | ConvertFrom-Json -AsHashtable } catch { }
+    Assert-True ($dupUninstallExit -eq 66) "(dup-uninstall) exit 66; obtido $dupUninstallExit"
+    Assert-True ($null -ne $dupUninstall -and @($dupUninstall.findings | Where-Object { $_.code -eq 'entrada_quebrada' -and $_.client -eq 'opencode' }).Count -eq 1) '(dup-uninstall) achado entrada_quebrada com client'
+    [System.IO.File]::WriteAllText($ocPath, $ocBeforeDup, [System.Text.UTF8Encoding]::new($false))
+
     # 5. Remover entradas: preserva cofre/config.
     $removeOutput = & (Join-Path $scriptDir 'Uninstall-McpIntegration.ps1') -Client all 2>&1
     $removeExit = $LASTEXITCODE

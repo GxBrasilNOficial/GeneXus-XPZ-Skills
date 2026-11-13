@@ -93,7 +93,13 @@ foreach ($clientName in $selectedClients) {
                 $changed = $true
             }
         } elseif ($result.status -in @('manual', 'entrada_em_conflito', 'conflict', 'entrada_quebrada', 'edicao_manual_necessaria')) {
-            $code = if ($result.status -eq 'manual') { 'edicao_manual_necessaria' } else { 'entrada_em_conflito' }
+            $code = if ($result.status -eq 'manual') {
+                'edicao_manual_necessaria'
+            } elseif ($result.status -eq 'entrada_quebrada') {
+                'entrada_quebrada'
+            } else {
+                'entrada_em_conflito'
+            }
             $findings.Add((New-McpFinding -Code $code -Class 'blocking' -Message ([string]$result.reason) -Client 'opencode')) | Out-Null
         }
         continue
@@ -119,7 +125,15 @@ foreach ($clientName in $selectedClients) {
                 $changed = $true
             }
         } elseif ($result.status -in @('manual', 'entrada_em_conflito', 'conflict', 'entrada_quebrada', 'edicao_manual_necessaria', 'python_indisponivel')) {
-            $code = if ($result.status -eq 'python_indisponivel') { 'python_indisponivel' } elseif ($result.status -eq 'edicao_manual_necessaria') { 'edicao_manual_necessaria' } elseif ($result.status -eq 'entrada_quebrada') { 'entrada_quebrada' } else { 'entrada_em_conflito' }
+            $code = if ($result.status -eq 'python_indisponivel') {
+                'python_indisponivel'
+            } elseif ($result.status -in @('edicao_manual_necessaria', 'manual')) {
+                'edicao_manual_necessaria'
+            } elseif ($result.status -eq 'entrada_quebrada') {
+                'entrada_quebrada'
+            } else {
+                'entrada_em_conflito'
+            }
             $class = if ($result.status -eq 'python_indisponivel') { 'warn' } else { 'blocking' }
             $findings.Add((New-McpFinding -Code $code -Class $class -Message ([string]$result.reason) -Client 'codex')) | Out-Null
         }
@@ -197,7 +211,15 @@ if (-not $WhatIfPreference -and -not $manifest.Corrupt -and $blocking.Count -eq 
 $allRequestedHandled = $true
 foreach ($requested in $selectedClients) {
     $clientState = $clientsResult[$requested]
-    if ($null -eq $clientState -or [string]$clientState.status -notin @('written', 'unchanged')) {
+    if ($null -eq $clientState) {
+        $allRequestedHandled = $false
+        break
+    }
+    # -WhatIf: planned conta como tratado (paridade com Install-McpIntegration).
+    $status = [string]$clientState.status
+    $handled = ($status -in @('written', 'unchanged')) -or
+        ($WhatIfPreference -and $status -eq 'planned')
+    if (-not $handled) {
         $allRequestedHandled = $false
         break
     }
