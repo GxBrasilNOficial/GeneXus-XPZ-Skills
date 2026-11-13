@@ -171,10 +171,10 @@ bloqueiam. O descritor e validado no F1 e no self-test.
    config e manifesto so saem com `-RemoveSkillData`; `-RemoveVault` remove o
    cofre. Ambos explicitos.    `-RemoveSkillData` exige manifesto sem clientes **e**
    nenhuma entrada jev live restante (OpenCode/Codex); se ainda houver,
-   `dados_compartilhados_em_uso` (exit 67) e o shared permanece. Conflito
-   `opencode.json`+`jsonc` ou Codex sem Python com texto suspeito de jev
-   tambem bloqueiam (fail-closed). Install em `unchanged` reancora hash no
-   manifesto quando a ancora falta (ex.: manifesto perdido).
+   `dados_compartilhados_em_uso` (exit 67) e o shared permanece.    Conflito `opencode.json`+`jsonc`, heuristica Codex (quoted/inline/subtable)
+   ou Codex sem Python com qualquer `mcp_servers` (fail-closed) tambem
+   bloqueiam. Install em `unchanged` reancora hash no manifesto quando a
+   ancora falta (ex.: manifesto perdido).
 
 ## OPENCODE
 

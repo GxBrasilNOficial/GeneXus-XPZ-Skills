@@ -108,6 +108,21 @@ try {
     Assert-True (@($dottedState.findings | Where-Object { $_.code -eq 'entrada_em_conflito' }).Count -eq 1) '(dotted-state) entrada_em_conflito'
     Remove-Item -LiteralPath $stateTarget -Force
 
+    # 3b. Heuristica textual / hold sem Python cobre grafias dos fixtures.
+    $noPythonProbe = [pscustomobject]@{ Ok = $false; Status = 'python_indisponivel'; HasJev = $null }
+    foreach ($fixture in @('manual-quoted.toml', 'manual-dotted.toml', 'manual-inline.toml', 'manual-subtable.toml', 'manual-spaced-header.toml', 'manual-canonical.toml')) {
+        $path = New-Fixture -Name $fixture
+        $text = Read-Text -Path $path
+        Assert-True (Test-McpCodexTextLooksLikeJev -Text $text) "($fixture/heuristica) textual reconhece jev"
+        Assert-True (Test-McpCodexConfigHoldsJev -Text $text -Probe $noPythonProbe -BlockState 'absent') "($fixture/hold) hold sem Python"
+    }
+    $cleanToml = "model = `"gpt-5`"`n"
+    Assert-True (-not (Test-McpCodexTextLooksLikeJev -Text $cleanToml)) '(heuristica) toml limpo negativo'
+    Assert-True (-not (Test-McpCodexConfigHoldsJev -Text $cleanToml -Probe $noPythonProbe -BlockState 'absent')) '(hold) limpo sem Python nao segura'
+    $otherMcpOnly = "model = `"gpt-5`"`n`n[mcp_servers.other]`ncommand = `"x`"`n"
+    Assert-True (-not (Test-McpCodexTextLooksLikeJev -Text $otherMcpOnly)) '(heuristica) outro mcp_servers sem jev'
+    Assert-True (Test-McpCodexConfigHoldsJev -Text $otherMcpOnly -Probe $noPythonProbe -BlockState 'absent') '(hold) mcp_servers sem Python fail-closed'
+
     # 4. Bloco entre marcadores reconhecido.
     $balanced = New-Fixture -Name 'markers-balanced.toml'
     $balancedTarget = Join-Path $codexDir 'config.toml'

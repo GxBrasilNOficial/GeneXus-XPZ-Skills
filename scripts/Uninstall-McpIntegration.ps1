@@ -170,12 +170,7 @@ if (Test-McpRegularFile -Path $codexLivePath) {
     $codexLiveDoc = Read-McpTextDocument -Path $codexLivePath
     $codexLiveBlock = Get-McpCodexBlockInfo -Text $codexLiveDoc.Text
     $codexLiveProbe = Invoke-McpTomlProbe -Text $codexLiveDoc.Text
-    # Inclui python_indisponivel: sem tomllib, heuristica textual cobre entrada manual.
-    $codexTextLooksLikeJev = [bool]($codexLiveDoc.Text -match 'mcp_servers\.jev|mcp_servers\s*\.\s*jev')
-    $codexHolds = ($codexLiveBlock.state -eq 'present') -or
-        ($codexLiveProbe.Ok -and [bool]$codexLiveProbe.HasJev) -or
-        (-not $codexLiveProbe.Ok -and $codexTextLooksLikeJev)
-    if ($codexHolds) {
+    if (Test-McpCodexConfigHoldsJev -Text $codexLiveDoc.Text -Probe $codexLiveProbe -BlockState ([string]$codexLiveBlock.state)) {
         $liveJevHolders.Add('codex') | Out-Null
     }
 }

@@ -161,7 +161,8 @@ function Get-McpCodexHeaderScan {
             $exactHeaders += $i
         } elseif ($line.StartsWith('[mcp_servers.jev.')) {
             $subHeaders += $i
-        } elseif ($line -match '^\[\s*mcp_servers\s*\.\s*jev\s*[\].]') {
+        } elseif ($line -match '^\[\s*mcp_servers\s*\.\s*[''"]?jev[''"]?\s*[\].]') {
+            # Cobre [ mcp_servers.jev ], [mcp_servers.'jev'], etc.
             $otherHeaders += $i
         }
     }
@@ -170,6 +171,50 @@ function Get-McpCodexHeaderScan {
         SubHeaders   = $subHeaders
         OtherHeaders = $otherHeaders
     }
+}
+
+function Test-McpCodexTextLooksLikeJev {
+    <#
+    .SYNOPSIS
+        Heuristica textual de entrada jev no TOML do Codex (sem tomllib).
+    #>
+    param([Parameter(Mandatory = $true)][AllowEmptyString()][string]$Text)
+    if ([string]::IsNullOrWhiteSpace($Text)) { return $false }
+    if ($Text -match 'xpz-mcp-integrations-setup:jev') { return $true }
+    $scan = Get-McpCodexHeaderScan -Text $Text
+    if ($scan.ExactHeaders.Count -gt 0 -or $scan.SubHeaders.Count -gt 0 -or $scan.OtherHeaders.Count -gt 0) {
+        return $true
+    }
+    # Chave pontilhada / aspas: mcp_servers.jev / mcp_servers.'jev'
+    if ($Text -match 'mcp_servers\s*\.\s*[''"]?jev[''"]?') { return $true }
+    # Tabela inline: mcp_servers = { jev = { ... } }
+    if ($Text -match 'mcp_servers\s*=\s*\{[\s\S]*?\bjev\b') { return $true }
+    # Subchaves sob [mcp_servers]: jev.command / jev = / "jev" =
+    if ($Text -match '(?ms)\[\s*mcp_servers\s*\].*?^\s*[''"]?jev[''"]?\s*[.=]') { return $true }
+    return $false
+}
+
+function Test-McpCodexConfigHoldsJev {
+    <#
+    .SYNOPSIS
+        Decide se o config.toml do Codex ainda referencia jev (live hold).
+    .DESCRIPTION
+        Prefer tomllib; sem Python, usa heuristica e fail-closed se houver
+        mcp_servers sem como provar ausencia de jev.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][AllowEmptyString()][string]$Text,
+        [Parameter(Mandatory = $true)]$Probe,
+        [Parameter(Mandatory = $true)][string]$BlockState
+    )
+    if ($BlockState -eq 'present') { return $true }
+    if ($Probe.Ok -and [bool]$Probe.HasJev) { return $true }
+    if (Test-McpCodexTextLooksLikeJev -Text $Text) { return $true }
+    if (-not $Probe.Ok -and [string]$Probe.Status -eq 'python_indisponivel' -and $Text -match 'mcp_servers') {
+        # Sem tomllib nao da para provar que mcp_servers nao esconde jev.
+        return $true
+    }
+    return $false
 }
 
 function Invoke-McpTomlProbe {
