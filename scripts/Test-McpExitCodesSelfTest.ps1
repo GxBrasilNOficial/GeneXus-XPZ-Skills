@@ -207,6 +207,9 @@ foreach ($code in $expected.Keys) {
 }
 $warnOnly = Get-McpExitCodeForFindings -Findings @((New-McpFinding -Code 'python_indisponivel' -Class 'warn' -Message 'teste'))
 Assert-True ($warnOnly -eq 0) '(catalog) warn isolado nao bloqueia'
+Assert-True ((Resolve-McpGapsExitCode -Overall 'INTEGRATIONS_OK' -Findings @((New-McpFinding -Code 'python_indisponivel' -Class 'warn' -Message 'teste'))) -eq 0) '(gaps-exit) OK permanece 0'
+Assert-True ((Resolve-McpGapsExitCode -Overall 'INTEGRATIONS_GAPS' -Findings @((New-McpFinding -Code 'python_indisponivel' -Class 'warn' -Message 'teste'))) -eq 60) '(gaps-exit) GAPS com so warn usa piso 60'
+Assert-True ((Resolve-McpGapsExitCode -Overall 'INTEGRATIONS_GAPS' -Findings @((New-McpFinding -Code 'credencial_ausente' -Class 'blocking' -Message 'teste'))) -eq 61) '(gaps-exit) GAPS com blocking preserva 61'
 
 if ($failures.Count -gt 0) {
     foreach ($failure in $failures) {

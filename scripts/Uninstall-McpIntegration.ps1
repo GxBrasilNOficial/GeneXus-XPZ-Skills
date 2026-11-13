@@ -185,13 +185,25 @@ if ($RemoveVault) {
     $changed = $true
 }
 
-if (-not $WhatIfPreference -and $manifestRefsRemaining.Count -gt 0 -and -not $manifest.Corrupt) {
-    $manifestWrite = Set-McpManifest -Value $manifest.Value
-    if ($manifestWrite.Status -eq 'written') { $changed = $true }
+# Persistir manifesto mesmo com clients vazio (uninstall -Client all sem -RemoveSkillData).
+# Se -RemoveSkillData ja apagou o arquivo, nao regrava.
+if (-not $WhatIfPreference -and -not $manifest.Corrupt -and $blocking.Count -eq 0 -and $changed) {
+    if (Test-McpRegularFile -Path (Get-McpManifestPath)) {
+        $manifestWrite = Set-McpManifest -Value $manifest.Value
+        if ($manifestWrite.Status -eq 'written') { $changed = $true }
+    }
 }
 
-$overall = if ($blocking.Count -eq 0) { 'INTEGRATIONS_OK' } else { 'INTEGRATIONS_GAPS' }
-$exitCode = if ($overall -eq 'INTEGRATIONS_OK') { 0 } else { Get-McpExitCodeForFindings -Findings @($findings) }
+$allRequestedHandled = $true
+foreach ($requested in $selectedClients) {
+    $clientState = $clientsResult[$requested]
+    if ($null -eq $clientState -or [string]$clientState.status -notin @('written', 'unchanged')) {
+        $allRequestedHandled = $false
+        break
+    }
+}
+$overall = if ($blocking.Count -eq 0 -and $allRequestedHandled) { 'INTEGRATIONS_OK' } else { 'INTEGRATIONS_GAPS' }
+$exitCode = Resolve-McpGapsExitCode -Overall $overall -Findings @($findings)
 if ($overall -eq 'INTEGRATIONS_OK') {
     $nextActions.Add('Recarregar/reiniciar o cliente para a remocao valer') | Out-Null
 }

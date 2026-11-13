@@ -143,6 +143,9 @@ try {
     Assert-True ($codexText -notmatch '\[mcp_servers\.jev\]') '(remove) entrada codex removida'
     Assert-True (Test-Path -LiteralPath $configPath) '(remove) config preservado'
     Assert-True (Test-McpVaultExists) '(remove) cofre preservado'
+    $manifestAfterRemove = Get-McpManifest
+    Assert-True ($manifestAfterRemove.Exists -and -not $manifestAfterRemove.Corrupt) '(remove) manifesto permanece'
+    Assert-True (@($manifestAfterRemove.Value.clients.Keys).Count -eq 0) '(remove) manifesto clients vazio persistido'
 
     # 6. Remover dados da skill: cofre preservado.
     $removeDataOutput = & (Join-Path $scriptDir 'Uninstall-McpIntegration.ps1') -Client all -RemoveSkillData 2>&1
@@ -153,6 +156,20 @@ try {
     Assert-True (-not (Test-Path -LiteralPath $launcherPath)) '(remove-data) launcher removido'
     Assert-True (-not (Test-Path -LiteralPath $vendorDir)) '(remove-data) vendor removido'
     Assert-True (Test-McpVaultExists) '(remove-data) cofre preservado'
+
+    # 6b. Install sem cofre: blocking antes de qualquer escrita (G1).
+    Remove-Item -LiteralPath (Get-McpVaultBlobPath) -Force
+    $noCredOutput = & (Join-Path $scriptDir 'Install-McpIntegration.ps1') -Action install -Client all 2>&1
+    $noCredExit = $LASTEXITCODE
+    $noCredText = (($noCredOutput | ForEach-Object { [string]$_ }) -join "`n")
+    $noCred = $null
+    try { $noCred = $noCredText | ConvertFrom-Json -AsHashtable } catch { }
+    Assert-True ($noCredExit -eq 61) "(no-cred) exit 61; obtido $noCredExit"
+    Assert-True ($null -ne $noCred -and [string]$noCred.overall -eq 'INTEGRATIONS_GAPS') '(no-cred) overall GAPS'
+    Assert-True ($null -ne $noCred -and @($noCred.findings | Where-Object { $_.code -eq 'credencial_ausente' }).Count -eq 1) '(no-cred) achado credencial_ausente'
+    Assert-True (-not (Test-Path -LiteralPath $launcherPath)) '(no-cred) launcher nao emitido sem cofre'
+    Assert-True (-not (Test-Path -LiteralPath $vendorDir)) '(no-cred) vendor nao instalado sem cofre'
+    $null = Write-McpVault -SecureSecret (ConvertTo-SecureString 'test-secret-selftest' -AsPlainText -Force)
 
     # 7. Auditoria de entrada manual migravel: edicao_manual_necessaria e
     # nextAction -MigrateLegacy, com exit 67 pela precedencia.

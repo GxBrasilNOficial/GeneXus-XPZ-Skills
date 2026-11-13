@@ -4,7 +4,7 @@
 
 - Repositorio: https://github.com/jkudish/jev-mcp
 - Licenca: MIT
-- Integridade do tarball: `sha512-0fFOAJwlsntMdHu4t40H4BObOowfqVsZdMnU1tbqIHojbWotRia8quh8/SjEtwpC0CbemZF9TpBDbFNBhnRGw==`
+- Integridade do tarball: `sha512-0fFOAJwlsntMdHu4+t40H4BObOowfqVsZdMnU1tbqIHojbWotRia8quh8/SjEtwpC0CbemZF9TpBDbFNBhnRGw==`
 - Copia integral da licenca: `fixtures/dist/0.13.0/LICENSE`
 - Proveniencia e escopo: `fixtures/dist/0.13.0/PROVENANCE.json`
 

@@ -1,7 +1,7 @@
 # Revisao estatica do dist - 0.13.0
 
 Data: 2026-11-09. Pacote: `@jkudish/jev-mcp@0.13.0`. Fonte: tarball do npm com
-integrity `sha512-0fFOAJwlsntMdHu4t40H4BObOowfqVsZdMnU1tbqIHojbWotRia8quh8/SjEtwpC0CbemZF9TpBDbFNBhnRGw==`.
+integrity `sha512-0fFOAJwlsntMdHu4+t40H4BObOowfqVsZdMnU1tbqIHojbWotRia8quh8/SjEtwpC0CbemZF9TpBDbFNBhnRGw==`.
 Commit do tag `v0.13.0`: `5e0ca5cacd1556dc0b8c227648843d3ebf5bdc93` (proveniencia,
 nao equivalencia demonstrada).
 

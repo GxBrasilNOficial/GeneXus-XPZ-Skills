@@ -203,7 +203,6 @@ if (-not $prerequisites.NodeCompatible -and $prerequisites.Winget.Present) {
     Add-McpNextAction -Code 63 -Text 'winget install --id OpenJS.NodeJS.LTS -e'
 }
 
-$blockingBeforeInstall = @($findings | Where-Object { $_.class -eq 'blocking' })
 $vendor = $null
 $launcher = $null
 $config = $null
@@ -213,9 +212,13 @@ if ($Action -in @('install', 'update') -and -not $credential.exists) {
     Add-McpNextAction -Code 61 -Text 'Set-McpCredential.ps1 -Action import -ImportFromOpenCode'
     Add-McpNextAction -Code 61 -Text 'Set-McpCredential.ps1 -Action set'
 }
+# Credencial entra no gate ANTES de qualquer escrita (vendor/launcher/config/clientes).
+$blockingBeforeInstall = @($findings | Where-Object { $_.class -eq 'blocking' })
 
 if ($blockingBeforeInstall.Count -gt 0) {
-    $result = New-McpMutationResult -ActionName $Action -Overall 'INTEGRATIONS_GAPS' -ExitCode (Get-McpExitCodeForFindings -Findings @($findings)) -Changed $false -Planned $planned -Findings $findings -Clients $clientsResult -Vendor $null -Launcher $null -Config $null -Credential $credential -NextActions (Get-McpNextActionText)
+    $earlyOverall = 'INTEGRATIONS_GAPS'
+    $earlyExit = Resolve-McpGapsExitCode -Overall $earlyOverall -Findings @($findings)
+    $result = New-McpMutationResult -ActionName $Action -Overall $earlyOverall -ExitCode $earlyExit -Changed $false -Planned $planned -Findings $findings -Clients $clientsResult -Vendor $null -Launcher $null -Config $null -Credential $credential -NextActions (Get-McpNextActionText)
     [pscustomobject]$result | ConvertTo-Json -Depth 30
     exit ([int]$result.exitCode)
 }
@@ -397,8 +400,22 @@ if (-not $WhatIfPreference) {
 }
 
 $blocking = @($findings | Where-Object { $_.class -eq 'blocking' })
-$overall = if ($blocking.Count -eq 0) { 'INTEGRATIONS_OK' } else { 'INTEGRATIONS_GAPS' }
-$exitCode = if ($overall -eq 'INTEGRATIONS_OK') { 0 } else { Get-McpExitCodeForFindings -Findings @($findings) }
+$requestedClients = @()
+if ($Client -eq 'all') {
+    $requestedClients = @('opencode', 'codex')
+} elseif ($Client -in @('opencode', 'codex')) {
+    $requestedClients = @($Client)
+}
+$allRequestedWritten = $true
+foreach ($requested in $requestedClients) {
+    $clientState = $clientsResult[$requested]
+    if ($null -eq $clientState -or [string]$clientState.state -ne 'escrito') {
+        $allRequestedWritten = $false
+        break
+    }
+}
+$overall = if ($blocking.Count -eq 0 -and $allRequestedWritten) { 'INTEGRATIONS_OK' } else { 'INTEGRATIONS_GAPS' }
+$exitCode = Resolve-McpGapsExitCode -Overall $overall -Findings @($findings)
 if ($overall -eq 'INTEGRATIONS_OK') {
     Add-McpNextAction -Code 0 -Text 'Recarregar/reiniciar o cliente para a entrada jev valer'
 }

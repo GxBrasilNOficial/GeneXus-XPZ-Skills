@@ -1345,6 +1345,29 @@ function Get-McpExitCodeForFindings {
     return 60
 }
 
+function Resolve-McpGapsExitCode {
+    <#
+    .SYNOPSIS
+        Exit code para overall=INTEGRATIONS_GAPS: nunca 0.
+    .DESCRIPTION
+        Get-McpExitCodeForFindings devolve 0 quando so ha warns (ou nenhum
+        blocking). Gaps estruturais (cliente pedido nao escrito, etc.) precisam
+        de piso 60 conforme o catalogo (GAPS sem codigo especifico).
+    #>
+    param(
+        [Parameter(Mandatory = $true)][ValidateSet('INTEGRATIONS_OK', 'INTEGRATIONS_GAPS')][string]$Overall,
+        [object[]]$Findings = @()
+    )
+    if ($Overall -eq 'INTEGRATIONS_OK') {
+        return 0
+    }
+    $code = Get-McpExitCodeForFindings -Findings $Findings
+    if ($code -eq 0) {
+        return 60
+    }
+    return $code
+}
+
 function Get-McpStateRank {
     param([Parameter(Mandatory = $true)][string]$State)
     $order = @(

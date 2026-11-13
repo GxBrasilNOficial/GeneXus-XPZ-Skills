@@ -12,7 +12,7 @@ STDOUT:
 {"result":{"protocolVersion":"2025-06-18","capabilities":{"tools":{"listChanged":false}},"serverInfo":{"name":"jev-mcp","version":"0.13.0"}},"jsonrpc":"2.0","id":1}
 
 STDERR:
-[jev-mcp] ready ÔÇö model typesafe/jev
+[jev-mcp] ready - model typesafe/jev
 
 EXIT: 0
 ELAPSED_MS: 755

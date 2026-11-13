@@ -15,7 +15,7 @@ Implementado em 2026-11-09 conforme o design v24.2 congelado por decisão humana
 - `xpz-mcp-integrations-setup/SKILL.md` — contrato normativo, fluxo, estados, exit codes e limites.
 - `xpz-mcp-integrations-setup/components/jev.json` — descritor fail-closed (5 modos como dado; 1 implementado).
 - `xpz-mcp-integrations-setup/templates/launcher.ps1` — molde do launcher `ProcessStartInfo` com stdio herdado e ambiente limpo por allowlist.
-- `xpz-mcp-integrations-setup/vendor/package.json` + `package-lock.json` — pin 0.13.0; integrity `sha512-0fFOAJwlsntMdHu4t40H4BObOowfqVsZdMnU1tbqIHojbWotRia8quh8/SjEtwpC0CbemZF9TpBDbFNBhnRGw==`; árvore de 9 pacotes.
+- `xpz-mcp-integrations-setup/vendor/package.json` + `package-lock.json` — pin 0.13.0; integrity `sha512-0fFOAJwlsntMdHu4+t40H4BObOowfqVsZdMnU1tbqIHojbWotRia8quh8/SjEtwpC0CbemZF9TpBDbFNBhnRGw==`; árvore de 9 pacotes.
 - `xpz-mcp-integrations-setup/fixtures/` — evidência sanitizada do `dist` (provider `compatible`, `engines.node`, `prepare`, boot, EOF, licença MIT, proveniência, revisão estática), fixtures JSONC/TOML e `auth export`.
 - `xpz-mcp-integrations-setup/exit-codes.catalog.json` — faixa reservada 60-69, sem colisão com `scripts/msbuild-exit-codes.catalog.json`.
 - `scripts/McpIntegrationSupport.ps1`, `McpVaultSupport.ps1`, `McpLauncherSupport.ps1`, `McpVendorSupport.ps1`, `McpOpenCodeSupport.ps1`, `McpCodexSupport.ps1`, `McpTomlProbe.py` — motores/support.
@@ -35,10 +35,10 @@ Implementado em 2026-11-09 conforme o design v24.2 congelado por decisão humana
 
 - `Test-McpOpenCodeAdapterSelfTest.ps1` — 38 asserts, token `XPZ_MCP_OPENCODE_ADAPTER_SELFTEST_OK`.
 - `Test-McpCodexAdapterSelfTest.ps1` — 44 asserts, token `XPZ_MCP_CODEX_ADAPTER_SELFTEST_OK`.
-- `Test-McpLauncherSelfTest.ps1` — 45 asserts (descritor, manifesto, transação, DPAPI, launcher, filho falso, negativos pré-filho), token `XPZ_MCP_LAUNCHER_SELFTEST_OK`.
+- `Test-McpLauncherSelfTest.ps1` — 52 asserts na medição de 2026-11-13 (era 45 na entrega inicial; subiu com predicado ACL, CreateExclusive e auditoria ACL), token `XPZ_MCP_LAUNCHER_SELFTEST_OK`.
 - `Test-McpCredentialSelfTest.ps1` — 19 asserts, token `XPZ_MCP_CREDENTIAL_SELFTEST_OK`.
-- `Test-McpExitCodesSelfTest.ps1` — 166 asserts, token `XPZ_MCP_EXIT_CODES_SELFTEST_OK`.
-- `Test-McpIntegrationsSelfTest.ps1` — 53 asserts sem o gate do dist e 54 com ele (inclui ponta-a-ponta instalar/auditar/reparar/remover com vendor falso, auditoria de entrada manual e guarda do dist), token `XPZ_MCP_INTEGRATIONS_SELFTEST_OK`.
+- `Test-McpExitCodesSelfTest.ps1` — 169 asserts na medição de 2026-11-13 (era 166; subiu com `Resolve-McpGapsExitCode`), token `XPZ_MCP_EXIT_CODES_SELFTEST_OK`.
+- `Test-McpIntegrationsSelfTest.ps1` — 67 asserts sem o gate do dist na medição de 2026-11-13 (era 53/54 na entrega; subiu com warn ACL, CreateExclusive, manifesto vazio e install sem cofre), token `XPZ_MCP_INTEGRATIONS_SELFTEST_OK`.
 - `Test-McpDistEvidenceSelfTest.ps1` — 24 asserts (gate do F1 com vendor real, revisão estática e boot sem chave), token `XPZ_MCP_DIST_EVIDENCE_SELFTEST_OK`.
 
 **Correção pós-pré-push (2026-11-09).** O exit 69, prometido no catálogo para os motores, passou a ser emitido pelos cinco motores por captura de erro no nível do script; o catálogo foi alinhado aos emissores reais de 60-65 e o self-test de exit codes passou a validar a matriz de emissores e a provar o 69 em cada motor.
@@ -61,3 +61,6 @@ Implementado em 2026-11-09 conforme o design v24.2 congelado por decisão humana
 - Commit material: `59b7073` — Corrige o exit 69 dos motores e alinha o catalogo de exit codes.
 - Commit material: `70ac932` — Corrige reserva de credencial, auditoria manual e precedencia de exit.
 - Commit material: `084f3d5` — Rotula nextActions como menu e corrige -CheckUpdates no design.
+- Commit material: `e37bbd7` — Predicado ACL so-dono (SID+FullControl) no vault MCP.
+- Commit material: `46c7bdb` — CreateExclusive na escrita transacional MCP.
+- Commit material: `34619c8` — Warn `acl_nao_aplicavel` na auditoria offline (A.9).

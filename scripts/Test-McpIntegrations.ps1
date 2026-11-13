@@ -409,7 +409,7 @@ $overall = 'INTEGRATIONS_GAPS'
 if ($blocking.Count -eq 0 -and $allClientsWritten) {
     $overall = 'INTEGRATIONS_OK'
 }
-$exitCode = if ($overall -eq 'INTEGRATIONS_OK') { 0 } else { Get-McpExitCodeForFindings -Findings @($findings) }
+$exitCode = Resolve-McpGapsExitCode -Overall $overall -Findings @($findings)
 $orderedNextActions = @($nextActions |
     Sort-Object -Property @{ Expression = { Get-McpExitCodeRank -Code $_.Code } }, @{ Expression = { $_.Text } } |
     Select-Object -ExpandProperty Text -Unique)
