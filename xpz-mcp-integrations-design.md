@@ -114,7 +114,7 @@ a **exceção de endpoint** do modo `compatible` é campo explícito. Detalhe: *
 | Classe | Contrato |
 |---|---|
 | **Diagnóstico read-only** (auditor) | JSON de máquina, `overall`, tabela estado→`exitCode`/classe, `-InputPath`; sem `-WhatIf` |
-| **Mutador** (instalar/reparar/remover/atualizar/vendorizar) | JSON de máquina, `-WhatIf`, `exitCode`, backup transacional |
+| **Mutador** (instalar/reparar/remover/atualizar/vendorizar) | JSON de máquina, `-WhatIf`, `exitCode`, backup transacional; com `-Client all`, conflito/`edicao_manual_necessaria` **não** faz rollback dos outros clientes nem dos artefatos compartilhados — o achado traz o cliente e a mensagem para o operador apresentar |
 
 A classe **biblioteca dot-source** (`OpenCodeJsoncSupport.ps1`) saiu da v1 na v22 (ver
 `999` — «JSONC do OpenCode — biblioteca única e migração dos consumidores»).

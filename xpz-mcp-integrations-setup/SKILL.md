@@ -134,6 +134,12 @@ bloqueiam. O descritor e validado no F1 e no self-test.
    pwsh -NoProfile -File scripts/Install-McpIntegration.ps1 -Action install -Client all
    ```
 
+   Com `-Client all`, conflito ou `edicao_manual_necessaria` em um cliente **nao**
+   desfaz o que ja foi gravado noutro cliente nem vendor/launcher/`config`.
+   Apresente sempre o **cliente** e o **erro** (`findings[].client` + `message` /
+   trecho-diff) e pare para decisao humana naquele cliente; o overall pode sair
+   `INTEGRATIONS_GAPS` com gravacao parcial intencional.
+
 5. **Revalidar e pedir recarga**
 
    Rode a auditoria de novo. `escrito`/`recarga_pendente` significam que a

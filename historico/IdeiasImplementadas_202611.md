@@ -66,5 +66,6 @@ Implementado em 2026-11-09 conforme o design v24.2 congelado por decisão humana
 - Commit material: `34619c8` — Warn `acl_nao_aplicavel` na auditoria offline (A.9).
 - Commit material: `a321ded` — Credencial antes de gravar, piso 60 em GAPS, manifesto clients vazio.
 - Commit material: `58eb33c` — Corrige portugues residual na entrada espanhola do CHANGELOG MCP.
+- Commit material: `15c1591` — Alinha A.9/exit 60/uninstall e sanitiza literal de allowlist no 999.
 
-**Correção pós-painel reforçada (2026-11-13).** Além do warn ACL e do CreateExclusive: install barra `credencial_ausente` antes de qualquer escrita; `Resolve-McpGapsExitCode` impede exit 0 com `INTEGRATIONS_GAPS`; install/uninstall exigem clientes pedidos tratados para `INTEGRATIONS_OK`; uninstall persiste `clients` vazio; integrity/fixture de boot alinhados.
+**Correção pós-painel reforçada (2026-11-13).** Além do warn ACL e do CreateExclusive: install barra `credencial_ausente` antes de qualquer escrita; `Resolve-McpGapsExitCode` impede exit 0 com `INTEGRATIONS_GAPS`; install/uninstall exigem clientes pedidos tratados para `INTEGRATIONS_OK`; uninstall persiste `clients` vazio; integrity/fixture de boot alinhados. Decisão humana: com `-Client all`, gravação parcial entre clientes é aceitável; conflito/`edicao_manual_necessaria` não toca o cliente afetado e não faz rollback dos demais; o agente deve apresentar o cliente e o erro do achado.
