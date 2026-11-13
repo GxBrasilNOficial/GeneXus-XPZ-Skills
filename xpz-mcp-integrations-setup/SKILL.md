@@ -216,8 +216,9 @@ Estados por cliente, **um valor so**, na ordem:
 `endpoint_alcancavel` → `credencial_verificada` → `e2e_opt_in_confirmado`.
 
 - **Offline:** os achados (`ausente`, `entrada_*`, `vendor_*`, `launcher_*`,
-  `node_*`, `config_*`, `credencial_ausente`, `acl_nao_aplicavel` como **warn**
-  na auditoria) sao diagnosticos, nao estados concorrentes. O warn de ACL cobre
+  `node_*`, `config_*`, `credencial_ausente` **blocking**, `acl_nao_aplicavel`
+  como **warn** na auditoria) sao diagnosticos, nao estados concorrentes.
+  `credencial_ausente` derruba `INTEGRATIONS_OK` (exit 61). O warn de ACL cobre
   raiz gerenciada, `config.json`, manifesto, `vault\` e blob quando existem;
   nao derruba `INTEGRATIONS_OK` sozinho.
 - **Precedencia de exit code:** com mais de um achado `blocking`, vence o
