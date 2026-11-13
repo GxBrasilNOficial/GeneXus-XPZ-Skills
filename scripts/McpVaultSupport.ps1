@@ -224,6 +224,67 @@ function Ensure-McpAclFile {
     return (Set-McpAcl -Path $Path)
 }
 
+function Get-McpAclAuditTargets {
+    <#
+    .SYNOPSIS
+        Paths gerenciados cuja ACL so-dono a auditoria offline deve observar.
+    #>
+    $targets = [System.Collections.Generic.List[object]]::new()
+    $root = Get-McpManagedRoot
+    if (Test-Path -LiteralPath $root -PathType Container) {
+        $targets.Add([pscustomobject]@{ Label = 'managed-root'; Path = $root; Kind = 'directory' }) | Out-Null
+    }
+    $configPath = Get-McpConfigPath
+    if (Test-McpRegularFile -Path $configPath) {
+        $targets.Add([pscustomobject]@{ Label = 'config'; Path = $configPath; Kind = 'file' }) | Out-Null
+    }
+    $manifestPath = Get-McpManifestPath
+    if (Test-McpRegularFile -Path $manifestPath) {
+        $targets.Add([pscustomobject]@{ Label = 'manifest'; Path = $manifestPath; Kind = 'file' }) | Out-Null
+    }
+    $vaultDir = Get-McpVaultDir
+    if (Test-Path -LiteralPath $vaultDir -PathType Container) {
+        $targets.Add([pscustomobject]@{ Label = 'vault-dir'; Path = $vaultDir; Kind = 'directory' }) | Out-Null
+    }
+    $blobPath = Get-McpVaultBlobPath
+    if (Test-McpRegularFile -Path $blobPath) {
+        $targets.Add([pscustomobject]@{ Label = 'vault-blob'; Path = $blobPath; Kind = 'file' }) | Out-Null
+    }
+    return @($targets)
+}
+
+function Get-McpAclAuditFindings {
+    <#
+    .SYNOPSIS
+        Achados warn de ACL so-dono ausente/divergente para a auditoria offline.
+
+    .DESCRIPTION
+        Nao bloqueia INTEGRATIONS_OK. Mutadores de blob continuam com
+        acl_nao_aplicavel blocking na escrita. So observa paths que existem;
+        ausencia do cofre continua sendo credencial_ausente.
+    #>
+    $failed = [System.Collections.Generic.List[object]]::new()
+    foreach ($target in @(Get-McpAclAuditTargets)) {
+        if (-not (Test-McpAcl -Path $target.Path)) {
+            $failed.Add($target) | Out-Null
+        }
+    }
+    if ($failed.Count -eq 0) {
+        return @()
+    }
+    $detail = (($failed | ForEach-Object { "$($_.Label)=$($_.Path)" }) -join '; ')
+    return @(
+        New-McpFinding `
+            -Code 'acl_nao_aplicavel' `
+            -Class 'warn' `
+            -Message ("ACL so-dono ausente ou divergente (auditoria): $detail") `
+            -Details ([ordered]@{
+                paths  = @($failed | ForEach-Object { [string]$_.Path })
+                labels = @($failed | ForEach-Object { [string]$_.Label })
+            })
+    )
+}
+
 function Write-McpVault {
     param(
         [Parameter(Mandatory = $true)][System.Security.SecureString]$SecureSecret,

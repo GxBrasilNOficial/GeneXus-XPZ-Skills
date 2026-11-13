@@ -700,7 +700,8 @@ não é a de referência.
 ### A.6 `config.json` — schema, origem e consumo
 
 `%LOCALAPPDATA%\xpz-mcp-integrations\config.json` — **registro de configuração não secreto**, ACL
-só-dono, UTF-8 sem BOM, **schema versionado** (reduzido na v22):
+só-dono (aplicada na gravação via `Set-McpConfig` / `Set-McpAcl`), UTF-8 sem BOM, **schema
+versionado** (reduzido na v22):
 
 ```
 { schemaVersion, provider: "compatible", baseUrl, model, endpointConfirmed }
@@ -804,7 +805,10 @@ grafia**. Os marcadores precisam estar balanceados e únicos.
   `launcher_divergente`; `node_ausente`/`node_incompativel`/`node_path_nao_resolve`; `pwsh_ausente`;
   `config_ausente`/`config_invalido`; `python_indisponivel` (**warn**, só afeta o Codex);
   `credencial_ausente`; `endpoint_nao_confirmado` (**warn** + confirmação, host fora do preset);
-  `acl_nao_aplicavel` (**warn** na auditoria; **blocking** nos mutadores de blob).
+  `acl_nao_aplicavel` (**warn** na auditoria; **blocking** nos mutadores de blob). Na auditoria,
+  o warn observa ACL so-dono nos paths existentes: raiz gerenciada, `config.json`,
+  `install-manifest.json`, pasta `vault\` e blob do cofre (`Test-McpAcl`); não promove exit
+  blocking. Nos mutadores de blob, falha ao aplicar/verificar ACL continua **blocking** (exit 67).
 - **Adiado ao F2:** `credencial_divergente` (cofre × export) — B.9.
 - **Online opt-in:** `-CheckUpdates` (F2) informa atualização, nunca auto-atualiza; `-CheckCredential`
   (v1) segue o critério acima. Canonicalização de path antes de `entrada_divergente`.

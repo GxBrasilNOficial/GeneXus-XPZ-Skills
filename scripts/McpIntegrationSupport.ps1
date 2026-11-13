@@ -843,7 +843,9 @@ function Set-McpConfig {
         }
     }
     if (-not $WhatIf) {
-        $null = Ensure-McpManagedRoot
+        $managedRoot = Ensure-McpManagedRoot
+        # Set-McpAcl vive em McpVaultSupport.ps1 (dot-source antes de gravar config).
+        $null = Set-McpAcl -Path $managedRoot -Directory
     }
     $value = [ordered]@{
         schemaVersion     = 1
@@ -852,7 +854,11 @@ function Set-McpConfig {
         model             = $Model
         endpointConfirmed = $EndpointConfirmed
     }
-    return Write-McpJsonFile -Path $path -Value $value -WhatIf:$WhatIf
+    $writeResult = Write-McpJsonFile -Path $path -Value $value -WhatIf:$WhatIf
+    if (-not $WhatIf -and (Test-McpRegularFile -Path $path)) {
+        $null = Set-McpAcl -Path $path
+    }
+    return $writeResult
 }
 
 function New-McpManifest {

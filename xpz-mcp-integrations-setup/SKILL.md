@@ -210,8 +210,10 @@ Estados por cliente, **um valor so**, na ordem:
 `endpoint_alcancavel` → `credencial_verificada` → `e2e_opt_in_confirmado`.
 
 - **Offline:** os achados (`ausente`, `entrada_*`, `vendor_*`, `launcher_*`,
-  `node_*`, `config_*`, `credencial_ausente`) sao diagnosticos, nao estados
-  concorrentes.
+  `node_*`, `config_*`, `credencial_ausente`, `acl_nao_aplicavel` como **warn**
+  na auditoria) sao diagnosticos, nao estados concorrentes. O warn de ACL cobre
+  raiz gerenciada, `config.json`, manifesto, `vault\` e blob quando existem;
+  nao derruba `INTEGRATIONS_OK` sozinho.
 - **Precedencia de exit code:** com mais de um achado `blocking`, vence o
   primeiro codigo presente em `precedence` no `exit-codes.catalog.json`:
   `67 > 66 > 61 > 62 > 63 > 64 > 65 > 60`. `nextActions` segue a mesma ordem.
@@ -258,7 +260,9 @@ antes do carregamento da biblioteca de suporte, o JSON de contingencia usa
 ## SEGURANCA E LIMITES
 
 - **Cofre:** DPAPI `CurrentUser`, sem entropia adicional; ACL so-dono no diretorio
-  e no blob. `acl_nao_aplicavel` bloqueia mutadores de blob na v1.
+  e no blob. `acl_nao_aplicavel` **bloqueia** mutadores de blob na v1; na
+  auditoria offline o mesmo codigo e **warn** (descoberta precoce, sem vetar
+  `INTEGRATIONS_OK`).
 - **Limite honesto:** DPAPI protege em repouso; nao protege contra processo do
   mesmo usuario, inspecao do ambiente do filho nem roaming.
 - **Launcher:** `ProcessStartInfo` com stdio herdado, ambiente limpo + allowlist

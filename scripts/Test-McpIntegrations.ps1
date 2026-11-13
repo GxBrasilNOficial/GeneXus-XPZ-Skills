@@ -7,8 +7,9 @@
 .DESCRIPTION
     Emite JSON de maquina no stdout. Nao grava, nao remove e nao altera config
     de cliente. overall=INTEGRATIONS_OK e estrutural: entrada reconhecida em
-    cada cliente gerenciado e nenhum achado blocking. Credencial verificada e
-    um eixo separado, promovido apenas por -CheckCredential (online opt-in).
+    cada cliente gerenciado e nenhum achado blocking (warns como
+    acl_nao_aplicavel nao derrubam sozinhos). Credencial verificada e um eixo
+    separado, promovido apenas por -CheckCredential (online opt-in).
 
     -CheckBoot e -CheckCredential sao opt-in. -CheckCredential exige
     autorizacao explicita por execucao.
@@ -259,6 +260,15 @@ $credentialExists = Test-McpVaultExists
 if (-not $credentialExists) {
     $findings.Add((New-McpFinding -Code 'credencial_ausente' -Class 'blocking' -Message 'cofre DPAPI ausente')) | Out-Null
     Add-McpNextAction -Code 61 -Text 'Set-McpCredential.ps1 -Action set'
+}
+
+# ACL so-dono: warn na auditoria (A.9); blocking permanece nos mutadores de blob.
+foreach ($aclFinding in @(Get-McpAclAuditFindings)) {
+    $findings.Add($aclFinding) | Out-Null
+}
+if (@($findings | Where-Object { $_.code -eq 'acl_nao_aplicavel' -and $_.class -eq 'warn' }).Count -gt 0) {
+    Add-McpNextAction -Code 67 -Text 'Install-McpIntegration.ps1 -Action repair (reaplica ACL na raiz/manifesto/config)'
+    Add-McpNextAction -Code 67 -Text 'Set-McpCredential.ps1 -Action set (reaplica ACL do cofre ao regravar)'
 }
 
 $clients = [ordered]@{}

@@ -119,6 +119,7 @@ try {
     Assert-True ([string]$audit.vendor.state -eq 'ok') '(audit) vendor ok'
     Assert-True ([string]$audit.launcher.state -eq 'ok') '(audit) launcher ok'
     Assert-True ($audit.credential.exists -eq $true) '(audit) credencial presente'
+    Assert-True (@($audit.findings | Where-Object { $_.code -eq 'acl_nao_aplicavel' }).Count -eq 0) '(audit) sem warn ACL apos install com ACL so-dono'
 
     # 4. Reinstalar: idempotente.
     $manifestBeforeRepair = [System.IO.File]::ReadAllText((Get-McpManifestPath))
@@ -183,7 +184,31 @@ try {
     Assert-True ($null -ne $legacyAudit -and [string](@($legacyAudit.nextActions)[0]) -like '*opencode*MigrateLegacy*') '(legacy) nextAction MigrateLegacy'
     Assert-True ($null -ne $legacyAudit -and [string]$legacyAudit.nextActionsMode -eq 'possible-actions') '(legacy) nextActions como menu'
 
-    # 8. Guarda do gate do dist: root com manifesto nao pode ganhar cofre falso.
+    # 8. Warn de ACL na auditoria: pasta/blob sem ACL so-dono (heranca default do temp).
+    $aclWarnRoot = Join-Path $tempRoot 'acl-warn-profile'
+    $aclManaged = Join-Path $aclWarnRoot 'xpz-mcp-integrations'
+    $aclVault = Join-Path $aclManaged 'vault'
+    [System.IO.Directory]::CreateDirectory($aclVault) | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $aclVault 'credential.blob'), "{`"version`":1}`n", [System.Text.UTF8Encoding]::new($false))
+    Assert-True (-not (Test-McpAcl -Path $aclManaged)) '(acl-warn) managed-root sem ACL so-dono'
+    Assert-True (-not (Test-McpAcl -Path $aclVault)) '(acl-warn) vault-dir sem ACL so-dono'
+    $aclWarnInput = Join-Path $aclWarnRoot 'audit-input.json'
+    [System.IO.File]::WriteAllText(
+        $aclWarnInput,
+        (@{ userProfile = $aclWarnRoot; localAppData = $aclWarnRoot } | ConvertTo-Json),
+        [System.Text.UTF8Encoding]::new($false)
+    )
+    $aclWarnOutput = @(& (Get-Command pwsh).Source -NoProfile -File (Join-Path $scriptDir 'Test-McpIntegrations.ps1') -InputPath $aclWarnInput 2>&1)
+    $aclWarnText = (($aclWarnOutput | ForEach-Object { [string]$_ }) -join "`n")
+    $aclWarnAudit = $null
+    try { $aclWarnAudit = $aclWarnText | ConvertFrom-Json -AsHashtable } catch { }
+    Assert-True ($null -ne $aclWarnAudit) '(acl-warn) JSON de auditoria parseavel'
+    $aclWarnFindings = @($aclWarnAudit.findings | Where-Object { $_.code -eq 'acl_nao_aplicavel' -and $_.class -eq 'warn' })
+    Assert-True ($aclWarnFindings.Count -eq 1) "(acl-warn) um achado warn acl_nao_aplicavel; obtido $($aclWarnFindings.Count)"
+    Assert-True ([string]$aclWarnFindings[0].message -match 'managed-root|vault') '(acl-warn) mensagem cita path gerenciado'
+    Assert-True (@($aclWarnAudit.nextActions | Where-Object { $_ -match 'repair|Set-McpCredential' }).Count -ge 1) '(acl-warn) nextActions de reparo/ACL'
+
+    # 9. Guarda do gate do dist: root com manifesto nao pode ganhar cofre falso.
     $guardRoot = Join-Path $tempRoot 'dist-guard'
     [System.IO.Directory]::CreateDirectory($guardRoot) | Out-Null
     [System.IO.File]::WriteAllText((Join-Path $guardRoot 'install-manifest.json'), '{}', [System.Text.UTF8Encoding]::new($false))
@@ -193,7 +218,7 @@ try {
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $guardRoot 'vault\credential.blob'))) '(dist guard) nenhum cofre criado'
     Assert-True (($guardOutput -join "`n").Contains('NOT_DISPOSABLE')) '(dist guard) motivo explicito'
 
-    # 9. Gate do dist real, quando informado.
+    # 10. Gate do dist real, quando informado.
     if (-not [string]::IsNullOrWhiteSpace($DistManagedRoot)) {
         $distOutput = & (Get-Command pwsh).Source -NoProfile -File (Join-Path $scriptDir 'Test-McpDistEvidenceSelfTest.ps1') -ManagedRoot $DistManagedRoot 2>&1
         $distExit = $LASTEXITCODE

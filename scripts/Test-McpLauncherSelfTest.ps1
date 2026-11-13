@@ -195,6 +195,7 @@ try {
         [System.Security.AccessControl.AccessControlType]::Allow
     )
     Assert-True (-not (Test-McpAclOwnerFullControlRule -Rule $worldFullRule -ExpectedSid $currentSid)) '(vault) predicado rejeita SID alheio'
+    Assert-True ((@(Get-McpAclAuditFindings)).Count -eq 0) '(vault) auditoria ACL limpa apos cofre/config com so-dono'
     $vaultWrite2 = Write-McpVault -SecureSecret (ConvertTo-SecureString 'second-secret' -AsPlainText -Force)
     Assert-True ($vaultWrite2.Status -eq 'written' -and (Read-McpVault) -ceq 'second-secret') '(vault) rotacao'
     $vaultWrite3 = Write-McpVault -SecureSecret $secure
