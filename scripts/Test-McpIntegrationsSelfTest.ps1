@@ -169,6 +169,18 @@ try {
     Assert-True ($null -ne $noCred -and @($noCred.findings | Where-Object { $_.code -eq 'credencial_ausente' }).Count -eq 1) '(no-cred) achado credencial_ausente'
     Assert-True (-not (Test-Path -LiteralPath $launcherPath)) '(no-cred) launcher nao emitido sem cofre'
     Assert-True (-not (Test-Path -LiteralPath $vendorDir)) '(no-cred) vendor nao instalado sem cofre'
+
+    # 6c. Repair sem cofre: mesmo gate blocking antes de escrita.
+    $noCredRepairOutput = & (Join-Path $scriptDir 'Install-McpIntegration.ps1') -Action repair -Client all 2>&1
+    $noCredRepairExit = $LASTEXITCODE
+    $noCredRepairText = (($noCredRepairOutput | ForEach-Object { [string]$_ }) -join "`n")
+    $noCredRepair = $null
+    try { $noCredRepair = $noCredRepairText | ConvertFrom-Json -AsHashtable } catch { }
+    Assert-True ($noCredRepairExit -eq 61) "(no-cred-repair) exit 61; obtido $noCredRepairExit"
+    Assert-True ($null -ne $noCredRepair -and [string]$noCredRepair.overall -eq 'INTEGRATIONS_GAPS') '(no-cred-repair) overall GAPS'
+    Assert-True ($null -ne $noCredRepair -and @($noCredRepair.findings | Where-Object { $_.code -eq 'credencial_ausente' }).Count -eq 1) '(no-cred-repair) achado credencial_ausente'
+    Assert-True (-not (Test-Path -LiteralPath $launcherPath)) '(no-cred-repair) launcher nao emitido sem cofre'
+    Assert-True (-not (Test-Path -LiteralPath $vendorDir)) '(no-cred-repair) vendor nao instalado sem cofre'
     $null = Write-McpVault -SecureSecret (ConvertTo-SecureString 'test-secret-selftest' -AsPlainText -Force)
 
     # 7. Auditoria de entrada manual migravel: edicao_manual_necessaria e

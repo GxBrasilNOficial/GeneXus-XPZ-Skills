@@ -207,12 +207,13 @@ $vendor = $null
 $launcher = $null
 $config = $null
 $credential = [ordered]@{ exists = (Test-McpVaultExists); source = 'vault-dpapi' }
-if ($Action -in @('install', 'update') -and -not $credential.exists) {
-    $findings.Add((New-McpFinding -Code 'credencial_ausente' -Class 'blocking' -Message 'cofre DPAPI ausente; importe/defina a chave antes de instalar')) | Out-Null
+if ($Action -in @('install', 'repair', 'update') -and -not $credential.exists) {
+    $findings.Add((New-McpFinding -Code 'credencial_ausente' -Class 'blocking' -Message 'cofre DPAPI ausente; importe/defina a chave antes de instalar/reparar/atualizar')) | Out-Null
     Add-McpNextAction -Code 61 -Text 'Set-McpCredential.ps1 -Action import -ImportFromOpenCode'
     Add-McpNextAction -Code 61 -Text 'Set-McpCredential.ps1 -Action set'
 }
-# Credencial entra no gate ANTES de qualquer escrita (vendor/launcher/config/clientes).
+# Credencial entra no gate ANTES de qualquer escrita (vendor/launcher/config/clientes),
+# inclusive em repair (mesmo criterio de install/update; record-e2e fica fora).
 $blockingBeforeInstall = @($findings | Where-Object { $_.class -eq 'blocking' })
 
 if ($blockingBeforeInstall.Count -gt 0) {
