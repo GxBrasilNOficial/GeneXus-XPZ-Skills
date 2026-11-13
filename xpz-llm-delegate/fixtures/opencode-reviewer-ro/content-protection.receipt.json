@@ -1,10 +1,10 @@
 {
   "kind": "xpz-opencode-reviewer-ro-matrix-receipt",
   "schemaVersion": 1,
-  "cliVersion": "2.2.6",
+  "cliVersion": "2.2.7",
   "model": "opencode-go/deepseek-v4.1-flash",
   "mechanism": "opencode run --format json + opencode debug agents",
-  "generatedAt": "2026-11-07T04:36:57.4393764Z",
+  "generatedAt": "2026-11-13T19:27:47.0142758Z",
   "workspaceRoot": "<SANITIZED_WORKSPACE_ROOT>",
   "cases": [
     {
@@ -113,7 +113,7 @@
       "event": {
         "tool": "read",
         "status": "completed",
-        "inputPath": ".env.example",
+        "inputPath": "<WORKSPACE_LOCAL>\\.env.example",
         "hasSentinel": true,
         "error": "",
         "expectedPath": ".env.example",
@@ -647,12 +647,12 @@
       "class": "structural",
       "expected": "grep * deny",
       "event": "sem evento",
+      "toolEventCount": 0,
       "pass": true,
       "reason": "ausencia de evento registrada; prova estrutural pela regra grep * deny",
       "exitCode": 0,
       "evidence": "local-grep.jsonl",
-      "ruleEvidence": "debug-agents-local.json",
-      "toolEventCount": 0
+      "ruleEvidence": "debug-agents-local.json"
     },
     {
       "name": "global-grep",
@@ -660,12 +660,12 @@
       "class": "structural",
       "expected": "grep * deny",
       "event": "sem evento",
+      "toolEventCount": 0,
       "pass": true,
       "reason": "ausencia de evento registrada; prova estrutural pela regra grep * deny",
-      "exitCode": 1,
+      "exitCode": 0,
       "evidence": "global-grep.jsonl",
-      "ruleEvidence": "debug-agents-global.json",
-      "toolEventCount": 0
+      "ruleEvidence": "debug-agents-global.json"
     }
   ],
   "behavioral": {

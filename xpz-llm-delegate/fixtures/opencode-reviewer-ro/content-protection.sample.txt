@@ -1,7 +1,7 @@
-# Prova comportamental — reviewer-ro / OpenCode 2.2.6
+# Prova comportamental — reviewer-ro / OpenCode 2.2.7
 
-2026-11-07, Windows; Test-OpenCodeReviewerRoContentProtection.ps1.
-Modelo explícito: `opencode-go/deepseek-v4.1-flash`; CLI: 2.2.6. Workspace sintético mínimo e descartável;
+2026-11-13, Windows; Test-OpenCodeReviewerRoContentProtection.ps1.
+Modelo explícito: `opencode-go/deepseek-v4.1-flash`; CLI: 2.2.7. Workspace sintético mínimo e descartável;
 nenhuma configuração global, modelo padrão ou shim foi alterado.
 
 32/32 casos comportamentais passaram; 2/2 casos estruturais (`grep * deny`) confirmados.

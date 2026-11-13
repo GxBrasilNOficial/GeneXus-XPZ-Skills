@@ -2,7 +2,7 @@
 
 <#
 .SYNOPSIS
-    Matriz de 34 casos do reviewer-ro na CLI OpenCode 2.2.6.
+    Matriz de 34 casos do reviewer-ro na CLI OpenCode 2.2.7.
 .DESCRIPTION
     32 casos comportamentais via `opencode run --format json`, com modelo explicito e workspace
     sintetico minimo; 2 casos `grep` estruturais via `opencode debug agents` (regra efetiva
