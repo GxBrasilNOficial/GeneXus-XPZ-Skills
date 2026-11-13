@@ -926,7 +926,12 @@ function Set-McpManifest {
     if (-not $WhatIf) {
         $null = Ensure-McpManagedRoot
     }
-    return Write-McpJsonFile -Path $path -Value $Value -WhatIf:$WhatIf
+    $writeResult = Write-McpJsonFile -Path $path -Value $Value -WhatIf:$WhatIf
+    # ACL so-dono tambem em unchanged (repair): espelha Set-McpConfig.
+    if (-not $WhatIf -and (Test-McpRegularFile -Path $path)) {
+        $null = Set-McpAcl -Path $path
+    }
+    return $writeResult
 }
 
 function Get-McpManifestClient {

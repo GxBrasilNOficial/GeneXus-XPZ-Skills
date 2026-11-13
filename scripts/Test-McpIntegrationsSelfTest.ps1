@@ -121,17 +121,25 @@ try {
     Assert-True ($audit.credential.exists -eq $true) '(audit) credencial presente'
     Assert-True (@($audit.findings | Where-Object { $_.code -eq 'acl_nao_aplicavel' }).Count -eq 0) '(audit) sem warn ACL apos install com ACL so-dono'
 
-    # 4. Reinstalar: idempotente.
-    $manifestBeforeRepair = [System.IO.File]::ReadAllText((Get-McpManifestPath))
+    # 4. Reinstalar: idempotente; repair reaplica ACL do manifesto em unchanged.
+    $manifestPath = Get-McpManifestPath
+    Assert-True (Test-McpAcl -Path $manifestPath) '(pre-repair) manifesto com ACL so-dono'
+    # Recriar o ficheiro herda ACL do diretorio (sem so-dono protegido); evita Set-Acl/SeSecurityPrivilege.
+    $manifestBytes = [System.IO.File]::ReadAllBytes($manifestPath)
+    Remove-Item -LiteralPath $manifestPath -Force
+    [System.IO.File]::WriteAllBytes($manifestPath, $manifestBytes)
+    Assert-True (-not (Test-McpAcl -Path $manifestPath)) '(pre-repair) ACL do manifesto quebrada de proposito'
+    $manifestBeforeRepair = [System.IO.File]::ReadAllText($manifestPath)
     $againOutput = & (Join-Path $scriptDir 'Install-McpIntegration.ps1') -Action repair -Client all 2>&1
     $againExit = $LASTEXITCODE
-    $manifestAfterRepair = [System.IO.File]::ReadAllText((Get-McpManifestPath))
+    $manifestAfterRepair = [System.IO.File]::ReadAllText($manifestPath)
     Assert-True ($againExit -eq 0) "(repair) exit 0; obtido $againExit"
     $again = ($againOutput | ConvertFrom-Json -AsHashtable)
     $manifestDiff = @(Compare-Object -ReferenceObject @($manifestBeforeRepair -split "`n") -DifferenceObject @($manifestAfterRepair -split "`n") |
         Select-Object -First 8 | ForEach-Object { "$($_.SideIndicator)$($_.InputObject)" }) -join ' | '
     Assert-True ($again.changed -eq $false) "(repair) sem mudanca; obtido changed=$($again.changed); manifestSame=$($manifestBeforeRepair -ceq $manifestAfterRepair); diff=$manifestDiff"
     Assert-True ($manifestBeforeRepair -ceq $manifestAfterRepair) "(repair) manifesto intacto; diff=$manifestDiff"
+    Assert-True (Test-McpAcl -Path $manifestPath) '(repair) ACL do manifesto reaplicada em unchanged'
 
     # 5. Remover entradas: preserva cofre/config.
     $removeOutput = & (Join-Path $scriptDir 'Uninstall-McpIntegration.ps1') -Client all 2>&1

@@ -137,6 +137,7 @@ if ($Action -eq 'record-e2e') {
             $manifest.Value.e2e = ConvertTo-McpOrdered -Value $manifest.Value.e2e
         }
         $manifest.Value.e2e[$Client] = [DateTime]::UtcNow.Ticks
+        # Set-McpManifest reaplica ACL so-dono mesmo se o JSON nao mudar depois.
         $null = Set-McpManifest -Value $manifest.Value
         $changed = $true
     }
@@ -396,7 +397,6 @@ if (-not $WhatIfPreference) {
     $manifestWrite = Set-McpManifest -Value $manifest.Value
     if ($manifestWrite.Status -eq 'written') {
         $changed = $true
-        $null = Set-McpAcl -Path $manifestWrite.Path
     }
 }
 
