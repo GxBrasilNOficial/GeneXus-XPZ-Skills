@@ -306,10 +306,10 @@ Formato do blob, entrada não-eco, ACL e os três eventos (rotação, remoção,
   aprovação humana** (medido), então não serve para instalação gerenciada. Auditoria por
   `claude mcp get jev`, **nunca** `claude mcp list` (que sobe todos os servidores). **Gate (F2):**
   protocolo de concorrência repetível com o cliente aberto. Detalhe: **A.13**.
-- **Entrada que a skill reconhece (v23):** uma entrada só é tratada como da skill se for
-  **byte-idêntica** a um bloco/entrada que a skill emitiu, com o hash registrado no **manifesto de
-  instalação** (Anexo A.12). Só essas a skill substitui (atualizar/reparar) ou remove, sempre com diff
-  e aprovação. Qualquer outra coisa → `entrada_em_conflito`, sem tocar.
+- **Entrada que a skill reconhece (v23; esclarecido pós-painel 2026-11-13):** uma entrada é da skill
+  se for **byte-idêntica** à forma que a skill **emitiria agora** (`expectedHash`) **ou** se o hash
+  estiver no **manifesto de instalação** (Anexo A.12). Só essas a skill substitui (atualizar/reparar)
+  ou remove, sempre com diff e aprovação. Qualquer outra coisa → `entrada_em_conflito`, sem tocar.
 - **Migração da entrada manual (v23):** quem já tem `mcp.jev` (ou `[mcp_servers.jev]`) configurado à
   mão — caso do usuário de referência — recebe o diff e, **com aprovação explícita**, a substituição
   (backup antes). Valores públicos (`JEV_API_BASE_URL`, `JEV_MCP_MODEL`) vão para o `config.json`; se
@@ -605,7 +605,10 @@ públicas permitidas, campos obrigatórios e regras de exclusividade; a exceçã
   **ACL aplicada antes de persistir**; escrita atômica.
 - **ACL concreta (v24):** `DirectorySecurity`/`FileSecurity` com `SetAccessRuleProtection($true, $false)`,
   `FileSystemAccessRule` só para o SID do usuário atual, herança removida e acesso negado a
-  `Users`/`Everyone`. O self-test prova leitura/escrita pelo dono e negação para um SID de teste.
+  `Users`/`Everyone`. O self-test prova o **predicado** (`Test-McpAclOwnerFullControlRule`: dono com
+  FullControl; ausência de regra para Everyone/Users; rejeição de regra só-leitura e de WorldSid) —
+  **não** adulteração de ACL em disco nem tentativa de acesso por outro SID (isso exigiria
+  `SeSecurityPrivilege` / processo estrangeiro).
 
 ### A.3 OpenCode — edição JSONC pelo mecanismo existente
 
@@ -626,9 +629,10 @@ públicas permitidas, campos obrigatórios e regras de exclusividade; a exceçã
   exatamente uma diferença — `mcp.servers.jev` acrescentado (inserir), trocado pela forma emitida
   (substituir) ou ausente (remover). Qualquer outra diferença, ou falha de parse → **nada é gravado**,
   estado `edicao_manual_necessaria` e o trecho pronto para colar.
-- **Chave duplicada:** o parser devolve o **último** valor sem erro (pwsh 7.6: `ConvertFrom-Json`), então
-  não há detecção explícita na v1. Uma edição que caia no objeto «sombreado» não aparece no objeto
-  parseado e falha na comparação acima → `edicao_manual_necessaria`. Detecção explícita: **Anexo B.3**.
+- **Chave duplicada:** o `ConvertFrom-Jsonc` do Guard (reusado pelo adaptador OpenCode) **rejeita**
+  chave duplicada/ambígua via `JsonDocument` + `HashSet` → o adaptador emite `entrada_quebrada` e
+  **nada é gravado**. O `ConvertFrom-Json` nativo do pwsh 7.6 ainda devolveria o último valor sem
+  erro; a skill **não** passa por esse caminho sozinho. Detecção estrutural mais rica: **Anexo B.3**.
 - **Limites conhecidos** do motor (cego a comentário ao casar chaves) estão registrados no **Anexo
   B.3** e na entrada própria do `999`; a validação por comparação é a mitigação da v1.
 - **Fixtures da v1:** arquivo com comentários; `mcp` ausente; `mcp` com outros servidores; entrada
@@ -886,11 +890,12 @@ Não confundir com o `manifest.sha256` de árvore (adiado, **Anexo B.4.2**).
   sentinela; por cliente (`opencode`, `codex`): caminho do arquivo de config, **hash da forma vigente e
   as anteriores emitidas por esta instalação** (na v1, uma só; cresce a cada atualização) e data da
   última escrita.
-- **Uso:** reconhecer uma entrada como «da skill» (substituir/remover só se byte-idêntica a um hash
-  registrado — A.3, A.8); saber se ainda há referência a um launcher antes de removê-lo.
+- **Uso:** reconhecer uma entrada como «da skill» (substituir/remover se byte-idêntica à emissão
+  atual **ou** a um hash registrado — A.3, A.8); saber se ainda há referência a um launcher antes de
+  removê-lo.
 - **Não é autoridade sobre a config viva:** a auditoria sempre lê o arquivo real do cliente. Manifesto
-  ausente ou corrompido → nenhuma entrada é reconhecida (tudo vira conflito ou migração com
-  aprovação), nunca remoção cega.
+  ausente ou corrompido → só a forma **byte-idêntica à emissão atual** continua reconhecida; qualquer
+  outra entrada vira conflito ou migração com aprovação — nunca remoção cega de conteúdo desconhecido.
 
 ### A.13 Claude Code — adaptador (F2; desenho da v24.1)
 

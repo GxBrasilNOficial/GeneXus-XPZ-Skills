@@ -179,8 +179,10 @@ bloqueiam. O descritor e validado no F1 e no self-test.
 - **Forma canonica:** `mcp.servers.jev`, `type: local`,
   `command: ["pwsh","-NoProfile","-File","<launcher>"]`, campo `environment`
   (nao `env`), `disabled` como desligamento.
-- **Forma legada:** `mcp.jev` reconhecida para leitura; migracao so com
-  `-MigrateLegacy` e diff aprovado. Se as duas coexistirem, conflito.
+- **Forma legada:** `mcp.jev` reconhecida para leitura; migracao com
+  `-MigrateLegacy` e diff aprovado, **ou** quando o hash da entrada ja
+  estiver no `install-manifest.json` (emissao anterior desta skill). Se as
+  duas formas coexistirem, conflito.
 - **Auditoria da forma legada:** `mcp.jev` unico e migravel →
   `edicao_manual_necessaria` (exit 67) com
   `Install-McpIntegration.ps1 -Client opencode -MigrateLegacy` no
@@ -189,8 +191,9 @@ bloqueiam. O descritor e validado no F1 e no self-test.
 - **Edicao:** mecanismo JSONC ja usado pelo `reviewer-ro` (insercao textual +
   `ConvertFrom-Jsonc` + comparacao pos-edicao). Qualquer falha → nada gravado,
   `edicao_manual_necessaria` e trecho pronto.
-- **Reconhecimento:** a skill so substitui/remove entrada byte-identica a um hash
-  registrado no manifesto; qualquer outra coisa e conflito.
+- **Reconhecimento:** a skill substitui/remove entrada se for byte-identica
+  a forma que ela emitiria agora **ou** se o hash estiver no
+  `install-manifest.json`; qualquer outra coisa e conflito.
 
 ## CODEX
 
@@ -259,10 +262,12 @@ Faixa reservada de exit codes: **60-69** (tabela completa em
 
 Os cinco motores (`Test-McpIntegrations`, `Install-McpIntegration`,
 `Uninstall-McpIntegration`, `Invoke-McpVendor` e `Set-McpCredential`) capturam
-falha interna no nivel do script e emitem JSON com `exitCode=69` e achado
-`erro_interno`; o launcher tambem usa 69 para falha interna. Se a falha ocorrer
-antes do carregamento da biblioteca de suporte, o JSON de contingencia usa
-`kind=xpz-mcp-integrations-setup-internal-error`.
+falha no nivel do script via `Write-McpInternalFailure`/`Resolve-McpTrapFailure`:
+`XPZ_MCP_LOCKED`/`XPZ_MCP_RACE`/`ACL` → exit **67** com o codigo correspondente;
+demais falhas internas → exit **69** e achado `erro_interno`. O launcher tambem
+usa 69 para falha interna. Se a falha ocorrer antes do carregamento da biblioteca
+de suporte, o JSON de contingencia usa `kind=xpz-mcp-integrations-setup-internal-error`
+e exit 69.
 
 ## SEGURANCA E LIMITES
 

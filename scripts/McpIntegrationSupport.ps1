@@ -1217,24 +1217,50 @@ function New-McpFinding {
     }
 }
 
+function Resolve-McpTrapFailure {
+    <#
+    .SYNOPSIS
+        Classifica excecao/mensagem de trap MCP em codigo de achado e exit.
+    .DESCRIPTION
+        Lock/corrida/ACL mapeiam para exit 67 (catalogo). Demais falhas internas → 69.
+    #>
+    param([Parameter(Mandatory = $true)][AllowEmptyString()][string]$Message)
+    if ($Message -match 'XPZ_MCP_LOCKED') {
+        return [pscustomobject]@{ Code = 'lock'; Class = 'blocking'; ExitCode = 67; Message = $Message }
+    }
+    if ($Message -match 'XPZ_MCP_RACE') {
+        return [pscustomobject]@{ Code = 'race'; Class = 'blocking'; ExitCode = 67; Message = $Message }
+    }
+    if ($Message -match '(?i)ACL_NAO_APLICAVEL|acl_nao_aplicavel|XPZ_MCP_ACL') {
+        return [pscustomobject]@{ Code = 'acl_nao_aplicavel'; Class = 'blocking'; ExitCode = 67; Message = $Message }
+    }
+    return [pscustomobject]@{ Code = 'erro_interno'; Class = 'blocking'; ExitCode = 69; Message = $Message }
+}
+
 function Write-McpInternalFailure {
     param(
         [Parameter(Mandatory = $true)][AllowEmptyString()][string]$Message,
         [ValidateSet('audit', 'mutation', 'vendor', 'credential')][string]$Kind = 'mutation',
         [string]$ActionName = 'internal-error'
     )
-    $finding = [ordered]@{ code = 'erro_interno'; class = 'blocking'; message = $Message }
+    $classified = Resolve-McpTrapFailure -Message $Message
+    $finding = [ordered]@{ code = [string]$classified.Code; class = [string]$classified.Class; message = [string]$classified.Message }
     $result = [ordered]@{
         schemaVersion  = 1
         kind           = "xpz-mcp-integrations-setup-$Kind"
         generatedAtUtc = [DateTime]::UtcNow.ToString('o')
-        exitCode       = 69
+        exitCode       = [int]$classified.ExitCode
         findings       = @($finding)
+    }
+    $reportHint = if ([string]$classified.Code -eq 'erro_interno') {
+        'Reporte o erro interno'
+    } else {
+        "Trate o achado '$($classified.Code)' (exit $($classified.ExitCode))"
     }
     switch ($Kind) {
         'audit' {
             $result.overall = 'INTEGRATIONS_GAPS'
-            $result.nextActions = @('Reporte o erro interno; nenhum diagnostico completo foi produzido.')
+            $result.nextActions = @("$reportHint; nenhum diagnostico completo foi produzido.")
         }
         'mutation' {
             $result.action = $ActionName
@@ -1246,17 +1272,17 @@ function Write-McpInternalFailure {
             $result.launcher = $null
             $result.config = $null
             $result.credential = $null
-            $result.nextActions = @('Reporte o erro interno; nenhuma alteracao foi confirmada.')
+            $result.nextActions = @("$reportHint; nenhuma alteracao foi confirmada.")
         }
         'vendor' {
-            $result.status = 'internal_error'
+            $result.status = $(if ([string]$classified.Code -eq 'erro_interno') { 'internal_error' } else { [string]$classified.Code })
             $result.version = $null
             $result.vendorDir = $null
             $result.entryPath = $null
             $result.integrity = $null
             $result.logPath = $null
             $result.npmExitCode = $null
-            $result.blockingReasons = @($Message)
+            $result.blockingReasons = @([string]$classified.Message)
         }
         'credential' {
             $result.action = $ActionName
@@ -1264,11 +1290,11 @@ function Write-McpInternalFailure {
             $result.written = $false
             $result.planned = $false
             $result.credential = [ordered]@{ exists = $false; source = 'vault-dpapi' }
-            $result.nextActions = @('Reporte o erro interno; a credencial nao foi alterada.')
+            $result.nextActions = @("$reportHint; a credencial nao foi alterada.")
         }
     }
     [pscustomobject]$result | ConvertTo-Json -Depth 20
-    exit 69
+    exit ([int]$classified.ExitCode)
 }
 
 function Get-McpExitCodePrecedence {

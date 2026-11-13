@@ -8,7 +8,9 @@
     Requer uma arvore vendorizada real (npm ci --ignore-scripts) e a evidencia
     sanitizada commitada em xpz-mcp-integrations-setup/fixtures/dist/0.13.0/.
     -ManagedRoot deve apontar para um managed root descartavel
-    (...\xpz-mcp-integrations-setup) cujo vendor-0.13.0 ja exista.
+    (...\xpz-mcp-integrations) cujo vendor-0.13.0 ja exista.
+    O leaf do caminho deve ser exatamente xpz-mcp-integrations, igual ao
+    que Get-McpManagedRoot resolve apos LOCALAPPDATA=parent.
 #>
 
 [CmdletBinding()]
@@ -107,6 +109,10 @@ try {
     $resolvedManagedRoot = $managedRoot
     if (-not (Test-Path -LiteralPath $managedRoot -PathType Container)) {
         throw "XPZ_MCP_DIST_EVIDENCE_MANAGED_ROOT_MISSING: $managedRoot"
+    }
+    $managedLeaf = Split-Path -Leaf $managedRoot
+    if ($managedLeaf -cne 'xpz-mcp-integrations') {
+        throw "XPZ_MCP_DIST_EVIDENCE_MANAGED_ROOT_LEAF: esperado leaf 'xpz-mcp-integrations'; obtido '$managedLeaf' em $managedRoot"
     }
     $guardPaths = @(
         (Join-Path $managedRoot 'install-manifest.json'),

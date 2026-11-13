@@ -24,7 +24,7 @@
   ],
   "limits": [
     "A equivalencia commit Git x tarball NAO foi demonstrada; a identidade operacional e o integrity sha512 do lockfile.",
-    "O wire do modo compatible segue hipotese; o host Command Code foi medido em 2026-11-09.",
+    "O wire do modo compatible foi exercitado no E2E de 2026-11-09 (-CheckCredential 200/answers_ok e jev_find); o host Command Code foi medido na mesma data.",
     "A contencao de rede nao foi demonstrada nesta maquina (Windows Sandbox indisponivel)."
   ]
 }

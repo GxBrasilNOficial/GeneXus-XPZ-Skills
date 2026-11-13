@@ -245,8 +245,16 @@ try {
     Assert-True ([string]$aclWarnFindings[0].message -match 'managed-root|vault') '(acl-warn) mensagem cita path gerenciado'
     Assert-True (@($aclWarnAudit.nextActions | Where-Object { $_ -match 'repair|Set-McpCredential' }).Count -ge 1) '(acl-warn) nextActions de reparo/ACL'
 
-    # 9. Guarda do gate do dist: root com manifesto nao pode ganhar cofre falso.
-    $guardRoot = Join-Path $tempRoot 'dist-guard'
+    # 9. Guarda do gate do dist: leaf errado; leaf certo com manifesto.
+    $badLeafRoot = Join-Path $tempRoot 'dist-guard'
+    [System.IO.Directory]::CreateDirectory($badLeafRoot) | Out-Null
+    $badLeafOutput = @(& (Get-Command pwsh).Source -NoProfile -File (Join-Path $scriptDir 'Test-McpDistEvidenceSelfTest.ps1') -ManagedRoot $badLeafRoot 2>&1)
+    $badLeafExit = $LASTEXITCODE
+    Assert-True ($badLeafExit -ne 0) "(dist leaf) leaf errado recusado; obtido exit $badLeafExit"
+    Assert-True (($badLeafOutput -join "`n").Contains('MANAGED_ROOT_LEAF')) '(dist leaf) motivo LEAF explicito'
+
+    $guardParent = Join-Path $tempRoot 'dist-guard-parent'
+    $guardRoot = Join-Path $guardParent 'xpz-mcp-integrations'
     [System.IO.Directory]::CreateDirectory($guardRoot) | Out-Null
     [System.IO.File]::WriteAllText((Join-Path $guardRoot 'install-manifest.json'), '{}', [System.Text.UTF8Encoding]::new($false))
     $guardOutput = @(& (Get-Command pwsh).Source -NoProfile -File (Join-Path $scriptDir 'Test-McpDistEvidenceSelfTest.ps1') -ManagedRoot $guardRoot 2>&1)

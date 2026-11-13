@@ -216,6 +216,15 @@ Assert-True ((Resolve-McpGapsExitCode -Overall 'INTEGRATIONS_OK' -Findings @((Ne
 Assert-True ((Resolve-McpGapsExitCode -Overall 'INTEGRATIONS_GAPS' -Findings @((New-McpFinding -Code 'python_indisponivel' -Class 'warn' -Message 'teste'))) -eq 60) '(gaps-exit) GAPS com so warn usa piso 60'
 Assert-True ((Resolve-McpGapsExitCode -Overall 'INTEGRATIONS_GAPS' -Findings @((New-McpFinding -Code 'credencial_ausente' -Class 'blocking' -Message 'teste'))) -eq 61) '(gaps-exit) GAPS com blocking preserva 61'
 
+$lockTrap = Resolve-McpTrapFailure -Message 'XPZ_MCP_LOCKED: outro processo'
+Assert-True ([string]$lockTrap.Code -eq 'lock' -and [int]$lockTrap.ExitCode -eq 67) '(trap) XPZ_MCP_LOCKED -> lock/67'
+$raceTrap = Resolve-McpTrapFailure -Message 'XPZ_MCP_RACE: hash divergiu'
+Assert-True ([string]$raceTrap.Code -eq 'race' -and [int]$raceTrap.ExitCode -eq 67) '(trap) XPZ_MCP_RACE -> race/67'
+$aclTrap = Resolve-McpTrapFailure -Message 'ACL_NAO_APLICAVEL: sem SeSecurityPrivilege'
+Assert-True ([string]$aclTrap.Code -eq 'acl_nao_aplicavel' -and [int]$aclTrap.ExitCode -eq 67) '(trap) ACL_NAO_APLICAVEL -> acl/67'
+$internalTrap = Resolve-McpTrapFailure -Message 'XPZ_MCP_TEST_FORCED_INTERNAL_ERROR'
+Assert-True ([string]$internalTrap.Code -eq 'erro_interno' -and [int]$internalTrap.ExitCode -eq 69) '(trap) demais -> erro_interno/69'
+
 if ($failures.Count -gt 0) {
     foreach ($failure in $failures) {
         Write-Output "FAIL: $failure"

@@ -321,7 +321,7 @@ foreach ($clientName in $selectedClients) {
             $clientsResult['opencode'] = [ordered]@{ state = 'nao_configurado'; status = $(if ($installed) { 'absent' } else { 'not-installed' }); path = $null; written = $false; reason = 'opencode.json/opencode.jsonc ausente' }
             if ($installed) {
                 $findings.Add((New-McpFinding -Code 'config_ausente' -Class 'blocking' -Message 'OpenCode sem opencode.json/jsonc; abra o OpenCode uma vez ou crie a config' -Client 'opencode')) | Out-Null
-            } elseif ($Client -eq 'opencode') {
+            } else {
                 $findings.Add((New-McpFinding -Code 'client_nao_instalado' -Class 'warn' -Message 'OpenCode nao detectado nesta maquina' -Client 'opencode')) | Out-Null
             }
             continue
@@ -331,7 +331,7 @@ foreach ($clientName in $selectedClients) {
         if ($null -ne $clientRecord -and $null -ne $clientRecord.hashes) { $hashes = @($clientRecord.hashes) }
         $update = Update-McpOpenCodeConfig -Path $target.path -LauncherPath $launcher.Path -BaseUrl $BaseUrl -Model $Model -ManifestHashes $hashes -Action install -MigrateLegacy:$MigrateLegacy -WhatIf:$WhatIfPreference
         $clientsResult['opencode'] = [ordered]@{
-            state    = $(if ($update.status -eq 'written') { 'escrito' } elseif ($update.status -eq 'unchanged') { 'escrito' } else { 'nao_configurado' })
+            state    = $(if ($update.status -in @('written', 'unchanged', 'planned')) { 'escrito' } else { 'nao_configurado' })
             status   = $update.status
             path     = $target.path
             written  = [bool]$update.written
@@ -359,7 +359,7 @@ foreach ($clientName in $selectedClients) {
             $clientsResult['codex'] = [ordered]@{ state = 'nao_configurado'; status = $(if ($installed) { 'absent' } else { 'not-installed' }); path = $codexPath; written = $false }
             if ($installed) {
                 $findings.Add((New-McpFinding -Code 'config_ausente' -Class 'blocking' -Message 'Codex sem config.toml; abra o Codex uma vez ou crie a config' -Client 'codex')) | Out-Null
-            } elseif ($Client -eq 'codex') {
+            } else {
                 $findings.Add((New-McpFinding -Code 'client_nao_instalado' -Class 'warn' -Message 'Codex nao detectado nesta maquina' -Client 'codex')) | Out-Null
             }
             continue
@@ -369,7 +369,7 @@ foreach ($clientName in $selectedClients) {
         if ($null -ne $clientRecord -and $null -ne $clientRecord.hashes) { $hashes = @($clientRecord.hashes) }
         $update = Update-McpCodexConfig -Path $codexPath -LauncherPath $launcher.Path -BaseUrl $BaseUrl -Model $Model -ManifestHashes $hashes -Action install -MigrateLegacy:$MigrateLegacy -WhatIf:$WhatIfPreference
         $clientsResult['codex'] = [ordered]@{
-            state    = $(if ($update.status -eq 'written') { 'escrito' } elseif ($update.status -eq 'unchanged') { 'escrito' } else { 'nao_configurado' })
+            state    = $(if ($update.status -in @('written', 'unchanged', 'planned')) { 'escrito' } else { 'nao_configurado' })
             status   = $update.status
             path     = $codexPath
             written  = [bool]$update.written
@@ -410,7 +410,16 @@ if ($Client -eq 'all') {
 $allRequestedWritten = $true
 foreach ($requested in $requestedClients) {
     $clientState = $clientsResult[$requested]
-    if ($null -eq $clientState -or [string]$clientState.state -ne 'escrito') {
+    if ($null -eq $clientState) {
+        $allRequestedWritten = $false
+        break
+    }
+    # -Client all: cliente nao instalado e warn (nao bloqueia o outro); -WhatIf: planned conta como tratado.
+    $status = [string]$clientState.status
+    $handled = ([string]$clientState.state -eq 'escrito') -or
+        ($Client -eq 'all' -and $status -eq 'not-installed') -or
+        ($WhatIfPreference -and $status -eq 'planned')
+    if (-not $handled) {
         $allRequestedWritten = $false
         break
     }

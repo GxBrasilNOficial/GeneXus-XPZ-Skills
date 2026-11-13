@@ -193,10 +193,17 @@ if ($planned) {
 try {
     $write = Write-McpVault -SecureSecret $secureSecret
 } catch {
-    $aclFailure = $_.Exception.Message -match 'ACL_NAO_APLICAVEL'
-    $code = if ($aclFailure) { 'acl_nao_aplicavel' } else { 'credencial_ilegivel' }
-    $exit = if ($aclFailure) { 67 } else { 61 }
-    $findings.Add((New-McpFinding -Code $code -Class 'blocking' -Message $_.Exception.Message)) | Out-Null
+    $classified = Resolve-McpTrapFailure -Message ([string]$_.Exception.Message)
+    if ([string]$classified.Code -eq 'erro_interno') {
+        $code = 'credencial_ilegivel'
+        $exit = 61
+        $msg = [string]$_.Exception.Message
+    } else {
+        $code = [string]$classified.Code
+        $exit = [int]$classified.ExitCode
+        $msg = [string]$classified.Message
+    }
+    $findings.Add((New-McpFinding -Code $code -Class 'blocking' -Message $msg)) | Out-Null
     $result = New-McpCredentialResult -ActionName $Action -Status 'failed' -ExitCode $exit -Written $false -Planned $false -Findings $findings -Exists (Test-McpVaultExists) -Source 'vault-dpapi' -NextActions $nextActions
     [pscustomobject]$result | ConvertTo-Json -Depth 10
     exit $exit

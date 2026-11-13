@@ -30,6 +30,7 @@ nao equivalencia demonstrada).
   egresso contido nem comportamento E2E.
 - A contencao de rede nao foi demonstrada nesta maquina; o protocolo opt-in de
   Windows Sandbox esta no Anexo B.4.6 do design.
-- O wire do modo `compatible` segue como hipotese; o host
+- O wire do modo `compatible` foi exercitado no E2E de 2026-11-09
+  (`-CheckCredential` 200/`answers_ok` e `jev_find` nos dois clientes); o host
   `https://api.commandcode.ai/provider/v1/systemone` foi medido com chamada
-  autenticada em 2026-11-09.
+  autenticada na mesma data.
