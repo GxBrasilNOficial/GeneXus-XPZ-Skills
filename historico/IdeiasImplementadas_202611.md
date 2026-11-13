@@ -38,7 +38,7 @@ Implementado em 2026-11-09 conforme o design v24.2 congelado por decisão humana
 - `Test-McpLauncherSelfTest.ps1` — 52 asserts na medição de 2026-11-13 (era 45 na entrega inicial; subiu com predicado ACL, CreateExclusive e auditoria ACL), token `XPZ_MCP_LAUNCHER_SELFTEST_OK`.
 - `Test-McpCredentialSelfTest.ps1` — 19 asserts, token `XPZ_MCP_CREDENTIAL_SELFTEST_OK`.
 - `Test-McpExitCodesSelfTest.ps1` — 169 asserts na medição de 2026-11-13 (era 166; subiu com `Resolve-McpGapsExitCode`), token `XPZ_MCP_EXIT_CODES_SELFTEST_OK`.
-- `Test-McpIntegrationsSelfTest.ps1` — 67 asserts sem o gate do dist na medição de 2026-11-13 (era 53/54 na entrega; subiu com warn ACL, CreateExclusive, manifesto vazio e install sem cofre), token `XPZ_MCP_INTEGRATIONS_SELFTEST_OK`.
+- `Test-McpIntegrationsSelfTest.ps1` — 72 asserts sem o gate do dist na medição de 2026-11-13 (era 53/54 na entrega; subiu com warn ACL, CreateExclusive, manifesto vazio, install/repair sem cofre), token `XPZ_MCP_INTEGRATIONS_SELFTEST_OK`.
 - `Test-McpDistEvidenceSelfTest.ps1` — 24 asserts (gate do F1 com vendor real, revisão estática e boot sem chave), token `XPZ_MCP_DIST_EVIDENCE_SELFTEST_OK`.
 
 **Correção pós-pré-push (2026-11-09).** O exit 69, prometido no catálogo para os motores, passou a ser emitido pelos cinco motores por captura de erro no nível do script; o catálogo foi alinhado aos emissores reais de 60-65 e o self-test de exit codes passou a validar a matriz de emissores e a provar o 69 em cada motor.
