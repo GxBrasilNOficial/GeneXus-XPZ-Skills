@@ -152,7 +152,27 @@ try {
     $null = Write-McpTextTransactional -Path $lockTarget -Text "locked`n" -EncodingKind 'utf8-nobom'
     [System.IO.File]::WriteAllText($lockTarget + '.xpz-mcp.lock', 'pid=0', [System.Text.UTF8Encoding]::new($false))
     Assert-ThrowsLike -Action { Write-McpTextTransactional -Path $lockTarget -Text "new`n" -EncodingKind 'utf8-nobom' } -Pattern 'XPZ_MCP_LOCKED' -Message '(tx) lock recusado'
+    Assert-True (Test-Path -LiteralPath ($lockTarget + '.xpz-mcp.lock')) '(tx) lock preexistente permanece apos recusa'
     Remove-Item -LiteralPath ($lockTarget + '.xpz-mcp.lock') -Force
+    # Concorrencia: vencedor segura o CreateNew; perdedor nao pode apagar o lock alheio no finally.
+    $lockRaceTarget = Join-Path $tempRoot 'lock-race.txt'
+    $null = Write-McpTextTransactional -Path $lockRaceTarget -Text "base`n" -EncodingKind 'utf8-nobom'
+    $lockRacePath = $lockRaceTarget + '.xpz-mcp.lock'
+    $lockHolder = [System.IO.File]::Open(
+        $lockRacePath,
+        [System.IO.FileMode]::CreateNew,
+        [System.IO.FileAccess]::Write,
+        [System.IO.FileShare]::None
+    )
+    try {
+        Assert-ThrowsLike -Action {
+            Write-McpTextTransactional -Path $lockRaceTarget -Text "new`n" -EncodingKind 'utf8-nobom'
+        } -Pattern 'XPZ_MCP_LOCKED' -Message '(tx) lock concorrente CreateNew'
+        Assert-True (Test-Path -LiteralPath $lockRacePath) '(tx) perdedor nao remove lock do vencedor'
+    } finally {
+        $lockHolder.Dispose()
+        Remove-Item -LiteralPath $lockRacePath -Force -ErrorAction SilentlyContinue
+    }
     $whatIfTarget = Join-Path $tempRoot 'whatif.txt'
     $whatIfWrite = Write-McpTextTransactional -Path $whatIfTarget -Text 'x' -EncodingKind 'utf8-nobom' -WhatIf
     Assert-True ($whatIfWrite.Status -eq 'planned' -and -not (Test-Path -LiteralPath $whatIfTarget)) '(tx) whatif sem escrita'

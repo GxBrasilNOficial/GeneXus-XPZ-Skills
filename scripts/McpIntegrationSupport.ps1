@@ -302,22 +302,26 @@ function Write-McpTextTransactional {
     }
 
     $lockPath = $fullPath + '.xpz-mcp.lock'
-    if (Test-Path -LiteralPath $lockPath) {
-        throw "XPZ_MCP_LOCKED: lock existente em $lockPath; remova-o apenas apos confirmar que nao ha execucao ativa"
-    }
-
     $lockStream = $null
+    $lockAcquired = $false
     $tempPath = $null
     $backupPath = $null
     $promoted = $false
     $createExclusive = [bool]$CreateExclusive -or (-not $exists)
     try {
-        $lockStream = [System.IO.File]::Open(
-            $lockPath,
-            [System.IO.FileMode]::CreateNew,
-            [System.IO.FileAccess]::Write,
-            [System.IO.FileShare]::None
-        )
+        # CreateNew e a aquisicao real; so remove o lock no finally se esta execucao o criou
+        # (perdedor concorrente nao pode apagar o .xpz-mcp.lock do vencedor).
+        try {
+            $lockStream = [System.IO.File]::Open(
+                $lockPath,
+                [System.IO.FileMode]::CreateNew,
+                [System.IO.FileAccess]::Write,
+                [System.IO.FileShare]::None
+            )
+        } catch [System.IO.IOException] {
+            throw "XPZ_MCP_LOCKED: lock existente em $lockPath; remova-o apenas apos confirmar que nao ha execucao ativa"
+        }
+        $lockAcquired = $true
         $lockPayload = [System.Text.Encoding]::UTF8.GetBytes("pid=$PID;utc=$([DateTime]::UtcNow.ToString('o'))")
         $lockStream.Write($lockPayload, 0, $lockPayload.Length)
         $lockStream.Flush($true)
@@ -412,8 +416,9 @@ function Write-McpTextTransactional {
     } finally {
         if ($null -ne $lockStream) {
             $lockStream.Dispose()
+            $lockStream = $null
         }
-        if (Test-Path -LiteralPath $lockPath) {
+        if ($lockAcquired -and (Test-Path -LiteralPath $lockPath)) {
             Remove-Item -LiteralPath $lockPath -Force -ErrorAction SilentlyContinue
         }
         if (-not $promoted -and $null -ne $tempPath -and (Test-Path -LiteralPath $tempPath)) {
