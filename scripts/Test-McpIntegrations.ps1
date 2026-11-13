@@ -338,6 +338,8 @@ if ($CheckBoot -and $null -ne $launcher -and $launcher.state -eq 'ok' -and $vend
     $boot = New-McpBootResult -LauncherPath $launcher.path
     foreach ($client in $clientOrder) {
         if (-not $clients[$client].installed -or $boot.state -ne 'boot_ok') { continue }
+        # So promove quem ja tem entrada reconhecida (>= escrito); nao_configurado nao vira boot_ok.
+        if (-not (Test-McpStateAtLeast -State $clients[$client].state -Minimum 'escrito')) { continue }
         if ((Get-McpStateRank -State $clients[$client].state) -lt (Get-McpStateRank -State 'boot_ok')) {
             $clients[$client].state = 'boot_ok'
         }

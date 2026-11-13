@@ -1064,13 +1064,62 @@ function Test-McpClientInstalled {
     return (Get-McpCommandInfo -Name 'codex' -VersionArguments @('--version')).Present
 }
 
+function Invoke-McpCommandVersionProbe {
+    <#
+    .SYNOPSIS
+        Sonda um executavel sem abrir janela de console (CreateNoWindow).
+    #>
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [string[]]$VersionArguments = @('--version'),
+        [int]$TimeoutMs = 8000
+    )
+    $psi = [System.Diagnostics.ProcessStartInfo]::new()
+    $psi.UseShellExecute = $false
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+    $psi.CreateNoWindow = $true
+    $ext = [System.IO.Path]::GetExtension($Path)
+    if ($ext -match '^\.(cmd|bat)$') {
+        $psi.FileName = $env:ComSpec
+        $argParts = @('/d', '/c', ('"{0}"' -f $Path)) + @($VersionArguments)
+        $psi.Arguments = ($argParts -join ' ')
+    } else {
+        $psi.FileName = $Path
+        # ArgumentList evita quoting fragil; disponivel no .NET Core / PS 7.
+        foreach ($a in @($VersionArguments)) {
+            [void]$psi.ArgumentList.Add([string]$a)
+        }
+    }
+    $process = $null
+    try {
+        $process = [System.Diagnostics.Process]::Start($psi)
+        if ($null -eq $process) { return $null }
+        $outTask = $process.StandardOutput.ReadToEndAsync()
+        $errTask = $process.StandardError.ReadToEndAsync()
+        if (-not $process.WaitForExit($TimeoutMs)) {
+            try { $process.Kill($true) } catch { }
+            return $null
+        }
+        $stdout = $outTask.GetAwaiter().GetResult()
+        $stderr = $errTask.GetAwaiter().GetResult()
+        $text = (($stdout + ' ' + $stderr).Trim())
+        if ([string]::IsNullOrWhiteSpace($text)) { return $null }
+        return $text
+    } catch {
+        return $null
+    } finally {
+        if ($null -ne $process) { $process.Dispose() }
+    }
+}
+
 function Get-McpCommandInfo {
     param(
         [Parameter(Mandatory = $true)][string]$Name,
         [string[]]$VersionArguments = @('--version')
     )
-    $command = Get-Command -Name $Name -ErrorAction SilentlyContinue
-    if ($null -eq $command -or [string]::IsNullOrWhiteSpace([string]$command.Source)) {
+    $commands = @(Get-Command -Name $Name -All -ErrorAction SilentlyContinue)
+    if ($commands.Count -eq 0) {
         return [pscustomobject]@{
             Present = $false
             Stub    = $false
@@ -1079,48 +1128,53 @@ function Get-McpCommandInfo {
             Version = $null
         }
     }
-    $path = [string]$command.Source
-    if ($path -match '\\WindowsApps\\') {
-        return [pscustomobject]@{
-            Present = $false
-            Stub    = $true
-            Name    = $Name
-            Path    = $path
-            Version = $null
+    # Prefira fora de WindowsApps (stub Store); pwsh empacotado pode ser real e e sondado sem janela.
+    $ranked = @($commands | Sort-Object @(
+            @{ Expression = { if ([string]$_.Source -match '\\WindowsApps\\') { 1 } else { 0 } } },
+            @{ Expression = { [string]$_.Source } }
+        ))
+    $sawWindowsAppsStub = $false
+    $lastWaPath = $null
+    foreach ($command in $ranked) {
+        $path = [string]$command.Source
+        if ([string]::IsNullOrWhiteSpace($path)) { continue }
+        $isWindowsApps = $path -match '\\WindowsApps\\'
+        if ($isWindowsApps -and $Name -ne 'pwsh') {
+            $sawWindowsAppsStub = $true
+            $lastWaPath = $path
+            continue
         }
-    }
-    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { continue }
+        $fileInfo = Get-Item -LiteralPath $path -Force
+        if ($fileInfo.Length -eq 0) {
+            if ($isWindowsApps) {
+                $sawWindowsAppsStub = $true
+                $lastWaPath = $path
+            }
+            continue
+        }
+        $versionText = Invoke-McpCommandVersionProbe -Path $path -VersionArguments $VersionArguments
+        if ([string]::IsNullOrWhiteSpace($versionText)) {
+            if ($isWindowsApps) {
+                $sawWindowsAppsStub = $true
+                $lastWaPath = $path
+            }
+            continue
+        }
         return [pscustomobject]@{
-            Present = $false
+            Present = $true
             Stub    = $false
             Name    = $Name
             Path    = $path
-            Version = $null
+            Version = $versionText
         }
-    }
-    $fileInfo = Get-Item -LiteralPath $path -Force
-    if ($fileInfo.Length -eq 0) {
-        return [pscustomobject]@{
-            Present = $false
-            Stub    = $false
-            Name    = $Name
-            Path    = $path
-            Version = $null
-        }
-    }
-    $versionText = $null
-    try {
-        $output = @(& $path @VersionArguments 2>&1)
-        $versionText = (($output | ForEach-Object { $_.ToString() }) -join ' ').Trim()
-    } catch {
-        $versionText = $null
     }
     return [pscustomobject]@{
-        Present = $true
-        Stub    = $false
+        Present = $false
+        Stub    = $sawWindowsAppsStub
         Name    = $Name
-        Path    = $path
-        Version = $versionText
+        Path    = $lastWaPath
+        Version = $null
     }
 }
 
@@ -1131,6 +1185,17 @@ function Get-McpPrerequisites {
     $python = Get-McpCommandInfo -Name 'python' -VersionArguments @('--version')
     if (-not $python.Present) {
         $python = Get-McpCommandInfo -Name 'py' -VersionArguments @('-3', '--version')
+    }
+
+    $pwshVersion = $null
+    $pwshCompatible = $false
+    if ($pwsh.Present -and -not [string]::IsNullOrWhiteSpace($pwsh.Version)) {
+        $match = [regex]::Match([string]$pwsh.Version, '(\d+)\.(\d+)(?:\.(\d+))?')
+        if ($match.Success) {
+            $build = if ($match.Groups[3].Success) { [int]$match.Groups[3].Value } else { 0 }
+            $pwshVersion = [version]::new([int]$match.Groups[1].Value, [int]$match.Groups[2].Value, $build)
+            $pwshCompatible = $pwshVersion -ge [version]'7.4.0'
+        }
     }
 
     $nodeVersion = $null
@@ -1167,6 +1232,8 @@ function Get-McpPrerequisites {
         Node             = $node
         Npm              = $npm
         Python           = $python
+        PwshVersion      = $pwshVersion
+        PwshCompatible   = $pwshCompatible
         NodeVersion      = $nodeVersion
         NodeCompatible   = $nodeCompatible
         PythonVersion    = $pythonVersion
@@ -1181,6 +1248,9 @@ function Get-McpPrerequisiteFindings {
     $findings = [System.Collections.Generic.List[object]]::new()
     if (-not $Prerequisites.Pwsh.Present) {
         $findings.Add((New-McpFinding -Code 'pwsh_ausente' -Class 'blocking' -Message 'pwsh 7.4+ nao encontrado ou nao utilizavel no PATH.')) | Out-Null
+    } elseif (-not [bool]$Prerequisites.PwshCompatible) {
+        $verLabel = if ($null -ne $Prerequisites.PwshVersion) { [string]$Prerequisites.PwshVersion } else { [string]$Prerequisites.Pwsh.Version }
+        $findings.Add((New-McpFinding -Code 'pwsh_ausente' -Class 'blocking' -Message "pwsh $verLabel nao atende >= 7.4.")) | Out-Null
     }
     if (-not $Prerequisites.Node.Present) {
         if ($Prerequisites.Node.Stub) {

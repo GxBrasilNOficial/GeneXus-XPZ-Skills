@@ -160,6 +160,11 @@ try {
     $unknownRemove = Update-McpCodexConfig -Path $unknownRemoveTarget -LauncherPath $launcher -BaseUrl $baseUrl -Model $model -ManifestHashes @('deadbeef') -Action remove
     Assert-True ($unknownRemove.status -eq 'entrada_em_conflito') "(remove-unknown) esperado entrada_em_conflito; obtido $($unknownRemove.status)"
     Assert-True ((Read-Text -Path $unknownRemoveTarget) -ceq $before) '(remove-unknown) arquivo intacto'
+    $manualRemoveTarget = New-Fixture -Name 'manual-canonical.toml'
+    $before = Read-Text -Path $manualRemoveTarget
+    $manualRemove = Update-McpCodexConfig -Path $manualRemoveTarget -LauncherPath $launcher -BaseUrl $baseUrl -Model $model -ManifestHashes @() -Action remove
+    Assert-True ($manualRemove.status -eq 'entrada_em_conflito') "(remove-manual) esperado entrada_em_conflito; obtido $($manualRemove.status)"
+    Assert-True ((Read-Text -Path $manualRemoveTarget) -ceq $before) '(remove-manual) arquivo intacto'
 
     # 8. -WhatIf nao grava.
     $whatIf = New-Fixture -Name 'empty.toml'

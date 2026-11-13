@@ -172,6 +172,19 @@ if ($compatible.endpointRule -ne 'explicit-url') {
 }
 $preset = $descriptor.Descriptor.presets[$compatible.preset]
 
+# repair/update sem -BaseUrl/-Model: preservar config.json existente (nao reaplicar preset).
+$existingConfig = $null
+if ($Action -in @('repair', 'update')) {
+    $existingConfig = Get-McpConfig
+    if ($existingConfig.Exists -and $null -ne $existingConfig.Value) {
+        if ([string]::IsNullOrWhiteSpace($BaseUrl)) {
+            $BaseUrl = [string]$existingConfig.Value.baseUrl
+        }
+        if ([string]::IsNullOrWhiteSpace($Model)) {
+            $Model = [string]$existingConfig.Value.model
+        }
+    }
+}
 if ([string]::IsNullOrWhiteSpace($BaseUrl)) {
     $BaseUrl = [string]$preset.baseUrl
 }
@@ -187,7 +200,12 @@ try { $baseUri = [Uri]::new($BaseUrl) } catch { }
 try { $presetUri = [Uri]::new([string]$preset.baseUrl) } catch { }
 $hostMatchesPreset = ($null -ne $baseUri -and $null -ne $presetUri -and $baseUri.Host -eq $presetUri.Host)
 $endpointConfirmed = $hostMatchesPreset -or [bool]$ConfirmEndpoint
-if (-not $hostMatchesPreset -and -not $ConfirmEndpoint) {
+if (-not $endpointConfirmed -and $Action -in @('repair', 'update') -and $null -ne $existingConfig -and $existingConfig.Exists -and $null -ne $existingConfig.Value) {
+    if ([bool]$existingConfig.Value.endpointConfirmed -and [string]$existingConfig.Value.baseUrl -eq $BaseUrl) {
+        $endpointConfirmed = $true
+    }
+}
+if (-not $hostMatchesPreset -and -not $endpointConfirmed) {
     $findings.Add((New-McpFinding -Code 'endpoint_nao_confirmado' -Class 'blocking' -Message ('host ' + $(if ($null -ne $baseUri) { $baseUri.Host } else { '<invalido>' }) + ' difere do preset Command Code; use -ConfirmEndpoint'))) | Out-Null
 }
 

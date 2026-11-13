@@ -141,6 +141,20 @@ try {
     Assert-True ($manifestBeforeRepair -ceq $manifestAfterRepair) "(repair) manifesto intacto; diff=$manifestDiff"
     Assert-True (Test-McpAcl -Path $manifestPath) '(repair) ACL do manifesto reaplicada em unchanged'
 
+    # 4a. repair preserva baseUrl/model do config.json quando omitidos.
+    $customBase = 'https://custom.example/provider/v1'
+    $customModel = 'custom/jev-model'
+    $null = Set-McpConfig -BaseUrl $customBase -Model $customModel -EndpointConfirmed $true
+    $repairPreserveOutput = @(& (Join-Path $scriptDir 'Install-McpIntegration.ps1') -Action repair -Client all 2>&1)
+    $repairPreserveExit = $LASTEXITCODE
+    $configAfterPreserve = Get-McpConfig
+    Assert-True ($repairPreserveExit -eq 0) "(repair-preserve) exit 0; obtido $repairPreserveExit"
+    Assert-True ($null -ne $configAfterPreserve.Value -and [string]$configAfterPreserve.Value.baseUrl -eq $customBase) '(repair-preserve) baseUrl preservada'
+    Assert-True ($null -ne $configAfterPreserve.Value -and [string]$configAfterPreserve.Value.model -eq $customModel) '(repair-preserve) model preservado'
+    # Restaura preset para o restante do self-test.
+    $null = Set-McpConfig -BaseUrl 'https://api.commandcode.ai/provider/v1/systemone' -Model 'typesafe/jev' -EndpointConfirmed $true
+    $null = & (Join-Path $scriptDir 'Install-McpIntegration.ps1') -Action repair -Client all 2>&1
+
     # 4b. Uninstall -WhatIf: planned conta como tratado (INTEGRATIONS_OK / exit 0).
     $whatIfRemoveOutput = @(& (Join-Path $scriptDir 'Uninstall-McpIntegration.ps1') -Client all -WhatIf 2>&1)
     $whatIfRemoveExit = $LASTEXITCODE

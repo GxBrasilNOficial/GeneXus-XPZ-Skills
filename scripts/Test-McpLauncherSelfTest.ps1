@@ -83,10 +83,38 @@ try {
     $stubDir = Join-Path $tempRoot 'WindowsApps'
     [System.IO.Directory]::CreateDirectory($stubDir) | Out-Null
     [System.IO.File]::WriteAllText((Join-Path $stubDir 'node.cmd'), "@echo off`r`necho v24.18.0`r`n", [System.Text.UTF8Encoding]::new($false))
-    $env:PATH = $stubDir + ';' + $originalPath
+    # PATH so com o stub: nao pode cair no node real do sistema (Get-Command -All).
+    $env:PATH = $stubDir
     $stubInfo = Get-McpCommandInfo -Name 'node' -VersionArguments @('--version')
     $env:PATH = $originalPath
     Assert-True ((-not $stubInfo.Present) -and $stubInfo.Stub) '(prereq) stub WindowsApps recusado'
+
+    # pwsh sob WindowsApps: zero-byte continua stub; nao usamos .cmd wrapper (abre janela).
+    $waPwshDir = Join-Path $tempRoot 'WindowsApps'
+    $waPwshExe = Join-Path $waPwshDir 'pwsh.exe'
+    [System.IO.File]::WriteAllBytes($waPwshExe, [byte[]]@())
+    $env:PATH = $waPwshDir
+    $waPwshStub = Get-McpCommandInfo -Name 'pwsh' -VersionArguments @('-NoProfile', '-Command', '$PSVersionTable.PSVersion.ToString()')
+    $env:PATH = $originalPath
+    Assert-True ((-not $waPwshStub.Present) -and $waPwshStub.Stub) '(prereq) pwsh WindowsApps zero-byte recusado'
+
+    # Piso 7.4: Present com 7.3.9 deve gerar achado blocking.
+    $oldPwshPrereq = [pscustomobject]@{
+        Pwsh             = [pscustomobject]@{ Present = $true; Stub = $false; Name = 'pwsh'; Path = 'C:\fake\pwsh.exe'; Version = '7.3.9' }
+        PwshVersion      = [version]'7.3.9'
+        PwshCompatible   = $false
+        Node             = [pscustomobject]@{ Present = $true; Stub = $false; Version = 'v22.0.0' }
+        Npm              = [pscustomobject]@{ Present = $true; Stub = $false }
+        Python           = [pscustomobject]@{ Present = $true; Version = 'Python 3.12.0' }
+        NodeCompatible   = $true
+        PythonCompatible = $true
+        Winget           = [pscustomobject]@{ Present = $false }
+        VersionManagers  = @()
+        NodeVersion      = $null
+        PythonVersion    = $null
+    }
+    $oldPwshFindings = @(Get-McpPrerequisiteFindings -Prerequisites $oldPwshPrereq)
+    Assert-True (@($oldPwshFindings | Where-Object { $_.code -eq 'pwsh_ausente' }).Count -eq 1) '(prereq) pwsh 7.3.9 bloqueia com pwsh_ausente'
 
     $fakeRepo = Join-Path $tempRoot 'fake-repo'
     $fakeComponentDir = Join-Path $fakeRepo 'xpz-mcp-integrations-setup/components'

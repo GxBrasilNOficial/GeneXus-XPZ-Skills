@@ -426,6 +426,16 @@ function Update-McpCodexConfig {
         }
     } elseif ($effectiveAction -eq 'remove') {
         if ($block.state -eq 'absent') {
+            if ($originalProbe.HasJev) {
+                return [pscustomobject]@{
+                    status  = 'entrada_em_conflito'
+                    path    = $Path
+                    action  = 'remove'
+                    reason  = 'entrada mcp_servers.jev sem marcadores da skill; remocao recusada'
+                    written = $false
+                    snippet = $snippet
+                }
+            }
             return [pscustomobject]@{ status = 'unchanged'; path = $Path; action = 'remove'; written = $false }
         }
         if ($block.contentHash -ne $expectedBlockHash -and $ManifestHashes -notcontains $block.contentHash) {
