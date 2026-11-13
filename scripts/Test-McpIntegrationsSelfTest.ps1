@@ -221,6 +221,36 @@ try {
     Assert-True ($null -ne $legacyAudit -and [string](@($legacyAudit.nextActions)[0]) -like '*opencode*MigrateLegacy*') '(legacy) nextAction MigrateLegacy'
     Assert-True ($null -ne $legacyAudit -and [string]$legacyAudit.nextActionsMode -eq 'possible-actions') '(legacy) nextActions como menu'
 
+    # 7b. Install OpenCode com chave duplicada: finding entrada_quebrada (exit 66).
+    $dupFixture = Join-Path (Get-McpRepoRoot) 'xpz-mcp-integrations-setup\fixtures\opencode\duplicated-key.jsonc'
+    [System.IO.File]::Copy($dupFixture, (Join-Path $oc 'opencode.jsonc'), $true)
+    $dupInstallOutput = @(& (Join-Path $scriptDir 'Install-McpIntegration.ps1') -Action install -Client opencode 2>&1)
+    $dupInstallExit = $LASTEXITCODE
+    $dupInstallText = (($dupInstallOutput | ForEach-Object { [string]$_ }) -join "`n")
+    $dupInstall = $null
+    try { $dupInstall = $dupInstallText | ConvertFrom-Json -AsHashtable } catch { }
+    Assert-True ($dupInstallExit -eq 66) "(dup-install) exit 66; obtido $dupInstallExit"
+    Assert-True ($null -ne $dupInstall -and @($dupInstall.findings | Where-Object { $_.code -eq 'entrada_quebrada' -and $_.client -eq 'opencode' }).Count -eq 1) '(dup-install) achado entrada_quebrada com client'
+    [System.IO.File]::WriteAllText((Join-Path $oc 'opencode.jsonc'), "{`n  `"mcp`": { `"servers`": {} }`n}`n", [System.Text.UTF8Encoding]::new($false))
+
+    # 7c. Install Codex com entrada manual migravel: edicao_manual_necessaria (exit 67).
+    $manualCodex = @"
+model = `"gpt-5`"
+
+[mcp_servers.jev]
+command = `"node`"
+args = [`"legacy.js`"]
+"@
+    [System.IO.File]::WriteAllText((Join-Path $cx 'config.toml'), $manualCodex, [System.Text.UTF8Encoding]::new($false))
+    $manualInstallOutput = @(& (Join-Path $scriptDir 'Install-McpIntegration.ps1') -Action install -Client codex 2>&1)
+    $manualInstallExit = $LASTEXITCODE
+    $manualInstallText = (($manualInstallOutput | ForEach-Object { [string]$_ }) -join "`n")
+    $manualInstall = $null
+    try { $manualInstall = $manualInstallText | ConvertFrom-Json -AsHashtable } catch { }
+    Assert-True ($manualInstallExit -eq 67) "(manual-codex-install) exit 67; obtido $manualInstallExit"
+    Assert-True ($null -ne $manualInstall -and @($manualInstall.findings | Where-Object { $_.code -eq 'edicao_manual_necessaria' -and $_.client -eq 'codex' }).Count -eq 1) '(manual-codex-install) achado edicao_manual_necessaria'
+    Assert-True ($null -ne $manualInstall -and (@($manualInstall.nextActions) -join "`n") -match 'MigrateLegacy') '(manual-codex-install) nextAction MigrateLegacy'
+
     # 8. Warn de ACL na auditoria: pasta/blob sem ACL so-dono (heranca default do temp).
     $aclWarnRoot = Join-Path $tempRoot 'acl-warn-profile'
     $aclManaged = Join-Path $aclWarnRoot 'xpz-mcp-integrations'

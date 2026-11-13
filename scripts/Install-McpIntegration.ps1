@@ -340,8 +340,15 @@ foreach ($clientName in $selectedClients) {
             snippet  = if ($update.PSObject.Properties['snippet']) { $update.snippet } else { $null }
             reason   = if ($update.PSObject.Properties['reason']) { $update.reason } else { $null }
         }
-        if ($update.status -in @('manual', 'entrada_em_conflito', 'conflict')) {
-            $findings.Add((New-McpFinding -Code $(if ($update.status -eq 'manual') { 'edicao_manual_necessaria' } else { 'entrada_em_conflito' }) -Class 'blocking' -Message ([string]$update.reason) -Client 'opencode')) | Out-Null
+        if ($update.status -in @('manual', 'entrada_em_conflito', 'conflict', 'entrada_quebrada')) {
+            $code = if ($update.status -eq 'manual') {
+                'edicao_manual_necessaria'
+            } elseif ($update.status -eq 'entrada_quebrada') {
+                'entrada_quebrada'
+            } else {
+                'entrada_em_conflito'
+            }
+            $findings.Add((New-McpFinding -Code $code -Class 'blocking' -Message ([string]$update.reason) -Client 'opencode')) | Out-Null
         }
         if ($update.status -eq 'manual') {
             Add-McpNextAction -Code 67 -Text 'Install-McpIntegration.ps1 -Client opencode -MigrateLegacy'
@@ -379,7 +386,15 @@ foreach ($clientName in $selectedClients) {
             reason   = if ($update.PSObject.Properties['reason']) { $update.reason } else { $null }
         }
         if ($update.status -in @('manual', 'entrada_em_conflito', 'conflict', 'entrada_quebrada', 'edicao_manual_necessaria', 'python_indisponivel')) {
-            $code = if ($update.status -eq 'python_indisponivel') { 'python_indisponivel' } elseif ($update.status -eq 'edicao_manual_necessaria') { 'edicao_manual_necessaria' } elseif ($update.status -eq 'entrada_quebrada') { 'entrada_quebrada' } else { 'entrada_em_conflito' }
+            $code = if ($update.status -eq 'python_indisponivel') {
+                'python_indisponivel'
+            } elseif ($update.status -in @('edicao_manual_necessaria', 'manual')) {
+                'edicao_manual_necessaria'
+            } elseif ($update.status -eq 'entrada_quebrada') {
+                'entrada_quebrada'
+            } else {
+                'entrada_em_conflito'
+            }
             $class = if ($update.status -eq 'python_indisponivel') { 'warn' } else { 'blocking' }
             $findings.Add((New-McpFinding -Code $code -Class $class -Message ([string]$update.reason) -Client 'codex')) | Out-Null
         }
