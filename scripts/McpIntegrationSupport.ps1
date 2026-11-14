@@ -912,6 +912,30 @@ function Get-McpManifest {
     }
 }
 
+function ConvertTo-McpCanonicalNode {
+    <#
+    .SYNOPSIS
+        Normaliza um objeto para comparacao de conteudo: chaves de objetos em ordem alfabetica,
+        recursivamente. A ordem dos arrays e preservada, porque nela ha significado.
+    #>
+    param($Node)
+    if ($null -eq $Node) { return $null }
+    if ($Node -is [System.Collections.IDictionary]) {
+        $ordered = [ordered]@{}
+        foreach ($key in @($Node.Keys | Sort-Object)) { $ordered[[string]$key] = ConvertTo-McpCanonicalNode -Node $Node[$key] }
+        return $ordered
+    }
+    if ($Node -is [System.Management.Automation.PSCustomObject]) {
+        $ordered = [ordered]@{}
+        foreach ($prop in @($Node.PSObject.Properties | Sort-Object -Property Name)) { $ordered[$prop.Name] = ConvertTo-McpCanonicalNode -Node $prop.Value }
+        return $ordered
+    }
+    if (($Node -is [System.Collections.IEnumerable]) -and -not ($Node -is [string])) {
+        return @(foreach ($item in $Node) { ConvertTo-McpCanonicalNode -Node $item })
+    }
+    return $Node
+}
+
 function Set-McpManifest {
     param(
         [Parameter(Mandatory = $true)]$Value,
@@ -938,8 +962,8 @@ function Set-McpManifest {
     $sameLogical = $false
     if (Test-McpRegularFile -Path $path) {
         try {
-            $existingNorm = (Get-Content -Raw -LiteralPath $path | ConvertFrom-Json | ConvertTo-Json -Depth 30 -Compress)
-            $newNorm = ($Value | ConvertTo-Json -Depth 30 | ConvertFrom-Json | ConvertTo-Json -Depth 30 -Compress)
+            $existingNorm = (ConvertTo-McpCanonicalNode -Node (Get-Content -Raw -LiteralPath $path | ConvertFrom-Json) | ConvertTo-Json -Depth 30 -Compress)
+            $newNorm = (ConvertTo-McpCanonicalNode -Node ($Value | ConvertTo-Json -Depth 30 | ConvertFrom-Json) | ConvertTo-Json -Depth 30 -Compress)
             $sameLogical = ($existingNorm -ceq $newNorm)
         } catch {
             $sameLogical = $false

@@ -661,6 +661,24 @@ args = [`"legacy.js`"]
     Assert-True ($orphanFindings.Count -eq 1 -and [string]$orphanFindings[0].class -eq 'warn' -and [string]$orphanFindings[0].client -eq 'codex') '(audit-orphan) registro_orfao warn somente para o codex'
     Assert-True (@($auditOrphan.nextActions | Where-Object { $_ -match 'Uninstall-McpIntegration\.ps1 -Client codex' }).Count -eq 1) '(audit-orphan) acao sugerida: Uninstall do codex'
 
+    # 9h. Set-McpManifest direto: arquivo com as mesmas chaves em outra ordem e valor em ordem canonica.
+    # Mesmo conteudo: nao regrava, nao faz backup, status unchanged. Chamada direta porque o Uninstall
+    # mantem a ordem do arquivo em memoria e nao exercita esse caso.
+    $ordPath = Get-McpManifestPath
+    $ordObj = Get-Content -Raw -LiteralPath $ordPath | ConvertFrom-Json
+    $ordValue = [ordered]@{}
+    foreach ($key in @('schemaVersion', 'packageVersion', 'launchers', 'clients', 'e2e')) { $ordValue[$key] = $ordObj.PSObject.Properties[$key].Value }
+    $ordRev = [ordered]@{}
+    foreach ($key in @('e2e', 'clients', 'launchers', 'packageVersion', 'schemaVersion')) { $ordRev[$key] = $ordObj.PSObject.Properties[$key].Value }
+    [System.IO.File]::WriteAllText($ordPath, (($ordRev | ConvertTo-Json -Depth 30) + "`n"), [System.Text.UTF8Encoding]::new($false))
+    $ordBefore = [System.IO.File]::ReadAllText($ordPath)
+    $ordBackupsBefore = @(Get-ChildItem -LiteralPath (Split-Path -Parent $ordPath) -Filter 'install-manifest.json.xpz-mcp.bak-*' -ErrorAction SilentlyContinue).Count
+    $ordResult = Set-McpManifest -Value $ordValue
+    $ordBackupsAfter = @(Get-ChildItem -LiteralPath (Split-Path -Parent $ordPath) -Filter 'install-manifest.json.xpz-mcp.bak-*' -ErrorAction SilentlyContinue).Count
+    Assert-True ([string]$ordResult.Status -eq 'unchanged') "(key-order) Set-McpManifest devolve unchanged; obtido $($ordResult.Status)"
+    Assert-True ([System.IO.File]::ReadAllText($ordPath) -ceq $ordBefore) '(key-order) manifesto nao foi regravado'
+    Assert-True ($ordBackupsAfter -eq $ordBackupsBefore) "(key-order) nenhum backup novo; antes=$ordBackupsBefore depois=$ordBackupsAfter"
+
     # 10. Gate do dist real, quando informado.
     if (-not [string]::IsNullOrWhiteSpace($DistManagedRoot)) {
         $distOutput = & (Get-Command pwsh).Source -NoProfile -File (Join-Path $scriptDir 'Test-McpDistEvidenceSelfTest.ps1') -ManagedRoot $DistManagedRoot 2>&1
