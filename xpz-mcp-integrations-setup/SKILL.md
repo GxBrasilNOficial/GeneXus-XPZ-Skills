@@ -180,6 +180,9 @@ bloqueiam. O descritor e validado no F1 e no self-test.
    live restante (OpenCode/Codex); se ainda houver, `dados_compartilhados_em_uso`
    (exit 67) e o shared permanece.
 
+   Registro de cliente cuja configuracao nao existe e orfao: sai do manifesto
+   com o aviso `registro_orfao_removido` (warn). Em `-WhatIf` aparece como plano.
+
    Conflito `opencode.json`+`jsonc`, heuristica Codex (quoted/inline/subtable)
    ou Codex sem Python com qualquer `mcp_servers` (fail-closed) tambem
    bloqueiam. Install em `unchanged` reancora hash no manifesto quando a

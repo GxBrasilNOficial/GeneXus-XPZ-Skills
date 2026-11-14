@@ -586,6 +586,26 @@ args = [`"legacy.js`"]
     Assert-True ($redirSeen.ContainsKey('/start')) '(probe-redirect) endpoint configurado recebeu a requisicao'
     Assert-True (-not $redirSeen.ContainsKey('/final')) '(probe-redirect) destino do redirecionamento nao recebe requisicao'
 
+    # 9d. Registro orfao (configuracao ausente): sai do manifesto e -RemoveSkillData completa.
+    $null = Invoke-McpRemovalCase -Params @{ Client = 'all' }
+    Assert-True ((Invoke-McpInstallForRemoval) -eq 0) '(orphan) reinstall exit 0'
+    $null = Invoke-McpRemovalCase -Params @{ Client = 'codex' }
+    Remove-Item -LiteralPath $ocFile -Force
+    $orphanManifestBefore = [System.IO.File]::ReadAllText((Get-McpManifestPath))
+
+    $orWhatIf = Invoke-McpRemovalCase -Params @{ Client = 'all'; RemoveSkillData = $true; WhatIf = $true }
+    Assert-True ($orWhatIf.Exit -eq 0) "(orphan-whatif) exit 0; obtido $($orWhatIf.Exit)"
+    Assert-True ([bool]$orWhatIf.Json.dataRemoved) '(orphan-whatif) plano mostra dataRemoved com registro orfao'
+    Assert-True ([System.IO.File]::ReadAllText((Get-McpManifestPath)) -ceq $orphanManifestBefore) '(orphan-whatif) manifesto intacto em -WhatIf'
+    Assert-True (@($orWhatIf.Json.findings | Where-Object { $_.code -eq 'registro_orfao_removido' }).Count -eq 1) '(orphan-whatif) achado registro_orfao_removido'
+
+    $orReal = Invoke-McpRemovalCase -Params @{ Client = 'all'; RemoveSkillData = $true }
+    Assert-True ($orReal.Exit -eq 0) "(orphan) exit 0; obtido $($orReal.Exit)"
+    Assert-True ([bool]$orReal.Json.dataRemoved -and [bool]$orReal.Json.changed) '(orphan) dados removidos e changed true'
+    Assert-True (-not (Test-Path -LiteralPath (Get-McpManifestPath)) -and -not (Test-Path -LiteralPath (Get-McpConfigPath))) '(orphan) manifesto e config removidos'
+    Assert-True (Test-McpVaultExists) '(orphan) cofre preservado'
+    Assert-True (@($orReal.Json.findings | Where-Object { $_.code -eq 'registro_orfao_removido' }).Count -eq 1) '(orphan) achado registro_orfao_removido'
+
     # 10. Gate do dist real, quando informado.
     if (-not [string]::IsNullOrWhiteSpace($DistManagedRoot)) {
         $distOutput = & (Get-Command pwsh).Source -NoProfile -File (Join-Path $scriptDir 'Test-McpDistEvidenceSelfTest.ps1') -ManagedRoot $DistManagedRoot 2>&1

@@ -101,6 +101,13 @@ foreach ($clientName in $selectedClients) {
         $target = Get-McpOpenCodeConfigTarget
         if ($target.status -eq 'absent') {
             $clientsResult['opencode'] = [ordered]@{ status = 'unchanged'; state = 'nao_configurado'; reason = 'config ausente' }
+            # Sem configuracao, o Jev nao esta la: o registro do manifesto e orfao e precisa sair,
+            # senao bloqueia -RemoveSkillData para sempre (e o plano de -WhatIf nao o mostra).
+            if ($null -ne (Get-McpManifestClient -Manifest $manifest.Value -Client 'opencode')) {
+                $manifest.Value = Remove-McpManifestClient -Manifest $manifest.Value -Client 'opencode'
+                $verbOrphan = if ($WhatIfPreference) { 'seria removido' } else { 'removido' }
+                $findings.Add((New-McpFinding -Code 'registro_orfao_removido' -Class 'warn' -Message "registro do opencode no manifesto sem configuracao; $verbOrphan" -Client 'opencode')) | Out-Null
+            }
             continue
         }
         if ($target.status -eq 'conflict') {
@@ -138,6 +145,12 @@ foreach ($clientName in $selectedClients) {
         $codexPath = Get-McpCodexConfigPath
         if (-not (Test-McpRegularFile -Path $codexPath)) {
             $clientsResult['codex'] = [ordered]@{ status = 'unchanged'; state = 'nao_configurado'; reason = 'config ausente' }
+            # Mesmo tratamento do opencode: registro sem configuracao e orfao.
+            if ($null -ne (Get-McpManifestClient -Manifest $manifest.Value -Client 'codex')) {
+                $manifest.Value = Remove-McpManifestClient -Manifest $manifest.Value -Client 'codex'
+                $verbOrphan = if ($WhatIfPreference) { 'seria removido' } else { 'removido' }
+                $findings.Add((New-McpFinding -Code 'registro_orfao_removido' -Class 'warn' -Message "registro do codex no manifesto sem configuracao; $verbOrphan" -Client 'codex')) | Out-Null
+            }
             continue
         }
         $result = Update-McpCodexConfig -Path $codexPath -LauncherPath $launcherPath -BaseUrl $effectiveBaseUrl -Model $effectiveModel -ManifestHashes $hashes -Action remove -WhatIf:$WhatIfPreference
