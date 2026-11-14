@@ -222,10 +222,24 @@ $clientOrder = @('opencode', 'codex')
 foreach ($client in $clientOrder) {
     $installed = Test-McpClientInstalled -Client $client
     if (-not $installed) {
+        # Cliente nao detectado nao tem estado avaliado, mas o caminho de configuracao pode existir como
+        # nao regular. Isso e fato do disco, nao depende de deteccao: vira conflito bloqueante.
+        $undetectedFindings = @()
+        $nonRegularPath = if ($client -eq 'opencode') {
+            $ocCandidates = Get-McpOpenCodeConfigCandidates
+            (Test-McpConfigPathNonRegular -Path $ocCandidates.Json) -or (Test-McpConfigPathNonRegular -Path $ocCandidates.Jsonc)
+        } else {
+            Test-McpConfigPathNonRegular -Path (Get-McpCodexConfigPath)
+        }
+        if ($nonRegularPath) {
+            $conflictFinding = New-McpFinding -Code 'entrada_em_conflito' -Class 'blocking' -Message "${client}: configuracao existe mas nao e arquivo regular (link, reparse ou diretorio); nao decide sozinho" -Client $client
+            $findings.Add($conflictFinding) | Out-Null
+            $undetectedFindings = @($conflictFinding)
+        }
         $clients[$client] = [ordered]@{
             installed = $false
             state     = 'nao_configurado'
-            findings  = @()
+            findings  = $undetectedFindings
         }
         continue
     }

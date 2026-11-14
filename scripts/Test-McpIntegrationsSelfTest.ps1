@@ -742,8 +742,8 @@ args = [`"legacy.js`"]
     $aud9kJson = (($aud9k | ForEach-Object { [string]$_ }) -join "`n") | ConvertFrom-Json -AsHashtable
     $conflictFindings = @($aud9kJson.findings | Where-Object { $_.code -eq 'entrada_em_conflito' -and $_.class -eq 'blocking' })
     # O Codex e detectado pela pasta .codex do ambiente de teste. O OpenCode nao e detectado aqui, e o auditor
-    # so avalia configuracao de cliente detectado (regra existente); por isso so o Codex aparece como conflito.
-    Assert-True ($conflictFindings.Count -ge 1) "(audit-nonregular) entrada_em_conflito blocking para o codex detectado; obtido $($conflictFindings.Count)"
+    # Cliente nao detectado tambem avisa quando o caminho de configuracao nao e arquivo regular.
+    Assert-True ($conflictFindings.Count -ge 2) "(audit-nonregular) entrada_em_conflito blocking para opencode (nao detectado) e codex; obtido $($conflictFindings.Count)"
     Assert-True ([string]$aud9kJson.overall -eq 'INTEGRATIONS_GAPS') "(audit-nonregular) overall GAPS; obtido $($aud9kJson.overall)"
     Assert-True (@($aud9kJson.nextActions | Where-Object { $_ -match 'Install-McpIntegration\.ps1 -Client (codex|opencode)' }).Count -eq 0) '(audit-nonregular) nao sugere Install para cliente em conflito'
     Remove-Item -LiteralPath $ocFile -Recurse -Force
@@ -775,6 +775,20 @@ args = [`"legacy.js`"]
     if (Test-Path -LiteralPath $cxFile) { Remove-Item -LiteralPath $cxFile -Force -ErrorAction SilentlyContinue }
     Remove-Item -LiteralPath $symTarget -Force -ErrorAction SilentlyContinue
     [System.IO.File]::WriteAllText($cxFile, "model = `"gpt-5`"`n", [System.Text.UTF8Encoding]::new($false))
+
+    # 9m. Cliente detectado (opencode.json regular) com opencode.jsonc nao regular: um unico entrada_em_conflito
+    # para o cliente, sem duplicar o achado do caminho nao detectado.
+    Remove-Item -LiteralPath $ocFile -Force
+    $null = New-Item -ItemType Directory -Path $ocFile
+    $ocJsonFile = Join-Path $oc 'opencode.json'
+    [System.IO.File]::WriteAllText($ocJsonFile, "{}`n", [System.Text.UTF8Encoding]::new($false))
+    $aud9l = @(& (Join-Path $scriptDir 'Test-McpIntegrations.ps1') 2>&1)
+    $aud9lJson = (($aud9l | ForEach-Object { [string]$_ }) -join "`n") | ConvertFrom-Json -AsHashtable
+    $ocConflict9l = @($aud9lJson.findings | Where-Object { $_.code -eq 'entrada_em_conflito' -and $_.client -eq 'opencode' })
+    Assert-True ($ocConflict9l.Count -eq 1) "(audit-detected-conflict) um unico entrada_em_conflito para opencode detectado; obtido $($ocConflict9l.Count)"
+    Remove-Item -LiteralPath $ocFile -Recurse -Force
+    Remove-Item -LiteralPath $ocJsonFile -Force
+    [System.IO.File]::WriteAllText($ocFile, "{`n  `"mcp`": {}`n}`n", [System.Text.UTF8Encoding]::new($false))
 
     # 10. Gate do dist real, quando informado.
     if (-not [string]::IsNullOrWhiteSpace($DistManagedRoot)) {
