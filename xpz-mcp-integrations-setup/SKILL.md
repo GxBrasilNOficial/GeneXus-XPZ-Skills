@@ -170,9 +170,17 @@ bloqueiam. O descritor e validado no F1 e no self-test.
 
    Preserva cofre, `auth.json`, fornecedor e demais MCPs. Launcher, vendor,
    config e manifesto so saem com `-RemoveSkillData`; `-RemoveVault` remove o
-   cofre. Ambos explicitos. `changed` no JSON vale so para mudanca real em disco ou no manifesto (com `-WhatIf` e sempre `false`; o plano aparece em `planned` e nos campos `*Removed`).    `-RemoveSkillData` exige manifesto sem clientes **e**
-   nenhuma entrada jev live restante (OpenCode/Codex); se ainda houver,
-   `dados_compartilhados_em_uso` (exit 67) e o shared permanece.    Conflito `opencode.json`+`jsonc`, heuristica Codex (quoted/inline/subtable)
+   cofre. Ambos explicitos.
+
+   `changed` no JSON vale so para mudanca real em disco ou no manifesto (com
+   `-WhatIf` e sempre `false`; o plano aparece em `planned` e nos campos
+   `*Removed`).
+
+   `-RemoveSkillData` exige manifesto sem clientes **e** nenhuma entrada jev
+   live restante (OpenCode/Codex); se ainda houver, `dados_compartilhados_em_uso`
+   (exit 67) e o shared permanece.
+
+   Conflito `opencode.json`+`jsonc`, heuristica Codex (quoted/inline/subtable)
    ou Codex sem Python com qualquer `mcp_servers` (fail-closed) tambem
    bloqueiam. Install em `unchanged` reancora hash no manifesto quando a
    ancora falta (ex.: manifesto perdido).
