@@ -13,6 +13,15 @@ Entradas legadas sem avaliação carregam `FALTA AVALIAR` em ambos os campos at�
 
 **Editar a substância de um gap já registrado (neste arquivo ou no `998-ideias-descartadas-e-porque.md`) exige justificativa no corpo do commit.** Enfraquecer, reprecisar ou descartar a severidade de uma afirmação — não apenas corrigir redação, adicionar contexto ou reorganizar — precisa dizer **por que**: nova evidência medida, releitura do código, ou correção de erro anterior. Motivo: uma edição que suaviza um gap sem dizer por que **parece resolvido** para quem lê depois, e é pior do que o gap não ter sido achado — quem lê para de investigar. Caso real (2026-08-17): um commit sem corpo trocou «não é citado em lugar nenhum» por «não era coberto na documentação normativa»; a formulação nova era defensável à primeira vista, mas escondia que a única outra menção ao símbolo no repositório era uma cópia **defasada** num self-test — a frase sugeria mitigação onde havia agravante. Só foi achado porque outra sessão foi verificar; sem corpo no commit, não havia como saber se a mudança vinha de leitura nova ou só de estilo.
 
+<a id="lexer-barra-aspa-bloco-nativo-20261114"></a>
+
+## Lexer: barra antes de aspa em código GeneXus e bloco nativo csharp/java — 2026-11-14
+
+- **Importância** — alta (se o pareamento de aspas em bloco nativo esconder marcadores `New`/`EndNew`, o gate 9-PNW pode liberar um pacote sem extração; no conjunto testado o resultado foi bloqueio, não passagem).
+- **Maturidade** — pesquisa feita (comportamento do GeneXus medido por validação do parser e geração de código; falta decidir se blocos `csharp`/`java` passam a ser opacos e se o espelho `Test-GeneXusSourceSanity.ps1` alinha a regra).
+
+Descrição: no GeneXus, `\"` dentro de literal é uma barra seguida do fechamento da aspa, e aspa dupla repetida não é aspa embutida. O lexer passa a aceitar esses casos em código GeneXus e mantém a rejeição de barra antes de aspa em linhas de bloco nativo (`csharp`, `java`), fail-closed. Residuais: (1) blocos nativos não são opacos ao lexer; uma contagem ímpar de aspas dentro de bloco nativo pode deslocar o pareamento, e o caso testado bloqueia; (2) o espelho `Test-GeneXusSourceSanity.ps1` mantém a regra conservadora descrita no `02`, e o comentário em `Get-CallConditionMask` ainda cita o `lex_source`; a divergência é deliberada e a alinhar só em frente própria, com aprovação; (3) o gate 9-PNW sobre frentes que já tinham barra antes de aspa precisa ser reexecutado para confirmar a mudança de resultado. Evidência: casos medidos em KB de teste, sem números de acervo privado. Gatilho: caso real de falha em bloco nativo, ou alinhamento do espelho.
+
 <a id="specifygenerate-pos-build-apos-generateonly-20261114"></a>
 
 ## SpecifyGenerate: sinal e/ou fechamento de pós-build após GenerateOnly — 2026-11-14

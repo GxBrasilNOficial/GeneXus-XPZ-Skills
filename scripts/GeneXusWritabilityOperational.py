@@ -89,13 +89,27 @@ def _identifier_continue(char: str) -> bool:
     return char == "_" or char.isalnum()
 
 
-def lex_source(source: str) -> list[Token]:
-    """Lex code tokens while ignoring GeneXus strings and documented comments.
+_NATIVE_BLOCK_LINE = re.compile(r"[ \t]*(?:csharp|java)(?=[ \t\r\n]|$)", re.IGNORECASE)
 
-    GeneXus 18 documentation confirms double-slash and C-style block comments.
-    Quoted strings support doubled quote delimiters.  Backslash escapes before a
-    quote are rejected because the official language material does not define
-    them consistently; they must not silently alter block boundaries.
+
+def _is_native_block_line(source: str, line_start: int) -> bool:
+    return _NATIVE_BLOCK_LINE.match(source, line_start) is not None
+
+
+def lex_source(source: str) -> list[Token]:
+    r"""Lex code tokens while ignoring GeneXus string literals and comments.
+
+    Double-slash and C-style block comments are ignored.  Inside a literal a
+    backslash is an ordinary character and the first matching quote closes the
+    literal: measured on GeneXus validation and generated code, a backslash before
+    a quote is not an escape in GeneXus code, and a doubled quote does not embed a
+    quote (GeneXus rejects a literal such as "a""b").  Lines that start with a
+    native block keyword (csharp or java) are not analyzed by this lexer, so a
+    backslash before a quote on such a line is rejected, fail-closed: the native
+    language may read it as an escape, and this lexer's quote pairing could then
+    hide New or EndNew markers.  Unterminated literals at end of input and
+    unterminated block comments are rejected; newlines inside a literal are still
+    accepted.
     """
     tokens: list[Token] = []
     i = 0
@@ -133,15 +147,14 @@ def lex_source(source: str) -> list[Token]:
         if char in ('"', "'"):
             quote = char
             start = i
+            native = _is_native_block_line(source, line_start)
             i += 1
             closed = False
             while i < length:
-                if source[i] == "\\" and i + 1 < length and source[i + 1] == quote:
-                    raise OperationalError("new-extraction-incomplete: unsupported backslash quote escape")
+                if native and source[i] == "\\" and i + 1 < length and source[i + 1] == quote:
+                    raise OperationalError(
+                        "new-extraction-incomplete: backslash before quote on a native block line is not analyzed")
                 if source[i] == quote:
-                    if i + 1 < length and source[i + 1] == quote:
-                        i += 2
-                        continue
                     i += 1
                     closed = True
                     break

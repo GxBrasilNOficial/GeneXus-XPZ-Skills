@@ -464,6 +464,58 @@ def main() -> int:
     else:
         raise AssertionError("unterminated block comment must fail closed")
 
+    gx_source = r'''New
+A = "\"
+B = '\'
+C = "\" + "x"
+D = "\\"
+EndNew
+'''
+    gx_blocks = operational.extract_new_blocks(gx_source)
+    _assert(len(gx_blocks) == 1 and [item.name for item in gx_blocks[0].assignments] == ["A", "B", "C", "D"],
+            "GeneXus code must read a backslash before a quote as an ordinary character and close the literal")
+
+    concat_blocks = operational.extract_new_blocks(r'''New
+TesteDesc = "a\" + "b"
+EndNew
+''')
+    _assert(len(concat_blocks) == 1 and [item.name for item in concat_blocks[0].assignments] == ["TesteDesc"],
+            "a backslash-quote inside New must not hide the block")
+
+    _assert(len(operational.extract_new_blocks(r'''// A = "\"
+New
+B = 1
+EndNew
+''')) == 1, "a backslash-quote inside a double-slash comment must stay ignored")
+
+    try:
+        operational.extract_new_blocks(r'''csharp string s = "a\"b";
+New
+B = 1
+EndNew
+''')
+    except operational.OperationalError as exc:
+        _assert("native block line" in str(exc),
+                "a native-line backslash-quote must fail closed with an explicit reason")
+    else:
+        raise AssertionError("a native-line backslash-quote must not be silently analyzed")
+
+    _assert(len(operational.extract_new_blocks(r'''csharp string s = "ab";
+New
+B = 1
+EndNew
+''')) == 1, "native-line literals without a backslash-quote must keep extracting blocks")
+
+    try:
+        operational.extract_new_blocks('New\nA = "abc\n')
+    except operational.OperationalError as exc:
+        _assert("unterminated string" in str(exc), "unterminated literals must keep failing closed")
+    else:
+        raise AssertionError("an unterminated literal must fail closed")
+
+    doubled = [token for token in operational.lex_source('A = "a""b"\n') if token.kind == "string"]
+    _assert(len(doubled) == 2, "a doubled quote must not embed a quote, matching GeneXus validation")
+
     with tempfile.TemporaryDirectory(prefix="gx-writability-transaction-context-selftest-") as temp:
         root = Path(temp)
         _create_corpus(root)
