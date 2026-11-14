@@ -3837,7 +3837,7 @@ As contagens são de **arquivos que mencionam o token**, não de parâmetros exc
 
 **Linhas afetadas (saída do `PostBuild-Gx.bat` em environment .NET Core + PostgreSQL).**
 - `[APLICADO] .js varridos=<n> | arquivos com chave negativa em gx.domain=<n> | chaves corrigidas=<n>` (`Fix-GxNegativeDomainKeys`): muda com cada `.js` novo na pasta `web` e quando aparece chave negativa.
-- `<arquivo>.js -> <n> chave(s)`: só aparece quando o `Fix-GxNegativeDomainKeys` corrige alguma chave; o nome do arquivo e a contagem variam. Visto como `<objeto>.js -> 1 chave(s)` nos builds de 2026-10-25.
+- `<arquivo>.js -> <n> chave(s)`: só aparece quando o `Fix-GxNegativeDomainKeys` corrige alguma chave; o nome do arquivo e a contagem variam. Visto como `<objeto>.js -> 1 chave(s)` nos builds de 2026-10-25. Em 2026-11-13 apareceu para 6 arquivos no mesmo build, com 8 chaves cada.
 - `Verify-GxJs: verificados <n> .js (modulos pulados: <n> | placeholders pulados: <n>) | invalidos: 0 | tempo: <n> ms`: hoje só o `tempo` é normalizado; as contagens entram na impressão digital.
 - `CommonRspHealth: OK - GeneXus.Programs.Common.csproj ok (<n> itens, <n> dominios); genexus.programs.common.bld ok (<n> itens, <n> dominios); <n> gxdomain*.cs no disco`: muda quando entra domínio novo.
 
@@ -3850,6 +3850,7 @@ As contagens são de **arquivos que mencionam o token**, não de parâmetros exc
 - 2026-10-26: Build All incremental com `exit 0`, sem reorg, `deployBinFreshness=fresh`, `Verify-GxJs` com `invalidos: 0` e `Build All Task Sucesso`. Mesmo assim, o status ficou `operação concluída, pendente de confirmação funcional`, porque três dessas linhas não tinham impressão digital registrada (relatório JSON do BuildAll sob `Temp/` da pasta paralela).
 - Contorno aplicado: wrapper local `Register-*KbPostBuildEvents.ps1` regravou o registro do environment em `kb-source-metadata.md` com os 10 eventos do build; a reclassificação deu `unexpected=[]` e `shouldDowngrade=false`.
 - O contorno não dura. O registro anterior já guardava `.js varridos=2974` e `verificados 2184`; o novo guarda `2966` e `2176`. Basta um `.js` ou um domínio a mais para a linha deixar de bater e o status voltar a `pendente`.
+- 2026-11-13: BuildAll saudável (KB FabricaBrasil18, environment NETPostgreSQL) com 6 arquivos × 8 chaves negativas, somando 48 linhas `<arquivo>.js(N): Syntax error : }`. O contorno corrigiu as 48 chaves e `Verify-GxJs` fechou com `invalidos: 0`. O exit 48 desse dia veio do reconhecedor do compressor, que supunha uma linha de erro por arquivo; corrigido em 2026-11-14 (ver CHANGELOG). A correção do compressor não altera a decisão em aberto deste item.
 
 **Ideia de solução.**
 1. Tratar como evento conhecido, comparando a forma e não as contagens, apenas as famílias de linha conhecidas acima (lista fechada de padrões, por exemplo `^\[aplicado\] \.js varridos=\d+ \| …`, `^\S+\.js -> \d+ chave\(s\)$`, `verify-gxjs: verificados \d+ …`, `commonrsphealth: ok - …`). As contagens continuam no diagnóstico como evidência.
