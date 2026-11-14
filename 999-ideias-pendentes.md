@@ -31,6 +31,56 @@ Entradas legadas sem avaliação carregam `FALTA AVALIAR` em ambos os campos at�
 
 **Relacionado.** `xpz-msbuild-build/SKILL.md` (BuildAll × SpecifyGenerate e eventos pós-build); `Invoke-GeneXusKbSpecifyGenerate.ps1`; `Invoke-GeneXusKbBuildAll.ps1`; registro de pós-build em `kb-source-metadata.md` / `Register-GeneXusKbPostBuildEvents.ps1`.
 
+<a id="xlsx-formato-real-powershell-dolar-r-20261114"></a>
+
+## Patch de `.xlsx`: formato Real `[$R$-416]` corrompido por expansão PowerShell — 2026-11-14
+
+- **Importância** — média (workaround conhecido: string literal / Python; sem isso o modelo importa “ok” e a moeda Real some ou vira lixo visual).
+- **Maturidade** — ideia (causa medida; falta helper/contrato documental na trilha XPZ para quem patcha modelo ExcelDocument).
+
+**Origem.** Frente RelTitulos (FabricaBrasil18, 2026-11): modelos `.xlsx` em File `ModelosDePlanilhas` usam formato Excel de moeda Real:
+
+`[$R$-416]\ #,##0.00;[RED]\-[$R$-416]\ #,##0.00`
+
+O `$R$` é sintaxe do Excel (código de moeda + LCID 416 = pt-BR), **não** variável. Em PowerShell, string expansível (`"..."` ou `@"..."@`) interpreta `$R` como variável: `"[$R$-416]"` vira `[$-416]` (medido 2026-11-14). Here-string **literal** `@'...'@` e aspas simples preservam. Patch via Python com string literal também preserva.
+
+**Sintoma.** Planilha gerada sem Real “de verdade” / formato estranho nas colunas de valor, apesar do template parecer ter sido atualizado. GeneXus `ExcelDocument` **não** expõe `NumberFormat` — o formato só vem das linhas pré-formatadas do `.xlsx`.
+
+**Ideia (não implementar nesta frente).** Uma ou mais:
+1. Helper compartilhado (ex. `Set-GeneXusExcelTemplateCurrencyFormat.ps1` / Python) que grava o formato Real canônico sem passar por expansão PS.
+2. Nota curta em skill aplicável (`xpz-builder` / doc de File / checklist de modelo ExcelDocument): ao embutir `[$R$-416]` em script, usar literal; nunca interpolar.
+3. Self-test que falhe se um artefato de exemplo ou fixture perder o substring `[$R$-416]` após round-trip de patch.
+
+**Fora de escopo agora.** Convenção de produto na KB FabricaBrasil (`DECISOES-ARQUITETURA-DA-KB.md`: formato canônico + AutoFit/template); este gap é da **trilha de edição/patch** nas skills.
+
+**Relacionado.** Modelos ExcelDocument + File extract; OOXML `numFmt`; entrada irmã sobre larguras/`openpyxl` abaixo.
+
+<a id="xlsx-openpyxl-col-min-max-larguras-20261114"></a>
+
+## Leitura de larguras `.xlsx`: openpyxl mente em `<col min max>` — 2026-11-14
+
+- **Importância** — média (agente “valida” larguras erradas, regrava modelo que já estava certo ou deixa coluna fora do esperado; sofrimento real na frente RelTitulos).
+- **Maturidade** — ideia (comportamento observado com evidência; falta helper de leitura normativa + nota na trilha).
+
+**Origem.** Mesma frente RelTitulos (FabricaBrasil18, 2026-11). No OOXML, várias colunas compartilham uma entrada, ex.:
+
+```xml
+<col width="14.81" customWidth="1" min="13" max="16" style="7" />
+```
+
+= colunas 13–16 (M–P) **todas** com largura 14.81. Leitura via openpyxl `column_dimensions` materializou bem só o `min`: M=14.81 e **N/O/P=13.0** (default), enquanto o `sheet1.xml` dentro do zip estava correto. Conferência normativa: abrir o `.xlsx` como zip e ler `xl/worksheets/sheet1.xml` (atributos `min`/`max`/`width`).
+
+**Sintoma.** Diff visual “larguras erradas” ou agente corrigindo N/O/P que já herdavam do range; falso negativo/positivo na validação pós-patch. Separado do bug de produto `AutoFit = 1` (esse sim estoura coluna A pelo texto do cabeçalho).
+
+**Ideia (não implementar nesta frente).** Uma ou mais:
+1. Helper compartilhado que devolva mapa coluna→largura expandindo cada `<col min max>` (PowerShell/`System.IO.Compression` ou Python sem confiar só em `column_dimensions`).
+2. Nota na skill/checklist de modelo: validar larguras no OOXML, não só via openpyxl.
+3. Self-test com fixture cujo `sheet1.xml` tenha `min != max` e assert de que o helper expande todas as colunas do intervalo.
+
+**Fora de escopo agora.** Decisão de KB “respeitar AJUSTADO do usuário” fica no `DECISOES` da FabricaBrasil; aqui só a armadilha de **leitura/validação** na trilha XPZ.
+
+**Relacionado.** Entrada irmã do formato Real/`$R$` acima; `ExcelDocument.AutoFit`; File `ModelosDePlanilhas`.
+
 <a id="jev-uso-eventual-orientacao-20261109"></a>
 
 ## Orientação de uso eventual do Jev quando disponível (pasta paralela e demais sessões) — 2026-11-09
