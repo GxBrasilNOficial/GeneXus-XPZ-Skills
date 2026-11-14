@@ -638,6 +638,21 @@ args = [`"legacy.js`"]
     Assert-True ([System.IO.File]::ReadAllText($fmtInstPath) -ceq $fmtInstBefore) '(reformat-install) manifesto nao foi regravado'
     Assert-True ($fmtInstBackupsAfter -eq $fmtInstBackupsBefore) "(reformat-install) nenhum backup novo; antes=$fmtInstBackupsBefore depois=$fmtInstBackupsAfter"
 
+    # 9g. Install com cliente detectado cuja configuracao sumiu: recusa com config_ausente (exit 62),
+    # nao cria a configuracao e nao regrava o manifesto. Registro do cliente segue no manifesto (o
+    # Uninstall o remove); o Install nao avisa sobre ele. Comportamento atual, travado de proposito.
+    $null = Invoke-McpRemovalCase -Params @{ Client = 'all' }
+    Assert-True ((Invoke-McpInstallForRemoval) -eq 0) '(install-orphan) reinstall exit 0'
+    Remove-Item -LiteralPath $cxFile -Force
+    $orphanInstBefore = [System.IO.File]::ReadAllText((Get-McpManifestPath))
+    $orInstOutput = @(& (Join-Path $scriptDir 'Install-McpIntegration.ps1') -Action repair -Client codex 2>&1)
+    $orInstExit = $LASTEXITCODE
+    $orInstJson = (($orInstOutput | ForEach-Object { [string]$_ }) -join "`n") | ConvertFrom-Json -AsHashtable
+    Assert-True ($orInstExit -eq 62) "(install-orphan) config_ausente sai com exit 62; obtido $orInstExit"
+    Assert-True (@($orInstJson.findings | Where-Object { $_.code -eq 'config_ausente' -and $_.class -eq 'blocking' }).Count -eq 1) '(install-orphan) achado config_ausente blocking'
+    Assert-True (-not (Test-Path -LiteralPath $cxFile)) '(install-orphan) Install nao cria a configuracao'
+    Assert-True ([System.IO.File]::ReadAllText((Get-McpManifestPath)) -ceq $orphanInstBefore) '(install-orphan) manifesto intacto apos a recusa'
+
     # 10. Gate do dist real, quando informado.
     if (-not [string]::IsNullOrWhiteSpace($DistManagedRoot)) {
         $distOutput = & (Get-Command pwsh).Source -NoProfile -File (Join-Path $scriptDir 'Test-McpDistEvidenceSelfTest.ps1') -ManagedRoot $DistManagedRoot 2>&1
