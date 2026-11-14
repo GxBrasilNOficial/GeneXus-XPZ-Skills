@@ -334,7 +334,7 @@ function Invoke-RunCase {
             else { Remove-Item Env:OPENCODE_DISABLE_PROJECT_CONFIG -ErrorAction SilentlyContinue }
         }
     }
-    $raw =Get-Content -LiteralPath $streamPath -Raw -Encoding utf8 -ErrorAction SilentlyContinue
+    $raw = Get-Content -LiteralPath $streamPath -Raw -Encoding utf8 -ErrorAction SilentlyContinue
     if ([string]::IsNullOrWhiteSpace($raw)) {
         return [ordered]@{ name = $name; profile = $profile; class = 'behavioral'; expected = [string]$Case.kind; event = 'none'; pass = $false; reason = 'emptyStream'; exitCode = $exitCode; evidence = $streamPath; toolEventCount = 0 }
     }
@@ -443,7 +443,7 @@ function Invoke-GrepStructuralCase {
             else { Remove-Item Env:OPENCODE_DISABLE_PROJECT_CONFIG -ErrorAction SilentlyContinue }
         }
     }
-    $toolEvents =@(Get-ToolEvents -Path $streamPath)
+    $toolEvents = @(Get-ToolEvents -Path $streamPath)
     $toolEventCount = $toolEvents.Count
     $eventText = 'sem evento'
     $contradiction = $false

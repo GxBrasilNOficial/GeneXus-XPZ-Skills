@@ -1235,7 +1235,9 @@ ao diretório entregue ao pré-check (`(Get-Location).ProviderPath`). O ambiente
 é alterado. **Quem chamar `opencode run` fora desses adapters deve fazer o mesmo.**
 
 **Não medido:** Copilot CLI e Gemini CLI (lançam com `-WorkingDirectory`, mas o CLI pode preferir
-`PWD`); `PWD` em forma 8.3 sobre `external_directory`. Evidência e decisão:
+`PWD`). O `PWD` em forma 8.3 sobre `external_directory` tem cobertura só indireta: a matriz de
+aceite rodou do Git Bash num diretório temporário 8.3 e passou os casos de `external-deny`, sem
+caso dedicado. Evidência e decisão:
 [`opencode-reviewer-ro-least-privilege-design.md`](../opencode-reviewer-ro-least-privilege-design.md),
 nota de 2026-11-14 no D4.
 

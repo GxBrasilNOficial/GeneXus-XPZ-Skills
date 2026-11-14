@@ -228,8 +228,9 @@ conteúdo sintético; A/B = repositórios vazios com marcadores):
 pai (o dispatcher roda adapters em runspaces paralelos que compartilham o ambiente do processo). O
 `debug agents` não muda (E9); essa premissa é revalidada a cada promoção de versão (passo E9 no
 `xpz-llm-delegate/SKILL.md`, «Provas e promoção»). O runner assíncrono cita seus argumentos de
-caminho (E10). Não medido: Copilot/Gemini; `PWD` em forma 8.3 sobre `external_directory`; outras
-variáveis de diretório.
+caminho (E10). Não medido: Copilot/Gemini; outras variáveis de diretório. `PWD` em forma 8.3 sobre
+`external_directory`: cobertura só indireta (a matriz de aceite rodou do Git Bash num diretório
+temporário 8.3 e passou os casos de `external-deny`, sem caso dedicado).
 
 ## Self-tests, fixtures e GATE DE ATIVAÇÃO
 
