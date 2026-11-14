@@ -751,7 +751,7 @@ args = [`"legacy.js`"]
     Remove-Item -LiteralPath $cxFile -Recurse -Force
     [System.IO.File]::WriteAllText($cxFile, "model = `"gpt-5`"`n", [System.Text.UTF8Encoding]::new($false))
 
-    # 9l. Link simbolico (reparse point real) no lugar do config.toml: mesmo ramo de 9j. Criar link exige
+    # 9n. Link simbolico (reparse point real) no lugar do config.toml: mesmo ramo de 9j. Criar link exige
     # privilegio (ou Modo de Desenvolvedor); sem ele o caso e registrado como SKIP e nada e afirmado.
     $symTarget = "$cxFile.real"
     $symlinkOk = $false
@@ -782,10 +782,10 @@ args = [`"legacy.js`"]
     $null = New-Item -ItemType Directory -Path $ocFile
     $ocJsonFile = Join-Path $oc 'opencode.json'
     [System.IO.File]::WriteAllText($ocJsonFile, "{}`n", [System.Text.UTF8Encoding]::new($false))
-    $aud9l = @(& (Join-Path $scriptDir 'Test-McpIntegrations.ps1') 2>&1)
-    $aud9lJson = (($aud9l | ForEach-Object { [string]$_ }) -join "`n") | ConvertFrom-Json -AsHashtable
-    $ocConflict9l = @($aud9lJson.findings | Where-Object { $_.code -eq 'entrada_em_conflito' -and $_.client -eq 'opencode' })
-    Assert-True ($ocConflict9l.Count -eq 1) "(audit-detected-conflict) um unico entrada_em_conflito para opencode detectado; obtido $($ocConflict9l.Count)"
+    $aud9m = @(& (Join-Path $scriptDir 'Test-McpIntegrations.ps1') 2>&1)
+    $aud9mJson = (($aud9m | ForEach-Object { [string]$_ }) -join "`n") | ConvertFrom-Json -AsHashtable
+    $ocConflict9m = @($aud9mJson.findings | Where-Object { $_.code -eq 'entrada_em_conflito' -and $_.client -eq 'opencode' })
+    Assert-True ($ocConflict9m.Count -eq 1) "(audit-detected-conflict) um unico entrada_em_conflito para opencode detectado; obtido $($ocConflict9m.Count)"
     Remove-Item -LiteralPath $ocFile -Recurse -Force
     Remove-Item -LiteralPath $ocJsonFile -Force
     [System.IO.File]::WriteAllText($ocFile, "{`n  `"mcp`": {}`n}`n", [System.Text.UTF8Encoding]::new($false))
