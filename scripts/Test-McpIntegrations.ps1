@@ -162,7 +162,7 @@ if ($prerequisites.VersionManagers.Count -gt 0) {
 $managedRoot = Get-McpManagedRoot
 $manifest = Get-McpManifest
 if ($manifest.Corrupt) {
-    $findings.Add((New-McpFinding -Code 'manifesto_corrompido' -Class 'warn' -Message $manifest.Error)) | Out-Null
+    $findings.Add((New-McpFinding -Code 'manifesto_corrompido' -Class 'blocking' -Message $manifest.Error)) | Out-Null
 }
 $config = Get-McpConfig
 $endpointMatchesPreset = $false

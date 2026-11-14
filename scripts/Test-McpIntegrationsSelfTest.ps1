@@ -679,6 +679,20 @@ args = [`"legacy.js`"]
     Assert-True ([System.IO.File]::ReadAllText($ordPath) -ceq $ordBefore) '(key-order) manifesto nao foi regravado'
     Assert-True ($ordBackupsAfter -eq $ordBackupsBefore) "(key-order) nenhum backup novo; antes=$ordBackupsBefore depois=$ordBackupsAfter"
 
+    # 9i. Manifesto corrompido (chave extra): o auditor trata como bloqueio, como os mutadores.
+    # Sem bloqueio, INTEGRATIONS_OK afirmaria um estado que o registro nao consegue confirmar.
+    $corruptPath = Get-McpManifestPath
+    $corruptObj = Get-Content -Raw -LiteralPath $corruptPath | ConvertFrom-Json -AsHashtable
+    $corruptObj['chaveExtraManual'] = 'valor-do-usuario'
+    [System.IO.File]::WriteAllText($corruptPath, (($corruptObj | ConvertTo-Json -Depth 30) + "`n"), [System.Text.UTF8Encoding]::new($false))
+    $corruptAuditOutput = @(& (Join-Path $scriptDir 'Test-McpIntegrations.ps1') 2>&1)
+    $corruptAuditExit = $LASTEXITCODE
+    $corruptAudit = (($corruptAuditOutput | ForEach-Object { [string]$_ }) -join "`n") | ConvertFrom-Json -AsHashtable
+    $corruptFindings = @($corruptAudit.findings | Where-Object { $_.code -eq 'manifesto_corrompido' })
+    Assert-True ($corruptFindings.Count -eq 1 -and [string]$corruptFindings[0].class -eq 'blocking') '(corrupt) manifesto_corrompido com classe blocking no auditor'
+    Assert-True ([string]$corruptAudit.overall -eq 'INTEGRATIONS_GAPS') "(corrupt) overall GAPS com manifesto corrompido; obtido $($corruptAudit.overall)"
+    Assert-True ($corruptAuditExit -eq 67) "(corrupt) exit 67 (manifesto_corrompido); obtido $corruptAuditExit"
+
     # 10. Gate do dist real, quando informado.
     if (-not [string]::IsNullOrWhiteSpace($DistManagedRoot)) {
         $distOutput = & (Get-Command pwsh).Source -NoProfile -File (Join-Path $scriptDir 'Test-McpDistEvidenceSelfTest.ps1') -ManagedRoot $DistManagedRoot 2>&1

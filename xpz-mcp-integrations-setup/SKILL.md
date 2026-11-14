@@ -21,6 +21,8 @@ git nem o MCP interno do Cursor. Isso continua com a `xpz-skills-setup`.
   temporario: a sonda TOML do Codex recebe o `config.toml` pela entrada padrao.
   Registro de cliente no manifesto sem a configuracao do cliente aparece como
   `registro_orfao` (warn), com a acao sugerida de rodar o `Uninstall` desse cliente.
+  Manifesto corrompido e bloqueio (`manifesto_corrompido`, exit 67), como nos
+  mutadores: sem registro confiavel, o auditor nao afirma `INTEGRATIONS_OK`.
 - **Nada gravado sem aprovacao explicita.** Mostre estados, achados e a acao
   oferecida; so execute o mutador depois do `sim`/`aprova` do usuario.
 - **Diff antes da escrita.** Rode o mutador com `-WhatIf` quando houver duvida,
