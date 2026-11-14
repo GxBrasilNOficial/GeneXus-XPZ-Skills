@@ -773,6 +773,54 @@
       "triagedBy": "Codex, com autorização do usuário",
       "kind": "closed",
       "excerpt": "**Origem.** Conversa de 2026-11-09 após a entrega da v1 de `xpz-mcp-integrations-setup` e a pré-push sem push. Ficou claro que a skill cobre **ciclo de vida** (instalar/auditar/reparar/atualizar/remover), não “quando o agente deve chamar o Jev”. Em sessão nova no OpenCode/Codex as tools podem aparecer via MCP, mas uso espontâneo sem menção ao Jev não é garantido nem foi medido como contrato."
+    },
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "999-ideias-pendentes.md",
+      "unitHash": "702d60a80389104c9f46b5f214a92c2ca62e6cf89684b811c61e68534005e0e0",
+      "listedMembers": [
+        "copilot",
+        "gemini",
+        "opencode"
+      ],
+      "verdict": "non-gap",
+      "reason": "Pendência de medição sob `PWD` divergente restrita a Copilot/Gemini, comparada ao comportamento medido do `opencode run`; não descreve o conjunto de backends de delegação.",
+      "triagedAt": "2026-11-14",
+      "triagedBy": "Claude Code, com autorização do usuário",
+      "kind": "closed",
+      "excerpt": "- **Medir Copilot CLI e Gemini CLI sob `PWD` divergente:** os adapters lançam com `-WorkingDirectory`, mas o CLI pode preferir `PWD`, como o `opencode run` 2.2.7. Repetir o A/B com marcadores sintéticos antes de afirmar contenção desses backends."
+    },
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "opencode-reviewer-ro-least-privilege-design.md",
+      "unitHash": "007c162cd39c4c0e91ebd3fe13a290c72c6b13eb4749d55bfa8b7731af03db4c",
+      "listedMembers": [
+        "copilot",
+        "gemini",
+        "opencode"
+      ],
+      "verdict": "non-gap",
+      "reason": "Nota datada de 2026-11-14 (decisão e «não medido») de um registro de design congelado; fechada por natureza, um backend novo não a tornaria falsa.",
+      "triagedAt": "2026-11-14",
+      "triagedBy": "Claude Code, com autorização do usuário",
+      "kind": "closed",
+      "excerpt": "**Decisão:** fixar **no processo filho** do `opencode run` o diretório real e o `PWD` no mesmo valor\n— a mesma string entregue ao pré-check (`(Get-Location).ProviderPath`). Nunca alterar o ambiente do\npai (o dispatcher roda adapters em runspaces paralelos que compartilham o ambiente do processo). O\n`debug agents` não muda (E9); essa premissa é revalidada a cada promoção de versão (passo E9 no\n`xpz-llm-delegate/SKILL.md`, «Provas e promoção»). O runner assíncrono cita seus argumentos de\ncaminho (E10). Não medido: Copilot/Gemini; `PWD` em forma 8.3 sobre `external_directory`; outras\nvariáveis de diretório."
+    },
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "xpz-llm-delegate/SKILL.md",
+      "unitHash": "7eeaa571fbdada503649e79712abdec00c311d5532b967e14a9c1c715ccba325",
+      "listedMembers": [
+        "copilot",
+        "gemini",
+        "opencode"
+      ],
+      "verdict": "non-gap",
+      "reason": "Limite medido na 2.2.7 específico do `opencode run`, com ressalva de não-medição para Copilot/Gemini; não enumera o inventário de backends.",
+      "triagedAt": "2026-11-14",
+      "triagedBy": "Claude Code, com autorização do usuário",
+      "kind": "closed",
+      "excerpt": "**Não medido:** Copilot CLI e Gemini CLI (lançam com `-WorkingDirectory`, mas o CLI pode preferir\n`PWD`); `PWD` em forma 8.3 sobre `external_directory`. Evidência e decisão:\n[`opencode-reviewer-ro-least-privilege-design.md`](../opencode-reviewer-ro-least-privilege-design.md),\nnota de 2026-11-14 no D4."
     }
   ]
 }
