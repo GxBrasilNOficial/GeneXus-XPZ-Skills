@@ -85,3 +85,20 @@ Implementado em 2026-11-14 conforme o plano v4 congelado por decisão do mantene
 - Commit material: `6b62c03` — Fixa diretório real e PWD no filho do opencode run (reviewer-ro).
 - Aceite (2026-11-14, opencode 2.2.7, conteúdo sintético): matriz completa **rodada do Git Bash** (invocador com `PWD` exportado), sem `-EvidenceDirectory` e sem `-Only`, modelo `opencode-go/deepseek-v4.1-flash` — 32/32 comportamentais e 2/2 estruturais (`OPENCODE_REVIEWER_RO_MATRIX_OK`); antes da correção, o mesmo arranjo falhava (E1). Prova de ponta a ponta pelo contorno da SKILL (`pwsh -Command "Set-Location '<A>'; & Invoke-OpenCode.ps1 ..."` chamado do Git Bash com `PWD` apontando para B, em caminho 8.3): resposta com `MARCADOR_README_A` e `MARCADOR_AGENTE_A`, nada de B. Passo E9 sem modelo: `debug agents` em A com e sem `PWD=B` deu saídas idênticas (`bash deny`), controle em B `allow`. Self-tests e parse limpos; os casos novos do self-test falham contra o código anterior.
 - Pré-push do `13` (HEAD `108a773`): 1 gap confirmado e corrigido no commit seguinte — o lançamento do watcher no `Start-OpenCodeJob.ps1` também passou a citar os caminhos (`-File`, `-TempDir`), mesmo defeito E10 do runner. Sem teste automatizado próprio (os self-tests usam `-NoWatcher`); o helper e a forma `pwsh -File` são os mesmos provados pelo caso `(pwd-espaco)` do runner.
+
+## Lexer e gate 9-PNW: verificação do efeito em frente com barra antes de aspa — 2026-11-14
+
+Origem: item de verificação de processo que acompanhava o registro `lexer-barra-aspa-bloco-nativo-20261114` de `999-ideias-pendentes.md`. Era uma checagem (reexecutar o gate 9-PNW nas frentes afetadas e comparar o resultado), não uma ideia de implementação.
+
+**Escopo verificado.** Numa frente de relatório de KB privada, quatro Procedures tinham barra antes de aspa e nenhum `New`/`EndNew`. Com o lexer anterior, os quatro falhavam com `new-extraction-incomplete: unsupported backslash quote escape`. Com o lexer atual, extraem zero blocos sem erro (medido em leitura, com as duas versões do módulo). O gate 9-PNW executado sobre a frente registrou `status=pass` e `operationalStatus=clear`, sem atribuições `New`.
+
+**Limites registrados.**
+- O commit ativo na execução do gate não foi registrado. A linha do tempo (commit do lexer antes do pacote, commit do scanner depois) indica o commit do lexer, mas é inferência.
+- A frente não tinha `New`, então o `pass` mostra que a extração não bloqueou, não que atribuições em `New` sejam graváveis.
+- Um nome de Procedure repetido no relatório da execução não foi confirmado como defeito do gate. Se for confirmado, vira item próprio.
+- Um aviso de compilação da mesma frente, sem relação com o lexer, não foi comparado com o acervo.
+
+### Rastreabilidade
+
+- `28f41bd` — Lexer: barra antes de aspa em código GeneXus e bloco nativo csharp/java.
+- `4eb6afa` — Scanner de sanidade alinhado ao lexer: barra antes de aspa e bloco nativo.
