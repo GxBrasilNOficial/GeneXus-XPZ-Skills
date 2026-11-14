@@ -76,6 +76,8 @@ Implementado em 2026-11-09 conforme o design v24.2 congelado por decisão humana
 - Commit material: `84cb040` — `Set-McpManifest` não regrava manifesto com o mesmo conteúdo lógico.
 - Commit material: `8e85cb3` — Auditor avisa sobre registro órfão (`registro_orfao`) com a ação de Uninstall.
 - Commit material: `bdf0a5a` — `Set-McpManifest` compara conteúdo com chaves ordenadas.
+- Commit material: `2391053` — Auditor trata manifesto corrompido como bloqueio (exit 67).
+- Commit material: `1c0e98b` — Auditor reporta configuração do Codex não regular como conflito, sem sugerir Install.
 - Commit material (teste): `f958d0a` — Reparo do Install com manifesto só reformatado.
 - Commit material (teste): `e3172f2` — Install com configuração ausente e registro presente.
 
