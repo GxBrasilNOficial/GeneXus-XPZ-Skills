@@ -129,60 +129,6 @@ function New-McpBootResult {
     }
 }
 
-function New-McpCredentialProbe {
-    param(
-        [Parameter(Mandatory = $true)][string]$BaseUrl,
-        [Parameter(Mandatory = $true)][string]$Model,
-        [Parameter(Mandatory = $true)][string]$Secret
-    )
-    $question = [ordered]@{
-        type         = 'noul'
-        instructions = 'This is a health probe; the statement is true.'
-    }
-    $body = [ordered]@{
-        model     = $Model
-        state     = 'xpz-mcp-integrations-setup credential probe'
-        questions = [ordered]@{
-            xpz_mcp_probe = $question
-        }
-    } | ConvertTo-Json -Depth 10 -Compress
-    try {
-        $response = Invoke-WebRequest -Uri $BaseUrl -Method Post -Headers @{ Authorization = "Bearer $Secret" } `
-            -ContentType 'application/json' -Body $body -SkipHttpErrorCheck -TimeoutSec 20
-    } catch {
-        return [pscustomobject]@{ endpointReachable = $false; credentialVerified = $false; status = $null; reason = 'request_failed' }
-    }
-    $endpointReachable = $true
-    $credentialVerified = $false
-    if ([int]$response.StatusCode -eq 200) {
-        try {
-            $parsed = $response.Content | ConvertFrom-Json -AsHashtable
-            $answers = $parsed['answers']
-            if ($answers -is [System.Collections.IDictionary] -and $answers.Contains('xpz_mcp_probe')) {
-                $answer = $answers['xpz_mcp_probe']
-                if ($answer -is [System.Collections.IDictionary] -and $answer.Contains('noul')) {
-                    $noul = $answer['noul']
-                    if ($noul -is [int] -or $noul -is [long] -or $noul -is [double] -or $noul -is [decimal]) {
-                        $value = [double]$noul
-                        if ($value -ge 0 -and $value -le 1) {
-                            $credentialVerified = $true
-                        }
-                    }
-                }
-            }
-        } catch {
-            $credentialVerified = $false
-        }
-    }
-    return [pscustomobject]@{
-        endpointReachable    = $endpointReachable
-        credentialVerified   = $credentialVerified
-        status               = [int]$response.StatusCode
-        reason               = $(if ($credentialVerified) { 'answers_ok' } elseif ($endpointReachable) { 'endpoint_only' } else { 'request_failed' })
-    }
-}
-
-
 $findings = [System.Collections.Generic.List[object]]::new()
 $nextActions = [System.Collections.Generic.List[object]]::new()
 function Add-McpNextAction {

@@ -258,7 +258,9 @@ Estados por cliente, **um valor so**, na ordem:
   invalida. Use `-CheckBoot` (local, opt-in) para medir.
 - **`credencial_verificada`:** so por `-CheckCredential` (online opt-in, uma
   chamada autenticada por execucao). Criterio: `200` e `answers` com a chave do
-  probe e `noul` numerico em `[0,1]`; `choice` nao e usado.
+  probe e `noul` numerico em `[0,1]`; `choice` nao e usado. Redirecionamento
+  nao e seguido (`redirect_nao_seguido`): a chave so vai para a URL configurada
+  e um `3xx` nao verifica credencial.
 - **`endpoint_alcancavel`:** diagnostico separado; nao implica credencial.
 - **`e2e_opt_in_confirmado`:** so depois de E2E manual aprovado com
   `jev_classify`; registre com

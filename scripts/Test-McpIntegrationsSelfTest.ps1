@@ -550,6 +550,42 @@ args = [`"legacy.js`"]
     Assert-True ([System.IO.File]::ReadAllText($ocFile) -ceq $ocBeforeSecond) '(rm-unchanged) arquivo do opencode identico'
     Assert-True (-not [bool]$r5b.Json.changed) '(rm-unchanged) changed false na segunda remocao'
 
+    # 9c. Probe de credencial nao segue redirecionamento: a chave nao pode sair da URL configurada.
+    $redirPort = 18700 + (Get-Random -Minimum 0 -Maximum 90)
+    $redirListener = [System.Net.HttpListener]::new()
+    $redirListener.Prefixes.Add("http://localhost:$redirPort/")
+    $redirListener.Start()
+    $redirSeen = [hashtable]::Synchronized(@{})
+    $redirJob = [powershell]::Create().AddScript({
+        param($listener, $seen)
+        while ($listener.IsListening) {
+            try { $ctx = $listener.GetContext() } catch { break }
+            $req = $ctx.Request
+            $res = $ctx.Response
+            $seen[$req.Url.AbsolutePath] = [string]$req.Headers['Authorization']
+            if ($req.Url.AbsolutePath -eq '/start') {
+                $res.StatusCode = 302
+                $res.RedirectLocation = '/final'
+            } else {
+                $res.StatusCode = 200
+                $bytes = [System.Text.Encoding]::UTF8.GetBytes('{"answers":{}}')
+                $res.OutputStream.Write($bytes, 0, $bytes.Length)
+            }
+            $res.Close()
+        }
+    }).AddArgument($redirListener).AddArgument($redirSeen)
+    $null = $redirJob.BeginInvoke()
+    Start-Sleep -Milliseconds 200
+    try {
+        $probeRedir = New-McpCredentialProbe -BaseUrl "http://localhost:$redirPort/start" -Model 'typesafe/jev' -Secret 'SEGREDO-REDIR-TESTE'
+    } finally {
+        $redirListener.Stop()
+    }
+    Assert-True (-not [bool]$probeRedir.credentialVerified) '(probe-redirect) redirecionamento nao verifica credencial'
+    Assert-True ([bool]$probeRedir.endpointReachable -and [string]$probeRedir.reason -eq 'redirect_nao_seguido') "(probe-redirect) endpoint alcancado e redirecionamento reportado; obtido reason=$($probeRedir.reason) reachable=$($probeRedir.endpointReachable)"
+    Assert-True ($redirSeen.ContainsKey('/start')) '(probe-redirect) endpoint configurado recebeu a requisicao'
+    Assert-True (-not $redirSeen.ContainsKey('/final')) '(probe-redirect) destino do redirecionamento nao recebe requisicao'
+
     # 10. Gate do dist real, quando informado.
     if (-not [string]::IsNullOrWhiteSpace($DistManagedRoot)) {
         $distOutput = & (Get-Command pwsh).Source -NoProfile -File (Join-Path $scriptDir 'Test-McpDistEvidenceSelfTest.ps1') -ManagedRoot $DistManagedRoot 2>&1
