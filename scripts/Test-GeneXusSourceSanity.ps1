@@ -171,13 +171,26 @@ function Get-CloseTokenKind {
     return $null
 }
 
+function Test-NativeBlockLine {
+    # Linha que comeca por csharp ou java e bloco nativo: o conteudo nao e analisado por este scanner.
+    param([string]$SourceText, [int]$Index)
+    $start = $Index
+    while ($start -gt 0 -and $SourceText[$start - 1] -ne "`n" -and $SourceText[$start - 1] -ne "`r") { $start-- }
+    $end = $SourceText.IndexOfAny([char[]]@("`r", "`n"), $start)
+    if ($end -lt 0) { $end = $SourceText.Length }
+    return [regex]::IsMatch($SourceText.Substring($start, $end - $start), '^[ \t]*(?i:csharp|java)(?=[ \t]|$)')
+}
+
 function Get-CallConditionMask {
-    # Varredura local por Source, seguindo lex_source: aspas duplicadas e comentarios.
+    # Varredura local por Source, alinhada ao lex_source: fora de bloco nativo, barra antes de aspa e
+    # caractere comum (a primeira aspa fecha o literal) e aspa dupla repetida nao e aspa embutida.
+    # Em linha csharp/java, barra antes de aspa continua inconclusiva.
     # So call-in-condition usa a mascara; os demais diagnosticos mantem o texto antigo.
     param([string]$SourceText)
     $chars = $SourceText.ToCharArray()
     $state = 'code'
     $quote = [char]0
+    $stringNative = $false
     for ($i = 0; $i -lt $chars.Length; $i++) {
         $c = $SourceText[$i]
         $next = [char]0
@@ -192,13 +205,11 @@ function Get-CallConditionMask {
                 $state = 'code'
             }
         } elseif ($state -eq 'string') {
-            if ($c -eq '\' -and $next -eq $quote) {
+            if ($c -eq '\' -and $next -eq $quote -and $stringNative) {
                 return [pscustomobject]@{ conclusive = $false; text = $SourceText }
             }
             if (-not $newline) { $chars[$i] = ' ' }
-            if ($c -eq $quote) {
-                if ($next -eq $quote) { $chars[++$i] = ' ' } else { $state = 'code' }
-            }
+            if ($c -eq $quote) { $state = 'code' }
         } elseif ($c -eq '/' -and ($next -eq '/' -or $next -eq '*')) {
             if ($next -eq '/') { $state = 'line' } else { $state = 'block' }
             $chars[$i] = ' '
@@ -206,6 +217,7 @@ function Get-CallConditionMask {
         } elseif ($c -eq "'" -or $c -eq '"') {
             $quote = $c
             $state = 'string'
+            $stringNative = Test-NativeBlockLine -SourceText $SourceText -Index $i
             # Mesmo '' ocupa o argumento; # nao forma identificador seguido de (.
             $chars[$i] = '#'
         }

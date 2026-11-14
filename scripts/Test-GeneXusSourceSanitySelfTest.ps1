@@ -294,6 +294,25 @@ If &x = 'a\' and MinhaProc()'
 Endif
 '@
 $null = Assert-Calls $escaped 1
+
+# Barra antes de aspa em codigo GeneXus fecha o literal, como no lexer: a chamada entre aspas nao dispara.
+$gxBackslashLiteral = @'
+If &x = "a\" and "MinhaProc()" > 0
+Endif
+'@
+$null = Assert-Calls $gxBackslashLiteral 0
+$gxBackslashCall = @'
+If &x = "a\" and MinhaProc() > 0
+Endif
+'@
+$null = Assert-Calls $gxBackslashCall 1
+# Linha csharp com barra antes de aspa continua inconclusiva: o detector anterior decide (sem exclusao nova).
+$nativeBackslash = @'
+csharp string s = "a\"b";
+If MinhaProc() > 0
+Endif
+'@
+$null = Assert-Calls $nativeBackslash 1
 $first = New-SinglePartObjectXml -ObjectType $trnType -Name 'Reset' -PartType $mainPart -Source "/* aberto"
 $secondPart = '<Part><Source><![CDATA[If AttrA.IsEmpty()' + "`nEndif" + ']]></Source></Part><Part><Level><Attribute>AttrA</Attribute></Level></Part>'
 $r = Invoke-Gate ($first.Replace('</Object>', $secondPart + '</Object>'))
