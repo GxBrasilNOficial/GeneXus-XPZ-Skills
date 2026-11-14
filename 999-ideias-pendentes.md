@@ -13,6 +13,24 @@ Entradas legadas sem avaliação carregam `FALTA AVALIAR` em ambos os campos at�
 
 **Editar a substância de um gap já registrado (neste arquivo ou no `998-ideias-descartadas-e-porque.md`) exige justificativa no corpo do commit.** Enfraquecer, reprecisar ou descartar a severidade de uma afirmação — não apenas corrigir redação, adicionar contexto ou reorganizar — precisa dizer **por que**: nova evidência medida, releitura do código, ou correção de erro anterior. Motivo: uma edição que suaviza um gap sem dizer por que **parece resolvido** para quem lê depois, e é pior do que o gap não ter sido achado — quem lê para de investigar. Caso real (2026-08-17): um commit sem corpo trocou «não é citado em lugar nenhum» por «não era coberto na documentação normativa»; a formulação nova era defensável à primeira vista, mas escondia que a única outra menção ao símbolo no repositório era uma cópia **defasada** num self-test — a frase sugeria mitigação onde havia agravante. Só foi achado porque outra sessão foi verificar; sem corpo no commit, não havia como saber se a mudança vinha de leitura nova ou só de estilo.
 
+<a id="specifygenerate-pos-build-apos-generateonly-20261114"></a>
+
+## SpecifyGenerate: sinal e/ou fechamento de pós-build após GenerateOnly — 2026-11-14
+
+- **Importância** — alta (SpecifyGenerate pode deixar `web`/UI/deploy sem o ciclo de pós-build que o BuildAll acopla; em KBs que dependem de pós-build o handoff fica falso-seguro; visto em sessão real 2026-11-13).
+- **Maturidade** — ideia (direção clara; falta desenho de contrato no wrapper e se o fechamento é automático, sinalizado ou bloqueante).
+
+**Origem.** Após documentar o descompasso BuildAll × SpecifyGenerate quanto a pós-build (`xpz-msbuild-build`), ficou pendente o **mecanismo** no wrapper: hoje a mitigação é só documental (skill + `AGENTS` local de KB). Agente improvisou SpecifyGenerate para extract de File após BuildAll falho e deixou ambiente inconsistente.
+
+**Ideia (não implementar nesta frente).** Em `Invoke-GeneXusKbSpecifyGenerate.ps1` (e diagnóstico JSON), uma ou mais destas rotas:
+1. Expor sinal explícito do tipo `generateOnlyWithoutTrailingPostBuild=true` (nome a fechar) e barrar handoff de UI/deploy na skill enquanto o sinal estiver ativo sem fechamento comprovado.
+2. Se a pasta paralela / `kb-source-metadata.md` tiver pós-build registrado para o environment, após `GenerateOnly` **oferecer ou executar** o fechamento equivalente (sem inventar bat genérico).
+3. Bloquear ou exigir confirmação explícita quando o objetivo declarado for estado servível e o chamador pediu SpecifyGenerate.
+
+**Fora de escopo agora.** Mitigação documental já em `xpz-msbuild-build` (NEVER + bloco de fases) e regra dura no `AGENTS.md` da FabricaBrasil18.
+
+**Relacionado.** `xpz-msbuild-build/SKILL.md` (BuildAll × SpecifyGenerate e eventos pós-build); `Invoke-GeneXusKbSpecifyGenerate.ps1`; `Invoke-GeneXusKbBuildAll.ps1`; registro de pós-build em `kb-source-metadata.md` / `Register-GeneXusKbPostBuildEvents.ps1`.
+
 <a id="jev-uso-eventual-orientacao-20261109"></a>
 
 ## Orientação de uso eventual do Jev quando disponível (pasta paralela e demais sessões) — 2026-11-09
