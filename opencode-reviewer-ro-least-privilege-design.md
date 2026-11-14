@@ -157,10 +157,11 @@ project-local resolvem `*` final `deny` + allow-set `{read,grep,glob,list}`. A c
 do repo, mas não deve ser lido como prova independente de semântica de merge/substituição campo a
 campo.
 
-**Pré-requisito de cwd:** opencode **não** recebe `-Cd` (`Invoke-LlmDelegatePanelDispatch.ps1:161`
-`$AdapterCdCapable` exclui opencode; `:1013-1024` resolve `-Cd` só para backends cd-capable;
-`:1024` `(Get-Location).Path` não alcança opencode). Herda a cwd ambiente (`Invoke-OpenCode.ps1:158-159`,
-`Start-Process` sem `-WorkingDirectory`).
+**Pré-requisito de cwd:** opencode **não** recebe `-Cd` (em `Invoke-LlmDelegatePanelDispatch.ps1`,
+`$AdapterCdCapable` exclui opencode e o `-Cd` só é resolvido para backends cd-capable; o
+`(Get-Location).Path` desse ramo não alcança opencode). No freeze, o adapter herdava a cwd do
+ambiente (`Start-Process` sem `-WorkingDirectory`). Desde 2026-11-14 o adapter fixa no filho do
+`run` o diretório resolvido **e** o `PWD` (ver a nota de 2026-11-14 no fim do D4).
 
 ### D4 — Escopo D-min; bloqueio padrão fora do cwd herdado; cwd-seguro é OPERACIONAL
 
@@ -179,11 +180,15 @@ tratar o cwd como "seguro" nem como proibição absoluta de todo path externo es
 `SKILL.md:965-971` (premissa anterior de que `read` lê "qualquer arquivo") — tratar a reescrita da doc como
 **correção de premissa**, versionada por fixture, condicionada ao self-test na versão instalada.
 
-**Qual é o cwd:** herdado do orquestrador (`Invoke-OpenCode.ps1:158-159`, sem `-WorkingDirectory`);
-opencode nunca recebe `-Cd`. Confinamento por **herança**, não por controle explícito.
+**Qual é o cwd:** no freeze, herdado do orquestrador (sem `-WorkingDirectory`); opencode nunca
+recebe `-Cd`. Confinamento por **herança**, não por controle explícito. Correção de 2026-11-14: o
+diretório que o `opencode run` usa é o `PWD` do ambiente quando ele existe, e não o diretório real;
+os adapters passaram a fixar os dois no mesmo valor (nota no fim do D4).
 
-**Garante / NÃO garante:** garante mecanicamente o bloqueio padrão de leitura fora do cwd herdado
-(`external_directory`, self-test), sem provar isolamento absoluto de todo path externo específico.
+**Garante / NÃO garante:** garante mecanicamente o bloqueio padrão de leitura fora do diretório
+resolvido pelo `run` (`external_directory`, self-test), sem provar isolamento absoluto de todo path
+externo específico. Até a correção de 2026-11-14, essa garantia só valia com `PWD` == diretório
+real (ou `PWD` ausente).
 **Não** mecaniza "o cwd é seguro" — não há BLOCK por cwd em `public` (só em `kb-sensitive`).
 cwd-seguro em `public` é **operacional**: o operador dispara revisão `public` da raiz do repo de
 skills (onde, medido, não há segredo REAL versionado — só iscas de self-test).
@@ -195,6 +200,36 @@ anulá-la por `last-match-wins`; resolver esse recorte é urgente no `999`. Meca
 pertence ao read-containment **adiado**.
 
 Renomear "read-only" → **"sem execução/escrita"** (a leitura não está totalmente contida).
+
+**Nota 2026-11-14 — `opencode run` usa o `PWD` do ambiente (correção pós-freeze).** O guard valida
+definição estática e `opencode debug agents` no diretório real; o `opencode run` 2.2.7 adota o `PWD`
+do ambiente quando ele existe, tanto para os caminhos lidos quanto para a config project-local do
+agente. O Git Bash exporta `PWD`, e um `pwsh` filho não o atualiza em `Set-Location`/`Push-Location`.
+Com `PWD` ≠ diretório real, o `run` lia fora do workspace pretendido e podia carregar um
+`reviewer-ro.md` que o guard nunca validou. Evidência (Windows 11, PowerShell 7.6.10, opencode 2.2.7,
+conteúdo sintético; A/B = repositórios vazios com marcadores):
+
+| # | Arranjo | Resultado |
+|---|---|---|
+| E1 | Matriz rodada do Git Bash, `Push-Location` por caso | BLOCK; `read README.md` devolveu o README real do repositório |
+| E2 | Mesmos casos do PowerShell sem `PWD` | passaram |
+| E3 | `Push-Location A` + `$env:PWD=B`, `opencode run --agent reviewer-ro` | leu README de B |
+| E4 | `ForEach-Object -Parallel` (caminho do dispatcher), chamador em A | runspaces com `Get-Location`=A; filho herda cwd=A e o `PWD` do processo |
+| E5 | `Start-Process -WorkingDirectory D -Environment @{PWD=D}`, pai em `PWD=X` | filho com `PWD=D` (forma passada, inclusive 8.3) e cwd=D (forma longa); `PATH` preservado; `PWD` do pai inalterado |
+| E6 | Processo em A, filho com `PWD=B`; marcador no corpo do agente | README e agente de B, no modo padrão e com `--standalone` |
+| E7 | Correção: pai com `PWD=B`, filho com `-WorkingDirectory A -Environment @{PWD=A}` | README e agente de A, nada de B |
+| E8 | `Invoke-ClaudeCode.ps1 -Cd A -Tools Read`, pai com `PWD=B` | leu A (Claude Code não afetado) |
+| E9 | `opencode debug agents` em A (`bash: deny`), com e sem `PWD=B` (B com `bash: allow`) | saídas idênticas (`deny`); controle em B ⇒ `allow`: `debug agents` ignora `PWD` |
+| E10 | `Start-Process -ArgumentList` com elemento contendo espaço | elemento chega sem aspas (partido em vários argumentos) |
+| E11 | Commit `5c471909` (2026-07-05, opencode 1.4.4) do contorno de worktree | não registra o invocador: não se sabe desde quando o comportamento existe |
+
+**Decisão:** fixar **no processo filho** do `opencode run` o diretório real e o `PWD` no mesmo valor
+— a mesma string entregue ao pré-check (`(Get-Location).ProviderPath`). Nunca alterar o ambiente do
+pai (o dispatcher roda adapters em runspaces paralelos que compartilham o ambiente do processo). O
+`debug agents` não muda (E9); essa premissa é revalidada a cada promoção de versão (passo E9 no
+`xpz-llm-delegate/SKILL.md`, «Provas e promoção»). O runner assíncrono cita seus argumentos de
+caminho (E10). Não medido: Copilot/Gemini; `PWD` em forma 8.3 sobre `external_directory`; outras
+variáveis de diretório.
 
 ## Self-tests, fixtures e GATE DE ATIVAÇÃO
 

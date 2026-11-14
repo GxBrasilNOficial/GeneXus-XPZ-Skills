@@ -322,7 +322,10 @@ function Invoke-RunCase {
             else { Remove-Item Env:OPENCODE_DISABLE_PROJECT_CONFIG -ErrorAction SilentlyContinue }
             Push-Location -LiteralPath $cwd
             try {
+                # Diretorio real + PWD do filho no cwd do caso: o run adota PWD (ex.: herdado do Git
+                # Bash); -Environment mescla, entao OPENCODE_DISABLE_PROJECT_CONFIG segue herdado.
                 $p = Start-Process -FilePath $exe -ArgumentList @('run', '--format', 'json', '--agent', 'reviewer-ro', '--model', $Model) `
+                    -WorkingDirectory $cwd -Environment @{ PWD = $cwd } `
                     -NoNewWindow -PassThru -RedirectStandardInput $promptPath -RedirectStandardOutput $streamPath -RedirectStandardError $stderrPath -Wait
                 $exitCode = $p.ExitCode
             } finally { Pop-Location }
@@ -331,7 +334,7 @@ function Invoke-RunCase {
             else { Remove-Item Env:OPENCODE_DISABLE_PROJECT_CONFIG -ErrorAction SilentlyContinue }
         }
     }
-    $raw = Get-Content -LiteralPath $streamPath -Raw -Encoding utf8 -ErrorAction SilentlyContinue
+    $raw =Get-Content -LiteralPath $streamPath -Raw -Encoding utf8 -ErrorAction SilentlyContinue
     if ([string]::IsNullOrWhiteSpace($raw)) {
         return [ordered]@{ name = $name; profile = $profile; class = 'behavioral'; expected = [string]$Case.kind; event = 'none'; pass = $false; reason = 'emptyStream'; exitCode = $exitCode; evidence = $streamPath; toolEventCount = 0 }
     }
@@ -429,7 +432,9 @@ function Invoke-GrepStructuralCase {
             else { Remove-Item Env:OPENCODE_DISABLE_PROJECT_CONFIG -ErrorAction SilentlyContinue }
             Push-Location -LiteralPath $cwd
             try {
+                # Mesmo par diretorio real + PWD do filho (ver Invoke-RunCase).
                 $p = Start-Process -FilePath $exe -ArgumentList @('run', '--format', 'json', '--agent', 'reviewer-ro', '--model', $Model) `
+                    -WorkingDirectory $cwd -Environment @{ PWD = $cwd } `
                     -NoNewWindow -PassThru -RedirectStandardInput $promptPath -RedirectStandardOutput $streamPath -RedirectStandardError $stderrPath -Wait
                 $exitCode = $p.ExitCode
             } finally { Pop-Location }
@@ -438,7 +443,7 @@ function Invoke-GrepStructuralCase {
             else { Remove-Item Env:OPENCODE_DISABLE_PROJECT_CONFIG -ErrorAction SilentlyContinue }
         }
     }
-    $toolEvents = @(Get-ToolEvents -Path $streamPath)
+    $toolEvents =@(Get-ToolEvents -Path $streamPath)
     $toolEventCount = $toolEvents.Count
     $eventText = 'sem evento'
     $contradiction = $false
@@ -603,7 +608,8 @@ foreach ($case in $behavioralCases) {
     $result = Invoke-RunCase -Case $case
     $results.Add([pscustomobject]$result)
     $status = if ($result.pass) { 'PASS' } else { 'FAIL' }
-    Write-Host "$status  $($result.name) [$($result.event)] $($result.reason)" -ForegroundColor $(if ($result.pass) { 'Green' } else { 'Red' })
+    $eventLabel = if ($result.event -is [System.Collections.IDictionary]) { "$($result.event.tool)/$($result.event.status)" } else { [string]$result.event }
+    Write-Host "$status  $($result.name) [$eventLabel] $($result.reason)" -ForegroundColor $(if ($result.pass) { 'Green' } else { 'Red' })
     if ($result.name -eq 'names-glob' -and -not $result.pass) {
         break
     }

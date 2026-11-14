@@ -71,7 +71,10 @@ $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('gx-oc-rro-selftest-' +
 [System.IO.Directory]::CreateDirectory($tempRoot) | Out-Null
 
 # variaveis de ambiente do fake-exe (limpas no finally)
-$fakeEnv = @('FAKE_OC_VERSION', 'FAKE_OC_DEBUG_AGENTS', 'FAKE_OC_DEBUG_AGENTS_EXIT', 'FAKE_OC_RUN_STREAM', 'FAKE_OC_RUN_STDERR', 'FAKE_OC_RUN_EXIT', 'FAKE_OC_MODEL_DEFAULT_MODE', 'FAKE_OC_ARGV_FILE', 'FAKE_OC_DEBUG_AGENTS_FAIL_UNTIL', 'FAKE_OC_DEBUG_AGENTS_FAILCOUNTER', 'FAKE_OC_CWD_FILE')
+$fakeEnv = @('FAKE_OC_VERSION', 'FAKE_OC_DEBUG_AGENTS', 'FAKE_OC_DEBUG_AGENTS_EXIT', 'FAKE_OC_RUN_STREAM', 'FAKE_OC_RUN_STDERR', 'FAKE_OC_RUN_EXIT', 'FAKE_OC_MODEL_DEFAULT_MODE', 'FAKE_OC_ARGV_FILE', 'FAKE_OC_DEBUG_AGENTS_FAIL_UNTIL', 'FAKE_OC_DEBUG_AGENTS_FAILCOUNTER', 'FAKE_OC_CWD_FILE', 'FAKE_OC_RUN_CWD_FILE', 'FAKE_OC_DEBUG_PWD_FILE')
+# PWD do processo (ex.: herdado do Git Bash) e preparado por casos deste teste; restaurado no finally.
+$hadOriginalPwd = Test-Path Env:PWD
+$originalPwd = $env:PWD
 $originalProfile = $env:USERPROFILE
 
 try {
@@ -88,6 +91,7 @@ if ($a.Count -ge 2 -and $a[0] -eq 'api' -and $a[1] -eq 'model.default') {
 if ($a.Count -ge 2 -and $a[0] -eq 'debug' -and $a[1] -eq 'agents') {
     # registra a pasta em que o debug agents rodou (prova do -WorkingDirectory), antes de qualquer falha
     if ($env:FAKE_OC_CWD_FILE) { Set-Content -LiteralPath $env:FAKE_OC_CWD_FILE -Value (Get-Location).Path -Encoding utf8 -NoNewline }
+    if ($env:FAKE_OC_DEBUG_PWD_FILE) { Set-Content -LiteralPath $env:FAKE_OC_DEBUG_PWD_FILE -Value ([string]$env:PWD) -Encoding utf8 -NoNewline }
     # falha transitoria simulada: exit 1 nas primeiras FAIL_UNTIL tentativas (conta em arquivo)
     if ($env:FAKE_OC_DEBUG_AGENTS_FAIL_UNTIL -and $env:FAKE_OC_DEBUG_AGENTS_FAILCOUNTER) {
         $n = 0
@@ -102,6 +106,13 @@ if ($a.Count -ge 2 -and $a[0] -eq 'debug' -and $a[1] -eq 'agents') {
 }
 if ($a.Count -ge 1 -and $a[0] -eq 'run') {
     if ($env:FAKE_OC_ARGV_FILE) { Set-Content -LiteralPath $env:FAKE_OC_ARGV_FILE -Value ($a -join ' ') -Encoding utf8 -NoNewline }
+    # registra cwd real e PWD do ambiente recebidos pelo run (prova da fixacao no filho), sem normalizar
+    if ($env:FAKE_OC_RUN_CWD_FILE) {
+        $hasPwd = Test-Path Env:PWD
+        $pwdValue = if ($hasPwd) { [string]$env:PWD } else { $null }
+        ([ordered]@{ cwd = (Get-Location).ProviderPath; hasPwd = $hasPwd; pwd = $pwdValue } | ConvertTo-Json -Compress) |
+            Set-Content -LiteralPath $env:FAKE_OC_RUN_CWD_FILE -Encoding utf8 -NoNewline
+    }
     [void][Console]::In.ReadToEnd()
     if ($env:FAKE_OC_RUN_STDERR) { [Console]::Error.WriteLine($env:FAKE_OC_RUN_STDERR) }
     if ($env:FAKE_OC_RUN_STREAM) { Get-Content -LiteralPath $env:FAKE_OC_RUN_STREAM -Encoding utf8 }
@@ -768,10 +779,136 @@ sem mode
         Assert-True ($threwO -and $msgO -match 'nao resolve') "(opt-out) -Agent <x> que NAO resolve => BLOCK (evita fallback ao build) (got: $msgO)"
         Assert-True (-not (Test-Path -LiteralPath $argvOptBlk)) "(opt-out) BLOCK antes do run: argv nao foi escrito"
         $env:FAKE_OC_DEBUG_AGENTS = $sampleDebugAgents
+
+        # ── (pwd) diretorio real + PWD fixados no FILHO do run ─────────────────────
+        # O `opencode run` adota o PWD do ambiente; o Git Bash exporta PWD e o pwsh nao o atualiza
+        # em Set-Location. Os adapters devem entregar ao run o MESMO diretorio validado pelo pre-check,
+        # sem alterar o ambiente do pai. A pasta e provada por marcador (o temp pode ser 8.3 e o
+        # filho receber a forma longa); o PWD, que chega na forma passada, por igualdade exata.
+        function Read-FakeRunCwd {
+            param([Parameter(Mandatory)] [string] $Path)
+            if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $null }
+            return (Get-Content -LiteralPath $Path -Raw -Encoding utf8 | ConvertFrom-Json)
+        }
+        function Test-DirHasMarker {
+            param([AllowNull()] [AllowEmptyString()] [string] $Dir, [Parameter(Mandatory)] [string] $Marker)
+            if ([string]::IsNullOrWhiteSpace($Dir)) { return $false }
+            return (Test-Path -LiteralPath (Join-Path $Dir $Marker) -PathType Leaf)
+        }
+        function Wait-FakeJobExitCode {
+            param([Parameter(Mandatory)] [string] $JobDir, [Parameter(Mandatory)] [string] $JobJson)
+            $job = $JobJson | ConvertFrom-Json
+            $ecPath = Join-Path $JobDir "$($job.jobId).exitcode.txt"
+            $waitedJob = 0
+            while (-not (Test-Path -LiteralPath $ecPath -PathType Leaf) -and $waitedJob -lt 50) { Start-Sleep -Milliseconds 300; $waitedJob++ }
+            $ec = if (Test-Path -LiteralPath $ecPath -PathType Leaf) { [string](Get-Content -LiteralPath $ecPath -Raw) } else { '' }
+            return [pscustomobject]@{ jobId = [string]$job.jobId; exitCode = $ec; requestPath = (Join-Path $JobDir "$($job.jobId).request.json") }
+        }
+
+        $pwdWs = Join-Path $tempRoot 'pwd-ws'
+        New-Item -ItemType Directory -Path (Join-Path $pwdWs '.opencode\agent') -Force | Out-Null
+        Copy-Item -LiteralPath $agentMd -Destination (Join-Path $pwdWs '.opencode\agent\reviewer-ro.md') -Force
+        Set-Content -LiteralPath (Join-Path $pwdWs 'pwd-ws-marker.txt') -Value 'x' -Encoding utf8
+        $pwdDecoy = Join-Path $tempRoot 'pwd-decoy'
+        New-Item -ItemType Directory -Path $pwdDecoy -Force | Out-Null
+        $pwdDecoyBash = $pwdDecoy.Replace('\', '/')   # formato exportado pelo Git Bash (C:/...)
+        $env:FAKE_OC_RUN_STREAM = $runStream
+        $env:FAKE_OC_RUN_STDERR = ''
+        $env:FAKE_OC_RUN_EXIT = '0'
+        $env:FAKE_OC_ARGV_FILE = ''
+
+        Push-Location -LiteralPath $pwdWs
+        try {
+            $pwdWsLoc = (Get-Location).ProviderPath
+
+            # (pwd-controle) anti-vacuidade: sem o adapter, o filho herda o PWD divergente intacto.
+            $ctlFile = Join-Path $tempRoot 'pwd-control.json'
+            $env:FAKE_OC_RUN_CWD_FILE = $ctlFile
+            $env:PWD = $pwdDecoyBash
+            $null = Start-Process -FilePath $fakeCmd -ArgumentList @('run') -WorkingDirectory $pwdWsLoc -NoNewWindow -PassThru -Wait `
+                -RedirectStandardInput $prompt -RedirectStandardOutput (Join-Path $tempRoot 'pwd-control.out') -RedirectStandardError (Join-Path $tempRoot 'pwd-control.err')
+            $ctl = Read-FakeRunCwd -Path $ctlFile
+            Assert-True ($null -ne $ctl -and [bool]$ctl.hasPwd -and [string]$ctl.pwd -ceq $pwdDecoyBash) "(pwd-controle) Start-Process cru: o filho recebe o PWD divergente sem normalizacao (got: $(if ($ctl) { $ctl.pwd } else { 'nada' }))"
+
+            # (pwd-sync) Invoke-OpenCode: run recebe cwd e PWD do diretorio validado pelo pre-check.
+            $syncFile = Join-Path $tempRoot 'pwd-sync.json'
+            $dbgCwdFile = Join-Path $tempRoot 'pwd-sync-debug-cwd.txt'
+            $dbgPwdFile = Join-Path $tempRoot 'pwd-sync-debug-pwd.txt'
+            $env:FAKE_OC_RUN_CWD_FILE = $syncFile
+            $env:FAKE_OC_CWD_FILE = $dbgCwdFile
+            $env:FAKE_OC_DEBUG_PWD_FILE = $dbgPwdFile
+            $env:PWD = $pwdDecoyBash
+            $ansPwd = & $invoke -OpenCodeExe $fakeCmd -MessagePath $prompt -Model 'fake/model' -TimeoutSec 30
+            $rs = Read-FakeRunCwd -Path $syncFile
+            $dbgCwd = if (Test-Path -LiteralPath $dbgCwdFile) { Get-Content -LiteralPath $dbgCwdFile -Raw } else { '' }
+            Assert-True (([string]$ansPwd) -match 'OK-ADAPTER' -and $null -ne $rs -and [bool]$rs.hasPwd -and [string]$rs.pwd -ceq $pwdWsLoc) "(pwd-sync) run recebe PWD = diretorio validado (got: $(if ($rs) { $rs.pwd } else { 'nada' }))"
+            Assert-True ((Test-DirHasMarker -Dir ([string]$rs.cwd) -Marker 'pwd-ws-marker.txt') -and (Test-DirHasMarker -Dir $dbgCwd -Marker 'pwd-ws-marker.txt')) "(pwd-sync) cwd do run = cwd do debug agents do pre-check (got run=$($rs.cwd); debug=$dbgCwd)"
+            $dbgPwd = if (Test-Path -LiteralPath $dbgPwdFile) { Get-Content -LiteralPath $dbgPwdFile -Raw } else { '' }
+            Assert-True ($dbgPwd -ceq $pwdDecoyBash) "(pwd-sync) debug agents NAO recebe PWD fixado (premissa E9: debug agents ignora PWD; revalidada na promocao) (got: $dbgPwd)"
+            Assert-True ((Test-Path Env:PWD) -and $env:PWD -ceq $pwdDecoyBash) '(pwd-sync) PWD do pai inalterado apos sucesso'
+            $env:FAKE_OC_CWD_FILE = ''
+            $env:FAKE_OC_DEBUG_PWD_FILE = ''
+
+            # (pwd-sync-falha) exit != 0 DEPOIS do lancamento: PWD do pai continua inalterado.
+            Remove-Item -LiteralPath $syncFile -Force -ErrorAction SilentlyContinue
+            $env:FAKE_OC_RUN_EXIT = '1'
+            $threwPwd = $false
+            try { & $invoke -OpenCodeExe $fakeCmd -MessagePath $prompt -Model 'fake/model' -TimeoutSec 30 | Out-Null }
+            catch { $threwPwd = $_.Exception.Message -match 'saiu com codigo 1' }
+            $rsf = Read-FakeRunCwd -Path $syncFile
+            Assert-True ($threwPwd -and $null -ne $rsf -and [string]$rsf.pwd -ceq $pwdWsLoc -and (Test-Path Env:PWD) -and $env:PWD -ceq $pwdDecoyBash) '(pwd-sync-falha) run lancado com PWD fixado; PWD do pai inalterado apos falha'
+            $env:FAKE_OC_RUN_EXIT = '0'
+
+            # (pwd-ausente) sem PWD no pai: o filho recebe PWD e o pai continua sem PWD (sucesso e falha).
+            Remove-Item Env:PWD -ErrorAction SilentlyContinue
+            Remove-Item -LiteralPath $syncFile -Force -ErrorAction SilentlyContinue
+            $ansNoPwd = & $invoke -OpenCodeExe $fakeCmd -MessagePath $prompt -Model 'fake/model' -TimeoutSec 30
+            $rsn = Read-FakeRunCwd -Path $syncFile
+            Assert-True (([string]$ansNoPwd) -match 'OK-ADAPTER' -and $null -ne $rsn -and [string]$rsn.pwd -ceq $pwdWsLoc -and -not (Test-Path Env:PWD)) '(pwd-ausente) run recebe PWD fixado; o pai continua sem PWD apos sucesso'
+            $env:FAKE_OC_RUN_EXIT = '1'
+            try { & $invoke -OpenCodeExe $fakeCmd -MessagePath $prompt -Model 'fake/model' -TimeoutSec 30 | Out-Null } catch { }
+            Assert-True (-not (Test-Path Env:PWD)) '(pwd-ausente) o pai continua sem PWD apos falha'
+            $env:FAKE_OC_RUN_EXIT = '0'
+
+            # (pwd-async) Start-OpenCodeJob: o filho INTERNO do runner recebe cwd e PWD fixados.
+            $asyncFile = Join-Path $tempRoot 'pwd-async.json'
+            $env:FAKE_OC_RUN_CWD_FILE = $asyncFile
+            $env:PWD = $pwdDecoyBash
+            $pwdJobDir = Join-Path $tempRoot 'pwd-jobs'
+            $jobJson = & $start -OpenCodeExe $fakeCmd -MessagePath $prompt -Model 'fake/model' -NoWatcher -TempDir $pwdJobDir
+            $jobDone = Wait-FakeJobExitCode -JobDir $pwdJobDir -JobJson ([string]$jobJson)
+            $ra = Read-FakeRunCwd -Path $asyncFile
+            $reqA = Get-Content -LiteralPath $jobDone.requestPath -Raw -Encoding utf8 | ConvertFrom-Json
+            Assert-True ($jobDone.exitCode -eq '0' -and $null -ne $ra -and [string]$ra.pwd -ceq $pwdWsLoc -and (Test-DirHasMarker -Dir ([string]$ra.cwd) -Marker 'pwd-ws-marker.txt')) "(pwd-async) filho do runner recebe cwd e PWD do diretorio validado (got: exit=$($jobDone.exitCode) pwd=$(if ($ra) { $ra.pwd } else { 'nada' }))"
+            Assert-True ($null -ne $reqA.PSObject.Properties['workingDirectory'] -and [string]$reqA.workingDirectory -ceq $pwdWsLoc) "(pwd-async) request.json registra workingDirectory (got: $($reqA.PSObject.Properties['workingDirectory']))"
+            Assert-True ((Test-Path Env:PWD) -and $env:PWD -ceq $pwdDecoyBash) '(pwd-async) PWD do pai inalterado apos o disparo'
+        }
+        finally { Pop-Location }
+
+        # (pwd-espaco) diretorio de trabalho e TempDir com espaco: argv do runner citado; job conclui.
+        $spaceWs = Join-Path $tempRoot 'dir com espaco'
+        New-Item -ItemType Directory -Path (Join-Path $spaceWs '.opencode\agent') -Force | Out-Null
+        Copy-Item -LiteralPath $agentMd -Destination (Join-Path $spaceWs '.opencode\agent\reviewer-ro.md') -Force
+        Set-Content -LiteralPath (Join-Path $spaceWs 'space-marker.txt') -Value 'x' -Encoding utf8
+        Push-Location -LiteralPath $spaceWs
+        try {
+            $spaceLoc = (Get-Location).ProviderPath
+            $spaceFile = Join-Path $tempRoot 'pwd-space.json'
+            $env:FAKE_OC_RUN_CWD_FILE = $spaceFile
+            $env:PWD = $pwdDecoyBash
+            $spaceJobDir = Join-Path $spaceWs 'jobs com espaco'
+            $spaceJson = & $start -OpenCodeExe $fakeCmd -MessagePath $prompt -Model 'fake/model' -NoWatcher -TempDir $spaceJobDir
+            $spaceDone = Wait-FakeJobExitCode -JobDir $spaceJobDir -JobJson ([string]$spaceJson)
+            $rsp = Read-FakeRunCwd -Path $spaceFile
+            Assert-True ($spaceDone.exitCode -eq '0' -and $null -ne $rsp -and [string]$rsp.pwd -ceq $spaceLoc -and (Test-DirHasMarker -Dir ([string]$rsp.cwd) -Marker 'space-marker.txt')) "(pwd-espaco) job com espaco conclui e o run recebe o diretorio inteiro (got: exit=$($spaceDone.exitCode) pwd=$(if ($rsp) { $rsp.pwd } else { 'nada' }))"
+        }
+        finally { Pop-Location }
+        $env:FAKE_OC_RUN_CWD_FILE = ''
     }
     finally { Pop-Location -ErrorAction SilentlyContinue }
 }
 finally {
+    if ($hadOriginalPwd) { $env:PWD = $originalPwd } else { Remove-Item Env:PWD -ErrorAction SilentlyContinue }
     $env:USERPROFILE = $originalProfile
     foreach ($e in $fakeEnv) { Remove-Item "Env:$e" -ErrorAction SilentlyContinue }
     if (Test-Path -LiteralPath $tempRoot) { Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue }

@@ -69,3 +69,18 @@ Implementado em 2026-11-09 conforme o design v24.2 congelado por decisão humana
 - Commit material: `15c1591` — Alinha A.9/exit 60/uninstall e sanitiza literal de allowlist no 999.
 
 **Correção pós-painel reforçada (2026-11-13).** Além do warn ACL e do CreateExclusive: install barra `credencial_ausente` antes de qualquer escrita; `Resolve-McpGapsExitCode` impede exit 0 com `INTEGRATIONS_GAPS`; install/uninstall exigem clientes pedidos tratados para `INTEGRATIONS_OK`; uninstall persiste `clients` vazio; integrity/fixture de boot alinhados. Decisão humana: com `-Client all`, gravação parcial entre clientes é aceitável; conflito/`edicao_manual_necessaria` não toca o cliente afetado e não faz rollback dos demais; o agente deve apresentar o cliente e o erro do achado. Paridade documental: `credencial_ausente` blocking no `SKILL` offline; assimetria `acl_nao_aplicavel` ecoada em `02` e `08`. Gate de cofre ausente no install cobre também `repair` (além de `install`/`update`); self-test `no-cred-repair`. Exit 68 reservado/`engines: []` (warn `python_indisponivel` não vira exit de processo); `999` de allowlist reduzido a resumo público; `AGENTS.md` lista `xpz-codex-apply-patch-alternative`. `Set-McpManifest` reaplica ACL so-dono também em `unchanged` (repair / record-e2e). Lock transacional: só remove `.xpz-mcp.lock` se esta execução o adquiriu (`lockAcquired`).
+
+## Revisor opencode — `opencode run` usa o `PWD` do ambiente (correção de segurança)
+
+Implementado em 2026-11-14 conforme o plano v4 congelado por decisão do mantenedor, após 3 rodadas de revisão por pares (deepseek, meta, openai, anthropic). Origem: achado da rotina pré-push dos commits da frente MCP.
+
+**Incidente.** O guard do `reviewer-ro` valida definição estática e `opencode debug agents` no diretório real, mas o `opencode run` 2.2.7 adota o `PWD` do ambiente quando ele existe — para arquivos lidos e para a config project-local do agente. O Git Bash exporta `PWD` e o `pwsh` filho não o atualiza ao trocar de pasta. Num teste com conteúdo sintético rodado do Git Bash, o `run` leu o README real do repositório; num A/B, carregou o agente de outra pasta, nunca validado pelo guard.
+
+**Evidência resumida.** Medições E1–E11 (A/B sintéticos): `run` segue `PWD` também com `--standalone`; `debug agents` ignora `PWD`; `Start-Process -WorkingDirectory D -Environment @{PWD=D}` fixa o filho sem tocar o pai; Claude Code (`-Cd`) não é afetado; `-ArgumentList` não cita elementos com espaço. Tabela completa na nota de 2026-11-14 do D4 em `opencode-reviewer-ro-least-privilege-design.md`.
+
+**Decisão e entrega.** Fixar diretório real e `PWD` no processo filho do `run` com a mesma string entregue ao pré-check (`(Get-Location).ProviderPath`), sem alterar o ambiente do pai: `Invoke-OpenCode.ps1`, runner de `Start-OpenCodeJob.ps1` (com argumentos de caminho citados e `workingDirectory` no `request.json`) e matriz `Test-OpenCodeReviewerRoContentProtection.ps1`. `Test-OpenCodeAgentResolves` ganhou `-WorkingDirectory` opcional. Self-test com controle anti-vacuidade, síncrono, assíncrono, caminho com espaço e `PWD` do pai inalterado; os casos novos falham contra o código anterior. A promoção de versão ganhou o passo sem modelo da premissa E9. Pendências no `999`; alternativas descartadas no `998`.
+
+### Rastreabilidade
+
+- Commit material: pendente de registro (preenchido após o commit desta frente).
+- Matriz do aceite (32 + 2) rodada do Git Bash: pendente de execução autorizada.

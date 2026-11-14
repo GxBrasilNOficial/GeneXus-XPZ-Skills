@@ -1083,9 +1083,18 @@ segurança no **próprio adapter**, de forma inseparável (nunca "default sem gu
   A matriz é a prova comportamental real da versão e não exige uma segunda rodada `run`. As
   capturas 1.18.33 ficam no histórico do Git; a equivalência fora dos casos medidos continua
   premissa, não isolamento demonstrado. Só promover `VERSION.txt` após a matriz, os dois
-  estruturais e o conjunto do README dos fixtures passarem.
+  estruturais e o conjunto do README dos fixtures passarem. A matriz deve passar rodada **do Git
+  Bash** (que exporta `PWD`), não só do PowerShell.
+  **Passo obrigatório sem modelo (premissa E9):** com dois repositórios sintéticos — A com
+  `reviewer-ro.md` contendo `bash: deny`, B com `bash: allow` — rodar `opencode debug agents` com
+  diretório real A e `-Environment @{PWD=B}` e confirmar que a saída é a de A (`deny`), com controle
+  em B dando `allow`. Se falhar, **não promover** e reabrir o desenho do guard (o pré-check deixaria
+  de ver a config que o `run` carrega). Ver «LIMITE CONHECIDO — `opencode run` usa o `PWD` do ambiente».
 - **cwd-seguro é OPERACIONAL (nota de operador).** O recorte **não** mecaniza "o cwd é seguro": o
-  bloqueio padrão é relativo ao cwd HERDADO (o adapter opencode não recebe `-Cd`), mas **quem dispara** é
+  bloqueio padrão é relativo ao diretório resolvido pelo `run` — o `PWD` do ambiente quando presente,
+  que o adapter fixa igual ao diretório validado pelo pré-check (o adapter opencode não recebe `-Cd`;
+  o dispatcher não muda porque seus runspaces herdam a localização do chamador e o adapter fixa o
+  filho) —, mas **quem dispara** é
   responsável por escolher um cwd sem segredos não-versionados fora dos padrões protegidos.
   Logs ou cache com segredos ainda podem ser lidos; iscas não comprovam segurança de dados reais.
   Mecanizar cwd-seguro + liberar opencode em `kb-sensitive`/pasta paralela
@@ -1188,7 +1197,8 @@ direto falha igual) e estado travado (reiniciar a máquina **não** resolve; tro
 worktree, e o harness fixa o cwd no worktree. Logo, despachar revisores **opencode** do cwd do
 worktree **falha em silêncio**. Codex/Claude Code/Copilot/Gemini têm `-Cd` próprio e não dependem
 disto; Antigravity `public-review` também não depende, mas por criar scratch próprio e recusar `-Cd`;
-o opencode **não** tem `-Cd` (a contenção é pelo cwd herdado).
+o opencode **não** tem `-Cd` (a contenção é pelo diretório resolvido pelo `run`, que o adapter fixa
+no filho — diretório real e `PWD` — igual ao diretório atual do adapter).
 
 **Workaround (materializar dir plano):** rodar o opencode de um cwd **fora de worktree**. Para
 revisar o estado de um worktree sem o gitlink, materialize-o num diretório plano curto e rode de
@@ -1198,9 +1208,36 @@ lá (o dossiê vai por **stdin**, então independe do cwd; o cwd só precisa con
 ```powershell
 # 1) materializa o HEAD do worktree num dir plano (sem .git)
 git -C <worktree> archive --format=tar HEAD | tar -xf - -C C:\Users\<user>\AppData\Local\Temp\xr
-# 2) roda o opencode desse cwd (Set-Location dentro do pwsh; o adapter usa (Get-Location).Path)
+# 2) roda o opencode desse cwd (Set-Location dentro do pwsh; o adapter usa (Get-Location).ProviderPath)
 pwsh -NoProfile -Command "Set-Location 'C:\Users\<user>\AppData\Local\Temp\xr'; & '<repo>\scripts\Invoke-OpenCode.ps1' -MessagePath '<dossie>.txt' -Model opencode-go/glm-5.2 -TimeoutSec 600"
 ```
+
+O contorno de diretório plano continua necessário: o `ENAMETOOLONG` é outro problema. Chamado do
+Git Bash, o `Set-Location` acima só passou a valer para o `opencode run` com a correção de
+2026-11-14, porque o adapter fixa no filho o diretório real **e** o `PWD` (o Bash exporta `PWD` e o
+`pwsh` não o atualiza). Ver «LIMITE CONHECIDO — `opencode run` usa o `PWD` do ambiente».
+
+## LIMITE CONHECIDO — `opencode run` usa o `PWD` do ambiente
+
+**Medido na 2.2.7** (Windows, 2026-11-14, conteúdo sintético). O `opencode run` adota como
+diretório de projeto o **`PWD` do ambiente** quando ele existe — para resolver os caminhos lidos
+**e** para carregar a config project-local do agente (`.opencode/agent/reviewer-ro.md`). Já o
+`opencode debug agents`, usado pelo pré-check do guard, **ignora** o `PWD` e usa o diretório real
+(premissa medida, revalidada a cada promoção de versão — passo E9 em «Provas e promoção»). O Git
+Bash exporta `PWD`, e um `pwsh` filho não o atualiza em `Set-Location`/`Push-Location`. Com `PWD` ≠
+diretório real, o `run` lia fora do workspace pretendido e podia usar um agente que o guard nunca
+validou.
+
+**Correção nos lançamentos do repositório:** `Invoke-OpenCode.ps1`, `Start-OpenCodeJob.ps1` (no
+filho interno do runner) e a matriz `Test-OpenCodeReviewerRoContentProtection.ps1` passam ao
+`Start-Process` do `run` `-WorkingDirectory <dir> -Environment @{ PWD = <dir> }`, com `<dir>` igual
+ao diretório entregue ao pré-check (`(Get-Location).ProviderPath`). O ambiente do processo pai não
+é alterado. **Quem chamar `opencode run` fora desses adapters deve fazer o mesmo.**
+
+**Não medido:** Copilot CLI e Gemini CLI (lançam com `-WorkingDirectory`, mas o CLI pode preferir
+`PWD`); `PWD` em forma 8.3 sobre `external_directory`. Evidência e decisão:
+[`opencode-reviewer-ro-least-privilege-design.md`](../opencode-reviewer-ro-least-privilege-design.md),
+nota de 2026-11-14 no D4.
 
 ## BACKENDS
 

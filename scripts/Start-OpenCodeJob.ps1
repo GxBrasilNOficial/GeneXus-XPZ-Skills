@@ -89,14 +89,17 @@ $exe = Resolve-OpenCodeExe -Override $OpenCodeExe
 #     Watch-OpenCodeJob.ps1). Opt-out consciente com -Agent <x> explicito (confirma que resolve).
 $agentExplicit = $PSBoundParameters.ContainsKey('Agent') -and -not [string]::IsNullOrWhiteSpace($Agent)
 if (-not $agentExplicit) { $Agent = 'reviewer-ro' }
-$cwd = (Get-Location).Path
+# Diretorio RESOLVIDO: a contencao do reviewer-ro e relativa a ele. O `opencode run` adota o PWD do
+# ambiente quando existe; por isso esta MESMA string vai ao pre-check, ao request.json e ao runner,
+# que fixa diretorio real E PWD no filho do run (o ambiente deste processo nao e alterado).
+$cwd = (Get-Location).ProviderPath
 if ($Agent -eq 'reviewer-ro') {
     $pc = Test-OpenCodeReviewerRoPrecheck -Exe $exe -WorkingDirectory $cwd
     if (-not $pc.pass) {
         throw "BLOCK: guard reviewer-ro fail-closed (motivo=$($pc.reason)): $($pc.detail)"
     }
 } else {
-    $res = Test-OpenCodeAgentResolves -Exe $exe -Name $Agent
+    $res = Test-OpenCodeAgentResolves -Exe $exe -Name $Agent -WorkingDirectory $cwd
     if (-not $res.ok) {
         throw "BLOCK: -Agent '$Agent' nao resolve (evita fallback silencioso ao 'build' full-access): $($res.detail)"
     }
@@ -144,6 +147,7 @@ $request = [ordered]@{
     exitCodePath = $exitCodePath
     argsPath = $argsPath
     exe        = $exe
+    workingDirectory = $cwd
 }
 $request | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $reqPath -Encoding utf8
 
@@ -160,17 +164,21 @@ if (-not [string]::IsNullOrWhiteSpace($Agent)) { $ocArgs += @('--agent', $Agent)
 $ocArgs | ConvertTo-Json -Depth 3 | Set-Content -LiteralPath $argsPath -Encoding utf8
 
 $runner = @'
+#requires -Version 7.4
 param(
     [Parameter(Mandatory)] [string] $Exe,
     [Parameter(Mandatory)] [string] $ArgsPath,
     [Parameter(Mandatory)] [string] $StdinPath,
     [Parameter(Mandatory)] [string] $StdoutPath,
     [Parameter(Mandatory)] [string] $StderrPath,
-    [Parameter(Mandatory)] [string] $ExitCodePath
+    [Parameter(Mandatory)] [string] $ExitCodePath,
+    [Parameter(Mandatory)] [string] $WorkingDirectory
 )
 $ErrorActionPreference = 'Stop'
 $OpenCodeArgs = @(Get-Content -LiteralPath $ArgsPath -Raw -Encoding utf8 | ConvertFrom-Json | ForEach-Object { [string]$_ })
+# Diretorio real + PWD do filho fixados no diretorio validado pelo pre-check (o run adota PWD).
 $p = Start-Process -FilePath $Exe -ArgumentList $OpenCodeArgs -WindowStyle Hidden -PassThru `
+    -WorkingDirectory $WorkingDirectory -Environment @{ PWD = $WorkingDirectory } `
     -RedirectStandardInput $StdinPath -RedirectStandardOutput $StdoutPath -RedirectStandardError $StderrPath
 $p.WaitForExit()
 Set-Content -LiteralPath $ExitCodePath -Value ([string]$p.ExitCode) -Encoding ascii -NoNewline
@@ -178,18 +186,28 @@ exit ([int]$p.ExitCode)
 '@
 Set-Content -LiteralPath $runnerPath -Value $runner -Encoding utf8
 
+# Start-Process -ArgumentList junta os elementos com espaco SEM aspas: cada caminho vai entre aspas
+# duplas (barras finais duplicadas para nao escapar a aspa de fechamento, ex.: C:\ -> "C:\\").
+function ConvertTo-OpenCodeRunnerQuotedArg {
+    param([Parameter(Mandatory)] [string] $Value)
+    return '"' + ($Value -replace '(\\+)$', '$1$1') + '"'
+}
+# O diretorio vai por argv do runner, NUNCA no args.json (argv do opencode; posicional viraria prompt).
 $runnerArgs = @(
-    '-NoProfile', '-File', $runnerPath,
-    '-Exe', $exe,
-    '-ArgsPath', $argsPath,
-    '-StdinPath', $stdinPath,
-    '-StdoutPath', $streamPath,
-    '-StderrPath', $errPath,
-    '-ExitCodePath', $exitCodePath
+    '-NoProfile', '-File', (ConvertTo-OpenCodeRunnerQuotedArg $runnerPath),
+    '-Exe', (ConvertTo-OpenCodeRunnerQuotedArg $exe),
+    '-ArgsPath', (ConvertTo-OpenCodeRunnerQuotedArg $argsPath),
+    '-StdinPath', (ConvertTo-OpenCodeRunnerQuotedArg $stdinPath),
+    '-StdoutPath', (ConvertTo-OpenCodeRunnerQuotedArg $streamPath),
+    '-StderrPath', (ConvertTo-OpenCodeRunnerQuotedArg $errPath),
+    '-ExitCodePath', (ConvertTo-OpenCodeRunnerQuotedArg $exitCodePath),
+    '-WorkingDirectory', (ConvertTo-OpenCodeRunnerQuotedArg $cwd)
 )
 $t0 = (Get-Date).ToUniversalTime()
 $request.startedAt = $t0.ToString('yyyy-MM-ddTHH:mm:ss.fffZ')
 $request | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $reqPath -Encoding utf8
+# O runner nao decide o diretorio de projeto (so lanca o run com -WorkingDirectory/-Environment
+# explicitos); por isso este lancamento externo dispensa -Environment.
 $proc = Start-Process -FilePath pwsh -ArgumentList $runnerArgs -WindowStyle Hidden -PassThru
 $procId = $proc.Id
 $expectedStartUtc = $null

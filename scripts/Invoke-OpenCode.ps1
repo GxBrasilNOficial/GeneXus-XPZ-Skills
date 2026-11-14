@@ -133,18 +133,22 @@ if (-not [string]::IsNullOrWhiteSpace($Variant)) {
 $agentExplicit = $PSBoundParameters.ContainsKey('Agent') -and -not [string]::IsNullOrWhiteSpace($Agent)
 if (-not $agentExplicit) { $Agent = 'reviewer-ro' }
 $isReviewerPath = ($Agent -eq 'reviewer-ro')
-# cwd HERDADO (o opencode nao tem -Cd; a leitura do reviewer-ro confina-se a ele). ATENCAO:
-# no Windows, `opencode run` FALHA (stdout vazio / uv_spawn ENAMETOOLONG) quando este cwd e um
-# git WORKTREE (.git gitlink). Rode de um dir plano sem .git (ex.: git archive HEAD -> dir).
-# Ver SKILL.md, secao "LIMITE CONHECIDO - opencode run FALHA EM CWD DE GIT WORKTREE (WINDOWS)".
-$cwd = (Get-Location).Path
+# Diretorio RESOLVIDO (o opencode nao tem -Cd; a leitura do reviewer-ro confina-se a ele).
+# O `opencode run` adota o PWD do ambiente quando existe (arquivos lidos E config project-local do
+# agente), enquanto o `debug agents` do pre-check usa o diretorio real. Por isso esta MESMA string
+# vai ao pre-check e ao filho do run, que recebe diretorio real E PWD fixados nela (o ambiente do
+# pai nao e alterado). Ver SKILL.md, secao "LIMITE CONHECIDO - opencode run usa o PWD do ambiente".
+# ATENCAO: no Windows, `opencode run` FALHA (stdout vazio / uv_spawn ENAMETOOLONG) quando este
+# diretorio e um git WORKTREE (.git gitlink). Rode de um dir plano sem .git (ex.: git archive HEAD
+# -> dir). Ver SKILL.md, secao "LIMITE CONHECIDO - opencode run FALHA EM CWD DE GIT WORKTREE (WINDOWS)".
+$cwd = (Get-Location).ProviderPath
 if ($isReviewerPath) {
     $pc = Test-OpenCodeReviewerRoPrecheck -Exe $exe -WorkingDirectory $cwd
     if (-not $pc.pass) {
         throw "BLOCK: guard reviewer-ro fail-closed (motivo=$($pc.reason)): $($pc.detail)"
     }
 } else {
-    $res = Test-OpenCodeAgentResolves -Exe $exe -Name $Agent
+    $res = Test-OpenCodeAgentResolves -Exe $exe -Name $Agent -WorkingDirectory $cwd
     if (-not $res.ok) {
         throw "BLOCK: -Agent '$Agent' nao resolve (evita fallback silencioso ao 'build' full-access): $($res.detail)"
     }
@@ -181,7 +185,9 @@ try {
         $out = (New-TemporaryFile).FullName
         $err = (New-TemporaryFile).FullName
 
+        # Diretorio real + PWD do FILHO fixados no diretorio validado pelo pre-check (o run adota PWD).
         $p = Start-Process -FilePath $exe -ArgumentList $ocArgs -NoNewWindow -PassThru `
+            -WorkingDirectory $cwd -Environment @{ PWD = $cwd } `
             -RedirectStandardInput $in -RedirectStandardOutput $out -RedirectStandardError $err
         if (-not $p.WaitForExit($TimeoutSec * 1000)) {
             try { $p.Kill($true) } catch { }

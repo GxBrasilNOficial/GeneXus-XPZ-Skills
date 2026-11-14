@@ -192,6 +192,13 @@ exige `read` de diretório, ambos com nomes visíveis. `names-list` aceita event
 ou `list` com nomes visíveis; a captura atual usou `read`. A CLI corrente não oferece mais
 `opencode debug agent --tool`; não usar essa interface antiga.
 
+A matriz deve ser válida rodada **do Git Bash** (que exporta `PWD`), não só do PowerShell: o
+`opencode run` adota o `PWD` do ambiente, e a matriz fixa diretório real e `PWD` no filho de cada
+caso. Na promoção, repetir também o passo E9 sem modelo: `opencode debug agents` com diretório real
+A (`bash: deny`) e `PWD=B` (`bash: allow`) deve devolver a saída de A — premissa de que o pré-check
+vê a mesma config que o `run` carrega. Passo e motivo em `xpz-llm-delegate/SKILL.md`, «Provas e
+promoção».
+
 Re-rodar `scripts/Test-OpenCodeReviewerRoSelfTest.ps1` e os demais self-tests até verde antes de
 reativar o default `-Agent reviewer-ro`. O diagnóstico estrutural
 `scripts/Test-OpenCodeReviewerRoInstalledCompatibility.ps1 -AsJson` confirma o estado instalado, mas

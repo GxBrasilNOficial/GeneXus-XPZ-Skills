@@ -1784,3 +1784,20 @@ corrigir o dono, não duplicar a regra nos consumidores.
 **Por que foi descartada como prática geral:** a janela observada é anterior à materialização da coluna no banco. Depois da primeira reorg, o rename é uma operação perigosa e não deve virar playbook para agente ou usuário. No caso coberto, a `Transaction` que referencia o atributo também precisou acompanhar o mesmo pacote e GUID; o sucesso desse caso não generaliza para atributos já materializados. A cautela permanece no `02`; 9-FD continua verificando drift de assinatura.
 
 **Reabrir somente se** surgir uma forma de rename suportada após reorg, validada na IDE e documentada como operação segura. A nota atual não autoriza rename XPZ fora da janela pré-primeiro-reorg.
+
+---
+
+## Alternativas descartadas na correção do `PWD` do `opencode run` (2026-11-14)
+
+**Origem:** plano v4 da frente de 2026-11-14 (3 rodadas de revisão por pares). A correção adotada fixa diretório real e `PWD` no processo filho do `run`; ver `xpz-llm-delegate/SKILL.md`, «LIMITE CONHECIDO — `opencode run` usa o `PWD` do ambiente».
+
+- **Guard `cwd_pwd_divergente`:** tautológico com diretório real e `PWD` fixados no mesmo valor, e exigiria normalização de caminho.
+- **Mutar `$env:PWD` no pai com restauração:** corrida entre os runspaces paralelos do dispatcher, que compartilham o ambiente do processo.
+- **Teste de concorrência:** sem mutação do pai, não há corrida a testar.
+- **`--standalone` como mitigação:** também segue o `PWD` (medido).
+- **Varredura forense do `opencode.log`:** o log não registra o diretório quando a instância é reaproveitada.
+- **Fixar `PWD` também no `debug agents`:** ele ignora `PWD` (medido); a promoção de versão revalida a premissa.
+- **Alinhar `api model.default`/`model.list` ao `PWD`:** impacto restrito ao id de modelo com `-Variant` sem `-Model`; o gate recebe o modelo depois.
+- **Caso novo `pwd-divergente` na matriz:** passaria por construção, mudaria as contagens fixadas e invalidaria o recibo promovido; a matriz rodada do Git Bash já parte de `PWD` divergente, e a regressão do adapter fica no self-test.
+- **Campo "invocador" no `receipt.json`:** mudaria o schema revalidado por `-EvidenceDirectory`; o invocador fica registrado no histórico.
+- **A/B nos demais backends com flag de diretório:** Codex usa `-C`; Claude Code foi medido e não é afetado.

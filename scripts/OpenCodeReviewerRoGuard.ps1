@@ -707,14 +707,17 @@ function Test-OpenCodeAgentResolves {
         em `opencode debug agents`) — senao o opencode cairia SILENCIOSAMENTE no `build` full-access
         (`--agent <ausente>` nao falha). Exige mode=primary ou mode=all (agente disponivel em run).
         Devolve @{ ok = $bool; detail }.
+        -WorkingDirectory (opcional): pasta do `debug agents`; sem ele, a pasta atual. Os adapters
+        passam o mesmo diretorio que fixam no filho do `run`.
     #>
     param(
         [Parameter(Mandatory)] [string] $Exe,
         [Parameter(Mandatory)] [string] $Name,
         [int] $Retries = 2,
-        [int] $RetryDelayMs = 250
+        [int] $RetryDelayMs = 250,
+        [string] $WorkingDirectory
     )
-    $da = Get-OpenCodeDebugAgentsJson -Exe $Exe -Retries $Retries -RetryDelayMs $RetryDelayMs
+    $da = Get-OpenCodeDebugAgentsJson -Exe $Exe -Retries $Retries -RetryDelayMs $RetryDelayMs -WorkingDirectory $WorkingDirectory
     if (-not $da.ok) {
         return @{ ok = $false; detail = $da.error }
     }
