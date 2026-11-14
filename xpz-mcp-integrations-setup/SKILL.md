@@ -17,7 +17,8 @@ git nem o MCP interno do Cursor. Isso continua com a `xpz-skills-setup`.
 ## GUIDELINE
 
 - **Auditar antes de agir.** O ponto de entrada e `scripts/Test-McpIntegrations.ps1`.
-  Ele nao grava, nao remove e nao altera config de cliente.
+  Ele nao grava, nao remove e nao altera config de cliente. Ressalva: a sonda TOML
+  do Codex grava uma copia temporaria do `config.toml` em `%TEMP%` e a remove no `finally`.
 - **Nada gravado sem aprovacao explicita.** Mostre estados, achados e a acao
   oferecida; so execute o mutador depois do `sim`/`aprova` do usuario.
 - **Diff antes da escrita.** Rode o mutador com `-WhatIf` quando houver duvida,
