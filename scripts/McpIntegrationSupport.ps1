@@ -932,7 +932,32 @@ function Set-McpManifest {
     if (-not $WhatIf) {
         $null = Ensure-McpManagedRoot
     }
-    $writeResult = Write-McpJsonFile -Path $path -Value $Value -WhatIf:$WhatIf
+    # Conteudo logico igual (so formatacao diferente, por edicao manual ou outra ferramenta):
+    # nao regrava, nao cria backup e nao conta como mudanca. Um JSON invalido cai no caminho
+    # normal de escrita, como antes.
+    $sameLogical = $false
+    if (Test-McpRegularFile -Path $path) {
+        try {
+            $existingNorm = (Get-Content -Raw -LiteralPath $path | ConvertFrom-Json | ConvertTo-Json -Depth 30 -Compress)
+            $newNorm = ($Value | ConvertTo-Json -Depth 30 | ConvertFrom-Json | ConvertTo-Json -Depth 30 -Compress)
+            $sameLogical = ($existingNorm -ceq $newNorm)
+        } catch {
+            $sameLogical = $false
+        }
+    }
+    if ($sameLogical) {
+        $existingBytes = [System.IO.File]::ReadAllBytes($path)
+        $writeResult = [pscustomobject]@{
+            Status     = 'unchanged'
+            Path       = $path
+            BackupPath = $null
+            Hash       = Get-McpBytesHash -Bytes $existingBytes
+            ByteCount  = $existingBytes.Length
+            Changed    = $false
+        }
+    } else {
+        $writeResult = Write-McpJsonFile -Path $path -Value $Value -WhatIf:$WhatIf
+    }
     # ACL so-dono tambem em unchanged (repair): espelha Set-McpConfig.
     if (-not $WhatIf -and (Test-McpRegularFile -Path $path)) {
         $null = Set-McpAcl -Path $path

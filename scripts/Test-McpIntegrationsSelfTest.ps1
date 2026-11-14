@@ -606,6 +606,22 @@ args = [`"legacy.js`"]
     Assert-True (Test-McpVaultExists) '(orphan) cofre preservado'
     Assert-True (@($orReal.Json.findings | Where-Object { $_.code -eq 'registro_orfao_removido' }).Count -eq 1) '(orphan) achado registro_orfao_removido'
 
+    # 9e. Manifesto so reformatado (mesmo conteudo logico): nao regrava, nao faz backup, changed false.
+    $null = Invoke-McpRemovalCase -Params @{ Client = 'all' }
+    Assert-True ((Invoke-McpInstallForRemoval) -eq 0) '(reformat) reinstall exit 0'
+    $null = Invoke-McpRemovalCase -Params @{ Client = 'all' }
+    $fmtPath = Get-McpManifestPath
+    $fmtObj = Get-Content -Raw -LiteralPath $fmtPath | ConvertFrom-Json
+    [System.IO.File]::WriteAllText($fmtPath, (($fmtObj | ConvertTo-Json -Depth 30 -Compress) + "`n"), [System.Text.UTF8Encoding]::new($false))
+    $fmtBefore = [System.IO.File]::ReadAllText($fmtPath)
+    $fmtBackupsBefore = @(Get-ChildItem -LiteralPath (Split-Path -Parent $fmtPath) -Filter 'install-manifest.json.xpz-mcp.bak-*' -ErrorAction SilentlyContinue).Count
+    $fmtRun = Invoke-McpRemovalCase -Params @{ Client = 'all' }
+    $fmtBackupsAfter = @(Get-ChildItem -LiteralPath (Split-Path -Parent $fmtPath) -Filter 'install-manifest.json.xpz-mcp.bak-*' -ErrorAction SilentlyContinue).Count
+    Assert-True ($fmtRun.Exit -eq 0) "(reformat) exit 0; obtido $($fmtRun.Exit)"
+    Assert-True (-not [bool]$fmtRun.Json.changed) '(reformat) changed false: so a formatacao mudou'
+    Assert-True ([System.IO.File]::ReadAllText($fmtPath) -ceq $fmtBefore) '(reformat) manifesto nao foi regravado'
+    Assert-True ($fmtBackupsAfter -eq $fmtBackupsBefore) "(reformat) nenhum backup novo; antes=$fmtBackupsBefore depois=$fmtBackupsAfter"
+
     # 10. Gate do dist real, quando informado.
     if (-not [string]::IsNullOrWhiteSpace($DistManagedRoot)) {
         $distOutput = & (Get-Command pwsh).Source -NoProfile -File (Join-Path $scriptDir 'Test-McpDistEvidenceSelfTest.ps1') -ManagedRoot $DistManagedRoot 2>&1
