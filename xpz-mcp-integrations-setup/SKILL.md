@@ -231,6 +231,11 @@ Estados por cliente, **um valor so**, na ordem:
   `credencial_ausente` derruba `INTEGRATIONS_OK` (exit 61). O warn de ACL cobre
   raiz gerenciada, `config.json`, manifesto, `vault\` e blob quando existem;
   nao derruba `INTEGRATIONS_OK` sozinho.
+- **Sondas de pre-requisito:** `Get-McpCommandInfo` só classifica os comandos
+  como presentes se iniciarem, terminarem em até 8 s com exit code 0 e a saída
+  contiver uma versão reconhecida para aquele comando. `pwsh` funcional em
+  `WindowsApps` continua elegível; stub de outros comandos nessa pasta continua
+  recusado.
 - **Precedencia de exit code:** com mais de um achado `blocking`, vence o
   primeiro codigo presente em `precedence` no `exit-codes.catalog.json`:
   `67 > 66 > 61 > 62 > 63 > 64 > 65 > 60`. `nextActions` segue a mesma ordem.

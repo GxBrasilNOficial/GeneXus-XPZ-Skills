@@ -17,6 +17,7 @@
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'XpzProcessProbeSupport.ps1')
 
 $script:McpDescriptorRelativePath = 'xpz-mcp-integrations-setup/components/jev.json'
 $script:McpLauncherTemplateRelativePath = 'xpz-mcp-integrations-setup/templates/launcher.ps1'
@@ -1064,6 +1065,30 @@ function Test-McpClientInstalled {
     return (Get-McpCommandInfo -Name 'codex' -VersionArguments @('--version')).Present
 }
 
+function Test-McpCommandVersionOutput {
+    param(
+        [Parameter(Mandatory = $true)][string]$Name,
+        [Parameter(Mandatory = $true)][AllowEmptyString()][string]$Text
+    )
+
+    $pattern = switch -Regex ($Name) {
+        '^pwsh$' { '^\s*\d+\.\d+(?:\.\d+){0,2}\s*$'; break }
+        '^(node|npm)$' { '^\s*v?\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?\s*$'; break }
+        '^(python|py)$' { '^\s*Python\s+\d+\.\d+(?:\.\d+)?\s*$'; break }
+        '^opencode$' { '^\s*opencode\s+v?\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?\s*$'; break }
+        '^codex$' { '^\s*codex-cli\s+\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?\s*$'; break }
+        '^(nvm|fnm|volta|winget)$' { '^\s*(?:(?:nvm|fnm|volta|winget)\s+)?v?\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?\s*$'; break }
+        default { return $false }
+    }
+
+    foreach ($line in @($Text -split '\r?\n')) {
+        if ([regex]::IsMatch($line, $pattern, [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)) {
+            return $true
+        }
+    }
+    return $false
+}
+
 function Invoke-McpCommandVersionProbe {
     <#
     .SYNOPSIS
@@ -1074,43 +1099,11 @@ function Invoke-McpCommandVersionProbe {
         [string[]]$VersionArguments = @('--version'),
         [int]$TimeoutMs = 8000
     )
-    $psi = [System.Diagnostics.ProcessStartInfo]::new()
-    $psi.UseShellExecute = $false
-    $psi.RedirectStandardOutput = $true
-    $psi.RedirectStandardError = $true
-    $psi.CreateNoWindow = $true
-    $ext = [System.IO.Path]::GetExtension($Path)
-    if ($ext -match '^\.(cmd|bat)$') {
-        $psi.FileName = $env:ComSpec
-        $argParts = @('/d', '/c', ('"{0}"' -f $Path)) + @($VersionArguments)
-        $psi.Arguments = ($argParts -join ' ')
-    } else {
-        $psi.FileName = $Path
-        # ArgumentList evita quoting fragil; disponivel no .NET Core / PS 7.
-        foreach ($a in @($VersionArguments)) {
-            [void]$psi.ArgumentList.Add([string]$a)
-        }
-    }
-    $process = $null
-    try {
-        $process = [System.Diagnostics.Process]::Start($psi)
-        if ($null -eq $process) { return $null }
-        $outTask = $process.StandardOutput.ReadToEndAsync()
-        $errTask = $process.StandardError.ReadToEndAsync()
-        if (-not $process.WaitForExit($TimeoutMs)) {
-            try { $process.Kill($true) } catch { }
-            return $null
-        }
-        $stdout = $outTask.GetAwaiter().GetResult()
-        $stderr = $errTask.GetAwaiter().GetResult()
-        $text = (($stdout + ' ' + $stderr).Trim())
-        if ([string]::IsNullOrWhiteSpace($text)) { return $null }
-        return $text
-    } catch {
-        return $null
-    } finally {
-        if ($null -ne $process) { $process.Dispose() }
-    }
+    $probe = Invoke-XpzProcessProbe -FilePath $Path -ArgumentList $VersionArguments -TimeoutMs $TimeoutMs
+    if (-not $probe.Succeeded) { return $null }
+    $text = ([string]$probe.Output).Trim()
+    if ([string]::IsNullOrWhiteSpace($text)) { return $null }
+    return $text
 }
 
 function Get-McpCommandInfo {
@@ -1154,7 +1147,7 @@ function Get-McpCommandInfo {
             continue
         }
         $versionText = Invoke-McpCommandVersionProbe -Path $path -VersionArguments $VersionArguments
-        if ([string]::IsNullOrWhiteSpace($versionText)) {
+        if ([string]::IsNullOrWhiteSpace($versionText) -or -not (Test-McpCommandVersionOutput -Name $Name -Text $versionText)) {
             if ($isWindowsApps) {
                 $sawWindowsAppsStub = $true
                 $lastWaPath = $path

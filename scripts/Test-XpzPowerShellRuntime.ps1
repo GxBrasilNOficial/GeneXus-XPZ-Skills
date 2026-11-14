@@ -15,6 +15,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'XpzProcessProbeSupport.ps1')
 
 $pwsh = Get-Command pwsh -ErrorAction SilentlyContinue
 if ($null -eq $pwsh) {
@@ -22,15 +23,24 @@ if ($null -eq $pwsh) {
     exit 1
 }
 
-$versionText = $null
-try {
-    $versionText = (& $pwsh.Source -NoProfile -Command '$PSVersionTable.PSVersion.ToString()' 2>&1 |
-        ForEach-Object { $_.ToString() }) -join ''
-} catch {
-    Write-Output "BLOCK: falha ao executar pwsh: $($_.Exception.Message)"
+$probe = Invoke-XpzProcessProbe -FilePath $pwsh.Source -ArgumentList @(
+    '-NoProfile', '-Command', '$PSVersionTable.PSVersion.ToString()'
+) -TimeoutMs 8000
+if (-not $probe.Started) {
+    Write-Output "BLOCK: falha ao iniciar pwsh: $($probe.Error)"
+    exit 1
+}
+if ($probe.TimedOut) {
+    Write-Output "BLOCK: pwsh nao respondeu dentro de 8000 ms; verifique o runtime em $($pwsh.Source)"
+    exit 1
+}
+if (-not $probe.Completed -or $probe.ExitCode -ne 0) {
+    $detail = if (-not [string]::IsNullOrWhiteSpace([string]$probe.StandardError)) { [string]$probe.StandardError.Trim() } else { [string]$probe.Error }
+    Write-Output "BLOCK: consulta de versao do pwsh terminou com exit code $($probe.ExitCode): $detail"
     exit 1
 }
 
+$versionText = [string]$probe.StandardOutput
 $actualVersion = $null
 if (-not [version]::TryParse($versionText.Trim(), [ref]$actualVersion)) {
     Write-Output "BLOCK: nao foi possivel determinar versao do pwsh: '$versionText'"

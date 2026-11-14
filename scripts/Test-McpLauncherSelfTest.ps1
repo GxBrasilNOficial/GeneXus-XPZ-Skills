@@ -12,6 +12,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $scriptDir = $PSScriptRoot
+$script:SelfTestPwshPath = (Get-Command pwsh).Source
 . (Join-Path $scriptDir 'McpIntegrationSupport.ps1')
 . (Join-Path $scriptDir 'McpVaultSupport.ps1')
 . (Join-Path $scriptDir 'McpLauncherSupport.ps1')
@@ -71,8 +72,142 @@ function Start-LauncherProcess {
     return [pscustomobject]@{ ExitCode = $exitCode; Stdout = $stdout; Stderr = $stderr }
 }
 
+function Invoke-RuntimeGateSyntheticCase {
+    param(
+        [Parameter(Mandatory = $true)][AllowEmptyString()][string]$OutputText,
+        [Parameter(Mandatory = $true)][int]$ExitCode,
+        [Parameter(Mandatory = $true)][string]$ShimPath,
+        [switch]$MissingShim
+    )
+
+    if (-not $MissingShim) {
+        $lineBreak = [Environment]::NewLine
+        $shimText = '@echo off' + $lineBreak + 'echo ' + $OutputText + $lineBreak + 'exit /b ' + $ExitCode + $lineBreak
+        [System.IO.File]::WriteAllText($ShimPath, $shimText, [System.Text.UTF8Encoding]::new($false))
+    }
+
+    $runtimePath = Join-Path $script:scriptDir 'Test-XpzPowerShellRuntime.ps1'
+    $childTemplate = @'
+function global:Get-Command {
+    param([string]$Name, [string]$ErrorAction)
+    if ($Name -eq 'pwsh') { return [pscustomobject]@{ Source = $env:XPZ_TEST_PWSH_SHIM } }
+    return Microsoft.PowerShell.Core\Get-Command @PSBoundParameters
+}
+& '__RUNTIME_PATH__' -MinimumVersion ([version]'7.4')
+'@
+    $childCommand = $childTemplate.Replace('__RUNTIME_PATH__', $runtimePath.Replace("'", "''"))
+    $encodedCommand = [Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes($childCommand))
+
+    $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = $script:SelfTestPwshPath
+    [void]$startInfo.ArgumentList.Add('-NoProfile')
+    [void]$startInfo.ArgumentList.Add('-EncodedCommand')
+    [void]$startInfo.ArgumentList.Add($encodedCommand)
+    $startInfo.UseShellExecute = $false
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    $startInfo.CreateNoWindow = $true
+    $startInfo.EnvironmentVariables['XPZ_TEST_PWSH_SHIM'] = $ShimPath
+
+    $process = [System.Diagnostics.Process]::Start($startInfo)
+    try {
+        $stdoutTask = $process.StandardOutput.ReadToEndAsync()
+        $stderrTask = $process.StandardError.ReadToEndAsync()
+        if (-not $process.WaitForExit(15000)) {
+            try { $process.Kill($true) } catch { try { $process.Kill() } catch { } }
+            [void]$process.WaitForExit(5000)
+            return [pscustomobject]@{ ExitCode = $null; TimedOut = $true; Stdout = ''; Stderr = '' }
+        }
+        return [pscustomobject]@{
+            ExitCode = $process.ExitCode
+            TimedOut = $false
+            Stdout   = $stdoutTask.GetAwaiter().GetResult()
+            Stderr   = $stderrTask.GetAwaiter().GetResult()
+        }
+    } finally {
+        $process.Dispose()
+    }
+}
+
 try {
-    # 1. Descritor e pin.
+    # 1. Sonda compartilhada e classificacao de versoes.
+    $realPwsh = Invoke-XpzProcessProbe -FilePath $script:SelfTestPwshPath -ArgumentList @(
+        '-NoProfile', '-Command', "[Console]::Out.Write('probe-out'); [Console]::Error.Write('probe-err')"
+    ) -TimeoutMs 5000
+    Assert-True ($realPwsh.Started -and $realPwsh.Completed -and $realPwsh.Succeeded -and $realPwsh.StandardOutput -eq 'probe-out' -and $realPwsh.StandardError -eq 'probe-err') '(probe) captura stdout/stderr com exit 0'
+
+    $nonzeroProbe = Invoke-XpzProcessProbe -FilePath $script:SelfTestPwshPath -ArgumentList @(
+        '-NoProfile', '-Command', "Write-Output '7.4.0'; exit 7"
+    ) -TimeoutMs 5000
+    Assert-True ($nonzeroProbe.Started -and $nonzeroProbe.Completed -and $nonzeroProbe.ExitCode -eq 7 -and -not $nonzeroProbe.Succeeded) '(probe) exit nao zero nao e sucesso'
+
+    $missingProbe = Invoke-XpzProcessProbe -FilePath (Join-Path $tempRoot 'missing-probe.exe') -TimeoutMs 1000
+    Assert-True ((-not $missingProbe.Started) -and $missingProbe.FailureKind -eq 'startFailed') '(probe) falha ao iniciar classificada'
+
+    $timeoutProbe = Invoke-XpzProcessProbe -FilePath $script:SelfTestPwshPath -ArgumentList @(
+        '-NoProfile', '-Command', 'Start-Sleep -Seconds 10'
+    ) -TimeoutMs 300
+    Assert-True ($timeoutProbe.Started -and $timeoutProbe.TimedOut -and -not $timeoutProbe.Succeeded) '(probe) timeout classificado e processo encerrado'
+
+    $versionCases = @(
+        [pscustomobject]@{ Name = 'pwsh'; Text = '7.4.0'; Valid = $true },
+        [pscustomobject]@{ Name = 'node'; Text = 'v24.18.0'; Valid = $true },
+        [pscustomobject]@{ Name = 'npm'; Text = '11.18.0'; Valid = $true },
+        [pscustomobject]@{ Name = 'python'; Text = 'Python 3.14.2'; Valid = $true },
+        [pscustomobject]@{ Name = 'py'; Text = 'Python 3.14.2'; Valid = $true },
+        [pscustomobject]@{ Name = 'nvm'; Text = '1.2.2'; Valid = $true },
+        [pscustomobject]@{ Name = 'fnm'; Text = 'fnm 1.38.1'; Valid = $true },
+        [pscustomobject]@{ Name = 'volta'; Text = '2.0.2'; Valid = $true },
+        [pscustomobject]@{ Name = 'winget'; Text = 'v1.12.4601'; Valid = $true },
+        [pscustomobject]@{ Name = 'opencode'; Text = 'opencode v2.2.7'; Valid = $true },
+        [pscustomobject]@{ Name = 'codex'; Text = 'codex-cli 0.167.0-alpha.3.2'; Valid = $true },
+        [pscustomobject]@{ Name = 'node'; Text = 'failed while checking version 24.18.0'; Valid = $false }
+    )
+    foreach ($versionCase in $versionCases) {
+        $isValid = Test-McpCommandVersionOutput -Name $versionCase.Name -Text $versionCase.Text
+        Assert-True ($isValid -eq $versionCase.Valid) "(version-format) $($versionCase.Name): '$($versionCase.Text)'"
+    }
+
+    $probeDirectory = Join-Path $tempRoot 'command probes'
+    [System.IO.Directory]::CreateDirectory($probeDirectory) | Out-Null
+    $nodeProbePath = Join-Path $probeDirectory 'node.cmd'
+    $lineBreak = [Environment]::NewLine
+    $env:PATH = $probeDirectory
+    [System.IO.File]::WriteAllText($nodeProbePath, ('@echo off' + $lineBreak + 'echo v24.18.0' + $lineBreak + 'exit /b 7' + $lineBreak), [System.Text.UTF8Encoding]::new($false))
+    $nodeExit7 = Get-McpCommandInfo -Name 'node' -VersionArguments @('--version')
+    Assert-True (-not $nodeExit7.Present) '(probe) versao valida com exit 7 rejeitada'
+
+    [System.IO.File]::WriteAllText($nodeProbePath, ('@echo off' + $lineBreak + 'echo v24.18.0' + $lineBreak + 'exit /b 0' + $lineBreak), [System.Text.UTF8Encoding]::new($false))
+    $nodeValid = Get-McpCommandInfo -Name 'node' -VersionArguments @('--version')
+    Assert-True ($nodeValid.Present -and $nodeValid.Version -eq 'v24.18.0') '(probe) versao valida com exit 0 aceita'
+
+    [System.IO.File]::WriteAllText($nodeProbePath, ('@echo off' + $lineBreak + 'echo not-a-version' + $lineBreak + 'exit /b 0' + $lineBreak), [System.Text.UTF8Encoding]::new($false))
+    $nodeInvalid = Get-McpCommandInfo -Name 'node' -VersionArguments @('--version')
+    Assert-True (-not $nodeInvalid.Present) '(probe) exit 0 sem versao valida rejeitado'
+
+    $pythonProbePath = Join-Path $probeDirectory 'python.cmd'
+    [System.IO.File]::WriteAllText($pythonProbePath, ('@echo off' + $lineBreak + 'echo Python 3.14.2 1>&2' + $lineBreak + 'exit /b 0' + $lineBreak), [System.Text.UTF8Encoding]::new($false))
+    $pythonValid = Get-McpCommandInfo -Name 'python' -VersionArguments @('--version')
+    Assert-True ($pythonValid.Present -and $pythonValid.Version -match 'Python 3\.14\.2') '(probe) versao Python em stderr aceita apos exit 0'
+    $env:PATH = $originalPath
+
+    # Runtime minimo: 7.3.9 bloqueia; 7.4.0 e 7.4.1 passam somente com exit 0.
+    $runtimeShim = Join-Path $tempRoot 'runtime probe\pwsh.cmd'
+    [System.IO.Directory]::CreateDirectory((Split-Path -Parent $runtimeShim)) | Out-Null
+    $runtime739 = Invoke-RuntimeGateSyntheticCase -OutputText '7.3.9' -ExitCode 0 -ShimPath $runtimeShim
+    Assert-True ($runtime739.ExitCode -eq 1 -and $runtime739.Stdout -match 'BLOCK:') '(runtime) 7.3.9 bloqueado'
+    $runtime740 = Invoke-RuntimeGateSyntheticCase -OutputText '7.4.0' -ExitCode 0 -ShimPath $runtimeShim
+    Assert-True ($runtime740.ExitCode -eq 0 -and $runtime740.Stdout -match 'POWERSHELL_RUNTIME_OK') '(runtime) 7.4.0 aceito'
+    $runtime741 = Invoke-RuntimeGateSyntheticCase -OutputText '7.4.1' -ExitCode 0 -ShimPath $runtimeShim
+    Assert-True ($runtime741.ExitCode -eq 0 -and $runtime741.Stdout -match 'POWERSHELL_RUNTIME_OK') '(runtime) 7.4.1 aceito'
+    $runtimeExit7 = Invoke-RuntimeGateSyntheticCase -OutputText '7.4.0' -ExitCode 7 -ShimPath $runtimeShim
+    Assert-True ($runtimeExit7.ExitCode -eq 1 -and $runtimeExit7.Stdout -match 'BLOCK:') '(runtime) versao impressa com exit 7 bloqueada'
+    $runtimeInvalid = Invoke-RuntimeGateSyntheticCase -OutputText 'not-a-version' -ExitCode 0 -ShimPath $runtimeShim
+    Assert-True ($runtimeInvalid.ExitCode -eq 1 -and $runtimeInvalid.Stdout -match 'BLOCK:') '(runtime) saida sem versao valida bloqueada'
+    $runtimeStartFailure = Invoke-RuntimeGateSyntheticCase -OutputText '' -ExitCode 0 -ShimPath (Join-Path $tempRoot 'missing-runtime\pwsh.cmd') -MissingShim
+    Assert-True ($runtimeStartFailure.ExitCode -eq 1 -and $runtimeStartFailure.Stdout -match 'BLOCK:') '(runtime) falha ao iniciar continua bloqueada'
+
+    # 2. Descritor e pin.
     $descriptor = Get-McpDescriptor
     Assert-True ([string]$descriptor.Descriptor.component.version -eq '0.13.0') '(descriptor) versao 0.13.0'
     Assert-True ([string]$descriptor.Descriptor.modes.compatible.secretEnvVar -eq 'JEV_API_KEY') '(descriptor) JEV_API_KEY'
@@ -98,6 +233,13 @@ try {
     $env:PATH = $originalPath
     Assert-True ((-not $waPwshStub.Present) -and $waPwshStub.Stub) '(prereq) pwsh WindowsApps zero-byte recusado'
 
+    $waPwshCommand = Join-Path $waPwshDir 'pwsh.cmd'
+    [System.IO.File]::WriteAllText($waPwshCommand, ('@echo off' + $lineBreak + 'echo 7.4.1' + $lineBreak + 'exit /b 0' + $lineBreak), [System.Text.UTF8Encoding]::new($false))
+    $env:PATH = $waPwshDir
+    $waPwshWorking = Get-McpCommandInfo -Name 'pwsh' -VersionArguments @('-NoProfile', '-Command', '$PSVersionTable.PSVersion.ToString()')
+    $env:PATH = $originalPath
+    Assert-True ($waPwshWorking.Present -and $waPwshWorking.Version -eq '7.4.1') '(prereq) pwsh WindowsApps funcional aceito'
+
     # Piso 7.4: Present com 7.3.9 deve gerar achado blocking.
     $oldPwshPrereq = [pscustomobject]@{
         Pwsh             = [pscustomobject]@{ Present = $true; Stub = $false; Name = 'pwsh'; Path = 'C:\fake\pwsh.exe'; Version = '7.3.9' }
@@ -115,6 +257,14 @@ try {
     }
     $oldPwshFindings = @(Get-McpPrerequisiteFindings -Prerequisites $oldPwshPrereq)
     Assert-True (@($oldPwshFindings | Where-Object { $_.code -eq 'pwsh_ausente' }).Count -eq 1) '(prereq) pwsh 7.3.9 bloqueia com pwsh_ausente'
+    foreach ($acceptedVersion in @('7.4.0', '7.4.1')) {
+        $acceptedPwshPrereq = $oldPwshPrereq | Select-Object *
+        $acceptedPwshPrereq.Pwsh = [pscustomobject]@{ Present = $true; Stub = $false; Name = 'pwsh'; Path = 'C:\fake\pwsh.exe'; Version = $acceptedVersion }
+        $acceptedPwshPrereq.PwshVersion = [version]$acceptedVersion
+        $acceptedPwshPrereq.PwshCompatible = $true
+        $acceptedFindings = @(Get-McpPrerequisiteFindings -Prerequisites $acceptedPwshPrereq)
+        Assert-True (@($acceptedFindings | Where-Object { $_.code -eq 'pwsh_ausente' }).Count -eq 0) "(prereq) pwsh $acceptedVersion aceito"
+    }
 
     $fakeRepo = Join-Path $tempRoot 'fake-repo'
     $fakeComponentDir = Join-Path $fakeRepo 'xpz-mcp-integrations-setup/components'
