@@ -471,13 +471,19 @@ def _procedure_source(path: Path) -> tuple[ElementTree.Element, str, str]:
     return root, guid, text
 
 
-def _property_name(root: ElementTree.Element) -> str:
-    for prop in (node for node in root.iter() if _local(node.tag).casefold() == "property"):
-        children = list(prop)
-        name = next((child for child in children if _local(child.tag).casefold() == "name"), None)
-        value = next((child for child in children if _local(child.tag).casefold() == "value"), None)
-        if name is not None and (name.text or "").strip().casefold() == "name" and value is not None:
-            return (value.text or "").strip()
+def _procedure_name(root: ElementTree.Element) -> str:
+    # Identidade do objeto: Object/@name; fallback limitado a Property Name filha direta de Object/Properties.
+    # Nao percorrer root.iter(): Variables e outros descendentes tambem carregam Property Name.
+    name = (root.attrib.get("name") or "").strip()
+    if name:
+        return name
+    for properties in (child for child in root if _local(child.tag).casefold() == "properties"):
+        for prop in (child for child in properties if _local(child.tag).casefold() == "property"):
+            children = list(prop)
+            name_node = next((child for child in children if _local(child.tag).casefold() == "name"), None)
+            value_node = next((child for child in children if _local(child.tag).casefold() == "value"), None)
+            if name_node is not None and (name_node.text or "").strip().casefold() == "name" and value_node is not None:
+                return (value_node.text or "").strip()
     return ""
 
 
@@ -2531,7 +2537,7 @@ def _candidate_groups(source_root: Path, procedure_path: Path, source_sha: str,
     _apply_overlay_source_paths_to_rows(automatic_rows, root_kinds_by_path)
     rows_by_key = {_row_identity_key(row): row for row in automatic_rows}
     procedure_root, procedure_guid, _ = _procedure_source(procedure_path)
-    procedure_name = _property_name(procedure_root) or procedure_path.stem
+    procedure_name = _procedure_name(procedure_root) or procedure_path.stem
     procedure_absolute = procedure_path.resolve(strict=True)
     try:
         procedure_relative = procedure_absolute.relative_to(corpus_reference_root.resolve(strict=True)).as_posix()
@@ -2727,7 +2733,7 @@ def analyze_procedure(procedure_path: Path, corpus_root: Path,
         relative = procedure.relative_to(corpus).as_posix()
     except ValueError:
         relative = procedure.name
-    name = _property_name(root) or procedure.stem
+    name = _procedure_name(root) or procedure.stem
     source_sha = _sha256(source)
     blocks = extract_new_blocks(source)
     if not blocks:

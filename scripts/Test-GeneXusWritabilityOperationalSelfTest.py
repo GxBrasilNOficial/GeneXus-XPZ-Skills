@@ -132,6 +132,73 @@ def _add_order_relation(root: Path) -> Path:
     return transaction_path
 
 
+def _write_named_procedure(root: Path, *, guid: str, object_name: str, variable_name: str,
+                           source: str, file_stem: str) -> Path:
+    # Variables (Part com Variable/Properties/Property Name) antes das propriedades do objeto,
+    # na mesma ordem de documento observada nas Procedures reais.
+    procedure = ET.Element("Object", {"type": PROCEDURE_TYPE, "guid": guid, "name": object_name})
+    variables_part = ET.SubElement(procedure, "Part", {"type": "80000000-0000-4000-8000-000000000001"})
+    variable = ET.SubElement(variables_part, "Variable", {"Name": variable_name})
+    variable_props = ET.SubElement(ET.SubElement(variable, "Properties"), "Property")
+    ET.SubElement(variable_props, "Name").text = "Name"
+    ET.SubElement(variable_props, "Value").text = variable_name
+    object_prop = ET.SubElement(ET.SubElement(procedure, "Properties"), "Property")
+    ET.SubElement(object_prop, "Name").text = "Name"
+    ET.SubElement(object_prop, "Value").text = object_name
+    source_part = ET.SubElement(procedure, "Part", {"type": operational.SOURCE_PART_TYPE_GUID})
+    ET.SubElement(source_part, "Source").text = source
+    path = root / "Procedure" / f"{file_stem}.xml"
+    _write_xml(path, procedure)
+    return path
+
+
+def _test_procedure_name_is_object_identity() -> None:
+    with tempfile.TemporaryDirectory(prefix="gx-writability-procedure-name-selftest-") as temp:
+        root = Path(temp)
+        base_path = _create_corpus(root)  # Object sem @name; nome vem so de Properties/Property
+        source = operational._procedure_source(base_path)[2]
+        alpha_path = _write_named_procedure(root, guid="70000000-0000-4000-8000-000000000002",
+                                            object_name="ProcAlpha", variable_name="AbrangenciaDaSelecaoDeCorte",
+                                            source=source, file_stem="ProcAlpha")
+        beta_path = _write_named_procedure(root, guid="70000000-0000-4000-8000-000000000003",
+                                           object_name="ProcBeta", variable_name="ArquivoPdfNome",
+                                           source=source, file_stem="ProcBeta")
+        cases = [
+            (base_path, "InsertCustomer", PROCEDURE_GUID),
+            (alpha_path, "ProcAlpha", "70000000-0000-4000-8000-000000000002"),
+            (beta_path, "ProcBeta", "70000000-0000-4000-8000-000000000003"),
+        ]
+        results = {}
+        for path, expected_name, expected_guid in cases:
+            element, _, _ = operational._procedure_source(path)
+            _assert(operational._procedure_name(element) == expected_name,
+                    f"_procedure_name must return the Object identity for {path.name}, not a Variable name")
+            result = operational.analyze_procedure(path, root)
+            _assert(result["procedure"]["name"] == expected_name,
+                    f"procedure.name must equal Object/@name for {path.name}")
+            _assert(result["procedure"]["guid"] == expected_guid,
+                    f"procedure.guid must stay the Object GUID for {path.name}")
+            _assert(result["procedure"]["path"] == path.relative_to(root).as_posix(),
+                    f"procedure.path must stay the corpus-relative path for {path.name}")
+            results[expected_name] = result
+        # Mesmo Source em todas as Procedures: so o nome pode diferir; decisoes e identidades nao.
+        reference = results["InsertCustomer"]
+        for name in ("ProcAlpha", "ProcBeta"):
+            other = results[name]
+            _assert(other["sourceSha256"] == reference["sourceSha256"] and other["status"] == reference["status"]
+                    and other["operationalStatus"] == reference["operationalStatus"]
+                    and other["newBlocksScanned"] == reference["newBlocksScanned"],
+                    f"{name} must keep the same source digest, status and block count as the reference")
+            _assert([(b["candidateState"], len(b["candidates"]), [a["name"] for a in b["assignments"]])
+                     for b in other["newBlocks"]]
+                    == [(b["candidateState"], len(b["candidates"]), [a["name"] for a in b["assignments"]])
+                        for b in reference["newBlocks"]],
+                    f"{name} must keep the same block classification and assignments as the reference")
+            _assert([a["assignment"]["sourceSha256"] for b in other["newBlocks"] for a in b["assignments"]]
+                    == [a["assignment"]["sourceSha256"] for b in reference["newBlocks"] for a in b["assignments"]],
+                    f"{name} assignment identities must keep the same source digests")
+
+
 def _assert(condition: bool, message: str) -> None:
     if not condition:
         raise AssertionError(message)
@@ -409,6 +476,7 @@ def main() -> int:
     _test_new_selection_eligibility()
     _test_new_applies_transaction_binding_context()
     _test_flat_front_model_overlays()
+    _test_procedure_name_is_object_identity()
     cycle_fixture = [
         {"decisionId": "cycle-a", "dependsOnDecisionIds": ["cycle-b"]},
         {"decisionId": "cycle-b", "dependsOnDecisionIds": ["cycle-a"]},
