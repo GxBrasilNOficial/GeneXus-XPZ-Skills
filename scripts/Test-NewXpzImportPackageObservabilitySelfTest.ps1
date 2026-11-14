@@ -157,6 +157,25 @@ try {
     if ($holdDoc.executionState -ne 'running' -or $holdDoc.packageState -ne 'candidate' -or $null -ne $holdDoc.completedAtUtc) { throw 'interrupcao deixou relatorio em falso estado terminal' }
     if (-not (Test-Path -LiteralPath $holdDoc.packagePath -PathType Leaf)) { throw 'interrupcao nao preservou pacote candidato observavel' }
 
+    # Regressao: o progress de heartbeat (etapa intermediaria) nao pode sobreviver ao encerramento.
+    . (Join-Path $PSScriptRoot 'XpzExecutionReportSupport.ps1')
+    foreach ($case in @(
+        [pscustomobject]@{ name = 'completed'; state = 'completed'; stage = 'completed'; code = 0 },
+        [pscustomobject]@{ name = 'blocked-drift'; state = 'blocked'; stage = 'front-acervo-drift'; code = 20 }
+    )) {
+        $caseReport = Join-Path $tempRoot ("progress-$($case.name).json")
+        $caseExpected = Join-Path $tempRoot ("progress-$($case.name).import_file.xml")
+        $caseCtx = New-XpzExecutionReportContext -ReportPath $caseReport -RepoRoot $tempRoot -FrontName 'Observabilidade_77777777_20260905' -NN '01' -ExpectedPackagePath $caseExpected -RunId ([guid]::NewGuid().ToString())
+        Update-XpzExecutionReport -Context $caseCtx -Stage 'front-acervo-drift' -Writer 'powershell' -Note 'executando gate de drift'
+        Set-XpzExecutionReportHeartbeat -Context $caseCtx -Stage 'front-acervo-drift' -Writer 'powershell' -Progress 'gate de drift ainda em execucao'
+        Update-XpzExecutionReport -Context $caseCtx -Stage 'python-engine' -Writer 'powershell' -Note 'iniciando motor Python'
+        Complete-XpzExecutionReport -Context $caseCtx -ExecutionState $case.state -Stage $case.stage -ResultExitCode $case.code -ProcessExitCode 0 -PackageState 'accepted' -InventoryDecision 'accepted'
+        $caseDoc = Get-Content -LiteralPath $caseReport -Raw | ConvertFrom-Json
+        if ($null -ne $caseDoc.progress) { throw "progress de etapa intermediaria sobreviveu ao encerramento $($case.name): '$($caseDoc.progress)'" }
+        if ($caseDoc.executionState -ne $case.state -or [int]$caseDoc.resultExitCode -ne $case.code -or $caseDoc.currentStage -ne $case.stage) { throw "estado terminal $($case.name) divergente do esperado" }
+        if (($caseDoc.stageHistory | Select-Object -Last 1).stage -ne $case.stage) { throw "stageHistory do encerramento $($case.name) nao termina na etapa terminal" }
+    }
+
     'NEW_XPZ_IMPORT_PACKAGE_OBSERVABILITY_SELFTEST_OK'
 } finally {
     if ($null -ne $process -and -not $process.HasExited) { try { $process.Kill($true) } catch { } }

@@ -283,6 +283,8 @@ function Complete-XpzExecutionReport {
     if ($null -ne $Values) {
         foreach ($key in $Values.Keys) { $allValues[$key] = $Values[$key] }
     }
+    # progress descreve etapa intermediaria (heartbeat); no encerramento ele deixa de valer.
+    $allValues['progress'] = $null
     $allValues['executionState'] = $ExecutionState
     $allValues['completedAtUtc'] = Get-XpzReportUtcNow
     $allValues['resultExitCode'] = $ResultExitCode
