@@ -19,6 +19,8 @@ git nem o MCP interno do Cursor. Isso continua com a `xpz-skills-setup`.
 - **Auditar antes de agir.** O ponto de entrada e `scripts/Test-McpIntegrations.ps1`.
   Ele nao grava, nao remove e nao altera config de cliente, e nao cria arquivo
   temporario: a sonda TOML do Codex recebe o `config.toml` pela entrada padrao.
+  Registro de cliente no manifesto sem a configuracao do cliente aparece como
+  `registro_orfao` (warn), com a acao sugerida de rodar o `Uninstall` desse cliente.
 - **Nada gravado sem aprovacao explicita.** Mostre estados, achados e a acao
   oferecida; so execute o mutador depois do `sim`/`aprova` do usuario.
 - **Diff antes da escrita.** Rode o mutador com `-WhatIf` quando houver duvida,

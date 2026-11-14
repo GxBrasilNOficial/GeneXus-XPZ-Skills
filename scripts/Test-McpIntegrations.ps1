@@ -279,6 +279,23 @@ if ($clients['codex'].installed -and $clients['codex'].state -eq 'nao_configurad
     Add-McpNextAction -Code 60 -Text 'Install-McpIntegration.ps1 -Client codex'
 }
 
+# Registro do cliente no manifesto sem a configuracao do cliente: o Install nao o remove e nao o
+# avisa; o Uninstall remove. Vale mesmo com o cliente nao detectado, porque o registro ainda existe.
+if ($null -ne $manifest -and $manifest.Exists -and -not $manifest.Corrupt) {
+    foreach ($client in $clientOrder) {
+        if ($null -eq (Get-McpManifestClient -Manifest $manifest.Value -Client $client)) { continue }
+        $configAbsent = if ($client -eq 'opencode') {
+            [string](Get-McpOpenCodeConfigTarget).status -eq 'absent'
+        } else {
+            -not (Test-McpRegularFile -Path (Get-McpCodexConfigPath))
+        }
+        if ($configAbsent) {
+            $findings.Add((New-McpFinding -Code 'registro_orfao' -Class 'warn' -Message "registro do $client no manifesto sem configuracao do cliente; rode o Uninstall desse cliente" -Client $client)) | Out-Null
+            Add-McpNextAction -Code 60 -Text "Uninstall-McpIntegration.ps1 -Client $client"
+        }
+    }
+}
+
 $boot = $null
 if ($CheckBoot -and $null -ne $launcher -and $launcher.state -eq 'ok' -and $vendor -and $vendor.state -eq 'ok' -and $credentialExists -and $null -ne $config.Value) {
     $boot = New-McpBootResult -LauncherPath $launcher.path

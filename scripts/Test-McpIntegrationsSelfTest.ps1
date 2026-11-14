@@ -643,6 +643,9 @@ args = [`"legacy.js`"]
     # Uninstall o remove); o Install nao avisa sobre ele. Comportamento atual, travado de proposito.
     $null = Invoke-McpRemovalCase -Params @{ Client = 'all' }
     Assert-True ((Invoke-McpInstallForRemoval) -eq 0) '(install-orphan) reinstall exit 0'
+    $auditCleanOutput = @(& (Join-Path $scriptDir 'Test-McpIntegrations.ps1') 2>&1)
+    $auditClean = (($auditCleanOutput | ForEach-Object { [string]$_ }) -join "`n") | ConvertFrom-Json -AsHashtable
+    Assert-True (@($auditClean.findings | Where-Object { $_.code -eq 'registro_orfao' }).Count -eq 0) '(audit-clean) sem registro_orfao quando as configuracoes existem'
     Remove-Item -LiteralPath $cxFile -Force
     $orphanInstBefore = [System.IO.File]::ReadAllText((Get-McpManifestPath))
     $orInstOutput = @(& (Join-Path $scriptDir 'Install-McpIntegration.ps1') -Action repair -Client codex 2>&1)
@@ -652,6 +655,11 @@ args = [`"legacy.js`"]
     Assert-True (@($orInstJson.findings | Where-Object { $_.code -eq 'config_ausente' -and $_.class -eq 'blocking' }).Count -eq 1) '(install-orphan) achado config_ausente blocking'
     Assert-True (-not (Test-Path -LiteralPath $cxFile)) '(install-orphan) Install nao cria a configuracao'
     Assert-True ([System.IO.File]::ReadAllText((Get-McpManifestPath)) -ceq $orphanInstBefore) '(install-orphan) manifesto intacto apos a recusa'
+    $auditOrphanOutput = @(& (Join-Path $scriptDir 'Test-McpIntegrations.ps1') 2>&1)
+    $auditOrphan = (($auditOrphanOutput | ForEach-Object { [string]$_ }) -join "`n") | ConvertFrom-Json -AsHashtable
+    $orphanFindings = @($auditOrphan.findings | Where-Object { $_.code -eq 'registro_orfao' })
+    Assert-True ($orphanFindings.Count -eq 1 -and [string]$orphanFindings[0].class -eq 'warn' -and [string]$orphanFindings[0].client -eq 'codex') '(audit-orphan) registro_orfao warn somente para o codex'
+    Assert-True (@($auditOrphan.nextActions | Where-Object { $_ -match 'Uninstall-McpIntegration\.ps1 -Client codex' }).Count -eq 1) '(audit-orphan) acao sugerida: Uninstall do codex'
 
     # 10. Gate do dist real, quando informado.
     if (-not [string]::IsNullOrWhiteSpace($DistManagedRoot)) {
