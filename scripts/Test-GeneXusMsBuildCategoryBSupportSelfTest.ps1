@@ -199,6 +199,114 @@ if (@($multi.files).Count -ne 2 -or [int]$multi.chavesCorrigidas -ne 2) {
     throw 'ASSERT_FAILED: caso com dois arquivos com contagem inesperada.'
 }
 
+# Uma linha de erro por chave negativa (forma observada em build real: N chaves no arquivo produzem
+# N linhas Syntax error, N-1 nos blocos internos e 1 no fechamento). Dados genericos: 6 arquivos x 8.
+function New-StaticCompressorPerKeyFixture {
+    param([string]$WebDir, [string[]]$Files, [int[]]$KeysPerFile)
+
+    # Um valor vale para todos os arquivos; senao, um valor por arquivo (N variados).
+    $keysOf = @{}
+    $totalKeys = 0
+    for ($f = 0; $f -lt $Files.Count; $f++) {
+        $n = if ($KeysPerFile.Count -eq 1) { $KeysPerFile[0] } else { $KeysPerFile[$f] }
+        $keysOf[$Files[$f]] = $n
+        $totalKeys += $n
+    }
+    $lines = [System.Collections.Generic.List[string]]::new()
+    [void]$lines.Add('Comprimindo arquivos estaticos ...')
+    foreach ($file in $Files) {
+        $lineNo = 100
+        for ($k = 1; $k -le $keysOf[$file]; $k++) {
+            [void]$lines.Add(("{0}({1}): Expected '}}': -" -f $file, $lineNo))
+            [void]$lines.Add(("{0}({1}): Expected ';'" -f $file, $lineNo))
+            [void]$lines.Add(('{0}({1}): Expected expression: :' -f $file, $lineNo))
+            [void]$lines.Add(('{0}({1}): Expected expression: }}' -f $file, ($lineNo + 1)))
+            if ($k -eq 1) {
+                [void]$lines.Add(("{0}({1}): Expected ')': ;" -f $file, ($lineNo + 1)))
+            }
+            else {
+                [void]$lines.Add(('{0}({1}): Syntax error : }} [C:\exemplo\buildall.msbuild]' -f $file, ($lineNo + 1)))
+            }
+            $lineNo += 20
+        }
+        [void]$lines.Add(('{0}({1}): Syntax error : }} [C:\exemplo\buildall.msbuild]' -f $file, ($lineNo + 100)))
+        [void]$lines.Add(('{0}({1}): Expected expression: )' -f $file, ($lineNo + 100)))
+    }
+    [void]$lines.Add('C:\exemplo\buildall.msbuild(40,5): warning : Some files could not be compressed.')
+    [void]$lines.Add(('Fix-GxNegativeDomainKeys: raiz = {0}' -f $WebDir))
+    [void]$lines.Add(('[APLICADO] .js varridos=2967 | arquivos com chave negativa em gx.domain={0} | chaves corrigidas={1}' -f $Files.Count, $totalKeys))
+    foreach ($file in $Files) {
+        [void]$lines.Add(('    {0} -> {1} chave(s)' -f $file, $keysOf[$file]))
+    }
+    [void]$lines.Add(('Verify-GxJs: raiz         = {0}  (via argumento)' -f $WebDir))
+    [void]$lines.Add('Verify-GxJs: verificados 2177 .js (modulos pulados: 389 | placeholders pulados: 0) | invalidos: 0 | tempo: 2792 ms')
+    [void]$lines.Add('  > Build All Task Sucesso')
+    [void]$lines.Add('  __BUILDALL_DONE__=true')
+    return [string[]]$lines.ToArray()
+}
+
+function Assert-StaticCompressorRefusedWith {
+    param([string]$Name, [object]$Result, [string]$ReasonLike)
+
+    if ($Result.recognized) {
+        throw "ASSERT_FAILED: caso deveria ser recusado: $Name"
+    }
+    if ([string]$Result.reason -notlike $ReasonLike) {
+        throw "ASSERT_FAILED: $Name recusou pelo motivo errado: $($Result.reason)"
+    }
+}
+
+$perKeyFiles = [string[]]@(1..6 | ForEach-Object { 'chave-generico-{0}.js' -f $_ })
+foreach ($perKeyFile in $perKeyFiles) {
+    [System.IO.File]::WriteAllText((Join-Path $webDir $perKeyFile), $validJs, [System.Text.UTF8Encoding]::new($false))
+}
+$perKeyLines = New-StaticCompressorPerKeyFixture -WebDir $webDir -Files $perKeyFiles -KeysPerFile 8
+$perKeyCountCall = {
+    param([string[]]$Lines, [int]$Count)
+    Test-GeneXusStaticCompressorKnownCase -StdOutLines $Lines -StdErrLines @() -GamNoiseLines @() -MsBuildExitCode 0 -KbOpen $true -TimedOut $false -BuildAllDone $true -DetectedBlockingPattern '' -BlockingReasonCount 0 -ClassifierErrorCount $Count -KbRoot $kbRoot -MetadataPresent $false -ExpectedWebDir ''
+}
+$perKey = & $perKeyCountCall $perKeyLines 48
+if (-not $perKey.recognized) {
+    throw "ASSERT_FAILED: caso 6 arquivos x 8 chaves x 8 linhas deveria ser reconhecido: $($perKey.reason)"
+}
+if (@($perKey.files).Count -ne 6 -or [int]$perKey.chavesCorrigidas -ne 48 -or @($perKey.files | Where-Object { $_.syntaxLineCount -ne 8 -or $_.chavesCorrigidas -ne 8 }).Count -ne 0) {
+    throw 'ASSERT_FAILED: caso 6x8 com contagens inesperadas (files, chavesCorrigidas ou syntaxLineCount).'
+}
+# N variados no mesmo build (1, 2, 3, 5 e 8 chaves): a regra e geral, nao especifica de 1 ou 8.
+$mixedKeys = [int[]]@(1, 2, 3, 5, 8)
+$mixedFiles = [string[]]$perKeyFiles[0..4]
+$mixedLines = New-StaticCompressorPerKeyFixture -WebDir $webDir -Files $mixedFiles -KeysPerFile $mixedKeys
+$mixed = & $perKeyCountCall $mixedLines 19
+if (-not $mixed.recognized) {
+    throw "ASSERT_FAILED: caso com N variados (1, 2, 3, 5, 8) deveria ser reconhecido: $($mixed.reason)"
+}
+if (@($mixed.files).Count -ne 5 -or [int]$mixed.chavesCorrigidas -ne 19) {
+    throw 'ASSERT_FAILED: caso com N variados com contagens inesperadas (files ou chavesCorrigidas).'
+}
+for ($m = 0; $m -lt $mixedFiles.Count; $m++) {
+    $entry = @($mixed.files | Where-Object { $_.fileName -eq $mixedFiles[$m] })
+    if ($entry.Count -ne 1 -or [int]$entry[0].syntaxLineCount -ne $mixedKeys[$m] -or [int]$entry[0].chavesCorrigidas -ne $mixedKeys[$m]) {
+        throw "ASSERT_FAILED: caso com N variados: arquivo $($mixedFiles[$m]) sem syntaxLineCount/chavesCorrigidas = $($mixedKeys[$m])."
+    }
+}
+Assert-StaticCompressorRefusedWith -Name 'mixed: arquivo de 3 chaves declarado com 4 no contorno' -Result (& $perKeyCountCall (Replace-StaticCompressorLines -Lines (Replace-StaticCompressorLines -Lines $mixedLines -Needle ('{0} -> 3' -f $mixedFiles[2]) -Old '-> 3' -New '-> 4') -Needle '[APLICADO]' -Old 'chaves corrigidas=19' -New 'chaves corrigidas=20') 19) -ReasonLike '*corrigiu 20 chave(s); os erros somam 19*'
+Assert-StaticCompressorRefusedWith -Name 'per-key: classificador contou por arquivo (6) em vez de por linha (48)' -Result (& $perKeyCountCall $perKeyLines 6) -ReasonLike '*classificador contou 6*'
+# Mesmo total (48 = 48), mas um arquivo com 9 linhas e outro com 7 para 8 chaves cada: so a regra por arquivo pega.
+$movedLine = [regex]::Escape($perKeyFiles[1]) + '\(241\): Syntax error'
+$perKeyMoved = [string[]]@($perKeyLines | ForEach-Object { if ($_ -match $movedLine) { $_.Replace($perKeyFiles[1] + '(241)', $perKeyFiles[0] + '(9241)') } else { $_ } })
+Assert-StaticCompressorRefusedWith -Name 'per-key: linhas diferentes de chaves num arquivo, total igual' -Result (& $perKeyCountCall $perKeyMoved 48) -ReasonLike ('*arquivo {0}: 8 chave(s) corrigida(s), 9 linha(s)*' -f $perKeyFiles[0])
+$dupLine = @($perKeyLines | Where-Object { $_ -like ('{0}(241): Syntax error*' -f $perKeyFiles[2]) })[0]
+$perKeyDup = [System.Collections.Generic.List[string]]::new([string[]]$perKeyLines)
+$perKeyDup.Insert($perKeyDup.IndexOf($dupLine) + 1, $dupLine)
+Assert-StaticCompressorRefusedWith -Name 'per-key: linha de erro duplicada (mesmo arquivo e numero)' -Result (& $perKeyCountCall ([string[]]$perKeyDup.ToArray()) 49) -ReasonLike '*linha de erro repetida*'
+Assert-StaticCompressorRefusedWith -Name 'per-key: total do APLICADO divergente das linhas' -Result (& $perKeyCountCall (Replace-StaticCompressorLines -Lines $perKeyLines -Needle '[APLICADO]' -Old 'chaves corrigidas=48' -New 'chaves corrigidas=47') 48) -ReasonLike '*corrigiu 47 chave(s); os erros somam 48*'
+Assert-StaticCompressorRefusedWith -Name 'per-key: APLICADO com arquivos=linhas (semantica antiga)' -Result (& $perKeyCountCall (Replace-StaticCompressorLines -Lines $perKeyLines -Needle '[APLICADO]' -Old 'gx.domain=6' -New 'gx.domain=48') 48) -ReasonLike '*afetou 48 arquivo(s); os erros citam 6*'
+Assert-StaticCompressorRefusedWith -Name 'per-key: arquivo do contorno fora dos erros' -Result (& $perKeyCountCall (Replace-StaticCompressorLines -Lines $perKeyLines -Needle ('{0} -> 8' -f $perKeyFiles[5]) -Old $perKeyFiles[5] -New 'fora-generico.js') 48) -ReasonLike '*fora-generico.js*'
+Assert-StaticCompressorRefusedWith -Name 'multi: arquivo com 2 linhas de erro e 1 chave' -Result (Invoke-StaticCompressorCase -Lines ([string[]](@($multiLines[0..3]) + @('outro-generico.js(1950): Syntax error : } [C:\exemplo\buildall.msbuild]') + @($multiLines[4..($multiLines.Count - 1)]))) -Root $kbRoot) -ReasonLike '*corrigiu 2 chave(s); os erros somam 3*'
+foreach ($perKeyFile in $perKeyFiles) {
+    Remove-Item -LiteralPath (Join-Path $webDir $perKeyFile) -Force -ErrorAction SilentlyContinue
+}
+
 # Negativos: cada um deve manter exit 48 (caso nao reconhecido).
 Assert-StaticCompressorRefused -Name 'sem linha APLICADO' -Result (Invoke-StaticCompressorCase -Lines (Remove-StaticCompressorLines -Lines $base -Needle '[APLICADO]') -Root $kbRoot)
 Assert-StaticCompressorRefused -Name 'chaves corrigidas=0' -Result (Invoke-StaticCompressorCase -Lines (Replace-StaticCompressorLines -Lines $base -Needle '[APLICADO]' -Old 'chaves corrigidas=1' -New 'chaves corrigidas=0') -Root $kbRoot)

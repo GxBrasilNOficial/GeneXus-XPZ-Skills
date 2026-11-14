@@ -216,14 +216,15 @@ function Resolve-GeneXusMsBuildCategoryBExitCode {
 
 # Caso conhecido do compressor de estaticos do GeneXus 18 (BuildAll). Dispensa a Categoria B somente
 # quando: (1) stdout e stderr trazem apenas linhas `<arquivo>.js(N): Syntax error : }` do compressor,
-# uma por arquivo, sem nenhuma outra linha de erro, falha ou exception, salvo ruido GAM que o
-# classificador nao conta; (2) o contorno do pos-build foi aplicado a exatamente esses arquivos, com
-# uma linha de correcao por arquivo; (3) o Verify-GxJs reportou zero invalidos na mesma raiz;
+# uma por chave negativa (numeros de linha distintos no mesmo arquivo), sem nenhuma outra linha de
+# erro, falha ou exception, salvo ruido GAM que o classificador nao conta; (2) o contorno do pos-build
+# foi aplicado a exatamente esses arquivos, com uma linha de correcao por arquivo cuja contagem de
+# chaves e igual a de linhas de erro do arquivo; (3) o Verify-GxJs reportou zero invalidos na mesma raiz;
 # (4) o BuildAll concluiu, na ordem abaixo; (5) o node --check aprova cada arquivo corrigido.
 # Qualquer outra situacao mantem exit 48. Quem dispensa e somente este wrapper, nunca o agente.
 $script:StaticCompressorClassifierErrorRegex = '(?i)error\s*:'
 $script:StaticCompressorBroadErrorRegex = '(?i)error|erro|failed|failure|falha|falhou|exception|unhandled|is denied|access denied|permission denied|cannot access|cannot (write|copy|read|open|load)|could not (copy|write|read|open|access|find|load)|unable to|negado|inacess[íi]vel|n[ãa]o foi poss[íi]vel|n.{1,3}o foi poss.{1,3}vel|n.{1,3}o [ê] poss.{1,3}vel|unexpected token|unterminated|\bmissing\b|\binvalid\b|\binv.{1,2}lido\b|\bfatal\b|\babort\b|\bat System\.|\bat Microsoft\.|\bat Artech\.|\bat GeneXus\.'
-$script:StaticCompressorSyntaxErrorRegex = '^\s*(?<file>[^\\/\s()]+\.js)\(\d+\): Syntax error : \}\s*(?<tail>\[[^\]\r\n]*\])?\s*$'
+$script:StaticCompressorSyntaxErrorRegex = '^\s*(?<file>[^\\/\s()]+\.js)\((?<line>\d+)\): Syntax error : \}\s*(?<tail>\[[^\]\r\n]*\])?\s*$'
 $script:StaticCompressorFileMessageRegex = '^\s*(?:.*[\\/])?(?<file>[^\\/\s()]+\.(?:js|css))(?:\(\d+\))?: '
 $script:StaticCompressorFixRootRegex = '^\s*Fix-GxNegativeDomainKeys: raiz = (?<raiz>.+?)\s*$'
 $script:StaticCompressorAppliedRegex = '^\s*\[APLICADO\] \.js varridos=(?<varridos>\d+) \| arquivos com chave negativa em gx\.domain=(?<arquivos>\d+) \| chaves corrigidas=(?<chaves>\d+)\s*$'
@@ -368,7 +369,7 @@ function Test-GeneXusStaticCompressorKnownCase {
     $stdout = @($StdOutLines | Where-Object { $null -ne $_ } | ForEach-Object { [string]$_ })
     $stderr = @($StdErrLines | Where-Object { $null -ne $_ } | ForEach-Object { [string]$_ })
 
-    # C1: so linhas de erro de sintaxe do compressor (uma por arquivo). Qualquer outra linha que o
+    # C1: so linhas de erro de sintaxe do compressor (uma por chave negativa). Qualquer outra linha que o
     # classificador conta, ou que traga erro, falha ou exception, recusa, inclusive sob ruido GAM.
     $syntaxHits = [System.Collections.Generic.List[object]]::new()
     $streams = @(@{ Name = 'stdout'; Lines = $stdout }, @{ Name = 'stderr'; Lines = $stderr })
@@ -383,7 +384,7 @@ function Test-GeneXusStaticCompressorKnownCase {
                 if ([regex]::IsMatch($syntax.Groups['tail'].Value, $script:StaticCompressorBroadErrorRegex)) {
                     return Get-GeneXusStaticCompressorCaseRefusal -Reason 'linha de sintaxe com trecho de falha fora do caso conhecido.'
                 }
-                [void]$syntaxHits.Add([pscustomobject]@{ Index = $i; Text = $line; FileName = $syntax.Groups['file'].Value })
+                [void]$syntaxHits.Add([pscustomobject]@{ Index = $i; Text = $line; FileName = $syntax.Groups['file'].Value; LineNumber = [int]$syntax.Groups['line'].Value })
                 continue
             }
             if ([regex]::IsMatch($line, $script:StaticCompressorClassifierErrorRegex)) {
@@ -400,20 +401,31 @@ function Test-GeneXusStaticCompressorKnownCase {
     if ($syntaxHits.Count -lt 1) {
         return Get-GeneXusStaticCompressorCaseRefusal -Reason 'nenhuma linha de erro de sintaxe do compressor.'
     }
+    # Duas grandezas: linhas de erro (uma por chave negativa) e arquivos distintos. A mesma linha
+    # (arquivo + numero) repetida recusa.
     $fileSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
     $errorFiles = [System.Collections.Generic.List[string]]::new()
+    $linesByFile = [System.Collections.Generic.Dictionary[string, int]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    $lineKeys = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
     foreach ($hit in $syntaxHits) {
-        if (-not $fileSet.Add($hit.FileName)) {
-            return Get-GeneXusStaticCompressorCaseRefusal -Reason ('mais de uma linha de erro para o arquivo {0}.' -f $hit.FileName)
+        if (-not $lineKeys.Add(('{0}|{1}' -f $hit.FileName, $hit.LineNumber))) {
+            return Get-GeneXusStaticCompressorCaseRefusal -Reason ('linha de erro repetida para o arquivo {0} (linha {1}).' -f $hit.FileName, $hit.LineNumber)
         }
-        [void]$errorFiles.Add($hit.FileName)
+        if ($fileSet.Add($hit.FileName)) {
+            [void]$errorFiles.Add($hit.FileName)
+            $linesByFile[$hit.FileName] = 1
+        }
+        else {
+            $linesByFile[$hit.FileName] = $linesByFile[$hit.FileName] + 1
+        }
     }
-    $expectedCount = $syntaxHits.Count
-    if ($ClassifierErrorCount -ge 0 -and $ClassifierErrorCount -ne $expectedCount) {
-        return Get-GeneXusStaticCompressorCaseRefusal -Reason ('o classificador contou {0} erro(s); a regra reconhece {1} linha(s) de sintaxe.' -f $ClassifierErrorCount, $expectedCount)
+    $expectedLineCount = $syntaxHits.Count
+    $expectedFileCount = $errorFiles.Count
+    if ($ClassifierErrorCount -ge 0 -and $ClassifierErrorCount -ne $expectedLineCount) {
+        return Get-GeneXusStaticCompressorCaseRefusal -Reason ('o classificador contou {0} erro(s); a regra reconhece {1} linha(s) de sintaxe.' -f $ClassifierErrorCount, $expectedLineCount)
     }
 
-    # C2: contorno aplicado uma vez, com chaves corrigidas e a mesma quantidade de arquivos dos erros.
+    # C2: contorno aplicado uma vez, com a mesma quantidade de arquivos dos erros e uma chave corrigida por linha de erro.
     $applied = @(Find-GeneXusStaticCompressorLines -Lines $stdout -Pattern $script:StaticCompressorAppliedRegex)
     $fixRoots = @(Find-GeneXusStaticCompressorLines -Lines $stdout -Pattern $script:StaticCompressorFixRootRegex)
     if ($applied.Count -ne 1) {
@@ -433,17 +445,21 @@ function Test-GeneXusStaticCompressorKnownCase {
         return Get-GeneXusStaticCompressorCaseRefusal -Reason 'contorno aplicado sem chave corrigida.'
     }
     $arquivosContorno = [int]$applied[0].Match.Groups['arquivos'].Value
-    if ($arquivosContorno -ne $expectedCount) {
-        return Get-GeneXusStaticCompressorCaseRefusal -Reason ('contorno afetou {0} arquivo(s); os erros citam {1}.' -f $arquivosContorno, $expectedCount)
+    if ($arquivosContorno -ne $expectedFileCount) {
+        return Get-GeneXusStaticCompressorCaseRefusal -Reason ('contorno afetou {0} arquivo(s); os erros citam {1}.' -f $arquivosContorno, $expectedFileCount)
+    }
+    if ($chaves -ne $expectedLineCount) {
+        return Get-GeneXusStaticCompressorCaseRefusal -Reason ('contorno corrigiu {0} chave(s); os erros somam {1} linha(s).' -f $chaves, $expectedLineCount)
     }
     $webDir = $fixRoots[0].Match.Groups['raiz'].Value
     $fixIndex = [int]$fixRoots[0].Index
     $appliedIndex = [int]$applied[0].Index
 
-    # C3: exatamente uma linha de correcao por arquivo com erro, no stdout (a posicao e verificada em C6), com soma igual ao total.
+    # C3: exatamente uma linha de correcao por arquivo com erro, no stdout (a posicao e verificada em C6),
+    # com chaves do arquivo iguais as linhas de erro do arquivo e soma igual ao total.
     $perFile = @(Find-GeneXusStaticCompressorLines -Lines $stdout -Pattern $script:StaticCompressorPerFileRegex)
-    if ($perFile.Count -ne $expectedCount) {
-        return Get-GeneXusStaticCompressorCaseRefusal -Reason ('linhas por arquivo do contorno: {0}; erros: {1}.' -f $perFile.Count, $expectedCount)
+    if ($perFile.Count -ne $expectedFileCount) {
+        return Get-GeneXusStaticCompressorCaseRefusal -Reason ('linhas por arquivo do contorno: {0}; arquivos com erro: {1}.' -f $perFile.Count, $expectedFileCount)
     }
     $correctedNames = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
     $sumChaves = 0
@@ -460,6 +476,9 @@ function Test-GeneXusStaticCompressorKnownCase {
         $k = [int]$entry.Match.Groups['chaves'].Value
         if ($k -lt 1) {
             return Get-GeneXusStaticCompressorCaseRefusal -Reason ('arquivo {0} sem chave corrigida.' -f $name)
+        }
+        if ($k -ne $linesByFile[$name]) {
+            return Get-GeneXusStaticCompressorCaseRefusal -Reason ('arquivo {0}: {1} chave(s) corrigida(s), {2} linha(s) de erro.' -f $name, $k, $linesByFile[$name])
         }
         $sumChaves += $k
         if ($entry.Index -lt $minPerFileIndex) { $minPerFileIndex = [int]$entry.Index }
@@ -562,6 +581,7 @@ function Test-GeneXusStaticCompressorKnownCase {
             sha256           = $fileHash
             lastWriteUtc     = $found[0].LastWriteTimeUtc.ToString('o')
             chavesCorrigidas = [int]$perEntry.Match.Groups['chaves'].Value
+            syntaxLineCount  = [int]$linesByFile[$name]
             syntaxLine       = $hitEntry.Text
             perFileLine      = $perEntry.Match.Value
         })
