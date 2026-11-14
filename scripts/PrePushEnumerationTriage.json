@@ -793,7 +793,7 @@
     {
       "code": "BACKEND_ENUMERATION_SUBSET",
       "file": "opencode-reviewer-ro-least-privilege-design.md",
-      "unitHash": "007c162cd39c4c0e91ebd3fe13a290c72c6b13eb4749d55bfa8b7731af03db4c",
+      "unitHash": "2c33aa6f079aef56dd685819adfaded3c4489da15df4b727bc3377dd96b4da5e",
       "listedMembers": [
         "copilot",
         "gemini",
@@ -804,12 +804,12 @@
       "triagedAt": "2026-11-14",
       "triagedBy": "Claude Code, com autorização do usuário",
       "kind": "closed",
-      "excerpt": "**Decisão:** fixar **no processo filho** do `opencode run` o diretório real e o `PWD` no mesmo valor\n— a mesma string entregue ao pré-check (`(Get-Location).ProviderPath`). Nunca alterar o ambiente do\npai (o dispatcher roda adapters em runspaces paralelos que compartilham o ambiente do processo). O\n`debug agents` não muda (E9); essa premissa é revalidada a cada promoção de versão (passo E9 no\n`xpz-llm-delegate/SKILL.md`, «Provas e promoção»). O runner assíncrono cita seus argumentos de\ncaminho (E10). Não medido: Copilot/Gemini; `PWD` em forma 8.3 sobre `external_directory`; outras\nvariáveis de diretório."
+      "excerpt": "**Decisão:** fixar **no processo filho** do `opencode run` o diretório real e o `PWD` no mesmo valor\n— a mesma string entregue ao pré-check (`(Get-Location).ProviderPath`). Nunca alterar o ambiente do\npai (o dispatcher roda adapters em runspaces paralelos que compartilham o ambiente do processo). O\n`debug agents` não muda (E9); essa premissa é revalidada a cada promoção de versão (passo E9 no\n`xpz-llm-delegate/SKILL.md`, «Provas e promoção»). O runner assíncrono cita seus argumentos de\ncaminho (E10). Não medido: Copilot/Gemini; outras variáveis de diretório. `PWD` em forma 8.3 sobre\n`external_directory`: cobertura só indireta (a matriz de aceite rodou do Git Bash num diretório\ntemporário 8.3 e passou os casos de `external-deny`, sem caso dedicado)."
     },
     {
       "code": "BACKEND_ENUMERATION_SUBSET",
       "file": "xpz-llm-delegate/SKILL.md",
-      "unitHash": "7eeaa571fbdada503649e79712abdec00c311d5532b967e14a9c1c715ccba325",
+      "unitHash": "61f90ebb6fc386498f629d5002a8091d587cad75054c9e7964e4bb7086751f4d",
       "listedMembers": [
         "copilot",
         "gemini",
@@ -820,7 +820,7 @@
       "triagedAt": "2026-11-14",
       "triagedBy": "Claude Code, com autorização do usuário",
       "kind": "closed",
-      "excerpt": "**Não medido:** Copilot CLI e Gemini CLI (lançam com `-WorkingDirectory`, mas o CLI pode preferir\n`PWD`); `PWD` em forma 8.3 sobre `external_directory`. Evidência e decisão:\n[`opencode-reviewer-ro-least-privilege-design.md`](../opencode-reviewer-ro-least-privilege-design.md),\nnota de 2026-11-14 no D4."
+      "excerpt": "**Não medido:** Copilot CLI e Gemini CLI (lançam com `-WorkingDirectory`, mas o CLI pode preferir\n`PWD`). O `PWD` em forma 8.3 sobre `external_directory` tem cobertura só indireta: a matriz de\naceite rodou do Git Bash num diretório temporário 8.3 e passou os casos de `external-deny`, sem\ncaso dedicado. Evidência e decisão:\n[`opencode-reviewer-ro-least-privilege-design.md`](../opencode-reviewer-ro-least-privilege-design.md),\nnota de 2026-11-14 no D4."
     }
   ]
 }
