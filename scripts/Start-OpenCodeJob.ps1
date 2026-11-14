@@ -188,6 +188,7 @@ Set-Content -LiteralPath $runnerPath -Value $runner -Encoding utf8
 
 # Start-Process -ArgumentList junta os elementos com espaco SEM aspas: cada caminho vai entre aspas
 # duplas (barras finais duplicadas para nao escapar a aspa de fechamento, ex.: C:\ -> "C:\\").
+# Usado no lancamento do runner e do watcher.
 function ConvertTo-OpenCodeRunnerQuotedArg {
     param([Parameter(Mandatory)] [string] $Value)
     return '"' + ($Value -replace '(\\+)$', '$1$1') + '"'
@@ -224,9 +225,10 @@ $watcher = Join-Path $PSScriptRoot 'Watch-OpenCodeJob.ps1'
 if (-not $NoWatcher) {
     if (Test-Path -LiteralPath $watcher -PathType Leaf) {
         $watchArgs = [System.Collections.Generic.List[string]]::new()
+        # Caminhos citados pelo mesmo motivo do runner (-ArgumentList nao cita elementos com espaco).
         [void]$watchArgs.AddRange([string[]]@(
-            '-NoExit', '-NoProfile', '-File', $watcher,
-            '-JobId', $jobId, '-ProcessId', "$procId", '-TempDir', $TempDir,
+            '-NoExit', '-NoProfile', '-File', (ConvertTo-OpenCodeRunnerQuotedArg $watcher),
+            '-JobId', $jobId, '-ProcessId', "$procId", '-TempDir', (ConvertTo-OpenCodeRunnerQuotedArg $TempDir),
             '-WatchTimeoutSec', "$WatchTimeoutSec"
         ))
         if (-not [string]::IsNullOrWhiteSpace($expectedStartUtc)) {
