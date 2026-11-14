@@ -1330,9 +1330,11 @@ function New-McpCredentialProbe {
     if ($null -eq $response) {
         return [pscustomobject]@{ endpointReachable = $false; credentialVerified = $false; status = $null; reason = 'request_failed' }
     }
-    $endpointReachable = $true
+    $statusCode = [int]$response.StatusCode
+    # 3xx: o endereco configurado nao e o endpoint real; por isso nao conta como alcancavel.
+    $endpointReachable = -not ($statusCode -ge 300 -and $statusCode -lt 400)
     $credentialVerified = $false
-    if ([int]$response.StatusCode -eq 200) {
+    if ($statusCode -eq 200) {
         try {
             $parsed = $response.Content | ConvertFrom-Json -AsHashtable
             $answers = $parsed['answers']

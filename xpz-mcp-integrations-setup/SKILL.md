@@ -260,7 +260,7 @@ Estados por cliente, **um valor so**, na ordem:
   chamada autenticada por execucao). Criterio: `200` e `answers` com a chave do
   probe e `noul` numerico em `[0,1]`; `choice` nao e usado. Redirecionamento
   nao e seguido (`redirect_nao_seguido`): a chave so vai para a URL configurada
-  e um `3xx` nao verifica credencial.
+  e um `3xx` nao verifica credencial nem conta como endpoint alcancavel.
 - **`endpoint_alcancavel`:** diagnostico separado; nao implica credencial.
 - **`e2e_opt_in_confirmado`:** so depois de E2E manual aprovado com
   `jev_classify`; registre com

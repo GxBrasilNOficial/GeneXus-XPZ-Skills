@@ -582,7 +582,7 @@ args = [`"legacy.js`"]
         $redirListener.Stop()
     }
     Assert-True (-not [bool]$probeRedir.credentialVerified) '(probe-redirect) redirecionamento nao verifica credencial'
-    Assert-True ([bool]$probeRedir.endpointReachable -and [string]$probeRedir.reason -eq 'redirect_nao_seguido') "(probe-redirect) endpoint alcancado e redirecionamento reportado; obtido reason=$($probeRedir.reason) reachable=$($probeRedir.endpointReachable)"
+    Assert-True ((-not [bool]$probeRedir.endpointReachable) -and [string]$probeRedir.reason -eq 'redirect_nao_seguido') "(probe-redirect) 3xx nao conta como endpoint alcancavel; obtido reason=$($probeRedir.reason) reachable=$($probeRedir.endpointReachable)"
     Assert-True ($redirSeen.ContainsKey('/start')) '(probe-redirect) endpoint configurado recebeu a requisicao'
     Assert-True (-not $redirSeen.ContainsKey('/final')) '(probe-redirect) destino do redirecionamento nao recebe requisicao'
 
