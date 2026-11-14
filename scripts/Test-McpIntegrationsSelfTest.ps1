@@ -622,6 +622,22 @@ args = [`"legacy.js`"]
     Assert-True ([System.IO.File]::ReadAllText($fmtPath) -ceq $fmtBefore) '(reformat) manifesto nao foi regravado'
     Assert-True ($fmtBackupsAfter -eq $fmtBackupsBefore) "(reformat) nenhum backup novo; antes=$fmtBackupsBefore depois=$fmtBackupsAfter"
 
+    # 9f. Install: manifesto so reformatado (mesmo conteudo) nao e regravado no reparo; changed false.
+    Assert-True ((Invoke-McpInstallForRemoval) -eq 0) '(reformat-install) install exit 0'
+    $fmtInstPath = Get-McpManifestPath
+    $fmtInstObj = Get-Content -Raw -LiteralPath $fmtInstPath | ConvertFrom-Json
+    [System.IO.File]::WriteAllText($fmtInstPath, (($fmtInstObj | ConvertTo-Json -Depth 30 -Compress) + "`n"), [System.Text.UTF8Encoding]::new($false))
+    $fmtInstBefore = [System.IO.File]::ReadAllText($fmtInstPath)
+    $fmtInstBackupsBefore = @(Get-ChildItem -LiteralPath (Split-Path -Parent $fmtInstPath) -Filter 'install-manifest.json.xpz-mcp.bak-*' -ErrorAction SilentlyContinue).Count
+    $fmtInstOutput = @(& (Join-Path $scriptDir 'Install-McpIntegration.ps1') -Action repair -Client all 2>&1)
+    $fmtInstExit = $LASTEXITCODE
+    $fmtInstJson = (($fmtInstOutput | ForEach-Object { [string]$_ }) -join "`n") | ConvertFrom-Json -AsHashtable
+    $fmtInstBackupsAfter = @(Get-ChildItem -LiteralPath (Split-Path -Parent $fmtInstPath) -Filter 'install-manifest.json.xpz-mcp.bak-*' -ErrorAction SilentlyContinue).Count
+    Assert-True ($fmtInstExit -eq 0) "(reformat-install) repair exit 0; obtido $fmtInstExit"
+    Assert-True (-not [bool]$fmtInstJson.changed) '(reformat-install) repair changed false: so a formatacao mudou'
+    Assert-True ([System.IO.File]::ReadAllText($fmtInstPath) -ceq $fmtInstBefore) '(reformat-install) manifesto nao foi regravado'
+    Assert-True ($fmtInstBackupsAfter -eq $fmtInstBackupsBefore) "(reformat-install) nenhum backup novo; antes=$fmtInstBackupsBefore depois=$fmtInstBackupsAfter"
+
     # 10. Gate do dist real, quando informado.
     if (-not [string]::IsNullOrWhiteSpace($DistManagedRoot)) {
         $distOutput = & (Get-Command pwsh).Source -NoProfile -File (Join-Path $scriptDir 'Test-McpDistEvidenceSelfTest.ps1') -ManagedRoot $DistManagedRoot 2>&1
