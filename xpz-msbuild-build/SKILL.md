@@ -425,6 +425,29 @@ wrapper deve detectar a falha de `SetActiveVersion`/`SetActiveEnvironment`, emit
 > `FailIfReorg` nem equivalente — ao contrário de `BuildAll`. A classificação
 > `reorg detectada ou executada` sinaliza este cenário como bloqueante.
 
+> **BuildAll × SpecifyGenerate e eventos pós-build:**
+> - **BuildAll** — uma task «Build All»: specify → generate → compile e, no fecho
+>   dessa task, os **eventos pós-build** do environment. A última geração e o
+>   pós-build ficam na **mesma** passagem.
+> - **SpecifyGenerate** — `SpecifyAll` e depois `GenerateOnly` **em separado**.
+>   O pós-build, quando corre, costuma amarrar-se ao fecho do `SpecifyAll`. O
+>   `GenerateOnly` final **gera de novo** e **em regra não dispara** outro ciclo
+>   de pós-build.
+>
+> Consequência: depois de SpecifyGenerate, o estado em `web` pode refletir uma
+> geração **mais nova** do que o último pós-build. O agente **não** deve tratar
+> `SpecifyDone`/`GenerateDone` como equivalente a «Build All fechado com
+> pós-build».
+>
+> O **conteúdo** do pós-build é da KB/environment (deploy, higiene de artefatos
+> gerados, contornos de bugs do gerador numa versão concreta do GeneXus, etc.).
+> A skill só fixa o **descompasso de fases**; o que cada pós-build faz e o que
+> verificar depois fica na pasta paralela / metadata da KB.
+>
+> Até o wrapper garantir pós-build após o `GenerateOnly`, após SpecifyGenerate o
+> agente deve: (1) saber se a KB depende de pós-build; (2) conferir ou reexecutar
+> o fechamento pós-build do environment antes de handoff de UI/deploy.
+
 > **Padrão conhecido — ruído estrutural do `dotnet publish` em `GAM\Platforms\NetCore*` (stdout):**
 > Mesmo padrão e mesma lógica de filtro documentados em detalhe na seção
 > `Invoke-GeneXusKbBuildAll.ps1` (assinaturas: `MSB3491` ou `NuGet.targets(...): error :`,
@@ -1149,6 +1172,7 @@ $scriptPath = "C:\Dev\Knowledge\GeneXus-XPZ-Skills\scripts\Start-GeneXusKbBuildD
 - NEVER gravar qualquer artefato em `C:\Program Files (x86)`
 - NEVER executar `icacls` nem qualquer concessão NTFS na instalação do GeneXus — apenas oferecer comandos em `environmentRemediationHints` para o usuário executar uma vez, por conta própria, se quiser silenciar o ruído GAM filtrado
 - NEVER recomendar elevar o build MSBuild a cada execução como substituto do filtro de ruído GAM; a única elevação mencionada é terminal administrativo **one-time** para o usuário rodar `icacls` sugerido
+- NEVER tratar `SpecifyDone`/`GenerateDone` como equivalente a Build All com pós-build fechado: o `GenerateOnly` final do SpecifyGenerate em regra **não** dispara novo ciclo de pós-build; se a KB depende de pós-build, conferir ou reexecutar o fechamento do environment antes de handoff de UI/deploy (detalhe do conteúdo do pós-build é local à KB)
 - NEVER executar `BuildAll` ou `SpecifyGenerate` **sem monitoramento legível** — janela visível (`-StartWatcher`) **ou** modo desacoplado (`Start-GeneXusKbBuildDetached.ps1`, com `msbuild.stdout.log` + arquivo-sentinela). A janela visível é o fluxo padrão; o modo desacoplado é **opt-in consciente do usuário sob conselho do agente** (build longo ou em segundo plano), nunca acionado em silêncio. Ausência **total** de monitoramento (nem janela, nem sentinela) só com justificativa operacional explícita e documentada, declarada ao usuário com base em `watcherContext.watcherLaunched: false` no JSON
 - NEVER chamar MSBuild para `BuildAll` ou `SpecifyGenerate` quando o preflight `msBuildConcurrency` confirmar `MSBuild.exe` em execução para a mesma KB; abortar com exit 46 e reportar o processo conflitante
 - NEVER executar reorg sem autorização explícita do usuário
