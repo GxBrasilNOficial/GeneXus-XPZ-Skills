@@ -119,7 +119,8 @@ foreach ($clientName in $selectedClients) {
         if ($result.status -in @('written', 'unchanged', 'planned')) {
             # Projeta manifesto em memoria tambem no -WhatIf (paridade do plano).
             $manifest.Value = Remove-McpManifestClient -Manifest $manifest.Value -Client 'opencode'
-            $changed = $true
+            # changed so vale para escrita real do cliente (regra B: 'unchanged' e 'planned' nao marcam).
+            if ($result.status -eq 'written') { $changed = $true }
         } elseif ($result.status -in @('manual', 'entrada_em_conflito', 'conflict', 'entrada_quebrada', 'edicao_manual_necessaria')) {
             $code = if ($result.status -eq 'manual') {
                 'edicao_manual_necessaria'
@@ -149,7 +150,8 @@ foreach ($clientName in $selectedClients) {
         }
         if ($result.status -in @('written', 'unchanged', 'planned')) {
             $manifest.Value = Remove-McpManifestClient -Manifest $manifest.Value -Client 'codex'
-            $changed = $true
+            # changed so vale para escrita real do cliente (regra B: 'unchanged' e 'planned' nao marcam).
+            if ($result.status -eq 'written') { $changed = $true }
         } elseif ($result.status -in @('manual', 'entrada_em_conflito', 'conflict', 'entrada_quebrada', 'edicao_manual_necessaria', 'python_indisponivel')) {
             $code = if ($result.status -eq 'python_indisponivel') {
                 'python_indisponivel'
@@ -233,7 +235,6 @@ if ($RemoveSkillData -and $blocking.Count -eq 0 -and $manifestRefsRemaining.Coun
             }
             if (Test-Path -LiteralPath (Get-McpConfigPath)) { $dataRemoved = $true }
             if (Test-Path -LiteralPath (Get-McpManifestPath)) { $dataRemoved = $true }
-            $changed = $true
         } else {
             foreach ($record in $launcherRecords) {
                 $recordVersion = [string]$record.version
@@ -270,7 +271,8 @@ if ($RemoveSkillData -and $blocking.Count -eq 0 -and $manifestRefsRemaining.Coun
                 Remove-Item -LiteralPath $manifestPath -Force
                 $dataRemoved = $true
             }
-            $changed = $true
+            # changed so vale se algum dado foi de fato removido (regra B).
+            if ($launcherRemoved -or $vendorRemoved -or $dataRemoved) { $changed = $true }
         }
     }
 }
@@ -281,13 +283,14 @@ if ($RemoveVault) {
     $vaultResult = Remove-McpVault -WhatIf:$WhatIfPreference
     if ($vaultResult.Status -in @('removed', 'planned')) {
         $vaultRemoved = $true
-        $changed = $true
     }
+    # changed so vale para remocao real (regra B): -WhatIf ('planned') nao marca.
+    if ($vaultResult.Status -eq 'removed') { $changed = $true }
 }
 
 # Persistir manifesto mesmo com clients vazio (uninstall -Client all sem -RemoveSkillData).
 # Se -RemoveSkillData ja apagou o arquivo, nao regrava.
-if (-not $WhatIfPreference -and -not $manifest.Corrupt -and $blocking.Count -eq 0 -and $changed) {
+if (-not $WhatIfPreference -and -not $manifest.Corrupt -and $blocking.Count -eq 0) {
     if (Test-McpRegularFile -Path (Get-McpManifestPath)) {
         $manifestWrite = Set-McpManifest -Value $manifest.Value
         if ($manifestWrite.Status -eq 'written') { $changed = $true }

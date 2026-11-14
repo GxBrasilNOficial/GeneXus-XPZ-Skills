@@ -352,7 +352,7 @@ try {
     $rvWhatIfExit = $LASTEXITCODE
     $rvWhatIf = (($rvWhatIfOut | ForEach-Object { [string]$_ }) -join "`n") | ConvertFrom-Json -AsHashtable
     Assert-True ($rvWhatIfExit -eq 0) "(remove-vault-whatif) exit 0; obtido $rvWhatIfExit"
-    Assert-True ([bool]$rvWhatIf.vaultRemoved -and [bool]$rvWhatIf.changed -and [bool]$rvWhatIf.planned) '(remove-vault-whatif) planejado: vaultRemoved e changed true'
+    Assert-True ([bool]$rvWhatIf.vaultRemoved -and -not [bool]$rvWhatIf.changed -and [bool]$rvWhatIf.planned) '(remove-vault-whatif) planejado: vaultRemoved true, changed false (regra B)'
     Assert-True (Test-McpVaultExists) '(remove-vault-whatif) -WhatIf nao apaga o cofre'
 
     $rvRealOut = @(& (Join-Path $scriptDir 'Uninstall-McpIntegration.ps1') -Client all -RemoveVault 2>&1)
@@ -366,9 +366,7 @@ try {
     $rvAbsentExit = $LASTEXITCODE
     $rvAbsent = (($rvAbsentOut | ForEach-Object { [string]$_ }) -join "`n") | ConvertFrom-Json -AsHashtable
     Assert-True ($rvAbsentExit -eq 0) "(remove-vault-absent) exit 0; obtido $rvAbsentExit"
-    # Escopo: aqui so o campo do cofre. 'changed' nao e afirmado porque clientes com status
-    # 'unchanged' ainda o marcam (decisao pendente sobre o contrato de changed no Uninstall).
-    Assert-True (-not [bool]$rvAbsent.vaultRemoved) '(remove-vault-absent) cofre ausente: vaultRemoved false'
+    Assert-True (-not [bool]$rvAbsent.vaultRemoved -and -not [bool]$rvAbsent.changed) '(remove-vault-absent) cofre ausente: vaultRemoved e changed false'
     $null = Write-McpVault -SecureSecret (ConvertTo-SecureString 'test-secret-selftest' -AsPlainText -Force)
 
     # 7. Auditoria de entrada manual migravel: edicao_manual_necessaria e
@@ -472,6 +470,85 @@ args = [`"legacy.js`"]
     Assert-True ($guardExit -ne 0) "(dist guard) root com manifesto recusado; obtido exit $guardExit"
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $guardRoot 'vault\credential.blob'))) '(dist guard) nenhum cofre criado'
     Assert-True (($guardOutput -join "`n").Contains('NOT_DISPOSABLE')) '(dist guard) motivo explicito'
+
+    # 9b. Matriz de remocao (linha de base). Afirma flags, arquivos e entradas.
+    # changed segue a regra B: so mudanca real em disco ou no manifesto.
+    function Invoke-McpRemovalCase {
+        param([hashtable]$Params)
+        $out = @(& (Join-Path $scriptDir 'Uninstall-McpIntegration.ps1') @Params 2>&1)
+        $code = $LASTEXITCODE
+        $json = (($out | ForEach-Object { [string]$_ }) -join "`n") | ConvertFrom-Json -AsHashtable
+        return [pscustomobject]@{ Exit = $code; Json = $json }
+    }
+    function Invoke-McpInstallForRemoval {
+        $null = Set-McpConfig -BaseUrl 'https://api.commandcode.ai/provider/v1/systemone' -Model 'typesafe/jev' -EndpointConfirmed $true
+        $null = @(& (Join-Path $scriptDir 'Install-McpIntegration.ps1') -Action install -Client all 2>&1)
+        return $LASTEXITCODE
+    }
+    $ocFile = Join-Path $oc 'opencode.jsonc'
+    $cxFile = Join-Path $cx 'config.toml'
+
+    # Reset das configs de cliente ao conteudo minimo inicial (secoes anteriores deixam
+    # entradas manuais que nao pertencem a esta matriz).
+    [System.IO.File]::WriteAllText($ocFile, "{`n  `"mcp`": {}`n}`n", [System.Text.UTF8Encoding]::new($false))
+    [System.IO.File]::WriteAllText($cxFile, "model = `"gpt-5`"`n", [System.Text.UTF8Encoding]::new($false))
+
+    # Estado de partida: limpa entradas e dados (cofre permanece), depois instala.
+    $null = @(& (Join-Path $scriptDir 'Uninstall-McpIntegration.ps1') -Client all 2>&1)
+    $null = @(& (Join-Path $scriptDir 'Uninstall-McpIntegration.ps1') -Client all -RemoveSkillData 2>&1)
+    if (-not (Test-McpVaultExists)) {
+        $null = Write-McpVault -SecureSecret (ConvertTo-SecureString 'test-secret-selftest' -AsPlainText -Force)
+    }
+    Assert-True ((Invoke-McpInstallForRemoval) -eq 0) '(rm-matrix) install inicial exit 0'
+
+    # R1: remover entradas (sem -RemoveSkillData). Clientes escritos.
+    $r1 = Invoke-McpRemovalCase -Params @{ Client = 'all' }
+    Assert-True ($r1.Exit -eq 0) "(rm-entries) exit 0; obtido $($r1.Exit)"
+    Assert-True ([string]$r1.Json.clients.opencode.status -eq 'written') "(rm-entries) opencode written; obtido $($r1.Json.clients.opencode.status)"
+    Assert-True ([string]$r1.Json.clients.codex.status -eq 'written') "(rm-entries) codex written; obtido $($r1.Json.clients.codex.status)"
+    Assert-True ([System.IO.File]::ReadAllText($ocFile) -notmatch '"jev"') '(rm-entries) entrada opencode removida'
+    Assert-True ([System.IO.File]::ReadAllText($cxFile) -notmatch '\[mcp_servers\.jev\]') '(rm-entries) entrada codex removida'
+    Assert-True (Test-Path -LiteralPath (Get-McpConfigPath)) '(rm-entries) config.json preservado'
+    Assert-True (Test-McpVaultExists) '(rm-entries) cofre preservado'
+    Assert-True (-not [bool]$r1.Json.vaultRemoved -and -not [bool]$r1.Json.dataRemoved -and -not [bool]$r1.Json.launcherRemoved -and -not [bool]$r1.Json.vendorRemoved) '(rm-entries) nenhum flag de dados/cofre sem switches'
+    Assert-True ([bool]$r1.Json.changed) '(rm-entries) changed true com clientes escritos'
+
+    # R2: remover dados (-RemoveSkillData). Havia dados instalados.
+    $r2 = Invoke-McpRemovalCase -Params @{ Client = 'all'; RemoveSkillData = $true }
+    Assert-True ($r2.Exit -eq 0) "(rm-data) exit 0; obtido $($r2.Exit)"
+    Assert-True ([bool]$r2.Json.dataRemoved -and [bool]$r2.Json.launcherRemoved -and [bool]$r2.Json.vendorRemoved) '(rm-data) flags de dados, launcher e vendor true'
+    Assert-True (-not (Test-Path -LiteralPath (Get-McpConfigPath)) -and -not (Test-Path -LiteralPath (Get-McpManifestPath)) -and -not (Test-Path -LiteralPath $launcherPath) -and -not (Test-Path -LiteralPath $vendorDir)) '(rm-data) config, manifesto, launcher e vendor removidos'
+    Assert-True (Test-McpVaultExists) '(rm-data) cofre preservado'
+    Assert-True ([bool]$r2.Json.changed) '(rm-data) changed true com dados removidos'
+
+    # R3: remover dados com nada instalado. Nenhum flag de remocao.
+    $r3 = Invoke-McpRemovalCase -Params @{ Client = 'all'; RemoveSkillData = $true }
+    Assert-True ($r3.Exit -eq 0) "(rm-data-empty) exit 0; obtido $($r3.Exit)"
+    Assert-True (-not [bool]$r3.Json.dataRemoved -and -not [bool]$r3.Json.launcherRemoved -and -not [bool]$r3.Json.vendorRemoved) '(rm-data-empty) nenhum flag de remocao com nada instalado'
+    Assert-True (Test-McpVaultExists) '(rm-data-empty) cofre preservado'
+    Assert-True (-not [bool]$r3.Json.changed) '(rm-data-empty) changed false sem nada removido'
+
+    # R4: -WhatIf de remocao de dados com tudo instalado. Plano sem tocar disco.
+    Assert-True ((Invoke-McpInstallForRemoval) -eq 0) '(rm-whatif) reinstall exit 0'
+    $ocBeforeWhatIf = [System.IO.File]::ReadAllText($ocFile)
+    $r4 = Invoke-McpRemovalCase -Params @{ Client = 'all'; RemoveSkillData = $true; WhatIf = $true }
+    Assert-True ($r4.Exit -eq 0) "(rm-whatif) exit 0; obtido $($r4.Exit)"
+    Assert-True ([bool]$r4.Json.planned) '(rm-whatif) planned true'
+    Assert-True ([bool]$r4.Json.dataRemoved -and [bool]$r4.Json.launcherRemoved -and [bool]$r4.Json.vendorRemoved) '(rm-whatif) plano projeta dados, launcher e vendor'
+    Assert-True ((Test-Path -LiteralPath (Get-McpConfigPath)) -and (Test-Path -LiteralPath (Get-McpManifestPath)) -and (Test-Path -LiteralPath $launcherPath) -and (Test-Path -LiteralPath $vendorDir)) '(rm-whatif) nada removido em disco'
+    Assert-True ([System.IO.File]::ReadAllText($ocFile) -ceq $ocBeforeWhatIf) '(rm-whatif) config do opencode intacta'
+    Assert-True (-not [bool]$r4.Json.changed) '(rm-whatif) changed false em -WhatIf (plano em flags)'
+
+    # R5: cliente sem o Jev. Primeira remocao escreve; segunda ve 'unchanged' e nao altera arquivo.
+    $r5a = Invoke-McpRemovalCase -Params @{ Client = 'opencode' }
+    Assert-True ($r5a.Exit -eq 0) "(rm-unchanged) primeira remocao exit 0; obtido $($r5a.Exit)"
+    Assert-True ([string]$r5a.Json.clients.opencode.status -eq 'written') "(rm-unchanged) primeira remocao written; obtido $($r5a.Json.clients.opencode.status)"
+    $ocBeforeSecond = [System.IO.File]::ReadAllText($ocFile)
+    $r5b = Invoke-McpRemovalCase -Params @{ Client = 'opencode' }
+    Assert-True ($r5b.Exit -eq 0) "(rm-unchanged) segunda remocao exit 0; obtido $($r5b.Exit)"
+    Assert-True ([string]$r5b.Json.clients.opencode.status -eq 'unchanged') "(rm-unchanged) segunda remocao unchanged; obtido $($r5b.Json.clients.opencode.status)"
+    Assert-True ([System.IO.File]::ReadAllText($ocFile) -ceq $ocBeforeSecond) '(rm-unchanged) arquivo do opencode identico'
+    Assert-True (-not [bool]$r5b.Json.changed) '(rm-unchanged) changed false na segunda remocao'
 
     # 10. Gate do dist real, quando informado.
     if (-not [string]::IsNullOrWhiteSpace($DistManagedRoot)) {
