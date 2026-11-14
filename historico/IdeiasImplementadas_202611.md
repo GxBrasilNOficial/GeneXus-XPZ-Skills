@@ -82,5 +82,5 @@ Implementado em 2026-11-14 conforme o plano v4 congelado por decisão do mantene
 
 ### Rastreabilidade
 
-- Commit material: pendente de registro (preenchido após o commit desta frente).
-- Matriz do aceite (32 + 2) rodada do Git Bash: pendente de execução autorizada.
+- Commit material: `6b62c03` — Fixa diretório real e PWD no filho do opencode run (reviewer-ro).
+- Aceite (2026-11-14, opencode 2.2.7, conteúdo sintético): matriz completa **rodada do Git Bash** (invocador com `PWD` exportado), sem `-EvidenceDirectory` e sem `-Only`, modelo `opencode-go/deepseek-v4.1-flash` — 32/32 comportamentais e 2/2 estruturais (`OPENCODE_REVIEWER_RO_MATRIX_OK`); antes da correção, o mesmo arranjo falhava (E1). Prova de ponta a ponta pelo contorno da SKILL (`pwsh -Command "Set-Location '<A>'; & Invoke-OpenCode.ps1 ..."` chamado do Git Bash com `PWD` apontando para B, em caminho 8.3): resposta com `MARCADOR_README_A` e `MARCADOR_AGENTE_A`, nada de B. Passo E9 sem modelo: `debug agents` em A com e sem `PWD=B` deu saídas idênticas (`bash deny`), controle em B `allow`. Self-tests e parse limpos; os casos novos do self-test falham contra o código anterior.
