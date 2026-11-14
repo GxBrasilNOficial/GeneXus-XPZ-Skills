@@ -67,6 +67,17 @@ Implementado em 2026-11-09 conforme o design v24.2 congelado por decisão humana
 - Commit material: `a321ded` — Credencial antes de gravar, piso 60 em GAPS, manifesto clients vazio.
 - Commit material: `58eb33c` — Corrige portugues residual na entrada espanhola do CHANGELOG MCP.
 - Commit material: `15c1591` — Alinha A.9/exit 60/uninstall e sanitiza literal de allowlist no 999.
+- Commit material: `dc17375` — Sonda TOML do Codex lê o config pela entrada padrão, sem arquivo temporário.
+- Commit material: `87fb50a` — `vaultRemoved` reflete o cofre de fato em `-RemoveVault`.
+- Commit material: `c34bdf8` — `changed` do Uninstall só com mudança real em disco ou no manifesto.
+- Commit material: `7edc4d0` — Sonda de credencial não segue redirecionamento (`-MaximumRedirection 0`).
+- Commit material: `c7768d0` — `3xx` na sonda de credencial conta como endpoint não alcançável.
+- Commit material: `676bf20` — Remove registro órfão do manifesto quando a configuração do cliente não existe.
+- Commit material: `84cb040` — `Set-McpManifest` não regrava manifesto com o mesmo conteúdo lógico.
+- Commit material: `8e85cb3` — Auditor avisa sobre registro órfão (`registro_orfao`) com a ação de Uninstall.
+- Commit material: `bdf0a5a` — `Set-McpManifest` compara conteúdo com chaves ordenadas.
+- Commit material (teste): `f958d0a` — Reparo do Install com manifesto só reformatado.
+- Commit material (teste): `e3172f2` — Install com configuração ausente e registro presente.
 
 **Correção pós-painel reforçada (2026-11-13).** Além do warn ACL e do CreateExclusive: install barra `credencial_ausente` antes de qualquer escrita; `Resolve-McpGapsExitCode` impede exit 0 com `INTEGRATIONS_GAPS`; install/uninstall exigem clientes pedidos tratados para `INTEGRATIONS_OK`; uninstall persiste `clients` vazio; integrity/fixture de boot alinhados. Decisão humana: com `-Client all`, gravação parcial entre clientes é aceitável; conflito/`edicao_manual_necessaria` não toca o cliente afetado e não faz rollback dos demais; o agente deve apresentar o cliente e o erro do achado. Paridade documental: `credencial_ausente` blocking no `SKILL` offline; assimetria `acl_nao_aplicavel` ecoada em `02` e `08`. Gate de cofre ausente no install cobre também `repair` (além de `install`/`update`); self-test `no-cred-repair`. Exit 68 reservado/`engines: []` (warn `python_indisponivel` não vira exit de processo); `999` de allowlist reduzido a resumo público; `AGENTS.md` lista `xpz-codex-apply-patch-alternative`. `Set-McpManifest` reaplica ACL so-dono também em `unchanged` (repair / record-e2e). Lock transacional: só remove `.xpz-mcp.lock` se esta execução o adquiriu (`lockAcquired`).
 
