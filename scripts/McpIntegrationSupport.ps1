@@ -48,6 +48,18 @@ function Test-McpPathUnder {
     )
 }
 
+function Test-McpConfigPathNonRegular {
+    <#
+    .SYNOPSIS
+        Verdadeiro quando o caminho existe mas nao e arquivo regular (diretorio, link simbolico,
+        reparse point). Essa configuracao nao pode ser lida nem reconhecida com seguranca: e conflito,
+        nunca ausencia. Um caminho inexistente devolve falso.
+    #>
+    param([Parameter(Mandatory = $true)][string]$Path)
+    if (Test-McpRegularFile -Path $Path) { return $false }
+    return (Test-Path -LiteralPath $Path)
+}
+
 function Test-McpRegularFile {
     param([Parameter(Mandatory = $true)][string]$Path)
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {

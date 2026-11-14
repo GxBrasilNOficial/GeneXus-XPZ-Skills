@@ -143,6 +143,13 @@ foreach ($clientName in $selectedClients) {
 
     if ($clientName -eq 'codex') {
         $codexPath = Get-McpCodexConfigPath
+        if (Test-McpConfigPathNonRegular -Path $codexPath) {
+            # Nao e arquivo regular: nao da para ler nem remover entrada. Conflito bloqueante;
+            # o registro do manifesto e os dados ficam, porque o cliente ainda pode usa-los.
+            $clientsResult['codex'] = [ordered]@{ status = 'conflict'; state = 'nao_configurado'; path = $codexPath; reason = 'config.toml nao e arquivo regular (link, reparse ou diretorio)' }
+            $findings.Add((New-McpFinding -Code 'entrada_em_conflito' -Class 'blocking' -Message 'Codex: config.toml existe mas nao e arquivo regular (link, reparse ou diretorio); nao decide sozinho' -Client 'codex')) | Out-Null
+            continue
+        }
         if (-not (Test-McpRegularFile -Path $codexPath)) {
             $clientsResult['codex'] = [ordered]@{ status = 'unchanged'; state = 'nao_configurado'; reason = 'config ausente' }
             # Mesmo tratamento do opencode: registro sem configuracao e orfao.
@@ -212,6 +219,10 @@ if (-not (Test-McpUninstallClientProjectedCleared -Name 'opencode')) {
     }
 }
 $codexLivePath = Get-McpCodexConfigPath
+# Caminho nao regular pode esconder um Jev vivo: nao e ausencia; o Codex segura os dados.
+if (-not (Test-McpUninstallClientProjectedCleared -Name 'codex') -and (Test-McpConfigPathNonRegular -Path $codexLivePath)) {
+    $liveJevHolders.Add('codex') | Out-Null
+}
 if (-not (Test-McpUninstallClientProjectedCleared -Name 'codex') -and (Test-McpRegularFile -Path $codexLivePath)) {
     $codexLiveDoc = Read-McpTextDocument -Path $codexLivePath
     $codexLiveBlock = Get-McpCodexBlockInfo -Text $codexLiveDoc.Text

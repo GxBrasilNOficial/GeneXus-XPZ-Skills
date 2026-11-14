@@ -287,7 +287,7 @@ if ($null -ne $manifest -and $manifest.Exists -and -not $manifest.Corrupt) {
         $configAbsent = if ($client -eq 'opencode') {
             [string](Get-McpOpenCodeConfigTarget).status -eq 'absent'
         } else {
-            -not (Test-McpRegularFile -Path (Get-McpCodexConfigPath))
+            -not (Test-McpRegularFile -Path (Get-McpCodexConfigPath)) -and -not (Test-McpConfigPathNonRegular -Path (Get-McpCodexConfigPath))
         }
         if ($configAbsent) {
             $findings.Add((New-McpFinding -Code 'registro_orfao' -Class 'warn' -Message "registro do $client no manifesto sem configuracao do cliente; rode o Uninstall desse cliente" -Client $client)) | Out-Null

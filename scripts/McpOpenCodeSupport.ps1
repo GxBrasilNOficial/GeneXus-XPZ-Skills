@@ -381,6 +381,14 @@ function Get-McpOpenCodeConfigCandidates {
 
 function Get-McpOpenCodeConfigTarget {
     $candidates = Get-McpOpenCodeConfigCandidates
+    if ((Test-McpConfigPathNonRegular -Path $candidates.Json) -or (Test-McpConfigPathNonRegular -Path $candidates.Jsonc)) {
+        return [pscustomobject]@{
+            status     = 'conflict'
+            path       = $null
+            candidates = $candidates
+            reason     = 'opencode.json/jsonc existe mas nao e arquivo regular (link, reparse ou diretorio); nao decide sozinho'
+        }
+    }
     if ($candidates.JsonExists -and $candidates.JsoncExists) {
         return [pscustomobject]@{
             status     = 'conflict'

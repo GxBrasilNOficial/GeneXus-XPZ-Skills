@@ -693,6 +693,45 @@ args = [`"legacy.js`"]
     Assert-True ([string]$corruptAudit.overall -eq 'INTEGRATIONS_GAPS') "(corrupt) overall GAPS com manifesto corrompido; obtido $($corruptAudit.overall)"
     Assert-True ($corruptAuditExit -eq 67) "(corrupt) exit 67 (manifesto_corrompido); obtido $corruptAuditExit"
 
+    # 9j. Configuracao de cliente que nao e arquivo regular (aqui, diretorio no lugar do arquivo): conflito
+    # bloqueante. -RemoveSkillData nao remove launcher nem vendor, e o Install nao escreve. Um link
+    # simbolico ou reparse point cai no mesmo ramo; a deteccao de reparse exige privilegio e nao e testada aqui.
+    Remove-Item -LiteralPath (Get-McpManifestPath) -Force -ErrorAction SilentlyContinue
+    if (-not (Test-Path -LiteralPath $ocFile)) {
+        [System.IO.File]::WriteAllText($ocFile, "{`n  `"mcp`": {}`n}`n", [System.Text.UTF8Encoding]::new($false))
+    }
+    if (-not (Test-Path -LiteralPath $cxFile)) {
+        [System.IO.File]::WriteAllText($cxFile, "model = `"gpt-5`"`n", [System.Text.UTF8Encoding]::new($false))
+    }
+    Assert-True ((Invoke-McpInstallForRemoval) -eq 0) '(nonregular) install inicial exit 0'
+
+    # Caso A: OpenCode com diretorio no lugar de opencode.jsonc.
+    Remove-Item -LiteralPath $ocFile -Force
+    $null = New-Item -ItemType Directory -Path $ocFile
+    $nrA = Invoke-McpRemovalCase -Params @{ Client = 'all'; RemoveSkillData = $true }
+    Assert-True ($nrA.Exit -ne 0) "(nonregular-opencode) -RemoveSkillData bloqueado; obtido exit $($nrA.Exit)"
+    Assert-True (-not [bool]$nrA.Json.dataRemoved -and -not [bool]$nrA.Json.launcherRemoved -and -not [bool]$nrA.Json.vendorRemoved) '(nonregular-opencode) nenhum dado removido'
+    Assert-True ((Test-Path -LiteralPath $launcherPath) -and (Test-Path -LiteralPath $vendorDir)) '(nonregular-opencode) launcher e vendor preservados'
+    Assert-True (@($nrA.Json.findings | Where-Object { $_.code -eq 'entrada_em_conflito' -and $_.class -eq 'blocking' }).Count -ge 1) '(nonregular-opencode) achado entrada_em_conflito blocking'
+    Remove-Item -LiteralPath $ocFile -Recurse -Force
+    [System.IO.File]::WriteAllText($ocFile, "{`n  `"mcp`": {}`n}`n", [System.Text.UTF8Encoding]::new($false))
+
+    # Caso B: Codex com diretorio no lugar de config.toml.
+    Assert-True ((Invoke-McpInstallForRemoval) -eq 0) '(nonregular) reinstall antes do caso Codex exit 0'
+    Remove-Item -LiteralPath $cxFile -Force
+    $null = New-Item -ItemType Directory -Path $cxFile
+    $nrInstall = @(& (Join-Path $scriptDir 'Install-McpIntegration.ps1') -Action repair -Client codex 2>&1)
+    $nrInstallExit = $LASTEXITCODE
+    Assert-True ($nrInstallExit -ne 0) "(nonregular-codex) Install recusa escrever; obtido exit $nrInstallExit"
+    Assert-True ((Get-Item -LiteralPath $cxFile).PSIsContainer) '(nonregular-codex) Install nao substitui o diretorio'
+    $nrB = Invoke-McpRemovalCase -Params @{ Client = 'all'; RemoveSkillData = $true }
+    Assert-True ($nrB.Exit -ne 0) "(nonregular-codex) -RemoveSkillData bloqueado; obtido exit $($nrB.Exit)"
+    Assert-True (-not [bool]$nrB.Json.dataRemoved -and -not [bool]$nrB.Json.launcherRemoved -and -not [bool]$nrB.Json.vendorRemoved) '(nonregular-codex) nenhum dado removido'
+    Assert-True ((Test-Path -LiteralPath $launcherPath) -and (Test-Path -LiteralPath $vendorDir)) '(nonregular-codex) launcher e vendor preservados'
+    Assert-True (@($nrB.Json.findings | Where-Object { $_.code -eq 'entrada_em_conflito' -and $_.class -eq 'blocking' }).Count -ge 1) '(nonregular-codex) achado entrada_em_conflito blocking'
+    Remove-Item -LiteralPath $cxFile -Recurse -Force
+    [System.IO.File]::WriteAllText($cxFile, "model = `"gpt-5`"`n", [System.Text.UTF8Encoding]::new($false))
+
     # 10. Gate do dist real, quando informado.
     if (-not [string]::IsNullOrWhiteSpace($DistManagedRoot)) {
         $distOutput = & (Get-Command pwsh).Source -NoProfile -File (Join-Path $scriptDir 'Test-McpDistEvidenceSelfTest.ps1') -ManagedRoot $DistManagedRoot 2>&1

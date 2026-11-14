@@ -187,6 +187,10 @@ bloqueiam. O descritor e validado no F1 e no self-test.
    Registro de cliente cuja configuracao nao existe e orfao: sai do manifesto
    com o aviso `registro_orfao_removido` (warn). Em `-WhatIf` aparece como plano.
 
+   Configuracao que existe mas nao e arquivo regular (diretorio, link simbolico
+   ou reparse point) e conflito bloqueante (`entrada_em_conflito`), nunca ausencia:
+   o Install nao escreve, e o `-RemoveSkillData` nao remove launcher nem vendor.
+
    Conflito `opencode.json`+`jsonc`, heuristica Codex (quoted/inline/subtable)
    ou Codex sem Python com qualquer `mcp_servers` (fail-closed) tambem
    bloqueiam. Install em `unchanged` reancora hash no manifesto quando a

@@ -387,6 +387,11 @@ foreach ($clientName in $selectedClients) {
     }
     if ($clientName -eq 'codex') {
         $codexPath = Get-McpCodexConfigPath
+        if (Test-McpConfigPathNonRegular -Path $codexPath) {
+            $clientsResult['codex'] = [ordered]@{ state = 'nao_configurado'; status = 'conflict'; path = $codexPath; written = $false }
+            $findings.Add((New-McpFinding -Code 'entrada_em_conflito' -Class 'blocking' -Message 'Codex: config.toml existe mas nao e arquivo regular (link, reparse ou diretorio); nao decide sozinho' -Client 'codex')) | Out-Null
+            continue
+        }
         if (-not (Test-McpRegularFile -Path $codexPath)) {
             $installed = Test-McpClientInstalled -Client 'codex'
             $clientsResult['codex'] = [ordered]@{ state = 'nao_configurado'; status = $(if ($installed) { 'absent' } else { 'not-installed' }); path = $codexPath; written = $false }
