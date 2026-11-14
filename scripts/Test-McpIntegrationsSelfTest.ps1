@@ -346,6 +346,31 @@ try {
     Assert-True (-not (Test-Path -LiteralPath $vendorDir)) '(no-cred-repair) vendor nao instalado sem cofre'
     $null = Write-McpVault -SecureSecret (ConvertTo-SecureString 'test-secret-selftest' -AsPlainText -Force)
 
+    # 6d. -RemoveVault: relatorio reflete o estado real do cofre (WhatIf com cofre presente,
+    # remocao real, e cofre ausente sem mudanca nem remocao).
+    $rvWhatIfOut = @(& (Join-Path $scriptDir 'Uninstall-McpIntegration.ps1') -Client all -RemoveVault -WhatIf 2>&1)
+    $rvWhatIfExit = $LASTEXITCODE
+    $rvWhatIf = (($rvWhatIfOut | ForEach-Object { [string]$_ }) -join "`n") | ConvertFrom-Json -AsHashtable
+    Assert-True ($rvWhatIfExit -eq 0) "(remove-vault-whatif) exit 0; obtido $rvWhatIfExit"
+    Assert-True ([bool]$rvWhatIf.vaultRemoved -and [bool]$rvWhatIf.changed -and [bool]$rvWhatIf.planned) '(remove-vault-whatif) planejado: vaultRemoved e changed true'
+    Assert-True (Test-McpVaultExists) '(remove-vault-whatif) -WhatIf nao apaga o cofre'
+
+    $rvRealOut = @(& (Join-Path $scriptDir 'Uninstall-McpIntegration.ps1') -Client all -RemoveVault 2>&1)
+    $rvRealExit = $LASTEXITCODE
+    $rvReal = (($rvRealOut | ForEach-Object { [string]$_ }) -join "`n") | ConvertFrom-Json -AsHashtable
+    Assert-True ($rvRealExit -eq 0) "(remove-vault) exit 0; obtido $rvRealExit"
+    Assert-True ([bool]$rvReal.vaultRemoved -and [bool]$rvReal.changed) '(remove-vault) cofre removido: vaultRemoved e changed true'
+    Assert-True (-not (Test-McpVaultExists)) '(remove-vault) cofre apagado de fato'
+
+    $rvAbsentOut = @(& (Join-Path $scriptDir 'Uninstall-McpIntegration.ps1') -Client all -RemoveVault 2>&1)
+    $rvAbsentExit = $LASTEXITCODE
+    $rvAbsent = (($rvAbsentOut | ForEach-Object { [string]$_ }) -join "`n") | ConvertFrom-Json -AsHashtable
+    Assert-True ($rvAbsentExit -eq 0) "(remove-vault-absent) exit 0; obtido $rvAbsentExit"
+    # Escopo: aqui so o campo do cofre. 'changed' nao e afirmado porque clientes com status
+    # 'unchanged' ainda o marcam (decisao pendente sobre o contrato de changed no Uninstall).
+    Assert-True (-not [bool]$rvAbsent.vaultRemoved) '(remove-vault-absent) cofre ausente: vaultRemoved false'
+    $null = Write-McpVault -SecureSecret (ConvertTo-SecureString 'test-secret-selftest' -AsPlainText -Force)
+
     # 7. Auditoria de entrada manual migravel: edicao_manual_necessaria e
     # nextAction -MigrateLegacy, com exit 67 pela precedencia.
     $legacyRoot = Join-Path $tempRoot 'legacy-profile'

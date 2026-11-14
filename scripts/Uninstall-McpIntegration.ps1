@@ -56,6 +56,7 @@ $nextActions = [System.Collections.Generic.List[string]]::new()
 $clientsResult = [ordered]@{}
 $changed = $false
 $planned = [bool]$WhatIfPreference
+$vaultRemoved = $false
 
 $descriptor = Get-McpDescriptor
 $pin = Get-McpVendorPin
@@ -275,11 +276,13 @@ if ($RemoveSkillData -and $blocking.Count -eq 0 -and $manifestRefsRemaining.Coun
 }
 
 if ($RemoveVault) {
-    if (-not $WhatIfPreference) {
-        $vaultResult = Remove-McpVault
-        if ($vaultResult.Status -eq 'removed') { $changed = $true }
+    # Status real do cofre: 'removed' (apagado), 'planned' (-WhatIf com cofre presente)
+    # ou 'absent' (nada a fazer, sem mudanca nem remocao).
+    $vaultResult = Remove-McpVault -WhatIf:$WhatIfPreference
+    if ($vaultResult.Status -in @('removed', 'planned')) {
+        $vaultRemoved = $true
+        $changed = $true
     }
-    $changed = $true
 }
 
 # Persistir manifesto mesmo com clients vazio (uninstall -Client all sem -RemoveSkillData).
@@ -325,7 +328,7 @@ $result = [ordered]@{
     launcherRemoved = $launcherRemoved
     vendorRemoved   = $vendorRemoved
     dataRemoved     = $dataRemoved
-    vaultRemoved    = [bool]$RemoveVault
+    vaultRemoved    = [bool]$vaultRemoved
     findings       = @($findings)
     nextActions    = @($nextActions | Select-Object -Unique)
 }
