@@ -239,12 +239,30 @@ function Invoke-McpTomlProbe {
             CanonicalJson = $null
         }
     }
-    $tempPath = Join-Path ([System.IO.Path]::GetTempPath()) ('xpz-mcp-toml-' + [Guid]::NewGuid().ToString('N') + '.toml')
+    # O TOML segue pela entrada padrao do probe (UTF-8 sem BOM): nunca vai para disco.
+    $proc = $null
     try {
-        [System.IO.File]::WriteAllText($tempPath, $Text, [System.Text.UTF8Encoding]::new($false))
-        $output = @(& $prerequisites.Python.Path $probeScript $tempPath 2>&1)
-        $exitCode = $LASTEXITCODE
-        $textOutput = (($output | ForEach-Object { $_.ToString() }) -join "`n").Trim()
+        $psi = [System.Diagnostics.ProcessStartInfo]::new()
+        $psi.FileName = [string]$prerequisites.Python.Path
+        $psi.ArgumentList.Add([string]$probeScript)
+        $psi.UseShellExecute = $false
+        $psi.CreateNoWindow = $true
+        $psi.RedirectStandardInput = $true
+        $psi.RedirectStandardOutput = $true
+        $psi.RedirectStandardError = $true
+        $psi.StandardInputEncoding = [System.Text.UTF8Encoding]::new($false)
+        $psi.StandardOutputEncoding = [System.Text.UTF8Encoding]::new($false)
+        $psi.StandardErrorEncoding = [System.Text.UTF8Encoding]::new($false)
+        $proc = [System.Diagnostics.Process]::Start($psi)
+        $stdoutTask = $proc.StandardOutput.ReadToEndAsync()
+        $stderrTask = $proc.StandardError.ReadToEndAsync()
+        $proc.StandardInput.Write($Text)
+        $proc.StandardInput.Close()
+        $proc.WaitForExit()
+        $stdoutText = [string]$stdoutTask.GetAwaiter().GetResult()
+        $null = $stderrTask.GetAwaiter().GetResult()
+        $exitCode = $proc.ExitCode
+        $textOutput = $stdoutText.Trim()
         if ($exitCode -ne 0 -or [string]::IsNullOrWhiteSpace($textOutput)) {
             return [pscustomobject]@{
                 Status  = 'probe_falhou'
@@ -273,11 +291,7 @@ function Invoke-McpTomlProbe {
             CanonicalJson = $(if ($parsed.ContainsKey('canonicalJson')) { [string]$parsed.canonicalJson } else { $null })
         }
     } finally {
-        if (Test-Path -LiteralPath $tempPath) {
-            # File.Delete ignora $WhatIfPreference; o temporario do probe nao
-            # pode vazar nem imprimir "What If" no stdout de maquina.
-            [System.IO.File]::Delete($tempPath)
-        }
+        if ($null -ne $proc) { $proc.Dispose() }
     }
 }
 

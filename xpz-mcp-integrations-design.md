@@ -113,7 +113,7 @@ a **exceção de endpoint** do modo `compatible` é campo explícito. Detalhe: *
 
 | Classe | Contrato |
 |---|---|
-| **Diagnóstico sem escrita de configuração** (auditor; a sonda TOML do Codex usa cópia temporária em `%TEMP%`) | JSON de máquina, `overall`, tabela estado→`exitCode`/classe, `-InputPath`; sem `-WhatIf` |
+| **Diagnóstico sem escrita de configuração** (auditor; sonda TOML sem arquivo temporário, conteúdo pela entrada padrão) | JSON de máquina, `overall`, tabela estado→`exitCode`/classe, `-InputPath`; sem `-WhatIf` |
 | **Mutador** (instalar/reparar/remover/atualizar/vendorizar) | JSON de máquina, `-WhatIf`, `exitCode`, backup transacional; com `-Client all`, conflito/`edicao_manual_necessaria` **não** faz rollback dos outros clientes nem dos artefatos compartilhados — o achado traz o cliente e a mensagem para o operador apresentar |
 
 A classe **biblioteca dot-source** (`OpenCodeJsoncSupport.ps1`) saiu da v1 na v22 (ver

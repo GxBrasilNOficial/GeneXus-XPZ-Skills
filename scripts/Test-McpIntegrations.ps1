@@ -6,7 +6,7 @@
 
 .DESCRIPTION
     Emite JSON de maquina no stdout. Nao grava, nao remove e nao altera config
-    de cliente (ressalva: a sonda TOML do Codex grava copia temporaria do config.toml em %TEMP%, removida no finally). overall=INTEGRATIONS_OK e estrutural: entrada reconhecida em
+    de cliente, sem criar arquivo temporario (a sonda TOML recebe o config.toml pela entrada padrao). overall=INTEGRATIONS_OK e estrutural: entrada reconhecida em
     cada cliente gerenciado e nenhum achado blocking (warns como
     acl_nao_aplicavel nao derrubam sozinhos). Credencial verificada e um eixo
     separado, promovido apenas por -CheckCredential (online opt-in).
