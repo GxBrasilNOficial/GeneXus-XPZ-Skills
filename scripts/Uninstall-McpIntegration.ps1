@@ -5,10 +5,13 @@
     Remove a entrada jev dos clientes gerenciados pela skill xpz-mcp-integrations-setup.
 
 .DESCRIPTION
-    Remove somente entrada reconhecida pelo install-manifest.json (hash
-    byte-identico ao bloco emitido). Preserva cofre DPAPI, auth.json, demais
-    MCPs e o restante de cada config de cliente. Launcher, vendor, config.json
-    e manifesto so saem com -RemoveSkillData; o cofre so com -RemoveVault.
+    Remove somente entrada reconhecida: byte-identica a emissao atual
+    (baseUrl/model do config.json efetivo; sem config, o preset) ou hash no
+    install-manifest.json. Preserva cofre DPAPI, auth.json, demais MCPs e o
+    restante de cada config de cliente. Launcher, vendor, config.json e
+    manifesto so saem com -RemoveSkillData; o cofre so com -RemoveVault.
+    Em -WhatIf, projeta remocao de clientes no manifesto em memoria, ignora
+    holders ja planejados na guarda live e reporta shared sem apagar.
 #>
 
 [CmdletBinding(SupportsShouldProcess = $true)]
@@ -62,6 +65,31 @@ if ($manifest.Corrupt) {
     $findings.Add((New-McpFinding -Code 'manifesto_corrompido' -Class 'blocking' -Message $manifest.Error)) | Out-Null
 }
 
+# Emissao atual: config.json efetivo (paridade com install); fallback = preset.
+$effectiveBaseUrl = 'https://api.commandcode.ai/provider/v1/systemone'
+$effectiveModel = 'typesafe/jev'
+try {
+    $compatible = $descriptor.Descriptor.modes.compatible
+    if ($null -ne $compatible -and -not [string]::IsNullOrWhiteSpace([string]$compatible.preset)) {
+        $preset = $descriptor.Descriptor.presets[[string]$compatible.preset]
+        if ($null -ne $preset) {
+            if (-not [string]::IsNullOrWhiteSpace([string]$preset.baseUrl)) { $effectiveBaseUrl = [string]$preset.baseUrl }
+            if (-not [string]::IsNullOrWhiteSpace([string]$preset.model)) { $effectiveModel = [string]$preset.model }
+        }
+    }
+} catch {
+    # Mantem fallback literal acima.
+}
+$configForUninstall = Get-McpConfig
+if ($configForUninstall.Exists -and $null -ne $configForUninstall.Value) {
+    if (-not [string]::IsNullOrWhiteSpace([string]$configForUninstall.Value.baseUrl)) {
+        $effectiveBaseUrl = [string]$configForUninstall.Value.baseUrl
+    }
+    if (-not [string]::IsNullOrWhiteSpace([string]$configForUninstall.Value.model)) {
+        $effectiveModel = [string]$configForUninstall.Value.model
+    }
+}
+
 $selectedClients = if ($Client -eq 'all') { @('opencode', 'codex') } else { @($Client) }
 foreach ($clientName in $selectedClients) {
     $clientRecord = Get-McpManifestClient -Manifest $manifest.Value -Client $clientName
@@ -79,19 +107,18 @@ foreach ($clientName in $selectedClients) {
             $clientsResult['opencode'] = [ordered]@{ status = 'conflict'; state = 'nao_configurado'; reason = $target.reason }
             continue
         }
-        $result = Update-McpOpenCodeConfig -Path $target.path -LauncherPath $launcherPath -BaseUrl 'https://api.commandcode.ai/provider/v1/systemone' -Model 'typesafe/jev' -ManifestHashes $hashes -Action remove -WhatIf:$WhatIfPreference
+        $result = Update-McpOpenCodeConfig -Path $target.path -LauncherPath $launcherPath -BaseUrl $effectiveBaseUrl -Model $effectiveModel -ManifestHashes $hashes -Action remove -WhatIf:$WhatIfPreference
         $clientsResult['opencode'] = [ordered]@{
             status = $result.status
-            state  = $(if ($result.status -in @('written', 'unchanged')) { 'nao_configurado' } else { 'nao_configurado' })
+            state  = $(if ($result.status -in @('written', 'unchanged', 'planned')) { 'nao_configurado' } else { 'nao_configurado' })
             path   = $target.path
             reason = if ($result.PSObject.Properties['reason']) { $result.reason } else { $null }
             diff   = if ($result.PSObject.Properties['diff']) { $result.diff } else { $null }
         }
-        if ($result.status -in @('written', 'unchanged')) {
-            if (-not $WhatIfPreference) {
-                $manifest.Value = Remove-McpManifestClient -Manifest $manifest.Value -Client 'opencode'
-                $changed = $true
-            }
+        if ($result.status -in @('written', 'unchanged', 'planned')) {
+            # Projeta manifesto em memoria tambem no -WhatIf (paridade do plano).
+            $manifest.Value = Remove-McpManifestClient -Manifest $manifest.Value -Client 'opencode'
+            $changed = $true
         } elseif ($result.status -in @('manual', 'entrada_em_conflito', 'conflict', 'entrada_quebrada', 'edicao_manual_necessaria')) {
             $code = if ($result.status -eq 'manual') {
                 'edicao_manual_necessaria'
@@ -111,7 +138,7 @@ foreach ($clientName in $selectedClients) {
             $clientsResult['codex'] = [ordered]@{ status = 'unchanged'; state = 'nao_configurado'; reason = 'config ausente' }
             continue
         }
-        $result = Update-McpCodexConfig -Path $codexPath -LauncherPath $launcherPath -BaseUrl 'https://api.commandcode.ai/provider/v1/systemone' -Model 'typesafe/jev' -ManifestHashes $hashes -Action remove -WhatIf:$WhatIfPreference
+        $result = Update-McpCodexConfig -Path $codexPath -LauncherPath $launcherPath -BaseUrl $effectiveBaseUrl -Model $effectiveModel -ManifestHashes $hashes -Action remove -WhatIf:$WhatIfPreference
         $clientsResult['codex'] = [ordered]@{
             status = $result.status
             state  = 'nao_configurado'
@@ -119,11 +146,9 @@ foreach ($clientName in $selectedClients) {
             reason = if ($result.PSObject.Properties['reason']) { $result.reason } else { $null }
             diff   = if ($result.PSObject.Properties['diff']) { $result.diff } else { $null }
         }
-        if ($result.status -in @('written', 'unchanged')) {
-            if (-not $WhatIfPreference) {
-                $manifest.Value = Remove-McpManifestClient -Manifest $manifest.Value -Client 'codex'
-                $changed = $true
-            }
+        if ($result.status -in @('written', 'unchanged', 'planned')) {
+            $manifest.Value = Remove-McpManifestClient -Manifest $manifest.Value -Client 'codex'
+            $changed = $true
         } elseif ($result.status -in @('manual', 'entrada_em_conflito', 'conflict', 'entrada_quebrada', 'edicao_manual_necessaria', 'python_indisponivel')) {
             $code = if ($result.status -eq 'python_indisponivel') {
                 'python_indisponivel'
@@ -140,33 +165,38 @@ foreach ($clientName in $selectedClients) {
     }
 }
 
+function Test-McpUninstallClientProjectedCleared {
+    param([Parameter(Mandatory = $true)][string]$Name)
+    if (-not $clientsResult.Contains($Name)) { return $false }
+    $status = [string]$clientsResult[$Name].status
+    return ($status -in @('written', 'unchanged', 'planned'))
+}
+
 $blocking = @($findings | Where-Object { $_.class -eq 'blocking' })
 $manifestRefsRemaining = @($manifest.Value.clients.Keys)
 $launcherRemoved = $false
 $vendorRemoved = $false
 $dataRemoved = $false
-# Guarda live: manifesto vazio nao basta — outro cliente pode ainda ter jev
-# (ex.: manifesto perdido e so um cliente reancorado).
+# Guarda live: manifesto vazio nao basta — outro cliente pode ainda ter jev.
+# Em -WhatIf, ignora clientes que este run ja projetou remover (disco intacto).
 $liveJevHolders = [System.Collections.Generic.List[string]]::new()
-$probeBaseUrl = 'https://api.commandcode.ai/provider/v1/systemone'
-$probeModel = 'typesafe/jev'
 $ocLiveTarget = Get-McpOpenCodeConfigTarget
-if ($ocLiveTarget.status -eq 'conflict') {
-    # Sem precedencia json/jsonc: nao da para provar ausencia de jev.
-    $liveJevHolders.Add('opencode') | Out-Null
-} elseif ($ocLiveTarget.status -eq 'ok') {
-    $ocLiveInfo = Get-McpOpenCodeEntryInfo -Path $ocLiveTarget.path -LauncherPath $launcherPath -BaseUrl $probeBaseUrl -Model $probeModel
-    if ($ocLiveInfo.status -eq 'ok') {
-        if ([string]$ocLiveInfo.form -ne 'absent') {
+if (-not (Test-McpUninstallClientProjectedCleared -Name 'opencode')) {
+    if ($ocLiveTarget.status -eq 'conflict') {
+        $liveJevHolders.Add('opencode') | Out-Null
+    } elseif ($ocLiveTarget.status -eq 'ok') {
+        $ocLiveInfo = Get-McpOpenCodeEntryInfo -Path $ocLiveTarget.path -LauncherPath $launcherPath -BaseUrl $effectiveBaseUrl -Model $effectiveModel
+        if ($ocLiveInfo.status -eq 'ok') {
+            if ([string]$ocLiveInfo.form -ne 'absent') {
+                $liveJevHolders.Add('opencode') | Out-Null
+            }
+        } elseif ($ocLiveInfo.status -in @('entrada_em_conflito', 'entrada_quebrada')) {
             $liveJevHolders.Add('opencode') | Out-Null
         }
-    } elseif ($ocLiveInfo.status -in @('entrada_em_conflito', 'entrada_quebrada')) {
-        # Fail-closed: config ambigua/ilegivel nao autoriza apagar shared.
-        $liveJevHolders.Add('opencode') | Out-Null
     }
 }
 $codexLivePath = Get-McpCodexConfigPath
-if (Test-McpRegularFile -Path $codexLivePath) {
+if (-not (Test-McpUninstallClientProjectedCleared -Name 'codex') -and (Test-McpRegularFile -Path $codexLivePath)) {
     $codexLiveDoc = Read-McpTextDocument -Path $codexLivePath
     $codexLiveBlock = Get-McpCodexBlockInfo -Text $codexLiveDoc.Text
     $codexLiveProbe = Invoke-McpTomlProbe -Text $codexLiveDoc.Text
@@ -179,50 +209,68 @@ if ($RemoveSkillData -and $blocking.Count -eq 0 -and $manifestRefsRemaining.Coun
         $holdersLabel = ($liveJevHolders -join ', ')
         $findings.Add((New-McpFinding -Code 'dados_compartilhados_em_uso' -Class 'blocking' -Message ("launcher/vendor ainda referenciados por entrada jev live ($holdersLabel); remova esses clientes antes de -RemoveSkillData"))) | Out-Null
         $blocking = @($findings | Where-Object { $_.class -eq 'blocking' })
-    } elseif (-not $WhatIfPreference) {
+    } else {
         $managedRoot = Get-McpManagedRoot
         $launcherRecords = @($manifest.Value.launchers)
         if ($launcherRecords.Count -eq 0) {
             $launcherRecords = @([pscustomobject]@{ version = $pin.Version })
         }
-        foreach ($record in $launcherRecords) {
-            $recordVersion = [string]$record.version
-            if ([string]::IsNullOrWhiteSpace($recordVersion)) { continue }
-            $candidateLauncher = Get-McpLauncherPath -Version $recordVersion
-            if (-not (Test-Path -LiteralPath $candidateLauncher)) { continue }
-            $launcherInfo = Test-McpLauncher -Version $recordVersion -Manifest $manifest.Value
-            if ($launcherInfo.state -eq 'ok') {
-                Remove-Item -LiteralPath $candidateLauncher -Force
-                $launcherRemoved = $true
+        if ($WhatIfPreference) {
+            # Plano: reporta o que seria removido, sem apagar.
+            foreach ($record in $launcherRecords) {
+                $recordVersion = [string]$record.version
+                if ([string]::IsNullOrWhiteSpace($recordVersion)) { continue }
+                $candidateLauncher = Get-McpLauncherPath -Version $recordVersion
+                if (Test-Path -LiteralPath $candidateLauncher) {
+                    $launcherInfo = Test-McpLauncher -Version $recordVersion -Manifest $manifest.Value
+                    if ($launcherInfo.state -eq 'ok') { $launcherRemoved = $true }
+                }
+                $vendorDir = Get-McpVendorDir -Version $recordVersion
+                if ((Test-Path -LiteralPath $vendorDir -PathType Container) -and (Test-McpPathUnder -Path $vendorDir -Parent $managedRoot)) {
+                    $vendorRemoved = $true
+                }
             }
-        }
-        $remainingLaunchers = @(Get-ChildItem -LiteralPath $managedRoot -File -Filter 'launcher-*.ps1' -ErrorAction SilentlyContinue)
-        if ($remainingLaunchers.Count -gt 0) {
-            $findings.Add((New-McpFinding -Code 'launcher_orfao' -Class 'warn' -Message 'launcher nao reconhecido permaneceu; confira antes de remover a mao')) | Out-Null
+            if (Test-Path -LiteralPath (Get-McpConfigPath)) { $dataRemoved = $true }
+            if (Test-Path -LiteralPath (Get-McpManifestPath)) { $dataRemoved = $true }
+            $changed = $true
         } else {
             foreach ($record in $launcherRecords) {
                 $recordVersion = [string]$record.version
                 if ([string]::IsNullOrWhiteSpace($recordVersion)) { continue }
-                $vendorDir = Get-McpVendorDir -Version $recordVersion
-                if ((Test-Path -LiteralPath $vendorDir -PathType Container) -and (Test-McpPathUnder -Path $vendorDir -Parent $managedRoot)) {
-                    Remove-Item -LiteralPath $vendorDir -Recurse -Force
-                    $vendorRemoved = $true
+                $candidateLauncher = Get-McpLauncherPath -Version $recordVersion
+                if (-not (Test-Path -LiteralPath $candidateLauncher)) { continue }
+                $launcherInfo = Test-McpLauncher -Version $recordVersion -Manifest $manifest.Value
+                if ($launcherInfo.state -eq 'ok') {
+                    Remove-Item -LiteralPath $candidateLauncher -Force
+                    $launcherRemoved = $true
                 }
             }
+            $remainingLaunchers = @(Get-ChildItem -LiteralPath $managedRoot -File -Filter 'launcher-*.ps1' -ErrorAction SilentlyContinue)
+            if ($remainingLaunchers.Count -gt 0) {
+                $findings.Add((New-McpFinding -Code 'launcher_orfao' -Class 'warn' -Message 'launcher nao reconhecido permaneceu; confira antes de remover a mao')) | Out-Null
+            } else {
+                foreach ($record in $launcherRecords) {
+                    $recordVersion = [string]$record.version
+                    if ([string]::IsNullOrWhiteSpace($recordVersion)) { continue }
+                    $vendorDir = Get-McpVendorDir -Version $recordVersion
+                    if ((Test-Path -LiteralPath $vendorDir -PathType Container) -and (Test-McpPathUnder -Path $vendorDir -Parent $managedRoot)) {
+                        Remove-Item -LiteralPath $vendorDir -Recurse -Force
+                        $vendorRemoved = $true
+                    }
+                }
+            }
+            $configPath = Get-McpConfigPath
+            if (Test-Path -LiteralPath $configPath) {
+                Remove-Item -LiteralPath $configPath -Force
+                $dataRemoved = $true
+            }
+            $manifestPath = Get-McpManifestPath
+            if (Test-Path -LiteralPath $manifestPath) {
+                Remove-Item -LiteralPath $manifestPath -Force
+                $dataRemoved = $true
+            }
+            $changed = $true
         }
-        $configPath = Get-McpConfigPath
-        if (Test-Path -LiteralPath $configPath) {
-            Remove-Item -LiteralPath $configPath -Force
-            $dataRemoved = $true
-        }
-        $manifestPath = Get-McpManifestPath
-        if (Test-Path -LiteralPath $manifestPath) {
-            Remove-Item -LiteralPath $manifestPath -Force
-            $dataRemoved = $true
-        }
-        $changed = $true
-    } else {
-        $changed = $true
     }
 }
 

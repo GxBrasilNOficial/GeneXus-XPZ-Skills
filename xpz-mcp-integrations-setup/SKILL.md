@@ -197,7 +197,8 @@ bloqueiam. O descritor e validado no F1 e no self-test.
   `ConvertFrom-Jsonc` + comparacao pos-edicao). Qualquer falha → nada gravado,
   `edicao_manual_necessaria` e trecho pronto.
 - **Reconhecimento:** a skill substitui/remove entrada se for byte-identica
-  a forma que ela emitiria agora **ou** se o hash estiver no
+  a forma que ela emitiria agora (`baseUrl`/`model` do `config.json`
+  efetivo; sem config, o preset) **ou** se o hash estiver no
   `install-manifest.json`; qualquer outra coisa e conflito.
 
 ## CODEX

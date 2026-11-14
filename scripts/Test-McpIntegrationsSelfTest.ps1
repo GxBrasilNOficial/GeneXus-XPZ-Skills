@@ -250,6 +250,52 @@ try {
         $env:PATH = $savedPathForVendor
     }
 
+    # 4h. -Client all -RemoveSkillData -WhatIf: plano completo sem apagar shared/entradas.
+    $whatIfDataOutput = @(& (Join-Path $scriptDir 'Uninstall-McpIntegration.ps1') -Client all -RemoveSkillData -WhatIf 2>&1)
+    $whatIfDataExit = $LASTEXITCODE
+    $whatIfDataText = (($whatIfDataOutput | ForEach-Object { [string]$_ }) -join "`n")
+    $whatIfData = $null
+    try { $whatIfData = $whatIfDataText | ConvertFrom-Json -AsHashtable } catch { }
+    Assert-True ($whatIfDataExit -eq 0) "(uninstall-whatif-data) exit 0; obtido $whatIfDataExit"
+    Assert-True ($null -ne $whatIfData -and [string]$whatIfData.overall -eq 'INTEGRATIONS_OK') "(uninstall-whatif-data) overall OK; obtido $($whatIfData.overall)"
+    Assert-True ($null -ne $whatIfData -and [bool]$whatIfData.planned -eq $true) '(uninstall-whatif-data) planned=true'
+    Assert-True ($null -ne $whatIfData -and @($whatIfData.findings | Where-Object { $_.code -eq 'dados_compartilhados_em_uso' }).Count -eq 0) '(uninstall-whatif-data) sem dados_compartilhados_em_uso'
+    Assert-True ($null -ne $whatIfData -and [bool]$whatIfData.launcherRemoved -eq $true) '(uninstall-whatif-data) launcherRemoved planejado'
+    Assert-True ($null -ne $whatIfData -and [bool]$whatIfData.vendorRemoved -eq $true) '(uninstall-whatif-data) vendorRemoved planejado'
+    Assert-True ($null -ne $whatIfData -and [bool]$whatIfData.dataRemoved -eq $true) '(uninstall-whatif-data) dataRemoved planejado'
+    Assert-True (Test-Path -LiteralPath $launcherPath) '(uninstall-whatif-data) launcher intacto'
+    Assert-True (Test-Path -LiteralPath $vendorDir) '(uninstall-whatif-data) vendor intacto'
+    Assert-True (Test-Path -LiteralPath $configPath) '(uninstall-whatif-data) config intacto'
+    Assert-True ([System.IO.File]::ReadAllText((Join-Path $oc 'opencode.jsonc')) -match '"jev"') '(uninstall-whatif-data) opencode intacto'
+    Assert-True ([System.IO.File]::ReadAllText((Join-Path $cx 'config.toml')) -match '\[mcp_servers\.jev\]') '(uninstall-whatif-data) codex intacto'
+
+    # 4i. Uninstall reconhece emissao atual via config.json customizado (sem hashes no manifesto).
+    $customRemoveBase = 'https://custom-remove.example/provider/v1'
+    $customRemoveModel = 'custom/remove-model'
+    $null = Set-McpConfig -BaseUrl $customRemoveBase -Model $customRemoveModel -EndpointConfirmed $true
+    $null = & (Join-Path $scriptDir 'Install-McpIntegration.ps1') -Action repair -Client all 2>&1
+    $manifestNoHashes = Get-McpManifest
+    foreach ($clientName in @('opencode', 'codex')) {
+        $rec = Get-McpManifestClient -Manifest $manifestNoHashes.Value -Client $clientName
+        Assert-True ($null -ne $rec) "(custom-remove) cliente $clientName no manifesto"
+        if ($null -ne $rec) {
+            $manifestNoHashes.Value.clients[$clientName] = [ordered]@{
+                path               = [string]$rec.path
+                hashes             = @()
+                lastWriteUtcTicks  = $rec.lastWriteUtcTicks
+            }
+        }
+    }
+    $null = Set-McpManifest -Value $manifestNoHashes.Value
+    $customRemoveOutput = @(& (Join-Path $scriptDir 'Uninstall-McpIntegration.ps1') -Client all 2>&1)
+    $customRemoveExit = $LASTEXITCODE
+    Assert-True ($customRemoveExit -eq 0) "(custom-remove) exit 0; obtido $customRemoveExit"
+    Assert-True ([System.IO.File]::ReadAllText((Join-Path $oc 'opencode.jsonc')) -notmatch '"jev"') '(custom-remove) entrada opencode removida'
+    Assert-True ([System.IO.File]::ReadAllText((Join-Path $cx 'config.toml')) -notmatch '\[mcp_servers\.jev\]') '(custom-remove) entrada codex removida'
+    # Restaura preset e reancora para o passo 5 (remove real).
+    $null = Set-McpConfig -BaseUrl 'https://api.commandcode.ai/provider/v1/systemone' -Model 'typesafe/jev' -EndpointConfirmed $true
+    $null = & (Join-Path $scriptDir 'Install-McpIntegration.ps1') -Action install -Client all 2>&1
+
     # 5. Remover entradas: preserva cofre/config.
     $removeOutput = & (Join-Path $scriptDir 'Uninstall-McpIntegration.ps1') -Client all 2>&1
     $removeExit = $LASTEXITCODE
