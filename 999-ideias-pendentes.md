@@ -81,6 +81,26 @@ O `$R$` é sintaxe do Excel (código de moeda + LCID 416 = pt-BR), **não** vari
 
 **Relacionado.** Entrada irmã do formato Real/`$R$` acima; `ExcelDocument.AutoFit`; File `ModelosDePlanilhas`.
 
+<a id="exceldocument-template-autofit-formatos-20261114"></a>
+
+## Checklist genérico: ExcelDocument + Template (AutoFit e formatos) — 2026-11-14
+
+- **Importância** — média (workaround hoje é conhecimento local da KB ou aprendizado na dor; sem nota genérica outra KB/agente repete o mesmo ciclo).
+- **Maturidade** — ideia (regras observadas com evidência; falta decidir dono documental — skill `xpz-builder`, checklist de File, ou nota curta em responsabilidade de Procedure — e o texto final).
+
+**Origem.** Frente RelTitulos (FabricaBrasil18, 2026-11): planilhas com `ExcelDocument.Template` apontando para `.xlsx` em File (`ModelosDePlanilhas`). Layout quebrado quando `AutoFit = 1` (coluna A estourada pelo texto longo do cabeçalho; larguras do modelo descartadas na prática). Formatos de data/moeda só “pegaram” nas linhas já pré-formatadas do template; teto curto de linhas formatadas falhou em planilhas longas. A API GeneXus de `ExcelDocument` **não** expõe `NumberFormat` — formato não se define no Source da procedure.
+
+**Sintoma típico.** Planilha gerada com colunas “fora do modelo” / larguras irreconhecíveis apesar do `.xlsx` ajustado; ou valores/datas sem máscara a partir de certa linha, com o Source aparentemente correto.
+
+**Ideia (não implementar nesta frente).** Registrar checklist genérico (não específico de uma KB) para agente que edita procedure/`File` de planilha com Template, por exemplo:
+1. Se o layout depende das larguras do `.xlsx`, usar `AutoFit = 0` (não `1`).
+2. Datas/moeda/outros formatos: garantir linhas pré-formatadas no template até o teto operacional esperado; não contar com `NumberFormat` no Source.
+3. Após mudar o File modelo, estado servível do `.xlsx` em `web` exige generate/BuildAll no environment que serve a app — import sozinho não basta (alinhar à regra BuildAll × SpecifyGenerate já documentada).
+
+**Fora de escopo desta entrada.** Armadilhas de *patch/leitura* do `.xlsx` (`[$R$-416]` no PowerShell; openpyxl/`col min max`) — já em entradas irmãs de 2026-11-14. Convenções de produto de uma KB (formato Real canônico, “respeitar AJUSTADO”, teto 20000 desta família) ficam no `DECISOES` local, não nesta checklist genérica.
+
+**Relacionado.** `xpz-builder` / checklist de File; entradas `xlsx-formato-real-powershell-dolar-r-20261114` e `xlsx-openpyxl-col-min-max-larguras-20261114`; `xpz-msbuild-build` (BuildAll para estado servível).
+
 <a id="jev-uso-eventual-orientacao-20261109"></a>
 
 ## Orientação de uso eventual do Jev quando disponível (pasta paralela e demais sessões) — 2026-11-09
