@@ -272,10 +272,11 @@ foreach ($clientName in $clientOrder) {
         Add-McpNextAction -Code 67 -Text ("Install-McpIntegration.ps1 -Client $clientName -MigrateLegacy")
     }
 }
-if ($clients['opencode'].installed -and $clients['opencode'].state -eq 'nao_configurado') {
+# Install nao e sugerido para cliente em conflito: ele recusa escrever e a acao seria inviavel.
+if ($clients['opencode'].installed -and $clients['opencode'].state -eq 'nao_configurado' -and -not (@($clients['opencode'].findings | Where-Object { $_.code -eq 'entrada_em_conflito' }).Count -gt 0)) {
     Add-McpNextAction -Code 60 -Text 'Install-McpIntegration.ps1 -Client opencode'
 }
-if ($clients['codex'].installed -and $clients['codex'].state -eq 'nao_configurado') {
+if ($clients['codex'].installed -and $clients['codex'].state -eq 'nao_configurado' -and -not (@($clients['codex'].findings | Where-Object { $_.code -eq 'entrada_em_conflito' }).Count -gt 0)) {
     Add-McpNextAction -Code 60 -Text 'Install-McpIntegration.ps1 -Client codex'
 }
 

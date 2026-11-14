@@ -640,6 +640,17 @@ function Get-McpCodexState {
     )
     $path = Get-McpCodexConfigPath
     $findings = [System.Collections.Generic.List[object]]::new()
+    # Caminho que existe mas nao e arquivo regular e conflito, nunca ausencia (mesma regra do OpenCode).
+    if (Test-McpConfigPathNonRegular -Path $path) {
+        $findings.Add((New-McpFinding -Code 'entrada_em_conflito' -Class 'blocking' -Message 'config.toml existe mas nao e arquivo regular (link, reparse ou diretorio); nao decide sozinho' -Client 'codex')) | Out-Null
+        return [pscustomobject]@{
+            client   = 'codex'
+            state    = 'nao_configurado'
+            path     = $path
+            findings = @($findings)
+            form     = 'absent'
+        }
+    }
     if (-not (Test-McpRegularFile -Path $path)) {
         return [pscustomobject]@{
             client   = 'codex'

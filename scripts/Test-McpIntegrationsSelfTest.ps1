@@ -695,7 +695,7 @@ args = [`"legacy.js`"]
 
     # 9j. Configuracao de cliente que nao e arquivo regular (aqui, diretorio no lugar do arquivo): conflito
     # bloqueante. -RemoveSkillData nao remove launcher nem vendor, e o Install nao escreve. Um link
-    # simbolico ou reparse point cai no mesmo ramo; a deteccao de reparse exige privilegio e nao e testada aqui.
+    # simbolico ou reparse point cai no mesmo ramo; o caso com link real e coberto pela secao 9l (condicional a privilegio).
     Remove-Item -LiteralPath (Get-McpManifestPath) -Force -ErrorAction SilentlyContinue
     if (-not (Test-Path -LiteralPath $ocFile)) {
         [System.IO.File]::WriteAllText($ocFile, "{`n  `"mcp`": {}`n}`n", [System.Text.UTF8Encoding]::new($false))
@@ -730,6 +730,50 @@ args = [`"legacy.js`"]
     Assert-True ((Test-Path -LiteralPath $launcherPath) -and (Test-Path -LiteralPath $vendorDir)) '(nonregular-codex) launcher e vendor preservados'
     Assert-True (@($nrB.Json.findings | Where-Object { $_.code -eq 'entrada_em_conflito' -and $_.class -eq 'blocking' }).Count -ge 1) '(nonregular-codex) achado entrada_em_conflito blocking'
     Remove-Item -LiteralPath $cxFile -Recurse -Force
+    [System.IO.File]::WriteAllText($cxFile, "model = `"gpt-5`"`n", [System.Text.UTF8Encoding]::new($false))
+
+    # 9k. Auditor com configuracao que nao e arquivo regular: conflito bloqueante (entrada_em_conflito), nao
+    # ausencia; e nao sugere Install (que recusa por conflito). Vale para OpenCode e Codex.
+    Remove-Item -LiteralPath $ocFile -Force
+    $null = New-Item -ItemType Directory -Path $ocFile
+    Remove-Item -LiteralPath $cxFile -Force
+    $null = New-Item -ItemType Directory -Path $cxFile
+    $aud9k = @(& (Join-Path $scriptDir 'Test-McpIntegrations.ps1') 2>&1)
+    $aud9kJson = (($aud9k | ForEach-Object { [string]$_ }) -join "`n") | ConvertFrom-Json -AsHashtable
+    $conflictFindings = @($aud9kJson.findings | Where-Object { $_.code -eq 'entrada_em_conflito' -and $_.class -eq 'blocking' })
+    # O Codex e detectado pela pasta .codex do ambiente de teste. O OpenCode nao e detectado aqui, e o auditor
+    # so avalia configuracao de cliente detectado (regra existente); por isso so o Codex aparece como conflito.
+    Assert-True ($conflictFindings.Count -ge 1) "(audit-nonregular) entrada_em_conflito blocking para o codex detectado; obtido $($conflictFindings.Count)"
+    Assert-True ([string]$aud9kJson.overall -eq 'INTEGRATIONS_GAPS') "(audit-nonregular) overall GAPS; obtido $($aud9kJson.overall)"
+    Assert-True (@($aud9kJson.nextActions | Where-Object { $_ -match 'Install-McpIntegration\.ps1 -Client (codex|opencode)' }).Count -eq 0) '(audit-nonregular) nao sugere Install para cliente em conflito'
+    Remove-Item -LiteralPath $ocFile -Recurse -Force
+    [System.IO.File]::WriteAllText($ocFile, "{`n  `"mcp`": {}`n}`n", [System.Text.UTF8Encoding]::new($false))
+    Remove-Item -LiteralPath $cxFile -Recurse -Force
+    [System.IO.File]::WriteAllText($cxFile, "model = `"gpt-5`"`n", [System.Text.UTF8Encoding]::new($false))
+
+    # 9l. Link simbolico (reparse point real) no lugar do config.toml: mesmo ramo de 9j. Criar link exige
+    # privilegio (ou Modo de Desenvolvedor); sem ele o caso e registrado como SKIP e nada e afirmado.
+    $symTarget = "$cxFile.real"
+    $symlinkOk = $false
+    try {
+        Remove-Item -LiteralPath $cxFile -Force -ErrorAction SilentlyContinue
+        [System.IO.File]::WriteAllText($symTarget, "model = `"gpt-5`"`n", [System.Text.UTF8Encoding]::new($false))
+        New-Item -ItemType SymbolicLink -Path $cxFile -Target $symTarget -ErrorAction Stop | Out-Null
+        $symlinkOk = $true
+    } catch {
+        Write-Host "[SKIP] 9l link simbolico indisponivel (sem privilegio ou Modo de Desenvolvedor): $($_.Exception.Message)" -ForegroundColor Yellow
+    }
+    if ($symlinkOk) {
+        Assert-True ((Get-Item -LiteralPath $cxFile -Force).Attributes.HasFlag([System.IO.FileAttributes]::ReparsePoint)) '(symlink) config.toml e reparse point'
+        $nrSym = Invoke-McpRemovalCase -Params @{ Client = 'all'; RemoveSkillData = $true }
+        Assert-True ($nrSym.Exit -ne 0) "(symlink) -RemoveSkillData bloqueado; obtido exit $($nrSym.Exit)"
+        Assert-True (-not [bool]$nrSym.Json.dataRemoved -and -not [bool]$nrSym.Json.launcherRemoved -and -not [bool]$nrSym.Json.vendorRemoved) '(symlink) nenhum dado removido'
+        Assert-True ((Test-Path -LiteralPath $launcherPath) -and (Test-Path -LiteralPath $vendorDir)) '(symlink) launcher e vendor preservados'
+        Assert-True (@($nrSym.Json.findings | Where-Object { $_.code -eq 'entrada_em_conflito' -and $_.class -eq 'blocking' }).Count -ge 1) '(symlink) achado entrada_em_conflito blocking'
+    }
+    # Limpeza: remove so o link (sem -Recurse) e o alvo; restaura o config.toml regular.
+    if (Test-Path -LiteralPath $cxFile) { Remove-Item -LiteralPath $cxFile -Force -ErrorAction SilentlyContinue }
+    Remove-Item -LiteralPath $symTarget -Force -ErrorAction SilentlyContinue
     [System.IO.File]::WriteAllText($cxFile, "model = `"gpt-5`"`n", [System.Text.UTF8Encoding]::new($false))
 
     # 10. Gate do dist real, quando informado.
