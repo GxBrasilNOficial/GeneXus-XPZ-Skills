@@ -113,3 +113,15 @@ Origem: item de verificação de processo que acompanhava o registro `lexer-barr
 
 - `28f41bd` — Lexer: barra antes de aspa em código GeneXus e bloco nativo csharp/java.
 - `4eb6afa` — Scanner de sanidade alinhado ao lexer: barra antes de aspa e bloco nativo.
+
+## MCP — configuração em link simbólico: reprodução física do conflito — 2026-11-14
+
+Origem: dúvida aberta no commit `bb256c7`, que corrigiu o caminho de configuração que não é arquivo regular. A correção foi fechada pelo código e pelo teste 9j (diretório no lugar do arquivo), mas a reprodução com link simbólico real ficou pendente porque criar link exige privilégio ou Modo de Desenvolvedor.
+
+**Evidência.** Em PowerShell com privilégio, num arquivo temporário fora do repositório, um link simbólico para um arquivo regular devolveu `Test-McpRegularFile` = `False` e `Test-McpConfigPathNonRegular` = `True`. Ou seja, o link cai no ramo de conflito bloqueante, e não no de ausência. A pasta de teste foi removida depois da medição.
+
+**Limite registrado.** A medição cobre o predicado (`Test-McpRegularFile` e `Test-McpConfigPathNonRegular`), não a remoção completa com `-RemoveSkillData`. Esse fluxo ficou coberto pelo teste 9j com diretório. Um caso de remoção com link real foi escrito no self-test como subcaso condicional a privilégio (`SKIP` sem privilégio), mas ainda não foi executado com privilégio, porque a suíte estava com uma falha de outra frente em andamento na mesma árvore de trabalho.
+
+### Rastreabilidade
+
+- `bb256c7` — Configuração que não é arquivo regular vira conflito bloqueante.
