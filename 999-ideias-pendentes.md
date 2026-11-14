@@ -17,7 +17,7 @@ Entradas legadas sem avaliação carregam `FALTA AVALIAR` em ambos os campos at�
 
 ## Lexer: barra antes de aspa em código GeneXus e bloco nativo csharp/java — 2026-11-14
 
-- **Importância** — alta (se o pareamento de aspas em bloco nativo esconder marcadores `New`/`EndNew`, o gate 9-PNW pode liberar um pacote sem extração; no conjunto testado o resultado foi bloqueio, não passagem).
+- **Importância** — média (gap real no lexer: se o pareamento de aspas em bloco nativo esconder marcadores `New`/`EndNew`, o gate 9-PNW pode liberar um pacote sem extração; o caso que faz isso foi construído, não encontrado no acervo medido, e nos casos testados o resultado foi bloqueio, não passagem).
 - **Maturidade** — pesquisa feita (comportamento do GeneXus medido por validação do parser e geração de código; falta decidir se blocos `csharp`/`java` passam a ser opacos).
 
 Descrição: no GeneXus, `\"` dentro de literal é uma barra seguida do fechamento da aspa, e aspa dupla repetida não é aspa embutida. O lexer passa a aceitar esses casos em código GeneXus e mantém a rejeição de barra antes de aspa em linhas de bloco nativo (`csharp`, `java`), fail-closed. Residual: blocos nativos não são opacos ao lexer; uma contagem ímpar de aspas dentro de bloco nativo pode deslocar o pareamento, e o caso testado bloqueia. Evidência: casos medidos em KB de teste, sem números de acervo privado. Gatilho: caso real de falha em bloco nativo.
