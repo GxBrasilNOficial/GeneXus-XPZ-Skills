@@ -22,6 +22,8 @@ Entradas legadas sem avaliação carregam `FALTA AVALIAR` em ambos os campos at�
 
 Descrição: no GeneXus, `\"` dentro de literal é uma barra seguida do fechamento da aspa, e aspa dupla repetida não é aspa embutida. O lexer passa a aceitar esses casos em código GeneXus e mantém a rejeição de barra antes de aspa em linhas de bloco nativo (`csharp`, `java`), fail-closed. Residual: blocos nativos não são opacos ao lexer; uma contagem ímpar de aspas dentro de bloco nativo pode deslocar o pareamento, e o caso testado bloqueia. Evidência: casos medidos em KB de teste, sem números de acervo privado. Gatilho: caso real de falha em bloco nativo.
 
+**Divergência a confirmar.** Antes do commit `28f41bd`, o docstring do `lex_source` citava a documentação oficial do GeneXus 18 com a frase «Quoted strings support doubled quote delimiters», e rejeitava barra antes de aspa porque, segundo o mesmo comentário, o material oficial não a definia de forma consistente. A regra de 2026-11-14 contradiz a leitura de aspa dobrada e se apoia apenas na medição em KB de teste, registrada no CHANGELOG. A skill `nexa` (`references/global-constraints.md`) confirma que `\"` não é escape em literal, mas não trata de aspa dobrada. Pendente: confirmar `"a""b"` com teste direto no GeneXus ou com o texto oficial antes de tratar a regra como definitiva. Enquanto isso, a regra vale como medição local, não como fonte oficial.
+
 <a id="specifygenerate-pos-build-apos-generateonly-20261114"></a>
 
 ## SpecifyGenerate: sinal e/ou fechamento de pós-build após GenerateOnly — 2026-11-14
