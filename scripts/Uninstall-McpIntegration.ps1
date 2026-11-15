@@ -63,7 +63,29 @@ $pin = Get-McpVendorPin
 $launcherPath = Get-McpLauncherPath -Version $pin.Version
 $manifest = Get-McpManifest
 if ($manifest.Corrupt) {
+    # Exit 67 = escrita recusada: sem registro confiavel, nada e removido (clientes,
+    # dados da skill ou cofre), nem em -WhatIf.
     $findings.Add((New-McpFinding -Code 'manifesto_corrompido' -Class 'blocking' -Message $manifest.Error)) | Out-Null
+    $nextActions.Add('Restaurar ou corrigir install-manifest.json antes de remover; nada foi alterado') | Out-Null
+    $corruptExit = Resolve-McpGapsExitCode -Overall 'INTEGRATIONS_GAPS' -Findings @($findings)
+    [pscustomobject][ordered]@{
+        schemaVersion   = 1
+        kind            = 'xpz-mcp-integrations-setup-mutation'
+        generatedAtUtc  = [DateTime]::UtcNow.ToString('o')
+        action          = 'remove'
+        overall         = 'INTEGRATIONS_GAPS'
+        exitCode        = $corruptExit
+        changed         = $false
+        planned         = $planned
+        clients         = $clientsResult
+        launcherRemoved = $false
+        vendorRemoved   = $false
+        dataRemoved     = $false
+        vaultRemoved    = $false
+        findings        = @($findings)
+        nextActions     = @($nextActions)
+    } | ConvertTo-Json -Depth 30
+    exit $corruptExit
 }
 
 # Emissao atual: config.json efetivo (paridade com install); fallback = preset.

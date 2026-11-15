@@ -693,6 +693,12 @@ verdade** (rejeitar stub `WindowsApps`/alias da Store) para `node`/`npm`/`pwsh`.
 (`>= 22`): `< 22` é bloqueante, acima disso é reportada. O launcher usa o Node **absoluto** resolvido
 no install; reparo re-resolve e re-emite. Manifesto × catálogo e runtime dedicado: **Anexo B.5**.
 
+**Implementação (2026-11-14):** para `pwsh`, a auditoria e o `-CheckBoot` usam o **primeiro da
+ordem do `PATH`**, porque os clientes gravam o comando literal `pwsh` e o resolvem assim; não se
+procura outro adiante. Limite: o `PATH` do cliente pode diferir do da auditoria. Para
+`node`/`npm`/`python`, qualquer executável em `WindowsApps` é recusado **sem sondagem** (stub da
+Store ou executável de pacote versionado de outro app, cujo caminho muda na atualização).
+
 **Python 3.11+ (opcional, v23):** resolvido por `GeneXusPythonPrerequisite.ps1` com checagem de
 versão ≥ 3.11 (para o `tomllib`). Usado **só** pelo adaptador do Codex (A.8). Ausente ou antigo →
 `python_indisponivel` (**warn**) e o Codex cai em `edicao_manual_necessaria`.
@@ -718,6 +724,11 @@ versionado** (reduzido na v22):
 - `endpointConfirmed` vale só para o `baseUrl` gravado: mudar a URL **invalida** e exige nova
   confirmação quando o host diferir do preset Command Code. Host/caminho **redigidos** antes da
   confirmação.
+- **Implementação (2026-11-14):** install, auditoria e launcher aplicam a mesma regra — `baseUrl`
+  só `https://`, host fora do preset exige `endpointConfirmed` booleano `true`; o launcher a
+  confere antes de abrir o cofre e sai com exit 62 sem iniciar o filho. O install invalida a
+  confirmação quando a URL muda; já auditoria e launcher **não** amarram o `endpointConfirmed` à
+  URL gravada, então uma edição manual que troque o host e mantenha `true` passa.
 
 ### A.7 Cofre — blob, entrada e eventos
 

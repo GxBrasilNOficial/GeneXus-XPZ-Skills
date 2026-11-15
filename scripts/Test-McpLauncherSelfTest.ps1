@@ -233,12 +233,33 @@ try {
     $env:PATH = $originalPath
     Assert-True ((-not $waPwshStub.Present) -and $waPwshStub.Stub) '(prereq) pwsh WindowsApps zero-byte recusado'
 
-    $waPwshCommand = Join-Path $waPwshDir 'pwsh.cmd'
+    # Pasta separada: com o pwsh.exe zero-byte ao lado, o primeiro do PATH seria o stub.
+    $waPwshWorkingDir = Join-Path $tempRoot 'working\WindowsApps'
+    [System.IO.Directory]::CreateDirectory($waPwshWorkingDir) | Out-Null
+    $waPwshCommand = Join-Path $waPwshWorkingDir 'pwsh.cmd'
     [System.IO.File]::WriteAllText($waPwshCommand, ('@echo off' + $lineBreak + 'echo 7.4.1' + $lineBreak + 'exit /b 0' + $lineBreak), [System.Text.UTF8Encoding]::new($false))
-    $env:PATH = $waPwshDir
+    $env:PATH = $waPwshWorkingDir
     $waPwshWorking = Get-McpCommandInfo -Name 'pwsh' -VersionArguments @('-NoProfile', '-Command', '$PSVersionTable.PSVersion.ToString()')
     $env:PATH = $originalPath
     Assert-True ($waPwshWorking.Present -and $waPwshWorking.Version -eq '7.4.1') '(prereq) pwsh WindowsApps funcional aceito'
+
+    # pwsh pela ordem do PATH, como o cliente resolve o comando literal 'pwsh': o primeiro vale,
+    # mesmo que outro mais adiante (e em ordem alfabetica anterior) seja compativel.
+    $pwshFirstDir = Join-Path $tempRoot 'z-primeiro-no-path'
+    $pwshSecondDir = Join-Path $tempRoot 'a-segundo-no-path'
+    [System.IO.Directory]::CreateDirectory($pwshFirstDir) | Out-Null
+    [System.IO.Directory]::CreateDirectory($pwshSecondDir) | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $pwshFirstDir 'pwsh.cmd'), ('@echo off' + $lineBreak + 'echo 7.3.9' + $lineBreak + 'exit /b 0' + $lineBreak), [System.Text.UTF8Encoding]::new($false))
+    [System.IO.File]::WriteAllText((Join-Path $pwshSecondDir 'pwsh.cmd'), ('@echo off' + $lineBreak + 'echo 7.4.1' + $lineBreak + 'exit /b 0' + $lineBreak), [System.Text.UTF8Encoding]::new($false))
+    $env:PATH = $pwshFirstDir + ';' + $pwshSecondDir
+    $pwshPathOrder = Get-McpCommandInfo -Name 'pwsh' -VersionArguments @('-NoProfile', '-Command', '$PSVersionTable.PSVersion.ToString()')
+    $env:PATH = $originalPath
+    Assert-True ($pwshPathOrder.Present -and $pwshPathOrder.Version -eq '7.3.9' -and ([string]$pwshPathOrder.Path).StartsWith($pwshFirstDir)) "(prereq) pwsh auditado e o primeiro do PATH; obtido $($pwshPathOrder.Version) em $($pwshPathOrder.Path)"
+    [System.IO.File]::WriteAllText((Join-Path $pwshFirstDir 'pwsh.cmd'), ('@echo off' + $lineBreak + 'exit /b 1' + $lineBreak), [System.Text.UTF8Encoding]::new($false))
+    $env:PATH = $pwshFirstDir + ';' + $pwshSecondDir
+    $pwshFirstBroken = Get-McpCommandInfo -Name 'pwsh' -VersionArguments @('-NoProfile', '-Command', '$PSVersionTable.PSVersion.ToString()')
+    $env:PATH = $originalPath
+    Assert-True (-not $pwshFirstBroken.Present) '(prereq) primeiro pwsh do PATH inutilizavel nao cai no segundo'
 
     # Piso 7.4: Present com 7.3.9 deve gerar achado blocking.
     $oldPwshPrereq = [pscustomobject]@{
@@ -442,6 +463,25 @@ exit 42
     [System.IO.File]::WriteAllText((Get-McpConfigPath), '{ invalid', [System.Text.UTF8Encoding]::new($false))
     $noConfig = Start-LauncherProcess -LauncherPath $launcherWrite.Path
     Assert-True ($noConfig.ExitCode -eq 62 -and [string]::IsNullOrEmpty($noConfig.Stdout)) "(launcher-noconfig) exit 62 e stdout vazio; obtido $($noConfig.ExitCode)"
+
+    # config.json editado fora do install: o launcher aplica a regra de endpoint antes do cofre/filho.
+    $launcherConfigCases = @(
+        @{ Label = 'http'; BaseUrl = 'http://api.commandcode.ai/provider/v1/systemone'; Confirmed = $true; Expected = 62 },
+        @{ Label = 'host-nao-confirmado'; BaseUrl = 'https://example.invalid/v1'; Confirmed = $false; Expected = 62 },
+        @{ Label = 'confirmado-string'; BaseUrl = 'https://example.invalid/v1'; Confirmed = 'true'; Expected = 62 },
+        @{ Label = 'host-confirmado'; BaseUrl = 'https://example.invalid/v1'; Confirmed = $true; Expected = 42 },
+        @{ Label = 'preset-sem-confirmacao'; BaseUrl = $baseUrl; Confirmed = $false; Expected = 42 }
+    )
+    foreach ($case in $launcherConfigCases) {
+        $caseConfig = [ordered]@{ schemaVersion = 1; provider = 'compatible'; baseUrl = $case.BaseUrl; model = $model; endpointConfirmed = $case.Confirmed }
+        [System.IO.File]::WriteAllText((Get-McpConfigPath), (($caseConfig | ConvertTo-Json) + "`n"), [System.Text.UTF8Encoding]::new($false))
+        $caseRun = Start-LauncherProcess -LauncherPath $launcherWrite.Path
+        if ($case.Expected -eq 62) {
+            Assert-True ($caseRun.ExitCode -eq 62 -and [string]::IsNullOrEmpty($caseRun.Stdout)) "(launcher-endpoint-$($case.Label)) exit 62, sem filho; obtido $($caseRun.ExitCode)"
+        } else {
+            Assert-True ($caseRun.ExitCode -eq 42) "(launcher-endpoint-$($case.Label)) filho iniciado; obtido $($caseRun.ExitCode)"
+        }
+    }
     [System.IO.File]::WriteAllText((Get-McpConfigPath), $configBackup, [System.Text.UTF8Encoding]::new($false))
 
     $missingNodeLauncher = Install-McpLauncher -Version '0.13.2' -NodePath (Join-Path $tempRoot 'missing-node.exe') -EntryPath $fakeChild -VendorDir $tempRoot

@@ -693,6 +693,35 @@ args = [`"legacy.js`"]
     Assert-True ([string]$corruptAudit.overall -eq 'INTEGRATIONS_GAPS') "(corrupt) overall GAPS com manifesto corrompido; obtido $($corruptAudit.overall)"
     Assert-True ($corruptAuditExit -eq 67) "(corrupt) exit 67 (manifesto_corrompido); obtido $corruptAuditExit"
 
+    # 9i-b. Mutadores com o mesmo manifesto corrompido: exit 67 = escrita recusada. O Uninstall nao
+    # remove a entrada do OpenCode nem o cofre; o Install nao recria o launcher nem regrava config.json.
+    # Estado proprio: instalacao limpa com entrada nos dois clientes, depois a mesma corrupcao (chave extra).
+    Remove-Item -LiteralPath $corruptPath -Force -ErrorAction SilentlyContinue
+    [System.IO.File]::WriteAllText($ocFile, "{`n  `"mcp`": {}`n}`n", [System.Text.UTF8Encoding]::new($false))
+    [System.IO.File]::WriteAllText($cxFile, "model = `"gpt-5`"`n", [System.Text.UTF8Encoding]::new($false))
+    Assert-True ((Invoke-McpInstallForRemoval) -eq 0) '(corrupt-mutators) install inicial exit 0'
+    Assert-True ([System.IO.File]::ReadAllText($ocFile) -match '"jev"') '(corrupt-mutators) entrada do OpenCode presente'
+    $corruptObj = Get-Content -Raw -LiteralPath $corruptPath | ConvertFrom-Json -AsHashtable
+    $corruptObj['chaveExtraManual'] = 'valor-do-usuario'
+    [System.IO.File]::WriteAllText($corruptPath, (($corruptObj | ConvertTo-Json -Depth 30) + "`n"), [System.Text.UTF8Encoding]::new($false))
+    $corruptManifestBefore = [System.IO.File]::ReadAllText($corruptPath)
+    $corruptOcBefore = [System.IO.File]::ReadAllText($ocFile)
+    $corruptRm = Invoke-McpRemovalCase -Params @{ Client = 'all'; RemoveVault = $true }
+    Assert-True ($corruptRm.Exit -eq 67 -and -not [bool]$corruptRm.Json.changed) "(corrupt-uninstall) exit 67 sem mudanca; obtido exit $($corruptRm.Exit) changed=$($corruptRm.Json.changed)"
+    Assert-True (-not [bool]$corruptRm.Json.vaultRemoved -and (Test-McpVaultExists)) '(corrupt-uninstall) cofre preservado'
+    Assert-True ([System.IO.File]::ReadAllText($ocFile) -ceq $corruptOcBefore) '(corrupt-uninstall) entrada do OpenCode intacta'
+    Assert-True ([System.IO.File]::ReadAllText($corruptPath) -ceq $corruptManifestBefore) '(corrupt-uninstall) manifesto intacto'
+    $corruptLauncherBackup = [System.IO.File]::ReadAllBytes($launcherPath)
+    $corruptConfigBefore = [System.IO.File]::ReadAllText((Get-McpConfigPath))
+    Remove-Item -LiteralPath $launcherPath -Force
+    $corruptInstOutput = @(& (Join-Path $scriptDir 'Install-McpIntegration.ps1') -Action repair -Client opencode 2>&1)
+    $corruptInstExit = $LASTEXITCODE
+    $corruptInst = (($corruptInstOutput | ForEach-Object { [string]$_ }) -join "`n") | ConvertFrom-Json -AsHashtable
+    Assert-True ($corruptInstExit -eq 67 -and -not [bool]$corruptInst.changed) "(corrupt-install) exit 67 sem mudanca; obtido exit $corruptInstExit changed=$($corruptInst.changed)"
+    Assert-True (-not (Test-Path -LiteralPath $launcherPath)) '(corrupt-install) launcher nao recriado antes do bloqueio'
+    Assert-True ([System.IO.File]::ReadAllText((Get-McpConfigPath)) -ceq $corruptConfigBefore) '(corrupt-install) config.json intacto'
+    [System.IO.File]::WriteAllBytes($launcherPath, $corruptLauncherBackup)
+
     # 9j. Configuracao de cliente que nao e arquivo regular (aqui, diretorio no lugar do arquivo): conflito
     # bloqueante. -RemoveSkillData nao remove launcher nem vendor, e o Install nao escreve. Um link
     # simbolico ou reparse point cai no mesmo ramo; o caso com link real e coberto pela secao 9l (condicional a privilegio).

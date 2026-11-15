@@ -1182,11 +1182,20 @@ function Get-McpCommandInfo {
             Version = $null
         }
     }
-    # Prefira fora de WindowsApps (stub Store); pwsh empacotado pode ser real e e sondado sem janela.
-    $ranked = @($commands | Sort-Object @(
-            @{ Expression = { if ([string]$_.Source -match '\\WindowsApps\\') { 1 } else { 0 } } },
-            @{ Expression = { [string]$_.Source } }
-        ))
+    if ($Name -eq 'pwsh') {
+        # Os clientes gravam o comando literal 'pwsh' e o resolvem pelo PATH: audita-se o mesmo
+        # executavel, o primeiro na ordem do PATH (Get-Command -All preserva essa ordem). Se ele
+        # nao for utilizavel, o cliente tambem falharia; nao se procura outro mais adiante.
+        $ranked = @($commands | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_.Source) } | Select-Object -First 1)
+    } else {
+        # node/npm/python: o install grava caminho absoluto, entao se prefere fora de WindowsApps.
+        # Nessa pasta ficam o stub da Store e executaveis de pacotes versionados de outros apps
+        # (o caminho muda na atualizacao do pacote): sao recusados sem sondar.
+        $ranked = @($commands | Sort-Object @(
+                @{ Expression = { if ([string]$_.Source -match '\\WindowsApps\\') { 1 } else { 0 } } },
+                @{ Expression = { [string]$_.Source } }
+            ))
+    }
     $sawWindowsAppsStub = $false
     $lastWaPath = $null
     foreach ($command in $ranked) {
@@ -1308,7 +1317,7 @@ function Get-McpPrerequisiteFindings {
     }
     if (-not $Prerequisites.Node.Present) {
         if ($Prerequisites.Node.Stub) {
-            $findings.Add((New-McpFinding -Code 'node_path_nao_resolve' -Class 'blocking' -Message 'node no PATH e apenas stub da Microsoft Store.')) | Out-Null
+            $findings.Add((New-McpFinding -Code 'node_path_nao_resolve' -Class 'blocking' -Message 'node no PATH so existe em WindowsApps (stub da Microsoft Store ou executavel de pacote versionado de outro app); esse caminho e recusado sem sondagem. Instale o Node fora de WindowsApps.')) | Out-Null
         } else {
             $findings.Add((New-McpFinding -Code 'node_ausente' -Class 'blocking' -Message 'node nao encontrado no PATH.')) | Out-Null
         }

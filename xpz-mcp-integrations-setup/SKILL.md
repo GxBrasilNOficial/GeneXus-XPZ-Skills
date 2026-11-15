@@ -184,6 +184,11 @@ bloqueiam. O descritor e validado no F1 e no self-test.
    live restante (OpenCode/Codex); se ainda houver, `dados_compartilhados_em_uso`
    (exit 67) e o shared permanece.
 
+   Manifesto corrompido (`manifesto_corrompido`, exit 67) recusa a remocao antes
+   de qualquer escrita: nenhum cliente, dado da skill ou cofre e removido, nem em
+   `-WhatIf`. O Install faz a mesma checagem antes de vendor, launcher e
+   `config.json`.
+
    Registro de cliente cuja configuracao nao existe e orfao: sai do manifesto
    com o aviso `registro_orfao_removido` (warn). Em `-WhatIf` aparece como plano.
 
@@ -253,9 +258,15 @@ Estados por cliente, **um valor so**, na ordem:
   nao derruba `INTEGRATIONS_OK` sozinho.
 - **Sondas de pre-requisito:** `Get-McpCommandInfo` só classifica os comandos
   como presentes se iniciarem, terminarem em até 8 s com exit code 0 e a saída
-  contiver uma versão reconhecida para aquele comando. `pwsh` funcional em
-  `WindowsApps` continua elegível; stub de outros comandos nessa pasta continua
-  recusado.
+  contiver uma versão reconhecida para aquele comando. Para `pwsh`, vale o
+  primeiro da ordem do `PATH`, o mesmo que o cliente resolve a partir do comando
+  literal `pwsh` gravado na entrada; se ele nao for utilizavel ou for < 7.4, o
+  achado aparece mesmo que outro `pwsh` adiante sirva. Esse `pwsh` pode estar em
+  `WindowsApps`. Limite: o `PATH` do processo do cliente pode diferir do `PATH`
+  da auditoria. Para `node`/`npm`/`python`, qualquer executavel em `WindowsApps`
+  e recusado sem sondagem: ali ficam o stub da Store e executaveis de pacotes
+  versionados de outros apps, cujo caminho muda na atualizacao do pacote, e o
+  install grava caminho absoluto.
 - **Precedencia de exit code:** com mais de um achado `blocking`, vence o
   primeiro codigo presente em `precedence` no `exit-codes.catalog.json`:
   `67 > 66 > 61 > 62 > 63 > 64 > 65 > 60`. `nextActions` segue a mesma ordem.
@@ -313,7 +324,13 @@ e exit 69.
   mesmo usuario, inspecao do ambiente do filho nem roaming.
 - **Launcher:** `ProcessStartInfo` com stdio herdado, ambiente limpo + allowlist
   do descritor, `JEV_API_KEY` lida do cofre, zero bytes do launcher em stdout e
-  exit code do filho propagado. O encerramento depende do fim do stdin; se o
+  exit code do filho propagado. Antes de abrir o cofre, aplica ao `config.json`
+  a mesma regra de endpoint do install e da auditoria: `baseUrl` so `https://`,
+  e host fora do preset exige `endpointConfirmed` booleano `true`; senao sai com
+  exit 62 sem iniciar o filho. A regra nao amarra o `endpointConfirmed` a uma URL
+  especifica: um `config.json` editado a mao que troque o host e mantenha `true`
+  passa, como na auditoria. Launcher emitido antes dessa regra so a recebe no
+  reparo. O encerramento depende do fim do stdin; se o
   cliente nao fechar, o filho pode ficar orfao (risco aceito sem Job Object).
 - **Rede:** o instalador so usa rede em install/update (`npm ci`); o launcher/MCP
   so fala com o endpoint configurado. A contencao de rede **nao foi demonstrada**

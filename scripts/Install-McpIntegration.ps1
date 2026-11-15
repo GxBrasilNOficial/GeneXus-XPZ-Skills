@@ -231,6 +231,12 @@ if ($Action -in @('install', 'repair', 'update') -and -not $credential.exists) {
     Add-McpNextAction -Code 61 -Text 'Set-McpCredential.ps1 -Action import -ImportFromOpenCode'
     Add-McpNextAction -Code 61 -Text 'Set-McpCredential.ps1 -Action set'
 }
+# Manifesto corrompido tambem entra no gate antes de qualquer escrita: exit 67 = escrita
+# recusada. A releitura depois de launcher/config continua como defesa contra corrida.
+$manifestBeforeWrite = Get-McpManifest
+if ($manifestBeforeWrite.Corrupt) {
+    $findings.Add((New-McpFinding -Code 'manifesto_corrompido' -Class 'blocking' -Message $manifestBeforeWrite.Error)) | Out-Null
+}
 # Credencial entra no gate ANTES de qualquer escrita (vendor/launcher/config/clientes),
 # inclusive em repair (mesmo criterio de install/update; record-e2e fica fora).
 $blockingBeforeInstall = @($findings | Where-Object { $_.class -eq 'blocking' })

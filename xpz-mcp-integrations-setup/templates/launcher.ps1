@@ -16,6 +16,7 @@ $mcpManagedRoot = '__XPZ_MCP_MANAGED_ROOT__'
 $mcpNodePath = '__XPZ_MCP_NODE_PATH__'
 $mcpEntryPath = '__XPZ_MCP_ENTRY_PATH__'
 $mcpVendorDir = '__XPZ_MCP_VENDOR_DIR__'
+$mcpPresetHost = '__XPZ_MCP_PRESET_HOST__'
 $mcpConfigPath = Join-Path $mcpManagedRoot 'config.json'
 $mcpVaultPath = Join-Path $mcpManagedRoot 'vault\credential.blob'
 
@@ -52,6 +53,20 @@ function Get-McpLauncherConfig {
     $model = [string]$config.model
     if ([string]::IsNullOrWhiteSpace($baseUrl) -or [string]::IsNullOrWhiteSpace($model)) {
         throw [System.IO.InvalidDataException]::new('config.json sem baseUrl/model')
+    }
+    # Mesma regra do install e da auditoria, antes de abrir o cofre: so https, e host
+    # fora do preset exige endpointConfirmed booleano verdadeiro.
+    if ($baseUrl -notmatch '^https://[^\s]+$') {
+        throw [System.IO.InvalidDataException]::new('config.json com baseUrl que nao e https')
+    }
+    $baseUri = $null
+    if (-not [Uri]::TryCreate($baseUrl, [UriKind]::Absolute, [ref]$baseUri)) {
+        throw [System.IO.InvalidDataException]::new('config.json com baseUrl invalida')
+    }
+    $confirmedProperty = $config.PSObject.Properties['endpointConfirmed']
+    $endpointConfirmed = ($null -ne $confirmedProperty -and $confirmedProperty.Value -is [bool] -and $confirmedProperty.Value)
+    if (-not [string]::Equals($baseUri.Host, $mcpPresetHost, [System.StringComparison]::OrdinalIgnoreCase) -and -not $endpointConfirmed) {
+        throw [System.IO.InvalidDataException]::new('config.json com host fora do preset sem endpoint confirmado; execute o reparo da skill com -ConfirmEndpoint')
     }
     return [pscustomobject]@{
         BaseUrl = $baseUrl

@@ -62,6 +62,23 @@ function Test-McpLauncherText {
     return (($head -join "`n").Contains($sentinel))
 }
 
+function Get-McpLauncherPresetHost {
+    # Host do preset do modo compatible: o launcher aplica a mesma regra de endpoint
+    # do install e da auditoria (host fora do preset exige endpointConfirmed).
+    param([string]$RepoRoot = (Get-McpRepoRoot))
+    $descriptor = Get-McpDescriptor -RepoRoot $RepoRoot
+    $presetName = [string]$descriptor.Descriptor.modes.compatible.preset
+    $preset = $descriptor.Descriptor.presets[$presetName]
+    if ($null -eq $preset) {
+        throw "XPZ_MCP_LAUNCHER_PRESET_MISSING: preset '$presetName' do modo compatible ausente no descritor"
+    }
+    $presetUri = $null
+    if (-not [Uri]::TryCreate([string]$preset.baseUrl, [UriKind]::Absolute, [ref]$presetUri) -or [string]::IsNullOrWhiteSpace($presetUri.Host)) {
+        throw "XPZ_MCP_LAUNCHER_PRESET_INVALID: baseUrl do preset '$presetName' invalida"
+    }
+    return $presetUri.Host
+}
+
 function New-McpLauncherText {
     param(
         [Parameter(Mandatory = $true)][string]$Version,
@@ -71,6 +88,7 @@ function New-McpLauncherText {
         [Parameter(Mandatory = $true)][string]$ManagedRoot,
         [string]$RepoRoot = (Get-McpRepoRoot)
     )
+    $presetHost = Get-McpLauncherPresetHost -RepoRoot $RepoRoot
     $templatePath = Get-McpLauncherTemplatePath -RepoRoot $RepoRoot
     if (-not (Test-McpRegularFile -Path $templatePath)) {
         throw "XPZ_MCP_LAUNCHER_TEMPLATE_MISSING: $templatePath"
@@ -82,6 +100,7 @@ function New-McpLauncherText {
         '__XPZ_MCP_ENTRY_PATH__'      = $EntryPath
         '__XPZ_MCP_VENDOR_DIR__'      = $VendorDir
         '__XPZ_MCP_MANAGED_ROOT__'    = $ManagedRoot
+        '__XPZ_MCP_PRESET_HOST__'     = $presetHost
     }
     $text = $template.Text
     foreach ($token in $values.Keys) {
