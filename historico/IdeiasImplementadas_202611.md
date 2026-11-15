@@ -122,11 +122,13 @@ Origem: dúvida aberta no commit `bb256c7`, que corrigiu o caminho de configura�
 
 **Evidência.** Em PowerShell com privilégio, num arquivo temporário fora do repositório, um link simbólico para um arquivo regular devolveu `Test-McpRegularFile` = `False` e `Test-McpConfigPathNonRegular` = `True`. Ou seja, o link cai no ramo de conflito bloqueante, e não no de ausência. A pasta de teste foi removida depois da medição.
 
-**Limite registrado.** A medição cobre o predicado (`Test-McpRegularFile` e `Test-McpConfigPathNonRegular`), não a remoção completa com `-RemoveSkillData`. Esse fluxo ficou coberto pelo teste 9j com diretório. Um caso de remoção com link real foi escrito no self-test como subcaso condicional a privilégio (`SKIP` sem privilégio), no bloco `9l`.
+**Limite registrado.** A medição cobre o predicado (`Test-McpRegularFile` e `Test-McpConfigPathNonRegular`), não a remoção completa com `-RemoveSkillData`. Esse fluxo ficou coberto pelo teste 9j com diretório. Um caso de remoção com link real foi escrito no self-test como subcaso condicional a privilégio (`SKIP` sem privilégio), no bloco que hoje se chama `9n`.
 
-**Validação com privilégio.** Rodada em PowerShell 7 elevado, com `Test-McpIntegrationsSelfTest.ps1`: `XPZ_MCP_INTEGRATIONS_SELFTEST_OK: 227 asserts`, sem `SKIP` do `9l`. O total corresponde ao estado commitado em `1c0e98b` (222 asserts sem privilégio, mais 5 do caso com link real). O bloco `9l` entrou nesse commit junto com a correção do auditor de outra sessão, sem mensagem própria.
+**Validação com privilégio.** Rodada em PowerShell 7 elevado, com `Test-McpIntegrationsSelfTest.ps1`: `XPZ_MCP_INTEGRATIONS_SELFTEST_OK: 227 asserts`, sem `SKIP` do bloco de link. O total corresponde ao estado commitado em `1c0e98b`, quando o bloco ainda se chamava `9l` (222 asserts sem privilégio, mais 5 do caso com link real). O bloco entrou nesse commit junto com a correção do auditor de outra sessão, sem mensagem própria.
+
+**Mudanças depois dessa validação.** Em `17b11fe`, o bloco foi renomeado de `9l` para `9n`, para resolver colisão com outro bloco `9l` de outra sessão; a lógica não mudou. Em `34d0ed4`, entrou o bloco `9m` (um único conflito para cliente detectado), que acrescenta um assert. Sem privilégio, o HEAD atual passa com 223 asserts. Com privilégio, o esperado é 228 asserts; essa rodada ainda não foi feita.
 
 ### Rastreabilidade
 
 - `bb256c7` — Configuração que não é arquivo regular vira conflito bloqueante.
-- `1c0e98b` — Auditor reporta configuração do Codex não regular como conflito (contém o bloco `9l` com o caso de link real).
+- `1c0e98b` — Auditor reporta configuração do Codex não regular como conflito (contém o bloco de link real, então chamado `9l` e depois renomeado para `9n` em `17b11fe`).
