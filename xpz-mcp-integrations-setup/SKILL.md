@@ -299,7 +299,7 @@ Faixa reservada de exit codes: **60-69** (tabela completa em
 | 62 | config ausente/invalida ou endpoint nao confirmado |
 | 63 | Node/npm/pwsh insuficiente |
 | 64 | vendor ausente/divergente ou `npm ci` falhou |
-| 65 | launcher ausente/divergente |
+| 65 | launcher ausente/divergente/desatualizado |
 | 66 | entrada quebrada/divergente/em conflito |
 | 67 | edicao manual, ACL, lock, corrida ou credencial ambigua |
 | 68 | reservado na v1 (python_indisponivel e warn; GAPS so com warn → piso 60) |
@@ -329,8 +329,12 @@ e exit 69.
   e host fora do preset exige `endpointConfirmed` booleano `true`; senao sai com
   exit 62 sem iniciar o filho. A regra nao amarra o `endpointConfirmed` a uma URL
   especifica: um `config.json` editado a mao que troque o host e mantenha `true`
-  passa, como na auditoria. Launcher emitido antes dessa regra so a recebe no
-  reparo. O encerramento depende do fim do stdin; se o
+  passa, como na auditoria (pendencia no `999`). O molde declara
+  `# template-revision: <n>` no cabecalho (rev atual: 2, a da regra de endpoint);
+  copia reconhecida por sentinela e hash, mas com revisao menor ou sem a linha,
+  sai na auditoria como `launcher_desatualizado` (blocking, exit 65) e pede
+  `-Action repair`, que re-emite a revisao atual. O Uninstall com
+  `-RemoveSkillData` remove essa copia como as demais reconhecidas. O encerramento depende do fim do stdin; se o
   cliente nao fechar, o filho pode ficar orfao (risco aceito sem Job Object).
 - **Rede:** o instalador so usa rede em install/update (`npm ci`); o launcher/MCP
   so fala com o endpoint configurado. A contencao de rede **nao foi demonstrada**

@@ -13,6 +13,22 @@ Entradas legadas sem avaliação carregam `FALTA AVALIAR` em ambos os campos at�
 
 **Editar a substância de um gap já registrado (neste arquivo ou no `998-ideias-descartadas-e-porque.md`) exige justificativa no corpo do commit.** Enfraquecer, reprecisar ou descartar a severidade de uma afirmação — não apenas corrigir redação, adicionar contexto ou reorganizar — precisa dizer **por que**: nova evidência medida, releitura do código, ou correção de erro anterior. Motivo: uma edição que suaviza um gap sem dizer por que **parece resolvido** para quem lê depois, e é pior do que o gap não ter sido achado — quem lê para de investigar. Caso real (2026-08-17): um commit sem corpo trocou «não é citado em lugar nenhum» por «não era coberto na documentação normativa»; a formulação nova era defensável à primeira vista, mas escondia que a única outra menção ao símbolo no repositório era uma cópia **defasada** num self-test — a frase sugeria mitigação onde havia agravante. Só foi achado porque outra sessão foi verificar; sem corpo no commit, não havia como saber se a mudança vinha de leitura nova ou só de estilo.
 
+<a id="mcp-endpoint-confirmado-sem-vinculo-url-20261114"></a>
+
+## MCP: `endpointConfirmed` não fica vinculado à URL confirmada — 2026-11-14
+
+- **Importância** — média (a chave pode ir para um host `https://` diferente do confirmado sem nova confirmação; o risco real é edição manual por engano, porque quem consegue editar o `config.json` roda como o mesmo usuário e já consegue abrir o cofre DPAPI).
+- **Maturidade** — ideia (duas direções de desenho identificadas; falta escolher e medir o custo de migração).
+
+Descrição: na `xpz-mcp-integrations-setup`, o install invalida a confirmação quando a URL muda, mas a auditoria (`Test-McpIntegrations.ps1`) e o launcher (`templates/launcher.ps1`, rev 2) só exigem `https://` e, para host fora do preset, `endpointConfirmed` booleano `true`. Um `config.json` com `endpointConfirmed=true` cuja `baseUrl` seja trocada à mão para outro host `https://` passa nos dois. Reproduzido em teste isolado, sem chamada de rede, por revisão externa de 2026-11-14 sobre o commit `43d287e`; o limite está documentado na SKILL, no design (A.6) e no CHANGELOG.
+
+Direções:
+
+- **Formato do `config.json` (preferida):** trocar o booleano por `endpointConfirmedHost` (host confirmado ou `null`), com `schemaVersion 2`. Leitor, escritor, install, auditoria e launcher passam a comparar o host atual com o confirmado. Migração: config v1 continua válida só para o host do preset; host fora dele exige `-Action repair -ConfirmEndpoint`, que grava a v2. Custo: `Get-McpConfig`/`Set-McpConfig`, regra de repair, auditoria, molde (rev 3), design A.6 e self-tests.
+- **Host confirmado gravado no launcher:** o install grava o host confirmado no molde emitido, e o launcher o compara com a `baseUrl`. Mais barata no launcher, mas a auditoria só concordaria se o manifesto também registrasse esse host; sem isso, auditoria e launcher divergem (`INTEGRATIONS_OK` com falha em tempo de execução).
+
+Gatilho: antes de suportar um segundo preset ou endpoint de terceiro como uso recomendado, ou se um relato mostrar edição manual de `baseUrl` em instalação real.
+
 <a id="lexer-barra-aspa-bloco-nativo-20261114"></a>
 
 ## Lexer: barra antes de aspa em código GeneXus e bloco nativo csharp/java — 2026-11-14

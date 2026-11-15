@@ -197,7 +197,12 @@ if ($null -ne $descriptor) {
     $launcherResult = Test-McpLauncher -Version $pin.Version -Manifest $manifest.Value
     $launcher = $launcherResult
     if ($launcherResult.state -ne 'ok') {
-        $findings.Add((New-McpFinding -Code $launcherResult.state -Class 'blocking' -Message "launcher: $($launcherResult.state)")) | Out-Null
+        $launcherMessage = if ($launcherResult.state -eq 'launcher_desatualizado') {
+            "launcher de molde anterior ($($launcherResult.reason)); sem o comportamento atual (ex.: regra de endpoint antes do cofre). Execute o reparo."
+        } else {
+            "launcher: $($launcherResult.state)"
+        }
+        $findings.Add((New-McpFinding -Code $launcherResult.state -Class 'blocking' -Message $launcherMessage)) | Out-Null
         Add-McpNextAction -Code 65 -Text 'Install-McpIntegration.ps1 -Action repair'
     }
 }

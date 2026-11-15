@@ -15,6 +15,21 @@ function Get-McpLauncherSentinel {
     return '# xpz-mcp-integrations-setup:launcher v1'
 }
 
+function Get-McpLauncherTemplateRevision {
+    # Revisao atual do molde. Sobe quando o comportamento do launcher muda (rev 2: regra de
+    # endpoint antes do cofre). Copia emitida com revisao menor ou sem a linha e desatualizada.
+    return 2
+}
+
+function Get-McpLauncherTextRevision {
+    # Revisao declarada no cabecalho da copia; sem a linha (molde anterior a rev 2) vale 1.
+    param([Parameter(Mandatory = $true)][AllowEmptyString()][string]$Text)
+    $head = (@($Text -split "`n") | Select-Object -First 10) -join "`n"
+    $match = [regex]::Match($head, '(?m)^# template-revision: (\d+)\r?$')
+    if (-not $match.Success) { return 1 }
+    return [int]$match.Groups[1].Value
+}
+
 function Get-McpLauncherTemplatePath {
     param([string]$RepoRoot = (Get-McpRepoRoot))
     return (Join-Path (Resolve-McpFullPath -Path $RepoRoot) 'xpz-mcp-integrations-setup/templates/launcher.ps1')
@@ -112,6 +127,9 @@ function New-McpLauncherText {
     }
     if (-not (Test-McpLauncherText -Text $text)) {
         throw 'XPZ_MCP_LAUNCHER_SENTINEL_MISSING: molde sem sentinela'
+    }
+    if ((Get-McpLauncherTextRevision -Text $text) -ne (Get-McpLauncherTemplateRevision)) {
+        throw 'XPZ_MCP_LAUNCHER_REVISION_MISMATCH: revisao do molde difere de Get-McpLauncherTemplateRevision'
     }
     return $text
 }
@@ -233,6 +251,18 @@ function Test-McpLauncher {
             expectedHash = [string]$record.sha256
             actualHash   = $document.Hash
             reason       = 'hash'
+        }
+    }
+    # Copia reconhecida (sentinela + hash do manifesto), mas de molde anterior: falta o
+    # comportamento atual (ex.: regra de endpoint da rev 2). Pede reparo; nao e copia alheia.
+    $revision = Get-McpLauncherTextRevision -Text $document.Text
+    if ($revision -lt (Get-McpLauncherTemplateRevision)) {
+        return [pscustomobject]@{
+            state        = 'launcher_desatualizado'
+            path         = $path
+            expectedHash = [string]$record.sha256
+            actualHash   = $document.Hash
+            reason       = "revisao $revision < $(Get-McpLauncherTemplateRevision)"
         }
     }
     return [pscustomobject]@{

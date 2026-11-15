@@ -272,7 +272,7 @@ if ($RemoveSkillData -and $blocking.Count -eq 0 -and $manifestRefsRemaining.Coun
                 $candidateLauncher = Get-McpLauncherPath -Version $recordVersion
                 if (Test-Path -LiteralPath $candidateLauncher) {
                     $launcherInfo = Test-McpLauncher -Version $recordVersion -Manifest $manifest.Value
-                    if ($launcherInfo.state -eq 'ok') { $launcherRemoved = $true }
+                    if ($launcherInfo.state -in @('ok', 'launcher_desatualizado')) { $launcherRemoved = $true }
                 }
                 $vendorDir = Get-McpVendorDir -Version $recordVersion
                 if ((Test-Path -LiteralPath $vendorDir -PathType Container) -and (Test-McpPathUnder -Path $vendorDir -Parent $managedRoot)) {
@@ -288,7 +288,7 @@ if ($RemoveSkillData -and $blocking.Count -eq 0 -and $manifestRefsRemaining.Coun
                 $candidateLauncher = Get-McpLauncherPath -Version $recordVersion
                 if (-not (Test-Path -LiteralPath $candidateLauncher)) { continue }
                 $launcherInfo = Test-McpLauncher -Version $recordVersion -Manifest $manifest.Value
-                if ($launcherInfo.state -eq 'ok') {
+                if ($launcherInfo.state -in @('ok', 'launcher_desatualizado')) {
                     Remove-Item -LiteralPath $candidateLauncher -Force
                     $launcherRemoved = $true
                 }

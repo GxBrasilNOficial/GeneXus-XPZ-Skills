@@ -722,6 +722,31 @@ args = [`"legacy.js`"]
     Assert-True ([System.IO.File]::ReadAllText((Get-McpConfigPath)) -ceq $corruptConfigBefore) '(corrupt-install) config.json intacto'
     [System.IO.File]::WriteAllBytes($launcherPath, $corruptLauncherBackup)
 
+    # 9i-c. Launcher de molde anterior (sem a linha de revisao), reconhecido por sentinela e hash
+    # registrado no manifesto: a auditoria nao pode dar ok; pede reparo, e o reparo re-emite a rev atual.
+    Remove-Item -LiteralPath $corruptPath -Force -ErrorAction SilentlyContinue
+    [System.IO.File]::WriteAllText($ocFile, "{`n  `"mcp`": {}`n}`n", [System.Text.UTF8Encoding]::new($false))
+    [System.IO.File]::WriteAllText($cxFile, "model = `"gpt-5`"`n", [System.Text.UTF8Encoding]::new($false))
+    Assert-True ((Invoke-McpInstallForRemoval) -eq 0) '(launcher-old) install inicial exit 0'
+    $oldLauncherText = ([System.IO.File]::ReadAllText($launcherPath)) -replace '(?m)^# template-revision: \d+\r?\n', ''
+    Assert-True ((Get-McpLauncherTextRevision -Text $oldLauncherText) -eq 1) '(launcher-old) copia sem linha de revisao vale rev 1'
+    [System.IO.File]::WriteAllText($launcherPath, $oldLauncherText, [System.Text.UTF8Encoding]::new($false))
+    $oldManifest = Get-McpManifest
+    $oldManifestValue = Set-McpManifestLauncher -Manifest $oldManifest.Value -Version '0.13.0' -Path $launcherPath -Sentinel (Get-McpLauncherSentinel) -Hash ([string](Read-McpTextDocument -Path $launcherPath).Hash)
+    $null = Set-McpManifest -Value $oldManifestValue
+    $oldAuditOutput = @(& (Join-Path $scriptDir 'Test-McpIntegrations.ps1') 2>&1)
+    $oldAuditExit = $LASTEXITCODE
+    $oldAudit = (($oldAuditOutput | ForEach-Object { [string]$_ }) -join "`n") | ConvertFrom-Json -AsHashtable
+    Assert-True ([string]$oldAudit.launcher.state -eq 'launcher_desatualizado') "(launcher-old) estado launcher_desatualizado; obtido $($oldAudit.launcher.state)"
+    Assert-True (@($oldAudit.findings | Where-Object { $_.code -eq 'launcher_desatualizado' -and $_.class -eq 'blocking' }).Count -eq 1) '(launcher-old) achado blocking'
+    Assert-True ([string]$oldAudit.overall -eq 'INTEGRATIONS_GAPS' -and $oldAuditExit -eq 65) "(launcher-old) GAPS com exit 65; obtido $($oldAudit.overall)/$oldAuditExit"
+    Assert-True (@($oldAudit.nextActions | Where-Object { $_ -match '-Action repair' }).Count -ge 1) '(launcher-old) acao sugerida: reparo'
+    $null = @(& (Join-Path $scriptDir 'Install-McpIntegration.ps1') -Action repair -Client all 2>&1)
+    Assert-True ((Get-McpLauncherTextRevision -Text ([System.IO.File]::ReadAllText($launcherPath))) -eq (Get-McpLauncherTemplateRevision)) '(launcher-old) reparo re-emite a revisao atual'
+    $repairedAuditOutput = @(& (Join-Path $scriptDir 'Test-McpIntegrations.ps1') 2>&1)
+    $repairedAudit = (($repairedAuditOutput | ForEach-Object { [string]$_ }) -join "`n") | ConvertFrom-Json -AsHashtable
+    Assert-True ([string]$repairedAudit.launcher.state -eq 'ok') "(launcher-old) launcher ok apos o reparo; obtido $($repairedAudit.launcher.state)"
+
     # 9j. Configuracao de cliente que nao e arquivo regular (aqui, diretorio no lugar do arquivo): conflito
     # bloqueante. -RemoveSkillData nao remove launcher nem vendor, e o Install nao escreve. Um link
     # simbolico ou reparse point cai no mesmo ramo; o caso com link real e coberto pela secao 9l (condicional a privilegio).

@@ -728,7 +728,10 @@ versionado** (reduzido na v22):
   só `https://`, host fora do preset exige `endpointConfirmed` booleano `true`; o launcher a
   confere antes de abrir o cofre e sai com exit 62 sem iniciar o filho. O install invalida a
   confirmação quando a URL muda; já auditoria e launcher **não** amarram o `endpointConfirmed` à
-  URL gravada, então uma edição manual que troque o host e mantenha `true` passa.
+  URL gravada, então uma edição manual que troque o host e mantenha `true` passa (pendência no
+  `999`). Para que a regra chegue às instalações existentes, o molde declara
+  `# template-revision: 2`; cópia de revisão anterior é `launcher_desatualizado` (blocking,
+  exit 65) na auditoria e pede reparo.
 
 ### A.7 Cofre — blob, entrada e eventos
 

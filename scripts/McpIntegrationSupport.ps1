@@ -1539,6 +1539,7 @@ function Get-McpExitCodeForFindings {
         vendor_falhou             = 64
         launcher_ausente          = 65
         launcher_divergente       = 65
+        launcher_desatualizado    = 65
         entrada_quebrada          = 66
         entrada_divergente        = 66
         entrada_em_conflito       = 66

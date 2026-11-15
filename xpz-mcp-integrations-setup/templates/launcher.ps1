@@ -1,9 +1,12 @@
 #requires -Version 7.4
 # xpz-mcp-integrations-setup:launcher v1
+# template-revision: 2
 # package: @jkudish/jev-mcp@__XPZ_MCP_PACKAGE_VERSION__
 #
 # Launcher gerado pela skill xpz-mcp-integrations-setup. Nao editar a mao: a copia
-# emitida e reconhecida por sentinela e hash no install-manifest.json.
+# emitida e reconhecida por sentinela e hash no install-manifest.json. A revisao do
+# molde sobe quando o comportamento do launcher muda; copia com revisao menor (ou
+# sem a linha) e launcher_desatualizado e pede reparo.
 #
 # Contrato: stdio herdado do cliente (sem RedirectStandard*), ambiente do filho
 # limpo e montado por allowlist, zero bytes do launcher em stdout, exit code do

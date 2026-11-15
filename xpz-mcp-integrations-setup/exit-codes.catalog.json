@@ -54,7 +54,7 @@
     {
       "exit": 65,
       "category": "launcher",
-      "summary": "launcher_ausente/launcher_divergente: copia emitida ausente, sem sentinela ou com hash divergente do manifesto.",
+      "summary": "launcher_ausente/launcher_divergente/launcher_desatualizado: copia emitida ausente, sem sentinela, com hash divergente do manifesto ou de revisao de molde anterior (pede reparo).",
       "engines": ["Test-McpIntegrations.ps1"]
     },
     {
