@@ -761,7 +761,7 @@ args = [`"legacy.js`"]
         New-Item -ItemType SymbolicLink -Path $cxFile -Target $symTarget -ErrorAction Stop | Out-Null
         $symlinkOk = $true
     } catch {
-        Write-Host "[SKIP] 9l link simbolico indisponivel (sem privilegio ou Modo de Desenvolvedor): $($_.Exception.Message)" -ForegroundColor Yellow
+        Write-Host "[SKIP] 9n link simbolico indisponivel (sem privilegio ou Modo de Desenvolvedor): $($_.Exception.Message)" -ForegroundColor Yellow
     }
     if ($symlinkOk) {
         Assert-True ((Get-Item -LiteralPath $cxFile -Force).Attributes.HasFlag([System.IO.FileAttributes]::ReparsePoint)) '(symlink) config.toml e reparse point'
