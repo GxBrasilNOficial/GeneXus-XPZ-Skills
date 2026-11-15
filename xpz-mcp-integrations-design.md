@@ -822,7 +822,10 @@ grafia**. Os marcadores precisam estar balanceados e únicos.
   sem corpo em log. Exige autorização explícita por execução.
 - **Offline (v1):** `OK`; `ausente`; `entrada_quebrada`/`entrada_divergente`/`entrada_em_conflito`;
   `edicao_manual_necessaria`; `vendor_ausente`/`vendor_divergente`; `launcher_ausente`/
-  `launcher_divergente`; `node_ausente`/`node_incompativel`/`node_path_nao_resolve`; `pwsh_ausente`;
+  `launcher_divergente`/`launcher_desatualizado` (cópia reconhecida de revisão de molde anterior;
+  **blocking**, pede reparo); `manifesto_corrompido` (**blocking**, exit 67); `registro_orfao`
+  (**warn**: registro de cliente no manifesto sem a configuração do cliente);
+  `node_ausente`/`node_incompativel`/`node_path_nao_resolve`; `pwsh_ausente`;
   `config_ausente`/`config_invalido`; `python_indisponivel` (**warn**, só afeta o Codex);
   `credencial_ausente` (**blocking** na auditoria/install); `endpoint_nao_confirmado`
   (**blocking** na auditoria quando o host difere do preset sem confirmação; mutadores pedem
