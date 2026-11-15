@@ -126,7 +126,7 @@ Origem: dúvida aberta no commit `bb256c7`, que corrigiu o caminho de configura�
 
 **Validação com privilégio.** Rodada em PowerShell 7 elevado, com `Test-McpIntegrationsSelfTest.ps1`: `XPZ_MCP_INTEGRATIONS_SELFTEST_OK: 227 asserts`, sem `SKIP` do bloco de link. O total corresponde ao estado commitado em `1c0e98b`, quando o bloco ainda se chamava `9l` (222 asserts sem privilégio, mais 5 do caso com link real). O bloco entrou nesse commit junto com a correção do auditor de outra sessão, sem mensagem própria.
 
-**Mudanças depois dessa validação.** Em `17b11fe`, o bloco foi renomeado de `9l` para `9n`, para resolver colisão com outro bloco `9l` de outra sessão; a lógica não mudou. Em `34d0ed4`, entrou o bloco `9m` (um único conflito para cliente detectado), que acrescenta um assert. Sem privilégio, o HEAD atual passa com 223 asserts. Com privilégio, o esperado é 228 asserts; essa rodada ainda não foi feita.
+**Mudanças depois dessa validação.** Em `17b11fe`, o bloco foi renomeado de `9l` para `9n`, para resolver colisão com outro bloco `9l` de outra sessão; a lógica não mudou. Em `34d0ed4`, entrou o bloco `9m` (um único conflito para cliente detectado), que acrescenta um assert. Sem privilégio, o HEAD atual passa com 223 asserts. Com privilégio, o HEAD atual (`0767796`) passou com `XPZ_MCP_INTEGRATIONS_SELFTEST_OK: 228 asserts`, sem `SKIP` do bloco de link.
 
 ### Rastreabilidade
 
