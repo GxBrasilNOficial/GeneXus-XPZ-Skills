@@ -2,33 +2,37 @@
 
 <#
 .SYNOPSIS
-  Executor de faxina (fail-safe) da Fase 2a da rotina pre-push de pasta paralela de KB
-  (skill xpz-kb-parallel-pre-push). Remove frentes nao-conformes e pacotes orfaos que o
-  motor de DIAGNOSTICO Test-XpzKbFrenteHygiene.ps1 flagou.
+  Executor de faxina da Fase 2a da rotina pre-push de pasta paralela de KB
+  (skill xpz-kb-parallel-pre-push). Remove frentes nao conformes e pacotes orfaos
+  flagados pelo motor de DIAGNOSTICO Test-XpzKbFrenteHygiene.ps1 (SchemaVersion 2).
 
 .DESCRIPTION
-  FONTE DE VERDADE UNICA = o motor Test-XpzKbFrenteHygiene.ps1. Este executor NAO
-  reimplementa o matching pacote<->frente: ele consome o JSON do motor. Em -Apply,
-  re-invoca o motor a cada passada e age SO sobre o conjunto autoritativo atual.
+  FONTE DE VERDADE UNICA = o motor. Este executor nao reimplementa o matching
+  pacote<->frente: usa o campo pacotesVinculados do motor para mostrar a cascata.
 
-  FAIL-SAFE: sem -Apply o comportamento e dry-run (lista o que SERIA removido, apaga
-  nada). -WhatIf tambem funciona. Deleção real so com -Apply.
+  FLUXO EM DUAS ETAPAS (obrigatorio):
+    1) Dry-run (sem -Apply): monta o plano (frentes, pacotes, sidecars, exclusoes,
+       metodo por item). Com -PlanPath grava o plano em arquivo novo, fora de
+       frentesDir e pacotesDir. Nada e apagado.
+    2) -Apply -JsonPath <plano salvo>: recalcula o plano; se diferir do salvo, para
+       sem remover nada. Se igual, executa exatamente a lista salva, numa passada.
 
-  SEGURANCA: ancora os diretorios-base sob -RepoRoot canonico e recusa reparse point
-  (junction/symlink) em qualquer componente do caminho; pre-varre cada item sem seguir
-  links e recusa reparse no item ou em descendente; remove diretorio por descida
-  bottom-up (nunca -Recurse). -Backup (opcional) move para fora das pastas-alvo, so no
-  mesmo volume.
+  METODO PADRAO: envio a Lixeira do Windows (RecycleOption.SendToRecycleBin).
+    -Backup <dir> -RunStamp <id>: move-aside no mesmo volume (nao apaga).
+    -Permanente: apagamento definitivo (explicito). -Backup e -Permanente sao
+    mutuamente exclusivos.
+  Pre-condicoes do metodo Lixeira (verificadas antes da primeira acao): sessao nao
+  elevada; volume fixo local; NukeOnDelete = 0 explicito; MaxCapacity legivel; lista
+  inteira cabe no limite descontando a ocupacao do usuario atual.
+  Verificacao apos cada envio: caminho original sumiu; registro $I novo com esse
+  caminho e tamanho; par $R presente. Falha -> hard-stop, fila parada.
 
-  CONTRATO DE SAIDA: 1 linha JSON no stdout (Kind='xpz-frente-hygiene-cleanup-result',
-  SchemaVersion=1). Texto humano so por stderr. status NORMATIVO (autoridade primaria):
-  clean | findings | applied-clean | applied-with-skips | not-stabilized | error.
-  EXIT: 0 clean/applied-clean; 2 findings (dry-run com itens); 3 applied-with-skips e
-  not-stabilized; 1 error. Automacao deve ler status, nao o numero do exit (o exit 2
-  coincide com o warn do motor, semantica distinta).
+  STATUS (um de): clean | findings | whatif | blocked | applied-clean |
+  applied-with-skips | hard-stop. EXIT: 0 clean/whatif/applied-clean; 2 findings;
+  3 applied-with-skips; 1 blocked/hard-stop. Automacao deve ler status.
 
-  LOCKSTEP: consumidor do contrato de Test-XpzKbFrenteHygiene.ps1; travado por
-  Test-XpzKbFrenteHygieneCleanupSelfTest.ps1 (tipos + fixture end-to-end).
+  LOCKSTEP: consumidor do contrato de Test-XpzKbFrenteHygiene.ps1 (SchemaVersion 2);
+  travado por Test-XpzKbFrenteHygieneCleanupSelfTest.ps1.
 
 .PARAMETER RepoRoot
   Raiz da pasta paralela da KB (default: diretorio de trabalho atual).
@@ -39,26 +43,30 @@
 .PARAMETER Scope
   Frentes | Pacotes | Ambos (default Ambos).
 .PARAMETER Apply
-  Executa a deleção real. Ausente = dry-run.
+  Executa a remocao. Exige -JsonPath.
+.PARAMETER PlanPath
+  (so dry-run) grava o plano em arquivo novo, fora das pastas-alvo.
 .PARAMETER JsonPath
-  JSON capturado do motor para PRE-VISUALIZAR (dry-run) ou CRUZAR/avisar drift (-Apply).
-  Nunca e autoridade de deleção sob -Apply (a autoridade e o motor re-invocado).
+  (so -Apply) plano salvo pelo dry-run com -PlanPath.
+.PARAMETER Permanente
+  Apagamento definitivo em vez de Lixeira. Nao combina com -Backup.
 .PARAMETER Backup
-  Diretorio de backup (move-aside) fora das pastas-alvo, mesmo volume. Requer -RunStamp.
+  Diretorio de backup (move-aside), fora das pastas-alvo, mesmo volume. Requer -RunStamp.
 .PARAMETER RunStamp
-  Carimbo unico da execução para o subdiretorio de backup (script nao chama relogio).
-.PARAMETER MaxPasses
-  Fusivel de iteracao ate ponto-fixo (default 5).
+  Carimbo unico da execucao para o subdiretorio de backup.
+.PARAMETER ExcludeFrente
+  Nomes exatos de frentes a preservar.
+.PARAMETER ExcludePacote
+  Nomes exatos de pacotes a preservar.
 .PARAMETER EnginePath
   Caminho do motor (default: Test-XpzKbFrenteHygiene.ps1 irmao deste script).
 .PARAMETER AsText
-  Saida humana em texto no stdout em vez do JSON padrao.
+  Saida humana resumida no stdout, em vez do JSON.
 
 .EXAMPLE
-  Remove-XpzKbFrenteHygieneFindings.ps1 -RepoRoot C:\kb-paralela
-  (dry-run: mostra o que seria removido)
+  Remove-XpzKbFrenteHygieneFindings.ps1 -RepoRoot C:\kb -PlanPath C:\temp\plano.json
 .EXAMPLE
-  Remove-XpzKbFrenteHygieneFindings.ps1 -RepoRoot C:\kb-paralela -Apply
+  Remove-XpzKbFrenteHygieneFindings.ps1 -RepoRoot C:\kb -Apply -JsonPath C:\temp\plano.json
 #>
 [CmdletBinding(SupportsShouldProcess)]
 param(
@@ -68,11 +76,13 @@ param(
   [ValidateSet('Frentes', 'Pacotes', 'Ambos')]
   [string]$Scope = 'Ambos',
   [switch]$Apply,
+  [string]$PlanPath,
   [string]$JsonPath,
+  [switch]$Permanente,
   [string]$Backup,
   [string]$RunStamp,
-  [ValidateRange(1, 50)]
-  [int]$MaxPasses = 5,
+  [string[]]$ExcludeFrente = @(),
+  [string[]]$ExcludePacote = @(),
   [string]$EnginePath,
   [switch]$AsText
 )
@@ -82,11 +92,19 @@ $ErrorActionPreference = 'Stop'
 
 if (-not $EnginePath) { $EnginePath = Join-Path $PSScriptRoot 'Test-XpzKbFrenteHygiene.ps1' }
 
-$reparse = [System.IO.FileAttributes]::ReparsePoint
-$sep = [System.IO.Path]::DirectorySeparatorChar
+$script:utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+$script:reparseAttr = [System.IO.FileAttributes]::ReparsePoint
+$script:sep = [System.IO.Path]::DirectorySeparatorChar
+$script:blockers = [System.Collections.Generic.List[string]]::new()
+$script:items = @()
+$script:exclusions = @()
+$script:actionsDone = 0
+$script:backupRoot = $null
+$script:doFrentes = ($Scope -eq 'Frentes' -or $Scope -eq 'Ambos')
+$script:doPacotes = ($Scope -eq 'Pacotes' -or $Scope -eq 'Ambos')
+$script:method = if ($Permanente) { 'permanent' } elseif ($Backup) { 'backup' } else { 'recycle' }
 
 function Write-Human { param([string]$Text) [Console]::Error.WriteLine($Text) }
-
 function Get-Canon { param([string]$Path) return ([System.IO.Path]::GetFullPath($Path)).TrimEnd('\', '/') }
 
 function Test-PathsEqual {
@@ -96,16 +114,14 @@ function Test-PathsEqual {
 
 function Test-IsUnder {
   param([string]$Child, [string]$Parent)
-  $c = Get-Canon $Child
-  $p = Get-Canon $Parent
-  return $c.StartsWith($p + $sep, [System.StringComparison]::OrdinalIgnoreCase)
+  return (Get-Canon $Child).StartsWith((Get-Canon $Parent) + $script:sep, [System.StringComparison]::OrdinalIgnoreCase)
 }
 
 function Test-IsReparse {
   param([string]$Path)
   if (-not (Test-Path -LiteralPath $Path)) { return $false }
   $it = Get-Item -LiteralPath $Path -Force
-  return (($it.Attributes -band $reparse) -ne 0)
+  return (($it.Attributes -band $script:reparseAttr) -ne 0)
 }
 
 # Pre-varredura sem seguir links: $true se o root OU qualquer descendente for reparse.
@@ -113,12 +129,9 @@ function Test-TreeHasReparse {
   param([string]$Root)
   if (Test-IsReparse $Root) { return $true }
   if (-not (Test-Path -LiteralPath $Root -PathType Container)) { return $false }
-  $children = Get-ChildItem -LiteralPath $Root -Force
-  foreach ($c in $children) {
-    if (($c.Attributes -band $reparse) -ne 0) { return $true }
-    if ($c.PSIsContainer) {
-      if (Test-TreeHasReparse $c.FullName) { return $true }
-    }
+  foreach ($c in (Get-ChildItem -LiteralPath $Root -Force)) {
+    if (($c.Attributes -band $script:reparseAttr) -ne 0) { return $true }
+    if ($c.PSIsContainer -and (Test-TreeHasReparse $c.FullName)) { return $true }
   }
   return $false
 }
@@ -146,13 +159,20 @@ function Get-Prop {
   return $pp.Value
 }
 
-function Get-VolumeRoot { param([string]$Path) return ([System.IO.Path]::GetPathRoot((Get-Canon $Path))) }
+function Get-TreeBytes {
+  param([string]$Path)
+  if (Test-Path -LiteralPath $Path -PathType Container) {
+    $s = (Get-ChildItem -LiteralPath $Path -Recurse -File -Force | Measure-Object -Property Length -Sum).Sum
+    if ($null -eq $s) { return [int64]0 }
+    return [int64]$s
+  }
+  return [int64](Get-Item -LiteralPath $Path -Force).Length
+}
 
-# Remoção bottom-up sem -Recurse (pre-varredura ja garantiu ausencia de reparse interno).
+# Remocao bottom-up sem -Recurse (a pre-varredura ja garantiu ausencia de reparse).
 function Remove-DirBottomUp {
   param([string]$Dir)
-  $all = @(Get-ChildItem -LiteralPath $Dir -Force -Recurse)
-  $ordered = $all | Sort-Object { $_.FullName.Length } -Descending
+  $ordered = @(Get-ChildItem -LiteralPath $Dir -Force -Recurse) | Sort-Object { $_.FullName.Length } -Descending
   foreach ($i in $ordered) { Remove-Item -LiteralPath $i.FullName -Force }
   Remove-Item -LiteralPath $Dir -Force
 }
@@ -162,258 +182,456 @@ function Invoke-HygieneEngine {
   $out = & pwsh -NoProfile -File $EnginePath -RepoRoot $RepoRoot -FrentesDirName $FrentesDirName -PacotesDirName $PacotesDirName 2>$null
   $code = $LASTEXITCODE
   if ($code -ne 0 -and $code -ne 2) { throw "BLOCK: motor de diagnostico falhou (exit $code)." }
-  return ($out | Out-String | ConvertFrom-Json)
+  $json = ($out | Out-String | ConvertFrom-Json)
+  if ((Get-Prop $json 'SchemaVersion') -ne 2) { throw "BLOCK: motor com SchemaVersion incompativel (esperado 2)." }
+  return $json
 }
 
-function Get-FrenteTargets { param($Json) return @(Get-Prop $Json 'frentesNaoConformes') }
-function Get-PacoteTargets {
-  param($Json)
-  $orf = @(Get-Prop $Json 'pacotesOrfaos')
-  $names = @()
-  foreach ($o in $orf) { $names += (Get-Prop $o 'pacote') }
-  return @($names)
+# Resolve o caminho fisico de um item flagado, com checagens fisicas (sem matching).
+function Resolve-Item {
+  param([string]$Name, [string]$Kind)
+  $baseDir = if ($Kind -eq 'frente') { $script:frentesDirCanon } else { $script:pacotesDirCanon }
+  if ($Name -match '[\\/:]' -or $Name -eq '..' -or $Name -eq '.') {
+    return [pscustomobject]@{ ok = $false; reason = 'unsafe-name'; path = $null }
+  }
+  $canon = Get-Canon (Join-Path $baseDir $Name)
+  $parent = [System.IO.Path]::GetDirectoryName($canon)
+  if (-not [string]::Equals($parent, $baseDir, [System.StringComparison]::OrdinalIgnoreCase)) {
+    return [pscustomobject]@{ ok = $false; reason = 'unsafe-name'; path = $null }
+  }
+  if (-not (Test-Path -LiteralPath $canon)) {
+    return [pscustomobject]@{ ok = $false; reason = 'already-absent'; path = $canon }
+  }
+  if (($Kind -eq 'frente') -ne (Test-Path -LiteralPath $canon -PathType Container)) {
+    return [pscustomobject]@{ ok = $false; reason = 'type-mismatch'; path = $canon }
+  }
+  if (Test-TreeHasReparse $canon) {
+    return [pscustomobject]@{ ok = $false; reason = 'reparse-point'; path = $canon }
+  }
+  return [pscustomobject]@{ ok = $true; reason = $null; path = $canon }
 }
 
-# --- Estado de execução -------------------------------------------------------
-$result = $null
-$exitCode = 1
-try {
-  $doFrentes = ($Scope -eq 'Frentes' -or $Scope -eq 'Ambos')
-  $doPacotes = ($Scope -eq 'Pacotes' -or $Scope -eq 'Ambos')
+# Nome de exclusao: exato, sem separadores nem curingas. Retorna $null se valido.
+function Test-ExclName {
+  param([string]$N)
+  if ([string]::IsNullOrWhiteSpace($N)) { return 'vazio' }
+  if ($N -ne $N.Trim()) { return 'espacos-nas-bordas' }
+  if ($N -match '[\\/:*?"<>|]' -or $N.Contains('..') -or $N -eq '.') { return 'caractere-invalido' }
+  if ($N.EndsWith('.')) { return 'termina-em-ponto' }
+  if ($N -match '[\x00-\x1F]') { return 'caractere-de-controle' }
+  return $null
+}
 
-  $repoRootCanon = Get-Canon $RepoRoot
-  $frentesDirCanon = Get-Canon (Join-Path $RepoRoot (($FrentesDirName -replace '\\', '/').Trim().TrimEnd('/')))
-  $pacotesDirCanon = Get-Canon (Join-Path $RepoRoot (($PacotesDirName -replace '\\', '/').Trim().TrimEnd('/')))
+# --- Plano -------------------------------------------------------------------------
+function Build-Plan {
+  $json = Invoke-HygieneEngine
+  $naoConf = @(Get-Prop $json 'frentesNaoConformes')
+  $orf = @(Get-Prop $json 'pacotesOrfaos')
+  $vinc = @(Get-Prop $json 'pacotesVinculados')
 
-  # --- Ancora de seguranca dos diretorios-base --------------------------------
-  if (-not (Test-IsUnder $frentesDirCanon $repoRootCanon)) { throw "BLOCK: frentesDir nao esta sob repoRoot." }
-  if (-not (Test-IsUnder $pacotesDirCanon $repoRootCanon)) { throw "BLOCK: pacotesDir nao esta sob repoRoot." }
-  if (Test-ChainHasReparse $repoRootCanon $frentesDirCanon) { throw "BLOCK: reparse point no caminho ate frentesDir." }
-  if (Test-ChainHasReparse $repoRootCanon $pacotesDirCanon) { throw "BLOCK: reparse point no caminho ate pacotesDir." }
-
-  # --- Validacao de -Backup ---------------------------------------------------
-  $backupRoot = $null
-  if ($Backup) {
-    if (-not $RunStamp) { throw "BLOCK: -Backup exige -RunStamp (o script nao gera carimbo de tempo)." }
-    $backupCanon = Get-Canon $Backup
-    if ((Test-IsUnder $backupCanon $frentesDirCanon) -or [string]::Equals($backupCanon, $frentesDirCanon, [System.StringComparison]::OrdinalIgnoreCase)) { throw "BLOCK: -Backup nao pode estar dentro de frentesDir." }
-    if ((Test-IsUnder $backupCanon $pacotesDirCanon) -or [string]::Equals($backupCanon, $pacotesDirCanon, [System.StringComparison]::OrdinalIgnoreCase)) { throw "BLOCK: -Backup nao pode estar dentro de pacotesDir." }
-    if (-not [string]::Equals((Get-VolumeRoot $backupCanon), (Get-VolumeRoot $repoRootCanon), [System.StringComparison]::OrdinalIgnoreCase)) { throw "BLOCK: -Backup cross-volume nao suportado no v1 (use mesmo volume; follow-up no 999)." }
-    $backupRoot = Join-Path $backupCanon $RunStamp
-    if ((Test-Path -LiteralPath $backupRoot) -and @(Get-ChildItem -LiteralPath $backupRoot -Force).Count -gt 0) { throw "BLOCK: subdir de backup '$backupRoot' ja existe e nao esta vazio (nao sobrescreve)." }
+  $frTargets = @()
+  if ($script:doFrentes) { $frTargets = @($naoConf | ForEach-Object { [string]$_ }) }
+  $exclSeen = @{}
+  foreach ($n in @($ExcludeFrente)) {
+    $e = Test-ExclName $n
+    if ($e) { $script:blockers.Add("exclusao de frente invalida ($e): '$n'"); continue }
+    if ($exclSeen.ContainsKey("frente|$n")) { continue }
+    $exclSeen["frente|$n"] = $true
+    if ($script:doFrentes -and ($frTargets -contains $n)) {
+      $frTargets = @($frTargets | Where-Object { $_ -ne $n })
+      $script:exclusions += [pscustomobject]@{ kind = 'frente'; name = $n; status = 'excluido' }
+    }
+    elseif (Test-Path -LiteralPath (Join-Path $script:frentesDirCanon $n) -PathType Container) {
+      $script:exclusions += [pscustomobject]@{ kind = 'frente'; name = $n; status = 'naoAlvo' }
+    }
+    else { $script:blockers.Add("exclusao de frente sem correspondencia no disco: '$n'") }
   }
 
-  # --- JSON capturado (se houver) ---------------------------------------------
-  $capturedJson = $null
-  if ($JsonPath) {
-    if (-not (Test-Path -LiteralPath $JsonPath -PathType Leaf)) { throw "BLOCK: -JsonPath nao encontrado: $JsonPath" }
-    $capturedJson = (Get-Content -LiteralPath $JsonPath -Raw | ConvertFrom-Json)
-    $k = Get-Prop $capturedJson 'Kind'
-    if ($k -ne 'xpz-frente-hygiene-result') { throw "BLOCK: JSON capturado sem Kind esperado (obtido '$k')." }
-    $sv = Get-Prop $capturedJson 'SchemaVersion'
-    if ($sv -ne 1) { throw "BLOCK: SchemaVersion incompativel (obtido '$sv', esperado 1)." }
-    if (-not (Test-PathsEqual (Get-Prop $capturedJson 'repoRoot') $RepoRoot)) { throw "BLOCK: repoRoot do JSON difere do alvo." }
-    if (-not (Test-PathsEqual (Get-Prop $capturedJson 'frentesDir') $frentesDirCanon)) { throw "BLOCK: frentesDir do JSON difere do alvo." }
-    if (-not (Test-PathsEqual (Get-Prop $capturedJson 'pacotesDir') $pacotesDirCanon)) { throw "BLOCK: pacotesDir do JSON difere do alvo." }
-  }
-
-  $passes = [System.Collections.Generic.List[object]]::new()
-  $untouchedNonStandard = @()
-  $remainingOrfaos = @()
-  $mode = if ($Apply) { 'apply' } else { 'dry-run' }
-
-  # Resolve o caminho fisico de um item flagado, com checagens fisicas (sem matching).
-  function Resolve-Item {
-    param([string]$Name, [string]$Kind)
-    $baseDir = if ($Kind -eq 'frente') { $frentesDirCanon } else { $pacotesDirCanon }
-    if ($Name -match '[\\/:]' -or $Name -eq '..' -or $Name -eq '.') {
-      return [pscustomobject]@{ ok = $false; reason = 'unsafe-name'; path = $null }
-    }
-    $path = Join-Path $baseDir $Name
-    $canon = Get-Canon $path
-    $parent = [System.IO.Path]::GetDirectoryName($canon)
-    if (-not [string]::Equals($parent, $baseDir, [System.StringComparison]::OrdinalIgnoreCase)) {
-      return [pscustomobject]@{ ok = $false; reason = 'unsafe-name'; path = $null }
-    }
-    $wantContainer = ($Kind -eq 'frente')
-    if (-not (Test-Path -LiteralPath $canon)) {
-      return [pscustomobject]@{ ok = $false; reason = 'already-absent'; path = $canon }
-    }
-    if ($wantContainer -ne (Test-Path -LiteralPath $canon -PathType Container)) {
-      return [pscustomobject]@{ ok = $false; reason = 'type-mismatch'; path = $canon }
-    }
-    if (Test-TreeHasReparse $canon) {
-      return [pscustomobject]@{ ok = $false; reason = 'reparse-point'; path = $canon }
-    }
-    return [pscustomobject]@{ ok = $true; reason = $null; path = $canon }
-  }
-
-  if (-not $Apply) {
-    # ---------------- DRY-RUN (uma avaliacao) ----------------
-    $json = if ($capturedJson) { $capturedJson } else { Invoke-HygieneEngine }
-    $untouchedNonStandard = @(Get-Prop $json 'pacotesNaoPadronizados')
-    $wouldFrentes = @()
-    $wouldPacotes = @()
-    $skipped = [System.Collections.Generic.List[object]]::new()
-    if ($doFrentes) {
-      foreach ($n in (Get-FrenteTargets $json)) {
-        $r = Resolve-Item -Name $n -Kind 'frente'
-        if ($r.ok) { $wouldFrentes += $n } else { $skipped.Add([pscustomobject]@{ item = $n; kind = 'frente'; reason = $r.reason }) }
+  # Pacotes alvo: orfaos + cascata (pacotes de frentes nao conformes que serao removidas)
+  $pTargets = @()
+  if ($script:doPacotes) {
+    foreach ($o in $orf) { $pTargets += [string](Get-Prop $o 'pacote') }
+    if ($script:doFrentes) {
+      foreach ($v in $vinc) {
+        if ((Get-Prop $v 'frenteStatus') -eq 'naoConforme' -and ($frTargets -contains [string](Get-Prop $v 'frente'))) {
+          $pTargets += [string](Get-Prop $v 'pacote')
+        }
       }
     }
-    if ($doPacotes) {
-      foreach ($n in (Get-PacoteTargets $json)) {
-        $r = Resolve-Item -Name $n -Kind 'pacote'
-        if ($r.ok) { $wouldPacotes += $n } else { $skipped.Add([pscustomobject]@{ item = $n; kind = 'pacote'; reason = $r.reason }) }
-      }
+  }
+  $pTargets = @($pTargets | Select-Object -Unique)
+
+  foreach ($n in @($ExcludePacote)) {
+    $e = Test-ExclName $n
+    if ($e) { $script:blockers.Add("exclusao de pacote invalida ($e): '$n'"); continue }
+    if ($exclSeen.ContainsKey("pacote|$n")) { continue }
+    $exclSeen["pacote|$n"] = $true
+    if ($pTargets -contains $n) {
+      $pTargets = @($pTargets | Where-Object { $_ -ne $n })
+      $script:exclusions += [pscustomobject]@{ kind = 'pacote'; name = $n; status = 'excluido' }
     }
-    $passes.Add([pscustomobject]@{ pass = 1; removedFrentes = @($wouldFrentes); removedPacotes = @($wouldPacotes); skipped = @($skipped) })
-    $hasItems = (($wouldFrentes.Count + $wouldPacotes.Count) -gt 0)
-    if ($hasItems -and $wouldFrentes.Count -gt 0 -and $doPacotes) {
-      Write-Human "AVISO cascata: remover $($wouldFrentes.Count) frente(s) deve orfanar pacotes-irmaos; re-rode apos -Apply para tratar a cascata."
+    elseif (Test-Path -LiteralPath (Join-Path $script:pacotesDirCanon $n) -PathType Leaf) {
+      $script:exclusions += [pscustomobject]@{ kind = 'pacote'; name = $n; status = 'naoAlvo' }
     }
-    if ($untouchedNonStandard.Count -gt 0) { Write-Human "$($untouchedNonStandard.Count) item(ns) fora do escopo do executor (pacotesNaoPadronizados, nao tocados)." }
-    $status = if ($hasItems) { 'findings' } else { 'clean' }
-    $exitCode = if ($hasItems) { 2 } else { 0 }
-    $remainingOrfaos = @()
+    else { $script:blockers.Add("exclusao de pacote sem correspondencia no disco: '$n'") }
+  }
+
+  # Ordem: cada pacote seguido do seu sidecar (se existir); depois as frentes
+  $ordered = @()
+  foreach ($p in $pTargets) {
+    $ordered += [pscustomobject]@{ kind = 'pacote'; name = $p }
+    $sc = "$p.package-inventory.json"
+    if (Test-Path -LiteralPath (Join-Path $script:pacotesDirCanon $sc) -PathType Leaf) {
+      $ordered += [pscustomobject]@{ kind = 'sidecar'; name = $sc }
+    }
+  }
+  foreach ($f in $frTargets) { $ordered += [pscustomobject]@{ kind = 'frente'; name = $f } }
+
+  $planItems = @()
+  foreach ($t in $ordered) {
+    $kindRes = if ($t.kind -eq 'frente') { 'frente' } else { 'pacote' }
+    $r = Resolve-Item -Name $t.name -Kind $kindRes
+    if (-not $r.ok) {
+      if ($r.reason -ne 'already-absent') { $script:blockers.Add("item bloqueado ($($r.reason)): $($t.name)") }
+      continue
+    }
+    $planItems += [pscustomobject]@{
+      kind = $t.kind; name = $t.name; path = $r.path; method = $script:method; bytes = [int64](Get-TreeBytes $r.path)
+    }
+  }
+  $script:items = @($planItems)
+  return $json
+}
+
+function Get-PlanKeys {
+  param($Items, $Exclusions)
+  $list = [System.Collections.Generic.List[string]]::new()
+  foreach ($i in @($Items | Where-Object { $null -ne $_ })) { $list.Add("item|$(Get-Prop $i 'kind')|$(Get-Prop $i 'name')|$(Get-Prop $i 'method')") }
+  foreach ($e in @($Exclusions | Where-Object { $null -ne $_ })) { $list.Add("excl|$(Get-Prop $e 'kind')|$(Get-Prop $e 'name')|$(Get-Prop $e 'status')") }
+  $arr = $list.ToArray()
+  [System.Array]::Sort($arr, [System.StringComparer]::Ordinal)
+  return , $arr
+}
+
+# --- Lixeira -----------------------------------------------------------------------
+function Test-IsElevated {
+  $p = [System.Security.Principal.WindowsPrincipal]::new([System.Security.Principal.WindowsIdentity]::GetCurrent())
+  return $p.IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
+# Le a configuracao da Lixeira do volume (somente leitura). Lanca BLOCK se nao confiavel.
+function Get-RecycleVolumeInfo {
+  param([string]$Root)
+  if ($Root -notmatch '^[A-Za-z]:\\$') { throw "BLOCK: volume nao e unidade local com letra ($Root)." }
+  $di = [System.IO.DriveInfo]::new($Root)
+  if ($di.DriveType -ne [System.IO.DriveType]::Fixed) { throw "BLOCK: volume $Root nao e fixo local ($($di.DriveType))." }
+  try { $vol = Get-Volume -DriveLetter $Root.Substring(0, 1) -ErrorAction Stop }
+  catch { throw "BLOCK: nao foi possivel identificar o volume $Root." }
+  $guid = ([string]$vol.UniqueId) -replace '^\\\\\?\\Volume\{', '' -replace '\}\\?$', ''
+  $key = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\BitBucket\Volume\{$guid}"
+  if (-not (Test-Path -LiteralPath $key)) { throw "BLOCK: chave da Lixeira ausente para o volume $Root ($key)." }
+  $p = Get-ItemProperty -LiteralPath $key
+  if ($null -eq $p.PSObject.Properties['NukeOnDelete'] -or [int]$p.NukeOnDelete -ne 0) {
+    throw "BLOCK: Lixeira do volume $Root nao confirmada (NukeOnDelete ausente ou diferente de 0)."
+  }
+  if ($null -eq $p.PSObject.Properties['MaxCapacity']) { throw "BLOCK: MaxCapacity ausente para o volume $Root." }
+  $maxMB = [int64]$p.MaxCapacity
+  if ($maxMB -le 0) { throw "BLOCK: MaxCapacity invalido ($maxMB MB) para o volume $Root." }
+  return [pscustomobject]@{ root = $Root; maxBytes = ($maxMB * 1MB); binDir = ($Root + '$Recycle.Bin') }
+}
+
+function Test-RecyclePrecheck {
+  $recItems = @($script:items | Where-Object { $_.method -eq 'recycle' })
+  if ($recItems.Count -eq 0) { return }
+  if (Test-IsElevated) { $script:blockers.Add('sessao elevada: a verificacao da Lixeira so cobre o usuario atual'); return }
+  $sid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+  $groups = $recItems | Group-Object { [System.IO.Path]::GetPathRoot((Get-Canon $_.path)) }
+  foreach ($g in $groups) {
+    try { $info = Get-RecycleVolumeInfo -Root $g.Name }
+    catch { $script:blockers.Add($_.Exception.Message); continue }
+    $binUser = Join-Path $info.binDir $sid
+    if (-not (Test-Path -LiteralPath $binUser)) { $script:blockers.Add("pasta da Lixeira do usuario ausente em $($g.Name)"); continue }
+    $occ = [int64](Get-TreeBytes $binUser)
+    $need = [int64](($g.Group | Measure-Object -Property bytes -Sum).Sum)
+    foreach ($it in $g.Group) {
+      if ($it.bytes -gt $info.maxBytes) { $script:blockers.Add("item acima do limite da Lixeira: $($it.name)") }
+    }
+    if (($occ + $need) -gt $info.maxBytes) {
+      $script:blockers.Add("lista nao cabe no limite da Lixeira de $($g.Name) (ocupacao=$occ, lista=$need, limite=$($info.maxBytes))")
+    }
+  }
+}
+
+# Le um arquivo $I (versoes 1 e 2). Versao desconhecida -> excecao (unverified).
+function Read-RecycleIndex {
+  param([string]$Path)
+  $b = [System.IO.File]::ReadAllBytes($Path)
+  if ($b.Length -lt 28) { throw 'unverified: indice $I curto demais' }
+  $ver = [System.BitConverter]::ToInt64($b, 0)
+  $size = [System.BitConverter]::ToInt64($b, 8)
+  $ft = [System.BitConverter]::ToInt64($b, 16)
+  if ($ver -eq 1) {
+    $txt = [System.Text.Encoding]::Unicode.GetString($b, 24, [Math]::Min(520, $b.Length - 24))
+    $orig = $txt.Split([char]0)[0]
+  }
+  elseif ($ver -eq 2) {
+    $len = [System.BitConverter]::ToInt32($b, 24)
+    if ($len -lt 1 -or (28 + $len * 2) -gt $b.Length) { throw 'unverified: indice $I v2 com tamanho invalido' }
+    $orig = [System.Text.Encoding]::Unicode.GetString($b, 28, $len * 2).TrimEnd([char]0)
+  }
+  else { throw "unverified: versao de indice \$I desconhecida ($ver)" }
+  return [pscustomobject]@{ version = $ver; size = $size; fileTime = $ft; path = $orig }
+}
+
+# Envio a Lixeira + verificacao. Lanca excecao se nao verificado.
+function Invoke-ItemRecycle {
+  param($Item, [DateTime]$StartUtc)
+  $root = [System.IO.Path]::GetPathRoot((Get-Canon $Item.path))
+  $info = Get-RecycleVolumeInfo -Root $root
+  $binUser = Join-Path $info.binDir ([System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value)
+  $before = @{}
+  foreach ($f in @(Get-ChildItem -LiteralPath $binUser -Filter '$I*' -Force -File -ErrorAction SilentlyContinue)) { $before[$f.Name] = $true }
+  Add-Type -AssemblyName Microsoft.VisualBasic
+  $ui = [Microsoft.VisualBasic.FileIO.UIOption]::OnlyErrorDialogs
+  $rec = [Microsoft.VisualBasic.FileIO.RecycleOption]::SendToRecycleBin
+  $script:actionsDone++
+  if ($Item.kind -eq 'frente') {
+    [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteDirectory($Item.path, $ui, $rec, [Microsoft.VisualBasic.FileIO.UICancelOption]::ThrowException)
   }
   else {
-    # ---------------- APPLY (iteracao ate ponto-fixo) ----------------
-    $stabilized = $null
-    $pass = 0
-    $lastJson = $null
-    while ($pass -lt $MaxPasses) {
-      $pass++
-      $json = Invoke-HygieneEngine
-      $lastJson = $json
-      $untouchedNonStandard = @(Get-Prop $json 'pacotesNaoPadronizados')
+    [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile($Item.path, $ui, $rec)
+  }
+  if (Test-Path -LiteralPath $Item.path) { throw "unverified: caminho original ainda existe ($($Item.name))" }
+  $novos = @(Get-ChildItem -LiteralPath $binUser -Filter '$I*' -Force -File | Where-Object { -not $before.ContainsKey($_.Name) })
+  foreach ($n in $novos) {
+    $idx = Read-RecycleIndex -Path $n.FullName
+    if (-not [string]::Equals((Get-Canon $idx.path), (Get-Canon $Item.path), [System.StringComparison]::OrdinalIgnoreCase)) { continue }
+    if ([DateTime]::FromFileTimeUtc($idx.fileTime) -lt $StartUtc) { continue }
+    if ($Item.kind -ne 'frente' -and $idx.size -ne [int64]$Item.bytes) { continue }
+    $rName = '$R' + $n.Name.Substring(2)
+    if (-not (Test-Path -LiteralPath (Join-Path $binUser $rName))) { throw "unverified: par \$R ausente ($($Item.name))" }
+    return 'recycle-verified'
+  }
+  throw "unverified: registro na Lixeira nao encontrado ($($Item.name))"
+}
 
-      # Drift vs JSON capturado (so aviso; autoridade e o motor fresco)
-      if ($capturedJson -and $pass -eq 1) {
-        $capF = @(Get-FrenteTargets $capturedJson)
-        $freshF = @(Get-FrenteTargets $json)
-        $appeared = @($freshF | Where-Object { $capF -notcontains $_ })
-        $gone = @($capF | Where-Object { $freshF -notcontains $_ })
-        if ($appeared.Count -gt 0 -or $gone.Count -gt 0) {
-          Write-Human "AVISO drift: frentes surgidas desde a captura=$($appeared.Count), sumidas=$($gone.Count). Autoridade = motor fresco."
-        }
-      }
+function Invoke-ItemBackup {
+  param($Item)
+  $sub = if ($Item.kind -eq 'frente') { 'frentes' } else { 'pacotes' }
+  $destDir = Join-Path $script:backupRoot $sub
+  if (-not (Test-Path -LiteralPath $destDir)) { [void](New-Item -ItemType Directory -Path $destDir -Force) }
+  $dest = Join-Path $destDir $Item.name
+  $script:actionsDone++
+  Move-Item -LiteralPath $Item.path -Destination $dest
+  $line = [pscustomobject]@{ kind = $Item.kind; name = $Item.name; from = $Item.path; to = (Get-Canon $dest); method = 'backup' } | ConvertTo-Json -Compress
+  [System.IO.File]::AppendAllText((Join-Path $script:backupRoot 'backup-manifest.jsonl'), $line + "`n", $script:utf8NoBom)
+  return 'backup'
+}
 
-      $targets = [System.Collections.Generic.List[object]]::new()
-      if ($doFrentes) { foreach ($n in (Get-FrenteTargets $json)) { $targets.Add([pscustomobject]@{ name = $n; kind = 'frente' }) } }
-      if ($doPacotes) { foreach ($n in (Get-PacoteTargets $json)) { $targets.Add([pscustomobject]@{ name = $n; kind = 'pacote' }) } }
+function Invoke-ItemPermanent {
+  param($Item)
+  $script:actionsDone++
+  if ($Item.kind -eq 'frente') { Remove-DirBottomUp $Item.path } else { Remove-Item -LiteralPath $Item.path -Force }
+  return 'permanent'
+}
 
-      if ($targets.Count -eq 0) { $stabilized = $true; break }
+# --- Estado de execucao -------------------------------------------------------
+$result = $null
+$exitCode = 1
+$mode = if ($Apply) { 'apply' } else { 'dry-run' }
+$status = 'blocked'
+$itemResults = @()
+$residuo = @()
+$sidecarsOrfaos = @()
+$pacotesRejeitados = @()
+$planSaved = $null
 
-      $removedFrentes = @()
-      $removedPacotes = @()
-      $skipped = [System.Collections.Generic.List[object]]::new()
-      $removedThisPass = 0
+try {
+  $repoRootCanon = Get-Canon $RepoRoot
+  $script:frentesDirCanon = Get-Canon (Join-Path $RepoRoot (($FrentesDirName -replace '\\', '/').Trim().TrimEnd('/')))
+  $script:pacotesDirCanon = Get-Canon (Join-Path $RepoRoot (($PacotesDirName -replace '\\', '/').Trim().TrimEnd('/')))
 
-      foreach ($t in $targets) {
-        $r = Resolve-Item -Name $t.name -Kind $t.kind
-        if (-not $r.ok) {
-          $skipped.Add([pscustomobject]@{ item = $t.name; kind = $t.kind; reason = $r.reason })
-          continue
-        }
-        if (-not $PSCmdlet.ShouldProcess($r.path, "Remover ($($t.kind))")) {
-          $skipped.Add([pscustomobject]@{ item = $t.name; kind = $t.kind; reason = 'whatif' })
-          continue
-        }
-        # re-check de reparse imediatamente antes da operacao final (estreita TOCTOU)
-        if (Test-IsReparse $r.path) {
-          $skipped.Add([pscustomobject]@{ item = $t.name; kind = $t.kind; reason = 'reparse-point' })
-          continue
-        }
-        try {
-          if ($backupRoot) {
-            $sub = if ($t.kind -eq 'frente') { 'frentes' } else { 'pacotes' }
-            $destDir = Join-Path $backupRoot $sub
-            if (-not (Test-Path -LiteralPath $destDir)) { [void](New-Item -ItemType Directory -Path $destDir -Force) }
-            $dest = Join-Path $destDir $t.name
-            Move-Item -LiteralPath $r.path -Destination $dest
-            $manifest = Join-Path $backupRoot 'backup-manifest.json'
-            $entry = [pscustomobject]@{ pass = $pass; kind = $t.kind; name = $t.name; from = $r.path; to = (Get-Canon $dest) }
-            $acc = @()
-            if (Test-Path -LiteralPath $manifest) { $acc = @(Get-Content -LiteralPath $manifest -Raw | ConvertFrom-Json) }
-            $acc += $entry
-            $acc | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $manifest -Encoding utf8
-          }
-          elseif ($t.kind -eq 'frente') {
-            Remove-DirBottomUp $r.path
-          }
-          else {
-            Remove-Item -LiteralPath $r.path -Force
-          }
-          if ($t.kind -eq 'frente') { $removedFrentes += $t.name } else { $removedPacotes += $t.name }
-          $removedThisPass++
-        }
-        catch {
-          $skipped.Add([pscustomobject]@{ item = $t.name; kind = $t.kind; reason = 'partial-removal' })
-        }
-      }
-
-      $passes.Add([pscustomobject]@{ pass = $pass; removedFrentes = @($removedFrentes); removedPacotes = @($removedPacotes); skipped = @($skipped) })
-
-      if ($removedThisPass -eq 0) { $stabilized = $false; break }
-    }
-
-    # Reconciliacao final do estado autoritativo
-    $finalJson = Invoke-HygieneEngine
-    $untouchedNonStandard = @(Get-Prop $finalJson 'pacotesNaoPadronizados')
-    $finalTargets = @()
-    if ($doFrentes) { foreach ($n in (Get-FrenteTargets $finalJson)) { $finalTargets += [pscustomobject]@{ kind = 'frente'; item = $n } } }
-    if ($doPacotes) { foreach ($n in (Get-PacoteTargets $finalJson)) { $finalTargets += [pscustomobject]@{ kind = 'pacote'; item = $n } } }
-    $remainingOrfaos = @($finalTargets)
-    if ($null -eq $stabilized) { $stabilized = ($finalTargets.Count -eq 0) }
-
-    # status com precedencia mutuamente exclusiva
-    $dangerSkips = 0
-    foreach ($p in $passes) { foreach ($s in $p.skipped) { if ($s.reason -eq 'reparse-point' -or $s.reason -eq 'partial-removal' -or $s.reason -eq 'unsafe-name' -or $s.reason -eq 'type-mismatch') { $dangerSkips++ } } }
-    if (-not $stabilized) {
-      $status = 'not-stabilized'; $exitCode = 3
-    }
-    elseif ($dangerSkips -gt 0) {
-      $status = 'applied-with-skips'; $exitCode = 3
-    }
-    else {
-      $status = 'applied-clean'; $exitCode = 0
-    }
-    if ($untouchedNonStandard.Count -gt 0) { Write-Human "$($untouchedNonStandard.Count) item(ns) fora do escopo do executor (pacotesNaoPadronizados, nao tocados)." }
+  # Ancora de seguranca dos diretorios-base
+  if (-not (Test-IsUnder $script:frentesDirCanon $repoRootCanon)) { $script:blockers.Add('frentesDir nao esta sob repoRoot') }
+  if (-not (Test-IsUnder $script:pacotesDirCanon $repoRootCanon)) { $script:blockers.Add('pacotesDir nao esta sob repoRoot') }
+  if (-not (Test-Path -LiteralPath $repoRootCanon -PathType Container)) { $script:blockers.Add('RepoRoot inexistente') }
+  elseif (-not ((Test-Path -LiteralPath $script:frentesDirCanon -PathType Container) -or (Test-Path -LiteralPath $script:pacotesDirCanon -PathType Container))) {
+    $script:blockers.Add('nenhuma das pastas de frentes/pacotes existe em RepoRoot')
+  }
+  if ($script:blockers.Count -eq 0) {
+    if (Test-ChainHasReparse $repoRootCanon $script:frentesDirCanon) { $script:blockers.Add('reparse point no caminho ate frentesDir') }
+    if (Test-ChainHasReparse $repoRootCanon $script:pacotesDirCanon) { $script:blockers.Add('reparse point no caminho ate pacotesDir') }
   }
 
-  $result = [pscustomobject]@{
-    Kind                 = 'xpz-frente-hygiene-cleanup-result'
-    SchemaVersion        = 1
-    mode                 = $mode
-    repoRoot             = $RepoRoot
-    frentesDir           = $frentesDirCanon
-    pacotesDir           = $pacotesDirCanon
-    scope                = $Scope
-    passes               = @($passes)
-    totalRemovedFrentes  = (@($passes) | ForEach-Object { @($_.removedFrentes).Count } | Measure-Object -Sum).Sum
-    totalRemovedPacotes  = (@($passes) | ForEach-Object { @($_.removedPacotes).Count } | Measure-Object -Sum).Sum
-    stabilized           = if ($Apply) { [bool]$stabilized } else { $null }
-    remainingOrfaos      = @($remainingOrfaos)
-    untouchedNonStandard = @($untouchedNonStandard)
-    status               = $status
-    exitCode             = $exitCode
+  # Combinacoes (H-6)
+  if ($Permanente -and $Backup) { $script:blockers.Add('-Permanente e -Backup sao mutuamente exclusivos') }
+  if ($Backup -and -not $RunStamp) { $script:blockers.Add('-Backup exige -RunStamp') }
+  if ($PlanPath -and $Apply) { $script:blockers.Add('-PlanPath so vale no dry-run') }
+  if ($Apply -and -not $JsonPath) { $script:blockers.Add('-Apply exige -JsonPath (plano salvo pelo dry-run com -PlanPath)') }
+  if ($JsonPath -and -not $Apply) { $script:blockers.Add('-JsonPath so vale com -Apply') }
+
+  if ($Backup -and $RunStamp -and $script:blockers.Count -eq 0) {
+    $backupCanon = Get-Canon $Backup
+    if ((Test-IsUnder $backupCanon $script:frentesDirCanon) -or [string]::Equals($backupCanon, $script:frentesDirCanon, [System.StringComparison]::OrdinalIgnoreCase)) { $script:blockers.Add('-Backup nao pode estar dentro de frentesDir') }
+    if ((Test-IsUnder $backupCanon $script:pacotesDirCanon) -or [string]::Equals($backupCanon, $script:pacotesDirCanon, [System.StringComparison]::OrdinalIgnoreCase)) { $script:blockers.Add('-Backup nao pode estar dentro de pacotesDir') }
+    if (-not [string]::Equals([System.IO.Path]::GetPathRoot($backupCanon), [System.IO.Path]::GetPathRoot($repoRootCanon), [System.StringComparison]::OrdinalIgnoreCase)) { $script:blockers.Add('-Backup em outro volume nao suportado') }
+    $script:backupRoot = Join-Path $backupCanon $RunStamp
+    if ((Test-Path -LiteralPath $script:backupRoot) -and @(Get-ChildItem -LiteralPath $script:backupRoot -Force).Count -gt 0) { $script:blockers.Add("subdir de backup '$($script:backupRoot)' ja existe e nao esta vazio") }
+  }
+
+  if ($script:blockers.Count -eq 0) {
+    $json = Build-Plan
+    $sidecarsOrfaos = @(Get-Prop $json 'sidecarsOrfaos')
+    $pacotesRejeitados = @(Get-Prop $json 'pacotesRejeitados')
+  }
+
+  if ($script:blockers.Count -eq 0 -and -not $Apply) {
+    # ---------------- DRY-RUN ----------------
+    if ($PlanPath) {
+      $pp = Get-Canon $PlanPath
+      if ((Test-IsUnder $pp $script:frentesDirCanon) -or (Test-IsUnder $pp $script:pacotesDirCanon)) { $script:blockers.Add('-PlanPath nao pode estar dentro das pastas-alvo') }
+      elseif (Test-Path -LiteralPath $pp) { $script:blockers.Add("-PlanPath ja existe (nao sobrescreve): $pp") }
+      elseif (-not (Test-Path -LiteralPath (Split-Path -Parent $pp) -PathType Container)) { $script:blockers.Add('pasta de -PlanPath inexistente') }
+      else {
+        $plan = [pscustomobject]@{
+          Kind = 'xpz-frente-hygiene-plan'; SchemaVersion = 1; repoRoot = $repoRootCanon
+          frentesDir = $script:frentesDirCanon; pacotesDir = $script:pacotesDirCanon
+          scope = $Scope; method = $script:method; exclusions = @($script:exclusions); items = @($script:items)
+        }
+        [System.IO.File]::WriteAllText($pp, ($plan | ConvertTo-Json -Depth 6), $script:utf8NoBom)
+        $planSaved = $pp
+      }
+    }
+  }
+
+  if ($script:blockers.Count -eq 0 -and $Apply) {
+    # ---------------- APPLY (plano salvo) ----------------
+    if (-not (Test-Path -LiteralPath $JsonPath -PathType Leaf)) { $script:blockers.Add("-JsonPath nao encontrado: $JsonPath") }
+    else {
+      $saved = Get-Content -LiteralPath $JsonPath -Raw | ConvertFrom-Json
+      if ((Get-Prop $saved 'Kind') -ne 'xpz-frente-hygiene-plan' -or (Get-Prop $saved 'SchemaVersion') -ne 1) { $script:blockers.Add('-JsonPath nao e um plano do executor (Kind/SchemaVersion)') }
+      elseif (-not (Test-PathsEqual (Get-Prop $saved 'repoRoot') $repoRootCanon) -or -not (Test-PathsEqual (Get-Prop $saved 'frentesDir') $script:frentesDirCanon) -or -not (Test-PathsEqual (Get-Prop $saved 'pacotesDir') $script:pacotesDirCanon)) {
+        $script:blockers.Add('plano salvo pertence a outra raiz/pasta')
+      }
+      else {
+        $savedKeys = Get-PlanKeys (Get-Prop $saved 'items') (Get-Prop $saved 'exclusions')
+        $curKeys = Get-PlanKeys $script:items $script:exclusions
+        $savedSet = [System.Collections.Generic.HashSet[string]]::new($savedKeys, [System.StringComparer]::Ordinal)
+        $curSet = [System.Collections.Generic.HashSet[string]]::new($curKeys, [System.StringComparer]::Ordinal)
+        $appeared = @($curKeys | Where-Object { -not $savedSet.Contains($_) })
+        $gone = @($savedKeys | Where-Object { -not $curSet.Contains($_) })
+        if ($appeared.Count -gt 0 -or $gone.Count -gt 0) {
+          $script:blockers.Add("plano atual difere do salvo: surgiram=$($appeared.Count), sumiram=$($gone.Count) (nada removido)")
+          foreach ($a in $appeared) { Write-Human "  + $a" }
+          foreach ($g in $gone) { Write-Human "  - $g" }
+        }
+      }
+    }
+    if ($script:blockers.Count -eq 0) { Test-RecyclePrecheck }
+    if ($script:blockers.Count -eq 0 -and $WhatIfPreference) {
+      $status = 'whatif'; $exitCode = 0
+      $itemResults = @($script:items | ForEach-Object { 'planned' })
+    }
+    elseif ($script:blockers.Count -eq 0) {
+      # ---- execucao da lista salva (uma passada) ----
+      $startUtc = [DateTime]::UtcNow.AddSeconds(-2)
+      $results = [System.Collections.Generic.List[string]]::new()
+      $hardStop = $null
+      try {
+        foreach ($it in $script:items) {
+          $kindRes = if ($it.kind -eq 'frente') { 'frente' } else { 'pacote' }
+          $r = Resolve-Item -Name $it.name -Kind $kindRes
+          if (-not $r.ok) {
+            if ($r.reason -eq 'already-absent') { $results.Add('already-absent'); continue }
+            throw "item mudou desde o plano ($($r.reason)): $($it.name)"
+          }
+          $it.path = $r.path
+          $res = switch ($it.method) {
+            'recycle' { Invoke-ItemRecycle -Item $it -StartUtc $startUtc }
+            'backup' { Invoke-ItemBackup -Item $it }
+            default { Invoke-ItemPermanent -Item $it }
+          }
+          $results.Add($res)
+        }
+      }
+      catch { $hardStop = $_.Exception.Message }
+      $itemResults = @($results)
+
+      # Residuo: o que ainda sobrou no estado autoritativo (exceto exclusoes intencionais)
+      $fin = Invoke-HygieneEngine
+      $excl = @($script:exclusions | Where-Object { $_.status -eq 'excluido' } | ForEach-Object { $_.name })
+      $residuo = @()
+      foreach ($n in @(Get-Prop $fin 'frentesNaoConformes')) { if ($excl -notcontains $n) { $residuo += "frente:$n" } }
+      foreach ($o in @(Get-Prop $fin 'pacotesOrfaos')) { $pn = [string](Get-Prop $o 'pacote'); if ($excl -notcontains $pn) { $residuo += "pacote:$pn" } }
+
+      if ($hardStop) {
+        Write-Human $hardStop
+        if ($script:actionsDone -eq 0) { $status = 'blocked'; $exitCode = 1 }
+        else { $status = 'hard-stop'; $exitCode = 1 }
+      }
+      elseif ($residuo.Count -gt 0 -or @($script:exclusions | Where-Object { $_.status -eq 'excluido' }).Count -gt 0) {
+        $status = 'applied-with-skips'; $exitCode = 3
+      }
+      else { $status = 'applied-clean'; $exitCode = 0 }
+      if ($hardStop) { $script:blockers.Add($hardStop) }
+    }
+  }
+
+  if ($script:blockers.Count -gt 0 -and $status -eq 'blocked') { $exitCode = 1 }
+  elseif (-not $Apply -and $script:blockers.Count -eq 0) {
+    $hasItems = (@($script:items).Count -gt 0)
+    $status = if ($hasItems) { 'findings' } else { 'clean' }
+    $exitCode = if ($hasItems) { 2 } else { 0 }
   }
 }
 catch {
-  $msg = $_.Exception.Message
-  Write-Human $msg
-  $errMode = if ($Apply) { 'apply' } else { 'dry-run' }
-  $result = [pscustomobject]@{
-    Kind = 'xpz-frente-hygiene-cleanup-result'; SchemaVersion = 1; mode = $errMode
-    repoRoot = $RepoRoot; scope = $Scope; status = 'error'; exitCode = 1; error = $msg
-  }
+  $script:blockers.Add($_.Exception.Message)
+  $status = if ($script:actionsDone -gt 0) { 'hard-stop' } else { 'blocked' }
   $exitCode = 1
 }
 
+if ($script:blockers.Count -gt 0 -and $status -notin @('hard-stop')) { $status = 'blocked'; $exitCode = 1 }
+
+$excludedList = @($script:exclusions)
+$itemsOut = @()
+for ($i = 0; $i -lt @($script:items).Count; $i++) {
+  $it = @($script:items)[$i]
+  $resI = if ($i -lt @($itemResults).Count) { @($itemResults)[$i] } elseif ($Apply) { 'not-reached' } else { 'planned' }
+  $itemsOut += [pscustomobject]@{ kind = $it.kind; name = $it.name; method = $it.method; bytes = [int64]$it.bytes; result = $resI }
+}
+$removedFr = @($itemsOut | Where-Object { $_.kind -eq 'frente' -and $_.result -notin @('planned', 'not-reached', 'already-absent') }).Count
+$removedPc = @($itemsOut | Where-Object { $_.kind -ne 'frente' -and $_.result -notin @('planned', 'not-reached', 'already-absent') }).Count
+$totalBytes = [int64]0
+foreach ($x in $itemsOut) { $totalBytes += [int64]$x.bytes }
+
+$result = [pscustomobject]@{
+  Kind                = 'xpz-frente-hygiene-cleanup-result'
+  SchemaVersion       = 2
+  mode                = if ($WhatIfPreference -and $Apply) { 'whatif' } else { $mode }
+  status              = $status
+  exitCode            = $exitCode
+  repoRoot            = $RepoRoot
+  scope               = $Scope
+  method              = $script:method
+  planPath            = $planSaved
+  items               = @($itemsOut)
+  exclusions          = @($excludedList)
+  blockers            = @($script:blockers)
+  sidecarsOrfaos      = @($sidecarsOrfaos)
+  pacotesRejeitados   = @($pacotesRejeitados)
+  residuo             = @($residuo)
+  totalFrentesRemovidas = [int]$removedFr
+  totalPacotesRemovidos = [int]$removedPc
+  totalBytesPlanejados  = [int64]$totalBytes
+}
+
 if ($AsText) {
-  "=== Faxina Fase 2a ($($result.mode)) — status: $($result.status) ==="
-  $result | ConvertTo-Json -Depth 8
+  "=== Faxina Fase 2a ($($result.mode)) -- status: $($result.status) ==="
+  "Metodo: $($result.method)   Itens: $(@($result.items).Count)   Bytes: $($result.totalBytesPlanejados)"
+  foreach ($x in @($result.items)) { "  [$($x.result)] $($x.kind) $($x.name)" }
+  foreach ($b in @($result.blockers)) { "  BLOQUEIO: $b" }
+  foreach ($r in @($result.residuo)) { "  RESIDUO: $r" }
+  if ($result.planPath) { "Plano salvo em: $($result.planPath)" }
 }
 else {
   [Console]::Out.WriteLine(($result | ConvertTo-Json -Depth 8 -Compress))

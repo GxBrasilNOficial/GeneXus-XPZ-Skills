@@ -2,24 +2,22 @@
 
 <#
 .SYNOPSIS
-  Self-test do executor Remove-XpzKbFrenteHygieneFindings.ps1 (faxina fail-safe da Fase 2a).
+  Self-test do executor Remove-XpzKbFrenteHygieneFindings.ps1 (faxina Fase 2a, fase 1).
   Sentinela: XPZ_KB_FRENTE_HYGIENE_CLEANUP_SELFTEST_OK.
 
 .DESCRIPTION
-  Cobre, com pastas sinteticas reais (filesystem-only, motor real como fonte de verdade):
-    A. LOCKSTEP de tipos: o motor emite Kind/SchemaVersion/frentesDir/pacotesDir e os tipos
-       que o executor consome (frentesNaoConformes string[], pacotesOrfaos object[]).
-    B. dry-run nao apaga (fixture end-to-end) e reporta findings.
-    C. -Apply remove frente + pacote orfao -> applied-clean; itens somem.
-    D. cascata estabiliza por progresso (remover frente orfana pacote-irmao -> removido).
-    E. seletividade Scope=Frentes deixa o pacote orfao intacto.
-    F. reparse-point (junction) no item -> recusado, link/target intactos.
-    G. idempotencia: -Apply 2x -> 2a no-op (applied-clean).
-    H. JSON sem Kind -> error; repoRoot divergente -> error.
-    I. JSON stale (item ausente no FS) -> skipped(already-absent), nao apaga.
-    J. pacotesNaoPadronizados intocado + espelhado em untouchedNonStandard.
-    K. backup mesmo-volume: itens movidos + manifesto; -Backup sem -RunStamp -> error;
-       -Backup dentro da pasta-alvo -> error; subdir de backup pre-existente -> error.
+  Pastas sinteticas em %TEMP%, motor real como fonte de verdade. Os casos de -Apply usam
+  -Permanente (nao tocam a Lixeira do usuario). O caso de Lixeira real e opt-in:
+  defina XPZ_FAXINA_SELFTEST_LIXEIRA=1; ele envia um item de teste a Lixeira e o
+  restaura pelo verbo da propria Lixeira.
+
+  Casos: A lockstep do motor (SchemaVersion 2 e campos); B dry-run gera plano e nao
+  apaga; C -Apply com plano remove frente e cascata; D -Apply sem plano -> blocked;
+  E plano divergente -> blocked sem remover; F reparse -> blocked; G Scope=Frentes deixa
+  orfao -> applied-with-skips; H exclusao -> applied-with-skips e preservado; I exclusao
+  sem correspondencia -> blocked; J -WhatIf -> whatif; K backup (move-aside + jsonl) e
+  combinacoes; L sidecar sai com o pacote e orfao so e reportado; M .rejected informativo;
+  N totais inteiros; O raiz vazia -> clean; P PlanPath dentro da pasta-alvo -> blocked.
 #>
 
 Set-StrictMode -Version Latest
@@ -49,7 +47,11 @@ function Write-File {
 }
 function New-Frente { param([string]$Root, [string]$Name) Write-File -Path (Join-Path $Root "$FRENTES/$Name/Obj.xml") -Content '<Object />' }
 function New-Pacote { param([string]$Root, [string]$File) Write-File -Path (Join-Path $Root "$PACOTES/$File") -Content '<ExportFile />' }
-function Invoke-Engine { param([string]$Root) return (& pwsh -NoProfile -File $engine '-RepoRoot' $Root 2>$null | Out-String | ConvertFrom-Json) }
+function Invoke-Engine {
+  param([string]$Root)
+  $out = & pwsh -NoProfile -File $engine '-RepoRoot' $Root 2>$null | Out-String
+  return ($out | ConvertFrom-Json)
+}
 function Invoke-Cleanup {
   param([string[]]$Arguments)
   $out = & pwsh -NoProfile -File $exe @Arguments 2>$null | Out-String
@@ -57,137 +59,194 @@ function Invoke-Cleanup {
 }
 function Assert-True { param([bool]$Cond, [string]$Message) if (-not $Cond) { throw "FALHA: $Message" } }
 
+# Planeja (dry-run gravando o plano em pasta propria, fora das pastas-alvo)
+$planDir = New-TempRoot -Slug 'planos'
+function Invoke-Plan {
+  param([string]$Root, [string[]]$Extra = @())
+  $plan = Join-Path $planDir ("plano-{0}.json" -f ([guid]::NewGuid().ToString('N')))
+  $r = Invoke-Cleanup -Arguments (@('-RepoRoot', $Root, '-PlanPath', $plan) + $Extra)
+  return [pscustomobject]@{ r = $r; plan = $plan }
+}
+function Invoke-Apply {
+  param([string]$Root, [string]$Plan, [string[]]$Extra = @())
+  return Invoke-Cleanup -Arguments (@('-RepoRoot', $Root, '-Apply', '-JsonPath', $Plan) + $Extra)
+}
+
 try {
-  # ===== A. lockstep de tipos do motor =====
+  # ===== A. lockstep do motor =====
   $a = New-TempRoot -Slug 'lockstep'
   New-Frente -Root $a -Name 'FrenteSemPadrao'
   New-Pacote -Root $a -File 'Inexistente_01.import_file.xml'
   $ja = Invoke-Engine -Root $a
   Assert-True ($ja.Kind -eq 'xpz-frente-hygiene-result') "A: Kind do motor"
-  Assert-True ($ja.SchemaVersion -eq 1) "A: SchemaVersion do motor"
-  Assert-True ([bool]$ja.frentesDir -and [bool]$ja.pacotesDir) "A: dirs resolvidos no motor"
+  Assert-True ($ja.SchemaVersion -eq 2) "A: SchemaVersion do motor = 2; obtido $($ja.SchemaVersion)"
   Assert-True (@($ja.frentesNaoConformes) -contains 'FrenteSemPadrao') "A: frentesNaoConformes string[]"
-  Assert-True (@($ja.pacotesOrfaos).Count -ge 1 -and [bool]$ja.pacotesOrfaos[0].pacote) "A: pacotesOrfaos[].pacote"
+  Assert-True (@($ja.pacotesOrfaos).Count -eq 1) "A: pacotesOrfaos"
+  Assert-True (@($ja.pacotesVinculados | Where-Object { $_.frenteStatus -eq 'ausente' }).Count -eq 1) "A: pacotesVinculados marca frente ausente"
+  Assert-True ($null -ne $ja.sidecarsOrfaos -and $null -ne $ja.pacotesRejeitados) "A: campos sidecarsOrfaos e pacotesRejeitados presentes"
 
-  # ===== B. dry-run nao apaga (E2E) =====
-  $rb = Invoke-Cleanup -Arguments @('-RepoRoot', $a)
-  Assert-True ($rb.exit -eq 2) "B: exit 2 (findings) esperado; obtido $($rb.exit)"
-  Assert-True ($rb.json.status -eq 'findings') "B: status findings; obtido $($rb.json.status)"
-  Assert-True ($rb.json.mode -eq 'dry-run') "B: mode dry-run"
-  Assert-True (@($rb.json.passes[0].removedFrentes) -contains 'FrenteSemPadrao') "B: frente apareceria em removedFrentes"
-  Assert-True (Test-Path -LiteralPath (Join-Path $a "$FRENTES/FrenteSemPadrao")) "B: dry-run NAO apagou a frente"
+  # ===== B. dry-run gera plano e nao apaga =====
+  $b = New-TempRoot -Slug 'dry'
+  New-Frente -Root $b -Name 'FrenteX'
+  New-Pacote -Root $b -File 'FrenteX_01.import_file.xml'   # pacote de frente nao conforme (cascata)
+  New-Pacote -Root $b -File 'Orfao_01.import_file.xml'     # orfao independente
+  $pb = Invoke-Plan -Root $b
+  Assert-True ($pb.r.exit -eq 2 -and $pb.r.json.status -eq 'findings') "B: exit 2 findings; obtido $($pb.r.json.status)"
+  Assert-True (Test-Path -LiteralPath $pb.plan) "B: plano gravado"
+  Assert-True (@($pb.r.json.items | Where-Object { $_.name -eq 'FrenteX_01.import_file.xml' }).Count -eq 1) "B: cascata (pacote da frente nao conforme) aparece no plano"
+  Assert-True (Test-Path -LiteralPath (Join-Path $b "$FRENTES/FrenteX")) "B: dry-run NAO apagou a frente"
 
-  # ===== C. -Apply remove frente + pacote orfao =====
-  $rc = Invoke-Cleanup -Arguments @('-RepoRoot', $a, '-Apply')
-  Assert-True ($rc.exit -eq 0) "C: exit 0 (applied-clean); obtido $($rc.exit)"
-  Assert-True ($rc.json.status -eq 'applied-clean') "C: status applied-clean; obtido $($rc.json.status)"
-  Assert-True ($rc.json.stabilized -eq $true) "C: stabilized true"
-  Assert-True (-not (Test-Path -LiteralPath (Join-Path $a "$FRENTES/FrenteSemPadrao"))) "C: frente removida"
-  Assert-True (-not (Test-Path -LiteralPath (Join-Path $a "$PACOTES/Inexistente_01.import_file.xml"))) "C: pacote orfao removido"
+  # ===== C. -Apply com plano remove frente + cascata =====
+  $c = New-TempRoot -Slug 'apply'
+  New-Frente -Root $c -Name 'FrenteC'
+  New-Pacote -Root $c -File 'FrenteC_01.import_file.xml'
+  $pc = Invoke-Plan -Root $c -Extra @('-Permanente')
+  $rc = Invoke-Apply -Root $c -Plan $pc.plan -Extra @('-Permanente')
+  Assert-True ($rc.exit -eq 0 -and $rc.json.status -eq 'applied-clean') "C: applied-clean; obtido $($rc.json.status) blockers=$(@($rc.json.blockers) -join ';')"
+  Assert-True (-not (Test-Path -LiteralPath (Join-Path $c "$FRENTES/FrenteC"))) "C: frente removida"
+  Assert-True (-not (Test-Path -LiteralPath (Join-Path $c "$PACOTES/FrenteC_01.import_file.xml"))) "C: pacote da cascata removido"
+  Assert-True ($rc.json.totalFrentesRemovidas -eq 1 -and $rc.json.totalPacotesRemovidos -eq 1) "C: totais removidos = 1 frente e 1 pacote"
 
-  # ===== D. cascata estabiliza =====
-  $d = New-TempRoot -Slug 'cascata'
-  New-Frente -Root $d -Name 'FrenteX'
-  New-Pacote -Root $d -File 'FrenteX_01.import_file.xml'   # OK enquanto FrenteX existe
+  # ===== D. -Apply sem plano -> blocked =====
+  $d = New-TempRoot -Slug 'semplano'
+  New-Frente -Root $d -Name 'FrenteD'
   $rd = Invoke-Cleanup -Arguments @('-RepoRoot', $d, '-Apply')
-  Assert-True ($rd.json.status -eq 'applied-clean') "D: status applied-clean; obtido $($rd.json.status)"
-  Assert-True ($rd.json.stabilized -eq $true) "D: cascata estabilizou"
-  Assert-True (-not (Test-Path -LiteralPath (Join-Path $d "$PACOTES/FrenteX_01.import_file.xml"))) "D: pacote-irmao orfanado removido na cascata"
-  Assert-True (@($rd.json.passes).Count -ge 2) "D: precisou de >=2 passadas"
+  Assert-True ($rd.exit -eq 1 -and $rd.json.status -eq 'blocked') "D: -Apply sem -JsonPath -> blocked; obtido $($rd.json.status)"
+  Assert-True (Test-Path -LiteralPath (Join-Path $d "$FRENTES/FrenteD")) "D: nada removido"
 
-  # ===== E. seletividade Scope=Frentes =====
-  $e = New-TempRoot -Slug 'scope'
-  New-Frente -Root $e -Name 'FrenteY'
-  New-Pacote -Root $e -File 'Orfao_01.import_file.xml'   # orfao independente
-  $re = Invoke-Cleanup -Arguments @('-RepoRoot', $e, '-Apply', '-Scope', 'Frentes')
-  Assert-True (-not (Test-Path -LiteralPath (Join-Path $e "$FRENTES/FrenteY"))) "E: frente removida no scope Frentes"
-  Assert-True (Test-Path -LiteralPath (Join-Path $e "$PACOTES/Orfao_01.import_file.xml")) "E: pacote orfao PRESERVADO fora do scope"
+  # ===== E. plano divergente -> blocked =====
+  $e = New-TempRoot -Slug 'divergente'
+  New-Frente -Root $e -Name 'FrenteE'
+  $pe = Invoke-Plan -Root $e -Extra @('-Permanente')
+  New-Pacote -Root $e -File 'Novo_01.import_file.xml'   # apareceu depois do dry-run
+  $re = Invoke-Apply -Root $e -Plan $pe.plan -Extra @('-Permanente')
+  Assert-True ($re.exit -eq 1 -and $re.json.status -eq 'blocked') "E: plano divergente -> blocked; obtido $($re.json.status)"
+  Assert-True (Test-Path -LiteralPath (Join-Path $e "$FRENTES/FrenteE")) "E: frente planejada intacta"
+  Assert-True (Test-Path -LiteralPath (Join-Path $e "$PACOTES/Novo_01.import_file.xml")) "E: item novo intacto"
 
-  # ===== F. reparse-point (junction) recusado =====
+  # ===== F. reparse-point -> blocked no plano =====
   $f = New-TempRoot -Slug 'reparse'
   $target = New-TempRoot -Slug 'reparse-target'
   Write-File -Path (Join-Path $target 'sentinela.txt') -Content 'NAO APAGAR'
   [void](New-Item -ItemType Directory -Path (Join-Path $f $FRENTES) -Force)
   $link = Join-Path $f "$FRENTES/FrenteJunction"
   [void](New-Item -ItemType Junction -Path $link -Value $target)
-  $rf = Invoke-Cleanup -Arguments @('-RepoRoot', $f, '-Apply')
-  Assert-True ($rf.exit -eq 3) "F: exit 3 esperado (item flagado nao removivel); obtido $($rf.exit)"
-  $fSkips = @(); foreach ($p in $rf.json.passes) { foreach ($s in $p.skipped) { $fSkips += $s.reason } }
-  Assert-True ($fSkips -contains 'reparse-point') "F: skipped reparse-point registrado"
-  Assert-True (Test-Path -LiteralPath $link) "F: junction NAO removida"
+  $pf = Invoke-Plan -Root $f
+  Assert-True ($pf.r.exit -eq 1 -and $pf.r.json.status -eq 'blocked') "F: junction -> blocked; obtido $($pf.r.json.status)"
+  Assert-True (Test-Path -LiteralPath $link) "F: junction intacta"
   Assert-True (Test-Path -LiteralPath (Join-Path $target 'sentinela.txt')) "F: alvo do junction intacto"
 
-  # ===== G. idempotencia =====
-  $g = New-TempRoot -Slug 'idemp'
-  New-Frente -Root $g -Name 'FrenteZ'
-  [void](Invoke-Cleanup -Arguments @('-RepoRoot', $g, '-Apply'))
-  $rg2 = Invoke-Cleanup -Arguments @('-RepoRoot', $g, '-Apply')
-  Assert-True ($rg2.exit -eq 0 -and $rg2.json.status -eq 'applied-clean') "G: 2a passada no-op applied-clean; obtido $($rg2.json.status)"
+  # ===== G. Scope=Frentes deixa orfao -> applied-with-skips =====
+  $g = New-TempRoot -Slug 'scope'
+  New-Frente -Root $g -Name 'FrenteG'
+  New-Pacote -Root $g -File 'Orfao_01.import_file.xml'
+  $pg = Invoke-Plan -Root $g -Extra @('-Scope', 'Frentes', '-Permanente')
+  $rg = Invoke-Apply -Root $g -Plan $pg.plan -Extra @('-Scope', 'Frentes', '-Permanente')
+  Assert-True ($rg.exit -eq 3 -and $rg.json.status -eq 'applied-with-skips') "G: orfao fora do escopo -> applied-with-skips; obtido $($rg.json.status)"
+  Assert-True (Test-Path -LiteralPath (Join-Path $g "$PACOTES/Orfao_01.import_file.xml")) "G: orfao preservado"
 
-  # ===== H. JSON sem Kind / repoRoot divergente =====
-  $h = New-TempRoot -Slug 'badjson'
+  # ===== H. exclusao de pacote -> applied-with-skips e preservado =====
+  $h = New-TempRoot -Slug 'excl'
   New-Frente -Root $h -Name 'FrenteH'
-  $noKind = Join-Path $h 'nokind.json'
-  '{"status":"warn","frentesNaoConformes":["FrenteH"],"pacotesOrfaos":[]}' | Set-Content -LiteralPath $noKind -Encoding utf8
-  $rh = Invoke-Cleanup -Arguments @('-RepoRoot', $h, '-JsonPath', $noKind)
-  Assert-True ($rh.exit -eq 1 -and $rh.json.status -eq 'error') "H: JSON sem Kind -> error; obtido $($rh.json.status)"
-  $jh = Invoke-Engine -Root $h
-  $divergente = Join-Path $h 'diverg.json'
-  ($jh | ConvertTo-Json -Depth 6) | Set-Content -LiteralPath $divergente -Encoding utf8
-  $rh2 = Invoke-Cleanup -Arguments @('-RepoRoot', (New-TempRoot -Slug 'outro'), '-JsonPath', $divergente)
-  Assert-True ($rh2.exit -eq 1 -and $rh2.json.status -eq 'error') "H: repoRoot divergente -> error; obtido $($rh2.json.status)"
+  New-Pacote -Root $h -File 'Orfao_01.import_file.xml'
+  $ph = Invoke-Plan -Root $h -Extra @('-Permanente', '-ExcludePacote', 'Orfao_01.import_file.xml')
+  $rh = Invoke-Apply -Root $h -Plan $ph.plan -Extra @('-Permanente', '-ExcludePacote', 'Orfao_01.import_file.xml')
+  Assert-True ($rh.exit -eq 3 -and $rh.json.status -eq 'applied-with-skips') "H: exclusao -> applied-with-skips; obtido $($rh.json.status)"
+  Assert-True (Test-Path -LiteralPath (Join-Path $h "$PACOTES/Orfao_01.import_file.xml")) "H: pacote excluido preservado"
+  Assert-True (-not (Test-Path -LiteralPath (Join-Path $h "$FRENTES/FrenteH"))) "H: frente nao excluida removida"
 
-  # ===== I. JSON stale (item virou ausente) =====
-  $i = New-TempRoot -Slug 'stale'
-  New-Frente -Root $i -Name 'FrenteStale'
-  $ji = Invoke-Engine -Root $i
-  $capI = Join-Path $i 'cap.json'
-  ($ji | ConvertTo-Json -Depth 6) | Set-Content -LiteralPath $capI -Encoding utf8
-  Remove-Item -LiteralPath (Join-Path $i "$FRENTES/FrenteStale") -Recurse -Force   # some apos a captura
-  $ri = Invoke-Cleanup -Arguments @('-RepoRoot', $i, '-JsonPath', $capI)
-  $iSkips = @(); foreach ($p in $ri.json.passes) { foreach ($s in $p.skipped) { $iSkips += $s.reason } }
-  Assert-True ($iSkips -contains 'already-absent') "I: JSON stale -> skipped already-absent; obtidos: $($iSkips -join ',')"
-  Assert-True ($ri.json.status -eq 'clean') "I: nada a remover de fato -> clean; obtido $($ri.json.status)"
+  # ===== I. exclusao sem correspondencia -> blocked =====
+  $i = New-TempRoot -Slug 'unmatched'
+  New-Frente -Root $i -Name 'FrenteI'
+  $ri = Invoke-Cleanup -Arguments @('-RepoRoot', $i, '-ExcludePacote', 'NaoExiste_01.import_file.xml')
+  Assert-True ($ri.exit -eq 1 -and $ri.json.status -eq 'blocked') "I: exclusao sem correspondencia -> blocked; obtido $($ri.json.status)"
 
-  # ===== J. pacotesNaoPadronizados intocado + espelhado =====
-  $j = New-TempRoot -Slug 'naopadr'
+  # ===== J. -WhatIf -> whatif, nada removido =====
+  $j = New-TempRoot -Slug 'whatif'
   New-Frente -Root $j -Name 'FrenteJ'
-  New-Pacote -Root $j -File 'weird.xpz'   # casa extensao, nao casa <frente>_<nn>
-  $rj = Invoke-Cleanup -Arguments @('-RepoRoot', $j, '-Apply')
-  Assert-True (@($rj.json.untouchedNonStandard) -contains 'weird.xpz') "J: weird.xpz espelhado em untouchedNonStandard"
-  Assert-True (Test-Path -LiteralPath (Join-Path $j "$PACOTES/weird.xpz")) "J: pacote nao-padronizado NAO tocado"
+  $pj = Invoke-Plan -Root $j -Extra @('-Permanente')
+  $rj = Invoke-Apply -Root $j -Plan $pj.plan -Extra @('-Permanente', '-WhatIf')
+  Assert-True ($rj.exit -eq 0 -and $rj.json.status -eq 'whatif') "J: -WhatIf -> whatif; obtido $($rj.json.status)"
+  Assert-True (Test-Path -LiteralPath (Join-Path $j "$FRENTES/FrenteJ")) "J: -WhatIf nao removeu"
 
-  # ===== K. backup =====
+  # ===== K. backup: move-aside, jsonl, combinacoes =====
   $k = New-TempRoot -Slug 'backup'
   New-Frente -Root $k -Name 'FrenteK'
   New-Pacote -Root $k -File 'OrfK_01.import_file.xml'
-  $bkRoot = New-TempRoot -Slug 'backup-dest'
-  $rk = Invoke-Cleanup -Arguments @('-RepoRoot', $k, '-Apply', '-Backup', $bkRoot, '-RunStamp', 'run001')
+  $bk = New-TempRoot -Slug 'backup-dest'
+  $pk = Invoke-Plan -Root $k -Extra @('-Backup', $bk, '-RunStamp', 'run001')
+  $rk = Invoke-Apply -Root $k -Plan $pk.plan -Extra @('-Backup', $bk, '-RunStamp', 'run001')
   Assert-True ($rk.json.status -eq 'applied-clean') "K: backup applied-clean; obtido $($rk.json.status)"
-  Assert-True (Test-Path -LiteralPath (Join-Path $bkRoot 'run001/frentes/FrenteK')) "K: frente movida ao backup"
-  Assert-True (Test-Path -LiteralPath (Join-Path $bkRoot 'run001/pacotes/OrfK_01.import_file.xml')) "K: pacote movido ao backup"
-  Assert-True (Test-Path -LiteralPath (Join-Path $bkRoot 'run001/backup-manifest.json')) "K: manifesto de backup gravado"
-  Assert-True (-not (Test-Path -LiteralPath (Join-Path $k "$FRENTES/FrenteK"))) "K: original removido apos backup"
+  Assert-True (Test-Path -LiteralPath (Join-Path $bk 'run001/frentes/FrenteK')) "K: frente movida"
+  Assert-True (Test-Path -LiteralPath (Join-Path $bk 'run001/pacotes/OrfK_01.import_file.xml')) "K: pacote movido"
+  Assert-True (Test-Path -LiteralPath (Join-Path $bk 'run001/backup-manifest.jsonl')) "K: manifesto jsonl gravado"
+  $k2 = Invoke-Cleanup -Arguments @('-RepoRoot', (New-TempRoot -Slug 'k2'), '-Backup', (New-TempRoot -Slug 'k2b'))
+  Assert-True ($k2.exit -eq 1 -and $k2.json.status -eq 'blocked') "K2: -Backup sem -RunStamp -> blocked"
+  $k3root = New-TempRoot -Slug 'k3'
+  New-Frente -Root $k3root -Name 'FrenteK3'
+  $k3 = Invoke-Cleanup -Arguments @('-RepoRoot', $k3root, '-Backup', (Join-Path $k3root $FRENTES), '-RunStamp', 'r')
+  Assert-True ($k3.exit -eq 1 -and $k3.json.status -eq 'blocked') "K3: -Backup dentro de frentesDir -> blocked"
+  $k4bk = New-TempRoot -Slug 'k4'
+  Write-File -Path (Join-Path $k4bk 'run001/ocupado.txt') -Content 'x'
+  $k4 = Invoke-Cleanup -Arguments @('-RepoRoot', (New-TempRoot -Slug 'k4root'), '-Backup', $k4bk, '-RunStamp', 'run001')
+  Assert-True ($k4.exit -eq 1 -and $k4.json.status -eq 'blocked') "K4: subdir de backup nao vazio -> blocked"
+  $kl = Invoke-Cleanup -Arguments @('-RepoRoot', (New-TempRoot -Slug 'kl'), '-Permanente', '-Backup', (New-TempRoot -Slug 'klb'), '-RunStamp', 'r')
+  Assert-True ($kl.exit -eq 1 -and $kl.json.status -eq 'blocked') "K-L: -Permanente com -Backup -> blocked"
 
-  # K2: -Backup sem -RunStamp -> error
-  $k2 = New-TempRoot -Slug 'backup-norunstamp'
-  New-Frente -Root $k2 -Name 'FrenteK2'
-  $rk2 = Invoke-Cleanup -Arguments @('-RepoRoot', $k2, '-Apply', '-Backup', (New-TempRoot -Slug 'bk2'))
-  Assert-True ($rk2.exit -eq 1 -and $rk2.json.status -eq 'error') "K2: -Backup sem -RunStamp -> error"
+  # ===== L. sidecar sai com o pacote; orfao so e reportado =====
+  $l = New-TempRoot -Slug 'sidecar'
+  New-Frente -Root $l -Name 'FrenteL'
+  New-Pacote -Root $l -File 'FrenteL_01.import_file.xml'
+  Write-File -Path (Join-Path $l "$PACOTES/FrenteL_01.import_file.xml.package-inventory.json") -Content '{}'
+  Write-File -Path (Join-Path $l "$PACOTES/Solto_02.import_file.xml.package-inventory.json") -Content '{}'
+  $pl = Invoke-Plan -Root $l -Extra @('-Permanente')
+  $rl = Invoke-Apply -Root $l -Plan $pl.plan -Extra @('-Permanente')
+  Assert-True (-not (Test-Path -LiteralPath (Join-Path $l "$PACOTES/FrenteL_01.import_file.xml.package-inventory.json"))) "L: sidecar removido junto com o pacote"
+  Assert-True (Test-Path -LiteralPath (Join-Path $l "$PACOTES/Solto_02.import_file.xml.package-inventory.json")) "L: sidecar orfao preservado"
+  Assert-True (@($rl.json.sidecarsOrfaos) -contains 'Solto_02.import_file.xml.package-inventory.json') "L: sidecar orfao reportado"
+  Assert-True ($rl.json.status -eq 'applied-clean') "L: sidecar orfao informativo nao muda status; obtido $($rl.json.status)"
 
-  # K3: -Backup dentro da pasta-alvo -> error
-  $k3 = New-TempRoot -Slug 'backup-inside'
-  New-Frente -Root $k3 -Name 'FrenteK3'
-  $rk3 = Invoke-Cleanup -Arguments @('-RepoRoot', $k3, '-Apply', '-Backup', (Join-Path $k3 $FRENTES), '-RunStamp', 'r')
-  Assert-True ($rk3.exit -eq 1 -and $rk3.json.status -eq 'error') "K3: -Backup dentro de frentesDir -> error"
+  # ===== M. .rejected informativo =====
+  $m = New-TempRoot -Slug 'rejected'
+  New-Pacote -Root $m -File 'Frente_01.import_file.xml.rejected.A'
+  New-Pacote -Root $m -File 'Frente_01.import_file.xml.rejected.B'
+  $rm = Invoke-Engine -Root $m
+  $contM = @($rm.pacotesRejeitados | Where-Object { $_.base -eq 'Frente_01.import_file.xml' })
+  Assert-True ($contM.Count -eq 1 -and $contM[0].contagem -eq 2) "M: rejeitados contados por nome-base"
+  $mRun = Invoke-Cleanup -Arguments @('-RepoRoot', $m)
+  Assert-True ($mRun.exit -eq 0 -and $mRun.json.status -eq 'clean') "M: rejeitados nao alteram o status do dry-run; obtido $($mRun.json.status)"
 
-  # K4: subdir de backup pre-existente nao-vazio -> error
-  $k4 = New-TempRoot -Slug 'backup-preexist'
-  New-Frente -Root $k4 -Name 'FrenteK4'
-  $bk4 = New-TempRoot -Slug 'bk4'
-  Write-File -Path (Join-Path $bk4 'run001/ocupado.txt') -Content 'x'
-  $rk4 = Invoke-Cleanup -Arguments @('-RepoRoot', $k4, '-Apply', '-Backup', $bk4, '-RunStamp', 'run001')
-  Assert-True ($rk4.exit -eq 1 -and $rk4.json.status -eq 'error') "K4: subdir de backup pre-existente -> error"
+  # ===== O. raiz vazia -> clean =====
+  $o = New-TempRoot -Slug 'vazia'
+  [void](New-Item -ItemType Directory -Path (Join-Path $o $FRENTES) -Force)
+  $ro = Invoke-Cleanup -Arguments @('-RepoRoot', $o)
+  Assert-True ($ro.exit -eq 0 -and $ro.json.status -eq 'clean') "O: raiz sem achados -> clean"
+
+  # ===== P. PlanPath dentro da pasta-alvo -> blocked =====
+  $p = New-TempRoot -Slug 'planinside'
+  New-Frente -Root $p -Name 'FrenteP'
+  $rp = Invoke-Cleanup -Arguments @('-RepoRoot', $p, '-PlanPath', (Join-Path $p "$FRENTES/plano.json"))
+  Assert-True ($rp.exit -eq 1 -and $rp.json.status -eq 'blocked') "P: PlanPath dentro de frentesDir -> blocked"
+
+  # ===== S. Lixeira real (opt-in) =====
+  if ($env:XPZ_FAXINA_SELFTEST_LIXEIRA -eq '1') {
+    $s = New-TempRoot -Slug 'lixeira'
+    New-Frente -Root $s -Name 'FrenteS'
+    $ps = Invoke-Plan -Root $s
+    $rs = Invoke-Apply -Root $s -Plan $ps.plan
+    Assert-True ($rs.json.status -eq 'applied-clean') "S: Lixeira applied-clean; obtido $($rs.json.status) blockers=$(@($rs.json.blockers) -join ';')"
+    Assert-True (@($rs.json.items | Where-Object { $_.result -eq 'recycle-verified' }).Count -eq 1) "S: envio verificado"
+    # restaura o item pelo verbo da propria Lixeira
+    $shell = New-Object -ComObject Shell.Application
+    $bin = $shell.Namespace(10)
+    $it = $bin.Items() | Where-Object { $_.Name -eq 'FrenteS' } | Select-Object -First 1
+    if ($it) {
+      $v = $it.Verbs() | Where-Object { ($_.Name -replace '&', '') -match '^(Restaurar|Restore)$' } | Select-Object -First 1
+      if ($v) { $v.DoIt() }
+    }
+    for ($tries = 0; $tries -lt 20 -and -not (Test-Path -LiteralPath (Join-Path $s "$FRENTES/FrenteS")); $tries++) { Start-Sleep -Milliseconds 500 }
+    Assert-True (Test-Path -LiteralPath (Join-Path $s "$FRENTES/FrenteS")) "S: item restaurado da Lixeira"
+  }
 
   'XPZ_KB_FRENTE_HYGIENE_CLEANUP_SELFTEST_OK'
 }

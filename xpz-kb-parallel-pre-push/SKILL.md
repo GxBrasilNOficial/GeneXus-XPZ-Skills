@@ -70,7 +70,7 @@ Do NOT use esta skill para:
    - `blocked` (exit 1) → há gate `block` **ou** `unknown`; push proibido até saneamento. Diagnosticar cada gate por `fase1-mecanica.md`. A triagem 2a/2b/2c ainda pode correr como diagnóstico; não desbloqueia push.
 5. Para gates **K8/K9** em `block`: se a causa for wrapper local ausente/ambíguo/defasado (`resolvedBy` = `none`/`ambiguous`, ou `resolvedBy='config'` apontando arquivo inexistente, ou contrato `-AsJson` não emitido), encaminhar à `xpz-kb-parallel-setup` (`atualizar_bootstrap_local`/`corrigir_wrapper_local`). Não editar o wrapper aqui.
    - Se **K9** bloquear por falha de rebuild/índice e o acervo tiver `Menubar/` com `type="gxlegacy/Menubar"` residual, tratar como migração pós-reclassificação (`01k` / `xpz-sync` / passo 8.g de `xpz-kb-parallel-setup`): re-sync ou limpeza **antes** de insistir no gate. Não é bug do orquestrador.
-6. Fase 2a estrutural: rodar `Test-XpzKbFrenteHygiene.ps1` (higiene de frente/pacote) — ver `fase2a-estrutural.md`. A correção dos `warn` (remover frentes não-conformes / pacotes órfãos) é a **forma canônica** via `Remove-XpzKbFrenteHygieneFindings.ps1` (fail-safe: dry-run por padrão, `-Apply` sob decisão humana, consome o JSON do motor como fonte de verdade) — **NUNCA** um passo automático desta rotina nem deleção ad-hoc.
+6. Fase 2a estrutural: rodar `Test-XpzKbFrenteHygiene.ps1` (higiene de frente/pacote) — ver `fase2a-estrutural.md`. A correção dos `warn` (remover frentes não-conformes / pacotes órfãos) é a **forma canônica** via `Remove-XpzKbFrenteHygieneFindings.ps1` (dry-run com `-PlanPath`, depois `-Apply -JsonPath` sob decisão humana; envio à Lixeira por padrão; consome o JSON do motor como fonte de verdade) — **NUNCA** um passo automático desta rotina nem deleção ad-hoc.
 7. Fase 2b: classificar o regime das mudanças (`Compare-XpzChecksums` descarta SAME; roteamento por regime, build como autoridade) — ver `fase2b-classificador-de-regime.md`. É **classificador**, não selo determinístico.
 8. Fase 2c: caça a regressão óbvia (checklist de agente sobre DIFF/NEW com Source relevante; herda roteamento da 2b) — ver `fase2c-caca-regressao-agente.md`. Triagem no relatório; **não** altera `pushReadiness`; **não** prova ausência de regressão.
 9. Montar o relatório da rodada (molde em `examples/`, com seção 2c obrigatória) e **parar**. Correções e push só após autorização explícita do usuário.
@@ -80,7 +80,7 @@ Do NOT use esta skill para:
 ## SATÉLITES
 
 - [`fase1-mecanica.md`](fase1-mecanica.md) — contrato dos gates G0–G5 + K1–K4/K8/K9/K11 do orquestrador (severidade consolidada, `unknown`⇒`blocked`, exit codes, descoberta de wrapper, parâmetros e tokens de camada).
-- [`fase2a-estrutural.md`](fase2a-estrutural.md) — `Test-XpzKbFrenteHygiene` (diagnóstico) + executor de faxina `Remove-XpzKbFrenteHygieneFindings` (correção fail-safe, fora da pré-push) + checklist de agente; nuance cabeça-detalhe do F1.
+- [`fase2a-estrutural.md`](fase2a-estrutural.md) — `Test-XpzKbFrenteHygiene` (diagnóstico) + executor de faxina `Remove-XpzKbFrenteHygieneFindings` (correção em dois passos, Lixeira por padrão, fora da pré-push) + checklist de agente; nuance cabeça-detalhe do F1.
 - [`fase2b-classificador-de-regime.md`](fase2b-classificador-de-regime.md) — classificador de regime (F1 → roteamento → build como autoridade), catálogo de padrões aceitos por-KB.
 - [`fase2c-caca-regressao-agente.md`](fase2c-caca-regressao-agente.md) — caça a regressão óbvia (triagem de agente pós-2b; não prova; não altera `pushReadiness`).
 

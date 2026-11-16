@@ -24,29 +24,38 @@ Ambos são `warn` (não bloqueiam) porque podem ter justificativa legítima (fre
 
 ### Contrato de saída
 
-JSON de máquina por padrão. Campos: `Kind` (`xpz-frente-hygiene-result`), `SchemaVersion` (`1`), `status` (`ok`|`warn`), `exitCode`, `repoRoot`, `frentesDir`, `pacotesDir` (caminhos resolvidos/normalizados), `frentesValidas`, `frentesNaoConformes[]` (nomes), `pacotesOk`, `pacotesOrfaos[]` (`{pacote, frenteEsperada}`), `pacotesNaoPadronizados[]`. **Exit: 0 ok, 2 warn.** Fase 2a nunca bloqueia push.
+JSON de máquina por padrão. Campos: `Kind` (`xpz-frente-hygiene-result`), `SchemaVersion` (`2`), `status` (`ok`|`warn`), `exitCode`, `repoRoot`, `frentesDir`, `pacotesDir` (caminhos resolvidos/normalizados), `frentesValidas`, `frentesNaoConformes[]` (nomes), `pacotesOk`, `pacotesOrfaos[]` (`{pacote, frenteEsperada}`), `pacotesNaoPadronizados[]`, `pacotesVinculados[]` (`{pacote, frente, frenteStatus}` com `frenteStatus` = `valida`|`naoConforme`|`ausente`; base da cascata), `sidecarsOrfaos[]` (sidecar `<pacote>.package-inventory.json` sem pacote e sem `.rejected` de mesmo nome-base) e `pacotesRejeitados[]` (`{base, contagem}` de `<base>.rejected.<A..Z>`; informativo). **Exit: 0 ok, 2 warn.** Fase 2a nunca bloqueia push.
 
 Este JSON é o **contrato de consumo** do executor de faxina (ver abaixo): renomear/retipar campos aqui quebra o executor; o lockstep é travado por `Test-XpzKbFrenteHygieneCleanupSelfTest.ps1`.
 
 ## Higiene local: as pastas inspecionadas são tipicamente gitignoradas
 
-`ObjetosGeradosParaImportacaoNaKbNoGenexus/` e `PacotesGeradosParaImportacaoNaKbNoGenexus/` são **área de trabalho local** — na maioria das KBs paralelas elas são **gitignoradas**. Portanto os `warn` da Fase 2a são **higiene da área de trabalho local**, distinta do conteúdo que vai no push: calibra a severidade na leitura (não confundir com problema do que será publicado). Como são gitignoradas, **deleção ali não tem recuperação por git** — daí o executor abaixo ser fail-safe por padrão.
+`ObjetosGeradosParaImportacaoNaKbNoGenexus/` e `PacotesGeradosParaImportacaoNaKbNoGenexus/` são **área de trabalho local** — na maioria das KBs paralelas elas são **gitignoradas**. Portanto os `warn` da Fase 2a são **higiene da área de trabalho local**, distinta do conteúdo que vai no push: calibra a severidade na leitura (não confundir com problema do que será publicado). Quando são gitignoradas, **remoção ali não tem recuperação por git**. Por isso o executor abaixo envia à **Lixeira do Windows** por padrão e exige plano salvo para qualquer remoção. A Lixeira **não é backup**: as políticas do Windows podem esvaziá-la, e a verificação só relata uma perda que já aconteceu.
 
 ## Faxina: `Remove-XpzKbFrenteHygieneFindings.ps1` (forma canônica de corrigir)
 
 Motor compartilhado, agnóstico de KB, **filesystem-only**. **Consome** o JSON de `Test-XpzKbFrenteHygiene` (fonte de verdade única — não reimplementa o matching) e remove exatamente o flagado.
 
 ```text
-pwsh -File <repo-skills>\scripts\Remove-XpzKbFrenteHygieneFindings.ps1 -RepoRoot <pasta-paralela> [-Apply]
+# 1) dry-run: mostra o plano completo (inclui a cascata) e grava o plano salvo
+pwsh -File <repo-skills>\scripts\Remove-XpzKbFrenteHygieneFindings.ps1 -RepoRoot <pasta-paralela> -PlanPath <arquivo-novo-fora-das-pastas-alvo>
+# 2) apply: só roda com o plano salvo; compara com o estado atual e para se diferir
+pwsh -File <repo-skills>\scripts\Remove-XpzKbFrenteHygieneFindings.ps1 -RepoRoot <pasta-paralela> -Apply -JsonPath <arquivo-do-passo-1>
 ```
 
-- **Fail-safe por padrão:** sem `-Apply` é **dry-run** (lista o que *seria* removido, apaga nada). `-WhatIf` também funciona. Deleção real só com `-Apply` — **exige decisão humana explícita**.
-- **`-Scope`** `Frentes`|`Pacotes`|`Ambos` (default `Ambos`). `pacotesNaoPadronizados` **nunca** é tocado (espelhado em `untouchedNonStandard`).
-- **`-Apply`** re-invoca o motor a cada passada e **itera até ponto-fixo** (trata a cascata: remover frentes orfana pacotes-irmãos), com fusível `-MaxPasses` (default 5).
-- **`-Backup <dir> -RunStamp <id>`** (opcional): move-aside no **mesmo volume**, fora das pastas-alvo, com `backup-manifest.json` (cross-volume é recusado no v1).
-- **Segurança:** ancora os diretórios-base sob `-RepoRoot` canônico, recusa reparse point (junction/symlink) em componente do caminho ou em descendente do item, e remove diretório por descida bottom-up (nunca `-Recurse`).
-- **Saída:** 1 linha JSON (`Kind='xpz-frente-hygiene-cleanup-result'`); texto humano só por stderr. `status` normativo: `clean`|`findings`|`applied-clean`|`applied-with-skips`|`not-stabilized`|`error`. **Exit:** 0 `clean`/`applied-clean`; 2 `findings`; 3 `applied-with-skips`/`not-stabilized`; 1 `error`. Automação lê `status`, não o número.
-- **Não é passo automático da pré-push.** A pré-push continua sendo análise + relatório; a faxina é ação separada, fail-safe, sob decisão humana. Validação: `Test-XpzKbFrenteHygieneCleanupSelfTest.ps1` (token `XPZ_KB_FRENTE_HYGIENE_CLEANUP_SELFTEST_OK`).
+- **Dois passos obrigatórios.** O dry-run (sem `-Apply`) não remove nada e grava o plano com `-PlanPath` (arquivo novo, fora de `frentesDir` e `pacotesDir`). O `-Apply` exige `-JsonPath` com esse plano; sem ele, `blocked`. Se o estado atual difere do plano salvo, `blocked`, sem remover nada. `-WhatIf` com `-Apply` mostra `whatif`.
+- **Método:** padrão é **Lixeira do Windows** (`SendToRecycleBin`, sem caixa de diálogo). `-Permanente` apaga em definitivo (explícito). `-Backup <dir> -RunStamp <id>` move para fora das pastas-alvo, no mesmo volume, com `backup-manifest.jsonl`. `-Permanente` e `-Backup` não combinam.
+- **Pré-condições da Lixeira** (verificadas antes da primeira ação, para a lista inteira): sessão não elevada; volume fixo local; `NukeOnDelete` = 0 explícito; `MaxCapacity` legível; a lista cabe no limite descontada a ocupação do usuário atual. Qualquer falha → `blocked`, sem fallback para apagamento definitivo.
+- **Verificação após cada envio:** o caminho original sumiu, existe um registro `$I` novo com esse caminho e tamanho, e o par `$R` está presente. Falha → `hard-stop` com a fila parada. Limite declarado: cobre só a Lixeira do usuário atual.
+- **Cascata:** a remoção de uma frente não conforme aparece no plano pelos pacotes que ela orfana (`pacotesVinculados` do motor). Um plano único cobre a cascata; não há passadas repetidas.
+- **Exclusões:** `-ExcludeFrente <nome>` e `-ExcludePacote <nome>`, nome exato. Nome sem correspondência no disco → `blocked`. Excluídos aparecem em `exclusions[]` e deixam o status em `applied-with-skips`.
+- **Escopo:** `-Scope` `Frentes`|`Pacotes`|`Ambos` (default `Ambos`). Órfão fora do escopo é resíduo (`applied-with-skips`), não `applied-clean`. `pacotesNaoPadronizados` **nunca** é tocado.
+- **Sidecar:** `<pacote>.package-inventory.json` sai junto com o pacote. Sidecar órfão é só informado.
+- **`.rejected`:** informativo (`pacotesRejeitados[]`). Não é removido nem altera o status.
+- **Segurança:** ancora os diretórios-base sob `-RepoRoot` canônico, recusa reparse point (junction/symlink) no caminho ou no item, e remove diretório por descida bottom-up (nunca `-Recurse`).
+- **Saída:** 1 linha JSON (`Kind='xpz-frente-hygiene-cleanup-result'`, `SchemaVersion=2`); texto humano só com `-AsText`. `status`: `clean`|`findings`|`whatif`|`blocked`|`applied-clean`|`applied-with-skips`|`hard-stop`. **Exit:** 0 `clean`/`whatif`/`applied-clean`; 2 `findings`; 3 `applied-with-skips`; 1 `blocked`/`hard-stop`. Automação lê `status`, não o número.
+- **Não é passo automático da pré-push.** A pré-push continua sendo análise + relatório; a faxina é ação separada, sob decisão humana. Validação: `Test-XpzKbFrenteHygieneCleanupSelfTest.ps1` (token `XPZ_KB_FRENTE_HYGIENE_CLEANUP_SELFTEST_OK`). O caso de Lixeira real é opt-in: `XPZ_FAXINA_SELFTEST_LIXEIRA=1`.
+- **Não testado:** arquivo bloqueado (aberto na IDE) durante o envio; rede e outros volumes; Lixeira desativada por política; cota estourada; `subst`.
 
 ## Nuance cabeça-detalhe (vinda do F1)
 
@@ -59,7 +68,7 @@ Além dos dois cheques mecânicos, antes de declarar a Fase 2a saneada:
 - [ ] A frente ativa vive na própria subpasta `NomeCurto_GUID_YYYYMMDD` (não na raiz de `ObjetosGeradosParaImportacaoNaKbNoGenexus`).
 - [ ] Não há XML de referência/exemplo/template/molde deixado na subpasta da frente como se fosse objeto a importar.
 - [ ] A pasta de pacotes está **plana** (sem subpastas por frente).
-- [ ] Pacotes órfãos reportados pelo motor têm justificativa explícita (frente já importada/removida) ou foram corrigidos — a forma **canônica** de corrigir é o executor `Remove-XpzKbFrenteHygieneFindings.ps1` (fail-safe, `-Apply` sob decisão humana), não deleção manual/ad-hoc.
+- [ ] Pacotes órfãos reportados pelo motor têm justificativa explícita (frente já importada/removida) ou foram corrigidos — a forma **canônica** de corrigir é o executor `Remove-XpzKbFrenteHygieneFindings.ps1` (dry-run com plano salvo, depois `-Apply -JsonPath` sob decisão humana), não deleção manual/ad-hoc.
 - [ ] Frentes não-conformes reportadas têm justificativa (experimental) ou foram renomeadas para o padrão; quando a decisão for remover, usar o executor (acima), não recontar/apagar à mão.
 
 O resultado da Fase 2a entra no relatório da rodada (molde em `examples/`) como `warn` consolidável, nunca como bloqueio automático.

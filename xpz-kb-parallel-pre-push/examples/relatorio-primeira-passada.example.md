@@ -36,7 +36,7 @@
 - frentes não-conformes: `<lista ou nenhuma>`
 - pacotes órfãos: `<lista ou nenhum>`  ·  pacotes não padronizados: `<lista ou nenhum>`
 - checklist de agente: `<itens pendentes ou OK>`
-- remediação (ação separada, sob decisão humana — **não** é passo da pré-push): via `Remove-XpzKbFrenteHygieneFindings.ps1` (fail-safe — dry-run por padrão, `-Apply`); ver `fase2a-estrutural.md`
+- remediação (ação separada, sob decisão humana — **não** é passo da pré-push): via `Remove-XpzKbFrenteHygieneFindings.ps1` (dry-run com `-PlanPath`; depois `-Apply -JsonPath`; Lixeira por padrão); ver `fase2a-estrutural.md`
 
 ## Fase 2b — classificação de regime (`Compare-XpzChecksums.ps1` + roteamento)
 

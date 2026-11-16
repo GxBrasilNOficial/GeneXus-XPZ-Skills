@@ -57,7 +57,7 @@ try {
   Assert-True ($ra.json.pacotesOk -eq 1) "A: pacotesOk=1 esperado; obtido $($ra.json.pacotesOk)"
   # Contrato de saida (consumido por Remove-XpzKbFrenteHygieneFindings.ps1)
   Assert-True ($ra.json.Kind -eq 'xpz-frente-hygiene-result') "A: Kind esperado; obtido $($ra.json.Kind)"
-  Assert-True ($ra.json.SchemaVersion -eq 1) "A: SchemaVersion=1 esperado; obtido $($ra.json.SchemaVersion)"
+  Assert-True ($ra.json.SchemaVersion -eq 2) "A: SchemaVersion=2 esperado; obtido $($ra.json.SchemaVersion)"
   Assert-True ([bool]$ra.json.frentesDir) "A: frentesDir resolvido esperado"
   Assert-True ([bool]$ra.json.pacotesDir) "A: pacotesDir resolvido esperado"
   Assert-True ([System.IO.Path]::IsPathRooted($ra.json.frentesDir)) "A: frentesDir absoluto esperado; obtido $($ra.json.frentesDir)"

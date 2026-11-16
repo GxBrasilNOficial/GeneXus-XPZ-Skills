@@ -24,11 +24,15 @@
   usuario decide aceitar ou corrigir.
 
   CONTRATO DE SAIDA: JSON de maquina por padrao no stdout. Campos: Kind
-  ('xpz-frente-hygiene-result'), SchemaVersion (1), status (ok|warn), exitCode,
+  ('xpz-frente-hygiene-result'), SchemaVersion (2), status (ok|warn), exitCode,
   repoRoot, frentesDir, pacotesDir (caminhos resolvidos/normalizados),
   frentesValidas, frentesNaoConformes[], pacotesOk, pacotesOrfaos[],
-  pacotesNaoPadronizados[]. -AsText da saida humana; -AsJson e no-op (JSON ja e o
-  default).
+  pacotesNaoPadronizados[]. SchemaVersion 2 acrescenta (aditivo e obrigatorio para o
+  executor): pacotesVinculados[] {pacote, frente, frenteStatus=valida|naoConforme|
+  ausente} para todo pacote casado; sidecarsOrfaos[] (sidecar <pacote>.package-
+  inventory.json sem pacote e sem .rejected de mesmo nome-base); pacotesRejeitados[]
+  {base, contagem} (arquivos <base>.rejected.<A..Z>, informativo). -AsText da saida
+  humana; -AsJson e no-op (JSON ja e o default).
 
   CONSUMIDOR: scripts/Remove-XpzKbFrenteHygieneFindings.ps1 (executor de faxina)
   consome este JSON como fonte de verdade. Renomear/retipar campos aqui quebra o
@@ -97,6 +101,9 @@ $pacoteFilePattern = [regex]::new('^(?<frente>.+)_\d+\.(import_file\.xml|xpz)$',
 $pacotesOrfaos = @()
 $pacotesOk = 0
 $pacotesNaoPadronizados = @()
+$pacotesVinculados = @()
+$sidecarsOrfaos = @()
+$pacotesRejeitados = @()
 if (Test-Path -LiteralPath $pacotesDir) {
   $arquivos = @(Get-ChildItem -LiteralPath $pacotesDir -File -ErrorAction SilentlyContinue |
                 Where-Object { $_.Name -match '\.(import_file\.xml|xpz)$' })
@@ -104,11 +111,37 @@ if (Test-Path -LiteralPath $pacotesDir) {
     $m = $pacoteFilePattern.Match($a.Name)
     if (-not $m.Success) { $pacotesNaoPadronizados += $a.Name; continue }
     $frenteEsperada = $m.Groups['frente'].Value
-    if ($frentesValidas -contains $frenteEsperada -or $frentesNaoConformes -contains $frenteEsperada) {
+    if ($frentesValidas -contains $frenteEsperada) {
       $pacotesOk++
+      $pacotesVinculados += [pscustomobject]@{ pacote = $a.Name; frente = $frenteEsperada; frenteStatus = 'valida' }
+    } elseif ($frentesNaoConformes -contains $frenteEsperada) {
+      $pacotesOk++
+      $pacotesVinculados += [pscustomobject]@{ pacote = $a.Name; frente = $frenteEsperada; frenteStatus = 'naoConforme' }
     } else {
       $pacotesOrfaos += [pscustomobject]@{ pacote = $a.Name; frenteEsperada = $frenteEsperada }
+      $pacotesVinculados += [pscustomobject]@{ pacote = $a.Name; frente = $frenteEsperada; frenteStatus = 'ausente' }
     }
+  }
+  # Sidecars <pacote>.package-inventory.json sem pacote e sem .rejected de mesmo nome-base
+  $todosArquivos = @(Get-ChildItem -LiteralPath $pacotesDir -File -ErrorAction SilentlyContinue)
+  foreach ($s in @($todosArquivos | Where-Object { $_.Name -match '\.package-inventory\.json$' })) {
+    $base = $s.Name -replace '\.package-inventory\.json$', ''
+    $temPacote = Test-Path -LiteralPath (Join-Path $pacotesDir $base)
+    $temRejeitado = @($todosArquivos | Where-Object { $_.Name.StartsWith($base + '.rejected.', [System.StringComparison]::Ordinal) }).Count -gt 0
+    if (-not $temPacote -and -not $temRejeitado) { $sidecarsOrfaos += $s.Name }
+  }
+  # Rejeitados <base>.rejected.<A..Z> (case-sensitive: a letra e maiuscula)
+  $rejRx = [regex]::new('^(?<base>.+)\.rejected\.[A-Z]$')
+  $contRej = @{}
+  foreach ($r in $todosArquivos) {
+    $mr = $rejRx.Match($r.Name)
+    if ($mr.Success) {
+      $b = $mr.Groups['base'].Value
+      if ($contRej.ContainsKey($b)) { $contRej[$b]++ } else { $contRej[$b] = 1 }
+    }
+  }
+  foreach ($k in ($contRej.Keys | Sort-Object)) {
+    $pacotesRejeitados += [pscustomobject]@{ base = $k; contagem = [int]$contRej[$k] }
   }
 }
 
@@ -119,7 +152,7 @@ $exitCode = if ($overall -eq 'warn') { 2 } else { 0 }
 
 $result = [pscustomobject]@{
   Kind                   = 'xpz-frente-hygiene-result'
-  SchemaVersion          = 1
+  SchemaVersion          = 2
   status                 = $overall
   exitCode               = $exitCode
   repoRoot               = $RepoRoot
@@ -130,6 +163,9 @@ $result = [pscustomobject]@{
   pacotesOk              = $pacotesOk
   pacotesOrfaos          = @($pacotesOrfaos)
   pacotesNaoPadronizados = @($pacotesNaoPadronizados)
+  pacotesVinculados      = @($pacotesVinculados)
+  sidecarsOrfaos         = @($sidecarsOrfaos)
+  pacotesRejeitados      = @($pacotesRejeitados)
 }
 
 if ($AsText) {
