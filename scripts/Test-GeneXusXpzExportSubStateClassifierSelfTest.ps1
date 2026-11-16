@@ -159,6 +159,22 @@ if ($dryBlock.inventoryDegraded) {
     throw "DRY export block degradado: $($dryBlock.inventoryError)"
 }
 Assert-SubState -Label 'DRY New-ExportPackageInventoryBlock' -Expected $extras -Actual $dryBlock.operationalSubState
+$multiObjectBlock = New-ExportPackageInventoryBlock `
+    -XpzPath $packagePath `
+    -ArtifactDirectory $integrationRoot `
+    -ObjectList 'Procedure:ProcPedida,Procedure:ProcExtra' `
+    -ExportAll 'false' `
+    -FullExportRequested $false
+if ($multiObjectBlock.inventoryDegraded) {
+    throw "DRY export multiobjeto degradado: $($multiObjectBlock.inventoryError)"
+}
+Assert-SubState -Label 'ObjectList separado por vírgula' -Expected $consolidado -Actual $multiObjectBlock.operationalSubState
+if ([string]$multiObjectBlock.packageInventory.deltaStatus -ne 'MATCH') {
+    throw "ObjectList multiobjeto deveria conciliar; deltaStatus=$($multiObjectBlock.packageInventory.deltaStatus)"
+}
+if ([int]$multiObjectBlock.packageInventory.extrasCount -ne 0 -or @($multiObjectBlock.packageInventory.requestedItemsMissing).Count -ne 0) {
+    throw 'ObjectList multiobjeto foi classificado incorretamente como extra ou ausente'
+}
 Remove-Item -LiteralPath $integrationRoot -Recurse -Force
 
 Write-Output 'EXPORT_SUBSTATE_CLASSIFIER_SELFTEST_OK'

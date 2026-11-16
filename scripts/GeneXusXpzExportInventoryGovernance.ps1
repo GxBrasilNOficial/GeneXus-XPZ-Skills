@@ -86,7 +86,12 @@ function New-ExportPackageInventoryBlock {
 
     $declaredDelta = $null
     if ($isSelective) {
-        $declaredDelta = $ObjectList
+        # ObjectList chega delimitado conforme a task Export (vírgula) ou
+        # conforme a forma aceita pelos chamadores (ponto-e-vírgula). O motor
+        # de inventário interpreta DeclaredDeltaItems por ';' ou quebra de linha.
+        $declaredDelta = @($ObjectList -split '[,;]' |
+            ForEach-Object { $_.Trim() } |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) -join ';'
     }
 
     $supportPath = Join-Path $PSScriptRoot 'GeneXusPackageInventorySupport.ps1'
