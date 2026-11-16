@@ -49,6 +49,20 @@ When changing a `Procedure`, run a minimum semantic pre-packaging gate on the `P
 - For every attribute copied from the `For each` navigation into the response SDT, confirm that the attribute exists in the target KB/corpus and that the SDT item shape matches the published API data contract.
 - If collection construction instantiates BC variables inside `For each`, apply the shared PostgreSQL/.NET precaution in [../SKILL.md](../SKILL.md#bc-construction-inside-for-each--postgresqlnet-precaution), section "BC construction inside For each — PostgreSQL/.NET precaution".
 
+### ExcelDocument com modelo .xlsx em File
+
+Quando a Procedure usa um modelo de planilha, revisar o `Source`, o modelo e a saída gerada como partes complementares. Os itens abaixo são verificações, não garantias para todos os generators, versões ou aplicativos:
+
+- Identificar os papéis e tipos de cada coluna em cabeçalhos de grupo, detalhes, subtotais e totais; confrontá-los com os formatos da definição da coluna e das células já formatadas. Verificar na saída exemplos de cada tipo, inclusive datas, números e valores monetários.
+- Conferir a configuração de `AutoFit` quando as larguras do modelo forem relevantes e testar a apresentação no environment que serve a aplicação. Conferir se as linhas formatadas cobrem o volume operacional esperado e testar também a região próxima ao limite; uma fronteira no modelo, sozinha, não comprova erro na saída.
+- Testar células adjacentes com e sem valor quando texto puder avançar visualmente. Zero numérico com formato que o oculte é uma alternativa, assim como limitar ou quebrar o texto; escolher conforme o significado do relatório e verificar fórmulas, filtros, contagens e integrações pertinentes, pois zero e célula vazia podem produzir resultados diferentes.
+- Ao extrair um `.xlsx` de `File`, identificar no XML o nó Base64 correto para aquele objeto; verificar que o resultado tem conteúdo, é ZIP legível e abre como planilha antes de atribuir falha à biblioteca. Distinguir extração inválida, falha de abertura e falha de uma operação específica.
+- Após editar e exportar, reabrir o arquivo e conferir os formatos efetivamente persistidos nas células e colunas afetadas. Comparar estruturas e recursos fora do escopo de modo proporcional ao conteúdo do modelo; ausência de erro na ferramenta não prova persistência nem preservação integral.
+- Para larguras em OOXML, conferir os intervalos `<col min="..." max="...">`: uma consulta por coluna em `openpyxl.column_dimensions` pode retornar um default para colunas cobertas por uma entrada agrupada. Ao passar formatos com cifrões por PowerShell, preservar os literais e confirmar o formato salvo, pois strings expansíveis podem interpretar `$` como variável.
+- Após alteração do `File`, verificar a disponibilização do modelo no environment que atende a aplicação e executar a validação funcional apropriada; importação, build e teste da saída são evidências distintas. Seguir `xpz-msbuild-build` para as fases de geração e build aplicáveis, sem presumir que importar sozinho atualize o arquivo servido.
+
+Evidência localizada relatada em 2026-11: em uma saída fortemente associada ao teste visual, cabeçalhos de data receberam estilo de data e detalhes numéricos permaneceram em formato geral, embora o modelo corrigido tivesse formato geral em B; a origem interna do estilo de data não foi demonstrada. Na mesma saída, uma célula visualmente vazia continha zero com formato que o ocultava. O resultado não garante comportamento equivalente em outros ambientes.
+
 ### Collection operations, Sub control flow, and parameter hygiene
 
 - **Collection sorting**: `.Sort()` on GeneXus collections supports both ascending and descending criteria (ref: skill `nexa`, `references/common-collections.md` and production usage in `FabricaBrasil18`):
@@ -69,6 +83,7 @@ When changing a `Procedure`, run a minimum semantic pre-packaging gate on the `P
 
 ## Quality Checklist
 
+- [ ] Quando aplicável, as verificações de `ExcelDocument` com modelo `.xlsx` acima foram executadas e seus limites registrados; a saída gerada foi conferida por tipo e apresentação, ou a validação pendente foi declarada.
 - [ ] For `Procedure`, the primary edit block was declared before editing and any block transition was justified explicitly
 - [ ] If `Procedure` `Source` contains `New`, 9-PNW completed on the current front with usable Python 3.x on `PATH` (the `WindowsApps` stub does not count); `PREREQUISITO AUSENTE` means the gate did not complete and packaging remains blocked; every generated assignment maps to its exact source occurrence and has `effectiveCanAssignInNew=true`, with any required decision `applied` and its current proof/dependency receipt retained. No pending, stale, malformed, out-of-scope, ineligible, or conflicting decision, incomplete extraction/coverage, or technical cause was overridden before packaging
 - [ ] If `Procedure` returns an SDT collection, the `parm(out:...)`, collection variable, item/helper variable, and response SDT item shape were reviewed as one data contract; 9-BC was required only when a `bc:<Transaction>` variable exists

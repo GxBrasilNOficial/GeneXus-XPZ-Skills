@@ -62,8 +62,10 @@ Descrição: no GeneXus, `\"` dentro de literal é uma barra seguida do fechamen
 
 ## Patch de `.xlsx`: formato Real `[$R$-416]` corrompido por expansão PowerShell — 2026-11-14
 
+**Atualização 2026-11-15.** Orientação preventiva incorporada em `xpz-builder/responsibilities-by-type/procedure.md`; helper e self-test permanecem ideias. Na investigação adicional, a expansão apareceu na saída de erro de uma tentativa que falhou antes de salvar; a evidência primária da ocorrência anterior não foi recuperada. Não há prova de corrupção salva nessa tentativa.
+
 - **Importância** — média (workaround conhecido: string literal / Python; sem isso o modelo importa “ok” e a moeda Real some ou vira lixo visual).
-- **Maturidade** — ideia (causa medida; falta helper/contrato documental na trilha XPZ para quem patcha modelo ExcelDocument).
+- **Maturidade** — orientação documental incorporada; helper e teste automatizado permanecem ideias.
 
 **Origem.** Frente RelTitulos (FabricaBrasil18, 2026-11): modelos `.xlsx` em File `ModelosDePlanilhas` usam formato Excel de moeda Real:
 
@@ -75,7 +77,7 @@ O `$R$` é sintaxe do Excel (código de moeda + LCID 416 = pt-BR), **não** vari
 
 **Ideia (não implementar nesta frente).** Uma ou mais:
 1. Helper compartilhado (ex. `Set-GeneXusExcelTemplateCurrencyFormat.ps1` / Python) que grava o formato Real canônico sem passar por expansão PS.
-2. Nota curta em skill aplicável (`xpz-builder` / doc de File / checklist de modelo ExcelDocument): ao embutir `[$R$-416]` em script, usar literal; nunca interpolar.
+2. Nota documental: incorporada em `xpz-builder/responsibilities-by-type/procedure.md`.
 3. Self-test que falhe se um artefato de exemplo ou fixture perder o substring `[$R$-416]` após round-trip de patch.
 
 **Fora de escopo agora.** Convenção de produto na KB FabricaBrasil (`DECISOES-ARQUITETURA-DA-KB.md`: formato canônico + AutoFit/template); este gap é da **trilha de edição/patch** nas skills.
@@ -86,8 +88,10 @@ O `$R$` é sintaxe do Excel (código de moeda + LCID 416 = pt-BR), **não** vari
 
 ## Leitura de larguras `.xlsx`: openpyxl mente em `<col min max>` — 2026-11-14
 
+**Atualização 2026-11-15.** A cautela documental foi incorporada em `xpz-builder/responsibilities-by-type/procedure.md`; helper e self-test permanecem ideias. A consulta específica por `column_dimensions[k].width` foi reproduzida com openpyxl 3.1.5 para uma entrada agrupada M–P; isso não demonstra defeito geral da biblioteca nem largura efetiva de 13 no Excel.
+
 - **Importância** — média (agente “valida” larguras erradas, regrava modelo que já estava certo ou deixa coluna fora do esperado; sofrimento real na frente RelTitulos).
-- **Maturidade** — ideia (comportamento observado com evidência; falta helper de leitura normativa + nota na trilha).
+- **Maturidade** — orientação documental incorporada; helper e teste automatizado permanecem ideias.
 
 **Origem.** Mesma frente RelTitulos (FabricaBrasil18, 2026-11). No OOXML, várias colunas compartilham uma entrada, ex.:
 
@@ -101,7 +105,7 @@ O `$R$` é sintaxe do Excel (código de moeda + LCID 416 = pt-BR), **não** vari
 
 **Ideia (não implementar nesta frente).** Uma ou mais:
 1. Helper compartilhado que devolva mapa coluna→largura expandindo cada `<col min max>` (PowerShell/`System.IO.Compression` ou Python sem confiar só em `column_dimensions`).
-2. Nota na skill/checklist de modelo: validar larguras no OOXML, não só via openpyxl.
+2. Nota documental: incorporada em `xpz-builder/responsibilities-by-type/procedure.md`.
 3. Self-test com fixture cujo `sheet1.xml` tenha `min != max` e assert de que o helper expande todas as colunas do intervalo.
 
 **Fora de escopo agora.** Decisão de KB “respeitar AJUSTADO do usuário” fica no `DECISOES` da FabricaBrasil; aqui só a armadilha de **leitura/validação** na trilha XPZ.
@@ -112,8 +116,10 @@ O `$R$` é sintaxe do Excel (código de moeda + LCID 416 = pt-BR), **não** vari
 
 ## Checklist genérico: ExcelDocument + Template (AutoFit e formatos) — 2026-11-14
 
+**Atualização 2026-11-15.** O checklist preventivo foi incorporado em `xpz-builder/responsibilities-by-type/procedure.md`. Permanecem como investigação residual a recuperação da evidência primária do efeito visual de `AutoFit` e a verificação do comportamento além da fronteira de linhas formatadas. A investigação confirmou uma fronteira no modelo antigo, mas não localizou saída que demonstre o sintoma após ela; encontrou texto preparado para mudar `AutoFit`, não a comparação visual. As afirmações categóricas e soluções propostas abaixo são o registro anterior, não garantias universais.
+
 - **Importância** — média (workaround hoje é conhecimento local da KB ou aprendizado na dor; sem nota genérica outra KB/agente repete o mesmo ciclo).
-- **Maturidade** — ideia (regras observadas com evidência; falta decidir dono documental — skill `xpz-builder`, checklist de File, ou nota curta em responsabilidade de Procedure — e o texto final).
+- **Maturidade** — checklist incorporado; investigação residual de evidências permanece aberta.
 
 **Origem.** Frente RelTitulos (FabricaBrasil18, 2026-11): planilhas com `ExcelDocument.Template` apontando para `.xlsx` em File (`ModelosDePlanilhas`). Layout quebrado quando `AutoFit = 1` (coluna A estourada pelo texto longo do cabeçalho; larguras do modelo descartadas na prática). Formatos de data/moeda só “pegaram” nas linhas já pré-formatadas do template; teto curto de linhas formatadas falhou em planilhas longas. A API GeneXus de `ExcelDocument` **não** expõe `NumberFormat` — formato não se define no Source da procedure.
 
