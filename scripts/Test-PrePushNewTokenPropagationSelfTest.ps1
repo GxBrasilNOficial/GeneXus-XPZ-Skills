@@ -22,7 +22,11 @@
         pelo .gitignore (Temp/, node_modules/) ou apenas nao rastreado NAO vira
         candidata, enquanto a mencao versionada equivalente continua virando —
         trava a regressao de voltar ao walk de filesystem, que inflava o
-        livro-razao de vereditos com material que nao e documento do repo.
+        livro-razao de vereditos com material que nao e documento do repo;
+      - token generico do PowerShell (-LiteralPath) como token antigo so casa
+        alias que o estende: PlanPath x LiteralPath (so sufixo 'Path') nao gera
+        candidata, enquanto InputLiteralPath x LiteralPath e JsonPath x PlanPath
+        (token de contrato do projeto) continuam pareados.
 #>
 
 Set-StrictMode -Version Latest
@@ -237,6 +241,62 @@ if ($null -ne $ObjectGuids -and $ObjectGuids.Count -gt 0) { $usaGuids = $true }
     $versionadoHit = @($trackedPaths | Where-Object { $_ -like 'exemplo.md:*' })
     if ($versionadoHit.Count -eq 0) {
         throw "exemplo.md (mencao defasada VERSIONADA) deveria continuar candidata; candidatas: $($trackedPaths -join ', ')"
+    }
+
+    # --- Token generico do PowerShell como antigo nao gera ruido ---
+    # Transicoes co-localizadas no mesmo hunk:
+    #   lit.ps1:    -LiteralPath (removido) + -PlanPath (introduzido). PlanPath so
+    #               divide o sufixo 'Path' com LiteralPath: NAO e alias. Mencao de
+    #               -LiteralPath em doc NAO deve virar candidata.
+    #   alias.ps1:  -LiteralPath -> -InputLiteralPath + -LiteralPath. Alias que
+    #               estende o generico continua pareado: doc com -LiteralPath vira
+    #               candidata.
+    #   faxina.ps1: -JsonPath -> -PlanPath + -JsonPath. Token de contrato do projeto
+    #               continua pareado: doc com -JsonPath vira candidata.
+    $litBase = @'
+Get-Content -LiteralPath $Destino
+'@
+    Write-TempFile -RelativePath 'lit.ps1' -Content $litBase
+    Write-TempFile -RelativePath 'alias.ps1' -Content $litBase
+    Write-TempFile -RelativePath 'faxina.ps1' -Content "Invoke-Faxina -JsonPath `$Plano`n"
+    Write-TempFile -RelativePath 'doc-lit.md' -Content "Use -LiteralPath para ler o arquivo.`n"
+    Write-TempFile -RelativePath 'doc-alias.md' -Content "Use -LiteralPath para ler o arquivo.`n"
+    Write-TempFile -RelativePath 'faxina-doc.md' -Content "Use -JsonPath para informar o plano.`n"
+    [void](Invoke-TempGit @('add', '-A'))
+    [void](Invoke-TempGit @('commit', '-q', '-m', 'base generico'))
+    $genericBaseSha = (Invoke-TempGit @('rev-parse', 'HEAD') | Out-String).Trim()
+
+    $litHead = @'
+Get-Content -LiteralPath $Destino -PlanPath $Plano
+'@
+    $aliasHead = @'
+Get-Content -InputLiteralPath $Destino -LiteralPath $Destino
+'@
+    Write-TempFile -RelativePath 'lit.ps1' -Content $litHead
+    Write-TempFile -RelativePath 'alias.ps1' -Content $aliasHead
+    Write-TempFile -RelativePath 'faxina.ps1' -Content "Invoke-Faxina -PlanPath `$Plano -JsonPath `$Plano`n"
+    [void](Invoke-TempGit @('add', '-A'))
+    [void](Invoke-TempGit @('commit', '-q', '-m', 'introduz PlanPath e InputLiteralPath'))
+
+    $genericOutput = & pwsh -NoProfile -File $scriptPath -RootPath $tempRoot -BaseRef $genericBaseSha -AsJson -MaxFindings 500 2>&1
+    $genericResult = (($genericOutput | Out-String).Trim()) | ConvertFrom-Json
+    $genericPaths = @($genericResult.findings | ForEach-Object { $_.path })
+
+    # Os pares sao globais ao diff: o par (InputLiteralPath, LiteralPath) torna
+    # toda mencao de -LiteralPath candidata POR DESIGN. Por isso a asserção
+    # distingue o par pela mensagem, não só pelo arquivo.
+    $genericFindings = @($genericResult.findings)
+    $ruidoPar = @($genericFindings | Where-Object { $_.message -match "'PlanPath'.*'LiteralPath'" })
+    if ($ruidoPar.Count -ne 0) {
+        throw "par (PlanPath, LiteralPath) por sufixo generico 'Path' NAO deveria gerar candidata; candidatas: $(@($ruidoPar | ForEach-Object { $_.path }) -join ', ')"
+    }
+    $aliasPar = @($genericFindings | Where-Object { $_.path -like 'doc-alias.md:*' -and $_.message -match "'InputLiteralPath'.*'LiteralPath'" })
+    if ($aliasPar.Count -eq 0) {
+        throw "doc-alias.md (alias InputLiteralPath estende o generico LiteralPath) deveria virar candidata; candidatas: $($genericPaths -join ', ')"
+    }
+    $jsonPar = @($genericFindings | Where-Object { $_.path -like 'faxina-doc.md:*' -and $_.message -match "'PlanPath'.*'JsonPath'" })
+    if ($jsonPar.Count -eq 0) {
+        throw "faxina-doc.md (-JsonPath, token de contrato do projeto, par com PlanPath) deveria virar candidata; candidatas: $($genericPaths -join ', ')"
     }
 
     Write-Output 'OK: Test-PrePushNewTokenPropagationSelfTest.ps1'

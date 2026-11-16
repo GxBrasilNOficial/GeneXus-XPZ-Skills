@@ -146,6 +146,32 @@ function Test-TokensRelated {
     return ($prefix -ge 4 -or $suffix -ge 4)
 }
 
+# Parâmetros genericos do PowerShell (comuns a todo cmdlet e -LiteralPath, que
+# aparece em quase todo script). Nao sao nomes de contrato do projeto. Quando
+# um deles e o token ANTIGO do par, so casa alias que o estende
+# (InputLiteralPath -> LiteralPath). Sem isso, um token novo que so divide o
+# sufixo generico (PlanPath x LiteralPath, ambos '*Path') gera uma candidata
+# para cada linha do repositório que cita -LiteralPath.
+$genericPowerShellParams = @(
+    'Confirm', 'Debug', 'ErrorAction', 'ErrorVariable', 'InformationAction',
+    'InformationVariable', 'LiteralPath', 'OutBuffer', 'OutVariable',
+    'PipelineVariable', 'ProgressAction', 'Verbose', 'WarningAction',
+    'WarningVariable', 'WhatIf'
+)
+
+function Test-PairAllowed {
+    param(
+        [Parameter(Mandatory = $true)][string]$NewToken,
+        [Parameter(Mandatory = $true)][string]$OldToken
+    )
+
+    if ($genericPowerShellParams -notcontains $OldToken) {
+        return $true
+    }
+    return ($NewToken.EndsWith($OldToken, [System.StringComparison]::OrdinalIgnoreCase) -or
+        $NewToken.StartsWith($OldToken, [System.StringComparison]::OrdinalIgnoreCase))
+}
+
 $wordRegexCache = @{}
 function Get-WordRegex {
     # Casa o token como palavra em qualquer forma (inclui $Token de código).
@@ -291,6 +317,9 @@ foreach ($hunk in $hunks) {
                     continue
                 }
                 if (-not (Test-TokensRelated -A $newToken -B $oldToken)) {
+                    continue
+                }
+                if (-not (Test-PairAllowed -NewToken $newToken -OldToken $oldToken)) {
                     continue
                 }
                 $key = '{0}|{1}' -f $newToken, $oldToken
