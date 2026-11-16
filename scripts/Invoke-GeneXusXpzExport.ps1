@@ -1365,6 +1365,8 @@ try {
         }
         inventoryDegraded = if ($null -ne $inventoryBlock) { [bool]$inventoryBlock.inventoryDegraded } else { $null }
         inventoryError = if ($null -ne $inventoryBlock) { $inventoryBlock.inventoryError } else { $null }
+        sidecarPublished = if ($null -ne $inventoryBlock) { $inventoryBlock.sidecarPublished } else { $null }
+        sidecarError = if ($null -ne $inventoryBlock) { $inventoryBlock.sidecarError } else { $null }
         packageInventory = if ($null -ne $inventoryBlock) { $inventoryBlock.packageInventory } else { $null }
         operationalSubState = $operationalSubState
         msBuildCategoryBBlocked = $msBuildCategoryBBlocked

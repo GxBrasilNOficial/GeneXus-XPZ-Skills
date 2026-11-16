@@ -427,6 +427,9 @@ if (-not [string]::IsNullOrWhiteSpace($resultOutputPath)) {
     $result | Add-Member -NotePropertyName packageInventory -NotePropertyValue $inventoryBlock.packageInventory -Force
     $result | Add-Member -NotePropertyName inventoryDegraded -NotePropertyValue $inventoryBlock.inventoryDegraded -Force
     $result | Add-Member -NotePropertyName inventoryError -NotePropertyValue $inventoryBlock.inventoryError -Force
+    $result | Add-Member -NotePropertyName packageInventoryPath -NotePropertyValue $inventoryBlock.packageInventoryPath -Force
+    $result | Add-Member -NotePropertyName sidecarPublished -NotePropertyValue $inventoryBlock.sidecarPublished -Force
+    $result | Add-Member -NotePropertyName sidecarError -NotePropertyValue $inventoryBlock.sidecarError -Force
     $inventoryExitCode = [int](Get-XpzPropertyValue -InputObject $inventoryBlock -Name 'inventoryExitCode' -Default 0)
     if ($null -ne $script:reportContext) {
         $packageInventory = Get-XpzPropertyValue -InputObject $inventoryBlock -Name 'packageInventory'

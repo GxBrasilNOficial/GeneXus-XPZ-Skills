@@ -823,6 +823,9 @@ if (-not [string]::IsNullOrWhiteSpace([string]$buildResult.outputPath)) {
     $buildResult.packageInventory = $inventoryBlock.packageInventory
     $buildResult.inventoryDegraded = $inventoryBlock.inventoryDegraded
     $buildResult.inventoryError = $inventoryBlock.inventoryError
+    $buildResult.packageInventoryPath = $inventoryBlock.packageInventoryPath
+    $buildResult.sidecarPublished = $inventoryBlock.sidecarPublished
+    $buildResult.sidecarError = $inventoryBlock.sidecarError
 }
 
 $buildResult | ConvertTo-Json -Depth 10

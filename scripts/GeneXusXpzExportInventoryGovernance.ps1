@@ -95,7 +95,9 @@ function New-ExportPackageInventoryBlock {
             inventoryDegraded    = $true
             inventoryError       = "Script de suporte de inventario nao encontrado: $supportPath"
             packageInventory     = $null
-            packageInventoryPath = $packageInventoryPath
+            packageInventoryPath = $null
+            sidecarPublished     = $false
+            sidecarError         = $null
             operationalSubState  = 'exportação concluída sem inventário (degradado)'
         }
     }
@@ -115,6 +117,8 @@ function New-ExportPackageInventoryBlock {
         inventoryError       = $core.inventoryError
         packageInventory     = $core.packageInventory
         packageInventoryPath = $core.packageInventoryPath
+        sidecarPublished     = $core.sidecarPublished
+        sidecarError         = $core.sidecarError
         operationalSubState  = $operationalSubState
     }
 }

@@ -175,7 +175,9 @@ function New-PackageInventoryResult {
         inventoryError       = $null
         inventoryExitCode    = 90
         packageInventory     = $null
-        packageInventoryPath = $SidecarInventoryPath
+        packageInventoryPath = $null
+        sidecarPublished     = if ([string]::IsNullOrWhiteSpace($SidecarInventoryPath)) { $null } else { $false }
+        sidecarError         = $null
     }
 
     if (-not (Test-Path -LiteralPath $inventoryScriptPath -PathType Leaf)) {
@@ -207,8 +209,14 @@ function New-PackageInventoryResult {
             throw 'motor de inventario nao publicou exitCode no JSON'
         }
         $inventoryExitCode = [int]$inventoryExitProperty.Value
+        $inventoryItemsProperty = $inventory.PSObject.Properties['inventory']
+        if ($null -eq $inventoryItemsProperty) {
+            $motorStatus = [string]$inventory.status
+            $motorBlockingReasons = @($inventory.blockingReasons) -join '; '
+            throw "resposta reduzida do motor de inventario: status=$motorStatus; exitCode=$inventoryExitCode; blockingReasons=$motorBlockingReasons"
+        }
         $namedItems = [System.Collections.Generic.List[pscustomobject]]::new()
-        foreach ($item in @($inventory.inventory)) {
+        foreach ($item in @($inventoryItemsProperty.Value)) {
             $namedItems.Add([pscustomobject]@{
                 sourceBlock = $item.sourceBlock
                 typeName    = $item.typeName
@@ -216,27 +224,22 @@ function New-PackageInventoryResult {
                 guid        = $item.guid
             }) | Out-Null
         }
-
-        if (-not [string]::IsNullOrWhiteSpace($SidecarInventoryPath)) {
-            $sidecarDir = Split-Path -Parent $SidecarInventoryPath
-            if (-not [string]::IsNullOrWhiteSpace($sidecarDir) -and -not (Test-Path -LiteralPath $sidecarDir)) {
-                [void](New-Item -ItemType Directory -Path $sidecarDir -Force)
+        $selectiveExport = [bool]$inventory.selectiveExport
+        $deltaProperty = $inventory.PSObject.Properties['deltaComparison']
+        $delta = if ($null -ne $deltaProperty) { $deltaProperty.Value } else { $null }
+        $hasValidDeltaComparison = $false
+        if ($selectiveExport -and $null -ne $delta) {
+            $requiredDeltaLists = @('requestedItemsFound', 'requestedItemsMissing', 'extraObjects', 'missingObjects', 'uncomparableObjects', 'aliasResolutions')
+            $missingDeltaLists = @($requiredDeltaLists | Where-Object {
+                    $property = $delta.PSObject.Properties[$_]
+                    $null -eq $property -or $property.Value -isnot [System.Array]
+                })
+            if ($missingDeltaLists.Count -gt 0) {
+                throw "deltaComparison malformado: listas ausentes ou nao-array: $($missingDeltaLists -join ', ')"
             }
-            $fullInventoryDoc = [ordered]@{
-                inputPath      = $inventory.inputPath
-                inputKind      = $inventory.inputKind
-                innerXmlEntry  = $inventory.innerXmlEntry
-                objectCount    = $inventory.objectCount
-                attributeCount = $inventory.attributeCount
-                items          = @($namedItems)
-            }
-            # Sidecar package-inventory.json: UTF-8 sem BOM (mesmo contrato que wrappers MSBuild usam via Get-Utf8NoBomEncoding).
-            $encoding = (Get-Utf8NoBomEncoding)
-            [System.IO.File]::WriteAllText(
-                $SidecarInventoryPath,
-                (($fullInventoryDoc | ConvertTo-Json -Depth 6) + [Environment]::NewLine),
-                $encoding)
-            $result.packageInventoryPath = $SidecarInventoryPath
+            $hasValidDeltaComparison = $true
+        } elseif ($selectiveExport) {
+            throw 'deltaComparison ausente em inventario seletivo'
         }
 
         $objectsByType = @{}
@@ -248,7 +251,7 @@ function New-PackageInventoryResult {
 
         $summary = [ordered]@{
             inventoryStatus                = $inventory.status
-            selectiveExport                = [bool]$inventory.selectiveExport
+            selectiveExport                = $selectiveExport
             totalObjects                   = [int]$inventory.objectCount
             totalAttributes                = [int]$inventory.attributeCount
             objectsByType                  = $objectsByType
@@ -256,14 +259,13 @@ function New-PackageInventoryResult {
             declaredIncludesTransaction    = [bool]$inventory.declaredIncludesTransaction
             attributesTopLevelUnreconciled = [bool]$inventory.attributesTopLevelUnreconciled
             inventoryExitCode              = $inventoryExitCode
-            packageInventoryPath           = $result.packageInventoryPath
+            packageInventoryPath           = $null
         }
         if (@($inventory.warnings).Count -gt 0) {
             $summary.inventoryWarnings = @($inventory.warnings)
         }
 
-        if ($summary.selectiveExport -and $null -ne $inventory.deltaComparison) {
-            $delta = $inventory.deltaComparison
+        if ($hasValidDeltaComparison) {
             $summary.requestedItemsFound = @($delta.requestedItemsFound | ForEach-Object {
                 if ($null -ne $_.typeName -and $null -ne $_.name) { '{0}:{1}' -f $_.typeName, $_.name }
             })
@@ -309,8 +311,57 @@ function New-PackageInventoryResult {
             }
         }
 
+        if (-not [string]::IsNullOrWhiteSpace($SidecarInventoryPath)) {
+            $sidecarDir = Split-Path -Parent $SidecarInventoryPath
+            if ([string]::IsNullOrWhiteSpace($sidecarDir)) {
+                $sidecarDir = (Get-Location).ProviderPath
+            }
+            if (-not [string]::IsNullOrWhiteSpace($sidecarDir) -and -not (Test-Path -LiteralPath $sidecarDir)) {
+                [void](New-Item -ItemType Directory -Path $sidecarDir -Force)
+            }
+            $tempSidecarPath = Join-Path $sidecarDir ('.{0}.{1}.tmp' -f [System.IO.Path]::GetFileName($SidecarInventoryPath), [guid]::NewGuid().ToString('N'))
+            try {
+                $fullInventoryDoc = [ordered]@{
+                    schemaVersion  = 2
+                    inputPath      = $inventory.inputPath
+                    inputKind       = $inventory.inputKind
+                    innerXmlEntry   = $inventory.innerXmlEntry
+                    objectCount     = $inventory.objectCount
+                    attributeCount  = $inventory.attributeCount
+                    items           = @($namedItems)
+                }
+                if ($hasValidDeltaComparison) {
+                    $fullInventoryDoc.deltaComparison = $delta
+                }
+                $encoding = Get-Utf8NoBomEncoding
+                [System.IO.File]::WriteAllText(
+                    $tempSidecarPath,
+                    (($fullInventoryDoc | ConvertTo-Json -Depth 10) + [Environment]::NewLine),
+                    $encoding)
+                [System.IO.File]::Move($tempSidecarPath, $SidecarInventoryPath, $true)
+                $result.packageInventoryPath = $SidecarInventoryPath
+                $result.sidecarPublished = $true
+            } catch {
+                $result.sidecarError = $_.Exception.Message
+                throw
+            } finally {
+                if (Test-Path -LiteralPath $tempSidecarPath -PathType Leaf) {
+                    Remove-Item -LiteralPath $tempSidecarPath -Force -ErrorAction SilentlyContinue
+                }
+            }
+        }
+
         if (-not [string]::IsNullOrWhiteSpace($result.packageInventoryPath)) {
+            $summary.packageInventoryPath = $result.packageInventoryPath
             $summary.nominalInventoryAt = $result.packageInventoryPath
+            if ($hasValidDeltaComparison) {
+                if ($summary.Contains('extrasCount')) {
+                    $summary.extrasFullListAt = $result.packageInventoryPath
+                }
+                if ($summary.Contains('aliasResolutionCount') -and [int]$summary.aliasResolutionCount -gt 0) {
+                    $summary.aliasResolutionsFullListAt = $result.packageInventoryPath
+                }
+            }
         }
 
         $result.inventoryExitCode = $inventoryExitCode
