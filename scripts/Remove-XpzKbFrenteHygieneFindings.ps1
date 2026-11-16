@@ -159,28 +159,83 @@ function Get-Prop {
   return $pp.Value
 }
 
-function Get-TreeBytes {
+function Get-TreeStats {
   param([string]$Path)
   if (Test-Path -LiteralPath $Path -PathType Container) {
-    $s = (Get-ChildItem -LiteralPath $Path -Recurse -File -Force | Measure-Object -Property Length -Sum).Sum
-    if ($null -eq $s) { return [int64]0 }
-    return [int64]$s
+    $files = @(Get-ChildItem -LiteralPath $Path -Recurse -File -Force)
+    $bytes = [int64]0
+    $max = [int64]0
+    foreach ($f in $files) {
+      $bytes += [int64]$f.Length
+      if ($f.LastWriteTimeUtc.Ticks -gt $max) { $max = $f.LastWriteTimeUtc.Ticks }
+    }
+    return [pscustomobject]@{ bytes = $bytes; files = [int]$files.Count; mtimeMaxTicks = $max }
   }
-  return [int64](Get-Item -LiteralPath $Path -Force).Length
+  $it = Get-Item -LiteralPath $Path -Force
+  return [pscustomobject]@{ bytes = [int64]$it.Length; files = 1; mtimeMaxTicks = $it.LastWriteTimeUtc.Ticks }
 }
 
-# Remocao bottom-up sem -Recurse (a pre-varredura ja garantiu ausencia de reparse).
+function Get-TreeBytes {
+  param([string]$Path)
+  return [int64](Get-TreeStats -Path $Path).bytes
+}
+
+# Remocao bottom-up sem -Recurse; recusa reparse point em cada item antes de remover.
 function Remove-DirBottomUp {
   param([string]$Dir)
+  $rootItem = Get-Item -LiteralPath $Dir -Force
+  if (($rootItem.Attributes -band $script:reparseAttr) -ne 0) { throw "reparse point na raiz da remocao: $Dir" }
   $ordered = @(Get-ChildItem -LiteralPath $Dir -Force -Recurse) | Sort-Object { $_.FullName.Length } -Descending
-  foreach ($i in $ordered) { Remove-Item -LiteralPath $i.FullName -Force }
+  foreach ($i in $ordered) {
+    if (($i.Attributes -band $script:reparseAttr) -ne 0) { throw "reparse point durante a remocao: $($i.FullName)" }
+    Remove-Item -LiteralPath $i.FullName -Force
+  }
   Remove-Item -LiteralPath $Dir -Force
+}
+
+# Arquivos bloqueados por outro processo (leitura exclusiva falha). Retorna lista de caminhos.
+function Get-LockedFiles {
+  param([string]$Path)
+  $locked = @()
+  $targets = if (Test-Path -LiteralPath $Path -PathType Container) { @(Get-ChildItem -LiteralPath $Path -Recurse -File -Force) } else { @(Get-Item -LiteralPath $Path -Force) }
+  foreach ($f in $targets) {
+    try {
+      $fs = [System.IO.File]::Open($f.FullName, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::None)
+      $fs.Close()
+    }
+    catch { $locked += $f.FullName }
+  }
+  return $locked
+}
+
+# Politicas globais que tornam a Lixeira inutilizavel (retorna motivo ou $null).
+function Test-RecycleGlobalPolicy {
+  foreach ($k in @('HKCU:\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer', 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer')) {
+    if (Test-Path -LiteralPath $k) {
+      $p = Get-ItemProperty -LiteralPath $k
+      if ($null -ne $p.PSObject.Properties['NoRecycleFiles'] -and [int]$p.NoRecycleFiles -eq 1) { return "politica NoRecycleFiles ativa ($k)" }
+    }
+  }
+  $g = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\BitBucket'
+  if (Test-Path -LiteralPath $g) {
+    $p = Get-ItemProperty -LiteralPath $g
+    if ($null -ne $p.PSObject.Properties['NukeOnDelete'] -and [int]$p.NukeOnDelete -ne 0) { return 'NukeOnDelete global ativo' }
+  }
+  return $null
 }
 
 # --- Motor (fonte de verdade) -------------------------------------------------
 function Invoke-HygieneEngine {
-  $out = & pwsh -NoProfile -File $EnginePath -RepoRoot $RepoRoot -FrentesDirName $FrentesDirName -PacotesDirName $PacotesDirName 2>$null
-  $code = $LASTEXITCODE
+  # Leitura pura: -WhatIf nao deve afetar a captura do motor (redirecao e temporario).
+  $WhatIfPreference = $false
+  $errFile = [System.IO.Path]::GetTempFileName()
+  try {
+    $out = & pwsh -NoProfile -File $EnginePath -RepoRoot $RepoRoot -FrentesDirName $FrentesDirName -PacotesDirName $PacotesDirName 2>$errFile
+    $code = $LASTEXITCODE
+    $errTxt = Get-Content -LiteralPath $errFile -Raw -ErrorAction SilentlyContinue
+  }
+  finally { Remove-Item -LiteralPath $errFile -Force -WhatIf:$false -ErrorAction SilentlyContinue }
+  if ($errTxt -and $errTxt.Trim()) { Write-Human ("motor: " + $errTxt.Trim()) }
   if ($code -ne 0 -and $code -ne 2) { throw "BLOCK: motor de diagnostico falhou (exit $code)." }
   $json = ($out | Out-String | ConvertFrom-Json)
   if ((Get-Prop $json 'SchemaVersion') -ne 2) { throw "BLOCK: motor com SchemaVersion incompativel (esperado 2)." }
@@ -241,10 +296,7 @@ function Build-Plan {
       $frTargets = @($frTargets | Where-Object { $_ -ne $n })
       $script:exclusions += [pscustomobject]@{ kind = 'frente'; name = $n; status = 'excluido' }
     }
-    elseif (Test-Path -LiteralPath (Join-Path $script:frentesDirCanon $n) -PathType Container) {
-      $script:exclusions += [pscustomobject]@{ kind = 'frente'; name = $n; status = 'naoAlvo' }
-    }
-    else { $script:blockers.Add("exclusao de frente sem correspondencia no disco: '$n'") }
+    else { $script:blockers.Add("exclusao de frente que nao e alvo desta execucao (fail-closed): '$n'") }
   }
 
   # Pacotes alvo: orfaos + cascata (pacotes de frentes nao conformes que serao removidas)
@@ -270,20 +322,17 @@ function Build-Plan {
       $pTargets = @($pTargets | Where-Object { $_ -ne $n })
       $script:exclusions += [pscustomobject]@{ kind = 'pacote'; name = $n; status = 'excluido' }
     }
-    elseif (Test-Path -LiteralPath (Join-Path $script:pacotesDirCanon $n) -PathType Leaf) {
-      $script:exclusions += [pscustomobject]@{ kind = 'pacote'; name = $n; status = 'naoAlvo' }
-    }
-    else { $script:blockers.Add("exclusao de pacote sem correspondencia no disco: '$n'") }
+    else { $script:blockers.Add("exclusao de pacote que nao e alvo desta execucao (fail-closed): '$n'") }
   }
 
-  # Ordem: cada pacote seguido do seu sidecar (se existir); depois as frentes
+  # Ordem: sidecar antes do pacote (se o pacote falhar, nao sobra inventario sem pacote)
   $ordered = @()
   foreach ($p in $pTargets) {
-    $ordered += [pscustomobject]@{ kind = 'pacote'; name = $p }
     $sc = "$p.package-inventory.json"
     if (Test-Path -LiteralPath (Join-Path $script:pacotesDirCanon $sc) -PathType Leaf) {
       $ordered += [pscustomobject]@{ kind = 'sidecar'; name = $sc }
     }
+    $ordered += [pscustomobject]@{ kind = 'pacote'; name = $p }
   }
   foreach ($f in $frTargets) { $ordered += [pscustomobject]@{ kind = 'frente'; name = $f } }
 
@@ -295,18 +344,28 @@ function Build-Plan {
       if ($r.reason -ne 'already-absent') { $script:blockers.Add("item bloqueado ($($r.reason)): $($t.name)") }
       continue
     }
+    $st = Get-TreeStats -Path $r.path
     $planItems += [pscustomobject]@{
-      kind = $t.kind; name = $t.name; path = $r.path; method = $script:method; bytes = [int64](Get-TreeBytes $r.path)
+      kind = $t.kind; name = $t.name; path = $r.path; method = $script:method
+      bytes = [int64]$st.bytes; files = [int]$st.files; mtimeMaxTicks = [int64]$st.mtimeMaxTicks
     }
   }
   $script:items = @($planItems)
   return $json
 }
 
+function Get-NormPath {
+  param([string]$P)
+  $c = (Get-Canon $P) -replace '^\\\\\?\\', ''
+  return $c.Normalize([System.Text.NormalizationForm]::FormC).ToUpperInvariant()
+}
+
 function Get-PlanKeys {
   param($Items, $Exclusions)
   $list = [System.Collections.Generic.List[string]]::new()
-  foreach ($i in @($Items | Where-Object { $null -ne $_ })) { $list.Add("item|$(Get-Prop $i 'kind')|$(Get-Prop $i 'name')|$(Get-Prop $i 'method')") }
+  foreach ($i in @($Items | Where-Object { $null -ne $_ })) {
+    $list.Add("item|$(Get-Prop $i 'kind')|$(Get-Prop $i 'name')|$(Get-Prop $i 'method')|$(Get-Prop $i 'files')|$(Get-Prop $i 'bytes')|$(Get-Prop $i 'mtimeMaxTicks')")
+  }
   foreach ($e in @($Exclusions | Where-Object { $null -ne $_ })) { $list.Add("excl|$(Get-Prop $e 'kind')|$(Get-Prop $e 'name')|$(Get-Prop $e 'status')") }
   $arr = $list.ToArray()
   [System.Array]::Sort($arr, [System.StringComparer]::Ordinal)
@@ -334,7 +393,9 @@ function Get-RecycleVolumeInfo {
   if ($null -eq $p.PSObject.Properties['NukeOnDelete'] -or [int]$p.NukeOnDelete -ne 0) {
     throw "BLOCK: Lixeira do volume $Root nao confirmada (NukeOnDelete ausente ou diferente de 0)."
   }
-  if ($null -eq $p.PSObject.Properties['MaxCapacity']) { throw "BLOCK: MaxCapacity ausente para o volume $Root." }
+  if ($null -eq $p.PSObject.Properties['MaxCapacity']) {
+    throw "BLOCK: limite da Lixeira (MaxCapacity) nao configurado para o volume $Root (chave $key). Para remover nesta maquina, use -Backup <dir> -RunStamp <id> (move-aside) ou -Permanente (definitivo), ambos explicitos."
+  }
   $maxMB = [int64]$p.MaxCapacity
   if ($maxMB -le 0) { throw "BLOCK: MaxCapacity invalido ($maxMB MB) para o volume $Root." }
   return [pscustomobject]@{ root = $Root; maxBytes = ($maxMB * 1MB); binDir = ($Root + '$Recycle.Bin') }
@@ -344,6 +405,12 @@ function Test-RecyclePrecheck {
   $recItems = @($script:items | Where-Object { $_.method -eq 'recycle' })
   if ($recItems.Count -eq 0) { return }
   if (Test-IsElevated) { $script:blockers.Add('sessao elevada: a verificacao da Lixeira so cobre o usuario atual'); return }
+  $pol = Test-RecycleGlobalPolicy
+  if ($pol) { $script:blockers.Add("Lixeira indisponivel por politica: $pol"); return }
+  foreach ($it in $recItems) {
+    $locked = @(Get-LockedFiles -Path $it.path)
+    if ($locked.Count -gt 0) { $script:blockers.Add("arquivo em uso por outro processo ($($locked.Count)), ex.: $($locked[0])") }
+  }
   $sid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
   $groups = $recItems | Group-Object { [System.IO.Path]::GetPathRoot((Get-Canon $_.path)) }
   foreach ($g in $groups) {
@@ -403,16 +470,24 @@ function Invoke-ItemRecycle {
   }
   if (Test-Path -LiteralPath $Item.path) { throw "unverified: caminho original ainda existe ($($Item.name))" }
   $novos = @(Get-ChildItem -LiteralPath $binUser -Filter '$I*' -Force -File | Where-Object { -not $before.ContainsKey($_.Name) })
+  $alvo = Get-NormPath $Item.path
+  $candidatos = @()
   foreach ($n in $novos) {
     $idx = Read-RecycleIndex -Path $n.FullName
-    if (-not [string]::Equals((Get-Canon $idx.path), (Get-Canon $Item.path), [System.StringComparison]::OrdinalIgnoreCase)) { continue }
+    if ((Get-NormPath $idx.path) -cne $alvo) { continue }
     if ([DateTime]::FromFileTimeUtc($idx.fileTime) -lt $StartUtc) { continue }
     if ($Item.kind -ne 'frente' -and $idx.size -ne [int64]$Item.bytes) { continue }
-    $rName = '$R' + $n.Name.Substring(2)
-    if (-not (Test-Path -LiteralPath (Join-Path $binUser $rName))) { throw "unverified: par \$R ausente ($($Item.name))" }
-    return 'recycle-verified'
+    $candidatos += $n
   }
-  throw "unverified: registro na Lixeira nao encontrado ($($Item.name))"
+  if ($candidatos.Count -eq 0) { throw "unverified: registro na Lixeira nao encontrado ($($Item.name))" }
+  if ($candidatos.Count -gt 1) { throw "unverified: registros ambiguos na Lixeira ($($candidatos.Count)) para ($($Item.name))" }
+  $rPath = Join-Path $binUser ('$R' + $candidatos[0].Name.Substring(2))
+  $rIsDir = Test-Path -LiteralPath $rPath -PathType Container
+  $rIsFile = Test-Path -LiteralPath $rPath -PathType Leaf
+  if (-not ((($Item.kind -eq 'frente') -and $rIsDir) -or (($Item.kind -ne 'frente') -and $rIsFile))) {
+    throw "unverified: par \$R ausente ou de tipo inesperado ($($Item.name))"
+  }
+  return 'recycle-verified'
 }
 
 function Invoke-ItemBackup {
@@ -512,6 +587,9 @@ try {
       if ((Get-Prop $saved 'Kind') -ne 'xpz-frente-hygiene-plan' -or (Get-Prop $saved 'SchemaVersion') -ne 1) { $script:blockers.Add('-JsonPath nao e um plano do executor (Kind/SchemaVersion)') }
       elseif (-not (Test-PathsEqual (Get-Prop $saved 'repoRoot') $repoRootCanon) -or -not (Test-PathsEqual (Get-Prop $saved 'frentesDir') $script:frentesDirCanon) -or -not (Test-PathsEqual (Get-Prop $saved 'pacotesDir') $script:pacotesDirCanon)) {
         $script:blockers.Add('plano salvo pertence a outra raiz/pasta')
+      }
+      elseif ((Get-Prop $saved 'scope') -ne $Scope) {
+        $script:blockers.Add("plano salvo foi gerado com Scope '$(Get-Prop $saved 'scope')' (esta execucao usa '$Scope')")
       }
       else {
         $savedKeys = Get-PlanKeys (Get-Prop $saved 'items') (Get-Prop $saved 'exclusions')

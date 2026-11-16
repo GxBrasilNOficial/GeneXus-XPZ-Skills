@@ -24,7 +24,7 @@ Ambos são `warn` (não bloqueiam) porque podem ter justificativa legítima (fre
 
 ### Contrato de saída
 
-JSON de máquina por padrão. Campos: `Kind` (`xpz-frente-hygiene-result`), `SchemaVersion` (`2`), `status` (`ok`|`warn`), `exitCode`, `repoRoot`, `frentesDir`, `pacotesDir` (caminhos resolvidos/normalizados), `frentesValidas`, `frentesNaoConformes[]` (nomes), `pacotesOk`, `pacotesOrfaos[]` (`{pacote, frenteEsperada}`), `pacotesNaoPadronizados[]`, `pacotesVinculados[]` (`{pacote, frente, frenteStatus}` com `frenteStatus` = `valida`|`naoConforme`|`ausente`; base da cascata), `sidecarsOrfaos[]` (sidecar `<pacote>.package-inventory.json` sem pacote e sem `.rejected` de mesmo nome-base) e `pacotesRejeitados[]` (`{base, contagem}` de `<base>.rejected.<A..Z>`; informativo). **Exit: 0 ok, 2 warn.** Fase 2a nunca bloqueia push.
+JSON de máquina por padrão. Campos: `Kind` (`xpz-frente-hygiene-result`), `SchemaVersion` (`2`), `status` (`ok`|`warn`), `exitCode`, `repoRoot`, `frentesDir`, `pacotesDir` (caminhos resolvidos/normalizados), `frentesValidas`, `frentesNaoConformes[]` (nomes), `pacotesOk`, `pacotesOrfaos[]` (`{pacote, frenteEsperada}`), `pacotesNaoPadronizados[]`, `pacotesVinculados[]` (`{pacote, frente, frenteStatus}` com `frenteStatus` = `valida`|`naoConforme`|`ausente`; base da cascata), `sidecarsOrfaos[]` (sidecar `<pacote>.package-inventory.json` sem o pacote correspondente) e `pacotesRejeitados[]` (`{base, contagem}` de `<base>.rejected.<A..Z>`; informativo). **Exit: 0 ok, 2 warn.** Fase 2a nunca bloqueia push.
 
 Este JSON é o **contrato de consumo** do executor de faxina (ver abaixo): renomear/retipar campos aqui quebra o executor; o lockstep é travado por `Test-XpzKbFrenteHygieneCleanupSelfTest.ps1`.
 

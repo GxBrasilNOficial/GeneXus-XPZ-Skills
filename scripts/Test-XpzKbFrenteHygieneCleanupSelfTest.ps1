@@ -230,6 +230,15 @@ try {
 
   # ===== S. Lixeira real (opt-in) =====
   if ($env:XPZ_FAXINA_SELFTEST_LIXEIRA -eq '1') {
+    # S0: arquivo em uso por outro processo -> blocked antes de qualquer envio
+    $s0 = New-TempRoot -Slug 'lixeira-lock'
+    New-Frente -Root $s0 -Name 'FrenteS0'
+    $ps0 = Invoke-Plan -Root $s0
+    $held = [System.IO.File]::Open((Join-Path $s0 "$FRENTES/FrenteS0/Obj.xml"), [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::None)
+    try { $rs0 = Invoke-Apply -Root $s0 -Plan $ps0.plan } finally { $held.Close() }
+    Assert-True ($rs0.json.status -eq 'blocked') "S0: arquivo em uso -> blocked; obtido $($rs0.json.status)"
+    Assert-True (Test-Path -LiteralPath (Join-Path $s0 "$FRENTES/FrenteS0")) "S0: nada removido"
+
     $s = New-TempRoot -Slug 'lixeira'
     New-Frente -Root $s -Name 'FrenteS'
     $ps = Invoke-Plan -Root $s

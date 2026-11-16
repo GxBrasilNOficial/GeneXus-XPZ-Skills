@@ -30,7 +30,7 @@
   pacotesNaoPadronizados[]. SchemaVersion 2 acrescenta (aditivo e obrigatorio para o
   executor): pacotesVinculados[] {pacote, frente, frenteStatus=valida|naoConforme|
   ausente} para todo pacote casado; sidecarsOrfaos[] (sidecar <pacote>.package-
-  inventory.json sem pacote e sem .rejected de mesmo nome-base); pacotesRejeitados[]
+  inventory.json sem o pacote correspondente); pacotesRejeitados[]
   {base, contagem} (arquivos <base>.rejected.<A..Z>, informativo). -AsText da saida
   humana; -AsJson e no-op (JSON ja e o default).
 
@@ -122,13 +122,11 @@ if (Test-Path -LiteralPath $pacotesDir) {
       $pacotesVinculados += [pscustomobject]@{ pacote = $a.Name; frente = $frenteEsperada; frenteStatus = 'ausente' }
     }
   }
-  # Sidecars <pacote>.package-inventory.json sem pacote e sem .rejected de mesmo nome-base
+  # Sidecars <pacote>.package-inventory.json sem o pacote correspondente (informativo)
   $todosArquivos = @(Get-ChildItem -LiteralPath $pacotesDir -File -ErrorAction SilentlyContinue)
   foreach ($s in @($todosArquivos | Where-Object { $_.Name -match '\.package-inventory\.json$' })) {
     $base = $s.Name -replace '\.package-inventory\.json$', ''
-    $temPacote = Test-Path -LiteralPath (Join-Path $pacotesDir $base)
-    $temRejeitado = @($todosArquivos | Where-Object { $_.Name.StartsWith($base + '.rejected.', [System.StringComparison]::Ordinal) }).Count -gt 0
-    if (-not $temPacote -and -not $temRejeitado) { $sidecarsOrfaos += $s.Name }
+    if (-not (Test-Path -LiteralPath (Join-Path $pacotesDir $base))) { $sidecarsOrfaos += $s.Name }
   }
   # Rejeitados <base>.rejected.<A..Z> (case-sensitive: a letra e maiuscula)
   $rejRx = [regex]::new('^(?<base>.+)\.rejected\.[A-Z]$')
