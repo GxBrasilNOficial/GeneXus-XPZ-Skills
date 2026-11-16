@@ -60,6 +60,18 @@ pwsh -File <repo-skills>\scripts\Remove-XpzKbFrenteHygieneFindings.ps1 -RepoRoot
 - **Não é passo automático da pré-push.** A pré-push continua sendo análise + relatório; a faxina é ação separada, sob decisão humana. Validação: `Test-XpzKbFrenteHygieneCleanupSelfTest.ps1` (token `XPZ_KB_FRENTE_HYGIENE_CLEANUP_SELFTEST_OK`). O caso de Lixeira real é opt-in: `XPZ_FAXINA_SELFTEST_LIXEIRA=1`.
 - **Não testado:** arquivo bloqueado (aberto na IDE) durante o envio; rede e outros volumes; Lixeira desativada por política; cota estourada; `subst`.
 
+### Limitações aceitas (decisão do operador, 2026-11-16)
+
+Registradas para não serem reabertas sem motivo novo. Nenhuma delas bloqueia o uso do executor.
+
+| Limitação | Comportamento atual | Decisão |
+|---|---|---|
+| Arquivo aberto entre a checagem e o envio | A checagem de arquivo em uso roda antes da primeira ação. Uma janela curta permanece: se um arquivo for aberto nesse intervalo, o envio pode falhar (hard-stop) ou seguir. No envio à Lixeira o dano é recuperável. Em `-Permanente` a janela é mais grave, porque a remoção é definitiva. | Aceita. Risco baixo e calculado para o uso atual (envio à Lixeira). Revisar se o modo `-Permanente` passar a ser usado de rotina. |
+| `subst` (unidade virtual) | A leitura da política da Lixeira usa a letra da unidade do `-RepoRoot`. Com `subst`, pode ler o volume virtual em vez do disco real. O pior caso previsto é bloqueio (lado seguro) ou leitura de política do volume errado. Não verificado. | Aceita sem teste. |
+| Cota da Lixeira por usuário | A checagem de limite considera só a ocupação do usuário atual. | Aceita (decisão do operador). |
+| Rede, mídia removível, Lixeira desativada por política, cota estourada | Bloqueiam antes da primeira ação, pelas pré-condições do método Lixeira. Não testado na prática. | Aceita: o bloqueio é o comportamento esperado. |
+| `-Backup` em outro volume | Recusado com mensagem de erro. | Já registrado no 999. |
+
 ## Nuance cabeça-detalhe (vinda do F1)
 
 O filtro F1 (`Compare-XpzChecksums`, ver [`fase2b-classificador-de-regime.md`](fase2b-classificador-de-regime.md)) descarta arquivos `SAME` (checksum inalterado). **Atenção:** `SAME` no **arquivo** X não implica que a **cabeça/objeto** associado a X esteja fora do raio de impacto. Um objeto cabeça pode ter checksum inalterado enquanto seu **detalhe** (outro arquivo) mudou e carrega dependentes. "Descartar SAME cedo" é correto para o **arquivo**, mas o analista **não** pode concluir, só do `SAME`, que a cabeça está fora de escopo — a triagem estrutural (esta fase) e o roteamento de regime (2b) tratam disso.
