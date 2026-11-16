@@ -486,7 +486,8 @@ function Invoke-ItemRecycle {
   $before = @{}
   foreach ($f in @(Get-ChildItem -LiteralPath $binUser -Filter '$I*' -Force -File -ErrorAction SilentlyContinue)) { $before[$f.Name] = $true }
   Add-Type -AssemblyName Microsoft.VisualBasic
-  $ui = [Microsoft.VisualBasic.FileIO.UIOption]::OnlyErrorDialogs
+  # Silencioso: sem janela do Windows que pararia a execucao esperando clique. Erro vira excecao -> hard-stop.
+  $ui = [Microsoft.VisualBasic.FileIO.UIOption]::NoUI
   $rec = [Microsoft.VisualBasic.FileIO.RecycleOption]::SendToRecycleBin
   $script:actionsDone++
   if ($Item.kind -eq 'frente') {
