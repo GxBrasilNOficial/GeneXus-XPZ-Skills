@@ -118,6 +118,8 @@ O `$R$` é sintaxe do Excel (código de moeda + LCID 416 = pt-BR), **não** vari
 
 **Atualização 2026-11-15.** O checklist preventivo foi incorporado em `xpz-builder/responsibilities-by-type/procedure.md`. Permanecem como investigação residual a recuperação da evidência primária do efeito visual de `AutoFit` e a verificação do comportamento além da fronteira de linhas formatadas. A investigação confirmou uma fronteira no modelo antigo, mas não localizou saída que demonstre o sintoma após ela; encontrou texto preparado para mudar `AutoFit`, não a comparação visual. As afirmações categóricas e soluções propostas abaixo são o registro anterior, não garantias universais.
 
+**Evidências adicionais de 2026-11-15.** Duas saídas semelhantes de Por Operação apresentaram larguras da coluna A de aproximadamente 116,45 e 10,0; não foi comprovado qual configuração de `AutoFit` ou qual modelo produziu cada saída. Em uma saída Pessoa analítica candidata, valores monetários examinados mantiveram formato monetário até a linha 2000 e um valor numérico na linha 2001 estava em `General`. O modelo antigo da mesma família apresenta essa fronteira, mas sua vinculação exata à execução não foi comprovada; não foi localizada confirmação visual da linha 2001.
+
 - **Importância** — média (workaround hoje é conhecimento local da KB ou aprendizado na dor; sem nota genérica outra KB/agente repete o mesmo ciclo).
 - **Maturidade** — checklist incorporado; investigação residual de evidências permanece aberta.
 
