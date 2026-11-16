@@ -11,7 +11,9 @@ Define e valida a estrutura inicial da pasta paralela da KB usada ao redor de um
 
 ## GUIDELINE
 
-Esta skill e de invocacao obrigatória antes de qualquer ação de consulta, triagem, leitura de XML ou geração de objeto em pasta que contenha `ObjetosDaKbEmXml/` ou `KbIntelligence/`. Nenhuma outra skill de KB (`xpz-index-triage`, `xpz-reader`, `xpz-builder`, `xpz-sync`, `nexa`) pode ser iniciada nessa pasta enquanto esta skill não tiver sido executada na sessao corrente.
+Esta skill é de invocação obrigatória antes de qualquer ação em uma sessão **setada na raiz** de uma pasta paralela de KB (pasta que contém `ObjetosDaKbEmXml/` ou `KbIntelligence/`), inclusive leitura, triagem, leitura de XML ou geração de objeto. Também é exigida antes de qualquer escrita nessa pasta feita a partir de outra sessão. Nenhuma outra skill de KB (`xpz-index-triage`, `xpz-reader`, `xpz-builder`, `xpz-sync`, `nexa`) pode ser iniciada nessa pasta enquanto esta skill não tiver sido executada na sessão corrente.
+
+A simples presença de `ObjetosDaKbEmXml/` ou `KbIntelligence/` em outra pasta não dispara esta skill. Ler amostras ou XMLs da pasta paralela, a partir de uma sessão não setada nela, apenas como referência (consulta de fora), dispensa a invocação. Essa leitura não inicia setup, runtime, gate de índice nem qualquer outro fluxo da pasta; se a consulta evoluir para ação na pasta, o gatilho passa a valer antes dela.
 
 Ao usar ou contornar os scripts da base compartilhada, seguir a seção `Scripts das skills XPZ` do `AGENTS.md` dessa base. Ignorar um script pronto e criar outro no lugar não é opção, nem em `Temp`. Se nenhum script pronto cobrir, parar e falar com o usuário antes de criar `.ps1`.
 
@@ -697,7 +699,7 @@ No handoff final, usar literalmente um dos estados canonicos listados acima. Nã
       ```
       ## Pasta paralela de KB GeneXus
 
-      Ao identificar que a pasta de trabalho ou qualquer pasta referenciada na conversa contem `ObjetosDaKbEmXml/` ou `KbIntelligence/`, invocar `xpz-kb-parallel-setup` uma vez na sessao antes de qualquer triagem, consulta ou geracao de objetos — mesmo que o AGENTS.md local nao instrua isso explicitamente.
+      Quando a sessão estiver setada na raiz de uma pasta que contenha `ObjetosDaKbEmXml/` ou `KbIntelligence/`, invocar `xpz-kb-parallel-setup` uma vez na sessão antes de qualquer triagem, consulta ou geração de objetos — mesmo que o AGENTS.md local não instrua isso explicitamente. Leitura de referência a partir de outra sessão, sem setar a pasta, não exige essa invocação.
       ```
     - Esta verificacao e não bloqueante: recusa ou pulo pelo usuário não impede a conclusao do setup
 7c. Quando a frente detectar risco operacional recorrente de edicao textual fora do padrão esperado do repositório, como `line ending` misto em arquivo de texto coberto por `.gitattributes`, o agente pode propor reforco opcional no arquivo global de instrucoes da ferramenta:
