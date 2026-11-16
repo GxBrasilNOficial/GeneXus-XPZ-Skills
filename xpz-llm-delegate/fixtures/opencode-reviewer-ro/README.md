@@ -12,19 +12,21 @@ Consumidos por `scripts/OpenCodeReviewerRoGuard.ps1` (pré-check runtime), por
 
 ## Versão medida
 
-`VERSION.txt` = **2.2.7**, promovida em 2026-11-13 após revalidar o conjunto obrigatório:
+`VERSION.txt` = **2.3.0**, promovida em 2026-11-16 após revalidar o conjunto obrigatório:
 descoberta por `opencode debug agents`, perfis project-local (36 regras) e global-only (21),
 equivalência `permission`/`tools`, aviso de fallback, matriz de 32 casos comportamentais com
-modelo explícito + 2 casos `grep` estruturais, e os self-tests existentes. A matriz usou
-`opencode run --format json` e o modelo explícito
+modelo explícito + 2 casos `grep` estruturais, passo E9 sem modelo e os self-tests existentes. A
+matriz usou `opencode run --format json` e o modelo explícito
 `opencode-go/deepseek-v4.1-flash`; o recibo está em `content-protection.receipt.json` e o resumo
 em `content-protection.sample.txt`. As regras efetivas do `reviewer-ro` permaneceram idênticas
-às medidas na 2.2.6 (36 project-local / 21 global-only). O caso `names-list` foi remedido uma
-vez no mesmo workspace sintético, porque a primeira resposta usou dois eventos de ferramenta;
-a evidência promovida é o replay oficial que fechou 32/32 e 2/2.
+às medidas na 2.2.7 (36 project-local / 21 global-only); `names-list` voltou a usar `read`.
 
-A captura 1.18.33 anterior permanece recuperável pelo histórico do Git; não há diretório de
-compatibilidade simultânea.
+A ajuda da CLI 2.3.0 acrescentou `--worktree`, `--title`, `--archived` e `--auto` a `run`. Os
+adapters não passam essas opções; `--auto` não reabre `read`/`external_directory` porque o bloco
+efetivo do `reviewer-ro` termina em denies explícitos. Nenhuma delas é rota do modo cego.
+
+As capturas anteriores (1.18.33 e 2.2.7) permanecem recuperáveis pelo histórico do Git; não há
+diretório de compatibilidade simultânea.
 
 Versão diferente ⇒ BLOCK `version`. O diagnóstico
 `scripts/Test-OpenCodeReviewerRoInstalledCompatibility.ps1 -AsJson` separa
@@ -34,7 +36,7 @@ Self-test determinístico/fake-exe não prova sozinho o comportamento de uma ver
 ## Arquivos
 
 - `VERSION.txt` — versão legitimamente promovida; comparar com o semver de `opencode --version`
-  (a CLI 2.2.7 imprime `opencode v2.2.7`; o guard normaliza para `2.2.7`).
+  (a CLI 2.3.0 imprime `opencode v2.3.0`; o guard normaliza para `2.3.0`).
 - `debug-agents-project-local.sample.json` — captura real de `opencode debug agents` na raiz
   deste repositório (project-local `reviewer-ro` + global), com 36 regras. Campos `system` e
   `description` foram omitidos; `id`, `name`, `mode`, `hidden` e `permissions` são verbatim.
@@ -44,11 +46,13 @@ Self-test determinístico/fake-exe não prova sozinho o comportamento de uma ver
 - `equiv-permission-vs-tools.sample.json` — probes reais `probe-perm`/`probe-tools` em config
   JSONC sintética carregada com `opencode --standalone debug agents`:
   `permission: { webfetch: deny }` e `tools: { webfetch: false }` resolvem `webfetch * deny`.
-  Na recaptura 2.2.7 os dois probes continuam com 7 regras estruturalmente simétricas (o prefixo
-  duplicado do sample anterior à 2.2.6 era artefato de captura, não comportamento da CLI).
-  Esses probes não são agentes reviewer-ro válidos.
+  Na recaptura 2.3.0 os dois probes continuam com 7 regras estruturalmente simétricas; as denies
+  nativas `browser * deny` e `skill browser deny` entram no sufixo de qualquer agente. O probe usa
+  apenas `tools: { webfetch: false }`: na 2.3.0, `tools` com `browser`/`skill` aninhados não
+  resolveu o agente na medição, então a equivalência promovida é a de `webfetch`. Esses probes
+  não são agentes reviewer-ro válidos.
 - `fallback-warning.txt` — linha JSON de erro do stdout de
-  `opencode run --format json --agent fixture-agent-missing` na 2.2.7 (timestamp e sessionID
+  `opencode run --format json --agent fixture-agent-missing` na 2.3.0 (timestamp e sessionID
   sanitizados; a captura usou `--standalone` para não prender no serviço de fundo). Com
   `--format json` o stderr fica vazio e o exit é 1. Sem `--format json`, o stdout fica vazio e
   o stderr traz `Error: Agent not found:` com cor ANSI, também com exit 1. O pós-check reconhece
@@ -58,7 +62,7 @@ Self-test determinístico/fake-exe não prova sozinho o comportamento de uma ver
   `agent "..." not found. Falling back to default agent` no stderr; texto comum no stdout que
   cite qualquer formato não conta como fallback.
 - `read-outside-cwd-blocked.sample.txt` — recibo sanitizado do caso `outside` da matriz
-  comportamental 2.2.7: leitura de arquivo fora do cwd negada por `external_directory`,
+  comportamental 2.3.0: leitura de arquivo fora do cwd negada por `external_directory`,
   sentinela ausente.
 - `content-protection.sample.txt` — resumo dos 34 casos (32 comportamentais + 2 estruturais).
 - `content-protection.receipt.json` — recibo máquina-legível com nome, perfil, classe,
@@ -85,7 +89,7 @@ Nos casos `read-deny`, `read-allow` e `external-deny`, o verificador exige que `
 Na revalidação, a raiz temporária nova é remapeada para `workspaceRoot` da captura ao comparar cwd e
 caminhos absolutos. Isso preserva a prova original sem resolver segmentos `.`/`..`.
 
-## Resolução efetiva medida (2.2.7) — bloco estrutural canônico
+## Resolução efetiva medida (2.3.0) — bloco estrutural canônico
 
 A âncora é o último `permission: "*", pattern: "*", action: "deny"`. Depois dela o guard exige a
 sequência canônica completa, na ordem, sem regras extras. Regras anteriores à âncora podem
@@ -114,7 +118,7 @@ exceção. A exceção exige nome exato e conteúdo sanitizado pelo operador: `s
 contra caminho inteiro podem negar diretório com `.env.` conservadoramente.
 `.env~`/`.env-example` não são protegidos.
 
-Na 2.2.7 o sufixo medido **não** contém exceção `allow` de tool-output: `external_directory` é
+Na 2.3.0 o sufixo medido **não** contém exceção `allow` de tool-output: `external_directory` é
 apenas `* deny`. Qualquer regra adicional depois do bloco (incluindo um `allow` tardio) bloqueia.
 `glob` e `read` de diretório podem mostrar nomes; `list` tem permissão, mas a enumeração
 observada veio por `read` de diretório, não por uma ferramenta `list` separada.
@@ -131,12 +135,12 @@ equivalência é premissa, não garantia de isolamento.
 
 ## Prova dos adapters
 
-Smoke da promoção 2.2.7, na raiz deste repositório (checkout normal): `Invoke-OpenCode.ps1`
+Smoke da promoção 2.3.0, na raiz deste repositório (checkout normal): `Invoke-OpenCode.ps1`
 com `-MessagePath` de um prompt curto e `-Model opencode-go/deepseek-v4.1-flash`, sem `-Agent`.
 O guard aceitou o default `reviewer-ro` e a resposta foi `PONG`.
 
 As duas provas abaixo são da promoção 2.2.6, em workspace sintético mínimo (não em `C:\Dev`),
-com o shim `opencode.cmd` resolvido pela máquina. Não foram repetidas na promoção 2.2.7.
+com o shim `opencode.cmd` resolvido pela máquina. Não foram repetidas nas promoções 2.2.7 e 2.3.0.
 
 - `Invoke-OpenCode.ps1 -Model opencode-go/deepseek-v4.1-flash -Variant low ...` retornou
   resposta; o argv usou `--model opencode-go/deepseek-v4.1-flash#low`, não `--variant`.
@@ -170,7 +174,7 @@ Atualizar o set re-medido completo (sanitizando paths/IDs onde couber):
 3. `debug-agents-global-only.sample.json`
 4. `equiv-permission-vs-tools.sample.json` — config JSONC sintética com `probe-perm` e
    `probe-tools`, carregada via `opencode --standalone debug agents`
-5. `fallback-warning.txt` — stdout verbatim de `run --format json --agent <ausente>`; na 2.2.7
+5. `fallback-warning.txt` — stdout verbatim de `run --format json --agent <ausente>`; na 2.3.0
    é JSON de erro no stdout, com exit 1 e stderr vazio. Sem `--format json` o erro vai para o
    stderr. Sanitizar timestamp/sessionID.
 6. `read-outside-cwd-blocked.sample.txt` e `content-protection.sample.txt` — derivados da matriz
