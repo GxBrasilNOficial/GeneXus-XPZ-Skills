@@ -821,6 +821,271 @@
       "triagedBy": "Claude Code, com autorização do usuário",
       "kind": "closed",
       "excerpt": "**Não medido:** Copilot CLI e Gemini CLI (lançam com `-WorkingDirectory`, mas o CLI pode preferir\n`PWD`). O `PWD` em forma 8.3 sobre `external_directory` não tem cobertura dedicada: a matriz de\naceite rodou do Git Bash com caminho longo, e a única prova em forma 8.3 é o item 4 (prova pelo\nadapter), que não testa `external_directory`. Evidência e decisão:\n[`opencode-reviewer-ro-least-privilege-design.md`](../opencode-reviewer-ro-least-privilege-design.md),\nnota de 2026-11-14 no D4."
+    },
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "09-inventario-e-rastreabilidade-publica.md",
+      "unitHash": "380d2b2a96a85dbaf9eb7a2986e68d1367fd02011df31f968550b56dd45e4506",
+      "listedMembers": [
+        "antigravity",
+        "copilot",
+        "gemini"
+      ],
+      "verdict": "non-gap",
+      "reason": "Contrato vivo: a entrada do motor Build-PrePushReviewDossier.ps1 classifica transportes por backend (stdin nos stdin-dossier-capable; argv-limited Copilot/Gemini/Antigravity). Reavaliar quando o conjunto de backends ou o transporte de algum deles mudar.",
+      "triagedAt": "2026-11-16",
+      "triagedBy": "Claude Code, com autorização do usuário",
+      "kind": "live-contract",
+      "canonicalMembers": [
+        "antigravity",
+        "claude-code",
+        "codex",
+        "copilot",
+        "gemini",
+        "opencode"
+      ],
+      "excerpt": "- `scripts/Build-PrePushReviewDossier.ps1` (motor) — monta o dossiê do modo assistido por dossiê da pré-push reforçada (revisor semantic-only): Seção A (git bruto) + Seção B (container do `-AsJson` do orquestrador mecânico"
+    },
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "14-revisao-pre-push-reforcada.md",
+      "unitHash": "fc1da539ab560b132508fac92335bf499dfdce72b39aa8c34afa0e2b1145f84a",
+      "listedMembers": [
+        "antigravity",
+        "codex",
+        "copilot",
+        "gemini"
+      ],
+      "verdict": "non-gap",
+      "reason": "Contrato vivo: regra vigente de omissão do semantic-only, que classifica Copilot, Gemini e Antigravity como argv-limited. Reavaliar quando o conjunto de backends ou o teto de transporte mudar.",
+      "triagedAt": "2026-11-16",
+      "triagedBy": "Claude Code, com autorização do usuário",
+      "kind": "live-contract",
+      "canonicalMembers": [
+        "antigravity",
+        "claude-code",
+        "codex",
+        "copilot",
+        "gemini",
+        "opencode"
+      ],
+      "excerpt": "**Omissão de revisor semantic-only.** `dossierReady=false` (sem git/`origin/main`), dossiê acima do teto de transporte **argv-limited** (Copilot, Gemini, Antigravity, ~30000 chars pelo mesmo critério do guard)"
+    },
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "xpz-llm-delegate/SKILL.md",
+      "unitHash": "7c145223f67fcdbb97be2ef4e94eecccc5abae0dd9d0f61a7a0dd9821b43845e",
+      "listedMembers": [
+        "claude-code",
+        "codex",
+        "opencode"
+      ],
+      "verdict": "non-gap",
+      "reason": "Contrato vivo: classificação vigente por regime de EOF, em que stdin-based são opencode, Codex e Claude Code. Reavaliar quando o conjunto de adapters ou o regime de algum deles mudar.",
+      "triagedAt": "2026-11-16",
+      "triagedBy": "Claude Code, com autorização do usuário",
+      "kind": "live-contract",
+      "canonicalMembers": [
+        "antigravity",
+        "claude-code",
+        "codex",
+        "copilot",
+        "gemini",
+        "opencode"
+      ],
+      "excerpt": "- **stdin-based** (`Invoke-OpenCode`/`Start-OpenCodeJob`, `Invoke-Codex`/`Start-CodexJob`, `Invoke-ClaudeCode`/`Start-ClaudeCodeJob`): entregam o prompt **por stdin** via `Start-Process -RedirectStandardInput`"
+    },
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "xpz-llm-delegate/SKILL.md",
+      "unitHash": "42325cdfd9d36ca5d62060cf9f863b2adff85c318d8196850c95d823e88b9bd1",
+      "listedMembers": [
+        "antigravity",
+        "copilot",
+        "gemini"
+      ],
+      "verdict": "non-gap",
+      "reason": "Contrato vivo: classificação vigente dos adapters argument-based (Gemini, Copilot, Antigravity). Reavaliar quando o conjunto ou o regime de argv mudar.",
+      "triagedAt": "2026-11-16",
+      "triagedBy": "Claude Code, com autorização do usuário",
+      "kind": "live-contract",
+      "canonicalMembers": [
+        "antigravity",
+        "claude-code",
+        "codex",
+        "copilot",
+        "gemini",
+        "opencode"
+      ],
+      "excerpt": "- **argument-based** (`Invoke-Gemini`, `Invoke-Copilot`, `Invoke-Antigravity`): passam o prompt como **argumento** e **fecham o stdin** no runner"
+    },
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "xpz-llm-delegate/SKILL.md",
+      "unitHash": "3dad32d18a0046fe0c668226776310685c5bdea402eb51ec685820f74f32db13",
+      "listedMembers": [
+        "antigravity",
+        "copilot",
+        "gemini"
+      ],
+      "verdict": "non-gap",
+      "reason": "Contrato vivo: workaround vigente aplicado à classe argument-based (Gemini, Copilot, Antigravity). Reavaliar quando a classe mudar.",
+      "triagedAt": "2026-11-16",
+      "triagedBy": "Claude Code, com autorização do usuário",
+      "kind": "live-contract",
+      "canonicalMembers": [
+        "antigravity",
+        "claude-code",
+        "codex",
+        "copilot",
+        "gemini",
+        "opencode"
+      ],
+      "excerpt": "- **Workaround** para os adapters **argument-based** (`Invoke-Gemini`, `Invoke-Copilot`, `Invoke-Antigravity`): invocá-los pela ferramenta **Bash** (ou shell com stdout em **pipe**)"
+    },
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "xpz-llm-delegate/SKILL.md",
+      "unitHash": "f89f37a22661746a4fdf252c17dc6c9ba8a934319ecb9d47672ed45b998544a8",
+      "listedMembers": [
+        "antigravity",
+        "copilot",
+        "gemini"
+      ],
+      "verdict": "non-gap",
+      "reason": "Contrato vivo: regime de argv vigente da classe argument-based (Gemini, Copilot, Antigravity), com o teto de ~32KB. Reavaliar quando a classe ou o teto mudar.",
+      "triagedAt": "2026-11-16",
+      "triagedBy": "Claude Code, com autorização do usuário",
+      "kind": "live-contract",
+      "canonicalMembers": [
+        "antigravity",
+        "claude-code",
+        "codex",
+        "copilot",
+        "gemini",
+        "opencode"
+      ],
+      "excerpt": "- **argument-based** (`Invoke-Gemini`, `Invoke-Copilot`, `Invoke-Antigravity`): o prompt vai no **argv** via runner → o teto ~32KB **persiste**"
+    },
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "xpz-llm-delegate/SKILL.md",
+      "unitHash": "1ec306b248c7ad117f5f2bcc8363074769943c1b927156689fbef65c353cef81",
+      "listedMembers": [
+        "claude-code",
+        "codex",
+        "opencode"
+      ],
+      "verdict": "non-gap",
+      "reason": "Contrato vivo: regime stdin vigente (opencode, Codex, Claude Code) e orientação de uso decorrente. Reavaliar quando o conjunto stdin-based mudar.",
+      "triagedAt": "2026-11-16",
+      "triagedBy": "Claude Code, com autorização do usuário",
+      "kind": "live-contract",
+      "canonicalMembers": [
+        "antigravity",
+        "claude-code",
+        "codex",
+        "copilot",
+        "gemini",
+        "opencode"
+      ],
+      "excerpt": "- **stdin-based** (opencode, Codex, ClaudeCode — síncronos e jobs): o prompt vai por **stdin/arquivo**, não pelo argv - sem o limite"
+    },
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "xpz-llm-delegate/SKILL.md",
+      "unitHash": "2168be884fab6dbbf61e9f176d9c4bddae094cb2c3b88a63ae8539fa9cd1239e",
+      "listedMembers": [
+        "claude-code",
+        "codex",
+        "opencode"
+      ],
+      "verdict": "non-gap",
+      "reason": "Contrato vivo: regra vigente do Claude Code no painel e da âncora git-capable (Codex-delegate ou subagente nativo). Reavaliar se a lista de âncoras ou o default do adapter mudar.",
+      "triagedAt": "2026-11-16",
+      "triagedBy": "Claude Code, com autorização do usuário",
+      "kind": "live-contract",
+      "canonicalMembers": [
+        "antigravity",
+        "claude-code",
+        "codex",
+        "copilot",
+        "gemini",
+        "opencode"
+      ],
+      "excerpt": "- Para **revisor pré-push**, a rotina pode precisar de `git` e scripts locais. Definir explicitamente ferramentas/permissões suficientes para leitura e comandos de validação"
+    },
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "xpz-llm-delegate/SKILL.md",
+      "unitHash": "dc798661315634dd732fac0bac9b2e2735727cee77561e30e9cdaa0f4d35fe4f",
+      "listedMembers": [
+        "antigravity",
+        "copilot",
+        "gemini"
+      ],
+      "verdict": "non-gap",
+      "reason": "Contrato vivo: limite vigente que classifica Copilot, Gemini e Antigravity como agênticos externos. Reavaliar quando a classe de CLIs agênticas mudar.",
+      "triagedAt": "2026-11-16",
+      "triagedBy": "Claude Code, com autorização do usuário",
+      "kind": "live-contract",
+      "canonicalMembers": [
+        "antigravity",
+        "claude-code",
+        "codex",
+        "copilot",
+        "gemini",
+        "opencode"
+      ],
+      "excerpt": "## LIMITE CONHECIDO — COPILOT CLI, GEMINI CLI E ANTIGRAVITY CLI TAMBÉM SÃO AGÊNTICOS EXTERNOS"
+    },
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "xpz-llm-delegate/SKILL.md",
+      "unitHash": "95bf5c9562ac0a46dc34658f070cb7a0c2044d534d667479d2b246e564945b84",
+      "listedMembers": [
+        "antigravity",
+        "copilot",
+        "gemini"
+      ],
+      "verdict": "non-gap",
+      "reason": "Contrato vivo: classificação vigente de copilot -p, gemini -p e agy -p como CLIs agênticas. Reavaliar quando a classe mudar.",
+      "triagedAt": "2026-11-16",
+      "triagedBy": "Claude Code, com autorização do usuário",
+      "kind": "live-contract",
+      "canonicalMembers": [
+        "antigravity",
+        "claude-code",
+        "codex",
+        "copilot",
+        "gemini",
+        "opencode"
+      ],
+      "excerpt": "O `copilot -p`, o `gemini -p` e o `agy -p` são CLIs agênticas, não backends one-shot puros. Mesmo em consulta curta, podem carregar contexto próprio"
+    },
+    {
+      "code": "BACKEND_ENUMERATION_SUBSET",
+      "file": "xpz-llm-delegate/SKILL.md",
+      "unitHash": "29f5d6c8f869580976ec2d5f489fb4fef5d95fb5220972249ce56e9dba558937",
+      "listedMembers": [
+        "antigravity",
+        "copilot",
+        "gemini"
+      ],
+      "verdict": "non-gap",
+      "reason": "Contrato vivo: consequências vigentes no gate de confidencialidade para Copilot, Gemini e Antigravity. Reavaliar quando a classe de CLIs agênticas mudar.",
+      "triagedAt": "2026-11-16",
+      "triagedBy": "Claude Code, com autorização do usuário",
+      "kind": "live-contract",
+      "canonicalMembers": [
+        "antigravity",
+        "claude-code",
+        "codex",
+        "copilot",
+        "gemini",
+        "opencode"
+      ],
+      "excerpt": "- O gate de confidencialidade continua obrigatório. Copilot/Gemini seguem o veredito por destino; Antigravity `public-review` é adicionalmente público-only"
     }
   ]
 }

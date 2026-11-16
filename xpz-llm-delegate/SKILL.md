@@ -898,13 +898,13 @@ Chamado de uma **shell headless sem TTY** (a ferramenta Bash/PowerShell de um ag
 agêntico **trava** lendo o stdin herdado (um pipe aberto que nunca dá EOF): medido — o opencode
 pendurava por minutos. Todos os adapters dão **EOF** ao CLI, por um de dois regimes:
 
-- <!-- backend-parity: ignore --> **stdin-based** (`Invoke-OpenCode`/`Start-OpenCodeJob`, `Invoke-Codex`/`Start-CodexJob`,
+- **stdin-based** (`Invoke-OpenCode`/`Start-OpenCodeJob`, `Invoke-Codex`/`Start-CodexJob`,
   `Invoke-ClaudeCode`/`Start-ClaudeCodeJob`): entregam o prompt **por stdin** via
   `Start-Process -RedirectStandardInput <arquivo>`; o **fim do arquivo dá o EOF**. O prompt fica
   **fora do argv** (ver a seção do limite ~32KB) e vem de `-Message` (inline) ou `-MessagePath`
   (arquivo, exclusivos) — `-MessagePath` muda só a **origem** do texto, não o transporte por stdin. O opencode lê o prompt do stdin quando o
   argumento posicional de `run` é **omitido** (verificado no opencode em uso nesta máquina, 2026-06).
-- <!-- backend-parity: ignore --> **argument-based** (`Invoke-Gemini`, `Invoke-Copilot`, `Invoke-Antigravity`): passam o prompt como **argumento** e
+- **argument-based** (`Invoke-Gemini`, `Invoke-Copilot`, `Invoke-Antigravity`): passam o prompt como **argumento** e
   **fecham o stdin** no runner com `$null | & ([string]$req.exe) @args` (`$null` = EOF puro, sem
   bytes, **não** `'' |`, que mandaria uma linha vazia antes do EOF). O runner é invocado por
   `pwsh -File` (que **não** lê stdin); migrar para `pwsh -Command` reintroduziria o hang.
@@ -935,7 +935,7 @@ is redirected`. Pela ferramenta Bash (stdout = pipe) funcionava.
   (console-handle) e/ou o prompt grande por argv; **não** reproduzido de forma determinística
   (medições mostraram `[Console]::IsOutputRedirected=True` nas sessões testadas, em que o erro
   **não** ocorre). Tratar como **sintoma observado**, não diagnóstico fechado.
-- <!-- backend-parity: ignore --> **Workaround** para os adapters **argument-based** (`Invoke-Gemini`, `Invoke-Copilot`, `Invoke-Antigravity`): invocá-los
+- **Workaround** para os adapters **argument-based** (`Invoke-Gemini`, `Invoke-Copilot`, `Invoke-Antigravity`): invocá-los
   pela ferramenta **Bash** (ou shell com stdout em **pipe**) e manter o prompt **enxuto**.
 - **opencode resolvido por desenho.** `Invoke-OpenCode` usa `Start-Process -RedirectStandardOutput/-Error`
   direto; `Start-OpenCodeJob` usa um runner mínimo, mas o runner também chama `Start-Process` com
@@ -945,7 +945,7 @@ is redirected`. Pela ferramenta Bash (stdout = pipe) funcionava.
 
 **Limite de ~32KB de linha de comando do Windows** (reproduzível): passar o prompt como
 **argumento** estoura `Argument list too long` acima de ~32767 caracteres.
-- <!-- backend-parity: ignore --> **argument-based** (`Invoke-Gemini`, `Invoke-Copilot`, `Invoke-Antigravity`): o prompt vai no **argv** via runner → o
+- **argument-based** (`Invoke-Gemini`, `Invoke-Copilot`, `Invoke-Antigravity`): o prompt vai no **argv** via runner → o
   teto ~32KB **persiste**. Os três ganharam `-MessagePath` (lê o prompt de arquivo e elimina o
   `(Get-Content)`/`"$(cat ...)"` inline do chamador), mas ele **não** levanta o teto; um **guard de
   tamanho fail-closed** (`$MaxArgvPromptChars = 30000`, **heurístico em chars** — UTF-16 code units,
@@ -953,7 +953,7 @@ is redirected`. Pela ferramenta Bash (stdout = pipe) funcionava.
   recusa prompts grandes com `BLOCK` claro antes do estouro de `Argument list too long`. A migração
   real para **stdin** segue como follow-up (bloqueada por falta de assinatura para validar
   empiricamente) — `999-ideias-pendentes.md`.
-- <!-- backend-parity: ignore --> **stdin-based** (opencode, Codex, ClaudeCode — síncronos e jobs): o prompt vai por **stdin/arquivo**,
+- **stdin-based** (opencode, Codex, ClaudeCode — síncronos e jobs): o prompt vai por **stdin/arquivo**,
   não pelo argv — sem o limite. Use `-MessagePath <arquivo>` (ou `-Message`): além de evitar o limite,
   dispensa `"$(cat ...)"`/`(Get-Content)` na linha de comando do chamador (sem substituição de comando
   = sem prompt de autorização desnecessário no harness).
@@ -1142,7 +1142,7 @@ payload para Anthropic (`anthropic/claude-opus-4-8`) e, portanto, é externo. Co
   aviso aparece **também em execução bem-sucedida**, medido em 2026-07-25, e por isso é descartado
   como ruído antes de qualquer classificação. A recusa propriamente dita nunca foi observada — o
   detector segue por precaução, não por evidência.
-- <!-- backend-parity: ignore --> Para **revisor pré-push**, a rotina pode precisar de `git` e scripts locais. Definir
+- Para **revisor pré-push**, a rotina pode precisar de `git` e scripts locais. Definir
   explicitamente ferramentas/permissões suficientes para leitura e comandos de validação
   (sem `bypassPermissions`) **só vale FORA do painel** — via `Invoke-ClaudeCode.ps1` **direto**.
   **In-panel herda o default do adapter** (`plan` + `Bash,Read,Glob,Grep`): `Invoke-LlmDelegatePanelDispatch.ps1`
@@ -1157,14 +1157,13 @@ payload para Anthropic (`anthropic/claude-opus-4-8`) e, portanto, é externo. Co
 - Os adapters `Invoke-ClaudeCode.ps1`, `Invoke-ClaudeCodeAsync.ps1` e `Start-ClaudeCodeJob.ps1` bloqueiam
   `PermissionMode=bypassPermissions`; esse modo não faz parte da delegação XPZ.
 
-## <!-- backend-parity: ignore --> LIMITE CONHECIDO — COPILOT CLI, GEMINI CLI E ANTIGRAVITY CLI TAMBÉM SÃO AGÊNTICOS EXTERNOS
+## LIMITE CONHECIDO — COPILOT CLI, GEMINI CLI E ANTIGRAVITY CLI TAMBÉM SÃO AGÊNTICOS EXTERNOS
 
-<!-- backend-parity: ignore -->
 O `copilot -p`, o `gemini -p` e o `agy -p` são CLIs agênticas, não backends one-shot puros. Mesmo em
 consulta curta, podem carregar contexto próprio e são serviços externos: Copilot casa
 `github-copilot/*`; Gemini casa `google/*`; Antigravity casa `antigravity/*`. Consequências:
 
-- <!-- backend-parity: ignore --> O gate de confidencialidade continua obrigatório. Copilot/Gemini seguem o veredito por destino;
+- O gate de confidencialidade continua obrigatório. Copilot/Gemini seguem o veredito por destino;
   Antigravity `public-review` é adicionalmente público-only e recusa `kb-sensitive` antes do adapter.
 - Para Copilot, o adapter usa `--no-custom-instructions`, `--disable-builtin-mcps` e
   `--available-tools=`; o teste local comprovou resposta com `tools_updated` sem ferramentas
