@@ -86,7 +86,7 @@ O `$R$` é sintaxe do Excel (código de moeda + LCID 416 = pt-BR), **não** vari
 
 <a id="xlsx-openpyxl-col-min-max-larguras-20261114"></a>
 
-## Leitura de larguras `.xlsx`: openpyxl mente em `<col min max>` — 2026-11-14
+## Leitura de larguras `.xlsx`: consulta openpyxl e intervalos `<col min max>` — 2026-11-14
 
 **Atualização 2026-11-15.** A cautela documental foi incorporada em `xpz-builder/responsibilities-by-type/procedure.md`; helper e self-test permanecem ideias. A consulta específica por `column_dimensions[k].width` foi reproduzida com openpyxl 3.1.5 para uma entrada agrupada M–P; isso não demonstra defeito geral da biblioteca nem largura efetiva de 13 no Excel.
 
@@ -99,9 +99,9 @@ O `$R$` é sintaxe do Excel (código de moeda + LCID 416 = pt-BR), **não** vari
 <col width="14.81" customWidth="1" min="13" max="16" style="7" />
 ```
 
-= colunas 13–16 (M–P) **todas** com largura 14.81. Leitura via openpyxl `column_dimensions` materializou bem só o `min`: M=14.81 e **N/O/P=13.0** (default), enquanto o `sheet1.xml` dentro do zip estava correto. Conferência normativa: abrir o `.xlsx` como zip e ler `xl/worksheets/sheet1.xml` (atributos `min`/`max`/`width`).
+= entrada de largura 14.81 para as colunas 13–16 (M–P). Na consulta específica `column_dimensions[k].width`, M retornou 14.81 e N/O/P retornaram 13.0 (default); essa consulta isolada não representa o intervalo agrupado completo. Para conferir a definição, identificar a planilha pertinente no ZIP e examinar seus atributos `min`/`max`/`width` no OOXML.
 
-**Sintoma.** Diff visual “larguras erradas” ou agente corrigindo N/O/P que já herdavam do range; falso negativo/positivo na validação pós-patch. Separado do bug de produto `AutoFit = 1` (esse sim estoura coluna A pelo texto do cabeçalho).
+**Risco.** A leitura isolada pode levar o agente a considerar N/O/P incorretas ou alterar colunas já cobertas pelo intervalo, produzindo diagnóstico equivocado. O relato anterior de alargamento com `AutoFit = 1` é uma investigação distinta, sem causa comprovada; ver entrada seguinte.
 
 **Ideia (não implementar nesta frente).** Uma ou mais:
 1. Helper compartilhado que devolva mapa coluna→largura expandindo cada `<col min max>` (PowerShell/`System.IO.Compression` ou Python sem confiar só em `column_dimensions`).
@@ -123,14 +123,11 @@ O `$R$` é sintaxe do Excel (código de moeda + LCID 416 = pt-BR), **não** vari
 - **Importância** — média (workaround hoje é conhecimento local da KB ou aprendizado na dor; sem nota genérica outra KB/agente repete o mesmo ciclo).
 - **Maturidade** — checklist incorporado; investigação residual de evidências permanece aberta.
 
-**Origem.** Frente RelTitulos (FabricaBrasil18, 2026-11): planilhas com `ExcelDocument.Template` apontando para `.xlsx` em File (`ModelosDePlanilhas`). Layout quebrado quando `AutoFit = 1` (coluna A estourada pelo texto longo do cabeçalho; larguras do modelo descartadas na prática). Formatos de data/moeda só “pegaram” nas linhas já pré-formatadas do template; teto curto de linhas formatadas falhou em planilhas longas. A API GeneXus de `ExcelDocument` **não** expõe `NumberFormat` — formato não se define no Source da procedure.
+**Origem.** Frente RelTitulos (FabricaBrasil18, 2026-11): planilhas com `ExcelDocument.Template` apontando para `.xlsx` em File (`ModelosDePlanilhas`). O registro anterior atribuiu o alargamento da coluna A a `AutoFit = 1` e a ausência de máscaras em relatórios longos ao teto de linhas pré-formatadas. A investigação posterior encontrou as evidências e os limites descritos acima, sem comprovar essas relações causais. A disponibilidade e o efeito de recursos de formatação devem ser verificados no contexto aplicável.
 
 **Sintoma típico.** Planilha gerada com colunas “fora do modelo” / larguras irreconhecíveis apesar do `.xlsx` ajustado; ou valores/datas sem máscara a partir de certa linha, com o Source aparentemente correto.
 
-**Ideia (não implementar nesta frente).** Registrar checklist genérico (não específico de uma KB) para agente que edita procedure/`File` de planilha com Template, por exemplo:
-1. Se o layout depende das larguras do `.xlsx`, usar `AutoFit = 0` (não `1`).
-2. Datas/moeda/outros formatos: garantir linhas pré-formatadas no template até o teto operacional esperado; não contar com `NumberFormat` no Source.
-3. Após mudar o File modelo, estado servível do `.xlsx` em `web` exige generate/BuildAll no environment que serve a app — import sozinho não basta (alinhar à regra BuildAll × SpecifyGenerate já documentada).
+**Propostas históricas.** A ideia original sugeria desligar `AutoFit` quando o layout dependesse do modelo, pré-formatar as linhas necessárias e gerar/buildar o environment após alteração do `File`. Essas propostas motivaram o checklist incorporado, mas não estabelecem uma solução universal; consultar o checklist para as verificações atuais e a documentação de build para a fase aplicável.
 
 **Fora de escopo desta entrada.** Armadilhas de *patch/leitura* do `.xlsx` (`[$R$-416]` no PowerShell; openpyxl/`col min max`) — já em entradas irmãs de 2026-11-14. Convenções de produto de uma KB (formato Real canônico, “respeitar AJUSTADO”, teto 20000 desta família) ficam no `DECISOES` local, não nesta checklist genérica.
 
