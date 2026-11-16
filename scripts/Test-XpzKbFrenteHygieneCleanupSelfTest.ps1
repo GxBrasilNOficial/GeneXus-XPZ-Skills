@@ -228,6 +228,19 @@ try {
   $rp = Invoke-Cleanup -Arguments @('-RepoRoot', $p, '-PlanPath', (Join-Path $p "$FRENTES/plano.json"))
   Assert-True ($rp.exit -eq 1 -and $rp.json.status -eq 'blocked') "P: PlanPath dentro de frentesDir -> blocked"
 
+  # ===== Y. .rejected de pacote removido em cascata: mantido, informado, status inalterado =====
+  $y = New-TempRoot -Slug 'rejcascata'
+  New-Frente -Root $y -Name 'FrenteY'
+  New-Pacote -Root $y -File 'FrenteY_01.import_file.xml'
+  New-Pacote -Root $y -File 'FrenteY_01.import_file.xml.rejected.A'
+  New-Pacote -Root $y -File 'Outro_09.import_file.xml.rejected.A'
+  $py = Invoke-Plan -Root $y -Extra @('-Permanente')
+  $ry = Invoke-Apply -Root $y -Plan $py.plan -Extra @('-Permanente')
+  Assert-True ($ry.json.status -eq 'applied-clean' -and $ry.exit -eq 0) "Y: .rejected nao altera status; obtido $($ry.json.status)"
+  Assert-True (Test-Path -LiteralPath (Join-Path $y "$PACOTES/FrenteY_01.import_file.xml.rejected.A")) "Y: .rejected preservado"
+  Assert-True (@($ry.json.rejeitadosRestantes) -contains 'FrenteY_01.import_file.xml.rejected.A') "Y: rejeitado de pacote removido informado"
+  Assert-True (-not (@($ry.json.rejeitadosRestantes) -contains 'Outro_09.import_file.xml.rejected.A')) "Y: rejeitado de pacote nao removido nao e informado"
+
   # ===== Q. frente com sufixo opcional e valida (nao entra no plano) =====
   $q = New-TempRoot -Slug 'sufixo'
   Write-File -Path (Join-Path $q "$FRENTES/${conforme}_ba03/Obj.xml") -Content '<Object />'

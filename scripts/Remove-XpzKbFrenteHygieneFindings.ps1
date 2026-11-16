@@ -346,14 +346,15 @@ function Build-Plan {
     else { $script:blockers.Add("exclusao de pacote que nao e alvo desta execucao (fail-closed): '$n'") }
   }
 
-  # Ordem: sidecar antes do pacote (se o pacote falhar, nao sobra inventario sem pacote)
+  # Ordem: pacote antes do sidecar (se o sidecar falhar, sobra so sidecar orfao, informativo;
+  # se o pacote falhasse depois do sidecar, o pacote ficaria sem inventario)
   $ordered = @()
   foreach ($p in $pTargets) {
+    $ordered += [pscustomobject]@{ kind = 'pacote'; name = $p }
     $sc = "$p.package-inventory.json"
     if (Test-Path -LiteralPath (Join-Path $script:pacotesDirCanon $sc) -PathType Leaf) {
       $ordered += [pscustomobject]@{ kind = 'sidecar'; name = $sc }
     }
-    $ordered += [pscustomobject]@{ kind = 'pacote'; name = $p }
   }
   foreach ($f in $frTargets) { $ordered += [pscustomobject]@{ kind = 'frente'; name = $f } }
 
@@ -546,6 +547,7 @@ $residuo = @()
 $sidecarsOrfaos = @()
 $pacotesRejeitados = @()
 $planSaved = $null
+$rejeitadosRestantes = @()
 
 try {
   $repoRootCanon = Get-Canon $RepoRoot
@@ -675,6 +677,15 @@ try {
       catch { $hardStop = $_.Exception.Message }
       $itemResults = @($results)
 
+      # .rejected de pacotes removidos NESTA execucao: evidencia forense, nunca removida; so informada.
+      foreach ($it in $script:items) {
+        if ($it.kind -ne 'pacote' -or (Test-Path -LiteralPath $it.path)) { continue }
+        $rej = @(Get-ChildItem -LiteralPath $script:pacotesDirCanon -File -Force -ErrorAction Stop | Where-Object {
+          $_.Name.StartsWith($it.name + '.rejected.', [System.StringComparison]::Ordinal) -and ($_.Name -cmatch '\.rejected\.[A-Z]$')
+        })
+        foreach ($rf in $rej) { $rejeitadosRestantes += $rf.Name }
+      }
+
       # Residuo: o que ainda sobrou no estado autoritativo (exceto exclusoes intencionais)
       $fin = Invoke-HygieneEngine
       $exclKeys = @($script:exclusions | Where-Object { $_.status -eq 'excluido' } | ForEach-Object { "$($_.kind)|$($_.name)" })
@@ -738,6 +749,7 @@ $result = [pscustomobject]@{
   sidecarsOrfaos      = @($sidecarsOrfaos)
   pacotesRejeitados   = @($pacotesRejeitados)
   residuo             = @($residuo)
+  rejeitadosRestantes = @($rejeitadosRestantes)
   totalFrentesRemovidas = [int]$removedFr
   totalPacotesRemovidos = [int]$removedPc
   totalBytesPlanejados  = [int64]$totalBytes
@@ -749,6 +761,7 @@ if ($AsText) {
   foreach ($x in @($result.items)) { "  [$($x.result)] $($x.kind) $($x.name)" }
   foreach ($b in @($result.blockers)) { "  BLOQUEIO: $b" }
   foreach ($r in @($result.residuo)) { "  RESIDUO: $r" }
+  foreach ($r in @($result.rejeitadosRestantes)) { "  REJEITADO (mantido, limpeza manual): $r" }
   if ($result.planPath) { "Plano salvo em: $($result.planPath)" }
 }
 else {
