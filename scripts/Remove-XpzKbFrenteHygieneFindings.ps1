@@ -175,6 +175,25 @@ function Get-TreeStats {
   return [pscustomobject]@{ bytes = [int64]$it.Length; files = 1; mtimeMaxTicks = $it.LastWriteTimeUtc.Ticks }
 }
 
+# Digest dos caminhos relativos (arquivos e pastas), ordinal; detecta rename e pasta vazia.
+function Get-TreePathsHash {
+  param([string]$Path)
+  $base = Get-Canon $Path
+  if (Test-Path -LiteralPath $Path -PathType Container) {
+    $entries = @(Get-ChildItem -LiteralPath $Path -Recurse -Force | ForEach-Object {
+      $rel = $_.FullName.Substring($base.Length).TrimStart('\', '/')
+      if ($_.PSIsContainer) { $rel + '/' } else { $rel }
+    })
+  }
+  else { $entries = @((Get-Item -LiteralPath $Path -Force).Name) }
+  $arr = [string[]]$entries
+  [System.Array]::Sort($arr, [System.StringComparer]::Ordinal)
+  $text = (($arr -join "`n") + "`n")
+  $sha = [System.Security.Cryptography.SHA256]::Create()
+  try { $h = $sha.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($text)) } finally { $sha.Dispose() }
+  return ([System.BitConverter]::ToString($h) -replace '-', '').ToLowerInvariant()
+}
+
 function Get-TreeBytes {
   param([string]$Path)
   return [int64](Get-TreeStats -Path $Path).bytes
@@ -293,8 +312,9 @@ function Build-Plan {
     if ($exclSeen.ContainsKey("frente|$n")) { continue }
     $exclSeen["frente|$n"] = $true
     if ($script:doFrentes -and ($frTargets -contains $n)) {
+      $actual = @($frTargets | Where-Object { $_ -eq $n })[0]
       $frTargets = @($frTargets | Where-Object { $_ -ne $n })
-      $script:exclusions += [pscustomobject]@{ kind = 'frente'; name = $n; status = 'excluido' }
+      $script:exclusions += [pscustomobject]@{ kind = 'frente'; name = $actual; status = 'excluido' }
     }
     else { $script:blockers.Add("exclusao de frente que nao e alvo desta execucao (fail-closed): '$n'") }
   }
@@ -319,8 +339,9 @@ function Build-Plan {
     if ($exclSeen.ContainsKey("pacote|$n")) { continue }
     $exclSeen["pacote|$n"] = $true
     if ($pTargets -contains $n) {
+      $actual = @($pTargets | Where-Object { $_ -eq $n })[0]
       $pTargets = @($pTargets | Where-Object { $_ -ne $n })
-      $script:exclusions += [pscustomobject]@{ kind = 'pacote'; name = $n; status = 'excluido' }
+      $script:exclusions += [pscustomobject]@{ kind = 'pacote'; name = $actual; status = 'excluido' }
     }
     else { $script:blockers.Add("exclusao de pacote que nao e alvo desta execucao (fail-closed): '$n'") }
   }
@@ -348,6 +369,7 @@ function Build-Plan {
     $planItems += [pscustomobject]@{
       kind = $t.kind; name = $t.name; path = $r.path; method = $script:method
       bytes = [int64]$st.bytes; files = [int]$st.files; mtimeMaxTicks = [int64]$st.mtimeMaxTicks
+      pathsSha256 = (Get-TreePathsHash -Path $r.path)
     }
   }
   $script:items = @($planItems)
@@ -364,7 +386,7 @@ function Get-PlanKeys {
   param($Items, $Exclusions)
   $list = [System.Collections.Generic.List[string]]::new()
   foreach ($i in @($Items | Where-Object { $null -ne $_ })) {
-    $list.Add("item|$(Get-Prop $i 'kind')|$(Get-Prop $i 'name')|$(Get-Prop $i 'method')|$(Get-Prop $i 'files')|$(Get-Prop $i 'bytes')|$(Get-Prop $i 'mtimeMaxTicks')")
+    $list.Add("item|$(Get-Prop $i 'kind')|$(Get-Prop $i 'name')|$(Get-Prop $i 'method')|$(Get-Prop $i 'files')|$(Get-Prop $i 'bytes')|$(Get-Prop $i 'mtimeMaxTicks')|$(Get-Prop $i 'pathsSha256')")
   }
   foreach ($e in @($Exclusions | Where-Object { $null -ne $_ })) { $list.Add("excl|$(Get-Prop $e 'kind')|$(Get-Prop $e 'name')|$(Get-Prop $e 'status')") }
   $arr = $list.ToArray()
@@ -401,16 +423,20 @@ function Get-RecycleVolumeInfo {
   return [pscustomobject]@{ root = $Root; maxBytes = ($maxMB * 1MB); binDir = ($Root + '$Recycle.Bin') }
 }
 
+# Arquivos em uso bloqueiam QUALQUER metodo, antes da primeira acao (inclui -Permanente e -Backup).
+function Test-ItemLocks {
+  foreach ($it in $script:items) {
+    $locked = @(Get-LockedFiles -Path $it.path)
+    if ($locked.Count -gt 0) { $script:blockers.Add("arquivo em uso por outro processo ($($locked.Count)), ex.: $($locked[0])") }
+  }
+}
+
 function Test-RecyclePrecheck {
   $recItems = @($script:items | Where-Object { $_.method -eq 'recycle' })
   if ($recItems.Count -eq 0) { return }
   if (Test-IsElevated) { $script:blockers.Add('sessao elevada: a verificacao da Lixeira so cobre o usuario atual'); return }
   $pol = Test-RecycleGlobalPolicy
   if ($pol) { $script:blockers.Add("Lixeira indisponivel por politica: $pol"); return }
-  foreach ($it in $recItems) {
-    $locked = @(Get-LockedFiles -Path $it.path)
-    if ($locked.Count -gt 0) { $script:blockers.Add("arquivo em uso por outro processo ($($locked.Count)), ex.: $($locked[0])") }
-  }
   $sid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
   $groups = $recItems | Group-Object { [System.IO.Path]::GetPathRoot((Get-Canon $_.path)) }
   foreach ($g in $groups) {
@@ -446,7 +472,7 @@ function Read-RecycleIndex {
     if ($len -lt 1 -or (28 + $len * 2) -gt $b.Length) { throw 'unverified: indice $I v2 com tamanho invalido' }
     $orig = [System.Text.Encoding]::Unicode.GetString($b, 28, $len * 2).TrimEnd([char]0)
   }
-  else { throw "unverified: versao de indice \$I desconhecida ($ver)" }
+  else { throw ('unverified: versao de indice $I desconhecida (' + $ver + ')') }
   return [pscustomobject]@{ version = $ver; size = $size; fileTime = $ft; path = $orig }
 }
 
@@ -485,7 +511,7 @@ function Invoke-ItemRecycle {
   $rIsDir = Test-Path -LiteralPath $rPath -PathType Container
   $rIsFile = Test-Path -LiteralPath $rPath -PathType Leaf
   if (-not ((($Item.kind -eq 'frente') -and $rIsDir) -or (($Item.kind -ne 'frente') -and $rIsFile))) {
-    throw "unverified: par \$R ausente ou de tipo inesperado ($($Item.name))"
+    throw ('unverified: par $R ausente ou de tipo inesperado (' + $Item.name + ')')
   }
   return 'recycle-verified'
 }
@@ -550,8 +576,13 @@ try {
     if ((Test-IsUnder $backupCanon $script:frentesDirCanon) -or [string]::Equals($backupCanon, $script:frentesDirCanon, [System.StringComparison]::OrdinalIgnoreCase)) { $script:blockers.Add('-Backup nao pode estar dentro de frentesDir') }
     if ((Test-IsUnder $backupCanon $script:pacotesDirCanon) -or [string]::Equals($backupCanon, $script:pacotesDirCanon, [System.StringComparison]::OrdinalIgnoreCase)) { $script:blockers.Add('-Backup nao pode estar dentro de pacotesDir') }
     if (-not [string]::Equals([System.IO.Path]::GetPathRoot($backupCanon), [System.IO.Path]::GetPathRoot($repoRootCanon), [System.StringComparison]::OrdinalIgnoreCase)) { $script:blockers.Add('-Backup em outro volume nao suportado') }
+    if ($RunStamp -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$' -or $RunStamp.Contains('..')) { $script:blockers.Add("-RunStamp invalido (use letras, numeros, '.', '_' ou '-'; sem '..'): '$RunStamp'") }
     $script:backupRoot = Join-Path $backupCanon $RunStamp
-    if ((Test-Path -LiteralPath $script:backupRoot) -and @(Get-ChildItem -LiteralPath $script:backupRoot -Force).Count -gt 0) { $script:blockers.Add("subdir de backup '$($script:backupRoot)' ja existe e nao esta vazio") }
+    if ($script:blockers.Count -eq 0) {
+      if ((Test-IsUnder $script:backupRoot $script:frentesDirCanon) -or (Test-IsUnder $script:backupRoot $script:pacotesDirCanon)) { $script:blockers.Add('destino do backup (backupCanon + RunStamp) cairia dentro das pastas-alvo') }
+      if (Test-ChainHasReparse ([System.IO.Path]::GetPathRoot($backupCanon)) $backupCanon) { $script:blockers.Add('reparse point no caminho do -Backup') }
+      if ((Test-Path -LiteralPath $script:backupRoot) -and @(Get-ChildItem -LiteralPath $script:backupRoot -Force).Count -gt 0) { $script:blockers.Add("subdir de backup '$($script:backupRoot)' ja existe e nao esta vazio") }
+    }
   }
 
   if ($script:blockers.Count -eq 0) {
@@ -562,7 +593,8 @@ try {
 
   if ($script:blockers.Count -eq 0 -and -not $Apply) {
     # ---------------- DRY-RUN ----------------
-    if ($PlanPath) {
+    if ($PlanPath -and $WhatIfPreference) { Write-Human '-WhatIf: o plano nao foi gravado.' }
+    elseif ($PlanPath) {
       $pp = Get-Canon $PlanPath
       if ((Test-IsUnder $pp $script:frentesDirCanon) -or (Test-IsUnder $pp $script:pacotesDirCanon)) { $script:blockers.Add('-PlanPath nao pode estar dentro das pastas-alvo') }
       elseif (Test-Path -LiteralPath $pp) { $script:blockers.Add("-PlanPath ja existe (nao sobrescreve): $pp") }
@@ -571,9 +603,12 @@ try {
         $plan = [pscustomobject]@{
           Kind = 'xpz-frente-hygiene-plan'; SchemaVersion = 1; repoRoot = $repoRootCanon
           frentesDir = $script:frentesDirCanon; pacotesDir = $script:pacotesDirCanon
-          scope = $Scope; method = $script:method; exclusions = @($script:exclusions); items = @($script:items)
+          scope = $Scope; method = $script:method; backupRoot = $script:backupRoot
+          exclusions = @($script:exclusions); items = @($script:items)
         }
-        [System.IO.File]::WriteAllText($pp, ($plan | ConvertTo-Json -Depth 6), $script:utf8NoBom)
+        # CreateNew: falha se o arquivo aparecer entre o teste e a escrita (sem sobrescrita)
+        $fs = [System.IO.File]::Open($pp, [System.IO.FileMode]::CreateNew, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
+        try { $bytes = $script:utf8NoBom.GetBytes(($plan | ConvertTo-Json -Depth 6)); $fs.Write($bytes, 0, $bytes.Length) } finally { $fs.Dispose() }
         $planSaved = $pp
       }
     }
@@ -603,9 +638,13 @@ try {
           foreach ($a in $appeared) { Write-Human "  + $a" }
           foreach ($g in $gone) { Write-Human "  - $g" }
         }
+        $savedBk = [string](Get-Prop $saved 'backupRoot')
+        $curBk = [string]$script:backupRoot
+        if ($savedBk -cne $curBk) { $script:blockers.Add("destino de backup difere do plano salvo (salvo='$savedBk', atual='$curBk')") }
       }
     }
-    if ($script:blockers.Count -eq 0) { Test-RecyclePrecheck }
+    if ($script:blockers.Count -eq 0 -and -not $WhatIfPreference) { Test-ItemLocks }
+    if ($script:blockers.Count -eq 0 -and -not $WhatIfPreference) { Test-RecyclePrecheck }
     if ($script:blockers.Count -eq 0 -and $WhatIfPreference) {
       $status = 'whatif'; $exitCode = 0
       $itemResults = @($script:items | ForEach-Object { 'planned' })
@@ -627,7 +666,8 @@ try {
           $res = switch ($it.method) {
             'recycle' { Invoke-ItemRecycle -Item $it -StartUtc $startUtc }
             'backup' { Invoke-ItemBackup -Item $it }
-            default { Invoke-ItemPermanent -Item $it }
+            'permanent' { Invoke-ItemPermanent -Item $it }
+            default { throw "metodo desconhecido no plano: $($it.method)" }
           }
           $results.Add($res)
         }
@@ -637,10 +677,10 @@ try {
 
       # Residuo: o que ainda sobrou no estado autoritativo (exceto exclusoes intencionais)
       $fin = Invoke-HygieneEngine
-      $excl = @($script:exclusions | Where-Object { $_.status -eq 'excluido' } | ForEach-Object { $_.name })
+      $exclKeys = @($script:exclusions | Where-Object { $_.status -eq 'excluido' } | ForEach-Object { "$($_.kind)|$($_.name)" })
       $residuo = @()
-      foreach ($n in @(Get-Prop $fin 'frentesNaoConformes')) { if ($excl -notcontains $n) { $residuo += "frente:$n" } }
-      foreach ($o in @(Get-Prop $fin 'pacotesOrfaos')) { $pn = [string](Get-Prop $o 'pacote'); if ($excl -notcontains $pn) { $residuo += "pacote:$pn" } }
+      foreach ($n in @(Get-Prop $fin 'frentesNaoConformes')) { if ($exclKeys -notcontains "frente|$n") { $residuo += "frente:$n" } }
+      foreach ($o in @(Get-Prop $fin 'pacotesOrfaos')) { $pn = [string](Get-Prop $o 'pacote'); if ($exclKeys -notcontains "pacote|$pn") { $residuo += "pacote:$pn" } }
 
       if ($hardStop) {
         Write-Human $hardStop
@@ -688,7 +728,7 @@ $result = [pscustomobject]@{
   mode                = if ($WhatIfPreference -and $Apply) { 'whatif' } else { $mode }
   status              = $status
   exitCode            = $exitCode
-  repoRoot            = $RepoRoot
+  repoRoot            = (Get-Canon $RepoRoot)
   scope               = $Scope
   method              = $script:method
   planPath            = $planSaved

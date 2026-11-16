@@ -13,7 +13,8 @@
   Cheque 1 - subpasta de frente deve seguir NomeCurto_GUID_YYYYMMDD (regra de
     xpz-kb-parallel-setup). NomeCurto pode conter underscores (frentes derivadas
     como `CriaAnimalRefatora_..._20260520_ba03` sao legitimas); GUID e YYYYMMDD
-    ancoram o final. Severidade: warn.
+    ancoram o final; um sufixo alfanumerico opcional apos a data (ex.: _ba03) e aceito.
+    Nome nao conforme nunca e removido sem decisao humana. Severidade: warn.
 
   Cheque 2 - pacote <frenteName>_<nn>.{import_file.xml,xpz} deve ter <frenteName>
     existindo como subpasta-fonte de frente. Pacote orfao = sem subpasta-fonte
@@ -81,7 +82,7 @@ $pacotesDirResolved = [System.IO.Path]::GetFullPath($pacotesDir)
 
 # Padrao: <NomeCurto>_<GUID>_<YYYYMMDD>; NomeCurto pode conter underscores
 $frentePattern = [regex]::new(
-  '^(?<nome>.+)_(?<guid>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})_(?<data>\d{8})$',
+  '^(?<nome>.+)_(?<guid>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})_(?<data>\d{8})(?:_[A-Za-z0-9]+)?$',
   [System.Text.RegularExpressions.RegexOptions]::IgnoreCase
 )
 
@@ -89,7 +90,7 @@ $frentePattern = [regex]::new(
 $frentesNaoConformes = @()
 $frentesValidas = @()
 if (Test-Path -LiteralPath $frentesDir) {
-  $subpastas = Get-ChildItem -LiteralPath $frentesDir -Directory -ErrorAction SilentlyContinue
+  $subpastas = Get-ChildItem -LiteralPath $frentesDir -Directory -Force -ErrorAction Stop
   foreach ($sp in $subpastas) {
     if ($frentePattern.IsMatch($sp.Name)) { $frentesValidas += $sp.Name }
     else { $frentesNaoConformes += $sp.Name }
@@ -105,7 +106,7 @@ $pacotesVinculados = @()
 $sidecarsOrfaos = @()
 $pacotesRejeitados = @()
 if (Test-Path -LiteralPath $pacotesDir) {
-  $arquivos = @(Get-ChildItem -LiteralPath $pacotesDir -File -ErrorAction SilentlyContinue |
+  $arquivos = @(Get-ChildItem -LiteralPath $pacotesDir -File -Force -ErrorAction Stop |
                 Where-Object { $_.Name -match '\.(import_file\.xml|xpz)$' })
   foreach ($a in $arquivos) {
     $m = $pacoteFilePattern.Match($a.Name)
@@ -123,7 +124,7 @@ if (Test-Path -LiteralPath $pacotesDir) {
     }
   }
   # Sidecars <pacote>.package-inventory.json sem o pacote correspondente (informativo)
-  $todosArquivos = @(Get-ChildItem -LiteralPath $pacotesDir -File -ErrorAction SilentlyContinue)
+  $todosArquivos = @(Get-ChildItem -LiteralPath $pacotesDir -File -Force -ErrorAction Stop)
   foreach ($s in @($todosArquivos | Where-Object { $_.Name -match '\.package-inventory\.json$' })) {
     $base = $s.Name -replace '\.package-inventory\.json$', ''
     if (-not (Test-Path -LiteralPath (Join-Path $pacotesDir $base))) { $sidecarsOrfaos += $s.Name }

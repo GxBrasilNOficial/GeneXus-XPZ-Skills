@@ -17,7 +17,7 @@ pwsh -File <repo-skills>\scripts\Test-XpzKbFrenteHygiene.ps1 -RepoRoot <pasta-pa
 
 ### Cheques
 
-- **Cheque 1 — subpasta de frente** deve seguir `NomeCurto_GUID_YYYYMMDD` (regra de `xpz-kb-parallel-setup`). `NomeCurto` pode conter underscores (frentes derivadas como `CriaAnimalRefatora_..._20260520_ba03` são legítimas); o GUID e o `YYYYMMDD` ancoram o final. Severidade: **warn**.
+- **Cheque 1 — subpasta de frente** deve seguir `NomeCurto_GUID_YYYYMMDD` (regra de `xpz-kb-parallel-setup`). `NomeCurto` pode conter underscores (frentes derivadas como `CriaAnimalRefatora_..._20260520_ba03` são legítimas); o GUID e o `YYYYMMDD` ancoram o final, e um sufixo alfanumérico opcional após a data (como `_ba03`) é aceito. Frente com nome fora desse padrão aparece no relatório, mas o executor de faxina só a remove com plano salvo e decisão humana. Severidade: **warn**.
 - **Cheque 2 — pacote** `<frenteName>_<nn>.{import_file.xml,xpz}` deve ter `<frenteName>` existindo como subpasta-fonte de frente. Pacote **órfão** = sem subpasta-fonte rastreável. Severidade: **warn**.
 
 Ambos são `warn` (não bloqueiam) porque podem ter justificativa legítima (frente deletada após import bem-sucedido; frente experimental fora do padrão). O usuário decide aceitar ou corrigir.

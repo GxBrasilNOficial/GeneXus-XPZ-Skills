@@ -228,6 +228,68 @@ try {
   $rp = Invoke-Cleanup -Arguments @('-RepoRoot', $p, '-PlanPath', (Join-Path $p "$FRENTES/plano.json"))
   Assert-True ($rp.exit -eq 1 -and $rp.json.status -eq 'blocked') "P: PlanPath dentro de frentesDir -> blocked"
 
+  # ===== Q. frente com sufixo opcional e valida (nao entra no plano) =====
+  $q = New-TempRoot -Slug 'sufixo'
+  Write-File -Path (Join-Path $q "$FRENTES/${conforme}_ba03/Obj.xml") -Content '<Object />'
+  $rq = Invoke-Cleanup -Arguments @('-RepoRoot', $q)
+  Assert-True ($rq.exit -eq 0 -and $rq.json.status -eq 'clean') "Q: frente com sufixo _ba03 e valida -> clean; obtido $($rq.json.status)"
+
+  # ===== R. -Permanente com arquivo em uso -> blocked, nada removido =====
+  $rr = New-TempRoot -Slug 'lockperm'
+  New-Frente -Root $rr -Name 'FrenteR'
+  $prr = Invoke-Plan -Root $rr -Extra @('-Permanente')
+  $heldR = [System.IO.File]::Open((Join-Path $rr "$FRENTES/FrenteR/Obj.xml"), [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::None)
+  try { $rrr = Invoke-Apply -Root $rr -Plan $prr.plan -Extra @('-Permanente') } finally { $heldR.Close() }
+  Assert-True ($rrr.exit -eq 1 -and $rrr.json.status -eq 'blocked') "R: -Permanente com arquivo em uso -> blocked; obtido $($rrr.json.status)"
+  Assert-True (Test-Path -LiteralPath (Join-Path $rr "$FRENTES/FrenteR/Obj.xml")) "R: nada removido"
+
+  # ===== S2. rename depois do dry-run -> blocked (identidade de caminhos) =====
+  $rs2 = New-TempRoot -Slug 'rename'
+  New-Frente -Root $rs2 -Name 'FrenteS2'
+  $ps2 = Invoke-Plan -Root $rs2 -Extra @('-Permanente')
+  Rename-Item -LiteralPath (Join-Path $rs2 "$FRENTES/FrenteS2/Obj.xml") -NewName 'Outro.xml'
+  $rrs2 = Invoke-Apply -Root $rs2 -Plan $ps2.plan -Extra @('-Permanente')
+  Assert-True ($rrs2.exit -eq 1 -and $rrs2.json.status -eq 'blocked') "S2: rename apos o plano -> blocked; obtido $($rrs2.json.status)"
+  Assert-True (Test-Path -LiteralPath (Join-Path $rs2 "$FRENTES/FrenteS2/Outro.xml")) "S2: nada removido"
+
+  # ===== T. destino de -Backup diferente do plano -> blocked =====
+  $t = New-TempRoot -Slug 'bkdif'
+  New-Frente -Root $t -Name 'FrenteT'
+  $bkA = New-TempRoot -Slug 'bkA'
+  $bkB = New-TempRoot -Slug 'bkB'
+  $pt = Invoke-Plan -Root $t -Extra @('-Backup', $bkA, '-RunStamp', 'r1')
+  $rt = Invoke-Apply -Root $t -Plan $pt.plan -Extra @('-Backup', $bkB, '-RunStamp', 'r1')
+  Assert-True ($rt.exit -eq 1 -and $rt.json.status -eq 'blocked') "T: -Backup diferente do plano -> blocked; obtido $($rt.json.status)"
+  Assert-True (Test-Path -LiteralPath (Join-Path $t "$FRENTES/FrenteT")) "T: nada movido"
+
+  # ===== U. RunStamp com '..' -> blocked =====
+  $u = Invoke-Cleanup -Arguments @('-RepoRoot', (New-TempRoot -Slug 'stamp'), '-Backup', (New-TempRoot -Slug 'stampb'), '-RunStamp', '..\x')
+  Assert-True ($u.exit -eq 1 -and $u.json.status -eq 'blocked') "U: RunStamp com '..' -> blocked"
+
+  # ===== V. -WhatIf na dry-run nao grava o plano =====
+  $v = New-TempRoot -Slug 'whatifplan'
+  New-Frente -Root $v -Name 'FrenteV'
+  $planV = Join-Path $planDir ("plano-whatif-{0}.json" -f ([guid]::NewGuid().ToString('N')))
+  [void](Invoke-Cleanup -Arguments @('-RepoRoot', $v, '-PlanPath', $planV, '-WhatIf'))
+  Assert-True (-not (Test-Path -LiteralPath $planV)) "V: -WhatIf nao gravou o plano"
+
+  # ===== W. -PlanPath ja existente -> blocked (nao sobrescreve) =====
+  $w = New-TempRoot -Slug 'planexist'
+  New-Frente -Root $w -Name 'FrenteW'
+  $planW = Join-Path $planDir ("plano-existe-{0}.json" -f ([guid]::NewGuid().ToString('N')))
+  Write-File -Path $planW -Content 'sentinela'
+  $rw = Invoke-Cleanup -Arguments @('-RepoRoot', $w, '-PlanPath', $planW)
+  Assert-True ($rw.exit -eq 1 -and $rw.json.status -eq 'blocked') "W: PlanPath existente -> blocked"
+  Assert-True ((Get-Content -LiteralPath $planW -Raw).Trim() -eq 'sentinela') "W: arquivo existente preservado"
+
+  # ===== X. exclusao com caixa diferente da do alvo =====
+  $x = New-TempRoot -Slug 'casing'
+  New-Frente -Root $x -Name 'FrenteX'
+  New-Pacote -Root $x -File 'Orfao_01.import_file.xml'
+  $px = Invoke-Plan -Root $x -Extra @('-Permanente', '-ExcludePacote', 'orfao_01.import_file.xml')
+  $rx = Invoke-Apply -Root $x -Plan $px.plan -Extra @('-Permanente', '-ExcludePacote', 'orfao_01.import_file.xml')
+  Assert-True ($rx.exit -eq 3 -and (Test-Path -LiteralPath (Join-Path $x "$PACOTES/Orfao_01.import_file.xml"))) "X: exclusao com caixa diferente preservada; obtido $($rx.json.status)"
+
   # ===== S. Lixeira real (opt-in) =====
   if ($env:XPZ_FAXINA_SELFTEST_LIXEIRA -eq '1') {
     # S0: arquivo em uso por outro processo -> blocked antes de qualquer envio
