@@ -4,7 +4,8 @@
 .SYNOPSIS
     Self-test do motor Test-GeneXusSourceIndentation.ps1 (v1: indent-under-depth,
     indent-unit-mismatch-in-delta, BaselinePath, ExportFile, exit 20 via processo filho,
-    BaselinePath GUID ausente=unresolved, Acervo hit textual raso + Object profundo).
+    BaselinePath GUID ausente=unresolved, Acervo hit textual raso + Object profundo,
+    Object duplicado entre profundidades, >20 hits textuais sem teto).
 #>
 
 Set-StrictMode -Version Latest
@@ -259,6 +260,42 @@ $r18 = Invoke-Indent -Xml (New-ProcXml -Guid $guidGood -Name 'ProcIndent' -Sourc
 Assert-True ($r18.baselineCompared -eq $true) 'recurse deve achar Object profundo apesar de hit textual raso'
 Assert-True ($r18.baselineStatus -eq 'compared') 'baselineStatus compared'
 Assert-True (Test-HasCode -Result $r18 -Code 'indent-under-depth') 'com baseline real deve achar under-depth'
+
+# 19) Object com mesmo GUID raso + fundo -> unresolved (duplicata entre profundidades)
+$dupAcervo = Join-Path $tempRoot 'acervo-dup'
+$dupShallow = Join-Path $dupAcervo 'shallow'
+$dupDeep = Join-Path $dupAcervo 'deep\Procedure'
+[void](New-Item -ItemType Directory -Path $dupShallow -Force)
+[void](New-Item -ItemType Directory -Path $dupDeep -Force)
+Write-Xml -Path (Join-Path $dupShallow 'ProcIndent.xml') -Xml $baselineXml
+Write-Xml -Path (Join-Path $dupDeep 'ProcIndentCopy.xml') -Xml $baselineXml
+$r19 = Invoke-Indent -Xml (New-ProcXml -Guid $guidGood -Name 'ProcIndent' -Source $badUnder) -AcervoPath $dupAcervo
+Assert-True ($r19.baselineStatus -eq 'no-baseline-unresolved') 'GUID duplicado raso+fundo deve unresolved'
+Assert-True ($r19.baselineCompared -ne $true) 'duplicata nao deve compared'
+Assert-True ($r19.sourceIndentStatus -eq 'inconclusive') 'duplicata deve inconclusive'
+Assert-True (-not (Test-HasCode -Result $r19 -Code 'indent-under-depth')) 'duplicata nao inventa under-depth'
+
+# 20) >20 hits textuais rasos + Object profundo (regressao do antigo -First 20)
+$manyAcervo = Join-Path $tempRoot 'acervo-many-refs'
+$manyShallow = Join-Path $manyAcervo 'shallow'
+$manyDeep = Join-Path $manyAcervo 'deep\Procedure'
+[void](New-Item -ItemType Directory -Path $manyShallow -Force)
+[void](New-Item -ItemType Directory -Path $manyDeep -Force)
+for ($i = 1; $i -le 25; $i++) {
+    $refXml = @"
+<Object type="$procType" name="Ref$i" guid="eeeeeeee-eeee-eeee-eeee-eeeeeeee$($i.ToString('0000'))">
+  <Part type="$mainPart">
+    <Source><![CDATA[// ref $guidGood]]></Source>
+  </Part>
+</Object>
+"@
+    Write-Xml -Path (Join-Path $manyShallow ("Ref{0:D2}.xml" -f $i)) -Xml $refXml
+}
+Write-Xml -Path (Join-Path $manyDeep 'ProcIndent.xml') -Xml $baselineXml
+$r20 = Invoke-Indent -Xml (New-ProcXml -Guid $guidGood -Name 'ProcIndent' -Source $badUnder) -AcervoPath $manyAcervo
+Assert-True ($r20.baselineCompared -eq $true) 'sem teto de 20: Object profundo deve compared'
+Assert-True ($r20.baselineStatus -eq 'compared') 'baselineStatus compared com muitos refs'
+Assert-True (Test-HasCode -Result $r20 -Code 'indent-under-depth') 'com baseline profundo deve under-depth'
 
 Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
 Write-Output 'OK: Test-GeneXusSourceIndentationSelfTest.ps1'

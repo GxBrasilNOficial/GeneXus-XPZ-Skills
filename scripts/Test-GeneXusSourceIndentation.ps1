@@ -598,41 +598,27 @@ function Resolve-BaselineObjectNode {
         if (Test-Path -LiteralPath $acervoResolved -PathType Leaf) {
             Add-BaselineCandidate -Path $acervoResolved
         } else {
-            # Glob flat (um nivel): hits textuais. Se nao renderem Object com o GUID,
-            # cai no recurse — referencia raso nao prova ausencia do objeto.
-            $flatHits = @()
+            # Varredura completa dos *.xml sob o acervo (sem teto): pre-filtro textual do GUID
+            # em toda profundidade, depois Object[@guid]. Assim hit raso nao esconde o profundo
+            # e Object duplicado entre profundidades vira unresolved.
+            $xmlFiles = @()
             try {
-                $flatHits = @(Select-String -Path (Join-Path $acervoResolved '*\*.xml') -Pattern ([regex]::Escape($ObjectGuid)) -SimpleMatch -ErrorAction Stop |
-                    Select-Object -ExpandProperty Path -Unique)
+                $xmlFiles = @(Get-ChildItem -LiteralPath $acervoResolved -Filter *.xml -File -Recurse -ErrorAction Stop)
             } catch {
-                # Zero arquivos no glob nao e falha de acesso; acesso negado/IO real → unresolved.
-                $errText = [string]$_.Exception.Message
-                if ($errText -match '(?i)access|denied|unauthorized|permission|locked|sharing|IOException|UnauthorizedAccess') {
-                    $result.message = "Falha ao enumerar AcervoPath (glob flat): $errText"
-                    return [pscustomobject]$result
-                }
-                $flatHits = @()
-            }
-            foreach ($h in $flatHits) { Add-BaselineCandidate -Path $h }
-
-            $flatFound = Find-BaselineObjectMatches -Paths $candidates
-            if (-not $flatFound.ok) {
-                $result.message = $flatFound.message
+                $result.message = "Falha ao enumerar AcervoPath: $($_.Exception.Message)"
                 return [pscustomobject]$result
             }
-
-            if ($flatFound.matches.Count -eq 0) {
+            foreach ($xmlFile in $xmlFiles) {
+                $full = $xmlFile.FullName
                 try {
-                    $recurseHits = @(Get-ChildItem -LiteralPath $acervoResolved -Filter *.xml -File -Recurse -ErrorAction Stop |
-                        Where-Object {
-                            Select-String -LiteralPath $_.FullName -Pattern $ObjectGuid -SimpleMatch -Quiet -ErrorAction SilentlyContinue
-                        } |
-                        Select-Object -First 20 -ExpandProperty FullName)
+                    $hasGuidText = [bool](Select-String -LiteralPath $full -Pattern $ObjectGuid -SimpleMatch -Quiet -ErrorAction Stop)
                 } catch {
-                    $result.message = "Falha ao enumerar AcervoPath (recurse): $($_.Exception.Message)"
+                    $result.message = "Falha ao ler arquivo do acervo ${full}: $($_.Exception.Message)"
                     return [pscustomobject]$result
                 }
-                foreach ($h in $recurseHits) { Add-BaselineCandidate -Path $h }
+                if ($hasGuidText) {
+                    Add-BaselineCandidate -Path $full
+                }
             }
         }
     }
