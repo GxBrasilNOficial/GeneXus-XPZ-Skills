@@ -17,8 +17,10 @@
 
 .PARAMETER AcervoPath
     Pasta ObjetosDaKbEmXml (preferencial) ou um unico XML. Pasta: varredura
-    completa dos *.xml (inclui ocultos). Arquivo isolado sem o Object do GUID
-    nao prova objeto novo — unresolved, como BaselinePath.
+    completa dos *.xml (inclui ocultos), com indice GUID->candidatos montado
+    uma vez por execucao para os GUIDs in-scope (uma leitura por arquivo).
+    Arquivo isolado sem o Object do GUID nao prova objeto novo — unresolved,
+    como BaselinePath.
 
 .PARAMETER BaselinePath
     Override explicito do XML baseline.
@@ -61,6 +63,12 @@ $script:BaselineRank = @{
     'compared'               = 1
     'not-applicable'         = 0
 }
+# Indice de pasta AcervoPath: uma enumeracao + uma leitura por XML para todos
+# os GUIDs in-scope da execucao. Resolve-BaselineObjectNode reutiliza o mapa.
+$script:AcervoDirIndexReady = $false
+$script:AcervoDirIndexRoot = $null
+$script:AcervoDirIndexError = $null
+$script:AcervoDirIndexMap = $null
 
 trap {
     [ordered]@{
@@ -522,6 +530,71 @@ function Get-XmlSourceLineOffset {
     return $lineOfSourceTag
 }
 
+function Initialize-AcervoDirectoryGuidCandidateIndex {
+    param(
+        [string]$AcervoPathLocal,
+        [string[]]$ObjectGuids
+    )
+
+    $script:AcervoDirIndexReady = $false
+    $script:AcervoDirIndexRoot = $null
+    $script:AcervoDirIndexError = $null
+    $script:AcervoDirIndexMap = $null
+
+    if ([string]::IsNullOrWhiteSpace($AcervoPathLocal)) { return }
+    if (-not (Test-Path -LiteralPath $AcervoPathLocal)) { return }
+    $acervoResolved = (Resolve-Path -LiteralPath $AcervoPathLocal).Path
+    if (Test-Path -LiteralPath $acervoResolved -PathType Leaf) { return }
+
+    $guidKeys = New-Object System.Collections.Generic.List[string]
+    $guidKeySet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    foreach ($g in @($ObjectGuids)) {
+        if ([string]::IsNullOrWhiteSpace($g)) { continue }
+        $norm = $g.Trim().ToLowerInvariant()
+        if ($guidKeySet.Add($norm)) {
+            $guidKeys.Add($norm) | Out-Null
+        }
+    }
+    if ($guidKeys.Count -eq 0) { return }
+
+    $map = @{}
+    foreach ($k in $guidKeys) {
+        $map[$k] = New-Object System.Collections.Generic.List[string]
+    }
+
+    try {
+        $xmlFiles = @(Get-ChildItem -LiteralPath $acervoResolved -Filter *.xml -File -Recurse -Force -ErrorAction Stop)
+    } catch {
+        $script:AcervoDirIndexRoot = $acervoResolved
+        $script:AcervoDirIndexError = "Falha ao enumerar AcervoPath: $($_.Exception.Message)"
+        $script:AcervoDirIndexReady = $true
+        return
+    }
+
+    foreach ($xmlFile in $xmlFiles) {
+        $full = $xmlFile.FullName
+        try {
+            $text = [System.IO.File]::ReadAllText($full)
+        } catch {
+            $script:AcervoDirIndexRoot = $acervoResolved
+            $script:AcervoDirIndexError = "Falha ao ler arquivo do acervo ${full}: $($_.Exception.Message)"
+            $script:AcervoDirIndexMap = $null
+            $script:AcervoDirIndexReady = $true
+            return
+        }
+        foreach ($k in $guidKeys) {
+            if ($text.IndexOf($k, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
+                $map[$k].Add($full) | Out-Null
+            }
+        }
+    }
+
+    $script:AcervoDirIndexRoot = $acervoResolved
+    $script:AcervoDirIndexMap = $map
+    $script:AcervoDirIndexError = $null
+    $script:AcervoDirIndexReady = $true
+}
+
 function Resolve-BaselineObjectNode {
     param(
         [string]$ObjectGuid,
@@ -568,7 +641,7 @@ function Resolve-BaselineObjectNode {
                 $doc.PreserveWhitespace = $true
                 $doc.Load($path)
                 # XPath de atributo e case-sensitive; GUID GeneXus pode variar de caixa.
-                # Select-String do pre-filtro e case-insensitive — alinhar o Object match.
+                # Pre-filtro textual e case-insensitive — alinhar o Object match.
                 $nodes = @(
                     @($doc.SelectNodes('//Object')) | Where-Object {
                         $_.GetAttribute('guid') -ieq $ObjectGuid
@@ -611,25 +684,39 @@ function Resolve-BaselineObjectNode {
             Add-BaselineCandidate -Path $acervoResolved
         } else {
             $acervoIsDirectory = $true
-            # Varredura completa dos *.xml sob o acervo (sem teto, com -Force para ocultos):
-            # pre-filtro textual do GUID em toda profundidade, depois Object[@guid].
-            $xmlFiles = @()
-            try {
-                $xmlFiles = @(Get-ChildItem -LiteralPath $acervoResolved -Filter *.xml -File -Recurse -Force -ErrorAction Stop)
-            } catch {
-                $result.message = "Falha ao enumerar AcervoPath: $($_.Exception.Message)"
-                return [pscustomobject]$result
-            }
-            foreach ($xmlFile in $xmlFiles) {
-                $full = $xmlFile.FullName
-                try {
-                    $hasGuidText = [bool](Select-String -LiteralPath $full -Pattern $ObjectGuid -SimpleMatch -Quiet -ErrorAction Stop)
-                } catch {
-                    $result.message = "Falha ao ler arquivo do acervo ${full}: $($_.Exception.Message)"
+            # Preferir indice montado uma vez por execucao (todos os GUIDs in-scope).
+            # Fallback: varredura completa por GUID (sem teto, -Force), se o indice
+            # nao cobrir esta raiz — preserva duplicata/oculto/falha de leitura.
+            if ($script:AcervoDirIndexReady -and [string]::Equals($script:AcervoDirIndexRoot, $acervoResolved, [System.StringComparison]::OrdinalIgnoreCase)) {
+                if (-not [string]::IsNullOrWhiteSpace($script:AcervoDirIndexError)) {
+                    $result.message = $script:AcervoDirIndexError
                     return [pscustomobject]$result
                 }
-                if ($hasGuidText) {
-                    Add-BaselineCandidate -Path $full
+                $guidKey = $ObjectGuid.Trim().ToLowerInvariant()
+                if ($null -ne $script:AcervoDirIndexMap -and $script:AcervoDirIndexMap.ContainsKey($guidKey)) {
+                    foreach ($full in @($script:AcervoDirIndexMap[$guidKey])) {
+                        Add-BaselineCandidate -Path $full
+                    }
+                }
+            } else {
+                $xmlFiles = @()
+                try {
+                    $xmlFiles = @(Get-ChildItem -LiteralPath $acervoResolved -Filter *.xml -File -Recurse -Force -ErrorAction Stop)
+                } catch {
+                    $result.message = "Falha ao enumerar AcervoPath: $($_.Exception.Message)"
+                    return [pscustomobject]$result
+                }
+                foreach ($xmlFile in $xmlFiles) {
+                    $full = $xmlFile.FullName
+                    try {
+                        $hasGuidText = [bool](Select-String -LiteralPath $full -Pattern $ObjectGuid -SimpleMatch -Quiet -ErrorAction Stop)
+                    } catch {
+                        $result.message = "Falha ao ler arquivo do acervo ${full}: $($_.Exception.Message)"
+                        return [pscustomobject]$result
+                    }
+                    if ($hasGuidText) {
+                        Add-BaselineCandidate -Path $full
+                    }
                 }
             }
         }
@@ -983,6 +1070,16 @@ $targets = @(Get-ObjectTargets -XmlDocument $xmlDocument)
 $result.objectCount = $targets.Count
 $partResults = New-Object System.Collections.Generic.List[object]
 $allFindings = New-Object System.Collections.Generic.List[object]
+
+# Indice de pasta antes do loop: uma passagem para todos os GUIDs Procedure in-scope.
+if ([string]::IsNullOrWhiteSpace($BaselinePath) -and -not [string]::IsNullOrWhiteSpace($AcervoPath)) {
+    $inScopeGuids = @(
+        $targets |
+            Where-Object { $_.objectType -eq $script:ProcedureObjectType } |
+            ForEach-Object { $_.objectGuid }
+    )
+    Initialize-AcervoDirectoryGuidCandidateIndex -AcervoPathLocal $AcervoPath -ObjectGuids $inScopeGuids
+}
 
 foreach ($target in $targets) {
     $isInScope = ($target.objectType -eq $script:ProcedureObjectType)

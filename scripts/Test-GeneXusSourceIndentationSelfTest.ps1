@@ -1,4 +1,4 @@
-#requires -Version 7.4
+﻿#requires -Version 7.4
 
 <#
 .SYNOPSIS
@@ -6,7 +6,8 @@
     indent-unit-mismatch-in-delta, BaselinePath, ExportFile, exit 20 via processo filho,
     BaselinePath GUID ausente=unresolved, Acervo hit textual raso + Object profundo,
     Object duplicado entre profundidades, >20 hits textuais sem teto,
-    AcervoPath=arquivo sem GUID=unresolved, XML oculto encontrado com -Force).
+    AcervoPath=arquivo sem GUID=unresolved, XML oculto encontrado com -Force,
+    ExportFile com 2 Procedures + indice GUID de pasta uma vez por execucao).
 #>
 
 Set-StrictMode -Version Latest
@@ -30,6 +31,7 @@ $webType = 'c9584656-94b6-4ccd-890f-332d11fc2c25'
 $mainPart = '528d1c06-a9c2-420d-bd35-21dca83f12ff'
 $guidGood = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
 $guidNew = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
+$guidSecond = 'cccccccc-cccc-cccc-cccc-cccccccccccc'
 
 function New-ProcXml {
     param(
@@ -319,6 +321,27 @@ $r22 = Invoke-Indent -Xml (New-ProcXml -Guid $guidGood -Name 'ProcIndent' -Sourc
 Assert-True ($r22.baselineCompared -eq $true) 'XML oculto deve ser encontrado com -Force'
 Assert-True ($r22.baselineStatus -eq 'compared') 'baselineStatus compared com oculto'
 Assert-True (Test-HasCode -Result $r22 -Code 'indent-under-depth') 'oculto compared deve under-depth'
+
+# 23) ExportFile com 2 Procedures: indice de pasta resolve ambos (regressao N×varredura)
+$multiAcervo = Join-Path $tempRoot 'acervo-multi'
+$multiDir = Join-Path $multiAcervo 'Procedure'
+[void](New-Item -ItemType Directory -Path $multiDir -Force)
+Write-Xml -Path (Join-Path $multiDir 'ProcIndent.xml') -Xml $baselineXml
+$baselineSecondXml = New-ProcXml -Guid $guidSecond -Name 'ProcSecond' -Source $baselineSource
+Write-Xml -Path (Join-Path $multiDir 'ProcSecond.xml') -Xml $baselineSecondXml
+$exportTwo = @"
+<ExportFile>
+  <Objects>
+$(New-ProcXml -Guid $guidGood -Name 'ProcIndent' -Source $badUnder)
+$(New-ProcXml -Guid $guidSecond -Name 'ProcSecond' -Source $badUnder)
+  </Objects>
+</ExportFile>
+"@
+$r23 = Invoke-Indent -Xml $exportTwo -AcervoPath $multiAcervo
+Assert-True ($r23.inScopePartCount -eq 2) 'ExportFile com 2 Procedures deve ter 2 parts in-scope'
+Assert-True ($r23.baselineCompared -eq $true) 'indice multi-GUID deve compared'
+Assert-True (@($r23.parts | Where-Object { $_.baselineStatus -eq 'compared' }).Count -eq 2) 'ambas as Procedures devem compared'
+Assert-True (Test-HasCode -Result $r23 -Code 'indent-under-depth') 'multi-GUID compared deve under-depth'
 
 Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
 Write-Output 'OK: Test-GeneXusSourceIndentationSelfTest.ps1'

@@ -132,3 +132,17 @@ Origem: dúvida aberta no commit `bb256c7`, que corrigiu o caminho de configura�
 
 - `bb256c7` — Configuração que não é arquivo regular vira conflito bloqueante.
 - `1c0e98b` — Auditor reporta configuração do Codex não regular como conflito (contém o bloco de link real, então chamado `9l` e depois renomeado para `9n` em `17b11fe`).
+
+## Indentação de Source: índice GUID→candidatos uma vez por execução — 2026-11-17
+
+Origem: entrada «Indentação de Source: índice/cache GUID→path na resolução de baseline — 2026-11-17» de `999-ideias-pendentes.md`, removida após a implementação. Diagnóstico externo: com acervo ~15k XML e 2 Procedures, N×`Select-String` (~12 s por GUID) dominava ~24 s de ~28 s; Absolute não era o custo; `-BaselinePath` isolado ~3 s.
+
+**Escopo entregue.** `Initialize-AcervoDirectoryGuidCandidateIndex` monta, uma vez por execução (quando `-AcervoPath` é pasta e não há `-BaselinePath`), o mapa textual dos GUIDs Procedure in-scope com uma enumeração `*.xml -Force` e um `ReadAllText` por arquivo; `Resolve-BaselineObjectNode` reutiliza o mapa. Fallback por GUID preservado se o índice não cobrir a raiz. Semântica `unresolved`/`new-object`/duplicata/ocultos/falha de leitura inalterada.
+
+**Validação.** `Test-GeneXusSourceIndentationSelfTest.ps1` (caso 23: ExportFile com 2 Procedures). Docs: `02`, `09`, CHANGELOG, SKILL/checklist.
+
+**Fora do escopo.** Absolute default; streaming parcial de JSON; LCS em Source muito grande; progresso/aviso para pastas grandes.
+
+### Rastreabilidade
+
+- (preenchido após o commit material desta frente)
