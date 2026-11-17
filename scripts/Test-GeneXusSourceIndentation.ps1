@@ -16,7 +16,9 @@
     XML Object ou ExportFile.
 
 .PARAMETER AcervoPath
-    Pasta ObjetosDaKbEmXml (ou arquivo) para resolver baseline pelo GUID.
+    Pasta ObjetosDaKbEmXml (preferencial) ou um unico XML. Pasta: varredura
+    completa dos *.xml (inclui ocultos). Arquivo isolado sem o Object do GUID
+    nao prova objeto novo — unresolved, como BaselinePath.
 
 .PARAMETER BaselinePath
     Override explicito do XML baseline.
@@ -542,6 +544,10 @@ function Resolve-BaselineObjectNode {
         return [pscustomobject]$result
     }
 
+    # new-object so e valido apos varredura de PASTA. Arquivo isolado (BaselinePath ou
+    # AcervoPath=folha) sem o Object do GUID e unresolved — nao prova ausencia no acervo.
+    $acervoIsDirectory = $false
+
     $candidates = New-Object System.Collections.Generic.List[string]
     $candidateSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
 
@@ -561,8 +567,14 @@ function Resolve-BaselineObjectNode {
                 $doc = New-Object System.Xml.XmlDocument
                 $doc.PreserveWhitespace = $true
                 $doc.Load($path)
-                $nodes = @($doc.SelectNodes("//Object[@guid='$ObjectGuid']"))
-                if ($nodes.Count -eq 0 -and $doc.DocumentElement.LocalName -eq 'Object' -and $doc.DocumentElement.GetAttribute('guid') -eq $ObjectGuid) {
+                # XPath de atributo e case-sensitive; GUID GeneXus pode variar de caixa.
+                # Select-String do pre-filtro e case-insensitive — alinhar o Object match.
+                $nodes = @(
+                    @($doc.SelectNodes('//Object')) | Where-Object {
+                        $_.GetAttribute('guid') -ieq $ObjectGuid
+                    }
+                )
+                if ($nodes.Count -eq 0 -and $doc.DocumentElement.LocalName -eq 'Object' -and ($doc.DocumentElement.GetAttribute('guid') -ieq $ObjectGuid)) {
                     $nodes = @($doc.DocumentElement)
                 }
                 foreach ($node in $nodes) {
@@ -598,12 +610,12 @@ function Resolve-BaselineObjectNode {
         if (Test-Path -LiteralPath $acervoResolved -PathType Leaf) {
             Add-BaselineCandidate -Path $acervoResolved
         } else {
-            # Varredura completa dos *.xml sob o acervo (sem teto): pre-filtro textual do GUID
-            # em toda profundidade, depois Object[@guid]. Assim hit raso nao esconde o profundo
-            # e Object duplicado entre profundidades vira unresolved.
+            $acervoIsDirectory = $true
+            # Varredura completa dos *.xml sob o acervo (sem teto, com -Force para ocultos):
+            # pre-filtro textual do GUID em toda profundidade, depois Object[@guid].
             $xmlFiles = @()
             try {
-                $xmlFiles = @(Get-ChildItem -LiteralPath $acervoResolved -Filter *.xml -File -Recurse -ErrorAction Stop)
+                $xmlFiles = @(Get-ChildItem -LiteralPath $acervoResolved -Filter *.xml -File -Recurse -Force -ErrorAction Stop)
             } catch {
                 $result.message = "Falha ao enumerar AcervoPath: $($_.Exception.Message)"
                 return [pscustomobject]$result
@@ -628,6 +640,10 @@ function Resolve-BaselineObjectNode {
             $result.message = "BaselinePath sem candidato legivel: $BaselinePathLocal"
             return [pscustomobject]$result
         }
+        if (-not $acervoIsDirectory) {
+            $result.message = "AcervoPath arquivo nao contem Object com GUID $ObjectGuid"
+            return [pscustomobject]$result
+        }
         $result.status = 'no-baseline-new-object'
         $result.message = "GUID $ObjectGuid ausente no acervo informado"
         return [pscustomobject]$result
@@ -644,6 +660,10 @@ function Resolve-BaselineObjectNode {
         if ($usedBaselinePath) {
             # Arquivo explicito existe mas nao prova objeto novo — so baseline errado/incompleto.
             $result.message = "BaselinePath nao contem Object com GUID $ObjectGuid"
+            return [pscustomobject]$result
+        }
+        if (-not $acervoIsDirectory) {
+            $result.message = "AcervoPath arquivo nao contem Object com GUID $ObjectGuid"
             return [pscustomobject]$result
         }
         $result.status = 'no-baseline-new-object'

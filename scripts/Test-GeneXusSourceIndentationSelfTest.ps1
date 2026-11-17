@@ -5,7 +5,8 @@
     Self-test do motor Test-GeneXusSourceIndentation.ps1 (v1: indent-under-depth,
     indent-unit-mismatch-in-delta, BaselinePath, ExportFile, exit 20 via processo filho,
     BaselinePath GUID ausente=unresolved, Acervo hit textual raso + Object profundo,
-    Object duplicado entre profundidades, >20 hits textuais sem teto).
+    Object duplicado entre profundidades, >20 hits textuais sem teto,
+    AcervoPath=arquivo sem GUID=unresolved, XML oculto encontrado com -Force).
 #>
 
 Set-StrictMode -Version Latest
@@ -296,6 +297,28 @@ $r20 = Invoke-Indent -Xml (New-ProcXml -Guid $guidGood -Name 'ProcIndent' -Sourc
 Assert-True ($r20.baselineCompared -eq $true) 'sem teto de 20: Object profundo deve compared'
 Assert-True ($r20.baselineStatus -eq 'compared') 'baselineStatus compared com muitos refs'
 Assert-True (Test-HasCode -Result $r20 -Code 'indent-under-depth') 'com baseline profundo deve under-depth'
+
+# 21) AcervoPath=arquivo isolado sem o GUID -> unresolved (nao new-object)
+$acervoLeafWrong = Join-Path $tempRoot 'acervo-leaf-wrong.xml'
+Write-Xml -Path $acervoLeafWrong -Xml (New-ProcXml -Guid $guidNew -Name 'OtherProc' -Source $baselineSource)
+$r21 = Invoke-Indent -Xml (New-ProcXml -Guid $guidGood -Name 'ProcIndent' -Source $badUnder) -AcervoPath $acervoLeafWrong
+Assert-True ($r21.baselineStatus -eq 'no-baseline-unresolved') 'AcervoPath arquivo sem GUID deve unresolved'
+Assert-True ($r21.baselineCompared -ne $true) 'folha isolada nao compared'
+Assert-True ($r21.sourceIndentStatus -eq 'inconclusive') 'folha isolada inconclusive'
+Assert-True (-not (Test-HasCode -Result $r21 -Code 'indent-under-depth')) 'folha isolada nao inventa under-depth'
+
+# 22) XML oculto sob o acervo com o Object -> compared (-Force)
+$hiddenAcervo = Join-Path $tempRoot 'acervo-hidden'
+$hiddenDir = Join-Path $hiddenAcervo 'Procedure'
+[void](New-Item -ItemType Directory -Path $hiddenDir -Force)
+$hiddenXml = Join-Path $hiddenDir 'ProcIndent-hidden.xml'
+Write-Xml -Path $hiddenXml -Xml $baselineXml
+$hiddenItem = Get-Item -LiteralPath $hiddenXml -Force
+$hiddenItem.Attributes = $hiddenItem.Attributes -bor [System.IO.FileAttributes]::Hidden
+$r22 = Invoke-Indent -Xml (New-ProcXml -Guid $guidGood -Name 'ProcIndent' -Source $badUnder) -AcervoPath $hiddenAcervo
+Assert-True ($r22.baselineCompared -eq $true) 'XML oculto deve ser encontrado com -Force'
+Assert-True ($r22.baselineStatus -eq 'compared') 'baselineStatus compared com oculto'
+Assert-True (Test-HasCode -Result $r22 -Code 'indent-under-depth') 'oculto compared deve under-depth'
 
 Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
 Write-Output 'OK: Test-GeneXusSourceIndentationSelfTest.ps1'
