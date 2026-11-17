@@ -2,7 +2,8 @@
 
 <#
 .SYNOPSIS
-    Self-test do motor Test-GeneXusSourceIndentation.ps1 (v1: indent-under-depth, indent-unit-mismatch-in-delta).
+    Self-test do motor Test-GeneXusSourceIndentation.ps1 (v1: indent-under-depth,
+    indent-unit-mismatch-in-delta, BaselinePath, ExportFile, exit 20 via processo filho).
 #>
 
 Set-StrictMode -Version Latest
@@ -64,6 +65,15 @@ function Invoke-Indent {
     if ($Absolute) { $args.AbsoluteIndentCheck = $true }
     $json = & $scriptPath @args
     return ($json | ConvertFrom-Json)
+}
+
+function Invoke-IndentChild {
+    param([string[]]$Arguments)
+    $output = & pwsh -NoProfile -File $scriptPath @Arguments 2>&1
+    return [pscustomobject]@{
+        ExitCode = $LASTEXITCODE
+        Text     = (($output | Out-String).Trim())
+    }
 }
 
 function Assert-True {
@@ -189,6 +199,35 @@ $underFinding = @($r1.findings | Where-Object { $_.code -eq 'indent-under-depth'
 Assert-True ($null -ne $underFinding) 'r1 precisa de under-depth para checar xmlLineNumber'
 Assert-True ($underFinding.sourceLineNumber -ge 1) 'sourceLineNumber >= 1'
 Assert-True ($underFinding.xmlLineNumber -eq (2 + $underFinding.sourceLineNumber)) 'xmlLineNumber = linha Source(3) + sourceLine - 1 => 2+sourceLine quando Object/Part/Source nas linhas 1-3'
+
+# 14) BaselinePath explicito (sem AcervoPath)
+$baselineFile = Join-Path $tempRoot 'explicit-baseline.xml'
+Write-Xml -Path $baselineFile -Xml $baselineXml
+$r14 = Invoke-Indent -Xml (New-ProcXml -Guid $guidGood -Name 'ProcIndent' -Source $badUnder) -BaselinePath $baselineFile
+Assert-True ($r14.baselineCompared -eq $true) 'BaselinePath deveria comparar'
+Assert-True (Test-HasCode -Result $r14 -Code 'indent-under-depth') 'BaselinePath deveria achar under-depth'
+
+# 15) ExportFile com 1 Procedure in-scope
+$exportXml = @"
+<ExportFile>
+  <Objects>
+$(New-ProcXml -Guid $guidGood -Name 'ProcIndent' -Source $badUnder)
+  </Objects>
+</ExportFile>
+"@
+$r15 = Invoke-Indent -Xml $exportXml -AcervoPath $acervoRoot
+Assert-True ($r15.inScopePartCount -ge 1) 'ExportFile deveria achar Procedure in-scope'
+Assert-True (Test-HasCode -Result $r15 -Code 'indent-under-depth') 'ExportFile deveria achar under-depth'
+Assert-True ($r15.parts[0].objectName -eq 'ProcIndent') 'ExportFile objectName'
+
+# 16) exit 20 / status=bloqueado via processo filho (InputPath ausente)
+$missingPath = Join-Path $tempRoot 'missing-no-such-input.xml'
+$child16 = Invoke-IndentChild -Arguments @('-InputPath', $missingPath)
+Assert-True ($child16.ExitCode -eq 20) ("exit 20 esperado; obtido $($child16.ExitCode)")
+$r16 = $child16.Text | ConvertFrom-Json
+Assert-True ($r16.status -eq 'bloqueado') 'status bloqueado no exit 20'
+Assert-True ($r16.exitCode -eq 20) 'exitCode 20 no JSON'
+Assert-True (Test-HasCode -Result $r16 -Code 'preflight') 'finding preflight no bloqueio'
 
 Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
 Write-Output 'OK: Test-GeneXusSourceIndentationSelfTest.ps1'

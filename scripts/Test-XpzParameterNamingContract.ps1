@@ -17,9 +17,10 @@
       - Familia de import (entrada e um .xpz): -InputPath com aliases -XpzPath e -Path.
       - Regra de direcao: no export, o .xpz e SAIDA e mantem o nome por papel
         -XpzPath; NÃO deve ganhar alias -InputPath (negativo explicito).
-      - Contrato de saida do motor de sanidade: Test-GeneXusSourceSanity.ps1 emite
-        JSON por padrão e NÃO expoe -AsJson (negativo explicito); trava contra
-        wrappers locais que carreguem essa flag de outro motor (ex: Get-*KbLastUpdate).
+      - Contrato de saida JSON-sem-AsJson: Test-GeneXusSourceSanity.ps1 e
+        Test-GeneXusSourceIndentation.ps1 emitem JSON por padrão e NÃO expoem
+        -AsJson (negativo explicito); trava contra wrappers locais que carreguem
+        essa flag de outro motor (ex: Get-*KbLastUpdate).
 
     Conceitos distintos (-ModifiedObjectNames/-ModifiedObjectGuids = handoff,
     -ExpectedItems = assercao, -IncludeItems/-ExcludeItems = contrato da task
@@ -155,9 +156,10 @@ Assert-CanonicalParameter -ScriptFileName 'Invoke-GeneXusXpzExport.ps1' `
     -ParameterName 'XpzPath' -ForbiddenAliases @('InputPath')
 Assert-ParameterAbsent -ScriptFileName 'Invoke-GeneXusXpzExport.ps1' -ParameterName 'InputPath'
 
-# 5. Contrato de saida do motor de sanidade: emite JSON por padrão e NÃO expoe -AsJson.
-#    Trava negativa contra wrappers locais que carreguem essa flag de outro motor;
-#    o erro de binding só apareceria em runtime, invisivel ao parse.
+# 5. Contrato de saida JSON-sem-AsJson (SourceSanity + SourceIndentation):
+#    emitem JSON por padrão e NÃO expoem -AsJson. Trava negativa contra wrappers
+#    locais que carreguem essa flag de outro motor; o erro de binding só
+#    apareceria em runtime, invisivel ao parse.
 Assert-ParameterAbsent -ScriptFileName 'Test-GeneXusSourceSanity.ps1' -ParameterName 'AsJson'
 Assert-ParameterAbsent -ScriptFileName 'Test-GeneXusSourceIndentation.ps1' -ParameterName 'AsJson'
 

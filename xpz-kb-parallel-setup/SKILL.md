@@ -434,6 +434,7 @@ Referencia rápida para decidir o peso operacional da ausencia de cada wrapper. 
   - retorna JSON por padrão no stdout, suficiente para distinguir `xmlWellFormed`, `sourceSanityStatus` e `probablyImportable`
   - bloqueia empacotamento local quando encontrar `sourceSanityStatus=fail`
   - em `warn`, devolve a lista de warnings e exige revisao conservadora antes do pacote
+  - opt-in separado: `scripts\Test-GeneXusSourceIndentation.ps1` (indentação de Source v1) pode rodar ao lado e expor `sourceIndentStatus`; **não** misturar indent em `$hasFail` / `probablyImportable` (fase 0 só aviso). O molde `examples/Test-KbSourceSanity.example.ps1` já registra esse comentário; não há wrapper local obrigatório de indentação nesta skill
 - Quando a pasta paralela da KB operar com empacotamento local em `PacotesGeradosParaImportacaoNaKbNoGenexus`, recomendar também wrapper local fino para gate de colisao de pacote, por exemplo `Test-*KbPackageCollision.ps1`:
   - recebe `FrontPrefix`, `NN` e `OutputDir`, ou `PackagePath`; `-Path`/`-InputPath`, quando aceitos, são alias de compatibilidade para `PackagePath`
   - delega para `scripts\Test-XpzPackageCollision.ps1` da base compartilhada
