@@ -34,6 +34,23 @@ Entradas legadas sem avaliação carregam `FALTA AVALIAR` em ambos os campos at�
 
 **Relacionado.** `scripts/Test-GeneXusSourceIndentation.ps1`; `02` (indentação de Source v1); `Test-GeneXusSourceSanity.ps1` (mapa type-aware como espelho de estilo, não de indentação).
 
+<a id="indentacao-source-indice-cache-baseline-guid-20261117"></a>
+
+## Indentação de Source: índice/cache GUID→path na resolução de baseline — 2026-11-17
+
+- **Importância** — média (workaround manual existe: `-BaselinePath` ou acervo estreito; acervo KB inteiro (~15k XML) com Absolute ficou >2 min sem JSON parcial numa medição real, enquanto o mesmo par Procedure+Absolute com `-BaselinePath` isolado concluiu em ~3 s).
+- **Maturidade** — ideia (direção clara; falta desenho do índice por execução e decisão de onde materializar).
+
+**Contexto.** Após a varredura completa de pasta (`*.xml` com `-Force`, sem teto), `-AcervoPath` apontando para `ObjetosDaKbEmXml` inteiro resolve baseline por GUID com custo proporcional ao tamanho do acervo, repetido por Procedure in-scope. A orientação documental (2026-11-17) já pede baseline pontual; o motor ainda não tem índice/cache.
+
+**Ideia (não implementar sem demanda).** Em uma execução, construir mapa GUID→caminho(s) uma vez (ou reutilizar índice derivado existente, se couber sem misturar contratos) e reutilizar nas resoluções seguintes da mesma chamada; emitir aviso/progresso se a pasta for grande. Não enfraquecer a semântica `unresolved`/`new-object`.
+
+**Fora desta pendência.** Tornar Absolute default; streaming parcial de JSON; LCS em Source muito grande.
+
+**Gatilho.** Pedido explícito ou novo caso operacional em que baseline pontual não basta e o acervo inteiro precisa ser consultado com frequência.
+
+**Relacionado.** `scripts/Test-GeneXusSourceIndentation.ps1`; `02` / `xpz-builder` (orientação Absolute/baseline pontual); entrada irmã «expandir allowlist…».
+
 <a id="mcp-endpoint-confirmado-sem-vinculo-url-20261114"></a>
 
 ## MCP: `endpointConfirmed` não fica vinculado à URL confirmada — 2026-11-14
