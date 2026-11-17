@@ -13,6 +13,27 @@ Entradas legadas sem avaliação carregam `FALTA AVALIAR` em ambos os campos at�
 
 **Editar a substância de um gap já registrado (neste arquivo ou no `998-ideias-descartadas-e-porque.md`) exige justificativa no corpo do commit.** Enfraquecer, reprecisar ou descartar a severidade de uma afirmação — não apenas corrigir redação, adicionar contexto ou reorganizar — precisa dizer **por que**: nova evidência medida, releitura do código, ou correção de erro anterior. Motivo: uma edição que suaviza um gap sem dizer por que **parece resolvido** para quem lê depois, e é pior do que o gap não ter sido achado — quem lê para de investigar. Caso real (2026-08-17): um commit sem corpo trocou «não é citado em lugar nenhum» por «não era coberto na documentação normativa»; a formulação nova era defensável à primeira vista, mas escondia que a única outra menção ao símbolo no repositório era uma cópia **defasada** num self-test — a frase sugeria mitigação onde havia agravante. Só foi achado porque outra sessão foi verificar; sem corpo no commit, não havia como saber se a mudança vinha de leitura nova ou só de estilo.
 
+<a id="indentacao-source-expandir-allowlist-20261117"></a>
+
+## Indentação de Source: expandir allowlist além de Procedure+Source — 2026-11-17
+
+- **Importância** — média (WebPanel/Transaction com Part Events também sofrem recuo × profundidade; a v1 do motor ignora esses pares em silêncio/`not-applicable`).
+- **Maturidade** — ideia (direção clara; falta fixture real + tokens `Event`/`EndEvent` e decisão explícita por par `(objectType, partType)`).
+
+**Contexto.** `Test-GeneXusSourceIndentation.ps1` v1 só avalia Procedure (`84a12160-…`) + Part Source (`528d1c06-…`). Decisão deliberada da entrega inicial (anti-sobreengenharia); não é bug da v1.
+
+**Ideia (não implementar sem demanda/fixture).** Expandir a allowlist como na opção A da triagem 2026-11-17: incluir Events (e só depois outros pares) com:
+1. Fixture versionada (wrap/`else` ou under-depth típico em Events).
+2. Gramática de profundidade com `Event`/`EndEvent` (e o que a fixture exigir).
+3. Self-test + amend explícito da allowlist (mapa type-aware, não “se aparecer”).
+4. Docs `02`/`09`/checklist alinhados ao novo par.
+
+**Fora desta pendência.** Drift estrutural em linha preserved (`indent-context-depth-drift`) — decisão B de 2026-11-17: fora da v1, sem compromisso, só com demanda real. Não misturar com esta entrada.
+
+**Gatilho.** Caso real em frente de WebPanel/Transaction (ou pedido explícito) em que o motor v1 fica `not-applicable` e o recuo ruim passa despercebido.
+
+**Relacionado.** `scripts/Test-GeneXusSourceIndentation.ps1`; `02` (indentação de Source v1); `Test-GeneXusSourceSanity.ps1` (mapa type-aware como espelho de estilo, não de indentação).
+
 <a id="mcp-endpoint-confirmado-sem-vinculo-url-20261114"></a>
 
 ## MCP: `endpointConfirmed` não fica vinculado à URL confirmada — 2026-11-14

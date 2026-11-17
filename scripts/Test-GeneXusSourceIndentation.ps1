@@ -2,7 +2,7 @@
 
 <#
 .SYNOPSIS
-    Verificador consultivo de indentacao de Source GeneXus (Plano A / v6).
+    Verificador consultivo de indentacao de Source GeneXus (v1).
 
 .DESCRIPTION
     Motor separado do SourceSanity. Findings de indentacao na fase 0 sao
@@ -466,7 +466,8 @@ function Get-LcsLineDiff {
     # conteudo diferente no match LCS ja viram added/removed; marcar changed
     # quando contentKey difere mas estamos no mesmo "slot" nao se aplica no LCS puro.
     # Heuristica: se um removed e um added consecutivos e ambos nao-blank, classificar
-    # o added como changed e descartar o removed do delta de indent (removed nao entra em 15/16).
+    # o added como changed e descartar o removed do delta de indent
+    # (removed nao entra em indent-under-depth / indent-unit-mismatch-in-delta).
     $refined = New-Object System.Collections.Generic.List[object]
     $k = 0
     $arr = $ops.ToArray()

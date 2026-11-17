@@ -2,7 +2,7 @@
 
 <#
 .SYNOPSIS
-    Self-test do motor Test-GeneXusSourceIndentation.ps1 (sinais 15/16, v6).
+    Self-test do motor Test-GeneXusSourceIndentation.ps1 (v1: indent-under-depth, indent-unit-mismatch-in-delta).
 #>
 
 Set-StrictMode -Version Latest
