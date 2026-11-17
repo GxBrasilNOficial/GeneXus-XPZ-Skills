@@ -22,6 +22,7 @@ When changing a `Procedure`, run a minimum semantic pre-packaging gate on the `P
 - name each justified block transition during review, for example `Rules/parm -> Variables` or `Source -> Calls and dependencies`
 - if the current reasoning no longer needs a new block, stop expanding; do NOT reopen the whole object by reflex
 - distinguish `well-formed XML` from `minimum Source sanity gate passed`
+- optional consultative Source indent check (Procedure+Source allowlist v1): see `xpz-builder/SKILL.md` and `quality-checklist.md` — advisory only; does not alter the minimum Source gate or `probablyImportable`
 - if the object depends on `Source`, do not package while the `Source` gate is still unresolved
 - review structural pair balance touched by the delta, such as `Sub/EndSub`, `For each/EndFor`, `Do Case/EndCase`, and `If/EndIf`
 - treat `elseif`, `iif(...)`, newly dense conditions, and calls inside conditions that diverge from the object's dominant local style as conservative warnings to rewrite when the form is not methodologically anchored
