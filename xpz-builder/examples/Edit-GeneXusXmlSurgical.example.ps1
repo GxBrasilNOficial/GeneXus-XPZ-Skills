@@ -136,5 +136,6 @@ if ($LASTEXITCODE -ne 0) { throw 'Aplicação recusada; conferir o JSON acima.' 
 # Editor e Set-GeneXusXmlLastUpdate usam -AsJson. Os motores abaixo já emitem
 # JSON por padrão, sem -AsJson: Build-GeneXusImportFileEnvelope,
 # New-XpzImportPackage, Copy-GeneXusAcervoToFront,
-# Get-GeneXusImportPackageObjectInventory e Test-GeneXusSourceSanity.
+# Get-GeneXusImportPackageObjectInventory, Test-GeneXusSourceSanity e
+# Test-GeneXusSourceIndentation.
 # Uma flag -AsJson aceita por um gate filho não pertence automaticamente ao pai.
