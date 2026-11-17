@@ -535,68 +535,133 @@ function Resolve-BaselineObjectNode {
         message    = ''
     }
 
+    $usedBaselinePath = -not [string]::IsNullOrWhiteSpace($BaselinePathLocal)
+    $usedAcervoPath = (-not $usedBaselinePath) -and (-not [string]::IsNullOrWhiteSpace($AcervoPathLocal))
+    if (-not $usedBaselinePath -and -not $usedAcervoPath) {
+        $result.message = 'Sem AcervoPath/BaselinePath'
+        return [pscustomobject]$result
+    }
+
     $candidates = New-Object System.Collections.Generic.List[string]
-    if (-not [string]::IsNullOrWhiteSpace($BaselinePathLocal)) {
+    $candidateSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+
+    function Add-BaselineCandidate {
+        param([string]$Path)
+        if ([string]::IsNullOrWhiteSpace($Path)) { return }
+        if ($candidateSet.Add($Path)) {
+            $candidates.Add($Path) | Out-Null
+        }
+    }
+
+    function Find-BaselineObjectMatches {
+        param([System.Collections.Generic.List[string]]$Paths)
+        $localMatches = New-Object System.Collections.Generic.List[object]
+        foreach ($path in $Paths) {
+            try {
+                $doc = New-Object System.Xml.XmlDocument
+                $doc.PreserveWhitespace = $true
+                $doc.Load($path)
+                $nodes = @($doc.SelectNodes("//Object[@guid='$ObjectGuid']"))
+                if ($nodes.Count -eq 0 -and $doc.DocumentElement.LocalName -eq 'Object' -and $doc.DocumentElement.GetAttribute('guid') -eq $ObjectGuid) {
+                    $nodes = @($doc.DocumentElement)
+                }
+                foreach ($node in $nodes) {
+                    $localMatches.Add([pscustomobject]@{ path = $path; node = $node }) | Out-Null
+                }
+            } catch {
+                return [pscustomobject]@{
+                    ok      = $false
+                    matches = @()
+                    message = "Falha ao ler baseline $path : $($_.Exception.Message)"
+                }
+            }
+        }
+        return [pscustomobject]@{
+            ok      = $true
+            matches = $localMatches.ToArray()
+            message = ''
+        }
+    }
+
+    if ($usedBaselinePath) {
         if (-not (Test-Path -LiteralPath $BaselinePathLocal -PathType Leaf)) {
             $result.message = "BaselinePath not found: $BaselinePathLocal"
             return [pscustomobject]$result
         }
-        $candidates.Add((Resolve-Path -LiteralPath $BaselinePathLocal).Path) | Out-Null
-    } elseif (-not [string]::IsNullOrWhiteSpace($AcervoPathLocal)) {
+        Add-BaselineCandidate -Path ((Resolve-Path -LiteralPath $BaselinePathLocal).Path)
+    } else {
         if (-not (Test-Path -LiteralPath $AcervoPathLocal)) {
             $result.message = "AcervoPath not found: $AcervoPathLocal"
             return [pscustomobject]$result
         }
         $acervoResolved = (Resolve-Path -LiteralPath $AcervoPathLocal).Path
         if (Test-Path -LiteralPath $acervoResolved -PathType Leaf) {
-            $candidates.Add($acervoResolved) | Out-Null
+            Add-BaselineCandidate -Path $acervoResolved
         } else {
-            $hits = @(Select-String -Path (Join-Path $acervoResolved '*\*.xml') -Pattern ([regex]::Escape($ObjectGuid)) -SimpleMatch -ErrorAction SilentlyContinue |
-                Select-Object -ExpandProperty Path -Unique)
-            # Fallback: varredura recursiva limitada se glob flat falhar
-            if ($hits.Count -eq 0) {
-                $hits = @(Get-ChildItem -LiteralPath $acervoResolved -Filter *.xml -File -Recurse -ErrorAction SilentlyContinue |
-                    Where-Object {
-                        Select-String -LiteralPath $_.FullName -Pattern $ObjectGuid -SimpleMatch -Quiet -ErrorAction SilentlyContinue
-                    } |
-                    Select-Object -First 5 -ExpandProperty FullName)
+            # Glob flat (um nivel): hits textuais. Se nao renderem Object com o GUID,
+            # cai no recurse — referencia raso nao prova ausencia do objeto.
+            $flatHits = @()
+            try {
+                $flatHits = @(Select-String -Path (Join-Path $acervoResolved '*\*.xml') -Pattern ([regex]::Escape($ObjectGuid)) -SimpleMatch -ErrorAction Stop |
+                    Select-Object -ExpandProperty Path -Unique)
+            } catch {
+                # Zero arquivos no glob nao e falha de acesso; acesso negado/IO real → unresolved.
+                $errText = [string]$_.Exception.Message
+                if ($errText -match '(?i)access|denied|unauthorized|permission|locked|sharing|IOException|UnauthorizedAccess') {
+                    $result.message = "Falha ao enumerar AcervoPath (glob flat): $errText"
+                    return [pscustomobject]$result
+                }
+                $flatHits = @()
             }
-            foreach ($h in $hits) { $candidates.Add($h) | Out-Null }
+            foreach ($h in $flatHits) { Add-BaselineCandidate -Path $h }
+
+            $flatFound = Find-BaselineObjectMatches -Paths $candidates
+            if (-not $flatFound.ok) {
+                $result.message = $flatFound.message
+                return [pscustomobject]$result
+            }
+
+            if ($flatFound.matches.Count -eq 0) {
+                try {
+                    $recurseHits = @(Get-ChildItem -LiteralPath $acervoResolved -Filter *.xml -File -Recurse -ErrorAction Stop |
+                        Where-Object {
+                            Select-String -LiteralPath $_.FullName -Pattern $ObjectGuid -SimpleMatch -Quiet -ErrorAction SilentlyContinue
+                        } |
+                        Select-Object -First 20 -ExpandProperty FullName)
+                } catch {
+                    $result.message = "Falha ao enumerar AcervoPath (recurse): $($_.Exception.Message)"
+                    return [pscustomobject]$result
+                }
+                foreach ($h in $recurseHits) { Add-BaselineCandidate -Path $h }
+            }
         }
-    } else {
-        $result.message = 'Sem AcervoPath/BaselinePath'
-        return [pscustomobject]$result
     }
 
     if ($candidates.Count -eq 0) {
+        if ($usedBaselinePath) {
+            $result.message = "BaselinePath sem candidato legivel: $BaselinePathLocal"
+            return [pscustomobject]$result
+        }
         $result.status = 'no-baseline-new-object'
         $result.message = "GUID $ObjectGuid ausente no acervo informado"
         return [pscustomobject]$result
     }
 
-    $matches = New-Object System.Collections.Generic.List[object]
-    foreach ($path in $candidates) {
-        try {
-            $doc = New-Object System.Xml.XmlDocument
-            $doc.PreserveWhitespace = $true
-            $doc.Load($path)
-            $nodes = @($doc.SelectNodes("//Object[@guid='$ObjectGuid']"))
-            if ($nodes.Count -eq 0 -and $doc.DocumentElement.LocalName -eq 'Object' -and $doc.DocumentElement.GetAttribute('guid') -eq $ObjectGuid) {
-                $nodes = @($doc.DocumentElement)
-            }
-            foreach ($node in $nodes) {
-                $matches.Add([pscustomobject]@{ path = $path; node = $node }) | Out-Null
-            }
-        } catch {
-            $result.status = 'no-baseline-unresolved'
-            $result.message = "Falha ao ler baseline $path : $($_.Exception.Message)"
-            return [pscustomobject]$result
-        }
+    $found = Find-BaselineObjectMatches -Paths $candidates
+    if (-not $found.ok) {
+        $result.message = $found.message
+        return [pscustomobject]$result
     }
+    $matches = @($found.matches)
 
     if ($matches.Count -eq 0) {
+        if ($usedBaselinePath) {
+            # Arquivo explicito existe mas nao prova objeto novo — so baseline errado/incompleto.
+            $result.message = "BaselinePath nao contem Object com GUID $ObjectGuid"
+            return [pscustomobject]$result
+        }
         $result.status = 'no-baseline-new-object'
-        $result.message = "GUID $ObjectGuid nao encontrado como Object"
+        $result.message = "GUID $ObjectGuid nao encontrado como Object no acervo"
         return [pscustomobject]$result
     }
     if ($matches.Count -gt 1) {

@@ -3,7 +3,8 @@
 <#
 .SYNOPSIS
     Self-test do motor Test-GeneXusSourceIndentation.ps1 (v1: indent-under-depth,
-    indent-unit-mismatch-in-delta, BaselinePath, ExportFile, exit 20 via processo filho).
+    indent-unit-mismatch-in-delta, BaselinePath, ExportFile, exit 20 via processo filho,
+    BaselinePath GUID ausente=unresolved, Acervo hit textual raso + Object profundo).
 #>
 
 Set-StrictMode -Version Latest
@@ -228,6 +229,36 @@ $r16 = $child16.Text | ConvertFrom-Json
 Assert-True ($r16.status -eq 'bloqueado') 'status bloqueado no exit 20'
 Assert-True ($r16.exitCode -eq 20) 'exitCode 20 no JSON'
 Assert-True (Test-HasCode -Result $r16 -Code 'preflight') 'finding preflight no bloqueio'
+
+# 17) BaselinePath existe mas sem o GUID do input -> unresolved (nao new-object)
+$wrongBaselineFile = Join-Path $tempRoot 'wrong-baseline-guid.xml'
+Write-Xml -Path $wrongBaselineFile -Xml (New-ProcXml -Guid $guidNew -Name 'OtherProc' -Source $baselineSource)
+$r17 = Invoke-Indent -Xml (New-ProcXml -Guid $guidGood -Name 'ProcIndent' -Source $badUnder) -BaselinePath $wrongBaselineFile
+Assert-True ($r17.baselineStatus -eq 'no-baseline-unresolved') 'BaselinePath com GUID ausente deve unresolved'
+Assert-True ($r17.baselineCompared -ne $true) 'nao deve comparar baseline errado'
+Assert-True ($r17.sourceIndentStatus -eq 'inconclusive') 'deve inconclusive sem tratar como new-object'
+Assert-True (-not (Test-HasCode -Result $r17 -Code 'indent-under-depth')) 'nao inventar under-depth por falso new-object'
+Assert-True (Test-HasCode -Result $r17 -Code 'indent-inconclusive') 'esperado indent-inconclusive'
+
+# 18) Acervo: GUID so como texto num XML raso; Object real mais fundo -> compared
+$nestedAcervo = Join-Path $tempRoot 'acervo-nested'
+$shallowDir = Join-Path $nestedAcervo 'shallow'
+$deepDir = Join-Path $nestedAcervo 'deep\Procedure'
+[void](New-Item -ItemType Directory -Path $shallowDir -Force)
+[void](New-Item -ItemType Directory -Path $deepDir -Force)
+$refOnlyXml = @"
+<Object type="$procType" name="RefOnly" guid="$guidNew">
+  <Part type="$mainPart">
+    <Source><![CDATA[// referencia textual $guidGood]]></Source>
+  </Part>
+</Object>
+"@
+Write-Xml -Path (Join-Path $shallowDir 'RefOnly.xml') -Xml $refOnlyXml
+Write-Xml -Path (Join-Path $deepDir 'ProcIndent.xml') -Xml $baselineXml
+$r18 = Invoke-Indent -Xml (New-ProcXml -Guid $guidGood -Name 'ProcIndent' -Source $badUnder) -AcervoPath $nestedAcervo
+Assert-True ($r18.baselineCompared -eq $true) 'recurse deve achar Object profundo apesar de hit textual raso'
+Assert-True ($r18.baselineStatus -eq 'compared') 'baselineStatus compared'
+Assert-True (Test-HasCode -Result $r18 -Code 'indent-under-depth') 'com baseline real deve achar under-depth'
 
 Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
 Write-Output 'OK: Test-GeneXusSourceIndentationSelfTest.ps1'
