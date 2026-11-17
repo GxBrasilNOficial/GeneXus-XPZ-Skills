@@ -145,4 +145,4 @@ Origem: entrada «Indentação de Source: índice/cache GUID→path na resoluç�
 
 ### Rastreabilidade
 
-- (preenchido após o commit material desta frente)
+- `aa5da49` — Monta índice GUID->candidatos uma vez na indentação.
