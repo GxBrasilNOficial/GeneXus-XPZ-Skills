@@ -5,9 +5,12 @@
     Verificador consultivo de indentacao de Source GeneXus (Plano A / v6).
 
 .DESCRIPTION
-    Motor separado do SourceSanity. Fase 0: so avisos (warn/inconclusive),
-    nunca alimenta probablyImportable. Allowlist v1: par Procedure + Source.
-    Emite SEMPRE JSON no stdout. Nao expoe -AsJson.
+    Motor separado do SourceSanity. Findings de indentacao na fase 0 sao
+    so warn/inconclusive (nunca alimentam probablyImportable). Allowlist v1:
+    par Procedure + Source. Emite SEMPRE JSON no stdout. Nao expoe -AsJson.
+    Exit 0 = JSON de analise emitido (inclui XML malformado no JSON);
+    exit 20 = bloqueio de preflight/input invalido ou erro interno (trap),
+    com JSON de status=bloqueado no stdout — nao e finding de indentacao.
 
 .PARAMETER InputPath
     XML Object ou ExportFile.
@@ -19,8 +22,9 @@
     Override explicito do XML baseline.
 
 .PARAMETER AbsoluteIndentCheck
-    Checa indentacao em todas as linhas de conteudo elegiveis da part,
-    mesmo sem baseline; baseline ainda e resolvida/reportada quando possivel.
+    Checa indentacao em todas as linhas de conteudo elegiveis da part
+    (inclui preserved quando ha baseline compared), mesmo sem baseline;
+    baseline ainda e resolvida/reportada quando possivel.
 #>
 
 [CmdletBinding()]
@@ -507,8 +511,12 @@ function Get-XmlSourceLineOffset {
     if ($partIdx -lt 0) { return 0 }
     $sourceIdx = $RawXml.IndexOf('<Source>', $partIdx, [System.StringComparison]::OrdinalIgnoreCase)
     if ($sourceIdx -lt 0) { return 0 }
+    # Conta a linha de <Source> (1-based). O chamador faz
+    # xmlLine = offset + sourceLineNumber - 1 (CDATA costuma abrir na mesma linha).
     $prefix = $RawXml.Substring(0, $sourceIdx)
-    return @($prefix -split "`r?`n").Count
+    $lineOfSourceTag = @($prefix -split "`r?`n", 0).Count
+    if ($lineOfSourceTag -lt 1) { return 1 }
+    return $lineOfSourceTag
 }
 
 function Resolve-BaselineObjectNode {
@@ -773,14 +781,20 @@ function Test-PartIndentation {
         return [pscustomobject]$part
     }
 
+    # Absoluto: tambem linhas preserved (defeito herdado no baseline).
+    $checkClasses = @('added', 'changed', 'reindented')
+    if ($Absolute) {
+        $checkClasses = @('added', 'changed', 'reindented', 'preserved')
+    }
+
     foreach ($op in $deltaOps) {
-        if ($op.classification -notin @('added', 'changed', 'reindented')) { continue }
+        if ($op.classification -notin $checkClasses) { continue }
         $m = $op.newModel
         if ($null -eq $m) { continue }
         if ($m.excludeFromSignals) { continue }
         if ($m.kind -eq 'blank') { continue }
 
-        $xmlLine = if ($xmlOffset -gt 0) { $xmlOffset + $m.sourceLineNumber } else { 0 }
+        $xmlLine = if ($xmlOffset -gt 0) { [Math]::Max(1, $xmlOffset + $m.sourceLineNumber - 1) } else { 0 }
 
         if ($m.inconclusiveLocal) {
             $findings.Add((New-IndentFinding -Severity 'inconclusive' -Code 'indent-inconclusive' `

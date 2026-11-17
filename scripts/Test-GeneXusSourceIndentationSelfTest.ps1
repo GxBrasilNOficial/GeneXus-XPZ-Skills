@@ -168,5 +168,27 @@ Assert-True ($r10.warnCount -eq 0) 'warnCount 0'
 Assert-True (-not [string]::IsNullOrWhiteSpace([string]$r10.parts[0].objectGuid)) 'objectGuid em parts'
 Assert-True ($r10.parts[0].objectName -eq 'ProcIndent') 'objectName em parts'
 
+# 12) Absolute + baseline compared: preserved com under-depth herdado
+$inheritedBad = @"
+if &x = 1
+msg('a')
+endif
+"@
+$guidInherited = 'cccccccc-cccc-cccc-cccc-cccccccccccc'
+$inheritedXml = New-ProcXml -Guid $guidInherited -Name 'ProcInherited' -Source $inheritedBad
+Write-Xml -Path (Join-Path $acervoRoot 'ProcInherited.xml') -Xml $inheritedXml
+$r12noAbs = Invoke-Indent -Xml $inheritedXml -AcervoPath $acervoRoot
+Assert-True ($r12noAbs.sourceIndentStatus -eq 'pass') 'sem absoluto, preserved herdado nao deve warn'
+$r12abs = Invoke-Indent -Xml $inheritedXml -AcervoPath $acervoRoot -Absolute
+Assert-True (Test-HasCode -Result $r12abs -Code 'indent-under-depth') 'absoluto+baseline deve achar preserved under-depth'
+Assert-True ($r12abs.absoluteCheckApplied -eq $true) 'absoluteCheckApplied com baseline'
+Assert-True ($r12abs.baselineCompared -eq $true) 'baseline compared no absoluto'
+
+# 13) xmlLineNumber: primeira linha do Source nao deve ser offset+1 a mais
+$underFinding = @($r1.findings | Where-Object { $_.code -eq 'indent-under-depth' } | Select-Object -First 1)
+Assert-True ($null -ne $underFinding) 'r1 precisa de under-depth para checar xmlLineNumber'
+Assert-True ($underFinding.sourceLineNumber -ge 1) 'sourceLineNumber >= 1'
+Assert-True ($underFinding.xmlLineNumber -eq (2 + $underFinding.sourceLineNumber)) 'xmlLineNumber = linha Source(3) + sourceLine - 1 => 2+sourceLine quando Object/Part/Source nas linhas 1-3'
+
 Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
 Write-Output 'OK: Test-GeneXusSourceIndentationSelfTest.ps1'
