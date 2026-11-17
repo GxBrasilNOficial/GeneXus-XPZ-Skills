@@ -180,6 +180,27 @@ try {
   Assert-True (Test-Path -LiteralPath (Join-Path $bk 'run001/frentes/FrenteK')) "K: frente movida"
   Assert-True (Test-Path -LiteralPath (Join-Path $bk 'run001/pacotes/OrfK_01.import_file.xml')) "K: pacote movido"
   Assert-True (Test-Path -LiteralPath (Join-Path $bk 'run001/backup-manifest.jsonl')) "K: manifesto jsonl gravado"
+  # K1: junction no destino final, tanto no plano como introduzida antes do apply.
+  $k1root = New-TempRoot -Slug 'k1root'
+  $k1backup = New-TempRoot -Slug 'k1backup'
+  $k1target = New-TempRoot -Slug 'k1target'
+  New-Frente -Root $k1root -Name 'FrenteK1'
+  $k1link = Join-Path $k1backup 'run001'
+  [void](New-Item -ItemType Junction -Path $k1link -Value $k1target)
+  try {
+    $k1planBlocked = Invoke-Plan -Root $k1root -Extra @('-Backup', $k1backup, '-RunStamp', 'run001')
+    Assert-True ($k1planBlocked.r.exit -eq 1 -and $k1planBlocked.r.json.status -eq 'blocked') 'K1: junction no destino bloqueia dry-run'
+    Assert-True (-not (Test-Path -LiteralPath $k1planBlocked.plan)) 'K1: plano nao gravado'
+  } finally { Remove-Item -LiteralPath $k1link -Force }
+  $k1plan = Invoke-Plan -Root $k1root -Extra @('-Backup', $k1backup, '-RunStamp', 'run001')
+  Assert-True ($k1plan.r.exit -eq 2 -and (Test-Path -LiteralPath $k1plan.plan)) 'K1: plano com destino normal gerado'
+  [void](New-Item -ItemType Junction -Path $k1link -Value $k1target)
+  try {
+    $k1apply = Invoke-Apply -Root $k1root -Plan $k1plan.plan -Extra @('-Backup', $k1backup, '-RunStamp', 'run001')
+    Assert-True ($k1apply.exit -eq 1 -and $k1apply.json.status -eq 'blocked') 'K1: junction introduzida bloqueia apply'
+    Assert-True (Test-Path -LiteralPath (Join-Path $k1root "$FRENTES/FrenteK1/Obj.xml")) 'K1: origem preservada'
+    Assert-True (@(Get-ChildItem -LiteralPath $k1target -Force).Count -eq 0) 'K1: destino redirecionado vazio'
+  } finally { Remove-Item -LiteralPath $k1link -Force }
   $k2 = Invoke-Cleanup -Arguments @('-RepoRoot', (New-TempRoot -Slug 'k2'), '-Backup', (New-TempRoot -Slug 'k2b'))
   Assert-True ($k2.exit -eq 1 -and $k2.json.status -eq 'blocked') "K2: -Backup sem -RunStamp -> blocked"
   $k3root = New-TempRoot -Slug 'k3'

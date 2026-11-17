@@ -583,7 +583,7 @@ try {
     $script:backupRoot = Join-Path $backupCanon $RunStamp
     if ($script:blockers.Count -eq 0) {
       if ((Test-IsUnder $script:backupRoot $script:frentesDirCanon) -or (Test-IsUnder $script:backupRoot $script:pacotesDirCanon)) { $script:blockers.Add('destino do backup (backupCanon + RunStamp) cairia dentro das pastas-alvo') }
-      if (Test-ChainHasReparse ([System.IO.Path]::GetPathRoot($backupCanon)) $backupCanon) { $script:blockers.Add('reparse point no caminho do -Backup') }
+      if (Test-ChainHasReparse ([System.IO.Path]::GetPathRoot($backupCanon)) $script:backupRoot) { $script:blockers.Add('reparse point no caminho do destino de backup') }
       if ((Test-Path -LiteralPath $script:backupRoot) -and @(Get-ChildItem -LiteralPath $script:backupRoot -Force).Count -gt 0) { $script:blockers.Add("subdir de backup '$($script:backupRoot)' ja existe e nao esta vazio") }
     }
   }
