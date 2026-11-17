@@ -121,6 +121,7 @@ $inputPathWithPathAlias = @(
     'Get-GeneXusObjectSummary.ps1',
     'Get-GeneXusImportPackageObjectInventory.ps1',
     'Test-GeneXusSourceSanity.ps1',
+    'Test-GeneXusSourceIndentation.ps1',
     'Test-GeneXusImportFileEnvelope.ps1',
     'Test-GeneXusObjectVariableDelta.ps1',
     'Test-GeneXusTransactionCoherence.ps1',
@@ -158,5 +159,6 @@ Assert-ParameterAbsent -ScriptFileName 'Invoke-GeneXusXpzExport.ps1' -ParameterN
 #    Trava negativa contra wrappers locais que carreguem essa flag de outro motor;
 #    o erro de binding só apareceria em runtime, invisivel ao parse.
 Assert-ParameterAbsent -ScriptFileName 'Test-GeneXusSourceSanity.ps1' -ParameterName 'AsJson'
+Assert-ParameterAbsent -ScriptFileName 'Test-GeneXusSourceIndentation.ps1' -ParameterName 'AsJson'
 
 Write-Output 'XPZ_PARAMETER_NAMING_CONTRACT_OK'

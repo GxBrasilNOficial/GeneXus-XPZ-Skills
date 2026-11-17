@@ -69,6 +69,9 @@ $hasXmlError = @($results | Where-Object { -not $_.xmlWellFormed }).Count -gt 0
 $hasFail = @($results | Where-Object { $_.sourceSanityStatus -eq 'fail' }).Count -gt 0
 $hasWarn = @($results | Where-Object { $_.sourceSanityStatus -eq 'warn' }).Count -gt 0
 
+# Opt-in: Test-GeneXusSourceIndentation.ps1 pode rodar em paralelo e expor
+# sourceIndentStatus ao lado. Nao misturar indent em $hasFail / probablyImportable.
+
 $summary = [pscustomobject]@{
     inputPath          = $targetPath
     fileCount          = $files.Count
