@@ -999,6 +999,69 @@ function Select-XpzHelpUnique {
     return @($out)
 }
 
+function Test-XpzIndexGateMaskOutputEvidence {
+    <#
+      Prova estrutural de que um wrapper de gate com implementacao local EMITE o
+      estado da mascara, em vez de apenas mencionar o campo. Comentarios ficam fora
+      por construcao (AST); variavel morta nao conta. Evidencia valida:
+      - pipeline de saida (NamedBlock/StatementBlock/Return) contendo o campo;
+      - variavel atribuida com o campo e usada em pipeline de saida/ConvertTo-Json.
+      Limite: prova estrutural, nao execucao. K9 e setup audit continuam sendo a
+      autoridade em runtime.
+    #>
+    param([Parameter(Mandatory)][string]$WrapperPath)
+
+    $parseErrors = $null
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile($WrapperPath, [ref]$null, [ref]$parseErrors)
+    if ($null -eq $ast -or @($parseErrors).Count -gt 0) { return $false }
+
+    $fieldPattern = 'source_mask_degraded|sourceMaskDegraded'
+    $outputCommands = @('Write-Output', 'Write-Host', 'Write-Information', 'Write-Verbose', 'ConvertTo-Json', 'Out-String', 'Out-Host')
+    $statementParentTypes = @('NamedBlockAst', 'StatementBlockAst', 'ReturnStatementAst')
+
+    $statementPipelines = @($ast.FindAll({
+                param($n) $n -is [System.Management.Automation.Language.PipelineAst] -and
+                $null -ne $n.Parent -and
+                $statementParentTypes -contains $n.Parent.GetType().Name
+            }, $true))
+
+    function Get-PipelineCommandNames {
+        param($Pipeline)
+        return @($Pipeline.FindAll({
+                    param($n) $n -is [System.Management.Automation.Language.CommandAst]
+                }, $true) | ForEach-Object { $_.GetCommandName() })
+    }
+
+    foreach ($pipe in $statementPipelines) {
+        if ($pipe.Extent.Text -notmatch $fieldPattern) { continue }
+        if ((Get-PipelineCommandNames -Pipeline $pipe) -notcontains 'Out-Null') { return $true }
+    }
+
+    $variables = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    foreach ($assign in $ast.FindAll({
+                param($n) $n -is [System.Management.Automation.Language.AssignmentStatementAst] -and
+                $n.Extent.Text -match $fieldPattern
+            }, $true)) {
+        $match = [regex]::Match($assign.Left.Extent.Text, '\$(?<name>[A-Za-z_][A-Za-z0-9_]*)')
+        if ($match.Success) { [void]$variables.Add($match.Groups['name'].Value) }
+    }
+    if ($variables.Count -eq 0) { return $false }
+
+    foreach ($pipe in $statementPipelines) {
+        $commandNames = Get-PipelineCommandNames -Pipeline $pipe
+        if ($commandNames -contains 'Out-Null') { continue }
+        $hasOutputCommand = @($commandNames | Where-Object { $outputCommands -contains $_ }).Count -gt 0
+        $isBareExpression = @($commandNames).Count -eq 0
+        if (-not $hasOutputCommand -and -not $isBareExpression) { continue }
+        foreach ($name in $variables) {
+            if ($pipe.Extent.Text -match ('\$' + [regex]::Escape($name) + '\b')) { return $true }
+        }
+    }
+
+    return $false
+}
+
+
 function Get-XpzWritabilityConsumerFinding {
     <#
       Classifica o consumo do contrato de cobertura de gravabilidade por um wrapper

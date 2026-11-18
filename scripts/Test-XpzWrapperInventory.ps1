@@ -18,7 +18,8 @@
                                             Test-KbSetupAudit/Test-KbIndexGate, missing_AsJson_passthrough
                                             quando o molde repassa -AsJson e o wrapper local nao;
                                             source_mask_contract_missing quando o wrapper de gate tem
-                                            implementacao local e nao expoe source_mask_degraded;
+                                            implementacao local e nao emite source_mask_degraded com
+                                            evidencia de saida (comentario ou variavel morta nao contam);
                                             forwards_unknown_engine_param quando o wrapper repassa a um
                                             motor compartilhado advanced um parametro nao-declarado;
                                             shared_engine_unresolved quando o caminho de motor inferido
@@ -334,10 +335,9 @@ foreach ($exampleFile in Get-ChildItem -LiteralPath $SkillsExamplesPath -Filter 
         }
 
         if ($baseName -ieq 'Test-KbIndexGate') {
-            # Implementacao local (emite GATE_OK por conta propria) precisa expor o
-            # estado da mascara. Delegador fino ao motor compartilhado nao entra aqui:
-            # o proprio motor garante source_mask_degraded no contrato.
-            $indexGateText = [System.IO.File]::ReadAllText($standardPath)
+            # Implementacao local (emite GATE_OK por conta propria) precisa EMITIR o
+            # estado da mascara, nao apenas mencionar o campo. Delegador fino ao motor
+            # compartilhado nao entra aqui: o proprio motor garante o contrato.
             $indexGateParseErrors = $null
             $indexGateAst = [System.Management.Automation.Language.Parser]::ParseFile($standardPath, [ref]$null, [ref]$indexGateParseErrors)
             $emitsGateOk = $false
@@ -348,7 +348,7 @@ foreach ($exampleFile in Get-ChildItem -LiteralPath $SkillsExamplesPath -Filter 
                             $n.Extent.Text -match 'GATE_OK'
                         }, $true)).Count -gt 0
             }
-            if ($emitsGateOk -and $indexGateText -notmatch 'source_mask_degraded|sourceMaskDegraded') {
+            if ($emitsGateOk -and -not (Test-XpzIndexGateMaskOutputEvidence -WrapperPath $standardPath)) {
                 $customized.Add(('{0}(reason=source_mask_contract_missing)' -f $standardLocalName))
             }
         }
