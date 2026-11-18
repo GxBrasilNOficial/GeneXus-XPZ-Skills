@@ -35,8 +35,11 @@ import argparse
 import hashlib
 import html
 import json
+import os
 import re
 import sqlite3
+import sys
+import uuid
 import xml.etree.ElementTree as ElementTree
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -49,6 +52,7 @@ from GeneXusKbIntelligenceExtractorSignature import (
     compute_signature,
 )
 from GeneXusCanonicalJson import canonical_text
+from GeneXusSourceLexer import classify_source_block, mask_gx_source
 
 # Origens do extrator generalizado idBasedOn -> Domain (relation_scope + Attribute; fora: Panel/Stencil/PackagedModule).
 IDBASEDON_DOMAIN_SOURCE_TYPES = (
@@ -279,6 +283,10 @@ WORKWITH_PROMPT_RE = re.compile(r"\bprompt=\"(?P<value>[^\"]+)\"", re.IGNORECASE
 class SourceBlock:
     text: str
     start_line: int
+    kind: str = "code"
+    mixed_layout: bool = False
+    mask_state: str = "masked"
+    masked_text: str | None = None
 
 
 @dataclass(frozen=True)
@@ -792,7 +800,77 @@ def unwrap_source_body(raw_body: str) -> str:
     return html.unescape(body)
 
 
-def source_blocks(xml_text: str) -> Iterable[SourceBlock]:
+# Estado do masking de Source (incremento 17a). Resetado por build.
+_ALLOW_MASK_DEGRADED = False
+_SOURCE_MASK_BLOCKED: list[tuple[str, int, str]] = []  # (arquivo, linha, motivo)
+_SOURCE_MASK_BLOCKED_SEEN: set[tuple[str, int]] = set()
+_SOURCE_MASK_SEEN: set[tuple[str, int, str]] = set()  # evita recontar por extrator
+_SOURCE_MASK_STATS = {"scanned": 0, "masked": 0, "native_skips": 0, "mixed_layout_skips": 0}
+_SOURCE_BLOCK_KIND_COUNTS: dict[str, int] = {"code": 0, "events": 0, "layout": 0, "serialized": 0}
+
+
+class SourceMaskBlockedError(RuntimeError):
+    def __init__(self, source_file: str, start_line: int, reason: str):
+        super().__init__(reason)
+        self.source_file = source_file
+        self.start_line = start_line
+        self.reason = reason
+
+
+def reset_source_mask_state(allow_degraded: bool) -> None:
+    global _ALLOW_MASK_DEGRADED
+    _ALLOW_MASK_DEGRADED = allow_degraded
+    _SOURCE_MASK_BLOCKED.clear()
+    _SOURCE_MASK_BLOCKED_SEEN.clear()
+    _SOURCE_MASK_SEEN.clear()
+    for key in _SOURCE_MASK_STATS:
+        _SOURCE_MASK_STATS[key] = 0
+    for key in _SOURCE_BLOCK_KIND_COUNTS:
+        _SOURCE_BLOCK_KIND_COUNTS[key] = 0
+
+
+def source_mask_metadata() -> dict[str, object]:
+    return {
+        "source_mask_blocks_scanned": _SOURCE_MASK_STATS["scanned"],
+        "source_mask_blocks_masked": _SOURCE_MASK_STATS["masked"],
+        "source_mask_native_skips": _SOURCE_MASK_STATS["native_skips"],
+        "source_mask_mixed_layout_skips": _SOURCE_MASK_STATS["mixed_layout_skips"],
+        "source_mask_degraded": bool(_SOURCE_MASK_BLOCKED),
+        "source_mask_degraded_blocks": _SOURCE_MASK_BLOCKED,
+        "source_block_kind_counts": dict(sorted(_SOURCE_BLOCK_KIND_COUNTS.items())),
+    }
+
+
+def _match_start(match) -> int:
+    try:
+        return match.start("name")
+    except IndexError:
+        return match.start()
+
+
+def _source_snippet(original_line: str, match) -> str:
+    cleaned = active_line(original_line)
+    if _match_start(match) < len(cleaned):
+        return cleaned
+    return original_line[:220]
+
+
+def _masked_lines(block: SourceBlock) -> Iterable[tuple[str, str, int]]:
+    if block.masked_text is None:
+        # layout/serialized/mixed/native-skip/failed: varredura atual, com corte
+        # de comentario por linha (`active_line`), como antes do incremento 17a.
+        olines = block.text.splitlines()
+        for offset, original_line in enumerate(olines):
+            yield active_line(original_line), original_line, block.start_line + offset
+        return
+    mlines = block.masked_text.splitlines()
+    olines = block.text.splitlines()
+    for offset, masked_line in enumerate(mlines):
+        original_line = olines[offset] if offset < len(olines) else ""
+        yield masked_line, original_line, block.start_line + offset
+
+
+def source_blocks(xml_text: str, source_file: str | None = None) -> Iterable[SourceBlock]:
     for match in SOURCE_RE.finditer(xml_text):
         raw_body = match.group("body")
         body_start = match.start("body")
@@ -802,7 +880,54 @@ def source_blocks(xml_text: str) -> Iterable[SourceBlock]:
         body = unwrap_source_body(raw_body)
         if not body.strip():
             continue
-        yield SourceBlock(text=body, start_line=line_number_at(xml_text, body_start))
+        start_line = line_number_at(xml_text, body_start)
+        kind = classify_source_block(body)
+        seen_key = (source_file or "", body_start, kind)
+        first_seen = seen_key not in _SOURCE_MASK_SEEN
+        if first_seen:
+            _SOURCE_MASK_SEEN.add(seen_key)
+            _SOURCE_BLOCK_KIND_COUNTS[kind] += 1
+        mixed_layout = kind != "layout" and "<gxmultiform" in body.lower()
+        if kind in ("layout", "serialized"):
+            if mixed_layout and first_seen:
+                _SOURCE_MASK_STATS["mixed_layout_skips"] += 1
+            yield SourceBlock(text=body, start_line=start_line, kind=kind,
+                              mixed_layout=mixed_layout, mask_state="not-applicable",
+                              masked_text=None)
+            continue
+        if first_seen:
+            _SOURCE_MASK_STATS["scanned"] += 1
+        if mixed_layout:
+            if first_seen:
+                _SOURCE_MASK_STATS["mixed_layout_skips"] += 1
+            yield SourceBlock(text=body, start_line=start_line, kind=kind,
+                              mixed_layout=True, mask_state="not-applicable",
+                              masked_text=None)
+            continue
+        result = mask_gx_source(body)
+        if result.state == "masked":
+            if first_seen:
+                _SOURCE_MASK_STATS["masked"] += 1
+            yield SourceBlock(text=body, start_line=start_line, kind=kind,
+                              mixed_layout=False, mask_state="masked",
+                              masked_text=result.masked)
+        elif result.state == "native-skip":
+            if first_seen:
+                _SOURCE_MASK_STATS["native_skips"] += 1
+            yield SourceBlock(text=body, start_line=start_line, kind=kind,
+                              mixed_layout=False, mask_state="native-skip",
+                              masked_text=None)
+        else:
+            if _ALLOW_MASK_DEGRADED:
+                blocked_key = (source_file or "", body_start)
+                if blocked_key not in _SOURCE_MASK_BLOCKED_SEEN:
+                    _SOURCE_MASK_BLOCKED_SEEN.add(blocked_key)
+                    _SOURCE_MASK_BLOCKED.append((source_file or "", start_line, result.reason))
+                yield SourceBlock(text=body, start_line=start_line, kind=kind,
+                                  mixed_layout=False, mask_state="failed",
+                                  masked_text=None)
+            else:
+                raise SourceMaskBlockedError(source_file or "", start_line, result.reason)
 
 
 def active_line(line: str) -> str:
@@ -960,7 +1085,9 @@ def append_call_evidences_from_expression(
     extractor_rule_procedure_dot_udp: str | None = None,
 ) -> None:
     line_no = line_number_at(xml_text, expression_start)
-    for match in PROCEDURE_DOT_CALL_RE.finditer(expression):
+    masked = mask_gx_source(expression)
+    expr = masked.masked if masked.state == "masked" else expression
+    for match in PROCEDURE_DOT_CALL_RE.finditer(expr):
         matched_name = match.group("name")
         target_name = procedure_lookup.get(matched_name.lower())
         if target_name:
@@ -977,7 +1104,7 @@ def append_call_evidences_from_expression(
                 evidence_role=evidence_role,
             )
 
-    direct_matches = procedure_direct_re.finditer(expression) if procedure_direct_re else ()
+    direct_matches = procedure_direct_re.finditer(expr) if procedure_direct_re else ()
     for match in direct_matches:
         matched_name = match.group("name")
         target_name = procedure_lookup.get(matched_name.lower())
@@ -996,7 +1123,7 @@ def append_call_evidences_from_expression(
             )
 
     if extractor_rule_procedure_call_command:
-        for match in PROCEDURE_CALL_COMMAND_RE.finditer(expression):
+        for match in PROCEDURE_CALL_COMMAND_RE.finditer(expr):
             matched_name = match.group("name")
             target_name = procedure_lookup.get(matched_name.lower())
             if target_name:
@@ -1014,7 +1141,7 @@ def append_call_evidences_from_expression(
                 )
 
     if extractor_rule_procedure_udp_func:
-        for match in PROCEDURE_UDP_FUNC_RE.finditer(expression):
+        for match in PROCEDURE_UDP_FUNC_RE.finditer(expr):
             matched_name = match.group("name")
             target_name = procedure_lookup.get(matched_name.lower())
             if target_name:
@@ -1032,7 +1159,7 @@ def append_call_evidences_from_expression(
                 )
 
     if extractor_rule_procedure_dot_udp:
-        for match in PROCEDURE_DOT_UDP_RE.finditer(expression):
+        for match in PROCEDURE_DOT_UDP_RE.finditer(expr):
             matched_name = match.group("name")
             target_name = procedure_lookup.get(matched_name.lower())
             if target_name:
@@ -1049,7 +1176,7 @@ def append_call_evidences_from_expression(
                     evidence_role=evidence_role,
                 )
 
-    for match in PROCEDURE_DOT_LINK_RE.finditer(expression):
+    for match in PROCEDURE_DOT_LINK_RE.finditer(expr):
         matched_name = match.group("name")
         target_name = procedure_lookup.get(matched_name.lower())
         if target_name:
@@ -1066,7 +1193,7 @@ def append_call_evidences_from_expression(
                 evidence_role=evidence_role,
             )
 
-    for match in WEBPANEL_DOT_LINK_RE.finditer(expression):
+    for match in WEBPANEL_DOT_LINK_RE.finditer(expr):
         matched_name = match.group("name")
         target_name = webpanel_lookup.get(matched_name.lower())
         if target_name:
@@ -1083,7 +1210,7 @@ def append_call_evidences_from_expression(
                 evidence_role=evidence_role,
             )
 
-    for match in WEBPANEL_DOT_CREATE_RE.finditer(expression):
+    for match in WEBPANEL_DOT_CREATE_RE.finditer(expr):
         matched_name = match.group("name")
         target_name = webpanel_lookup.get(matched_name.lower())
         if target_name:
@@ -1101,7 +1228,7 @@ def append_call_evidences_from_expression(
             )
 
     if data_provider_direct_re:
-        for match in data_provider_direct_re.finditer(expression):
+        for match in data_provider_direct_re.finditer(expr):
             matched_name = match.group("name")
             target_name = data_provider_lookup.get(matched_name.lower())
             if target_name:
@@ -1135,14 +1262,12 @@ def extract_evidence(
 
     for source in source_objects:
         xml_text = read_text(source.path)
-        for block in source_blocks(xml_text):
-            for offset, line in enumerate(block.text.splitlines()):
-                cleaned = active_line(line)
-                if not cleaned.strip():
+        for block in source_blocks(xml_text, source.rel_path):
+            for masked_line, original_line, line_no in _masked_lines(block):
+                if not masked_line.strip():
                     continue
-                line_no = block.start_line + offset
 
-                for match in PROCEDURE_DOT_CALL_RE.finditer(cleaned):
+                for match in PROCEDURE_DOT_CALL_RE.finditer(masked_line):
                     matched_name = match.group("name")
                     target_name = procedure_lookup.get(matched_name.lower())
                     if target_name:
@@ -1154,11 +1279,11 @@ def extract_evidence(
                             relation_kind="calls_procedure",
                             line=line_no,
                             column=match.start("name") + 1,
-                            snippet=cleaned,
+                            snippet=_source_snippet(original_line, match),
                             extractor_rule="procedure_dot_call",
                         )
 
-                direct_matches = procedure_direct_re.finditer(cleaned) if procedure_direct_re else ()
+                direct_matches = procedure_direct_re.finditer(masked_line) if procedure_direct_re else ()
                 for match in direct_matches:
                     matched_name = match.group("name")
                     target_name = procedure_lookup.get(matched_name.lower())
@@ -1171,11 +1296,11 @@ def extract_evidence(
                             relation_kind="calls_procedure",
                             line=line_no,
                             column=match.start("name") + 1,
-                            snippet=cleaned,
+                            snippet=_source_snippet(original_line, match),
                             extractor_rule="procedure_direct_call",
                         )
 
-                for match in PROCEDURE_CALL_COMMAND_RE.finditer(cleaned):
+                for match in PROCEDURE_CALL_COMMAND_RE.finditer(masked_line):
                     matched_name = match.group("name")
                     target_name = procedure_lookup.get(matched_name.lower())
                     if target_name:
@@ -1187,11 +1312,11 @@ def extract_evidence(
                             relation_kind="calls_procedure",
                             line=line_no,
                             column=match.start("name") + 1,
-                            snippet=cleaned,
+                            snippet=_source_snippet(original_line, match),
                             extractor_rule="procedure_call_command",
                         )
 
-                for match in PROCEDURE_UDP_FUNC_RE.finditer(cleaned):
+                for match in PROCEDURE_UDP_FUNC_RE.finditer(masked_line):
                     matched_name = match.group("name")
                     target_name = procedure_lookup.get(matched_name.lower())
                     if target_name:
@@ -1203,11 +1328,11 @@ def extract_evidence(
                             relation_kind="calls_procedure",
                             line=line_no,
                             column=match.start("name") + 1,
-                            snippet=cleaned,
+                            snippet=_source_snippet(original_line, match),
                             extractor_rule="procedure_udp_func",
                         )
 
-                for match in PROCEDURE_DOT_UDP_RE.finditer(cleaned):
+                for match in PROCEDURE_DOT_UDP_RE.finditer(masked_line):
                     matched_name = match.group("name")
                     target_name = procedure_lookup.get(matched_name.lower())
                     if target_name:
@@ -1219,11 +1344,11 @@ def extract_evidence(
                             relation_kind="calls_procedure",
                             line=line_no,
                             column=match.start("name") + 1,
-                            snippet=cleaned,
+                            snippet=_source_snippet(original_line, match),
                             extractor_rule="procedure_dot_udp",
                         )
 
-                for match in PROCEDURE_DOT_LINK_RE.finditer(cleaned):
+                for match in PROCEDURE_DOT_LINK_RE.finditer(masked_line):
                     matched_name = match.group("name")
                     target_name = procedure_lookup.get(matched_name.lower())
                     if target_name:
@@ -1235,11 +1360,11 @@ def extract_evidence(
                             relation_kind="calls_procedure",
                             line=line_no,
                             column=match.start("name") + 1,
-                            snippet=cleaned,
+                            snippet=_source_snippet(original_line, match),
                             extractor_rule="procedure_dot_link",
                         )
 
-                for match in WEBPANEL_DOT_LINK_RE.finditer(cleaned):
+                for match in WEBPANEL_DOT_LINK_RE.finditer(masked_line):
                     matched_name = match.group("name")
                     target_name = webpanel_lookup.get(matched_name.lower())
                     if target_name:
@@ -1251,11 +1376,11 @@ def extract_evidence(
                             relation_kind="calls_webpanel",
                             line=line_no,
                             column=match.start("name") + 1,
-                            snippet=cleaned,
+                            snippet=_source_snippet(original_line, match),
                             extractor_rule="webpanel_dot_link",
                         )
 
-                for match in WEBPANEL_DOT_CREATE_RE.finditer(cleaned):
+                for match in WEBPANEL_DOT_CREATE_RE.finditer(masked_line):
                     matched_name = match.group("name")
                     target_name = webpanel_lookup.get(matched_name.lower())
                     if target_name:
@@ -1267,12 +1392,12 @@ def extract_evidence(
                             relation_kind="creates_webcomponent",
                             line=line_no,
                             column=match.start("name") + 1,
-                            snippet=cleaned,
+                            snippet=_source_snippet(original_line, match),
                             extractor_rule="webpanel_dot_create",
                         )
 
                 if data_provider_direct_re:
-                    for match in data_provider_direct_re.finditer(cleaned):
+                    for match in data_provider_direct_re.finditer(masked_line):
                         matched_name = match.group("name")
                         target_name = data_provider_lookup.get(matched_name.lower())
                         if target_name:
@@ -1284,7 +1409,7 @@ def extract_evidence(
                                 relation_kind="calls_dataprovider",
                                 line=line_no,
                                 column=match.start("name") + 1,
-                                snippet=cleaned,
+                                snippet=_source_snippet(original_line, match),
                                 extractor_rule="dataprovider_direct_call",
                             )
 
@@ -1311,14 +1436,12 @@ def extract_source_for_each_explicit_table_evidence(
 
     for source in source_objects:
         xml_text = read_text(source.path)
-        for block in source_blocks(xml_text):
-            for offset, line in enumerate(block.text.splitlines()):
-                cleaned = active_line(line)
-                if not cleaned.strip():
+        for block in source_blocks(xml_text, source.rel_path):
+            for masked_line, original_line, line_no in _masked_lines(block):
+                if not masked_line.strip():
                     continue
-                line_no = block.start_line + offset
 
-                for match in FOR_EACH_EXPLICIT_TABLE_RE.finditer(cleaned):
+                for match in FOR_EACH_EXPLICIT_TABLE_RE.finditer(masked_line):
                     matched_name = match.group("name")
                     target_name = table_lookup.get(matched_name.lower())
                     if not target_name:
@@ -1331,7 +1454,7 @@ def extract_source_for_each_explicit_table_evidence(
                         relation_kind="navigates_explicit_table",
                         line=line_no,
                         column=match.start("name") + 1,
-                        snippet=cleaned,
+                        snippet=_source_snippet(original_line, match),
                         extractor_rule="source_for_each_explicit_table",
                         evidence_role="Source explicit for each table",
                     )
@@ -1359,14 +1482,12 @@ def extract_source_for_each_qualified_table_prefix_evidence(
 
     for source in source_objects:
         xml_text = read_text(source.path)
-        for block in source_blocks(xml_text):
-            for offset, line in enumerate(block.text.splitlines()):
-                cleaned = active_line(line)
-                if not cleaned.strip():
+        for block in source_blocks(xml_text, source.rel_path):
+            for masked_line, original_line, line_no in _masked_lines(block):
+                if not masked_line.strip():
                     continue
-                line_no = block.start_line + offset
 
-                for match in FOR_EACH_QUALIFIED_TABLE_RE.finditer(cleaned):
+                for match in FOR_EACH_QUALIFIED_TABLE_RE.finditer(masked_line):
                     matched_prefix = match.group("prefix")
                     target_name = table_lookup.get(matched_prefix.lower())
                     if not target_name:
@@ -1379,7 +1500,7 @@ def extract_source_for_each_qualified_table_prefix_evidence(
                         relation_kind="navigates_qualified_table_prefix",
                         line=line_no,
                         column=match.start("prefix") + 1,
-                        snippet=cleaned,
+                        snippet=_source_snippet(original_line, match),
                         extractor_rule="source_for_each_qualified_table_prefix",
                         evidence_role="Source qualified for each table prefix",
                     )
@@ -1411,6 +1532,14 @@ def gxobject_name(value: str) -> str | None:
 
 def effective_condition_expression(value: str) -> str:
     return value.split("//", 1)[0]
+
+
+def masked_condition_expression(value: str) -> str:
+    stripped = value.strip()
+    result = mask_gx_source(stripped)
+    if result.state == "masked":
+        return result.masked
+    return stripped.split("//", 1)[0]
 
 
 def bc_variable_targets(xml_text: str, transaction_lookup: dict[str, str]) -> dict[str, str]:
@@ -1492,14 +1621,12 @@ def extract_source_bc_load_transaction_evidence(
         variable_targets = bc_variable_targets(xml_text, transaction_lookup)
         if not variable_targets:
             continue
-        for block in source_blocks(xml_text):
-            for offset, line in enumerate(block.text.splitlines()):
-                cleaned = active_line(line)
-                if not cleaned.strip():
+        for block in source_blocks(xml_text, source.rel_path):
+            for masked_line, original_line, line_no in _masked_lines(block):
+                if not masked_line.strip():
                     continue
-                line_no = block.start_line + offset
 
-                for match in BC_LOAD_RE.finditer(cleaned):
+                for match in BC_LOAD_RE.finditer(masked_line):
                     receiver_name = match.group("receiver")[1:]
                     target_name = variable_targets.get(receiver_name.lower())
                     if not target_name:
@@ -1512,7 +1639,7 @@ def extract_source_bc_load_transaction_evidence(
                         relation_kind="loads_business_component",
                         line=line_no,
                         column=match.start("receiver") + 1,
-                        snippet=cleaned,
+                        snippet=_source_snippet(original_line, match),
                         extractor_rule="source_bc_load_transaction",
                         evidence_role="Source BC Load",
                     )
@@ -1543,14 +1670,12 @@ def extract_source_bc_save_transaction_evidence(
         variable_targets = bc_variable_targets(xml_text, transaction_lookup)
         if not variable_targets:
             continue
-        for block in source_blocks(xml_text):
-            for offset, line in enumerate(block.text.splitlines()):
-                cleaned = active_line(line)
-                if not cleaned.strip():
+        for block in source_blocks(xml_text, source.rel_path):
+            for masked_line, original_line, line_no in _masked_lines(block):
+                if not masked_line.strip():
                     continue
-                line_no = block.start_line + offset
 
-                for match in BC_SAVE_RE.finditer(cleaned):
+                for match in BC_SAVE_RE.finditer(masked_line):
                     receiver_name = match.group("receiver")[1:]
                     target_name = variable_targets.get(receiver_name.lower())
                     if not target_name:
@@ -1563,7 +1688,7 @@ def extract_source_bc_save_transaction_evidence(
                         relation_kind="saves_business_component",
                         line=line_no,
                         column=match.start("receiver") + 1,
-                        snippet=cleaned,
+                        snippet=_source_snippet(original_line, match),
                         extractor_rule="source_bc_save_transaction",
                         evidence_role="Source BC Save",
                     )
@@ -1594,14 +1719,12 @@ def extract_source_bc_delete_transaction_evidence(
         variable_targets = bc_variable_targets(xml_text, transaction_lookup)
         if not variable_targets:
             continue
-        for block in source_blocks(xml_text):
-            for offset, line in enumerate(block.text.splitlines()):
-                cleaned = active_line(line)
-                if not cleaned.strip():
+        for block in source_blocks(xml_text, source.rel_path):
+            for masked_line, original_line, line_no in _masked_lines(block):
+                if not masked_line.strip():
                     continue
-                line_no = block.start_line + offset
 
-                for match in BC_DELETE_RE.finditer(cleaned):
+                for match in BC_DELETE_RE.finditer(masked_line):
                     receiver_name = match.group("receiver")[1:]
                     target_name = variable_targets.get(receiver_name.lower())
                     if not target_name:
@@ -1614,7 +1737,7 @@ def extract_source_bc_delete_transaction_evidence(
                         relation_kind="deletes_business_component",
                         line=line_no,
                         column=match.start("receiver") + 1,
-                        snippet=cleaned,
+                        snippet=_source_snippet(original_line, match),
                         extractor_rule="source_bc_delete_transaction",
                         evidence_role="Source BC Delete",
                     )
@@ -1645,14 +1768,12 @@ def extract_source_bc_check_transaction_evidence(
         variable_targets = bc_variable_targets(xml_text, transaction_lookup)
         if not variable_targets:
             continue
-        for block in source_blocks(xml_text):
-            for offset, line in enumerate(block.text.splitlines()):
-                cleaned = active_line(line)
-                if not cleaned.strip():
+        for block in source_blocks(xml_text, source.rel_path):
+            for masked_line, original_line, line_no in _masked_lines(block):
+                if not masked_line.strip():
                     continue
-                line_no = block.start_line + offset
 
-                for match in BC_CHECK_RE.finditer(cleaned):
+                for match in BC_CHECK_RE.finditer(masked_line):
                     receiver_name = match.group("receiver")[1:]
                     target_name = variable_targets.get(receiver_name.lower())
                     if not target_name:
@@ -1665,7 +1786,7 @@ def extract_source_bc_check_transaction_evidence(
                         relation_kind="checks_business_component",
                         line=line_no,
                         column=match.start("receiver") + 1,
-                        snippet=cleaned,
+                        snippet=_source_snippet(original_line, match),
                         extractor_rule="source_bc_check_transaction",
                         evidence_role="Source BC Check",
                     )
@@ -1696,14 +1817,12 @@ def extract_source_simple_bc_insert_update_transaction_evidence(
         variable_targets = simple_bc_variable_targets(xml_text, transaction_lookup)
         if not variable_targets:
             continue
-        for block in source_blocks(xml_text):
-            for offset, line in enumerate(block.text.splitlines()):
-                cleaned = active_line(line)
-                if not cleaned.strip():
+        for block in source_blocks(xml_text, source.rel_path):
+            for masked_line, original_line, line_no in _masked_lines(block):
+                if not masked_line.strip():
                     continue
-                line_no = block.start_line + offset
 
-                for match in BC_SIMPLE_INSERT_UPDATE_RE.finditer(cleaned):
+                for match in BC_SIMPLE_INSERT_UPDATE_RE.finditer(masked_line):
                     receiver_name = match.group("receiver")[1:]
                     target_name = variable_targets.get(receiver_name.lower())
                     if not target_name:
@@ -1717,7 +1836,7 @@ def extract_source_simple_bc_insert_update_transaction_evidence(
                         relation_kind=f"{method}s_business_component",
                         line=line_no,
                         column=match.start("receiver") + 1,
-                        snippet=cleaned,
+                        snippet=_source_snippet(original_line, match),
                         extractor_rule=f"source_simple_bc_{method}_transaction",
                         evidence_role=f"Source Simple BC {method.capitalize()}",
                     )
@@ -1748,14 +1867,12 @@ def extract_source_external_object_method_evidence(
         variable_targets = external_object_variable_targets(xml_text, external_object_lookup)
         if not variable_targets:
             continue
-        for block in source_blocks(xml_text):
-            for offset, line in enumerate(block.text.splitlines()):
-                cleaned = active_line(line)
-                if not cleaned.strip():
+        for block in source_blocks(xml_text, source.rel_path):
+            for masked_line, original_line, line_no in _masked_lines(block):
+                if not masked_line.strip():
                     continue
-                line_no = block.start_line + offset
 
-                for match in EXTERNAL_OBJECT_METHOD_RE.finditer(cleaned):
+                for match in EXTERNAL_OBJECT_METHOD_RE.finditer(masked_line):
                     receiver_name = match.group("receiver")[1:]
                     target_name = variable_targets.get(receiver_name.lower())
                     if not target_name:
@@ -1768,7 +1885,7 @@ def extract_source_external_object_method_evidence(
                         relation_kind="calls_external_object_method",
                         line=line_no,
                         column=match.start("receiver") + 1,
-                        snippet=cleaned,
+                        snippet=_source_snippet(original_line, match),
                         extractor_rule="source_external_object_method",
                         evidence_role="Source ExternalObject method",
                     )
@@ -1925,7 +2042,7 @@ def extract_workwith_condition_evidence(
             if not condition_value:
                 continue
 
-            expression = effective_condition_expression(condition_value)
+            expression = masked_condition_expression(condition_value)
             direct_matches = procedure_direct_re.finditer(expression) if procedure_direct_re else ()
             for procedure_match in direct_matches:
                 target_name = procedure_lookup.get(procedure_match.group("name").lower())
@@ -1978,7 +2095,7 @@ def extract_workwith_condition_attribute_evidence(
                 if not attr_name.lower().endswith("condition"):
                     continue
 
-                expression = effective_condition_expression(attr_value)
+                expression = masked_condition_expression(attr_value)
                 direct_matches = procedure_direct_re.finditer(expression) if procedure_direct_re else ()
                 for procedure_match in direct_matches:
                     target_name = procedure_lookup.get(procedure_match.group("name").lower())
@@ -2672,7 +2789,7 @@ def extract_css_event_usage_evidence(usage_objects: Iterable[ObjectInfo]) -> lis
     evidences: list[Evidence] = []
     for source in usage_objects:
         xml_text = read_text(source.path)
-        for block in source_blocks(xml_text):
+        for block in source_blocks(xml_text, source.rel_path):
             block_text = strip_scss_comments(block.text)
             for offset, line in enumerate(block_text.splitlines()):
                 if not line.strip():
@@ -2954,12 +3071,11 @@ def write_index(
     packaged_domain_skips: list[dict[str, str]],
 ) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    if output_path.exists():
-        output_path.unlink()
+    tmp_path = output_path.with_name(output_path.name + f".tmp-{uuid.uuid4().hex}")
 
     extractor_signature_hash = compute_extractor_signature_hash()
 
-    conn = sqlite3.connect(output_path)
+    conn = sqlite3.connect(tmp_path)
     try:
         create_schema(conn)
         conn.executemany(
@@ -2980,6 +3096,27 @@ def write_index(
                 (
                     "packaged_domain_skips",
                     json.dumps(packaged_domain_skips, ensure_ascii=False, separators=(",", ":")),
+                ),
+            ],
+        )
+
+        sm = source_mask_metadata()
+        conn.executemany(
+            "INSERT INTO metadata(key, value) VALUES (?, ?)",
+            [
+                ("source_mask_blocks_scanned", str(sm["source_mask_blocks_scanned"])),
+                ("source_mask_blocks_masked", str(sm["source_mask_blocks_masked"])),
+                ("source_mask_native_skips", str(sm["source_mask_native_skips"])),
+                ("source_mask_mixed_layout_skips", str(sm["source_mask_mixed_layout_skips"])),
+                ("source_mask_degraded", "true" if sm["source_mask_degraded"] else "false"),
+                (
+                    "source_mask_degraded_blocks",
+                    json.dumps(sm["source_mask_degraded_blocks"], ensure_ascii=False, separators=(",", ":")),
+                ),
+                (
+                    "source_block_kind_counts",
+                    json.dumps(sm["source_block_kind_counts"], ensure_ascii=False, sort_keys=True,
+                              separators=(",", ":")),
                 ),
             ],
         )
@@ -3097,8 +3234,16 @@ def write_index(
         )
 
         conn.commit()
-    finally:
+    except BaseException:
         conn.close()
+        tmp_path.unlink(missing_ok=True)
+        raise
+    conn.close()
+    try:
+        os.replace(tmp_path, output_path)
+    except BaseException:
+        tmp_path.unlink(missing_ok=True)
+        raise
 
 
 def validation_report(
@@ -3282,6 +3427,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--validation-cases-path", type=Path)
     parser.add_argument("--fail-on-validation-failure", action="store_true")
     parser.add_argument(
+        "--allow-mask-degraded",
+        action="store_true",
+        help="Em falha de mascara de Source, gera indice degradado em vez de abortar com exit 9.",
+    )
+    parser.add_argument(
         "--parallel-kb-root",
         type=Path,
         help="Raiz da pasta paralela da KB; usada para resolver scripts/gx-object-type-catalog.override.json.",
@@ -3299,6 +3449,7 @@ def main() -> int:
     source_root = args.source_root.resolve()
     if not source_root.exists():
         raise SystemExit(f"SourceRoot not found: {source_root}")
+    reset_source_mask_state(args.allow_mask_degraded)
 
     try:
         activate_object_type_catalog(
@@ -3544,4 +3695,8 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except SourceMaskBlockedError as exc:
+        print(f"SOURCE_MASK_BLOCKED: {exc.source_file}:{exc.start_line}:{exc.reason}", file=sys.stderr)
+        raise SystemExit(9)

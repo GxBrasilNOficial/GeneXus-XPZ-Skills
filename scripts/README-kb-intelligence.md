@@ -48,7 +48,7 @@ Escopo de extracao de relacoes atual:
 
 - origens por `Source` efetivo: `Procedure`, `WebPanel`, `DataProvider`, `Transaction`, `API` e `DataSelector`
 - destinos por `Source` efetivo: `Procedure`, `WebPanel` e `DataProvider`
-- a varredura de `Source` cobre também `Source` serializado em XML estruturado (ex: `<Property><Name>ControlWhere</Name><Value>Objeto(...) ou udp(Objeto, ...)</Value></Property>` em layouts de WebPanel), não apenas `Source` em CDATA com código GeneXus livre
+- a varredura de `Source` serializado em XML estruturado (ex: `<Property><Name>ControlWhere</Name><Value>Objeto(...) ou udp(Objeto, ...)</Value></Property>` em layouts de WebPanel) continua na varredura de linha atual e tem cobertura **parcial**: em KB-A, 30 referências capturadas, 21 perdidas e 15 comentadas; a extração dedicada de `ControlWhere` fica para o incremento 17b
 - criacao de WebComponent em `Source` efetivo: `Procedure`, `WebPanel`, `DataProvider`, `Transaction`, `API` e `DataSelector` para `WebPanel` a partir de `<WebPanel>.Create(...)`, quando o alvo existir no inventario local de `WebPanel`
 - origem por action: `WorkWithForWeb`
 - destino por action: `Procedure` ou `WebPanel`
@@ -84,6 +84,20 @@ As formas de chamada de `Procedure` são resolvidas pelo inventario real, sem de
 
 Eles não substituem o acervo XML em `ObjetosDaKbEmXml` e não provam comportamento runtime.
 
+## Mascara de Source (incremento 17a)
+
+`scripts/GeneXusSourceLexer.py` e o dono unico do scanner de codigo-fonte GeneXus. Cada `Source` e classificado em `code`, `events`, `layout` ou `serialized` antes da extracao:
+
+- `code` e `events` recebem `mask_gx_source`, que substitui caractere de string/comentario por espaco preservando `len`, `\r`, `\n` e `\r\n`; `lex_source` e `mask_gx_source` derivam do mesmo scanner.
+- `layout` e `serialized` nao sao mascarados. Bloco que contem `<GxMultiForm` sem comecar por ele e `mixed_layout` e tambem nao e mascarado (varredura atual preservada).
+- Bloco `code`/`events` com linha nativa `csharp`/`java` e `native-skip`: nao e mascarado e a varredura atual e mantida; a contagem aparece na metadata.
+- `Source` cobre tambem `Formula` de `Attribute` e condicoes de `WorkWith`/`WorkWithForWeb` (via `masked_condition_expression`). CSS/SCSS continua com `strip_scss_comments`; `idBasedOn`, XML de layout e gravabilidade nao usam esta mascara.
+- `line`/`column` fisicos nao mudam. O `snippet` mantem a linha limpa atual para matches existentes; quando o match novo so existe porque a mascara atravessou um `//` dentro de string, usa a linha original truncada em 220 caracteres.
+
+Falha de mascara em bloco `code`/`events` nao nativo e fail-closed: o build retorna exit `9` com `SOURCE_MASK_BLOCKED: <arquivo>:<linha>:<motivo>` antes de gravar o SQLite, e um arquivo pre-existente permanece intacto (escrita atomica por temporario + `os.replace`). `-AllowMaskDegraded`/`--allow-mask-degraded` gera indice degradado.
+
+Chaves novas em `metadata` (lidas por `index-metadata`): `source_mask_blocks_scanned` (`code`/`events` unicos), `source_mask_blocks_masked`, `source_mask_native_skips`, `source_mask_mixed_layout_skips`, `source_mask_degraded` (`true|false`), `source_mask_degraded_blocks` (JSON com arquivo, linha e motivo) e `source_block_kind_counts` (JSON com `code`/`events`/`layout`/`serialized`). Em indice nao degradado, `scanned = masked + native_skips + mixed_layout_skips`.
+
 ## Pre-requisito Python
 
 - rebuild do índice exige **Python 3.x utilizavel** no `PATH` (resolucao em `scripts/GeneXusPythonPrerequisite.ps1`, chamado por `Build-KbIntelligenceIndex.ps1`)
@@ -91,6 +105,7 @@ Eles não substituem o acervo XML em `ObjetosDaKbEmXml` e não provam comportame
 - ao chegar à etapa de assinatura, o gate `Test-*KbIndexGate.ps1` também exige Python 3 para executar `GeneXusKbIntelligenceExtractorSignature.py` via `GeneXusKbIntelligenceExtractorContract.ps1`; sem Python, bloqueia (`BLOCK:`; com `-AsJson`, `status=BLOCK` e exit `1`), mesmo que o índice exista. Exit `8` pertence ao rebuild
 - as fachadas 9-TXW (`Test-GeneXusTransactionWritability.ps1`) e 9-PNW (`Test-GeneXusNewWritableTargets.ps1`) também exigem Python 3.x utilizável no `PATH`: `GeneXusTransactionWritabilitySupport.ps1` resolve o executável antes de chamar `GeneXusWritabilityOperational.py`; sem Python, a operação termina com `PREREQUISITO AUSENTE`, mesmo que o índice exista. A resolução rejeita o stub `WindowsApps` da Microsoft Store
 - falha do motor Python em `Build-KbIntelligenceIndex.ps1` repassa a saída capturada e preserva o exit code do `.py` (incluindo exit `2` para override de catálogo inválido/bloqueado)
+- falha de mascara de `Source` (lexer) em bloco `code`/`events` nao nativo retorna exit `9` com `SOURCE_MASK_BLOCKED: <arquivo>:<linha>:<motivo>` **antes** de gravar o SQLite; `-AllowMaskDegraded`/`--allow-mask-degraded` gera indice degradado com `source_mask_degraded=true` e `source_mask_degraded_blocks` na metadata
 - **rigor**: sync XPZ/XML oficial **não** termina sem índice regenerado — a materialização em `ObjetosDaKbEmXml` pode já ter concluido; declarar **fluxo incompleto**, não sync OK nem falha do pacote exportado; não autorizar triagem ampla sem índice; ver `README.md`, `08-guia-para-agente-gpt.md` e `xpz-sync`
 
 ## Gerar índice
@@ -170,7 +185,7 @@ O gate `Test-*KbIndexGate.ps1` (molde em `xpz-kb-parallel-setup/examples/Test-Kb
 
 ## Schema e versionamento
 
-O índice armazena `schema_version` na tabela `metadata`. O valor atual e `"5"` (inclui a tabela `transaction_attribute_writability` com `writability_rule_version`, a tabela `css_class` do catalogo de classes CSS, os marcadores de Pattern e `origin TEXT NOT NULL` na tabela `objects`). A assinatura atual usa `EXTRACTOR_SIGNATURE_VERSION="16"` e `EXTRACTOR_SIGNATURE_FORMAT="manifest-lf-v1"`.
+O índice armazena `schema_version` na tabela `metadata`. O valor atual e `"5"` (inclui a tabela `transaction_attribute_writability` com `writability_rule_version`, a tabela `css_class` do catalogo de classes CSS, os marcadores de Pattern e `origin TEXT NOT NULL` na tabela `objects`). A assinatura atual usa `EXTRACTOR_SIGNATURE_VERSION="17"` e `EXTRACTOR_SIGNATURE_FORMAT="manifest-lf-v1"`.
 
 O design e deliberado: o índice e artefato derivado e sempre regeneravel. Por isso não existe caminho de migracao de schema — qualquer mudanca estrutural no motor exige rebuild completo.
 
@@ -568,6 +583,13 @@ Self-test local (não depende de pasta paralela real) para `idBasedOn`→`Domain
 
 ```powershell
 .\scripts\Test-KbIntelligenceIdBasedOnDomainSelfTest.ps1
+```
+
+Self-test local do lexer/máscara de `Source` (incremento 17a): 1:1/CRLF, três estados, spans, classificação `code`/`events`/`layout`/`serialized`, bloco misto, `native-skip`, falha exit `9` com SQLite pre-existente intacto, `-AllowMaskDegraded` e metadata de máscara:
+
+```powershell
+.\scripts\Test-GeneXusSourceLexerSelfTest.py
+.\scripts\Test-KbIntelligenceSourceMaskSelfTest.ps1
 ```
 
 Self-tests Python locais do extrator, da assinatura e da gravabilidade do KbIntelligence:

@@ -203,6 +203,9 @@ function Invoke-IndexRefresh {
             if ($rebuildExitCode -eq 8) {
                 throw "$(Get-GeneXusPythonPrerequisiteErrorMessage)"
             }
+            if ($rebuildExitCode -eq 9) {
+                throw "SOURCE_MASK_BLOCKED: falha de mascara de Source no rebuild; corrigir o bloco indicado ou usar -AllowMaskDegraded conscientemente."
+            }
 
             throw "Falha no rebuild do indice (exit $rebuildExitCode)."
         }

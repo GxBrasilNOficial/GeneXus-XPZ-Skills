@@ -26,15 +26,11 @@ from typing import Any
 
 import GeneXusTransactionWritabilityCore as automatic
 from GeneXusCanonicalJson import CanonicalJsonError, canonical_bytes, loads_strict
+from GeneXusSourceLexer import OperationalError, Token, lex_source
 
 
 SOURCE_PART_TYPE_GUID = "528d1c06-a9c2-420d-bd35-21dca83f12ff"
 PROCEDURE_TYPE_GUID = "84a12160-f59b-4ad7-a683-ea4481ac23e9"
-IDENTIFIER_START = re.compile(r"[^\W\d]", re.UNICODE)
-
-
-class OperationalError(ValueError):
-    pass
 
 
 class _OverlayOrigins(dict[str, str]):
@@ -50,15 +46,6 @@ class DecisionIssue(OperationalError):
         super().__init__(detail)
         self.status = status
         self.reason_code = reason_code
-
-
-@dataclass(frozen=True)
-class Token:
-    kind: str
-    value: str
-    start: int
-    end: int
-    line: int
 
 
 @dataclass(frozen=True)
@@ -79,118 +66,6 @@ class NewBlock:
 
 def _sha256(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8", errors="strict")).hexdigest()
-
-
-def _identifier_start(char: str) -> bool:
-    return char == "_" or bool(IDENTIFIER_START.fullmatch(char))
-
-
-def _identifier_continue(char: str) -> bool:
-    return char == "_" or char.isalnum()
-
-
-_NATIVE_BLOCK_LINE = re.compile(r"[ \t]*(?:csharp|java)(?=[ \t\r\n]|$)", re.IGNORECASE)
-
-
-def _is_native_block_line(source: str, line_start: int) -> bool:
-    return _NATIVE_BLOCK_LINE.match(source, line_start) is not None
-
-
-def lex_source(source: str) -> list[Token]:
-    r"""Lex code tokens while ignoring GeneXus string literals and comments.
-
-    Double-slash and C-style block comments are ignored.  Inside a literal a
-    backslash is an ordinary character and the first matching quote closes the
-    literal: measured on GeneXus validation and generated code, a backslash before
-    a quote is not an escape in GeneXus code, and a doubled quote does not embed a
-    quote (GeneXus rejects a literal such as "a""b").  Lines that start with a
-    native block keyword (csharp or java) are not analyzed by this lexer, so a
-    backslash before a quote on such a line is rejected, fail-closed: the native
-    language may read it as an escape, and this lexer's quote pairing could then
-    hide New or EndNew markers.  Unterminated literals at end of input and
-    unterminated block comments are rejected; newlines inside a literal are still
-    accepted.
-    """
-    tokens: list[Token] = []
-    i = 0
-    line = 1
-    line_start = 0
-    length = len(source)
-    while i < length:
-        char = source[i]
-        if char in "\r\n":
-            if char == "\r" and i + 1 < length and source[i + 1] == "\n":
-                i += 1
-            i += 1
-            line += 1
-            line_start = i
-            continue
-        if char.isspace():
-            i += 1
-            continue
-        if source.startswith("//", i):
-            end = i + 2
-            while end < length and source[end] not in "\r\n":
-                end += 1
-            i = end
-            continue
-        if source.startswith("/*", i):
-            end = source.find("*/", i + 2)
-            if end < 0:
-                raise OperationalError("new-extraction-incomplete: unterminated block comment")
-            line += source.count("\n", i, end + 2)
-            last_lf = source.rfind("\n", i, end + 2)
-            if last_lf >= 0:
-                line_start = last_lf + 1
-            i = end + 2
-            continue
-        if char in ('"', "'"):
-            quote = char
-            start = i
-            native = _is_native_block_line(source, line_start)
-            i += 1
-            closed = False
-            while i < length:
-                if native and source[i] == "\\" and i + 1 < length and source[i + 1] == quote:
-                    raise OperationalError(
-                        "new-extraction-incomplete: backslash before quote on a native block line is not analyzed")
-                if source[i] == quote:
-                    i += 1
-                    closed = True
-                    break
-                if source[i] in "\r\n":
-                    if source[i] == "\r" and i + 1 < length and source[i + 1] == "\n":
-                        i += 1
-                    i += 1
-                    line += 1
-                    line_start = i
-                    continue
-                i += 1
-            if not closed:
-                raise OperationalError(f"new-extraction-incomplete: unterminated string at offset {start}")
-            tokens.append(Token("string", source[start:i], start, i, line))
-            continue
-        if _identifier_start(char):
-            start = i
-            i += 1
-            while i < length and _identifier_continue(source[i]):
-                i += 1
-            tokens.append(Token("identifier", source[start:i], start, i, line))
-            continue
-        if char == "&":
-            tokens.append(Token("ampersand", char, i, i + 1, line))
-            i += 1
-            continue
-        if char in "=<>!":
-            start = i
-            i += 1
-            if i < length and source[i] in "=<>":
-                i += 1
-            tokens.append(Token("operator", source[start:i], start, i, line))
-            continue
-        tokens.append(Token("punctuation", char, i, i + 1, line))
-        i += 1
-    return tokens
 
 
 def _is_command_keyword(tokens: list[Token], index: int, keyword: str) -> bool:

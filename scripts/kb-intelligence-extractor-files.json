@@ -5,6 +5,7 @@
     "scripts/GeneXusCanonicalJson.py",
     "scripts/GeneXusKbIntelligenceExtractorSignature.py",
     "scripts/GeneXusObjectTypeCatalogCore.py",
+    "scripts/GeneXusSourceLexer.py",
     "scripts/GeneXusTransactionWritabilityCore.py",
     "scripts/Query-KbIntelligenceIndex.py",
     "scripts/gx-legacy-export-element-registry.json",

@@ -23,6 +23,9 @@
 .PARAMETER FailOnValidationFailure
     Return a non-zero exit code when any validation case fails.
 
+.PARAMETER AllowMaskDegraded
+    Em falha de máscara de Source, gera índice degradado em vez de abortar com exit 9.
+
 .PARAMETER ParallelKbRoot
     Raiz da pasta paralela da KB; resolve scripts/gx-object-type-catalog.override.json quando existir.
 
@@ -42,6 +45,8 @@ param(
     [string]$ValidationCasesPath,
 
     [switch]$FailOnValidationFailure,
+
+    [switch]$AllowMaskDegraded,
 
     [string]$ParallelKbRoot,
 
@@ -79,6 +84,9 @@ if ($ValidationCasesPath) {
 }
 if ($FailOnValidationFailure) {
     $arguments += "--fail-on-validation-failure"
+}
+if ($AllowMaskDegraded) {
+    $arguments += "--allow-mask-degraded"
 }
 if ($ParallelKbRoot) {
     $arguments += @("--parallel-kb-root", $ParallelKbRoot)
