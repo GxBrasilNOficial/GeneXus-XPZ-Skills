@@ -148,3 +148,4 @@ Origem: entrada «Indentação de Source: índice/cache GUID→path na resoluç�
 - `aa5da49` — Monta índice GUID->candidatos uma vez na indentação.
 - `981116d` — Protege o índice da indentação com contadores e remove BOM.
 - `d3c9455` — GUID vazio na indentação volta a ser unresolved com índice.
+- `cdcf475` — Normaliza GUID da indentação e fecha eixos irmãos.
