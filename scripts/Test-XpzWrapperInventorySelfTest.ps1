@@ -397,6 +397,18 @@ Write-Output 'GATE_OK'
     @'
 #requires -Version 7.4
 param([switch]$AsJson)
+$payload = @{ status = 'OK'; sourceMaskDegraded = $false }
+Write-Host $payload.status
+Write-Output 'GATE_OK'
+'@ | Set-Content -LiteralPath $indexGateStandardPath -Encoding utf8NoBOM
+
+    $output = (& $inventoryScriptPath -KbParallelRoot $kbRoot -SkillsExamplesPath $examplesPath 2>&1 |
+        ForEach-Object { $_.ToString() }) -join ' '
+    Assert-Contains -Text $output -Pattern 'Test-DemoKbIndexGate\.ps1\(reason=source_mask_contract_missing\)' -Message 'acesso a outra propriedade nao pode satisfazer o contrato'
+
+    @'
+#requires -Version 7.4
+param([switch]$AsJson)
 $forward = @{}
 if ($AsJson) { $forward['AsJson'] = $true }
 & $engine @forward
@@ -430,6 +442,9 @@ if ($coverageMatch.Success -and $coverageMatch.Groups['value'].Value -in @('comp
 } else {
     $gateStatus = 'PENDENTE'
 }
+$maskMatch = [regex]::Match($gateRaw, 'source_mask_degraded\s*[:=]\s*(?<value>true|false)')
+$sourceMaskDegraded = if ($maskMatch.Success) { $maskMatch.Groups['value'].Value } else { 'unknown' }
+if ($sourceMaskDegraded -eq 'unknown') { $gateStatus = 'PENDENTE' }
 '@ | Set-Content -LiteralPath $setupAuditStandardPath -Encoding utf8NoBOM
 
     $output = (& $inventoryScriptPath -KbParallelRoot $kbRoot -SkillsExamplesPath $examplesPath 2>&1 |
@@ -437,6 +452,27 @@ if ($coverageMatch.Success -and $coverageMatch.Groups['value'].Value -in @('comp
     Assert-NotContains -Text $output -Pattern 'WRITABILITY_CONSUMER_CONTRACT_STALE' -Message 'consumidor com marcador e cobertura nao pode ser stale'
     Assert-NotContains -Text $output -Pattern 'Test-DemoKbSetupAudit\.ps1\(reason=writability_consumer_contract_unclassified' -Message 'consumidor direto com prova AST nao pode ser unclassified'
     Assert-NotContains -Text $output -Pattern 'Test-DemoKbSetupAudit\.ps1\(reason=' -Message 'consumidor direto com prova AST nao pode receber finding do setup'
+
+    # Consumidor direto que le so a cobertura e ignora a mascara.
+    @'
+#requires -Version 7.4
+param([switch]$AsJson)
+# WRITABILITY_COVERAGE_CONTRACT_V1
+& $enginePath -AsJson:$AsJson
+$gateRaw = 'writability_coverage: partial GATE_OK'
+$coverageMatch = [regex]::Match($gateRaw, 'writability_coverage\s*[:=]\s*(?<value>\S+)')
+$writabilityCoverage = 'unknown'
+$gateStatus = if ($gateRaw -match '\bGATE_OK\b') { 'OK' } else { 'PENDENTE' }
+if ($coverageMatch.Success -and $coverageMatch.Groups['value'].Value -in @('complete-in-model', 'partial', 'invalid')) {
+    $writabilityCoverage = $coverageMatch.Groups['value'].Value
+} else {
+    $gateStatus = 'PENDENTE'
+}
+'@ | Set-Content -LiteralPath $setupAuditStandardPath -Encoding utf8NoBOM
+
+    $output = (& $inventoryScriptPath -KbParallelRoot $kbRoot -SkillsExamplesPath $examplesPath 2>&1 |
+        ForEach-Object { $_.ToString() }) -join ' '
+    Assert-Contains -Text $output -Pattern 'Test-DemoKbSetupAudit\.ps1\(reason=source_mask_consumer_contract_missing\)' -Message 'consumidor direto sem mascara deve ser sinalizado'
 
     # Migracao parcial: declara [switch]$AsJson mas NAO repassa ao motor -> deve ser
     # sinalizado (a checagem detecta o repasse, nao a mera mencao do termo).

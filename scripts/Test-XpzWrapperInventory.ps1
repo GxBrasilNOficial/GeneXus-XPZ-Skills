@@ -20,6 +20,8 @@
                                             source_mask_contract_missing quando o wrapper de gate tem
                                             implementacao local e nao emite source_mask_degraded com
                                             evidencia de saida (comentario ou variavel morta nao contam);
+                                            source_mask_consumer_contract_missing quando consumidor direto
+                                            de Test-KbSetupAudit le so a cobertura e ignora source_mask_degraded;
                                             forwards_unknown_engine_param quando o wrapper repassa a um
                                             motor compartilhado advanced um parametro nao-declarado;
                                             shared_engine_unresolved quando o caminho de motor inferido
@@ -379,6 +381,10 @@ foreach ($exampleFile in Get-ChildItem -LiteralPath $SkillsExamplesPath -Filter 
                         $engineDiagnostics.Add(('{0}(reason={1}{2})' -f $standardLocalName, $consumerFinding.Reason, $detail))
                     }
                 }
+            }
+            if ($consumerFinding.Classification -eq 'direct-compliant' -and
+                -not (Test-XpzSetupAuditMaskConsumerBehavior -WrapperPath $standardPath)) {
+                $customized.Add(('{0}(reason=source_mask_consumer_contract_missing)' -f $standardLocalName))
             }
         }
 

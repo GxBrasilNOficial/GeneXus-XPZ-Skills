@@ -12,7 +12,7 @@
     1. READY        - repo limpo + stubs verdes + -SkipFetch -> ready (exit 0).
     2. K8 red       - estado bloqueante do setup-audit -> blocked.
     3. K9 block     - status BLOCK do index gate -> blocked.
-    3b-3e. K9 mask  - sourceMaskDegraded ausente/inconsistente bloqueia; true+aviso passa.
+    3b-3f. K9 mask  - sourceMaskDegraded ausente/inconsistente/tipo invalido bloqueia; true+aviso passa.
     4. wrapper none - sem wrapper de setup-audit -> K8 block (resolvedBy none).
     5. ambiguous    - 2 wrappers de setup-audit sem config -> K8 block.
     6. BaseRef inv. - ref inexistente -> unknown -> blocked.
@@ -68,6 +68,10 @@ param([switch]$AsJson)
 $stubMaskedInconsistentIndex = @'
 param([switch]$AsJson)
 '{"status":"OK","sourceMaskDegraded":false,"sourceMaskDegradedWarning":"aviso indevido"}'
+'@
+$stubMaskedWrongTypeIndex = @'
+param([switch]$AsJson)
+'{"status":"OK","sourceMaskDegraded":"false"}'
 '@
 
 function Assert-True {
@@ -154,6 +158,15 @@ try {
   $k9_3e = @($o3e.json.gates | Where-Object { $_.id -eq 'K9' })[0]
   Assert-True ($o3e.json.pushReadiness -eq 'blocked') "3e: blocked esperado; obtido $($o3e.json.pushReadiness)"
   Assert-True ([string]$k9_3e.message -match 'inconsistente') "3e: mensagem deveria citar estado inconsistente; obtido $($k9_3e.message)"
+
+  # --- 3f: tipo invalido de sourceMaskDegraded -> block ---
+  $r3f = New-OrchBase
+  Set-XpzPrePushSelfTestFile -Root $r3f.Root -RelPath 'scripts/Test-FixKbIndexGate.ps1' -Content $stubMaskedWrongTypeIndex
+  [void](New-XpzPrePushSelfTestCommit -Root $r3f.Root -Message '3f: index gate tipo invalido')
+  $o3f = Invoke-Orch -Root $r3f.Root -BaseRef $r3f.Base
+  $k9_3f = @($o3f.json.gates | Where-Object { $_.id -eq 'K9' })[0]
+  Assert-True ($o3f.json.pushReadiness -eq 'blocked') "3f: blocked esperado; obtido $($o3f.json.pushReadiness)"
+  Assert-True ([string]$k9_3f.message -match 'sourceMaskDegraded') "3f: mensagem deveria citar sourceMaskDegraded; obtido $($k9_3f.message)"
 
   # --- 4: wrapper none -> K8 block ---
   $r4 = New-OrchBase

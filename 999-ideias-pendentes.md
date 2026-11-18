@@ -13,6 +13,25 @@ Entradas legadas sem avaliação carregam `FALTA AVALIAR` em ambos os campos at�
 
 **Editar a substância de um gap já registrado (neste arquivo ou no `998-ideias-descartadas-e-porque.md`) exige justificativa no corpo do commit.** Enfraquecer, reprecisar ou descartar a severidade de uma afirmação — não apenas corrigir redação, adicionar contexto ou reorganizar — precisa dizer **por que**: nova evidência medida, releitura do código, ou correção de erro anterior. Motivo: uma edição que suaviza um gap sem dizer por que **parece resolvido** para quem lê depois, e é pior do que o gap não ter sido achado — quem lê para de investigar. Caso real (2026-08-17): um commit sem corpo trocou «não é citado em lugar nenhum» por «não era coberto na documentação normativa»; a formulação nova era defensável à primeira vista, mas escondia que a única outra menção ao símbolo no repositório era uma cópia **defasada** num self-test — a frase sugeria mitigação onde havia agravante. Só foi achado porque outra sessão foi verificar; sem corpo no commit, não havia como saber se a mudança vinha de leitura nova ou só de estilo.
 
+<a id="inventario-prova-mascara-alcancabilidade-20261118"></a>
+
+## Inventário: prova de saída da máscara é estrutural, não de alcançabilidade — 2026-11-18
+
+- **Importância** — baixa (o inventário é alerta estático; K9 bloqueia `sourceMaskDegraded` ausente ou inconsistente e o setup audit deixa `indice/gate=PENDENTE`. O falso negativo afeta a completude do alerta, não a liberação operacional).
+- **Maturidade** — ideia (direção de análise de alcançabilidade em aberto; não há caso real que justifique o custo).
+
+**Contexto.** `Test-XpzIndexGateMaskOutputEvidence` (`scripts/XpzWrapperEngineParamSupport.ps1`) prova que um wrapper de gate com implementação local emite `source_mask_degraded`/`sourceMaskDegraded` por AST: pipeline de saída de nível de instrução ou variável usada em saída/`ConvertTo-Json`. Comentário e variável morta não contam. A prova é estrutural: não verifica se o pipeline é alcançável.
+
+**Limite medido (2026-11-18).** Um wrapper com `function EmitMask { Write-Output 'source_mask_degraded: false' }` e apenas `Write-Output 'GATE_OK'` no nível superior retornou evidência `true`; o inventário não sinalizou `source_mask_contract_missing`, embora a função nunca seja chamada. O mesmo vale para emissão por string dinâmica ou reflexão não modelada. A variante `Write-Host $payload.status` foi endurecida nesta mesma frente e deixa de contar; o limite que resta é de alcançabilidade, não de acesso a propriedade.
+
+**Por que não corrigir agora.** Exigiria grafo de chamadas ou restringir a evidência a statements de nível superior/chamadas comprovadas, com risco de falso positivo em wrappers legítimos que emitem por função auxiliar. O runtime já cobre o caso operacional: K9 bloqueia contrato ausente ou inconsistente e o setup audit não fecha `materializado_e_indice_validado`.
+
+**Ideia (se houver caso real).** Restringir a evidência a pipelines de nível superior ou a funções efetivamente chamadas a partir do nível superior; alternativa mais barata é exigir uma linha explícita de saída no wrapper local. Avaliar custo/benefício antes de implementar.
+
+**Gatilho.** Caso real em pasta paralela em que um wrapper com emissão morta ou dinâmica passe no inventário e o K9/setup audit não sejam executados, ou revisão que mostre impacto concreto.
+
+**Relacionado.** `scripts/XpzWrapperEngineParamSupport.ps1` (`Test-XpzIndexGateMaskOutputEvidence`); `scripts/Test-XpzWrapperInventory.ps1` (`source_mask_contract_missing`); `scripts/Test-XpzWrapperInventorySelfTest.ps1`; `scripts/Test-XpzKbIndexGate.ps1`; `scripts/Test-XpzSetupAudit.ps1`; `02-regras-operacionais-e-runtime.md`; `09-inventario-e-rastreabilidade-publica.md`.
+
 <a id="indentacao-source-expandir-allowlist-20261117"></a>
 
 ## Indentação de Source: expandir allowlist além de Procedure+Source — 2026-11-17

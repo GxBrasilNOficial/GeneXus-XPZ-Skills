@@ -1054,11 +1054,65 @@ function Test-XpzIndexGateMaskOutputEvidence {
         $isBareExpression = @($commandNames).Count -eq 0
         if (-not $hasOutputCommand -and -not $isBareExpression) { continue }
         foreach ($name in $variables) {
-            if ($pipe.Extent.Text -match ('\$' + [regex]::Escape($name) + '\b')) { return $true }
+            $escapedName = [regex]::Escape($name)
+            if ($pipe.Extent.Text -notmatch ('\$' + $escapedName + '\b')) { continue }
+            $fieldAccessPatterns = @(
+                ('\$' + $escapedName + '\s*\.\s*sourceMaskDegraded\b'),
+                ('\$' + $escapedName + '\s*\[\s*[''"]sourceMaskDegraded[''"]\s*\]')
+            )
+            $hasFieldAccess = $false
+            foreach ($pattern in $fieldAccessPatterns) {
+                if ($pipe.Extent.Text -match $pattern) { $hasFieldAccess = $true; break }
+            }
+            if ($hasFieldAccess) { return $true }
+            # Acesso a outra propriedade/indice nao prova que o campo foi emitido.
+            if ($pipe.Extent.Text -match ('\$' + $escapedName + '\s*[.\[]')) { continue }
+            return $true
         }
     }
 
     return $false
+}
+
+
+function Test-XpzSetupAuditMaskConsumerBehavior {
+    <#
+      Prova estrutural de que um consumidor DIRETO de Test-*KbSetupAudit.ps1
+      le e valida source_mask_degraded a partir de $gateRaw. Exige extracao por
+      [regex]::Match($gateRaw, ...source_mask_degraded...) e um fallback executavel
+      (sourceMaskDegraded='unknown' ou gateStatus='PENDENTE'). Nao prova
+      alcançabilidade; K9/setup audit continuam sendo a autoridade em runtime.
+    #>
+    param([Parameter(Mandatory)][string]$WrapperPath)
+
+    $parseErrors = $null
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile($WrapperPath, [ref]$null, [ref]$parseErrors)
+    if ($null -eq $ast -or @($parseErrors).Count -gt 0) { return $false }
+
+    $hasMaskExtraction = @($ast.FindAll({
+                param($n) $n -is [System.Management.Automation.Language.InvokeMemberExpressionAst] -and
+                $n.Extent.Text -match '(?is)^\[regex\]::Match\s*\(\s*\$gateRaw\s*,.*source_mask_degraded(?![A-Za-z0-9_])'
+            }, $true)).Count -gt 0
+    if (-not $hasMaskExtraction) { return $false }
+
+    $hasUnknownAssignment = @($ast.FindAll({
+                param($n) $n -is [System.Management.Automation.Language.AssignmentStatementAst] -and
+                $n.Left -is [System.Management.Automation.Language.VariableExpressionAst] -and
+                $n.Left.VariablePath.UserPath -ieq 'sourceMaskDegraded' -and
+                $n.Right -is [System.Management.Automation.Language.CommandExpressionAst] -and
+                $n.Right.Expression -is [System.Management.Automation.Language.StringConstantExpressionAst] -and
+                $n.Right.Expression.Value -eq 'unknown'
+            }, $true)).Count -gt 0
+    $hasPendingAssignment = @($ast.FindAll({
+                param($n) $n -is [System.Management.Automation.Language.AssignmentStatementAst] -and
+                $n.Left -is [System.Management.Automation.Language.VariableExpressionAst] -and
+                $n.Left.VariablePath.UserPath -ieq 'gateStatus' -and
+                $n.Right -is [System.Management.Automation.Language.CommandExpressionAst] -and
+                $n.Right.Expression -is [System.Management.Automation.Language.StringConstantExpressionAst] -and
+                $n.Right.Expression.Value -eq 'PENDENTE'
+            }, $true)).Count -gt 0
+
+    return ($hasUnknownAssignment -or $hasPendingAssignment)
 }
 
 
