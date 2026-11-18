@@ -137,12 +137,14 @@ Origem: dúvida aberta no commit `bb256c7`, que corrigiu o caminho de configura�
 
 Origem: entrada «Indentação de Source: índice/cache GUID→path na resolução de baseline — 2026-11-17» de `999-ideias-pendentes.md`, removida após a implementação. Diagnóstico externo: com acervo ~15k XML e 2 Procedures, N×`Select-String` (~12 s por GUID) dominava ~24 s de ~28 s; Absolute não era o custo; `-BaselinePath` isolado ~3 s.
 
-**Escopo entregue.** `Initialize-AcervoDirectoryGuidCandidateIndex` monta, uma vez por execução (quando `-AcervoPath` é pasta e não há `-BaselinePath`), o mapa textual dos GUIDs Procedure in-scope com uma enumeração `*.xml -Force` e um `ReadAllText` por arquivo; `Resolve-BaselineObjectNode` reutiliza o mapa. Fallback por GUID preservado se o índice não cobrir a raiz. Semântica `unresolved`/`new-object`/duplicata/ocultos/falha de leitura inalterada.
+**Escopo entregue.** `Initialize-AcervoDirectoryGuidCandidateIndex` monta, uma vez por execução (quando `-AcervoPath` é pasta e não há `-BaselinePath`), o mapa textual dos GUIDs Procedure in-scope com uma enumeração `*.xml -Force` e um `ReadAllText` por arquivo; `Resolve-BaselineObjectNode` reutiliza o mapa. Fallback por GUID preservado se o índice não cobrir a raiz. JSON aditivo de pré-filtro: `acervoDirectoryIndexUsed`, `acervoDirectoryPrefilterPassCount`, `acervoDirectoryPrefilterFileReads`. Semântica de duplicata/ocultos/falha de leitura preservada; identidade de GUID endurecida depois do índice: rejeição antecipada de GUID vazio (`d3c9455`) e `Normalize-ObjectGuid` (Trim + `TryParse`, rejeita Empty/inválido; alinha índice/`Find`/pré-filtro/offset) para espaços nas bordas, zero e não-UUID — evita falso `no-baseline-new-object` introduzido ou deixado aberto pelo caminho do índice.
 
-**Validação.** `Test-GeneXusSourceIndentationSelfTest.ps1` (caso 23: ExportFile com 2 Procedures). Docs: `02`, `09`, CHANGELOG, SKILL/checklist.
+**Validação.** `Test-GeneXusSourceIndentationSelfTest.ps1`: caso 23 (ExportFile com 2 Procedures + contadores 1 passagem/N leituras); caso 24 (ExportFile misto GUID ok + vazio → unresolved no vazio); casos 25–27 (GUID padded → compared; zero e `YOUR-GUID-HERE` → unresolved). Docs: `02`, `09`, CHANGELOG, SKILL/checklist.
 
 **Fora do escopo.** Absolute default; streaming parcial de JSON; LCS em Source muito grande; progresso/aviso para pastas grandes.
 
 ### Rastreabilidade
 
 - `aa5da49` — Monta índice GUID->candidatos uma vez na indentação.
+- `981116d` — Protege o índice da indentação com contadores e remove BOM.
+- `d3c9455` — GUID vazio na indentação volta a ser unresolved com índice.

@@ -8,7 +8,8 @@
     Object duplicado entre profundidades, >20 hits textuais sem teto,
     AcervoPath=arquivo sem GUID=unresolved, XML oculto encontrado com -Force,
     ExportFile com 2 Procedures + contadores de prefiltro (1 passagem / N leituras),
-    ExportFile misto GUID ok + GUID vazio = unresolved no vazio).
+    ExportFile misto GUID ok + GUID vazio = unresolved no vazio,
+    GUID com espacos nas bordas compared, GUID zero/invalido = unresolved).
 #>
 
 Set-StrictMode -Version Latest
@@ -369,6 +370,34 @@ Assert-True ($r24empty.baselineStatus -eq 'no-baseline-unresolved') 'GUID vazio 
 Assert-True ($r24empty.status -eq 'inconclusive') 'GUID vazio deve status inconclusive'
 Assert-True (-not (@($r24empty.findings | Where-Object { $_.code -eq 'indent-under-depth' }).Count -gt 0)) 'GUID vazio nao inventa under-depth'
 Assert-True ($r24.acervoDirectoryIndexUsed -eq $true) 'indice ainda montado pelo GUID ok'
+
+# 25) GUID com espacos nas bordas no input: indice + Find normalizados -> compared
+$paddedGuidXml = @"
+<Object type="$procType" name="ProcPadded" guid="  $guidGood  ">
+  <Part type="$mainPart">
+    <Source><![CDATA[$badUnder]]></Source>
+  </Part>
+</Object>
+"@
+$r25 = Invoke-Indent -Xml $paddedGuidXml -AcervoPath $acervoRoot
+Assert-True ($r25.baselineCompared -eq $true) 'GUID com espacos deve compared apos Normalize-ObjectGuid'
+Assert-True ($r25.baselineStatus -eq 'compared') 'baselineStatus compared com GUID padded'
+Assert-True (Test-HasCode -Result $r25 -Code 'indent-under-depth') 'GUID padded compared deve under-depth'
+
+# 26) GUID zero -> unresolved (nao new-object), mesmo com AcervoPath pasta
+$guidZero = '00000000-0000-0000-0000-000000000000'
+$r26 = Invoke-Indent -Xml (New-ProcXml -Guid $guidZero -Name 'ProcZero' -Source $badUnder) -AcervoPath $acervoRoot
+Assert-True ($r26.baselineStatus -eq 'no-baseline-unresolved') 'GUID zero deve unresolved'
+Assert-True ($r26.baselineCompared -ne $true) 'GUID zero nao compared'
+Assert-True ($r26.sourceIndentStatus -eq 'inconclusive') 'GUID zero inconclusive'
+Assert-True (-not (Test-HasCode -Result $r26 -Code 'indent-under-depth')) 'GUID zero nao inventa under-depth'
+
+# 27) GUID nao-UUID -> unresolved (nao new-object)
+$r27 = Invoke-Indent -Xml (New-ProcXml -Guid 'YOUR-GUID-HERE' -Name 'ProcInvalid' -Source $badUnder) -AcervoPath $acervoRoot
+Assert-True ($r27.baselineStatus -eq 'no-baseline-unresolved') 'GUID invalido deve unresolved'
+Assert-True ($r27.baselineCompared -ne $true) 'GUID invalido nao compared'
+Assert-True ($r27.sourceIndentStatus -eq 'inconclusive') 'GUID invalido inconclusive'
+Assert-True (-not (Test-HasCode -Result $r27 -Code 'indent-under-depth')) 'GUID invalido nao inventa under-depth'
 
 Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
 Write-Output 'OK: Test-GeneXusSourceIndentationSelfTest.ps1'

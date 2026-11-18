@@ -511,6 +511,15 @@ function Get-LcsLineDiff {
     return $refined.ToArray()
 }
 
+function Normalize-ObjectGuid {
+    param([AllowNull()][string]$Value)
+    # Espelho do padrao DomainDrift: Trim + TryParse; rejeita Empty/invalido.
+    if ([string]::IsNullOrWhiteSpace($Value)) { return '' }
+    $parsed = [guid]::Empty
+    if (-not [guid]::TryParse($Value.Trim(), [ref]$parsed) -or $parsed -eq [guid]::Empty) { return '' }
+    return $parsed.ToString('D').ToLowerInvariant()
+}
+
 function Get-XmlSourceLineOffset {
     param(
         [string]$RawXml,
@@ -519,9 +528,17 @@ function Get-XmlSourceLineOffset {
     )
     # Aproximacao: primeira ocorrencia de Part type + Source apos o guid do objeto.
     if ([string]::IsNullOrWhiteSpace($RawXml)) { return 0 }
-    $guidIdx = $RawXml.IndexOf($ObjectGuid, [System.StringComparison]::OrdinalIgnoreCase)
-    if ($guidIdx -lt 0) { $guidIdx = 0 }
-    $partNeedle = 'type="' + $PartType + '"'
+    $guidNeedle = Normalize-ObjectGuid -Value $ObjectGuid
+    if ([string]::IsNullOrWhiteSpace($guidNeedle) -and -not [string]::IsNullOrWhiteSpace($ObjectGuid)) {
+        $guidNeedle = $ObjectGuid.Trim()
+    }
+    $guidIdx = 0
+    if (-not [string]::IsNullOrWhiteSpace($guidNeedle)) {
+        $guidIdx = $RawXml.IndexOf($guidNeedle, [System.StringComparison]::OrdinalIgnoreCase)
+        if ($guidIdx -lt 0) { $guidIdx = 0 }
+    }
+    $partTypeNeedle = if ($null -eq $PartType) { '' } else { $PartType.Trim() }
+    $partNeedle = 'type="' + $partTypeNeedle + '"'
     $partIdx = $RawXml.IndexOf($partNeedle, $guidIdx, [System.StringComparison]::OrdinalIgnoreCase)
     if ($partIdx -lt 0) { return 0 }
     $sourceIdx = $RawXml.IndexOf('<Source>', $partIdx, [System.StringComparison]::OrdinalIgnoreCase)
@@ -554,8 +571,8 @@ function Initialize-AcervoDirectoryGuidCandidateIndex {
     $guidKeys = New-Object System.Collections.Generic.List[string]
     $guidKeySet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
     foreach ($g in @($ObjectGuids)) {
-        if ([string]::IsNullOrWhiteSpace($g)) { continue }
-        $norm = $g.Trim().ToLowerInvariant()
+        $norm = Normalize-ObjectGuid -Value $g
+        if ([string]::IsNullOrWhiteSpace($norm)) { continue }
         if ($guidKeySet.Add($norm)) {
             $guidKeys.Add($norm) | Out-Null
         }
@@ -626,10 +643,12 @@ function Resolve-BaselineObjectNode {
         return [pscustomobject]$result
     }
 
-    # GUID vazio nao identifica Object: unresolved (nunca new-object). Com indice montado
-    # por outros GUIDs do mesmo ExportFile, candidatos vazios cairiam em new-object.
-    if ([string]::IsNullOrWhiteSpace($ObjectGuid)) {
-        $result.message = 'Object GUID vazio; baseline inconclusiva (nao prova objeto novo)'
+    # GUID vazio/zero/invalido nao identifica Object: unresolved (nunca new-object).
+    # Com indice montado por outros GUIDs do mesmo ExportFile, candidatos vazios
+    # ou Find sem match apos Trim assimetrico cairiam em new-object.
+    $normalizedGuid = Normalize-ObjectGuid -Value $ObjectGuid
+    if ([string]::IsNullOrWhiteSpace($normalizedGuid)) {
+        $result.message = 'Object GUID vazio, zero ou invalido; baseline inconclusiva (nao prova objeto novo)'
         return [pscustomobject]$result
     }
 
@@ -656,14 +675,13 @@ function Resolve-BaselineObjectNode {
                 $doc = New-Object System.Xml.XmlDocument
                 $doc.PreserveWhitespace = $true
                 $doc.Load($path)
-                # XPath de atributo e case-sensitive; GUID GeneXus pode variar de caixa.
-                # Pre-filtro textual e case-insensitive — alinhar o Object match.
+                # Comparar GUID normalizado (Trim/TryParse/D) nos dois lados — alinhado ao indice.
                 $nodes = @(
                     @($doc.SelectNodes('//Object')) | Where-Object {
-                        $_.GetAttribute('guid') -ieq $ObjectGuid
+                        (Normalize-ObjectGuid -Value $_.GetAttribute('guid')) -eq $normalizedGuid
                     }
                 )
-                if ($nodes.Count -eq 0 -and $doc.DocumentElement.LocalName -eq 'Object' -and ($doc.DocumentElement.GetAttribute('guid') -ieq $ObjectGuid)) {
+                if ($nodes.Count -eq 0 -and $doc.DocumentElement.LocalName -eq 'Object' -and ((Normalize-ObjectGuid -Value $doc.DocumentElement.GetAttribute('guid')) -eq $normalizedGuid)) {
                     $nodes = @($doc.DocumentElement)
                 }
                 foreach ($node in $nodes) {
@@ -708,9 +726,8 @@ function Resolve-BaselineObjectNode {
                     $result.message = $script:AcervoDirIndexError
                     return [pscustomobject]$result
                 }
-                $guidKey = $ObjectGuid.Trim().ToLowerInvariant()
-                if ($null -ne $script:AcervoDirIndexMap -and $script:AcervoDirIndexMap.ContainsKey($guidKey)) {
-                    foreach ($full in @($script:AcervoDirIndexMap[$guidKey])) {
+                if ($null -ne $script:AcervoDirIndexMap -and $script:AcervoDirIndexMap.ContainsKey($normalizedGuid)) {
+                    foreach ($full in @($script:AcervoDirIndexMap[$normalizedGuid])) {
                         Add-BaselineCandidate -Path $full
                     }
                 }
@@ -726,7 +743,7 @@ function Resolve-BaselineObjectNode {
                 foreach ($xmlFile in $xmlFiles) {
                     $full = $xmlFile.FullName
                     try {
-                        $hasGuidText = [bool](Select-String -LiteralPath $full -Pattern $ObjectGuid -SimpleMatch -Quiet -ErrorAction Stop)
+                        $hasGuidText = [bool](Select-String -LiteralPath $full -Pattern $normalizedGuid -SimpleMatch -Quiet -ErrorAction Stop)
                         $script:AcervoDirPrefilterFileReads++
                     } catch {
                         $result.message = "Falha ao ler arquivo do acervo ${full}: $($_.Exception.Message)"
@@ -746,11 +763,11 @@ function Resolve-BaselineObjectNode {
             return [pscustomobject]$result
         }
         if (-not $acervoIsDirectory) {
-            $result.message = "AcervoPath arquivo nao contem Object com GUID $ObjectGuid"
+            $result.message = "AcervoPath arquivo nao contem Object com GUID $normalizedGuid"
             return [pscustomobject]$result
         }
         $result.status = 'no-baseline-new-object'
-        $result.message = "GUID $ObjectGuid ausente no acervo informado"
+        $result.message = "GUID $normalizedGuid ausente no acervo informado"
         return [pscustomobject]$result
     }
 
@@ -764,20 +781,20 @@ function Resolve-BaselineObjectNode {
     if ($matches.Count -eq 0) {
         if ($usedBaselinePath) {
             # Arquivo explicito existe mas nao prova objeto novo — so baseline errado/incompleto.
-            $result.message = "BaselinePath nao contem Object com GUID $ObjectGuid"
+            $result.message = "BaselinePath nao contem Object com GUID $normalizedGuid"
             return [pscustomobject]$result
         }
         if (-not $acervoIsDirectory) {
-            $result.message = "AcervoPath arquivo nao contem Object com GUID $ObjectGuid"
+            $result.message = "AcervoPath arquivo nao contem Object com GUID $normalizedGuid"
             return [pscustomobject]$result
         }
         $result.status = 'no-baseline-new-object'
-        $result.message = "GUID $ObjectGuid nao encontrado como Object no acervo"
+        $result.message = "GUID $normalizedGuid nao encontrado como Object no acervo"
         return [pscustomobject]$result
     }
     if ($matches.Count -gt 1) {
         $result.status = 'no-baseline-unresolved'
-        $result.message = "GUID $ObjectGuid duplicado no acervo ($($matches.Count) hits)"
+        $result.message = "GUID $normalizedGuid duplicado no acervo ($($matches.Count) hits)"
         return [pscustomobject]$result
     }
 
