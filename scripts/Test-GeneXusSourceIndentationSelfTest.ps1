@@ -7,7 +7,8 @@
     BaselinePath GUID ausente=unresolved, Acervo hit textual raso + Object profundo,
     Object duplicado entre profundidades, >20 hits textuais sem teto,
     AcervoPath=arquivo sem GUID=unresolved, XML oculto encontrado com -Force,
-    ExportFile com 2 Procedures + contadores de prefiltro (1 passagem / N leituras)).
+    ExportFile com 2 Procedures + contadores de prefiltro (1 passagem / N leituras),
+    ExportFile misto GUID ok + GUID vazio = unresolved no vazio).
 #>
 
 Set-StrictMode -Version Latest
@@ -347,6 +348,27 @@ Assert-True ($r23.acervoDirectoryIndexUsed -eq $true) 'acervoDirectoryIndexUsed 
 Assert-True ($r23.acervoDirectoryPrefilterPassCount -eq 1) ("prefiltro deve ter 1 passagem; obtido $($r23.acervoDirectoryPrefilterPassCount)")
 Assert-True ($r23.acervoDirectoryPrefilterFileReads -eq $multiXmlCount) ("leituras devem ser $multiXmlCount (nao $($multiXmlCount * 2)); obtido $($r23.acervoDirectoryPrefilterFileReads)")
 Assert-True ($multiXmlCount -eq 2) 'fixture multi deve ter 2 XMLs'
+
+# 24) ExportFile misto: GUID ok + GUID vazio com indice montado -> vazio unresolved (nao new-object)
+$exportMixedGuid = @"
+<ExportFile>
+  <Objects>
+$(New-ProcXml -Guid $guidGood -Name 'ProcIndent' -Source $badUnder)
+$(New-ProcXml -Guid '' -Name 'Pnoguid' -Source $badUnder)
+  </Objects>
+</ExportFile>
+"@
+$r24 = Invoke-Indent -Xml $exportMixedGuid -AcervoPath $multiAcervo
+Assert-True ($r24.inScopePartCount -eq 2) 'ExportFile misto deve ter 2 parts in-scope'
+$r24ok = @($r24.parts | Where-Object { $_.objectName -eq 'ProcIndent' })[0]
+$r24empty = @($r24.parts | Where-Object { $_.objectName -eq 'Pnoguid' })[0]
+Assert-True ($null -ne $r24ok) 'part ProcIndent presente'
+Assert-True ($null -ne $r24empty) 'part Pnoguid presente'
+Assert-True ($r24ok.baselineStatus -eq 'compared') 'GUID ok deve compared com indice'
+Assert-True ($r24empty.baselineStatus -eq 'no-baseline-unresolved') 'GUID vazio deve unresolved (nao new-object)'
+Assert-True ($r24empty.status -eq 'inconclusive') 'GUID vazio deve status inconclusive'
+Assert-True (-not (@($r24empty.findings | Where-Object { $_.code -eq 'indent-under-depth' }).Count -gt 0)) 'GUID vazio nao inventa under-depth'
+Assert-True ($r24.acervoDirectoryIndexUsed -eq $true) 'indice ainda montado pelo GUID ok'
 
 Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
 Write-Output 'OK: Test-GeneXusSourceIndentationSelfTest.ps1'

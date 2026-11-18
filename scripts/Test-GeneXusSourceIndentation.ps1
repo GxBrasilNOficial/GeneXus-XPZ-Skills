@@ -626,6 +626,13 @@ function Resolve-BaselineObjectNode {
         return [pscustomobject]$result
     }
 
+    # GUID vazio nao identifica Object: unresolved (nunca new-object). Com indice montado
+    # por outros GUIDs do mesmo ExportFile, candidatos vazios cairiam em new-object.
+    if ([string]::IsNullOrWhiteSpace($ObjectGuid)) {
+        $result.message = 'Object GUID vazio; baseline inconclusiva (nao prova objeto novo)'
+        return [pscustomobject]$result
+    }
+
     # new-object so e valido apos varredura de PASTA. Arquivo isolado (BaselinePath ou
     # AcervoPath=folha) sem o Object do GUID e unresolved — nao prova ausencia no acervo.
     $acervoIsDirectory = $false
