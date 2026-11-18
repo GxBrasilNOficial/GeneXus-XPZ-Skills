@@ -19,7 +19,8 @@
                                             quando o molde repassa -AsJson e o wrapper local nao;
                                             source_mask_contract_missing quando o wrapper de gate tem
                                             implementacao local e nao emite source_mask_degraded com
-                                            evidencia de saida (comentario ou variavel morta nao contam);
+                                            evidencia de saida capturavel (comentario, variavel morta e
+                                            Write-Host/Write-Verbose/Write-Information/Out-Host nao contam);
                                             source_mask_consumer_contract_missing quando consumidor direto
                                             de Test-KbSetupAudit le so a cobertura e ignora source_mask_degraded;
                                             forwards_unknown_engine_param quando o wrapper repassa a um

@@ -1002,10 +1002,14 @@ function Select-XpzHelpUnique {
 function Test-XpzIndexGateMaskOutputEvidence {
     <#
       Prova estrutural de que um wrapper de gate com implementacao local EMITE o
-      estado da mascara, em vez de apenas mencionar o campo. Comentarios ficam fora
-      por construcao (AST); variavel morta nao conta. Evidencia valida:
-      - pipeline de saida (NamedBlock/StatementBlock/Return) contendo o campo;
-      - variavel atribuida com o campo e usada em pipeline de saida/ConvertTo-Json.
+      estado da mascara no fluxo que o consumidor captura, em vez de apenas
+      mencionar o campo. Comentarios ficam fora por construcao (AST); variavel
+      morta nao conta. Evidencia valida:
+      - pipeline de sucesso (NamedBlock/StatementBlock/Return) contendo o campo;
+      - variavel atribuida com o campo e usada em Write-Output/ConvertTo-Json/Out-String.
+      Write-Host, Write-Verbose, Write-Information e sinks de host/arquivo/descarte
+      (Out-Host/Out-Null/Out-File/Set-Content) nao contam: nao chegam ao consumidor
+      sem opcoes/preferencias adicionais.
       Limite: prova estrutural, nao execucao. K9 e setup audit continuam sendo a
       autoridade em runtime.
     #>
@@ -1016,7 +1020,13 @@ function Test-XpzIndexGateMaskOutputEvidence {
     if ($null -eq $ast -or @($parseErrors).Count -gt 0) { return $false }
 
     $fieldPattern = 'source_mask_degraded|sourceMaskDegraded'
-    $outputCommands = @('Write-Output', 'Write-Host', 'Write-Information', 'Write-Verbose', 'ConvertTo-Json', 'Out-String', 'Out-Host')
+    # Somente fluxos que K9 e setup audit realmente capturam (success stream).
+    # Write-Host/Write-Verbose/Write-Information e sinks de host/arquivo/descarte
+    # (Out-Host/Out-Null/Out-File/Set-Content) nao contam: o campo nao chega ao
+    # consumidor.
+    $outputCommands = @('Write-Output', 'ConvertTo-Json', 'Out-String')
+    # Sinks que descartam ou desviam o fluxo de stdout; o campo nao chega ao consumidor.
+    $nonCapturableSinks = @('Out-Host', 'Out-Null', 'Out-File', 'Set-Content', 'Add-Content', 'Out-GridView', 'Out-Printer')
     $statementParentTypes = @('NamedBlockAst', 'StatementBlockAst', 'ReturnStatementAst')
 
     $statementPipelines = @($ast.FindAll({
@@ -1034,7 +1044,12 @@ function Test-XpzIndexGateMaskOutputEvidence {
 
     foreach ($pipe in $statementPipelines) {
         if ($pipe.Extent.Text -notmatch $fieldPattern) { continue }
-        if ((Get-PipelineCommandNames -Pipeline $pipe) -notcontains 'Out-Null') { return $true }
+        $commandNames = Get-PipelineCommandNames -Pipeline $pipe
+        if (@($commandNames | Where-Object { $nonCapturableSinks -contains $_ }).Count -gt 0) { continue }
+        $hasOutputCommand = @($commandNames | Where-Object { $outputCommands -contains $_ }).Count -gt 0
+        $isBareExpression = @($commandNames).Count -eq 0
+        if (-not $hasOutputCommand -and -not $isBareExpression) { continue }
+        return $true
     }
 
     $variables = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
@@ -1049,7 +1064,7 @@ function Test-XpzIndexGateMaskOutputEvidence {
 
     foreach ($pipe in $statementPipelines) {
         $commandNames = Get-PipelineCommandNames -Pipeline $pipe
-        if ($commandNames -contains 'Out-Null') { continue }
+        if (@($commandNames | Where-Object { $nonCapturableSinks -contains $_ }).Count -gt 0) { continue }
         $hasOutputCommand = @($commandNames | Where-Object { $outputCommands -contains $_ }).Count -gt 0
         $isBareExpression = @($commandNames).Count -eq 0
         if (-not $hasOutputCommand -and -not $isBareExpression) { continue }
