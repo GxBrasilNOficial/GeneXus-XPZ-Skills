@@ -14,11 +14,14 @@ Contrato de saida herdado do motor:
 - Default (texto): emite GATE_OK no sucesso, lanca `BLOCK: <motivo>` no bloqueio.
   Inclui `writability_coverage` e, para `partial`/`invalid`, um aviso explícito;
   inclui `source_mask_degraded` e, quando `true`, um aviso de cobertura parcial.
-  `GATE_OK` certifica validade técnica do índice, não gravabilidade, cobertura
-  completa da máscara nem autorização.
+  `source_mask_degraded` e obrigatorio e so aceita a linha completa `true`/`false`;
+  ausente ou com sufixo invalido bloqueia. `GATE_OK` certifica validade técnica do
+  índice, não gravabilidade, cobertura completa da máscara nem autorização.
 - -AsJson: { status: OK|BLOCK, reason, extractor_signature_*, writabilityCoverage,
   writabilityCoverageWarning, sourceMaskDegraded, sourceMaskDegradedWarning, ... }.
-  Sob -AsJson nunca lanca; bloqueio vira { status: BLOCK, reason } + exit 1.
+  `sourceMaskDegraded` e booleano obrigatorio; `true` exige aviso e `false` nao o
+  admite. O gate K9 bloqueia campo ausente ou inconsistente. Sob -AsJson nunca
+  lanca; bloqueio vira { status: BLOCK, reason } + exit 1.
   Consumido pelo gate K9 do orquestrador Invoke-XpzKbParallelPrePushPhase1.ps1.
 - A validacao da assinatura atual (version/hash/format) executa o calculador
   `scripts/GeneXusKbIntelligenceExtractorSignature.py` via Python 3. Python

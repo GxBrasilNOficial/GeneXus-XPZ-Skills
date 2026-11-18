@@ -20,6 +20,8 @@
     D. source_mask_degraded=true expoe o aviso em texto e JSON, sem bloquear.
     E. source_mask_degraded=false nao emite aviso.
     F. Metadata sem source_mask_degraded bloqueia (campo obrigatorio).
+    G. Valores com sufixo (false-corrompido, true-lixo) bloqueiam; nao ha
+       aceitacao por prefixo.
 #>
 
 Set-StrictMode -Version Latest
@@ -209,6 +211,23 @@ function Test-GeneXusKbIntelligenceExtractorSignatureFromMetadata {
   Assert-True ($rf.exit -eq 1) "F: exit 1 esperado sem source_mask_degraded; obtido $($rf.exit)"
   Assert-True ($null -ne $rf.json -and $rf.json.status -eq 'BLOCK') 'F: status BLOCK esperado sem source_mask_degraded'
   Assert-True ([string]$rf.json.reason -match 'source_mask_degraded') 'F: motivo deveria citar source_mask_degraded'
+
+  # --- G: valores invalidos nao podem ser aceitos por prefixo ---
+  foreach ($invalidMaskValue in @('false-corrompido', 'true-lixo')) {
+    $invalidFixture = New-IndexGateFixture -ExtraMetadata @(
+      "  'source_mask_degraded: $invalidMaskValue'",
+      "  'source_mask_degraded_blocks: []'"
+    )
+    $rg = Invoke-XpzSelfTestScript -ScriptPath $engine -ScriptArgs @(
+      '-RepoRoot', $invalidFixture.Root,
+      '-StructureWrapperPath', $invalidFixture.Structure,
+      '-QueryWrapperPath', $invalidFixture.Query,
+      '-ExtractorContractPath', $invalidFixture.Contract,
+      '-AsJson')
+    Assert-True ($rg.exit -eq 1) "G: exit 1 esperado para '$invalidMaskValue'; obtido $($rg.exit)"
+    Assert-True ($null -ne $rg.json -and $rg.json.status -eq 'BLOCK') "G: status BLOCK esperado para '$invalidMaskValue'"
+    Assert-True ([string]$rg.json.reason -match 'source_mask_degraded') "G: motivo deveria citar source_mask_degraded para '$invalidMaskValue'"
+  }
 
   'XPZ_KB_INDEX_GATE_CONTRACT_SELFTEST_OK'
 }

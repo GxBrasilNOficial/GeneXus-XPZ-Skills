@@ -12,6 +12,7 @@
     1. READY        - repo limpo + stubs verdes + -SkipFetch -> ready (exit 0).
     2. K8 red       - estado bloqueante do setup-audit -> blocked.
     3. K9 block     - status BLOCK do index gate -> blocked.
+    3b-3e. K9 mask  - sourceMaskDegraded ausente/inconsistente bloqueia; true+aviso passa.
     4. wrapper none - sem wrapper de setup-audit -> K8 block (resolvedBy none).
     5. ambiguous    - 2 wrappers de setup-audit sem config -> K8 block.
     6. BaseRef inv. - ref inexistente -> unknown -> blocked.
@@ -46,11 +47,27 @@ param([switch]$AsJson)
 '@
 $stubOkIndex = @'
 param([switch]$AsJson)
-'{"status":"OK"}'
+'{"status":"OK","sourceMaskDegraded":false,"sourceMaskDegradedWarning":null}'
 '@
 $stubBlockIndex = @'
 param([switch]$AsJson)
 '{"status":"BLOCK","reason":"fixture block"}'
+'@
+$stubOldIndex = @'
+param([switch]$AsJson)
+'{"status":"OK"}'
+'@
+$stubMaskedIndex = @'
+param([switch]$AsJson)
+'{"status":"OK","sourceMaskDegraded":true,"sourceMaskDegradedWarning":"cobertura parcial de fixture"}'
+'@
+$stubMaskedNoWarningIndex = @'
+param([switch]$AsJson)
+'{"status":"OK","sourceMaskDegraded":true}'
+'@
+$stubMaskedInconsistentIndex = @'
+param([switch]$AsJson)
+'{"status":"OK","sourceMaskDegraded":false,"sourceMaskDegradedWarning":"aviso indevido"}'
 '@
 
 function Assert-True {
@@ -100,6 +117,43 @@ try {
   $o3 = Invoke-Orch -Root $r3.Root -BaseRef $r3.Base
   Assert-True ($o3.json.pushReadiness -eq 'blocked') "3: blocked esperado; obtido $($o3.json.pushReadiness)"
   Assert-True ((@($o3.json.gates | Where-Object { $_.id -eq 'K9' })[0]).status -eq 'block') "3: K9 block esperado"
+
+  # --- 3b: K9 antigo sem sourceMaskDegraded -> block de contrato ---
+  $r3b = New-OrchBase
+  Set-XpzPrePushSelfTestFile -Root $r3b.Root -RelPath 'scripts/Test-FixKbIndexGate.ps1' -Content $stubOldIndex
+  [void](New-XpzPrePushSelfTestCommit -Root $r3b.Root -Message '3b: index gate antigo')
+  $o3b = Invoke-Orch -Root $r3b.Root -BaseRef $r3b.Base
+  $k9_3b = @($o3b.json.gates | Where-Object { $_.id -eq 'K9' })[0]
+  Assert-True ($o3b.json.pushReadiness -eq 'blocked') "3b: blocked esperado; obtido $($o3b.json.pushReadiness)"
+  Assert-True ($k9_3b.status -eq 'block') "3b: K9 block esperado"
+  Assert-True ([string]$k9_3b.message -match 'sourceMaskDegraded') "3b: mensagem deveria citar sourceMaskDegraded; obtido $($k9_3b.message)"
+
+  # --- 3c: K9 com mascara degradada e aviso -> ok com aviso ---
+  $r3c = New-OrchBase
+  Set-XpzPrePushSelfTestFile -Root $r3c.Root -RelPath 'scripts/Test-FixKbIndexGate.ps1' -Content $stubMaskedIndex
+  [void](New-XpzPrePushSelfTestCommit -Root $r3c.Root -Message '3c: index gate com mascara degradada')
+  $o3c = Invoke-Orch -Root $r3c.Root -BaseRef $r3c.Base
+  $k9_3c = @($o3c.json.gates | Where-Object { $_.id -eq 'K9' })[0]
+  Assert-True ($k9_3c.status -eq 'ok') "3c: K9 ok esperado; obtido $($k9_3c.status)"
+  Assert-True ([string]$k9_3c.message -match 'cobertura parcial de mascara') "3c: mensagem deveria citar cobertura parcial; obtido $($k9_3c.message)"
+
+  # --- 3d: K9 com mascara degradada sem aviso -> block ---
+  $r3d = New-OrchBase
+  Set-XpzPrePushSelfTestFile -Root $r3d.Root -RelPath 'scripts/Test-FixKbIndexGate.ps1' -Content $stubMaskedNoWarningIndex
+  [void](New-XpzPrePushSelfTestCommit -Root $r3d.Root -Message '3d: index gate sem aviso')
+  $o3d = Invoke-Orch -Root $r3d.Root -BaseRef $r3d.Base
+  $k9_3d = @($o3d.json.gates | Where-Object { $_.id -eq 'K9' })[0]
+  Assert-True ($o3d.json.pushReadiness -eq 'blocked') "3d: blocked esperado; obtido $($o3d.json.pushReadiness)"
+  Assert-True ([string]$k9_3d.message -match 'sem sourceMaskDegradedWarning') "3d: mensagem deveria citar aviso ausente; obtido $($k9_3d.message)"
+
+  # --- 3e: K9 com estado inconsistente -> block ---
+  $r3e = New-OrchBase
+  Set-XpzPrePushSelfTestFile -Root $r3e.Root -RelPath 'scripts/Test-FixKbIndexGate.ps1' -Content $stubMaskedInconsistentIndex
+  [void](New-XpzPrePushSelfTestCommit -Root $r3e.Root -Message '3e: index gate inconsistente')
+  $o3e = Invoke-Orch -Root $r3e.Root -BaseRef $r3e.Base
+  $k9_3e = @($o3e.json.gates | Where-Object { $_.id -eq 'K9' })[0]
+  Assert-True ($o3e.json.pushReadiness -eq 'blocked') "3e: blocked esperado; obtido $($o3e.json.pushReadiness)"
+  Assert-True ([string]$k9_3e.message -match 'inconsistente') "3e: mensagem deveria citar estado inconsistente; obtido $($k9_3e.message)"
 
   # --- 4: wrapper none -> K8 block ---
   $r4 = New-OrchBase

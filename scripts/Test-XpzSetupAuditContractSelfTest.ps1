@@ -19,6 +19,10 @@
        cobertura unknown; GATE_OK sozinho nao e aceito.
     E. Gate com source_mask_degraded=true -> indice/mascara true e aviso
        preservado, sem alterar o estado do gate.
+    F. GATE_OK sem source_mask_degraded -> indice/gate PENDENTE e estado nao limpo.
+    G. source_mask_degraded com sufixo invalido -> unknown e PENDENTE.
+    H. source_mask_degraded=true sem aviso -> contrato incompleto.
+    I. source_mask_degraded=false com aviso -> estado inconsistente.
 #>
 
 Set-StrictMode -Version Latest
@@ -88,6 +92,7 @@ try {
   # --- C: gate com cobertura partial -> GATE_OK aceito e cobertura preservada ---
   $c = New-SetupAuditFixture -GateText @'
 Write-Output 'writability_coverage: partial'
+Write-Output 'source_mask_degraded: false'
 Write-Output 'inventory_validation_status: OK'
 Write-Output 'GATE_OK'
 '@
@@ -126,6 +131,66 @@ Write-Output 'GATE_OK'
   Assert-True ($re.json.'indice/gate' -eq 'OK') "E: indice/gate OK esperado; obtido $($re.json.'indice/gate')"
   Assert-True ($re.json.'indice/mascara' -eq 'true') "E: indice/mascara true esperado; obtido $($re.json.'indice/mascara')"
   Assert-True ([string]$re.json.'indice/mascara.aviso' -match 'degradada') "E: aviso de mascara degradada esperado"
+
+  # --- F: GATE_OK sem source_mask_degraded -> gate PENDENTE e estado nao limpo ---
+  $f = New-SetupAuditFixture -GateText @'
+Write-Output 'writability_coverage: complete-in-model'
+Write-Output 'inventory_validation_status: OK'
+Write-Output 'GATE_OK'
+'@
+  $rf = Invoke-XpzSelfTestScript -ScriptPath $engine -ScriptArgs @(
+    '-KbRoot', $f.Root, '-GateWrapperPath', $f.Gate, '-MetadataWrapperTestPath', $f.Metadata,
+    '-PowerShellRuntimeTestPath', $f.Runtime, '-NamingWrapperPath', $f.Naming, '-AsJson')
+  Assert-True ($null -ne $rf.json) "F: stdout deveria ser JSON parseavel"
+  Assert-True ($rf.json.'indice/gate' -eq 'PENDENTE') "F: indice/gate PENDENTE esperado; obtido $($rf.json.'indice/gate')"
+  Assert-True ($rf.json.'indice/mascara' -eq 'unknown') "F: indice/mascara unknown esperado; obtido $($rf.json.'indice/mascara')"
+  Assert-True ([string]$rf.json.'indice/mascara.aviso' -match 'sem source_mask_degraded') "F: aviso de contrato ausente esperado"
+  Assert-True ($rf.json.estado_operacional_sugerido -ne 'materializado_e_indice_validado') "F: estado nao pode ser materializado_e_indice_validado"
+
+  # --- G: valor invalido nao pode ser aceito por prefixo ---
+  $g = New-SetupAuditFixture -GateText @'
+Write-Output 'writability_coverage: complete-in-model'
+Write-Output 'source_mask_degraded: false-corrompido'
+Write-Output 'inventory_validation_status: OK'
+Write-Output 'GATE_OK'
+'@
+  $rg = Invoke-XpzSelfTestScript -ScriptPath $engine -ScriptArgs @(
+    '-KbRoot', $g.Root, '-GateWrapperPath', $g.Gate, '-MetadataWrapperTestPath', $g.Metadata,
+    '-PowerShellRuntimeTestPath', $g.Runtime, '-NamingWrapperPath', $g.Naming, '-AsJson')
+  Assert-True ($null -ne $rg.json) "G: stdout deveria ser JSON parseavel"
+  Assert-True ($rg.json.'indice/gate' -eq 'PENDENTE') "G: indice/gate PENDENTE esperado; obtido $($rg.json.'indice/gate')"
+  Assert-True ($rg.json.'indice/mascara' -eq 'unknown') "G: indice/mascara unknown esperado; obtido $($rg.json.'indice/mascara')"
+
+  # --- H: source_mask_degraded=true sem aviso -> contrato incompleto ---
+  $h = New-SetupAuditFixture -GateText @'
+Write-Output 'writability_coverage: complete-in-model'
+Write-Output 'source_mask_degraded: true'
+Write-Output 'inventory_validation_status: OK'
+Write-Output 'GATE_OK'
+'@
+  $rh = Invoke-XpzSelfTestScript -ScriptPath $engine -ScriptArgs @(
+    '-KbRoot', $h.Root, '-GateWrapperPath', $h.Gate, '-MetadataWrapperTestPath', $h.Metadata,
+    '-PowerShellRuntimeTestPath', $h.Runtime, '-NamingWrapperPath', $h.Naming, '-AsJson')
+  Assert-True ($null -ne $rh.json) "H: stdout deveria ser JSON parseavel"
+  Assert-True ($rh.json.'indice/gate' -eq 'PENDENTE') "H: indice/gate PENDENTE esperado; obtido $($rh.json.'indice/gate')"
+  Assert-True ($rh.json.'indice/mascara' -eq 'unknown') "H: indice/mascara unknown esperado; obtido $($rh.json.'indice/mascara')"
+  Assert-True ([string]$rh.json.'indice/mascara.aviso' -match 'sem source_mask_degraded_warning') "H: aviso de contrato incompleto esperado"
+
+  # --- I: false com aviso -> estado inconsistente ---
+  $i = New-SetupAuditFixture -GateText @'
+Write-Output 'writability_coverage: complete-in-model'
+Write-Output 'source_mask_degraded: false'
+Write-Output 'source_mask_degraded_warning: aviso indevido'
+Write-Output 'inventory_validation_status: OK'
+Write-Output 'GATE_OK'
+'@
+  $ri = Invoke-XpzSelfTestScript -ScriptPath $engine -ScriptArgs @(
+    '-KbRoot', $i.Root, '-GateWrapperPath', $i.Gate, '-MetadataWrapperTestPath', $i.Metadata,
+    '-PowerShellRuntimeTestPath', $i.Runtime, '-NamingWrapperPath', $i.Naming, '-AsJson')
+  Assert-True ($null -ne $ri.json) "I: stdout deveria ser JSON parseavel"
+  Assert-True ($ri.json.'indice/gate' -eq 'PENDENTE') "I: indice/gate PENDENTE esperado; obtido $($ri.json.'indice/gate')"
+  Assert-True ($ri.json.'indice/mascara' -eq 'unknown') "I: indice/mascara unknown esperado; obtido $($ri.json.'indice/mascara')"
+  Assert-True ([string]$ri.json.'indice/mascara.aviso' -match 'inconsistente') "I: aviso de estado inconsistente esperado"
 
   'XPZ_SETUP_AUDIT_CONTRACT_SELFTEST_OK'
 }

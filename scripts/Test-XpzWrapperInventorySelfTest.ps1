@@ -10,7 +10,8 @@
     tratar Test-*KbPowerShellRuntime.ps1 como falso positivo. Também valida os sinais
     consultivos de wrappers recomendados ausentes e os sinais bloqueantes de scripts
     legados orfaos, e os motivos de INVENTORY_CUSTOMIZED: missing_AsJson_passthrough
-    (K8/K9), consumes_legacy_text_stdout (Update-*KbFromXpz),
+    (K8/K9), source_mask_contract_missing (gate K9 com implementacao local sem
+    source_mask_degraded), consumes_legacy_text_stdout (Update-*KbFromXpz),
     unsafe_last_exitcode_after_ps1_engine (wrappers auditados que chamam motor PowerShell por variavel) e forwards_unknown_engine_param
     (repasse a motor compartilhado advanced de parametro nao-declarado; caso end-to-end).
     Valida ainda o diff de superficie wrapper-vs-molde (surface_mismatch -> INVENTORY_CUSTOMIZED;
@@ -332,6 +333,37 @@ if ($AsJson) { $forward['AsJson'] = $true }
 
     Assert-NotContains -Text $output -Pattern 'Test-DemoKbSetupAudit\.ps1\(reason=missing_AsJson_passthrough\)' -Message 'wrapper K8 com repasse de -AsJson nao pode ser sinalizado por esse motivo'
     Assert-NotContains -Text $output -Pattern 'Test-DemoKbIndexGate\.ps1\(reason=missing_AsJson_passthrough\)' -Message 'wrapper K9 com repasse de -AsJson nao pode ser sinalizado por esse motivo'
+
+    # Wrapper K9 com implementacao local precisa expor source_mask_degraded;
+    # delegador fino ao motor compartilhado nao entra nessa checagem.
+    @'
+#requires -Version 7.4
+param([switch]$AsJson)
+Write-Output 'GATE_OK'
+'@ | Set-Content -LiteralPath $indexGateStandardPath -Encoding utf8NoBOM
+
+    $output = (& $inventoryScriptPath -KbParallelRoot $kbRoot -SkillsExamplesPath $examplesPath 2>&1 |
+        ForEach-Object { $_.ToString() }) -join ' '
+    Assert-Contains -Text $output -Pattern 'Test-DemoKbIndexGate\.ps1\(reason=source_mask_contract_missing\)' -Message 'gate local sem source_mask_degraded deve ser sinalizado'
+
+    @'
+#requires -Version 7.4
+param([switch]$AsJson)
+$payload = @{ status = 'OK'; sourceMaskDegraded = $false }
+Write-Output 'GATE_OK'
+'@ | Set-Content -LiteralPath $indexGateStandardPath -Encoding utf8NoBOM
+
+    $output = (& $inventoryScriptPath -KbParallelRoot $kbRoot -SkillsExamplesPath $examplesPath 2>&1 |
+        ForEach-Object { $_.ToString() }) -join ' '
+    Assert-NotContains -Text $output -Pattern 'Test-DemoKbIndexGate\.ps1\(reason=source_mask_contract_missing\)' -Message 'gate local com source_mask_degraded nao pode ser sinalizado por esse motivo'
+
+    @'
+#requires -Version 7.4
+param([switch]$AsJson)
+$forward = @{}
+if ($AsJson) { $forward['AsJson'] = $true }
+& $engine @forward
+'@ | Set-Content -LiteralPath $indexGateStandardPath -Encoding utf8NoBOM
 
     # Contrato de consumo da cobertura: wrapper antigo que reduz o gate a GATE_OK
     # falha mesmo com a superficie/parametros corretos; o marcador + leitura da cobertura passa.

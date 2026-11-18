@@ -22,8 +22,9 @@
     8. assinatura do extrator (version/hash/format na metadata do SQLite) contra o motor
        atual via GeneXusKbIntelligenceExtractorContract.ps1;
     9. cobertura e contagem das occurrences de gravabilidade, separadas da validade tecnica.
-    10. estado da mascara de Source: `source_mask_degraded=true` gera aviso de cobertura
-        parcial, sem bloquear (degradacao e modo consentido por -AllowMaskDegraded).
+    10. estado da mascara de Source: exige a linha completa `source_mask_degraded: true|false`;
+        campo ausente, valor com sufixo ou tipo invalido bloqueia. `true` gera aviso de
+        cobertura parcial, sem bloquear (degradacao e modo consentido por -AllowMaskDegraded).
 
   CONTRATO DE SAIDA:
     - Default (texto): retrocompativel -- emite as linhas de assinatura,
@@ -177,9 +178,9 @@ $extractorCheck = Test-GeneXusKbIntelligenceExtractorSignatureFromMetadata -Meta
 if (-not $extractorCheck.ok) { Fail-Gate $extractorCheck.summary }
 
 # 10. estado da mascara de Source (degradacao consentida)
-$maskDegradedMatch = [regex]::Match($indexMetadataText, '(?i)source_mask_degraded\s*[:=]\s*(?<value>true|false)')
-if (-not $maskDegradedMatch.Success) { Fail-Gate 'index-metadata sem source_mask_degraded; regenere o indice' }
-$sourceMaskDegraded = $maskDegradedMatch.Groups['value'].Value.ToLowerInvariant() -eq 'true'
+$maskDegradedMatch = [regex]::Match($indexMetadataText, '(?m)^[ \t]*source_mask_degraded[ \t]*[:=][ \t]*(?<value>true|false)[ \t]*\r?$')
+if (-not $maskDegradedMatch.Success) { Fail-Gate 'index-metadata com source_mask_degraded ausente ou invalido (esperado true|false); regenere o indice' }
+$sourceMaskDegraded = $maskDegradedMatch.Groups['value'].Value -eq 'true'
 $sourceMaskDegradedWarning = if ($sourceMaskDegraded) {
   'Mascara de Source degradada; GATE_OK confirma validade tecnica do indice, nao cobertura completa. Consulte source_mask_degraded_blocks no index-metadata para arquivo, linha e motivo.'
 } else {

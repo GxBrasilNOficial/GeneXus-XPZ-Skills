@@ -355,15 +355,24 @@ if (-not $k9w.ok) {
     $raw = (& $k9w.path -AsJson 2>$null | Out-String).Trim()
     $j = $raw | ConvertFrom-Json
     if ([string]$j.status -eq 'OK') {
-      $k9MaskWarning = ''
+      $maskProperty = $j.PSObject.Properties['sourceMaskDegraded']
       $maskWarningProperty = $j.PSObject.Properties['sourceMaskDegradedWarning']
+      $k9MaskWarning = ''
       if ($null -ne $maskWarningProperty -and -not [string]::IsNullOrWhiteSpace([string]$maskWarningProperty.Value)) {
         $k9MaskWarning = [string]$maskWarningProperty.Value
       }
-      if ([string]::IsNullOrWhiteSpace($k9MaskWarning)) {
-        Add-Gate 'K9' 'ok' "indice apto (resolvedBy=$($k9w.resolvedBy))"
+      if ($null -eq $maskProperty -or $maskProperty.Value -isnot [bool]) {
+        Add-Gate 'K9' 'block' "setup desatualizado: gate de indice nao emitiu sourceMaskDegraded booleano -- atualize via xpz-kb-parallel-setup (resolvedBy=$($k9w.resolvedBy))"
+      } elseif ([bool]$maskProperty.Value) {
+        if ([string]::IsNullOrWhiteSpace($k9MaskWarning)) {
+          Add-Gate 'K9' 'block' "setup desatualizado: gate de indice com sourceMaskDegraded=true sem sourceMaskDegradedWarning -- atualize via xpz-kb-parallel-setup (resolvedBy=$($k9w.resolvedBy))"
+        } else {
+          Add-Gate 'K9' 'ok' "indice apto com cobertura parcial de mascara: $k9MaskWarning (resolvedBy=$($k9w.resolvedBy))"
+        }
+      } elseif (-not [string]::IsNullOrWhiteSpace($k9MaskWarning)) {
+        Add-Gate 'K9' 'block' "setup desatualizado: gate de indice com sourceMaskDegraded=false e sourceMaskDegradedWarning -- estado inconsistente (resolvedBy=$($k9w.resolvedBy))"
       } else {
-        Add-Gate 'K9' 'ok' "indice apto com cobertura parcial de mascara: $k9MaskWarning (resolvedBy=$($k9w.resolvedBy))"
+        Add-Gate 'K9' 'ok' "indice apto (resolvedBy=$($k9w.resolvedBy))"
       }
     } else {
       Add-Gate 'K9' 'block' "indice bloqueado: $([string]$j.reason) (resolvedBy=$($k9w.resolvedBy))"

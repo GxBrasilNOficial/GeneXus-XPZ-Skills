@@ -219,7 +219,7 @@ $inventorySemanticStatus = $null
 $writabilityCoverage = 'unknown'
 $writabilityCoverageWarning = 'Gate de indice sem campo writability_coverage; nao afirmar cobertura de gravabilidade.'
 $sourceMaskDegraded = 'unknown'
-$sourceMaskDegradedWarning = 'Gate de indice sem campo source_mask_degraded; nao afirmar cobertura completa da mascara.'
+$sourceMaskDegradedWarning = 'Gate de indice sem source_mask_degraded valido (true|false); nao afirmar cobertura completa da mascara.'
 try {
     $gateRaw = Invoke-WrapperText -Path $GateWrapperPath
     $coverageMatch = [regex]::Match($gateRaw, 'writability_coverage\s*[:=]\s*(?<value>\S+)')
@@ -237,16 +237,34 @@ try {
     $gateStatus = 'BLOCK'
 }
 
+$sourceMaskContractValid = $false
 $maskDegradedMatch = if ($gateRaw) {
-    [regex]::Match($gateRaw, 'source_mask_degraded\s*[:=]\s*(?<value>true|false)')
+    [regex]::Match($gateRaw, '(?m)^[ \t]*source_mask_degraded[ \t]*[:=][ \t]*(?<value>true|false)[ \t]*\r?$')
 } else {
     [regex]::Match('', 'a^')
 }
 if ($maskDegradedMatch.Success) {
-    $sourceMaskDegraded = $maskDegradedMatch.Groups['value'].Value.ToLowerInvariant()
-    $maskWarningMatch = [regex]::Match($gateRaw, 'source_mask_degraded_warning\s*[:=]\s*(?<value>.+)')
-    if ($maskWarningMatch.Success) { $sourceMaskDegradedWarning = $maskWarningMatch.Groups['value'].Value.Trim() }
-    else { $sourceMaskDegradedWarning = $null }
+    $sourceMaskDegraded = $maskDegradedMatch.Groups['value'].Value
+    $maskWarningMatch = [regex]::Match($gateRaw, '(?m)^[ \t]*source_mask_degraded_warning[ \t]*[:=][ \t]*(?<value>.+?)[ \t]*\r?$')
+    $maskWarning = if ($maskWarningMatch.Success) { $maskWarningMatch.Groups['value'].Value.Trim() } else { '' }
+    if ($sourceMaskDegraded -eq 'true') {
+        if (-not [string]::IsNullOrWhiteSpace($maskWarning)) {
+            $sourceMaskDegradedWarning = $maskWarning
+            $sourceMaskContractValid = $true
+        } else {
+            $sourceMaskDegraded = 'unknown'
+            $sourceMaskDegradedWarning = 'Gate de indice com source_mask_degraded=true sem source_mask_degraded_warning; contrato incompleto.'
+        }
+    } elseif (-not [string]::IsNullOrWhiteSpace($maskWarning)) {
+        $sourceMaskDegraded = 'unknown'
+        $sourceMaskDegradedWarning = 'Gate de indice com source_mask_degraded=false e aviso de mascara; estado inconsistente.'
+    } else {
+        $sourceMaskDegradedWarning = $null
+        $sourceMaskContractValid = $true
+    }
+}
+if ($gateStatus -eq 'OK' -and -not $sourceMaskContractValid) {
+    $gateStatus = 'PENDENTE'
 }
 
 $inventorySemanticMatch = if ($gateRaw) {

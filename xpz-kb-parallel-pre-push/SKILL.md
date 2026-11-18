@@ -18,8 +18,8 @@ Roda a rotina pré-push de uma **pasta paralela de KB GeneXus**: invoca o orques
 - A rotina é de **análise e relatório**. Apresentar o diagnóstico ao usuário; não aplicar correções nem fazer push sem autorização explícita depois do relatório.
 - Não delegar o veredito de gate a subagente/LLM secundário; o juízo fica com o agente principal.
 - Se a pasta paralela ainda não estiver montada, validada ou mapeada, parar e usar `xpz-kb-parallel-setup` antes desta rotina.
-- Os gates **K8** (auditoria de setup) e **K9** (gate de índice) consomem **wrappers locais** da pasta paralela por **contrato estruturado** (`-AsJson`). Se K8/K9 bloquearem por wrapper local ausente, ambíguo ou defasado (sem repasse de `-AsJson`), a correção é via `xpz-kb-parallel-setup` (`atualizar_bootstrap_local` / `corrigir_wrapper_local`) — não editar o wrapper por conta própria nesta skill.
-- Os estados-string consumidos de K8 (`estado_operacional_sugerido`) e K9 (`status`/`reason`) são **contrato compartilhado** com `xpz-kb-parallel-setup`; renomeá-los lá quebra esta rotina (ver `fase1-mecanica.md`).
+- Os gates **K8** (auditoria de setup) e **K9** (gate de índice) consomem **wrappers locais** da pasta paralela por **contrato estruturado** (`-AsJson`). Se K8/K9 bloquearem por wrapper local ausente, ambíguo, defasado (sem repasse de `-AsJson`) ou sem os campos obrigatórios de máscara (`sourceMaskDegraded`/`sourceMaskDegradedWarning`), a correção é via `xpz-kb-parallel-setup` (`atualizar_bootstrap_local` / `corrigir_wrapper_local`) — não editar o wrapper por conta própria nesta skill.
+- Os estados-string consumidos de K8 (`estado_operacional_sugerido`) e K9 (`status`/`reason`, além do contrato de máscara `sourceMaskDegraded`/`sourceMaskDegradedWarning`) são **contrato compartilhado** com `xpz-kb-parallel-setup`; renomeá-los ou omiti-los lá quebra esta rotina (ver `fase1-mecanica.md`).
 
 ## PATH RESOLUTION
 
