@@ -427,7 +427,7 @@ if (-not $VerifyOnly) {
         -ScriptPath $IndexUpdateScriptPath `
         -SharedSkillsRoot $SharedSkillsRoot `
         -ValidationCasesPath $IndexValidationCasesPath `
-        -AllowMaskDegraded $AllowMaskDegraded
+        -AllowMaskDegraded:$AllowMaskDegraded
 }
 
 $shouldShowGitSummary = -not $NoGitSummary

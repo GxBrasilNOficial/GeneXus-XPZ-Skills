@@ -75,6 +75,18 @@ foreach ($name in $ExpectedAuditedByMolde.Keys) {
     }
 }
 
+# 4. Repasse de [switch] para funcao local exige a forma com dois pontos. Com parametros
+# nomeados obrigatorios, "-Switch $valor" vira argumento posicional e quebra o binding.
+$updateExampleText = [System.IO.File]::ReadAllText((Join-Path $examplesDir 'Update-KbFromXpz.example.ps1'))
+$expectedSwitchForm = '-AllowMaskDegraded:$AllowMaskDegraded'
+$spaceSwitchForm = '-AllowMaskDegraded $AllowMaskDegraded'
+if (-not $updateExampleText.Contains($expectedSwitchForm)) {
+    throw "ASSERT_FAILED: Update-KbFromXpz.example.ps1 deve repassar $expectedSwitchForm"
+}
+if ($updateExampleText.Contains($spaceSwitchForm)) {
+    throw "ASSERT_FAILED: Update-KbFromXpz.example.ps1 nao pode usar $spaceSwitchForm (binde como argumento posicional)"
+}
+
 # 4. Comment-based help dos moldes (recorrencia): todo molde com invocacao do proprio nome no
 # .EXAMPLE tem ajuda visivel e 0 achado (flag orfa, .PARAMETER orfao, ajuda invisivel). Anti-vacuidade
 # por PISO de cobertura (medido: 20), tolerante a novos moldes.
