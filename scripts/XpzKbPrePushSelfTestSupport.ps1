@@ -74,8 +74,17 @@ function Invoke-XpzSelfTestScript {
     [Parameter(Mandatory)][string]$ScriptPath,
     [string[]]$ScriptArgs = @()
   )
-  $stdout = & pwsh -NoProfile -File $ScriptPath @ScriptArgs 2>$null | Out-String
-  $code = $LASTEXITCODE
+  # O stdout do filho herda a codepage do console (nesta maquina, IBM850).
+  # Sem UTF-8, paths com acento chegam ao JSON do pai como mojibake e quebram
+  # comparacoes de caminho nos self-tests. Restaura a codificacao ao final.
+  $previousOutputEncoding = [Console]::OutputEncoding
+  try { [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false) } catch { }
+  try {
+    $stdout = & pwsh -NoProfile -File $ScriptPath @ScriptArgs 2>$null | Out-String
+    $code = $LASTEXITCODE
+  } finally {
+    try { [Console]::OutputEncoding = $previousOutputEncoding } catch { }
+  }
   $json = $null
   if ($stdout -and $stdout.Trim()) {
     try { $json = $stdout | ConvertFrom-Json } catch { $json = $null }
