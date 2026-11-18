@@ -93,6 +93,11 @@ EndEvent
 '@
     Write-ObjectXml (Join-Path $webPanelDir 'WPCssMaskFake.xml') $webPanelGuid 'WPCssMaskFake' '33333333-3333-3333-3333-333333333303' $cssEventSource
 
+    # Bloco serialized que contem <GxMultiForm>: nao e mascarado, conta em
+    # mixed_layout_skips e fica fora de source_mask_blocks_scanned.
+    $serializedMixedSource = '<SerializedRoot><GxMultiForm rootId="1"><Form><Value>PFakeTargetFake()</Value></Form></GxMultiForm></SerializedRoot>'
+    Write-ObjectXml (Join-Path $webPanelDir 'WPSerializedMixedFake.xml') $webPanelGuid 'WPSerializedMixedFake' '33333333-3333-3333-3333-333333333304' $serializedMixedSource
+
     Write-AttributeXml (Join-Path $attributeDir 'AttrMaskFormulaFake.xml') 'AttrMaskFormulaFake' '44444444-4444-4444-4444-444444444401' "PRealFake(0) + 'PFakeTargetFake()'"
 
     $workWithConditionXml = @"
@@ -132,14 +137,20 @@ EndEvent
     if ([int]$metadata.metadata.source_mask_native_skips -ne 1) {
         throw "source_mask_native_skips deveria ser 1; obtido $($metadata.metadata.source_mask_native_skips)"
     }
-    if ([int]$metadata.metadata.source_mask_mixed_layout_skips -ne 1) {
-        throw "source_mask_mixed_layout_skips deveria ser 1; obtido $($metadata.metadata.source_mask_mixed_layout_skips)"
+    if ([int]$metadata.metadata.source_mask_mixed_layout_skips -ne 2) {
+        throw "source_mask_mixed_layout_skips deveria ser 2; obtido $($metadata.metadata.source_mask_mixed_layout_skips)"
     }
     if ([int]$metadata.metadata.source_mask_blocks_scanned -ne 4) {
         throw "source_mask_blocks_scanned deveria ser 4; obtido $($metadata.metadata.source_mask_blocks_scanned)"
     }
     if ([int]$metadata.metadata.source_mask_blocks_masked -ne 2) {
         throw "source_mask_blocks_masked deveria ser 2; obtido $($metadata.metadata.source_mask_blocks_masked)"
+    }
+    $codeEventsMixed = [int]$metadata.metadata.source_mask_blocks_scanned `
+        - [int]$metadata.metadata.source_mask_blocks_masked `
+        - [int]$metadata.metadata.source_mask_native_skips
+    if ($codeEventsMixed -ne 1) {
+        throw "scanned - masked - native deveria ser 1 (mixed de code/events); obtido $codeEventsMixed"
     }
     $kindCounts = $metadata.metadata.source_block_kind_counts | ConvertFrom-Json
     $kindNames = @($kindCounts.PSObject.Properties.Name)
@@ -148,8 +159,8 @@ EndEvent
             throw "source_block_kind_counts deveria conter '$kind'; obtido $($kindNames -join ',')"
         }
     }
-    if ([int]$kindCounts.layout -lt 1 -or [int]$kindCounts.code -lt 1 -or [int]$kindCounts.events -lt 1) {
-        throw "source_block_kind_counts deveria contar layout, code e events; obtido $($metadata.metadata.source_block_kind_counts)"
+    if ([int]$kindCounts.layout -lt 1 -or [int]$kindCounts.code -lt 1 -or [int]$kindCounts.events -lt 1 -or [int]$kindCounts.serialized -lt 1) {
+        throw "source_block_kind_counts deveria contar layout, code, events e serialized; obtido $($metadata.metadata.source_block_kind_counts)"
     }
 
     $report = Get-Content -LiteralPath $reportPath -Raw -Encoding UTF8 | ConvertFrom-Json

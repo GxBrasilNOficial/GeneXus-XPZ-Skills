@@ -98,7 +98,7 @@ Eles não substituem o acervo XML em `ObjetosDaKbEmXml` e não provam comportame
 
 Falha de mascara em bloco `code`/`events` nao nativo e fail-closed: o build retorna exit `9` com `SOURCE_MASK_BLOCKED: <arquivo>:<linha>:<motivo>` antes de gravar o SQLite, e um arquivo pre-existente permanece intacto (escrita atomica por temporario + `os.replace`). `-AllowMaskDegraded`/`--allow-mask-degraded` gera indice degradado.
 
-Chaves novas em `metadata` (lidas por `index-metadata`): `source_mask_blocks_scanned` (`code`/`events` unicos), `source_mask_blocks_masked`, `source_mask_native_skips`, `source_mask_mixed_layout_skips`, `source_mask_degraded` (`true|false`), `source_mask_degraded_blocks` (JSON com arquivo, linha e motivo) e `source_block_kind_counts` (JSON com `code`/`events`/`layout`/`serialized`). Em indice nao degradado, `scanned = masked + native_skips + mixed_layout_skips`.
+Chaves novas em `metadata` (lidas por `index-metadata`): `source_mask_blocks_scanned` (`code`/`events` unicos), `source_mask_blocks_masked`, `source_mask_native_skips`, `source_mask_mixed_layout_skips`, `source_mask_degraded` (`true|false`), `source_mask_degraded_blocks` (JSON com arquivo, linha e motivo) e `source_block_kind_counts` (JSON com `code`/`events`/`layout`/`serialized`). Em indice nao degradado, `scanned - masked - native_skips` e a quantidade de blocos `code`/`events` pulados por `mixed_layout`; `source_mask_mixed_layout_skips` tambem conta blocos `serialized` que contenham `<GxMultiForm>`, que ficam fora de `scanned`.
 
 ## Pre-requisito Python
 

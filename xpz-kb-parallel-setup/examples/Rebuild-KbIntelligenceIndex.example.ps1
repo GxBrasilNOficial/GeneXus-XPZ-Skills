@@ -24,6 +24,9 @@ Caminho opcional para os casos de validação.
 .PARAMETER FailOnValidationFailure
 Retorna erro quando qualquer caso de validação falhar.
 
+.PARAMETER AllowMaskDegraded
+Gera indice degradado quando a mascara de Source falhar, em vez de abortar com exit 9.
+
 .PARAMETER SharedSkillsRoot
 Raiz local da base compartilhada `GeneXus-XPZ-Skills`. Use este parâmetro quando
 o wrapper sanitizado for adaptado para um ambiente com outro caminho local.
@@ -45,6 +48,8 @@ param(
     [string]$ValidationCasesPath,
 
     [switch]$FailOnValidationFailure,
+
+    [switch]$AllowMaskDegraded,
 
     [string]$SharedSkillsRoot = "C:\CAMINHO\PARA\GeneXus-XPZ-Skills"
 )
@@ -102,6 +107,10 @@ if ($ValidationCasesPath) {
 
 if ($FailOnValidationFailure) {
     $params.FailOnValidationFailure = $true
+}
+
+if ($AllowMaskDegraded) {
+    $params.AllowMaskDegraded = $true
 }
 
 $global:LASTEXITCODE = $null

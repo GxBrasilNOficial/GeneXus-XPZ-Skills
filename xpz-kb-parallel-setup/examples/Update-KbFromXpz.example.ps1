@@ -44,6 +44,10 @@ materialização bem-sucedida. Quando omitido, usa
 Caminho opcional para casos de validação usados no refresh compulsorio do
 índice.
 
+.PARAMETER AllowMaskDegraded
+Repassa -AllowMaskDegraded ao rebuild do índice quando a máscara de Source
+falhar; gera índice degradado em vez de abortar com exit 9.
+
 .PARAMETER NoGitSummary
 Suprime resumo local de alterações Git em `ObjetosDaKbEmXml`.
 
@@ -94,6 +98,8 @@ param(
     [string]$IndexUpdateScriptPath,
 
     [string]$IndexValidationCasesPath,
+
+    [switch]$AllowMaskDegraded,
 
     [string[]]$ExpectedItems = @(),
 
@@ -166,7 +172,9 @@ function Invoke-IndexRefresh {
         [Parameter(Mandatory = $true)]
         [string]$SharedSkillsRoot,
 
-        [string]$ValidationCasesPath
+        [string]$ValidationCasesPath,
+
+        [switch]$AllowMaskDegraded
     )
 
     if (-not (Test-Path -LiteralPath $ScriptPath)) {
@@ -180,6 +188,10 @@ function Invoke-IndexRefresh {
     if ($ValidationCasesPath) {
         $rebuildParams.ValidationCasesPath = $ValidationCasesPath
         $rebuildParams.FailOnValidationFailure = $true
+    }
+
+    if ($AllowMaskDegraded) {
+        $rebuildParams.AllowMaskDegraded = $true
     }
 
     Write-HumanLine ""
@@ -414,7 +426,8 @@ if (-not $VerifyOnly) {
     Invoke-IndexRefresh `
         -ScriptPath $IndexUpdateScriptPath `
         -SharedSkillsRoot $SharedSkillsRoot `
-        -ValidationCasesPath $IndexValidationCasesPath
+        -ValidationCasesPath $IndexValidationCasesPath `
+        -AllowMaskDegraded $AllowMaskDegraded
 }
 
 $shouldShowGitSummary = -not $NoGitSummary
