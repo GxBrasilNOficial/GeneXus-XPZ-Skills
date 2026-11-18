@@ -17,6 +17,8 @@
        indice/gate OK.
     D. Gate com GATE_OK sem writability_coverage -> indice/gate PENDENTE e
        cobertura unknown; GATE_OK sozinho nao e aceito.
+    E. Gate com source_mask_degraded=true -> indice/mascara true e aviso
+       preservado, sem alterar o estado do gate.
 #>
 
 Set-StrictMode -Version Latest
@@ -108,6 +110,22 @@ Write-Output 'GATE_OK'
   Assert-True ($rd.json.'indice/gate' -eq 'PENDENTE') "D: indice/gate PENDENTE esperado; obtido $($rd.json.'indice/gate')"
   Assert-True ($rd.json.'indice/gravabilidade.cobertura' -eq 'unknown') "D: cobertura unknown esperada; obtida $($rd.json.'indice/gravabilidade.cobertura')"
   Assert-True ([string]$rd.json.'indice/gravabilidade.aviso' -match 'sem campo writability_coverage') "D: aviso de cobertura ausente esperado"
+
+  # --- E: mascara degradada -> estado exposto sem bloquear o gate ---
+  $e = New-SetupAuditFixture -GateText @'
+Write-Output 'writability_coverage: complete-in-model'
+Write-Output 'source_mask_degraded: true'
+Write-Output 'source_mask_degraded_warning: Mascara de Source degradada; cobertura parcial.'
+Write-Output 'inventory_validation_status: OK'
+Write-Output 'GATE_OK'
+'@
+  $re = Invoke-XpzSelfTestScript -ScriptPath $engine -ScriptArgs @(
+    '-KbRoot', $e.Root, '-GateWrapperPath', $e.Gate, '-MetadataWrapperTestPath', $e.Metadata,
+    '-PowerShellRuntimeTestPath', $e.Runtime, '-NamingWrapperPath', $e.Naming, '-AsJson')
+  Assert-True ($null -ne $re.json) "E: stdout deveria ser JSON parseavel"
+  Assert-True ($re.json.'indice/gate' -eq 'OK') "E: indice/gate OK esperado; obtido $($re.json.'indice/gate')"
+  Assert-True ($re.json.'indice/mascara' -eq 'true') "E: indice/mascara true esperado; obtido $($re.json.'indice/mascara')"
+  Assert-True ([string]$re.json.'indice/mascara.aviso' -match 'degradada') "E: aviso de mascara degradada esperado"
 
   'XPZ_SETUP_AUDIT_CONTRACT_SELFTEST_OK'
 }

@@ -4,7 +4,8 @@
 .SYNOPSIS
     Self-test do incremento 17a: mascara de Source, Formula, condicoes, layout
     intocado, mixed-layout skip, native-skip, falha fechada (exit 9), escrita
-    atomica, modo degradado e metadata.
+    atomica, modo degradado e metadata. A falha em Formula/condicao usa a mesma
+    politica fail-closed dos blocos e registra a unidade no modo degradado.
 #>
 
 Set-StrictMode -Version Latest
@@ -217,6 +218,58 @@ EndEvent
     }
     if ([string]$metadata2.metadata.source_mask_degraded_blocks -notmatch 'unterminated string') {
         throw "source_mask_degraded_blocks deveria citar o motivo; obtido $($metadata2.metadata.source_mask_degraded_blocks)"
+    }
+
+    # ---------------------------------------------------------------- KB 3
+    # Formula e condicao usam o mesmo scanner, mas nao sao blocos de Source.
+    # A falha deve ser fail-closed e, no modo degradado, entrar na mesma lista.
+    $parallelRoot3 = Join-Path $tempRoot 'KbParalela3'
+    $objetosPath3 = Join-Path $parallelRoot3 'ObjetosDaKbEmXml'
+    $procedureDir3 = Join-Path $objetosPath3 'Procedure'
+    $attributeDir3 = Join-Path $objetosPath3 'Attribute'
+    $workWithForWebDir3 = Join-Path $objetosPath3 'WorkWithForWeb'
+    $kbIntelDir3 = Join-Path $parallelRoot3 'KbIntelligence'
+    [void](New-Item -ItemType Directory -Path $procedureDir3, $attributeDir3, $workWithForWebDir3, $kbIntelDir3 -Force)
+
+    Write-ObjectXml (Join-Path $procedureDir3 'PRealFake.xml') $procedureGuid 'PRealFake' '22222222-2222-2222-2222-222222222301' ''
+    Write-AttributeXml (Join-Path $attributeDir3 'AttrUnterminatedFormulaFake.xml') 'AttrUnterminatedFormulaFake' '44444444-4444-4444-4444-444444444402' "PRealFake() + 'unterminated"
+
+    $unterminatedConditionXml = @"
+<Object type="$workWithForWebGuid" name="WWUnterminatedConditionFake" guid="55555555-5555-5555-5555-555555555502">
+  <Condition value="PRealFake() + 'unterminated"/>
+</Object>
+"@
+    [System.IO.File]::WriteAllText((Join-Path $workWithForWebDir3 'WWUnterminatedConditionFake.xml'), $unterminatedConditionXml, (New-Object System.Text.UTF8Encoding($false)))
+
+    $sqlitePath3 = Join-Path $kbIntelDir3 'kb-intelligence.sqlite'
+    $reportPath3 = Join-Path $kbIntelDir3 'kb-intelligence-validation.json'
+    [System.IO.File]::WriteAllText($sqlitePath3, 'sentinel', (New-Object System.Text.UTF8Encoding($false)))
+
+    $exit4 = Invoke-Build -SourceRoot $objetosPath3 -OutputPath $sqlitePath3 -ReportPath $reportPath3
+    if ($exit4 -ne 9) { throw "build de Formula/condicao sem -AllowMaskDegraded deveria sair 9; obtido $exit4" }
+    $sentinel3 = [System.IO.File]::ReadAllText($sqlitePath3)
+    if ($sentinel3 -ne 'sentinel') {
+        throw 'SQLite pre-existente deveria permanecer intacto apos a falha fechada de Formula/condicao'
+    }
+
+    $exit5 = Invoke-Build -SourceRoot $objetosPath3 -OutputPath $sqlitePath3 -ReportPath $reportPath3 -AllowMaskDegraded
+    if ($exit5 -ne 0) { throw "build de Formula/condicao com -AllowMaskDegraded deveria sair 0; obtido $exit5" }
+    $metadata3 = (& $queryScript -IndexPath $sqlitePath3 -Query index-metadata -ParallelKbRoot $parallelRoot3 -Format json) | ConvertFrom-Json
+    if ([string]$metadata3.metadata.source_mask_degraded -ne 'true') {
+        throw "source_mask_degraded deveria ser true na falha de Formula/condicao; obtido $($metadata3.metadata.source_mask_degraded)"
+    }
+    $degradedBlocks3 = [string]$metadata3.metadata.source_mask_degraded_blocks
+    if ($degradedBlocks3 -notmatch 'Attribute/AttrUnterminatedFormulaFake\.xml') {
+        throw "source_mask_degraded_blocks deveria citar a Formula; obtido $degradedBlocks3"
+    }
+    if ($degradedBlocks3 -notmatch 'WorkWithForWeb/WWUnterminatedConditionFake\.xml') {
+        throw "source_mask_degraded_blocks deveria citar a condicao; obtido $degradedBlocks3"
+    }
+    if ($degradedBlocks3 -notmatch 'unterminated string') {
+        throw "source_mask_degraded_blocks deveria citar o motivo da expressao; obtido $degradedBlocks3"
+    }
+    if ([int]$metadata3.metadata.source_mask_blocks_scanned -ne 0) {
+        throw "KB 3 nao tem blocos de Source; source_mask_blocks_scanned deveria ser 0; obtido $($metadata3.metadata.source_mask_blocks_scanned)"
     }
 
     Write-Output 'OK: Test-KbIntelligenceSourceMaskSelfTest.ps1'

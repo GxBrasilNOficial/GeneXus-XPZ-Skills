@@ -22,15 +22,19 @@
     8. assinatura do extrator (version/hash/format na metadata do SQLite) contra o motor
        atual via GeneXusKbIntelligenceExtractorContract.ps1;
     9. cobertura e contagem das occurrences de gravabilidade, separadas da validade tecnica.
+    10. estado da mascara de Source: `source_mask_degraded=true` gera aviso de cobertura
+        parcial, sem bloquear (degradacao e modo consentido por -AllowMaskDegraded).
 
   CONTRATO DE SAIDA:
     - Default (texto): retrocompativel -- emite as linhas de assinatura,
       inventory_validation_status: OK e GATE_OK no sucesso; lanca excecao
       `BLOCK: <motivo>` no bloqueio (consumido por grep GATE_OK pelo
-      Test-XpzSetupAudit e por agentes).
+      Test-XpzSetupAudit e por agentes). Emite `source_mask_degraded: true|false`
+      e, quando `true`, `source_mask_degraded_warning`.
     - -AsJson: contrato estruturado -- objeto { status: OK|BLOCK, reason,
       extractor_signature_version, extractor_signature_hash,
       extractor_signature_format, writabilityCoverage, writabilityCoverageWarning,
+      sourceMaskDegraded, sourceMaskDegradedWarning,
       inventory_validation_status, last_index_build_run_at,
       last_xpz_materialization_run_at }. NUNCA lanca sob -AsJson: bloqueio vira
       { status: BLOCK, reason } + exit 1. Consumido pelo orquestrador K9.
@@ -172,11 +176,23 @@ $indexMetadataMap = Get-GeneXusKbIntelligenceExtractorSignatureFromIndexMetadata
 $extractorCheck = Test-GeneXusKbIntelligenceExtractorSignatureFromMetadata -Metadata $indexMetadataMap
 if (-not $extractorCheck.ok) { Fail-Gate $extractorCheck.summary }
 
+# 10. estado da mascara de Source (degradacao consentida)
+$maskDegradedMatch = [regex]::Match($indexMetadataText, '(?i)source_mask_degraded\s*[:=]\s*(?<value>true|false)')
+if (-not $maskDegradedMatch.Success) { Fail-Gate 'index-metadata sem source_mask_degraded; regenere o indice' }
+$sourceMaskDegraded = $maskDegradedMatch.Groups['value'].Value.ToLowerInvariant() -eq 'true'
+$sourceMaskDegradedWarning = if ($sourceMaskDegraded) {
+  'Mascara de Source degradada; GATE_OK confirma validade tecnica do indice, nao cobertura completa. Consulte source_mask_degraded_blocks no index-metadata para arquivo, linha e motivo.'
+} else {
+  $null
+}
+
 $out['extractor_signature_version'] = $extractorCheck.stored.extractor_signature_version
 $out['extractor_signature_hash'] = $extractorCheck.stored.extractor_signature_hash
 $out['extractor_signature_format'] = $extractorCheck.stored.extractor_signature_format
 $out['writabilityCoverage'] = $writabilityCoverage
 $out['writabilityCoverageWarning'] = $writabilityCoverageWarning
+$out['sourceMaskDegraded'] = $sourceMaskDegraded
+$out['sourceMaskDegradedWarning'] = $sourceMaskDegradedWarning
 $out['inventory_validation_status'] = 'OK'
 
 if ($AsJson) {
@@ -187,6 +203,9 @@ if ($AsJson) {
   ('extractor_signature_format: {0}' -f $extractorCheck.stored.extractor_signature_format)
   ('writability_coverage: {0}' -f $writabilityCoverage)
   if ($writabilityCoverageWarning) { ('writability_coverage_warning: {0}' -f $writabilityCoverageWarning) }
+  $sourceMaskDegradedText = if ($sourceMaskDegraded) { 'true' } else { 'false' }
+  ('source_mask_degraded: {0}' -f $sourceMaskDegradedText)
+  if ($sourceMaskDegradedWarning) { ('source_mask_degraded_warning: {0}' -f $sourceMaskDegradedWarning) }
   'inventory_validation_status: OK'
   'GATE_OK'
 }

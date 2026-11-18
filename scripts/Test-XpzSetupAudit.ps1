@@ -218,6 +218,8 @@ $inventorySemanticStatus = $null
 # WRITABILITY_COVERAGE_CONTRACT_V1: GATE_OK só é aceito junto com writability_coverage.
 $writabilityCoverage = 'unknown'
 $writabilityCoverageWarning = 'Gate de indice sem campo writability_coverage; nao afirmar cobertura de gravabilidade.'
+$sourceMaskDegraded = 'unknown'
+$sourceMaskDegradedWarning = 'Gate de indice sem campo source_mask_degraded; nao afirmar cobertura completa da mascara.'
 try {
     $gateRaw = Invoke-WrapperText -Path $GateWrapperPath
     $coverageMatch = [regex]::Match($gateRaw, 'writability_coverage\s*[:=]\s*(?<value>\S+)')
@@ -233,6 +235,18 @@ try {
 } catch {
     $gateRaw = $_.Exception.Message.Trim()
     $gateStatus = 'BLOCK'
+}
+
+$maskDegradedMatch = if ($gateRaw) {
+    [regex]::Match($gateRaw, 'source_mask_degraded\s*[:=]\s*(?<value>true|false)')
+} else {
+    [regex]::Match('', 'a^')
+}
+if ($maskDegradedMatch.Success) {
+    $sourceMaskDegraded = $maskDegradedMatch.Groups['value'].Value.ToLowerInvariant()
+    $maskWarningMatch = [regex]::Match($gateRaw, 'source_mask_degraded_warning\s*[:=]\s*(?<value>.+)')
+    if ($maskWarningMatch.Success) { $sourceMaskDegradedWarning = $maskWarningMatch.Groups['value'].Value.Trim() }
+    else { $sourceMaskDegradedWarning = $null }
 }
 
 $inventorySemanticMatch = if ($gateRaw) {
@@ -438,6 +452,10 @@ Emit-Line -Key 'indice/gate.evidencia' -Value $(if ($gateRaw) { $gateRaw.Replace
 Emit-Line -Key 'indice/gravabilidade.cobertura' -Value $writabilityCoverage
 if (-not [string]::IsNullOrWhiteSpace($writabilityCoverageWarning)) {
     Emit-Line -Key 'indice/gravabilidade.aviso' -Value $writabilityCoverageWarning
+}
+Emit-Line -Key 'indice/mascara' -Value $sourceMaskDegraded
+if (-not [string]::IsNullOrWhiteSpace($sourceMaskDegradedWarning)) {
+    Emit-Line -Key 'indice/mascara.aviso' -Value $sourceMaskDegradedWarning
 }
 Emit-Line -Key 'indice/semantica' -Value $inventorySemanticStatus
 Emit-Line -Key 'indice/semantica.evidencia' -Value $(if ($gateRaw) { $gateRaw.Replace([Environment]::NewLine, ' | ') } else { '(sem saida)' })

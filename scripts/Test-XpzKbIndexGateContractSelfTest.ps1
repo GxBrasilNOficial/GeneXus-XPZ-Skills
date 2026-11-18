@@ -16,6 +16,10 @@
   Uma fixture sintetica tambem chega a etapa de assinatura e simula a excecao
   PREREQUISITO AUSENTE: o modo texto deve prefixar BLOCK e o JSON deve preservar
   status BLOCK, exit 1 e a causa original.
+  Fixtures com assinatura valida cobrem o estado da mascara:
+    D. source_mask_degraded=true expoe o aviso em texto e JSON, sem bloquear.
+    E. source_mask_degraded=false nao emite aviso.
+    F. Metadata sem source_mask_degraded bloqueia (campo obrigatorio).
 #>
 
 Set-StrictMode -Version Latest
@@ -101,6 +105,110 @@ try {
   Assert-True ($pythonJson.exit -eq 1) "C: exit 1 esperado sob -AsJson; obtido $($pythonJson.exit)"
   Assert-True ($null -ne $pythonJson.json -and $pythonJson.json.status -eq 'BLOCK') 'C: excecao de Python ausente deveria virar status BLOCK sob -AsJson'
   Assert-True ([string]$pythonJson.json.reason -match '^PREREQUISITO AUSENTE:') 'C: JSON deveria preservar a causa original sem prefixo textual'
+
+  # --- D/E/F: estado da mascara de Source no contrato do gate ---
+  function New-IndexGateFixture {
+    param([string[]]$ExtraMetadata = @())
+
+    $root = Join-Path ([System.IO.Path]::GetTempPath()) ("xpz-indexgate-mask-{0}" -f ([guid]::NewGuid().ToString('N')))
+    [void](New-Item -ItemType Directory -Path $root -Force); $roots.Add($root)
+    $indexDir = Join-Path $root 'KbIntelligence'
+    [void](New-Item -ItemType Directory -Path $indexDir -Force)
+
+    $structure = Join-Path $root 'Test-KbStructure.ps1'
+    $query = Join-Path $root 'Query-KbIntelligence.ps1'
+    $contract = Join-Path $root 'GeneXusKbIntelligenceExtractorContract.ps1'
+    $utf8 = [System.Text.UTF8Encoding]::new($false)
+
+    [System.IO.File]::WriteAllText((Join-Path $indexDir 'kb-intelligence.sqlite'), '', $utf8)
+    [System.IO.File]::WriteAllText((Join-Path $root 'kb-source-metadata.md'), "last_xpz_materialization_run_at: 2026-10-02T11:00:00Z`n", $utf8)
+    [System.IO.File]::WriteAllText($structure, "'STRUCTURE_OK'`n", $utf8)
+
+    $metadataLines = @(
+      "  'last_index_build_run_at: 2026-10-02T12:00:00Z'",
+      "  'inventory_validation_status: OK'",
+      "  'writability_coverage: complete-in-model'",
+      "  'writability_rows_expected: 0'",
+      "  'writability_rows_written: 0'",
+      "  'writability_rows_lost: 0'"
+    ) + $ExtraMetadata
+
+    $queryTemplate = @'
+param([string]$Query, [string]$Format)
+$metadata = @(
+__METADATA__
+)
+$metadata -join "`n"
+'@
+    [System.IO.File]::WriteAllText($query, $queryTemplate.Replace('__METADATA__', ($metadataLines -join "`n")), $utf8)
+
+    $contractText = @'
+function Get-GeneXusKbIntelligenceExtractorSignatureFromIndexMetadataText {
+  param([string]$IndexMetadataText)
+  return @{ extractor_signature_version = '19'; extractor_signature_hash = 'h'; extractor_signature_format = 'manifest-lf-v1' }
+}
+function Test-GeneXusKbIntelligenceExtractorSignatureFromMetadata {
+  param([hashtable]$Metadata)
+  return @{ ok = $true; summary = ''; stored = @{ extractor_signature_version = '19'; extractor_signature_hash = 'h'; extractor_signature_format = 'manifest-lf-v1' } }
+}
+'@
+    [System.IO.File]::WriteAllText($contract, $contractText, $utf8)
+
+    return [pscustomobject]@{
+      Root = $root
+      Structure = $structure
+      Query = $query
+      Contract = $contract
+    }
+  }
+
+  $degradedFixture = New-IndexGateFixture -ExtraMetadata @(
+    "  'source_mask_degraded: true'",
+    "  'source_mask_degraded_blocks: [[`"Attribute/A.xml`",12,`"unterminated string`"]]'"
+  )
+  $rd = Invoke-XpzSelfTestScript -ScriptPath $engine -ScriptArgs @(
+    '-RepoRoot', $degradedFixture.Root,
+    '-StructureWrapperPath', $degradedFixture.Structure,
+    '-QueryWrapperPath', $degradedFixture.Query,
+    '-ExtractorContractPath', $degradedFixture.Contract,
+    '-AsJson')
+  Assert-True ($rd.exit -eq 0) "D: exit 0 esperado com mascara degradada; obtido $($rd.exit)"
+  Assert-True ($null -ne $rd.json -and $rd.json.status -eq 'OK') 'D: status OK esperado com mascara degradada'
+  Assert-True ($rd.json.sourceMaskDegraded -eq $true) 'D: sourceMaskDegraded=true esperado'
+  Assert-True ([string]$rd.json.sourceMaskDegradedWarning -match 'degradada') 'D: aviso de mascara degradada esperado'
+
+  $maskTextErrorPath = Join-Path $degradedFixture.Root 'mask-text-error.log'
+  $maskTextStdout = & $pwshPath -NoProfile -File $engine -RepoRoot $degradedFixture.Root -StructureWrapperPath $degradedFixture.Structure -QueryWrapperPath $degradedFixture.Query -ExtractorContractPath $degradedFixture.Contract 2> $maskTextErrorPath | Out-String
+  $maskTextExit = $LASTEXITCODE
+  Assert-True ($maskTextExit -eq 0) "D: exit 0 esperado no modo texto; obtido $maskTextExit"
+  Assert-True ($maskTextStdout -match 'source_mask_degraded: true') 'D: modo texto deveria expor source_mask_degraded: true'
+  Assert-True ($maskTextStdout -match 'source_mask_degraded_warning:') 'D: modo texto deveria expor o aviso de mascara'
+  Assert-True ($maskTextStdout -match '\bGATE_OK\b') 'D: modo texto deveria manter GATE_OK'
+
+  $cleanFixture = New-IndexGateFixture -ExtraMetadata @(
+    "  'source_mask_degraded: false'",
+    "  'source_mask_degraded_blocks: []'"
+  )
+  $re = Invoke-XpzSelfTestScript -ScriptPath $engine -ScriptArgs @(
+    '-RepoRoot', $cleanFixture.Root,
+    '-StructureWrapperPath', $cleanFixture.Structure,
+    '-QueryWrapperPath', $cleanFixture.Query,
+    '-ExtractorContractPath', $cleanFixture.Contract,
+    '-AsJson')
+  Assert-True ($re.exit -eq 0) "E: exit 0 esperado sem degradacao; obtido $($re.exit)"
+  Assert-True ($re.json.sourceMaskDegraded -eq $false) 'E: sourceMaskDegraded=false esperado'
+  Assert-True ($null -eq $re.json.sourceMaskDegradedWarning) 'E: sem aviso quando a mascara nao esta degradada'
+
+  $missingFixture = New-IndexGateFixture
+  $rf = Invoke-XpzSelfTestScript -ScriptPath $engine -ScriptArgs @(
+    '-RepoRoot', $missingFixture.Root,
+    '-StructureWrapperPath', $missingFixture.Structure,
+    '-QueryWrapperPath', $missingFixture.Query,
+    '-ExtractorContractPath', $missingFixture.Contract,
+    '-AsJson')
+  Assert-True ($rf.exit -eq 1) "F: exit 1 esperado sem source_mask_degraded; obtido $($rf.exit)"
+  Assert-True ($null -ne $rf.json -and $rf.json.status -eq 'BLOCK') 'F: status BLOCK esperado sem source_mask_degraded'
+  Assert-True ([string]$rf.json.reason -match 'source_mask_degraded') 'F: motivo deveria citar source_mask_degraded'
 
   'XPZ_KB_INDEX_GATE_CONTRACT_SELFTEST_OK'
 }

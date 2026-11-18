@@ -833,6 +833,15 @@ def reset_source_mask_state(allow_degraded: bool) -> None:
         _SOURCE_BLOCK_KIND_COUNTS[key] = 0
 
 
+def _record_mask_failure(source_file: str, line: int, reason: str, unit_key: int) -> None:
+    source_file = str(source_file)
+    blocked_key = (source_file, unit_key)
+    if blocked_key in _SOURCE_MASK_BLOCKED_SEEN:
+        return
+    _SOURCE_MASK_BLOCKED_SEEN.add(blocked_key)
+    _SOURCE_MASK_BLOCKED.append((source_file, line, reason))
+
+
 def source_mask_metadata() -> dict[str, object]:
     return {
         "source_mask_blocks_scanned": _SOURCE_MASK_STATS["scanned"],
@@ -923,15 +932,32 @@ def source_blocks(xml_text: str, source_file: str | None = None) -> Iterable[Sou
                               masked_text=None)
         else:
             if _ALLOW_MASK_DEGRADED:
-                blocked_key = (source_file or "", body_start)
-                if blocked_key not in _SOURCE_MASK_BLOCKED_SEEN:
-                    _SOURCE_MASK_BLOCKED_SEEN.add(blocked_key)
-                    _SOURCE_MASK_BLOCKED.append((source_file or "", start_line, result.reason))
+                _record_mask_failure(source_file or "", start_line, result.reason, body_start)
                 yield SourceBlock(text=body, start_line=start_line, kind=kind,
                                   mixed_layout=False, mask_state="failed",
                                   masked_text=None)
             else:
                 raise SourceMaskBlockedError(source_file or "", start_line, result.reason)
+
+
+def mask_expression_or_fail(expression: str, *, source_file: str, line: int, unit_key: int) -> str:
+    """Aplica a politica fail-closed da mascara a uma expressao isolada.
+
+    Blocos de ``Source`` passam por ``source_blocks``; ``Formula`` e condicoes
+    de WorkWith nao sao blocos, mas usam o mesmo scanner e a mesma politica:
+    falha sem ``-AllowMaskDegraded`` aborta o build; com a flag, registra a
+    unidade em ``source_mask_degraded_blocks`` e segue com o texto original.
+    """
+    result = mask_gx_source(expression)
+    if result.state == "masked":
+        return result.masked
+    if result.state == "native-skip":
+        return expression
+    source_file = str(source_file)
+    if _ALLOW_MASK_DEGRADED:
+        _record_mask_failure(source_file, line, result.reason, unit_key)
+        return expression
+    raise SourceMaskBlockedError(source_file, line, result.reason)
 
 
 def active_line(line: str) -> str:
@@ -1090,8 +1116,12 @@ def append_call_evidences_from_expression(
     extractor_rule_procedure_dot_udp: str | None = None,
 ) -> None:
     line_no = line_number_at(xml_text, expression_start)
-    masked = mask_gx_source(expression)
-    expr = masked.masked if masked.state == "masked" else expression
+    expr = mask_expression_or_fail(
+        expression,
+        source_file=source.rel_path,
+        line=line_no,
+        unit_key=expression_start,
+    )
     for match in PROCEDURE_DOT_CALL_RE.finditer(expr):
         matched_name = match.group("name")
         target_name = procedure_lookup.get(matched_name.lower())
@@ -1556,12 +1586,23 @@ def effective_condition_expression(value: str) -> str:
     return value.split("//", 1)[0]
 
 
-def masked_condition_expression(value: str) -> str:
+def masked_condition_expression(
+    value: str,
+    *,
+    source_file: str,
+    line: int,
+    unit_key: int,
+) -> str:
     stripped = value.strip()
     result = mask_gx_source(stripped)
     if result.state == "masked":
         return result.masked
-    return stripped.split("//", 1)[0]
+    if result.state == "native-skip":
+        return stripped.split("//", 1)[0]
+    if _ALLOW_MASK_DEGRADED:
+        _record_mask_failure(source_file, line, result.reason, unit_key)
+        return stripped.split("//", 1)[0]
+    raise SourceMaskBlockedError(source_file, line, result.reason)
 
 
 def bc_variable_targets(xml_text: str, transaction_lookup: dict[str, str]) -> dict[str, str]:
@@ -2117,7 +2158,12 @@ def extract_workwith_condition_evidence(
             if not condition_value:
                 continue
 
-            expression = masked_condition_expression(condition_value)
+            expression = masked_condition_expression(
+                condition_value,
+                source_file=source.rel_path,
+                line=line_number_at(xml_text, condition_match.start()),
+                unit_key=condition_match.start(),
+            )
             direct_matches = procedure_direct_re.finditer(expression) if procedure_direct_re else ()
             for procedure_match in direct_matches:
                 target_name = procedure_lookup.get(procedure_match.group("name").lower())
@@ -2170,7 +2216,12 @@ def extract_workwith_condition_attribute_evidence(
                 if not attr_name.lower().endswith("condition"):
                     continue
 
-                expression = masked_condition_expression(attr_value)
+                expression = masked_condition_expression(
+                    attr_value,
+                    source_file=source.rel_path,
+                    line=line_number_at(xml_text, tag_match.start()),
+                    unit_key=tag_match.start(),
+                )
                 direct_matches = procedure_direct_re.finditer(expression) if procedure_direct_re else ()
                 for procedure_match in direct_matches:
                     target_name = procedure_lookup.get(procedure_match.group("name").lower())

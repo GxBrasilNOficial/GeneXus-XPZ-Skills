@@ -73,7 +73,7 @@ K8 lê `estado_operacional_sugerido` do `Test-XpzSetupAudit.ps1 -AsJson` e mapei
 - **vermelhos → `block`** (fail-closed): `runtime_powershell_bloqueado`, `auditoria_incompleta`.
 - **qualquer outro estado → `warn`**.
 
-K9 lê `status`/`reason` do `Test-XpzKbIndexGate.ps1 -AsJson`: `status='OK'` → `ok`; senão → `block` com o `reason`.
+K9 lê `status`/`reason` do `Test-XpzKbIndexGate.ps1 -AsJson`: `status='OK'` → `ok`; senão → `block` com o `reason`. Quando o gate traz `sourceMaskDegradedWarning`, o estado continua `ok`, mas a mensagem registra a cobertura parcial da máscara.
 
 > Esses literais (`estado_operacional_sugerido` de K8; `status`/`reason` de K9) são **contrato compartilhado** com `xpz-kb-parallel-setup` (que materializa e mantém os wrappers locais). Renomeá-los lá quebra K8/K9 aqui — alterar nos dois lados juntos.
 

@@ -13,11 +13,13 @@ caminhos locais e repassando -AsJson. Simetrico ao molde de auditoria de setup
 Contrato de saida herdado do motor:
 - Default (texto): emite GATE_OK no sucesso, lanca `BLOCK: <motivo>` no bloqueio.
   Inclui `writability_coverage` e, para `partial`/`invalid`, um aviso explícito;
-  `GATE_OK` certifica validade técnica do índice, não gravabilidade nem autorização.
+  inclui `source_mask_degraded` e, quando `true`, um aviso de cobertura parcial.
+  `GATE_OK` certifica validade técnica do índice, não gravabilidade, cobertura
+  completa da máscara nem autorização.
 - -AsJson: { status: OK|BLOCK, reason, extractor_signature_*, writabilityCoverage,
-  writabilityCoverageWarning, ... }. Sob -AsJson nunca lanca; bloqueio vira
-  { status: BLOCK, reason } + exit 1. Consumido pelo gate K9 do orquestrador
-  Invoke-XpzKbParallelPrePushPhase1.ps1.
+  writabilityCoverageWarning, sourceMaskDegraded, sourceMaskDegradedWarning, ... }.
+  Sob -AsJson nunca lanca; bloqueio vira { status: BLOCK, reason } + exit 1.
+  Consumido pelo gate K9 do orquestrador Invoke-XpzKbParallelPrePushPhase1.ps1.
 - A validacao da assinatura atual (version/hash/format) executa o calculador
   `scripts/GeneXusKbIntelligenceExtractorSignature.py` via Python 3. Python
   utilizavel no PATH e pre-requisito do gate; sem ele, o gate bloqueia (`BLOCK:`

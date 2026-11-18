@@ -13,7 +13,7 @@ from pathlib import Path, PurePosixPath
 from GeneXusCanonicalJson import CanonicalJsonError, canonical_bytes, loads_strict
 
 
-EXTRACTOR_SIGNATURE_VERSION = "18"
+EXTRACTOR_SIGNATURE_VERSION = "19"
 EXTRACTOR_SIGNATURE_FORMAT = "manifest-lf-v1"
 MANIFEST_RELATIVE_PATH = "scripts/kb-intelligence-extractor-files.json"
 

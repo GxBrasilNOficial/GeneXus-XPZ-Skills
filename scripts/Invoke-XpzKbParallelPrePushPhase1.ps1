@@ -355,7 +355,16 @@ if (-not $k9w.ok) {
     $raw = (& $k9w.path -AsJson 2>$null | Out-String).Trim()
     $j = $raw | ConvertFrom-Json
     if ([string]$j.status -eq 'OK') {
-      Add-Gate 'K9' 'ok' "indice apto (resolvedBy=$($k9w.resolvedBy))"
+      $k9MaskWarning = ''
+      $maskWarningProperty = $j.PSObject.Properties['sourceMaskDegradedWarning']
+      if ($null -ne $maskWarningProperty -and -not [string]::IsNullOrWhiteSpace([string]$maskWarningProperty.Value)) {
+        $k9MaskWarning = [string]$maskWarningProperty.Value
+      }
+      if ([string]::IsNullOrWhiteSpace($k9MaskWarning)) {
+        Add-Gate 'K9' 'ok' "indice apto (resolvedBy=$($k9w.resolvedBy))"
+      } else {
+        Add-Gate 'K9' 'ok' "indice apto com cobertura parcial de mascara: $k9MaskWarning (resolvedBy=$($k9w.resolvedBy))"
+      }
     } else {
       Add-Gate 'K9' 'block' "indice bloqueado: $([string]$j.reason) (resolvedBy=$($k9w.resolvedBy))"
     }
