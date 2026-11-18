@@ -48,10 +48,12 @@ Escopo de extracao de relacoes atual:
 
 - origens por `Source` efetivo: `Procedure`, `WebPanel`, `DataProvider`, `Transaction`, `API` e `DataSelector`
 - destinos por `Source` efetivo: `Procedure`, `WebPanel` e `DataProvider`
-- a varredura de `Source` serializado em XML estruturado (ex: `<Property><Name>ControlWhere</Name><Value>Objeto(...) ou udp(Objeto, ...)</Value></Property>` em layouts de WebPanel) continua na varredura de linha atual e tem cobertura **parcial**: em KB-A, 30 referências capturadas, 21 perdidas e 15 comentadas; a extração dedicada de `ControlWhere` fica para o incremento 17b
+- a varredura de `Source` serializado em XML estruturado (ex: `<Property><Name>ControlWhere</Name><Value>Objeto(...) ou udp(Objeto, ...)</Value></Property>` em layouts de WebPanel) continua na varredura de linha atual e tem cobertura **parcial**: em KB-A, 30 referências capturadas, 21 perdidas e 15 comentadas; a extração dedicada de `ControlWhere` permanece fora do escopo atual
 - criacao de WebComponent em `Source` efetivo: `Procedure`, `WebPanel`, `DataProvider`, `Transaction`, `API` e `DataSelector` para `WebPanel` a partir de `<WebPanel>.Create(...)`, quando o alvo existir no inventario local de `WebPanel`
+- chamada de WebPanel por popup em `Source` efetivo: `Procedure`, `WebPanel`, `DataProvider`, `Transaction`, `API` e `DataSelector` para `WebPanel` a partir de `<WebPanel>.Popup(...)`, quando o alvo existir no inventario local de `WebPanel`; receiver com `&`, receiver fora do inventario e linha comentada ficam fora
 - origem por action: `WorkWithForWeb`
 - destino por action: `Procedure` ou `WebPanel`
+- action escopada por aba gerada: a aba (`wcname`) tambem vira origem para o alvo da action, com evidencia no XML da WorkWith (linha da action); o XML da aba continua em `objects.file_path`
 - vinculacao explicita: `WorkWithForWeb` para `Transaction`
 - link explicito: `WorkWithForWeb` para `WebPanel`
 - prompt explicito: `WorkWithForWeb` para `WebPanel`
@@ -75,10 +77,10 @@ Escopo de extracao de relacoes atual:
 - exclusao de Business Component: `Procedure`, `WebPanel` e `DataProvider` para `Transaction` a partir de `&Variavel.Delete()` em `Source` efetivo, quando a variável tiver `ATTCUSTOMTYPE` `bc:<Transaction>` resolvido no inventario local
 - validação de Business Component: `Procedure`, `WebPanel` e `DataProvider` para `Transaction` a partir de `&Variavel.Check()` em `Source` efetivo, quando a variável tiver `ATTCUSTOMTYPE` `bc:<Transaction>` resolvido no inventario local
 - insercao/atualizacao de Business Component simples: `Procedure`, `WebPanel` e `DataProvider` para `Transaction` a partir de `&Variavel.Insert()` ou `&Variavel.Update()` em `Source` efetivo, quando a variável tiver `ATTCUSTOMTYPE` `bc:<Transaction>` resolvido no inventario local e não tiver `AttCollection=True`
-- relacoes: chamadas diretas em `Source efetivo`, `Procedure.Link(...)` em `Source efetivo`, criacao de WebComponent por `<WebPanel>.Create(...)`, actions `gxobject` resolvidas, parametros de action `WorkWithForWeb` com `Procedure.Link(...)`, vinculacoes explicitas de `Transaction`, links e prompts explicitos de `WebPanel` em `WorkWithForWeb`, condições por tag e atributo de `WorkWithForWeb` chamando `Procedure`, propriedades `ATTCUSTOMTYPE`, chamadas de método em variável `exo:<ExternalObject>`, `idBasedOn`→`Domain` (`based_on_domain`, regras `attribute_idbasedon_domain` / `object_idbasedon_domain`) e `Formula` de `Attribute`, atributos e tabelas estruturais de `Transaction`, atributos chave e membros de índice de `Table`, tipos internos resolvidos de `SDT`, tabelas declaradas em `for each` explicito, prefixos de tabela em `for each` qualificado e chamadas `.Load(...)`/`.Save()`/`.Delete()`/`.Check()`/`.Insert()`/`.Update()` de BC resolvidas para `Transaction`
+- relacoes: chamadas diretas em `Source efetivo`, `Procedure.Link(...)` em `Source efetivo`, criacao de WebComponent por `<WebPanel>.Create(...)`, chamada de WebPanel por `<WebPanel>.Popup(...)`, actions `gxobject` resolvidas (incluindo action escopada por aba gerada), parametros de action `WorkWithForWeb` com `Procedure.Link(...)`, vinculacoes explicitas de `Transaction`, links e prompts explicitos de `WebPanel` em `WorkWithForWeb`, condições por tag e atributo de `WorkWithForWeb` chamando `Procedure`, propriedades `ATTCUSTOMTYPE`, chamadas de método em variável `exo:<ExternalObject>`, `idBasedOn`→`Domain` (`based_on_domain`, regras `attribute_idbasedon_domain` / `object_idbasedon_domain`) e `Formula` de `Attribute`, atributos e tabelas estruturais de `Transaction`, atributos chave e membros de índice de `Table`, tipos internos resolvidos de `SDT`, tabelas declaradas em `for each` explicito, prefixos de tabela em `for each` qualificado e chamadas `.Load(...)`/`.Save()`/`.Delete()`/`.Check()`/`.Insert()`/`.Update()` de BC resolvidas para `Transaction`
 - artefato principal: SQLite derivado
 
-A extracao básica cobre `DataProvider` como origem e como destino de chamada direta, `Procedure.Link(...)` e `<WebPanel>.Create(...)` em `Source` efetivo, actions de `WorkWithForWeb` com `gxobject` resolvido para `Procedure` ou `WebPanel`, parametros de action `WorkWithForWeb` com `Procedure.Link(...)`, vinculacao explicita de `WorkWithForWeb` para `Transaction`, links e prompts explicitos de `WorkWithForWeb` para `WebPanel`, condições por tag e atributo de `WorkWithForWeb` chamando `Procedure`, e `ATTCUSTOMTYPE` como `CustomType` literal. Ela não cobre semantica completa de `Transaction`, semantica de `WorkWithForWeb` além dos recortes já cobertos. A extracao semantica ampliou `for each`, `.Load(...)`, resolucao de `CustomType` para `SDT`, `Domain` e `ExternalObject`, e chamada efetiva de método em variável `exo:<ExternalObject>`.
+A extracao básica cobre `DataProvider` como origem e como destino de chamada direta, `Procedure.Link(...)`, `<WebPanel>.Create(...)` e `<WebPanel>.Popup(...)` em `Source` efetivo, actions de `WorkWithForWeb` com `gxobject` resolvido para `Procedure` ou `WebPanel` (incluindo a aba gerada como origem adicional), parametros de action `WorkWithForWeb` com `Procedure.Link(...)`, vinculacao explicita de `WorkWithForWeb` para `Transaction`, links e prompts explicitos de `WorkWithForWeb` para `WebPanel`, condições por tag e atributo de `WorkWithForWeb` chamando `Procedure`, e `ATTCUSTOMTYPE` como `CustomType` literal. Ela não cobre semantica completa de `Transaction`, semantica de `WorkWithForWeb` além dos recortes já cobertos. A extracao semantica ampliou `for each`, `.Load(...)`, resolucao de `CustomType` para `SDT`, `Domain` e `ExternalObject`, e chamada efetiva de método em variável `exo:<ExternalObject>`.
 
 As formas de chamada de `Procedure` são resolvidas pelo inventario real, sem depender de prefixos de nomenclatura locais. Chamadas dinamicas como `Call(&Nome)`, `Call(ATT:Att)` ou nome de programa entre aspas permanecem fora do grafo nominal. No casador de chamada direta, quando todos os nomes são identificadores ASCII (`[A-Za-z_][A-Za-z0-9_]*`), a devolução à alternância é pelo texto passado a `finditer`.
 
@@ -185,7 +187,7 @@ O gate `Test-*KbIndexGate.ps1` (molde em `xpz-kb-parallel-setup/examples/Test-Kb
 
 ## Schema e versionamento
 
-O índice armazena `schema_version` na tabela `metadata`. O valor atual e `"5"` (inclui a tabela `transaction_attribute_writability` com `writability_rule_version`, a tabela `css_class` do catalogo de classes CSS, os marcadores de Pattern e `origin TEXT NOT NULL` na tabela `objects`). A assinatura atual usa `EXTRACTOR_SIGNATURE_VERSION="17"` e `EXTRACTOR_SIGNATURE_FORMAT="manifest-lf-v1"`.
+O índice armazena `schema_version` na tabela `metadata`. O valor atual e `"5"` (inclui a tabela `transaction_attribute_writability` com `writability_rule_version`, a tabela `css_class` do catalogo de classes CSS, os marcadores de Pattern e `origin TEXT NOT NULL` na tabela `objects`). A assinatura atual usa `EXTRACTOR_SIGNATURE_VERSION="18"` e `EXTRACTOR_SIGNATURE_FORMAT="manifest-lf-v1"`.
 
 O design e deliberado: o índice e artefato derivado e sempre regeneravel. Por isso não existe caminho de migracao de schema — qualquer mudanca estrutural no motor exige rebuild completo.
 
@@ -400,6 +402,8 @@ Uma decisão `resolve-inferred-relation` aplicada pode tornar contextual a class
   -Format text
 ```
 
+`source_file` nas consultas de evidência vem de `evidence.source_file`. Em aresta de action escopada por aba gerada, ele aponta para o XML da WorkWith, onde a linha da action existe; o XML da aba continua em `object-info`. Isso não é o mesmo que `source_file` do objeto de origem em `object-info`.
+
 ## Triagem de impacto básico
 
 O comando `impact-basic` resume dependentes diretos e dependencias diretas do objeto, ainda sem alterar o escopo de extracao.
@@ -561,7 +565,7 @@ Self-test local (não depende de pasta paralela real) para `Property Formula` em
 .\scripts\Test-KbIntelligenceAttributeFormulaExtractionSelfTest.ps1
 ```
 
-Self-test local (não depende de pasta paralela real) para formas de chamada de `Procedure` resolvidas pelo inventario real, sem depender de prefixos como `proc*`:
+Self-test local (não depende de pasta paralela real) para formas de chamada de `Procedure` resolvidas pelo inventario real, sem depender de prefixos como `proc*`, e para `WebPanel.Popup(...)` e actions escopadas por aba gerada (`workwith_tab_action_gxobject`, incluindo não vazamento entre abas e `source_file` no XML da WorkWith):
 
 ```powershell
 .\scripts\Test-KbIntelligenceProcedureCallFormsSelfTest.ps1

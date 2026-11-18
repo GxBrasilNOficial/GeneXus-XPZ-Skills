@@ -30,10 +30,10 @@ if ($writabilityPrerequisiteMessage -notmatch 'classificacao automatica de grava
 }
 
 $expected = Get-GeneXusKbIntelligenceExpectedExtractorSignature
-if ($expected.extractor_signature_version -ne '17') {
-    throw "Vetor fixo de versao divergente: esperado 17, obtido $($expected.extractor_signature_version)"
+if ($expected.extractor_signature_version -ne '18') {
+    throw "Vetor fixo de versao divergente: esperado 18, obtido $($expected.extractor_signature_version)"
 }
-if ($expected.extractor_signature_hash -ne 'a4ea0b4baeb4a0c0c926ba904c7220d22b4d86cdd83ee95dc2e42acc909454c6') {
+if ($expected.extractor_signature_hash -ne '94e0911800e892e3e7ab6360b74c7e90b02c04c747302e8fe78373f74ddc0cf2') {
     throw "Vetor fixo de hash divergente: $($expected.extractor_signature_hash)"
 }
 if ($expected.extractor_signature_format -ne 'manifest-lf-v1') {

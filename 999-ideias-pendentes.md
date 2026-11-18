@@ -1198,6 +1198,14 @@ A `decisao-001` adiou o runbook 2b até 2 experimentos (003 Transaction + 004 Pr
 
 `Test-KbIntelligenceIdBasedOnDomainSelfTest.ps1` (2026-09-24) limpa `$tempRoot` ao terminar. Os irmãos ainda deixam a árvore GUID em `%TEMP%` sem remover a raiz: `Test-KbIntelligenceAttributeFormulaExtractionSelfTest.ps1`, `Test-KbIntelligenceProcedureCallFormsSelfTest.ps1`, `Test-KbIntelligenceCssClassExtractionSelfTest.ps1`, `Test-KbIntelligenceExternalObjectMethodExtractionSelfTest.ps1`, `Test-KbIntelligenceGeneratedObjectExtractionSelfTest.ps1`, `Test-KbIntelligenceLegacyOrphanSkipSelfTest.ps1`, `Test-KbIntelligenceQueryableGuardSelfTest.ps1`. Alinhar ao tocar cada um, ou em lote de higiene — não é gap funcional do extrator.
 
+## Pendência — `evidence_file` formal para arestas de aba gerada (KbIntelligence)
+
+**Origem:** implementação de 2026-11-18 (opção B: `.Popup` + actions de `WorkWithForWeb` escopadas por aba gerada).
+**Estado atual (B):** a aresta da aba tem como origem o `WebPanel` gerado (`wcname`) e guarda a linha no XML da WorkWith. Para manter a linha verificável, `evidence.source_file` recebe o XML da WorkWith e as consultas (`who-uses`/`show-evidence`/`impact-basic`/`functional-trace-basic`/`css-class-usage`) leem esse campo. O XML da aba continua em `objects.file_path`/`object-info`.
+**O que falta (C):** separar formalmente “arquivo do objeto de origem” de “arquivo da evidência”. Opções: coluna `evidence_file` anulável em `evidence` (schema 6) ou tabela própria de evidência derivada. `source_file` volta a ser o XML do objeto de origem; `evidence_file` aponta o XML onde a linha existe. Atualizar consultas para devolver os dois campos, o gate/schema, os self-tests e a documentação; rebuild completo.
+**Critério de aceite:** para `WebPanel:VendaContratoGeneral -> WebPanel:wpImportaPessoaEnderecos`, `source_file` = `WebPanel/VendaContratoGeneral.xml`, `evidence_file` = `WorkWithForWeb/WorkWithWebVendaContrato.xml`, `line` = 275; para arestas normais, `evidence_file` = `source_file`. Nenhuma escrita direta no SQLite; fluxo oficial de rebuild.
+**Gatilho:** próximo bump de schema ou nova aresta derivada que precise de evidência em arquivo diferente do objeto de origem. Até lá, a opção B é a documentada e não deve ser “corrigida” apontando a linha para o XML vazio da aba.
+
 ## Plano A — Implementar relação `references_attribute` no índice KbIntelligence
 
 **Importância:** baixa (rebaixada em 2026-06-12 — ver «Reavaliação» abaixo; a motivação de detecção de regressão ficou largamente coberta por IDE+build)

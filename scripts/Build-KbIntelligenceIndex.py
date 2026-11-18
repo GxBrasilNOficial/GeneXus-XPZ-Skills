@@ -86,6 +86,7 @@ PROCEDURE_DOT_UDP_RE = re.compile(r"(?<![&.])\b(?P<name>[A-Za-z_][A-Za-z0-9_]*)\
 PROCEDURE_DOT_LINK_RE = re.compile(r"(?<![&.])\b(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*\.\s*Link\s*\(", re.IGNORECASE)
 WEBPANEL_DOT_LINK_RE = re.compile(r"\b(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*\.\s*Link\s*\(", re.IGNORECASE)
 WEBPANEL_DOT_CREATE_RE = re.compile(r"(?<![&.])\b(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*\.\s*Create\s*\(", re.IGNORECASE)
+WEBPANEL_DOT_POPUP_RE = re.compile(r"(?<![&.\w])(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*\.\s*Popup\s*\(", re.IGNORECASE)
 FOR_EACH_EXPLICIT_TABLE_RE = re.compile(
     r"\bfor\s+each\s+(?P<name>[A-Za-z_][A-Za-z0-9_]*)\b(?!\s*\.)",
     re.IGNORECASE,
@@ -277,6 +278,9 @@ SDT_ITEM_RE = re.compile(r"<Item\b(?P<attrs>[^>]*)>(?P<body>.*?)</Item>", re.IGN
 WORKWITH_TRANSACTION_RE = re.compile(r"<transaction\b[^>]*\btransaction=\"(?P<value>[^\"]+)\"", re.IGNORECASE)
 WORKWITH_WEBPANEL_LINK_RE = re.compile(r"<link\b[^>]*\bwebpanel=\"(?P<name>[^\"]+)\"", re.IGNORECASE)
 WORKWITH_PROMPT_RE = re.compile(r"\bprompt=\"(?P<value>[^\"]+)\"", re.IGNORECASE)
+WORKWITH_TABS_RE = re.compile(r"<tabs\b[^>]*>(?P<body>.*?)</tabs>", re.IGNORECASE | re.DOTALL)
+WORKWITH_TAB_OPEN_RE = re.compile(r"<tab\b(?P<attrs>[^>]*?)(?<!/)>", re.IGNORECASE | re.DOTALL)
+WORKWITH_TAB_CLOSE_RE = re.compile(r"</tab\s*>", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -949,6 +953,7 @@ def add_evidence(
     snippet: str,
     extractor_rule: str,
     evidence_role: str = "Source efetivo",
+    source_file: str | None = None,
 ) -> None:
     evidences.append(
         Evidence(
@@ -957,7 +962,7 @@ def add_evidence(
             target_type=target_type,
             target_name=target_name,
             relation_kind=relation_kind,
-            source_file=source.rel_path,
+            source_file=source_file or source.rel_path,
             line=line,
             column=column,
             snippet=compact_snippet(snippet),
@@ -1394,6 +1399,23 @@ def extract_evidence(
                             column=match.start("name") + 1,
                             snippet=_source_snippet(original_line, match),
                             extractor_rule="webpanel_dot_create",
+                        )
+
+                for match in WEBPANEL_DOT_POPUP_RE.finditer(masked_line):
+                    matched_name = match.group("name")
+                    target_name = webpanel_lookup.get(matched_name.lower())
+                    if target_name:
+                        add_evidence(
+                            evidences,
+                            source=source,
+                            target_type="WebPanel",
+                            target_name=target_name,
+                            relation_kind="calls_webpanel",
+                            line=line_no,
+                            column=match.start("name") + 1,
+                            snippet=_source_snippet(original_line, match),
+                            extractor_rule="webpanel_dot_popup",
+                            evidence_role="Source WebPanel popup",
                         )
 
                 if data_provider_direct_re:
@@ -1904,14 +1926,32 @@ def extract_source_external_object_method_evidence(
     return list(unique.values())
 
 
+def _resolve_workwith_action_target(
+    raw_gxobject: str,
+    procedure_lookup: dict[str, str],
+    webpanel_lookup: dict[str, str],
+) -> tuple[str | None, str | None]:
+    raw_target_name = gxobject_name(raw_gxobject)
+    if not raw_target_name:
+        return None, None
+    target_name = procedure_lookup.get(raw_target_name.lower())
+    if target_name:
+        return "Procedure", target_name
+    target_name = webpanel_lookup.get(raw_target_name.lower())
+    if target_name:
+        return "WebPanel", target_name
+    return None, None
+
+
 def extract_workwith_action_evidence(
     workwith_objects: Iterable[ObjectInfo],
     procedure_names: set[str],
-    webpanel_names: set[str],
+    webpanel_objects: dict[str, ObjectInfo],
 ) -> list[Evidence]:
     evidences: list[Evidence] = []
     procedure_lookup = case_insensitive_lookup(procedure_names, "Procedure")
-    webpanel_lookup = case_insensitive_lookup(webpanel_names, "WebPanel")
+    webpanel_lookup = case_insensitive_lookup(set(webpanel_objects), "WebPanel")
+    webpanel_by_name = {name.lower(): obj for name, obj in webpanel_objects.items()}
 
     for source in workwith_objects:
         xml_text = read_text(source.path)
@@ -1920,23 +1960,14 @@ def extract_workwith_action_evidence(
             raw_gxobject = attrs.get("gxobject")
             if not raw_gxobject:
                 continue
-            raw_target_name = gxobject_name(raw_gxobject)
-            if not raw_target_name:
-                continue
 
-            target_type = None
-            target_name = procedure_lookup.get(raw_target_name.lower())
-            relation_kind = "workwith_action_calls_procedure"
-            if target_name:
-                target_type = "Procedure"
-            else:
-                target_name = webpanel_lookup.get(raw_target_name.lower())
-                relation_kind = "workwith_action_calls_webpanel"
-                if target_name:
-                    target_type = "WebPanel"
-
+            target_type, target_name = _resolve_workwith_action_target(
+                raw_gxobject, procedure_lookup, webpanel_lookup)
             if not target_type or not target_name:
                 continue
+            relation_kind = (
+                "workwith_action_calls_procedure" if target_type == "Procedure"
+                else "workwith_action_calls_webpanel")
 
             add_evidence(
                 evidences,
@@ -1950,6 +1981,50 @@ def extract_workwith_action_evidence(
                 extractor_rule="workwith_action_gxobject",
                 evidence_role="WorkWith action",
             )
+
+        # Action escopada por aba gerada: a aba (`wcname`) vira origem e a
+        # evidencia continua no XML da WorkWith, onde a linha da action existe.
+        if source.object_type == "WorkWithForWeb":
+            for tabs_match in WORKWITH_TABS_RE.finditer(xml_text):
+                for tab_match in WORKWITH_TAB_OPEN_RE.finditer(
+                        xml_text, tabs_match.start("body"), tabs_match.end("body")):
+                    tab_attrs = parse_attributes(tab_match.group("attrs"))
+                    wcname = tab_attrs.get("wcname")
+                    if not wcname:
+                        continue
+                    tab_object = webpanel_by_name.get(wcname.lower())
+                    if not tab_object:
+                        continue
+                    close_match = WORKWITH_TAB_CLOSE_RE.search(
+                        xml_text, tab_match.end(), tabs_match.end("body"))
+                    if not close_match:
+                        continue
+                    for action_match in ACTION_RE.finditer(
+                            xml_text, tab_match.end(), close_match.start()):
+                        action_attrs = parse_attributes(action_match.group("attrs"))
+                        raw_gxobject = action_attrs.get("gxobject")
+                        if not raw_gxobject:
+                            continue
+                        target_type, target_name = _resolve_workwith_action_target(
+                            raw_gxobject, procedure_lookup, webpanel_lookup)
+                        if not target_type or not target_name:
+                            continue
+                        relation_kind = (
+                            "workwith_tab_action_calls_procedure" if target_type == "Procedure"
+                            else "workwith_tab_action_calls_webpanel")
+                        add_evidence(
+                            evidences,
+                            source=tab_object,
+                            target_type=target_type,
+                            target_name=target_name,
+                            relation_kind=relation_kind,
+                            line=line_number_at(xml_text, action_match.start()),
+                            column=1,
+                            snippet=action_match.group(0),
+                            extractor_rule="workwith_tab_action_gxobject",
+                            evidence_role="WorkWith tab action",
+                            source_file=source.rel_path,
+                        )
 
         for action_match in ACTION_BLOCK_RE.finditer(xml_text):
             action_body = action_match.group("body")
@@ -3532,7 +3607,7 @@ def main() -> int:
     workwith_evidences = extract_workwith_action_evidence(
         workwith_objects,
         procedure_names=set(procedures),
-        webpanel_names=set(webpanels),
+        webpanel_objects=webpanels,
     )
     workwith_condition_evidences = extract_workwith_condition_evidence(
         workwith_objects,

@@ -26,8 +26,8 @@ function Assert-True([bool]$Condition, [string]$Message) {
 
 . (Join-Path $PSScriptRoot 'GeneXusKbIntelligenceExtractorContract.ps1')
 $expectedSignature = Get-GeneXusKbIntelligenceExpectedExtractorSignature
-Assert-True ($expectedSignature.extractor_signature_version -eq '17') `
-    "versao do extrator deve refletir o incremento planejado 16->17; obtido $($expectedSignature.extractor_signature_version)"
+Assert-True ($expectedSignature.extractor_signature_version -eq '18') `
+    "versao do extrator deve refletir o incremento planejado 17->18; obtido $($expectedSignature.extractor_signature_version)"
 
 function Get-BasedOnDomainRows([string]$SqlitePath) {
     $outJson = Join-Path ([System.IO.Path]::GetTempPath()) ('kb-idb-rows-{0}.json' -f ([guid]::NewGuid().ToString('N')))

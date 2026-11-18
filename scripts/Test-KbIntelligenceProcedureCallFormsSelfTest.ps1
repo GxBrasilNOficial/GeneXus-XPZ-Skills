@@ -2,7 +2,7 @@
 
 <#
 .SYNOPSIS
-    Self-test minimo para extracao de formas de chamada de Procedure no KbIntelligence.
+    Self-test de formas de chamada de Procedure, WebPanel.Popup e actions de aba gerada no KbIntelligence.
 #>
 
 Set-StrictMode -Version Latest
@@ -19,6 +19,7 @@ $procedureGuid = '84a12160-f59b-4ad7-a683-ea4481ac23e9'
 $transactionGuid = '1db606f2-af09-4cf9-a3b5-b481519d28f6'
 $workWithGuid = '15cf49b5-fc38-4899-91b5-395d02d79889'
 $workWithForWebGuid = '78cecefe-be7d-4980-86ce-8d6e91fba04b'
+$webPanelGuid = 'c9584656-94b6-4ccd-890f-332d11fc2c25'
 
 $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('kb-intel-procedure-call-forms-selftest-{0}' -f ([guid]::NewGuid().ToString('N')))
 $parallelRoot = Join-Path $tempRoot 'KbParalela'
@@ -67,6 +68,7 @@ Call(PCommandNoPrefixFake, &sdtLog)
 &val = udp(PValueNoPrefixFake, 0)
 &other = PMethodNoPrefixFake.Udp("C")
 &url = PLinkTargetFake.Link(&OrderId)
+wpPopupTargetFake.Popup(&OrderId)
 //PUnusedNoPrefixFake()
 Call(&DynamicProcedureName, &x)
 Call(ATT:DynamicProcedureAttribute, &x)
@@ -75,8 +77,19 @@ Call(ATT:DynamicProcedureAttribute, &x)
 "@
 [System.IO.File]::WriteAllText((Join-Path $procedureDir 'PUsesCallFormsFake.xml'), $callerXml, (Get-Utf8NoBomEncoding))
 
+$popupNegativesXml = @"
+<Object type="$procedureGuid" name="PPopupNegativesFake" guid="22222222-2222-2222-2222-222222222215">
+  <Source><![CDATA[
+//wpPopupTargetFake.Popup(&OrderId)
+&wpPopupTargetFake.Popup(&OrderId)
+Carga.Popup(TrnMode.Update, &OrderId)
+]]></Source>
+</Object>
+"@
+[System.IO.File]::WriteAllText((Join-Path $procedureDir 'PPopupNegativesFake.xml'), $popupNegativesXml, (Get-Utf8NoBomEncoding))
+
 $webPanelXml = @"
-<Object type="c9584656-94b6-4ccd-890f-332d11fc2c25" name="WPUsesProcedureLinkFake" guid="66666666-6666-6666-6666-666666666601">
+<Object type="$webPanelGuid" name="WPUsesProcedureLinkFake" guid="66666666-6666-6666-6666-666666666601">
   <Source><![CDATA[
 Event 'Open'
   Extensions.Web.Window.OpenNewWindow(PActionLinkTargetAFake.Link(&OrderId))
@@ -85,6 +98,32 @@ EndEvent
 </Object>
 "@
 [System.IO.File]::WriteAllText((Join-Path $webPanelDir 'WPUsesProcedureLinkFake.xml'), $webPanelXml, (Get-Utf8NoBomEncoding))
+
+$webPanelTargets = @(
+    @{ Name = 'WPPopupTargetFake'; Guid = '66666666-6666-6666-6666-666666666602' },
+    @{ Name = 'WPOnlyOtherFake'; Guid = '66666666-6666-6666-6666-666666666603' },
+    @{ Name = 'WPGeneralTabFake'; Guid = '66666666-6666-6666-6666-666666666604' },
+    @{ Name = 'WPOtherTabFake'; Guid = '66666666-6666-6666-6666-666666666605' }
+)
+foreach ($target in $webPanelTargets) {
+    $targetXml = @"
+<Object type="$webPanelGuid" name="$($target.Name)" guid="$($target.Guid)">
+  <Source><![CDATA[]]></Source>
+</Object>
+"@
+    [System.IO.File]::WriteAllText((Join-Path $webPanelDir ("{0}.xml" -f $target.Name)), $targetXml, (Get-Utf8NoBomEncoding))
+}
+
+$popupCallerXml = @"
+<Object type="$webPanelGuid" name="WPUsesPopupFake" guid="66666666-6666-6666-6666-666666666606">
+  <Source><![CDATA[
+Event 'Open'
+  wpPopupTargetFake.Popup()
+EndEvent
+]]></Source>
+</Object>
+"@
+[System.IO.File]::WriteAllText((Join-Path $webPanelDir 'WPUsesPopupFake.xml'), $popupCallerXml, (Get-Utf8NoBomEncoding))
 
 $transactionXml = @"
 <Object type="$transactionGuid" name="TOrderCallFormsFake" guid="33333333-3333-3333-3333-333333333301">
@@ -131,6 +170,27 @@ $workWithXml = @"
 $workWithMobileXml = $workWithXml.Replace($workWithForWebGuid, $workWithGuid).Replace('55555555-5555-5555-5555-555555555501', '55555555-5555-5555-5555-555555555502')
 [System.IO.File]::WriteAllText((Join-Path $workWithDir 'WWCallFormsFake.xml'), $workWithMobileXml, (Get-Utf8NoBomEncoding))
 
+$workWithTabXml = @"
+<Object type="$workWithForWebGuid" name="WWPopupTabFake" guid="55555555-5555-5555-5555-555555555503">
+  <Data Pattern="$workWithForWebGuid" Version="1.0"><![CDATA[<?xml version="1.0" encoding="utf-16"?>
+<WorkWith>
+  <tabs>
+    <tab name="General" code="General" type="Tabular" wcname="WPGeneralTabFake">
+      <actions>
+        <action name="AbreGeneral" gxobject="$webPanelGuid-WPPopupTargetFake" />
+      </actions>
+    </tab>
+    <tab name="Other" code="Other" type="Tabular" wcname="WPOtherTabFake">
+      <actions>
+        <action name="AbreOther" gxobject="$webPanelGuid-WPOnlyOtherFake" />
+      </actions>
+    </tab>
+  </tabs>
+</WorkWith>]]></Data>
+</Object>
+"@
+[System.IO.File]::WriteAllText((Join-Path $workWithForWebDir 'WWPopupTabFake.xml'), $workWithTabXml, (Get-Utf8NoBomEncoding))
+
 $cases = @(
     @{ id = 'source-static-no-prefix'; source = 'Procedure:PUsesCallFormsFake'; target = 'Procedure:PStaticNoPrefixFake'; expected_rule = 'procedure_direct_call'; should_exist = $true },
     @{ id = 'source-prefix-keeps-longer-name'; source = 'Procedure:PUsesCallFormsFake'; target = 'Procedure:PPrefixFakeExtra'; expected_rule = 'procedure_direct_call'; should_exist = $true },
@@ -157,7 +217,16 @@ $cases = @(
     @{ id = 'workwith-condition-attribute-dot-udp'; source = 'WorkWithForWeb:WWCallFormsFake'; target = 'Procedure:PMethodNoPrefixFake'; expected_rule = 'workwith_condition_attribute_procedure_dot_udp'; should_exist = $true },
     @{ id = 'workwith-action-wrapper-gxobject-preserved'; source = 'WorkWithForWeb:WWCallFormsFake'; target = 'Procedure:PWrapperFake'; expected_rule = 'workwith_action_gxobject'; should_exist = $true },
     @{ id = 'workwith-action-parameter-procedure-dot-link-a'; source = 'WorkWithForWeb:WWCallFormsFake'; target = 'Procedure:PActionLinkTargetAFake'; expected_rule = 'workwith_action_parameter_procedure_dot_link'; should_exist = $true },
-    @{ id = 'workwith-action-parameter-procedure-dot-link-b'; source = 'WorkWithForWeb:WWCallFormsFake'; target = 'Procedure:PActionLinkTargetBFake'; expected_rule = 'workwith_action_parameter_procedure_dot_link'; should_exist = $true }
+    @{ id = 'workwith-action-parameter-procedure-dot-link-b'; source = 'WorkWithForWeb:WWCallFormsFake'; target = 'Procedure:PActionLinkTargetBFake'; expected_rule = 'workwith_action_parameter_procedure_dot_link'; should_exist = $true },
+    @{ id = 'popup-procedure-source'; source = 'Procedure:PUsesCallFormsFake'; target = 'WebPanel:WPPopupTargetFake'; expected_rule = 'webpanel_dot_popup'; should_exist = $true },
+    @{ id = 'popup-webpanel-source'; source = 'WebPanel:WPUsesPopupFake'; target = 'WebPanel:WPPopupTargetFake'; expected_rule = 'webpanel_dot_popup'; should_exist = $true },
+    @{ id = 'popup-commented-line-ignored'; source = 'Procedure:PPopupNegativesFake'; target = 'WebPanel:WPPopupTargetFake'; expected_rule = 'webpanel_dot_popup'; should_exist = $false },
+    @{ id = 'popup-variable-receiver-ignored'; source = 'Procedure:PPopupNegativesFake'; target = 'WebPanel:WPPopupTargetFake'; expected_rule = 'webpanel_dot_popup'; should_exist = $false },
+    @{ id = 'workwith-tab-action-general'; source = 'WebPanel:WPGeneralTabFake'; target = 'WebPanel:WPPopupTargetFake'; expected_rule = 'workwith_tab_action_gxobject'; should_exist = $true },
+    @{ id = 'workwith-tab-action-other-does-not-leak'; source = 'WebPanel:WPOtherTabFake'; target = 'WebPanel:WPPopupTargetFake'; expected_rule = 'workwith_tab_action_gxobject'; should_exist = $false },
+    @{ id = 'workwith-tab-action-other-own'; source = 'WebPanel:WPOtherTabFake'; target = 'WebPanel:WPOnlyOtherFake'; expected_rule = 'workwith_tab_action_gxobject'; should_exist = $true },
+    @{ id = 'workwith-tab-action-general-does-not-leak'; source = 'WebPanel:WPGeneralTabFake'; target = 'WebPanel:WPOnlyOtherFake'; expected_rule = 'workwith_tab_action_gxobject'; should_exist = $false },
+    @{ id = 'workwith-tab-level-action-preserved'; source = 'WorkWithForWeb:WWPopupTabFake'; target = 'WebPanel:WPPopupTargetFake'; expected_rule = 'workwith_action_gxobject'; should_exist = $true }
 )
 $validationCasesPath = Join-Path $kbIntelDir 'procedure-call-forms-validation.json'
 [pscustomobject]@{ cases = $cases } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $validationCasesPath -Encoding utf8NoBOM
@@ -181,6 +250,58 @@ $report = Get-Content -LiteralPath $validationPath -Raw -Encoding UTF8 | Convert
 $failed = @($report.cases | Where-Object { $_.status -ne 'passed' })
 if ($failed.Count -gt 0) {
     throw "Casos de validacao falharam: $($failed.id -join ', ')"
+}
+
+$queryPython = Join-Path $scriptDir 'Query-KbIntelligenceIndex.py'
+$popupUsesJson = & python $queryPython --index-path $sqlitePath --query who-uses `
+    --object-type WebPanel --object-name WPPopupTargetFake --format json
+if ($LASTEXITCODE -ne 0) {
+    throw "who-uses de WPPopupTargetFake falhou; exit $LASTEXITCODE"
+}
+$popupUses = $popupUsesJson | ConvertFrom-Json
+$popupSources = @($popupUses.results | ForEach-Object { "$($_.source_type):$($_.source_name)" })
+foreach ($expectedSource in @(
+    'Procedure:PUsesCallFormsFake',
+    'WebPanel:WPUsesPopupFake',
+    'WebPanel:WPGeneralTabFake',
+    'WorkWithForWeb:WWPopupTabFake'
+)) {
+    if ($popupSources -notcontains $expectedSource) {
+        throw "who-uses de WPPopupTargetFake deveria conter $expectedSource; obtido: $($popupSources -join ', ')"
+    }
+}
+if ($popupSources -contains 'WebPanel:WPOtherTabFake') {
+    throw "who-uses de WPPopupTargetFake nao deveria atribuir a action a WPOtherTabFake"
+}
+
+$tabEvidence = @($popupUses.results | Where-Object {
+    $_.source_type -eq 'WebPanel' -and $_.source_name -eq 'WPGeneralTabFake'
+})
+if ($tabEvidence.Count -ne 1) {
+    throw "who-uses de WPPopupTargetFake deveria ter 1 evidencia de WPGeneralTabFake; obtido $($tabEvidence.Count)"
+}
+if ([string]$tabEvidence[0].source_file -ne 'WorkWithForWeb/WWPopupTabFake.xml') {
+    throw "source_file da aba deveria apontar para o XML da WorkWith; obtido '$($tabEvidence[0].source_file)'"
+}
+if ([int]$tabEvidence[0].line -le 0) {
+    throw "line da evidencia da aba deveria ser positiva; obtido $($tabEvidence[0].line)"
+}
+if ([string]$tabEvidence[0].extractor_rule -ne 'workwith_tab_action_gxobject') {
+    throw "regra da evidencia da aba inesperada: $($tabEvidence[0].extractor_rule)"
+}
+
+$otherUsesJson = & python $queryPython --index-path $sqlitePath --query who-uses `
+    --object-type WebPanel --object-name WPOnlyOtherFake --format json
+if ($LASTEXITCODE -ne 0) {
+    throw "who-uses de WPOnlyOtherFake falhou; exit $LASTEXITCODE"
+}
+$otherUses = $otherUsesJson | ConvertFrom-Json
+$otherSources = @($otherUses.results | ForEach-Object { "$($_.source_type):$($_.source_name)" })
+if ($otherSources -notcontains 'WebPanel:WPOtherTabFake') {
+    throw "who-uses de WPOnlyOtherFake deveria conter WebPanel:WPOtherTabFake; obtido: $($otherSources -join ', ')"
+}
+if ($otherSources -contains 'WebPanel:WPGeneralTabFake') {
+    throw "who-uses de WPOnlyOtherFake nao deveria atribuir a action a WPGeneralTabFake"
 }
 
 Write-Output 'OK: Test-KbIntelligenceProcedureCallFormsSelfTest.ps1'
