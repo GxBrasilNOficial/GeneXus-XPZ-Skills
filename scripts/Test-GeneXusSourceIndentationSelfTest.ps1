@@ -1,4 +1,4 @@
-﻿#requires -Version 7.4
+#requires -Version 7.4
 
 <#
 .SYNOPSIS
@@ -7,7 +7,7 @@
     BaselinePath GUID ausente=unresolved, Acervo hit textual raso + Object profundo,
     Object duplicado entre profundidades, >20 hits textuais sem teto,
     AcervoPath=arquivo sem GUID=unresolved, XML oculto encontrado com -Force,
-    ExportFile com 2 Procedures + indice GUID de pasta uma vez por execucao).
+    ExportFile com 2 Procedures + contadores de prefiltro (1 passagem / N leituras)).
 #>
 
 Set-StrictMode -Version Latest
@@ -322,13 +322,14 @@ Assert-True ($r22.baselineCompared -eq $true) 'XML oculto deve ser encontrado co
 Assert-True ($r22.baselineStatus -eq 'compared') 'baselineStatus compared com oculto'
 Assert-True (Test-HasCode -Result $r22 -Code 'indent-under-depth') 'oculto compared deve under-depth'
 
-# 23) ExportFile com 2 Procedures: indice de pasta resolve ambos (regressao N×varredura)
+# 23) ExportFile com 2 Procedures: indice = 1 passagem e N leituras (nao N×Procedures)
 $multiAcervo = Join-Path $tempRoot 'acervo-multi'
 $multiDir = Join-Path $multiAcervo 'Procedure'
 [void](New-Item -ItemType Directory -Path $multiDir -Force)
 Write-Xml -Path (Join-Path $multiDir 'ProcIndent.xml') -Xml $baselineXml
 $baselineSecondXml = New-ProcXml -Guid $guidSecond -Name 'ProcSecond' -Source $baselineSource
 Write-Xml -Path (Join-Path $multiDir 'ProcSecond.xml') -Xml $baselineSecondXml
+$multiXmlCount = @(Get-ChildItem -LiteralPath $multiAcervo -Filter *.xml -File -Recurse -Force).Count
 $exportTwo = @"
 <ExportFile>
   <Objects>
@@ -342,6 +343,10 @@ Assert-True ($r23.inScopePartCount -eq 2) 'ExportFile com 2 Procedures deve ter 
 Assert-True ($r23.baselineCompared -eq $true) 'indice multi-GUID deve compared'
 Assert-True (@($r23.parts | Where-Object { $_.baselineStatus -eq 'compared' }).Count -eq 2) 'ambas as Procedures devem compared'
 Assert-True (Test-HasCode -Result $r23 -Code 'indent-under-depth') 'multi-GUID compared deve under-depth'
+Assert-True ($r23.acervoDirectoryIndexUsed -eq $true) 'acervoDirectoryIndexUsed deve ser true'
+Assert-True ($r23.acervoDirectoryPrefilterPassCount -eq 1) ("prefiltro deve ter 1 passagem; obtido $($r23.acervoDirectoryPrefilterPassCount)")
+Assert-True ($r23.acervoDirectoryPrefilterFileReads -eq $multiXmlCount) ("leituras devem ser $multiXmlCount (nao $($multiXmlCount * 2)); obtido $($r23.acervoDirectoryPrefilterFileReads)")
+Assert-True ($multiXmlCount -eq 2) 'fixture multi deve ter 2 XMLs'
 
 Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
 Write-Output 'OK: Test-GeneXusSourceIndentationSelfTest.ps1'

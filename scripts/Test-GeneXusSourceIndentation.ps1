@@ -69,6 +69,10 @@ $script:AcervoDirIndexReady = $false
 $script:AcervoDirIndexRoot = $null
 $script:AcervoDirIndexError = $null
 $script:AcervoDirIndexMap = $null
+# Contadores do prefiltro textual de pasta (indice ou fallback por GUID).
+$script:AcervoDirIndexUsed = $false
+$script:AcervoDirPrefilterPassCount = 0
+$script:AcervoDirPrefilterFileReads = 0
 
 trap {
     [ordered]@{
@@ -540,6 +544,7 @@ function Initialize-AcervoDirectoryGuidCandidateIndex {
     $script:AcervoDirIndexRoot = $null
     $script:AcervoDirIndexError = $null
     $script:AcervoDirIndexMap = $null
+    $script:AcervoDirIndexUsed = $false
 
     if ([string]::IsNullOrWhiteSpace($AcervoPathLocal)) { return }
     if (-not (Test-Path -LiteralPath $AcervoPathLocal)) { return }
@@ -571,15 +576,18 @@ function Initialize-AcervoDirectoryGuidCandidateIndex {
         return
     }
 
+    $script:AcervoDirPrefilterPassCount++
     foreach ($xmlFile in $xmlFiles) {
         $full = $xmlFile.FullName
         try {
             $text = [System.IO.File]::ReadAllText($full)
+            $script:AcervoDirPrefilterFileReads++
         } catch {
             $script:AcervoDirIndexRoot = $acervoResolved
             $script:AcervoDirIndexError = "Falha ao ler arquivo do acervo ${full}: $($_.Exception.Message)"
             $script:AcervoDirIndexMap = $null
             $script:AcervoDirIndexReady = $true
+            $script:AcervoDirIndexUsed = $false
             return
         }
         foreach ($k in $guidKeys) {
@@ -593,6 +601,7 @@ function Initialize-AcervoDirectoryGuidCandidateIndex {
     $script:AcervoDirIndexMap = $map
     $script:AcervoDirIndexError = $null
     $script:AcervoDirIndexReady = $true
+    $script:AcervoDirIndexUsed = $true
 }
 
 function Resolve-BaselineObjectNode {
@@ -706,10 +715,12 @@ function Resolve-BaselineObjectNode {
                     $result.message = "Falha ao enumerar AcervoPath: $($_.Exception.Message)"
                     return [pscustomobject]$result
                 }
+                $script:AcervoDirPrefilterPassCount++
                 foreach ($xmlFile in $xmlFiles) {
                     $full = $xmlFile.FullName
                     try {
                         $hasGuidText = [bool](Select-String -LiteralPath $full -Pattern $ObjectGuid -SimpleMatch -Quiet -ErrorAction Stop)
+                        $script:AcervoDirPrefilterFileReads++
                     } catch {
                         $result.message = "Falha ao ler arquivo do acervo ${full}: $($_.Exception.Message)"
                         return [pscustomobject]$result
@@ -1036,6 +1047,9 @@ $result = [ordered]@{
     baselineCompared       = $false
     baselineStatus         = 'not-applicable'
     absoluteCheckApplied   = [bool]$AbsoluteIndentCheck
+    acervoDirectoryIndexUsed = $false
+    acervoDirectoryPrefilterPassCount = 0
+    acervoDirectoryPrefilterFileReads = 0
     warnCount              = 0
     inconclusiveCount      = 0
     passCount              = 0
@@ -1131,5 +1145,9 @@ $result.warnCount = @($partResults | Where-Object { $_.status -eq 'warn' }).Coun
 $result.inconclusiveCount = @($partResults | Where-Object { $_.status -eq 'inconclusive' }).Count
 $result.passCount = @($partResults | Where-Object { $_.status -eq 'pass' }).Count
 $result.notApplicableCount = @($partResults | Where-Object { $_.status -eq 'not-applicable' }).Count
+
+$result.acervoDirectoryIndexUsed = [bool]$script:AcervoDirIndexUsed
+$result.acervoDirectoryPrefilterPassCount = [int]$script:AcervoDirPrefilterPassCount
+$result.acervoDirectoryPrefilterFileReads = [int]$script:AcervoDirPrefilterFileReads
 
 $result | ConvertTo-Json -Depth 8
