@@ -11,9 +11,9 @@
     consultivos de wrappers recomendados ausentes e os sinais bloqueantes de scripts
     legados orfaos, e os motivos de INVENTORY_CUSTOMIZED: missing_AsJson_passthrough
     (K8/K9), source_mask_contract_missing (gate K9 com implementacao local sem
-    emissao efetiva de source_mask_degraded; comentario, variavel morta e streams
-    nao capturaveis como Write-Host/Write-Verbose/Write-Information/Out-Host contam
-    como ausencia), consumes_legacy_text_stdout (Update-*KbFromXpz),
+    emissao efetiva de source_mask_degraded; comentario, variavel morta, streams
+    nao capturaveis como Write-Host/Write-Verbose/Write-Information/Out-Host e
+    redirecionamento para null/arquivo contam como ausencia), consumes_legacy_text_stdout (Update-*KbFromXpz),
     unsafe_last_exitcode_after_ps1_engine (wrappers auditados que chamam motor PowerShell por variavel) e forwards_unknown_engine_param
     (repasse a motor compartilhado advanced de parametro nao-declarado; caso end-to-end).
     Valida ainda o diff de superficie wrapper-vs-molde (surface_mismatch -> INVENTORY_CUSTOMIZED;
@@ -418,6 +418,30 @@ Write-Output 'GATE_OK'
     $output = (& $inventoryScriptPath -KbParallelRoot $kbRoot -SkillsExamplesPath $examplesPath 2>&1 |
         ForEach-Object { $_.ToString() }) -join ' '
     Assert-Contains -Text $output -Pattern 'Test-DemoKbIndexGate\.ps1\(reason=source_mask_contract_missing\)' -Message 'Out-Host nao pode satisfazer o contrato'
+
+    foreach ($redirection in @('> $null', "> 'mask-probe.txt'")) {
+        $redirectFixture = @"
+#requires -Version 7.4
+param([switch]`$AsJson)
+Write-Output 'source_mask_degraded: false' $redirection
+Write-Output 'GATE_OK'
+"@
+        Set-Content -LiteralPath $indexGateStandardPath -Value $redirectFixture -Encoding utf8NoBOM
+        $output = (& $inventoryScriptPath -KbParallelRoot $kbRoot -SkillsExamplesPath $examplesPath 2>&1 |
+            ForEach-Object { $_.ToString() }) -join ' '
+        Assert-Contains -Text $output -Pattern 'Test-DemoKbIndexGate\.ps1\(reason=source_mask_contract_missing\)' -Message "redirecionamento '$redirection' nao pode satisfazer o contrato"
+    }
+
+    @'
+#requires -Version 7.4
+param([switch]$AsJson)
+Write-Output 'source_mask_degraded: false' 2> $null
+Write-Output 'GATE_OK'
+'@ | Set-Content -LiteralPath $indexGateStandardPath -Encoding utf8NoBOM
+
+    $output = (& $inventoryScriptPath -KbParallelRoot $kbRoot -SkillsExamplesPath $examplesPath 2>&1 |
+        ForEach-Object { $_.ToString() }) -join ' '
+    Assert-NotContains -Text $output -Pattern 'Test-DemoKbIndexGate\.ps1\(reason=source_mask_contract_missing\)' -Message 'redirecionamento apenas de erro nao pode invalidar a saida de sucesso'
 
     @'
 #requires -Version 7.4

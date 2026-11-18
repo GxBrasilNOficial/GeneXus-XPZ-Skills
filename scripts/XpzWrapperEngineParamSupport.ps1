@@ -1009,7 +1009,9 @@ function Test-XpzIndexGateMaskOutputEvidence {
       - variavel atribuida com o campo e usada em Write-Output/ConvertTo-Json/Out-String.
       Write-Host, Write-Verbose, Write-Information e sinks de host/arquivo/descarte
       (Out-Host/Out-Null/Out-File/Set-Content) nao contam: nao chegam ao consumidor
-      sem opcoes/preferencias adicionais.
+      sem opcoes/preferencias adicionais. Redirecionamento de saida para null/arquivo
+      (> $null, > arquivo, *> $null) tambem nao conta; 2> e 2>&1/*>&1 preservam o
+      fluxo de sucesso.
       Limite: prova estrutural, nao execucao. K9 e setup audit continuam sendo a
       autoridade em runtime.
     #>
@@ -1023,7 +1025,8 @@ function Test-XpzIndexGateMaskOutputEvidence {
     # Somente fluxos que K9 e setup audit realmente capturam (success stream).
     # Write-Host/Write-Verbose/Write-Information e sinks de host/arquivo/descarte
     # (Out-Host/Out-Null/Out-File/Set-Content) nao contam: o campo nao chega ao
-    # consumidor.
+    # consumidor. Redirecionamento de saida para null/arquivo (> $null, > arquivo,
+    # *> $null) tambem nao conta; 2> e 2>&1/*>&1 preservam o fluxo de sucesso.
     $outputCommands = @('Write-Output', 'ConvertTo-Json', 'Out-String')
     # Sinks que descartam ou desviam o fluxo de stdout; o campo nao chega ao consumidor.
     $nonCapturableSinks = @('Out-Host', 'Out-Null', 'Out-File', 'Set-Content', 'Add-Content', 'Out-GridView', 'Out-Printer')
@@ -1042,8 +1045,23 @@ function Test-XpzIndexGateMaskOutputEvidence {
                 }, $true) | ForEach-Object { $_.GetCommandName() })
     }
 
+    function Test-PipelineOutputCapturable {
+        param($Pipeline)
+        foreach ($element in @($Pipeline.PipelineElements)) {
+            if ($element.PSObject.Properties.Name -notcontains 'Redirections') { continue }
+            foreach ($redir in @($element.Redirections)) {
+                if ($redir -is [System.Management.Automation.Language.FileRedirectionAst]) {
+                    $fromStream = [string]$redir.FromStream
+                    if ($fromStream -in @('Output', 'All')) { return $false }
+                }
+            }
+        }
+        return $true
+    }
+
     foreach ($pipe in $statementPipelines) {
         if ($pipe.Extent.Text -notmatch $fieldPattern) { continue }
+        if (-not (Test-PipelineOutputCapturable -Pipeline $pipe)) { continue }
         $commandNames = Get-PipelineCommandNames -Pipeline $pipe
         if (@($commandNames | Where-Object { $nonCapturableSinks -contains $_ }).Count -gt 0) { continue }
         $hasOutputCommand = @($commandNames | Where-Object { $outputCommands -contains $_ }).Count -gt 0
@@ -1063,6 +1081,7 @@ function Test-XpzIndexGateMaskOutputEvidence {
     if ($variables.Count -eq 0) { return $false }
 
     foreach ($pipe in $statementPipelines) {
+        if (-not (Test-PipelineOutputCapturable -Pipeline $pipe)) { continue }
         $commandNames = Get-PipelineCommandNames -Pipeline $pipe
         if (@($commandNames | Where-Object { $nonCapturableSinks -contains $_ }).Count -gt 0) { continue }
         $hasOutputCommand = @($commandNames | Where-Object { $outputCommands -contains $_ }).Count -gt 0
