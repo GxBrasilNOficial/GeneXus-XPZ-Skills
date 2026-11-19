@@ -15,7 +15,7 @@ The satellite has two parts: a **generic** part (any `File` payload) and an **`.
 
 ## `.xlsx` used as an `ExcelDocument` template
 
-Applies when the `File` carries an `.xlsx` used by a `Procedure` via `ExcelDocument`. The template is the only place where number formats live (`ExcelDocument` does not expose `NumberFormat`).
+Applies when the `File` carries an `.xlsx` used by a `Procedure` via `ExcelDocument`. The template is the only place where number formats live in the consumer observed in 2026-11 (`ExcelDocument` does not expose `NumberFormat`; see the 2026-11-14 entry in `999-ideias-pendentes.md`); revalidate if the generator/runtime changes.
 
 ### Column/type contract (with the Procedure)
 
@@ -65,6 +65,7 @@ The goal is the **number format applied to the cells the writer will fill**, not
 
 - **File in the batch/package:** after any rewrite, re-extract the body from the **front XML** and, when a package exists, from the **package**, and compare bytes/hash; then inspect the ZIP/XML. Validating only the intermediate `.xlsx` is not enough. This is an `ABORT` at closing: if the final body was not re-extracted and compared, abort before concluding.
 - **File only as a dependency** (not in the batch/package, referenced by a `Procedure` with `ExcelDocument.Template`): read the body from the **acervo**, run the `.xlsx` checks on it, and declare the `File` as an unchanged dependency with its acervo path/GUID/lastUpdate; there is no front×package body to compare, and no abort for that comparison. The package contains the Procedure, not the `File`.
+- **Dependency not locatable:** if the `File` cannot be found in the acervo, record the unresolved dependency (the name/GUID the `Procedure` references and where it was searched) and do not infer the body or its formats; the `.xlsx` checks were not run, and the front stays pending/blocked under the general rule for unresolved applicable checks. The "inconclusive" exit above presupposes a body to inspect and does not cover an absent body.
 
 ## Quality Checklist
 
@@ -73,7 +74,7 @@ The goal is the **number format applied to the cells the writer will fill**, not
 - [ ] No custom `numFmt`/`xf` was introduced without an explicit user request and a verification record; existing contract formats (date, currency, percentage, `0`, `#,##0.00`) were preserved.
 - [ ] The worksheet roots use the default namespace (no prefix) on the final body; the consumer/generator version and the verification reader were recorded.
 - [ ] For a `File` in the batch/package: the final body was re-extracted from the front XML and from the package and compared (bytes/hash); the origin, hash/size and what counts as proof were recorded; `ABORT` if that was not done.
-- [ ] For a `File` `.xlsx` that is only a dependency (not in the batch/package, referenced by a `Procedure` with `ExcelDocument.Template`): the body was read from the acervo, the `.xlsx` checks were run on it, and the `File` was declared as an unchanged dependency with its acervo path/GUID/lastUpdate; no front×package comparison was claimed.
+- [ ] For a `File` `.xlsx` that is only a dependency (not in the batch/package, referenced by a `Procedure` with `ExcelDocument.Template`): the body was read from the acervo, the `.xlsx` checks were run on it, and the `File` was declared as an unchanged dependency with its acervo path/GUID/lastUpdate; no front×package comparison was claimed. If the `File` was not locatable in the acervo, the unresolved dependency was recorded (name/GUID and searched paths) and the front stayed pending/blocked, with the checks not claimed.
 - [ ] `MATCH`/inventory was not treated as proof of content or cell format.
 
 ## Related references
