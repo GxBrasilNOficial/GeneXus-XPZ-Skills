@@ -2,6 +2,12 @@
 
 > Documento de especificação (papel) para implementação. Fecha os defeitos 1 e 2, com os gaps das rodadas v1–v5 incorporados. Decisão do humano (2026-09-28): **congelar o design** e transferir a prova para a implementação + self-tests (`15-revisao-por-pares.md`, «Quando o design estabiliza»).
 
+## Adendo de 2026-11-19 — guarda `lastUpdateRegressed` (códigos 37/38)
+
+Extensão autorizada após o congelamento; não reescreve o corpo v6. Prevalece sobre §4.5/§4.6 no que toca a regressão de `lastUpdate`. Dono normativo: `xpz-builder/SKILL.md` (seção de recarimbo) e helper `Resolve-GeneXusLastUpdateRegression` em `GeneXusXmlSurgicalEditSupport.ps1`.
+
+- Após o motor de bump, compara o candidato ao carimbo do destino (preferindo `-OutputPath` existente). Modo `self` com destino mais novo que o candidato: `37 LASTUPDATE_REGRESSED`, sem gravação. Destino com carimbo ilegível: `38 LASTUPDATE_UNREADABLE`, sem gravação. Modos `newObjectNotImported` e `explicitBaseline` podem gravar abaixo do atual com rastro (`lastUpdateRegressed`, `lastUpdateRegressReason`, `lastUpdateComparisonSource`); aviso humano em modo texto; com `-AsJson`, o aviso humano vai ao stderr real via `Write-GeneXusStderrLine` (não `Write-Warning`, que vaza no stdout do `pwsh -File`). Help do wrapper lista 37/38. 9-FD e edição IDE/manual fora. Provas em `Test-EditGeneXusXmlSurgicalContract.ps1` / `Test-SetGeneXusXmlLastUpdateSelfTest.ps1`.
+
 ## Adendo de 2026-10-11 — entrada por arquivos (plano v4)
 
 Extensão autorizada após o congelamento; não reescreve o corpo v6. Prevalece sobre §4.5/§4.6 e amplia §5 no que segue. Dono normativo: `xpz-builder/SKILL.md`, seção de entrada por arquivos; exemplo real em `xpz-builder/examples/Edit-GeneXusXmlSurgical.example.ps1`.
