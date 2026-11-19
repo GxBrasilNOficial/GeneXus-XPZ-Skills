@@ -77,7 +77,7 @@ The goal is the **number format applied to the cells the writer will fill**, not
 
 ## Related references
 
-- `xpz-builder/responsibilities-by-type/procedure.md` — the Procedure column/type contract and the `ExcelDocument` checks (AutoFit, widths, extraction, output validation).
+- `xpz-builder/responsibilities-by-type/procedure.md` — the Procedure-side contract and the checks that remain there (AutoFit, Base64 extraction, output validation); the column/type map and the OOXML width check are owned by this satellite.
 - `01h-moldes-sanitizados-metadados-e-artefatos.md` — the three sanitized `File` molds.
 - `999-ideias-pendentes.md` — the three `.xlsx` entries of 2026-11-14 (`$R$`, `col min/max`, AutoFit/boundary).
 - `02-regras-operacionais-e-runtime.md` — "Validação funcional pós-import: objetos com insumo externo oficial".
