@@ -61,7 +61,7 @@ The goal is the **number format applied to the cells the writer will fill**, not
 - `[$R$-416]...` currency: preserve the literal. When patching through PowerShell, use a single-quoted string or a literal here-string, never an expandable string (see `999`).
 - Pre-formatted line limit: test the boundary (e.g., 2000/20000) in the served environment; do not assert a mechanism; follow `xpz-msbuild-build` for the build/deploy phase.
 
-### Final body (front × package)
+### Final body (batch/package or acervo dependency)
 
 - **File in the batch/package:** after any rewrite, re-extract the body from the **front XML** and, when a package exists, from the **package**, and compare bytes/hash; then inspect the ZIP/XML. Validating only the intermediate `.xlsx` is not enough. This is an `ABORT` at closing: if the final body was not re-extracted and compared, abort before concluding.
 - **File only as a dependency** (not in the batch/package, referenced by a `Procedure` with `ExcelDocument.Template`): read the body from the **acervo**, run the `.xlsx` checks on it, and declare the `File` as an unchanged dependency with its acervo path/GUID/lastUpdate; there is no front×package body to compare, and no abort for that comparison. The package contains the Procedure, not the `File`.

@@ -399,7 +399,7 @@ Omitir a `Part` `Events` no XML submetido **não a apaga**: o objeto mantém a `
 - delimitacao de nomes e assimetrica: PostgreSQL `NAME="User"` (com aspas, o gerador nao delimita sozinho) vs SQL Server `NAME=User` (sem aspas; aspas duplas viram `[[User]]` → `Sintaxe incorreta`); so importa com maiuscula/palavra reservada (ex.: tabela `User` do GAM)
 - `For Each` de DataView em evento de WebPanel e rejeitado (`src0065`); a leitura mora em `Procedure` e o grid itera colecao (`For &Item in &Itens ... Load ... EndFor`)
 - referencia completa: satelite `xpz-builder/responsibilities-by-type/dataview.md`; risco `alto` no `03` (nota de recalibracao 2026-08-17); moldes `dvExemploMultiDbms`/`dvExemploSingleDbmsMissingPlatform` no `01e`
-- referencia de `File`: satelite `xpz-builder/responsibilities-by-type/file.md`; moldes `ArquivoImagemExemplo_gif`/`ArquivoConfiguracaoExemplo_props`/`ArquivoModeloPlanilhaExemplo_xlsx` no `01h`; para `File` com `.xlsx` template de `ExcelDocument`, aplicar a secao `.xlsx` (namespace default, coluna mista default, sem `numFmt` "General" customizado, corpo final reextraido e comparado)
+- referencia de `File`: satelite `xpz-builder/responsibilities-by-type/file.md`; moldes `ArquivoImagemExemplo_gif`/`ArquivoConfiguracaoExemplo_props`/`ArquivoModeloPlanilhaExemplo_xlsx` no `01h`; para `File` com `.xlsx` template de `ExcelDocument`, aplicar a secao `.xlsx` (namespace default, coluna mista default, sem `numFmt` "General" customizado; corpo final reextraido e comparado frente × pacote quando o `File` integra o lote, ou lido do acervo e declarado como dependencia inalterada quando e apenas consultado)
 
 ### Regra adicional para revisao de `API`
 
