@@ -2,7 +2,7 @@
 
 Satellite of `xpz-builder/SKILL.md` for `File` objects. **Load it before generating, editing, or packaging a `File`**, in addition to the main `SKILL.md`.
 
-The satellite has two parts: a **generic** part (any `File` payload) and an **`.xlsx`** part that applies only when the `File` carries a spreadsheet used as an `ExcelDocument` template. Read the generic part always; read the `.xlsx` part when the batch contains a `File` with `.xlsx`, or a `Procedure` whose `Source` uses `ExcelDocument` with a `Template` (the template `File` can then be read from the corpus for the checks).
+The satellite has two parts: a **generic** part (any `File` payload) and an **`.xlsx`** part that applies only when the `File` carries a spreadsheet used as an `ExcelDocument` template. Read the generic part always; read the `.xlsx` part when the batch contains a `File` with `.xlsx`, or a `Procedure` whose `Source` uses `ExcelDocument` with a `Template` (the template `File` can then be read from the acervo for the checks; if the `File` is not in the batch/package, it is an unchanged dependency and there is no front×package body to compare).
 
 ## Generic: identity, payload, and extraction
 
@@ -63,8 +63,8 @@ The goal is the **number format applied to the cells the writer will fill**, not
 
 ### Final body (front × package)
 
-- After any rewrite, re-extract the body from the **front XML** and, when a package exists, from the **package**, and compare bytes/hash; then inspect the ZIP/XML. Validating only the intermediate `.xlsx` is not enough.
-- This is an `ABORT` at closing, not a `NEVER`: if the final body was not re-extracted and compared, abort before concluding.
+- **File in the batch/package:** after any rewrite, re-extract the body from the **front XML** and, when a package exists, from the **package**, and compare bytes/hash; then inspect the ZIP/XML. Validating only the intermediate `.xlsx` is not enough. This is an `ABORT` at closing: if the final body was not re-extracted and compared, abort before concluding.
+- **File only as a dependency** (not in the batch/package, referenced by a `Procedure` with `ExcelDocument.Template`): read the body from the **acervo**, run the `.xlsx` checks on it, and declare the `File` as an unchanged dependency with its acervo path/GUID/lastUpdate; there is no front×package body to compare, and no abort for that comparison. The package contains the Procedure, not the `File`.
 
 ## Quality Checklist
 

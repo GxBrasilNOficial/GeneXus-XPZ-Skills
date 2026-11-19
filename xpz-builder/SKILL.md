@@ -223,7 +223,7 @@ If the main need is to prepare or validate the initial folder structure around t
 - In the closing, explicitly state that the saved XML was reread, the persisted `lastUpdate` was confirmed, and the applicable local repository rules were reread and satisfied before packaging
 - Use NEVER and ABORT as hard stops, not suggestions
 - NEVER use speculative or reassuring language about import/build success
-- When the batch contains a `File` with `.xlsx` (or a `Procedure` with `ExcelDocument.Template`), load `responsibilities-by-type/file.md`; before concluding, re-extract and compare the final body from the front and the package — `ABORT` if that was not done. A custom `numFmt`/`xf` in a template is opt-in (user request + verification), never a default fix.
+- When the batch contains a `File` with `.xlsx` (or a `Procedure` with `ExcelDocument.Template`), load `responsibilities-by-type/file.md`; if the `File` is in the batch, re-extract and compare the final body from the front and the package — `ABORT` if that was not done. If the `File` is only a dependency (not in the batch/package), read its body from the acervo, run the `.xlsx` checks on it, and declare it as an unchanged dependency with its acervo path/GUID/lastUpdate; there is no front×package comparison. A custom `numFmt`/`xf` in a template is opt-in (user request + verification), never a default fix.
 
 ---
 
