@@ -314,6 +314,25 @@ function Copy-AcervoMetaToFront {
     }
     $newLastUpdate = Format-GeneXusLastUpdate -Value $baseCandidate
 
+    $regressedVsFront = $false
+    if (-not [string]::IsNullOrWhiteSpace($FrontLastUpdateBefore)) {
+        $beforeParsed = [DateTimeOffset]::MinValue
+        $afterParsed = [DateTimeOffset]::MinValue
+        $beforeOk = [DateTimeOffset]::TryParse(
+            $FrontLastUpdateBefore,
+            [System.Globalization.CultureInfo]::InvariantCulture,
+            [System.Globalization.DateTimeStyles]::AssumeUniversal,
+            [ref]$beforeParsed)
+        $afterOk = [DateTimeOffset]::TryParse(
+            $newLastUpdate,
+            [System.Globalization.CultureInfo]::InvariantCulture,
+            [System.Globalization.DateTimeStyles]::AssumeUniversal,
+            [ref]$afterParsed)
+        if ($beforeOk -and $afterOk -and $afterParsed -lt $beforeParsed) {
+            $regressedVsFront = $true
+        }
+    }
+
     if ($DryRun) {
         $script:findings += New-Finding -Severity 'info' -Code $DryRunCode `
             -Message "DRY RUN: $MessagePrefix '$($AcervoMeta.Path)' -> '$DestinationPath' e bump lastUpdate de $aLastStr para $newLastUpdate." `
@@ -321,6 +340,14 @@ function Copy-AcervoMetaToFront {
             -ObjectFile $fRel -AcervoFile $aRel `
             -Action $DryRunCode `
             -FrontLastUpdateBefore $FrontLastUpdateBefore -AcervoLastUpdate $aLastStr -FrontLastUpdateAfter $newLastUpdate
+        if ($regressedVsFront) {
+            $script:findings += New-Finding -Severity 'warn' -Code 'front-lastupdate-regressed-on-copy' `
+                -Message "DRY RUN: objeto '$($AcervoMeta.Name)' teria lastUpdate ($newLastUpdate) anterior ao da frente antes da copia ($FrontLastUpdateBefore)." `
+                -ObjectName $AcervoMeta.Name -ObjectGuid $AcervoMeta.Guid `
+                -ObjectFile $fRel -AcervoFile $aRel `
+                -Action $DryRunCode `
+                -FrontLastUpdateBefore $FrontLastUpdateBefore -AcervoLastUpdate $aLastStr -FrontLastUpdateAfter $newLastUpdate
+        }
         return
     }
 
@@ -339,6 +366,14 @@ function Copy-AcervoMetaToFront {
         -ObjectFile $fRel -AcervoFile $aRel `
         -Action $ActionCode `
         -FrontLastUpdateBefore $FrontLastUpdateBefore -AcervoLastUpdate $aLastStr -FrontLastUpdateAfter $newLastUpdate
+    if ($regressedVsFront) {
+        $script:findings += New-Finding -Severity 'warn' -Code 'front-lastupdate-regressed-on-copy' `
+            -Message "Objeto '$($AcervoMeta.Name)' ficou com lastUpdate ($newLastUpdate) anterior ao da frente antes da copia ($FrontLastUpdateBefore)." `
+            -ObjectName $AcervoMeta.Name -ObjectGuid $AcervoMeta.Guid `
+            -ObjectFile $fRel -AcervoFile $aRel `
+            -Action $ActionCode `
+            -FrontLastUpdateBefore $FrontLastUpdateBefore -AcervoLastUpdate $aLastStr -FrontLastUpdateAfter $newLastUpdate
+    }
 }
 
 # Validar parâmetros sem criar uma frente.

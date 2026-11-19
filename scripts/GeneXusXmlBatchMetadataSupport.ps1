@@ -526,23 +526,7 @@ function Get-GeneXusObjectRootInfo {
     }
 }
 
-function ConvertTo-GeneXusLastUpdateInstant {
-    param([AllowNull()][AllowEmptyString()][string]$Value)
-
-    if ([string]::IsNullOrWhiteSpace($Value)) {
-        return [pscustomobject]@{ Present = $false; Parsed = $false; Instant = $null; Raw = $Value }
-    }
-    $parsed = [DateTimeOffset]::MinValue
-    $ok = [DateTimeOffset]::TryParse(
-        $Value,
-        [System.Globalization.CultureInfo]::InvariantCulture,
-        [System.Globalization.DateTimeStyles]::AssumeUniversal,
-        [ref]$parsed)
-    if (-not $ok) {
-        return [pscustomobject]@{ Present = $true; Parsed = $false; Instant = $null; Raw = $Value }
-    }
-    return [pscustomobject]@{ Present = $true; Parsed = $true; Instant = $parsed; Raw = $Value }
-}
+# ConvertTo-GeneXusLastUpdateInstant vem de GeneXusXmlSurgicalEditSupport.ps1 (dot-source acima).
 
 # ---------------------------------------------------------------------------
 # lastUpdate: composicao dos baselines (secao 2.1)
@@ -3181,6 +3165,28 @@ function Invoke-GeneXusXmlBatchMetadataCore {
                 if ($written.Parsed -and $written.Instant -gt [DateTimeOffset]::UtcNow.AddSeconds($futureTolerance)) {
                     [void]$blocks.Add((New-GeneXusBatchBlock -Code 'NEW_OBJECT_LASTUPDATE_TOO_FAR_FUTURE' -Message "valor que o motor gravaria ('$lastUpdateValue') passa a tolerancia do envelope ($futureTolerance s)." -Path $plan.RelativePath))
                     continue
+                }
+            }
+
+            if ($plan.Baseline.Status -eq 'NO_BASELINE') {
+                $frontStamp = [string]$plan.RootAttributes['lastUpdate']
+                $regression = Resolve-GeneXusLastUpdateRegression `
+                    -CurrentLastUpdate $frontStamp `
+                    -CandidateLastUpdate $lastUpdateValue `
+                    -Mode 'newObjectNotImported' `
+                    -CurrentSource 'input'
+                if ($regression.Status -eq 'UNREADABLE') {
+                    [void]$blocks.Add((New-GeneXusBatchBlock -Code $regression.Code -Message $regression.Message -Path $plan.RelativePath))
+                    continue
+                }
+                if ($regression.Regressed) {
+                    [void]$warnings.Add((New-GeneXusBatchWarning -Kind 'lastUpdateRegressed' -Message $regression.WarningMessage -OpId $plan.Operations[0].Id -Path $plan.RelativePath -Detail ([ordered]@{
+                                before  = $regression.CurrentRaw
+                                after   = $regression.CandidateRaw
+                                reason  = $regression.Reason
+                                mode    = $regression.Mode
+                                source  = $regression.CurrentSource
+                            })))
                 }
             }
 

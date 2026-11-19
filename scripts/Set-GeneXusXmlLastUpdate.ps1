@@ -40,11 +40,14 @@
 
 .PARAMETER NewObjectNotImported
     Declara explicitamente objeto novo nunca importado. Usa UtcNow + margem,
-    sem baseline, podendo reduzir acúmulo local. Com baseline explícito não
-    vazio: LASTUPDATE_CONTEXT_CONFLICT/30. Baseline explícito no modo normal
-    exige raiz Object/Attribute igual e GUID válido não zero igual (31);
-    XML legado com GUID vazio é recusado. Checagem só da raiz, DTD proibido;
-    não amplia o contrato de encoding do gerador.
+    sem baseline, podendo reduzir acúmulo local (com rastro lastUpdateRegressed
+    e aviso humano/JSON quando o candidato fica abaixo do destino). Com
+    baseline explícito não vazio: LASTUPDATE_CONTEXT_CONFLICT/30. Baseline
+    explícito no modo normal exige raiz Object/Attribute igual e GUID válido
+    não zero igual (31); XML legado com GUID vazio é recusado. Self com
+    OutputPath mais novo: LASTUPDATE_REGRESSED/37. Destino ilegível: 38.
+    Checagem só da raiz, DTD proibido; não amplia o contrato de encoding do
+    gerador.
 
 .PARAMETER DryRun
     Simula sem gravar nem criar backup.
@@ -160,6 +163,23 @@ function Invoke-LastUpdateBumpCore {
         return (New-BumpError -Code 'NO_LASTUPDATE' -Message $_.Exception.Message -ExitCode 12)
     }
 
+    $bumpMode = Resolve-GeneXusLastUpdateBumpMode `
+        -NewObjectNotImported:$NewObjectNotImported.IsPresent `
+        -BaselineXmlPath $baselinePathUsed `
+        -InputPath $resolvedInput
+    $comparisonTarget = Get-GeneXusLastUpdateComparisonTarget `
+        -InputPath $resolvedInput `
+        -OutputPath $resolvedOutput `
+        -InputLastUpdateRaw $lastUpdateBefore
+    $regression = Resolve-GeneXusLastUpdateRegression `
+        -CurrentLastUpdate $comparisonTarget.Raw `
+        -CandidateLastUpdate $lastUpdateAfter `
+        -Mode $bumpMode `
+        -CurrentSource $comparisonTarget.Source
+    if ($regression.Status -eq 'UNREADABLE' -or $regression.Status -eq 'BLOCKED') {
+        return (New-BumpError -Code $regression.Code -Message $regression.Message -ExitCode $regression.ExitCode)
+    }
+
     $patchedText = Set-FirstObjectLastUpdateInText -Text $sourceText -NewLastUpdateValue $lastUpdateAfter
     $bytesAfter = [System.Text.Encoding]::UTF8.GetByteCount($patchedText)
 
@@ -199,23 +219,27 @@ function Invoke-LastUpdateBumpCore {
     }
 
     return [pscustomobject]@{
-        Status                 = 'OK'
-        Code                   = 'BUMP_OK'
-        Message                = 'BUMP_OK'
-        ExitCode               = 0
-        DryRun                 = [bool]$DryRun.IsPresent
-        NewObjectNotImported   = [bool]$NewObjectNotImported.IsPresent
-        InputPath              = $resolvedInput
-        OutputPath             = $resolvedOutput
-        BytesBefore            = $bytesBefore
-        BytesAfter             = $bytesAfter
-        LastUpdateBefore       = $lastUpdateBefore
-        LastUpdateAfter        = $lastUpdateAfter
-        LastUpdateBaselinePath = $baselinePathUsed
-        FreshnessMarginSeconds = $FreshnessMarginSeconds
-        WellFormed             = $wellFormed
-        WellFormedError        = $wellFormedError
-        BakPath                = $bakPath
+        Status                     = 'OK'
+        Code                       = 'BUMP_OK'
+        Message                    = 'BUMP_OK'
+        ExitCode                   = 0
+        DryRun                     = [bool]$DryRun.IsPresent
+        NewObjectNotImported       = [bool]$NewObjectNotImported.IsPresent
+        InputPath                  = $resolvedInput
+        OutputPath                 = $resolvedOutput
+        BytesBefore                = $bytesBefore
+        BytesAfter                 = $bytesAfter
+        LastUpdateBefore           = $lastUpdateBefore
+        LastUpdateAfter            = $lastUpdateAfter
+        LastUpdateBaselinePath     = $baselinePathUsed
+        FreshnessMarginSeconds     = $FreshnessMarginSeconds
+        LastUpdateRegressed        = [bool]$regression.Regressed
+        LastUpdateRegressReason    = $regression.Reason
+        LastUpdateComparisonSource = $comparisonTarget.Source
+        LastUpdateRegressWarning   = $regression.WarningMessage
+        WellFormed                 = $wellFormed
+        WellFormedError            = $wellFormedError
+        BakPath                    = $bakPath
     }
 }
 
@@ -232,6 +256,12 @@ function Write-BumpHumanOutput {
     Write-Output ("  newObjectNotImported: {0}" -f $Result.NewObjectNotImported)
     Write-Output ("  lastUpdate    : {0} -> {1}" -f $Result.LastUpdateBefore, $Result.LastUpdateAfter)
     Write-Output ("  baseline      : {0}" -f $Result.LastUpdateBaselinePath)
+    if ($Result.LastUpdateRegressed) {
+        Write-Output ("  lastUpdateRegressed: true ({0}; fonte={1})" -f $Result.LastUpdateRegressReason, $Result.LastUpdateComparisonSource)
+        if (-not [string]::IsNullOrWhiteSpace($Result.LastUpdateRegressWarning)) {
+            Write-Output $Result.LastUpdateRegressWarning
+        }
+    }
     if ($null -ne $Result.WellFormed) {
         Write-Output ("  wellFormed    : {0}" -f $Result.WellFormed)
     }
@@ -256,13 +286,16 @@ function ConvertTo-BumpJsonOutput {
         outputPath             = $Result.OutputPath
         bytesBefore            = $Result.BytesBefore
         bytesAfter             = $Result.BytesAfter
-        lastUpdateBefore       = $Result.LastUpdateBefore
-        lastUpdateAfter        = $Result.LastUpdateAfter
-        lastUpdateBaselinePath = $Result.LastUpdateBaselinePath
-        freshnessMarginSeconds = $Result.FreshnessMarginSeconds
-        wellFormed             = $Result.WellFormed
-        wellFormedError        = $Result.WellFormedError
-        bakPath                = $Result.BakPath
+        lastUpdateBefore           = $Result.LastUpdateBefore
+        lastUpdateAfter            = $Result.LastUpdateAfter
+        lastUpdateBaselinePath     = $Result.LastUpdateBaselinePath
+        freshnessMarginSeconds     = $Result.FreshnessMarginSeconds
+        lastUpdateRegressed        = $Result.LastUpdateRegressed
+        lastUpdateRegressReason    = $Result.LastUpdateRegressReason
+        lastUpdateComparisonSource = $Result.LastUpdateComparisonSource
+        wellFormed                 = $Result.WellFormed
+        wellFormedError            = $Result.WellFormedError
+        bakPath                    = $Result.BakPath
     }
 }
 
@@ -277,6 +310,10 @@ try {
         -AssertWellFormedAfter $AssertWellFormedAfter
 
     if ($AsJson) {
+        if ($coreResult.Status -eq 'OK' -and $coreResult.LastUpdateRegressed -and
+            -not [string]::IsNullOrWhiteSpace($coreResult.LastUpdateRegressWarning)) {
+            Write-Warning $coreResult.LastUpdateRegressWarning
+        }
         ConvertTo-BumpJsonOutput -Result $coreResult | ConvertTo-Json -Depth 5 -Compress
     } else {
         Write-BumpHumanOutput -Result $coreResult

@@ -124,6 +124,75 @@ if ($r5.status -ne 'ERROR') { throw "Caso 5: status deveria ser ERROR; obtido '$
 if ($r5.code -ne 'INPUT_NOT_FOUND') { throw "Caso 5: code deveria ser INPUT_NOT_FOUND; obtido '$($r5.code)'." }
 if ($code5 -ne 14) { throw "Caso 5: exitCode deveria ser 14; obtido '$code5'." }
 
+# Caso 6: NewObjectNotImported reduz carimbo futuro + rastro
+$f6 = Join-Path $tempRoot 'obj6.xml'
+$highStamp = '2099-06-01T00:00:00.0000000Z'
+[System.IO.File]::WriteAllText($f6, (New-FixtureObjectXml -Name $objName -Guid $objGuid -LastUpdate $highStamp), $utf8)
+$raw6 = & $scriptPath -InputPath $f6 -NewObjectNotImported -AsJson 2>$null
+$code6 = $LASTEXITCODE
+$r6 = $raw6 | ConvertFrom-Json
+if ($code6 -ne 0) { throw "Caso 6: exit deveria ser 0; obtido '$code6'." }
+if ($r6.status -ne 'OK') { throw "Caso 6: status OK esperado." }
+if (-not $r6.lastUpdateRegressed) { throw 'Caso 6: lastUpdateRegressed deveria ser true.' }
+if ($r6.lastUpdateRegressReason -ne 'newObjectNotImported') { throw "Caso 6: reason inesperada '$($r6.lastUpdateRegressReason)'." }
+$after6 = Get-LastUpdateFromText (Get-Content -LiteralPath $f6 -Raw -Encoding UTF8)
+if ((Get-StampUtc $after6) -ge (Get-StampUtc $highStamp)) { throw 'Caso 6: deveria ter reduzido o carimbo futuro.' }
+# stdout AsJson deve permanecer JSON valido (uma linha)
+$null = [System.Text.Json.JsonDocument]::Parse([string]$raw6)
+
+# Caso 7: baseline explicito antigo + frente futura -> grava com rastro
+$f7 = Join-Path $tempRoot 'obj7.xml'
+$base7 = Join-Path $tempRoot 'base7.xml'
+[System.IO.File]::WriteAllText($f7, (New-FixtureObjectXml -Name $objName -Guid $objGuid -LastUpdate $highStamp), $utf8)
+[System.IO.File]::WriteAllText($base7, (New-FixtureObjectXml -Name $objName -Guid $objGuid -LastUpdate '2020-01-01T00:00:00.0000000Z'), $utf8)
+$r7 = & $scriptPath -InputPath $f7 -BaselineXmlPath $base7 -AsJson 2>$null | ConvertFrom-Json
+if ($r7.status -ne 'OK') { throw 'Caso 7: status OK esperado.' }
+if (-not $r7.lastUpdateRegressed) { throw 'Caso 7: lastUpdateRegressed deveria ser true.' }
+if ($r7.lastUpdateRegressReason -ne 'explicitBaselineBelowCurrent') { throw "Caso 7: reason inesperada." }
+$after7 = Get-LastUpdateFromText (Get-Content -LiteralPath $f7 -Raw -Encoding UTF8)
+if ((Get-StampUtc $after7) -ge (Get-StampUtc $highStamp)) { throw 'Caso 7: deveria ter baixado o carimbo acumulado.' }
+
+# Caso 8: self in-place nao regride
+$f8 = Join-Path $tempRoot 'obj8.xml'
+[System.IO.File]::WriteAllText($f8, (New-FixtureObjectXml -Name $objName -Guid $objGuid -LastUpdate $oldStamp), $utf8)
+$r8 = & $scriptPath -InputPath $f8 -AsJson | ConvertFrom-Json
+if ($r8.status -ne 'OK') { throw 'Caso 8: status OK esperado.' }
+if ($r8.lastUpdateRegressed) { throw 'Caso 8: self in-place nao deveria marcar regressed.' }
+
+# Caso 9: OutputPath com carimbo maior + self -> LASTUPDATE_REGRESSED
+$f9in = Join-Path $tempRoot 'obj9-in.xml'
+$f9out = Join-Path $tempRoot 'obj9-out.xml'
+[System.IO.File]::WriteAllText($f9in, (New-FixtureObjectXml -Name $objName -Guid $objGuid -LastUpdate $oldStamp), $utf8)
+[System.IO.File]::WriteAllText($f9out, (New-FixtureObjectXml -Name $objName -Guid $objGuid -LastUpdate $highStamp), $utf8)
+$before9 = Get-Content -LiteralPath $f9out -Raw -Encoding UTF8
+$r9 = & $scriptPath -InputPath $f9in -OutputPath $f9out -AsJson | ConvertFrom-Json
+$code9 = $LASTEXITCODE
+if ($r9.status -ne 'ERROR') { throw 'Caso 9: status ERROR esperado.' }
+if ($r9.code -ne 'LASTUPDATE_REGRESSED') { throw "Caso 9: code LASTUPDATE_REGRESSED esperado; obtido '$($r9.code)'." }
+if ($code9 -ne 37) { throw "Caso 9: exit 37 esperado; obtido '$code9'." }
+$after9disk = Get-Content -LiteralPath $f9out -Raw -Encoding UTF8
+if ($after9disk -cne $before9) { throw 'Caso 9: destino nao deveria ter sido alterado.' }
+
+# Caso 10: atual ilegivel no destino -> LASTUPDATE_UNREADABLE
+$f10in = Join-Path $tempRoot 'obj10-in.xml'
+$f10out = Join-Path $tempRoot 'obj10-out.xml'
+$badStamp = '2026-13-40T99:99:99.0000000Z'
+[System.IO.File]::WriteAllText($f10in, (New-FixtureObjectXml -Name $objName -Guid $objGuid -LastUpdate $oldStamp), $utf8)
+[System.IO.File]::WriteAllText($f10out, (New-FixtureObjectXml -Name $objName -Guid $objGuid -LastUpdate $badStamp), $utf8)
+$r10 = & $scriptPath -InputPath $f10in -OutputPath $f10out -AsJson | ConvertFrom-Json
+$code10 = $LASTEXITCODE
+if ($r10.code -ne 'LASTUPDATE_UNREADABLE') { throw "Caso 10: LASTUPDATE_UNREADABLE esperado; obtido '$($r10.code)'." }
+if ($code10 -ne 38) { throw "Caso 10: exit 38 esperado; obtido '$code10'." }
+
+# Caso 11: DryRun com NewObjectNotImported reporta regressao e nao grava
+$f11 = Join-Path $tempRoot 'obj11.xml'
+[System.IO.File]::WriteAllText($f11, (New-FixtureObjectXml -Name $objName -Guid $objGuid -LastUpdate $highStamp), $utf8)
+$r11 = & $scriptPath -InputPath $f11 -NewObjectNotImported -DryRun -AsJson 2>$null | ConvertFrom-Json
+if ($r11.status -ne 'OK' -or -not $r11.dryRun) { throw 'Caso 11: DryRun OK esperado.' }
+if (-not $r11.lastUpdateRegressed) { throw 'Caso 11: deveria reportar regressed.' }
+$disk11 = Get-Content -LiteralPath $f11 -Raw -Encoding UTF8
+if ($disk11 -notmatch [regex]::Escape('lastUpdate="' + $highStamp + '"')) { throw 'Caso 11: DryRun nao deveria gravar.' }
+
 Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
 
 Write-Output 'OK: Test-SetGeneXusXmlLastUpdateSelfTest.ps1'

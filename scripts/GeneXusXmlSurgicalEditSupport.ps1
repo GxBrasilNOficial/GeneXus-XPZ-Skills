@@ -333,6 +333,209 @@ function Set-FirstObjectLastUpdateInText {
     return $Text.Substring(0, $current.Index) + $replacementToken + $Text.Substring($current.Index + $current.Length)
 }
 
+function ConvertTo-GeneXusLastUpdateInstant {
+    param([AllowNull()][AllowEmptyString()][string]$Value)
+
+    if ([string]::IsNullOrWhiteSpace($Value)) {
+        return [pscustomobject]@{ Present = $false; Parsed = $false; Instant = $null; Raw = $Value }
+    }
+    $parsed = [DateTimeOffset]::MinValue
+    $ok = [DateTimeOffset]::TryParse(
+        $Value,
+        [System.Globalization.CultureInfo]::InvariantCulture,
+        [System.Globalization.DateTimeStyles]::AssumeUniversal,
+        [ref]$parsed)
+    if (-not $ok) {
+        return [pscustomobject]@{ Present = $true; Parsed = $false; Instant = $null; Raw = $Value }
+    }
+    return [pscustomobject]@{ Present = $true; Parsed = $true; Instant = $parsed; Raw = $Value }
+}
+
+function Get-GeneXusLastUpdateComparisonTarget {
+    <#
+        Prefer the destination file stamp when OutputPath exists as a leaf;
+        otherwise use the input stamp already read from the source text.
+    #>
+    param(
+        [string]$InputPath,
+        [string]$OutputPath,
+        [AllowNull()][AllowEmptyString()][string]$InputLastUpdateRaw
+    )
+
+    $resolvedOutput = $null
+    if (-not [string]::IsNullOrWhiteSpace($OutputPath)) {
+        $resolvedOutput = [System.IO.Path]::GetFullPath($OutputPath)
+    }
+    $resolvedInput = $null
+    if (-not [string]::IsNullOrWhiteSpace($InputPath)) {
+        $resolvedInput = [System.IO.Path]::GetFullPath($InputPath)
+    }
+
+    $useOutput = $false
+    if (-not [string]::IsNullOrWhiteSpace($resolvedOutput) -and
+        (Test-Path -LiteralPath $resolvedOutput -PathType Leaf)) {
+        if ([string]::IsNullOrWhiteSpace($resolvedInput) -or
+            -not [string]::Equals($resolvedOutput, $resolvedInput, [StringComparison]::OrdinalIgnoreCase)) {
+            $useOutput = $true
+        }
+    }
+
+    if ($useOutput) {
+        $destText = [System.IO.File]::ReadAllText($resolvedOutput)
+        $info = Get-FirstObjectLastUpdateFromText -Text $destText
+        if ($null -eq $info) {
+            return [pscustomobject]@{ Raw = $null; Source = 'outputPath'; Path = $resolvedOutput }
+        }
+        return [pscustomobject]@{ Raw = $info.Value; Source = 'outputPath'; Path = $resolvedOutput }
+    }
+
+    return [pscustomobject]@{ Raw = $InputLastUpdateRaw; Source = 'input'; Path = $resolvedInput }
+}
+
+function Resolve-GeneXusLastUpdateRegression {
+    <#
+        Compare candidate stamp to the destination/current stamp.
+        Modes newObjectNotImported/explicitBaseline may write with regressed=true;
+        mode self blocks with LASTUPDATE_REGRESSED when candidate < current.
+    #>
+    param(
+        [AllowNull()][AllowEmptyString()][string]$CurrentLastUpdate,
+        [Parameter(Mandatory = $true)][string]$CandidateLastUpdate,
+        [Parameter(Mandatory = $true)][ValidateSet('self', 'explicitBaseline', 'newObjectNotImported')][string]$Mode,
+        [string]$CurrentSource = 'input'
+    )
+
+    $current = ConvertTo-GeneXusLastUpdateInstant -Value $CurrentLastUpdate
+    $candidate = ConvertTo-GeneXusLastUpdateInstant -Value $CandidateLastUpdate
+
+    if ($current.Present -and -not $current.Parsed) {
+        return [pscustomobject]@{
+            Status           = 'UNREADABLE'
+            Code             = 'LASTUPDATE_UNREADABLE'
+            Message          = "LASTUPDATE_UNREADABLE: lastUpdate atual nao parseavel (fonte=$CurrentSource): '$CurrentLastUpdate'."
+            ExitCode         = 38
+            Regressed        = $false
+            AllowWrite       = $false
+            Mode             = $Mode
+            CurrentRaw       = $CurrentLastUpdate
+            CandidateRaw     = $CandidateLastUpdate
+            CurrentSource    = $CurrentSource
+            Reason           = 'current-unreadable'
+            WarningMessage   = $null
+        }
+    }
+    if (-not $candidate.Parsed) {
+        return [pscustomobject]@{
+            Status           = 'UNREADABLE'
+            Code             = 'LASTUPDATE_UNREADABLE'
+            Message          = "LASTUPDATE_UNREADABLE: candidato lastUpdate nao parseavel: '$CandidateLastUpdate'."
+            ExitCode         = 38
+            Regressed        = $false
+            AllowWrite       = $false
+            Mode             = $Mode
+            CurrentRaw       = $CurrentLastUpdate
+            CandidateRaw     = $CandidateLastUpdate
+            CurrentSource    = $CurrentSource
+            Reason           = 'candidate-unreadable'
+            WarningMessage   = $null
+        }
+    }
+    if (-not $current.Present -or -not $current.Parsed) {
+        return [pscustomobject]@{
+            Status           = 'OK'
+            Code             = $null
+            Message          = $null
+            ExitCode         = 0
+            Regressed        = $false
+            AllowWrite       = $true
+            Mode             = $Mode
+            CurrentRaw       = $CurrentLastUpdate
+            CandidateRaw     = $CandidateLastUpdate
+            CurrentSource    = $CurrentSource
+            Reason           = $null
+            WarningMessage   = $null
+        }
+    }
+
+    if ($candidate.Instant -ge $current.Instant) {
+        return [pscustomobject]@{
+            Status           = 'OK'
+            Code             = $null
+            Message          = $null
+            ExitCode         = 0
+            Regressed        = $false
+            AllowWrite       = $true
+            Mode             = $Mode
+            CurrentRaw       = $CurrentLastUpdate
+            CandidateRaw     = $CandidateLastUpdate
+            CurrentSource    = $CurrentSource
+            Reason           = $null
+            WarningMessage   = $null
+        }
+    }
+
+    $reason = if ($Mode -eq 'newObjectNotImported') {
+        'newObjectNotImported'
+    } elseif ($Mode -eq 'explicitBaseline') {
+        'explicitBaselineBelowCurrent'
+    } else {
+        'selfAgainstNewerDestination'
+    }
+    $msg = "WARN LASTUPDATE_REGRESSED: candidato '$CandidateLastUpdate' < atual '$CurrentLastUpdate' (fonte=$CurrentSource; modo=$Mode)."
+
+    if ($Mode -eq 'self') {
+        return [pscustomobject]@{
+            Status           = 'BLOCKED'
+            Code             = 'LASTUPDATE_REGRESSED'
+            Message          = "LASTUPDATE_REGRESSED: self contra destino mais novo (atual='$CurrentLastUpdate' fonte=$CurrentSource; candidato='$CandidateLastUpdate')."
+            ExitCode         = 37
+            Regressed        = $true
+            AllowWrite       = $false
+            Mode             = $Mode
+            CurrentRaw       = $CurrentLastUpdate
+            CandidateRaw     = $CandidateLastUpdate
+            CurrentSource    = $CurrentSource
+            Reason           = $reason
+            WarningMessage   = $msg
+        }
+    }
+
+    return [pscustomobject]@{
+        Status           = 'OK'
+        Code             = $null
+        Message          = $null
+        ExitCode         = 0
+        Regressed        = $true
+        AllowWrite       = $true
+        Mode             = $Mode
+        CurrentRaw       = $CurrentLastUpdate
+        CandidateRaw     = $CandidateLastUpdate
+        CurrentSource    = $CurrentSource
+        Reason           = $reason
+        WarningMessage   = $msg
+    }
+}
+
+function Resolve-GeneXusLastUpdateBumpMode {
+    param(
+        [switch]$NewObjectNotImported,
+        [string]$BaselineXmlPath,
+        [string]$InputPath
+    )
+
+    if ($NewObjectNotImported.IsPresent) {
+        return 'newObjectNotImported'
+    }
+    if (-not [string]::IsNullOrWhiteSpace($BaselineXmlPath)) {
+        $b = [System.IO.Path]::GetFullPath($BaselineXmlPath)
+        $i = if (-not [string]::IsNullOrWhiteSpace($InputPath)) { [System.IO.Path]::GetFullPath($InputPath) } else { $null }
+        if ([string]::IsNullOrWhiteSpace($i) -or -not [string]::Equals($b, $i, [StringComparison]::OrdinalIgnoreCase)) {
+            return 'explicitBaseline'
+        }
+    }
+    return 'self'
+}
+
 # ---------------------------------------------------------------------------
 # Primitivo e patch indexado
 # ---------------------------------------------------------------------------
@@ -836,12 +1039,44 @@ function Invoke-GeneXusXmlSurgicalEditCore {
     $lastUpdateMutation = $null
     $finalText = $patchedText
 
+    $lastUpdateRegressed = $false
+    $lastUpdateRegressReason = $null
+    $lastUpdateComparisonSource = $null
+    $lastUpdateRegressWarning = $null
+
     if ($willBump) {
         try {
             $lastUpdateAfter = Get-NewGeneXusLastUpdateValueFromEngine -BaselineXmlPath $baselinePathUsed
         } catch {
             return (New-GeneXusXmlSurgicalError -Code 'NO_LASTUPDATE' -Message $_.Exception.Message -ExitCode 12)
         }
+
+        $bumpMode = Resolve-GeneXusLastUpdateBumpMode `
+            -NewObjectNotImported:$NewObjectNotImported.IsPresent `
+            -BaselineXmlPath $baselinePathUsed `
+            -InputPath $resolvedInput
+        $comparisonTarget = Get-GeneXusLastUpdateComparisonTarget `
+            -InputPath $resolvedInput `
+            -OutputPath $resolvedOutput `
+            -InputLastUpdateRaw $lastUpdateBefore
+        $regression = Resolve-GeneXusLastUpdateRegression `
+            -CurrentLastUpdate $comparisonTarget.Raw `
+            -CandidateLastUpdate $lastUpdateAfter `
+            -Mode $bumpMode `
+            -CurrentSource $comparisonTarget.Source
+        $lastUpdateComparisonSource = $comparisonTarget.Source
+        if ($regression.Status -eq 'UNREADABLE' -or $regression.Status -eq 'BLOCKED') {
+            return (New-GeneXusXmlSurgicalError -Code $regression.Code -Message $regression.Message -ExitCode $regression.ExitCode -Details ([pscustomobject]@{
+                    mode            = $regression.Mode
+                    currentRaw      = $regression.CurrentRaw
+                    candidateRaw    = $regression.CandidateRaw
+                    currentSource   = $regression.CurrentSource
+                    reason          = $regression.Reason
+                }))
+        }
+        $lastUpdateRegressed = [bool]$regression.Regressed
+        $lastUpdateRegressReason = $regression.Reason
+        $lastUpdateRegressWarning = $regression.WarningMessage
 
         $valueStart = $f0 + $script:LastUpdateToken.Length
         $valueEnd = $patchedText.IndexOf('"', $valueStart, [System.StringComparison]::Ordinal)
@@ -957,19 +1192,23 @@ function Invoke-GeneXusXmlSurgicalEditCore {
         BytesBefore             = $bytesBefore
         BytesAfter              = $bytesAfter
         BytesDelta              = $bytesDelta
-        LastUpdateBefore        = $lastUpdateBefore
-        LastUpdateAfter         = $lastUpdateAfter
-        PreserveLastUpdate      = [bool]$PreserveLastUpdate.IsPresent
-        NewObjectNotImported    = [bool]$NewObjectNotImported.IsPresent
-        WillBumpLastUpdate      = $willBump
-        LastUpdateBaselinePath  = $baselinePathUsed
-        DetectedEol             = $detectedEol
-        SourceEolMixed          = [bool]$sourceProfile.Mixed
-        ReplacementEolMismatch  = $replacementEolMismatch
-        MutatedIntervals        = (Get-GeneXusMutatedIntervals -AnchorMutations $anchorMutations -LastUpdateMutation $lastUpdateMutation)
-        WellFormed              = $wellFormed
-        WellFormedError         = $wellFormedError
-        ReplacementPreview      = (Get-ReplacementPreview -Text $Replacement)
-        BakPath                 = $bakPath
+        LastUpdateBefore           = $lastUpdateBefore
+        LastUpdateAfter            = $lastUpdateAfter
+        PreserveLastUpdate         = [bool]$PreserveLastUpdate.IsPresent
+        NewObjectNotImported       = [bool]$NewObjectNotImported.IsPresent
+        WillBumpLastUpdate         = $willBump
+        LastUpdateBaselinePath     = $baselinePathUsed
+        LastUpdateRegressed        = $lastUpdateRegressed
+        LastUpdateRegressReason    = $lastUpdateRegressReason
+        LastUpdateComparisonSource = $lastUpdateComparisonSource
+        LastUpdateRegressWarning   = $lastUpdateRegressWarning
+        DetectedEol                = $detectedEol
+        SourceEolMixed             = [bool]$sourceProfile.Mixed
+        ReplacementEolMismatch     = $replacementEolMismatch
+        MutatedIntervals           = (Get-GeneXusMutatedIntervals -AnchorMutations $anchorMutations -LastUpdateMutation $lastUpdateMutation)
+        WellFormed                 = $wellFormed
+        WellFormedError            = $wellFormedError
+        ReplacementPreview         = (Get-ReplacementPreview -Text $Replacement)
+        BakPath                    = $bakPath
     }
 }

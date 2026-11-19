@@ -162,6 +162,28 @@ if ($explicitNewerDryRunText -notmatch 'lastUpdate="2026-03-01T00:00:00.0000000Z
     throw 'DryRun de reconstrucao explicita nao deveria gravar sobre frente mais nova.'
 }
 
+# Regressao frente×copia: frente no futuro forçada a reconstruir a partir do acervo
+$frontRegress = Join-Path $tempRoot 'FrontRegressCopy'
+[void](New-Item -ItemType Directory -Path $frontRegress -Force)
+$regressName = 'procRegressCopy'
+$regressGuid = '66666666-6666-6666-6666-666666666666'
+$regressAcervoXml = New-FixtureObjectXml -Name $regressName -Guid $regressGuid -LastUpdate '2020-01-01T00:00:00.0000000Z'
+$regressFrontXml = New-FixtureObjectXml -Name $regressName -Guid $regressGuid -LastUpdate '2099-01-01T00:00:00.0000000Z'
+[System.IO.File]::WriteAllText((Join-Path $procedureDir "$regressName.xml"), $regressAcervoXml, (Get-Utf8NoBomEncoding))
+$regressFrontPath = Join-Path $frontRegress "$regressName.xml"
+[System.IO.File]::WriteAllText($regressFrontPath, $regressFrontXml, (Get-Utf8NoBomEncoding))
+$regressResult = & $scriptPath -FrontFolder $frontRegress -AcervoFolder $acervo -ObjectList "Procedure:$regressName" | ConvertFrom-Json
+if ($regressResult.status -ne 'pass') {
+    throw "Copia com regressao de lastUpdate deveria retornar pass; obtido $($regressResult.status)"
+}
+$regressWarn = @($regressResult.findings | Where-Object { $_.code -eq 'front-lastupdate-regressed-on-copy' -and $_.objectName -eq $regressName })
+if ($regressWarn.Count -ne 1) {
+    throw "Copia com regressao deveria emitir front-lastupdate-regressed-on-copy; obtido $($regressWarn.Count)"
+}
+if ($regressWarn[0].severity -ne 'warn') {
+    throw 'Finding de regressao no Copy deveria ser warn.'
+}
+
 $missingResult = & $scriptPath -FrontFolder $frontMissing -AcervoFolder $acervo -ObjectNames 'procInexistente' | ConvertFrom-Json
 if ($missingResult.status -ne 'fail') {
     throw "Seed de alvo inexistente deveria retornar fail; obtido $($missingResult.status)"

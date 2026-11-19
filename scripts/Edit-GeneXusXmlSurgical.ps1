@@ -262,6 +262,12 @@ function Write-SurgicalHumanOutput {
         if (-not [string]::IsNullOrWhiteSpace($Result.LastUpdateBaselinePath)) {
             Write-Output ("  baseline               : {0}" -f $Result.LastUpdateBaselinePath)
         }
+        if ($Result.LastUpdateRegressed) {
+            Write-Output ("  lastUpdateRegressed    : true ({0}; fonte={1})" -f $Result.LastUpdateRegressReason, $Result.LastUpdateComparisonSource)
+            if (-not [string]::IsNullOrWhiteSpace($Result.LastUpdateRegressWarning)) {
+                Write-Output $Result.LastUpdateRegressWarning
+            }
+        }
     }
 
     if ($Result.ReplacementEolMismatch -eq $true) {
@@ -304,20 +310,23 @@ function ConvertTo-SurgicalJsonOutput {
         bytesBefore            = $Result.BytesBefore
         bytesAfter             = $Result.BytesAfter
         bytesDelta             = $Result.BytesDelta
-        lastUpdateBefore       = $Result.LastUpdateBefore
-        lastUpdateAfter        = $Result.LastUpdateAfter
-        preserveLastUpdate     = $Result.PreserveLastUpdate
-        newObjectNotImported   = $Result.NewObjectNotImported
-        willBumpLastUpdate     = $Result.WillBumpLastUpdate
-        lastUpdateBaselinePath = $Result.LastUpdateBaselinePath
-        detectedEol            = $Result.DetectedEol
-        sourceEolMixed         = $Result.SourceEolMixed
-        replacementEolMismatch = $Result.ReplacementEolMismatch
-        mutatedIntervals       = $Result.MutatedIntervals
-        wellFormed             = $Result.WellFormed
-        wellFormedError        = $Result.WellFormedError
-        replacementPreview     = $Result.ReplacementPreview
-        bakPath                = $Result.BakPath
+        lastUpdateBefore           = $Result.LastUpdateBefore
+        lastUpdateAfter            = $Result.LastUpdateAfter
+        preserveLastUpdate         = $Result.PreserveLastUpdate
+        newObjectNotImported       = $Result.NewObjectNotImported
+        willBumpLastUpdate         = $Result.WillBumpLastUpdate
+        lastUpdateBaselinePath     = $Result.LastUpdateBaselinePath
+        lastUpdateRegressed        = $Result.LastUpdateRegressed
+        lastUpdateRegressReason    = $Result.LastUpdateRegressReason
+        lastUpdateComparisonSource = $Result.LastUpdateComparisonSource
+        detectedEol                = $Result.DetectedEol
+        sourceEolMixed             = $Result.SourceEolMixed
+        replacementEolMismatch     = $Result.ReplacementEolMismatch
+        mutatedIntervals           = $Result.MutatedIntervals
+        wellFormed                 = $Result.WellFormed
+        wellFormedError            = $Result.WellFormedError
+        replacementPreview         = $Result.ReplacementPreview
+        bakPath                    = $Result.BakPath
     }
 }
 
@@ -371,6 +380,10 @@ try {
     }
 
     if ($AsJson) {
+        if ($coreResult.Status -eq 'OK' -and $coreResult.LastUpdateRegressed -and
+            -not [string]::IsNullOrWhiteSpace($coreResult.LastUpdateRegressWarning)) {
+            Write-Warning $coreResult.LastUpdateRegressWarning
+        }
         ConvertTo-SurgicalJsonOutput -Result $coreResult | ConvertTo-Json -Depth 6 -Compress
     } else {
         Write-SurgicalHumanOutput -Result $coreResult
