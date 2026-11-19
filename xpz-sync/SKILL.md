@@ -266,6 +266,7 @@ Os wrappers seguem esta convenção de parâmetros:
       escopo comparativo, tratar como bloqueio real do sync
 14. Se a materialização XPZ/XML em `ObjetosDaKbEmXml` foi concluída com sucesso e não era `VerifyOnly`, confirmar na saída do wrapper ou em evidência local clara que o refresh compulsório do índice derivado também foi executado
     - se o rebuild falhar com `PREREQUISITO AUSENTE` / exit `8` do motor Python, declarar **fluxo incompleto** (XMLs possivelmente atualizados, índice pendente); não fechar como sync OK nem como defeito do XPZ
+    - se o rebuild falhar com `SOURCE_MASK_BLOCKED` / exit `9` (máscara de `Source`), declarar **fluxo incompleto** (XMLs possivelmente atualizados, índice pendente); corrigir o bloco `<arquivo>:<linha>:<motivo>` indicado ou usar `-AllowMaskDegraded` conscientemente; índice degradado (`source_mask_degraded=true`, blocos em `source_mask_degraded_blocks` no `index-metadata`) vale como cobertura parcial, não como índice completo
     - em pasta que adota `KbIntelligence`, ausência de evidência do refresh deve ser tratada como falha ou defasagem operacional do wrapper local
     - não compensar essa ausência com rebuild manual separado do índice como se fosse fluxo normal
     - se o wrapper não produzir evidência suficiente do refresh, encerrar com bloqueio de compatibilidade e oferecer atualização via `xpz-kb-parallel-setup`
