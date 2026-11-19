@@ -1892,3 +1892,71 @@ MovimentoEmpresaId = &sdtRegistroParametros.EmpresaId when not &sdtRegistroParam
   </Properties>
 </Object>
 ```
+
+### Molde sanitizado de File 3 - `ArquivoModeloPlanilhaExemplo_xlsx`
+
+- Perfil: `File` com modelo `.xlsx` pequeno (duas abas), com formatos de data e moeda, coluna default para o caso misto e extração em `ModelosDePlanilhas`.
+- Uso operacional: referência estrutural e de conteúdo para `File` usado como template de `ExcelDocument`; o corpo é uma planilha sanitizada, não um asset binário/textual.
+- Cobertura: forma do XML (2 Parts, `base64Binary`, `FileName`/`FileExtension`/`IsDefault`, `NetExtract*`); duas abas; data `dd/mm/yyyy`; moeda `[$R$-416]`; coluna default; sem `numFmt` "General" customizado.
+- Limite: o corpo é pequeno e genérico; não representa todos os layouts de relatório. Para um template real, partir do `.xlsx` da KB e aplicar a forma.
+- Sanitização: nome, GUID, descrição e corpo são de exemplo; não há dado de cliente.
+- Hash do corpo: SHA-256 `F1CD1E41A3FA3C96CB7DED2C7F455652D02ABC72E6BBA123D156CD02C3B2BA0A`.
+- Metadados editoriais: o `checksum` do objeto é placeholder de molde e o `lastUpdate` é data editorial; não são carimbo mecânico de importação.
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<Object parentGuid="afa47377-41d5-4ae8-9755-6f53150aa361" user="SANITIZED\\USER" versionDate="0001-01-01T00:00:00.0000000" lastUpdate="2026-11-18T00:00:00.0000000Z" checksum="d41d8cd98f00b204e9800998ecf8427e" fullyQualifiedName="ArquivoModeloPlanilhaExemplo_xlsx" moduleGuid="afa47377-41d5-4ae8-9755-6f53150aa361" guid="c1a7e2b4-9d3f-4e6a-8b2c-5f1d0a7e9b3c" name="ArquivoModeloPlanilhaExemplo_xlsx" type="1132ac08-290f-4fd1-bd18-64777b7329d1" description="Modelo de planilha exemplo">
+  <Part type="9b6155f9-f286-4ed5-bd15-67672e8ea320">
+    <Data>
+      <base64Binary>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</base64Binary>
+    </Data>
+    <Properties>
+      <Property>
+        <Name>FileName</Name>
+        <Value>ArquivoModeloPlanilhaExemplo.xlsx</Value>
+      </Property>
+      <Property>
+        <Name>FileExtension</Name>
+        <Value>.xlsx</Value>
+      </Property>
+      <Property>
+        <Name>IsDefault</Name>
+        <Value>False</Value>
+      </Property>
+    </Properties>
+  </Part>
+  <Part type="babf62c5-0111-49e9-a1c3-cc004d90900a">
+    <Properties />
+  </Part>
+  <Properties>
+    <Property>
+      <Name>Name</Name>
+      <Value>ArquivoModeloPlanilhaExemplo_xlsx</Value>
+    </Property>
+    <Property>
+      <Name>Description</Name>
+      <Value>Modelo de planilha exemplo</Value>
+    </Property>
+    <Property>
+      <Name>NetExtract</Name>
+      <Value>True</Value>
+    </Property>
+    <Property>
+      <Name>NetExtractFolder</Name>
+      <Value>ModelosDePlanilhas</Value>
+    </Property>
+    <Property>
+      <Name>NetCoreExtract</Name>
+      <Value>True</Value>
+    </Property>
+    <Property>
+      <Name>NetCoreExtractFolder</Name>
+      <Value>ModelosDePlanilhas</Value>
+    </Property>
+    <Property>
+      <Name>IsDefault</Name>
+      <Value>False</Value>
+    </Property>
+  </Properties>
+</Object>
+```

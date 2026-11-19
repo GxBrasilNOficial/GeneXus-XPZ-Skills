@@ -2553,6 +2553,7 @@ Funcionar como resumo decisório sem esconder os limites da evidência.
 - `Regra operacional`: a confirmacao funcional exige teste com o insumo oficial na versão correta e no formato esperado pelo objeto; esse teste e responsabilidade da frente funcional, não da trilha de import.
 - `Regra operacional`: essa camada complementa os sub-estados já definidos na skill `xpz-msbuild-import-export` — em particular `importacao real efetiva provada` — com consciencia explicita do insumo externo como dimensao de validação separada.
 - `Regra operacional`: ausencia de teste funcional com insumo real não invalida o sub-estado de import já declarado; são camadas independentes.
+- `Regra operacional`: para `File` que carrega modelo `.xlsx` usado como template de `ExcelDocument`, o formato numérico vem só do template (`ExcelDocument` não expõe `NumberFormat`); neste consumidor o runtime aplica o formato por tipo de escrita apenas quando a célula está no estilo default — coluna mista fica default, e root de `xl/worksheets/sheet*.xml` deve usar namespace default (sem prefixo). Detalhe e checklist: `xpz-builder/responsibilities-by-type/file.md`.
 
 ## Limite do XPZ/XML frente a providers e extensoes GeneXus
 

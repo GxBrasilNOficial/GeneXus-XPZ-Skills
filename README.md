@@ -74,7 +74,7 @@ Guia operacional e metodologico da trilha KB Intelligence. Contratos de fases en
 ### Skills para agentes
 
 - `xpz-reader`: apoio à leitura e interpretação estrutural de `XPZ` e XMLs relacionados
-- `xpz-builder`: apoio à materialização controlada de artefatos e envelopes `XPZ`
+- `xpz-builder`: apoio à materialização controlada de artefatos e envelopes `XPZ`; inclui o satélite `file.md` para `File` com `.xlsx` usado como template de `ExcelDocument` (namespace default, coluna mista default, sem `numFmt` "General" customizado)
 - `xpz-sync`: orquestração de sincronização e conferência do acervo XML a partir de parâmetros explícitos e scripts em `scripts/`
 - `xpz-daemon`: instalação e gerenciamento de um monitor persistente que observa pastas de XPZ e dispara sincronização automaticamente ao detectar novos arquivos
 - `xpz-doc-builder`: geração e recomposição de documentação Markdown a partir do acervo XML e de moldes sanitizados
@@ -339,7 +339,7 @@ Guía operacional y metodológica de la trilha KB Intelligence. Los contratos de
 ### Skills para agentes
 
 - `xpz-reader`: apoyo a la lectura e interpretación estructural de `XPZ` y XMLs relacionados
-- `xpz-builder`: apoyo a la materialización controlada de artefactos y envelopes `XPZ`
+- `xpz-builder`: apoyo a la materialización controlada de artefactos y envelopes `XPZ`; incluye el satélite `file.md` para `File` con `.xlsx` usado como plantilla de `ExcelDocument` (espacio de nombres por defecto, columna mixta por defecto, sin `numFmt` "General" personalizado)
 - `xpz-sync`: orquestación de sincronización y verificación del acervo XML a partir de parámetros explícitos y scripts en `scripts/`
 - `xpz-daemon`: instalación y gestión de un monitor persistente que observa carpetas de XPZ y dispara sincronización automáticamente al detectar nuevos archivos
 - `xpz-doc-builder`: generación y recomposición de documentación Markdown a partir del acervo XML y de moldes sanitizados
@@ -604,7 +604,7 @@ Operational and methodological guide for the KB Intelligence workstream. Closed 
 ### Skills for agents
 
 - `xpz-reader`: support for reading and structural interpretation of `XPZ` and related XMLs
-- `xpz-builder`: support for controlled materialization of `XPZ` artifacts and envelopes
+- `xpz-builder`: support for controlled materialization of `XPZ` artifacts and envelopes; includes the `file.md` satellite for `File` carrying an `.xlsx` used as an `ExcelDocument` template (default namespace, mixed column at default, no custom `numFmt` "General")
 - `xpz-sync`: orchestration of synchronization and verification of the XML archive from explicit parameters and scripts in `scripts/`
 - `xpz-daemon`: installation and management of a persistent monitor that watches XPZ folders and automatically triggers synchronization when new files are detected
 - `xpz-doc-builder`: generation and recomposition of Markdown documentation from the XML archive and sanitized templates

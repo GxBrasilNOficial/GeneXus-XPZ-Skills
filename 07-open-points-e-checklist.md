@@ -151,6 +151,7 @@ Orientar futuras coletas de templates comparáveis.
 - Exportar pelo menos 1 template adicional de Domain com necessidade baixa, preferindo um caso escalar e outro enumerado mais rico.
 - Exportar pelo menos 1 template adicional de ExternalObject com necessidade media, preferindo um caso nativo simples e outro com varios métodos externos.
 - Exportar pelo menos 1 template adicional de File com necessidade media, preferindo um asset binario pequeno e outro arquivo textual/configuracional.
+- Nota: o perfil `.xlsx` de `File` (template de `ExcelDocument`) está coberto pelo molde `ArquivoModeloPlanilhaExemplo_xlsx` em `01h`; este ponto aberto continua valendo para o par binário pequeno + textual/configuracional, que o molde `.xlsx` não fecha.
 - Exportar pelo menos 1 template adicional de Folder com necessidade baixa, preferindo uma pasta simples e outra com propriedades de arvore/consulta.
 - Exportar pelo menos 1 template adicional de Generator com necessidade baixa, preferindo um caso default e outro com `DefaultType` diferente.
 - Exportar pelo menos 1 template adicional de Language com necessidade media, preferindo um idioma curto e outro com mais chaves de traducao.

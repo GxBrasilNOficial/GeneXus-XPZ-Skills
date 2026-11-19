@@ -63,6 +63,8 @@ The checklist below is the consolidated end-to-end verification for any packagin
 - [ ] Root type of every active XML was classified before package serialization
 - [ ] No top-level `Attribute` was placed under `<Objects>`
 - [ ] For each object type present in the batch, the corresponding satellite under `responsibilities-by-type/` was loaded and its Quality Checklist was satisfied end-to-end
+- [ ] If the batch contains a `File` with `.xlsx` (or a `Procedure` whose `Source` uses `ExcelDocument.Template`), `responsibilities-by-type/file.md` was loaded and its `.xlsx` section was applied end-to-end (column/type map, effective number-format resolution, namespace, custom `numFmt`/`xf`, final body); every column ended `ok` or `inconclusive`, with the pending validation declared
+- [ ] For every `File` with `.xlsx`: the final body was re-extracted from the front XML and from the package and compared (bytes/hash) before inspecting the ZIP/XML; the origin, hash/size and what counts as proof were recorded; the custom `numFmt` "General" and the mixed-column rule were checked by use, not by presence in `styles.xml`
 - [ ] For PostgreSQL/.NET targets, new or modified `For each` code that instantiates BCs was reviewed against the shared [BC-construction precaution](SKILL.md#bc-construction-inside-for-each--postgresqlnet-precaution), including changes that remove visible database access. This was a manual review; 9-BC does not validate cursor behavior.
 - [ ] When an `API` or `Procedure` returns an SDT collection, the cross-type `AttCollection=True` rule in `SKILL.md` and the type-specific checklists in `api.md`/`procedure.md` were both satisfied; this checklist does not replace those satellites
 - [ ] UTF-8 BOM hygiene was checked on every active XML
