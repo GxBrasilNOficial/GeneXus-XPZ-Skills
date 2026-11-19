@@ -49,6 +49,11 @@ The goal is the **number format applied to the cells the writer will fill**, not
 - Pin the rule to the **consumer/generator version and the verification reader** (which reader is used to check). Require a minimal fixture before promoting the rule: prefixed template → generated output → inspect the `sheetData/row/c` namespace. If the runtime changes, revalidate.
 - Re-run this check on the final embedded body, not on an intermediate `.xlsx`.
 
+### Widths and column ranges
+
+- For OOXML widths, check the `<col min="..." max="...">` ranges: a per-column query in `openpyxl.column_dimensions` may return a default for columns covered by a grouped entry. Read the `min`/`max`/`width` attributes from the ZIP for the actual range; do not treat the per-column default as the effective width.
+- The `[$R$-416]...` currency literal and the PowerShell hazard are covered in "Custom formats and styles" below.
+
 ### Custom formats and styles
 
 - Do not create a custom `numFmt`/`xf` by default; the default is the contract. Do not remove an existing format that is part of the contract (date, currency, percentage, `#,##0.00`, `0`).

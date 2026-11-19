@@ -117,7 +117,7 @@ O `$R$` é sintaxe do Excel (código de moeda + LCID 416 = pt-BR), **não** vari
 
 **Ideia (não implementar nesta frente).** Uma ou mais:
 1. Helper compartilhado (ex. `Set-GeneXusExcelTemplateCurrencyFormat.ps1` / Python) que grava o formato Real canônico sem passar por expansão PS.
-2. Nota documental: incorporada em `xpz-builder/responsibilities-by-type/procedure.md`.
+2. Nota documental: incorporada em `xpz-builder/responsibilities-by-type/file.md` (o `procedure.md` aponta para o satélite).
 3. Self-test que falhe se um artefato de exemplo ou fixture perder o substring `[$R$-416]` após round-trip de patch.
 
 **Fora de escopo agora.** Convenção de produto na KB FabricaBrasil (`DECISOES-ARQUITETURA-DA-KB.md`: formato canônico + AutoFit/template); este gap é da **trilha de edição/patch** nas skills.
@@ -145,7 +145,7 @@ O `$R$` é sintaxe do Excel (código de moeda + LCID 416 = pt-BR), **não** vari
 
 **Ideia (não implementar nesta frente).** Uma ou mais:
 1. Helper compartilhado que devolva mapa coluna→largura expandindo cada `<col min max>` (PowerShell/`System.IO.Compression` ou Python sem confiar só em `column_dimensions`).
-2. Nota documental: incorporada em `xpz-builder/responsibilities-by-type/procedure.md`.
+2. Nota documental: incorporada em `xpz-builder/responsibilities-by-type/file.md` (o `procedure.md` aponta para o satélite).
 3. Self-test com fixture cujo `sheet1.xml` tenha `min != max` e assert de que o helper expande todas as colunas do intervalo.
 
 **Fora de escopo agora.** Decisão de KB “respeitar AJUSTADO do usuário” fica no `DECISOES` da FabricaBrasil; aqui só a armadilha de **leitura/validação** na trilha XPZ.
