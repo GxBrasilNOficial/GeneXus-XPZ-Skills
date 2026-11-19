@@ -69,10 +69,11 @@ The goal is the **number format applied to the cells the writer will fill**, not
 ## Quality Checklist
 
 - [ ] For every `File` in the batch: the generic part above was read; the body was extracted from the final front XML (one `base64Binary`, two Parts) and the shape was confirmed.
-- [ ] For every `File` with `.xlsx` (or `Procedure` with `ExcelDocument.Template`): the column/type map, the band classification and the effective number-format resolution were run per column; every column ended `ok` or `inconclusive`, with the pending validation declared.
+- [ ] For every `File` with `.xlsx` (or `Procedure` with `ExcelDocument.Template`): the column/type map, the band classification and the effective number-format resolution were run per column, on the body from the batch/package or, when the `File` is only a dependency, from the acervo; every column ended `ok` or `inconclusive`, with the pending validation declared.
 - [ ] No custom `numFmt`/`xf` was introduced without an explicit user request and a verification record; existing contract formats (date, currency, percentage, `0`, `#,##0.00`) were preserved.
 - [ ] The worksheet roots use the default namespace (no prefix) on the final body; the consumer/generator version and the verification reader were recorded.
-- [ ] The final body was re-extracted from the front and from the package and compared (bytes/hash); the origin, hash/size and what counts as proof were recorded.
+- [ ] For a `File` in the batch/package: the final body was re-extracted from the front XML and from the package and compared (bytes/hash); the origin, hash/size and what counts as proof were recorded; `ABORT` if that was not done.
+- [ ] For a `File` `.xlsx` that is only a dependency (not in the batch/package, referenced by a `Procedure` with `ExcelDocument.Template`): the body was read from the acervo, the `.xlsx` checks were run on it, and the `File` was declared as an unchanged dependency with its acervo path/GUID/lastUpdate; no front×package comparison was claimed.
 - [ ] `MATCH`/inventory was not treated as proof of content or cell format.
 
 ## Related references
