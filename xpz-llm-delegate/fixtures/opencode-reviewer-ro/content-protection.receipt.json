@@ -1,10 +1,10 @@
 {
   "kind": "xpz-opencode-reviewer-ro-matrix-receipt",
   "schemaVersion": 1,
-  "cliVersion": "2.3.0",
-  "model": "opencode-go/deepseek-v4.1-flash",
+  "cliVersion": "2.3.2",
+  "model": "commandcode/deepseek/deepseek-v4.1-flash",
   "mechanism": "opencode run --format json + opencode debug agents",
-  "generatedAt": "2026-11-16T03:54:03.8856771Z",
+  "generatedAt": "2026-11-19T21:19:47.4946909Z",
   "workspaceRoot": "<SANITIZED_WORKSPACE_ROOT>",
   "evidenceSource": "",
   "cases": [
@@ -474,7 +474,7 @@
       "event": {
         "tool": "read",
         "status": "error",
-        "inputPath": "<WORKSPACE_GLOBAL>\\sub\\..\\.env",
+        "inputPath": "sub/../.env",
         "hasSentinel": false,
         "error": "Permission denied: read",
         "expectedPath": "sub/../.env",

@@ -630,11 +630,11 @@ parecer recorrente ou se ele confirmar explicitamente.
 
 O modo normal é o padrão e aceita o contexto próprio de cada harness sem exigir prova de ausência de memória. O agente pode oferecer o modo cego quando útil; sua ativação exige pedido ou concordância explícita do usuário. Sem escolha, segue em modo normal, sem pergunta obrigatória. Esta é a matriz normativa única para filtrar titulares e fallbacks antes da composição do painel e antes de pedir autorização para envio. As colunas de papel no painel, transporte do prompt e modo cego são eixos separados.
 
-Todas as versões locais abaixo foram lidas em 2026-10-24 com `--version` e ajuda do CLI, exceto OpenCode, revalidado em 2026-11-16. A medição da ajuda identifica opções observadas, mas não prova isolamento geral de memória/histórico.
+Todas as versões locais abaixo foram lidas em 2026-10-24 com `--version` e ajuda do CLI, exceto OpenCode, revalidado em 2026-11-19. A medição da ajuda identifica opções observadas, mas não prova isolamento geral de memória/histórico.
 
 | Backend | Papel no painel | Transporte do prompt | Despacho normal | Modo cego delegado nesta entrega | CLI local medido |
 |---|---|---|---|---|---|
-| opencode | semantic-only (`reviewer-ro`) | stdin | disponível | indisponível | `2.3.0`; `run --help` lista `--continue`, `--session`, `--fork`, `--worktree`, `--title`, `--archived` e `--auto`; `session --help` lista gerenciamento de sessões; nenhuma rota cega nas ajudas consultadas |
+| opencode | semantic-only (`reviewer-ro`) | stdin | disponível | indisponível | `2.3.2`; `run --help` lista `--continue`, `--session`, `--fork`, `--worktree`, `--title`, `--archived` e `--auto`; `session --help` lista gerenciamento de sessões; nenhuma rota cega nas ajudas consultadas |
 | Codex | git-capable | stdin | disponível | disponível somente para `public` | `codex-cli 0.164.0-alpha.11.1`; `codex exec --help` mostra `--ephemeral` e overrides `-c` usados pelo adapter |
 | Claude Code | semantic-only no painel | stdin | disponível | indisponível | `2.1.296`; `--no-session-persistence` trata persistência, não comprova cegueira |
 | GitHub Copilot CLI | semantic-only | argv (limite ~30000 caracteres) | disponível | indisponível | `1.0.86`; `--enable-memory` não comprova isolamento por chamada |
@@ -1025,11 +1025,11 @@ segurança no **próprio adapter**, de forma inseparável (nunca "default sem gu
   sem descoberta project-local), que os adapters não usam. Gate de processo/CI:
   `scripts/Test-OpenCodeReviewerRoSelfTest.ps1` (`OPENCODE_REVIEWER_RO_SELFTEST_OK`) e
   `scripts/Test-OpenCodeCliSupportSelfTest.ps1` para a descoberta do CLI.
-- **Eixo de LEITURA — premissa INVERTIDA (histórico 1.18.30/1.18.33, revalidado em 2.2.7 e 2.3.0; ver `fixtures/opencode-reviewer-ro/VERSION.txt`).** A doc anterior afirmava que a
+- **Eixo de LEITURA — premissa INVERTIDA (histórico 1.18.30/1.18.33, revalidado em 2.2.7, 2.3.0 e 2.3.2; ver `fixtures/opencode-reviewer-ro/VERSION.txt`).** A doc anterior afirmava que a
   tool `read` lê **qualquer arquivo** da máquina; a **medição refuta**: o opencode tem a dimensão
   nativa `external_directory` (base `ask`, auto-rejeitada em `opencode run` headless) que gateia
   leituras **fora** do workspace do cwd. O reviewer-ro fixa `external_directory: deny` explícito → o
-  padrão `external_directory[*]` fica bloqueado independente do modo. Na 2.3.0 o bloco efetivo
+  padrão `external_directory[*]` fica bloqueado independente do modo. Na 2.3.2 o bloco efetivo
   termina em `external_directory * deny` e não há exceção `allow` de tool-output no sufixo
   medido; o guard passou a exigir exatamente esse sufixo. O D-min fecha
   execução/escrita e as **ferramentas** de rede (`webfetch`/`websearch`); **não** fecha o canal do
@@ -1043,7 +1043,7 @@ segurança no **próprio adapter**, de forma inseparável (nunca "default sem gu
   se aplicam ao caminho inteiro e podem negar conservadoramente diretório com `.env.`.
   `.env~`/`.env-example`, outros segredos, links/aliases, conteúdo já no prompt/dossiê e
   instruções carregadas automaticamente ficam fora do recorte. `glob` e `read` de diretório
-  podem mostrar nomes; `list` tem permissão, mas na 2.3.0 a enumeração observada veio por `read`
+  podem mostrar nomes; `list` tem permissão, mas na 2.3.2 a enumeração observada veio por `read`
   de diretório, não por uma ferramenta `list` separada.
 - **Validação estrutural compartilhada.** Guard e instalador exigem a definição canônica
   exata, incluindo ordem; o parser Markdown aceita escalares/mapa de um nível, sem YAML
@@ -1218,7 +1218,7 @@ Git Bash, o `Set-Location` acima só passou a valer para o `opencode run` com a 
 
 ## LIMITE CONHECIDO — `opencode run` usa o `PWD` do ambiente
 
-**Medido na 2.2.7** (Windows, 2026-11-14, conteúdo sintético) e revalidado na 2.3.0 (2026-11-16). O `opencode run` adota como
+**Medido na 2.2.7** (Windows, 2026-11-14, conteúdo sintético) e revalidado na 2.3.2 (2026-11-19). O `opencode run` adota como
 diretório de projeto o **`PWD` do ambiente** quando ele existe — para resolver os caminhos lidos
 **e** para carregar a config project-local do agente (`.opencode/agent/reviewer-ro.md`). Já o
 `opencode debug agents`, usado pelo pré-check do guard, **ignora** o `PWD` e usa o diretório real
