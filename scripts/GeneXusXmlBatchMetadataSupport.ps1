@@ -3046,6 +3046,34 @@ function Invoke-GeneXusXmlBatchMetadataCore {
                 }
             }
 
+            # Aviso de regressao tambem na fase de plano (sem -Apply), para o
+            # operador ver lastUpdateRegressed antes de materializar.
+            if ($baseline.Status -eq 'NO_BASELINE') {
+                $planCandidate = [DateTime]::UtcNow.AddSeconds($FreshnessMarginSeconds).ToString(
+                    "yyyy-MM-dd'T'HH:mm:ss'.0000000Z'",
+                    [System.Globalization.CultureInfo]::InvariantCulture)
+                $frontStamp = [string]$rootAttributes['lastUpdate']
+                $planRegression = Resolve-GeneXusLastUpdateRegression `
+                    -CurrentLastUpdate $frontStamp `
+                    -CandidateLastUpdate $planCandidate `
+                    -Mode 'newObjectNotImported' `
+                    -CurrentSource 'input'
+                if ($planRegression.Status -eq 'UNREADABLE') {
+                    [void]$blocks.Add((New-GeneXusBatchBlock -Code $planRegression.Code -Message $planRegression.Message -OpId $first.Id -Path $relativePath))
+                    continue
+                }
+                if ($planRegression.Regressed) {
+                    [void]$warnings.Add((New-GeneXusBatchWarning -Kind 'lastUpdateRegressed' -Message $planRegression.WarningMessage -OpId $first.Id -Path $relativePath -Detail ([ordered]@{
+                                before  = $planRegression.CurrentRaw
+                                after   = $planRegression.CandidateRaw
+                                reason  = $planRegression.Reason
+                                mode    = $planRegression.Mode
+                                source  = $planRegression.CurrentSource
+                                phase   = 'plan'
+                            })))
+                }
+            }
+
             $wellFormed = Test-GeneXusXmlWellFormed -Text $text
             if (-not $wellFormed.WellFormed) {
                 [void]$blocks.Add((New-GeneXusBatchBlock -Code 'IDENTITY_MISMATCH' -Message "texto planejado nao e XML bem formado: $($wellFormed.ErrorMessage)" -OpId $first.Id -Path $relativePath))
@@ -3168,27 +3196,8 @@ function Invoke-GeneXusXmlBatchMetadataCore {
                 }
             }
 
-            if ($plan.Baseline.Status -eq 'NO_BASELINE') {
-                $frontStamp = [string]$plan.RootAttributes['lastUpdate']
-                $regression = Resolve-GeneXusLastUpdateRegression `
-                    -CurrentLastUpdate $frontStamp `
-                    -CandidateLastUpdate $lastUpdateValue `
-                    -Mode 'newObjectNotImported' `
-                    -CurrentSource 'input'
-                if ($regression.Status -eq 'UNREADABLE') {
-                    [void]$blocks.Add((New-GeneXusBatchBlock -Code $regression.Code -Message $regression.Message -Path $plan.RelativePath))
-                    continue
-                }
-                if ($regression.Regressed) {
-                    [void]$warnings.Add((New-GeneXusBatchWarning -Kind 'lastUpdateRegressed' -Message $regression.WarningMessage -OpId $plan.Operations[0].Id -Path $plan.RelativePath -Detail ([ordered]@{
-                                before  = $regression.CurrentRaw
-                                after   = $regression.CandidateRaw
-                                reason  = $regression.Reason
-                                mode    = $regression.Mode
-                                source  = $regression.CurrentSource
-                            })))
-                }
-            }
+            # lastUpdateRegressed para NO_BASELINE ja foi avaliado na fase de
+            # plano (mesmo ciclo), para avisar sem -Apply e evitar duplicar warning.
 
             $finalScopes = Get-GeneXusXmlObjectScopes -Text $plan.PlannedText
             $bump = Invoke-GeneXusLastUpdateBump -Text $plan.PlannedText -Scopes $finalScopes -NewValue $lastUpdateValue `

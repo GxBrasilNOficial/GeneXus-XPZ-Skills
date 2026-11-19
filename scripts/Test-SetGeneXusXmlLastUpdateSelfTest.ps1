@@ -140,6 +140,27 @@ if ((Get-StampUtc $after6) -ge (Get-StampUtc $highStamp)) { throw 'Caso 6: dever
 # stdout AsJson deve permanecer JSON valido (uma linha)
 $null = [System.Text.Json.JsonDocument]::Parse([string]$raw6)
 
+# Caso 6b: processo filho (pwsh -File) — stdout puro JSON; aviso so no stderr
+$f6b = Join-Path $tempRoot 'obj6b.xml'
+[System.IO.File]::WriteAllText($f6b, (New-FixtureObjectXml -Name $objName -Guid $objGuid -LastUpdate $highStamp), $utf8)
+$out6b = Join-Path $tempRoot 'obj6b.stdout.txt'
+$err6b = Join-Path $tempRoot 'obj6b.stderr.txt'
+$p6b = Start-Process -FilePath (Get-Process -Id $PID).Path `
+    -ArgumentList @('-NoProfile', '-File', $scriptPath, '-InputPath', $f6b, '-NewObjectNotImported', '-AsJson') `
+    -NoNewWindow -Wait -PassThru `
+    -RedirectStandardOutput $out6b `
+    -RedirectStandardError $err6b
+if ($p6b.ExitCode -ne 0) { throw "Caso 6b: exit 0 esperado; obtido $($p6b.ExitCode)." }
+$stdout6b = [System.IO.File]::ReadAllText($out6b)
+$stderr6b = [System.IO.File]::ReadAllText($err6b)
+if ($stdout6b -match '(?i)AVISO:|WARN ') { throw 'Caso 6b: stdout nao deve conter aviso.' }
+$null = [System.Text.Json.JsonDocument]::Parse($stdout6b.Trim())
+$r6b = $stdout6b | ConvertFrom-Json
+if (-not $r6b.lastUpdateRegressed) { throw 'Caso 6b: lastUpdateRegressed no JSON esperado.' }
+if ($stderr6b -notmatch 'LASTUPDATE_REGRESSED|lastUpdateRegressed|candidato') {
+    throw 'Caso 6b: stderr deveria carregar o aviso de regressao.'
+}
+
 # Caso 7: baseline explicito antigo + frente futura -> grava com rastro
 $f7 = Join-Path $tempRoot 'obj7.xml'
 $base7 = Join-Path $tempRoot 'base7.xml'

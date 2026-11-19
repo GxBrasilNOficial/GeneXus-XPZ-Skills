@@ -35,6 +35,7 @@
       32 PAYLOAD_SOURCE_MISSING         33 PAYLOAD_SOURCE_CONFLICT
       34 PAYLOAD_PATH_INVALID           35 PAYLOAD_READ_FAILED
       36 PAYLOAD_ENCODING_INVALID
+      37 LASTUPDATE_REGRESSED           38 LASTUPDATE_UNREADABLE
 
     Exatamente uma origem por conteúdo: Anchor ou AnchorPath; Replacement ou
     ReplacementPath. Omissões agora geram erro estruturado (32), não do binder.
@@ -382,7 +383,7 @@ try {
     if ($AsJson) {
         if ($coreResult.Status -eq 'OK' -and $coreResult.LastUpdateRegressed -and
             -not [string]::IsNullOrWhiteSpace($coreResult.LastUpdateRegressWarning)) {
-            Write-Warning $coreResult.LastUpdateRegressWarning
+            Write-GeneXusStderrLine -Message $coreResult.LastUpdateRegressWarning
         }
         ConvertTo-SurgicalJsonOutput -Result $coreResult | ConvertTo-Json -Depth 6 -Compress
     } else {

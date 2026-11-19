@@ -516,6 +516,31 @@ try {
     Assert-BlockCode -Case 'Caso 6b' -Report $result.Report -Expected 'NEW_OBJECT_LASTUPDATE_TOO_FAR_FUTURE'
 
     # ----------------------------------------------------------------------
+    # Caso 6c - NewObjectsNotImported: plano (sem -Apply) emite lastUpdateRegressed
+    # ----------------------------------------------------------------------
+    $sandbox = New-Sandbox -Name 'caso06c'
+    $guid = '66666666-6666-6666-6666-6666666666c1'
+    $alto = '2099-06-01T00:00:00.0000000Z'
+    Write-TextFile -Path (Join-Path $sandbox.Front 'SDT\SdtNovoRegress.xml') -Text (New-ObjectXmlText -Name 'SdtNovoRegress' -Guid $guid -TypeGuid $sdtTypeGuid -LastUpdate $alto)
+    $manifestPath = Join-Path $sandbox.Root 'manifesto.json'
+    Write-Manifest -Path $manifestPath -Operations @(
+        (New-DocumentationOperation -Id 'op-novo-regress' -Guid $guid -Name 'SdtNovoRegress' -XmlPath 'SDT/SdtNovoRegress.xml' -ObjectState 'new')
+    )
+    $result = Invoke-Engine -ManifestPath $manifestPath -FrontFolder $sandbox.Front -ExtraArguments @('-NewObjectsNotImported')
+    if ($result.Report.status -ne 'planned') {
+        throw "Caso 6c: status planned esperado; obtido '$($result.Report.status)' [$((Get-BlockCodes -Report $result.Report) -join ', ')]."
+    }
+    $warnKinds = @(@($result.Report.warnings) | ForEach-Object { $_.kind })
+    if ($warnKinds -notcontains 'lastUpdateRegressed') {
+        throw "Caso 6c: warning lastUpdateRegressed esperado no plano; obtidos [$($warnKinds -join ', ')]."
+    }
+    $path6c = Join-Path $sandbox.Front 'SDT\SdtNovoRegress.xml'
+    $text6c = [System.IO.File]::ReadAllText($path6c)
+    if ($text6c -notmatch [regex]::Escape('lastUpdate="' + $alto + '"')) {
+        throw 'Caso 6c: plano nao deveria alterar lastUpdate no disco.'
+    }
+
+    # ----------------------------------------------------------------------
     # Caso 7 - scanner de referencias a Domain
     # ----------------------------------------------------------------------
     $sandbox = New-Sandbox -Name 'caso07'

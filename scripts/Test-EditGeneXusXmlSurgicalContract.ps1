@@ -583,6 +583,33 @@ try {
         }
     }
 
+    # ==== 34b) lastUpdateRegressed / 37 / 38 ==================================
+    $script:cases++
+    $highStamp = '2099-06-01T00:00:00.0000000Z'
+    $oldStamp = '2020-01-01T00:00:00.0000000Z'
+    $fReg = Join-Path $tempRoot 'regress-in.xml'
+    $fRegOut = Join-Path $tempRoot 'regress-out.xml'
+    [void](Write-Fixture -Path $fReg -Text (New-Xml -Body $loneBody -LastUpdate $highStamp) -Encoding $utf8)
+    $r = Invoke-Surgical @{ InputPath = $fReg; Anchor = $anchor; Replacement = 'Q'; EditMode = 'Replace'; NewObjectNotImported = $true; DryRun = $true }
+    Assert-Eq 0 $r.ExitCode 'regress DryRun exit'
+    Assert-Eq 'OK' $r.Json.status 'regress DryRun status'
+    Assert-True ([bool]$r.Json.lastUpdateRegressed) 'regress DryRun marca lastUpdateRegressed'
+    Assert-Eq $highStamp ([regex]::Match([System.IO.File]::ReadAllText($fReg), 'lastUpdate="([^"]+)"').Groups[1].Value) 'regress DryRun nao grava'
+
+    [void](Write-Fixture -Path $fReg -Text (New-Xml -Body $loneBody -LastUpdate $oldStamp) -Encoding $utf8)
+    [void](Write-Fixture -Path $fRegOut -Text (New-Xml -Body $loneBody -LastUpdate $highStamp) -Encoding $utf8)
+    $beforeOut = [System.IO.File]::ReadAllText($fRegOut)
+    $r = Invoke-Surgical @{ InputPath = $fReg; OutputPath = $fRegOut; Anchor = $anchor; Replacement = 'Q'; EditMode = 'Replace' }
+    Assert-Eq 37 $r.ExitCode 'self OutputPath mais novo = 37'
+    Assert-Eq 'LASTUPDATE_REGRESSED' $r.Json.code 'code LASTUPDATE_REGRESSED'
+    Assert-Eq $beforeOut ([System.IO.File]::ReadAllText($fRegOut)) '37 nao altera destino'
+
+    $badStamp = '2026-13-40T99:99:99.0000000Z'
+    [void](Write-Fixture -Path $fRegOut -Text (New-Xml -Body $loneBody -LastUpdate $badStamp) -Encoding $utf8)
+    $r = Invoke-Surgical @{ InputPath = $fReg; OutputPath = $fRegOut; Anchor = $anchor; Replacement = 'Q'; EditMode = 'Replace' }
+    Assert-Eq 38 $r.ExitCode 'destino ilegivel = 38'
+    Assert-Eq 'LASTUPDATE_UNREADABLE' $r.Json.code 'code LASTUPDATE_UNREADABLE'
+
     # ==== 35) origens, precedência e ausência de efeitos colaterais ===========
     $script:cases++
     $f = New-CaseFile -Name 'payload-errors' -Body $loneBody

@@ -312,7 +312,7 @@ try {
     if ($AsJson) {
         if ($coreResult.Status -eq 'OK' -and $coreResult.LastUpdateRegressed -and
             -not [string]::IsNullOrWhiteSpace($coreResult.LastUpdateRegressWarning)) {
-            Write-Warning $coreResult.LastUpdateRegressWarning
+            Write-GeneXusStderrLine -Message $coreResult.LastUpdateRegressWarning
         }
         ConvertTo-BumpJsonOutput -Result $coreResult | ConvertTo-Json -Depth 5 -Compress
     } else {

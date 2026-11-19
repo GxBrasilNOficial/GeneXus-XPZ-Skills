@@ -18,6 +18,16 @@ $script:LastUpdateToken = 'lastUpdate="'
 $script:FreshnessMarginSecondsDefault = 60
 $script:MutatedIntervalLimit = 100
 
+function Write-GeneXusStderrLine {
+    <#
+        Escreve no stderr real do processo. Preferir a Write-Warning quando o
+        script for chamado via `pwsh -File` e o stdout precisar permanecer JSON
+        puro: em processo filho, Write-Warning costuma cair no stdout capturado.
+    #>
+    param([Parameter(Mandatory = $true)][AllowEmptyString()][string]$Message)
+    [Console]::Error.WriteLine($Message)
+}
+
 # ---------------------------------------------------------------------------
 # EOL (descido do motor em lote; contrato identico ao consumido por la)
 # ---------------------------------------------------------------------------
