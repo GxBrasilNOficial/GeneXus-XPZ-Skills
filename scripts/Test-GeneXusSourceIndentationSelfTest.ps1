@@ -527,5 +527,31 @@ $r36 = Invoke-Indent -Xml (New-ProcXml -Guid $guidInc -Name 'ProcInc' -Source $i
 Assert-True (Test-HasCode -Result $r36 -Code 'indent-inconclusive') 'wrap+inconclusiveLocal deve inconclusive'
 Assert-True (@($r36.findings | Where-Object { $_.code -eq 'indent-inconclusive' -and $_.deltaLineClass -eq 'preserved' }).Count -gt 0) 'inconclusive em preserved apos depth+'
 
+# 37) anti-duplicata: mesma sourceLine + mesmo code nao repete (reindented covered by Absolute loop)
+$guidDup = 'adadadad-adad-adad-adad-adadadadadad'
+$dupBase = @"
+if &a
+	msg('x')
+endfor
+"@
+Write-Xml -Path (Join-Path $acervoRoot 'ProcDup.xml') -Xml (New-ProcXml -Guid $guidDup -Name 'ProcDup' -Source $dupBase)
+# Aprofundar If interno (reindented) mantendo endfor mismatch
+$dupWrap = @"
+if &o
+	if &a
+		msg('x')
+	endfor
+endif
+"@
+$r37 = Invoke-Indent -Xml (New-ProcXml -Guid $guidDup -Name 'ProcDup' -Source $dupWrap) -AcervoPath $acervoRoot
+$inc37 = @($r37.findings | Where-Object { $_.code -eq 'indent-inconclusive' })
+Assert-True ($inc37.Count -gt 0) 'reindented inconclusive deve aparecer (laco Absolute)'
+$dupGroups = $inc37 | Group-Object -Property sourceLineNumber
+Assert-True (@($dupGroups | Where-Object { $_.Count -gt 1 }).Count -eq 0) 'indent-inconclusive nao deve duplicar por linha'
+$r37abs = Invoke-Indent -Xml (New-ProcXml -Guid $guidDup -Name 'ProcDup' -Source $dupWrap) -AcervoPath $acervoRoot -Absolute
+$inc37abs = @($r37abs.findings | Where-Object { $_.code -eq 'indent-inconclusive' })
+$dupAbs = $inc37abs | Group-Object -Property sourceLineNumber
+Assert-True (@($dupAbs | Where-Object { $_.Count -gt 1 }).Count -eq 0) 'com Absolute tambem sem duplicata de inconclusive'
+
 Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
 Write-Output 'OK: Test-GeneXusSourceIndentationSelfTest.ps1'
