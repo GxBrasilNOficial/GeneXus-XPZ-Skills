@@ -553,28 +553,39 @@ $inc37abs = @($r37abs.findings | Where-Object { $_.code -eq 'indent-inconclusive
 $dupAbs = $inc37abs | Group-Object -Property sourceLineNumber
 Assert-True (@($dupAbs | Where-Object { $_.Count -gt 1 }).Count -eq 0) 'com Absolute tambem sem duplicata de inconclusive'
 
-# 38) G1 DeepSeek: wrap + corpo com unidade divergente + recuo curto => drift NAO engolido
+# 38) unit-mismatch nao engole drift: MESMA linha preserved (ja com espaco no baseline), moda tab, depth+
 $guidUm = 'aeaeaeae-aeae-aeae-aeae-aeaeaeaeaeae'
+# Linha " x" ja nasce com 1 espaco (unidade divergente) em part cuja moda sera tab apos o wrap
 $umBase = @"
 if &Gerar
-	&Cell += 1
-endif
-"@
-Write-Xml -Path (Join-Path $acervoRoot 'ProcUm.xml') -Xml (New-ProcXml -Guid $guidUm -Name 'ProcUm' -Source $umBase)
-# Moda tab (msgs); corpo &Cell preserved com 4 espacos (unidade divergente) + depth+ sem aprofundar
-$umWrap = @"
-if &Outer
 	msg('a')
 	msg('b')
-if &Gerar
-    &Cell += 1
-endif
+ x
 	msg('c')
 endif
 "@
+Write-Xml -Path (Join-Path $acervoRoot 'ProcUm.xml') -Xml (New-ProcXml -Guid $guidUm -Name 'ProcUm' -Source $umBase)
+$umWrap = @"
+if &Outer
+	msg('k1')
+	msg('k2')
+if &Gerar
+	msg('a')
+	msg('b')
+ x
+	msg('c')
+endif
+	msg('k3')
+endif
+"@
 $r38 = Invoke-Indent -Xml (New-ProcXml -Guid $guidUm -Name 'ProcUm' -Source $umWrap) -AcervoPath $acervoRoot
-Assert-True (Test-HasCode -Result $r38 -Code 'indent-context-depth-drift') 'unit-mismatch nao deve engolir drift'
-Assert-True (Test-HasCode -Result $r38 -Code 'indent-unit-mismatch-in-delta') 'unit-mismatch continua finding a parte'
+# linePreview do motor e trimado ("x"); ancora pela sourceLine da linha com espaco no Source
+$drift38 = @($r38.findings | Where-Object { $_.code -eq 'indent-context-depth-drift' -and $_.deltaLineClass -eq 'preserved' -and $_.linePreview -eq 'x' })
+$unit38 = @($r38.findings | Where-Object { $_.code -eq 'indent-unit-mismatch-in-delta' -and $_.deltaLineClass -eq 'preserved' -and $_.linePreview -eq 'x' })
+Assert-True ($drift38.Count -gt 0) 'mesma linha preserved deve drift (unit-mismatch nao engole)'
+Assert-True ($unit38.Count -gt 0) 'mesma linha preserved deve unit-mismatch a parte'
+Assert-True ([int]$drift38[0].sourceLineNumber -eq [int]$unit38[0].sourceLineNumber) 'drift e unit-mismatch na mesma sourceLineNumber'
+Assert-True ([int]$drift38[0].baselineExpectedDepth -lt [int]$drift38[0].expectedDepth) 'depth+ na linha do caso 38'
 
 Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
 Write-Output 'OK: Test-GeneXusSourceIndentationSelfTest.ps1'
