@@ -16,6 +16,7 @@ Implementado em 2026-11-20 conforme design congelado `RoundId=wrap-indent-v4-202
 - `2d1cdd4` — Fecha G1/G2 das guardas do laço de drift de indentação.
 - `8fb6fc2` — Evita findings duplicados entre laço de drift e Absolute.
 - `12d6842` — Impede que unit-mismatch engula indent-context-depth-drift.
+- `1b88fd5` — Ancora o caso 38 na mesma linha preserved e alinha o Escopo.
 
 ## Skill `xpz-mcp-integrations-setup` — componente MCP externo opcional (Jev/System One) — implementação da v1
 
