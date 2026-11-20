@@ -659,7 +659,7 @@ O wrapper de export normaliza entradas de `-ObjectList` separadas por vírgula o
 
 O sidecar `package-inventory.json` segue `schemaVersion=2`: preserva a lista nominal e inclui cópia completa de `deltaComparison` quando houve confronto seletivo válido. `extrasFullListAt` e `aliasResolutionsFullListAt` só são publicados quando a comparação correspondente está no sidecar. Os caminhos só aparecem após gravação atômica bem-sucedida; `sidecarPublished=false`/`sidecarError` sinalizam falha e não autorizam tratar um arquivo anterior como artefato desta execução.
 
-Para consumir esse sidecar, exigir `sidecarPublished=true` no retorno da execução atual e usar o caminho retornado; se o campo estiver `false`, nulo ou ausente, ignorar qualquer arquivo canônico que já exista e executar o inventário novamente sobre o artefato final.
+Para consumir esse sidecar, exigir `sidecarPublished=true` no retorno da execução atual e usar o caminho retornado; se o campo estiver `false`, nulo ou ausente, ignorar qualquer arquivo canônico que já exista e executar o inventário novamente sobre o artefato final. Para exportação seletiva, siga o [caminho B da skill `xpz-msbuild-import-export`](xpz-msbuild-import-export/SKILL.md#inventário-do-pacote-após-export-seletivo) para repetir a resolução de catálogo e o confronto com a lista original.
 
 ## Checklist Inicial De Requisitos Da Skill
 
