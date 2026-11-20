@@ -399,5 +399,101 @@ Assert-True ($r27.baselineCompared -ne $true) 'GUID invalido nao compared'
 Assert-True ($r27.sourceIndentStatus -eq 'inconclusive') 'GUID invalido inconclusive'
 Assert-True (-not (Test-HasCode -Result $r27 -Code 'indent-under-depth')) 'GUID invalido nao inventa under-depth'
 
+# --- indent-context-depth-drift (wrap / recontextualizacao) ---
+
+$guidWrap = 'dddddddd-dddd-dddd-dddd-dddddddddddd'
+$wrapBaselineSrc = @"
+if &Gerar
+	&Cell += 1
+endif
+"@
+$wrapBaselineXml = New-ProcXml -Guid $guidWrap -Name 'ProcWrap' -Source $wrapBaselineSrc
+Write-Xml -Path (Join-Path $acervoRoot 'ProcWrap.xml') -Xml $wrapBaselineXml
+
+# 28) wrap sem aprofundar corpo => indent-context-depth-drift (sem Absolute)
+$wrapBadSrc = @"
+if &Outer
+if &Gerar
+	&Cell += 1
+endif
+endif
+"@
+$r28 = Invoke-Indent -Xml (New-ProcXml -Guid $guidWrap -Name 'ProcWrap' -Source $wrapBadSrc) -AcervoPath $acervoRoot
+Assert-True (Test-HasCode -Result $r28 -Code 'indent-context-depth-drift') 'wrap under-indent deveria drift'
+$drift28 = @($r28.findings | Where-Object { $_.code -eq 'indent-context-depth-drift' } | Select-Object -First 1)
+Assert-True ($null -ne $drift28) 'finding drift presente'
+Assert-True ($drift28.deltaLineClass -eq 'preserved') 'drift em preserved'
+Assert-True ([int]$drift28.baselineExpectedDepth -lt [int]$drift28.expectedDepth) 'profundidade deve ter subido'
+
+# 29) wrap com +1 nivel no bloco interno (If/corpo/Endif) => some o drift
+$wrapGoodSrc = @"
+if &Outer
+	if &Gerar
+		&Cell += 1
+	endif
+endif
+"@
+$r29 = Invoke-Indent -Xml (New-ProcXml -Guid $guidWrap -Name 'ProcWrap' -Source $wrapGoodSrc) -AcervoPath $acervoRoot
+Assert-True (-not (Test-HasCode -Result $r29 -Code 'indent-context-depth-drift')) 'wrap corrigido nao deve drift'
+
+# 30) under-depth herdado (Absolute) sem aumento de profundidade => under-depth sem drift
+$r30 = Invoke-Indent -Xml (New-ProcXml -Guid $guidGood -Name 'ProcIndent' -Source $badUnder) -AcervoPath $acervoRoot -Absolute
+Assert-True (Test-HasCode -Result $r30 -Code 'indent-under-depth') 'Absolute herdado ainda under-depth'
+Assert-True (-not (Test-HasCode -Result $r30 -Code 'indent-context-depth-drift')) 'herdado sem depth+ nao e drift'
+
+# 31) BaselinePath = InputPath => unresolved (nao compared util)
+$samePathXml = New-ProcXml -Guid $guidWrap -Name 'ProcWrap' -Source $wrapBadSrc
+$samePathFile = Join-Path $tempRoot 'same-as-baseline.xml'
+Write-Xml -Path $samePathFile -Xml $samePathXml
+$r31json = & $scriptPath -InputPath $samePathFile -BaselinePath $samePathFile
+$r31 = $r31json | ConvertFrom-Json
+Assert-True ($r31.parts[0].baselineStatus -eq 'no-baseline-unresolved') 'baseline=input deve unresolved'
+Assert-True ($r31.parts[0].baselineCompared -ne $true) 'baseline=input nao compared'
+Assert-True (-not (Test-HasCode -Result $r31 -Code 'indent-context-depth-drift')) 'baseline=input nao inventa drift'
+
+# 32) AcervoPath=folha no mesmo InputPath => unresolved
+$r32json = & $scriptPath -InputPath $samePathFile -AcervoPath $samePathFile
+$r32 = $r32json | ConvertFrom-Json
+Assert-True ($r32.parts[0].baselineStatus -eq 'no-baseline-unresolved') 'AcervoPath=input deve unresolved'
+Assert-True (-not (Test-HasCode -Result $r32 -Code 'indent-context-depth-drift')) 'AcervoPath=input nao inventa drift'
+
+# 33) unitMode=none: wrap sem recuo no corpo => drift (bifurcacao none)
+$guidNone = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee'
+$noneBase = @"
+if &a
+msg('x')
+endif
+"@
+Write-Xml -Path (Join-Path $acervoRoot 'ProcNone.xml') -Xml (New-ProcXml -Guid $guidNone -Name 'ProcNone' -Source $noneBase)
+$noneWrap = @"
+if &o
+if &a
+msg('x')
+endif
+endif
+"@
+$r33 = Invoke-Indent -Xml (New-ProcXml -Guid $guidNone -Name 'ProcNone' -Source $noneWrap) -AcervoPath $acervoRoot
+Assert-True (Test-HasCode -Result $r33 -Code 'indent-context-depth-drift') 'unitMode=none wrap deve drift'
+
+# 34) reindented com profundidade aumentada e recuo curto => drift
+$guidRe = 'ffffffff-ffff-ffff-ffff-ffffffffffff'
+$reBase = @"
+if &a
+	msg('x')
+endif
+"@
+Write-Xml -Path (Join-Path $acervoRoot 'ProcRe.xml') -Xml (New-ProcXml -Guid $guidRe -Name 'ProcRe' -Source $reBase)
+# If interno aprofundado; corpo sem tab (reindented zero + under na nova depth 2)
+$reWrap = @"
+if &o
+	if &a
+msg('x')
+	endif
+endif
+"@
+$r34 = Invoke-Indent -Xml (New-ProcXml -Guid $guidRe -Name 'ProcRe' -Source $reWrap) -AcervoPath $acervoRoot
+Assert-True (Test-HasCode -Result $r34 -Code 'indent-context-depth-drift') 'reindented under apos wrap deve drift'
+Assert-True (@($r34.findings | Where-Object { $_.code -eq 'indent-context-depth-drift' -and $_.deltaLineClass -eq 'reindented' }).Count -gt 0) 'classe reindented no drift'
+
 Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
 Write-Output 'OK: Test-GeneXusSourceIndentationSelfTest.ps1'

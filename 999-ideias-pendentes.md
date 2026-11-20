@@ -47,8 +47,6 @@ Entradas legadas sem avaliação carregam `FALTA AVALIAR` em ambos os campos at�
 3. Self-test + amend explícito da allowlist (mapa type-aware, não “se aparecer”).
 4. Docs `02`/`09`/checklist alinhados ao novo par.
 
-**Fora desta pendência.** Drift estrutural em linha preserved (`indent-context-depth-drift`) — decisão B de 2026-11-17: fora da v1, sem compromisso, só com demanda real. Não misturar com esta entrada.
-
 **Gatilho.** Caso real em frente de WebPanel/Transaction (ou pedido explícito) em que o motor v1 fica `not-applicable` e o recuo ruim passa despercebido.
 
 **Relacionado.** `scripts/Test-GeneXusSourceIndentation.ps1`; `02` (indentação de Source v1); `Test-GeneXusSourceSanity.ps1` (mapa type-aware como espelho de estilo, não de indentação).

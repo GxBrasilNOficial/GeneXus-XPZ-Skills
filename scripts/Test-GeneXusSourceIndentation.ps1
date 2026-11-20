@@ -11,6 +11,10 @@
     Exit 0 = JSON de analise emitido (inclui XML malformado no JSON);
     exit 20 = bloqueio de preflight/input invalido ou erro interno (trap),
     com JSON de status=bloqueado no stdout — nao e finding de indentacao.
+    Com baseline compared, emite tambem indent-context-depth-drift (warn) em
+    linhas preserved/reindented cuja profundidade esperada subiu e o recuo
+    ficou curto — sem exigir -AbsoluteIndentCheck. Absolute continua opt-in
+    para under-depth herdado em preserved.
 
 .PARAMETER InputPath
     XML Object ou ExportFile.
@@ -118,18 +122,41 @@ function New-IndentFinding {
         [string]$LinePreview,
         [string]$ObjectName = '',
         [string]$ObjectGuid = '',
-        [string]$PartType = ''
+        [string]$PartType = '',
+        [string]$DeltaLineClass = $null,
+        $BaselineExpectedDepth = $null,
+        $ExpectedDepth = $null
     )
     return [pscustomobject]@{
-        severity         = $Severity
-        code             = $Code
-        message          = $Message
-        sourceLineNumber = $SourceLineNumber
-        xmlLineNumber    = $XmlLineNumber
-        linePreview      = $LinePreview
-        objectName       = $ObjectName
-        objectGuid       = $ObjectGuid
-        partType         = $PartType
+        severity               = $Severity
+        code                   = $Code
+        message                = $Message
+        sourceLineNumber       = $SourceLineNumber
+        xmlLineNumber          = $XmlLineNumber
+        linePreview            = $LinePreview
+        objectName             = $ObjectName
+        objectGuid             = $ObjectGuid
+        partType               = $PartType
+        deltaLineClass         = $DeltaLineClass
+        baselineExpectedDepth  = $BaselineExpectedDepth
+        expectedDepth          = $ExpectedDepth
+    }
+}
+
+function Test-IsSamePhysicalPath {
+    param(
+        [string]$PathA,
+        [string]$PathB
+    )
+    if ([string]::IsNullOrWhiteSpace($PathA) -or [string]::IsNullOrWhiteSpace($PathB)) {
+        return $false
+    }
+    try {
+        $a = (Resolve-Path -LiteralPath $PathA -ErrorAction Stop).Path
+        $b = (Resolve-Path -LiteralPath $PathB -ErrorAction Stop).Path
+        return [string]::Equals($a, $b, [System.StringComparison]::OrdinalIgnoreCase)
+    } catch {
+        return [string]::Equals($PathA.TrimEnd('\', '/'), $PathB.TrimEnd('\', '/'), [System.StringComparison]::OrdinalIgnoreCase)
     }
 }
 
@@ -882,7 +909,8 @@ function Test-PartIndentation {
         [string]$RawXml,
         [bool]$Absolute,
         [string]$BaselinePathLocal,
-        [string]$AcervoPathLocal
+        [string]$AcervoPathLocal,
+        [string]$InputPathResolved = ''
     )
 
     $xmlOffset = Get-XmlSourceLineOffset -RawXml $RawXml -ObjectGuid $Target.objectGuid -PartType $script:SourcePartType
@@ -920,6 +948,23 @@ function Test-PartIndentation {
 
     $baseline = Resolve-BaselineObjectNode -ObjectGuid $Target.objectGuid -ObjectType $Target.objectType `
         -BaselinePathLocal $BaselinePathLocal -AcervoPathLocal $AcervoPathLocal
+
+    # Guarda: baseline resolvida no mesmo arquivo fisico do InputPath nao e compared util
+    # (falso pass: delta vazio). Cobre -BaselinePath e -AcervoPath folha/pasta.
+    if (
+        $baseline.status -eq 'compared' -and
+        -not [string]::IsNullOrWhiteSpace($InputPathResolved) -and
+        -not [string]::IsNullOrWhiteSpace([string]$baseline.path) -and
+        (Test-IsSamePhysicalPath -PathA $InputPathResolved -PathB ([string]$baseline.path))
+    ) {
+        $baseline = [pscustomobject]@{
+            status     = 'no-baseline-unresolved'
+            objectNode = $null
+            path       = $baseline.path
+            message    = 'Baseline resolvida no mesmo arquivo fisico do InputPath; nao prova pre-wrap'
+        }
+    }
+
     $part.baselineStatus = $baseline.status
     $part.baselinePath = $baseline.path
     $part.baselineCompared = ($baseline.status -eq 'compared')
@@ -973,6 +1018,78 @@ function Test-PartIndentation {
         $part.status = 'inconclusive'
         $part.findings = $findings.ToArray()
         return [pscustomobject]$part
+    }
+
+    # Depth-drift (wrap/recontextualizacao): so com baseline compared; nao exige Absolute.
+    # Classes preserved e reindented; herdado sem aumento de profundidade nao dispara.
+    if ($baseline.status -eq 'compared') {
+        foreach ($op in $deltaOps) {
+            if ($op.classification -notin @('preserved', 'reindented')) { continue }
+            $oldM = $op.oldModel
+            $m = $op.newModel
+            if ($null -eq $oldM -or $null -eq $m) { continue }
+            if ($oldM.excludeFromSignals -or $m.excludeFromSignals) { continue }
+            if ($oldM.kind -eq 'blank' -or $m.kind -eq 'blank') { continue }
+
+            $xmlLine = if ($xmlOffset -gt 0) { [Math]::Max(1, $xmlOffset + $m.sourceLineNumber - 1) } else { 0 }
+
+            if ($oldM.inconclusiveLocal -or $m.inconclusiveLocal) {
+                continue
+            }
+
+            if ($unitMode -eq 'mixed') {
+                continue
+            }
+
+            if ($unitMode -eq 'tab' -and $m.unit -eq 'space') {
+                $findings.Add((New-IndentFinding -Severity 'warn' -Code 'indent-unit-mismatch-in-delta' `
+                    -Message "$($Target.objectName): linha do delta usa espacos; moda da part e tab." `
+                    -SourceLineNumber $m.sourceLineNumber -XmlLineNumber $xmlLine -LinePreview $m.preview `
+                    -ObjectName $Target.objectName -ObjectGuid $Target.objectGuid -PartType $script:SourcePartType `
+                    -DeltaLineClass $op.classification)) | Out-Null
+                continue
+            }
+            if ($unitMode -eq 'space' -and $m.unit -eq 'tab') {
+                $findings.Add((New-IndentFinding -Severity 'warn' -Code 'indent-unit-mismatch-in-delta' `
+                    -Message "$($Target.objectName): linha do delta usa tab; moda da part e espacos." `
+                    -SourceLineNumber $m.sourceLineNumber -XmlLineNumber $xmlLine -LinePreview $m.preview `
+                    -ObjectName $Target.objectName -ObjectGuid $Target.objectGuid -PartType $script:SourcePartType `
+                    -DeltaLineClass $op.classification)) | Out-Null
+                continue
+            }
+            if ($m.unit -eq 'mixed') {
+                $findings.Add((New-IndentFinding -Severity 'warn' -Code 'indent-unit-mismatch-in-delta' `
+                    -Message "$($Target.objectName): leading WS misto (tab+espaco) na linha do delta." `
+                    -SourceLineNumber $m.sourceLineNumber -XmlLineNumber $xmlLine -LinePreview $m.preview `
+                    -ObjectName $Target.objectName -ObjectGuid $Target.objectGuid -PartType $script:SourcePartType `
+                    -DeltaLineClass $op.classification)) | Out-Null
+                continue
+            }
+
+            if ($m.expectedDepth -le $oldM.expectedDepth) { continue }
+
+            $underAtNew = $false
+            if ($unitMode -eq 'none') {
+                if ($m.expectedDepth -gt 0 -and $m.leadingLength -lt $m.expectedDepth) {
+                    $underAtNew = $true
+                }
+            } else {
+                $expectedLenNew = Get-ExpectedLeadingLength -Model $m -UnitMode $unitMode -SpaceWidth $spaceWidth
+                if ($m.expectedDepth -ge 1 -and $m.leadingLength -lt $expectedLenNew) {
+                    $underAtNew = $true
+                }
+            }
+
+            if (-not $underAtNew) { continue }
+
+            $findings.Add((New-IndentFinding -Severity 'warn' -Code 'indent-context-depth-drift' `
+                -Message "$($Target.objectName): profundidade esperada subiu ($($oldM.expectedDepth)->$($m.expectedDepth)) sem recuo suficiente (classe $($op.classification))." `
+                -SourceLineNumber $m.sourceLineNumber -XmlLineNumber $xmlLine -LinePreview $m.preview `
+                -ObjectName $Target.objectName -ObjectGuid $Target.objectGuid -PartType $script:SourcePartType `
+                -DeltaLineClass $op.classification `
+                -BaselineExpectedDepth $oldM.expectedDepth `
+                -ExpectedDepth $m.expectedDepth)) | Out-Null
+        }
     }
 
     # Absoluto: tambem linhas preserved (defeito herdado no baseline).
@@ -1143,7 +1260,8 @@ foreach ($target in $targets) {
 
     $result.inScopePartCount++
     $partResult = Test-PartIndentation -Target $target -SourceText $sourceText -RawXml $rawXml `
-        -Absolute:([bool]$AbsoluteIndentCheck) -BaselinePathLocal $BaselinePath -AcervoPathLocal $AcervoPath
+        -Absolute:([bool]$AbsoluteIndentCheck) -BaselinePathLocal $BaselinePath -AcervoPathLocal $AcervoPath `
+        -InputPathResolved $resolvedInput
     $partResults.Add($partResult) | Out-Null
     foreach ($f in @($partResult.findings)) {
         $allFindings.Add($f) | Out-Null

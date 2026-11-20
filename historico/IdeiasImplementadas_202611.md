@@ -2,6 +2,18 @@
 
 Registro de ideias que saíram de `999-ideias-pendentes.md` por terem sido implementadas ou incorporadas ao contrato metodológico vigente.
 
+## Indentação de Source: `indent-context-depth-drift` (wrap / recontextualização) — 2026-11-20
+
+Implementado em 2026-11-20 conforme design congelado `RoundId=wrap-indent-v4-20261120-080658` (decisão humana B: congelar; prova na implementação/self-test). Origem: recorte «Fora desta pendência / drift estrutural em linha preserved» que constava na entrada de expansão de allowlist Events em `999-ideias-pendentes.md` (decisão B 2026-11-17 adiava; demanda real de wrap under-indent reabriu). Removido desse parágrafo do `999` ao fechar a frente; a entrada Events permanece só para expansão de allowlist.
+
+**Escopo entregue.** Motor `Test-GeneXusSourceIndentation.ps1` emite `indent-context-depth-drift` (warn) com baseline `compared`, classes LCS `preserved`/`reindented`, quando a profundidade estrutural sobe e o recuo não acompanha — **sem** exigir `-AbsoluteIndentCheck`. Mesma bifurcação de under-depth (inclui `unitMode=none`). Guardas: unit-mismatch/mixed antes do drift; BaselinePath/AcervoPath no mesmo path físico de InputPath → `no-baseline-unresolved`. Gate de **processo** (ABORT de empacotamento) lê `parts[].baselineStatus` da part do wrap, não o agregado top-level; `probablyImportable` e 9-FD intocados. Absolute continua opt-in consultivo para under-depth herdado sem aumento de profundidade. C (hint editor) e D (wrapper exemplo) fora desta frente. Docs: `xpz-builder` SKILL/checklist/`procedure.md`, `02`, `08`, `09`, CHANGELOG trilíngue.
+
+**Validação.** `Test-GeneXusSourceIndentationSelfTest.ps1` casos 28–34 (wrap fail/pass, Absolute herdado sem drift, Baseline/Acervo=Input unresolved, `unitMode=none`, reindented drift). Token: `OK: Test-GeneXusSourceIndentationSelfTest.ps1`.
+
+### Rastreabilidade
+
+- (pendente commit material desta frente)
+
 ## Skill `xpz-mcp-integrations-setup` — componente MCP externo opcional (Jev/System One) — implementação da v1
 
 Implementado em 2026-11-09 conforme o design v24.2 congelado por decisão humana (`resubmissionDeclinedByHuman`, `RoundId=mcp-int-v24-freeze-20261109`). Origem: entrada «Skill `xpz-mcp-integrations-setup` — componente MCP externo opcional (Jev/System One)» de `999-ideias-pendentes.md`, removida após a implementação.
