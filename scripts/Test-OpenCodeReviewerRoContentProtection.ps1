@@ -20,7 +20,8 @@
 param(
     [string] $OpenCodeExe,
     [string] $OutputDirectory,
-    [string] $Model = 'opencode-go/deepseek-v4.1-flash',
+    # Default alinhado a captura 2.3.2; o chamador pode passar outro modelo CLI-capable com saldo.
+    [string] $Model = 'commandcode/deepseek/deepseek-v4.1-flash',
     [string[]] $Only,
     [string] $EvidenceDirectory,
     [switch] $PathValidationSelfTestOnly
