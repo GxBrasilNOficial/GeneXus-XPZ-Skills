@@ -12,6 +12,8 @@ Implementado em 2026-11-20 conforme design congelado `RoundId=wrap-indent-v4-202
 
 **Residual (opção A, 2026-11-20).** Classe LCS `changed` fica fora do laço de drift (congelamento: só `preserved`/`reindented`). Em wrap com linha recontextualizada **e** editada no mesmo delta, o motor pode emitir só `indent-under-depth` (consultivo) sem `indent-context-depth-drift`; o ABORT de processo documentado, ancorado no drift, **não** dispara nesse eixo. Aceito como residual desta frente — não alargar o motor agora; endurecimento futuro (emitir drift também em `changed`, ou ABORT também em under-depth com baseline `compared`) fica fora.
 
+**Adendo documental (2026-11-20, pós-parecer pasta paralela).** Reforço só em docs: NEVER omitir o +1 do corpo recontextualizado para “minimizar churn”; baseline de wrap = snapshot **imediatamente** pré-wrap (`-AcervoPath` só se for esse estado). C (hint no `Edit-GeneXusXmlSurgical`) e endurecimento do residual `changed` foram anotados como entradas novas em `999-ideias-pendentes.md` (maturidade `ideia`); D (wrapper local) permanece só com o ponteiro na setup.
+
 ### Rastreabilidade
 
 - `50dfe39` — Detecta drift de profundidade no wrap de Source.

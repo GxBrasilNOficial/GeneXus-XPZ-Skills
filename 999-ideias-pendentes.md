@@ -51,6 +51,44 @@ Entradas legadas sem avaliação carregam `FALTA AVALIAR` em ambos os campos at�
 
 **Relacionado.** `scripts/Test-GeneXusSourceIndentation.ps1`; `02` (indentação de Source v1); `Test-GeneXusSourceSanity.ps1` (mapa type-aware como espelho de estilo, não de indentação).
 
+<a id="indentacao-source-hint-editor-cirurgico-20261120"></a>
+
+## Indentação de Source: hint no JSON do `Edit-GeneXusXmlSurgical` (opção C) — 2026-11-20
+
+- **Importância** — média (maior gap operacional remanescente após o gate de processo por `indent-context-depth-drift`: o agente pode editar wrap/`else`/novo bloco e esquecer de rodar o indent com `-BaselinePath` pré-wrap antes de empacotar; o checklist/doc sozinho não lembra no momento da edição).
+- **Maturidade** — ideia (direção clara; faltam desenho de heurística “parece wrap”, shape do campo JSON, se DryRun emite, se exige BaselinePath já conhecido, e fixture/self-test).
+
+**Contexto.** A frente wrap-indent de 2026-11-20 entregou drift + ABORT de processo no `xpz-builder` (Opção B) e deixou C/D fora de escopo. Parecer da pasta paralela (mesmo dia) confirmou o buraco do incidente fechado via drift, e apontou o hint no editor como o maior gap operacional ainda aberto. Não misturar com a entrada de expandir allowlist (Events) nem com o residual LCS `changed`.
+
+**Ideia (não implementar sem desenho + demanda).** Em `Edit-GeneXusXmlSurgical.ps1`, sinal consultivo aditivo no JSON quando o `Replacement` (ou o diff da part) parecer recontextualização de linhas existentes — lembrete de rodar `Test-GeneXusSourceIndentation.ps1` com snapshot pré-wrap. Não embutir o gate, não alterar `probablyImportable`/9-FD, não tornar Absolute obrigatório.
+
+**Por que não agora.** Heurística falível (falso positivo/negativo); o editor não cria sozinho o snapshot pré-wrap; mudança contratual do editor exige self-test + docs + painel próprio. Congelamento B já convergiu sem C.
+
+**Gatilho.** Demanda explícita, ou caso real em pasta paralela em que o wrap foi editado e o indent/ABORT só foi lembrado tarde (ou nunca).
+
+**Relacionado.** `scripts/Edit-GeneXusXmlSurgical.ps1`; `scripts/Test-GeneXusSourceIndentation.ps1`; `xpz-builder/SKILL.md` (gate de processo wrap); `historico/IdeiasImplementadas_202611.md` (entrada wrap-indent; C fora de escopo); parecer pasta paralela 2026-11-20.
+
+<a id="indentacao-source-residual-changed-20261120"></a>
+
+## Indentação de Source: endurecer residual LCS `changed` no drift/ABORT — 2026-11-20
+
+- **Importância** — média (com wrap **e** edição do corpo na mesma linha/`Replacement`, o motor pode emitir só `indent-under-depth` consultivo; o ABORT ancorado em `indent-context-depth-drift` não dispara — buraco residual aceito na opção A da frente 2026-11-20).
+- **Maturidade** — ideia (limite conhecido documentado; faltam fixture de incidente real e escolha de sub-rota de endurecimento).
+
+**Contexto.** Congelamento do laço de drift: só classes LCS `preserved`/`reindented`. Residual explícito em `historico/IdeiasImplementadas_202611.md` e CHANGELOG. Parecer da pasta paralela reafirmou o buraco sem trazer fixture nova.
+
+**Ideia (não implementar sem caso/fixture).** Sub-rotas candidatas em aberto — **não** escolher agora:
+1. Emitir `indent-context-depth-drift` também em linha `changed` quando a profundidade sobe e o recuo não acompanha; e/ou
+2. ABORT de processo também em `indent-under-depth` com baseline `compared` no fluxo de wrap.
+
+**Por que não agora.** Reabre motor + contrato + self-test + painel; risco de falso positivo em `changed` (edição funcional misturada com reindent); sem incidente pós-B reproduzível o custo supera o benefício. Não substitui o hint do editor (entrada C acima).
+
+**Gatilho.** Incidente concreto (preferência: pasta paralela) com fixture reproduzível de wrap+edição na mesma linha escapando do ABORT, ou pedido explícito com fixture.
+
+**Dados faltantes.** Fixture mínima; decisão 1 vs 2 (ou ambas); critério de falso-positivo aceitável.
+
+**Relacionado.** `scripts/Test-GeneXusSourceIndentation.ps1`; `historico/IdeiasImplementadas_202611.md` (Residual opção A); entrada C (hint editor) acima; `02` / `xpz-builder` (ABORT só em drift).
+
 <a id="mcp-endpoint-confirmado-sem-vinculo-url-20261114"></a>
 
 ## MCP: `endpointConfirmed` não fica vinculado à URL confirmada — 2026-11-14
