@@ -496,10 +496,12 @@ Assert-True (Test-HasCode -Result $r34 -Code 'indent-context-depth-drift') 'rein
 Assert-True (@($r34.findings | Where-Object { $_.code -eq 'indent-context-depth-drift' -and $_.deltaLineClass -eq 'reindented' }).Count -gt 0) 'classe reindented no drift'
 
 # 35) G1: preserved com unidade divergente SEM depth+ e SEM Absolute => nao inventa unit-mismatch
+# Moda tab inequívoca (2+ tabs vs 1 espaço) — empate 1/1 cairia em unitMode=mixed e vacinaria o assert
 $guidUnit = 'abababab-abab-abab-abab-abababababab'
 $unitBase = @"
 if &x
-	msg('tab')
+	msg('tab1')
+	msg('tab2')
  msg('space')
 endif
 "@
@@ -507,6 +509,7 @@ Write-Xml -Path (Join-Path $acervoRoot 'ProcUnit.xml') -Xml (New-ProcXml -Guid $
 $r35 = Invoke-Indent -Xml (New-ProcXml -Guid $guidUnit -Name 'ProcUnit' -Source $unitBase) -AcervoPath $acervoRoot
 Assert-True (-not (Test-HasCode -Result $r35 -Code 'indent-unit-mismatch-in-delta')) 'preserved unit divergente sem Absolute/sem depth+ nao e mismatch'
 Assert-True (-not (Test-HasCode -Result $r35 -Code 'indent-context-depth-drift')) 'sem wrap nao e drift'
+Assert-True (-not (Test-HasCode -Result $r35 -Code 'indent-inconclusive')) 'moda tab inequívoca nao deve inconclusive de mixed'
 
 # 36) G2: wrap sobre close mismatch (inconclusiveLocal) com depth+ => indent-inconclusive (sem Absolute)
 $guidInc = 'acacacac-acac-acac-acac-acacacacacac'
@@ -586,6 +589,10 @@ Assert-True ($drift38.Count -gt 0) 'mesma linha preserved deve drift (unit-misma
 Assert-True ($unit38.Count -gt 0) 'mesma linha preserved deve unit-mismatch a parte'
 Assert-True ([int]$drift38[0].sourceLineNumber -eq [int]$unit38[0].sourceLineNumber) 'drift e unit-mismatch na mesma sourceLineNumber'
 Assert-True ([int]$drift38[0].baselineExpectedDepth -lt [int]$drift38[0].expectedDepth) 'depth+ na linha do caso 38'
+
+# 39) wrap + Absolute: drift continua (Absolute nao suprime indent-context-depth-drift)
+$r39 = Invoke-Indent -Xml (New-ProcXml -Guid $guidWrap -Name 'ProcWrap' -Source $wrapBadSrc) -AcervoPath $acervoRoot -Absolute
+Assert-True (Test-HasCode -Result $r39 -Code 'indent-context-depth-drift') 'Absolute+wrap ainda emite drift'
 
 Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
 Write-Output 'OK: Test-GeneXusSourceIndentationSelfTest.ps1'
