@@ -14,6 +14,7 @@ Implementado em 2026-11-20 conforme design congelado `RoundId=wrap-indent-v4-202
 
 - `50dfe39` — Detecta drift de profundidade no wrap de Source.
 - `2d1cdd4` — Fecha G1/G2 das guardas do laço de drift de indentação.
+- `8fb6fc2` — Evita findings duplicados entre laço de drift e Absolute.
 
 ## Skill `xpz-mcp-integrations-setup` — componente MCP externo opcional (Jev/System One) — implementação da v1
 
