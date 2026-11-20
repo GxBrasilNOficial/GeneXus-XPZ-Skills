@@ -20,6 +20,7 @@ Implementado em 2026-11-20 conforme design congelado `RoundId=wrap-indent-v4-202
 - `46cb19f` — Aponta o gate de wrap-indent na setup sem tornar wrapper obrigatório.
 - `12d6842` — Impede que unit-mismatch engula indent-context-depth-drift.
 - `1b88fd5` — Ancora o caso 38 na mesma linha preserved e alinha o Escopo.
+- `08c1276` — Reforça self-test 35/39, limpa CHANGELOG ES/EN e registra residual `changed`.
 
 ## Skill `xpz-mcp-integrations-setup` — componente MCP externo opcional (Jev/System One) — implementação da v1
 
