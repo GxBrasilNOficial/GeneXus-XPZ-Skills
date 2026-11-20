@@ -1398,6 +1398,10 @@ try {
         strategyTrace = @($probeStage.Diagnostic.strategyTrace + $script:StrategyTrace)
     }
 
+    if ($preflightResult.preflightEnabled -and -not [string]::IsNullOrWhiteSpace($CatalogOverridePath)) {
+        $diagnostic.requestedContext['CatalogOverridePath'] = $preflightResult.catalogOverridePath
+    }
+
     try {
         $json = ConvertTo-JsonText -InputObject $diagnostic
     }

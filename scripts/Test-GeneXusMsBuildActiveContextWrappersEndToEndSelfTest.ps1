@@ -41,7 +41,8 @@ function Invoke-WrapperScenario {
         [string[]]$StdErrCmdLines = @(),
         [int]$FakeExitCode = 0,
         [string]$EnvironmentName,
-        [hashtable]$Selection
+        [hashtable]$Selection,
+        [string]$FullExportCatalogOverridePath
     )
 
     $fakeGeneXusDirectory = Join-Path $ScenarioRoot 'GeneXus'
@@ -87,6 +88,7 @@ function Invoke-WrapperScenario {
         }
     }
     if (-not [string]::IsNullOrWhiteSpace($EnvironmentName)) { $wrapperArgs.EnvironmentName = $EnvironmentName }
+    if (-not [string]::IsNullOrWhiteSpace($FullExportCatalogOverridePath)) { $wrapperArgs.CatalogOverridePath = $FullExportCatalogOverridePath }
 
     if ($null -ne $Selection) {
         if ($Wrapper -eq 'Export') {
@@ -189,6 +191,17 @@ try {
     $allowedPreflight = $allowed.Diagnostic.objectListPreflight
     Assert-True ($allowed.ExitCode -eq 0 -and $allowedPreflight.items[0].status -eq 'not_in_index') 'Índice válido deve permitir pré-validação com aviso.'
     Assert-True ($null -eq $allowedPreflight.PSObject.Properties['catalogOverrideDiagnostic']) 'Pré-validação concluída deve omitir diagnóstico de catálogo.'
+    Assert-True ($null -eq $allowed.Diagnostic.requestedContext.PSObject.Properties['CatalogOverridePath']) 'Seleção sem override explícito deve omitir o campo.'
+
+    $validOverride = Join-Path $testRoot 'valid-override.json'
+    [IO.File]::WriteAllText($validOverride, '{"types":{}}')
+    $relativeOverride = [IO.Path]::GetRelativePath((Get-Location).Path, $validOverride)
+    $explicit = Invoke-WrapperScenario -Wrapper 'Export' -ScenarioRoot (Join-Path $testRoot 'selective-explicit') `
+        -Selection @{ IndexPath = $indexPath; CatalogOverridePath = $relativeOverride } -StdOutCmdLines $decisiveLines
+    Assert-True ($explicit.ExitCode -eq 0 -and $explicit.Diagnostic.requestedContext.CatalogOverridePath -eq $validOverride) 'Seleção deve registrar o caminho absoluto do override explícito.'
+    $fullWithOverride = Invoke-WrapperScenario -Wrapper 'Export' -ScenarioRoot (Join-Path $testRoot 'full-explicit') `
+        -FullExportCatalogOverridePath $validOverride -StdOutCmdLines $decisiveLines
+    Assert-True ($fullWithOverride.ExitCode -eq 0 -and $null -eq $fullWithOverride.Diagnostic.requestedContext.PSObject.Properties['CatalogOverridePath']) 'Export completo deve omitir o campo.'
 
     $invalidOverride = Join-Path $testRoot 'invalid-override.json'
     [IO.File]::WriteAllText($invalidOverride, '{"upstreamPending":"invalid"}')
