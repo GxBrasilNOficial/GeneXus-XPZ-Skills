@@ -495,5 +495,37 @@ $r34 = Invoke-Indent -Xml (New-ProcXml -Guid $guidRe -Name 'ProcRe' -Source $reW
 Assert-True (Test-HasCode -Result $r34 -Code 'indent-context-depth-drift') 'reindented under apos wrap deve drift'
 Assert-True (@($r34.findings | Where-Object { $_.code -eq 'indent-context-depth-drift' -and $_.deltaLineClass -eq 'reindented' }).Count -gt 0) 'classe reindented no drift'
 
+# 35) G1: preserved com unidade divergente SEM depth+ e SEM Absolute => nao inventa unit-mismatch
+$guidUnit = 'abababab-abab-abab-abab-abababababab'
+$unitBase = @"
+if &x
+	msg('tab')
+ msg('space')
+endif
+"@
+Write-Xml -Path (Join-Path $acervoRoot 'ProcUnit.xml') -Xml (New-ProcXml -Guid $guidUnit -Name 'ProcUnit' -Source $unitBase)
+$r35 = Invoke-Indent -Xml (New-ProcXml -Guid $guidUnit -Name 'ProcUnit' -Source $unitBase) -AcervoPath $acervoRoot
+Assert-True (-not (Test-HasCode -Result $r35 -Code 'indent-unit-mismatch-in-delta')) 'preserved unit divergente sem Absolute/sem depth+ nao e mismatch'
+Assert-True (-not (Test-HasCode -Result $r35 -Code 'indent-context-depth-drift')) 'sem wrap nao e drift'
+
+# 36) G2: wrap sobre close mismatch (inconclusiveLocal) com depth+ => indent-inconclusive (sem Absolute)
+$guidInc = 'acacacac-acac-acac-acac-acacacacacac'
+$incBase = @"
+if &a
+	msg('x')
+endfor
+"@
+Write-Xml -Path (Join-Path $acervoRoot 'ProcInc.xml') -Xml (New-ProcXml -Guid $guidInc -Name 'ProcInc' -Source $incBase)
+$incWrap = @"
+if &o
+if &a
+	msg('x')
+endfor
+endif
+"@
+$r36 = Invoke-Indent -Xml (New-ProcXml -Guid $guidInc -Name 'ProcInc' -Source $incWrap) -AcervoPath $acervoRoot
+Assert-True (Test-HasCode -Result $r36 -Code 'indent-inconclusive') 'wrap+inconclusiveLocal deve inconclusive'
+Assert-True (@($r36.findings | Where-Object { $_.code -eq 'indent-inconclusive' -and $_.deltaLineClass -eq 'preserved' }).Count -gt 0) 'inconclusive em preserved apos depth+'
+
 Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
 Write-Output 'OK: Test-GeneXusSourceIndentationSelfTest.ps1'

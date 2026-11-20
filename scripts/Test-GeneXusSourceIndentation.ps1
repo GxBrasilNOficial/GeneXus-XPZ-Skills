@@ -1022,6 +1022,8 @@ function Test-PartIndentation {
 
     # Depth-drift (wrap/recontextualizacao): so com baseline compared; nao exige Absolute.
     # Classes preserved e reindented; herdado sem aumento de profundidade nao dispara.
+    # Ordem: depth+ primeiro; so entao guardas de unidade / inconclusive (evita unit-mismatch
+    # em preserved sem Absolute e sem depth+; reindented unit-mismatch fica no laco Absolute).
     if ($baseline.status -eq 'compared') {
         foreach ($op in $deltaOps) {
             if ($op.classification -notin @('preserved', 'reindented')) { continue }
@@ -1033,7 +1035,16 @@ function Test-PartIndentation {
 
             $xmlLine = if ($xmlOffset -gt 0) { [Math]::Max(1, $xmlOffset + $m.sourceLineNumber - 1) } else { 0 }
 
+            if ($m.expectedDepth -le $oldM.expectedDepth) { continue }
+
             if ($oldM.inconclusiveLocal -or $m.inconclusiveLocal) {
+                $findings.Add((New-IndentFinding -Severity 'inconclusive' -Code 'indent-inconclusive' `
+                    -Message "$($Target.objectName): trecho inconclusivo apos aumento de profundidade (classe $($op.classification)); falta evidencia para drift." `
+                    -SourceLineNumber $m.sourceLineNumber -XmlLineNumber $xmlLine -LinePreview $m.preview `
+                    -ObjectName $Target.objectName -ObjectGuid $Target.objectGuid -PartType $script:SourcePartType `
+                    -DeltaLineClass $op.classification `
+                    -BaselineExpectedDepth $oldM.expectedDepth `
+                    -ExpectedDepth $m.expectedDepth)) | Out-Null
                 continue
             }
 
@@ -1041,32 +1052,39 @@ function Test-PartIndentation {
                 continue
             }
 
-            if ($unitMode -eq 'tab' -and $m.unit -eq 'space') {
-                $findings.Add((New-IndentFinding -Severity 'warn' -Code 'indent-unit-mismatch-in-delta' `
-                    -Message "$($Target.objectName): linha do delta usa espacos; moda da part e tab." `
-                    -SourceLineNumber $m.sourceLineNumber -XmlLineNumber $xmlLine -LinePreview $m.preview `
-                    -ObjectName $Target.objectName -ObjectGuid $Target.objectGuid -PartType $script:SourcePartType `
-                    -DeltaLineClass $op.classification)) | Out-Null
+            # Unit-mismatch so em preserved neste laco (Absolute ja cobre reindented).
+            if ($op.classification -eq 'preserved') {
+                if ($unitMode -eq 'tab' -and $m.unit -eq 'space') {
+                    $findings.Add((New-IndentFinding -Severity 'warn' -Code 'indent-unit-mismatch-in-delta' `
+                        -Message "$($Target.objectName): linha do delta usa espacos; moda da part e tab." `
+                        -SourceLineNumber $m.sourceLineNumber -XmlLineNumber $xmlLine -LinePreview $m.preview `
+                        -ObjectName $Target.objectName -ObjectGuid $Target.objectGuid -PartType $script:SourcePartType `
+                        -DeltaLineClass $op.classification)) | Out-Null
+                    continue
+                }
+                if ($unitMode -eq 'space' -and $m.unit -eq 'tab') {
+                    $findings.Add((New-IndentFinding -Severity 'warn' -Code 'indent-unit-mismatch-in-delta' `
+                        -Message "$($Target.objectName): linha do delta usa tab; moda da part e espacos." `
+                        -SourceLineNumber $m.sourceLineNumber -XmlLineNumber $xmlLine -LinePreview $m.preview `
+                        -ObjectName $Target.objectName -ObjectGuid $Target.objectGuid -PartType $script:SourcePartType `
+                        -DeltaLineClass $op.classification)) | Out-Null
+                    continue
+                }
+                if ($m.unit -eq 'mixed') {
+                    $findings.Add((New-IndentFinding -Severity 'warn' -Code 'indent-unit-mismatch-in-delta' `
+                        -Message "$($Target.objectName): leading WS misto (tab+espaco) na linha do delta." `
+                        -SourceLineNumber $m.sourceLineNumber -XmlLineNumber $xmlLine -LinePreview $m.preview `
+                        -ObjectName $Target.objectName -ObjectGuid $Target.objectGuid -PartType $script:SourcePartType `
+                        -DeltaLineClass $op.classification)) | Out-Null
+                    continue
+                }
+            } elseif (
+                ($unitMode -eq 'tab' -and $m.unit -eq 'space') -or
+                ($unitMode -eq 'space' -and $m.unit -eq 'tab') -or
+                ($m.unit -eq 'mixed')
+            ) {
                 continue
             }
-            if ($unitMode -eq 'space' -and $m.unit -eq 'tab') {
-                $findings.Add((New-IndentFinding -Severity 'warn' -Code 'indent-unit-mismatch-in-delta' `
-                    -Message "$($Target.objectName): linha do delta usa tab; moda da part e espacos." `
-                    -SourceLineNumber $m.sourceLineNumber -XmlLineNumber $xmlLine -LinePreview $m.preview `
-                    -ObjectName $Target.objectName -ObjectGuid $Target.objectGuid -PartType $script:SourcePartType `
-                    -DeltaLineClass $op.classification)) | Out-Null
-                continue
-            }
-            if ($m.unit -eq 'mixed') {
-                $findings.Add((New-IndentFinding -Severity 'warn' -Code 'indent-unit-mismatch-in-delta' `
-                    -Message "$($Target.objectName): leading WS misto (tab+espaco) na linha do delta." `
-                    -SourceLineNumber $m.sourceLineNumber -XmlLineNumber $xmlLine -LinePreview $m.preview `
-                    -ObjectName $Target.objectName -ObjectGuid $Target.objectGuid -PartType $script:SourcePartType `
-                    -DeltaLineClass $op.classification)) | Out-Null
-                continue
-            }
-
-            if ($m.expectedDepth -le $oldM.expectedDepth) { continue }
 
             $underAtNew = $false
             if ($unitMode -eq 'none') {
