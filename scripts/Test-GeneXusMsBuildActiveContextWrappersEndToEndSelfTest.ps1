@@ -40,7 +40,8 @@ function Invoke-WrapperScenario {
         [string[]]$StdOutCmdLines = @(),
         [string[]]$StdErrCmdLines = @(),
         [int]$FakeExitCode = 0,
-        [string]$EnvironmentName
+        [string]$EnvironmentName,
+        [hashtable]$Selection
     )
 
     $fakeGeneXusDirectory = Join-Path $ScenarioRoot 'GeneXus'
@@ -86,6 +87,18 @@ function Invoke-WrapperScenario {
         }
     }
     if (-not [string]::IsNullOrWhiteSpace($EnvironmentName)) { $wrapperArgs.EnvironmentName = $EnvironmentName }
+
+    if ($null -ne $Selection) {
+        if ($Wrapper -eq 'Export') {
+            $wrapperArgs.ExportAll = 'false'
+            $wrapperArgs.ObjectList = 'Procedure:Demo'
+        } else {
+            $wrapperArgs.IncludeItems = 'Procedure:Demo'
+        }
+        foreach ($key in $Selection.Keys) {
+            $wrapperArgs[$key] = $Selection[$key]
+        }
+    }
 
     $wrapperOutput = & $wrapperPath @wrapperArgs
     $wrapperExitCode = $LASTEXITCODE
@@ -139,6 +152,50 @@ try {
         $result = Invoke-WrapperScenario -Wrapper $wrapper -ScenarioRoot (Join-Path $testRoot ("decisive-" + $wrapper.ToLower())) -EnvironmentName 'EnvRequested' -StdOutCmdLines $decisiveLines
         Assert-True -Condition ($result.ExitCode -eq 0) -Message ("[$wrapper] decisivo deveria dar exit 0; recebeu {0} ({1})." -f $result.ExitCode, $result.Diagnostic.summary)
         Assert-DecisiveSignals -Diagnostic $result.Diagnostic -Wrapper $wrapper -ExpectedAtOpen 'EnvOpen'
+    }
+
+    $sourceRoot = Join-Path $testRoot 'ObjetosDaKbEmXml'
+    [void][IO.Directory]::CreateDirectory($sourceRoot)
+    $indexPath = Join-Path $testRoot 'index.sqlite'
+    $indexOutput = & python (Join-Path $PSScriptRoot 'Build-KbIntelligenceIndex.py') --source-root $sourceRoot --output-path $indexPath
+    Assert-True ($LASTEXITCODE -eq 0) "Falha ao criar índice sintético: $indexOutput"
+    $missingOverride = Join-Path $testRoot 'missing-override.json'
+
+    foreach ($wrapper in @('Export', 'Import', 'Preview')) {
+        $expectedStage = if ($wrapper -eq 'Export') { 'pre-export-identity' } else { 'pre-import-identity' }
+        foreach ($withIndex in @($false, $true)) {
+            $scenarioRoot = Join-Path $testRoot "$wrapper-selective-index-$withIndex"
+            $selection = @{ CatalogOverridePath = $missingOverride }
+            if ($withIndex) { $selection.IndexPath = $indexPath }
+            $blocked = Invoke-WrapperScenario -Wrapper $wrapper -ScenarioRoot $scenarioRoot `
+                -Selection $selection -FakeExitCode 99 -StdOutCmdLines @(
+                    'echo task-started> "%~dp0task-started.txt"'
+                )
+            Assert-True ($blocked.ExitCode -eq 35 -and $blocked.Diagnostic.exitCode -eq 35 -and $blocked.Diagnostic.stage -eq $expectedStage) "[$wrapper] esperado exit 35 em $expectedStage (índice=$withIndex): $($blocked.Diagnostic.summary)"
+            Assert-True (-not (Test-Path -LiteralPath (Join-Path $scenarioRoot 'task-started.txt'))) "[$wrapper] MSBuild não deve iniciar após bloqueio seletivo."
+            $preflight = $blocked.Diagnostic.objectListPreflight
+            Assert-True ($preflight.preflightEnabled -and -not $preflight.preflightSkipped -and $preflight.items.Count -eq 0) "[$wrapper] envelope de pré-validação incorreto."
+            $diagnostic = $preflight.PSObject.Properties['catalogOverrideDiagnostic']
+            if ($withIndex) {
+                Assert-True ($diagnostic.Value.reason -eq 'override-path-unavailable' -and $null -ne $preflight.lastIndexBuildAt) "[$wrapper] diagnóstico de catálogo ou timestamp ausente."
+            } else {
+                Assert-True ($null -eq $diagnostic -and $null -eq $preflight.lastIndexBuildAt) "[$wrapper] ausência de índice deve ter prioridade."
+            }
+        }
+    }
+
+    $allowed = Invoke-WrapperScenario -Wrapper 'Export' -ScenarioRoot (Join-Path $testRoot 'selective-ready') `
+        -Selection @{ IndexPath = $indexPath } -EnvironmentName 'EnvRequested' -StdOutCmdLines $decisiveLines
+    $allowedPreflight = $allowed.Diagnostic.objectListPreflight
+    Assert-True ($allowed.ExitCode -eq 0 -and $allowedPreflight.items[0].status -eq 'not_in_index') 'Índice válido deve permitir pré-validação com aviso.'
+    Assert-True ($null -eq $allowedPreflight.PSObject.Properties['catalogOverrideDiagnostic']) 'Pré-validação concluída deve omitir diagnóstico de catálogo.'
+
+    $invalidOverride = Join-Path $testRoot 'invalid-override.json'
+    [IO.File]::WriteAllText($invalidOverride, '{"upstreamPending":"invalid"}')
+    foreach ($wrapper in @('Export', 'Import', 'Preview')) {
+        $invalid = Invoke-WrapperScenario -Wrapper $wrapper -ScenarioRoot (Join-Path $testRoot "$wrapper-invalid-override") `
+            -Selection @{ IndexPath = $indexPath; CatalogOverridePath = $invalidOverride }
+        Assert-True ($invalid.ExitCode -eq 90) "[$wrapper] conteúdo de override inválido deve preservar exit 90."
     }
 
     # Troca bem-sucedida (Export): efetivo = leitura posterior; AtOpen = abertura.

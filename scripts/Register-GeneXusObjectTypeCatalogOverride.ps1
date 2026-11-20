@@ -82,7 +82,7 @@ $supportScript = Join-Path $PSScriptRoot 'GeneXusObjectTypeCatalogSupport.ps1'
 . $supportScript
 
 $resolvedKbRoot = (Resolve-Path -LiteralPath $ParallelKbRoot).Path
-if (-not $CatalogOverridePath) {
+if ([string]::IsNullOrWhiteSpace($CatalogOverridePath)) {
     $CatalogOverridePath = Get-GeneXusObjectTypeCatalogDefaultOverridePath -ParallelKbRoot $resolvedKbRoot
 }
 
@@ -98,7 +98,7 @@ $typeNameKey = $TypeName.Trim()
 $guidValue = $ObjectTypeGuid.Trim().ToLowerInvariant()
 
 $overrideObject = $null
-if (Test-Path -LiteralPath $CatalogOverridePath -PathType Leaf) {
+if (Test-Path -LiteralPath $CatalogOverridePath) {
     $existingClassification = Get-GeneXusCatalogOverrideClassification `
         -CatalogOverridePath $CatalogOverridePath `
         -ParallelKbRoot $resolvedKbRoot

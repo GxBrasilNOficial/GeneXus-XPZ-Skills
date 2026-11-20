@@ -62,7 +62,9 @@ $result = [pscustomobject]@{
 if ($AsJson) {
     $result | ConvertTo-Json -Depth 6
 } else {
-    if ($reminder.reminderRequired) {
+    if ($reminder.blocked) {
+        Write-Output ("{0}: {1}; motivo={2}; diagnostico={3}; caminho={4}" -f $reminder.status, $reminder.message, $reminder.reason, $reminder.diagnosticReason, $reminder.overridePath)
+    } elseif ($reminder.reminderRequired) {
         Write-Output $reminder.message
     } elseif ($reminder.cleanupRecommended) {
         $names = @($reminder.redundantTypeNames) -join ', '

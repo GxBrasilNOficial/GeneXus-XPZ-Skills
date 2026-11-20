@@ -181,6 +181,74 @@ Assert-True (-not (($queryOut -join "`n") -match 'Traceback')) 'query semantica 
 $queryResult = $queryOut | ConvertFrom-Json
 Assert-True ($queryResult.status -eq 'INVALID_OVERRIDE_SHAPE' -and $queryResult.blocked) 'query semantica deve devolver JSON estruturado para override invalido'
 
+# Caminho explícito indisponível, omissão e primeiro registro.
+$reminderScript = Join-Path $scriptDir 'Test-XpzCatalogOverrideSessionReminder.ps1'
+$registerScript = Join-Path $scriptDir 'Register-GeneXusObjectTypeCatalogOverride.ps1'
+$inventoryScript = Join-Path $scriptDir 'Get-GeneXusImportPackageObjectInventory.ps1'
+$buildScript = Join-Path $scriptDir 'Build-KbIntelligenceIndex.py'
+$queryScript = Join-Path $scriptDir 'Query-KbIntelligenceIndex.py'
+$missingPath = Join-Path $emptyRoot 'missing.json'
+$directoryPath = Join-Path $emptyRoot 'scripts'
+$sourceRoot = Join-Path $emptyRoot 'ObjetosDaKbEmXml'
+[void][IO.Directory]::CreateDirectory($sourceRoot)
+$indexPath = Join-Path $emptyRoot 'index.sqlite'
+foreach ($blank in @('', '   ')) {
+    $resolution = Resolve-GeneXusObjectTypeCatalogPaths -ParallelKbRoot $emptyRoot -CatalogOverridePath $blank
+    Assert-True (-not $resolution.OverrideActive) 'valor vazio/branco deve equivaler a omissão'
+    $discovered = Resolve-GeneXusObjectTypeCatalogPaths -ParallelKbRoot $redundantRoot -CatalogOverridePath $blank
+    Assert-True ($discovered.OverrideActive) 'valor vazio/branco deve permitir descoberta convencional'
+    $indexOutput = & python $buildScript --source-root $sourceRoot --output-path $indexPath --catalog-override-path $blank
+    Assert-True ($LASTEXITCODE -eq 0) "build Python deve aceitar valor vazio/branco: $indexOutput"
+    $queryOutput = & python $queryScript --index-path $indexPath --query who-uses --object-type Procedure --object-name Foo --catalog-override-path $blank
+    Assert-True ($LASTEXITCODE -eq 0) "query Python deve aceitar valor vazio/branco: $queryOutput"
+}
+
+$packagePath = Join-Path $emptyRoot 'package.xml'
+[IO.File]::WriteAllText($packagePath, "<ExportFile><Objects><Object name='Demo' type='$($procedure.objectTypeGuid)' guid='11111111-2222-3333-4444-555555555555' /></Objects></ExportFile>")
+$metadataPath = Join-Path $emptyRoot 'kb-source-metadata.md'
+[IO.File]::WriteAllText($metadataPath, '# Metadata sintética')
+$metadataHash = (Get-FileHash -LiteralPath $metadataPath).Hash
+$inventory = & $inventoryScript -InputPath $packagePath -CatalogOverridePath $invalidOverridePath | ConvertFrom-Json
+Assert-True ($LASTEXITCODE -eq 90 -and $inventory.blockingReasons[0] -match '^OVERRIDE_RESOLUTION_BLOCKED:') 'inventário deve preservar código 90 para conteúdo inválido'
+
+foreach ($path in @($missingPath, $directoryPath)) {
+    $classification = Get-GeneXusCatalogOverrideClassification -CatalogOverridePath $path -ParallelKbRoot $redundantRoot
+    $reminder = & $reminderScript -ParallelKbRoot $redundantRoot -CatalogOverridePath $path -AsJson | ConvertFrom-Json
+    Assert-True ($LASTEXITCODE -eq 2 -and $reminder.blocked) 'lembrete JSON deve bloquear caminho indisponível'
+    $reminderText = & $reminderScript -ParallelKbRoot $redundantRoot -CatalogOverridePath $path
+    Assert-True ($LASTEXITCODE -eq 2 -and $reminderText.Contains($path) -and $reminderText.Contains('override-path-not-file')) 'lembrete em texto deve exibir o diagnóstico e o caminho'
+    $inventory = & $inventoryScript -InputPath $packagePath -CatalogOverridePath $path | ConvertFrom-Json
+    Assert-True ($LASTEXITCODE -eq 20 -and $inventory.blockingReasons[0].StartsWith('BLOCK:')) 'inventário deve devolver código 20 para caminho indisponível'
+
+    $build = & python $buildScript --source-root $sourceRoot --output-path $indexPath --catalog-override-path $path | ConvertFrom-Json
+    Assert-True ($LASTEXITCODE -eq 2) 'build deve devolver diagnóstico estruturado e código 2'
+    $query = & python $queryScript --index-path $indexPath --query who-uses --object-type Procedure --object-name Foo --catalog-override-path $path | ConvertFrom-Json
+    Assert-True ($LASTEXITCODE -eq 2) 'consulta semântica deve devolver diagnóstico estruturado e código 2'
+    foreach ($result in @($classification, $build.catalogOverrideDiagnostic, $query.catalogOverrideDiagnostic)) {
+        Assert-True ($result.status -eq 'OVERRIDE_RESOLUTION_BLOCKED' -and $result.blocked -and $result.reason -eq 'override-path-unavailable' -and $result.diagnosticReason -eq 'override-path-not-file') 'status e motivos do bloqueio devem ser iguais em PS/Python'
+        Assert-True (-not $result.overrideActive -and -not $result.upstreamPending -and -not $result.declaredUpstreamPending -and -not $result.effectiveUpstreamPending) 'caminho indisponível não ativa override nem pendência'
+        Assert-True ($result.overridePath -eq $path -and $result.message.Contains($path) -and $result.effectiveCatalogAction -eq 'block-resolution') 'diagnóstico deve informar caminho e ação'
+    }
+}
+$indexMetadata = & python $queryScript --index-path $indexPath --query index-metadata --catalog-override-path $missingPath | ConvertFrom-Json
+Assert-True ($LASTEXITCODE -eq 0 -and $null -ne $indexMetadata) 'index-metadata deve funcionar com um caminho de override indisponível'
+
+$syncError = $null
+try {
+    & (Join-Path $scriptDir 'Sync-GeneXusXpzToXml.ps1') -InputPath $packagePath -DestinationRoot $sourceRoot -KbMetadataPath $metadataPath -CatalogOverridePath $missingPath
+} catch {
+    $syncError = $_.Exception.Message
+}
+Assert-True ($syncError -match '^OVERRIDE_RESOLUTION_BLOCKED: override-path-unavailable') 'sync deve preservar prefixo e motivo do resolvedor'
+Assert-True (@(Get-ChildItem -LiteralPath $sourceRoot -Recurse -File).Count -eq 0) 'sync bloqueado não deve materializar XML'
+Assert-True ((Get-FileHash -LiteralPath $metadataPath).Hash -eq $metadataHash) 'sync bloqueado deve preservar metadata'
+
+$registration = & $registerScript -ParallelKbRoot $emptyRoot -CatalogOverridePath $directoryPath -TypeName LocalRegistration -ObjectTypeGuid '812c4c84-8836-43a3-8799-51088216e307' -UserApproved -AsJson | ConvertFrom-Json
+Assert-True ($LASTEXITCODE -eq 2 -and $registration.diagnosticReason -eq 'override-path-not-file') 'diretório de destino deve bloquear registro com diagnóstico'
+Assert-True (@(Get-ChildItem -LiteralPath $directoryPath -Force).Count -eq 0) 'registro bloqueado não deve gravar no diretório'
+$registration = & $registerScript -ParallelKbRoot $emptyRoot -CatalogOverridePath '   ' -TypeName LocalRegistration -ObjectTypeGuid '812c4c84-8836-43a3-8799-51088216e307' -UserApproved -AsJson | ConvertFrom-Json
+Assert-True ($LASTEXITCODE -eq 0 -and (Test-Path -LiteralPath (Join-Path $directoryPath 'gx-object-type-catalog.override.json') -PathType Leaf)) 'primeiro registro com destino branco deve criar o arquivo convencional'
+
 # Unsafe shadowing e GUID duplicado.
 $shadowRoot = New-CaseRoot 'shadow'
 Write-JsonFile -Path (Join-Path $shadowRoot 'scripts/gx-object-type-catalog.override.json') -Value ([ordered]@{ types = [ordered]@{ Attribute = [ordered]@{ objectTypeGuid='aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'; rootKind='Attribute'; folderName='Attribute'; inventoryEligible=$true; queryableByKbIntelligence=$true; containerType=$false } } })

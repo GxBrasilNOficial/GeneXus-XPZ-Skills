@@ -903,7 +903,11 @@ try {
 
         $preflightBlocked = [ordered]@{
             status = 'não apto para prosseguir'
-            summary = 'Pré-validação de identidade no índice KbIntelligence bloqueou a exportação seletiva.'
+            summary = if ($null -ne $preflightResult.PSObject.Properties['catalogOverrideDiagnostic']) {
+                'O caminho explícito do catálogo de tipos bloqueou a exportação seletiva.'
+            } else {
+                'Pré-validação de identidade no índice KbIntelligence bloqueou a exportação seletiva.'
+            }
             exitCode = $preflightResult.exitCode
             stage = 'pre-export-identity'
             requestedContext = [ordered]@{
@@ -1295,7 +1299,9 @@ try {
             -ArtifactDirectory $artifactDirectory `
             -ObjectList $objectListSpec `
             -ExportAll $ExportAll `
-            -FullExportRequested $FullExport.IsPresent
+            -FullExportRequested $FullExport.IsPresent `
+            -ParallelKbRoot $ParallelKbRoot `
+            -CatalogOverridePath $CatalogOverridePath
         if ($inventoryBlock.inventoryDegraded) {
             Add-WarningMessage -Message ('Inventario do pacote degradado: {0}' -f $inventoryBlock.inventoryError)
             Add-StrategyTrace -Message ('Inventario degradado: {0}' -f $inventoryBlock.inventoryError)

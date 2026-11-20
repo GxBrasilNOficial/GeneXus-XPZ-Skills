@@ -167,6 +167,7 @@ LAYOUT_CLASS_ATTR_RE = re.compile(
 
 from GeneXusObjectTypeCatalogCore import (  # noqa: E402
     CatalogOverrideDiagnosticError,
+    parse_catalog_override_path,
     build_type_guid_index,
     load_gx_object_type_catalog,
     resolve_effective_object_type_catalog,
@@ -3564,7 +3565,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--catalog-override-path",
-        type=Path,
+        type=parse_catalog_override_path,
         help="Caminho explicito do override local; prevalece sobre a deteccao automatica pela pasta paralela.",
     )
     return parser.parse_args()
@@ -3581,7 +3582,7 @@ def main() -> int:
         activate_object_type_catalog(
             source_root,
             parallel_kb_root=args.parallel_kb_root.resolve() if args.parallel_kb_root else None,
-            catalog_override_path=args.catalog_override_path.resolve() if args.catalog_override_path else None,
+            catalog_override_path=args.catalog_override_path,
         )
     except CatalogOverrideDiagnosticError as exc:
         print(json.dumps(build_catalog_override_blocked_result(exc), indent=2, ensure_ascii=False))

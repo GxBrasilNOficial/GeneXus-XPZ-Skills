@@ -784,8 +784,8 @@ divergente dentro dos wrappers.
 Parâmetros específicos de exportação:
 
 - `-XpzPath`
-- `-ObjectList` (nome canônico da seleção por nome; sinônimo aceito `-ObjectNames`; tipo `[string[]]`, aceita string única ou array; export seletivo: formato `Tipo:Nome`; exige `-ParallelKbRoot` ou `-IndexPath` — pré-validação `objectListPreflight`, estágio `pre-export-identity`, exit **35** se homônimo ou índice inválido; ver `10a-gx-export-task-labels.md`)
-- `-ParallelKbRoot` / `-IndexPath` / `-CatalogOverridePath` (obrigatórios com `-ObjectList` preenchido e sem `-ExportAll`/exportação full)
+- `-ObjectList` (nome canônico da seleção por nome; sinônimo aceito `-ObjectNames`; tipo `[string[]]`, aceita string única ou array; export seletivo: formato `Tipo:Nome`; exige `-ParallelKbRoot` ou `-IndexPath` — pré-validação `objectListPreflight`, estágio `pre-export-identity`, exit **35** se houver homônimo, índice ausente/inválido ou caminho explícito de catálogo indisponível; ver `10a-gx-export-task-labels.md`)
+- `-ParallelKbRoot` / `-IndexPath` — um deles é obrigatório com `-ObjectList` preenchido e sem `-ExportAll`/exportação full. `-CatalogOverridePath` é opcional. Com apenas `-IndexPath`, o PowerShell não descobre o override convencional. Para usar catálogo local, informe `-ParallelKbRoot` ou `-CatalogOverridePath`. O inventário pós-exportação seletiva usa o mesmo contexto de catálogo.
 - `-DependencyType` (em export seletivo/cirúrgico que deve conter somente a lista nominal, usar `"None"`)
 - `-ReferenceType` (em export seletivo/cirúrgico que deve conter somente a lista nominal, usar `"None"`)
 - `-ExportKbInfo`
@@ -796,9 +796,9 @@ Parâmetros específicos de importação:
 - `-InputPath` (nome canônico da entrada primária; aliases `-XpzPath` retrocompatível e `-Path`; aceita `.xpz`, `.xml` e `.import_file.xml` quando o envelope foi validado por `Test-GeneXusImportFileEnvelope.ps1`; a extensão aceita não é restringida pelo nome do parâmetro)
 - `-PreviewMode`
 - `-UpdateFilePath`
-- `-IncludeItems` (import seletivo: formato `Tipo:Nome`; exige `-ParallelKbRoot` ou `-IndexPath` — pré-validação `objectListPreflight`, exit **35** se homônimo ou índice inválido)
+- `-IncludeItems` (import seletivo: formato `Tipo:Nome`; exige `-ParallelKbRoot` ou `-IndexPath` — pré-validação `objectListPreflight`, exit **35** se houver homônimo, índice ausente/inválido ou caminho explícito de catálogo indisponível)
 - `-ExcludeItems`
-- `-ParallelKbRoot` / `-IndexPath` / `-CatalogOverridePath` (obrigatórios com `-IncludeItems` preenchido; ver `10a-gx-export-task-labels.md`)
+- `-ParallelKbRoot` / `-IndexPath` — um deles é obrigatório com `-IncludeItems` preenchido; ver `10a-gx-export-task-labels.md`. `-CatalogOverridePath` é opcional. Com apenas `-IndexPath`, use `-ParallelKbRoot` ou um caminho explícito para ativar o catálogo local.
 - `-AutomaticBackup`
 - `-ImportType`
 - `-ImportKbInformation` (tri-state: omitido ou `false` equivalem a não emitir o atributo; apenas `true` emite e exige suporte na task carregada)

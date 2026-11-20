@@ -96,6 +96,38 @@ try {
     Assert-True ($null -eq $fullExport.packageInventory.PSObject.Properties['extrasFullListAt']) 'export sem delta nao deve anunciar extrasFullListAt'
     Assert-True ($true -eq $fullExport.sidecarPublished) 'sidecar de export completo deve ser publicado'
 
+    . (Join-Path $scriptDir 'GeneXusXpzExportInventoryGovernance.ps1')
+    $catalogDirectory = Join-Path $tempRoot 'scripts'
+    [void][IO.Directory]::CreateDirectory($catalogDirectory)
+    $localCatalog = Join-Path $catalogDirectory 'gx-object-type-catalog.override.json'
+    [IO.File]::WriteAllText($localCatalog, '{"types":{"WorkWithForWeb":{"exportTaskLabel":"LocalWebPattern","inventoryEligible":false}}}')
+    $xpzPath = Join-Path $tempRoot 'synthetic.xpz'
+    $archive = [IO.Compression.ZipFile]::Open($xpzPath, [IO.Compression.ZipArchiveMode]::Create)
+    try {
+        [void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile($archive, $xmlPath, 'export.xml')
+    } finally {
+        $archive.Dispose()
+    }
+
+    foreach ($explicit in @($true, $false)) {
+        $artifactDirectory = Join-Path $tempRoot "alias-export-$explicit"
+        [void][IO.Directory]::CreateDirectory($artifactDirectory)
+        $catalogContext = if ($explicit) { @{ CatalogOverridePath = $localCatalog } } else { @{ ParallelKbRoot = $tempRoot } }
+        $localExport = New-ExportPackageInventoryBlock -XpzPath $xpzPath -ArtifactDirectory $artifactDirectory -ObjectList 'LocalWebPattern:MainWW' @catalogContext
+        Assert-True ($localExport.sidecarPublished) 'inventário seletivo com catálogo local deve publicar sidecar'
+        Assert-Equal '1' ([string]$localExport.packageInventory.aliasResolutionCount) 'resumo deve reconhecer rótulo exclusivo do catálogo local'
+        $localSidecar = Get-Content -LiteralPath $localExport.packageInventoryPath -Raw | ConvertFrom-Json
+        Assert-Equal 'WorkWithForWeb' $localSidecar.deltaComparison.aliasResolutions[0].inventoryTypeName 'sidecar seletivo deve conciliar o tipo canônico'
+        Assert-Equal 'exportTaskLabel' $localSidecar.deltaComparison.aliasResolutions[0].rule 'sidecar deve registrar a regra usada'
+    }
+
+    $fullLocalDirectory = Join-Path $tempRoot 'full-export-with-context'
+    [void][IO.Directory]::CreateDirectory($fullLocalDirectory)
+    $fullLocal = New-ExportPackageInventoryBlock -XpzPath $xpzPath -ArtifactDirectory $fullLocalDirectory -FullExportRequested $true -CatalogOverridePath (Join-Path $tempRoot 'missing.json')
+    Assert-True ($fullLocal.sidecarPublished) 'export completo deve inventariar com catálogo base mesmo com caminho local indisponível'
+    $fullLocalSidecar = Get-Content -LiteralPath $fullLocal.packageInventoryPath -Raw | ConvertFrom-Json
+    Assert-True ($null -eq $fullLocalSidecar.PSObject.Properties['deltaComparison']) 'export completo deve publicar inventário sem confronto seletivo'
+
     $manyObjectsPath = Join-Path $tempRoot 'selective-many.import_file.xml'
     $manyXml = [System.Text.StringBuilder]::new()
     [void]$manyXml.AppendLine('<?xml version="1.0" encoding="utf-8"?>')

@@ -88,4 +88,14 @@ if ($items.Count -ne 2) {
     throw "Esperava 2 itens parseados; obtido: $($items.Count)"
 }
 
+$invalidIndex = Invoke-GeneXusObjectListIdentityPreflight -ObjectList 'Procedure:Demo' -IndexPath $PSCommandPath
+$missingIndexLog = ConvertTo-GeneXusObjectListPreflightLogSection -PreflightResult $blocked
+$invalidIndexLog = ConvertTo-GeneXusObjectListPreflightLogSection -PreflightResult $invalidIndex
+foreach ($section in @($missingIndexLog, $invalidIndexLog)) {
+    if ($null -ne $section.lastIndexBuildAt -or $section.Contains('catalogOverrideDiagnostic')) {
+        throw 'Retorno de índice indisponível deve ter timestamp nulo e dispensar diagnóstico de catálogo.'
+    }
+}
+if ($invalidIndex.exitCode -ne 35) { throw 'Índice inválido deve produzir exit 35.' }
+
 Write-Output 'OBJECT_LIST_IDENTITY_PREFLIGHT_SELFTEST_OK'

@@ -19,6 +19,7 @@ if str(_SCRIPT_DIR) not in sys.path:
 
 from GeneXusObjectTypeCatalogCore import (  # noqa: E402
     CatalogOverrideDiagnosticError,
+    parse_catalog_override_path,
     resolve_effective_object_type_catalog_for_query,
 )
 from GeneXusCanonicalJson import CanonicalJsonError, loads_strict  # noqa: E402
@@ -1683,7 +1684,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--catalog-override-path",
-        type=Path,
+        type=parse_catalog_override_path,
         help="Caminho explicito do override de catalogo (prevalece sobre deteccao por parallel-kb-root).",
     )
     return parser.parse_args()

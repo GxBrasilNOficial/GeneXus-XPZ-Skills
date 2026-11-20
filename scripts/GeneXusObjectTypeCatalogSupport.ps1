@@ -42,7 +42,7 @@ function Read-GeneXusObjectTypeCatalogFile {
 function New-GeneXusCatalogOverrideDiagnosticResult {
     param([string]$Status,[bool]$OverrideActive,[string]$OverridePath,[string]$Reason,[string]$DiagnosticReason,[string]$FieldPath,[string]$Message,[object[]]$Entries=@(),[bool]$DeclaredUpstreamPending=$false,[string]$EffectiveCatalogAction='none')
     $pending=@($Entries|Where-Object{$_.classification -eq 'pending'}); $redundant=@($Entries|Where-Object{$_.classification -eq 'redundant'}); $divergent=@($Entries|Where-Object{$_.classification -eq 'divergent'}); $blocked=@($Entries|Where-Object{$_.effectiveCatalogAction -eq 'block-resolution'})
-    $effectivePending = $Status -in @('REMINDER_REQUIRED','INVALID_OVERRIDE_SHAPE','OVERRIDE_RESOLUTION_BLOCKED')
+    $effectivePending = $OverrideActive -and $Status -in @('REMINDER_REQUIRED','INVALID_OVERRIDE_SHAPE','OVERRIDE_RESOLUTION_BLOCKED')
     [pscustomobject]@{
         status=$Status; overrideActive=$OverrideActive; overridePath=$OverridePath; reason=$Reason; diagnosticReason=$DiagnosticReason; fieldPath=$FieldPath; message=$Message; blocked=($Status -in @('INVALID_OVERRIDE_SHAPE','OVERRIDE_RESOLUTION_BLOCKED'))
         classificationEntries=@($Entries); declaredUpstreamPending=$DeclaredUpstreamPending; effectiveUpstreamPending=$effectivePending; upstreamPending=$effectivePending; cleanupRecommended=($Status -eq 'CLEANUP_RECOMMENDED'); noticeRequired=($Status -ne 'OK'); reminderRequired=($Status -eq 'REMINDER_REQUIRED')
@@ -82,9 +82,26 @@ function Test-GeneXusCatalogJsonHasDuplicateKey {
     return $script:dupFound
 }
 
+function Get-GeneXusExplicitCatalogOverridePathDiagnostic {
+    param([string]$CatalogOverridePath)
+
+    if ([string]::IsNullOrWhiteSpace($CatalogOverridePath) -or (Test-Path -LiteralPath $CatalogOverridePath -PathType Leaf)) {
+        return $null
+    }
+    return New-GeneXusCatalogOverrideDiagnosticResult -Status 'OVERRIDE_RESOLUTION_BLOCKED' `
+        -OverrideActive:$false -OverridePath $CatalogOverridePath -Reason 'override-path-unavailable' `
+        -DiagnosticReason 'override-path-not-file' `
+        -Message "Caminho explícito do catálogo override não aponta para arquivo: $CatalogOverridePath" `
+        -EffectiveCatalogAction 'block-resolution'
+}
+
 function Get-GeneXusCatalogOverrideClassification {
     param([string]$BaseCatalogPath,[string]$CatalogOverridePath,[string]$ParallelKbRoot,[object]$OverrideCatalog,[string]$OverridePathForDiagnostics)
     if([string]::IsNullOrWhiteSpace($BaseCatalogPath)){$BaseCatalogPath=Get-GeneXusObjectTypeCatalogDefaultBasePath}
+    if ($null -eq $OverrideCatalog) {
+        $pathDiagnostic = Get-GeneXusExplicitCatalogOverridePathDiagnostic -CatalogOverridePath $CatalogOverridePath
+        if ($null -ne $pathDiagnostic) { return $pathDiagnostic }
+    }
     $resolvedOverridePath=$CatalogOverridePath
     if([string]::IsNullOrWhiteSpace($resolvedOverridePath) -and -not [string]::IsNullOrWhiteSpace($ParallelKbRoot)){$resolvedOverridePath=Get-GeneXusObjectTypeCatalogDefaultOverridePath -ParallelKbRoot $ParallelKbRoot}
     $overrideActive=($null -ne $OverrideCatalog) -or (-not [string]::IsNullOrWhiteSpace($resolvedOverridePath) -and (Test-Path -LiteralPath $resolvedOverridePath -PathType Leaf))

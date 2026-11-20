@@ -344,7 +344,7 @@ function ConvertTo-GeneXusObjectListPreflightLogSection {
         return $null
     }
 
-    return [ordered]@{
+    $section = [ordered]@{
         gateContext         = $PreflightResult.gateContext
         preflightEnabled    = $PreflightResult.preflightEnabled
         preflightSkipped    = $PreflightResult.preflightSkipped
@@ -353,6 +353,11 @@ function ConvertTo-GeneXusObjectListPreflightLogSection {
         lastIndexBuildAt    = $PreflightResult.lastIndexBuildAt
         items               = @($PreflightResult.preflightItems)
     }
+    $diagnostic = $PreflightResult.PSObject.Properties['catalogOverrideDiagnostic']
+    if ($null -ne $diagnostic) {
+        $section['catalogOverrideDiagnostic'] = $diagnostic.Value
+    }
+    return $section
 }
 
 function New-GeneXusObjectListPreflightSkippedResult {
@@ -434,6 +439,7 @@ function Invoke-GeneXusObjectListIdentityPreflight {
             exitCode            = 35
             indexPath           = $null
             parallelKbRoot      = $resolvedParallel
+            lastIndexBuildAt    = $null
             preflightItems      = @()
             blockingReasons     = @('Operação seletiva MSBuild com lista Tipo:Nome exige -ParallelKbRoot ou -IndexPath do índice KbIntelligence.')
             warnings            = @()
@@ -459,6 +465,25 @@ function Invoke-GeneXusObjectListIdentityPreflight {
             preflightItems      = @()
             blockingReasons     = @([string]$indexReady.reason)
             warnings            = @()
+        }
+    }
+
+    $pathDiagnostic = Get-GeneXusExplicitCatalogOverridePathDiagnostic -CatalogOverridePath $CatalogOverridePath
+    if ($null -ne $pathDiagnostic) {
+        return [pscustomobject]@{
+            gateContext               = $GateContext
+            preflightEnabled          = $true
+            preflightSkipped          = $false
+            preflightSkipReason       = $null
+            block                     = $true
+            exitCode                  = 35
+            indexPath                 = $resolvedIndex
+            parallelKbRoot            = $resolvedParallel
+            lastIndexBuildAt          = $indexReady.lastIndexBuildAt
+            preflightItems            = @()
+            blockingReasons           = @($pathDiagnostic.message)
+            warnings                  = @()
+            catalogOverrideDiagnostic = $pathDiagnostic
         }
     }
 

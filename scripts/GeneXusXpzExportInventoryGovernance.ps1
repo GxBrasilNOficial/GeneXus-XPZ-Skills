@@ -78,7 +78,9 @@ function New-ExportPackageInventoryBlock {
         [string]$ArtifactDirectory,
         [string]$ObjectList,
         [string]$ExportAll,
-        [bool]$FullExportRequested
+        [bool]$FullExportRequested,
+        [string]$ParallelKbRoot,
+        [string]$CatalogOverridePath
     )
 
     $packageInventoryPath = Join-Path $ArtifactDirectory 'package-inventory.json'
@@ -108,10 +110,16 @@ function New-ExportPackageInventoryBlock {
     }
 
     . $supportPath
-    $core = New-PackageInventoryResult `
-        -InputPath $XpzPath `
-        -DeclaredDeltaItems $declaredDelta `
-        -SidecarInventoryPath $packageInventoryPath
+    $inventoryParams = @{
+        InputPath            = $XpzPath
+        DeclaredDeltaItems   = $declaredDelta
+        SidecarInventoryPath = $packageInventoryPath
+    }
+    if ($isSelective) {
+        $inventoryParams['ParallelKbRoot'] = $ParallelKbRoot
+        $inventoryParams['CatalogOverridePath'] = $CatalogOverridePath
+    }
+    $core = New-PackageInventoryResult @inventoryParams
 
     $operationalSubState = Resolve-ExportPackageInventoryOperationalSubState `
         -PackageInventory $core.packageInventory `

@@ -166,7 +166,9 @@ function New-PackageInventoryResult {
         [string]$DeclaredDeltaItems,
         [string]$SidecarInventoryPath,
         [switch]$FailOnDeltaMismatch,
-        [switch]$FailOnUnknownTypes
+        [switch]$FailOnUnknownTypes,
+        [string]$ParallelKbRoot,
+        [string]$CatalogOverridePath
     )
 
     $inventoryScriptPath = Join-Path $PSScriptRoot 'Get-GeneXusImportPackageObjectInventory.ps1'
@@ -201,6 +203,13 @@ function New-PackageInventoryResult {
         }
         if ($FailOnUnknownTypes) {
             $invokeParams['FailOnUnknownTypes'] = $true
+        }
+
+        if (-not [string]::IsNullOrWhiteSpace($ParallelKbRoot)) {
+            $invokeParams['ParallelKbRoot'] = $ParallelKbRoot
+        }
+        if (-not [string]::IsNullOrWhiteSpace($CatalogOverridePath)) {
+            $invokeParams['CatalogOverridePath'] = $CatalogOverridePath
         }
 
         $inventory = (& $inventoryScriptPath @invokeParams | ConvertFrom-Json)

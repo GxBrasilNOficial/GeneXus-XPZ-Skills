@@ -359,6 +359,11 @@ if (-not (Test-Path -LiteralPath $InputPath -PathType Leaf)) {
     throw "BLOCK: InputPath nao encontrado: $InputPath"
 }
 
+$pathDiagnostic = Get-GeneXusExplicitCatalogOverridePathDiagnostic -CatalogOverridePath $CatalogOverridePath
+if ($null -ne $pathDiagnostic) {
+    throw "BLOCK: $($pathDiagnostic.message)"
+}
+
 $catalogResolution = Resolve-GeneXusObjectTypeCatalogPaths -BaseCatalogPath $CatalogPath -CatalogOverridePath $CatalogOverridePath -ParallelKbRoot $ParallelKbRoot
 $CatalogPath = $catalogResolution.BaseCatalogPath
 $guidMap = Get-GeneXusCatalogGuidToTypeMap -MergedCatalog $catalogResolution.MergedCatalog

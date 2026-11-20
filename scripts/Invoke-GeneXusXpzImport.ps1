@@ -883,7 +883,11 @@ try {
 
         $preflightBlocked = [ordered]@{
             status = 'não apto para prosseguir'
-            summary = 'Pré-validação de identidade no índice KbIntelligence bloqueou a importação seletiva.'
+            summary = if ($null -ne $preflightResult.PSObject.Properties['catalogOverrideDiagnostic']) {
+                'O caminho explícito do catálogo de tipos bloqueou a importação seletiva.'
+            } else {
+                'Pré-validação de identidade no índice KbIntelligence bloqueou a importação seletiva.'
+            }
             exitCode = $preflightResult.exitCode
             stage = 'pre-import-identity'
             requestedContext = [ordered]@{

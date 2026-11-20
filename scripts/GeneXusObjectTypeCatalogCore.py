@@ -237,13 +237,17 @@ def _cleanup(entries: list[dict[str, object]], declared: bool, path: Path | None
     return _result("CLEANUP_RECOMMENDED", entries, declared, path, reason, reason if reason == "equivalent" else None, None, "merge" if entries else "none")
 
 
-def _result(status: str, entries: list[dict[str, object]], declared: bool, path: Path | None, reason: object, diagnostic: object, field_path: object, action: str) -> dict[str, object]:
+def _result(status: str, entries: list[dict[str, object]], declared: bool, path: Path | None, reason: object, diagnostic: object, field_path: object, action: str, *, override_active: bool = True, message: str = "catalog override diagnostic") -> dict[str, object]:
     pending = [e for e in entries if e["classification"] == "pending"]
     redundant = [e for e in entries if e["classification"] == "redundant"]
     divergent = [e for e in entries if e["classification"] == "divergent"]
     blocked = [e for e in entries if e["effectiveCatalogAction"] == "block-resolution"]
-    effective = status in {"REMINDER_REQUIRED", "INVALID_OVERRIDE_SHAPE", "OVERRIDE_RESOLUTION_BLOCKED"}
-    return {"status": status, "overrideActive": True, "overridePath": str(path) if path else None, "reason": reason, "diagnosticReason": diagnostic, "fieldPath": field_path, "message": "catalog override diagnostic", "blocked": status in {"INVALID_OVERRIDE_SHAPE", "OVERRIDE_RESOLUTION_BLOCKED"}, "classificationEntries": entries, "declaredUpstreamPending": declared, "effectiveUpstreamPending": effective, "upstreamPending": effective, "cleanupRecommended": status == "CLEANUP_RECOMMENDED", "noticeRequired": status != "OK", "reminderRequired": status == "REMINDER_REQUIRED", "pendingTypeNames": sorted(e["typeName"] for e in pending), "pendingTypeGuids": [e.get("objectTypeGuid") for e in pending if e.get("objectTypeGuid")], "redundantTypeNames": sorted(e["typeName"] for e in redundant), "redundantTypeGuids": [e.get("objectTypeGuid") for e in redundant if e.get("objectTypeGuid")], "divergentTypeNames": sorted(e["typeName"] for e in divergent), "divergentTypeGuids": [e.get("objectTypeGuid") for e in divergent if e.get("objectTypeGuid")], "blockedTypeNames": sorted(e["typeName"] for e in blocked), "blockedTypeGuids": [e.get("objectTypeGuid") for e in blocked if e.get("objectTypeGuid")], "effectiveCatalogAction": action}
+    effective = override_active and status in {"REMINDER_REQUIRED", "INVALID_OVERRIDE_SHAPE", "OVERRIDE_RESOLUTION_BLOCKED"}
+    return {"status": status, "overrideActive": override_active, "overridePath": str(path) if path else None, "reason": reason, "diagnosticReason": diagnostic, "fieldPath": field_path, "message": message, "blocked": status in {"INVALID_OVERRIDE_SHAPE", "OVERRIDE_RESOLUTION_BLOCKED"}, "classificationEntries": entries, "declaredUpstreamPending": declared, "effectiveUpstreamPending": effective, "upstreamPending": effective, "cleanupRecommended": status == "CLEANUP_RECOMMENDED", "noticeRequired": status != "OK", "reminderRequired": status == "REMINDER_REQUIRED", "pendingTypeNames": sorted(e["typeName"] for e in pending), "pendingTypeGuids": [e.get("objectTypeGuid") for e in pending if e.get("objectTypeGuid")], "redundantTypeNames": sorted(e["typeName"] for e in redundant), "redundantTypeGuids": [e.get("objectTypeGuid") for e in redundant if e.get("objectTypeGuid")], "divergentTypeNames": sorted(e["typeName"] for e in divergent), "divergentTypeGuids": [e.get("objectTypeGuid") for e in divergent if e.get("objectTypeGuid")], "blockedTypeNames": sorted(e["typeName"] for e in blocked), "blockedTypeGuids": [e.get("objectTypeGuid") for e in blocked if e.get("objectTypeGuid")], "effectiveCatalogAction": action}
+
+
+def parse_catalog_override_path(value: str) -> Path | None:
+    return Path(value) if value.strip() else None
 
 
 def merge_gx_object_type_catalogs(base: dict[str, object], override: dict[str, object] | None, classification: dict[str, object] | None = None) -> dict[str, object]:
@@ -287,8 +291,14 @@ def resolve_parallel_kb_root_from_index_path(index_path: Path, parallel_kb_root:
 
 def resolve_catalog_override_path(parallel_kb_root: Path | None, catalog_override_path: Path | None) -> Path | None:
     if catalog_override_path is not None:
-        resolved = catalog_override_path.resolve()
-        return resolved if resolved.is_file() else None
+        if not catalog_override_path.is_file():
+            raise CatalogOverrideDiagnosticError(_result(
+                "OVERRIDE_RESOLUTION_BLOCKED", [], False, catalog_override_path,
+                "override-path-unavailable", "override-path-not-file", None, "block-resolution",
+                override_active=False,
+                message=f"Caminho explícito do catálogo override não aponta para arquivo: {catalog_override_path}",
+            ))
+        return catalog_override_path.resolve()
     if parallel_kb_root is None:
         return None
     candidate = parallel_kb_root / DEFAULT_OVERRIDE_RELATIVE
