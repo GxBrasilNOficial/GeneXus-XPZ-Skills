@@ -25,6 +25,8 @@ Caminho opcional para gx-object-type-catalog.json.
 
 .PARAMETER CatalogOverridePath
 Caminho opcional para gx-object-type-catalog.override.json na pasta paralela.
+Caminho explícito não branco que não aponta para arquivo retorna BLOCK e exit 20.
+Conteúdo de override bloqueante mantém OVERRIDE_RESOLUTION_BLOCKED e exit 90.
 
 .PARAMETER ParallelKbRoot
 Raiz da pasta paralela; resolve override em scripts/ quando CatalogOverridePath omitido.
