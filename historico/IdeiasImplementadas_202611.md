@@ -12,7 +12,7 @@ Implementado em 2026-11-20 conforme design congelado `RoundId=wrap-indent-v4-202
 
 ### Rastreabilidade
 
-- (pendente commit material desta frente)
+- `50dfe39` — Detecta drift de profundidade no wrap de Source.
 
 ## Skill `xpz-mcp-integrations-setup` — componente MCP externo opcional (Jev/System One) — implementação da v1
 
