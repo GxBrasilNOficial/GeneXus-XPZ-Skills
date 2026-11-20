@@ -71,6 +71,8 @@ $hasWarn = @($results | Where-Object { $_.sourceSanityStatus -eq 'warn' }).Count
 
 # Opt-in: Test-GeneXusSourceIndentation.ps1 pode rodar em paralelo e expor
 # sourceIndentStatus ao lado. Nao misturar indent em $hasFail / probablyImportable.
+# Wrap/recontextualizacao: gate de processo (BaselinePath + ABORT em
+# indent-context-depth-drift) esta no xpz-builder, nao neste wrapper.
 
 $summary = [pscustomobject]@{
     inputPath          = $targetPath
