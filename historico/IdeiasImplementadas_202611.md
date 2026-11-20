@@ -8,7 +8,7 @@ Implementado em 2026-11-20 conforme design congelado `RoundId=wrap-indent-v4-202
 
 **Escopo entregue.** Motor `Test-GeneXusSourceIndentation.ps1` emite `indent-context-depth-drift` (warn) com baseline `compared`, classes LCS `preserved`/`reindented`, quando a profundidade estrutural sobe e o recuo não acompanha — **sem** exigir `-AbsoluteIndentCheck`. Mesma bifurcação de under-depth (inclui `unitMode=none`). Guardas: unit-mismatch/mixed antes do drift; BaselinePath/AcervoPath no mesmo path físico de InputPath → `no-baseline-unresolved`. Gate de **processo** (ABORT de empacotamento) lê `parts[].baselineStatus` da part do wrap, não o agregado top-level; `probablyImportable` e 9-FD intocados. Absolute continua opt-in consultivo para under-depth herdado sem aumento de profundidade. C (hint editor) e D (wrapper exemplo) fora desta frente. Docs: `xpz-builder` SKILL/checklist/`procedure.md`, `02`, `08`, `09`, CHANGELOG trilíngue.
 
-**Validação.** `Test-GeneXusSourceIndentationSelfTest.ps1` casos 28–36 (wrap fail/pass, Absolute herdado sem drift, Baseline/Acervo=Input unresolved, `unitMode=none`, reindented drift, G1 unit-mismatch sem depth+, G2 inconclusiveLocal com depth+) e anti-duplicata laço drift×Absolute. Token: `OK: Test-GeneXusSourceIndentationSelfTest.ps1`.
+**Validação.** `Test-GeneXusSourceIndentationSelfTest.ps1` casos 28–38 (wrap fail/pass, Absolute herdado sem drift, Baseline/Acervo=Input unresolved, `unitMode=none`, reindented drift, G1 unit-mismatch sem depth+, G2 inconclusiveLocal com depth+, anti-duplicata drift×Absolute, drift não engolido por unit-mismatch). Token: `OK: Test-GeneXusSourceIndentationSelfTest.ps1`.
 
 ### Rastreabilidade
 

@@ -553,5 +553,28 @@ $inc37abs = @($r37abs.findings | Where-Object { $_.code -eq 'indent-inconclusive
 $dupAbs = $inc37abs | Group-Object -Property sourceLineNumber
 Assert-True (@($dupAbs | Where-Object { $_.Count -gt 1 }).Count -eq 0) 'com Absolute tambem sem duplicata de inconclusive'
 
+# 38) G1 DeepSeek: wrap + corpo com unidade divergente + recuo curto => drift NAO engolido
+$guidUm = 'aeaeaeae-aeae-aeae-aeae-aeaeaeaeaeae'
+$umBase = @"
+if &Gerar
+	&Cell += 1
+endif
+"@
+Write-Xml -Path (Join-Path $acervoRoot 'ProcUm.xml') -Xml (New-ProcXml -Guid $guidUm -Name 'ProcUm' -Source $umBase)
+# Moda tab (msgs); corpo &Cell preserved com 4 espacos (unidade divergente) + depth+ sem aprofundar
+$umWrap = @"
+if &Outer
+	msg('a')
+	msg('b')
+if &Gerar
+    &Cell += 1
+endif
+	msg('c')
+endif
+"@
+$r38 = Invoke-Indent -Xml (New-ProcXml -Guid $guidUm -Name 'ProcUm' -Source $umWrap) -AcervoPath $acervoRoot
+Assert-True (Test-HasCode -Result $r38 -Code 'indent-context-depth-drift') 'unit-mismatch nao deve engolir drift'
+Assert-True (Test-HasCode -Result $r38 -Code 'indent-unit-mismatch-in-delta') 'unit-mismatch continua finding a parte'
+
 Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
 Write-Output 'OK: Test-GeneXusSourceIndentationSelfTest.ps1'

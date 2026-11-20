@@ -1022,8 +1022,8 @@ function Test-PartIndentation {
 
     # Depth-drift (wrap/recontextualizacao): so com baseline compared; nao exige Absolute.
     # Classes preserved e reindented; herdado sem aumento de profundidade nao dispara.
-    # Ordem: depth+ primeiro; so entao guardas de unidade / inconclusive (evita unit-mismatch
-    # em preserved sem Absolute e sem depth+; reindented unit-mismatch fica no laco Absolute).
+    # Ordem: depth+ -> inconclusive/mixed (falta evidencia) -> unit-mismatch (finding a parte,
+    # NAO engole drift) -> under-indent => indent-context-depth-drift.
     if ($baseline.status -eq 'compared') {
         foreach ($op in $deltaOps) {
             if ($op.classification -notin @('preserved', 'reindented')) { continue }
@@ -1056,7 +1056,7 @@ function Test-PartIndentation {
                 continue
             }
 
-            # Unit-mismatch so em preserved sem Absolute (Absolute/delta cobre reindented e preserved+Absolute).
+            # Unit-mismatch: finding a parte; NAO continue aqui — senao engole o drift (ABORT).
             if (
                 ($unitMode -eq 'tab' -and $m.unit -eq 'space') -or
                 ($unitMode -eq 'space' -and $m.unit -eq 'tab') -or
@@ -1076,7 +1076,6 @@ function Test-PartIndentation {
                         -ObjectName $Target.objectName -ObjectGuid $Target.objectGuid -PartType $script:SourcePartType `
                         -DeltaLineClass $op.classification)) | Out-Null
                 }
-                continue
             }
 
             $underAtNew = $false
