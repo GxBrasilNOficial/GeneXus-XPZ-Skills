@@ -2473,7 +2473,7 @@ Funcionar como resumo decisório sem esconder os limites da evidência.
 - Inferência forte: para geração de `.xpz` de objetos, o bloco especial de KB (`KnowledgeBase` ou elemento top-level com nome literal da KB) deve ser tratado como proibido
 - Hipótese forte: o erro `Fail creating backup: Empty name is not allowed.` está mais ligado ao bloco especial de KB em exports full/especiais, sobretudo quando `KnowledgeBase/@name` falta, do que ao formato normal de `ObjectsIdentityMapping`
 - Inferência forte: antes de empacotar, validar parse XML do objeto clonado e validar que o envelope XPZ continua contendo o mesmo padrão estrutural do molde usado
-- Hipótese: checksum, datas e outros metadados externos só devem ser recalculados se houver processo real de exportação que faca isso; na ausencia desse processo, preservar o padrão do molde usado
+- Hipótese: checksum, datas e outros metadados externos só devem ser recalculados se houver processo real de exportação que faca isso; na ausencia desse processo, preservar o padrão do molde usado. Achado de import: ver `xpz-msbuild-import-export/SKILL.md`, subseção `Observação (medida): checksum e representação após import`; ele não valida que preservar o checksum do molde sobrevive a um import
 
 ### Campos de nome invariantes no formato normal
 
@@ -2482,7 +2482,7 @@ Funcionar como resumo decisório sem esconder os limites da evidência.
 - Evidência direta: `ObjectIdentity/@Name` não apareceu vazio nos exports normais lidos
 - Evidência direta: `ObjectIdentity/@Type` e `ObjectIdentity/Guid` também vieram sempre preenchidos nos exports normais lidos
 - Regra operacional: `ObjectIdentity/@Type` deve ser um GUID valido, derivado do campo `Object/@parentType` do XML de origem do objeto sendo empacotado; nunca usar valor inteiro (como `"1"` ou `"8"`) — valor inteiro causa erro `Guid should contain 32 digits with 4 dashes` no GeneXus durante Import File Load
-- Evidência direta: `Source/@kb` e `Source/Version/@guid` precisam ser GUIDs sintaticamente validos para que o GeneXus ao menos aceite o parse inicial do `.xpz`
+- Evidência direta: `Source/@kb` e `Source/Version/@guid` precisam ser GUIDs sintaticamente validos para que o GeneXus ao menos aceite o parse inicial do `.xpz`; a exigência de GUID foi verificada com valores presentes e inválidos, que o parse rejeita. Um bloco `Source` presente e vazio foi aceito pela task de import em teste controlado (com `ImportKbInformation` omitido), mas o gate de envelope o reprova; a ausência do bloco não foi testada (ver `10-base-operacional-msbuild-headless.md`)
 - Evidência direta: `Dependency/Properties/@Name` e `Dependency/Properties/@PackageName`, quando o no `Properties` existe, vieram preenchidos
 - Inferência forte: entre os campos de nome do formato normal, os candidatos mais fortes a obrigatoriedade estrutural são `Source/Version/@name`, `Object/@name` e `ObjectIdentity/@Name`
 - Hipótese forte: como esses campos vieram consistentes no formato normal, o erro `Empty name is not allowed` fica mais plausivelmente associado ao bloco especial `KnowledgeBase/@name` em variantes especiais do que a um campo nominal do envelope normal

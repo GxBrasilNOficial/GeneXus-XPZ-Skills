@@ -13,6 +13,36 @@ Entradas legadas sem avaliação carregam `FALTA AVALIAR` em ambos os campos at�
 
 **Editar a substância de um gap já registrado (neste arquivo ou no `998-ideias-descartadas-e-porque.md`) exige justificativa no corpo do commit.** Enfraquecer, reprecisar ou descartar a severidade de uma afirmação — não apenas corrigir redação, adicionar contexto ou reorganizar — precisa dizer **por que**: nova evidência medida, releitura do código, ou correção de erro anterior. Motivo: uma edição que suaviza um gap sem dizer por que **parece resolvido** para quem lê depois, e é pior do que o gap não ter sido achado — quem lê para de investigar. Caso real (2026-08-17): um commit sem corpo trocou «não é citado em lugar nenhum» por «não era coberto na documentação normativa»; a formulação nova era defensável à primeira vista, mas escondia que a única outra menção ao símbolo no repositório era uma cópia **defasada** num self-test — a frase sugeria mitigação onde havia agravante. Só foi achado porque outra sessão foi verificar; sem corpo no commit, não havia como saber se a mudança vinha de leitura nova ou só de estilo.
 
+<a id="prepush-fase2b-checksum-pos-import-20261121"></a>
+
+## Pré-push fase 2b: classificador de checksum após import — 2026-11-21
+
+- **Importância** — média (um DIFF falso custa triagem e, se roteado, um build que não era necessário; não bloqueia sozinho, porque o build segue como autoridade).
+- **Maturidade** — ideia (a hipótese da sincronização seguinte não foi medida).
+
+**Contexto.** O filtro F1 da fase 2b (`xpz-kb-parallel-pre-push/fase2b-classificador-de-regime.md`, passo 1) descarta `SAME` comparando o `checksum` do `<Object>` entre `BaseRef` e `HEAD`. Em teste controlado, o checksum de objeto lido por export depois do import diferiu do valor do acervo sem mudança de código (ver `xpz-msbuild-import-export/SKILL.md`, subseção `Observação (medida): checksum e representação após import`). Hipótese, não medida: a sincronização seguinte trazer essa forma reescrita ao acervo e a fase 2b ver um DIFF sem mudança funcional.
+
+**Por que não agora.** É mudança de classificador (script) e exige teste próprio; a hipótese da sincronização seguinte não foi medida. Não reabre a decisão de design de `fase2b-classificador-de-regime.md` (não cristalizar runbook determinístico; o build é a autoridade).
+
+**Gatilho.** Primeiro caso real de DIFF falso na pré-push depois de import, ou medição de uma sincronização após import.
+
+**Relacionado.** `CalculateChecksums + AreObjectsEqual — diagnóstico de integridade de objeto pré/pós-operação` e `Medir importação com checksum="" em KB de ensaio` (mesma família de problema; não duplicar); `xpz-msbuild-import-export/SKILL.md`.
+
+<a id="lastupdate-menor-aplicado-reconciliar-footgun-20261121"></a>
+
+## `lastUpdate` menor aplicado pela KB: reconciliar com o footgun de import — 2026-11-21
+
+- **Importância** — média (o risco é perder conteúdo e trilha de carimbo; o gate contra o acervo e a orientação de não enviar pacote velho já reduzem a exposição).
+- **Maturidade** — ideia (a condição que distingue as duas observações não foi isolada).
+
+**Contexto.** O footgun `import inócuo por lastUpdate velho` (`xpz-msbuild-import-export/SKILL.md`) diz que `lastUpdate` menor ou igual ao do objeto vivo não atualiza o objeto; a origem desse registro (`historico/IdeiasImplementadas_202606.md`) não cita medição. Em teste controlado (um objeto), um pacote com `lastUpdate` menor que o vivo foi aplicado: o conteúdo antigo voltou e o carimbo regrediu para o do pacote. O caso de `lastUpdate` igual não foi medido. A skill passou a registrar as duas observações e a orientar a não enviar pacote com carimbo menor que o do vivo.
+
+**Por que não agora.** Falta reprodução controlada: carimbo menor, igual e maior; com e sem export pré-import; mais de um objeto e tipo; registrando o `lastUpdate` vivo antes e depois. Nenhuma mudança de motor depende disso hoje.
+
+**Gatilho.** Nova rodada de teste de import com carimbos controlados, ou caso real de regressão de carimbo.
+
+**Relacionado.** Footgun `import inócuo por lastUpdate velho` e subseção `Observação (medida): checksum e representação após import` em `xpz-msbuild-import-export/SKILL.md`; `xpz-builder/SKILL.md` (`-NewObjectNotImported` e `lastUpdateRegressed` tratam do carimbo local de objeto nunca importado, não do objeto vivo).
+
 <a id="inventario-prova-mascara-alcancabilidade-20261118"></a>
 
 ## Inventário: prova de saída da máscara é estrutural, não de alcançabilidade — 2026-11-18

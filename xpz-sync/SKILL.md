@@ -184,7 +184,7 @@ Os wrappers seguem esta convenção de parâmetros:
 - `-CatalogOverridePath` / `-DiscoveryReportPath` *(opcionais)* — override local e relatório JSON quando o pacote tiver GUID não mapeado. Caminho explícito de override que não aponta para arquivo bloqueia a resolução antes da gravação de XML ou metadados; ver a regra de catálogo efetivo em `02-regras-operacionais-e-runtime.md`, seção «Tipo desconhecido no catálogo XPZ».
 - se `-KbMetadataPath` estiver ativo no wrapper local, a gravação de `kb-source-metadata.md` é tentada fora de `-VerifyOnly`, sem exigir item criado ou atualizado, depois das validações e bloqueios que a precedem e antes do rename por GUID (com `-FullSnapshot`) e das escritas de itens; uma falha posterior não desfaz a gravação. Quando o arquivo já existe, o motor `scripts/Sync-GeneXusXpzToXml.ps1` (via `scripts/XpzKbSourceMetadataEditSupport.ps1`) atualiza **cirurgicamente** somente campos de materialização (`updated`, `last_xpz_materialization_run_at`, `source_xpz`, `source_refresh_status` e tabelas `KMW`/`Source`/`Source/Version`), preservando `last_setup_audit_run_at`, `setup_contract_signature_*`, demais frontmatter e seções fora do escopo, com EOL dominante via `scripts/XpzTextFileEolSupport.ps1`; quando não existe, o arquivo é criado a partir do template. Em `-VerifyOnly` o arquivo não é tocado.
 - quando `kb-source-metadata.md` for atualizado por uma materialização, ele deve registrar `last_xpz_materialization_run_at` como horário do processamento que chegou à gravação da metadata, mesmo quando nenhum XML tiver mudança material. A conferência `-VerifyOnly` não atualiza esse campo nem o arquivo
-- se o `XPZ` vier com `Source` vazio, incompleto ou ausente, o wrapper deve preservar valores estáveis conhecidos e emitir warning de refresh parcial; isso não invalida o sync de objetos
+- se o `XPZ` vier com `Source` vazio, incompleto ou ausente, o wrapper deve preservar valores estáveis conhecidos e emitir warning de refresh parcial; isso não invalida o sync de objetos. Estados de `KbMetadataStatus` e avisos de refresh parcial: ver o parágrafo de estados, logo após a descrição de `-VerifyOnly` na seção de `kb-source-metadata.md`
 - depois de materialização XPZ/XML bem-sucedida em `ObjetosDaKbEmXml`, o wrapper local deve acionar compulsoriamente a regeneração/validação do índice derivado por wrapper local de `KbIntelligence`
 - rebuild do índice via `scripts/Build-KbIntelligenceIndex.ps1` exige **Python 3.x utilizável** no `PATH` (`scripts/GeneXusPythonPrerequisite.ps1`; stub da Microsoft Store em `WindowsApps` não conta). Ausência bloqueia o refresh com exit `8` e mensagem `PREREQUISITO AUSENTE` — **rigor**: sync normal **não** terminou; a materialização XPZ/XML pode já ter concluído, mas isso **não** equivale a sucesso do fluxo oficial nem autoriza triagem ampla sem índice. Não tratar como falha do pacote exportado; instalar Python 3.x e rerodar o rebuild (`Rebuild-*KbIntelligenceIndex.ps1`). Ver `README.md`, `02-regras-operacionais-e-runtime.md` e molde `Update-KbFromXpz.example.ps1`
 - falha de máscara de `Source` no rebuild (bloco não nativo ou expressão isolada de `Formula`/condição) retorna exit `9` com `SOURCE_MASK_BLOCKED: <arquivo>:<linha>:<motivo>` **antes** de gravar o SQLite; `-AllowMaskDegraded` gera índice degradado com `source_mask_degraded=true` e `source_mask_degraded_blocks` na metadata, e a triagem deve tratar isso como cobertura parcial
@@ -359,12 +359,27 @@ mudança material nos XMLs. Quando o arquivo já existe, a atualização é
 cirúrgica, sem regeneracao total; quando não existe, ele é criado a partir do
 template. O motor preserva
 `last_setup_audit_run_at` (autoridade de `xpz-kb-parallel-setup`), demais
-frontmatter fora do escopo do sync e seções extras; atualiza valores estaveis de
-`Source`/`KMW` quando o `XPZ` atual vier com metadados vazios ou parciais.
+frontmatter fora do escopo do sync e seções extras; atualiza os campos presentes
+no `XPZ` e preserva o valor anterior dos campos vazios ou ausentes.
 
 Em `-VerifyOnly`, o motor não escreve o arquivo; o relatório registra
 `VerifyOnly=true` e `KbMetadataStatus=not-requested` (quando o caminho foi
 informado), sem alterar a proveniência da última materialização.
+
+Estados de `KbMetadataStatus` (campo do objeto de relatório, gravado em JSON só
+com `-ReportPath`; o arquivo é apagado ao fim de uma execução sem erro, a menos
+que se use `-KeepReport`): `complete` exige os cinco campos de identidade do
+`Source` vindos do pacote (`kb`, `username`, `UNCPath`, `Version/@guid` e
+`Version/@name`) e se refere só ao `Source`, então o aviso de `KMW` ausente pode
+sair mesmo com `complete`; `partial-preserved` ocorre com `Source` incompleto e
+baseline anterior com algum dos cinco campos preenchido; `partial-new`, com
+`Source` incompleto e sem baseline. Esses três vêm de
+`scripts/XpzKbSourceMetadataEditSupport.ps1`, e só eles chegam ao frontmatter
+(`source_refresh_status`). `not-requested` vem de
+`scripts/Sync-GeneXusXpzToXml.ps1` e ocorre sem `-KbMetadataPath` ou em
+`-VerifyOnly`; nesse caso `KbMetadataSourceComplete` fica `null`. Os avisos de
+metadados vão para `Warnings` no relatório e no JSON de resumo do stdout; no
+stderr só o primeiro é ecoado, como `AVISO:`.
 
 Esse arquivo também é o local esperado de `last_xpz_materialization_run_at`
 (autoridade desta skill).
