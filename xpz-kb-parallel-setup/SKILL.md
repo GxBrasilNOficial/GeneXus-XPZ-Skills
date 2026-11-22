@@ -195,9 +195,11 @@ A skill `xpz-llm-delegate` usa um arquivo de politica por-KB na raiz da pasta pa
 ### Registro de eventos pos-build
 
 Dimensão `pos-build/registro` de `Test-*KbSetupAudit.ps1`. Para cada environment com eventos pos-build não inertes observados no JSON de build mais recente em `Temp\`, a auditoria verifica se existe registro em `kb_environment_post_build_event_hashes` de `kb-source-metadata.md`:
-- `pos-build/registro: PENDENTE`: algum environment observado está sem registro (`noEntryForEnvironment`), ou tem evento que só bate com o hash da forma legada (`so na forma legada`; com outra contagem o build rebaixa, então regravar pelo procedimento abaixo). O build aceita esse caso com aviso (`legacyMatchCount`); a pasta só fica limpa depois da regravação. Entra no plano consolidado e torna `materializado_e_indice_validado` impossível como estado limpo. Sem registro, o build deixa de reconhecer o evento e rebaixa por cautela.
-- `pos-build/registro: OK`: todo environment observado tem registro.
-- `pos-build/registro: SEM_EVIDENCIA`: nenhum JSON de build com eventos em `Temp\`. Não é pendência nem estado limpo; o handoff deve dizer que falta evidência e recomendar um build de verificação.
+- `pos-build/registro: PENDENTE`: algum environment está sem registro (`noEntryForEnvironment`), ou tem divergência entre o espelho `## Eventos pos-build registrados` e o campo (sempre `PENDENTE`, com ação de regravar), ou tem evento que só bate com o hash da forma legada (checado também pelo espelho, sem build) (`so na forma legada`; com outra contagem o build rebaixa, então regravar pelo procedimento abaixo). O build aceita esse caso com aviso (`legacyMatchCount`); a pasta só fica limpa depois da regravação. Entra no plano consolidado e torna `materializado_e_indice_validado` impossível como estado limpo. Sem registro, o build deixa de reconhecer o evento e rebaixa por cautela.
+- `pos-build/registro: OK`: todo environment observado tem registro coerente com o build mais recente em `Temp\`. Só com build; nunca `OK` sem build.
+- `pos-build/registro: SEM_EVIDENCIA`: sem build com eventos em `Temp\` e sem espelho para conferir a forma; ou registro de família coerente com o espelho, mas sem build para conferir a cobertura. Não é pendência nem estado limpo; o handoff deve dizer o que falta e recomendar um build de verificação.
+
+Prioridade das evidências: o campo `kb_environment_post_build_event_hashes` é a autoridade para o build; o espelho serve para checar forma e divergência, inclusive sem build; o build serve para cobertura. Sem espelho e sem build, a forma do registro não pode ser confirmada.
 
 Procedimento de registro (sempre com confirmação explícita do usuário antes da gravação):
 1. Escolher o build de base: JSON de build do environment com `exitCode 0` e status `compilou limpo`. Não usar build com status pendente sem revisão prévia do motivo da pendência.

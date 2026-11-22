@@ -425,7 +425,7 @@ $hasDeclarativeDrift = $declarativeStatus -ne 'OK'
 . (Join-Path $scriptDir 'GeneXusMsBuildPostBuildEventsSupport.ps1')
 . (Join-Path $scriptDir 'GeneXusKbDeploymentEnvironmentSupport.ps1')
 $postBuildRegistryStatus = 'SEM_EVIDENCIA'
-$postBuildRegistryEvidence = 'sem JSON de build com eventos pos-build em Temp\ (rodar um build para evidenciar)'
+$postBuildRegistryEvidence = 'sem registro, espelho ou JSON de build com eventos pos-build em Temp\ (rodar um build para evidenciar)'
 $postBuildMetadataPath = Join-Path $KbRoot 'kb-source-metadata.md'
 $postBuildTempRoot = Join-Path $KbRoot 'Temp'
 $postBuildLatestByEnv = @{}
@@ -457,39 +457,144 @@ if (Test-Path -LiteralPath $postBuildTempRoot -PathType Container) {
         }
     }
 }
-if ($postBuildLatestByEnv.Count -gt 0) {
+# Espelho legivel "## Eventos pos-build registrados" (subsecao "### env: X", linhas "- `evento`").
+# Auditoria humana, mas a auditoria usa para checar forma (familia x legada) e divergencia com o campo,
+# inclusive sem build. Ausencia da secao = sem espelho (nao e divergencia).
+$postBuildMirror = @{}
+$postBuildMirrorPresent = $false
+if (Test-Path -LiteralPath $postBuildMetadataPath -PathType Leaf) {
+    $postBuildMirrorEnv = $null
+    $postBuildInMirror = $false
+    foreach ($postBuildMetaLine in @(Get-Content -LiteralPath $postBuildMetadataPath)) {
+        $postBuildTrim = $postBuildMetaLine.Trim()
+        if ($postBuildTrim -eq '## Eventos pos-build registrados') {
+            $postBuildInMirror = $true
+            $postBuildMirrorPresent = $true
+            $postBuildMirrorEnv = $null
+            continue
+        }
+        if ($postBuildInMirror -and $postBuildTrim -match '^##\s') { $postBuildInMirror = $false; $postBuildMirrorEnv = $null; continue }
+        if (-not $postBuildInMirror) { continue }
+        if ($postBuildTrim -match '^###\s+env:\s*(.+)$') {
+            $postBuildMirrorEnv = $Matches[1].Trim()
+            if (-not $postBuildMirror.ContainsKey($postBuildMirrorEnv)) { $postBuildMirror[$postBuildMirrorEnv] = @() }
+            continue
+        }
+        if ($null -ne $postBuildMirrorEnv -and $postBuildTrim -match '^-\s+`(.+)`$') {
+            $postBuildMirror[$postBuildMirrorEnv] += $Matches[1]
+        }
+    }
+}
+
+# Campo kb_environment_post_build_event_hashes (autoridade para o build) e uniao de environments.
+$postBuildFieldMap = $null
+if (Test-Path -LiteralPath $postBuildMetadataPath -PathType Leaf) {
+    $postBuildFieldMap = (Read-GeneXusKbDeploymentMetadataFields -MetadataPath $postBuildMetadataPath).kb_environment_post_build_event_hashes
+}
+$postBuildEnvs = @{}
+foreach ($postBuildKey in $postBuildLatestByEnv.Keys) { $postBuildEnvs[$postBuildKey] = $true }
+foreach ($postBuildKey in $postBuildMirror.Keys) { $postBuildEnvs[$postBuildKey] = $true }
+if ($null -ne $postBuildFieldMap) {
+    foreach ($postBuildKey in $postBuildFieldMap.Keys) { $postBuildEnvs[$postBuildKey] = $true }
+}
+
+if ($postBuildEnvs.Count -gt 0) {
     $postBuildParts = @()
     $postBuildPendingEnvs = @()
-    foreach ($postBuildEnvKey in @($postBuildLatestByEnv.Keys | Sort-Object)) {
+    $postBuildUnknownEnvs = @()
+    foreach ($postBuildEnvKey in @($postBuildEnvs.Keys | Sort-Object)) {
         $postBuildRegistry = Get-GeneXusPostBuildEventRegistryState -MetadataPath $postBuildMetadataPath -EnvironmentName $postBuildEnvKey
-        $postBuildEntry = $postBuildLatestByEnv[$postBuildEnvKey]
-        # Comparacao por hash: cada evento observado deve bater com um hash registrado na forma de familia.
-        # Evento que so bate na forma legada (contagem atual igual a do registro antigo) fica PENDENTE:
-        # com outra contagem o build rebaixa, entao o registro precisa ser regravado.
+        # Hashes registrados no campo (forma de familia ou legada), comparados sem diferenciar caixa.
         $postBuildRegisteredSet = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
         foreach ($postBuildRegisteredHash in @($postBuildRegistry.hashes)) {
             if (-not [string]::IsNullOrWhiteSpace($postBuildRegisteredHash)) { [void]$postBuildRegisteredSet.Add($postBuildRegisteredHash.Trim()) }
         }
-        $postBuildUnregistered = 0
-        $postBuildLegacyOnly = 0
-        if ($postBuildRegistry.state -eq 'available') {
-            foreach ($postBuildLine in @($postBuildEntry.lines)) {
-                if ($postBuildRegisteredSet.Contains((Get-GeneXusPostBuildEventFamilyHash -Line $postBuildLine))) { continue }
-                if ($postBuildRegisteredSet.Contains((Get-GeneXusPostBuildEventNormalizedHash -Line $postBuildLine))) {
-                    $postBuildLegacyOnly++
-                } else {
-                    $postBuildUnregistered++
+        $postBuildReasons = @()
+        $postBuildPending = $false
+        $postBuildHasBuild = $postBuildLatestByEnv.ContainsKey($postBuildEnvKey)
+        $postBuildAction = 'regravar com Register-*KbPostBuildEvents.ps1'
+
+        # 1) Pareamento espelho x campo, sem build. Cada linha do espelho casa com um hash do campo na forma
+        #    de familia ou na legada. Linha sem par ou hash do campo sem linha = divergencia (sempre PENDENTE,
+        #    regravar). Par obtido so pela forma legada = forma legada (PENDENTE, regravar).
+        $postBuildMirrorLines = @()
+        if ($postBuildMirror.ContainsKey($postBuildEnvKey)) { $postBuildMirrorLines = @($postBuildMirror[$postBuildEnvKey]) }
+        $postBuildLegacyForm = 0
+        if ($postBuildMirrorPresent) {
+            $postBuildMatched = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+            $postBuildUnpaired = 0
+            foreach ($postBuildMirrorLine in $postBuildMirrorLines) {
+                $postBuildFamilyHash = Get-GeneXusPostBuildEventFamilyHash -Line $postBuildMirrorLine
+                if ($postBuildRegisteredSet.Contains($postBuildFamilyHash)) {
+                    [void]$postBuildMatched.Add($postBuildFamilyHash)
+                    continue
+                }
+                $postBuildLegacyHash = Get-GeneXusPostBuildEventNormalizedHash -Line $postBuildMirrorLine
+                if ($postBuildRegisteredSet.Contains($postBuildLegacyHash)) {
+                    [void]$postBuildMatched.Add($postBuildLegacyHash)
+                    $postBuildLegacyForm++
+                    continue
+                }
+                $postBuildUnpaired++
+            }
+            if ($postBuildUnpaired -gt 0 -or $postBuildMatched.Count -ne $postBuildRegisteredSet.Count) {
+                $postBuildReasons += "espelho divergente do campo ($postBuildAction)"
+                $postBuildPending = $true
+            } elseif ($postBuildLegacyForm -gt 0) {
+                $postBuildReasons += "forma legada=$postBuildLegacyForm ($postBuildAction)"
+                $postBuildPending = $true
+            }
+        }
+
+        # 3) Cobertura pelo build mais recente com eventos (quando existir).
+        if ($postBuildHasBuild) {
+            $postBuildEntry = $postBuildLatestByEnv[$postBuildEnvKey]
+            if ($postBuildRegistry.state -ne 'available') {
+                $postBuildReasons += "sem registro (build $(Split-Path -Leaf $postBuildEntry.file); $postBuildAction)"
+                $postBuildPending = $true
+            } else {
+                $postBuildUnregistered = 0
+                $postBuildLegacyOnly = 0
+                foreach ($postBuildLine in @($postBuildEntry.lines)) {
+                    if ($postBuildRegisteredSet.Contains((Get-GeneXusPostBuildEventFamilyHash -Line $postBuildLine))) { continue }
+                    if ($postBuildRegisteredSet.Contains((Get-GeneXusPostBuildEventNormalizedHash -Line $postBuildLine))) {
+                        $postBuildLegacyOnly++
+                    } else {
+                        $postBuildUnregistered++
+                    }
+                }
+                if ($postBuildUnregistered -gt 0) {
+                    $postBuildReasons += "sem registro=$postBuildUnregistered (build $(Split-Path -Leaf $postBuildEntry.file); $postBuildAction)"
+                    $postBuildPending = $true
+                }
+                if ($postBuildLegacyOnly -gt 0) {
+                    $postBuildReasons += "so na forma legada=$postBuildLegacyOnly (build $(Split-Path -Leaf $postBuildEntry.file); $postBuildAction)"
+                    $postBuildPending = $true
                 }
             }
         }
-        $postBuildDetail = ''
-        if ($postBuildUnregistered -gt 0) { $postBuildDetail += ", sem registro=$postBuildUnregistered" }
-        if ($postBuildLegacyOnly -gt 0) { $postBuildDetail += ", so na forma legada=$postBuildLegacyOnly (regravar com Register-*KbPostBuildEvents.ps1)" }
-        $postBuildParts += ('{0}: {1} evento(s) em {2}, registro={3}{4}' -f $postBuildEnvKey, $postBuildEntry.count, (Split-Path -Leaf $postBuildEntry.file), $postBuildRegistry.state, $postBuildDetail)
-        if ($postBuildRegistry.state -ne 'available' -or $postBuildUnregistered -gt 0 -or $postBuildLegacyOnly -gt 0) { $postBuildPendingEnvs += $postBuildEnvKey }
+
+        if ($postBuildPending) {
+            $postBuildPendingEnvs += $postBuildEnvKey
+        } elseif ($postBuildHasBuild) {
+            $postBuildReasons += 'registro coerente com o build'
+        } elseif ($postBuildMirrorLines.Count -gt 0) {
+            $postBuildReasons += 'registro de familia coerente com o espelho; sem build para conferir cobertura'
+            $postBuildUnknownEnvs += $postBuildEnvKey
+        } else {
+            $postBuildReasons += 'sem espelho e sem build: forma do registro nao confirmada'
+            $postBuildUnknownEnvs += $postBuildEnvKey
+        }
+        $postBuildParts += ('{0}: {1}' -f $postBuildEnvKey, ($postBuildReasons -join '; '))
     }
-    $postBuildRegistryEvidence = $postBuildParts -join '; '
-    $postBuildRegistryStatus = if ($postBuildPendingEnvs.Count -gt 0) { 'PENDENTE' } else { 'OK' }
+    $postBuildRegistryEvidence = $postBuildParts -join ' | '
+    $postBuildRegistryStatus = if ($postBuildPendingEnvs.Count -gt 0) {
+        'PENDENTE'
+    } elseif ($postBuildUnknownEnvs.Count -gt 0) {
+        'SEM_EVIDENCIA'
+    } else {
+        'OK'
+    }
 }
 $hasPostBuildRegistryPendencies = $postBuildRegistryStatus -eq 'PENDENTE'
 

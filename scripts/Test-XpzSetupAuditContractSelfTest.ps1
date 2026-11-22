@@ -301,6 +301,86 @@ Write-Output 'GATE_OK'
   Assert-True ([string]$rn.json.'pos-build/registro.evidencia' -match 'forma legada') "N: evidencia deve avisar forma legada; obtido $($rn.json.'pos-build/registro.evidencia')"
   Assert-True ([string]$rn.json.'pos-build/registro.evidencia' -match 'regravar com Register-\*KbPostBuildEvents\.ps1') "N: evidencia deve dizer a acao exata (regravar); obtido $($rn.json.'pos-build/registro.evidencia')"
 
+  # --- O/P/Q/R: espelho e campo, sem build (regras de forma e divergencia) ---
+  $pbRun = {
+    param($f)
+    Invoke-XpzSelfTestScript -ScriptPath $engine -ScriptArgs @(
+      '-KbRoot', $f.Root, '-GateWrapperPath', $f.Gate, '-MetadataWrapperTestPath', $f.Metadata,
+      '-PowerShellRuntimeTestPath', $f.Runtime, '-NamingWrapperPath', $f.Naming, '-AsJson')
+  }
+  $pbFamily1 = Get-GeneXusPostBuildEventFamilyHash -Line $pbLine1
+  $pbLegacy1 = Get-GeneXusPostBuildEventNormalizedHash -Line $pbLine1
+  $pbFamily2 = Get-GeneXusPostBuildEventFamilyHash -Line $pbLine2
+  $pbGateText = @'
+Write-Output 'writability_coverage: complete-in-model'
+Write-Output 'source_mask_degraded: false'
+Write-Output 'inventory_validation_status: OK'
+Write-Output 'GATE_OK'
+'@
+
+  # O: espelho ausente, campo de familia, sem build -> SEM_EVIDENCIA (nunca OK sem build)
+  $o = New-SetupAuditFixture -GateText $pbGateText
+  [System.IO.File]::WriteAllText((Join-Path $o.Root 'kb-source-metadata.md'),
+    "kb_environment_post_build_event_hashes: NETFrameworkSQLServer=$pbFamily1`n", $utf8NoBom)
+  $ro = & $pbRun $o
+  Assert-True ($null -ne $ro.json) "O: stdout deveria ser JSON parseavel"
+  Assert-True ($ro.json.'pos-build/registro' -eq 'SEM_EVIDENCIA') "O: SEM_EVIDENCIA esperado sem espelho e sem build; obtido $($ro.json.'pos-build/registro')"
+
+  # P: espelho com duas familias (linha de familia + evento executavel de outra familia) e campo com uma
+  #    -> PENDENTE por divergencia. Linhas com a mesma familia e contagens diferentes contam como uma so.
+  $pbOther = 'Powershell Write-Output teste-pb-x'
+  $p = New-SetupAuditFixture -GateText $pbGateText
+  [System.IO.File]::WriteAllText((Join-Path $p.Root 'kb-source-metadata.md'), @"
+kb_environment_post_build_event_hashes: NETFrameworkSQLServer=$pbFamily1
+
+## Eventos pos-build registrados
+
+### env: NETFrameworkSQLServer
+
+- ``$pbLine1``
+- ``$pbOther``
+
+"@, $utf8NoBom)
+  $rp = & $pbRun $p
+  Assert-True ($null -ne $rp.json) "P: stdout deveria ser JSON parseavel"
+  Assert-True ($rp.json.'pos-build/registro' -eq 'PENDENTE') "P: PENDENTE esperado com espelho divergente; obtido $($rp.json.'pos-build/registro')"
+  Assert-True ([string]$rp.json.'pos-build/registro.evidencia' -match 'espelho divergente') "P: evidencia deve citar espelho divergente; obtido $($rp.json.'pos-build/registro.evidencia')"
+
+  # Q: campo com hash legado e espelho coerente com a linha crua, sem build -> PENDENTE por forma legada
+  $q = New-SetupAuditFixture -GateText $pbGateText
+  [System.IO.File]::WriteAllText((Join-Path $q.Root 'kb-source-metadata.md'), @"
+kb_environment_post_build_event_hashes: NETFrameworkSQLServer=$pbLegacy1
+
+## Eventos pos-build registrados
+
+### env: NETFrameworkSQLServer
+
+- ``$pbLine1``
+
+"@, $utf8NoBom)
+  $rq = & $pbRun $q
+  Assert-True ($null -ne $rq.json) "Q: stdout deveria ser JSON parseavel"
+  Assert-True ($rq.json.'pos-build/registro' -eq 'PENDENTE') "Q: PENDENTE esperado para forma legada sem build; obtido $($rq.json.'pos-build/registro')"
+  Assert-True ([string]$rq.json.'pos-build/registro.evidencia' -match 'forma legada') "Q: evidencia deve citar forma legada"
+  Assert-True ([string]$rq.json.'pos-build/registro.evidencia' -match 'regravar com Register-\*KbPostBuildEvents\.ps1') "Q: evidencia deve dizer a acao exata"
+
+  # R: campo e espelho de familia coerentes, sem build -> SEM_EVIDENCIA (nunca OK sem build)
+  $r = New-SetupAuditFixture -GateText $pbGateText
+  [System.IO.File]::WriteAllText((Join-Path $r.Root 'kb-source-metadata.md'), @"
+kb_environment_post_build_event_hashes: NETFrameworkSQLServer=$pbFamily1
+
+## Eventos pos-build registrados
+
+### env: NETFrameworkSQLServer
+
+- ``$pbLine1``
+
+"@, $utf8NoBom)
+  $rr = & $pbRun $r
+  Assert-True ($null -ne $rr.json) "R: stdout deveria ser JSON parseavel"
+  Assert-True ($rr.json.'pos-build/registro' -eq 'SEM_EVIDENCIA') "R: SEM_EVIDENCIA esperado para familia coerente sem build; obtido $($rr.json.'pos-build/registro')"
+  Assert-True ([string]$rr.json.'pos-build/registro.evidencia' -match 'sem build') "R: evidencia deve dizer que falta build"
+
   'XPZ_SETUP_AUDIT_CONTRACT_SELFTEST_OK'
 }
 finally {
