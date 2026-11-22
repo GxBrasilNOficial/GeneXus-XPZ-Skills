@@ -924,6 +924,7 @@ Omitir a `Part` `Events` no XML submetido **não a apaga**: o objeto mantém a `
 - reusar precedente estrutural de pacote não autoriza herdar automaticamente a identidade nominal da frente anterior
 - quando a continuidade da frente não estiver fechada por evidencia direta ou confirmacao explicita do usuário, o agente deve explicitar a ambiguidade antes de nomear pasta ou pacote
 - se um `XPZ` oficial vindo da KB trouxer objetos adicionais além do foco imediato da frente, o agente deve informar o inesperado sem presumir erro; isso pode ser mudanca paralela legitima feita diretamente na IDE do GeneXus
+- após rename/refatoracao na IDE, `Updated` fora do foco pode ser cascata de referencia: `lastUpdate`/`checksum` podem estar iguais ao arquivo anterior; conferir o diff antes de tratar como mudanca paralela; ver `02-regras-operacionais-e-runtime.md`, secao «Rename na IDE: reescrita de referencias em consumidores e frescor do acervo»
 - o agente deve distinguir explicitamente `artefato da frente atual`, `mudanca paralela legitima vinda da KB/IDE` e `mudanca lateral indevida do proprio agente fora do escopo`
 - quando houver contexto esperado da frente, o agente pode comparar opcionalmente `foco esperado` versus `retorno oficial`, classificando `esperados que voltaram`, `esperados que nao voltaram` e `retorno oficial adicional da KB`, sem transformar a ausencia desse contexto em erro
 - frente validada tecnicamente não implica publicacao Git; a conclusao técnica e apenas `validado_tecnicamente` ate o usuário autorizar o fechamento

@@ -6,7 +6,7 @@ Satélite de [`SKILL.md`](SKILL.md). A Fase 2b **não** é um runbook determiní
 
 ## Passo 1 — F1: descartar `SAME` (`Compare-XpzChecksums.ps1`)
 
-O filtro F1 compara o atributo `checksum` no `<Object>` raiz dos XMLs do acervo entre `BaseRef` e `HEAD`, classificando cada arquivo alterado como **SAME** (checksum idêntico — mudou só por re-export, tipicamente `lastUpdate`), **DIFF**, **NEW**, **DELETED** ou **NO_CHECKSUM** (checksum ausente nos dois lados — sem sinal F1 utilizável para comparar conteúdo). É classificador puro: não bloqueia, só rotula.
+O filtro F1 compara o atributo `checksum` no `<Object>` raiz dos XMLs do acervo entre `BaseRef` e `HEAD`, classificando cada arquivo alterado como **SAME** (checksum idêntico — sugere re-export, mas **não prova** conteúdo igual; uma cascata de rename pode alterar conteúdo sem recalcular o `checksum`), **DIFF**, **NEW**, **DELETED** ou **NO_CHECKSUM** (checksum ausente nos dois lados — sem sinal F1 utilizável para comparar conteúdo). É classificador puro: não bloqueia, só rotula.
 
 ```text
 pwsh -File <repo-skills>\scripts\Compare-XpzChecksums.ps1 -RepoRoot <pasta-paralela-da-KB>
@@ -14,7 +14,7 @@ pwsh -File <repo-skills>\scripts\Compare-XpzChecksums.ps1 -RepoRoot <pasta-paral
 
 Saída JSON por padrão (`status` `ok`|`unknown`, `baseRef`, `repoRoot`, `range`, `results[]`); **exit 0 ok, 3 unknown (falha de git)**. F1 nunca bloqueia.
 
-> **Cabeça-detalhe:** descartar `SAME` é correto para o **arquivo**, mas não prova que a cabeça associada está fora do raio de impacto (o detalhe pode ter mudado). Ver [`fase2a-estrutural.md`](fase2a-estrutural.md).
+> **Cabeça-detalhe:** descartar `SAME` é aceitável para a **triagem de regime**, mas não prova que o arquivo não mudou nem que a cabeça associada está fora do raio de impacto (o detalhe pode ter mudado). Ver [`fase2a-estrutural.md`](fase2a-estrutural.md).
 
 ## Passo 2 — roteamento por regime
 
@@ -25,7 +25,7 @@ Sobre o que **não** for `SAME`, classificar o regime e rotear:
 | **Aditivo data-bearing** (atributo novo com FK/stored, nenhum removido) | **único lugar onde a estática agrega**: `who-uses(Table)` ∪ `who-uses(Transaction)`; shortlist de omissão = navegadores intocados ranqueados por afinidade. Status `suspeito-por-omissão` = **triagem, não veredito** | estática (triagem) + análise do agente |
 | **Aditivo computado** (atributo novo com `<Formula>`) | **pular** — não há risco de omissão | — |
 | **delete** (atributo/objeto removido) | desenvolvimento normal mediado pela IDE: a referência estrutural costuma ser barrada na própria IDE antes de chegar ao acervo referenciado. **Não tratar como garantia universal** — referência só-em-código permanece ponta aberta; o **build permanece backstop** | IDE (mediação) + build (backstop) |
-| **rename** | propagado pela IDE — não-evento | IDE |
+| **rename** | propagado pela IDE — não-evento para risco de órfão/regressão; para frescor do acervo, o consumidor reescrito pode vir `SAME`/`Updated` e exige conferir o diff (ver `02`, seção «Rename na IDE…») | IDE (regressão) + `02` (frescor) |
 | **troca de tipo/domínio/chave** | reorg não-backward-compatible. **A autoridade é o build com `FailIfReorg`**, não a enumeração estática | build (`xpz-msbuild-build`) |
 | **alto volume** (>~20 dependentes) | rotear ao build em vez de enumerar | build |
 | **lógica de negócio** (cálculo que compila e roda errado) | fora do alcance da estática e do build estrutural | só teste funcional |
