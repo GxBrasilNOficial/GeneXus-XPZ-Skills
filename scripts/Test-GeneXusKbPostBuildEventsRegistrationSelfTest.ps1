@@ -78,6 +78,9 @@ try {
     if ($text1 -notmatch '### env: NETPostgreSQL') { throw 'ASSERT_FAILED: subsecao env1 ausente no espelho' }
     if ($text1 -notmatch 'AtualizaDeployFB18PgNetCore\.Bat') { throw 'ASSERT_FAILED: linha crua do deploy1 ausente no espelho' }
     if ($text1 -notmatch 'conteudo preexistente') { throw 'ASSERT_FAILED: conteudo preexistente do arquivo foi perdido' }
+    # Higiene de fim de arquivo: uma unica quebra final, sem linha em branco (git diff --check).
+    if ($text1 -match "`n`n$") { throw 'ASSERT_FAILED: o registro deixou linha em branco no fim do arquivo' }
+    if ($text1 -notmatch "[^`n]`n$") { throw 'ASSERT_FAILED: o arquivo deveria terminar com uma unica quebra de linha' }
 
     # --- Registro do environment 2: preserva o 1 ---
     $json2 = Join-Path $tempRoot 'build2.json'
@@ -94,6 +97,7 @@ try {
     if ($text2 -notmatch '### env: NETFramework') { throw 'ASSERT_FAILED: subsecao env2 ausente' }
     if ($text2 -notmatch 'AtualizaDeployFB18PgNetCore\.Bat') { throw 'ASSERT_FAILED: linha crua do deploy1 perdida apos registrar env2' }
     if ($text2 -notmatch 'AtualizaDeployFB18\.Bat') { throw 'ASSERT_FAILED: linha crua do deploy2 ausente' }
+    if ($text2 -match "`n`n$") { throw 'ASSERT_FAILED: o segundo registro deixou linha em branco no fim do arquivo' }
 
     # Re-registro do mesmo environment substitui (não duplica) a subsecao.
     & $registerScript -BuildResultJsonPath $json1 -EnvironmentName 'NETPostgreSQL' -MetadataPath $metadataPath -ConfirmRegistration -AsJson | Out-Null

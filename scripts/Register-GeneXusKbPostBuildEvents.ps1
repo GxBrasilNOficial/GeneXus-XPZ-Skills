@@ -272,6 +272,14 @@ if ($headerIdx -lt 0) {
     }
 }
 
+# Higiene: sem linha em branco no fim do arquivo (git diff --check acusa "new blank line at EOF").
+# O ultimo elemento da lista e a quebra final; mantem uma so, entao reduz a sequencia de vazios do fim a um.
+while ($fileLines.Count -gt 1 -and
+       [string]::IsNullOrWhiteSpace($fileLines[$fileLines.Count - 1]) -and
+       [string]::IsNullOrWhiteSpace($fileLines[$fileLines.Count - 2])) {
+    $fileLines.RemoveAt($fileLines.Count - 1)
+}
+
 Write-TextFilePreservingEol -Path $MetadataPath -FileContext $fileContext
 
 $result = [ordered]@{
