@@ -232,4 +232,4 @@ Origem: entrada «Linhas do pós-build com contagens variáveis contam como even
 
 ### Rastreabilidade
 
-- Commit único desta frente na `main`, mensagem «Corrige falso pendente por evento pos-build». O hash não está neste arquivo porque ele faz parte do próprio commit; localizar com `git log --grep="pos-build"`.
+- `8f64aae` — Corrige falso pendente por evento pos-build no BuildAll e SpecifyGenerate.
