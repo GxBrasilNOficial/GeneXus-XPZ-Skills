@@ -310,6 +310,14 @@ try {
         -Selection @{ IndexPath = $indexPath; ExportKbInfo = 'false' } -StdOutCmdLines $decisiveLines
     Assert-ExportKbInfo -Result $selectiveFalse -Label 'ExportKbInfo seletiva false explicito' -Requested 'false' -Source 'caller' -Effective 'false' -EmittedProperty 'ExportKBInfo'
 
+    # Bloqueio pre-validate (diretorio pai do XPZ inexistente): campos registrados, efetivo nulo.
+    $preValidate = Invoke-WrapperScenario -Wrapper 'Export' -ScenarioRoot (Join-Path $testRoot 'kbinfo-pre-validate') `
+        -ExtraArgs @{ XpzPath = (Join-Path $testRoot 'kbinfo-pre-validate\missing-dir\pkg.xpz') } -StdOutCmdLines $decisiveLines
+    Assert-True ($preValidate.ExitCode -eq 33 -and [string]$preValidate.Diagnostic.stage -eq 'pre-validate') ("[ExportKbInfo pre-validate] esperado exit 33 em pre-validate; recebeu {0} em '{1}'." -f $preValidate.ExitCode, $preValidate.Diagnostic.stage)
+    $preValidateContext = $preValidate.Diagnostic.requestedContext
+    Assert-True ([string]$preValidateContext.ExportKbInfo -eq 'true' -and [string]$preValidateContext.ExportKbInfoSource -eq 'default') '[ExportKbInfo pre-validate] deve registrar ExportKbInfo pedido e origem.'
+    Assert-True ($null -ne $preValidateContext.PSObject.Properties['ExportKbInfoEffective'] -and $null -eq $preValidateContext.ExportKbInfoEffective) '[ExportKbInfo pre-validate] deve registrar ExportKbInfoEffective nulo.'
+
     # Task sem ExportKBInfo: variantes da assembly, cada cenario em processo filho.
     $noPropertyDll = New-SyntheticTasksVariant -Name 'no-kbinfo' -Replacement ''
     $propertiesOnlyDll = New-SyntheticTasksVariant -Name 'kbproperties-only' -Replacement 'public string ExportKBProperties { get; set; }'

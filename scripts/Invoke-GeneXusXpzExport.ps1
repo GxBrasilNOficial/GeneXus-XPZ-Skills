@@ -873,6 +873,17 @@ try {
             summary = 'Validação prévia bloqueou a exportação.'
             exitCode = $exitCode
             stage = 'pre-validate'
+            requestedContext = [ordered]@{
+                VersionName = $VersionName
+                EnvironmentName = $EnvironmentName
+                ObjectList = $objectListSpec
+                DependencyType = $DependencyType
+                ReferenceType = $ReferenceType
+                ExportKbInfo = $exportKbInfoRequested
+                ExportKbInfoSource = $exportKbInfoSource
+                ExportKbInfoEffective = $exportKbInfoEffective
+                ExportAll = $ExportAll
+            }
             resolvedPaths = [ordered]@{
                 GeneXusDir = $probeStage.Diagnostic.resolvedPaths.GeneXusDir
                 MsBuildPath = $probeStage.Diagnostic.resolvedPaths.MsBuildPath
