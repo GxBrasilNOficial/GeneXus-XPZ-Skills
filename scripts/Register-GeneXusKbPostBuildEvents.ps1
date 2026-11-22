@@ -11,7 +11,7 @@
     inertes (linhas REM comentadas, duração TimeSpan válida ou data civil válida),
     normaliza e gera fingerprints SHA-256, e grava:
       - kb_environment_post_build_event_hashes: campo plano (env=h1,h2; ...) que o build le.
-      - secao-espelho legivel "## Eventos pos-build registrados": auditoria humana, com as
+      - secao-espelho legivel "## Eventos pos-build registrados": auditoria de setup (forma e divergencia), com as
         linhas cruas; o build NÃO le o espelho, só os hashes.
 
     Ação sensivel: registrar desarma o rebaixamento por evento pos-build daquele environment.
@@ -202,7 +202,7 @@ if (-not $updated) {
 
 # --- Espelho legivel (atualizacao cirurgica da subsecao do environment) ---
 $mirrorHeader = '## Eventos pos-build registrados'
-$mirrorIntro  = '> Espelho legivel de `kb_environment_post_build_event_hashes` (autoria: xpz-kb-parallel-setup). O build compara por fingerprint da forma normalizada; as linhas cruas abaixo sao ilustrativas e esta secao e so para auditoria humana.'
+$mirrorIntro  = '> Espelho legivel de `kb_environment_post_build_event_hashes` (autoria: xpz-kb-parallel-setup). O build le so o campo e compara por fingerprint da forma normalizada. A auditoria de setup confere o espelho contra o campo: as linhas cruas abaixo sao a evidencia de forma (familia ou legada) e nao devem ser editadas a mao.'
 $subHeader = '### env: ' + $envName
 
 $subsectionLines = New-Object System.Collections.Generic.List[string]

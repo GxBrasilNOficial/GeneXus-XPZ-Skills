@@ -117,7 +117,7 @@ try {
     if ([int]$reg5.registeredEventCount -ne 1 -or @($reg5.registeredHashes).Count -ne 1) { throw 'ASSERT_FAILED: duas linhas de familia com contagens diferentes deveriam virar um hash' }
     if ([int]$reg5.removedHashCount -ne 2) { throw "ASSERT_FAILED: NETPostgreSQL deveria remover 2 hashes anteriores; atual=$($reg5.removedHashCount)" }
     $text5 = [System.IO.File]::ReadAllText($metadataPath)
-    if ($text5 -notmatch 'as linhas cruas abaixo sao ilustrativas') { throw 'ASSERT_FAILED: frase-guia do espelho ausente' }
+    if ($text5 -notmatch 'as linhas cruas abaixo sao a evidencia de forma') { throw 'ASSERT_FAILED: frase-guia do espelho ausente' }
 
     # Registro legado (hash da forma antiga, contagens X) com contagens Y -> inesperado; com X -> esperado.
     $legacyX = Get-GeneXusPostBuildEventNormalizedHash -Line $famX
