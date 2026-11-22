@@ -157,4 +157,40 @@ if ((Get-GeneXusPostBuildEventNormalizedHash -Line 'Verify-GxJs: verificados 217
     throw 'ASSERT_FAILED: vetor legado do Verify-GxJs (tempo 9) mudou'
 }
 
+# nextStep do registro pendente (Get-GeneXusPostBuildRegistryNextStep): o build so detecta e encaminha para
+# a auditoria de setup (skill xpz-kb-parallel-setup), sem citar script de registro.
+$nsFamilyLine = '[APLICADO] .js varridos=2968 | arquivos com chave negativa em gx.domain=3 | chaves corrigidas=5'
+$nsFamilyHash = Get-GeneXusPostBuildEventFamilyHash -Line $nsFamilyLine
+$nsLegacyHash = Get-GeneXusPostBuildEventNormalizedHash -Line $nsFamilyLine
+$nsOther = 'Powershell Write-Output evento-novo'
+$nsSound = 'start "" powershell -NoProfile -WindowStyle Hidden -Command "(New-Object System.Media.SoundPlayer ''c:\temp\sino.wav'').PlaySync()"'
+
+function Get-NextStepCase {
+    param([string[]]$Lines, [string[]]$Registered, [string]$State)
+    $classification = Get-GeneXusPostBuildEventClassification -PostBuildEventLines $Lines -RegisteredHashes $Registered
+    return Get-GeneXusPostBuildRegistryNextStep -Classification $classification -RegistryState ([pscustomobject]@{ state = $State }) -EnvironmentName 'EnvTeste'
+}
+function Assert-NextStepText {
+    param([string]$Text, [string]$Reason, [string]$Case)
+    if ([string]::IsNullOrEmpty($Text)) { throw "ASSERT_FAILED: nextStep ($Case) deveria vir preenchido." }
+    if ($Text -notmatch [regex]::Escape($Reason)) { throw "ASSERT_FAILED: nextStep ($Case) deveria citar '$Reason'; recebeu '$Text'." }
+    if ($Text -notmatch 'xpz-kb-parallel-setup' -or $Text -notmatch 'auditoria de setup') { throw "ASSERT_FAILED: nextStep ($Case) deveria apontar para a auditoria de setup; recebeu '$Text'." }
+    if ($Text -match 'Register-') { throw "ASSERT_FAILED: nextStep ($Case) nao deveria citar script de registro; recebeu '$Text'." }
+    if ($Text -notmatch "'EnvTeste'") { throw "ASSERT_FAILED: nextStep ($Case) deveria citar o environment; recebeu '$Text'." }
+}
+
+# Sem entrada + evento desconhecido (sem registro, nao e som) -> sem registro
+Assert-NextStepText -Text (Get-NextStepCase -Lines @($nsOther) -Registered @() -State 'noEntryForEnvironment') -Reason 'sem registro' -Case 'sem entrada e desconhecido'
+# Sem entrada + so evento benigno (som) -> tambem sem registro (a auditoria conta esse caso como pendente)
+Assert-NextStepText -Text (Get-NextStepCase -Lines @($nsSound) -Registered @() -State 'noEntryForEnvironment') -Reason 'sem registro' -Case 'sem entrada e benigno'
+# Registro existente + evento nao registrado -> evento nao registrado
+Assert-NextStepText -Text (Get-NextStepCase -Lines @($nsOther) -Registered @($nsFamilyHash) -State 'available') -Reason 'evento nao registrado' -Case 'registrado com evento novo'
+# Registro so na forma legada com a mesma contagem -> aceito, mas pede regravacao
+Assert-NextStepText -Text (Get-NextStepCase -Lines @($nsFamilyLine) -Registered @($nsLegacyHash) -State 'available') -Reason 'registro na forma antiga' -Case 'forma antiga'
+# Registro nao consultado -> sem nextStep
+if ($null -ne (Get-NextStepCase -Lines @($nsOther) -Registered @() -State 'metadataNotProvided')) { throw 'ASSERT_FAILED: metadataNotProvided nao deveria ter nextStep.' }
+if ($null -ne (Get-NextStepCase -Lines @($nsOther) -Registered @() -State 'environmentNameUnavailable')) { throw 'ASSERT_FAILED: environmentNameUnavailable nao deveria ter nextStep.' }
+# Registro completo (tudo esperado, forma de familia) -> sem nextStep
+if ($null -ne (Get-NextStepCase -Lines @($nsFamilyLine) -Registered @($nsFamilyHash) -State 'available')) { throw 'ASSERT_FAILED: registro completo nao deveria ter nextStep.' }
+
 Write-Output 'GENEXUS_MSBUILD_POST_BUILD_EVENTS_SUPPORT_SELFTEST_OK'
