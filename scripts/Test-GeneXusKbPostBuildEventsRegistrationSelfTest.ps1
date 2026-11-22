@@ -129,6 +129,20 @@ try {
     $c7 = Get-GeneXusPostBuildEventClassification -PostBuildEventLines @($famX) -RegisteredHashes @($legacyX)
     if ($c7.shouldDowngrade -or $c7.legacyMatchCount -ne 1) { throw 'ASSERT_FAILED: registro legado com a mesma contagem deveria ser aceito com legacyMatchCount=1' }
 
+    # Sucesso do SpecifyGenerate ("specify e generate concluidos") tambem e base apta para o registro.
+    $specifyObj = [ordered]@{
+        exitCode          = 0
+        status            = 'specify e generate conclu' + [char]0x00ED + 'dos'
+        executionEvidence = [ordered]@{ msBuildExitCode = 0; msBuildFailed = $false }
+        observedContext   = [ordered]@{ ActiveEnvironment = 'NETSpecifyGenerate' }
+        stdoutSignals     = [ordered]@{ postBuildEvents = @($sino) }
+    }
+    $jsonSg = Join-Path $tempRoot 'build-specify.json'
+    [System.IO.File]::WriteAllText($jsonSg, ($specifyObj | ConvertTo-Json -Depth 8), (Get-Utf8NoBomEncoding))
+    & $registerScript -BuildResultJsonPath $jsonSg -EnvironmentName 'NETSpecifyGenerate' -MetadataPath $metadataPath -ConfirmRegistration -AsJson | Out-Null
+    $hashesSg = Get-GeneXusRegisteredPostBuildEventHashesForEnvironment -MetadataPath $metadataPath -EnvironmentName 'NETSpecifyGenerate'
+    if (@($hashesSg).Count -ne 1) { throw "ASSERT_FAILED: build de SpecifyGenerate apto deveria registrar 1 hash; atual=$(@($hashesSg).Count)" }
+
     # Base do registro: o Register recusa build nao apto (BLOCK) e nao grava nada.
     $textBeforeRefusal = [System.IO.File]::ReadAllText($metadataPath)
     $nonBaseCases = @(

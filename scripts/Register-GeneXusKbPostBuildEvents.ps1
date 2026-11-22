@@ -15,8 +15,8 @@
         linhas cruas; o build NÃO le o espelho, só os hashes.
 
     Recusa (BLOCK) build que nao sirva de base: exitCode e executionEvidence.msBuildExitCode diferentes
-    de 0, msBuildFailed verdadeiro, status fora de "compilou limpo" ou pendente por motivo alem do
-    registro ausente (mesmo veredito da dimensao pos-build/base da auditoria de setup).
+    de 0, msBuildFailed verdadeiro, status fora de "compilou limpo" (BuildAll) ou "specify e generate concluidos"
+    (SpecifyGenerate), ou pendente por motivo alem do registro ausente (mesmo veredito da dimensao pos-build/base da auditoria de setup).
 
     Ação sensivel: registrar desarma o rebaixamento por evento pos-build daquele environment.
     Exige confirmacao. Modo interativo pede frase exata; modo agente usa -ConfirmRegistration

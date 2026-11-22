@@ -444,6 +444,11 @@ kb_environment_post_build_event_hashes: NETFrameworkSQLServer=$pbFamily1
   Assert-True ($rz.json.'pos-build/base' -eq 'NAO_APTO') "Z: NAO_APTO esperado com status nao previsto; obtido $($rz.json.'pos-build/base')"
   Assert-True ([string]$rz.json.'pos-build/base.evidencia' -match 'status nao previsto') "Z: evidencia deve citar status nao previsto"
 
+  # SG: sucesso do SpecifyGenerate (status "specify e generate concluidos") tambem serve de base
+  $pbSpecifyOk = 'specify e generate conclu' + [char]0x00ED + 'dos'
+  $rsg = & $pbBase @{ ExitCode = 0; Status = $pbSpecifyOk; MsBuildExitCode = 0; RegistryState = $null; Unexpected = @() }
+  Assert-True ($rsg.json.'pos-build/base' -eq 'APTO') "SG: APTO esperado para sucesso do SpecifyGenerate; obtido $($rsg.json.'pos-build/base') / $($rsg.json.'pos-build/base.evidencia')"
+
   # W: sem build com eventos em Temp\ -> SEM_EVIDENCIA (reaproveita o caso L)
   Assert-True ($rl.json.'pos-build/base' -eq 'SEM_EVIDENCIA') "W: pos-build/base SEM_EVIDENCIA esperado sem build; obtido $($rl.json.'pos-build/base')"
 

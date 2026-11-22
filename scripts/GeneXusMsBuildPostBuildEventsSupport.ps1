@@ -374,7 +374,7 @@ function Get-GeneXusPostBuildBaseFacts {
 function Get-GeneXusPostBuildBaseVerdict {
     # Veredito unico (auditoria e registro): o build serve de base do registro de eventos pos-build?
     # Apto: exitCode e executionEvidence.msBuildExitCode 0, sem msBuildFailed, e status "compilou limpo"
-    # ou pendente SO por registro ausente (registryStatus noEntryForEnvironment e unexpected vazio).
+    # (BuildAll) ou "specify e generate concluidos" (SpecifyGenerate), ou pendente SO por registro ausente (registryStatus noEntryForEnvironment e unexpected vazio).
     param([Parameter(Mandatory = $true)]$Facts)
 
     if ($null -eq $Facts.exitCode -or "$($Facts.exitCode)" -ne '0') {
@@ -388,6 +388,10 @@ function Get-GeneXusPostBuildBaseVerdict {
     }
     if ($Facts.statusText -match 'compilou limpo') {
         return [pscustomobject]@{ ok = $true; reason = 'status compilou limpo' }
+    }
+    # Sucesso do SpecifyGenerate (equivalente ao "compilou limpo" do BuildAll).
+    if ($Facts.statusText -match 'specify e generate conclu') {
+        return [pscustomobject]@{ ok = $true; reason = 'status specify e generate concluidos' }
     }
     if ($Facts.statusText -match 'pendente de confirma') {
         if ($null -eq $Facts.registryState) {
