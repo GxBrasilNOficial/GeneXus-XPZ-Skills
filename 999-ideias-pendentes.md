@@ -22,7 +22,7 @@ Entradas legadas sem avaliação carregam `FALTA AVALIAR` em ambos os campos at�
 
 **Contexto.** O filtro F1 da fase 2b (`xpz-kb-parallel-pre-push/fase2b-classificador-de-regime.md`, passo 1) descarta `SAME` comparando o `checksum` do `<Object>` entre `BaseRef` e `HEAD`. Em teste controlado, o checksum de objeto lido por export depois do import diferiu do valor do acervo sem mudança de código (ver `xpz-msbuild-import-export/SKILL.md`, subseção `Observação (medida): checksum e representação após import`). Hipótese, não medida: a sincronização seguinte trazer essa forma reescrita ao acervo e a fase 2b ver um DIFF sem mudança funcional.
 
-**Modalidade irmã (2026-11-21).** Um consumidor reescrito por rename na IDE pode mudar de conteúdo com `checksum` igual — falso `SAME`, o espelho do caso acima. A leitura correta e a correção documental estão em `02-regras-operacionais-e-runtime.md` e na Fase 2b, sem alterar a lógica do classificador; esta entrada permanece aberta para o caso de DIFF falso após import.
+**Modalidade irmã (observação de 2026-11-21).** Um consumidor reescrito por rename na IDE pode mudar de conteúdo com `checksum` igual — falso `SAME`, o espelho do caso acima. A leitura correta e a correção documental estão em `02-regras-operacionais-e-runtime.md` e na Fase 2b, sem alterar a lógica do classificador; esta entrada permanece aberta para o caso de DIFF falso após import.
 
 **Por que não agora.** É mudança de classificador (script) e exige teste próprio; a hipótese da sincronização seguinte não foi medida. Não reabre a decisão de design de `fase2b-classificador-de-regime.md` (não cristalizar runbook determinístico; o build é a autoridade).
 
