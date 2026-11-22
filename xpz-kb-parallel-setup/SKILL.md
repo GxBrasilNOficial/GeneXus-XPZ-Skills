@@ -202,13 +202,18 @@ Dimensão `pos-build/registro` de `Test-*KbSetupAudit.ps1`. Para cada environmen
 Prioridade das evidências: o campo `kb_environment_post_build_event_hashes` é a autoridade para o build; o espelho serve para checar forma e divergência, inclusive sem build; o build serve para cobertura. Sem espelho e sem build, a forma do registro não pode ser confirmada.
 
 Procedimento de registro (sempre com confirmação explícita do usuário antes da gravação):
-1. Escolher o build de base: JSON de build do environment com `exitCode 0` e status `compilou limpo`. Não usar build com status pendente sem revisão prévia do motivo da pendência.
-2. Listar para o usuário os eventos não inertes do build (o motor mostra a contagem antes de gravar) e o environment (`observedContext.ActiveEnvironment`).
+1. Escolher o build de base do environment, com `exitCode 0` e `executionEvidence.msBuildExitCode 0`, em uma destas condições: (a) status `compilou limpo`; ou (b) status `operacao concluida, pendente de confirmacao funcional` cujo único motivo seja o registro ausente: `stdoutSignals.postBuildEventClassification.registryStatus.state = noEntryForEnvironment` e `unexpected` vazio. As linhas de `unknownFallback` são os eventos a registrar, não outro motivo. Se o campo `registryStatus` não existir no JSON (diagnóstico anterior ao registro), o build não serve de base, porque não dá para afirmar que o registro é o único motivo; nesse caso, gerar um build novo com o código atual. Antes de usar qualquer build pendente, examinar o motivo da pendência e relatá-lo ao usuário. Se houver outro motivo (erro, aviso ou linha inesperada), não usar esse build como base e pedir outro.
+2. Listar para o usuário os eventos não inertes do build e o environment (`observedContext.ActiveEnvironment`). A contagem do JSON pode incluir linhas inertes (REM ou tempo); só as executáveis entram no registro, e o motor mostra a contagem antes de gravar.
 3. Só após o "sim" explícito do usuário, executar o wrapper local `Register-*KbPostBuildEvents.ps1` com `-BuildResultJsonPath`, `-EnvironmentName` e `-ConfirmRegistration`. Nunca passar `-ConfirmRegistration` por conta própria.
 4. Primeira regravação após mudança de formato do fingerprint: o motor remove os hashes antigos do environment e informa `removedHashCount`. Informar esse número ao usuário antes de concluir.
 5. Rerodar `Test-*KbSetupAudit.ps1` e confirmar `pos-build/registro: OK`.
+6. Enquanto `pos-build/registro` estiver `PENDENTE`, a conclusão da auditoria não é bem-sucedida: não gravar `last_setup_audit_run_at` nem `setup_contract_signature_*`, e o `AUDIT_REQUIRED` de frescor continua aberto.
 
 Ao ver `legacyMatchCount` no diagnóstico de build, ou `pos-build/registro: PENDENTE` com evidência `so na forma legada`, o agente propõe a regravação pelo procedimento acima, pede confirmação e não declara a pasta limpa antes. Ao ver `registryStatus.state = noEntryForEnvironment` em um diagnóstico de build (ou `pos-build/registro: PENDENTE` na auditoria), o agente monta a lista de eventos do build e pede confirmação ao usuário. Não grava sozinho, mesmo que o build pareça normal. Registrar desarma o rebaixamento por evento pos-build daquele environment; por isso a gravação é sensível.
+
+Entrada pelo build. Ao rodar build da pasta paralela, ou ao ler o diagnóstico de um build, o agente que vir um destes sinais deve carregar esta skill e rodar a auditoria de setup (`Test-*KbSetupAudit.ps1`) antes de propor qualquer registro: `postBuildEventClassification.registryStatus.state = noEntryForEnvironment`, `legacyMatchCount` maior que zero, ou `shouldDowngrade = true` com evento não registrado. A auditoria confirma o registro e dá a ação; o build sozinho não basta para gravar.
+
+Evidência de registro: o campo `kb_environment_post_build_event_hashes` e o `registryStatus` do diagnóstico. O log de execução (por exemplo `monitor.log`) não comprova registro, mesmo que mostre o pós-build concluído.
 
 ## PATH RESOLUTION
 
@@ -407,6 +412,7 @@ Referencia rápida para decidir o peso operacional da ausencia de cada wrapper. 
 | `Test-*KbObjetosDaKbNaming.ps1` | `ObjetosDaKbEmXml` materializado | `wrappers_atualizados` e `materializado_e_indice_validado` limpos |
 | `Test-*KbSetupFreshness.ps1` | sempre (invocacao pelo gatilho global) | fast path da PRE-CONDICAO — ausente forca auditoria completa a cada invocacao do gatilho |
 | `Set-*KbSetupAuditTimestamp.ps1` | recomendado quando `last_setup_audit_run_at` ou `setup_contract_signature_*` estiver ausente, invalido ou defasado após auditoria bem-sucedida | nenhum estado, enquanto o motor compartilhado puder ser chamado diretamente ou a edicao manual seguir o passo 34 |
+| `Register-*KbPostBuildEvents.ps1` | sempre que houver environment com eventos pós-build observados (build em `Temp\` ou `registryStatus` do diagnóstico de build) | `pos-build/registro: OK`; sem ele, a regravação de registro legado ou divergente não é possível. Se faltar, criá-lo a partir do exemplo `Register-KbPostBuildEvents.example.ps1`, com aprovação do usuário |
 | `Update-*KbFromXpz.ps1` | sempre (fluxo oficial de materialização) | `pronto_para_primeira_materializacao` |
 | `Test-*KbFullSnapshot.ps1` | sempre (fluxo oficial de materialização) | `pronto_para_primeira_materializacao` |
 | `Query-*KbIntelligence.ps1` | `KbIntelligence` adotado | `wrappers_atualizados` |
