@@ -43,6 +43,19 @@ Entradas legadas sem avaliação carregam `FALTA AVALIAR` em ambos os campos at�
 
 **Relacionado.** Footgun `import inócuo por lastUpdate velho` e subseção `Observação (medida): checksum e representação após import` em `xpz-msbuild-import-export/SKILL.md`; `xpz-builder/SKILL.md` (`-NewObjectNotImported` e `lastUpdateRegressed` tratam do carimbo local de objeto nunca importado, não do objeto vivo).
 
+<a id="rotulo-importacao-efetiva-renomear-20261121"></a>
+
+## Rótulo importação real efetiva provada: renomear para dizer processamento — 2026-11-21
+
+- **Importância** — baixa (o rótulo se entende com o esclarecimento da seção de checksum após import).
+- **Maturidade** — ideia (a renomeação altera contrato e não há caso real que a exija hoje).
+
+**Contexto.** O rótulo `importação real efetiva provada` sugere que o conteúdo foi aplicado, o que a task não garante. A própria skill já esclarece que o rótulo significa processamento do objeto (`xpz-msbuild-import-export/SKILL.md`, item 12).
+
+**Por que não agora.** Renomear muda contrato e exige revisão em `10-base-operacional-msbuild-headless.md`, `xpz-kb-parallel-setup/SKILL.md`, `xpz-kb-parallel-setup/examples/AGENTS.md.example` (que usa a forma sem acentos, `importacao real efetiva provada por evidencia de stdout`, e se propaga para os `AGENTS.md` locais), `xpz-msbuild-build/SKILL.md`, `xpz-msbuild-import-export/SKILL.md` e `02-regras-operacionais-e-runtime.md` (perto da linha 2555).
+
+**Gatilho.** Decisão de contrato sobre rótulos da skill, ou caso real em que o rótulo leve a conclusão errada sobre conteúdo.
+
 <a id="inventario-prova-mascara-alcancabilidade-20261118"></a>
 
 ## Inventário: prova de saída da máscara é estrutural, não de alcançabilidade — 2026-11-18
