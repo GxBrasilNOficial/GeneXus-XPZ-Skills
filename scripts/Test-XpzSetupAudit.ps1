@@ -623,6 +623,45 @@ if ($postBuildLatestByEnv.Count -gt 0) {
     $postBuildBaseStatus = if ($postBuildBaseRejected -gt 0) { 'NAO_APTO' } else { 'APTO' }
 }
 
+# Dimensao importacao_msbuild (regra 8.g6.i), informativa: evidencia objetiva de uso do fluxo de importacao
+# headless (Invoke-GeneXusXpzImport.ps1). Mera existencia de PacotesGeradosParaImportacaoNaKbNoGenexus nao
+# basta. Evidencia suficiente: artefato nominal de importacao em Temp\ ou em qualquer subpasta, wrapper local
+# Invoke-*KbXpzImport.ps1, ou referencia a importacao headless em AGENTS.md/README.md locais.
+$importMsbuildStatus = 'NAO_ADOTADO'
+$importMsbuildEvidence = 'sem artefato de importacao em Temp\ (nem subpastas), sem wrapper local Invoke-*KbXpzImport.ps1 e sem referencia a importacao headless em AGENTS.md/README.md'
+$importArtifactNames = @('import.json', 'import.log', 'import.monitor.log', 'msbuild.stdout.log')
+$importArtifact = $null
+if (Test-Path -LiteralPath $postBuildTempRoot -PathType Container) {
+    $importArtifact = Get-ChildItem -LiteralPath $postBuildTempRoot -Recurse -File -ErrorAction SilentlyContinue |
+        Where-Object { $importArtifactNames -contains $_.Name.ToLowerInvariant() } |
+        Select-Object -First 1
+}
+$importWrapper = $null
+$importScriptsDir = Join-Path $KbRoot 'scripts'
+if (Test-Path -LiteralPath $importScriptsDir -PathType Container) {
+    $importWrapper = Get-ChildItem -LiteralPath $importScriptsDir -File -Filter 'Invoke-*KbXpzImport.ps1' -ErrorAction SilentlyContinue |
+        Select-Object -First 1
+}
+$importDocHit = $null
+foreach ($importDocName in @('AGENTS.md', 'README.md')) {
+    $importDocPath = Join-Path $KbRoot $importDocName
+    if (Test-Path -LiteralPath $importDocPath -PathType Leaf) {
+        $importDocText = Get-Content -LiteralPath $importDocPath -Raw
+        if ($importDocText -match '(?i)importa..o headless|msbuild import|xpz-msbuild-import-export|Invoke-GeneXusXpzImport') {
+            $importDocHit = $importDocName
+            break
+        }
+    }
+}
+$importParts = @()
+if ($null -ne $importArtifact) { $importParts += ('artefato de importacao: {0}' -f [System.IO.Path]::GetRelativePath($KbRoot, $importArtifact.FullName)) }
+if ($null -ne $importWrapper) { $importParts += ('wrapper local: scripts\{0}' -f $importWrapper.Name) }
+if ($null -ne $importDocHit) { $importParts += ('referencia documental: {0}' -f $importDocHit) }
+if ($importParts.Count -gt 0) {
+    $importMsbuildStatus = 'ADOTADO'
+    $importMsbuildEvidence = $importParts -join ' | '
+}
+
 $inventoryScriptPath = Join-Path $scriptDir 'Test-XpzWrapperInventory.ps1'
 $examplesPath = Join-Path (Split-Path -Parent $scriptDir) 'xpz-kb-parallel-setup\examples'
 $inventoryStatus = 'INVENTORY_UNKNOWN'
@@ -692,6 +731,8 @@ Emit-Line -Key 'pos-build/registro' -Value $postBuildRegistryStatus
 Emit-Line -Key 'pos-build/registro.evidencia' -Value $postBuildRegistryEvidence
 Emit-Line -Key 'pos-build/base' -Value $postBuildBaseStatus
 Emit-Line -Key 'pos-build/base.evidencia' -Value $postBuildBaseEvidence
+Emit-Line -Key 'importacao_msbuild' -Value $importMsbuildStatus
+Emit-Line -Key 'importacao_msbuild.evidencia' -Value $importMsbuildEvidence
 Emit-Line -Key 'empacotamento local' -Value $packageAuditStatus
 Emit-Line -Key 'empacotamento local.evidencia' -Value $packageEvidence
 Emit-Line -Key 'declarativo/timestamps' -Value $declarativeStatus

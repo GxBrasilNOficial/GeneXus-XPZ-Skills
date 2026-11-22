@@ -444,6 +444,45 @@ kb_environment_post_build_event_hashes: NETFrameworkSQLServer=$pbFamily1
   Assert-True ($rz.json.'pos-build/base' -eq 'NAO_APTO') "Z: NAO_APTO esperado com status nao previsto; obtido $($rz.json.'pos-build/base')"
   Assert-True ([string]$rz.json.'pos-build/base.evidencia' -match 'status nao previsto') "Z: evidencia deve citar status nao previsto"
 
+  # AA a AE: importacao_msbuild (regra 8.g6.i)
+  # AA: artefato nominal de importacao em subpasta de Temp\ -> ADOTADO
+  $aa = New-SetupAuditFixture -GateText $pbGateText
+  $aaDir = Join-Path $aa.Root 'Temp\armA_import'
+  [void](New-Item -ItemType Directory -Path $aaDir -Force)
+  [System.IO.File]::WriteAllText((Join-Path $aaDir 'import.log'), "log`n", $utf8NoBom)
+  $raa = & $pbRun $aa
+  Assert-True ($raa.json.'importacao_msbuild' -eq 'ADOTADO') "AA: ADOTADO esperado com import.log em subpasta de Temp; obtido $($raa.json.'importacao_msbuild')"
+  Assert-True ([string]$raa.json.'importacao_msbuild.evidencia' -match 'artefato de importacao') "AA: evidencia deve citar o artefato"
+
+  # AB: wrapper local Invoke-*KbXpzImport.ps1 -> ADOTADO
+  $ab = New-SetupAuditFixture -GateText $pbGateText
+  $abDir = Join-Path $ab.Root 'scripts'
+  [void](New-Item -ItemType Directory -Path $abDir -Force)
+  [System.IO.File]::WriteAllText((Join-Path $abDir 'Invoke-DemoKbXpzImport.ps1'), "# wrapper`n", $utf8NoBom)
+  $rab = & $pbRun $ab
+  Assert-True ($rab.json.'importacao_msbuild' -eq 'ADOTADO') "AB: ADOTADO esperado com wrapper local de importacao; obtido $($rab.json.'importacao_msbuild')"
+  Assert-True ([string]$rab.json.'importacao_msbuild.evidencia' -match 'wrapper local') "AB: evidencia deve citar o wrapper"
+
+  # AC: referencia documental a importacao headless -> ADOTADO
+  $ac = New-SetupAuditFixture -GateText $pbGateText
+  [System.IO.File]::WriteAllText((Join-Path $ac.Root 'AGENTS.md'), "Fluxo: skill xpz-msbuild-import-export.`n", $utf8NoBom)
+  $rac = & $pbRun $ac
+  Assert-True ($rac.json.'importacao_msbuild' -eq 'ADOTADO') "AC: ADOTADO esperado com referencia documental; obtido $($rac.json.'importacao_msbuild')"
+  Assert-True ([string]$rac.json.'importacao_msbuild.evidencia' -match 'referencia documental') "AC: evidencia deve citar a referencia documental"
+
+  # AD: nenhuma evidencia -> NAO_ADOTADO
+  $ad = New-SetupAuditFixture -GateText $pbGateText
+  $rad = & $pbRun $ad
+  Assert-True ($rad.json.'importacao_msbuild' -eq 'NAO_ADOTADO') "AD: NAO_ADOTADO esperado sem evidencia; obtido $($rad.json.'importacao_msbuild')"
+
+  # AE: so a pasta de pacotes populada, sem referencia documental -> NAO_ADOTADO (mera existencia nao basta)
+  $ae = New-SetupAuditFixture -GateText $pbGateText
+  $aeDir = Join-Path $ae.Root 'PacotesGeradosParaImportacaoNaKbNoGenexus'
+  [void](New-Item -ItemType Directory -Path $aeDir -Force)
+  [System.IO.File]::WriteAllText((Join-Path $aeDir 'pacote.xpz'), "x`n", $utf8NoBom)
+  $rae = & $pbRun $ae
+  Assert-True ($rae.json.'importacao_msbuild' -eq 'NAO_ADOTADO') "AE: NAO_ADOTADO esperado so com pasta de pacotes; obtido $($rae.json.'importacao_msbuild')"
+
   # SG: sucesso do SpecifyGenerate (status "specify e generate concluidos") tambem serve de base
   $pbSpecifyOk = 'specify e generate conclu' + [char]0x00ED + 'dos'
   $rsg = & $pbBase @{ ExitCode = 0; Status = $pbSpecifyOk; MsBuildExitCode = 0; RegistryState = $null; Unexpected = @() }
