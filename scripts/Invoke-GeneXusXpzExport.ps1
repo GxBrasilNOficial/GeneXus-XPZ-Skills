@@ -755,6 +755,9 @@ try {
                 VersionName = $VersionName
                 EnvironmentName = $EnvironmentName
                 ObjectList = $objectListSpec
+                ExportKbInfo = $exportKbInfoRequested
+                ExportKbInfoSource = $exportKbInfoSource
+                ExportKbInfoEffective = $exportKbInfoEffective
                 ExportAll = $ExportAll
                 StartWatcherRequested = $StartWatcher.IsPresent
             }
@@ -932,6 +935,9 @@ try {
                 VersionName = $VersionName
                 EnvironmentName = $EnvironmentName
                 ObjectList = $objectListSpec
+                ExportKbInfo = $exportKbInfoRequested
+                ExportKbInfoSource = $exportKbInfoSource
+                ExportKbInfoEffective = $exportKbInfoEffective
                 ExportAll = $ExportAll
                 ParallelKbRoot = $ParallelKbRoot
                 IndexPath = $IndexPath
@@ -1004,7 +1010,7 @@ try {
             if ([string]::IsNullOrWhiteSpace($exportKbInfoPropertyName)) {
                 Add-WarningMessage -Message 'ExportKbInfo: default true rebaixado para false porque a task Export não expõe ExportKBInfo nem ExportKBProperties. O bloco Source do XPZ sairá vazio (sync com refresh parcial de kb-source-metadata.md; XPZ inválido como template de New-XpzImportPackage).'
             } else {
-                Add-WarningMessage -Message ('ExportKbInfo: default true rebaixado para false porque a task Export expõe apenas {0}, cuja semântica não foi medida. O bloco Source do XPZ pode sair vazio; passe -ExportKbInfo true explícito para emitir.' -f $exportKbInfoPropertyName)
+                Add-WarningMessage -Message ('ExportKbInfo: default true rebaixado para false porque a task Export expõe apenas {0}, cuja semântica não foi medida. O bloco Source do XPZ pode sair vazio; -ExportKbInfo true explícito emite o atributo nessa propriedade, mas o efeito dele não foi medido.' -f $exportKbInfoPropertyName)
             }
         } elseif ([string]::IsNullOrWhiteSpace($exportKbInfoPropertyName)) {
             Add-BlockingReason -Reason 'A instalação atual não expõe ExportKBInfo nem ExportKBProperties na task Export.'
@@ -1097,6 +1103,9 @@ try {
                 EnvironmentName = $EnvironmentName
                 XpzPath = $resolvedXpzPath
                 ObjectList = $resolvedObjectList
+                ExportKbInfo = $exportKbInfoRequested
+                ExportKbInfoSource = $exportKbInfoSource
+                ExportKbInfoEffective = $exportKbInfoEffective
             }
             resolvedPaths = [ordered]@{
                 GeneXusDir = $resolvedGeneXusDir

@@ -84,6 +84,9 @@ foreach ($objectList in $candidates) {
         LogPath           = $logPath
         ObjectList        = $objectList
         ExportAll         = 'false'
+        # Os XPZ da matriz ficam em historico/ (versionado): false explicito evita gravar
+        # username e UNCPath da maquina no bloco Source (o default do motor e true).
+        ExportKbInfo      = 'false'
     }
     if (-not [string]::IsNullOrWhiteSpace($ParallelKbRoot)) { $exportArgs.ParallelKbRoot = $ParallelKbRoot }
     if (-not [string]::IsNullOrWhiteSpace($GeneXusDir)) { $exportArgs.GeneXusDir = $GeneXusDir }

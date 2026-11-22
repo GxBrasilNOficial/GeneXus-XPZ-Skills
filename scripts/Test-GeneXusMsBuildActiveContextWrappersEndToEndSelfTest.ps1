@@ -270,6 +270,11 @@ try {
                 )
             Assert-True ($blocked.ExitCode -eq 35 -and $blocked.Diagnostic.exitCode -eq 35 -and $blocked.Diagnostic.stage -eq $expectedStage) "[$wrapper] esperado exit 35 em $expectedStage (índice=$withIndex): $($blocked.Diagnostic.summary)"
             Assert-True (-not (Test-Path -LiteralPath (Join-Path $scenarioRoot 'task-started.txt'))) "[$wrapper] MSBuild não deve iniciar após bloqueio seletivo."
+            if ($wrapper -eq 'Export') {
+                $blockedContext = $blocked.Diagnostic.requestedContext
+                Assert-True ([string]$blockedContext.ExportKbInfo -eq 'true' -and [string]$blockedContext.ExportKbInfoSource -eq 'default') "[Export] bloqueio $expectedStage deve registrar ExportKbInfo pedido e origem."
+                Assert-True ($null -ne $blockedContext.PSObject.Properties['ExportKbInfoEffective'] -and $null -eq $blockedContext.ExportKbInfoEffective) "[Export] bloqueio $expectedStage deve registrar ExportKbInfoEffective nulo (anterior à checagem de suporte)."
+            }
             $preflight = $blocked.Diagnostic.objectListPreflight
             Assert-True ($preflight.preflightEnabled -and -not $preflight.preflightSkipped -and $preflight.items.Count -eq 0) "[$wrapper] envelope de pré-validação incorreto."
             $diagnostic = $preflight.PSObject.Properties['catalogOverrideDiagnostic']
