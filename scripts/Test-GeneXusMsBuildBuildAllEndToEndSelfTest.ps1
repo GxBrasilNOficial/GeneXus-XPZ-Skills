@@ -448,6 +448,21 @@ try {
     Assert-True -Condition ($pbN4.Diagnostic.status -eq 'operacao concluida, pendente de confirmacao funcional') -Message ("PB4 deveria ficar pendente; recebeu '{0}'." -f $pbN4.Diagnostic.status)
     Assert-True -Condition ([string]$pbN4Classification.nextStep -match 'evento nao registrado' -and [string]$pbN4Classification.nextStep -match 'auditoria de setup') -Message ("PB4 nextStep deveria indicar evento nao registrado e a auditoria de setup; recebeu '{0}'." -f $pbN4Classification.nextStep)
     Assert-True -Condition (@($pbN4Classification.unexpected).Count -eq 2) -Message ("PB4 deveria ter 2 eventos inesperados (invalidos 1 e nome C); atual={0}." -f @($pbN4Classification.unexpected).Count)
+
+    # Veredito de base sobre a saida REAL do BuildAll: o resumo que o build produz para pendencia por evento
+    # precisa continuar sendo reconhecido por Get-GeneXusPostBuildBaseVerdict (auditoria pos-build/base e Register);
+    # se alguem mudar o texto do resumo no BuildAll, este bloco falha em vez de o impasse voltar em silencio.
+    . (Join-Path $PSScriptRoot 'GeneXusMsBuildPostBuildEventsSupport.ps1')
+    $pbVerdictCases = @(
+        @{ Name = 'PB2 (environment sem registro, evento a registrar)'; Diagnostic = $pbN2.Diagnostic; ExpectOk = $true }
+        @{ Name = 'PB3 (compilou limpo apos o registro)';                Diagnostic = $pbN3.Diagnostic; ExpectOk = $true }
+        @{ Name = 'PB4 (environment registrado, evento novo)';           Diagnostic = $pbN4.Diagnostic; ExpectOk = $true }
+        @{ Name = 'PB1 (registro nao consultado)';                       Diagnostic = $pbN1.Diagnostic; ExpectOk = $false }
+    )
+    foreach ($pbVerdictCase in $pbVerdictCases) {
+        $pbVerdict = Get-GeneXusPostBuildBaseVerdict -Facts (Get-GeneXusPostBuildBaseFacts -BuildJson $pbVerdictCase.Diagnostic)
+        Assert-True -Condition ([bool]$pbVerdict.ok -eq $pbVerdictCase.ExpectOk) -Message ("Veredito de base sobre a saida real do BuildAll, {0}: esperado ok={1}; obtido ok={2} ({3})." -f $pbVerdictCase.Name, $pbVerdictCase.ExpectOk, $pbVerdict.ok, $pbVerdict.reason)
+    }
 }
 finally {
     foreach ($msBuildFilePath in $artifactDirectories) {
