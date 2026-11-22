@@ -39,6 +39,10 @@ Entradas legadas sem avaliação carregam `FALTA AVALIAR` em ambos os campos at�
 
 **Contexto.** `Sync-GeneXusXpzToXml.ps1` compara o texto com `-eq`, que no PowerShell ignora caixa. Um XPZ cujo único delta seja de caixa cai em `unchanged` e não é gravado. A documentação da frente de rename agora declara a limitação; a correção de motor não foi feita.
 
+**Por que não agora.** A troca de `-eq` por `-ceq` é mudança de motor; exige teste próprio e não há caso real medido.
+
+**Relacionado.** `02-regras-operacionais-e-runtime.md` (seção «Rename na IDE…», estados do sync) e `xpz-sync/SKILL.md` (passo 16).
+
 **Gatilho.** Primeiro caso real de rename/edição só de caixa que precise chegar ao acervo, ou decisão de endurecer a comparação.
 
 <a id="lastupdate-menor-aplicado-reconciliar-footgun-20261121"></a>

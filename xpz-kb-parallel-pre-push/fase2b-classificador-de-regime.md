@@ -25,7 +25,7 @@ Sobre o que **não** for `SAME`, classificar o regime e rotear:
 | **Aditivo data-bearing** (atributo novo com FK/stored, nenhum removido) | **único lugar onde a estática agrega**: `who-uses(Table)` ∪ `who-uses(Transaction)`; shortlist de omissão = navegadores intocados ranqueados por afinidade. Status `suspeito-por-omissão` = **triagem, não veredito** | estática (triagem) + análise do agente |
 | **Aditivo computado** (atributo novo com `<Formula>`) | **pular** — não há risco de omissão | — |
 | **delete** (atributo/objeto removido) | desenvolvimento normal mediado pela IDE: a referência estrutural costuma ser barrada na própria IDE antes de chegar ao acervo referenciado. **Não tratar como garantia universal** — referência só-em-código permanece ponta aberta; o **build permanece backstop** | IDE (mediação) + build (backstop) |
-| **rename** | propagado pela IDE — não-evento para risco de órfão/regressão; para frescor do acervo, o consumidor reescrito pode vir `SAME`/`Updated` e exige conferir o diff (ver `02`, seção «Rename na IDE…») | IDE (regressão) + `02` (frescor) |
+| **rename** | propagado pela IDE — não-evento para risco de órfão/regressão; para frescor do acervo, o consumidor reescrito pode vir `SAME` na F1 e `updated` no sync, e exige conferir o diff (ver `02`, seção «Rename na IDE…») | IDE (regressão) + `02` (frescor) |
 | **troca de tipo/domínio/chave** | reorg não-backward-compatible. **A autoridade é o build com `FailIfReorg`**, não a enumeração estática | build (`xpz-msbuild-build`) |
 | **alto volume** (>~20 dependentes) | rotear ao build em vez de enumerar | build |
 | **lógica de negócio** (cálculo que compila e roda errado) | fora do alcance da estática e do build estrutural | só teste funcional |
