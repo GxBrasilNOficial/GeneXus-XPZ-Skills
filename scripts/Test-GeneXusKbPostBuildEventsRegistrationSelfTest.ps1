@@ -104,6 +104,7 @@ try {
     $text3 = [System.IO.File]::ReadAllText($metadataPath)
     $occurrences = ([regex]::Matches($text3, '### env: NETPostgreSQL')).Count
     if ($occurrences -ne 1) { throw "ASSERT_FAILED: re-registro deveria manter 1 subsecao env1, atual=$occurrences" }
+    if ($text3 -match "`n`n$") { throw 'ASSERT_FAILED: o re-registro deixou linha em branco no fim do arquivo' }
 
     # --- Forma nova: registro com fingerprint de familia; contagem nova no build seguinte -> esperado ---
     $famX = '[APLICADO] .js varridos=2966 | arquivos com chave negativa em gx.domain=1 | chaves corrigidas=1'

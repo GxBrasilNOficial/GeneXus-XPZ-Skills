@@ -11,6 +11,11 @@ inertes (REM comentado, duração TimeSpan válida ou data civil válida), gera 
 secao-espelho legivel. Ação sensivel (desarma o rebaixamento por evento pos-build daquele
 environment): exige confirmacao. Sem -ConfirmRegistration, o motor pede frase exata via Read-Host;
 o agente só passa -ConfirmRegistration após o usuário aprovar explicitamente os eventos listados.
+O motor recusa (BLOCK) o build que não sirva de base do registro, com o mesmo veredito da dimensão
+pos-build/base da auditoria de setup: exitCode e executionEvidence.msBuildExitCode 0, sem msBuildFailed,
+e status compilou limpo (BuildAll) ou specify e generate concluídos (SpecifyGenerate), ou pendente só por
+registro ausente. Use o build do environment que a auditoria marcar como APTO; nada é gravado quando o
+build é recusado.
 
 .PARAMETER SharedSkillsRoot
 Raiz local da base compartilhada `GeneXus-XPZ-Skills`.

@@ -137,6 +137,13 @@ Wrappers esperados:
   `Resolve-GeneXusKbIdentity.ps1` em modo somente leitura e, quando chamado com
   opcao explicita de atualizacao, ao motor
   `Update-XpzKbSourceMetadataIdentity.ps1`.
+- `Register-<NomeKb>KbPostBuildEvents.ps1`: registra os eventos pos-build
+  conhecidos de um environment em `kb-source-metadata.md` (campo
+  `kb_environment_post_build_event_hashes` e espelho legivel). Acao sensivel:
+  so com confirmacao explicita do usuario e somente a partir do build que a
+  auditoria de setup marcar como `pos-build/base: APTO`; o motor recusa build
+  nao apto. O build apenas encaminha para a auditoria de setup: nao registrar
+  direto a partir do diagnostico do build.
 - `Test-<NomeKb>KbMetadataWrapper.ps1`: valida o contrato funcional do
   `Get-<NomeKb>KbMetadata.ps1` contra `kb-source-metadata.md`; retorna
   `METADATA_WRAPPER_OK`, `PENDENTE_DE_DADOS` ou `BLOCK: ...`.
