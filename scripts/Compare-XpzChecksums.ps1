@@ -8,7 +8,8 @@
 
 .DESCRIPTION
   Motor compartilhado, agnostico de KB. Classifica cada XML alterado como SAME
-  (checksum identico -- mudou so por re-export, tipicamente lastUpdate), DIFF,
+  (checksum identico -- sugere re-export, mas nao prova conteudo igual; uma
+  cascata de rename pode alterar conteudo sem recalcular o checksum), DIFF,
   NEW, DELETED ou NO_CHECKSUM (checksum ausente nos dois lados). E classificador
   puro: nao bloqueia, so rotula para triagem.
 
@@ -17,12 +18,13 @@
   Implementacoes que buscam tag retornam NONE dos dois lados, dando SAME falso em
   100% do universo. Este helper canoniza a leitura correta.
 
-  ATENCAO METODOLOGICA (cabeca-detalhe): SAME no ARQUIVO X NAO implica que a
-  cabeca/objeto associado a X esteja fora de escopo. Um objeto cabeca pode ter
-  checksum inalterado enquanto seu detalhe (outro arquivo) mudou e carrega
-  dependentes. "Descartar SAME cedo" e correto para o ARQUIVO, mas o analista
-  NAO pode concluir, so do SAME, que a cabeca esta fora do raio de impacto. A
-  Fase 2a/2b trata isso (ver satelite fase2a-estrutural.md).
+  ATENCAO METODOLOGICA (cabeca-detalhe): SAME no ARQUIVO X NAO prova que o
+  arquivo nao mudou nem implica que a cabeca/objeto associado a X esteja fora de
+  escopo. Um objeto cabeca pode ter checksum inalterado enquanto seu detalhe
+  (outro arquivo) mudou e carrega dependentes. Descartar SAME cedo e aceitavel
+  para a triagem de regime, mas o analista NAO pode concluir, so do SAME, que a
+  cabeca esta fora do raio de impacto. A Fase 2a/2b trata isso (ver satelite
+  fase2a-estrutural.md).
 
   CONTRATO DE SAIDA: JSON de maquina por padrao no stdout. Campos: status
   (ok|unknown), exitCode, baseRef, repoRoot, range, results[]. -AsText da saida

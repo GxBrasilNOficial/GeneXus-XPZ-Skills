@@ -74,7 +74,7 @@ Registradas para não serem reabertas sem motivo novo. Nenhuma delas bloqueia o 
 
 ## Nuance cabeça-detalhe (vinda do F1)
 
-O filtro F1 (`Compare-XpzChecksums`, ver [`fase2b-classificador-de-regime.md`](fase2b-classificador-de-regime.md)) descarta arquivos `SAME` (checksum inalterado). **Atenção:** `SAME` no **arquivo** X não implica que a **cabeça/objeto** associado a X esteja fora do raio de impacto. Um objeto cabeça pode ter checksum inalterado enquanto seu **detalhe** (outro arquivo) mudou e carrega dependentes. "Descartar SAME cedo" é correto para o **arquivo**, mas o analista **não** pode concluir, só do `SAME`, que a cabeça está fora de escopo — a triagem estrutural (esta fase) e o roteamento de regime (2b) tratam disso.
+O filtro F1 (`Compare-XpzChecksums`, ver [`fase2b-classificador-de-regime.md`](fase2b-classificador-de-regime.md)) descarta arquivos `SAME` (checksum inalterado). **Atenção:** `SAME` não prova que o arquivo não mudou nem que a **cabeça/objeto** associado a X esteja fora do raio de impacto. Um objeto cabeça pode ter checksum inalterado enquanto seu **detalhe** (outro arquivo) mudou e carrega dependentes. Descartar `SAME` é aceitável para a **triagem de regime**, mas não prova conteúdo igual; o analista **não** pode concluir, só do `SAME`, que a cabeça está fora de escopo — a triagem estrutural (esta fase) e o roteamento de regime (2b) tratam disso.
 
 ## Checklist de agente (parte não scriptada)
 
