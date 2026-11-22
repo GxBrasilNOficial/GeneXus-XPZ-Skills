@@ -327,6 +327,35 @@ function Get-GeneXusPostBuildEventClassification {
     }
 }
 
+function Get-GeneXusPostBuildRegistryNextStep {
+    # Proximo passo para o agente quando o registro de eventos pos-build esta pendente: o build so
+    # detecta e encaminha. A acao de registrar pertence a skill xpz-kb-parallel-setup, que confere o
+    # registro na auditoria de setup e indica a acao; por isso a mensagem nao cita script de registro.
+    # Retorna $null quando nao ha pendencia de registro (inclusive registro nao consultado).
+    param(
+        [Parameter(Mandatory = $true)]$Classification,
+        [Parameter(Mandatory = $true)]$RegistryState,
+        [AllowNull()][string]$EnvironmentName
+    )
+
+    $state = [string]$RegistryState.state
+    if ($state -eq 'metadataNotProvided' -or $state -eq 'environmentNameUnavailable') { return $null }
+
+    $nonInertCount = @($Classification.expected).Count + @($Classification.unexpected).Count +
+                     @($Classification.benignFallback).Count + @($Classification.unknownFallback).Count
+    $reason = $null
+    if ($state -eq 'noEntryForEnvironment' -and $nonInertCount -gt 0) {
+        $reason = 'sem registro'
+    } elseif ($state -eq 'available' -and @($Classification.unexpected).Count -gt 0) {
+        $reason = 'evento nao registrado'
+    } elseif ([int]$Classification.legacyMatchCount -gt 0) {
+        $reason = 'registro na forma antiga'
+    }
+    if ($null -eq $reason) { return $null }
+
+    return ("Registro de eventos pos-build pendente para '{0}' ({1}): carregue a skill xpz-kb-parallel-setup e rode a auditoria de setup da pasta paralela. Ela confere o registro e indica a acao; o build sozinho nao basta para registrar." -f $EnvironmentName, $reason)
+}
+
 function Get-GeneXusPostBuildBaseFacts {
     # Fatos do JSON de um build usados para decidir se ele serve de base do registro de eventos
     # pos-build. Sem excecao por campo ausente: o campo ausente fica $null e o veredito decide.

@@ -1888,6 +1888,10 @@ try {
             environment  = $pbRegistryState.environment
             metadataPath = $pbRegistryState.metadataPath
         })
+        # Proximo passo: o build so detecta e encaminha para a auditoria de setup (skill
+        # xpz-kb-parallel-setup), sem citar script de registro. $null quando nao ha pendencia.
+        $pbNextStep = Get-GeneXusPostBuildRegistryNextStep -Classification $pbClassification -RegistryState $pbRegistryState -EnvironmentName $activeEnvironmentOutput
+        $pbClassification | Add-Member -NotePropertyName nextStep -NotePropertyValue $pbNextStep
 
         $pbNonInertCount = @($pbClassification.expected).Count + @($pbClassification.unexpected).Count +
                            @($pbClassification.benignFallback).Count + @($pbClassification.unknownFallback).Count
@@ -1897,24 +1901,27 @@ try {
             } elseif ($pbRegistryState.state -eq 'environmentNameUnavailable') {
                 Add-WarningMessage -Message 'Registro de eventos pos-build nao consultado: environment ativo nao identificado.'
             } else {
-                Add-WarningMessage -Message ("Nenhum evento pos-build registrado para '{0}'. Registre via xpz-kb-parallel-setup (Register-GeneXusKbPostBuildEvents.ps1)." -f $activeEnvironmentOutput)
+                Add-WarningMessage -Message ("Nenhum evento pos-build registrado para '{0}'." -f $activeEnvironmentOutput)
             }
+        }
+        if ($null -ne $pbNextStep) {
+            Add-WarningMessage -Message $pbNextStep
         }
 
         foreach ($evt in $pbClassification.expected) {
             Add-WarningMessage -Message "Evento pos-build registrado reconhecido (nao afeta a classificacao): '$evt'"
         }
         foreach ($evt in $pbClassification.benignFallback) {
-            Add-WarningMessage -Message "Evento pos-build benigno reconhecido sem registro: '$evt'. Registre via xpz-kb-parallel-setup (Register-GeneXusKbPostBuildEvents.ps1) para reconhecimento explicito."
+            Add-WarningMessage -Message "Evento pos-build benigno reconhecido sem registro: '$evt'."
         }
         foreach ($evt in $pbClassification.unexpected) {
-            Add-WarningMessage -Message "Evento pos-build NAO registrado detectado: '$evt'. Se for legitimo, registre via xpz-kb-parallel-setup (Register-GeneXusKbPostBuildEvents.ps1); status rebaixado por cautela."
+            Add-WarningMessage -Message "Evento pos-build NAO registrado detectado: '$evt'; status rebaixado por cautela."
         }
         foreach ($evt in $pbClassification.unknownFallback) {
             Add-WarningMessage -Message "Evento pos-build nao reconhecido detectado: '$evt'. Processo externo pode ter sido disparado; status rebaixado por cautela."
         }
         if ($pbClassification.legacyMatchCount -gt 0) {
-            Add-WarningMessage -Message ("Evento(s) pos-build aceitos pelo formato antigo do registro: {0}. Registre de novo a partir de um build saudavel (xpz-kb-parallel-setup, Register-GeneXusKbPostBuildEvents.ps1)." -f $pbClassification.legacyMatchCount)
+            Add-WarningMessage -Message ("Evento(s) pos-build aceitos pelo formato antigo do registro: {0}." -f $pbClassification.legacyMatchCount)
         }
 
         if ($pbClassification.shouldDowngrade -and $buildStatus.Status -eq 'compilou limpo') {

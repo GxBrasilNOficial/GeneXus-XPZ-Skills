@@ -419,6 +419,14 @@ try {
     Assert-True -Condition ($pbN2.Diagnostic.status -eq 'operacao concluida, pendente de confirmacao funcional') -Message 'PB2 deveria ficar pendente sem entrada registrada.'
     Assert-True -Condition (@($pbN2.Diagnostic.warnings | Where-Object { [string]$_ -match "Nenhum evento pos-build registrado para 'TestEnvironment'" }).Count -eq 1) -Message 'PB2 deveria avisar que nenhum evento esta registrado para o environment.'
 
+    # nextStep: sem metadata o registro nao foi consultado (sem nextStep); sem entrada, o build encaminha
+    # para a auditoria de setup da skill xpz-kb-parallel-setup, sem citar script de registro.
+    Assert-True -Condition ($null -eq $pbN1Classification.nextStep) -Message 'PB1 nao deveria ter nextStep quando o registro nao foi consultado.'
+    $pbN2NextStep = [string]$pbN2.Diagnostic.stdoutSignals.postBuildEventClassification.nextStep
+    Assert-True -Condition ($pbN2NextStep -match 'xpz-kb-parallel-setup' -and $pbN2NextStep -match 'auditoria de setup' -and $pbN2NextStep -notmatch 'Register-') -Message ("PB2 nextStep deveria apontar para a auditoria de setup sem citar script de registro; recebeu '{0}'." -f $pbN2NextStep)
+    Assert-True -Condition (@($pbN2.Diagnostic.warnings | Where-Object { [string]$_ -eq $pbN2NextStep }).Count -eq 1) -Message 'PB2 deveria repetir o nextStep nos avisos.'
+    Assert-True -Condition (@($pbN2.Diagnostic.warnings | Where-Object { [string]$_ -match 'Register-GeneXusKbPostBuildEvents' }).Count -eq 0) -Message 'PB2 nao deveria citar o script de registro nos avisos do build.'
+
     # Registro a partir do JSON do proprio build (linhas com contagens do PB1).
     & (Join-Path $PSScriptRoot 'Register-GeneXusKbPostBuildEvents.ps1') `
         -BuildResultJsonPath (Join-Path $testRoot 'pb-no-entry\result.json') `
@@ -429,6 +437,7 @@ try {
     $artifactDirectories.Add([string]$pbN3.Diagnostic.artifacts.MsBuildFilePath)
     $pbN3Classification = $pbN3.Diagnostic.stdoutSignals.postBuildEventClassification
     Assert-True -Condition ([string]$pbN3Classification.registryStatus.state -eq 'available') -Message ("PB3 registryStatus.state deveria ser available; recebeu '{0}'." -f $pbN3Classification.registryStatus.state)
+    Assert-True -Condition ($null -eq $pbN3Classification.nextStep) -Message 'PB3 nao deveria ter nextStep com o registro completo.'
     Assert-True -Condition ($pbN3.ExitCode -eq 0 -and $pbN3.Diagnostic.status -eq 'compilou limpo') -Message ("PB3 deveria compilar limpo apos o registro; exit {0}, status '{1}'." -f $pbN3.ExitCode, $pbN3.Diagnostic.status)
     Assert-True -Condition (@($pbN3Classification.expected).Count -eq 3 -and -not $pbN3Classification.shouldDowngrade -and [int]$pbN3Classification.legacyMatchCount -eq 0) -Message 'PB3 deveria ter 3 eventos esperados, sem rebaixar e sem legacyMatchCount.'
 
@@ -437,6 +446,7 @@ try {
     $artifactDirectories.Add([string]$pbN4.Diagnostic.artifacts.MsBuildFilePath)
     $pbN4Classification = $pbN4.Diagnostic.stdoutSignals.postBuildEventClassification
     Assert-True -Condition ($pbN4.Diagnostic.status -eq 'operacao concluida, pendente de confirmacao funcional') -Message ("PB4 deveria ficar pendente; recebeu '{0}'." -f $pbN4.Diagnostic.status)
+    Assert-True -Condition ([string]$pbN4Classification.nextStep -match 'evento nao registrado' -and [string]$pbN4Classification.nextStep -match 'auditoria de setup') -Message ("PB4 nextStep deveria indicar evento nao registrado e a auditoria de setup; recebeu '{0}'." -f $pbN4Classification.nextStep)
     Assert-True -Condition (@($pbN4Classification.unexpected).Count -eq 2) -Message ("PB4 deveria ter 2 eventos inesperados (invalidos 1 e nome C); atual={0}." -f @($pbN4Classification.unexpected).Count)
 }
 finally {

@@ -252,6 +252,28 @@ try {
     Assert-True -Condition ([string]$sgNoMetadata.Diagnostic.stdoutSignals.postBuildEventClassification.registryStatus.state -eq 'metadataNotProvided') -Message 'SG2 registryStatus.state deveria ser metadataNotProvided.'
     Assert-True -Condition ([string]$sgNoMetadata.Diagnostic.status -match 'pendente de confirma') -Message ("SG2 deveria ficar pendente sem consulta ao registro; status '{0}'." -f $sgNoMetadata.Diagnostic.status)
     Assert-True -Condition (@($sgNoMetadata.Diagnostic.warnings | Where-Object { [string]$_ -match 'Registro de eventos pos-build nao consultado' }).Count -eq 1) -Message 'SG2 deveria avisar que o registro nao foi consultado.'
+    Assert-True -Condition ($null -eq $sgClassification.nextStep) -Message 'SG1 nao deveria ter nextStep com o registro completo.'
+    Assert-True -Condition ($null -eq $sgNoMetadata.Diagnostic.stdoutSignals.postBuildEventClassification.nextStep) -Message 'SG2 nao deveria ter nextStep quando o registro nao foi consultado.'
+
+    # SG3: metadata sem entrada para o environment -> nextStep aponta para a auditoria de setup, sem script de registro.
+    $sgEmptyRoot = Join-Path $testRoot 'sg-parallel-empty'
+    [System.IO.Directory]::CreateDirectory($sgEmptyRoot) | Out-Null
+    $sgEmptyMetadata = @(
+        '---'
+        'deployment_environment_name: TestEnvironment'
+        'deployment_hosting_kind: dotnet-core-self-host'
+        'kb_environment_count: 1'
+        'kb_environment_names: TestEnvironment'
+        '---'
+        ''
+    ) -join "`n"
+    [System.IO.File]::WriteAllText((Join-Path $sgEmptyRoot 'kb-source-metadata.md'), $sgEmptyMetadata, [System.Text.UTF8Encoding]::new($false))
+    $sgNoEntry = Invoke-SpecifyGenerateScenario -ScenarioRoot (Join-Path $testRoot 'sg-no-entry') -StdErrLines @() -ContextLines (New-SpecifyPostBuildContextLines -Events @($sgA1, $sgB1, $sgC1)) -ExtraWrapperParams @{ ParallelKbRoot = $sgEmptyRoot }
+    $artifactDirectories.Add([string]$sgNoEntry.Diagnostic.artifacts.MsBuildFilePath)
+    $sgNoEntryNextStep = [string]$sgNoEntry.Diagnostic.stdoutSignals.postBuildEventClassification.nextStep
+    Assert-True -Condition ([string]$sgNoEntry.Diagnostic.stdoutSignals.postBuildEventClassification.registryStatus.state -eq 'noEntryForEnvironment') -Message 'SG3 registryStatus.state deveria ser noEntryForEnvironment.'
+    Assert-True -Condition ($sgNoEntryNextStep -match 'xpz-kb-parallel-setup' -and $sgNoEntryNextStep -match 'auditoria de setup' -and $sgNoEntryNextStep -notmatch 'Register-') -Message ("SG3 nextStep deveria apontar para a auditoria de setup sem citar script de registro; recebeu '{0}'." -f $sgNoEntryNextStep)
+    Assert-True -Condition (@($sgNoEntry.Diagnostic.warnings | Where-Object { [string]$_ -match 'Register-GeneXusKbPostBuildEvents' }).Count -eq 0) -Message 'SG3 nao deveria citar o script de registro nos avisos do build.'
 }
 finally {
     foreach ($msBuildFilePath in $artifactDirectories) {
