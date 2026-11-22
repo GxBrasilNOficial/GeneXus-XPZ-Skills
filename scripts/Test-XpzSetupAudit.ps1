@@ -453,6 +453,7 @@ if (Test-Path -LiteralPath $postBuildTempRoot -PathType Container) {
         $postBuildLatestByEnv[$postBuildEnvName] = [pscustomobject]@{
             file  = $postBuildJsonFile.FullName
             count = $postBuildExecutable.Count
+            lines = @($postBuildExecutable | ForEach-Object { $_.Trim() })
         }
     }
 }
@@ -462,8 +463,30 @@ if ($postBuildLatestByEnv.Count -gt 0) {
     foreach ($postBuildEnvKey in @($postBuildLatestByEnv.Keys | Sort-Object)) {
         $postBuildRegistry = Get-GeneXusPostBuildEventRegistryState -MetadataPath $postBuildMetadataPath -EnvironmentName $postBuildEnvKey
         $postBuildEntry = $postBuildLatestByEnv[$postBuildEnvKey]
-        $postBuildParts += ('{0}: {1} evento(s) em {2}, registro={3}' -f $postBuildEnvKey, $postBuildEntry.count, (Split-Path -Leaf $postBuildEntry.file), $postBuildRegistry.state)
-        if ($postBuildRegistry.state -ne 'available') { $postBuildPendingEnvs += $postBuildEnvKey }
+        # Comparacao por hash: cada evento observado deve bater com um hash registrado na forma de familia.
+        # Evento que so bate na forma legada (contagem atual igual a do registro antigo) fica PENDENTE:
+        # com outra contagem o build rebaixa, entao o registro precisa ser regravado.
+        $postBuildRegisteredSet = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+        foreach ($postBuildRegisteredHash in @($postBuildRegistry.hashes)) {
+            if (-not [string]::IsNullOrWhiteSpace($postBuildRegisteredHash)) { [void]$postBuildRegisteredSet.Add($postBuildRegisteredHash.Trim()) }
+        }
+        $postBuildUnregistered = 0
+        $postBuildLegacyOnly = 0
+        if ($postBuildRegistry.state -eq 'available') {
+            foreach ($postBuildLine in @($postBuildEntry.lines)) {
+                if ($postBuildRegisteredSet.Contains((Get-GeneXusPostBuildEventFamilyHash -Line $postBuildLine))) { continue }
+                if ($postBuildRegisteredSet.Contains((Get-GeneXusPostBuildEventNormalizedHash -Line $postBuildLine))) {
+                    $postBuildLegacyOnly++
+                } else {
+                    $postBuildUnregistered++
+                }
+            }
+        }
+        $postBuildDetail = ''
+        if ($postBuildUnregistered -gt 0) { $postBuildDetail += ", sem registro=$postBuildUnregistered" }
+        if ($postBuildLegacyOnly -gt 0) { $postBuildDetail += ", so na forma legada=$postBuildLegacyOnly (regravar)" }
+        $postBuildParts += ('{0}: {1} evento(s) em {2}, registro={3}{4}' -f $postBuildEnvKey, $postBuildEntry.count, (Split-Path -Leaf $postBuildEntry.file), $postBuildRegistry.state, $postBuildDetail)
+        if ($postBuildRegistry.state -ne 'available' -or $postBuildUnregistered -gt 0 -or $postBuildLegacyOnly -gt 0) { $postBuildPendingEnvs += $postBuildEnvKey }
     }
     $postBuildRegistryEvidence = $postBuildParts -join '; '
     $postBuildRegistryStatus = if ($postBuildPendingEnvs.Count -gt 0) { 'PENDENTE' } else { 'OK' }

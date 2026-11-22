@@ -195,7 +195,7 @@ A skill `xpz-llm-delegate` usa um arquivo de politica por-KB na raiz da pasta pa
 ### Registro de eventos pos-build
 
 Dimensão `pos-build/registro` de `Test-*KbSetupAudit.ps1`. Para cada environment com eventos pos-build não inertes observados no JSON de build mais recente em `Temp\`, a auditoria verifica se existe registro em `kb_environment_post_build_event_hashes` de `kb-source-metadata.md`:
-- `pos-build/registro: PENDENTE`: algum environment observado está sem registro (`noEntryForEnvironment`). Entra no plano consolidado e torna `materializado_e_indice_validado` impossível como estado limpo. Sem registro, o build deixa de reconhecer o evento e rebaixa por cautela.
+- `pos-build/registro: PENDENTE`: algum environment observado está sem registro (`noEntryForEnvironment`), ou tem evento que só bate com o hash da forma legada (`so na forma legada`; com outra contagem o build rebaixa, então regravar pelo procedimento abaixo). Entra no plano consolidado e torna `materializado_e_indice_validado` impossível como estado limpo. Sem registro, o build deixa de reconhecer o evento e rebaixa por cautela.
 - `pos-build/registro: OK`: todo environment observado tem registro.
 - `pos-build/registro: SEM_EVIDENCIA`: nenhum JSON de build com eventos em `Temp\`. Não é pendência nem estado limpo; o handoff deve dizer que falta evidência e recomendar um build de verificação.
 

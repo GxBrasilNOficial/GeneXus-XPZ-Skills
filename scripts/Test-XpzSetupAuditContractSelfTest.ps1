@@ -240,6 +240,66 @@ Write-Output 'GATE_OK'
   Assert-True ($null -ne $rl.json) "L: stdout deveria ser JSON parseavel"
   Assert-True ($rl.json.'pos-build/registro' -eq 'SEM_EVIDENCIA') "L: SEM_EVIDENCIA esperado; obtido $($rl.json.'pos-build/registro')"
 
+  # --- M: registro na forma de familia; build com contagens diferentes -> OK (comparacao por hash) ---
+  . (Join-Path $PSScriptRoot 'GeneXusMsBuildPostBuildEventsSupport.ps1')
+  $pbLine1 = '[APLICADO] .js varridos=2968 | arquivos com chave negativa em gx.domain=3 | chaves corrigidas=5'
+  $pbLine2 = '[APLICADO] .js varridos=2178 | arquivos com chave negativa em gx.domain=1 | chaves corrigidas=2'
+  $m = New-SetupAuditFixture -GateText @'
+Write-Output 'writability_coverage: complete-in-model'
+Write-Output 'source_mask_degraded: false'
+Write-Output 'inventory_validation_status: OK'
+Write-Output 'GATE_OK'
+'@
+  $mDir1 = Join-Path $m.Root 'Temp\build-m1'
+  [void](New-Item -ItemType Directory -Path $mDir1 -Force)
+  $mBuild1 = Join-Path $mDir1 'build.json'
+  $mDoc1 = [ordered]@{
+    observedContext = [ordered]@{ ActiveEnvironment = 'NETFrameworkSQLServer' }
+    stdoutSignals   = [ordered]@{ postBuildEvents = @($pbLine1) }
+  }
+  [System.IO.File]::WriteAllText($mBuild1, ($mDoc1 | ConvertTo-Json -Depth 6), $utf8NoBom)
+  (Get-Item -LiteralPath $mBuild1).LastWriteTime = (Get-Date).AddMinutes(-5)
+  $register2 = Join-Path $PSScriptRoot 'Register-GeneXusKbPostBuildEvents.ps1'
+  $rm0 = Invoke-XpzSelfTestScript -ScriptPath $register2 -ScriptArgs @(
+    '-BuildResultJsonPath', $mBuild1, '-KbParallelRoot', $m.Root, '-EnvironmentName', 'NETFrameworkSQLServer',
+    '-ConfirmRegistration', '-AsJson')
+  Assert-True ($rm0.exit -eq 0) "M: registro deveria sair 0; obtido $($rm0.exit)"
+  $mDir2 = Join-Path $m.Root 'Temp\build-m2'
+  [void](New-Item -ItemType Directory -Path $mDir2 -Force)
+  $mDoc2 = [ordered]@{
+    observedContext = [ordered]@{ ActiveEnvironment = 'NETFrameworkSQLServer' }
+    stdoutSignals   = [ordered]@{ postBuildEvents = @($pbLine2) }
+  }
+  [System.IO.File]::WriteAllText((Join-Path $mDir2 'build.json'), ($mDoc2 | ConvertTo-Json -Depth 6), $utf8NoBom)
+  $rm = Invoke-XpzSelfTestScript -ScriptPath $engine -ScriptArgs @(
+    '-KbRoot', $m.Root, '-GateWrapperPath', $m.Gate, '-MetadataWrapperTestPath', $m.Metadata,
+    '-PowerShellRuntimeTestPath', $m.Runtime, '-NamingWrapperPath', $m.Naming, '-AsJson')
+  Assert-True ($null -ne $rm.json) "M: stdout deveria ser JSON parseavel"
+  Assert-True ($rm.json.'pos-build/registro' -eq 'OK') "M: OK esperado (forma de familia cobre contagem diferente); obtido $($rm.json.'pos-build/registro') / $($rm.json.'pos-build/registro.evidencia')"
+
+  # --- N: registro so na forma legada, mesma contagem -> PENDENTE com aviso de regravacao ---
+  $n = New-SetupAuditFixture -GateText @'
+Write-Output 'writability_coverage: complete-in-model'
+Write-Output 'source_mask_degraded: false'
+Write-Output 'inventory_validation_status: OK'
+Write-Output 'GATE_OK'
+'@
+  $nLegacyHash = Get-GeneXusPostBuildEventNormalizedHash -Line $pbLine1
+  Add-Content -LiteralPath (Join-Path $n.Root 'kb-source-metadata.md') -Value "kb_environment_post_build_event_hashes: NETFrameworkSQLServer=$nLegacyHash" -Encoding utf8
+  $nDir = Join-Path $n.Root 'Temp\build-n'
+  [void](New-Item -ItemType Directory -Path $nDir -Force)
+  $nDoc = [ordered]@{
+    observedContext = [ordered]@{ ActiveEnvironment = 'NETFrameworkSQLServer' }
+    stdoutSignals   = [ordered]@{ postBuildEvents = @($pbLine1) }
+  }
+  [System.IO.File]::WriteAllText((Join-Path $nDir 'build.json'), ($nDoc | ConvertTo-Json -Depth 6), $utf8NoBom)
+  $rn = Invoke-XpzSelfTestScript -ScriptPath $engine -ScriptArgs @(
+    '-KbRoot', $n.Root, '-GateWrapperPath', $n.Gate, '-MetadataWrapperTestPath', $n.Metadata,
+    '-PowerShellRuntimeTestPath', $n.Runtime, '-NamingWrapperPath', $n.Naming, '-AsJson')
+  Assert-True ($null -ne $rn.json) "N: stdout deveria ser JSON parseavel"
+  Assert-True ($rn.json.'pos-build/registro' -eq 'PENDENTE') "N: PENDENTE esperado para registro legado; obtido $($rn.json.'pos-build/registro')"
+  Assert-True ([string]$rn.json.'pos-build/registro.evidencia' -match 'forma legada') "N: evidencia deve avisar forma legada; obtido $($rn.json.'pos-build/registro.evidencia')"
+
   'XPZ_SETUP_AUDIT_CONTRACT_SELFTEST_OK'
 }
 finally {
