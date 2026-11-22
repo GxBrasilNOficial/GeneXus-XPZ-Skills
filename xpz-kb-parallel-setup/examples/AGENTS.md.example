@@ -22,7 +22,9 @@ Invocar o GeneXus via MSBuild headless (ex: `Invoke-GeneXusKbBuildAll.ps1`,
 operando a KB como parte do seu funcionamento normal. O agente é o chamador do
 processo; quem grava na KB é o próprio GeneXus. Essa distinção é intencional:
 proibir o agente de manipular arquivos diretamente não proíbe invocar operações
-GeneXus autorizadas pelo usuário.
+GeneXus autorizadas pelo usuário. Em toda chamada de `Invoke-GeneXusKbBuildAll.ps1` e
+`Invoke-GeneXusKbSpecifyGenerate.ps1`, passar `-ParallelKbRoot` apontando para a raiz desta
+pasta; sem ele, o registro de eventos pós-build não é consultado e o wrapper avisa.
 
 ## Estrutura funcional da pasta paralela da KB
 

@@ -58,7 +58,9 @@ function Invoke-SpecifyGenerateScenario {
             "echo The active environment is 'TestEnvironment'",
             "echo The active environment is 'TestEnvironment'"
         ),
-        [int]$FakeExitCode = 0
+        [int]$FakeExitCode = 0,
+        # Parametros extras do wrapper (ex.: ParallelKbRoot), em hashtable para splat nomeado. Vazio preserva a chamada original.
+        [hashtable]$ExtraWrapperParams = @{}
     )
 
     $fakeGeneXusDirectory = Join-Path $ScenarioRoot 'GeneXus'
@@ -103,7 +105,8 @@ function Invoke-SpecifyGenerateScenario {
         -LogPath $logPath `
         -GeneXusDir $fakeGeneXusDirectory `
         -MsBuildPath $fakeMsBuildPath `
-        -EnvironmentName 'TestEnvironment'
+        -EnvironmentName 'TestEnvironment' `
+        @ExtraWrapperParams
     $wrapperExitCode = $LASTEXITCODE
     $jsonText = @($wrapperOutput) -join [Environment]::NewLine
 
@@ -181,6 +184,74 @@ try {
     Assert-True -Condition ($setFailedReason.Count -eq 1) -Message 'Falha de SetActiveEnvironment deveria gerar um blockingReason especifico.'
     Assert-True -Condition ([string]$setFailedReason[0] -match "momento da abertura era '\.Net Environment'") -Message ("O blockingReason deveria citar o environment de abertura; recebeu '{0}'." -f $setFailedReason[0])
     Assert-True -Condition ([string]$setFailed.Diagnostic.observedContext.ActiveEnvironment -eq '.Net Environment') -Message 'Com SetActiveEnvironment falho, o environment efetivo continua sendo o de abertura.'
+
+    # --- Eventos pos-build: paridade com o BuildAll (cenario dedicado, com -ParallelKbRoot) ---
+    . (Join-Path $PSScriptRoot 'GeneXusMsBuildPostBuildEventsSupport.ps1')
+
+    function ConvertTo-CmdEchoLine {
+        param([Parameter(Mandatory = $true)][string]$Line)
+
+        $escaped = $Line.
+            Replace('^', '^^').
+            Replace('&', '^&').
+            Replace('|', '^|').
+            Replace('<', '^<').
+            Replace('>', '^>').
+            Replace('(', '^(').
+            Replace(')', '^)')
+        return ('echo {0}' -f $escaped)
+    }
+
+    function New-SpecifyPostBuildContextLines {
+        param([string[]]$Events)
+
+        $lines = New-Object System.Collections.Generic.List[string]
+        [void]$lines.Add("echo The active environment is 'TestEnvironment'")
+        [void]$lines.Add("echo The active environment is 'TestEnvironment'")
+        [void]$lines.Add((ConvertTo-CmdEchoLine -Line 'Executando eventos pos-construcao ...'))
+        foreach ($event in $Events) {
+            [void]$lines.Add((ConvertTo-CmdEchoLine -Line $event))
+        }
+        [void]$lines.Add((ConvertTo-CmdEchoLine -Line '========== fim dos eventos pos-construcao =========='))
+        return @($lines)
+    }
+
+    $sgA1 = '[APLICADO] .js varridos=2966 | arquivos com chave negativa em gx.domain=1 | chaves corrigidas=1'
+    $sgB1 = 'Verify-GxJs: verificados 2176 .js (modulos pulados: 389 | placeholders pulados: 0) | invalidos: 0 | tempo: 2237 ms'
+    $sgC1 = 'CommonRspHealth: OK - genexus.programs.common.rsp ok (439 itens, 221 dominios); 218 gxdomain*.cs no disco'
+    $sgA2 = '[APLICADO] .js varridos=2977 | arquivos com chave negativa em gx.domain=4 | chaves corrigidas=5'
+    $sgB2 = 'Verify-GxJs: verificados 2190 .js (modulos pulados: 391 | placeholders pulados: 0) | invalidos: 0 | tempo: 9 ms'
+    $sgC2 = 'CommonRspHealth: OK - genexus.programs.common.rsp ok (450 itens, 230 dominios); 220 gxdomain*.cs no disco'
+
+    $sgParallelRoot = Join-Path $testRoot 'sg-parallel'
+    [System.IO.Directory]::CreateDirectory($sgParallelRoot) | Out-Null
+    $sgHashes = (@($sgA1, $sgB1, $sgC1) | ForEach-Object { Get-GeneXusPostBuildEventFamilyHash -Line $_ }) -join ','
+    $sgMetadataText = @(
+        '---'
+        'deployment_environment_name: TestEnvironment'
+        'deployment_hosting_kind: dotnet-core-self-host'
+        'kb_environment_count: 1'
+        'kb_environment_names: TestEnvironment'
+        "kb_environment_post_build_event_hashes: TestEnvironment=$sgHashes"
+        '---'
+        ''
+    ) -join "`n"
+    [System.IO.File]::WriteAllText((Join-Path $sgParallelRoot 'kb-source-metadata.md'), $sgMetadataText, [System.Text.UTF8Encoding]::new($false))
+
+    # SG1: com registro das contagens do dia anterior, contagens novas -> esperado, sem rebaixar.
+    $sgRegistered = Invoke-SpecifyGenerateScenario -ScenarioRoot (Join-Path $testRoot 'sg-registered') -StdErrLines @() -ContextLines (New-SpecifyPostBuildContextLines -Events @($sgA2, $sgB2, $sgC2)) -ExtraWrapperParams @{ ParallelKbRoot = $sgParallelRoot }
+    $artifactDirectories.Add([string]$sgRegistered.Diagnostic.artifacts.MsBuildFilePath)
+    $sgClassification = $sgRegistered.Diagnostic.stdoutSignals.postBuildEventClassification
+    Assert-True -Condition ([string]$sgClassification.registryStatus.state -eq 'available') -Message ("SG1 registryStatus.state deveria ser available; recebeu '{0}'." -f $sgClassification.registryStatus.state)
+    Assert-True -Condition (@($sgClassification.expected).Count -eq 3 -and -not $sgClassification.shouldDowngrade) -Message 'SG1 deveria ter 3 eventos esperados e nao rebaixar.'
+    Assert-True -Condition ($sgRegistered.ExitCode -eq 0 -and [string]$sgRegistered.Diagnostic.status -notmatch 'pendente de confirma') -Message ("SG1 deveria sair sem pendencia de pos-build com registro; exit {0}, status '{1}'." -f $sgRegistered.ExitCode, $sgRegistered.Diagnostic.status)
+
+    # SG2: sem -ParallelKbRoot -> o registro nao e consultado; pendente e aviso explicito.
+    $sgNoMetadata = Invoke-SpecifyGenerateScenario -ScenarioRoot (Join-Path $testRoot 'sg-no-metadata') -StdErrLines @() -ContextLines (New-SpecifyPostBuildContextLines -Events @($sgA1, $sgB1, $sgC1))
+    $artifactDirectories.Add([string]$sgNoMetadata.Diagnostic.artifacts.MsBuildFilePath)
+    Assert-True -Condition ([string]$sgNoMetadata.Diagnostic.stdoutSignals.postBuildEventClassification.registryStatus.state -eq 'metadataNotProvided') -Message 'SG2 registryStatus.state deveria ser metadataNotProvided.'
+    Assert-True -Condition ([string]$sgNoMetadata.Diagnostic.status -match 'pendente de confirma') -Message ("SG2 deveria ficar pendente sem consulta ao registro; status '{0}'." -f $sgNoMetadata.Diagnostic.status)
+    Assert-True -Condition (@($sgNoMetadata.Diagnostic.warnings | Where-Object { [string]$_ -match 'Registro de eventos pos-build nao consultado' }).Count -eq 1) -Message 'SG2 deveria avisar que o registro nao foi consultado.'
 }
 finally {
     foreach ($msBuildFilePath in $artifactDirectories) {

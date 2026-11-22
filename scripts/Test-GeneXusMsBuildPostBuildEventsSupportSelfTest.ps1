@@ -91,4 +91,70 @@ if ($timingWindowEvents[0] -notmatch '^Powershell New-TimeSpan' -or
     throw "Separacao comando/output de timing inesperada: $($timingWindowEvents -join ' | ')"
 }
 
+# Familias de linha conhecidas: contagens variaveis nao mudam o fingerprint da forma nova.
+$aOne = '[APLICADO] .js varridos=2966 | arquivos com chave negativa em gx.domain=1 | chaves corrigidas=1'
+$aTwo = '[APLICADO] .js varridos=2970 | arquivos com chave negativa em gx.domain=3 | chaves corrigidas=3'
+if ((Get-GeneXusPostBuildEventFamilyHash -Line $aOne) -ne (Get-GeneXusPostBuildEventFamilyHash -Line $aTwo)) {
+    throw 'ASSERT_FAILED: familia A deveria ignorar contagens'
+}
+
+$bOne = 'Verify-GxJs: verificados 2178 .js (modulos pulados: 389 | placeholders pulados: 0) | invalidos: 0 | tempo: 2301 ms'
+$bTwo = 'Verify-GxJs: verificados 2200 .js (modulos pulados: 391 | placeholders pulados: 2) | invalidos: 0 | tempo: 9 ms'
+if ((Get-GeneXusPostBuildEventFamilyHash -Line $bOne) -ne (Get-GeneXusPostBuildEventFamilyHash -Line $bTwo)) {
+    throw 'ASSERT_FAILED: familia B deveria ignorar contagens e tempo'
+}
+
+# Familia C: nas duas formas (Core com 2 entradas e Framework com 1), contagens nao mudam o hash.
+$cCoreOne = 'CommonRspHealth: OK - GeneXus.Programs.Common.csproj ok (439 itens, 221 dominios); genexus.programs.common.bld ok (120 itens, 60 dominios); 218 gxdomain*.cs no disco'
+$cCoreTwo = 'CommonRspHealth: OK - GeneXus.Programs.Common.csproj ok (441 itens, 222 dominios); genexus.programs.common.bld ok (121 itens, 61 dominios); 219 gxdomain*.cs no disco'
+if ((Get-GeneXusPostBuildEventFamilyHash -Line $cCoreOne) -ne (Get-GeneXusPostBuildEventFamilyHash -Line $cCoreTwo)) {
+    throw 'ASSERT_FAILED: familia C (Core) deveria ignorar contagens'
+}
+$cFwOne = 'CommonRspHealth: OK - genexus.programs.common.rsp ok (439 itens, 221 dominios); 218 gxdomain*.cs no disco'
+$cFwTwo = 'CommonRspHealth: OK - genexus.programs.common.rsp ok (500 itens, 300 dominios); 999 gxdomain*.cs no disco'
+if ((Get-GeneXusPostBuildEventFamilyHash -Line $cFwOne) -ne (Get-GeneXusPostBuildEventFamilyHash -Line $cFwTwo)) {
+    throw 'ASSERT_FAILED: familia C (Framework) deveria ignorar contagens'
+}
+
+# Familia C: nome de arquivo diferente nao e aceito como o mesmo evento; digito no nome e preservado.
+$cBld = 'CommonRspHealth: OK - genexus.programs.common.bld ok (439 itens, 221 dominios); 218 gxdomain*.cs no disco'
+$cRsp = 'CommonRspHealth: OK - genexus.programs.common.rsp ok (439 itens, 221 dominios); 218 gxdomain*.cs no disco'
+if ((Get-GeneXusPostBuildEventFamilyHash -Line $cBld) -eq (Get-GeneXusPostBuildEventFamilyHash -Line $cRsp)) {
+    throw 'ASSERT_FAILED: nome diferente na familia C nao pode ter o mesmo hash'
+}
+$cDigit18 = 'CommonRspHealth: OK - genexus.programs.common18.rsp ok (1 itens, 1 dominios); 0 gxdomain*.cs no disco'
+$cDigit19 = 'CommonRspHealth: OK - genexus.programs.common19.rsp ok (1 itens, 1 dominios); 0 gxdomain*.cs no disco'
+if ((Get-GeneXusPostBuildEventFamilyHash -Line $cDigit18) -eq (Get-GeneXusPostBuildEventFamilyHash -Line $cDigit19)) {
+    throw 'ASSERT_FAILED: digito em nome de arquivo da familia C deveria ser preservado'
+}
+
+# Linhas fora das familias: hash da forma nova igual ao da legada, e sem texto de familia.
+$outside = @(
+    '[dry-run] .js varridos=5 | arquivos com chave negativa em gx.domain=1 | chaves corrigidas=1'
+    '[APLICADO] .js varridos=0 | arquivos com chave negativa em gx.domain=0 | chaves corrigidas=0'
+    'Verify-GxJs: verificados 0 .js (modulos pulados: 0 | placeholders pulados: 0) | invalidos: 0 | tempo: 4 ms'
+    'Verify-GxJs: verificados 2178 .js (modulos pulados: 389 | placeholders pulados: 0) | invalidos: 1 | tempo: 2301 ms'
+    'CommonRspHealth: aviso - algo'
+    '> Build All Task Sucesso'
+)
+foreach ($o in $outside) {
+    if ((Get-GeneXusPostBuildEventFamilyHash -Line $o) -ne (Get-GeneXusPostBuildEventNormalizedHash -Line $o)) {
+        throw "ASSERT_FAILED: linha fora das familias deveria manter o hash legado: $o"
+    }
+    if ($null -ne (Get-GeneXusPostBuildEventFamilyText -Line $o)) {
+        throw "ASSERT_FAILED: linha fora das familias nao deveria casar familia: $o"
+    }
+}
+
+# Vetores fixos da forma legada (registros reais existentes dependem dela).
+if ((Get-GeneXusPostBuildEventNormalizedHash -Line '> Build All Task Sucesso') -ne '117b74510cfb2842438aacd70a231eeffcbfee1a6547cfd353f1197c4636277d') {
+    throw 'ASSERT_FAILED: vetor legado de "> Build All Task Sucesso" mudou'
+}
+if ((Get-GeneXusPostBuildEventNormalizedHash -Line 'Verify-GxJs: verificados 2178 .js (modulos pulados: 389 | placeholders pulados: 0) | invalidos: 0 | tempo: 2301 ms') -ne '731e32fdd1f382e3e0f9fd19867bfc3046497ac8b695dfb59946b7750cda0d97') {
+    throw 'ASSERT_FAILED: vetor legado do Verify-GxJs (tempo 2301) mudou'
+}
+if ((Get-GeneXusPostBuildEventNormalizedHash -Line 'Verify-GxJs: verificados 2178 .js (modulos pulados: 389 | placeholders pulados: 0) | invalidos: 0 | tempo: 9 ms') -ne '731e32fdd1f382e3e0f9fd19867bfc3046497ac8b695dfb59946b7750cda0d97') {
+    throw 'ASSERT_FAILED: vetor legado do Verify-GxJs (tempo 9) mudou'
+}
+
 Write-Output 'GENEXUS_MSBUILD_POST_BUILD_EVENTS_SUPPORT_SELFTEST_OK'

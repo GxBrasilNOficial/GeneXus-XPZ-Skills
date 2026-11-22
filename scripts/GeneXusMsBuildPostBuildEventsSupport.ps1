@@ -183,6 +183,70 @@ function Get-GeneXusPostBuildEventNormalizedHash {
     return [System.Convert]::ToHexString($hashBytes).ToLowerInvariant()
 }
 
+# Familias de linha conhecidas (lista fechada). Cada Match casa a linha ja normalizada (trim,
+# espacos colapsados, minusculas); as substituicoes trocam so as contagens, ancoradas no texto
+# vizinho. Os formatos vem dos scripts locais do pos-build (fora do repositorio, em
+# C:\Program Files (x86)\GeneXus\Scripts). Quem mudar um formato confere tambem
+# GeneXusMsBuildCategoryBSupport.ps1 (reconhecedor do caso do compressor de estaticos).
+$script:PostBuildEventFamilies = @(
+    [pscustomobject]@{
+        Name    = 'A'
+        Match   = '^\[aplicado\] \.js varridos=[1-9]\d* \| arquivos com chave negativa em gx\.domain=\d+ \| chaves corrigidas=\d+$'
+        Replace = @(
+            @{ Pattern = 'varridos=\d+'; Value = 'varridos=<n>' }
+            @{ Pattern = 'gx\.domain=\d+'; Value = 'gx.domain=<n>' }
+            @{ Pattern = 'corrigidas=\d+'; Value = 'corrigidas=<n>' }
+        )
+    }
+    [pscustomobject]@{
+        Name    = 'B'
+        Match   = '^verify-gxjs: verificados [1-9]\d* \.js \(modulos pulados: \d+ \| placeholders pulados: \d+\) \| invalidos: 0 \| tempo: \d+ ms$'
+        Replace = @(
+            @{ Pattern = 'verificados \d+'; Value = 'verificados <n>' }
+            @{ Pattern = 'pulados: \d+'; Value = 'pulados: <n>' }
+            @{ Pattern = 'tempo: \d+'; Value = 'tempo: <n>' }
+        )
+    }
+    [pscustomobject]@{
+        Name    = 'C'
+        Match   = '^commonrsphealth: ok - [-\w.]+ ok \(\d+ itens, \d+ dominios\)(; [-\w.]+ ok \(\d+ itens, \d+ dominios\))*; \d+ gxdomain\*\.cs no disco$'
+        Replace = @(
+            @{ Pattern = '\(\d+ itens, \d+ dominios\)'; Value = '(<n> itens, <n> dominios)' }
+            @{ Pattern = '; \d+ gxdomain'; Value = '; <n> gxdomain' }
+        )
+    }
+)
+
+function Get-GeneXusPostBuildEventFamilyText {
+    param([Parameter(Mandatory = $true)][string]$Line)
+
+    # Texto normalizado com as contagens trocadas por <n>, ou $null quando a linha nao casa familia.
+    $normalized = (($Line.Trim()) -replace '\s+', ' ').ToLowerInvariant()
+    foreach ($family in $script:PostBuildEventFamilies) {
+        if ($normalized -match $family.Match) {
+            $text = $normalized
+            foreach ($rule in $family.Replace) {
+                $text = $text -replace $rule.Pattern, $rule.Value
+            }
+            return $text
+        }
+    }
+    return $null
+}
+
+function Get-GeneXusPostBuildEventFamilyHash {
+    param([Parameter(Mandatory = $true)][string]$Line)
+
+    # Forma nova do fingerprint. Linha fora das familias devolve o mesmo valor da forma legada.
+    $text = Get-GeneXusPostBuildEventFamilyText -Line $Line
+    if ($null -eq $text) {
+        return Get-GeneXusPostBuildEventNormalizedHash -Line $Line
+    }
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes($text)
+    $hashBytes = [System.Security.Cryptography.SHA256]::HashData($bytes)
+    return [System.Convert]::ToHexString($hashBytes).ToLowerInvariant()
+}
+
 function Test-GeneXusPostBuildEventBenignBySound {
     param([AllowNull()][string]$Line)
 
@@ -220,6 +284,7 @@ function Get-GeneXusPostBuildEventClassification {
     $unexpected      = [System.Collections.Generic.List[string]]::new()
     $benignFallback  = [System.Collections.Generic.List[string]]::new()
     $unknownFallback = [System.Collections.Generic.List[string]]::new()
+    $legacyMatchCount = 0
 
     foreach ($line in $events) {
         if (Test-GeneXusPostBuildEventInert -Line $line) {
@@ -228,9 +293,14 @@ function Get-GeneXusPostBuildEventClassification {
         }
 
         if ($hasRegistry) {
-            $hash = Get-GeneXusPostBuildEventNormalizedHash -Line $line
+            # 1) forma nova; 2) linha de familia aceita pela forma legada (registro antigo, com aviso).
+            $hash = Get-GeneXusPostBuildEventFamilyHash -Line $line
             if ($registeredSet.Contains($hash)) {
                 [void]$expected.Add($line)
+            } elseif (($null -ne (Get-GeneXusPostBuildEventFamilyText -Line $line)) -and
+                      $registeredSet.Contains((Get-GeneXusPostBuildEventNormalizedHash -Line $line))) {
+                [void]$expected.Add($line)
+                $legacyMatchCount++
             } else {
                 [void]$unexpected.Add($line)
             }
@@ -253,5 +323,6 @@ function Get-GeneXusPostBuildEventClassification {
         benignFallback    = @($benignFallback)
         unknownFallback   = @($unknownFallback)
         shouldDowngrade   = $shouldDowngrade
+        legacyMatchCount  = $legacyMatchCount
     }
 }

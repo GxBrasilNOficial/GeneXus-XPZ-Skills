@@ -139,7 +139,9 @@ function Invoke-BuildAllScenario {
             "echo The active environment is 'TestEnvironment'",
             "echo The active environment is 'TestEnvironment'"
         ),
-        [int]$FakeExitCode = 0
+        [int]$FakeExitCode = 0,
+        # Parametros extras do wrapper (ex.: ParallelKbRoot), em hashtable para splat nomeado. Vazio preserva a chamada original.
+        [hashtable]$ExtraWrapperParams = @{}
     )
 
     $fakeGeneXusDirectory = Join-Path $ScenarioRoot 'GeneXus'
@@ -185,7 +187,8 @@ function Invoke-BuildAllScenario {
         -LogPath $logPath `
         -GeneXusDir $fakeGeneXusDirectory `
         -MsBuildPath $fakeMsBuildPath `
-        -EnvironmentName 'TestEnvironment'
+        -EnvironmentName 'TestEnvironment' `
+        @ExtraWrapperParams
     $wrapperExitCode = $LASTEXITCODE
     $jsonText = @($wrapperOutput) -join [Environment]::NewLine
 
@@ -358,6 +361,83 @@ try {
     Assert-True -Condition ($s6.Diagnostic.status -eq 'operacao concluida, pendente de confirmacao funcional') -Message ("S6 status pendente esperado; recebeu '{0}'." -f $s6.Diagnostic.status)
     Assert-True -Condition ($s6.Diagnostic.staticCompressorKnownCase.recognized -eq $true) -Message ("S6 recognized deveria ser true (A2); reason={0}" -f $s6.Diagnostic.staticCompressorKnownCase.reason)
     Assert-True -Condition ((Get-ArrayCount -Value $s6.Diagnostic.buildErrors) -eq 0) -Message 'S6 buildErrors deveria ficar vazio.'
+
+    # --- Registro de eventos pos-build (cenario dedicado; S1-S6 e New-StaticCompressorContextLines nao mudam) ---
+    function New-PostBuildContextLines {
+        param([string[]]$Events)
+
+        $lines = New-Object System.Collections.Generic.List[string]
+        [void]$lines.Add("echo The active environment is 'TestEnvironment'")
+        [void]$lines.Add("echo The active environment is 'TestEnvironment'")
+        [void]$lines.Add((ConvertTo-CmdEchoLine -Line 'Executando eventos pos-construcao ...'))
+        foreach ($event in $Events) {
+            [void]$lines.Add((ConvertTo-CmdEchoLine -Line $event))
+        }
+        [void]$lines.Add((ConvertTo-CmdEchoLine -Line '========== fim dos eventos pos-construcao =========='))
+        return @($lines)
+    }
+
+    $pbA1 = '[APLICADO] .js varridos=2966 | arquivos com chave negativa em gx.domain=1 | chaves corrigidas=1'
+    $pbB1 = 'Verify-GxJs: verificados 2176 .js (modulos pulados: 389 | placeholders pulados: 0) | invalidos: 0 | tempo: 2237 ms'
+    $pbC1 = 'CommonRspHealth: OK - genexus.programs.common.rsp ok (439 itens, 221 dominios); 218 gxdomain*.cs no disco'
+    $pbA2 = '[APLICADO] .js varridos=2977 | arquivos com chave negativa em gx.domain=4 | chaves corrigidas=5'
+    $pbB2 = 'Verify-GxJs: verificados 2190 .js (modulos pulados: 391 | placeholders pulados: 0) | invalidos: 0 | tempo: 9 ms'
+    $pbC2 = 'CommonRspHealth: OK - genexus.programs.common.rsp ok (450 itens, 230 dominios); 220 gxdomain*.cs no disco'
+    $pbB3 = 'Verify-GxJs: verificados 2190 .js (modulos pulados: 391 | placeholders pulados: 0) | invalidos: 1 | tempo: 9 ms'
+    $pbC3 = 'CommonRspHealth: OK - genexus.programs.common.bld ok (450 itens, 230 dominios); 220 gxdomain*.cs no disco'
+
+    $pbParallelRoot = Join-Path $testRoot 'pb-parallel'
+    [System.IO.Directory]::CreateDirectory($pbParallelRoot) | Out-Null
+    $pbMetadataText = @(
+        '---'
+        'deployment_environment_name: TestEnvironment'
+        'deployment_hosting_kind: dotnet-core-self-host'
+        'kb_environment_count: 1'
+        'kb_environment_names: TestEnvironment'
+        '---'
+        ''
+        '## Notas'
+        ''
+        'conteudo preexistente'
+        ''
+    ) -join "`n"
+    [System.IO.File]::WriteAllText((Join-Path $pbParallelRoot 'kb-source-metadata.md'), $pbMetadataText, [System.Text.UTF8Encoding]::new($false))
+    $pbWrapperParams = @{ ParallelKbRoot = $pbParallelRoot }
+
+    # PB1: sem metadata -> o registro nao e consultado, e o wrapper avisa; pendente.
+    $pbN1 = Invoke-BuildAllScenario -ScenarioRoot (Join-Path $testRoot 'pb-no-metadata') -StdErrLines @() -ContextLines (New-PostBuildContextLines -Events @($pbA1, $pbB1, $pbC1))
+    $artifactDirectories.Add([string]$pbN1.Diagnostic.artifacts.MsBuildFilePath)
+    $pbN1Classification = $pbN1.Diagnostic.stdoutSignals.postBuildEventClassification
+    Assert-True -Condition ([string]$pbN1Classification.registryStatus.state -eq 'metadataNotProvided') -Message ("PB1 registryStatus.state deveria ser metadataNotProvided; recebeu '{0}'." -f $pbN1Classification.registryStatus.state)
+    Assert-True -Condition ($pbN1.Diagnostic.status -eq 'operacao concluida, pendente de confirmacao funcional') -Message ("PB1 deveria ficar pendente sem registro; recebeu '{0}'." -f $pbN1.Diagnostic.status)
+    Assert-True -Condition (@($pbN1.Diagnostic.warnings | Where-Object { [string]$_ -match 'Registro de eventos pos-build nao consultado: kb-source-metadata\.md nao informado' }).Count -eq 1) -Message 'PB1 deveria avisar que o registro nao foi consultado.'
+
+    # PB2: metadata sem entrada para o environment -> pendente; o aviso indica o registro.
+    $pbN2 = Invoke-BuildAllScenario -ScenarioRoot (Join-Path $testRoot 'pb-no-entry') -StdErrLines @() -ContextLines (New-PostBuildContextLines -Events @($pbA1, $pbB1, $pbC1)) -ExtraWrapperParams $pbWrapperParams
+    $artifactDirectories.Add([string]$pbN2.Diagnostic.artifacts.MsBuildFilePath)
+    Assert-True -Condition ([string]$pbN2.Diagnostic.stdoutSignals.postBuildEventClassification.registryStatus.state -eq 'noEntryForEnvironment') -Message 'PB2 registryStatus.state deveria ser noEntryForEnvironment.'
+    Assert-True -Condition ($pbN2.Diagnostic.status -eq 'operacao concluida, pendente de confirmacao funcional') -Message 'PB2 deveria ficar pendente sem entrada registrada.'
+    Assert-True -Condition (@($pbN2.Diagnostic.warnings | Where-Object { [string]$_ -match "Nenhum evento pos-build registrado para 'TestEnvironment'" }).Count -eq 1) -Message 'PB2 deveria avisar que nenhum evento esta registrado para o environment.'
+
+    # Registro a partir do JSON do proprio build (linhas com contagens do PB1).
+    & (Join-Path $PSScriptRoot 'Register-GeneXusKbPostBuildEvents.ps1') `
+        -BuildResultJsonPath (Join-Path $testRoot 'pb-no-entry\result.json') `
+        -EnvironmentName 'TestEnvironment' -KbParallelRoot $pbParallelRoot -ConfirmRegistration -AsJson | Out-Null
+
+    # PB3: contagens novas (A, B e C) depois do registro -> compilou limpo, sem legado.
+    $pbN3 = Invoke-BuildAllScenario -ScenarioRoot (Join-Path $testRoot 'pb-registered') -StdErrLines @() -ContextLines (New-PostBuildContextLines -Events @($pbA2, $pbB2, $pbC2)) -ExtraWrapperParams $pbWrapperParams
+    $artifactDirectories.Add([string]$pbN3.Diagnostic.artifacts.MsBuildFilePath)
+    $pbN3Classification = $pbN3.Diagnostic.stdoutSignals.postBuildEventClassification
+    Assert-True -Condition ([string]$pbN3Classification.registryStatus.state -eq 'available') -Message ("PB3 registryStatus.state deveria ser available; recebeu '{0}'." -f $pbN3Classification.registryStatus.state)
+    Assert-True -Condition ($pbN3.ExitCode -eq 0 -and $pbN3.Diagnostic.status -eq 'compilou limpo') -Message ("PB3 deveria compilar limpo apos o registro; exit {0}, status '{1}'." -f $pbN3.ExitCode, $pbN3.Diagnostic.status)
+    Assert-True -Condition (@($pbN3Classification.expected).Count -eq 3 -and -not $pbN3Classification.shouldDowngrade -and [int]$pbN3Classification.legacyMatchCount -eq 0) -Message 'PB3 deveria ter 3 eventos esperados, sem rebaixar e sem legacyMatchCount.'
+
+    # PB4 (negativo): depois do registro, invalidos 1 e nome diferente na familia C -> pendente.
+    $pbN4 = Invoke-BuildAllScenario -ScenarioRoot (Join-Path $testRoot 'pb-negative') -StdErrLines @() -ContextLines (New-PostBuildContextLines -Events @($pbA2, $pbB3, $pbC3)) -ExtraWrapperParams $pbWrapperParams
+    $artifactDirectories.Add([string]$pbN4.Diagnostic.artifacts.MsBuildFilePath)
+    $pbN4Classification = $pbN4.Diagnostic.stdoutSignals.postBuildEventClassification
+    Assert-True -Condition ($pbN4.Diagnostic.status -eq 'operacao concluida, pendente de confirmacao funcional') -Message ("PB4 deveria ficar pendente; recebeu '{0}'." -f $pbN4.Diagnostic.status)
+    Assert-True -Condition (@($pbN4Classification.unexpected).Count -eq 2) -Message ("PB4 deveria ter 2 eventos inesperados (invalidos 1 e nome C); atual={0}." -f @($pbN4Classification.unexpected).Count)
 }
 finally {
     foreach ($msBuildFilePath in $artifactDirectories) {

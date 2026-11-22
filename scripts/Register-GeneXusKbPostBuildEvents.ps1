@@ -98,14 +98,18 @@ if ([string]::IsNullOrWhiteSpace($envName)) {
 }
 $envName = $envName.Trim()
 
+# Um evento por hash (forma de familia quando houver): a primeira linha crua de cada hash fica no espelho.
 $rawEvents = New-Object System.Collections.Generic.List[string]
-$seenRaw = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+$hashes = New-Object System.Collections.Generic.List[string]
+$seenHash = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
 foreach ($line in $observed) {
     if ([string]::IsNullOrWhiteSpace($line)) { continue }
     if (Test-GeneXusPostBuildEventInert -Line $line) { continue }
     $trimmed = $line.Trim()
-    if ($seenRaw.Add($trimmed)) {
+    $eventHash = Get-GeneXusPostBuildEventFamilyHash -Line $trimmed
+    if ($seenHash.Add($eventHash)) {
         $rawEvents.Add($trimmed) | Out-Null
+        $hashes.Add($eventHash) | Out-Null
     }
 }
 
@@ -113,15 +117,24 @@ if ($rawEvents.Count -eq 0) {
     throw "BLOCK: nenhum evento pos-build executavel observado no JSON para o environment '$envName' (so inertes/REM ou lista vazia). Nada a registrar."
 }
 
-$hashes = New-Object System.Collections.Generic.List[string]
-foreach ($evt in $rawEvents) {
-    $hashes.Add((Get-GeneXusPostBuildEventNormalizedHash -Line $evt)) | Out-Null
+# Hashes que estavam registrados para este environment e deixam de existir com o novo conjunto.
+$previousHashes = Get-GeneXusRegisteredPostBuildEventHashesForEnvironment -MetadataPath $MetadataPath -EnvironmentName $envName
+$previousSet = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+foreach ($h in @($previousHashes)) {
+    if (-not [string]::IsNullOrWhiteSpace($h)) { [void]$previousSet.Add($h.Trim()) }
+}
+$newSet = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+foreach ($h in $hashes) { [void]$newSet.Add($h) }
+$removedHashCount = 0
+foreach ($h in $previousSet) {
+    if (-not $newSet.Contains($h)) { $removedHashCount++ }
 }
 
 $presentation = "Eventos pos-build a registrar para o environment '$envName':`n"
 for ($i = 0; $i -lt $rawEvents.Count; $i++) {
     $presentation += ("  [{0}] {1}`n" -f ($i + 1), $rawEvents[$i])
 }
+$presentation += ("`nFingerprints distintos: {0}. Fingerprints anteriores removidos: {1}.`n" -f $hashes.Count, $removedHashCount)
 $presentation += "`nApos registrar, estes eventos deixam de rebaixar o status do build neste environment."
 
 $confirmed = $false
@@ -189,7 +202,7 @@ if (-not $updated) {
 
 # --- Espelho legivel (atualizacao cirurgica da subsecao do environment) ---
 $mirrorHeader = '## Eventos pos-build registrados'
-$mirrorIntro  = '> Espelho legivel de `kb_environment_post_build_event_hashes` (autoria: xpz-kb-parallel-setup). O build compara por fingerprint; esta secao e so para auditoria humana.'
+$mirrorIntro  = '> Espelho legivel de `kb_environment_post_build_event_hashes` (autoria: xpz-kb-parallel-setup). O build compara por fingerprint da forma normalizada; as linhas cruas abaixo sao ilustrativas e esta secao e so para auditoria humana.'
 $subHeader = '### env: ' + $envName
 
 $subsectionLines = New-Object System.Collections.Generic.List[string]
@@ -220,6 +233,12 @@ if ($headerIdx -lt 0) {
     }
     $fileLines.InsertRange($insertAt, $createBlock)
 } else {
+    # Atualiza a frase-guia da secao existente (troca de formato). Substituicao de linha: indices nao mudam.
+    for ($i = $headerIdx + 1; $i -lt $fileLines.Count; $i++) {
+        if ($fileLines[$i] -match '^##\s') { break }
+        if ($fileLines[$i].StartsWith('> Espelho legivel de')) { $fileLines[$i] = $mirrorIntro; break }
+    }
+
     $sectionEnd = $fileLines.Count
     for ($i = $headerIdx + 1; $i -lt $fileLines.Count; $i++) {
         if ($fileLines[$i] -match '^##\s') { $sectionEnd = $i; break }
@@ -251,10 +270,11 @@ $result = [ordered]@{
     registeredEventCount  = $rawEvents.Count
     registeredEvents      = @($rawEvents)
     registeredHashes      = @($hashes)
+    removedHashCount      = $removedHashCount
 }
 
 if ($AsJson) {
     $result | ConvertTo-Json -Depth 6
 } else {
-    Write-Output ("KB_POST_BUILD_EVENTS_REGISTERED_OK: env=$envName events=$($rawEvents.Count) metadata=$MetadataPath")
+    Write-Output ("KB_POST_BUILD_EVENTS_REGISTERED_OK: env=$envName events=$($rawEvents.Count) removed=$removedHashCount metadata=$MetadataPath")
 }

@@ -227,6 +227,8 @@ $script:StaticCompressorBroadErrorRegex = '(?i)error|erro|failed|failure|falha|f
 $script:StaticCompressorSyntaxErrorRegex = '^\s*(?<file>[^\\/\s()]+\.js)\((?<line>\d+)\): Syntax error : \}\s*(?<tail>\[[^\]\r\n]*\])?\s*$'
 $script:StaticCompressorFileMessageRegex = '^\s*(?:.*[\\/])?(?<file>[^\\/\s()]+\.(?:js|css))(?:\(\d+\))?: '
 $script:StaticCompressorFixRootRegex = '^\s*Fix-GxNegativeDomainKeys: raiz = (?<raiz>.+?)\s*$'
+# Acoplado a GeneXusMsBuildPostBuildEventsSupport.ps1 (familias A/B de eventos pos-build): quem mudar
+# o formato de [APLICADO] ou de Verify-GxJs confere os dois arquivos. Falha segura nos dois lados.
 $script:StaticCompressorAppliedRegex = '^\s*\[APLICADO\] \.js varridos=(?<varridos>\d+) \| arquivos com chave negativa em gx\.domain=(?<arquivos>\d+) \| chaves corrigidas=(?<chaves>\d+)\s*$'
 $script:StaticCompressorPerFileRegex = '^\s*(?<file>[^\s\\/]+\.js) -> (?<chaves>\d+) chave\(s\)\s*$'
 $script:StaticCompressorVerifyRootRegex = '^\s*Verify-GxJs: raiz\s*=\s*(?<raiz>.+?)\s+\(via argumento\)\s*$'

@@ -123,4 +123,54 @@ if ($k.shouldDowngrade -or $k.expected.Count -ne 1) {
     throw 'ASSERT_FAILED: Verify-GxJs com tempo diferente deveria ser esperado apos registro'
 }
 
+# Caso L: familia A registrada pela forma nova; contagens diferentes no build seguinte -> esperado.
+$aRegisteredLine = '[APLICADO] .js varridos=2966 | arquivos com chave negativa em gx.domain=1 | chaves corrigidas=1'
+$aBuildLine      = '[APLICADO] .js varridos=2977 | arquivos com chave negativa em gx.domain=4 | chaves corrigidas=5'
+$aNewHash        = Get-GeneXusPostBuildEventFamilyHash -Line $aRegisteredLine
+$l = Get-GeneXusPostBuildEventClassification -PostBuildEventLines @($aBuildLine) -RegisteredHashes @($aNewHash)
+if ($l.shouldDowngrade -or $l.expected.Count -ne 1 -or $l.legacyMatchCount -ne 0) {
+    throw 'ASSERT_FAILED: caso L familia A com contagens novas deveria ser esperada pela forma nova, sem legacyMatchCount'
+}
+
+# Caso M: registro legado (hash da forma antiga) de linha de familia -> esperado com legacyMatchCount=1.
+$legacyVerifyHash = Get-GeneXusPostBuildEventNormalizedHash -Line $verifyOk1
+$m = Get-GeneXusPostBuildEventClassification -PostBuildEventLines @($verifyOk2) -RegisteredHashes @($legacyVerifyHash)
+if ($m.shouldDowngrade -or $m.expected.Count -ne 1 -or $m.legacyMatchCount -ne 1) {
+    throw 'ASSERT_FAILED: caso M registro legado de familia deveria ser esperado com legacyMatchCount=1'
+}
+
+# Caso N: linha fora das familias registrada pela forma antiga nao conta em legacyMatchCount.
+$n = Get-GeneXusPostBuildEventClassification -PostBuildEventLines @($sino) -RegisteredHashes @($sinoHash)
+if ($n.shouldDowngrade -or $n.expected.Count -ne 1 -or $n.legacyMatchCount -ne 0) {
+    throw 'ASSERT_FAILED: caso N linha fora das familias nao deveria contar em legacyMatchCount'
+}
+
+# Caso O: com registro, linhas que nao podem ser aceitas continuam inesperadas (lista fechada).
+$o = Get-GeneXusPostBuildEventClassification -PostBuildEventLines @(
+    '[dry-run] .js varridos=5 | arquivos com chave negativa em gx.domain=1 | chaves corrigidas=1'
+    '[APLICADO] .js varridos=0 | arquivos com chave negativa em gx.domain=0 | chaves corrigidas=0'
+    'Verify-GxJs: verificados 2178 .js (modulos pulados: 389 | placeholders pulados: 0) | invalidos: 1 | tempo: 2301 ms'
+    'CommonRspHealth: aviso - algo'
+    'arquivo-generico.js -> 1 chave(s)'
+) -RegisteredHashes @($aNewHash)
+if (-not $o.shouldDowngrade -or $o.unexpected.Count -ne 5 -or $o.legacyMatchCount -ne 0) {
+    throw "ASSERT_FAILED: caso O as 5 linhas fora da lista fechada deveriam ser inesperadas; atual=$($o.unexpected.Count)"
+}
+
+# Caso P: familia C com nome diferente do registrado -> inesperada.
+$cRegistered = 'CommonRspHealth: OK - genexus.programs.common.rsp ok (439 itens, 221 dominios); 218 gxdomain*.cs no disco'
+$cOther      = 'CommonRspHealth: OK - genexus.programs.common.bld ok (439 itens, 221 dominios); 218 gxdomain*.cs no disco'
+$p = Get-GeneXusPostBuildEventClassification -PostBuildEventLines @($cOther) -RegisteredHashes @((Get-GeneXusPostBuildEventFamilyHash -Line $cRegistered))
+if (-not $p.shouldDowngrade -or $p.unexpected.Count -ne 1) {
+    throw 'ASSERT_FAILED: caso P nome diferente na familia C deveria ser inesperado'
+}
+
+# Caso Q: verificados 0 com tempo diferente mantem a classificacao de hoje (tempo neutralizado).
+$zeroA = 'Verify-GxJs: verificados 0 .js (modulos pulados: 0 | placeholders pulados: 0) | invalidos: 0 | tempo: 4 ms'
+$zeroB = 'Verify-GxJs: verificados 0 .js (modulos pulados: 0 | placeholders pulados: 0) | invalidos: 0 | tempo: 9 ms'
+$q = Get-GeneXusPostBuildEventClassification -PostBuildEventLines @($zeroB) -RegisteredHashes @((Get-GeneXusPostBuildEventNormalizedHash -Line $zeroA))
+if ($q.shouldDowngrade -or $q.expected.Count -ne 1) {
+    throw 'ASSERT_FAILED: caso Q verificados 0 com tempo diferente deveria continuar esperado pelo hash legado'
+}
+
 'GENEXUS_POST_BUILD_EVENT_CLASSIFICATION_SELFTEST_OK'

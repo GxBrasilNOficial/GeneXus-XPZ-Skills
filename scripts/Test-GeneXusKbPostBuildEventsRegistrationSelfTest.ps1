@@ -98,6 +98,46 @@ try {
     $occurrences = ([regex]::Matches($text3, '### env: NETPostgreSQL')).Count
     if ($occurrences -ne 1) { throw "ASSERT_FAILED: re-registro deveria manter 1 subsecao env1, atual=$occurrences" }
 
+    # --- Forma nova: registro com fingerprint de familia; contagem nova no build seguinte -> esperado ---
+    $famX = '[APLICADO] .js varridos=2966 | arquivos com chave negativa em gx.domain=1 | chaves corrigidas=1'
+    $famY = '[APLICADO] .js varridos=2999 | arquivos com chave negativa em gx.domain=2 | chaves corrigidas=2'
+    $json4 = Join-Path $tempRoot 'build4.json'
+    New-BuildJson -EnvName 'NETFramework' -Events @($sino, $famX) -Path $json4
+    $reg4 = (& $registerScript -BuildResultJsonPath $json4 -EnvironmentName 'NETFramework' -MetadataPath $metadataPath -ConfirmRegistration -AsJson) -join "`n" | ConvertFrom-Json
+    # NETFramework tinha (sino, deploy2); o novo conjunto mantem o sino e tira o deploy2.
+    if ([int]$reg4.removedHashCount -ne 1) { throw "ASSERT_FAILED: removedHashCount deveria ser 1; atual=$($reg4.removedHashCount)" }
+    $hashes4 = Get-GeneXusRegisteredPostBuildEventHashesForEnvironment -MetadataPath $metadataPath -EnvironmentName 'NETFramework'
+    $c4 = Get-GeneXusPostBuildEventClassification -PostBuildEventLines @($sino, $famY) -RegisteredHashes $hashes4
+    if ($c4.shouldDowngrade -or $c4.expected.Count -ne 2) { throw 'ASSERT_FAILED: registro de familia seguido de contagem nova deveria ser esperado' }
+
+    # Um fingerprint por hash: duas linhas de familia com contagens diferentes viram um evento registrado.
+    $json5 = Join-Path $tempRoot 'build5.json'
+    New-BuildJson -EnvName 'NETPostgreSQL' -Events @($famX, $famY) -Path $json5
+    $reg5 = (& $registerScript -BuildResultJsonPath $json5 -EnvironmentName 'NETPostgreSQL' -MetadataPath $metadataPath -ConfirmRegistration -AsJson) -join "`n" | ConvertFrom-Json
+    if ([int]$reg5.registeredEventCount -ne 1 -or @($reg5.registeredHashes).Count -ne 1) { throw 'ASSERT_FAILED: duas linhas de familia com contagens diferentes deveriam virar um hash' }
+    if ([int]$reg5.removedHashCount -ne 2) { throw "ASSERT_FAILED: NETPostgreSQL deveria remover 2 hashes anteriores; atual=$($reg5.removedHashCount)" }
+    $text5 = [System.IO.File]::ReadAllText($metadataPath)
+    if ($text5 -notmatch 'as linhas cruas abaixo sao ilustrativas') { throw 'ASSERT_FAILED: frase-guia do espelho ausente' }
+
+    # Registro legado (hash da forma antiga, contagens X) com contagens Y -> inesperado; com X -> esperado.
+    $legacyX = Get-GeneXusPostBuildEventNormalizedHash -Line $famX
+    $c6 = Get-GeneXusPostBuildEventClassification -PostBuildEventLines @($famY) -RegisteredHashes @($legacyX)
+    if (-not $c6.shouldDowngrade -or $c6.legacyMatchCount -ne 0) { throw 'ASSERT_FAILED: registro legado com contagem diferente deveria ser inesperado (exige re-registro)' }
+    $c7 = Get-GeneXusPostBuildEventClassification -PostBuildEventLines @($famX) -RegisteredHashes @($legacyX)
+    if ($c7.shouldDowngrade -or $c7.legacyMatchCount -ne 1) { throw 'ASSERT_FAILED: registro legado com a mesma contagem deveria ser aceito com legacyMatchCount=1' }
+
+    # Estados do registro, com precedencia metadataNotProvided -> environmentNameUnavailable -> noEntryForEnvironment -> available.
+    $st1 = Get-GeneXusPostBuildEventRegistryState -MetadataPath '' -EnvironmentName ''
+    if ($st1.state -ne 'metadataNotProvided') { throw "ASSERT_FAILED: estado deveria ser metadataNotProvided; atual=$($st1.state)" }
+    $st2 = Get-GeneXusPostBuildEventRegistryState -MetadataPath $metadataPath -EnvironmentName ''
+    if ($st2.state -ne 'environmentNameUnavailable') { throw "ASSERT_FAILED: estado deveria ser environmentNameUnavailable; atual=$($st2.state)" }
+    $st3 = Get-GeneXusPostBuildEventRegistryState -MetadataPath $metadataPath -EnvironmentName 'AmbienteInexistente'
+    if ($st3.state -ne 'noEntryForEnvironment' -or @($st3.hashes).Count -ne 0) { throw "ASSERT_FAILED: environment sem entrada deveria ser noEntryForEnvironment; atual=$($st3.state)" }
+    $st3b = Get-GeneXusPostBuildEventRegistryState -MetadataPath (Join-Path $tempRoot 'inexistente.md') -EnvironmentName 'NETPostgreSQL'
+    if ($st3b.state -ne 'noEntryForEnvironment') { throw "ASSERT_FAILED: arquivo ausente deveria ser noEntryForEnvironment; atual=$($st3b.state)" }
+    $st4 = Get-GeneXusPostBuildEventRegistryState -MetadataPath $metadataPath -EnvironmentName 'netpostgresql'
+    if ($st4.state -ne 'available' -or @($st4.hashes).Count -ne 1) { throw "ASSERT_FAILED: environment registrado deveria ser available com 1 hash; atual=$($st4.state)" }
+
     'GENEXUS_KB_POST_BUILD_EVENTS_REGISTRATION_SELFTEST_OK'
 } finally {
     if (Test-Path -LiteralPath $tempRoot) {

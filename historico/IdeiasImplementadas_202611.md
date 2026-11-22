@@ -171,3 +171,65 @@ Origem: entrada «Indentação de Source: índice/cache GUID→path na resoluç�
 - `981116d` — Protege o índice da indentação com contadores e remove BOM.
 - `d3c9455` — GUID vazio na indentação volta a ser unresolved com índice.
 - `cdcf475` — Normaliza GUID da indentação e fecha eixos irmãos.
+
+## Linhas do pós-build com contagens variáveis contam como evento não registrado a cada build — 2026-11-22
+
+Origem: entrada «Linhas do pós-build com contagens variáveis contam como evento não registrado a cada build» de `999-ideias-pendentes.md`, removida após a implementação. Texto original copiado integralmente abaixo. Plano final e quatro rodadas de revisão por pares em `Temp/revisao-por-pares/20261122-posbuild/` (desenho congelado pelo usuário).
+
+### Entrada original
+
+
+- **Importância** — média: não produz resultado limpo indevido, mas deixa o status `pendente` em build bom e obriga leitura manual; o contorno disponível (registrar a linha literal) se desfaz no build seguinte em que a contagem mudar. O gate de deploy não depende disso (decide por `exit 0` e build concluído).
+- **Maturidade** — ideia (decisão de desenho em aberto: qual rota de normalização e qual o recorte das linhas aceitas).
+
+**Contexto.** Registrado em 2026-10-26, na revisão da frente de Categoria B, depois da dispensa do compressor (commit `1f68037`), inicialmente só para a linha `[APLICADO]`. Ampliado no mesmo dia, depois de uma frente de WebPanel de relatório em KB de produção (pasta paralela): o mesmo efeito aparece em mais três linhas de saída do pós-build, todas com números que mudam de um build para outro.
+
+**Linhas afetadas (saída do `PostBuild-Gx.bat` em environment .NET Core + PostgreSQL).**
+- `[APLICADO] .js varridos=<n> | arquivos com chave negativa em gx.domain=<n> | chaves corrigidas=<n>` (`Fix-GxNegativeDomainKeys`): muda com cada `.js` novo na pasta `web` e quando aparece chave negativa.
+- `<arquivo>.js -> <n> chave(s)`: só aparece quando o `Fix-GxNegativeDomainKeys` corrige alguma chave; o nome do arquivo e a contagem variam. Visto como `<objeto>.js -> 1 chave(s)` nos builds de 2026-10-25. Em 2026-11-13 apareceu para 6 arquivos no mesmo build, com 8 chaves cada.
+- `Verify-GxJs: verificados <n> .js (modulos pulados: <n> | placeholders pulados: <n>) | invalidos: 0 | tempo: <n> ms`: hoje só o `tempo` é normalizado; as contagens entram na impressão digital.
+- `CommonRspHealth: OK - GeneXus.Programs.Common.csproj ok (<n> itens, <n> dominios); genexus.programs.common.bld ok (<n> itens, <n> dominios); <n> gxdomain*.cs no disco`: muda quando entra domínio novo.
+
+**Estado observado (leitura do código).**
+- `scripts/GeneXusMsBuildPostBuildEventsSupport.ps1`, `Get-GeneXusPostBuildEventNormalizedHash` (linhas 177–180): a única normalização além de trim/espaços/caixa é o trecho `tempo: <n> ms` da linha `Verify-GxJs` com `invalidos: 0`.
+- `Get-GeneXusPostBuildEventClassification` marca `shouldDowngrade` quando há evento inesperado. `Invoke-GeneXusKbBuildAll.ps1` só rebaixa o status `compilou limpo`.
+
+**Evidência em build real (2026-10-25 e 2026-10-26, KB de produção, environment .NET Core + PostgreSQL).**
+- 2026-10-25: nos builds das rodadas do WebPanel de relatório, as linhas `[APLICADO] … chaves corrigidas=1`, `<objeto>.js -> 1 chave(s)`, `Verify-GxJs: verificados 2176 …` e `CommonRspHealth: OK …` saíram como "Evento pos-build NAO registrado".
+- 2026-10-26: Build All incremental com `exit 0`, sem reorg, `deployBinFreshness=fresh`, `Verify-GxJs` com `invalidos: 0` e `Build All Task Sucesso`. Mesmo assim, o status ficou `operação concluída, pendente de confirmação funcional`, porque três dessas linhas não tinham impressão digital registrada (relatório JSON do BuildAll sob `Temp/` da pasta paralela).
+- Contorno aplicado: wrapper local `Register-*KbPostBuildEvents.ps1` regravou o registro do environment em `kb-source-metadata.md` com os 10 eventos do build; a reclassificação deu `unexpected=[]` e `shouldDowngrade=false`.
+- O contorno não dura. O registro anterior já guardava `.js varridos=2974` e `verificados 2184`; o novo guarda `2966` e `2176`. Basta um `.js` ou um domínio a mais para a linha deixar de bater e o status voltar a `pendente`.
+- 2026-11-13: BuildAll saudável (KB FabricaBrasil18, environment NETPostgreSQL) com 6 arquivos × 8 chaves negativas, somando 48 linhas `<arquivo>.js(N): Syntax error : }`. O contorno corrigiu as 48 chaves e `Verify-GxJs` fechou com `invalidos: 0`. O exit 48 desse dia veio do reconhecedor do compressor, que supunha uma linha de erro por arquivo; corrigido em 2026-11-14 (ver CHANGELOG). A correção do compressor não altera a decisão em aberto deste item.
+
+**Ideia de solução.**
+1. Tratar como evento conhecido, comparando a forma e não as contagens, apenas as famílias de linha conhecidas acima (lista fechada de padrões, por exemplo `^\[aplicado\] \.js varridos=\d+ \| …`, `^\S+\.js -> \d+ chave\(s\)$`, `verify-gxjs: verificados \d+ …`, `commonrsphealth: ok - …`). As contagens continuam no diagnóstico como evidência.
+2. Alternativa: o registro de evento pós-build aceitar padrão com contagens variáveis em vez de impressão digital fixa.
+3. Não substituir números de forma genérica em qualquer linha: isso esconderia mudanças reais em comandos e caminhos (por exemplo, um `.bat` de deploy diferente).
+4. Condicionar a aceitação a sinais de saúde já presentes nas próprias linhas: `invalidos: 0` no `Verify-GxJs` e `OK` no `CommonRspHealth`. Linha com `invalidos` diferente de zero ou `CommonRspHealth` diferente de `OK` continua inesperada.
+5. Teste: fixtures com contagens diferentes (`chaves corrigidas=0` e `=1`, `verificados 2176` e `2184`, com e sem a linha por arquivo) devem produzir a mesma classificação; `invalidos: 1` e `CommonRspHealth: FALHA` devem continuar rebaixando.
+
+**Decisões em aberto.** Rota 1 (lista fechada de formas no motor) ou rota 2 (padrão no registro); se a linha `[APLICADO]` e a linha por arquivo valem só com a dispensa do compressor reconhecida ou também isoladas; se o registro literal já gravado deve ser migrado ou só tolerado.
+
+**Relacionado.** A leitura de sinais que pode dar resultado limpo por falha (entrada «Falha ao ler os sinais do BuildAll deixa o resultado como limpo (falso “roundtrip ok”)») tem prioridade maior que este item.
+
+**Retomada.** A condição original ("primeiro build real com a dispensa ativa") foi atendida em 2026-10-26: o status ficou `pendente` na prática, conforme a evidência acima. Falta decidir a rota. Nenhuma ação automática.
+
+
+**Decisões fechadas.**
+- Rota híbrida: as formas conhecidas ficam no motor, como lista fechada de três famílias (`[APLICADO]` do `Fix-GxNegativeDomainKeys`, `Verify-GxJs` com `invalidos: 0` e `CommonRspHealth: ok`); o registro por environment continua como autoridade.
+- `[APLICADO]` é aceito sem depender de outra linha.
+- Registro gravado pela forma antiga continua aceito para as linhas de família, com aviso `legacyMatchCount`; a primeira regravação troca a forma.
+- Sem `-ParallelKbRoot` ou `-KbMetadataPath`, o registro não é consultado: `registryStatus.state` e aviso próprio (`metadataNotProvided`, `environmentNameUnavailable`, `noEntryForEnvironment`).
+- Recusado por sobre-engenharia: aceitar linha por arquivo, regex tolerante a espaçamento, marcador de esquema na metadata, catálogo de famílias por KB, `-WhatIf` no Register e motor compartilhado com o reconhecedor do compressor.
+
+**Escopo entregue.** `GeneXusMsBuildPostBuildEventsSupport.ps1` (`Get-GeneXusPostBuildEventFamilyHash`, `legacyMatchCount`); `GeneXusKbDeploymentEnvironmentSupport.ps1` (`Get-GeneXusPostBuildEventRegistryState`); wrappers `Invoke-GeneXusKbBuildAll.ps1` e `Invoke-GeneXusKbSpecifyGenerate.ps1` (`registryStatus` e avisos); `Register-GeneXusKbPostBuildEvents.ps1` (um fingerprint por hash, `removedHashCount`). A forma legada `Get-GeneXusPostBuildEventNormalizedHash` ficou igual.
+
+**Validação.** Self-tests: `Test-GeneXusPostBuildEventClassificationSelfTest.ps1`, `Test-GeneXusMsBuildPostBuildEventsSupportSelfTest.ps1`, `Test-GeneXusKbPostBuildEventsRegistrationSelfTest.ps1` (inclui os quatro estados e a precedência), `Test-GeneXusMsBuildBuildAllEndToEndSelfTest.ps1` (cenário PB1–PB4) e `Test-GeneXusMsBuildSpecifyGenerateEndToEndSelfTest.ps1` (SG1–SG2). Vetores fixos do hash legado conferidos no HEAD.
+
+**Fora do escopo.** Linha por arquivo (entrada curta no `999`, com critério de reabertura); caso conhecido do compressor de estáticos (continua `pendente` por desenho); `MSB3491`; entrada do `999` sobre falha de leitura de sinais do BuildAll.
+
+**Adoção.** Pastas paralelas existentes: registrar de novo cada environment a partir de um build saudável. Até lá, o status segue o comportamento anterior, com o aviso de formato antigo quando alguma linha bater pelo legado. A frente altera arquivos que entram na assinatura do setup; a reauditoria das pastas paralelas fica pendente.
+
+### Rastreabilidade
+
+- Commit único desta frente na `main`, mensagem «Corrige falso pendente por evento pos-build». O hash não está neste arquivo porque ele faz parte do próprio commit; localizar com `git log --grep="pos-build"`.

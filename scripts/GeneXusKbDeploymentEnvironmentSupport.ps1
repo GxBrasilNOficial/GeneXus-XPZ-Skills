@@ -240,31 +240,70 @@ function Read-GeneXusKbDeploymentMetadataFields {
     return [pscustomobject]$result
 }
 
+function Get-GeneXusPostBuildEventRegistryState {
+    <#
+      Estado do registro de eventos pos-build para um environment. Precedencia:
+      metadataNotProvided -> environmentNameUnavailable -> noEntryForEnvironment -> available.
+      noEntryForEnvironment cobre arquivo ausente, campo ausente, chave ausente e chave vazia.
+      Nos wrappers, caminho informado com arquivo ausente para antes, com exit 46
+      (Resolve-GeneXusKbValidationEnvironment), entao esse caso nao chega aqui.
+    #>
+    param(
+        [AllowNull()][string]$MetadataPath,
+        [AllowNull()][string]$EnvironmentName
+    )
+
+    $state = [ordered]@{
+        state        = $null
+        environment  = $EnvironmentName
+        metadataPath = $MetadataPath
+        hashes       = @()
+    }
+
+    if ([string]::IsNullOrWhiteSpace($MetadataPath)) {
+        $state.state = 'metadataNotProvided'
+        return [pscustomobject]$state
+    }
+    if ([string]::IsNullOrWhiteSpace($EnvironmentName)) {
+        $state.state = 'environmentNameUnavailable'
+        return [pscustomobject]$state
+    }
+    if (-not (Test-Path -LiteralPath $MetadataPath -PathType Leaf)) {
+        $state.state = 'noEntryForEnvironment'
+        return [pscustomobject]$state
+    }
+
+    $fields = Read-GeneXusKbDeploymentMetadataFields -MetadataPath $MetadataPath
+    $map = $fields.kb_environment_post_build_event_hashes
+    $found = @()
+    $hasEntry = $false
+    if ($null -ne $map) {
+        foreach ($envKey in $map.Keys) {
+            if ($envKey -ieq $EnvironmentName) {
+                $hasEntry = $true
+                $found = @($map[$envKey])
+                break
+            }
+        }
+    }
+
+    if ($hasEntry -and $found.Count -gt 0) {
+        $state.state = 'available'
+        $state.hashes = $found
+    } else {
+        $state.state = 'noEntryForEnvironment'
+    }
+    return [pscustomobject]$state
+}
+
 function Get-GeneXusRegisteredPostBuildEventHashesForEnvironment {
     param(
         [AllowNull()][string]$MetadataPath,
         [AllowNull()][string]$EnvironmentName
     )
 
-    if ([string]::IsNullOrWhiteSpace($MetadataPath) -or [string]::IsNullOrWhiteSpace($EnvironmentName)) {
-        return @()
-    }
-    if (-not (Test-Path -LiteralPath $MetadataPath -PathType Leaf)) {
-        return @()
-    }
-
-    $fields = Read-GeneXusKbDeploymentMetadataFields -MetadataPath $MetadataPath
-    $map = $fields.kb_environment_post_build_event_hashes
-    if ($null -eq $map -or $map.Count -eq 0) {
-        return @()
-    }
-
-    foreach ($envKey in $map.Keys) {
-        if ($envKey -ieq $EnvironmentName) {
-            return @($map[$envKey])
-        }
-    }
-    return @()
+    $registry = Get-GeneXusPostBuildEventRegistryState -MetadataPath $MetadataPath -EnvironmentName $EnvironmentName
+    return @($registry.hashes)
 }
 
 function Resolve-GeneXusValidationEnvironmentName {

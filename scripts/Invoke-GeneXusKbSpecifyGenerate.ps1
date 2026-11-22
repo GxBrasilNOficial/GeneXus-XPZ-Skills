@@ -1400,11 +1400,28 @@ try {
         if ($null -ne $script:DeploymentEnvironmentContext) {
             $metadataPathForPostBuild = Get-GeneXusKbDeploymentContextValue -DeploymentEnvironmentContext $script:DeploymentEnvironmentContext -Name 'kbSourceMetadataPath'
         }
-        $registeredPostBuildHashes = Get-GeneXusRegisteredPostBuildEventHashesForEnvironment `
+        $pbRegistryState = Get-GeneXusPostBuildEventRegistryState `
             -MetadataPath $metadataPathForPostBuild -EnvironmentName $activeEnvironmentOutput
         $pbClassification = Get-GeneXusPostBuildEventClassification `
-            -PostBuildEventLines $postBuildEventLines -RegisteredHashes $registeredPostBuildHashes
+            -PostBuildEventLines $postBuildEventLines -RegisteredHashes @($pbRegistryState.hashes)
+        $pbClassification | Add-Member -NotePropertyName registryStatus -NotePropertyValue ([ordered]@{
+            state        = $pbRegistryState.state
+            environment  = $pbRegistryState.environment
+            metadataPath = $pbRegistryState.metadataPath
+        })
         $postBuildShouldDowngradeFlag = $pbClassification.shouldDowngrade
+
+        $pbNonInertCount = @($pbClassification.expected).Count + @($pbClassification.unexpected).Count +
+                           @($pbClassification.benignFallback).Count + @($pbClassification.unknownFallback).Count
+        if ($pbRegistryState.state -ne 'available' -and $pbNonInertCount -gt 0) {
+            if ($pbRegistryState.state -eq 'metadataNotProvided') {
+                Add-WarningMessage -Message 'Registro de eventos pos-build nao consultado: kb-source-metadata.md nao informado. Passe -ParallelKbRoot ou -KbMetadataPath.'
+            } elseif ($pbRegistryState.state -eq 'environmentNameUnavailable') {
+                Add-WarningMessage -Message 'Registro de eventos pos-build nao consultado: environment ativo nao identificado.'
+            } else {
+                Add-WarningMessage -Message ("Nenhum evento pos-build registrado para '{0}'. Registre via xpz-kb-parallel-setup (Register-GeneXusKbPostBuildEvents.ps1)." -f $activeEnvironmentOutput)
+            }
+        }
 
         foreach ($evt in $pbClassification.expected) {
             Add-WarningMessage -Message "Evento pos-build registrado reconhecido (nao afeta a classificacao): '$evt'"
@@ -1417,6 +1434,9 @@ try {
         }
         foreach ($evt in $pbClassification.unknownFallback) {
             Add-WarningMessage -Message "Evento pos-build nao reconhecido detectado: '$evt'. Processo externo pode ter sido disparado; status rebaixado por cautela."
+        }
+        if ($pbClassification.legacyMatchCount -gt 0) {
+            Add-WarningMessage -Message ("Evento(s) pos-build aceitos pelo formato antigo do registro: {0}. Registre de novo a partir de um build saudavel (xpz-kb-parallel-setup, Register-GeneXusKbPostBuildEvents.ps1)." -f $pbClassification.legacyMatchCount)
         }
     }
 

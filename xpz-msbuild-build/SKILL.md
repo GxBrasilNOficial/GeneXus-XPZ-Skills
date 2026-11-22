@@ -177,8 +177,10 @@ Do NOT use esta skill para:
   de pasta paralela, passar `-ParallelKbRoot` (ou `-KbMetadataPath`). Os wrappers **leem**
   `kb_environment_count`, `deployment_environment_name`, `kb_environment_names`,
   `deployment_hosting_kind` e, quando a validação de deploy bin estiver ativa,
-  `kb_environment_web_dirs` do metadata — **não** inventariam environments nem inferem
-  caminho de `web\bin` por pastas da KB nativa em cada build.
+  `kb_environment_web_dirs` do metadata; leem também `kb_environment_post_build_event_hashes`
+  (registro de eventos pos-build) — **não** inventariam environments nem inferem caminho de
+  `web\bin` por pastas da KB nativa em cada build. Sem metadata informado, o registro de eventos
+  pos-build não é consultado e o wrapper avisa.
 - Para diagnostico de `.cs` gerado, resolver o caminho com `Resolve-GeneXusGeneratedCsPath.ps1`,
   que le `kb_environment_web_dirs` no mesmo metadata; metadata sem esse campo volta para
   `xpz-kb-parallel-setup`.
@@ -566,14 +568,21 @@ janela e não entram como comandos. As linhas `Powershell New-TimeSpan ...`,
 reais: sem fingerprint em `kb_environment_post_build_event_hashes`, rebaixam por cautela.
 Valores incompletos ou inválidos (`Days: not-a-number`, `TotalSeconds: ERROR`, data impossível)
 também permanecem não reconhecidos e rebaixam; não ampliar esse conjunto sem evidência.
-Quando um pós-build registrado inclui a saída prevista do contorno `Verify-GxJs`
-(`invalidos: 0`), o fingerprint normaliza somente o trecho dinâmico `tempo: <n> ms`;
-mudanças em contagens, raiz, módulos pulados ou `invalidos` continuam exigindo novo
-registro ou rebaixamento por cautela.
+Quando um pós-build registrado inclui as saídas previstas do contorno (`[APLICADO]` do
+`Fix-GxNegativeDomainKeys`, `Verify-GxJs` com `invalidos: 0` e `CommonRspHealth: ok`), o
+fingerprint normaliza somente as contagens e o trecho dinâmico `tempo: <n> ms`, nas três
+famílias fechadas do motor (`GeneXusMsBuildPostBuildEventsSupport.ps1`). Mudanças em raiz,
+módulos pulados, `invalidos`, status ou nome de arquivo continuam exigindo novo registro ou
+rebaixamento por cautela.
+Registros gravados pela forma antiga do fingerprint continuam aceitos para essas linhas de
+família, com aviso `legacyMatchCount`; o aviso pede novo registro a partir de um build saudável.
+O `registryStatus` do diagnóstico (`metadataNotProvided`, `environmentNameUnavailable`,
+`noEntryForEnvironment`, `available`) mostra se o registro foi consultado; sem consulta, o
+wrapper avisa antes dos avisos por linha. Continuam `pendente` por desenho o caso conhecido do
+compressor de estáticos e a linha por arquivo (`<nome>.js -> <n> chave(s)`).
 Evidência observada: em GeneXus 18 Up 15, o contorno `Verify-GxJs` pode emitir a mesma
-linha funcional com variação apenas no tempo (`tempo: <n> ms`) e `invalidos: 0`; por isso
-somente esse trecho é normalizado. Essa evidência não autoriza normalizar raiz, contagens,
-módulos pulados ou qualquer linha com `invalidos` diferente de zero.
+linha funcional com variação apenas em contagens e no tempo, com `invalidos: 0`. Essa evidência
+não autoriza normalizar raiz, módulos pulados ou qualquer linha com `invalidos` diferente de zero.
 
 > **Alternativa manual para processo já separado ou retomada após timeout:**
 > Em execução nova de `BuildAll` ou `SpecifyGenerate`, preferir `-StartWatcher` no
