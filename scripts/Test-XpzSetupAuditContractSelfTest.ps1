@@ -299,6 +299,7 @@ Write-Output 'GATE_OK'
   Assert-True ($null -ne $rn.json) "N: stdout deveria ser JSON parseavel"
   Assert-True ($rn.json.'pos-build/registro' -eq 'PENDENTE') "N: PENDENTE esperado para registro legado; obtido $($rn.json.'pos-build/registro')"
   Assert-True ([string]$rn.json.'pos-build/registro.evidencia' -match 'forma legada') "N: evidencia deve avisar forma legada; obtido $($rn.json.'pos-build/registro.evidencia')"
+  Assert-True ([string]$rn.json.'pos-build/registro.evidencia' -match 'regravar com Register-\*KbPostBuildEvents\.ps1') "N: evidencia deve dizer a acao exata (regravar); obtido $($rn.json.'pos-build/registro.evidencia')"
 
   'XPZ_SETUP_AUDIT_CONTRACT_SELFTEST_OK'
 }

@@ -195,7 +195,7 @@ A skill `xpz-llm-delegate` usa um arquivo de politica por-KB na raiz da pasta pa
 ### Registro de eventos pos-build
 
 Dimensão `pos-build/registro` de `Test-*KbSetupAudit.ps1`. Para cada environment com eventos pos-build não inertes observados no JSON de build mais recente em `Temp\`, a auditoria verifica se existe registro em `kb_environment_post_build_event_hashes` de `kb-source-metadata.md`:
-- `pos-build/registro: PENDENTE`: algum environment observado está sem registro (`noEntryForEnvironment`), ou tem evento que só bate com o hash da forma legada (`so na forma legada`; com outra contagem o build rebaixa, então regravar pelo procedimento abaixo). Entra no plano consolidado e torna `materializado_e_indice_validado` impossível como estado limpo. Sem registro, o build deixa de reconhecer o evento e rebaixa por cautela.
+- `pos-build/registro: PENDENTE`: algum environment observado está sem registro (`noEntryForEnvironment`), ou tem evento que só bate com o hash da forma legada (`so na forma legada`; com outra contagem o build rebaixa, então regravar pelo procedimento abaixo). O build aceita esse caso com aviso (`legacyMatchCount`); a pasta só fica limpa depois da regravação. Entra no plano consolidado e torna `materializado_e_indice_validado` impossível como estado limpo. Sem registro, o build deixa de reconhecer o evento e rebaixa por cautela.
 - `pos-build/registro: OK`: todo environment observado tem registro.
 - `pos-build/registro: SEM_EVIDENCIA`: nenhum JSON de build com eventos em `Temp\`. Não é pendência nem estado limpo; o handoff deve dizer que falta evidência e recomendar um build de verificação.
 
@@ -206,7 +206,7 @@ Procedimento de registro (sempre com confirmação explícita do usuário antes 
 4. Primeira regravação após mudança de formato do fingerprint: o motor remove os hashes antigos do environment e informa `removedHashCount`. Informar esse número ao usuário antes de concluir.
 5. Rerodar `Test-*KbSetupAudit.ps1` e confirmar `pos-build/registro: OK`.
 
-Ao ver `registryStatus.state = noEntryForEnvironment` em um diagnóstico de build (ou `pos-build/registro: PENDENTE` na auditoria), o agente monta a lista de eventos do build e pede confirmação ao usuário. Não grava sozinho, mesmo que o build pareça normal. Registrar desarma o rebaixamento por evento pos-build daquele environment; por isso a gravação é sensível.
+Ao ver `legacyMatchCount` no diagnóstico de build, ou `pos-build/registro: PENDENTE` com evidência `so na forma legada`, o agente propõe a regravação pelo procedimento acima, pede confirmação e não declara a pasta limpa antes. Ao ver `registryStatus.state = noEntryForEnvironment` em um diagnóstico de build (ou `pos-build/registro: PENDENTE` na auditoria), o agente monta a lista de eventos do build e pede confirmação ao usuário. Não grava sozinho, mesmo que o build pareça normal. Registrar desarma o rebaixamento por evento pos-build daquele environment; por isso a gravação é sensível.
 
 ## PATH RESOLUTION
 

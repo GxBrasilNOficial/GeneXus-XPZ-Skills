@@ -484,7 +484,7 @@ if ($postBuildLatestByEnv.Count -gt 0) {
         }
         $postBuildDetail = ''
         if ($postBuildUnregistered -gt 0) { $postBuildDetail += ", sem registro=$postBuildUnregistered" }
-        if ($postBuildLegacyOnly -gt 0) { $postBuildDetail += ", so na forma legada=$postBuildLegacyOnly (regravar)" }
+        if ($postBuildLegacyOnly -gt 0) { $postBuildDetail += ", so na forma legada=$postBuildLegacyOnly (regravar com Register-*KbPostBuildEvents.ps1)" }
         $postBuildParts += ('{0}: {1} evento(s) em {2}, registro={3}{4}' -f $postBuildEnvKey, $postBuildEntry.count, (Split-Path -Leaf $postBuildEntry.file), $postBuildRegistry.state, $postBuildDetail)
         if ($postBuildRegistry.state -ne 'available' -or $postBuildUnregistered -gt 0 -or $postBuildLegacyOnly -gt 0) { $postBuildPendingEnvs += $postBuildEnvKey }
     }
