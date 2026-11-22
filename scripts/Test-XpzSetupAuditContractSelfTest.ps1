@@ -381,6 +381,58 @@ kb_environment_post_build_event_hashes: NETFrameworkSQLServer=$pbFamily1
   Assert-True ($rr.json.'pos-build/registro' -eq 'SEM_EVIDENCIA') "R: SEM_EVIDENCIA esperado para familia coerente sem build; obtido $($rr.json.'pos-build/registro')"
   Assert-True ([string]$rr.json.'pos-build/registro.evidencia' -match 'sem build') "R: evidencia deve dizer que falta build"
 
+  # --- S a X: pos-build/base (o build mais recente serve de base para registrar?) ---
+  $pbBase = {
+    param([hashtable]$Spec)
+    $fx = New-SetupAuditFixture -GateText $pbGateText
+    $dir = Join-Path $fx.Root 'Temp\build-base'
+    [void](New-Item -ItemType Directory -Path $dir -Force)
+    $classification = [ordered]@{ unexpected = @($Spec.Unexpected) }
+    if ($Spec.RegistryState) { $classification['registryStatus'] = [ordered]@{ state = $Spec.RegistryState } }
+    $doc = [ordered]@{
+      exitCode        = $Spec.ExitCode
+      status          = $Spec.Status
+      observedContext = [ordered]@{ ActiveEnvironment = 'NETFrameworkSQLServer' }
+      stdoutSignals   = [ordered]@{
+        postBuildEvents              = @('Powershell Write-Output teste-pb-x')
+        postBuildEventClassification = $classification
+      }
+    }
+    if ($null -ne $Spec.MsBuildExitCode) {
+      $doc['executionEvidence'] = [ordered]@{ msBuildExitCode = $Spec.MsBuildExitCode; msBuildFailed = $false }
+    }
+    [System.IO.File]::WriteAllText((Join-Path $dir 'build.json'), ($doc | ConvertTo-Json -Depth 8), $utf8NoBom)
+    return (& $pbRun $fx)
+  }
+  $pbPending = 'operacao concluida, pendente de confirmacao funcional'
+
+  $rs1 = & $pbBase @{ ExitCode = 0; Status = 'compilou limpo'; MsBuildExitCode = 0; RegistryState = $null; Unexpected = @() }
+  Assert-True ($null -ne $rs1.json) "S1: stdout deveria ser JSON parseavel"
+  Assert-True ($rs1.json.'pos-build/base' -eq 'APTO') "S1: APTO esperado para compilou limpo; obtido $($rs1.json.'pos-build/base') / $($rs1.json.'pos-build/base.evidencia')"
+
+  $rs2 = & $pbBase @{ ExitCode = 0; Status = $pbPending; MsBuildExitCode = 0; RegistryState = 'noEntryForEnvironment'; Unexpected = @() }
+  Assert-True ($rs2.json.'pos-build/base' -eq 'APTO') "S2: APTO esperado para pendente so por registro ausente; obtido $($rs2.json.'pos-build/base') / $($rs2.json.'pos-build/base.evidencia')"
+
+  $rt = & $pbBase @{ ExitCode = 0; Status = $pbPending; MsBuildExitCode = 0; RegistryState = $null; Unexpected = @() }
+  Assert-True ($rt.json.'pos-build/base' -eq 'NAO_APTO') "T: NAO_APTO esperado sem registryStatus; obtido $($rt.json.'pos-build/base')"
+  Assert-True ([string]$rt.json.'pos-build/base.evidencia' -match 'sem registryStatus') "T: evidencia deve citar a falta de registryStatus"
+  Assert-True ([string]$rt.json.'pos-build/base.evidencia' -match 'gerar build novo') "T: evidencia deve mandar gerar build novo"
+
+  $ru = & $pbBase @{ ExitCode = 0; Status = $pbPending; MsBuildExitCode = $null; RegistryState = 'noEntryForEnvironment'; Unexpected = @() }
+  Assert-True ($ru.json.'pos-build/base' -eq 'NAO_APTO') "U: NAO_APTO esperado sem msBuildExitCode; obtido $($ru.json.'pos-build/base')"
+  Assert-True ([string]$ru.json.'pos-build/base.evidencia' -match 'msBuildExitCode') "U: evidencia deve citar msBuildExitCode"
+
+  $rv = & $pbBase @{ ExitCode = 0; Status = $pbPending; MsBuildExitCode = 0; RegistryState = 'noEntryForEnvironment'; Unexpected = @('linha inesperada') }
+  Assert-True ($rv.json.'pos-build/base' -eq 'NAO_APTO') "V: NAO_APTO esperado com evento inesperado; obtido $($rv.json.'pos-build/base')"
+  Assert-True ([string]$rv.json.'pos-build/base.evidencia' -match 'inesperado') "V: evidencia deve citar evento inesperado"
+
+  $rx = & $pbBase @{ ExitCode = 1; Status = 'compilou limpo'; MsBuildExitCode = 0; RegistryState = $null; Unexpected = @() }
+  Assert-True ($rx.json.'pos-build/base' -eq 'NAO_APTO') "X: NAO_APTO esperado com exitCode diferente de 0; obtido $($rx.json.'pos-build/base')"
+  Assert-True ([string]$rx.json.'pos-build/base.evidencia' -match 'exitCode') "X: evidencia deve citar exitCode"
+
+  # W: sem build com eventos em Temp\ -> SEM_EVIDENCIA (reaproveita o caso L)
+  Assert-True ($rl.json.'pos-build/base' -eq 'SEM_EVIDENCIA') "W: pos-build/base SEM_EVIDENCIA esperado sem build; obtido $($rl.json.'pos-build/base')"
+
   'XPZ_SETUP_AUDIT_CONTRACT_SELFTEST_OK'
 }
 finally {
