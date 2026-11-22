@@ -791,7 +791,7 @@ Parâmetros específicos de exportação:
 - `-ParallelKbRoot` / `-IndexPath` — um deles é obrigatório com `-ObjectList` preenchido e sem `-ExportAll`/exportação full. `-CatalogOverridePath` é opcional. Com apenas `-IndexPath`, o PowerShell não descobre o override convencional. Para usar catálogo local, informe `-ParallelKbRoot` ou `-CatalogOverridePath`. O inventário pós-exportação seletiva usa o mesmo contexto de catálogo.
 - `-DependencyType` (em export seletivo/cirúrgico que deve conter somente a lista nominal, usar `"None"`)
 - `-ReferenceType` (em export seletivo/cirúrgico que deve conter somente a lista nominal, usar `"None"`)
-- `-ExportKbInfo`
+- `-ExportKbInfo` (default `true` na exportação seletiva e na completa; o default é rebaixado para `false`, com aviso e sem bloqueio, quando a task não expõe `ExportKBInfo`; valor explícito nunca é rebaixado e só `true` explícito sem `ExportKBInfo` nem `ExportKBProperties` bloqueia com exit 34; regra completa e medição em `xpz-msbuild-import-export/SKILL.md`)
 - `-ExportAll`
 
 Parâmetros específicos de importação:

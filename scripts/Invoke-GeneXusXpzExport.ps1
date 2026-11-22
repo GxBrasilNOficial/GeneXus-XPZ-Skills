@@ -60,7 +60,13 @@ Valores além de "None" e o default formal quando omitido devem ser confirmados
 na instalação antes de uso operacional.
 
 .PARAMETER ExportKbInfo
-Valor explícito para ExportKBInfo. Default: false.
+Valor para ExportKBInfo. Default: true (exportação seletiva e completa), para que o
+bloco Source do XPZ saia com a identidade da KB (kb, username, UNCPath, Version).
+O default só vale quando a task Export expõe ExportKBInfo; se ela expuser apenas
+ExportKBProperties, ou nenhuma das duas, o default é rebaixado para false com aviso
+em warnings, sem bloquear. Valor explícito nunca é rebaixado: true explícito sem
+nenhuma das duas propriedades bloqueia com exit 34. Use false explícito para XPZ
+que será compartilhado sem usuário e caminho UNC da máquina.
 
 .PARAMETER ExportAll
 Valor explícito para ExportAll. Default: false.
@@ -125,7 +131,7 @@ param(
     [string]$ReferenceType,
 
     [ValidateSet('true', 'false')]
-    [string]$ExportKbInfo = 'false',
+    [string]$ExportKbInfo = 'true',
 
     [ValidateSet('true', 'false')]
     [string]$ExportAll = 'false',
@@ -211,6 +217,16 @@ if (-not (Test-Path -LiteralPath $preflightSupportPath -PathType Leaf)) {
 if ($FullExport) {
     $ExportAll = 'true'
 }
+
+# Origem do ExportKbInfo: o default (true) pode ser rebaixado na checagem de suporte
+# da task Export; valor explícito do chamador nunca é rebaixado. O valor efetivo só
+# é conhecido depois dessa checagem.
+$exportKbInfoRequested = $ExportKbInfo
+$exportKbInfoSource = 'default'
+if ($PSBoundParameters.ContainsKey('ExportKbInfo')) {
+    $exportKbInfoSource = 'caller'
+}
+$exportKbInfoEffective = $null
 
 # Normalizacao do contrato de selecao: -ObjectList (canonico, alias -ObjectNames)
 # aceita string única ou string[]. O corpo do script consome a forma string com
@@ -801,7 +817,9 @@ try {
                 ObjectList = $objectListSpec
                 DependencyType = $DependencyType
                 ReferenceType = $ReferenceType
-                ExportKbInfo = $ExportKbInfo
+                ExportKbInfo = $exportKbInfoRequested
+                ExportKbInfoSource = $exportKbInfoSource
+                ExportKbInfoEffective = $exportKbInfoEffective
                 ExportAll = $ExportAll
             }
             observedContext = [ordered]@{
@@ -979,9 +997,25 @@ try {
     if ($ExportAll -eq 'true' -and -not (Test-ExportTaskSupportsProperty -PropertyNames $exportTaskPropertyNames -PropertyName 'ExportAll')) {
         Add-BlockingReason -Reason 'A instalação atual não expõe a propriedade ExportAll na task Export.'
     }
-    if ($ExportKbInfo -eq 'true' -and [string]::IsNullOrWhiteSpace($exportKbInfoPropertyName)) {
-        Add-BlockingReason -Reason 'A instalação atual não expõe ExportKBInfo nem ExportKBProperties na task Export.'
+    if ($ExportKbInfo -eq 'true') {
+        if ($exportKbInfoSource -eq 'default' -and $exportKbInfoPropertyName -ne 'ExportKBInfo') {
+            # Default rebaixado: devolve o comportamento anterior (false) em vez de bloquear.
+            $ExportKbInfo = 'false'
+            if ([string]::IsNullOrWhiteSpace($exportKbInfoPropertyName)) {
+                Add-WarningMessage -Message 'ExportKbInfo: default true rebaixado para false porque a task Export não expõe ExportKBInfo nem ExportKBProperties. O bloco Source do XPZ sairá vazio (sync com refresh parcial de kb-source-metadata.md; XPZ inválido como template de New-XpzImportPackage).'
+            } else {
+                Add-WarningMessage -Message ('ExportKbInfo: default true rebaixado para false porque a task Export expõe apenas {0}, cuja semântica não foi medida. O bloco Source do XPZ pode sair vazio; passe -ExportKbInfo true explícito para emitir.' -f $exportKbInfoPropertyName)
+            }
+        } elseif ([string]::IsNullOrWhiteSpace($exportKbInfoPropertyName)) {
+            Add-BlockingReason -Reason 'A instalação atual não expõe ExportKBInfo nem ExportKBProperties na task Export.'
+        }
     }
+    $exportKbInfoEffective = $ExportKbInfo
+    $exportKbInfoPropertyLabel = '(nenhuma)'
+    if (-not [string]::IsNullOrWhiteSpace($exportKbInfoPropertyName)) {
+        $exportKbInfoPropertyLabel = $exportKbInfoPropertyName
+    }
+    Add-StrategyTrace -Message ('ExportKbInfo: pedido={0}; origem={1}; efetivo={2}; propriedade da task={3}.' -f $exportKbInfoRequested, $exportKbInfoSource, $exportKbInfoEffective, $exportKbInfoPropertyLabel)
 
     if ($script:BlockingReasons.Count -gt 0) {
         $unsupported = [ordered]@{
@@ -995,7 +1029,9 @@ try {
                 ObjectList = $objectListSpec
                 DependencyType = $DependencyType
                 ReferenceType = $ReferenceType
-                ExportKbInfo = $ExportKbInfo
+                ExportKbInfo = $exportKbInfoRequested
+                ExportKbInfoSource = $exportKbInfoSource
+                ExportKbInfoEffective = $exportKbInfoEffective
                 ExportAll = $ExportAll
             }
             observedContext = [ordered]@{
@@ -1333,7 +1369,9 @@ try {
             ObjectList = $objectListSpec
             DependencyType = $DependencyType
             ReferenceType = $ReferenceType
-            ExportKbInfo = $ExportKbInfo
+            ExportKbInfo = $exportKbInfoRequested
+            ExportKbInfoSource = $exportKbInfoSource
+            ExportKbInfoEffective = $exportKbInfoEffective
             ExportAll = $ExportAll
             StartWatcherRequested = $StartWatcher.IsPresent
             ParallelKbRoot = $ParallelKbRoot
@@ -1467,7 +1505,9 @@ catch {
             ObjectList = $objectListSpec
             DependencyType = $DependencyType
             ReferenceType = $ReferenceType
-            ExportKbInfo = $ExportKbInfo
+            ExportKbInfo = $exportKbInfoRequested
+            ExportKbInfoSource = $exportKbInfoSource
+            ExportKbInfoEffective = $exportKbInfoEffective
             ExportAll = $ExportAll
             StartWatcherRequested = $StartWatcher.IsPresent
         }

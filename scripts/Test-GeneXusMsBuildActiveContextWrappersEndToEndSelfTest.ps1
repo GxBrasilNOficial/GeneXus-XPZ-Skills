@@ -10,6 +10,9 @@
     Cobre: teste decisivo dos sinais (observedContext = compactSignals = arquivo de sinais; uma
     leitura + troca pedida + sem falha de Set => efetivo nulo), troca bem-sucedida, Set falho com
     bloqueio citando a abertura, exits preservados (41/31) e assercao estrutural no .msbuild.
+    Cobre tambem o default ExportKbInfo=true do Export: origem (default/caller), valor efetivo,
+    rebaixamento com aviso quando a task nao expoe ExportKBInfo (variantes da assembly em
+    processo filho) e exit 34 apenas para true explicito sem nenhuma das propriedades.
 #>
 
 [CmdletBinding()]
@@ -42,7 +45,13 @@ function Invoke-WrapperScenario {
         [int]$FakeExitCode = 0,
         [string]$EnvironmentName,
         [hashtable]$Selection,
-        [string]$FullExportCatalogOverridePath
+        [string]$FullExportCatalogOverridePath,
+        # Variante da assembly sintetica (ex.: sem ExportKBInfo). Exige -InChildProcess:
+        # o wrapper le a assembly por LoadFrom e, no mesmo processo, a identidade ja
+        # carregada pelos cenarios anteriores prevaleceria.
+        [string]$TasksDllPath,
+        [switch]$InChildProcess,
+        [hashtable]$ExtraArgs
     )
 
     $fakeGeneXusDirectory = Join-Path $ScenarioRoot 'GeneXus'
@@ -56,7 +65,12 @@ function Invoke-WrapperScenario {
     }
 
     [System.IO.File]::WriteAllText((Join-Path $fakeGeneXusDirectory 'Genexus.Tasks.targets'), '<Project />', [System.Text.UTF8Encoding]::new($false))
-    Copy-Item -LiteralPath $syntheticDllPath -Destination (Join-Path $fakeGeneXusDirectory 'Genexus.MsBuild.Tasks.dll') -Force
+    $sourceDllPath = $syntheticDllPath
+    if (-not [string]::IsNullOrWhiteSpace($TasksDllPath)) {
+        if (-not $InChildProcess) { throw 'TasksDllPath exige -InChildProcess.' }
+        $sourceDllPath = $TasksDllPath
+    }
+    Copy-Item -LiteralPath $sourceDllPath -Destination (Join-Path $fakeGeneXusDirectory 'Genexus.MsBuild.Tasks.dll') -Force
 
     $cmdLines = @('@echo off') + $StdOutCmdLines + $StdErrCmdLines + @('exit /b {0}' -f $FakeExitCode)
     [System.IO.File]::WriteAllText($fakeMsBuildPath, ($cmdLines -join "`r`n") + "`r`n", [System.Text.Encoding]::ASCII)
@@ -102,8 +116,24 @@ function Invoke-WrapperScenario {
         }
     }
 
-    $wrapperOutput = & $wrapperPath @wrapperArgs
-    $wrapperExitCode = $LASTEXITCODE
+    if ($null -ne $ExtraArgs) {
+        foreach ($key in $ExtraArgs.Keys) {
+            $wrapperArgs[$key] = $ExtraArgs[$key]
+        }
+    }
+
+    if ($InChildProcess) {
+        $childArgs = [System.Collections.Generic.List[string]]::new()
+        foreach ($key in $wrapperArgs.Keys) {
+            $childArgs.Add("-$key")
+            $childArgs.Add([string]$wrapperArgs[$key])
+        }
+        $wrapperOutput = & $script:PwshPath -NoProfile -File $wrapperPath @childArgs
+        $wrapperExitCode = $LASTEXITCODE
+    } else {
+        $wrapperOutput = & $wrapperPath @wrapperArgs
+        $wrapperExitCode = $LASTEXITCODE
+    }
     $jsonText = @($wrapperOutput) -join [Environment]::NewLine
 
     return [ordered]@{
@@ -141,6 +171,71 @@ function Assert-DecisiveSignals {
     $fileSignals = [System.IO.File]::ReadAllText($signalsFilePath) | ConvertFrom-Json -Depth 20
     Assert-True -Condition ($null -eq $fileSignals.activeEnvironment) -Message "[$Wrapper] arquivo de sinais: activeEnvironment deveria ser nulo."
     Assert-True -Condition ([string]$fileSignals.activeEnvironmentAtOpen -eq $ExpectedAtOpen) -Message ("[$Wrapper] arquivo de sinais: activeEnvironmentAtOpen deveria ser '{0}'." -f $ExpectedAtOpen)
+}
+
+$script:PwshPath = (Get-Process -Id $PID).Path
+
+function New-SyntheticTasksVariant {
+    # Compila, em processo filho, uma variante da fixture com a propriedade ExportKBInfo
+    # trocada (ou removida). O filho evita carregar no processo do teste uma segunda
+    # assembly com a mesma identidade.
+    param([string]$Name, [string]$Replacement)
+
+    $propertyLine = 'public string ExportKBInfo { get; set; }'
+    $source = [System.IO.File]::ReadAllText($fixtureSourcePath)
+    if (-not $source.Contains($propertyLine)) {
+        throw "Fixture sem a linha esperada: $propertyLine"
+    }
+    $variantDirectory = Join-Path $testRoot ('tasks-' + $Name)
+    [System.IO.Directory]::CreateDirectory($variantDirectory) | Out-Null
+    $variantSourcePath = Join-Path $variantDirectory 'SyntheticGeneXusMsBuildTasks.cs'
+    $variantDllPath = Join-Path $variantDirectory 'Genexus.MsBuild.Tasks.dll'
+    [System.IO.File]::WriteAllText($variantSourcePath, $source.Replace($propertyLine, $Replacement), [System.Text.UTF8Encoding]::new($false))
+    $compileCommand = "Add-Type -TypeDefinition ([System.IO.File]::ReadAllText('$variantSourcePath')) -OutputAssembly '$variantDllPath'"
+    & $script:PwshPath -NoProfile -Command $compileCommand
+    Assert-True (($LASTEXITCODE -eq 0) -and (Test-Path -LiteralPath $variantDllPath -PathType Leaf)) "Falha ao compilar a variante '$Name' da assembly sintetica."
+    return $variantDllPath
+}
+
+function Assert-ExportKbInfo {
+    # Confere requestedContext, strategyTrace e o .msbuild gerado para ExportKbInfo.
+    param(
+        $Result,
+        [string]$Label,
+        [int]$ExpectedExit = 0,
+        [string]$Requested,
+        [string]$Source,
+        [string]$Effective,
+        [string]$EmittedProperty,
+        [bool]$ExpectDowngradeWarning = $false
+    )
+
+    $diagnostic = $Result.Diagnostic
+    Assert-True ($Result.ExitCode -eq $ExpectedExit) ("[$Label] exit esperado {0}; recebeu {1} ({2})." -f $ExpectedExit, $Result.ExitCode, $diagnostic.summary)
+    $context = $diagnostic.requestedContext
+    Assert-True ([string]$context.ExportKbInfo -eq $Requested) ("[$Label] requestedContext.ExportKbInfo esperado '{0}'; recebeu '{1}'." -f $Requested, $context.ExportKbInfo)
+    Assert-True ([string]$context.ExportKbInfoSource -eq $Source) ("[$Label] ExportKbInfoSource esperado '{0}'; recebeu '{1}'." -f $Source, $context.ExportKbInfoSource)
+    Assert-True ([string]$context.ExportKbInfoEffective -eq $Effective) ("[$Label] ExportKbInfoEffective esperado '{0}'; recebeu '{1}'." -f $Effective, $context.ExportKbInfoEffective)
+
+    $traceLine = 'ExportKbInfo: pedido={0}; origem={1}; efetivo={2};' -f $Requested, $Source, $Effective
+    $traceHits = @($diagnostic.strategyTrace | Where-Object { ([string]$_).StartsWith($traceLine, [System.StringComparison]::Ordinal) })
+    Assert-True ($traceHits.Count -eq 1) ("[$Label] strategyTrace deveria ter uma linha iniciando com '{0}'." -f $traceLine)
+
+    $downgradeWarnings = @($diagnostic.warnings | Where-Object { ([string]$_) -match '^ExportKbInfo: default true rebaixado' })
+    if ($ExpectDowngradeWarning) {
+        Assert-True ($downgradeWarnings.Count -eq 1) "[$Label] aviso de rebaixamento esperado em warnings."
+    } else {
+        Assert-True ($downgradeWarnings.Count -eq 0) "[$Label] aviso de rebaixamento inesperado em warnings."
+    }
+
+    if ($ExpectedExit -ne 0) { return }
+    $msBuildText = [System.IO.File]::ReadAllText([string]$diagnostic.artifacts.MsBuildFilePath)
+    Assert-True ($msBuildText.Contains("<ExportKbInfo>$Effective</ExportKbInfo>")) "[$Label] .msbuild deveria declarar <ExportKbInfo>$Effective</ExportKbInfo>."
+    foreach ($propertyName in @('ExportKBInfo', 'ExportKBProperties')) {
+        $attribute = $propertyName + '="$(ExportKbInfo)"'
+        $shouldEmit = ($propertyName -eq $EmittedProperty)
+        Assert-True ($msBuildText.Contains($attribute) -eq $shouldEmit) ("[$Label] atributo {0} no .msbuild: esperado presente={1}." -f $propertyName, $shouldEmit)
+    }
 }
 
 try {
@@ -202,6 +297,38 @@ try {
     $fullWithOverride = Invoke-WrapperScenario -Wrapper 'Export' -ScenarioRoot (Join-Path $testRoot 'full-explicit') `
         -FullExportCatalogOverridePath $validOverride -StdOutCmdLines $decisiveLines
     Assert-True ($fullWithOverride.ExitCode -eq 0 -and $null -eq $fullWithOverride.Diagnostic.requestedContext.PSObject.Properties['CatalogOverridePath']) 'Export completo deve omitir o campo.'
+
+    # ExportKbInfo: default true na seletiva e na completa; false explicito respeitado.
+    Assert-ExportKbInfo -Result $allowed -Label 'ExportKbInfo seletiva default' -Requested 'true' -Source 'default' -Effective 'true' -EmittedProperty 'ExportKBInfo'
+    Assert-ExportKbInfo -Result $fullWithOverride -Label 'ExportKbInfo completa default' -Requested 'true' -Source 'default' -Effective 'true' -EmittedProperty 'ExportKBInfo'
+    $selectiveFalse = Invoke-WrapperScenario -Wrapper 'Export' -ScenarioRoot (Join-Path $testRoot 'kbinfo-selective-false') `
+        -Selection @{ IndexPath = $indexPath; ExportKbInfo = 'false' } -StdOutCmdLines $decisiveLines
+    Assert-ExportKbInfo -Result $selectiveFalse -Label 'ExportKbInfo seletiva false explicito' -Requested 'false' -Source 'caller' -Effective 'false' -EmittedProperty 'ExportKBInfo'
+
+    # Task sem ExportKBInfo: variantes da assembly, cada cenario em processo filho.
+    $noPropertyDll = New-SyntheticTasksVariant -Name 'no-kbinfo' -Replacement ''
+    $propertiesOnlyDll = New-SyntheticTasksVariant -Name 'kbproperties-only' -Replacement 'public string ExportKBProperties { get; set; }'
+
+    $noPropertyDefault = Invoke-WrapperScenario -Wrapper 'Export' -ScenarioRoot (Join-Path $testRoot 'kbinfo-noprop-default') `
+        -TasksDllPath $noPropertyDll -InChildProcess -StdOutCmdLines $decisiveLines
+    Assert-ExportKbInfo -Result $noPropertyDefault -Label 'ExportKbInfo sem suporte default' -Requested 'true' -Source 'default' -Effective 'false' -EmittedProperty '' -ExpectDowngradeWarning $true
+
+    $noPropertyFalse = Invoke-WrapperScenario -Wrapper 'Export' -ScenarioRoot (Join-Path $testRoot 'kbinfo-noprop-false') `
+        -TasksDllPath $noPropertyDll -InChildProcess -ExtraArgs @{ ExportKbInfo = 'false' } -StdOutCmdLines $decisiveLines
+    Assert-ExportKbInfo -Result $noPropertyFalse -Label 'ExportKbInfo sem suporte false explicito' -Requested 'false' -Source 'caller' -Effective 'false' -EmittedProperty ''
+
+    $noPropertyTrue = Invoke-WrapperScenario -Wrapper 'Export' -ScenarioRoot (Join-Path $testRoot 'kbinfo-noprop-true') `
+        -TasksDllPath $noPropertyDll -InChildProcess -ExtraArgs @{ ExportKbInfo = 'true' } -StdOutCmdLines $decisiveLines
+    Assert-ExportKbInfo -Result $noPropertyTrue -Label 'ExportKbInfo sem suporte true explicito' -ExpectedExit 34 -Requested 'true' -Source 'caller' -Effective 'true'
+    Assert-True ([string]$noPropertyTrue.Diagnostic.stage -eq 'task-support') '[ExportKbInfo sem suporte true explicito] stage esperado task-support.'
+
+    $propertiesOnlyDefault = Invoke-WrapperScenario -Wrapper 'Export' -ScenarioRoot (Join-Path $testRoot 'kbinfo-propsonly-default') `
+        -TasksDllPath $propertiesOnlyDll -InChildProcess -StdOutCmdLines $decisiveLines
+    Assert-ExportKbInfo -Result $propertiesOnlyDefault -Label 'ExportKbInfo so ExportKBProperties default' -Requested 'true' -Source 'default' -Effective 'false' -EmittedProperty 'ExportKBProperties' -ExpectDowngradeWarning $true
+
+    $propertiesOnlyTrue = Invoke-WrapperScenario -Wrapper 'Export' -ScenarioRoot (Join-Path $testRoot 'kbinfo-propsonly-true') `
+        -TasksDllPath $propertiesOnlyDll -InChildProcess -ExtraArgs @{ ExportKbInfo = 'true' } -StdOutCmdLines $decisiveLines
+    Assert-ExportKbInfo -Result $propertiesOnlyTrue -Label 'ExportKbInfo so ExportKBProperties true explicito' -Requested 'true' -Source 'caller' -Effective 'true' -EmittedProperty 'ExportKBProperties'
 
     $invalidOverride = Join-Path $testRoot 'invalid-override.json'
     [IO.File]::WriteAllText($invalidOverride, '{"upstreamPending":"invalid"}')
