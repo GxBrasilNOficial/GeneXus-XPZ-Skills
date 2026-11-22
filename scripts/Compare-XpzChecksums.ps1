@@ -9,7 +9,7 @@
 .DESCRIPTION
   Motor compartilhado, agnostico de KB. Classifica cada XML alterado como SAME
   (checksum identico -- sugere re-export, mas nao prova conteudo igual; uma
-  cascata de rename pode alterar conteudo sem recalcular o checksum), DIFF,
+  cascata de rename pode alterar conteudo com o checksum igual), DIFF,
   NEW, DELETED ou NO_CHECKSUM (checksum ausente nos dois lados). E classificador
   puro: nao bloqueia, so rotula para triagem.
 
