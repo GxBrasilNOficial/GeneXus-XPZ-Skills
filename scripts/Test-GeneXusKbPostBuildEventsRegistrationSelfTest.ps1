@@ -152,7 +152,7 @@ try {
     $pendingObj = [ordered]@{
         exitCode          = 0
         status            = 'operacao concluida, pendente de confirmacao funcional'
-        summary           = 'BuildAll concluiu sem erro de MSBuild, mas stdout indica evento pos-build nao registrado/nao reconhecido. Verifique stdoutSignals.postBuildEvents no diagnostico.'
+        pendingCauses     = @('postBuildEvent')
         executionEvidence = [ordered]@{ msBuildExitCode = 0; msBuildFailed = $false }
         observedContext   = [ordered]@{ ActiveEnvironment = 'NETPendingEvent' }
         stdoutSignals     = [ordered]@{
@@ -174,7 +174,9 @@ try {
         @{ Name = 'msBuildFailed verdadeiro'; Mutate = { param($o) $o['executionEvidence'] = [ordered]@{ msBuildExitCode = 0; msBuildFailed = $true } }; Match = 'msBuildFailed' }
         @{ Name = 'status nao previsto';     Mutate = { param($o) $o['status'] = 'falhou' };                                       Match = 'status nao previsto' }
         @{ Name = 'pendente sem registryStatus'; Mutate = { param($o) $o['status'] = 'operacao concluida, pendente de confirmacao funcional' }; Match = 'sem registryStatus' }
-        @{ Name = 'pendente por outra causa (stderr)'; Mutate = { param($o) $o['status'] = 'operacao concluida, pendente de confirmacao funcional'; $o['summary'] = 'BuildAll concluiu sem erro de MSBuild, mas stderr nao esta vazio.'; $o['stdoutSignals']['postBuildEventClassification'] = [ordered]@{ registryStatus = [ordered]@{ state = 'available' }; unexpected = @('x') } }; Match = 'resumo do build' }
+        @{ Name = 'pendente por outra causa (stderr)'; Mutate = { param($o) $o['status'] = 'operacao concluida, pendente de confirmacao funcional'; $o['pendingCauses'] = @('stderr', 'postBuildEvent'); $o['stdoutSignals']['postBuildEventClassification'] = [ordered]@{ registryStatus = [ordered]@{ state = 'available' }; unexpected = @('x') } }; Match = 'causa alem de evento' }
+        @{ Name = 'pendente com compressor de estaticos'; Mutate = { param($o) $o['status'] = 'operacao concluida, pendente de confirmacao funcional'; $o['pendingCauses'] = @('postBuildEvent', 'staticCompressor'); $o['stdoutSignals']['postBuildEventClassification'] = [ordered]@{ registryStatus = [ordered]@{ state = 'available' }; unexpected = @('x') } }; Match = 'staticCompressor' }
+        @{ Name = 'pendente sem pendingCauses'; Mutate = { param($o) $o['status'] = 'operacao concluida, pendente de confirmacao funcional'; $o['stdoutSignals']['postBuildEventClassification'] = [ordered]@{ registryStatus = [ordered]@{ state = 'available' }; unexpected = @('x') } }; Match = 'sem pendingCauses' }
     )
     foreach ($case in $nonBaseCases) {
         $obj = [ordered]@{

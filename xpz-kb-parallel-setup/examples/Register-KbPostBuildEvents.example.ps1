@@ -14,7 +14,8 @@ o agente só passa -ConfirmRegistration após o usuário aprovar explicitamente 
 O motor recusa (BLOCK) o build que não sirva de base do registro, com o mesmo veredito da dimensão
 pos-build/base da auditoria de setup: exitCode e executionEvidence.msBuildExitCode 0, sem msBuildFailed,
 e status compilou limpo (BuildAll) ou specify e generate concluídos (SpecifyGenerate), ou pendente só por
-evento pós-build a registrar (inclusive evento novo num environment já registrado). Use o build do environment que a auditoria marcar como APTO; nada é gravado quando o
+evento pós-build a registrar (pendingCauses igual a postBuildEvent; inclusive evento novo num environment
+já registrado). Use o build do environment que a auditoria marcar como APTO; nada é gravado quando o
 build é recusado.
 
 .PARAMETER SharedSkillsRoot

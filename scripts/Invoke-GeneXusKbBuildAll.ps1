@@ -382,6 +382,18 @@ function Add-WarningMessage {
     }
 }
 
+# Causas da pendencia ("pendente de confirmacao funcional"), publicadas em pendingCauses no diagnostico.
+# Lista fechada: buildAllMarkerMissing, stderr, alert, postBuildEvent, staticCompressor. Cada causa e gravada
+# quando o fato existe, mesmo que outra causa ja tenha rebaixado o status. O veredito de base do registro
+# de eventos pos-build (Get-GeneXusPostBuildBaseVerdict) le este campo, nao o texto do summary.
+function Add-PendingCause {
+    param([string]$Cause)
+
+    if (-not $script:PendingCauses.Contains($Cause)) {
+        $script:PendingCauses.Add($Cause)
+    }
+}
+
 function Resolve-ProbeScriptPath {
     $scriptDirectory = Split-Path -Parent $PSCommandPath
     $probePath = Join-Path $scriptDirectory 'Test-GeneXusMsBuildSetup.ps1'
@@ -709,6 +721,7 @@ $stdErrText = ''
 $postProcessingFailed = $false
 $postProcessingError = $null
 $buildStatus = $null
+$script:PendingCauses = [System.Collections.Generic.List[string]]::new()
 $msBuildCategoryBBlocked = $false
 $script:StaticCompressorKnownCase = $null
 $operationalSubStateBuild = $null
@@ -1803,6 +1816,9 @@ try {
         -ReorgDetected      $reorgDetected `
         -TimedOut           $timedOut `
         -AllowReorgConfirmed $allowReorgConfirmed
+    if ($buildStatus.Status -eq 'operacao concluida, pendente de confirmacao funcional') {
+        Add-PendingCause -Cause 'buildAllMarkerMissing'
+    }
 
     $stdErrFilteredNoise = ''
     $stdErrFiltered      = ''
@@ -1852,6 +1868,9 @@ try {
 
     $buildWarningLines   = @([regex]::Matches($stdOutFiltered, '(?m)[^\r\n]*\(\d+,\d+\)\s*:\s*warning\s*:[^\r\n]*') |
                              ForEach-Object { $_.Value.Trim() })
+
+    if (-not [string]::IsNullOrWhiteSpace($stdErrFiltered)) { Add-PendingCause -Cause 'stderr' }
+    if ($detectedBlockingPattern) { Add-PendingCause -Cause 'alert' }
 
     if ($buildStatus.Status -eq 'compilou limpo' -and -not [string]::IsNullOrWhiteSpace($stdErrFiltered)) {
         $buildStatus = [ordered]@{
@@ -1924,6 +1943,7 @@ try {
             Add-WarningMessage -Message ("Evento(s) pos-build aceitos pelo formato antigo do registro: {0}." -f $pbClassification.legacyMatchCount)
         }
 
+        if ($pbClassification.shouldDowngrade) { Add-PendingCause -Cause 'postBuildEvent' }
         if ($pbClassification.shouldDowngrade -and $buildStatus.Status -eq 'compilou limpo') {
             $buildStatus = [ordered]@{
                 Status   = 'operacao concluida, pendente de confirmacao funcional'
@@ -2039,6 +2059,7 @@ try {
             $staticCompressorFileNames = @($staticCase.files | ForEach-Object { $_.fileName }) -join ', '
             $staticCompressorText = ("O compressor de estaticos reportou chave negativa em {0}; o contorno do pos-build corrigiu e o Verify-GxJs confirmou zero invalidos. A rodada nao e classificada como Categoria B; so o wrapper dispensa, e o campo staticCompressorKnownCase registra a evidencia." -f $staticCompressorFileNames)
             $buildErrors = @()
+            Add-PendingCause -Cause 'staticCompressor'
             $buildStatus = [ordered]@{
                 Status   = 'operacao concluida, pendente de confirmacao funcional'
                 Summary  = (("{0} {1}" -f $buildStatus.Summary, $staticCompressorText).Trim())
@@ -2087,6 +2108,8 @@ try {
     catch {
         $postProcessingFailed = $true
         $postProcessingError  = $_.Exception.Message
+        # A lista de causas pode ter ficado incompleta: marca para o veredito de base nao confiar nela.
+        Add-PendingCause -Cause 'postProcessingFailed'
         Add-WarningMessage -Message ('Pos-processamento local falhou apos MSBuild: {0}' -f $postProcessingError)
         Add-StrategyTrace -Message ('Pos-processamento falhou apos MSBuild: {0}' -f $postProcessingError)
         if ([string]::IsNullOrEmpty($stdOutFiltered) -and -not [string]::IsNullOrEmpty($stdOutText)) {
@@ -2175,6 +2198,7 @@ try {
     $diagnostic = [ordered]@{
         status           = $buildStatus.Status
         summary          = $buildStatus.Summary
+        pendingCauses    = @($script:PendingCauses)
         exitCode         = $buildStatus.ExitCode
         executionEvidence = [ordered]@{
             msBuildExitCode = $msBuildExitCode

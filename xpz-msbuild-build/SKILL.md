@@ -587,6 +587,12 @@ skill `xpz-kb-parallel-setup` e rodar a auditoria de setup da pasta paralela. Es
 eventos nem cita script de registro: quem confere o registro e indica a ação é a skill de setup, e a
 gravação exige confirmação explícita do usuário. `nextStep` é `$null` quando não há pendência de
 registro ou quando o registro não foi consultado (`metadataNotProvided`, `environmentNameUnavailable`).
+O diagnóstico de `Invoke-GeneXusKbBuildAll.ps1` e de `Invoke-GeneXusKbSpecifyGenerate.ps1` traz também
+`pendingCauses`, a lista das causas da pendência, em vocabulário fechado: `postBuildEvent`, `stderr`, `alert`,
+`buildAllMarkerMissing` e `staticCompressor` (só BuildAll), e `postProcessingFailed`. A lista é vazia quando o
+build fica limpo. O veredito de base do registro de eventos pós-build lê esse campo, e não o texto do `summary`,
+que no SpecifyGenerate é genérico. Os JSONs de recuperação (falha de serialização do diagnóstico) não trazem o
+campo.
 Evidência observada: em GeneXus 18 Up 15, o contorno `Verify-GxJs` pode emitir a mesma
 linha funcional com variação apenas em contagens e no tempo, com `invalidos: 0`. Essa evidência
 não autoriza normalizar raiz, módulos pulados ou qualquer linha com `invalidos` diferente de zero.

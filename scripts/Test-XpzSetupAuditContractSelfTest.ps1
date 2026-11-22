@@ -404,7 +404,7 @@ kb_environment_post_build_event_hashes: NETFrameworkSQLServer=$pbFamily1
         postBuildEventClassification = $classification
       }
     }
-    if ($Spec.ContainsKey('Summary')) { $doc['summary'] = $Spec['Summary'] }
+    if ($Spec.ContainsKey('PendingCauses')) { $doc['pendingCauses'] = @($Spec['PendingCauses']) }
     if ($null -ne $Spec.MsBuildExitCode) {
       $doc['executionEvidence'] = [ordered]@{ msBuildExitCode = $Spec.MsBuildExitCode; msBuildFailed = ($Spec.ContainsKey('MsBuildFailed') -and [bool]$Spec['MsBuildFailed']) }
     }
@@ -412,29 +412,49 @@ kb_environment_post_build_event_hashes: NETFrameworkSQLServer=$pbFamily1
     return (& $pbRun $fx)
   }
   $pbPending = 'operacao concluida, pendente de confirmacao funcional'
-  $pbEventSummary = 'BuildAll concluiu sem erro de MSBuild, mas stdout indica evento pos-build nao registrado/nao reconhecido. Verifique stdoutSignals.postBuildEvents no diagnostico.'
-  $pbStderrSummary = 'BuildAll concluiu sem erro de MSBuild, mas stderr nao esta vazio. Verifique stderrContent no diagnostico.'
+  # Status pendente do SpecifyGenerate (acentuado), montado por codigo para nao depender do encoding deste arquivo.
+  $pbPendingSg = 'opera' + [char]0x00E7 + [char]0x00E3 + 'o conclu' + [char]0x00ED + 'da, pendente de confirma' + [char]0x00E7 + [char]0x00E3 + 'o funcional'
+  $pbSgRecovery = 'specify e generate conclu' + [char]0x00ED + 'dos com falha no pos-processamento'
 
   $rs1 = & $pbBase @{ ExitCode = 0; Status = 'compilou limpo'; MsBuildExitCode = 0; RegistryState = $null; Unexpected = @() }
   Assert-True ($null -ne $rs1.json) "S1: stdout deveria ser JSON parseavel"
   Assert-True ($rs1.json.'pos-build/base' -eq 'APTO') "S1: APTO esperado para compilou limpo; obtido $($rs1.json.'pos-build/base') / $($rs1.json.'pos-build/base.evidencia')"
 
-  $rs2 = & $pbBase @{ ExitCode = 0; Status = $pbPending; Summary = $pbEventSummary; MsBuildExitCode = 0; RegistryState = 'noEntryForEnvironment'; Unexpected = @() }
+  $rs2 = & $pbBase @{ ExitCode = 0; Status = $pbPending; PendingCauses = @('postBuildEvent'); MsBuildExitCode = 0; RegistryState = 'noEntryForEnvironment'; Unexpected = @() }
   Assert-True ($rs2.json.'pos-build/base' -eq 'APTO') "S2: APTO esperado para pendente so por evento pos-build (environment sem registro); obtido $($rs2.json.'pos-build/base') / $($rs2.json.'pos-build/base.evidencia')"
 
   # S3: environment ja registrado (available), evento novo ou mudado -> APTO (antes dava impasse com o Register)
-  $rs3 = & $pbBase @{ ExitCode = 0; Status = $pbPending; Summary = $pbEventSummary; MsBuildExitCode = 0; RegistryState = 'available'; Unexpected = @('evento novo') }
+  $rs3 = & $pbBase @{ ExitCode = 0; Status = $pbPending; PendingCauses = @('postBuildEvent'); MsBuildExitCode = 0; RegistryState = 'available'; Unexpected = @('evento novo') }
   Assert-True ($rs3.json.'pos-build/base' -eq 'APTO') "S3: APTO esperado para pendente so por evento novo com registryStatus available; obtido $($rs3.json.'pos-build/base') / $($rs3.json.'pos-build/base.evidencia')"
 
-  # S4: available mas a pendencia vem de stderr, nao de evento -> NAO_APTO
-  $rs4 = & $pbBase @{ ExitCode = 0; Status = $pbPending; Summary = $pbStderrSummary; MsBuildExitCode = 0; RegistryState = 'available'; Unexpected = @('evento novo') }
-  Assert-True ($rs4.json.'pos-build/base' -eq 'NAO_APTO') "S4: NAO_APTO esperado quando o resumo nao aponta evento como causa; obtido $($rs4.json.'pos-build/base')"
-  Assert-True ([string]$rs4.json.'pos-build/base.evidencia' -match 'resumo do build') "S4: evidencia deve citar o resumo do build"
+  # S4: available, mas a pendencia tem stderr alem do evento -> NAO_APTO
+  $rs4 = & $pbBase @{ ExitCode = 0; Status = $pbPending; PendingCauses = @('stderr', 'postBuildEvent'); MsBuildExitCode = 0; RegistryState = 'available'; Unexpected = @('evento novo') }
+  Assert-True ($rs4.json.'pos-build/base' -eq 'NAO_APTO') "S4: NAO_APTO esperado com causa alem de evento; obtido $($rs4.json.'pos-build/base')"
+  Assert-True ([string]$rs4.json.'pos-build/base.evidencia' -match 'causa alem de evento') "S4: evidencia deve citar a causa alem de evento"
 
-  # S5: registro nao consultado (metadataNotProvided) -> NAO_APTO mesmo com resumo de evento
-  $rs5 = & $pbBase @{ ExitCode = 0; Status = $pbPending; Summary = $pbEventSummary; MsBuildExitCode = 0; RegistryState = 'metadataNotProvided'; Unexpected = @() }
+  # S5: registro nao consultado (metadataNotProvided) -> NAO_APTO mesmo so com evento
+  $rs5 = & $pbBase @{ ExitCode = 0; Status = $pbPending; PendingCauses = @('postBuildEvent'); MsBuildExitCode = 0; RegistryState = 'metadataNotProvided'; Unexpected = @() }
   Assert-True ($rs5.json.'pos-build/base' -eq 'NAO_APTO') "S5: NAO_APTO esperado com registro nao consultado; obtido $($rs5.json.'pos-build/base')"
   Assert-True ([string]$rs5.json.'pos-build/base.evidencia' -match 'nao foi consultado') "S5: evidencia deve citar registro nao consultado"
+
+  # S6: caso conhecido do compressor de estaticos junto com o evento -> NAO_APTO (o compressor e outra causa)
+  $rs6 = & $pbBase @{ ExitCode = 0; Status = $pbPending; PendingCauses = @('postBuildEvent', 'staticCompressor'); MsBuildExitCode = 0; RegistryState = 'available'; Unexpected = @('evento novo') }
+  Assert-True ($rs6.json.'pos-build/base' -eq 'NAO_APTO') "S6: NAO_APTO esperado com o compressor de estaticos; obtido $($rs6.json.'pos-build/base')"
+  Assert-True ([string]$rs6.json.'pos-build/base.evidencia' -match 'staticCompressor') "S6: evidencia deve citar staticCompressor"
+
+  # S7: SpecifyGenerate pendente so por evento (status acentuado, summary generico) -> APTO
+  $rs7 = & $pbBase @{ ExitCode = 0; Status = $pbPendingSg; PendingCauses = @('postBuildEvent'); MsBuildExitCode = 0; RegistryState = 'available'; Unexpected = @('evento novo') }
+  Assert-True ($rs7.json.'pos-build/base' -eq 'APTO') "S7: APTO esperado para SpecifyGenerate pendente so por evento; obtido $($rs7.json.'pos-build/base') / $($rs7.json.'pos-build/base.evidencia')"
+
+  # S8: pendente sem o campo pendingCauses (build anterior ao campo) -> NAO_APTO
+  $rs8 = & $pbBase @{ ExitCode = 0; Status = $pbPending; MsBuildExitCode = 0; RegistryState = 'available'; Unexpected = @('evento novo') }
+  Assert-True ($rs8.json.'pos-build/base' -eq 'NAO_APTO') "S8: NAO_APTO esperado sem pendingCauses; obtido $($rs8.json.'pos-build/base')"
+  Assert-True ([string]$rs8.json.'pos-build/base.evidencia' -match 'sem pendingCauses') "S8: evidencia deve citar a falta de pendingCauses"
+
+  # S9: status de recuperacao do SpecifyGenerate (falha no pos-processamento) -> NAO_APTO
+  $rs9 = & $pbBase @{ ExitCode = 0; Status = $pbSgRecovery; MsBuildExitCode = 0; RegistryState = $null; Unexpected = @() }
+  Assert-True ($rs9.json.'pos-build/base' -eq 'NAO_APTO') "S9: NAO_APTO esperado para status de recuperacao; obtido $($rs9.json.'pos-build/base')"
+  Assert-True ([string]$rs9.json.'pos-build/base.evidencia' -match 'status nao previsto') "S9: evidencia deve citar status nao previsto"
 
   $rt = & $pbBase @{ ExitCode = 0; Status = $pbPending; MsBuildExitCode = 0; RegistryState = $null; Unexpected = @() }
   Assert-True ($rt.json.'pos-build/base' -eq 'NAO_APTO') "T: NAO_APTO esperado sem registryStatus; obtido $($rt.json.'pos-build/base')"
@@ -445,9 +465,9 @@ kb_environment_post_build_event_hashes: NETFrameworkSQLServer=$pbFamily1
   Assert-True ($ru.json.'pos-build/base' -eq 'NAO_APTO') "U: NAO_APTO esperado sem msBuildExitCode; obtido $($ru.json.'pos-build/base')"
   Assert-True ([string]$ru.json.'pos-build/base.evidencia' -match 'msBuildExitCode') "U: evidencia deve citar msBuildExitCode"
 
-  $rv = & $pbBase @{ ExitCode = 0; Status = $pbPending; Summary = $pbStderrSummary; MsBuildExitCode = 0; RegistryState = 'noEntryForEnvironment'; Unexpected = @('linha inesperada') }
-  Assert-True ($rv.json.'pos-build/base' -eq 'NAO_APTO') "V: NAO_APTO esperado quando a pendencia tem outra causa alem do evento; obtido $($rv.json.'pos-build/base')"
-  Assert-True ([string]$rv.json.'pos-build/base.evidencia' -match 'resumo do build') "V: evidencia deve citar o resumo do build"
+  $rv = & $pbBase @{ ExitCode = 0; Status = $pbPending; PendingCauses = @('stderr'); MsBuildExitCode = 0; RegistryState = 'noEntryForEnvironment'; Unexpected = @('linha inesperada') }
+  Assert-True ($rv.json.'pos-build/base' -eq 'NAO_APTO') "V: NAO_APTO esperado quando a pendencia nao vem de evento; obtido $($rv.json.'pos-build/base')"
+  Assert-True ([string]$rv.json.'pos-build/base.evidencia' -match 'causa alem de evento') "V: evidencia deve citar a causa da pendencia"
 
   $rx = & $pbBase @{ ExitCode = 1; Status = 'compilou limpo'; MsBuildExitCode = 0; RegistryState = $null; Unexpected = @() }
   Assert-True ($rx.json.'pos-build/base' -eq 'NAO_APTO') "X: NAO_APTO esperado com exitCode diferente de 0; obtido $($rx.json.'pos-build/base')"

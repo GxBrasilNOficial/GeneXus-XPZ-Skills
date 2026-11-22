@@ -375,8 +375,11 @@ function Get-GeneXusPostBuildBaseFacts {
     $statusText = ''
     if ($null -ne $BuildJson.PSObject.Properties['status'] -and $null -ne $BuildJson.status) { $statusText = [string]$BuildJson.status }
 
-    $summaryText = ''
-    if ($null -ne $BuildJson.PSObject.Properties['summary'] -and $null -ne $BuildJson.summary) { $summaryText = [string]$BuildJson.summary }
+    # pendingCauses: $null quando o JSON nao traz o campo (build anterior a ele); senao, a lista (pode ser vazia).
+    $pendingCauses = $null
+    if ($null -ne $BuildJson.PSObject.Properties['pendingCauses'] -and $null -ne $BuildJson.pendingCauses) {
+        $pendingCauses = @(@($BuildJson.pendingCauses) | ForEach-Object { [string]$_ })
+    }
 
     $registryState = $null
     $unexpectedCount = 0
@@ -398,7 +401,7 @@ function Get-GeneXusPostBuildBaseFacts {
         msBuildExitCode = $msBuildExitCode
         msBuildFailed   = $msBuildFailed
         statusText      = $statusText
-        summaryText     = $summaryText
+        pendingCauses   = $pendingCauses
         registryState   = $registryState
         unexpectedCount = $unexpectedCount
     }
@@ -407,10 +410,11 @@ function Get-GeneXusPostBuildBaseFacts {
 function Get-GeneXusPostBuildBaseVerdict {
     # Veredito unico (auditoria e registro): o build serve de base do registro de eventos pos-build?
     # Apto: exitCode e executionEvidence.msBuildExitCode 0, sem msBuildFailed, e status "compilou limpo"
-    # (BuildAll) ou "specify e generate concluidos" (SpecifyGenerate), ou pendente SO por evento pos-build a registrar:
-    # o resumo do build aponta o evento como causa e o registryStatus e available (environment ja registrado, evento novo
-    # ou mudado) ou noEntryForEnvironment (environment sem registro). Pendencia por outra causa (stderr, alerta, sem marcador
-    # de conclusao) deixa outro resumo e nao serve de base.
+    # (BuildAll) ou "specify e generate concluidos" (SpecifyGenerate), exatos, ou pendente SO por evento pos-build a
+    # registrar: pendingCauses do diagnostico e exatamente ["postBuildEvent"] e o registryStatus e available (environment
+    # ja registrado, evento novo ou mudado) ou noEntryForEnvironment (environment sem registro). Qualquer outra causa
+    # (stderr, alert, buildAllMarkerMissing, staticCompressor, postProcessingFailed) ou JSON sem pendingCauses nao serve.
+    # A decisao e pelo campo estruturado, nunca pelo texto do summary (o SpecifyGenerate usa summary generico).
     param([Parameter(Mandatory = $true)]$Facts)
 
     if ($null -eq $Facts.exitCode -or "$($Facts.exitCode)" -ne '0') {
@@ -422,11 +426,12 @@ function Get-GeneXusPostBuildBaseVerdict {
     if ($null -ne $Facts.msBuildFailed -and [bool]$Facts.msBuildFailed) {
         return [pscustomobject]@{ ok = $false; reason = 'executionEvidence.msBuildFailed verdadeiro' }
     }
-    if ($Facts.statusText -match 'compilou limpo') {
+    if ($Facts.statusText -match '^compilou limpo$') {
         return [pscustomobject]@{ ok = $true; reason = 'status compilou limpo' }
     }
-    # Sucesso do SpecifyGenerate (equivalente ao "compilou limpo" do BuildAll).
-    if ($Facts.statusText -match 'specify e generate conclu') {
+    # Sucesso do SpecifyGenerate (equivalente ao "compilou limpo" do BuildAll). Exato: o status de recuperacao
+    # "specify e generate concluidos com falha no pos-processamento" nao serve de base.
+    if ($Facts.statusText -match '^specify e generate conclu.dos$') {
         return [pscustomobject]@{ ok = $true; reason = 'status specify e generate concluidos' }
     }
     if ($Facts.statusText -match 'pendente de confirma') {
@@ -436,8 +441,13 @@ function Get-GeneXusPostBuildBaseVerdict {
         if ($Facts.registryState -ne 'noEntryForEnvironment' -and $Facts.registryState -ne 'available') {
             return [pscustomobject]@{ ok = $false; reason = "registryStatus=$($Facts.registryState), o registro nao foi consultado para o environment" }
         }
-        if ([string]$Facts.summaryText -notmatch 'evento pos-build nao registrado') {
-            return [pscustomobject]@{ ok = $false; reason = 'a pendencia nao tem evento pos-build como causa no resumo do build' }
+        if ($null -eq $Facts.pendingCauses) {
+            return [pscustomobject]@{ ok = $false; reason = 'sem pendingCauses no diagnostico (build anterior ao campo de causas da pendencia)' }
+        }
+        $causes = @($Facts.pendingCauses)
+        $otherCauses = @($causes | Where-Object { $_ -ne 'postBuildEvent' })
+        if ($causes -notcontains 'postBuildEvent' -or $otherCauses.Count -gt 0) {
+            return [pscustomobject]@{ ok = $false; reason = ("a pendencia tem causa alem de evento pos-build (pendingCauses: {0})" -f ($causes -join ', ')) }
         }
         return [pscustomobject]@{ ok = $true; reason = 'pendente apenas por evento pos-build a registrar' }
     }

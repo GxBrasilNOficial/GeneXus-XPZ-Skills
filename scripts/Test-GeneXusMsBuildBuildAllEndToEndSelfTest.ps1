@@ -300,6 +300,8 @@ try {
     Assert-True -Condition ($s1.Diagnostic.staticCompressorKnownCase.recognized -eq $true) -Message ("S1 recognized deveria ser true; reason={0}" -f $s1.Diagnostic.staticCompressorKnownCase.reason)
     Assert-True -Condition ((Get-ArrayCount -Value $s1.Diagnostic.buildErrors) -eq 0) -Message 'S1 buildErrors deveria ficar vazio apos a dispensa.'
     Assert-True -Condition ((Get-ArrayCount -Value $s1.Diagnostic.staticCompressorKnownCase.files) -eq 1) -Message 'S1 deveria listar 1 arquivo no caso conhecido.'
+    # O caso conhecido do compressor e causa propria da pendencia: o veredito de base do registro nao o aceita.
+    Assert-True -Condition (@($s1.Diagnostic.pendingCauses) -contains 'staticCompressor') -Message ("S1 pendingCauses deveria conter staticCompressor; recebeu '{0}'." -f (@($s1.Diagnostic.pendingCauses) -join ', '))
 
     # S2: dois arquivos → mesmo resultado.
     $s2Root = Join-Path $testRoot 'static-s2'
@@ -449,9 +451,12 @@ try {
     Assert-True -Condition ([string]$pbN4Classification.nextStep -match 'evento nao registrado' -and [string]$pbN4Classification.nextStep -match 'auditoria de setup') -Message ("PB4 nextStep deveria indicar evento nao registrado e a auditoria de setup; recebeu '{0}'." -f $pbN4Classification.nextStep)
     Assert-True -Condition (@($pbN4Classification.unexpected).Count -eq 2) -Message ("PB4 deveria ter 2 eventos inesperados (invalidos 1 e nome C); atual={0}." -f @($pbN4Classification.unexpected).Count)
 
-    # Veredito de base sobre a saida REAL do BuildAll: o resumo que o build produz para pendencia por evento
-    # precisa continuar sendo reconhecido por Get-GeneXusPostBuildBaseVerdict (auditoria pos-build/base e Register);
-    # se alguem mudar o texto do resumo no BuildAll, este bloco falha em vez de o impasse voltar em silencio.
+    # Veredito de base sobre a saida REAL do BuildAll: as causas da pendencia (pendingCauses) que o build publica
+    # precisam continuar sendo lidas por Get-GeneXusPostBuildBaseVerdict (auditoria pos-build/base e Register);
+    # se o build deixar de publicar a causa certa, este bloco falha em vez de o impasse voltar em silencio.
+    Assert-True -Condition ((@($pbN2.Diagnostic.pendingCauses) -join ',') -eq 'postBuildEvent') -Message ("PB2 pendingCauses deveria ser so postBuildEvent; recebeu '{0}'." -f (@($pbN2.Diagnostic.pendingCauses) -join ', '))
+    Assert-True -Condition ((@($pbN4.Diagnostic.pendingCauses) -join ',') -eq 'postBuildEvent') -Message ("PB4 pendingCauses deveria ser so postBuildEvent; recebeu '{0}'." -f (@($pbN4.Diagnostic.pendingCauses) -join ', '))
+    Assert-True -Condition (@($pbN3.Diagnostic.pendingCauses).Count -eq 0) -Message ("PB3 compilou limpo e nao deveria ter pendingCauses; recebeu '{0}'." -f (@($pbN3.Diagnostic.pendingCauses) -join ', '))
     . (Join-Path $PSScriptRoot 'GeneXusMsBuildPostBuildEventsSupport.ps1')
     $pbVerdictCases = @(
         @{ Name = 'PB2 (environment sem registro, evento a registrar)'; Diagnostic = $pbN2.Diagnostic; ExpectOk = $true }

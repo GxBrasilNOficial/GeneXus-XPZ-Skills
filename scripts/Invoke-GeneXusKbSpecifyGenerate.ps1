@@ -557,7 +557,14 @@ function Resolve-BuildStatus {
         foreach ($alert in $foundAlerts) {
             Add-WarningMessage -Message ('Padrão de alerta em stdout/stderr impede classificação limpa: "{0}".' -f $alert)
         }
+        # Causas da pendencia, publicadas em pendingCauses (lista fechada: stderr, alert, postBuildEvent).
+        # O summary abaixo e generico; o veredito de base do registro pos-build le este campo.
+        $pendingCauses = [System.Collections.Generic.List[string]]::new()
+        if ($stderrNonEmpty) { $pendingCauses.Add('stderr') }
+        if ($foundAlerts.Count -gt 0) { $pendingCauses.Add('alert') }
+        if ($PostBuildShouldDowngrade) { $pendingCauses.Add('postBuildEvent') }
         return [ordered]@{
+            PendingCauses = @($pendingCauses)
             Status   = 'operação concluída, pendente de confirmação funcional'
             Summary  = 'SpecifyAll e GenerateOnly concluídos com exitCode 0, mas impedimentos detectados em stdout/stderr (stderr não vazio, padrões de alerta ou eventos pós-build). Validação funcional necessária antes de concluir sobre o resultado.'
             ExitCode = 0
@@ -1627,9 +1634,18 @@ try {
         }
     }
 
+    # pendingCauses: causas da pendencia vindas do Resolve-BuildStatus; com pos-processamento falho a lista
+    # pode estar incompleta e ganha 'postProcessingFailed' para o veredito de base nao confiar nela.
+    $diagnosticPendingCauses = [System.Collections.Generic.List[string]]::new()
+    if ($buildStatus.Contains('PendingCauses')) {
+        foreach ($pendingCause in @($buildStatus['PendingCauses'])) { $diagnosticPendingCauses.Add([string]$pendingCause) }
+    }
+    if ($postProcessingFailed) { $diagnosticPendingCauses.Add('postProcessingFailed') }
+
     $diagnostic = [ordered]@{
         status           = $buildStatus.Status
         summary          = $buildStatus.Summary
+        pendingCauses    = @($diagnosticPendingCauses)
         exitCode         = $buildStatus.ExitCode
         executionEvidence = [ordered]@{
             msBuildExitCode = $msBuildExitCode

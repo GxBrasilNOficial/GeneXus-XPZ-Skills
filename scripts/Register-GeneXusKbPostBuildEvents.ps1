@@ -16,7 +16,8 @@
 
     Recusa (BLOCK) build que nao sirva de base: exitCode e executionEvidence.msBuildExitCode diferentes
     de 0, msBuildFailed verdadeiro, status fora de "compilou limpo" (BuildAll) ou "specify e generate concluidos"
-    (SpecifyGenerate), ou pendente por motivo alem de evento pos-build a registrar (mesmo veredito da dimensao pos-build/base da auditoria de setup).
+    (SpecifyGenerate), ou pendente por motivo alem de evento pos-build a registrar, lido em pendingCauses do
+    diagnostico e nao no summary (mesmo veredito da dimensao pos-build/base da auditoria de setup).
 
     Ação sensivel: registrar desarma o rebaixamento por evento pos-build daquele environment.
     Exige confirmacao. Modo interativo pede frase exata; modo agente usa -ConfirmRegistration

@@ -274,6 +274,26 @@ try {
     Assert-True -Condition ([string]$sgNoEntry.Diagnostic.stdoutSignals.postBuildEventClassification.registryStatus.state -eq 'noEntryForEnvironment') -Message 'SG3 registryStatus.state deveria ser noEntryForEnvironment.'
     Assert-True -Condition ($sgNoEntryNextStep -match 'xpz-kb-parallel-setup' -and $sgNoEntryNextStep -match 'auditoria de setup' -and $sgNoEntryNextStep -notmatch 'Register-') -Message ("SG3 nextStep deveria apontar para a auditoria de setup sem citar script de registro; recebeu '{0}'." -f $sgNoEntryNextStep)
     Assert-True -Condition (@($sgNoEntry.Diagnostic.warnings | Where-Object { [string]$_ -match 'Register-GeneXusKbPostBuildEvents' }).Count -eq 0) -Message 'SG3 nao deveria citar o script de registro nos avisos do build.'
+
+    # SG4: environment ja registrado, evento novo (invalidos 1 fora da familia) -> pendente so por evento. O summary do
+    # SpecifyGenerate e generico; o veredito de base decide por pendingCauses e precisa aceitar este build.
+    $sgBNew = 'Verify-GxJs: verificados 2190 .js (modulos pulados: 391 | placeholders pulados: 0) | invalidos: 1 | tempo: 9 ms'
+    $sgNewEvent = Invoke-SpecifyGenerateScenario -ScenarioRoot (Join-Path $testRoot 'sg-new-event') -StdErrLines @() -ContextLines (New-SpecifyPostBuildContextLines -Events @($sgA2, $sgBNew, $sgC2)) -ExtraWrapperParams @{ ParallelKbRoot = $sgParallelRoot }
+    $artifactDirectories.Add([string]$sgNewEvent.Diagnostic.artifacts.MsBuildFilePath)
+    Assert-True -Condition ([string]$sgNewEvent.Diagnostic.status -match 'pendente de confirma') -Message ("SG4 deveria ficar pendente com evento novo; status '{0}'." -f $sgNewEvent.Diagnostic.status)
+    Assert-True -Condition ((@($sgNewEvent.Diagnostic.pendingCauses) -join ',') -eq 'postBuildEvent') -Message ("SG4 pendingCauses deveria ser so postBuildEvent; recebeu '{0}'." -f (@($sgNewEvent.Diagnostic.pendingCauses) -join ', '))
+    $sgNewEventVerdict = Get-GeneXusPostBuildBaseVerdict -Facts (Get-GeneXusPostBuildBaseFacts -BuildJson $sgNewEvent.Diagnostic)
+    Assert-True -Condition ([bool]$sgNewEventVerdict.ok) -Message ("SG4: o veredito de base deveria aceitar a saida real do SpecifyGenerate pendente so por evento; obtido ok={0} ({1})." -f $sgNewEventVerdict.ok, $sgNewEventVerdict.reason)
+
+    # SG5: o mesmo evento novo com stderr nao vazio -> a pendencia tem outra causa e o build nao serve de base.
+    $sgNewEventStderr = Invoke-SpecifyGenerateScenario -ScenarioRoot (Join-Path $testRoot 'sg-new-event-stderr') -StdErrLines @('falha qualquer no stderr') -ContextLines (New-SpecifyPostBuildContextLines -Events @($sgA2, $sgBNew, $sgC2)) -ExtraWrapperParams @{ ParallelKbRoot = $sgParallelRoot }
+    $artifactDirectories.Add([string]$sgNewEventStderr.Diagnostic.artifacts.MsBuildFilePath)
+    Assert-True -Condition (@($sgNewEventStderr.Diagnostic.pendingCauses) -contains 'stderr' -and @($sgNewEventStderr.Diagnostic.pendingCauses) -contains 'postBuildEvent') -Message ("SG5 pendingCauses deveria conter stderr e postBuildEvent; recebeu '{0}'." -f (@($sgNewEventStderr.Diagnostic.pendingCauses) -join ', '))
+    $sgNewEventStderrVerdict = Get-GeneXusPostBuildBaseVerdict -Facts (Get-GeneXusPostBuildBaseFacts -BuildJson $sgNewEventStderr.Diagnostic)
+    Assert-True -Condition (-not [bool]$sgNewEventStderrVerdict.ok) -Message ("SG5: o veredito de base nao deveria aceitar pendencia com stderr; obtido ok={0} ({1})." -f $sgNewEventStderrVerdict.ok, $sgNewEventStderrVerdict.reason)
+
+    # SG1 (registro completo) segue sem causa de pendencia.
+    Assert-True -Condition (@($sgRegistered.Diagnostic.pendingCauses).Count -eq 0) -Message ("SG1 nao deveria ter pendingCauses; recebeu '{0}'." -f (@($sgRegistered.Diagnostic.pendingCauses) -join ', '))
 }
 finally {
     foreach ($msBuildFilePath in $artifactDirectories) {
