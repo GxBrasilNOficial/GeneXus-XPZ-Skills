@@ -8,7 +8,7 @@
 .DESCRIPTION
   Cobre a classificacao por checksum (atributo do <Object> raiz) sobre um repo
   git de fixture:
-    SAME        - checksum identico entre BaseRef e HEAD (mudou so o lastUpdate).
+    SAME        - checksum identico entre BaseRef e HEAD; sugere re-export, mas nao prova conteudo igual (ex.: cascata de rename).
     DIFF        - checksum mudou.
     NEW         - arquivo novo no HEAD.
     DELETED     - arquivo removido no HEAD.
