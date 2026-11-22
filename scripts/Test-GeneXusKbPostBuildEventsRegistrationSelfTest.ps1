@@ -148,6 +148,24 @@ try {
     $hashesSg = Get-GeneXusRegisteredPostBuildEventHashesForEnvironment -MetadataPath $metadataPath -EnvironmentName 'NETSpecifyGenerate'
     if (@($hashesSg).Count -ne 1) { throw "ASSERT_FAILED: build de SpecifyGenerate apto deveria registrar 1 hash; atual=$(@($hashesSg).Count)" }
 
+    # Environment ja registrado com evento novo: o build fica pendente por evento (registryStatus available) e e base apta.
+    $pendingObj = [ordered]@{
+        exitCode          = 0
+        status            = 'operacao concluida, pendente de confirmacao funcional'
+        summary           = 'BuildAll concluiu sem erro de MSBuild, mas stdout indica evento pos-build nao registrado/nao reconhecido. Verifique stdoutSignals.postBuildEvents no diagnostico.'
+        executionEvidence = [ordered]@{ msBuildExitCode = 0; msBuildFailed = $false }
+        observedContext   = [ordered]@{ ActiveEnvironment = 'NETPendingEvent' }
+        stdoutSignals     = [ordered]@{
+            postBuildEvents              = @($sino)
+            postBuildEventClassification = [ordered]@{ registryStatus = [ordered]@{ state = 'available' }; unexpected = @($sino) }
+        }
+    }
+    $jsonPe = Join-Path $tempRoot 'build-pending-event.json'
+    [System.IO.File]::WriteAllText($jsonPe, ($pendingObj | ConvertTo-Json -Depth 8), (Get-Utf8NoBomEncoding))
+    & $registerScript -BuildResultJsonPath $jsonPe -EnvironmentName 'NETPendingEvent' -MetadataPath $metadataPath -ConfirmRegistration -AsJson | Out-Null
+    $hashesPe = Get-GeneXusRegisteredPostBuildEventHashesForEnvironment -MetadataPath $metadataPath -EnvironmentName 'NETPendingEvent'
+    if (@($hashesPe).Count -ne 1) { throw "ASSERT_FAILED: build pendente so por evento (available) deveria registrar 1 hash; atual=$(@($hashesPe).Count)" }
+
     # Base do registro: o Register recusa build nao apto (BLOCK) e nao grava nada.
     $textBeforeRefusal = [System.IO.File]::ReadAllText($metadataPath)
     $nonBaseCases = @(
@@ -156,6 +174,7 @@ try {
         @{ Name = 'msBuildFailed verdadeiro'; Mutate = { param($o) $o['executionEvidence'] = [ordered]@{ msBuildExitCode = 0; msBuildFailed = $true } }; Match = 'msBuildFailed' }
         @{ Name = 'status nao previsto';     Mutate = { param($o) $o['status'] = 'falhou' };                                       Match = 'status nao previsto' }
         @{ Name = 'pendente sem registryStatus'; Mutate = { param($o) $o['status'] = 'operacao concluida, pendente de confirmacao funcional' }; Match = 'sem registryStatus' }
+        @{ Name = 'pendente por outra causa (stderr)'; Mutate = { param($o) $o['status'] = 'operacao concluida, pendente de confirmacao funcional'; $o['summary'] = 'BuildAll concluiu sem erro de MSBuild, mas stderr nao esta vazio.'; $o['stdoutSignals']['postBuildEventClassification'] = [ordered]@{ registryStatus = [ordered]@{ state = 'available' }; unexpected = @('x') } }; Match = 'resumo do build' }
     )
     foreach ($case in $nonBaseCases) {
         $obj = [ordered]@{

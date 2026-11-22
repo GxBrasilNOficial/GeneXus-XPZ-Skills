@@ -375,6 +375,9 @@ function Get-GeneXusPostBuildBaseFacts {
     $statusText = ''
     if ($null -ne $BuildJson.PSObject.Properties['status'] -and $null -ne $BuildJson.status) { $statusText = [string]$BuildJson.status }
 
+    $summaryText = ''
+    if ($null -ne $BuildJson.PSObject.Properties['summary'] -and $null -ne $BuildJson.summary) { $summaryText = [string]$BuildJson.summary }
+
     $registryState = $null
     $unexpectedCount = 0
     if ($null -ne $BuildJson.PSObject.Properties['stdoutSignals'] -and $null -ne $BuildJson.stdoutSignals -and
@@ -395,6 +398,7 @@ function Get-GeneXusPostBuildBaseFacts {
         msBuildExitCode = $msBuildExitCode
         msBuildFailed   = $msBuildFailed
         statusText      = $statusText
+        summaryText     = $summaryText
         registryState   = $registryState
         unexpectedCount = $unexpectedCount
     }
@@ -403,7 +407,10 @@ function Get-GeneXusPostBuildBaseFacts {
 function Get-GeneXusPostBuildBaseVerdict {
     # Veredito unico (auditoria e registro): o build serve de base do registro de eventos pos-build?
     # Apto: exitCode e executionEvidence.msBuildExitCode 0, sem msBuildFailed, e status "compilou limpo"
-    # (BuildAll) ou "specify e generate concluidos" (SpecifyGenerate), ou pendente SO por registro ausente (registryStatus noEntryForEnvironment e unexpected vazio).
+    # (BuildAll) ou "specify e generate concluidos" (SpecifyGenerate), ou pendente SO por evento pos-build a registrar:
+    # o resumo do build aponta o evento como causa e o registryStatus e available (environment ja registrado, evento novo
+    # ou mudado) ou noEntryForEnvironment (environment sem registro). Pendencia por outra causa (stderr, alerta, sem marcador
+    # de conclusao) deixa outro resumo e nao serve de base.
     param([Parameter(Mandatory = $true)]$Facts)
 
     if ($null -eq $Facts.exitCode -or "$($Facts.exitCode)" -ne '0') {
@@ -426,13 +433,13 @@ function Get-GeneXusPostBuildBaseVerdict {
         if ($null -eq $Facts.registryState) {
             return [pscustomobject]@{ ok = $false; reason = 'sem registryStatus no diagnostico (build anterior ao diagnostico de registro)' }
         }
-        if ($Facts.registryState -ne 'noEntryForEnvironment') {
-            return [pscustomobject]@{ ok = $false; reason = "registryStatus=$($Facts.registryState), a pendencia nao e so registro ausente" }
+        if ($Facts.registryState -ne 'noEntryForEnvironment' -and $Facts.registryState -ne 'available') {
+            return [pscustomobject]@{ ok = $false; reason = "registryStatus=$($Facts.registryState), o registro nao foi consultado para o environment" }
         }
-        if ([int]$Facts.unexpectedCount -gt 0) {
-            return [pscustomobject]@{ ok = $false; reason = "ha $($Facts.unexpectedCount) evento(s) inesperado(s), a pendencia nao e so registro ausente" }
+        if ([string]$Facts.summaryText -notmatch 'evento pos-build nao registrado') {
+            return [pscustomobject]@{ ok = $false; reason = 'a pendencia nao tem evento pos-build como causa no resumo do build' }
         }
-        return [pscustomobject]@{ ok = $true; reason = 'pendente apenas por registro ausente' }
+        return [pscustomobject]@{ ok = $true; reason = 'pendente apenas por evento pos-build a registrar' }
     }
     return [pscustomobject]@{ ok = $false; reason = "status nao previsto: $($Facts.statusText)" }
 }

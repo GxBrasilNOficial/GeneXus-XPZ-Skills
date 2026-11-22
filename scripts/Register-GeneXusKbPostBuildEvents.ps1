@@ -16,7 +16,7 @@
 
     Recusa (BLOCK) build que nao sirva de base: exitCode e executionEvidence.msBuildExitCode diferentes
     de 0, msBuildFailed verdadeiro, status fora de "compilou limpo" (BuildAll) ou "specify e generate concluidos"
-    (SpecifyGenerate), ou pendente por motivo alem do registro ausente (mesmo veredito da dimensao pos-build/base da auditoria de setup).
+    (SpecifyGenerate), ou pendente por motivo alem de evento pos-build a registrar (mesmo veredito da dimensao pos-build/base da auditoria de setup).
 
     Ação sensivel: registrar desarma o rebaixamento por evento pos-build daquele environment.
     Exige confirmacao. Modo interativo pede frase exata; modo agente usa -ConfirmRegistration
@@ -84,7 +84,7 @@ if (-not (Test-Path -LiteralPath $BuildResultJsonPath -PathType Leaf)) {
 $buildJson = (Get-Content -LiteralPath $BuildResultJsonPath -Raw) | ConvertFrom-Json
 
 # Base do registro: so build apto (mesmo veredito da dimensao pos-build/base da auditoria de setup).
-# Evita registrar eventos de um build com erro, ou pendente por motivo alem do registro ausente.
+# Evita registrar eventos de um build com erro, ou pendente por motivo alem de evento pos-build a registrar.
 $baseVerdict = Get-GeneXusPostBuildBaseVerdict -Facts (Get-GeneXusPostBuildBaseFacts -BuildJson $buildJson)
 if (-not $baseVerdict.ok) {
     throw "BLOCK: build nao apto como base do registro ($($baseVerdict.reason)). Gere um build novo com o codigo atual e use o JSON dele. Nada gravado."
