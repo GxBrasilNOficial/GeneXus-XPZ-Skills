@@ -441,7 +441,7 @@ A frase «sinalizar sem rebaixar `exitCode`» aplica-se **somente** à Categoria
 
 ### Observação (medida): checksum e representação após import
 
-- **Medido:** em teste controlado (três objetos `Procedure`, uma KB, export pela rota MSBuild), o `checksum` do `Object` lido por export depois do import diferiu do valor do acervo nos três. Nos dois objetos com export pré-import igual ao acervo, o único diff do corpo foi a substituição de `<Properties />` por `<Source><![CDATA[]]></Source>` vazio mais `IsDefault=False`; o código não mudou. Um pacote já na forma do acervo também saiu na forma reescrita, com o mesmo checksum. Com mesmo conteúdo e `lastUpdate` maior, o checksum se manteve entre duas importações sucessivas; com conteúdo alterado, mudou.
+- **Medido:** em teste controlado (três objetos `Procedure`, uma KB, export pela rota MSBuild), o `checksum` do `Object` lido por export depois do import diferiu do valor do acervo nos três. Nos dois objetos com export pré-import igual ao acervo, o único diff do corpo foi a substituição de `<Properties />` por `<Source><![CDATA[]]></Source>` vazio mais `IsDefault=False`; o código não mudou. Um pacote já na forma do acervo também saiu na forma reescrita, com o mesmo checksum da importação anterior do mesmo objeto. Com mesmo conteúdo e `lastUpdate` maior, o checksum se manteve entre duas importações sucessivas; com conteúdo alterado, mudou.
 - **Leitura permitida:** divergência de checksum depois de import, por si, não prova mudança de conteúdo. A reescrita coincide com a divergência, mas a relação causal não foi isolada.
 - **Limites:** três `Procedure`, uma KB; algoritmo do checksum e fase do cálculo (import ou export) não observados; sem medição de import em `Transaction`. Para o `lastUpdate` do pacote, ver o footgun `import com lastUpdate menor ou igual`. O footgun `Part` omitida trata de parte ausente no pacote, não desta reescrita.
 
@@ -535,7 +535,7 @@ pwsh -NoProfile -File scripts/Invoke-GeneXusXpzImport.ps1 `
    - caminho do `.msbuild`
    - caminho do log
    - artefatos gerados ou consumidos
-12. Classificar o resultado como (sub-estado declarado pelo agente a partir da evidência; não é o campo `status` do wrapper, que sai `sucesso operacional` no import e `preview apenas` no preview quando o exit é 0, com ou sem `importedItems`):
+12. Classificar o resultado como (sub-estado declarado pelo agente a partir da evidência; não é o campo `status` do wrapper, que sai `sucesso operacional` ou `sucesso operacional com falha no pos-processamento` no import, e `preview apenas` ou `preview apenas com falha no pos-processamento` no preview, quando o exit é 0, com ou sem `importedItems`):
    - `não apto para prosseguir`
    - `importação real efetiva provada` — `importedItems` contém explicitamente o objeto esperado. Esse rótulo significa que a task processou e listou o objeto esperado; não significa que o conteúdo aplicado mudou. O mesmo vale para as variantes deste rótulo listadas a seguir. Ver `### Observação (medida): checksum e representação após import`
    - `importação real efetiva provada por alias normalizado` — `importedItemsRaw` difere do item esperado cru, mas `expectedItemsCanonical` e `importedItemsCanonical` coincidem e `itemAliasMatches` registra a equivalência, como `Panel:Nome` ↔ `SDPanel:Nome`
