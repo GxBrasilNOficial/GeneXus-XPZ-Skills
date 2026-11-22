@@ -192,6 +192,54 @@ Write-Output 'GATE_OK'
   Assert-True ($ri.json.'indice/mascara' -eq 'unknown') "I: indice/mascara unknown esperado; obtido $($ri.json.'indice/mascara')"
   Assert-True ([string]$ri.json.'indice/mascara.aviso' -match 'inconsistente') "I: aviso de estado inconsistente esperado"
 
+  # --- J: evento pos-build observado em Temp\ sem registro -> pos-build/registro PENDENTE ---
+  $j = New-SetupAuditFixture -GateText @'
+Write-Output 'writability_coverage: complete-in-model'
+Write-Output 'source_mask_degraded: false'
+Write-Output 'inventory_validation_status: OK'
+Write-Output 'GATE_OK'
+'@
+  $jTemp = Join-Path $j.Root 'Temp\build-pb'
+  [void](New-Item -ItemType Directory -Path $jTemp -Force)
+  $jBuild = Join-Path $jTemp 'build.json'
+  $jDoc = [ordered]@{
+    observedContext = [ordered]@{ ActiveEnvironment = 'NETFrameworkSQLServer' }
+    stdoutSignals   = [ordered]@{ postBuildEvents = @('Powershell Write-Output teste-pb-x') }
+  }
+  [System.IO.File]::WriteAllText($jBuild, ($jDoc | ConvertTo-Json -Depth 6), $utf8NoBom)
+  $rj = Invoke-XpzSelfTestScript -ScriptPath $engine -ScriptArgs @(
+    '-KbRoot', $j.Root, '-GateWrapperPath', $j.Gate, '-MetadataWrapperTestPath', $j.Metadata,
+    '-PowerShellRuntimeTestPath', $j.Runtime, '-NamingWrapperPath', $j.Naming, '-AsJson')
+  Assert-True ($null -ne $rj.json) "J: stdout deveria ser JSON parseavel"
+  Assert-True ($rj.json.'pos-build/registro' -eq 'PENDENTE') "J: pos-build/registro PENDENTE esperado; obtido $($rj.json.'pos-build/registro')"
+  Assert-True ([string]$rj.json.'pos-build/registro.evidencia' -match 'NETFrameworkSQLServer') "J: evidencia deve citar o environment"
+  Assert-True ($rj.json.estado_operacional_sugerido -ne 'materializado_e_indice_validado') "J: estado nao pode ser limpo com registro pendente"
+
+  # --- K: mesmo build apos registro feito pelo motor oficial -> pos-build/registro OK ---
+  $register = Join-Path $PSScriptRoot 'Register-GeneXusKbPostBuildEvents.ps1'
+  $rk0 = Invoke-XpzSelfTestScript -ScriptPath $register -ScriptArgs @(
+    '-BuildResultJsonPath', $jBuild, '-KbParallelRoot', $j.Root, '-EnvironmentName', 'NETFrameworkSQLServer',
+    '-ConfirmRegistration', '-AsJson')
+  Assert-True ($rk0.exit -eq 0) "K: registro deveria sair 0; obtido $($rk0.exit)"
+  $rk = Invoke-XpzSelfTestScript -ScriptPath $engine -ScriptArgs @(
+    '-KbRoot', $j.Root, '-GateWrapperPath', $j.Gate, '-MetadataWrapperTestPath', $j.Metadata,
+    '-PowerShellRuntimeTestPath', $j.Runtime, '-NamingWrapperPath', $j.Naming, '-AsJson')
+  Assert-True ($null -ne $rk.json) "K: stdout deveria ser JSON parseavel"
+  Assert-True ($rk.json.'pos-build/registro' -eq 'OK') "K: pos-build/registro OK esperado apos registro; obtido $($rk.json.'pos-build/registro')"
+
+  # --- L: sem nenhum build com eventos em Temp\ -> SEM_EVIDENCIA (nem pendencia, nem limpo) ---
+  $l = New-SetupAuditFixture -GateText @'
+Write-Output 'writability_coverage: complete-in-model'
+Write-Output 'source_mask_degraded: false'
+Write-Output 'inventory_validation_status: OK'
+Write-Output 'GATE_OK'
+'@
+  $rl = Invoke-XpzSelfTestScript -ScriptPath $engine -ScriptArgs @(
+    '-KbRoot', $l.Root, '-GateWrapperPath', $l.Gate, '-MetadataWrapperTestPath', $l.Metadata,
+    '-PowerShellRuntimeTestPath', $l.Runtime, '-NamingWrapperPath', $l.Naming, '-AsJson')
+  Assert-True ($null -ne $rl.json) "L: stdout deveria ser JSON parseavel"
+  Assert-True ($rl.json.'pos-build/registro' -eq 'SEM_EVIDENCIA') "L: SEM_EVIDENCIA esperado; obtido $($rl.json.'pos-build/registro')"
+
   'XPZ_SETUP_AUDIT_CONTRACT_SELFTEST_OK'
 }
 finally {

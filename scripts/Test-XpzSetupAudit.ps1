@@ -417,6 +417,59 @@ if ($declarativeDriftEntries.Count -gt 0) {
 }
 $hasDeclarativeDrift = $declarativeStatus -ne 'OK'
 
+# Registro de eventos pos-build (dimensao pos-build/registro). Evidencia: para cada environment, o JSON
+# de build mais recente em Temp\ cujo stdoutSignals.postBuildEvents tenha eventos nao inertes. Sem
+# registro (noEntryForEnvironment) o environment fica PENDENTE; sem nenhum JSON de build com eventos o
+# resultado e SEM_EVIDENCIA (informativo, nao pendencia nem limpo). Reusa os motores de classificacao
+# e de estado de registro (mesmos de Register-GeneXusKbPostBuildEvents.ps1 e dos wrappers de build).
+. (Join-Path $scriptDir 'GeneXusMsBuildPostBuildEventsSupport.ps1')
+. (Join-Path $scriptDir 'GeneXusKbDeploymentEnvironmentSupport.ps1')
+$postBuildRegistryStatus = 'SEM_EVIDENCIA'
+$postBuildRegistryEvidence = 'sem JSON de build com eventos pos-build em Temp\ (rodar um build para evidenciar)'
+$postBuildMetadataPath = Join-Path $KbRoot 'kb-source-metadata.md'
+$postBuildTempRoot = Join-Path $KbRoot 'Temp'
+$postBuildLatestByEnv = @{}
+if (Test-Path -LiteralPath $postBuildTempRoot -PathType Container) {
+    $postBuildJsonFiles = @(Get-ChildItem -LiteralPath $postBuildTempRoot -Recurse -File -Filter '*.json' -ErrorAction SilentlyContinue |
+        Sort-Object LastWriteTime -Descending)
+    foreach ($postBuildJsonFile in $postBuildJsonFiles) {
+        try {
+            $postBuildDoc = (Get-Content -LiteralPath $postBuildJsonFile.FullName -Raw) | ConvertFrom-Json -ErrorAction Stop
+        } catch {
+            continue
+        }
+        if ($null -eq $postBuildDoc.PSObject.Properties['stdoutSignals'] -or $null -eq $postBuildDoc.stdoutSignals) { continue }
+        if ($null -eq $postBuildDoc.stdoutSignals.PSObject.Properties['postBuildEvents']) { continue }
+        if ($null -eq $postBuildDoc.PSObject.Properties['observedContext'] -or $null -eq $postBuildDoc.observedContext) { continue }
+        if ($null -eq $postBuildDoc.observedContext.PSObject.Properties['ActiveEnvironment']) { continue }
+        $postBuildEnvName = [string]$postBuildDoc.observedContext.ActiveEnvironment
+        if ([string]::IsNullOrWhiteSpace($postBuildEnvName)) { continue }
+        $postBuildEnvName = $postBuildEnvName.Trim()
+        if ($postBuildLatestByEnv.ContainsKey($postBuildEnvName)) { continue }
+        $postBuildExecutable = @(@($postBuildDoc.stdoutSignals.postBuildEvents) | Where-Object {
+            -not [string]::IsNullOrWhiteSpace($_) -and -not (Test-GeneXusPostBuildEventInert -Line $_)
+        })
+        if ($postBuildExecutable.Count -eq 0) { continue }
+        $postBuildLatestByEnv[$postBuildEnvName] = [pscustomobject]@{
+            file  = $postBuildJsonFile.FullName
+            count = $postBuildExecutable.Count
+        }
+    }
+}
+if ($postBuildLatestByEnv.Count -gt 0) {
+    $postBuildParts = @()
+    $postBuildPendingEnvs = @()
+    foreach ($postBuildEnvKey in @($postBuildLatestByEnv.Keys | Sort-Object)) {
+        $postBuildRegistry = Get-GeneXusPostBuildEventRegistryState -MetadataPath $postBuildMetadataPath -EnvironmentName $postBuildEnvKey
+        $postBuildEntry = $postBuildLatestByEnv[$postBuildEnvKey]
+        $postBuildParts += ('{0}: {1} evento(s) em {2}, registro={3}' -f $postBuildEnvKey, $postBuildEntry.count, (Split-Path -Leaf $postBuildEntry.file), $postBuildRegistry.state)
+        if ($postBuildRegistry.state -ne 'available') { $postBuildPendingEnvs += $postBuildEnvKey }
+    }
+    $postBuildRegistryEvidence = $postBuildParts -join '; '
+    $postBuildRegistryStatus = if ($postBuildPendingEnvs.Count -gt 0) { 'PENDENTE' } else { 'OK' }
+}
+$hasPostBuildRegistryPendencies = $postBuildRegistryStatus -eq 'PENDENTE'
+
 $inventoryScriptPath = Join-Path $scriptDir 'Test-XpzWrapperInventory.ps1'
 $examplesPath = Join-Path (Split-Path -Parent $scriptDir) 'xpz-kb-parallel-setup\examples'
 $inventoryStatus = 'INVENTORY_UNKNOWN'
@@ -450,6 +503,7 @@ $suggestedState = switch ($true) {
     ($namingStatus -eq 'DIVERGENT') { 'naming_objetos_da_kb_pendente'; break }
     ($hasMetadataWrapperPendencies) { 'atualizacao_metodologica_pendente'; break }
     ($hasDeploymentMetadataPendencies) { 'atualizacao_metodologica_pendente'; break }
+    ($hasPostBuildRegistryPendencies) { 'atualizacao_metodologica_pendente'; break }
     ($hasInventoryMethodologyPendencies) { 'atualizacao_metodologica_pendente'; break }
     ($hasDeclarativeDrift) { 'atualizacao_metodologica_pendente'; break }
     ($syncStatus -eq 'OK' -and $gateStatus -eq 'OK' -and $inventorySemanticStatus -eq 'OK' -and $packageAuditStatus -eq 'OK') { 'materializado_e_indice_validado'; break }
@@ -481,6 +535,8 @@ Emit-Line -Key 'metadata wrapper' -Value $metadataWrapperStatus
 Emit-Line -Key 'metadata wrapper.evidencia' -Value $(if ($metadataWrapperRaw) { $metadataWrapperRaw.Replace([Environment]::NewLine, ' | ') } else { '(sem saida)' })
 Emit-Line -Key 'metadata/deploy' -Value $deploymentMetadataStatus
 Emit-Line -Key 'metadata/deploy.evidencia' -Value $(if ($deploymentMetadataRaw) { $deploymentMetadataRaw.Replace([Environment]::NewLine, ' | ') } else { '(sem saida)' })
+Emit-Line -Key 'pos-build/registro' -Value $postBuildRegistryStatus
+Emit-Line -Key 'pos-build/registro.evidencia' -Value $postBuildRegistryEvidence
 Emit-Line -Key 'empacotamento local' -Value $packageAuditStatus
 Emit-Line -Key 'empacotamento local.evidencia' -Value $packageEvidence
 Emit-Line -Key 'declarativo/timestamps' -Value $declarativeStatus
