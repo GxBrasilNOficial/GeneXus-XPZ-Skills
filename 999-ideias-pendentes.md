@@ -33,26 +33,26 @@ Entradas legadas sem avaliação carregam `FALTA AVALIAR` em ambos os campos at�
 ## `lastUpdate` menor aplicado pela KB: reconciliar com o footgun de import — 2026-11-21
 
 - **Importância** — média (o risco é perder conteúdo e trilha de carimbo; o gate contra o acervo e a orientação de não enviar pacote velho já reduzem a exposição).
-- **Maturidade** — ideia (a condição que distingue as duas observações não foi isolada).
+- **Maturidade** — ideia (a condição que distingue o caso menor do caso igual não foi isolada).
 
-**Contexto.** O footgun `import inócuo por lastUpdate velho` (`xpz-msbuild-import-export/SKILL.md`) diz que `lastUpdate` menor ou igual ao do objeto vivo não atualiza o objeto; a origem desse registro (`historico/IdeiasImplementadas_202606.md`) não cita medição. Em teste controlado (um objeto), um pacote com `lastUpdate` menor que o vivo foi aplicado: o conteúdo antigo voltou e o carimbo regrediu para o do pacote. O caso de `lastUpdate` igual não foi medido. A skill passou a registrar as duas observações e a orientar a não enviar pacote com carimbo menor que o do vivo.
+**Contexto.** O footgun `import com lastUpdate menor ou igual` (`xpz-msbuild-import-export/SKILL.md`) registra a regressão de carimbo observada em teste controlado (um objeto): um pacote com `lastUpdate` menor que o vivo foi aplicado, o conteúdo antigo voltou e o carimbo regrediu para o do pacote. O caso de `lastUpdate` igual não foi medido. A skill orienta a não enviar pacote com carimbo menor que o do objeto vivo na KB.
 
 **Por que não agora.** Falta reprodução controlada: carimbo menor, igual e maior; com e sem export pré-import; mais de um objeto e tipo; registrando o `lastUpdate` vivo antes e depois. Nenhuma mudança de motor depende disso hoje.
 
 **Gatilho.** Nova rodada de teste de import com carimbos controlados, ou caso real de regressão de carimbo.
 
-**Relacionado.** Footgun `import inócuo por lastUpdate velho` e subseção `Observação (medida): checksum e representação após import` em `xpz-msbuild-import-export/SKILL.md`; `xpz-builder/SKILL.md` (`-NewObjectNotImported` e `lastUpdateRegressed` tratam do carimbo local de objeto nunca importado, não do objeto vivo).
+**Relacionado.** Footgun `import com lastUpdate menor ou igual` e subseção `Observação (medida): checksum e representação após import` em `xpz-msbuild-import-export/SKILL.md`; `xpz-builder/SKILL.md` (`-NewObjectNotImported` e `lastUpdateRegressed` tratam do carimbo local de objeto nunca importado, não do objeto vivo).
 
 <a id="rotulo-importacao-efetiva-renomear-20261121"></a>
 
 ## Rótulo importação real efetiva provada: renomear para dizer processamento — 2026-11-21
 
-- **Importância** — baixa (o rótulo se entende com o esclarecimento da seção de checksum após import).
+- **Importância** — baixa (o rótulo se entende com o esclarecimento do item 12 da skill de import).
 - **Maturidade** — ideia (a renomeação altera contrato e não há caso real que a exija hoje).
 
 **Contexto.** O rótulo `importação real efetiva provada` sugere que o conteúdo foi aplicado, o que a task não garante. A própria skill já esclarece que o rótulo significa processamento do objeto (`xpz-msbuild-import-export/SKILL.md`, item 12).
 
-**Por que não agora.** Renomear muda contrato e exige revisão em `10-base-operacional-msbuild-headless.md`, `xpz-kb-parallel-setup/SKILL.md`, `xpz-kb-parallel-setup/examples/AGENTS.md.example` (que usa a forma sem acentos, `importacao real efetiva provada por evidencia de stdout`, e se propaga para os `AGENTS.md` locais), `xpz-msbuild-build/SKILL.md`, `xpz-msbuild-import-export/SKILL.md` e `02-regras-operacionais-e-runtime.md` (perto da linha 2555).
+**Por que não agora.** Renomear muda contrato e exige revisão em `10-base-operacional-msbuild-headless.md`, `xpz-kb-parallel-setup/SKILL.md`, `xpz-kb-parallel-setup/examples/AGENTS.md.example` (que usa a forma sem acentos, `importacao real efetiva provada por evidencia de stdout`, e se propaga para os `AGENTS.md` locais), `xpz-msbuild-build/SKILL.md`, `xpz-msbuild-import-export/SKILL.md` e `02-regras-operacionais-e-runtime.md`.
 
 **Gatilho.** Decisão de contrato sobre rótulos da skill, ou caso real em que o rótulo leve a conclusão errada sobre conteúdo.
 
