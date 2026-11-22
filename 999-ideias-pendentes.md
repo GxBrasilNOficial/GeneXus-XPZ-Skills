@@ -30,6 +30,17 @@ Entradas legadas sem avaliação carregam `FALTA AVALIAR` em ambos os campos at�
 
 **Relacionado.** `CalculateChecksums + AreObjectsEqual — diagnóstico de integridade de objeto pré/pós-operação` e `Medir importação com checksum="" em KB de ensaio` (mesma família de problema; não duplicar); `xpz-msbuild-import-export/SKILL.md`.
 
+<a id="sync-case-insensitive-unchanged-20261122"></a>
+
+## Sync ignora caixa em `unchanged`: mudança só de caixa não materializa — 2026-11-22
+
+- **Importância** — baixa (o efeito é silencioso, mas exige que a mudança seja só de caixa; não há caso real medido).
+- **Maturidade** — ideia (trocar `-eq` por `-ceq` no motor exige teste próprio; não medido).
+
+**Contexto.** `Sync-GeneXusXpzToXml.ps1` compara o texto com `-eq`, que no PowerShell ignora caixa. Um XPZ cujo único delta seja de caixa cai em `unchanged` e não é gravado. A documentação da frente de rename agora declara a limitação; a correção de motor não foi feita.
+
+**Gatilho.** Primeiro caso real de rename/edição só de caixa que precise chegar ao acervo, ou decisão de endurecer a comparação.
+
 <a id="lastupdate-menor-aplicado-reconciliar-footgun-20261121"></a>
 
 ## `lastUpdate` menor aplicado pela KB: reconciliar com o footgun de import — 2026-11-21
