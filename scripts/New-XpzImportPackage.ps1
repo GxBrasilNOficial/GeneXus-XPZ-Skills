@@ -343,7 +343,7 @@ if (-not [string]::IsNullOrWhiteSpace($AcervoPath)) {
         $acervoEffective = (Resolve-Path -LiteralPath $conventionAcervo).Path
         $acervoResolvedBy = 'convention'
     } else {
-        Write-XpzPackageJsonAndExit -InputObject ([ordered]@{ status = 'bloqueado'; exitCode = 20; stage = 'front-acervo-drift'; repoRoot = $RepoRoot; frontName = $FrontName; acervoResolvedBy = $null; blockingReasons = @("Acervo nao informado e acervo canonico ausente em '$conventionAcervo'. O gate de drift de lastUpdate nao pode ser pulado por omissao: informe -AcervoPath apontando para ObjetosDaKbEmXml. Footgun: import com lastUpdate menor ou igual ao objeto vivo na KB passa em silencio (exitCode 0, sem efeito) e desperdica um ciclo import+build."); warnings = @() }) -ExitCode 20
+        Write-XpzPackageJsonAndExit -InputObject ([ordered]@{ status = 'bloqueado'; exitCode = 20; stage = 'front-acervo-drift'; repoRoot = $RepoRoot; frontName = $FrontName; acervoResolvedBy = $null; blockingReasons = @("Acervo nao informado e acervo canonico ausente em '$conventionAcervo'. O gate de drift de lastUpdate nao pode ser pulado por omissao: informe -AcervoPath apontando para ObjetosDaKbEmXml. Footgun: import com lastUpdate menor ou igual ao objeto vivo na KB pode passar em silencio (exitCode 0); no caso medido de carimbo menor, a KB aplicou o conteudo antigo e regrediu o carimbo; o caso igual nao foi medido. Ver o footgun em xpz-msbuild-import-export/SKILL.md."); warnings = @() }) -ExitCode 20
     }
 }
 
