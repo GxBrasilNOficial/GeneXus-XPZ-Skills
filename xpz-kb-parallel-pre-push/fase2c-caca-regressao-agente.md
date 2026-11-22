@@ -37,7 +37,7 @@ Expansão a SDT / WorkWith estrutural fora de Source **não** faz parte desta fa
 | `NEW` com Source | Sem “ramo antigo”; foco em contrato (`parm`, `Chamador`), ramos iniciais, padrões baratos |
 | `DELETED` | Em geral **N/A** para Source do removido; registrar remoção; seguir nota 2b (delete) + build |
 | `NO_CHECKSUM` | Checksum ausente nos **dois** lados — **não** aplicar checklist de código como se fosse `DIFF`. Registrar no relatório; triagem = inspecionar por que não há checksum (tipo/artefato/export). Token: `NO_CHECKSUM — inspecionar artefato`. **Não** concluir “nada óbvio” só porque não houve diff de Source legível via F1 |
-| `SAME` | Fora do filtro de leitura 2c. **Não** concluir ausência de impacto na cabeça associada — nuance em [`fase2a-estrutural.md`](fase2a-estrutural.md) / 2b |
+| `SAME` | Fora do filtro de leitura 2c. **Não** concluir ausência de impacto na cabeça associada — nuance em [`fase2a-estrutural.md`](fase2a-estrutural.md) / 2b. `SAME` pode esconder reescrita de referência por rename; a checagem de frescor do acervo é export completo + diff (`02`), não a 2c |
 
 ## Insumo mecânico (sem script novo)
 
