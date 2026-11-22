@@ -203,8 +203,11 @@ Write-Output 'GATE_OK'
   [void](New-Item -ItemType Directory -Path $jTemp -Force)
   $jBuild = Join-Path $jTemp 'build.json'
   $jDoc = [ordered]@{
-    observedContext = [ordered]@{ ActiveEnvironment = 'NETFrameworkSQLServer' }
-    stdoutSignals   = [ordered]@{ postBuildEvents = @('Powershell Write-Output teste-pb-x') }
+    exitCode          = 0
+    status            = 'compilou limpo'
+    executionEvidence = [ordered]@{ msBuildExitCode = 0; msBuildFailed = $false }
+    observedContext   = [ordered]@{ ActiveEnvironment = 'NETFrameworkSQLServer' }
+    stdoutSignals     = [ordered]@{ postBuildEvents = @('Powershell Write-Output teste-pb-x') }
   }
   [System.IO.File]::WriteAllText($jBuild, ($jDoc | ConvertTo-Json -Depth 6), $utf8NoBom)
   $rj = Invoke-XpzSelfTestScript -ScriptPath $engine -ScriptArgs @(
@@ -254,8 +257,11 @@ Write-Output 'GATE_OK'
   [void](New-Item -ItemType Directory -Path $mDir1 -Force)
   $mBuild1 = Join-Path $mDir1 'build.json'
   $mDoc1 = [ordered]@{
-    observedContext = [ordered]@{ ActiveEnvironment = 'NETFrameworkSQLServer' }
-    stdoutSignals   = [ordered]@{ postBuildEvents = @($pbLine1) }
+    exitCode          = 0
+    status            = 'compilou limpo'
+    executionEvidence = [ordered]@{ msBuildExitCode = 0; msBuildFailed = $false }
+    observedContext   = [ordered]@{ ActiveEnvironment = 'NETFrameworkSQLServer' }
+    stdoutSignals     = [ordered]@{ postBuildEvents = @($pbLine1) }
   }
   [System.IO.File]::WriteAllText($mBuild1, ($mDoc1 | ConvertTo-Json -Depth 6), $utf8NoBom)
   (Get-Item -LiteralPath $mBuild1).LastWriteTime = (Get-Date).AddMinutes(-5)
@@ -399,7 +405,7 @@ kb_environment_post_build_event_hashes: NETFrameworkSQLServer=$pbFamily1
       }
     }
     if ($null -ne $Spec.MsBuildExitCode) {
-      $doc['executionEvidence'] = [ordered]@{ msBuildExitCode = $Spec.MsBuildExitCode; msBuildFailed = $false }
+      $doc['executionEvidence'] = [ordered]@{ msBuildExitCode = $Spec.MsBuildExitCode; msBuildFailed = ($Spec.ContainsKey('MsBuildFailed') -and [bool]$Spec['MsBuildFailed']) }
     }
     [System.IO.File]::WriteAllText((Join-Path $dir 'build.json'), ($doc | ConvertTo-Json -Depth 8), $utf8NoBom)
     return (& $pbRun $fx)
@@ -429,6 +435,14 @@ kb_environment_post_build_event_hashes: NETFrameworkSQLServer=$pbFamily1
   $rx = & $pbBase @{ ExitCode = 1; Status = 'compilou limpo'; MsBuildExitCode = 0; RegistryState = $null; Unexpected = @() }
   Assert-True ($rx.json.'pos-build/base' -eq 'NAO_APTO') "X: NAO_APTO esperado com exitCode diferente de 0; obtido $($rx.json.'pos-build/base')"
   Assert-True ([string]$rx.json.'pos-build/base.evidencia' -match 'exitCode') "X: evidencia deve citar exitCode"
+
+  $ry = & $pbBase @{ ExitCode = 0; Status = 'compilou limpo'; MsBuildExitCode = 0; MsBuildFailed = $true; RegistryState = $null; Unexpected = @() }
+  Assert-True ($ry.json.'pos-build/base' -eq 'NAO_APTO') "Y: NAO_APTO esperado com msBuildFailed verdadeiro; obtido $($ry.json.'pos-build/base')"
+  Assert-True ([string]$ry.json.'pos-build/base.evidencia' -match 'msBuildFailed') "Y: evidencia deve citar msBuildFailed"
+
+  $rz = & $pbBase @{ ExitCode = 0; Status = 'falhou'; MsBuildExitCode = 0; RegistryState = $null; Unexpected = @() }
+  Assert-True ($rz.json.'pos-build/base' -eq 'NAO_APTO') "Z: NAO_APTO esperado com status nao previsto; obtido $($rz.json.'pos-build/base')"
+  Assert-True ([string]$rz.json.'pos-build/base.evidencia' -match 'status nao previsto') "Z: evidencia deve citar status nao previsto"
 
   # W: sem build com eventos em Temp\ -> SEM_EVIDENCIA (reaproveita o caso L)
   Assert-True ($rl.json.'pos-build/base' -eq 'SEM_EVIDENCIA') "W: pos-build/base SEM_EVIDENCIA esperado sem build; obtido $($rl.json.'pos-build/base')"

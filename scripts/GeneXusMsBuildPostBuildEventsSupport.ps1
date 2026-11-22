@@ -326,3 +326,80 @@ function Get-GeneXusPostBuildEventClassification {
         legacyMatchCount  = $legacyMatchCount
     }
 }
+
+function Get-GeneXusPostBuildBaseFacts {
+    # Fatos do JSON de um build usados para decidir se ele serve de base do registro de eventos
+    # pos-build. Sem excecao por campo ausente: o campo ausente fica $null e o veredito decide.
+    param([Parameter(Mandatory = $true)]$BuildJson)
+
+    $exitCode = $null
+    if ($null -ne $BuildJson.PSObject.Properties['exitCode']) { $exitCode = $BuildJson.exitCode }
+
+    $msBuildExitCode = $null
+    $msBuildFailed = $null
+    if ($null -ne $BuildJson.PSObject.Properties['executionEvidence'] -and $null -ne $BuildJson.executionEvidence) {
+        $evidence = $BuildJson.executionEvidence
+        if ($null -ne $evidence.PSObject.Properties['msBuildExitCode']) { $msBuildExitCode = $evidence.msBuildExitCode }
+        if ($null -ne $evidence.PSObject.Properties['msBuildFailed']) { $msBuildFailed = $evidence.msBuildFailed }
+    }
+
+    $statusText = ''
+    if ($null -ne $BuildJson.PSObject.Properties['status'] -and $null -ne $BuildJson.status) { $statusText = [string]$BuildJson.status }
+
+    $registryState = $null
+    $unexpectedCount = 0
+    if ($null -ne $BuildJson.PSObject.Properties['stdoutSignals'] -and $null -ne $BuildJson.stdoutSignals -and
+        $null -ne $BuildJson.stdoutSignals.PSObject.Properties['postBuildEventClassification'] -and
+        $null -ne $BuildJson.stdoutSignals.postBuildEventClassification) {
+        $classification = $BuildJson.stdoutSignals.postBuildEventClassification
+        if ($null -ne $classification.PSObject.Properties['registryStatus'] -and $null -ne $classification.registryStatus -and
+            $null -ne $classification.registryStatus.PSObject.Properties['state']) {
+            $registryState = [string]$classification.registryStatus.state
+        }
+        if ($null -ne $classification.PSObject.Properties['unexpected'] -and $null -ne $classification.unexpected) {
+            $unexpectedCount = @($classification.unexpected).Count
+        }
+    }
+
+    return [pscustomobject][ordered]@{
+        exitCode        = $exitCode
+        msBuildExitCode = $msBuildExitCode
+        msBuildFailed   = $msBuildFailed
+        statusText      = $statusText
+        registryState   = $registryState
+        unexpectedCount = $unexpectedCount
+    }
+}
+
+function Get-GeneXusPostBuildBaseVerdict {
+    # Veredito unico (auditoria e registro): o build serve de base do registro de eventos pos-build?
+    # Apto: exitCode e executionEvidence.msBuildExitCode 0, sem msBuildFailed, e status "compilou limpo"
+    # ou pendente SO por registro ausente (registryStatus noEntryForEnvironment e unexpected vazio).
+    param([Parameter(Mandatory = $true)]$Facts)
+
+    if ($null -eq $Facts.exitCode -or "$($Facts.exitCode)" -ne '0') {
+        return [pscustomobject]@{ ok = $false; reason = 'exitCode ausente ou diferente de 0' }
+    }
+    if ($null -eq $Facts.msBuildExitCode -or "$($Facts.msBuildExitCode)" -ne '0') {
+        return [pscustomobject]@{ ok = $false; reason = 'executionEvidence.msBuildExitCode ausente ou diferente de 0' }
+    }
+    if ($null -ne $Facts.msBuildFailed -and [bool]$Facts.msBuildFailed) {
+        return [pscustomobject]@{ ok = $false; reason = 'executionEvidence.msBuildFailed verdadeiro' }
+    }
+    if ($Facts.statusText -match 'compilou limpo') {
+        return [pscustomobject]@{ ok = $true; reason = 'status compilou limpo' }
+    }
+    if ($Facts.statusText -match 'pendente de confirma') {
+        if ($null -eq $Facts.registryState) {
+            return [pscustomobject]@{ ok = $false; reason = 'sem registryStatus no diagnostico (build anterior ao diagnostico de registro)' }
+        }
+        if ($Facts.registryState -ne 'noEntryForEnvironment') {
+            return [pscustomobject]@{ ok = $false; reason = "registryStatus=$($Facts.registryState), a pendencia nao e so registro ausente" }
+        }
+        if ([int]$Facts.unexpectedCount -gt 0) {
+            return [pscustomobject]@{ ok = $false; reason = "ha $($Facts.unexpectedCount) evento(s) inesperado(s), a pendencia nao e so registro ausente" }
+        }
+        return [pscustomobject]@{ ok = $true; reason = 'pendente apenas por registro ausente' }
+    }
+    return [pscustomobject]@{ ok = $false; reason = "status nao previsto: $($Facts.statusText)" }
+}

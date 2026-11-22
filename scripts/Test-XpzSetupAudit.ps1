@@ -450,39 +450,12 @@ if (Test-Path -LiteralPath $postBuildTempRoot -PathType Container) {
             -not [string]::IsNullOrWhiteSpace($_) -and -not (Test-GeneXusPostBuildEventInert -Line $_)
         })
         if ($postBuildExecutable.Count -eq 0) { continue }
-        # Dados do build que decidem se ele serve de base do registro (dimensao pos-build/base).
-        $postBuildExitCode = $null
-        if ($null -ne $postBuildDoc.PSObject.Properties['exitCode']) { $postBuildExitCode = $postBuildDoc.exitCode }
-        $postBuildMsBuildExit = $null
-        $postBuildMsBuildFailed = $null
-        if ($null -ne $postBuildDoc.PSObject.Properties['executionEvidence'] -and $null -ne $postBuildDoc.executionEvidence) {
-            if ($null -ne $postBuildDoc.executionEvidence.PSObject.Properties['msBuildExitCode']) { $postBuildMsBuildExit = $postBuildDoc.executionEvidence.msBuildExitCode }
-            if ($null -ne $postBuildDoc.executionEvidence.PSObject.Properties['msBuildFailed']) { $postBuildMsBuildFailed = $postBuildDoc.executionEvidence.msBuildFailed }
-        }
-        $postBuildStatusText = ''
-        if ($null -ne $postBuildDoc.PSObject.Properties['status'] -and $null -ne $postBuildDoc.status) { $postBuildStatusText = [string]$postBuildDoc.status }
-        $postBuildRegistryState = $null
-        $postBuildUnexpectedCount = 0
-        if ($null -ne $postBuildDoc.stdoutSignals.PSObject.Properties['postBuildEventClassification'] -and $null -ne $postBuildDoc.stdoutSignals.postBuildEventClassification) {
-            $postBuildClassification = $postBuildDoc.stdoutSignals.postBuildEventClassification
-            if ($null -ne $postBuildClassification.PSObject.Properties['registryStatus'] -and $null -ne $postBuildClassification.registryStatus -and
-                $null -ne $postBuildClassification.registryStatus.PSObject.Properties['state']) {
-                $postBuildRegistryState = [string]$postBuildClassification.registryStatus.state
-            }
-            if ($null -ne $postBuildClassification.PSObject.Properties['unexpected'] -and $null -ne $postBuildClassification.unexpected) {
-                $postBuildUnexpectedCount = @($postBuildClassification.unexpected).Count
-            }
-        }
+        # Fatos do build para o veredito de base (suporte compartilhado, o mesmo usado pelo Register).
         $postBuildLatestByEnv[$postBuildEnvName] = [pscustomobject]@{
-            file            = $postBuildJsonFile.FullName
-            count           = $postBuildExecutable.Count
-            lines           = @($postBuildExecutable | ForEach-Object { $_.Trim() })
-            exitCode        = $postBuildExitCode
-            msBuildExitCode = $postBuildMsBuildExit
-            msBuildFailed   = $postBuildMsBuildFailed
-            statusText      = $postBuildStatusText
-            registryState   = $postBuildRegistryState
-            unexpectedCount = $postBuildUnexpectedCount
+            file  = $postBuildJsonFile.FullName
+            count = $postBuildExecutable.Count
+            lines = @($postBuildExecutable | ForEach-Object { $_.Trim() })
+            facts = Get-GeneXusPostBuildBaseFacts -BuildJson $postBuildDoc
         }
     }
 }
@@ -630,36 +603,6 @@ $hasPostBuildRegistryPendencies = $postBuildRegistryStatus -eq 'PENDENTE'
 # Base do registro (dimensao pos-build/base): informa, por environment, se o build mais recente com eventos
 # serve de base para registrar. Informativa: nao altera o estado sugerido. Evita que o agente tenha de
 # interpretar o JSON de build: um build nao apto exige build novo antes de qualquer registro.
-function Get-PostBuildBaseVerdict {
-    param([Parameter(Mandatory = $true)]$Entry)
-
-    if ($null -eq $Entry.exitCode -or "$($Entry.exitCode)" -ne '0') {
-        return [pscustomobject]@{ ok = $false; reason = 'exitCode ausente ou diferente de 0' }
-    }
-    if ($null -eq $Entry.msBuildExitCode -or "$($Entry.msBuildExitCode)" -ne '0') {
-        return [pscustomobject]@{ ok = $false; reason = 'executionEvidence.msBuildExitCode ausente ou diferente de 0' }
-    }
-    if ($null -ne $Entry.msBuildFailed -and [bool]$Entry.msBuildFailed) {
-        return [pscustomobject]@{ ok = $false; reason = 'executionEvidence.msBuildFailed verdadeiro' }
-    }
-    if ($Entry.statusText -match 'compilou limpo') {
-        return [pscustomobject]@{ ok = $true; reason = 'status compilou limpo' }
-    }
-    if ($Entry.statusText -match 'pendente de confirma') {
-        if ($null -eq $Entry.registryState) {
-            return [pscustomobject]@{ ok = $false; reason = 'sem registryStatus no diagnostico (build anterior ao diagnostico de registro)' }
-        }
-        if ($Entry.registryState -ne 'noEntryForEnvironment') {
-            return [pscustomobject]@{ ok = $false; reason = "registryStatus=$($Entry.registryState), a pendencia nao e so registro ausente" }
-        }
-        if ([int]$Entry.unexpectedCount -gt 0) {
-            return [pscustomobject]@{ ok = $false; reason = "ha $($Entry.unexpectedCount) evento(s) inesperado(s), a pendencia nao e so registro ausente" }
-        }
-        return [pscustomobject]@{ ok = $true; reason = 'pendente apenas por registro ausente' }
-    }
-    return [pscustomobject]@{ ok = $false; reason = "status nao previsto: $($Entry.statusText)" }
-}
-
 $postBuildBaseStatus = 'SEM_EVIDENCIA'
 $postBuildBaseEvidence = 'sem JSON de build com eventos pos-build em Temp\ (rodar um build para evidenciar)'
 if ($postBuildLatestByEnv.Count -gt 0) {
@@ -667,7 +610,7 @@ if ($postBuildLatestByEnv.Count -gt 0) {
     $postBuildBaseRejected = 0
     foreach ($postBuildBaseEnv in @($postBuildLatestByEnv.Keys | Sort-Object)) {
         $postBuildBaseEntry = $postBuildLatestByEnv[$postBuildBaseEnv]
-        $postBuildBaseVerdict = Get-PostBuildBaseVerdict -Entry $postBuildBaseEntry
+        $postBuildBaseVerdict = Get-GeneXusPostBuildBaseVerdict -Facts $postBuildBaseEntry.facts
         $postBuildBaseFile = Split-Path -Leaf (Split-Path -Parent $postBuildBaseEntry.file)
         if ($postBuildBaseVerdict.ok) {
             $postBuildBaseParts += ('{0}: apto ({1}; build {2})' -f $postBuildBaseEnv, $postBuildBaseVerdict.reason, $postBuildBaseFile)

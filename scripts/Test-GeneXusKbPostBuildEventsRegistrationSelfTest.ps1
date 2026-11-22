@@ -26,10 +26,13 @@ function Get-Utf8NoBomEncoding {
 
 function New-BuildJson {
     param([string]$EnvName, [string[]]$Events, [string]$Path)
+    # Build apto como base do registro: exitCode e msBuildExitCode 0, sem msBuildFailed, status compilou limpo.
     $obj = [ordered]@{
-        status          = 'compilou limpo'
-        observedContext = [ordered]@{ ActiveEnvironment = $EnvName }
-        stdoutSignals   = [ordered]@{ postBuildEvents = @($Events) }
+        exitCode          = 0
+        status            = 'compilou limpo'
+        executionEvidence = [ordered]@{ msBuildExitCode = 0; msBuildFailed = $false }
+        observedContext   = [ordered]@{ ActiveEnvironment = $EnvName }
+        stdoutSignals     = [ordered]@{ postBuildEvents = @($Events) }
     }
     [System.IO.File]::WriteAllText($Path, ($obj | ConvertTo-Json -Depth 8), (Get-Utf8NoBomEncoding))
 }
@@ -125,6 +128,37 @@ try {
     if (-not $c6.shouldDowngrade -or $c6.legacyMatchCount -ne 0) { throw 'ASSERT_FAILED: registro legado com contagem diferente deveria ser inesperado (exige re-registro)' }
     $c7 = Get-GeneXusPostBuildEventClassification -PostBuildEventLines @($famX) -RegisteredHashes @($legacyX)
     if ($c7.shouldDowngrade -or $c7.legacyMatchCount -ne 1) { throw 'ASSERT_FAILED: registro legado com a mesma contagem deveria ser aceito com legacyMatchCount=1' }
+
+    # Base do registro: o Register recusa build nao apto (BLOCK) e nao grava nada.
+    $textBeforeRefusal = [System.IO.File]::ReadAllText($metadataPath)
+    $nonBaseCases = @(
+        @{ Name = 'exitCode 1';              Mutate = { param($o) $o['exitCode'] = 1 };                                            Match = 'exitCode' }
+        @{ Name = 'msBuildExitCode ausente'; Mutate = { param($o) $o.Remove('executionEvidence') };                                Match = 'msBuildExitCode' }
+        @{ Name = 'msBuildFailed verdadeiro'; Mutate = { param($o) $o['executionEvidence'] = [ordered]@{ msBuildExitCode = 0; msBuildFailed = $true } }; Match = 'msBuildFailed' }
+        @{ Name = 'status nao previsto';     Mutate = { param($o) $o['status'] = 'falhou' };                                       Match = 'status nao previsto' }
+        @{ Name = 'pendente sem registryStatus'; Mutate = { param($o) $o['status'] = 'operacao concluida, pendente de confirmacao funcional' }; Match = 'sem registryStatus' }
+    )
+    foreach ($case in $nonBaseCases) {
+        $obj = [ordered]@{
+            exitCode          = 0
+            status            = 'compilou limpo'
+            executionEvidence = [ordered]@{ msBuildExitCode = 0; msBuildFailed = $false }
+            observedContext   = [ordered]@{ ActiveEnvironment = 'NETPostgreSQL' }
+            stdoutSignals     = [ordered]@{ postBuildEvents = @($sino, $deploy1) }
+        }
+        & $case.Mutate $obj
+        $jsonNb = Join-Path $tempRoot ('nonbase-' + [guid]::NewGuid().ToString('N') + '.json')
+        [System.IO.File]::WriteAllText($jsonNb, ($obj | ConvertTo-Json -Depth 8), (Get-Utf8NoBomEncoding))
+        $refusal = $null
+        try {
+            & $registerScript -BuildResultJsonPath $jsonNb -EnvironmentName 'NETPostgreSQL' -MetadataPath $metadataPath -ConfirmRegistration -AsJson | Out-Null
+        } catch {
+            $refusal = $_.Exception.Message
+        }
+        if ($null -eq $refusal -or $refusal -notmatch 'BLOCK: build nao apto') { throw "ASSERT_FAILED: build nao apto ($($case.Name)) deveria ser recusado com BLOCK; obtido='$refusal'" }
+        if ($refusal -notmatch $case.Match) { throw "ASSERT_FAILED: recusa de '$($case.Name)' deveria citar '$($case.Match)'; obtido='$refusal'" }
+    }
+    if ([System.IO.File]::ReadAllText($metadataPath) -ne $textBeforeRefusal) { throw 'ASSERT_FAILED: recusa por build nao apto nao deveria alterar o metadata' }
 
     # Estados do registro, com precedencia metadataNotProvided -> environmentNameUnavailable -> noEntryForEnvironment -> available.
     $st1 = Get-GeneXusPostBuildEventRegistryState -MetadataPath '' -EnvironmentName ''

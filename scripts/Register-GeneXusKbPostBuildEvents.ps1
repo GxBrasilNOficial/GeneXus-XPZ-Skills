@@ -14,6 +14,10 @@
       - secao-espelho legivel "## Eventos pos-build registrados": auditoria de setup (forma e divergencia), com as
         linhas cruas; o build NÃO le o espelho, só os hashes.
 
+    Recusa (BLOCK) build que nao sirva de base: exitCode e executionEvidence.msBuildExitCode diferentes
+    de 0, msBuildFailed verdadeiro, status fora de "compilou limpo" ou pendente por motivo alem do
+    registro ausente (mesmo veredito da dimensao pos-build/base da auditoria de setup).
+
     Ação sensivel: registrar desarma o rebaixamento por evento pos-build daquele environment.
     Exige confirmacao. Modo interativo pede frase exata; modo agente usa -ConfirmRegistration
     (o agente deve obter a confirmacao explicita do humano antes de passar o switch).
@@ -78,6 +82,13 @@ if (-not (Test-Path -LiteralPath $BuildResultJsonPath -PathType Leaf)) {
 }
 
 $buildJson = (Get-Content -LiteralPath $BuildResultJsonPath -Raw) | ConvertFrom-Json
+
+# Base do registro: so build apto (mesmo veredito da dimensao pos-build/base da auditoria de setup).
+# Evita registrar eventos de um build com erro, ou pendente por motivo alem do registro ausente.
+$baseVerdict = Get-GeneXusPostBuildBaseVerdict -Facts (Get-GeneXusPostBuildBaseFacts -BuildJson $buildJson)
+if (-not $baseVerdict.ok) {
+    throw "BLOCK: build nao apto como base do registro ($($baseVerdict.reason)). Gere um build novo com o codigo atual e use o JSON dele. Nada gravado."
+}
 
 $observed = @()
 if ($null -ne $buildJson.PSObject.Properties['stdoutSignals'] -and $null -ne $buildJson.stdoutSignals) {
