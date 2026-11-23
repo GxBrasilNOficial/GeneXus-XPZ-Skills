@@ -144,7 +144,8 @@ Wrappers esperados:
   `kb_environment_post_build_event_hashes` e espelho legivel). Acao sensivel:
   so com confirmacao explicita do usuario e somente a partir do build que a
   auditoria de setup marcar como `apto` na evidencia de `pos-build/base` (a
-  linha e agregada por environment); o motor recusa build
+  linha e agregada; o veredito de cada environment fica na evidencia); o
+  motor recusa build
   nao apto. O build apenas encaminha para a auditoria de setup: nao registrar
   direto a partir do diagnostico do build.
 - `Test-<NomeKb>KbMetadataWrapper.ps1`: valida o contrato funcional do

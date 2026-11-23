@@ -13,6 +13,21 @@ Entradas legadas sem avaliação carregam `FALTA AVALIAR` em ambos os campos at�
 
 **Editar a substância de um gap já registrado (neste arquivo ou no `998-ideias-descartadas-e-porque.md`) exige justificativa no corpo do commit.** Enfraquecer, reprecisar ou descartar a severidade de uma afirmação — não apenas corrigir redação, adicionar contexto ou reorganizar — precisa dizer **por que**: nova evidência medida, releitura do código, ou correção de erro anterior. Motivo: uma edição que suaviza um gap sem dizer por que **parece resolvido** para quem lê depois, e é pior do que o gap não ter sido achado — quem lê para de investigar. Caso real (2026-08-17): um commit sem corpo trocou «não é citado em lugar nenhum» por «não era coberto na documentação normativa»; a formulação nova era defensável à primeira vista, mas escondia que a única outra menção ao símbolo no repositório era uma cópia **defasada** num self-test — a frase sugeria mitigação onde havia agravante. Só foi achado porque outra sessão foi verificar; sem corpo no commit, não havia como saber se a mudança vinha de leitura nova ou só de estilo.
 
+<a id="timestamp-setup-com-registro-pendente-20261123"></a>
+
+## Timestamp de setup gravado com `pos-build/registro: PENDENTE` — 2026-11-23
+
+- **Importância** — média (um carimbo gravado com registro pendente esconde a pendência nas sessões seguintes, porque o freshness passa a liberar pelo caminho leve; o workaround é seguir o procedimento da skill).
+- **Maturidade** — ideia (falta decidir como o motor de timestamp obtém o resultado da auditoria).
+
+**Contexto.** A skill de setup manda não gravar `last_setup_audit_run_at` nem `setup_contract_signature_*` enquanto `pos-build/registro` estiver `PENDENTE` (procedimento de registro, passo 6, e item 7 da ordem de correções). `Set-XpzSetupAuditTimestamp.ps1` não confere isso: grava sempre que chamado, e a regra fica só no procedimento seguido pelo agente.
+
+**Por que não agora.** Fazer o motor bloquear exige decidir de onde ele tira o resultado: rodar a auditoria de novo (custo e dependência dos wrappers locais), ler uma saída gravada pela auditoria (contrato novo de artefato) ou receber o resultado do chamador (não impede o chamador de mentir). É desenho novo, não correção pontual.
+
+**Gatilho.** Primeiro caso real de carimbo gravado com registro pendente, ou nova frente no motor de timestamp.
+
+**Relacionado.** `xpz-kb-parallel-setup/SKILL.md` (seção «Registro de eventos pos-build»), `scripts/Set-XpzSetupAuditTimestamp.ps1`, `scripts/Test-XpzSetupAudit.ps1`.
+
 <a id="prepush-fase2b-checksum-pos-import-20261121"></a>
 
 ## Pré-push fase 2b: classificador de checksum após import — 2026-11-21
