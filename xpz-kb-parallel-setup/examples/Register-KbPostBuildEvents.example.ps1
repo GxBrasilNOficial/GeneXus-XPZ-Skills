@@ -11,19 +11,20 @@ inertes (REM comentado, duração TimeSpan válida ou data civil válida), gera 
 secao-espelho legivel. Ação sensivel (desarma o rebaixamento por evento pos-build daquele
 environment): exige confirmacao. Sem -ConfirmRegistration, o motor pede frase exata via Read-Host;
 o agente só passa -ConfirmRegistration após o usuário aprovar explicitamente os eventos listados.
-O motor recusa (BLOCK) o build que não sirva de base do registro, com o mesmo veredito da dimensão
-pos-build/base da auditoria de setup: exitCode e executionEvidence.msBuildExitCode 0, sem msBuildFailed,
-e status compilou limpo (BuildAll) ou specify e generate concluídos (SpecifyGenerate), ou pendente só por
-evento pós-build a registrar (pendingCauses igual a postBuildEvent; inclusive evento novo num environment
-já registrado). Use o build do environment que a auditoria marcar como APTO; nada é gravado quando o
-build é recusado.
+O motor recusa (BLOCK), sem gravar nada, o build que não sirva de base do registro, com o mesmo
+veredito da dimensão pos-build/base da auditoria de setup, e também quando -EnvironmentName diverge
+de observedContext.ActiveEnvironment do JSON. Em -BuildResultJsonPath, use o JSON exato que a
+evidência de pos-build/base cita como apto para o environment (formato "build Temp\..."); a linha
+pos-build/base é agregada e não serve para escolher o environment. A regra completa de aptidão está
+na seção "Registro de eventos pos-build" de xpz-kb-parallel-setup/SKILL.md.
 
 .PARAMETER SharedSkillsRoot
 Raiz local da base compartilhada `GeneXus-XPZ-Skills`.
 
 .EXAMPLE
+# JSON citado na evidência de pos-build/base (a cópia automática tem nome por execução).
 .\Register-KbPostBuildEvents.ps1 `
-    -BuildResultJsonPath "C:\Dev\Prod\Gx_FabricaBrasil\Temp\xpz-msbuild-build\build.json" `
+    -BuildResultJsonPath "C:\Dev\Prod\Gx_FabricaBrasil\Temp\xpz-msbuild-build\buildall-20261123-161907-a38d2b47.json" `
     -EnvironmentName "NETPostgreSQL" `
     -KbParallelRoot "C:\Dev\Prod\Gx_FabricaBrasil" `
     -ConfirmRegistration `
