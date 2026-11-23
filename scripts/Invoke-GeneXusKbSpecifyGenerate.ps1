@@ -1909,11 +1909,10 @@ catch {
             strategyTrace        = @($script:StrategyTrace)
             note                 = 'Diagnostico completo indisponivel apos falha interna; consultar msbuild.stdout.log para evidencia primaria.'
         }
-        if ($null -ne $parallelKbDiagnosticCopyPath -and $recovery.Contains('artifacts')) {
-            $recovery['artifacts']['ParallelKbDiagnosticCopyPath'] = $parallelKbDiagnosticCopyPath
-        }
         try {
-            $recoveryJson = ConvertTo-JsonText -InputObject $recovery
+            # Copia no Temp\ da pasta paralela (melhor esforco), com o environment conhecido, antes do log:
+            # a auditoria de setup ve que houve build mais novo sem diagnostico utilizavel.
+            $recoveryJson = Complete-GeneXusParallelKbBuildDiagnosticCopy -Diagnostic $recovery -Path $parallelKbDiagnosticCopyPath -EnvironmentName $EnvironmentName -Serialize { param($d) ConvertTo-JsonText -InputObject $d }
             try {
                 if (-not [string]::IsNullOrWhiteSpace($resolvedLogPath) -and -not (Test-IsUnderProgramFilesX86 -PathValue $resolvedLogPath)) {
                     Write-JsonLog -TargetLogPath $resolvedLogPath -JsonPayload $recoveryJson
@@ -1921,10 +1920,6 @@ catch {
             }
             catch {
                 # best effort apenas
-            }
-            # Copia no Temp\ da pasta paralela (melhor esforco): a auditoria de setup ve que houve build mais novo.
-            if ($null -ne $parallelKbDiagnosticCopyPath) {
-                try { [void](Write-GeneXusParallelKbBuildDiagnosticCopy -Path $parallelKbDiagnosticCopyPath -JsonPayload $recoveryJson) } catch { }
             }
             Write-Output $recoveryJson
             exit $recoveryExitCode
@@ -1981,14 +1976,9 @@ catch {
         strategyTrace    = @($script:StrategyTrace)
     }
 
-    if ($null -ne $parallelKbDiagnosticCopyPath -and $failure.Contains('artifacts')) {
-        $failure['artifacts']['ParallelKbDiagnosticCopyPath'] = $parallelKbDiagnosticCopyPath
-    }
-    $failureJson = ConvertTo-JsonText -InputObject $failure
-    # Copia no Temp\ da pasta paralela (melhor esforco): a auditoria de setup ve que houve build mais novo.
-    if ($null -ne $parallelKbDiagnosticCopyPath) {
-        try { [void](Write-GeneXusParallelKbBuildDiagnosticCopy -Path $parallelKbDiagnosticCopyPath -JsonPayload $failureJson) } catch { }
-    }
+    # Copia no Temp\ da pasta paralela (melhor esforco), com o environment conhecido: a auditoria de setup ve
+    # que houve build mais novo sem diagnostico utilizavel.
+    $failureJson = Complete-GeneXusParallelKbBuildDiagnosticCopy -Diagnostic $failure -Path $parallelKbDiagnosticCopyPath -EnvironmentName $EnvironmentName -Serialize { param($d) ConvertTo-JsonText -InputObject $d }
     try {
         if (-not [string]::IsNullOrWhiteSpace($resolvedLogPath) -and -not (Test-IsUnderProgramFilesX86 -PathValue $resolvedLogPath)) {
             $parent = [System.IO.Path]::GetDirectoryName($resolvedLogPath)

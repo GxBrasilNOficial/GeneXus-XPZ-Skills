@@ -581,6 +581,59 @@ kb_environment_post_build_event_hashes: NETFrameworkSQLServer=$pbFamily1
   Assert-True ($rai.json.'pos-build/base' -eq 'APTO') "AI: APTO esperado; obtido $($rai.json.'pos-build/base')"
   Assert-True ([string]$rai.json.'pos-build/base.evidencia' -notmatch 'sem diagnostico utilizavel') "AI: sem aviso quando a copia de recuperacao e mais antiga; obtido $($rai.json.'pos-build/base.evidencia')"
   Assert-True ([string]$rai.json.'pos-build/registro.evidencia' -notmatch 'sem diagnostico utilizavel') "AI: sem aviso em pos-build/registro quando a copia e mais antiga"
+  Assert-True ([string]$rah.json.'pos-build/registro.evidencia' -match 'sem environment identificado.*pode ser de NETFrameworkSQLServer') "AH: copia sem environment deve apontar o environment avaliado por build anterior; obtido $($rah.json.'pos-build/registro.evidencia')"
+
+  # AJ-AN: comparacao por environment. Builds avaliados (com eventos) e copias sem diagnostico utilizavel, cada um
+  # com environment e idade em minutos; validationEnvironment vazio = environment nao identificado.
+  $pbEnvCopyCase = {
+    param([object[]]$Builds, [object[]]$Copies)
+    $fx = New-SetupAuditFixture -GateText $pbGateText
+    $now = Get-Date
+    $i = 0
+    foreach ($b in $Builds) {
+      $i++
+      $dir = Join-Path $fx.Root ("Temp\build-{0}" -f $i)
+      [void](New-Item -ItemType Directory -Path $dir -Force)
+      $events = @()
+      if ($b.Events) { $events = @('Powershell Write-Output teste-pb-x') }
+      $doc = [ordered]@{
+        exitCode          = 0
+        status            = 'compilou limpo'
+        observedContext   = [ordered]@{ ActiveEnvironment = $b.Env }
+        executionEvidence = [ordered]@{ msBuildExitCode = 0; msBuildFailed = $false }
+        stdoutSignals     = [ordered]@{ postBuildEvents = $events; postBuildEventClassification = [ordered]@{ unexpected = @() } }
+      }
+      $path = Join-Path $dir 'build.json'
+      [System.IO.File]::WriteAllText($path, ($doc | ConvertTo-Json -Depth 8), $utf8NoBom)
+      (Get-Item -LiteralPath $path).LastWriteTime = $now.AddMinutes(-1 * $b.Age)
+    }
+    $copyDir = Join-Path $fx.Root 'Temp\xpz-msbuild-build'
+    [void](New-Item -ItemType Directory -Path $copyDir -Force)
+    foreach ($c in $Copies) {
+      $doc = [ordered]@{ status = 'falha'; exitCode = 1; postProcessingFailed = $true }
+      if ($c.Env) { $doc['validationEnvironment'] = $c.Env }
+      $path = Join-Path $copyDir $c.Name
+      [System.IO.File]::WriteAllText($path, ($doc | ConvertTo-Json -Depth 4), $utf8NoBom)
+      (Get-Item -LiteralPath $path).LastWriteTime = $now.AddMinutes(-1 * $c.Age)
+    }
+    return (& $pbRun $fx)
+  }
+  # AJ: falha de A mais nova que o build avaliado de A, com o build de B mais novo que a falha -> avisa por A.
+  $raj = & $pbEnvCopyCase @(@{ Env = 'EnvA'; Age = 30; Events = $true }, @{ Env = 'EnvB'; Age = 0; Events = $true }) @(@{ Name = 'buildall-20261123-110000-0000000a.json'; Env = 'EnvA'; Age = 10 })
+  Assert-True ([string]$raj.json.'pos-build/registro.evidencia' -match 'buildall-20261123-110000-0000000a\.json do environment EnvA sem diagnostico utilizavel.*avaliacao pelo build anterior desse environment') "AJ: deve avisar do build mais novo de EnvA mesmo com EnvB mais recente; obtido $($raj.json.'pos-build/registro.evidencia')"
+  Assert-True ([string]$raj.json.'pos-build/base.evidencia' -match 'do environment EnvA sem diagnostico utilizavel') "AJ: pos-build/base.evidencia tambem deve avisar; obtido $($raj.json.'pos-build/base.evidencia')"
+  # AK: falha de A seguida de build utilizavel de A mais novo (mesmo sem eventos) -> sem aviso.
+  $rak = & $pbEnvCopyCase @(@{ Env = 'EnvA'; Age = 30; Events = $true }, @{ Env = 'EnvA'; Age = 5; Events = $false }) @(@{ Name = 'buildall-20261123-110000-0000000b.json'; Env = 'EnvA'; Age = 10 })
+  Assert-True ([string]$rak.json.'pos-build/registro.evidencia' -notmatch 'sem diagnostico utilizavel') "AK: build utilizavel mais novo do mesmo environment dispensa o aviso; obtido $($rak.json.'pos-build/registro.evidencia')"
+  # AL: falha de um environment sem build avaliado -> avisa que nao ha build anterior desse environment.
+  $ral = & $pbEnvCopyCase @(@{ Env = 'EnvA'; Age = 0; Events = $true }) @(@{ Name = 'specifygenerate-20261123-110000-0000000c.json'; Env = 'EnvC'; Age = 10 })
+  Assert-True ([string]$ral.json.'pos-build/registro.evidencia' -match 'specifygenerate-20261123-110000-0000000c\.json do environment EnvC sem diagnostico utilizavel.*nenhum build anterior avaliado para esse environment') "AL: deve avisar de EnvC sem build avaliado; obtido $($ral.json.'pos-build/registro.evidencia')"
+  # AM: falha sem environment identificado e nenhum build avaliado -> nao fala em build anterior.
+  $ram = & $pbEnvCopyCase @() @(@{ Name = 'buildall-20261123-110000-0000000d.json'; Env = ''; Age = 1 })
+  Assert-True ([string]$ram.json.'pos-build/registro.evidencia' -match 'sem environment identificado.*nenhum build anterior avaliado' -and [string]$ram.json.'pos-build/registro.evidencia' -notmatch 'avaliacao pelo build anterior') "AM: sem build avaliado, o aviso nao deve citar build anterior; obtido $($ram.json.'pos-build/registro.evidencia')"
+  # AN: falha sem environment, mais antiga que todos os builds avaliados -> sem aviso.
+  $ran = & $pbEnvCopyCase @(@{ Env = 'EnvA'; Age = 0; Events = $true }, @{ Env = 'EnvB'; Age = 2; Events = $true }) @(@{ Name = 'buildall-20261123-110000-0000000e.json'; Env = ''; Age = 10 })
+  Assert-True ([string]$ran.json.'pos-build/registro.evidencia' -notmatch 'sem diagnostico utilizavel') "AN: copia sem environment mais antiga que todos os builds avaliados nao deve avisar; obtido $($ran.json.'pos-build/registro.evidencia')"
 
   # SG: sucesso do SpecifyGenerate (status "specify e generate concluidos") tambem serve de base
   $pbSpecifyOk = 'specify e generate conclu' + [char]0x00ED + 'dos'

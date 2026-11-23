@@ -190,7 +190,9 @@ Do NOT use esta skill para:
   Falha na gravação vira aviso e `artifacts.ParallelKbDiagnosticCopyError`, sem mudar o status.
   A cópia também é gravada, como melhor esforço, nos JSONs de recuperação e de falha padrão. Eles
   não entram na avaliação da auditoria, que só avisa na evidência quando o build mais novo não
-  tem diagnóstico utilizável.
+  tem diagnóstico utilizável. Esses JSONs levam `validationEnvironment` (environment resolvido ou
+  pedido, quando conhecido) para o aviso ser por environment, e só citam a cópia quando ela foi
+  gravada.
 - Para diagnostico de `.cs` gerado, resolver o caminho com `Resolve-GeneXusGeneratedCsPath.ps1`,
   que le `kb_environment_web_dirs` no mesmo metadata; metadata sem esse campo volta para
   `xpz-kb-parallel-setup`.

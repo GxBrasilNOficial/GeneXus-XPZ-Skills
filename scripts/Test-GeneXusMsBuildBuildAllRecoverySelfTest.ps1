@@ -169,6 +169,8 @@ try {
     Assert-True -Condition (Test-Path -LiteralPath $copyPath -PathType Leaf) -Message ("Recovery deveria gravar a copia do diagnostico: '{0}'." -f $copyPath)
     $copyDoc = Get-Content -LiteralPath $copyPath -Raw | ConvertFrom-Json -Depth 16
     Assert-True -Condition ($copyDoc.postProcessingFailed -eq $true -and $copyDoc.status -eq $withCopy.Diagnostic.status) -Message 'A copia deveria ser o mesmo JSON de recuperação emitido.'
+    # validationEnvironment: a auditoria de setup atribui ao environment o build sem diagnostico utilizavel.
+    Assert-True -Condition ([string]$copyDoc.validationEnvironment -eq 'TestEnvironment' -and [string]$withCopy.Diagnostic.validationEnvironment -eq 'TestEnvironment') -Message ("Recovery deveria levar validationEnvironment=TestEnvironment na copia e no JSON emitido; copia '{0}', emitido '{1}'." -f $copyDoc.validationEnvironment, $withCopy.Diagnostic.validationEnvironment)
     $noCopyProperty = $complete.Diagnostic.artifacts.PSObject.Properties['ParallelKbDiagnosticCopyPath']
     Assert-True -Condition ($null -eq $noCopyProperty) -Message 'Recovery sem -ParallelKbRoot não deveria citar copia do diagnostico.'
 }

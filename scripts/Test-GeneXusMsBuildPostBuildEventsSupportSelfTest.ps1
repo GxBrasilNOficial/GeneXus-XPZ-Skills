@@ -209,6 +209,21 @@ try {
     $cpBytes = [System.IO.File]::ReadAllBytes($cpPath)
     if ($cpBytes[0] -eq 0xEF) { throw 'ASSERT_FAILED: copia nao deveria ter BOM.' }
     if ([System.IO.File]::ReadAllText($cpPath) -ne ('{"status":"x"}' + [Environment]::NewLine)) { throw 'ASSERT_FAILED: conteudo da copia divergente.' }
+
+    # Recuperacao e falha padrao (Complete-GeneXusParallelKbBuildDiagnosticCopy): cita a copia so quando gravou.
+    $cpSerialize = { param($d) $d | ConvertTo-Json -Depth 6 }
+    $cpOkDiag = [ordered]@{ status = 'falha'; artifacts = [ordered]@{ StdOutPath = 'x' } }
+    $cpOkPath = Get-GeneXusParallelKbBuildDiagnosticCopyPath -ParallelKbRoot $cpRoot -Stage 'buildall'
+    $cpOkDoc = (Complete-GeneXusParallelKbBuildDiagnosticCopy -Diagnostic $cpOkDiag -Path $cpOkPath -EnvironmentName ' EnvA ' -Serialize $cpSerialize) | ConvertFrom-Json
+    if ([string]$cpOkDoc.artifacts.ParallelKbDiagnosticCopyPath -ne $cpOkPath -or [string]$cpOkDoc.validationEnvironment -ne 'EnvA') { throw 'ASSERT_FAILED: copia gravada deveria ser citada, com validationEnvironment aparado.' }
+    $cpOkCopy = Get-Content -LiteralPath $cpOkPath -Raw | ConvertFrom-Json
+    if ([string]$cpOkCopy.validationEnvironment -ne 'EnvA' -or [string]$cpOkCopy.artifacts.ParallelKbDiagnosticCopyPath -ne $cpOkPath) { throw 'ASSERT_FAILED: a copia gravada deveria levar validationEnvironment e o proprio caminho.' }
+    $cpBadDiag = [ordered]@{ status = 'falha'; artifacts = [ordered]@{ StdOutPath = 'x' } }
+    $cpBadPath = Get-GeneXusParallelKbBuildDiagnosticCopyPath -ParallelKbRoot (Join-Path $cpRoot 'nao-existe') -Stage 'buildall'
+    $cpBadDoc = (Complete-GeneXusParallelKbBuildDiagnosticCopy -Diagnostic $cpBadDiag -Path $cpBadPath -EnvironmentName '' -Serialize $cpSerialize) | ConvertFrom-Json
+    if ($null -ne $cpBadDoc.artifacts.ParallelKbDiagnosticCopyPath -or [string]$cpBadDoc.artifacts.ParallelKbDiagnosticCopyError -notmatch 'pasta paralela inexistente' -or $null -ne $cpBadDoc.validationEnvironment) { throw 'ASSERT_FAILED: copia nao gravada nao deveria ser citada; esperado ParallelKbDiagnosticCopyError e validationEnvironment nulo.' }
+    $cpNoPathDoc = (Complete-GeneXusParallelKbBuildDiagnosticCopy -Diagnostic ([ordered]@{ status = 'falha'; artifacts = [ordered]@{} }) -Path '' -EnvironmentName 'EnvA' -Serialize $cpSerialize) | ConvertFrom-Json
+    if ($null -ne $cpNoPathDoc.PSObject.Properties['validationEnvironment'] -or $null -ne $cpNoPathDoc.artifacts.PSObject.Properties['ParallelKbDiagnosticCopyPath']) { throw 'ASSERT_FAILED: sem -ParallelKbRoot o JSON nao deveria mudar.' }
 }
 finally {
     if (Test-Path -LiteralPath $cpRoot) { Remove-Item -LiteralPath $cpRoot -Recurse -Force }

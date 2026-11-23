@@ -492,3 +492,38 @@ function Write-GeneXusParallelKbBuildDiagnosticCopy {
         return $_.Exception.Message
     }
 }
+
+function Complete-GeneXusParallelKbBuildDiagnosticCopy {
+    # Recuperacao e falha padrao dos wrappers de build. Esses JSONs nao trazem stdoutSignals nem
+    # observedContext.ActiveEnvironment, entao a auditoria de setup nao os avalia; para ela saber de qual
+    # environment e o build sem diagnostico utilizavel, a copia leva validationEnvironment (o environment
+    # resolvido ou pedido, quando conhecido). Grava a copia e so a cita em artifacts quando gravou; falha
+    # na gravacao vira ParallelKbDiagnosticCopyError. Sem -Path, so serializa. Devolve o JSON final; uma
+    # excecao da primeira serializacao propaga, como antes.
+    param(
+        [Parameter(Mandatory = $true)][System.Collections.IDictionary]$Diagnostic,
+        [string]$Path,
+        [string]$EnvironmentName,
+        [Parameter(Mandatory = $true)][scriptblock]$Serialize
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Path)) { return (& $Serialize $Diagnostic) }
+    $validationEnvironment = $null
+    if (-not [string]::IsNullOrWhiteSpace($EnvironmentName)) { $validationEnvironment = $EnvironmentName.Trim() }
+    $Diagnostic['validationEnvironment'] = $validationEnvironment
+    $hasArtifacts = ($Diagnostic.Contains('artifacts') -and $Diagnostic['artifacts'] -is [System.Collections.IDictionary])
+    if ($hasArtifacts) { $Diagnostic['artifacts']['ParallelKbDiagnosticCopyPath'] = $Path }
+    $json = & $Serialize $Diagnostic
+    $copyError = Write-GeneXusParallelKbBuildDiagnosticCopy -Path $Path -JsonPayload $json
+    if ($null -ne $copyError) {
+        if ($hasArtifacts) {
+            $Diagnostic['artifacts']['ParallelKbDiagnosticCopyPath'] = $null
+            $Diagnostic['artifacts']['ParallelKbDiagnosticCopyError'] = $copyError
+        }
+        else {
+            $Diagnostic['parallelKbDiagnosticCopyError'] = $copyError
+        }
+        try { $json = & $Serialize $Diagnostic } catch { }
+    }
+    return $json
+}

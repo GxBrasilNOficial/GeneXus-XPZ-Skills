@@ -429,6 +429,7 @@ $postBuildRegistryEvidence = 'sem registro, espelho ou JSON de build com eventos
 $postBuildMetadataPath = Join-Path $KbRoot 'kb-source-metadata.md'
 $postBuildTempRoot = Join-Path $KbRoot 'Temp'
 $postBuildLatestByEnv = @{}
+$postBuildUsableTimeByEnv = @{}
 if (Test-Path -LiteralPath $postBuildTempRoot -PathType Container) {
     $postBuildJsonFiles = @(Get-ChildItem -LiteralPath $postBuildTempRoot -Recurse -File -Filter '*.json' -ErrorAction SilentlyContinue |
         Sort-Object LastWriteTime -Descending)
@@ -445,6 +446,9 @@ if (Test-Path -LiteralPath $postBuildTempRoot -PathType Container) {
         $postBuildEnvName = [string]$postBuildDoc.observedContext.ActiveEnvironment
         if ([string]::IsNullOrWhiteSpace($postBuildEnvName)) { continue }
         $postBuildEnvName = $postBuildEnvName.Trim()
+        # Build com diagnostico utilizavel mais recente por environment (com ou sem eventos), para o aviso de
+        # build mais novo sem diagnostico utilizavel (abaixo).
+        if (-not $postBuildUsableTimeByEnv.ContainsKey($postBuildEnvName)) { $postBuildUsableTimeByEnv[$postBuildEnvName] = $postBuildJsonFile.LastWriteTime }
         if ($postBuildLatestByEnv.ContainsKey($postBuildEnvName)) { continue }
         $postBuildExecutable = @(@($postBuildDoc.stdoutSignals.postBuildEvents) | Where-Object {
             -not [string]::IsNullOrWhiteSpace($_) -and -not (Test-GeneXusPostBuildEventInert -Line $_)
@@ -626,35 +630,59 @@ if ($postBuildLatestByEnv.Count -gt 0) {
 
 # Build mais novo sem diagnostico utilizavel (informativo, nao muda status): os wrappers gravam a copia do
 # diagnostico em Temp\xpz-msbuild-build\ tambem na recuperacao e na falha padrao. Esses JSONs nao trazem
-# stdoutSignals ou observedContext.ActiveEnvironment e nao entram na avaliacao; quando o mais recente deles
-# e mais novo que todos os builds avaliados, as duas dimensoes avisam que a avaliacao usa um build anterior.
+# stdoutSignals ou observedContext.ActiveEnvironment e nao entram na avaliacao; trazem validationEnvironment
+# quando o environment era conhecido. A comparacao e por environment: para cada environment, a copia sem
+# diagnostico mais recente avisa quando nao ha build utilizavel mais novo desse environment. Sem environment
+# identificado, avisa quando algum environment avaliado tem build mais antigo que a copia (ou nenhum foi avaliado).
+$postBuildNewestNotes = [System.Collections.Generic.List[string]]::new()
 $postBuildCopyRoot = Join-Path $postBuildTempRoot 'xpz-msbuild-build'
 if (Test-Path -LiteralPath $postBuildCopyRoot -PathType Container) {
-    $postBuildNewestCopy = Get-ChildItem -LiteralPath $postBuildCopyRoot -File -ErrorAction SilentlyContinue |
+    $postBuildUnusableByEnv = @{}
+    $postBuildCopies = @(Get-ChildItem -LiteralPath $postBuildCopyRoot -File -ErrorAction SilentlyContinue |
         Where-Object { $_.Name -match '^(buildall|specifygenerate)-.+\.json$' } |
-        Sort-Object LastWriteTime -Descending |
-        Select-Object -First 1
-    if ($null -ne $postBuildNewestCopy) {
-        $postBuildNewestUsable = $false
+        Sort-Object LastWriteTime -Descending)
+    foreach ($postBuildCopy in $postBuildCopies) {
+        $postBuildCopyUsable = $false
+        $postBuildCopyEnv = ''
         try {
-            $postBuildNewestDoc = (Get-Content -LiteralPath $postBuildNewestCopy.FullName -Raw) | ConvertFrom-Json -ErrorAction Stop
-            $postBuildNewestUsable = ($null -ne $postBuildNewestDoc.PSObject.Properties['stdoutSignals'] -and $null -ne $postBuildNewestDoc.stdoutSignals -and
-                $null -ne $postBuildNewestDoc.PSObject.Properties['observedContext'] -and $null -ne $postBuildNewestDoc.observedContext -and
-                $null -ne $postBuildNewestDoc.observedContext.PSObject.Properties['ActiveEnvironment'] -and
-                -not [string]::IsNullOrWhiteSpace([string]$postBuildNewestDoc.observedContext.ActiveEnvironment))
+            $postBuildCopyDoc = (Get-Content -LiteralPath $postBuildCopy.FullName -Raw) | ConvertFrom-Json -ErrorAction Stop
+            $postBuildCopyUsable = ($null -ne $postBuildCopyDoc.PSObject.Properties['stdoutSignals'] -and $null -ne $postBuildCopyDoc.stdoutSignals -and
+                $null -ne $postBuildCopyDoc.PSObject.Properties['observedContext'] -and $null -ne $postBuildCopyDoc.observedContext -and
+                $null -ne $postBuildCopyDoc.observedContext.PSObject.Properties['ActiveEnvironment'] -and
+                -not [string]::IsNullOrWhiteSpace([string]$postBuildCopyDoc.observedContext.ActiveEnvironment))
+            if ($null -ne $postBuildCopyDoc.PSObject.Properties['validationEnvironment'] -and -not [string]::IsNullOrWhiteSpace([string]$postBuildCopyDoc.validationEnvironment)) {
+                $postBuildCopyEnv = ([string]$postBuildCopyDoc.validationEnvironment).Trim()
+            }
         } catch {
-            $postBuildNewestUsable = $false
+            $postBuildCopyUsable = $false
         }
-        $postBuildNewerThanUsed = $true
-        foreach ($postBuildUsedEntry in $postBuildLatestByEnv.Values) {
-            if ($postBuildUsedEntry.time -ge $postBuildNewestCopy.LastWriteTime) { $postBuildNewerThanUsed = $false; break }
+        if ($postBuildCopyUsable) { continue }
+        if (-not $postBuildUnusableByEnv.ContainsKey($postBuildCopyEnv)) { $postBuildUnusableByEnv[$postBuildCopyEnv] = $postBuildCopy }
+    }
+    foreach ($postBuildCopyEnvKey in @($postBuildUnusableByEnv.Keys | Sort-Object)) {
+        $postBuildCopy = $postBuildUnusableByEnv[$postBuildCopyEnvKey]
+        if ($postBuildCopyEnvKey -ne '') {
+            if ($postBuildUsableTimeByEnv.ContainsKey($postBuildCopyEnvKey) -and $postBuildUsableTimeByEnv[$postBuildCopyEnvKey] -ge $postBuildCopy.LastWriteTime) { continue }
+            if ($postBuildLatestByEnv.ContainsKey($postBuildCopyEnvKey)) {
+                $postBuildNewestNotes.Add(('build mais recente {0} do environment {1} sem diagnostico utilizavel (recuperacao ou falha); avaliacao pelo build anterior desse environment' -f $postBuildCopy.Name, $postBuildCopyEnvKey))
+            } else {
+                $postBuildNewestNotes.Add(('build mais recente {0} do environment {1} sem diagnostico utilizavel (recuperacao ou falha); nenhum build anterior avaliado para esse environment' -f $postBuildCopy.Name, $postBuildCopyEnvKey))
+            }
+            continue
         }
-        if (-not $postBuildNewestUsable -and $postBuildNewerThanUsed) {
-            $postBuildNewestNote = ('build mais recente {0} sem diagnostico utilizavel (recuperacao ou falha); avaliacao pelo build anterior' -f $postBuildNewestCopy.Name)
-            $postBuildRegistryEvidence = ('{0} | {1}' -f $postBuildRegistryEvidence, $postBuildNewestNote)
-            $postBuildBaseEvidence = ('{0} | {1}' -f $postBuildBaseEvidence, $postBuildNewestNote)
+        if ($postBuildLatestByEnv.Count -eq 0) {
+            $postBuildNewestNotes.Add(('build mais recente {0} sem diagnostico utilizavel e sem environment identificado (recuperacao ou falha); nenhum build anterior avaliado' -f $postBuildCopy.Name))
+            continue
+        }
+        $postBuildStaleEnvs = @($postBuildLatestByEnv.Keys | Where-Object { $postBuildUsableTimeByEnv[$_] -lt $postBuildCopy.LastWriteTime } | Sort-Object)
+        if ($postBuildStaleEnvs.Count -gt 0) {
+            $postBuildNewestNotes.Add(('build mais recente {0} sem diagnostico utilizavel e sem environment identificado (recuperacao ou falha); pode ser de {1}, avaliado por build anterior' -f $postBuildCopy.Name, ($postBuildStaleEnvs -join ', ')))
         }
     }
+}
+foreach ($postBuildNewestNote in $postBuildNewestNotes) {
+    $postBuildRegistryEvidence = ('{0} | {1}' -f $postBuildRegistryEvidence, $postBuildNewestNote)
+    $postBuildBaseEvidence = ('{0} | {1}' -f $postBuildBaseEvidence, $postBuildNewestNote)
 }
 
 # Dimensao importacao_msbuild (regra 8.g6.i), informativa: evidencia objetiva de uso do fluxo de importacao
