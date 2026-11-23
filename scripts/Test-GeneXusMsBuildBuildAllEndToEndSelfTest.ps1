@@ -468,6 +468,21 @@ try {
         $pbVerdict = Get-GeneXusPostBuildBaseVerdict -Facts (Get-GeneXusPostBuildBaseFacts -BuildJson $pbVerdictCase.Diagnostic)
         Assert-True -Condition ([bool]$pbVerdict.ok -eq $pbVerdictCase.ExpectOk) -Message ("Veredito de base sobre a saida real do BuildAll, {0}: esperado ok={1}; obtido ok={2} ({3})." -f $pbVerdictCase.Name, $pbVerdictCase.ExpectOk, $pbVerdict.ok, $pbVerdict.reason)
     }
+
+    # Copia do diagnostico no Temp\ da pasta paralela (onde a auditoria de setup procura o build mais recente):
+    # com -ParallelKbRoot o wrapper grava a copia e cita o caminho; sem ele, nao grava nem cita.
+    $pbCopyRoot = Join-Path (Join-Path $pbParallelRoot 'Temp') 'xpz-msbuild-build'
+    foreach ($pbCopyCase in @(@{ Name = 'PB2'; Diagnostic = $pbN2.Diagnostic }, @{ Name = 'PB4'; Diagnostic = $pbN4.Diagnostic })) {
+        $pbCopyPath = [string]$pbCopyCase.Diagnostic.artifacts.ParallelKbDiagnosticCopyPath
+        Assert-True -Condition (-not [string]::IsNullOrWhiteSpace($pbCopyPath)) -Message ("{0} deveria citar artifacts.ParallelKbDiagnosticCopyPath com -ParallelKbRoot." -f $pbCopyCase.Name)
+        Assert-True -Condition ((Split-Path -Parent $pbCopyPath) -eq $pbCopyRoot -and (Split-Path -Leaf $pbCopyPath) -match '^buildall-\d{8}-\d{6}-[0-9a-f]{8}\.json$') -Message ("{0}: copia fora de <ParallelKbRoot>\Temp\xpz-msbuild-build\buildall-*.json: '{1}'." -f $pbCopyCase.Name, $pbCopyPath)
+        Assert-True -Condition (Test-Path -LiteralPath $pbCopyPath -PathType Leaf) -Message ("{0}: copia do diagnostico nao gravada em '{1}'." -f $pbCopyCase.Name, $pbCopyPath)
+        $pbCopyDoc = Get-Content -LiteralPath $pbCopyPath -Raw | ConvertFrom-Json
+        Assert-True -Condition ($pbCopyDoc.status -eq $pbCopyCase.Diagnostic.status -and [string]$pbCopyDoc.observedContext.ActiveEnvironment -eq 'TestEnvironment' -and [string]$pbCopyDoc.artifacts.ParallelKbDiagnosticCopyPath -eq $pbCopyPath) -Message ("{0}: a copia deveria ser o mesmo diagnostico emitido (status, ActiveEnvironment e o proprio caminho)." -f $pbCopyCase.Name)
+        $pbCopyBytes = [System.IO.File]::ReadAllBytes($pbCopyPath)
+        Assert-True -Condition (-not ($pbCopyBytes.Length -ge 3 -and $pbCopyBytes[0] -eq 0xEF -and $pbCopyBytes[1] -eq 0xBB -and $pbCopyBytes[2] -eq 0xBF)) -Message ("{0}: a copia nao deveria ter BOM." -f $pbCopyCase.Name)
+    }
+    Assert-True -Condition ($null -eq $pbN1.Diagnostic.artifacts.PSObject.Properties['ParallelKbDiagnosticCopyPath']) -Message 'PB1 (sem -ParallelKbRoot) nao deveria citar nem gravar copia do diagnostico.'
 }
 finally {
     foreach ($msBuildFilePath in $artifactDirectories) {

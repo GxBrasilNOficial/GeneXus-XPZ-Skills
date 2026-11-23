@@ -52,6 +52,8 @@ xpz-kb-parallel-setup). Omitir só e valido quando kb_environment_count for 1 no
 Raiz da pasta paralela da KB para resolver kb-source-metadata.md (campos deployment_environment_name,
 kb_environment_count, kb_environment_names e, quando o gate de deploy bin estiver ativo,
 kb_environment_web_dirs). Não dispara inventario de environments na KB nativa.
+Com -ParallelKbRoot, grava também uma cópia do diagnóstico JSON em <ParallelKbRoot>\Temp\xpz-msbuild-build\buildall-<data>-<id>.json (artifacts.ParallelKbDiagnosticCopyPath), onde a auditoria
+de setup procura o build mais recente por environment; -KbMetadataPath sozinho não grava a cópia.
 
 .PARAMETER KbMetadataPath
 Caminho explicito para kb-source-metadata.md; prevalece sobre -ParallelKbRoot.
@@ -2297,6 +2299,12 @@ try {
 
     $diagnostic['timing'] = Get-GeneXusMsBuildTimingSection -TimingLog $script:TimingLog -MonitorLogPath $MonitorLogPath
 
+    # Copia no Temp\ da pasta paralela, onde a auditoria de setup procura o build mais recente.
+    $parallelKbDiagnosticCopyPath = Get-GeneXusParallelKbBuildDiagnosticCopyPath -ParallelKbRoot $ParallelKbRoot -Stage 'buildall'
+    if ($null -ne $parallelKbDiagnosticCopyPath) {
+        $diagnostic['artifacts']['ParallelKbDiagnosticCopyPath'] = $parallelKbDiagnosticCopyPath
+    }
+
     try {
         $json = ConvertTo-JsonText -InputObject $diagnostic
     }
@@ -2349,6 +2357,16 @@ try {
 
     if ($SelfTestForceOuterRecovery.IsPresent) {
         throw 'SELFTEST: falha artificial antes da escrita do diagnostico normal.'
+    }
+
+    if ($null -ne $parallelKbDiagnosticCopyPath) {
+        $parallelKbDiagnosticCopyError = Write-GeneXusParallelKbBuildDiagnosticCopy -Path $parallelKbDiagnosticCopyPath -JsonPayload $json
+        if ($null -ne $parallelKbDiagnosticCopyError) {
+            $diagnostic['artifacts']['ParallelKbDiagnosticCopyPath'] = $null
+            $diagnostic['artifacts']['ParallelKbDiagnosticCopyError'] = $parallelKbDiagnosticCopyError
+            $diagnostic['warnings'] = @($diagnostic['warnings']) + @(('Copia do diagnostico no Temp\ da pasta paralela nao gravada ({0}); a auditoria de setup nao vera este build.' -f $parallelKbDiagnosticCopyError))
+            try { $json = ConvertTo-JsonText -InputObject $diagnostic } catch { }
+        }
     }
 
     Write-JsonLog -TargetLogPath $resolvedLogPath -JsonPayload $json

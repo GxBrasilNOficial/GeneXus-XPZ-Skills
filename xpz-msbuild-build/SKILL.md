@@ -181,6 +181,13 @@ Do NOT use esta skill para:
   (registro de eventos pos-build) — **não** inventariam environments nem inferem caminho de
   `web\bin` por pastas da KB nativa em cada build. Sem metadata informado, o registro de eventos
   pos-build não é consultado e o wrapper avisa.
+- Com `-ParallelKbRoot`, os dois wrappers gravam também uma cópia do diagnóstico JSON no `Temp\`
+  da pasta paralela (`Temp\xpz-msbuild-build\buildall-<data>-<id>.json` ou
+  `specifygenerate-<data>-<id>.json`), citada em `artifacts.ParallelKbDiagnosticCopyPath`. É ali
+  que a auditoria de setup lê o build mais recente por environment (`pos-build/registro` e
+  `pos-build/base`); o `-LogPath` escolhido pelo chamador e os logs brutos no `Temp\` do
+  repositório do motor não são vistos por ela. `-KbMetadataPath` sozinho não grava a cópia.
+  Falha na gravação vira aviso e `artifacts.ParallelKbDiagnosticCopyError`, sem mudar o status.
 - Para diagnostico de `.cs` gerado, resolver o caminho com `Resolve-GeneXusGeneratedCsPath.ps1`,
   que le `kb_environment_web_dirs` no mesmo metadata; metadata sem esse campo volta para
   `xpz-kb-parallel-setup`.

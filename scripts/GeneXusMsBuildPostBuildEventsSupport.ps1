@@ -453,3 +453,42 @@ function Get-GeneXusPostBuildBaseVerdict {
     }
     return [pscustomobject]@{ ok = $false; reason = "status nao previsto: $($Facts.statusText)" }
 }
+
+function Get-GeneXusParallelKbBuildDiagnosticCopyPath {
+    # Caminho da copia do diagnostico de build no Temp\ da pasta paralela. A auditoria de setup
+    # (pos-build/registro e pos-build/base) procura ali o JSON de build mais recente por environment;
+    # sem a copia, o build fica so no Temp\ do repositorio do motor (ou no -LogPath escolhido pelo
+    # chamador) e a auditoria julga por um build antigo. So com -ParallelKbRoot explicito; sem ele, $null.
+    param(
+        [string]$ParallelKbRoot,
+        [Parameter(Mandatory = $true)][string]$Stage
+    )
+
+    if ([string]::IsNullOrWhiteSpace($ParallelKbRoot)) { return $null }
+    $root = [System.IO.Path]::GetFullPath($ParallelKbRoot)
+    $name = '{0}-{1}-{2}.json' -f $Stage, (Get-Date -Format 'yyyyMMdd-HHmmss'), ([guid]::NewGuid().ToString('N').Substring(0, 8))
+    return (Join-Path (Join-Path (Join-Path $root 'Temp') 'xpz-msbuild-build') $name)
+}
+
+function Write-GeneXusParallelKbBuildDiagnosticCopy {
+    # Grava a copia (UTF-8 sem BOM). Devolve $null quando gravou, ou o motivo da falha. Nao cria a raiz
+    # da pasta paralela: raiz inexistente e falha, so a subpasta Temp\xpz-msbuild-build e criada.
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][AllowEmptyString()][string]$JsonPayload
+    )
+
+    try {
+        $directory = Split-Path -Parent $Path
+        $root = Split-Path -Parent (Split-Path -Parent $directory)
+        if (-not (Test-Path -LiteralPath $root -PathType Container)) {
+            return ("pasta paralela inexistente: {0}" -f $root)
+        }
+        [System.IO.Directory]::CreateDirectory($directory) | Out-Null
+        [System.IO.File]::WriteAllText($Path, $JsonPayload + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding($false)))
+        return $null
+    }
+    catch {
+        return $_.Exception.Message
+    }
+}

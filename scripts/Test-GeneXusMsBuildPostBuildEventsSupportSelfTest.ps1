@@ -193,4 +193,25 @@ if ($null -ne (Get-NextStepCase -Lines @($nsOther) -Registered @() -State 'envir
 # Registro completo (tudo esperado, forma de familia) -> sem nextStep
 if ($null -ne (Get-NextStepCase -Lines @($nsFamilyLine) -Registered @($nsFamilyHash) -State 'available')) { throw 'ASSERT_FAILED: registro completo nao deveria ter nextStep.' }
 
+# Copia do diagnostico no Temp\ da pasta paralela: sem raiz nao ha caminho; raiz inexistente nao e criada.
+if ($null -ne (Get-GeneXusParallelKbBuildDiagnosticCopyPath -ParallelKbRoot '' -Stage 'buildall')) { throw 'ASSERT_FAILED: sem -ParallelKbRoot nao deveria haver caminho de copia.' }
+$cpRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('xpz-pbcopy-{0}' -f ([guid]::NewGuid().ToString('N')))
+try {
+    $cpMissing = Get-GeneXusParallelKbBuildDiagnosticCopyPath -ParallelKbRoot $cpRoot -Stage 'buildall'
+    $cpMissingError = Write-GeneXusParallelKbBuildDiagnosticCopy -Path $cpMissing -JsonPayload '{}'
+    if ($null -eq $cpMissingError -or $cpMissingError -notmatch 'pasta paralela inexistente') { throw "ASSERT_FAILED: raiz inexistente deveria falhar com 'pasta paralela inexistente'; obtido '$cpMissingError'." }
+    if (Test-Path -LiteralPath $cpRoot) { throw 'ASSERT_FAILED: a raiz inexistente da pasta paralela nao deveria ser criada.' }
+    [System.IO.Directory]::CreateDirectory($cpRoot) | Out-Null
+    $cpPath = Get-GeneXusParallelKbBuildDiagnosticCopyPath -ParallelKbRoot $cpRoot -Stage 'specifygenerate'
+    if ((Split-Path -Parent $cpPath) -ne (Join-Path $cpRoot 'Temp\xpz-msbuild-build')) { throw "ASSERT_FAILED: copia fora de Temp\xpz-msbuild-build: '$cpPath'." }
+    $cpError = Write-GeneXusParallelKbBuildDiagnosticCopy -Path $cpPath -JsonPayload '{"status":"x"}'
+    if ($null -ne $cpError) { throw "ASSERT_FAILED: gravacao da copia deveria funcionar com raiz existente; erro '$cpError'." }
+    $cpBytes = [System.IO.File]::ReadAllBytes($cpPath)
+    if ($cpBytes[0] -eq 0xEF) { throw 'ASSERT_FAILED: copia nao deveria ter BOM.' }
+    if ([System.IO.File]::ReadAllText($cpPath) -ne ('{"status":"x"}' + [Environment]::NewLine)) { throw 'ASSERT_FAILED: conteudo da copia divergente.' }
+}
+finally {
+    if (Test-Path -LiteralPath $cpRoot) { Remove-Item -LiteralPath $cpRoot -Recurse -Force }
+}
+
 Write-Output 'GENEXUS_MSBUILD_POST_BUILD_EVENTS_SUPPORT_SELFTEST_OK'

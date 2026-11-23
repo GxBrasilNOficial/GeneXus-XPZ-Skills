@@ -43,6 +43,8 @@ gravado pelo xpz-kb-parallel-setup).
 .PARAMETER ParallelKbRoot
 Raiz da pasta paralela da KB para resolver kb-source-metadata.md sem inventario em runtime
 (quando o gate de deploy bin estiver ativo, também le kb_environment_web_dirs).
+Com -ParallelKbRoot, grava também uma cópia do diagnóstico JSON em <ParallelKbRoot>\Temp\xpz-msbuild-build\specifygenerate-<data>-<id>.json (artifacts.ParallelKbDiagnosticCopyPath), onde a
+auditoria de setup procura o build mais recente por environment; -KbMetadataPath sozinho não grava a cópia.
 
 .PARAMETER KbMetadataPath
 Caminho explicito para kb-source-metadata.md; prevalece sobre -ParallelKbRoot.
@@ -1732,6 +1734,12 @@ try {
         $diagnostic['environmentRemediationHints'] = $environmentRemediationHints
     }
 
+    # Copia no Temp\ da pasta paralela, onde a auditoria de setup procura o build mais recente.
+    $parallelKbDiagnosticCopyPath = Get-GeneXusParallelKbBuildDiagnosticCopyPath -ParallelKbRoot $ParallelKbRoot -Stage 'specifygenerate'
+    if ($null -ne $parallelKbDiagnosticCopyPath) {
+        $diagnostic['artifacts']['ParallelKbDiagnosticCopyPath'] = $parallelKbDiagnosticCopyPath
+    }
+
     try {
         $json = ConvertTo-JsonText -InputObject $diagnostic
     }
@@ -1781,6 +1789,16 @@ try {
 
     # Fallback: gravar sempre no diretório de artefatos, independente de $resolvedLogPath.
     # Garante rastreabilidade mesmo quando o chamador for interrompido antes de ler o JSON.
+    if ($null -ne $parallelKbDiagnosticCopyPath) {
+        $parallelKbDiagnosticCopyError = Write-GeneXusParallelKbBuildDiagnosticCopy -Path $parallelKbDiagnosticCopyPath -JsonPayload $json
+        if ($null -ne $parallelKbDiagnosticCopyError) {
+            $diagnostic['artifacts']['ParallelKbDiagnosticCopyPath'] = $null
+            $diagnostic['artifacts']['ParallelKbDiagnosticCopyError'] = $parallelKbDiagnosticCopyError
+            $diagnostic['warnings'] = @($diagnostic['warnings']) + @(('Copia do diagnostico no Temp\ da pasta paralela nao gravada ({0}); a auditoria de setup nao vera este build.' -f $parallelKbDiagnosticCopyError))
+            try { $json = ConvertTo-JsonText -InputObject $diagnostic } catch { }
+        }
+    }
+
     $artifactResultPath = Join-Path $artifactDirectory 'specifygenerate-result.json'
     [System.IO.File]::WriteAllText($artifactResultPath, $json + [Environment]::NewLine, (Get-Utf8NoBomEncoding))
 

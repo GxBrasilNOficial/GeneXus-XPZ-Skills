@@ -294,6 +294,19 @@ try {
 
     # SG1 (registro completo) segue sem causa de pendencia.
     Assert-True -Condition (@($sgRegistered.Diagnostic.pendingCauses).Count -eq 0) -Message ("SG1 nao deveria ter pendingCauses; recebeu '{0}'." -f (@($sgRegistered.Diagnostic.pendingCauses) -join ', '))
+
+    # Copia do diagnostico no Temp\ da pasta paralela (onde a auditoria de setup procura o build mais recente):
+    # com -ParallelKbRoot o wrapper grava a copia e cita o caminho; sem ele (SG2), nao grava nem cita.
+    foreach ($sgCopyCase in @(@{ Name = 'SG3'; Diagnostic = $sgNoEntry.Diagnostic; Root = $sgEmptyRoot }, @{ Name = 'SG4'; Diagnostic = $sgNewEvent.Diagnostic; Root = $sgParallelRoot })) {
+        $sgCopyPath = [string]$sgCopyCase.Diagnostic.artifacts.ParallelKbDiagnosticCopyPath
+        $sgCopyRoot = Join-Path (Join-Path $sgCopyCase.Root 'Temp') 'xpz-msbuild-build'
+        Assert-True -Condition (-not [string]::IsNullOrWhiteSpace($sgCopyPath)) -Message ("{0} deveria citar artifacts.ParallelKbDiagnosticCopyPath com -ParallelKbRoot." -f $sgCopyCase.Name)
+        Assert-True -Condition ((Split-Path -Parent $sgCopyPath) -eq $sgCopyRoot -and (Split-Path -Leaf $sgCopyPath) -match '^specifygenerate-\d{8}-\d{6}-[0-9a-f]{8}\.json$') -Message ("{0}: copia fora de <ParallelKbRoot>\Temp\xpz-msbuild-build\specifygenerate-*.json: '{1}'." -f $sgCopyCase.Name, $sgCopyPath)
+        Assert-True -Condition (Test-Path -LiteralPath $sgCopyPath -PathType Leaf) -Message ("{0}: copia do diagnostico nao gravada em '{1}'." -f $sgCopyCase.Name, $sgCopyPath)
+        $sgCopyDoc = Get-Content -LiteralPath $sgCopyPath -Raw | ConvertFrom-Json
+        Assert-True -Condition ($sgCopyDoc.status -eq $sgCopyCase.Diagnostic.status -and [string]$sgCopyDoc.observedContext.ActiveEnvironment -eq 'TestEnvironment' -and [string]$sgCopyDoc.artifacts.ParallelKbDiagnosticCopyPath -eq $sgCopyPath) -Message ("{0}: a copia deveria ser o mesmo diagnostico emitido (status, ActiveEnvironment e o proprio caminho)." -f $sgCopyCase.Name)
+    }
+    Assert-True -Condition ($null -eq $sgNoMetadata.Diagnostic.artifacts.PSObject.Properties['ParallelKbDiagnosticCopyPath']) -Message 'SG2 (sem -ParallelKbRoot) nao deveria citar nem gravar copia do diagnostico.'
 }
 finally {
     foreach ($msBuildFilePath in $artifactDirectories) {
