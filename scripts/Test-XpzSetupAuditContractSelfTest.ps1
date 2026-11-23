@@ -520,6 +520,25 @@ kb_environment_post_build_event_hashes: NETFrameworkSQLServer=$pbFamily1
   $rae = & $pbRun $ae
   Assert-True ($rae.json.'importacao_msbuild' -eq 'NAO_ADOTADO') "AE: NAO_ADOTADO esperado so com pasta de pacotes; obtido $($rae.json.'importacao_msbuild')"
 
+  # AF: msbuild.stdout.log de build em subpasta de Temp\, sem artefato de importacao -> NAO_ADOTADO
+  # (BuildAll, SpecifyGenerate, exportacao e outros scripts MSBuild tambem gravam esse log)
+  $af = New-SetupAuditFixture -GateText $pbGateText
+  $afDir = Join-Path $af.Root 'Temp\build-x\gx-build-1'
+  [void](New-Item -ItemType Directory -Path $afDir -Force)
+  [System.IO.File]::WriteAllText((Join-Path $afDir 'msbuild.stdout.log'), "Build All Task Sucesso`n", $utf8NoBom)
+  $raf = & $pbRun $af
+  Assert-True ($raf.json.'importacao_msbuild' -eq 'NAO_ADOTADO') "AF: NAO_ADOTADO esperado so com msbuild.stdout.log de build; obtido $($raf.json.'importacao_msbuild') / $($raf.json.'importacao_msbuild.evidencia')"
+
+  # AG: import-real.msbuild (artefato proprio de Invoke-GeneXusXpzImport.ps1) em subpasta de Temp\ -> ADOTADO
+  $ag = New-SetupAuditFixture -GateText $pbGateText
+  $agDir = Join-Path $ag.Root 'Temp\import-x\gx-import-1'
+  [void](New-Item -ItemType Directory -Path $agDir -Force)
+  [System.IO.File]::WriteAllText((Join-Path $agDir 'import-real.msbuild'), "<Project />`n", $utf8NoBom)
+  [System.IO.File]::WriteAllText((Join-Path $agDir 'msbuild.stdout.log'), "log`n", $utf8NoBom)
+  $rag = & $pbRun $ag
+  Assert-True ($rag.json.'importacao_msbuild' -eq 'ADOTADO') "AG: ADOTADO esperado com import-real.msbuild em subpasta de Temp; obtido $($rag.json.'importacao_msbuild')"
+  Assert-True ([string]$rag.json.'importacao_msbuild.evidencia' -match 'import-real\.msbuild') "AG: evidencia deve citar import-real.msbuild; obtido $($rag.json.'importacao_msbuild.evidencia')"
+
   # SG: sucesso do SpecifyGenerate (status "specify e generate concluidos") tambem serve de base
   $pbSpecifyOk = 'specify e generate conclu' + [char]0x00ED + 'dos'
   $rsg = & $pbBase @{ ExitCode = 0; Status = $pbSpecifyOk; MsBuildExitCode = 0; RegistryState = $null; Unexpected = @() }

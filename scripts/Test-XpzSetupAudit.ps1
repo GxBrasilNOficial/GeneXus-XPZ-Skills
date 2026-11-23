@@ -627,9 +627,11 @@ if ($postBuildLatestByEnv.Count -gt 0) {
 # headless (Invoke-GeneXusXpzImport.ps1). Mera existencia de PacotesGeradosParaImportacaoNaKbNoGenexus nao
 # basta. Evidencia suficiente: artefato nominal de importacao em Temp\ ou em qualquer subpasta, wrapper local
 # Invoke-*KbXpzImport.ps1, ou referencia a importacao headless em AGENTS.md/README.md locais.
+# msbuild.stdout.log NAO conta: BuildAll, SpecifyGenerate, exportacao e outros scripts MSBuild tambem o gravam.
+# Os nomes abaixo sao proprios da importacao (real ou preview) ou de convencao de redirecionamento.
 $importMsbuildStatus = 'NAO_ADOTADO'
 $importMsbuildEvidence = 'sem artefato de importacao em Temp\ (nem subpastas), sem wrapper local Invoke-*KbXpzImport.ps1 e sem referencia a importacao headless em AGENTS.md/README.md'
-$importArtifactNames = @('import.json', 'import.log', 'import.monitor.log', 'msbuild.stdout.log')
+$importArtifactNames = @('import.json', 'import.log', 'import.monitor.log', 'import-real.msbuild', 'import-preview.msbuild', 'msbuild.import.signals.json')
 $importArtifact = $null
 if (Test-Path -LiteralPath $postBuildTempRoot -PathType Container) {
     $importArtifact = Get-ChildItem -LiteralPath $postBuildTempRoot -Recurse -File -ErrorAction SilentlyContinue |

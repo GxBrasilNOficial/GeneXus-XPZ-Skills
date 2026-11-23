@@ -943,7 +943,7 @@ Pre-condicao obrigatória: confirmar que o passo 7b foi executado nesta sessao a
 
 8.g6.i Determinar se ha evidencia objetiva de uso do fluxo de importação via MSBuild — `Invoke-GeneXusXpzImport.ps1` da skill `xpz-msbuild-import-export` — pela pasta paralela:
     - considerar como evidencia suficiente qualquer uma das seguintes:
-      - existência, em `Temp\` ou em qualquer subpasta de `Temp\`, de `import.json`, `import.log`, `import.monitor.log` ou `msbuild.stdout.log` (artefatos nominais de execução de `Invoke-GeneXusXpzImport.ps1`)
+      - existência, em `Temp\` ou em qualquer subpasta de `Temp\`, de `import.json`, `import.log`, `import.monitor.log`, `import-real.msbuild`, `import-preview.msbuild` ou `msbuild.import.signals.json` (artefatos nominais de execução de `Invoke-GeneXusXpzImport.ps1` e do preview `Test-GeneXusXpzImportPreview.ps1`, ou nomes de convenção para a saída redirecionada); `msbuild.stdout.log` sozinho não é evidência, porque BuildAll, SpecifyGenerate, exportação e outros scripts MSBuild também o gravam
       - existência de wrapper local que delegue a `Invoke-GeneXusXpzImport.ps1` (ex: `Invoke-*KbXpzImport.ps1`)
       - documentação local (`AGENTS.md`, `README.md`) mencionando importação headless, MSBuild import ou a skill `xpz-msbuild-import-export` no fluxo operacional
       - `PacotesGeradosParaImportacaoNaKbNoGenexus` populado E referencia documental local ao caminho de importação headless (a mera existência da pasta não basta — empacotamento sem importação headless e cenário valido coberto por 8.g3)
