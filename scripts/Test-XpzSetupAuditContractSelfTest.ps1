@@ -539,6 +539,49 @@ kb_environment_post_build_event_hashes: NETFrameworkSQLServer=$pbFamily1
   Assert-True ($rag.json.'importacao_msbuild' -eq 'ADOTADO') "AG: ADOTADO esperado com import-real.msbuild em subpasta de Temp; obtido $($rag.json.'importacao_msbuild')"
   Assert-True ([string]$rag.json.'importacao_msbuild.evidencia' -match 'import-real\.msbuild') "AG: evidencia deve citar import-real.msbuild; obtido $($rag.json.'importacao_msbuild.evidencia')"
 
+  # AH/AI: copia de recuperacao (sem stdoutSignals nem ActiveEnvironment) em Temp\xpz-msbuild-build\.
+  # AH: mais nova que o build avaliado -> status mantido e as duas dimensoes avisam. AI: mais antiga -> sem aviso.
+  $pbRecoveryCopy = {
+    param([bool]$Newer)
+    $fx = New-SetupAuditFixture -GateText $pbGateText
+    $buildDir = Join-Path $fx.Root 'Temp\build-base'
+    [void](New-Item -ItemType Directory -Path $buildDir -Force)
+    $buildDoc = [ordered]@{
+      exitCode          = 0
+      status            = 'compilou limpo'
+      observedContext   = [ordered]@{ ActiveEnvironment = 'NETFrameworkSQLServer' }
+      executionEvidence = [ordered]@{ msBuildExitCode = 0; msBuildFailed = $false }
+      stdoutSignals     = [ordered]@{
+        postBuildEvents              = @('Powershell Write-Output teste-pb-x')
+        postBuildEventClassification = [ordered]@{ unexpected = @() }
+      }
+    }
+    $buildPath = Join-Path $buildDir 'build.json'
+    [System.IO.File]::WriteAllText($buildPath, ($buildDoc | ConvertTo-Json -Depth 8), $utf8NoBom)
+    $copyDir = Join-Path $fx.Root 'Temp\xpz-msbuild-build'
+    [void](New-Item -ItemType Directory -Path $copyDir -Force)
+    $copyPath = Join-Path $copyDir 'buildall-20261123-120000-abcdef01.json'
+    $recoveryDoc = [ordered]@{ status = 'compilou limpo com falha no pos-processamento'; exitCode = 0; postProcessingFailed = $true; observedContext = [ordered]@{ KbOpen = $true } }
+    [System.IO.File]::WriteAllText($copyPath, ($recoveryDoc | ConvertTo-Json -Depth 4), $utf8NoBom)
+    $now = Get-Date
+    if ($Newer) {
+      (Get-Item -LiteralPath $buildPath).LastWriteTime = $now.AddMinutes(-10)
+      (Get-Item -LiteralPath $copyPath).LastWriteTime = $now
+    } else {
+      (Get-Item -LiteralPath $buildPath).LastWriteTime = $now
+      (Get-Item -LiteralPath $copyPath).LastWriteTime = $now.AddMinutes(-10)
+    }
+    return (& $pbRun $fx)
+  }
+  $rah = & $pbRecoveryCopy $true
+  Assert-True ($rah.json.'pos-build/base' -eq 'APTO') "AH: status de pos-build/base deve seguir o build anterior (APTO); obtido $($rah.json.'pos-build/base')"
+  Assert-True ([string]$rah.json.'pos-build/base.evidencia' -match 'sem diagnostico utilizavel') "AH: pos-build/base.evidencia deve avisar do build mais novo; obtido $($rah.json.'pos-build/base.evidencia')"
+  Assert-True ([string]$rah.json.'pos-build/registro.evidencia' -match 'buildall-20261123-120000-abcdef01\.json sem diagnostico utilizavel') "AH: pos-build/registro.evidencia deve citar o arquivo; obtido $($rah.json.'pos-build/registro.evidencia')"
+  $rai = & $pbRecoveryCopy $false
+  Assert-True ($rai.json.'pos-build/base' -eq 'APTO') "AI: APTO esperado; obtido $($rai.json.'pos-build/base')"
+  Assert-True ([string]$rai.json.'pos-build/base.evidencia' -notmatch 'sem diagnostico utilizavel') "AI: sem aviso quando a copia de recuperacao e mais antiga; obtido $($rai.json.'pos-build/base.evidencia')"
+  Assert-True ([string]$rai.json.'pos-build/registro.evidencia' -notmatch 'sem diagnostico utilizavel') "AI: sem aviso em pos-build/registro quando a copia e mais antiga"
+
   # SG: sucesso do SpecifyGenerate (status "specify e generate concluidos") tambem serve de base
   $pbSpecifyOk = 'specify e generate conclu' + [char]0x00ED + 'dos'
   $rsg = & $pbBase @{ ExitCode = 0; Status = $pbSpecifyOk; MsBuildExitCode = 0; RegistryState = $null; Unexpected = @() }

@@ -453,6 +453,7 @@ if (Test-Path -LiteralPath $postBuildTempRoot -PathType Container) {
         # Fatos do build para o veredito de base (suporte compartilhado, o mesmo usado pelo Register).
         $postBuildLatestByEnv[$postBuildEnvName] = [pscustomobject]@{
             file  = $postBuildJsonFile.FullName
+            time  = $postBuildJsonFile.LastWriteTime
             count = $postBuildExecutable.Count
             lines = @($postBuildExecutable | ForEach-Object { $_.Trim() })
             facts = Get-GeneXusPostBuildBaseFacts -BuildJson $postBuildDoc
@@ -621,6 +622,39 @@ if ($postBuildLatestByEnv.Count -gt 0) {
     }
     $postBuildBaseEvidence = $postBuildBaseParts -join ' | '
     $postBuildBaseStatus = if ($postBuildBaseRejected -gt 0) { 'NAO_APTO' } else { 'APTO' }
+}
+
+# Build mais novo sem diagnostico utilizavel (informativo, nao muda status): os wrappers gravam a copia do
+# diagnostico em Temp\xpz-msbuild-build\ tambem na recuperacao e na falha padrao. Esses JSONs nao trazem
+# stdoutSignals ou observedContext.ActiveEnvironment e nao entram na avaliacao; quando o mais recente deles
+# e mais novo que todos os builds avaliados, as duas dimensoes avisam que a avaliacao usa um build anterior.
+$postBuildCopyRoot = Join-Path $postBuildTempRoot 'xpz-msbuild-build'
+if (Test-Path -LiteralPath $postBuildCopyRoot -PathType Container) {
+    $postBuildNewestCopy = Get-ChildItem -LiteralPath $postBuildCopyRoot -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -match '^(buildall|specifygenerate)-.+\.json$' } |
+        Sort-Object LastWriteTime -Descending |
+        Select-Object -First 1
+    if ($null -ne $postBuildNewestCopy) {
+        $postBuildNewestUsable = $false
+        try {
+            $postBuildNewestDoc = (Get-Content -LiteralPath $postBuildNewestCopy.FullName -Raw) | ConvertFrom-Json -ErrorAction Stop
+            $postBuildNewestUsable = ($null -ne $postBuildNewestDoc.PSObject.Properties['stdoutSignals'] -and $null -ne $postBuildNewestDoc.stdoutSignals -and
+                $null -ne $postBuildNewestDoc.PSObject.Properties['observedContext'] -and $null -ne $postBuildNewestDoc.observedContext -and
+                $null -ne $postBuildNewestDoc.observedContext.PSObject.Properties['ActiveEnvironment'] -and
+                -not [string]::IsNullOrWhiteSpace([string]$postBuildNewestDoc.observedContext.ActiveEnvironment))
+        } catch {
+            $postBuildNewestUsable = $false
+        }
+        $postBuildNewerThanUsed = $true
+        foreach ($postBuildUsedEntry in $postBuildLatestByEnv.Values) {
+            if ($postBuildUsedEntry.time -ge $postBuildNewestCopy.LastWriteTime) { $postBuildNewerThanUsed = $false; break }
+        }
+        if (-not $postBuildNewestUsable -and $postBuildNewerThanUsed) {
+            $postBuildNewestNote = ('build mais recente {0} sem diagnostico utilizavel (recuperacao ou falha); avaliacao pelo build anterior' -f $postBuildNewestCopy.Name)
+            $postBuildRegistryEvidence = ('{0} | {1}' -f $postBuildRegistryEvidence, $postBuildNewestNote)
+            $postBuildBaseEvidence = ('{0} | {1}' -f $postBuildBaseEvidence, $postBuildNewestNote)
+        }
+    }
 }
 
 # Dimensao importacao_msbuild (regra 8.g6.i), informativa: evidencia objetiva de uso do fluxo de importacao

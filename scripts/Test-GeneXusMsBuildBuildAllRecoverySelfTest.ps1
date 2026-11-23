@@ -52,7 +52,9 @@ function Remove-WrapperArtifactDirectory {
 function Invoke-RecoveryScenario {
     param(
         [string]$ScenarioRoot,
-        [bool]$EmitBuildAllDone
+        [bool]$EmitBuildAllDone,
+        # Raiz de pasta paralela sintetica (com kb-source-metadata.md). Vazio preserva a chamada original.
+        [string]$ParallelKbRoot = ''
     )
 
     $fakeGeneXusDirectory = Join-Path $ScenarioRoot 'GeneXus'
@@ -91,6 +93,8 @@ function Invoke-RecoveryScenario {
         [System.Text.Encoding]::ASCII)
 
     $wrapperPath = Join-Path $PSScriptRoot 'Invoke-GeneXusKbBuildAll.ps1'
+    $extraParams = @{}
+    if (-not [string]::IsNullOrWhiteSpace($ParallelKbRoot)) { $extraParams['ParallelKbRoot'] = $ParallelKbRoot }
     $wrapperOutput = & $wrapperPath `
         -KbPath $fakeKbDirectory `
         -WorkingDirectory $workingDirectory `
@@ -98,7 +102,7 @@ function Invoke-RecoveryScenario {
         -GeneXusDir $fakeGeneXusDirectory `
         -MsBuildPath $fakeMsBuildPath `
         -EnvironmentName 'TestEnvironment' `
-        -SelfTestForceOuterRecovery
+        -SelfTestForceOuterRecovery @extraParams
     $wrapperExitCode = $LASTEXITCODE
     $jsonText = @($wrapperOutput) -join [Environment]::NewLine
 
@@ -140,6 +144,33 @@ try {
     Assert-True -Condition ($incomplete.Diagnostic.observedContext.BuildAllDone -eq $false) -Message 'Cenário negativo deve manter BuildAllDone=false.'
     Assert-True -Condition ($incomplete.Diagnostic.status -ne 'compilou limpo com falha no pos-processamento') -Message 'Recovery não pode promover evidência sem BuildAllDone a sucesso limpo degradado.'
     Assert-True -Condition ($incomplete.Diagnostic.postProcessingFailed -eq $true) -Message 'Cenário negativo deve continuar identificado como falha de pós-processamento.'
+
+    # Com -ParallelKbRoot, a recuperacao tambem grava a copia do diagnostico no Temp\ da pasta paralela,
+    # para a auditoria de setup saber que houve um build mais novo que o avaliado.
+    $parallelRoot = Join-Path $testRoot 'parallel'
+    [System.IO.Directory]::CreateDirectory($parallelRoot) | Out-Null
+    $metadataText = @(
+        '---'
+        'deployment_environment_name: TestEnvironment'
+        'deployment_hosting_kind: dotnet-core-self-host'
+        'kb_environment_count: 1'
+        'kb_environment_names: TestEnvironment'
+        '---'
+        ''
+    ) -join "`n"
+    [System.IO.File]::WriteAllText((Join-Path $parallelRoot 'kb-source-metadata.md'), $metadataText, [System.Text.UTF8Encoding]::new($false))
+    $withCopy = Invoke-RecoveryScenario -ScenarioRoot (Join-Path $testRoot 'parallel-copy') -EmitBuildAllDone $true -ParallelKbRoot $parallelRoot
+    $artifactDirectories.Add([string]$withCopy.Diagnostic.executionEvidence.StdOutPath)
+
+    Assert-True -Condition ($withCopy.Diagnostic.postProcessingFailed -eq $true) -Message 'Cenário com pasta paralela deve passar pela recuperação.'
+    $copyPath = [string]$withCopy.Diagnostic.artifacts.ParallelKbDiagnosticCopyPath
+    $copyRoot = Join-Path (Join-Path $parallelRoot 'Temp') 'xpz-msbuild-build'
+    Assert-True -Condition ((Split-Path -Parent $copyPath) -eq $copyRoot -and (Split-Path -Leaf $copyPath) -match '^buildall-\d{8}-\d{6}-[0-9a-f]{8}\.json$') -Message ("Recovery deveria citar a copia em <ParallelKbRoot>\Temp\xpz-msbuild-build\buildall-*.json; recebeu '{0}'." -f $copyPath)
+    Assert-True -Condition (Test-Path -LiteralPath $copyPath -PathType Leaf) -Message ("Recovery deveria gravar a copia do diagnostico: '{0}'." -f $copyPath)
+    $copyDoc = Get-Content -LiteralPath $copyPath -Raw | ConvertFrom-Json -Depth 16
+    Assert-True -Condition ($copyDoc.postProcessingFailed -eq $true -and $copyDoc.status -eq $withCopy.Diagnostic.status) -Message 'A copia deveria ser o mesmo JSON de recuperação emitido.'
+    $noCopyProperty = $complete.Diagnostic.artifacts.PSObject.Properties['ParallelKbDiagnosticCopyPath']
+    Assert-True -Condition ($null -eq $noCopyProperty) -Message 'Recovery sem -ParallelKbRoot não deveria citar copia do diagnostico.'
 }
 finally {
     foreach ($stdOutPath in $artifactDirectories) {

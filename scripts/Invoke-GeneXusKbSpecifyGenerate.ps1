@@ -619,6 +619,10 @@ $stdErrText = ''
 $postProcessingFailed = $false
 $postProcessingError = $null
 $buildStatus = $null
+# Copia do diagnostico no Temp\ da pasta paralela, gravada em todos os pontos de emissao (normal, recuperacao
+# e falha padrao). Calculada antes do try para que a recuperacao e a falha padrao tambem a tenham.
+$parallelKbDiagnosticCopyPath = $null
+try { $parallelKbDiagnosticCopyPath = Get-GeneXusParallelKbBuildDiagnosticCopyPath -ParallelKbRoot $ParallelKbRoot -Stage 'specifygenerate' } catch { $parallelKbDiagnosticCopyPath = $null }
 $msBuildCategoryBBlocked = $false
 $operationalSubStateSpecify = $null
 $activeVersionOutput = $null
@@ -1735,7 +1739,6 @@ try {
     }
 
     # Copia no Temp\ da pasta paralela, onde a auditoria de setup procura o build mais recente.
-    $parallelKbDiagnosticCopyPath = Get-GeneXusParallelKbBuildDiagnosticCopyPath -ParallelKbRoot $ParallelKbRoot -Stage 'specifygenerate'
     if ($null -ne $parallelKbDiagnosticCopyPath) {
         $diagnostic['artifacts']['ParallelKbDiagnosticCopyPath'] = $parallelKbDiagnosticCopyPath
     }
@@ -1906,6 +1909,9 @@ catch {
             strategyTrace        = @($script:StrategyTrace)
             note                 = 'Diagnostico completo indisponivel apos falha interna; consultar msbuild.stdout.log para evidencia primaria.'
         }
+        if ($null -ne $parallelKbDiagnosticCopyPath -and $recovery.Contains('artifacts')) {
+            $recovery['artifacts']['ParallelKbDiagnosticCopyPath'] = $parallelKbDiagnosticCopyPath
+        }
         try {
             $recoveryJson = ConvertTo-JsonText -InputObject $recovery
             try {
@@ -1915,6 +1921,10 @@ catch {
             }
             catch {
                 # best effort apenas
+            }
+            # Copia no Temp\ da pasta paralela (melhor esforco): a auditoria de setup ve que houve build mais novo.
+            if ($null -ne $parallelKbDiagnosticCopyPath) {
+                try { [void](Write-GeneXusParallelKbBuildDiagnosticCopy -Path $parallelKbDiagnosticCopyPath -JsonPayload $recoveryJson) } catch { }
             }
             Write-Output $recoveryJson
             exit $recoveryExitCode
@@ -1971,7 +1981,14 @@ catch {
         strategyTrace    = @($script:StrategyTrace)
     }
 
+    if ($null -ne $parallelKbDiagnosticCopyPath -and $failure.Contains('artifacts')) {
+        $failure['artifacts']['ParallelKbDiagnosticCopyPath'] = $parallelKbDiagnosticCopyPath
+    }
     $failureJson = ConvertTo-JsonText -InputObject $failure
+    # Copia no Temp\ da pasta paralela (melhor esforco): a auditoria de setup ve que houve build mais novo.
+    if ($null -ne $parallelKbDiagnosticCopyPath) {
+        try { [void](Write-GeneXusParallelKbBuildDiagnosticCopy -Path $parallelKbDiagnosticCopyPath -JsonPayload $failureJson) } catch { }
+    }
     try {
         if (-not [string]::IsNullOrWhiteSpace($resolvedLogPath) -and -not (Test-IsUnderProgramFilesX86 -PathValue $resolvedLogPath)) {
             $parent = [System.IO.Path]::GetDirectoryName($resolvedLogPath)

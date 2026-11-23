@@ -724,6 +724,10 @@ $postProcessingFailed = $false
 $postProcessingError = $null
 $buildStatus = $null
 $script:PendingCauses = [System.Collections.Generic.List[string]]::new()
+# Copia do diagnostico no Temp\ da pasta paralela, gravada em todos os pontos de emissao (normal, recuperacao
+# e falha padrao). Calculada antes do try para que a recuperacao e a falha padrao tambem a tenham.
+$parallelKbDiagnosticCopyPath = $null
+try { $parallelKbDiagnosticCopyPath = Get-GeneXusParallelKbBuildDiagnosticCopyPath -ParallelKbRoot $ParallelKbRoot -Stage 'buildall' } catch { $parallelKbDiagnosticCopyPath = $null }
 $msBuildCategoryBBlocked = $false
 $script:StaticCompressorKnownCase = $null
 $operationalSubStateBuild = $null
@@ -2300,7 +2304,6 @@ try {
     $diagnostic['timing'] = Get-GeneXusMsBuildTimingSection -TimingLog $script:TimingLog -MonitorLogPath $MonitorLogPath
 
     # Copia no Temp\ da pasta paralela, onde a auditoria de setup procura o build mais recente.
-    $parallelKbDiagnosticCopyPath = Get-GeneXusParallelKbBuildDiagnosticCopyPath -ParallelKbRoot $ParallelKbRoot -Stage 'buildall'
     if ($null -ne $parallelKbDiagnosticCopyPath) {
         $diagnostic['artifacts']['ParallelKbDiagnosticCopyPath'] = $parallelKbDiagnosticCopyPath
     }
@@ -2478,6 +2481,9 @@ catch {
             strategyTrace        = @($script:StrategyTrace)
             note                 = 'Diagnostico completo indisponivel apos falha interna; consultar msbuild.stdout.log para evidencia primaria. buildSignals.Complete=true: reorg/erros/eventos pos-build sao integrais e confiaveis (nao reabrir o log para eles). Complete=false: bucket parcial — campo null nao e zero/vazio, reabrir o log para os campos null.'
         }
+        if ($null -ne $parallelKbDiagnosticCopyPath -and $recovery.Contains('artifacts')) {
+            $recovery['artifacts']['ParallelKbDiagnosticCopyPath'] = $parallelKbDiagnosticCopyPath
+        }
         try {
             $recoveryJson = ConvertTo-JsonText -InputObject $recovery
             try {
@@ -2487,6 +2493,10 @@ catch {
             }
             catch {
                 # best effort apenas
+            }
+            # Copia no Temp\ da pasta paralela (melhor esforco): a auditoria de setup ve que houve build mais novo.
+            if ($null -ne $parallelKbDiagnosticCopyPath) {
+                try { [void](Write-GeneXusParallelKbBuildDiagnosticCopy -Path $parallelKbDiagnosticCopyPath -JsonPayload $recoveryJson) } catch { }
             }
             Write-Output $recoveryJson
             exit $recoveryExitCode
@@ -2551,7 +2561,14 @@ catch {
     }
 
     $failure['timing'] = Get-GeneXusMsBuildTimingSection -TimingLog $script:TimingLog -MonitorLogPath $MonitorLogPath
+    if ($null -ne $parallelKbDiagnosticCopyPath -and $failure.Contains('artifacts')) {
+        $failure['artifacts']['ParallelKbDiagnosticCopyPath'] = $parallelKbDiagnosticCopyPath
+    }
     $failureJson = ConvertTo-JsonText -InputObject $failure
+    # Copia no Temp\ da pasta paralela (melhor esforco): a auditoria de setup ve que houve build mais novo.
+    if ($null -ne $parallelKbDiagnosticCopyPath) {
+        try { [void](Write-GeneXusParallelKbBuildDiagnosticCopy -Path $parallelKbDiagnosticCopyPath -JsonPayload $failureJson) } catch { }
+    }
     try {
         if (-not [string]::IsNullOrWhiteSpace($resolvedLogPath) -and -not (Test-IsUnderProgramFilesX86 -PathValue $resolvedLogPath)) {
             $parent = [System.IO.Path]::GetDirectoryName($resolvedLogPath)
