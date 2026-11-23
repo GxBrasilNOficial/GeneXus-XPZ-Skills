@@ -651,6 +651,59 @@ kb_environment_post_build_event_hashes: NETFrameworkSQLServer=$pbFamily1
   $ran = & $pbEnvCopyCase @(@{ Env = 'EnvA'; Age = 0; Events = $true }, @{ Env = 'EnvB'; Age = 2; Events = $true }) @(@{ Name = 'buildall-20261123-110000-0000000e.json'; Env = ''; Age = 10 })
   Assert-True ([string]$ran.json.'pos-build/registro.evidencia' -notmatch 'sem diagnostico utilizavel') "AN: copia sem environment mais antiga que todos os builds avaliados nao deve avisar; obtido $($ran.json.'pos-build/registro.evidencia')"
 
+  # AO: pos-build/base e status agregado; com dois environments, um apto e outro nao, a linha e NAO_APTO e o
+  # veredito de cada environment fica na evidencia.
+  $ao = New-SetupAuditFixture -GateText $pbGateText
+  $aoBuilds = @(
+    @{ Env = 'EnvA'; Status = 'compilou limpo' },
+    @{ Env = 'EnvB'; Status = 'falhou' }
+  )
+  foreach ($aoBuild in $aoBuilds) {
+    $aoDir = Join-Path $ao.Root ("Temp\build-{0}" -f $aoBuild.Env)
+    [void](New-Item -ItemType Directory -Path $aoDir -Force)
+    $aoDoc = [ordered]@{
+      exitCode          = 0
+      status            = $aoBuild.Status
+      observedContext   = [ordered]@{ ActiveEnvironment = $aoBuild.Env }
+      executionEvidence = [ordered]@{ msBuildExitCode = 0; msBuildFailed = $false }
+      stdoutSignals     = [ordered]@{ postBuildEvents = @('Powershell Write-Output teste-pb-x'); postBuildEventClassification = [ordered]@{ unexpected = @() } }
+    }
+    [System.IO.File]::WriteAllText((Join-Path $aoDir 'build.json'), ($aoDoc | ConvertTo-Json -Depth 8), $utf8NoBom)
+  }
+  $rao = & $pbRun $ao
+  Assert-True ($rao.json.'pos-build/base' -eq 'NAO_APTO') "AO: status agregado NAO_APTO esperado com um environment nao apto; obtido $($rao.json.'pos-build/base')"
+  Assert-True ([string]$rao.json.'pos-build/base.evidencia' -match 'EnvA: apto') "AO: evidencia deve marcar EnvA como apto; obtido $($rao.json.'pos-build/base.evidencia')"
+  Assert-True ([string]$rao.json.'pos-build/base.evidencia' -match 'EnvB: nao apto') "AO: evidencia deve marcar EnvB como nao apto; obtido $($rao.json.'pos-build/base.evidencia')"
+
+  # AP: environment ja registrado (available) com evento novo fora do campo -> pos-build/registro PENDENTE
+  $ap = New-SetupAuditFixture -GateText $pbGateText
+  $apDir1 = Join-Path $ap.Root 'Temp\build-ap1'
+  [void](New-Item -ItemType Directory -Path $apDir1 -Force)
+  $apBuild1 = Join-Path $apDir1 'build.json'
+  $apDoc1 = [ordered]@{
+    exitCode          = 0
+    status            = 'compilou limpo'
+    executionEvidence = [ordered]@{ msBuildExitCode = 0; msBuildFailed = $false }
+    observedContext   = [ordered]@{ ActiveEnvironment = 'NETFrameworkSQLServer' }
+    stdoutSignals     = [ordered]@{ postBuildEvents = @('Powershell Write-Output teste-pb-x') }
+  }
+  [System.IO.File]::WriteAllText($apBuild1, ($apDoc1 | ConvertTo-Json -Depth 6), $utf8NoBom)
+  (Get-Item -LiteralPath $apBuild1).LastWriteTime = (Get-Date).AddMinutes(-5)
+  $rap0 = Invoke-XpzSelfTestScript -ScriptPath $register -ScriptArgs @(
+    '-BuildResultJsonPath', $apBuild1, '-KbParallelRoot', $ap.Root, '-EnvironmentName', 'NETFrameworkSQLServer',
+    '-ConfirmRegistration', '-AsJson')
+  Assert-True ($rap0.exit -eq 0) "AP: registro deveria sair 0; obtido $($rap0.exit)"
+  $apDir2 = Join-Path $ap.Root 'Temp\build-ap2'
+  [void](New-Item -ItemType Directory -Path $apDir2 -Force)
+  $apDoc2 = [ordered]@{
+    observedContext = [ordered]@{ ActiveEnvironment = 'NETFrameworkSQLServer' }
+    stdoutSignals   = [ordered]@{ postBuildEvents = @('Powershell Write-Output teste-pb-x', 'Powershell Write-Output evento-novo') }
+  }
+  [System.IO.File]::WriteAllText((Join-Path $apDir2 'build.json'), ($apDoc2 | ConvertTo-Json -Depth 6), $utf8NoBom)
+  $rap = & $pbRun $ap
+  Assert-True ($rap.json.'pos-build/registro' -eq 'PENDENTE') "AP: PENDENTE esperado com evento novo num environment ja registrado; obtido $($rap.json.'pos-build/registro') / $($rap.json.'pos-build/registro.evidencia')"
+  Assert-True ([string]$rap.json.'pos-build/registro.evidencia' -match 'sem registro=1') "AP: evidencia deve contar o evento novo (sem registro=1); obtido $($rap.json.'pos-build/registro.evidencia')"
+
   # SG: sucesso do SpecifyGenerate (status "specify e generate concluidos") tambem serve de base
   $pbSpecifyOk = 'specify e generate conclu' + [char]0x00ED + 'dos'
   $rsg = & $pbBase @{ ExitCode = 0; Status = $pbSpecifyOk; MsBuildExitCode = 0; RegistryState = $null; Unexpected = @() }

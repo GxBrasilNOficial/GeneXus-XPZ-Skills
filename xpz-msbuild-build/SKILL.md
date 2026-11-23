@@ -183,10 +183,12 @@ Do NOT use esta skill para:
   pos-build não é consultado e o wrapper avisa.
 - Com `-ParallelKbRoot`, os dois wrappers gravam também uma cópia do diagnóstico JSON no `Temp\`
   da pasta paralela (`Temp\xpz-msbuild-build\buildall-<data>-<id>.json` ou
-  `specifygenerate-<data>-<id>.json`), citada em `artifacts.ParallelKbDiagnosticCopyPath`. É ali
-  que a auditoria de setup lê o build mais recente por environment (`pos-build/registro` e
-  `pos-build/base`); o `-LogPath` escolhido pelo chamador e os logs brutos no `Temp\` do
-  repositório do motor não são vistos por ela. `-KbMetadataPath` sozinho não grava a cópia.
+  `specifygenerate-<data>-<id>.json`), citada em `artifacts.ParallelKbDiagnosticCopyPath`. É o
+  caminho garantido para a auditoria de setup ler o build mais recente por environment
+  (`pos-build/registro` e `pos-build/base`). A auditoria lê também qualquer outro JSON de build
+  em `Temp\` da pasta paralela, inclusive em subpastas, como um `-LogPath` apontado para lá; um
+  `-LogPath` fora dele e os logs brutos no `Temp\` do repositório do motor não são vistos por
+  ela. `-KbMetadataPath` sozinho não grava a cópia.
   Falha na gravação vira aviso e `artifacts.ParallelKbDiagnosticCopyError`, sem mudar o status.
   A cópia também é gravada, como melhor esforço, nos JSONs de recuperação e de falha padrão. Eles
   não entram na avaliação da auditoria, que só avisa na evidência quando o build mais novo não

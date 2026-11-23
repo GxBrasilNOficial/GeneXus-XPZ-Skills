@@ -605,8 +605,9 @@ if ($postBuildEnvs.Count -gt 0) {
 }
 $hasPostBuildRegistryPendencies = $postBuildRegistryStatus -eq 'PENDENTE'
 
-# Base do registro (dimensao pos-build/base): informa, por environment, se o build mais recente com eventos
-# serve de base para registrar. Informativa: nao altera o estado sugerido. Evita que o agente tenha de
+# Base do registro (dimensao pos-build/base): informa se o build mais recente com eventos serve de base para
+# registrar. A linha e agregada (NAO_APTO se algum environment nao serve); o veredito de cada environment fica na
+# evidencia ("<env>: apto" / "<env>: nao apto"). Informativa: nao altera o estado sugerido. Evita que o agente tenha de
 # interpretar o JSON de build: um build nao apto exige build novo antes de qualquer registro.
 $postBuildBaseStatus = 'SEM_EVIDENCIA'
 $postBuildBaseEvidence = 'sem JSON de build com eventos pos-build em Temp\ (rodar um build para evidenciar)'
