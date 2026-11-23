@@ -148,6 +148,30 @@ try {
     $hashesSg = Get-GeneXusRegisteredPostBuildEventHashesForEnvironment -MetadataPath $metadataPath -EnvironmentName 'NETSpecifyGenerate'
     if (@($hashesSg).Count -ne 1) { throw "ASSERT_FAILED: build de SpecifyGenerate apto deveria registrar 1 hash; atual=$(@($hashesSg).Count)" }
 
+    # -EnvironmentName divergente do ActiveEnvironment do JSON: BLOCK, nada gravado. Igual a menos da caixa: aceito.
+    $mismatchObj = [ordered]@{
+        exitCode          = 0
+        status            = 'compilou limpo'
+        executionEvidence = [ordered]@{ msBuildExitCode = 0; msBuildFailed = $false }
+        observedContext   = [ordered]@{ ActiveEnvironment = 'AmbienteA' }
+        stdoutSignals     = [ordered]@{ postBuildEvents = @($sino) }
+    }
+    $jsonMismatch = Join-Path $tempRoot 'build-env-mismatch.json'
+    [System.IO.File]::WriteAllText($jsonMismatch, ($mismatchObj | ConvertTo-Json -Depth 8), (Get-Utf8NoBomEncoding))
+    $textBeforeMismatch = [System.IO.File]::ReadAllText($metadataPath)
+    $mismatchRefusal = $null
+    try {
+        & $registerScript -BuildResultJsonPath $jsonMismatch -EnvironmentName 'AmbienteB' -MetadataPath $metadataPath -ConfirmRegistration -AsJson | Out-Null
+    } catch {
+        $mismatchRefusal = $_.Exception.Message
+    }
+    if ($null -eq $mismatchRefusal -or $mismatchRefusal -notmatch 'BLOCK: -EnvironmentName .AmbienteB. diverge') { throw "ASSERT_FAILED: environment divergente deveria ser recusado com BLOCK; obtido='$mismatchRefusal'" }
+    if ([System.IO.File]::ReadAllText($metadataPath) -ne $textBeforeMismatch) { throw 'ASSERT_FAILED: recusa por environment divergente nao deveria alterar o metadata' }
+    & $registerScript -BuildResultJsonPath $jsonMismatch -EnvironmentName 'ambientea' -MetadataPath $metadataPath -ConfirmRegistration -AsJson | Out-Null
+    $metadataAfterCase = [System.IO.File]::ReadAllText($metadataPath)
+    if ($metadataAfterCase -notmatch 'AmbienteA=') { throw 'ASSERT_FAILED: environment igual a menos da caixa deveria registrar com a grafia do build (AmbienteA)' }
+    if ($metadataAfterCase -cmatch 'ambientea=') { throw 'ASSERT_FAILED: registro nao deveria usar a grafia do parametro (ambientea)' }
+
     # Environment ja registrado com evento novo: o build fica pendente por evento (registryStatus available) e e base apta.
     $pendingObj = [ordered]@{
         exitCode          = 0

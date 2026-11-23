@@ -28,7 +28,9 @@
     stdoutSignals.postBuildEvents.
 
 .PARAMETER EnvironmentName
-    Environment a registrar. Quando omitido, usa observedContext.ActiveEnvironment do JSON.
+    Environment a registrar. Quando omitido, usa observedContext.ActiveEnvironment do JSON. Quando
+    informado e o JSON trouxer ActiveEnvironment diferente (sem diferenciar caixa), o script recusa com
+    BLOCK e nao grava nada; igual a menos da caixa, grava com a grafia do JSON.
 
 .PARAMETER KbParallelRoot
     Raiz da pasta paralela da KB (para localizar kb-source-metadata.md).
@@ -98,12 +100,21 @@ if ($null -ne $buildJson.PSObject.Properties['stdoutSignals'] -and $null -ne $bu
     }
 }
 
+$jsonEnvName = $null
+if ($null -ne $buildJson.PSObject.Properties['observedContext'] -and $null -ne $buildJson.observedContext -and
+    $null -ne $buildJson.observedContext.PSObject.Properties['ActiveEnvironment'] -and
+    -not [string]::IsNullOrWhiteSpace([string]$buildJson.observedContext.ActiveEnvironment)) {
+    $jsonEnvName = ([string]$buildJson.observedContext.ActiveEnvironment).Trim()
+}
 $envName = $EnvironmentName
 if ([string]::IsNullOrWhiteSpace($envName)) {
-    if ($null -ne $buildJson.PSObject.Properties['observedContext'] -and $null -ne $buildJson.observedContext -and
-        $null -ne $buildJson.observedContext.PSObject.Properties['ActiveEnvironment']) {
-        $envName = $buildJson.observedContext.ActiveEnvironment
-    }
+    $envName = $jsonEnvName
+} elseif ($null -ne $jsonEnvName -and -not [string]::Equals($envName.Trim(), $jsonEnvName, [System.StringComparison]::OrdinalIgnoreCase)) {
+    # Os eventos sao do environment ativo no build: grava-los em outro environment desarmaria o rebaixamento errado.
+    throw "BLOCK: -EnvironmentName '$($envName.Trim())' diverge do environment do build (observedContext.ActiveEnvironment='$jsonEnvName'). Use o JSON de um build desse environment. Nada gravado."
+} elseif ($null -ne $jsonEnvName) {
+    # Igual a menos da caixa: grava com a grafia do build, que e a que o build usa para consultar o registro.
+    $envName = $jsonEnvName
 }
 if ([string]::IsNullOrWhiteSpace($envName)) {
     throw 'BLOCK: environment nao informado e ActiveEnvironment ausente no JSON do build. Use -EnvironmentName.'

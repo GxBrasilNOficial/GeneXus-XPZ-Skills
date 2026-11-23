@@ -457,6 +457,9 @@ if (Test-Path -LiteralPath $postBuildTempRoot -PathType Container) {
         # Fatos do build para o veredito de base (suporte compartilhado, o mesmo usado pelo Register).
         $postBuildLatestByEnv[$postBuildEnvName] = [pscustomobject]@{
             file  = $postBuildJsonFile.FullName
+            # Rotulo na evidencia: caminho relativo a Temp\ (as copias de BuildAll e SpecifyGenerate dividem a mesma
+            # pasta, entao so a pasta pai nao identifica o JSON; e este arquivo que vai em -BuildResultJsonPath).
+            label = [System.IO.Path]::GetRelativePath($postBuildTempRoot, $postBuildJsonFile.FullName)
             time  = $postBuildJsonFile.LastWriteTime
             count = $postBuildExecutable.Count
             lines = @($postBuildExecutable | ForEach-Object { $_.Trim() })
@@ -557,7 +560,7 @@ if ($postBuildEnvs.Count -gt 0) {
         if ($postBuildHasBuild) {
             $postBuildEntry = $postBuildLatestByEnv[$postBuildEnvKey]
             if ($postBuildRegistry.state -ne 'available') {
-                $postBuildReasons += "sem registro (build $(Split-Path -Leaf (Split-Path -Parent $postBuildEntry.file)); $postBuildAction)"
+                $postBuildReasons += "sem registro (build Temp\$($postBuildEntry.label); $postBuildAction)"
                 $postBuildPending = $true
             } else {
                 $postBuildUnregistered = 0
@@ -571,11 +574,11 @@ if ($postBuildEnvs.Count -gt 0) {
                     }
                 }
                 if ($postBuildUnregistered -gt 0) {
-                    $postBuildReasons += "sem registro=$postBuildUnregistered (build $(Split-Path -Leaf (Split-Path -Parent $postBuildEntry.file)); $postBuildAction)"
+                    $postBuildReasons += "sem registro=$postBuildUnregistered (build Temp\$($postBuildEntry.label); $postBuildAction)"
                     $postBuildPending = $true
                 }
                 if ($postBuildLegacyOnly -gt 0) {
-                    $postBuildReasons += "so na forma legada=$postBuildLegacyOnly (build $(Split-Path -Leaf (Split-Path -Parent $postBuildEntry.file)); $postBuildAction)"
+                    $postBuildReasons += "so na forma legada=$postBuildLegacyOnly (build Temp\$($postBuildEntry.label); $postBuildAction)"
                     $postBuildPending = $true
                 }
             }
@@ -584,7 +587,7 @@ if ($postBuildEnvs.Count -gt 0) {
         if ($postBuildPending) {
             $postBuildPendingEnvs += $postBuildEnvKey
         } elseif ($postBuildHasBuild) {
-            $postBuildReasons += 'registro coerente com o build'
+            $postBuildReasons += ('registro coerente com o build Temp\{0}' -f $postBuildLatestByEnv[$postBuildEnvKey].label)
         } elseif ($postBuildMirrorLines.Count -gt 0) {
             $postBuildReasons += 'registro de familia coerente com o espelho; sem build para conferir cobertura'
             $postBuildUnknownEnvs += $postBuildEnvKey
@@ -617,7 +620,7 @@ if ($postBuildLatestByEnv.Count -gt 0) {
     foreach ($postBuildBaseEnv in @($postBuildLatestByEnv.Keys | Sort-Object)) {
         $postBuildBaseEntry = $postBuildLatestByEnv[$postBuildBaseEnv]
         $postBuildBaseVerdict = Get-GeneXusPostBuildBaseVerdict -Facts $postBuildBaseEntry.facts
-        $postBuildBaseFile = Split-Path -Leaf (Split-Path -Parent $postBuildBaseEntry.file)
+        $postBuildBaseFile = "Temp\$($postBuildBaseEntry.label)"
         if ($postBuildBaseVerdict.ok) {
             $postBuildBaseParts += ('{0}: apto ({1}; build {2})' -f $postBuildBaseEnv, $postBuildBaseVerdict.reason, $postBuildBaseFile)
         } else {
@@ -688,12 +691,13 @@ foreach ($postBuildNewestNote in $postBuildNewestNotes) {
 
 # Dimensao importacao_msbuild (regra 8.g6.i), informativa: evidencia objetiva de uso do fluxo de importacao
 # headless (Invoke-GeneXusXpzImport.ps1). Mera existencia de PacotesGeradosParaImportacaoNaKbNoGenexus nao
-# basta. Evidencia suficiente: artefato nominal de importacao em Temp\ ou em qualquer subpasta, wrapper local
-# Invoke-*KbXpzImport.ps1, ou referencia a importacao headless em AGENTS.md/README.md locais.
+# basta. Evidencia suficiente: artefato nominal de importacao em Temp\ ou em qualquer subpasta, ou wrapper local
+# Invoke-*KbXpzImport.ps1. Referencia documental em AGENTS.md/README.md NAO conta: o modelo AGENTS.md.example ja
+# traz instrucoes genericas sobre importacao headless, e toda pasta criada a partir dele daria ADOTADO.
 # msbuild.stdout.log NAO conta: BuildAll, SpecifyGenerate, exportacao e outros scripts MSBuild tambem o gravam.
 # Os nomes abaixo sao proprios da importacao (real ou preview) ou de convencao de redirecionamento.
 $importMsbuildStatus = 'NAO_ADOTADO'
-$importMsbuildEvidence = 'sem artefato de importacao em Temp\ (nem subpastas), sem wrapper local Invoke-*KbXpzImport.ps1 e sem referencia a importacao headless em AGENTS.md/README.md'
+$importMsbuildEvidence = 'sem artefato de importacao em Temp\ (nem subpastas) e sem wrapper local Invoke-*KbXpzImport.ps1'
 $importArtifactNames = @('import.json', 'import.log', 'import.monitor.log', 'import-real.msbuild', 'import-preview.msbuild', 'msbuild.import.signals.json')
 $importArtifact = $null
 if (Test-Path -LiteralPath $postBuildTempRoot -PathType Container) {
@@ -707,21 +711,9 @@ if (Test-Path -LiteralPath $importScriptsDir -PathType Container) {
     $importWrapper = Get-ChildItem -LiteralPath $importScriptsDir -File -Filter 'Invoke-*KbXpzImport.ps1' -ErrorAction SilentlyContinue |
         Select-Object -First 1
 }
-$importDocHit = $null
-foreach ($importDocName in @('AGENTS.md', 'README.md')) {
-    $importDocPath = Join-Path $KbRoot $importDocName
-    if (Test-Path -LiteralPath $importDocPath -PathType Leaf) {
-        $importDocText = Get-Content -LiteralPath $importDocPath -Raw
-        if ($importDocText -match '(?i)importa..o headless|msbuild import|xpz-msbuild-import-export|Invoke-GeneXusXpzImport') {
-            $importDocHit = $importDocName
-            break
-        }
-    }
-}
 $importParts = @()
 if ($null -ne $importArtifact) { $importParts += ('artefato de importacao: {0}' -f [System.IO.Path]::GetRelativePath($KbRoot, $importArtifact.FullName)) }
 if ($null -ne $importWrapper) { $importParts += ('wrapper local: scripts\{0}' -f $importWrapper.Name) }
-if ($null -ne $importDocHit) { $importParts += ('referencia documental: {0}' -f $importDocHit) }
 if ($importParts.Count -gt 0) {
     $importMsbuildStatus = 'ADOTADO'
     $importMsbuildEvidence = $importParts -join ' | '

@@ -24,9 +24,10 @@ processo; quem grava na KB é o próprio GeneXus. Essa distinção é intenciona
 proibir o agente de manipular arquivos diretamente não proíbe invocar operações
 GeneXus autorizadas pelo usuário. Em toda chamada de `Invoke-GeneXusKbBuildAll.ps1` e
 `Invoke-GeneXusKbSpecifyGenerate.ps1`, passar `-ParallelKbRoot` apontando para a raiz desta
-pasta; sem ele, o registro de eventos pós-build não é consultado e o wrapper avisa. Com ele, o
-wrapper grava também uma cópia do diagnóstico em `Temp\xpz-msbuild-build\`, que é onde a
-auditoria de setup procura o build mais recente.
+pasta. Sem ele e sem `-KbMetadataPath`, o registro de eventos pós-build não é consultado e o
+wrapper avisa. Só com `-ParallelKbRoot` o wrapper grava também uma cópia do diagnóstico em
+`Temp\xpz-msbuild-build\`, que é o caminho garantido para a auditoria de setup achar o build
+mais recente.
 
 ## Estrutura funcional da pasta paralela da KB
 

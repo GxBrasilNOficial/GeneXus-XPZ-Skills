@@ -516,12 +516,17 @@ kb_environment_post_build_event_hashes: NETFrameworkSQLServer=$pbFamily1
   Assert-True ($rab.json.'importacao_msbuild' -eq 'ADOTADO') "AB: ADOTADO esperado com wrapper local de importacao; obtido $($rab.json.'importacao_msbuild')"
   Assert-True ([string]$rab.json.'importacao_msbuild.evidencia' -match 'wrapper local') "AB: evidencia deve citar o wrapper"
 
-  # AC: referencia documental a importacao headless -> ADOTADO
+  # AC: referencia documental a importacao headless nao conta -> NAO_ADOTADO (o modelo AGENTS.md.example ja traz
+  # instrucoes genericas de importacao; contar a referencia daria ADOTADO a toda pasta criada a partir dele)
   $ac = New-SetupAuditFixture -GateText $pbGateText
   [System.IO.File]::WriteAllText((Join-Path $ac.Root 'AGENTS.md'), "Fluxo: skill xpz-msbuild-import-export.`n", $utf8NoBom)
   $rac = & $pbRun $ac
-  Assert-True ($rac.json.'importacao_msbuild' -eq 'ADOTADO') "AC: ADOTADO esperado com referencia documental; obtido $($rac.json.'importacao_msbuild')"
-  Assert-True ([string]$rac.json.'importacao_msbuild.evidencia' -match 'referencia documental') "AC: evidencia deve citar a referencia documental"
+  Assert-True ($rac.json.'importacao_msbuild' -eq 'NAO_ADOTADO') "AC: NAO_ADOTADO esperado so com referencia documental; obtido $($rac.json.'importacao_msbuild')"
+  # AC2: AGENTS.md copiado do modelo oficial, sem artefato nem wrapper -> NAO_ADOTADO
+  $ac2 = New-SetupAuditFixture -GateText $pbGateText
+  Copy-Item -LiteralPath (Join-Path (Split-Path -Parent $PSScriptRoot) 'xpz-kb-parallel-setup\examples\AGENTS.md.example') -Destination (Join-Path $ac2.Root 'AGENTS.md')
+  $rac2 = & $pbRun $ac2
+  Assert-True ($rac2.json.'importacao_msbuild' -eq 'NAO_ADOTADO') "AC2: NAO_ADOTADO esperado com AGENTS.md do modelo; obtido $($rac2.json.'importacao_msbuild') / $($rac2.json.'importacao_msbuild.evidencia')"
 
   # AD: nenhuma evidencia -> NAO_ADOTADO
   $ad = New-SetupAuditFixture -GateText $pbGateText
@@ -674,6 +679,9 @@ kb_environment_post_build_event_hashes: NETFrameworkSQLServer=$pbFamily1
   Assert-True ($rao.json.'pos-build/base' -eq 'NAO_APTO') "AO: status agregado NAO_APTO esperado com um environment nao apto; obtido $($rao.json.'pos-build/base')"
   Assert-True ([string]$rao.json.'pos-build/base.evidencia' -match 'EnvA: apto') "AO: evidencia deve marcar EnvA como apto; obtido $($rao.json.'pos-build/base.evidencia')"
   Assert-True ([string]$rao.json.'pos-build/base.evidencia' -match 'EnvB: nao apto') "AO: evidencia deve marcar EnvB como nao apto; obtido $($rao.json.'pos-build/base.evidencia')"
+  # O rotulo identifica o JSON avaliado (caminho relativo a Temp\), nao so a pasta pai.
+  Assert-True ([string]$rao.json.'pos-build/base.evidencia' -match 'build Temp\\build-EnvA\\build\.json') "AO: evidencia deve citar o JSON avaliado de EnvA; obtido $($rao.json.'pos-build/base.evidencia')"
+  Assert-True ([string]$rao.json.'pos-build/registro.evidencia' -match 'Temp\\build-EnvB\\build\.json') "AO: pos-build/registro.evidencia deve citar o JSON de EnvB; obtido $($rao.json.'pos-build/registro.evidencia')"
 
   # AP: environment ja registrado (available) com evento novo fora do campo -> pos-build/registro PENDENTE
   $ap = New-SetupAuditFixture -GateText $pbGateText
