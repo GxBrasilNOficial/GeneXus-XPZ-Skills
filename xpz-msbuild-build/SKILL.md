@@ -602,8 +602,10 @@ registro ou quando o registro não foi consultado (`metadataNotProvided`, `envir
 O diagnóstico de `Invoke-GeneXusKbBuildAll.ps1` e de `Invoke-GeneXusKbSpecifyGenerate.ps1` traz também
 `pendingCauses`, a lista das causas da pendência, em vocabulário fechado: `postBuildEvent`, `stderr`, `alert`,
 `buildAllMarkerMissing` e `staticCompressor` (só BuildAll), e `postProcessingFailed`. A lista é vazia quando o
-build fica limpo. O veredito de base do registro de eventos pós-build lê esse campo, e não o texto do `summary`,
-que no SpecifyGenerate é genérico. Os JSONs de recuperação (falha de serialização do diagnóstico) não trazem o
+build fica limpo, com uma exceção: quando só o pós-processamento do wrapper falha, o status continua `compilou limpo`
+ou `specify e generate concluídos`, com `postProcessingFailed=true` no topo do JSON e na lista. O veredito de base
+do registro de eventos pós-build lê esse campo, e não o texto do `summary`, que no SpecifyGenerate é genérico, e
+recusa qualquer build com `postProcessingFailed` (no topo do JSON ou na lista), seja qual for o status. Os JSONs de recuperação (falha de serialização do diagnóstico) não trazem o
 campo.
 Evidência observada: em GeneXus 18 Up 15, o contorno `Verify-GxJs` pode emitir a mesma
 linha funcional com variação apenas em contagens e no tempo, com `invalidos: 0`. Essa evidência

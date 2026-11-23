@@ -375,6 +375,12 @@ function Get-GeneXusPostBuildBaseFacts {
     $statusText = ''
     if ($null -ne $BuildJson.PSObject.Properties['status'] -and $null -ne $BuildJson.status) { $statusText = [string]$BuildJson.status }
 
+    # postProcessingFailed (topo do JSON): o wrapper mantem o status limpo quando so o pos-processamento falha.
+    $postProcessingFailed = $null
+    if ($null -ne $BuildJson.PSObject.Properties['postProcessingFailed'] -and $null -ne $BuildJson.postProcessingFailed) {
+        $postProcessingFailed = $BuildJson.postProcessingFailed
+    }
+
     # pendingCauses: $null quando o JSON nao traz o campo (build anterior a ele); senao, a lista (pode ser vazia).
     $pendingCauses = $null
     if ($null -ne $BuildJson.PSObject.Properties['pendingCauses'] -and $null -ne $BuildJson.pendingCauses) {
@@ -401,6 +407,7 @@ function Get-GeneXusPostBuildBaseFacts {
         msBuildExitCode = $msBuildExitCode
         msBuildFailed   = $msBuildFailed
         statusText      = $statusText
+        postProcessingFailed = $postProcessingFailed
         pendingCauses   = $pendingCauses
         registryState   = $registryState
         unexpectedCount = $unexpectedCount
@@ -415,6 +422,8 @@ function Get-GeneXusPostBuildBaseVerdict {
     # ja registrado, evento novo ou mudado) ou noEntryForEnvironment (environment sem registro). Qualquer outra causa
     # (stderr, alert, buildAllMarkerMissing, staticCompressor, postProcessingFailed) ou JSON sem pendingCauses nao serve.
     # A decisao e pelo campo estruturado, nunca pelo texto do summary (o SpecifyGenerate usa summary generico).
+    # Falha no pos-processamento do wrapper (postProcessingFailed no topo do JSON ou em pendingCauses) nunca serve,
+    # qualquer que seja o status: o wrapper mantem o status limpo nesse caso, mas os sinais podem estar incompletos.
     param([Parameter(Mandatory = $true)]$Facts)
 
     if ($null -eq $Facts.exitCode -or "$($Facts.exitCode)" -ne '0') {
@@ -425,6 +434,16 @@ function Get-GeneXusPostBuildBaseVerdict {
     }
     if ($null -ne $Facts.msBuildFailed -and [bool]$Facts.msBuildFailed) {
         return [pscustomobject]@{ ok = $false; reason = 'executionEvidence.msBuildFailed verdadeiro' }
+    }
+    $postProcessingFailedFact = $false
+    if ($null -ne $Facts.PSObject.Properties['postProcessingFailed'] -and $null -ne $Facts.postProcessingFailed -and [bool]$Facts.postProcessingFailed) {
+        $postProcessingFailedFact = $true
+    }
+    if ($null -ne $Facts.pendingCauses -and (@($Facts.pendingCauses) -contains 'postProcessingFailed')) {
+        $postProcessingFailedFact = $true
+    }
+    if ($postProcessingFailedFact) {
+        return [pscustomobject]@{ ok = $false; reason = 'pos-processamento do wrapper falhou (postProcessingFailed); os sinais do build podem estar incompletos' }
     }
     if ($Facts.statusText -match '^compilou limpo$') {
         return [pscustomobject]@{ ok = $true; reason = 'status compilou limpo' }

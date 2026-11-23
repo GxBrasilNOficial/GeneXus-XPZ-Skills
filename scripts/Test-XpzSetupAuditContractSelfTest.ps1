@@ -405,6 +405,7 @@ kb_environment_post_build_event_hashes: NETFrameworkSQLServer=$pbFamily1
       }
     }
     if ($Spec.ContainsKey('PendingCauses')) { $doc['pendingCauses'] = @($Spec['PendingCauses']) }
+    if ($Spec.ContainsKey('PostProcessingFailed')) { $doc['postProcessingFailed'] = [bool]$Spec['PostProcessingFailed'] }
     if ($null -ne $Spec.MsBuildExitCode) {
       $doc['executionEvidence'] = [ordered]@{ msBuildExitCode = $Spec.MsBuildExitCode; msBuildFailed = ($Spec.ContainsKey('MsBuildFailed') -and [bool]$Spec['MsBuildFailed']) }
     }
@@ -455,6 +456,21 @@ kb_environment_post_build_event_hashes: NETFrameworkSQLServer=$pbFamily1
   $rs9 = & $pbBase @{ ExitCode = 0; Status = $pbSgRecovery; MsBuildExitCode = 0; RegistryState = $null; Unexpected = @() }
   Assert-True ($rs9.json.'pos-build/base' -eq 'NAO_APTO') "S9: NAO_APTO esperado para status de recuperacao; obtido $($rs9.json.'pos-build/base')"
   Assert-True ([string]$rs9.json.'pos-build/base.evidencia' -match 'status nao previsto') "S9: evidencia deve citar status nao previsto"
+
+  # S10 a S12: falha no pos-processamento do wrapper com status limpo (o wrapper mantem o status) -> NAO_APTO
+  $rs10 = & $pbBase @{ ExitCode = 0; Status = 'compilou limpo'; PendingCauses = @('postProcessingFailed'); PostProcessingFailed = $true; MsBuildExitCode = 0; RegistryState = 'available'; Unexpected = @() }
+  Assert-True ($rs10.json.'pos-build/base' -eq 'NAO_APTO') "S10: NAO_APTO esperado para compilou limpo com postProcessingFailed; obtido $($rs10.json.'pos-build/base')"
+  Assert-True ([string]$rs10.json.'pos-build/base.evidencia' -match 'postProcessingFailed') "S10: evidencia deve citar postProcessingFailed"
+  # S11: so o campo do topo do JSON (sem pendingCauses)
+  $rs11 = & $pbBase @{ ExitCode = 0; Status = 'compilou limpo'; PostProcessingFailed = $true; MsBuildExitCode = 0; RegistryState = 'available'; Unexpected = @() }
+  Assert-True ($rs11.json.'pos-build/base' -eq 'NAO_APTO') "S11: NAO_APTO esperado com postProcessingFailed so no topo; obtido $($rs11.json.'pos-build/base')"
+  # S12: SpecifyGenerate limpo, so em pendingCauses
+  $pbSgClean = 'specify e generate conclu' + [char]0x00ED + 'dos'
+  $rs12 = & $pbBase @{ ExitCode = 0; Status = $pbSgClean; PendingCauses = @('postProcessingFailed'); MsBuildExitCode = 0; RegistryState = 'available'; Unexpected = @() }
+  Assert-True ($rs12.json.'pos-build/base' -eq 'NAO_APTO') "S12: NAO_APTO esperado para SpecifyGenerate limpo com postProcessingFailed em pendingCauses; obtido $($rs12.json.'pos-build/base')"
+  # Controle: compilou limpo com postProcessingFailed=false continua APTO
+  $rs13 = & $pbBase @{ ExitCode = 0; Status = 'compilou limpo'; PendingCauses = @(); PostProcessingFailed = $false; MsBuildExitCode = 0; RegistryState = 'available'; Unexpected = @() }
+  Assert-True ($rs13.json.'pos-build/base' -eq 'APTO') "S13: APTO esperado com postProcessingFailed falso; obtido $($rs13.json.'pos-build/base') / $($rs13.json.'pos-build/base.evidencia')"
 
   $rt = & $pbBase @{ ExitCode = 0; Status = $pbPending; MsBuildExitCode = 0; RegistryState = $null; Unexpected = @() }
   Assert-True ($rt.json.'pos-build/base' -eq 'NAO_APTO') "T: NAO_APTO esperado sem registryStatus; obtido $($rt.json.'pos-build/base')"

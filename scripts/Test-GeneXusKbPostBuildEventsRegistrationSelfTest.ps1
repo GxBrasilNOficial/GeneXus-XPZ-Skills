@@ -177,6 +177,7 @@ try {
         @{ Name = 'pendente por outra causa (stderr)'; Mutate = { param($o) $o['status'] = 'operacao concluida, pendente de confirmacao funcional'; $o['pendingCauses'] = @('stderr', 'postBuildEvent'); $o['stdoutSignals']['postBuildEventClassification'] = [ordered]@{ registryStatus = [ordered]@{ state = 'available' }; unexpected = @('x') } }; Match = 'causa alem de evento' }
         @{ Name = 'pendente com compressor de estaticos'; Mutate = { param($o) $o['status'] = 'operacao concluida, pendente de confirmacao funcional'; $o['pendingCauses'] = @('postBuildEvent', 'staticCompressor'); $o['stdoutSignals']['postBuildEventClassification'] = [ordered]@{ registryStatus = [ordered]@{ state = 'available' }; unexpected = @('x') } }; Match = 'staticCompressor' }
         @{ Name = 'pendente sem pendingCauses'; Mutate = { param($o) $o['status'] = 'operacao concluida, pendente de confirmacao funcional'; $o['stdoutSignals']['postBuildEventClassification'] = [ordered]@{ registryStatus = [ordered]@{ state = 'available' }; unexpected = @('x') } }; Match = 'sem pendingCauses' }
+        @{ Name = 'compilou limpo com falha no pos-processamento'; Mutate = { param($o) $o['postProcessingFailed'] = $true; $o['pendingCauses'] = @('postProcessingFailed') }; Match = 'postProcessingFailed' }
     )
     foreach ($case in $nonBaseCases) {
         $obj = [ordered]@{
