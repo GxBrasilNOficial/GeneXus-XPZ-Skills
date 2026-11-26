@@ -25,13 +25,15 @@ Após a confirmação, retome cada dúvida da primeira passada. Para cada uma, a
 
 Se uma dúvida tiver mais de um ponto, indique o resultado de cada ponto. Uma resposta parcial deixa os demais em aberto. Antes de propor a atualização do registro, apresente ao responsável todas as dúvidas que continuam abertas e, ao gravar, registre também as pendências que ele decidir manter.
 
-Uma evidência pode cobrir o ponto indiretamente, desde que esse vínculo seja demonstrado. Uma resposta sobre intenção não comprova, por si só, a cobertura de um build. Uma contagem igual não comprova que as ocorrências de um aviso sejam as mesmas. Leve ao responsável as questões ainda abertas, uma por vez e com a evidência da dúvida.
+Mantenha explícitos os arquivos e trechos do delta que você não examinou: uma decisão ou revisão anterior pode esclarecer a intenção, mas não constitui leitura própria nem completa sua cobertura. Se não for possível examiná-los, mantenha a revisão como parcial e apresente essa limitação ao responsável.
+
+Uma evidência pode cobrir o ponto indiretamente, desde que esse vínculo seja demonstrado. Distinga a decisão sobre intenção da evidência de build ou de teste funcional que a dúvida também exigir; intenção, por si só, não comprova nenhum dos dois. Informe o cenário coberto pelo teste ou apresente a necessidade de teste que continua aberta, inclusive quando o responsável decidir mantê-la como pendência. Uma contagem igual não comprova que as ocorrências de um aviso sejam as mesmas. Leve ao responsável as questões ainda abertas, uma por vez e com a evidência da dúvida.
 
 ## Decidir sobre whitespace do acervo
 
 Quando o G4 emitir `warn`, confira o `detail[]` na saída JSON. Proponha o aceite específico se os diagnósticos forem exclusivamente de whitespace no fim de linha em XMLs sob `acervoDirName` e houver evidência da origem oficial, como a mesma linha no XML exportado ou no commit de materialização correspondente. Linhas `unparsed` que apenas reproduzem o trecho de um diagnóstico identificado podem ser reconhecidas como contexto. Se sobrar uma linha sem explicação ou houver outro tipo de ocorrência, siga a [triagem normal de G4](fase1-mecanica.md#tabela-de-gates). Isso inclui avisos em XML novo da frente.
 
-Registre o aceite explícito do responsável para a rodada. Preserve o acervo e o resultado `warn`. Se houver suspeita de alteração funcional, trate-a pelo fluxo oficial da KB.
+Registre o aceite explícito do responsável. Em rodada posterior, reaproveite-o sem pedir novo aceite quando sua abrangência cobrir os diagnósticos atuais e houver evidência dessa cobertura; informe o `warn` e o aceite aplicado. Mudança ou igualdade de contagem, sozinha, não demonstra cobertura. Apresente para decisão as ocorrências cuja cobertura pelo aceite anterior não puder ser demonstrada; silêncio não é aceite. Preserve o acervo e o resultado `warn`. Se houver suspeita de alteração funcional, trate-a pelo fluxo oficial da KB.
 
 ## Registrar as decisões
 
