@@ -1,14 +1,22 @@
 # Revisão de fechamento de versão da KB
 
-Quando o responsável pedir explicitamente a revisão de fechamento de uma versão da KB, apresente o relatório da pré-push de pasta paralela e prossiga com a análise e as perguntas. A pré-push comum termina no relatório. Cumpra a [precondição de setup](../xpz-kb-parallel-setup/SKILL.md) antes de trabalhar na pasta paralela. Se o setup bloquear, resolva a precondição antes de iniciar a revisão. Se a Fase 1 da pré-push indicar `blocked`, o push fica proibido e a revisão pode prosseguir como diagnóstico com os insumos válidos.
+Quando o responsável pedir explicitamente a revisão de fechamento de uma versão da KB, apresente o relatório da pré-push de pasta paralela e conduza as duas etapas abaixo. A pré-push comum termina no relatório. Cumpra a [precondição de setup](../xpz-kb-parallel-setup/SKILL.md) antes de trabalhar na pasta paralela. Se o setup bloquear, resolva a precondição antes de iniciar a revisão. Se a Fase 1 da pré-push indicar `blocked`, o push fica proibido e a revisão pode prosseguir como diagnóstico com os insumos válidos.
 
-## Identificar e revisar o delta
+## Primeira passada no delta
 
 - Siga as Fases 1, 2a, 2b e 2c do [fluxo da skill](SKILL.md). Use o fetch padrão do orquestrador e registre o `fetchStatus` e os hashes completos da `BaseRef` e do `HEAD` logo após a Fase 1. Se usar `-SkipFetch` por escolha consciente, identifique a referência como local. Reaproveite uma rodada quando as referências e os insumos locais relevantes ainda corresponderem ao estado avaliado. Se mudarem ou houver dúvida sobre o estado avaliado, repita as verificações afetadas.
 - Identifique a versão pelo pedido ou pela convenção da KB. Se o escopo da versão diferir de `BaseRef..HEAD` da pré-push, combine com o responsável o commit que serve de base para a comparação e o commit final da versão. Use `git diff <base-da-versão>..<fim-da-versão>` para a leitura estática do que ficou fora da rodada. Use a base da pré-push nas verificações mecânicas e, na Fase 2b, use no comparador a mesma `BaseRef` e o mesmo acervo da Fase 1, com `-BaseRef` e `-AcervoDirName` quando divergirem dos padrões.
-- F1 e K11 selecionam caminhos pelo intervalo Git e leem o conteúdo atual desses arquivos no disco. A Fase 2a também lê o disco. Quando mudanças locais relevantes afetarem uma verificação, vincule seu resultado ao estado local e revalide antes de atribuí-lo ao commit da versão. A 2c ajuda a priorizar a leitura. Investigue os demais objetos e arquivos relevantes e registre as exclusões.
+- F1 e K11 selecionam caminhos pelo intervalo Git e leem o conteúdo atual desses arquivos no disco. A Fase 2a também lê o disco. Quando mudanças locais relevantes afetarem uma verificação, vincule seu resultado ao estado local e revalide antes de atribuí-lo ao commit da versão. A 2c ajuda a priorizar a leitura dos objetos e arquivos relevantes.
 
-Faça uma primeira passada no delta e anote suas próprias dúvidas e suspeitas antes de ler as perguntas e respostas de rodadas anteriores. Se precisar do registro para identificar a versão, consulte primeiro apenas o cabeçalho e o intervalo revisado. Depois da primeira passada, confronte seus achados com as decisões anteriores. Se uma resposta ainda se aplicar ao trecho e ao estado em revisão, aproveite-a. Leve ao responsável, uma por vez e com a evidência da dúvida, as questões novas ou as que a evidência atual reabrir.
+A primeira passada serve para você formar seu próprio parecer sobre possíveis lacunas, erros e regressões. Ler as conclusões anteriores primeiro pode concentrar sua atenção nos problemas que outros revisores já levantaram e fazer passar despercebido um problema novo.
+
+Antes de ler as perguntas e respostas anteriores, examine o conteúdo dos diffs selecionados. A listagem de arquivos, o `git diff --stat` e a classificação por checksum ajudam a escolher o que ler. Para identificar a versão ou o intervalo pelo registro, siga o limite de leitura indicado no [gatilho da skill](SKILL.md#triggers).
+
+Entregue ao responsável o parecer da primeira passada, com o intervalo revisado, os objetos e arquivos efetivamente lidos, o que ficou de fora e as dúvidas ou suspeitas encontradas. Se a lista de suspeitas estiver vazia, informe isso. Termine a resposta perguntando: «Posso agora consultar o registro anterior e confrontar as decisões com esta primeira passada?» Aguarde a confirmação antes de abrir as perguntas e respostas.
+
+## Confrontar com o registro anterior
+
+Após a confirmação, consulte o registro e indique quais achados ele esclarece, quais decisões a evidência atual reabre e o que ainda depende de evidência ou decisão do responsável. Aproveite uma resposta quando ela ainda se aplicar ao trecho e ao estado em revisão. Leve ao responsável, uma por vez e com a evidência da dúvida, as questões novas ou reabertas.
 
 ## Decidir sobre whitespace do acervo
 

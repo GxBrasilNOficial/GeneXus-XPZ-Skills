@@ -39,7 +39,7 @@ Use esta skill para:
 - Interpretar o `pushReadiness` e os gates de uma rodada já executada
 - Conduzir a [revisão de fechamento de versão da KB](fechamento-de-versao.md) quando pedida explicitamente
 
-Ao receber um pedido de fechamento de versão, leia primeiro o roteiro vinculado. Se precisar do registro anterior para identificar a versão ou o intervalo, consulte somente o cabeçalho. Leia as perguntas e respostas anteriores depois de examinar o delta por conta própria e anotar suas dúvidas e suspeitas.
+Ao receber um pedido de fechamento de versão, leia primeiro o roteiro vinculado. Entregue o parecer da primeira passada ao usuário, encerre a resposta e aguarde a confirmação para abrir as perguntas e respostas anteriores. Se precisar de um dado do cabeçalho para identificar a versão ou o intervalo, solicite à ferramenta apenas um trecho que termine antes das perguntas e respostas. Se não puder isolar esse trecho, adie a leitura do registro.
 
 Do NOT use esta skill para:
 - A rotina pré-push do **repositório de skills** `GeneXus-XPZ-Skills` (use o documento [`13-revisao-pre-push.md`](../13-revisao-pre-push.md) e, opcionalmente, o tier reforçado [`14`](../14-revisao-pre-push-reforcada.md))
