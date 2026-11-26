@@ -10,13 +10,13 @@ Quando o responsável pedir explicitamente a revisão de fechamento de uma vers�
 
 A primeira passada serve para você formar seu próprio parecer sobre possíveis lacunas, erros e regressões. Ler as conclusões anteriores primeiro pode concentrar sua atenção nos problemas que outros revisores já levantaram e fazer passar despercebido um problema novo.
 
-Antes de ler as perguntas e respostas anteriores, examine o conteúdo dos diffs selecionados. A listagem de arquivos, o `git diff --stat` e a classificação por checksum ajudam a escolher o que ler. Para identificar a versão ou o intervalo pelo registro, siga o limite de leitura indicado no [gatilho da skill](SKILL.md#triggers).
+Antes de abrir o registro anterior, examine o conteúdo dos diffs selecionados. A listagem de arquivos, o `git diff --stat` e a classificação por checksum ajudam a escolher o que ler. Identifique a versão pelo pedido e o intervalo pelo Git; se a base da versão estiver ambígua, pergunte ao responsável. Se o corpo do registro já tiver sido exibido, informe isso e trate a passada como assistida pelo histórico.
 
 Entregue ao responsável o parecer da primeira passada, com o intervalo revisado, os objetos e arquivos efetivamente lidos, o que ficou de fora e as dúvidas ou suspeitas encontradas. Se a lista de suspeitas estiver vazia, informe isso. Termine a resposta perguntando: «Posso agora consultar o registro anterior e confrontar as decisões com esta primeira passada?» Aguarde a confirmação antes de abrir as perguntas e respostas.
 
 ## Confrontar com o registro anterior
 
-Após a confirmação, consulte o registro e indique quais achados ele esclarece, quais decisões a evidência atual reabre e o que ainda depende de evidência ou decisão do responsável. Aproveite uma resposta quando ela ainda se aplicar ao trecho e ao estado em revisão. Leve ao responsável, uma por vez e com a evidência da dúvida, as questões novas ou reabertas.
+Após a confirmação, consulte o registro e indique quais achados ele esclarece, quais decisões a evidência atual reabre e o que ainda depende de evidência ou decisão do responsável. Aproveite uma resposta quando ela ainda se aplicar ao trecho e ao estado em revisão. Cada dúvida da primeira passada continua em aberto até haver evidência que responda ao ponto específico ou decisão explícita do responsável de encerrar com a pendência. Leve ao responsável, uma por vez e com a evidência da dúvida, as questões novas ou reabertas.
 
 ## Decidir sobre whitespace do acervo
 
