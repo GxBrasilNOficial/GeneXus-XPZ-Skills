@@ -1,6 +1,6 @@
 # Relatório de pré-push de pasta paralela — PRIMEIRA PASSADA (molde)
 
-> Molde de relatório da **primeira passada** de uma rodada de pré-push de pasta paralela de KB (estilo do experimento-001). Preencher com a saída real do orquestrador e dos motores; **não** inventar números. Apresentar ao usuário e **parar** — correções/push só após autorização explícita.
+> Molde de relatório da **primeira passada** de uma rodada de pré-push de pasta paralela de KB (estilo do experimento-001). Preencher com a saída real do orquestrador e dos motores. A rodada termina com a entrega do relatório. Se houver pedido explícito de fechamento de versão, [prossiga com a revisão](../fechamento-de-versao.md).
 
 ## Identificação da rodada
 

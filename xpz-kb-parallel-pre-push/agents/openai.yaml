@@ -1,7 +1,7 @@
 interface:
   display_name: "XPZ KB Parallel Pre-Push"
-  short_description: "Validate a KB parallel-folder before push (phases 1/2a/2b/2c; 2c is agent triage, not a gate)."
-  default_prompt: "Use $xpz-kb-parallel-pre-push to validate the GeneXus KB parallel-folder state before pushing that KB (Phase 1 gates, 2a hygiene, 2b regime classifier, 2c obvious-regression triage in the report — not a proof/gate; not the skills repo pre-push)."
+  short_description: "Validate a GeneXus KB parallel folder before push or review a KB release on explicit request."
+  default_prompt: "Use $xpz-kb-parallel-pre-push for a GeneXus KB parallel folder. Report phases 1, 2a, 2b and 2c, with 2c as agent triage. Follow fechamento-de-versao.md only when the user explicitly asks for a KB release review."
 
 policy:
   allow_implicit_invocation: true

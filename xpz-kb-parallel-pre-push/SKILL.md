@@ -1,6 +1,6 @@
 ---
 name: xpz-kb-parallel-pre-push
-description: Valida o estado de uma pasta paralela de KB GeneXus antes do push (rotina pré-push de pasta paralela) — Fase 1 (orquestrador de gates mecânicos), Fase 2a (higiene), Fase 2b (classificador de regime) e Fase 2c (caça a regressão óbvia no relatório, triagem de agente, não gate); não é a rotina pré-push do repositório de skills (documento 13)
+description: Valida a pré-push de uma pasta paralela de KB GeneXus (Fase 1 mecânica, 2a higiene, 2b classificação, 2c triagem de regressão). Inclui revisão de fechamento de versão da KB sob pedido explícito. A pré-push do repositório de skills segue o documento 13.
 ---
 
 # xpz-kb-parallel-pre-push
@@ -37,6 +37,7 @@ Use esta skill para:
 - Rodar a Fase 1 mecânica (orquestrador de gates) sobre uma pasta paralela
 - Fazer a triagem estrutural (Fase 2a), a classificação de regime (Fase 2b) e a caça a regressão óbvia (Fase 2c, triagem de agente) de um conjunto de mudanças da pasta paralela antes do push
 - Interpretar o `pushReadiness` e os gates de uma rodada já executada
+- Conduzir a [revisão de fechamento de versão da KB](fechamento-de-versao.md) quando pedida explicitamente
 
 Do NOT use esta skill para:
 - A rotina pré-push do **repositório de skills** `GeneXus-XPZ-Skills` (use o documento [`13-revisao-pre-push.md`](../13-revisao-pre-push.md) e, opcionalmente, o tier reforçado [`14`](../14-revisao-pre-push-reforcada.md))
@@ -55,25 +56,25 @@ Do NOT use esta skill para:
 - Para os gates **K8/K9**, reconhecer que a resolução do wrapper local tem 4 desfechos (`config` / `config` apontando arquivo inexistente=block / `convention` com exatamente 1 candidato=ok / `none` ou `ambiguous`=block) e encaminhar correção de wrapper à `xpz-kb-parallel-setup`.
 - Não declarar push liberado quando `pushReadiness` ≠ `ready`; `warn` exige decisão consciente do usuário, `blocked` proíbe push até saneamento.
 - Após a Fase 2b, executar a Fase 2c (caça a regressão óbvia — ver `fase2c-caca-regressao-agente.md`): triagem de agente no relatório; **não** altera `pushReadiness` e **não** substitui Fase 1, build nem teste funcional.
-- Apresentar relatório por rodada (ver moldes em `examples/`) e parar; correções e push só após autorização explícita.
+- Apresentar o relatório da rodada (ver moldes em `examples/`). Quando houver pedido explícito de fechamento, seguir o [roteiro de revisão](fechamento-de-versao.md).
 
 ---
 
 ## WORKFLOW (uma rodada de pré-push de pasta paralela)
 
 1. Confirmar que o alvo é uma **pasta paralela de KB** (não o repositório de skills → nesse caso, usar o documento 13). Se a pasta ainda não estiver montada/validada, parar e usar `xpz-kb-parallel-setup`.
-2. Garantir referência remota fresca: `git -C <pasta-paralela> fetch origin` antes de rodar (ou usar `-SkipFetch` conscientemente, assumindo a `BaseRef` local).
+2. Usar o fetch padrão do orquestrador ou escolher conscientemente `-SkipFetch`, assumindo a `BaseRef` local.
 3. Rodar o orquestrador: `pwsh -File <repo-skills>\scripts\Invoke-XpzKbParallelPrePushPhase1.ps1 -RepoRoot <pasta-paralela>` (JSON de máquina por padrão; `-AsText` para leitura humana).
 4. Ler `pushReadiness`:
    - `ready` (exit 0) → Fase 1 mecânica sem bloqueio; seguir para a triagem 2a/2b/2c.
-   - `warn` (exit 2) → há gate warn (ex.: branch≠main, working tree sujo, whitespace só no acervo ou em XML novo/adicionado da frente); reportar e pedir decisão do usuário. Em G4, `warn` não autoriza limpeza global: corrigir só linhas novas/editadas; o 9-FD decide trim forte quando houver baseline por GUID único. A triagem 2a/2b/2c ainda pode correr como diagnóstico; não desbloqueia push.
+   - `warn` (exit 2) → há gate warn (ex.: branch≠main, working tree sujo, whitespace só no acervo ou em XML novo/adicionado da frente); reportar e pedir decisão do usuário. Para G4, consulte a política de preservação na [Fase 1](fase1-mecanica.md#tabela-de-gates). A triagem 2a/2b/2c ainda pode correr como diagnóstico; não desbloqueia push.
    - `blocked` (exit 1) → há gate `block` **ou** `unknown`; push proibido até saneamento. Diagnosticar cada gate por `fase1-mecanica.md`. A triagem 2a/2b/2c ainda pode correr como diagnóstico; não desbloqueia push.
 5. Para gates **K8/K9** em `block`: se a causa for wrapper local ausente/ambíguo/defasado (`resolvedBy` = `none`/`ambiguous`, ou `resolvedBy='config'` apontando arquivo inexistente, ou contrato `-AsJson` não emitido), encaminhar à `xpz-kb-parallel-setup` (`atualizar_bootstrap_local`/`corrigir_wrapper_local`). Não editar o wrapper aqui.
    - Se **K9** bloquear por falha de rebuild/índice e o acervo tiver `Menubar/` com `type="gxlegacy/Menubar"` residual, tratar como migração pós-reclassificação (`01k` / `xpz-sync` / passo 8.g de `xpz-kb-parallel-setup`): re-sync ou limpeza **antes** de insistir no gate. Não é bug do orquestrador.
 6. Fase 2a estrutural: rodar `Test-XpzKbFrenteHygiene.ps1` (higiene de frente/pacote) — ver `fase2a-estrutural.md`. A correção dos `warn` (remover frentes não-conformes / pacotes órfãos) é a **forma canônica** via `Remove-XpzKbFrenteHygieneFindings.ps1` (dry-run com `-PlanPath`, depois `-Apply -JsonPath` sob decisão humana; envio à Lixeira por padrão; consome o JSON do motor como fonte de verdade) — **NUNCA** um passo automático desta rotina nem deleção ad-hoc.
 7. Fase 2b: classificar o regime das mudanças (`Compare-XpzChecksums` descarta `SAME` como sinal de representação — não prova conteúdo igual; roteamento por regime, build como autoridade) — ver `fase2b-classificador-de-regime.md`. É **classificador**, não selo determinístico.
 8. Fase 2c: caça a regressão óbvia (checklist de agente sobre DIFF/NEW com Source relevante; herda roteamento da 2b) — ver `fase2c-caca-regressao-agente.md`. Triagem no relatório; **não** altera `pushReadiness`; **não** prova ausência de regressão.
-9. Montar o relatório da rodada (molde em `examples/`, com seção 2c obrigatória) e **parar**. Correções e push só após autorização explícita do usuário.
+9. Apresentar o relatório da rodada (molde em `examples/`, com seção 2c obrigatória). A pré-push comum termina aqui. Se a revisão de fechamento foi pedida explicitamente, prossiga com a [análise e as perguntas](fechamento-de-versao.md). Correções e push exigem autorização explícita.
 
 ---
 
@@ -83,6 +84,7 @@ Do NOT use esta skill para:
 - [`fase2a-estrutural.md`](fase2a-estrutural.md) — `Test-XpzKbFrenteHygiene` (diagnóstico) + executor de faxina `Remove-XpzKbFrenteHygieneFindings` (correção em dois passos, Lixeira por padrão, fora da pré-push) + checklist de agente; nuance cabeça-detalhe do F1.
 - [`fase2b-classificador-de-regime.md`](fase2b-classificador-de-regime.md) — classificador de regime (F1 → roteamento → build como autoridade), catálogo de padrões aceitos por-KB.
 - [`fase2c-caca-regressao-agente.md`](fase2c-caca-regressao-agente.md) — caça a regressão óbvia (triagem de agente pós-2b; não prova; não altera `pushReadiness`).
+- [`fechamento-de-versao.md`](fechamento-de-versao.md) — roteiro complementar de revisão e registro de decisões da versão da KB, sob pedido explícito.
 
 ---
 

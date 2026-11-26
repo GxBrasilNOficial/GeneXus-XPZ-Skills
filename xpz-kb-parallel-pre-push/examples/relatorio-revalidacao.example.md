@@ -1,6 +1,6 @@
 # Relatório de pré-push de pasta paralela — RE-VALIDAÇÃO (molde)
 
-> Molde de relatório de **re-validação** (segunda passada após o usuário aplicar correções de uma primeira passada — estilo do experimento-002). O foco é o **delta**: o que mudou de status desde a passada anterior. Apresentar ao usuário e **parar**.
+> Molde de relatório de **re-validação** (segunda passada após o usuário aplicar correções de uma primeira passada — estilo do experimento-002). Registre o que mudou desde a passada anterior. A rodada termina com a entrega do relatório. Se houver pedido explícito de fechamento de versão, [prossiga com a revisão](../fechamento-de-versao.md).
 
 ## Identificação da rodada
 
