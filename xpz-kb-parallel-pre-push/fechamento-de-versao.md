@@ -18,6 +18,8 @@ Entregue ao responsável o parecer da primeira passada, com o intervalo revisado
 
 Após a confirmação, retome cada dúvida da primeira passada. Para cada uma, apresente o que foi perguntado, a evidência ou decisão anterior relacionada e explique se ela responde ao ponto no estado revisado. Indique o que foi esclarecido e o que continua pendente. Se o responsável decidir encerrar com uma pendência, registre essa decisão junto ao item.
 
+Se uma dúvida tiver mais de um ponto, indique o resultado de cada ponto. Uma resposta parcial deixa os demais em aberto. Antes de propor a atualização do registro, apresente ao responsável todas as dúvidas que continuam abertas e, ao gravar, registre também as pendências que ele decidir manter.
+
 Uma evidência pode cobrir o ponto indiretamente, desde que esse vínculo seja demonstrado. Uma resposta sobre intenção não comprova, por si só, a cobertura de um build. Uma contagem igual não comprova que as ocorrências de um aviso sejam as mesmas. Leve ao responsável as questões ainda abertas, uma por vez e com a evidência da dúvida.
 
 ## Decidir sobre whitespace do acervo
