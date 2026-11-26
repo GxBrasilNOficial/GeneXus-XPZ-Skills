@@ -39,6 +39,8 @@ Use esta skill para:
 - Interpretar o `pushReadiness` e os gates de uma rodada já executada
 - Conduzir a [revisão de fechamento de versão da KB](fechamento-de-versao.md) quando pedida explicitamente
 
+Ao receber um pedido de fechamento de versão, leia primeiro o roteiro vinculado. Se precisar do registro anterior para identificar a versão ou o intervalo, consulte somente o cabeçalho. Leia as perguntas e respostas anteriores depois de examinar o delta por conta própria e anotar suas dúvidas e suspeitas.
+
 Do NOT use esta skill para:
 - A rotina pré-push do **repositório de skills** `GeneXus-XPZ-Skills` (use o documento [`13-revisao-pre-push.md`](../13-revisao-pre-push.md) e, opcionalmente, o tier reforçado [`14`](../14-revisao-pre-push-reforcada.md))
 - Preparar, validar ou auditar a **estrutura** da pasta paralela e seus wrappers locais (use `xpz-kb-parallel-setup`)
