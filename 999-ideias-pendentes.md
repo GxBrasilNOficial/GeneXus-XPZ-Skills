@@ -13,6 +13,15 @@ Entradas legadas sem avaliação carregam `FALTA AVALIAR` em ambos os campos at�
 
 **Editar a substância de um gap já registrado (neste arquivo ou no `998-ideias-descartadas-e-porque.md`) exige justificativa no corpo do commit.** Enfraquecer, reprecisar ou descartar a severidade de uma afirmação — não apenas corrigir redação, adicionar contexto ou reorganizar — precisa dizer **por que**: nova evidência medida, releitura do código, ou correção de erro anterior. Motivo: uma edição que suaviza um gap sem dizer por que **parece resolvido** para quem lê depois, e é pior do que o gap não ter sido achado — quem lê para de investigar. Caso real (2026-08-17): um commit sem corpo trocou «não é citado em lugar nenhum» por «não era coberto na documentação normativa»; a formulação nova era defensável à primeira vista, mas escondia que a única outra menção ao símbolo no repositório era uma cópia **defasada** num self-test — a frase sugeria mitigação onde havia agravante. Só foi achado porque outra sessão foi verificar; sem corpo no commit, não havia como saber se a mudança vinha de leitura nova ou só de estilo.
 
+## Reduzir o ruído de whitespace do acervo no G4
+
+- **Importância** — média (o aviso recorrente exige triagem e decisão repetidas para whitespace que acompanha a sincronização oficial).
+- **Maturidade** — ideia (falta definir como identificar a origem oficial sem confundir outras ocorrências).
+
+O G4 de `Invoke-XpzKbParallelPrePushPhase1.ps1` classifica ocorrências pelo caminho e emite `warn` para o acervo. Em uma revisão de KB, whitespace em XMLs sincronizados a partir de XPZ exportado pela IDE gerou aviso recorrente. O responsável pediu que esse resultado da sincronização deixe de produzir ruído na pré-push.
+
+Investigar uma forma de reconhecer a origem da sincronização oficial e evitar que essas ocorrências rebaixem `pushReadiness`, preservando a classificação dos demais casos. Avaliar evidências disponíveis, alterações no contrato do motor, consumidores, documentação e testes, inclusive resultados mistos e falha na identificação de origem. A definição e implementação ficam para outra frente.
+
 <a id="timestamp-setup-com-registro-pendente-20261123"></a>
 
 ## Timestamp de setup gravado com `pos-build/registro: PENDENTE` — 2026-11-23

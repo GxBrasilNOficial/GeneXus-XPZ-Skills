@@ -41,6 +41,8 @@ Use esta skill para:
 
 Ao receber um pedido de fechamento de versão, leia primeiro o roteiro vinculado. Identifique a versão pelo pedido e o intervalo pelo Git; se a base da versão estiver ambígua, pergunte ao responsável. Entregue o parecer da primeira passada, encerre a resposta e aguarde a confirmação antes de abrir o registro anterior, inclusive seu cabeçalho. Se o corpo do registro já tiver sido exibido, informe isso e trate a passada como assistida pelo histórico.
 
+Até entregar esse parecer, delimite buscas e comandos Git para que nenhuma saída exiba conteúdo dos registros de fechamento, inclusive de outras versões. A regra e os procedimentos estão no [roteiro](fechamento-de-versao.md#primeira-passada-no-delta).
+
 Do NOT use esta skill para:
 - A rotina pré-push do **repositório de skills** `GeneXus-XPZ-Skills` (use o documento [`13-revisao-pre-push.md`](../13-revisao-pre-push.md) e, opcionalmente, o tier reforçado [`14`](../14-revisao-pre-push-reforcada.md))
 - Preparar, validar ou auditar a **estrutura** da pasta paralela e seus wrappers locais (use `xpz-kb-parallel-setup`)
