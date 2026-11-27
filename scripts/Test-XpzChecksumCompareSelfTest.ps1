@@ -8,10 +8,10 @@
 .DESCRIPTION
   Cobre a classificacao por checksum (atributo do <Object> raiz) sobre um repo
   git de fixture:
-    SAME        - checksum identico entre BaseRef e HEAD; sugere re-export, mas nao prova conteudo igual (ex.: cascata de rename).
+    SAME        - checksum identico entre BaseRef e o arquivo atual no disco; sugere re-export, mas nao prova conteudo igual (ex.: cascata de rename).
     DIFF        - checksum mudou.
-    NEW         - arquivo novo no HEAD.
-    DELETED     - arquivo removido no HEAD.
+    NEW         - arquivo novo no intervalo (presente no disco, ausente em BaseRef).
+    DELETED     - arquivo removido no intervalo (presente em BaseRef, ausente no disco).
     NO_CHECKSUM - checksum ausente nos dois lados (arquivo no diff sem atributo).
     unknown     - BaseRef inexistente -> status unknown, exit 3.
   F1 nunca bloqueia: status 'ok', exit 0 (exceto unknown).

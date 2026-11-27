@@ -3,15 +3,18 @@
 <#
 .SYNOPSIS
   Filtro F1 da Fase 2b da rotina pre-push de pasta paralela de KB (skill
-  xpz-kb-parallel-pre-push): compara o atributo checksum no <Object> raiz de XMLs
-  GeneXus do acervo entre BaseRef e HEAD.
+  xpz-kb-parallel-pre-push): seleciona XMLs do acervo no intervalo BaseRef..HEAD
+  e compara o checksum em BaseRef com o do arquivo atual no disco.
 
 .DESCRIPTION
-  Motor compartilhado, agnostico de KB. Classifica cada XML alterado como SAME
-  (checksum identico -- sugere re-export, mas nao prova conteudo igual; uma
-  cascata de rename pode alterar conteudo com o checksum igual), DIFF,
-  NEW, DELETED ou NO_CHECKSUM (checksum ausente nos dois lados). E classificador
-  puro: nao bloqueia, so rotula para triagem.
+  Motor compartilhado, agnostico de KB. Por padrao, usa git diff --name-only no
+  intervalo BaseRef..HEAD para selecionar caminhos; para cada caminho, le o
+  checksum em BaseRef (git show) e o do arquivo atual no disco. Classifica cada
+  XML como SAME (checksum identico -- sugere re-export, mas nao prova conteudo
+  igual; uma cascata de rename pode alterar conteudo com o checksum igual),
+  DIFF, NEW, DELETED ou NO_CHECKSUM (checksum ausente nos dois lados). Uma
+  alteracao local em caminho selecionado pode afetar o resultado mesmo com HEAD
+  inalterado. E classificador puro: nao bloqueia, so rotula para triagem.
 
   ATENCAO METODOLOGICA (checksum): em XMLs GeneXus exportados pela IDE o checksum
   e ATRIBUTO do elemento raiz <Object> (checksum="..."), NAO tag <Checksum>.
@@ -43,8 +46,8 @@
   Nome da pasta do acervo oficial (default: ObjetosDaKbEmXml).
 
 .PARAMETER Files
-  Lista explicita de arquivos. Se omitida, usa git diff --name-only para
-  encontrar os XML alterados no acervo entre BaseRef e HEAD.
+  Lista explicita de arquivos. Se omitida, usa git diff --name-only no intervalo
+  BaseRef..HEAD para selecionar os XML do acervo a classificar (lado novo = disco).
 
 .PARAMETER AsText
   Saida humana em texto em vez do JSON padrao.
